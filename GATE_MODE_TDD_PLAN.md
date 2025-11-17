@@ -6,16 +6,16 @@ Gate Mode is a per-step parameter that controls how gates are fired during pulse
 
 ## Gate Mode Types
 
-1. **MULTI** (0): Fires a new gate for every clock pulse
+1. **ALL** (0): Fires a new gate for every clock pulse
    - Pulse count = 4 → 4 separate gates (on-off-on-off-on-off-on-off)
 
-2. **SINGLE** (1): Single gate on first pulse only
+2. **FIRST** (1): Single gate on first pulse only
    - Pulse count = 4 → 1 gate on first pulse, silent for remaining 3
 
 3. **HOLD** (2): Gate held high for entire duration
    - Pulse count = 4 → 1 long gate spanning all 4 pulses
 
-4. **FIRST_LAST** (3): Gates on first and last pulse only
+4. **FIRSTLAST** (3): Gates on first and last pulse only
    - Pulse count = 4 → gate on pulse 1, silent on pulses 2-3, gate on pulse 4
 
 ## TDD Implementation Phases
@@ -31,18 +31,18 @@ Gate Mode is a per-step parameter that controls how gates are fired during pulse
 CASE("step stores and retrieves gate mode") {
     NoteSequence::Step step;
 
-    // Default value should be 0 (MULTI)
-    expectEqual(step.gateMode(), 0, "default gate mode should be 0 (MULTI)");
+    // Default value should be 0 (ALL)
+    expectEqual(step.gateMode(), 0, "default gate mode should be 0 (ALL)");
 
     // Test setting various values
     step.setGateMode(1);
-    expectEqual(step.gateMode(), 1, "should store gate mode 1 (SINGLE)");
+    expectEqual(step.gateMode(), 1, "should store gate mode 1 (FIRST)");
 
     step.setGateMode(2);
     expectEqual(step.gateMode(), 2, "should store gate mode 2 (HOLD)");
 
     step.setGateMode(3);
-    expectEqual(step.gateMode(), 3, "should store gate mode 3 (FIRST_LAST)");
+    expectEqual(step.gateMode(), 3, "should store gate mode 3 (FIRSTLAST)");
 }
 ```
 
@@ -159,7 +159,7 @@ CASE("gate mode integrates with Layer system") {
 
     // Test 4: layerDefaultValue
     int defaultValue = NoteSequence::layerDefaultValue(NoteSequence::Layer::GateMode);
-    expectEqual(defaultValue, 0, "default should be 0 (MULTI)");
+    expectEqual(defaultValue, 0, "default should be 0 (ALL)");
 
     // Test 5: layerValue/setLayerValue
     NoteSequence::Step step;
@@ -214,7 +214,7 @@ CASE("gate mode resets to 0 on clear") {
 
     step.clear();
 
-    expectEqual(step.gateMode(), 0, "gate mode should reset to 0 (MULTI)");
+    expectEqual(step.gateMode(), 0, "gate mode should reset to 0 (ALL)");
 }
 ```
 
@@ -224,10 +224,10 @@ CASE("gate mode resets to 0 on clear") {
 
 ## Phase 2: Engine Layer - Gate Generation Logic
 
-### Test 2.1: MULTI Mode Behavior (Conceptual/Manual)
+### Test 2.1: ALL Mode Behavior (Conceptual/Manual)
 
 **Expected Behavior:**
-- Step with pulseCount=4, gateMode=MULTI (0)
+- Step with pulseCount=4, gateMode=ALL (0)
 - Should generate 4 separate gate events:
   - Pulse 1: gate on → gate off
   - Pulse 2: gate on → gate off
@@ -237,14 +237,14 @@ CASE("gate mode resets to 0 on clear") {
 **Implementation Notes:**
 - This is the default behavior (already works with current pulse count)
 - Modify `triggerStep()` to check `step.gateMode()`
-- For MULTI: Keep current behavior (gate per pulse)
+- For ALL: Keep current behavior (gate per pulse)
 
 ---
 
-### Test 2.2: SINGLE Mode Behavior (Conceptual/Manual)
+### Test 2.2: FIRST Mode Behavior (Conceptual/Manual)
 
 **Expected Behavior:**
-- Step with pulseCount=4, gateMode=SINGLE (1)
+- Step with pulseCount=4, gateMode=FIRST (1)
 - Should generate only 1 gate on first pulse:
   - Pulse 1: gate on → gate off
   - Pulses 2-4: no gates (silent)
@@ -257,16 +257,16 @@ bool shouldFireGate = false;
 int gateMode = step.gateMode();
 
 switch (gateMode) {
-case 0: // MULTI
+case 0: // ALL
     shouldFireGate = true;  // Fire every pulse
     break;
-case 1: // SINGLE
+case 1: // FIRST
     shouldFireGate = (_pulseCounter == 0);  // Only first pulse
     break;
 case 2: // HOLD
     // Handle in gate queue logic
     break;
-case 3: // FIRST_LAST
+case 3: // FIRSTLAST
     shouldFireGate = (_pulseCounter == 0 || _pulseCounter == step.pulseCount());
     break;
 }
@@ -299,10 +299,10 @@ case 2: // HOLD
 
 ---
 
-### Test 2.4: FIRST_LAST Mode Behavior (Conceptual/Manual)
+### Test 2.4: FIRSTLAST Mode Behavior (Conceptual/Manual)
 
 **Expected Behavior:**
-- Step with pulseCount=4, gateMode=FIRST_LAST (3)
+- Step with pulseCount=4, gateMode=FIRSTLAST (3)
 - Should generate 2 gates:
   - Pulse 1: gate on → gate off
   - Pulses 2-3: no gates
@@ -319,10 +319,10 @@ case 2: // HOLD
 
 2. **Visual display:**
    - Show mode as text abbreviation:
-     - 0 → "ALL" (MULTI)
-     - 1 → "FIRST" (SINGLE)
+     - 0 → "ALL" (ALL)
+     - 1 → "FIRST" (FIRST)
      - 2 → "HOLD"
-     - 3 → "F-L" (FIRST_LAST)
+     - 3 → "F-L" (FIRSTLAST)
 
 3. **Detail overlay:**
    - Show full mode name when adjusting
@@ -341,11 +341,11 @@ case 2: // HOLD
 
 ### Manual Tests:
 
-1. **MULTI + PulseCount=1**: Should behave like normal (1 gate)
-2. **MULTI + PulseCount=4**: Should produce 4 separate gates
-3. **SINGLE + PulseCount=4**: Should produce 1 gate, step lasts 4 pulses
+1. **ALL + PulseCount=1**: Should behave like normal (1 gate)
+2. **ALL + PulseCount=4**: Should produce 4 separate gates
+3. **FIRST + PulseCount=4**: Should produce 1 gate, step lasts 4 pulses
 4. **HOLD + PulseCount=4**: Should produce 1 long gate (4 pulses long)
-5. **FIRST_LAST + PulseCount=4**: Should produce 2 gates (first and last)
+5. **FIRSTLAST + PulseCount=4**: Should produce 2 gates (first and last)
 6. **Interaction with Retrigger**: Verify retrigger works with all modes
 7. **Serialization**: Save/load project, verify gate modes preserved
 
@@ -388,7 +388,7 @@ case 2: // HOLD
 - Serialization automatic
 
 ### Default Behavior:
-- Default gateMode = 0 (MULTI)
+- Default gateMode = 0 (ALL)
 - Maintains backward compatibility (existing projects work unchanged)
 
 ---
@@ -420,5 +420,5 @@ case 2: // HOLD
 - Gate mode only affects behavior when pulseCount > 0 (multiple pulses)
 - When pulseCount = 0 (single pulse), all modes behave identically
 - HOLD mode produces the longest gate (entire pulse duration)
-- SINGLE mode is useful for melodic patterns with rhythm variation
-- FIRST_LAST mode creates interesting syncopated patterns
+- FIRST mode is useful for melodic patterns with rhythm variation
+- FIRSTLAST mode creates interesting syncopated patterns

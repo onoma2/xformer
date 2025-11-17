@@ -307,16 +307,16 @@ All phases complete:
 Gate Mode is a per-step parameter that controls how gates are fired during pulse count repetitions. Works in conjunction with pulse count to provide fine-grained control over gate timing patterns.
 
 **4 Gate Mode Types:**
-- **MULTI (0)**: Fires gates on every pulse (default, backward compatible)
-- **SINGLE (1)**: Single gate on first pulse only, silent for remaining pulses
+- **ALL (0)**: Fires gates on every pulse (default, backward compatible)
+- **FIRST (1)**: Single gate on first pulse only, silent for remaining pulses
 - **HOLD (2)**: One long gate held high for entire duration
-- **FIRST_LAST (3)**: Gates on first and last pulse only
+- **FIRSTLAST (3)**: Gates on first and last pulse only
 
 **UI Display Abbreviations:**
-- MULTI → "ALL"
-- SINGLE → "FIRST"
+- ALL → "ALL"
+- FIRST → "FIRST"
 - HOLD → "HOLD"
-- FIRST_LAST → "F-L"
+- FIRSTLAST → "F-L"
 
 ### TDD Methodology: Strict RED-GREEN-REFACTOR Cycle
 
@@ -453,10 +453,10 @@ Gate Mode is a per-step parameter that controls how gates are fired during pulse
 
 **Action Plan:**
 1. Design switch statement for 4 gate modes:
-   - MULTI (0): Current behavior (gate per pulse)
-   - SINGLE (1): Only fire gate when `_pulseCounter == 0`
+   - ALL (0): Current behavior (gate per pulse)
+   - FIRST (1): Only fire gate when `_pulseCounter == 0`
    - HOLD (2): Fire long gate on first pulse spanning all pulses
-   - FIRST_LAST (3): Fire gate when `_pulseCounter == 0 || _pulseCounter == step.pulseCount()`
+   - FIRSTLAST (3): Fire gate when `_pulseCounter == 0 || _pulseCounter == step.pulseCount()`
 
 2. Write pseudocode for implementation
 
@@ -490,10 +490,10 @@ Gate Mode is a per-step parameter that controls how gates are fired during pulse
 **Action Plan:**
 1. Build simulator: `cd build/sim/debug && make -j`
 2. Test each gate mode with pulseCount=4:
-   - MULTI: Should hear 4 separate gates
-   - SINGLE: Should hear 1 gate, step lasts 4 pulses
+   - ALL: Should hear 4 separate gates
+   - FIRST: Should hear 1 gate, step lasts 4 pulses
    - HOLD: Should hear 1 long gate (4 pulses duration)
-   - FIRST_LAST: Should hear 2 gates (first and last)
+   - FIRSTLAST: Should hear 2 gates (first and last)
 3. Verify with external MIDI monitor or audio output
 4. Document any issues found
 
@@ -562,8 +562,8 @@ Gate Mode is a per-step parameter that controls how gates are fired during pulse
 **Action Plan:**
 1. Add GateMode case to `drawDetail()` function
 2. Display full mode names when adjusting:
-   - "MULTI" or "ALL"
-   - "SINGLE" or "FIRST"
+   - "ALL" or "ALL"
+   - "FIRST" or "FIRST"
    - "HOLD"
    - "FIRST-LAST" or "F-L"
 3. Use Small font, centered display
