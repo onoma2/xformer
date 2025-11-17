@@ -186,11 +186,11 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
             canvas.setColor(Color::Bright);
             const char* modeStr;
             switch (step.gateMode()) {
-            case 0: modeStr = "ALL"; break;
-            case 1: modeStr = "FIRST"; break;
-            case 2: modeStr = "HOLD"; break;
-            case 3: modeStr = "F-L"; break;
-            default: modeStr = "ALL"; break;
+            case 0: modeStr = "A"; break;
+            case 1: modeStr = "1"; break;
+            case 2: modeStr = "H"; break;
+            case 3: modeStr = "1L"; break;
+            default: modeStr = "A"; break;
             }
             FixedStringBuilder<8> str("%s", modeStr);
             canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
@@ -723,11 +723,11 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
     case Layer::GateMode: {
         const char* modeName;
         switch (step.gateMode()) {
-        case 0: modeName = "ALL"; break;
-        case 1: modeName = "FIRST"; break;
-        case 2: modeName = "HOLD"; break;
-        case 3: modeName = "F-L"; break;
-        default: modeName = "ALL"; break;
+        case 0: modeName = "A"; break;
+        case 1: modeName = "1"; break;
+        case 2: modeName = "H"; break;
+        case 3: modeName = "1L"; break;
+        default: modeName = "A"; break;
         }
         str.reset();
         str("%s", modeName);
