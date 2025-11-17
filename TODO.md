@@ -833,11 +833,23 @@ void Accumulator::tick() const {
 
 **Result**: Default min value changed from -7 to 0. Ready for simulator testing.
 
-#### Improvement 2: Reset on STOP
-- [ ] Step 2.1: Locate STOP handler
-- [ ] Step 2.2: Write reset test (RED)
-- [ ] Step 2.3: Implement reset logic (GREEN)
-- [ ] Commit: "Reset accumulator on STOP"
+#### Improvement 2: Reset on STOP ✅ COMPLETE
+- [x] Step 2.1: Locate STOP handler (NoteTrackEngine::reset())
+- [x] Step 2.2: Write reset test (RED) - TestAccumulator.cpp
+- [x] Step 2.3: Implement reset logic (GREEN) - Accumulator::reset() + engine integration
+- [x] Ready for local testing
+
+**Implementation:**
+- Added `reset()` method to Accumulator.h/cpp
+- Resets `_currentValue` to `_minValue`
+- Resets `_pendulumDirection` to 1 (up)
+- Integrated into NoteTrackEngine::reset() for both main and fill sequences
+- Test case verifies reset behavior
+
+**Expected behavior:**
+- Pressing STOP resets accumulator to minValue
+- Predictable behavior when restarting sequence
+- Counter starts fresh each playback session
 
 #### Improvement 3: Delay First Tick
 - [ ] Step 3.1: Add _hasStarted flag to model

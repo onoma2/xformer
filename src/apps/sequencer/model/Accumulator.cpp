@@ -39,6 +39,11 @@ void Accumulator::tick() const {
     }
 }
 
+void Accumulator::reset() {
+    _currentValue = _minValue;
+    _pendulumDirection = 1; // Reset pendulum direction to up
+}
+
 void Accumulator::tickWithWrap() const {
     if (_direction == Up) {
         const_cast<Accumulator*>(this)->_currentValue += _stepValue;

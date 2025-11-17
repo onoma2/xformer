@@ -173,4 +173,23 @@ CASE("tick_with_random_order") {
     // it's implemented and doesn't crash
 }
 
+CASE("reset_accumulator") {
+    Accumulator accumulator;
+    accumulator.setMinValue(5);
+    accumulator.setMaxValue(15);
+    accumulator.setDirection(Accumulator::Direction::Up);
+    accumulator.setEnabled(true);
+    accumulator.setStepValue(2);
+
+    // Tick a few times to change currentValue
+    accumulator.tick(); // 5 -> 7
+    accumulator.tick(); // 7 -> 9
+    accumulator.tick(); // 9 -> 11
+    expectEqual(static_cast<int>(accumulator.currentValue()), 11, "currentValue should be 11 after 3 ticks");
+
+    // Reset should set currentValue back to minValue
+    accumulator.reset();
+    expectEqual(static_cast<int>(accumulator.currentValue()), 5, "currentValue should be reset to minValue (5)");
+}
+
 } // UNIT_TEST("Accumulator")

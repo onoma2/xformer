@@ -103,6 +103,14 @@ void NoteTrackEngine::reset() {
     _cvQueue.clear();
     _recordHistory.clear();
 
+    // Reset accumulator to minValue
+    if (_sequence) {
+        const_cast<Accumulator&>(_sequence->accumulator()).reset();
+    }
+    if (_fillSequence) {
+        const_cast<Accumulator&>(_fillSequence->accumulator()).reset();
+    }
+
     changePattern();
 }
 

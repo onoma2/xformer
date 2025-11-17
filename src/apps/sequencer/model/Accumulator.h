@@ -32,6 +32,7 @@ public:
     void setOrder(Order order) { _order = order; }
     void setDirection(Direction direction) { _direction = direction; }
     void tick() const;
+    void reset();
     int16_t currentValue() const { return _currentValue; }
     uint8_t stepValue() const { return _stepValue; }
     int16_t minValue() const { return _minValue; }
