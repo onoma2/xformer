@@ -692,6 +692,12 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
         canvas.setColor(Color::Bright);
         canvas.drawTextCentered(64 + 32 + 64, 32 - 4, 32, 8, str);
         break;
+    case Layer::PulseCount:
+        str.reset();
+        str("%d", step.pulseCount() + 1);
+        canvas.setFont(Font::Small);
+        canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
+        break;
     case Layer::Length:
         SequencePainter::drawLength(
             canvas,
