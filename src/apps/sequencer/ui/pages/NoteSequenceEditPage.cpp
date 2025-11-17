@@ -519,6 +519,9 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
             setLayer(Layer::Slide);
             break;
         case Layer::Slide:
+            setLayer(Layer::GateMode);
+            break;
+        case Layer::GateMode:
             setLayer(Layer::Gate);
             break;
         default:
@@ -586,6 +589,7 @@ int NoteSequenceEditPage::activeFunctionKey() {
     case Layer::GateProbability:
     case Layer::GateOffset:
     case Layer::Slide:
+    case Layer::GateMode:
         return 0;
     case Layer::Retrigger:
     case Layer::RetriggerProbability:
