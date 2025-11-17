@@ -156,28 +156,30 @@ make -j flash_bootloader
 make -j flash_sequencer
 ```
 
-## New Feature: Accumulator
+## New Features
+
+### Accumulator
 
 The PEW|FORMER firmware now includes an advanced accumulator feature that provides powerful parameter modulation capabilities:
 
-### Core Features:
+#### Core Features:
 - **Stateful Counter**: Increments/decrements based on configurable parameters
 - **Step-Triggered**: Updates when specific sequence steps are triggered
 - **Multi-Mode Operation**: Supports four distinct operational modes
 - **Real-Time Modulation**: Applies modulation to note pitch in real-time
 
-### Operational Modes:
+#### Operational Modes:
 - **Wrap**: Values wrap from max to min and vice versa
 - **Pendulum**: Bidirectional counting with direction reversal at boundaries
 - **Random**: Generates random values within min/max range when triggered
 - **Hold**: Clamps at min/max boundaries without wrapping
 
-### UI Controls:
+#### UI Controls:
 - **ACCUM Page**: Dedicated parameter editing interface with "ACCUM" header
 - **ACCST Page**: Per-step trigger configuration with "ACCST" header
 - **Integration**: Accessible via existing sequence navigation (Sequence key cycles: NoteSequence → Accumulator → AccumulatorSteps → NoteSequence)
 
-### Configuration Parameters:
+#### Configuration Parameters:
 - Enable/Disable control
 - Direction (Up, Down, Freeze)
 - Order (Wrap, Pendulum, Random, Hold)
@@ -185,6 +187,59 @@ The PEW|FORMER firmware now includes an advanced accumulator feature that provid
 - Value Range (-100 to 100)
 - Step Size (1-100)
 - Trigger mapping per step
+
+For complete implementation details, see `QWEN.md`.
+
+### Pulse Count
+
+A Metropolix-style pulse count feature that allows each step to repeat for a configurable number of clock pulses (1-8) before advancing to the next step.
+
+#### Features:
+- **Variable Step Duration**: Each step can play for 1-8 clock pulses
+- **Independent Control**: Per-step configuration without changing global divisor
+- **Seamless Integration**: Works with all play modes and existing features
+
+#### UI Access:
+1. Navigate to STEPS page
+2. Press Retrigger button (F2) twice to reach "PULSE COUNT" layer
+3. Select steps with S1-S16 buttons
+4. Adjust pulse count (1-8) with encoder
+
+#### Use Cases:
+- Create polyrhythmic patterns
+- Add emphasis to specific steps
+- Generate complex timing without changing tempo
+- Combine with retrigger for intricate rhythmic structures
+
+### Gate Mode
+
+Gate mode controls how gates are fired during pulse count repetitions, providing fine-grained rhythmic control.
+
+#### Four Gate Modes:
+- **A (ALL)**: Fires gates on every pulse (default)
+- **1 (FIRST)**: Single gate on first pulse only
+- **H (HOLD)**: One long continuous gate for entire step duration
+- **1L (FIRSTLAST)**: Gates on first and last pulse only
+
+#### UI Access:
+1. Navigate to STEPS page
+2. Press Gate button (F1) five times to reach "GATE MODE" layer
+3. Select steps with S1-S16 buttons
+4. Adjust gate mode with encoder (displays A/1/H/1L)
+
+#### Use Cases:
+- Create accent patterns with FIRST mode
+- Sustain notes across pulses with HOLD mode
+- Generate bouncing rhythms with FIRSTLAST mode
+- Mix different gate modes across steps for complex patterns
+
+#### Compatibility:
+- Works seamlessly with pulse count feature
+- Compatible with retrigger, gate offset, and gate probability
+- Backward compatible (default mode maintains existing behavior)
+- Fully integrated with all play modes
+
+For complete technical documentation, see `CLAUDE.md`.
 
 Flashing to the hardware is done using OpenOCD. By default, this expects an Olimex ARM-USB-OCD-H JTAG to be attached to the USB port. You can easily reconfigure this to use a different JTAG by editing the `OPENOCD_INTERFACE` variable in the `src/platform/stm32/CMakeLists.txt` file. Make sure to change both occurrences. A list of available interfaces can be found in the `tools/openocd/share/openocd/scripts/interface` directory (or `/home/vagrant/tools/openocd/share/openocd/scripts/interface` when running the virtual machine).
 
