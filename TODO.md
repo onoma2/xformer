@@ -851,13 +851,27 @@ void Accumulator::tick() const {
 - Predictable behavior when restarting sequence
 - Counter starts fresh each playback session
 
-#### Improvement 3: Delay First Tick
-- [ ] Step 3.1: Add _hasStarted flag to model
-- [ ] Step 3.2: Write delayed start test (RED)
-- [ ] Step 3.3: Implement delayed tick logic (GREEN)
-- [ ] Step 3.4: Update reset() to clear flag
-- [ ] Step 3.5: Update serialization for _hasStarted
-- [ ] Commit: "Delay accumulator first tick until after first step"
+#### Improvement 3: Delay First Tick ✅ COMPLETE
+- [x] Step 3.1: Add _hasStarted flag to model
+- [x] Step 3.2: Write delayed start test (RED) - TestAccumulator.cpp
+- [x] Step 3.3: Implement delayed tick logic (GREEN) - Accumulator::tick()
+- [x] Step 3.4: Update reset() to clear flag
+- [x] Step 3.5: Update serialization for _hasStarted
+- [x] Ready for local testing
+
+**Implementation:**
+- Added `_hasStarted` mutable bool flag to Accumulator.h
+- Initialized to false in constructor
+- Modified `tick()` to skip first call (sets _hasStarted=true and returns early)
+- Updated `reset()` to clear _hasStarted flag
+- Added _hasStarted to serialization (write/read methods)
+- Test case verifies delayed tick behavior
+
+**Expected behavior:**
+- First step plays at base note value (no accumulation applied)
+- Accumulation starts from second triggered step
+- More intuitive UX - counter visible as it increments
+- Reset clears delay flag for next playback
 
 ---
 

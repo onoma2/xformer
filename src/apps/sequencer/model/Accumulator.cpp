@@ -16,32 +16,40 @@ Accumulator::Accumulator() :
     _maxValue(7),
     _stepValue(1),
     _ratchetTriggerParam(0),
-    _pendulumDirection(1)
+    _pendulumDirection(1),
+    _hasStarted(false)
 {
 }
 
 void Accumulator::tick() const {
-    if (_enabled) {
-        switch (_order) {
-        case Wrap:
-            tickWithWrap();
-            break;
-        case Pendulum:
-            tickWithPendulum();
-            break;
-        case Random:
-            tickWithRandom();
-            break;
-        case Hold:
-            tickWithHold();
-            break;
-        }
+    if (!_enabled) return;
+
+    // Delay first tick - skip the first call to tick()
+    if (!_hasStarted) {
+        const_cast<Accumulator*>(this)->_hasStarted = true;
+        return; // Skip first tick
+    }
+
+    switch (_order) {
+    case Wrap:
+        tickWithWrap();
+        break;
+    case Pendulum:
+        tickWithPendulum();
+        break;
+    case Random:
+        tickWithRandom();
+        break;
+    case Hold:
+        tickWithHold();
+        break;
     }
 }
 
 void Accumulator::reset() {
     _currentValue = _minValue;
     _pendulumDirection = 1; // Reset pendulum direction to up
+    _hasStarted = false; // Reset delayed start flag
 }
 
 void Accumulator::tickWithWrap() const {
@@ -119,6 +127,7 @@ void Accumulator::write(VersionedSerializedWriter &writer) const {
     writer.write(_stepValue);
     writer.write(_currentValue);
     writer.write(_pendulumDirection);
+    writer.write(static_cast<uint8_t>(_hasStarted ? 1 : 0));
 }
 
 void Accumulator::read(VersionedSerializedReader &reader) {
@@ -137,4 +146,8 @@ void Accumulator::read(VersionedSerializedReader &reader) {
     reader.read(_stepValue);
     reader.read(_currentValue);
     reader.read(_pendulumDirection);
+
+    uint8_t hasStartedValue;
+    reader.read(hasStartedValue);
+    _hasStarted = (hasStartedValue != 0);
 }

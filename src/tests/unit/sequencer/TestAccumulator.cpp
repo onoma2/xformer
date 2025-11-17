@@ -192,4 +192,25 @@ CASE("reset_accumulator") {
     expectEqual(static_cast<int>(accumulator.currentValue()), 5, "currentValue should be reset to minValue (5)");
 }
 
+CASE("delayed_first_tick") {
+    Accumulator accumulator;
+    accumulator.setMinValue(0);
+    accumulator.setMaxValue(10);
+    accumulator.setDirection(Accumulator::Direction::Up);
+    accumulator.setEnabled(true);
+    accumulator.setStepValue(3);
+
+    // First tick should be skipped (delayed start)
+    accumulator.tick();
+    expectEqual(static_cast<int>(accumulator.currentValue()), 0, "currentValue should remain at minValue (0) after first tick");
+
+    // Second tick should increment
+    accumulator.tick();
+    expectEqual(static_cast<int>(accumulator.currentValue()), 3, "currentValue should be minValue + stepValue (3) after second tick");
+
+    // Third tick should increment again
+    accumulator.tick();
+    expectEqual(static_cast<int>(accumulator.currentValue()), 6, "currentValue should be 6 after third tick");
+}
+
 } // UNIT_TEST("Accumulator")

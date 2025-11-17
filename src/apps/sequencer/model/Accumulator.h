@@ -63,6 +63,7 @@ private:
 
     mutable int16_t _currentValue;  // Mark as mutable to allow modification through const references
     mutable int8_t _pendulumDirection; // For Pendulum mode: 1 for up, -1 for down
+    mutable bool _hasStarted; // Track if accumulator has processed its first tick
     int16_t _minValue;
     int16_t _maxValue;
     uint8_t _stepValue;
