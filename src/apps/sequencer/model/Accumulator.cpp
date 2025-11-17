@@ -12,7 +12,7 @@ Accumulator::Accumulator() :
     _enabled(false),
     _ratchetTriggerMode(First),
     _currentValue(0),
-    _minValue(-7),
+    _minValue(0),
     _maxValue(7),
     _stepValue(1),
     _ratchetTriggerParam(0),
