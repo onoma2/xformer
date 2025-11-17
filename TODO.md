@@ -394,37 +394,42 @@ Gate Mode is a per-step parameter that controls how gates are fired during pulse
 ## 🔧 Phase 2: Engine Layer - Gate Generation Logic
 
 ### Step 2.1: Understand Current Gate Generation
-**Status**: ⏳ Pending Phase 1 completion
+**Status**: ✅ COMPLETE
 
-**Action Plan:**
-1. Read `NoteTrackEngine.cpp` `triggerStep()` method
-2. Identify where gates are queued (`_gateQueue.pushReplace()`)
-3. Understand current pulse count integration
-4. Map out where gate mode logic should be inserted
+**Completed Actions:**
+1. ✅ Read `NoteTrackEngine.cpp` `triggerStep()` method (lines 329-381)
+2. ✅ Identified gate queue mechanism: `_gateQueue.pushReplace()`
+3. ✅ Understood pulse count integration in tick() method (lines 140-189)
+4. ✅ Mapped gate generation flow:
+   - tick() calls triggerStep() on EVERY pulse
+   - triggerStep() queues gate ON/OFF events
+   - _pulseCounter tracks current pulse (1 to pulseCount+1)
 
-**Expected Result:** Clear understanding of gate generation flow
+**Result:** Clear understanding of gate generation flow documented in GATE_MODE_ENGINE_DESIGN.md
 
 ---
 
 ### Step 2.2: Design Gate Mode Logic
-**Status**: ⏳ Pending Step 2.1
+**Status**: ✅ COMPLETE
 
-**Action Plan:**
-1. Design switch statement for 4 gate modes:
-   - ALL (0): Current behavior (gate per pulse)
-   - FIRST (1): Only fire gate when `_pulseCounter == 0`
-   - HOLD (2): Fire long gate on first pulse spanning all pulses
-   - FIRSTLAST (3): Fire gate when `_pulseCounter == 0 || _pulseCounter == step.pulseCount()`
+**Completed Actions:**
+1. ✅ Designed switch statement for 4 gate modes:
+   - ALL (0): shouldFireGate = true (current behavior)
+   - FIRST (1): shouldFireGate = (_pulseCounter == 1)
+   - HOLD (2): shouldFireGate = (_pulseCounter == 1), extended gate length
+   - FIRSTLAST (3): shouldFireGate = (_pulseCounter == 1 || _pulseCounter == pulseCount + 1)
 
-2. Write pseudocode for implementation
+2. ✅ Wrote complete pseudocode in GATE_MODE_ENGINE_DESIGN.md
 
-3. Identify edge cases:
-   - pulseCount = 0 (single pulse)
-   - Interaction with gate offset
-   - Interaction with gate length
-   - Interaction with retrigger
+3. ✅ Identified and documented edge cases:
+   - pulseCount = 0 (single pulse) ✓
+   - pulseCount = 3 (four pulses) ✓
+   - Interaction with gate offset ✓
+   - Interaction with gate length ✓
+   - Interaction with retrigger ✓
+   - Backward compatibility ✓
 
-**Expected Result:** Clear implementation plan with edge cases documented
+**Result:** Complete implementation plan with pseudocode and edge case analysis
 
 ---
 
