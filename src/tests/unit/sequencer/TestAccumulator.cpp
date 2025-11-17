@@ -38,6 +38,11 @@ CASE("initial_step_value") {
     expectEqual(static_cast<int>(accumulator.stepValue()), 1, "initial stepValue should be 1");
 }
 
+CASE("default_min_value_is_zero") {
+    Accumulator accumulator;
+    expectEqual(static_cast<int>(accumulator.minValue()), 0, "default minValue should be 0");
+}
+
 CASE("tick_with_custom_step_value") {
     Accumulator accumulator;
     accumulator.setDirection(Accumulator::Direction::Up);
