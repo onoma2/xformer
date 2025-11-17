@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- **Pulse Count feature**: Metropolix-style step repetition where each step can repeat for 1-8 clock pulses before advancing
+- Per-step pulse count parameter (0-7 representing 1-8 pulses)
+- Pulse count accessible via Retrigger button cycling (RETRIG → RETRIG PROB → PULSE COUNT)
+- Visual display showing pulse count value (1-8) for each step
+- Detail overlay showing pulse count value when adjusting with encoder
+- Pulse counter state tracking in NoteTrackEngine for timing control
+- Full integration with both Aligned and Free play modes
+- Comprehensive unit tests for pulse count model layer (7 test cases, all passing)
 - Accumulator functionality: Stateful counter that increments/decrements based on configurable parameters
 - Accumulator parameters: Mode, Direction (Up/Down/Freeze), Order (Wrap/Pendulum/Random/Hold), Polarity (Unipolar/Bipolar), Min/Max values, and Step Size
 - Real-time pitch modulation using accumulator value
@@ -12,6 +20,9 @@
 - Unit tests for accumulator functionality and modulation
 
 ### Changed
+- NoteTrackEngine now tracks pulse counter state to control step advancement timing
+- Step advancement logic modified to respect pulse count values (steps hold for N pulses)
+- NoteSequenceEditPage updated with pulse count layer integration
 - Moved accumulator trigger toggling from Gate button (F1) to Note button (F4) cycling
 - Updated NoteSequenceEditPage to include AccumulatorTrigger in Note button cycling sequence
 - Modified triggerStep() to include accumulator ticking when step has isAccumulatorTrigger set
