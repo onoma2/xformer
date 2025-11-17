@@ -35,6 +35,8 @@ An accumulator is a stateful counter that:
 2. **NoteTrackEngine Integration** (`src/apps/sequencer/engine/NoteTrackEngine.cpp`)
    - Modified `triggerStep()` to check for accumulator triggers
    - Added logic to call `accumulator.tick()` when step has `isAccumulatorTrigger` set
+   - Updated `evalStepNote()` function to apply accumulator value to note pitch
+   - Ensures accumulator value modulates the note output in real-time
    - Ensured proper state management for multi-threaded access
 
 3. **NoteSequence Integration** (`src/apps/sequencer/model/NoteSequence.h`)
@@ -57,6 +59,13 @@ An accumulator is a stateful counter that:
    - Modified sequence page cycling to allow cycling through different sequence views
    - Pressing Sequence key now cycles: NoteSequence → Accumulator → AccumulatorSteps → NoteSequence
    - Maintains state to track current sequence view
+
+### Phase 3: Modulation Implementation
+1. **Pitch Modulation Integration**
+   - Updated `evalStepNote()` function to incorporate accumulator value into pitch calculation
+   - Accumulator value is added directly to the step's note value before voltage conversion
+   - Modulation occurs in real-time as the sequence plays and accumulator updates
+   - Maintains full compatibility with existing note sequence functionality
 
 ## Technical Details
 

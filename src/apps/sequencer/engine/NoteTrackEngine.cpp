@@ -68,8 +68,15 @@ static int evalTransposition(const Scale &scale, int octave, int transpose) {
 }
 
 // evaluate note voltage
-static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, const Scale &scale, int rootNote, int octave, int transpose, bool useVariation = true) {
+static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, const Scale &scale, int rootNote, int octave, int transpose, const NoteSequence &sequence, bool useVariation = true) {
     int note = step.note() + evalTransposition(scale, octave, transpose);
+
+    // Apply accumulator modulation if enabled
+    if (sequence.accumulator().enabled()) {
+        int accumulatorValue = sequence.accumulator().currentValue();
+        note += accumulatorValue;
+    }
+
     int probability = clamp(step.noteVariationProbability() + probabilityBias, -1, NoteSequence::NoteVariationProbability::Max);
     if (useVariation && int(rng.nextRange(NoteSequence::NoteVariationProbability::Range)) <= probability) {
         int offset = step.noteVariationRange() == 0 ? 0 : rng.nextRange(std::abs(step.noteVariationRange()) + 1);
@@ -247,7 +254,7 @@ void NoteTrackEngine::update(float dt) {
 
     if (stepMonitoring) {
         const auto &step = sequence.step(_monitorStepIndex);
-        setOverride(evalStepNote(step, 0, scale, rootNote, octave, transpose, false));
+        setOverride(evalStepNote(step, 0, scale, rootNote, octave, transpose, sequence, false));
     } else if (liveMonitoring && _recordHistory.isNoteActive()) {
         int note = noteFromMidiNote(_recordHistory.activeNote()) + evalTransposition(scale, octave, transpose);
         setOverride(scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f));
@@ -339,7 +346,7 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     if (stepGate || _noteTrack.cvUpdateMode() == NoteTrack::CvUpdateMode::Always) {
         const auto &scale = evalSequence.selectedScale(_model.project().scale());
         int rootNote = evalSequence.selectedRootNote(_model.project().rootNote());
-        _cvQueue.push({ Groove::applySwing(tick + gateOffset, swing()), evalStepNote(step, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose), step.slide() });
+        _cvQueue.push({ Groove::applySwing(tick + gateOffset, swing()), evalStepNote(step, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose, evalSequence), step.slide() });
     }
 }
 
