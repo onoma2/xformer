@@ -174,6 +174,13 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
                 step.retriggerProbability() + 1, NoteSequence::RetriggerProbability::Range
             );
             break;
+        case Layer::PulseCount: {
+            // Display pulse count as number (shows actual pulses: value + 1)
+            canvas.setColor(Color::Bright);
+            FixedStringBuilder<8> str("%d", step.pulseCount() + 1);
+            canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
+            break;
+        }
         case Layer::Length:
             SequencePainter::drawLength(
                 canvas,
@@ -437,6 +444,9 @@ void NoteSequenceEditPage::encoder(EncoderEvent &event) {
             case Layer::AccumulatorTrigger:
                 step.setAccumulatorTrigger(event.value() > 0);
                 break;
+            case Layer::PulseCount:
+                step.setPulseCount(step.pulseCount() + event.value());
+                break;
             case Layer::Condition:
                 step.setCondition(ModelUtils::adjustedEnum(step.condition(), event.value()));
                 break;
@@ -521,6 +531,12 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
         case Layer::Retrigger:
             setLayer(Layer::RetriggerProbability);
             break;
+        case Layer::RetriggerProbability:
+            setLayer(Layer::PulseCount);
+            break;
+        case Layer::PulseCount:
+            setLayer(Layer::Retrigger);
+            break;
         default:
             setLayer(Layer::Retrigger);
             break;
@@ -573,6 +589,7 @@ int NoteSequenceEditPage::activeFunctionKey() {
         return 0;
     case Layer::Retrigger:
     case Layer::RetriggerProbability:
+    case Layer::PulseCount:
         return 1;
     case Layer::Length:
     case Layer::LengthVariationRange:
