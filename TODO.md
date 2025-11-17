@@ -179,6 +179,66 @@
 - Documentation updated to reflect current status
 - Ready for use in production firmware
 
+## In Progress: Metropolix-Style Pulse Count Feature
+
+### Overview
+Implementing step repetition feature where each step can repeat for 1-8 clock pulses before advancing. This is distinct from retrigger/ratcheting - it extends step duration rather than subdividing it.
+
+### Implementation Approach
+Using Test-Driven Development (TDD) methodology following PULSE-COUNT-TODO.md plan.
+
+### Phase 1: Model Layer - Storage and Data Structures ✓ (In Progress)
+**Status**: Implementing layer integration (Test 1.4 - RED phase)
+
+**Completed Tests:**
+- ✅ Test 1.1: Basic Storage - Step stores and retrieves pulse count (0-7) - GREEN
+- ✅ Test 1.2: Value Clamping - Out-of-range values clamp correctly - GREEN
+- ✅ Test 1.3: Bitfield Packing - No interference with other step fields - GREEN
+
+**Current Test (RED phase):**
+- 🔴 Test 1.4: Layer Integration - Add PulseCount to Layer enum, implement layerName/layerRange/layerDefaultValue/layerValue/setLayerValue
+  - Status: Test committed, will fail compilation
+  - Next: Implement GREEN phase in NoteSequence.h and NoteSequence.cpp
+
+**Remaining Phase 1 Tests:**
+- ⏳ Test 1.5: Serialization - Save/load persistence
+- ⏳ Test 1.6: Clear/Reset - Verify proper reset behavior
+
+**Implementation Details:**
+- Using 3 bits (17-19) in NoteSequence::Step._data1 union
+- Type: `using PulseCount = UnsignedValue<3>;` (stores 0-7, represents 1-8 pulses)
+- Automatic clamping via UnsignedValue
+- 12 bits remaining in _data1 for future features
+
+**Files Modified:**
+- `src/apps/sequencer/model/NoteSequence.h` - Added pulseCount field and accessors
+- `src/tests/unit/sequencer/TestPulseCount.cpp` - Created test suite with Tests 1.1-1.4
+- `src/tests/unit/sequencer/CMakeLists.txt` - Registered test
+
+### Phase 2: Engine Layer - Pulse Counter State Management (Pending)
+- Test 2.1: Track pulse counter state per track
+- Test 2.2: Counter increments on each clock pulse
+- Test 2.3: Step advances when counter reaches pulseCount
+- Test 2.4: Counter resets on step advance
+- Test 2.5: Integration with existing timing
+
+### Phase 3: Integration Tests (Pending)
+- Pattern timing with various pulse counts
+- Interaction with retrigger feature
+- Clock sync behavior
+
+### Phase 4: UI Implementation (Pending)
+- Add to button cycling in NoteSequenceEditPage
+- Visual feedback for pulse count layer
+
+### Phase 5: Acceptance Tests (Pending)
+- Hardware verification
+- Performance testing
+
+### Reference Documentation
+- `PULSE_COUNT_IMPLEMENTATION.md` - Technical specification
+- `PULSE-COUNT-TODO.md` - Complete TDD plan
+
 ## Pending Features
 
 ### To brainstorm
