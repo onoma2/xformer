@@ -93,6 +93,7 @@ void NoteTrackEngine::reset() {
     _sequenceState.reset();
     _currentStep = -1;
     _prevCondition = false;
+    _pulseCounter = 0;
     _activity = false;
     _gateOutput = false;
     _cvOutput = 0.f;
@@ -109,6 +110,7 @@ void NoteTrackEngine::restart() {
     _freeRelativeTick = 0;
     _sequenceState.reset();
     _currentStep = -1;
+    _pulseCounter = 0;
 }
 
 TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
@@ -138,7 +140,21 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
         switch (_noteTrack.playMode()) {
         case Types::PlayMode::Aligned:
             if (relativeTick % divisor == 0) {
-                _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                // Pulse count logic: Get current step's pulse count
+                int currentStepIndex = _currentStep >= 0 ? _currentStep : sequence.firstStep();
+                int stepPulseCount = sequence.step(currentStepIndex).pulseCount();
+
+                // Increment pulse counter
+                _pulseCounter++;
+
+                // Only advance to next step when all pulses for current step are complete
+                bool shouldAdvanceStep = (_pulseCounter > stepPulseCount);
+
+                if (shouldAdvanceStep) {
+                    _pulseCounter = 0;
+                    _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                }
+
                 recordStep(tick, divisor);
                 triggerStep(tick, divisor);
             }
@@ -149,7 +165,21 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                 _freeRelativeTick = 0;
             }
             if (relativeTick == 0) {
-                _sequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                // Pulse count logic: Get current step's pulse count
+                int currentStepIndex = _currentStep >= 0 ? _currentStep : sequence.firstStep();
+                int stepPulseCount = sequence.step(currentStepIndex).pulseCount();
+
+                // Increment pulse counter
+                _pulseCounter++;
+
+                // Only advance to next step when all pulses for current step are complete
+                bool shouldAdvanceStep = (_pulseCounter > stepPulseCount);
+
+                if (shouldAdvanceStep) {
+                    _pulseCounter = 0;
+                    _sequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                }
+
                 recordStep(tick, divisor);
                 triggerStep(tick, divisor);
             }

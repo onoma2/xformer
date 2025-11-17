@@ -176,4 +176,42 @@ CASE("pulse count resets to 0 on clear") {
     expectEqual(step.pulseCount(), 0, "pulse count should be 0 after clear");
 }
 
+// ============================================================================
+// Phase 2: Engine Layer - Conceptual Tests
+// ============================================================================
+// Note: Full engine integration tests are complex and require extensive mocking.
+// These tests document the expected behavior for implementation.
+
+// Test 2.1: Pulse Counter Logic - Expected Behavior
+CASE("pulse count determines step duration") {
+    // This test documents the expected behavior:
+    // - A step with pulseCount=0 (represents 1 pulse) advances after 1 clock pulse
+    // - A step with pulseCount=3 (represents 4 pulses) advances after 4 clock pulses
+    // - A step with pulseCount=7 (represents 8 pulses) advances after 8 clock pulses
+
+    // Create steps with different pulse counts
+    NoteSequence::Step step1;
+    step1.setPulseCount(0);  // 1 pulse (0+1)
+
+    NoteSequence::Step step2;
+    step2.setPulseCount(3);  // 4 pulses (3+1)
+
+    NoteSequence::Step step3;
+    step3.setPulseCount(7);  // 8 pulses (7+1)
+
+    // Verify values are stored correctly
+    expectEqual(step1.pulseCount(), 0, "step1 should have pulseCount 0 (1 pulse)");
+    expectEqual(step2.pulseCount(), 3, "step2 should have pulseCount 3 (4 pulses)");
+    expectEqual(step3.pulseCount(), 7, "step3 should have pulseCount 7 (8 pulses)");
+
+    // Expected engine behavior (documented for implementation):
+    // - Engine maintains _pulseCounter variable (starts at 0)
+    // - On each clock pulse that matches divisor:
+    //   - Increment _pulseCounter
+    //   - If _pulseCounter > currentStep.pulseCount():
+    //     - Reset _pulseCounter to 0
+    //     - Advance to next step via _sequenceState.advance*()
+    //   - Trigger current step (gates/CV)
+}
+
 }

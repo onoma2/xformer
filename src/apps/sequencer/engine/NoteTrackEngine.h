@@ -65,6 +65,7 @@ private:
     SequenceState _sequenceState;
     int _currentStep;
     bool _prevCondition;
+    int _pulseCounter;  // Tracks current pulse within step for pulse count feature
 
     int _monitorStepIndex = -1;
 
