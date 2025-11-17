@@ -909,6 +909,389 @@ void Accumulator::tick() const {
 
 ---
 
+### 🎯 NEW FEATURE: Accumulator Trigger Mode (TDD Implementation)
+
+#### Overview
+Add global setting to control when accumulator increments - by step, by gate pulse, or by ratchet subdivision.
+
+**Three Trigger Modes:**
+1. **STEP** - Increment once per step (current behavior)
+2. **GATE** - Increment per gate pulse (respects pulse count and gate mode)
+3. **RTRIG** - Increment per ratchet/retrigger subdivision
+
+**Implementation:** Global setting on ACCUM page (Option A)
+
+---
+
+### Phase 1: Model Layer - Add TriggerMode Parameter
+
+#### Goal
+Add TriggerMode enum and field to Accumulator model with serialization.
+
+#### Step 1.1: Define TriggerMode Enum and Add Field
+
+**File:** `src/apps/sequencer/model/Accumulator.h`
+
+**Actions:**
+1. Add TriggerMode enum after existing enums:
+   ```cpp
+   enum TriggerMode { Step, Gate, Retrigger };
+   ```
+2. Add getter/setter methods:
+   ```cpp
+   TriggerMode triggerMode() const { return static_cast<TriggerMode>(_triggerMode); }
+   void setTriggerMode(TriggerMode mode) { _triggerMode = mode; }
+   ```
+3. Add bitfield in private section (2 bits, allowing 4 modes for future):
+   ```cpp
+   uint8_t _triggerMode : 2;
+   ```
+4. Note: `_ratchetTriggerMode` already exists (3 bits) but unused - we're adding separate `_triggerMode`
+
+**Expected Result:** Compiles with new field added
+
+---
+
+#### Step 1.2: Initialize TriggerMode in Constructor (RED→GREEN)
+
+**File:** `src/apps/sequencer/model/Accumulator.cpp`
+
+**Actions:**
+1. Write test first (RED):
+   - File: `src/tests/unit/sequencer/TestAccumulator.cpp`
+   - Test case: `default_trigger_mode_is_step`
+   - Verify new Accumulator has triggerMode() == Accumulator::Step
+
+2. Implement (GREEN):
+   - Add to constructor initializer list: `_triggerMode(Step)`
+
+**Expected Result:** Test passes
+
+---
+
+#### Step 1.3: Update Serialization (RED→GREEN)
+
+**File:** `src/apps/sequencer/model/Accumulator.cpp`
+
+**Actions:**
+1. Write test first (RED):
+   - File: `src/tests/unit/sequencer/TestAccumulatorSerialization.cpp`
+   - Add triggerMode to round-trip test
+   - Set triggerMode to different values and verify serialization
+
+2. Update write() method (GREEN):
+   - Pack _triggerMode into flags byte (already has room):
+   ```cpp
+   uint8_t flags = (_mode << 0) | (_polarity << 2) |
+                   (_direction << 3) | (_order << 5) |
+                   (_enabled << 7);
+   ```
+   - Need to expand or use another byte - analyze current bitfield usage
+   - Current flags: mode(2) + polarity(1) + direction(2) + order(2) + enabled(1) = 8 bits FULL
+   - **Solution:** Write _triggerMode as separate byte OR pack with _hasStarted
+
+3. Update read() method (GREEN):
+   - Read and unpack _triggerMode from serialization
+
+**Expected Result:** Serialization tests pass, triggerMode persists across save/load
+
+---
+
+### Phase 2: Engine Layer - Implement Trigger Mode Logic
+
+#### Goal
+Modify NoteTrackEngine to call accumulator.tick() based on selected trigger mode.
+
+#### Step 2.1: Analyze Current Code
+
+**File:** `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+**Current Implementation (lines 354-360):**
+```cpp
+// STEP mode - increment once per step
+if (step.isAccumulatorTrigger()) {
+    const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+}
+```
+
+**Target Locations:**
+- **STEP mode:** Keep at line 354-360 (current location)
+- **GATE mode:** Add inside `if (shouldFireGate)` block after line 390
+- **RTRIG mode:** Add inside retrigger while loop at line 402
+
+---
+
+#### Step 2.2: Implement STEP Mode (Current Behavior)
+
+**Actions:**
+1. Modify existing code to check trigger mode:
+   ```cpp
+   if (step.isAccumulatorTrigger() && targetSequence.accumulator().enabled()) {
+       if (targetSequence.accumulator().triggerMode() == Accumulator::Step) {
+           const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+       }
+   }
+   ```
+
+**Expected Result:** STEP mode works as before (backward compatible)
+
+---
+
+#### Step 2.3: Implement GATE Mode
+
+**File:** `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+**Actions:**
+1. Add after line 390, inside `if (shouldFireGate)` block:
+   ```cpp
+   if (shouldFireGate) {
+       // Existing gate generation code...
+
+       // GATE mode: increment per gate pulse
+       if (step.isAccumulatorTrigger() && targetSequence.accumulator().enabled()) {
+           if (targetSequence.accumulator().triggerMode() == Accumulator::Gate) {
+               const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+           }
+       }
+
+       uint32_t stepLength = ...
+   }
+   ```
+
+**Expected Result:**
+- GATE mode increments based on gate mode and pulse count
+- ALL mode with pulseCount=3 → 4 increments
+- FIRST mode with pulseCount=3 → 1 increment
+- HOLD mode with pulseCount=3 → 1 increment
+- FIRSTLAST mode with pulseCount=3 → 2 increments
+
+---
+
+#### Step 2.4: Implement RETRIGGER Mode
+
+**File:** `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+**Actions:**
+1. Add inside while loop at line 402:
+   ```cpp
+   int stepRetrigger = evalStepRetrigger(step, _noteTrack.retriggerProbabilityBias());
+   if (stepRetrigger > 1) {
+       uint32_t retriggerLength = divisor / stepRetrigger;
+       uint32_t retriggerOffset = 0;
+       while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
+           // RETRIGGER mode: increment per ratchet subdivision
+           if (step.isAccumulatorTrigger() && targetSequence.accumulator().enabled()) {
+               if (targetSequence.accumulator().triggerMode() == Accumulator::Retrigger) {
+                   const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+               }
+           }
+
+           _gateQueue.pushReplace({ ... });
+           _gateQueue.pushReplace({ ... });
+           retriggerOffset += retriggerLength;
+       }
+   }
+   ```
+
+**Expected Result:**
+- RTRIG mode increments once per ratchet subdivision
+- retrigger=3 (4 subdivisions) → 4 increments
+
+---
+
+#### Step 2.5: Build and Manual Testing
+
+**Actions:**
+1. Build simulator: `cd build/sim/debug && make -j`
+2. Test each mode:
+   - STEP: Enable accumulator trigger on step, set mode=STEP, verify 1 increment per step
+   - GATE: Set pulseCount=3, gateMode=ALL, mode=GATE, verify 4 increments
+   - RTRIG: Set retrigger=3, mode=RTRIG, verify 4 increments
+3. Verify combinations work correctly
+
+**Expected Result:** All three modes work as designed
+
+---
+
+### Phase 3: UI Layer - Add TriggerMode to ACCUM Page
+
+#### Goal
+Add TriggerMode parameter to ACCUM page for user control.
+
+#### Step 3.1: Add TriggerMode to AccumulatorListModel
+
+**File:** `src/apps/sequencer/ui/model/AccumulatorListModel.h`
+
+**Actions:**
+1. Add to Item enum (after existing parameters):
+   ```cpp
+   TriggerMode,
+   ```
+2. Update itemCount() if needed
+3. Add case in text() method to return "Trigger Mode"
+4. Add case in valueFmt() to return mode names: "STEP", "GATE", "RTRIG"
+5. Add indexed value support (similar to Direction/Order)
+
+**Expected Result:** TriggerMode appears in ACCUM page list
+
+---
+
+#### Step 3.2: Implement Encoder Control
+
+**File:** `src/apps/sequencer/ui/model/AccumulatorListModel.h`
+
+**Actions:**
+1. Add to edit() method:
+   ```cpp
+   case TriggerMode:
+       accumulator.setTriggerMode(
+           static_cast<Accumulator::TriggerMode>(
+               ModelUtils::adjustedByStep(
+                   accumulator.triggerMode(), -1, 2, step, !shift
+               )
+           )
+       );
+       break;
+   ```
+
+**Expected Result:** Encoder cycles through STEP → GATE → RTRIG → STEP
+
+---
+
+#### Step 3.3: Test UI in Simulator
+
+**Actions:**
+1. Navigate to ACCUM page
+2. Find "Trigger Mode" parameter
+3. Use encoder to change value
+4. Verify display shows: STEP, GATE, RTRIG
+5. Save and load project to verify persistence
+
+**Expected Result:** UI fully functional
+
+---
+
+### Phase 4: Testing & Documentation
+
+#### Step 4.1: Unit Tests
+
+**Files to Test:**
+- `TestAccumulator.cpp` - TriggerMode getter/setter
+- `TestAccumulatorSerialization.cpp` - TriggerMode serialization
+
+**Test Cases:**
+1. Default trigger mode is STEP
+2. Set/get trigger mode for all three values
+3. Serialization round-trip preserves trigger mode
+4. Invalid values clamp correctly
+
+---
+
+#### Step 4.2: Integration Testing
+
+**Scenarios:**
+1. **STEP mode + pulse count:**
+   - Set pulseCount=3, triggerMode=STEP
+   - Verify: 1 increment per step (not 4)
+
+2. **GATE mode + gate modes:**
+   - Set pulseCount=3, gateMode=ALL, triggerMode=GATE
+   - Verify: 4 increments
+   - Set pulseCount=3, gateMode=FIRST, triggerMode=GATE
+   - Verify: 1 increment
+   - Set pulseCount=3, gateMode=FIRSTLAST, triggerMode=GATE
+   - Verify: 2 increments
+
+3. **RTRIG mode + retrigger:**
+   - Set retrigger=3, triggerMode=RTRIG
+   - Verify: 4 increments
+
+4. **Combined scenarios:**
+   - pulseCount=2, retrigger=1, gateMode=ALL, triggerMode=GATE
+   - Verify: 3 increments (3 gate pulses)
+   - Same setup but triggerMode=RTRIG
+   - Verify: 6 increments (3 pulses × 2 retriggers each)
+
+---
+
+#### Step 4.3: Update Documentation
+
+**Files to Update:**
+1. **TODO.md** - Mark feature complete
+2. **CLAUDE.md** - Add Trigger Mode section to Accumulator Feature documentation
+3. **CHANGELOG.md** - Add to unreleased section
+
+---
+
+### Implementation Checklist
+
+#### Phase 1: Model Layer
+- [ ] Step 1.1: Define TriggerMode enum and add field
+- [ ] Step 1.2: Initialize in constructor with test (RED→GREEN)
+- [ ] Step 1.3: Update serialization with test (RED→GREEN)
+
+#### Phase 2: Engine Layer
+- [ ] Step 2.1: Analyze current code locations
+- [ ] Step 2.2: Implement STEP mode (refactor existing)
+- [ ] Step 2.3: Implement GATE mode
+- [ ] Step 2.4: Implement RTRIG mode
+- [ ] Step 2.5: Build and manual testing
+
+#### Phase 3: UI Layer
+- [ ] Step 3.1: Add to AccumulatorListModel
+- [ ] Step 3.2: Implement encoder control
+- [ ] Step 3.3: Test UI in simulator
+
+#### Phase 4: Testing & Documentation
+- [ ] Step 4.1: Unit tests (model + serialization)
+- [ ] Step 4.2: Integration testing (all mode combinations)
+- [ ] Step 4.3: Update documentation
+
+---
+
+### Expected File Changes
+
+**Model Layer:**
+- `src/apps/sequencer/model/Accumulator.h` - Add enum, field, getters/setters
+- `src/apps/sequencer/model/Accumulator.cpp` - Constructor, serialization
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Add tests
+- `src/tests/unit/sequencer/TestAccumulatorSerialization.cpp` - Update tests
+
+**Engine Layer:**
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Implement 3 trigger modes
+
+**UI Layer:**
+- `src/apps/sequencer/ui/model/AccumulatorListModel.h` - Add TriggerMode parameter
+
+**Documentation:**
+- `TODO.md` - This plan and completion tracking
+- `CLAUDE.md` - Feature documentation
+- `CHANGELOG.md` - Release notes
+
+---
+
+### Technical Notes
+
+**Bitfield Usage Analysis:**
+Current Accumulator bitfields (line 57-62 in Accumulator.h):
+```cpp
+uint8_t _mode : 2;              // 2 bits
+uint8_t _polarity : 1;          // 1 bit
+uint8_t _direction : 2;         // 2 bits
+uint8_t _order : 2;             // 2 bits
+uint8_t _enabled : 1;           // 1 bit
+uint8_t _ratchetTriggerMode : 3; // 3 bits (UNUSED - can repurpose)
+// Total: 13 bits across 2 bytes
+```
+
+**Serialization Size:**
+- Current: 10 bytes (1 flags + 2 minValue + 2 maxValue + 1 stepValue + 2 currentValue + 1 pendulumDirection + 1 hasStarted)
+- After TriggerMode: 10 bytes (no change - pack into existing structure or reuse _ratchetTriggerMode bits)
+
+**Option:** Repurpose `_ratchetTriggerMode` (3 bits) for `_triggerMode` (2 bits) since it's currently unused.
+
+---
+
 ## Pending Features
 
 ### To brainstorm
