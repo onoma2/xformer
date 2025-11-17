@@ -1324,6 +1324,626 @@ uint8_t _ratchetTriggerMode : 3; // 3 bits (UNUSED - can repurpose)
 
 ---
 
+## 🧪 EXPERIMENTAL: RTRIG Mode - Spread Accumulator Ticks Over Time (Option 3)
+
+**Status**: ⚠️ OPTIONAL EXPERIMENTAL FEATURE - High Risk, Proceed with Caution
+
+**Goal**: Make accumulator ticks fire when each retrigger gate fires (spread over time) instead of all at once at step start.
+
+**Approach**: Weak Reference with Sequence ID (Option 3 from RTRIG-Timing-Research.md)
+
+**Risk Assessment**: 🟠 MEDIUM RISK
+- Safer than pointer-based approaches (no dangling pointers)
+- Still has edge cases (sequence might be invalid between schedule and fire)
+- Requires extensive testing on hardware
+- **Potential for crashes if not carefully implemented**
+
+**Effort Estimate**: 8-12 days (investigation + implementation + testing)
+
+**Prerequisites**:
+- ✅ Read RTRIG-Timing-Research.md (complete technical investigation)
+- ✅ Read Queue-BasedAccumTicks.md (full implementation plan)
+- ⚠️ Understand pointer invalidation risks
+- ⚠️ Accept risk of edge case crashes during development
+
+---
+
+### TDD Implementation Plan - Option 3: Sequence ID Approach
+
+#### Phase 1: Model Layer - Gate Structure Extension (2-3 days)
+
+**Goal**: Extend Gate struct to include accumulator tick metadata without using pointers
+
+##### Step 1.1: Define AccumulatorTickEvent Struct (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+File: `src/tests/unit/sequencer/TestAccumulatorTickQueue.cpp` (NEW)
+
+```cpp
+#include "catch.hpp"
+#include "apps/sequencer/engine/NoteTrackEngine.h"
+
+TEST_CASE("AccumulatorTickEvent stores sequence ID") {
+    NoteTrackEngine::AccumulatorTickEvent event;
+    event.tick = 100;
+    event.sequenceId = 0;  // Main sequence
+
+    REQUIRE(event.tick == 100);
+    REQUIRE(event.sequenceId == 0);
+}
+
+TEST_CASE("AccumulatorTickEvent distinguishes main and fill sequences") {
+    NoteTrackEngine::AccumulatorTickEvent mainEvent;
+    mainEvent.sequenceId = 0;  // Main
+
+    NoteTrackEngine::AccumulatorTickEvent fillEvent;
+    fillEvent.sequenceId = 1;  // Fill
+
+    REQUIRE(mainEvent.sequenceId != fillEvent.sequenceId);
+}
+```
+
+**GREEN - Implement:**
+
+File: `src/apps/sequencer/engine/NoteTrackEngine.h`
+
+```cpp
+// Add near Gate struct definition (around line 82)
+struct AccumulatorTickEvent {
+    uint32_t tick;          // When to tick accumulator
+    uint8_t sequenceId;     // 0=main, 1=fill
+
+    bool operator<(const AccumulatorTickEvent &other) const {
+        return tick < other.tick;
+    }
+};
+
+struct AccumulatorTickEventCompare {
+    bool operator()(const AccumulatorTickEvent &a, const AccumulatorTickEvent &b) const {
+        return a.tick < b.tick;
+    }
+};
+```
+
+**REFACTOR**: Document struct, add comments
+
+**Verification**:
+```bash
+cd build/sim/debug
+make -j TestAccumulatorTickQueue
+./src/tests/unit/TestAccumulatorTickQueue
+```
+
+---
+
+##### Step 1.2: Add AccumulatorTickQueue to NoteTrackEngine (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+```cpp
+TEST_CASE("NoteTrackEngine has accumulator tick queue") {
+    // This will be tested via integration tests later
+    // For now, verify compilation and initialization
+    REQUIRE(true);  // Placeholder
+}
+```
+
+**GREEN - Implement:**
+
+File: `src/apps/sequencer/engine/NoteTrackEngine.h`
+
+```cpp
+// Add near _gateQueue member variable (around line 93)
+SortedQueue<AccumulatorTickEvent, 16, AccumulatorTickEventCompare> _accumulatorTickQueue;
+```
+
+**REFACTOR**: Add comment explaining queue purpose
+
+**Verification**:
+- Build compiles
+- No regression in existing tests
+
+---
+
+#### Phase 2: Engine Layer - Schedule Ticks in triggerStep() (3-4 days)
+
+**Goal**: Schedule accumulator ticks alongside gate events in retrigger loop
+
+##### Step 2.1: Analyze Current triggerStep() Logic
+
+**Actions**:
+1. Read `src/apps/sequencer/engine/NoteTrackEngine.cpp` lines 408-437 (RTRIG implementation)
+2. Identify where retrigger loop schedules gates
+3. Plan insertion point for accumulator tick scheduling
+
+**Key Findings**:
+- Line 410-421: Current RTRIG mode ticks all at once (REMOVE this)
+- Line 423-436: Retrigger gate scheduling loop (ADD tick scheduling here)
+- Gates scheduled with future timestamps using `tick + gateOffset + retriggerOffset`
+
+---
+
+##### Step 2.2: Schedule Accumulator Ticks in Retrigger Loop (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+File: `src/tests/integration/sequencer/TestNoteTrackEngineRetrigger.cpp` (NEW)
+
+```cpp
+#include "catch.hpp"
+#include "apps/sequencer/engine/NoteTrackEngine.h"
+#include "apps/sequencer/model/NoteSequence.h"
+#include "apps/sequencer/model/NoteTrack.h"
+
+TEST_CASE("RTRIG mode schedules accumulator ticks in queue") {
+    // Setup
+    NoteTrack track;
+    NoteSequence sequence;
+    sequence.accumulator().setEnabled(true);
+    sequence.accumulator().setTriggerMode(Accumulator::Retrigger);
+    sequence.step(0).setRetrigger(3);  // 3 retriggers
+    sequence.step(0).setAccumulatorTrigger(true);
+
+    NoteTrackEngine engine(track, /* ... */);
+
+    // Trigger step
+    engine.triggerStep(/* ... */);
+
+    // Verify: Accumulator tick queue should have 3 events scheduled
+    REQUIRE(engine.accumulatorTickQueueSize() == 3);  // Need to add accessor
+}
+
+TEST_CASE("RTRIG mode ticks fire at correct timestamps") {
+    // Setup with divisor=48, retrig=3
+    // Expected ticks at: tick+0, tick+16, tick+32
+
+    // Verify tick timestamps match gate firing timestamps
+    REQUIRE(true);  // Implement after queue scheduling works
+}
+```
+
+**GREEN - Implement:**
+
+File: `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+Modify `triggerStep()` around lines 408-437:
+
+```cpp
+// BEFORE (lines 410-421): REMOVE this immediate tick loop
+/*
+if (step.isAccumulatorTrigger()) {
+    const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
+    if (targetSequence.accumulator().enabled() &&
+        targetSequence.accumulator().triggerMode() == Accumulator::Retrigger) {
+        int tickCount = stepRetrigger;
+        for (int i = 0; i < tickCount; ++i) {
+            const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+        }
+    }
+}
+*/
+
+// AFTER: Schedule ticks in queue alongside gates
+if (stepRetrigger > 1) {
+    uint32_t retriggerLength = divisor / stepRetrigger;
+    uint32_t retriggerOffset = 0;
+    int retriggerIndex = 0;
+
+    // Check if we should schedule accumulator ticks
+    bool shouldScheduleAccumTicks = (
+        step.isAccumulatorTrigger() &&
+        sequence.accumulator().enabled() &&
+        sequence.accumulator().triggerMode() == Accumulator::Retrigger
+    );
+
+    while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
+        // Schedule gates (existing logic)
+        _gateQueue.pushReplace({
+            Groove::applySwing(tick + gateOffset + retriggerOffset, swing()),
+            true
+        });
+        _gateQueue.pushReplace({
+            Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()),
+            false
+        });
+
+        // NEW: Schedule accumulator tick at same timestamp as gate ON
+        if (shouldScheduleAccumTicks) {
+            _accumulatorTickQueue.push({
+                Groove::applySwing(tick + gateOffset + retriggerOffset, swing()),
+                useFillSequence ? uint8_t(1) : uint8_t(0)  // Sequence ID
+            });
+        }
+
+        retriggerOffset += retriggerLength;
+        retriggerIndex++;
+    }
+}
+```
+
+**REFACTOR**: Extract to helper method if needed
+
+**Verification**:
+```bash
+cd build/sim/debug
+make -j TestNoteTrackEngineRetrigger
+./src/tests/integration/TestNoteTrackEngineRetrigger
+```
+
+---
+
+#### Phase 3: Engine Layer - Process Ticks in tick() (2-3 days)
+
+**Goal**: Process scheduled accumulator ticks when their timestamp arrives
+
+##### Step 3.1: Process AccumulatorTickQueue in tick() (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+```cpp
+TEST_CASE("Accumulator ticks fire when timestamp reached") {
+    // Setup: Schedule 3 ticks at tick 0, 16, 32
+    // Advance clock to tick 0 → verify 1 tick
+    // Advance clock to tick 16 → verify 2nd tick
+    // Advance clock to tick 32 → verify 3rd tick
+
+    NoteSequence sequence;
+    sequence.accumulator().setEnabled(true);
+    sequence.accumulator().setDirection(Accumulator::Up);
+    sequence.accumulator().setMin(0);
+    sequence.accumulator().setMax(10);
+    sequence.accumulator().setStep(1);
+
+    // Initial value should be 0
+    REQUIRE(sequence.accumulator().value() == 0);
+
+    // After 3 ticks should be 3
+    // (This will be verified via integration test)
+}
+```
+
+**GREEN - Implement:**
+
+File: `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+Modify `tick()` method around line 220 (after gate processing):
+
+```cpp
+// Process gate queue (existing logic, around line 210-219)
+while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
+    // ... existing gate processing ...
+    _gateQueue.pop();
+}
+
+// NEW: Process accumulator tick queue
+while (!_accumulatorTickQueue.empty() && tick >= _accumulatorTickQueue.front().tick) {
+    auto event = _accumulatorTickQueue.front();
+    _accumulatorTickQueue.pop();
+
+    // Lookup sequence by ID (0=main, 1=fill)
+    NoteSequence* targetSeq = nullptr;
+    if (event.sequenceId == 0 && _sequence) {
+        targetSeq = _sequence;
+    } else if (event.sequenceId == 1 && _fillSequence) {
+        targetSeq = _fillSequence;
+    }
+
+    // Validate sequence and tick accumulator
+    if (targetSeq &&
+        targetSeq->accumulator().enabled() &&
+        targetSeq->accumulator().triggerMode() == Accumulator::Retrigger) {
+        const_cast<Accumulator&>(targetSeq->accumulator()).tick();
+    }
+}
+```
+
+**REFACTOR**:
+- Add helper method: `processAccumulatorTickQueue(uint32_t tick)`
+- Add validation logging (debug mode)
+- Add safety checks for edge cases
+
+**Verification**:
+```bash
+cd build/sim/debug
+make -j sequencer
+./src/apps/sequencer/sequencer
+# Manual test: Enable accumulator, set RTRIG mode, set retrig=3
+# Verify ticks spread over time (not all at once)
+```
+
+---
+
+#### Phase 4: Edge Case Handling & Validation (2-3 days)
+
+**Goal**: Handle sequence changes, pattern switches, fill mode transitions safely
+
+##### Step 4.1: Handle Pattern Changes (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+```cpp
+TEST_CASE("Scheduled ticks are cleared when pattern changes") {
+    // Setup: Schedule 3 ticks
+    // Change pattern
+    // Verify: Tick queue is cleared (no stale ticks)
+
+    REQUIRE(true);  // Implement
+}
+
+TEST_CASE("Scheduled ticks are cleared when sequence is deleted") {
+    // Similar to above
+    REQUIRE(true);
+}
+```
+
+**GREEN - Implement:**
+
+File: `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+Add queue clearing in appropriate places:
+- Pattern change
+- Sequence deletion
+- Fill mode transition
+- Project load
+
+```cpp
+void NoteTrackEngine::clearAccumulatorTickQueue() {
+    while (!_accumulatorTickQueue.empty()) {
+        _accumulatorTickQueue.pop();
+    }
+}
+
+// Call in:
+// - Pattern change handler
+// - Sequence change handler
+// - reset() method
+```
+
+**REFACTOR**: Document when queue should be cleared
+
+---
+
+##### Step 4.2: Handle Fill Mode Transitions (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+```cpp
+TEST_CASE("Fill mode transition doesn't cause crashes") {
+    // Schedule ticks for main sequence
+    // Switch to fill sequence
+    // Verify: Ticks for main sequence are safely ignored
+
+    REQUIRE(true);
+}
+```
+
+**GREEN - Implement:**
+
+Enhanced validation in tick processing:
+
+```cpp
+// In tick() accumulator tick processing
+if (targetSeq &&
+    (targetSeq == _sequence || targetSeq == _fillSequence) &&  // Extra validation
+    targetSeq->accumulator().enabled() &&
+    targetSeq->accumulator().triggerMode() == Accumulator::Retrigger) {
+    const_cast<Accumulator&>(targetSeq->accumulator()).tick();
+}
+```
+
+**REFACTOR**: Add defensive programming checks
+
+---
+
+#### Phase 5: Integration Testing (2-3 days)
+
+**Goal**: Verify feature works correctly in all scenarios
+
+##### Test Cases:
+
+**5.1 Basic Functionality:**
+```cpp
+TEST_CASE("RTRIG mode spreads ticks over time") {
+    // retrig=3, divisor=48
+    // Verify 3 ticks at timestamps: 0, 16, 32
+    // Verify accumulator value increases one-by-one
+}
+
+TEST_CASE("STEP mode still works (no regression)") {
+    // Verify STEP mode unchanged
+}
+
+TEST_CASE("GATE mode still works (no regression)") {
+    // Verify GATE mode unchanged
+}
+```
+
+**5.2 Edge Cases:**
+```cpp
+TEST_CASE("High retrigger count doesn't overflow queue") {
+    // retrig=7, pulseCount=8
+    // Verify no crashes, queue handles gracefully
+}
+
+TEST_CASE("Rapid pattern changes don't cause crashes") {
+    // Schedule ticks, switch pattern rapidly
+    // Verify no dangling references
+}
+
+TEST_CASE("Fill mode transitions are safe") {
+    // Test main→fill→main transitions
+}
+
+TEST_CASE("Project load clears stale tick queue") {
+    // Load new project
+    // Verify old ticks don't fire
+}
+```
+
+**5.3 Hardware Testing:**
+- Flash to hardware
+- Test with real-time pattern changes
+- Test with rapid button presses
+- Monitor for crashes (leave running overnight)
+
+---
+
+#### Phase 6: Documentation & Cleanup (1 day)
+
+**6.1 Update Documentation:**
+- `CLAUDE.md` - Update RTRIG mode description
+- `QWEN.md` - Update trigger mode behavior section
+- `CHANGELOG.md` - Add experimental feature note
+- `RTRIG-Timing-Research.md` - Add "Implementation Status" section
+
+**6.2 Code Cleanup:**
+- Remove old immediate-tick code
+- Add inline comments explaining queue-based approach
+- Document validation logic
+- Add debug logging (conditional compilation)
+
+**6.3 Add Feature Flag (Optional):**
+```cpp
+// In Config.h
+#define CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS 1
+
+// In code:
+#if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+    // Queue-based tick scheduling
+#else
+    // Original immediate-tick behavior
+#endif
+```
+
+---
+
+### Implementation Checklist
+
+**Phase 1: Model Layer** (2-3 days)
+- [ ] Step 1.1: Define AccumulatorTickEvent struct
+- [ ] Step 1.2: Add _accumulatorTickQueue to NoteTrackEngine
+- [ ] Verify compilation, no regressions
+
+**Phase 2: Engine Layer - Scheduling** (3-4 days)
+- [ ] Step 2.1: Analyze current triggerStep() logic
+- [ ] Step 2.2: Schedule ticks in retrigger loop
+- [ ] Remove old immediate-tick code
+- [ ] Integration tests pass
+
+**Phase 3: Engine Layer - Processing** (2-3 days)
+- [ ] Step 3.1: Process tick queue in tick() method
+- [ ] Add sequence validation logic
+- [ ] Manual testing in simulator
+
+**Phase 4: Edge Case Handling** (2-3 days)
+- [ ] Step 4.1: Handle pattern changes
+- [ ] Step 4.2: Handle fill mode transitions
+- [ ] Add queue clearing logic
+- [ ] Defensive programming checks
+
+**Phase 5: Integration Testing** (2-3 days)
+- [ ] All basic functionality tests pass
+- [ ] All edge case tests pass
+- [ ] Hardware testing (no crashes)
+- [ ] Overnight stress test
+
+**Phase 6: Documentation** (1 day)
+- [ ] Update all documentation
+- [ ] Code cleanup and comments
+- [ ] Optional: Add feature flag
+
+---
+
+### Success Criteria
+
+**Functional:**
+- ✅ RTRIG mode ticks spread over time (one per retrigger as it fires)
+- ✅ STEP and GATE modes unchanged (no regression)
+- ✅ Accumulator value increases one-by-one in RTRIG mode
+- ✅ Ticks align with retrigger gate timestamps
+
+**Stability:**
+- ✅ No crashes during pattern changes
+- ✅ No crashes during fill mode transitions
+- ✅ No crashes during project load/save
+- ✅ Safe handling of rapid user input
+- ✅ Passes overnight stress test on hardware
+
+**Code Quality:**
+- ✅ All tests pass (unit + integration)
+- ✅ Code well-documented with comments
+- ✅ Defensive programming for edge cases
+- ✅ No memory leaks
+- ✅ Performance impact < 5% (profiling)
+
+---
+
+### Risks & Mitigation
+
+**Risk 1: Sequence Invalid Between Schedule and Fire** 🟠
+- **Mitigation**: Validate sequence pointer before dereferencing
+- **Mitigation**: Clear queue on pattern/sequence changes
+- **Mitigation**: Use sequence ID instead of pointer
+
+**Risk 2: Queue Overflow with High Retrigger Counts** 🟡
+- **Mitigation**: Test with retrig=7, pulseCount=8 (worst case)
+- **Mitigation**: Document queue limits in code comments
+- **Mitigation**: Consider larger queue if needed (16 → 32 entries)
+
+**Risk 3: Thread Safety Issues** 🟠
+- **Mitigation**: Review thread model in FreeRTOS task documentation
+- **Mitigation**: Add locks if tick() and triggerStep() on different threads
+- **Mitigation**: Test with TSAN if available
+
+**Risk 4: Performance Impact** 🟡
+- **Mitigation**: Profile before/after implementation
+- **Mitigation**: Keep processing loop tight (no allocations)
+- **Mitigation**: Early exit if queue empty
+
+**Risk 5: Difficult to Debug Edge Cases** 🟠
+- **Mitigation**: Add debug logging (conditional compilation)
+- **Mitigation**: Unit test all edge cases
+- **Mitigation**: Hardware testing with all scenarios
+
+---
+
+### Alternative: Accept Current Behavior
+
+**If implementation becomes too risky or complex:**
+- Revert changes and accept burst mode (current behavior)
+- Document as known limitation
+- Musical value: Burst mode is still useful
+- Zero crashes, zero risk
+
+**Decision Point**: After Phase 4, assess stability
+- If stable → Continue to Phase 5
+- If crashes persist → Revert to burst mode
+
+---
+
+### Key Files
+
+**Model Layer:**
+- `src/apps/sequencer/engine/NoteTrackEngine.h` - AccumulatorTickEvent struct, queue declaration
+- `src/apps/sequencer/model/Accumulator.h/cpp` - No changes needed
+
+**Engine Layer:**
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Schedule and process tick queue
+
+**Testing:**
+- `src/tests/unit/sequencer/TestAccumulatorTickQueue.cpp` (NEW)
+- `src/tests/integration/sequencer/TestNoteTrackEngineRetrigger.cpp` (NEW)
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Update tests
+
+**Documentation:**
+- `CLAUDE.md` - Update RTRIG mode description
+- `QWEN.md` - Update trigger mode behavior
+- `CHANGELOG.md` - Add experimental feature
+- `RTRIG-Timing-Research.md` - Add implementation status
+
+---
+
 ## Completed - Archive
 
 ### 🐛 BUG FIX: Accumulator State Not Saved to Project File (COMPLETED)
