@@ -28,6 +28,7 @@ Types::LayerRange NoteSequence::layerRange(Layer layer) {
     CASE(Condition)
     case Layer::AccumulatorTrigger:
         return { 0, 1 };
+    CASE(PulseCount)
     case Layer::Last:
         break;
     }
@@ -70,6 +71,8 @@ int NoteSequence::layerDefaultValue(Layer layer)
         return int(step.condition());
     case Layer::AccumulatorTrigger:
         return step.isAccumulatorTrigger() ? 1 : 0;
+    case Layer::PulseCount:
+        return step.pulseCount();
     case Layer::Last:
         break;
     }
@@ -107,6 +110,8 @@ int NoteSequence::Step::layerValue(Layer layer) const {
         return int(condition());
     case Layer::AccumulatorTrigger:
         return isAccumulatorTrigger() ? 1 : 0;
+    case Layer::PulseCount:
+        return pulseCount();
     case Layer::Last:
         break;
     }
@@ -157,6 +162,9 @@ void NoteSequence::Step::setLayerValue(Layer layer, int value) {
         break;
     case Layer::AccumulatorTrigger:
         setAccumulatorTrigger(value != 0);
+        break;
+    case Layer::PulseCount:
+        setPulseCount(value);
         break;
     case Layer::Last:
         break;

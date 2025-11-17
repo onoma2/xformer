@@ -53,6 +53,7 @@ public:
         NoteVariationProbability,
         Condition,
         AccumulatorTrigger,
+        PulseCount,
         Last
     };
 
@@ -72,6 +73,7 @@ public:
         case Layer::NoteVariationProbability:   return "NOTE PROB";
         case Layer::Condition:                  return "CONDITION";
         case Layer::AccumulatorTrigger:         return "ACCUM";
+        case Layer::PulseCount:                 return "PULSE COUNT";
         case Layer::Last:                       break;
         }
         return nullptr;
