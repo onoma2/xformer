@@ -156,6 +156,36 @@ make -j flash_bootloader
 make -j flash_sequencer
 ```
 
+## New Feature: Accumulator
+
+The PEW|FORMER firmware now includes an advanced accumulator feature that provides powerful parameter modulation capabilities:
+
+### Core Features:
+- **Stateful Counter**: Increments/decrements based on configurable parameters
+- **Step-Triggered**: Updates when specific sequence steps are triggered
+- **Multi-Mode Operation**: Supports four distinct operational modes
+- **Real-Time Modulation**: Applies modulation to note pitch in real-time
+
+### Operational Modes:
+- **Wrap**: Values wrap from max to min and vice versa
+- **Pendulum**: Bidirectional counting with direction reversal at boundaries
+- **Random**: Generates random values within min/max range when triggered
+- **Hold**: Clamps at min/max boundaries without wrapping
+
+### UI Controls:
+- **ACCUM Page**: Dedicated parameter editing interface with "ACCUM" header
+- **ACCST Page**: Per-step trigger configuration with "ACCST" header
+- **Integration**: Accessible via existing sequence navigation (Sequence key cycles: NoteSequence → Accumulator → AccumulatorSteps → NoteSequence)
+
+### Configuration Parameters:
+- Enable/Disable control
+- Direction (Up, Down, Freeze)
+- Order (Wrap, Pendulum, Random, Hold)
+- Polarity (Unipolar, Bipolar)
+- Value Range (-100 to 100)
+- Step Size (1-100)
+- Trigger mapping per step
+
 Flashing to the hardware is done using OpenOCD. By default, this expects an Olimex ARM-USB-OCD-H JTAG to be attached to the USB port. You can easily reconfigure this to use a different JTAG by editing the `OPENOCD_INTERFACE` variable in the `src/platform/stm32/CMakeLists.txt` file. Make sure to change both occurrences. A list of available interfaces can be found in the `tools/openocd/share/openocd/scripts/interface` directory (or `/home/vagrant/tools/openocd/share/openocd/scripts/interface` when running the virtual machine).
 
 ### Developing for the simulator

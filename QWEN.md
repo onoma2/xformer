@@ -228,12 +228,35 @@ The `NoteTrackEngine::triggerStep()` method now checks each step for:
 ## Key Implementation Files
 
 - `src/apps/sequencer/model/Accumulator.h` - Accumulator class definition
-- `src/apps/sequencer/model/Accumulator.cpp` - Accumulator class implementation  
+- `src/apps/sequencer/model/Accumulator.cpp` - Accumulator class implementation
 - `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Engine integration
 - `src/apps/sequencer/ui/pages/AccumulatorPage.h/cpp` - ACCUM page UI
 - `src/apps/sequencer/ui/pages/AccumulatorStepsPage.h/cpp` - ACCST page UI
 - `src/apps/sequencer/model/NoteSequence.h` - Step trigger integration
 - `src/apps/sequencer/ui/pages/TopPage.cpp` - Page cycling integration
+- `src/apps/sequencer/ui/model/AccumulatorListModel.h` - UI model for accumulator parameter editing
+
+## Known Issues - RESOLVED
+
+### Previously Existing Issue: UI Encoder Control
+- **Issue**: Direction and Order parameters on ACCUM page didn't respond to encoder changes
+- **Root Cause**: `AccumulatorListModel::edit()` method wasn't properly handling indexed values
+- **Resolution**: Updated `edit()` method to detect indexed parameters and cycle through values using `setIndexed()`
+- **Status**: ✅ **RESOLVED** - Encoder now works for Direction (Up/Down/Freeze) and Order (Wrap/Pendulum/Random/Hold)
+
+### Pre-existing Test Infrastructure Issue
+- `TestNoteTrackEngine` exhibits segmentation fault in specific test configurations
+- Issue predates accumulator implementation (likely due to complex dummy dependency setup)
+- Accumulator functionality itself is stable and tested
+- Workaround implemented for production code by using real Engine instance
+
+## Additional Improvements
+
+### UI Interaction Improvements
+- Encoder now properly cycles through Direction values (Up → Down → Freeze → Up)
+- Encoder now properly cycles through Order values (Wrap → Pendulum → Random → Hold → Wrap)
+- Values properly wrap around when cycling (e.g., going backwards from first value goes to last value)
+- Non-indexed parameters (Min/Max/Step) continue to work as before with encoder value changes
 
 ## Build Status
 

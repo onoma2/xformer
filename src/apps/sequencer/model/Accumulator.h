@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <algorithm> // For std::min and std::max
+#include "core/utils/Random.h"
 
 class Accumulator {
 public:
@@ -40,6 +41,11 @@ public:
     void setPolarity(Polarity polarity) { _polarity = polarity; }
 
 private:
+    void tickWithWrap() const;
+    void tickWithPendulum() const;
+    void tickWithRandom() const;
+    void tickWithHold() const;
+
     uint8_t _mode : 2;
     uint8_t _polarity : 1;
     uint8_t _direction : 2;
@@ -48,6 +54,7 @@ private:
     uint8_t _ratchetTriggerMode : 3;
 
     mutable int16_t _currentValue;  // Mark as mutable to allow modification through const references
+    mutable int8_t _pendulumDirection; // For Pendulum mode: 1 for up, -1 for down
     int16_t _minValue;
     int16_t _maxValue;
     uint8_t _stepValue;

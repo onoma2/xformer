@@ -43,8 +43,22 @@ public:
 
     virtual void edit(int row, int column, int value, bool shift) override {
         if (!_sequence || column != 1) return;
-        
-        editValue(Item(row), value, shift);
+
+        // Check if this row has indexed values (Direction or Order)
+        int count = indexedCount(row);
+        if (count > 0) {
+            // For indexed values, cycle through the options
+            int current = indexed(row);
+            if (current >= 0) {
+                int next = (current + value) % count;
+                // Handle negative values properly
+                if (next < 0) next += count;
+                setIndexed(row, next);
+            }
+        } else {
+            // For non-indexed values, use the original editValue method
+            editValue(Item(row), value, shift);
+        }
     }
 
     virtual int indexedCount(int row) const override {
