@@ -93,6 +93,7 @@ void NoteTrackEngine::reset() {
     _sequenceState.reset();
     _currentStep = -1;
     _prevCondition = false;
+    _pulseCounter = 0;
     _activity = false;
     _gateOutput = false;
     _cvOutput = 0.f;
@@ -109,6 +110,7 @@ void NoteTrackEngine::restart() {
     _freeRelativeTick = 0;
     _sequenceState.reset();
     _currentStep = -1;
+    _pulseCounter = 0;
 }
 
 TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
@@ -138,9 +140,24 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
         switch (_noteTrack.playMode()) {
         case Types::PlayMode::Aligned:
             if (relativeTick % divisor == 0) {
-                _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                // Pulse count logic: Get current step's pulse count from sequence state
+                int currentStepIndex = _sequenceState.step();
+                int stepPulseCount = sequence.step(currentStepIndex).pulseCount();
+
+                // Increment pulse counter
+                _pulseCounter++;
+
+                // Fire the current step BEFORE advancing
                 recordStep(tick, divisor);
                 triggerStep(tick, divisor);
+
+                // Only advance to next step when all pulses for current step are complete
+                bool shouldAdvanceStep = (_pulseCounter > stepPulseCount);
+
+                if (shouldAdvanceStep) {
+                    _pulseCounter = 0;
+                    _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                }
             }
             break;
         case Types::PlayMode::Free:
@@ -149,9 +166,24 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                 _freeRelativeTick = 0;
             }
             if (relativeTick == 0) {
-                _sequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                // Pulse count logic: Get current step's pulse count from sequence state
+                int currentStepIndex = _sequenceState.step();
+                int stepPulseCount = sequence.step(currentStepIndex).pulseCount();
+
+                // Increment pulse counter
+                _pulseCounter++;
+
+                // Fire the current step BEFORE advancing
                 recordStep(tick, divisor);
                 triggerStep(tick, divisor);
+
+                // Only advance to next step when all pulses for current step are complete
+                bool shouldAdvanceStep = (_pulseCounter > stepPulseCount);
+
+                if (shouldAdvanceStep) {
+                    _pulseCounter = 0;
+                    _sequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                }
             }
             break;
         case Types::PlayMode::Last:
@@ -327,19 +359,47 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     }
 
     if (stepGate) {
-        uint32_t stepLength = (divisor * evalStepLength(step, _noteTrack.lengthBias())) / NoteSequence::Length::Range;
-        int stepRetrigger = evalStepRetrigger(step, _noteTrack.retriggerProbabilityBias());
-        if (stepRetrigger > 1) {
-            uint32_t retriggerLength = divisor / stepRetrigger;
-            uint32_t retriggerOffset = 0;
-            while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
-                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true });
-                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false });
-                retriggerOffset += retriggerLength;
+        // Gate mode logic: Determine if gate should fire on this pulse
+        bool shouldFireGate = false;
+        int gateMode = step.gateMode();
+        int pulseCount = step.pulseCount();
+
+        switch (gateMode) {
+        case 0: // ALL - Fire gates on every pulse (default, backward compatible)
+            shouldFireGate = true;
+            break;
+        case 1: // FIRST - Fire gate only on first pulse
+            shouldFireGate = (_pulseCounter == 1);
+            break;
+        case 2: // HOLD - Fire ONE long gate on first pulse
+            shouldFireGate = (_pulseCounter == 1);
+            break;
+        case 3: // FIRSTLAST - Fire gates on first and last pulse
+            shouldFireGate = (_pulseCounter == 1) || (_pulseCounter == (pulseCount + 1));
+            break;
+        }
+
+        if (shouldFireGate) {
+            uint32_t stepLength = (divisor * evalStepLength(step, _noteTrack.lengthBias())) / NoteSequence::Length::Range;
+
+            // HOLD mode: extend gate length to cover all pulses
+            if (gateMode == 2) {
+                stepLength = divisor * (pulseCount + 1);
             }
-        } else {
-            _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true });
-            _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false });
+
+            int stepRetrigger = evalStepRetrigger(step, _noteTrack.retriggerProbabilityBias());
+            if (stepRetrigger > 1) {
+                uint32_t retriggerLength = divisor / stepRetrigger;
+                uint32_t retriggerOffset = 0;
+                while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
+                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true });
+                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false });
+                    retriggerOffset += retriggerLength;
+                }
+            } else {
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true });
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false });
+            }
         }
     }
 

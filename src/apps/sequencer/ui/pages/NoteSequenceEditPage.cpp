@@ -174,6 +174,28 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
                 step.retriggerProbability() + 1, NoteSequence::RetriggerProbability::Range
             );
             break;
+        case Layer::PulseCount: {
+            // Display pulse count as number (shows actual pulses: value + 1)
+            canvas.setColor(Color::Bright);
+            FixedStringBuilder<8> str("%d", step.pulseCount() + 1);
+            canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
+            break;
+        }
+        case Layer::GateMode: {
+            // Display gate mode as abbreviation
+            canvas.setColor(Color::Bright);
+            const char* modeStr;
+            switch (step.gateMode()) {
+            case 0: modeStr = "A"; break;
+            case 1: modeStr = "1"; break;
+            case 2: modeStr = "H"; break;
+            case 3: modeStr = "1L"; break;
+            default: modeStr = "A"; break;
+            }
+            FixedStringBuilder<8> str("%s", modeStr);
+            canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
+            break;
+        }
         case Layer::Length:
             SequencePainter::drawLength(
                 canvas,
@@ -437,6 +459,12 @@ void NoteSequenceEditPage::encoder(EncoderEvent &event) {
             case Layer::AccumulatorTrigger:
                 step.setAccumulatorTrigger(event.value() > 0);
                 break;
+            case Layer::PulseCount:
+                step.setPulseCount(step.pulseCount() + event.value());
+                break;
+            case Layer::GateMode:
+                step.setGateMode(step.gateMode() + event.value());
+                break;
             case Layer::Condition:
                 step.setCondition(ModelUtils::adjustedEnum(step.condition(), event.value()));
                 break;
@@ -509,6 +537,9 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
             setLayer(Layer::Slide);
             break;
         case Layer::Slide:
+            setLayer(Layer::GateMode);
+            break;
+        case Layer::GateMode:
             setLayer(Layer::Gate);
             break;
         default:
@@ -520,6 +551,12 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
         switch (layer()) {
         case Layer::Retrigger:
             setLayer(Layer::RetriggerProbability);
+            break;
+        case Layer::RetriggerProbability:
+            setLayer(Layer::PulseCount);
+            break;
+        case Layer::PulseCount:
+            setLayer(Layer::Retrigger);
             break;
         default:
             setLayer(Layer::Retrigger);
@@ -570,9 +607,11 @@ int NoteSequenceEditPage::activeFunctionKey() {
     case Layer::GateProbability:
     case Layer::GateOffset:
     case Layer::Slide:
+    case Layer::GateMode:
         return 0;
     case Layer::Retrigger:
     case Layer::RetriggerProbability:
+    case Layer::PulseCount:
         return 1;
     case Layer::Length:
     case Layer::LengthVariationRange:
@@ -675,6 +714,27 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
         canvas.setColor(Color::Bright);
         canvas.drawTextCentered(64 + 32 + 64, 32 - 4, 32, 8, str);
         break;
+    case Layer::PulseCount:
+        str.reset();
+        str("%d", step.pulseCount() + 1);
+        canvas.setFont(Font::Small);
+        canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
+        break;
+    case Layer::GateMode: {
+        const char* modeName;
+        switch (step.gateMode()) {
+        case 0: modeName = "A"; break;
+        case 1: modeName = "1"; break;
+        case 2: modeName = "H"; break;
+        case 3: modeName = "1L"; break;
+        default: modeName = "A"; break;
+        }
+        str.reset();
+        str("%s", modeName);
+        canvas.setFont(Font::Small);
+        canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
+        break;
+    }
     case Layer::Length:
         SequencePainter::drawLength(
             canvas,

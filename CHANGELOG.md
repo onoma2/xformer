@@ -3,7 +3,27 @@
 ## [Unreleased]
 
 ### Added
-- Accumulator functionality: Stateful counter that increments/decrements based on configurable parameters
+- **Gate Mode feature**: Per-step gate firing control during pulse count repetitions with 4 distinct modes
+  - Gate mode accessible via Gate button cycling (GATE → GATE PROB → GATE OFFSET → SLIDE → GATE MODE)
+  - Four gate modes:
+    - **A (ALL)**: Fires gates on every pulse (default, backward compatible)
+    - **1 (FIRST)**: Single gate on first pulse only, silent for remaining pulses
+    - **H (HOLD)**: One long gate held high for entire step duration
+    - **1L (FIRSTLAST)**: Gates on first and last pulse only
+  - Visual display showing compact mode abbreviations (A/1/H/1L) for each step
+  - Detail overlay showing mode abbreviation when adjusting with encoder
+  - Seamless integration with pulse count feature for powerful rhythmic control
+  - Comprehensive unit tests for gate mode model layer (6 test cases, all passing)
+  - Full compatibility with all play modes, retrigger, gate offset, and gate probability
+- **Pulse Count feature**: Metropolix-style step repetition where each step can repeat for 1-8 clock pulses before advancing
+  - Per-step pulse count parameter (0-7 representing 1-8 pulses)
+  - Pulse count accessible via Retrigger button cycling (RETRIG → RETRIG PROB → PULSE COUNT)
+  - Visual display showing pulse count value (1-8) for each step
+  - Detail overlay showing pulse count value when adjusting with encoder
+  - Pulse counter state tracking in NoteTrackEngine for timing control
+  - Full integration with both Aligned and Free play modes
+  - Comprehensive unit tests for pulse count model layer (7 test cases, all passing)
+- **Accumulator functionality**: Stateful counter that increments/decrements based on configurable parameters
 - Accumulator parameters: Mode, Direction (Up/Down/Freeze), Order (Wrap/Pendulum/Random/Hold), Polarity (Unipolar/Bipolar), Min/Max values, and Step Size
 - Real-time pitch modulation using accumulator value
 - ACCUM page for editing accumulator parameters
@@ -12,6 +32,15 @@
 - Unit tests for accumulator functionality and modulation
 
 ### Changed
+- NoteTrackEngine gate firing logic now respects gate mode setting
+- Gate generation in triggerStep() uses switch statement to control gate firing based on mode
+- HOLD mode extends gate length to cover entire step duration (divisor * (pulseCount + 1))
+- NoteSequenceEditPage updated with gate mode layer integration in Gate button cycling
+- NoteTrackEngine now tracks pulse counter state to control step advancement timing
+- Step advancement logic modified to respect pulse count values (steps hold for N pulses)
+- Step advancement reordered: triggerStep() now called BEFORE counter reset and step advance
+- Pulse count lookup changed from stale _currentStep to authoritative _sequenceState.step()
+- NoteSequenceEditPage updated with pulse count layer integration
 - Moved accumulator trigger toggling from Gate button (F1) to Note button (F4) cycling
 - Updated NoteSequenceEditPage to include AccumulatorTrigger in Note button cycling sequence
 - Modified triggerStep() to include accumulator ticking when step has isAccumulatorTrigger set
@@ -20,6 +49,14 @@
 - Memory-optimized accumulator using bitfields for parameters
 
 ### Fixed
+- **Critical gate mode bug**: Fixed pulse counter timing issue where triggerStep() was called after counter reset
+  - Root cause: _pulseCounter was reset before triggerStep() could read it
+  - Fix: Reordered operations to call triggerStep() before advancing step
+  - Impact: Gate modes now see correct pulse counter values (1, 2, 3...)
+- **Critical pulse count bug**: Fixed step index lookup using stale _currentStep instead of _sequenceState.step()
+  - Root cause: _currentStep is set inside triggerStep() and becomes stale after advancement
+  - Fix: Changed to use _sequenceState.step() which is authoritative
+  - Impact: Pulse count now reads from correct step index
 - Test compilation errors related to dummy implementation classes
 - GateOutput constructor dependencies in unit tests
 

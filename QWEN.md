@@ -1,8 +1,12 @@
-# QWEN.md - Accumulator Feature Development Report
+# QWEN.md - Feature Development Reports
 
 ## Overview
 
-This document details the implementation of the accumulator feature for the PEW|FORMER Eurorack sequencer firmware. The accumulator adds a powerful new modulation capability allowing for dynamic parameter changes over time based on step triggers.
+This document details the implementation of major features for the PEW|FORMER Eurorack sequencer firmware, including the accumulator, pulse count, and gate mode features. These features add powerful new sequencing capabilities and creative control.
+
+---
+
+# Part 1: Accumulator Feature
 
 ## Feature Specification
 
@@ -261,6 +265,165 @@ The `NoteTrackEngine::triggerStep()` method now checks each step for:
 - Page cycling between NoteSequence, ACCUM, and ACCST working
 
 ---
-Document Version: 1.0
+
+# Part 2: Pulse Count Feature
+
+## Feature Specification
+
+### Overview
+The pulse count feature is a Metropolix-style step repetition system that allows each step to repeat for a configurable number of clock pulses (1-8) before advancing to the next step. Unlike retrigger (which subdivides a step), pulse count extends the step duration by repeating it.
+
+### Core Parameters
+- **Pulse Count**: Per-step value from 0-7 (representing 1-8 clock pulses)
+  - 0 = 1 pulse (normal/default behavior)
+  - 1 = 2 pulses
+  - 7 = 8 pulses (maximum)
+
+## Implementation Architecture
+
+### Model Layer (`src/apps/sequencer/model/`)
+- **NoteSequence.h**: Added `pulseCount` field to Step class
+  - 3-bit bitfield in `_data1` union (bits 17-19)
+  - Type: `using PulseCount = UnsignedValue<3>;`
+  - Automatic clamping (0-7)
+  - Integrated with Layer enum for UI access
+  - Serialization automatic via `_data1.raw`
+
+### Engine Layer (`src/apps/sequencer/engine/`)
+- **NoteTrackEngine.h/cpp**: Pulse counter state management
+  - Added `_pulseCounter` member variable
+  - Tracks current pulse within step (1 to pulseCount+1)
+  - Increments on each clock pulse
+  - Only advances step when `_pulseCounter > step.pulseCount()`
+  - Resets counter when advancing to next step
+  - Works with both Aligned and Free play modes
+
+### UI Layer (`src/apps/sequencer/ui/pages/`)
+- **NoteSequenceEditPage.cpp**: Full UI integration
+  - Added to Retrigger button cycling
+  - Encoder support for value adjustment
+  - Visual display showing pulse count (1-8)
+  - Detail overlay showing current value
+
+## Testing Status
+
+✅ **Fully tested and verified:**
+- All unit tests pass (7 test cases covering model layer)
+- Engine logic verified in simulator
+- UI integration complete and functional
+- Hardware verified and working
+- Compatible with all existing features
+
+## Use Cases
+- **Variable rhythm patterns**: Create polyrhythmic sequences by varying step durations
+- **Step emphasis**: Make important steps longer by increasing their pulse count
+- **Complex timing**: Combine with retrigger for intricate rhythmic structures
+- **Pattern variation**: Change pulse counts to create variations without altering notes
+
+## Key Files
+- `src/apps/sequencer/model/NoteSequence.h/cpp` - Model layer implementation
+- `src/apps/sequencer/engine/NoteTrackEngine.h/cpp` - Engine timing logic
+- `src/apps/sequencer/ui/pages/NoteSequenceEditPage.cpp` - UI integration
+- `src/tests/unit/sequencer/TestPulseCount.cpp` - Unit tests
+
+---
+
+# Part 3: Gate Mode Feature
+
+## Feature Specification
+
+### Overview
+Gate mode is a per-step parameter that controls how gates are fired during pulse count repetitions. It provides fine-grained control over gate timing patterns when combined with the pulse count feature.
+
+### Four Gate Mode Types
+- **A (ALL, 0)**: Fires gates on every pulse (default, backward compatible)
+- **1 (FIRST, 1)**: Single gate on first pulse only, silent for remaining pulses
+- **H (HOLD, 2)**: One long gate held high for entire step duration
+- **1L (FIRSTLAST, 3)**: Gates on first and last pulse only
+
+## Implementation Architecture
+
+### Model Layer (`src/apps/sequencer/model/`)
+- **NoteSequence.h**: Added `gateMode` field to Step class
+  - 2-bit bitfield in `_data1` union (bits 20-21)
+  - Type: `using GateMode = UnsignedValue<2>;`
+  - Automatic clamping (0-3)
+  - GateModeType enum: All=0, First=1, Hold=2, FirstLast=3
+  - Integrated with Layer enum for UI access
+  - Serialization automatic via `_data1.raw`
+  - 10 bits remaining in `_data1` for future features
+
+### Engine Layer (`src/apps/sequencer/engine/`)
+- **NoteTrackEngine.cpp**: Gate firing logic in `triggerStep()`
+  - Switch statement controls gate generation based on mode
+  - Uses `_pulseCounter` to determine current pulse (1 to pulseCount+1)
+  - **ALL mode**: `shouldFireGate = true` (every pulse)
+  - **FIRST mode**: `shouldFireGate = (_pulseCounter == 1)` (first only)
+  - **HOLD mode**: Single gate on first pulse with extended length `divisor * (pulseCount + 1)`
+  - **FIRSTLAST mode**: `shouldFireGate = (_pulseCounter == 1 || _pulseCounter == pulseCount + 1)`
+  - Works with both Aligned and Free play modes
+
+### UI Layer (`src/apps/sequencer/ui/pages/`)
+- **NoteSequenceEditPage.cpp**: Full UI integration
+  - Added to Gate button (F1) cycling mechanism
+  - Encoder support for value adjustment (0-3 with clamping)
+  - Visual display showing compact abbreviations (A/1/H/1L)
+  - Detail overlay showing mode abbreviation when adjusting
+
+## Development Process
+
+### TDD Methodology
+Followed strict Test-Driven Development (RED-GREEN-REFACTOR):
+- **Phase 1 (Model Layer)**: 6 unit tests written first, all passing
+- **Phase 2 (Engine Layer)**: Design documented, then implemented
+- **Phase 3 (UI Integration)**: Button cycling, visual display, encoder support
+- **Phase 4 (Documentation)**: Complete documentation in TODO.md, CLAUDE.md, README.md
+
+### Bug Fixes
+Two critical bugs discovered and fixed during testing:
+1. **Pulse counter timing bug**: triggerStep() was called after counter reset
+   - Fixed by calling triggerStep() BEFORE advancing step
+2. **Step index lookup bug**: Used stale `_currentStep` instead of `_sequenceState.step()`
+   - Fixed by reading from authoritative `_sequenceState.step()`
+
+## Testing Status
+
+✅ **Fully tested and verified:**
+- All unit tests pass (6 test cases covering model layer)
+- Engine logic verified in simulator with all 4 modes
+- UI integration complete and functional
+- Two critical bugs discovered and fixed
+- Hardware verified and working
+- Compatible with existing features
+- Production ready
+
+## Use Cases
+- **Accent patterns**: Use FIRST mode to create accents on downbeats while step repeats
+- **Long notes**: Use HOLD mode to sustain notes across multiple pulses
+- **Rhythmic variations**: Use FIRSTLAST mode to create "bouncing" rhythms
+- **Silent repeats**: Combine FIRST mode with high pulse counts for rhythmic gaps
+- **Dynamic patterns**: Mix different gate modes across steps for complex gate patterns
+
+## Compatibility
+- ✅ Works with all play modes (Aligned, Free)
+- ✅ Integrates seamlessly with pulse count feature
+- ✅ Compatible with retrigger feature
+- ✅ Works with gate offset and gate probability
+- ✅ Compatible with slide/portamento
+- ✅ Works with fill modes
+- ✅ Backward compatible (default mode 0 = ALL maintains existing behavior)
+- ✅ Serialization supported (saved with projects)
+
+## Key Files
+- `src/apps/sequencer/model/NoteSequence.h/cpp` - Model layer implementation
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Engine gate firing logic
+- `src/apps/sequencer/ui/pages/NoteSequenceEditPage.cpp` - UI integration
+- `src/tests/unit/sequencer/TestGateMode.cpp` - Unit tests
+- `GATE_MODE_TDD_PLAN.md` - Complete technical specification
+- `GATE_MODE_ENGINE_DESIGN.md` - Engine implementation design
+
+---
+
+Document Version: 2.0
 Last Updated: November 2025
-Project: PEW|FORMER Accumulator Implementation
+Project: PEW|FORMER Feature Implementation (Accumulator, Pulse Count, Gate Mode)

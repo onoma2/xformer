@@ -93,6 +93,13 @@ The sequencer application follows a Model-Engine-UI separation:
 - `Model.h`: Top-level data container holding Project, Settings, ClipBoard
 - `Project.h`: Musical project data (tracks, sequences, patterns)
 - `Settings.h`: Global system settings
+- `NoteSequence.h`: Note sequence with multiple editable layers:
+  - Gate-related: Gate, GateProbability, GateOffset, Slide, GateMode
+  - Retrigger: Retrigger, RetriggerProbability, PulseCount
+  - Length: Length, LengthVariationRange, LengthVariationProbability
+  - Note: Note, NoteVariationRange, NoteVariationProbability
+  - Other: Condition, AccumulatorTrigger
+- `Accumulator.h`: Accumulator feature for real-time parameter modulation
 - Thread-safe access via `WriteLock` and `ConfigLock`
 
 **Engine** (`src/apps/sequencer/engine/`):
@@ -157,6 +164,297 @@ Three major improvement categories documented in `doc/improvements/`:
 1. **Noise reduction** (`noise-reduction.md`): Display settings to minimize OLED noise
 2. **Shape improvements** (`shape-improvements.md`): Enhanced CV curve generation
 3. **MIDI improvements** (`midi-improvements.md`): Extended MIDI functionality
+
+## Accumulator Feature
+
+The PEW|FORMER firmware includes an advanced accumulator feature that provides powerful real-time parameter modulation capabilities. See `QWEN.md` for complete implementation documentation.
+
+### Overview
+
+An accumulator is a stateful counter that increments/decrements based on configurable parameters and updates when specific sequence steps are triggered. It modulates musical parameters (currently pitch, with potential for expansion to gate length, probability, and CV curves).
+
+### Core Parameters
+
+- **Enable**: On/off control
+- **Mode**: Stage or Track level operation
+- **Direction**: Up, Down, or Freeze
+- **Order**: Boundary behavior modes
+  - **Wrap**: Values wrap from max to min and vice versa
+  - **Pendulum**: Bidirectional counting with direction reversal at boundaries
+  - **Random**: Generates random values within min/max range when triggered
+  - **Hold**: Clamps at min/max boundaries without wrapping
+- **Polarity**: Unipolar or Bipolar range
+- **Value Range**: Min/Max constraints (-100 to 100)
+- **Step Size**: Amount to increment/decrement per trigger (1-100)
+- **Current Value**: The current accumulated value (read-only)
+
+### UI Integration
+
+**AccumulatorPage ("ACCUM"):**
+- Parameter editing interface using list-based layout
+- All configurable parameters accessible via encoder
+- Real-time value updates
+
+**AccumulatorStepsPage ("ACCST"):**
+- Per-step trigger configuration
+- 16-step toggle interface (STP1-STP16)
+- Visual feedback for active triggers
+
+**NoteSequenceEditPage Integration:**
+- Press Note button (F3) to cycle through: Note → NoteVariationRange → NoteVariationProbability → AccumulatorTrigger → Note
+- When in AccumulatorTrigger layer, use S1-S16 buttons to toggle accumulator triggers for each step
+
+**TopPage Navigation:**
+- Sequence key cycles: NoteSequence → Accumulator → AccumulatorSteps → NoteSequence
+- Maintains current view state
+
+### Implementation Architecture
+
+**Model Layer** (`src/apps/sequencer/model/`):
+- `Accumulator.h/cpp`: Core accumulator logic with all parameters and tick() method
+- `NoteSequence.h`: Integration with sequence steps via `AccumulatorTrigger` layer and `_accumulator` instance
+- Thread-safe with mutable state management for multi-threaded access
+- Memory-efficient bitfield parameter packing
+
+**Engine Layer** (`src/apps/sequencer/engine/`):
+- `NoteTrackEngine.cpp`: Integration in `triggerStep()` and `evalStepNote()`
+  - Checks `step.isAccumulatorTrigger()` and calls `accumulator.tick()` when active
+  - Applies accumulator value to note pitch in real-time during `evalStepNote()`
+
+**UI Layer** (`src/apps/sequencer/ui/pages/`):
+- `AccumulatorPage.h/cpp`: Main parameter editing page
+- `AccumulatorStepsPage.h/cpp`: Step trigger configuration page
+- `ui/model/AccumulatorListModel.h`: List model for parameter editing with indexed value support
+
+### Performance Impact
+
+- Minimal CPU overhead (single conditional check per step)
+- No additional memory per sequence beyond accumulator object
+- UI updates only during manual interaction
+- Compatible with existing timing constraints
+
+### Testing Status
+
+✅ **Fully tested and verified:**
+- All unit tests pass (`TestAccumulator.cpp`)
+- Integration tests confirm real-time modulation
+- Successfully deployed and tested on actual hardware
+- Full compatibility with existing sequencer features
+
+### Future Extensions
+
+Planned enhancements documented in `QWEN.md`:
+- Apply accumulator to gate length and probability
+- Cross-track accumulator influence
+- Integration with arpeggiator
+- CV input tracking
+- Scene recall functionality
+- Extension to curve sequences
+
+### Key Files
+
+- `src/apps/sequencer/model/Accumulator.h/cpp` - Core implementation
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Engine integration
+- `src/apps/sequencer/ui/pages/AccumulatorPage.h/cpp` - ACCUM page UI
+- `src/apps/sequencer/ui/pages/AccumulatorStepsPage.h/cpp` - ACCST page UI
+- `src/apps/sequencer/ui/model/AccumulatorListModel.h` - UI list model
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Unit tests
+
+## Pulse Count Feature
+
+The PEW|FORMER firmware includes a Metropolix-style pulse count feature that allows each step to repeat for a configurable number of clock pulses before advancing to the next step. This enables variable step lengths without changing the global divisor.
+
+### Overview
+
+Pulse count is a per-step parameter that determines how many clock pulses a step will play before the sequencer advances to the next step. Unlike retrigger (which subdivides a step), pulse count extends the step duration by repeating it for multiple clock pulses.
+
+### Core Parameters
+
+- **Pulse Count**: Per-step value from 0-7 (representing 1-8 clock pulses)
+  - 0 = 1 pulse (normal/default behavior)
+  - 1 = 2 pulses
+  - 2 = 3 pulses
+  - ...
+  - 7 = 8 pulses (maximum)
+
+### UI Integration
+
+**Accessing Pulse Count Layer:**
+1. Navigate to STEPS page (track editing view)
+2. Press Retrigger button (F2) to cycle through layers:
+   - First press: RETRIG (retrigger count)
+   - Second press: RETRIG PROB (retrigger probability)
+   - Third press: **PULSE COUNT** ← Feature layer
+   - Fourth press: cycles back to RETRIG
+
+**Editing Pulse Count:**
+1. Select steps using S1-S16 buttons
+2. Turn encoder to adjust pulse count (displays 1-8)
+3. Detail overlay shows current value when adjusting
+4. Visual display shows number above each step
+
+### Implementation Architecture
+
+**Model Layer** (`src/apps/sequencer/model/`):
+- `NoteSequence.h`: Added `pulseCount` field to Step class
+  - 3-bit bitfield in `_data1` union (bits 17-19)
+  - Type: `using PulseCount = UnsignedValue<3>;`
+  - Automatic clamping (0-7)
+  - Integrated with Layer enum for UI access
+  - Serialization automatic via `_data1.raw`
+
+**Engine Layer** (`src/apps/sequencer/engine/`):
+- `NoteTrackEngine.h/cpp`: Pulse counter state management
+  - Added `_pulseCounter` member variable
+  - Tracks current pulse within step
+  - Increments on each clock pulse
+  - Only advances step when `_pulseCounter > step.pulseCount()`
+  - Resets counter when advancing to next step
+  - Works with both Aligned and Free play modes
+
+**UI Layer** (`src/apps/sequencer/ui/pages/`):
+- `NoteSequenceEditPage.cpp`: Full UI integration
+  - Added to Retrigger button cycling
+  - Encoder support for value adjustment
+  - Visual display showing pulse count (1-8)
+  - Detail overlay showing current value
+
+### Use Cases
+
+- **Variable rhythm patterns**: Create polyrhythmic sequences by varying step durations
+- **Step emphasis**: Make important steps longer by increasing their pulse count
+- **Complex timing**: Combine with retrigger for intricate rhythmic structures
+- **Pattern variation**: Change pulse counts to create pattern variations without altering notes
+
+### Compatibility
+
+- ✅ Works with all play modes (Aligned, Free)
+- ✅ Compatible with retrigger feature
+- ✅ Works with fill modes
+- ✅ Integrates with all existing sequencer features
+- ✅ Serialization supported (saved with projects)
+
+### Testing Status
+
+✅ **Fully tested and verified:**
+- All unit tests pass (7 test cases covering model layer)
+- Engine logic verified in simulator
+- UI integration complete and functional
+- Compatible with existing features
+
+### Key Files
+
+- `src/apps/sequencer/model/NoteSequence.h/cpp` - Model layer implementation
+- `src/apps/sequencer/engine/NoteTrackEngine.h/cpp` - Engine timing logic
+- `src/apps/sequencer/ui/pages/NoteSequenceEditPage.cpp` - UI integration
+- `src/tests/unit/sequencer/TestPulseCount.cpp` - Unit tests
+
+## Gate Mode Feature
+
+The PEW|FORMER firmware includes a gate mode feature that controls how gates are fired during pulse count repetitions. This provides fine-grained control over gate timing patterns when combined with the pulse count feature.
+
+### Overview
+
+Gate mode is a per-step parameter that determines the gate firing behavior when a step repeats for multiple pulses. It allows creative rhythmic patterns by controlling which pulses within a step produce gates.
+
+### Core Parameters
+
+- **Gate Mode**: Per-step value from 0-3 (representing 4 different modes)
+  - **A (ALL, 0)**: Fires gates on every pulse (default, backward compatible)
+  - **1 (FIRST, 1)**: Single gate on first pulse only, silent for remaining pulses
+  - **H (HOLD, 2)**: One long gate held high for entire step duration
+  - **1L (FIRSTLAST, 3)**: Gates on first and last pulse only
+
+### UI Integration
+
+**Accessing Gate Mode Layer:**
+1. Navigate to STEPS page (track editing view)
+2. Press Gate button (F1) to cycle through layers:
+   - First press: GATE (gate on/off)
+   - Second press: GATE PROB (gate probability)
+   - Third press: GATE OFFSET (gate timing offset)
+   - Fourth press: SLIDE (slide/portamento)
+   - Fifth press: **GATE MODE** ← Feature layer
+   - Sixth press: cycles back to GATE
+
+**Editing Gate Mode:**
+1. Select steps using S1-S16 buttons
+2. Turn encoder to adjust gate mode (0-3)
+3. Detail overlay shows mode abbreviation when adjusting
+4. Visual display shows compact abbreviation above each step:
+   - A = gates on every pulse
+   - 1 = gate on first pulse only
+   - H = one long continuous gate
+   - 1L = gates on first and last pulse
+
+### Implementation Architecture
+
+**Model Layer** (`src/apps/sequencer/model/`):
+- `NoteSequence.h`: Added `gateMode` field to Step class
+  - 2-bit bitfield in `_data1` union (bits 20-21)
+  - Type: `using GateMode = UnsignedValue<2>;`
+  - Automatic clamping (0-3)
+  - GateModeType enum: All=0, First=1, Hold=2, FirstLast=3
+  - Integrated with Layer enum for UI access
+  - Serialization automatic via `_data1.raw`
+  - 10 bits remaining in `_data1` for future features
+
+**Engine Layer** (`src/apps/sequencer/engine/`):
+- `NoteTrackEngine.cpp`: Gate firing logic in `triggerStep()`
+  - Switch statement controls gate generation based on mode
+  - Uses `_pulseCounter` to determine current pulse (1 to pulseCount+1)
+  - ALL mode: `shouldFireGate = true` (every pulse)
+  - FIRST mode: `shouldFireGate = (_pulseCounter == 1)` (first only)
+  - HOLD mode: Single gate on first pulse with extended length `divisor * (pulseCount + 1)`
+  - FIRSTLAST mode: `shouldFireGate = (_pulseCounter == 1 || _pulseCounter == pulseCount + 1)`
+  - Works with both Aligned and Free play modes
+
+**UI Layer** (`src/apps/sequencer/ui/pages/`):
+- `NoteSequenceEditPage.cpp`: Full UI integration
+  - Added to Gate button (F1) cycling mechanism
+  - Encoder support for value adjustment (0-3 with clamping)
+  - Visual display showing compact abbreviations (A/1/H/1L)
+  - Detail overlay showing mode abbreviation when adjusting
+
+### Use Cases
+
+- **Accent patterns**: Use FIRST mode to create accents on downbeats while step repeats
+- **Long notes**: Use HOLD mode to sustain notes across multiple pulses
+- **Rhythmic variations**: Use FIRSTLAST mode to create "bouncing" rhythms
+- **Silent repeats**: Combine FIRST mode with high pulse counts for rhythmic gaps
+- **Dynamic patterns**: Mix different gate modes across steps for complex gate patterns
+
+### Compatibility
+
+- ✅ Works with all play modes (Aligned, Free)
+- ✅ Integrates seamlessly with pulse count feature
+- ✅ Compatible with retrigger feature
+- ✅ Works with gate offset and gate probability
+- ✅ Compatible with slide/portamento
+- ✅ Works with fill modes
+- ✅ Backward compatible (default mode 0 = ALL maintains existing behavior)
+- ✅ Serialization supported (saved with projects)
+
+### Testing Status
+
+✅ **Fully tested and verified:**
+- All unit tests pass (6 test cases covering model layer)
+- Engine logic verified in simulator with all 4 modes
+- UI integration complete and functional
+- Two critical bugs discovered and fixed during testing:
+  - Pulse counter timing bug (triggerStep called before counter reset)
+  - Step index lookup bug (stale _currentStep instead of _sequenceState.step())
+- Compatible with existing features
+- Production ready
+
+### Key Files
+
+- `src/apps/sequencer/model/NoteSequence.h/cpp` - Model layer implementation
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Engine gate firing logic
+- `src/apps/sequencer/ui/pages/NoteSequenceEditPage.cpp` - UI integration
+- `src/tests/unit/sequencer/TestGateMode.cpp` - Unit tests
+- `GATE_MODE_TDD_PLAN.md` - Complete technical specification
+- `GATE_MODE_ENGINE_DESIGN.md` - Engine implementation design
 
 ## Simulator Interface
 
@@ -251,3 +549,32 @@ Building the sequencer generates multiple artifacts in `build/{platform}/{type}/
 - `.size`: Section sizes
 
 The `compile_commands.json` symlink at `src/compile_commands.json` points to the STM32 release build for IDE integration.
+
+## Third-Party Libraries
+
+The following third-party libraries are used in this project:
+
+- [FreeRTOS](http://www.freertos.org) - Real-time operating system
+- [libopencm3](https://github.com/libopencm3/libopencm3) - Open-source ARM Cortex-M microcontroller library (updated to October 2024)
+- [libusbhost](https://github.com/libusbhost/libusbhost) - USB host library
+- [NanoVG](https://github.com/memononen/nanovg) - Vector graphics rendering
+- [FatFs](http://elm-chan.org/fsw/ff/00index_e.html) - FAT filesystem module
+- [stb_sprintf](https://github.com/nothings/stb/blob/master/stb_sprintf.h) - Fast sprintf implementation
+- [stb_image_write](https://github.com/nothings/stb/blob/master/stb_image_write.h) - Image writing
+- [soloud](https://sol.gfxile.net/soloud/) - Audio engine (simulator)
+- [RtMidi](https://www.music.mcgill.ca/~gary/rtmidi/) - MIDI I/O library (simulator)
+- [pybind11](https://github.com/pybind/pybind11) - Python bindings
+- [tinyformat](https://github.com/c42f/tinyformat) - Type-safe printf
+- [args](https://github.com/Taywee/args) - Command-line argument parsing
+
+## Documentation References
+
+- **CLAUDE.md** (this file) - Main development reference for Claude Code
+- **QWEN.md** - Complete accumulator feature implementation documentation
+- **TODO.md** - Development task tracking and completed features
+- **README.md** - Project overview and build instructions
+- **doc/improvements/** - jackpf improvement documentation
+  - `noise-reduction.md` - Display noise reduction techniques
+  - `shape-improvements.md` - CV curve generation enhancements
+  - `midi-improvements.md` - MIDI functionality extensions
+- **doc/simulator-interface.png** - Simulator UI reference diagram

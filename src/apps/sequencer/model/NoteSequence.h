@@ -34,6 +34,16 @@ public:
     using NoteVariationRange = SignedValue<7>;
     using NoteVariationProbability = UnsignedValue<3>;
     using Condition = UnsignedValue<7>;
+    using PulseCount = UnsignedValue<3>;  // 0-7 representing 1-8 pulses
+    using GateMode = UnsignedValue<2>;    // 0-3 representing 4 modes
+
+    enum class GateModeType {
+        All = 0,        // Fires gates on every pulse (default)
+        First = 1,      // Single gate on first pulse only
+        Hold = 2,       // One long gate for entire duration
+        FirstLast = 3,  // Gates on first and last pulse only
+        Last
+    };
 
     static_assert(int(Types::Condition::Last) <= Condition::Max + 1, "Condition enum does not fit");
 
@@ -52,6 +62,8 @@ public:
         NoteVariationProbability,
         Condition,
         AccumulatorTrigger,
+        PulseCount,
+        GateMode,
         Last
     };
 
@@ -71,6 +83,8 @@ public:
         case Layer::NoteVariationProbability:   return "NOTE PROB";
         case Layer::Condition:                  return "CONDITION";
         case Layer::AccumulatorTrigger:         return "ACCUM";
+        case Layer::PulseCount:                 return "PULSE COUNT";
+        case Layer::GateMode:                   return "GATE MODE";
         case Layer::Last:                       break;
         }
         return nullptr;
@@ -187,6 +201,18 @@ public:
         void setAccumulatorTrigger(bool isAccumulatorTrigger) { _data1.isAccumulatorTrigger = isAccumulatorTrigger; }
         void toggleAccumulatorTrigger() { setAccumulatorTrigger(!isAccumulatorTrigger()); }
 
+        // pulseCount
+        int pulseCount() const { return _data1.pulseCount; }
+        void setPulseCount(int pulseCount) {
+            _data1.pulseCount = PulseCount::clamp(pulseCount);
+        }
+
+        // gateMode
+        int gateMode() const { return _data1.gateMode; }
+        void setGateMode(int gateMode) {
+            _data1.gateMode = GateMode::clamp(gateMode);
+        }
+
         //----------------------------------------
         // Methods
         //----------------------------------------
@@ -225,8 +251,10 @@ public:
             BitField<uint32_t, 2, RetriggerProbability::Bits> retriggerProbability;
             BitField<uint32_t, 5, GateOffset::Bits> gateOffset;
             BitField<uint32_t, 9, Condition::Bits> condition;
-            BitField<uint32_t, 16, 1> isAccumulatorTrigger; // Added this line
-            // 15 bits left
+            BitField<uint32_t, 16, 1> isAccumulatorTrigger;
+            BitField<uint32_t, 17, PulseCount::Bits> pulseCount;  // bits 17-19
+            BitField<uint32_t, 20, GateMode::Bits> gateMode;      // bits 20-21
+            // 10 bits left
         } _data1;
     };
 
