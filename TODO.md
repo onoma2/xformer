@@ -691,7 +691,207 @@ All phases complete:
 
 ## Active Tasks
 
-### 🐛 BUG FIX: Accumulator State Not Saved to Project File (TDD Implementation)
+### ✅ BUG FIX COMPLETE: Accumulator Serialization (Phases 1-2 Complete, Hardware Tested)
+
+**Status**: Phases 1-2 complete, hardware tested and verified working ✅
+
+**Remaining phases (3-5) skipped** - hardware testing confirmed fix works correctly.
+
+**What was fixed:**
+- Accumulator parameters now persist across save/load on hardware
+- Version33 project format with backward compatibility
+- All 4 unit tests passing
+
+**Files Modified:**
+- `src/apps/sequencer/model/Accumulator.h/cpp` - Serialization methods
+- `src/apps/sequencer/model/NoteSequence.cpp` - Integration
+- `src/apps/sequencer/model/ProjectVersion.h` - Version33
+- `src/tests/unit/sequencer/TestAccumulatorSerialization.cpp` - Unit tests
+
+---
+
+### 🎯 FEATURE: Accumulator UX Improvements (TDD Implementation)
+
+#### Overview
+Three improvements discovered during hardware testing to enhance accumulator usability and behavior.
+
+**Improvements:**
+1. Default min value should be 0 (currently -7)
+2. Counter should reset to 0 when pressing STOP
+3. Counter should start incrementing after first step pass (not immediately on enable/load)
+
+---
+
+### Improvement 1: Change Default Min Value to 0
+
+#### Test Plan
+**Goal**: Default accumulator min value should be 0 instead of -7
+
+**Step 1.1: Update Test Expectations (RED)**
+- File: `src/tests/unit/sequencer/TestAccumulator.cpp`
+- Modify test to expect minValue = 0 for new Accumulator
+- Test will fail with current implementation
+
+**Step 1.2: Update Accumulator Constructor (GREEN)**
+- File: `src/apps/sequencer/model/Accumulator.cpp`
+- Change `_minValue(-7)` to `_minValue(0)` in constructor
+- Test should pass
+
+**Expected Impact:**
+- New projects will have accumulator min = 0
+- Existing saved projects will load their saved min values unchanged
+- Better default for most musical use cases (unipolar range 0-7)
+
+---
+
+### Improvement 2: Reset Counter on STOP
+
+#### Test Plan
+**Goal**: Accumulator currentValue resets to minValue when sequencer stops
+
+**Step 2.1: Locate STOP Handler**
+- Search for sequencer stop/reset logic
+- Likely in: `src/apps/sequencer/engine/NoteTrackEngine.cpp` or `Engine.cpp`
+- Document where STOP is handled
+
+**Step 2.2: Write Test (RED)**
+- Create test case: accumulator resets on stop
+- Set accumulator to non-zero value
+- Trigger stop
+- Verify currentValue == minValue
+
+**Step 2.3: Implement Reset Logic (GREEN)**
+- Add method to Accumulator: `void reset() { _currentValue = _minValue; }`
+- Call `accumulator.reset()` in stop handler
+- Test should pass
+
+**Expected Impact:**
+- Pressing STOP resets accumulator to known state
+- Predictable behavior when restarting sequence
+- Counter starts fresh each playback session
+
+---
+
+### Improvement 3: Delay First Tick Until After First Step
+
+#### Test Plan
+**Goal**: Accumulator doesn't increment immediately on enable/load; waits for first step to pass
+
+**Background:**
+Currently, accumulator likely starts incrementing immediately when enabled. This causes the first note to already have accumulation applied, which is unexpected. Should start at minValue and only increment after the first step trigger.
+
+**Step 3.1: Add "First Tick" Flag**
+- Add to Accumulator.h: `bool _hasStarted` (default false)
+- Track whether accumulator has seen its first trigger
+
+**Step 3.2: Write Test (RED)**
+- Create test: first tick is skipped
+- Enable accumulator
+- Call tick() once
+- Verify currentValue == minValue (not minValue + stepValue)
+- Call tick() again
+- Verify currentValue == minValue + stepValue
+
+**Step 3.3: Implement Delayed Start Logic (GREEN)**
+```cpp
+void Accumulator::tick() const {
+    if (!_enabled) return;
+
+    if (!_hasStarted) {
+        const_cast<Accumulator*>(this)->_hasStarted = true;
+        return; // Skip first tick
+    }
+
+    // Existing tick logic...
+}
+```
+
+**Step 3.4: Reset Flag on Stop/Reset**
+- Modify reset() method: `_hasStarted = false`
+- Ensures next playback starts fresh
+
+**Step 3.5: Serialization Update**
+- Add `_hasStarted` to write() method
+- Add `_hasStarted` to read() method
+- Update TestAccumulatorSerialization to include this field
+- Increment to Version34? (or keep in Version33 since not released yet)
+
+**Expected Impact:**
+- First step plays at base note value (no accumulation)
+- Accumulation starts from second triggered step
+- More intuitive behavior for users
+- Counter always visible as it increments
+
+---
+
+### Implementation Checklist
+
+#### Improvement 1: Default Min = 0 ✅ (Simple change)
+- [ ] Step 1.1: Update test expectations (RED)
+- [ ] Step 1.2: Update constructor (GREEN)
+- [ ] Commit: "Change default accumulator min to 0"
+
+#### Improvement 2: Reset on STOP
+- [ ] Step 2.1: Locate STOP handler
+- [ ] Step 2.2: Write reset test (RED)
+- [ ] Step 2.3: Implement reset logic (GREEN)
+- [ ] Commit: "Reset accumulator on STOP"
+
+#### Improvement 3: Delay First Tick
+- [ ] Step 3.1: Add _hasStarted flag to model
+- [ ] Step 3.2: Write delayed start test (RED)
+- [ ] Step 3.3: Implement delayed tick logic (GREEN)
+- [ ] Step 3.4: Update reset() to clear flag
+- [ ] Step 3.5: Update serialization for _hasStarted
+- [ ] Commit: "Delay accumulator first tick until after first step"
+
+---
+
+### Testing Strategy
+
+**Unit Tests:**
+1. TestAccumulator.cpp - Update/add test cases for each improvement
+2. TestAccumulatorSerialization.cpp - Update if serialization changes
+
+**Hardware Testing:**
+1. Test default min value on new project
+2. Test STOP reset behavior
+3. Test first-tick delay on enable and on load
+4. Verify backward compatibility with existing projects
+
+---
+
+### Files to Modify
+
+**Improvement 1:**
+- `src/apps/sequencer/model/Accumulator.cpp` - Constructor default
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Test expectations
+
+**Improvement 2:**
+- `src/apps/sequencer/model/Accumulator.h` - Add reset() method
+- `src/apps/sequencer/model/Accumulator.cpp` - Implement reset()
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` (or Engine.cpp) - Call reset on STOP
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Add reset test
+
+**Improvement 3:**
+- `src/apps/sequencer/model/Accumulator.h` - Add _hasStarted flag
+- `src/apps/sequencer/model/Accumulator.cpp` - Implement delayed tick, update reset(), update serialization
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Add delayed tick test
+- `src/tests/unit/sequencer/TestAccumulatorSerialization.cpp` - Update serialization tests
+
+---
+
+## Pending Features
+
+### To brainstorm
+
+---
+
+## Completed - Archive
+
+### 🐛 BUG FIX: Accumulator State Not Saved to Project File (COMPLETED)
+
+**Final Status**: ✅ FIXED and verified on hardware
 
 #### Bug Description
 **Issue**: Accumulator parameters (enabled, mode, direction, order, min/max/step values) are not persisted when saving projects to SD card.
