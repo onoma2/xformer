@@ -424,6 +424,15 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     retriggerOffset += retriggerLength;
                 }
             } else {
+                // RETRIGGER mode: Also tick for retrigger=1 (no subdivisions)
+                if (step.isAccumulatorTrigger()) {
+                    const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
+                    if (targetSequence.accumulator().enabled() &&
+                        targetSequence.accumulator().triggerMode() == Accumulator::Retrigger) {
+                        const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+                    }
+                }
+
                 _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true });
                 _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false });
             }
