@@ -96,24 +96,27 @@ public:
 
     // noteTrack
 
-    const NoteTrack &noteTrack() const { SANITIZE_TRACK_MODE(_trackMode, TrackMode::Note); return *_track.note; }
-          NoteTrack &noteTrack()       { SANITIZE_TRACK_MODE(_trackMode, TrackMode::Note); return *_track.note; }
+    const NoteTrack &noteTrack() const { SANITIZE_TRACK_MODE(_trackMode, TrackMode::Note); return _container.as<NoteTrack>(); }
+          NoteTrack &noteTrack()       { SANITIZE_TRACK_MODE(_trackMode, TrackMode::Note); return _container.as<NoteTrack>(); }
 
     // curveTrack
 
-    const CurveTrack &curveTrack() const { SANITIZE_TRACK_MODE(_trackMode, TrackMode::Curve); return *_track.curve; }
-          CurveTrack &curveTrack()       { SANITIZE_TRACK_MODE(_trackMode, TrackMode::Curve); return *_track.curve; }
+    const CurveTrack &curveTrack() const { SANITIZE_TRACK_MODE(_trackMode, TrackMode::Curve); return _container.as<CurveTrack>(); }
+          CurveTrack &curveTrack()       { SANITIZE_TRACK_MODE(_trackMode, TrackMode::Curve); return _container.as<CurveTrack>(); }
 
     // midiCvTrack
 
-    const MidiCvTrack &midiCvTrack() const { SANITIZE_TRACK_MODE(_trackMode, TrackMode::MidiCv); return *_track.midiCv; }
-          MidiCvTrack &midiCvTrack()       { SANITIZE_TRACK_MODE(_trackMode, TrackMode::MidiCv); return *_track.midiCv; }
+    const MidiCvTrack &midiCvTrack() const { SANITIZE_TRACK_MODE(_trackMode, TrackMode::MidiCv); return _container.as<MidiCvTrack>(); }
+          MidiCvTrack &midiCvTrack()       { SANITIZE_TRACK_MODE(_trackMode, TrackMode::MidiCv); return _container.as<MidiCvTrack>(); }
 
     //----------------------------------------
     // Methods
     //----------------------------------------
 
-    Track() {
+    Track() :
+        _trackMode(TrackMode::Default),
+        _trackIndex(-1)
+    {
         initContainer();
     }
 
@@ -132,15 +135,29 @@ public:
         ASSERT(_trackMode == other._trackMode, "invalid track mode");
         _linkTrack = other._linkTrack;
         _container = other._container;
-        setContainerTrackIndex(_trackIndex);
+        setTrackIndex(other._trackIndex); // Call the private setTrackIndex
         return *this;
     }
 
 private:
-    void setTrackIndex(int trackIndex);
-    void setContainerTrackIndex(int trackIndex);
+    void setTrackIndex(int trackIndex) {
+        _trackIndex = trackIndex; // Set _trackIndex first
+        // Move logic from setContainerTrackIndex here
+        switch (_trackMode) {
+        case TrackMode::Note:
+            _container.as<NoteTrack>().setTrackIndex(trackIndex);
+            break;
+        case TrackMode::Curve:
+            _container.as<CurveTrack>().setTrackIndex(trackIndex);
+            break;
+        case TrackMode::MidiCv:
+            _container.as<MidiCvTrack>().setTrackIndex(trackIndex);
+            break;
+        case TrackMode::Last:
+            break;
+        }
+    }
 
-    // Note: always call through Project::setTrackMode
     void setTrackMode(TrackMode trackMode) {
         trackMode = ModelUtils::clampedEnum(trackMode);
         if (trackMode != _trackMode) {
@@ -148,8 +165,24 @@ private:
             initContainer();
         }
     }
-
-    void initContainer();
+    void initContainer() {
+        switch (_trackMode) {
+        case TrackMode::Note:
+            _track.note = _container.create<NoteTrack>();
+            _track.note->setTrackIndex(_trackIndex); // Set track index here
+            break;
+        case TrackMode::Curve:
+            _track.curve = _container.create<CurveTrack>();
+            _track.curve->setTrackIndex(_trackIndex); // Set track index here
+            break;
+        case TrackMode::MidiCv:
+            _track.midiCv = _container.create<MidiCvTrack>();
+            _track.midiCv->setTrackIndex(_trackIndex); // Set track index here
+            break;
+        case TrackMode::Last:
+            break;
+        }
+    }
 
     uint8_t _trackIndex = -1;
     TrackMode _trackMode;

@@ -136,6 +136,16 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
         switch (layer()) {
         case Layer::Gate:
             break;
+        case Layer::AccumulatorTrigger:
+            // Draw accumulator trigger like gate - filled square when enabled
+            if (step.isAccumulatorTrigger()) {
+                canvas.setColor(Color::Bright);
+                canvas.fillRect(x + 2, y + 2, stepWidth - 4, stepWidth - 4);
+            } else {
+                canvas.setColor(Color::Medium);
+                canvas.drawRect(x + 2, y + 2, stepWidth - 4, stepWidth - 4);
+            }
+            break;
         case Layer::GateProbability:
             SequencePainter::drawProbability(
                 canvas,
@@ -234,7 +244,7 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
     // handle detail display
 
     if (_showDetail) {
-        if (layer() == Layer::Gate || layer() == Layer::Slide || _stepSelection.none()) {
+        if ((layer() == Layer::Gate || layer() == Layer::Slide || layer() == Layer::AccumulatorTrigger) || _stepSelection.none()) {
             _showDetail = false;
         }
         if (_stepSelection.isPersisted() && os::ticks() > _showDetailTicks + os::time::ms(500)) {
@@ -255,7 +265,25 @@ void NoteSequenceEditPage::updateLeds(Leds &leds) {
     for (int i = 0; i < 16; ++i) {
         int stepIndex = stepOffset() + i;
         bool red = (stepIndex == currentStep) || _stepSelection[stepIndex];
-        bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || _stepSelection[stepIndex]);
+
+        // Different green behavior depending on the layer
+        bool green = (stepIndex != currentStep);
+        if (_stepSelection[stepIndex]) {
+            green = true;  // Selected steps always show with green
+        } else {
+            switch (layer()) {
+            case Layer::Gate:
+                green = green && sequence.step(stepIndex).gate();
+                break;
+            case Layer::AccumulatorTrigger:
+                green = green && sequence.step(stepIndex).isAccumulatorTrigger();
+                break;
+            default:
+                green = green && sequence.step(stepIndex).gate();  // Default to showing gates
+                break;
+            }
+        }
+
         leds.set(MatrixMap::fromStep(i), red, green);
     }
 
@@ -310,6 +338,10 @@ void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
         switch (layer()) {
         case Layer::Gate:
             sequence.step(stepIndex).toggleGate();
+            event.consume();
+            break;
+        case Layer::AccumulatorTrigger:
+            sequence.step(stepIndex).toggleAccumulatorTrigger();
             event.consume();
             break;
         default:
@@ -402,6 +434,9 @@ void NoteSequenceEditPage::encoder(EncoderEvent &event) {
             case Layer::Slide:
                 step.setSlide(event.value() > 0);
                 break;
+            case Layer::AccumulatorTrigger:
+                step.setAccumulatorTrigger(event.value() > 0);
+                break;
             case Layer::Condition:
                 step.setCondition(ModelUtils::adjustedEnum(step.condition(), event.value()));
                 break;
@@ -473,6 +508,9 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
         case Layer::GateOffset:
             setLayer(Layer::Slide);
             break;
+        case Layer::Slide:
+            setLayer(Layer::Gate);
+            break;
         default:
             setLayer(Layer::Gate);
             break;
@@ -509,6 +547,12 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
         case Layer::NoteVariationRange:
             setLayer(Layer::NoteVariationProbability);
             break;
+        case Layer::NoteVariationProbability:
+            setLayer(Layer::AccumulatorTrigger);
+            break;
+        case Layer::AccumulatorTrigger:
+            setLayer(Layer::Note);
+            break;
         default:
             setLayer(Layer::Note);
             break;
@@ -540,6 +584,8 @@ int NoteSequenceEditPage::activeFunctionKey() {
         return 3;
     case Layer::Condition:
         return 4;
+    case Layer::AccumulatorTrigger:
+        return 3; // Same as Note button
     case Layer::Last:
         break;
     }
@@ -550,7 +596,7 @@ int NoteSequenceEditPage::activeFunctionKey() {
 void NoteSequenceEditPage::updateMonitorStep() {
     auto &trackEngine = _engine.selectedTrackEngine().as<NoteTrackEngine>();
 
-    // TODO should we monitor an all layers not just note?
+    // Only monitor note layer, not accumulator triggers
     if (layer() == Layer::Note && !_stepSelection.isPersisted() && _stepSelection.any()) {
         trackEngine.setMonitorStep(_stepSelection.first());
     } else {
@@ -583,6 +629,7 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
     switch (layer()) {
     case Layer::Gate:
     case Layer::Slide:
+    case Layer::AccumulatorTrigger:
         break;
     case Layer::GateProbability:
         SequencePainter::drawProbability(

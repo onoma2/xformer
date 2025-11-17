@@ -7,6 +7,7 @@
 #include "Types.h"
 #include "Scale.h"
 #include "Routing.h"
+#include "Accumulator.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -50,6 +51,7 @@ public:
         NoteVariationRange,
         NoteVariationProbability,
         Condition,
+        AccumulatorTrigger,
         Last
     };
 
@@ -68,6 +70,7 @@ public:
         case Layer::NoteVariationRange:         return "NOTE RANGE";
         case Layer::NoteVariationProbability:   return "NOTE PROB";
         case Layer::Condition:                  return "CONDITION";
+        case Layer::AccumulatorTrigger:         return "ACCUM";
         case Layer::Last:                       break;
         }
         return nullptr;
@@ -179,6 +182,11 @@ public:
         int layerValue(Layer layer) const;
         void setLayerValue(Layer layer, int value);
 
+        // isAccumulatorTrigger
+        bool isAccumulatorTrigger() const { return _data1.isAccumulatorTrigger ? true : false; }
+        void setAccumulatorTrigger(bool isAccumulatorTrigger) { _data1.isAccumulatorTrigger = isAccumulatorTrigger; }
+        void toggleAccumulatorTrigger() { setAccumulatorTrigger(!isAccumulatorTrigger()); }
+
         //----------------------------------------
         // Methods
         //----------------------------------------
@@ -217,7 +225,8 @@ public:
             BitField<uint32_t, 2, RetriggerProbability::Bits> retriggerProbability;
             BitField<uint32_t, 5, GateOffset::Bits> gateOffset;
             BitField<uint32_t, 9, Condition::Bits> condition;
-            // 16 bits left
+            BitField<uint32_t, 16, 1> isAccumulatorTrigger; // Added this line
+            // 15 bits left
         } _data1;
     };
 
@@ -404,6 +413,9 @@ public:
     const StepArray &steps() const { return _steps; }
           StepArray &steps()       { return _steps; }
 
+    const Accumulator &accumulator() const { return _accumulator; }
+          Accumulator &accumulator()       { return _accumulator; }
+
     const Step &step(int index) const { return _steps[index]; }
           Step &step(int index)       { return _steps[index]; }
 
@@ -460,6 +472,8 @@ private:
     Routable<uint8_t> _lastStep;
 
     StepArray _steps;
+
+    Accumulator _accumulator;
 
     uint8_t _edited;
 

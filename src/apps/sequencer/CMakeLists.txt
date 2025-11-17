@@ -24,6 +24,7 @@ set(sources
     # intro
     intro/Intro.cpp
     # model
+    model/Accumulator.cpp
     model/Arpeggiator.cpp
     model/Calibration.cpp
     model/ClipBoard.cpp
@@ -81,6 +82,8 @@ set(sources
     ui/pages/LayoutPage.cpp
     ui/pages/ListPage.cpp
     ui/pages/MidiOutputPage.cpp
+    ui/pages/AccumulatorPage.cpp
+    ui/pages/AccumulatorStepsPage.cpp
     ui/pages/MonitorPage.cpp
     ui/pages/NoteSequenceEditPage.cpp
     ui/pages/NoteSequencePage.cpp
@@ -98,6 +101,9 @@ set(sources
     ui/pages/TopPage.cpp
     ui/pages/TrackPage.cpp
     ui/pages/UserScalePage.cpp
+    # ui/models
+    ui/model/AccumulatorListModel.h
+    ui/model/AccumulatorStepsListModel.h
     # ui/painters
     ui/painters/SequencePainter.cpp
     ui/painters/SongPainter.cpp

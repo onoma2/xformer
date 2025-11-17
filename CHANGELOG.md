@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Accumulator functionality: Stateful counter that increments/decrements based on configurable parameters
+- Accumulator parameters: Mode, Direction (Up/Down/Freeze), Order (Wrap/Pendulum/Random/Hold), Polarity (Unipolar/Bipolar), Min/Max values, and Step Size
+- Real-time pitch modulation using accumulator value
+- ACCUM page for editing accumulator parameters
+- ACCST page for per-step accumulator trigger configuration
+- Per-step accumulator trigger flags to enable/disable triggering on specific steps
+- Unit tests for accumulator functionality and modulation
+
+### Changed
+- Moved accumulator trigger toggling from Gate button (F1) to Note button (F4) cycling
+- Updated NoteSequenceEditPage to include AccumulatorTrigger in Note button cycling sequence
+- Modified triggerStep() to include accumulator ticking when step has isAccumulatorTrigger set
+- Updated evalStepNote() to incorporate accumulator value into pitch calculation
+- Added mutable member pattern to accumulator for thread-safe operation
+- Memory-optimized accumulator using bitfields for parameters
+
+### Fixed
+- Test compilation errors related to dummy implementation classes
+- GateOutput constructor dependencies in unit tests
+
 ## v0.1.42 (6 June 2022)
 
 #### Fixes

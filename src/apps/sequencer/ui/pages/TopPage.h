@@ -42,15 +42,27 @@ private:
         Monitor         = PageKeyMap::Monitor,
         System          = PageKeyMap::System,
 
+        // accumulator modes
+        Accumulator     = PageKeyMap::UserScale + 1,  // Use next available code
+        AccumulatorSteps = PageKeyMap::UserScale + 2, // Use next available code
+
         Last,
+    };
+
+    enum class SequenceView : uint8_t {
+        NoteSequence,
+        Accumulator,
+        AccumulatorSteps,
     };
 
     void setMode(Mode mode);
     void setMainPage(Page &page);
+    void setSequenceView(SequenceView view);
 
     void setSequencePage();
     void setSequenceEditPage();
 
     Mode _mode;
     Mode _lastMode;
+    SequenceView _sequenceView = SequenceView::NoteSequence;
 };

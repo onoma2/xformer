@@ -221,13 +221,52 @@ void TopPage::setMainPage(Page &page) {
 }
 
 void TopPage::setSequencePage() {
+    // Determine if we're cycling within sequence views (pressing Sequence key while already viewing sequence)
+    Page* currentPage = _manager.top();
+    auto &pages = _manager.pages();
+    bool fromSequenceView = (currentPage == &pages.noteSequence ||
+                            currentPage == &pages.accumulator ||
+                            currentPage == &pages.accumulatorSteps);
+
+    // Cycle to next view only if we're currently on a sequence view
+    if (fromSequenceView) {
+        switch (_sequenceView) {
+        case SequenceView::NoteSequence:
+            _sequenceView = SequenceView::Accumulator;
+            break;
+        case SequenceView::Accumulator:
+            _sequenceView = SequenceView::AccumulatorSteps;
+            break;
+        case SequenceView::AccumulatorSteps:
+            _sequenceView = SequenceView::NoteSequence;
+            break;
+        }
+    } else {
+        _sequenceView = SequenceView::NoteSequence; // Default to note sequence for first visit
+    }
+
+    setSequenceView(_sequenceView);
+}
+
+void TopPage::setSequenceView(SequenceView view) {
     auto &pages = _manager.pages();
 
     switch (_project.selectedTrack().trackMode()) {
     case Track::TrackMode::Note:
-        setMainPage(pages.noteSequence);
+        switch (view) {
+        case SequenceView::NoteSequence:
+            setMainPage(pages.noteSequence);
+            break;
+        case SequenceView::Accumulator:
+            setMainPage(pages.accumulator);
+            break;
+        case SequenceView::AccumulatorSteps:
+            setMainPage(pages.accumulatorSteps);
+            break;
+        }
         break;
     case Track::TrackMode::Curve:
+        // For curve tracks, just show the curve sequence page
         setMainPage(pages.curveSequence);
         break;
     case Track::TrackMode::MidiCv:

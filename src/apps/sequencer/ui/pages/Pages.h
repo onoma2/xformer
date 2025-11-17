@@ -30,6 +30,8 @@
 #include "TopPage.h"
 #include "TrackPage.h"
 #include "UserScalePage.h"
+#include "AccumulatorPage.h"
+#include "AccumulatorStepsPage.h"
 
 #ifdef CONFIG_ENABLE_INTRO
 #include "IntroPage.h"
@@ -55,6 +57,8 @@ struct Pages {
     MidiOutputPage midiOutput;
     UserScalePage userScale;
     OverviewPage overview;
+    AccumulatorPage accumulator;
+    AccumulatorStepsPage accumulatorSteps;
     SystemPage system;
     // modal pages
     TempoPage tempo;
@@ -96,6 +100,8 @@ struct Pages {
         midiOutput(manager, context),
         userScale(manager, context),
         overview(manager, context),
+        accumulator(manager, context),
+        accumulatorSteps(manager, context),
         system(manager, context),
         // modal pages
         tempo(manager, context),
