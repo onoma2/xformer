@@ -35,6 +35,7 @@ public:
     using NoteVariationProbability = UnsignedValue<3>;
     using Condition = UnsignedValue<7>;
     using PulseCount = UnsignedValue<3>;  // 0-7 representing 1-8 pulses
+    using GateMode = UnsignedValue<2>;    // 0-3 representing 4 modes
 
     static_assert(int(Types::Condition::Last) <= Condition::Max + 1, "Condition enum does not fit");
 
@@ -196,6 +197,12 @@ public:
             _data1.pulseCount = PulseCount::clamp(pulseCount);
         }
 
+        // gateMode
+        int gateMode() const { return _data1.gateMode; }
+        void setGateMode(int gateMode) {
+            _data1.gateMode = GateMode::clamp(gateMode);
+        }
+
         //----------------------------------------
         // Methods
         //----------------------------------------
@@ -236,7 +243,8 @@ public:
             BitField<uint32_t, 9, Condition::Bits> condition;
             BitField<uint32_t, 16, 1> isAccumulatorTrigger;
             BitField<uint32_t, 17, PulseCount::Bits> pulseCount;  // bits 17-19
-            // 12 bits left
+            BitField<uint32_t, 20, GateMode::Bits> gateMode;      // bits 20-21
+            // 10 bits left
         } _data1;
     };
 
