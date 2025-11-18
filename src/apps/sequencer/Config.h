@@ -68,7 +68,7 @@
 // When ENABLED (1): RTRIG mode fires N ticks spread over time, one per retrigger (gradual mode, experimental)
 // See: RTRIG-Timing-Research.md, Queue-BasedAccumTicks.md for implementation details
 // Risk: Medium (sequence validation, queue management)
-// Default: 0 (burst mode) for stable release
+// Default: 1 (spread mode enabled for testing)
 #ifndef CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
-#define CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS 0  // Default: burst mode (stable)
+#define CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS 1  // ENABLED for testing/development
 #endif

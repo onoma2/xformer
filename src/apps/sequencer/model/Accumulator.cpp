@@ -9,7 +9,7 @@ Accumulator::Accumulator() :
     _polarity(Unipolar),
     _direction(Up),
     _order(Wrap),
-    _enabled(false),
+    _enabled(true),  // Default: ON for easier testing
     _ratchetTriggerMode(First),
     _triggerMode(Step),
     _currentValue(0),

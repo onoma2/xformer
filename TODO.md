@@ -1845,7 +1845,43 @@ void AccumulatorStepsPage::update() {
 
 ## 🧪 EXPERIMENTAL: RTRIG Mode - Spread Accumulator Ticks Over Time (Option 3)
 
-**Status**: ✅ PHASES 0-4 COMPLETE & FULLY TESTED - Ready for Hardware Testing (flag=0 default, stable)
+**Status**: ✅ PHASES 0-4 COMPLETE & FULLY TESTED - ⚠️ TESTING IN PROGRESS (flag=1 enabled)
+
+### 🔬 Active Research & Known Issues
+
+**Issue #1: RTRIG Spread Mode Not Applying to Note Pitch**
+- **Status**: 🔴 UNDER INVESTIGATION
+- **Symptom**: Accumulator counter increments correctly, but note pitch does not change during playback
+- **Observed**: Simulator testing shows accumulator value updating but CV output remains constant
+- **Expected**: CV output should reflect accumulator modulation on note pitch
+- **Testing**: Tested with flag=1, accumulator enabled, TRIG=RTRIG, retrig>1
+- **Next Steps**:
+  - Investigate `evalStepNote()` integration in NoteTrackEngine
+  - Verify accumulator value is being applied to note pitch calculation
+  - Check if pitch modulation logic is being bypassed
+  - Add debug logging to track accumulator→pitch flow
+  - Review NoteTrackEngine.cpp lines where accumulator value affects note output
+- **Priority**: 🔴 HIGH - Core feature not working as designed
+
+**Issue #2: Accumulator Status Indication on Note Layer Page**
+- **Status**: 🟡 DESIGN RESEARCH NEEDED
+- **Current**: No visual indication when viewing AccumulatorTrigger layer on STEPS page
+- **Problem**: User cannot tell if accumulator is enabled/active without switching to ACCUM page
+- **Proposal**: Research alternative indication methods:
+  - Option A: Status icon/character in page header
+  - Option B: Brightness/color change when accumulator active
+  - Option C: Brief on-screen notification when toggling triggers
+  - Option D: Footer status indicator (like other pages)
+- **Constraints**: OLED display space limitations, noise reduction concerns
+- **Next Steps**:
+  - Review similar status indicators in other pages
+  - Test visual approaches on actual hardware
+  - Consider noise reduction impact of additional display elements
+- **Priority**: 🟡 MEDIUM - Quality of life improvement
+
+---
+
+**Status**: ✅ PHASES 0-4 IMPLEMENTATION COMPLETE - ⚠️ BEHAVIOR VERIFICATION IN PROGRESS (flag=1 enabled)
 
 **Current Behavior (Working & Stable)**:
 - RTRIG mode with retrig=3 → All 3 accumulator ticks fire immediately at step start
