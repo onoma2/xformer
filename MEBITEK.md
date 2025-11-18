@@ -10,7 +10,7 @@
 
 The mebitek fork is a community-maintained version of the original PER|FORMER eurorack sequencer with developer-focused improvements. The repository emphasizes logic operators, launchpad integration, and stochastic features.
 
-**Key Finding**: The mebitek fork **does NOT implement pulse count or gate mode features** found in PEW|FORMER. It has a simpler retrigger/ratchet implementation.
+**Key Finding**: The mebitek fork **DOES implement pulse count equivalent** via `stageRepeats` + `stageRepeatMode`! In fact, mebitek offers MORE gate pattern options (8 modes) compared to PEW|FORMER's gate mode (4 modes).
 
 ---
 
@@ -72,10 +72,12 @@ struct Gate {
 - `stageRepeatMode` - 3-bit unsigned (repeat behavior mode)
 - `condition` - 7-bit unsigned (conditional execution criteria)
 
-**What's Missing Compared to PEW|FORMER**:
-- ❌ No `pulseCount` parameter (Metropolix-style step repetition)
-- ❌ No `gateMode` parameter (ALL/FIRST/HOLD/FIRSTLAST)
-- ❌ No accumulator system
+**What's Different Compared to PEW|FORMER**:
+- ✅ HAS `stageRepeats` (equivalent to pulseCount)
+- ✅ HAS `stageRepeatMode` with 8 options (vs PEW|FORMER's 4 gateMode options)
+- ❌ NO accumulator system
+- ✅ MORE repeat pattern variety (Odd/Even/Triplets/Middle/Last/Random)
+- ❌ NO HOLD mode (continuous gate)
 
 ---
 
@@ -148,6 +150,119 @@ From web search results:
 
 ---
 
+## Stage Repeats Implementation (PULSE COUNT EQUIVALENT!)
+
+**IMPORTANT DISCOVERY**: mebitek **DOES have pulse count** functionality via `stageRepeats` + `stageRepeatMode`!
+
+### How Stage Repeats Work
+
+**Location**: `src/apps/sequencer/engine/NoteTrackEngine.cpp` (tick method, Free playMode)
+
+1. **Step Repetition Control**:
+   ```cpp
+   // Counter tracks which repetition (1 to N)
+   _currentStageRepeat++;
+
+   // Check if this is the last repetition
+   bool isLastStageStep = ((int)(step.stageRepeats()+1) - (int)_currentStageRepeat) <= 0;
+
+   // Only advance when all repetitions complete
+   if (isLastStageStep) {
+       _currentStageRepeat = 1;  // Reset for next step
+       _sequenceState.advanceFree(...);  // Advance to next step
+   }
+   ```
+
+2. **Gate Firing Control** (triggerStep method):
+   ```cpp
+   // Determine if gate should fire based on current repetition
+   switch (step.stageRepeatMode()) {
+       case Types::StageRepeatMode::Each:
+           // Fire on every repetition (default)
+           break;
+
+       case Types::StageRepeatMode::First:
+           stepGate = stepGate && (_currentStageRepeat == 1);
+           break;
+
+       case Types::StageRepeatMode::Last:
+           stepGate = stepGate && (_currentStageRepeat == step.stageRepeats()+1);
+           break;
+
+       case Types::StageRepeatMode::Middle:
+           stepGate = stepGate && (_currentStageRepeat == (step.stageRepeats()+1)/2);
+           break;
+
+       case Types::StageRepeatMode::Odd:
+           stepGate = stepGate && (_currentStageRepeat % 2 != 0);
+           break;
+
+       case Types::StageRepeatMode::Even:
+           stepGate = stepGate && (_currentStageRepeat % 2 == 0);
+           break;
+
+       case Types::StageRepeatMode::Triplets:
+           stepGate = stepGate && ((_currentStageRepeat - 1) % 3 == 0);
+           break;
+
+       case Types::StageRepeatMode::Random:
+           // Randomly selects from above modes
+           break;
+   }
+   ```
+
+### Stage Repeat Modes (Types::StageRepeatMode enum)
+
+| Mode | Behavior |
+|------|----------|
+| **Each** | Gates fire on every repetition (like PEW\|FORMER ALL mode) |
+| **First** | Gate fires only on first repetition (like FIRST mode) |
+| **Last** | Gate fires only on final repetition |
+| **Middle** | Gate fires on middle repetition |
+| **Odd** | Gates fire on odd-numbered repetitions (1, 3, 5...) |
+| **Even** | Gates fire on even-numbered repetitions (2, 4, 6...) |
+| **Triplets** | Gates fire every 3rd repetition (1, 4, 7...) |
+| **Random** | Randomly picks one of the above patterns |
+
+### Example: stageRepeats=3, stageRepeatMode=Odd
+
+```
+Step configured with 3 repeats (stageRepeats=3)
+Mode: Odd
+
+Repetition 1: _currentStageRepeat=1 → Odd (1 % 2 != 0) → GATE FIRES ✓
+Repetition 2: _currentStageRepeat=2 → Even (2 % 2 == 0) → NO GATE ✗
+Repetition 3: _currentStageRepeat=3 → Odd (3 % 2 != 0) → GATE FIRES ✓
+Repetition 4: _currentStageRepeat=4 (last) → Even → NO GATE ✗
+
+Then advance to next step
+```
+
+### Comparison: mebitek vs PEW|FORMER
+
+| Feature | mebitek | PEW\|FORMER |
+|---------|---------|-------------|
+| **Duration Control** | `stageRepeats` (0-7) | `pulseCount` (0-7 = 1-8 pulses) |
+| **Counter Variable** | `_currentStageRepeat` | `_pulseCounter` |
+| **Gate Pattern** | `stageRepeatMode` (8 modes) | `gateMode` (4 modes) |
+| **Fire All** | `Each` | `ALL` |
+| **Fire First** | `First` | `FIRST` |
+| **Fire First+Last** | ❌ | `FIRSTLAST` |
+| **Long Gate** | ❌ | `HOLD` |
+| **Fire Last** | `Last` ✅ | ❌ |
+| **Fire Middle** | `Middle` ✅ | ❌ |
+| **Fire Odd** | `Odd` ✅ | ❌ |
+| **Fire Even** | `Even` ✅ | ❌ |
+| **Fire Triplets** | `Triplets` ✅ | ❌ |
+| **Random** | `Random` ✅ | ❌ |
+
+**Key Differences**:
+- **mebitek**: More pattern variety (8 modes), geared toward rhythmic complexity
+- **PEW|FORMER**: Simpler (4 modes), includes HOLD for sustained notes
+- **Both**: Control step duration and selective gate firing
+
+---
+
 ## Comparison with PEW|FORMER
 
 ### Similarities
@@ -170,12 +285,13 @@ From web search results:
 
 | Feature | mebitek/performer | PEW|FORMER |
 |---------|-------------------|------------|
-| **Pulse Count** | ❌ Not implemented | ✅ Metropolix-style (0-7 = 1-8 pulses) |
-| **Gate Mode** | ❌ Not implemented | ✅ ALL/FIRST/HOLD/FIRSTLAST |
+| **Pulse Count** | ✅ `stageRepeats` (0-7) | ✅ `pulseCount` (0-7 = 1-8 pulses) |
+| **Gate Mode** | ✅ `stageRepeatMode` (8 modes: Each/First/Last/Middle/Odd/Even/Triplets/Random) | ✅ `gateMode` (4 modes: ALL/FIRST/HOLD/FIRSTLAST) |
 | **Accumulator** | ❌ Not implemented | ✅ Full accumulator system with STEP/GATE/RTRIG modes |
 | **Retrigger** | ✅ Basic (0-7 count) | ✅ Basic + accumulator integration |
 | **Gate Struct** | Minimal (tick + bool) | Minimal (tick + bool) |
 | **Max Retriggers** | 8 (3-bit) | 8 (3-bit) |
+| **Max Stage Repeats** | 8 (3-bit) | 8 (3-bit pulseCount) |
 
 ### Architecture Insights
 
@@ -282,9 +398,10 @@ While mebitek lacks pulse count and gate mode, it has other interesting features
 The mebitek fork demonstrates that:
 
 1. **Retriggers work well** with simple queue-based scheduling and minimal Gate struct
-2. **Pulse count and gate mode are NOT essential** features (mebitek thrives without them)
+2. **Pulse count equivalent (stageRepeats) is a proven feature** with even MORE pattern options than PEW|FORMER
 3. **Queue-based event scheduling is the standard approach** for timing-critical features
 4. **Extending the Gate struct** for accumulator metadata would be consistent with industry patterns
+5. **More gate pattern variety is valuable** - mebitek's 8 modes offer greater rhythmic complexity
 
 **For PEW|FORMER's experimental spread-tick feature**:
 - Single-queue approach (extend Gate struct) aligns with mebitek's proven architecture
