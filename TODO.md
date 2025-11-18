@@ -1850,17 +1850,41 @@ void AccumulatorStepsPage::update() {
 ### 🔬 Active Research & Known Issues
 
 **Issue #1: RTRIG Spread Mode Not Applying to Note Pitch**
-- **Status**: 🔴 UNDER INVESTIGATION
+- **Status**: 🔴 ROOT CAUSE IDENTIFIED - FIX IN PROGRESS
 - **Symptom**: Accumulator counter increments correctly, but note pitch does not change during playback
 - **Observed**: Simulator testing shows accumulator value updating but CV output remains constant
-- **Expected**: CV output should reflect accumulator modulation on note pitch
-- **Testing**: Tested with flag=1, accumulator enabled, TRIG=RTRIG, retrig>1
-- **Next Steps**:
-  - Investigate `evalStepNote()` integration in NoteTrackEngine
-  - Verify accumulator value is being applied to note pitch calculation
-  - Check if pitch modulation logic is being bypassed
-  - Add debug logging to track accumulator→pitch flow
-  - Review NoteTrackEngine.cpp lines where accumulator value affects note output
+- **Expected**: CV output should update on EACH retrigger firing (spread mode design intent)
+
+**Root Cause Analysis** (NoteTrackEngine.cpp):
+1. ✅ **Line 511 (triggerStep)**: CV calculated ONCE with `evalStepNote()` and pushed to `_cvQueue`
+2. ✅ **Lines 466-477 (triggerStep)**: Multiple retrigger gates scheduled with `shouldTickAccum=true`
+3. ✅ **Line 236 (tick)**: Accumulator ticks when gate fires from queue (WORKING)
+4. ❌ **MISSING**: CV recalculation after accumulator tick - CV never updates!
+
+**The Problem**:
+- CV is calculated at step start with OLD accumulator value (line 511)
+- Accumulator ticks correctly on each retrigger gate (line 236)
+- BUT CV is NEVER recalculated after accumulator ticks
+- Result: Pitch doesn't change despite counter incrementing
+
+**Design Intent**:
+- SPREAD MODE: CV should recalculate on EACH retrigger firing
+- BURST MODE: CV calculated once upfront (all ticks happen immediately)
+- User specifically requested spread mode to update CV progressively
+
+**Fix Requirements**:
+- After line 236 (accumulator tick), need to:
+  1. Recalculate CV using `evalStepNote()` with new accumulator value
+  2. Push new CV value to `_cvQueue` with current tick timing
+  3. Requires step data (note, scale, transpose, etc.) to call `evalStepNote()`
+  4. **Challenge**: Gate struct doesn't store step info, need to add or find alternative
+
+**Next Steps**:
+- [ ] Design: Add step data to Gate struct OR store current step reference
+- [ ] Implement: CV recalculation logic after accumulator tick (line 237+)
+- [ ] Test: Verify CV updates on each retrigger in spread mode
+- [ ] Hardware: Test on actual hardware to verify timing correctness
+
 - **Priority**: 🔴 HIGH - Core feature not working as designed
 
 **Issue #2: Accumulator Status Indication on Note Layer Page**
