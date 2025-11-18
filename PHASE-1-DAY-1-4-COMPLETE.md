@@ -102,17 +102,38 @@ make -j TestHarmonyEngine
 ### Expected Output
 
 ```
-===============================================================================
-All tests passed (59 assertions in 6 test cases)
+========================================
+Unit Test: HarmonyEngine
+----------------------------------------
+Case: default_construction
+Passed
+----------------------------------------
+Case: ionian_scale_intervals
+Passed
+----------------------------------------
+Case: ionian_diatonic_chord_qualities
+Passed
+----------------------------------------
+Case: chord_intervals
+Passed
+----------------------------------------
+Case: basic_harmonization
+Passed
+----------------------------------------
+Case: midi_range_clamping
+Passed
+----------------------------------------
+Finished successful
+========================================
 ```
 
-**Breakdown**:
-- Default Construction: 5 assertions
-- Scale Intervals: 7 assertions
-- Diatonic Qualities: 7 assertions
-- Chord Intervals: 16 assertions (4 qualities × 4 notes)
-- Basic Harmonization: 12 assertions (3 chords × 4 notes)
-- MIDI Clamping: 12 assertions
+**Test Cases**:
+1. default_construction - 5 assertions
+2. ionian_scale_intervals - 7 assertions
+3. ionian_diatonic_chord_qualities - 7 assertions
+4. chord_intervals - 16 assertions (4 qualities × 4 notes)
+5. basic_harmonization - 12 assertions (3 chords × 4 notes)
+6. midi_range_clamping - 12 assertions
 
 ---
 
@@ -218,7 +239,12 @@ When you run the tests locally, verify:
 
 **Pushed to**: `claude/tdd-specialist-prompt-013yXh6kw7F7Je4F6MKCPwvE`
 
-**Commit**: `2b44f45` - feat: Implement HarmonyEngine core (Phase 1, Days 1-4 complete)
+**Commits**:
+- `2b44f45` - feat: Implement HarmonyEngine core (Phase 1, Days 1-4 complete)
+- `c5de804` - fix: Convert TestHarmonyEngine to UnitTest.h framework
+
+**Note on Test Framework**:
+The initial test implementation used Catch2 framework (`catch.hpp`) which caused linker errors. The project uses a custom `UnitTest.h` framework instead. The test has been converted to use `UNIT_TEST()`, `CASE()`, `expectEqual()`, and `expectTrue()` macros following the project's conventions (see `TestAccumulator.cpp` for reference).
 
 ---
 
