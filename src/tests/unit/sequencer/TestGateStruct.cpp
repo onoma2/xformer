@@ -51,13 +51,13 @@ TEST_CASE("Gate struct experimental spread-ticks fields") {
         mainGate.tick = 100;
         mainGate.gate = true;
         mainGate.shouldTickAccumulator = false;
-        mainGate.sequenceId = NoteTrackEngine::MainSequenceId;
+        mainGate.sequenceId = 0;  // MainSequenceId
 
         NoteTrackEngine::Gate fillGate;
         fillGate.tick = 200;
         fillGate.gate = true;
         fillGate.shouldTickAccumulator = true;
-        fillGate.sequenceId = NoteTrackEngine::FillSequenceId;
+        fillGate.sequenceId = 1;  // FillSequenceId
 
         REQUIRE(mainGate.sequenceId == 0);
         REQUIRE(fillGate.sequenceId == 1);
@@ -95,7 +95,9 @@ TEST_CASE("Gate struct sequence ID constants") {
     }
 }
 
-#else // CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+#endif // CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+
+#if !CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
 
 TEST_CASE("Gate struct without experimental features") {
     SECTION("Gate struct has minimal size") {
