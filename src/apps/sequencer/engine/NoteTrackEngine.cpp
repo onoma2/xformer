@@ -223,9 +223,9 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
         if (event.shouldTickAccumulator) {
             // Lookup sequence by ID (0=main, 1=fill)
             NoteSequence* targetSeq = nullptr;
-            if (event.sequenceId == 0 && _sequence) {
+            if (event.sequenceId == NoteTrackEngine::MainSequenceId && _sequence) {
                 targetSeq = _sequence;
-            } else if (event.sequenceId == 1 && _fillSequence) {
+            } else if (event.sequenceId == NoteTrackEngine::FillSequenceId && _fillSequence) {
                 targetSeq = _fillSequence;
             }
 
@@ -460,7 +460,7 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     targetSequence.accumulator().enabled() &&
                     targetSequence.accumulator().triggerMode() == Accumulator::Retrigger
                 );
-                uint8_t seqId = useFillSequence ? FillSequenceId : MainSequenceId;
+                uint8_t seqId = useFillSequence ? NoteTrackEngine::FillSequenceId : NoteTrackEngine::MainSequenceId;
 #endif
 
                 while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
@@ -496,7 +496,7 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     targetSequence.accumulator().enabled() &&
                     targetSequence.accumulator().triggerMode() == Accumulator::Retrigger
                 );
-                uint8_t seqId = useFillSequence ? FillSequenceId : MainSequenceId;
+                uint8_t seqId = useFillSequence ? NoteTrackEngine::FillSequenceId : NoteTrackEngine::MainSequenceId;
 
                 _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true, shouldTickAccum, seqId });
                 _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false, false, seqId });
