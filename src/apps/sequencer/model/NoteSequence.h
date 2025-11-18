@@ -47,6 +47,16 @@ public:
 
     static_assert(int(Types::Condition::Last) <= Condition::Max + 1, "Condition enum does not fit");
 
+    // Harmony role enum (plain enum, no Last member per Performer conventions)
+    enum HarmonyRole {
+        HarmonyOff = 0,          // No harmony (default)
+        HarmonyMaster = 1,       // Master track (defines harmony)
+        HarmonyFollowerRoot = 2, // Follower plays root
+        HarmonyFollower3rd = 3,  // Follower plays 3rd
+        HarmonyFollower5th = 4,  // Follower plays 5th
+        HarmonyFollower7th = 5   // Follower plays 7th
+    };
+
     enum class Layer {
         Gate,
         GateProbability,
@@ -455,11 +465,42 @@ public:
     inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
     void writeRouted(Routing::Target target, int intValue, float floatValue);
 
+    // harmonyRole
+
+    HarmonyRole harmonyRole() const { return _harmonyRole; }
+    void setHarmonyRole(HarmonyRole role) {
+        // Constraint: Only tracks 1 and 5 (index 0 and 4) can be HarmonyMaster
+        if (role == HarmonyMaster && !canBeHarmonyMaster()) {
+            _harmonyRole = HarmonyFollower3rd; // Auto-revert to safe default
+        } else {
+            _harmonyRole = role;
+        }
+    }
+
+    bool canBeHarmonyMaster() const {
+        return (_trackIndex == 0 || _trackIndex == 4); // Track 1 or Track 5
+    }
+
+    // masterTrackIndex
+
+    int masterTrackIndex() const { return _masterTrackIndex; }
+    void setMasterTrackIndex(int index) {
+        _masterTrackIndex = clamp(index, int8_t(0), int8_t(7));
+    }
+
+    // harmonyScale
+
+    int harmonyScale() const { return _harmonyScale; }
+    void setHarmonyScale(int scale) {
+        _harmonyScale = clamp(scale, uint8_t(0), uint8_t(6)); // 0-6 for 7 modes
+    }
+
     //----------------------------------------
     // Methods
     //----------------------------------------
 
     NoteSequence() { clear(); }
+    NoteSequence(int trackIndex) : _trackIndex(trackIndex) { clear(); }
 
     void clear();
     void clearSteps();
@@ -502,6 +543,11 @@ private:
     StepArray _steps;
 
     Accumulator _accumulator;
+
+    // Harmony properties (Phase 1)
+    HarmonyRole _harmonyRole = HarmonyOff;
+    int8_t _masterTrackIndex = 0;  // Which track to follow (0-7)
+    uint8_t _harmonyScale = 0;     // Scale override (0-6 for 7 modes)
 
     uint8_t _edited;
 

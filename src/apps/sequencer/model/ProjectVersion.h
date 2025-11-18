@@ -96,6 +96,9 @@ enum ProjectVersion {
     // added NoteSequence::Accumulator serialization
     Version33 = 33,
 
+    // added NoteSequence harmony properties (harmonyRole, masterTrackIndex, harmonyScale)
+    Version34 = 34,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

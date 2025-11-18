@@ -319,6 +319,13 @@ void NoteSequence::write(VersionedSerializedWriter &writer) const {
 
     // Write accumulator state (Version33+)
     _accumulator.write(writer);
+
+    // Write harmony properties (Version34+)
+    // Bit-pack: harmonyRole (3 bits) + harmonyScale (3 bits) = 6 bits in 1 byte
+    uint8_t harmonyFlags = (static_cast<uint8_t>(_harmonyRole) << 0) |
+                           (static_cast<uint8_t>(_harmonyScale) << 3);
+    writer.write(harmonyFlags);
+    writer.write(_masterTrackIndex);
 }
 
 void NoteSequence::read(VersionedSerializedReader &reader) {
@@ -342,5 +349,19 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
     } else {
         // Backward compatibility: use default accumulator
         _accumulator = Accumulator();
+    }
+
+    // Read harmony properties (Version34+)
+    if (reader.dataVersion() >= ProjectVersion::Version34) {
+        uint8_t harmonyFlags;
+        reader.read(harmonyFlags);
+        _harmonyRole = static_cast<HarmonyRole>((harmonyFlags >> 0) & 0x7);  // 3 bits
+        _harmonyScale = (harmonyFlags >> 3) & 0x7;                            // 3 bits
+        reader.read(_masterTrackIndex);
+    } else {
+        // Backward compatibility: use defaults
+        _harmonyRole = HarmonyOff;
+        _masterTrackIndex = 0;
+        _harmonyScale = 0;
     }
 }
