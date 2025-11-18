@@ -137,13 +137,14 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
         case Layer::Gate:
             break;
         case Layer::AccumulatorTrigger:
-            // Draw accumulator trigger like gate - filled square when enabled
+            // Draw outline with playhead highlighting (like Gate layer)
+            canvas.setColor(stepIndex == currentStep ? Color::Bright : Color::Medium);
+            canvas.drawRect(x + 2, y + 2, stepWidth - 4, stepWidth - 4);
+
+            // Fill inner square if trigger enabled
             if (step.isAccumulatorTrigger()) {
                 canvas.setColor(Color::Bright);
-                canvas.fillRect(x + 2, y + 2, stepWidth - 4, stepWidth - 4);
-            } else {
-                canvas.setColor(Color::Medium);
-                canvas.drawRect(x + 2, y + 2, stepWidth - 4, stepWidth - 4);
+                canvas.fillRect(x + 4, y + 4, stepWidth - 8, stepWidth - 8);
             }
             break;
         case Layer::GateProbability:
