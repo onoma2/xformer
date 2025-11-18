@@ -424,17 +424,75 @@ static float evalHarmonyNote(
 - Test framework issue discovered and fixed quickly
 
 ### What Was Challenging ⚠️
-- Understanding Performer enum conventions (plain enum, no Last)
-- Clamp type matching (int vs int8_t/uint8_t)
-- Test framework differences (Catch2 vs UnitTest.h)
-- Serialization version management
+
+**1. Test Framework Confusion**
+- **Issue**: Initially used Catch2 (`#include "catch.hpp"`, `TEST_CASE`, `REQUIRE`)
+- **Error**: Linker errors for undefined Catch2 symbols
+- **Root Cause**: Project uses custom `UnitTest.h` framework
+- **Solution**: Convert to `UNIT_TEST()`, `CASE()`, `expectEqual()`, `expectTrue()`
+- **Learning**: Always check existing test files first (TestAccumulator.cpp was the reference)
+
+**2. Clamp Type Mismatch**
+- **Issue**: `clamp(index, int8_t(0), int8_t(7))` caused compilation error
+- **Error**: "no matching function for call to 'clamp'"
+- **Root Cause**: All three arguments must be the **same type**
+- **Solution**: Use `clamp(index, 0, 7)` and let compiler handle member variable assignment
+- **Learning**: Don't force type casts in function calls - let the type system work
+
+**3. Enum Convention Violations**
+- **Issue**: Used `enum class` with `Last` member in model layer
+- **Error**: "no member named 'X' in 'ClassName'"
+- **Root Cause**: Model enums use **plain enum** (not `enum class`) with **no Last member**
+- **Solution**: Follow Accumulator.h pattern exactly
+- **Note**: UI layer DOES use `enum class` with `Last` - convention is layer-specific
+- **Learning**: grep for existing enum patterns: `grep -r "enum HarmonyRole" src/apps/sequencer/model/`
+
+**4. Serialization Version Management**
+- **Issue**: Had to add Version34 for harmony properties
+- **Challenge**: Ensuring backward compatibility with Version33 and earlier
+- **Solution**: Followed Accumulator serialization pattern with version checks
+- **Learning**: Always add version guard: `if (reader.dataVersion() >= ProjectVersion::VersionX)`
 
 ### Best Practices Established 📋
-- Always read existing code patterns before implementing
-- Use grep/find extensively to understand conventions
-- Write tests first, even for "simple" features
-- Commit frequently with clear messages
-- Document architectural decisions inline
+
+**Before Writing Code:**
+1. Read 3-5 similar existing implementations
+2. Use `grep -r` to find all usages of similar patterns
+3. Check CMakeLists.txt to understand build integration
+4. Identify which layer you're working in (model/engine/ui have different conventions)
+
+**Testing:**
+1. Write tests FIRST (true TDD)
+2. Use `UnitTest.h` framework (NOT Catch2)
+3. Cast enums to int for comparison: `static_cast<int>(enum)`
+4. Test defaults, setters, clamping, and edge cases
+
+**Type System:**
+1. Let the compiler handle type conversions in assignments
+2. Use plain `clamp(value, min, max)` without type casts
+3. Model enums: plain `enum` (no `class`, no `Last`)
+4. UI enums: `enum class` with `Last`
+
+**Serialization:**
+1. Bit-pack related values (3 bits + 3 bits = 1 byte)
+2. Always add version guards for backward compatibility
+3. Document bit positions in comments
+4. Test both write and read paths
+
+**Git Workflow:**
+1. Commit after each GREEN phase
+2. Use descriptive messages with file names
+3. Push frequently to avoid losing work
+4. Document fixes in commit messages
+
+### Common Errors Quick Reference
+
+See **CLAUDE.md § Testing Conventions and Common Errors** for detailed examples of:
+- Test framework usage (UnitTest.h vs Catch2)
+- Clamp type matching errors
+- Enum convention violations
+- Bitfield packing patterns
+- Compilation error diagnostics
 
 ---
 
