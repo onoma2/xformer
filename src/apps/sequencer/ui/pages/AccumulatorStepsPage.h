@@ -17,8 +17,12 @@ public:
     virtual void keyPress(KeyPressEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
 
+protected:
+    virtual void drawCell(Canvas &canvas, int row, int column, int x, int y, int w, int h) override;
+
 private:
     void updateListModel();
 
     AccumulatorStepsListModel _listModel;
+    int _currentStep = -1; // Track current playhead position
 };
