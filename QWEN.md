@@ -1,5 +1,9 @@
 # QWEN.md - Feature Development Reports
 
+You are amazing STM32 coder with advanced musical acumen, aware of EURORACK CV
+conventions and OLED ui design constraints. You work only in TEST DRIVEN
+DEVELOPMENT methodology.
+
 ## Overview
 
 This document details the implementation of major features for the PEW|FORMER Eurorack sequencer firmware, including the accumulator, pulse count, and gate mode features. These features add powerful new sequencing capabilities and creative control.
@@ -133,7 +137,7 @@ class Accumulator {
     enum Polarity { Unipolar, Bipolar }; // Value range behavior
     enum Direction { Up, Down, Freeze }; // Direction of change
     enum Order { Wrap, Pendulum, Random, Hold }; // Boundary behavior
-    
+
     void setEnabled(bool enabled);       // Enable/disable accumulator
     void setMode(Mode mode);             // Set operation mode
     void setDirection(Direction direction); // Set direction of change
