@@ -316,6 +316,9 @@ void NoteSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_lastStep.base);
 
     writeArray(writer, _steps);
+
+    // Write accumulator state (Version33+)
+    _accumulator.write(writer);
 }
 
 void NoteSequence::read(VersionedSerializedReader &reader) {
@@ -332,4 +335,12 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
     reader.read(_lastStep.base);
 
     readArray(reader, _steps);
+
+    // Read accumulator state (Version33+)
+    if (reader.dataVersion() >= ProjectVersion::Version33) {
+        _accumulator.read(reader);
+    } else {
+        // Backward compatibility: use default accumulator
+        _accumulator = Accumulator();
+    }
 }

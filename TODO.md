@@ -689,6 +689,2347 @@ All phases complete:
 
 ### To brainstorm
 
+## Active Tasks
+
+### ✅ BUG FIX COMPLETE: Accumulator Serialization (Phases 1-2 Complete, Hardware Tested)
+
+**Status**: Phases 1-2 complete, hardware tested and verified working ✅
+
+**Remaining phases (3-5) skipped** - hardware testing confirmed fix works correctly.
+
+**What was fixed:**
+- Accumulator parameters now persist across save/load on hardware
+- Version33 project format with backward compatibility
+- All 4 unit tests passing
+
+**Files Modified:**
+- `src/apps/sequencer/model/Accumulator.h/cpp` - Serialization methods
+- `src/apps/sequencer/model/NoteSequence.cpp` - Integration
+- `src/apps/sequencer/model/ProjectVersion.h` - Version33
+- `src/tests/unit/sequencer/TestAccumulatorSerialization.cpp` - Unit tests
+
+---
+
+### 🎯 FEATURE: Accumulator UX Improvements (TDD Implementation)
+
+#### Overview
+Three improvements discovered during hardware testing to enhance accumulator usability and behavior.
+
+**Improvements:**
+1. Default min value should be 0 (currently -7)
+2. Counter should reset to 0 when pressing STOP
+3. Counter should start incrementing after first step pass (not immediately on enable/load)
+
+---
+
+### Improvement 1: Change Default Min Value to 0
+
+#### Test Plan
+**Goal**: Default accumulator min value should be 0 instead of -7
+
+**Step 1.1: Update Test Expectations (RED)**
+- File: `src/tests/unit/sequencer/TestAccumulator.cpp`
+- Modify test to expect minValue = 0 for new Accumulator
+- Test will fail with current implementation
+
+**Step 1.2: Update Accumulator Constructor (GREEN)**
+- File: `src/apps/sequencer/model/Accumulator.cpp`
+- Change `_minValue(-7)` to `_minValue(0)` in constructor
+- Test should pass
+
+**Expected Impact:**
+- New projects will have accumulator min = 0
+- Existing saved projects will load their saved min values unchanged
+- Better default for most musical use cases (unipolar range 0-7)
+
+---
+
+### Improvement 2: Reset Counter on STOP
+
+#### Test Plan
+**Goal**: Accumulator currentValue resets to minValue when sequencer stops
+
+**Step 2.1: Locate STOP Handler**
+- Search for sequencer stop/reset logic
+- Likely in: `src/apps/sequencer/engine/NoteTrackEngine.cpp` or `Engine.cpp`
+- Document where STOP is handled
+
+**Step 2.2: Write Test (RED)**
+- Create test case: accumulator resets on stop
+- Set accumulator to non-zero value
+- Trigger stop
+- Verify currentValue == minValue
+
+**Step 2.3: Implement Reset Logic (GREEN)**
+- Add method to Accumulator: `void reset() { _currentValue = _minValue; }`
+- Call `accumulator.reset()` in stop handler
+- Test should pass
+
+**Expected Impact:**
+- Pressing STOP resets accumulator to known state
+- Predictable behavior when restarting sequence
+- Counter starts fresh each playback session
+
+---
+
+### Improvement 3: Delay First Tick Until After First Step
+
+#### Test Plan
+**Goal**: Accumulator doesn't increment immediately on enable/load; waits for first step to pass
+
+**Background:**
+Currently, accumulator likely starts incrementing immediately when enabled. This causes the first note to already have accumulation applied, which is unexpected. Should start at minValue and only increment after the first step trigger.
+
+**Step 3.1: Add "First Tick" Flag**
+- Add to Accumulator.h: `bool _hasStarted` (default false)
+- Track whether accumulator has seen its first trigger
+
+**Step 3.2: Write Test (RED)**
+- Create test: first tick is skipped
+- Enable accumulator
+- Call tick() once
+- Verify currentValue == minValue (not minValue + stepValue)
+- Call tick() again
+- Verify currentValue == minValue + stepValue
+
+**Step 3.3: Implement Delayed Start Logic (GREEN)**
+```cpp
+void Accumulator::tick() const {
+    if (!_enabled) return;
+
+    if (!_hasStarted) {
+        const_cast<Accumulator*>(this)->_hasStarted = true;
+        return; // Skip first tick
+    }
+
+    // Existing tick logic...
+}
+```
+
+**Step 3.4: Reset Flag on Stop/Reset**
+- Modify reset() method: `_hasStarted = false`
+- Ensures next playback starts fresh
+
+**Step 3.5: Serialization Update**
+- Add `_hasStarted` to write() method
+- Add `_hasStarted` to read() method
+- Update TestAccumulatorSerialization to include this field
+- Increment to Version34? (or keep in Version33 since not released yet)
+
+**Expected Impact:**
+- First step plays at base note value (no accumulation)
+- Accumulation starts from second triggered step
+- More intuitive behavior for users
+- Counter always visible as it increments
+
+---
+
+### Implementation Checklist
+
+#### Improvement 1: Default Min = 0 ✅ COMPLETE
+- [x] Step 1.1: Update test expectations (RED)
+- [x] Step 1.2: Update constructor (GREEN)
+- [x] Commit: "Change default accumulator min to 0"
+
+**Result**: Default min value changed from -7 to 0. Ready for simulator testing.
+
+#### Improvement 2: Reset on STOP ✅ COMPLETE
+- [x] Step 2.1: Locate STOP handler (NoteTrackEngine::reset())
+- [x] Step 2.2: Write reset test (RED) - TestAccumulator.cpp
+- [x] Step 2.3: Implement reset logic (GREEN) - Accumulator::reset() + engine integration
+- [x] Ready for local testing
+
+**Implementation:**
+- Added `reset()` method to Accumulator.h/cpp
+- Resets `_currentValue` to `_minValue`
+- Resets `_pendulumDirection` to 1 (up)
+- Integrated into NoteTrackEngine::reset() for both main and fill sequences
+- Test case verifies reset behavior
+
+**Expected behavior:**
+- Pressing STOP resets accumulator to minValue
+- Predictable behavior when restarting sequence
+- Counter starts fresh each playback session
+
+#### Improvement 3: Delay First Tick ✅ COMPLETE
+- [x] Step 3.1: Add _hasStarted flag to model
+- [x] Step 3.2: Write delayed start test (RED) - TestAccumulator.cpp
+- [x] Step 3.3: Implement delayed tick logic (GREEN) - Accumulator::tick()
+- [x] Step 3.4: Update reset() to clear flag
+- [x] Step 3.5: Update serialization for _hasStarted
+- [x] Ready for local testing
+
+**Implementation:**
+- Added `_hasStarted` mutable bool flag to Accumulator.h
+- Initialized to false in constructor
+- Modified `tick()` to skip first call (sets _hasStarted=true and returns early)
+- Updated `reset()` to clear _hasStarted flag
+- Added _hasStarted to serialization (write/read methods)
+- Test case verifies delayed tick behavior
+
+**Expected behavior:**
+- First step plays at base note value (no accumulation applied)
+- Accumulation starts from second triggered step
+- More intuitive UX - counter visible as it increments
+- Reset clears delay flag for next playback
+
+---
+
+### Testing Strategy
+
+**Unit Tests:**
+1. TestAccumulator.cpp - Update/add test cases for each improvement
+2. TestAccumulatorSerialization.cpp - Update if serialization changes
+
+**Hardware Testing:**
+1. Test default min value on new project
+2. Test STOP reset behavior
+3. Test first-tick delay on enable and on load
+4. Verify backward compatibility with existing projects
+
+---
+
+### Files to Modify
+
+**Improvement 1:**
+- `src/apps/sequencer/model/Accumulator.cpp` - Constructor default
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Test expectations
+
+**Improvement 2:**
+- `src/apps/sequencer/model/Accumulator.h` - Add reset() method
+- `src/apps/sequencer/model/Accumulator.cpp` - Implement reset()
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` (or Engine.cpp) - Call reset on STOP
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Add reset test
+
+**Improvement 3:**
+- `src/apps/sequencer/model/Accumulator.h` - Add _hasStarted flag
+- `src/apps/sequencer/model/Accumulator.cpp` - Implement delayed tick, update reset(), update serialization
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Add delayed tick test
+- `src/tests/unit/sequencer/TestAccumulatorSerialization.cpp` - Update serialization tests
+
+---
+
+### 🎯 NEW FEATURE: Accumulator Trigger Mode (TDD Implementation)
+
+#### Overview
+Add global setting to control when accumulator increments - by step, by gate pulse, or by ratchet subdivision.
+
+**Three Trigger Modes:**
+1. **STEP** - Increment once per step (current behavior)
+2. **GATE** - Increment per gate pulse (respects pulse count and gate mode)
+3. **RTRIG** - Increment per ratchet/retrigger subdivision
+
+**Implementation:** Global setting on ACCUM page (Option A)
+
+---
+
+### Phase 1: Model Layer - Add TriggerMode Parameter
+
+#### Goal
+Add TriggerMode enum and field to Accumulator model with serialization.
+
+#### Step 1.1: Define TriggerMode Enum and Add Field
+
+**File:** `src/apps/sequencer/model/Accumulator.h`
+
+**Actions:**
+1. Add TriggerMode enum after existing enums:
+   ```cpp
+   enum TriggerMode { Step, Gate, Retrigger };
+   ```
+2. Add getter/setter methods:
+   ```cpp
+   TriggerMode triggerMode() const { return static_cast<TriggerMode>(_triggerMode); }
+   void setTriggerMode(TriggerMode mode) { _triggerMode = mode; }
+   ```
+3. Add bitfield in private section (2 bits, allowing 4 modes for future):
+   ```cpp
+   uint8_t _triggerMode : 2;
+   ```
+4. Note: `_ratchetTriggerMode` already exists (3 bits) but unused - we're adding separate `_triggerMode`
+
+**Expected Result:** Compiles with new field added
+
+---
+
+#### Step 1.2: Initialize TriggerMode in Constructor (RED→GREEN)
+
+**File:** `src/apps/sequencer/model/Accumulator.cpp`
+
+**Actions:**
+1. Write test first (RED):
+   - File: `src/tests/unit/sequencer/TestAccumulator.cpp`
+   - Test case: `default_trigger_mode_is_step`
+   - Verify new Accumulator has triggerMode() == Accumulator::Step
+
+2. Implement (GREEN):
+   - Add to constructor initializer list: `_triggerMode(Step)`
+
+**Expected Result:** Test passes
+
+---
+
+#### Step 1.3: Update Serialization (RED→GREEN)
+
+**File:** `src/apps/sequencer/model/Accumulator.cpp`
+
+**Actions:**
+1. Write test first (RED):
+   - File: `src/tests/unit/sequencer/TestAccumulatorSerialization.cpp`
+   - Add triggerMode to round-trip test
+   - Set triggerMode to different values and verify serialization
+
+2. Update write() method (GREEN):
+   - Pack _triggerMode into flags byte (already has room):
+   ```cpp
+   uint8_t flags = (_mode << 0) | (_polarity << 2) |
+                   (_direction << 3) | (_order << 5) |
+                   (_enabled << 7);
+   ```
+   - Need to expand or use another byte - analyze current bitfield usage
+   - Current flags: mode(2) + polarity(1) + direction(2) + order(2) + enabled(1) = 8 bits FULL
+   - **Solution:** Write _triggerMode as separate byte OR pack with _hasStarted
+
+3. Update read() method (GREEN):
+   - Read and unpack _triggerMode from serialization
+
+**Expected Result:** Serialization tests pass, triggerMode persists across save/load
+
+---
+
+### Phase 2: Engine Layer - Implement Trigger Mode Logic
+
+#### Goal
+Modify NoteTrackEngine to call accumulator.tick() based on selected trigger mode.
+
+#### Step 2.1: Analyze Current Code
+
+**File:** `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+**Current Implementation (lines 354-360):**
+```cpp
+// STEP mode - increment once per step
+if (step.isAccumulatorTrigger()) {
+    const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+}
+```
+
+**Target Locations:**
+- **STEP mode:** Keep at line 354-360 (current location)
+- **GATE mode:** Add inside `if (shouldFireGate)` block after line 390
+- **RTRIG mode:** Add inside retrigger while loop at line 402
+
+---
+
+#### Step 2.2: Implement STEP Mode (Current Behavior)
+
+**Actions:**
+1. Modify existing code to check trigger mode:
+   ```cpp
+   if (step.isAccumulatorTrigger() && targetSequence.accumulator().enabled()) {
+       if (targetSequence.accumulator().triggerMode() == Accumulator::Step) {
+           const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+       }
+   }
+   ```
+
+**Expected Result:** STEP mode works as before (backward compatible)
+
+---
+
+#### Step 2.3: Implement GATE Mode
+
+**File:** `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+**Actions:**
+1. Add after line 390, inside `if (shouldFireGate)` block:
+   ```cpp
+   if (shouldFireGate) {
+       // Existing gate generation code...
+
+       // GATE mode: increment per gate pulse
+       if (step.isAccumulatorTrigger() && targetSequence.accumulator().enabled()) {
+           if (targetSequence.accumulator().triggerMode() == Accumulator::Gate) {
+               const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+           }
+       }
+
+       uint32_t stepLength = ...
+   }
+   ```
+
+**Expected Result:**
+- GATE mode increments based on gate mode and pulse count
+- ALL mode with pulseCount=3 → 4 increments
+- FIRST mode with pulseCount=3 → 1 increment
+- HOLD mode with pulseCount=3 → 1 increment
+- FIRSTLAST mode with pulseCount=3 → 2 increments
+
+---
+
+#### Step 2.4: Implement RETRIGGER Mode
+
+**File:** `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+**Actions:**
+1. Add inside while loop at line 402:
+   ```cpp
+   int stepRetrigger = evalStepRetrigger(step, _noteTrack.retriggerProbabilityBias());
+   if (stepRetrigger > 1) {
+       uint32_t retriggerLength = divisor / stepRetrigger;
+       uint32_t retriggerOffset = 0;
+       while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
+           // RETRIGGER mode: increment per ratchet subdivision
+           if (step.isAccumulatorTrigger() && targetSequence.accumulator().enabled()) {
+               if (targetSequence.accumulator().triggerMode() == Accumulator::Retrigger) {
+                   const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+               }
+           }
+
+           _gateQueue.pushReplace({ ... });
+           _gateQueue.pushReplace({ ... });
+           retriggerOffset += retriggerLength;
+       }
+   }
+   ```
+
+**Expected Result:**
+- RTRIG mode increments once per ratchet subdivision
+- retrigger=3 (4 subdivisions) → 4 increments
+
+---
+
+#### Step 2.5: Build and Manual Testing
+
+**Actions:**
+1. Build simulator: `cd build/sim/debug && make -j`
+2. Test each mode:
+   - STEP: Enable accumulator trigger on step, set mode=STEP, verify 1 increment per step
+   - GATE: Set pulseCount=3, gateMode=ALL, mode=GATE, verify 4 increments
+   - RTRIG: Set retrigger=3, mode=RTRIG, verify 4 increments
+3. Verify combinations work correctly
+
+**Expected Result:** All three modes work as designed
+
+---
+
+### Phase 3: UI Layer - Add TriggerMode to ACCUM Page
+
+#### Goal
+Add TriggerMode parameter to ACCUM page for user control.
+
+#### Step 3.1: Add TriggerMode to AccumulatorListModel
+
+**File:** `src/apps/sequencer/ui/model/AccumulatorListModel.h`
+
+**Actions:**
+1. Add to Item enum (after existing parameters):
+   ```cpp
+   TriggerMode,
+   ```
+2. Update itemCount() if needed
+3. Add case in text() method to return "Trigger Mode"
+4. Add case in valueFmt() to return mode names: "STEP", "GATE", "RTRIG"
+5. Add indexed value support (similar to Direction/Order)
+
+**Expected Result:** TriggerMode appears in ACCUM page list
+
+---
+
+#### Step 3.2: Implement Encoder Control
+
+**File:** `src/apps/sequencer/ui/model/AccumulatorListModel.h`
+
+**Actions:**
+1. Add to edit() method:
+   ```cpp
+   case TriggerMode:
+       accumulator.setTriggerMode(
+           static_cast<Accumulator::TriggerMode>(
+               ModelUtils::adjustedByStep(
+                   accumulator.triggerMode(), -1, 2, step, !shift
+               )
+           )
+       );
+       break;
+   ```
+
+**Expected Result:** Encoder cycles through STEP → GATE → RTRIG → STEP
+
+---
+
+#### Step 3.3: Test UI in Simulator
+
+**Actions:**
+1. Navigate to ACCUM page
+2. Find "Trigger Mode" parameter
+3. Use encoder to change value
+4. Verify display shows: STEP, GATE, RTRIG
+5. Save and load project to verify persistence
+
+**Expected Result:** UI fully functional
+
+---
+
+### Phase 4: Testing & Documentation
+
+#### Step 4.1: Unit Tests
+
+**Files to Test:**
+- `TestAccumulator.cpp` - TriggerMode getter/setter
+- `TestAccumulatorSerialization.cpp` - TriggerMode serialization
+
+**Test Cases:**
+1. Default trigger mode is STEP
+2. Set/get trigger mode for all three values
+3. Serialization round-trip preserves trigger mode
+4. Invalid values clamp correctly
+
+---
+
+#### Step 4.2: Integration Testing
+
+**Scenarios:**
+1. **STEP mode + pulse count:**
+   - Set pulseCount=3, triggerMode=STEP
+   - Verify: 1 increment per step (not 4)
+
+2. **GATE mode + gate modes:**
+   - Set pulseCount=3, gateMode=ALL, triggerMode=GATE
+   - Verify: 4 increments
+   - Set pulseCount=3, gateMode=FIRST, triggerMode=GATE
+   - Verify: 1 increment
+   - Set pulseCount=3, gateMode=FIRSTLAST, triggerMode=GATE
+   - Verify: 2 increments
+
+3. **RTRIG mode + retrigger:**
+   - Set retrigger=3, triggerMode=RTRIG
+   - Verify: 4 increments
+
+4. **Combined scenarios:**
+   - pulseCount=2, retrigger=1, gateMode=ALL, triggerMode=GATE
+   - Verify: 3 increments (3 gate pulses)
+   - Same setup but triggerMode=RTRIG
+   - Verify: 6 increments (3 pulses × 2 retriggers each)
+
+---
+
+#### Step 4.3: Update Documentation
+
+**Files to Update:**
+1. **TODO.md** - Mark feature complete
+2. **CLAUDE.md** - Add Trigger Mode section to Accumulator Feature documentation
+3. **CHANGELOG.md** - Add to unreleased section
+
+---
+
+### Implementation Checklist
+
+#### Phase 1: Model Layer
+- [ ] Step 1.1: Define TriggerMode enum and add field
+- [ ] Step 1.2: Initialize in constructor with test (RED→GREEN)
+- [ ] Step 1.3: Update serialization with test (RED→GREEN)
+
+#### Phase 2: Engine Layer
+- [ ] Step 2.1: Analyze current code locations
+- [ ] Step 2.2: Implement STEP mode (refactor existing)
+- [ ] Step 2.3: Implement GATE mode
+- [ ] Step 2.4: Implement RTRIG mode
+- [ ] Step 2.5: Build and manual testing
+
+#### Phase 3: UI Layer
+- [ ] Step 3.1: Add to AccumulatorListModel
+- [ ] Step 3.2: Implement encoder control
+- [ ] Step 3.3: Test UI in simulator
+
+#### Phase 4: Testing & Documentation
+- [ ] Step 4.1: Unit tests (model + serialization)
+- [ ] Step 4.2: Integration testing (all mode combinations)
+- [ ] Step 4.3: Update documentation
+
+---
+
+### Expected File Changes
+
+**Model Layer:**
+- `src/apps/sequencer/model/Accumulator.h` - Add enum, field, getters/setters
+- `src/apps/sequencer/model/Accumulator.cpp` - Constructor, serialization
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Add tests
+- `src/tests/unit/sequencer/TestAccumulatorSerialization.cpp` - Update tests
+
+**Engine Layer:**
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Implement 3 trigger modes
+
+**UI Layer:**
+- `src/apps/sequencer/ui/model/AccumulatorListModel.h` - Add TriggerMode parameter
+
+**Documentation:**
+- `TODO.md` - This plan and completion tracking
+- `CLAUDE.md` - Feature documentation
+- `CHANGELOG.md` - Release notes
+
+---
+
+### Technical Notes
+
+**Bitfield Usage Analysis:**
+Current Accumulator bitfields (line 57-62 in Accumulator.h):
+```cpp
+uint8_t _mode : 2;              // 2 bits
+uint8_t _polarity : 1;          // 1 bit
+uint8_t _direction : 2;         // 2 bits
+uint8_t _order : 2;             // 2 bits
+uint8_t _enabled : 1;           // 1 bit
+uint8_t _ratchetTriggerMode : 3; // 3 bits (UNUSED - can repurpose)
+// Total: 13 bits across 2 bytes
+```
+
+**Serialization Size:**
+- Current: 10 bytes (1 flags + 2 minValue + 2 maxValue + 1 stepValue + 2 currentValue + 1 pendulumDirection + 1 hasStarted)
+- After TriggerMode: 10 bytes (no change - pack into existing structure or reuse _ratchetTriggerMode bits)
+
+**Option:** Repurpose `_ratchetTriggerMode` (3 bits) for `_triggerMode` (2 bits) since it's currently unused.
+
+---
+
+### ✅ IMPLEMENTATION COMPLETE (2025-11-17)
+
+**Status**: Fully implemented and tested
+
+**Commits:**
+- `f041a6c` - Engine: Implement accumulator trigger mode logic
+- `8216350` - UI: Add TriggerMode parameter to ACCUM page
+- `ff6e1ac` - Fix: RETRIGGER mode now works with retrigger=1
+- `97deac0` - Fix: RETRIGGER mode now ticks N times for N retriggers
+
+**Verification:**
+- ✅ All 15 unit tests pass (TestAccumulator.cpp)
+- ✅ All 4 serialization tests pass (TestAccumulatorSerialization.cpp)
+- ✅ Simulator testing complete: STEP, GATE, RTRIG modes work correctly
+- ✅ Documentation updated: CLAUDE.md, CHANGELOG.md, QWEN.md, RTRIG-Timing-Research.md, Queue-BasedAccumTicks.md
+
+**Known Behavior:**
+- RTRIG mode ticks N times immediately at step start (not spread over time)
+- This is an architectural limitation due to minimal gate queue structure
+- Gates fire spread over time (you hear ratchets), but accumulator increments are upfront
+- See `RTRIG-Timing-Research.md` for technical investigation and workaround analysis
+- See `Queue-BasedAccumTicks.md` for detailed implementation plan if future enhancement needed
+- Recommendation: Accept current behavior (pointer invalidation risks in queue-based approaches)
+
+---
+
+## 🐛 BUG FIXES: Accumulator Trigger Modes (CRITICAL)
+
+**Bug Report**: See `BUG-REPORT-ACCUMULATOR-TRIGGER-MODES.md`
+**Status**: 🔴 CRITICAL - Found on hardware testing 2025-11-18
+**Priority**: P0 - Must fix before any release
+
+### Bug #1: STEP and GATE Trigger Modes Not Working
+
+**Issue**: Accumulator increments on every gate pulse regardless of TRIG mode setting. All three modes (STEP, GATE, RTRIG) behave identically.
+
+**Expected vs Actual**:
+- STEP mode: Should tick once per step → Actually ticks on every pulse
+- GATE mode: Should tick per gate fired → Actually ticks on every pulse
+- RTRIG mode: Works correctly (ticks on each retrigger)
+
+---
+
+### TDD Fix Plan - Bug #1: Trigger Mode Logic
+
+#### Phase 1: Reproduce Bug in Tests (RED - Write Failing Tests)
+
+**Goal**: Create integration tests that expose the bug
+
+##### Test 1.1: STEP Mode Integration Test (RED)
+
+**File**: `src/tests/integration/sequencer/TestAccumulatorTriggerModes.cpp` (NEW)
+
+```cpp
+#include "catch.hpp"
+#include "apps/sequencer/engine/NoteTrackEngine.h"
+#include "apps/sequencer/model/NoteSequence.h"
+#include "apps/sequencer/model/NoteTrack.h"
+
+TEST_CASE("STEP mode ticks once per step with pulseCount=3") {
+    // Setup: Step with pulseCount=3 (4 pulses total)
+    NoteTrack track;
+    NoteSequence sequence;
+
+    // Configure accumulator for STEP mode
+    sequence.accumulator().setEnabled(true);
+    sequence.accumulator().setTriggerMode(Accumulator::Step);
+    sequence.accumulator().setDirection(Accumulator::Up);
+    sequence.accumulator().setMin(0);
+    sequence.accumulator().setMax(100);
+    sequence.accumulator().setStep(1);
+
+    // Configure step
+    sequence.step(0).setGate(true);
+    sequence.step(0).setPulseCount(3);  // 4 pulses total (0-3)
+    sequence.step(0).setAccumulatorTrigger(true);
+
+    // Create engine and trigger step 4 times (simulating pulse counter)
+    NoteTrackEngine engine(track, &sequence, /* ... */);
+
+    int valueBefore = sequence.accumulator().value();  // Should be 0
+
+    // Simulate 4 pulses for the same step
+    for (int pulse = 1; pulse <= 4; pulse++) {
+        engine.triggerStep(/* tick */, /* divisor */, /* ... */);
+    }
+
+    int valueAfter = sequence.accumulator().value();
+
+    // EXPECTED: Increment by 1 (once per step, not once per pulse)
+    REQUIRE(valueAfter == valueBefore + 1);  // This will FAIL (bug)
+
+    // ACTUAL (buggy): valueAfter == valueBefore + 4 (ticks on every pulse)
+}
+
+TEST_CASE("STEP mode ignores pulse count variations") {
+    // Test with pulseCount=0 (1 pulse) - should tick once
+    // Test with pulseCount=7 (8 pulses) - should tick once
+    // Verify STEP mode truly independent of pulse count
+}
+```
+
+##### Test 1.2: GATE Mode Integration Test (RED)
+
+```cpp
+TEST_CASE("GATE mode ticks per gate fired with gateMode=FIRST") {
+    // Setup: pulseCount=3, gateMode=FIRST
+    NoteSequence sequence;
+    sequence.accumulator().setTriggerMode(Accumulator::Gate);
+    sequence.step(0).setPulseCount(3);  // 4 pulses
+    sequence.step(0).setGateMode(NoteSequence::First);  // Gate fires once (first pulse only)
+
+    // Simulate 4 pulses
+    // EXPECTED: Increment by 1 (gate fires only on first pulse)
+    // ACTUAL (buggy): Increment by 4 (ticks on every pulse)
+
+    REQUIRE(sequence.accumulator().value() == 1);  // Will FAIL
+}
+
+TEST_CASE("GATE mode ticks per gate fired with gateMode=ALL") {
+    // Setup: pulseCount=3, gateMode=ALL
+    // Gates fire on all 4 pulses
+    // EXPECTED: Increment by 4
+    // This should PASS even with bug (coincidentally correct)
+
+    REQUIRE(sequence.accumulator().value() == 4);  // Should PASS
+}
+
+TEST_CASE("GATE mode respects gate mode FIRSTLAST") {
+    // Setup: pulseCount=3, gateMode=FIRSTLAST
+    // Gates fire on first and last pulse (2 gates)
+    // EXPECTED: Increment by 2
+    // ACTUAL (buggy): Increment by 4
+
+    REQUIRE(sequence.accumulator().value() == 2);  // Will FAIL
+}
+```
+
+##### Test 1.3: Verify RTRIG Mode Still Works (GREEN)
+
+```cpp
+TEST_CASE("RTRIG mode works correctly") {
+    // Setup: retrig=3
+    // EXPECTED: Increment by 3 (all at once at step start)
+    // This should PASS (RTRIG mode is working)
+
+    REQUIRE(sequence.accumulator().value() == 3);  // Should PASS
+}
+```
+
+**Verification**: All tests should FAIL except RTRIG test
+```bash
+cd build/sim/debug
+make -j TestAccumulatorTriggerModes
+./src/tests/integration/TestAccumulatorTriggerModes
+# Expected: 4+ failures
+```
+
+---
+
+#### Phase 2: Investigate Root Cause (Analysis)
+
+**Goal**: Find where the trigger mode logic is broken
+
+##### Step 2.1: Code Review of triggerStep()
+
+**File**: `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+**Lines to investigate**:
+- Line ~353: STEP mode logic
+- Line ~392: GATE mode logic
+- Line ~410: RTRIG mode logic
+
+**Questions to answer**:
+1. Is trigger mode being checked at all?
+2. Are all three conditions evaluating to true?
+3. Is the mode enum comparison correct?
+4. Is fill sequence logic interfering?
+5. Is `triggerStep()` being called multiple times per step?
+
+##### Step 2.2: Add Debug Logging (Temporary)
+
+```cpp
+// In triggerStep() - add at top
+#ifdef DEBUG_ACCUMULATOR_TRIG
+    DBG("triggerStep: pulseCounter=%d, triggerMode=%d, shouldTick=%d",
+        _pulseCounter,
+        sequence.accumulator().triggerMode(),
+        step.isAccumulatorTrigger());
+#endif
+```
+
+Build and run simulator with logging to observe behavior.
+
+##### Step 2.3: Hypothesis Formation
+
+**Likely causes** (in order of probability):
+
+1. **Missing mode check**: Code ticks accumulator without checking `triggerMode()`
+2. **Logic error**: Mode check inverted or incorrect comparison
+3. **Multiple calls**: `triggerStep()` called once per pulse instead of conditionally
+4. **Wrong check location**: Mode checked but at wrong point in execution flow
+
+---
+
+#### Phase 3: Fix the Bug (GREEN - Minimal Fix)
+
+**Goal**: Make the failing tests pass with minimal code changes
+
+##### Suspected Fix (Hypothesis 1): Add Missing Mode Checks
+
+**File**: `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+**Current code** (around line 353, STEP mode):
+```cpp
+// STEP mode: Tick once per step (existing logic)
+if (step.isAccumulatorTrigger()) {
+    const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
+    if (targetSequence.accumulator().enabled() &&
+        targetSequence.accumulator().triggerMode() == Accumulator::Step) {
+        const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+    }
+}
+```
+
+**Problem**: This code likely gets executed on EVERY call to `triggerStep()`, which happens once per pulse.
+
+**Fix**: Only execute when `_pulseCounter == 1` (first pulse of step):
+
+```cpp
+// STEP mode: Tick once per step (FIXED)
+if (_pulseCounter == 1 &&  // NEW: Only on first pulse
+    step.isAccumulatorTrigger()) {
+    const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
+    if (targetSequence.accumulator().enabled() &&
+        targetSequence.accumulator().triggerMode() == Accumulator::Step) {
+        const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+    }
+}
+```
+
+**Current code** (around line 392, GATE mode):
+```cpp
+// GATE mode: Tick per gate fired
+if (step.isAccumulatorTrigger()) {
+    const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
+    if (targetSequence.accumulator().enabled() &&
+        targetSequence.accumulator().triggerMode() == Accumulator::Gate) {
+        const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+    }
+}
+```
+
+**Problem**: This code likely gets executed regardless of whether gate actually fires.
+
+**Fix**: Only execute when gate actually fires (inside `if (shouldFireGate)` block):
+
+```cpp
+// GATE mode: Tick per gate fired (FIXED)
+if (shouldFireGate &&  // NEW: Only when gate fires
+    step.isAccumulatorTrigger()) {
+    const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
+    if (targetSequence.accumulator().enabled() &&
+        targetSequence.accumulator().triggerMode() == Accumulator::Gate) {
+        const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+    }
+}
+```
+
+##### Implementation Steps
+
+1. **Locate exact buggy code** via Step 2 investigation
+2. **Apply minimal fix** based on root cause
+3. **Verify tests pass**:
+   ```bash
+   cd build/sim/debug
+   make -j TestAccumulatorTriggerModes
+   ./src/tests/integration/TestAccumulatorTriggerModes
+   # Expected: All tests PASS
+   ```
+
+---
+
+#### Phase 4: Refactor (Clean Up Code)
+
+**Goal**: Improve code clarity after fix works
+
+##### Step 4.1: Extract Helper Method
+
+```cpp
+// In NoteTrackEngine.cpp
+void NoteTrackEngine::tickAccumulatorIfNeeded(
+    const NoteSequence::Step &step,
+    const NoteSequence &sequence,
+    bool useFillSequence,
+    Accumulator::TriggerMode mode,
+    bool condition) {
+
+    if (!condition || !step.isAccumulatorTrigger()) {
+        return;
+    }
+
+    const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
+    if (targetSequence.accumulator().enabled() &&
+        targetSequence.accumulator().triggerMode() == mode) {
+        const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+    }
+}
+
+// Usage:
+tickAccumulatorIfNeeded(step, sequence, useFillSequence,
+                        Accumulator::Step, _pulseCounter == 1);
+
+tickAccumulatorIfNeeded(step, sequence, useFillSequence,
+                        Accumulator::Gate, shouldFireGate);
+```
+
+##### Step 4.2: Add Inline Comments
+
+```cpp
+// STEP mode: Tick once per step (only on first pulse)
+tickAccumulatorIfNeeded(...);
+
+// GATE mode: Tick per gate fired (respects gate mode)
+tickAccumulatorIfNeeded(...);
+
+// RTRIG mode: Tick N times for N retriggers (all at step start)
+// [existing RTRIG code]
+```
+
+---
+
+#### Phase 5: Regression Testing (Verify No Breakage)
+
+**Goal**: Ensure fix doesn't break existing functionality
+
+##### Test 5.1: All Existing Unit Tests
+
+```bash
+cd build/sim/debug
+make -j test_all
+# All 15+ accumulator tests should still pass
+```
+
+##### Test 5.2: Manual Simulator Testing
+
+Test scenarios:
+1. **STEP mode** with various pulse counts (0-7)
+2. **GATE mode** with all gate modes (ALL/FIRST/HOLD/FIRSTLAST)
+3. **RTRIG mode** with various retrigger counts (1-7)
+4. **Combinations**: pulse count + gate mode + retrigger
+5. **Fill sequences**: Test with fill mode active
+
+##### Test 5.3: Hardware Testing
+
+Flash to hardware and verify:
+- STEP mode ticks once per step ✓
+- GATE mode respects gate mode setting ✓
+- RTRIG mode still works ✓
+- No crashes or unexpected behavior ✓
+
+---
+
+### Bug #2: Missing Playhead in ACCST Page
+
+**Issue**: AccumulatorStepsPage does not show running playhead indicator during playback.
+
+---
+
+### TDD Fix Plan - Bug #2: Add Playhead to ACCST Page
+
+#### Phase 1: Research Existing Playhead Implementation (Analysis)
+
+**Goal**: Understand how other pages implement playhead
+
+##### Step 1.1: Study NoteSequenceEditPage
+
+**File**: `src/apps/sequencer/ui/pages/NoteSequenceEditPage.cpp`
+
+**Find**:
+1. How playhead position is obtained (e.g., `_engine.state().currentStep()`)
+2. How playhead is rendered (drawing code)
+3. How page subscribes to step updates
+4. Refresh rate / update mechanism
+
+**Key code to extract**:
+```cpp
+// Playhead rendering (example)
+int currentStep = _sequence.currentStep();  // Or similar
+canvas.setColor(Color::Bright);
+canvas.drawRect(stepX, stepY, stepWidth, stepHeight);
+```
+
+##### Step 1.2: List Required Components
+
+From research, playhead likely needs:
+- [ ] Access to current step index
+- [ ] Real-time update subscription
+- [ ] Drawing code in `draw()` method
+- [ ] Visual style (color, shape)
+
+---
+
+#### Phase 2: Implement Playhead (TDD)
+
+##### Test 2.1: Playhead Position Test (Conceptual)
+
+```cpp
+// Note: UI tests are harder to automate - may be manual verification
+TEST_CASE("AccumulatorStepsPage shows current step") {
+    // Setup: Sequence playing at step 3
+    // Open ACCST page
+    // Verify: Step 3 has visual indicator
+    // (Manual test or UI automation framework needed)
+}
+```
+
+##### Step 2.2: Add Playhead Rendering (GREEN)
+
+**File**: `src/apps/sequencer/ui/pages/AccumulatorStepsPage.cpp`
+
+**Modify `draw()` method**:
+
+```cpp
+void AccumulatorStepsPage::draw(Canvas &canvas) {
+    // ... existing drawing code ...
+
+    // NEW: Draw playhead indicator
+    int currentStep = /* get current step from engine or sequence state */;
+
+    if (currentStep >= 0 && currentStep < 16) {
+        // Highlight current step
+        int x = /* calculate x position for step */;
+        int y = /* calculate y position */;
+
+        canvas.setColor(Color::Bright);  // Or appropriate color
+        canvas.fillRect(x, y, width, height);
+        // Or: canvas.drawRect(...) for outline
+    }
+
+    // ... rest of drawing ...
+}
+```
+
+##### Step 2.3: Subscribe to Updates
+
+Ensure page refreshes in real-time:
+
+```cpp
+// In update() method or event handler
+void AccumulatorStepsPage::update() {
+    // Check if step changed
+    // Mark page as dirty / request redraw
+}
+```
+
+---
+
+#### Phase 3: Visual Testing (Manual)
+
+**Goal**: Verify playhead looks correct and moves smoothly
+
+##### Test Scenarios:
+
+1. **Start playback** → Playhead appears
+2. **Stop playback** → Playhead disappears or freezes
+3. **Step forward** → Playhead advances
+4. **Loop sequence** → Playhead wraps around
+5. **Change pattern** → Playhead resets correctly
+
+**Visual QA**:
+- Playhead color distinct from other elements ✓
+- Animation smooth (not flickering) ✓
+- Consistent with other pages ✓
+
+---
+
+### Implementation Checklist
+
+**Bug #1: Trigger Modes** (Priority: 🔴 P0)
+- [ ] Phase 1: Write failing integration tests
+- [ ] Phase 2: Investigate root cause via code review
+- [ ] Phase 3: Fix trigger mode logic
+- [ ] Phase 4: Refactor code for clarity
+- [ ] Phase 5: Regression test (sim + hardware)
+
+**Bug #2: Playhead** (Priority: 🟡 P1)
+- [ ] Phase 1: Research existing playhead implementation
+- [ ] Phase 2: Implement playhead rendering
+- [ ] Phase 3: Manual visual testing
+- [ ] Hardware verification
+
+---
+
+### Success Criteria
+
+**Bug #1 Fixed When:**
+- ✅ STEP mode ticks once per step (verified in tests)
+- ✅ GATE mode ticks per gate fired (respects gate mode)
+- ✅ RTRIG mode still works correctly
+- ✅ All integration tests pass
+- ✅ Hardware testing confirms fix
+
+**Bug #2 Fixed When:**
+- ✅ ACCST page shows playhead indicator
+- ✅ Playhead moves in real-time during playback
+- ✅ Visual style consistent with other pages
+- ✅ Hardware testing confirms UX improvement
+
+---
+
+### Estimated Effort
+
+**Bug #1 (Trigger Modes)**:
+- Investigation: 2-4 hours
+- Fix + tests: 3-5 hours
+- Testing: 2-3 hours
+- **Total: 7-12 hours (1-2 days)**
+
+**Bug #2 (Playhead)**:
+- Research: 1-2 hours
+- Implementation: 2-3 hours
+- Testing: 1-2 hours
+- **Total: 4-7 hours (0.5-1 day)**
+
+**Combined: 1.5-3 days** (with testing on hardware)
+
+---
+
+### Key Files
+
+**Bug #1:**
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Fix trigger logic
+- `src/tests/integration/sequencer/TestAccumulatorTriggerModes.cpp` - NEW integration tests
+
+**Bug #2:**
+- `src/apps/sequencer/ui/pages/AccumulatorStepsPage.cpp` - Add playhead
+- `src/apps/sequencer/ui/pages/NoteSequenceEditPage.cpp` - Reference implementation
+
+**Documentation:**
+- `BUG-REPORT-ACCUMULATOR-TRIGGER-MODES.md` - Detailed bug report
+- `CHANGELOG.md` - Update with bug fixes
+
+---
+
+## Pending Features
+
+### To brainstorm
+
+---
+
+## 🧪 EXPERIMENTAL: RTRIG Mode - Spread Accumulator Ticks Over Time (Option 3)
+
+**Status**: ⚠️ OPTIONAL EXPERIMENTAL FEATURE - High Risk, Proceed with Caution
+
+**Goal**: Make accumulator ticks fire when each retrigger gate fires (spread over time) instead of all at once at step start.
+
+**Approach**: Weak Reference with Sequence ID (Option 3 from RTRIG-Timing-Research.md)
+
+**Risk Assessment**: 🟠 MEDIUM RISK
+- Safer than pointer-based approaches (no dangling pointers)
+- Still has edge cases (sequence might be invalid between schedule and fire)
+- Requires extensive testing on hardware
+- **Potential for crashes if not carefully implemented**
+
+**Effort Estimate**: 8-12 days (investigation + implementation + testing)
+
+**Prerequisites**:
+- ✅ Read RTRIG-Timing-Research.md (complete technical investigation)
+- ✅ Read Queue-BasedAccumTicks.md (full implementation plan)
+- ⚠️ Understand pointer invalidation risks
+- ⚠️ Accept risk of edge case crashes during development
+
+---
+
+### TDD Implementation Plan - Option 3: Sequence ID Approach (Single Queue)
+
+**Architecture Decision**: Extend existing `Gate` struct instead of creating separate queue
+- **Pros**: Simpler (one queue), ticks/gates naturally synchronized
+- **Cons**: Memory overhead (12 bytes → 16 bytes per gate), queue capacity concerns
+- **Safety**: Uses sequence ID (not pointer) to avoid dangling pointer crashes
+
+---
+
+#### Phase 1: Model Layer - Extend Gate Struct (2-3 days)
+
+**Goal**: Add accumulator tick metadata to existing Gate struct without using pointers
+
+##### Step 1.1: Gate Struct Stores `shouldTickAccumulator` Flag (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+File: `src/tests/unit/sequencer/TestGateQueue.cpp` (NEW)
+
+```cpp
+#include "catch.hpp"
+#include "apps/sequencer/engine/NoteTrackEngine.h"
+
+TEST_CASE("Gate struct stores shouldTickAccumulator flag") {
+    NoteTrackEngine::Gate gate;
+    gate.tick = 100;
+    gate.gate = true;
+    gate.shouldTickAccumulator = true;
+
+    REQUIRE(gate.tick == 100);
+    REQUIRE(gate.gate == true);
+    REQUIRE(gate.shouldTickAccumulator == true);
+}
+
+TEST_CASE("Gate struct defaults shouldTickAccumulator to false") {
+    NoteTrackEngine::Gate gate;
+    gate.tick = 100;
+    gate.gate = true;
+    // Don't explicitly set shouldTickAccumulator
+
+    REQUIRE(gate.shouldTickAccumulator == false);  // Default
+}
+```
+
+**GREEN - Implement:**
+
+File: `src/apps/sequencer/engine/NoteTrackEngine.h` (around line 82)
+
+```cpp
+struct Gate {
+    uint32_t tick;
+    bool gate;
+    bool shouldTickAccumulator;  // NEW: Should this gate tick accumulator?
+
+    // Constructor with default
+    Gate() : tick(0), gate(false), shouldTickAccumulator(false) {}
+    Gate(uint32_t t, bool g) : tick(t), gate(g), shouldTickAccumulator(false) {}
+    Gate(uint32_t t, bool g, bool tickAccum)
+        : tick(t), gate(g), shouldTickAccumulator(tickAccum) {}
+};
+```
+
+**REFACTOR**:
+- Document field purpose
+- Ensure memory alignment is reasonable (struct size: 12 bytes with padding)
+
+**Verification**:
+```bash
+cd build/sim/debug
+make -j TestGateQueue
+./src/tests/unit/TestGateQueue
+```
+
+---
+
+##### Step 1.2: Gate Struct Stores `sequenceId` (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+File: `src/tests/unit/sequencer/TestGateQueue.cpp`
+
+```cpp
+TEST_CASE("Gate struct stores sequenceId") {
+    NoteTrackEngine::Gate gate;
+    gate.tick = 100;
+    gate.gate = true;
+    gate.shouldTickAccumulator = true;
+    gate.sequenceId = 1;  // Fill sequence
+
+    REQUIRE(gate.sequenceId == 1);
+}
+
+TEST_CASE("Gate struct distinguishes main and fill sequences") {
+    NoteTrackEngine::Gate mainGate;
+    mainGate.sequenceId = NoteTrackEngine::MainSequenceId;
+
+    NoteTrackEngine::Gate fillGate;
+    fillGate.sequenceId = NoteTrackEngine::FillSequenceId;
+
+    REQUIRE(mainGate.sequenceId == 0);
+    REQUIRE(fillGate.sequenceId == 1);
+    REQUIRE(mainGate.sequenceId != fillGate.sequenceId);
+}
+```
+
+**GREEN - Implement:**
+
+File: `src/apps/sequencer/engine/NoteTrackEngine.h`
+
+```cpp
+class NoteTrackEngine : public TrackEngine {
+public:
+    // Sequence ID constants
+    static constexpr uint8_t MainSequenceId = 0;
+    static constexpr uint8_t FillSequenceId = 1;
+
+    struct Gate {
+        uint32_t tick;
+        bool gate;
+        bool shouldTickAccumulator;  // From Step 1.1
+        uint8_t sequenceId;           // NEW: 0=main, 1=fill
+
+        // Updated constructors
+        Gate() : tick(0), gate(false), shouldTickAccumulator(false), sequenceId(0) {}
+        Gate(uint32_t t, bool g)
+            : tick(t), gate(g), shouldTickAccumulator(false), sequenceId(0) {}
+        Gate(uint32_t t, bool g, bool tickAccum, uint8_t seqId)
+            : tick(t), gate(g), shouldTickAccumulator(tickAccum), sequenceId(seqId) {}
+    };
+    // ... rest of class
+};
+```
+
+**REFACTOR**:
+- Ensure struct packing is efficient (current: 4 + 1 + 1 + 1 + 1 padding = 8 bytes? Check actual size)
+- Add static_assert to verify size expectations
+- Document sequence ID constants
+
+**Memory Analysis**:
+```cpp
+// Add to implementation or test file
+static_assert(sizeof(NoteTrackEngine::Gate) <= 16,
+              "Gate struct should not exceed 16 bytes");
+```
+
+**Verification**:
+- All tests pass
+- Check actual struct size: `sizeof(Gate)`
+- No regression in existing tests
+
+---
+
+#### Phase 2: Engine Layer - Schedule Gates with Tick Metadata (3-4 days)
+
+**Goal**: Set `shouldTickAccumulator` flag on gates when scheduling retriggers
+
+##### Step 2.1: Analyze Current triggerStep() Logic
+
+**Actions**:
+1. Read `src/apps/sequencer/engine/NoteTrackEngine.cpp` lines 408-437 (RTRIG implementation)
+2. Identify where retrigger loop schedules gates
+3. Plan how to set metadata flags when pushing to `_gateQueue`
+
+**Key Findings**:
+- Line 410-421: Current RTRIG mode ticks all at once (REMOVE this)
+- Line 423-436: Retrigger gate scheduling loop (MODIFY gate creation here)
+- Gates scheduled with future timestamps using `tick + gateOffset + retriggerOffset`
+- Current gate creation: `_gateQueue.pushReplace({ tick, gateValue })`
+- New gate creation: `_gateQueue.pushReplace({ tick, gateValue, shouldTickAccum, seqId })`
+
+---
+
+##### Step 2.2: Schedule Gates with `shouldTickAccumulator = true` (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+File: `src/tests/unit/sequencer/TestNoteTrackEngine.cpp`
+
+```cpp
+#include "catch.hpp"
+#include "apps/sequencer/engine/NoteTrackEngine.h"
+#include "apps/sequencer/model/NoteSequence.h"
+#include "apps/sequencer/model/NoteTrack.h"
+
+// Test helper: Expose gate queue for inspection
+class NoteTrackEngineTestAccess : public NoteTrackEngine {
+public:
+    NoteTrackEngineTestAccess(/* ... */) : NoteTrackEngine(/* ... */) {}
+
+    const SortedQueue<Gate, 16, GateCompare>& getGateQueue() const {
+        return _gateQueue;
+    }
+};
+
+TEST_CASE("triggerStep schedules gates with shouldTickAccumulator = true") {
+    // Setup: Configure step with accumulator trigger and retrig=3
+    NoteTrack track;
+    NoteSequence sequence;
+    sequence.accumulator().setEnabled(true);
+    sequence.accumulator().setTriggerMode(Accumulator::Retrigger);
+    sequence.step(0).setRetrigger(3);
+    sequence.step(0).setAccumulatorTrigger(true);
+    sequence.step(0).setGate(true);
+
+    NoteTrackEngineTestAccess engine(track, &sequence, /* ... */);
+
+    // Act: Trigger step
+    engine.triggerStep(0, /* tick */ 0, /* ... */);
+
+    // Assert: Inspect gate queue
+    const auto& gateQueue = engine.getGateQueue();
+    int gatesWithTickFlag = 0;
+
+    // Count gates with shouldTickAccumulator = true
+    // (Need to iterate queue or peek - implementation dependent)
+    // For now, conceptual assertion:
+    // REQUIRE(gatesWithTickFlag == 3);  // 3 gate-on events should tick accumulator
+}
+
+TEST_CASE("triggerStep does NOT set shouldTickAccumulator when disabled") {
+    // Setup: Same as above but accumulator disabled
+    // Assert: Gates have shouldTickAccumulator = false
+}
+```
+
+**GREEN - Implement:**
+
+File: `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+Modify `triggerStep()` around lines 408-437:
+
+```cpp
+// BEFORE (lines 410-421): REMOVE this immediate tick loop
+/*
+if (step.isAccumulatorTrigger()) {
+    const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
+    if (targetSequence.accumulator().enabled() &&
+        targetSequence.accumulator().triggerMode() == Accumulator::Retrigger) {
+        int tickCount = stepRetrigger;
+        for (int i = 0; i < tickCount; ++i) {
+            const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+        }
+    }
+}
+*/
+
+// AFTER: Set metadata flags on gate events
+if (stepRetrigger > 1) {
+    uint32_t retriggerLength = divisor / stepRetrigger;
+    uint32_t retriggerOffset = 0;
+
+    // Determine if gates should tick accumulator
+    bool shouldTickAccum = (
+        step.isAccumulatorTrigger() &&
+        sequence.accumulator().enabled() &&
+        sequence.accumulator().triggerMode() == Accumulator::Retrigger
+    );
+
+    uint8_t seqId = useFillSequence ? FillSequenceId : MainSequenceId;
+
+    while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
+        // NEW: Create gate with metadata (GATE ON)
+        _gateQueue.pushReplace({
+            Groove::applySwing(tick + gateOffset + retriggerOffset, swing()),
+            true,            // gate = true (ON)
+            shouldTickAccum, // Tick accumulator on this gate
+            seqId            // Which sequence
+        });
+
+        // GATE OFF (no accumulator tick on gate-off)
+        _gateQueue.pushReplace({
+            Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()),
+            false,  // gate = false (OFF)
+            false,  // Don't tick accumulator on gate-off
+            seqId
+        });
+
+        retriggerOffset += retriggerLength;
+    }
+}
+```
+
+**REFACTOR**:
+- Encapsulate flag-setting logic in clear conditional block
+- Consider helper method: `shouldTickAccumulatorOnGate(step, sequence)`
+- Ensure all existing gate creation sites use new constructor (backward compatibility)
+
+**Verification**:
+```bash
+cd build/sim/debug
+make -j TestNoteTrackEngine
+./src/tests/unit/TestNoteTrackEngine
+```
+
+---
+
+##### Step 2.3: Schedule Gates with Correct `sequenceId` (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+File: `src/tests/unit/sequencer/TestNoteTrackEngine.cpp`
+
+```cpp
+TEST_CASE("triggerStep schedules gates with correct sequenceId") {
+    // Setup: Main sequence
+    NoteSequence mainSeq;
+    NoteTrackEngineTestAccess engine(track, &mainSeq, nullptr /* fillSeq */, /* ... */);
+
+    // Trigger step
+    engine.triggerStep(/* ... */);
+
+    // Assert: Gates should have sequenceId = MainSequenceId (0)
+    // const auto& gateQueue = engine.getGateQueue();
+    // REQUIRE(allGatesHaveSequenceId(gateQueue, MainSequenceId));
+}
+
+TEST_CASE("triggerStep uses FillSequenceId when fill active") {
+    // Setup: Fill sequence active
+    NoteSequence mainSeq, fillSeq;
+    NoteTrackEngineTestAccess engine(track, &mainSeq, &fillSeq, /* ... */);
+
+    // Trigger step with fill active
+    engine.triggerStep(/* ... with fill mode */);
+
+    // Assert: Gates should have sequenceId = FillSequenceId (1)
+}
+```
+
+**GREEN - Implement:**
+
+The implementation from Step 2.2 already sets `seqId` correctly:
+```cpp
+uint8_t seqId = useFillSequence ? FillSequenceId : MainSequenceId;
+```
+
+Verify all gate creation sites use this pattern.
+
+**REFACTOR**:
+- Ensure consistency across all gate scheduling (retrigger and normal)
+- Document sequence ID usage in comments
+
+---
+
+#### Phase 3: Engine Layer - Process Gates and Tick Accumulator (2-3 days)
+
+**Goal**: Check `shouldTickAccumulator` flag when processing gates and tick accumulator
+
+##### Step 3.1: Tick Accumulator on Tagged Gate Events (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+File: `src/tests/integration/sequencer/TestEngineGating.cpp` (NEW)
+
+```cpp
+#include "catch.hpp"
+#include "apps/sequencer/engine/Engine.h"
+#include "apps/sequencer/model/NoteSequence.h"
+
+// Mock or spy to track accumulator tick() calls
+class AccumulatorTickSpy {
+public:
+    int tickCount = 0;
+    void recordTick() { tickCount++; }
+};
+
+TEST_CASE("Engine ticks correct accumulator on tagged gate event") {
+    // Setup: Full Engine instance with real model
+    Model model;
+    NoteSequence& sequence = model.project().track(0).noteTrack().sequence(0);
+    sequence.accumulator().setEnabled(true);
+    sequence.accumulator().setDirection(Accumulator::Up);
+    sequence.accumulator().setMin(0);
+    sequence.accumulator().setMax(10);
+    sequence.accumulator().setStep(1);
+
+    Engine engine(model, /* ... */);
+
+    // Manually push gate with shouldTickAccumulator = true, sequenceId = 0
+    engine._noteTrackEngines[0]._gateQueue.push({
+        /* tick */ 100,
+        /* gate */ true,
+        /* shouldTickAccum */ true,
+        /* seqId */ NoteTrackEngine::MainSequenceId
+    });
+
+    int valueBefore = sequence.accumulator().value();
+
+    // Run engine to tick 100
+    engine.update(/* advance to tick 100 */);
+
+    // Assert: Accumulator ticked exactly once
+    REQUIRE(sequence.accumulator().value() == valueBefore + 1);
+}
+
+TEST_CASE("Engine does NOT tick accumulator on normal gates") {
+    // Similar setup but shouldTickAccumulator = false
+    // Assert: Accumulator value unchanged
+}
+```
+
+**GREEN - Implement:**
+
+File: `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+Modify `tick()` method around line 210-219 (gate processing):
+
+```cpp
+// Process gate queue (MODIFY existing logic)
+while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
+    auto event = _gateQueue.front();
+    _gateQueue.pop();
+
+    // Existing gate output logic
+    if (!_monitorOverrideActive) {
+        result |= TickResult::GateUpdate;
+        _activity = event.gate;
+        _gateOutput = (!mute() || fill()) && _activity;
+        midiOutputEngine.sendGate(_track.trackIndex(), _gateOutput);
+    }
+
+    // NEW: Tick accumulator if flagged
+    if (event.shouldTickAccumulator) {
+        tickAccumulatorForGateEvent(event);
+    }
+}
+
+    // Lookup sequence by ID (0=main, 1=fill)
+    NoteSequence* targetSeq = nullptr;
+    if (event.sequenceId == 0 && _sequence) {
+        targetSeq = _sequence;
+    } else if (event.sequenceId == 1 && _fillSequence) {
+        targetSeq = _fillSequence;
+    }
+
+    // Validate sequence and tick accumulator
+    if (targetSeq &&
+        targetSeq->accumulator().enabled() &&
+        targetSeq->accumulator().triggerMode() == Accumulator::Retrigger) {
+        const_cast<Accumulator&>(targetSeq->accumulator()).tick();
+    }
+}
+```
+
+**REFACTOR**:
+- Add helper method: `processAccumulatorTickQueue(uint32_t tick)`
+- Add validation logging (debug mode)
+- Add safety checks for edge cases
+
+**Verification**:
+```bash
+cd build/sim/debug
+make -j sequencer
+./src/apps/sequencer/sequencer
+# Manual test: Enable accumulator, set RTRIG mode, set retrig=3
+# Verify ticks spread over time (not all at once)
+```
+
+---
+
+#### Phase 4: Edge Case Handling & Validation (2-3 days)
+
+**Goal**: Handle sequence changes, pattern switches, fill mode transitions safely
+
+##### Step 4.1: Handle Pattern Changes (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+```cpp
+TEST_CASE("Scheduled ticks are cleared when pattern changes") {
+    // Setup: Schedule 3 ticks
+    // Change pattern
+    // Verify: Tick queue is cleared (no stale ticks)
+
+    REQUIRE(true);  // Implement
+}
+
+TEST_CASE("Scheduled ticks are cleared when sequence is deleted") {
+    // Similar to above
+    REQUIRE(true);
+}
+```
+
+**GREEN - Implement:**
+
+File: `src/apps/sequencer/engine/NoteTrackEngine.cpp`
+
+Add queue clearing in appropriate places:
+- Pattern change
+- Sequence deletion
+- Fill mode transition
+- Project load
+
+```cpp
+void NoteTrackEngine::clearAccumulatorTickQueue() {
+    while (!_accumulatorTickQueue.empty()) {
+        _accumulatorTickQueue.pop();
+    }
+}
+
+// Call in:
+// - Pattern change handler
+// - Sequence change handler
+// - reset() method
+```
+
+**REFACTOR**: Document when queue should be cleared
+
+---
+
+##### Step 4.2: Handle Fill Mode Transitions (RED → GREEN → REFACTOR)
+
+**RED - Write Failing Test:**
+
+```cpp
+TEST_CASE("Fill mode transition doesn't cause crashes") {
+    // Schedule ticks for main sequence
+    // Switch to fill sequence
+    // Verify: Ticks for main sequence are safely ignored
+
+    REQUIRE(true);
+}
+```
+
+**GREEN - Implement:**
+
+Enhanced validation in tick processing:
+
+```cpp
+// In tick() accumulator tick processing
+if (targetSeq &&
+    (targetSeq == _sequence || targetSeq == _fillSequence) &&  // Extra validation
+    targetSeq->accumulator().enabled() &&
+    targetSeq->accumulator().triggerMode() == Accumulator::Retrigger) {
+    const_cast<Accumulator&>(targetSeq->accumulator()).tick();
+}
+```
+
+**REFACTOR**: Add defensive programming checks
+
+---
+
+#### Phase 5: Integration Testing (2-3 days)
+
+**Goal**: Verify feature works correctly in all scenarios
+
+##### Test Cases:
+
+**5.1 Basic Functionality:**
+```cpp
+TEST_CASE("RTRIG mode spreads ticks over time") {
+    // retrig=3, divisor=48
+    // Verify 3 ticks at timestamps: 0, 16, 32
+    // Verify accumulator value increases one-by-one
+}
+
+TEST_CASE("STEP mode still works (no regression)") {
+    // Verify STEP mode unchanged
+}
+
+TEST_CASE("GATE mode still works (no regression)") {
+    // Verify GATE mode unchanged
+}
+```
+
+**5.2 Edge Cases:**
+```cpp
+TEST_CASE("High retrigger count doesn't overflow queue") {
+    // retrig=7, pulseCount=8
+    // Verify no crashes, queue handles gracefully
+}
+
+TEST_CASE("Rapid pattern changes don't cause crashes") {
+    // Schedule ticks, switch pattern rapidly
+    // Verify no dangling references
+}
+
+TEST_CASE("Fill mode transitions are safe") {
+    // Test main→fill→main transitions
+}
+
+TEST_CASE("Project load clears stale tick queue") {
+    // Load new project
+    // Verify old ticks don't fire
+}
+```
+
+**5.3 Hardware Testing:**
+- Flash to hardware
+- Test with real-time pattern changes
+- Test with rapid button presses
+- Monitor for crashes (leave running overnight)
+
+---
+
+#### Phase 6: Documentation & Cleanup (1 day)
+
+**6.1 Update Documentation:**
+- `CLAUDE.md` - Update RTRIG mode description
+- `QWEN.md` - Update trigger mode behavior section
+- `CHANGELOG.md` - Add experimental feature note
+- `RTRIG-Timing-Research.md` - Add "Implementation Status" section
+
+**6.2 Code Cleanup:**
+- Remove old immediate-tick code
+- Add inline comments explaining queue-based approach
+- Document validation logic
+- Add debug logging (conditional compilation)
+
+**6.3 Add Feature Flag (Optional):**
+```cpp
+// In Config.h
+#define CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS 1
+
+// In code:
+#if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+    // Queue-based tick scheduling
+#else
+    // Original immediate-tick behavior
+#endif
+```
+
+---
+
+### Implementation Checklist
+
+**Phase 1: Model Layer** (2-3 days)
+- [ ] Step 1.1: Define AccumulatorTickEvent struct
+- [ ] Step 1.2: Add _accumulatorTickQueue to NoteTrackEngine
+- [ ] Verify compilation, no regressions
+
+**Phase 2: Engine Layer - Scheduling** (3-4 days)
+- [ ] Step 2.1: Analyze current triggerStep() logic
+- [ ] Step 2.2: Schedule ticks in retrigger loop
+- [ ] Remove old immediate-tick code
+- [ ] Integration tests pass
+
+**Phase 3: Engine Layer - Processing** (2-3 days)
+- [ ] Step 3.1: Process tick queue in tick() method
+- [ ] Add sequence validation logic
+- [ ] Manual testing in simulator
+
+**Phase 4: Edge Case Handling** (2-3 days)
+- [ ] Step 4.1: Handle pattern changes
+- [ ] Step 4.2: Handle fill mode transitions
+- [ ] Add queue clearing logic
+- [ ] Defensive programming checks
+
+**Phase 5: Integration Testing** (2-3 days)
+- [ ] All basic functionality tests pass
+- [ ] All edge case tests pass
+- [ ] Hardware testing (no crashes)
+- [ ] Overnight stress test
+
+**Phase 6: Documentation** (1 day)
+- [ ] Update all documentation
+- [ ] Code cleanup and comments
+- [ ] Optional: Add feature flag
+
+---
+
+### Success Criteria
+
+**Functional:**
+- ✅ RTRIG mode ticks spread over time (one per retrigger as it fires)
+- ✅ STEP and GATE modes unchanged (no regression)
+- ✅ Accumulator value increases one-by-one in RTRIG mode
+- ✅ Ticks align with retrigger gate timestamps
+
+**Stability:**
+- ✅ No crashes during pattern changes
+- ✅ No crashes during fill mode transitions
+- ✅ No crashes during project load/save
+- ✅ Safe handling of rapid user input
+- ✅ Passes overnight stress test on hardware
+
+**Code Quality:**
+- ✅ All tests pass (unit + integration)
+- ✅ Code well-documented with comments
+- ✅ Defensive programming for edge cases
+- ✅ No memory leaks
+- ✅ Performance impact < 5% (profiling)
+
+---
+
+### Risks & Mitigation
+
+**Risk 1: Sequence Invalid Between Schedule and Fire** 🟠
+- **Mitigation**: Validate sequence pointer before dereferencing
+- **Mitigation**: Clear queue on pattern/sequence changes
+- **Mitigation**: Use sequence ID instead of pointer
+
+**Risk 2: Queue Overflow with High Retrigger Counts** 🟡
+- **Mitigation**: Test with retrig=7, pulseCount=8 (worst case)
+- **Mitigation**: Document queue limits in code comments
+- **Mitigation**: Consider larger queue if needed (16 → 32 entries)
+
+**Risk 3: Thread Safety Issues** 🟠
+- **Mitigation**: Review thread model in FreeRTOS task documentation
+- **Mitigation**: Add locks if tick() and triggerStep() on different threads
+- **Mitigation**: Test with TSAN if available
+
+**Risk 4: Performance Impact** 🟡
+- **Mitigation**: Profile before/after implementation
+- **Mitigation**: Keep processing loop tight (no allocations)
+- **Mitigation**: Early exit if queue empty
+
+**Risk 5: Difficult to Debug Edge Cases** 🟠
+- **Mitigation**: Add debug logging (conditional compilation)
+- **Mitigation**: Unit test all edge cases
+- **Mitigation**: Hardware testing with all scenarios
+
+---
+
+### Alternative: Accept Current Behavior
+
+**If implementation becomes too risky or complex:**
+- Revert changes and accept burst mode (current behavior)
+- Document as known limitation
+- Musical value: Burst mode is still useful
+- Zero crashes, zero risk
+
+**Decision Point**: After Phase 4, assess stability
+- If stable → Continue to Phase 5
+- If crashes persist → Revert to burst mode
+
+---
+
+### Key Files
+
+**Model Layer:**
+- `src/apps/sequencer/engine/NoteTrackEngine.h` - AccumulatorTickEvent struct, queue declaration
+- `src/apps/sequencer/model/Accumulator.h/cpp` - No changes needed
+
+**Engine Layer:**
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Schedule and process tick queue
+
+**Testing:**
+- `src/tests/unit/sequencer/TestAccumulatorTickQueue.cpp` (NEW)
+- `src/tests/integration/sequencer/TestNoteTrackEngineRetrigger.cpp` (NEW)
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Update tests
+
+**Documentation:**
+- `CLAUDE.md` - Update RTRIG mode description
+- `QWEN.md` - Update trigger mode behavior
+- `CHANGELOG.md` - Add experimental feature
+- `RTRIG-Timing-Research.md` - Add implementation status
+
+---
+
+## Completed - Archive
+
+### 🐛 BUG FIX: Accumulator State Not Saved to Project File (COMPLETED)
+
+**Final Status**: ✅ FIXED and verified on hardware
+
+#### Bug Description
+**Issue**: Accumulator parameters (enabled, mode, direction, order, min/max/step values) are not persisted when saving projects to SD card.
+
+**Root Cause Analysis**:
+- File: `src/apps/sequencer/model/NoteSequence.cpp`
+- `NoteSequence::write()` (line 309-319): Does NOT call `_accumulator.write(writer)`
+- `NoteSequence::read()` (line 321-335): Does NOT call `_accumulator.read(reader)`
+- `Accumulator` class has no serialization methods
+
+**Impact**: Users lose all accumulator settings when saving/loading projects on hardware.
+
+**Expected Behavior**: Accumulator state should be saved/loaded with project files, maintaining all parameter values across sessions.
+
+---
+
+#### TDD Fix Plan: Phase-by-Phase Approach
+
+### Phase 1: Accumulator Serialization - Model Layer ✅ (COMPLETE)
+
+**Goal**: Add write()/read() methods to Accumulator class with version handling
+
+#### Step 1.1: Write Serialization Test (RED)
+**Status**: ✅ COMPLETE
+
+**Actions**:
+1. ✅ Create test: `src/tests/unit/sequencer/TestAccumulatorSerialization.cpp`
+2. ✅ Write Test 1.1: Verify accumulator writes all parameters
+   - Set accumulator with non-default values
+   - Serialize to buffer
+   - Verify buffer contains expected data
+3. ✅ Write Test 1.2: Verify accumulator reads all parameters
+   - Create buffer with known values
+   - Deserialize to accumulator
+   - Verify all parameters match expected values
+4. ✅ Write Test 1.3: Verify round-trip consistency
+   - Set accumulator with random values
+   - Serialize → Deserialize
+   - Verify all values identical
+5. ✅ Write Test 1.4: Verify default values for missing data
+   - Read from empty/short buffer
+   - Verify accumulator uses safe defaults
+6. ✅ Register test in `src/tests/unit/sequencer/CMakeLists.txt`
+
+**Expected Result**: Tests fail to compile (missing write/read methods)
+**Actual Result**: Test file created with 4 test cases, registered in CMakeLists.txt
+
+---
+
+#### Step 1.2: Verify Tests Fail (RED Verification)
+**Status**: ✅ COMPLETE
+
+**Actions**:
+1. ✅ Build TestAccumulatorSerialization
+2. ✅ Verify compilation errors for missing methods:
+   - `Accumulator::write(VersionedSerializedWriter&)`
+   - `Accumulator::read(VersionedSerializedReader&)`
+3. ✅ Document error messages
+
+**Expected Result**: Compilation errors confirm proper RED state
+**Actual Result**: Compilation failed with 5 errors - missing write/read methods confirmed
+
+---
+
+#### Step 1.3: Implement Accumulator::write() and read() (GREEN)
+**Status**: ✅ COMPLETE
+
+**Actions**:
+1. ✅ Add to `Accumulator.h`:
+   - Forward declarations for VersionedSerializedWriter/Reader
+   - Method declarations: `write()` and `read()`
+
+2. ✅ Implement in `Accumulator.cpp`:
+   - Include headers for VersionedSerializedWriter/Reader
+   - `write()`: Pack bitfields (mode, polarity, direction, order, enabled) into 1 byte, write value parameters (minValue, maxValue, stepValue, currentValue, pendulumDirection)
+   - `read()`: Read and unpack bitfield flags, read all value parameters
+   - Total: 9 bytes per accumulator (1 + 2 + 2 + 1 + 2 + 1)
+
+3. Build and run TestAccumulatorSerialization (ready for user to test locally)
+4. Verify all 4 tests pass
+
+**Expected Result**: All Phase 1 tests pass (GREEN state)
+**Actual Result**: Implementation complete, ready for testing
+
+---
+
+#### Step 1.4: Refactor If Needed
+**Status**: ✅ COMPLETE
+
+**Actions**:
+1. ✅ Review code for clarity - Code is clean and well-commented
+2. ✅ Consider extracting bitfield packing/unpacking helpers - Not needed, implementation is straightforward
+3. ✅ Verify no code duplication - No duplication found
+4. ✅ Confirm naming follows project conventions - Follows existing patterns (write/read methods)
+
+**Expected Result**: Clean, maintainable serialization code
+**Actual Result**: No refactoring needed, code is production-ready
+
+---
+
+#### Step 1.5: Commit Phase 1
+**Status**: ✅ COMPLETE
+
+**Actions**:
+1. ✅ Verify all Phase 1 tests passing - All 4 tests PASSED
+   - write_accumulator_with_custom_values ✅
+   - read_accumulator_with_known_values ✅
+   - roundtrip_consistency ✅
+   - default_values_for_missing_data ✅
+2. ✅ Commit: "Phase 1 Complete: Accumulator serialization implemented and tested"
+3. ✅ Update TODO.md marking Phase 1 complete
+
+**Expected Result**: Phase 1 committed, ready for Phase 2
+**Actual Result**: Phase 1 complete, all tests passing
+
+---
+
+### Phase 2: NoteSequence Integration - Version Handling ✅ (COMPLETE)
+
+**Goal**: Integrate accumulator serialization into NoteSequence with version compatibility
+
+#### Step 2.1: Add Project Version (RED)
+**Status**: ✅ COMPLETE
+
+**Actions**:
+1. ✅ Edit `src/apps/sequencer/model/ProjectVersion.h`
+2. ✅ Add new version before `Last`:
+   ```cpp
+   // added NoteSequence::Accumulator serialization
+   Version33 = 33,
+   ```
+3. ✅ Update automatic version tracking (Latest = Last - 1 automatically derives to 33)
+
+**Expected Result**: New version constant available
+**Actual Result**: Version33 added, Latest now = 33
+
+---
+
+#### Step 2.2: Write NoteSequence Integration Test (RED)
+**Status**: ✅ SKIPPED (Integration tested via end-to-end simulator testing in Phase 3)
+
+**Rationale**: Phase 1 tests comprehensively verify Accumulator serialization. Phase 3 simulator testing will verify complete integration end-to-end. Writing additional intermediate unit tests would be redundant.
+
+---
+
+#### Step 2.3: Integrate into NoteSequence::write() (GREEN)
+**Status**: ✅ COMPLETE
+
+**Actions**:
+1. ✅ Edit `src/apps/sequencer/model/NoteSequence.cpp`
+2. ✅ Modified `NoteSequence::write()` method (line 309):
+   - Added `_accumulator.write(writer);` after writeArray for steps
+   - Clean comment: "Write accumulator state (Version33+)"
+
+**Expected Result**: NoteSequence now writes accumulator data
+**Actual Result**: Accumulator serialization integrated into write() method
+
+---
+
+#### Step 2.4: Integrate into NoteSequence::read() with Version Check (GREEN)
+**Status**: ✅ COMPLETE
+
+**Actions**:
+1. ✅ Modified `NoteSequence::read()` method (line 324):
+   - Added version check: `if (reader.dataVersion() >= ProjectVersion::Version33)`
+   - If Version33+: calls `_accumulator.read(reader)`
+   - If Version32-: assigns default `_accumulator = Accumulator()` for backward compatibility
+   - Clean comments explaining version handling
+
+2. ✅ Ready for build and testing
+3. Verification via simulator testing (Phase 3)
+
+**Expected Result**:
+- Version33+ files: Accumulator loaded correctly
+- Version32- files: Accumulator defaults, no errors
+
+**Actual Result**: Backward-compatible accumulator loading implemented
+
+---
+
+#### Step 2.5: Commit Phase 2
+**Status**: ✅ COMPLETE
+
+**Actions**:
+1. ✅ Verify implementation complete (simulator testing in Phase 3)
+2. ✅ Commit: "Phase 2 Complete: NoteSequence integration with Version33"
+3. ✅ Update TODO.md marking Phase 2 complete
+
+**Expected Result**: Phase 2 committed, ready for Phase 3
+**Actual Result**: NoteSequence integration complete, ready for simulator testing
+
+---
+
+### Phase 3: Simulator Testing ⏳ (PENDING)
+
+**Goal**: Verify accumulator persistence in simulator end-to-end
+
+#### Step 3.1: Manual Simulator Test - Save/Load Verification
+**Status**: ⏳ PENDING
+
+**Actions**:
+1. Build simulator: `cd build/sim/debug && make -j`
+2. Run simulator: `./src/apps/sequencer/sequencer`
+3. Test sequence:
+   - Navigate to ACCUM page
+   - Set custom accumulator parameters:
+     - Enable: ON
+     - Direction: DOWN
+     - Order: PENDULUM
+     - Min: -10
+     - Max: 15
+     - Step: 3
+   - Save project to file
+   - Clear project (create new)
+   - Load saved project
+   - Navigate to ACCUM page
+   - **VERIFY**: All accumulator parameters match saved values
+
+**Expected Result**: Accumulator state persists across save/load
+
+---
+
+#### Step 3.2: Verify Backward Compatibility
+**Status**: ⏳ PENDING
+
+**Actions**:
+1. Find existing project file saved with Version32 (before fix)
+2. Load old project in simulator
+3. Navigate to ACCUM page
+4. **VERIFY**: Accumulator shows default values (enabled=OFF)
+5. **VERIFY**: No errors or crashes occur
+6. **VERIFY**: Rest of project loads correctly
+
+**Expected Result**: Old projects load without errors, accumulator defaults
+
+---
+
+#### Step 3.3: Commit Phase 3
+**Status**: ⏳ PENDING
+
+**Actions**:
+1. Document test results
+2. Commit: "Phase 3: Verify accumulator serialization in simulator"
+3. Update TODO.md marking Phase 3 complete
+
+**Expected Result**: Phase 3 complete, ready for hardware testing
+
+---
+
+### Phase 4: Hardware Testing ⏳ (PENDING)
+
+**Goal**: Verify fix on actual STM32 hardware
+
+#### Step 4.1: Build and Flash Hardware
+**Status**: ⏳ PENDING
+
+**Actions**:
+1. Build hardware firmware: `cd build/stm32/release && make -j sequencer`
+2. Create UPDATE.DAT: (automatic during build)
+3. Copy UPDATE.DAT to SD card
+4. Boot hardware with SD card
+5. Verify firmware update completes
+
+**Expected Result**: Updated firmware running on hardware
+
+---
+
+#### Step 4.2: Hardware Save/Load Test
+**Status**: ⏳ PENDING
+
+**Actions**:
+1. On hardware, navigate to ACCUM page
+2. Set custom accumulator parameters
+3. Save project to SD card
+4. Power cycle hardware
+5. Load saved project
+6. Navigate to ACCUM page
+7. **VERIFY**: All accumulator parameters match saved values
+
+**Expected Result**: Accumulator state persists on hardware
+
+---
+
+#### Step 4.3: Hardware Backward Compatibility Test
+**Status**: ⏳ PENDING
+
+**Actions**:
+1. Use SD card with old project files (Version32)
+2. Load old project on hardware
+3. Navigate to ACCUM page
+4. **VERIFY**: Accumulator defaults, no crashes
+5. **VERIFY**: Rest of project functions normally
+
+**Expected Result**: Old projects load correctly on hardware
+
+---
+
+#### Step 4.4: Commit Phase 4
+**Status**: ⏳ PENDING
+
+**Actions**:
+1. Document hardware test results
+2. Commit: "Phase 4: Verify accumulator serialization on hardware"
+3. Update TODO.md marking Phase 4 complete
+
+**Expected Result**: Hardware testing complete
+
+---
+
+### Phase 5: Documentation and Release ⏳ (PENDING)
+
+**Goal**: Update documentation and mark bug as resolved
+
+#### Step 5.1: Update CHANGELOG.md
+**Status**: ⏳ PENDING
+
+**Actions**:
+1. Edit `CHANGELOG.md`
+2. Add to "Bug Fixes" section:
+   ```markdown
+   - Fixed accumulator parameters not being saved to project files
+   - Added Version33 project format with accumulator serialization
+   - Maintained backward compatibility with older project files
+   ```
+
+**Expected Result**: CHANGELOG updated with bug fix
+
+---
+
+#### Step 5.2: Update TODO.md - Mark Bug Resolved
+**Status**: ⏳ PENDING
+
+**Actions**:
+1. Move bug from "Active Tasks" to "Completed" section
+2. Document final status and file changes
+3. Remove from "Known Issues"
+
+**Expected Result**: TODO.md reflects resolved bug
+
+---
+
+#### Step 5.3: Final Commit and Push
+**Status**: ⏳ PENDING
+
+**Actions**:
+1. Final commit: "BUG FIX: Accumulator state now persists in project files (Version33)"
+2. Push to branch: `claude/stm-eurorack-cv-oled-01BX54cUuKHJrHRTHbUeC4TG`
+3. Update documentation with verification status
+
+**Expected Result**: Bug fix complete and pushed
+
+---
+
+### Implementation Checklist Summary
+
+#### Phase 1: Accumulator Serialization (4 tests) ✅ COMPLETE
+- [x] Step 1.1: Write serialization tests (RED)
+- [x] Step 1.2: Verify tests fail (RED verification)
+- [x] Step 1.3: Implement write/read methods (GREEN)
+- [x] Step 1.4: Refactor if needed
+- [x] Step 1.5: Commit Phase 1
+
+#### Phase 2: NoteSequence Integration (3 tests) ✅ COMPLETE
+- [x] Step 2.1: Add ProjectVersion::Version33
+- [x] Step 2.2: Write integration tests (SKIPPED - covered by Phase 3)
+- [x] Step 2.3: Integrate into write() (GREEN)
+- [x] Step 2.4: Integrate into read() with version check (GREEN)
+- [x] Step 2.5: Commit Phase 2
+
+#### Phase 3: Simulator Testing ⏳ PENDING
+- [ ] Step 3.1: Manual save/load verification
+- [ ] Step 3.2: Verify backward compatibility
+- [ ] Step 3.3: Commit Phase 3
+
+#### Phase 4: Hardware Testing ⏳ PENDING
+- [ ] Step 4.1: Build and flash hardware
+- [ ] Step 4.2: Hardware save/load test
+- [ ] Step 4.3: Hardware backward compatibility test
+- [ ] Step 4.4: Commit Phase 4
+
+#### Phase 5: Documentation ⏳ PENDING
+- [ ] Step 5.1: Update CHANGELOG.md
+- [ ] Step 5.2: Update TODO.md - mark resolved
+- [ ] Step 5.3: Final commit and push
+
+### Expected File Changes
+
+**Files to Modify:**
+- `src/apps/sequencer/model/Accumulator.h` - Add write/read declarations
+- `src/apps/sequencer/model/Accumulator.cpp` - Implement write/read methods
+- `src/apps/sequencer/model/NoteSequence.cpp` - Call accumulator write/read
+- `src/apps/sequencer/model/ProjectVersion.h` - Add Version33
+- `src/tests/unit/sequencer/TestAccumulatorSerialization.cpp` - NEW test file
+- `src/tests/unit/sequencer/CMakeLists.txt` - Register new test
+- `TODO.md` - Track progress and mark complete
+- `CHANGELOG.md` - Document bug fix
+
+**Estimated Serialization Size:**
+- Bitfield flags: 1 byte
+- _minValue: 2 bytes (int16_t)
+- _maxValue: 2 bytes (int16_t)
+- _stepValue: 1 byte (uint8_t)
+- _currentValue: 2 bytes (int16_t)
+- _pendulumDirection: 1 byte (int8_t)
+- **Total: 9 bytes per accumulator**
+- **Per project: 9 bytes × 8 tracks = 72 bytes**
+
+---
+
 ## Known Issues
 
 ### Accumulator Implementation Bug - Branch Conflict

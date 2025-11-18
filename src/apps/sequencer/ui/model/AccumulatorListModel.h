@@ -10,6 +10,7 @@ public:
         Enabled,
         Direction,
         Order,
+        TriggerMode,
         MinValue,
         MaxValue,
         StepValue,
@@ -63,12 +64,14 @@ public:
 
     virtual int indexedCount(int row) const override {
         if (!_sequence) return 0;
-        
+
         switch (Item(row)) {
         case Direction:
             return 3; // Up, Down, Freeze
         case Order:
             return 4; // Wrap, Pendulum, Random, Hold
+        case TriggerMode:
+            return 3; // Step, Gate, Retrigger
         default:
             return 0;
         }
@@ -76,12 +79,14 @@ public:
 
     virtual int indexed(int row) const override {
         if (!_sequence) return -1;
-        
+
         switch (Item(row)) {
         case Direction:
             return static_cast<int>(_sequence->accumulator().direction());
         case Order:
             return static_cast<int>(_sequence->accumulator().order());
+        case TriggerMode:
+            return static_cast<int>(_sequence->accumulator().triggerMode());
         default:
             return -1;
         }
@@ -89,7 +94,7 @@ public:
 
     virtual void setIndexed(int row, int index) override {
         if (!_sequence || index < 0) return;
-        
+
         if (index < indexedCount(row)) {
             switch (Item(row)) {
             case Direction:
@@ -97,6 +102,9 @@ public:
                 break;
             case Order:
                 const_cast<Accumulator&>(_sequence->accumulator()).setOrder(static_cast<Accumulator::Order>(index));
+                break;
+            case TriggerMode:
+                const_cast<Accumulator&>(_sequence->accumulator()).setTriggerMode(static_cast<Accumulator::TriggerMode>(index));
                 break;
             default:
                 break;
@@ -110,6 +118,7 @@ private:
         case Enabled:         return "ENABLED";
         case Direction:       return "DIRECTN";
         case Order:           return "ORDER";
+        case TriggerMode:     return "TRIG";
         case MinValue:        return "MIN";
         case MaxValue:        return "MAX";
         case StepValue:       return "STEP";
@@ -125,7 +134,7 @@ private:
 
     void formatValue(Item item, StringBuilder &str) const {
         if (!_sequence) return;
-        
+
         switch (item) {
         case Enabled:
             str(_sequence->accumulator().enabled() ? "ON" : "OFF");
@@ -146,6 +155,15 @@ private:
             case Accumulator::Order::Pendulum:  str("PEND"); break;
             case Accumulator::Order::Random:    str("RAND"); break;
             case Accumulator::Order::Hold:      str("HOLD"); break;
+            }
+            break;
+        }
+        case TriggerMode: {
+            auto trigMode = _sequence->accumulator().triggerMode();
+            switch (trigMode) {
+            case Accumulator::TriggerMode::Step:      str("STEP"); break;
+            case Accumulator::TriggerMode::Gate:      str("GATE"); break;
+            case Accumulator::TriggerMode::Retrigger: str("RTRIG"); break;
             }
             break;
         }

@@ -13,6 +13,7 @@ CASE("tick_up_enabled") {
     Accumulator accumulator;
     accumulator.setDirection(Accumulator::Direction::Up);
     accumulator.setEnabled(true);
+    accumulator.tick(); // Consume delayed first tick
     accumulator.tick();
     expectEqual(static_cast<int>(accumulator.currentValue()), 1, "currentValue should be 1 after one tick");
 }
@@ -27,9 +28,15 @@ CASE("tick_disabled") {
 
 CASE("tick_down_enabled") {
     Accumulator accumulator;
+    // Configure before reset so currentValue stays at constructor default (0)
+    accumulator.setMinValue(-10); // Set minValue to allow negative values
+    accumulator.setMaxValue(10);
     accumulator.setDirection(Accumulator::Direction::Down);
     accumulator.setEnabled(true);
-    accumulator.tick();
+    accumulator.setOrder(Accumulator::Order::Hold); // Use Hold for clamping behavior
+
+    accumulator.tick(); // Consume delayed first tick (stays at 0)
+    accumulator.tick(); // 0 -> -1
     expectEqual(static_cast<int>(accumulator.currentValue()), -1, "currentValue should be -1 after one tick down");
 }
 
@@ -38,11 +45,17 @@ CASE("initial_step_value") {
     expectEqual(static_cast<int>(accumulator.stepValue()), 1, "initial stepValue should be 1");
 }
 
+CASE("default_min_value_is_zero") {
+    Accumulator accumulator;
+    expectEqual(static_cast<int>(accumulator.minValue()), 0, "default minValue should be 0");
+}
+
 CASE("tick_with_custom_step_value") {
     Accumulator accumulator;
     accumulator.setDirection(Accumulator::Direction::Up);
     accumulator.setEnabled(true);
     accumulator.setStepValue(5);
+    accumulator.tick(); // Consume delayed first tick
     accumulator.tick();
     expectEqual(static_cast<int>(accumulator.currentValue()), 5, "currentValue should be 5 after one tick with stepValue 5");
 }
@@ -56,6 +69,7 @@ CASE("tick_with_min_max_clamping") {
     accumulator.setStepValue(1);
     accumulator.setOrder(Accumulator::Order::Hold); // Use Hold for clamping behavior
 
+    accumulator.tick(); // Consume delayed first tick
     accumulator.tick(); // 0 -> 1
     expectEqual(static_cast<int>(accumulator.currentValue()), 1, "currentValue should be 1");
     accumulator.tick(); // 1 -> 2
@@ -81,6 +95,7 @@ CASE("tick_with_wrap_order") {
     accumulator.setStepValue(1);
     accumulator.setOrder(Accumulator::Order::Wrap);
 
+    accumulator.tick(); // Consume delayed first tick
     accumulator.tick(); // 0 -> 1
     expectEqual(static_cast<int>(accumulator.currentValue()), 1, "currentValue should be 1");
     accumulator.tick(); // 1 -> 2
@@ -106,6 +121,7 @@ CASE("tick_with_pendulum_order") {
     accumulator.setStepValue(1);
     accumulator.setOrder(Accumulator::Order::Pendulum);
 
+    accumulator.tick(); // Consume delayed first tick
     accumulator.tick(); // 0 -> 1
     expectEqual(static_cast<int>(accumulator.currentValue()), 1, "currentValue should be 1");
     accumulator.tick(); // 1 -> 2
@@ -127,6 +143,7 @@ CASE("tick_with_hold_order") {
     accumulator.setStepValue(1);
     accumulator.setOrder(Accumulator::Order::Hold);
 
+    accumulator.tick(); // Consume delayed first tick
     accumulator.tick(); // 0 -> 1
     expectEqual(static_cast<int>(accumulator.currentValue()), 1, "currentValue should be 1");
     accumulator.tick(); // 1 -> 2
@@ -166,6 +183,53 @@ CASE("tick_with_random_order") {
     expectTrue(thirdValue >= 0 && thirdValue <= 10, "currentValue should be within min/max bounds");
     // Note: Since we can't predict the exact random behavior, we're just testing that
     // it's implemented and doesn't crash
+}
+
+CASE("reset_accumulator") {
+    Accumulator accumulator;
+    accumulator.setMinValue(5);
+    accumulator.setMaxValue(15);
+    accumulator.setDirection(Accumulator::Direction::Up);
+    accumulator.setEnabled(true);
+    accumulator.setStepValue(2);
+    accumulator.reset(); // Sync currentValue to new minValue after setup
+
+    // Tick a few times to change currentValue
+    accumulator.tick(); // Consume delayed first tick (reset clears _hasStarted)
+    accumulator.tick(); // 5 -> 7
+    accumulator.tick(); // 7 -> 9
+    accumulator.tick(); // 9 -> 11
+    expectEqual(static_cast<int>(accumulator.currentValue()), 11, "currentValue should be 11 after 3 ticks");
+
+    // Reset should set currentValue back to minValue
+    accumulator.reset();
+    expectEqual(static_cast<int>(accumulator.currentValue()), 5, "currentValue should be reset to minValue (5)");
+}
+
+CASE("delayed_first_tick") {
+    Accumulator accumulator;
+    accumulator.setMinValue(0);
+    accumulator.setMaxValue(10);
+    accumulator.setDirection(Accumulator::Direction::Up);
+    accumulator.setEnabled(true);
+    accumulator.setStepValue(3);
+
+    // First tick should be skipped (delayed start)
+    accumulator.tick();
+    expectEqual(static_cast<int>(accumulator.currentValue()), 0, "currentValue should remain at minValue (0) after first tick");
+
+    // Second tick should increment
+    accumulator.tick();
+    expectEqual(static_cast<int>(accumulator.currentValue()), 3, "currentValue should be minValue + stepValue (3) after second tick");
+
+    // Third tick should increment again
+    accumulator.tick();
+    expectEqual(static_cast<int>(accumulator.currentValue()), 6, "currentValue should be 6 after third tick");
+}
+
+CASE("default_trigger_mode_is_step") {
+    Accumulator accumulator;
+    expectEqual(static_cast<int>(accumulator.triggerMode()), static_cast<int>(Accumulator::Step), "default triggerMode should be Step");
 }
 
 } // UNIT_TEST("Accumulator")

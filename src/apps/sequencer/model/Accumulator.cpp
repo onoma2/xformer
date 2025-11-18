@@ -1,5 +1,7 @@
 #include "Accumulator.h"
 #include "core/utils/Random.h"
+#include "core/io/VersionedSerializedWriter.h"
+#include "core/io/VersionedSerializedReader.h"
 #include <algorithm> // For std::min and std::max
 
 Accumulator::Accumulator() :
@@ -9,32 +11,48 @@ Accumulator::Accumulator() :
     _order(Wrap),
     _enabled(false),
     _ratchetTriggerMode(First),
+    _triggerMode(Step),
     _currentValue(0),
-    _minValue(-7),
+    _pendulumDirection(1),
+    _hasStarted(false),
+    _minValue(0),
     _maxValue(7),
     _stepValue(1),
-    _ratchetTriggerParam(0),
-    _pendulumDirection(1)
+    _ratchetTriggerParam(0)
 {
+    // Initialize currentValue to minValue after both are initialized
+    _currentValue = _minValue;
 }
 
 void Accumulator::tick() const {
-    if (_enabled) {
-        switch (_order) {
-        case Wrap:
-            tickWithWrap();
-            break;
-        case Pendulum:
-            tickWithPendulum();
-            break;
-        case Random:
-            tickWithRandom();
-            break;
-        case Hold:
-            tickWithHold();
-            break;
-        }
+    if (!_enabled) return;
+
+    // Delay first tick - skip the first call to tick()
+    if (!_hasStarted) {
+        const_cast<Accumulator*>(this)->_hasStarted = true;
+        return; // Skip first tick
     }
+
+    switch (_order) {
+    case Wrap:
+        tickWithWrap();
+        break;
+    case Pendulum:
+        tickWithPendulum();
+        break;
+    case Random:
+        tickWithRandom();
+        break;
+    case Hold:
+        tickWithHold();
+        break;
+    }
+}
+
+void Accumulator::reset() {
+    _currentValue = _minValue;
+    _pendulumDirection = 1; // Reset pendulum direction to up
+    _hasStarted = false; // Reset delayed start flag
 }
 
 void Accumulator::tickWithWrap() const {
@@ -97,4 +115,47 @@ void Accumulator::tickWithHold() const {
             const_cast<Accumulator*>(this)->_currentValue = _minValue;
         }
     }
+}
+
+void Accumulator::write(VersionedSerializedWriter &writer) const {
+    // Write bitfield parameters as single byte
+    uint8_t flags = (_mode << 0) | (_polarity << 2) |
+                    (_direction << 3) | (_order << 5) |
+                    (_enabled << 7);
+    writer.write(flags);
+
+    // Write value parameters
+    writer.write(_minValue);
+    writer.write(_maxValue);
+    writer.write(_stepValue);
+    writer.write(_currentValue);
+    writer.write(_pendulumDirection);
+
+    // Pack hasStarted and triggerMode into single byte
+    uint8_t flags2 = (_hasStarted ? 1 : 0) | (_triggerMode << 1);
+    writer.write(flags2);
+}
+
+void Accumulator::read(VersionedSerializedReader &reader) {
+    // Read bitfield flags
+    uint8_t flags;
+    reader.read(flags);
+    _mode = (flags >> 0) & 0x03;
+    _polarity = (flags >> 2) & 0x01;
+    _direction = (flags >> 3) & 0x03;
+    _order = (flags >> 5) & 0x03;
+    _enabled = (flags >> 7) & 0x01;
+
+    // Read value parameters
+    reader.read(_minValue);
+    reader.read(_maxValue);
+    reader.read(_stepValue);
+    reader.read(_currentValue);
+    reader.read(_pendulumDirection);
+
+    // Unpack hasStarted and triggerMode from single byte
+    uint8_t flags2;
+    reader.read(flags2);
+    _hasStarted = (flags2 & 0x01) != 0;
+    _triggerMode = (flags2 >> 1) & 0x03;
 }

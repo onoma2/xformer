@@ -30,6 +30,21 @@
 - ACCST page for per-step accumulator trigger configuration
 - Per-step accumulator trigger flags to enable/disable triggering on specific steps
 - Unit tests for accumulator functionality and modulation
+- **Accumulator Trigger Mode feature**: Control when accumulator increments with three distinct modes
+  - TRIG parameter accessible on ACCUM page via encoder cycling (STEP → GATE → RTRIG)
+  - Three trigger modes:
+    - **STEP**: Increment once per step (default, backward compatible)
+    - **GATE**: Increment per gate pulse (respects pulse count and gate mode)
+    - **RTRIG**: Increment N times for N retriggers (all ticks fire immediately at step start)
+  - Visual display showing mode names (STEP/GATE/RTRIG) in ACCUM page
+  - TriggerMode enum with 2-bit bitfield for memory efficiency
+  - Packed with _hasStarted in single byte for optimized serialization
+  - Full integration with STEP/GATE/RTRIG logic in NoteTrackEngine
+  - **Known behavior**: RTRIG mode ticks fire immediately at step start (burst mode) due to gate queue architecture
+    - See RTRIG-Timing-Research.md for technical investigation and workaround analysis
+    - See Queue-BasedAccumTicks.md for detailed implementation plan if future enhancement needed
+    - Recommendation: Accept current behavior (pointer invalidation risks in queue-based approaches)
+  - All unit tests updated and passing (15 test cases in TestAccumulator)
 
 ### Changed
 - NoteTrackEngine gate firing logic now respects gate mode setting
@@ -47,6 +62,21 @@
 - Updated evalStepNote() to incorporate accumulator value into pitch calculation
 - Added mutable member pattern to accumulator for thread-safe operation
 - Memory-optimized accumulator using bitfields for parameters
+- **NoteTrackEngine trigger mode integration**:
+  - STEP mode ticks added at line ~353 with triggerMode check
+  - GATE mode ticks added at line ~392 inside shouldFireGate block
+  - RTRIG mode ticks added at line ~410 with immediate N-tick loop
+- **AccumulatorListModel UI integration**:
+  - Added TriggerMode to Item enum for ACCUM page display
+  - Implemented indexed value support for encoder cycling through modes
+  - Added formatValue() cases for displaying STEP/GATE/RTRIG text
+- **Accumulator initialization order**:
+  - Fixed member initialization to follow declaration order
+  - Added constructor body assignment for _currentValue = _minValue
+- **TestAccumulator test suite**:
+  - Updated all tests to consume delayed first tick before assertions
+  - Fixed tick_down_enabled test to allow negative values with Hold mode
+  - Added reset() calls where needed to sync currentValue after parameter changes
 
 ### Fixed
 - **Critical gate mode bug**: Fixed pulse counter timing issue where triggerStep() was called after counter reset
@@ -57,6 +87,22 @@
   - Root cause: _currentStep is set inside triggerStep() and becomes stale after advancement
   - Fix: Changed to use _sequenceState.step() which is authoritative
   - Impact: Pulse count now reads from correct step index
+- **RETRIGGER mode bug**: Fixed retrigger=1 not incrementing accumulator
+  - Root cause: Tick code only in `stepRetrigger > 1` branch, else branch had no tick
+  - Fix: Added accumulator tick in else branch for retrigger=1 case
+  - Impact: retrigger=1 now correctly increments once in RTRIG mode
+- **RETRIGGER mode bug**: Fixed accumulator only incrementing once despite multiple retriggers
+  - Root cause: Tick code inside `while (retriggerOffset <= stepLength)` loop, which exits early when LENGTH is short
+  - Fix: Moved accumulator ticks to separate for loop BEFORE gate queue scheduling
+  - Impact: Now ticks exactly N times for N retriggers, regardless of LENGTH parameter
+- **Accumulator initialization bug**: Fixed undefined behavior from incorrect member initialization order
+  - Root cause: `_currentValue` initialized using `_minValue` before `_minValue` was initialized
+  - Fix: Initialize both in declaration order, then set `_currentValue = _minValue` in constructor body
+  - Impact: All accumulator tests now pass without garbage values
+- **Test failures**: Updated TestAccumulator suite for delayed first tick behavior
+  - Fixed 8 test cases to consume delayed first tick before assertions
+  - Fixed tick_down_enabled to use Hold mode with negative minValue range
+  - All 15 test cases now passing
 - Test compilation errors related to dummy implementation classes
 - GateOutput constructor dependencies in unit tests
 

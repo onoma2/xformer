@@ -26,6 +26,33 @@ An accumulator is a stateful counter that:
 - **Value Range**: Min/Max constraints (-100 to 100)
 - **Step Size**: Amount to increment/decrement per trigger
 - **Current Value**: The current accumulated value (read-only)
+- **Trigger Mode** (added 2025-11-17): Controls WHEN accumulator increments
+  - **STEP**: Increment once per step (default, backward compatible)
+  - **GATE**: Increment per gate pulse (respects pulse count and gate mode)
+  - **RTRIG**: Increment N times for N retriggers
+
+### Trigger Mode Behavior
+
+**STEP Mode:**
+- Ticks once per step when accumulator trigger is enabled
+- Independent of pulse count, gate mode, retrigger settings
+- Most predictable mode for sequential counting
+
+**GATE Mode:**
+- Ticks once per gate pulse fired
+- Integrates with pulse count and gate mode features:
+  - `pulseCount=3, gateMode=ALL` → 4 ticks
+  - `pulseCount=3, gateMode=FIRST` → 1 tick
+  - `pulseCount=3, gateMode=FIRSTLAST` → 2 ticks
+- Useful for rhythmic accumulation patterns tied to pulse density
+
+**RTRIG Mode:**
+- Ticks N times for N retriggers (retrig=3 → 3 ticks)
+- **Current limitation**: All ticks fire immediately at step start
+  - Gates fire spread over time (you hear ratchets)
+  - But accumulator increments happen upfront, all at once
+  - See "RTRIG Timing Research" section below for technical details
+- Useful for step-based bursts of accumulation
 
 ## Implementation Phases
 
@@ -424,6 +451,40 @@ Two critical bugs discovered and fixed during testing:
 
 ---
 
-Document Version: 2.0
+# Part 4: RTRIG Timing Research
+
+## Summary
+
+**Observed Behavior:**
+- Retrigger gates fire spread over time (you hear 3 distinct ratchets for retrig=3)
+- But accumulator increments happen all at once at step start
+- This seems contradictory - if gates are separate events, why can't we hook into them?
+
+**Root Cause:**
+- Gate struct is minimal (tick + bool) with no metadata about accumulator context
+- Accumulator ticks happen BEFORE gate scheduling in `triggerStep()`
+- Gates are scheduled with future timestamps, processed in generic loop
+- No way to hook into individual gate firings without extending architecture
+
+**Potential Workarounds:**
+1. **Extend Gate Structure** (🔴 HIGH RISK) - Pointer invalidation, crashes possible
+2. **Separate Accumulator Tick Queue** (🟠 MEDIUM RISK) - Still has pointer safety issues
+3. **Weak Reference with Validation** (🟠 MEDIUM RISK) - Safer but still has edge cases
+4. **Accept Current Behavior** (✅ SAFE) - Zero risk, burst mode still musically useful
+
+**Recommendation:**
+Accept current behavior (Option 4). Pointer safety concerns in all queue-based approaches, high complexity for marginal benefit. Burst mode (all ticks at once) is still musically useful and predictable.
+
+**For Complete Technical Analysis:**
+See **RTRIG-Timing-Research.md** for comprehensive investigation including:
+- Gate queue architecture analysis
+- Code examples with implementation approaches
+- Memory overhead calculations
+- Risk assessment for each workaround option
+- Full recommendation rationale
+
+---
+
+Document Version: 3.0
 Last Updated: November 2025
 Project: PEW|FORMER Feature Implementation (Accumulator, Pulse Count, Gate Mode)

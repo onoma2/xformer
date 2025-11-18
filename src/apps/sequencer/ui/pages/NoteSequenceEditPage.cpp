@@ -515,7 +515,12 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
             setLayer(Layer::Length);
             break;
         case Function::Note:
-            setLayer(Layer::Note);
+            // SHIFT + NOTE: Reset accumulator counter
+            {
+                auto &sequence = _project.selectedNoteSequence();
+                const_cast<Accumulator&>(sequence.accumulator()).reset();
+                showMessage("ACCUM RESET");
+            }
             break;
         case Function::Condition:
             setLayer(Layer::Condition);
@@ -537,9 +542,6 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
             setLayer(Layer::Slide);
             break;
         case Layer::Slide:
-            setLayer(Layer::GateMode);
-            break;
-        case Layer::GateMode:
             setLayer(Layer::Gate);
             break;
         default:
@@ -556,6 +558,9 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
             setLayer(Layer::PulseCount);
             break;
         case Layer::PulseCount:
+            setLayer(Layer::GateMode);
+            break;
+        case Layer::GateMode:
             setLayer(Layer::Retrigger);
             break;
         default:
@@ -607,11 +612,11 @@ int NoteSequenceEditPage::activeFunctionKey() {
     case Layer::GateProbability:
     case Layer::GateOffset:
     case Layer::Slide:
-    case Layer::GateMode:
         return 0;
     case Layer::Retrigger:
     case Layer::RetriggerProbability:
     case Layer::PulseCount:
+    case Layer::GateMode:
         return 1;
     case Layer::Length:
     case Layer::LengthVariationRange:

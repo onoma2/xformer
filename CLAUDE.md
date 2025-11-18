@@ -187,12 +187,54 @@ An accumulator is a stateful counter that increments/decrements based on configu
 - **Value Range**: Min/Max constraints (-100 to 100)
 - **Step Size**: Amount to increment/decrement per trigger (1-100)
 - **Current Value**: The current accumulated value (read-only)
+- **Trigger Mode**: Controls when accumulator increments (NEW in 2025-11-17)
+  - **STEP**: Increment once per step (default, backward compatible)
+  - **GATE**: Increment per gate pulse (respects pulse count and gate mode)
+  - **RTRIG**: Increment per retrigger subdivision (note: all ticks fire immediately at step start, not spread over time)
+
+### Trigger Mode Details
+
+The trigger mode parameter controls WHEN the accumulator increments during step playback:
+
+**STEP Mode (default):**
+- Ticks once per step when accumulator trigger is enabled on that step
+- Independent of pulse count, gate mode, and retrigger settings
+- Example: 4 steps with triggers → 4 increments total
+
+**GATE Mode:**
+- Ticks once per gate pulse
+- Respects pulse count and gate mode settings:
+  - `pulseCount=3, gateMode=ALL` → 4 ticks (pulses 1, 2, 3, 4)
+  - `pulseCount=3, gateMode=FIRST` → 1 tick (pulse 1 only)
+  - `pulseCount=3, gateMode=HOLD` → 1 tick (pulse 1 only)
+  - `pulseCount=3, gateMode=FIRSTLAST` → 2 ticks (pulses 1 and 4)
+- Useful for rhythmic accumulation patterns tied to pulse density
+
+**RTRIG Mode (Retrigger):**
+- Ticks N times for N retriggers
+- `retrig=1` → 1 tick
+- `retrig=3` → 3 ticks
+- `retrig=7` → 7 ticks
+- **Known behavior**: All N ticks fire immediately when step starts (not spread over time)
+  - Retrigger gates fire spread over time (you hear ratchets)
+  - But accumulator increments happen upfront, all at once
+  - This is an architectural limitation
+  - See `RTRIG-Timing-Research.md` for technical investigation and workaround analysis
+  - See `Queue-BasedAccumTicks.md` for detailed implementation plan if future enhancement needed
+- Useful for step-based bursts of accumulation
+
+**Delayed First Tick:**
+All modes respect the delayed first tick feature (Improvement 3):
+- First tick after PLAY is skipped (prevents jump on start)
+- Subsequent steps tick normally
+- Reset via STOP button or `accumulator.reset()`
 
 ### UI Integration
 
 **AccumulatorPage ("ACCUM"):**
 - Parameter editing interface using list-based layout
 - All configurable parameters accessible via encoder
+- TRIG parameter: Turn encoder to cycle STEP → GATE → RTRIG
 - Real-time value updates
 
 **AccumulatorStepsPage ("ACCST"):**
@@ -218,7 +260,9 @@ An accumulator is a stateful counter that increments/decrements based on configu
 
 **Engine Layer** (`src/apps/sequencer/engine/`):
 - `NoteTrackEngine.cpp`: Integration in `triggerStep()` and `evalStepNote()`
-  - Checks `step.isAccumulatorTrigger()` and calls `accumulator.tick()` when active
+  - STEP mode: Ticks once per step (line ~353)
+  - GATE mode: Ticks per gate pulse (line ~392)
+  - RTRIG mode: Ticks N times for N retriggers (line ~410, immediate loop)
   - Applies accumulator value to note pitch in real-time during `evalStepNote()`
 
 **UI Layer** (`src/apps/sequencer/ui/pages/`):
@@ -250,6 +294,13 @@ Planned enhancements documented in `QWEN.md`:
 - CV input tracking
 - Scene recall functionality
 - Extension to curve sequences
+
+**RTRIG Mode Timing Enhancement:**
+- Currently: All N ticks fire immediately at step start
+- Potential: Queue-based ticks spread over time (one per retrigger as it fires)
+- See `RTRIG-Timing-Research.md` for gate queue architecture investigation and workaround analysis
+- See `Queue-BasedAccumTicks.md` for detailed implementation plan and risk analysis
+- Status: Investigated and documented - recommendation is to accept current behavior (high effort, high risk, pointer invalidation concerns)
 
 ### Key Files
 
