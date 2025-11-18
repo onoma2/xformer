@@ -350,8 +350,8 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     _currentStep = SequenceUtils::rotateStep(_sequenceState.step(), sequence.firstStep(), sequence.lastStep(), rotate);
     const auto &step = evalSequence.step(_currentStep);
 
-    // STEP mode: Tick accumulator once per step
-    if (step.isAccumulatorTrigger()) {
+    // STEP mode: Tick accumulator once per step (first pulse only)
+    if (step.isAccumulatorTrigger() && _pulseCounter == 1) {
         const auto &targetSequence = useFillSequence ? *_fillSequence : sequence; // Use the same sequence as evalSequence
         if (targetSequence.accumulator().enabled() &&
             targetSequence.accumulator().triggerMode() == Accumulator::Step) {
