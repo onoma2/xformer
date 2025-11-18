@@ -485,14 +485,14 @@ public:
 
     int masterTrackIndex() const { return _masterTrackIndex; }
     void setMasterTrackIndex(int index) {
-        _masterTrackIndex = clamp(index, int8_t(0), int8_t(7));
+        _masterTrackIndex = clamp(index, 0, 7);
     }
 
     // harmonyScale
 
     int harmonyScale() const { return _harmonyScale; }
     void setHarmonyScale(int scale) {
-        _harmonyScale = clamp(scale, uint8_t(0), uint8_t(6)); // 0-6 for 7 modes
+        _harmonyScale = clamp(scale, 0, 6); // 0-6 for 7 modes
     }
 
     //----------------------------------------
