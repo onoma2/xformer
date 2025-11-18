@@ -208,14 +208,35 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
     TickResult result = TickResult::NoUpdate;
 
     while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
+        auto event = _gateQueue.front();
+        _gateQueue.pop();
+
         if (!_monitorOverrideActive) {
             result |= TickResult::GateUpdate;
-            _activity = _gateQueue.front().gate;
+            _activity = event.gate;
             _gateOutput = (!mute() || fill()) && _activity;
             midiOutputEngine.sendGate(_track.trackIndex(), _gateOutput);
         }
-        _gateQueue.pop();
 
+#if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+        // SPREAD MODE (flag=1): Tick accumulator when gate fires
+        if (event.shouldTickAccumulator) {
+            // Lookup sequence by ID (0=main, 1=fill)
+            NoteSequence* targetSeq = nullptr;
+            if (event.sequenceId == 0 && _sequence) {
+                targetSeq = _sequence;
+            } else if (event.sequenceId == 1 && _fillSequence) {
+                targetSeq = _fillSequence;
+            }
+
+            // Validate sequence and tick accumulator
+            if (targetSeq &&
+                targetSeq->accumulator().enabled() &&
+                targetSeq->accumulator().triggerMode() == Accumulator::Retrigger) {
+                const_cast<Accumulator&>(targetSeq->accumulator()).tick();
+            }
+        }
+#endif
     }
 
     while (!_cvQueue.empty() && tick >= _cvQueue.front().tick) {
@@ -407,7 +428,8 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
             int stepRetrigger = evalStepRetrigger(step, _noteTrack.retriggerProbabilityBias());
             if (stepRetrigger > 1) {
-                // RETRIGGER mode: Tick accumulator for each retrigger subdivision (not limited by stepLength)
+#if !CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+                // BURST MODE (flag=0): Tick accumulator for each retrigger subdivision (all at once)
                 if (step.isAccumulatorTrigger()) {
                     const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
                     if (targetSequence.accumulator().enabled() &&
@@ -419,16 +441,36 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                         }
                     }
                 }
+#endif
 
                 uint32_t retriggerLength = divisor / stepRetrigger;
                 uint32_t retriggerOffset = 0;
+#if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+                // SPREAD MODE (flag=1): Determine if gates should tick accumulator
+                const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
+                bool shouldTickAccum = (
+                    step.isAccumulatorTrigger() &&
+                    targetSequence.accumulator().enabled() &&
+                    targetSequence.accumulator().triggerMode() == Accumulator::Retrigger
+                );
+                uint8_t seqId = useFillSequence ? FillSequenceId : MainSequenceId;
+#endif
+
                 while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
+#if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+                    // SPREAD MODE: Schedule gates with metadata (tick accumulator when gate fires)
+                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true, shouldTickAccum, seqId });
+                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false, false, seqId });
+#else
+                    // BURST MODE: Schedule gates without metadata (accumulator already ticked)
                     _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true });
                     _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false });
+#endif
                     retriggerOffset += retriggerLength;
                 }
             } else {
-                // RETRIGGER mode: Also tick for retrigger=1 (no subdivisions)
+#if !CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+                // BURST MODE (flag=0): Tick for retrigger=1 (no subdivisions, immediate tick)
                 if (step.isAccumulatorTrigger()) {
                     const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
                     if (targetSequence.accumulator().enabled() &&
@@ -439,6 +481,19 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
                 _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true });
                 _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false });
+#else
+                // SPREAD MODE (flag=1): Schedule gates with metadata for retrigger=1
+                const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
+                bool shouldTickAccum = (
+                    step.isAccumulatorTrigger() &&
+                    targetSequence.accumulator().enabled() &&
+                    targetSequence.accumulator().triggerMode() == Accumulator::Retrigger
+                );
+                uint8_t seqId = useFillSequence ? FillSequenceId : MainSequenceId;
+
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true, shouldTickAccum, seqId });
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false, false, seqId });
+#endif
             }
         }
     }
