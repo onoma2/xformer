@@ -27,6 +27,7 @@ set(sources
     model/Accumulator.cpp
     model/Arpeggiator.cpp
     model/Calibration.cpp
+    model/HarmonyEngine.cpp
     model/ClipBoard.cpp
     model/ClockSetup.cpp
     model/Curve.cpp
