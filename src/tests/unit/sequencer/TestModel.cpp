@@ -29,7 +29,7 @@ CASE("model_harmony_engine_is_persistent") {
 
     // Should persist
     expectEqual(static_cast<int>(model.harmonyEngine().mode()), static_cast<int>(HarmonyEngine::Dorian), "HarmonyEngine mode should persist");
-    expectEqual(model.harmonyEngine().transpose(), 5, "HarmonyEngine transpose should persist");
+    expectEqual(static_cast<int>(model.harmonyEngine().transpose()), 5, "HarmonyEngine transpose should persist");
 }
 
 } // UNIT_TEST("Model")
