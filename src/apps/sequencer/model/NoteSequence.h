@@ -469,16 +469,7 @@ public:
 
     HarmonyRole harmonyRole() const { return _harmonyRole; }
     void setHarmonyRole(HarmonyRole role) {
-        // Constraint: Only tracks 1 and 5 (index 0 and 4) can be HarmonyMaster
-        if (role == HarmonyMaster && !canBeHarmonyMaster()) {
-            _harmonyRole = HarmonyFollower3rd; // Auto-revert to safe default
-        } else {
-            _harmonyRole = role;
-        }
-    }
-
-    bool canBeHarmonyMaster() const {
-        return (_trackIndex == 0 || _trackIndex == 4); // Track 1 or Track 5
+        _harmonyRole = role;
     }
 
     // masterTrackIndex
