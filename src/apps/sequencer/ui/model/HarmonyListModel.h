@@ -122,7 +122,7 @@ private:
         switch (item) {
         case HarmonyRole:      return "ROLE";
         case MasterTrack:      return "MASTER";
-        case HarmonyScale:     return "SCALE";
+        case HarmonyScale:     return "MODE";
         case HarmonyInversion: return "INVERSION";
         case HarmonyVoicing:   return "VOICING";
         case HarmonyTranspose: return "CH-TRNSP";
