@@ -31,6 +31,8 @@ Types::LayerRange NoteSequence::layerRange(Layer layer) {
     CASE(PulseCount)
     CASE(GateMode)
     CASE(HarmonyRoleOverride)
+    CASE(InversionOverride)
+    CASE(VoicingOverride)
     case Layer::Last:
         break;
     }
@@ -79,6 +81,10 @@ int NoteSequence::layerDefaultValue(Layer layer)
         return step.gateMode();
     case Layer::HarmonyRoleOverride:
         return step.harmonyRoleOverride();
+    case Layer::InversionOverride:
+        return step.inversionOverride();
+    case Layer::VoicingOverride:
+        return step.voicingOverride();
     case Layer::Last:
         break;
     }
@@ -122,6 +128,10 @@ int NoteSequence::Step::layerValue(Layer layer) const {
         return gateMode();
     case Layer::HarmonyRoleOverride:
         return harmonyRoleOverride();
+    case Layer::InversionOverride:
+        return inversionOverride();
+    case Layer::VoicingOverride:
+        return voicingOverride();
     case Layer::Last:
         break;
     }
@@ -181,6 +191,12 @@ void NoteSequence::Step::setLayerValue(Layer layer, int value) {
         break;
     case Layer::HarmonyRoleOverride:
         setHarmonyRoleOverride(value);
+        break;
+    case Layer::InversionOverride:
+        setInversionOverride(value);
+        break;
+    case Layer::VoicingOverride:
+        setVoicingOverride(value);
         break;
     case Layer::Last:
         break;

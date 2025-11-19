@@ -37,6 +37,8 @@ public:
     using PulseCount = UnsignedValue<3>;  // 0-7 representing 1-8 pulses
     using GateMode = UnsignedValue<2>;    // 0-3 representing 4 modes
     using HarmonyRoleOverride = UnsignedValue<3>;  // 0-5 per-step harmony role override
+    using InversionOverride = UnsignedValue<3>;  // 0-4 per-step inversion override (master only)
+    using VoicingOverride = UnsignedValue<3>;  // 0-4 per-step voicing override (master only)
 
     enum class GateModeType {
         All = 0,        // Fires gates on every pulse (default)
@@ -53,6 +55,24 @@ public:
         Fifth = 3,        // Override to 5th
         Seventh = 4,      // Override to 7th
         Off = 5,          // Override to off (no harmony, play base note)
+        Last
+    };
+
+    enum class InversionOverrideType {
+        UseSequence = 0,  // Use sequence-level inversion (default)
+        RootPosition = 1, // Override to root position
+        First = 2,        // Override to 1st inversion
+        Second = 3,       // Override to 2nd inversion
+        Third = 4,        // Override to 3rd inversion
+        Last
+    };
+
+    enum class VoicingOverrideType {
+        UseSequence = 0,  // Use sequence-level voicing (default)
+        Close = 1,        // Override to close voicing
+        Drop2 = 2,        // Override to drop-2 voicing
+        Drop3 = 3,        // Override to drop-3 voicing
+        Spread = 4,       // Override to spread voicing
         Last
     };
 
@@ -86,6 +106,8 @@ public:
         PulseCount,
         GateMode,
         HarmonyRoleOverride,
+        InversionOverride,
+        VoicingOverride,
         Last
     };
 
@@ -108,6 +130,8 @@ public:
         case Layer::PulseCount:                 return "PULSE COUNT";
         case Layer::GateMode:                   return "GATE MODE";
         case Layer::HarmonyRoleOverride:        return "HARMONY ROLE";
+        case Layer::InversionOverride:          return "INVERSION";
+        case Layer::VoicingOverride:            return "VOICING";
         case Layer::Last:                       break;
         }
         return nullptr;
@@ -242,6 +266,18 @@ public:
             _data1.harmonyRoleOverride = HarmonyRoleOverride::clamp(harmonyRoleOverride);
         }
 
+        // inversionOverride
+        int inversionOverride() const { return _data1.inversionOverride; }
+        void setInversionOverride(int inversionOverride) {
+            _data1.inversionOverride = InversionOverride::clamp(inversionOverride);
+        }
+
+        // voicingOverride
+        int voicingOverride() const { return _data1.voicingOverride; }
+        void setVoicingOverride(int voicingOverride) {
+            _data1.voicingOverride = VoicingOverride::clamp(voicingOverride);
+        }
+
         //----------------------------------------
         // Methods
         //----------------------------------------
@@ -284,7 +320,9 @@ public:
             BitField<uint32_t, 17, PulseCount::Bits> pulseCount;  // bits 17-19
             BitField<uint32_t, 20, GateMode::Bits> gateMode;      // bits 20-21
             BitField<uint32_t, 22, HarmonyRoleOverride::Bits> harmonyRoleOverride;  // bits 22-24
-            // 7 bits left
+            BitField<uint32_t, 25, InversionOverride::Bits> inversionOverride;  // bits 25-27
+            BitField<uint32_t, 28, VoicingOverride::Bits> voicingOverride;  // bits 28-30
+            // 1 bit left
         } _data1;
     };
 

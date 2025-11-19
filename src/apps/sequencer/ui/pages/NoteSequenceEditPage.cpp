@@ -215,6 +215,40 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
             canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
             break;
         }
+        case Layer::InversionOverride: {
+            // Display inversion override as abbreviation
+            canvas.setFont(Font::Tiny);
+            canvas.setColor(Color::Bright);
+            const char* invStr;
+            switch (step.inversionOverride()) {
+            case 0: invStr = "S"; break;   // SEQ
+            case 1: invStr = "R"; break;   // ROOT
+            case 2: invStr = "1"; break;   // 1ST
+            case 3: invStr = "2"; break;   // 2ND
+            case 4: invStr = "3"; break;   // 3RD
+            default: invStr = "S"; break;
+            }
+            FixedStringBuilder<8> str("%s", invStr);
+            canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
+            break;
+        }
+        case Layer::VoicingOverride: {
+            // Display voicing override as abbreviation
+            canvas.setFont(Font::Tiny);
+            canvas.setColor(Color::Bright);
+            const char* voicStr;
+            switch (step.voicingOverride()) {
+            case 0: voicStr = "S"; break;    // SEQ
+            case 1: voicStr = "C"; break;    // CLOSE
+            case 2: voicStr = "2"; break;    // DROP2
+            case 3: voicStr = "3"; break;    // DROP3
+            case 4: voicStr = "W"; break;    // SPREAD (Wide)
+            default: voicStr = "S"; break;
+            }
+            FixedStringBuilder<8> str("%s", voicStr);
+            canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
+            break;
+        }
         case Layer::Length:
             SequencePainter::drawLength(
                 canvas,
@@ -487,6 +521,12 @@ void NoteSequenceEditPage::encoder(EncoderEvent &event) {
             case Layer::HarmonyRoleOverride:
                 step.setHarmonyRoleOverride(step.harmonyRoleOverride() + event.value());
                 break;
+            case Layer::InversionOverride:
+                step.setInversionOverride(step.inversionOverride() + event.value());
+                break;
+            case Layer::VoicingOverride:
+                step.setVoicingOverride(step.voicingOverride() + event.value());
+                break;
             case Layer::Condition:
                 step.setCondition(ModelUtils::adjustedEnum(step.condition(), event.value()));
                 break;
@@ -590,7 +630,10 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
             break;
         }
         break;
-    case Function::Length:
+    case Function::Length: {
+        const auto &sequence = _project.selectedNoteSequence();
+        bool isMaster = (sequence.harmonyRole() == NoteSequence::HarmonyMaster);
+
         switch (layer()) {
         case Layer::Length:
             setLayer(Layer::LengthVariationRange);
@@ -598,11 +641,26 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
         case Layer::LengthVariationRange:
             setLayer(Layer::LengthVariationProbability);
             break;
+        case Layer::LengthVariationProbability:
+            // Only show Inversion/Voicing for Master tracks
+            if (isMaster) {
+                setLayer(Layer::InversionOverride);
+            } else {
+                setLayer(Layer::Length);
+            }
+            break;
+        case Layer::InversionOverride:
+            setLayer(Layer::VoicingOverride);
+            break;
+        case Layer::VoicingOverride:
+            setLayer(Layer::Length);
+            break;
         default:
             setLayer(Layer::Length);
             break;
         }
         break;
+    }
     case Function::Note: {
         const auto &sequence = _project.selectedNoteSequence();
         bool isFollower = (sequence.harmonyRole() >= NoteSequence::HarmonyFollowerRoot);
@@ -655,6 +713,8 @@ int NoteSequenceEditPage::activeFunctionKey() {
     case Layer::Length:
     case Layer::LengthVariationRange:
     case Layer::LengthVariationProbability:
+    case Layer::InversionOverride:
+    case Layer::VoicingOverride:
         return 2;
     case Layer::Note:
     case Layer::NoteVariationRange:
@@ -788,6 +848,38 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
         }
         str.reset();
         str("%s", harmonyName);
+        // Use default Tiny font (already set above)
+        canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
+        break;
+    }
+    case Layer::InversionOverride: {
+        const char* inversionName;
+        switch (step.inversionOverride()) {
+        case 0: inversionName = "SEQ"; break;
+        case 1: inversionName = "ROOT"; break;
+        case 2: inversionName = "1ST"; break;
+        case 3: inversionName = "2ND"; break;
+        case 4: inversionName = "3RD"; break;
+        default: inversionName = "SEQ"; break;
+        }
+        str.reset();
+        str("%s", inversionName);
+        // Use default Tiny font (already set above)
+        canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
+        break;
+    }
+    case Layer::VoicingOverride: {
+        const char* voicingName;
+        switch (step.voicingOverride()) {
+        case 0: voicingName = "SEQ"; break;
+        case 1: voicingName = "CLOSE"; break;
+        case 2: voicingName = "DROP2"; break;
+        case 3: voicingName = "DROP3"; break;
+        case 4: voicingName = "SPREAD"; break;
+        default: voicingName = "SEQ"; break;
+        }
+        str.reset();
+        str("%s", voicingName);
         // Use default Tiny font (already set above)
         canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
         break;
