@@ -35,9 +35,11 @@
 - Full UI integration
 
 **Optional Next Steps** (if desired):
-- Inversion parameter (0-3) - ~1.5 hours to add
-- Voicing parameter (Close/Drop2/Drop3/Spread) - ~1.5 hours to add
-- Both already supported by HarmonyEngine internally, just need UI exposure
+- ✅ Inversion parameter (0-3) - UI + infrastructure complete (commit c6792a6)
+- ✅ Voicing parameter (Close/Drop2/Drop3/Spread) - UI + infrastructure complete (commit c6792a6)
+- ❌ Inversion transformation logic in HarmonyEngine::harmonize() - NOT implemented (~1.5 hours)
+- ❌ Voicing transformation logic in HarmonyEngine::harmonize() - NOT implemented (~1.5 hours)
+- **Status**: Parameters exist and can be set in UI, but transformation algorithms never written (comment placeholders only)
 
 ---
 

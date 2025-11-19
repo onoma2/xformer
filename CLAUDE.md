@@ -650,12 +650,12 @@ Harmony works seamlessly with all existing features:
 ### What's NOT Implemented (Optional)
 
 These features from the original plan are not yet implemented but could be added:
-- ❌ Inversion parameter (0-3) - ~1.5 hours to add
-- ❌ Voicing parameter (Close/Drop2/Drop3/Spread) - ~1.5 hours to add
+- ⚠️ Inversion parameter (0-3) - UI + infrastructure complete, ❌ transformation logic NOT implemented
+- ⚠️ Voicing parameter (Close/Drop2/Drop3/Spread) - UI + infrastructure complete, ❌ transformation logic NOT implemented
 - ❌ Manual chord quality selection (currently auto-diatonic)
 - ❌ Additional scales (Harmonic Minor, Melodic Minor, etc.)
 
-**Note**: HarmonyEngine already supports inversion and voicing internally, just needs UI exposure. Current implementation uses root position close voicing only.
+**Note**: Inversion and voicing parameters exist in UI (HarmonyPage) and are stored, but `HarmonyEngine::harmonize()` does not apply them - transformation algorithms were never implemented (comment placeholders only). Current behavior: always outputs root position close voicing regardless of parameter settings.
 
 ### Key Files
 

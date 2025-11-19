@@ -43,8 +43,8 @@ Direct integration into `NoteTrackEngine::evalStepNote()` (NOT separate HarmonyT
 - Diatonic chord quality detection (Major7, Minor7, Dominant7, HalfDim7)
 - 4-voice chord generation (root, 3rd, 5th, 7th)
 - Transpose parameter (-24 to +24 semitones)
-- Inversion support (0-3, implemented but not exposed in UI yet)
-- Voicing support (Close, Drop2, Drop3, Spread - implemented but not exposed yet)
+- Inversion infrastructure (0-3, UI + storage exist, ❌ transformation logic NOT implemented)
+- Voicing infrastructure (Close, Drop2, Drop3, Spread - UI + storage exist, ❌ transformation logic NOT implemented)
 
 **Test Coverage**: 13 passing unit tests
 - Scale interval lookups (7 modes)
@@ -413,12 +413,14 @@ ui/pages/HarmonyPage.cpp
 These features from the original plan are **not yet implemented** but could be added incrementally:
 
 ### Inversion & Voicing (Phase 2/3)
-- ❌ Inversion parameter (0-3) exposed in UI
-- ❌ Voicing parameter (Close/Drop2/Drop3/Spread) exposed in UI
+- ✅ Inversion parameter (0-3) exposed in UI (UI + storage complete)
+- ✅ Voicing parameter (Close/Drop2/Drop3/Spread) exposed in UI (UI + storage complete)
+- ❌ Inversion transformation logic in HarmonyEngine::harmonize() NOT implemented
+- ❌ Voicing transformation logic in HarmonyEngine::harmonize() NOT implemented
 - ❌ Per-step inversion/voicing override
 
-**Note**: HarmonyEngine already supports these parameters internally. Adding UI would take ~1.5 hours.
-**Current Behavior**: Uses root position close voicing only.
+**Status**: Infrastructure complete (parameters, UI, serialization, engine wiring), but transformation algorithms never implemented.
+**Current Behavior**: Always uses root position close voicing regardless of parameter settings (comment placeholders exist in code).
 
 ### Advanced Features (Phase 3-5)
 - ❌ Manual chord quality selection (currently auto-diatonic only)
@@ -494,69 +496,69 @@ No special cases or ordering issues!
 
 ## Next Steps (Optional)
 
-### If you want to add Inversion & Voicing parameters:
+### ✅ DONE: Inversion & Voicing Infrastructure (commit c6792a6)
 
-#### 1. TDD Test First (30 min)
+The following infrastructure is **already implemented**:
+- ✅ Model layer: `NoteSequence::harmonyInversion()` and `harmonyVoicing()` with getters/setters
+- ✅ Serialization: Bit-packed storage in project files
+- ✅ Engine integration: Values passed to `HarmonyEngine::setInversion()` and `setVoicing()`
+- ✅ UI layer: INVERSION and VOICING parameters visible in HarmonyPage (S3 → S3)
+- ✅ Unit tests: TestNoteSequence.cpp validates property storage and clamping
+
+### ❌ TODO: Implement Transformation Logic in HarmonyEngine (~2-3 hours)
+
+The actual chord transformation algorithms need to be implemented in `HarmonyEngine::harmonize()`:
+
+#### 1. Inversion Algorithm (1-1.5 hours)
 ```cpp
-// src/tests/unit/sequencer/TestNoteSequence.cpp
-CASE("harmony_inversion_voicing") {
-    NoteSequence seq;
-
-    // Test inversion
-    seq.setHarmonyInversion(2);
-    expectEqual(seq.harmonyInversion(), 2, "Inversion should be 2");
-
-    seq.setHarmonyInversion(5);  // Over max
-    expectEqual(seq.harmonyInversion(), 3, "Should clamp to max 3");
-
-    // Test voicing
-    seq.setHarmonyVoicing(1);  // Drop2
-    expectEqual(seq.harmonyVoicing(), 1, "Voicing should be Drop2");
+// src/apps/sequencer/model/HarmonyEngine.cpp
+void HarmonyEngine::applyInversion(ChordNotes& chord) const {
+    // Reorder chord tones and adjust octaves based on _inversion (0-3)
+    // Root position (0): R-3-5-7 (no change)
+    // 1st inversion (1): 3-5-7-R (root up octave)
+    // 2nd inversion (2): 5-7-R-3 (root+3rd up octave)
+    // 3rd inversion (3): 7-R-3-5 (root+3rd+5th up octave)
 }
 ```
 
-#### 2. Model Layer (30 min)
+#### 2. Voicing Algorithm (1-1.5 hours)
 ```cpp
-// src/apps/sequencer/model/NoteSequence.h
-uint8_t _harmonyInversion = 0; // Inversion (0-3)
-uint8_t _harmonyVoicing = 0;   // Voicing (0-3: Close, Drop2, Drop3, Spread)
-
-int harmonyInversion() const { return _harmonyInversion; }
-void setHarmonyInversion(int inv) { _harmonyInversion = clamp(inv, 0, 3); }
-
-int harmonyVoicing() const { return _harmonyVoicing; }
-void setHarmonyVoicing(int voicing) { _harmonyVoicing = clamp(voicing, 0, 3); }
+void HarmonyEngine::applyVoicing(ChordNotes& chord) const {
+    // Spread chord tones across octaves based on _voicing
+    // Close (0): All within one octave (no change)
+    // Drop2 (1): Second-highest note dropped one octave
+    // Drop3 (2): Third-highest note dropped one octave
+    // Spread (3): Wide orchestral voicing (custom intervals)
+}
 ```
 
-Update serialization in `NoteSequence.cpp`.
-
-#### 3. Engine Layer (15 min)
+#### 3. Integration in harmonize() (15 min)
 ```cpp
-// src/apps/sequencer/engine/NoteTrackEngine.cpp
-HarmonyEngine harmonyEngine;
-harmonyEngine.setMode(static_cast<HarmonyEngine::Mode>(sequence.harmonyScale()));
-harmonyEngine.setInversion(sequence.harmonyInversion());  // NEW
-harmonyEngine.setVoicing(static_cast<HarmonyEngine::Voicing>(sequence.harmonyVoicing()));  // NEW
-auto chord = harmonyEngine.harmonize(midiNote, scaleDegree);
+ChordNotes HarmonyEngine::harmonize(int16_t rootNote, uint8_t scaleDegree) const {
+    // ... existing code builds chord ...
+
+    applyInversion(chord);  // NEW: Apply inversion transformation
+    applyVoicing(chord);    // NEW: Apply voicing transformation
+
+    return chord;
+}
 ```
 
-#### 4. UI Layer (15 min)
+#### 4. Add Tests (30 min)
 ```cpp
-// src/apps/sequencer/ui/model/HarmonyListModel.h
-enum Item {
-    HarmonyRole,
-    MasterTrack,
-    HarmonyScale,
-    HarmonyInversion,  // NEW
-    HarmonyVoicing,    // NEW
-    Last
-};
-
-// Add indexed value support for Inversion and Voicing
+// src/tests/unit/sequencer/TestHarmonyEngine.cpp
+CASE("inversion_root_position") { /* ... */ }
+CASE("inversion_first") { /* ... */ }
+CASE("inversion_second") { /* ... */ }
+CASE("inversion_third") { /* ... */ }
+CASE("voicing_close") { /* ... */ }
+CASE("voicing_drop2") { /* ... */ }
+CASE("voicing_drop3") { /* ... */ }
+CASE("voicing_spread") { /* ... */ }
 ```
 
-**Total Effort**: ~1.5 hours
-**Decision**: Up to you! Current implementation is fully functional without these.
+**Total Effort**: ~2-3 hours to make the UI controls functional
+**Current Behavior**: Parameters are stored but ignored - always outputs root position close voicing
 
 ---
 
