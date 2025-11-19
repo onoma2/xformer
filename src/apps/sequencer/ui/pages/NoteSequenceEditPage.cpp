@@ -199,16 +199,17 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
         }
         case Layer::HarmonyRoleOverride: {
             // Display harmony role override as abbreviation
+            canvas.setFont(Font::Tiny);
             canvas.setColor(Color::Bright);
             const char* harmonyStr;
             switch (step.harmonyRoleOverride()) {
-            case 0: harmonyStr = "SEQ"; break;
-            case 1: harmonyStr = "ROOT"; break;
-            case 2: harmonyStr = "3RD"; break;
-            case 3: harmonyStr = "5TH"; break;
-            case 4: harmonyStr = "7TH"; break;
-            case 5: harmonyStr = "OFF"; break;
-            default: harmonyStr = "SEQ"; break;
+            case 0: harmonyStr = "S"; break;   // SEQ
+            case 1: harmonyStr = "R"; break;   // ROOT
+            case 2: harmonyStr = "3"; break;   // 3RD
+            case 3: harmonyStr = "5"; break;   // 5TH
+            case 4: harmonyStr = "7"; break;   // 7TH
+            case 5: harmonyStr = "-"; break;   // OFF
+            default: harmonyStr = "S"; break;
             }
             FixedStringBuilder<8> str("%s", harmonyStr);
             canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
@@ -787,7 +788,7 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
         }
         str.reset();
         str("%s", harmonyName);
-        canvas.setFont(Font::Small);
+        // Use default Tiny font (already set above)
         canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
         break;
     }
