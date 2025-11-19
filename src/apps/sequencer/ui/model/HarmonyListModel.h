@@ -12,6 +12,7 @@ public:
         HarmonyScale,
         HarmonyInversion,
         HarmonyVoicing,
+        HarmonyTranspose,
         Last
     };
 
@@ -124,6 +125,7 @@ private:
         case HarmonyScale:     return "SCALE";
         case HarmonyInversion: return "INVERSION";
         case HarmonyVoicing:   return "VOICING";
+        case HarmonyTranspose: return "CH-TRNSP";
         case Last:             break;
         }
         return nullptr;
@@ -188,6 +190,9 @@ private:
             }
             break;
         }
+        case HarmonyTranspose:
+            str("%+d", _sequence->harmonyTranspose());
+            break;
         case Last:
             break;
         }
@@ -200,6 +205,10 @@ private:
         case MasterTrack:
             _sequence->setMasterTrackIndex(
                 clamp(_sequence->masterTrackIndex() + value, 0, 7)); // 0-7 for 8 tracks
+            break;
+        case HarmonyTranspose:
+            _sequence->setHarmonyTranspose(
+                clamp(_sequence->harmonyTranspose() + value, -24, 24));
             break;
         default:
             break;

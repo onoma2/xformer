@@ -331,6 +331,9 @@ void NoteSequence::write(VersionedSerializedWriter &writer) const {
     // Byte 2: harmonyVoicing (2 bits) + 6 bits reserved for future use
     uint8_t harmonyFlags2 = (static_cast<uint8_t>(_harmonyVoicing) << 0);
     writer.write(harmonyFlags2);
+
+    // Byte 3: harmonyTranspose (int8_t, ±24 semitones)
+    writer.write(_harmonyTranspose);
 }
 
 void NoteSequence::read(VersionedSerializedReader &reader) {
@@ -369,6 +372,9 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
         uint8_t harmonyFlags2;
         reader.read(harmonyFlags2);
         _harmonyVoicing = (harmonyFlags2 >> 0) & 0x3;  // 2 bits
+
+        // Read third harmony byte (Version34+ with transpose)
+        reader.read(_harmonyTranspose);
     } else {
         // Backward compatibility: use defaults
         _harmonyRole = HarmonyOff;
@@ -376,5 +382,6 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
         _harmonyScale = 0;
         _harmonyInversion = 0;
         _harmonyVoicing = 0;
+        _harmonyTranspose = 0;
     }
 }

@@ -509,6 +509,13 @@ public:
         _harmonyVoicing = clamp(voicing, 0, 3); // 0-3 for 4 voicings
     }
 
+    // harmonyTranspose
+
+    int harmonyTranspose() const { return _harmonyTranspose; }
+    void setHarmonyTranspose(int transpose) {
+        _harmonyTranspose = clamp(transpose, -24, 24); // ±24 semitones (±2 octaves)
+    }
+
     //----------------------------------------
     // Methods
     //----------------------------------------
@@ -564,6 +571,7 @@ private:
     uint8_t _harmonyScale = 0;     // Scale override (0-6 for 7 modes)
     uint8_t _harmonyInversion = 0; // Inversion (0-3 for root, 1st, 2nd, 3rd)
     uint8_t _harmonyVoicing = 0;   // Voicing (0-3 for Close, Drop2, Drop3, Spread)
+    int8_t _harmonyTranspose = 0;  // Chord transpose (±24 semitones)
 
     uint8_t _edited;
 
