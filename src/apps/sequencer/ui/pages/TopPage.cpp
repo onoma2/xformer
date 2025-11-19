@@ -92,7 +92,18 @@ void TopPage::keyPress(KeyPressEvent &event) {
 
     if (key.isTrackSelect()) {
         _project.setSelectedTrackIndex(key.trackSelect());
-        _sequenceView = SequenceView::NoteSequence; // Reset to default view when changing tracks
+
+        // If currently on a sequence subpage, navigate back to NoteSequence view
+        Page* currentPage = _manager.top();
+        bool onSequenceView = (currentPage == &pages.noteSequence ||
+                              currentPage == &pages.accumulator ||
+                              currentPage == &pages.harmony);
+
+        if (onSequenceView) {
+            _sequenceView = SequenceView::NoteSequence;
+            setSequenceView(_sequenceView);
+        }
+
         event.consume();
     }
     if (key.isTrack() && event.count() == 2) {
