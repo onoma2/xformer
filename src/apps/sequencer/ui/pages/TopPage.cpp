@@ -226,7 +226,6 @@ void TopPage::setSequencePage() {
     auto &pages = _manager.pages();
     bool fromSequenceView = (currentPage == &pages.noteSequence ||
                             currentPage == &pages.accumulator ||
-                            currentPage == &pages.accumulatorSteps ||
                             currentPage == &pages.harmony);
 
     // Cycle to next view only if we're currently on a sequence view
@@ -236,9 +235,6 @@ void TopPage::setSequencePage() {
             _sequenceView = SequenceView::Accumulator;
             break;
         case SequenceView::Accumulator:
-            _sequenceView = SequenceView::AccumulatorSteps;
-            break;
-        case SequenceView::AccumulatorSteps:
             _sequenceView = SequenceView::Harmony;
             break;
         case SequenceView::Harmony:
@@ -263,9 +259,6 @@ void TopPage::setSequenceView(SequenceView view) {
             break;
         case SequenceView::Accumulator:
             setMainPage(pages.accumulator);
-            break;
-        case SequenceView::AccumulatorSteps:
-            setMainPage(pages.accumulatorSteps);
             break;
         case SequenceView::Harmony:
             setMainPage(pages.harmony);

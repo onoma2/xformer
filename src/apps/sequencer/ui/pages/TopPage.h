@@ -52,7 +52,6 @@ private:
     enum class SequenceView : uint8_t {
         NoteSequence,
         Accumulator,
-        AccumulatorSteps,
         Harmony,
     };
 
