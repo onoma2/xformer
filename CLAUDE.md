@@ -522,6 +522,169 @@ Gate mode is a per-step parameter that determines the gate firing behavior when 
 - `GATE_MODE_TDD_PLAN.md` - Complete technical specification
 - `GATE_MODE_ENGINE_DESIGN.md` - Engine implementation design
 
+## Harmony Feature
+
+The PEW|FORMER firmware includes Harmonàig-style harmonic sequencing that allows tracks to automatically harmonize a master track's melody. This enables instant chord creation, complex harmonic arrangements, and modal exploration. See `HARMONY-DONE.md` for complete implementation summary and `QWEN.md` Part 5 for technical details.
+
+### Overview
+
+The harmony feature provides master/follower track relationships where follower tracks automatically play harmonized chord tones (root, 3rd, 5th, 7th) based on a master track's melody. Any track can be a master or follower, allowing flexible harmonic arrangements.
+
+**Core capabilities:**
+- Master/follower track relationships
+- 7 modal scales (Ionian modes)
+- 4-voice chord generation
+- Per-track harmony configuration
+- Synchronized step playback
+
+### Core Parameters
+
+**HarmonyRole** (per NoteSequence):
+- `Off` (0): No harmony (default)
+- `Master` (1): Defines the harmony (plays melody)
+- `FollowerRoot` (2): Plays root note of harmonized chord
+- `Follower3rd` (3): Plays 3rd note of harmonized chord
+- `Follower5th` (4): Plays 5th note of harmonized chord
+- `Follower7th` (5): Plays 7th note of harmonized chord
+
+**MasterTrackIndex** (per NoteSequence):
+- Range: 0-7 (tracks 1-8)
+- Specifies which track to follow when in follower role
+- Only relevant for follower tracks
+
+**HarmonyScale** (per NoteSequence):
+- Range: 0-6 (7 Ionian modes)
+- **0 - Ionian** (Major): Bright, happy
+- **1 - Dorian** (Minor with raised 6th): Jazz minor
+- **2 - Phrygian** (Minor with b2): Spanish/dark
+- **3 - Lydian** (Major with #4): Dreamy
+- **4 - Mixolydian** (Major with b7): Dominant/bluesy
+- **5 - Aeolian** (Natural Minor): Melancholic
+- **6 - Locrian** (Diminished): Unstable/tense
+
+### UI Integration
+
+**Accessing Harmony Page:**
+1. Navigate to a Note track (press T1-T8)
+2. Press **Sequence** button (S2) to cycle views:
+   - 1st press: NoteSequence page
+   - 2nd press: Accumulator page (ACCUM)
+   - 3rd press: **Harmony page** (HARMONY) ← Feature page
+   - 4th press: Cycles back to NoteSequence
+
+**Editing Harmony Parameters:**
+- Turn encoder to navigate between parameters
+- Turn encoder to edit selected parameter value
+- **ROLE**: Cycles Off → Master → Root → 3rd → 5th → 7th
+- **MASTER**: Cycles T1 → T2 → ... → T8 (which track to follow)
+- **SCALE**: Cycles through 7 modes (Ionian through Locrian)
+
+### Implementation Architecture
+
+**Model Layer:**
+- `HarmonyEngine.h/cpp` - Core harmonization logic for all 7 Ionian modes
+- `NoteSequence.h/cpp` - Harmony properties (harmonyRole, masterTrackIndex, harmonyScale)
+- `Model.h` - Central HarmonyEngine instance accessible to all tracks
+
+**Engine Layer:**
+- `NoteTrackEngine.cpp::evalStepNote()` - Direct integration
+- Checks if sequence is harmony follower
+- Gets master track's note at same step index (synchronized playback)
+- Harmonizes using HarmonyEngine
+- Extracts appropriate chord tone based on follower role
+- Replaces follower's note with harmonized pitch
+
+**Modulation Order** (important):
+1. Base note + transpose/octave
+2. **Harmony modulation** (if follower)
+3. Accumulator modulation (if enabled)
+4. Note variation (if enabled)
+
+**UI Layer:**
+- `HarmonyListModel.h` - Parameter editing model
+- `HarmonyPage.h/cpp` - Dedicated harmony configuration page
+- `Pages.h` - HarmonyPage integration
+- `TopPage.h/cpp` - Navigation integration (Sequence button cycling)
+
+### Use Cases
+
+**Instant Chord Pads:**
+- Set Track 1 as Master, program melody
+- Set Tracks 2-4 as Followers (Root/3rd/5th)
+- Result: Instant 3-voice chord harmonization
+
+**Dual Chord Progressions:**
+- Tracks 1-4: Bass harmony group
+- Tracks 5-8: Lead harmony group
+- Independent harmonic progressions
+
+**Modal Exploration:**
+- Same master melody across multiple tracks
+- Different harmonyScale settings per follower
+- Hear how modes color the melodic material
+
+**Jazz Voicings:**
+- Use all 4 follower voices (Root/3rd/5th/7th)
+- Set scale to Dorian or Mixolydian
+- Instant jazz chord progressions
+
+### Compatibility
+
+Harmony works seamlessly with all existing features:
+- ✅ Accumulator (harmony first, then accumulator offset)
+- ✅ Note variation (harmony first, then random variation)
+- ✅ Transpose/Octave (applied after harmony)
+- ✅ Gate modes, Pulse count, Retrigger
+- ✅ Fill modes
+- ✅ Slide/portamento
+
+### Testing Status
+
+✅ **Fully tested and verified:**
+- 19 passing unit tests (HarmonyEngine, NoteSequence, Model integration)
+- Contract tests verify coordination
+- Hardware build successful
+- Compatible with existing features
+- Production ready
+
+### What's NOT Implemented (Optional)
+
+These features from the original plan are not yet implemented but could be added:
+- ❌ Inversion parameter (0-3) - ~1.5 hours to add
+- ❌ Voicing parameter (Close/Drop2/Drop3/Spread) - ~1.5 hours to add
+- ❌ Manual chord quality selection (currently auto-diatonic)
+- ❌ Additional scales (Harmonic Minor, Melodic Minor, etc.)
+
+**Note**: HarmonyEngine already supports inversion and voicing internally, just needs UI exposure. Current implementation uses root position close voicing only.
+
+### Key Files
+
+**Model Layer:**
+- `src/apps/sequencer/model/HarmonyEngine.h/cpp` - Core harmonization
+- `src/apps/sequencer/model/NoteSequence.h/cpp` - Harmony properties
+- `src/apps/sequencer/model/Model.h` - HarmonyEngine integration
+
+**Engine Layer:**
+- `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Direct integration in evalStepNote()
+
+**UI Layer:**
+- `src/apps/sequencer/ui/model/HarmonyListModel.h` - Parameter editing model
+- `src/apps/sequencer/ui/pages/HarmonyPage.h/cpp` - Main configuration page
+- `src/apps/sequencer/ui/pages/Pages.h` - Page registration
+- `src/apps/sequencer/ui/pages/TopPage.h/cpp` - Navigation integration
+
+**Tests:**
+- `src/tests/unit/sequencer/TestHarmonyEngine.cpp` - HarmonyEngine unit tests
+- `src/tests/unit/sequencer/TestHarmonyIntegration.cpp` - Integration tests
+- `src/tests/unit/sequencer/TestModel.cpp` - Model coordination tests
+
+**Documentation:**
+- `HARMONY-DONE.md` - Complete implementation summary
+- `HARMONY-HARDWARE-TESTS.md` - 8 comprehensive test cases
+- `WORKING-TDD-HARMONY-PLAN.md` - Planning document with status
+- `QWEN.md` Part 5 - Technical implementation details
+- `PHASE-1-COMPLETE.md` - Phase 1 Days 1-6 summary
+
 ## Simulator Interface
 
 The simulator provides a complete virtual hardware interface (see `doc/simulator-interface.png`):
