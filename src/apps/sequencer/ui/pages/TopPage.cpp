@@ -92,6 +92,7 @@ void TopPage::keyPress(KeyPressEvent &event) {
 
     if (key.isTrackSelect()) {
         _project.setSelectedTrackIndex(key.trackSelect());
+        _sequenceView = SequenceView::NoteSequence; // Reset to default view when changing tracks
         event.consume();
     }
     if (key.isTrack() && event.count() == 2) {
