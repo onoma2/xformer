@@ -187,6 +187,49 @@ The name references the **Tuesday** Eurorack module - a generative algorithmic s
 | 21 | **QUANTUM** | Probabilistic | probability_map[16][8] | Quantum wave collapse |
 | 22 | **LSYSTEM** | Generative | axiom, rules, string | L-System string rewriting |
 
+### Genre-Inspired Algorithms
+
+| # | Name | Genre | State Structure | Description |
+|---|------|-------|-----------------|-------------|
+| 23 | **TECHNO** | Minimal Techno | sequence[8], position, variation_seed | Hypnotic repetition, locked groove, subtle variation |
+| 24 | **JUNGLE** | Drum & Bass | break_pattern[16], chop_position, roll_count | Breakbeat chops, syncopation, fast bursts |
+| 25 | **AMBIENT** | Ambient/Drone | last_note, hold_timer, drift_direction | Sparse triggers, long holds, slow drift |
+| 26 | **ACID** | Acid House | sequence[8], position, slide_flag, accent_pattern | 303-style patterns, slides, accents on octaves |
+| 27 | **FUNK** | Funk/Disco | groove_template, ghost_probability, pocket_offset | Syncopated groove, ghost notes, off-beat emphasis |
+| 28 | **DRILL** | UK Drill/Trap | hihat_pattern, slide_target, triplet_mode | Hi-hat rolls, bass slides, triplet subdivisions |
+| 29 | **MINIMAL** | Minimal/Clicks | burst_length, silence_length, click_density | Staccato bursts, silence gaps, glitchy |
+
+### Artist-Inspired Algorithms
+
+| # | Name | Artist | State Structure | Description |
+|---|------|--------|-----------------|-------------|
+| 30 | **KRAFTWERK** | Kraftwerk | sequence[8], position, lock_timer | Precise mechanical sequences, robotic repetition |
+| 31 | **APHEX** | Aphex Twin | pattern[16], time_sig_num, glitch_prob | Complex polyrhythms, acid lines, glitchy variations |
+| 32 | **BOARDS** | Boards of Canada | base_note, detune_amount, wobble_phase | Nostalgic detuned textures, tape wobble, melancholic |
+| 33 | **TANGERINE** | Tangerine Dream | arp_pattern[16], filter_pos, sequence_length | Berlin school motorik arpeggios, cosmic |
+| 34 | **AUTECHRE** | Autechre | transform_matrix[4], mutation_rate, chaos_seed | Abstract constantly evolving, never repeats |
+| 35 | **SQUAREPUSH** | Squarepusher | bass_position, run_length, jazz_mode | Virtuoso bass runs, jazz-influenced, slap patterns |
+| 36 | **DAFT** | Daft Punk | loop_pattern[8], filter_cutoff, sweep_direction | Filtered disco loops, 4-on-floor, vocal rhythms |
+
+### Parameter Response (Genre/Artist Algorithms)
+
+| Algo | Power (density) | Flow (movement) | Ornament (decoration) |
+|------|-----------------|-----------------|----------------------|
+| TECHNO | Gates per bar | Variation frequency | Offbeat triggers |
+| JUNGLE | Chop density | Syncopation | Rolls/ghosts |
+| AMBIENT | Trigger rate | Note drift | Harmonics |
+| ACID | Sequence length | Slide probability | Accents/octaves |
+| FUNK | Ghost density | Pocket tightness | Approach notes |
+| DRILL | Roll density | Slide frequency | Triplet feel |
+| MINIMAL | Burst length | Silence duration | Glitch repeats |
+| KRAFTWERK | Note density | Transposition freq | Mechanical ghosts |
+| APHEX | Time sig complexity | Glitch probability | Acid accents |
+| BOARDS | Trigger density | Detune amount | Degraded harmonics |
+| TANGERINE | Arp speed | Filter movement | Cosmic octaves |
+| AUTECHRE | Mutation intensity | Transform rate | Micro-timing |
+| SQUAREPUSH | Run speed | Jazz balance | Articulations |
+| DAFT | Filter resonance | Sweep speed | Disco fills |
+
 ### MVP Algorithm Set (6 algorithms)
 
 | Priority | # | Name | Complexity | Why Include |
