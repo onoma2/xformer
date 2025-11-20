@@ -128,6 +128,28 @@ An accumulator is a stateful counter that:
    - Memory usage optimized with bitfield parameter packing
    - Thread safety ensured through mutable member pattern
 
+### Phase 5: Visual Indicators (2025-11-20)
+1. **Counter Display**
+   - Added `WindowPainter::drawAccumulatorValue()` function
+   - Shows current accumulator value in header (e.g., "+5", "-12")
+   - Position: x=176 (aligned with step 12), y=6 (header line)
+   - Font: Font::Tiny to match step numbers
+   - Color: Color::Medium for subtle non-competing display
+   - Only visible when accumulator is enabled
+   - Integrated into all Note track pages: STEPS, SEQUENCE, ACCUM, ACCST, HARMONY
+
+2. **Corner Dot Indicator**
+   - Small dot in top-right corner of steps with accumulator trigger enabled
+   - Position: `(x + stepWidth - 5, y + 4)`
+   - Contrasting color for visibility: Color::None (black) when gate on, Color::Bright when gate off
+   - Visible across all pages and layers on STEPS page
+   - AccumulatorTrigger layer now inherits gate squares and only shows corner dots (no separate filled squares)
+
+3. **Implementation Files**
+   - `WindowPainter.h/cpp`: New drawAccumulatorValue() function
+   - `NoteSequenceEditPage.cpp`: Corner dot rendering in step drawing loop
+   - `NoteSequencePage.cpp`, `AccumulatorPage.cpp`, `AccumulatorStepsPage.cpp`, `HarmonyPage.cpp`: Counter display calls
+
 ## Technical Details
 
 ### Data Model

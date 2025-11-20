@@ -285,6 +285,17 @@ All modes respect the delayed first tick feature (Improvement 3):
 - `AccumulatorStepsPage.h/cpp`: Step trigger configuration page
 - `ui/model/AccumulatorListModel.h`: List model for parameter editing with indexed value support
 
+**Visual Indicators**:
+- **Counter display**: Current value shown in header (x=176, aligned with step 12)
+  - Format: "+5", "-12", "+0" using Font::Tiny, Color::Medium
+  - Visible on all Note track pages when accumulator is enabled
+  - Implemented via `WindowPainter::drawAccumulatorValue()`
+- **Corner dot indicator**: Top-right dot on steps with accumulator trigger enabled
+  - Position: `(x + stepWidth - 5, y + 4)`
+  - Color: `Color::None` (black) when gate on, `Color::Bright` when gate off
+  - Visible across all pages and layers
+  - AccumulatorTrigger layer inherits gate squares, only adds corner dots
+
 ### Performance Impact
 
 - Minimal CPU overhead (single conditional check per step)
@@ -323,6 +334,8 @@ Planned enhancements documented in `QWEN.md`:
 - `src/apps/sequencer/engine/NoteTrackEngine.cpp` - Engine integration
 - `src/apps/sequencer/ui/pages/AccumulatorPage.h/cpp` - ACCUM page UI
 - `src/apps/sequencer/ui/pages/AccumulatorStepsPage.h/cpp` - ACCST page UI
+- `src/apps/sequencer/ui/pages/NoteSequenceEditPage.cpp` - Corner dot and counter display
+- `src/apps/sequencer/ui/painters/WindowPainter.h/cpp` - drawAccumulatorValue() function
 - `src/apps/sequencer/ui/model/AccumulatorListModel.h` - UI list model
 - `src/tests/unit/sequencer/TestAccumulator.cpp` - Unit tests
 

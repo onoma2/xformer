@@ -3,6 +3,17 @@
 ## [Unreleased]
 
 ### Added
+- **Accumulator UI Enhancements**: Visual indicators for accumulator state across all Note track pages
+  - **Counter display**: Shows current accumulator value (e.g., "+5", "-12") in header at x=176 (aligned with step 12)
+    - Uses Font::Tiny to match step number size
+    - Uses Color::Medium for subtle display that doesn't compete with primary elements
+    - Only visible when accumulator is enabled
+    - Displayed on all Note track pages: STEPS, SEQUENCE, ACCUM, ACCST, HARMONY
+  - **Corner dot indicator**: Small dot in top-right corner of steps with accumulator trigger enabled
+    - Visible across all pages and layers
+    - Uses contrasting color: black (Color::None) when gate on, bright when gate off
+    - AccumulatorTrigger layer inherits gate squares and shows corner dots for trigger-enabled steps
+  - New WindowPainter::drawAccumulatorValue() function for reusable counter display
 - **Gate Mode feature**: Per-step gate firing control during pulse count repetitions with 4 distinct modes
   - Gate mode accessible via Gate button cycling (GATE → GATE PROB → GATE OFFSET → SLIDE → GATE MODE)
   - Four gate modes:
