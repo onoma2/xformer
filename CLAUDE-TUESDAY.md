@@ -29,10 +29,10 @@ The 5 parameters are intentionally **high-level musical controls** rather than t
 | Parameter | Range | Musical Meaning |
 |-----------|-------|-----------------|
 | **Algorithm** | 0-31 | The "personality" - MARKOV (probabilistic), STOMPER (rhythmic), SCALEWALK (melodic), etc. |
-| **Flow** | 0-255 | How the sequence moves - smooth vs. jumpy, predictable vs. chaotic |
-| **Ornament** | 0-255 | Embellishments and fills - sparse vs. decorated |
-| **Intensity** | 0-255 | Activity/density - sparse gates vs. busy patterns |
-| **LoopLength** | 1-127 | Pattern length (>64 = infinite/evolving) |
+| **Flow** | 1-16 | How the sequence moves - smooth vs. jumpy, predictable vs. chaotic |
+| **Ornament** | 1-16 | Embellishments and fills - sparse vs. decorated |
+| **Intensity** | 1-16 | Activity/density - sparse gates vs. busy patterns |
+| **LoopLength** | Inf, 1-16, 19, 21, 24, 32, 35, 42, 48, 64 | Pattern length (Inf = evolving/non-repeating) |
 
 ### Why F0-F4 + Encoder Control
 
@@ -61,8 +61,8 @@ Unlike NoteTrack which uses step buttons (S1-S16) to select steps for editing, T
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
 │                                                            │
-│  MARKOV     127        85         200        16            │
-│  ████░░░    ████░░░    ███░░░░    ██████░    steps         │
+│  MARKOV       8          5         12         16           │
+│                                                            │
 │                                                            │
 │                                                            │
 │                                                            │
@@ -71,29 +71,27 @@ Unlike NoteTrack which uses step buttons (S1-S16) to select steps for editing, T
 └────────────────────────────────────────────────────────────┘
 ```
 
-All 5 parameters displayed uniformly - value above, bar graph below, F-button label at bottom. Algorithm name (MARKOV) is just another parameter value.
+All 5 parameters displayed uniformly - value above F-button label. No bar graphs needed since ranges are small (1-16).
 
 **Interaction Flow:**
 
 1. **Press F1** → Select ALGO parameter
    - Turn encoder → Cycle through: MARKOV → STOMPER → SCALEWALK → WOBBLE → ...
-   - Algorithm name updates in center display
 
 2. **Press F2** → Select FLOW parameter
-   - Turn encoder → Adjust 0-255
-   - Bar graph updates in real-time
+   - Turn encoder → Adjust 1-16
    - Affects how sequence progresses
 
 3. **Press F3** → Select ORN (Ornament) parameter
-   - Turn encoder → Adjust 0-255
+   - Turn encoder → Adjust 1-16
    - Controls embellishments/fills
 
 4. **Press F4** → Select INTEN (Intensity) parameter
-   - Turn encoder → Adjust 0-255
+   - Turn encoder → Adjust 1-16
    - Controls gate density/activity
 
 5. **Press F5** → Select LOOP parameter
-   - Turn encoder → Adjust 1-64 (or ∞)
+   - Turn encoder → Cycle: Inf, 1-16, 19, 21, 24, 32, 35, 42, 48, 64
    - Sets pattern loop length
 
 **Visual Feedback During Playback:**
@@ -104,8 +102,8 @@ All 5 parameters displayed uniformly - value above, bar graph below, F-button la
 ├────────────────────────────────────────────────────────────┤
 │                                              ┌──────────┐  │
 │                                              │ ●  C4    │  │
-│  STOMPER    255        50         230        │ CV: 2.1V │  │
-│  ████████   ████████   ██░░░░░    █████████  │ GT: HIGH │  │
+│  STOMPER      16         3         14        │ CV: 2.1V │  │
+│                                        Inf   │ GT: HIGH │  │
 │                                              └──────────┘  │
 │                                                            │
 │                                                            │
@@ -286,10 +284,10 @@ private:
 
     int8_t _trackIndex = -1;
     uint8_t _algorithm = 0;
-    uint8_t _flow = 127;
-    uint8_t _ornament = 127;
-    uint8_t _intensity = 127;
-    uint8_t _loopLength = 16;
+    uint8_t _flow = 8;        // 1-16, default middle
+    uint8_t _ornament = 8;    // 1-16, default middle
+    uint8_t _intensity = 8;   // 1-16, default middle
+    uint8_t _loopLength = 16; // Inf, 1-16, 19, 21, 24, 32, 35, 42, 48, 64
 
     friend class Track;
 };
@@ -301,9 +299,9 @@ private:
 
 void TuesdayTrack::clear() {
     _algorithm = 0;
-    _flow = 127;
-    _ornament = 127;
-    _intensity = 127;
+    _flow = 8;
+    _ornament = 8;
+    _intensity = 8;
     _loopLength = 16;
 }
 
@@ -478,9 +476,9 @@ UNIT_TEST("TuesdayTrack") {
 CASE("default_values") {
     TuesdayTrack track;
     expectEqual(track.algorithm(), 0, "default algorithm should be 0");
-    expectEqual(track.flow(), 127, "default flow should be 127");
-    expectEqual(track.ornament(), 127, "default ornament should be 127");
-    expectEqual(track.intensity(), 127, "default intensity should be 127");
+    expectEqual(track.flow(), 8, "default flow should be 8");
+    expectEqual(track.ornament(), 8, "default ornament should be 8");
+    expectEqual(track.intensity(), 8, "default intensity should be 8");
     expectEqual(track.loopLength(), 16, "default loopLength should be 16");
 }
 
