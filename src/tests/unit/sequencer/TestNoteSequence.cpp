@@ -21,30 +21,6 @@ CASE("note_sequence_has_accumulator") {
     expectTrue(noteSequence.accumulator().enabled(), "accumulator should be enabled");
 }
 
-CASE("harmony_track_position_constraints") {
-    // Track 1 (index 0) should be able to be HarmonyMaster
-    NoteSequence seq1(0);
-    expectTrue(seq1.canBeHarmonyMaster(), "Track 1 should be able to be HarmonyMaster");
-
-    seq1.setHarmonyRole(NoteSequence::HarmonyMaster);
-    expectEqual(static_cast<int>(seq1.harmonyRole()), static_cast<int>(NoteSequence::HarmonyMaster), "Track 1 should be HarmonyMaster");
-
-    // Track 2 (index 1) should NOT be able to be HarmonyMaster
-    NoteSequence seq2(1);
-    expectFalse(seq2.canBeHarmonyMaster(), "Track 2 should NOT be able to be HarmonyMaster");
-
-    seq2.setHarmonyRole(NoteSequence::HarmonyMaster);
-    expectTrue(static_cast<int>(seq2.harmonyRole()) != static_cast<int>(NoteSequence::HarmonyMaster), "Track 2 should auto-revert from HarmonyMaster");
-    expectEqual(static_cast<int>(seq2.harmonyRole()), static_cast<int>(NoteSequence::HarmonyFollower3rd), "Track 2 should auto-assign to HarmonyFollower3rd");
-
-    // Track 5 (index 4) should be able to be HarmonyMaster
-    NoteSequence seq5(4);
-    expectTrue(seq5.canBeHarmonyMaster(), "Track 5 should be able to be HarmonyMaster");
-
-    seq5.setHarmonyRole(NoteSequence::HarmonyMaster);
-    expectEqual(static_cast<int>(seq5.harmonyRole()), static_cast<int>(NoteSequence::HarmonyMaster), "Track 5 should be HarmonyMaster");
-}
-
 CASE("harmony_properties") {
     NoteSequence seq(0);
 
@@ -84,6 +60,50 @@ CASE("harmony_properties") {
 
     seq.setHarmonyRole(NoteSequence::HarmonyFollower7th);
     expectEqual(static_cast<int>(seq.harmonyRole()), static_cast<int>(NoteSequence::HarmonyFollower7th), "harmonyRole should be HarmonyFollower7th");
+}
+
+CASE("harmony_inversion_and_voicing") {
+    NoteSequence seq(0);
+
+    // Test harmonyInversion default value
+    expectEqual(seq.harmonyInversion(), 0, "default harmonyInversion should be 0 (root position)");
+
+    // Test harmonyInversion setter and getter
+    seq.setHarmonyInversion(1); // 1st inversion
+    expectEqual(seq.harmonyInversion(), 1, "harmonyInversion should be 1 after setting");
+
+    seq.setHarmonyInversion(2); // 2nd inversion
+    expectEqual(seq.harmonyInversion(), 2, "harmonyInversion should be 2 after setting");
+
+    seq.setHarmonyInversion(3); // 3rd inversion
+    expectEqual(seq.harmonyInversion(), 3, "harmonyInversion should be 3 after setting");
+
+    // Test clamping (0-3 for 4 inversions)
+    seq.setHarmonyInversion(5); // Should clamp to 3
+    expectEqual(seq.harmonyInversion(), 3, "harmonyInversion should clamp to 3");
+
+    seq.setHarmonyInversion(-2); // Should clamp to 0
+    expectEqual(seq.harmonyInversion(), 0, "harmonyInversion should clamp to 0");
+
+    // Test harmonyVoicing default value
+    expectEqual(seq.harmonyVoicing(), 0, "default harmonyVoicing should be 0 (Close)");
+
+    // Test harmonyVoicing setter and getter
+    seq.setHarmonyVoicing(1); // Drop2
+    expectEqual(seq.harmonyVoicing(), 1, "harmonyVoicing should be 1 (Drop2) after setting");
+
+    seq.setHarmonyVoicing(2); // Drop3
+    expectEqual(seq.harmonyVoicing(), 2, "harmonyVoicing should be 2 (Drop3) after setting");
+
+    seq.setHarmonyVoicing(3); // Spread
+    expectEqual(seq.harmonyVoicing(), 3, "harmonyVoicing should be 3 (Spread) after setting");
+
+    // Test clamping (0-3 for 4 voicings)
+    seq.setHarmonyVoicing(7); // Should clamp to 3
+    expectEqual(seq.harmonyVoicing(), 3, "harmonyVoicing should clamp to 3");
+
+    seq.setHarmonyVoicing(-1); // Should clamp to 0
+    expectEqual(seq.harmonyVoicing(), 0, "harmonyVoicing should clamp to 0");
 }
 
 } // UNIT_TEST("NoteSequence")

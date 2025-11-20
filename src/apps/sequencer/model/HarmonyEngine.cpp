@@ -86,8 +86,13 @@ HarmonyEngine::ChordNotes HarmonyEngine::harmonize(int16_t rootNote, uint8_t sca
     chord.seventh = applyInterval(rootNote, intervals[3]);
 
     // Phase 2: Apply inversion
+    applyInversion(chord);
+
     // Phase 3: Apply voicing
+    applyVoicing(chord);
+
     // Phase 2: Apply transpose
+    applyTranspose(chord);
 
     return chord;
 }
@@ -95,6 +100,64 @@ HarmonyEngine::ChordNotes HarmonyEngine::harmonize(int16_t rootNote, uint8_t sca
 int16_t HarmonyEngine::applyInterval(int16_t baseNote, int16_t interval) const {
     int16_t result = baseNote + interval;
     return clamp(result, int16_t(0), int16_t(127)); // MIDI range 0-127
+}
+
+void HarmonyEngine::applyInversion(ChordNotes &chord) const {
+    // Inversion reorders the chord tones by moving notes up an octave
+    // Root position (0): R-3-5-7 (no change)
+    // 1st inversion (1): 3-5-7-R (root up octave, third becomes bass)
+    // 2nd inversion (2): 5-7-R-3 (root and third up octave, fifth becomes bass)
+    // 3rd inversion (3): 7-R-3-5 (root, third, fifth up octave, seventh becomes bass)
+
+    switch (_inversion) {
+        case 0:
+            // Root position - no change
+            break;
+
+        case 1:
+            // 1st inversion: third becomes bass, root moves up an octave
+            chord.root = applyInterval(chord.root, 12);
+            break;
+
+        case 2:
+            // 2nd inversion: fifth becomes bass, root and third move up an octave
+            chord.root = applyInterval(chord.root, 12);
+            chord.third = applyInterval(chord.third, 12);
+            break;
+
+        case 3:
+            // 3rd inversion: seventh becomes bass, root, third, and fifth move up an octave
+            chord.root = applyInterval(chord.root, 12);
+            chord.third = applyInterval(chord.third, 12);
+            chord.fifth = applyInterval(chord.fifth, 12);
+            break;
+
+        default:
+            // Should not reach here due to clamping in setInversion()
+            break;
+    }
+}
+
+void HarmonyEngine::applyVoicing(ChordNotes &chord) const {
+    // Phase 3: Voicing implementation (Drop2, Drop3, Spread)
+    // For now, only Close voicing is supported (no transformation)
+    (void)chord; // Suppress unused parameter warning
+}
+
+void HarmonyEngine::applyTranspose(ChordNotes &chord) const {
+    // Transpose shifts all chord notes by the same interval
+    // Range: -24 to +24 semitones (±2 octaves)
+    // applyInterval() handles MIDI range clamping (0-127)
+
+    if (_transpose == 0) {
+        return; // No transpose
+    }
+
+    // Apply transpose to all chord notes
+    chord.root = applyInterval(chord.root, _transpose);
+    chord.third = applyInterval(chord.third, _transpose);
+    chord.fifth = applyInterval(chord.fifth, _transpose);
+    chord.seventh = applyInterval(chord.seventh, _transpose);
 }
 
 void HarmonyEngine::write(VersionedSerializedWriter &writer) const {

@@ -3,6 +3,8 @@
 #include "ListModel.h"
 
 #include "model/NoteSequence.h"
+#include "model/Model.h"
+#include "model/Track.h"
 
 class HarmonyListModel : public ListModel {
 public:
@@ -10,13 +12,20 @@ public:
         HarmonyRole,
         MasterTrack,
         HarmonyScale,
+        HarmonyInversion,
+        HarmonyVoicing,
+        HarmonyTranspose,
         Last
     };
 
-    HarmonyListModel() : _sequence(nullptr) {}
+    HarmonyListModel() : _sequence(nullptr), _model(nullptr) {}
 
     void setSequence(NoteSequence *sequence) {
         _sequence = sequence;
+    }
+
+    void setModel(Model *model) {
+        _model = model;
     }
 
     virtual int rows() const override {
@@ -65,6 +74,10 @@ public:
             return 6; // Off, Master, FollowerRoot, Follower3rd, Follower5th, Follower7th
         case HarmonyScale:
             return 7; // Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian
+        case HarmonyInversion:
+            return 4; // Root, 1st, 2nd, 3rd
+        case HarmonyVoicing:
+            return 4; // Close, Drop2, Drop3, Spread
         default:
             return 0;
         }
@@ -78,6 +91,10 @@ public:
             return static_cast<int>(_sequence->harmonyRole());
         case HarmonyScale:
             return _sequence->harmonyScale();
+        case HarmonyInversion:
+            return _sequence->harmonyInversion();
+        case HarmonyVoicing:
+            return _sequence->harmonyVoicing();
         default:
             return -1;
         }
@@ -88,11 +105,37 @@ public:
 
         if (index < indexedCount(row)) {
             switch (Item(row)) {
-            case HarmonyRole:
-                _sequence->setHarmonyRole(static_cast<NoteSequence::HarmonyRole>(index));
+            case HarmonyRole: {
+                // Save old role before changing
+                auto oldRole = _sequence->harmonyRole();
+                auto newRole = static_cast<NoteSequence::HarmonyRole>(index);
+
+                // Set new role
+                _sequence->setHarmonyRole(newRole);
+
+                // Copy master's mode when changing from non-follower to follower
+                bool wasFollower = (oldRole >= NoteSequence::HarmonyFollowerRoot);
+                bool isFollower = (newRole >= NoteSequence::HarmonyFollowerRoot);
+
+                if (!wasFollower && isFollower && _model) {
+                    int masterIdx = _sequence->masterTrackIndex();
+                    const auto &masterTrack = _model->project().track(masterIdx);
+                    if (masterTrack.trackMode() == Track::TrackMode::Note) {
+                        const auto &masterSequence = masterTrack.noteTrack().sequence(0);
+                        int masterMode = masterSequence.harmonyScale();
+                        _sequence->setHarmonyScale(masterMode);
+                    }
+                }
                 break;
+            }
             case HarmonyScale:
                 _sequence->setHarmonyScale(index);
+                break;
+            case HarmonyInversion:
+                _sequence->setHarmonyInversion(index);
+                break;
+            case HarmonyVoicing:
+                _sequence->setHarmonyVoicing(index);
                 break;
             default:
                 break;
@@ -103,10 +146,13 @@ public:
 private:
     static const char *itemName(Item item) {
         switch (item) {
-        case HarmonyRole:   return "ROLE";
-        case MasterTrack:   return "MASTER";
-        case HarmonyScale:  return "SCALE";
-        case Last:          break;
+        case HarmonyRole:      return "ROLE";
+        case MasterTrack:      return "MASTER";
+        case HarmonyScale:     return "MODE";
+        case HarmonyInversion: return "INVERSION";
+        case HarmonyVoicing:   return "VOICING";
+        case HarmonyTranspose: return "CH-TRNSP";
+        case Last:             break;
         }
         return nullptr;
     }
@@ -148,6 +194,31 @@ private:
             }
             break;
         }
+        case HarmonyInversion: {
+            int inversion = _sequence->harmonyInversion();
+            switch (inversion) {
+            case 0: str("ROOT"); break;
+            case 1: str("1ST"); break;
+            case 2: str("2ND"); break;
+            case 3: str("3RD"); break;
+            default: str("---"); break;
+            }
+            break;
+        }
+        case HarmonyVoicing: {
+            int voicing = _sequence->harmonyVoicing();
+            switch (voicing) {
+            case 0: str("CLOSE"); break;
+            case 1: str("DROP2"); break;
+            case 2: str("DROP3"); break;
+            case 3: str("SPREAD"); break;
+            default: str("---"); break;
+            }
+            break;
+        }
+        case HarmonyTranspose:
+            str("%+d", _sequence->harmonyTranspose());
+            break;
         case Last:
             break;
         }
@@ -161,6 +232,10 @@ private:
             _sequence->setMasterTrackIndex(
                 clamp(_sequence->masterTrackIndex() + value, 0, 7)); // 0-7 for 8 tracks
             break;
+        case HarmonyTranspose:
+            _sequence->setHarmonyTranspose(
+                clamp(_sequence->harmonyTranspose() + value, -24, 24));
+            break;
         default:
             break;
         }
@@ -173,4 +248,5 @@ private:
     }
 
     NoteSequence *_sequence;
+    Model *_model;
 };

@@ -18,6 +18,7 @@ void HarmonyPage::enter() {
 
 void HarmonyPage::exit() {
     _listModel.setSequence(nullptr);
+    _listModel.setModel(nullptr);
 }
 
 void HarmonyPage::draw(Canvas &canvas) {
@@ -54,4 +55,5 @@ void HarmonyPage::encoder(EncoderEvent &event) {
 void HarmonyPage::updateListModel() {
     auto &sequence = _project.selectedNoteSequence();
     _listModel.setSequence(&sequence);
+    _listModel.setModel(&_model);
 }

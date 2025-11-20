@@ -73,7 +73,21 @@ static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, c
     int note = step.note() + evalTransposition(scale, octave, transpose);
 
     // Apply harmony modulation if this sequence is a harmony follower
-    NoteSequence::HarmonyRole harmonyRole = sequence.harmonyRole();
+    // Check per-step harmony role override first
+    int harmonyRoleOverride = step.harmonyRoleOverride();
+    NoteSequence::HarmonyRole harmonyRole;
+
+    if (harmonyRoleOverride == 0) {
+        // UseSequence: use sequence-level role
+        harmonyRole = sequence.harmonyRole();
+    } else if (harmonyRoleOverride >= 1 && harmonyRoleOverride <= 4) {
+        // Map override values to follower roles: 1=Root, 2=3rd, 3=5th, 4=7th
+        harmonyRole = static_cast<NoteSequence::HarmonyRole>(harmonyRoleOverride + 1);
+    } else {
+        // harmonyRoleOverride == 5: Off (no harmony)
+        harmonyRole = NoteSequence::HarmonyOff;
+    }
+
     if (harmonyRole != NoteSequence::HarmonyOff && harmonyRole != NoteSequence::HarmonyMaster) {
         // Get master track and sequence
         int masterTrackIndex = sequence.masterTrackIndex();
@@ -96,9 +110,20 @@ static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, c
         // Get harmony mode from sequence's harmonyScale setting
         HarmonyEngine::Mode harmonyMode = static_cast<HarmonyEngine::Mode>(sequence.harmonyScale());
 
+        // Check master step for per-step inversion/voicing overrides
+        int inversionValue = masterStep.inversionOverride();
+        int voicingValue = masterStep.voicingOverride();
+
+        // Use master step overrides if set, otherwise use sequence-level settings
+        int inversion = (inversionValue == 0) ? sequence.harmonyInversion() : (inversionValue - 1);
+        int voicing = (voicingValue == 0) ? sequence.harmonyVoicing() : (voicingValue - 1);
+
         // Create a local HarmonyEngine for harmonization
         HarmonyEngine harmonyEngine;
         harmonyEngine.setMode(harmonyMode);
+        harmonyEngine.setInversion(inversion);
+        harmonyEngine.setVoicing(static_cast<HarmonyEngine::Voicing>(voicing));
+        harmonyEngine.setTranspose(sequence.harmonyTranspose());
         auto chord = harmonyEngine.harmonize(midiNote, scaleDegree);
 
         // Extract the appropriate chord tone based on follower role
@@ -466,6 +491,9 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             break;
         case 3: // FIRSTLAST - Fire gates on first and last pulse
             shouldFireGate = (_pulseCounter == 1) || (_pulseCounter == (pulseCount + 1));
+            break;
+        default: // Safety fallback - treat unknown as ALL mode
+            shouldFireGate = true;
             break;
         }
 

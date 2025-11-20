@@ -36,12 +36,43 @@ public:
     using Condition = UnsignedValue<7>;
     using PulseCount = UnsignedValue<3>;  // 0-7 representing 1-8 pulses
     using GateMode = UnsignedValue<2>;    // 0-3 representing 4 modes
+    using HarmonyRoleOverride = UnsignedValue<3>;  // 0-5 per-step harmony role override
+    using InversionOverride = UnsignedValue<3>;  // 0-4 per-step inversion override (master only)
+    using VoicingOverride = UnsignedValue<3>;  // 0-4 per-step voicing override (master only)
 
     enum class GateModeType {
         All = 0,        // Fires gates on every pulse (default)
         First = 1,      // Single gate on first pulse only
         Hold = 2,       // One long gate for entire duration
         FirstLast = 3,  // Gates on first and last pulse only
+        Last
+    };
+
+    enum class HarmonyRoleOverrideType {
+        UseSequence = 0,  // Use sequence-level harmonyRole (default)
+        Root = 1,         // Override to root
+        Third = 2,        // Override to 3rd
+        Fifth = 3,        // Override to 5th
+        Seventh = 4,      // Override to 7th
+        Off = 5,          // Override to off (no harmony, play base note)
+        Last
+    };
+
+    enum class InversionOverrideType {
+        UseSequence = 0,  // Use sequence-level inversion (default)
+        RootPosition = 1, // Override to root position
+        First = 2,        // Override to 1st inversion
+        Second = 3,       // Override to 2nd inversion
+        Third = 4,        // Override to 3rd inversion
+        Last
+    };
+
+    enum class VoicingOverrideType {
+        UseSequence = 0,  // Use sequence-level voicing (default)
+        Close = 1,        // Override to close voicing
+        Drop2 = 2,        // Override to drop-2 voicing
+        Drop3 = 3,        // Override to drop-3 voicing
+        Spread = 4,       // Override to spread voicing
         Last
     };
 
@@ -74,6 +105,9 @@ public:
         AccumulatorTrigger,
         PulseCount,
         GateMode,
+        HarmonyRoleOverride,
+        InversionOverride,
+        VoicingOverride,
         Last
     };
 
@@ -95,6 +129,9 @@ public:
         case Layer::AccumulatorTrigger:         return "ACCUM";
         case Layer::PulseCount:                 return "PULSE COUNT";
         case Layer::GateMode:                   return "GATE MODE";
+        case Layer::HarmonyRoleOverride:        return "HARMONY ROLE";
+        case Layer::InversionOverride:          return "INVERSION";
+        case Layer::VoicingOverride:            return "VOICING";
         case Layer::Last:                       break;
         }
         return nullptr;
@@ -223,6 +260,24 @@ public:
             _data1.gateMode = GateMode::clamp(gateMode);
         }
 
+        // harmonyRoleOverride
+        int harmonyRoleOverride() const { return _data1.harmonyRoleOverride; }
+        void setHarmonyRoleOverride(int harmonyRoleOverride) {
+            _data1.harmonyRoleOverride = HarmonyRoleOverride::clamp(harmonyRoleOverride);
+        }
+
+        // inversionOverride
+        int inversionOverride() const { return _data1.inversionOverride; }
+        void setInversionOverride(int inversionOverride) {
+            _data1.inversionOverride = InversionOverride::clamp(inversionOverride);
+        }
+
+        // voicingOverride
+        int voicingOverride() const { return _data1.voicingOverride; }
+        void setVoicingOverride(int voicingOverride) {
+            _data1.voicingOverride = VoicingOverride::clamp(voicingOverride);
+        }
+
         //----------------------------------------
         // Methods
         //----------------------------------------
@@ -264,7 +319,10 @@ public:
             BitField<uint32_t, 16, 1> isAccumulatorTrigger;
             BitField<uint32_t, 17, PulseCount::Bits> pulseCount;  // bits 17-19
             BitField<uint32_t, 20, GateMode::Bits> gateMode;      // bits 20-21
-            // 10 bits left
+            BitField<uint32_t, 22, HarmonyRoleOverride::Bits> harmonyRoleOverride;  // bits 22-24
+            BitField<uint32_t, 25, InversionOverride::Bits> inversionOverride;  // bits 25-27
+            BitField<uint32_t, 28, VoicingOverride::Bits> voicingOverride;  // bits 28-30
+            // 1 bit left
         } _data1;
     };
 
@@ -469,16 +527,7 @@ public:
 
     HarmonyRole harmonyRole() const { return _harmonyRole; }
     void setHarmonyRole(HarmonyRole role) {
-        // Constraint: Only tracks 1 and 5 (index 0 and 4) can be HarmonyMaster
-        if (role == HarmonyMaster && !canBeHarmonyMaster()) {
-            _harmonyRole = HarmonyFollower3rd; // Auto-revert to safe default
-        } else {
-            _harmonyRole = role;
-        }
-    }
-
-    bool canBeHarmonyMaster() const {
-        return (_trackIndex == 0 || _trackIndex == 4); // Track 1 or Track 5
+        _harmonyRole = role;
     }
 
     // masterTrackIndex
@@ -493,6 +542,27 @@ public:
     int harmonyScale() const { return _harmonyScale; }
     void setHarmonyScale(int scale) {
         _harmonyScale = clamp(scale, 0, 6); // 0-6 for 7 modes
+    }
+
+    // harmonyInversion
+
+    int harmonyInversion() const { return _harmonyInversion; }
+    void setHarmonyInversion(int inversion) {
+        _harmonyInversion = clamp(inversion, 0, 3); // 0-3 for 4 inversions
+    }
+
+    // harmonyVoicing
+
+    int harmonyVoicing() const { return _harmonyVoicing; }
+    void setHarmonyVoicing(int voicing) {
+        _harmonyVoicing = clamp(voicing, 0, 3); // 0-3 for 4 voicings
+    }
+
+    // harmonyTranspose
+
+    int harmonyTranspose() const { return _harmonyTranspose; }
+    void setHarmonyTranspose(int transpose) {
+        _harmonyTranspose = clamp(transpose, -24, 24); // ±24 semitones (±2 octaves)
     }
 
     //----------------------------------------
@@ -548,6 +618,9 @@ private:
     HarmonyRole _harmonyRole = HarmonyOff;
     int8_t _masterTrackIndex = 0;  // Which track to follow (0-7)
     uint8_t _harmonyScale = 0;     // Scale override (0-6 for 7 modes)
+    uint8_t _harmonyInversion = 0; // Inversion (0-3 for root, 1st, 2nd, 3rd)
+    uint8_t _harmonyVoicing = 0;   // Voicing (0-3 for Close, Drop2, Drop3, Spread)
+    int8_t _harmonyTranspose = 0;  // Chord transpose (±24 semitones)
 
     uint8_t _edited;
 

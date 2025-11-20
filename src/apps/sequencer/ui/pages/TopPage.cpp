@@ -91,7 +91,34 @@ void TopPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
     if (key.isTrackSelect()) {
+        // Store which page we're on BEFORE changing track
+        Page* currentPage = _manager.top();
+        bool onSequenceView = (currentPage == &pages.noteSequence ||
+                              currentPage == &pages.accumulator);
+        bool onTrackView = (currentPage == &pages.track ||
+                           currentPage == &pages.harmony);
+
+        // Sync view states with current page before track change
+        if (currentPage == &pages.noteSequence) {
+            _sequenceView = SequenceView::NoteSequence;
+        } else if (currentPage == &pages.accumulator) {
+            _sequenceView = SequenceView::Accumulator;
+        } else if (currentPage == &pages.track) {
+            _trackView = TrackView::Track;
+        } else if (currentPage == &pages.harmony) {
+            _trackView = TrackView::Harmony;
+        }
+
+        // Now change the track
         _project.setSelectedTrackIndex(key.trackSelect());
+
+        // Navigate to same view for new track
+        if (onSequenceView) {
+            setSequenceView(_sequenceView);
+        } else if (onTrackView) {
+            setTrackView(_trackView);
+        }
+
         event.consume();
     }
     if (key.isTrack() && event.count() == 2) {
@@ -152,7 +179,7 @@ void TopPage::setMode(Mode mode) {
         setMainPage(pages.layout);
         break;
     case Mode::Track:
-        setMainPage(pages.track);
+        setTrackPage();
         break;
     case Mode::Sequence:
         setSequencePage();
@@ -225,8 +252,7 @@ void TopPage::setSequencePage() {
     Page* currentPage = _manager.top();
     auto &pages = _manager.pages();
     bool fromSequenceView = (currentPage == &pages.noteSequence ||
-                            currentPage == &pages.accumulator ||
-                            currentPage == &pages.harmony);
+                            currentPage == &pages.accumulator);
 
     // Cycle to next view only if we're currently on a sequence view
     if (fromSequenceView) {
@@ -235,9 +261,6 @@ void TopPage::setSequencePage() {
             _sequenceView = SequenceView::Accumulator;
             break;
         case SequenceView::Accumulator:
-            _sequenceView = SequenceView::Harmony;
-            break;
-        case SequenceView::Harmony:
             _sequenceView = SequenceView::NoteSequence;
             break;
         }
@@ -260,9 +283,6 @@ void TopPage::setSequenceView(SequenceView view) {
         case SequenceView::Accumulator:
             setMainPage(pages.accumulator);
             break;
-        case SequenceView::Harmony:
-            setMainPage(pages.harmony);
-            break;
         }
         break;
     case Track::TrackMode::Curve:
@@ -270,6 +290,54 @@ void TopPage::setSequenceView(SequenceView view) {
         setMainPage(pages.curveSequence);
         break;
     case Track::TrackMode::MidiCv:
+        setMainPage(pages.track);
+        break;
+    case Track::TrackMode::Last:
+        break;
+    }
+}
+
+void TopPage::setTrackPage() {
+    // Determine if we're cycling within track views (pressing Track key while already viewing track)
+    Page* currentPage = _manager.top();
+    auto &pages = _manager.pages();
+    bool fromTrackView = (currentPage == &pages.track ||
+                         currentPage == &pages.harmony);
+
+    // Cycle to next view only if we're currently on a track view
+    if (fromTrackView) {
+        switch (_trackView) {
+        case TrackView::Track:
+            _trackView = TrackView::Harmony;
+            break;
+        case TrackView::Harmony:
+            _trackView = TrackView::Track;
+            break;
+        }
+    } else {
+        _trackView = TrackView::Track; // Default to track page for first visit
+    }
+
+    setTrackView(_trackView);
+}
+
+void TopPage::setTrackView(TrackView view) {
+    auto &pages = _manager.pages();
+
+    switch (_project.selectedTrack().trackMode()) {
+    case Track::TrackMode::Note:
+        switch (view) {
+        case TrackView::Track:
+            setMainPage(pages.track);
+            break;
+        case TrackView::Harmony:
+            setMainPage(pages.harmony);
+            break;
+        }
+        break;
+    case Track::TrackMode::Curve:
+    case Track::TrackMode::MidiCv:
+        // For non-note tracks, always show track page
         setMainPage(pages.track);
         break;
     case Track::TrackMode::Last:

@@ -87,4 +87,7 @@ private:
 
     // Helper methods
     int16_t applyInterval(int16_t baseNote, int16_t interval) const;
+    void applyInversion(ChordNotes &chord) const;
+    void applyVoicing(ChordNotes &chord) const;
+    void applyTranspose(ChordNotes &chord) const;
 };

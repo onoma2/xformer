@@ -52,17 +52,24 @@ private:
     enum class SequenceView : uint8_t {
         NoteSequence,
         Accumulator,
+    };
+
+    enum class TrackView : uint8_t {
+        Track,
         Harmony,
     };
 
     void setMode(Mode mode);
     void setMainPage(Page &page);
     void setSequenceView(SequenceView view);
+    void setTrackView(TrackView view);
 
     void setSequencePage();
+    void setTrackPage();
     void setSequenceEditPage();
 
     Mode _mode;
     Mode _lastMode;
     SequenceView _sequenceView = SequenceView::NoteSequence;
+    TrackView _trackView = TrackView::Track;
 };

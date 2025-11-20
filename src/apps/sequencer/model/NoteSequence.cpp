@@ -30,6 +30,9 @@ Types::LayerRange NoteSequence::layerRange(Layer layer) {
         return { 0, 1 };
     CASE(PulseCount)
     CASE(GateMode)
+    CASE(HarmonyRoleOverride)
+    CASE(InversionOverride)
+    CASE(VoicingOverride)
     case Layer::Last:
         break;
     }
@@ -76,6 +79,12 @@ int NoteSequence::layerDefaultValue(Layer layer)
         return step.pulseCount();
     case Layer::GateMode:
         return step.gateMode();
+    case Layer::HarmonyRoleOverride:
+        return step.harmonyRoleOverride();
+    case Layer::InversionOverride:
+        return step.inversionOverride();
+    case Layer::VoicingOverride:
+        return step.voicingOverride();
     case Layer::Last:
         break;
     }
@@ -117,6 +126,12 @@ int NoteSequence::Step::layerValue(Layer layer) const {
         return pulseCount();
     case Layer::GateMode:
         return gateMode();
+    case Layer::HarmonyRoleOverride:
+        return harmonyRoleOverride();
+    case Layer::InversionOverride:
+        return inversionOverride();
+    case Layer::VoicingOverride:
+        return voicingOverride();
     case Layer::Last:
         break;
     }
@@ -173,6 +188,15 @@ void NoteSequence::Step::setLayerValue(Layer layer, int value) {
         break;
     case Layer::GateMode:
         setGateMode(value);
+        break;
+    case Layer::HarmonyRoleOverride:
+        setHarmonyRoleOverride(value);
+        break;
+    case Layer::InversionOverride:
+        setInversionOverride(value);
+        break;
+    case Layer::VoicingOverride:
+        setVoicingOverride(value);
         break;
     case Layer::Last:
         break;
@@ -321,11 +345,19 @@ void NoteSequence::write(VersionedSerializedWriter &writer) const {
     _accumulator.write(writer);
 
     // Write harmony properties (Version34+)
-    // Bit-pack: harmonyRole (3 bits) + harmonyScale (3 bits) = 6 bits in 1 byte
-    uint8_t harmonyFlags = (static_cast<uint8_t>(_harmonyRole) << 0) |
-                           (static_cast<uint8_t>(_harmonyScale) << 3);
-    writer.write(harmonyFlags);
+    // Byte 1: harmonyRole (3 bits) + harmonyScale (3 bits) + harmonyInversion (2 bits) = 8 bits
+    uint8_t harmonyFlags1 = (static_cast<uint8_t>(_harmonyRole) << 0) |
+                            (static_cast<uint8_t>(_harmonyScale) << 3) |
+                            (static_cast<uint8_t>(_harmonyInversion) << 6);
+    writer.write(harmonyFlags1);
     writer.write(_masterTrackIndex);
+
+    // Byte 2: harmonyVoicing (2 bits) + 6 bits reserved for future use
+    uint8_t harmonyFlags2 = (static_cast<uint8_t>(_harmonyVoicing) << 0);
+    writer.write(harmonyFlags2);
+
+    // Byte 3: harmonyTranspose (int8_t, ±24 semitones)
+    writer.write(_harmonyTranspose);
 }
 
 void NoteSequence::read(VersionedSerializedReader &reader) {
@@ -353,15 +385,27 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
 
     // Read harmony properties (Version34+)
     if (reader.dataVersion() >= ProjectVersion::Version34) {
-        uint8_t harmonyFlags;
-        reader.read(harmonyFlags);
-        _harmonyRole = static_cast<HarmonyRole>((harmonyFlags >> 0) & 0x7);  // 3 bits
-        _harmonyScale = (harmonyFlags >> 3) & 0x7;                            // 3 bits
+        uint8_t harmonyFlags1;
+        reader.read(harmonyFlags1);
+        _harmonyRole = static_cast<HarmonyRole>((harmonyFlags1 >> 0) & 0x7);  // 3 bits
+        _harmonyScale = (harmonyFlags1 >> 3) & 0x7;                            // 3 bits
+        _harmonyInversion = (harmonyFlags1 >> 6) & 0x3;                        // 2 bits
         reader.read(_masterTrackIndex);
+
+        // Read second harmony byte (Version34+ with inversion/voicing)
+        uint8_t harmonyFlags2;
+        reader.read(harmonyFlags2);
+        _harmonyVoicing = (harmonyFlags2 >> 0) & 0x3;  // 2 bits
+
+        // Read third harmony byte (Version34+ with transpose)
+        reader.read(_harmonyTranspose);
     } else {
         // Backward compatibility: use defaults
         _harmonyRole = HarmonyOff;
         _masterTrackIndex = 0;
         _harmonyScale = 0;
+        _harmonyInversion = 0;
+        _harmonyVoicing = 0;
+        _harmonyTranspose = 0;
     }
 }

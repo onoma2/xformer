@@ -122,4 +122,220 @@ CASE("midi_range_clamping") {
     expectTrue(lowChord.seventh >= 0, "low chord seventh should be >= 0");
 }
 
+// Phase 2 Task 2.2: Inversion Logic Tests
+
+CASE("inversion_root_position") {
+    HarmonyEngine engine;
+    engine.setMode(HarmonyEngine::Ionian);
+    engine.setInversion(0); // Root position
+
+    // C Major 7 in root position: C(60)-E(64)-G(67)-B(71)
+    auto chord = engine.harmonize(60, 0);
+    expectEqual(static_cast<int>(chord.root), 60, "root position: root should be C(60)");
+    expectEqual(static_cast<int>(chord.third), 64, "root position: third should be E(64)");
+    expectEqual(static_cast<int>(chord.fifth), 67, "root position: fifth should be G(67)");
+    expectEqual(static_cast<int>(chord.seventh), 71, "root position: seventh should be B(71)");
+
+    // Lowest note should be root
+    int16_t lowestNote = chord.root;
+    if (chord.third < lowestNote) lowestNote = chord.third;
+    if (chord.fifth < lowestNote) lowestNote = chord.fifth;
+    if (chord.seventh < lowestNote) lowestNote = chord.seventh;
+    expectEqual(static_cast<int>(lowestNote), static_cast<int>(chord.root), "root position: lowest note should be root");
+}
+
+CASE("inversion_first") {
+    HarmonyEngine engine;
+    engine.setMode(HarmonyEngine::Ionian);
+    engine.setInversion(1); // 1st inversion
+
+    // C Major 7 in 1st inversion: E(64)-G(67)-B(71)-C(72)
+    // 3rd becomes bass, root moves up an octave
+    auto chord = engine.harmonize(60, 0);
+
+    // Expected: third stays at 64 (bass), root up to 72
+    expectEqual(static_cast<int>(chord.third), 64, "1st inversion: third should remain at E(64) as bass");
+    expectEqual(static_cast<int>(chord.fifth), 67, "1st inversion: fifth should remain at G(67)");
+    expectEqual(static_cast<int>(chord.seventh), 71, "1st inversion: seventh should remain at B(71)");
+    expectEqual(static_cast<int>(chord.root), 72, "1st inversion: root should move up octave to C(72)");
+
+    // Lowest note should be 3rd
+    int16_t lowestNote = chord.root;
+    if (chord.third < lowestNote) lowestNote = chord.third;
+    if (chord.fifth < lowestNote) lowestNote = chord.fifth;
+    if (chord.seventh < lowestNote) lowestNote = chord.seventh;
+    expectEqual(static_cast<int>(lowestNote), static_cast<int>(chord.third), "1st inversion: lowest note should be third");
+}
+
+CASE("inversion_second") {
+    HarmonyEngine engine;
+    engine.setMode(HarmonyEngine::Ionian);
+    engine.setInversion(2); // 2nd inversion
+
+    // C Major 7 in 2nd inversion: G(67)-B(71)-C(72)-E(76)
+    // 5th becomes bass, root and 3rd move up an octave
+    auto chord = engine.harmonize(60, 0);
+
+    // Expected: fifth stays at 67 (bass), root and third up octaves
+    expectEqual(static_cast<int>(chord.fifth), 67, "2nd inversion: fifth should remain at G(67) as bass");
+    expectEqual(static_cast<int>(chord.seventh), 71, "2nd inversion: seventh should remain at B(71)");
+    expectEqual(static_cast<int>(chord.root), 72, "2nd inversion: root should move up octave to C(72)");
+    expectEqual(static_cast<int>(chord.third), 76, "2nd inversion: third should move up octave to E(76)");
+
+    // Lowest note should be 5th
+    int16_t lowestNote = chord.root;
+    if (chord.third < lowestNote) lowestNote = chord.third;
+    if (chord.fifth < lowestNote) lowestNote = chord.fifth;
+    if (chord.seventh < lowestNote) lowestNote = chord.seventh;
+    expectEqual(static_cast<int>(lowestNote), static_cast<int>(chord.fifth), "2nd inversion: lowest note should be fifth");
+}
+
+CASE("inversion_third") {
+    HarmonyEngine engine;
+    engine.setMode(HarmonyEngine::Ionian);
+    engine.setInversion(3); // 3rd inversion
+
+    // C Major 7 in 3rd inversion: B(71)-C(72)-E(76)-G(79)
+    // 7th becomes bass, root, 3rd, and 5th move up an octave
+    auto chord = engine.harmonize(60, 0);
+
+    // Expected: seventh stays at 71 (bass), root/third/fifth up octaves
+    expectEqual(static_cast<int>(chord.seventh), 71, "3rd inversion: seventh should remain at B(71) as bass");
+    expectEqual(static_cast<int>(chord.root), 72, "3rd inversion: root should move up octave to C(72)");
+    expectEqual(static_cast<int>(chord.third), 76, "3rd inversion: third should move up octave to E(76)");
+    expectEqual(static_cast<int>(chord.fifth), 79, "3rd inversion: fifth should move up octave to G(79)");
+
+    // Lowest note should be 7th
+    int16_t lowestNote = chord.root;
+    if (chord.third < lowestNote) lowestNote = chord.third;
+    if (chord.fifth < lowestNote) lowestNote = chord.fifth;
+    if (chord.seventh < lowestNote) lowestNote = chord.seventh;
+    expectEqual(static_cast<int>(lowestNote), static_cast<int>(chord.seventh), "3rd inversion: lowest note should be seventh");
+}
+
+CASE("inversion_boundary_clamping") {
+    HarmonyEngine engine;
+
+    // Test clamping to 0-3 range
+    engine.setInversion(5);
+    expectEqual(static_cast<int>(engine.inversion()), 3, "inversion should clamp to max 3");
+
+    engine.setInversion(10);
+    expectEqual(static_cast<int>(engine.inversion()), 3, "inversion should clamp to max 3");
+
+    engine.setInversion(0);
+    expectEqual(static_cast<int>(engine.inversion()), 0, "inversion 0 should be valid");
+
+    engine.setInversion(3);
+    expectEqual(static_cast<int>(engine.inversion()), 3, "inversion 3 should be valid");
+}
+
+CASE("inversion_with_minor_chord") {
+    HarmonyEngine engine;
+    engine.setMode(HarmonyEngine::Aeolian); // Natural minor
+    engine.setInversion(1); // 1st inversion
+
+    // D minor 7 (i in D Aeolian): D(62)-F(65)-A(69)-C(72)
+    // 1st inversion: F(65)-A(69)-C(72)-D(74)
+    auto chord = engine.harmonize(62, 0); // D, degree 0 in Aeolian = minor7
+
+    expectEqual(static_cast<int>(chord.third), 65, "1st inversion minor: third at F(65) as bass");
+    expectEqual(static_cast<int>(chord.fifth), 69, "1st inversion minor: fifth at A(69)");
+    expectEqual(static_cast<int>(chord.seventh), 72, "1st inversion minor: seventh at C(72)");
+    expectEqual(static_cast<int>(chord.root), 74, "1st inversion minor: root up octave to D(74)");
+
+    // Verify quality is Minor7
+    expectEqual(static_cast<int>(engine.getDiatonicQuality(0)), static_cast<int>(HarmonyEngine::Minor7), "Aeolian degree 0 should be Minor7");
+}
+
+// Phase 2 Task 2.3: Transpose Logic Tests
+
+CASE("transpose_up_octave") {
+    HarmonyEngine engine;
+    engine.setMode(HarmonyEngine::Ionian);
+    engine.setTranspose(12); // Up 1 octave
+
+    // C Major 7 transposed up 1 octave
+    auto chord = engine.harmonize(60, 0);
+    expectEqual(static_cast<int>(chord.root), 72, "transpose +12: root should be C5(72)");
+    expectEqual(static_cast<int>(chord.third), 76, "transpose +12: third should be E5(76)");
+    expectEqual(static_cast<int>(chord.fifth), 79, "transpose +12: fifth should be G5(79)");
+    expectEqual(static_cast<int>(chord.seventh), 83, "transpose +12: seventh should be B5(83)");
+}
+
+CASE("transpose_down_octave") {
+    HarmonyEngine engine;
+    engine.setMode(HarmonyEngine::Ionian);
+    engine.setTranspose(-12); // Down 1 octave
+
+    // C Major 7 transposed down 1 octave
+    auto chord = engine.harmonize(60, 0);
+    expectEqual(static_cast<int>(chord.root), 48, "transpose -12: root should be C3(48)");
+    expectEqual(static_cast<int>(chord.third), 52, "transpose -12: third should be E3(52)");
+    expectEqual(static_cast<int>(chord.fifth), 55, "transpose -12: fifth should be G3(55)");
+    expectEqual(static_cast<int>(chord.seventh), 59, "transpose -12: seventh should be B3(59)");
+}
+
+CASE("transpose_parameter_clamping") {
+    HarmonyEngine engine;
+
+    // Test clamping to ±24 range
+    engine.setTranspose(30);
+    expectEqual(static_cast<int>(engine.transpose()), 24, "transpose should clamp to max +24");
+
+    engine.setTranspose(-30);
+    expectEqual(static_cast<int>(engine.transpose()), -24, "transpose should clamp to min -24");
+
+    engine.setTranspose(0);
+    expectEqual(static_cast<int>(engine.transpose()), 0, "transpose 0 should be valid");
+
+    engine.setTranspose(24);
+    expectEqual(static_cast<int>(engine.transpose()), 24, "transpose +24 should be valid");
+
+    engine.setTranspose(-24);
+    expectEqual(static_cast<int>(engine.transpose()), -24, "transpose -24 should be valid");
+}
+
+CASE("transpose_midi_range_clamping") {
+    HarmonyEngine engine;
+    engine.setMode(HarmonyEngine::Ionian);
+    engine.setTranspose(24); // +2 octaves
+
+    // High root note that would exceed MIDI 127
+    auto chord = engine.harmonize(120, 0); // G#8 Major7
+
+    // All notes should clamp to 127
+    expectTrue(chord.root <= 127, "transpose with high note: root should clamp to 127");
+    expectTrue(chord.third <= 127, "transpose with high note: third should clamp to 127");
+    expectTrue(chord.fifth <= 127, "transpose with high note: fifth should clamp to 127");
+    expectTrue(chord.seventh <= 127, "transpose with high note: seventh should clamp to 127");
+
+    // Test low boundary
+    engine.setTranspose(-24); // -2 octaves
+    auto lowChord = engine.harmonize(10, 0); // A#-1 Major7
+
+    // All notes should be >= 0
+    expectTrue(lowChord.root >= 0, "transpose with low note: root should be >= 0");
+    expectTrue(lowChord.third >= 0, "transpose with low note: third should be >= 0");
+    expectTrue(lowChord.fifth >= 0, "transpose with low note: fifth should be >= 0");
+    expectTrue(lowChord.seventh >= 0, "transpose with low note: seventh should be >= 0");
+}
+
+CASE("transpose_with_inversion") {
+    HarmonyEngine engine;
+    engine.setMode(HarmonyEngine::Ionian);
+    engine.setInversion(1); // 1st inversion
+    engine.setTranspose(12); // Up 1 octave
+
+    // C Major 7 in 1st inversion, transposed up octave
+    // Base 1st inversion: E(64)-G(67)-B(71)-C(72)
+    // After transpose +12: E(76)-G(79)-B(83)-C(84)
+    auto chord = engine.harmonize(60, 0);
+
+    expectEqual(static_cast<int>(chord.third), 76, "1st inv + transpose: third at E5(76)");
+    expectEqual(static_cast<int>(chord.fifth), 79, "1st inv + transpose: fifth at G5(79)");
+    expectEqual(static_cast<int>(chord.seventh), 83, "1st inv + transpose: seventh at B5(83)");
+    expectEqual(static_cast<int>(chord.root), 84, "1st inv + transpose: root at C6(84)");
+}
+
 } // UNIT_TEST("HarmonyEngine")
