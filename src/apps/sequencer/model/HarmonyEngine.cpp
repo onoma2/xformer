@@ -139,9 +139,50 @@ void HarmonyEngine::applyInversion(ChordNotes &chord) const {
 }
 
 void HarmonyEngine::applyVoicing(ChordNotes &chord) const {
-    // Phase 3: Voicing implementation (Drop2, Drop3, Spread)
-    // For now, only Close voicing is supported (no transformation)
-    (void)chord; // Suppress unused parameter warning
+    if (_voicing == Close) {
+        return; // No transformation for close voicing
+    }
+
+    switch (_voicing) {
+        case Drop2: {
+            // Drop 2nd highest note down an octave
+            // Rank each note by how many others it's higher than (0=lowest, 3=highest)
+            int rootRank = (chord.root > chord.third) + (chord.root > chord.fifth) + (chord.root > chord.seventh);
+            int thirdRank = (chord.third > chord.root) + (chord.third > chord.fifth) + (chord.third > chord.seventh);
+            int fifthRank = (chord.fifth > chord.root) + (chord.fifth > chord.third) + (chord.fifth > chord.seventh);
+            int seventhRank = (chord.seventh > chord.root) + (chord.seventh > chord.third) + (chord.seventh > chord.fifth);
+
+            // 2nd highest has rank 2
+            if (rootRank == 2) chord.root = applyInterval(chord.root, -12);
+            else if (thirdRank == 2) chord.third = applyInterval(chord.third, -12);
+            else if (fifthRank == 2) chord.fifth = applyInterval(chord.fifth, -12);
+            else if (seventhRank == 2) chord.seventh = applyInterval(chord.seventh, -12);
+            break;
+        }
+        case Drop3: {
+            // Drop 3rd highest note down an octave
+            int rootRank = (chord.root > chord.third) + (chord.root > chord.fifth) + (chord.root > chord.seventh);
+            int thirdRank = (chord.third > chord.root) + (chord.third > chord.fifth) + (chord.third > chord.seventh);
+            int fifthRank = (chord.fifth > chord.root) + (chord.fifth > chord.third) + (chord.fifth > chord.seventh);
+            int seventhRank = (chord.seventh > chord.root) + (chord.seventh > chord.third) + (chord.seventh > chord.fifth);
+
+            // 3rd highest has rank 1
+            if (rootRank == 1) chord.root = applyInterval(chord.root, -12);
+            else if (thirdRank == 1) chord.third = applyInterval(chord.third, -12);
+            else if (fifthRank == 1) chord.fifth = applyInterval(chord.fifth, -12);
+            else if (seventhRank == 1) chord.seventh = applyInterval(chord.seventh, -12);
+            break;
+        }
+        case Spread: {
+            // Wide voicing: root stays as bass, others move up an octave
+            chord.third = applyInterval(chord.third, 12);
+            chord.fifth = applyInterval(chord.fifth, 12);
+            chord.seventh = applyInterval(chord.seventh, 12);
+            break;
+        }
+        default:
+            break;
+    }
 }
 
 void HarmonyEngine::applyTranspose(ChordNotes &chord) const {
