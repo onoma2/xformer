@@ -488,6 +488,9 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         case 3: // FIRSTLAST - Fire gates on first and last pulse
             shouldFireGate = (_pulseCounter == 1) || (_pulseCounter == (pulseCount + 1));
             break;
+        default: // Safety fallback - treat unknown as ALL mode
+            shouldFireGate = true;
+            break;
         }
 
         if (shouldFireGate) {
