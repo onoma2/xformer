@@ -677,6 +677,15 @@ Master tracks can define per-step inversion and voicing overrides that affect ho
 
 **Note**: The per-step override infrastructure is complete and values are passed to HarmonyEngine. However, HarmonyEngine::harmonize() transformation algorithms for inversion/voicing are not yet fully implemented (see "What's NOT Implemented" below).
 
+### Current Observed Behavior (Hardware Testing)
+
+- **Per-step inversion**: Has some harmonic effect (values influence harmonization)
+- **Per-step voicing**: No audible effect
+- **Sequence-level inversion**: No effect
+- **Sequence-level voicing**: No effect
+
+The per-step inversion parameter appears to influence the harmonization in some way, while voicing and global parameters have no effect. Full transformation algorithms need implementation.
+
 ### What's NOT Implemented (Optional)
 
 These features from the original plan are not yet implemented but could be added:

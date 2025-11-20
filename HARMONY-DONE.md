@@ -453,7 +453,15 @@ These features from the original plan are **not yet implemented** but could be a
 - ⚠️ Voicing transformation logic in HarmonyEngine::harmonize() - placeholder only
 
 **Status**: Full infrastructure complete (parameters, UI, serialization, engine wiring, per-step overrides), but transformation algorithms need implementation.
-**Current Behavior**: Values are stored and passed correctly, but HarmonyEngine always uses root position close voicing (transformation algorithms are placeholders).
+
+**Current Observed Behavior (Hardware Testing)**:
+- **Per-step inversion**: Has some harmonic effect (values influence harmonization)
+- **Per-step voicing**: No audible effect
+- **Sequence-level inversion**: No effect
+- **Sequence-level voicing**: No effect
+
+The per-step inversion parameter appears to influence the harmonization in some way, while voicing and global parameters have no effect. Full transformation algorithms need implementation.
+
 **Effort to add**: ~2-3 hours to implement actual transformation algorithms.
 
 ### Advanced Features (Phase 3-5)
