@@ -121,6 +121,12 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
             canvas.fillRect(x + 4, y + 4, stepWidth - 8, stepWidth - 8);
         }
 
+        // accumulator trigger indicator (top-right corner dot)
+        if (step.isAccumulatorTrigger()) {
+            canvas.setColor(step.gate() ? Color::None : Color::Bright);
+            canvas.point(x + stepWidth - 5, y + 4);
+        }
+
         // record step
         if (stepIndex == currentRecordStep) {
             // draw circle
