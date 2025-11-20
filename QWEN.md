@@ -708,17 +708,47 @@ The harmony feature works seamlessly with all existing features:
 - ✅ **Fill Modes**: Harmony applied to fill sequences
 - ✅ **Slide/Portamento**: Works on harmonized notes
 
-## What's NOT Implemented (Optional Phase 2)
+## Per-Step Inversion/Voicing Overrides (Phase 2 - IMPLEMENTED)
+
+Master tracks can define per-step inversion and voicing overrides that control how follower tracks harmonize each step.
+
+### Per-Step Inversion Override
+- **SEQ (0)**: Use sequence-level inversion setting (default)
+- **ROOT (1)**: Override to root position
+- **1ST (2)**: Override to 1st inversion
+- **2ND (3)**: Override to 2nd inversion
+- **3RD (4)**: Override to 3rd inversion
+
+### Per-Step Voicing Override
+- **SEQ (0)**: Use sequence-level voicing setting (default)
+- **CLOSE (1)**: Override to close voicing
+- **DROP2 (2)**: Override to drop-2 voicing
+- **DROP3 (3)**: Override to drop-3 voicing
+- **SPREAD (4)**: Override to spread voicing
+
+### UI Access
+- Available only for Master tracks via F3 (Note) button cycle
+- Master track cycle: Note → Range → Prob → Accum → **INVERSION** → **VOICING** → Note
+- Follower track cycle: Note → Range → Prob → Accum → **HARMONY ROLE** → Note
+- Compact display abbreviations: S/R/1/2/3 (inversion), S/C/2/3/W (voicing)
+
+### Implementation Details
+- **Model**: Stored in NoteSequence::Step bitfields (bits 25-27, 28-30)
+- **Engine**: Read in `evalStepNote()` from master step when harmonizing followers
+- **Values**: Passed to local HarmonyEngine with per-step overrides
+
+**Note**: Infrastructure complete - values are stored, passed to HarmonyEngine, and affect harmonization flow. However, HarmonyEngine::harmonize() transformation algorithms for actually applying inversion/voicing are not yet implemented (placeholder code only).
+
+## What's NOT Implemented (Optional Phase 3)
 
 These features from the original plan are not yet implemented but could be added:
 
-### Inversion & Voicing
-- ❌ Inversion parameter (0-3) - HarmonyEngine supports it, just needs UI
-- ❌ Voicing parameter (Close/Drop2/Drop3/Spread) - Same, already in engine
-- ❌ Per-step inversion/voicing override
+### Inversion & Voicing Transformation Algorithms
+- ⚠️ HarmonyEngine::applyInversion() - placeholder implementation only
+- ⚠️ HarmonyEngine::applyVoicing() - placeholder implementation only
 
-**Note**: Current implementation uses root position close voicing only.
-**Effort to add**: ~1.5 hours total for both parameters.
+**Note**: Per-step override UI and storage is complete, but actual chord transformations need implementation.
+**Effort to add**: ~2-3 hours to implement actual transformation algorithms.
 
 ### Advanced Features
 - ❌ Manual chord quality selection (currently auto-diatonic only)
@@ -746,7 +776,8 @@ These features from the original plan are not yet implemented but could be added
 
 **Impact on Future Features:**
 - Does NOT block any planned Phase 2+ features
-- Inversion/Voicing can be added in ~1.5 hours
+- ✅ Per-step Inversion/Voicing UI and storage - IMPLEMENTED
+- Transformation algorithms can be added in ~2-3 hours
 - All advanced features still possible
 
 ### Why Remove T1/T5 Master Constraint?
