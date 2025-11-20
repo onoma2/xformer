@@ -25,6 +25,10 @@ void HarmonyPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "HARMONY");
     WindowPainter::drawActiveFunction(canvas, "HARMONY");
+
+    const auto &sequence = _project.selectedNoteSequence();
+    WindowPainter::drawAccumulatorValue(canvas, sequence.accumulator().currentValue(), sequence.accumulator().enabled());
+
     WindowPainter::drawFooter(canvas);
 
     ListPage::draw(canvas);

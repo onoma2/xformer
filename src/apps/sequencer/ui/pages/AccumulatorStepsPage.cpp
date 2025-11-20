@@ -21,6 +21,10 @@ void AccumulatorStepsPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "ACCST");
     WindowPainter::drawActiveFunction(canvas, "ACCU STEPS");
+
+    const auto &sequence = _project.selectedNoteSequence();
+    WindowPainter::drawAccumulatorValue(canvas, sequence.accumulator().currentValue(), sequence.accumulator().enabled());
+
     WindowPainter::drawFooter(canvas);
 
     ListPage::draw(canvas);

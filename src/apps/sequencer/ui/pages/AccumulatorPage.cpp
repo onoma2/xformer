@@ -24,6 +24,10 @@ void AccumulatorPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "ACCUM");
     WindowPainter::drawActiveFunction(canvas, "ACCUMULATOR");
+
+    const auto &sequence = _project.selectedNoteSequence();
+    WindowPainter::drawAccumulatorValue(canvas, sequence.accumulator().currentValue(), sequence.accumulator().enabled());
+
     WindowPainter::drawFooter(canvas);
 
     ListPage::draw(canvas);
