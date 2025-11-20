@@ -114,9 +114,9 @@ static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, c
         int inversionValue = masterStep.inversionOverride();
         int voicingValue = masterStep.voicingOverride();
 
-        // Use master step overrides if set, otherwise use sequence-level settings
-        int inversion = (inversionValue == 0) ? sequence.harmonyInversion() : (inversionValue - 1);
-        int voicing = (voicingValue == 0) ? sequence.harmonyVoicing() : (voicingValue - 1);
+        // Use master step overrides if set, otherwise use master's sequence-level settings
+        int inversion = (inversionValue == 0) ? masterSequence.harmonyInversion() : (inversionValue - 1);
+        int voicing = (voicingValue == 0) ? masterSequence.harmonyVoicing() : (voicingValue - 1);
 
         // Create a local HarmonyEngine for harmonization
         HarmonyEngine harmonyEngine;
