@@ -41,10 +41,6 @@ void NoteSequencePage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "SEQUENCE");
     WindowPainter::drawActiveFunction(canvas, Track::trackModeName(_project.selectedTrack().trackMode()));
-
-    const auto &sequence = _project.selectedNoteSequence();
-    WindowPainter::drawAccumulatorValue(canvas, sequence.accumulator().currentValue(), sequence.accumulator().enabled());
-
     WindowPainter::drawFooter(canvas);
 
     ListPage::draw(canvas);

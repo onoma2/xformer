@@ -126,8 +126,7 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
         }
 
         // accumulator trigger indicator (top-right corner dot)
-        // Don't show on AccumulatorTrigger layer as it already shows filled squares
-        if (step.isAccumulatorTrigger() && layer() != Layer::AccumulatorTrigger) {
+        if (step.isAccumulatorTrigger()) {
             canvas.setColor(step.gate() ? Color::None : Color::Bright);
             canvas.point(x + stepWidth - 5, y + 4);
         }
@@ -148,15 +147,7 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
         case Layer::Gate:
             break;
         case Layer::AccumulatorTrigger:
-            // Draw outline with playhead highlighting (like Gate layer)
-            canvas.setColor(stepIndex == currentStep ? Color::Bright : Color::Medium);
-            canvas.drawRect(x + 2, y + 2, stepWidth - 4, stepWidth - 4);
-
-            // Fill inner square if trigger enabled
-            if (step.isAccumulatorTrigger()) {
-                canvas.setColor(Color::Bright);
-                canvas.fillRect(x + 4, y + 4, stepWidth - 8, stepWidth - 8);
-            }
+            // Inherits gate squares, corner dot shows which steps have accum trigger
             break;
         case Layer::GateProbability:
             SequencePainter::drawProbability(
