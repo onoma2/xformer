@@ -7,6 +7,7 @@
 #include "NoteTrack.h"
 #include "CurveTrack.h"
 #include "MidiCvTrack.h"
+#include "TuesdayTrack.h"
 
 #include "core/Debug.h"
 #include "core/math/Math.h"
@@ -34,26 +35,29 @@ public:
         Note,
         Curve,
         MidiCv,
+        Tuesday,
         Last,
         Default = Note
     };
 
     static const char *trackModeName(TrackMode trackMode) {
         switch (trackMode) {
-        case TrackMode::Note:   return "Note";
-        case TrackMode::Curve:  return "Curve";
-        case TrackMode::MidiCv: return "MIDI/CV";
-        case TrackMode::Last:   break;
+        case TrackMode::Note:    return "Note";
+        case TrackMode::Curve:   return "Curve";
+        case TrackMode::MidiCv:  return "MIDI/CV";
+        case TrackMode::Tuesday: return "Tuesday";
+        case TrackMode::Last:    break;
         }
         return nullptr;
     }
 
     static uint8_t trackModeSerialize(TrackMode trackMode) {
         switch (trackMode) {
-        case TrackMode::Note:   return 0;
-        case TrackMode::Curve:  return 1;
-        case TrackMode::MidiCv: return 2;
-        case TrackMode::Last:   break;
+        case TrackMode::Note:    return 0;
+        case TrackMode::Curve:   return 1;
+        case TrackMode::MidiCv:  return 2;
+        case TrackMode::Tuesday: return 3;
+        case TrackMode::Last:    break;
         }
         return 0;
     }
@@ -109,6 +113,11 @@ public:
     const MidiCvTrack &midiCvTrack() const { SANITIZE_TRACK_MODE(_trackMode, TrackMode::MidiCv); return _container.as<MidiCvTrack>(); }
           MidiCvTrack &midiCvTrack()       { SANITIZE_TRACK_MODE(_trackMode, TrackMode::MidiCv); return _container.as<MidiCvTrack>(); }
 
+    // tuesdayTrack
+
+    const TuesdayTrack &tuesdayTrack() const { SANITIZE_TRACK_MODE(_trackMode, TrackMode::Tuesday); return _container.as<TuesdayTrack>(); }
+          TuesdayTrack &tuesdayTrack()       { SANITIZE_TRACK_MODE(_trackMode, TrackMode::Tuesday); return _container.as<TuesdayTrack>(); }
+
     //----------------------------------------
     // Methods
     //----------------------------------------
@@ -153,6 +162,9 @@ private:
         case TrackMode::MidiCv:
             _container.as<MidiCvTrack>().setTrackIndex(trackIndex);
             break;
+        case TrackMode::Tuesday:
+            _container.as<TuesdayTrack>().setTrackIndex(trackIndex);
+            break;
         case TrackMode::Last:
             break;
         }
@@ -179,6 +191,10 @@ private:
             _track.midiCv = _container.create<MidiCvTrack>();
             _track.midiCv->setTrackIndex(_trackIndex); // Set track index here
             break;
+        case TrackMode::Tuesday:
+            _track.tuesday = _container.create<TuesdayTrack>();
+            _track.tuesday->setTrackIndex(_trackIndex); // Set track index here
+            break;
         case TrackMode::Last:
             break;
         }
@@ -188,11 +204,12 @@ private:
     TrackMode _trackMode;
     int8_t _linkTrack;
 
-    Container<NoteTrack, CurveTrack, MidiCvTrack> _container;
+    Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack> _container;
     union {
         NoteTrack *note;
         CurveTrack *curve;
         MidiCvTrack *midiCv;
+        TuesdayTrack *tuesday;
     } _track;
 
     friend class Project;

@@ -18,6 +18,8 @@ void Track::clearPattern(int patternIndex) {
         break;
     case TrackMode::MidiCv:
         break;
+    case TrackMode::Tuesday:
+        break;
     case TrackMode::Last:
         break;
     }
@@ -32,6 +34,8 @@ void Track::copyPattern(int src, int dst) {
         _track.curve->sequence(dst) = _track.curve->sequence(src);
         break;
     case TrackMode::MidiCv:
+        break;
+    case TrackMode::Tuesday:
         break;
     case TrackMode::Last:
         break;
@@ -55,6 +59,9 @@ void Track::gateOutputName(int index, StringBuilder &str) const {
     case TrackMode::MidiCv:
         _track.midiCv->gateOutputName(index, str);
         break;
+    case TrackMode::Tuesday:
+        _track.tuesday->gateOutputName(index, str);
+        break;
     case TrackMode::Last:
         break;
     }
@@ -68,6 +75,9 @@ void Track::cvOutputName(int index, StringBuilder &str) const {
         break;
     case TrackMode::MidiCv:
         _track.midiCv->cvOutputName(index, str);
+        break;
+    case TrackMode::Tuesday:
+        _track.tuesday->cvOutputName(index, str);
         break;
     case TrackMode::Last:
         break;
@@ -87,6 +97,9 @@ void Track::write(VersionedSerializedWriter &writer) const {
         break;
     case TrackMode::MidiCv:
         _track.midiCv->write(writer);
+        break;
+    case TrackMode::Tuesday:
+        _track.tuesday->write(writer);
         break;
     case TrackMode::Last:
         break;
@@ -108,6 +121,9 @@ void Track::read(VersionedSerializedReader &reader) {
         break;
     case TrackMode::MidiCv:
         _track.midiCv->read(reader);
+        break;
+    case TrackMode::Tuesday:
+        _track.tuesday->read(reader);
         break;
     case TrackMode::Last:
         break;
