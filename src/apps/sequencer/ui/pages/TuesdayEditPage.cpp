@@ -309,7 +309,7 @@ void TuesdayEditPage::drawParam(Canvas &canvas, int x, int slot, int param) {
 
     const int colWidth = 48;
     const int valueY = 16;
-    const int barY = 21;  // Closer to value text
+    const int barY = 24;  // Bar/algo name line
     const int barHeight = 4;
     const int barWidth = 40;
     const int barX = x + (colWidth - barWidth) / 2;  // Center bar horizontally
@@ -317,7 +317,29 @@ void TuesdayEditPage::drawParam(Canvas &canvas, int x, int slot, int param) {
     canvas.setFont(Font::Tiny);
     canvas.setBlendMode(BlendMode::Set);
 
-    // Draw value text centered
+    // For Algorithm: draw name at bar level (not number level)
+    if (param == Algorithm) {
+        FixedStringBuilder<16> valueStr;
+        formatParamValue(param, valueStr);
+        int textWidth = canvas.textWidth(valueStr);
+        int textX = x + (colWidth - textWidth) / 2;
+        canvas.setColor(_selectedSlot == slot ? Color::Bright : Color::Medium);
+        canvas.drawText(textX, barY + 3, valueStr);  // +3 to vertically center with bars
+        return;
+    }
+
+    // For CvUpdateMode: draw value at bar level
+    if (param == CvUpdateMode) {
+        FixedStringBuilder<16> valueStr;
+        formatParamValue(param, valueStr);
+        int textWidth = canvas.textWidth(valueStr);
+        int textX = x + (colWidth - textWidth) / 2;
+        canvas.setColor(_selectedSlot == slot ? Color::Bright : Color::Medium);
+        canvas.drawText(textX, barY + 3, valueStr);
+        return;
+    }
+
+    // For numeric params: draw number above, bar below
     FixedStringBuilder<16> valueStr;
     formatParamValue(param, valueStr);
 
@@ -327,19 +349,17 @@ void TuesdayEditPage::drawParam(Canvas &canvas, int x, int slot, int param) {
     canvas.setColor(_selectedSlot == slot ? Color::Bright : Color::Medium);
     canvas.drawText(textX, valueY, valueStr);
 
-    // Draw bar (skip for Algorithm and CvUpdateMode which are not numeric ranges)
-    if (param != Algorithm && param != CvUpdateMode) {
-        int value = paramValue(param);
-        int maxValue = paramMax(param);
-        bool bipolar = paramIsBipolar(param);
+    // Draw bar
+    int value = paramValue(param);
+    int maxValue = paramMax(param);
+    bool bipolar = paramIsBipolar(param);
 
-        // Special case: Rotate is N/A for infinite loops
-        if (param == Rotate && tuesdayTrack().loopLength() == 0) {
-            return;
-        }
-
-        drawBar(canvas, barX, barY, barWidth, barHeight, value, maxValue, bipolar);
+    // Special case: Rotate is N/A for infinite loops
+    if (param == Rotate && tuesdayTrack().loopLength() == 0) {
+        return;
     }
+
+    drawBar(canvas, barX, barY, barWidth, barHeight, value, maxValue, bipolar);
 }
 
 void TuesdayEditPage::drawBar(Canvas &canvas, int x, int y, int width, int height, int value, int maxValue, bool bipolar) {
