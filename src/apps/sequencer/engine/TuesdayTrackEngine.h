@@ -67,8 +67,11 @@ private:
     Random _extraRng;
 
     // Cached parameter seeds for re-initialization on loop
+    uint8_t _cachedAlgorithm = 0;
     uint8_t _cachedFlow = 0;
     uint8_t _cachedOrnament = 0;
+    uint8_t _cachedLoopLength = 0;
+    uint8_t _cachedScan = 0;
 
     // Algorithm state
     uint32_t _stepIndex = 0;

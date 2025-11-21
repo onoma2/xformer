@@ -310,7 +310,15 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     }
 
     // Check if parameters changed - if so, reinitialize and invalidate buffer
-    if (_cachedFlow != _tuesdayTrack.flow() || _cachedOrnament != _tuesdayTrack.ornament()) {
+    bool paramsChanged = (_cachedAlgorithm != _tuesdayTrack.algorithm() ||
+                         _cachedFlow != _tuesdayTrack.flow() ||
+                         _cachedOrnament != _tuesdayTrack.ornament() ||
+                         _cachedLoopLength != _tuesdayTrack.loopLength() ||
+                         _cachedScan != _tuesdayTrack.scan());
+    if (paramsChanged) {
+        _cachedAlgorithm = _tuesdayTrack.algorithm();
+        _cachedLoopLength = _tuesdayTrack.loopLength();
+        _cachedScan = _tuesdayTrack.scan();
         initAlgorithm();
         _bufferValid = false;
     }
