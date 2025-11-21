@@ -113,6 +113,80 @@ void TuesdayTrackEngine::initAlgorithm() {
         _wobbleLastWasHigh = 0;
         break;
 
+    case 8: // TECHNO
+        // Flow seeds main RNG, Ornament seeds extra RNG
+        _rng = Random((flow - 1) << 4);
+        _extraRng = Random((ornament - 1) << 4);
+        _technoKickPattern = _rng.next() % 4;  // 4 kick variations
+        _technoHatPattern = _extraRng.next() % 4;  // 4 hat variations
+        _technoBassNote = _rng.next() % 5;  // Bass note 0-4
+        break;
+
+    case 9: // FUNK
+        // Flow seeds main RNG, Ornament seeds extra RNG
+        _rng = Random((flow - 1) << 4);
+        _extraRng = Random((ornament - 1) << 4);
+        _funkPattern = _rng.next() % 8;  // 8 funk patterns
+        _funkSyncopation = _extraRng.next() % 4;  // Syncopation level
+        _funkGhostProb = 32 + (_extraRng.next() % 64);  // 32-96 ghost note probability
+        break;
+
+    case 10: // DRONE
+        // Flow seeds main RNG, Ornament seeds extra RNG
+        _rng = Random((flow - 1) << 4);
+        _extraRng = Random((ornament - 1) << 4);
+        _droneBaseNote = _rng.next() % 12;  // Root note
+        _droneInterval = _extraRng.next() % 4;  // 0=unison, 1=5th, 2=octave, 3=5th+octave
+        _droneSpeed = 1 + (_rng.next() % 4);  // Change rate 1-4
+        break;
+
+    case 11: // PHASE
+        // Flow seeds main RNG, Ornament seeds extra RNG
+        _rng = Random((flow - 1) << 4);
+        _extraRng = Random((ornament - 1) << 4);
+        _phaseAccum = 0;
+        _phaseSpeed = 0x1000000 + (_extraRng.next() & 0xffffff);  // Slow phase drift
+        _phaseLength = 3 + (_rng.next() % 6);  // Pattern length 3-8
+        for (int i = 0; i < 8; i++) {
+            _phasePattern[i] = _rng.next() % 8;  // Simple melodic cell
+        }
+        break;
+
+    case 12: // RAGA
+        // Flow seeds main RNG, Ornament seeds extra RNG
+        _rng = Random((flow - 1) << 4);
+        _extraRng = Random((ornament - 1) << 4);
+        // Indian pentatonic-ish scales (sa re ga ma pa dha ni)
+        {
+            int scaleType = _rng.next() % 4;
+            switch (scaleType) {
+            case 0: // Bhairav-like (morning raga)
+                _ragaScale[0] = 0; _ragaScale[1] = 1; _ragaScale[2] = 4;
+                _ragaScale[3] = 5; _ragaScale[4] = 7; _ragaScale[5] = 8;
+                _ragaScale[6] = 11;
+                break;
+            case 1: // Yaman-like (evening raga)
+                _ragaScale[0] = 0; _ragaScale[1] = 2; _ragaScale[2] = 4;
+                _ragaScale[3] = 6; _ragaScale[4] = 7; _ragaScale[5] = 9;
+                _ragaScale[6] = 11;
+                break;
+            case 2: // Todi-like
+                _ragaScale[0] = 0; _ragaScale[1] = 1; _ragaScale[2] = 3;
+                _ragaScale[3] = 6; _ragaScale[4] = 7; _ragaScale[5] = 8;
+                _ragaScale[6] = 11;
+                break;
+            default: // Kafi-like (Dorian)
+                _ragaScale[0] = 0; _ragaScale[1] = 2; _ragaScale[2] = 3;
+                _ragaScale[3] = 5; _ragaScale[4] = 7; _ragaScale[5] = 9;
+                _ragaScale[6] = 10;
+                break;
+            }
+        }
+        _ragaDirection = 0;  // 0=ascending, 1=descending
+        _ragaPosition = 0;
+        _ragaOrnament = _extraRng.next() % 3;  // Ornament type
+        break;
+
     default:
         break;
     }
@@ -220,6 +294,64 @@ void TuesdayTrackEngine::reseed() {
         _wobblePhase = 0;
         _wobblePhase2 = 0;
         _wobbleLastWasHigh = 0;
+        break;
+
+    case 8: // TECHNO
+        _technoKickPattern = _rng.next() % 4;
+        _technoHatPattern = _extraRng.next() % 4;
+        _technoBassNote = _rng.next() % 5;
+        break;
+
+    case 9: // FUNK
+        _funkPattern = _rng.next() % 8;
+        _funkSyncopation = _extraRng.next() % 4;
+        _funkGhostProb = 32 + (_extraRng.next() % 64);
+        break;
+
+    case 10: // DRONE
+        _droneBaseNote = _rng.next() % 12;
+        _droneInterval = _extraRng.next() % 4;
+        _droneSpeed = 1 + (_rng.next() % 4);
+        break;
+
+    case 11: // PHASE
+        _phaseAccum = 0;
+        _phaseSpeed = 0x1000000 + (_extraRng.next() & 0xffffff);
+        _phaseLength = 3 + (_rng.next() % 6);
+        for (int i = 0; i < 8; i++) {
+            _phasePattern[i] = _rng.next() % 8;
+        }
+        break;
+
+    case 12: // RAGA
+        {
+            int scaleType = _rng.next() % 4;
+            switch (scaleType) {
+            case 0:
+                _ragaScale[0] = 0; _ragaScale[1] = 1; _ragaScale[2] = 4;
+                _ragaScale[3] = 5; _ragaScale[4] = 7; _ragaScale[5] = 8;
+                _ragaScale[6] = 11;
+                break;
+            case 1:
+                _ragaScale[0] = 0; _ragaScale[1] = 2; _ragaScale[2] = 4;
+                _ragaScale[3] = 6; _ragaScale[4] = 7; _ragaScale[5] = 9;
+                _ragaScale[6] = 11;
+                break;
+            case 2:
+                _ragaScale[0] = 0; _ragaScale[1] = 1; _ragaScale[2] = 3;
+                _ragaScale[3] = 6; _ragaScale[4] = 7; _ragaScale[5] = 8;
+                _ragaScale[6] = 11;
+                break;
+            default:
+                _ragaScale[0] = 0; _ragaScale[1] = 2; _ragaScale[2] = 3;
+                _ragaScale[3] = 5; _ragaScale[4] = 7; _ragaScale[5] = 9;
+                _ragaScale[6] = 10;
+                break;
+            }
+        }
+        _ragaDirection = 0;
+        _ragaPosition = 0;
+        _ragaOrnament = _extraRng.next() % 3;
         break;
 
     default:
@@ -490,6 +622,55 @@ void TuesdayTrackEngine::generateBuffer() {
                 }
                 _extraRng.next();  // velocity
 
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _rng.nextRange(3);
+                }
+            }
+            break;
+
+        case 8: // TECHNO warmup
+            {
+                _rng.next();  // pattern position
+                _extraRng.next();  // hat variation
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _rng.nextRange(3);
+                }
+            }
+            break;
+
+        case 9: // FUNK warmup
+            {
+                _rng.next();  // pattern note
+                _extraRng.nextRange(256);  // ghost check
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _rng.nextRange(3);
+                }
+            }
+            break;
+
+        case 10: // DRONE warmup
+            {
+                _rng.next();  // interval variation
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _rng.nextRange(3);
+                }
+            }
+            break;
+
+        case 11: // PHASE warmup
+            {
+                _phaseAccum += _phaseSpeed;
+                _rng.next();  // consume for determinism
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _rng.nextRange(3);
+                }
+            }
+            break;
+
+        case 12: // RAGA warmup
+            {
+                _rng.next();  // note selection
+                _extraRng.next();  // ornament
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
@@ -877,6 +1058,200 @@ void TuesdayTrackEngine::generateBuffer() {
 
                 // Additional slide from glide parameter
                 if (glide > 0 && _rng.nextRange(100) < glide) {
+                    slide = (_rng.nextRange(3)) + 1;
+                }
+            }
+            break;
+
+        case 8: // TECHNO buffer generation - Four-on-floor club
+            {
+                gatePercent = 75;
+                int beatPos = step % 4;  // Position within beat
+                int barPos = step % 16;  // Position within bar
+
+                // Four-on-floor kick pattern variations
+                bool isKick = false;
+                switch (_technoKickPattern) {
+                case 0: isKick = (beatPos == 0); break;  // Basic 4/4
+                case 1: isKick = (beatPos == 0) || (barPos == 14); break;  // With pickup
+                case 2: isKick = (beatPos == 0) || (barPos == 6); break;  // With offbeat
+                case 3: isKick = (beatPos == 0) || (barPos == 3) || (barPos == 11); break;  // Syncopated
+                }
+
+                if (isKick) {
+                    note = _technoBassNote;  // Bass note 0-4
+                    octave = 0;
+                    gatePercent = 80;
+                } else {
+                    // Hi-hat patterns on off-beats
+                    bool isHat = false;
+                    switch (_technoHatPattern) {
+                    case 0: isHat = (beatPos == 2); break;  // Off-beat hats
+                    case 1: isHat = (beatPos == 1) || (beatPos == 3); break;  // 8th notes
+                    case 2: isHat = true; break;  // 16th notes
+                    case 3: isHat = (beatPos != 0) && (_rng.next() % 3 != 0); break;  // Random 16ths
+                    }
+                    if (isHat) {
+                        note = 7 + (_extraRng.next() % 3);  // Higher notes for hats
+                        octave = 1;
+                        gatePercent = 40;
+                    } else {
+                        note = 0;
+                        octave = 0;
+                        gatePercent = 0;
+                    }
+                }
+
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    slide = (_rng.nextRange(3)) + 1;
+                }
+            }
+            break;
+
+        case 9: // FUNK buffer generation - Syncopated grooves
+            {
+                gatePercent = 75;
+                int pos = step % 16;
+
+                // Funk patterns with syncopation
+                static const uint16_t funkPatterns[8] = {
+                    0b1010010010100100,  // Basic funk
+                    0b1001001010010010,  // Syncopated
+                    0b1010100100101001,  // Displaced
+                    0b1001010010100101,  // Complex
+                    0b1010010100100101,  // Variation 1
+                    0b1001001001010010,  // Variation 2
+                    0b1010100101001010,  // Variation 3
+                    0b1001010100100101,  // Variation 4
+                };
+
+                bool isNote = (funkPatterns[_funkPattern] >> (15 - pos)) & 1;
+
+                if (isNote) {
+                    // Note selection based on position
+                    int noteChoice = _rng.next() % 8;
+                    switch (_funkSyncopation) {
+                    case 0: note = noteChoice % 5; break;  // Pentatonic-ish
+                    case 1: note = (noteChoice % 3) * 2; break;  // Root/3rd/5th
+                    case 2: note = noteChoice; break;  // Full range
+                    case 3: note = (pos % 4 == 0) ? 0 : (noteChoice % 5) + 2; break;  // Root on beat
+                    }
+                    octave = (pos % 8 == 0) ? 0 : (_rng.nextBinary() ? 1 : 0);
+
+                    // Ghost notes (quieter)
+                    if (_extraRng.nextRange(256) < _funkGhostProb && pos % 4 != 0) {
+                        gatePercent = 35;  // Ghost note
+                    } else {
+                        gatePercent = 75;
+                    }
+                } else {
+                    note = 0;
+                    gatePercent = 0;
+                }
+
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    slide = (_rng.nextRange(3)) + 1;
+                }
+            }
+            break;
+
+        case 10: // DRONE buffer generation - Sustained textures
+            {
+                // Very long gates, slow movement
+                int interval = 0;
+                switch (_droneInterval) {
+                case 0: interval = 0; break;   // Unison
+                case 1: interval = 7; break;   // Perfect 5th
+                case 2: interval = 12; break;  // Octave
+                case 3: interval = 19; break;  // 5th + octave
+                }
+
+                // Slow change rate
+                if ((step % (4 * _droneSpeed)) == 0) {
+                    // Occasional variation
+                    if (_rng.next() % 4 == 0) {
+                        interval += (_rng.nextBinary() ? 2 : -2);
+                    }
+                }
+
+                note = (_droneBaseNote + interval) % 12;
+                octave = (_droneBaseNote + interval) / 12;
+                gatePercent = 400;  // Very long sustain
+
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    slide = 3;  // Long slide for drones
+                }
+            }
+            break;
+
+        case 11: // PHASE buffer generation - Minimalist phasing
+            {
+                gatePercent = 75;
+                _phaseAccum += _phaseSpeed;
+
+                // Get pattern position with phase offset
+                int patternPos = (step + (_phaseAccum >> 28)) % _phaseLength;
+                note = _phasePattern[patternPos];
+                octave = 0;
+
+                // Consume RNG for determinism
+                _rng.next();
+
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    slide = (_rng.nextRange(3)) + 1;
+                }
+            }
+            break;
+
+        case 12: // RAGA buffer generation - Indian classical melodies
+            {
+                gatePercent = 75;
+
+                // Move through scale in characteristic ways
+                int movement = _rng.next() % 8;
+                switch (movement) {
+                case 0:
+                case 1:
+                case 2:
+                    // Continue in current direction
+                    if (_ragaDirection == 0) {
+                        _ragaPosition = (_ragaPosition + 1) % 7;
+                        if (_ragaPosition == 6) _ragaDirection = 1;
+                    } else {
+                        _ragaPosition = (_ragaPosition + 6) % 7;  // -1 mod 7
+                        if (_ragaPosition == 0) _ragaDirection = 0;
+                    }
+                    break;
+                case 3:
+                case 4:
+                    // Skip a note
+                    if (_ragaDirection == 0) {
+                        _ragaPosition = (_ragaPosition + 2) % 7;
+                    } else {
+                        _ragaPosition = (_ragaPosition + 5) % 7;
+                    }
+                    break;
+                case 5:
+                    // Repeat
+                    break;
+                case 6:
+                    // Jump to root or 5th
+                    _ragaPosition = (_rng.nextBinary()) ? 0 : 4;
+                    break;
+                case 7:
+                    // Change direction
+                    _ragaDirection = 1 - _ragaDirection;
+                    break;
+                }
+
+                note = _ragaScale[_ragaPosition];
+                octave = (_ragaPosition > 4) ? 1 : 0;
+
+                // Ornaments (gamaka-like slides)
+                int ornamentChance = _extraRng.next() % 8;
+                if (ornamentChance < _ragaOrnament && glide > 0) {
+                    slide = 2;  // Characteristic slides
+                } else if (glide > 0 && _rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
             }
@@ -1530,6 +1905,215 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 // Additional slide from glide parameter
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
+                }
+
+                noteVoltage = (note + (octave * 12)) / 12.0f;
+            }
+            break;
+
+        case 8: // TECHNO - Four-on-floor club
+            {
+                shouldGate = true;
+                _gatePercent = 75;
+                int glide = _tuesdayTrack.glide();
+
+                int beatPos = effectiveStep % 4;
+                int barPos = effectiveStep % 16;
+
+                bool isKick = false;
+                switch (_technoKickPattern) {
+                case 0: isKick = (beatPos == 0); break;
+                case 1: isKick = (beatPos == 0) || (barPos == 14); break;
+                case 2: isKick = (beatPos == 0) || (barPos == 6); break;
+                case 3: isKick = (beatPos == 0) || (barPos == 3) || (barPos == 11); break;
+                }
+
+                if (isKick) {
+                    note = _technoBassNote;
+                    octave = 0;
+                    _gatePercent = 80;
+                } else {
+                    bool isHat = false;
+                    switch (_technoHatPattern) {
+                    case 0: isHat = (beatPos == 2); break;
+                    case 1: isHat = (beatPos == 1) || (beatPos == 3); break;
+                    case 2: isHat = true; break;
+                    case 3: isHat = (beatPos != 0) && (_rng.next() % 3 != 0); break;
+                    }
+                    if (isHat) {
+                        note = 7 + (_extraRng.next() % 3);
+                        octave = 1;
+                        _gatePercent = 40;
+                    } else {
+                        shouldGate = false;
+                        note = 0;
+                        octave = 0;
+                    }
+                }
+
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _slide = (_rng.nextRange(3)) + 1;
+                } else {
+                    _slide = 0;
+                }
+
+                noteVoltage = (note + (octave * 12)) / 12.0f;
+            }
+            break;
+
+        case 9: // FUNK - Syncopated grooves
+            {
+                shouldGate = true;
+                _gatePercent = 75;
+                int glide = _tuesdayTrack.glide();
+
+                int pos = effectiveStep % 16;
+
+                static const uint16_t funkPatterns[8] = {
+                    0b1010010010100100,
+                    0b1001001010010010,
+                    0b1010100100101001,
+                    0b1001010010100101,
+                    0b1010010100100101,
+                    0b1001001001010010,
+                    0b1010100101001010,
+                    0b1001010100100101,
+                };
+
+                bool isNote = (funkPatterns[_funkPattern] >> (15 - pos)) & 1;
+
+                if (isNote) {
+                    int noteChoice = _rng.next() % 8;
+                    switch (_funkSyncopation) {
+                    case 0: note = noteChoice % 5; break;
+                    case 1: note = (noteChoice % 3) * 2; break;
+                    case 2: note = noteChoice; break;
+                    case 3: note = (pos % 4 == 0) ? 0 : (noteChoice % 5) + 2; break;
+                    }
+                    octave = (pos % 8 == 0) ? 0 : (_rng.nextBinary() ? 1 : 0);
+
+                    if (_extraRng.nextRange(256) < _funkGhostProb && pos % 4 != 0) {
+                        _gatePercent = 35;
+                    }
+                } else {
+                    shouldGate = false;
+                    note = 0;
+                    octave = 0;
+                }
+
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _slide = (_rng.nextRange(3)) + 1;
+                } else {
+                    _slide = 0;
+                }
+
+                noteVoltage = (note + (octave * 12)) / 12.0f;
+            }
+            break;
+
+        case 10: // DRONE - Sustained textures
+            {
+                shouldGate = true;
+                int glide = _tuesdayTrack.glide();
+
+                int interval = 0;
+                switch (_droneInterval) {
+                case 0: interval = 0; break;
+                case 1: interval = 7; break;
+                case 2: interval = 12; break;
+                case 3: interval = 19; break;
+                }
+
+                if ((effectiveStep % (4 * _droneSpeed)) == 0) {
+                    if (_rng.next() % 4 == 0) {
+                        interval += (_rng.nextBinary() ? 2 : -2);
+                    }
+                }
+
+                note = (_droneBaseNote + interval) % 12;
+                octave = (_droneBaseNote + interval) / 12;
+                _gatePercent = 400;
+
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _slide = 3;
+                } else {
+                    _slide = 0;
+                }
+
+                noteVoltage = (note + (octave * 12)) / 12.0f;
+            }
+            break;
+
+        case 11: // PHASE - Minimalist phasing
+            {
+                shouldGate = true;
+                _gatePercent = 75;
+                int glide = _tuesdayTrack.glide();
+
+                _phaseAccum += _phaseSpeed;
+                int patternPos = (effectiveStep + (_phaseAccum >> 28)) % _phaseLength;
+                note = _phasePattern[patternPos];
+                octave = 0;
+
+                _rng.next();  // Consume for determinism
+
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _slide = (_rng.nextRange(3)) + 1;
+                } else {
+                    _slide = 0;
+                }
+
+                noteVoltage = (note + (octave * 12)) / 12.0f;
+            }
+            break;
+
+        case 12: // RAGA - Indian classical melodies
+            {
+                shouldGate = true;
+                _gatePercent = 75;
+                int glide = _tuesdayTrack.glide();
+
+                int movement = _rng.next() % 8;
+                switch (movement) {
+                case 0:
+                case 1:
+                case 2:
+                    if (_ragaDirection == 0) {
+                        _ragaPosition = (_ragaPosition + 1) % 7;
+                        if (_ragaPosition == 6) _ragaDirection = 1;
+                    } else {
+                        _ragaPosition = (_ragaPosition + 6) % 7;
+                        if (_ragaPosition == 0) _ragaDirection = 0;
+                    }
+                    break;
+                case 3:
+                case 4:
+                    if (_ragaDirection == 0) {
+                        _ragaPosition = (_ragaPosition + 2) % 7;
+                    } else {
+                        _ragaPosition = (_ragaPosition + 5) % 7;
+                    }
+                    break;
+                case 5:
+                    break;
+                case 6:
+                    _ragaPosition = (_rng.nextBinary()) ? 0 : 4;
+                    break;
+                case 7:
+                    _ragaDirection = 1 - _ragaDirection;
+                    break;
+                }
+
+                note = _ragaScale[_ragaPosition];
+                octave = (_ragaPosition > 4) ? 1 : 0;
+
+                int ornamentChance = _extraRng.next() % 8;
+                if (ornamentChance < _ragaOrnament && glide > 0) {
+                    _slide = 2;
+                } else if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _slide = (_rng.nextRange(3)) + 1;
+                } else {
+                    _slide = 0;
                 }
 
                 noteVoltage = (note + (octave * 12)) / 12.0f;

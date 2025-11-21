@@ -144,6 +144,33 @@ private:
     uint32_t _wobblePhaseSpeed2 = 0;
     uint8_t _wobbleLastWasHigh = 0;
 
+    // TECHNO algorithm state
+    uint8_t _technoKickPattern = 0;
+    uint8_t _technoHatPattern = 0;
+    uint8_t _technoBassNote = 0;
+
+    // FUNK algorithm state
+    uint8_t _funkPattern = 0;
+    uint8_t _funkSyncopation = 0;
+    uint8_t _funkGhostProb = 0;
+
+    // DRONE algorithm state
+    uint8_t _droneBaseNote = 0;
+    uint8_t _droneInterval = 0;
+    uint8_t _droneSpeed = 0;
+
+    // PHASE algorithm state
+    uint32_t _phaseAccum = 0;
+    uint32_t _phaseSpeed = 0;
+    uint8_t _phasePattern[8] = {0};
+    uint8_t _phaseLength = 0;
+
+    // RAGA algorithm state
+    uint8_t _ragaScale[7] = {0};
+    uint8_t _ragaDirection = 0;
+    uint8_t _ragaPosition = 0;
+    uint8_t _ragaOrnament = 0;
+
     // Output state
     bool _activity = false;
     bool _gateOutput = false;
