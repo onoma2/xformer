@@ -942,8 +942,11 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     }
 
     // Calculate base cooldown from power
-    // Power 1-16 maps to CoolDownMax 16-1 (inverted)
-    int baseCooldown = 17 - power;
+    // Linear mapping: Power = number of notes in loop
+    // Gap between notes = loopLength / power
+    int effectiveLength = (loopLength > 0) ? loopLength : 16;  // Use 16 for infinite loops
+    int baseCooldown = (power > 0) ? effectiveLength / power : effectiveLength;
+    if (baseCooldown < 1) baseCooldown = 1;
 
     // Apply skew to cooldown based on loop position
     // Skew value determines what fraction of loop is at power 16:
