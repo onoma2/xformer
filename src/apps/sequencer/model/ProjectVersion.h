@@ -99,6 +99,9 @@ enum ProjectVersion {
     // added NoteSequence harmony properties (harmonyRole, masterTrackIndex, harmonyScale)
     Version34 = 34,
 
+    // added TuesdayTrack serialization
+    Version35 = 35,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,
