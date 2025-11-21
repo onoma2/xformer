@@ -1169,3 +1169,56 @@ CASE("clamping") {
   - `shape-improvements.md` - CV curve generation enhancements
   - `midi-improvements.md` - MIDI functionality extensions
 - **doc/simulator-interface.png** - Simulator UI reference diagram
+
+## Tuesday Track CV/Gate Behavior Analysis
+
+Analysis of the differences between the original Tuesday Eurorack module and the PEW|FORMER TuesdayTrack implementation regarding CV (pitch) changes and gate firing behavior.
+
+### Original Tuesday Module Behavior
+- **CV Update**: Only when intensity threshold is met (`Tick->vel >= T->CoolDown`)
+- **Gate Output**: Only fired when intensity threshold is met
+- **Result**: When intensity filtering prevents a note from playing, both gate and CV output remain unchanged at previous values
+
+### PEW|FORMER TuesdayTrack Behavior
+- **CV Update**: Updated on every step regardless of gate state
+- **Gate Output**: Only fired when algorithm says `shouldGate` AND cooldown period has expired
+- **Result**: Continuous pitch evolution with sparse gate articulation
+
+### Musical Implications
+
+#### Original Tuesday
+- More traditional sequencer behavior
+- CV output is "gated" - only changes when notes are played
+- Intensity parameter acts as both density control and gate filter
+- Better suited for triggering envelope generators with each pitch change
+
+#### PEW|FORMER TuesdayTrack
+- Modern generative music behavior
+- CV output continuously evolves, creating smooth pitch progressions
+- Gates fire independently, allowing for rhythmic articulation of continuous pitch changes
+- Better suited for evolving textures and algorithmic pitch progressions
+- Works well with external envelope generators that need to be triggered independently
+
+### Implementation Options for CV Update Mode Switch
+
+#### Approach 1: Parameter-Based Switch (Recommended)
+- Add new parameter `cvUpdateMode` to `TuesdayTrack` class
+- Values: `Free` (current behavior) or `Gated` (original behavior)
+- Store as bitfield in `_cvUpdateMode`
+- Modify engine logic in `TuesdayTrackEngine::tick()` to conditionally execute CV updates
+- Add parameter to UI in `TuesdayPage` for user control
+
+#### State Management Considerations
+- In GATED mode, engine needs to maintain the previous CV value when not updating
+- Need to handle initialization and switching between modes correctly
+- Consider how this affects slide/portamento behavior in both modes
+
+### Files Referenced in Analysis
+- `/ALGO-RESEARCH/Tuesday/Sources/Tuesday.c` - Original Tuesday implementation
+- `/ALGO-RESEARCH/Tuesday/Sources/Tuesday.h` - Original Tuesday data structures
+- `/src/apps/sequencer/engine/TuesdayTrackEngine.cpp` - PEW|FORMER implementation
+- `/src/apps/sequencer/engine/TuesdayTrackEngine.h` - PEW|FORMER data structures
+- `/src/apps/sequencer/model/TuesdayTrack.h` - PEW|FORMER model parameters
+
+### Additional Documentation
+A complete analysis of this behavior and implementation ideas was created in `TUESDAY-GATED-PITCH-CHANGE.md`.

@@ -1137,6 +1137,90 @@ While simplified, each algorithm maintains the distinctive musical character of 
 
 ---
 
-Document Version: 6.0
+# Part 8: Tuesday Track CV/Gate Behavior Analysis
+
+## Overview
+
+Analysis of the differences between the original Tuesday Eurorack module and the PEW|FORMER TuesdayTrack implementation regarding CV (pitch) changes and gate firing behavior.
+
+### Original Tuesday Module Behavior
+- **CV Update**: Only when intensity threshold is met (`Tick->vel >= T->CoolDown`)
+- **Gate Output**: Only fired when intensity threshold is met
+- **Result**: When intensity filtering prevents a note from playing, both gate and CV output remain unchanged at previous values
+
+### PEW|FORMER TuesdayTrack Behavior
+- **CV Update**: Updated on every step regardless of gate state
+- **Gate Output**: Only fired when algorithm says `shouldGate` AND cooldown period has expired
+- **Result**: Continuous pitch evolution with sparse gate articulation
+
+## Musical Implications
+
+### Original Tuesday
+- More traditional sequencer behavior
+- CV output is "gated" - only changes when notes are played
+- Intensity parameter acts as both density control and gate filter
+- Better suited for triggering envelope generators with each pitch change
+
+### PEW|FORMER TuesdayTrack
+- Modern generative music behavior
+- CV output continuously evolves, creating smooth pitch progressions
+- Gates fire independently, allowing for rhythmic articulation of continuous pitch changes
+- Better suited for evolving textures and algorithmic pitch progressions
+- Works well with external envelope generators that need to be triggered independently
+
+## Implementation Options for CV Update Mode Switch
+
+### Approach 1: Parameter-Based Switch (Recommended)
+- Add new parameter `cvUpdateMode` to `TuesdayTrack` class
+- Values: `Free` (current behavior) or `Gated` (original behavior)
+- Store as bitfield in `_cvUpdateMode`
+- Modify engine logic in `TuesdayTrackEngine::tick()` to conditionally execute CV updates
+- Add parameter to UI in `TuesdayPage` for user control
+
+### State Management Considerations
+- In GATED mode, engine needs to maintain the previous CV value when not updating
+- Need to handle initialization and switching between modes correctly
+- Consider how this affects slide/portamento behavior in both modes
+
+## Files Referenced in Analysis
+- `/ALGO-RESEARCH/Tuesday/Sources/Tuesday.c` - Original Tuesday implementation
+- `/ALGO-RESEARCH/Tuesday/Sources/Tuesday.h` - Original Tuesday data structures
+- `/src/apps/sequencer/engine/TuesdayTrackEngine.cpp` - PEW|FORMER implementation
+- `/src/apps/sequencer/engine/TuesdayTrackEngine.h` - PEW|FORMER data structures
+- `/src/apps/sequencer/model/TuesdayTrack.h` - PEW|FORMER model parameters
+
+## Additional Documentation
+A complete analysis of this behavior and implementation ideas was created in `TUESDAY-GATED-PITCH-CHANGE.md`.
+
+---
+
+## Documentation Restructuring
+
+### Separation of Concerns
+
+The documentation has been restructured to improve maintainability and readability by separating concerns:
+
+**Original Large Files Split:**
+- `CLAUDE-TUESDAY.md` was split into multiple focused documents:
+  - `TUESDAY-TDD-PLAN.md` - Complete TDD implementation plan with all test cases and setup steps
+  - `TUESDAY-ALGORITHMS.md` - Complete algorithm catalog with details on all 37 algorithms
+  - `TUESDAY-TECHNICAL-DETAILS.md` - Technical implementation details and original source code reference
+  - `TUESDAY-DOCUMENTATION-SUMMARY.md` - Overview of all split documents
+  - `CLAUDE-TUESDAY.md` - Now focuses on high-level TDD plan and vision
+
+**Phase 0 Implementation Moved:**
+- Detailed Phase 0 TDD Foundation implementation steps moved to `DONE.md`
+- Preserves historical record while keeping main documents focused
+
+**Benefits of Restructuring:**
+- Smaller, more focused documents for specific topics
+- Easier maintenance and updates
+- Better separation of high-level plans vs detailed implementation steps
+- Improved readability and navigation
+- Historical preservation of implementation details in `DONE.md`
+
+---
+
+Document Version: 6.2
 Last Updated: November 2025
-Project: PEW|FORMER Feature Implementation (Accumulator, Pulse Count, Gate Mode, Harmony, Tuesday Track, Simplified Algorithms)
+Project: PEW|FORMER Feature Implementation (Accumulator, Pulse Count, Gate Mode, Harmony, Tuesday Track, Simplified Algorithms, CV/Gate Behavior Analysis, Documentation Restructuring)
