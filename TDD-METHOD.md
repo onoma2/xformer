@@ -579,6 +579,263 @@ expectEqual(isValid, false, "should be null");
 
 ---
 
+## Simulator Interface for TDD
+
+**Simulator Interface** - Critical for TDD workflow:
+- Complete virtual hardware interface for testing
+- All physical hardware interactions simulated
+- Runs exact same firmware code as hardware
+- Accurate development and testing environment
+
+**Development Workflow** (TDD-focused):
+- Simulator-first development is recommended for TDD
+  1. Develop and test features in simulator (`build/sim/debug`)
+  2. Better debugging experience with native tools
+  3. Faster iteration cycle for TDD cycles
+  4. Port to hardware once stable
+
+**When modifying timing-critical code:**
+- Test on actual hardware after simulator validation - simulator timing differs
+- Check `Engine::update()` execution time during TDD
+- Verify against task priorities and stack sizes during integration testing
+
+**When adding UI features:**
+- Use simulator to test UI behavior before hardware validation
+- Consider noise reduction impact (pixel count affects audio noise)
+- Test with different brightness/screensaver settings
+- Use simulator screenshot feature to document UI changes
+
+---
+
+## TDD Application Examples
+
+### Feature Implementation Process
+Real-world TDD application examples from the project:
+
+**Accumulator Feature** (TDD-verified):
+- Phase 1: Model and Engine Integration
+- Phase 2: UI Implementation
+- Phase 3: Modulation Implementation
+- All unit tests pass with TDD approach
+- ✅ **Successfully tested and verified on actual hardware**
+
+**Pulse Count Feature** (TDD-verified):
+- Model layer implementation with 7 unit tests
+- Integration with engine timing logic
+- UI integration with encoder support
+- ✅ **Fully tested and verified on actual hardware**
+
+**Gate Mode Feature** (TDD-verified):
+- Followed strict TDD methodology (RED-GREEN-REFACTOR):
+  - Phase 1 (Model Layer): 6 unit tests written first, all passing
+  - Phase 2 (Engine Layer): Design documented, then implemented
+  - Phase 3 (UI Integration): Button cycling, visual display, encoder support
+- Two critical bugs discovered and fixed during TDD process
+- ✅ **Production ready**
+
+**Harmony Feature** (TDD-verified):
+- Total: 19 Passing Unit Tests
+- HarmonyEngine Tests (13): Default values, scale intervals, chord quality, etc.
+- NoteSequence Harmony Tests (3): Default properties, validation, clamping
+- Model Integration Tests (3): Engine accessor methods, coordination contracts
+- ✅ **19/19 unit tests passing (100%)**
+
+### Testing Status Documentation
+Each feature includes explicit testing verification:
+- Unit tests passing counts
+- Integration testing confirmation
+- Hardware verification results
+- Bug discovery and fixes during TDD
+
+---
+
+## Testing Conventions and Common Errors
+
+### Test Framework
+
+**CRITICAL**: This project uses a **custom UnitTest.h framework**, NOT Catch2 or Google Test.
+
+**Correct Test Structure:**
+```cpp
+#include "UnitTest.h"
+
+UNIT_TEST("TestName") {
+
+CASE("test_case_name") {
+    // Test code here
+    expectEqual(actual, expected, "optional message");
+    expectTrue(condition, "optional message");
+    expectFalse(condition, "optional message");
+}
+
+} // UNIT_TEST("TestName")
+```
+
+**Common Test Framework Errors:**
+
+❌ **WRONG** (Catch2 style):
+```cpp
+#include "catch.hpp"
+
+TEST_CASE("Description", "[tag]") {
+    REQUIRE(condition);
+}
+```
+
+✅ **CORRECT** (UnitTest.h style):
+```cpp
+#include "UnitTest.h"
+
+UNIT_TEST("TestName") {
+CASE("description") {
+    expectTrue(condition, "message");
+}
+}
+```
+
+**Assertion Functions:**
+- `expectEqual(a, b, msg)` - Compare values (int, float, const char*)
+- `expectTrue(condition, msg)` - Assert true
+- `expectFalse(condition, msg)` - Assert false
+- `expect(condition, msg)` - Generic assertion
+
+**Enum Comparison:**
+- Always cast enums to `int` for expectEqual:
+```cpp
+expectEqual(static_cast<int>(actual), static_cast<int>(expected), "message");
+```
+
+### Type System Conventions
+
+**Clamp Function Type Matching:**
+
+The `clamp()` function requires all three arguments to be the **same type**.
+
+❌ **WRONG**:
+```cpp
+_masterTrackIndex = clamp(index, int8_t(0), int8_t(7));  // Type mismatch!
+_harmonyScale = clamp(scale, uint8_t(0), uint8_t(6));   // Type mismatch!
+```
+
+✅ **CORRECT**:
+```cpp
+_masterTrackIndex = clamp(index, 0, 7);  // All int
+_harmonyScale = clamp(scale, 0, 6);      // All int
+```
+
+The compiler will assign to the correct member variable type automatically.
+
+**Enum Conventions in Model Layer:**
+
+Model enums follow specific patterns:
+
+✅ **CORRECT** (plain enum, no Last):
+```cpp
+enum HarmonyRole {
+    HarmonyOff = 0,
+    HarmonyMaster = 1,
+    HarmonyFollowerRoot = 2,
+    // ... no Last member
+};
+```
+
+❌ **WRONG** (enum class with Last):
+```cpp
+enum class HarmonyRole {  // Don't use "class"
+    HarmonyOff = 0,
+    Last  // Don't add Last in model enums
+};
+```
+
+**Note**: UI/Pages enums DO use `enum class` and `Last` - this convention is specific to model layer.
+
+### Bitfield Packing
+
+**Available Space Check:**
+```cpp
+// In NoteSequence::Step::_data1 union
+// Check comments for remaining bits:
+BitField<uint32_t, 20, GateMode::Bits> gateMode;  // bits 20-21
+// 10 bits left  <-- Always documented
+```
+
+**Serialization Pattern:**
+```cpp
+// Write (bit-pack multiple values into single byte)
+uint8_t flags = (static_cast<uint8_t>(_role) << 0) |
+                (static_cast<uint8_t>(_scale) << 3);
+writer.write(flags);
+
+// Read (unpack with masks)
+uint8_t flags;
+reader.read(flags);
+_role = static_cast<Role>((flags >> 0) & 0x7);   // 3 bits
+_scale = (flags >> 3) & 0x7;                      // 3 bits
+```
+
+### Common Compilation Errors
+
+**Error: "no member named 'X' in 'ClassName'"**
+- Cause: Using undefined enum or method
+- Fix: Check if you're using plain enum (not enum class) for model enums
+- Fix: Ensure you've added the member to the class definition
+
+**Error: "no matching function for call to 'clamp'"**
+- Cause: Type mismatch in clamp arguments
+- Fix: Use `clamp(value, 0, max)` without type casts
+
+**Error: "undefined symbols for architecture"**
+- Cause: Missing CMakeLists.txt registration
+- Fix: Add `register_sequencer_test(TestName TestName.cpp)` to CMakeLists.txt
+
+### Test Organization
+
+**Unit Test Location:**
+- `src/tests/unit/sequencer/` - Model and small unit tests
+- `src/tests/integration/` - Integration tests (less common)
+
+**Test Naming:**
+- File: `TestFeatureName.cpp`
+- Test: `UNIT_TEST("FeatureName")`
+- Cases: `CASE("descriptive_lowercase_name")`
+
+**Example Test Structure:**
+```cpp
+#include "UnitTest.h"
+#include "apps/sequencer/model/YourClass.h"
+
+UNIT_TEST("YourClass") {
+
+CASE("default_values") {
+    YourClass obj;
+    expectEqual(obj.value(), 0, "default value should be 0");
+}
+
+CASE("setter_getter") {
+    YourClass obj;
+    obj.setValue(42);
+    expectEqual(obj.value(), 42, "value should be 42");
+}
+
+CASE("clamping") {
+    YourClass obj;
+    obj.setValue(1000);  // Over max
+    expectEqual(obj.value(), 127, "value should clamp to 127");
+}
+
+} // UNIT_TEST("YourClass")
+```
+
+### Reference Examples
+
+**Good test examples to copy from:**
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Model testing
+- `src/tests/unit/sequencer/TestNoteSequence.cpp` - Property testing
+- `src/tests/unit/sequencer/TestHarmonyEngine.cpp` - Lookup table testing
+- `src/tests/unit/sequencer/TestPulseCount.cpp` - Feature testing
+
+---
+
 ## Conclusion
 
 Successful TDD in PEW|FORMER requires:

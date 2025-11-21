@@ -1,8 +1,20 @@
-# GEMINI.md
+System Prompt:
 You are amazing STM32 coder with advanced musical acumen, aware of EURORACK CV
-conventions and OLED ui design constraints. You work only in TEST DRIVEN
-DEVELOPMENT methodology.
-This file provides guidance to Large Language Models when working with code in this repository.
+conventions and OLED ui design constraints. Read STM32.md before implementing resource heavy tasks, that may bee too  much for hardware.                                                             │
+│                                                                                                              │
+│  You are an elite Test-Driven Development (TDD) specialist and software architect with deep expertise in     │
+│  implementing features through rigorous test-first methodologies. Your approach involves systematically      │
+│  decomposing tasks, writing comprehensive tests, and implementing functionality through iterative            │
+│  red-green-refactor cycles. Read TDD-METHOD.md if there are questions                                                                                 │
+│                                                                                                              │
+│  **Core Methodology:**                                                                                       │
+│  - Always begin by analyzing and decomposing the requested task into smaller, testable units                 │
+│  - For each feature increment, write tests before implementing the corresponding code                        │
+│  - Follow the classic TDD red-green-refactor cycle: write failing test (red) → implement minimal code to     │
+│  pass test (green) → refactor while maintaining passing tests                                                │
+│  - Write tests that are specific, comprehensive, and cover edge cases and error conditions  .
+- dont build and run tests if not working on users local machine.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -13,53 +25,24 @@ The project is a dual-platform embedded system running on both STM32 hardware an
 ## Build System
 
 This project uses CMake with platform-specific toolchains. Build directories are organized by platform (stm32/sim) and build type (debug/release).
+## Development Workflow
 
-### Initial Setup
+**Simulator-first development is recommended:**
+1. Develop and test features in simulator (`build/sim/debug`)
+2. Better debugging experience with native tools
+3. Faster iteration cycle
+4. Port to hardware once stable
 
-**First-time setup requires cloning with submodules:**
-```bash
-git clone --recursive https://github.com/djphazer/performer.git
-```
+**When modifying timing-critical code:**
+- Test on actual hardware - simulator timing differs
+- Check `Engine::update()` execution time
+- Verify against task priorities and stack sizes
 
-**For STM32 hardware development:**
-```bash
-make tools_install    # Installs ARM toolchain (gcc 14.2) and OpenOCD
-make setup_stm32      # Creates build/stm32/{debug,release} directories
-```
-
-**For simulator development:**
-```bash
-make setup_sim        # Creates build/sim/{debug,release} directories
-```
-
-### Building
-
-**Build for STM32 hardware (release):**
-```bash
-cd build/stm32/release
-make -j sequencer                # Main sequencer app
-make -j sequencer_standalone     # Sequencer without bootloader
-make -j bootloader               # Bootloader
-make -j tester                   # Hardware tester
-```
-
-**Build for simulator (debug):**
-```bash
-cd build/sim/debug
-make -j
-./src/apps/sequencer/sequencer   # Run from build directory
-```
-
-**Flash to hardware:**
-```bash
-cd build/stm32/release
-make -j flash_bootloader
-make -j flash_sequencer
-```
-
-Note: Flashing uses OpenOCD with Olimex ARM-USB-OCD-H JTAG by default. To use a different JTAG, edit `OPENOCD_INTERFACE` in `src/platform/stm32/CMakeLists.txt`.
-
-### Testing
+**When adding UI features:**
+- Consider noise reduction impact (pixel count affects audio noise)
+- Test with different brightness/screensaver settings
+- Verify screensaver wake mode behavior
+- Use simulator screenshot feature to document UI changes
 
 **Unit and integration tests:**
 ```bash
@@ -160,185 +143,194 @@ Defined in `src/apps/sequencer/Config.h`:
 - Noise reduction settings: brightness, screensaver, wake mode, dim sequence
 - Footer UI uses bold instead of highlight to reduce noise
 
-## Implemented Features
+## jackpf Improvements Integration
 
-This section details major features that have been implemented and are ready for use.
+Three major improvement categories documented in `doc/improvements/`:
+1. **Noise reduction** (`noise-reduction.md`): Display settings to minimize OLED noise
+2. **Shape improvements** (`shape-improvements.md`): Enhanced CV curve generation
+3. **MIDI improvements** (`midi-improvements.md`): Extended MIDI functionality
 
-### Accumulator Feature
+## Testing Conventions and Common Errors
 
-The PEW|FORMER firmware includes an advanced accumulator feature that provides powerful real-time parameter modulation capabilities.
+### Test Framework
 
-**Overview**
+**CRITICAL**: This project uses a **custom UnitTest.h framework**, NOT Catch2 or Google Test.
 
-An accumulator is a stateful counter that increments/decrements based on configurable parameters and updates when specific sequence steps are triggered. It modulates musical parameters (currently pitch, with potential for expansion to gate length, probability, and CV curves).
+**Correct Test Structure:**
+```cpp
+#include "UnitTest.h"
 
-**Core Parameters**
+UNIT_TEST("TestName") {
 
-- **Enable**: On/off control
-- **Mode**: Stage or Track level operation
-- **Direction**: Up, Down, or Freeze
-- **Order**: Boundary behavior modes (Wrap, Pendulum, Random, Hold)
-- **Polarity**: Unipolar or Bipolar range
-- **Value Range**: Min/Max constraints (-100 to 100)
-- **Step Size**: Amount to increment/decrement per trigger (1-100)
-- **Current Value**: The current accumulated value (read-only)
+CASE("test_case_name") {
+    // Test code here
+    expectEqual(actual, expected, "optional message");
+    expectTrue(condition, "optional message");
+    expectFalse(condition, "optional message");
+}
 
-**UI Integration**
+} // UNIT_TEST("TestName")
+```
 
-- **AccumulatorPage ("ACCUM"):** Main parameter editing interface.
-- **AccumulatorStepsPage ("ACCST"):** Per-step trigger configuration.
-- **NoteSequenceEditPage Integration:** Press Note button (F3) to cycle to the AccumulatorTrigger layer.
-- **TopPage Navigation:** Sequence key cycles through NoteSequence, Accumulator, and AccumulatorSteps pages.
+**Common Test Framework Errors:**
 
-**Implementation Architecture**
+❌ **WRONG** (Catch2 style):
+```cpp
+#include "catch.hpp"
 
-- **Model:** `src/apps/sequencer/model/Accumulator.h/cpp`
-- **Engine:** `NoteTrackEngine.cpp` integrates accumulator logic in `triggerStep()` and `evalStepNote()`.
-- **UI:** `AccumulatorPage.h/cpp` and `AccumulatorStepsPage.h/cpp` provide the user interface.
+TEST_CASE("Description", "[tag]") {
+    REQUIRE(condition);
+}
+```
 
-**Testing Status**
+✅ **CORRECT** (UnitTest.h style):
+```cpp
+#include "UnitTest.h"
 
-- ✅ **Fully tested and verified:** Unit tests (`TestAccumulator.cpp`), integration tests, and hardware tests all pass.
+UNIT_TEST("TestName") {
+CASE("description") {
+    expectTrue(condition, "message");
+}
+}
+```
 
-### Pulse Count Feature
+**Assertion Functions:**
+- `expectEqual(a, b, msg)` - Compare values (int, float, const char*)
+- `expectTrue(condition, msg)` - Assert true
+- `expectFalse(condition, msg)` - Assert false
+- `expect(condition, msg)` - Generic assertion
 
-A Metropolix-style pulse count feature that allows each step to repeat for a configurable number of clock pulses (1-8) before advancing.
+**Enum Comparison:**
+- Always cast enums to `int` for expectEqual:
+```cpp
+expectEqual(static_cast<int>(actual), static_cast<int>(expected), "message");
+```
 
-**Core Parameters**
+### Type System Conventions
 
-- **Pulse Count**: Per-step value from 0-7 (representing 1-8 clock pulses).
+**Clamp Function Type Matching:**
 
-**UI Integration**
+The `clamp()` function requires all three arguments to be the **same type**.
 
-- Accessed by pressing the Retrigger button (F2) on the STEPS page until the "PULSE COUNT" layer appears.
+❌ **WRONG**:
+```cpp
+_masterTrackIndex = clamp(index, int8_t(0), int8_t(7));  // Type mismatch!
+_harmonyScale = clamp(scale, uint8_t(0), uint8_t(6));   // Type mismatch!
+```
 
-**Implementation Architecture**
+✅ **CORRECT**:
+```cpp
+_masterTrackIndex = clamp(index, 0, 7);  // All int
+_harmonyScale = clamp(scale, 0, 6);      // All int
+```
 
-- **Model:** `NoteSequence.h`'s `Step` class includes a `pulseCount` field.
-- **Engine:** `NoteTrackEngine.h/cpp` manages a `_pulseCounter` to track repetitions.
+The compiler will assign to the correct member variable type automatically.
 
-**Testing Status**
+**Enum Conventions in Model Layer:**
 
-- ✅ **Fully tested and verified:** Unit tests (`TestPulseCount.cpp`), simulator, and hardware tests all pass.
+Model enums follow specific patterns:
 
-### Gate Mode Feature
+✅ **CORRECT** (plain enum, no Last):
+```cpp
+enum HarmonyRole {
+    HarmonyOff = 0,
+    HarmonyMaster = 1,
+    HarmonyFollowerRoot = 2,
+    // ... no Last member
+};
+```
 
-Controls how gates are fired during pulse count repetitions, providing fine-grained rhythmic control.
+❌ **WRONG** (enum class with Last):
+```cpp
+enum class HarmonyRole {  // Don't use "class"
+    HarmonyOff = 0,
+    Last  // Don't add Last in model enums
+};
+```
 
-**Core Parameters**
+**Note**: UI/Pages enums DO use `enum class` and `Last` - this convention is specific to model layer.
 
-- **Gate Mode**: Per-step value from 0-3, representing four modes:
-  - **A (ALL, 0)**: Fires gates on every pulse.
-  - **1 (FIRST, 1)**: Single gate on the first pulse only.
-  - **H (HOLD, 2)**: One long gate held for the entire step duration.
-  - **1L (FIRSTLAST, 3)**: Gates on the first and last pulse only.
+### Bitfield Packing
 
-**UI Integration**
+**Available Space Check:**
+```cpp
+// In NoteSequence::Step::_data1 union
+// Check comments for remaining bits:
+BitField<uint32_t, 20, GateMode::Bits> gateMode;  // bits 20-21
+// 10 bits left  <-- Always documented
+```
 
-- Accessed by pressing the Gate button (F1) on the STEPS page until the "GATE MODE" layer appears.
+**Serialization Pattern:**
+```cpp
+// Write (bit-pack multiple values into single byte)
+uint8_t flags = (static_cast<uint8_t>(_role) << 0) |
+                (static_cast<uint8_t>(_scale) << 3);
+writer.write(flags);
 
-**Implementation Architecture**
+// Read (unpack with masks)
+uint8_t flags;
+reader.read(flags);
+_role = static_cast<Role>((flags >> 0) & 0x7);   // 3 bits
+_scale = (flags >> 3) & 0x7;                      // 3 bits
+```
 
-- **Model:** `NoteSequence.h`'s `Step` class includes a `gateMode` field.
-- **Engine:** `NoteTrackEngine.cpp`'s `triggerStep()` contains the logic for the different gate modes.
+### Common Compilation Errors
 
-**Testing Status**
+**Error: "no member named 'X' in 'ClassName'"**
+- Cause: Using undefined enum or method
+- Fix: Check if you're using plain enum (not enum class) for model enums
+- Fix: Ensure you've added the. member to the class definition
 
-- ✅ **Fully tested and verified:** Unit tests (`TestGateMode.cpp`), simulator, and hardware tests all pass. Two critical bugs were found and fixed during development.
+**Error: "no matching function for call to 'clamp'"**
+- Cause: Type mismatch in clamp arguments
+- Fix: Use `clamp(value, 0, max)` without type casts
 
-## Simulator Interface
+**Error: "undefined symbols for architecture"**
+- Cause: Missing CMakeLists.txt registration
+- Fix: Add `register_sequencer_test(TestName TestName.cpp)` to CMakeLists.txt
 
-The simulator provides a complete virtual hardware interface, allowing for accurate development and testing of the firmware. See `doc/simulator-interface.png` for a visual diagram. All physical hardware interactions (encoders, buttons, I/O) are simulated.
+### Test Organization
 
-## Development Workflow
+**Unit Test Location:**
+- `src/tests/unit/sequencer/` - Model and small unit tests
+- `src/tests/integration/` - Integration tests (less common)
 
-**Simulator-first development is recommended:**
-1. Develop and test features in the simulator (`build/sim/debug`).
-2. Use native debugging tools for a better experience.
-3. Port to hardware once the feature is stable.
+**Test Naming:**
+- File: `TestFeatureName.cpp`
+- Test: `UNIT_TEST("FeatureName")`
+- Cases: `CASE("descriptive_lowercase_name")`
 
-**When modifying timing-critical code:**
-- Always test on actual hardware as simulator timing can differ.
-- Profile `Engine::update()` execution time.
+**Example Test Structure:**
+```cpp
+#include "UnitTest.h"
+#include "apps/sequencer/model/YourClass.h"
 
-**When adding UI features:**
-- Be mindful of the noise impact of display changes.
-- Use the simulator's screenshot feature to document UI changes.
+UNIT_TEST("YourClass") {
 
-## File Generation Notes
+CASE("default_values") {
+    YourClass obj;
+    expectEqual(obj.value(), 0, "default value should be 0");
+}
 
-Building the sequencer generates multiple artifacts in `build/{platform}/{type}/src/apps/sequencer/`, including `.hex`, `.bin`, and `UPDATE.DAT` files for flashing, as well as `.map` and `.list` files for debugging.
+CASE("setter_getter") {
+    YourClass obj;
+    obj.setValue(42);
+    expectEqual(obj.value(), 42, "value should be 42");
+}
 
-## Third-Party Libraries
+CASE("clamping") {
+    YourClass obj;
+    obj.setValue(1000);  // Over max
+    expectEqual(obj.value(), 127, "value should clamp to 127");
+}
 
-- **FreeRTOS**: Real-time operating system
-- **libopencm3**: ARM Cortex-M microcontroller library
-- **FatFs**: FAT filesystem module
-- And others, see `CLAUDE.md` for a complete list.
+} // UNIT_TEST("YourClass")
+```
 
-## Documentation References
+### Reference Examples
 
-- **GEMINI.md** (this file): Main development reference.
-- **QWEN.md**: Detailed feature development reports.
-- **CLAUDE.md**: Alternative detailed development reference.
-- **TODO.md**: Development task tracking.
-- **README.md**: Project overview and build instructions.
-- **doc/improvements/**: Documentation on major improvements.
-
-## Optional TDD Plan: Per-Retrigger Accumulator Ticking
-
-**Disclaimer:** This is a high-risk feature that complicates the engine's timing logic. The analysis in `RTRIG-Timing-Research.md` recommends against it due to pointer invalidation risks and complexity. Proceed with caution. This plan outlines a Test-Driven Development approach for the "Sequence ID" (weak reference) method.
-
-### Phase 1: Model Layer (GateQueue)
-
-1.  **Test: `Gate` struct stores `shouldTickAccumulator` flag.**
-    *   **RED:** In a new test file (e.g., `TestGateQueue.cpp`), write a test that pushes a `Gate` event with `shouldTickAccumulator = true` to the `GateQueue` and asserts the flag is `true` when the event is popped. The test will fail to compile.
-    *   **GREEN:** Add `bool shouldTickAccumulator;` to the `Gate` struct in `GateQueue.h`. Initialize it to `false` in constructors.
-    *   **REFACTOR:** N/A.
-
-2.  **Test: `Gate` struct stores `sequenceId`.**
-    *   **RED:** Write a test to push a `Gate` event with a specific `sequenceId` (e.g., `1` for a fill sequence) and assert the ID is correct when popped. The test will fail to compile.
-    *   **GREEN:** Add `uint8_t sequenceId;` to the `Gate` struct. Define constants for IDs (e.g., `MainSequenceId = 0`, `FillSequenceId = 1`). Initialize it in constructors.
-    *   **REFACTOR:** Ensure struct memory alignment is reasonable.
-
-### Phase 2: Engine Layer (Scheduling)
-
-*This requires a test setup for `NoteTrackEngine` where the `GateQueue` can be inspected.*
-
-1.  **Test: `triggerStep` schedules gates with `shouldTickAccumulator = true`.**
-    *   **RED:** In `TestNoteTrackEngine.cpp`, configure a step with an accumulator trigger and a retrigger count > 1. Set the accumulator's trigger mode to `Retrigger`. Call `triggerStep`. Inspect the events pushed to the `GateQueue`. Assert that the `shouldTickAccumulator` flag is `true` for the gate-on events. This test will fail.
-    *   **GREEN:** In `NoteTrackEngine::triggerStep`, within the retrigger loop, add logic to set `shouldTickAccumulator = true` on the `Gate` event if the step is an accumulator trigger and the accumulator is configured for retrigger mode.
-    *   **REFACTOR:** Encapsulate the flag-setting logic in a clear, readable conditional block.
-
-2.  **Test: `triggerStep` schedules gates with the correct `sequenceId`.**
-    *   **RED:** Write a test where the `NoteTrackEngine` is processing a fill sequence. Call `triggerStep` and assert that the scheduled gate events have `sequenceId = FillSequenceId`. This will likely require modifying the `triggerStep` signature or engine state for testing.
-    *   **GREEN:** Pass the sequence context (or its ID) into `triggerStep` and use it to set the `sequenceId` on the scheduled `Gate` events.
-    *   **REFACTOR:** Clean up the `triggerStep` signature and call sites.
-
-### Phase 3: Engine Layer (Processing)
-
-*This is the most critical phase and requires testing the main `Engine`'s processing loop.*
-
-1.  **Test: `Engine` ticks the correct accumulator on a tagged gate event.**
-    *   **RED:** In a new test file (e.g., `TestEngineGating.cpp`), get a full `Engine` instance. Manually push a `Gate` event to its queue with `shouldTickAccumulator = true` and `sequenceId = MainSequenceId`. Use a mock or spy on the main sequence's `Accumulator` to track calls to its `tick()` method. Run the `Engine` for one cycle. Assert that `tick()` was called exactly once.
-    *   **GREEN:** In the `Engine`'s main processing loop where it pops from the `_gateQueue`, add the new logic:
-        1.  Check if `event.shouldTickAccumulator` is true.
-        2.  If so, get the `NoteSequence*` based on `event.sequenceId`.
-        3.  Perform a validity check on the pointer.
-        4.  If valid, call `sequence->accumulator().tick()`.
-    *   **REFACTOR:** Move the sequence lookup and ticking logic into a new private helper method within the `Engine`.
-
-2.  **Test: `Engine` does NOT tick accumulator if sequence is invalid.**
-    *   **RED:** Similar to the above test, but schedule an event for the `FillSequenceId`. Before running the engine cycle, deactivate the fill sequence in the model, invalidating it. Run the engine cycle. Assert that the accumulator's `tick()` method was **never** called and the firmware did not crash.
-    *   **GREEN:** Implement the pointer validity check from the previous step. Ensure it correctly identifies the sequence as invalid and skips the `tick()` call.
-    *   **REFACTOR:** N/A.
-
-### Phase 4: Manual and Stress Testing
-
-After all unit tests pass, this feature requires extensive manual testing on hardware due to its timing-sensitive nature.
-
-1.  **Queue Capacity:** Test with maximum retrigger and pulse counts to ensure the `GateQueue` (16 entries) does not overflow.
-2.  **Pattern Switching:** While a retriggering sequence is playing, rapidly switch patterns.
-3.  **Fill Mode:** Trigger and release fill mode while a retriggering sequence is active.
-4.  **Project Loading:** Load a new project while a sequence with this feature is playing.
-5.  **UI Responsiveness:** Ensure the UI remains responsive under heavy retrigger/accumulator load.
+**Good test examples to copy from:**
+- `src/tests/unit/sequencer/TestAccumulator.cpp` - Model testing
+- `src/tests/unit/sequencer/TestNoteSequence.cpp` - Property testing
+- `src/tests/unit/sequencer/TestHarmonyEngine.cpp` - Lookup table testing
+- `src/tests/unit/sequencer/TestPulseCount.cpp` - Feature testing

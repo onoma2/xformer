@@ -56,6 +56,54 @@
     - See Queue-BasedAccumTicks.md for detailed implementation plan if future enhancement needed
     - Recommendation: Accept current behavior (pointer invalidation risks in queue-based approaches)
   - All unit tests updated and passing (15 test cases in TestAccumulator)
+- **Harmony Feature**: Harmonàig-style harmonic sequencing with master/follower relationships
+  - **Core Parameters**:
+    - **HarmonyRole**: Off, Master, FollowerRoot, Follower3rd, Follower5th, Follower7th
+    - **MasterTrackIndex**: Range 0-7 (tracks 1-8) specifying which track to follow
+    - **HarmonyScale**: 7 Ionian modes (0-6): Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian
+  - **Per-Step Overrides for Master Tracks**:
+    - **Per-Step Inversion Override**: SEQ, ROOT, 1ST, 2ND, 3RD
+    - **Per-Step Voicing Override**: SEQ, CLOSE, DROP2, DROP3, SPREAD
+  - **UI Integration**: Harmony page accessible via Sequence button cycling (NoteSequence → Accumulator → Harmony)
+  - **HarmonyEngine**: Core harmonization logic with all 7 Ionian modes and diatonic chord qualities
+  - **Inversion Algorithm**: All 4 inversions fully implemented (Root, 1st, 2nd, 3rd)
+  - **Voicing Algorithm**: All 4 voicings fully implemented (Close, Drop2, Drop3, Spread)
+  - **19 Passing Unit Tests** across HarmonyEngine, NoteSequence, and Model integration
+  - **Modulation Order**: Base note + transpose → Harmony → Accumulator → Note variation
+  - **Full Compatibility**: Works with all existing features (Accumulator, Note variation, Gate modes, etc.)
+- **Tuesday Track**: TUE track type providing generative/algorithmic sequencing inspired by Mutable Instruments Marbles, Noise Engineering Mimetic Digitalis, and Tuesday Eurorack module
+  - **Core Parameters**:
+    - **Algorithm**: 0-12 (TEST, TRITRANCE, STOMPER, MARKOV, CHIPARP, GOACID, SNH, WOBBLE, TECHNO, FUNK, DRONE, PHASE, RAGA)
+    - **Flow**: 0-16, sequence movement/variation (seeds RNG)
+    - **Ornament**: 0-16, embellishments and fills (seeds extra RNG)
+    - **Power**: 0-16, number of notes in loop (linear note count)
+    - **LoopLength**: Inf, 1-64, pattern length
+    - **Glide**: 0-100%, slide probability
+    - **Scale**: Free/Project, note quantization mode
+    - **Skew**: -8 to +8, density curve across loop
+  - **TuesdayPage UI**: F1-F5 select parameters with visual bar graphs showing values 0-16
+  - **Reseed Functionality**: Shift+F5 shortcut and context menu RESEED option
+  - **13 Implemented Algorithms** with genre-specific musical characteristics
+  - **Dual RNG System**: Flow/Ornament create deterministic patterns (same values = same patterns)
+  - **Long Gates**: Support for up to 400% gate length for sustained notes
+  - **Scale Quantization**: Can use project scale or chromatic
+  - **Advanced Controls**: CV Update Mode (Free/Gated), Rotate (bipolar), Scan, Sequence parameters
+- **Tuesday Sequence Page**: New TuesdaySequencePage with sequence-related parameters
+  - **Rotate** parameter: Bipolar rotation (±32767) for pattern transformation
+  - **Scan** parameter: Scan position (0-100%) within loop
+  - **CV Update Mode**: Free (continuous) or Gated (only when note plays)
+  - **Playhead progress indicator**: Visual progress through pattern
+- **Simplified Musical Algorithms**: 10 genre-specific algorithms optimized for Tuesday track
+  - **SIMPLE_AMBIENT**: Long sustained notes with slides for ambient feel
+  - **SIMPLE_TECHNO**: Driving 4/4 patterns with occasional syncopation
+  - **SIMPLE_JAZZ**: Swing feel with chord tones and scale notes
+  - **SIMPLE_CLASSICAL**: Counterpoint patterns with smooth transitions
+  - **SIMPLE_MINIMALIST**: Phasing patterns with consistent rhythm
+  - **SIMPLE_BREAKBEAT**: Classic breakbeat rhythms with bass/snare
+  - **SIMPLE_DRONE**: Sustained drone with occasional harmony
+  - **SIMPLE_ARPEGGIO**: Ascending/descending arpeggiated patterns
+  - **SIMPLE_FUNK**: Syncopated bass lines with groove
+  - **SIMPLE_RAGA**: Traditional ascending/descending melodic patterns
 
 ### Changed
 - NoteTrackEngine gate firing logic now respects gate mode setting
@@ -88,6 +136,33 @@
   - Updated all tests to consume delayed first tick before assertions
   - Fixed tick_down_enabled test to allow negative values with Hold mode
   - Added reset() calls where needed to sync currentValue after parameter changes
+- **Harmony Engine Integration**:
+  - Direct integration in NoteTrackEngine::evalStepNote() following Accumulator modulation pattern
+  - Master/follower relationships implemented with synchronized step playback
+  - Harmony modulation applied after base note + transpose, before accumulator
+  - Per-step inversion/voicing overrides read from master sequence during harmonization
+- **TuesdayTrack Implementation**:
+  - Dual RNG seeding from Flow/Ornament parameters for deterministic patterns
+  - Cooldown-based density control for Power parameter (linear note count)
+  - Algorithm-specific gate length variations with support for long gates (up to 400%)
+  - Clock sync and deterministic loops for consistent pattern generation
+  - Pre-generated 128-step buffer for finite loops and 256-step warmup for mature patterns
+  - UI improvements: Paginated TuesdayEditPage with S1 navigation and parameter alignment
+- **Tuesday Sequence Parameters**:
+  - Added Rotate parameter for pattern transformation with bipolar range
+  - Added Scan parameter for position within loop
+  - Added CV Update Mode parameter (Free/Gated) for pitch change behavior
+  - Added playhead progress indicator for visual feedback
+  - Added bounds checks and safety guards to prevent segfaults
+- **Per-Step Inversion/Voicing Implementation**:
+  - Added per-step override bitfields in NoteSequence::Step (bits 25-27, 28-30)
+  - Updated UI layer to show compact abbreviations (S/R/1/2/3 for inversion, S/C/2/3/W for voicing)
+  - Modified harmonization to read per-step overrides from master steps when following
+- **TUE Track UI Integration**:
+  - Updated TrackPage with Shift+F5 reseed shortcut and context menu RESEED option
+  - Added visual bar graphs for parameter values in TuesdayPage
+  - Added TuesdaySequencePage for sequence-level parameters
+  - Implemented algorithm-specific parameter mapping for Flow/Ornament controls
 
 ### Fixed
 - **Critical gate mode bug**: Fixed pulse counter timing issue where triggerStep() was called after counter reset
@@ -116,6 +191,62 @@
   - All 15 test cases now passing
 - Test compilation errors related to dummy implementation classes
 - GateOutput constructor dependencies in unit tests
+- **Tuesday Track Serialization Bug**: Fixed missing version guards causing "Failed to load (end_of_file)" errors
+  - Root cause: TuesdayTrack::read() had no version guards
+  - Fix: Added ProjectVersion::Version35 with version guards on all read() calls
+  - Impact: Projects with Tuesday tracks load correctly
+- **Tuesday Track Division by Zero Bug**: Fixed hardware reboots when loading projects with Tuesday tracks
+  - Root cause: PHASE `_phaseLength` and DRONE `_droneSpeed` defaulted to 0, causing modulo by zero
+  - Fix: Added safe defaults (4 and 1) plus runtime guards at all modulo operations
+  - Impact: Hardware no longer reboots when loading projects with Tuesday tracks
+- **Harmony Inversion Bug**: Fixed where harmony inversion/voicing were read from master sequence instead of follower
+  - Root cause: Per-step inversion/voicing parameters were being read from wrong sequence during harmonization
+  - Fix: Updated to read per-step overrides from master sequence when harmonizing followers
+  - Impact: Per-step inversion and voicing overrides now work correctly
+- **Skew Calculation Safety**: Added safety guards to prevent segfault in skew calculation
+  - Root cause: Possible division by zero or invalid index access in skew calculations
+  - Fix: Added bounds checking and safe defaults in skew implementation
+  - Impact: Skew parameter now works safely with all values
+- **Loop Length Display**: Corrected LOOP parameter max for proper bar display (64 = full bar)
+  - Root cause: Incorrect max value in UI display
+  - Fix: Updated maximum value to match actual range
+  - Impact: Loop length now displays correctly in UI
+- **Tuesday Algorithm Fixes**: Fixed CHIPARP/GOACID algorithms and ensured Glide=0 properly disables slides
+  - Root cause: Placeholder implementations and Glide parameter not properly respected
+  - Fix: Replaced placeholders with proper implementations, added Glide=0 handling
+  - Impact: All algorithms now work correctly with proper Glide behavior
+- **Per-Step Harmony Role Override**: Added proper handling for per-step harmony role overrides
+  - Root cause: Per-step harmony role parameters were not being applied correctly
+  - Fix: Added proper UI and engine handling for per-step role overrides
+  - Impact: Users can now set per-step harmony roles
+- **CV Update Mode Implementation**: Added proper implementation of CV Update Mode feature
+  - Root cause: Continuous pitch evolution vs gated behavior was not configurable
+  - Fix: Added Free/Gated CV update mode parameter with proper engine support
+  - Impact: Users can choose between continuous or gated pitch updates
+- **Tuesday Track Buffer Generation**: Fixed buffer regeneration to happen instantly when parameters change
+  - Root cause: Delayed buffer updates led to stale patterns
+  - Fix: Added immediate buffer regeneration on parameter changes
+  - Impact: Parameter changes now immediately affect pattern output
+- **Tuesday Track Scan Parameter**: Fixed Scan parameter to work with finite loops, not just infinite
+  - Root cause: Scan was only implemented for infinite loops
+  - Fix: Extended Scan functionality to finite loops
+  - Impact: Scan now works with all loop types
+- **Tuesday Track Rotate Parameter**: Limited Rotate to loop length for easier use
+  - Root cause: Rotate values beyond loop length were confusing
+  - Fix: Constrained Rotate to valid loop range
+  - Impact: More intuitive Rotate parameter behavior
+- **Tuesday Track Reset Issue**: Disabled reset measure for infinite loops to allow truly infinite patterns
+  - Root cause: Reset was interrupting infinite loops
+  - Fix: Removed reset measure for infinite loop patterns
+  - Impact: Truly infinite patterns now possible without interruption
+- **Tuesday Track Power Parameter**: Changed Power parameter to be linear (Power = number of notes)
+  - Root cause: Non-linear power was confusing for users
+  - Fix: Made Power represent actual note count in loop
+  - Impact: More intuitive power parameter behavior
+- **Tuesday Track Skew Function**: Changed skew from ramp to step function for clearer density control
+  - Root cause: Ramp function was not providing clear density variation
+  - Fix: Implemented step function for more distinct density changes
+  - Impact: Clearer and more predictable skew behavior
 
 ## v0.1.42 (6 June 2022)
 
