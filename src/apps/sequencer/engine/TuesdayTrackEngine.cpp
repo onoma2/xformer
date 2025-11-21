@@ -99,11 +99,63 @@ void TuesdayTrackEngine::restart() {
 }
 
 void TuesdayTrackEngine::reseed() {
-    // Reset step to beginning and reinitialize algorithm
-    // This gives a fresh pattern start while keeping parameters
+    // Reset step to beginning
     _stepIndex = 0;
     _coolDown = 0;
-    initAlgorithm();
+
+    // Generate new random seeds for a fresh pattern
+    // Use current RNG state to generate new seeds, giving variety
+    uint32_t newSeed1 = _rng.next();
+    uint32_t newSeed2 = _extraRng.next();
+
+    // Reinitialize RNGs with new random seeds
+    _rng = Random(newSeed1);
+    _extraRng = Random(newSeed2);
+
+    // Reinitialize algorithm state with new RNG values
+    int algorithm = _tuesdayTrack.algorithm();
+
+    switch (algorithm) {
+    case 0: // TEST
+        _testMode = (_rng.next() & 0x1);
+        _testSweepSpeed = (_rng.next() & 0x3);
+        _testAccent = (_rng.next() & 0x1);
+        _testVelocity = (_rng.next() & 0xF0);
+        _testNote = 0;
+        break;
+
+    case 1: // TRITRANCE
+        _triB1 = (_rng.next() & 0x7);
+        _triB2 = (_rng.next() & 0x7);
+        _triB3 = (_extraRng.next() & 0x15);
+        if (_triB3 >= 7) _triB3 -= 7; else _triB3 = 0;
+        _triB3 -= 4;
+        break;
+
+    case 2: // STOMPER
+        _stomperMode = (_rng.next() % 7) * 2;
+        _stomperCountDown = 0;
+        _stomperLowNote = _rng.next() % 3;
+        _stomperLastNote = _stomperLowNote;
+        _stomperLastOctave = 0;
+        _stomperHighNote[0] = _rng.next() % 7;
+        _stomperHighNote[1] = _rng.next() % 5;
+        break;
+
+    case 3: // MARKOV
+        _markovHistory1 = (_rng.next() & 0x7);
+        _markovHistory3 = (_rng.next() & 0x7);
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                _markovMatrix[i][j][0] = (_rng.next() % 8);
+                _markovMatrix[i][j][1] = (_extraRng.next() % 8);
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
 }
 
 TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
