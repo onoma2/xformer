@@ -157,13 +157,13 @@ private:
     // DRONE algorithm state
     uint8_t _droneBaseNote = 0;
     uint8_t _droneInterval = 0;
-    uint8_t _droneSpeed = 0;
+    uint8_t _droneSpeed = 1;  // Safe default to avoid division by zero
 
     // PHASE algorithm state
     uint32_t _phaseAccum = 0;
     uint32_t _phaseSpeed = 0;
     uint8_t _phasePattern[8] = {0};
-    uint8_t _phaseLength = 0;
+    uint8_t _phaseLength = 4;  // Safe default to avoid division by zero
 
     // RAGA algorithm state
     uint8_t _ragaScale[7] = {0};
