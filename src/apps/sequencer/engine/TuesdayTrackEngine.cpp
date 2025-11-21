@@ -80,6 +80,7 @@ void TuesdayTrackEngine::reset() {
     _stepIndex = 0;
     _gateLength = 0;
     _gateTicks = 0;
+    _coolDown = 0;
     _activity = false;
     _gateOutput = false;
     _cvOutput = 0.f;
@@ -118,6 +119,12 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     if (_cachedFlow != _tuesdayTrack.flow() || _cachedOrnament != _tuesdayTrack.ornament()) {
         initAlgorithm();
     }
+
+    // Calculate CoolDownMax from power parameter
+    // Power 1-16 maps to CoolDownMax 16-1 (inverted)
+    // Low power = high cooldown = sparse patterns
+    // High power = low cooldown = dense patterns
+    _coolDownMax = 17 - power;  // power 1 -> 16, power 16 -> 1
 
     // Calculate step timing with clock sync
     // Use 16th notes as base timing
@@ -368,18 +375,25 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             break;
         }
 
-        // Apply gate based on power (probability)
-        if (shouldGate) {
-            int probability = (power * 100) / 16;
-            if ((int)_rng.nextRange(100) < probability) {
-                _gateOutput = true;
-                // Gate length: 50% of step duration
-                _gateTicks = divisor / 2;
-                _activity = true;
-            }
+        // Decrement cooldown
+        if (_coolDown > 0) {
+            _coolDown--;
+            if (_coolDown > _coolDownMax) _coolDown = _coolDownMax;
         }
 
-        // Apply CV
+        // Apply gate using cooldown system
+        // Note triggers only when cooldown has expired
+        // Velocity (from algorithm) must beat current cooldown value
+        if (shouldGate && _coolDown == 0) {
+            _gateOutput = true;
+            // Gate length: 50% of step duration
+            _gateTicks = divisor / 2;
+            _activity = true;
+            // Reset cooldown after triggering
+            _coolDown = _coolDownMax;
+        }
+
+        // Apply CV (always update CV even if no gate)
         _cvOutput = noteVoltage;
 
         // Advance step

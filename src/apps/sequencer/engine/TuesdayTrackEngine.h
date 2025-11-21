@@ -46,6 +46,12 @@ private:
     uint32_t _gateLength = 0;
     uint32_t _gateTicks = 0;
 
+    // Cooldown system (Power parameter controls note density)
+    // Higher power = shorter cooldown = more notes
+    // Lower power = longer cooldown = sparser patterns
+    int _coolDown = 0;
+    int _coolDownMax = 0;
+
     // TEST algorithm state
     uint8_t _testMode = 0;      // 0=OCTSWEEPS, 1=SCALEWALKER
     uint8_t _testSweepSpeed = 0;
