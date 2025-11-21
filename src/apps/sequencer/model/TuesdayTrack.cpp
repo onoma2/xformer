@@ -88,6 +88,7 @@ void TuesdayTrack::clear() {
     _ornament = 0;
     _power = 0;
     _loopLength = 16;
+    _glide = 0;
 }
 
 void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
@@ -96,6 +97,7 @@ void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_ornament);
     writer.write(_power);
     writer.write(_loopLength);
+    writer.write(_glide);
 }
 
 void TuesdayTrack::read(VersionedSerializedReader &reader) {
@@ -104,4 +106,5 @@ void TuesdayTrack::read(VersionedSerializedReader &reader) {
     reader.read(_ornament);
     reader.read(_power);
     reader.read(_loopLength);
+    reader.read(_glide, 0);  // Default 0% for old projects
 }

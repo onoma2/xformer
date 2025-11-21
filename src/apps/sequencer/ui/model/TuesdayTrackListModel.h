@@ -47,6 +47,7 @@ private:
         Ornament,
         Power,
         LoopLength,
+        Glide,
         Last
     };
 
@@ -57,6 +58,7 @@ private:
         case Ornament:      return "Ornament";
         case Power:         return "Power";
         case LoopLength:    return "Loop Length";
+        case Glide:         return "Glide";
         case Last:          break;
         }
         return nullptr;
@@ -83,6 +85,9 @@ private:
         case LoopLength:
             _track->printLoopLength(str);
             break;
+        case Glide:
+            _track->printGlide(str);
+            break;
         case Last:
             break;
         }
@@ -104,6 +109,9 @@ private:
             break;
         case LoopLength:
             _track->editLoopLength(value, shift);
+            break;
+        case Glide:
+            _track->editGlide(value, shift);
             break;
         case Last:
             break;

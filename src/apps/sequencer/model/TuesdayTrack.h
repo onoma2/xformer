@@ -87,6 +87,21 @@ public:
     // Get actual loop length value (for engine use)
     int actualLoopLength() const;
 
+    // glide (slide probability 0-100%)
+
+    int glide() const { return _glide; }
+    void setGlide(int glide) {
+        _glide = clamp(glide, 0, 100);
+    }
+
+    void editGlide(int value, bool shift) {
+        setGlide(this->glide() + value * (shift ? 10 : 1));
+    }
+
+    void printGlide(StringBuilder &str) const {
+        str("%d%%", glide());
+    }
+
     //----------------------------------------
     // Methods
     //----------------------------------------
@@ -112,6 +127,7 @@ private:
     uint8_t _ornament = 0;
     uint8_t _power = 0;
     uint8_t _loopLength = 16;
+    uint8_t _glide = 0;  // Default 0% (no slides)
 
     friend class Track;
 };

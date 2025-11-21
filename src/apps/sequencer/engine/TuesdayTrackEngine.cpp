@@ -275,8 +275,9 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     _gatePercent = 200 + (_rng.nextRange(9) * 25); // 200% to 400%
                 }
 
-                // Random slide (like RandomSlideAndLength)
-                if (_rng.nextBinary() && _rng.nextBinary()) {
+                // Random slide controlled by glide parameter
+                int glide = _tuesdayTrack.glide();
+                if (glide > 0 && _rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;  // 1-3
                 } else {
                     _slide = 0;
@@ -365,7 +366,12 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     case 11:  // SLIDEDOWN2
                         octave = 0;
                         note = _stomperLowNote;
-                        _slide = (_rng.nextRange(3)) + 1;  // Slide 1-3
+                        // Slide controlled by glide parameter
+                        if (_tuesdayTrack.glide() > 0) {
+                            _slide = (_rng.nextRange(3)) + 1;  // Slide 1-3
+                        } else {
+                            _slide = 0;
+                        }
                         if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
                         _stomperMode = 14;  // MAKENEW
                         break;
@@ -377,7 +383,12 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     case 13:  // SLIDEUP2
                         octave = 1;
                         note = _stomperHighNote[_rng.next() % 2];
-                        _slide = (_rng.nextRange(3)) + 1;  // Slide 1-3
+                        // Slide controlled by glide parameter
+                        if (_tuesdayTrack.glide() > 0) {
+                            _slide = (_rng.nextRange(3)) + 1;  // Slide 1-3
+                        } else {
+                            _slide = 0;
+                        }
                         if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
                         _stomperMode = 14;  // MAKENEW
                         break;
@@ -463,8 +474,9 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     _gatePercent = 200 + (_rng.nextRange(9) * 25); // 200% to 400%
                 }
 
-                // Random slide (like RandomSlideAndLength)
-                if (_rng.nextBinary() && _rng.nextBinary()) {
+                // Random slide controlled by glide parameter
+                int glide = _tuesdayTrack.glide();
+                if (glide > 0 && _rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;  // 1-3
                 } else {
                     _slide = 0;
