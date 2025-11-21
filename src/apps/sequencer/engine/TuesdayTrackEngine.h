@@ -33,7 +33,9 @@ private:
     uint32_t _stepIndex = 0;
     uint32_t _gateLength = 0;
     uint32_t _gateTicks = 0;
+    uint32_t _rngSeed = 12345;  // Fixed seed for deterministic loops
     Random _rng;
+    float _lastNote = 0.f;      // For MARKOV algorithm state
 
     // Output state
     bool _activity = false;
