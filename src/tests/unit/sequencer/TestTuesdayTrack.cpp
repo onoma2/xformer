@@ -17,6 +17,7 @@ CASE("default_values") {
     expectEqual(track.ornament(), 0, "default ornament should be 0");
     expectEqual(track.power(), 0, "default power should be 0");
     expectEqual(track.loopLength(), 16, "default loopLength index should be 16");
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "default cvUpdateMode should be Free (0)");
 }
 
 //----------------------------------------
@@ -110,7 +111,7 @@ CASE("loopLength_setter_getter") {
 CASE("loopLength_clamping_upper") {
     TuesdayTrack track;
     track.setLoopLength(30);
-    expectEqual(track.loopLength(), 23, "loopLength should clamp to 23 (max index)");
+    expectEqual(track.loopLength(), 25, "loopLength should clamp to 25 (max index)");
 }
 
 CASE("actualLoopLength_infinite") {
@@ -136,7 +137,7 @@ CASE("actualLoopLength_standard_values") {
 CASE("actualLoopLength_extended_values") {
     TuesdayTrack track;
 
-    // Test extended values: 19, 21, 24, 32, 35, 42, 48, 64
+    // Test extended values: 19, 21, 24, 32, 35, 42, 48, 56, 64
     track.setLoopLength(17);
     expectEqual(track.actualLoopLength(), 19, "index 17 = 19");
 
@@ -157,6 +158,12 @@ CASE("actualLoopLength_extended_values") {
 
     track.setLoopLength(23);
     expectEqual(track.actualLoopLength(), 48, "index 23 = 48");
+
+    track.setLoopLength(24);
+    expectEqual(track.actualLoopLength(), 56, "index 24 = 56");
+
+    track.setLoopLength(25);
+    expectEqual(track.actualLoopLength(), 64, "index 25 = 64");
 }
 
 //----------------------------------------
@@ -172,6 +179,7 @@ CASE("clear_resets_all_values") {
     track.setOrnament(12);
     track.setPower(14);
     track.setLoopLength(20);
+    track.setCvUpdateMode(TuesdayTrack::CvUpdateMode::Gated);
 
     // Clear
     track.clear();
@@ -182,6 +190,7 @@ CASE("clear_resets_all_values") {
     expectEqual(track.ornament(), 0, "ornament should reset to 0");
     expectEqual(track.power(), 0, "power should reset to 0");
     expectEqual(track.loopLength(), 16, "loopLength should reset to 16");
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "cvUpdateMode should reset to Free");
 }
 
 //----------------------------------------
@@ -223,6 +232,190 @@ CASE("editLoopLength_increments") {
     track.setLoopLength(16);
     track.editLoopLength(1, false);
     expectEqual(track.loopLength(), 17, "loopLength should increment to 17");
+}
+
+//----------------------------------------
+// CvUpdateMode Parameter
+//----------------------------------------
+
+CASE("cvUpdateMode_default_value") {
+    TuesdayTrack track;
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "default cvUpdateMode should be Free (0)");
+}
+
+CASE("cvUpdateMode_setter_getter") {
+    TuesdayTrack track;
+    track.setCvUpdateMode(TuesdayTrack::CvUpdateMode::Gated);
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 1, "cvUpdateMode should be Gated (1)");
+    track.setCvUpdateMode(TuesdayTrack::CvUpdateMode::Free);
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "cvUpdateMode should be Free (0)");
+}
+
+CASE("cvUpdateMode_edit_toggles") {
+    TuesdayTrack track;
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "initial should be Free");
+    track.editCvUpdateMode(1, false);
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 1, "should toggle to Gated");
+    track.editCvUpdateMode(1, false);
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "should toggle back to Free");
+}
+
+CASE("cvUpdateMode_clear_resets") {
+    TuesdayTrack track;
+    track.setCvUpdateMode(TuesdayTrack::CvUpdateMode::Gated);
+    track.clear();
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "cvUpdateMode should reset to Free after clear");
+}
+
+//----------------------------------------
+// Octave Parameter (-10 to +10)
+//----------------------------------------
+
+CASE("octave_default_value") {
+    TuesdayTrack track;
+    expectEqual(track.octave(), 0, "default octave should be 0");
+}
+
+CASE("octave_setter_getter") {
+    TuesdayTrack track;
+    track.setOctave(5);
+    expectEqual(track.octave(), 5, "octave should be 5");
+    track.setOctave(-3);
+    expectEqual(track.octave(), -3, "octave should be -3");
+}
+
+CASE("octave_clamping") {
+    TuesdayTrack track;
+    track.setOctave(15);
+    expectEqual(track.octave(), 10, "octave should clamp to 10");
+    track.setOctave(-15);
+    expectEqual(track.octave(), -10, "octave should clamp to -10");
+}
+
+//----------------------------------------
+// Transpose Parameter (-11 to +11)
+//----------------------------------------
+
+CASE("transpose_default_value") {
+    TuesdayTrack track;
+    expectEqual(track.transpose(), 0, "default transpose should be 0");
+}
+
+CASE("transpose_setter_getter") {
+    TuesdayTrack track;
+    track.setTranspose(7);
+    expectEqual(track.transpose(), 7, "transpose should be 7");
+    track.setTranspose(-5);
+    expectEqual(track.transpose(), -5, "transpose should be -5");
+}
+
+CASE("transpose_clamping") {
+    TuesdayTrack track;
+    track.setTranspose(20);
+    expectEqual(track.transpose(), 11, "transpose should clamp to 11");
+    track.setTranspose(-20);
+    expectEqual(track.transpose(), -11, "transpose should clamp to -11");
+}
+
+//----------------------------------------
+// Divisor Parameter
+//----------------------------------------
+
+CASE("divisor_default_value") {
+    TuesdayTrack track;
+    expectEqual(track.divisor(), 192, "default divisor should be 192 (1/4 note)");
+}
+
+CASE("divisor_setter_getter") {
+    TuesdayTrack track;
+    track.setDivisor(96);
+    expectEqual(track.divisor(), 96, "divisor should be 96");
+}
+
+//----------------------------------------
+// ResetMeasure Parameter (0-128)
+//----------------------------------------
+
+CASE("resetMeasure_default_value") {
+    TuesdayTrack track;
+    expectEqual(track.resetMeasure(), 0, "default resetMeasure should be 0 (off)");
+}
+
+CASE("resetMeasure_setter_getter") {
+    TuesdayTrack track;
+    track.setResetMeasure(8);
+    expectEqual(track.resetMeasure(), 8, "resetMeasure should be 8");
+}
+
+CASE("resetMeasure_clamping") {
+    TuesdayTrack track;
+    track.setResetMeasure(200);
+    expectEqual(track.resetMeasure(), 128, "resetMeasure should clamp to 128");
+}
+
+//----------------------------------------
+// Scale Parameter (-1 to ScaleCount)
+//----------------------------------------
+
+CASE("scale_default_value") {
+    TuesdayTrack track;
+    expectEqual(track.scale(), -1, "default scale should be -1 (Default/Project)");
+}
+
+CASE("scale_setter_getter") {
+    TuesdayTrack track;
+    track.setScale(3);
+    expectEqual(track.scale(), 3, "scale should be 3");
+    track.setScale(-1);
+    expectEqual(track.scale(), -1, "scale should be -1 (Default)");
+}
+
+//----------------------------------------
+// RootNote Parameter (-1 to 11)
+//----------------------------------------
+
+CASE("rootNote_default_value") {
+    TuesdayTrack track;
+    expectEqual(track.rootNote(), -1, "default rootNote should be -1 (Default/Project)");
+}
+
+CASE("rootNote_setter_getter") {
+    TuesdayTrack track;
+    track.setRootNote(5);
+    expectEqual(track.rootNote(), 5, "rootNote should be 5 (F)");
+    track.setRootNote(-1);
+    expectEqual(track.rootNote(), -1, "rootNote should be -1 (Default)");
+}
+
+CASE("rootNote_clamping") {
+    TuesdayTrack track;
+    track.setRootNote(15);
+    expectEqual(track.rootNote(), 11, "rootNote should clamp to 11");
+    track.setRootNote(-5);
+    expectEqual(track.rootNote(), -1, "rootNote should clamp to -1");
+}
+
+//----------------------------------------
+// Sequence Parameters Clear
+//----------------------------------------
+
+CASE("sequence_params_clear") {
+    TuesdayTrack track;
+    track.setOctave(5);
+    track.setTranspose(-3);
+    track.setDivisor(96);
+    track.setResetMeasure(16);
+    track.setScale(2);
+    track.setRootNote(7);
+
+    track.clear();
+
+    expectEqual(track.octave(), 0, "octave should reset to 0");
+    expectEqual(track.transpose(), 0, "transpose should reset to 0");
+    expectEqual(track.divisor(), 192, "divisor should reset to 192");
+    expectEqual(track.resetMeasure(), 0, "resetMeasure should reset to 0");
+    expectEqual(track.scale(), -1, "scale should reset to -1");
+    expectEqual(track.rootNote(), -1, "rootNote should reset to -1");
 }
 
 } // UNIT_TEST("TuesdayTrack")

@@ -7,39 +7,15 @@ static const char *algorithmNames[] = {
     "TRITRANCE",  // 1
     "STOMPER",    // 2
     "MARKOV",     // 3
-    "WOBBLE",     // 4
-    "CHIPARP1",   // 5
-    "CHIPARP2",   // 6
-    "SNH",        // 7
-    "SAIKO",      // 8
-    "SAIKOLEAD",  // 9
-    "SCALEWALK",  // 10
-    "TOOEASY",    // 11
-    "RANDOM",     // 12
-    "CELLAUTO",   // 13
-    "CHAOS",      // 14
-    "FRACTAL",    // 15
-    "WAVE",       // 16
-    "DNA",        // 17
-    "TURING",     // 18
-    "PARTICLE",   // 19
-    "NEURAL",     // 20
-    "QUANTUM",    // 21
-    "LSYSTEM",    // 22
-    "TECHNO",     // 23
-    "JUNGLE",     // 24
-    "AMBIENT",    // 25
-    "ACID",       // 26
-    "FUNK",       // 27
-    "DRILL",      // 28
-    "MINIMAL",    // 29
-    "KRAFTWERK",  // 30
-    "APHEX",      // 31
-    "BOARDS",     // 32
-    "TANGERINE",  // 33
-    "AUTECHRE",   // 34
-    "SQUAREPUSH", // 35
-    "DAFT",       // 36
+    "CHIPARP",    // 4
+    "GOACID",     // 5
+    "SNH",        // 6
+    "WOBBLE",     // 7
+    "TECHNO",     // 8
+    "FUNK",       // 9
+    "DRONE",      // 10
+    "PHASE",      // 11
+    "RAGA",       // 12
 };
 
 // Loop length values: Inf (0), 1-16, 19, 21, 24, 32, 35, 42, 48, 56, 64
@@ -50,7 +26,7 @@ static const int loopLengthValues[] = {
 };
 
 void TuesdayTrack::printAlgorithm(StringBuilder &str) const {
-    if (_algorithm < 37) {
+    if (_algorithm < 13) {
         str(algorithmNames[_algorithm]);
     } else {
         str("???");
@@ -91,6 +67,15 @@ void TuesdayTrack::clear() {
     _glide = 0;
     _useScale = false;
     _skew = 0;
+    _cvUpdateMode = Free;
+    _octave = 0;
+    _transpose = 0;
+    _divisor = 12;
+    _resetMeasure = 8;
+    _scale = -1;
+    _rootNote = -1;
+    _scan = 0;
+    _rotate = 0;
 }
 
 void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
@@ -102,6 +87,15 @@ void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_glide);
     writer.write(_useScale);
     writer.write(_skew);
+    writer.write(_cvUpdateMode);
+    writer.write(_octave);
+    writer.write(_transpose);
+    writer.write(_divisor);
+    writer.write(_resetMeasure);
+    writer.write(_scale);
+    writer.write(_rootNote);
+    writer.write(_scan);
+    writer.write(_rotate);
 }
 
 void TuesdayTrack::read(VersionedSerializedReader &reader) {
@@ -113,4 +107,13 @@ void TuesdayTrack::read(VersionedSerializedReader &reader) {
     reader.read(_glide, 0);  // Default 0% for old projects
     reader.read(_useScale, false);  // Default free for old projects
     reader.read(_skew, 0);  // Default 0 for old projects
+    reader.read(_cvUpdateMode, Free);  // Default Free for old projects
+    reader.read(_octave, 0);  // Default 0 for old projects
+    reader.read(_transpose, 0);  // Default 0 for old projects
+    reader.read(_divisor, 12);  // Default 1/16 note for old projects
+    reader.read(_resetMeasure, 8);  // Default 8 bars for old projects
+    reader.read(_scale, -1);  // Default -1 (project) for old projects
+    reader.read(_rootNote, -1);  // Default -1 (project) for old projects
+    reader.read(_scan, 0);  // Default 0 for old projects
+    reader.read(_rotate, 0);  // Default 0 for old projects
 }

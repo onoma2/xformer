@@ -47,9 +47,11 @@ private:
         Ornament,
         Power,
         LoopLength,
+        Scan,
+        Rotate,
         Glide,
-        Scale,
         Skew,
+        CvUpdateMode,
         Last
     };
 
@@ -60,9 +62,11 @@ private:
         case Ornament:      return "Ornament";
         case Power:         return "Power";
         case LoopLength:    return "Loop Length";
+        case Scan:          return "Scan";
+        case Rotate:        return "Rotate";
         case Glide:         return "Glide";
-        case Scale:         return "Scale";
         case Skew:          return "Skew";
+        case CvUpdateMode:  return "CV Mode";
         case Last:          break;
         }
         return nullptr;
@@ -89,14 +93,24 @@ private:
         case LoopLength:
             _track->printLoopLength(str);
             break;
+        case Scan:
+            _track->printScan(str);
+            break;
+        case Rotate:
+            if (_track->loopLength() == 0) {
+                str("N/A");
+            } else {
+                _track->printRotate(str);
+            }
+            break;
         case Glide:
             _track->printGlide(str);
             break;
-        case Scale:
-            _track->printUseScale(str);
-            break;
         case Skew:
             _track->printSkew(str);
+            break;
+        case CvUpdateMode:
+            _track->printCvUpdateMode(str);
             break;
         case Last:
             break;
@@ -120,14 +134,22 @@ private:
         case LoopLength:
             _track->editLoopLength(value, shift);
             break;
+        case Scan:
+            _track->editScan(value, shift);
+            break;
+        case Rotate:
+            if (_track->loopLength() != 0) {
+                _track->editRotate(value, shift);
+            }
+            break;
         case Glide:
             _track->editGlide(value, shift);
             break;
-        case Scale:
-            _track->editUseScale(value, shift);
-            break;
         case Skew:
             _track->editSkew(value, shift);
+            break;
+        case CvUpdateMode:
+            _track->editCvUpdateMode(value, shift);
             break;
         case Last:
             break;

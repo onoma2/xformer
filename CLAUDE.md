@@ -759,10 +759,10 @@ The PEW|FORMER firmware includes a Tuesday track type that provides generative/a
 
 | Parameter | Range | Musical Meaning |
 |-----------|-------|-----------------|
-| **Algorithm** | 0-31 | Pattern personality (MARKOV, STOMPER, TRITRANCE, etc.) |
+| **Algorithm** | 0-12 | Pattern personality (MARKOV, STOMPER, TRITRANCE, etc.) |
 | **Flow** | 0-16 | Sequence movement/variation (seeds RNG) |
 | **Ornament** | 0-16 | Embellishments and fills (seeds extra RNG) |
-| **Power** | 0-16 | Note density (0=silent, 16=maximum) |
+| **Power** | 0-16 | Number of notes in loop (0=silent, 16=all steps) |
 | **LoopLength** | Inf, 1-64 | Pattern length |
 | **Glide** | 0-100% | Slide probability |
 | **Scale** | Free/Project | Note quantization mode |
@@ -770,9 +770,10 @@ The PEW|FORMER firmware includes a Tuesday track type that provides generative/a
 
 ### Key Features
 
-**Power: Cooldown-Based Density**
-- Power 1 → Very sparse (16 steps between notes)
-- Power 16 → Maximum density (every step)
+**Power: Linear Note Count**
+- Power = number of notes that play in the loop
+- Power 16 = 16 notes, Power 8 = 8 notes, Power 1 = 1 note
+- Gap between notes = LoopLength / Power
 
 **Flow & Ornament: Dual RNG Seeding**
 - Same values always produce identical patterns (deterministic)
@@ -824,9 +825,37 @@ Creates density curves across the loop:
 
 | # | Name | Type | Description |
 |---|------|------|-------------|
-| 0 | TEST | Utility | Calibration/test patterns |
-| 1 | TRITRANCE | Melodic | German minimal melodies |
-| 3 | MARKOV | Melodic | 3rd-order Markov transitions |
+| 0 | TEST | Utility | Calibration/test patterns (OCTSWEEPS/SCALEWALKER) |
+| 1 | TRITRANCE | Melodic | German minimal arpeggios with phase modulation |
+| 2 | STOMPER | Bass | Acid bass with 14-state machine, slides |
+| 3 | MARKOV | Melodic | 3rd-order Markov chain transitions |
+| 4 | CHIPARP | Melodic | 8-bit chiptune arpeggios with direction changes |
+| 5 | GOACID | Bass | Goa/psytrance acid patterns with transposes |
+| 6 | SNH | Melodic | Sample & Hold filtered random walk |
+| 7 | WOBBLE | Bass | Dual-phase LFO bass wobbles |
+| 8 | TECHNO | Rhythmic | Four-on-floor club patterns (kick/hat interleaved) |
+| 9 | FUNK | Rhythmic | Syncopated grooves with ghost notes |
+| 10 | DRONE | Ambient | Sustained textures with long gates (400%) |
+| 11 | PHASE | Melodic | Minimalist phasing (Steve Reich style) |
+| 12 | RAGA | Melodic | Indian classical with Bhairav/Yaman/Todi/Kafi scales |
+
+### Flow & Ornament Controls Per Algorithm
+
+| Algo | Flow Controls | Ornament Controls |
+|------|---------------|-------------------|
+| TEST | Mode, sweep speed | Accent, velocity |
+| TRITRANCE | High note (b1), phase offset (b2) | Octave offset (b3) |
+| STOMPER | Pattern mode, transitions | Note choices, countdown |
+| MARKOV | History states, matrix col 0 | Matrix col 1 |
+| CHIPARP | Chord seed, base note | Arpeggio direction |
+| GOACID | Note sequence patterns | Transpose flags |
+| SNH | Target note values | Velocity variation |
+| WOBBLE | Phase transitions, slides | Velocity variation |
+| TECHNO | Kick pattern (0-3), bass note | Hat pattern (0-3) |
+| FUNK | Rhythm pattern (0-7), notes | Syncopation, ghost probability |
+| DRONE | Base note, change speed | Interval type |
+| PHASE | Pattern length (3-8), melodic cell | Phase drift speed |
+| RAGA | Scale type, movements | Ornament/gamaka probability |
 
 ### UI Integration
 
@@ -843,9 +872,10 @@ Creates density curves across the loop:
 
 ✅ **Implemented and verified:**
 - Model layer with all parameters
-- Engine with dual RNG, cooldown, gate/CV output
+- Engine with dual RNG, linear Power density, gate/CV output
 - UI page with parameter editing
-- TEST, TRITRANCE, MARKOV algorithms
+- 13 algorithms: TEST, TRITRANCE, STOMPER, MARKOV, CHIPARP, GOACID, SNH, WOBBLE, TECHNO, FUNK, DRONE, PHASE, RAGA
+- Glide=0 properly disables all algorithm-generated slides
 - Glide, Scale, Skew features
 - Reseed via Shift+F5 and context menu
 - Long gates (200-400%)

@@ -252,7 +252,8 @@ void TopPage::setSequencePage() {
     Page* currentPage = _manager.top();
     auto &pages = _manager.pages();
     bool fromSequenceView = (currentPage == &pages.noteSequence ||
-                            currentPage == &pages.accumulator);
+                            currentPage == &pages.accumulator ||
+                            currentPage == &pages.tuesdaySequence);
 
     // Cycle to next view only if we're currently on a sequence view
     if (fromSequenceView) {
@@ -293,8 +294,8 @@ void TopPage::setSequenceView(SequenceView view) {
         setMainPage(pages.track);
         break;
     case Track::TrackMode::Tuesday:
-        // Tuesday tracks use TrackPage for parameter editing (no step sequences)
-        setMainPage(pages.track);
+        // Tuesday tracks use TuesdaySequencePage for sequence parameters
+        setMainPage(pages.tuesdaySequence);
         break;
     case Track::TrackMode::Last:
         break;
@@ -364,8 +365,8 @@ void TopPage::setSequenceEditPage() {
         setMainPage(pages.track);
         break;
     case Track::TrackMode::Tuesday:
-        // Tuesday tracks use TrackPage (no step sequence editor)
-        setMainPage(pages.track);
+        // Tuesday tracks use TuesdayEditPage for main parameter editing
+        setMainPage(pages.tuesdayEdit);
         break;
     case Track::TrackMode::Last:
         break;
