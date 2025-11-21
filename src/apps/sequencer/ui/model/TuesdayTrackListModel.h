@@ -47,6 +47,7 @@ private:
         Ornament,
         Power,
         LoopLength,
+        Rotate,
         Glide,
         Skew,
         CvUpdateMode,
@@ -60,6 +61,7 @@ private:
         case Ornament:      return "Ornament";
         case Power:         return "Power";
         case LoopLength:    return "Loop Length";
+        case Rotate:        return "Rotate";
         case Glide:         return "Glide";
         case Skew:          return "Skew";
         case CvUpdateMode:  return "CV Mode";
@@ -88,6 +90,13 @@ private:
             break;
         case LoopLength:
             _track->printLoopLength(str);
+            break;
+        case Rotate:
+            if (_track->loopLength() == 0) {
+                str("N/A");
+            } else {
+                _track->printRotate(str);
+            }
             break;
         case Glide:
             _track->printGlide(str);
@@ -119,6 +128,11 @@ private:
             break;
         case LoopLength:
             _track->editLoopLength(value, shift);
+            break;
+        case Rotate:
+            if (_track->loopLength() != 0) {
+                _track->editRotate(value, shift);
+            }
             break;
         case Glide:
             _track->editGlide(value, shift);
