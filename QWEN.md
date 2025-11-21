@@ -1077,6 +1077,66 @@ ALGO: MARKOV  FLOW: ████░░░░  ORN: ███░░░░░  POW
 
 ---
 
-Document Version: 5.0
+# Part 7: Tuesday Track Simplified Algorithms
+
+## Simplified Music Algorithm Implementation
+
+### Overview
+As part of the Tuesday track development, we created simplified versions of the MUSIC-ALGOS.md algorithms specifically optimized for the PEW|FORMER's Tuesday track implementation. These simplified algorithms focus on the four core outputs:
+
+- **Gate**: On/off control (0 or 1)
+- **Pitch CV**: Note value (0-127 MIDI-style)
+- **Slide**: Slide on/off (0 or 1)
+- **Gate Length**: Duration in steps (1-8 steps)
+
+All other parameters (velocity, accent, etc.) are collapsed into the gate length parameter to simplify the algorithm while preserving musical character.
+
+### Implemented Algorithms
+The simplified implementation includes 10 genre-specific algorithms:
+
+1. **SIMPLE_AMBIENT**: Long sustained notes with slides for ambient feel
+2. **SIMPLE_TECHNO**: Driving 4/4 patterns with occasional syncopation
+3. **SIMPLE_JAZZ**: Swing feel with chord tones and scale notes
+4. **SIMPLE_CLASSICAL**: Counterpoint patterns with smooth transitions
+5. **SIMPLE_MINIMALIST**: Phasing patterns with consistent rhythm
+6. **SIMPLE_BREAKBEAT**: Classic breakbeat rhythms with bass/snare
+7. **SIMPLE_DRONE**: Sustained drone with occasional harmony
+8. **SIMPLE_ARPEGGIO**: Ascending/descending arpeggiated patterns
+9. **SIMPLE_FUNK**: Syncopated bass lines with groove
+10. **SIMPLE_RAGA**: Traditional ascending/descending melodic patterns
+
+### Key Features
+
+#### Dual RNG System (FLOW/ORNAMENT)
+The simplified algorithms maintain the original dual RNG system where:
+- **FLOW parameter** (0-16) seeds the primary RNG, controlling fundamental melodic/harmonic structure
+- **ORNAMENT parameter** (0-16) seeds the secondary RNG, controlling decorative elements and probability of events
+
+#### Deterministic Behavior
+Same FLOW/ORNAMENT values always produce identical patterns, providing users with consistent musical results they can rely on.
+
+#### Resource Optimization
+The simplified algorithms are optimized for the STM32 platform with:
+- Minimal memory footprint
+- Efficient processing (no floating-point operations)
+- Simple LCG (Linear Congruential Generator) for random number generation
+
+### Implementation File
+The simplified algorithms are implemented in:
+- `ALGO-RESEARCH/simple/simple-mus.cpp`
+
+This file contains all 10 simplified algorithms with a consistent interface that can be easily integrated into the Tuesday track engine.
+
+### Musical Character Preservation
+While simplified, each algorithm maintains the distinctive musical character of its genre:
+- Ambient algorithms produce long, evolving textures
+- Techno algorithms create locked, hypnotic patterns
+- Jazz algorithms feature swing and chord tone focus
+- Classical algorithms follow voice leading principles
+- And so forth for all 10 genres
+
+---
+
+Document Version: 6.0
 Last Updated: November 2025
-Project: PEW|FORMER Feature Implementation (Accumulator, Pulse Count, Gate Mode, Harmony, Tuesday Track)
+Project: PEW|FORMER Feature Implementation (Accumulator, Pulse Count, Gate Mode, Harmony, Tuesday Track, Simplified Algorithms)
