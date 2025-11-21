@@ -1221,6 +1221,117 @@ The documentation has been restructured to improve maintainability and readabili
 
 ---
 
-Document Version: 6.2
+---
+
+# Part 9: Tuesday Track Tick Distribution Implementation Plan
+
+## Overview
+
+Research and planning for implementing a more authentic timing system in the PEW|FORMER Tuesday track, similar to the original Tuesday Eurorack module. The enhancement adds support for multiple algorithmic "ticks" within each main "step", with ticks distributed across the step duration rather than processed in a burst at the beginning.
+
+## Key Findings
+
+### Current State Analysis
+- **PEW|FORMER Implementation**: Each "step" corresponds to a timing boundary where the algorithm generates one output
+- **Original Tuesday Module**: More complex timing system with complete pattern arrays populated during initialization, complex internal timing relationships, and Ticks Per Beat (TPB) control
+
+### Proposed Enhancement: Distributed Sub-Ticks
+- **Core Concept**: Each main sequencer step can contain multiple algorithmic "ticks" (sub-ticks)
+- **ticksPerStep Parameter**: New parameter (1-8 range) controlling sub-tick count per main step
+- **Distribution**: Rather than processing all sub-ticks at beginning of step (burst mode), distribute them evenly across step duration
+
+## Implementation Architecture
+
+### 1. Core State Management
+- **New Variables**: `_ticksPerStep`, `_currentSubTick`, `_subTickDivisor`, `_subTickTriggered`
+- **Timing Division**: Calculate sub-tick timing by dividing main step duration by `_ticksPerStep`
+- **State Evolution**: Process algorithm logic at sub-tick intervals while maintaining main step coherence
+
+### 2. TuesdayTrackEngine Modifications
+- **Data Model**: Add new member variables to manage sub-tick state
+- **Timing System**: Update `tick()` method to detect both main step and sub-tick boundaries
+- **Processing**: Process algorithm state evolution at sub-tick intervals and apply gate/CV outputs based on conditions
+
+### 3. Algorithm Enhancements
+- **State Evolution**: Allow internal algorithm states to update at sub-tick resolution
+- **Algorithm-Specific Logic**:
+  - TEST: Vary note progression within step
+  - TRITRANCE: Update internal variables (b1, b2, b3) more frequently for complex arpeggiation
+  - STOMPER: Update pattern state machine at sub-tick intervals for complex rhythms
+  - MARKOV: Make multiple predictions within one main step for more activity
+
+### 4. TuesdayTrack Model Integration
+- **New Parameter**: `ticksPerStep` property with getter, setter, editor, and printer methods
+- **Range**: Limited to 1-8 to maintain performance
+- **Default**: Value of 1 for backward compatibility
+- **Serialization**: Include in project save/load operations
+
+### 5. Performance Considerations
+- **Memory Impact**: Additional ~10-15 bytes per Tuesday track (minimal impact)
+- **CPU Overhead**: With max 8 ticks per step, processing remains within STM32 capabilities
+- **Timing Precision**: High-resolution timer system supports microsecond-level timing
+- **Performance Testing**: Recommended to measure CPU usage, timing precision, and algorithm scaling
+
+### 6. UI Integration
+- **Parameter Access**: Add `ticksPerStep` to TuesdayPage parameter list
+- **Control Method**: Update F1-F5 selection cycle to include parameter
+- **Visual Feedback**: Show current value and impact on timing
+- **User Experience**: Follow existing UI conventions, immediate feedback during playback
+
+### 7. Compatibility Verification
+- **Existing Features**: Verify compatibility with fills, mute/solo, reset/sync, pattern switching, loop boundaries, gate settings, and scale/transposition
+- **Backward Compatibility**: Projects without parameter default to 1 (existing behavior)
+
+## Benefits
+
+### Musical Benefits
+- **Enhanced Rhythmic Complexity**: Each main step can contain multiple algorithmic events
+- **Authentic Timing**: Closer to original Tuesday timing relationships
+- **Micro-Timing Control**: Fine-grained control over rhythmic patterns
+- **Complex Patterns**: Enable more sophisticated algorithmic behavior
+
+### Technical Benefits
+- **Hardware Compatibility**: Designed for STM32 constraints
+- **Performance**: Optimized for real-time operation
+- **Backward Compatibility**: Existing projects work unchanged
+- **Scalability**: Flexible parameter for different complexity levels
+
+## Implementation Phases
+
+### Phase 1: Core Architecture
+1. Add new state variables to TuesdayTrackEngine
+2. Implement sub-tick timing distribution algorithm
+3. Update tick() method for main steps and sub-ticks
+4. Ensure backward compatibility
+
+### Phase 2: Algorithm Updates
+1. Modify each algorithm for distributed sub-tick timing
+2. Update state evolution logic for sub-tick intervals
+3. Maintain gate/CV output logic with distributed timing
+4. Test with various ticksPerStep values
+
+### Phase 3: Model Integration
+1. Add ticksPerStep parameter to TuesdayTrack model
+2. Implement getter/setter/editor/printer methods
+3. Update serialization
+4. Ensure default maintains compatibility
+
+### Phase 4: UI Integration
+1. Add parameter to TuesdayPage UI
+2. Update parameter selection cycle
+3. Implement value adjustment controls
+4. Add visual feedback
+
+### Phase 5: Testing & Validation
+1. Performance testing with different values
+2. Compatibility testing with existing features
+3. Timing precision verification
+4. User experience testing
+
+## Conclusion
+
+This plan provides a comprehensive approach to implementing distributed sub-tick timing in the PEW|FORMER Tuesday track, bringing it closer to the original Tuesday module's sophisticated timing system while maintaining real-time performance and hardware compatibility.
+
+Document Version: 6.3
 Last Updated: November 2025
-Project: PEW|FORMER Feature Implementation (Accumulator, Pulse Count, Gate Mode, Harmony, Tuesday Track, Simplified Algorithms, CV/Gate Behavior Analysis, Documentation Restructuring)
+Project: PEW|FORMER Feature Implementation (Accumulator, Pulse Count, Gate Mode, Harmony, Tuesday Track, Simplified Algorithms, CV/Gate Behavior Analysis, Tick Distribution Implementation Plan, Documentation Restructuring)
