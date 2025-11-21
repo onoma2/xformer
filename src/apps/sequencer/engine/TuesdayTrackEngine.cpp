@@ -187,8 +187,11 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         initAlgorithm();
     }
 
-    // Calculate effective power with skew applied
-    int effectivePower = power;
+    // Calculate base cooldown from power
+    // Power 1-16 maps to CoolDownMax 16-1 (inverted)
+    int baseCooldown = 17 - power;
+
+    // Apply skew to cooldown based on loop position
     int skew = _tuesdayTrack.skew();
     if (skew != 0 && loopLength > 0) {
         // Calculate position in loop (0.0 to 1.0)
@@ -197,26 +200,29 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         // Exponential curve: exponent ranges from 1.0 to 3.0
         float exponent = 1.0f + (float)abs(skew) / 4.0f;
 
-        float powerMod;
+        float curvedPos;
         if (skew > 0) {
             // Build-up: sparse at start, dense at end
-            powerMod = powf(position, exponent);
+            curvedPos = powf(position, exponent);
         } else {
             // Fade-out: dense at start, sparse at end
-            powerMod = powf(1.0f - position, exponent);
+            curvedPos = powf(1.0f - position, exponent);
         }
 
-        // Apply modifier to power (ensure minimum of 1)
-        effectivePower = 1 + (int)((power - 1) * powerMod);
-        if (effectivePower < 1) effectivePower = 1;
-        if (effectivePower > 16) effectivePower = 16;
-    }
+        // Target cooldown based on curved position
+        // curvedPos 0 = sparse (cooldown 16), curvedPos 1 = dense (cooldown 1)
+        int targetCooldown = 16 - (int)(15.0f * curvedPos);
 
-    // Calculate CoolDownMax from effective power
-    // Power 1-16 maps to CoolDownMax 16-1 (inverted)
-    // Low power = high cooldown = sparse patterns
-    // High power = low cooldown = dense patterns
-    _coolDownMax = 17 - effectivePower;
+        // Blend between base and target based on skew magnitude
+        float blend = (float)abs(skew) / 8.0f;
+        _coolDownMax = baseCooldown + (int)(blend * (float)(targetCooldown - baseCooldown));
+
+        // Clamp to valid range
+        if (_coolDownMax < 1) _coolDownMax = 1;
+        if (_coolDownMax > 16) _coolDownMax = 16;
+    } else {
+        _coolDownMax = baseCooldown;
+    }
 
     // Calculate step timing with clock sync
     // Use 16th notes as base timing
