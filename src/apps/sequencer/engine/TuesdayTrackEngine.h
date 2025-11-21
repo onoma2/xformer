@@ -36,6 +36,9 @@ public:
     // Reseed the algorithm (called from UI via Shift+F5)
     void reseed();
 
+    // Current step index for UI display
+    int currentStep() const { return _stepIndex; }
+
     // Generate pattern buffer for finite loops
     void generateBuffer();
 

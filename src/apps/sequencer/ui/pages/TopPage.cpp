@@ -365,8 +365,8 @@ void TopPage::setSequenceEditPage() {
         setMainPage(pages.track);
         break;
     case Track::TrackMode::Tuesday:
-        // Tuesday tracks use TuesdaySequencePage for sequence parameters
-        setMainPage(pages.tuesdaySequence);
+        // Tuesday tracks use TuesdayEditPage for main parameter editing
+        setMainPage(pages.tuesdayEdit);
         break;
     case Track::TrackMode::Last:
         break;
