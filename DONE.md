@@ -4,6 +4,45 @@ This file archives major features and bug fixes that have been fully implemented
 
 ---
 
+## ✅ COMPLETE: Tuesday Track (Generative Algorithmic Sequencing)
+
+### Overview
+A new track type that provides generative/algorithmic sequencing inspired by Mutable Instruments Marbles, Noise Engineering Mimetic Digitalis, and the Tuesday Eurorack module. Instead of manually programming steps, users set high-level parameters and algorithms generate musical patterns in real-time.
+
+### Implementation Approach
+- **New Track Type**: Added alongside Note, Curve, and MidiCv tracks
+- **Dual RNG Seeding**: Flow and Ornament parameters seed RNGs for deterministic pattern generation
+- **Cooldown-Based Density**: Power parameter controls note density through cooldown mechanism
+
+### Features Implemented
+- **8 Parameters**: Algorithm, Flow, Ornament, Power, LoopLength, Glide, Scale, Skew
+- **3 Algorithms**: TEST (utility), TRITRANCE (melodic), MARKOV (probabilistic)
+- **Long Gates**: Support for 200-400% gate lengths (multi-beat sustains)
+- **Glide Parameter**: 0-100% slide probability control
+- **Scale Quantization**: Free (chromatic) or Project scale modes
+- **Skew Parameter**: -8 to +8 density curve across loop (build-up/fade-out)
+- **Reseed**: Shift+F5 shortcut and context menu option
+
+### Test Status
+- ✅ Model layer with all parameters and serialization
+- ✅ Engine with dual RNG, cooldown, gate/CV output
+- ✅ UI page with parameter editing
+- ✅ Hardware build successful and verified working
+
+### Final Summary
+- **Status**: PRODUCTION READY
+- **Impact**: Adds generative sequencing capabilities for evolving, algorithmic patterns
+- **Documentation**: `CLAUDE-TUESDAY.md` (complete reference), `QWEN.md` Part 6, `CLAUDE.md`
+
+### Key Files
+- Model: `src/apps/sequencer/model/TuesdayTrack.h/cpp`
+- Engine: `src/apps/sequencer/engine/TuesdayTrackEngine.h/cpp`
+- UI: `src/apps/sequencer/ui/pages/TuesdayPage.h/cpp`
+- UI: `src/apps/sequencer/ui/model/TuesdayTrackListModel.h`
+- TrackPage: Shift+F5 reseed, context menu integration
+
+---
+
 ## ✅ COMPLETE: Harmony Feature
 
 ### Overview
