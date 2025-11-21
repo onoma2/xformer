@@ -14,6 +14,7 @@ enum class ContextAction {
     Copy,
     Paste,
     Route,
+    Reseed,
     Last
 };
 
@@ -22,6 +23,7 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "COPY" },
     { "PASTE" },
     { "ROUTE" },
+    { "RESEED" },
 };
 
 TrackPage::TrackPage(PageManager &manager, PageContext &context) :
@@ -137,6 +139,9 @@ void TrackPage::contextAction(int index) {
     case ContextAction::Route:
         initRoute();
         break;
+    case ContextAction::Reseed:
+        reseedTuesday();
+        break;
     case ContextAction::Last:
         break;
     }
@@ -148,6 +153,8 @@ bool TrackPage::contextActionEnabled(int index) const {
         return _model.clipBoard().canPasteTrack();
     case ContextAction::Route:
         return _listModel->routingTarget(selectedRow()) != Routing::Target::None;
+    case ContextAction::Reseed:
+        return _project.selectedTrack().trackMode() == Track::TrackMode::Tuesday;
     default:
         return true;
     }
@@ -175,4 +182,15 @@ void TrackPage::pasteTrackSetup() {
 
 void TrackPage::initRoute() {
     _manager.pages().top.editRoute(_listModel->routingTarget(selectedRow()), _project.selectedTrackIndex());
+}
+
+void TrackPage::reseedTuesday() {
+    auto &track = _project.selectedTrack();
+    if (track.trackMode() == Track::TrackMode::Tuesday) {
+        int trackIndex = _project.selectedTrackIndex();
+        auto &trackEngine = _engine.trackEngine(trackIndex);
+        auto *tuesdayEngine = static_cast<TuesdayTrackEngine *>(&trackEngine);
+        tuesdayEngine->reseed();
+        showMessage("LOOP RESEEDED");
+    }
 }

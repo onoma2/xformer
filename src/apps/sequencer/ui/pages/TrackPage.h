@@ -30,6 +30,7 @@ private:
     void copyTrackSetup();
     void pasteTrackSetup();
     void initRoute();
+    void reseedTuesday();
 
     RoutableListModel *_listModel;
     NoteTrackListModel _noteTrackListModel;
