@@ -192,31 +192,40 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     int baseCooldown = 17 - power;
 
     // Apply skew to cooldown based on loop position
+    // Skew value determines what fraction of loop reaches power 16:
+    // Skew 8 = last 50% at power 16, Skew 4 = last 25% at power 16
     int skew = _tuesdayTrack.skew();
     if (skew != 0 && loopLength > 0) {
         // Calculate position in loop (0.0 to 1.0)
         float position = (float)_stepIndex / (float)loopLength;
 
-        // Logarithmic curve: exponent ranges from 1.0 to 3.0
-        // Logarithmic rises fast then levels off
-        float exponent = 1.0f + (float)abs(skew) / 4.0f;
-
-        float curvedPos;
         if (skew > 0) {
-            // Build-up: sparse at start, dense at end (logarithmic rise)
-            curvedPos = 1.0f - powf(1.0f - position, exponent);
+            // Build-up: last (skew/16) of loop reaches power 16
+            // Skew 8 → ramp starts at 0.5, Skew 4 → starts at 0.75
+            float rampStart = 1.0f - (float)skew / 16.0f;
+
+            if (position <= rampStart) {
+                // Before ramp: use base power setting
+                _coolDownMax = baseCooldown;
+            } else {
+                // During ramp: interpolate from base to cooldown 1 (power 16)
+                float rampProgress = (position - rampStart) / (1.0f - rampStart);
+                _coolDownMax = baseCooldown - (int)(rampProgress * (float)(baseCooldown - 1));
+            }
         } else {
-            // Fade-out: dense at start, sparse at end (inverted logarithmic)
-            curvedPos = powf(1.0f - position, exponent);
+            // Fade-out: first (|skew|/16) of loop at power 16, then ramp down
+            // Skew -8 → first 50% at max, Skew -4 → first 25% at max
+            float rampEnd = (float)(-skew) / 16.0f;
+
+            if (position <= rampEnd) {
+                // Before ramp end: at power 16 (cooldown 1)
+                _coolDownMax = 1;
+            } else {
+                // After ramp end: interpolate from cooldown 1 to base
+                float rampProgress = (position - rampEnd) / (1.0f - rampEnd);
+                _coolDownMax = 1 + (int)(rampProgress * (float)(baseCooldown - 1));
+            }
         }
-
-        // Target cooldown based on curved position
-        // curvedPos 0 = sparse (cooldown 16), curvedPos 1 = dense (cooldown 1)
-        int targetCooldown = 16 - (int)(15.0f * curvedPos);
-
-        // Blend between base and target based on skew magnitude
-        float blend = (float)abs(skew) / 8.0f;
-        _coolDownMax = baseCooldown + (int)(blend * (float)(targetCooldown - baseCooldown));
 
         // Clamp to valid range
         if (_coolDownMax < 1) _coolDownMax = 1;
