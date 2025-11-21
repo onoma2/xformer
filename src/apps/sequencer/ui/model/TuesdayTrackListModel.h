@@ -49,6 +49,7 @@ private:
         LoopLength,
         Glide,
         Scale,
+        Skew,
         Last
     };
 
@@ -61,6 +62,7 @@ private:
         case LoopLength:    return "Loop Length";
         case Glide:         return "Glide";
         case Scale:         return "Scale";
+        case Skew:          return "Skew";
         case Last:          break;
         }
         return nullptr;
@@ -93,6 +95,9 @@ private:
         case Scale:
             _track->printUseScale(str);
             break;
+        case Skew:
+            _track->printSkew(str);
+            break;
         case Last:
             break;
         }
@@ -120,6 +125,9 @@ private:
             break;
         case Scale:
             _track->editUseScale(value, shift);
+            break;
+        case Skew:
+            _track->editSkew(value, shift);
             break;
         case Last:
             break;

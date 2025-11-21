@@ -90,6 +90,7 @@ void TuesdayTrack::clear() {
     _loopLength = 16;
     _glide = 0;
     _useScale = false;
+    _skew = 0;
 }
 
 void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
@@ -100,6 +101,7 @@ void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_loopLength);
     writer.write(_glide);
     writer.write(_useScale);
+    writer.write(_skew);
 }
 
 void TuesdayTrack::read(VersionedSerializedReader &reader) {
@@ -110,4 +112,5 @@ void TuesdayTrack::read(VersionedSerializedReader &reader) {
     reader.read(_loopLength);
     reader.read(_glide, 0);  // Default 0% for old projects
     reader.read(_useScale, false);  // Default free for old projects
+    reader.read(_skew, 0);  // Default 0 for old projects
 }

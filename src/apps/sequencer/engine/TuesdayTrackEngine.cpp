@@ -3,6 +3,8 @@
 #include "Engine.h"
 #include "model/Scale.h"
 
+#include <cmath>
+
 // Initialize algorithm state based on Flow (seed1) and Ornament (seed2)
 // This mirrors the original Tuesday Init functions
 void TuesdayTrackEngine::initAlgorithm() {
@@ -185,11 +187,36 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         initAlgorithm();
     }
 
-    // Calculate CoolDownMax from power parameter
+    // Calculate effective power with skew applied
+    int effectivePower = power;
+    int skew = _tuesdayTrack.skew();
+    if (skew != 0 && loopLength > 0) {
+        // Calculate position in loop (0.0 to 1.0)
+        float position = (float)_stepIndex / (float)loopLength;
+
+        // Exponential curve: exponent ranges from 1.0 to 3.0
+        float exponent = 1.0f + (float)abs(skew) / 4.0f;
+
+        float powerMod;
+        if (skew > 0) {
+            // Build-up: sparse at start, dense at end
+            powerMod = powf(position, exponent);
+        } else {
+            // Fade-out: dense at start, sparse at end
+            powerMod = powf(1.0f - position, exponent);
+        }
+
+        // Apply modifier to power (ensure minimum of 1)
+        effectivePower = 1 + (int)((power - 1) * powerMod);
+        if (effectivePower < 1) effectivePower = 1;
+        if (effectivePower > 16) effectivePower = 16;
+    }
+
+    // Calculate CoolDownMax from effective power
     // Power 1-16 maps to CoolDownMax 16-1 (inverted)
     // Low power = high cooldown = sparse patterns
     // High power = low cooldown = dense patterns
-    _coolDownMax = 17 - power;  // power 1 -> 16, power 16 -> 1
+    _coolDownMax = 17 - effectivePower;
 
     // Calculate step timing with clock sync
     // Use 16th notes as base timing

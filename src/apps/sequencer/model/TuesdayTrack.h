@@ -117,6 +117,21 @@ public:
         str(_useScale ? "Project" : "Free");
     }
 
+    // skew (density curve across loop, -8 to +8)
+
+    int skew() const { return _skew; }
+    void setSkew(int skew) {
+        _skew = clamp(skew, -8, 8);
+    }
+
+    void editSkew(int value, bool shift) {
+        setSkew(this->skew() + value);
+    }
+
+    void printSkew(StringBuilder &str) const {
+        str("%+d", skew());
+    }
+
     //----------------------------------------
     // Methods
     //----------------------------------------
@@ -144,6 +159,7 @@ private:
     uint8_t _loopLength = 16;
     uint8_t _glide = 0;  // Default 0% (no slides)
     bool _useScale = false;  // Default: free (chromatic)
+    int8_t _skew = 0;  // Default: 0 (even distribution)
 
     friend class Track;
 };
