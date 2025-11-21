@@ -4,6 +4,8 @@
 
 #include "model/Track.h"
 
+#include "core/utils/Random.h"
+
 class TuesdayTrackEngine : public TrackEngine {
 public:
     TuesdayTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
@@ -27,6 +29,13 @@ public:
 private:
     const TuesdayTrack &_tuesdayTrack;
 
+    // Algorithm state
+    uint32_t _stepIndex = 0;
+    uint32_t _gateLength = 0;
+    uint32_t _gateTicks = 0;
+    Random _rng;
+
+    // Output state
     bool _activity = false;
     bool _gateOutput = false;
     float _cvOutput = 0.f;
