@@ -1166,8 +1166,9 @@ void TuesdayTrackEngine::generateBuffer() {
                 case 3: interval = 19; break;  // 5th + octave
                 }
 
-                // Slow change rate
-                if ((step % (4 * _droneSpeed)) == 0) {
+                // Slow change rate (guard against division by zero)
+                int droneRate = (_droneSpeed > 0) ? (4 * _droneSpeed) : 4;
+                if ((step % droneRate) == 0) {
                     // Occasional variation
                     if (_rng.next() % 4 == 0) {
                         interval += (_rng.nextBinary() ? 2 : -2);
@@ -1189,8 +1190,9 @@ void TuesdayTrackEngine::generateBuffer() {
                 gatePercent = 75;
                 _phaseAccum += _phaseSpeed;
 
-                // Get pattern position with phase offset
-                int patternPos = (step + (_phaseAccum >> 28)) % _phaseLength;
+                // Get pattern position with phase offset (guard against division by zero)
+                int phaseLen = (_phaseLength > 0) ? _phaseLength : 4;
+                int patternPos = (step + (_phaseAccum >> 28)) % phaseLen;
                 note = _phasePattern[patternPos];
                 octave = 0;
 
@@ -2024,7 +2026,9 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 case 3: interval = 19; break;
                 }
 
-                if ((effectiveStep % (4 * _droneSpeed)) == 0) {
+                // Guard against division by zero
+                int droneRate = (_droneSpeed > 0) ? (4 * _droneSpeed) : 4;
+                if ((effectiveStep % droneRate) == 0) {
                     if (_rng.next() % 4 == 0) {
                         interval += (_rng.nextBinary() ? 2 : -2);
                     }
@@ -2051,7 +2055,9 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 int glide = _tuesdayTrack.glide();
 
                 _phaseAccum += _phaseSpeed;
-                int patternPos = (effectiveStep + (_phaseAccum >> 28)) % _phaseLength;
+                // Guard against division by zero
+                int phaseLen = (_phaseLength > 0) ? _phaseLength : 4;
+                int patternPos = (effectiveStep + (_phaseAccum >> 28)) % phaseLen;
                 note = _phasePattern[patternPos];
                 octave = 0;
 

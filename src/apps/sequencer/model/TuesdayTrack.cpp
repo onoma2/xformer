@@ -99,21 +99,23 @@ void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
 }
 
 void TuesdayTrack::read(VersionedSerializedReader &reader) {
-    reader.read(_algorithm);
-    reader.read(_flow);
-    reader.read(_ornament);
-    reader.read(_power);
-    reader.read(_loopLength);
-    reader.read(_glide, 0);  // Default 0% for old projects
-    reader.read(_useScale, false);  // Default free for old projects
-    reader.read(_skew, 0);  // Default 0 for old projects
-    reader.read(_cvUpdateMode, Free);  // Default Free for old projects
-    reader.read(_octave, 0);  // Default 0 for old projects
-    reader.read(_transpose, 0);  // Default 0 for old projects
-    reader.read(_divisor, 12);  // Default 1/16 note for old projects
-    reader.read(_resetMeasure, 8);  // Default 8 bars for old projects
-    reader.read(_scale, -1);  // Default -1 (project) for old projects
-    reader.read(_rootNote, -1);  // Default -1 (project) for old projects
-    reader.read(_scan, 0);  // Default 0 for old projects
-    reader.read(_rotate, 0);  // Default 0 for old projects
+    // All fields need version guards since TuesdayTrack is new in Version35
+    // Defaults come from member initialization in TuesdayTrack.h
+    reader.read(_algorithm, ProjectVersion::Version35);
+    reader.read(_flow, ProjectVersion::Version35);
+    reader.read(_ornament, ProjectVersion::Version35);
+    reader.read(_power, ProjectVersion::Version35);
+    reader.read(_loopLength, ProjectVersion::Version35);
+    reader.read(_glide, ProjectVersion::Version35);
+    reader.read(_useScale, ProjectVersion::Version35);
+    reader.read(_skew, ProjectVersion::Version35);
+    reader.read(_cvUpdateMode, ProjectVersion::Version35);
+    reader.read(_octave, ProjectVersion::Version35);
+    reader.read(_transpose, ProjectVersion::Version35);
+    reader.read(_divisor, ProjectVersion::Version35);
+    reader.read(_resetMeasure, ProjectVersion::Version35);
+    reader.read(_scale, ProjectVersion::Version35);
+    reader.read(_rootNote, ProjectVersion::Version35);
+    reader.read(_scan, ProjectVersion::Version35);
+    reader.read(_rotate, ProjectVersion::Version35);
 }
