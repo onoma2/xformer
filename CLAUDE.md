@@ -741,6 +741,126 @@ These features from the original plan are not yet implemented but could be added
 - `QWEN.md` Part 5 - Technical implementation details
 - `PHASE-1-COMPLETE.md` - Phase 1 Days 1-6 summary
 
+## Tuesday Track (Generative Algorithmic Sequencing)
+
+The PEW|FORMER firmware includes a Tuesday track type that provides generative/algorithmic sequencing. Instead of manually programming steps, users set high-level parameters and algorithms generate musical patterns in real-time.
+
+### Overview
+
+**Inspired by:**
+- Mutable Instruments Marbles
+- Noise Engineering Mimetic Digitalis
+- Intellijel Metropolix
+- Tuesday Eurorack module
+
+**Key difference from other track types:** No steps to edit - patterns are generated algorithmically based on parameter settings.
+
+### Core Parameters
+
+| Parameter | Range | Musical Meaning |
+|-----------|-------|-----------------|
+| **Algorithm** | 0-31 | Pattern personality (MARKOV, STOMPER, TRITRANCE, etc.) |
+| **Flow** | 0-16 | Sequence movement/variation (seeds RNG) |
+| **Ornament** | 0-16 | Embellishments and fills (seeds extra RNG) |
+| **Power** | 0-16 | Note density (0=silent, 16=maximum) |
+| **LoopLength** | Inf, 1-64 | Pattern length |
+| **Glide** | 0-100% | Slide probability |
+| **Scale** | Free/Project | Note quantization mode |
+| **Skew** | -8 to +8 | Density curve across loop |
+
+### Key Features
+
+**Power: Cooldown-Based Density**
+- Power 1 → Very sparse (16 steps between notes)
+- Power 16 → Maximum density (every step)
+
+**Flow & Ornament: Dual RNG Seeding**
+- Same values always produce identical patterns (deterministic)
+- Different combinations create unique pattern variations
+
+**Gate Lengths with Long Gates**
+- Short gates (40%): 25-100%
+- Medium gates (30%): 100-175%
+- Long gates (30%): 200-400% (multi-beat sustains)
+
+**Glide Parameter**
+- 0% = No slides (default)
+- 100% = Always slide between notes
+
+**Scale Quantization**
+- Free = All 12 semitones
+- Project = Quantize to project scale
+
+**Skew Parameter**
+Creates density curves across the loop:
+- Skew 8: Last 50% at power 16 (build-up)
+- Skew -8: First 50% at power 16 (fade-out)
+- Skew 0: Use Power setting throughout
+- **Note:** Skew has no effect when Loop is Inf (infinite)
+
+**Reseed Functionality**
+- **Shift+F5**: Generates new random pattern
+- **Context Menu**: RESEED option for Tuesday tracks
+- Produces new pattern while preserving Flow/Ornament values
+
+### Implementation Architecture
+
+**Model Layer** (`src/apps/sequencer/model/`):
+- `TuesdayTrack.h/cpp`: Data model with all parameters, serialization
+
+**Engine Layer** (`src/apps/sequencer/engine/`):
+- `TuesdayTrackEngine.h/cpp`: Core generation logic
+  - Dual RNG seeding from Flow/Ornament
+  - Cooldown-based density control
+  - Algorithm dispatch and state management
+  - Gate/CV output generation
+
+**UI Layer** (`src/apps/sequencer/ui/pages/`):
+- `TuesdayPage.h/cpp`: Parameter editing interface
+- `TuesdayTrackListModel.h`: List model for parameter editing
+- `TrackPage.cpp`: Shift+F5 reseed, context menu
+
+### Implemented Algorithms
+
+| # | Name | Type | Description |
+|---|------|------|-------------|
+| 0 | TEST | Utility | Calibration/test patterns |
+| 1 | TRITRANCE | Melodic | German minimal melodies |
+| 3 | MARKOV | Melodic | 3rd-order Markov transitions |
+
+### UI Integration
+
+**TuesdayPage:**
+- F1-F5 select parameters
+- Encoder adjusts selected parameter
+- Visual bar graphs show values 0-16
+
+**TrackPage:**
+- Shift+F5: Reseed loop shortcut
+- Context Menu: RESEED option (Tuesday tracks only)
+
+### Testing Status
+
+✅ **Implemented and verified:**
+- Model layer with all parameters
+- Engine with dual RNG, cooldown, gate/CV output
+- UI page with parameter editing
+- TEST, TRITRANCE, MARKOV algorithms
+- Glide, Scale, Skew features
+- Reseed via Shift+F5 and context menu
+- Long gates (200-400%)
+- Loop lengths 56 and 64
+
+### Key Files
+
+- `src/apps/sequencer/model/TuesdayTrack.h/cpp` - Model layer
+- `src/apps/sequencer/engine/TuesdayTrackEngine.h/cpp` - Engine layer
+- `src/apps/sequencer/ui/pages/TuesdayPage.h/cpp` - UI page
+- `src/apps/sequencer/ui/model/TuesdayTrackListModel.h` - UI list model
+- `src/apps/sequencer/ui/pages/TrackPage.cpp` - Shift+F5, context menu
+- `CLAUDE-TUESDAY.md` - Complete implementation reference
+- `QWEN.md` Part 6 - Technical implementation details
+
 ## Simulator Interface
 
 The simulator provides a complete virtual hardware interface (see `doc/simulator-interface.png`):
