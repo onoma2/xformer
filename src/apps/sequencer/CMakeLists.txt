@@ -14,6 +14,7 @@ set(sources
     engine/MidiLearn.cpp
     engine/MidiOutputEngine.cpp
     engine/NoteTrackEngine.cpp
+    engine/TuesdayTrackEngine.cpp
     engine/RoutingEngine.cpp
     engine/SequenceState.cpp
     # engine/generators
