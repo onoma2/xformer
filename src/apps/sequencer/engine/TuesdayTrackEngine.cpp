@@ -91,6 +91,7 @@ void TuesdayTrackEngine::reset() {
     _activity = false;
     _gateOutput = false;
     _cvOutput = 0.f;
+    _lastGatedCv = 0.f;
 
     // Re-initialize algorithm with current seeds
     initAlgorithm();
@@ -571,7 +572,8 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         // Apply gate using cooldown system
         // Note triggers only when cooldown has expired
         // Velocity (from algorithm) must beat current cooldown value
-        if (shouldGate && _coolDown == 0) {
+        bool gateTriggered = shouldGate && _coolDown == 0;
+        if (gateTriggered) {
             _gateOutput = true;
             // Gate length: use algorithm-determined percentage
             _gateTicks = (divisor * _gatePercent) / 100;
@@ -581,18 +583,32 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             _coolDown = _coolDownMax;
         }
 
-        // Apply CV with slide/portamento
-        _cvTarget = noteVoltage;
-        if (_slide > 0) {
-            // Calculate slide time: slide * 12 ticks (scaled for our timing)
-            int slideTicks = _slide * 12;
-            _cvDelta = (_cvTarget - _cvCurrent) / slideTicks;
-            _slideCountDown = slideTicks;
+        // Apply CV with slide/portamento based on cvUpdateMode
+        // Free mode: CV updates every step (continuous evolution)
+        // Gated mode: CV only updates when gate fires (original Tuesday behavior)
+        bool shouldUpdateCv = (_tuesdayTrack.cvUpdateMode() == TuesdayTrack::Free) || gateTriggered;
+
+        if (shouldUpdateCv) {
+            _cvTarget = noteVoltage;
+            if (_slide > 0) {
+                // Calculate slide time: slide * 12 ticks (scaled for our timing)
+                int slideTicks = _slide * 12;
+                _cvDelta = (_cvTarget - _cvCurrent) / slideTicks;
+                _slideCountDown = slideTicks;
+            } else {
+                // Instant change
+                _cvCurrent = _cvTarget;
+                _cvOutput = _cvTarget;
+                _slideCountDown = 0;
+            }
+            // Store this as last gated CV for maintaining output in Gated mode
+            _lastGatedCv = noteVoltage;
         } else {
-            // Instant change
-            _cvCurrent = _cvTarget;
-            _cvOutput = _cvTarget;
-            _slideCountDown = 0;
+            // Gated mode and no gate - maintain last CV value
+            // Ensure slide continues if in progress, otherwise keep static
+            if (_slideCountDown == 0) {
+                _cvOutput = _lastGatedCv;
+            }
         }
 
         // Advance step

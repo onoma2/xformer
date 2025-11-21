@@ -17,6 +17,7 @@ CASE("default_values") {
     expectEqual(track.ornament(), 0, "default ornament should be 0");
     expectEqual(track.power(), 0, "default power should be 0");
     expectEqual(track.loopLength(), 16, "default loopLength index should be 16");
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "default cvUpdateMode should be Free (0)");
 }
 
 //----------------------------------------
@@ -172,6 +173,7 @@ CASE("clear_resets_all_values") {
     track.setOrnament(12);
     track.setPower(14);
     track.setLoopLength(20);
+    track.setCvUpdateMode(TuesdayTrack::CvUpdateMode::Gated);
 
     // Clear
     track.clear();
@@ -182,6 +184,7 @@ CASE("clear_resets_all_values") {
     expectEqual(track.ornament(), 0, "ornament should reset to 0");
     expectEqual(track.power(), 0, "power should reset to 0");
     expectEqual(track.loopLength(), 16, "loopLength should reset to 16");
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "cvUpdateMode should reset to Free");
 }
 
 //----------------------------------------
@@ -223,6 +226,39 @@ CASE("editLoopLength_increments") {
     track.setLoopLength(16);
     track.editLoopLength(1, false);
     expectEqual(track.loopLength(), 17, "loopLength should increment to 17");
+}
+
+//----------------------------------------
+// CvUpdateMode Parameter
+//----------------------------------------
+
+CASE("cvUpdateMode_default_value") {
+    TuesdayTrack track;
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "default cvUpdateMode should be Free (0)");
+}
+
+CASE("cvUpdateMode_setter_getter") {
+    TuesdayTrack track;
+    track.setCvUpdateMode(TuesdayTrack::CvUpdateMode::Gated);
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 1, "cvUpdateMode should be Gated (1)");
+    track.setCvUpdateMode(TuesdayTrack::CvUpdateMode::Free);
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "cvUpdateMode should be Free (0)");
+}
+
+CASE("cvUpdateMode_edit_toggles") {
+    TuesdayTrack track;
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "initial should be Free");
+    track.editCvUpdateMode(1, false);
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 1, "should toggle to Gated");
+    track.editCvUpdateMode(1, false);
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "should toggle back to Free");
+}
+
+CASE("cvUpdateMode_clear_resets") {
+    TuesdayTrack track;
+    track.setCvUpdateMode(TuesdayTrack::CvUpdateMode::Gated);
+    track.clear();
+    expectEqual(static_cast<int>(track.cvUpdateMode()), 0, "cvUpdateMode should reset to Free after clear");
 }
 
 } // UNIT_TEST("TuesdayTrack")

@@ -10,6 +10,15 @@
 class TuesdayTrack {
 public:
     //----------------------------------------
+    // Types
+    //----------------------------------------
+
+    enum CvUpdateMode {
+        Free = 0,   // CV updates every step (current behavior)
+        Gated = 1   // CV only updates when gate fires (original Tuesday behavior)
+    };
+
+    //----------------------------------------
     // Properties
     //----------------------------------------
 
@@ -132,6 +141,23 @@ public:
         str("%+d", skew());
     }
 
+    // cvUpdateMode (controls when CV changes: every step or only with gates)
+
+    CvUpdateMode cvUpdateMode() const { return static_cast<CvUpdateMode>(_cvUpdateMode); }
+    void setCvUpdateMode(CvUpdateMode mode) {
+        _cvUpdateMode = static_cast<uint8_t>(mode);
+    }
+
+    void editCvUpdateMode(int value, bool shift) {
+        if (value != 0) {
+            setCvUpdateMode(_cvUpdateMode == Free ? Gated : Free);
+        }
+    }
+
+    void printCvUpdateMode(StringBuilder &str) const {
+        str(_cvUpdateMode == Free ? "Free" : "Gated");
+    }
+
     //----------------------------------------
     // Methods
     //----------------------------------------
@@ -160,6 +186,7 @@ private:
     uint8_t _glide = 0;  // Default 0% (no slides)
     bool _useScale = false;  // Default: free (chromatic)
     int8_t _skew = 0;  // Default: 0 (even distribution)
+    uint8_t _cvUpdateMode = Free;  // Default: Free (CV updates every step)
 
     friend class Track;
 };

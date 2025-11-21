@@ -94,4 +94,7 @@ private:
     bool _activity = false;
     bool _gateOutput = false;
     float _cvOutput = 0.f;
+
+    // Gated CV mode state - tracks last CV value when gate fired
+    float _lastGatedCv = 0.f;
 };

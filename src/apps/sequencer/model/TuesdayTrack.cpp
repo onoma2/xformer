@@ -91,6 +91,7 @@ void TuesdayTrack::clear() {
     _glide = 0;
     _useScale = false;
     _skew = 0;
+    _cvUpdateMode = Free;
 }
 
 void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
@@ -102,6 +103,7 @@ void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_glide);
     writer.write(_useScale);
     writer.write(_skew);
+    writer.write(_cvUpdateMode);
 }
 
 void TuesdayTrack::read(VersionedSerializedReader &reader) {
@@ -113,4 +115,5 @@ void TuesdayTrack::read(VersionedSerializedReader &reader) {
     reader.read(_glide, 0);  // Default 0% for old projects
     reader.read(_useScale, false);  // Default free for old projects
     reader.read(_skew, 0);  // Default 0 for old projects
+    reader.read(_cvUpdateMode, Free);  // Default Free for old projects (backward compatible)
 }

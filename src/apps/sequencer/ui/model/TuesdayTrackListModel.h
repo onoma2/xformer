@@ -50,6 +50,7 @@ private:
         Glide,
         Scale,
         Skew,
+        CvUpdateMode,
         Last
     };
 
@@ -63,6 +64,7 @@ private:
         case Glide:         return "Glide";
         case Scale:         return "Scale";
         case Skew:          return "Skew";
+        case CvUpdateMode:  return "CV Mode";
         case Last:          break;
         }
         return nullptr;
@@ -98,6 +100,9 @@ private:
         case Skew:
             _track->printSkew(str);
             break;
+        case CvUpdateMode:
+            _track->printCvUpdateMode(str);
+            break;
         case Last:
             break;
         }
@@ -128,6 +133,9 @@ private:
             break;
         case Skew:
             _track->editSkew(value, shift);
+            break;
+        case CvUpdateMode:
+            _track->editCvUpdateMode(value, shift);
             break;
         case Last:
             break;
