@@ -512,7 +512,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
         // Apply project scale if enabled
         if (_tuesdayTrack.useScale()) {
-            const auto &scale = _model.project().scale();
+            const Scale &scale = _model.project().selectedScale();
             int rootNote = _model.project().rootNote();
             // Treat note as scale degree, convert to voltage
             int scaleNote = note + octave * scale.notesPerOctave();
