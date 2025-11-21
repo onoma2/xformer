@@ -881,6 +881,25 @@ Creates density curves across the loop:
 - Long gates (200-400%)
 - Loop lengths 56 and 64
 
+### Critical Bugs Found and Fixed (2025-11-21)
+
+**Bug 1: Division by Zero on Project Load**
+- **Symptom**: Hardware reboots when loading project with Tuesday track
+- **Cause**: PHASE `_phaseLength` and DRONE `_droneSpeed` defaulted to 0, causing modulo by zero
+- **Fix**: Safe defaults (4 and 1) + runtime guards at all modulo operations
+- **Commit**: `c70a2e7`
+
+**Bug 2: Serialization Missing Version Guards**
+- **Symptom**: "Failed to load (end_of_file)" when loading projects with Tuesday tracks
+- **Cause**: TuesdayTrack::read() had no version guards for first 5 fields
+- **Fix**: Added ProjectVersion::Version35, all read() calls now use version guards with defaults
+- **Commit**: `bcb12c9`
+
+**Lesson Learned**: New track types need:
+1. Safe default values for ALL state variables (avoid 0 for divisors)
+2. ProjectVersion entry for serialization
+3. Version guards on ALL read() calls with sensible defaults
+
 ### Key Files
 
 - `src/apps/sequencer/model/TuesdayTrack.h/cpp` - Model layer
