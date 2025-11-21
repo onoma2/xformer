@@ -736,8 +736,12 @@ void TuesdayTrackEngine::generateBuffer() {
                 if (_chipRng.nextRange(256) < 0x20) {
                     // accent
                 }
+                // Algorithm's slide logic - only apply if glide > 0
                 if (_chipRng.nextRange(256) < 0x80) {
-                    slide = _chipRng.nextRange(256) % 3;
+                    int algoSlide = _chipRng.nextRange(256) % 3;
+                    if (glide > 0) {
+                        slide = algoSlide;
+                    }
                 }
                 if (_chipRng.nextRange(256) >= 0xd0) {
                     note = 0;  // Note off (~19% chance)
@@ -749,6 +753,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 octave = 0;
                 _extraRng.nextRange(256);  // velocity
 
+                // Additional slide from glide parameter
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
@@ -847,7 +852,10 @@ void TuesdayTrackEngine::generateBuffer() {
                     note = pos2 % 8;
                     if (_wobbleLastWasHigh == 0) {
                         if (_rng.nextRange(256) >= 56) {
-                            slide = _rng.next() % 3;
+                            int algoSlide = _rng.next() % 3;
+                            if (glide > 0) {
+                                slide = algoSlide;
+                            }
                         }
                     }
                     _wobbleLastWasHigh = 1;
@@ -856,7 +864,10 @@ void TuesdayTrackEngine::generateBuffer() {
                     note = pos % 8;
                     if (_wobbleLastWasHigh == 1) {
                         if (_rng.nextRange(256) >= 56) {
-                            slide = _rng.next() % 3;
+                            int algoSlide = _rng.next() % 3;
+                            if (glide > 0) {
+                                slide = algoSlide;
+                            }
                         }
                     }
                     _wobbleLastWasHigh = 0;
@@ -864,6 +875,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 octave = 0;
                 _extraRng.next();  // velocity
 
+                // Additional slide from glide parameter
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
@@ -1342,8 +1354,14 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 if (_chipRng.nextRange(256) < 0x20) {
                     // accent - could affect velocity
                 }
+                // Algorithm's slide logic - only apply if glide > 0
                 if (_chipRng.nextRange(256) < 0x80) {
-                    _slide = _chipRng.nextRange(256) % 3;
+                    int algoSlide = _chipRng.nextRange(256) % 3;
+                    if (glide > 0) {
+                        _slide = algoSlide;
+                    } else {
+                        _slide = 0;
+                    }
                 } else {
                     _slide = 0;
                 }
@@ -1357,6 +1375,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 octave = 0;
                 _extraRng.nextRange(256);  // velocity
 
+                // Additional slide from glide parameter
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 }
@@ -1474,7 +1493,12 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     note = pos2 % 8;
                     if (_wobbleLastWasHigh == 0) {
                         if (_rng.nextRange(256) >= 56) {
-                            _slide = _rng.next() % 3;
+                            int algoSlide = _rng.next() % 3;
+                            if (glide > 0) {
+                                _slide = algoSlide;
+                            } else {
+                                _slide = 0;
+                            }
                         } else {
                             _slide = 0;
                         }
@@ -1485,7 +1509,12 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     note = pos % 8;
                     if (_wobbleLastWasHigh == 1) {
                         if (_rng.nextRange(256) >= 56) {
-                            _slide = _rng.next() % 3;
+                            int algoSlide = _rng.next() % 3;
+                            if (glide > 0) {
+                                _slide = algoSlide;
+                            } else {
+                                _slide = 0;
+                            }
                         } else {
                             _slide = 0;
                         }
@@ -1495,6 +1524,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 octave = 0;
                 _extraRng.next();  // velocity
 
+                // Additional slide from glide parameter
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 }
