@@ -1432,6 +1432,8 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 _gatePercent = _buffer[effectiveStep].gatePercent;
                 _slide = _buffer[effectiveStep].slide;
                 shouldGate = true;
+                // Calculate noteVoltage from buffered data for CV/glide
+                noteVoltage = (note + (octave * 12)) / 12.0f;
             }
         } else {
             // Infinite loop: live generation with scan offset
