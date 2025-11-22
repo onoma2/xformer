@@ -254,6 +254,33 @@ void TuesdayTrackEngine::initAlgorithm() {
         _kraftGhostMask = _extraRng.next() & 0x55;  // Every other step ghost
         break;
 
+    case 18: // APHEX - complex polyrhythmic patterns
+        _rng = Random((flow - 1) << 4);
+        _extraRng = Random((ornament - 1) << 4);
+        // Generate polyrhythmic pattern
+        for (int i = 0; i < 8; i++) {
+            _aphexPattern[i] = _rng.next() % 12;
+        }
+        _aphexTimeSigNum = 3 + (flow % 5);  // 3, 4, 5, 6, 7
+        _aphexGlitchProb = ornament * 16;  // 0-255 scale
+        _aphexPosition = 0;
+        _aphexNoteIndex = 0;
+        _aphexLastNote = _aphexPattern[0];
+        _aphexStepCounter = 0;
+        break;
+
+    case 19: // AUTECH - constantly evolving abstract patterns
+        _rng = Random((flow - 1) << 4);
+        _extraRng = Random((ornament - 1) << 4);
+        _autechreTransformState[0] = _rng.next();
+        _autechreTransformState[1] = _extraRng.next();
+        _autechreMutationRate = flow * 16;  // 0-255 scale
+        _autechreChaosSeed = _rng.next();
+        _autechreStepCount = 0;
+        _autechreCurrentNote = _rng.next() % 12;
+        _autechrePatternShift = 0;
+        break;
+
     default:
         break;
     }
@@ -473,6 +500,28 @@ void TuesdayTrackEngine::reseed() {
         _kraftTranspose = 0;
         _kraftTranspCount = 0;
         _kraftGhostMask = _extraRng.next() & 0x55;
+        break;
+
+    case 18: // APHEX
+        for (int i = 0; i < 8; i++) {
+            _aphexPattern[i] = _rng.next() % 12;
+        }
+        _aphexTimeSigNum = 3 + (_rng.next() % 5);
+        _aphexGlitchProb = _extraRng.next();
+        _aphexPosition = 0;
+        _aphexNoteIndex = 0;
+        _aphexLastNote = _aphexPattern[0];
+        _aphexStepCounter = 0;
+        break;
+
+    case 19: // AUTECH
+        _autechreTransformState[0] = _rng.next();
+        _autechreTransformState[1] = _extraRng.next();
+        _autechreMutationRate = _rng.next();
+        _autechreChaosSeed = _rng.next();
+        _autechreStepCount = 0;
+        _autechreCurrentNote = _rng.next() % 12;
+        _autechrePatternShift = 0;
         break;
 
     default:
@@ -930,6 +979,58 @@ void TuesdayTrackEngine::generateBuffer() {
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
+            }
+            break;
+
+        case 18: // APHEX warmup
+            {
+                // Advance position with odd time signature
+                _aphexPosition = (_aphexPosition + 1) % _aphexTimeSigNum;
+
+                // Update note index
+                if (_aphexPosition == 0) {
+                    _aphexNoteIndex = (_aphexNoteIndex + 1) % 8;
+                }
+
+                // Glitch probability check
+                if (_extraRng.nextRange(256) < _aphexGlitchProb) {
+                    _extraRng.next();  // Additional randomness for glitch
+                }
+
+                // Glide check
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _rng.nextRange(3);
+                }
+
+                _aphexStepCounter++;
+            }
+            break;
+
+        case 19: // AUTECH warmup
+            {
+                // Transform state evolution
+                if (_rng.nextRange(256) < _autechreMutationRate) {
+                    _autechreTransformState[0] = _rng.next();
+                    _autechreTransformState[1] = _extraRng.next();
+                }
+
+                // Pattern shift
+                if (_rng.nextRange(16) < 4) {
+                    _autechrePatternShift = (_autechrePatternShift + 1) % 12;
+                }
+
+                // Current note update
+                _autechreCurrentNote = (_autechreCurrentNote + _rng.nextRange(5) - 2 + 12) % 12;
+
+                // Micro-timing check
+                _extraRng.next();
+
+                // Glide check
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _rng.nextRange(3);
+                }
+
+                _autechreStepCount++;
             }
             break;
 
@@ -1730,6 +1831,85 @@ void TuesdayTrackEngine::generateBuffer() {
                 }
 
                 _extraRng.next();
+            }
+            break;
+
+        case 18: // APHEX buffer generation - complex polyrhythmic patterns
+            {
+                // Get note from pattern with polyrhythmic position
+                note = _aphexPattern[_aphexNoteIndex];
+                octave = 0;
+
+                // Varied gate lengths (Aphex Twin style)
+                gatePercent = 25 + (_extraRng.next() % 75);  // 25-100%
+
+                // Glitch effect
+                if (_extraRng.nextRange(256) < _aphexGlitchProb) {
+                    // Glitch can repeat, shift, or mutate
+                    int glitchType = _extraRng.next() % 3;
+                    if (glitchType == 0) {
+                        note = _aphexLastNote;  // Repeat
+                    } else if (glitchType == 1) {
+                        note = (note + 7) % 12;  // Fifth shift
+                    } else {
+                        gatePercent = 15 + (_extraRng.next() % 30);  // Short stutter
+                    }
+                }
+
+                _aphexLastNote = note;
+
+                // Advance position with odd time signature
+                _aphexPosition = (_aphexPosition + 1) % _aphexTimeSigNum;
+
+                // Update note index when position wraps
+                if (_aphexPosition == 0) {
+                    _aphexNoteIndex = (_aphexNoteIndex + 1) % 8;
+                }
+
+                // Glide check (more common for Aphex style)
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    slide = 1 + _rng.nextRange(2);
+                }
+
+                _aphexStepCounter++;
+            }
+            break;
+
+        case 19: // AUTECH buffer generation - constantly evolving abstract patterns
+            {
+                // Note from transform state
+                note = (_autechreCurrentNote + _autechrePatternShift) % 12;
+                octave = 0;
+
+                // Irregular gates (15-100%)
+                gatePercent = 15 + (_extraRng.next() % 85);
+
+                // Transform state evolution based on mutation rate
+                if (_rng.nextRange(256) < _autechreMutationRate) {
+                    _autechreTransformState[0] = _rng.next();
+                    _autechreTransformState[1] = _extraRng.next();
+                    // Update chaos seed
+                    _autechreChaosSeed = _autechreTransformState[0] ^ _autechreTransformState[1];
+                }
+
+                // Pattern shift evolution
+                if (_rng.nextRange(16) < 4) {
+                    _autechrePatternShift = (_autechrePatternShift + 1) % 12;
+                }
+
+                // Current note evolution (more chaotic)
+                int noteShift = (_rng.nextRange(5) - 2);  // -2 to +2
+                _autechreCurrentNote = (_autechreCurrentNote + noteShift + 12) % 12;
+
+                // Micro-timing check for ornament
+                _extraRng.next();
+
+                // Glide check
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    slide = 1 + _rng.nextRange(3);  // Variable slide length
+                }
+
+                _autechreStepCount++;
             }
             break;
 
@@ -2889,6 +3069,93 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 }
 
                 _extraRng.next();
+                noteVoltage = (note + (octave * 12)) / 12.0f;
+            }
+            break;
+
+        case 18: // APHEX - complex polyrhythmic patterns (infinite loop)
+            {
+                int glide = _tuesdayTrack.glide();
+
+                // Get note from pattern
+                note = _aphexPattern[_aphexNoteIndex];
+                octave = 0;
+
+                // Varied gate lengths
+                _gatePercent = 25 + (_extraRng.next() % 75);
+                shouldGate = true;
+
+                // Glitch effect
+                if (_extraRng.nextRange(256) < _aphexGlitchProb) {
+                    int glitchType = _extraRng.next() % 3;
+                    if (glitchType == 0) {
+                        note = _aphexLastNote;  // Repeat
+                    } else if (glitchType == 1) {
+                        note = (note + 7) % 12;  // Fifth shift
+                    } else {
+                        _gatePercent = 15 + (_extraRng.next() % 30);  // Short stutter
+                    }
+                }
+
+                _aphexLastNote = note;
+
+                // Advance position with odd time signature
+                _aphexPosition = (_aphexPosition + 1) % _aphexTimeSigNum;
+
+                // Update note index when position wraps
+                if (_aphexPosition == 0) {
+                    _aphexNoteIndex = (_aphexNoteIndex + 1) % 8;
+                }
+
+                // Glide check
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _slide = 1 + _rng.nextRange(2);
+                } else {
+                    _slide = 0;
+                }
+
+                _aphexStepCounter++;
+                noteVoltage = (note + (octave * 12)) / 12.0f;
+            }
+            break;
+
+        case 19: // AUTECH - constantly evolving abstract patterns (infinite loop)
+            {
+                int glide = _tuesdayTrack.glide();
+
+                // Note from transform state
+                note = (_autechreCurrentNote + _autechrePatternShift) % 12;
+                octave = 0;
+
+                // Irregular gates
+                _gatePercent = 15 + (_extraRng.next() % 85);
+                shouldGate = true;
+
+                // Transform state evolution
+                if (_rng.nextRange(256) < _autechreMutationRate) {
+                    _autechreTransformState[0] = _rng.next();
+                    _autechreTransformState[1] = _extraRng.next();
+                    _autechreChaosSeed = _autechreTransformState[0] ^ _autechreTransformState[1];
+                }
+
+                // Pattern shift evolution
+                if (_rng.nextRange(16) < 4) {
+                    _autechrePatternShift = (_autechrePatternShift + 1) % 12;
+                }
+
+                // Current note evolution
+                int noteShift = (_rng.nextRange(5) - 2);
+                _autechreCurrentNote = (_autechreCurrentNote + noteShift + 12) % 12;
+
+                // Glide check
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _slide = 1 + _rng.nextRange(3);
+                } else {
+                    _slide = 0;
+                }
+
+                _extraRng.next();
+                _autechreStepCount++;
                 noteVoltage = (note + (octave * 12)) / 12.0f;
             }
             break;
