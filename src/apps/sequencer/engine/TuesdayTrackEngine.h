@@ -171,6 +171,68 @@ private:
     uint8_t _ragaPosition = 0;
     uint8_t _ragaOrnament = 0;
 
+    // AMBIENT algorithm state (13)
+    int8_t _ambientLastNote = 0;
+    uint8_t _ambientHoldTimer = 0;
+    int8_t _ambientDriftDir = 1;
+    uint8_t _ambientDriftAmount = 0;
+    uint8_t _ambientHarmonic = 0;
+    uint8_t _ambientSilenceCount = 0;
+    uint8_t _ambientDriftCounter = 0;
+
+    // ACID algorithm state (14)
+    uint8_t _acidSequence[8] = {0};
+    uint8_t _acidPosition = 0;
+    uint8_t _acidAccentPattern = 0;
+    uint8_t _acidOctaveMask = 0;
+    int8_t _acidLastNote = 0;
+    uint8_t _acidSlideTarget = 0;
+    uint8_t _acidStepCount = 0;
+
+    // DRILL algorithm state (15)
+    uint8_t _drillHiHatPattern = 0;
+    uint8_t _drillSlideTarget = 0;
+    uint8_t _drillTripletMode = 0;
+    uint8_t _drillRollCount = 0;
+    uint8_t _drillLastNote = 0;
+    uint8_t _drillStepInBar = 0;
+    uint8_t _drillSubdivision = 1;
+
+    // MINIMAL algorithm state (16)
+    uint8_t _minimalBurstLength = 0;
+    uint8_t _minimalSilenceLength = 0;
+    uint8_t _minimalClickDensity = 0;
+    uint8_t _minimalBurstTimer = 0;
+    uint8_t _minimalSilenceTimer = 0;
+    uint8_t _minimalNoteIndex = 0;
+    uint8_t _minimalMode = 0;
+
+    // KRAFT algorithm state (17)
+    uint8_t _kraftSequence[8] = {0};
+    uint8_t _kraftPosition = 0;
+    uint8_t _kraftLockTimer = 0;
+    uint8_t _kraftTranspose = 0;
+    uint8_t _kraftTranspCount = 0;
+    int8_t _kraftBaseNote = 0;
+    uint8_t _kraftGhostMask = 0;
+
+    // APHEX algorithm state (18)
+    uint8_t _aphexPattern[8] = {0};
+    uint8_t _aphexTimeSigNum = 4;
+    uint8_t _aphexGlitchProb = 0;
+    uint8_t _aphexPosition = 0;
+    uint8_t _aphexNoteIndex = 0;
+    int8_t _aphexLastNote = 0;
+    uint8_t _aphexStepCounter = 0;
+
+    // AUTECH algorithm state (19)
+    uint8_t _autechreTransformState[2] = {0};
+    uint8_t _autechreMutationRate = 0;
+    uint8_t _autechreChaosSeed = 0;
+    uint8_t _autechreStepCount = 0;
+    int8_t _autechreCurrentNote = 0;
+    uint8_t _autechrePatternShift = 0;
+
     // Output state
     bool _activity = false;
     bool _gateOutput = false;

@@ -187,6 +187,18 @@ void TuesdayTrackEngine::initAlgorithm() {
         _ragaOrnament = _extraRng.next() % 3;  // Ornament type
         break;
 
+    case 13: // AMBIENT - slow evolving pads
+        _rng = Random((flow - 1) << 4);
+        _extraRng = Random((ornament - 1) << 4);
+        _ambientLastNote = _rng.next() % 12;
+        _ambientHoldTimer = (_rng.next() % 8) + 4;  // 4-11 steps
+        _ambientDriftDir = (_rng.next() % 2) ? 1 : -1;
+        _ambientDriftAmount = flow;  // Flow controls drift speed
+        _ambientHarmonic = _extraRng.next() % 4;  // Harmonic interval type
+        _ambientSilenceCount = 0;
+        _ambientDriftCounter = 0;
+        break;
+
     default:
         break;
     }
@@ -353,6 +365,15 @@ void TuesdayTrackEngine::reseed() {
         _ragaDirection = 0;
         _ragaPosition = 0;
         _ragaOrnament = _extraRng.next() % 3;
+        break;
+
+    case 13: // AMBIENT
+        _ambientLastNote = _rng.next() % 12;
+        _ambientHoldTimer = (_rng.next() % 8) + 4;
+        _ambientDriftDir = (_rng.next() % 2) ? 1 : -1;
+        _ambientHarmonic = _extraRng.next() % 4;
+        _ambientSilenceCount = 0;
+        _ambientDriftCounter = 0;
         break;
 
     default:
@@ -672,6 +693,33 @@ void TuesdayTrackEngine::generateBuffer() {
             {
                 _rng.next();  // note selection
                 _extraRng.next();  // ornament
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _rng.nextRange(3);
+                }
+            }
+            break;
+
+        case 13: // AMBIENT warmup
+            {
+                // Drift counter and direction change
+                _ambientDriftCounter++;
+                if (_ambientDriftCounter >= 4) {
+                    _ambientDriftCounter = 0;
+                    _ambientLastNote = (_ambientLastNote + _ambientDriftDir + 12) % 12;
+                    if (_rng.next() % 8 == 0) {
+                        _ambientDriftDir = -_ambientDriftDir;
+                    }
+                }
+                // Hold timer and gate decision
+                if (_ambientHoldTimer > 0) {
+                    _ambientHoldTimer--;
+                } else {
+                    _rng.next();  // note selection
+                    _ambientHoldTimer = (_rng.next() % 8) + 4;
+                }
+                // Harmonic selection
+                _extraRng.next();
+                // Glide check
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
@@ -1255,6 +1303,50 @@ void TuesdayTrackEngine::generateBuffer() {
                 if (ornamentChance < _ragaOrnament && glide > 0) {
                     slide = 2;  // Characteristic slides
                 } else if (glide > 0 && _rng.nextRange(100) < glide) {
+                    slide = (_rng.nextRange(3)) + 1;
+                }
+            }
+            break;
+
+        case 13: // AMBIENT buffer generation - Slow evolving pads
+            {
+                // Very long gates for ambient pads
+                gatePercent = 90;
+
+                // Drift counter for slow pitch evolution
+                _ambientDriftCounter++;
+                if (_ambientDriftCounter >= 4) {
+                    _ambientDriftCounter = 0;
+                    _ambientLastNote = (_ambientLastNote + _ambientDriftDir + 12) % 12;
+                    // Occasionally change drift direction
+                    if (_rng.next() % 8 == 0) {
+                        _ambientDriftDir = -_ambientDriftDir;
+                    }
+                }
+
+                // Hold timer controls when new notes are generated
+                if (_ambientHoldTimer > 0) {
+                    _ambientHoldTimer--;
+                    note = _ambientLastNote;
+                } else {
+                    // Generate new note with consonant intervals
+                    int interval = _rng.next() % 12;
+                    _ambientLastNote = interval;
+                    note = _ambientLastNote;
+                    _ambientHoldTimer = (_rng.next() % 8) + 4;  // 4-11 steps hold
+                }
+
+                // Add harmonics based on ornament parameter
+                int harmonicType = _extraRng.next() % 4;
+                switch (harmonicType) {
+                case 0: octave = 0; break;  // Unison
+                case 1: octave = 0; note = (note + 5) % 12; break;  // Fourth
+                case 2: octave = 0; note = (note + 7) % 12; break;  // Fifth
+                case 3: octave = 1; break;  // Octave up
+                }
+
+                // Long, slow glides for ambient feel
+                if (glide > 0 && _rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
             }
@@ -2158,6 +2250,55 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 if (ornamentChance < _ragaOrnament && glide > 0) {
                     _slide = 2;
                 } else if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _slide = (_rng.nextRange(3)) + 1;
+                } else {
+                    _slide = 0;
+                }
+
+                noteVoltage = (note + (octave * 12)) / 12.0f;
+            }
+            break;
+
+        case 13: // AMBIENT - Slow evolving pads (infinite loop)
+            {
+                shouldGate = true;
+                _gatePercent = 90;  // Very long gates for pads
+                int glide = _tuesdayTrack.glide();
+
+                // Drift counter for slow pitch evolution
+                _ambientDriftCounter++;
+                if (_ambientDriftCounter >= 4) {
+                    _ambientDriftCounter = 0;
+                    _ambientLastNote = (_ambientLastNote + _ambientDriftDir + 12) % 12;
+                    // Occasionally change drift direction
+                    if (_rng.next() % 8 == 0) {
+                        _ambientDriftDir = -_ambientDriftDir;
+                    }
+                }
+
+                // Hold timer controls when new notes are generated
+                if (_ambientHoldTimer > 0) {
+                    _ambientHoldTimer--;
+                    note = _ambientLastNote;
+                } else {
+                    // Generate new note
+                    int interval = _rng.next() % 12;
+                    _ambientLastNote = interval;
+                    note = _ambientLastNote;
+                    _ambientHoldTimer = (_rng.next() % 8) + 4;
+                }
+
+                // Add harmonics based on ornament
+                int harmonicType = _extraRng.next() % 4;
+                switch (harmonicType) {
+                case 0: octave = 0; break;
+                case 1: octave = 0; note = (note + 5) % 12; break;
+                case 2: octave = 0; note = (note + 7) % 12; break;
+                case 3: octave = 1; break;
+                }
+
+                // Glide for smooth transitions
+                if (glide > 0 && _rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 } else {
                     _slide = 0;
