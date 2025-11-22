@@ -35,13 +35,6 @@ void TuesdayEditPage::draw(Canvas &canvas) {
 
     const auto &track = tuesdayTrack();
 
-    // Draw page indicator in header area
-    canvas.setFont(Font::Tiny);
-    canvas.setBlendMode(BlendMode::Set);
-    canvas.setColor(Color::Medium);
-    FixedStringBuilder<8> pageStr("[%d/%d]", _currentPage + 1, PageCount);
-    canvas.drawText(232, 6, pageStr);
-
     // Draw 4 parameters for current page
     // Use 51px columns to match F-key spacing (256/5 ≈ 51)
     const int colWidth = 51;
@@ -53,6 +46,16 @@ void TuesdayEditPage::draw(Canvas &canvas) {
 
     // Draw status box on right side
     drawStatusBox(canvas);
+
+    // Draw page indicator between status box and footer, to the right of the status box
+    canvas.setFont(Font::Tiny);
+    canvas.setBlendMode(BlendMode::Set);
+    canvas.setColor(Color::Medium);
+    FixedStringBuilder<8> pageStr("[%d/%d]", _currentPage + 1, PageCount);
+    // Center horizontally in F5 button region (x=204 to x=256, width=52)
+    int textWidth = canvas.textWidth(pageStr);
+    int centerX = 204 + (52 - textWidth) / 2;
+    canvas.drawText(centerX, 50, pageStr);
 
     // Draw footer with function key labels
     const char *functionNames[5];
@@ -394,7 +397,7 @@ void TuesdayEditPage::drawStatusBox(Canvas &canvas) {
     const int boxX = 204;  // Start after 4 columns (51*4=204)
     const int boxY = 14;
     const int boxW = 48;   // Narrower box
-    const int boxH = 32;
+    const int boxH = 30;   // Reduced to avoid interference with page indicator
 
     // Draw box outline
     canvas.setBlendMode(BlendMode::Set);
