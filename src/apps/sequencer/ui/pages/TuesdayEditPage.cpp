@@ -247,7 +247,7 @@ int TuesdayEditPage::paramMax(int param) const {
     case Flow:          return 16;
     case Ornament:      return 16;
     case Power:         return 16;
-    case LoopLength:    return 25;   // Index 0-25 (0=Inf, 25=64)
+    case LoopLength:    return 29;   // Index 0-29 (0=Inf, 29=128)
     case Scan:          return 127;
     case Rotate:        return 63;   // Bipolar: -63 to +63
     case Glide:         return 100;

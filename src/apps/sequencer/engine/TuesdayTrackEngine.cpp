@@ -194,6 +194,7 @@ void TuesdayTrackEngine::initAlgorithm() {
 
 void TuesdayTrackEngine::reset() {
     _stepIndex = 0;
+    _displayStep = -1;  // No step displayed until first tick
     _gateLength = 0;
     _gateTicks = 0;
     _coolDown = 0;
@@ -1300,15 +1301,14 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     }
 
     // Check if parameters changed - if so, reinitialize and invalidate buffer
+    // Note: Scan is NOT included here - it's a real-time playback parameter
     bool paramsChanged = (_cachedAlgorithm != _tuesdayTrack.algorithm() ||
                          _cachedFlow != _tuesdayTrack.flow() ||
                          _cachedOrnament != _tuesdayTrack.ornament() ||
-                         _cachedLoopLength != _tuesdayTrack.loopLength() ||
-                         _cachedScan != _tuesdayTrack.scan());
+                         _cachedLoopLength != _tuesdayTrack.loopLength());
     if (paramsChanged) {
         _cachedAlgorithm = _tuesdayTrack.algorithm();
         _cachedLoopLength = _tuesdayTrack.loopLength();
-        _cachedScan = _tuesdayTrack.scan();
         initAlgorithm();
         _bufferValid = false;
     }
@@ -1319,9 +1319,9 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     }
 
     // Calculate base cooldown from power
-    // Linear mapping: Power = number of notes in loop
-    // Gap between notes = loopLength / power
-    int effectiveLength = (loopLength > 0) ? loopLength : 16;  // Use 16 for infinite loops
+    // Linear mapping: Power = number of notes per 16 steps
+    // Use fixed reference length for consistent density regardless of loop length
+    int effectiveLength = 16;  // Fixed reference for density calculations
     int baseCooldown = (power > 0) ? effectiveLength / power : effectiveLength;
     if (baseCooldown < 1) baseCooldown = 1;
 
@@ -1373,9 +1373,28 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     uint32_t divisor = _tuesdayTrack.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
 
     // Calculate reset divisor from resetMeasure parameter
-    // For infinite loops (loopLength == 0), ignore reset measure to allow true infinite patterns
     int resetMeasure = _tuesdayTrack.resetMeasure();
-    uint32_t resetDivisor = (resetMeasure > 0 && loopLength > 0) ? resetMeasure * _engine.measureDivisor() : 0;
+    uint32_t resetDivisor;
+
+    if (loopLength > 0) {
+        // Finite loop - calculate reset from loop duration
+        // This ensures steps always align with loop boundaries
+        uint32_t loopDuration = loopLength * divisor;
+
+        if (resetMeasure > 0) {
+            // If resetMeasure is set, round up to next complete loop cycle
+            // to allow patterns to evolve over multiple loop cycles
+            uint32_t measureReset = resetMeasure * _engine.measureDivisor();
+            resetDivisor = ((measureReset + loopDuration - 1) / loopDuration) * loopDuration;
+        } else {
+            // No reset measure - just use loop duration
+            resetDivisor = loopDuration;
+        }
+    } else {
+        // Infinite loop - no reset, tick grows forever
+        resetDivisor = 0;
+    }
+
     uint32_t relativeTick = resetDivisor == 0 ? tick : tick % resetDivisor;
 
     // Reset on measure boundary (only if resetMeasure is enabled and not infinite loop)
@@ -1406,6 +1425,25 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     }
 
     if (stepTrigger) {
+        // Calculate step from tick count (ensures sync with divisor)
+        uint32_t calculatedStep = relativeTick / divisor;
+
+        // For finite loops, wrap within loop length
+        if (loopLength > 0) {
+            // Check if we wrapped to beginning of loop - reinitialize algorithm
+            uint32_t newStep = calculatedStep % loopLength;
+            if (newStep < _stepIndex && _stepIndex > 0) {
+                // Loop wrapped - reinitialize algorithm for deterministic repeats
+                initAlgorithm();
+            }
+            _stepIndex = newStep;
+        } else {
+            _stepIndex = calculatedStep;
+        }
+
+        // Set display step for UI sync
+        _displayStep = _stepIndex;
+
         // Generate output based on algorithm
         bool shouldGate = false;
         float noteVoltage = 0.f;
@@ -2210,15 +2248,8 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             }
         }
 
-        // Advance step
-        _stepIndex++;
-
-        // Loop handling with algorithm reinitialization for deterministic repeats
-        if (loopLength > 0 && _stepIndex >= (uint32_t)loopLength) {
-            _stepIndex = 0;
-            // Reinitialize algorithm to get same pattern
-            initAlgorithm();
-        }
+        // Step advancement and loop handling now done at start of stepTrigger block
+        // via tick-based calculation
 
         return TickResult::CvUpdate | TickResult::GateUpdate;
     }
