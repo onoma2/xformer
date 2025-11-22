@@ -84,6 +84,7 @@ void Project::clear() {
     noteSequence(7, 0).setLastStep(15);
     noteSequence(7, 0).setGates({ 1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1 });
     noteSequence(7, 0).setNotes({ 0,0,0,0,12,0,12,1,24,21,22,0,3,6,12,1 });
+    track(7).setTrackMode(Track::TrackMode::Tuesday);
 #endif
 
     _observable.notify(ProjectCleared);

@@ -1,6 +1,8 @@
 #include "OverviewPage.h"
 
 #include "model/NoteTrack.h"
+#include "model/TuesdayTrack.h"
+#include "engine/TuesdayTrackEngine.h"
 
 #include "ui/painters/WindowPainter.h"
 
@@ -82,6 +84,31 @@ static void drawCurveTrack(Canvas &canvas, int trackIndex, const CurveTrackEngin
     }
 }
 
+static void drawTuesdayTrack(Canvas &canvas, int trackIndex, const TuesdayTrackEngine &trackEngine, const TuesdayTrack &tuesdayTrack) {
+    canvas.setBlendMode(BlendMode::Set);
+
+    int y = trackIndex * 8;
+    int loopLength = tuesdayTrack.actualLoopLength();
+    int currentStep = trackEngine.currentStep();
+
+    // Gate indicator square (blinking when active)
+    bool gateActive = trackEngine.gateOutput(0);
+    canvas.setColor(gateActive ? Color::Bright : Color::Low);
+    canvas.fillRect(64 + 1, y + 1, 6, 6);
+
+    // Step counter
+    canvas.setColor(Color::Medium);
+    if (currentStep >= 0) {
+        if (loopLength > 0) {
+            // Show step/loop format for finite loops
+            canvas.drawText(64 + 12, y + 5, FixedStringBuilder<16>("%d/%d", currentStep + 1, loopLength));
+        } else {
+            // Just show step for infinite loops
+            canvas.drawText(64 + 12, y + 5, FixedStringBuilder<16>("%d", currentStep + 1));
+        }
+    }
+}
+
 
 OverviewPage::OverviewPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
@@ -137,6 +164,9 @@ void OverviewPage::draw(Canvas &canvas) {
             drawCurveTrack(canvas, trackIndex, trackEngine.as<CurveTrackEngine>(), track.curveTrack().sequence(trackState.pattern()));
             break;
         case Track::TrackMode::MidiCv:
+            break;
+        case Track::TrackMode::Tuesday:
+            drawTuesdayTrack(canvas, trackIndex, trackEngine.as<TuesdayTrackEngine>(), track.tuesdayTrack());
             break;
         case Track::TrackMode::Last:
             break;

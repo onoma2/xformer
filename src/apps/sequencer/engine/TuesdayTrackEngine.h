@@ -37,7 +37,7 @@ public:
     void reseed();
 
     // Current step index for UI display
-    int currentStep() const { return _stepIndex; }
+    int currentStep() const { return _displayStep; }
 
     // Generate pattern buffer for finite loops
     void generateBuffer();
@@ -71,10 +71,10 @@ private:
     uint8_t _cachedFlow = 0;
     uint8_t _cachedOrnament = 0;
     uint8_t _cachedLoopLength = 0;
-    uint8_t _cachedScan = 0;
 
     // Algorithm state
     uint32_t _stepIndex = 0;
+    int _displayStep = -1;  // Step currently being displayed (set before processing)
     uint32_t _gateLength = 0;
     uint32_t _gateTicks = 0;
 

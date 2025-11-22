@@ -247,6 +247,25 @@
   - Root cause: Ramp function was not providing clear density variation
   - Fix: Implemented step function for more distinct density changes
   - Impact: Clearer and more predictable skew behavior
+- **Tuesday Track Clock Divisor Drift**: Fixed timing drift when using non-default clock divisors (1/8, 1/4, etc.)
+  - Root cause: Step index was incremented instead of calculated from tick count, causing timing misalignment
+  - Fix: Calculate stepIndex from relativeTick/divisor and align resetDivisor to loop duration multiples
+  - Impact: Tuesday tracks now stay in perfect sync with other tracks at all clock divisions
+- **Tuesday Track Display Step Sync**: Fixed playhead display being ahead of actual playback
+  - Root cause: _stepIndex was incremented at end of processing, making UI show next step
+  - Fix: Added _displayStep variable set before processing for accurate UI sync
+  - Impact: OverviewPage playhead now matches actual step being played
+- **Tuesday Track Loop Length Options**: Added missing loop length values
+  - Added: 95, 96, 127, 128 to loop length selection
+  - Impact: More flexibility in loop length choices
+- **Tuesday Track Scan Clamping**: Fixed scan parameter to respect loop boundaries
+  - Root cause: Scan could exceed buffer bounds when loop length changed
+  - Fix: Dynamic scan clamping based on (128 - loopLength), re-clamp when loop length changes
+  - Impact: Scan parameter now properly constrained to valid range
+- **Tuesday Track OverviewPage Display**: Added TuesdayTrack visualization to OverviewPage
+  - Shows blinking gate indicator and step counter (step/loopLength for finite loops)
+  - Matches NoteTrack infobox display style
+  - Impact: Visual feedback for Tuesday track state on overview
 
 ## v0.1.42 (6 June 2022)
 

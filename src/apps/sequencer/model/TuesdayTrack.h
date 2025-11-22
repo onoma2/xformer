@@ -85,8 +85,9 @@ public:
 
     int loopLength() const { return _loopLength; }
     void setLoopLength(int loopLength) {
-        _loopLength = clamp(loopLength, 0, 25);
-        // Re-clamp rotate to new loop length
+        _loopLength = clamp(loopLength, 0, 29);
+        // Re-clamp scan and rotate to new loop length
+        setScan(_scan);
         setRotate(_rotate);
     }
 
@@ -271,11 +272,13 @@ public:
         }
     }
 
-    // scan (0-127, scans pattern position for infinite loops)
+    // scan (0 to 128-loopLength, offsets window into buffer)
 
     int scan() const { return _scan; }
     void setScan(int scan) {
-        _scan = clamp(scan, 0, 127);
+        int maxScan = 128 - actualLoopLength();
+        if (maxScan < 0) maxScan = 0;
+        _scan = clamp(scan, 0, maxScan);
     }
 
     void editScan(int value, bool shift) {
