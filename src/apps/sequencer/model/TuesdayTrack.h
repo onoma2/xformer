@@ -27,7 +27,7 @@ public:
 
     int algorithm() const { return _algorithm; }
     void setAlgorithm(int algorithm) {
-        _algorithm = clamp(algorithm, 0, 12);
+        _algorithm = clamp(algorithm, 0, 19);
     }
 
     void editAlgorithm(int value, bool shift) {
