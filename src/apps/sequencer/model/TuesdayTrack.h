@@ -115,6 +115,20 @@ public:
         str("%d%%", glide());
     }
 
+    // trill (re-trigger probability 0-100%)
+    int trill() const { return _trill; }
+    void setTrill(int trill) {
+        _trill = clamp(trill, 0, 100);
+    }
+
+    void editTrill(int value, bool shift) {
+        setTrill(this->trill() + value * (shift ? 10 : 1));
+    }
+
+    void printTrill(StringBuilder &str) const {
+        str("%d%%", trill());
+    }
+
     // useScale (use project scale for note quantization)
 
     bool useScale() const { return _useScale; }
@@ -352,6 +366,7 @@ private:
     uint8_t _power = 0;
     uint8_t _loopLength = 16;
     uint8_t _glide = 0;  // Default 0% (no slides)
+    uint8_t _trill = 0;  // Default 0% (no trills/re-triggers)
     bool _useScale = false;  // Default: free (chromatic)
     int8_t _skew = 0;  // Default: 0 (even distribution)
     uint8_t _cvUpdateMode = Free;  // Default: Free (CV updates every step)

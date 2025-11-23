@@ -134,7 +134,7 @@ int TuesdayEditPage::paramForPage(int page, int slot) const {
     static const int pageParams[PageCount][ParamsPerPage] = {
         { Algorithm, Flow, Ornament, Power },           // Page 1
         { LoopLength, Scan, Rotate, Glide },            // Page 2
-        { Skew, GateOffset, CvUpdateMode, -1 },         // Page 3
+        { Skew, GateOffset, CvUpdateMode, Trill },      // Page 3
     };
 
     if (page < 0 || page >= PageCount || slot < 0 || slot >= ParamsPerPage) {
@@ -156,6 +156,7 @@ const char *TuesdayEditPage::paramName(int param) const {
     case Skew:          return "Skew";
     case GateOffset:    return "Gate Offset";
     case CvUpdateMode:  return "CV Mode";
+    case Trill:         return "Trill";
     default:            return "-";
     }
 }
@@ -173,6 +174,7 @@ const char *TuesdayEditPage::paramShortName(int param) const {
     case Skew:          return "SKEW";
     case GateOffset:    return "GOFS";
     case CvUpdateMode:  return "CVUPD";
+    case Trill:         return "TRILL";
     default:            return "-";
     }
 }
@@ -225,6 +227,9 @@ void TuesdayEditPage::formatParamValue(int param, StringBuilder &str) const {
     case CvUpdateMode:
         track.printCvUpdateMode(str);
         break;
+    case Trill:
+        str("%d%%", track.trill());
+        break;
     default:
         str("-");
         break;
@@ -246,6 +251,7 @@ int TuesdayEditPage::paramValue(int param) const {
     case Skew:          return track.skew();
     case GateOffset:    return track.gateOffset();
     case CvUpdateMode:  return track.cvUpdateMode();
+    case Trill:         return track.trill();
     default:            return 0;
     }
 }
@@ -263,6 +269,7 @@ int TuesdayEditPage::paramMax(int param) const {
     case Skew:          return 8;    // Bipolar: -8 to +8
     case GateOffset:    return 100;  // Percentage: 0-100%
     case CvUpdateMode:  return 1;
+    case Trill:         return 100;
     default:            return 0;
     }
 }
@@ -309,6 +316,9 @@ void TuesdayEditPage::editParam(int param, int value, bool shift) {
         break;
     case CvUpdateMode:
         track.editCvUpdateMode(value, shift);
+        break;
+    case Trill:
+        track.editTrill(value, shift);
         break;
     default:
         break;

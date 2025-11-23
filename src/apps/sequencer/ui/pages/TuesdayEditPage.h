@@ -39,6 +39,7 @@ private:
         Skew,
         GateOffset,
         CvUpdateMode,
+        Trill,
         // Total
         ParamCount
     };

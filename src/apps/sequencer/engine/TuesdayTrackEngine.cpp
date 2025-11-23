@@ -315,11 +315,29 @@ void TuesdayTrackEngine::reset() {
     _gateLength = 0;
     _gateTicks = 0;
     _coolDown = 0;
+    _coolDownMax = 0;
+    _gatePercent = 75;
+    _gateOffset = 0;
     _slide = 0;
     _cvTarget = 0.f;
     _cvCurrent = 0.f;
     _cvDelta = 0.f;
     _slideCountDown = 0;
+
+    // Gate timing state
+    _gateLengthTicks = 0;
+    _pendingGateOffsetTicks = 0;
+    _pendingGateActivation = false;
+
+    // Retrigger/Trill State
+    _retriggerArmed = false;
+    _retriggerCount = 0;
+    _retriggerPeriod = 0;
+    _retriggerLength = 0;
+    _retriggerTimer = 0;
+    _isTrillNote = false;
+    _trillCvTarget = 0.f;
+
     _activity = false;
     _gateOutput = false;
     _cvOutput = 0.f;
@@ -3068,27 +3086,35 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 bool hihatHit = (_drillHiHatPattern & (1 << _drillStepInBar)) != 0;
 
                 if (hihatHit) {
-                    // Hi-hat hit
+                    // --- HI-HAT HIT ---
                     note = 7 + (_rng.next() % 5);
                     octave = 1;
                     _gatePercent = 25;
                     shouldGate = true;
+                    _slide = 0;
 
-                    // Check for roll
-                    if (_extraRng.nextRange(16) < 4) {
-                        _drillRollCount = 2 + (_rng.next() % 3);
+                    // Check for Trill/Retrigger
+                    int trillChanceAlgorithmic = 30; // 30% base chance for a roll on a hi-hat
+                    int userTrillSetting = _tuesdayTrack.trill();
+                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                    if (_uiRng.nextRange(100) < finalTrillChance) {
+                        _retriggerArmed = true;
+                        _retriggerCount = 3; // 4 notes total (1 initial + 3 retriggers)
+                        _retriggerPeriod = CONFIG_SEQUENCE_PPQN / 4; // 16th notes
+                        _retriggerLength = _retriggerPeriod / 2; // 50% gate
+                        _isTrillNote = false; // Start on the base note
+
+                        // Set the trill note (2 semitones up)
+                        float baseVoltage = (note + (octave * 12)) / 12.f;
+                        _trillCvTarget = baseVoltage + (2.f / 12.f);
+
+                        // Make sure the first note of the retrigger is short
+                        _gatePercent = (_retriggerLength * 100) / CONFIG_SEQUENCE_PPQN;
                     }
-                    _slide = 0;
-                } else if (_drillRollCount > 0) {
-                    // Continue roll
-                    _drillRollCount--;
-                    note = 7 + (_rng.next() % 5);
-                    octave = 1;
-                    _gatePercent = 20;
-                    shouldGate = true;
-                    _slide = 0;
+
                 } else {
-                    // Bass note
+                    // --- BASS NOTE ---
                     note = _drillLastNote;
                     octave = -1;
                     _gatePercent = 75;
@@ -3101,10 +3127,10 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
                     // Slide
                     if (_extraRng.nextRange(16) < 8) {
-                        _slide = 2;
+                        _slide = 2; // Hardcoded slide for drill feel
                         _drillSlideTarget = _rng.next() % 12;
                     } else if (glide > 0 && _rng.nextRange(100) < glide) {
-                        _slide = (_rng.nextRange(3)) + 1;
+                        _slide = (_rng.nextRange(3)) + 1; // Probabilistic slide
                     } else {
                         _slide = 0;
                     }
@@ -3488,7 +3514,14 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         if (gateTriggered) {
             _pendingGateActivation = true;
             _pendingGateOffsetTicks = (CONFIG_SEQUENCE_PPQN * _gateOffset) / 100;
-            _gateLengthTicks = (CONFIG_SEQUENCE_PPQN * _gatePercent) / 100;
+
+            // If a re-trigger was armed by the algorithm, use the short re-trigger
+            // length for the gate. Otherwise, use the main gate length.
+            if (_retriggerArmed) {
+                _gateLengthTicks = _retriggerLength;
+            } else {
+                _gateLengthTicks = (CONFIG_SEQUENCE_PPQN * _gatePercent) / 100;
+            }
         }
 
         return TickResult::CvUpdate | TickResult::GateUpdate;
@@ -3498,26 +3531,80 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 }
 
 void TuesdayTrackEngine::update(float dt) {
-    // Handle pending gate offset
+    // --- CV Sliding ---
+    // This happens independently of gate logic
+    if (_slideCountDown > 0) {
+        _slideCountDown--;
+        _cvCurrent += _cvDelta;
+    } else {
+        _cvCurrent = _cvTarget;
+    }
+    // Only update final CV output if not in a trill, which has its own CV logic
+    if (!_retriggerArmed) {
+        _cvOutput = _cvCurrent;
+    }
+
+
+    // --- Gate Timing State Machine ---
+
+    // 1. Handle initial gate offset delay
     if (_pendingGateOffsetTicks > 0) {
         _pendingGateOffsetTicks--;
+        return; // Still waiting for the first event to start
     }
 
-    // Check for gate activation after offset
-    if (_pendingGateActivation && _pendingGateOffsetTicks == 0) {
+    // 2. Activate the very first gate event if it was pending
+    if (_pendingGateActivation) {
         _gateOutput = true;
-        _activity = true;
         _pendingGateActivation = false;
-        // Note: _gateLengthTicks is already set from tick()
+        // _gateLengthTicks has already been set correctly in tick()
+        // for either a normal note or the first note of a trill.
+
+        // Set the initial CV for the first note
+        _cvOutput = _cvTarget;
+        return; // Gate is now on, wait for next update
     }
 
-    // Handle gate length countdown
+    // 3. Main state machine for gates that are already active or re-triggering
     if (_gateOutput) {
+        // --- Gate is currently ON ---
         if (_gateLengthTicks > 0) {
             _gateLengthTicks--;
         } else {
+            // ON-time has expired, so turn the gate OFF
             _gateOutput = false;
-            _activity = false;
+
+            // If we are in a re-trigger chain, set the timer for the silent OFF-time
+            if (_retriggerArmed && _retriggerCount > 0) {
+                _gateLengthTicks = _retriggerPeriod - _retriggerLength; // This now becomes the off-time
+            }
+        }
+    } else {
+        // --- Gate is currently OFF ---
+        if (_retriggerArmed) {
+            if (_retriggerCount > 0) {
+                if (_gateLengthTicks > 0) {
+                    _gateLengthTicks--;
+                } else {
+                    // OFF-time has expired, so fire the next re-triggered note
+                    _retriggerCount--;
+                    _gateOutput = true;
+                    _gateLengthTicks = _retriggerLength; // Set ON-time for this new note
+
+                    // Set the trill CV by alternating
+                    _isTrillNote = !_isTrillNote;
+                    if (_isTrillNote) {
+                        _cvOutput = _trillCvTarget;
+                    } else {
+                        _cvOutput = _cvTarget;
+                    }
+                }
+            } else {
+                // Last re-trigger has finished, disarm the system for the next step
+                _retriggerArmed = false;
+            }
         }
     }
+
+    _activity = _gateOutput || _retriggerArmed;
 }

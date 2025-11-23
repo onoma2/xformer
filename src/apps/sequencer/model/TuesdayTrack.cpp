@@ -92,6 +92,7 @@ void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_power);
     writer.write(_loopLength);
     writer.write(_glide);
+    writer.write(_trill);
     writer.write(_useScale);
     writer.write(_skew);
     writer.write(_cvUpdateMode);
@@ -115,6 +116,7 @@ void TuesdayTrack::read(VersionedSerializedReader &reader) {
     reader.read(_power, ProjectVersion::Version35);
     reader.read(_loopLength, ProjectVersion::Version35);
     reader.read(_glide, ProjectVersion::Version35);
+    reader.read(_trill, ProjectVersion::Version41);
     reader.read(_useScale, ProjectVersion::Version35);
     reader.read(_skew, ProjectVersion::Version35);
     reader.read(_cvUpdateMode, ProjectVersion::Version35);

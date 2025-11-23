@@ -109,6 +109,15 @@ public:
     uint32_t _pendingGateOffsetTicks = 0;
     bool _pendingGateActivation = false;
 
+    // Retrigger/Trill State
+    int _retriggerCount = 0;
+    uint32_t _retriggerPeriod = 0;
+    uint32_t _retriggerLength = 0;
+    uint32_t _retriggerTimer = 0;
+    bool _isTrillNote = false;
+    float _trillCvTarget = 0.f;
+    bool _retriggerArmed = false;
+
     // Slide/portamento state
     int _slide = 0;           // Slide amount (0=instant, 1-3=glide)
     float _cvTarget = 0.f;    // Target CV value

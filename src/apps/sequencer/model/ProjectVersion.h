@@ -105,6 +105,9 @@ enum ProjectVersion {
     // added TuesdayTrack::gateOffset
     Version40 = 40,
 
+    // added TuesdayTrack::trill
+    Version41 = 41,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,
