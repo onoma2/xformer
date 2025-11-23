@@ -2319,8 +2319,8 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 // Check for trill/re-trigger
                 if (bufferedStep.isTrill) {
                     _retriggerArmed = true;
-                    _retriggerCount = 3; // 4 notes total
-                    _retriggerPeriod = CONFIG_SEQUENCE_PPQN / 4; // 16th notes
+                    _retriggerCount = 2; // 3 notes total
+                    _retriggerPeriod = CONFIG_SEQUENCE_PPQN / 3; // 8th note triplets
                     _retriggerLength = _retriggerPeriod / 2;
                     _isTrillNote = false;
 
@@ -3110,21 +3110,20 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     int userTrillSetting = _tuesdayTrack.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        _retriggerArmed = true;
-                        _retriggerCount = 3; // 4 notes total (1 initial + 3 retriggers)
-                        _retriggerPeriod = CONFIG_SEQUENCE_PPQN / 4; // 16th notes
-                        _retriggerLength = _retriggerPeriod / 2; // 50% gate
-                        _isTrillNote = false; // Start on the base note
-
-                        // Set the trill note (2 semitones up)
-                        float baseVoltage = (note + (octave * 12)) / 12.f;
-                        _trillCvTarget = baseVoltage + (2.f / 12.f);
-
-                        // Make sure the first note of the retrigger is short
-                        _gatePercent = (_retriggerLength * 100) / CONFIG_SEQUENCE_PPQN;
-                    }
-
+                                        if (_uiRng.nextRange(100) < finalTrillChance) {
+                                            _retriggerArmed = true;
+                                            _retriggerCount = 2; // 3 notes total
+                                            _retriggerPeriod = CONFIG_SEQUENCE_PPQN / 3; // 8th note triplets
+                                            _retriggerLength = _retriggerPeriod / 2; // 50% gate
+                                            _isTrillNote = false;
+                    
+                                            // Set the trill note (2 semitones up)
+                                            float baseVoltage = (note + (octave * 12)) / 12.f;
+                                            _trillCvTarget = baseVoltage + (2.f / 12.f);
+                    
+                                            // Make sure the first note of the retrigger is short
+                                            _gatePercent = (_retriggerLength * 100) / CONFIG_SEQUENCE_PPQN;
+                                        }
                 } else {
                     // --- BASS NOTE ---
                     note = _drillLastNote;
