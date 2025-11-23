@@ -2504,6 +2504,23 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                         } else {
                             _slide = 0;
                         }
+                        // Check for Trill on stomp down
+                        {
+                            int trillChanceAlgorithmic = 18; // 18% base chance
+                            int userTrillSetting = _tuesdayTrack.trill();
+                            int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                            if (_uiRng.nextRange(100) < finalTrillChance) {
+                                _retriggerArmed = true;
+                                _retriggerCount = 1; // 2 notes total
+                                _retriggerPeriod = divisor / 2; // 8th notes
+                                _retriggerLength = _retriggerPeriod / 2;
+                                _isTrillNote = false;
+
+                                float baseVoltage = (note + (octave * 12)) / 12.f;
+                                _trillCvTarget = baseVoltage + (12.f / 12.f); // Octave up (match high)
+                            }
+                        }
                         if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
                         _stomperMode = 14;  // MAKENEW
                         break;
@@ -2520,6 +2537,23 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                             _slide = (_rng.nextRange(3)) + 1;  // Slide 1-3
                         } else {
                             _slide = 0;
+                        }
+                        // Check for Trill on stomp up
+                        {
+                            int trillChanceAlgorithmic = 18; // 18% base chance
+                            int userTrillSetting = _tuesdayTrack.trill();
+                            int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                            if (_uiRng.nextRange(100) < finalTrillChance) {
+                                _retriggerArmed = true;
+                                _retriggerCount = 1; // 2 notes total
+                                _retriggerPeriod = divisor / 2; // 8th notes
+                                _retriggerLength = _retriggerPeriod / 2;
+                                _isTrillNote = false;
+
+                                float baseVoltage = (note + (octave * 12)) / 12.f;
+                                _trillCvTarget = baseVoltage - (12.f / 12.f); // Octave down (match low)
+                            }
                         }
                         if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
                         _stomperMode = 14;  // MAKENEW
@@ -2681,6 +2715,24 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     _slide = (_rng.nextRange(3)) + 1;
                 }
 
+                // Check for Trill on accented chord positions
+                if (chordpos == 0) { // First note of chord
+                    int trillChanceAlgorithmic = 20; // 20% base chance
+                    int userTrillSetting = _tuesdayTrack.trill();
+                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                    if (_uiRng.nextRange(100) < finalTrillChance) {
+                        _retriggerArmed = true;
+                        _retriggerCount = 1 + (_uiRng.nextRange(2)); // 2-3 notes total
+                        _retriggerPeriod = divisor / 4; // 16th notes for chiptune speed
+                        _retriggerLength = _retriggerPeriod / 2;
+                        _isTrillNote = false;
+
+                        float baseVoltage = (note + (octave * 12)) / 12.f;
+                        _trillCvTarget = baseVoltage + (1.f / 12.f); // Semitone up
+                    }
+                }
+
                 noteVoltage = (note + (octave * 12)) / 12.0f;
             }
             break;
@@ -2830,6 +2882,26 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     _slide = (_rng.nextRange(3)) + 1;
                 }
 
+                // Check for Trill on phase transitions
+                bool phaseChanged = (_wobbleLastWasHigh == 0 && _rng.nextRange(256) >= 128) ||
+                                   (_wobbleLastWasHigh == 1 && _rng.nextRange(256) < 128);
+                if (phaseChanged) {
+                    int trillChanceAlgorithmic = 12; // 12% base chance (low, wobble is already complex)
+                    int userTrillSetting = _tuesdayTrack.trill();
+                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                    if (_uiRng.nextRange(100) < finalTrillChance) {
+                        _retriggerArmed = true;
+                        _retriggerCount = 1; // 2 notes total
+                        _retriggerPeriod = divisor / 3; // Triplet
+                        _retriggerLength = _retriggerPeriod / 2;
+                        _isTrillNote = false;
+
+                        float baseVoltage = (note + (octave * 12)) / 12.f;
+                        _trillCvTarget = baseVoltage + (2.f / 12.f); // Major 2nd up
+                    }
+                }
+
                 noteVoltage = (note + (octave * 12)) / 12.0f;
             }
             break;
@@ -2867,6 +2939,22 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                         note = 7 + (_extraRng.next() % 3);
                         octave = 1;
                         _gatePercent = 40;
+
+                        // Check for Trill on hi-hats
+                        int trillChanceAlgorithmic = 25; // 25% base chance for hat rolls
+                        int userTrillSetting = _tuesdayTrack.trill();
+                        int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                        if (_uiRng.nextRange(100) < finalTrillChance) {
+                            _retriggerArmed = true;
+                            _retriggerCount = 2 + (_uiRng.nextRange(2)); // 3-4 notes total
+                            _retriggerPeriod = divisor / 4; // 16th note rolls
+                            _retriggerLength = _retriggerPeriod / 2;
+                            _isTrillNote = false;
+
+                            float baseVoltage = (note + (octave * 12)) / 12.f;
+                            _trillCvTarget = baseVoltage + (2.f / 12.f); // Major 2nd up
+                        }
                     } else {
                         shouldGate = false;
                         note = 0;
@@ -2915,8 +3003,25 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     }
                     octave = (pos % 8 == 0) ? 0 : (_rng.nextBinary() ? 1 : 0);
 
-                    if (_extraRng.nextRange(256) < _funkGhostProb && pos % 4 != 0) {
+                    bool isGhost = (_extraRng.nextRange(256) < _funkGhostProb && pos % 4 != 0);
+                    if (isGhost) {
                         _gatePercent = 35;
+
+                        // Check for Trill on ghost notes
+                        int trillChanceAlgorithmic = 15; // 15% base chance for ghost double
+                        int userTrillSetting = _tuesdayTrack.trill();
+                        int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                        if (_uiRng.nextRange(100) < finalTrillChance) {
+                            _retriggerArmed = true;
+                            _retriggerCount = 1; // 2 notes total (ghost double)
+                            _retriggerPeriod = divisor / 3; // Triplet for swing
+                            _retriggerLength = _retriggerPeriod / 2;
+                            _isTrillNote = false;
+
+                            float baseVoltage = (note + (octave * 12)) / 12.f;
+                            _trillCvTarget = baseVoltage - (2.f / 12.f); // Major 2nd down
+                        }
                     }
                 } else {
                     shouldGate = false;
@@ -3041,6 +3146,26 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     _slide = (_rng.nextRange(3)) + 1;
                 } else {
                     _slide = 0;
+                }
+
+                // Check for Trill on ascending movements (traditional ornamentation)
+                if (_ragaDirection == 0) { // Ascending
+                    int trillChanceAlgorithmic = 25; // 25% base chance (higher for ornamentation)
+                    int userTrillSetting = _tuesdayTrack.trill();
+                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                    if (_uiRng.nextRange(100) < finalTrillChance) {
+                        _retriggerArmed = true;
+                        _retriggerCount = 2 + (_uiRng.nextRange(2)); // 3-4 notes for ornamental passages
+                        _retriggerPeriod = divisor / 3; // Triplet for traditional feel
+                        _retriggerLength = _retriggerPeriod / 2;
+                        _isTrillNote = false;
+
+                        float baseVoltage = (note + (octave * 12)) / 12.f;
+                        // Alternate between +1 and +2 semitones for micro-movements
+                        float interval = (_uiRng.nextBinary() ? 1.f : 2.f) / 12.f;
+                        _trillCvTarget = baseVoltage + interval;
+                    }
                 }
 
                 noteVoltage = (note + (octave * 12)) / 12.0f;
@@ -3236,6 +3361,24 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     _slide = 2;
                 } else {
                     _slide = 0;
+                }
+
+                // Check for Trill on accented notes
+                if (hasAccent) {
+                    int trillChanceAlgorithmic = 20; // 20% base chance for 303 throb
+                    int userTrillSetting = _tuesdayTrack.trill();
+                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                    if (_uiRng.nextRange(100) < finalTrillChance) {
+                        _retriggerArmed = true;
+                        _retriggerCount = 1 + (_uiRng.nextRange(2)); // 2-3 notes total
+                        _retriggerPeriod = divisor / 2; // 8th notes for acid throb
+                        _retriggerLength = _retriggerPeriod / 2;
+                        _isTrillNote = false;
+
+                        float baseVoltage = (note + (octave * 12)) / 12.f;
+                        _trillCvTarget = baseVoltage + (3.f / 12.f); // Minor 3rd up
+                    }
                 }
 
                 // Advance position
