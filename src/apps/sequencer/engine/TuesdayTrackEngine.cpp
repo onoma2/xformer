@@ -299,6 +299,28 @@ void TuesdayTrackEngine::initAlgorithm() {
     break;
 }
 
+    case 20: // STEPWAVE - Root/octave with chromatic stepping trill
+{
+    _rng = Random((flow - 1) << 4);
+    _extraRng = Random((ornament - 1) << 4);
+
+    // Ornament controls direction bias: 0=down biased, 8=random, 16=up biased
+    // Map 0-16 to -1/0/+1: 0-5=down, 6-10=random, 11-16=up
+    if (ornament <= 5) {
+        _stepwave_direction = -1;  // Down biased
+    } else if (ornament >= 11) {
+        _stepwave_direction = 1;   // Up biased
+    } else {
+        _stepwave_direction = 0;   // Random direction each time
+    }
+
+    _stepwave_step_count = 3 + (_rng.next() % 5);  // 3-7 substeps
+    _stepwave_current_step = 0;
+    _stepwave_chromatic_offset = 0;
+    _stepwave_is_stepped = true;  // Default to stepped, glide probability determines slide
+    break;
+}
+
     default:
         break;
     }
@@ -493,6 +515,7 @@ void TuesdayTrackEngine::reseed() {
     case 13: // AMBIENT
     case 18: // APHEX
     case 19: // AUTECH
+    case 20: // STEPWAVE
         // These algorithms are fully deterministic from flow/ornament,
         // so reseed just re-initializes with the same parameters.
         initAlgorithm();
@@ -1049,6 +1072,19 @@ void TuesdayTrackEngine::generateBuffer() {
 
                     _autechre_rule_timer = 8 + (_tuesdayTrack.flow() * 4);
                     _autechre_rule_index = (_autechre_rule_index + 1) % 8;
+                }
+            }
+            break;
+
+        case 20: // STEPWAVE warmup
+            {
+                // Simple warmup - just consume RNG to advance state
+                _rng.next();  // octave choice
+                _extraRng.next();  // step count variation
+
+                // Glide check
+                if (glide > 0 && _rng.nextRange(100) < glide) {
+                    _rng.nextRange(3);
                 }
             }
             break;
@@ -2190,6 +2226,46 @@ void TuesdayTrackEngine::generateBuffer() {
                         isTrill = true;
                     }
                 }
+            }
+            break;
+
+        case 20: // STEPWAVE buffer generation
+            {
+                // Determine octave: root (0) or +2 octaves based on flow probability
+                // Flow controls probability: 0=always root, 8=50/50, 16=always high
+                int flowVal = _tuesdayTrack.flow();
+                int highOctaveChance = (flowVal * 100) / 16;  // 0-100%
+
+                if (_rng.nextRange(100) < highOctaveChance) {
+                    octave = 2;
+                } else {
+                    octave = 0;
+                }
+
+                // Note is always root (0) - the character comes from the trill
+                note = 0;
+                gatePercent = 85;  // Slightly longer gates for the stepping effect
+
+                // Check for trill (base probability 50%)
+                int trillChanceAlgorithmic = 50;
+                int userTrillSetting = _tuesdayTrack.trill();
+                int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                if (_uiRng.nextRange(100) < finalTrillChance) {
+                    isTrill = true;
+
+                    // Determine if this is stepped or slide (glide parameter)
+                    // Glide = probability of slide vs stepped
+                    if (glide > 0 && _rng.nextRange(100) < glide) {
+                        slide = 2;  // Long slide for smooth glissando
+                    }
+
+                    // Determine step count for this trill (3-7)
+                    _stepwave_step_count = 3 + (_extraRng.next() % 5);
+                }
+
+                // Gate offset: create rhythmic interest
+                gateOffset = (step % 4) * 15;  // 0, 15, 30, 45
             }
             break;
 
@@ -3673,6 +3749,76 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             }
             break;
 
+        case 20: // STEPWAVE - Root/octave with chromatic stepping trill (infinite loop)
+            {
+                shouldGate = true;
+
+                // Determine octave: root (0) or +2 octaves based on flow probability
+                int flowVal = _tuesdayTrack.flow();
+                int highOctaveChance = (flowVal * 100) / 16;  // 0-100%
+
+                if (_rng.nextRange(100) < highOctaveChance) {
+                    octave = 2;
+                } else {
+                    octave = 0;
+                }
+
+                // Note is always root (0) - the character comes from the trill
+                note = 0;
+                _gatePercent = 85;
+                _slide = 0;
+                _gateOffset = (effectiveStep % 4) * 15;  // Rhythmic timing
+
+                // Check for stepped trill (base probability 50%)
+                int trillChanceAlgorithmic = 50;
+                int userTrillSetting = _tuesdayTrack.trill();
+                int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                if (_uiRng.nextRange(100) < finalTrillChance) {
+                    // Determine step count for this trill (3-7)
+                    _stepwave_step_count = 3 + (_extraRng.next() % 5);
+                    _stepwave_current_step = 0;
+                    _stepwave_chromatic_offset = 0;
+
+                    // Determine direction for this trill
+                    int ornament = _tuesdayTrack.ornament();
+                    int direction;
+                    if (ornament <= 5) {
+                        direction = -1;  // Down
+                    } else if (ornament >= 11) {
+                        direction = 1;   // Up
+                    } else {
+                        // Random direction
+                        direction = _uiRng.nextBinary() ? 1 : -1;
+                    }
+                    _stepwave_direction = direction;
+
+                    // Determine if this is stepped or slide
+                    int glideParam = _tuesdayTrack.glide();
+                    if (glideParam > 0 && _rng.nextRange(100) < glideParam) {
+                        _stepwave_is_stepped = false;  // Slide mode
+                        _slide = 2;  // Long slide for glissando
+                    } else {
+                        _stepwave_is_stepped = true;  // Stepped mode
+                    }
+
+                    // Arm the retrigger system with stepped chromatic movement
+                    _retriggerArmed = true;
+                    _retriggerCount = _stepwave_step_count - 1;  // -1 because first note plays immediately
+                    _retriggerPeriod = divisor / _stepwave_step_count;  // Spread evenly
+                    _retriggerLength = _retriggerPeriod / 2;
+                    _isTrillNote = false;
+
+                    // Calculate the final target for the trill
+                    float baseVoltage = (note + (octave * 12)) / 12.f;
+                    int totalChromaticSteps = (_stepwave_step_count - 1) * direction;
+                    _trillCvTarget = baseVoltage + (totalChromaticSteps / 12.f);
+                }
+
+                noteVoltage = (note + (octave * 12)) / 12.0f;
+            }
+            break;
+
         default:
             shouldGate = false;
             noteVoltage = 0.f;
@@ -3883,12 +4029,23 @@ void TuesdayTrackEngine::update(float dt) {
                     _gateOutput = true;
                     _gateLengthTicks = _retriggerLength; // Set ON-time for this new note
 
-                    // Set the trill CV by alternating
-                    _isTrillNote = !_isTrillNote;
-                    if (_isTrillNote) {
-                        _cvOutput = _trillCvTarget;
+                    // Check if this is a STEPWAVE stepped chromatic trill
+                    int algorithm = _tuesdayTrack.algorithm();
+                    if (algorithm == 20 && _stepwave_is_stepped) {
+                        // STEPWAVE: Increment chromatically through each step
+                        _stepwave_current_step++;
+                        _stepwave_chromatic_offset += _stepwave_direction;
+
+                        // Calculate new CV: base + chromatic offset
+                        _cvOutput = _cvTarget + (_stepwave_chromatic_offset / 12.f);
                     } else {
-                        _cvOutput = _cvTarget;
+                        // Standard alternating trill for other algorithms
+                        _isTrillNote = !_isTrillNote;
+                        if (_isTrillNote) {
+                            _cvOutput = _trillCvTarget;
+                        } else {
+                            _cvOutput = _cvTarget;
+                        }
                     }
                 }
             } else {

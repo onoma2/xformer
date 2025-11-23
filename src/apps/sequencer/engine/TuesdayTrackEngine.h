@@ -258,6 +258,13 @@ public:
     int _autechre_rule_timer;       // How long to wait before applying the next rule
     uint8_t _autechre_rule_sequence[8]; // The sequence of rules to apply
 
+    // STEPWAVE algorithm state (20) - Chromatic stepping trill
+    int8_t _stepwave_direction;     // -1=down, 0=random, +1=up
+    uint8_t _stepwave_step_count;   // Number of trill substeps (3-7)
+    int8_t _stepwave_current_step;  // Current position in trill (0 to step_count-1)
+    int8_t _stepwave_chromatic_offset; // Running chromatic offset from base note
+    bool _stepwave_is_stepped;      // true=stepped, false=slide
+
 
     // Output state
     bool _activity = false;

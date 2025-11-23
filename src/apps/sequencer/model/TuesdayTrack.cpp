@@ -23,6 +23,7 @@ static const char *algorithmNames[] = {
     "KRAFT",      // 17
     "APHEX",      // 18
     "AUTECH",     // 19
+    "STEPWAVE",   // 20
 };
 
 // Loop length values: Inf (0), 1-16, 19, 21, 24, 32, 35, 42, 48, 56, 64, 95, 96, 127, 128
@@ -33,7 +34,7 @@ static const int loopLengthValues[] = {
 };
 
 void TuesdayTrack::printAlgorithm(StringBuilder &str) const {
-    if (_algorithm < 20) {
+    if (_algorithm < 21) {
         str(algorithmNames[_algorithm]);
     } else {
         str("???");
