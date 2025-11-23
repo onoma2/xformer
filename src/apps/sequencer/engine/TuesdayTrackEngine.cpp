@@ -299,22 +299,25 @@ void TuesdayTrackEngine::initAlgorithm() {
     break;
 }
 
-    case 20: // STEPWAVE - Root/octave with chromatic stepping trill
+    case 20: // STEPWAVE - Scale stepping with chromatic trill
 {
     _rng = Random((flow - 1) << 4);
     _extraRng = Random((ornament - 1) << 4);
 
-    // Ornament controls direction bias: 0=down biased, 8=random, 16=up biased
-    // Map 0-16 to -1/0/+1: 0-5=down, 6-10=random, 11-16=up
+    // Flow controls scale step direction: 0-7=down, 8=stationary, 9-16=up
+    // Ornament controls trill direction AND step size:
+    //   0-5: trill down, 2 steps
+    //   6-10: trill random, 2-3 steps mixed
+    //   11-16: trill up, 3 steps
     if (ornament <= 5) {
-        _stepwave_direction = -1;  // Down biased
+        _stepwave_direction = -1;  // Trill down
     } else if (ornament >= 11) {
-        _stepwave_direction = 1;   // Up biased
+        _stepwave_direction = 1;   // Trill up
     } else {
-        _stepwave_direction = 0;   // Random direction each time
+        _stepwave_direction = 0;   // Random trill direction each time
     }
 
-    _stepwave_step_count = 3 + (_rng.next() % 5);  // 3-7 substeps
+    _stepwave_step_count = 3 + (_rng.next() % 5);  // 3-7 substeps for trill
     _stepwave_current_step = 0;
     _stepwave_chromatic_offset = 0;
     _stepwave_is_stepped = true;  // Default to stepped, glide probability determines slide
@@ -2231,19 +2234,45 @@ void TuesdayTrackEngine::generateBuffer() {
 
         case 20: // STEPWAVE buffer generation
             {
-                // Determine octave: root (0) or +2 octaves based on flow probability
-                // Flow controls probability: 0=always root, 8=50/50, 16=always high
+                // Flow controls scale step direction with octave jumps
+                // 0-7: step down, 8: stationary, 9-16: step up
+                // Also probabilistically jump octaves
                 int flowVal = _tuesdayTrack.flow();
-                int highOctaveChance = (flowVal * 100) / 16;  // 0-100%
+                int ornamentVal = _tuesdayTrack.ornament();
 
-                if (_rng.nextRange(100) < highOctaveChance) {
+                // Determine scale step movement based on flow
+                int scaleStepDir = 0;
+                if (flowVal <= 7) {
+                    scaleStepDir = -1;  // Step down
+                } else if (flowVal >= 9) {
+                    scaleStepDir = 1;   // Step up
+                }
+                // flowVal == 8 means stationary (scaleStepDir = 0)
+
+                // Determine step size from ornament: 0-5=2 steps, 6-10=2-3 mixed, 11-16=3 steps
+                int stepSize;
+                if (ornamentVal <= 5) {
+                    stepSize = 2;
+                } else if (ornamentVal >= 11) {
+                    stepSize = 3;
+                } else {
+                    stepSize = 2 + (_extraRng.next() % 2);  // 2 or 3
+                }
+
+                // Calculate note as scale degree offset from previous
+                // Use step counter to accumulate movement
+                note = (step * scaleStepDir * stepSize) % 7;  // Keep within single octave range for scale
+                if (note < 0) note += 7;
+
+                // Octave jumps: probabilistically jump up 2 octaves
+                // Higher flow = more upward movement = more high octave jumps
+                int octaveJumpChance = 20 + (flowVal * 3);  // 20-68%
+                if (_rng.nextRange(100) < octaveJumpChance) {
                     octave = 2;
                 } else {
                     octave = 0;
                 }
 
-                // Note is always root (0) - the character comes from the trill
-                note = 0;
                 gatePercent = 85;  // Slightly longer gates for the stepping effect
 
                 // Check for trill (base probability 50%)
@@ -2255,13 +2284,18 @@ void TuesdayTrackEngine::generateBuffer() {
                     isTrill = true;
 
                     // Determine if this is stepped or slide (glide parameter)
-                    // Glide = probability of slide vs stepped
                     if (glide > 0 && _rng.nextRange(100) < glide) {
                         slide = 2;  // Long slide for smooth glissando
                     }
 
-                    // Determine step count for this trill (3-7)
-                    _stepwave_step_count = 3 + (_extraRng.next() % 5);
+                    // Trill step count from ornament: lower=2, middle=2-3, higher=3
+                    if (ornamentVal <= 5) {
+                        _stepwave_step_count = 2;
+                    } else if (ornamentVal >= 11) {
+                        _stepwave_step_count = 3;
+                    } else {
+                        _stepwave_step_count = 2 + (_extraRng.next() % 2);
+                    }
                 }
 
                 // Gate offset: create rhythmic interest
@@ -3749,22 +3783,44 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             }
             break;
 
-        case 20: // STEPWAVE - Root/octave with chromatic stepping trill (infinite loop)
+        case 20: // STEPWAVE - Scale stepping with trill (infinite loop)
             {
                 shouldGate = true;
 
-                // Determine octave: root (0) or +2 octaves based on flow probability
+                // Flow controls scale step direction with octave jumps
                 int flowVal = _tuesdayTrack.flow();
-                int highOctaveChance = (flowVal * 100) / 16;  // 0-100%
+                int ornamentVal = _tuesdayTrack.ornament();
 
-                if (_rng.nextRange(100) < highOctaveChance) {
+                // Determine scale step movement based on flow
+                int scaleStepDir = 0;
+                if (flowVal <= 7) {
+                    scaleStepDir = -1;  // Step down
+                } else if (flowVal >= 9) {
+                    scaleStepDir = 1;   // Step up
+                }
+
+                // Determine step size from ornament: 0-5=2 steps, 6-10=2-3 mixed, 11-16=3 steps
+                int stepSize;
+                if (ornamentVal <= 5) {
+                    stepSize = 2;
+                } else if (ornamentVal >= 11) {
+                    stepSize = 3;
+                } else {
+                    stepSize = 2 + (_extraRng.next() % 2);  // 2 or 3
+                }
+
+                // Calculate note as scale degree offset
+                note = (effectiveStep * scaleStepDir * stepSize) % 7;
+                if (note < 0) note += 7;
+
+                // Octave jumps: probabilistically jump up 2 octaves
+                int octaveJumpChance = 20 + (flowVal * 3);  // 20-68%
+                if (_rng.nextRange(100) < octaveJumpChance) {
                     octave = 2;
                 } else {
                     octave = 0;
                 }
 
-                // Note is always root (0) - the character comes from the trill
-                note = 0;
                 _gatePercent = 85;
                 _slide = 0;
                 _gateOffset = (effectiveStep % 4) * 15;  // Rhythmic timing
@@ -3775,17 +3831,22 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                 if (_uiRng.nextRange(100) < finalTrillChance) {
-                    // Determine step count for this trill (3-7)
-                    _stepwave_step_count = 3 + (_extraRng.next() % 5);
+                    // Trill step count from ornament: lower=2, middle=2-3, higher=3
+                    if (ornamentVal <= 5) {
+                        _stepwave_step_count = 2;
+                    } else if (ornamentVal >= 11) {
+                        _stepwave_step_count = 3;
+                    } else {
+                        _stepwave_step_count = 2 + (_extraRng.next() % 2);
+                    }
                     _stepwave_current_step = 0;
                     _stepwave_chromatic_offset = 0;
 
-                    // Determine direction for this trill
-                    int ornament = _tuesdayTrack.ornament();
+                    // Determine trill direction from ornament
                     int direction;
-                    if (ornament <= 5) {
+                    if (ornamentVal <= 5) {
                         direction = -1;  // Down
-                    } else if (ornament >= 11) {
+                    } else if (ornamentVal >= 11) {
                         direction = 1;   // Up
                     } else {
                         // Random direction
@@ -3802,17 +3863,17 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                         _stepwave_is_stepped = true;  // Stepped mode
                     }
 
-                    // Arm the retrigger system with stepped chromatic movement
+                    // Arm the retrigger system
                     _retriggerArmed = true;
                     _retriggerCount = _stepwave_step_count - 1;  // -1 because first note plays immediately
                     _retriggerPeriod = divisor / _stepwave_step_count;  // Spread evenly
                     _retriggerLength = _retriggerPeriod / 2;
                     _isTrillNote = false;
 
-                    // Calculate the final target for the trill
+                    // Calculate the final target for the trill (used for slide mode)
                     float baseVoltage = (note + (octave * 12)) / 12.f;
-                    int totalChromaticSteps = (_stepwave_step_count - 1) * direction;
-                    _trillCvTarget = baseVoltage + (totalChromaticSteps / 12.f);
+                    int totalSteps = (_stepwave_step_count - 1) * direction;
+                    _trillCvTarget = baseVoltage + (totalSteps / 12.f);
                 }
 
                 noteVoltage = (note + (octave * 12)) / 12.0f;
