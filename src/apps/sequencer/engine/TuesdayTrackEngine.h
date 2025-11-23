@@ -78,15 +78,16 @@ public:
     // _extraRng is seeded from the other parameter
     Random _rng;
     Random _extraRng;
+    Random _uiRng;
 
-    // Cached parameter seeds for re-initialization on loop
-    uint8_t _cachedAlgorithm = 0;
-    uint8_t _cachedFlow = 0;
-    uint8_t _cachedOrnament = 0;
-    uint8_t _cachedLoopLength = 0;
+    // Cached properties
+    int _cachedAlgorithm;
+    int _cachedFlow;
+    int _cachedOrnament;
+    int _cachedLoopLength;
 
-    // Algorithm state
-    uint32_t _stepIndex = 0;
+    // Persisted state
+    int _stepIndex = 0;
     int _displayStep = -1;  // Step currently being displayed (set before processing)
     uint32_t _gateLength = 0;
     uint32_t _gateTicks = 0;
@@ -104,8 +105,9 @@ public:
     uint8_t _gateOffset = 0;  // Default 0% gate offset
 
     // State for gate offset processing
-    uint8_t _pendingGateOffsetTicks = 0;  // Ticks remaining to delay gate firing
-    bool _pendingGateActivation = false;  // Flag indicating a gate is waiting to fire after offset
+    uint32_t _gateLengthTicks = 0;
+    uint32_t _pendingGateOffsetTicks = 0;
+    bool _pendingGateActivation = false;
 
     // Slide/portamento state
     int _slide = 0;           // Slide amount (0=instant, 1-3=glide)

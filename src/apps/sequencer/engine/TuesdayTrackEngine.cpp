@@ -13,8 +13,11 @@ void TuesdayTrackEngine::initAlgorithm() {
     int ornament = _tuesdayTrack.ornament();
     int algorithm = _tuesdayTrack.algorithm();
 
+    _uiRng = Random(flow * 37 + ornament * 101);
+
     _cachedFlow = flow;
     _cachedOrnament = ornament;
+    _cachedAlgorithm = algorithm;
 
     switch (algorithm) {
     case 0: // TEST
@@ -302,6 +305,11 @@ void TuesdayTrackEngine::initAlgorithm() {
 }
 
 void TuesdayTrackEngine::reset() {
+    _cachedAlgorithm = -1;
+    _cachedFlow = -1;
+    _cachedOrnament = -1;
+    _cachedLoopLength = -1;
+
     _stepIndex = 0;
     _displayStep = -1;  // No step displayed until first tick
     _gateLength = 0;
@@ -2293,13 +2301,20 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 // Similar to glide override: global parameter can override algorithmic value based on probability
                 uint8_t bufferedGateOffset = _buffer[effectiveStep].gateOffset;
                 uint8_t globalGateOffset = _tuesdayTrack.gateOffset();
+                uint8_t finalOffset = 0;
 
-                // Apply global override based on user GateOffset parameter (probability-based override)
-                if (globalGateOffset > 0 && _rng.nextRange(100) < globalGateOffset) {
-                    _gateOffset = globalGateOffset;  // Override with user value
+                if (globalGateOffset == 0) {
+                    // Force on-beat timing
+                    finalOffset = 0;
                 } else {
-                    _gateOffset = bufferedGateOffset;  // Use algorithmic value
+                    // Use algorithmic groove as base
+                    finalOffset = bufferedGateOffset;
+                    // with a chance to override
+                    if (_uiRng.nextRange(100) < globalGateOffset) {
+                        finalOffset = globalGateOffset;
+                    }
                 }
+                _gateOffset = finalOffset;
 
                 shouldGate = true;
                 // Calculate noteVoltage from buffered data for CV/glide
@@ -3344,13 +3359,16 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             }
         } // End else (infinite loop)
 
-        // Apply global GateOffset override (similar to glide override)
-        // The global parameter can override algorithmic gate offset based on probability
+        // Apply global GateOffset override
         uint8_t globalGateOffset = _tuesdayTrack.gateOffset();
-        if (globalGateOffset > 0 && _rng.nextRange(100) < globalGateOffset) {
-            _gateOffset = globalGateOffset;  // Override with user value
+        if (globalGateOffset == 0) {
+            _gateOffset = 0; // Force on-beat
+        } else {
+            // Probabilistically override the algorithm's calculated value
+            if (_uiRng.nextRange(100) < globalGateOffset) {
+                _gateOffset = globalGateOffset;
+            }
         }
-        // Otherwise, keep the algorithmically-generated value
 
         // Apply octave and transpose from sequence parameters
         int trackOctave = _tuesdayTrack.octave();
@@ -3457,6 +3475,13 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         // Step advancement and loop handling now done at start of stepTrigger block
         // via tick-based calculation
 
+        // Setup gate timing counters
+        if (gateTriggered) {
+            _pendingGateActivation = true;
+            _pendingGateOffsetTicks = (CONFIG_SEQUENCE_PPQN * _gateOffset) / 100;
+            _gateLengthTicks = (CONFIG_SEQUENCE_PPQN * _gatePercent) / 100;
+        }
+
         return TickResult::CvUpdate | TickResult::GateUpdate;
     }
 
@@ -3464,6 +3489,26 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 }
 
 void TuesdayTrackEngine::update(float dt) {
-    // Nothing to update for now
-    // Future: slide/glide processing
+    // Handle pending gate offset
+    if (_pendingGateOffsetTicks > 0) {
+        _pendingGateOffsetTicks--;
+    }
+
+    // Check for gate activation after offset
+    if (_pendingGateActivation && _pendingGateOffsetTicks == 0) {
+        _gateOutput = true;
+        _activity = true;
+        _pendingGateActivation = false;
+        // Note: _gateLengthTicks is already set from tick()
+    }
+
+    // Handle gate length countdown
+    if (_gateOutput) {
+        if (_gateLengthTicks > 0) {
+            _gateLengthTicks--;
+        } else {
+            _gateOutput = false;
+            _activity = false;
+        }
+    }
 }
