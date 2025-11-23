@@ -52,6 +52,7 @@ private:
         uint8_t gatePercent;
         uint8_t slide;
         uint8_t gateOffset;
+        bool isTrill = false;
     };
 
     // Pattern buffer for finite loops (128 steps)

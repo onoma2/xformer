@@ -1065,6 +1065,7 @@ void TuesdayTrackEngine::generateBuffer() {
         uint8_t gatePercent = 75;
         uint8_t slide = 0;
         uint8_t gateOffset = 0;  // Initialize default value for gateOffset
+        bool isTrill = false;
 
         switch (algorithm) {
         case 0: // TEST
@@ -1657,7 +1658,7 @@ void TuesdayTrackEngine::generateBuffer() {
 
                 note = (_droneBaseNote + interval) % 12;
                 octave = (_droneBaseNote + interval) / 12;
-                gatePercent = 400;  // Very long sustain
+                gatePercent = 255;  // Very long sustain (clamped to uint8_t max)
 
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     slide = 3;  // Long slide for drones
@@ -1773,7 +1774,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     // --- Default Drone Behavior ---
                     note = _ambient_drone_notes[ (step / 4) % 3 ]; // Slowly cycle through drone notes
                     octave = 0;
-                    gatePercent = 1600; // Hold gate for 16 steps
+                    gatePercent = 255; // Hold gate for long time (clamped)
                     _ambient_event_timer--;
                 }
 
@@ -1803,47 +1804,41 @@ void TuesdayTrackEngine::generateBuffer() {
                 bool hihatHit = (_drillHiHatPattern & (1 << _drillStepInBar)) != 0;
 
                 if (hihatHit) {
-                    // Hi-hat hit - high note, short gate
-                    note = 7 + (_rng.next() % 5);  // High notes for hi-hat
-                    octave = 1;
-                    gatePercent = 25;  // Short staccato for hi-hat
-
-                    // Check for roll (rapid repeats)
-                    if (_extraRng.nextRange(16) < 4) {
-                        _drillRollCount = 2 + (_rng.next() % 3);  // 2-4 repeats
-                    }
-                } else if (_drillRollCount > 0) {
-                    // Continue roll
-                    _drillRollCount--;
+                    // --- HI-HAT HIT ---
                     note = 7 + (_rng.next() % 5);
                     octave = 1;
-                    gatePercent = 20;  // Very short for roll notes
+                    gatePercent = 25;
+                    slide = 0;
+
+                    // Check for Trill/Retrigger
+                    int trillChanceAlgorithmic = 30; // 30% base chance
+                    int userTrillSetting = _tuesdayTrack.trill();
+                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                    if (_uiRng.nextRange(100) < finalTrillChance) {
+                        isTrill = true;
+                        // Set the gate percent to be short for the trill
+                        uint32_t retriggerLength = (CONFIG_SEQUENCE_PPQN / 4) / 2;
+                        gatePercent = (retriggerLength * 100) / CONFIG_SEQUENCE_PPQN;
+                    }
+
                 } else {
-                    // Bass note - low octave
+                    // --- BASS NOTE ---
                     note = _drillLastNote;
-                    octave = -1;  // Deep bass
+                    octave = -1;
                     gatePercent = 75;
 
-                    // Occasional bass note change
                     if (_rng.nextRange(8) < 2) {
                         _drillLastNote = _rng.next() % 5;
                     }
 
-                    // Slide to target
                     if (_extraRng.nextRange(16) < 8) {
-                        slide = 2;  // Medium glide for bass slides
+                        slide = 2;
                         _drillSlideTarget = _rng.next() % 12;
                     } else if (glide > 0 && _rng.nextRange(100) < glide) {
                         slide = (_rng.nextRange(3)) + 1;
-                    }
-
-                    // DRILL: Apply UK drill timing variations with micro-syncopation
-                    if (hihatHit) {
-                        gateOffset = (_drillStepInBar == 0) ? 5 : 25;  // Strong beats (0) slightly early, others delayed for swing
-                    } else if (_drillRollCount > 0) {
-                        gateOffset = 10 + _drillRollCount * 5;  // Roll notes with progressive timing
                     } else {
-                        gateOffset = 0;  // Bass notes on beat
+                        slide = 0;
                     }
                 }
             }
@@ -2114,7 +2109,8 @@ void TuesdayTrackEngine::generateBuffer() {
         _buffer[step].octave = octave;
         _buffer[step].gatePercent = gatePercent;
         _buffer[step].slide = slide;
-        _buffer[step].gateOffset = gateOffset;  // Assign the gateOffset value
+        _buffer[step].gateOffset = gateOffset;
+        _buffer[step].isTrill = isTrill;
     }
 
     _bufferValid = true;
@@ -2270,6 +2266,10 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     }
 
     if (stepTrigger) {
+        // Disarm any re-triggers from the previous step to ensure a clean state
+        _retriggerArmed = false;
+        _retriggerCount = 0;
+
         // Calculate step from tick count (ensures sync with divisor)
         uint32_t calculatedStep = relativeTick / divisor;
 
@@ -2310,14 +2310,26 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
             // Read from pre-generated buffer
             if (effectiveStep < BUFFER_SIZE) {
-                note = _buffer[effectiveStep].note;
-                octave = _buffer[effectiveStep].octave;
-                _gatePercent = _buffer[effectiveStep].gatePercent;
-                _slide = _buffer[effectiveStep].slide;
+                const auto &bufferedStep = _buffer[effectiveStep];
+                note = bufferedStep.note;
+                octave = bufferedStep.octave;
+                _gatePercent = bufferedStep.gatePercent;
+                _slide = bufferedStep.slide;
 
-                // Retrieve gate offset from buffered data with potential global override
-                // Similar to glide override: global parameter can override algorithmic value based on probability
-                uint8_t bufferedGateOffset = _buffer[effectiveStep].gateOffset;
+                // Check for trill/re-trigger
+                if (bufferedStep.isTrill) {
+                    _retriggerArmed = true;
+                    _retriggerCount = 3; // 4 notes total
+                    _retriggerPeriod = CONFIG_SEQUENCE_PPQN / 4; // 16th notes
+                    _retriggerLength = _retriggerPeriod / 2;
+                    _isTrillNote = false;
+
+                    float baseVoltage = (note + (octave * 12)) / 12.f;
+                    _trillCvTarget = baseVoltage + (2.f / 12.f);
+                }
+
+                // Retrieve gate offset from buffered data
+                uint8_t bufferedGateOffset = bufferedStep.gateOffset;
                 uint8_t globalGateOffset = _tuesdayTrack.gateOffset();
                 uint8_t finalOffset = 0;
 
