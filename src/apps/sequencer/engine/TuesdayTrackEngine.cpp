@@ -588,7 +588,7 @@ void TuesdayTrackEngine::generateBuffer() {
         switch (algorithm) {
         case 0: // TEST
             {
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     // consume RNG for slide
                 }
                 switch (_testMode) {
@@ -611,7 +611,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     _rng.nextRange(9);
                 }
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
 
@@ -666,7 +666,7 @@ void TuesdayTrackEngine::generateBuffer() {
                         _stomperLastNote = _stomperLowNote;
                         _stomperLastOctave = 0;
                         // Match RNG pattern: nextRange(100) then conditional nextRange(3)
-                        if (glide > 0 && _rng.nextRange(100) < glide) {
+                        if (_rng.nextRange(100) < glide) {
                             _rng.nextRange(3);
                         }
                         if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
@@ -681,7 +681,7 @@ void TuesdayTrackEngine::generateBuffer() {
                         _stomperLastNote = _stomperHighNote[_rng.next() % 2];
                         _stomperLastOctave = 1;
                         // Match RNG pattern: nextRange(100) then conditional nextRange(3)
-                        if (glide > 0 && _rng.nextRange(100) < glide) {
+                        if (_rng.nextRange(100) < glide) {
                             _rng.nextRange(3);
                         }
                         if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
@@ -747,7 +747,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     _rng.nextRange(9);
                 }
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
 
@@ -777,7 +777,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 _chipRng.nextRange(256);  // gate length
                 _extraRng.nextRange(256);  // velocity
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -789,7 +789,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 _extraRng.nextBinary();  // accent
                 _rng.next();  // note selection
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -807,7 +807,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 _snhCurrentDelta += ((newdelta - _snhCurrentDelta) * 100) / 200;
                 _snhCurrent += _snhCurrentDelta * 100;
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
                 _extraRng.next();  // velocity
@@ -836,7 +836,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 }
                 _extraRng.next();  // velocity
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -846,7 +846,7 @@ void TuesdayTrackEngine::generateBuffer() {
             {
                 _rng.next();  // pattern position
                 _extraRng.next();  // hat variation
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -856,7 +856,7 @@ void TuesdayTrackEngine::generateBuffer() {
             {
                 _rng.next();  // pattern note
                 _extraRng.nextRange(256);  // ghost check
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -865,7 +865,7 @@ void TuesdayTrackEngine::generateBuffer() {
         case 10: // DRONE warmup
             {
                 _rng.next();  // interval variation
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -875,7 +875,7 @@ void TuesdayTrackEngine::generateBuffer() {
             {
                 _phaseAccum += _phaseSpeed;
                 _rng.next();  // consume for determinism
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -885,7 +885,7 @@ void TuesdayTrackEngine::generateBuffer() {
             {
                 _rng.next();  // note selection
                 _extraRng.next();  // ornament
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -929,7 +929,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 }
 
                 // Glide check
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -962,7 +962,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 }
 
                 // Glide check
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -984,7 +984,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 }
 
                 // Slide check
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
 
@@ -1019,7 +1019,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 _extraRng.next();
 
                 // Glide check
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -1086,7 +1086,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 _extraRng.next();  // step count variation
 
                 // Glide check
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _rng.nextRange(3);
                 }
             }
@@ -1110,7 +1110,7 @@ void TuesdayTrackEngine::generateBuffer() {
         case 0: // TEST
             {
                 gatePercent = 75;
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = _testSweepSpeed + 1;
                 }
 
@@ -1144,7 +1144,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     gatePercent = 200 + (_rng.nextRange(9) * 25); // 200% to 400%
                 }
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
 
@@ -1229,7 +1229,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     case 11:
                         octave = 0;
                         note = _stomperLowNote;
-                        if (glide > 0 && _rng.nextRange(100) < glide) {
+                        if (_rng.nextRange(100) < glide) {
                             slide = (_rng.nextRange(3)) + 1;
                         }
                         // Check for Trill on stomp down
@@ -1252,7 +1252,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     case 13:
                         octave = 1;
                         note = _stomperHighNote[_rng.next() % 2];
-                        if (glide > 0 && _rng.nextRange(100) < glide) {
+                        if (_rng.nextRange(100) < glide) {
                             slide = (_rng.nextRange(3)) + 1;
                         }
                         // Check for Trill on stomp up
@@ -1357,7 +1357,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     gatePercent = 200 + (_rng.nextRange(9) * 25);
                 }
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
 
@@ -1418,7 +1418,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 _extraRng.nextRange(256);  // velocity
 
                 // Additional slide from glide parameter
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
 
@@ -1494,7 +1494,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 while (note < 0) { note += 12; octave--; }
                 while (note >= 12) { note -= 12; octave++; }
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
 
@@ -1531,7 +1531,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 note = (absVal >> 22) % 12;
                 octave = 0;
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
                 _extraRng.next();  // velocity
@@ -1577,7 +1577,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 _extraRng.next();  // velocity
 
                 // Additional slide from glide parameter
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
 
@@ -1645,7 +1645,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     }
                 }
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
 
@@ -1723,7 +1723,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     gateOffset = 0;  // No gate, no offset
                 }
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
             }
@@ -1753,7 +1753,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 octave = (_droneBaseNote + interval) / 12;
                 gatePercent = 255;  // Very long sustain (clamped to uint8_t max)
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = 3;  // Long slide for drones
                 }
 
@@ -1787,7 +1787,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 // Consume RNG for determinism
                 _rng.next();
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
             }
@@ -1841,7 +1841,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 int ornamentChance = _extraRng.next() % 8;
                 if (ornamentChance < _ragaOrnament && glide > 0) {
                     slide = 2;  // Characteristic slides
-                } else if (glide > 0 && _rng.nextRange(100) < glide) {
+                } else if (_rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
 
@@ -1938,7 +1938,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     if (_extraRng.nextRange(16) < 8) {
                         slide = 2;
                         _drillSlideTarget = _rng.next() % 12;
-                    } else if (glide > 0 && _rng.nextRange(100) < glide) {
+                    } else if (_rng.nextRange(100) < glide) {
                         slide = (_rng.nextRange(3)) + 1;
                     } else {
                         slide = 0;
@@ -1998,7 +1998,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 }
 
                 // Glide check
-                if (gatePercent > 0 && glide > 0 && _rng.nextRange(100) < glide) {
+                if (gatePercent > 0 && _rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
 
@@ -2028,7 +2028,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 }
 
                 // Slide based on flow
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     slide = 2;  // 303-style slide
                 }
 
@@ -2098,7 +2098,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 _kraftPosition = (_kraftPosition + 1) % 8;
 
                 // Glide check (rare for mechanical feel)
-                if (glide > 0 && _rng.nextRange(100) < glide / 2) {
+                if (_rng.nextRange(100) < glide / 2) {
                     slide = 1;  // Short slide
                 }
 
@@ -2284,7 +2284,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     isTrill = true;
 
                     // Determine if this is stepped or slide (glide parameter)
-                    if (glide > 0 && _rng.nextRange(100) < glide) {
+                    if (_rng.nextRange(100) < glide) {
                         slide = 2;  // Long slide for smooth glissando
                     }
 
@@ -2571,7 +2571,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
                 // Slide controlled by glide parameter
                 int glide = _tuesdayTrack.glide();
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = _testSweepSpeed + 1;  // Use sweep speed as slide amount
                 } else {
                     _slide = 0;
@@ -2613,7 +2613,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
                 // Random slide controlled by glide parameter
                 int glide = _tuesdayTrack.glide();
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;  // 1-3
                 } else {
                     _slide = 0;
@@ -2846,7 +2846,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
                 // Random slide controlled by glide parameter
                 int glide = _tuesdayTrack.glide();
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;  // 1-3
                 } else {
                     _slide = 0;
@@ -2915,7 +2915,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 _extraRng.nextRange(256);  // velocity
 
                 // Additional slide from glide parameter
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 }
 
@@ -2992,7 +2992,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 while (note < 0) { note += 12; octave--; }
                 while (note >= 12) { note -= 12; octave++; }
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 } else {
                     _slide = 0;
@@ -3025,7 +3025,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 note = (absVal >> 22) % 12;
                 octave = 0;
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 } else {
                     _slide = 0;
@@ -3082,7 +3082,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 _extraRng.next();  // velocity
 
                 // Additional slide from glide parameter
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 }
 
@@ -3166,7 +3166,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     }
                 }
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 } else {
                     _slide = 0;
@@ -3233,7 +3233,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     octave = 0;
                 }
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 } else {
                     _slide = 0;
@@ -3268,7 +3268,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 octave = (_droneBaseNote + interval) / 12;
                 _gatePercent = 400;
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = 3;
                 } else {
                     _slide = 0;
@@ -3293,7 +3293,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
                 _rng.next();  // Consume for determinism
 
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 } else {
                     _slide = 0;
@@ -3346,7 +3346,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 int ornamentChance = _extraRng.next() % 8;
                 if (ornamentChance < _ragaOrnament && glide > 0) {
                     _slide = 2;
-                } else if (glide > 0 && _rng.nextRange(100) < glide) {
+                } else if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 } else {
                     _slide = 0;
@@ -3469,7 +3469,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     if (_extraRng.nextRange(16) < 8) {
                         _slide = 2; // Hardcoded slide for drill feel
                         _drillSlideTarget = _rng.next() % 12;
-                    } else if (glide > 0 && _rng.nextRange(100) < glide) {
+                    } else if (_rng.nextRange(100) < glide) {
                         _slide = (_rng.nextRange(3)) + 1; // Probabilistic slide
                     } else {
                         _slide = 0;
@@ -3532,7 +3532,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 }
 
                 // Glide
-                if (shouldGate && glide > 0 && _rng.nextRange(100) < glide) {
+                if (shouldGate && _rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;
                 } else {
                     _slide = 0;
@@ -3561,7 +3561,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 }
 
                 // Slide based on flow
-                if (glide > 0 && _rng.nextRange(100) < glide) {
+                if (_rng.nextRange(100) < glide) {
                     _slide = 2;
                 } else {
                     _slide = 0;
@@ -3635,7 +3635,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 _kraftPosition = (_kraftPosition + 1) % 8;
 
                 // Glide (rare)
-                if (glide > 0 && _rng.nextRange(100) < glide / 2) {
+                if (_rng.nextRange(100) < glide / 2) {
                     _slide = 1;
                 } else {
                     _slide = 0;
