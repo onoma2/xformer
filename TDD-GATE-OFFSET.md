@@ -145,7 +145,7 @@
 - Test multiple project switching works correctly
 
 ### Commit Phase 6
-- Commit all changes from Phase 6 with message: "Finalize GateOffset implementation with QA and regression tests"
+- Commit all changes from Phase 6 with message: "Finalize GateOffset implementation with QA, regression tests, and global override mechanism"
 
 ## Implementation Checklist
 

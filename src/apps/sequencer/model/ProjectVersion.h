@@ -102,6 +102,9 @@ enum ProjectVersion {
     // added TuesdayTrack serialization
     Version35 = 35,
 
+    // added TuesdayTrack::gateOffset
+    Version40 = 40,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

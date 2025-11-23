@@ -51,6 +51,7 @@ private:
         int8_t octave;
         uint8_t gatePercent;
         uint8_t slide;
+        uint8_t gateOffset;
     };
 
     // Pattern buffer for finite loops (128 steps)
@@ -59,6 +60,18 @@ private:
     bool _bufferValid = false;
 
     const TuesdayTrack &_tuesdayTrack;
+
+public:
+    // Public type alias for testing
+    using PublicBufferedStep = BufferedStep;
+
+    // Public method to access buffer for testing purposes
+    PublicBufferedStep getBufferAt(int index) const {
+        if (index >= 0 && index < BUFFER_SIZE) {
+            return _buffer[index];
+        }
+        return PublicBufferedStep{}; // Return default if out of bounds
+    }
 
     // Dual RNG system (matches original Tuesday)
     // _rng is seeded from seed1 (Flow) or seed2 (Ornament) depending on algorithm
@@ -86,6 +99,13 @@ private:
 
     // Gate length (as fraction of divisor, 0-100%)
     int _gatePercent = 75;  // Default 75% gate length
+
+    // Gate offset from step start (as fraction of divisor, 0-100%)
+    uint8_t _gateOffset = 0;  // Default 0% gate offset
+
+    // State for gate offset processing
+    uint8_t _pendingGateOffsetTicks = 0;  // Ticks remaining to delay gate firing
+    bool _pendingGateActivation = false;  // Flag indicating a gate is waiting to fire after offset
 
     // Slide/portamento state
     int _slide = 0;           // Slide amount (0=instant, 1-3=glide)

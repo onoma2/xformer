@@ -289,6 +289,20 @@ public:
         str("%d", scan());
     }
 
+    // gateOffset (0-100% user override for algorithmic gate timing)
+    int gateOffset() const { return _gateOffset; }
+    void setGateOffset(int gateOffset) {
+        _gateOffset = clamp(gateOffset, 0, 100);
+    }
+
+    void editGateOffset(int value, bool shift) {
+        setGateOffset(this->gateOffset() + value * (shift ? 10 : 1));
+    }
+
+    void printGateOffset(StringBuilder &str) const {
+        str("%d%%", gateOffset());
+    }
+
     // rotate (bipolar shift for finite loops, limited by loop length)
 
     int rotate() const { return _rotate; }
@@ -351,6 +365,7 @@ private:
     int8_t _rootNote = -1;  // Default: -1 (use project root)
     uint8_t _scan = 0;  // Default: 0 (no scan offset)
     int8_t _rotate = 0;  // Default: 0 (no rotation)
+    uint8_t _gateOffset = 0;  // Default: 0% (no gate timing offset)
 
     friend class Track;
 };

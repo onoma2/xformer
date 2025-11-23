@@ -103,6 +103,7 @@ void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_rootNote);
     writer.write(_scan);
     writer.write(_rotate);
+    writer.write(_gateOffset);
 }
 
 void TuesdayTrack::read(VersionedSerializedReader &reader) {
@@ -125,4 +126,5 @@ void TuesdayTrack::read(VersionedSerializedReader &reader) {
     reader.read(_rootNote, ProjectVersion::Version35);
     reader.read(_scan, ProjectVersion::Version35);
     reader.read(_rotate, ProjectVersion::Version35);
+    reader.read(_gateOffset, ProjectVersion::Version40); // New in version 40
 }

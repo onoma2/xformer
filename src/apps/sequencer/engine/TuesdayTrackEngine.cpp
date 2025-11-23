@@ -4,6 +4,7 @@
 #include "model/Scale.h"
 
 #include <cmath>
+#include <algorithm>
 
 // Initialize algorithm state based on Flow (seed1) and Ornament (seed2)
 // This mirrors the original Tuesday Init functions
@@ -855,7 +856,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     _ambient_event_type = 1 + (_extraRng.next() % 2);
                     _ambient_event_step = 0;
                     int power = _tuesdayTrack.power();
-                    _ambient_event_timer = 16 + (power > 0 ? 256 / power : 256);
+                    _ambient_event_timer = 16 + (power > 0 ? 256 - (power * 15) : 256);
                 }
             }
             break;
@@ -1037,6 +1038,7 @@ void TuesdayTrackEngine::generateBuffer() {
         int octave = 0;
         uint8_t gatePercent = 75;
         uint8_t slide = 0;
+        uint8_t gateOffset = 0;  // Initialize default value for gateOffset
 
         switch (algorithm) {
         case 0: // TEST
@@ -1050,12 +1052,16 @@ void TuesdayTrackEngine::generateBuffer() {
                 case 0:  // OCTSWEEPS
                     octave = (step % 5);
                     note = 0;
+                    // TEST: Apply timing variations based on mode
+                    gateOffset = (step % 4) * 10;  // Simple periodic timing variations
                     break;
                 case 1:  // SCALEWALKER
                 default:
                     octave = 0;
                     note = _testNote;
                     _testNote = (_testNote + 1) % 12;
+                    // TEST: Apply timing variations based on position in scale walk
+                    gateOffset = (step % 3) * 20;  // Different timing for each step in triad
                     break;
                 }
             }
@@ -1076,7 +1082,22 @@ void TuesdayTrackEngine::generateBuffer() {
                     slide = (_rng.nextRange(3)) + 1;
                 }
 
+                // TRITRANCE: Generate phase-based timing variations for swing feel
                 int phase = (step + _triB2) % 3;
+                switch (phase) {
+                case 0:
+                    // First phase: slightly early timing
+                    gateOffset = 10 + (_rng.nextRange(15));  // 10-25% early
+                    break;
+                case 1:
+                    // Second phase: on-time or slightly late
+                    gateOffset = 45 + (_rng.nextRange(10));  // 45-55% timing
+                    break;
+                case 2:
+                    // Third phase: swing delay
+                    gateOffset = 60 + (_rng.nextRange(20));  // 60-80% delay
+                    break;
+                }
                 switch (phase) {
                 case 0:
                     if (_extraRng.nextBinary() && _extraRng.nextBinary()) {
@@ -1217,6 +1238,27 @@ void TuesdayTrackEngine::generateBuffer() {
 
                 if (note < 0) note = 0;
                 if (note > 11) note = 11;
+
+                // STOMPER: Apply timing variations that complement the stomping rhythm
+                // Different timing based on the current mode
+                switch (_stomperMode) {
+                case 0: case 1: case 2: case 3:
+                    gateOffset = 5;   // Early timing for foundational notes
+                    break;
+                case 4: case 5: case 6: case 7:
+                    gateOffset = 25;  // Mid-range timing for build-up
+                    break;
+                case 8: case 9: case 10: case 11:
+                    gateOffset = 75;  // Later timing for climax
+                    break;
+                case 12: case 13:
+                    gateOffset = 15;  // Moderate timing for transitions
+                    break;
+                case 14:
+                default:
+                    gateOffset = 0;   // On-beat timing for steady sections
+                    break;
+                }
             }
             break;
 
@@ -1240,6 +1282,14 @@ void TuesdayTrackEngine::generateBuffer() {
                 _markovHistory1 = _markovHistory3;
                 _markovHistory3 = note;
                 octave = _rng.nextBinary() ? 1 : 0;
+
+                // MARKOV: Use transition probabilities to determine timing variations
+                // Based on which transition was taken, generate different timing offsets
+                // Transition from _markovHistory1 to _markovHistory3 may influence timing
+                int transition_delta = abs(note - _markovHistory3);
+                int history_factor = (_markovHistory1 + _markovHistory3) % 11;  // Keep in 0-10 range
+                gateOffset = (transition_delta * 10) + (history_factor * 2);  // Scale factors for 0-100 range
+                if (gateOffset > 100) gateOffset = 100;
             }
             break;
 
@@ -1286,6 +1336,18 @@ void TuesdayTrackEngine::generateBuffer() {
                 // Additional slide from glide parameter
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
+                }
+
+                // CHIPARP: Apply chiptune-style timing variations
+                // Use the chord position to create arpeggio timing patterns
+                if (pos == 0) {
+                    gateOffset = 0;    // Root note on-beat
+                } else if (pos == 1) {
+                    gateOffset = 10;   // Second note slightly delayed
+                } else if (pos == 2) {
+                    gateOffset = 30;   // Third note with more delay
+                } else {  // pos == 3
+                    gateOffset = 50;   // Fourth note with even more delay for arpeggio feel
                 }
             }
             break;
@@ -1341,6 +1403,17 @@ void TuesdayTrackEngine::generateBuffer() {
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
+
+                // GOACID: Apply Goa/psytrance-style timing variations
+                // Create rhythmic shifts that complement the acid patterns
+                int stepInBar = step % 16;
+                if (stepInBar == 0 || stepInBar == 8) {
+                    gateOffset = 0;    // On strong beats (1st and 3rd beat), on-time
+                } else if (stepInBar % 4 == 0) {
+                    gateOffset = 10;   // On weak beats (2nd and 4th beat), slight delay
+                } else {
+                    gateOffset = 25 + (stepInBar % 5);  // Off-beat patterns with varying delays
+                }
             }
             break;
 
@@ -1368,6 +1441,10 @@ void TuesdayTrackEngine::generateBuffer() {
                     slide = (_rng.nextRange(3)) + 1;
                 }
                 _extraRng.next();  // velocity
+
+                // SNH: Apply Sample & Hold timing variations
+                // Based on the current phase position for randomness
+                gateOffset = (_snhPhase >> 24) % 100;  // Use phase bits for random timing delay
             }
             break;
 
@@ -1409,6 +1486,11 @@ void TuesdayTrackEngine::generateBuffer() {
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
+
+                // WOBBLE: Apply wobble timing variations based on dual phase system
+                // Use both phase positions to create complex timing shifts
+                uint32_t phaseSum = (_wobblePhase + _wobblePhase2) >> 25;
+                gateOffset = phaseSum % 100;  // Use combined phase for timing variation
             }
             break;
 
@@ -1454,6 +1536,16 @@ void TuesdayTrackEngine::generateBuffer() {
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
+
+                // TECHNO: Apply four-on-floor timing variations
+                // Emphasize kick drum on beats, add slight timing shifts for groove
+                if (isKick) {
+                    gateOffset = (barPos == 0) ? 0 : 5;  // Kick on beat 1 is on-time, others slightly delayed
+                } else if (_extraRng.next() % 2) {  // Use a generic condition since hat pattern is complex
+                    gateOffset = 15 + (beatPos * 5);  // Hi-hats with rhythmic timing variations
+                } else {
+                    gateOffset = 25;  // Off-pattern elements with mid timing delay
+                }
             }
             break;
 
@@ -1487,6 +1579,18 @@ void TuesdayTrackEngine::generateBuffer() {
                     }
                     octave = (pos % 8 == 0) ? 0 : (_rng.nextBinary() ? 1 : 0);
 
+                    // FUNK: Generate syncopated timing offsets to complement the rhythm
+                    if (pos % 4 == 0) {
+                        // On beats (1, 2, 3, 4) - often on-time
+                        gateOffset = 40 + (_rng.nextRange(20));  // 40-60% timing
+                    } else if (pos % 2 == 0) {
+                        // On upbeats (e.g., "&" of 2, 4) - maybe slightly early or late
+                        gateOffset = 20 + (_rng.nextRange(20));  // 20-40% timing
+                    } else {
+                        // On off-beats (e.g., "&" of 1, 3, or 16th notes) - syncopated feel
+                        gateOffset = 50 + (_rng.nextRange(30));  // 50-80% timing
+                    }
+
                     // Ghost notes (quieter)
                     if (_extraRng.nextRange(256) < _funkGhostProb && pos % 4 != 0) {
                         gatePercent = 35;  // Ghost note
@@ -1496,6 +1600,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 } else {
                     note = 0;
                     gatePercent = 0;
+                    gateOffset = 0;  // No gate, no offset
                 }
 
                 if (glide > 0 && _rng.nextRange(100) < glide) {
@@ -1531,6 +1636,15 @@ void TuesdayTrackEngine::generateBuffer() {
                 if (glide > 0 && _rng.nextRange(100) < glide) {
                     slide = 3;  // Long slide for drones
                 }
+
+                // DRONE: Apply sustained timing variations matching the slow drone nature
+                // Use drone rate and position to create subtle timing shifts
+                int timingFactor = (step % droneRate);
+                if (timingFactor < droneRate / 2) {
+                    gateOffset = 0;      // Stable timing during first half of drone change
+                } else {
+                    gateOffset = 15;     // Slight delay during second half of drone change
+                }
             }
             break;
 
@@ -1544,6 +1658,11 @@ void TuesdayTrackEngine::generateBuffer() {
                 int patternPos = (step + (_phaseAccum >> 28)) % phaseLen;
                 note = _phasePattern[patternPos];
                 octave = 0;
+
+                // PHASE: Generate timing variations based on phase accumulator
+                // Use fractional part of accumulator to create evolving rhythmic patterns
+                uint32_t fractionalPhase = _phaseAccum & 0x0FFFFFFF;  // Get fractional part
+                gateOffset = (fractionalPhase >> 24) & 0x7F;  // Extract upper bits as timing offset (0-127, capped by uint8_t)
 
                 // Consume RNG for determinism
                 _rng.next();
@@ -1639,8 +1758,12 @@ void TuesdayTrackEngine::generateBuffer() {
                     // Reset timer based on Power
                     int power = _tuesdayTrack.power();
                     _ambient_event_timer = 16 + (power > 0 ? 256 / power : 256);
+
+                    // AMBIENT: Generate random timing variations for organic feel
+                    // More timing flexibility for sparse events
+                    gateOffset = _rng.nextRange(50);  // Random timing (0-49%) for organic feel
                 }
-                
+
                 slide = 0;
             }
             break;
@@ -1686,6 +1809,15 @@ void TuesdayTrackEngine::generateBuffer() {
                         _drillSlideTarget = _rng.next() % 12;
                     } else if (glide > 0 && _rng.nextRange(100) < glide) {
                         slide = (_rng.nextRange(3)) + 1;
+                    }
+
+                    // DRILL: Apply UK drill timing variations with micro-syncopation
+                    if (hihatHit) {
+                        gateOffset = (_drillStepInBar == 0) ? 5 : 25;  // Strong beats (0) slightly early, others delayed for swing
+                    } else if (_drillRollCount > 0) {
+                        gateOffset = 10 + _drillRollCount * 5;  // Roll notes with progressive timing
+                    } else {
+                        gateOffset = 0;  // Bass notes on beat
                     }
                 }
             }
@@ -1745,6 +1877,14 @@ void TuesdayTrackEngine::generateBuffer() {
                 if (gatePercent > 0 && glide > 0 && _rng.nextRange(100) < glide) {
                     slide = (_rng.nextRange(3)) + 1;
                 }
+
+                // MINIMAL: Apply timing variations that complement the burst/silence pattern
+                if (_minimalMode == 0) {
+                    gateOffset = 0;   // Silence mode - no gate offset
+                } else {
+                    // Burst mode - vary timing based on burst progression
+                    gateOffset = (_minimalBurstTimer % 4) * 10;  // Cycle through timing variations during burst
+                }
             }
             break;
 
@@ -1781,6 +1921,15 @@ void TuesdayTrackEngine::generateBuffer() {
 
                 // Consume extra RNG
                 _extraRng.next();
+
+                // ACID: Apply acid-style timing variations that complement the 303 patterns
+                if (hasAccent) {
+                    gateOffset = 10;  // Accented notes slightly delayed
+                } else if (_acidPosition % 2 == 0) {
+                    gateOffset = 0;   // Even steps on-beat
+                } else {
+                    gateOffset = 20;  // Odd steps with slight delay
+                }
             }
             break;
 
@@ -1822,6 +1971,14 @@ void TuesdayTrackEngine::generateBuffer() {
                 }
 
                 _extraRng.next();
+
+                // KRAFT: Apply precise mechanical timing variations
+                // Complement the precise, algorithmic nature of the sequence
+                if (isGhost) {
+                    gateOffset = 20 + (_kraftPosition * 5);  // Ghost notes with specific timing
+                } else {
+                    gateOffset = (_kraftPosition % 3) * 10;  // Pattern-based timing variations
+                }
             }
             break;
 
@@ -1854,6 +2011,11 @@ void TuesdayTrackEngine::generateBuffer() {
                 _aphex_pos1 = (_aphex_pos1 + 1) % 4;
                 _aphex_pos2 = (_aphex_pos2 + 1) % 3;
                 _aphex_pos3 = (_aphex_pos3 + 1) % 5;
+
+                // APHEX: Apply polyrhythmic timing variations
+                // Use multi-track positioning to create complex timing variations
+                int polyRhythmFactor = (_aphex_pos1 + _aphex_pos2 + _aphex_pos3) % 12;
+                gateOffset = polyRhythmFactor * 8;  // Scale to 0-96% range
             }
             break;
 
@@ -1909,6 +2071,10 @@ void TuesdayTrackEngine::generateBuffer() {
                     _autechre_rule_timer = 8 + (_tuesdayTrack.flow() * 4);
                     _autechre_rule_index = (_autechre_rule_index + 1) % 8;
                 }
+
+                // AUTECHRE: Apply algorithmic timing variations that complement the pattern transformations
+                // Use the current rule index and timer to create evolving timing variations
+                gateOffset = ((_autechre_rule_index * 10) + (_autechre_rule_timer % 7)) % 100;
             }
             break;
 
@@ -1922,6 +2088,7 @@ void TuesdayTrackEngine::generateBuffer() {
         _buffer[step].octave = octave;
         _buffer[step].gatePercent = gatePercent;
         _buffer[step].slide = slide;
+        _buffer[step].gateOffset = gateOffset;  // Assign the gateOffset value
     }
 
     _bufferValid = true;
@@ -2121,6 +2288,19 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 octave = _buffer[effectiveStep].octave;
                 _gatePercent = _buffer[effectiveStep].gatePercent;
                 _slide = _buffer[effectiveStep].slide;
+
+                // Retrieve gate offset from buffered data with potential global override
+                // Similar to glide override: global parameter can override algorithmic value based on probability
+                uint8_t bufferedGateOffset = _buffer[effectiveStep].gateOffset;
+                uint8_t globalGateOffset = _tuesdayTrack.gateOffset();
+
+                // Apply global override based on user GateOffset parameter (probability-based override)
+                if (globalGateOffset > 0 && _rng.nextRange(100) < globalGateOffset) {
+                    _gateOffset = globalGateOffset;  // Override with user value
+                } else {
+                    _gateOffset = bufferedGateOffset;  // Use algorithmic value
+                }
+
                 shouldGate = true;
                 // Calculate noteVoltage from buffered data for CV/glide
                 noteVoltage = (note + (octave * 12)) / 12.0f;
@@ -2850,7 +3030,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     _ambient_event_step = 0;
                     // Reset timer based on Power
                     int power = _tuesdayTrack.power();
-                    _ambient_event_timer = 16 + (power > 0 ? 256 / power : 256);
+                    _ambient_event_timer = 16 + (power > 0 ? 256 - (power * 15) : 256);
                 }
                 
                 _slide = 0;
@@ -3164,6 +3344,14 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             }
         } // End else (infinite loop)
 
+        // Apply global GateOffset override (similar to glide override)
+        // The global parameter can override algorithmic gate offset based on probability
+        uint8_t globalGateOffset = _tuesdayTrack.gateOffset();
+        if (globalGateOffset > 0 && _rng.nextRange(100) < globalGateOffset) {
+            _gateOffset = globalGateOffset;  // Override with user value
+        }
+        // Otherwise, keep the algorithmically-generated value
+
         // Apply octave and transpose from sequence parameters
         int trackOctave = _tuesdayTrack.octave();
         int trackTranspose = _tuesdayTrack.transpose();
@@ -3201,13 +3389,41 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         // Velocity (from algorithm) must beat current cooldown value
         bool gateTriggered = shouldGate && _coolDown == 0;
         if (gateTriggered) {
-            _gateOutput = true;
-            // Gate length: use algorithm-determined percentage
-            _gateTicks = (divisor * _gatePercent) / 100;
-            if (_gateTicks < 1) _gateTicks = 1;  // Minimum 1 tick
-            _activity = true;
-            // Reset cooldown after triggering
-            _coolDown = _coolDownMax;
+            // Instead of immediately firing the gate, calculate the offset delay
+            uint32_t actualGateOffset = (divisor * _gateOffset) / 100;
+
+            if (actualGateOffset > 0) {
+                // Create a delayed gate activation
+                _pendingGateOffsetTicks = static_cast<uint8_t>(std::min(actualGateOffset, static_cast<uint32_t>(255))); // Cap at 255
+                _pendingGateActivation = true;
+
+                // Don't set the gate yet - it will be set after the offset delay
+                // But we still need to reset cooldown and other states
+                _activity = true;
+                _coolDown = _coolDownMax;
+            } else {
+                // No offset - set gate immediately as before
+                _gateOutput = true;
+                // Gate length: use algorithm-determined percentage
+                _gateTicks = (divisor * _gatePercent) / 100;
+                if (_gateTicks < 1) _gateTicks = 1;  // Minimum 1 tick
+                _activity = true;
+                // Reset cooldown after triggering
+                _coolDown = _coolDownMax;
+            }
+        }
+
+        // Process pending gate offset if any
+        if (_pendingGateActivation && _pendingGateOffsetTicks > 0) {
+            _pendingGateOffsetTicks--;
+            if (_pendingGateOffsetTicks == 0) {
+                // Time to fire the gate after offset delay
+                _gateOutput = true;
+                // Gate length: use algorithm-determined percentage
+                _gateTicks = (divisor * _gatePercent) / 100;
+                if (_gateTicks < 1) _gateTicks = 1;  // Minimum 1 tick
+                _pendingGateActivation = false;
+            }
         }
 
         // Apply CV with slide/portamento based on cvUpdateMode

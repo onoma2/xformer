@@ -134,7 +134,7 @@ int TuesdayEditPage::paramForPage(int page, int slot) const {
     static const int pageParams[PageCount][ParamsPerPage] = {
         { Algorithm, Flow, Ornament, Power },           // Page 1
         { LoopLength, Scan, Rotate, Glide },            // Page 2
-        { Skew, CvUpdateMode, -1, -1 },                 // Page 3
+        { Skew, GateOffset, CvUpdateMode, -1 },         // Page 3
     };
 
     if (page < 0 || page >= PageCount || slot < 0 || slot >= ParamsPerPage) {
@@ -154,6 +154,7 @@ const char *TuesdayEditPage::paramName(int param) const {
     case Rotate:        return "Rotate";
     case Glide:         return "Glide";
     case Skew:          return "Skew";
+    case GateOffset:    return "Gate Offset";
     case CvUpdateMode:  return "CV Mode";
     default:            return "-";
     }
@@ -170,6 +171,7 @@ const char *TuesdayEditPage::paramShortName(int param) const {
     case Rotate:        return "ROT";
     case Glide:         return "GLIDE";
     case Skew:          return "SKEW";
+    case GateOffset:    return "GOFS";
     case CvUpdateMode:  return "CVUPD";
     default:            return "-";
     }
@@ -217,6 +219,9 @@ void TuesdayEditPage::formatParamValue(int param, StringBuilder &str) const {
     case Skew:
         str("%+d", track.skew());
         break;
+    case GateOffset:
+        str("%d%%", track.gateOffset());
+        break;
     case CvUpdateMode:
         track.printCvUpdateMode(str);
         break;
@@ -239,6 +244,7 @@ int TuesdayEditPage::paramValue(int param) const {
     case Rotate:        return track.rotate();
     case Glide:         return track.glide();
     case Skew:          return track.skew();
+    case GateOffset:    return track.gateOffset();
     case CvUpdateMode:  return track.cvUpdateMode();
     default:            return 0;
     }
@@ -255,6 +261,7 @@ int TuesdayEditPage::paramMax(int param) const {
     case Rotate:        return 63;   // Bipolar: -63 to +63
     case Glide:         return 100;
     case Skew:          return 8;    // Bipolar: -8 to +8
+    case GateOffset:    return 100;  // Percentage: 0-100%
     case CvUpdateMode:  return 1;
     default:            return 0;
     }
@@ -296,6 +303,9 @@ void TuesdayEditPage::editParam(int param, int value, bool shift) {
         break;
     case Skew:
         track.editSkew(value, shift);
+        break;
+    case GateOffset:
+        track.editGateOffset(value, shift);
         break;
     case CvUpdateMode:
         track.editCvUpdateMode(value, shift);

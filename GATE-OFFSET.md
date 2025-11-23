@@ -164,7 +164,12 @@ Add UI control for GateOffset parameter:
 - GateOffset timing should be properly synchronized with the clock system
 - Respects divisor settings and timing constraints
 
-### 3. Performance Considerations
+### 3. Global Override Mechanism
+- Like Glide parameter, the global GateOffset parameter can override algorithmic values
+- User GateOffset value overrides algorithmic values based on probability (glide > 0 && _rng.nextRange(100) < glide)
+- Provides user control while preserving algorithmic diversity
+
+### 4. Performance Considerations
 - Minimal impact on CPU usage since timing is pre-calculated in buffer
 - Memory impact is just 1 byte per buffer entry
 
