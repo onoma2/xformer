@@ -2304,14 +2304,17 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 uint8_t finalOffset = 0;
 
                 if (globalGateOffset == 0) {
-                    // Force on-beat timing
+                    // Mode 1: Force On-Beat
                     finalOffset = 0;
+                } else if (globalGateOffset == 100) {
+                    // Mode 3: Pure Random Offset
+                    finalOffset = _uiRng.nextRange(101); // 0-100
                 } else {
-                    // Use algorithmic groove as base
-                    finalOffset = bufferedGateOffset;
-                    // with a chance to override
+                    // Mode 2: Probabilistic blend of Algorithmic and Random
+                    finalOffset = bufferedGateOffset; // Base is the algorithmic groove
+                    // with a chance of being overridden by a random value
                     if (_uiRng.nextRange(100) < globalGateOffset) {
-                        finalOffset = globalGateOffset;
+                        finalOffset = _uiRng.nextRange(101); // 0-100
                     }
                 }
                 _gateOffset = finalOffset;
@@ -3362,11 +3365,17 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         // Apply global GateOffset override
         uint8_t globalGateOffset = _tuesdayTrack.gateOffset();
         if (globalGateOffset == 0) {
-            _gateOffset = 0; // Force on-beat
+            // Mode 1: Force On-Beat
+            _gateOffset = 0;
+        } else if (globalGateOffset == 100) {
+            // Mode 3: Pure Random Offset
+            _gateOffset = _uiRng.nextRange(101); // 0-100
         } else {
-            // Probabilistically override the algorithm's calculated value
+            // Mode 2: Probabilistic blend of Algorithmic and Random
+            // Note: _gateOffset already holds the algorithmic value here.
+            // We just check for a random override.
             if (_uiRng.nextRange(100) < globalGateOffset) {
-                _gateOffset = globalGateOffset;
+                _gateOffset = _uiRng.nextRange(101); // 0-100
             }
         }
 
