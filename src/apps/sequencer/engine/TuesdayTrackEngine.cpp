@@ -2109,6 +2109,17 @@ void TuesdayTrackEngine::generateBuffer() {
                 // Use multi-track positioning to create complex timing variations
                 int polyRhythmFactor = (_aphex_pos1 + _aphex_pos2 + _aphex_pos3) % 12;
                 gateOffset = polyRhythmFactor * 8;  // Scale to 0-96% range
+
+                // Check for Trill on polyrhythmic collision points (glitchy)
+                int polyCollision = ((_aphex_pos1 * 7) ^ (_aphex_pos2 * 5) ^ (_aphex_pos3 * 3)) % 12;
+                if (polyCollision > 8) {
+                    int trillChanceAlgorithmic = 45; // High for glitch
+                    int userTrillSetting = _tuesdayTrack.trill();
+                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+                    if (_uiRng.nextRange(100) < finalTrillChance) {
+                        isTrill = true;
+                    }
+                }
             }
             break;
 
@@ -2168,6 +2179,17 @@ void TuesdayTrackEngine::generateBuffer() {
                 // AUTECHRE: Apply algorithmic timing variations that complement the pattern transformations
                 // Use the current rule index and timer to create evolving timing variations
                 gateOffset = ((_autechre_rule_index * 10) + (_autechre_rule_timer % 7)) % 100;
+
+                // Check for Trill on SWAP rule or fresh transformation (glitchy)
+                uint8_t current_rule = _autechre_rule_sequence[_autechre_rule_index];
+                if (current_rule == 3 || _autechre_rule_timer < 2) {
+                    int trillChanceAlgorithmic = 50; // Very high for abstract chaos
+                    int userTrillSetting = _tuesdayTrack.trill();
+                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+                    if (_uiRng.nextRange(100) < finalTrillChance) {
+                        isTrill = true;
+                    }
+                }
             }
             break;
 
@@ -3545,6 +3567,27 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 _aphex_pos2 = (_aphex_pos2 + 1) % 3;
                 _aphex_pos3 = (_aphex_pos3 + 1) % 5;
 
+                // Check for Trill on polyrhythmic collision points (glitchy)
+                int polyCollision = ((_aphex_pos1 * 7) ^ (_aphex_pos2 * 5) ^ (_aphex_pos3 * 3)) % 12;
+                if (polyCollision > 8) {
+                    int trillChanceAlgorithmic = 45; // High for glitch
+                    int userTrillSetting = _tuesdayTrack.trill();
+                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                    if (_uiRng.nextRange(100) < finalTrillChance) {
+                        _retriggerArmed = true;
+                        _retriggerCount = 3 + (_uiRng.nextRange(3)); // 4-6 notes (extreme glitch)
+                        _retriggerPeriod = divisor / 5; // 32nd notes - rapid fire
+                        _retriggerLength = _retriggerPeriod / 3; // Short staccato
+                        _isTrillNote = false;
+
+                        float baseVoltage = (note + (octave * 12)) / 12.f;
+                        // Dissonant intervals: tritone (+6) or minor 2nd (+1)
+                        float interval = ((_aphex_pos1 + _aphex_pos3) % 2) ? 6.f : 1.f;
+                        _trillCvTarget = baseVoltage + (interval / 12.f);
+                    }
+                }
+
                 noteVoltage = (note + (octave * 12)) / 12.0f;
             }
             break;
@@ -3601,6 +3644,29 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     // --- Reset for next rule ---
                     _autechre_rule_timer = 8 + (_tuesdayTrack.flow() * 4);
                     _autechre_rule_index = (_autechre_rule_index + 1) % 8;
+                }
+
+                // Check for Trill on SWAP rule or fresh transformation (glitchy)
+                uint8_t current_rule = _autechre_rule_sequence[_autechre_rule_index];
+                if (current_rule == 3 || _autechre_rule_timer < 2) {
+                    int trillChanceAlgorithmic = 50; // Very high for abstract chaos
+                    int userTrillSetting = _tuesdayTrack.trill();
+                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
+
+                    if (_uiRng.nextRange(100) < finalTrillChance) {
+                        _retriggerArmed = true;
+                        // More trills on SWAP rule (most chaotic)
+                        int minCount = (current_rule == 3) ? 4 : 2;
+                        _retriggerCount = minCount + (_uiRng.nextRange(3)); // 4-7 for SWAP, 2-5 others
+                        _retriggerPeriod = divisor / 4; // 16th notes
+                        _retriggerLength = _retriggerPeriod / 2;
+                        _isTrillNote = false;
+
+                        float baseVoltage = (note + (octave * 12)) / 12.f;
+                        // Rule-based intervals for deterministic glitch
+                        int abstractInterval = (_autechre_rule_index * 3) % 8; // 0,3,6,1,4,7,2,5 semitones
+                        _trillCvTarget = baseVoltage + (abstractInterval / 12.f);
+                    }
                 }
 
                 noteVoltage = (note + (octave * 12)) / 12.0f;
