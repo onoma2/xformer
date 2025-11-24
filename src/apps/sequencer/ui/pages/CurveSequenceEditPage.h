@@ -61,6 +61,7 @@ private:
     int _section = 0;
     bool _showDetail;
     uint32_t _showDetailTicks;
+    bool _phaseEditMode = false;
 
     CurveSequenceListModel _listModel;
 

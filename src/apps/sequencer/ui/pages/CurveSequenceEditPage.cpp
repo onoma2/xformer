@@ -47,9 +47,10 @@ enum class Function {
     Min     = 1,
     Max     = 2,
     Gate    = 3,
+    Phase   = 4,
 };
 
-static const char *functionNames[] = { "SHAPE", "MIN", "MAX", "GATE", nullptr };
+static const char *functionNames[] = { "SHAPE", "MIN", "MAX", "GATE", "PHASE", nullptr };
 
 static const CurveSequenceListModel::Item quickEditItems[8] = {
     CurveSequenceListModel::Item::FirstStep,
@@ -139,7 +140,16 @@ void CurveSequenceEditPage::exit() {
 void CurveSequenceEditPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "STEPS");
-    WindowPainter::drawActiveFunction(canvas, CurveSequence::layerName(layer()));
+
+    // Show phase offset value when in phase edit mode
+    if (_phaseEditMode) {
+        const auto &track = _project.selectedTrack().curveTrack();
+        FixedStringBuilder<16> str("PHASE: %d%%", track.phaseOffset());
+        WindowPainter::drawActiveFunction(canvas, str);
+    } else {
+        WindowPainter::drawActiveFunction(canvas, CurveSequence::layerName(layer()));
+    }
+
     WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), activeFunctionKey());
 
     const auto &trackEngine = _engine.selectedTrackEngine().as<CurveTrackEngine>();
@@ -399,6 +409,15 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
 void CurveSequenceEditPage::encoder(EncoderEvent &event) {
     auto &sequence = _project.selectedCurveSequence();
 
+    // Handle phase edit mode - adjust track-level phase offset
+    if (_phaseEditMode) {
+        auto &track = _project.selectedTrack().curveTrack();
+        bool shift = globalKeyState()[Key::Shift];
+        track.editPhaseOffset(event.value(), shift);
+        event.consume();
+        return;
+    }
+
     if (_stepSelection.any()) {
         _showDetail = true;
         _showDetailTicks = os::ticks();
@@ -469,6 +488,19 @@ void CurveSequenceEditPage::encoder(EncoderEvent &event) {
 }
 
 void CurveSequenceEditPage::switchLayer(int functionKey, bool shift) {
+    // Handle Phase function (F5) - toggle phase edit mode
+    if (Function(functionKey) == Function::Phase) {
+        _phaseEditMode = !_phaseEditMode;
+        if (!_phaseEditMode) {
+            // Exiting phase mode, clear step selection to return to normal mode
+            _stepSelection.clear();
+        }
+        return;
+    }
+
+    // Exit phase edit mode when switching to other layers
+    _phaseEditMode = false;
+
     if (shift) {
         switch (Function(functionKey)) {
         case Function::Shape:
@@ -482,6 +514,8 @@ void CurveSequenceEditPage::switchLayer(int functionKey, bool shift) {
             break;
         case Function::Gate:
             setLayer(Layer::Gate);
+            break;
+        case Function::Phase:
             break;
         }
         return;
@@ -523,10 +557,16 @@ void CurveSequenceEditPage::switchLayer(int functionKey, bool shift) {
             break;
         }
         break;
+    case Function::Phase:
+        break;
     }
 }
 
 int CurveSequenceEditPage::activeFunctionKey() {
+    if (_phaseEditMode) {
+        return 4;
+    }
+
     switch(layer()) {
     case Layer::Shape:
     case Layer::ShapeVariation:
