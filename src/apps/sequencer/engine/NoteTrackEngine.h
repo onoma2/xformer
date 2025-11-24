@@ -81,8 +81,8 @@ private:
 
     TrackLinkData _linkData;
 
-    NoteSequence *_sequence;
-    const NoteSequence *_fillSequence;
+    NoteSequence *_sequence = nullptr;
+    const NoteSequence *_fillSequence = nullptr;
 
     uint32_t _freeRelativeTick;
     SequenceState _sequenceState;
