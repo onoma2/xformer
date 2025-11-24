@@ -194,19 +194,19 @@ public:
         str("%+.1f%%", gateProbabilityBias() * 12.5f);
     }
 
-    // phaseOffset
+    // globalPhase
 
-    int phaseOffset() const { return _phaseOffset; }
-    void setPhaseOffset(int phaseOffset) {
-        _phaseOffset = clamp(phaseOffset, 0, 100);
+    float globalPhase() const { return _globalPhase; }
+    void setGlobalPhase(float globalPhase) {
+        _globalPhase = clamp(globalPhase, 0.f, 1.f);
     }
 
-    void editPhaseOffset(int value, bool shift) {
-        setPhaseOffset(phaseOffset() + value * (shift ? 10 : 1));
+    void editGlobalPhase(float value, bool shift) {
+        setGlobalPhase(globalPhase() + value * (shift ? 0.1f : 0.01f));
     }
 
-    void printPhaseOffset(StringBuilder &str) const {
-        str("%d%%", phaseOffset());
+    void printGlobalPhase(StringBuilder &str) const {
+        str("%.2f", globalPhase());
     }
 
     // sequences
@@ -264,7 +264,7 @@ private:
     Routable<int8_t> _rotate;
     Routable<int8_t> _shapeProbabilityBias;
     Routable<int8_t> _gateProbabilityBias;
-    uint8_t _phaseOffset;
+    float _globalPhase;
 
     CurveSequenceArray _sequences;
 

@@ -193,7 +193,7 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
 
     _currentStepFraction = float(relativeTick % divisor) / divisor;
 
-    if (mute()) {
+    if (mute() || (isRecording() && _curveTrack.globalPhase() > 0.f)) {
         switch (_curveTrack.muteMode()) {
         case CurveTrack::MuteMode::LastValue:
             // keep value
@@ -210,19 +210,42 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
         case CurveTrack::MuteMode::Last:
             break;
         }
+        if (isRecording() && _curveTrack.globalPhase() > 0.f) {
+            // pass through recorded value
+            updateRecordValue();
+            _cvOutputTarget = range.denormalize(_recordValue);
+        }
     } else {
         bool fillVariation = _fillMode == CurveTrack::FillMode::Variation;
         bool fillNextPattern = _fillMode == CurveTrack::FillMode::NextPattern;
         bool fillInvert = _fillMode == CurveTrack::FillMode::Invert;
 
-        const auto &evalSequence = fillNextPattern ? *_fillSequence : *_sequence;
-        const auto &step = evalSequence.step(_currentStep);
+        const auto &evalSequence = fillNextPattern ? *_fillSequence : sequence;
+        
+        int firstStep = evalSequence.firstStep();
+        int lastStep = evalSequence.lastStep();
+        int sequenceLength = lastStep - firstStep + 1;
 
-        // Apply phase offset (convert 0-100 to 0.0-1.0 and wrap)
-        float phaseOffset = float(_curveTrack.phaseOffset()) / 100.f;
-        float phasedFraction = fmod(_currentStepFraction + phaseOffset, 1.0f);
+        float globalPhase = _curveTrack.globalPhase();
 
-        float value = evalStepShape(step, _shapeVariation || fillVariation, fillInvert, phasedFraction);
+        int lookupStep;
+        float lookupFraction;
+
+        if (globalPhase > 0.f && sequenceLength > 0) {
+            float currentGlobalPos = float(_sequenceState.step() - firstStep) + _currentStepFraction;
+            float phasedGlobalPos = fmod(currentGlobalPos + globalPhase * sequenceLength, float(sequenceLength));
+            
+            lookupStep = firstStep + int(phasedGlobalPos);
+            lookupFraction = fmod(phasedGlobalPos, 1.0f);
+        } else {
+            // No phase offset
+            lookupStep = _currentStep;
+            lookupFraction = _currentStepFraction;
+        }
+        
+        const auto &step = evalSequence.step(lookupStep);
+
+        float value = evalStepShape(step, _shapeVariation || fillVariation, fillInvert, lookupFraction);
         value = range.denormalize(value);
         _cvOutputTarget = value;
     }

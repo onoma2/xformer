@@ -144,7 +144,8 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
     // Show phase offset value when in phase edit mode
     if (_phaseEditMode) {
         const auto &track = _project.selectedTrack().curveTrack();
-        FixedStringBuilder<16> str("PHASE: %d%%", track.phaseOffset());
+        FixedStringBuilder<16> str("PHASE: ");
+        track.printGlobalPhase(str);
         WindowPainter::drawActiveFunction(canvas, str);
     } else {
         WindowPainter::drawActiveFunction(canvas, CurveSequence::layerName(layer()));
@@ -413,7 +414,7 @@ void CurveSequenceEditPage::encoder(EncoderEvent &event) {
     if (_phaseEditMode) {
         auto &track = _project.selectedTrack().curveTrack();
         bool shift = globalKeyState()[Key::Shift];
-        track.editPhaseOffset(event.value(), shift);
+        track.editGlobalPhase(event.value(), shift);
         event.consume();
         return;
     }

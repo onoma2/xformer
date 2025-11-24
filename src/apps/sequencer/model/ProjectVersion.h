@@ -108,6 +108,9 @@ enum ProjectVersion {
     // added TuesdayTrack::trill
     Version41 = 41,
 
+    // added CurveTrack::globalPhase
+    Version42 = 42,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,
