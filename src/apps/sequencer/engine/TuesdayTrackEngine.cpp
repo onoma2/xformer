@@ -2540,16 +2540,18 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         int scan = _tuesdayTrack.scan();
         uint32_t effectiveStep = _stepIndex;
         if (loopLength > 0) {
-            // Finite loop: rotate shifts within loop, then scan offsets into infinite tape
+            // Finite loop: rotate shifts within loop, then scan offsets into buffer
             int rot = _tuesdayTrack.rotate();
             // Handle negative rotation with proper modulo
             effectiveStep = ((_stepIndex + rot) % loopLength + loopLength) % loopLength;
-            // Add scan offset to select which portion of infinite tape
+            // Add scan offset
             effectiveStep += scan;
+            // Wrap to buffer size (64 steps) - longer loops cycle through the pattern
+            int bufferIndex = effectiveStep % BUFFER_SIZE;
 
             // Read from pre-generated buffer
-            if (effectiveStep < BUFFER_SIZE) {
-                const auto &bufferedStep = _buffer[effectiveStep];
+            {
+                const auto &bufferedStep = _buffer[bufferIndex];
                 note = bufferedStep.note;
                 octave = bufferedStep.octave;
                 _gatePercent = bufferedStep.gatePercent;

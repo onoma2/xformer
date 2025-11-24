@@ -286,11 +286,11 @@ public:
         }
     }
 
-    // scan (0 to 128-loopLength, offsets window into buffer)
+    // scan (0 to 64-loopLength, offsets window into buffer)
 
     int scan() const { return _scan; }
     void setScan(int scan) {
-        int maxScan = 128 - actualLoopLength();
+        int maxScan = 64 - actualLoopLength();
         if (maxScan < 0) maxScan = 0;
         _scan = clamp(scan, 0, maxScan);
     }

@@ -55,8 +55,8 @@ private:
         bool isTrill = false;
     };
 
-    // Pattern buffer for finite loops (128 steps)
-    static const int BUFFER_SIZE = 128;
+    // Pattern buffer for finite loops (64 steps, wraps for longer loops)
+    static const int BUFFER_SIZE = 64;
     BufferedStep _buffer[BUFFER_SIZE];
     bool _bufferValid = false;
 
