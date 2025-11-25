@@ -29,11 +29,10 @@ The wavefolder effect will be controlled by three main parameters:
 The user interface for this feature will be integrated into the `CurveSequenceEditPage` and will leverage existing UI patterns from the `TuesdayTrack` interface for consistency and ease of use.
 
 *   **Page Toggling with `PHASE` (F4) Key:**
-    The `PHASE` key (F4) will act as a three-state toggle, cycling through different editing modes:
-    1.  **Mode 1 (Default):** Normal step editing.
-    2.  **Mode 2 (1st press):** "Global Phase" edit mode (the current behavior).
-    3.  **Mode 3 (2nd press):** A new "Wavefolder" parameter edit page.
-    A subsequent press would cycle back to Mode 1.
+    The `PHASE` key (F4) will act as a two-state toggle, cycling through different editing modes:
+    1.  **Mode 1 (1st press):** "Global Phase" edit mode (the current behavior).
+    2.  **Mode 2 (2nd press):** A new "Wavefolder" parameter edit page.
+    A subsequent press would cycle back to Mode 1. Pressing a different function key (F1-F3) would exit to the normal step editing mode for that layer.
 
 *   **Wavefolder Edit Page:**
     *   This page will present a simple list of the three wavefolder parameters: `Fold`, `Gain`, and `Symmetry`.
