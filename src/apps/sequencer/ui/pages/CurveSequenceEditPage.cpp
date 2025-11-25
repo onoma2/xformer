@@ -149,7 +149,7 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
     if (_editMode == EditMode::Wavefolder) {
         // Draw Wavefolder UI
         WindowPainter::drawActiveFunction(canvas, "WAVEFOLDER");
-        const char *wavefolderFunctionNames[5] = { "FOLD", "GAIN", "SYM", "", "NEXT" };
+        const char *wavefolderFunctionNames[5] = { "FOLD", "GAIN", "SYM", "FILTER", "NEXT" };
         WindowPainter::drawFooter(canvas, wavefolderFunctionNames, pageKeyState(), _wavefolderRow);
 
         const int colWidth = 51;
@@ -158,7 +158,7 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
         const int barHeight = 4;
         const int barWidth = 40;
 
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < 4; ++i) {
             int x = i * colWidth;
             int barX = x + (colWidth - barWidth) / 2;
 
@@ -186,6 +186,12 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
                 max = 1.f;
                 bipolar = true;
                 track.printWavefolderSymmetry(valueStr);
+                break;
+            case 3: // FILTER
+                value = track.djFilter();
+                max = 1.f;
+                bipolar = true;
+                track.printDjFilter(valueStr);
                 break;
             }
 
@@ -441,7 +447,7 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
     if (key.isFunction()) {
         if (_editMode == EditMode::Wavefolder) {
             int function = key.function();
-            if (function >= 0 && function < 3) {
+            if (function >= 0 && function < 4) {
                 _wavefolderRow = function;
                 event.consume();
                 return;
@@ -482,12 +488,13 @@ void CurveSequenceEditPage::encoder(EncoderEvent &event) {
         return;
     case EditMode::Wavefolder:
         if (event.pressed()) {
-            _wavefolderRow = clamp(_wavefolderRow + event.value(), 0, 2);
+            _wavefolderRow = clamp(_wavefolderRow + event.value(), 0, 3);
         } else {
             switch (_wavefolderRow) {
             case 0: track.editWavefolderFold(event.value(), shift); break;
             case 1: track.editWavefolderGain(event.value(), shift); break;
             case 2: track.editWavefolderSymmetry(event.value(), shift); break;
+            case 3: track.editDjFilter(event.value(), shift); break;
             }
         }
         event.consume();

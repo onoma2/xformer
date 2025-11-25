@@ -114,6 +114,9 @@ enum ProjectVersion {
     // added CurveTrack wavefolder properties
     Version43 = 43,
 
+    // added CurveTrack dj filter
+    Version44 = 44,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

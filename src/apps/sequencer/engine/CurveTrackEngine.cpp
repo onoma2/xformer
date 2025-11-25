@@ -14,6 +14,35 @@
 
 static Random rng;
 
+static float applyDjFilter(float input, float &lpfState, float control) {
+    // 1. Dead zone
+    if (control > -0.02f && control < 0.02f) {
+        return input;
+    }
+
+    float alpha;
+    if (control < 0.f) { // LPF Mode (knob left)
+        // More turn (-> -1.0) = more filtering = lower alpha
+        alpha = 1.f - std::abs(control);
+    } else { // HPF Mode (knob right)
+        // More turn (-> +1.0) = more of a filtering effect.
+        // We remap the knob's travel to an effective alpha range that feels more linear.
+        alpha = 0.1f + std::abs(control) * 0.85f;
+    }
+    // The clamp and square can be applied to both to shape the response
+    alpha = clamp(alpha * alpha, 0.005f, 0.95f); // Clamp max to avoid instabilities
+
+    // Update the internal LPF state
+    lpfState = lpfState + alpha * (input - lpfState);
+
+    // 2. Correct LPF/HPF mapping
+    if (control < 0.f) { // LPF
+        return lpfState;
+    } else { // HPF
+        return input - lpfState;
+    }
+}
+
 static float applyWavefolder(float input, float fold, float gain, float symmetry) {
     // map from [0, 1] to [-1, 1]
     float bipolar_input = (input * 2.f) - 1.f;
@@ -60,6 +89,7 @@ void CurveTrackEngine::reset() {
     _fillMode = CurveTrack::FillMode::None;
     _activity = false;
     _gateOutput = false;
+    _lpfState = 0.f;
 
     _recorder.reset();
     _gateQueue.clear();
@@ -73,6 +103,7 @@ void CurveTrackEngine::restart() {
     _currentStepFraction = 0.f;
     _phasedStep = -1;
     _phasedStepFraction = 0.f;
+    _lpfState = 0.f;
 }
 
 TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
@@ -273,7 +304,9 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
         float shapeValue = evalStepShape(step, _shapeVariation || fillVariation, fillInvert, lookupFraction);
 
         // 2. Get wavefolder parameters from the track
-        float fold = _curveTrack.wavefolderFold();
+        float fold_linear = _curveTrack.wavefolderFold();
+        // Apply an exponential curve for more fine-grained control at low values
+        float fold = fold_linear * fold_linear;
 
         // 3. Apply wavefolder if enabled (fold > 0)
         if (fold > 0.f) {
@@ -284,6 +317,13 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
 
         // 4. Denormalize the final value to voltage
         float value = range.denormalize(shapeValue);
+
+        // 5. Apply DJ Filter
+        float filterControl = _curveTrack.djFilter();
+        if (filterControl != 0.f) {
+            value = applyDjFilter(value, _lpfState, filterControl);
+        }
+
         _cvOutputTarget = value;
     }
 

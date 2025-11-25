@@ -82,6 +82,7 @@ private:
     bool _gateOutput;
     float _cvOutput = 0.f;
     float _cvOutputTarget = 0.f;
+    float _lpfState = 0.f;
 
     struct Gate {
         uint32_t tick;

@@ -230,6 +230,13 @@ public:
     void editWavefolderSymmetry(int value, bool shift) { setWavefolderSymmetry(wavefolderSymmetry() + value * (shift ? 0.1f : 0.01f)); }
     void printWavefolderSymmetry(StringBuilder &str) const { str("%+.2f", wavefolderSymmetry()); }
 
+    // djFilter
+
+    float djFilter() const { return _djFilter; }
+    void setDjFilter(float value) { _djFilter = clamp(value, -1.f, 1.f); }
+    void editDjFilter(int value, bool shift) { setDjFilter(djFilter() + value * (shift ? 0.1f : 0.01f)); }
+    void printDjFilter(StringBuilder &str) const { str("%+.2f", djFilter()); }
+
     // sequences
 
     const CurveSequenceArray &sequences() const { return _sequences; }
@@ -289,6 +296,7 @@ private:
     float _wavefolderFold;
     float _wavefolderGain;
     float _wavefolderSymmetry;
+    float _djFilter;
 
     CurveSequenceArray _sequences;
 
