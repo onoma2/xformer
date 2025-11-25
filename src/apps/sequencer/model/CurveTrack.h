@@ -209,6 +209,27 @@ public:
         str("%.2f", globalPhase());
     }
 
+    // wavefolderFold
+
+    float wavefolderFold() const { return _wavefolderFold; }
+    void setWavefolderFold(float value) { _wavefolderFold = clamp(value, 0.f, 1.f); }
+    void editWavefolderFold(int value, bool shift) { setWavefolderFold(wavefolderFold() + value * (shift ? 0.1f : 0.01f)); }
+    void printWavefolderFold(StringBuilder &str) const { str("%.2f", wavefolderFold()); }
+
+    // wavefolderGain
+
+    float wavefolderGain() const { return _wavefolderGain; }
+    void setWavefolderGain(float value) { _wavefolderGain = clamp(value, 1.f, 5.f); }
+    void editWavefolderGain(int value, bool shift) { setWavefolderGain(wavefolderGain() + value * (shift ? 0.1f : 0.01f)); }
+    void printWavefolderGain(StringBuilder &str) const { str("%.2f", wavefolderGain()); }
+
+    // wavefolderSymmetry
+
+    float wavefolderSymmetry() const { return _wavefolderSymmetry; }
+    void setWavefolderSymmetry(float value) { _wavefolderSymmetry = clamp(value, -1.f, 1.f); }
+    void editWavefolderSymmetry(int value, bool shift) { setWavefolderSymmetry(wavefolderSymmetry() + value * (shift ? 0.1f : 0.01f)); }
+    void printWavefolderSymmetry(StringBuilder &str) const { str("%+.2f", wavefolderSymmetry()); }
+
     // sequences
 
     const CurveSequenceArray &sequences() const { return _sequences; }
@@ -265,6 +286,9 @@ private:
     Routable<int8_t> _shapeProbabilityBias;
     Routable<int8_t> _gateProbabilityBias;
     float _globalPhase;
+    float _wavefolderFold;
+    float _wavefolderGain;
+    float _wavefolderSymmetry;
 
     CurveSequenceArray _sequences;
 

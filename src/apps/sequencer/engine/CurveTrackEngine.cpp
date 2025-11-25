@@ -14,6 +14,21 @@
 
 static Random rng;
 
+static float applyWavefolder(float input, float fold, float gain, float symmetry) {
+    // map from [0, 1] to [-1, 1]
+    float bipolar_input = (input * 2.f) - 1.f;
+    // apply symmetry
+    float biased_input = bipolar_input + symmetry;
+    // apply gain
+    float gained_input = biased_input * gain;
+    // apply folding using sine function. fold parameter controls frequency.
+    // map fold from [0, 1] to a range of number of folds, e.g. 1 to 9
+    float fold_count = 1.f + fold * 8.f;
+    float folded_output = sinf(gained_input * M_PI * fold_count);
+    // map back from [-1, 1] to [0, 1]
+    return (folded_output + 1.f) * 0.5f;
+}
+
 static float evalStepShape(const CurveSequence::Step &step, bool variation, bool invert, float fraction) {
     auto function = Curve::function(Curve::Type(variation ? step.shapeVariation() : step.shape()));
     float value = function(fraction);
@@ -254,8 +269,21 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
 
         const auto &step = evalSequence.step(lookupStep);
 
-        float value = evalStepShape(step, _shapeVariation || fillVariation, fillInvert, lookupFraction);
-        value = range.denormalize(value);
+        // 1. Get the original normalized shape value
+        float shapeValue = evalStepShape(step, _shapeVariation || fillVariation, fillInvert, lookupFraction);
+
+        // 2. Get wavefolder parameters from the track
+        float fold = _curveTrack.wavefolderFold();
+
+        // 3. Apply wavefolder if enabled (fold > 0)
+        if (fold > 0.f) {
+            float gain = _curveTrack.wavefolderGain();
+            float symmetry = _curveTrack.wavefolderSymmetry();
+            shapeValue = applyWavefolder(shapeValue, fold, gain, symmetry);
+        }
+
+        // 4. Denormalize the final value to voltage
+        float value = range.denormalize(shapeValue);
         _cvOutputTarget = value;
     }
 

@@ -33,6 +33,9 @@ void CurveTrack::clear() {
     setShapeProbabilityBias(0);
     setGateProbabilityBias(0);
     setGlobalPhase(0.f);
+    setWavefolderFold(0.f);
+    setWavefolderGain(1.f);
+    setWavefolderSymmetry(0.f);
 
     for (auto &sequence : _sequences) {
         sequence.clear();
@@ -49,6 +52,9 @@ void CurveTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_shapeProbabilityBias.base);
     writer.write(_gateProbabilityBias.base);
     writer.write(_globalPhase);
+    writer.write(_wavefolderFold);
+    writer.write(_wavefolderGain);
+    writer.write(_wavefolderSymmetry);
     writeArray(writer, _sequences);
 }
 
@@ -66,7 +72,16 @@ void CurveTrack::read(VersionedSerializedReader &reader) {
     } else {
         uint8_t phaseOffset;
         reader.read(phaseOffset, ProjectVersion::Version35);
-        _globalPhase = float(phaseOffset) / 100.f;
+        setGlobalPhase(float(phaseOffset) / 100.f);
+    }
+    if (reader.dataVersion() >= ProjectVersion::Version43) {
+        reader.read(_wavefolderFold);
+        reader.read(_wavefolderGain);
+        reader.read(_wavefolderSymmetry);
+    } else {
+        setWavefolderFold(0.f);
+        setWavefolderGain(1.f);
+        setWavefolderSymmetry(0.f);
     }
     readArray(reader, _sequences);
 }

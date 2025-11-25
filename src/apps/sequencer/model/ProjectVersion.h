@@ -111,6 +111,9 @@ enum ProjectVersion {
     // added CurveTrack::globalPhase
     Version42 = 42,
 
+    // added CurveTrack wavefolder properties
+    Version43 = 43,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

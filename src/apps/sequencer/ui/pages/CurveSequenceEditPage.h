@@ -58,10 +58,17 @@ private:
 
     ContextMenu _contextMenu;
 
+    enum class EditMode {
+        Step,
+        GlobalPhase,
+        Wavefolder,
+    };
+
     int _section = 0;
     bool _showDetail;
     uint32_t _showDetailTicks;
-    bool _phaseEditMode = false;
+    EditMode _editMode = EditMode::Step;
+    int _wavefolderRow = 0;
 
     CurveSequenceListModel _listModel;
 
