@@ -34,12 +34,12 @@ public:
     struct Parameters {
         float globalPhase = 0.0f;
         float wavefolderFold = 0.0f;
-        float wavefolderGain = 1.0f;
+        float wavefolderGain = 0.0f;
         float wavefolderSymmetry = 0.0f;
         float djFilter = 0.0f;
         float filterF = 0.0f;
         float foldF = 0.0f;
-        float xFade = 0.0f;
+        float xFade = 1.0f;
         float min = 0.0f;
         float max = 1.0f;
         Curve::Type shape = Curve::Type::Linear;

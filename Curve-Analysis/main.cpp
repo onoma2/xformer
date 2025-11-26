@@ -102,14 +102,40 @@ private:
         m_controls.push_back({"Max", &m_max, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false});
     }
 
+    void resetControls() {
+        m_params = CurveProcessor::Parameters();
+        m_min = m_params.min;
+        m_max = m_params.max;
+        m_selectedShape = m_params.shape;
+        m_shapeVariation = m_params.shapeVariation;
+        m_invert = m_params.invert;
+        m_processor.resetStates();
+    }
+
     void handleKeyDown(SDL_Keycode key) {
-        if (key == SDLK_ESCAPE) m_running = false;
-        else if (key == SDLK_r) m_processor.resetStates();
-        else if (key == SDLK_s) m_shapeVariation = !m_shapeVariation;
-        else if (key == SDLK_i) m_invert = !m_invert;
-        else if (key >= SDLK_1 && key <= SDLK_8) m_selectedShape = (Curve::Type)(key - SDLK_1 + 4);
-        else if (key >= SDLK_F1 && key <= SDLK_F6) updateSampleRate(8000 * (1 << (key - SDLK_F1)));
-        else if (key == SDLK_v) m_params.range = (VoltageRange)(((int)m_params.range + 1) % (int)VoltageRange::Last);
+        switch (key) {
+            case SDLK_ESCAPE: m_running = false; break;
+            case SDLK_r: resetControls(); break;
+            case SDLK_s: m_shapeVariation = !m_shapeVariation; break;
+            case SDLK_i: m_invert = !m_invert; break;
+            case SDLK_1: m_selectedShape = Curve::Type::Sine; break;
+            case SDLK_2: m_selectedShape = Curve::Type::Triangle; break;
+            case SDLK_3: m_selectedShape = Curve::Type::RampUp; break;
+            case SDLK_4: m_selectedShape = Curve::Type::RampDown; break;
+            case SDLK_5: m_selectedShape = Curve::Type::Square; break;
+            case SDLK_6: m_selectedShape = Curve::Type::Linear; break;
+            case SDLK_7: m_selectedShape = Curve::Type::Bell; break;
+            case SDLK_8: m_selectedShape = Curve::Type::Sigmoid; break;
+            case SDLK_z: updateSampleRate(500); break;
+            case SDLK_x: updateSampleRate(8000); break;
+            case SDLK_c: updateSampleRate(16000); break;
+            case SDLK_v: updateSampleRate(32000); break;
+            case SDLK_b: updateSampleRate(44100); break;
+            case SDLK_n: updateSampleRate(48000); break;
+            case SDLK_m: updateSampleRate(96000); break;
+            case SDLK_l: m_params.range = (VoltageRange)(((int)m_params.range + 1) % (int)VoltageRange::Last); break;
+            default: break;
+        }
     }
 
     void handleMouse(const SDL_Event& e) {
@@ -122,10 +148,13 @@ private:
     }
 
     void handleMouseMotion(const SDL_Event& e) {
+        SDL_Point p = {e.motion.x, e.motion.y};
         for (auto& c : m_controls) {
             if (c.dragging) {
-                float pos = (float)(e.motion.x - c.rect.x) / c.rect.w;
-                *c.value = c.min + std::clamp(pos, 0.f, 1.f) * (c.max - c.min);
+                if (SDL_PointInRect(&p, &c.rect)) {
+                    float pos = (float)(e.motion.x - c.rect.x) / c.rect.w;
+                    *c.value = c.min + std::clamp(pos, 0.f, 1.f) * (c.max - c.min);
+                }
             }
         }
     }
@@ -224,6 +253,14 @@ private:
             SDL_Rect fill = {c.rect.x, c.rect.y, (int)(c.rect.w * pos), c.rect.h};
             SDL_SetRenderDrawColor(m_renderer, 0, 100, 200, 255);
             SDL_RenderFillRect(m_renderer, &fill);
+
+            // Draw center line for bipolar controls
+            if (c.min < 0) {
+                int centerX = c.rect.x + c.rect.w / 2;
+                SDL_SetRenderDrawColor(m_renderer, 255, 255, 255, 255);
+                SDL_RenderDrawLine(m_renderer, centerX, c.rect.y, centerX, c.rect.y + c.rect.h);
+            }
+
             SDL_SetRenderDrawColor(m_renderer, 100, 100, 100, 255);
             SDL_RenderDrawRect(m_renderer, &c.rect);
 #ifdef HAS_SDL2_TTF
@@ -241,9 +278,9 @@ private:
         if (m_font) {
             int y = 400;
             renderText("Shape: " + std::string(Curve::name(m_selectedShape)), 20, y, {255,255,255,255}); y+=20;
-            renderText("Voltage Range: " + std::string(voltageRangeName(m_params.range)) + " (V to change)", 20, y, {255,255,255,255}); y+=20;
+            renderText("Voltage Range: " + std::string(voltageRangeName(m_params.range)) + " (L to change)", 20, y, {255,255,255,255}); y+=20;
             renderText("Controls: R-reset, S-var, I-inv, 1-8-shapes", 20, y, {255,255,255,255}); y+=20;
-            renderText("Sample Rate: " + std::to_string(m_sampleRate) + "Hz (F1-F6)", 20, y, {255,255,255,255});
+            renderText("Sample Rate: " + std::to_string(m_sampleRate) + "Hz (Z-M)", 20, y, {255,255,255,255});
         }
 #endif
     }
@@ -271,7 +308,7 @@ private:
     bool m_shapeVariation, m_invert;
     float m_min, m_max;
     int m_sampleRate = 48000;
-    void updateSampleRate(int newRate) { if (newRate >= 8000 && newRate <= 192000) m_sampleRate = newRate; }
+    void updateSampleRate(int newRate) { if (newRate >= 500 && newRate <= 192000) m_sampleRate = newRate; }
 };
 
 int main(int argc, char* argv[]) {
