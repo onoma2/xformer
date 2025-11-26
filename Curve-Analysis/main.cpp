@@ -12,6 +12,7 @@
 
 #include "CurveProcessor.h"
 #include "Curve.h"
+#include "dj_fft.h"
 
 struct Control {
     std::string name;
@@ -36,13 +37,14 @@ public:
         m_shapeVariation(false),
         m_invert(false),
         m_min(0.0f),
-        m_max(1.0f)
+        m_max(1.0f),
+        m_selectedSpectrumSource(SpectrumSource::FinalOutput)
     {
         if (SDL_Init(SDL_INIT_VIDEO) < 0) { std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl; return; }
 #ifdef HAS_SDL2_TTF
         if (TTF_Init() == -1) { std::cerr << "TTF could not initialize! TTF_Error: " << TTF_GetError() << std::endl; return; }
 #endif
-        m_window = SDL_CreateWindow("Curve Analysis Tool", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1600, 900, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+        m_window = SDL_CreateWindow("Curve Analysis Tool", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1600, 1200, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
         if (!m_window) { std::cerr << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl; return; }
         m_renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED);
         if (!m_renderer) { std::cerr << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl; return; }
@@ -74,7 +76,7 @@ public:
         while (m_running) {
             while (SDL_PollEvent(&e)) {
                 if (e.type == SDL_QUIT) m_running = false;
-                else if (e.type == SDL_KEYDOWN) handleKeyDown(e.key.keysym.sym);
+                else if (e.type == SDL_KEYDOWN) handleKeyDown(e.key.keysym.sym, (SDL_Keymod)e.key.keysym.mod);
                 else if (e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) handleMouse(e);
                 else if (e.type == SDL_MOUSEMOTION) handleMouseMotion(e);
             }
@@ -87,9 +89,11 @@ public:
 private:
     void initControls() {
         int y = 30;
-        int controlHeight = 30;
-        int controlWidth = 200;
-        int spacing = 10;
+        int controlHeight = 20;
+        int controlWidth = 150;
+        int spacing = 5;
+        
+        // Main controls
         m_controls.push_back({"Global Phase", &m_params.globalPhase, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
         m_controls.push_back({"Wavefolder Fold", &m_params.wavefolderFold, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
         m_controls.push_back({"Wavefolder Gain", &m_params.wavefolderGain, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
@@ -99,7 +103,20 @@ private:
         m_controls.push_back({"Fold F (Feedback)", &m_params.foldF, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
         m_controls.push_back({"Crossfade", &m_params.xFade, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
         m_controls.push_back({"Min", &m_min, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
-        m_controls.push_back({"Max", &m_max, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false});
+        m_controls.push_back({"Max", &m_max, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
+
+        // Advanced controls
+        y += 20;
+        m_controls.push_back({"Fold Amount", &m_params.advanced.foldAmount, 1.0f, 32.0f, 0.1f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
+        m_controls.push_back({"HPF Curve", &m_params.advanced.hpfCurve, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
+        m_controls.push_back({"Resonance Gain", &m_params.advanced.resonanceGain, 0.5f, 4.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
+        m_controls.push_back({"Resonance Tame", &m_params.advanced.resonanceTame, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
+        m_controls.push_back({"Feedback Curve", &m_params.advanced.feedbackCurve, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
+        m_controls.push_back({"Fold Comp", &m_params.advanced.foldComp, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
+        m_controls.push_back({"LPF Comp", &m_params.advanced.lpfComp, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
+        m_controls.push_back({"HPF Comp", &m_params.advanced.hpfComp, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
+        m_controls.push_back({"Res Comp", &m_params.advanced.resComp, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
+        m_controls.push_back({"Max Comp", &m_params.advanced.maxComp, 1.0f, 5.0f, 0.01f, {250, y, controlWidth, controlHeight}, false}); y += controlHeight + spacing;
     }
 
     void resetControls() {
@@ -109,10 +126,12 @@ private:
         m_selectedShape = m_params.shape;
         m_shapeVariation = m_params.shapeVariation;
         m_invert = m_params.invert;
+        m_selectedSpectrumSource = m_params.spectrumSource;
         m_processor.resetStates();
     }
 
-    void handleKeyDown(SDL_Keycode key) {
+    void handleKeyDown(SDL_Keycode key, SDL_Keymod mod) {
+        float step = (mod & KMOD_SHIFT) ? 0.1f : 0.01f;
         switch (key) {
             case SDLK_ESCAPE: m_running = false; break;
             case SDLK_r: resetControls(); break;
@@ -134,6 +153,18 @@ private:
             case SDLK_n: updateSampleRate(48000); break;
             case SDLK_m: updateSampleRate(96000); break;
             case SDLK_l: m_params.range = (VoltageRange)(((int)m_params.range + 1) % (int)VoltageRange::Last); break;
+            case SDLK_a: m_selectedSpectrumSource = SpectrumSource::Input; break;
+            case SDLK_d: m_selectedSpectrumSource = SpectrumSource::PostWavefolder; break;
+            case SDLK_f: m_selectedSpectrumSource = SpectrumSource::PostFilter; break;
+            case SDLK_g: m_selectedSpectrumSource = SpectrumSource::PostCompensation; break;
+            case SDLK_h: m_selectedSpectrumSource = SpectrumSource::FinalOutput; break;
+
+            // Advanced controls
+            case SDLK_q: m_params.advanced.foldAmount = std::max(1.f, m_params.advanced.foldAmount - 1.f); break;
+            case SDLK_w: m_params.advanced.foldAmount = std::min(32.f, m_params.advanced.foldAmount + 1.f); break;
+            case SDLK_e: m_params.advanced.hpfCurve = std::max(0.f, m_params.advanced.hpfCurve - step); break;
+            case SDLK_t: m_params.advanced.hpfCurve = std::min(1.f, m_params.advanced.hpfCurve + step); break;
+
             default: break;
         }
     }
@@ -165,6 +196,7 @@ private:
         m_params.shape = m_selectedShape;
         m_params.shapeVariation = m_shapeVariation;
         m_params.invert = m_invert;
+        m_params.spectrumSource = m_selectedSpectrumSource;
         m_signalData = m_processor.process(m_params, m_sampleRate);
     }
 
@@ -172,6 +204,7 @@ private:
         SDL_SetRenderDrawColor(m_renderer, 20, 20, 20, 255);
         SDL_RenderClear(m_renderer);
         drawWaveforms();
+        drawSpectrum();
         drawControls();
         drawInfo();
         SDL_RenderPresent(m_renderer);
@@ -234,6 +267,82 @@ private:
         }
     }
 
+    void drawSpectrum() {
+        const int margin = 40, controlPanelWidth = 450;
+        int x = controlPanelWidth + margin;
+        int y = 900 + margin;
+        int w = 1600 - controlPanelWidth - 2 * margin;
+        int h = 1200 - 900 - 2 * margin;
+
+        SDL_Rect bg = {x, y, w, h};
+        SDL_SetRenderDrawColor(m_renderer, 30, 30, 30, 255);
+        SDL_RenderFillRect(m_renderer, &bg);
+        
+        const auto& spectrum = m_signalData.spectrum;
+        const auto& spectrum_oversampled = m_signalData.spectrum_oversampled;
+        if (spectrum.empty() || spectrum_oversampled.empty()) return;
+
+        // Draw oversampled spectrum (aliasing potential) in red
+        SDL_SetRenderDrawColor(m_renderer, 255, 0, 0, 255);
+        float max_mag = -100.f;
+        for(float mag : spectrum_oversampled) max_mag = std::max(max_mag, mag);
+        float min_freq = 20.f;
+        float max_freq_oversampled = m_sampleRate; // 2 * (m_sampleRate / 2)
+        for(size_t i = 0; i < spectrum_oversampled.size(); ++i) {
+            float freq = float(i) * max_freq_oversampled / spectrum_oversampled.size();
+            if (freq < min_freq) continue;
+            if (freq > m_sampleRate / 2.f) {
+                float aliased_freq = m_sampleRate - freq;
+                if (aliased_freq < min_freq) continue;
+                float mag = spectrum_oversampled[i];
+                float normalized_mag = (mag + 60.f) / 60.f;
+                int bar_height = std::clamp(int(normalized_mag * h), 0, h);
+                int bar_x = x + w * log10(aliased_freq / min_freq) / log10((m_sampleRate/2.f) / min_freq);
+                SDL_Rect bar = {bar_x, y + h - bar_height, 2, bar_height};
+                SDL_RenderFillRect(m_renderer, &bar);
+            }
+        }
+        
+        // Draw normal spectrum in orange
+        SDL_SetRenderDrawColor(m_renderer, 255, 128, 0, 255);
+        max_mag = -100.f;
+        for(float mag : spectrum) max_mag = std::max(max_mag, mag);
+        for(size_t i = 0; i < spectrum.size(); ++i) {
+            float freq = float(i) * m_sampleRate / (2 * spectrum.size());
+            if (freq < min_freq) continue;
+            float mag = spectrum[i];
+            float normalized_mag = (mag + 60.f) / 60.f;
+            int bar_height = std::clamp(int(normalized_mag * h), 0, h);
+            int bar_x = x + w * log10(freq / min_freq) / log10((m_sampleRate/2.f) / min_freq);
+            SDL_Rect bar = {bar_x, y + h - bar_height, 2, bar_height};
+            SDL_RenderFillRect(m_renderer, &bar);
+        }
+
+        drawGridLines(x, y, w, h);
+        
+        // Draw Nyquist line
+        int nyquist_x = x + w;
+        SDL_SetRenderDrawColor(m_renderer, 255, 0, 0, 255);
+        SDL_RenderDrawLine(m_renderer, nyquist_x, y, nyquist_x, y + h);
+
+        SDL_SetRenderDrawColor(m_renderer, 100, 100, 100, 255);
+        SDL_RenderDrawRect(m_renderer, &bg);
+
+#ifdef HAS_SDL2_TTF
+        if (m_font) {
+            renderText("Spectrum Analysis", x, y - 25, {255, 255, 255, 255});
+            renderText("Nyquist", nyquist_x - 50, y + h + 5, {255, 0, 0, 255});
+            for (int i = 0; i <= 6; ++i) {
+                 renderText(std::to_string(-i * 10) + "dB", x - 40, y + i * h / 6 - 8, {255, 255, 255, 255});
+            }
+            for (float freq = 100.f; freq < m_sampleRate/2.f; freq *= 2) {
+                int line_x = x + w * log10(freq / min_freq) / log10((m_sampleRate/2.f) / min_freq);
+                renderText(std::to_string(int(freq)), line_x - 15, y + h + 5, {255,255,255,255});
+            }
+        }
+#endif
+    }
+
     void drawGridLines(int x, int y, int w, int h) {
         SDL_SetRenderDrawColor(m_renderer, 50, 50, 50, 255);
         for (int i = 1; i < 4; ++i) SDL_RenderDrawLine(m_renderer, x, y + i*h/4, x + w, y + i*h/4);
@@ -254,7 +363,6 @@ private:
             SDL_SetRenderDrawColor(m_renderer, 0, 100, 200, 255);
             SDL_RenderFillRect(m_renderer, &fill);
 
-            // Draw center line for bipolar controls
             if (c.min < 0) {
                 int centerX = c.rect.x + c.rect.w / 2;
                 SDL_SetRenderDrawColor(m_renderer, 255, 255, 255, 255);
@@ -276,11 +384,22 @@ private:
     void drawInfo() {
 #ifdef HAS_SDL2_TTF
         if (m_font) {
-            int y = 400;
+            int y = 600;
             renderText("Shape: " + std::string(Curve::name(m_selectedShape)), 20, y, {255,255,255,255}); y+=20;
             renderText("Voltage Range: " + std::string(voltageRangeName(m_params.range)) + " (L to change)", 20, y, {255,255,255,255}); y+=20;
             renderText("Controls: R-reset, S-var, I-inv, 1-8-shapes", 20, y, {255,255,255,255}); y+=20;
-            renderText("Sample Rate: " + std::to_string(m_sampleRate) + "Hz (Z-M)", 20, y, {255,255,255,255});
+            renderText("Sample Rate: " + std::to_string(m_sampleRate) + "Hz (Z-M)", 20, y, {255,255,255,255}); y+=20;
+            
+            y+=20;
+            renderText("Spectrum Source (A,D,F,G,H):", 20, y, {255,255,255,255}); y+=20;
+            const char* sourceNames[] = {"Input", "Post Wavefolder", "Post Filter", "Post Compensation", "Final Output"};
+            for(int i = 0; i < int(SpectrumSource::Last); ++i) {
+                SDL_Color color = (i == int(m_selectedSpectrumSource)) ? SDL_Color{255, 255, 0, 255} : SDL_Color{255, 255, 255, 255};
+                renderText(sourceNames[i], 40 + i * 150, y, color);
+            }
+
+            y+=40;
+            renderText("Advanced Controls (Q/W, E/T, ...):", 20, y, {255,255,255,255});
         }
 #endif
     }
@@ -300,7 +419,7 @@ private:
     TTF_Font* m_font;
 #endif
     bool m_running;
-    CurveProcessor m_processor;
+    CurveProcessor m_processor{2048};
     CurveProcessor::Parameters m_params;
     CurveProcessor::SignalData m_signalData;
     std::vector<Control> m_controls;
@@ -308,6 +427,7 @@ private:
     bool m_shapeVariation, m_invert;
     float m_min, m_max;
     int m_sampleRate = 48000;
+    SpectrumSource m_selectedSpectrumSource;
     void updateSampleRate(int newRate) { if (newRate >= 500 && newRate <= 192000) m_sampleRate = newRate; }
 };
 

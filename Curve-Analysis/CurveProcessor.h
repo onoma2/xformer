@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Curve.h"
+#include "dj_fft.h"
 #include <vector>
 #include <cmath>
 #include <cstdint>
@@ -28,9 +29,30 @@ struct VoltageRangeInfo {
 const VoltageRangeInfo& voltageRangeInfo(VoltageRange range);
 const char* voltageRangeName(VoltageRange range);
 
+enum class SpectrumSource {
+    Input,
+    PostWavefolder,
+    PostFilter,
+    PostCompensation,
+    FinalOutput,
+    Last
+};
 
 class CurveProcessor {
 public:
+    struct AdvancedParameters {
+        float foldAmount = 8.0f;
+        float hpfCurve = 0.85f;
+        float resonanceGain = 1.5f;
+        float resonanceTame = 0.8f;
+        float feedbackCurve = 1.0f;
+        float foldComp = 0.8f;
+        float lpfComp = 0.3f;
+        float hpfComp = 0.5f;
+        float resComp = 0.1f;
+        float maxComp = 2.5f;
+    };
+
     struct Parameters {
         float globalPhase = 0.0f;
         float wavefolderFold = 0.0f;
@@ -44,6 +66,8 @@ public:
         float max = 1.0f;
         Curve::Type shape = Curve::Type::Linear;
         VoltageRange range = VoltageRange::Bipolar5V;
+        SpectrumSource spectrumSource = SpectrumSource::FinalOutput;
+        AdvancedParameters advanced;
         bool shapeVariation = false;
         bool invert = false;
     };
@@ -55,6 +79,8 @@ public:
         std::vector<float> postFilter;     // Voltage
         std::vector<float> postCompensation; // Voltage
         std::vector<float> finalOutput;      // Voltage
+        std::vector<float> spectrum;
+        std::vector<float> spectrum_oversampled;
     };
 
     CurveProcessor(int bufferSize = 1024);

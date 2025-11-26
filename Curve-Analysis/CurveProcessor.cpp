@@ -4,6 +4,25 @@
 #include <algorithm>
 #include <vector>
 
+// Helper function to compute spectrum
+static std::vector<float> computeSpectrum(const std::vector<float>& signal, bool window) {
+    (void)window; // TODO: add windowing
+    int size = signal.size();
+    dj::fft_arg<float> fft_data(size);
+    for(int i = 0; i < size; ++i) {
+        fft_data[i] = {signal[i], 0.0f};
+    }
+
+    auto fft_result = dj::fft1d(fft_data, dj::fft_dir::DIR_FWD);
+
+    std::vector<float> spectrum(size / 2);
+    for(int i = 0; i < size / 2; ++i) {
+        float mag = std::abs(fft_result[i]);
+        spectrum[i] = 20.0f * log10(mag + 1e-6);
+    }
+    return spectrum;
+}
+
 static const VoltageRangeInfo voltageRangeInfos[] = {
     [int(VoltageRange::Unipolar1V)]  = { 0.f, 1.f },
     [int(VoltageRange::Unipolar2V)]  = { 0.f, 2.f },
@@ -39,30 +58,32 @@ const char* voltageRangeName(VoltageRange range) {
 
 
 // Convert linear feedback value to logarithmic scale for smoother control
-static float linearToLogarithmicFeedback(float linearValue) {
+static float linearToLogarithmicFeedback(float linearValue, const CurveProcessor::AdvancedParameters& advanced) {
     if (linearValue <= 0.0f) return 0.0f;
     if (linearValue >= 1.0f) return 1.0f;
-    return log10f(linearValue * 9.0f + 1.0f) / log10f(10.0f);
+    // The curve is controlled by feedbackCurve, where 1.0 is the default log curve
+    float curve = 1.0f + (advanced.feedbackCurve - 1.0f) * 9.0f;
+    return log10f(linearValue * curve + 1.0f) / log10f(curve + 1.0f);
 }
 
-static float applyDjFilter(float input, float &lpfState, float control, float resonance) {
+static float applyDjFilter(float input, float &lpfState, float control, float resonance, const CurveProcessor::AdvancedParameters& advanced) {
     if (control > -0.02f && control < 0.02f) return input;
-    float alpha = (control < 0.f) ? 1.f - std::abs(control) : 0.1f + std::abs(control) * 0.85f;
+    float alpha = (control < 0.f) ? 1.f - std::abs(control) : 0.1f + std::abs(control) * advanced.hpfCurve;
     alpha = std::clamp(alpha * alpha, 0.005f, 0.95f);
-    float logResonance = linearToLogarithmicFeedback(resonance);
-    if (std::abs(control) > 0.7f) logResonance *= (1.0f - (std::abs(control) - 0.7f) * 0.8f);
-    float feedback = logResonance * 1.5f;
+    float logResonance = linearToLogarithmicFeedback(resonance, advanced);
+    if (std::abs(control) > 0.7f) logResonance *= (1.0f - (std::abs(control) - 0.7f) * advanced.resonanceTame);
+    float feedback = logResonance * advanced.resonanceGain;
     float feedback_input = input - lpfState * feedback;
     lpfState = lpfState + alpha * (feedback_input - lpfState);
     lpfState = std::max(-6.0f, std::min(6.0f, lpfState));
     return (control < 0.f) ? lpfState : input - lpfState;
 }
 
-static float applyWavefolder(float input, float fold, float gain, float symmetry) {
+static float applyWavefolder(float input, float fold, float gain, float symmetry, const CurveProcessor::AdvancedParameters& advanced) {
     float bipolar_input = (input * 2.f) - 1.f;
     float biased_input = bipolar_input + symmetry;
     float gained_input = biased_input * gain;
-    float fold_count = 1.f + fold * 8.f;
+    float fold_count = 1.f + fold * advanced.foldAmount;
     float folded_output = sinf(gained_input * float(M_PI) * fold_count);
     return (folded_output + 1.f) * 0.5f;
 }
@@ -74,65 +95,55 @@ static float applyLfoLimiting(float input, float resonance) {
     return std::max(-maxThreshold, std::min(maxThreshold, input));
 }
 
-static float calculateAmplitudeCompensation(float fold, float filterControl, float filterResonance) {
+static float calculateAmplitudeCompensation(float fold, float filterControl, float filterResonance, const CurveProcessor::AdvancedParameters& advanced) {
     if (fold < 0.01f) return 1.0f;
-    float foldCompensation = 1.0f + (fold * 0.8f);
+    float foldCompensation = 1.0f + (fold * advanced.foldComp);
     float filterCompensation = 1.0f;
     if (filterControl < 0.0f) {
-        filterCompensation = 1.0f + (std::abs(filterControl) * 0.3f);
+        filterCompensation = 1.0f + (std::abs(filterControl) * advanced.lpfComp);
     } else if (filterControl > 0.0f) {
-        filterCompensation = 1.0f + (filterControl * 0.5f);
+        filterCompensation = 1.0f + (filterControl * advanced.hpfComp);
     }
-    float resonanceCompensation = 1.0f + (filterResonance * 0.1f);
+    float resonanceCompensation = 1.0f + (filterResonance * advanced.resComp);
     float compensation = foldCompensation * filterCompensation * resonanceCompensation;
-    return std::clamp(compensation, 1.0f, 2.5f);
+    return std::clamp(compensation, 1.0f, advanced.maxComp);
 }
 
 CurveProcessor::CurveProcessor(int bufferSize) : _bufferSize(bufferSize), _lpfState(0.0f), _feedbackState(0.0f) {}
 
-CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Parameters& params, int sampleRate) {
-    SignalData data;
-    data.originalSignal.resize(_bufferSize);
-    data.phasedSignal.resize(_bufferSize);
-    data.postWavefolder.resize(_bufferSize);
-    data.postFilter.resize(_bufferSize);
-    data.postCompensation.resize(_bufferSize);
-    data.finalOutput.resize(_bufferSize);
-
+static void process_once(const CurveProcessor::Parameters& params, CurveProcessor::SignalData& data, int size, float& lpfState, float& feedbackState) {
     const auto& range = voltageRangeInfo(params.range);
-    float phaseOffset = params.globalPhase * _bufferSize;
     auto curveFunc = Curve::function(params.shape);
 
-    for (int i = 0; i < _bufferSize; ++i) {
-        float fraction = fmod((float(i) + phaseOffset) / _bufferSize, 1.0f);
+    for (int i = 0; i < size; ++i) {
+        float fraction = fmod((float(i) + params.globalPhase * size) / size, 1.0f);
         if (fraction < 0) fraction += 1.0f;
 
         float value = curveFunc(fraction);
         if (params.invert) value = 1.f - value;
         float normalizedValue = params.min + value * (params.max - params.min);
 
-        data.originalSignal[i] = normalizedValue;
-        data.phasedSignal[i] = normalizedValue;
+        if (i < data.originalSignal.size()) data.originalSignal[i] = normalizedValue;
 
         float originalVoltage = range.denormalize(normalizedValue);
 
         float folderInput = normalizedValue;
         if (params.wavefolderFold > 0.0f) {
-            float logShaperFeedback = linearToLogarithmicFeedback(params.foldF);
-            folderInput += _feedbackState * logShaperFeedback;
+            float logShaperFeedback = linearToLogarithmicFeedback(params.foldF, params.advanced);
+            folderInput += feedbackState * logShaperFeedback;
             float gain = 1.0f + (params.wavefolderGain * 2.0f);
-            folderInput = applyWavefolder(folderInput, params.wavefolderFold * params.wavefolderFold, gain, params.wavefolderSymmetry);
+            folderInput = applyWavefolder(folderInput, params.wavefolderFold * params.wavefolderFold, gain, params.wavefolderSymmetry, params.advanced);
         }
-        data.postWavefolder[i] = folderInput;
+        if (i < data.postWavefolder.size()) data.postWavefolder[i] = folderInput;
 
         float voltage = range.denormalize(folderInput);
-        data.postFilter[i] = applyDjFilter(voltage, _lpfState, params.djFilter, params.filterF);
+        if (i < data.postFilter.size()) data.postFilter[i] = applyDjFilter(voltage, lpfState, params.djFilter, params.filterF, params.advanced);
 
         float compensatedVoltage = data.postFilter[i];
         if (params.djFilter < -0.02f || params.djFilter > 0.02f) {
-            compensatedVoltage *= calculateAmplitudeCompensation(params.wavefolderFold, params.djFilter, params.filterF);
+            compensatedVoltage *= calculateAmplitudeCompensation(params.wavefolderFold, params.djFilter, params.filterF, params.advanced);
         }
-        data.postCompensation[i] = compensatedVoltage;
+        if (i < data.postCompensation.size()) data.postCompensation[i] = compensatedVoltage;
         
         float processedSignal = compensatedVoltage;
         
@@ -140,10 +151,60 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
         
         processedSignal = applyLfoLimiting(processedSignal, params.filterF);
         
-        _feedbackState = std::max(-4.0f, std::min(4.0f, processedSignal));
+        feedbackState = std::max(-4.0f, std::min(4.0f, processedSignal));
         
-        data.finalOutput[i] = std::max(-5.0f, std::min(5.0f, voltage));
+        if (i < data.finalOutput.size()) data.finalOutput[i] = std::max(-5.0f, std::min(5.0f, voltage));
     }
+}
+
+
+CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Parameters& params, int sampleRate) {
+    (void)sampleRate;
+    SignalData data;
+    
+    // Process at normal sample rate
+    data.originalSignal.resize(_bufferSize);
+    data.phasedSignal.resize(_bufferSize); // Not used anymore, but let's keep it for now
+    data.postWavefolder.resize(_bufferSize);
+    data.postFilter.resize(_bufferSize);
+    data.postCompensation.resize(_bufferSize);
+    data.finalOutput.resize(_bufferSize);
+    process_once(params, data, _bufferSize, _lpfState, _feedbackState);
+
+    // Compute spectrum
+    const std::vector<float>* source_vector = nullptr;
+    switch (params.spectrumSource) {
+        case SpectrumSource::Input: source_vector = &data.originalSignal; break;
+        case SpectrumSource::PostWavefolder: source_vector = &data.postWavefolder; break;
+        case SpectrumSource::PostFilter: source_vector = &data.postFilter; break;
+        case SpectrumSource::PostCompensation: source_vector = &data.postCompensation; break;
+        case SpectrumSource::FinalOutput: source_vector = &data.finalOutput; break;
+        default: source_vector = &data.finalOutput; break;
+    }
+    data.spectrum = computeSpectrum(*source_vector, true);
+
+    // Process at 2x oversample rate for aliasing analysis
+    int oversample_size = _bufferSize * 2;
+    SignalData oversample_data;
+    oversample_data.originalSignal.resize(oversample_size);
+    oversample_data.postWavefolder.resize(oversample_size);
+    oversample_data.postFilter.resize(oversample_size);
+    oversample_data.postCompensation.resize(oversample_size);
+    oversample_data.finalOutput.resize(oversample_size);
+    float oversample_lpfState = 0.f;
+    float oversample_feedbackState = 0.f;
+    process_once(params, oversample_data, oversample_size, oversample_lpfState, oversample_feedbackState);
+
+    const std::vector<float>* oversample_source_vector = nullptr;
+    switch (params.spectrumSource) {
+        case SpectrumSource::Input: oversample_source_vector = &oversample_data.originalSignal; break;
+        case SpectrumSource::PostWavefolder: oversample_source_vector = &oversample_data.postWavefolder; break;
+        case SpectrumSource::PostFilter: oversample_source_vector = &oversample_data.postFilter; break;
+        case SpectrumSource::PostCompensation: oversample_source_vector = &oversample_data.postCompensation; break;
+        case SpectrumSource::FinalOutput: oversample_source_vector = &oversample_data.finalOutput; break;
+        default: oversample_source_vector = &oversample_data.finalOutput; break;
+    }
+    data.spectrum_oversampled = computeSpectrum(*oversample_source_vector, true);
 
     return data;
 }
