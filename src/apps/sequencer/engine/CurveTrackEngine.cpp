@@ -382,6 +382,9 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
 
         float value = evalStepShape(step, _shapeVariation || fillVariation, fillInvert, lookupFraction);
 
+        // Store original phased value before processing for crossfading
+        float originalValue = range.denormalize(value);
+
         // 2. Get wavefolder and feedback parameters
         float fold = _curveTrack.wavefolderFold();
         float shaperFeedback = _curveTrack.foldF();
@@ -394,7 +397,7 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
             folderInput = value + _feedbackState * logShaperFeedback;
         }
 
-        // 4. Apply wavefolder if enabled
+        // 5. Apply wavefolder if enabled
         if (fold > 0.f) {
             float uiGain = _curveTrack.wavefolderGain();
             // Map UI gain from 0.0-2.0 to internal gain range 1.0-5.0
@@ -406,10 +409,10 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
             folderInput = applyWavefolder(folderInput, fold_exp, gain, symmetry);
         }
 
-        // 5. Denormalize to voltage
+        // 6. Denormalize to voltage
         float voltage = range.denormalize(folderInput);
 
-        // 6. Apply DJ Filter
+        // 7. Apply DJ Filter
         float filterControl = _curveTrack.djFilter();
         float filterResonance = _curveTrack.filterF();
         // The filter is always active to calculate state, but only applied if control is not 0
@@ -422,14 +425,21 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
             voltage *= compensation;
         }
 
-        // 7. Apply LFO-appropriate limiting to tame high resonance and ensure max 5V output
-        voltage = applyLfoLimiting(voltage, filterResonance);
+        // Store the processed signal (before crossfade) for feedback
+        float processedSignal = voltage;
 
-        // 8. Update feedback state for next tick (after compensation and limiting)
+        // 7. Apply crossfade between original phased shape and processed signal
+        float xFade = _curveTrack.xFade();
+        voltage = originalValue * (1.0f - xFade) + voltage * xFade;
+
+        // 8. Apply LFO-appropriate limiting to tame high resonance and ensure max 5V output
+        processedSignal = applyLfoLimiting(processedSignal, filterResonance);
+
+        // 9. Update feedback state for next tick (from processed signal before crossfading)
         // Apply additional limiting to feedback state to prevent runaway feedback
-        _feedbackState = std::max(-4.0f, std::min(4.0f, voltage)); // Keep feedback state within ±4V
+        _feedbackState = std::max(-4.0f, std::min(4.0f, processedSignal)); // Keep feedback state within ±4V
 
-        // 9. Apply final hard limiting to ensure output never exceeds ±5V
+        // 10. Apply final hard limiting to ensure output never exceeds ±5V
         _cvOutputTarget = std::max(-5.0f, std::min(5.0f, voltage));
     }
 

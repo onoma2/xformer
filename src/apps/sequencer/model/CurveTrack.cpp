@@ -39,6 +39,7 @@ void CurveTrack::clear() {
     setDjFilter(0.f);
     setFoldF(0.f);
     setFilterF(0.f);
+    setXFade(1.f);  // Start with fully processed signal
 
     for (auto &sequence : _sequences) {
         sequence.clear();
@@ -61,6 +62,7 @@ void CurveTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_djFilter);
     writer.write(_foldF);
     writer.write(_filterF);
+    writer.write(_xFade);
     writeArray(writer, _sequences);
 }
 
@@ -105,6 +107,11 @@ void CurveTrack::read(VersionedSerializedReader &reader) {
     } else {
         setFoldF(0.f);
         setFilterF(0.f);
+    }
+    if (reader.dataVersion() >= ProjectVersion::Version46) {
+        reader.read(_xFade);
+    } else {
+        setXFade(1.f);  // Default to fully processed signal for older projects
     }
     readArray(reader, _sequences);
 }

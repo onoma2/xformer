@@ -249,6 +249,12 @@ public:
     void editFilterF(int value, bool shift) { setFilterF(filterF() + value * (shift ? 0.1f : 0.01f)); }
     void printFilterF(StringBuilder &str) const { str("%.2f", filterF()); }
 
+    // xFade
+    float xFade() const { return _xFade; }
+    void setXFade(float value) { _xFade = clamp(value, 0.f, 1.f); }
+    void editXFade(int value, bool shift) { setXFade(xFade() + value * (shift ? 0.1f : 0.01f)); }
+    void printXFade(StringBuilder &str) const { str("%.2f", xFade()); }
+
     // sequences
 
     const CurveSequenceArray &sequences() const { return _sequences; }
@@ -311,6 +317,7 @@ private:
     float _djFilter;
     float _foldF;
     float _filterF;
+    float _xFade;
 
     CurveSequenceArray _sequences;
 

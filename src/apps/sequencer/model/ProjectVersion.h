@@ -120,6 +120,9 @@ enum ProjectVersion {
     // added CurveTrack feedback parameters
     Version45 = 45,
 
+    // added CurveTrack xFade parameter
+    Version46 = 46,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

@@ -175,10 +175,7 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
                 break;
             case 1: // GAIN
                 value = track.wavefolderGain();
-                max = 5.f;
-                // Treat as 0-4 for bar
-                value = value - 1.f;
-                max = max - 1.f;
+                max = 2.f;  // New range is 0.0 to 2.0
                 track.printWavefolderGain(valueStr);
                 break;
             case 2: // SYMMETRY
@@ -226,7 +223,7 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
     } else if (_editMode == EditMode::Wavefolder2) {
         // Draw Wavefolder 2 UI
         WindowPainter::drawActiveFunction(canvas, "WAVEFOLDER 2");
-        const char *wavefolderFunctionNames[5] = { "FOLD-F", "FILTER-F", "", "", "BACK" };
+        const char *wavefolderFunctionNames[5] = { "FOLD-F", "FILTER-F", "XFADE", "", "BACK" };
         WindowPainter::drawFooter(canvas, wavefolderFunctionNames, pageKeyState(), _wavefolderRow);
 
         const int colWidth = 51;
@@ -235,7 +232,7 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
         const int barHeight = 4;
         const int barWidth = 40;
 
-        for (int i = 0; i < 2; ++i) { // Only 2 parameters for now
+        for (int i = 0; i < 3; ++i) { // 3 parameters: Fold-F, Filter-F, xFade
             int x = i * colWidth;
             int barX = x + (colWidth - barWidth) / 2;
 
@@ -255,6 +252,12 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
                 max = 1.f;
                 bipolar = false; // Filter resonance is 0-1
                 track.printFilterF(valueStr);
+                break;
+            case 2: // XFADE
+                value = track.xFade();
+                max = 1.f;
+                bipolar = false; // xFade is 0-1 (original to processed)
+                track.printXFade(valueStr);
                 break;
             }
 
@@ -529,7 +532,7 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
             }
         } else if (_editMode == EditMode::Wavefolder2) {
             int function = key.function();
-            if (function >= 0 && function < 2) { // Only F1 and F2 for these 2 parameters
+            if (function >= 0 && function < 3) { // F1, F2, F3 for Fold-F, Filter-F, xFade
                 _wavefolderRow = function;
                 event.consume();
                 return;
@@ -583,11 +586,12 @@ void CurveSequenceEditPage::encoder(EncoderEvent &event) {
         return;
     case EditMode::Wavefolder2:
         if (event.pressed()) {
-            _wavefolderRow = clamp(_wavefolderRow + event.value(), 0, 1);
+            _wavefolderRow = clamp(_wavefolderRow + event.value(), 0, 2);
         } else {
             switch (_wavefolderRow) {
             case 0: track.editFoldF(event.value(), shift); break;
             case 1: track.editFilterF(event.value(), shift); break;
+            case 2: track.editXFade(event.value(), shift); break;
             }
         }
         event.consume();
