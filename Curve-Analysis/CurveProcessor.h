@@ -51,6 +51,9 @@ public:
         float hpfComp = 0.5f;
         float resComp = 0.1f;
         float maxComp = 2.5f;
+        float lfoLimiterAmount = 3.0f;
+        float lfoLimiterMin = 0.5f;
+        float feedbackLimit = 4.0f;
     };
 
     struct Parameters {

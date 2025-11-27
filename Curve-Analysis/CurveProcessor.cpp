@@ -88,10 +88,10 @@ static float applyWavefolder(float input, float fold, float gain, float symmetry
     return (folded_output + 1.f) * 0.5f;
 }
 
-static float applyLfoLimiting(float input, float resonance) {
-    float threshold = 5.0f - (resonance * 3.0f);
+static float applyLfoLimiting(float input, float resonance, const CurveProcessor::AdvancedParameters& advanced) {
+    float threshold = 5.0f - (resonance * advanced.lfoLimiterAmount);
     float maxThreshold = 5.0f;
-    threshold = std::max(0.5f, std::min(threshold, maxThreshold));
+    threshold = std::max(advanced.lfoLimiterMin, std::min(threshold, maxThreshold));
     return std::max(-maxThreshold, std::min(maxThreshold, input));
 }
 
@@ -134,25 +134,28 @@ static void process_once(const CurveProcessor::Parameters& params, CurveProcesso
             float gain = 1.0f + (params.wavefolderGain * 2.0f);
             folderInput = applyWavefolder(folderInput, params.wavefolderFold * params.wavefolderFold, gain, params.wavefolderSymmetry, params.advanced);
         }
-        if (i < data.postWavefolder.size()) data.postWavefolder[i] = folderInput;
+        if (i < data.postWavefolder.size()) data.postWavefolder[i] = std::max(0.0f, std::min(1.0f, folderInput));
 
         float voltage = range.denormalize(folderInput);
-        if (i < data.postFilter.size()) data.postFilter[i] = applyDjFilter(voltage, lpfState, params.djFilter, params.filterF, params.advanced);
+        if (i < data.postFilter.size()) data.postFilter[i] = std::max(-5.0f, std::min(5.0f, applyDjFilter(voltage, lpfState, params.djFilter, params.filterF, params.advanced)));
 
-        float compensatedVoltage = data.postFilter[i];
+        float uncompensatedVoltage = data.postFilter[i];
+        float compensatedVoltage = uncompensatedVoltage;
         if (params.djFilter < -0.02f || params.djFilter > 0.02f) {
             compensatedVoltage *= calculateAmplitudeCompensation(params.wavefolderFold, params.djFilter, params.filterF, params.advanced);
         }
-        if (i < data.postCompensation.size()) data.postCompensation[i] = compensatedVoltage;
-        
+        // For visualization purposes, clamp postCompensation to prevent extreme values in plots
+        if (i < data.postCompensation.size()) data.postCompensation[i] = std::max(-5.0f, std::min(5.0f, compensatedVoltage));
+
         float processedSignal = compensatedVoltage;
-        
+
         voltage = originalVoltage * (1.0f - params.xFade) + compensatedVoltage * params.xFade;
-        
-        processedSignal = applyLfoLimiting(processedSignal, params.filterF);
-        
-        feedbackState = std::max(-4.0f, std::min(4.0f, processedSignal));
-        
+
+        // Apply LFO limiting to the crossfaded voltage (not just the compensated voltage)
+        voltage = applyLfoLimiting(voltage, params.filterF, params.advanced);
+
+        feedbackState = std::max(-params.advanced.feedbackLimit, std::min(params.advanced.feedbackLimit, processedSignal));
+
         if (i < data.finalOutput.size()) data.finalOutput[i] = std::max(-5.0f, std::min(5.0f, voltage));
     }
 }
