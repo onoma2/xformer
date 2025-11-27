@@ -73,6 +73,11 @@ public:
         AdvancedParameters advanced;
         bool shapeVariation = false;
         bool invert = false;
+
+        // Hardware simulation parameters
+        int dacResolutionBits = 16;        // PEW|FORMER uses 16-bit DAC (though effective resolution may vary)
+        float dacUpdateRate = 1.0f;        // Update interval in milliseconds (PEW|FORMER: 1.0ms for 1000Hz update rate)
+        float timingJitter = 0.0f;         // Timing inaccuracy in milliseconds (minimal in real hardware)
     };
 
     struct SignalData {
@@ -82,6 +87,7 @@ public:
         std::vector<float> postFilter;     // Voltage
         std::vector<float> postCompensation; // Voltage
         std::vector<float> finalOutput;      // Voltage
+        std::vector<float> hardwareLimitedOutput; // Voltage with hardware constraints applied
         std::vector<float> spectrum;
         std::vector<float> spectrum_oversampled;
     };

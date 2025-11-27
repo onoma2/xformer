@@ -145,6 +145,12 @@ private:
         m_controls.push_back({"LFO Limiter Amt", &m_params.advanced.lfoLimiterAmount, 0.0f, 5.0f, 0.1f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
         m_controls.push_back({"LFO Limiter Min", &m_params.advanced.lfoLimiterMin, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
         m_controls.push_back({"Feedback Limit", &m_params.advanced.feedbackLimit, 0.0f, 8.0f, 0.1f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
+
+        // Hardware limitation controls
+        y += 20;
+        m_controls.push_back({"DAC Resolution (bits)", (float*)&m_params.dacResolutionBits, 8.0f, 24.0f, 1.0f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"DAC Update Rate", &m_params.dacUpdateRate, 0.001f, 10.0f, 0.001f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;  // Update rate in ms (0.001ms to 10ms)
+        m_controls.push_back({"Timing Jitter (ms)", &m_params.timingJitter, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;  // Reduced jitter range
     }
 
     void resetControls() {
@@ -256,15 +262,22 @@ private:
         int y = 30;
         int spacing = 5;
 
-        // Update positions for main controls
+        // Update positions for main controls (first 10)
         for (int i = 0; i < 10; ++i) {  // First 10 are main controls
             m_controls[i].rect = {controlX, y, controlWidth, controlHeight};
             y += controlHeight + spacing;
         }
 
-        // Add space and update positions for advanced controls
+        // Update positions for advanced controls (next group)
         y += 20;
-        for (int i = 10; i < static_cast<int>(m_controls.size()); ++i) {
+        for (int i = 10; i < 23; ++i) { // Advanced controls from index 10 to 22
+            m_controls[i].rect = {controlX, y, controlWidth, controlHeight};
+            y += controlHeight + spacing;
+        }
+
+        // Update positions for hardware limitation controls (last 3)
+        y += 20;
+        for (int i = 23; i < static_cast<int>(m_controls.size()); ++i) {
             m_controls[i].rect = {controlX, y, controlWidth, controlHeight};
             y += controlHeight + spacing;
         }
@@ -316,98 +329,14 @@ private:
             {"Post Filter", &m_signalData.postFilter},
             {"Post Compensation", &m_signalData.postCompensation},
             {"Final Output", &m_signalData.finalOutput},
-            {"Time Budget Estimation", &m_signalData.finalOutput}  // Using final output but with time budget overlay
+            {"Hardware Limited Output", &m_signalData.hardwareLimitedOutput}  // With all hardware constraints applied
         };
-
-        // Create an estimated time budget visualization based on signal characteristics
-        std::vector<float> estimatedTimeBudget;
-        if (!m_signalData.finalOutput.empty()) {
-            estimatedTimeBudget.resize(m_signalData.finalOutput.size());
-            const auto& perf = m_processor.getPerformance();
-
-            // Estimate time budget based on signal characteristics
-            // More complex signals (rapid changes, extreme values) may consume more CPU time
-            for (size_t i = 0; i < m_signalData.finalOutput.size(); ++i) {
-                float value = m_signalData.finalOutput[i];
-                float complexity = 0.0f;
-
-                // Calculate signal complexity based on absolute value and rate of change
-                if (i > 0) {
-                    float rateOfChange = std::abs(m_signalData.finalOutput[i] - m_signalData.finalOutput[i-1]);
-                    complexity = rateOfChange * 50.0f;  // Amplify for visibility
-
-                    // Also consider absolute value (extreme values may require more processing)
-                    complexity += std::abs(value) * 0.1f;
-                }
-
-                // Normalize to a percentage of the total CPU usage
-                float estimatedUsage = perf.cpuUsagePercent + (complexity * perf.cpuUsagePercent / 100.0f);
-
-                // Cap it to the maximum possible usage
-                estimatedTimeBudget[i] = std::min(estimatedUsage, 100.0f);
-            }
-        }
 
         for (size_t i = 0; i < graphs.size(); ++i) {
             int row = i / 3, col = i % 3;
             int x = controlPanelWidth + margin + col * (graphWidth + margin);
             int y = topMargin + margin + row * (graphHeight + margin + 30);
             drawGraph(graphs[i].first, *graphs[i].second, i, x, y, graphWidth, graphHeight);
-
-            // For the time budget estimation plot, show a visualization of time consumption
-            if (i == 5) {  // Time budget estimation plot
-                const auto& perf = m_processor.getPerformance();
-
-                // Draw estimated time budget as a waveform representing processing load variation
-                if (!estimatedTimeBudget.empty()) {
-                    SDL_SetRenderDrawColor(m_renderer, 100, 100, 255, 255); // Light blue for estimated time budget
-
-                    for (size_t j = 1; j < estimatedTimeBudget.size(); ++j) {
-                        float prevX = x + (j-1) * graphWidth / float(estimatedTimeBudget.size()-1);
-                        float currX = x + j * graphWidth / float(estimatedTimeBudget.size()-1);
-
-                        float prevY = y + graphHeight - (estimatedTimeBudget[j-1] * graphHeight / 100.0f);
-                        float currY = y + graphHeight - (estimatedTimeBudget[j] * graphHeight / 100.0f);
-
-                        SDL_RenderDrawLine(m_renderer, static_cast<int>(prevX), static_cast<int>(prevY),
-                                           static_cast<int>(currX), static_cast<int>(currY));
-                    }
-                }
-
-                // Draw a horizontal line representing the 100% time budget threshold (at bottom)
-                SDL_SetRenderDrawColor(m_renderer, 255, 0, 0, 255);  // Red line
-                SDL_RenderDrawLine(m_renderer, x, y + graphHeight, x + graphWidth, y + graphHeight);
-
-                // Draw another line representing the average CPU usage
-                int avgUsageY = y + graphHeight - static_cast<int>(perf.cpuUsagePercent * graphHeight / 100.0f);
-                SDL_SetRenderDrawColor(m_renderer, 0, 255, 0, 255);  // Green line
-                SDL_RenderDrawLine(m_renderer, x, avgUsageY, x + graphWidth, avgUsageY);
-
-                // Draw a warning area if the average CPU usage is high
-                if (perf.cpuUsagePercent > 95.0f) {
-                    SDL_SetRenderDrawColor(m_renderer, 255, 0, 0, 100);  // Red with transparency
-                    SDL_Rect warningRect = {x, avgUsageY, graphWidth, y + graphHeight - avgUsageY};
-                    SDL_RenderFillRect(m_renderer, &warningRect);
-                } else if (perf.cpuUsagePercent > 80.0f) {
-                    SDL_SetRenderDrawColor(m_renderer, 255, 255, 0, 100);  // Yellow with transparency
-                    SDL_Rect warningRect = {x, avgUsageY, graphWidth, y + graphHeight - avgUsageY};
-                    SDL_RenderFillRect(m_renderer, &warningRect);
-                }
-
-                // Add text label for the lines
-                SDL_SetRenderDrawColor(m_renderer, 255, 255, 255, 255);
-#ifdef HAS_SDL2_TTF
-                if (m_font) {
-                    char label[64];
-                    snprintf(label, sizeof(label), "%.1f%% Avg CPU", perf.cpuUsagePercent);
-                    renderText(label, x + 5, avgUsageY - 15, {0, 255, 0, 255});
-                    renderText("100% Budget", x + 5, y + graphHeight - 15, {255, 0, 0, 255});
-
-                    // Add a label explaining the visualization
-                    renderText("Est. Processing Load", x + 5, y + 5, {100, 100, 255, 255});
-                }
-#endif
-            }
         }
     }
 

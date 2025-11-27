@@ -66,6 +66,41 @@ static float linearToLogarithmicFeedback(float linearValue, const CurveProcessor
     return log10f(linearValue * curve + 1.0f) / log10f(curve + 1.0f);
 }
 
+// Apply hardware constraints to the signal
+static void applyHardwareConstraints(std::vector<float>& output, const CurveProcessor::Parameters& params, int sampleRate) {
+    if (output.empty()) return;
+
+    // Calculate DAC resolution constraints (quantization)
+    int maxDigitalValue = (1 << params.dacResolutionBits) - 1; // 2^bits - 1
+    float voltageRange = 10.0f; // Eurorack standard is typically ±5V = 10V total range
+    float quantizationStep = voltageRange / maxDigitalValue;
+
+    // For PEW|FORMER hardware, CV updates happen every 'dacUpdateRate' ms regardless of musical timing
+    // Calculate how many samples correspond to the specified update interval based on the sample rate
+    float samplesPerMs = sampleRate / 1000.0f;
+    int updateInterval = static_cast<int>(params.dacUpdateRate * samplesPerMs); // samples per update interval
+    if (updateInterval < 1) updateInterval = 1; // Ensure at least every sample
+
+    // Track the last valid value to use when skipping samples due to update rate
+    float lastValidValue = output[0];
+
+    for (size_t i = 0; i < output.size(); ++i) {
+        // Apply quantization (DAC resolution)
+        float quantizedValue = roundf(output[i] / quantizationStep) * quantizationStep;
+
+        // Apply update rate constraints (based on real hardware: updates every dacUpdateRate ms)
+        bool shouldUpdate = (i % updateInterval == 0);
+
+        if (shouldUpdate) {
+            output[i] = quantizedValue;
+            lastValidValue = quantizedValue;
+        } else {
+            // Use the last valid value when update is skipped
+            output[i] = lastValidValue;
+        }
+    }
+}
+
 static float applyDjFilter(float input, float &lpfState, float control, float resonance, const CurveProcessor::AdvancedParameters& advanced) {
     if (control > -0.02f && control < 0.02f) return input;
     float alpha = (control < 0.f) ? 1.f - std::abs(control) : 0.1f + std::abs(control) * advanced.hpfCurve;
@@ -214,6 +249,12 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
         default: oversample_source_vector = &oversample_data.finalOutput; break;
     }
     data.spectrum_oversampled = computeSpectrum(*oversample_source_vector, true);
+
+    // Create a copy of the final output for hardware constraint simulation
+    data.hardwareLimitedOutput = data.finalOutput;
+
+    // Apply hardware constraints to create the limited output
+    applyHardwareConstraints(data.hardwareLimitedOutput, params, sampleRate);
 
     // End timing and calculate performance metrics
     auto end = std::chrono::high_resolution_clock::now();
