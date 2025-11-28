@@ -74,12 +74,28 @@ public:
         float filterF = 0.0f;
         float foldF = 0.0f;
         
+        // Enable Flags
+        bool enableWavefolder = true; // Core PER|FORMER feature
+        bool enableDjFilter = true;   // Core PER|FORMER feature
+        bool enablePostFilterCompensation = true; // Core PER|FORMER feature (Gain Compensation)
+        bool enablePhaseSkew = false; // New feature
+        bool enablePhaseMirror = false; // New feature
+        bool enableShapeToWavefolderFold = false; // New feature
+        bool enableFoldToFilterFreq = false;      // New feature
+        bool enableFilterToWavefolderFold = false;// New feature
+        bool enableShapeToPhaseSkew = false;      // New feature
+        bool enableFilterToPhaseSkew = false;     // New feature
+        bool enableShapeToPhaseMirror = false;    // New feature
+
         // New Feedback Routing Parameters (Bipolar -1.0 to 1.0)
         float shapeToWavefolderFold = 0.0f; // Original Shape -> Wavefolder Fold
         float foldToFilterFreq = 0.0f;  // Fold Output -> Filter Frequency
         float filterToWavefolderFold = 0.0f;// Filter Output -> Wavefolder Fold
         float shapeToPhaseSkew = 0.0f;  // Original Shape -> Phase Skew
         float filterToPhaseSkew = 0.0f; // Filter Output -> Phase Skew
+        float shapeToPhaseMirror = 0.0f; // Original Shape -> Phase Mirror
+
+        float phaseMirror = 0.0f; // Phase Mirror Point (0.0 to 1.0)
 
         FilterSlope filterSlope = FilterSlope::dB6;
         float filterSlopeFloatProxy = 0.0f; // Proxy for UI
@@ -105,6 +121,7 @@ public:
         std::vector<float> originalSignal; // 0-1
         std::vector<float> phasedSignal;   // 0-1, this is the original signal with phase offset
         std::vector<float> skewedPhase;    // 0-1, Visualizing the phase warp
+        std::vector<float> mirroredPhase;  // 0-1, Visualizing the phase reflection
         std::vector<float> postWavefolder; // 0-1
         std::vector<float> postFilter;     // Voltage
         std::vector<float> postCompensation; // Voltage

@@ -189,14 +189,19 @@ static float calculateMaxSlewRate(const std::vector<float>& signal) {
 static int calculateAlgoComplexity(const CurveProcessor::Parameters& params) {
     int score = 1; // Base cost for phase/shape generation
     
+    // Phase Skew cost
+    if (params.enablePhaseSkew || params.shapeToPhaseSkew != 0.0f || params.filterToPhaseSkew != 0.0f) {
+        score += 2; // powf is not super cheap
+    }
+
     // Wavefolder cost (expensive sin/cos)
-    if (params.wavefolderFold > 0.0f) {
+    if (params.enableWavefolder && params.wavefolderFold > 0.0f) {
         score += 10; 
         if (params.foldF > 0.0f) score += 2; // Feedback adds complexity
     }
 
     // Filter cost (multiplications/state updates)
-    if (std::abs(params.djFilter) > 0.02f) {
+    if (params.enableDjFilter && std::abs(params.djFilter) > 0.02f) {
         int stages = 1;
         if (params.filterSlope == FilterSlope::dB12) stages = 2;
         if (params.filterSlope == FilterSlope::dB24) stages = 4;
@@ -205,11 +210,18 @@ static int calculateAlgoComplexity(const CurveProcessor::Parameters& params) {
     }
 
     // Compensation cost (logic + mults)
-    bool usingFold = params.wavefolderFold > 0.01f;
-    bool usingFilter = std::abs(params.djFilter) > 0.02f;
+    bool usingFold = params.enableWavefolder && params.wavefolderFold > 0.01f;
+    bool usingFilter = params.enableDjFilter && std::abs(params.djFilter) > 0.02f;
     if (usingFold || usingFilter) {
         score += 2;
     }
+
+    // Feedback paths also add small cost
+    if (params.enableShapeToWavefolderFold) score += 1;
+    if (params.enableFoldToFilterFreq) score += 1;
+    if (params.enableFilterToWavefolderFold) score += 1;
+    if (params.enableShapeToPhaseSkew) score += 1;
+    if (params.enableFilterToPhaseSkew) score += 1;
 
     return score;
 }
@@ -249,6 +261,53 @@ static float applyPhaseSkew(float phase, float skew) {
     return powf(phase, exponent);
 }
 
+static float applyPhaseMirror(float phase, float mirrorPoint) {
+    // Mirror point 0.0: Identity (0->1)
+    // Mirror point 0.5: Triangle (0->1->0) if input was 0->1
+    // Mirror point 1.0: Inverted Saw (1->0) if mapped correctly?
+    
+    // Actually, let's implement "Through Zero Reflection" logic.
+    // Map phase 0..1 based on mirror point.
+    // If mirrorPoint is 0, phase is 0..1
+    // If mirrorPoint is 1, phase is 1..0 (inverted)
+    // If mirrorPoint is 0.5, phase goes 0..1..0 (triangle)
+    
+    // Generalized:
+    // Divide cycle into two segments: 0 -> MirrorPoint (Rising), MirrorPoint -> 1 (Falling)
+    // We want output 0 -> 1 during Rising, and 1 -> 0 during Falling?
+    // No, that's just a triangle shaper.
+    
+    // Let's use a "Reflect" logic.
+    // Input phase P (0..1). Threshold M (0..1).
+    // If P < M: Output = P / M (Scales 0..M to 0..1)
+    // If P >= M: Output = (1 - P) / (1 - M) (Scales M..1 to 1..0) ??
+    
+    // Wait, standard phase mirroring usually means:
+    // If P > M, reflect back.
+    // Effective Phase = P
+    // If P > M: Effective Phase = M - (P - M) = 2M - P
+    
+    // Let's try a simple "Ping Pong" map.
+    // Mirror Point controls the "Turnaround" point in the cycle.
+    
+    // Actually, let's implement a standard "Variable Slope Triangle" from Phase.
+    // Skew does logarithmic bending. Mirror does Linear bending (Saw -> Tri -> Ramp).
+    
+    if (mirrorPoint <= 0.001f) return phase; // Saw
+    if (mirrorPoint >= 0.999f) return 1.0f - phase; // Inv Saw
+    
+    if (phase < (1.0f - mirrorPoint)) {
+        // Rising segment
+        return phase / (1.0f - mirrorPoint);
+    } else {
+        // Falling segment
+        return 1.0f - (phase - (1.0f - mirrorPoint)) / mirrorPoint;
+    }
+    // This maps Mirror=0 to Saw (0->1), Mirror=0.5 to Triangle (0->1->0), Mirror=1 to Inv Saw (1->0).
+    // Wait, checking bounds:
+    // If M=0.5. Split at 0.5. 0->0.5 maps to 0->1. 0.5->1 maps to 1->0. Correct.
+}
+
 static void process_once(const CurveProcessor::Parameters& params, CurveProcessor::SignalData& data, int size, std::vector<float>& lpfState, float& feedbackState) {
     const auto& range = voltageRangeInfo(params.range);
     auto curveFunc = Curve::function(params.shape);
@@ -260,33 +319,39 @@ static void process_once(const CurveProcessor::Parameters& params, CurveProcesso
         // Calculate Phase Skew (with Feedback)
         float dynamicSkew = params.phaseSkew;
         
-        // Feedback: Shape -> Skew (using previous sample's shape value would be ideal, but recursive is fine)
-        // We can use 'data.originalSignal[i-1]' if available, but for simplicity let's use feedbackState (processed)
-        // Or better, let's use the "previous loop's normalized value" concept. 
-        // Since this is a tight loop, we don't have easy access to "last frame's shape at this index".
-        // We will use 'feedbackState' (Filter Output) for the Filter->Skew path.
-        
-        if (std::abs(params.filterToPhaseSkew) > 0.001f) {
+        if (params.enableFilterToPhaseSkew) {
              float modSource = std::max(-1.0f, std::min(1.0f, feedbackState / 5.0f));
              dynamicSkew += modSource * params.filterToPhaseSkew;
         }
         
-        // Feedback: Shape -> Skew requires the shape itself. 
-        // We haven't calculated the shape yet! This creates a causality dilemma.
-        // Solution: Use the *unskewed* shape to modulate the skew of the *skewed* shape.
-        // It's a subtle but valid effect.
-        if (std::abs(params.shapeToPhaseSkew) > 0.001f) {
+        if (params.enableShapeToPhaseSkew) {
              float tempShape = curveFunc(fraction); // Unskewed shape
              dynamicSkew += (tempShape - 0.5f) * 2.0f * params.shapeToPhaseSkew;
         }
 
         dynamicSkew = std::max(-1.0f, std::min(1.0f, dynamicSkew));
         
-        // Apply Skew
-        float skewedFraction = applyPhaseSkew(fraction, dynamicSkew);
+        float skewedFraction = fraction;
+        if (params.enablePhaseSkew || std::abs(params.shapeToPhaseSkew) > 0.001f || std::abs(params.filterToPhaseSkew) > 0.001f) {
+            skewedFraction = applyPhaseSkew(fraction, dynamicSkew);
+        }
         if (i < data.skewedPhase.size()) data.skewedPhase[i] = skewedFraction;
 
-        float value = curveFunc(skewedFraction);
+        // Calculate Phase Mirror (with Feedback)
+        float dynamicMirror = params.phaseMirror;
+        if (params.enableShapeToPhaseMirror) {
+             float tempShape = curveFunc(skewedFraction); // Using skewed shape
+             dynamicMirror += (tempShape - 0.5f) * 2.0f * params.shapeToPhaseMirror;
+        }
+        dynamicMirror = std::max(0.0f, std::min(1.0f, dynamicMirror));
+
+        float mirroredFraction = skewedFraction;
+        if (params.enablePhaseMirror || std::abs(params.shapeToPhaseMirror) > 0.001f) {
+            mirroredFraction = applyPhaseMirror(skewedFraction, dynamicMirror);
+        }
+        if (i < data.mirroredPhase.size()) data.mirroredPhase[i] = mirroredFraction;
+
+        float value = curveFunc(mirroredFraction);
         if (params.invert) value = 1.f - value;
         float normalizedValue = params.min + value * (params.max - params.min);
 
@@ -295,52 +360,49 @@ static void process_once(const CurveProcessor::Parameters& params, CurveProcesso
         float originalVoltage = range.denormalize(normalizedValue);
 
         // 1. Shape -> Wavefolder Fold Feedback
-        // Modulates the 'wavefolderFold' parameter based on the original shape intensity
         float dynamicFold = params.wavefolderFold;
-        if (std::abs(params.shapeToWavefolderFold) > 0.001f) {
+        if (params.enableShapeToWavefolderFold) {
             dynamicFold += (normalizedValue - 0.5f) * 2.0f * params.shapeToWavefolderFold; // Bipolar modulation
             dynamicFold = std::max(0.0f, std::min(1.0f, dynamicFold));
         }
 
         // 3. Filter Output -> Wavefolder Fold Feedback (Uses previous sample's filter output)
-        // We use the previous loop's 'processedSignal' or 'uncompensatedVoltage' indirectly via a state variable if needed.
-        // But since we don't have sample-delay state for this specific path readily available in this simplified loop, 
-        // we can use the 'feedbackState' which captures the processed signal.
-        if (std::abs(params.filterToWavefolderFold) > 0.001f) {
-             // feedbackState is roughly the previous processed signal
-             // Normalize -5V..5V to -1..1 for modulation
+        if (params.enableFilterToWavefolderFold) {
              float modSource = std::max(-1.0f, std::min(1.0f, feedbackState / 5.0f));
              dynamicFold += modSource * params.filterToWavefolderFold;
              dynamicFold = std::max(0.0f, std::min(1.0f, dynamicFold));
         }
 
         float folderInput = normalizedValue;
-        if (dynamicFold > 0.0f) {
-            float logShaperFeedback = linearToLogarithmicFeedback(params.foldF, params.advanced);
-            folderInput += feedbackState * logShaperFeedback;
-            float gain = 1.0f + (params.wavefolderGain * 2.0f);
-            folderInput = applyWavefolder(folderInput, dynamicFold * dynamicFold, gain, params.wavefolderSymmetry, params.advanced);
+        if (params.enableWavefolder || std::abs(params.shapeToWavefolderFold) > 0.001f || std::abs(params.filterToWavefolderFold) > 0.001f) { // If wavefolder enabled OR any feedback to it is active
+            if (dynamicFold > 0.0f) { // Only fold if fold amount > 0
+                float logShaperFeedback = linearToLogarithmicFeedback(params.foldF, params.advanced);
+                folderInput += feedbackState * logShaperFeedback;
+                float gain = 1.0f + (params.wavefolderGain * 2.0f);
+                folderInput = applyWavefolder(folderInput, dynamicFold * dynamicFold, gain, params.wavefolderSymmetry, params.advanced);
+            }
         }
         if (i < data.postWavefolder.size()) data.postWavefolder[i] = std::max(0.0f, std::min(1.0f, folderInput));
 
         float voltage = range.denormalize(folderInput);
 
         // 2. Fold Output -> Filter Freq Feedback
-        // Modulates filter cutoff based on the wavefolder output
         float dynamicFilter = params.djFilter;
-        if (std::abs(params.foldToFilterFreq) > 0.001f) {
-            // folderInput is 0..1 (unipolar). Center it to -0.5..0.5 for modulation? Or use as is.
-            // Let's map 0..1 to -1..1 for full range bipolar modulation
+        if (params.enableFoldToFilterFreq) {
             float modSource = (folderInput - 0.5f) * 2.0f; 
             dynamicFilter += modSource * params.foldToFilterFreq;
             dynamicFilter = std::max(-1.0f, std::min(1.0f, dynamicFilter));
         }
 
-        if (i < data.postFilter.size()) data.postFilter[i] = std::max(-5.0f, std::min(5.0f, applyDjFilter(voltage, lpfState, dynamicFilter, params.filterF, params.filterSlope, params.advanced)));
+        if (params.enableDjFilter || std::abs(params.foldToFilterFreq) > 0.001f) { // If filter enabled OR feedback to it is active
+            if (i < data.postFilter.size()) data.postFilter[i] = std::max(-5.0f, std::min(5.0f, applyDjFilter(voltage, lpfState, dynamicFilter, params.filterF, params.filterSlope, params.advanced)));
+        } else {
+            if (i < data.postFilter.size()) data.postFilter[i] = voltage; // Bypass filter, pass voltage directly
+        }
 
         float uncompensatedVoltage = data.postFilter[i];
         float compensatedVoltage = uncompensatedVoltage;
-        if (dynamicFilter < -0.02f || dynamicFilter > 0.02f) {
+        if (params.enablePostFilterCompensation && (params.enableDjFilter || std::abs(params.foldToFilterFreq) > 0.001f) && (dynamicFilter < -0.02f || dynamicFilter > 0.02f)) {
             compensatedVoltage *= calculateAmplitudeCompensation(dynamicFold, dynamicFilter, params.filterF, params.advanced);
         }
         // For visualization purposes, clamp postCompensation to prevent extreme values in plots
@@ -373,7 +435,8 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
     // Process at normal sample rate
     data.originalSignal.resize(_bufferSize);
     data.phasedSignal.resize(_bufferSize); // Not used anymore, but let's keep it for now
-    data.skewedPhase.resize(_bufferSize);  // NEW: Visualizing the phase warp
+    data.skewedPhase.resize(_bufferSize);
+    data.mirroredPhase.resize(_bufferSize); // NEW
     data.postWavefolder.resize(_bufferSize);
     data.postFilter.resize(_bufferSize);
     data.postCompensation.resize(_bufferSize);
@@ -385,6 +448,7 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
     switch (params.spectrumSource) {
         case SpectrumSource::Input: source_vector = &data.originalSignal; break;
         case SpectrumSource::SkewedPhase: source_vector = &data.skewedPhase; break;
+        // case SpectrumSource::MirroredPhase: source_vector = &data.mirroredPhase; break; // TODO: Add to enum if needed
         case SpectrumSource::PostWavefolder: source_vector = &data.postWavefolder; break;
         case SpectrumSource::PostFilter: source_vector = &data.postFilter; break;
         case SpectrumSource::PostCompensation: source_vector = &data.postCompensation; break;
@@ -397,7 +461,8 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
     int oversample_size = _bufferSize * 2;
     SignalData oversample_data;
     oversample_data.originalSignal.resize(oversample_size);
-    oversample_data.skewedPhase.resize(oversample_size); // Resize oversampled buffer
+    oversample_data.skewedPhase.resize(oversample_size);
+    oversample_data.mirroredPhase.resize(oversample_size); // NEW
     oversample_data.postWavefolder.resize(oversample_size);
     oversample_data.postFilter.resize(oversample_size);
     oversample_data.postCompensation.resize(oversample_size);
@@ -410,6 +475,7 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
     switch (params.spectrumSource) {
         case SpectrumSource::Input: oversample_source_vector = &oversample_data.originalSignal; break;
         case SpectrumSource::SkewedPhase: oversample_source_vector = &oversample_data.skewedPhase; break;
+        // case SpectrumSource::MirroredPhase: oversample_source_vector = &oversample_data.mirroredPhase; break;
         case SpectrumSource::PostWavefolder: oversample_source_vector = &oversample_data.postWavefolder; break;
         case SpectrumSource::PostFilter: oversample_source_vector = &oversample_data.postFilter; break;
         case SpectrumSource::PostCompensation: oversample_source_vector = &oversample_data.postCompensation; break;
