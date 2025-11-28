@@ -31,10 +31,18 @@ const char* voltageRangeName(VoltageRange range);
 
 enum class SpectrumSource {
     Input,
+    SkewedPhase,
     PostWavefolder,
     PostFilter,
     PostCompensation,
     FinalOutput,
+    Last
+};
+
+enum class FilterSlope {
+    dB6,
+    dB12,
+    dB24,
     Last
 };
 
@@ -58,12 +66,23 @@ public:
 
     struct Parameters {
         float globalPhase = 0.0f;
+        float phaseSkew = 0.0f;         // Main Phase Skew (-1.0 to 1.0)
         float wavefolderFold = 0.0f;
         float wavefolderGain = 0.0f;
         float wavefolderSymmetry = 0.0f;
         float djFilter = 0.0f;
         float filterF = 0.0f;
         float foldF = 0.0f;
+        
+        // New Feedback Routing Parameters (Bipolar -1.0 to 1.0)
+        float shapeToWavefolderFold = 0.0f; // Original Shape -> Wavefolder Fold
+        float foldToFilterFreq = 0.0f;  // Fold Output -> Filter Frequency
+        float filterToWavefolderFold = 0.0f;// Filter Output -> Wavefolder Fold
+        float shapeToPhaseSkew = 0.0f;  // Original Shape -> Phase Skew
+        float filterToPhaseSkew = 0.0f; // Filter Output -> Phase Skew
+
+        FilterSlope filterSlope = FilterSlope::dB6;
+        float filterSlopeFloatProxy = 0.0f; // Proxy for UI
         float xFade = 1.0f;
         float min = 0.0f;
         float max = 1.0f;
@@ -79,11 +98,13 @@ public:
         float dacResolutionFloatProxy = 16.0f;  // Float proxy for UI control (matches dacResolutionBits)
         float dacUpdateRate = 1.0f;        // Update interval in milliseconds (PEW|FORMER: 1.0ms for 1000Hz update rate)
         float timingJitter = 0.0f;         // Timing inaccuracy in milliseconds (minimal in real hardware)
+        float frequency = 1.0f;            // LFO Frequency in Hz for simulation
     };
 
     struct SignalData {
         std::vector<float> originalSignal; // 0-1
         std::vector<float> phasedSignal;   // 0-1, this is the original signal with phase offset
+        std::vector<float> skewedPhase;    // 0-1, Visualizing the phase warp
         std::vector<float> postWavefolder; // 0-1
         std::vector<float> postFilter;     // Voltage
         std::vector<float> postCompensation; // Voltage
@@ -100,16 +121,33 @@ public:
         int sampleRate = 48000;          // The sample rate being used
     };
 
+    struct HardwareStats {
+        float maxSlewRate = 0.0f;       // Max voltage jump per step (Volts)
+        int algoComplexityScore = 0;    // Estimated CPU complexity score
+        float clippingPercent = 0.0f;   // Percentage of samples at rail limits
+    };
+
     CurveProcessor(int bufferSize = 1024);
     ~CurveProcessor() = default;
 
     SignalData process(const Parameters& params, int sampleRate = 48000);
     void resetStates();
     const PerformanceData& getPerformance() const { return m_performance; }
+    const HardwareStats& getHardwareStats() const { return m_hardwareStats; }
+    
+    // Get the latest hardware output value (useful for audio modulation)
+    float getCurrentHardwareOutput() const { 
+        if (m_hardwareStats.maxSlewRate == 0.0f && m_performance.processTimeMs == 0.0f) return 0.0f; // Not processed yet
+        // We can't easily access the last buffer here without storing it.
+        // Let's store the last calculated sample in a member variable during process()
+        return m_lastHardwareOutput;
+    }
 
 private:
     int _bufferSize;
-    float _lpfState;
+    std::vector<float> _lpfState;
     float _feedbackState;
+    float m_lastHardwareOutput = 0.0f;
     PerformanceData m_performance;
+    HardwareStats m_hardwareStats;
 };

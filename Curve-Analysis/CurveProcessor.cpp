@@ -68,6 +68,7 @@ static float linearToLogarithmicFeedback(float linearValue, const CurveProcessor
 
 // Apply hardware constraints to the signal
 static void applyHardwareConstraints(std::vector<float>& output, const CurveProcessor::Parameters& params, int sampleRate) {
+    (void)sampleRate; // unused in this simplified logic
     if (output.empty()) return;
 
     // Calculate DAC resolution constraints (quantization)
@@ -75,43 +76,73 @@ static void applyHardwareConstraints(std::vector<float>& output, const CurveProc
     float voltageRange = 10.0f; // Eurorack standard is typically ±5V = 10V total range
     float quantizationStep = voltageRange / maxDigitalValue;
 
-    // For PEW|FORMER hardware, CV updates happen every 'dacUpdateRate' ms regardless of musical timing
-    // Calculate how many samples correspond to the specified update interval based on the sample rate
-    float samplesPerMs = sampleRate / 1000.0f;
-    int updateInterval = static_cast<int>(params.dacUpdateRate * samplesPerMs); // samples per update interval
-    if (updateInterval < 1) updateInterval = 1; // Ensure at least every sample
+    // Calculate step size: How many buffer samples per hardware update?
+    // Buffer represents exactly 1 cycle.
+    // Period (ms) = 1000.0f / params.frequency
+    // Updates per period = Period / params.dacUpdateRate
+    // Samples per update = BufferSize / Updates per period
+    //                    = BufferSize / ( (1000.0f / params.frequency) / params.dacUpdateRate )
+    //                    = BufferSize * params.dacUpdateRate * params.frequency / 1000.0f;
+    
+    float samplesPerUpdate = output.size() * params.dacUpdateRate * params.frequency / 1000.0f;
+    
+    // If samplesPerUpdate < 1, hardware is faster than our buffer resolution -> No skipping
+    if (samplesPerUpdate < 1.0f) {
+        for (size_t i = 0; i < output.size(); ++i) {
+             output[i] = roundf(output[i] / quantizationStep) * quantizationStep;
+        }
+        return;
+    }
 
-    // Track the last valid value to use when skipping samples due to update rate
+    // Accumulator logic for sample-and-hold
+    float accumulator = samplesPerUpdate; // Start ready to update
     float lastValidValue = output[0];
 
     for (size_t i = 0; i < output.size(); ++i) {
-        // Apply quantization (DAC resolution)
-        float quantizedValue = roundf(output[i] / quantizationStep) * quantizationStep;
+        accumulator += 1.0f;
 
-        // Apply update rate constraints (based on real hardware: updates every dacUpdateRate ms)
-        bool shouldUpdate = (i % updateInterval == 0);
-
-        if (shouldUpdate) {
+        if (accumulator >= samplesPerUpdate) {
+            // Time to update
+            float quantizedValue = roundf(output[i] / quantizationStep) * quantizationStep;
             output[i] = quantizedValue;
             lastValidValue = quantizedValue;
+            accumulator -= samplesPerUpdate; // Keep remainder
         } else {
-            // Use the last valid value when update is skipped
+            // Hold previous value
             output[i] = lastValidValue;
         }
     }
 }
 
-static float applyDjFilter(float input, float &lpfState, float control, float resonance, const CurveProcessor::AdvancedParameters& advanced) {
+static float applyDjFilter(float input, std::vector<float>& states, float control, float resonance, FilterSlope slope, const CurveProcessor::AdvancedParameters& advanced) {
     if (control > -0.02f && control < 0.02f) return input;
+
+    // Determine number of poles (stages)
+    int stages = 1;
+    if (slope == FilterSlope::dB12) stages = 2;
+    else if (slope == FilterSlope::dB24) stages = 4;
+
+    // Ensure we have enough state variables
+    if (states.size() < (size_t)stages) states.resize(stages, 0.0f);
+
     float alpha = (control < 0.f) ? 1.f - std::abs(control) : 0.1f + std::abs(control) * advanced.hpfCurve;
     alpha = std::clamp(alpha * alpha, 0.005f, 0.95f);
     float logResonance = linearToLogarithmicFeedback(resonance, advanced);
     if (std::abs(control) > 0.7f) logResonance *= (1.0f - (std::abs(control) - 0.7f) * advanced.resonanceTame);
     float feedback = logResonance * advanced.resonanceGain;
-    float feedback_input = input - lpfState * feedback;
-    lpfState = lpfState + alpha * (feedback_input - lpfState);
-    lpfState = std::max(-6.0f, std::min(6.0f, lpfState));
-    return (control < 0.f) ? lpfState : input - lpfState;
+    
+    // Use first stage for feedback (or average?) - sticking to first stage to maintain character
+    float feedback_input = input - states[0] * feedback;
+
+    float currentInput = feedback_input;
+
+    for (int i = 0; i < stages; ++i) {
+        states[i] = states[i] + alpha * (currentInput - states[i]);
+        states[i] = std::max(-6.0f, std::min(6.0f, states[i]));
+        currentInput = states[i];
+    }
+
+    return (control < 0.f) ? currentInput : input - currentInput;
 }
 
 static float applyWavefolder(float input, float fold, float gain, float symmetry, const CurveProcessor::AdvancedParameters& advanced) {
@@ -144,9 +175,81 @@ static float calculateAmplitudeCompensation(float fold, float filterControl, flo
     return std::clamp(compensation, 1.0f, advanced.maxComp);
 }
 
-CurveProcessor::CurveProcessor(int bufferSize) : _bufferSize(bufferSize), _lpfState(0.0f), _feedbackState(0.0f) {}
+// Hardware Analysis Helpers
+static float calculateMaxSlewRate(const std::vector<float>& signal) {
+    if (signal.empty()) return 0.0f;
+    float maxDiff = 0.0f;
+    for (size_t i = 1; i < signal.size(); ++i) {
+        float diff = std::abs(signal[i] - signal[i-1]);
+        if (diff > maxDiff) maxDiff = diff;
+    }
+    return maxDiff;
+}
 
-static void process_once(const CurveProcessor::Parameters& params, CurveProcessor::SignalData& data, int size, float& lpfState, float& feedbackState) {
+static int calculateAlgoComplexity(const CurveProcessor::Parameters& params) {
+    int score = 1; // Base cost for phase/shape generation
+    
+    // Wavefolder cost (expensive sin/cos)
+    if (params.wavefolderFold > 0.0f) {
+        score += 10; 
+        if (params.foldF > 0.0f) score += 2; // Feedback adds complexity
+    }
+
+    // Filter cost (multiplications/state updates)
+    if (std::abs(params.djFilter) > 0.02f) {
+        int stages = 1;
+        if (params.filterSlope == FilterSlope::dB12) stages = 2;
+        if (params.filterSlope == FilterSlope::dB24) stages = 4;
+        score += (3 * stages);
+        if (params.filterF > 0.0f) score += 2; // Resonance math
+    }
+
+    // Compensation cost (logic + mults)
+    bool usingFold = params.wavefolderFold > 0.01f;
+    bool usingFilter = std::abs(params.djFilter) > 0.02f;
+    if (usingFold || usingFilter) {
+        score += 2;
+    }
+
+    return score;
+}
+
+static float calculateClippingPercent(const std::vector<float>& signal) {
+    if (signal.empty()) return 0.0f;
+    int clippedSamples = 0;
+    const float limit = 5.0f - 0.01f; // Close to 5V rail
+    const float negLimit = -5.0f + 0.01f; // Close to -5V rail
+
+    for (float val : signal) {
+        if (val >= limit || val <= negLimit) {
+            clippedSamples++;
+        }
+    }
+    return (float)clippedSamples / signal.size() * 100.0f;
+}
+
+CurveProcessor::CurveProcessor(int bufferSize) : _bufferSize(bufferSize), _feedbackState(0.0f) {
+    _lpfState.resize(4, 0.0f); // Pre-allocate for max 4 stages
+}
+
+static float applyPhaseSkew(float phase, float skew) {
+    // Simple power curve skewing: phase^exp
+    // Skew 0 -> exp 1 (Linear)
+    // Skew -1 -> exp 0.25 (Rushing / Logarithmic)
+    // Skew +1 -> exp 4.0 (Dragging / Exponential)
+    
+    // Map skew -1..1 to exponent 0.25..4.0
+    float exponent;
+    if (skew >= 0) {
+        exponent = 1.0f + skew * 3.0f; // 1.0 to 4.0
+    } else {
+        exponent = 1.0f / (1.0f + std::abs(skew) * 3.0f); // 1.0 to 0.25
+    }
+    
+    return powf(phase, exponent);
+}
+
+static void process_once(const CurveProcessor::Parameters& params, CurveProcessor::SignalData& data, int size, std::vector<float>& lpfState, float& feedbackState) {
     const auto& range = voltageRangeInfo(params.range);
     auto curveFunc = Curve::function(params.shape);
 
@@ -154,7 +257,36 @@ static void process_once(const CurveProcessor::Parameters& params, CurveProcesso
         float fraction = fmod((float(i) + params.globalPhase * size) / size, 1.0f);
         if (fraction < 0) fraction += 1.0f;
 
-        float value = curveFunc(fraction);
+        // Calculate Phase Skew (with Feedback)
+        float dynamicSkew = params.phaseSkew;
+        
+        // Feedback: Shape -> Skew (using previous sample's shape value would be ideal, but recursive is fine)
+        // We can use 'data.originalSignal[i-1]' if available, but for simplicity let's use feedbackState (processed)
+        // Or better, let's use the "previous loop's normalized value" concept. 
+        // Since this is a tight loop, we don't have easy access to "last frame's shape at this index".
+        // We will use 'feedbackState' (Filter Output) for the Filter->Skew path.
+        
+        if (std::abs(params.filterToPhaseSkew) > 0.001f) {
+             float modSource = std::max(-1.0f, std::min(1.0f, feedbackState / 5.0f));
+             dynamicSkew += modSource * params.filterToPhaseSkew;
+        }
+        
+        // Feedback: Shape -> Skew requires the shape itself. 
+        // We haven't calculated the shape yet! This creates a causality dilemma.
+        // Solution: Use the *unskewed* shape to modulate the skew of the *skewed* shape.
+        // It's a subtle but valid effect.
+        if (std::abs(params.shapeToPhaseSkew) > 0.001f) {
+             float tempShape = curveFunc(fraction); // Unskewed shape
+             dynamicSkew += (tempShape - 0.5f) * 2.0f * params.shapeToPhaseSkew;
+        }
+
+        dynamicSkew = std::max(-1.0f, std::min(1.0f, dynamicSkew));
+        
+        // Apply Skew
+        float skewedFraction = applyPhaseSkew(fraction, dynamicSkew);
+        if (i < data.skewedPhase.size()) data.skewedPhase[i] = skewedFraction;
+
+        float value = curveFunc(skewedFraction);
         if (params.invert) value = 1.f - value;
         float normalizedValue = params.min + value * (params.max - params.min);
 
@@ -162,22 +294,54 @@ static void process_once(const CurveProcessor::Parameters& params, CurveProcesso
 
         float originalVoltage = range.denormalize(normalizedValue);
 
+        // 1. Shape -> Wavefolder Fold Feedback
+        // Modulates the 'wavefolderFold' parameter based on the original shape intensity
+        float dynamicFold = params.wavefolderFold;
+        if (std::abs(params.shapeToWavefolderFold) > 0.001f) {
+            dynamicFold += (normalizedValue - 0.5f) * 2.0f * params.shapeToWavefolderFold; // Bipolar modulation
+            dynamicFold = std::max(0.0f, std::min(1.0f, dynamicFold));
+        }
+
+        // 3. Filter Output -> Wavefolder Fold Feedback (Uses previous sample's filter output)
+        // We use the previous loop's 'processedSignal' or 'uncompensatedVoltage' indirectly via a state variable if needed.
+        // But since we don't have sample-delay state for this specific path readily available in this simplified loop, 
+        // we can use the 'feedbackState' which captures the processed signal.
+        if (std::abs(params.filterToWavefolderFold) > 0.001f) {
+             // feedbackState is roughly the previous processed signal
+             // Normalize -5V..5V to -1..1 for modulation
+             float modSource = std::max(-1.0f, std::min(1.0f, feedbackState / 5.0f));
+             dynamicFold += modSource * params.filterToWavefolderFold;
+             dynamicFold = std::max(0.0f, std::min(1.0f, dynamicFold));
+        }
+
         float folderInput = normalizedValue;
-        if (params.wavefolderFold > 0.0f) {
+        if (dynamicFold > 0.0f) {
             float logShaperFeedback = linearToLogarithmicFeedback(params.foldF, params.advanced);
             folderInput += feedbackState * logShaperFeedback;
             float gain = 1.0f + (params.wavefolderGain * 2.0f);
-            folderInput = applyWavefolder(folderInput, params.wavefolderFold * params.wavefolderFold, gain, params.wavefolderSymmetry, params.advanced);
+            folderInput = applyWavefolder(folderInput, dynamicFold * dynamicFold, gain, params.wavefolderSymmetry, params.advanced);
         }
         if (i < data.postWavefolder.size()) data.postWavefolder[i] = std::max(0.0f, std::min(1.0f, folderInput));
 
         float voltage = range.denormalize(folderInput);
-        if (i < data.postFilter.size()) data.postFilter[i] = std::max(-5.0f, std::min(5.0f, applyDjFilter(voltage, lpfState, params.djFilter, params.filterF, params.advanced)));
+
+        // 2. Fold Output -> Filter Freq Feedback
+        // Modulates filter cutoff based on the wavefolder output
+        float dynamicFilter = params.djFilter;
+        if (std::abs(params.foldToFilterFreq) > 0.001f) {
+            // folderInput is 0..1 (unipolar). Center it to -0.5..0.5 for modulation? Or use as is.
+            // Let's map 0..1 to -1..1 for full range bipolar modulation
+            float modSource = (folderInput - 0.5f) * 2.0f; 
+            dynamicFilter += modSource * params.foldToFilterFreq;
+            dynamicFilter = std::max(-1.0f, std::min(1.0f, dynamicFilter));
+        }
+
+        if (i < data.postFilter.size()) data.postFilter[i] = std::max(-5.0f, std::min(5.0f, applyDjFilter(voltage, lpfState, dynamicFilter, params.filterF, params.filterSlope, params.advanced)));
 
         float uncompensatedVoltage = data.postFilter[i];
         float compensatedVoltage = uncompensatedVoltage;
-        if (params.djFilter < -0.02f || params.djFilter > 0.02f) {
-            compensatedVoltage *= calculateAmplitudeCompensation(params.wavefolderFold, params.djFilter, params.filterF, params.advanced);
+        if (dynamicFilter < -0.02f || dynamicFilter > 0.02f) {
+            compensatedVoltage *= calculateAmplitudeCompensation(dynamicFold, dynamicFilter, params.filterF, params.advanced);
         }
         // For visualization purposes, clamp postCompensation to prevent extreme values in plots
         if (i < data.postCompensation.size()) data.postCompensation[i] = std::max(-5.0f, std::min(5.0f, compensatedVoltage));
@@ -209,6 +373,7 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
     // Process at normal sample rate
     data.originalSignal.resize(_bufferSize);
     data.phasedSignal.resize(_bufferSize); // Not used anymore, but let's keep it for now
+    data.skewedPhase.resize(_bufferSize);  // NEW: Visualizing the phase warp
     data.postWavefolder.resize(_bufferSize);
     data.postFilter.resize(_bufferSize);
     data.postCompensation.resize(_bufferSize);
@@ -219,6 +384,7 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
     const std::vector<float>* source_vector = nullptr;
     switch (params.spectrumSource) {
         case SpectrumSource::Input: source_vector = &data.originalSignal; break;
+        case SpectrumSource::SkewedPhase: source_vector = &data.skewedPhase; break;
         case SpectrumSource::PostWavefolder: source_vector = &data.postWavefolder; break;
         case SpectrumSource::PostFilter: source_vector = &data.postFilter; break;
         case SpectrumSource::PostCompensation: source_vector = &data.postCompensation; break;
@@ -231,17 +397,19 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
     int oversample_size = _bufferSize * 2;
     SignalData oversample_data;
     oversample_data.originalSignal.resize(oversample_size);
+    oversample_data.skewedPhase.resize(oversample_size); // Resize oversampled buffer
     oversample_data.postWavefolder.resize(oversample_size);
     oversample_data.postFilter.resize(oversample_size);
     oversample_data.postCompensation.resize(oversample_size);
     oversample_data.finalOutput.resize(oversample_size);
-    float oversample_lpfState = 0.f;
+    std::vector<float> oversample_lpfState(4, 0.0f);
     float oversample_feedbackState = 0.f;
     process_once(params, oversample_data, oversample_size, oversample_lpfState, oversample_feedbackState);
 
     const std::vector<float>* oversample_source_vector = nullptr;
     switch (params.spectrumSource) {
         case SpectrumSource::Input: oversample_source_vector = &oversample_data.originalSignal; break;
+        case SpectrumSource::SkewedPhase: oversample_source_vector = &oversample_data.skewedPhase; break;
         case SpectrumSource::PostWavefolder: oversample_source_vector = &oversample_data.postWavefolder; break;
         case SpectrumSource::PostFilter: oversample_source_vector = &oversample_data.postFilter; break;
         case SpectrumSource::PostCompensation: oversample_source_vector = &oversample_data.postCompensation; break;
@@ -255,6 +423,16 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
 
     // Apply hardware constraints to create the limited output
     applyHardwareConstraints(data.hardwareLimitedOutput, params, sampleRate);
+
+    // Calculate Hardware Safety Stats
+    m_hardwareStats.maxSlewRate = calculateMaxSlewRate(data.hardwareLimitedOutput);
+    m_hardwareStats.algoComplexityScore = calculateAlgoComplexity(params);
+    m_hardwareStats.clippingPercent = calculateClippingPercent(data.hardwareLimitedOutput);
+
+    // Store last output for real-time access
+    if (!data.hardwareLimitedOutput.empty()) {
+        m_lastHardwareOutput = data.hardwareLimitedOutput.back();
+    }
 
     // End timing and calculate performance metrics
     auto end = std::chrono::high_resolution_clock::now();
@@ -273,6 +451,6 @@ CurveProcessor::SignalData CurveProcessor::process(const CurveProcessor::Paramet
 }
 
 void CurveProcessor::resetStates() {
-    _lpfState = 0.0f;
+    std::fill(_lpfState.begin(), _lpfState.end(), 0.0f);
     _feedbackState = 0.0f;
 }

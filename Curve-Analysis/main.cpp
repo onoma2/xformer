@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_audio.h>
 #ifdef HAS_SDL2_TTF
 #include <SDL2/SDL_ttf.h>
 #endif
@@ -13,6 +14,7 @@
 #include "CurveProcessor.h"
 #include "Curve.h"
 #include "dj_fft.h"
+#include "AudioEngine.h"
 
 struct Control {
     std::string name;
@@ -22,8 +24,23 @@ struct Control {
     float step;
     SDL_Rect rect;
     bool dragging;
+    bool hovered;
     SDL_Rect textRect;
 };
+
+struct ControlSection {
+    std::string name;
+    int startIndex;
+    int count;
+    bool collapsed;
+    SDL_Rect headerRect; // Clickable area for header
+};
+
+// Audio Callback Wrapper
+void audioCallback(void* userdata, Uint8* stream, int len) {
+    AudioEngine* engine = static_cast<AudioEngine*>(userdata);
+    engine->process(reinterpret_cast<float*>(stream), len / sizeof(float), 48000); // Assuming 48k for now
+}
 
 class CurveAnalysisApp {
 public:
@@ -42,7 +59,7 @@ public:
         m_selectedSpectrumSource(SpectrumSource::FinalOutput),
         m_selectedControl(nullptr)
     {
-        if (SDL_Init(SDL_INIT_VIDEO) < 0) { std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl; return; }
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) { std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl; return; }
 #ifdef HAS_SDL2_TTF
         if (TTF_Init() == -1) { std::cerr << "TTF could not initialize! TTF_Error: " << TTF_GetError() << std::endl; return; }
 #endif
@@ -61,7 +78,7 @@ public:
         int windowWidth = static_cast<int>(1600 / std::max(1.0f, dpiScale * 0.5f));  // Don't make window too small
         int windowHeight = static_cast<int>(1200 / std::max(1.0f, dpiScale * 0.5f));
 
-        m_window = SDL_CreateWindow("Curve Analysis Tool", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowWidth, windowHeight, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+        m_window = SDL_CreateWindow("Curve Analysis Tool v2.0", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowWidth, windowHeight, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
         if (!m_window) { std::cerr << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl; return; }
         m_renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED);
         if (!m_renderer) { std::cerr << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl; return; }
@@ -75,12 +92,33 @@ public:
 #endif
         initControls();
         m_processor.resetStates();
+        
+        // Initialize Audio
+        SDL_AudioSpec want, have;
+        SDL_zero(want);
+        want.freq = 48000;
+        want.format = AUDIO_F32;
+        want.channels = 1;
+        want.samples = 1024;
+        want.callback = audioCallback;
+        want.userdata = &m_audioEngine;
+
+        m_audioDeviceId = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
+        if (m_audioDeviceId == 0) {
+            std::cerr << "Failed to open audio: " << SDL_GetError() << std::endl;
+        } else {
+            SDL_PauseAudioDevice(m_audioDeviceId, 0); // Start playing
+        }
+
         m_running = true;
         SDL_StartTextInput();
     }
 
     ~CurveAnalysisApp() {
         SDL_StopTextInput();
+        if (m_audioDeviceId != 0) {
+            SDL_CloseAudioDevice(m_audioDeviceId);
+        }
 #ifdef HAS_SDL2_TTF
         if (m_font) TTF_CloseFont(m_font);
 #endif
@@ -119,44 +157,75 @@ private:
         int spacing = 5;
 
         // Main controls - positions will be updated in updateControlsLayout()
-        m_controls.push_back({"Global Phase", &m_params.globalPhase, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Wavefolder Fold", &m_params.wavefolderFold, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Wavefolder Gain", &m_params.wavefolderGain, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Wavefolder Symmetry", &m_params.wavefolderSymmetry, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"DJ Filter", &m_params.djFilter, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Filter F (Res)", &m_params.filterF, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Fold F (Feedback)", &m_params.foldF, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Crossfade", &m_params.xFade, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Min", &m_min, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Max", &m_max, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Global Phase", &m_params.globalPhase, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Phase Skew", &m_params.phaseSkew, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Wavefolder Fold", &m_params.wavefolderFold, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Wavefolder Gain", &m_params.wavefolderGain, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Wavefolder Symmetry", &m_params.wavefolderSymmetry, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"DJ Filter", &m_params.djFilter, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Filter F (Res)", &m_params.filterF, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Filter Slope (6/12/24)", &m_params.filterSlopeFloatProxy, 0.0f, 2.0f, 1.0f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Fold F (Feedback)", &m_params.foldF, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Crossfade", &m_params.xFade, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        
+        // New Feedback Routing Controls
+        m_controls.push_back({"Shape -> Wavefolder Fold", &m_params.shapeToWavefolderFold, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Fold -> Filter Freq", &m_params.foldToFilterFreq, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Filter -> Wavefolder Fold", &m_params.filterToWavefolderFold, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Shape -> Phase Skew", &m_params.shapeToPhaseSkew, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Filter -> Phase Skew", &m_params.filterToPhaseSkew, -1.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+
+        m_controls.push_back({"Min", &m_min, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Max", &m_max, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
 
         // Advanced controls
         y += 20;
-        m_controls.push_back({"Fold Amount", &m_params.advanced.foldAmount, 1.0f, 32.0f, 0.1f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"HPF Curve", &m_params.advanced.hpfCurve, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Resonance Gain", &m_params.advanced.resonanceGain, 0.5f, 4.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Resonance Tame", &m_params.advanced.resonanceTame, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Feedback Curve", &m_params.advanced.feedbackCurve, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Fold Comp", &m_params.advanced.foldComp, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"LPF Comp", &m_params.advanced.lpfComp, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"HPF Comp", &m_params.advanced.hpfComp, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Res Comp", &m_params.advanced.resComp, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Max Comp", &m_params.advanced.maxComp, 1.0f, 5.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"LFO Limiter Amt", &m_params.advanced.lfoLimiterAmount, 0.0f, 5.0f, 0.1f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"LFO Limiter Min", &m_params.advanced.lfoLimiterMin, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
-        m_controls.push_back({"Feedback Limit", &m_params.advanced.feedbackLimit, 0.0f, 8.0f, 0.1f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Fold Amount", &m_params.advanced.foldAmount, 1.0f, 32.0f, 0.1f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"HPF Curve", &m_params.advanced.hpfCurve, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Resonance Gain", &m_params.advanced.resonanceGain, 0.5f, 4.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Resonance Tame", &m_params.advanced.resonanceTame, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Feedback Curve", &m_params.advanced.feedbackCurve, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Fold Comp", &m_params.advanced.foldComp, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"LPF Comp", &m_params.advanced.lpfComp, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"HPF Comp", &m_params.advanced.hpfComp, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Res Comp", &m_params.advanced.resComp, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Max Comp", &m_params.advanced.maxComp, 1.0f, 5.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"LFO Limiter Amt", &m_params.advanced.lfoLimiterAmount, 0.0f, 5.0f, 0.1f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"LFO Limiter Min", &m_params.advanced.lfoLimiterMin, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Feedback Limit", &m_params.advanced.feedbackLimit, 0.0f, 8.0f, 0.1f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
 
         // Hardware limitation controls
         y += 20;
         // Add a float proxy for the dacResolutionBits integer parameter to work with the control system
         // We'll handle conversion in the update method
-        m_controls.push_back({"DAC Resolution (bits)", &m_params.dacResolutionFloatProxy, 12.0f, 16.0f, 1.0f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;  // PEW|FORMER uses 16-bit DAC8568
-        m_controls.push_back({"DAC Update Rate", &m_params.dacUpdateRate, 0.1f, 5.0f, 0.001f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;  // Update rate in ms (0.1ms to 5ms, default 1.0ms for 1000Hz)
-        m_controls.push_back({"Timing Jitter (ms)", &m_params.timingJitter, 0.0f, 0.5f, 0.01f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;  // Reduced jitter range (real hardware has minimal jitter)
+        m_controls.push_back({"LFO Freq (Hz)", &m_params.frequency, 0.01f, 10.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"DAC Resolution (bits)", &m_params.dacResolutionFloatProxy, 12.0f, 16.0f, 1.0f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;  // PEW|FORMER uses 16-bit DAC8568
+        m_controls.push_back({"DAC Update Rate", &m_params.dacUpdateRate, 0.1f, 5.0f, 0.001f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;  // Update rate in ms (0.1ms to 5ms, default 1.0ms for 1000Hz)
+        m_controls.push_back({"Timing Jitter (ms)", &m_params.timingJitter, 0.0f, 0.5f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;  // Reduced jitter range (real hardware has minimal jitter)
 
-        // Fine control for foldF parameter (0.0 to 0.1 with high precision)
+        m_controls.push_back({"Fine Fold-F (0.0-0.1)", &m_params.foldF, 0.0f, 0.1f, 0.0001f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;  // Fine control for foldF
+        m_controls.push_back({"Super Fine Fold-F (0-0.01)", &m_params.foldF, 0.0f, 0.01f, 0.00001f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing; // Super fine control
+
+        // Audio Controls
         y += 20;
-        m_controls.push_back({"Fine Fold-F (0.0-0.1)", &m_params.foldF, 0.0f, 0.1f, 0.0001f, {250, y, controlWidth, controlHeight}, false, {0,0,0,0}}); y += controlHeight + spacing;  // Fine control for foldF
+        m_controls.push_back({"Audio Vol (0-1)", &m_audioEngine.m_volume, 0.0f, 1.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        m_controls.push_back({"Audio Mod Amt", &m_audioEngine.m_modAmount, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
+        
+        // Initialize Sections
+        // Section 1: Signal Chain (first 19 controls) -> Indices 0-18
+        m_sections.push_back({"Signal Chain", 0, 19, false, {0,0,0,0}});
+        
+        // Section 2: Advanced Shaping (next 13 controls) -> Indices 19-31
+        m_sections.push_back({"Advanced Shaping", 19, 13, true, {0,0,0,0}}); // Collapsed by default
+        
+        // Section 3: Hardware Simulation (next 4 controls) -> Indices 32-35
+        m_sections.push_back({"Hardware Simulation", 32, 4, true, {0,0,0,0}}); // Collapsed by default
+        
+        // Section 4: Fine Tuning (next 2 controls) -> Indices 36-37
+        m_sections.push_back({"Fine Tuning", 36, 2, true, {0,0,0,0}}); // Collapsed by default
+        
+        // Section 5: Audio Engine (last 2 controls) -> Indices 38-39
+        m_sections.push_back({"Audio Engine", 38, 2, true, {0,0,0,0}}); // Collapsed by default
     }
 
     void resetControls() {
@@ -219,6 +288,9 @@ private:
             case SDLK_w: m_params.advanced.foldAmount -= step * ((mod & KMOD_SHIFT) ? 10.f : 1.f); break;
             case SDLK_e: m_params.advanced.hpfCurve += step; break;
             case SDLK_t: m_params.advanced.hpfCurve -= step; break;
+            
+            // Audio
+            case SDLK_p: m_audioEngine.m_active = !m_audioEngine.m_active; break;
 
             default: break;
         }
@@ -233,7 +305,22 @@ private:
     void handleMouse(const SDL_Event& e) {
         if (e.button.button == SDL_BUTTON_LEFT) {
             SDL_Point p = {e.button.x, e.button.y};
+            
+            // Check section headers
+            if (e.type == SDL_MOUSEBUTTONDOWN) {
+                for (auto& section : m_sections) {
+                    if (SDL_PointInRect(&p, &section.headerRect)) {
+                        section.collapsed = !section.collapsed;
+                        updateControlsLayout(); // Re-layout immediately
+                        return;
+                    }
+                }
+            }
+
             for (auto& c : m_controls) {
+                // If control is effectively invisible (height 0 or off screen), don't interact
+                if (c.rect.h == 0) continue;
+                
                 if (SDL_PointInRect(&p, &c.rect)) c.dragging = (e.type == SDL_MOUSEBUTTONDOWN);
                 if (SDL_PointInRect(&p, &c.textRect) && e.type == SDL_MOUSEBUTTONDOWN) {
                     m_selectedControl = &c;
@@ -246,10 +333,31 @@ private:
     void handleMouseMotion(const SDL_Event& e) {
         SDL_Point p = {e.motion.x, e.motion.y};
         for (auto& c : m_controls) {
+            c.hovered = SDL_PointInRect(&p, &c.rect);
             if (c.dragging) {
-                if (SDL_PointInRect(&p, &c.rect)) {
-                    float pos = (float)(e.motion.x - c.rect.x) / c.rect.w;
-                    *c.value = c.min + std::clamp(pos, 0.f, 1.f) * (c.max - c.min);
+                if (SDL_PointInRect(&p, &c.rect)) { // Only allow updates if mouse is inside the rect
+                    // Calculate value based on relative x position in control
+                    // Use the initial click offset if we wanted perfect tracking, but simple absolute mapping is fine for now
+                    // Logic from before:
+                    int mouseX = e.motion.x;
+                    // Clamp mouseX to control bounds for value calculation
+                    int validX = std::clamp(mouseX, c.rect.x, c.rect.x + c.rect.w);
+                    float pos = (float)(validX - c.rect.x) / c.rect.w;
+                    
+                    if (c.name == "LFO Freq (Hz)") {
+                        // Custom mapping: 80% of slider for 0.01-1.0Hz, 20% for 1.0-10.0Hz
+                        float mappedValue;
+                        if (pos <= 0.8f) {
+                            float ratio = pos / 0.8f;
+                            mappedValue = 0.01f + ratio * (1.0f - 0.01f);
+                        } else {
+                            float ratio = (pos - 0.8f) / 0.2f;
+                            mappedValue = 1.0f + ratio * (10.0f - 1.0f);
+                        }
+                        *c.value = mappedValue;
+                    } else {
+                        *c.value = c.min + pos * (c.max - c.min);
+                    }
                 }
             }
         }
@@ -261,42 +369,44 @@ private:
 
         const int controlPanelWidth = std::max(300, static_cast<int>(winWidth / 4));
         const int margin = static_cast<int>(20 * std::min(float(winWidth)/1600.0f, float(winHeight)/1200.0f));
-        const int controlX = margin;  // Left side of the window for controls
+        const int controlX = margin;
         const int controlWidth = static_cast<int>(controlPanelWidth * 0.8f);
         const int controlHeight = std::max(15, static_cast<int>(20 * std::min(float(winWidth)/1600.0f, float(winHeight)/1200.0f)));
 
         int y = 30;
         int spacing = 5;
+        int groupSpacing = 25; // Height of the header area
 
-        // Update positions for main controls (first 10)
-        for (int i = 0; i < 10; ++i) {  // First 10 are main controls
-            m_controls[i].rect = {controlX, y, controlWidth, controlHeight};
-            y += controlHeight + spacing;
-        }
+        for (auto& section : m_sections) {
+            // Header Position
+            section.headerRect = {controlX, y, controlWidth, 20};
+            y += groupSpacing;
 
-        // Update positions for advanced controls (next group)
-        y += 20;
-        for (int i = 10; i < 23; ++i) { // Advanced controls from index 10 to 22
-            m_controls[i].rect = {controlX, y, controlWidth, controlHeight};
-            y += controlHeight + spacing;
-        }
+            // Controls
+            for (int i = 0; i < section.count; ++i) {
+                int idx = section.startIndex + i;
+                if (idx >= (int)m_controls.size()) break;
 
-        // Update positions for hardware limitation controls (last 3)
-        y += 20;
-        for (int i = 23; i < 26; ++i) { // Hardware limitation controls from index 23 to 25
-            m_controls[i].rect = {controlX, y, controlWidth, controlHeight};
-            y += controlHeight + spacing;
-        }
-
-        // Update position for fine foldF control (last one)
-        if (m_controls.size() > 26) {
-            m_controls[26].rect = {controlX, y, controlWidth, controlHeight};
-            y += controlHeight + spacing;
+                if (section.collapsed) {
+                    // Hide control
+                    m_controls[idx].rect = {0, 0, 0, 0}; 
+                } else {
+                    // Show control
+                    m_controls[idx].rect = {controlX, y, controlWidth, controlHeight};
+                    y += controlHeight + spacing;
+                }
+            }
+            y += 5; // Small gap between sections
         }
     }
 
     void update() {
         updateControlsLayout();  // Update control positions based on window size
+
+        // Map Slope Proxy to Enum
+        m_params.filterSlope = static_cast<FilterSlope>(std::round(m_params.filterSlopeFloatProxy));
+        // Snap proxy to valid integer steps (0, 1, 2)
+        m_params.filterSlopeFloatProxy = static_cast<float>(static_cast<int>(m_params.filterSlope));
 
         // Sync the integer dacResolutionBits with its float proxy for UI control
         m_params.dacResolutionBits = static_cast<int>(m_params.dacResolutionFloatProxy);
@@ -310,6 +420,9 @@ private:
         m_params.invert = m_invert;
         m_params.spectrumSource = m_selectedSpectrumSource;
         m_signalData = m_processor.process(m_params, m_sampleRate);
+        
+        // Update Audio Engine with latest LFO buffer and frequency
+        m_audioEngine.setLfoBuffer(m_signalData.hardwareLimitedOutput, m_params.frequency);
     }
 
     void render() {
@@ -330,29 +443,39 @@ private:
         // Calculate layout based on available space
         const int margin = static_cast<int>(20 * std::min(float(winWidth)/1600.0f, float(winHeight)/1200.0f));
         const int controlPanelWidth = std::max(300, static_cast<int>(winWidth / 4));
-        const int topMargin = margin;
+        const int topMargin = margin + 70; // Reduced margin to move graphs up
 
         // Calculate available space for graphs, reserving space at the bottom for spectrum
-        const int spectrumHeight = 250; // Fixed height for spectrum
+        const int spectrumHeight = 200; // Reduced height for spectrum to prevent overlap
+        // Reserve space for spectrum, top UI, and a bottom footer
+        // Adding extra padding to separate graphs from spectrum
         const int availableWidth = winWidth - controlPanelWidth - 3 * margin;
-        const int availableHeight = winHeight - spectrumHeight - 100; // Reserve space for spectrum and other UI elements
+        const int availableHeight = winHeight - spectrumHeight - topMargin - margin - 40; 
 
-        const int graphWidth = availableWidth / 3;
-        const int graphHeight = availableHeight / 2;
+        // Reduce graph size to 95% of available area as requested
+        const int totalGraphWidth = static_cast<int>(availableWidth * 0.95f);
+        const int totalGraphHeight = static_cast<int>(availableHeight * 0.95f);
+        
+        const int graphWidth = totalGraphWidth / 3;
+        const int graphHeight = totalGraphHeight / 2;
+        
+        // Center the grid in the available area
+        const int offsetX = (availableWidth - totalGraphWidth) / 2;
+        const int offsetY = (availableHeight - totalGraphHeight) / 2;
 
         std::vector<std::pair<std::string, const std::vector<float>*>> graphs = {
             {"Input Signal", &m_signalData.originalSignal},
+            {"Skewed Phase", &m_signalData.skewedPhase}, 
             {"Post Wavefolder", &m_signalData.postWavefolder},
             {"Post Filter", &m_signalData.postFilter},
-            {"Post Compensation", &m_signalData.postCompensation},
             {"Final Output", &m_signalData.finalOutput},
             {"Hardware Limited Output", &m_signalData.hardwareLimitedOutput}  // With all hardware constraints applied
         };
 
         for (size_t i = 0; i < graphs.size(); ++i) {
             int row = i / 3, col = i % 3;
-            int x = controlPanelWidth + margin + col * (graphWidth + margin);
-            int y = topMargin + margin + row * (graphHeight + margin + 30);
+            int x = controlPanelWidth + margin + offsetX + col * (graphWidth + 10); // small spacing
+            int y = topMargin + margin + offsetY + row * (graphHeight + 40); // extra vertical spacing for labels
             drawGraph(graphs[i].first, *graphs[i].second, i, x, y, graphWidth, graphHeight);
 
             // For the hardware limited output plot, detect and visualize stair-stepping artifacts
@@ -369,32 +492,22 @@ private:
                     }
 
                     // If difference is significant, indicate stair-stepping artifacts
-                    if (maxDiff > 0.1f) {  // Threshold for significant difference
+                    if (maxDiff > 0.05f) {  // Threshold for significant difference (50mV)
                         // Draw a red border around the graph to indicate stair-stepping
                         SDL_SetRenderDrawColor(m_renderer, 255, 0, 0, 255);  // Red
                         SDL_Rect border = {x, y, graphWidth, graphHeight};
                         SDL_RenderDrawRect(m_renderer, &border);
 
-                        // Add an overlay indicator
-                        SDL_SetRenderDrawColor(m_renderer, 255, 0, 0, 100);  // Semi-transparent red
-                        SDL_Rect overlay = {x, y, graphWidth, graphHeight};
-                        SDL_RenderFillRect(m_renderer, &overlay);
-
 #ifdef HAS_SDL2_TTF
                         if (m_font) {
-                            renderText("STAIR-STEPPING!", x + 10, y + 10, {255, 255, 255, 255});
+                            renderText("STAIR-STEPPING!", x + 10, y + 10, {255, 50, 50, 255});
                         }
 #endif
-                    } else if (maxDiff > 0.05f) {  // Moderate difference
+                    } else if (maxDiff > 0.02f) {  // Moderate difference (20mV)
                         // Draw an orange border
                         SDL_SetRenderDrawColor(m_renderer, 255, 165, 0, 255);  // Orange
                         SDL_Rect border = {x, y, graphWidth, graphHeight};
                         SDL_RenderDrawRect(m_renderer, &border);
-
-                        // Add a semi-transparent overlay
-                        SDL_SetRenderDrawColor(m_renderer, 255, 165, 0, 50);  // Semi-transparent orange
-                        SDL_Rect overlay = {x, y, graphWidth, graphHeight};
-                        SDL_RenderFillRect(m_renderer, &overlay);
                     }
                 }
             }
@@ -449,9 +562,9 @@ private:
         const int margin = static_cast<int>(20 * std::min(float(winWidth)/1600.0f, float(winHeight)/1200.0f));
         const int controlPanelWidth = std::max(300, static_cast<int>(winWidth / 4));
         int x = controlPanelWidth + margin;
-        int y = winHeight - 300; // Position at bottom
+        int h = 200; // Fixed height for spectrum
+        int y = winHeight - h - 50; // Position at bottom with padding
         int w = winWidth - controlPanelWidth - 2 * margin;
-        int h = 250; // Fixed height for spectrum
 
         SDL_Rect bg = {x, y, w, h};
         SDL_SetRenderDrawColor(m_renderer, 30, 30, 30, 255);
@@ -534,38 +647,123 @@ private:
     }
 
     void drawControls() {
+        // Draw Control Panel Background
+        int winWidth, winHeight;
+        SDL_GetWindowSize(m_window, &winWidth, &winHeight);
+        const int controlPanelWidth = std::max(300, static_cast<int>(winWidth / 4));
+        SDL_Rect panelRect = {0, 0, controlPanelWidth, winHeight};
+        SDL_SetRenderDrawColor(m_renderer, 25, 25, 25, 255); // Slightly lighter than main bg
+        SDL_RenderFillRect(m_renderer, &panelRect);
+        SDL_SetRenderDrawColor(m_renderer, 40, 40, 40, 255);
+        SDL_RenderDrawLine(m_renderer, controlPanelWidth, 0, controlPanelWidth, winHeight);
+
+        // Draw Section Headers
+        for (const auto& section : m_sections) {
+            // Draw collapse icon
+            std::string icon = section.collapsed ? "[+]" : "[-]";
+            
+            // Hover effect for header
+            int mouseX, mouseY;
+            SDL_GetMouseState(&mouseX, &mouseY);
+            SDL_Point p = {mouseX, mouseY};
+            
+            SDL_Color headerColor = {200, 200, 200, 255};
+            if (SDL_PointInRect(&p, &section.headerRect)) {
+                headerColor = {255, 255, 255, 255}; // Brighter on hover
+            }
+
+            if (m_font) {
+                renderText(icon + " " + section.name, section.headerRect.x, section.headerRect.y, headerColor);
+            }
+        }
+
         for (auto& c : m_controls) {
+            // Skip invisible controls
+            if (c.rect.h == 0) continue;
+
+            // Background of slider
             SDL_SetRenderDrawColor(m_renderer, 50, 50, 50, 255);
             SDL_RenderFillRect(m_renderer, &c.rect);
-            float pos = (*c.value - c.min) / (c.max - c.min);
+            
+            // Fill of slider
+            float pos;
+            if (c.name == "LFO Freq (Hz)") {
+                // Custom inverse mapping: 0.01-1.0Hz -> 0-80%, 1.0-10.0Hz -> 80-100%
+                float val = *c.value;
+                if (val <= 1.0f) {
+                    float ratio = (val - 0.01f) / (1.0f - 0.01f);
+                    pos = ratio * 0.8f;
+                } else {
+                    float ratio = (val - 1.0f) / (10.0f - 1.0f);
+                    pos = 0.8f + ratio * 0.2f;
+                }
+            } else {
+                pos = (*c.value - c.min) / (c.max - c.min);
+            }
+            pos = std::clamp(pos, 0.0f, 1.0f);
             SDL_Rect fill = {c.rect.x, c.rect.y, (int)(c.rect.w * pos), c.rect.h};
-            SDL_SetRenderDrawColor(m_renderer, 0, 100, 200, 255);
+            
+            // Hover effect color
+            if (c.hovered || c.dragging) {
+                SDL_SetRenderDrawColor(m_renderer, 0, 140, 240, 255); // Brighter blue
+            } else {
+                SDL_SetRenderDrawColor(m_renderer, 0, 100, 200, 255); // Standard blue
+            }
             SDL_RenderFillRect(m_renderer, &fill);
 
+            // Center line for bipolar controls
             if (c.min < 0) {
-                int centerX = c.rect.x + c.rect.w / 2;
-                SDL_SetRenderDrawColor(m_renderer, 255, 255, 255, 255);
+                int centerX = c.rect.x + (int)((0.0f - c.min) / (c.max - c.min) * c.rect.w);
+                SDL_SetRenderDrawColor(m_renderer, 255, 255, 255, 100);
                 SDL_RenderDrawLine(m_renderer, centerX, c.rect.y, centerX, c.rect.y + c.rect.h);
             }
 
-            SDL_SetRenderDrawColor(m_renderer, 100, 100, 100, 255);
+            // Border
+            if (c.hovered || &c == m_selectedControl) {
+                 SDL_SetRenderDrawColor(m_renderer, 150, 150, 150, 255);
+            } else {
+                 SDL_SetRenderDrawColor(m_renderer, 80, 80, 80, 255);
+            }
             SDL_RenderDrawRect(m_renderer, &c.rect);
+
 #ifdef HAS_SDL2_TTF
             if (m_font) {
-                renderText(c.name, 20, c.rect.y + 5, {255, 255, 255, 255});
+                // Name
+                renderText(c.name, 20, c.rect.y + 2, {220, 220, 220, 255});
+                
+                // Value
                 std::stringstream ss;
                 if (&c == m_selectedControl) {
                     ss << m_textInputBuffer;
                     if (int(SDL_GetTicks() / 500) % 2 == 0) {
                         ss << "|";
                     }
+                } else if (c.name == "Filter Slope (6/12/24)") {
+                    int val = static_cast<int>(*c.value);
+                    if (val == 0) ss << "6dB/oct";
+                    else if (val == 1) ss << "12dB/oct";
+                    else if (val == 2) ss << "24dB/oct";
+                    else ss << "Unknown";
+                } else if (c.name == "LFO Freq (Hz)") {
+                    ss << std::fixed << std::setprecision(2) << *c.value;
                 } else {
                     ss << std::fixed << std::setprecision(2) << *c.value;
                 }
+                
+                // Calculate text position to be right of the slider
+                int textX = c.rect.x + c.rect.w + 10;
+                
+                // Pre-render to get size for textRect
                 SDL_Surface* valueSurface = TTF_RenderText_Solid(m_font, ss.str().c_str(), {255,255,255,255});
-                c.textRect = {c.rect.x + c.rect.w + 10, c.rect.y + 5, valueSurface->w, valueSurface->h};
-                renderText(ss.str(), c.textRect.x, c.textRect.y, (&c == m_selectedControl) ? SDL_Color{255,255,0,255} : SDL_Color{255,255,255,255});
-                SDL_FreeSurface(valueSurface);
+                if (valueSurface) {
+                    c.textRect = {textX, c.rect.y + 2, valueSurface->w, valueSurface->h};
+                    SDL_Color valColor = (&c == m_selectedControl) ? SDL_Color{255,255,0,255} : SDL_Color{200,200,200,255};
+                    // Highlight value if hovered
+                    if (c.hovered) valColor.r = std::min(255, valColor.r + 55);
+                    
+                    renderText(ss.str(), c.textRect.x, c.textRect.y, valColor);
+                    SDL_FreeSurface(valueSurface);
+                }
             }
 #endif
         }
@@ -581,39 +779,97 @@ private:
             // Calculate position just below the control panel
             const int controlPanelWidth = std::max(300, static_cast<int>(winWidth / 4));
             const int margin = static_cast<int>(20 * std::min(float(winWidth)/1600.0f, float(winHeight)/1200.0f));
-            int x = controlPanelWidth + margin;  // Position to the right of the control panel
-            int y = 30;  // Start at the same vertical level as the controls
+            const int startX = controlPanelWidth + margin;
+            int x = startX;
+            int y = 10; // Status bar Y position
 
-            renderText("Shape: " + std::string(Curve::name(m_selectedShape)), x, y, {255,255,255,255}); y+=20;
-            renderText("Voltage Range: " + std::string(voltageRangeName(m_params.range)) + " (L to change)", x, y, {255,255,255,255}); y+=20;
-            renderText("Controls: R-reset, S-var, I-inv, 1-8-shapes", x, y, {255,255,255,255}); y+=20;
-            renderText("Sample Rate: " + std::to_string(m_sampleRate) + "Hz (Z-M)", x, y, {255,255,255,255}); y+=20;
+            // Draw Status Bar items
+            std::string text;
+            
+            // 1. Shape
+            text = "Shape: " + std::string(Curve::name(m_selectedShape));
+            if (m_shapeVariation) text += " (Var)";
+            if (m_invert) text += " (Inv)";
+            renderText(text, x, y, {255,255,255,255}); 
+            
+            // 2. Voltage Range
+            x += 220;
+            text = "Range: " + std::string(voltageRangeName(m_params.range));
+            renderText(text, x, y, {255,255,255,255}); 
+            
+            // 3. Sample Rate
+            x += 200;
+            text = "Rate: " + std::to_string(m_sampleRate) + "Hz";
+            renderText(text, x, y, {255,255,255,255}); 
 
-            // Draw performance information
+            // 4. Performance (Moved to right side of top bar)
+            x = winWidth - 250; 
             const auto& perf = m_processor.getPerformance();
-            y += 10;
-            renderText("Performance:", x, y, {255,255,255,255}); y+=20;
             char perfText[128];
-            snprintf(perfText, sizeof(perfText), "Process: %.3f ms", perf.processTimeMs);
-            renderText(perfText, x, y, {255,255,255,255}); y+=20;
-            snprintf(perfText, sizeof(perfText), "Time Budget: %.3f ms", perf.timeBudgetMs);
-            renderText(perfText, x, y, {255,255,255,255}); y+=20;
-            snprintf(perfText, sizeof(perfText), "CPU Usage: %.1f%%", perf.cpuUsagePercent);
+            snprintf(perfText, sizeof(perfText), "CPU: %.1f%% (%.2fms)", perf.cpuUsagePercent, perf.processTimeMs);
             SDL_Color perfColor = {0, 255, 0, 255};  // Green by default
             if (perf.cpuUsagePercent > 80.0f) perfColor = {255, 255, 0, 255};  // Yellow for 80%+
             if (perf.cpuUsagePercent > 95.0f) perfColor = {255, 0, 0, 255};    // Red for 95%+
-            renderText(perfText, x, y, perfColor); y+=20;
+            renderText(perfText, x, y, perfColor);
 
-            y+=20;
-            renderText("Spectrum Source (A,D,F,G,H):", x, y, {255,255,255,255}); y+=20;
-            const char* sourceNames[] = {"Input", "Post Wavefolder", "Post Filter", "Post Compensation", "Final Output"};
+            // --- Hardware Safety Analysis Panel ---
+            const auto& stats = m_processor.getHardwareStats();
+            int safeX = startX; 
+            int safeY = y + 30;
+            
+            renderText("Hardware Safety:", safeX, safeY, {200, 200, 200, 255});
+            
+            // Metric 1: Max Slew Rate
+            safeX += 150;
+            char slewText[64];
+            snprintf(slewText, sizeof(slewText), "Max Step: %.2f V", stats.maxSlewRate);
+            SDL_Color slewColor = {0, 255, 0, 255};
+            if (stats.maxSlewRate > 0.5f) slewColor = {255, 165, 0, 255}; // Orange > 0.5V
+            if (stats.maxSlewRate > 1.0f) slewColor = {255, 50, 50, 255}; // Red > 1.0V
+            renderText(slewText, safeX, safeY, slewColor);
+
+            // Metric 2: Algo Complexity
+            safeX += 180;
+            std::string algoText = "Algo Cost: " + std::to_string(stats.algoComplexityScore);
+            SDL_Color algoColor = {0, 255, 0, 255};
+            if (stats.algoComplexityScore > 10) algoColor = {255, 165, 0, 255}; // Medium
+            if (stats.algoComplexityScore > 15) algoColor = {255, 50, 50, 255}; // High
+            renderText(algoText, safeX, safeY, algoColor);
+
+            // Metric 3: Clipping
+            safeX += 150;
+            char clipText[64];
+            snprintf(clipText, sizeof(clipText), "Clipping: %.1f%%", stats.clippingPercent);
+            SDL_Color clipColor = {0, 255, 0, 255};
+            if (stats.clippingPercent > 1.0f) clipColor = {255, 165, 0, 255};
+            if (stats.clippingPercent > 5.0f) clipColor = {255, 50, 50, 255};
+            renderText(clipText, safeX, safeY, clipColor);
+            
+            
+            // Spectrum Legend (positioned above spectrum)
+            int spectrumHeight = 200;
+            int spectrumY = winHeight - spectrumHeight - 50; 
+            int legendY = spectrumY - 25;
+            x = startX;
+            
+            renderText("Spectrum Source (Keys A-H):", x, legendY, {200,200,200,255}); 
+            x += 220;
+            
+            const char* sourceNames[] = {"Input", "Skewed", "Post Wave", "Post Filt", "Post Comp", "Output"};
             for(int i = 0; i < int(SpectrumSource::Last); ++i) {
-                SDL_Color color = (i == int(m_selectedSpectrumSource)) ? SDL_Color{255, 255, 0, 255} : SDL_Color{255, 255, 255, 255};
-                renderText(sourceNames[i], x + i * 150, y, color);
+                SDL_Color color = (i == int(m_selectedSpectrumSource)) ? SDL_Color{255, 255, 0, 255} : SDL_Color{150, 150, 150, 255};
+                renderText(sourceNames[i], x, legendY, color);
+                x += 90; // Reduced spacing to fit
             }
-
-            y+=40;
-            renderText("Advanced Controls (Q/W, E/T, ...):", x, y, {255,255,255,255});
+            
+            // Shortcuts Hint (Moved to very bottom)
+            std::string shortcuts = "Keys: R-Reset, S-Var, I-Inv, 1-8-Shape, L-Range, P-Audio";
+            renderText(shortcuts, controlPanelWidth + margin, winHeight - 20, {100,100,100,255});
+            
+            // Audio Status (Top Right, below CPU)
+            if (m_audioEngine.m_active) {
+                renderText("AUDIO ON", winWidth - 100, y + 30, {0, 255, 0, 255});
+            }
         }
 #endif
     }
@@ -643,8 +899,11 @@ private:
     int m_sampleRate = 48000;
     SpectrumSource m_selectedSpectrumSource;
     Control* m_selectedControl;
+    std::vector<ControlSection> m_sections;
     std::string m_textInputBuffer;
     float m_dpi;
+    SDL_AudioDeviceID m_audioDeviceId = 0;
+    AudioEngine m_audioEngine;
     void updateSampleRate(int newRate) { if (newRate >= 500 && newRate <= 192000) m_sampleRate = newRate; }
 };
 
