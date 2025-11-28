@@ -212,20 +212,20 @@ private:
         m_controls.push_back({"Audio Mod Amt", &m_audioEngine.m_modAmount, 0.0f, 2.0f, 0.01f, {250, y, controlWidth, controlHeight}, false, false, {0,0,0,0}}); y += controlHeight + spacing;
         
         // Initialize Sections
-        // Section 1: Signal Chain (first 19 controls) -> Indices 0-18
-        m_sections.push_back({"Signal Chain", 0, 19, false, {0,0,0,0}});
+        // Section 1: Signal Chain (17 controls) -> Indices 0-16
+        m_sections.push_back({"Signal Chain", 0, 17, false, {0,0,0,0}}); // Open by default
         
-        // Section 2: Advanced Shaping (next 13 controls) -> Indices 19-31
-        m_sections.push_back({"Advanced Shaping", 19, 13, true, {0,0,0,0}}); // Collapsed by default
+        // Section 2: Advanced Shaping (13 controls) -> Indices 17-29
+        m_sections.push_back({"Advanced Shaping", 17, 13, true, {0,0,0,0}}); // Collapsed by default
         
-        // Section 3: Hardware Simulation (next 4 controls) -> Indices 32-35
-        m_sections.push_back({"Hardware Simulation", 32, 4, true, {0,0,0,0}}); // Collapsed by default
+        // Section 3: Hardware Simulation (4 controls) -> Indices 30-33
+        m_sections.push_back({"Hardware Simulation", 30, 4, true, {0,0,0,0}}); // Collapsed by default
         
-        // Section 4: Fine Tuning (next 2 controls) -> Indices 36-37
-        m_sections.push_back({"Fine Tuning", 36, 2, true, {0,0,0,0}}); // Collapsed by default
+        // Section 4: Fine Tuning (2 controls) -> Indices 34-35
+        m_sections.push_back({"Fine Tuning", 34, 2, true, {0,0,0,0}}); // Collapsed by default
         
-        // Section 5: Audio Engine (last 2 controls) -> Indices 38-39
-        m_sections.push_back({"Audio Engine", 38, 2, true, {0,0,0,0}}); // Collapsed by default
+        // Section 5: Audio Engine (2 controls) -> Indices 36-37
+        m_sections.push_back({"Audio Engine", 36, 2, true, {0,0,0,0}}); // Collapsed by default
     }
 
     void resetControls() {
