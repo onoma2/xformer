@@ -471,8 +471,21 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         const auto &targetSequence = useFillSequence ? *_fillSequence : sequence; // Use the same sequence as evalSequence
         if (targetSequence.accumulator().enabled() &&
             targetSequence.accumulator().triggerMode() == Accumulator::Step) {
-            // Tick the accumulator - using mutable allows modification through const ref
-            const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+            // Get per-step accumulator value (0=OFF, 1=S(use global), 2-15=override)
+            int stepValue = step.accumulatorStepValue();
+            auto &accumulator = const_cast<Accumulator&>(targetSequence.accumulator());
+
+            if (stepValue == 1) {
+                // Value 1 = S (use global stepValue)
+                accumulator.tick();
+            } else if (stepValue >= 2) {
+                // Value 2-15 = override with specific value
+                uint8_t savedStepValue = accumulator.stepValue();
+                accumulator.setStepValue(stepValue);
+                accumulator.tick();
+                accumulator.setStepValue(savedStepValue);
+            }
+            // stepValue == 0 handled by isAccumulatorTrigger() check above
         }
     }
 
@@ -513,7 +526,18 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
                 if (targetSequence.accumulator().enabled() &&
                     targetSequence.accumulator().triggerMode() == Accumulator::Gate) {
-                    const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+                    // Get per-step accumulator value (0=OFF, 1=S(use global), 2-15=override)
+                    int stepValue = step.accumulatorStepValue();
+                    auto &accumulator = const_cast<Accumulator&>(targetSequence.accumulator());
+
+                    if (stepValue == 1) {
+                        accumulator.tick();
+                    } else if (stepValue >= 2) {
+                        uint8_t savedStepValue = accumulator.stepValue();
+                        accumulator.setStepValue(stepValue);
+                        accumulator.tick();
+                        accumulator.setStepValue(savedStepValue);
+                    }
                 }
             }
 
@@ -532,10 +556,24 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
                     if (targetSequence.accumulator().enabled() &&
                         targetSequence.accumulator().triggerMode() == Accumulator::Retrigger) {
-                        // Tick N times for N retriggers, regardless of gate length
+                        // Get per-step accumulator value (0=OFF, 1=S(use global), 2-15=override)
+                        int stepValue = step.accumulatorStepValue();
+                        auto &accumulator = const_cast<Accumulator&>(targetSequence.accumulator());
                         int tickCount = stepRetrigger;
-                        for (int i = 0; i < tickCount; ++i) {
-                            const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+
+                        if (stepValue == 1) {
+                            // Value 1 = S (use global stepValue)
+                            for (int i = 0; i < tickCount; ++i) {
+                                accumulator.tick();
+                            }
+                        } else if (stepValue >= 2) {
+                            // Value 2-15 = override with specific value
+                            uint8_t savedStepValue = accumulator.stepValue();
+                            accumulator.setStepValue(stepValue);
+                            for (int i = 0; i < tickCount; ++i) {
+                                accumulator.tick();
+                            }
+                            accumulator.setStepValue(savedStepValue);
                         }
                     }
                 }
