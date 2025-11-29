@@ -152,7 +152,17 @@ static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, c
     // Apply accumulator modulation if enabled
     if (sequence.accumulator().enabled()) {
         int accumulatorValue = sequence.accumulator().currentValue();
-        note += accumulatorValue;
+
+        // Check accumulator mode
+        if (sequence.accumulator().mode() == Accumulator::Track) {
+            // TRACK mode: Apply to ALL steps
+            note += accumulatorValue;
+        } else {
+            // STAGE mode: Only apply to steps with triggers enabled
+            if (step.isAccumulatorTrigger()) {
+                note += accumulatorValue;
+            }
+        }
     }
 
     int probability = clamp(step.noteVariationProbability() + probabilityBias, -1, NoteSequence::NoteVariationProbability::Max);

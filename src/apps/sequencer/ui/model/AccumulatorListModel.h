@@ -8,6 +8,7 @@ class AccumulatorListModel : public ListModel {
 public:
     enum Item {
         Enabled,
+        Mode,
         Direction,
         Order,
         TriggerMode,
@@ -66,6 +67,8 @@ public:
         if (!_sequence) return 0;
 
         switch (Item(row)) {
+        case Mode:
+            return 2; // Stage, Track
         case Direction:
             return 3; // Up, Down, Freeze
         case Order:
@@ -81,6 +84,8 @@ public:
         if (!_sequence) return -1;
 
         switch (Item(row)) {
+        case Mode:
+            return static_cast<int>(_sequence->accumulator().mode());
         case Direction:
             return static_cast<int>(_sequence->accumulator().direction());
         case Order:
@@ -97,6 +102,9 @@ public:
 
         if (index < indexedCount(row)) {
             switch (Item(row)) {
+            case Mode:
+                const_cast<Accumulator&>(_sequence->accumulator()).setMode(static_cast<Accumulator::Mode>(index));
+                break;
             case Direction:
                 const_cast<Accumulator&>(_sequence->accumulator()).setDirection(static_cast<Accumulator::Direction>(index));
                 break;
@@ -116,6 +124,7 @@ private:
     static const char *itemName(Item item) {
         switch (item) {
         case Enabled:         return "ENABLED";
+        case Mode:            return "MODE";
         case Direction:       return "DIRECTN";
         case Order:           return "ORDER";
         case TriggerMode:     return "TRIG";
@@ -139,6 +148,14 @@ private:
         case Enabled:
             str(_sequence->accumulator().enabled() ? "ON" : "OFF");
             break;
+        case Mode: {
+            auto mode = _sequence->accumulator().mode();
+            switch (mode) {
+            case Accumulator::Mode::Stage: str("STAGE"); break;
+            case Accumulator::Mode::Track: str("TRACK"); break;
+            }
+            break;
+        }
         case Direction: {
             auto dir = _sequence->accumulator().direction();
             switch (dir) {
