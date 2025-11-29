@@ -471,19 +471,31 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         const auto &targetSequence = useFillSequence ? *_fillSequence : sequence; // Use the same sequence as evalSequence
         if (targetSequence.accumulator().enabled() &&
             targetSequence.accumulator().triggerMode() == Accumulator::Step) {
-            // Get per-step accumulator value (0=OFF, 1=S(use global), 2-15=override)
+            // Get per-step accumulator value (0=OFF, 1=S(global), -7 to +7=override)
             int stepValue = step.accumulatorStepValue();
             auto &accumulator = const_cast<Accumulator&>(targetSequence.accumulator());
 
             if (stepValue == 1) {
                 // Value 1 = S (use global stepValue)
                 accumulator.tick();
-            } else if (stepValue >= 2) {
-                // Value 2-15 = override with specific value
+            } else if (stepValue != 0) {
+                // Override: handle signed values (-7 to +7)
                 uint8_t savedStepValue = accumulator.stepValue();
-                accumulator.setStepValue(stepValue);
+                Accumulator::Direction savedDirection = accumulator.direction();
+
+                if (stepValue < 0) {
+                    // Negative: flip direction and use absolute value
+                    Accumulator::Direction flipped = (savedDirection == Accumulator::Up) ? Accumulator::Down : Accumulator::Up;
+                    accumulator.setDirection(flipped);
+                    accumulator.setStepValue(-stepValue);  // abs value
+                } else {
+                    // Positive: use value directly
+                    accumulator.setStepValue(stepValue);
+                }
+
                 accumulator.tick();
                 accumulator.setStepValue(savedStepValue);
+                accumulator.setDirection(savedDirection);
             }
             // stepValue == 0 handled by isAccumulatorTrigger() check above
         }
@@ -526,17 +538,30 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
                 if (targetSequence.accumulator().enabled() &&
                     targetSequence.accumulator().triggerMode() == Accumulator::Gate) {
-                    // Get per-step accumulator value (0=OFF, 1=S(use global), 2-15=override)
+                    // Get per-step accumulator value (0=OFF, 1=S(global), -7 to +7=override)
                     int stepValue = step.accumulatorStepValue();
                     auto &accumulator = const_cast<Accumulator&>(targetSequence.accumulator());
 
                     if (stepValue == 1) {
                         accumulator.tick();
-                    } else if (stepValue >= 2) {
+                    } else if (stepValue != 0) {
+                        // Override: handle signed values (-7 to +7)
                         uint8_t savedStepValue = accumulator.stepValue();
-                        accumulator.setStepValue(stepValue);
+                        Accumulator::Direction savedDirection = accumulator.direction();
+
+                        if (stepValue < 0) {
+                            // Negative: flip direction and use absolute value
+                            Accumulator::Direction flipped = (savedDirection == Accumulator::Up) ? Accumulator::Down : Accumulator::Up;
+                            accumulator.setDirection(flipped);
+                            accumulator.setStepValue(-stepValue);
+                        } else {
+                            // Positive: use value directly
+                            accumulator.setStepValue(stepValue);
+                        }
+
                         accumulator.tick();
                         accumulator.setStepValue(savedStepValue);
+                        accumulator.setDirection(savedDirection);
                     }
                 }
             }
@@ -556,7 +581,7 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
                     if (targetSequence.accumulator().enabled() &&
                         targetSequence.accumulator().triggerMode() == Accumulator::Retrigger) {
-                        // Get per-step accumulator value (0=OFF, 1=S(use global), 2-15=override)
+                        // Get per-step accumulator value (0=OFF, 1=S(global), -7 to +7=override)
                         int stepValue = step.accumulatorStepValue();
                         auto &accumulator = const_cast<Accumulator&>(targetSequence.accumulator());
                         int tickCount = stepRetrigger;
@@ -566,14 +591,27 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                             for (int i = 0; i < tickCount; ++i) {
                                 accumulator.tick();
                             }
-                        } else if (stepValue >= 2) {
-                            // Value 2-15 = override with specific value
+                        } else if (stepValue != 0) {
+                            // Override: handle signed values (-7 to +7)
                             uint8_t savedStepValue = accumulator.stepValue();
-                            accumulator.setStepValue(stepValue);
+                            Accumulator::Direction savedDirection = accumulator.direction();
+
+                            if (stepValue < 0) {
+                                // Negative: flip direction and use absolute value
+                                Accumulator::Direction flipped = (savedDirection == Accumulator::Up) ? Accumulator::Down : Accumulator::Up;
+                                accumulator.setDirection(flipped);
+                                accumulator.setStepValue(-stepValue);
+                            } else {
+                                // Positive: use value directly
+                                accumulator.setStepValue(stepValue);
+                            }
+
                             for (int i = 0; i < tickCount; ++i) {
                                 accumulator.tick();
                             }
+
                             accumulator.setStepValue(savedStepValue);
+                            accumulator.setDirection(savedDirection);
                         }
                     }
                 }

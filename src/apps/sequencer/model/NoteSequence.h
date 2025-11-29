@@ -39,7 +39,7 @@ public:
     using HarmonyRoleOverride = UnsignedValue<3>;  // 0-5 per-step harmony role override
     using InversionOverride = UnsignedValue<3>;  // 0-4 per-step inversion override (master only)
     using VoicingOverride = UnsignedValue<3>;  // 0-4 per-step voicing override (master only)
-    using AccumulatorStepValue = UnsignedValue<4>;  // 0-15: 0=OFF, 1=S(global), 2-15=override
+    using AccumulatorStepValue = UnsignedValue<4>;  // 0-15 storage: 0=OFF, 1=S, 2-8=(-7..-1), 9-15=(+1..+7)
 
     enum class GateModeType {
         All = 0,        // Fires gates on every pulse (default)
@@ -244,10 +244,34 @@ public:
         int layerValue(Layer layer) const;
         void setLayerValue(Layer layer, int value);
 
-        // accumulatorStepValue: 0=OFF, 1=S(use global), 2-15=override
-        int accumulatorStepValue() const { return _data1.accumulatorStepValue; }
+    private:
+        // Convert user value (-7..+7, 0=OFF, 1=S) to storage value (0-15)
+        static int encodeAccumulatorValue(int userValue) {
+            if (userValue == 0) return 0;        // OFF
+            if (userValue == 1) return 1;        // S (global)
+            if (userValue < 0) return userValue + 9;   // -7..-1 → 2..8
+            return userValue + 8;                // +1..+7 → 9..15
+        }
+
+        // Convert storage value (0-15) to user value (-7..+7, 0=OFF, 1=S)
+        static int decodeAccumulatorValue(int rawValue) {
+            if (rawValue == 0) return 0;         // OFF
+            if (rawValue == 1) return 1;         // S (global)
+            if (rawValue >= 2 && rawValue <= 8) return rawValue - 9;  // 2..8 → -7..-1
+            return rawValue - 8;                 // 9..15 → +1..+7
+        }
+
+    public:
+        // accumulatorStepValue: 0=OFF, 1=S(global), -7 to +7=override (encoded in 0-15 storage)
+        int accumulatorStepValue() const { return decodeAccumulatorValue(_data1.accumulatorStepValue); }
         void setAccumulatorStepValue(int value) {
-            _data1.accumulatorStepValue = AccumulatorStepValue::clamp(value);
+            // Clamp to valid user range: -7 to +7, plus 0 and 1
+            int clamped = value;
+            if (value < -7) clamped = -7;
+            if (value > 7) clamped = 7;
+            // 0 and 1 are valid, no change needed
+
+            _data1.accumulatorStepValue = encodeAccumulatorValue(clamped);
         }
 
         // Backward-compatible boolean accessors

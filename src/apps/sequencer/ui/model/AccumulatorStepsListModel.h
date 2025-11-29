@@ -72,7 +72,7 @@ private:
             } else if (value == 1) {
                 str("S");  // S = use global sequence stepValue
             } else {
-                str("%d", value);
+                str("%+d", value);  // Shows with sign: +1 to +7, -7 to -1
             }
         } else {
             str("OFF");
@@ -83,12 +83,14 @@ private:
         if (!_sequence || stepIndex >= 16) return;
 
         int currentValue = _sequence->step(stepIndex).accumulatorStepValue();
-        int step = shift ? 5 : 1;  // Shift = faster increment
+        int step = shift ? 5 : 1;
         int newValue = currentValue + (value * step);
 
-        // Wrap around: 0 → 15 → 0
-        if (newValue < 0) newValue = 15;
-        if (newValue > 15) newValue = 0;
+        // Wrap around: -7 → +7 → -7 (skip 0 and 1 during wrapping)
+        if (newValue < -7) newValue = 7;
+        if (newValue > 7) newValue = -7;
+        if (newValue == 0) newValue = (value > 0) ? 1 : -7;
+        if (newValue == 1) newValue = (value > 0) ? 2 : 0;
 
         const_cast<NoteSequence::Step&>(_sequence->step(stepIndex)).setAccumulatorStepValue(newValue);
     }

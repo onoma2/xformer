@@ -158,7 +158,7 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
             } else if (value == 1) {
                 str("S");   // Use sequence accumulator stepValue
             } else {
-                str("%d", value);  // Override value 2-15
+                str("%+d", value);  // -7 to +7 with sign (e.g., "+3", "-5")
             }
 
             canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
@@ -967,7 +967,7 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
         } else if (value == 1) {
             str("Seq");
         } else {
-            str("%d", value);
+            str("%+d", value);  // Shows "+1" to "+7" or "-7" to "-1"
         }
 
         canvas.setFont(Font::Small);
