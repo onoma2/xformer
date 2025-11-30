@@ -45,18 +45,18 @@ public:
     }
 
     virtual int indexedCount(int row) const override {
-        return 2; // true/false for each step
+        return 16; // 0-15: 0=OFF, 1=S(global), 2-15=override
     }
 
     virtual int indexed(int row) const override {
         if (!_sequence || row >= 16) return 0;
-        return _sequence->step(row).isAccumulatorTrigger() ? 1 : 0;
+        return _sequence->step(row).accumulatorStepValue();
     }
 
     virtual void setIndexed(int row, int index) override {
-        if (!_sequence || row >= 16 || index < 0 || index > 1) return;
-        
-        const_cast<NoteSequence::Step&>(_sequence->step(row)).setAccumulatorTrigger(index != 0);
+        if (!_sequence || row >= 16 || index < 0 || index > 15) return;
+
+        const_cast<NoteSequence::Step&>(_sequence->step(row)).setAccumulatorStepValue(index);
     }
 
 private:
@@ -66,7 +66,14 @@ private:
 
     void formatValue(int stepIndex, StringBuilder &str) const {
         if (_sequence && stepIndex < 16) {
-            str(_sequence->step(stepIndex).isAccumulatorTrigger() ? "ON" : "OFF");
+            int value = _sequence->step(stepIndex).accumulatorStepValue();
+            if (value == 0) {
+                str("OFF");
+            } else if (value == 1) {
+                str("S");  // S = use global sequence stepValue
+            } else {
+                str("%+d", value);  // Shows with sign: +1 to +7, -7 to -1
+            }
         } else {
             str("OFF");
         }
@@ -74,9 +81,18 @@ private:
 
     void editValue(int stepIndex, int value, bool shift) {
         if (!_sequence || stepIndex >= 16) return;
-        
-        bool newValue = !_sequence->step(stepIndex).isAccumulatorTrigger();
-        const_cast<NoteSequence::Step&>(_sequence->step(stepIndex)).setAccumulatorTrigger(newValue);
+
+        int currentValue = _sequence->step(stepIndex).accumulatorStepValue();
+        int step = shift ? 5 : 1;
+        int newValue = currentValue + (value * step);
+
+        // Wrap around: -7 → +7 → -7 (skip 0 and 1 during wrapping)
+        if (newValue < -7) newValue = 7;
+        if (newValue > 7) newValue = -7;
+        if (newValue == 0) newValue = (value > 0) ? 1 : -7;
+        if (newValue == 1) newValue = (value > 0) ? 2 : 0;
+
+        const_cast<NoteSequence::Step&>(_sequence->step(stepIndex)).setAccumulatorStepValue(newValue);
     }
 
     NoteSequence *_sequence;

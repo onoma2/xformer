@@ -110,6 +110,44 @@ public:
     }
   }
 
+  // cvOutputRotate
+
+  int cvOutputRotate() const { return _cvOutputRotate.get(Routing::isRouted(Routing::Target::CvOutputRotate, _trackIndex)); }
+  void setCvOutputRotate(int rotate, bool routed = false) {
+      _cvOutputRotate.set(clamp(rotate, -8, 8), routed);
+  }
+  void editCvOutputRotate(int value, bool shift) {
+      if (!Routing::isRouted(Routing::Target::CvOutputRotate, _trackIndex)) {
+          setCvOutputRotate(cvOutputRotate() + value);
+      }
+  }
+  void printCvOutputRotate(StringBuilder &str) const {
+      Routing::printRouted(str, Routing::Target::CvOutputRotate, _trackIndex);
+      str("%+d", cvOutputRotate());
+  }
+  bool isCvOutputRotated() const {
+      return _cvOutputRotate.base != 0 || Routing::isRouted(Routing::Target::CvOutputRotate, _trackIndex);
+  }
+
+  // gateOutputRotate
+
+  int gateOutputRotate() const { return _gateOutputRotate.get(Routing::isRouted(Routing::Target::GateOutputRotate, _trackIndex)); }
+  void setGateOutputRotate(int rotate, bool routed = false) {
+      _gateOutputRotate.set(clamp(rotate, -8, 8), routed);
+  }
+  void editGateOutputRotate(int value, bool shift) {
+      if (!Routing::isRouted(Routing::Target::GateOutputRotate, _trackIndex)) {
+          setGateOutputRotate(gateOutputRotate() + value);
+      }
+  }
+  void printGateOutputRotate(StringBuilder &str) const {
+      Routing::printRouted(str, Routing::Target::GateOutputRotate, _trackIndex);
+      str("%+d", gateOutputRotate());
+  }
+  bool isGateOutputRotated() const {
+      return _gateOutputRotate.base != 0 || Routing::isRouted(Routing::Target::GateOutputRotate, _trackIndex);
+  }
+
   // noteTrack
 
   const NoteTrack &noteTrack() const {
@@ -234,6 +272,8 @@ private:
   uint8_t _trackIndex = -1;
   TrackMode _trackMode;
   int8_t _linkTrack;
+  Routable<int8_t> _cvOutputRotate;
+  Routable<int8_t> _gateOutputRotate;
 
   Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack> _container;
   union {

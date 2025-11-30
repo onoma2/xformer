@@ -39,6 +39,7 @@ public:
     using HarmonyRoleOverride = UnsignedValue<3>;  // 0-5 per-step harmony role override
     using InversionOverride = UnsignedValue<3>;  // 0-4 per-step inversion override (master only)
     using VoicingOverride = UnsignedValue<3>;  // 0-4 per-step voicing override (master only)
+    using AccumulatorStepValue = UnsignedValue<4>;  // 0-15 storage: 0=OFF, 1=S, 2-8=(-7..-1), 9-15=(+1..+7)
 
     enum class GateModeType {
         All = 0,        // Fires gates on every pulse (default)
@@ -243,10 +244,44 @@ public:
         int layerValue(Layer layer) const;
         void setLayerValue(Layer layer, int value);
 
-        // isAccumulatorTrigger
-        bool isAccumulatorTrigger() const { return _data1.isAccumulatorTrigger ? true : false; }
-        void setAccumulatorTrigger(bool isAccumulatorTrigger) { _data1.isAccumulatorTrigger = isAccumulatorTrigger; }
-        void toggleAccumulatorTrigger() { setAccumulatorTrigger(!isAccumulatorTrigger()); }
+    private:
+        // Convert user value (-7..+7, 0=OFF, 1=S) to storage value (0-15)
+        static int encodeAccumulatorValue(int userValue) {
+            if (userValue == 0) return 0;        // OFF
+            if (userValue == 1) return 1;        // S (global)
+            if (userValue < 0) return userValue + 9;   // -7..-1 → 2..8
+            return userValue + 8;                // +1..+7 → 9..15
+        }
+
+        // Convert storage value (0-15) to user value (-7..+7, 0=OFF, 1=S)
+        static int decodeAccumulatorValue(int rawValue) {
+            if (rawValue == 0) return 0;         // OFF
+            if (rawValue == 1) return 1;         // S (global)
+            if (rawValue >= 2 && rawValue <= 8) return rawValue - 9;  // 2..8 → -7..-1
+            return rawValue - 8;                 // 9..15 → +1..+7
+        }
+
+    public:
+        // accumulatorStepValue: 0=OFF, 1=S(global), -7 to +7=override (encoded in 0-15 storage)
+        int accumulatorStepValue() const { return decodeAccumulatorValue(_data1.accumulatorStepValue); }
+        void setAccumulatorStepValue(int value) {
+            // Clamp to valid user range: -7 to +7, plus 0 and 1
+            int clamped = value;
+            if (value < -7) clamped = -7;
+            if (value > 7) clamped = 7;
+            // 0 and 1 are valid, no change needed
+
+            _data1.accumulatorStepValue = encodeAccumulatorValue(clamped);
+        }
+
+        // Backward-compatible boolean accessors
+        bool isAccumulatorTrigger() const { return _data1.accumulatorStepValue > 0; }
+        void setAccumulatorTrigger(bool trigger) {
+            _data1.accumulatorStepValue = trigger ? 1 : 0;  // 1 = S (use global stepValue)
+        }
+        void toggleAccumulatorTrigger() {
+            setAccumulatorTrigger(!isAccumulatorTrigger());
+        }
 
         // pulseCount
         int pulseCount() const { return _data1.pulseCount; }
@@ -272,10 +307,10 @@ public:
             _data1.inversionOverride = InversionOverride::clamp(inversionOverride);
         }
 
-        // voicingOverride
-        int voicingOverride() const { return _data1.voicingOverride; }
+        // voicingOverride - DROPPED to make space for accumulatorStepValue
+        int voicingOverride() const { return 0; }  // Always return UseSequence
         void setVoicingOverride(int voicingOverride) {
-            _data1.voicingOverride = VoicingOverride::clamp(voicingOverride);
+            // No-op - feature dropped
         }
 
         //----------------------------------------
@@ -316,13 +351,13 @@ public:
             BitField<uint32_t, 2, RetriggerProbability::Bits> retriggerProbability;
             BitField<uint32_t, 5, GateOffset::Bits> gateOffset;
             BitField<uint32_t, 9, Condition::Bits> condition;
-            BitField<uint32_t, 16, 1> isAccumulatorTrigger;
-            BitField<uint32_t, 17, PulseCount::Bits> pulseCount;  // bits 17-19
-            BitField<uint32_t, 20, GateMode::Bits> gateMode;      // bits 20-21
-            BitField<uint32_t, 22, HarmonyRoleOverride::Bits> harmonyRoleOverride;  // bits 22-24
-            BitField<uint32_t, 25, InversionOverride::Bits> inversionOverride;  // bits 25-27
-            BitField<uint32_t, 28, VoicingOverride::Bits> voicingOverride;  // bits 28-30
-            // 1 bit left
+            BitField<uint32_t, 16, AccumulatorStepValue::Bits> accumulatorStepValue;  // bits 16-19 (was 1 bit)
+            BitField<uint32_t, 20, PulseCount::Bits> pulseCount;  // bits 20-22 (shifted from 17)
+            BitField<uint32_t, 23, GateMode::Bits> gateMode;      // bits 23-24 (shifted from 20)
+            BitField<uint32_t, 25, HarmonyRoleOverride::Bits> harmonyRoleOverride;  // bits 25-27 (shifted from 22)
+            BitField<uint32_t, 28, InversionOverride::Bits> inversionOverride;  // bits 28-30 (shifted from 25)
+            // voicingOverride dropped to make space - was bits 28-30, would overflow
+            // 1 bit left (bit 31)
         } _data1;
     };
 

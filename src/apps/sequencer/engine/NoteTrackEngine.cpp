@@ -152,7 +152,17 @@ static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, c
     // Apply accumulator modulation if enabled
     if (sequence.accumulator().enabled()) {
         int accumulatorValue = sequence.accumulator().currentValue();
-        note += accumulatorValue;
+
+        // Check accumulator mode
+        if (sequence.accumulator().mode() == Accumulator::Track) {
+            // TRACK mode: Apply to ALL steps
+            note += accumulatorValue;
+        } else {
+            // STAGE mode: Only apply to steps with triggers enabled
+            if (step.isAccumulatorTrigger()) {
+                note += accumulatorValue;
+            }
+        }
     }
 
     int probability = clamp(step.noteVariationProbability() + probabilityBias, -1, NoteSequence::NoteVariationProbability::Max);
@@ -461,8 +471,33 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         const auto &targetSequence = useFillSequence ? *_fillSequence : sequence; // Use the same sequence as evalSequence
         if (targetSequence.accumulator().enabled() &&
             targetSequence.accumulator().triggerMode() == Accumulator::Step) {
-            // Tick the accumulator - using mutable allows modification through const ref
-            const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+            // Get per-step accumulator value (0=OFF, 1=S(global), -7 to +7=override)
+            int stepValue = step.accumulatorStepValue();
+            auto &accumulator = const_cast<Accumulator&>(targetSequence.accumulator());
+
+            if (stepValue == 1) {
+                // Value 1 = S (use global stepValue)
+                accumulator.tick();
+            } else if (stepValue != 0) {
+                // Override: handle signed values (-7 to +7)
+                uint8_t savedStepValue = accumulator.stepValue();
+                Accumulator::Direction savedDirection = accumulator.direction();
+
+                if (stepValue < 0) {
+                    // Negative: flip direction and use absolute value
+                    Accumulator::Direction flipped = (savedDirection == Accumulator::Up) ? Accumulator::Down : Accumulator::Up;
+                    accumulator.setDirection(flipped);
+                    accumulator.setStepValue(-stepValue);  // abs value
+                } else {
+                    // Positive: use value directly
+                    accumulator.setStepValue(stepValue);
+                }
+
+                accumulator.tick();
+                accumulator.setStepValue(savedStepValue);
+                accumulator.setDirection(savedDirection);
+            }
+            // stepValue == 0 handled by isAccumulatorTrigger() check above
         }
     }
 
@@ -503,7 +538,31 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
                 if (targetSequence.accumulator().enabled() &&
                     targetSequence.accumulator().triggerMode() == Accumulator::Gate) {
-                    const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+                    // Get per-step accumulator value (0=OFF, 1=S(global), -7 to +7=override)
+                    int stepValue = step.accumulatorStepValue();
+                    auto &accumulator = const_cast<Accumulator&>(targetSequence.accumulator());
+
+                    if (stepValue == 1) {
+                        accumulator.tick();
+                    } else if (stepValue != 0) {
+                        // Override: handle signed values (-7 to +7)
+                        uint8_t savedStepValue = accumulator.stepValue();
+                        Accumulator::Direction savedDirection = accumulator.direction();
+
+                        if (stepValue < 0) {
+                            // Negative: flip direction and use absolute value
+                            Accumulator::Direction flipped = (savedDirection == Accumulator::Up) ? Accumulator::Down : Accumulator::Up;
+                            accumulator.setDirection(flipped);
+                            accumulator.setStepValue(-stepValue);
+                        } else {
+                            // Positive: use value directly
+                            accumulator.setStepValue(stepValue);
+                        }
+
+                        accumulator.tick();
+                        accumulator.setStepValue(savedStepValue);
+                        accumulator.setDirection(savedDirection);
+                    }
                 }
             }
 
@@ -522,10 +581,37 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     const auto &targetSequence = useFillSequence ? *_fillSequence : sequence;
                     if (targetSequence.accumulator().enabled() &&
                         targetSequence.accumulator().triggerMode() == Accumulator::Retrigger) {
-                        // Tick N times for N retriggers, regardless of gate length
+                        // Get per-step accumulator value (0=OFF, 1=S(global), -7 to +7=override)
+                        int stepValue = step.accumulatorStepValue();
+                        auto &accumulator = const_cast<Accumulator&>(targetSequence.accumulator());
                         int tickCount = stepRetrigger;
-                        for (int i = 0; i < tickCount; ++i) {
-                            const_cast<Accumulator&>(targetSequence.accumulator()).tick();
+
+                        if (stepValue == 1) {
+                            // Value 1 = S (use global stepValue)
+                            for (int i = 0; i < tickCount; ++i) {
+                                accumulator.tick();
+                            }
+                        } else if (stepValue != 0) {
+                            // Override: handle signed values (-7 to +7)
+                            uint8_t savedStepValue = accumulator.stepValue();
+                            Accumulator::Direction savedDirection = accumulator.direction();
+
+                            if (stepValue < 0) {
+                                // Negative: flip direction and use absolute value
+                                Accumulator::Direction flipped = (savedDirection == Accumulator::Up) ? Accumulator::Down : Accumulator::Up;
+                                accumulator.setDirection(flipped);
+                                accumulator.setStepValue(-stepValue);
+                            } else {
+                                // Positive: use value directly
+                                accumulator.setStepValue(stepValue);
+                            }
+
+                            for (int i = 0; i < tickCount; ++i) {
+                                accumulator.tick();
+                            }
+
+                            accumulator.setStepValue(savedStepValue);
+                            accumulator.setDirection(savedDirection);
                         }
                     }
                 }

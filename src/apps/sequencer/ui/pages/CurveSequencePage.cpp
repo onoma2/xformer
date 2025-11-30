@@ -24,6 +24,21 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "ROUTE" },
 };
 
+enum class LfoContextAction {
+    Triangle,
+    Sine,
+    Sawtooth,
+    Square,
+    Last
+};
+
+static const ContextMenuModel::Item lfoContextMenuItems[] = {
+    { "TRI" },
+    { "SINE" },
+    { "SAW" },
+    { "SQUA" },
+};
+
 CurveSequencePage::CurveSequencePage(PageManager &manager, PageContext &context) :
     ListPage(manager, context, _listModel)
 {}
@@ -54,6 +69,12 @@ void CurveSequencePage::keyPress(KeyPressEvent &event) {
 
     if (key.isContextMenu()) {
         contextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step5)) {
+        lfoContextShow();
         event.consume();
         return;
     }
@@ -132,4 +153,36 @@ void CurveSequencePage::duplicateSequence() {
 
 void CurveSequencePage::initRoute() {
     _manager.pages().top.editRoute(_listModel.routingTarget(selectedRow()), _project.selectedTrackIndex());
+}
+
+void CurveSequencePage::lfoContextShow() {
+    showContextMenu(ContextMenu(
+        lfoContextMenuItems,
+        int(LfoContextAction::Last),
+        [&] (int index) { lfoContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void CurveSequencePage::lfoContextAction(int index) {
+    switch (LfoContextAction(index)) {
+    case LfoContextAction::Triangle:
+        _project.selectedCurveSequence().populateWithTriangleWaveLfo(0, CONFIG_STEP_COUNT - 1);
+        showMessage("LFO TRIANGLE POPULATED");
+        break;
+    case LfoContextAction::Sine:
+        _project.selectedCurveSequence().populateWithSineWaveLfo(0, CONFIG_STEP_COUNT - 1);
+        showMessage("LFO SINE POPULATED");
+        break;
+    case LfoContextAction::Sawtooth:
+        _project.selectedCurveSequence().populateWithSawtoothWaveLfo(0, CONFIG_STEP_COUNT - 1);
+        showMessage("LFO SAWTOOTH POPULATED");
+        break;
+    case LfoContextAction::Square:
+        _project.selectedCurveSequence().populateWithSquareWaveLfo(0, CONFIG_STEP_COUNT - 1);
+        showMessage("LFO SQUARE POPULATED");
+        break;
+    case LfoContextAction::Last:
+        break;
+    }
 }

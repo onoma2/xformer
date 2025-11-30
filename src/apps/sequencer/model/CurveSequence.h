@@ -331,6 +331,17 @@ public:
 
     void duplicateSteps();
 
+    // LFO-shape population functions
+    void populateWithLfoShape(Curve::Type shape, int firstStep, int lastStep);
+    void populateWithLfoPattern(Curve::Type shape, int firstStep, int lastStep);
+    void populateWithLfoWaveform(Curve::Type upShape, Curve::Type downShape, int firstStep, int lastStep);
+
+    // Advanced LFO waveform functions
+    void populateWithSineWaveLfo(int firstStep, int lastStep);
+    void populateWithTriangleWaveLfo(int firstStep, int lastStep);
+    void populateWithSawtoothWaveLfo(int firstStep, int lastStep);
+    void populateWithSquareWaveLfo(int firstStep, int lastStep);
+
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);
 

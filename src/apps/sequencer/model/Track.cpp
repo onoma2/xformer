@@ -1,9 +1,12 @@
 #include "Track.h"
 #include "Project.h"
+#include "ProjectVersion.h"
 
 void Track::clear() {
     _trackMode = TrackMode::Default;
     _linkTrack = -1;
+    setCvOutputRotate(0);
+    setGateOutputRotate(0);
 
     initContainer();
 }
@@ -87,6 +90,8 @@ void Track::cvOutputName(int index, StringBuilder &str) const {
 void Track::write(VersionedSerializedWriter &writer) const {
     writer.writeEnum(_trackMode, trackModeSerialize);
     writer.write(_linkTrack);
+    writer.write(_cvOutputRotate.base);
+    writer.write(_gateOutputRotate.base);
 
     switch (_trackMode) {
     case TrackMode::Note:
@@ -109,6 +114,14 @@ void Track::write(VersionedSerializedWriter &writer) const {
 void Track::read(VersionedSerializedReader &reader) {
     reader.readEnum(_trackMode, trackModeSerialize);
     reader.read(_linkTrack);
+    
+    if (reader.dataVersion() >= ProjectVersion::Version47) { // Assuming Version47 is next available or using dummy check
+         reader.read(_cvOutputRotate.base);
+         reader.read(_gateOutputRotate.base);
+    } else {
+         setCvOutputRotate(0);
+         setGateOutputRotate(0);
+    }
 
     initContainer();
 

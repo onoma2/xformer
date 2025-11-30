@@ -146,9 +146,24 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
         switch (layer()) {
         case Layer::Gate:
             break;
-        case Layer::AccumulatorTrigger:
-            // Inherits gate squares, corner dot shows which steps have accum trigger
+        case Layer::AccumulatorTrigger: {
+            // Display accumulator step value as text
+            int value = step.accumulatorStepValue();
+            canvas.setFont(Font::Tiny);
+            canvas.setColor(Color::Bright);
+
+            FixedStringBuilder<8> str;
+            if (value == 0) {
+                str("--");  // OFF
+            } else if (value == 1) {
+                str("S");   // Use sequence accumulator stepValue
+            } else {
+                str("%+d", value);  // -7 to +7 with sign (e.g., "+3", "-5")
+            }
+
+            canvas.drawText(x + (stepWidth - canvas.textWidth(str) + 1) / 2, y + 20, str);
             break;
+        }
         case Layer::GateProbability:
             SequencePainter::drawProbability(
                 canvas,
@@ -321,7 +336,7 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
     // handle detail display
 
     if (_showDetail) {
-        if ((layer() == Layer::Gate || layer() == Layer::Slide || layer() == Layer::AccumulatorTrigger) || _stepSelection.none()) {
+        if ((layer() == Layer::Gate || layer() == Layer::Slide) || _stepSelection.none()) {
             _showDetail = false;
         }
         if (_stepSelection.isPersisted() && os::ticks() > _showDetailTicks + os::time::ms(500)) {
@@ -418,7 +433,7 @@ void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
             event.consume();
             break;
         case Layer::AccumulatorTrigger:
-            sequence.step(stepIndex).toggleAccumulatorTrigger();
+            // No toggle behavior - value stays as edited via encoder
             event.consume();
             break;
         default:
@@ -512,7 +527,7 @@ void NoteSequenceEditPage::encoder(EncoderEvent &event) {
                 step.setSlide(event.value() > 0);
                 break;
             case Layer::AccumulatorTrigger:
-                step.setAccumulatorTrigger(event.value() > 0);
+                step.setAccumulatorStepValue(step.accumulatorStepValue() + event.value());
                 break;
             case Layer::PulseCount:
                 step.setPulseCount(step.pulseCount() + event.value());
@@ -579,7 +594,7 @@ void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
             setLayer(Layer::Length);
             break;
         case Function::Note:
-            // SHIFT + NOTE: Reset accumulator counter
+            // SHIFT + NOTE: Reset accumulator runtime value
             {
                 auto &sequence = _project.selectedNoteSequence();
                 const_cast<Accumulator&>(sequence.accumulator()).reset();
@@ -766,7 +781,6 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
     switch (layer()) {
     case Layer::Gate:
     case Layer::Slide:
-    case Layer::AccumulatorTrigger:
         break;
     case Layer::GateProbability:
         SequencePainter::drawProbability(
@@ -944,6 +958,22 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
         canvas.setFont(Font::Small);
         canvas.drawTextCentered(64 + 32, 16, 96, 32, str);
         break;
+    case Layer::AccumulatorTrigger: {
+        int value = step.accumulatorStepValue();
+        str.reset();
+
+        if (value == 0) {
+            str("OFF");
+        } else if (value == 1) {
+            str("Seq");
+        } else {
+            str("%+d", value);  // Shows "+1" to "+7" or "-7" to "-1"
+        }
+
+        canvas.setFont(Font::Small);
+        canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
+        break;
+    }
     case Layer::Last:
         break;
     }

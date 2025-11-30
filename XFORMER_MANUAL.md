@@ -49,9 +49,9 @@ When a track is set to Algo type, its UI page changes to display controls specif
 - **Shift-S1**: Main UI
 
     	**Page 1:** Algorithm, Flow, Ornament, Power
-    
+
     	**Page 2:** Loop, Scan, Rotate, CV Mode
-    
+
     	**Page 3:** Skew, Gate Offset, Glide, Trill
 
 Key elements include:
@@ -350,13 +350,13 @@ Key features:
 
 ```
 !!! Currently Rettigger events advance Accum counter by the number of
-retrigers of step, so by modulating retrigger value you can get different
+retrigers of the step, so by modulating retrigger value you can get different
 amount of scale increments!!!
 ```
 
 Accumulator is enabled by default. Push NOTE(F4) several times to get to
-Accumulator page with. Activate a step to enable accum increment at this
-step. Small persistend dot will appear in top right corner of the scuare.
+Accumulator page with. Push step and rotate encoder to change accumulator
+increments for the step. Small persistend dot will appear in top right corner of the scuare.
 
 Number in the top line indicates current Accum counter number.
 
@@ -366,6 +366,12 @@ Number in the top line indicates current Accum counter number.
 
 - **Unipolar (0):** Output range from 0 to maxValue
 - **Bipolar (1):** Output range from minValue to maxValue (centered around 0)
+
+**Activation Options:**
+
+- **TRACK:** All the steps will be transosed in following accumulator counter
+increase.
+- **STAGE:** Only the steps with accumulator triggers on them will be updated.
 
 **Direction Options:**
 
@@ -405,7 +411,7 @@ to)
   complex rhythmic patterns where individual steps can be subdivided.
 
   **Technical Details**:
-  
+
    - Pulse Count values range from 0 to 7, representing 1 to 8 pulses
    - A value of 0 means the step advances after 1 pulse (normal behavior)
    - A value of 7 means the step holds for 8 total pulses before advancing
@@ -442,4 +448,100 @@ to)
       - Gates fire on the first pulse and the last pulse of the sequence
       - Creates an "bookend" pattern with silence in between
       - Useful for creating rhythmic accents at the beginning and end of a held note
+
+## 5. Global Output Rotation (CV & Gate)
+
+This feature allows you to dynamically rotate which tracks are assigned to physical CV and Gate outputs. It acts like a virtual 8-channel sequential switch, letting your modulation patterns "spin" around your connected modules.
+
+### How it Works
+
+The rotation applies to the physical output's lookup of its assigned track. When rotation is applied, the output will instead look for its source from a shifted position within a dynamically defined "pool" of rotating tracks.
+
+- **Selective Rotation:** Only tracks explicitly enabled for rotation (via the Routing page) will participate. Static tracks remain untouched.
+- **Dynamic Pool:** The system identifies all tracks currently targeted for rotation. These tracks form a "pool" that rotates amongst themselves.
+
+### Setup Instructions
+
+1.  **Configure Track Layout:**
+    *   Navigate to the **Layout Page** (usually by pressing SHIFT + S2, then selecting "LAYOUT").
+    *   Go to **CV Output Mode** (F4). For each physical CV output (1-8), select the **Track** that should usually drive it.
+    *   Repeat for **Gate Output Mode** (F3).
+    *   *Example:* CV Out 1 -> Track 1, CV Out 2 -> Track 2, CV Out 3 -> Track 3.
+
+2.  **Create a Rotation Route:**
+    *   Navigate to the **Routing Page** (usually by pressing SHIFT + S2, then selecting "ROUTING").
+    *   Select an **empty Route slot**.
+    *   Set **Target** to `CV Out Rot` (for CV output rotation) or `Gate Out Rot` (for Gate output rotation).
+    *   Set **Source** (e.g., `CV In 1`, a slow LFO, or MIDI CC). This source will control the speed and direction of the rotation.
+    *   Adjust **Min** and **Max** to define the range of rotation steps. The default is 0 to 8, allowing up to 8 steps of rotation. You can set it to -8 to 8 for bipolar control.
+    *   **Crucially: Select the Tracks to Rotate.** In the "Tracks" section of the Routing page, use the track selection mask to **select only the tracks you want to participate in this rotation pool**. For example, if you want Tracks 1, 2, and 3 to rotate, select Track 1, Track 2, and Track 3.
+    *   **COMMIT** the route.
+
+### Example Use Case
+
+*   **Goal:** Rotate 3 LFOs (Track 1, 2, 3) across 3 filter inputs (CV Out 1, 2, 3).
+*   **Layout Page:**
+    *   CV Out 1 -> Track 1
+    *   CV Out 2 -> Track 2
+    *   CV Out 3 -> Track 3
+    *   CV Out 4 -> Track 4 (Static, e.g., for a bassline)
+*   **Routing Page:**
+    *   Target: `CV Out Rot`
+    *   Source: `CV In 1` (LFO source)
+    *   Min: `0`, Max: `3` (to rotate 3 steps)
+    *   Tracks: `X X X - - - - -` (Track 1, 2, 3 selected)
+*   **Effect:** As `CV In 1` modulates from 0 to 3, the output of Track 1 will move from CV Out 1 -> 2 -> 3 -> 1, Track 2 will move 2 -> 3 -> 1 -> 2, and so on. CV Out 4 will remain static, always receiving from Track 4.
+
+## 6. New Curve Track Features
+
+### Global Phase
+
+The Global Phase feature allows you to offset the playback position of your curve sequence. This shifts the entire sequence playback by a specified phase amount without changing the actual step data.
+
+- **Access:** Press F5 to cycle through edit modes: Step → Phase → Wavefolder → Step
+- **Function:** When enabled, the sequence will read values from a position that's offset by the phase value
+- **Range:** 0.00 to 1.00 (can be adjusted with encoder, press for 0.1 steps, release for 0.01 steps)
+- **Effect:** The phase offset is visualized with a dimmer vertical line showing the phased step position compared to the actual current step
+
+### Shift+Step Shortcut for Multi-Step Shape/Min/Max Editing
+
+When multiple steps are selected in a CurveSequence, you can use shift with encoder to create smooth transitions across the selected steps:
+
+- **Multi-Step Shape Editing:** Select multiple steps, press Shift while turning the encoder - this will set all selected steps to the same shape but create a smooth transition from the minimum to maximum values across the steps
+- **Shift+Encoder with Multiple Steps Selected:** When you have multiple steps selected and turn the encoder with shift, it creates a gradient of min/max values across the selected steps
+
+### Wavefolding Features
+
+The CurveTrack includes advanced wavefolding capabilities accessible through the Phase button:
+
+- **Access:** Press F5 repeatedly to cycle to the Wavefolder screen
+- **Parameters:**
+  - **FOLD:** Controls the folding amount (0.00 to 1.00) - increases harmonic complexity
+  - **GAIN:** Controls input gain (0.00 to 2.00) - adjusts signal strength before folding
+  - **FILTER:** DJ filter control (-1.00 to 1.00) - applies low-pass (negative) or high-pass (positive) filtering
+  - **XFADE:** Crossfade between original and processed signal (0.00 to 1.00) - blend between dry and wet signals
+
+### LFO Context Menu Feature
+
+A quick way to fill sequences with common LFO waveforms:
+
+- **Access:** Press and hold the "STEP 5" button while on a CurveSequence page (not CurveSequenceEdit page)
+- **Options:**
+  - **TRI:** Triangle wave pattern using Triangle curve shapes
+  - **SINE:** Sine wave approximation using SmoothUp/SmoothDown alternating
+  - **SAW:** Sawtooth wave pattern using RampUp shapes
+  - **SQUA:** Square wave pattern using StepUp/StepDown alternating
+
+These features enhance the CurveTrack's capabilities, allowing for more complex modulation patterns and easier creation of LFO-style CV sequences.
+
+### Phase Visualization
+
+When Global Phase is active, the engine continues to track both the actual step position and the phased step position:
+
+- The actual current step position is displayed with a brighter vertical line
+- The phased step position is shown with a dimmer vertical line
+- This visual feedback helps you understand how the phase offset is affecting the sequence playback
+
+These new features make the CurveTrack significantly more powerful for creating complex modulation sources, from simple LFOs to intricate evolving modulation patterns with wavefolding and phase shifting capabilities.
+
 

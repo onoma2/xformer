@@ -1,6 +1,7 @@
 #include "TopPage.h"
 
 #include "Pages.h"
+#include "ui/PageKeyMap.h"
 
 #include "ui/model/NoteSequenceListModel.h"
 #include "ui/model/CurveSequenceListModel.h"
@@ -127,10 +128,10 @@ void TopPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    if (key.pageModifier()) {
+    if (key.pageModifier() && PageKeyMap::isPageKey(key.code())) {
         setMode(Mode(key.code()));
         event.consume();
-    } else {
+    } else if (!key.pageModifier()) {
         if (key.isPattern() && _mode != Mode::Pattern) {
             pages.pattern.setModal(true);
             pages.pattern.show();

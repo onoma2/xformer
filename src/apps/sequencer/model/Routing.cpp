@@ -191,6 +191,17 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
         for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
             if (tracks & (1<<trackIndex)) {
                 auto &track = _project.track(trackIndex);
+
+                // Handle generic Track targets
+                if (target == Target::CvOutputRotate) {
+                    track.setCvOutputRotate(intValue, true);
+                    continue;
+                }
+                if (target == Target::GateOutputRotate) {
+                    track.setGateOutputRotate(intValue, true);
+                    continue;
+                }
+
                 switch (track.trackMode()) {
                 case Track::TrackMode::Note:
                     if (isTrackTarget(target)) {
@@ -300,6 +311,8 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::LengthBias)]                      = { -8,     8,      -8,     8,      8       },
     [int(Routing::Target::NoteProbabilityBias)]             = { -8,     8,      -8,     8,      8       },
     [int(Routing::Target::ShapeProbabilityBias)]            = { -8,     8,      -8,     8,      8       },
+    [int(Routing::Target::CvOutputRotate)]                  = { -8,     8,      0,      8,      1       },
+    [int(Routing::Target::GateOutputRotate)]                = { -8,     8,      0,      8,      1       },
     // Sequence targets
     [int(Routing::Target::FirstStep)]                       = { 0,      63,     0,      63,     16      },
     [int(Routing::Target::LastStep)]                        = { 0,      63,     0,      63,     16      },
@@ -347,6 +360,8 @@ void Routing::printTargetValue(Routing::Target target, float normalized, StringB
     case Target::Octave:
     case Target::Transpose:
     case Target::Rotate:
+    case Target::CvOutputRotate:
+    case Target::GateOutputRotate:
         str("%+d", intValue);
         break;
     case Target::Offset:

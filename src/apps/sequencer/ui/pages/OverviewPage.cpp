@@ -55,7 +55,7 @@ static void drawCurve(Canvas &canvas, int x, int y, int w, int h, float &lastY, 
     lastY = fy0;
 }
 
-static void drawCurveTrack(Canvas &canvas, int trackIndex, const CurveTrackEngine &trackEngine, const CurveSequence &sequence) {
+static void drawCurveTrack(Canvas &canvas, int trackIndex, const CurveTrackEngine &trackEngine, const CurveTrack &curveTrack, const CurveSequence &sequence) {
     canvas.setBlendMode(BlendMode::Add);
     canvas.setColor(Color::MediumBright);
 
@@ -76,11 +76,22 @@ static void drawCurveTrack(Canvas &canvas, int trackIndex, const CurveTrackEngin
         drawCurve(canvas, x, y + 1, 8, 6, lastY, function, min, max);
     }
 
-    if (trackEngine.currentStep() >= 0) {
-        int x = 64 + ((trackEngine.currentStep() - stepOffset) + trackEngine.currentStepFraction()) * 8;
-        canvas.setBlendMode(BlendMode::Set);
-        canvas.setColor(Color::Bright);
-        canvas.vline(x, y + 1, 7);
+    if (curveTrack.globalPhase() > 0.f) {
+        // draw only phased cursor
+        if (trackEngine.phasedStep() >= 0) {
+            int x = 64 + ((trackEngine.phasedStep() - stepOffset) + trackEngine.phasedStepFraction()) * 8;
+            canvas.setBlendMode(BlendMode::Set);
+            canvas.setColor(Color::Medium);
+            canvas.vline(x, y + 1, 7);
+        }
+    } else {
+        // draw normal cursor
+        if (trackEngine.currentStep() >= 0) {
+            int x = 64 + ((trackEngine.currentStep() - stepOffset) + trackEngine.currentStepFraction()) * 8;
+            canvas.setBlendMode(BlendMode::Set);
+            canvas.setColor(Color::Bright);
+            canvas.vline(x, y + 1, 7);
+        }
     }
 }
 
@@ -161,7 +172,7 @@ void OverviewPage::draw(Canvas &canvas) {
             drawNoteTrack(canvas, trackIndex, trackEngine.as<NoteTrackEngine>(), track.noteTrack().sequence(trackState.pattern()));
             break;
         case Track::TrackMode::Curve:
-            drawCurveTrack(canvas, trackIndex, trackEngine.as<CurveTrackEngine>(), track.curveTrack().sequence(trackState.pattern()));
+            drawCurveTrack(canvas, trackIndex, trackEngine.as<CurveTrackEngine>(), track.curveTrack(), track.curveTrack().sequence(trackState.pattern()));
             break;
         case Track::TrackMode::MidiCv:
             break;

@@ -194,6 +194,48 @@ public:
         str("%+.1f%%", gateProbabilityBias() * 12.5f);
     }
 
+    // globalPhase
+
+    float globalPhase() const { return _globalPhase; }
+    void setGlobalPhase(float globalPhase) {
+        _globalPhase = clamp(globalPhase, 0.f, 1.f);
+    }
+
+    void editGlobalPhase(float value, bool shift) {
+        setGlobalPhase(globalPhase() + value * (shift ? 0.1f : 0.01f));
+    }
+
+    void printGlobalPhase(StringBuilder &str) const {
+        str("%.2f", globalPhase());
+    }
+
+    // wavefolderFold
+
+    float wavefolderFold() const { return _wavefolderFold; }
+    void setWavefolderFold(float value) { _wavefolderFold = clamp(value, 0.f, 1.f); }
+    void editWavefolderFold(int value, bool shift) { setWavefolderFold(wavefolderFold() + value * (shift ? 0.1f : 0.01f)); }
+    void printWavefolderFold(StringBuilder &str) const { str("%.2f", wavefolderFold()); }
+
+    // wavefolderGain
+
+    float wavefolderGain() const { return _wavefolderGain; }
+    void setWavefolderGain(float value) { _wavefolderGain = clamp(value, 0.f, 2.f); }
+    void editWavefolderGain(int value, bool shift) { setWavefolderGain(wavefolderGain() + value * (shift ? 0.1f : 0.01f)); }
+    void printWavefolderGain(StringBuilder &str) const { str("%.2f", wavefolderGain()); }
+
+    // djFilter
+
+    float djFilter() const { return _djFilter; }
+    void setDjFilter(float value) { _djFilter = clamp(value, -1.f, 1.f); }
+    void editDjFilter(int value, bool shift) { setDjFilter(djFilter() + value * (shift ? 0.1f : 0.01f)); }
+    void printDjFilter(StringBuilder &str) const { str("%+.2f", djFilter()); }
+
+    // xFade
+    float xFade() const { return _xFade; }
+    void setXFade(float value) { _xFade = clamp(value, 0.f, 1.f); }
+    void editXFade(int value, bool shift) { setXFade(xFade() + value * (shift ? 0.1f : 0.01f)); }
+    void printXFade(StringBuilder &str) const { str("%.2f", xFade()); }
+
     // sequences
 
     const CurveSequenceArray &sequences() const { return _sequences; }
@@ -201,6 +243,17 @@ public:
 
     const CurveSequence &sequence(int index) const { return _sequences[index]; }
           CurveSequence &sequence(int index)       { return _sequences[index]; }
+
+    // LFO-shape population functions at track level
+    void populateWithLfoShape(int sequenceIndex, Curve::Type shape, int firstStep, int lastStep);
+    void populateWithLfoPattern(int sequenceIndex, Curve::Type shape, int firstStep, int lastStep);
+    void populateWithLfoWaveform(int sequenceIndex, Curve::Type upShape, Curve::Type downShape, int firstStep, int lastStep);
+
+    // Advanced LFO waveform functions at track level
+    void populateWithSineWaveLfo(int sequenceIndex, int firstStep, int lastStep);
+    void populateWithTriangleWaveLfo(int sequenceIndex, int firstStep, int lastStep);
+    void populateWithSawtoothWaveLfo(int sequenceIndex, int firstStep, int lastStep);
+    void populateWithSquareWaveLfo(int sequenceIndex, int firstStep, int lastStep);
 
     //----------------------------------------
     // Routing
@@ -238,6 +291,11 @@ private:
     Routable<int8_t> _rotate;
     Routable<int8_t> _shapeProbabilityBias;
     Routable<int8_t> _gateProbabilityBias;
+    float _globalPhase;
+    float _wavefolderFold;
+    float _wavefolderGain;
+    float _djFilter;
+    float _xFade;
 
     CurveSequenceArray _sequences;
 

@@ -1,20 +1,16 @@
-System Prompt:
-You are amazing STM32 coder with advanced musical acumen, aware of EURORACK CV
-conventions and OLED ui design constraints. Read STM32.md before implementing resource heavy tasks, that may bee too  much for hardware.                                                             │
-│                                                                                                              │
-│  You are an elite Test-Driven Development (TDD) specialist and software architect with deep expertise in     │
-│  implementing features through rigorous test-first methodologies. Your approach involves systematically      │
-│  decomposing tasks, writing comprehensive tests, and implementing functionality through iterative            │
-│  red-green-refactor cycles. Read TDD-METHOD.md if there are questions                                                                                 │
-│                                                                                                              │
-│  **Core Methodology:**                                                                                       │
-│  - Always begin by analyzing and decomposing the requested task into smaller, testable units                 │
-│  - For each feature increment, write tests before implementing the corresponding code                        │
-│  - Follow the classic TDD red-green-refactor cycle: write failing test (red) → implement minimal code to     │
-│  pass test (green) → refactor while maintaining passing tests                                                │
-│  - Write tests that are specific, comprehensive, and cover edge cases and error conditions  .
-- dont build and run tests if not working on users local machine.
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# QWEN.md - PEW|FORMER Sequencer Firmware Context
+
+## System Prompt
+You are amazing STM32 coder with advanced musical acumen, aware of EURORACK CV conventions and OLED ui design constraints. Read STM32.md before implementing resource heavy tasks, that may be too much for hardware.
+
+You are an elite Test-Driven Development (TDD) specialist and software architect with deep expertise in implementing features through rigorous test-first methodologies. Your approach involves systematically decomposing tasks, writing comprehensive tests, and implementing functionality through iterative red-green-refactor cycles. Read TDD-METHOD.md if there are questions.
+
+**Core Methodology:**
+- Always begin by analyzing and decomposing the requested task into smaller, testable units
+- For each feature increment, write tests before implementing the corresponding code
+- Follow the classic TDD red-green-refactor cycle: write failing test (red) → implement minimal code to pass test (green) → refactor while maintaining passing tests
+- Write tests that are specific, comprehensive, and cover edge cases and error conditions
+- Don't build and run tests if not working on users local machine.
 
 ## Project Overview
 
@@ -25,6 +21,7 @@ The project is a dual-platform embedded system running on both STM32 hardware an
 ## Build System
 
 This project uses CMake with platform-specific toolchains. Build directories are organized by platform (stm32/sim) and build type (debug/release).
+
 ## Development Workflow
 
 **Simulator-first development is recommended:**
@@ -149,6 +146,40 @@ Three major improvement categories documented in `doc/improvements/`:
 1. **Noise reduction** (`noise-reduction.md`): Display settings to minimize OLED noise
 2. **Shape improvements** (`shape-improvements.md`): Enhanced CV curve generation
 3. **MIDI improvements** (`midi-improvements.md`): Extended MIDI functionality
+
+## LFO-Shape Population Enhancement
+
+### Overview
+Enhancement to provide quick access to common LFO waveforms for CurveTrack sequences.
+
+### Implemented Features
+1. **Core Functions Added to CurveSequence:**
+   - `populateWithLfoShape(Curve::Type shape, int firstStep, int lastStep)`
+   - `populateWithLfoPattern(Curve::Type shape, int firstStep, int lastStep)`
+   - `populateWithLfoWaveform(Curve::Type upShape, Curve::Type downShape, int firstStep, int lastStep)`
+   - `populateWithSineWaveLfo(int firstStep, int lastStep)`
+   - `populateWithTriangleWaveLfo(int firstStep, int lastStep)`
+   - `populateWithSawtoothWaveLfo(int firstStep, int lastStep)`
+   - `populateWithSquareWaveLfo(int firstStep, int lastStep)`
+
+2. **UI Integration:**
+   - Added to CurveSequencePage context menu:
+     - "LFO-TRIANGLE" - Populates with triangle wave pattern
+     - "LFO-SINE" - Populates with sine wave approximation
+     - "LFO-SAW" - Populates with sawtooth wave pattern
+     - "LFO-SQUARE" - Populates with square wave pattern
+
+3. **LFO Shape Mappings:**
+   - Sine wave: Uses `Curve::Bell` (0.5 - 0.5 * cos(x * 2π))
+   - Triangle wave: Uses `Curve::Triangle`
+   - Sawtooth wave: Uses `Curve::RampUp` (ascending) or `Curve::RampDown` (descending)
+   - Square wave: Uses `Curve::StepUp` (rising edge) or `Curve::StepDown` (falling edge)
+
+### Resource Requirements
+- **RAM Impact**: ~30 bytes for LFO functions
+- **Processing Overhead**: ~6,400-9,600 cycles for full sequence population (non real-time)
+- **Flash Memory**: ~800-1,300 bytes
+- **Audio Performance Impact**: None during normal operation
 
 ## Testing Conventions and Common Errors
 
@@ -279,7 +310,7 @@ _scale = (flags >> 3) & 0x7;                      // 3 bits
 **Error: "no member named 'X' in 'ClassName'"**
 - Cause: Using undefined enum or method
 - Fix: Check if you're using plain enum (not enum class) for model enums
-- Fix: Ensure you've added the. member to the class definition
+- Fix: Ensure you've added the member to the class definition
 
 **Error: "no matching function for call to 'clamp'"**
 - Cause: Type mismatch in clamp arguments

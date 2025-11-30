@@ -108,6 +108,24 @@ enum ProjectVersion {
     // added TuesdayTrack::trill
     Version41 = 41,
 
+    // added CurveTrack::globalPhase
+    Version42 = 42,
+
+    // added CurveTrack wavefolder properties
+    Version43 = 43,
+
+    // added CurveTrack dj filter
+    Version44 = 44,
+
+    // added CurveTrack feedback parameters
+    Version45 = 45,
+
+    // added CurveTrack xFade parameter
+    Version46 = 46,
+
+    // added Track::cvOutputRotate and Track::gateOutputRotate
+    Version47 = 47,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

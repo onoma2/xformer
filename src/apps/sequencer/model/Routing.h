@@ -62,7 +62,9 @@ public:
         LengthBias,
         NoteProbabilityBias,
         ShapeProbabilityBias,
-        TrackLast = ShapeProbabilityBias,
+        CvOutputRotate,
+        GateOutputRotate,
+        TrackLast = GateOutputRotate,
 
         // Sequence targets
         SequenceFirst,
@@ -105,6 +107,8 @@ public:
         case Target::LengthBias:                return "Length Bias";
         case Target::NoteProbabilityBias:       return "Note P. Bias";
         case Target::ShapeProbabilityBias:      return "Shape P. Bias";
+        case Target::CvOutputRotate:            return "CV Out Rot";
+        case Target::GateOutputRotate:          return "Gate Out Rot";
 
         case Target::FirstStep:                 return "First Step";
         case Target::LastStep:                  return "Last Step";
@@ -154,6 +158,8 @@ public:
 
         case Target::PlayToggle:                return 26;
         case Target::RecordToggle:              return 27;
+        case Target::CvOutputRotate:            return 28;
+        case Target::GateOutputRotate:          return 29;
 
         case Target::Last:                      break;
         }

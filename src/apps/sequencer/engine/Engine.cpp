@@ -458,14 +458,76 @@ void Engine::updateTrackOutputs() {
         trackCvIndex[trackIndex] = 0;
     }
 
-    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-        int gateOutputTrack = gateOutputTracks[trackIndex];
-        if (!_gateOutputOverride) {
-            _gateOutput.setGate(trackIndex, _trackEngines[gateOutputTrack]->gateOutput(trackGateIndex[gateOutputTrack]++));
+    // --- Gate Rotation Logic ---
+    int gatePool[CONFIG_CHANNEL_COUNT];
+    int gatePoolSize = 0;
+    
+    // Identify Gate Pool
+    for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+        int trackIndex = gateOutputTracks[i];
+        if (_project.track(trackIndex).isGateOutputRotated()) {
+            gatePool[gatePoolSize++] = i;
         }
-        int cvOutputTrack = cvOutputTracks[trackIndex];
+    }
+
+    // --- CV Rotation Logic ---
+    int cvPool[CONFIG_CHANNEL_COUNT];
+    int cvPoolSize = 0;
+
+    // Identify CV Pool
+    for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+        int trackIndex = cvOutputTracks[i];
+        if (_project.track(trackIndex).isCvOutputRotated()) {
+            cvPool[cvPoolSize++] = i;
+        }
+    }
+
+    for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+        // Gate Output
+        int gateSourceOutputIndex = i;
+        // Check if this output is in the pool
+        int gatePoolIndex = -1;
+        for (int k = 0; k < gatePoolSize; ++k) { if (gatePool[k] == i) { gatePoolIndex = k; break; } }
+        
+        if (gatePoolIndex != -1) {
+            // It's rotating!
+            int originalTrack = gateOutputTracks[i];
+            int rotation = _project.track(originalTrack).gateOutputRotate();
+            
+            // Wrap rotation within pool size
+            // Note: standard % operator can return negative values, handle carefully
+            int rotatedIndex = (gatePoolIndex - rotation) % gatePoolSize;
+            if (rotatedIndex < 0) rotatedIndex += gatePoolSize;
+            
+            gateSourceOutputIndex = gatePool[rotatedIndex];
+        }
+
+        int gateOutputTrack = gateOutputTracks[gateSourceOutputIndex];
+        if (!_gateOutputOverride) {
+            _gateOutput.setGate(i, _trackEngines[gateOutputTrack]->gateOutput(trackGateIndex[gateOutputTrack]++));
+        }
+
+        // CV Output
+        int cvSourceOutputIndex = i;
+        // Check if this output is in the pool
+        int cvPoolIndex = -1;
+        for (int k = 0; k < cvPoolSize; ++k) { if (cvPool[k] == i) { cvPoolIndex = k; break; } }
+        
+        if (cvPoolIndex != -1) {
+            // It's rotating!
+            int originalTrack = cvOutputTracks[i];
+            int rotation = _project.track(originalTrack).cvOutputRotate();
+            
+            // Wrap rotation within pool size
+            int rotatedIndex = (cvPoolIndex - rotation) % cvPoolSize;
+            if (rotatedIndex < 0) rotatedIndex += cvPoolSize;
+            
+            cvSourceOutputIndex = cvPool[rotatedIndex];
+        }
+
+        int cvOutputTrack = cvOutputTracks[cvSourceOutputIndex];
         if (!_cvOutputOverride) {
-            _cvOutput.setChannel(trackIndex, _trackEngines[cvOutputTrack]->cvOutput(trackCvIndex[cvOutputTrack]++));
+            _cvOutput.setChannel(i, _trackEngines[cvOutputTrack]->cvOutput(trackCvIndex[cvOutputTrack]++));
         }
     }
 }

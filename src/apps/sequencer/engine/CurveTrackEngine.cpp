@@ -9,10 +9,64 @@
 #include "core/utils/Random.h"
 #include "core/math/Math.h"
 
+#include <cmath>
+#include <algorithm>
+
 #include "model/Curve.h"
 #include "model/Types.h"
 
 static Random rng;
+
+static float applyDjFilter(float input, float &lpfState, float control, float resonance) {
+    // 1. Dead zone
+    if (control > -0.02f && control < 0.02f) {
+        return input;
+    }
+
+    float alpha;
+    if (control < 0.f) { // LPF Mode (knob left)
+        alpha = 1.f - std::abs(control);
+    } else { // HPF Mode (knob right)
+        alpha = 0.1f + std::abs(control) * 0.85f;
+    }
+    alpha = clamp(alpha * alpha, 0.005f, 0.95f);
+
+    // Resonance logic removed for now (was dependent on linearToLogarithmicFeedback)
+    
+    float feedback_input = input; 
+
+    // Update the internal LPF state
+    lpfState = lpfState + alpha * (feedback_input - lpfState);
+
+    // Apply hard limiting to lpfState to prevent internal state from growing without bounds
+    lpfState = std::max(-6.0f, std::min(6.0f, lpfState)); // Allow slightly more than output range internally
+
+    // 2. Correct LPF/HPF mapping
+    if (control < 0.f) { // LPF
+        return lpfState;
+    } else { // HPF
+        return input - lpfState;
+    }
+}
+
+static float applyWavefolder(float input, float fold, float gain) {
+    // map from [0, 1] to [-1, 1]
+    float bipolar_input = (input * 2.f) - 1.f;
+    // apply gain
+    float gained_input = bipolar_input * gain;
+    // apply folding using sine function. fold parameter controls frequency.
+    // map fold from [0, 1] to a range of number of folds, e.g. 1 to 9
+    float fold_count = 1.f + fold * 8.f;
+    float folded_output = sinf(gained_input * M_PI * fold_count);
+    // map back from [-1, 1] to [0, 1]
+    return (folded_output + 1.f) * 0.5f;
+}
+
+// LFO-appropriate limiter function to ensure max 5V output
+static float applyLfoLimiting(float input, float resonance) {
+    // Simple hard clamp for now
+    return std::max(-5.0f, std::min(5.0f, input));
+}
 
 static float evalStepShape(const CurveSequence::Step &step, bool variation, bool invert, float fraction) {
     auto function = Curve::function(Curve::Type(variation ? step.shapeVariation() : step.shape()));
@@ -39,10 +93,14 @@ void CurveTrackEngine::reset() {
     _sequenceState.reset();
     _currentStep = -1;
     _currentStepFraction = 0.f;
+    _phasedStep = -1;
+    _phasedStepFraction = 0.f;
     _shapeVariation = false;
     _fillMode = CurveTrack::FillMode::None;
     _activity = false;
     _gateOutput = false;
+    _lpfState = 0.f;
+    _feedbackState = 0.f;
 
     _recorder.reset();
     _gateQueue.clear();
@@ -54,6 +112,10 @@ void CurveTrackEngine::restart() {
     _sequenceState.reset();
     _currentStep = -1;
     _currentStepFraction = 0.f;
+    _phasedStep = -1;
+    _phasedStepFraction = 0.f;
+    _lpfState = 0.f;
+    _feedbackState = 0.f;
 }
 
 TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
@@ -193,7 +255,7 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
 
     _currentStepFraction = float(relativeTick % divisor) / divisor;
 
-    if (mute()) {
+    if (mute() || (isRecording() && _curveTrack.globalPhase() > 0.f)) {
         switch (_curveTrack.muteMode()) {
         case CurveTrack::MuteMode::LastValue:
             // keep value
@@ -210,17 +272,94 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
         case CurveTrack::MuteMode::Last:
             break;
         }
+        if (isRecording() && _curveTrack.globalPhase() > 0.f) {
+            // pass through recorded value
+            updateRecordValue();
+            _cvOutputTarget = range.denormalize(_recordValue);
+        }
+        _phasedStep = _currentStep;
+        _phasedStepFraction = _currentStepFraction;
     } else {
         bool fillVariation = _fillMode == CurveTrack::FillMode::Variation;
         bool fillNextPattern = _fillMode == CurveTrack::FillMode::NextPattern;
         bool fillInvert = _fillMode == CurveTrack::FillMode::Invert;
 
-        const auto &evalSequence = fillNextPattern ? *_fillSequence : *_sequence;
-        const auto &step = evalSequence.step(_currentStep);
+        const auto &evalSequence = fillNextPattern ? *_fillSequence : sequence;
+        
+        int firstStep = evalSequence.firstStep();
+        int lastStep = evalSequence.lastStep();
+        int sequenceLength = lastStep - firstStep + 1;
 
-        float value = evalStepShape(step, _shapeVariation || fillVariation, fillInvert, _currentStepFraction);
-        value = range.denormalize(value);
-        _cvOutputTarget = value;
+        float globalPhase = _curveTrack.globalPhase();
+
+        int lookupStep;
+        float lookupFraction;
+
+        if (globalPhase > 0.f && sequenceLength > 0) {
+            float currentGlobalPos = float(_sequenceState.step() - firstStep) + _currentStepFraction;
+            float phasedGlobalPos = fmod(currentGlobalPos + globalPhase * sequenceLength, float(sequenceLength));
+            
+            lookupStep = firstStep + int(phasedGlobalPos);
+            lookupFraction = fmod(phasedGlobalPos, 1.0f);
+        } else {
+            // No phase offset
+            lookupStep = _currentStep;
+            lookupFraction = _currentStepFraction;
+        }
+        
+        _phasedStep = lookupStep;
+        _phasedStepFraction = lookupFraction;
+
+        const auto &step = evalSequence.step(lookupStep);
+
+        float value = evalStepShape(step, _shapeVariation || fillVariation, fillInvert, lookupFraction);
+
+        // Store original phased value before processing for crossfading
+        float originalValue = range.denormalize(value);
+
+        // 2. Get wavefolder and feedback parameters
+        float fold = _curveTrack.wavefolderFold();
+
+        // 3. Prepare wavefolder input
+        float folderInput = value;
+
+        // 5. Apply wavefolder if enabled
+        if (fold > 0.f) {
+            float uiGain = _curveTrack.wavefolderGain();
+            // Map UI gain from 0.0-2.0 to internal gain range 1.0-5.0
+            // 0.0 (standard) -> 1.0, 1.0 (extra) -> 3.0, 2.0 (extreme) -> 5.0
+            float gain = 1.0f + (uiGain * 2.0f);
+            // Apply exponential curve to fold control for better resolution
+            float fold_exp = fold * fold;
+            folderInput = applyWavefolder(folderInput, fold_exp, gain);
+        }
+
+        // 6. Denormalize to voltage
+        float voltage = range.denormalize(folderInput);
+
+        // 7. Apply DJ Filter
+        float filterControl = _curveTrack.djFilter();
+        // The filter is always active to calculate state, but only applied if control is not 0
+        // Resonance removed for now
+        voltage = applyDjFilter(voltage, _lpfState, filterControl, 0.0f);
+
+        // Store the processed signal (before crossfade)
+        float processedSignal = voltage;
+
+        // 7. Apply crossfade between original phased shape and processed signal
+        float xFade = _curveTrack.xFade();
+        voltage = originalValue * (1.0f - xFade) + voltage * xFade;
+
+        // 8. Apply LFO-appropriate limiting to ensure max 5V output
+        // Resonance parameter removed from limiting for now
+        processedSignal = applyLfoLimiting(processedSignal, 0.0f);
+
+        // 9. Update feedback state for next tick (from processed signal before crossfading)
+        // Apply additional limiting to feedback state to prevent runaway feedback
+        _feedbackState = std::max(-4.0f, std::min(4.0f, processedSignal)); // Keep feedback state within ±4V
+
+        // 10. Apply final hard limiting to ensure output never exceeds ±5V
+        _cvOutputTarget = std::max(-5.0f, std::min(5.0f, voltage));
     }
 
     _engine.midiOutputEngine().sendCv(_track.trackIndex(), _cvOutputTarget);
