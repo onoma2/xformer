@@ -3,6 +3,9 @@
 ## Concept
 Allow dynamic rotation of track-to-output assignments within a **user-defined subset** of tracks. This enables complex signal routing (e.g., rotating a chord voicing across 3 oscillators) while leaving other tracks (e.g., drums on track 4-8) static.
 
+## Status
+**Implemented.**
+
 ## Architecture
 The "Active Rotation Pool" is defined dynamically by the **Routing Mask**.
 *   If a Track is targeted by the Rotation Route, it joins the pool.
@@ -24,63 +27,35 @@ The "Active Rotation Pool" is defined dynamically by the **Routing Mask**.
     *   For Outputs NOT in the Pool:
         *   Use the static assignment from Layout.
 
-## Implementation Plan
+## Implementation Details
 
-### 1. Model (`Track.h`, `Routing.h`)
-*   **Add Parameter:** `Routable<int8_t> _outputRotate` to **`Track`** class.
-    *   *Note:* We use a single parameter to control both CV and Gate rotation for that track, or split them if needed. Let's start with a unified `Target::OutputRotate` or separate `CvRotate`/`GateRotate`.
-    *   Let's use distinct targets: `Routing::Target::CvOutputRotate` and `Routing::Target::GateOutputRotate` (Per Track).
-*   **Routing:** Ensure these are flagged as `isTrackTarget`.
+### 1. Model (`Track.h`, `Routing.h`, `ProjectVersion.h`)
+*   `ProjectVersion.h`: Added `Version47`.
+*   `Routing.h`: Added `Target::CvOutputRotate` and `Target::GateOutputRotate` to `Target` enum.
+*   `Track.h`: Added `Routable<int8_t> _cvOutputRotate` and `Routable<int8_t> _gateOutputRotate` to `Track` class, with accessors `cvOutputRotate()`, `gateOutputRotate()`, `isCvOutputRotated()`, `isGateOutputRotated()`.
+*   `Track.cpp`: Updated `clear()`, `write()`, `read()` to handle the new parameters and versioning.
+*   `Routing.cpp`: Added `TargetInfo` entries for the new targets (`minDef=0`, `maxDef=8`, `min=-8`, `max=8`). Updated `writeTarget` to correctly dispatch `CvOutputRotate` and `GateOutputRotate` to the `Track` object.
 
 ### 2. Engine (`Engine.cpp`)
-*   **Logic:**
-    ```cpp
-    // Pseudo-code for CV Rotation
-    std::vector<int> poolOutputs;
-    std::vector<int> poolTracks;
-    
-    // 1. Identify Pool
-    for (int i = 0; i < 8; ++i) {
-        int trackIdx = _project.cvOutputTrack(i);
-        if (trackIdx != -1 && _project.track(trackIdx).cvOutputRotate() != 0) {
-            poolOutputs.push_back(i);
-            poolTracks.push_back(trackIdx);
-        }
-    }
-    
-    // 2. Dispatch
-    for (int i = 0; i < 8; ++i) {
-        int originalTrack = _project.cvOutputTrack(i);
-        if (originalTrack == -1) continue;
-        
-        // Check if this output is in the pool
-        auto it = std::find(poolOutputs.begin(), poolOutputs.end(), i);
-        if (it != poolOutputs.end()) {
-            // It's rotating!
-            int poolIndex = std::distance(poolOutputs.begin(), it);
-            int rotation = _project.track(originalTrack).cvOutputRotate();
-            
-            // Wrap rotation within pool size
-            int poolSize = poolOutputs.size();
-            int rotatedIndex = (poolIndex - rotation) % poolSize;
-            if (rotatedIndex < 0) rotatedIndex += poolSize;
-            
-            // Assign the rotated track
-            driver.setCV(i, trackEngines[poolTracks[rotatedIndex]].cv());
-        } else {
-            // Static
-            driver.setCV(i, trackEngines[originalTrack].cv());
-        }
-    }
-    ```
+*   `Engine::updateTrackOutputs()`: Implemented the rotation logic:
+    *   Iterates through `CONFIG_CHANNEL_COUNT` (8) physical outputs.
+    *   Builds `cvPool` and `gatePool` arrays of physical output indices. An output `i` is added to the pool if the track it's assigned to (`_project.cvOutputTrack(i)`) is configured for rotation (`_project.track(trackIndex).isCvOutputRotated()`).
+    *   For each output `i` in the pool, calculates a `rotatedIndex` by applying the track's rotation value (retrieved from `_project.track(originalTrack).cvOutputRotate()`) modulo `poolSize`.
+    *   Dispatches the CV/Gate value from the track at `poolTracks[rotatedIndex]` to the physical output `i`.
+    *   Outputs not in the pool (or `poolSize <= 1`) remain static.
 
 ## Resource Cost
-*   **CPU:** Light. Two loops over 8 items. Vector/Find operations are tiny on size 8.
-*   **RAM:** Per-track variable (8 bytes).
+*   **CPU:** Low. Involves a few loops (max 8 iterations) and integer arithmetic. Happens once per engine update (1ms).
+*   **RAM:** Very low. A few stack arrays (size 8).
 
-## Usage Example
-1.  **Layout:** Track 1->Out 1, Track 2->Out 2, Track 3->Out 3, Track 4->Out 4.
-2.  **Routing:** LFO1 -> `CvOutputRotate` -> Tracks **1, 2, 3** (Amount 100%).
-3.  **Result:**
-    *   Outputs 1, 2, 3 rotate sources (1->2->3->1...).
-    *   Output 4 stays firmly connected to Track 4.
+## Usage
+1.  **Layout Page:** Assign tracks to physical CV/Gate outputs as desired.
+2.  **Routing Page:**
+    *   Create a new route.
+    *   Set **Target** to `CV Out Rot` or `Gate Out Rot`.
+    *   Set **Source** (e.g., `CV In 1`, a slow LFO).
+    *   Set **Min/Max** for the rotation range (defaults to 0-8, can be adjusted to -8 to 8).
+    *   **Crucially:** Select the **Tracks** that you want to participate in the rotation using the track mask (e.g., Track 1, 2, 3).
+    *   **Commit** the route.
+
+When the modulation source changes, the selected tracks' outputs will rotate amongst themselves, leaving unselected tracks' outputs static.

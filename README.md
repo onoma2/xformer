@@ -1,4 +1,57 @@
-![Build Status](https://github.com/djphazer/performer/actions/workflows/ci.yml/badge.svg?branch=master)
+## XFORMER Summary
+
+XFORMER is a fork of the Phazerville PER|FORMER firmware with several algorithmic and musical enhancement features:
+
+### Warnings
+- The update is based on Phazerville fork of the original firmware, so no
+  Mebitek or other features. No new modulation ROUTES are implemented for new
+track features (yet).
+  MIDI and Launchpad functionalities WERE NOT tested at all.
+- It is important to note that 99,5% of the code was written by musician little
+  helpers aka LLMs, that you can by for couple of dollars a month.
+- I have tested it on my unit and it seems that everything that I care about works. But no backwards compatibility, no guarantees, no sincere or not condolences are planned to happen.
+- Use at your own risk. Make a backup of your projects on a separate SD.
+
+### Key Features
+
+#### Algo Track
+- A special track type that generates musical content algorithmically
+- 21 built-in algorithms that produce deterministic results (same parameters = same outputs)
+- Parameters: Algorithm (0-20), Flow (0-16), Ornament (0-16), Power (0-16)
+- Additional controls: Loop Length, Scan, Rotate, CV Mode, Glide, Gate Offset, Trill, Skew
+
+#### NOTE TRACK Harmony Engine
+- Creates harmonic relationships between tracks by generating chords based on scale degrees
+- Supports 7 harmony modes: Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian
+- Voicing options: Close, Drop2, Drop3, and Spread
+- Master/Follower system for harmonizing tracks
+
+#### NOTE TRACK Accumulator
+- Counter that can count up, down, or in complex patterns based on trigger inputs
+- Multiple counting modes: Wrap, Pendulum, Random, Hold
+- Can be triggered by step events, gate events, or retrigger events
+
+#### NOTE TRACK Pulse Count and Gate Mode
+- Pulse Count: Allows steps to play for multiple clock pulses before advancing
+- Values range from 0 to 7 (1 to 8 pulses total)
+- Gate Mode: Controls which of multiple pulses fire a gate signal
+- Four modes: All, First, Hold, FirstLast
+
+#### Curve TRACK Global phase offset, shortcuts, track waveshaping
+
+
+#### Global Output Rotation
+- Dynamically rotate which tracks are assigned to physical CV and Gate outputs
+- Acts like a virtual 8-channel sequential switch
+- Allows modulation patterns to "spin" around connected modules
+
+#### Curve Track Features
+- **Global Phase**: Offset the playback position of curve sequences (0.00 to 1.00 range)
+- **Wavefolding**: Advanced signal processing with FOLD, GAIN, FILTER, and XFADE parameters
+- **Shift+Step Shortcut**: Create smooth transitions across multiple selected steps
+- **LFO Context Menu**: Quick fill options for common LFO waveforms (Triangle, Sine, Sawtooth, Square)
+- **Phase Visualization**: Visual feedback showing both actual and phased step positions
+
 
 # PEW|FORMER
 

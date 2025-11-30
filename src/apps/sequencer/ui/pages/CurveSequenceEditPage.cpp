@@ -149,7 +149,7 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
     if (_editMode == EditMode::Wavefolder1) {
         // Draw Wavefolder UI
         WindowPainter::drawActiveFunction(canvas, "WAVEFOLDER");
-        const char *wavefolderFunctionNames[5] = { "FOLD", "GAIN", "FILTER", "XFADE", "" };
+        const char *wavefolderFunctionNames[5] = { "FOLD", "GAIN", "FILTER", "XFADE", "NEXT" };
         WindowPainter::drawFooter(canvas, wavefolderFunctionNames, pageKeyState(), _wavefolderRow);
 
         const int colWidth = 51;

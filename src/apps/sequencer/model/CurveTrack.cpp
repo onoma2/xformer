@@ -55,7 +55,10 @@ void CurveTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_globalPhase);
     writer.write(_wavefolderFold);
     writer.write(_wavefolderGain);
+    writer.write(0.f); // _wavefolderSymmetry placeholder
     writer.write(_djFilter);
+    writer.write(0.f); // _foldF placeholder
+    writer.write(0.f); // _filterF placeholder
     writer.write(_xFade);
     writeArray(writer, _sequences);
 }
@@ -85,11 +88,10 @@ void CurveTrack::read(VersionedSerializedReader &reader) {
         _wavefolderGain = (_wavefolderGain - 1.0f) / 2.0f;
         _wavefolderGain = clamp(_wavefolderGain, 0.f, 2.f);
         float dummy;
-        reader.read(dummy); // _wavefolderSymmetry
+        reader.read(dummy); // _wavefolderSymmetry (or placeholder)
     } else {
         setWavefolderFold(0.f);
         setWavefolderGain(0.f);  // Standard gain maps to 0.0 in the new UI system
-        // setWavefolderSymmetry(0.f); // Removed
     }
     if (reader.dataVersion() >= ProjectVersion::Version44) {
         reader.read(_djFilter);
@@ -98,8 +100,8 @@ void CurveTrack::read(VersionedSerializedReader &reader) {
     }
     if (reader.dataVersion() >= ProjectVersion::Version45) {
         float dummy;
-        reader.read(dummy); // _foldF
-        reader.read(dummy); // _filterF
+        reader.read(dummy); // _foldF placeholder
+        reader.read(dummy); // _filterF placeholder
     } 
     if (reader.dataVersion() >= ProjectVersion::Version46) {
         reader.read(_xFade);
