@@ -129,6 +129,9 @@ enum ProjectVersion {
     // added CurveTrack chaos parameters
     Version48 = 48,
 
+    // added CurveTrack::chaosAlgo
+    Version49 = 49,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

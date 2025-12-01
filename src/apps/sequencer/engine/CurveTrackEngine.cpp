@@ -105,6 +105,7 @@ void CurveTrackEngine::reset() {
     _chaosValue = 0.f;
     _chaosPhase = 0.f;
     _latoocarfian.reset();
+    _lorenz.reset();
 
     _recorder.reset();
     _gateQueue.clear();
@@ -124,6 +125,7 @@ void CurveTrackEngine::restart() {
     _chaosValue = 0.f;
     _chaosPhase = 0.f;
     _latoocarfian.reset();
+    _lorenz.reset();
 }
 
 TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
@@ -222,18 +224,31 @@ void CurveTrackEngine::update(float dt) {
     }
 
     // Update Chaos
-    float rate = _curveTrack.chaosHz();
-    _chaosPhase += rate * dt;
-    if (_chaosPhase >= 1.f) {
-        _chaosPhase -= 1.f;
-        float p1 = _curveTrack.chaosParam1() / 100.f;
-        float p2 = _curveTrack.chaosParam2() / 100.f;
-        // Map params to chaotic regions (approx 0.5 to 3.0)
-        float a = 0.5f + p1 * 2.5f;
-        float b = 0.5f + p1 * 2.5f;
-        float c = 0.5f + p2 * 2.5f;
-        float d = 0.5f + p2 * 2.5f;
-        _chaosValue = _latoocarfian.next(a, b, c, d);
+    float p1 = _curveTrack.chaosParam1() / 100.f;
+    float p2 = _curveTrack.chaosParam2() / 100.f;
+
+    if (_curveTrack.chaosAlgo() == CurveTrack::ChaosAlgorithm::Latoocarfian) {
+        float rate = _curveTrack.chaosHz();
+        _chaosPhase += rate * dt;
+        if (_chaosPhase >= 1.f) {
+            _chaosPhase -= 1.f;
+            // Map params to chaotic regions (approx 0.5 to 3.0)
+            float a = 0.5f + p1 * 2.5f;
+            float b = 0.5f + p1 * 2.5f;
+            float c = 0.5f + p2 * 2.5f;
+            float d = 0.5f + p2 * 2.5f;
+            _chaosValue = _latoocarfian.next(a, b, c, d);
+        }
+    } else if (_curveTrack.chaosAlgo() == CurveTrack::ChaosAlgorithm::Lorenz) {
+        // Lorenz runs at full update rate (1ms) for smoothness
+        // Map "Hz" rate knob to speed factor (0.1 to 10.0)
+        float speed = 0.1f + powf(_curveTrack.chaosRate() / 127.f, 4.f) * 10.f;
+        // Map P1 to Rho (Rayleigh number) - 10.0 to 50.0
+        float rho = 10.0f + p1 * 40.0f;
+        // Map P2 to Beta (Geometric factor) - 0.5 to 4.0
+        float beta = 0.5f + p2 * 3.5f;
+        
+        _chaosValue = _lorenz.next(dt * speed, rho, beta);
     }
 }
 

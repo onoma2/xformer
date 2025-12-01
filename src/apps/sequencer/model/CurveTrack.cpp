@@ -38,6 +38,7 @@ void CurveTrack::clear() {
     setDjFilter(0.f);
     setXFade(1.f);  // Start with fully processed signal
     setChaosAmount(0);
+    setChaosAlgo(ChaosAlgorithm::Latoocarfian);
     setChaosRate(0);
     setChaosParam1(0);
     setChaosParam2(0);
@@ -68,6 +69,7 @@ void CurveTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_chaosRate);
     writer.write(_chaosParam1);
     writer.write(_chaosParam2);
+    writer.write(_chaosAlgo);
     writeArray(writer, _sequences);
 }
 
@@ -126,6 +128,11 @@ void CurveTrack::read(VersionedSerializedReader &reader) {
         setChaosRate(0);
         setChaosParam1(0);
         setChaosParam2(0);
+    }
+    if (reader.dataVersion() >= ProjectVersion::Version49) {
+        reader.read(_chaosAlgo);
+    } else {
+        setChaosAlgo(ChaosAlgorithm::Latoocarfian);
     }
     readArray(reader, _sequences);
 }

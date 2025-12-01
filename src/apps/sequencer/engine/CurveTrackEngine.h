@@ -6,6 +6,7 @@
 #include "CurveRecorder.h"
 
 #include "generators/Latoocarfian.h"
+#include "generators/Lorenz.h"
 
 #include "model/Track.h"
 
@@ -80,6 +81,7 @@ private:
     float _phasedStepFraction;
 
     Latoocarfian _latoocarfian;
+    Lorenz _lorenz;
     float _chaosValue = 0.f;
     float _chaosPhase = 0.f;
 

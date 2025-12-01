@@ -238,20 +238,41 @@ public:
     void editXFade(int value, bool shift) { setXFade(xFade() + value * (shift ? 0.1f : 0.01f)); }
     void printXFade(StringBuilder &str) const { str("%.2f", xFade()); }
 
-    // chaos
+    // Chaos
+
+    enum class ChaosAlgorithm : uint8_t {
+        Latoocarfian,
+        Lorenz,
+        Last
+    };
+
+    static const char *chaosAlgorithmName(ChaosAlgorithm algo) {
+        switch (algo) {
+        case ChaosAlgorithm::Latoocarfian: return "Latoocarfian";
+        case ChaosAlgorithm::Lorenz:       return "Lorenz";
+        case ChaosAlgorithm::Last:         break;
+        }
+        return nullptr;
+    }
 
     int chaosAmount() const { return _chaosAmount; }
     void setChaosAmount(int value) { _chaosAmount = clamp(value, 0, 100); }
     void editChaosAmount(int value, bool shift) { setChaosAmount(chaosAmount() + value * (shift ? 5 : 1)); }
     void printChaosAmount(StringBuilder &str) const { str("%d%%", chaosAmount()); }
 
+    ChaosAlgorithm chaosAlgo() const { return _chaosAlgo; }
+    void setChaosAlgo(ChaosAlgorithm algo) { _chaosAlgo = ModelUtils::clampedEnum(algo); }
+    void editChaosAlgo(int value, bool shift) { setChaosAlgo(ModelUtils::adjustedEnum(chaosAlgo(), value)); }
+    void printChaosAlgo(StringBuilder &str) const { str(chaosAlgorithmName(chaosAlgo())); }
+
     int chaosRate() const { return _chaosRate; }
     void setChaosRate(int value) { _chaosRate = clamp(value, 0, 127); }
     void editChaosRate(int value, bool shift) { setChaosRate(chaosRate() + value * (shift ? 5 : 1)); }
-    float chaosHz() const { return 0.1f + std::pow(_chaosRate / 127.f, 2.f) * 100.f; }
+    float chaosHz() const { return 0.1f + std::pow(_chaosRate / 127.f, 4.f) * 100.f; }
     void printChaosRate(StringBuilder &str) const {
         float rate = chaosHz();
-        if (rate < 10.f) str("%.1fHz", rate);
+        if (rate < 1.f) str("%.2fHz", rate);
+        else if (rate < 10.f) str("%.1fHz", rate);
         else str("%.0fHz", rate);
     }
 
@@ -327,6 +348,7 @@ private:
     float _xFade;
 
     int _chaosAmount;
+    ChaosAlgorithm _chaosAlgo;
     int _chaosRate;
     int _chaosParam1;
     int _chaosParam2;

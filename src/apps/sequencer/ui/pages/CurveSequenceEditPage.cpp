@@ -220,7 +220,7 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
         }
 
     } else if (_editMode == EditMode::Chaos) {
-        WindowPainter::drawActiveFunction(canvas, "Latoocarfian");
+        WindowPainter::drawActiveFunction(canvas, "CHAOS");
         const char *chaosFunctionNames[5] = { "AMT", "HZ", "P1", "P2", "NEXT" };
         WindowPainter::drawFooter(canvas, chaosFunctionNames, pageKeyState(), _chaosRow);
 
@@ -229,6 +229,26 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
         const int barY = 32;
         const int barHeight = 4;
         const int barWidth = 40;
+
+        // Draw Algo Name below "AMT"
+        canvas.setFont(Font::Tiny);
+        canvas.setColor(Color::Medium);
+        // Assuming "AMT" is at index 0 (x=0)
+        // Center text under the bar
+        if (track.chaosAlgo() == CurveTrack::ChaosAlgorithm::Latoocarfian) {
+             const char* line1 = "Latoo-";
+             const char* line2 = "carfian";
+             int x1 = 0 + (colWidth - canvas.textWidth(line1)) / 2;
+             int x2 = 0 + (colWidth - canvas.textWidth(line2)) / 2;
+             canvas.drawText(x1, 44, line1);
+             canvas.drawText(x2, 50, line2);
+        } else {
+            FixedStringBuilder<16> algoName;
+            track.printChaosAlgo(algoName);
+            int algoX = 0 + (colWidth - canvas.textWidth(algoName)) / 2;
+            canvas.drawText(algoX, 44, algoName);
+        }
+
 
         for (int i = 0; i < 4; ++i) {
             int x = i * colWidth;
@@ -516,13 +536,20 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
                 return;
             }
         } else if (_editMode == EditMode::Chaos) {
-            int function = key.function();
-            if (function >= 0 && function < 4) {
+        int function = key.function();
+        if (function >= 0 && function < 4) {
+            if (key.shiftModifier() && function == 0) {
+                // Toggle Algo on Shift + F1
+                auto algo = _project.selectedTrack().curveTrack().chaosAlgo();
+                auto newAlgo = CurveTrack::ChaosAlgorithm((int(algo) + 1) % int(CurveTrack::ChaosAlgorithm::Last));
+                _project.selectedTrack().curveTrack().setChaosAlgo(newAlgo);
+            } else {
                 _chaosRow = function;
-                event.consume();
-                return;
             }
+            event.consume();
+            return;
         }
+    }
         // For F5, or any F-key in other modes
         switchLayer(key.function(), key.shiftModifier());
         event.consume();
