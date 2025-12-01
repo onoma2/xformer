@@ -6,6 +6,8 @@
 #include "Serialize.h"
 #include "Routing.h"
 
+#include <cmath>
+
 class CurveTrack {
 public:
     //----------------------------------------
@@ -236,6 +238,33 @@ public:
     void editXFade(int value, bool shift) { setXFade(xFade() + value * (shift ? 0.1f : 0.01f)); }
     void printXFade(StringBuilder &str) const { str("%.2f", xFade()); }
 
+    // chaos
+
+    int chaosAmount() const { return _chaosAmount; }
+    void setChaosAmount(int value) { _chaosAmount = clamp(value, 0, 100); }
+    void editChaosAmount(int value, bool shift) { setChaosAmount(chaosAmount() + value * (shift ? 5 : 1)); }
+    void printChaosAmount(StringBuilder &str) const { str("%d%%", chaosAmount()); }
+
+    int chaosRate() const { return _chaosRate; }
+    void setChaosRate(int value) { _chaosRate = clamp(value, 0, 127); }
+    void editChaosRate(int value, bool shift) { setChaosRate(chaosRate() + value * (shift ? 5 : 1)); }
+    float chaosHz() const { return 0.1f + std::pow(_chaosRate / 127.f, 2.f) * 100.f; }
+    void printChaosRate(StringBuilder &str) const {
+        float rate = chaosHz();
+        if (rate < 10.f) str("%.1fHz", rate);
+        else str("%.0fHz", rate);
+    }
+
+    int chaosParam1() const { return _chaosParam1; }
+    void setChaosParam1(int value) { _chaosParam1 = clamp(value, 0, 100); }
+    void editChaosParam1(int value, bool shift) { setChaosParam1(chaosParam1() + value * (shift ? 5 : 1)); }
+    void printChaosParam1(StringBuilder &str) const { str("%d", chaosParam1()); }
+
+    int chaosParam2() const { return _chaosParam2; }
+    void setChaosParam2(int value) { _chaosParam2 = clamp(value, 0, 100); }
+    void editChaosParam2(int value, bool shift) { setChaosParam2(chaosParam2() + value * (shift ? 5 : 1)); }
+    void printChaosParam2(StringBuilder &str) const { str("%d", chaosParam2()); }
+
     // sequences
 
     const CurveSequenceArray &sequences() const { return _sequences; }
@@ -296,6 +325,11 @@ private:
     float _wavefolderGain;
     float _djFilter;
     float _xFade;
+
+    int _chaosAmount;
+    int _chaosRate;
+    int _chaosParam1;
+    int _chaosParam2;
 
     CurveSequenceArray _sequences;
 

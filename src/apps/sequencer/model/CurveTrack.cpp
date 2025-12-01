@@ -37,6 +37,10 @@ void CurveTrack::clear() {
     setWavefolderGain(0.f);  // Standard gain maps to 0.0 in the new UI system
     setDjFilter(0.f);
     setXFade(1.f);  // Start with fully processed signal
+    setChaosAmount(0);
+    setChaosRate(0);
+    setChaosParam1(0);
+    setChaosParam2(0);
 
     for (auto &sequence : _sequences) {
         sequence.clear();
@@ -60,6 +64,10 @@ void CurveTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(0.f); // _foldF placeholder
     writer.write(0.f); // _filterF placeholder
     writer.write(_xFade);
+    writer.write(_chaosAmount);
+    writer.write(_chaosRate);
+    writer.write(_chaosParam1);
+    writer.write(_chaosParam2);
     writeArray(writer, _sequences);
 }
 
@@ -107,6 +115,17 @@ void CurveTrack::read(VersionedSerializedReader &reader) {
         reader.read(_xFade);
     } else {
         setXFade(1.f);  // Default to fully processed signal for older projects
+    }
+    if (reader.dataVersion() >= ProjectVersion::Version48) {
+        reader.read(_chaosAmount);
+        reader.read(_chaosRate);
+        reader.read(_chaosParam1);
+        reader.read(_chaosParam2);
+    } else {
+        setChaosAmount(0);
+        setChaosRate(0);
+        setChaosParam1(0);
+        setChaosParam2(0);
     }
     readArray(reader, _sequences);
 }

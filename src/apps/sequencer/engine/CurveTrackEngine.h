@@ -5,6 +5,8 @@
 #include "SortedQueue.h"
 #include "CurveRecorder.h"
 
+#include "generators/Latoocarfian.h"
+
 #include "model/Track.h"
 
 class CurveTrackEngine : public TrackEngine {
@@ -77,6 +79,9 @@ private:
     int _phasedStep;
     float _phasedStepFraction;
 
+    Latoocarfian _latoocarfian;
+    float _chaosValue = 0.f;
+    float _chaosPhase = 0.f;
 
     bool _activity;
     bool _gateOutput;

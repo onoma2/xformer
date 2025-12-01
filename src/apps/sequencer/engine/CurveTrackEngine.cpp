@@ -102,6 +102,10 @@ void CurveTrackEngine::reset() {
     _lpfState = 0.f;
     _feedbackState = 0.f;
 
+    _chaosValue = 0.f;
+    _chaosPhase = 0.f;
+    _latoocarfian.reset();
+
     _recorder.reset();
     _gateQueue.clear();
 
@@ -116,6 +120,10 @@ void CurveTrackEngine::restart() {
     _phasedStepFraction = 0.f;
     _lpfState = 0.f;
     _feedbackState = 0.f;
+    
+    _chaosValue = 0.f;
+    _chaosPhase = 0.f;
+    _latoocarfian.reset();
 }
 
 TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
@@ -211,6 +219,21 @@ void CurveTrackEngine::update(float dt) {
         _cvOutput = Slide::applySlide(_cvOutput, _cvOutputTarget + offset, _curveTrack.slideTime(), dt);
     } else {
         _cvOutput = _cvOutputTarget + offset;
+    }
+
+    // Update Chaos
+    float rate = _curveTrack.chaosHz();
+    _chaosPhase += rate * dt;
+    if (_chaosPhase >= 1.f) {
+        _chaosPhase -= 1.f;
+        float p1 = _curveTrack.chaosParam1() / 100.f;
+        float p2 = _curveTrack.chaosParam2() / 100.f;
+        // Map params to chaotic regions (approx 0.5 to 3.0)
+        float a = 0.5f + p1 * 2.5f;
+        float b = 0.5f + p1 * 2.5f;
+        float c = 0.5f + p2 * 2.5f;
+        float d = 0.5f + p2 * 2.5f;
+        _chaosValue = _latoocarfian.next(a, b, c, d);
     }
 }
 
@@ -313,6 +336,12 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
         const auto &step = evalSequence.step(lookupStep);
 
         float value = evalStepShape(step, _shapeVariation || fillVariation, fillInvert, lookupFraction);
+
+        // Apply Chaos (Pre-fold)
+        if (_curveTrack.chaosAmount() > 0) {
+            float chaosAmount = _curveTrack.chaosAmount() / 100.f;
+            value += _chaosValue * chaosAmount;
+        }
 
         // Store original phased value before processing for crossfading
         float originalValue = range.denormalize(value);

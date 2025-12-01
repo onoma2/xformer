@@ -219,6 +219,61 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
             }
         }
 
+    } else if (_editMode == EditMode::Chaos) {
+        WindowPainter::drawActiveFunction(canvas, "Latoocarfian");
+        const char *chaosFunctionNames[5] = { "AMT", "HZ", "P1", "P2", "NEXT" };
+        WindowPainter::drawFooter(canvas, chaosFunctionNames, pageKeyState(), _chaosRow);
+
+        const int colWidth = 51;
+        const int valueY = 26;
+        const int barY = 32;
+        const int barHeight = 4;
+        const int barWidth = 40;
+
+        for (int i = 0; i < 4; ++i) {
+            int x = i * colWidth;
+            int barX = x + (colWidth - barWidth) / 2;
+
+            float value = 0.f;
+            float max = 1.f;
+            FixedStringBuilder<16> valueStr;
+
+            switch (i) {
+            case 0: // AMT
+                value = track.chaosAmount();
+                max = 100.f;
+                track.printChaosAmount(valueStr);
+                break;
+            case 1: // HZ
+                value = track.chaosRate();
+                max = 127.f;
+                track.printChaosRate(valueStr);
+                break;
+            case 2: // P1
+                value = track.chaosParam1();
+                max = 100.f;
+                track.printChaosParam1(valueStr);
+                break;
+            case 3: // P2
+                value = track.chaosParam2();
+                max = 100.f;
+                track.printChaosParam2(valueStr);
+                break;
+            }
+
+            canvas.setFont(Font::Tiny);
+            canvas.setColor((i == _chaosRow) ? Color::Bright : Color::Medium);
+            int textWidth = canvas.textWidth(valueStr);
+            int textX = x + (colWidth - textWidth) / 2;
+            canvas.drawText(textX, valueY, valueStr);
+
+            canvas.setColor(Color::Bright);
+            int fillWidth = (value * barWidth) / max;
+            if (fillWidth > 0) {
+                canvas.fillRect(barX, barY, fillWidth, barHeight);
+            }
+        }
+
     } else {
         // Draw Step/Phase UI
         if (_editMode == EditMode::GlobalPhase) {
@@ -460,6 +515,13 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
                 event.consume();
                 return;
             }
+        } else if (_editMode == EditMode::Chaos) {
+            int function = key.function();
+            if (function >= 0 && function < 4) {
+                _chaosRow = function;
+                event.consume();
+                return;
+            }
         }
         // For F5, or any F-key in other modes
         switchLayer(key.function(), key.shiftModifier());
@@ -503,6 +565,19 @@ void CurveSequenceEditPage::encoder(EncoderEvent &event) {
             case 1: track.editWavefolderGain(event.value(), shift); break;
             case 2: track.editDjFilter(event.value(), shift); break;
             case 3: track.editXFade(event.value(), shift); break;
+            }
+        }
+        event.consume();
+        return;
+    case EditMode::Chaos:
+        if (event.pressed()) {
+            _chaosRow = clamp(_chaosRow + event.value(), 0, 3);
+        } else {
+            switch (_chaosRow) {
+            case 0: track.editChaosAmount(event.value(), shift); break;
+            case 1: track.editChaosRate(event.value(), shift); break;
+            case 2: track.editChaosParam1(event.value(), shift); break;
+            case 3: track.editChaosParam2(event.value(), shift); break;
             }
         }
         event.consume();
@@ -593,6 +668,10 @@ void CurveSequenceEditPage::switchLayer(int functionKey, bool shift) {
             _wavefolderRow = 0; // Reset row selection
             break;
         case EditMode::Wavefolder1:
+            _editMode = EditMode::Chaos;
+            _chaosRow = 0; // Reset row selection
+            break;
+        case EditMode::Chaos:
             _editMode = EditMode::Step;
             _stepSelection.clear();
             break;
@@ -668,7 +747,7 @@ void CurveSequenceEditPage::switchLayer(int functionKey, bool shift) {
 }
 
 int CurveSequenceEditPage::activeFunctionKey() {
-    if (_editMode == EditMode::GlobalPhase || _editMode == EditMode::Wavefolder1) {
+    if (_editMode == EditMode::GlobalPhase || _editMode == EditMode::Wavefolder1 || _editMode == EditMode::Chaos) {
         return 4; // Function::Phase
     }
 

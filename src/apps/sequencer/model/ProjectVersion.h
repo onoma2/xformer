@@ -126,6 +126,9 @@ enum ProjectVersion {
     // added Track::cvOutputRotate and Track::gateOutputRotate
     Version47 = 47,
 
+    // added CurveTrack chaos parameters
+    Version48 = 48,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

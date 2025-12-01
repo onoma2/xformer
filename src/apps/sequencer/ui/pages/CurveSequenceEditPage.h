@@ -61,7 +61,8 @@ private:
     enum class EditMode {
         Step,
         GlobalPhase,
-        Wavefolder1
+        Wavefolder1,
+        Chaos
     };
 
     int _section = 0;
@@ -69,6 +70,7 @@ private:
     uint32_t _showDetailTicks;
     EditMode _editMode = EditMode::Step;
     int _wavefolderRow = 0;
+    int _chaosRow = 0;
 
     CurveSequenceListModel _listModel;
 
