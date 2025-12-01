@@ -8,7 +8,10 @@
 
 #include "model/Curve.h"
 
+#include "core/utils/Random.h"
 #include "core/utils/StringBuilder.h"
+
+static Random rng;
 
 enum class ContextAction {
     Init,
@@ -40,6 +43,21 @@ static const ContextMenuModel::Item lfoContextMenuItems[] = {
     { "SINE" },
     { "SAW" },
     { "SQUA" },
+};
+
+enum class SettingsContextAction {
+    Init,
+    Randomize,
+    Copy,
+    Paste,
+    Last
+};
+
+static const ContextMenuModel::Item settingsContextMenuItems[] = {
+    { "INIT" },
+    { "RAND" },
+    { "COPY" },
+    { "PASTE" },
 };
 
 enum class Function {
@@ -117,6 +135,8 @@ static std::pair<int, int> calculateMultiStepShapeMinMax(size_t stepsSelected,
 
     return std::make_pair(min, max);
 }
+
+CurveSequenceEditPage::SettingsClipboard CurveSequenceEditPage::_settingsClipboard;
 
 CurveSequenceEditPage::CurveSequenceEditPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
@@ -862,12 +882,16 @@ void CurveSequenceEditPage::drawDetail(Canvas &canvas, const CurveSequence::Step
 }
 
 void CurveSequenceEditPage::contextShow() {
-    showContextMenu(ContextMenu(
-        contextMenuItems,
-        int(ContextAction::Last),
-        [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
-    ));
+    if (_editMode == EditMode::Step || _editMode == EditMode::GlobalPhase) {
+        showContextMenu(ContextMenu(
+            contextMenuItems,
+            int(ContextAction::Last),
+            [&] (int index) { contextAction(index); },
+            [&] (int index) { return contextActionEnabled(index); }
+        ));
+    } else {
+        settingsContextShow();
+    }
 }
 
 void CurveSequenceEditPage::contextAction(int index) {
@@ -899,6 +923,98 @@ bool CurveSequenceEditPage::contextActionEnabled(int index) const {
     default:
         return true;
     }
+}
+
+void CurveSequenceEditPage::settingsContextShow() {
+    showContextMenu(ContextMenu(
+        settingsContextMenuItems,
+        int(SettingsContextAction::Last),
+        [&] (int index) { settingsContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void CurveSequenceEditPage::settingsContextAction(int index) {
+    switch (SettingsContextAction(index)) {
+    case SettingsContextAction::Init:
+        initSettings();
+        break;
+    case SettingsContextAction::Randomize:
+        randomizeSettings();
+        break;
+    case SettingsContextAction::Copy:
+        copySettings();
+        break;
+    case SettingsContextAction::Paste:
+        pasteSettings();
+        break;
+    case SettingsContextAction::Last:
+        break;
+    }
+}
+
+void CurveSequenceEditPage::initSettings() {
+    auto &track = _project.selectedTrack().curveTrack();
+    if (_editMode == EditMode::Wavefolder1) {
+        track.setWavefolderFold(0.f);
+        track.setWavefolderGain(0.f);
+        track.setDjFilter(0.f);
+        track.setXFade(1.f);
+        showMessage("WAVEFOLDER INITIALIZED");
+    } else if (_editMode == EditMode::Chaos) {
+        track.setChaosAmount(0);
+        track.setChaosRate(0);
+        track.setChaosParam1(0);
+        track.setChaosParam2(0);
+        track.setChaosAlgo(CurveTrack::ChaosAlgorithm::Latoocarfian);
+        showMessage("CHAOS INITIALIZED");
+    }
+}
+
+void CurveSequenceEditPage::randomizeSettings() {
+    auto &track = _project.selectedTrack().curveTrack();
+    if (_editMode == EditMode::Wavefolder1) {
+        track.setWavefolderFold(float(rng.nextRange(100)) / 100.f);
+        track.setWavefolderGain(float(rng.nextRange(200)) / 100.f);
+        track.setDjFilter((float(rng.nextRange(200)) / 100.f) - 1.f);
+        track.setXFade(float(rng.nextRange(100)) / 100.f);
+        showMessage("WAVEFOLDER RANDOMIZED");
+    } else if (_editMode == EditMode::Chaos) {
+        track.setChaosAmount(rng.nextRange(101));
+        track.setChaosRate(rng.nextRange(128));
+        track.setChaosParam1(rng.nextRange(101));
+        track.setChaosParam2(rng.nextRange(101));
+        track.setChaosAlgo(CurveTrack::ChaosAlgorithm(rng.nextRange(int(CurveTrack::ChaosAlgorithm::Last))));
+        showMessage("CHAOS RANDOMIZED");
+    }
+}
+
+void CurveSequenceEditPage::copySettings() {
+    auto &track = _project.selectedTrack().curveTrack();
+    _settingsClipboard.wavefolderFold = track.wavefolderFold();
+    _settingsClipboard.wavefolderGain = track.wavefolderGain();
+    _settingsClipboard.djFilter = track.djFilter();
+    _settingsClipboard.xFade = track.xFade();
+    _settingsClipboard.chaosAmount = track.chaosAmount();
+    _settingsClipboard.chaosRate = track.chaosRate();
+    _settingsClipboard.chaosParam1 = track.chaosParam1();
+    _settingsClipboard.chaosParam2 = track.chaosParam2();
+    _settingsClipboard.chaosAlgo = track.chaosAlgo();
+    showMessage("SETTINGS COPIED");
+}
+
+void CurveSequenceEditPage::pasteSettings() {
+    auto &track = _project.selectedTrack().curveTrack();
+    track.setWavefolderFold(_settingsClipboard.wavefolderFold);
+    track.setWavefolderGain(_settingsClipboard.wavefolderGain);
+    track.setDjFilter(_settingsClipboard.djFilter);
+    track.setXFade(_settingsClipboard.xFade);
+    track.setChaosAmount(_settingsClipboard.chaosAmount);
+    track.setChaosRate(_settingsClipboard.chaosRate);
+    track.setChaosParam1(_settingsClipboard.chaosParam1);
+    track.setChaosParam2(_settingsClipboard.chaosParam2);
+    track.setChaosAlgo(_settingsClipboard.chaosAlgo);
+    showMessage("SETTINGS PASTED");
 }
 
 void CurveSequenceEditPage::initSequence() {

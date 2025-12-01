@@ -51,12 +51,36 @@ private:
     void duplicateSequence();
     void generateSequence();
 
+    void settingsContextShow();
+    void settingsContextAction(int index);
+    
+    void initSettings();
+    void randomizeSettings();
+    void copySettings();
+    void pasteSettings();
+
     void quickEdit(int index);
 
     CurveSequence::Layer layer() const { return _project.selectedCurveSequenceLayer(); }
     void setLayer(CurveSequence::Layer layer) { _project.setSelectedCurveSequenceLayer(layer); }
 
     ContextMenu _contextMenu;
+
+    struct SettingsClipboard {
+        // Wavefolder
+        float wavefolderFold;
+        float wavefolderGain;
+        float djFilter;
+        float xFade;
+        // Chaos
+        int chaosAmount;
+        int chaosRate;
+        int chaosParam1;
+        int chaosParam2;
+        CurveTrack::ChaosAlgorithm chaosAlgo;
+    };
+
+    static SettingsClipboard _settingsClipboard;
 
     enum class EditMode {
         Step,
