@@ -22,6 +22,7 @@ void Track::clearPattern(int patternIndex) {
     case TrackMode::MidiCv:
         break;
     case TrackMode::Tuesday:
+        _track.tuesday->sequence(patternIndex).clear();
         break;
     case TrackMode::Last:
         break;
@@ -39,6 +40,7 @@ void Track::copyPattern(int src, int dst) {
     case TrackMode::MidiCv:
         break;
     case TrackMode::Tuesday:
+        _track.tuesday->sequence(dst) = _track.tuesday->sequence(src);
         break;
     case TrackMode::Last:
         break;

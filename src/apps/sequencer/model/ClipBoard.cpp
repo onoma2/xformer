@@ -56,6 +56,9 @@ void ClipBoard::copyPattern(int patternIndex) {
         case Track::TrackMode::Curve:
             pattern.sequences[trackIndex].data.curve = track.curveTrack().sequence(patternIndex);
             break;
+        case Track::TrackMode::Tuesday:
+            pattern.sequences[trackIndex].data.tuesday = track.tuesdayTrack().sequence(patternIndex);
+            break;
         default:
             break;
         }
@@ -116,6 +119,9 @@ void ClipBoard::pastePattern(int patternIndex) const {
                     break;
                 case Track::TrackMode::Curve:
                     track.curveTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.curve;
+                    break;
+                case Track::TrackMode::Tuesday:
+                    track.tuesdayTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.tuesday;
                     break;
                 default:
                     break;
