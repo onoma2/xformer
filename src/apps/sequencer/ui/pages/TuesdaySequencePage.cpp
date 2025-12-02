@@ -23,7 +23,7 @@ TuesdaySequencePage::TuesdaySequencePage(PageManager &manager, PageContext &cont
 {}
 
 void TuesdaySequencePage::enter() {
-    _listModel.setTrack(_project.selectedTrack().tuesdayTrack());
+    _listModel.setSequence(&_project.selectedTuesdaySequence());
 }
 
 void TuesdaySequencePage::exit() {
@@ -92,7 +92,7 @@ bool TuesdaySequencePage::contextActionEnabled(int index) const {
 }
 
 void TuesdaySequencePage::initSequence() {
-    _project.selectedTrack().tuesdayTrack().clear();
+    _project.selectedTuesdaySequence().clear();
     showMessage("SEQUENCE INITIALIZED");
 }
 

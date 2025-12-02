@@ -50,6 +50,7 @@ set(sources
     model/Song.cpp
     model/TimeSignature.cpp
     model/Track.cpp
+    model/TuesdaySequence.cpp
     model/Types.cpp
     model/UserScale.cpp
     model/UserSettings.cpp

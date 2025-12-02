@@ -4,7 +4,7 @@ include_directories(..) # Add current directory for utils
 
 # Modify register_test to link against sequencer_shared
 function(register_sequencer_test test file)
-    add_executable(${test} ${file})
+    add_executable(${test} ${file} ../../../apps/sequencer/model/TuesdaySequence.cpp)
     target_link_libraries(${test} core sequencer_shared) # Link against sequencer_shared
     platform_postprocess_executable(${test})
     add_test(NAME ${test} COMMAND ${test})
@@ -58,3 +58,4 @@ register_sequencer_test(TestCurveTrackEnginePhase TestCurveTrackEnginePhase.cpp)
 register_sequencer_test(TestCurveTrackEngineGlobalPhase TestCurveTrackEngineGlobalPhase.cpp)
 register_sequencer_test(TestOutputRotation TestOutputRotation.cpp)
 register_sequencer_test(TestCurveTrackPatterns TestCurveTrackPatterns.cpp)
+register_sequencer_test(TestTuesdayTrackPatterns TestTuesdayTrackPatterns.cpp)

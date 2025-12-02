@@ -4,16 +4,19 @@
 
 #include "RoutableListModel.h"
 
-#include "model/TuesdayTrack.h"
+#include "model/TuesdaySequence.h"
 
-class TuesdayTrackListModel : public RoutableListModel {
+class TuesdaySequenceListModel : public RoutableListModel {
 public:
-    void setTrack(TuesdayTrack &track) {
-        _track = &track;
+    TuesdaySequenceListModel()
+    {}
+
+    void setSequence(TuesdaySequence *sequence) {
+        _sequence = sequence;
     }
 
     virtual int rows() const override {
-        return Last;
+        return _sequence ? Last : 0;
     }
 
     virtual int columns() const override {
@@ -35,9 +38,30 @@ public:
     }
 
     virtual Routing::Target routingTarget(int row) const override {
-        // Tuesday track parameters don't have routing targets yet
-        // Future: Could add Flow, Power, etc. as routing targets
-        return Routing::Target::None;
+        switch (Item(row)) {
+        case Algorithm:
+            return Routing::Target::Algorithm;
+        case Flow:
+            return Routing::Target::Flow;
+        case Ornament:
+            return Routing::Target::Ornament;
+        case Power:
+            return Routing::Target::Power;
+        case LoopLength:
+            return Routing::Target::LoopLength;
+        case Scan:
+            return Routing::Target::Scan;
+        case Rotate:
+            return Routing::Target::Rotate;
+        case Glide:
+            return Routing::Target::Glide;
+        case Skew:
+            return Routing::Target::Skew;
+        case CvUpdateMode:
+            return Routing::Target::CvUpdateMode;
+        default:
+            return Routing::Target::None;
+        }
     }
 
 private:
@@ -79,38 +103,38 @@ private:
     void formatValue(Item item, StringBuilder &str) const {
         switch (item) {
         case Algorithm:
-            _track->printAlgorithm(str);
+            _sequence->printAlgorithm(str);
             break;
         case Flow:
-            _track->printFlow(str);
+            _sequence->printFlow(str);
             break;
         case Ornament:
-            _track->printOrnament(str);
+            _sequence->printOrnament(str);
             break;
         case Power:
-            _track->printPower(str);
+            _sequence->printPower(str);
             break;
         case LoopLength:
-            _track->printLoopLength(str);
+            _sequence->printLoopLength(str);
             break;
         case Scan:
-            _track->printScan(str);
+            _sequence->printScan(str);
             break;
         case Rotate:
-            if (_track->loopLength() == 0) {
+            if (_sequence->loopLength() == 0) {
                 str("N/A");
             } else {
-                _track->printRotate(str);
+                _sequence->printRotate(str);
             }
             break;
         case Glide:
-            _track->printGlide(str);
+            _sequence->printGlide(str);
             break;
         case Skew:
-            _track->printSkew(str);
+            _sequence->printSkew(str);
             break;
         case CvUpdateMode:
-            _track->printCvUpdateMode(str);
+            _sequence->printCvUpdateMode(str);
             break;
         case Last:
             break;
@@ -120,41 +144,41 @@ private:
     void editValue(Item item, int value, bool shift) {
         switch (item) {
         case Algorithm:
-            _track->editAlgorithm(value, shift);
+            _sequence->editAlgorithm(value, shift);
             break;
         case Flow:
-            _track->editFlow(value, shift);
+            _sequence->editFlow(value, shift);
             break;
         case Ornament:
-            _track->editOrnament(value, shift);
+            _sequence->editOrnament(value, shift);
             break;
         case Power:
-            _track->editPower(value, shift);
+            _sequence->editPower(value, shift);
             break;
         case LoopLength:
-            _track->editLoopLength(value, shift);
+            _sequence->editLoopLength(value, shift);
             break;
         case Scan:
-            _track->editScan(value, shift);
+            _sequence->editScan(value, shift);
             break;
         case Rotate:
-            if (_track->loopLength() != 0) {
-                _track->editRotate(value, shift);
+            if (_sequence->loopLength() != 0) {
+                _sequence->editRotate(value, shift);
             }
             break;
         case Glide:
-            _track->editGlide(value, shift);
+            _sequence->editGlide(value, shift);
             break;
         case Skew:
-            _track->editSkew(value, shift);
+            _sequence->editSkew(value, shift);
             break;
         case CvUpdateMode:
-            _track->editCvUpdateMode(value, shift);
+            _sequence->editCvUpdateMode(value, shift);
             break;
         case Last:
             break;
         }
     }
 
-    TuesdayTrack *_track;
+    TuesdaySequence *_sequence;
 };

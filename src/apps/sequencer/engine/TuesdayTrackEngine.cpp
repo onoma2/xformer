@@ -9,9 +9,11 @@
 // Initialize algorithm state based on Flow (seed1) and Ornament (seed2)
 // This mirrors the original Tuesday Init functions
 void TuesdayTrackEngine::initAlgorithm() {
-    int flow = _tuesdayTrack.flow();
-    int ornament = _tuesdayTrack.ornament();
-    int algorithm = _tuesdayTrack.algorithm();
+    const auto &_tuesdayTrackRef = tuesdayTrack();
+    const auto &sequence = _tuesdayTrackRef.sequence(pattern());
+    int flow = sequence.flow();
+    int ornament = sequence.ornament();
+    int algorithm = sequence.algorithm();
 
     _uiRng = Random(flow * 37 + ornament * 101);
 
@@ -194,13 +196,13 @@ void TuesdayTrackEngine::initAlgorithm() {
     case 13: // AMBIENT - Harmonic Drone & Event Scheduler
 {
     // 1. Set up the drone chord based on Flow. Not random, but deterministic.
-    _ambient_root_note = (_tuesdayTrack.flow() - 1) % 12;
+    _ambient_root_note = (sequence.flow() - 1) % 12;
     _ambient_drone_notes[0] = _ambient_root_note;
     _ambient_drone_notes[1] = (_ambient_root_note + 7) % 12; // Perfect 5th
     _ambient_drone_notes[2] = (_ambient_root_note + 16) % 12; // A Major 9th (as a 2nd)
 
     // 2. Init event state using Ornament for randomness
-    _extraRng = Random((_tuesdayTrack.ornament() - 1) << 4);
+    _extraRng = Random((sequence.ornament() - 1) << 4);
     _ambient_event_timer = 16 + (_extraRng.next() % 48); // First event in 16-64 steps
     _ambient_event_type = 0;
     _ambient_event_step = 0;
@@ -265,13 +267,13 @@ void TuesdayTrackEngine::initAlgorithm() {
     case 18: // APHEX - Polyrhythmic Event Sequencer
 {
     // 1. Seed the patterns based on Flow, using the main RNG
-    _rng = Random((_tuesdayTrack.flow() - 1) << 4);
+    _rng = Random((sequence.flow() - 1) << 4);
     for (int i = 0; i < 4; ++i) _aphex_track1_pattern[i] = _rng.next() % 12;
     for (int i = 0; i < 3; ++i) _aphex_track2_pattern[i] = _rng.next() % 3; // 0, 1, or 2
     for (int i = 0; i < 5; ++i) _aphex_track3_pattern[i] = (_rng.next() % 8 == 0) ? (_rng.next() % 5) : 0; // Sparse bass notes
 
     // 2. Set initial phase based on Ornament
-    int ornament_val = _tuesdayTrack.ornament();
+    int ornament_val = sequence.ornament();
     _aphex_pos1 = (ornament_val * 1) % 4;
     _aphex_pos2 = (ornament_val * 2) % 3;
     _aphex_pos3 = (ornament_val * 3) % 5;
@@ -290,10 +292,10 @@ void TuesdayTrackEngine::initAlgorithm() {
     _autechre_pattern[6] = 0;   // root
     _autechre_pattern[7] = 36;  // +3 octaves
     // 2. Set rule timing based on Flow
-    _autechre_rule_timer = 8 + (_tuesdayTrack.flow() * 4);
+    _autechre_rule_timer = 8 + (sequence.flow() * 4);
 
     // 3. Create a sequence of rules based on Ornament
-    _rng = Random((_tuesdayTrack.ornament() - 1) << 4);
+    _rng = Random((sequence.ornament() - 1) << 4);
     for (int i = 0; i < 8; ++i) _autechre_rule_sequence[i] = _rng.next() % 5; // 5 different rules
     _autechre_rule_index = 0;
     break;
@@ -392,7 +394,8 @@ void TuesdayTrackEngine::reseed() {
     _extraRng = Random(newSeed2);
 
     // Reinitialize algorithm state with new RNG values
-    int algorithm = _tuesdayTrack.algorithm();
+    const auto &sequence = tuesdayTrack().sequence(pattern());
+    int algorithm = sequence.algorithm();
 
     switch (algorithm) {
     case 0: // TEST
@@ -574,11 +577,15 @@ void TuesdayTrackEngine::reseed() {
 }
 
 void TuesdayTrackEngine::generateBuffer() {
+    // Forced recompilation marker
     // Initialize algorithm fresh to get deterministic pattern
     // initAlgorithm(); // ALgo is not resseeded on capture
 
-    int algorithm = _tuesdayTrack.algorithm();
-    int glide = _tuesdayTrack.glide();
+    const auto &_tuesdayTrackRef = tuesdayTrack();
+    const auto &sequence = _tuesdayTrackRef.sequence(pattern());
+
+    int algorithm = sequence.algorithm();
+    int glide = sequence.glide();
 
     // Generate buffer directly from initial algorithm state
     // When default is infinite mode, algorithm evolves naturally during playback
@@ -724,7 +731,7 @@ void TuesdayTrackEngine::generateBuffer() {
                         // Check for Trill on stomp down
                         {
                             int trillChanceAlgorithmic = 18;
-                            int userTrillSetting = _tuesdayTrack.trill();
+                            int userTrillSetting = sequence.trill();
                             int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
                             if (_uiRng.nextRange(100) < finalTrillChance) {
                                 isTrill = true;
@@ -747,7 +754,7 @@ void TuesdayTrackEngine::generateBuffer() {
                         // Check for Trill on stomp up
                         {
                             int trillChanceAlgorithmic = 18;
-                            int userTrillSetting = _tuesdayTrack.trill();
+                            int userTrillSetting = sequence.trill();
                             int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
                             if (_uiRng.nextRange(100) < finalTrillChance) {
                                 isTrill = true;
@@ -922,7 +929,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 // Check for Trill on first chord position
                 if (chordpos == 0) {
                     int trillChanceAlgorithmic = 20;
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
                     if (_uiRng.nextRange(100) < finalTrillChance) {
                         isTrill = true;
@@ -1093,7 +1100,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 // Check for Trill on phase transitions
                 {
                     int trillChanceAlgorithmic = 12;
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
                     if (_uiRng.nextRange(100) < finalTrillChance) {
                         isTrill = true;
@@ -1142,7 +1149,7 @@ void TuesdayTrackEngine::generateBuffer() {
 
                         // Check for Trill on hi-hats
                         int trillChanceAlgorithmic = 25;
-                        int userTrillSetting = _tuesdayTrack.trill();
+                        int userTrillSetting = sequence.trill();
                         int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
                         if (_uiRng.nextRange(100) < finalTrillChance) {
                             isTrill = true;
@@ -1222,7 +1229,7 @@ void TuesdayTrackEngine::generateBuffer() {
 
                         // Check for Trill on ghost notes
                         int trillChanceAlgorithmic = 15;
-                        int userTrillSetting = _tuesdayTrack.trill();
+                        int userTrillSetting = sequence.trill();
                         int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
                         if (_uiRng.nextRange(100) < finalTrillChance) {
                             isTrill = true;
@@ -1369,7 +1376,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 // Check for Trill on ascending movements
                 if (_ragaDirection == 0) {
                     int trillChanceAlgorithmic = 25;
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
                     if (_uiRng.nextRange(100) < finalTrillChance) {
                         isTrill = true;
@@ -1407,7 +1414,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     _ambient_event_type = 1 + (_extraRng.next() % 2); // 1 or 2
                     _ambient_event_step = 0;
                     // Reset timer based on Power
-                    int power = _tuesdayTrack.power();
+                    int power = sequence.power();
                     _ambient_event_timer = 16 + (power > 0 ? 256 / power : 256);
 
                     // AMBIENT: Generate random timing variations for organic feel
@@ -1436,7 +1443,7 @@ void TuesdayTrackEngine::generateBuffer() {
 
                     // Check for Trill/Retrigger
                     int trillChanceAlgorithmic = 30; // 30% base chance
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                     if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -1573,7 +1580,7 @@ void TuesdayTrackEngine::generateBuffer() {
 
                     // Check for Trill on accented notes
                     int trillChanceAlgorithmic = 20;
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
                     if (_uiRng.nextRange(100) < finalTrillChance) {
                         isTrill = true;
@@ -1674,7 +1681,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 int polyCollision = ((_aphex_pos1 * 7) ^ (_aphex_pos2 * 5) ^ (_aphex_pos3 * 3)) % 12;
                 if (polyCollision > 8) {
                     int trillChanceAlgorithmic = 45; // High for glitch
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
                     if (_uiRng.nextRange(100) < finalTrillChance) {
                         isTrill = true;
@@ -1697,7 +1704,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 _autechre_rule_timer--;
                 if (_autechre_rule_timer <= 0) {
                     uint8_t current_rule = _autechre_rule_sequence[_autechre_rule_index];
-                    int intensity = _tuesdayTrack.power() / 2; // Power: 0-8
+                    int intensity = sequence.power() / 2; // Power: 0-8
 
                     // --- Apply a deterministic transformation rule ---
                     switch (current_rule) {
@@ -1741,7 +1748,7 @@ void TuesdayTrackEngine::generateBuffer() {
                     }
 
                     // --- Reset for next rule ---
-                    _autechre_rule_timer = 8 + (_tuesdayTrack.flow() * 4);
+                    _autechre_rule_timer = 8 + (sequence.flow() * 4);
                     _autechre_rule_index = (_autechre_rule_index + 1) % 8;
                 }
 
@@ -1753,7 +1760,7 @@ void TuesdayTrackEngine::generateBuffer() {
                 uint8_t current_rule = _autechre_rule_sequence[_autechre_rule_index];
                 if (current_rule == 3 || _autechre_rule_timer < 2) {
                     int trillChanceAlgorithmic = 50; // Very high for abstract chaos
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
                     if (_uiRng.nextRange(100) < finalTrillChance) {
                         isTrill = true;
@@ -1767,8 +1774,8 @@ void TuesdayTrackEngine::generateBuffer() {
                 // Flow controls scale step direction with octave jumps
                 // 0-7: step down, 8: stationary, 9-16: step up
                 // Also probabilistically jump octaves
-                int flowVal = _tuesdayTrack.flow();
-                int ornamentVal = _tuesdayTrack.ornament();
+                int flowVal = sequence.flow();
+                int ornamentVal = sequence.ornament();
 
                 // Determine scale step movement based on flow
                 int scaleStepDir = 0;
@@ -1807,7 +1814,7 @@ void TuesdayTrackEngine::generateBuffer() {
 
                 // Check for trill (base probability 50%)
                 int trillChanceAlgorithmic = 50;
-                int userTrillSetting = _tuesdayTrack.trill();
+                int userTrillSetting = sequence.trill();
                 int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                 if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -1862,10 +1869,13 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         return TickResult::NoUpdate;
     }
 
+    const auto &_tuesdayTrackRef = tuesdayTrack();
+    const auto &sequence = _tuesdayTrackRef.sequence(pattern());
+
     // Get parameters
-    int power = _tuesdayTrack.power();
-    int loopLength = _tuesdayTrack.actualLoopLength();
-    int algorithm = _tuesdayTrack.algorithm();
+    int power = sequence.power();
+    int loopLength = sequence.actualLoopLength();
+    int algorithm = sequence.algorithm();
 
     // Power = 0 means silent
     if (power == 0) {
@@ -1877,13 +1887,13 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
     // Check if parameters changed - if so, reinitialize and invalidate buffer
     // Note: Scan is NOT included here - it's a real-time playback parameter
-    bool paramsChanged = (_cachedAlgorithm != _tuesdayTrack.algorithm() ||
-                         _cachedFlow != _tuesdayTrack.flow() ||
-                         _cachedOrnament != _tuesdayTrack.ornament() ||
-                         _cachedLoopLength != _tuesdayTrack.loopLength());
+    bool paramsChanged = (_cachedAlgorithm != sequence.algorithm() ||
+                         _cachedFlow != sequence.flow() ||
+                         _cachedOrnament != sequence.ornament() ||
+                         _cachedLoopLength != sequence.loopLength());
     if (paramsChanged) {
-        _cachedAlgorithm = _tuesdayTrack.algorithm();
-        _cachedLoopLength = _tuesdayTrack.loopLength();
+        _cachedAlgorithm = sequence.algorithm();
+        _cachedLoopLength = sequence.loopLength();
         initAlgorithm();
         _bufferValid = false;
     }
@@ -1904,7 +1914,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     // Apply skew to cooldown based on loop position
     // Skew value determines what fraction of loop is at power 16:
     // Skew 8 = last 50% at power 16, Skew 4 = last 25% at power 16
-    int skew = _tuesdayTrack.skew();
+    int skew = sequence.skew();
     if (skew != 0 && loopLength > 0) {
         // Calculate position in loop (0.0 to 1.0), clamped for safety
         float position = (float)_stepIndex / (float)loopLength;
@@ -1946,10 +1956,10 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
     // Calculate step timing with clock sync
     // Use track divisor (converts from PPQN to actual ticks)
-    uint32_t divisor = _tuesdayTrack.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+    uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
 
     // Calculate reset divisor from resetMeasure parameter
-    int resetMeasure = _tuesdayTrack.resetMeasure();
+    int resetMeasure = sequence.resetMeasure();
     uint32_t resetDivisor;
 
     if (loopLength > 0) {
@@ -2033,11 +2043,11 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         // Calculate effective step index
         // Scan: offsets where on the infinite tape we capture from (0-127)
         // Rotate: for finite loops, shifts start point within the captured loop
-        int scan = _tuesdayTrack.scan();
+        int scan = sequence.scan();
         uint32_t effectiveStep = _stepIndex;
         if (loopLength > 0) {
             // Finite loop: rotate shifts within loop, then scan offsets into buffer
-            int rot = _tuesdayTrack.rotate();
+            int rot = sequence.rotate();
             // Handle negative rotation with proper modulo
             effectiveStep = ((_stepIndex + rot) % loopLength + loopLength) % loopLength;
             // Add scan offset
@@ -2067,7 +2077,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
                 // Retrieve gate offset from buffered data
                 uint8_t bufferedGateOffset = bufferedStep.gateOffset;
-                uint8_t globalGateOffset = _tuesdayTrack.gateOffset();
+                uint8_t globalGateOffset = sequence.gateOffset();
                 uint8_t finalOffset = 0;
 
                 if (globalGateOffset == 0) {
@@ -2103,7 +2113,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 _gatePercent = 75;  // Default gate length
 
                 // Slide controlled by glide parameter
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
                 if (_rng.nextRange(100) < glide) {
                     _slide = _testSweepSpeed + 1;  // Use sweep speed as slide amount
                 } else {
@@ -2145,7 +2155,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 }
 
                 // Random slide controlled by glide parameter
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
                 if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;  // 1-3
                 } else {
@@ -2236,7 +2246,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                         octave = 0;
                         note = _stomperLowNote;
                         // Slide controlled by glide parameter
-                        if (_tuesdayTrack.glide() > 0) {
+                        if (sequence.glide() > 0) {
                             _slide = (_rng.nextRange(3)) + 1;  // Slide 1-3
                         } else {
                             _slide = 0;
@@ -2244,7 +2254,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                         // Check for Trill on stomp down
                         {
                             int trillChanceAlgorithmic = 18; // 18% base chance
-                            int userTrillSetting = _tuesdayTrack.trill();
+                            int userTrillSetting = sequence.trill();
                             int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                             if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -2270,7 +2280,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                         octave = 1;
                         note = _stomperHighNote[_rng.next() % 2];
                         // Slide controlled by glide parameter
-                        if (_tuesdayTrack.glide() > 0) {
+                        if (sequence.glide() > 0) {
                             _slide = (_rng.nextRange(3)) + 1;  // Slide 1-3
                         } else {
                             _slide = 0;
@@ -2278,7 +2288,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                         // Check for Trill on stomp up
                         {
                             int trillChanceAlgorithmic = 18; // 18% base chance
-                            int userTrillSetting = _tuesdayTrack.trill();
+                            int userTrillSetting = sequence.trill();
                             int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                             if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -2378,7 +2388,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 }
 
                 // Random slide controlled by glide parameter
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
                 if (_rng.nextRange(100) < glide) {
                     _slide = (_rng.nextRange(3)) + 1;  // 1-3
                 } else {
@@ -2404,7 +2414,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             {
                 shouldGate = true;
                 _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 int chordpos = effectiveStep % 4;
 
@@ -2459,7 +2469,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 // Check for Trill on accented chord positions
                 if (chordpos == 0) { // First note of chord
                     int trillChanceAlgorithmic = 20; // 20% base chance
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                     if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -2482,7 +2492,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             {
                 shouldGate = true;
                 _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 _rng.nextRange(256);  // velocity (consumed but not used)
                 bool accent = _extraRng.nextBinary();
@@ -2547,7 +2557,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             {
                 shouldGate = true;
                 _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 _snhPhase += _snhPhaseSpeed;
                 int v = _snhPhase >> 30;
@@ -2585,7 +2595,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             {
                 shouldGate = true;
                 _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 _wobblePhase += _wobblePhaseSpeed;
                 _wobblePhase2 += _wobblePhaseSpeed2;
@@ -2640,7 +2650,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                                    (_wobbleLastWasHigh == 1 && _rng.nextRange(256) < 128);
                 if (phaseChanged) {
                     int trillChanceAlgorithmic = 12; // 12% base chance (low, wobble is already complex)
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                     if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -2663,7 +2673,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             {
                 shouldGate = true;
                 _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 int beatPos = effectiveStep % 4;
                 int barPos = effectiveStep % 16;
@@ -2695,7 +2705,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
                         // Check for Trill on hi-hats
                         int trillChanceAlgorithmic = 25; // 25% base chance for hat rolls
-                        int userTrillSetting = _tuesdayTrack.trill();
+                        int userTrillSetting = sequence.trill();
                         int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                         if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -2733,7 +2743,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             {
                 shouldGate = true;
                 _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 int pos = effectiveStep % 16;
 
@@ -2766,7 +2776,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
                         // Check for Trill on ghost notes
                         int trillChanceAlgorithmic = 15; // 15% base chance for ghost double
-                        int userTrillSetting = _tuesdayTrack.trill();
+                        int userTrillSetting = sequence.trill();
                         int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                         if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -2803,7 +2813,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         case 10: // DRONE - Sustained textures
             {
                 shouldGate = true;
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 int interval = 0;
                 switch (_droneInterval) {
@@ -2839,7 +2849,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             {
                 shouldGate = true;
                 _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 _phaseAccum += _phaseSpeed;
                 // Guard against division by zero
@@ -2868,7 +2878,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             {
                 shouldGate = true;
                 _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 int movement = _rng.next() % 8;
                 switch (movement) {
@@ -2916,7 +2926,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 // Check for Trill on ascending movements (traditional ornamentation)
                 if (_ragaDirection == 0) { // Ascending
                     int trillChanceAlgorithmic = 25; // 25% base chance (higher for ornamentation)
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                     if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -2967,7 +2977,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     _ambient_event_type = 1 + (_extraRng.next() % 2); // 1 or 2
                     _ambient_event_step = 0;
                     // Reset timer based on Power
-                    int power = _tuesdayTrack.power();
+                    int power = sequence.power();
                     _ambient_event_timer = 16 + (power > 0 ? 256 - (power * 15) : 256);
                 }
 
@@ -2979,7 +2989,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
         case 15: // DRILL - UK Drill hi-hat rolls and bass slides (infinite loop)
             {
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 // Advance step in bar
                 _drillStepInBar = (_drillStepInBar + 1) % 8;
@@ -2997,7 +3007,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
                     // Check for Trill/Retrigger
                     int trillChanceAlgorithmic = 30; // 30% base chance for a roll on a hi-hat
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                                         if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -3043,7 +3053,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
         case 16: // MINIMAL - staccato bursts and silence (infinite loop)
             {
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 // Mode state machine
                 if (_minimalMode == 0) {
@@ -3105,7 +3115,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
         case 14: // ACID - 303-style patterns (infinite loop)
             {
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 // Get note from sequence
                 note = _acidSequence[_acidPosition];
@@ -3131,7 +3141,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 // Check for Trill on accented notes
                 if (hasAccent) {
                     int trillChanceAlgorithmic = 20; // 20% base chance for 303 throb
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                     if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -3164,7 +3174,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
         case 17: // KRAFT - precise mechanical sequences (infinite loop)
             {
-                int glide = _tuesdayTrack.glide();
+                int glide = sequence.glide();
 
                 // Get note from sequence with transpose
                 note = (_kraftSequence[_kraftPosition] + _kraftTranspose) % 12;
@@ -3242,7 +3252,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 int polyCollision = ((_aphex_pos1 * 7) ^ (_aphex_pos2 * 5) ^ (_aphex_pos3 * 3)) % 12;
                 if (polyCollision > 8) {
                     int trillChanceAlgorithmic = 45; // High for glitch
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                     if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -3278,7 +3288,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 _autechre_rule_timer--;
                 if (_autechre_rule_timer <= 0) {
                     uint8_t current_rule = _autechre_rule_sequence[_autechre_rule_index];
-                    int intensity = _tuesdayTrack.power() / 2; // Power: 0-8
+                    int intensity = sequence.power() / 2; // Power: 0-8
 
                     // --- Apply a deterministic transformation rule ---
                     switch (current_rule) {
@@ -3322,7 +3332,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     }
 
                     // --- Reset for next rule ---
-                    _autechre_rule_timer = 8 + (_tuesdayTrack.flow() * 4);
+                    _autechre_rule_timer = 8 + (sequence.flow() * 4);
                     _autechre_rule_index = (_autechre_rule_index + 1) % 8;
                 }
 
@@ -3330,7 +3340,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 uint8_t current_rule = _autechre_rule_sequence[_autechre_rule_index];
                 if (current_rule == 3 || _autechre_rule_timer < 2) {
                     int trillChanceAlgorithmic = 50; // Very high for abstract chaos
-                    int userTrillSetting = _tuesdayTrack.trill();
+                    int userTrillSetting = sequence.trill();
                     int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                     if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -3358,8 +3368,8 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 shouldGate = true;
 
                 // Flow controls scale step direction with octave jumps
-                int flowVal = _tuesdayTrack.flow();
-                int ornamentVal = _tuesdayTrack.ornament();
+                int flowVal = sequence.flow();
+                int ornamentVal = sequence.ornament();
 
                 // Determine scale step movement based on flow
                 int scaleStepDir = 0;
@@ -3397,7 +3407,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
                 // Check for stepped trill (base probability 50%)
                 int trillChanceAlgorithmic = 50;
-                int userTrillSetting = _tuesdayTrack.trill();
+                int userTrillSetting = sequence.trill();
                 int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
 
                 if (_uiRng.nextRange(100) < finalTrillChance) {
@@ -3425,7 +3435,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                     _stepwave_direction = direction;
 
                     // Determine if this is stepped or slide
-                    int glideParam = _tuesdayTrack.glide();
+                    int glideParam = sequence.glide();
                     if (glideParam > 0 && _rng.nextRange(100) < glideParam) {
                         _stepwave_is_stepped = false;  // Slide mode
                         _slide = 2;  // Long slide for glissando
@@ -3458,7 +3468,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         } // End else (infinite loop)
 
         // Apply global GateOffset override
-        uint8_t globalGateOffset = _tuesdayTrack.gateOffset();
+        uint8_t globalGateOffset = sequence.gateOffset();
         if (globalGateOffset == 0) {
             // Mode 1: Force On-Beat
             _gateOffset = 0;
@@ -3475,18 +3485,18 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         }
 
         // Apply octave and transpose from sequence parameters
-        int trackOctave = _tuesdayTrack.octave();
-        int trackTranspose = _tuesdayTrack.transpose();
+        int trackOctave = sequence.octave();
+        int trackTranspose = sequence.transpose();
 
         // Get scale and root note (use track settings if not Default, otherwise project)
-        int trackScaleIdx = _tuesdayTrack.scale();
-        int trackRootNote = _tuesdayTrack.rootNote();
+        int trackScaleIdx = sequence.scale();
+        int trackRootNote = sequence.rootNote();
 
         const Scale &scale = (trackScaleIdx >= 0) ? Scale::get(trackScaleIdx) : _model.project().selectedScale();
         int rootNote = (trackRootNote >= 0) ? trackRootNote : _model.project().rootNote();
 
         // Apply scale quantization if useScale is enabled, track has specific scale, or project has non-chromatic scale
-        if (_tuesdayTrack.useScale() || trackScaleIdx >= 0 || _model.project().scale() > 0) {
+        if (sequence.useScale() || trackScaleIdx >= 0 || _model.project().scale() > 0) {
             // Treat note as scale degree, convert to voltage
             int scaleNote = note + octave * scale.notesPerOctave();
             // Add transpose (in semitones for chromatic, scale degrees otherwise)
@@ -3551,7 +3561,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         // Apply CV with slide/portamento based on cvUpdateMode
         // Free mode: CV updates every step (continuous evolution)
         // Gated mode: CV only updates when gate fires (original Tuesday behavior)
-        bool shouldUpdateCv = (_tuesdayTrack.cvUpdateMode() == TuesdayTrack::Free) || gateTriggered;
+        bool shouldUpdateCv = (sequence.cvUpdateMode() == TuesdaySequence::Free) || gateTriggered;
 
         if (shouldUpdateCv) {
             _cvTarget = noteVoltage;
@@ -3600,6 +3610,8 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 }
 
 void TuesdayTrackEngine::update(float dt) {
+    const auto &_tuesdayTrackRef = tuesdayTrack();
+    const auto &sequence = _tuesdayTrackRef.sequence(pattern());
     // --- CV Sliding ---
     // This happens independently of gate logic
     if (_slideCountDown > 0) {
@@ -3661,27 +3673,27 @@ void TuesdayTrackEngine::update(float dt) {
                     _gateLengthTicks = _retriggerLength; // Set ON-time for this new note
 
                     // Check if this is a STEPWAVE stepped trill
-                    int algorithm = _tuesdayTrack.algorithm();
+                    int algorithm = sequence.algorithm();
                     if (algorithm == 20 && _stepwave_is_stepped) {
                         // STEPWAVE: Increment through scale degrees
                         _stepwave_current_step++;
                         _stepwave_chromatic_offset += _stepwave_direction;
 
                         // Get scale info to convert scale degrees to voltage
-                        int trackScaleIdx = _tuesdayTrack.scale();
-                        int trackRootNote = _tuesdayTrack.rootNote();
+                        int trackScaleIdx = sequence.scale();
+                        int trackRootNote = sequence.rootNote();
                         const Scale &scale = (trackScaleIdx >= 0) ? Scale::get(trackScaleIdx) : _model.project().selectedScale();
                         int rootNote = (trackRootNote >= 0) ? trackRootNote : _model.project().rootNote();
 
                         // Calculate new CV using scale degrees (respects project/track scale)
-                        if (_tuesdayTrack.useScale() || trackScaleIdx >= 0 || _model.project().scale() > 0) {
+                        if (sequence.useScale() || trackScaleIdx >= 0 || _model.project().scale() > 0) {
                             // Scale mode: treat offset as scale degree offset
                             // _cvTarget is the base note in voltage, we need to find its scale degree
                             // and add the offset, then convert back to voltage
                             int baseScaleDegree = 0;  // Root note starts at degree 0
                             int targetDegree = baseScaleDegree + _stepwave_chromatic_offset;
                             _cvOutput = scale.noteToVolts(targetDegree) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
-                            _cvOutput += _tuesdayTrack.octave();  // Apply track octave
+                            _cvOutput += sequence.octave();  // Apply track octave
                         } else {
                             // Chromatic/free mode: offset in semitones
                             _cvOutput = _cvTarget + (_stepwave_chromatic_offset / 12.f);

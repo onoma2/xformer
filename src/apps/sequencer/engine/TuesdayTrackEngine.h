@@ -9,8 +9,7 @@
 class TuesdayTrackEngine : public TrackEngine {
 public:
     TuesdayTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
-        TrackEngine(engine, model, track, linkedTrackEngine),
-        _tuesdayTrack(track.tuesdayTrack())
+        TrackEngine(engine, model, track, linkedTrackEngine)
     {
         reset();
     }
@@ -25,8 +24,12 @@ public:
     virtual bool activity() const override { return _activity; }
     virtual bool gateOutput(int index) const override { return _gateOutput; }
     virtual float cvOutput(int index) const override { return _cvOutput; }
+
+    const TuesdayTrack &tuesdayTrack() const {
+        return _track.tuesdayTrack();
+    }
     virtual float sequenceProgress() const override {
-        int loopLength = _tuesdayTrack.actualLoopLength();
+        int loopLength = tuesdayTrack().sequence(pattern()).actualLoopLength();
         if (loopLength <= 0) return 0.f;  // Infinite loop shows no progress
         // Use modulo to ensure step is always within bounds
         uint32_t step = _stepIndex % loopLength;
@@ -59,8 +62,6 @@ private:
     static const int BUFFER_SIZE = 64;
     BufferedStep _buffer[BUFFER_SIZE];
     bool _bufferValid = false;
-
-    const TuesdayTrack &_tuesdayTrack;
 
 public:
     // Public type alias for testing
