@@ -203,9 +203,7 @@ void TuesdayTrackEngine::reset() {
     _cvDelta = 0.f;
     _slideCountDown = 0;
 
-    _gateLengthTicks = 0;
-    _pendingGateOffsetTicks = 0;
-    _pendingGateActivation = false;
+    _microGateQueue.clear();
     _tieActive = false;
 
     _retriggerArmed = false;
@@ -596,27 +594,20 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
             // Determine if this is a Beat Start (Step 0, 4, 8, 12)
             bool isBeatStart = (_stepIndex % 4) == 0;
 
-            if (tupleN != 4) {
-                if (isBeatStart) {
-                    // Arm Polyrhythm
-                    result.chaos = 100; // Signal to FX layer to trigger poly
-                    // We need to pass tupleN to FX layer. 
-                    // We can encode it in chaos or gateOffset?
-                    // Or rely on FX layer re-calculating it from Ornament.
-                } else {
-                    // Mute intermediate steps (1, 2, 3)
-                    result.velocity = 0; 
-                }
+            // Signal polyrhythm on beat starts ONLY (don't mask intermediate steps)
+            if (isBeatStart && tupleN != 4) {
+                result.chaos = 100;
+                result.polyCount = tupleN;  // NEW: Pass tuplet count to FX layer
             }
 
-            // ... (Algorithm Logic for Step 0) ...
+            // Algorithm logic (ALWAYS run, no masking)
             int patternVal = _autechre_pattern[_stepIndex % 8];
             result.note = patternVal % 12;
             result.octave = patternVal / 12;
-            
+
             _autechre_rule_timer--;
-            
-            if (result.velocity > 0) result.velocity = 160;
+
+            result.velocity = 160;  // NO MASKING
             result.gateRatio = 75;
             // ... (Transformation Logic) ...
             if (_autechre_rule_timer <= 0) {
@@ -649,15 +640,13 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
              else if (ornament >= 13) tupleN = 7;
              
              bool isBeatStart = (_stepIndex % 4) == 0;
-             
-             if (tupleN != 4) {
-                 if (isBeatStart) {
-                     result.chaos = 100;
-                 } else {
-                     result.velocity = 0;
-                 }
+
+             // Signal polyrhythm on beat starts ONLY (don't mask intermediate steps)
+             if (isBeatStart && tupleN != 4) {
+                 result.chaos = 100;
+                 result.polyCount = tupleN;  // NEW: Pass tuplet count to FX layer
              }
-             
+
              int dir;
              if (flow <= 7) dir = -1;
              else if (flow >= 9) dir = 1;
@@ -665,18 +654,17 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
              
              int stepSize = 2 + (_stepIndex % 2); 
              
-             result.note = (_stepIndex * dir * stepSize) % 7; 
+             result.note = (_stepIndex * dir * stepSize) % 7;
              if (result.note < 0) result.note += 7;
-             
-             if (result.velocity > 0) {
-                 result.velocity = 200;
-                 if (_rng.nextRange(100) < (20 + flow * 3)) {
-                     result.octave = 2;
-                     result.velocity = 255;
-                     result.accent = true;
-                 } else {
-                     result.octave = 0;
-                 }
+
+             // Always generate velocity (NO MASKING)
+             result.velocity = 200;
+             if (_rng.nextRange(100) < (20 + flow * 3)) {
+                 result.octave = 2;
+                 result.velocity = 255;
+                 result.accent = true;
+             } else {
+                 result.octave = 0;
              }
              
              if (_rng.nextRange(100) < sequence.glide()) {
@@ -865,6 +853,22 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 
     bool stepTrigger = (relativeTick % divisor == 0);
 
+    // --- MICRO-GATE QUEUE PROCESSING ---
+
+    // Process scheduled gates from micro-queue
+    while (!_microGateQueue.empty() && tick >= _microGateQueue.front().tick) {
+        auto event = _microGateQueue.front();
+        _microGateQueue.pop();
+
+        _gateOutput = event.gate;
+        _activity = event.gate;
+
+        // For trill intervals, update CV when gate fires
+        if (event.gate && _retriggerArmed && _ratchetInterval != 0) {
+            _cvOutput = event.cvTarget;
+        }
+    }
+
     // --- ENGINE UPDATE LOGIC ---
     
     // Handle existing gate timer
@@ -900,23 +904,56 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         
         // 2. FX LAYER (Post-Processing)
         
-        // A. Trill/Ratchet
+        // A. Polyrhythm / Trill Detection
         _retriggerArmed = false;
-        if (result.chaos > 0) {
+
+        if (result.polyCount > 0 && result.chaos > 50) {
+            // POLYRHYTHM MODE: Distribute N gates across 4-beat window
+            int tupleN = result.polyCount;
+            uint32_t windowTicks = 4 * divisor;  // 4 beats (user requirement)
+            uint32_t spacing = windowTicks / tupleN;  // Even distribution
+
+            // Gate length: Use algorithm's gateRatio
+            uint32_t baseGateLen = (spacing * result.gateRatio) / 100;
+            uint32_t userGate = sequence.gateLength();
+            uint32_t gateLen = (baseGateLen * userGate) / 50;
+            if (gateLen < 1) gateLen = 1;
+
+            // Gate offset (applies to FIRST gate only)
+            uint32_t gateOffsetTicks = (divisor * _gateOffset) / 100;
+
+            // Calculate base CV voltage
+            float baseVolts = scaleToVolts(result.note, result.octave);
+
+            // Schedule N gate ON/OFF pairs
+            // Apply gate offset to the base tick, then space gates evenly from there
+            uint32_t baseTick = tick + gateOffsetTicks;
+
+            for (int i = 0; i < tupleN; i++) {
+                uint32_t offset = (i * spacing);
+
+                _microGateQueue.push({ baseTick + offset, true, baseVolts });
+                _microGateQueue.push({ baseTick + offset + gateLen, false, baseVolts });
+            }
+
+            _retriggerArmed = true;  // Skip normal gate logic
+        }
+        else if (result.chaos > 0) {
+            // TRILL MODE: Original probabilistic ratchet (unchanged)
             int chance = (result.chaos * sequence.trill()) / 100;
             if (_uiRng.nextRange(100) < chance) {
                 _retriggerArmed = true;
-                _retriggerCount = 2; // Default triplet feel or simple double
+                _retriggerCount = 2;
                 _retriggerPeriod = divisor / 3;
                 _retriggerLength = _retriggerPeriod / 2;
-                _ratchetInterval = 0; // Standard trill
-                
-                // Custom Trill Logic per Algorithm could go here (e.g. StepWave intervals)
-                if (sequence.algorithm() == 20) { // StepWave Special
-                     _ratchetInterval = _stepwave_direction;
-                     _retriggerCount = _stepwave_step_count - 1;
-                     _retriggerPeriod = divisor / _stepwave_step_count;
-                     _retriggerLength = _retriggerPeriod / 2;
+                _ratchetInterval = 0;
+
+                // StepWave special trill (climbing intervals)
+                if (sequence.algorithm() == 20) {
+                    _ratchetInterval = _stepwave_direction;
+                    _retriggerCount = _stepwave_step_count - 1;
+                    _retriggerPeriod = divisor / _stepwave_step_count;
+                    _retriggerLength = _retriggerPeriod / 2;
                 }
             }
         }
@@ -973,34 +1010,29 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         if (densityGate) {
              // Reset pressure
              _coolDown = _coolDownMax;
-             
+
              // D. Gate Length (Scaler)
-             int userGate = sequence.gateLength();
+             uint32_t gateOffsetTicks = (divisor * _gateOffset) / 100;
              uint32_t baseLen = (divisor * result.gateRatio) / 100;
-             
-             _gateTicks = (baseLen * userGate) / 50; // Center at 50
-             if (_gateTicks < 1) _gateTicks = 1;
-             
-             // Apply Pending Gate Offset
-             _pendingGateOffsetTicks = (divisor * _gateOffset) / 100;
-             _pendingGateActivation = true;
-             
-             // Handle Ties
-             // If gateTicks > divisor, it's a tie candidate.
-             // But we need to check next step... 
-             // For now, just let the gate run long. 
-             // update() handles the drop.
-             
-             _gateOutput = true;
-             _activity = true;
-             
-             // Set CV
+             uint32_t userGate = sequence.gateLength();
+             uint32_t gateLengthTicks = (baseLen * userGate) / 50;
+             if (gateLengthTicks < 1) gateLengthTicks = 1;
+
+             // Calculate CV voltage
              float volts = scaleToVolts(result.note, result.octave);
-             
-             // Handle Slide CV
+
+             // Schedule gates in micro-queue (not immediate)
+             // Skip if retrigger/polyrhythm will handle it
+             if (!_retriggerArmed) {
+                 _microGateQueue.push({ tick + gateOffsetTicks, true, volts });
+                 _microGateQueue.push({ tick + gateOffsetTicks + gateLengthTicks, false, volts });
+                 _activity = true;
+             }
+
+             // Handle CV Slide
              if (_slide > 0) {
                  _cvTarget = volts;
-                 int slideTicks = _slide * 12; 
+                 int slideTicks = _slide * 12;
                  _cvDelta = (_cvTarget - _cvCurrent) / slideTicks;
                  _slideCountDown = slideTicks;
              } else {
@@ -1008,16 +1040,13 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                  _cvOutput = volts;
                  _slideCountDown = 0;
              }
-             
+
              // Handle Trill Start CV
              if (_retriggerArmed) {
-                 _gateTicks = _retriggerLength; // Override gate for trill
-                 _trillCvTarget = volts; // Start base
-                 // Recalculate trill target for next ratchet?
-                 // For simple trill, we oscillate.
-                 // For StepWave, we might climb.
+                 _gateTicks = _retriggerLength;
+                 _trillCvTarget = volts;
              }
-             
+
         } else {
              // Ghost note / Rest
              // Update CV anyway if Free mode?

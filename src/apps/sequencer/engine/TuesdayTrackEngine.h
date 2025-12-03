@@ -5,6 +5,7 @@
 #include "model/Track.h"
 
 #include "core/utils/Random.h"
+#include "SortedQueue.h"
 
 class TuesdayTrackEngine : public TrackEngine {
 public:
@@ -55,6 +56,20 @@ private:
         uint16_t gateRatio = 75; // 0-200% (Relative Duration)
         uint8_t gateOffset = 0;  // 0-100% (Timing Offset)
         uint8_t chaos = 0;       // 0-100 (Likelihood of glitch/trill)
+        uint8_t polyCount = 0;   // Number of subdivisions (0=none, 3/5/7=tuplet)
+    };
+
+    // Micro-gate scheduling system (inspired by NoteTrackEngine)
+    struct MicroGate {
+        uint32_t tick;      // Absolute tick when gate should fire
+        bool gate;          // true=ON, false=OFF
+        float cvTarget;     // CV voltage for this gate (for trill intervals)
+    };
+
+    struct MicroGateCompare {
+        bool operator()(const MicroGate &a, const MicroGate &b) const {
+            return a.tick < b.tick;
+        }
     };
 
     // Unified Generation Engine
@@ -94,10 +109,8 @@ private:
     // Gate offset from step start (as fraction of divisor, 0-100%)
     uint8_t _gateOffset = 0;  // Default 0% gate offset
 
-    // State for gate offset processing
-    uint32_t _gateLengthTicks = 0;
-    uint32_t _pendingGateOffsetTicks = 0;
-    bool _pendingGateActivation = false;
+    // Micro-gate queue for precise timing
+    SortedQueue<MicroGate, 16, MicroGateCompare> _microGateQueue;
     bool _tieActive = false; // Tracks if the current gate is tied from previous
 
     // Retrigger/Trill State
