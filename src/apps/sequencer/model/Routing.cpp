@@ -329,7 +329,6 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::Trill)]                           = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::GateOffset)]                      = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::GateLength)]                      = { 0,      100,    0,      100,    10      },
-    [int(Routing::Target::Scan)]                            = { 0,      63,     0,      63,     16      },
     // Chaos targets
     [int(Routing::Target::ChaosAmount)]                     = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::ChaosRate)]                       = { 0,      127,    0,      127,    10      },

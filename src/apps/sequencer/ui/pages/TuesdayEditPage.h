@@ -32,7 +32,6 @@ private:
         Power,
         // Page 2
         LoopLength,
-        Scan,
         Rotate,
         Glide,
         Skew,

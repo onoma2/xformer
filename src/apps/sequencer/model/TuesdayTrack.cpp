@@ -53,7 +53,6 @@ void TuesdayTrack::read(VersionedSerializedReader &reader) {
         reader.read(tempSequence._resetMeasure, ProjectVersion::Version35);
         reader.read(tempSequence._scale, ProjectVersion::Version35);
         reader.read(tempSequence._rootNote, ProjectVersion::Version35);
-        reader.read(tempSequence._scan.base, ProjectVersion::Version35);
         reader.read(tempSequence._rotate.base, ProjectVersion::Version35);
         reader.read(tempSequence._gateOffset.base, ProjectVersion::Version40);
 

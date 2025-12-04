@@ -53,8 +53,6 @@ public:
             return Routing::Target::Trill;
         case GateLength:
             return Routing::Target::GateLength;
-        case Scan:
-            return Routing::Target::Scan;
         case Rotate:
             return Routing::Target::Rotate;
         case Octave:
@@ -79,7 +77,6 @@ private:
         Ornament,
         Power,
         LoopLength,
-        Scan,
         Rotate,
         Glide,
         Skew,
@@ -102,7 +99,6 @@ private:
         case Ornament:      return "Ornament";
         case Power:         return "Power";
         case LoopLength:    return "Loop Length";
-        case Scan:          return "Scan";
         case Rotate:        return "Rotate";
         case Glide:         return "Glide";
         case Skew:          return "Skew";
@@ -140,9 +136,6 @@ private:
             break;
         case LoopLength:
             _sequence->printLoopLength(str);
-            break;
-        case Scan:
-            _sequence->printScan(str);
             break;
         case Rotate:
             _sequence->printRotate(str);
@@ -201,9 +194,6 @@ private:
             break;
         case LoopLength:
             _sequence->editLoopLength(value, shift);
-            break;
-        case Scan:
-            _sequence->editScan(value, shift);
             break;
         case Rotate:
             _sequence->editRotate(value, shift);

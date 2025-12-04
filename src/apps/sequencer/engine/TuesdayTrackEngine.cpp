@@ -929,8 +929,8 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     if (mute()) { _gateOutput=false; _cvOutput=0.f; _activity=false; return TickResult::NoUpdate; }
     
     const auto &sequence = tuesdayTrack().sequence(pattern());
-    int power = sequence.power();
-    if (power == 0) { _gateOutput=false; _cvOutput=0.f; _activity=false; return TickResult::NoUpdate; }
+    // int power = sequence.power(); 
+    // Power check moved inside stepTrigger to allow for Skew modulation
 
     // Parameter Change Check
     bool paramsChanged = (_cachedAlgorithm != sequence.algorithm() ||
@@ -1082,6 +1082,19 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         }
 
         // C. Density (Power Gating)
+        int power = sequence.power();
+        int loopLength = sequence.actualLoopLength();
+        int skew = sequence.skew();
+
+        if (loopLength > 0 && skew != 0) {
+             // Skew Logic: -8 to +8 over the loop
+             int currentPos = _stepIndex % loopLength;
+             // Linear interpolation: -skew at start, +skew at end
+             // Formula: offset = -skew + (2 * skew * pos) / (len - 1)
+             int offset = -skew + ((2 * skew * currentPos) / std::max(1, loopLength - 1));
+             power = std::max(0, std::min(16, power + offset));
+        }
+
         // Calculate Base Cooldown from Power (Linear 1-16)
         // High Power (16) -> Cooldown 1 (Every step allowed)
         // Low Power (1) -> Cooldown 16 (Sparse)
@@ -1109,8 +1122,8 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         bool densityGate = false;
         bool accentActive = false;  // Track accent for gate length extension
 
-        // 0. Explicit Mute from Algorithm (e.g. Polyrhythm Masking)
-        if (result.velocity == 0) {
+        // 0. Explicit Mute from Algorithm (e.g. Polyrhythm Masking) OR Power 0
+        if (result.velocity == 0 || power == 0) {
             densityGate = false;
         }
         // 1. ACCENT: Always fire + extend gate length (mapped from original GATE_ACCENT output)

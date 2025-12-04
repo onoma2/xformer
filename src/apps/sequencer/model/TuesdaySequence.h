@@ -124,8 +124,7 @@ public:
     int loopLength() const { return _loopLength; }
     void setLoopLength(int loopLength) {
         _loopLength = clamp(loopLength, 0, 29);
-        // Re-clamp scan and rotate to new loop length
-        setScan(_scan.base);
+        // Re-clamp rotate to new loop length
         setRotate(_rotate.base);
     }
 
@@ -326,26 +325,6 @@ public:
         }
     }
 
-    // scan (0 to 64-loopLength, offsets window into buffer)
-
-    int scan() const { return _scan.get(isRouted(Routing::Target::Scan)); }
-    void setScan(int scan, bool routed = false) {
-        int maxScan = 64 - actualLoopLength();
-        if (maxScan < 0) maxScan = 0;
-        _scan.set(clamp(scan, 0, maxScan), routed);
-    }
-
-    void editScan(int value, bool shift) {
-        if (!isRouted(Routing::Target::Scan)) {
-            setScan(this->scan() + value);
-        }
-    }
-
-    void printScan(StringBuilder &str) const {
-        printRouted(str, Routing::Target::Scan);
-        str("%d", scan());
-    }
-
     // gateLength (0-100% scaling for gate duration)
     int gateLength() const { return _gateLength.get(isRouted(Routing::Target::GateLength)); }
     void setGateLength(int gateLength, bool routed = false) {
@@ -448,7 +427,6 @@ private:
     uint8_t _resetMeasure = 8;  // Default: 8 bars
     int8_t _scale = -1;  // Default: -1 (Project Scale)
     int8_t _rootNote = -1;  // Default: -1 (use project root)
-    Routable<uint8_t> _scan;  // Default: 0 (no scan offset)
     Routable<int8_t> _rotate;  // Default: 0 (no rotation)
     Routable<uint8_t> _gateLength; // Default: 50% (Standard)
     Routable<uint8_t> _gateOffset;  // Default: 0% (no gate timing offset)

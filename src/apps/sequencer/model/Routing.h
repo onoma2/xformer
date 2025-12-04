@@ -85,7 +85,6 @@ public:
         Glide,
         Trill,
         GateOffset,
-        Scan,
         GateLength, // Added
         TuesdayLast = GateLength,
 
@@ -153,7 +152,6 @@ public:
         case Target::Glide:                     return "Glide";
         case Target::Trill:                     return "Trill";
         case Target::GateOffset:                return "Gate Offset";
-        case Target::Scan:                      return "Scan";
 
         case Target::ChaosAmount:               return "Chaos Amount";
         case Target::ChaosRate:                 return "Chaos Rate";

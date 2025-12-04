@@ -140,8 +140,8 @@ void TuesdayEditPage::encoder(EncoderEvent &event) {
 int TuesdayEditPage::paramForPage(int page, int slot) const {
     static const int pageParams[PageCount][ParamsPerPage] = {
         { Algorithm, Flow, Ornament, Power },           // Page 1
-        { LoopLength, Scan, Rotate, CvUpdateMode },     // Page 2
-        { Skew, GateLength, Glide, Trill },             // Page 3
+        { LoopLength, Rotate, Glide, Skew },            // Page 2
+        { GateLength, CvUpdateMode, Trill, -1 },        // Page 3
     };
 
     if (page < 0 || page >= PageCount || slot < 0 || slot >= ParamsPerPage) {
@@ -157,7 +157,6 @@ const char *TuesdayEditPage::paramName(int param) const {
     case Ornament:      return "Ornament";
     case Power:         return "Power";
     case LoopLength:    return "Loop";
-    case Scan:          return "Scan";
     case Rotate:        return "Rotate";
     case Glide:         return "Glide";
     case Skew:          return "Skew";
@@ -175,7 +174,6 @@ const char *TuesdayEditPage::paramShortName(int param) const {
     case Ornament:      return "ORN";
     case Power:         return "POWER";
     case LoopLength:    return "LOOP";
-    case Scan:          return "SCAN";
     case Rotate:        return "ROT";
     case Glide:         return "GLIDE";
     case Skew:          return "SKEW";
@@ -211,9 +209,6 @@ void TuesdayEditPage::formatParamValue(int param, StringBuilder &str) const {
         break;
     case LoopLength:
         sequence.printLoopLength(str);
-        break;
-    case Scan:
-        str("%d", sequence.scan());
         break;
     case Rotate:
         if (sequence.loopLength() == 0) {
@@ -252,7 +247,6 @@ int TuesdayEditPage::paramValue(int param) const {
     case Ornament:      return sequence.ornament();
     case Power:         return sequence.power();
     case LoopLength:    return sequence.loopLength();
-    case Scan:          return sequence.scan();
     case Rotate:        return sequence.rotate();
     case Glide:         return sequence.glide();
     case Skew:          return sequence.skew();
@@ -270,7 +264,6 @@ int TuesdayEditPage::paramMax(int param) const {
     case Ornament:      return 16;
     case Power:         return 16;
     case LoopLength:    return 29;   // Index 0-29 (0=Inf, 29=128)
-    case Scan:          return 127;
     case Rotate:        return 63;   // Bipolar: -63 to +63
     case Glide:         return 100;
     case Skew:          return 8;    // Bipolar: -8 to +8
@@ -303,9 +296,6 @@ void TuesdayEditPage::editParam(int param, int value, bool shift) {
         break;
     case LoopLength:
         sequence.editLoopLength(value, shift);
-        break;
-    case Scan:
-        sequence.editScan(value, shift);
         break;
     case Rotate:
         if (sequence.loopLength() != 0) {

@@ -100,9 +100,6 @@ void TuesdaySequence::writeRouted(Routing::Target target, int intValue, float fl
     case Routing::Target::Divisor:
         setDivisor(intValue, true);
         break;
-    case Routing::Target::Scan:
-        setScan(intValue, true);
-        break;
     case Routing::Target::Rotate:
         setRotate(intValue, true);
         break;
@@ -137,7 +134,6 @@ void TuesdaySequence::clear() {
     _resetMeasure = 0;
     _scale = -1;  // Project
     _rootNote = -1;
-    _scan.clear();
     _rotate.clear();
     _gateLength.clear();
     _gateLength.setBase(50);
@@ -161,7 +157,6 @@ void TuesdaySequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_resetMeasure);
     writer.write(_scale);
     writer.write(_rootNote);
-    _scan.write(writer);
     _rotate.write(writer);
     _gateLength.write(writer);
     _gateOffset.write(writer);
@@ -189,7 +184,6 @@ void TuesdaySequence::read(VersionedSerializedReader &reader) {
     reader.read(_resetMeasure, ProjectVersion::Version35);
     reader.read(_scale, ProjectVersion::Version35);
     reader.read(_rootNote, ProjectVersion::Version35);
-    _scan.read(reader);
     _rotate.read(reader);
     _gateLength.read(reader);
     _gateOffset.read(reader);
