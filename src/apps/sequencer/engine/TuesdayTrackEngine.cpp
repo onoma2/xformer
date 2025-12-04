@@ -101,11 +101,11 @@ void TuesdayTrackEngine::initAlgorithm() {
         break;
 
     case 9: // WOBBLE
-        // Swap seeds like Stomper? 
+        // Swap seeds like Stomper?
         // Original: R=seed2>>2, Extra=seed1>>2.
         _rng = Random(ornamentSeed);
         _extraRng = Random(flowSeed + 0x9e3779b9);
-        
+
         _wobblePhase = 0;
         // Speed based on pattern length?
         // T->CurrentPattern.Length.
@@ -116,6 +116,13 @@ void TuesdayTrackEngine::initAlgorithm() {
         _wobblePhase2 = 0;
         _wobbleLastWasHigh = 0;
         _wobblePhaseSpeed2 = 0x02000000; // Slower
+        break;
+
+    case 10: // SCALEWALKER
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
+        // Walker position persists across loop boundaries and parameter changes
+        // Only reset via reset() (algorithm change) or reseed() (manual Shift+F5)
         break;
 
     case 3: // APHEX (Mapped from 18)
@@ -326,10 +333,17 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
     int algorithm = sequence.algorithm();
     
     // --- CONTEXT CALCULATION (Porting Tick/Beat/Loop) ---
-    
+
+    // Compute divisor (ticks per step) - needed for beat grid calculations
+    uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+
+    // Beat detection (for algorithms that need to sync to beat grid)
+    int stepsPerBeat = (divisor > 0) ? (CONFIG_PPQN / divisor) : 0;
+    bool isBeatStart = (stepsPerBeat > 0) && ((_stepIndex % stepsPerBeat) == 0);
+
     // 1. Derive TPB (Ticks Per Beat) based on Quarter Note (192 PPQN)
     // This ensures "Beat" based algorithms lock to the musical grid.
-    uint32_t stepTicks = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+    uint32_t stepTicks = divisor;
     int tpb = 1;
     if (stepTicks > 0) {
         // Round to nearest integer to handle slight timing drifts or swing if applied globally (unlikely here)
@@ -340,6 +354,10 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
     // If infinite (0), assume 32 steps (2 bars of 16ths) for LFO scaling
     int loopLength = sequence.actualLoopLength();
     int effectiveLoopLength = (loopLength > 0) ? loopLength : 32;
+
+    // Apply rotation offset (wire up existing UI parameter)
+    int rotate = (loopLength > 0) ? sequence.rotate() : 0;
+    int rotatedStep = (loopLength > 0) ? ((_stepIndex + rotate + loopLength) % loopLength) : _stepIndex;
 
     TuesdayTickResult result;
     result.velocity = 255; // Default high velocity
@@ -544,9 +562,10 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
             
             // Re-calculate positions based on warped indices
             // This makes the algo stateless (good for loop points!)
-            int pos1 = _stepIndex % 4; // Track 1 is always straight 4/4
-            int pos2 = modifierStep % 3; // Track 2 is warped
-            int pos3 = _stepIndex % 5; // Track 3 is straight 5/4 (natural poly)
+            // Use rotatedStep for pattern indexing to enable rotation parameter
+            int pos1 = rotatedStep % 4; // Track 1 is always straight 4/4
+            int pos2 = modifierStep % 3; // Track 2 is warped (intentionally uses unrotated time)
+            int pos3 = rotatedStep % 5; // Track 3 is straight 5/4 (natural poly)
 
             result.note = _aphex_track1_pattern[pos1];
             result.octave = 0;
@@ -584,24 +603,41 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
     case 4: // AUTECHRE
         {
             // Polyrhythmic Time Warping (Fast Tuplets)
+            int flow = sequence.flow();
             int ornament = sequence.ornament();
             int tupleN = 4;
-            
+
             if (ornament >= 5 && ornament <= 8) tupleN = 3;
             else if (ornament >= 9 && ornament <= 12) tupleN = 5;
             else if (ornament >= 13) tupleN = 7;
 
-            // Determine if this is a Beat Start (Step 0, 4, 8, 12)
-            bool isBeatStart = (_stepIndex % 4) == 0;
+            // Determine if this is a Beat Start using actual divisor (respects time signature)
+            // Use divisor-based calculation instead of hardcoded 4
+            int stepsPerBeat = divisor / (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+            bool isBeatStart = (stepsPerBeat > 0) && ((_stepIndex % stepsPerBeat) == 0);
 
             // Signal polyrhythm on beat starts ONLY (don't mask intermediate steps)
             if (isBeatStart && tupleN != 4) {
-                result.chaos = 100;
+                // Vary chaos based on flow (probabilistic polyrhythm)
+                // flow 0-16 → chaos 20-100 (low flow = sparse, high flow = dense)
+                result.chaos = 20 + (flow * 5);
                 result.polyCount = tupleN;  // NEW: Pass tuplet count to FX layer
+                result.isSpatial = true;     // Polyrhythm mode (spread in time)
+
+                // Generate note offsets from pattern (micro-melody)
+                // Use pattern values as intervals, cycling through pattern if needed
+                for (int i = 0; i < tupleN && i < 8; i++) {
+                    int patternIdx = (rotatedStep + i) % 8;
+                    int patternNote = _autechre_pattern[patternIdx] % 12;
+                    // Convert to interval relative to base note (first pattern value)
+                    int baseNote = _autechre_pattern[rotatedStep % 8] % 12;
+                    result.noteOffsets[i] = patternNote - baseNote;
+                }
             }
 
             // Algorithm logic (ALWAYS run, no masking)
-            int patternVal = _autechre_pattern[_stepIndex % 8];
+            // Use rotatedStep for pattern indexing to enable rotation parameter
+            int patternVal = _autechre_pattern[rotatedStep % 8];
             result.note = patternVal % 12;
             result.octave = patternVal / 12;
 
@@ -633,27 +669,46 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
         {
              int flow = sequence.flow();
              int ornament = sequence.ornament();
-             
+
+             // Determine tuplet count based on ornament
              int tupleN = 4;
              if (ornament >= 5 && ornament <= 8) tupleN = 3;
              else if (ornament >= 9 && ornament <= 12) tupleN = 5;
              else if (ornament >= 13) tupleN = 7;
-             
-             bool isBeatStart = (_stepIndex % 4) == 0;
 
-             // Signal polyrhythm on beat starts ONLY (don't mask intermediate steps)
+             // Fix hardcoded beat grid - use divisor-based calculation
+             int stepsPerBeat = divisor / (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+             bool isBeatStart = (stepsPerBeat > 0) && ((_stepIndex % stepsPerBeat) == 0);
+
+             // Signal micro-sequencing on beat starts (TRILL mode - rapid chromatic stepping)
              if (isBeatStart && tupleN != 4) {
-                 result.chaos = 100;
-                 result.polyCount = tupleN;  // NEW: Pass tuplet count to FX layer
+                 // Vary chaos based on flow (probabilistic micro-sequencing)
+                 result.chaos = 20 + (flow * 5);
+                 result.polyCount = tupleN;
+                 result.isSpatial = false;  // TRILL mode (rapid succession, not spread)
+
+                 // Update direction based on flow
+                 if (flow <= 7) _stepwave_direction = -1;      // Descending
+                 else if (flow >= 9) _stepwave_direction = 1;  // Ascending
+                 else _stepwave_direction = 0;                 // Random/static
+
+                 _stepwave_step_count = tupleN;
+
+                 // Generate chromatic note offsets (semitone steps)
+                 // Each gate in the micro-sequence steps up/down chromatically
+                 for (int i = 0; i < tupleN && i < 8; i++) {
+                     result.noteOffsets[i] = i * _stepwave_direction;  // Chromatic intervals
+                 }
              }
 
+             // Base note generation (scale-based walking)
              int dir;
              if (flow <= 7) dir = -1;
              else if (flow >= 9) dir = 1;
-             else dir = 1; 
-             
-             int stepSize = 2 + (_stepIndex % 2); 
-             
+             else dir = 1;
+
+             int stepSize = 2 + (_stepIndex % 2);
+
              result.note = (_stepIndex * dir * stepSize) % 7;
              if (result.note < 0) result.note += 7;
 
@@ -666,7 +721,7 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
              } else {
                  result.octave = 0;
              }
-             
+
              if (_rng.nextRange(100) < sequence.glide()) {
                  result.slide = true;
                  result.gateRatio = 100;
@@ -693,9 +748,10 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
             else result.gateRatio = 75;
             
             if (_rng.nextBinary() && _rng.nextBinary()) result.slide = true;
-            
-            if (_rng.nextRange(256) >= 100) result.accent = true;
-            
+
+            // 100% accent probability per original Tuesday
+            result.accent = true;
+
             result.velocity = (_rng.nextRange(256) / 2) + 40;
         }
         break;
@@ -730,7 +786,8 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
                 result.gateRatio = (4 + 6 * rnd) * (100/6); // approx mapping
             }
             
-            int extraVel = ((_stepIndex + _triB2) == 0) ? 127 : 0; // triB2 unused? Original used GENERIC.b2
+            // Add extra velocity on first step of pattern (original used GENERIC.b2 which doesn't exist in this port)
+            int extraVel = (_stepIndex == 0) ? 127 : 0;
             result.velocity = (_rng.nextRange(256) / 2) + extraVel; 
         }
         break;
@@ -790,14 +847,14 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
 
             _wobblePhase += _wobblePhaseSpeed;
             _wobblePhase2 += _wobblePhaseSpeed2;
-            
+
             // PercChance(R, seed2). seed2=ornament.
             // Map ornament 0-16 to 0-255 threshold
             if (_rng.nextRange(256) >= (sequence.ornament() * 16)) {
                 // Use Phase 2
                 result.octave = 1;
                 result.note = (_wobblePhase2 >> 27) & 0x1F; // 0-31
-                
+
                 if (_wobbleLastWasHigh == 0) {
                     if (_rng.nextRange(256) >= 200) result.slide = true;
                 }
@@ -806,15 +863,56 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
                 // Use Phase 1
                 result.octave = 0;
                 result.note = (_wobblePhase >> 27) & 0x1F;
-                
+
                 if (_wobbleLastWasHigh == 1) {
                     if (_rng.nextRange(256) >= 200) result.slide = true;
                 }
                 _wobbleLastWasHigh = 0;
             }
-            
+
             result.velocity = (_extraRng.nextRange(256) / 4);
             if (_rng.nextRange(256) >= 50) result.accent = true;
+        }
+        break;
+
+    case 10: // SCALEWALKER - Rhythmic subdivisions with scale walking
+        {
+            int flow = sequence.flow();
+            int ornament = sequence.ornament();
+
+            // 1. Determine subdivision count
+            int subdivisions = 4;  // Default straight 16ths
+            if (ornament >= 5 && ornament <= 8) subdivisions = 3;
+            else if (ornament >= 9 && ornament <= 12) subdivisions = 5;
+            else if (ornament >= 13) subdivisions = 7;
+
+            // 2. Direction
+            int direction = (flow <= 7) ? -1 : ((flow == 8) ? 0 : 1);
+
+            // 3. Base note is current walker position
+            result.note = _scalewalker_pos;
+            result.octave = 0;
+            result.velocity = 100 + (sequence.power() * 10);  // 100-260 range
+            result.gateRatio = 75;
+
+            // 4. Trigger micro-sequencing on beat starts (isBeatStart calculated at top of generateStep)
+            if (isBeatStart && subdivisions != 4) {
+                result.chaos = 100;  // Always fire
+                result.polyCount = subdivisions;
+                result.isSpatial = true;  // Spread across beat
+
+                // Generate sequential scale degree offsets
+                for (int i = 0; i < subdivisions && i < 8; i++) {
+                    result.noteOffsets[i] = i * direction;
+                }
+            }
+            else if (subdivisions != 4) {
+                // Polyrhythm mode on non-beat steps: mute to prevent gate leakage
+                result.velocity = 0;
+            }
+
+            // Advance walker every step (not just on beat starts)
+            _scalewalker_pos = (_scalewalker_pos + direction + 7) % 7;
         }
         break;
     }
@@ -863,8 +961,9 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         _gateOutput = event.gate;
         _activity = event.gate;
 
-        // For trill intervals, update CV when gate fires
-        if (event.gate && _retriggerArmed && _ratchetInterval != 0) {
+        // Update CV from micro-gate queue (always apply when gate fires)
+        // Micro-gates store their target CV and should always use it
+        if (event.gate) {
             _cvOutput = event.cvTarget;
         }
     }
@@ -908,9 +1007,11 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         _retriggerArmed = false;
 
         if (result.polyCount > 0 && result.chaos > 50) {
-            // POLYRHYTHM MODE: Distribute N gates across 4-beat window
+            // MICRO-SEQUENCING MODE: Distribute N gates with independent pitches
             int tupleN = result.polyCount;
-            uint32_t windowTicks = 4 * divisor;  // 4 beats (user requirement)
+
+            // Determine timing distribution (spatial = spread, temporal = rapid)
+            uint32_t windowTicks = result.isSpatial ? (4 * divisor) : divisor;
             uint32_t spacing = windowTicks / tupleN;  // Even distribution
 
             // Gate length: Use algorithm's gateRatio
@@ -922,18 +1023,29 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             // Gate offset (applies to FIRST gate only)
             uint32_t gateOffsetTicks = (divisor * _gateOffset) / 100;
 
-            // Calculate base CV voltage
-            float baseVolts = scaleToVolts(result.note, result.octave);
-
-            // Schedule N gate ON/OFF pairs
+            // Schedule N gate ON/OFF pairs with independent pitches
             // Apply gate offset to the base tick, then space gates evenly from there
             uint32_t baseTick = tick + gateOffsetTicks;
 
             for (int i = 0; i < tupleN; i++) {
                 uint32_t offset = (i * spacing);
 
-                _microGateQueue.push({ baseTick + offset, true, baseVolts });
-                _microGateQueue.push({ baseTick + offset + gateLen, false, baseVolts });
+                // Calculate voltage for THIS gate using note offset
+                float volts;
+                if (result.isSpatial) {
+                    // POLYRHYTHM: Scale-degree based (quantized to scale)
+                    // noteOffsets are intervals in scale degrees
+                    int noteWithOffset = result.note + result.noteOffsets[i];
+                    volts = scaleToVolts(noteWithOffset, result.octave);
+                } else {
+                    // TRILL: Chromatic (bypass quantization)
+                    // noteOffsets are semitone intervals, add directly to voltage
+                    float baseVolts = scaleToVolts(result.note, result.octave);
+                    volts = baseVolts + (result.noteOffsets[i] / 12.f);
+                }
+
+                _microGateQueue.push({ baseTick + offset, true, volts });
+                _microGateQueue.push({ baseTick + offset + gateLen, false, volts });
             }
 
             _retriggerArmed = true;  // Skip normal gate logic
@@ -990,18 +1102,24 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         // If we trigger, we reset cooldown.
         
         bool densityGate = false;
-        
+        bool accentActive = false;  // Track accent for gate length extension
+
         // 0. Explicit Mute from Algorithm (e.g. Polyrhythm Masking)
         if (result.velocity == 0) {
             densityGate = false;
         }
-        // 1. Timer Expired (Power)
+        // 1. ACCENT: Always fire + extend gate length (mapped from original GATE_ACCENT output)
+        else if (result.accent) {
+            densityGate = true;
+            accentActive = true;  // Will extend gate length later
+        }
+        // 2. Timer Expired (Power)
         else if (_coolDown == 0) {
-            densityGate = true; 
-        } 
-        // 2. High Velocity Override
+            densityGate = true;
+        }
+        // 3. High Velocity Override
         else {
-            int velDensity = result.velocity / 16; 
+            int velDensity = result.velocity / 16;
             if (velDensity >= _coolDown) {
                 densityGate = true;
             }
@@ -1017,6 +1135,11 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
              uint32_t userGate = sequence.gateLength();
              uint32_t gateLengthTicks = (baseLen * userGate) / 50;
              if (gateLengthTicks < 1) gateLengthTicks = 1;
+
+             // Accent: Extend gate length by 50% (per original Tuesday's GATE_ACCENT mapping)
+             if (accentActive) {
+                 gateLengthTicks = (gateLengthTicks * 3) / 2;
+             }
 
              // Calculate CV voltage
              float volts = scaleToVolts(result.note, result.octave);
@@ -1050,7 +1173,8 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         } else {
              // Ghost note / Rest
              // Update CV anyway if Free mode?
-             if (sequence.cvUpdateMode() == TuesdaySequence::Free) {
+             // BUT: Don't update on explicitly muted steps (velocity=0 from polyrhythm suppression)
+             if (sequence.cvUpdateMode() == TuesdaySequence::Free && result.velocity > 0) {
                   float volts = scaleToVolts(result.note, result.octave);
                   _cvCurrent = volts;
                   _cvOutput = volts;

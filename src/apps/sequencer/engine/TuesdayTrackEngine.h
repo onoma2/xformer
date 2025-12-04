@@ -57,6 +57,14 @@ private:
         uint8_t gateOffset = 0;  // 0-100% (Timing Offset)
         uint8_t chaos = 0;       // 0-100 (Likelihood of glitch/trill)
         uint8_t polyCount = 0;   // Number of subdivisions (0=none, 3/5/7=tuplet)
+
+        // Micro-sequencing: Note offsets for each micro-gate (in semitones/scale degrees)
+        int8_t noteOffsets[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+        // Spatial vs Temporal distribution
+        // true = polyrhythm mode (gates spread evenly across 4-beat window)
+        // false = trill mode (gates fired rapidly in succession)
+        bool isSpatial = true;
     };
 
     // Micro-gate scheduling system (inspired by NoteTrackEngine)
@@ -110,7 +118,8 @@ private:
     uint8_t _gateOffset = 0;  // Default 0% gate offset
 
     // Micro-gate queue for precise timing
-    SortedQueue<MicroGate, 16, MicroGateCompare> _microGateQueue;
+    // Size 32: supports 7-tuplet (14 entries) with headroom for multiple beats
+    SortedQueue<MicroGate, 32, MicroGateCompare> _microGateQueue;
     bool _tieActive = false; // Tracks if the current gate is tied from previous
 
     // Retrigger/Trill State
@@ -178,94 +187,12 @@ private:
     uint8_t _chip2ChordLen = 0;
     Random _chip2Rng;
 
-    // GOACID algorithm state
-    uint8_t _goaB1 = 0;  // Pattern transpose flag 1
-    uint8_t _goaB2 = 0;  // Pattern transpose flag 2
-
-    // SNH (Sample & Hold) algorithm state
-    uint32_t _snhPhase = 0;
-    uint32_t _snhPhaseSpeed = 0;
-    uint8_t _snhLastVal = 0;
-    int32_t _snhTarget = 0;
-    int32_t _snhCurrent = 0;
-    int32_t _snhCurrentDelta = 0;
-
     // WOBBLE algorithm state
     uint32_t _wobblePhase = 0;
     uint32_t _wobblePhaseSpeed = 0;
     uint32_t _wobblePhase2 = 0;
     uint32_t _wobblePhaseSpeed2 = 0;
     uint8_t _wobbleLastWasHigh = 0;
-
-    // TECHNO algorithm state
-    uint8_t _technoKickPattern = 0;
-    uint8_t _technoHatPattern = 0;
-    uint8_t _technoBassNote = 0;
-
-    // FUNK algorithm state
-    uint8_t _funkPattern = 0;
-    uint8_t _funkSyncopation = 0;
-    uint8_t _funkGhostProb = 0;
-
-    // DRONE algorithm state
-    uint8_t _droneBaseNote = 0;
-    uint8_t _droneInterval = 0;
-    uint8_t _droneSpeed = 1;  // Safe default to avoid division by zero
-
-    // PHASE algorithm state
-    uint32_t _phaseAccum = 0;
-    uint32_t _phaseSpeed = 0;
-    uint8_t _phasePattern[8] = {0};
-    uint8_t _phaseLength = 4;  // Safe default to avoid division by zero
-
-    // RAGA algorithm state
-    uint8_t _ragaScale[7] = {0};
-    uint8_t _ragaDirection = 0;
-    uint8_t _ragaPosition = 0;
-    uint8_t _ragaOrnament = 0;
-
-    // AMBIENT algorithm state (13) - Harmonic Drone & Event Scheduler
-    int8_t _ambient_root_note;
-    int8_t _ambient_drone_notes[3]; // The notes of the drone chord
-    int _ambient_event_timer;       // Countdown to the next sparse event
-    uint8_t _ambient_event_type;    // 0=none, 1=single note, 2=arpeggio
-    uint8_t _ambient_event_step;    // Position within the current event
-
-    // ACID algorithm state (14)
-    uint8_t _acidSequence[8] = {0};
-    uint8_t _acidPosition = 0;
-    uint8_t _acidAccentPattern = 0;
-    uint8_t _acidOctaveMask = 0;
-    int8_t _acidLastNote = 0;
-    uint8_t _acidSlideTarget = 0;
-    uint8_t _acidStepCount = 0;
-
-    // DRILL algorithm state (15)
-    uint8_t _drillHiHatPattern = 0;
-    uint8_t _drillSlideTarget = 0;
-    uint8_t _drillTripletMode = 0;
-    uint8_t _drillRollCount = 0;
-    uint8_t _drillLastNote = 0;
-    uint8_t _drillStepInBar = 0;
-    uint8_t _drillSubdivision = 1;
-
-    // MINIMAL algorithm state (16)
-    uint8_t _minimalBurstLength = 0;
-    uint8_t _minimalSilenceLength = 0;
-    uint8_t _minimalClickDensity = 0;
-    uint8_t _minimalBurstTimer = 0;
-    uint8_t _minimalSilenceTimer = 0;
-    uint8_t _minimalNoteIndex = 0;
-    uint8_t _minimalMode = 0;
-
-    // KRAFT algorithm state (17)
-    uint8_t _kraftSequence[8] = {0};
-    uint8_t _kraftPosition = 0;
-    uint8_t _kraftLockTimer = 0;
-    uint8_t _kraftTranspose = 0;
-    uint8_t _kraftTranspCount = 0;
-    int8_t _kraftBaseNote = 0;
-    uint8_t _kraftGhostMask = 0;
 
     // For APHEX - Polyrhythmic Event Sequencer
     uint8_t _aphex_track1_pattern[4]; // 4-step melodic pattern
@@ -286,6 +213,8 @@ private:
     int8_t _stepwave_chromatic_offset; // Running chromatic offset from base note
     bool _stepwave_is_stepped;      // true=stepped, false=slide
 
+    // SCALEWALKER algorithm state (10) - Scale degree walker with subdivisions
+    int8_t _scalewalker_pos;        // Current position in scale (0-6)
 
     // Output state
     bool _activity = false;

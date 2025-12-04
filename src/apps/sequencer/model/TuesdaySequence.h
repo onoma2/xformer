@@ -34,10 +34,10 @@ public:
 
     void editAlgorithm(int value, bool shift) {
         if (!isRouted(Routing::Target::Algorithm)) {
-            // Cycle only through valid algorithms: 0, 1, 2, 3(6), 4(7), 5(8), 6(9), 18, 19, 20
-            // 0=Test, 1=Tri, 2=Stomper, 6=Markov, 7=Chip1, 8=Chip2, 9=Wobble, 18=Aphex, 19=Aut, 20=Step
-            static const int VALID_ALGORITHMS[] = {0, 1, 2, 6, 7, 8, 9, 18, 19, 20};
-            const int VALID_COUNT = 10;
+            // Cycle only through valid algorithms: 0, 1, 2, 3(6), 4(7), 5(8), 6(9), 10, 18, 19, 20
+            // 0=Test, 1=Tri, 2=Stomper, 6=Markov, 7=Chip1, 8=Chip2, 9=Wobble, 10=ScaleWalk, 18=Aphex, 19=Aut, 20=Step
+            static const int VALID_ALGORITHMS[] = {0, 1, 2, 6, 7, 8, 9, 10, 18, 19, 20};
+            const int VALID_COUNT = 11;
 
             // Find current algorithm position in valid array
             int currentIdx = -1;
