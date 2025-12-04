@@ -7,6 +7,18 @@
 #include <algorithm>
 
 // Initialize algorithm state based on Flow (seed1) and Ornament (seed2)
+//
+// DUAL RNG SYSTEM (Tuesday Spec Law 2):
+// - _rng (Main RNG, seeded from Flow): Controls FLOW decisions
+//   * Timing, mode transitions, gesture state machines, big structural changes
+//   * Example: When to mutate, which phrase to play, beat-locked decisions
+//
+// - _extraRng (Aux RNG, seeded from Ornament): Controls ORNAMENT details
+//   * Pitch variations, velocity, articulation, micro-timing
+//   * Example: Which note in a scale, accent probability, slide amount
+//
+// This separation prevents unwanted correlation (e.g., slides always sync with accents).
+// Salt value (0x9e3779b9) ensures distinct sequences even when Flow == Ornament.
 void TuesdayTrackEngine::initAlgorithm() {
     const auto &_tuesdayTrackRef = tuesdayTrack();
     const auto &sequence = _tuesdayTrackRef.sequence(pattern());
@@ -51,9 +63,11 @@ void TuesdayTrackEngine::initAlgorithm() {
         break;
 
     case 2: // STOMPER
-        // Original Swap: Main RNG = Ornament, Extra RNG = Flow
-        _rng = Random(ornamentSeed);
-        _extraRng = Random(flowSeed + 0x9e3779b9);
+        // FIX: Corrected RNG assignment to match Tuesday spec (Law 2)
+        // Original C had R=seed2, Extra=seed1 (swapped), which violated the spec.
+        // Correct: Flow → main RNG (gesture state machine), Ornament → extra RNG (velocity/timing)
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
         _stomperMode = (_extraRng.next() % 7) * 2;
         _stomperCountDown = 0;
@@ -101,21 +115,19 @@ void TuesdayTrackEngine::initAlgorithm() {
         break;
 
     case 9: // WOBBLE
-        // Swap seeds like Stomper?
-        // Original: R=seed2>>2, Extra=seed1>>2.
-        _rng = Random(ornamentSeed);
-        _extraRng = Random(flowSeed + 0x9e3779b9);
+        // FIX: Corrected RNG assignment to match Tuesday spec (Law 2)
+        // Original C had R=seed2, Extra=seed1 (swapped), which violated the spec.
+        // Correct: Flow → main RNG (phase selection), Ornament → extra RNG (velocity)
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
         _wobblePhase = 0;
-        // Speed based on pattern length?
-        // T->CurrentPattern.Length.
-        // Let's assume generic speed based on Flow/Ornament
-        // Original: 0xFFFFFFFF / Length.
-        // Let's pick a base speed.
-        _wobblePhaseSpeed = 0x08000000; // Slow
+        // Speed based on pattern length (dynamically updated in generateStep)
+        // Original: 0xFFFFFFFF / Length
+        _wobblePhaseSpeed = 0x08000000; // Slow (will be overridden)
         _wobblePhase2 = 0;
         _wobbleLastWasHigh = 0;
-        _wobblePhaseSpeed2 = 0x02000000; // Slower
+        _wobblePhaseSpeed2 = 0x02000000; // Slower (will be overridden)
         break;
 
     case 10: // SCALEWALKER
@@ -467,11 +479,12 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
                 if (_stomperMode >= 14) {
                     _stomperMode = (_extraRng.next() % 7) * 2;
                 }
-                
-                // Randomize notes periodically (simulated "PercChance 100" from original)
-                if (_rng.nextRange(256) >= 100) _stomperLowNote = _rng.next() % 3;
-                if (_rng.nextRange(256) >= 100) _stomperHighNote[0] = _rng.next() % 7;
-                if (_rng.nextRange(256) >= 100) _stomperHighNote[1] = _rng.next() % 5;
+
+                // FIX: Original C had PercChance(R, 100) = 100% probability (always true)
+                // Randomize notes every tick for chaotic character (Pattern C: Range-Biased Random)
+                _stomperLowNote = _rng.next() % 3;
+                _stomperHighNote[0] = _rng.next() % 7;
+                _stomperHighNote[1] = _rng.next() % 5;
 
                 veloffset = 100; // Base velocity when active
                 int maxticklen = 2;
@@ -520,13 +533,17 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
                 case 2: case 3: // LOWHI
                     // Simplified mapping for brevity, adhering to logic
                     if (_stomperMode == 6 || _stomperMode == 7 || _stomperMode == 9 || _stomperMode == 2) accentoffs = 100;
-                    
+
                     if (_stomperMode == 8 || _stomperMode == 3) {
                         result.octave = 1;
                         result.note = _stomperHighNote[_rng.next() % 2];
-                        if (_stomperMode == 8) _stomperMode++; else if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen; 
+                        if (_stomperMode == 8) _stomperMode++; else if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
                         if (_stomperMode == 3) _stomperMode = 14;
                     } else {
+                        // NOTE: Original C bug faithfully preserved:
+                        // STOMPER_HIGH cases (6,7) play low octave/low note instead of high octave/high note
+                        // Original C line 101: case STOMPER_HIGH1: NOTE(0, PS->Stomper.LowNote);
+                        // This gives STOMPER its characteristic "heavy" sound
                          result.octave = 0;
                          result.note = _stomperLowNote;
                          if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
@@ -656,7 +673,8 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
                 else if (rule == 3) { for(int i=0;i<8;i+=2) std::swap(_autechre_pattern[i], _autechre_pattern[i+1]); }
                 else if (rule == 4) { for(int i=0;i<8;++i) { int o=_autechre_pattern[i]/12; int n=(_autechre_pattern[i]%12+intensity)%12; _autechre_pattern[i]=n+o*12; } }
 
-                _autechre_rule_timer = 8 + (sequence.flow() * 4);
+                // FIX: Use cached flow to prevent timer drift if user tweaks knob mid-pattern
+                _autechre_rule_timer = 8 + (_cachedFlow * 4);
                 _autechre_rule_index = (_autechre_rule_index + 1) % 8;
             }
         }
@@ -680,10 +698,12 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
 
                  _stepwave_step_count = subdivisions;
 
-                 // Generate chromatic note offsets (semitone steps)
-                 // Each gate in the micro-sequence steps up/down chromatically
+                 // INTENTIONAL CHROMATIC BYPASS (Spec Law 3 deviation):
+                 // Trill mode requires chromatic semitone steps for the sliding effect.
+                 // These noteOffsets are added directly to voltage (line 1023), bypassing scale quantization.
+                 // This is a documented design choice for STEPWAVE's unique chromatic trill character.
                  for (int i = 0; i < subdivisions && i < 8; i++) {
-                     result.noteOffsets[i] = i * _stepwave_direction;  // Chromatic intervals
+                     result.noteOffsets[i] = i * _stepwave_direction;  // Chromatic intervals (semitones)
                  }
              }
 
@@ -771,9 +791,10 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
                 int rnd = (_chipRng.next() >> 7) % 3;
                 result.gateRatio = (4 + 6 * rnd) * (100/6); // approx mapping
             }
-            
-            // Add extra velocity on first step of pattern (original used GENERIC.b2 which doesn't exist in this port)
-            int extraVel = (_stepIndex == 0) ? 127 : 0;
+
+            // FIX: Add extra velocity on first step of PATTERN (not global step)
+            // Original used GENERIC.b2 to track pattern position
+            int extraVel = (rotatedStep == 0) ? 127 : 0;
             result.velocity = (_rng.nextRange(256) / 2) + extraVel; 
         }
         break;
@@ -838,8 +859,10 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
             // Map ornament 0-16 to 0-255 threshold
             if (_rng.nextRange(256) >= (sequence.ornament() * 16)) {
                 // Use Phase 2
-                result.octave = 1;
-                result.note = (_wobblePhase2 >> 27) & 0x1F; // 0-31
+                // FIX: Wrap 5-bit phase (0-31) to scale degrees and overflow to octaves
+                int rawPhase = (_wobblePhase2 >> 27) & 0x1F;
+                result.note = rawPhase % 7;  // Wrap to scale degrees 0-6
+                result.octave = 1 + (rawPhase / 7);  // Base octave + overflow
 
                 if (_wobbleLastWasHigh == 0) {
                     if (_rng.nextRange(256) >= 200) result.slide = true;
@@ -847,8 +870,10 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
                 _wobbleLastWasHigh = 1;
             } else {
                 // Use Phase 1
-                result.octave = 0;
-                result.note = (_wobblePhase >> 27) & 0x1F;
+                // FIX: Wrap 5-bit phase (0-31) to scale degrees and overflow to octaves
+                int rawPhase = (_wobblePhase >> 27) & 0x1F;
+                result.note = rawPhase % 7;  // Wrap to scale degrees 0-6
+                result.octave = (rawPhase / 7);  // Overflow octaves
 
                 if (_wobbleLastWasHigh == 1) {
                     if (_rng.nextRange(256) >= 200) result.slide = true;

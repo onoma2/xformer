@@ -53,8 +53,15 @@ private:
         uint8_t velocity = 0;   // 0-255 (For Density Gating)
         bool accent = false;
         bool slide = false;
+
+        // TIMING UNIT CONVERSION (Original C → C++):
+        // Original C: maxsubticklength (fixed units: 4-22 subticks at TUESDAY_SUBTICKRES=6)
+        // C++: gateRatio (percentage: 0-200% of step divisor)
+        // At 192 PPQN with 48 PPQN steps: divisor=4 ticks, 75% = 3 ticks ≈ 6 subticks
+        // This percentage-based approach scales properly with variable tempo/divisor.
         uint16_t gateRatio = 75; // 0-200% (Relative Duration)
         uint8_t gateOffset = 0;  // 0-100% (Timing Offset)
+
         uint8_t chaos = 0;       // 0-100 (Likelihood of glitch/trill)
         uint8_t polyCount = 0;   // Number of subdivisions (0=none, 3/5/7=tuplet)
 
