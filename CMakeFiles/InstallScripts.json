@@ -1,0 +1,24 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/libs/rtmidi/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/libs/pybind11/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/apps/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/apps/bootloader/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/apps/sequencer/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/apps/sequencer/python/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/apps/hwconfig/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/apps/tester/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/tests/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/tests/integration/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/tests/unit/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/tests/unit/core/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/tests/unit/core/io/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/tests/unit/core/utils/cmake_install.cmake",
+		"/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/tests/unit/sequencer/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

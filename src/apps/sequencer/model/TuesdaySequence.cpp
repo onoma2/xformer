@@ -127,7 +127,6 @@ void TuesdaySequence::clear() {
     _glide.setBase(50); // Default 50%
     _trill.clear();
     _trill.setBase(50); // Default 50%
-    _useScale = false;
     _skew = 0;
     _cvUpdateMode = Free;
 
@@ -136,7 +135,7 @@ void TuesdaySequence::clear() {
     _divisor.clear();
     _divisor.setBase(12); // 1/16
     _resetMeasure = 0;
-    _scale = -1;
+    _scale = -1;  // Project
     _rootNote = -1;
     _scan.clear();
     _rotate.clear();
@@ -154,7 +153,6 @@ void TuesdaySequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_loopLength);
     writer.write(_glide.base);
     writer.write(_trill.base);
-    writer.write(_useScale);
     writer.write(_skew);
     writer.write(_cvUpdateMode);
     writer.write(_octave.base);
@@ -179,7 +177,6 @@ void TuesdaySequence::read(VersionedSerializedReader &reader) {
     reader.read(_loopLength, ProjectVersion::Version35);
     reader.read(_glide.base, ProjectVersion::Version35);
     reader.read(_trill.base, ProjectVersion::Version41);
-    reader.read(_useScale, ProjectVersion::Version35);
     reader.read(_skew, ProjectVersion::Version35);
     reader.read(_cvUpdateMode, ProjectVersion::Version35);
     reader.read(_octave.base, ProjectVersion::Version35);

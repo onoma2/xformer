@@ -298,16 +298,17 @@ float TuesdayTrackEngine::scaleToVolts(int noteIndex, int octave) const {
 
     // 1. Resolve which Scale to use
     int trackScaleIdx = sequence.scale();
-    bool useProjectScale = (trackScaleIdx < 0);
-    const Scale &scale = useProjectScale ? project.selectedScale() : Scale::get(trackScaleIdx);
+    const Scale &scale = (trackScaleIdx < 0)
+        ? project.selectedScale()   // -1 = use project scale
+        : Scale::get(trackScaleIdx); // 0+ = use specific scale (0 = Semitones/chromatic)
 
     // 2. Resolve Root Note
     int trackRoot = sequence.rootNote();
     int rootNote = (trackRoot < 0) ? project.rootNote() : trackRoot;
 
-    // 3. Determine quantization mode
-    // In Tuesday, we assume if a Scale is selected, we use it.
-    bool quantize = sequence.useScale() || !useProjectScale || project.scale() > 0;
+    // 3. Quantization is always applied
+    // Scale 0 (Semitones) naturally provides chromatic quantization (all 12 notes)
+    bool quantize = true;
 
     float voltage = 0.f;
 

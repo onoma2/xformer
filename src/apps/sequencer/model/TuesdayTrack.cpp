@@ -32,7 +32,6 @@ void TuesdayTrack::read(VersionedSerializedReader &reader) {
         reader.read(tempSequence._loopLength, ProjectVersion::Version35);
         reader.read(tempSequence._glide.base, ProjectVersion::Version35);
         reader.read(tempSequence._trill.base, ProjectVersion::Version41);
-        reader.read(tempSequence._useScale, ProjectVersion::Version35);
         reader.read(tempSequence._skew, ProjectVersion::Version35);
         
         uint8_t cvUpdateMode;

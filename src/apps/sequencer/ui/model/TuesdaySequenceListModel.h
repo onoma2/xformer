@@ -86,7 +86,6 @@ private:
         GateLength, // Added
         CvUpdateMode,
         Trill,
-        UseScale,
         Octave,
         Transpose,
         Divisor,
@@ -110,7 +109,6 @@ private:
         case GateLength:    return "Gate Length";
         case CvUpdateMode:  return "CV Mode";
         case Trill:         return "Trill";
-        case UseScale:      return "Use Scale";
         case Octave:        return "Octave";
         case Transpose:     return "Transpose";
         case Divisor:       return "Divisor";
@@ -163,9 +161,6 @@ private:
             break;
         case Trill:
             _sequence->printTrill(str);
-            break;
-        case UseScale:
-            _sequence->printUseScale(str);
             break;
         case Octave:
             _sequence->printOctave(str);
@@ -227,9 +222,6 @@ private:
             break;
         case Trill:
             _sequence->editTrill(value, shift);
-            break;
-        case UseScale:
-            _sequence->editUseScale(value, shift);
             break;
         case Octave:
             _sequence->editOctave(value, shift);

@@ -173,21 +173,6 @@ public:
         str("%d%%", trill());
     }
 
-    // useScale (use project scale for note quantization)
-
-    bool useScale() const { return _useScale; }
-    void setUseScale(bool useScale) {
-        _useScale = useScale;
-    }
-
-    void editUseScale(int value, bool shift) {
-        setUseScale(value > 0 ? !_useScale : _useScale);
-    }
-
-    void printUseScale(StringBuilder &str) const {
-        str(_useScale ? "Project" : "Free");
-    }
-
     // skew (density curve across loop, -8 to +8)
 
     int skew() const { return _skew; }
@@ -301,7 +286,9 @@ public:
         }
     }
 
-    // scale (-1 = Default, 0+ = specific scale)
+    // scale (-1 = Project scale, 0 = Chromatic/Semitones, 1+ = specific scale)
+    // Note: Scale 0 is "Semitones" (chromatic) - quantizes to all 12 semitones
+    // This controls OUTPUT quantization, not algorithm behavior
 
     int scale() const { return _scale; }
     void setScale(int scale) {
@@ -451,7 +438,6 @@ private:
     uint8_t _loopLength = 0;  // Default: infinite (evolving patterns)
     Routable<uint8_t> _glide;  // Default 0% (no slides)
     Routable<uint8_t> _trill;  // Default 0% (no trills/re-triggers)
-    bool _useScale = false;  // Default: free (chromatic)
     int8_t _skew = 0;  // Default: 0 (even distribution)
     uint8_t _cvUpdateMode = Free;  // Default: Free (CV updates every step)
 
@@ -460,7 +446,7 @@ private:
     Routable<int8_t> _transpose;  // Default: 0 (no transposition)
     Routable<uint16_t> _divisor;  // Default: 1/16 note
     uint8_t _resetMeasure = 8;  // Default: 8 bars
-    int8_t _scale = -1;  // Default: -1 (use project scale)
+    int8_t _scale = -1;  // Default: -1 (Project Scale)
     int8_t _rootNote = -1;  // Default: -1 (use project root)
     Routable<uint8_t> _scan;  // Default: 0 (no scan offset)
     Routable<int8_t> _rotate;  // Default: 0 (no rotation)

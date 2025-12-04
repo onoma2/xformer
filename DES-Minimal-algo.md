@@ -29,15 +29,21 @@ Design the MINIMAL algorithm implementation using TuesdayTrack's 14 existing par
 | **glide** | 0-100% | int | Slide probability | Sets `result.slide` flag |
 | **trill** | 0-100% | int | Retrigger/ratchet probability | Sets `result.chaos` (fires polyCount) |
 
-### **Musical Transform (5 parameters)**
+### **Musical Transform (4 parameters)**
 
 | Parameter | Range | Type | Purpose | Effect |
 |-----------|-------|------|---------|--------|
-| **useScale** | bool | bool | Scale quantization on/off | true=scale.noteToVolts(), false=chromatic |
-| **scale** | -1 to Scale::Count | int | Which scale to use | -1=project scale, 0+=specific |
+| **scale** | -1 to Scale::Count-1 | int | Scale selection & quantization | -1=project, 0=chromatic, 1+=specific |
 | **rootNote** | -1 to 11 | int | Root note offset | -1=project root, 0-11=C to B |
 | **octave** | -10 to +10 | int | Global octave shift | Added to final voltage |
 | **transpose** | -11 to +11 | int | Semitone/degree shift | Added before quantization |
+
+**REMOVED: `useScale` parameter** (redundant - now use `scale=0` for chromatic mode)
+
+**Scale Values:**
+- `scale = -1`: Use project scale (inherits from global settings)
+- `scale = 0`: Chromatic/free (Semitones scale = all 12 semitones)
+- `scale = 1+`: Specific scales (Major, Minor, Blues, Pentatonic, etc.)
 
 ### **Timing Control (2 parameters)**
 
@@ -62,7 +68,33 @@ Design the MINIMAL algorithm implementation using TuesdayTrack's 14 existing par
 | **rotate** | -(len-1) to +(len-1) | int | Loop rotation offset | ⚠️ Could be used for phase shift |
 | **cvUpdateMode** | Free/Gated | enum | CV update timing | Free=always update, Gated=only with gates |
 
-**Total: 14 user-facing parameters** (scan/rotate less useful in generateStep() architecture)
+**Total: 13 user-facing parameters** (removed useScale; scan/rotate less useful in generateStep() architecture)
+
+---
+
+## Scale Parameter: Output Quantization (NOT Algorithm Control)
+
+**IMPORTANT:** The `scale` parameter controls **output quantization** in `scaleToVolts()`.
+
+**It does NOT affect algorithm behavior.** Algorithms generate note indices (scale degrees or semitones) and the quantization layer transforms them to voltages.
+
+### Separation of Concerns
+
+**Algorithm Stage** (`generateStep()`):
+- Generates raw note indices (scale degrees or semitones)
+- Scale-based algorithms use 0-6 (for 7-note scales)
+- Chromatic algorithms can use 0-11 (semitones)
+- **Algorithm does not know or care about quantization**
+
+**Quantization Stage** (`scaleToVolts()`):
+- Transforms note indices to voltages using selected scale
+- Applies scale quantization, rootNote, transpose, octave
+- **Scale 0 (Semitones) = all 12 semitones** (effectively chromatic)
+
+**Example:** An algorithm that outputs note index 5 will produce:
+- C Major scale (scale=1): G (5th degree of C major = G)
+- Chromatic (scale=0): F (5th semitone from C = F)
+- Project scale (scale=-1): Depends on project settings
 
 ---
 
@@ -409,22 +441,14 @@ voltage = scale.noteToVolts(totalDegree)
 
 ---
 
-#### **11. USE SCALE (bool) - Quantization Mode**
+#### **11. SCALE (-1 to Scale::Count-1) - Scale Selection & Quantization**
 
 **Mapping**:
-- false → Chromatic (direct semitone→voltage)
-- true → Scale-quantized (map to project scale)
+- scale = -1: Use project scale (inherit from global settings)
+- scale = 0: Chromatic/free (Semitones = all 12 semitones)
+- scale = 1+: Specific scales (Major, Minor, etc.)
 
-**Musical Effect for MINIMAL**:
-- MINIMAL generates notes 0-6 (7 values)
-- useScale=false → Chromatic (C, C#, D, D#, E, F, F#)
-- useScale=true → Scale (C, D, E, F, G, A, B in C Major)
-
-**Recommendation**: true (for modal minimal techno feel)
-
----
-
-#### **12. SCALE (-1 to Scale::Count) - Scale Selection**
+**Note:** The `useScale` parameter has been removed (was redundant)
 
 **Options**: Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, etc.
 
@@ -437,7 +461,11 @@ voltage = scale.noteToVolts(totalDegree)
 
 ---
 
-#### **13. ROOT NOTE (-1 to 11) - Tonic Pitch**
+#### **12. ROOT NOTE (-1 to 11) - Tonic Pitch**
+
+**Mapping**:
+- rootNote = -1: Use project root note
+- rootNote = 0-11: C, C#, D, ..., B
 
 **Musical Effect**:
 - Sets the tonal center (C, C#, D, etc.)
@@ -445,7 +473,7 @@ voltage = scale.noteToVolts(totalDegree)
 
 ---
 
-#### **14. DIVISOR (varies) - Step Rate**
+#### **13. DIVISOR (varies) - Step Rate**
 
 **Mapping**: 1/4, 1/8, 1/16, 1/32, etc.
 
@@ -854,7 +882,7 @@ transpose = 0
 
 ## Summary
 
-### **MINIMAL Algorithm uses all 14 parameters**:
+### **MINIMAL Algorithm uses all 13 parameters**:
 
 | Parameter | Usage | Importance |
 |-----------|-------|-----------|
@@ -866,14 +894,13 @@ transpose = 0
 | loopLength | Evolution vs repetition | ⭐⭐⭐⭐☆ |
 | gateLength | Gate duration multiplier | ⭐⭐⭐☆☆ |
 | gateOffset | Gate timing offset | ⭐☆☆☆☆ |
-| useScale | Quantization on/off | ⭐⭐⭐⭐☆ |
-| scale | Scale selection | ⭐⭐⭐☆☆ |
+| scale | Scale selection & quantization | ⭐⭐⭐⭐☆ |
 | rootNote | Tonic pitch | ⭐⭐⭐☆☆ |
 | octave | Pitch range | ⭐⭐⭐☆☆ |
 | transpose | Key transposition | ⭐⭐☆☆☆ |
 | divisor | Step rate | ⭐⭐⭐⭐☆ |
 
-**Total integration**: 14/14 parameters used ✅
+**Total integration**: 13/13 parameters used ✅ (removed redundant `useScale`)
 
 ---
 
