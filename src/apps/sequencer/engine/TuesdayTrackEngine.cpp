@@ -175,14 +175,9 @@ void TuesdayTrackEngine::initAlgorithm() {
         _rng = Random(flowSeed);
         _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
-        if (ornament <= 5) {
-            _stepwave_direction = -1;
-        } else if (ornament >= 11) {
-            _stepwave_direction = 1;
-        } else {
-            _stepwave_direction = 0;
-        }
-
+        // Direction is controlled by flow parameter in generateStep()
+        // Ornament controls timing mode (rapid vs spread)
+        _stepwave_direction = 0;  // Will be set by flow in generateStep()
         _stepwave_step_count = 3 + (_rng.next() % 5);
         _stepwave_current_step = 0;
         _stepwave_chromatic_offset = 0;
@@ -697,13 +692,19 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
     case 5: // STEPWAVE
         {
              int flow = sequence.flow();
+             int ornament = sequence.ornament();
 
-             // Signal micro-sequencing on beat starts (TRILL mode - rapid chromatic stepping)
+             // Signal micro-sequencing on beat starts (scale-based stepping with glide)
              if (isBeatStart && subdivisions != 4) {
                  // Vary chaos based on flow (probabilistic micro-sequencing)
                  result.chaos = 20 + (flow * 5);
                  result.polyCount = subdivisions;
-                 result.isSpatial = false;  // TRILL mode (rapid succession, not spread)
+
+                 // ORNAMENT controls timing mode:
+                 // 0-7: Rapid (1-beat window) - fast chromatic-style runs within scale
+                 // 8: Neutral transition point
+                 // 9-16: Spread (4-beat window) - polyrhythmic patterns across beat
+                 result.isSpatial = (ornament >= 9);
 
                  // Update direction based on flow
                  if (flow <= 7) _stepwave_direction = -1;      // Descending
@@ -712,13 +713,14 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
 
                  _stepwave_step_count = subdivisions;
 
-                 // INTENTIONAL CHROMATIC BYPASS (Spec Law 3 deviation):
-                 // Trill mode requires chromatic semitone steps for the sliding effect.
-                 // These noteOffsets are added directly to voltage (line 1023), bypassing scale quantization.
-                 // This is a documented design choice for STEPWAVE's unique chromatic trill character.
+                 // Generate scale-degree offsets for micro-sequencing
+                 // These are intervals in scale degrees, respecting the selected scale
                  for (int i = 0; i < subdivisions && i < 8; i++) {
-                     result.noteOffsets[i] = i * _stepwave_direction;  // Chromatic intervals (semitones)
+                     result.noteOffsets[i] = i * _stepwave_direction;  // Scale-degree intervals
                  }
+
+                 // Enable glide for smooth transitions between micro-sequence notes
+                 result.slide = true;
              }
 
              // Base note generation (scale-based walking)
@@ -1080,18 +1082,10 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 uint32_t offset = (i * spacing);
 
                 // Calculate voltage for THIS gate using note offset
-                float volts;
-                if (result.isSpatial) {
-                    // POLYRHYTHM: Scale-degree based (quantized to scale)
-                    // noteOffsets are intervals in scale degrees
-                    int noteWithOffset = result.note + result.noteOffsets[i];
-                    volts = scaleToVolts(noteWithOffset, result.octave);
-                } else {
-                    // TRILL: Chromatic (bypass quantization)
-                    // noteOffsets are semitone intervals, add directly to voltage
-                    float baseVolts = scaleToVolts(result.note, result.octave);
-                    volts = baseVolts + (result.noteOffsets[i] / 12.f);
-                }
+                // Note: noteOffsets are ALWAYS scale-degree intervals (respects quantization)
+                // isSpatial only controls TIMING (spread vs rapid), not quantization
+                int noteWithOffset = result.note + result.noteOffsets[i];
+                float volts = scaleToVolts(noteWithOffset, result.octave);
 
                 _microGateQueue.push({ baseTick + offset, true, volts });
                 _microGateQueue.push({ baseTick + offset + gateLen, false, volts });
@@ -1108,14 +1102,6 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 _retriggerPeriod = divisor / 3;
                 _retriggerLength = _retriggerPeriod / 2;
                 _ratchetInterval = 0;
-
-                // StepWave special trill (climbing intervals)
-                if (sequence.algorithm() == 20) {
-                    _ratchetInterval = _stepwave_direction;
-                    _retriggerCount = _stepwave_step_count - 1;
-                    _retriggerPeriod = divisor / _stepwave_step_count;
-                    _retriggerLength = _retriggerPeriod / 2;
-                }
             }
         }
 
