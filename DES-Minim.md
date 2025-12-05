@@ -293,22 +293,21 @@ finalGateLength = (algorithmGateRatio * gateLength) / 50
 
 **Mapping**:
 ```cpp
-gateOffsetTicks = (divisor * gateOffset) / 100
-// Delays gate from step start by gateOffset percentage
+// Scaler Model:
+// - User Knob 0%   -> Force 0 (Strict/Quantized)
+// - User Knob 50%  -> 1x (Original Algo Timing)
+// - User Knob 100% -> 2x (Exaggerated Swing)
+scaledOffset = (algoOffset * userKnob * 2) / 100;
 ```
 
-**Examples** (at divisor=4 ticks, i.e., 1/16 note):
-- gateOffset=0% → gate fires at tick 0 (on the beat)
-- gateOffset=25% → gate fires at tick 1 (slight delay)
-- gateOffset=50% → gate fires at tick 2 (half-step delay)
-
 **Musical Effect for MINIMAL**:
-- MINIMAL backup code sets gateOffset=-1% to +1% (very tight)
-- User parameter can override this
-- Low offset (0-10%): Tight, precise, minimal aesthetic
-- High offset (50-100%): Swung, off-grid, less minimal
+- Algorithm generates micro-jitter (0-5%) for organic feel
+- User parameter scales this:
+  - 0%: Machine-tight minimal (Robot)
+  - 50%: Organic minimal (Human)
+  - 100%: Loose/sloppy minimal (Drunk)
 
-**Recommendation**: 0% for authentic minimal (quantized precision)
+**Recommendation**: 0-50% depending on desired tightness.
 
 ---
 
@@ -503,7 +502,8 @@ case 11: {  // MINIMAL
             }
 
             result.accent = false;  // MINIMAL doesn't use accents
-            result.gateOffset = 0;  // Tight timing
+            // Micro-timing jitter (0-5%)
+            result.gateOffset = clamp(int(_rng.nextRange(6)), 0, 100);
 
             // Advance note index
             _minimal_noteIndex++;
@@ -590,7 +590,9 @@ USER TWEAKS KNOB
   volts = 0.83V  (F in octave 1)
   ↓
 [8. GATE SCHEDULING]
-  gateOffsetTicks = (divisor * sequence.gateOffset()) / 100
+  // Scaler Logic:
+  scaledOffset = (algoOffset * sequence.gateOffset() * 2) / 100
+  gateOffsetTicks = (divisor * scaledOffset) / 100
   gateLengthTicks = (divisor * gateRatio * sequence.gateLength()) / 5000
   ↓
   _microGateQueue.push({ tick + gateOffsetTicks, true, 0.83V })  ← Gate ON
@@ -791,7 +793,8 @@ transpose = 0
 | power | Gate firing density (cooldown) | ⭐⭐⭐⭐☆ |
 | glide | Slide probability (reduced) | ⭐⭐☆☆☆ |
 | trill | Trill probability (reduced) | ⭐⭐☆☆☆ |
-| loopLength | Evolution vs repetition | ⭐⭐⭐⭐☆ |
+| **loopLength** | 0-29 | 0=Infinite, 1-29=Fixed step loop |
+| **start** | 0-16 | Start delay in steps |
 | gateLength | Gate duration multiplier | ⭐⭐⭐☆☆ |
 | gateOffset | Gate timing offset | ⭐☆☆☆☆ |
 | scale | Scale selection & quantization | ⭐⭐⭐⭐☆ |

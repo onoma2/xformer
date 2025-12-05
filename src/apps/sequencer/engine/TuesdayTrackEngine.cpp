@@ -629,6 +629,10 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
                 result.chaos = 100;
                 result.velocity = 255;
             }
+            
+            // Polyrhythm Offset
+            int polyRhythmFactor = (pos1 + pos2 + pos3) % 12;
+            result.gateOffset = clamp(polyRhythmFactor * 8, 0, 100);
         }
         break;
         
@@ -661,6 +665,9 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
             int patternVal = _autechre_pattern[rotatedStep % 8];
             result.note = patternVal % 12;
             result.octave = patternVal / 12;
+
+            // Random Jitter (0-10%)
+            result.gateOffset = clamp(int(_rng.nextRange(11)), 0, 100);
 
             _autechre_rule_timer--;
 
@@ -741,6 +748,9 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
              } else {
                  result.gateRatio = 75;
              }
+             
+             // Micro Jitter (0-6%)
+             result.gateOffset = clamp(int(_rng.nextRange(7)), 0, 100);
         }
         break;
 
@@ -766,6 +776,13 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
             result.accent = true;
 
             result.velocity = (_rng.nextRange(256) / 2) + 40;
+            
+            // Markov Timing (Push/Pull)
+            if (_rng.nextBinary()) {
+                result.gateOffset = clamp(int(10 - _rng.nextRange(10)), 0, 100);
+            } else {
+                result.gateOffset = clamp(int(15 + _rng.nextRange(10)), 0, 100);
+            }
         }
         break;
 
@@ -803,6 +820,9 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
             // Original used GENERIC.b2 to track pattern position
             int extraVel = (rotatedStep == 0) ? 127 : 0;
             result.velocity = (_rng.nextRange(256) / 2) + extraVel; 
+            
+            // Pattern Offset
+            result.gateOffset = clamp(int(_stepIndex % 7), 0, 100);
         }
         break;
 
@@ -890,6 +910,9 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
 
             result.velocity = (_extraRng.nextRange(256) / 4);
             if (_rng.nextRange(256) >= 50) result.accent = true;
+            
+            // Wobble Phase Offset (0-30%)
+            result.gateOffset = clamp(int(((_wobblePhase + _wobblePhase2) >> 28) % 30), 0, 100);
         }
         break;
 

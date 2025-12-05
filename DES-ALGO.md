@@ -34,7 +34,7 @@ Design the MINIMAL algorithm implementation using TuesdayTrack's 14 existing par
 | **glide** | 0-100% | Slide probability |
 | **trill** | 0-100% | Retrigger/Subdivision probability |
 | **gateLength** | 0-100% | Gate duration scaler |
-| **gateOffset** | 0-100% | Micro-timing shift |
+| **gateOffset** | 0-100% | Micro-timing shift (0%=Quantized, 50%=Algo Groove, 100%=Exaggerated) |
 | **divisor** | varies | Step clock division (1/16, etc.) |
 | **resetMeasure**| 0-128 | Force reset every N bars |
 
