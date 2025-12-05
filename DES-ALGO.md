@@ -22,6 +22,7 @@ Design the MINIMAL algorithm implementation using TuesdayTrack's 14 existing par
 | Parameter | Range | Purpose |
 |-----------|-------|---------|
 | **loopLength** | 0-29 | 0=Infinite, 1-29=Fixed step loop |
+| **start** | 0-16 | Start delay in steps |
 | **scale** | -1 to Count | Scale selection (-1=Project) |
 | **rootNote** | -1 to 11 | Root note override |
 | **octave** | -10 to +10 | Global octave shift |
