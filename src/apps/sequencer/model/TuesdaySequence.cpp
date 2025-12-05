@@ -139,7 +139,7 @@ void TuesdaySequence::clear() {
     _gateLength.clear();
     _gateLength.setBase(50);
     _gateOffset.clear();
-    _gateOffset.setBase(50); // Default 50%
+    _gateOffset.setBase(0); // Default 0% (Quantized)
 }
 
 void TuesdaySequence::write(VersionedSerializedWriter &writer) const {

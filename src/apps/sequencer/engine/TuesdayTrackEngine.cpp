@@ -440,11 +440,15 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
                 }
                 result.octave = 0;
                 result.note = _triB3 + 4;
+                // Phase 0: Tight/Human (0-10%)
+                result.gateOffset = clamp(int(10 - _rng.nextRange(10)), 0, 100);
                 break;
             case 1:
                 result.octave = 1;
                 result.note = _triB3 + 4;
                 if (_rng.nextBinary()) _triB2 = (_rng.next() & 0x7);
+                // Phase 1: Heavy Swing (25-35%)
+                result.gateOffset = clamp(int(25 + _rng.nextRange(10)), 0, 100);
                 break;
             case 2:
                 result.octave = 2;
@@ -452,6 +456,8 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
                 result.velocity = 255; // Accent phase
                 result.accent = true;
                 if (_rng.nextBinary()) _triB1 = ((_rng.next() >> 5) & 0x7);
+                // Phase 2: Max Drag (40-50%)
+                result.gateOffset = clamp(int(40 + _rng.nextRange(10)), 0, 100);
                 break;
             }
 
@@ -1013,8 +1019,13 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         // 1. GENERATE (The Brain)
         TuesdayTickResult result = generateStep(tick);
         
-        // Apply Algorithm's Timing Offset
-        _gateOffset = result.gateOffset;
+        // Apply Algorithm's Timing Offset with User Scaler
+        // Scaler Model: 
+        // - User Knob 0%   -> Force 0 (Strict/Quantized)
+        // - User Knob 50%  -> 1x (Original Algo Timing)
+        // - User Knob 100% -> 2x (Exaggerated Swing)
+        int userScaler = sequence.gateOffset();
+        _gateOffset = clamp((int)((result.gateOffset * userScaler * 2) / 100), 0, 100);
         
         // 2. FX LAYER (Post-Processing)
         

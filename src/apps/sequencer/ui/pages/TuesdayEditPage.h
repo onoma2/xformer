@@ -36,7 +36,7 @@ private:
         Glide,
         Skew,
         GateLength,
-        CvUpdateMode,
+        GateOffset,
         Trill,
         Start,
         // Total

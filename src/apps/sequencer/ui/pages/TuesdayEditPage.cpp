@@ -141,7 +141,7 @@ int TuesdayEditPage::paramForPage(int page, int slot) const {
     static const int pageParams[PageCount][ParamsPerPage] = {
         { Algorithm, Flow, Ornament, Power },           // Page 1
         { LoopLength, Rotate, Glide, Skew },            // Page 2
-        { GateLength, CvUpdateMode, Trill, Start },     // Page 3
+        { GateLength, GateOffset, Trill, Start },       // Page 3
     };
 
     if (page < 0 || page >= PageCount || slot < 0 || slot >= ParamsPerPage) {
@@ -161,7 +161,7 @@ const char *TuesdayEditPage::paramName(int param) const {
     case Glide:         return "Glide";
     case Skew:          return "Skew";
     case GateLength:    return "Gate Length";
-    case CvUpdateMode:  return "CV Mode";
+    case GateOffset:    return "Gate Offset";
     case Trill:         return "Trill";
     case Start:         return "Start";
     default:            return "-";
@@ -179,7 +179,7 @@ const char *TuesdayEditPage::paramShortName(int param) const {
     case Glide:         return "GLIDE";
     case Skew:          return "SKEW";
     case GateLength:    return "GATE";
-    case CvUpdateMode:  return "CVUPD";
+    case GateOffset:    return "GOFS";
     case Trill:         return "TRILL";
     case Start:         return "START";
     default:            return "-";
@@ -228,8 +228,8 @@ void TuesdayEditPage::formatParamValue(int param, StringBuilder &str) const {
     case GateLength:
         str("%d%%", sequence.gateLength());
         break;
-    case CvUpdateMode:
-        sequence.printCvUpdateMode(str);
+    case GateOffset:
+        str("%d%%", sequence.gateOffset());
         break;
     case Trill:
         str("%d%%", sequence.trill());
@@ -256,7 +256,7 @@ int TuesdayEditPage::paramValue(int param) const {
     case Glide:         return sequence.glide();
     case Skew:          return sequence.skew();
     case GateLength:    return sequence.gateLength();
-    case CvUpdateMode:  return sequence.cvUpdateMode();
+    case GateOffset:    return sequence.gateOffset();
     case Trill:         return sequence.trill();
     case Start:         return sequence.start();
     default:            return 0;
@@ -274,7 +274,7 @@ int TuesdayEditPage::paramMax(int param) const {
     case Glide:         return 100;
     case Skew:          return 8;    // Bipolar: -8 to +8
     case GateLength:    return 100;  // Percentage: 0-100%
-    case CvUpdateMode:  return 1;
+    case GateOffset:    return 100;  // Percentage: 0-100%
     case Trill:         return 100;
     case Start:         return 16;
     default:            return 0;
@@ -318,8 +318,8 @@ void TuesdayEditPage::editParam(int param, int value, bool shift) {
     case GateLength:
         sequence.editGateLength(value, shift);
         break;
-    case CvUpdateMode:
-        sequence.editCvUpdateMode(value, shift);
+    case GateOffset:
+        sequence.editGateOffset(value, shift);
         break;
     case Trill:
         sequence.editTrill(value, shift);
@@ -357,17 +357,6 @@ void TuesdayEditPage::drawParam(Canvas &canvas, int x, int slot, int param) {
         int textX = x + (colWidth - textWidth) / 2;
         canvas.setColor(_selectedSlot == slot ? Color::Bright : Color::Medium);
         canvas.drawText(textX, barY + 3, valueStr);  // +3 to vertically center with bars
-        return;
-    }
-
-    // For CvUpdateMode: draw value at bar level
-    if (param == CvUpdateMode) {
-        FixedStringBuilder<16> valueStr;
-        formatParamValue(param, valueStr);
-        int textWidth = canvas.textWidth(valueStr);
-        int textX = x + (colWidth - textWidth) / 2;
-        canvas.setColor(_selectedSlot == slot ? Color::Bright : Color::Medium);
-        canvas.drawText(textX, barY + 3, valueStr);
         return;
     }
 
