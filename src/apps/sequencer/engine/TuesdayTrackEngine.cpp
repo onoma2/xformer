@@ -7,51 +7,69 @@
 #include <algorithm>
 
 // Initialize algorithm state based on Flow (seed1) and Ornament (seed2)
-// This mirrors the original Tuesday Init functions
+//
+// DUAL RNG SYSTEM (Tuesday Spec Law 2):
+// - _rng (Main RNG, seeded from Flow): Controls FLOW decisions
+//   * Timing, mode transitions, gesture state machines, big structural changes
+//   * Example: When to mutate, which phrase to play, beat-locked decisions
+//
+// - _extraRng (Aux RNG, seeded from Ornament): Controls ORNAMENT details
+//   * Pitch variations, velocity, articulation, micro-timing
+//   * Example: Which note in a scale, accent probability, slide amount
+//
+// This separation prevents unwanted correlation (e.g., slides always sync with accents).
+// Salt value (0x9e3779b9) ensures distinct sequences even when Flow == Ornament.
 void TuesdayTrackEngine::initAlgorithm() {
-    int flow = _tuesdayTrack.flow();
-    int ornament = _tuesdayTrack.ornament();
-    int algorithm = _tuesdayTrack.algorithm();
+    const auto &_tuesdayTrackRef = tuesdayTrack();
+    const auto &sequence = _tuesdayTrackRef.sequence(pattern());
+    int flow = sequence.flow();
+    int ornament = sequence.ornament();
+    int algorithm = sequence.algorithm();
 
+    // Generate seeds
+    // Salt the Extra seed to ensure it's distinct even if Flow == Ornament
+    uint32_t flowSeed = (flow - 1) << 4;
+    uint32_t ornamentSeed = (ornament - 1) << 4;
+    
     _uiRng = Random(flow * 37 + ornament * 101);
 
     _cachedFlow = flow;
     _cachedOrnament = ornament;
     _cachedAlgorithm = algorithm;
+    _cachedLoopLength = sequence.loopLength();
 
     switch (algorithm) {
     case 0: // TEST
-        // seed1 (flow) determines mode and sweep speed
-        // seed2 (ornament) determines accent and velocity
-        _testMode = (flow - 1) >> 3;  // 0 or 1 (1-8 = mode 0, 9-16 = mode 1)
-        _testSweepSpeed = ((flow - 1) & 0x3);  // 0-3
-        _testAccent = (ornament - 1) >> 3;  // 0 or 1
-        _testVelocity = ((ornament - 1) << 4);  // 0-240
+        _testMode = (flow - 1) >> 3;
+        _testSweepSpeed = ((flow - 1) & 0x3);
+        _testAccent = (ornament - 1) >> 3;
+        _testVelocity = ((ornament - 1) << 4);
         _testNote = 0;
+        
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
         break;
 
     case 1: // TRITRANCE
-        // seed1 (flow) seeds main RNG for b1, b2
-        // seed2 (ornament) seeds extra RNG for b3
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
-        _triB1 = (_rng.next() & 0x7);   // High note for case 2
-        _triB2 = (_rng.next() & 0x7);   // Phase offset for mod 3
+        _triB1 = (_rng.next() & 0x7);
+        _triB2 = (_rng.next() & 0x7);
 
-        // b3: note offset for octave 0/1
         _triB3 = (_extraRng.next() & 0x15);
         if (_triB3 >= 7) _triB3 -= 7; else _triB3 = 0;
-        _triB3 -= 4;  // Range: -4 to +3
+        _triB3 -= 4;
         break;
 
     case 2: // STOMPER
-        // seed2 (ornament) seeds main RNG for note choices
-        // seed1 (flow) seeds extra RNG for mode/pattern
-        _rng = Random((ornament - 1) << 4);
-        _extraRng = Random((flow - 1) << 4);
+        // FIX: Corrected RNG assignment to match Tuesday spec (Law 2)
+        // Original C had R=seed2, Extra=seed1 (swapped), which violated the spec.
+        // Correct: Flow → main RNG (gesture state machine), Ornament → extra RNG (velocity/timing)
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
-        _stomperMode = (_extraRng.next() % 7) * 2;  // Initial pattern mode
+        _stomperMode = (_extraRng.next() % 7) * 2;
         _stomperCountDown = 0;
         _stomperLowNote = _rng.next() % 3;
         _stomperLastNote = _stomperLowNote;
@@ -60,271 +78,121 @@ void TuesdayTrackEngine::initAlgorithm() {
         _stomperHighNote[1] = _rng.next() % 5;
         break;
 
-    case 3: // MARKOV
-        // Both seeds contribute to matrix generation
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-
+    case 6: // MARKOV
+        _rng = Random(flowSeed);
+        // Init History
         _markovHistory1 = (_rng.next() & 0x7);
         _markovHistory3 = (_rng.next() & 0x7);
-
-        // Generate 8x8x2 Markov transition matrix
+        // Init Matrix
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
                 _markovMatrix[i][j][0] = (_rng.next() % 8);
-                _markovMatrix[i][j][1] = (_extraRng.next() % 8);
+                _markovMatrix[i][j][1] = (_rng.next() % 8);
             }
         }
         break;
 
-    case 4: // CHIPARP
-        // Flow seeds main RNG, Ornament seeds chord RNG
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
+    case 7: // CHIPARP 1
+        _rng = Random(flowSeed);
         _chipChordSeed = _rng.next();
         _chipRng = Random(_chipChordSeed);
         _chipBase = _rng.next() % 3;
-        _chipDir = _extraRng.nextBinary() ? 1 : 0;
+        _chipDir = (_rng.next() >> 7) % 2;
         break;
 
-    case 5: // GOACID
-        // Flow seeds main RNG, Ornament seeds extra RNG for transpose
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        _goaB1 = _extraRng.nextBinary() ? 1 : 0;
-        _goaB2 = _extraRng.nextBinary() ? 1 : 0;
+    case 8: // CHIPARP 2
+        _rng = Random(flowSeed);
+        _chipChordSeed = _rng.next();
+        _chip2Rng = Random(_chipChordSeed);
+        _chip2ChordScaler = (_rng.next() % 3) + 2;
+        _chip2Offset = (_rng.next() % 5);
+        _chip2Len = ((_rng.next() & 0x3) + 1) * 2;
+        _chip2TimeMult = _rng.nextBinary() ? (_rng.nextBinary() ? 1 : 0) : 0;
+        _chip2DeadTime = 0;
+        _chip2Idx = 0;
+        _chip2Dir = _rng.nextBinary() ? (_rng.nextBinary() ? 1 : 0) : 0;
+        _chip2ChordLen = 3 + (flow >> 2); 
         break;
 
-    case 6: // SNH (Sample & Hold)
-        // Flow seeds main RNG, Ornament seeds extra RNG
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        _snhPhase = 0;
-        _snhPhaseSpeed = 0xffffffff / 16;  // Default speed based on 16 steps
-        _snhLastVal = 0;
-        _snhTarget = _snhCurrent = _rng.next() << 10;
-        _snhCurrentDelta = 0;
-        break;
+    case 9: // WOBBLE
+        // FIX: Corrected RNG assignment to match Tuesday spec (Law 2)
+        // Original C had R=seed2, Extra=seed1 (swapped), which violated the spec.
+        // Correct: Flow → main RNG (phase selection), Ornament → extra RNG (velocity)
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
-    case 7: // WOBBLE
-        // Flow seeds main RNG, Ornament seeds extra RNG
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
         _wobblePhase = 0;
-        _wobblePhaseSpeed = 0xffffffff / 16;  // Default based on 16 steps
+        // Speed based on pattern length (dynamically updated in generateStep)
+        // Original: 0xFFFFFFFF / Length
+        _wobblePhaseSpeed = 0x08000000; // Slow (will be overridden)
         _wobblePhase2 = 0;
-        _wobblePhaseSpeed2 = 0xcfffffff / 4;  // Faster second oscillator
         _wobbleLastWasHigh = 0;
+        _wobblePhaseSpeed2 = 0x02000000; // Slower (will be overridden)
         break;
 
-    case 8: // TECHNO
-        // Flow seeds main RNG, Ornament seeds extra RNG
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        _technoKickPattern = _rng.next() % 4;  // 4 kick variations
-        _technoHatPattern = _extraRng.next() % 4;  // 4 hat variations
-        _technoBassNote = _rng.next() % 5;  // Bass note 0-4
+    case 10: // SCALEWALKER
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
+        // Walker position persists across loop boundaries and parameter changes
+        // Only reset via reset() (algorithm change) or reseed() (manual Shift+F5)
         break;
 
-    case 9: // FUNK
-        // Flow seeds main RNG, Ornament seeds extra RNG
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        _funkPattern = _rng.next() % 8;  // 8 funk patterns
-        _funkSyncopation = _extraRng.next() % 4;  // Syncopation level
-        _funkGhostProb = 32 + (_extraRng.next() % 64);  // 32-96 ghost note probability
+    case 3: // APHEX (Mapped from 18)
+    case 18:
+        _rng = Random(flowSeed);
+        for (int i = 0; i < 4; ++i) _aphex_track1_pattern[i] = _rng.next() % 12;
+        for (int i = 0; i < 3; ++i) _aphex_track2_pattern[i] = _rng.next() % 3;
+        for (int i = 0; i < 5; ++i) _aphex_track3_pattern[i] = (_rng.next() % 8 == 0) ? (_rng.next() % 5) : 0;
+
+        _aphex_pos1 = (ornament * 1) % 4;
+        _aphex_pos2 = (ornament * 2) % 3;
+        _aphex_pos3 = (ornament * 3) % 5;
         break;
 
-    case 10: // DRONE
-        // Flow seeds main RNG, Ornament seeds extra RNG
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        _droneBaseNote = _rng.next() % 12;  // Root note
-        _droneInterval = _extraRng.next() % 4;  // 0=unison, 1=5th, 2=octave, 3=5th+octave
-        _droneSpeed = 1 + (_rng.next() % 4);  // Change rate 1-4
-        break;
-
-    case 11: // PHASE
-        // Flow seeds main RNG, Ornament seeds extra RNG
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        _phaseAccum = 0;
-        _phaseSpeed = 0x1000000 + (_extraRng.next() & 0xffffff);  // Slow phase drift
-        _phaseLength = 3 + (_rng.next() % 6);  // Pattern length 3-8
-        for (int i = 0; i < 8; i++) {
-            _phasePattern[i] = _rng.next() % 8;  // Simple melodic cell
+    case 4: // AUTECHRE (Mapped from 19)
+    case 19:
+        // Seed pattern with variation based on Flow
+        _rng = Random(flowSeed);
+        for (int i = 0; i < 8; ++i) {
+            // 50% chance of root, 25% +1oct, 25% +2oct
+            int r = _rng.next() % 4;
+            if (r == 0) _autechre_pattern[i] = 12; // +1 oct
+            else if (r == 1) _autechre_pattern[i] = 24; // +2 oct
+            else _autechre_pattern[i] = 0; // root
+            
+            // Add some melodic movement
+            if (_rng.nextBinary()) _autechre_pattern[i] += (_rng.next() % 5) * 2; // 0, 2, 4, 6, 8
         }
+        _autechre_rule_timer = 8 + (flow * 4);
+
+        _rng = Random(ornamentSeed);
+        for (int i = 0; i < 8; ++i) _autechre_rule_sequence[i] = _rng.next() % 5;
+        _autechre_rule_index = 0;
         break;
 
-    case 12: // RAGA
-        // Flow seeds main RNG, Ornament seeds extra RNG
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        // Indian pentatonic-ish scales (sa re ga ma pa dha ni)
-        {
-            int scaleType = _rng.next() % 4;
-            switch (scaleType) {
-            case 0: // Bhairav-like (morning raga)
-                _ragaScale[0] = 0; _ragaScale[1] = 1; _ragaScale[2] = 4;
-                _ragaScale[3] = 5; _ragaScale[4] = 7; _ragaScale[5] = 8;
-                _ragaScale[6] = 11;
-                break;
-            case 1: // Yaman-like (evening raga)
-                _ragaScale[0] = 0; _ragaScale[1] = 2; _ragaScale[2] = 4;
-                _ragaScale[3] = 6; _ragaScale[4] = 7; _ragaScale[5] = 9;
-                _ragaScale[6] = 11;
-                break;
-            case 2: // Todi-like
-                _ragaScale[0] = 0; _ragaScale[1] = 1; _ragaScale[2] = 3;
-                _ragaScale[3] = 6; _ragaScale[4] = 7; _ragaScale[5] = 8;
-                _ragaScale[6] = 11;
-                break;
-            default: // Kafi-like (Dorian)
-                _ragaScale[0] = 0; _ragaScale[1] = 2; _ragaScale[2] = 3;
-                _ragaScale[3] = 5; _ragaScale[4] = 7; _ragaScale[5] = 9;
-                _ragaScale[6] = 10;
-                break;
-            }
-        }
-        _ragaDirection = 0;  // 0=ascending, 1=descending
-        _ragaPosition = 0;
-        _ragaOrnament = _extraRng.next() % 3;  // Ornament type
+    case 5: // STEPWAVE (Mapped from 20)
+    case 20:
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
+
+        // Direction is controlled by flow parameter in generateStep()
+        // Ornament controls timing mode (rapid vs spread)
+        _stepwave_direction = 0;  // Will be set by flow in generateStep()
+        _stepwave_step_count = 3 + (_rng.next() % 5);
+        _stepwave_current_step = 0;
+        _stepwave_chromatic_offset = 0;
+        _stepwave_is_stepped = true;
         break;
-
-    case 13: // AMBIENT - Harmonic Drone & Event Scheduler
-{
-    // 1. Set up the drone chord based on Flow. Not random, but deterministic.
-    _ambient_root_note = (_tuesdayTrack.flow() - 1) % 12;
-    _ambient_drone_notes[0] = _ambient_root_note;
-    _ambient_drone_notes[1] = (_ambient_root_note + 7) % 12; // Perfect 5th
-    _ambient_drone_notes[2] = (_ambient_root_note + 16) % 12; // A Major 9th (as a 2nd)
-
-    // 2. Init event state using Ornament for randomness
-    _extraRng = Random((_tuesdayTrack.ornament() - 1) << 4);
-    _ambient_event_timer = 16 + (_extraRng.next() % 48); // First event in 16-64 steps
-    _ambient_event_type = 0;
-    _ambient_event_step = 0;
-    break;
-}
-
-    case 15: // DRILL - UK Drill hi-hat rolls and bass slides
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        _drillHiHatPattern = 0b10101010;  // Basic hi-hat pattern
-        _drillSlideTarget = _rng.next() % 12;
-        _drillTripletMode = (ornament > 8) ? 1 : 0;  // High ornament = triplets
-        _drillRollCount = 0;
-        _drillLastNote = _rng.next() % 5;  // Low bass notes
-        _drillStepInBar = 0;
-        _drillSubdivision = 1;
-        break;
-
-    case 16: // MINIMAL - staccato bursts and silence
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        _minimalBurstLength = 2 + (_rng.next() % 7);  // 2-8 steps
-        _minimalSilenceLength = 4 + (flow % 13);  // 4-16 steps
-        _minimalClickDensity = ornament * 16;  // 0-255 scale
-        _minimalBurstTimer = 0;
-        _minimalSilenceTimer = _minimalSilenceLength;  // Start in silence
-        _minimalNoteIndex = 0;
-        _minimalMode = 0;  // 0=silence, 1=burst
-        break;
-
-    case 14: // ACID - 303-style patterns with slides
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        // Generate 8-step acid sequence
-        for (int i = 0; i < 8; i++) {
-            _acidSequence[i] = _rng.next() % 12;
-        }
-        _acidPosition = 0;
-        _acidAccentPattern = _extraRng.next();  // Random accent pattern
-        _acidOctaveMask = _extraRng.next() & 0x33;  // Sparse octave jumps
-        _acidLastNote = _acidSequence[0];
-        _acidSlideTarget = 0;
-        _acidStepCount = 0;
-        break;
-
-    case 17: // KRAFT - precise mechanical sequences
-        _rng = Random((flow - 1) << 4);
-        _extraRng = Random((ornament - 1) << 4);
-        // Generate repetitive mechanical pattern
-        _kraftBaseNote = _rng.next() % 12;
-        for (int i = 0; i < 8; i++) {
-            // Kraftwerk patterns often alternate between 2-3 notes
-            _kraftSequence[i] = (_kraftBaseNote + ((i % 2) ? 7 : 0)) % 12;
-        }
-        _kraftPosition = 0;
-        _kraftLockTimer = 16 + (_rng.next() % 16);  // Lock for 16-32 steps
-        _kraftTranspose = 0;
-        _kraftTranspCount = 0;
-        _kraftGhostMask = _extraRng.next() & 0x55;  // Every other step ghost
-        break;
-
-    case 18: // APHEX - Polyrhythmic Event Sequencer
-{
-    // 1. Seed the patterns based on Flow, using the main RNG
-    _rng = Random((_tuesdayTrack.flow() - 1) << 4);
-    for (int i = 0; i < 4; ++i) _aphex_track1_pattern[i] = _rng.next() % 12;
-    for (int i = 0; i < 3; ++i) _aphex_track2_pattern[i] = _rng.next() % 3; // 0, 1, or 2
-    for (int i = 0; i < 5; ++i) _aphex_track3_pattern[i] = (_rng.next() % 8 == 0) ? (_rng.next() % 5) : 0; // Sparse bass notes
-
-    // 2. Set initial phase based on Ornament
-    int ornament_val = _tuesdayTrack.ornament();
-    _aphex_pos1 = (ornament_val * 1) % 4;
-    _aphex_pos2 = (ornament_val * 2) % 3;
-    _aphex_pos3 = (ornament_val * 3) % 5;
-    break;
-}
-
-    case 19: // AUTECHRE - Algorithmic Transformation Engine
-{
-    // 1. Start with octave-jumping pattern: 5 roots, 2 at +2oct, 1 at +3oct
-    _autechre_pattern[0] = 0;   // root
-    _autechre_pattern[1] = 0;   // root
-    _autechre_pattern[2] = 24;  // +2 octaves
-    _autechre_pattern[3] = 0;   // root
-    _autechre_pattern[4] = 0;   // root
-    _autechre_pattern[5] = 24;  // +2 octaves
-    _autechre_pattern[6] = 0;   // root
-    _autechre_pattern[7] = 36;  // +3 octaves
-    // 2. Set rule timing based on Flow
-    _autechre_rule_timer = 8 + (_tuesdayTrack.flow() * 4);
-
-    // 3. Create a sequence of rules based on Ornament
-    _rng = Random((_tuesdayTrack.ornament() - 1) << 4);
-    for (int i = 0; i < 8; ++i) _autechre_rule_sequence[i] = _rng.next() % 5; // 5 different rules
-    _autechre_rule_index = 0;
-    break;
-}
-
-    case 20: // STEPWAVE - Scale stepping with chromatic trill
-{
-    _rng = Random((flow - 1) << 4);
-    _extraRng = Random((ornament - 1) << 4);
-
-    // Flow controls scale step direction: 0-7=down, 8=stationary, 9-16=up
-    // Ornament controls trill direction AND step size:
-    //   0-5: trill down, 2 steps
-    //   6-10: trill random, 2-3 steps mixed
-    //   11-16: trill up, 3 steps
-    if (ornament <= 5) {
-        _stepwave_direction = -1;  // Trill down
-    } else if (ornament >= 11) {
-        _stepwave_direction = 1;   // Trill up
-    } else {
-        _stepwave_direction = 0;   // Random trill direction each time
-    }
-
-    _stepwave_step_count = 3 + (_rng.next() % 5);  // 3-7 substeps for trill
-    _stepwave_current_step = 0;
-    _stepwave_chromatic_offset = 0;
-    _stepwave_is_stepped = true;  // Default to stepped, glide probability determines slide
-    break;
-}
 
     default:
+        // Fallback to TEST
+        _testMode = (flow - 1) >> 3;
+        _testSweepSpeed = ((flow - 1) & 0x3);
+        _testAccent = (ornament - 1) >> 3;
+        _testVelocity = ((ornament - 1) << 4);
+        _testNote = 0;
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
         break;
     }
 }
@@ -336,7 +204,7 @@ void TuesdayTrackEngine::reset() {
     _cachedLoopLength = -1;
 
     _stepIndex = 0;
-    _displayStep = -1;  // No step displayed until first tick
+    _displayStep = -1;
     _gateLength = 0;
     _gateTicks = 0;
     _coolDown = 0;
@@ -349,12 +217,9 @@ void TuesdayTrackEngine::reset() {
     _cvDelta = 0.f;
     _slideCountDown = 0;
 
-    // Gate timing state
-    _gateLengthTicks = 0;
-    _pendingGateOffsetTicks = 0;
-    _pendingGateActivation = false;
+    _microGateQueue.clear();
+    _tieActive = false;
 
-    // Retrigger/Trill State
     _retriggerArmed = false;
     _retriggerCount = 0;
     _retriggerPeriod = 0;
@@ -362,14 +227,13 @@ void TuesdayTrackEngine::reset() {
     _retriggerTimer = 0;
     _isTrillNote = false;
     _trillCvTarget = 0.f;
+    _ratchetInterval = 0;
 
     _activity = false;
     _gateOutput = false;
     _cvOutput = 0.f;
     _lastGatedCv = 0.f;
-    _bufferValid = false;
 
-    // Re-initialize algorithm with current seeds
     initAlgorithm();
 }
 
@@ -382,27 +246,29 @@ void TuesdayTrackEngine::reseed() {
     _stepIndex = 0;
     _coolDown = 0;
 
-    // Generate new random seeds for a fresh pattern
-    // Use current RNG state to generate new seeds, giving variety
+    // Advance the RNGs to get new seeds
     uint32_t newSeed1 = _rng.next();
     uint32_t newSeed2 = _extraRng.next();
 
-    // Reinitialize RNGs with new random seeds
+    // Re-seed with these new values
+    // This simulates "turning the knobs" to a new random position
+    // We need to temporarily override the cached Flow/Ornament effectively
+    // But initAlgorithm reads from sequence. 
+    // Ideally, 'reseed' implies we want variation *within* the current parameters?
+    // Or does it mean "Scramble"?
+    // For now, we'll just re-init the RNGs directly to simulate a fresh start
     _rng = Random(newSeed1);
     _extraRng = Random(newSeed2);
-
-    // Reinitialize algorithm state with new RNG values
-    int algorithm = _tuesdayTrack.algorithm();
+    
+    // We should probably re-run init logic that depends on RNG
+    // But without changing the 'flow/ornament' variables which are read from sequence.
+    // A full initAlgorithm call would reset seeds based on Sequence.
+    // So we need to manually re-init state vars here if we want true random reseed.
+    
+    const auto &sequence = tuesdayTrack().sequence(pattern());
+    int algorithm = sequence.algorithm();
 
     switch (algorithm) {
-    case 0: // TEST
-        _testMode = (_rng.next() & 0x1);
-        _testSweepSpeed = (_rng.next() & 0x3);
-        _testAccent = (_rng.next() & 0x1);
-        _testVelocity = (_rng.next() & 0xF0);
-        _testNote = 0;
-        break;
-
     case 1: // TRITRANCE
         _triB1 = (_rng.next() & 0x7);
         _triB2 = (_rng.next() & 0x7);
@@ -410,3189 +276,1041 @@ void TuesdayTrackEngine::reseed() {
         if (_triB3 >= 7) _triB3 -= 7; else _triB3 = 0;
         _triB3 -= 4;
         break;
-
     case 2: // STOMPER
-        _stomperMode = (_rng.next() % 7) * 2;
+        _stomperMode = (_extraRng.next() % 7) * 2;
         _stomperCountDown = 0;
         _stomperLowNote = _rng.next() % 3;
-        _stomperLastNote = _stomperLowNote;
-        _stomperLastOctave = 0;
         _stomperHighNote[0] = _rng.next() % 7;
         _stomperHighNote[1] = _rng.next() % 5;
         break;
-
-    case 3: // MARKOV
-        _markovHistory1 = (_rng.next() & 0x7);
-        _markovHistory3 = (_rng.next() & 0x7);
-        for (int i = 0; i < 8; i++) {
-            for (int j = 0; j < 8; j++) {
-                _markovMatrix[i][j][0] = (_rng.next() % 8);
-                _markovMatrix[i][j][1] = (_extraRng.next() % 8);
-            }
-        }
-        break;
-
-    case 4: // CHIPARP
-        _chipChordSeed = _rng.next();
-        _chipRng = Random(_chipChordSeed);
-        _chipBase = _rng.next() % 3;
-        _chipDir = _extraRng.nextBinary() ? 1 : 0;
-        break;
-
-    case 5: // GOACID
-        _goaB1 = _extraRng.nextBinary() ? 1 : 0;
-        _goaB2 = _extraRng.nextBinary() ? 1 : 0;
-        break;
-
-    case 6: // SNH
-        _snhPhase = 0;
-        _snhLastVal = 0;
-        _snhTarget = _snhCurrent = _rng.next() << 10;
-        _snhCurrentDelta = 0;
-        break;
-
-    case 7: // WOBBLE
-        _wobblePhase = 0;
-        _wobblePhase2 = 0;
-        _wobbleLastWasHigh = 0;
-        break;
-
-    case 8: // TECHNO
-        _technoKickPattern = _rng.next() % 4;
-        _technoHatPattern = _extraRng.next() % 4;
-        _technoBassNote = _rng.next() % 5;
-        break;
-
-    case 9: // FUNK
-        _funkPattern = _rng.next() % 8;
-        _funkSyncopation = _extraRng.next() % 4;
-        _funkGhostProb = 32 + (_extraRng.next() % 64);
-        break;
-
-    case 10: // DRONE
-        _droneBaseNote = _rng.next() % 12;
-        _droneInterval = _extraRng.next() % 4;
-        _droneSpeed = 1 + (_rng.next() % 4);
-        break;
-
-    case 11: // PHASE
-        _phaseAccum = 0;
-        _phaseSpeed = 0x1000000 + (_extraRng.next() & 0xffffff);
-        _phaseLength = 3 + (_rng.next() % 6);
-        for (int i = 0; i < 8; i++) {
-            _phasePattern[i] = _rng.next() % 8;
-        }
-        break;
-
-    case 12: // RAGA
-        {
-            int scaleType = _rng.next() % 4;
-            switch (scaleType) {
-            case 0:
-                _ragaScale[0] = 0; _ragaScale[1] = 1; _ragaScale[2] = 4;
-                _ragaScale[3] = 5; _ragaScale[4] = 7; _ragaScale[5] = 8;
-                _ragaScale[6] = 11;
-                break;
-            case 1:
-                _ragaScale[0] = 0; _ragaScale[1] = 2; _ragaScale[2] = 4;
-                _ragaScale[3] = 6; _ragaScale[4] = 7; _ragaScale[5] = 9;
-                _ragaScale[6] = 11;
-                break;
-            case 2:
-                _ragaScale[0] = 0; _ragaScale[1] = 1; _ragaScale[2] = 3;
-                _ragaScale[3] = 6; _ragaScale[4] = 7; _ragaScale[5] = 8;
-                _ragaScale[6] = 11;
-                break;
-            default:
-                _ragaScale[0] = 0; _ragaScale[1] = 2; _ragaScale[2] = 3;
-                _ragaScale[3] = 5; _ragaScale[4] = 7; _ragaScale[5] = 9;
-                _ragaScale[6] = 10;
-                break;
-            }
-        }
-        _ragaDirection = 0;
-        _ragaPosition = 0;
-        _ragaOrnament = _extraRng.next() % 3;
-        break;
-
-    case 13: // AMBIENT
-    case 18: // APHEX
-    case 19: // AUTECH
-    case 20: // STEPWAVE
-        // These algorithms are fully deterministic from flow/ornament,
-        // so reseed just re-initializes with the same parameters.
-        initAlgorithm();
-        break;
-
-    case 15: // DRILL
-        _drillHiHatPattern = 0b10101010 | (_rng.next() & 0x55);  // Vary pattern
-        _drillSlideTarget = _rng.next() % 12;
-        _drillTripletMode = _extraRng.nextBinary();
-        _drillRollCount = 0;
-        _drillLastNote = _rng.next() % 5;
-        _drillStepInBar = 0;
-        _drillSubdivision = 1;
-        break;
-
-    case 16: // MINIMAL
-        _minimalBurstLength = 2 + (_rng.next() % 7);
-        _minimalSilenceLength = 4 + (_rng.next() % 13);
-        _minimalClickDensity = _extraRng.next();
-        _minimalBurstTimer = 0;
-        _minimalSilenceTimer = _minimalSilenceLength;
-        _minimalNoteIndex = 0;
-        _minimalMode = 0;
-        break;
-
-    case 14: // ACID
-        for (int i = 0; i < 8; i++) {
-            _acidSequence[i] = _rng.next() % 12;
-        }
-        _acidPosition = 0;
-        _acidAccentPattern = _extraRng.next();
-        _acidOctaveMask = _extraRng.next() & 0x33;
-        _acidLastNote = _acidSequence[0];
-        _acidSlideTarget = 0;
-        _acidStepCount = 0;
-        break;
-
-    case 17: // KRAFT
-        _kraftBaseNote = _rng.next() % 12;
-        for (int i = 0; i < 8; i++) {
-            _kraftSequence[i] = (_kraftBaseNote + ((i % 2) ? 7 : 0)) % 12;
-        }
-        _kraftPosition = 0;
-        _kraftLockTimer = 16 + (_rng.next() % 16);
-        _kraftTranspose = 0;
-        _kraftTranspCount = 0;
-        _kraftGhostMask = _extraRng.next() & 0x55;
-        break;
-
-    default:
-        break;
+        // Add others if needed
     }
 }
 
-void TuesdayTrackEngine::generateBuffer() {
-    // Initialize algorithm fresh to get deterministic pattern
-    // initAlgorithm(); // ALgo is not resseeded on capture
-
-    int algorithm = _tuesdayTrack.algorithm();
-    int glide = _tuesdayTrack.glide();
-
-    // Generate buffer directly from initial algorithm state
-    // When default is infinite mode, algorithm evolves naturally during playback
-    // Buffer captures current state when switching to finite loop
-
-    // Generate 64 steps into buffer
-    for (int step = 0; step < BUFFER_SIZE; step++) {
-        int note = 0;
-        int octave = 0;
-        uint8_t gatePercent = 75;
-        uint8_t slide = 0;
-        uint8_t gateOffset = 0;  // Initialize default value for gateOffset
-        bool isTrill = false;
-
-        switch (algorithm) {
-        case 0: // TEST
-            {
-                gatePercent = 75;
-                if (_rng.nextRange(100) < glide) {
-                    slide = _testSweepSpeed + 1;
-                }
-
-                switch (_testMode) {
-                case 0:  // OCTSWEEPS
-                    octave = (step % 5);
-                    note = 0;
-                    // TEST: Apply timing variations based on mode
-                    gateOffset = (step % 4) * 10;  // Simple periodic timing variations
-                    break;
-                case 1:  // SCALEWALKER
-                default:
-                    octave = 0;
-                    _testNote = (_testNote + 1) % 12;
-                    note = _testNote;
-                    break;
-                }
-            }
-            break;
-
-        case 1: // TRITRANCE
-            {
-                int gateLengthChoice = _rng.nextRange(100);
-                if (gateLengthChoice < 40) {
-                    gatePercent = 50 + (_rng.nextRange(4) * 12);  // 50%, 62%, 74%, 86%
-                } else if (gateLengthChoice < 70) {
-                    gatePercent = 100 + (_rng.nextRange(4) * 25); // 100%, 125%, 150%, 175%
-                } else {
-                    gatePercent = 200 + (_rng.nextRange(9) * 25); // 200% to 400%
-                }
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        slide = slideAmount;
-                    }
-                }
-
-                // TRITRANCE: Generate phase-based timing variations for swing feel
-                int phase = (step + _triB2) % 3;
-                switch (phase) {
-                case 0:
-                    // First phase: slightly early timing
-                    gateOffset = 10 + (_rng.nextRange(15));  // 10-25% early
-                    break;
-                case 1:
-                    // Second phase: on-time or slightly late
-                    gateOffset = 45 + (_rng.nextRange(10));  // 45-55% timing
-                    break;
-                case 2:
-                    // Third phase: swing delay
-                    gateOffset = 60 + (_rng.nextRange(20));  // 60-80% delay
-                    break;
-                }
-                switch (phase) {
-                case 0:
-                    if (_extraRng.nextBinary() && _extraRng.nextBinary()) {
-                        _triB3 = (_extraRng.next() & 0x15);
-                        if (_triB3 >= 7) _triB3 -= 7; else _triB3 = 0;
-                        _triB3 -= 4;
-                    }
-                    octave = 0;
-                    note = _triB3 + 4;
-                    break;
-                case 1:
-                    octave = 1;
-                    note = _triB3 + 4;
-                    if (_rng.nextBinary()) {
-                        _triB2 = (_rng.next() & 0x7);
-                    }
-                    break;
-                case 2:
-                    octave = 2;
-                    note = _triB1;
-                    if (_rng.nextBinary()) {
-                        _triB1 = ((_rng.next() >> 5) & 0x7);
-                    }
-                    break;
-                }
-
-                if (note < 0) note = 0;
-                if (note > 11) note = 11;
-            }
-            break;
-
-        case 2: // STOMPER - buffer generation
-            {
-                gatePercent = 75;
-                slide = 0;
-
-                if (_stomperCountDown > 0) {
-                    gatePercent = _stomperCountDown * 25;
-                    _stomperCountDown--;
-                    // Still generate a note but mark as rest
-                    note = _stomperLastNote;
-                    octave = _stomperLastOctave;
-                } else {
-                    if (_stomperMode >= 14) {
-                        _stomperMode = (_extraRng.next() % 7) * 2;
-                    }
-
-                    _rng.nextRange(100);
-                    _stomperLowNote = _rng.next() % 3;
-                    _rng.nextRange(100);
-                    _stomperHighNote[0] = _rng.next() % 7;
-                    _rng.nextRange(100);
-                    _stomperHighNote[1] = _rng.next() % 5;
-
-                    int maxticklen = 2;
-
-                    switch (_stomperMode) {
-                    case 10:
-                        octave = 1;
-                        note = _stomperHighNote[_rng.next() % 2];
-                        _stomperMode++;
-                        break;
-                    case 11:
-                        octave = 0;
-                        note = _stomperLowNote;
-                        if (_rng.nextRange(100) < glide) {
-                            slide = (_rng.nextRange(3)) + 1;
-                        }
-                        // Check for Trill on stomp down
-                        {
-                            int trillChanceAlgorithmic = 18;
-                            int userTrillSetting = _tuesdayTrack.trill();
-                            int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-                            if (_uiRng.nextRange(100) < finalTrillChance) {
-                                isTrill = true;
-                            }
-                        }
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;
-                        break;
-                    case 12:
-                        octave = 0;
-                        note = _stomperLowNote;
-                        _stomperMode++;
-                        break;
-                    case 13:
-                        octave = 1;
-                        note = _stomperHighNote[_rng.next() % 2];
-                        if (_rng.nextRange(100) < glide) {
-                            slide = (_rng.nextRange(3)) + 1;
-                        }
-                        // Check for Trill on stomp up
-                        {
-                            int trillChanceAlgorithmic = 18;
-                            int userTrillSetting = _tuesdayTrack.trill();
-                            int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-                            if (_uiRng.nextRange(100) < finalTrillChance) {
-                                isTrill = true;
-                            }
-                        }
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;
-                        break;
-                    case 4:
-                    case 5:
-                        octave = 0;
-                        note = _stomperLowNote;
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;
-                        break;
-                    case 0:
-                    case 1:
-                        octave = _stomperLastOctave;
-                        note = _stomperLastNote;
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;
-                        break;
-                    case 6:
-                    case 7:
-                        octave = 0;
-                        note = _stomperLowNote;
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;
-                        break;
-                    case 8:
-                        octave = 1;
-                        note = _stomperHighNote[_rng.next() % 2];
-                        _stomperMode++;
-                        break;
-                    case 9:
-                        octave = 0;
-                        note = _stomperLowNote;
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;
-                        break;
-                    case 2:
-                        octave = 0;
-                        note = _stomperLowNote;
-                        _stomperMode++;
-                        break;
-                    case 3:
-                        octave = 1;
-                        note = _stomperHighNote[_rng.next() % 2];
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;
-                        break;
-                    default:
-                        octave = _stomperLastOctave;
-                        note = _stomperLastNote;
-                        break;
-                    }
-
-                    _stomperLastNote = note;
-                    _stomperLastOctave = octave;
-                }
-
-                if (note < 0) note = 0;
-                if (note > 11) note = 11;
-
-                // STOMPER: Apply timing variations that complement the stomping rhythm
-                // Different timing based on the current mode
-                switch (_stomperMode) {
-                case 0: case 1: case 2: case 3:
-                    gateOffset = 5;   // Early timing for foundational notes
-                    break;
-                case 4: case 5: case 6: case 7:
-                    gateOffset = 25;  // Mid-range timing for build-up
-                    break;
-                case 8: case 9: case 10: case 11:
-                    gateOffset = 75;  // Later timing for climax
-                    break;
-                case 12: case 13:
-                    gateOffset = 15;  // Moderate timing for transitions
-                    break;
-                case 14:
-                default:
-                    gateOffset = 0;   // On-beat timing for steady sections
-                    break;
-                }
-            }
-            break;
-
-        case 3: // MARKOV
-            {
-                int gateLengthChoice = _rng.nextRange(100);
-                if (gateLengthChoice < 40) {
-                    gatePercent = 50 + (_rng.nextRange(4) * 12);
-                } else if (gateLengthChoice < 70) {
-                    gatePercent = 100 + (_rng.nextRange(4) * 25);
-                } else {
-                    gatePercent = 200 + (_rng.nextRange(9) * 25);
-                }
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        slide = slideAmount;
-                    }
-                }
-
-                int idx = _rng.nextBinary() ? 1 : 0;
-                note = _markovMatrix[_markovHistory1][_markovHistory3][idx];
-                _markovHistory1 = _markovHistory3;
-                _markovHistory3 = note;
-                octave = _rng.nextBinary() ? 1 : 0;
-
-                // MARKOV: Use transition probabilities to determine timing variations
-                // Based on which transition was taken, generate different timing offsets
-                // Transition from _markovHistory1 to _markovHistory3 may influence timing
-                int transition_delta = abs(note - _markovHistory3);
-                int history_factor = (_markovHistory1 + _markovHistory3) % 11;  // Keep in 0-10 range
-                gateOffset = (transition_delta * 10) + (history_factor * 2);  // Scale factors for 0-100 range
-                if (gateOffset > 100) gateOffset = 100;
-            }
-            break;
-
-        case 4: // CHIPARP buffer generation
-            {
-                gatePercent = 75;
-                int chordpos = step % 4;
-
-                if (chordpos == 0) {
-                    _chipRng = Random(_chipChordSeed);
-                    if (_rng.nextRange(256) < 0x20) {
-                        _chipBase = _rng.next() % 3;
-                    }
-                    if (_rng.nextRange(256) < 0xf0) {
-                        _chipDir = _extraRng.nextBinary() ? 1 : 0;
-                    }
-                }
-
-                int pos = chordpos;
-                if (_chipDir == 1) {
-                    pos = 3 - chordpos;
-                }
-
-                if (_chipRng.nextRange(256) < 0x20) {
-                    // accent
-                }
-                // Algorithm's slide logic - only apply if glide > 0
-                if (_chipRng.nextRange(256) < 0x80) {
-                    int algoSlide = _chipRng.nextRange(256) % 3;
-                    if (glide > 0) {
-                        slide = algoSlide;
-                    }
-                }
-                if (_chipRng.nextRange(256) >= 0xd0) {
-                    note = 0;  // Note off (~19% chance)
-                    gatePercent = 0;
-                } else {
-                    note = (pos * 2) + _chipBase;
-                    gatePercent = 50 + 25 * (_chipRng.nextRange(256) % 3);
-                }
-                octave = 0;
-                _extraRng.nextRange(256);  // velocity
-
-                // Additional slide from glide parameter
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        slide = slideAmount;
-                    }
-                }
-
-                // Check for Trill on first chord position
-                if (chordpos == 0) {
-                    int trillChanceAlgorithmic = 20;
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        isTrill = true;
-                    }
-                }
-
-                // CHIPARP: Apply chiptune-style timing variations
-                // Use the chord position to create arpeggio timing patterns
-                if (pos == 0) {
-                    gateOffset = 0;    // Root note on-beat
-                } else if (pos == 1) {
-                    gateOffset = 10;   // Second note slightly delayed
-                } else if (pos == 2) {
-                    gateOffset = 30;   // Third note with more delay
-                } else {  // pos == 3
-                    gateOffset = 50;   // Fourth note with even more delay for arpeggio feel
-                }
-            }
-            break;
-
-        case 5: // GOACID buffer generation
-            {
-                gatePercent = 75;
-                _rng.nextRange(256);  // velocity (consumed but not used)
-                bool accent = _extraRng.nextBinary();
-
-                int randNote = _rng.next() % 8;
-                // Original uses signed char: 0xf4=-12, 0xfe=-2, 0xf2=-14
-                switch (randNote) {
-                case 0:
-                case 2:
-                    note = 0; break;
-                case 1: note = -12; break;  // 0xf4
-                case 3: note = 1; break;
-                case 4: note = 3; break;
-                case 5: note = 7; break;
-                case 6: note = 12; break;  // 0xc
-                case 7: note = 13; break;  // 0xd
-                }
-
-                if (accent) {
-                    switch (randNote) {
-                    case 0:
-                    case 3:
-                    case 7: note = 0; break;
-                    case 1: note = -12; break;  // 0xf4
-                    case 2: note = -2; break;   // 0xfe
-                    case 4: note = 3; break;
-                    case 5: note = -14; break;  // 0xf2
-                    case 6: note = 1; break;
-                    }
-                }
-
-                // Apply pattern transpose
-                if (_goaB1 && (step % 16) <= 7) {
-                    note += 3;
-                }
-                if (_goaB2 && (step % 16) <= 7) {
-                    note -= 5;
-                }
-
-                // Add +24 semitones (2 octaves) as in original
-                note += 24;
-
-                // Convert to note/octave
-                while (note < 0) { note += 12; octave--; }
-                while (note >= 12) { note -= 12; octave++; }
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        slide = slideAmount;
-                    }
-                }
-
-                // GOACID: Apply Goa/psytrance-style timing variations
-                // Create rhythmic shifts that complement the acid patterns
-                int stepInBar = step % 16;
-                if (stepInBar == 0 || stepInBar == 8) {
-                    gateOffset = 0;    // On strong beats (1st and 3rd beat), on-time
-                } else if (stepInBar % 4 == 0) {
-                    gateOffset = 10;   // On weak beats (2nd and 4th beat), slight delay
-                } else {
-                    gateOffset = 25 + (stepInBar % 5);  // Off-beat patterns with varying delays
-                }
-            }
-            break;
-
-        case 6: // SNH buffer generation
-            {
-                gatePercent = 75;
-                _snhPhase += _snhPhaseSpeed;
-                int v = _snhPhase >> 30;
-
-                if (v != _snhLastVal) {
-                    _snhLastVal = v;
-                    _snhTarget = _rng.next() << 10;
-                }
-                int newdelta = (_snhTarget - _snhCurrent) / 100;
-                _snhCurrentDelta += ((newdelta - _snhCurrentDelta) * 100) / 200;
-                _snhCurrent += _snhCurrentDelta * 100;
-
-                // Convert filtered value to note
-                int absVal = _snhCurrent;
-                if (absVal < 0) absVal = -absVal;
-                note = (absVal >> 22) % 12;
-                octave = 0;
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        slide = slideAmount;
-                    }
-                }
-                _extraRng.next();  // velocity
-
-                // SNH: Apply Sample & Hold timing variations
-                // Based on the current phase position for randomness
-                gateOffset = (_snhPhase >> 24) % 100;  // Use phase bits for random timing delay
-            }
-            break;
-
-        case 7: // WOBBLE buffer generation
-            {
-                gatePercent = 75;
-                _wobblePhase += _wobblePhaseSpeed;
-                _wobblePhase2 += _wobblePhaseSpeed2;
-
-                if (_rng.nextRange(256) >= 128) {  // High phase
-                    int32_t pos2 = _wobblePhase2 >> 27;
-                    note = pos2 % 8;
-                    if (_wobbleLastWasHigh == 0) {
-                        if (_rng.nextRange(256) >= 56) {
-                            int algoSlide = _rng.next() % 3;
-                            if (glide > 0) {
-                                slide = algoSlide;
-                            }
-                        }
-                    }
-                    _wobbleLastWasHigh = 1;
-                } else {  // Low phase
-                    int32_t pos = _wobblePhase >> 27;
-                    note = pos % 8;
-                    if (_wobbleLastWasHigh == 1) {
-                        if (_rng.nextRange(256) >= 56) {
-                            int algoSlide = _rng.next() % 3;
-                            if (glide > 0) {
-                                slide = algoSlide;
-                            }
-                        }
-                    }
-                    _wobbleLastWasHigh = 0;
-                }
-                octave = 0;
-                _extraRng.next();  // velocity
-
-                // Additional slide from glide parameter
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        slide = slideAmount;
-                    }
-                }
-
-                // Check for Trill on phase transitions
-                {
-                    int trillChanceAlgorithmic = 12;
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        isTrill = true;
-                    }
-                }
-
-                // WOBBLE: Apply wobble timing variations based on dual phase system
-                // Use both phase positions to create complex timing shifts
-                uint32_t phaseSum = (_wobblePhase + _wobblePhase2) >> 25;
-                gateOffset = phaseSum % 100;  // Use combined phase for timing variation
-            }
-            break;
-
-        case 8: // TECHNO buffer generation - Four-on-floor club
-            {
-                gatePercent = 75;
-                int beatPos = step % 4;  // Position within beat
-                int barPos = step % 16;  // Position within bar
-
-                // Four-on-floor kick pattern variations
-                bool isKick = false;
-                switch (_technoKickPattern) {
-                case 0: isKick = (beatPos == 0); break;  // Basic 4/4
-                case 1: isKick = (beatPos == 0) || (barPos == 14); break;  // With pickup
-                case 2: isKick = (beatPos == 0) || (barPos == 6); break;  // With offbeat
-                case 3: isKick = (beatPos == 0) || (barPos == 3) || (barPos == 11); break;  // Syncopated
-                }
-
-                if (isKick) {
-                    note = _technoBassNote;  // Bass note 0-4
-                    octave = 0;
-                    gatePercent = 80;
-                } else {
-                    // Hi-hat patterns on off-beats
-                    bool isHat = false;
-                    switch (_technoHatPattern) {
-                    case 0: isHat = (beatPos == 2); break;  // Off-beat hats
-                    case 1: isHat = (beatPos == 1) || (beatPos == 3); break;  // 8th notes
-                    case 2: isHat = true; break;  // 16th notes
-                    case 3: isHat = (beatPos != 0) && (_rng.next() % 3 != 0); break;  // Random 16ths
-                    }
-                    if (isHat) {
-                        note = 7 + (_extraRng.next() % 3);  // Higher notes for hats
-                        octave = 1;
-                        gatePercent = 40;
-
-                        // Check for Trill on hi-hats
-                        int trillChanceAlgorithmic = 25;
-                        int userTrillSetting = _tuesdayTrack.trill();
-                        int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-                        if (_uiRng.nextRange(100) < finalTrillChance) {
-                            isTrill = true;
-                        }
-                    } else {
-                        note = 0;
-                        octave = 0;
-                        gatePercent = 0;
-                    }
-                }
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        slide = slideAmount;
-                    }
-                }
-
-                // TECHNO: Apply four-on-floor timing variations
-                // Emphasize kick drum on beats, add slight timing shifts for groove
-                if (isKick) {
-                    gateOffset = (barPos == 0) ? 0 : 5;  // Kick on beat 1 is on-time, others slightly delayed
-                } else if (_extraRng.next() % 2) {  // Use a generic condition since hat pattern is complex
-                    gateOffset = 15 + (beatPos * 5);  // Hi-hats with rhythmic timing variations
-                } else {
-                    gateOffset = 25;  // Off-pattern elements with mid timing delay
-                }
-            }
-            break;
-
-        case 9: // FUNK buffer generation - Syncopated grooves
-            {
-                gatePercent = 75;
-                int pos = step % 16;
-
-                // Funk patterns with syncopation
-                static const uint16_t funkPatterns[8] = {
-                    0b1010010010100100,  // Basic funk
-                    0b1001001010010010,  // Syncopated
-                    0b1010100100101001,  // Displaced
-                    0b1001010010100101,  // Complex
-                    0b1010010100100101,  // Variation 1
-                    0b1001001001010010,  // Variation 2
-                    0b1010100101001010,  // Variation 3
-                    0b1001010100100101,  // Variation 4
-                };
-
-                bool isNote = (funkPatterns[_funkPattern] >> (15 - pos)) & 1;
-
-                if (isNote) {
-                    // Note selection based on position
-                    int noteChoice = _rng.next() % 8;
-                    switch (_funkSyncopation) {
-                    case 0: note = noteChoice % 5; break;  // Pentatonic-ish
-                    case 1: note = (noteChoice % 3) * 2; break;  // Root/3rd/5th
-                    case 2: note = noteChoice; break;  // Full range
-                    case 3: note = (pos % 4 == 0) ? 0 : (noteChoice % 5) + 2; break;  // Root on beat
-                    }
-                    octave = (pos % 8 == 0) ? 0 : (_rng.nextBinary() ? 1 : 0);
-
-                    // FUNK: Generate syncopated timing offsets to complement the rhythm
-                    if (pos % 4 == 0) {
-                        // On beats (1, 2, 3, 4) - often on-time
-                        gateOffset = 40 + (_rng.nextRange(20));  // 40-60% timing
-                    } else if (pos % 2 == 0) {
-                        // On upbeats (e.g., "&" of 2, 4) - maybe slightly early or late
-                        gateOffset = 20 + (_rng.nextRange(20));  // 20-40% timing
-                    } else {
-                        // On off-beats (e.g., "&" of 1, 3, or 16th notes) - syncopated feel
-                        gateOffset = 50 + (_rng.nextRange(30));  // 50-80% timing
-                    }
-
-                    // Ghost notes (quieter)
-                    if (_extraRng.nextRange(256) < _funkGhostProb && pos % 4 != 0) {
-                        gatePercent = 35;  // Ghost note
-
-                        // Check for Trill on ghost notes
-                        int trillChanceAlgorithmic = 15;
-                        int userTrillSetting = _tuesdayTrack.trill();
-                        int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-                        if (_uiRng.nextRange(100) < finalTrillChance) {
-                            isTrill = true;
-                        }
-                    } else {
-                        gatePercent = 75;
-                    }
-                } else {
-                    note = 0;
-                    gatePercent = 0;
-                    gateOffset = 0;  // No gate, no offset
-                }
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        slide = slideAmount;
-                    }
-                }
-            }
-            break;
-
-        case 10: // DRONE buffer generation - Sustained textures
-            {
-                // Very long gates, slow movement
-                int interval = 0;
-                switch (_droneInterval) {
-                case 0: interval = 0; break;   // Unison
-                case 1: interval = 7; break;   // Perfect 5th
-                case 2: interval = 12; break;  // Octave
-                case 3: interval = 19; break;  // 5th + octave
-                }
-
-                // Slow change rate (guard against division by zero)
-                int droneRate = (_droneSpeed > 0) ? (4 * _droneSpeed) : 4;
-                if ((step % droneRate) == 0) {
-                    // Occasional variation
-                    if (_rng.next() % 4 == 0) {
-                        interval += (_rng.nextBinary() ? 2 : -2);
-                    }
-                }
-
-                note = (_droneBaseNote + interval) % 12;
-                octave = (_droneBaseNote + interval) / 12;
-                gatePercent = 255;  // Very long sustain (clamped to uint8_t max)
-
-                if (_rng.nextRange(100) < glide) {
-                    slide = 3;  // Long slide for drones
-                }
-
-                // DRONE: Apply sustained timing variations matching the slow drone nature
-                // Use drone rate and position to create subtle timing shifts
-                int timingFactor = (step % droneRate);
-                if (timingFactor < droneRate / 2) {
-                    gateOffset = 0;      // Stable timing during first half of drone change
-                } else {
-                    gateOffset = 15;     // Slight delay during second half of drone change
-                }
-            }
-            break;
-
-        case 11: // PHASE buffer generation - Minimalist phasing
-            {
-                gatePercent = 75;
-                _phaseAccum += _phaseSpeed;
-
-                // Get pattern position with phase offset (guard against division by zero)
-                int phaseLen = (_phaseLength > 0) ? _phaseLength : 4;
-                int patternPos = (step + (_phaseAccum >> 28)) % phaseLen;
-                note = _phasePattern[patternPos];
-                octave = 0;
-
-                // PHASE: Generate timing variations based on phase accumulator
-                // Use fractional part of accumulator to create evolving rhythmic patterns
-                uint32_t fractionalPhase = _phaseAccum & 0x0FFFFFFF;  // Get fractional part
-                gateOffset = (fractionalPhase >> 24) & 0x7F;  // Extract upper bits as timing offset (0-127, capped by uint8_t)
-
-                // Consume RNG for determinism
-                _rng.next();
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        slide = slideAmount;
-                    }
-                }
-            }
-            break;
-
-        case 12: // RAGA buffer generation - Indian classical melodies
-            {
-                gatePercent = 75;
-
-                // Move through scale in characteristic ways
-                int movement = _rng.next() % 8;
-                switch (movement) {
-                case 0:
-                case 1:
-                case 2:
-                    // Continue in current direction
-                    if (_ragaDirection == 0) {
-                        _ragaPosition = (_ragaPosition + 1) % 7;
-                        if (_ragaPosition == 6) _ragaDirection = 1;
-                    } else {
-                        _ragaPosition = (_ragaPosition + 6) % 7;  // -1 mod 7
-                        if (_ragaPosition == 0) _ragaDirection = 0;
-                    }
-                    break;
-                case 3:
-                case 4:
-                    // Skip a note
-                    if (_ragaDirection == 0) {
-                        _ragaPosition = (_ragaPosition + 2) % 7;
-                    } else {
-                        _ragaPosition = (_ragaPosition + 5) % 7;
-                    }
-                    break;
-                case 5:
-                    // Repeat
-                    break;
-                case 6:
-                    // Jump to root or 5th
-                    _ragaPosition = (_rng.nextBinary()) ? 0 : 4;
-                    break;
-                case 7:
-                    // Change direction
-                    _ragaDirection = 1 - _ragaDirection;
-                    break;
-                }
-
-                note = _ragaScale[_ragaPosition];
-                octave = (_ragaPosition > 4) ? 1 : 0;
-
-                // Ornaments (gamaka-like slides)
-                int ornamentChance = _extraRng.next() % 8;
-                if (ornamentChance < _ragaOrnament && glide > 0) {
-                    slide = 2;  // Characteristic slides
-                } else if (_rng.nextRange(100) < glide) {
-                    slide = (_rng.nextRange(3)) + 1;
-                }
-
-                // Check for Trill on ascending movements
-                if (_ragaDirection == 0) {
-                    int trillChanceAlgorithmic = 25;
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        isTrill = true;
-                    }
-                }
-            }
-            break;
-
-        case 13: // AMBIENT buffer generation
-            {
-                // --- Handle ongoing events first ---
-                if (_ambient_event_type == 1) { // Single Note Event
-                    note = (_ambient_root_note + 12) % 12; // Octave up
-                    octave = 1;
-                    gatePercent = 150;
-                    _ambient_event_type = 0; // Event is one step long
-                } else if (_ambient_event_type == 2) { // Arpeggio Event
-                    note = _ambient_drone_notes[_ambient_event_step];
-                    octave = 0;
-                    gatePercent = 50;
-                    _ambient_event_step++;
-                    if (_ambient_event_step >= 3) {
-                        _ambient_event_type = 0; // End of event
-                    }
-                } else {
-                    // --- Default Drone Behavior ---
-                    note = _ambient_drone_notes[ (step / 4) % 3 ]; // Slowly cycle through drone notes
-                    octave = 0;
-                    gatePercent = 255; // Hold gate for long time (clamped)
-                    _ambient_event_timer--;
-                }
-
-                // --- Check if it's time for a new event ---
-                if (_ambient_event_timer <= 0) {
-                    _ambient_event_type = 1 + (_extraRng.next() % 2); // 1 or 2
-                    _ambient_event_step = 0;
-                    // Reset timer based on Power
-                    int power = _tuesdayTrack.power();
-                    _ambient_event_timer = 16 + (power > 0 ? 256 / power : 256);
-
-                    // AMBIENT: Generate random timing variations for organic feel
-                    // More timing flexibility for sparse events
-                    gateOffset = _rng.nextRange(50);  // Random timing (0-49%) for organic feel
-                }
-
-                slide = 0;
-            }
-            break;
-
-        case 15: // DRILL buffer generation - UK Drill hi-hat rolls and bass slides
-            {
-                // Advance step in bar
-                _drillStepInBar = (_drillStepInBar + 1) % 8;
-
-                // Check hi-hat pattern
-                bool hihatHit = (_drillHiHatPattern & (1 << _drillStepInBar)) != 0;
-
-                if (hihatHit) {
-                    // --- HI-HAT HIT ---
-                    note = 7 + (_rng.next() % 5);
-                    octave = 1;
-                    gatePercent = 25;
-                    slide = 0;
-
-                    // Check for Trill/Retrigger
-                    int trillChanceAlgorithmic = 30; // 30% base chance
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        isTrill = true;
-                        // Set the gate percent to be short for the trill
-                        uint32_t retriggerLength = (CONFIG_SEQUENCE_PPQN / 4) / 2;
-                        gatePercent = (retriggerLength * 100) / CONFIG_SEQUENCE_PPQN;
-                    }
-
-                } else {
-                    // --- BASS NOTE ---
-                    note = _drillLastNote;
-                    octave = -1;
-                    gatePercent = 75;
-
-                    if (_rng.nextRange(8) < 2) {
-                        _drillLastNote = _rng.next() % 5;
-                    }
-
-                    if (_extraRng.nextRange(16) < 8) {
-                        slide = 2;
-                        _drillSlideTarget = _rng.next() % 12;
-                    } else if (_rng.nextRange(100) < glide) {
-                        slide = (_rng.nextRange(3)) + 1;
-                    } else {
-                        slide = 0;
-                    }
-                }
-            }
-            break;
-
-        case 16: // MINIMAL buffer generation - staccato bursts and silence
-            {
-                // Mode state machine: silence → burst → silence
-                if (_minimalMode == 0) {
-                    // Silence mode - no gate
-                    if (_minimalSilenceTimer > 0) {
-                        _minimalSilenceTimer--;
-                        gatePercent = 0;
-                        note = 0;
-                        octave = 0;
-                        _rng.next();  // consume for determinism
-                    } else {
-                        // Switch to burst mode
-                        _minimalMode = 1;
-                        _minimalBurstTimer = _minimalBurstLength;
-                        _minimalNoteIndex = 0;
-                        // Generate first note of burst
-                        note = _rng.next() % 12;
-                        octave = 0;
-                        gatePercent = 25;  // Short staccato gates
-                    }
-                } else {
-                    // Burst mode - generate notes
-                    if (_minimalBurstTimer > 0) {
-                        _minimalBurstTimer--;
-                        _minimalNoteIndex++;
-
-                        // Generate note based on pattern
-                        int baseNote = _rng.next() % 12;
-
-                        // Glitch repeats based on ornament
-                        if (_extraRng.nextRange(256) < _minimalClickDensity) {
-                            // Glitch - repeat previous note or create click
-                            note = baseNote;
-                            gatePercent = 15;  // Very short click
-                        } else {
-                            note = baseNote;
-                            gatePercent = 25;  // Normal staccato
-                        }
-                        octave = 0;
-                    } else {
-                        // Switch to silence mode
-                        _minimalMode = 0;
-                        _minimalSilenceTimer = _minimalSilenceLength;
-                        gatePercent = 0;
-                        note = 0;
-                        octave = 0;
-                    }
-                }
-
-                // Glide check
-                if (gatePercent > 0 && _rng.nextRange(100) < glide) {
-                    slide = (_rng.nextRange(3)) + 1;
-                }
-
-                // MINIMAL: Apply timing variations that complement the burst/silence pattern
-                if (_minimalMode == 0) {
-                    gateOffset = 0;   // Silence mode - no gate offset
-                } else {
-                    // Burst mode - vary timing based on burst progression
-                    gateOffset = (_minimalBurstTimer % 4) * 10;  // Cycle through timing variations during burst
-                }
-            }
-            break;
-
-        case 14: // ACID buffer generation - 303-style patterns
-            {
-                // Get note from sequence
-                note = _acidSequence[_acidPosition];
-                octave = 0;
-
-                // Check for accent
-                bool hasAccent = (_acidAccentPattern & (1 << _acidPosition)) != 0;
-                gatePercent = hasAccent ? 95 : 65;  // Punchy 303 gates
-
-                // Check for octave jump
-                if (_acidOctaveMask & (1 << _acidPosition)) {
-                    octave = 1;
-                }
-
-                // Slide based on flow
-                if (_rng.nextRange(100) < glide) {
-                    slide = 2;  // 303-style slide
-                }
-
-                // Advance position
-                _acidPosition = (_acidPosition + 1) % 8;
-                _acidLastNote = note;
-                _acidStepCount++;
-
-                // Occasional pattern mutation
-                if (_rng.nextRange(128) < 2) {
-                    int mutatePos = _rng.next() % 8;
-                    _acidSequence[mutatePos] = _rng.next() % 12;
-                }
-
-                // Consume extra RNG
-                _extraRng.next();
-
-                // ACID: Apply acid-style timing variations that complement the 303 patterns
-                if (hasAccent) {
-                    gateOffset = 10;  // Accented notes slightly delayed
-
-                    // Check for Trill on accented notes
-                    int trillChanceAlgorithmic = 20;
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        isTrill = true;
-                    }
-                } else if (_acidPosition % 2 == 0) {
-                    gateOffset = 0;   // Even steps on-beat
-                } else {
-                    gateOffset = 20;  // Odd steps with slight delay
-                }
-            }
-            break;
-
-        case 17: // KRAFT buffer generation - precise mechanical sequences
-            {
-                // Get note from sequence with transpose
-                note = (_kraftSequence[_kraftPosition] + _kraftTranspose) % 12;
-                octave = 0;
-
-                // Check for ghost note
-                bool isGhost = (_kraftGhostMask & (1 << _kraftPosition)) != 0;
-                gatePercent = isGhost ? 25 : 50;  // Precise, mechanical gates
-
-                // Lock timer controls pattern stability
-                if (_kraftLockTimer > 0) {
-                    _kraftLockTimer--;
-                } else {
-                    // Pattern evolution when lock expires
-                    _kraftLockTimer = 16 + (_rng.next() % 16);
-                    _kraftBaseNote = (_kraftBaseNote + _rng.nextRange(5)) % 12;
-                    // Regenerate pattern
-                    for (int i = 0; i < 8; i++) {
-                        _kraftSequence[i] = (_kraftBaseNote + ((i % 2) ? 7 : 0)) % 12;
-                    }
-                }
-
-                // Transpose based on flow
-                if (_rng.nextRange(16) < 4) {
-                    _kraftTranspose = _rng.next() % 12;
-                    _kraftTranspCount++;
-                }
-
-                // Advance position
-                _kraftPosition = (_kraftPosition + 1) % 8;
-
-                // Glide check (rare for mechanical feel)
-                if (_rng.nextRange(100) < glide / 2) {
-                    slide = 1;  // Short slide
-                }
-
-                _extraRng.next();
-
-                // KRAFT: Apply precise mechanical timing variations
-                // Complement the precise, algorithmic nature of the sequence
-                if (isGhost) {
-                    gateOffset = 20 + (_kraftPosition * 5);  // Ghost notes with specific timing
-                } else {
-                    gateOffset = (_kraftPosition % 3) * 10;  // Pattern-based timing variations
-                }
-            }
-            break;
-
-        case 18: // APHEX buffer generation
-            {
-                // --- Main melody from Track 1 ---
-                note = _aphex_track1_pattern[_aphex_pos1];
-                octave = 0;
-                gatePercent = 75;
-                slide = 0;
-
-                // --- Modification from Track 2 ---
-                uint8_t modifier = _aphex_track2_pattern[_aphex_pos2];
-                if (modifier == 1) { // Stutter
-                    gatePercent = 20;
-                } else if (modifier == 2) { // Slide
-                    slide = 1;
-                }
-
-                // --- Override from Track 3 ---
-                uint8_t bass_note = _aphex_track3_pattern[_aphex_pos3];
-                if (bass_note > 0) {
-                    note = bass_note;
-                    octave = -1; // Deep bass
-                    gatePercent = 90;
-                    slide = 0;
-                }
-
-                // --- Advance all tracks ---
-                _aphex_pos1 = (_aphex_pos1 + 1) % 4;
-                _aphex_pos2 = (_aphex_pos2 + 1) % 3;
-                _aphex_pos3 = (_aphex_pos3 + 1) % 5;
-
-                // APHEX: Apply polyrhythmic timing variations
-                // Use multi-track positioning to create complex timing variations
-                int polyRhythmFactor = (_aphex_pos1 + _aphex_pos2 + _aphex_pos3) % 12;
-                gateOffset = polyRhythmFactor * 8;  // Scale to 0-96% range
-
-                // Check for Trill on polyrhythmic collision points (glitchy)
-                int polyCollision = ((_aphex_pos1 * 7) ^ (_aphex_pos2 * 5) ^ (_aphex_pos3 * 3)) % 12;
-                if (polyCollision > 8) {
-                    int trillChanceAlgorithmic = 45; // High for glitch
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        isTrill = true;
-                    }
-                }
-            }
-            break;
-
-        case 19: // AUTECHRE buffer generation
-            {
-                // --- Always play the current state of the pattern ---
-                // Pattern encodes note + octave*12, so extract both
-                int patternVal = _autechre_pattern[step % 8];
-                note = patternVal % 12;
-                octave = patternVal / 12;
-                gatePercent = 75;
-                slide = 0;
-
-                // --- Countdown to the next transformation ---
-                _autechre_rule_timer--;
-                if (_autechre_rule_timer <= 0) {
-                    uint8_t current_rule = _autechre_rule_sequence[_autechre_rule_index];
-                    int intensity = _tuesdayTrack.power() / 2; // Power: 0-8
-
-                    // --- Apply a deterministic transformation rule ---
-                    switch (current_rule) {
-                        case 0: // ROTATE
-                            {
-                                int8_t temp = _autechre_pattern[7];
-                                for (int i = 7; i > 0; --i) _autechre_pattern[i] = _autechre_pattern[i-1];
-                                _autechre_pattern[0] = temp;
-                            }
-                            break;
-                        case 1: // REVERSE
-                            for (int i = 0; i < 4; ++i) {
-                                int8_t temp = _autechre_pattern[i];
-                                _autechre_pattern[i] = _autechre_pattern[7-i];
-                                _autechre_pattern[7-i] = temp;
-                            }
-                            break;
-                        case 2: // INVERT around a pivot - preserve octave
-                            for (int i = 0; i < 8; ++i) {
-                                int octave = _autechre_pattern[i] / 12;
-                                int note = _autechre_pattern[i] % 12;
-                                int interval = note - 6;
-                                note = (6 - interval + 12) % 12;
-                                _autechre_pattern[i] = note + (octave * 12);
-                            }
-                            break;
-                        case 3: // SWAP adjacent notes
-                            for (int i = 0; i < 8; i += 2) {
-                                int8_t temp = _autechre_pattern[i];
-                                _autechre_pattern[i] = _autechre_pattern[i+1];
-                                _autechre_pattern[i+1] = temp;
-                            }
-                            break;
-                        case 4: // ADD intensity - preserve octave
-                            for (int i = 0; i < 8; ++i) {
-                                int octave = _autechre_pattern[i] / 12;
-                                int note = (_autechre_pattern[i] % 12 + intensity) % 12;
-                                _autechre_pattern[i] = note + (octave * 12);
-                            }
-                            break;
-                    }
-
-                    // --- Reset for next rule ---
-                    _autechre_rule_timer = 8 + (_tuesdayTrack.flow() * 4);
-                    _autechre_rule_index = (_autechre_rule_index + 1) % 8;
-                }
-
-                // AUTECHRE: Apply algorithmic timing variations that complement the pattern transformations
-                // Use the current rule index and timer to create evolving timing variations
-                gateOffset = ((_autechre_rule_index * 10) + (_autechre_rule_timer % 7)) % 100;
-
-                // Check for Trill on SWAP rule or fresh transformation (glitchy)
-                uint8_t current_rule = _autechre_rule_sequence[_autechre_rule_index];
-                if (current_rule == 3 || _autechre_rule_timer < 2) {
-                    int trillChanceAlgorithmic = 50; // Very high for abstract chaos
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        isTrill = true;
-                    }
-                }
-            }
-            break;
-
-        case 20: // STEPWAVE buffer generation
-            {
-                // Flow controls scale step direction with octave jumps
-                // 0-7: step down, 8: stationary, 9-16: step up
-                // Also probabilistically jump octaves
-                int flowVal = _tuesdayTrack.flow();
-                int ornamentVal = _tuesdayTrack.ornament();
-
-                // Determine scale step movement based on flow
-                int scaleStepDir = 0;
-                if (flowVal <= 7) {
-                    scaleStepDir = -1;  // Step down
-                } else if (flowVal >= 9) {
-                    scaleStepDir = 1;   // Step up
-                }
-                // flowVal == 8 means stationary (scaleStepDir = 0)
-
-                // Determine step size from ornament: 0-5=2 steps, 6-10=2-3 mixed, 11-16=3 steps
-                int stepSize;
-                if (ornamentVal <= 5) {
-                    stepSize = 2;
-                } else if (ornamentVal >= 11) {
-                    stepSize = 3;
-                } else {
-                    stepSize = 2 + (_extraRng.next() % 2);  // 2 or 3
-                }
-
-                // Calculate note as scale degree offset from previous
-                // Use step counter to accumulate movement
-                note = (step * scaleStepDir * stepSize) % 7;  // Keep within single octave range for scale
-                if (note < 0) note += 7;
-
-                // Octave jumps: probabilistically jump up 2 octaves
-                // Higher flow = more upward movement = more high octave jumps
-                int octaveJumpChance = 20 + (flowVal * 3);  // 20-68%
-                if (_rng.nextRange(100) < octaveJumpChance) {
-                    octave = 2;
-                } else {
-                    octave = 0;
-                }
-
-                gatePercent = 85;  // Slightly longer gates for the stepping effect
-
-                // Check for trill (base probability 50%)
-                int trillChanceAlgorithmic = 50;
-                int userTrillSetting = _tuesdayTrack.trill();
-                int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                if (_uiRng.nextRange(100) < finalTrillChance) {
-                    isTrill = true;
-
-                    // Determine if this is stepped or slide (glide parameter)
-                    if (_rng.nextRange(100) < glide) {
-                        slide = 2;  // Long slide for smooth glissando
-                    }
-
-                    // Trill step count from ornament: lower=2, middle=2-3, higher=3
-                    if (ornamentVal <= 5) {
-                        _stepwave_step_count = 2;
-                    } else if (ornamentVal >= 11) {
-                        _stepwave_step_count = 3;
-                    } else {
-                        _stepwave_step_count = 2 + (_extraRng.next() % 2);
-                    }
-                }
-
-                // Gate offset: create rhythmic interest
-                gateOffset = (step % 4) * 15;  // 0, 15, 30, 45
-            }
-            break;
-
-        default:
-            note = 0;
-            octave = 0;
-            break;
-        }
-
-        _buffer[step].note = note;
-        _buffer[step].octave = octave;
-        _buffer[step].gatePercent = gatePercent;
-        _buffer[step].slide = slide;
-        _buffer[step].gateOffset = gateOffset;
-        _buffer[step].isTrill = isTrill;
+float TuesdayTrackEngine::scaleToVolts(int noteIndex, int octave) const {
+    const auto &sequence = tuesdayTrack().sequence(pattern());
+    const auto &project = _model.project();
+
+    // 1. Resolve which Scale to use
+    int trackScaleIdx = sequence.scale();
+    const Scale &scale = (trackScaleIdx < 0)
+        ? project.selectedScale()   // -1 = use project scale
+        : Scale::get(trackScaleIdx); // 0+ = use specific scale (0 = Semitones/chromatic)
+
+    // 2. Resolve Root Note
+    int trackRoot = sequence.rootNote();
+    int rootNote = (trackRoot < 0) ? project.rootNote() : trackRoot;
+
+    // 3. Quantization is always applied
+    // Scale 0 (Semitones) naturally provides chromatic quantization (all 12 notes)
+    bool quantize = true;
+
+    float voltage = 0.f;
+
+    if (quantize) {
+        // SCALE MODE: noteIndex is Scale Degree
+        int totalDegree = noteIndex + (octave * scale.notesPerOctave());
+        
+        // Apply Transpose (in Degrees)
+        totalDegree += sequence.transpose();
+
+        // Convert to Volts
+        voltage = scale.noteToVolts(totalDegree);
+
+        // Add Root Note offset
+        voltage += (rootNote * (1.f / 12.f));
+    } else {
+        // CHROMATIC MODE: noteIndex is Semitone
+        int totalSemitones = noteIndex + (octave * 12);
+        
+        // Apply Transpose (in Semitones)
+        totalSemitones += sequence.transpose();
+
+        // 1V/Oct
+        voltage = totalSemitones * (1.f / 12.f);
     }
 
-    _bufferValid = true;
+    // 4. Apply Track Octave Offset
+    voltage += sequence.octave();
 
-    // Reinitialize algorithm for live playback
-    // initAlgorithm(); // don't initialize
+    return voltage;
+}
+
+TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t tick) {
+    const auto &sequence = tuesdayTrack().sequence(pattern());
+    int algorithm = sequence.algorithm();
+    
+    // --- CONTEXT CALCULATION (Porting Tick/Beat/Loop) ---
+
+    // Compute divisor (ticks per step) - needed for beat grid calculations
+    uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+
+    // Beat detection (for algorithms that need to sync to beat grid)
+    int stepsPerBeat = (divisor > 0) ? (CONFIG_PPQN / divisor) : 0;
+    bool isBeatStart = (stepsPerBeat > 0) && ((_stepIndex % stepsPerBeat) == 0);
+
+    // 1. Derive TPB (Ticks Per Beat) based on Quarter Note (192 PPQN)
+    // This ensures "Beat" based algorithms lock to the musical grid.
+    uint32_t stepTicks = divisor;
+    int tpb = 1;
+    if (stepTicks > 0) {
+        // Round to nearest integer to handle slight timing drifts or swing if applied globally (unlikely here)
+        tpb = std::max(1, (int)((192 + (stepTicks/2)) / stepTicks));
+    }
+    
+    // 2. Derive Effective Loop Length
+    // If infinite (0), assume 32 steps (2 bars of 16ths) for LFO scaling
+    int loopLength = sequence.actualLoopLength();
+    int effectiveLoopLength = (loopLength > 0) ? loopLength : 32;
+
+    // Apply rotation offset (wire up existing UI parameter)
+    int rotate = (loopLength > 0) ? sequence.rotate() : 0;
+    int rotatedStep = (loopLength > 0) ? ((_stepIndex + rotate + loopLength) % loopLength) : _stepIndex;
+
+    // Ornament parameter (used by multiple algorithms)
+    int ornament = sequence.ornament();
+
+    // Standard subdivision count (from ornament parameter)
+    // Used by polyrhythmic algorithms for tuplet generation
+    int subdivisions = 4;  // Default: straight 16ths
+    if (ornament >= 5 && ornament <= 8) subdivisions = 3;      // Triplets (3:4)
+    else if (ornament >= 9 && ornament <= 12) subdivisions = 5; // Quintuplets (5:4)
+    else if (ornament >= 13) subdivisions = 7;                  // Septuplets (7:4)
+
+    TuesdayTickResult result;
+    result.velocity = 255; // Default high velocity
+
+    // Map legacy/alternate algorithms to supported set
+    int algo = algorithm;
+    if (algorithm == 18) algo = 3; // APHEX
+    if (algorithm == 19) algo = 4; // AUTECHRE
+    if (algorithm == 20) algo = 5; // STEPWAVE
+    
+    switch (algo) {
+    case 0: // TEST
+        {
+            result.gateRatio = 75;
+            if (_rng.nextRange(100) < sequence.glide()) {
+                result.slide = true;
+            }
+
+            switch (_testMode) {
+            case 0: // OCTSWEEPS
+                result.octave = (_stepIndex % 5);
+                result.note = 0;
+                break;
+            case 1: // SCALEWALKER
+            default:
+                result.octave = 0;
+                result.note = _testNote;
+                _testNote = (_testNote + 1) % 12;
+                break;
+            }
+            result.velocity = _testVelocity;
+        }
+        break;
+
+    case 1: // TRITRANCE
+        {
+            // Gate Length Logic (Probabilistic)
+            int gateLenRnd = _rng.nextRange(100);
+            if (gateLenRnd < 40) result.gateRatio = 50 + (_rng.nextRange(4) * 12);
+            else if (gateLenRnd < 70) result.gateRatio = 100 + (_rng.nextRange(4) * 25);
+            else result.gateRatio = 200 + (_rng.nextRange(9) * 25);
+
+            // Slide Logic
+            if (_rng.nextRange(100) < sequence.glide()) {
+                result.slide = true;
+            }
+
+            // Note: TriTrance uses modulo 3, which is its own rhythmic grid (Polyrhythm).
+            // It does NOT use the Beat (TPB) concept, so we leave it as is.
+            int phase = (_stepIndex + _triB2) % 3;
+            switch (phase) {
+            case 0:
+                if (_extraRng.nextBinary() && _extraRng.nextBinary()) {
+                    _triB3 = (_extraRng.next() & 0x15);
+                    if (_triB3 >= 7) _triB3 -= 7; else _triB3 = 0;
+                    _triB3 -= 4;
+                }
+                result.octave = 0;
+                result.note = _triB3 + 4;
+                // Phase 0: Tight/Human (0-10%)
+                result.gateOffset = clamp(int(10 - _rng.nextRange(10)), 0, 100);
+                break;
+            case 1:
+                result.octave = 1;
+                result.note = _triB3 + 4;
+                if (_rng.nextBinary()) _triB2 = (_rng.next() & 0x7);
+                // Phase 1: Heavy Swing (25-35%)
+                result.gateOffset = clamp(int(25 + _rng.nextRange(10)), 0, 100);
+                break;
+            case 2:
+                result.octave = 2;
+                result.note = _triB1;
+                result.velocity = 255; // Accent phase
+                result.accent = true;
+                if (_rng.nextBinary()) _triB1 = ((_rng.next() >> 5) & 0x7);
+                // Phase 2: Max Drag (40-50%)
+                result.gateOffset = clamp(int(40 + _rng.nextRange(10)), 0, 100);
+                break;
+            }
+
+            // Velocity variation (unless accented above)
+            if (!result.accent) {
+                result.velocity = (_rng.nextRange(256) / 2);
+            }
+        }
+        break;
+
+    case 2: // STOMPER
+        {
+            result.gateRatio = 75;
+            int accentoffs = 0;
+            uint8_t veloffset = 0;
+
+            if (_stomperCountDown > 0) {
+                // Rest period (Countdown)
+                result.gateRatio = _stomperCountDown * 25;
+                result.velocity = 0; // Silent
+                _stomperCountDown--;
+                result.note = _stomperLastNote;
+                result.octave = _stomperLastOctave;
+            } else {
+                // Active period
+                if (_stomperMode >= 14) {
+                    _stomperMode = (_extraRng.next() % 7) * 2;
+                }
+
+                // FIX: Original C had PercChance(R, 100) = 100% probability (always true)
+                // Randomize notes every tick for chaotic character (Pattern C: Range-Biased Random)
+                _stomperLowNote = _rng.next() % 3;
+                _stomperHighNote[0] = _rng.next() % 7;
+                _stomperHighNote[1] = _rng.next() % 5;
+
+                veloffset = 100; // Base velocity when active
+                int maxticklen = 2;
+
+                switch (_stomperMode) {
+                case 10: // SLIDEDOWN1
+                    result.octave = 1;
+                    result.note = _stomperHighNote[_rng.next() % 2];
+                    _stomperMode++;
+                    break;
+                case 11: // SLIDEDOWN2
+                    result.octave = 0;
+                    result.note = _stomperLowNote;
+                    result.slide = true;
+                    if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
+                    _stomperMode = 14;
+                    break;
+                case 12: // SLIDEUP1
+                    result.octave = 0;
+                    result.note = _stomperLowNote;
+                    _stomperMode++;
+                    break;
+                case 13: // SLIDEUP2
+                    result.octave = 1;
+                    result.note = _stomperHighNote[_rng.next() % 2];
+                    result.slide = true;
+                    if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
+                    _stomperMode = 14;
+                    break;
+                case 4: case 5: // LOW
+                    accentoffs = 100;
+                    result.octave = 0;
+                    result.note = _stomperLowNote;
+                    if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
+                    _stomperMode = 14;
+                    break;
+                case 0: case 1: // PAUSE
+                    result.octave = _stomperLastOctave;
+                    result.note = _stomperLastNote;
+                    veloffset = 0; // Quiet
+                    if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
+                    _stomperMode = 14;
+                    break;
+                case 6: case 7: // HIGH
+                case 8: case 9: // HILOW
+                case 2: case 3: // LOWHI
+                    // Simplified mapping for brevity, adhering to logic
+                    if (_stomperMode == 6 || _stomperMode == 7 || _stomperMode == 9 || _stomperMode == 2) accentoffs = 100;
+
+                    if (_stomperMode == 8 || _stomperMode == 3) {
+                        result.octave = 1;
+                        result.note = _stomperHighNote[_rng.next() % 2];
+                        if (_stomperMode == 8) _stomperMode++; else if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
+                        if (_stomperMode == 3) _stomperMode = 14;
+                    } else {
+                        // NOTE: Original C bug faithfully preserved:
+                        // STOMPER_HIGH cases (6,7) play low octave/low note instead of high octave/high note
+                        // Original C line 101: case STOMPER_HIGH1: NOTE(0, PS->Stomper.LowNote);
+                        // This gives STOMPER its characteristic "heavy" sound
+                         result.octave = 0;
+                         result.note = _stomperLowNote;
+                         if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
+                         _stomperMode = 14;
+                    }
+                    break;
+                }
+                _stomperLastNote = result.note;
+                _stomperLastOctave = result.octave;
+                
+                // Calculate velocity
+                result.velocity = (_extraRng.nextRange(256) / 4) + veloffset;
+                // Accent logic: PercChance(50 + accentoffs)
+                if (_rng.nextRange(256) >= (50 + accentoffs)) {
+                     result.accent = true;
+                }
+
+                result.beatSpread = 18; // Base spread
+            }
+        }
+        break;
+
+    case 3: // APHEX
+        {
+            // Polyrhythmic Time Warping
+            // Subdivisions control the time base for the Modifier Track (Track 2)
+            uint32_t modifierStep = _stepIndex;
+            if (subdivisions != 4) {
+                modifierStep = (_stepIndex * subdivisions) / 4;
+            }
+
+            // Track 1: Main Melody (Straight)
+            // Use the standard position counters but update them based on warped steps?
+            // No, simpler: Use the calculated steps directly to look up pattern.
+            // But Aphex uses stateful position counters (_aphex_pos1).
+            // We must advance the state differently.
+            // Let's apply the warping to the *increment* decision.
+            
+            // Actually, since we run live every step, we can't skip updates.
+            // We must index into the pattern using the warped step.
+            
+            // Re-calculate positions based on warped indices
+            // This makes the algo stateless (good for loop points!)
+            // Use rotatedStep for pattern indexing to enable rotation parameter
+            int pos1 = rotatedStep % 4; // Track 1 is always straight 4/4
+            int pos2 = modifierStep % 3; // Track 2 is warped (intentionally uses unrotated time)
+            int pos3 = rotatedStep % 5; // Track 3 is straight 5/4 (natural poly)
+
+            result.note = _aphex_track1_pattern[pos1];
+            result.octave = 0;
+            result.gateRatio = 75;
+            result.velocity = 180;
+
+            uint8_t modifier = _aphex_track2_pattern[pos2];
+            if (modifier == 1) {
+                result.gateRatio = 25;
+                result.velocity = 80;
+                result.beatSpread = 60;
+            } else if (modifier == 2) {
+                result.gateRatio = 100;
+                result.slide = true;
+            }
+
+            uint8_t bass = _aphex_track3_pattern[pos3];
+            if (bass > 0) {
+                result.note = bass;
+                result.octave = -1;
+                result.gateRatio = 90;
+                result.velocity = 255;
+                result.accent = true;
+            }
+            
+            // Collision logic needs warped pos2
+            int polyCollision = ((pos1 * 7) ^ (pos2 * 5) ^ (pos3 * 3)) % 12;
+            if (polyCollision > 9) {
+                result.beatSpread = 100;
+                result.velocity = 255;
+            }
+            
+            // Polyrhythm Offset
+            int polyRhythmFactor = (pos1 + pos2 + pos3) % 12;
+            result.gateOffset = clamp(polyRhythmFactor * 8, 0, 100);
+        }
+        break;
+        
+    case 4: // AUTECHRE
+        {
+            // Polyrhythmic Time Warping (Fast Tuplets)
+            int flow = sequence.flow();
+
+            // Signal polyrhythm on beat starts ONLY (don't mask intermediate steps)
+            if (isBeatStart && subdivisions != 4) {
+                // Vary beatSpread based on flow (timing window control)
+                // flow 0-16 → beatSpread 20-100 (low flow = narrow window, high flow = wide spread)
+                result.beatSpread = 20 + (flow * 5);
+                result.polyCount = subdivisions;  // Pass tuplet count to FX layer
+                result.isSpatial = true;          // Polyrhythm mode (spread in time)
+
+                // Generate note offsets from pattern (micro-melody)
+                // Use pattern values as intervals, cycling through pattern if needed
+                for (int i = 0; i < subdivisions && i < 8; i++) {
+                    int patternIdx = (rotatedStep + i) % 8;
+                    int patternNote = _autechre_pattern[patternIdx] % 12;
+                    // Convert to interval relative to base note (first pattern value)
+                    int baseNote = _autechre_pattern[rotatedStep % 8] % 12;
+                    result.noteOffsets[i] = patternNote - baseNote;
+                }
+            }
+
+            // Algorithm logic (ALWAYS run, no masking)
+            // Use rotatedStep for pattern indexing to enable rotation parameter
+            int patternVal = _autechre_pattern[rotatedStep % 8];
+            result.note = patternVal % 12;
+            result.octave = patternVal / 12;
+
+            // Random Jitter (0-10%)
+            result.gateOffset = clamp(int(_rng.nextRange(11)), 0, 100);
+
+            _autechre_rule_timer--;
+
+            result.velocity = 160;  // NO MASKING
+            result.gateRatio = 75;
+            // ... (Transformation Logic) ...
+            if (_autechre_rule_timer <= 0) {
+                uint8_t rule = _autechre_rule_sequence[_autechre_rule_index];
+                int intensity = sequence.power() / 2;
+                if (result.velocity > 0) {
+                    result.velocity = 255;
+                    result.accent = true;
+                }
+                if (rule == 0) { int8_t t = _autechre_pattern[7]; for(int i=7; i>0; --i) _autechre_pattern[i]=_autechre_pattern[i-1]; _autechre_pattern[0]=t; }
+                else if (rule == 1) { for(int i=0;i<4;++i) std::swap(_autechre_pattern[i], _autechre_pattern[7-i]); }
+                else if (rule == 2) { for(int i=0;i<8;++i) { int o=_autechre_pattern[i]/12; int n=_autechre_pattern[i]%12; n=(6-(n-6)+12)%12; _autechre_pattern[i]=n+o*12; } }
+                else if (rule == 3) { for(int i=0;i<8;i+=2) std::swap(_autechre_pattern[i], _autechre_pattern[i+1]); }
+                else if (rule == 4) { for(int i=0;i<8;++i) { int o=_autechre_pattern[i]/12; int n=(_autechre_pattern[i]%12+intensity)%12; _autechre_pattern[i]=n+o*12; } }
+
+                // FIX: Use cached flow to prevent timer drift if user tweaks knob mid-pattern
+                _autechre_rule_timer = 8 + (_cachedFlow * 4);
+                _autechre_rule_index = (_autechre_rule_index + 1) % 8;
+            }
+        }
+        break;
+
+    case 5: // STEPWAVE
+        {
+             int flow = sequence.flow();
+             int ornament = sequence.ornament();
+
+             // Signal micro-sequencing on beat starts (scale-based stepping with glide)
+             if (isBeatStart && subdivisions != 4) {
+                 // Vary beatSpread based on flow (timing window control)
+                 result.beatSpread = 20 + (flow * 5);
+                 result.polyCount = subdivisions;
+
+                 // ORNAMENT controls timing mode:
+                 // 0-7: Rapid (1-beat window) - fast chromatic-style runs within scale
+                 // 8: Neutral transition point
+                 // 9-16: Spread (4-beat window) - polyrhythmic patterns across beat
+                 result.isSpatial = (ornament >= 9);
+
+                 // Update direction based on flow
+                 if (flow <= 7) _stepwave_direction = -1;      // Descending
+                 else if (flow >= 9) _stepwave_direction = 1;  // Ascending
+                 else _stepwave_direction = 0;                 // Random/static
+
+                 _stepwave_step_count = subdivisions;
+
+                 // Generate scale-degree offsets for micro-sequencing
+                 // These are intervals in scale degrees, respecting the selected scale
+                 for (int i = 0; i < subdivisions && i < 8; i++) {
+                     result.noteOffsets[i] = i * _stepwave_direction;  // Scale-degree intervals
+                 }
+
+                 // Enable glide for smooth transitions between micro-sequence notes
+                 result.slide = true;
+             }
+
+             // Base note generation (scale-based walking)
+             int dir;
+             if (flow <= 7) dir = -1;
+             else if (flow >= 9) dir = 1;
+             else dir = 1;
+
+             int stepSize = 2 + (_stepIndex % 2);
+
+             result.note = (_stepIndex * dir * stepSize) % 7;
+             if (result.note < 0) result.note += 7;
+
+             // Always generate velocity (NO MASKING)
+             result.velocity = 200;
+             if (_rng.nextRange(100) < (20 + flow * 3)) {
+                 result.octave = 2;
+                 result.velocity = 255;
+                 result.accent = true;
+             } else {
+                 result.octave = 0;
+             }
+
+             if (_rng.nextRange(100) < sequence.glide()) {
+                 result.slide = true;
+                 result.gateRatio = 100;
+             } else {
+                 result.gateRatio = 75;
+             }
+             
+             // Micro Jitter (0-6%)
+             result.gateOffset = clamp(int(_rng.nextRange(7)), 0, 100);
+        }
+        break;
+
+    case 6: // MARKOV
+        {
+            result.gateRatio = 75;
+            int idx = _rng.nextBinary() ? 1 : 0;
+            int newNote = _markovMatrix[_markovHistory1][_markovHistory3][idx];
+            
+            _markovHistory1 = _markovHistory3;
+            _markovHistory3 = newNote;
+            
+            result.note = newNote; // 0-7 scale degrees
+            result.octave = _rng.nextBinary();
+            
+            // Random Slide/Length
+            if (_rng.nextRange(100) < 50) result.gateRatio = 100 + (_rng.nextRange(4) * 25);
+            else result.gateRatio = 75;
+            
+            if (_rng.nextBinary() && _rng.nextBinary()) result.slide = true;
+
+            // 100% accent probability per original Tuesday
+            result.accent = true;
+
+            result.velocity = (_rng.nextRange(256) / 2) + 40;
+            
+            // Markov Timing (Push/Pull)
+            if (_rng.nextBinary()) {
+                result.gateOffset = clamp(int(10 - _rng.nextRange(10)), 0, 100);
+            } else {
+                result.gateOffset = clamp(int(15 + _rng.nextRange(10)), 0, 100);
+            }
+        }
+        break;
+
+    case 7: // CHIPARP 1
+        {
+            result.gateRatio = 75;
+            // Use TPB for beat-sync reset (replaces hardcoded % 4)
+            int chordpos = _stepIndex % tpb;
+            
+            if (chordpos == 0) {
+                result.accent = true;
+                _chipRng = Random(_chipChordSeed);
+                if (_rng.nextRange(256) >= 0x20) _chipBase = _rng.next() % 3;
+                if (_rng.nextRange(256) >= 0xF0) _chipDir = (_rng.next() >> 7) % 2;
+            }
+            
+            if (_chipDir == 1) chordpos = tpb - chordpos - 1;
+            
+            if (_chipRng.nextRange(256) >= 0x20) result.accent = true;
+            
+            if (_chipRng.nextRange(256) >= 0x80) {
+                result.slide = true;
+            }
+            
+            if (_chipRng.nextRange(256) >= 0xD0) {
+                result.velocity = 0; // Note Off
+            } else {
+                result.note = (chordpos * 2) + _chipBase;
+                result.octave = 0;
+                int rnd = (_chipRng.next() >> 7) % 3;
+                result.gateRatio = (4 + 6 * rnd) * (100/6); // approx mapping
+            }
+
+            // FIX: Add extra velocity on first step of PATTERN (not global step)
+            // Original used GENERIC.b2 to track pattern position
+            int extraVel = (rotatedStep == 0) ? 127 : 0;
+            result.velocity = (_rng.nextRange(256) / 2) + extraVel; 
+            
+            // Pattern Offset
+            result.gateOffset = clamp(int(_stepIndex % 7), 0, 100);
+        }
+        break;
+
+    case 8: // CHIPARP 2
+        {
+            result.gateRatio = 75;
+            result.octave = 0;
+            
+            if (_chip2DeadTime > 0) {
+                _chip2DeadTime--;
+                result.velocity = 0; // Note Off
+            } else {
+                int deadTimeAdd = 0;
+                if (_chip2Idx == _chip2ChordLen) {
+                    _chip2Idx = 0;
+                    _chip2Len--;
+                    result.accent = true;
+                    if (_rng.nextRange(256) >= 200) deadTimeAdd = 1 + (_rng.next() % 3);
+                    
+                    if (_chip2Len == 0) {
+                        _chipChordSeed = _rng.next();
+                        _chip2ChordScaler = (_rng.next() % 3) + 2;
+                        _chip2Offset = (_rng.next() % 5);
+                        _chip2Len = ((_rng.next() & 0x3) + 1) * 2;
+                        if (_rng.nextBinary()) {
+                            _chip2Dir = _rng.nextBinary();
+                        }
+                    }
+                    _chip2Rng = Random(_chipChordSeed);
+                }
+                
+                int scaleidx = (_chip2Idx % _chip2ChordLen);
+                if (_chip2Dir) scaleidx = _chip2ChordLen - scaleidx - 1;
+                
+                result.note = (scaleidx * _chip2ChordScaler) + _chip2Offset;
+                _chip2Idx++;
+                
+                _chip2DeadTime = _chip2TimeMult;
+                if (_chip2DeadTime > 0) {
+                    result.gateRatio = (1 + _chip2TimeMult) * 100; 
+                }
+                _chip2DeadTime += deadTimeAdd;
+            }
+            
+            result.velocity = _chip2Rng.nextRange(256);
+        }
+        break;
+
+    case 9: // WOBBLE
+        {
+            // Update PhaseSpeed based on Effective Loop Length
+            // Original: 0xffffffff / Length
+            // We update it dynamically here to allow breathing with Loop Length changes
+            _wobblePhaseSpeed = 0xFFFFFFFF / std::max(1, effectiveLoopLength);
+            _wobblePhaseSpeed2 = 0xCFFFFFFF / std::max(1, effectiveLoopLength / 4);
+
+            _wobblePhase += _wobblePhaseSpeed;
+            _wobblePhase2 += _wobblePhaseSpeed2;
+
+            // PercChance(R, seed2). seed2=ornament.
+            // Map ornament 0-16 to 0-255 threshold
+            if (_rng.nextRange(256) >= (sequence.ornament() * 16)) {
+                // Use Phase 2
+                // FIX: Wrap 5-bit phase (0-31) to scale degrees and overflow to octaves
+                int rawPhase = (_wobblePhase2 >> 27) & 0x1F;
+                result.note = rawPhase % 7;  // Wrap to scale degrees 0-6
+                result.octave = 1 + (rawPhase / 7);  // Base octave + overflow
+
+                if (_wobbleLastWasHigh == 0) {
+                    if (_rng.nextRange(256) >= 200) result.slide = true;
+                }
+                _wobbleLastWasHigh = 1;
+            } else {
+                // Use Phase 1
+                // FIX: Wrap 5-bit phase (0-31) to scale degrees and overflow to octaves
+                int rawPhase = (_wobblePhase >> 27) & 0x1F;
+                result.note = rawPhase % 7;  // Wrap to scale degrees 0-6
+                result.octave = (rawPhase / 7);  // Overflow octaves
+
+                if (_wobbleLastWasHigh == 1) {
+                    if (_rng.nextRange(256) >= 200) result.slide = true;
+                }
+                _wobbleLastWasHigh = 0;
+            }
+
+            result.velocity = (_extraRng.nextRange(256) / 4);
+            if (_rng.nextRange(256) >= 50) result.accent = true;
+            
+            // Wobble Phase Offset (0-30%)
+            result.gateOffset = clamp(int(((_wobblePhase + _wobblePhase2) >> 28) % 30), 0, 100);
+        }
+        break;
+
+    case 10: // SCALEWALKER - Rhythmic subdivisions with scale walking
+        {
+            int flow = sequence.flow();
+
+            // 1. Direction
+            int direction = (flow <= 7) ? -1 : 1;  // Always walk scale (remove direction=0)
+
+            // 2. Base note is current walker position
+            result.note = _scalewalker_pos;
+            result.octave = 0;
+            result.velocity = 100 + (sequence.power() * 10);  // 100-260 range
+            result.gateRatio = 75;
+
+            // 3. Polyrhythm: N gates spread across 1 beat
+            // Calculate which of N gates should fire THIS step
+            bool shouldFirePolyGate = false;
+            if (subdivisions != 4) {
+                // Determine if THIS step is one of the N poly gates
+                // Using beat position: which of N subdivisions are we at?
+                int beatPosition = _stepIndex % stepsPerBeat;
+                int gateIndex = (beatPosition * subdivisions) / stepsPerBeat;
+                int nextGateIndex = ((beatPosition + 1) * subdivisions) / stepsPerBeat;
+
+                if (gateIndex != nextGateIndex) {
+                    // This step crosses a poly gate boundary - fire it
+                    shouldFirePolyGate = true;
+                    result.polyCount = 1;  // Just this one poly gate
+                    result.beatSpread = 100;
+                    result.isSpatial = true;
+                    result.slide = true;
+
+                    // Note offset for this specific gate
+                    result.noteOffsets[0] = gateIndex * direction;
+                }
+            }
+
+            // 4. stepTrill: INDEPENDENT subdivision (works on ANY step)
+            int stepTrillCount = 1;
+            if (sequence.stepTrill() > 0) {
+                stepTrillCount = 1 + (sequence.stepTrill() * 3) / 100;
+                stepTrillCount = clamp(stepTrillCount, 1, 4);
+            }
+
+            // Decide what to do based on poly gate and stepTrill
+            if (shouldFirePolyGate) {
+                // Poly gate step: subdivide if stepTrill active
+                if (stepTrillCount > 1) {
+                    int baseOffset = result.noteOffsets[0];
+                    result.polyCount = stepTrillCount;
+                    result.beatSpread = 0;
+                    result.isSpatial = false;  // Rapid fire
+
+                    // All gates walk based on direction
+                    for (int i = 0; i < stepTrillCount && i < 8; i++) {
+                        result.noteOffsets[i] = baseOffset + (i * direction);
+                    }
+
+                    result.slide = sequence.glide() > 50;
+                }
+                // else: keep polyCount=1 from poly gate setup above
+            } else if (stepTrillCount > 1) {
+                // Non-poly step with stepTrill: fire rapid burst
+                result.polyCount = stepTrillCount;
+                result.beatSpread = 0;
+                result.isSpatial = false;
+
+                // All gates walk based on direction (from current walker position)
+                for (int i = 0; i < stepTrillCount && i < 8; i++) {
+                    result.noteOffsets[i] = i * direction;
+                }
+
+                result.slide = sequence.glide() > 50;
+            } else if (subdivisions == 4) {
+                // No poly, no stepTrill: regular single gate via normal path
+                result.polyCount = 0;  // Use normal gate system (not micro-queue)
+                result.beatSpread = 0;
+                result.isSpatial = false;
+                result.noteOffsets[0] = 0;
+            } else {
+                // Poly mode but not a poly step and no stepTrill: MUTE
+                result.polyCount = 0;
+                result.velocity = 0;
+            }
+
+            // Advance walker every step (not just on beat starts)
+            _scalewalker_pos = (_scalewalker_pos + direction + 7) % 7;
+        }
+        break;
+    }
+
+    return result;
 }
 
 TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
-    // Check mute
-    if (mute()) {
-        _gateOutput = false;
-        _cvOutput = 0.f;
-        _activity = false;
-        return TickResult::NoUpdate;
-    }
+    if (mute()) { _gateOutput=false; _cvOutput=0.f; _activity=false; return TickResult::NoUpdate; }
+    
+    const auto &sequence = tuesdayTrack().sequence(pattern());
+    // int power = sequence.power(); 
+    // Power check moved inside stepTrigger to allow for Skew modulation
 
-    // Get parameters
-    int power = _tuesdayTrack.power();
-    int loopLength = _tuesdayTrack.actualLoopLength();
-    int algorithm = _tuesdayTrack.algorithm();
-
-    // Power = 0 means silent
-    if (power == 0) {
-        _gateOutput = false;
-        _cvOutput = 0.f;
-        _activity = false;
-        return TickResult::NoUpdate;
-    }
-
-    // Check if parameters changed - if so, reinitialize and invalidate buffer
-    // Note: Scan is NOT included here - it's a real-time playback parameter
-    bool paramsChanged = (_cachedAlgorithm != _tuesdayTrack.algorithm() ||
-                         _cachedFlow != _tuesdayTrack.flow() ||
-                         _cachedOrnament != _tuesdayTrack.ornament() ||
-                         _cachedLoopLength != _tuesdayTrack.loopLength());
+    // Parameter Change Check
+    bool paramsChanged = (_cachedAlgorithm != sequence.algorithm() ||
+                         _cachedFlow != sequence.flow() ||
+                         _cachedOrnament != sequence.ornament() ||
+                         _cachedLoopLength != sequence.loopLength());
     if (paramsChanged) {
-        _cachedAlgorithm = _tuesdayTrack.algorithm();
-        _cachedLoopLength = _tuesdayTrack.loopLength();
         initAlgorithm();
-        _bufferValid = false;
     }
 
-    // Generate buffer for finite loops if needed
-    if (loopLength > 0 && !_bufferValid) {
-        generateBuffer();
+    // Time Calculation
+    uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+
+    // Apply Start Delay (Time Shift)
+    uint32_t startTicks = sequence.start() * divisor;
+    if (tick < startTicks) {
+        _gateOutput = false;
+        _activity = false;
+        return TickResult::NoUpdate;
     }
+    tick -= startTicks;
 
-    // Calculate base cooldown from power
-    // Linear mapping: Power = number of notes per 16 steps
-    // Use fixed reference length for consistent density regardless of loop length
-    // int effectiveLength = 16;  // Fixed reference for density calculations
-    // int baseCooldown = (power > 0) ? effectiveLength / power : effectiveLength;
-    int baseCooldown = 17 - power;
-    if (baseCooldown < 1) baseCooldown = 1;
-
-    // Apply skew to cooldown based on loop position
-    // Skew value determines what fraction of loop is at power 16:
-    // Skew 8 = last 50% at power 16, Skew 4 = last 25% at power 16
-    int skew = _tuesdayTrack.skew();
-    if (skew != 0 && loopLength > 0) {
-        // Calculate position in loop (0.0 to 1.0), clamped for safety
-        float position = (float)_stepIndex / (float)loopLength;
-        if (position > 1.0f) position = 1.0f;
-        if (position < 0.0f) position = 0.0f;
-
-        if (skew > 0) {
-            // Build-up: last (skew/16) of loop at power 16
-            // Skew 8 → switch at 0.5, Skew 4 → switch at 0.75
-            float switchPoint = 1.0f - (float)skew / 16.0f;
-
-            if (position < switchPoint) {
-                // Before switch: use base power setting
-                _coolDownMax = baseCooldown;
-            } else {
-                // After switch: full density (power 16)
-                _coolDownMax = 1;
-            }
-        } else {
-            // Fade-out: first (|skew|/16) of loop at power 16
-            // Skew -8 → switch at 0.5, Skew -4 → switch at 0.25
-            float switchPoint = (float)(-skew) / 16.0f;
-
-            if (position < switchPoint) {
-                // Before switch: full density (power 16)
-                _coolDownMax = 1;
-            } else {
-                // After switch: base power setting
-                _coolDownMax = baseCooldown;
-            }
-        }
-
-        // Clamp to valid range
-        if (_coolDownMax < 1) _coolDownMax = 1;
-        if (_coolDownMax > 16) _coolDownMax = 16;
-    } else {
-        _coolDownMax = baseCooldown;
-    }
-
-    // Calculate step timing with clock sync
-    // Use track divisor (converts from PPQN to actual ticks)
-    uint32_t divisor = _tuesdayTrack.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-
-    // Calculate reset divisor from resetMeasure parameter
-    int resetMeasure = _tuesdayTrack.resetMeasure();
-    uint32_t resetDivisor;
-
-    if (loopLength > 0) {
-        // Finite loop - calculate reset from loop duration
-        // This ensures steps always align with loop boundaries
-        uint32_t loopDuration = loopLength * divisor;
-
-        if (resetMeasure > 0) {
-            // If resetMeasure is set, round up to next complete loop cycle
-            // to allow patterns to evolve over multiple loop cycles
-            uint32_t measureReset = resetMeasure * _engine.measureDivisor();
-            resetDivisor = ((measureReset + loopDuration - 1) / loopDuration) * loopDuration;
-        } else {
-            // No reset measure - just use loop duration
-            resetDivisor = loopDuration;
-        }
-    } else {
-        // Infinite loop - no reset, tick grows forever
-        resetDivisor = 0;
-    }
-
-    uint32_t relativeTick = resetDivisor == 0 ? tick : tick % resetDivisor;
-
-    // Reset on measure boundary (only if resetMeasure is enabled and not infinite loop)
+    int loopLength = sequence.actualLoopLength();
+    uint32_t resetDivisor = (loopLength > 0) ? (loopLength * divisor) : 0;
+    
+    uint32_t relativeTick = (resetDivisor == 0) ? tick : tick % resetDivisor;
+    
+    // Finite Loop Reset
     if (resetDivisor > 0 && relativeTick == 0) {
-        reset();
+        initAlgorithm(); // Reset RNGs to loop start state
+        _stepIndex = 0;
     }
 
-    // Check if we're at a step boundary
     bool stepTrigger = (relativeTick % divisor == 0);
 
-    // Handle gate timing
+    // --- MICRO-GATE QUEUE PROCESSING ---
+
+    // Process scheduled gates from micro-queue
+    while (!_microGateQueue.empty() && tick >= _microGateQueue.front().tick) {
+        auto event = _microGateQueue.front();
+        _microGateQueue.pop();
+
+        _gateOutput = event.gate;
+        _activity = event.gate;
+
+        // Update CV from micro-gate queue (always apply when gate fires)
+        // Micro-gates store their target CV and should always use it
+        if (event.gate) {
+            _cvOutput = event.cvTarget;
+        }
+    }
+
+    // --- ENGINE UPDATE LOGIC ---
+    
+    // Handle existing gate timer
     if (_gateTicks > 0) {
         _gateTicks--;
         if (_gateTicks == 0) {
-            _gateOutput = false;
-            _activity = false;
+             // Gate OFF
+             _gateOutput = false;
+             // If in retrigger cycle, this is the gap between ratchets
+             // Logic handled in update()
         }
     }
-
-    // Handle slide/portamento
+    
+    // Handle CV Slide
     if (_slideCountDown > 0) {
         _cvCurrent += _cvDelta;
         _slideCountDown--;
-        if (_slideCountDown == 0) {
-            _cvCurrent = _cvTarget;  // Ensure we hit target exactly
-        }
+        if (_slideCountDown == 0) _cvCurrent = _cvTarget;
         _cvOutput = _cvCurrent;
     }
 
     if (stepTrigger) {
-        // Disarm any re-triggers from the previous step to ensure a clean state
-        _retriggerArmed = false;
-        _retriggerCount = 0;
-
-        // Calculate step from tick count (ensures sync with divisor)
+        // Advance Step
         uint32_t calculatedStep = relativeTick / divisor;
-
-        // For finite loops, wrap within loop length
-        if (loopLength > 0) {
-            // Check if we wrapped to beginning of loop - reinitialize algorithm
-            uint32_t newStep = calculatedStep % loopLength;
-            if (newStep < _stepIndex && _stepIndex > 0) {
-                // Loop wrapped - reinitialize algorithm for deterministic repeats
-                initAlgorithm();
-            }
-            _stepIndex = newStep;
-        } else {
-            _stepIndex = calculatedStep;
-        }
-
-        // Set display step for UI sync
+        _stepIndex = calculatedStep;
         _displayStep = _stepIndex;
 
-        // Generate output based on algorithm
-        bool shouldGate = false;
-        float noteVoltage = 0.f;
-        int note = 0;
-        int octave = 0;
+        // 1. GENERATE (The Brain)
+        TuesdayTickResult result = generateStep(tick);
+        
+        // Apply Algorithm's Timing Offset with User Scaler
+        // Scaler Model: 
+        // - User Knob 0%   -> Force 0 (Strict/Quantized)
+        // - User Knob 50%  -> 1x (Original Algo Timing)
+        // - User Knob 100% -> 2x (Exaggerated Swing)
+        int userScaler = sequence.gateOffset();
+        _gateOffset = clamp((int)((result.gateOffset * userScaler * 2) / 100), 0, 100);
+        
+        // 2. FX LAYER (Post-Processing)
 
-        // Calculate effective step index
-        // Scan: offsets where on the infinite tape we capture from (0-127)
-        // Rotate: for finite loops, shifts start point within the captured loop
-        int scan = _tuesdayTrack.scan();
-        uint32_t effectiveStep = _stepIndex;
-        if (loopLength > 0) {
-            // Finite loop: rotate shifts within loop, then scan offsets into buffer
-            int rot = _tuesdayTrack.rotate();
-            // Handle negative rotation with proper modulo
-            effectiveStep = ((_stepIndex + rot) % loopLength + loopLength) % loopLength;
-            // Add scan offset
-            effectiveStep += scan;
-            // Wrap to buffer size (64 steps) - longer loops cycle through the pattern
-            int bufferIndex = effectiveStep % BUFFER_SIZE;
+        // Calculate power/cooldown ONCE per step (used by both micro-gate and normal gate paths)
+        int power = sequence.power();
+        int loopLength = sequence.actualLoopLength();
+        int skew = sequence.skew();
 
-            // Read from pre-generated buffer
-            {
-                const auto &bufferedStep = _buffer[bufferIndex];
-                note = bufferedStep.note;
-                octave = bufferedStep.octave;
-                _gatePercent = bufferedStep.gatePercent;
-                _slide = bufferedStep.slide;
+        if (loopLength > 0 && skew != 0) {
+            int currentPos = _stepIndex % loopLength;
+            int offset = -skew + ((2 * skew * currentPos) / std::max(1, loopLength - 1));
+            power = std::max(0, std::min(16, power + offset));
+        }
 
-                // Check for trill/re-trigger
-                if (bufferedStep.isTrill) {
-                    _retriggerArmed = true;
-                    _retriggerCount = 2; // 3 notes total
-                    _retriggerPeriod = divisor / 3; // 8th note triplets
-                    _retriggerLength = _retriggerPeriod / 2;
-                    _isTrillNote = false;
+        int baseCooldown = 17 - power;
+        if (baseCooldown < 1) baseCooldown = 1;
+        _coolDownMax = baseCooldown;
 
-                    float baseVoltage = (note + (octave * 12)) / 12.f;
-                    _trillCvTarget = baseVoltage + (2.f / 12.f);
-                }
+        // Reset cooldown at start of each step (micro-gate loop manages per-event)
+        _coolDown = 0;
 
-                // Retrieve gate offset from buffered data
-                uint8_t bufferedGateOffset = bufferedStep.gateOffset;
-                uint8_t globalGateOffset = _tuesdayTrack.gateOffset();
-                uint8_t finalOffset = 0;
+        // A. Polyrhythm / Trill Detection
+        _retriggerArmed = false;
 
-                if (globalGateOffset == 0) {
-                    // Mode 1: Force On-Beat
-                    finalOffset = 0;
-                } else if (globalGateOffset == 100) {
-                    // Mode 3: Pure Random Offset
-                    finalOffset = _uiRng.nextRange(101); // 0-100
+        if (result.polyCount > 0) {
+            // MICRO-SEQUENCING MODE: Distribute N gates with independent pitches
+            int tupleN = result.polyCount;
+
+            // Simplified: All gates fire within their own step
+            // Poly spread is handled by which steps fire (algorithm layer)
+            uint32_t windowTicks = divisor;
+            uint32_t spacing = windowTicks / tupleN;  // Even distribution
+
+            // Gate length: Use algorithm's gateRatio
+            uint32_t baseGateLen = (spacing * result.gateRatio) / 100;
+            uint32_t userGate = sequence.gateLength();
+            uint32_t gateLen = (baseGateLen * userGate) / 50;
+            if (gateLen < 1) gateLen = 1;
+
+            // Gate offset (applies to FIRST gate only)
+            uint32_t gateOffsetTicks = (divisor * _gateOffset) / 100;
+
+            // Schedule N gate ON/OFF pairs with independent pitches
+            // Apply gate offset to the base tick, then space gates evenly from there
+            uint32_t baseTick = tick + gateOffsetTicks;
+
+            // Per-event power gating (uses power/cooldown calculated above)
+            for (int i = 0; i < tupleN; i++) {
+                uint32_t offset = (i * spacing);
+
+                // Calculate voltage for THIS gate using note offset
+                int noteWithOffset = result.note + result.noteOffsets[i];
+                float volts = scaleToVolts(noteWithOffset, result.octave);
+
+                // PER-EVENT POWER CHECK
+                bool eventAllowed = false;
+
+                if (result.velocity == 0 || power == 0) {
+                    eventAllowed = false;
+                } else if (result.accent) {
+                    eventAllowed = true;
+                } else if (_coolDown == 0) {
+                    eventAllowed = true;
+                    _coolDown = _coolDownMax;
                 } else {
-                    // Mode 2: Probabilistic blend of Algorithmic and Random
-                    finalOffset = bufferedGateOffset; // Base is the algorithmic groove
-                    // with a chance of being overridden by a random value
-                    if (_uiRng.nextRange(100) < globalGateOffset) {
-                        finalOffset = _uiRng.nextRange(101); // 0-100
+                    int velDensity = result.velocity / 16;
+                    if (velDensity >= _coolDown) {
+                        eventAllowed = true;
+                        _coolDown = _coolDownMax;
                     }
                 }
-                _gateOffset = finalOffset;
 
-                shouldGate = true;
-                // Calculate noteVoltage from buffered data for CV/glide
-                noteVoltage = (note + (octave * 12)) / 12.0f;
+                // Decrement cooldown for next event
+                if (_coolDown > 0) _coolDown--;
+
+                if (eventAllowed) {
+                    _microGateQueue.push({ baseTick + offset, true, volts });
+                    _microGateQueue.push({ baseTick + offset + gateLen, false, volts });
+                }
             }
+
+            _retriggerArmed = true;  // Skip normal gate logic
+        }
+        else if (result.beatSpread > 0) {
+            // TRILL MODE: Original probabilistic ratchet (unchanged)
+            int chance = (result.beatSpread * sequence.trill()) / 100;
+            if (_uiRng.nextRange(100) < chance) {
+                _retriggerArmed = true;
+                _retriggerCount = 2;
+                _retriggerPeriod = divisor / 3;
+                _retriggerLength = _retriggerPeriod / 2;
+                _ratchetInterval = 0;
+            }
+        }
+
+        // B. Glide
+        _slide = 0;
+        if (result.slide && sequence.glide() > 0) {
+             _slide = 1 + (sequence.glide() / 30); // Map 0-100 to 1-4 range approx
+        }
+
+        // C. Density (Power Gating)
+        // Power/cooldown already calculated above (lines 1112-1125)
+
+        // Only update cooldown if not using micro-sequencing (which handles power per-event)
+        if (!_retriggerArmed) {
+
+            // Decrement cooldown state
+            if (_coolDown > 0) {
+                _coolDown--;
+                if (_coolDown > _coolDownMax) _coolDown = _coolDownMax;
+            }
+        }
+        
+        // Gate Decision:
+        // 1. Must satisfy Cooldown (Density)
+        // 2. Velocity helps overcome Cooldown (Original Tuesday Logic)
+        // Original: if (vel >= cooldown)
+        // We map velocity 0-255 to roughly 0-16 range to compare with cooldown?
+        // Or just use raw velocity if cooldown was velocity-based?
+        // In C++ port, cooldown is a counter.
+        // Let's implement the "Beat the Clock" logic:
+        // If cooldown is high, we need high velocity to trigger.
+        // If we trigger, we reset cooldown.
+        
+        bool densityGate = false;
+        bool accentActive = false;  // Track accent for gate length extension
+
+        // 0. Explicit Mute from Algorithm (e.g. Polyrhythm Masking) OR Power 0
+        if (result.velocity == 0 || power == 0) {
+            densityGate = false;
+        }
+        // 1. ACCENT: Always fire + extend gate length (mapped from original GATE_ACCENT output)
+        else if (result.accent) {
+            densityGate = true;
+            accentActive = true;  // Will extend gate length later
+        }
+        // 2. Timer Expired (Power)
+        else if (_coolDown == 0) {
+            densityGate = true;
+        }
+        // 3. High Velocity Override
+        else {
+            int velDensity = result.velocity / 16;
+            if (velDensity >= _coolDown) {
+                densityGate = true;
+            }
+        }
+        
+        if (densityGate) {
+             // Reset pressure
+             _coolDown = _coolDownMax;
+
+             // D. Gate Length (Scaler)
+             uint32_t gateOffsetTicks = (divisor * _gateOffset) / 100;
+             uint32_t baseLen = (divisor * result.gateRatio) / 100;
+             uint32_t userGate = sequence.gateLength();
+             uint32_t gateLengthTicks = (baseLen * userGate) / 50;
+             if (gateLengthTicks < 1) gateLengthTicks = 1;
+
+             // Accent: Extend gate length by 50% (per original Tuesday's GATE_ACCENT mapping)
+             if (accentActive) {
+                 gateLengthTicks = (gateLengthTicks * 3) / 2;
+             }
+
+             // Calculate CV voltage
+             float volts = scaleToVolts(result.note, result.octave);
+
+             // Schedule gates in micro-queue (not immediate)
+             // Skip if retrigger/polyrhythm will handle it
+             if (!_retriggerArmed) {
+                 _microGateQueue.push({ tick + gateOffsetTicks, true, volts });
+                 _microGateQueue.push({ tick + gateOffsetTicks + gateLengthTicks, false, volts });
+                 _activity = true;
+             }
+
+             // Handle CV Slide
+             if (_slide > 0) {
+                 _cvTarget = volts;
+                 int slideTicks = _slide * 12;
+                 _cvDelta = (_cvTarget - _cvCurrent) / slideTicks;
+                 _slideCountDown = slideTicks;
+             } else {
+                 _cvCurrent = volts;
+                 _cvOutput = volts;
+                 _slideCountDown = 0;
+             }
+
+             // Handle Trill Start CV
+             if (_retriggerArmed) {
+                 _gateTicks = _retriggerLength;
+                 _trillCvTarget = volts;
+             }
+
         } else {
-            // Infinite loop: live generation with scan offset
-            effectiveStep = _stepIndex + scan;
-
-            switch (algorithm) {
-        case 0: // TEST - Test patterns
-            // Flow: Mode (OCTSWEEPS or SCALEWALKER) + SweepSpeed
-            // Ornament: Accent + Velocity
-            {
-                shouldGate = true;  // Always gate in test mode
-                _gatePercent = 75;  // Default gate length
-
-                // Slide controlled by glide parameter
-                int glide = _tuesdayTrack.glide();
-                if (_rng.nextRange(100) < glide) {
-                    _slide = _testSweepSpeed + 1;  // Use sweep speed as slide amount
-                } else {
-                    _slide = 0;
-                }
-
-                switch (_testMode) {
-                case 0:  // OCTSWEEPS - sweep through octaves
-                    octave = (effectiveStep % 5);  // 5 octaves
-                    note = 0;
-                    break;
-                case 1:  // SCALEWALKER - walk through notes
-                default:
-                    octave = 0;
-                    note = _testNote;
-                    _testNote = (_testNote + 1) % 12;
-                    break;
-                }
-
-                // CV: 1V/octave standard
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 1: // TRITRANCE - German minimal style arpeggios
-            // Flow: Seeds RNG for b1 (high note), b2 (phase offset)
-            // Ornament: Seeds RNG for b3 (note offset)
-            {
-                shouldGate = true;
-
-                // Random gate length - min 50%, up to 400%
-                int gateLengthChoice = _rng.nextRange(100);
-                if (gateLengthChoice < 40) {
-                    _gatePercent = 50 + (_rng.nextRange(4) * 12);  // 50%, 62%, 74%, 86%
-                } else if (gateLengthChoice < 70) {
-                    _gatePercent = 100 + (_rng.nextRange(4) * 25); // 100%, 125%, 150%, 175%
-                } else {
-                    _gatePercent = 200 + (_rng.nextRange(9) * 25); // 200% to 400%
-                }
-
-                // Random slide controlled by glide parameter
-                int glide = _tuesdayTrack.glide();
-                if (_rng.nextRange(100) < glide) {
-                    _slide = (_rng.nextRange(3)) + 1;  // 1-3
-                } else {
-                    _slide = 0;
-                }
-
-                // Tritrance pattern based on step position mod 3
-                int phase = (effectiveStep + _triB2) % 3;
-                switch (phase) {
-                case 0:
-                    // Maybe change b3
-                    if (_extraRng.nextBinary() && _extraRng.nextBinary()) {
-                        _triB3 = (_extraRng.next() & 0x15);
-                        if (_triB3 >= 7) _triB3 -= 7; else _triB3 = 0;
-                        _triB3 -= 4;
-                    }
-                    octave = 0;
-                    note = _triB3 + 4;  // Center around note 4
-                    break;
-                case 1:
-                    octave = 1;
-                    note = _triB3 + 4;
-                    // Maybe change b2
-                    if (_rng.nextBinary()) {
-                        _triB2 = (_rng.next() & 0x7);
-                    }
-                    break;
-                case 2:
-                    octave = 2;
-                    note = _triB1;
-                    // Maybe change b1
-                    if (_rng.nextBinary()) {
-                        _triB1 = ((_rng.next() >> 5) & 0x7);
-                    }
-                    break;
-                }
-
-                // Clamp note to valid range
-                if (note < 0) note = 0;
-                if (note > 11) note = 11;
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 2: // STOMPER - Acid bass patterns with slides
-            // Flow: Seeds RNG for pattern modes
-            // Ornament: Seeds RNG for note choices
-            {
-                int accentoffs = 0;
-                _gatePercent = 75;  // Default
-                _slide = 0;  // Default no slide
-
-                if (_stomperCountDown > 0) {
-                    // Rest/note-off period - use countdown for gate length
-                    shouldGate = false;
-                    _gatePercent = _stomperCountDown * 25;  // Shorter gates during countdown
-                    _stomperCountDown--;
-                } else {
-                    shouldGate = true;
-
-                    // Generate new mode if needed
-                    if (_stomperMode >= 14) {  // STOMPER_MAKENEW
-                        _stomperMode = (_extraRng.next() % 7) * 2;
-                    }
-
-                    // Maybe change notes
-                    if (_rng.nextRange(100) < 100) {
-                        _stomperLowNote = _rng.next() % 3;
-                    }
-                    if (_rng.nextRange(100) < 100) {
-                        _stomperHighNote[0] = _rng.next() % 7;
-                    }
-                    if (_rng.nextRange(100) < 100) {
-                        _stomperHighNote[1] = _rng.next() % 5;
-                    }
-
-                    int maxticklen = 2;
-
-                    // Pattern state machine
-                    switch (_stomperMode) {
-                    case 10:  // SLIDEDOWN1
-                        octave = 1;
-                        note = _stomperHighNote[_rng.next() % 2];
-                        _stomperMode++;
-                        break;
-                    case 11:  // SLIDEDOWN2
-                        octave = 0;
-                        note = _stomperLowNote;
-                        // Slide controlled by glide parameter
-                        if (_tuesdayTrack.glide() > 0) {
-                            _slide = (_rng.nextRange(3)) + 1;  // Slide 1-3
-                        } else {
-                            _slide = 0;
-                        }
-                        // Check for Trill on stomp down
-                        {
-                            int trillChanceAlgorithmic = 18; // 18% base chance
-                            int userTrillSetting = _tuesdayTrack.trill();
-                            int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                            if (_uiRng.nextRange(100) < finalTrillChance) {
-                                _retriggerArmed = true;
-                                _retriggerCount = 1; // 2 notes total
-                                _retriggerPeriod = divisor / 2; // 8th notes
-                                _retriggerLength = _retriggerPeriod / 2;
-                                _isTrillNote = false;
-
-                                float baseVoltage = (note + (octave * 12)) / 12.f;
-                                _trillCvTarget = baseVoltage + (12.f / 12.f); // Octave up (match high)
-                            }
-                        }
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;  // MAKENEW
-                        break;
-                    case 12:  // SLIDEUP1
-                        octave = 0;
-                        note = _stomperLowNote;
-                        _stomperMode++;
-                        break;
-                    case 13:  // SLIDEUP2
-                        octave = 1;
-                        note = _stomperHighNote[_rng.next() % 2];
-                        // Slide controlled by glide parameter
-                        if (_tuesdayTrack.glide() > 0) {
-                            _slide = (_rng.nextRange(3)) + 1;  // Slide 1-3
-                        } else {
-                            _slide = 0;
-                        }
-                        // Check for Trill on stomp up
-                        {
-                            int trillChanceAlgorithmic = 18; // 18% base chance
-                            int userTrillSetting = _tuesdayTrack.trill();
-                            int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                            if (_uiRng.nextRange(100) < finalTrillChance) {
-                                _retriggerArmed = true;
-                                _retriggerCount = 1; // 2 notes total
-                                _retriggerPeriod = divisor / 2; // 8th notes
-                                _retriggerLength = _retriggerPeriod / 2;
-                                _isTrillNote = false;
-
-                                float baseVoltage = (note + (octave * 12)) / 12.f;
-                                _trillCvTarget = baseVoltage - (12.f / 12.f); // Octave down (match low)
-                            }
-                        }
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;  // MAKENEW
-                        break;
-                    case 4:  // LOW1
-                        accentoffs = 100;
-                        // fall through
-                    case 5:  // LOW2
-                        octave = 0;
-                        note = _stomperLowNote;
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;  // MAKENEW
-                        break;
-                    case 0:  // PAUSE1
-                    case 1:  // PAUSE2
-                        octave = _stomperLastOctave;
-                        note = _stomperLastNote;
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;  // MAKENEW
-                        break;
-                    case 6:  // HIGH1
-                        accentoffs = 100;
-                        // fall through
-                    case 7:  // HIGH2
-                        octave = 0;
-                        note = _stomperLowNote;
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;  // MAKENEW
-                        break;
-                    case 8:  // HILOW1
-                        octave = 1;
-                        note = _stomperHighNote[_rng.next() % 2];
-                        _stomperMode++;
-                        break;
-                    case 9:  // HILOW2
-                        octave = 0;
-                        note = _stomperLowNote;
-                        accentoffs = 100;
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;  // MAKENEW
-                        break;
-                    case 2:  // LOWHI1
-                        octave = 0;
-                        note = _stomperLowNote;
-                        accentoffs = 100;
-                        _stomperMode++;
-                        break;
-                    case 3:  // LOWHI2
-                        octave = 1;
-                        note = _stomperHighNote[_rng.next() % 2];
-                        if (_extraRng.nextBinary()) _stomperCountDown = _extraRng.next() % maxticklen;
-                        _stomperMode = 14;  // MAKENEW
-                        break;
-                    default:
-                        octave = _stomperLastOctave;
-                        note = _stomperLastNote;
-                        break;
-                    }
-
-                    _stomperLastNote = note;
-                    _stomperLastOctave = octave;
-                }
-
-                // Clamp
-                if (note < 0) note = 0;
-                if (note > 11) note = 11;
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 3: // MARKOV - Markov chain melody generation
-            // Flow + Ornament: Seeds for generating the transition matrix
-            {
-                shouldGate = true;
-
-                // Random gate length - min 50%, up to 400%
-                int gateLengthChoice = _rng.nextRange(100);
-                if (gateLengthChoice < 40) {
-                    _gatePercent = 50 + (_rng.nextRange(4) * 12);  // 50%, 62%, 74%, 86%
-                } else if (gateLengthChoice < 70) {
-                    _gatePercent = 100 + (_rng.nextRange(4) * 25); // 100%, 125%, 150%, 175%
-                } else {
-                    _gatePercent = 200 + (_rng.nextRange(9) * 25); // 200% to 400%
-                }
-
-                // Random slide controlled by glide parameter
-                int glide = _tuesdayTrack.glide();
-                if (_rng.nextRange(100) < glide) {
-                    _slide = (_rng.nextRange(3)) + 1;  // 1-3
-                } else {
-                    _slide = 0;
-                }
-
-                // Select from Markov matrix based on history
-                int idx = _rng.nextBinary() ? 1 : 0;
-                note = _markovMatrix[_markovHistory1][_markovHistory3][idx];
-
-                // Update history
-                _markovHistory1 = _markovHistory3;
-                _markovHistory3 = note;
-
-                // Random octave (0 or 1)
-                octave = _rng.nextBinary() ? 1 : 0;
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 4: // CHIPARP - Chiptune arpeggios
-            {
-                shouldGate = true;
-                _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
-
-                int chordpos = effectiveStep % 4;
-
-                if (chordpos == 0) {
-                    _chipRng = Random(_chipChordSeed);
-                    if (_rng.nextRange(256) < 0x20) {
-                        _chipBase = _rng.next() % 3;
-                    }
-                    if (_rng.nextRange(256) < 0xf0) {
-                        _chipDir = _extraRng.nextBinary() ? 1 : 0;
-                    }
-                }
-
-                int pos = chordpos;
-                if (_chipDir == 1) {
-                    pos = 3 - chordpos;
-                }
-
-                if (_chipRng.nextRange(256) < 0x20) {
-                    // accent - could affect velocity
-                }
-                // Algorithm's slide logic - only apply if glide > 0
-                if (_chipRng.nextRange(256) < 0x80) {
-                    int algoSlide = _chipRng.nextRange(256) % 3;
-                    if (glide > 0) {
-                        _slide = algoSlide;
-                    } else {
-                        _slide = 0;
-                    }
-                } else {
-                    _slide = 0;
-                }
-                if (_chipRng.nextRange(256) >= 0xd0) {
-                    shouldGate = false;  // Note off (~19% chance)
-                    _gatePercent = 0;
-                } else {
-                    note = (pos * 2) + _chipBase;
-                    _gatePercent = 50 + 25 * (_chipRng.nextRange(256) % 3);
-                }
-                octave = 0;
-                _extraRng.nextRange(256);  // velocity
-
-                // Additional slide from glide parameter
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        _slide = slideAmount;
-                    }
-                }
-
-                // Check for Trill on accented chord positions
-                if (chordpos == 0) { // First note of chord
-                    int trillChanceAlgorithmic = 20; // 20% base chance
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        _retriggerArmed = true;
-                        _retriggerCount = 1 + (_uiRng.nextRange(2)); // 2-3 notes total
-                        _retriggerPeriod = divisor / 4; // 16th notes for chiptune speed
-                        _retriggerLength = _retriggerPeriod / 2;
-                        _isTrillNote = false;
-
-                        float baseVoltage = (note + (octave * 12)) / 12.f;
-                        _trillCvTarget = baseVoltage + (1.f / 12.f); // Semitone up
-                    }
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 5: // GOACID - Goa/psytrance acid patterns
-            {
-                shouldGate = true;
-                _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
-
-                _rng.nextRange(256);  // velocity (consumed but not used)
-                bool accent = _extraRng.nextBinary();
-
-                int randNote = _rng.next() % 8;
-                // Original uses signed char: 0xf4=-12, 0xfe=-2, 0xf2=-14
-                switch (randNote) {
-                case 0:
-                case 2:
-                    note = 0; break;
-                case 1: note = -12; break;  // 0xf4
-                case 3: note = 1; break;
-                case 4: note = 3; break;
-                case 5: note = 7; break;
-                case 6: note = 12; break;  // 0xc
-                case 7: note = 13; break;  // 0xd
-                }
-
-                if (accent) {
-                    switch (randNote) {
-                    case 0:
-                    case 3:
-                    case 7: note = 0; break;
-                    case 1: note = -12; break;  // 0xf4
-                    case 2: note = -2; break;   // 0xfe
-                    case 4: note = 3; break;
-                    case 5: note = -14; break;  // 0xf2
-                    case 6: note = 1; break;
-                    }
-                }
-
-                // Apply pattern transpose
-                if (_goaB1 && (effectiveStep % 16) <= 7) {
-                    note += 3;
-                }
-                if (_goaB2 && (effectiveStep % 16) <= 7) {
-                    note -= 5;
-                }
-
-                // Add +24 semitones (2 octaves) as in original
-                note += 24;
-
-                // Convert to note/octave
-                while (note < 0) { note += 12; octave--; }
-                while (note >= 12) { note -= 12; octave++; }
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        _slide = slideAmount;
-                    } else {
-                        _slide = 0;
-                    }
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 6: // SNH - Sample & Hold random walk
-            {
-                shouldGate = true;
-                _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
-
-                _snhPhase += _snhPhaseSpeed;
-                int v = _snhPhase >> 30;
-
-                if (v != _snhLastVal) {
-                    _snhLastVal = v;
-                    _snhTarget = _rng.next() << 10;
-                }
-                int newdelta = (_snhTarget - _snhCurrent) / 100;
-                _snhCurrentDelta += ((newdelta - _snhCurrentDelta) * 100) / 200;
-                _snhCurrent += _snhCurrentDelta * 100;
-
-                // Convert filtered value to note
-                int absVal = _snhCurrent;
-                if (absVal < 0) absVal = -absVal;
-                note = (absVal >> 22) % 12;
-                octave = 0;
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        _slide = slideAmount;
-                    } else {
-                        _slide = 0;
-                    }
-                }
-                _extraRng.next();  // velocity
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 7: // WOBBLE - Dual-phase LFO bass
-            {
-                shouldGate = true;
-                _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
-
-                _wobblePhase += _wobblePhaseSpeed;
-                _wobblePhase2 += _wobblePhaseSpeed2;
-
-                if (_rng.nextRange(256) >= 128) {  // High phase
-                    int32_t pos2 = _wobblePhase2 >> 27;
-                    note = pos2 % 8;
-                    if (_wobbleLastWasHigh == 0) {
-                        if (_rng.nextRange(256) >= 56) {
-                            int algoSlide = _rng.next() % 3;
-                            if (glide > 0) {
-                                _slide = algoSlide;
-                            } else {
-                                _slide = 0;
-                            }
-                        } else {
-                            _slide = 0;
-                        }
-                    }
-                    _wobbleLastWasHigh = 1;
-                } else {  // Low phase
-                    int32_t pos = _wobblePhase >> 27;
-                    note = pos % 8;
-                    if (_wobbleLastWasHigh == 1) {
-                        if (_rng.nextRange(256) >= 56) {
-                            int algoSlide = _rng.next() % 3;
-                            if (glide > 0) {
-                                _slide = algoSlide;
-                            } else {
-                                _slide = 0;
-                            }
-                        } else {
-                            _slide = 0;
-                        }
-                    }
-                    _wobbleLastWasHigh = 0;
-                }
-                octave = 0;
-                _extraRng.next();  // velocity
-
-                // Additional slide from glide parameter
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        _slide = slideAmount;
-                    }
-                }
-
-                // Check for Trill on phase transitions
-                bool phaseChanged = (_wobbleLastWasHigh == 0 && _rng.nextRange(256) >= 128) ||
-                                   (_wobbleLastWasHigh == 1 && _rng.nextRange(256) < 128);
-                if (phaseChanged) {
-                    int trillChanceAlgorithmic = 12; // 12% base chance (low, wobble is already complex)
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        _retriggerArmed = true;
-                        _retriggerCount = 1; // 2 notes total
-                        _retriggerPeriod = divisor / 3; // Triplet
-                        _retriggerLength = _retriggerPeriod / 2;
-                        _isTrillNote = false;
-
-                        float baseVoltage = (note + (octave * 12)) / 12.f;
-                        _trillCvTarget = baseVoltage + (2.f / 12.f); // Major 2nd up
-                    }
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 8: // TECHNO - Four-on-floor club
-            {
-                shouldGate = true;
-                _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
-
-                int beatPos = effectiveStep % 4;
-                int barPos = effectiveStep % 16;
-
-                bool isKick = false;
-                switch (_technoKickPattern) {
-                case 0: isKick = (beatPos == 0); break;
-                case 1: isKick = (beatPos == 0) || (barPos == 14); break;
-                case 2: isKick = (beatPos == 0) || (barPos == 6); break;
-                case 3: isKick = (beatPos == 0) || (barPos == 3) || (barPos == 11); break;
-                }
-
-                if (isKick) {
-                    note = _technoBassNote;
-                    octave = 0;
-                    _gatePercent = 80;
-                } else {
-                    bool isHat = false;
-                    switch (_technoHatPattern) {
-                    case 0: isHat = (beatPos == 2); break;
-                    case 1: isHat = (beatPos == 1) || (beatPos == 3); break;
-                    case 2: isHat = true; break;
-                    case 3: isHat = (beatPos != 0) && (_rng.next() % 3 != 0); break;
-                    }
-                    if (isHat) {
-                        note = 7 + (_extraRng.next() % 3);
-                        octave = 1;
-                        _gatePercent = 40;
-
-                        // Check for Trill on hi-hats
-                        int trillChanceAlgorithmic = 25; // 25% base chance for hat rolls
-                        int userTrillSetting = _tuesdayTrack.trill();
-                        int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                        if (_uiRng.nextRange(100) < finalTrillChance) {
-                            _retriggerArmed = true;
-                            _retriggerCount = 2 + (_uiRng.nextRange(2)); // 3-4 notes total
-                            _retriggerPeriod = divisor / 4; // 16th note rolls
-                            _retriggerLength = _retriggerPeriod / 2;
-                            _isTrillNote = false;
-
-                            float baseVoltage = (note + (octave * 12)) / 12.f;
-                            _trillCvTarget = baseVoltage + (2.f / 12.f); // Major 2nd up
-                        }
-                    } else {
-                        shouldGate = false;
-                        note = 0;
-                        octave = 0;
-                    }
-                }
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        _slide = slideAmount;
-                    } else {
-                        _slide = 0;
-                    }
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 9: // FUNK - Syncopated grooves
-            {
-                shouldGate = true;
-                _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
-
-                int pos = effectiveStep % 16;
-
-                static const uint16_t funkPatterns[8] = {
-                    0b1010010010100100,
-                    0b1001001010010010,
-                    0b1010100100101001,
-                    0b1001010010100101,
-                    0b1010010100100101,
-                    0b1001001001010010,
-                    0b1010100101001010,
-                    0b1001010100100101,
-                };
-
-                bool isNote = (funkPatterns[_funkPattern] >> (15 - pos)) & 1;
-
-                if (isNote) {
-                    int noteChoice = _rng.next() % 8;
-                    switch (_funkSyncopation) {
-                    case 0: note = noteChoice % 5; break;
-                    case 1: note = (noteChoice % 3) * 2; break;
-                    case 2: note = noteChoice; break;
-                    case 3: note = (pos % 4 == 0) ? 0 : (noteChoice % 5) + 2; break;
-                    }
-                    octave = (pos % 8 == 0) ? 0 : (_rng.nextBinary() ? 1 : 0);
-
-                    bool isGhost = (_extraRng.nextRange(256) < _funkGhostProb && pos % 4 != 0);
-                    if (isGhost) {
-                        _gatePercent = 35;
-
-                        // Check for Trill on ghost notes
-                        int trillChanceAlgorithmic = 15; // 15% base chance for ghost double
-                        int userTrillSetting = _tuesdayTrack.trill();
-                        int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                        if (_uiRng.nextRange(100) < finalTrillChance) {
-                            _retriggerArmed = true;
-                            _retriggerCount = 1; // 2 notes total (ghost double)
-                            _retriggerPeriod = divisor / 3; // Triplet for swing
-                            _retriggerLength = _retriggerPeriod / 2;
-                            _isTrillNote = false;
-
-                            float baseVoltage = (note + (octave * 12)) / 12.f;
-                            _trillCvTarget = baseVoltage - (2.f / 12.f); // Major 2nd down
-                        }
-                    }
-                } else {
-                    shouldGate = false;
-                    note = 0;
-                    octave = 0;
-                }
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        _slide = slideAmount;
-                    } else {
-                        _slide = 0;
-                    }
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 10: // DRONE - Sustained textures
-            {
-                shouldGate = true;
-                int glide = _tuesdayTrack.glide();
-
-                int interval = 0;
-                switch (_droneInterval) {
-                case 0: interval = 0; break;
-                case 1: interval = 7; break;
-                case 2: interval = 12; break;
-                case 3: interval = 19; break;
-                }
-
-                // Guard against division by zero
-                int droneRate = (_droneSpeed > 0) ? (4 * _droneSpeed) : 4;
-                if ((effectiveStep % droneRate) == 0) {
-                    if (_rng.next() % 4 == 0) {
-                        interval += (_rng.nextBinary() ? 2 : -2);
-                    }
-                }
-
-                note = (_droneBaseNote + interval) % 12;
-                octave = (_droneBaseNote + interval) / 12;
-                _gatePercent = 400;
-
-                if (_rng.nextRange(100) < glide) {
-                    _slide = 3;
-                } else {
-                    _slide = 0;
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 11: // PHASE - Minimalist phasing
-            {
-                shouldGate = true;
-                _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
-
-                _phaseAccum += _phaseSpeed;
-                // Guard against division by zero
-                int phaseLen = (_phaseLength > 0) ? _phaseLength : 4;
-                int patternPos = (effectiveStep + (_phaseAccum >> 28)) % phaseLen;
-                note = _phasePattern[patternPos];
-                octave = 0;
-
-                _rng.next();  // Consume for determinism
-
-                {
-                    int glideChance = _rng.nextRange(100);
-                    int slideAmount = (_rng.nextRange(3)) + 1;
-                    if (glideChance < glide) {
-                        _slide = slideAmount;
-                    } else {
-                        _slide = 0;
-                    }
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 12: // RAGA - Indian classical melodies
-            {
-                shouldGate = true;
-                _gatePercent = 75;
-                int glide = _tuesdayTrack.glide();
-
-                int movement = _rng.next() % 8;
-                switch (movement) {
-                case 0:
-                case 1:
-                case 2:
-                    if (_ragaDirection == 0) {
-                        _ragaPosition = (_ragaPosition + 1) % 7;
-                        if (_ragaPosition == 6) _ragaDirection = 1;
-                    } else {
-                        _ragaPosition = (_ragaPosition + 6) % 7;
-                        if (_ragaPosition == 0) _ragaDirection = 0;
-                    }
-                    break;
-                case 3:
-                case 4:
-                    if (_ragaDirection == 0) {
-                        _ragaPosition = (_ragaPosition + 2) % 7;
-                    } else {
-                        _ragaPosition = (_ragaPosition + 5) % 7;
-                    }
-                    break;
-                case 5:
-                    break;
-                case 6:
-                    _ragaPosition = (_rng.nextBinary()) ? 0 : 4;
-                    break;
-                case 7:
-                    _ragaDirection = 1 - _ragaDirection;
-                    break;
-                }
-
-                note = _ragaScale[_ragaPosition];
-                octave = (_ragaPosition > 4) ? 1 : 0;
-
-                int ornamentChance = _extraRng.next() % 8;
-                if (ornamentChance < _ragaOrnament && glide > 0) {
-                    _slide = 2;
-                } else if (_rng.nextRange(100) < glide) {
-                    _slide = (_rng.nextRange(3)) + 1;
-                } else {
-                    _slide = 0;
-                }
-
-                // Check for Trill on ascending movements (traditional ornamentation)
-                if (_ragaDirection == 0) { // Ascending
-                    int trillChanceAlgorithmic = 25; // 25% base chance (higher for ornamentation)
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        _retriggerArmed = true;
-                        _retriggerCount = 2 + (_uiRng.nextRange(2)); // 3-4 notes for ornamental passages
-                        _retriggerPeriod = divisor / 3; // Triplet for traditional feel
-                        _retriggerLength = _retriggerPeriod / 2;
-                        _isTrillNote = false;
-
-                        float baseVoltage = (note + (octave * 12)) / 12.f;
-                        // Alternate between +1 and +2 semitones for micro-movements
-                        float interval = (_uiRng.nextBinary() ? 1.f : 2.f) / 12.f;
-                        _trillCvTarget = baseVoltage + interval;
-                    }
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 13: // AMBIENT - Slow evolving pads (infinite loop)
-            {
-                shouldGate = true;
-                // --- Handle ongoing events first ---
-                if (_ambient_event_type == 1) { // Single Note Event
-                    note = (_ambient_root_note + 12) % 12; // Octave up
-                    octave = 1;
-                    _gatePercent = 150;
-                    _ambient_event_type = 0; // Event is one step long
-                } else if (_ambient_event_type == 2) { // Arpeggio Event
-                    note = _ambient_drone_notes[_ambient_event_step];
-                    octave = 0;
-                    _gatePercent = 50;
-                    _ambient_event_step++;
-                    if (_ambient_event_step >= 3) {
-                        _ambient_event_type = 0; // End of event
-                    }
-                } else {
-                    // --- Default Drone Behavior ---
-                    note = _ambient_drone_notes[ (effectiveStep / 4) % 3 ]; // Slowly cycle through drone notes
-                    octave = 0;
-                    _gatePercent = 1600; // Hold gate for 16 steps
-                    _ambient_event_timer--;
-                }
-
-                // --- Check if it's time for a new event ---
-                if (_ambient_event_timer <= 0) {
-                    _ambient_event_type = 1 + (_extraRng.next() % 2); // 1 or 2
-                    _ambient_event_step = 0;
-                    // Reset timer based on Power
-                    int power = _tuesdayTrack.power();
-                    _ambient_event_timer = 16 + (power > 0 ? 256 - (power * 15) : 256);
-                }
-
-                _slide = 0;
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 15: // DRILL - UK Drill hi-hat rolls and bass slides (infinite loop)
-            {
-                int glide = _tuesdayTrack.glide();
-
-                // Advance step in bar
-                _drillStepInBar = (_drillStepInBar + 1) % 8;
-
-                // Check hi-hat pattern
-                bool hihatHit = (_drillHiHatPattern & (1 << _drillStepInBar)) != 0;
-
-                if (hihatHit) {
-                    // --- HI-HAT HIT ---
-                    note = 7 + (_rng.next() % 5);
-                    octave = 1;
-                    _gatePercent = 25;
-                    shouldGate = true;
-                    _slide = 0;
-
-                    // Check for Trill/Retrigger
-                    int trillChanceAlgorithmic = 30; // 30% base chance for a roll on a hi-hat
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                                        if (_uiRng.nextRange(100) < finalTrillChance) {
-                                            _retriggerArmed = true;
-                                            _retriggerCount = 2; // 3 notes total
-                                            _retriggerPeriod = divisor / 3; // 8th note triplets
-                                            _retriggerLength = _retriggerPeriod / 2; // 50% gate
-                                            _isTrillNote = false;
-
-                                            // Set the trill note (2 semitones up)
-                                            float baseVoltage = (note + (octave * 12)) / 12.f;
-                                            _trillCvTarget = baseVoltage + (2.f / 12.f);
-
-                                            // Make sure the first note of the retrigger is short
-                                            _gatePercent = (_retriggerLength * 100) / divisor;
-                                        }
-                } else {
-                    // --- BASS NOTE ---
-                    note = _drillLastNote;
-                    octave = -1;
-                    _gatePercent = 75;
-                    shouldGate = true;
-
-                    // Occasional bass note change
-                    if (_rng.nextRange(8) < 2) {
-                        _drillLastNote = _rng.next() % 5;
-                    }
-
-                    // Slide
-                    if (_extraRng.nextRange(16) < 8) {
-                        _slide = 2; // Hardcoded slide for drill feel
-                        _drillSlideTarget = _rng.next() % 12;
-                    } else if (_rng.nextRange(100) < glide) {
-                        _slide = (_rng.nextRange(3)) + 1; // Probabilistic slide
-                    } else {
-                        _slide = 0;
-                    }
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 16: // MINIMAL - staccato bursts and silence (infinite loop)
-            {
-                int glide = _tuesdayTrack.glide();
-
-                // Mode state machine
-                if (_minimalMode == 0) {
-                    // Silence mode
-                    if (_minimalSilenceTimer > 0) {
-                        _minimalSilenceTimer--;
-                        _rng.next();
-                        shouldGate = false;
-                        _gatePercent = 0;
-                        note = 0;
-                        octave = 0;
-                    } else {
-                        // Switch to burst
-                        _minimalMode = 1;
-                        _minimalBurstTimer = _minimalBurstLength;
-                        _minimalNoteIndex = 0;
-                        note = _rng.next() % 12;
-                        octave = 0;
-                        _gatePercent = 25;
-                        shouldGate = true;
-                    }
-                } else {
-                    // Burst mode
-                    if (_minimalBurstTimer > 0) {
-                        _minimalBurstTimer--;
-                        _minimalNoteIndex++;
-                        int baseNote = _rng.next() % 12;
-
-                        if (_extraRng.nextRange(256) < _minimalClickDensity) {
-                            note = baseNote;
-                            _gatePercent = 15;
-                        } else {
-                            note = baseNote;
-                            _gatePercent = 25;
-                        }
-                        octave = 0;
-                        shouldGate = true;
-                    } else {
-                        // Switch to silence
-                        _minimalMode = 0;
-                        _minimalSilenceTimer = _minimalSilenceLength;
-                        shouldGate = false;
-                        _gatePercent = 0;
-                        note = 0;
-                        octave = 0;
-                    }
-                }
-
-                // Glide
-                if (shouldGate && _rng.nextRange(100) < glide) {
-                    _slide = (_rng.nextRange(3)) + 1;
-                } else {
-                    _slide = 0;
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 14: // ACID - 303-style patterns (infinite loop)
-            {
-                int glide = _tuesdayTrack.glide();
-
-                // Get note from sequence
-                note = _acidSequence[_acidPosition];
-                octave = 0;
-
-                // Check for accent
-                bool hasAccent = (_acidAccentPattern & (1 << _acidPosition)) != 0;
-                _gatePercent = hasAccent ? 95 : 65;
-                shouldGate = true;
-
-                // Check for octave jump
-                if (_acidOctaveMask & (1 << _acidPosition)) {
-                    octave = 1;
-                }
-
-                // Slide based on flow
-                if (_rng.nextRange(100) < glide) {
-                    _slide = 2;
-                } else {
-                    _slide = 0;
-                }
-
-                // Check for Trill on accented notes
-                if (hasAccent) {
-                    int trillChanceAlgorithmic = 20; // 20% base chance for 303 throb
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        _retriggerArmed = true;
-                        _retriggerCount = 1 + (_uiRng.nextRange(2)); // 2-3 notes total
-                        _retriggerPeriod = divisor / 2; // 8th notes for acid throb
-                        _retriggerLength = _retriggerPeriod / 2;
-                        _isTrillNote = false;
-
-                        float baseVoltage = (note + (octave * 12)) / 12.f;
-                        _trillCvTarget = baseVoltage + (3.f / 12.f); // Minor 3rd up
-                    }
-                }
-
-                // Advance position
-                _acidPosition = (_acidPosition + 1) % 8;
-                _acidLastNote = note;
-                _acidStepCount++;
-
-                // Occasional pattern mutation
-                if (_rng.nextRange(128) < 2) {
-                    int mutatePos = _rng.next() % 8;
-                    _acidSequence[mutatePos] = _rng.next() % 12;
-                }
-
-                _extraRng.next();
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 17: // KRAFT - precise mechanical sequences (infinite loop)
-            {
-                int glide = _tuesdayTrack.glide();
-
-                // Get note from sequence with transpose
-                note = (_kraftSequence[_kraftPosition] + _kraftTranspose) % 12;
-                octave = 0;
-
-                // Check for ghost note
-                bool isGhost = (_kraftGhostMask & (1 << _kraftPosition)) != 0;
-                _gatePercent = isGhost ? 25 : 50;
-                shouldGate = true;
-
-                // Lock timer
-                if (_kraftLockTimer > 0) {
-                    _kraftLockTimer--;
-                } else {
-                    _kraftLockTimer = 16 + (_rng.next() % 16);
-                    _kraftBaseNote = (_kraftBaseNote + _rng.nextRange(5)) % 12;
-                    for (int i = 0; i < 8; i++) {
-                        _kraftSequence[i] = (_kraftBaseNote + ((i % 2) ? 7 : 0)) % 12;
-                    }
-                }
-
-                // Transpose
-                if (_rng.nextRange(16) < 4) {
-                    _kraftTranspose = _rng.next() % 12;
-                    _kraftTranspCount++;
-                }
-
-                // Advance position
-                _kraftPosition = (_kraftPosition + 1) % 8;
-
-                // Glide (rare)
-                if (_rng.nextRange(100) < glide / 2) {
-                    _slide = 1;
-                } else {
-                    _slide = 0;
-                }
-
-                _extraRng.next();
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 18: // APHEX - complex polyrhythmic patterns (infinite loop)
-            {
-                shouldGate = true;
-                // --- Main melody from Track 1 ---
-                note = _aphex_track1_pattern[_aphex_pos1];
-                octave = 0;
-                _gatePercent = 75;
-                _slide = 0;
-
-                // --- Modification from Track 2 ---
-                uint8_t modifier = _aphex_track2_pattern[_aphex_pos2];
-                if (modifier == 1) { // Stutter
-                    _gatePercent = 20;
-                } else if (modifier == 2) { // Slide
-                    _slide = 1;
-                }
-
-                // --- Override from Track 3 ---
-                uint8_t bass_note = _aphex_track3_pattern[_aphex_pos3];
-                if (bass_note > 0) {
-                    note = bass_note;
-                    octave = -1; // Deep bass
-                    _gatePercent = 90;
-                    _slide = 0;
-                }
-
-                // --- Advance all tracks ---
-                _aphex_pos1 = (_aphex_pos1 + 1) % 4;
-                _aphex_pos2 = (_aphex_pos2 + 1) % 3;
-                _aphex_pos3 = (_aphex_pos3 + 1) % 5;
-
-                // Check for Trill on polyrhythmic collision points (glitchy)
-                int polyCollision = ((_aphex_pos1 * 7) ^ (_aphex_pos2 * 5) ^ (_aphex_pos3 * 3)) % 12;
-                if (polyCollision > 8) {
-                    int trillChanceAlgorithmic = 45; // High for glitch
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        _retriggerArmed = true;
-                        _retriggerCount = 3 + (_uiRng.nextRange(3)); // 4-6 notes (extreme glitch)
-                        _retriggerPeriod = divisor / 5; // 32nd notes - rapid fire
-                        _retriggerLength = _retriggerPeriod / 3; // Short staccato
-                        _isTrillNote = false;
-
-                        float baseVoltage = (note + (octave * 12)) / 12.f;
-                        // Dissonant intervals: tritone (+6) or minor 2nd (+1)
-                        float interval = ((_aphex_pos1 + _aphex_pos3) % 2) ? 6.f : 1.f;
-                        _trillCvTarget = baseVoltage + (interval / 12.f);
-                    }
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 19: // AUTECHRE - constantly evolving abstract patterns (infinite loop)
-            {
-                shouldGate = true;
-                // --- Always play the current state of the pattern ---
-                // Pattern encodes note + octave*12, so extract both
-                int patternVal = _autechre_pattern[effectiveStep % 8];
-                note = patternVal % 12;
-                octave = patternVal / 12;
-                _gatePercent = 75;
-                _slide = 0;
-
-                // --- Countdown to the next transformation ---
-                _autechre_rule_timer--;
-                if (_autechre_rule_timer <= 0) {
-                    uint8_t current_rule = _autechre_rule_sequence[_autechre_rule_index];
-                    int intensity = _tuesdayTrack.power() / 2; // Power: 0-8
-
-                    // --- Apply a deterministic transformation rule ---
-                    switch (current_rule) {
-                        case 0: // ROTATE
-                            {
-                                int8_t temp = _autechre_pattern[7];
-                                for (int i = 7; i > 0; --i) _autechre_pattern[i] = _autechre_pattern[i-1];
-                                _autechre_pattern[0] = temp;
-                            }
-                            break;
-                        case 1: // REVERSE
-                            for (int i = 0; i < 4; ++i) {
-                                int8_t temp = _autechre_pattern[i];
-                                _autechre_pattern[i] = _autechre_pattern[7-i];
-                                _autechre_pattern[7-i] = temp;
-                            }
-                            break;
-                        case 2: // INVERT around a pivot - preserve octave
-                            for (int i = 0; i < 8; ++i) {
-                                int octave = _autechre_pattern[i] / 12;
-                                int note = _autechre_pattern[i] % 12;
-                                int interval = note - 6;
-                                note = (6 - interval + 12) % 12;
-                                _autechre_pattern[i] = note + (octave * 12);
-                            }
-                            break;
-                        case 3: // SWAP adjacent notes
-                            for (int i = 0; i < 8; i += 2) {
-                                int8_t temp = _autechre_pattern[i];
-                                _autechre_pattern[i] = _autechre_pattern[i+1];
-                                _autechre_pattern[i+1] = temp;
-                            }
-                            break;
-                        case 4: // ADD intensity - preserve octave
-                            for (int i = 0; i < 8; ++i) {
-                                int octave = _autechre_pattern[i] / 12;
-                                int note = (_autechre_pattern[i] % 12 + intensity) % 12;
-                                _autechre_pattern[i] = note + (octave * 12);
-                            }
-                            break;
-                    }
-
-                    // --- Reset for next rule ---
-                    _autechre_rule_timer = 8 + (_tuesdayTrack.flow() * 4);
-                    _autechre_rule_index = (_autechre_rule_index + 1) % 8;
-                }
-
-                // Check for Trill on SWAP rule or fresh transformation (glitchy)
-                uint8_t current_rule = _autechre_rule_sequence[_autechre_rule_index];
-                if (current_rule == 3 || _autechre_rule_timer < 2) {
-                    int trillChanceAlgorithmic = 50; // Very high for abstract chaos
-                    int userTrillSetting = _tuesdayTrack.trill();
-                    int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                    if (_uiRng.nextRange(100) < finalTrillChance) {
-                        _retriggerArmed = true;
-                        // More trills on SWAP rule (most chaotic)
-                        int minCount = (current_rule == 3) ? 4 : 2;
-                        _retriggerCount = minCount + (_uiRng.nextRange(3)); // 4-7 for SWAP, 2-5 others
-                        _retriggerPeriod = divisor / 4; // 16th notes
-                        _retriggerLength = _retriggerPeriod / 2;
-                        _isTrillNote = false;
-
-                        float baseVoltage = (note + (octave * 12)) / 12.f;
-                        // Rule-based intervals for deterministic glitch
-                        int abstractInterval = (_autechre_rule_index * 3) % 8; // 0,3,6,1,4,7,2,5 semitones
-                        _trillCvTarget = baseVoltage + (abstractInterval / 12.f);
-                    }
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        case 20: // STEPWAVE - Scale stepping with trill (infinite loop)
-            {
-                shouldGate = true;
-
-                // Flow controls scale step direction with octave jumps
-                int flowVal = _tuesdayTrack.flow();
-                int ornamentVal = _tuesdayTrack.ornament();
-
-                // Determine scale step movement based on flow
-                int scaleStepDir = 0;
-                if (flowVal <= 7) {
-                    scaleStepDir = -1;  // Step down
-                } else if (flowVal >= 9) {
-                    scaleStepDir = 1;   // Step up
-                }
-
-                // Determine step size from ornament: 0-5=2 steps, 6-10=2-3 mixed, 11-16=3 steps
-                int stepSize;
-                if (ornamentVal <= 5) {
-                    stepSize = 2;
-                } else if (ornamentVal >= 11) {
-                    stepSize = 3;
-                } else {
-                    stepSize = 2 + (_extraRng.next() % 2);  // 2 or 3
-                }
-
-                // Calculate note as scale degree offset
-                note = (effectiveStep * scaleStepDir * stepSize) % 7;
-                if (note < 0) note += 7;
-
-                // Octave jumps: probabilistically jump up 2 octaves
-                int octaveJumpChance = 20 + (flowVal * 3);  // 20-68%
-                if (_rng.nextRange(100) < octaveJumpChance) {
-                    octave = 2;
-                } else {
-                    octave = 0;
-                }
-
-                _gatePercent = 85;
-                _slide = 0;
-                _gateOffset = (effectiveStep % 4) * 15;  // Rhythmic timing
-
-                // Check for stepped trill (base probability 50%)
-                int trillChanceAlgorithmic = 50;
-                int userTrillSetting = _tuesdayTrack.trill();
-                int finalTrillChance = (trillChanceAlgorithmic * userTrillSetting) / 100;
-
-                if (_uiRng.nextRange(100) < finalTrillChance) {
-                    // Trill step count from ornament: lower=2, middle=2-3, higher=3
-                    if (ornamentVal <= 5) {
-                        _stepwave_step_count = 2;
-                    } else if (ornamentVal >= 11) {
-                        _stepwave_step_count = 3;
-                    } else {
-                        _stepwave_step_count = 2 + (_extraRng.next() % 2);
-                    }
-                    _stepwave_current_step = 0;
-                    _stepwave_chromatic_offset = 0;
-
-                    // Determine trill direction from ornament
-                    int direction;
-                    if (ornamentVal <= 5) {
-                        direction = -1;  // Down
-                    } else if (ornamentVal >= 11) {
-                        direction = 1;   // Up
-                    } else {
-                        // Random direction
-                        direction = _uiRng.nextBinary() ? 1 : -1;
-                    }
-                    _stepwave_direction = direction;
-
-                    // Determine if this is stepped or slide
-                    int glideParam = _tuesdayTrack.glide();
-                    if (glideParam > 0 && _rng.nextRange(100) < glideParam) {
-                        _stepwave_is_stepped = false;  // Slide mode
-                        _slide = 2;  // Long slide for glissando
-                    } else {
-                        _stepwave_is_stepped = true;  // Stepped mode
-                    }
-
-                    // Arm the retrigger system
-                    _retriggerArmed = true;
-                    _retriggerCount = _stepwave_step_count - 1;  // -1 because first note plays immediately
-                    _retriggerPeriod = divisor / _stepwave_step_count;  // Spread evenly
-                    _retriggerLength = _retriggerPeriod / 2;
-                    _isTrillNote = false;
-
-                    // Calculate the final target for the trill (used for slide mode)
-                    float baseVoltage = (note + (octave * 12)) / 12.f;
-                    int totalSteps = (_stepwave_step_count - 1) * direction;
-                    _trillCvTarget = baseVoltage + (totalSteps / 12.f);
-                }
-
-                noteVoltage = (note + (octave * 12)) / 12.0f;
-            }
-            break;
-
-        default:
-            shouldGate = false;
-            noteVoltage = 0.f;
-            break;
-            }
-        } // End else (infinite loop)
-
-        // Apply global GateOffset override
-        uint8_t globalGateOffset = _tuesdayTrack.gateOffset();
-        if (globalGateOffset == 0) {
-            // Mode 1: Force On-Beat
-            _gateOffset = 0;
-        } else if (globalGateOffset == 100) {
-            // Mode 3: Pure Random Offset
-            _gateOffset = _uiRng.nextRange(101); // 0-100
-        } else {
-            // Mode 2: Probabilistic blend of Algorithmic and Random
-            // Note: _gateOffset already holds the algorithmic value here.
-            // We just check for a random override.
-            if (_uiRng.nextRange(100) < globalGateOffset) {
-                _gateOffset = _uiRng.nextRange(101); // 0-100
-            }
+             // Ghost note / Rest
+             // Update CV anyway if Free mode?
+             // BUT: Don't update on explicitly muted steps (velocity=0 from polyrhythm suppression)
+             if (sequence.cvUpdateMode() == TuesdaySequence::Free && result.velocity > 0) {
+                  float volts = scaleToVolts(result.note, result.octave);
+                  _cvCurrent = volts;
+                  _cvOutput = volts;
+             }
         }
-
-        // Apply octave and transpose from sequence parameters
-        int trackOctave = _tuesdayTrack.octave();
-        int trackTranspose = _tuesdayTrack.transpose();
-
-        // Get scale and root note (use track settings if not Default, otherwise project)
-        int trackScaleIdx = _tuesdayTrack.scale();
-        int trackRootNote = _tuesdayTrack.rootNote();
-
-        const Scale &scale = (trackScaleIdx >= 0) ? Scale::get(trackScaleIdx) : _model.project().selectedScale();
-        int rootNote = (trackRootNote >= 0) ? trackRootNote : _model.project().rootNote();
-
-        // Apply scale quantization if useScale is enabled, track has specific scale, or project has non-chromatic scale
-        if (_tuesdayTrack.useScale() || trackScaleIdx >= 0 || _model.project().scale() > 0) {
-            // Treat note as scale degree, convert to voltage
-            int scaleNote = note + octave * scale.notesPerOctave();
-            // Add transpose (in semitones for chromatic, scale degrees otherwise)
-            scaleNote += trackTranspose;
-            noteVoltage = scale.noteToVolts(scaleNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
-        } else {
-            // Free (chromatic) mode - apply transpose directly
-            noteVoltage = (note + trackTranspose + (octave * 12)) / 12.0f;
-        }
-
-        // Apply octave offset (1V per octave)
-        noteVoltage += trackOctave;
-
-        // Decrement cooldown
-        if (_coolDown > 0) {
-            _coolDown--;
-            if (_coolDown > _coolDownMax) _coolDown = _coolDownMax;
-        }
-
-        // Apply gate using cooldown system
-        // Note triggers only when cooldown has expired
-        // Velocity (from algorithm) must beat current cooldown value
-        bool gateTriggered = shouldGate && _coolDown == 0;
-        if (gateTriggered) {
-            // Instead of immediately firing the gate, calculate the offset delay
-            uint32_t actualGateOffset = (divisor * _gateOffset) / 100;
-
-            if (actualGateOffset > 0) {
-                // Create a delayed gate activation
-                _pendingGateOffsetTicks = static_cast<uint8_t>(std::min(actualGateOffset, static_cast<uint32_t>(255))); // Cap at 255
-                _pendingGateActivation = true;
-
-                // Don't set the gate yet - it will be set after the offset delay
-                // But we still need to reset cooldown and other states
-                _activity = true;
-                _coolDown = _coolDownMax;
-            } else {
-                // No offset - set gate immediately as before
-                _gateOutput = true;
-                // Gate length: use algorithm-determined percentage
-                _gateTicks = (divisor * _gatePercent) / 100;
-                if (_gateTicks < 1) _gateTicks = 1;  // Minimum 1 tick
-                _activity = true;
-                // Reset cooldown after triggering
-                _coolDown = _coolDownMax;
-            }
-        }
-
-        // Process pending gate offset if any
-        if (_pendingGateActivation && _pendingGateOffsetTicks > 0) {
-            _pendingGateOffsetTicks--;
-            if (_pendingGateOffsetTicks == 0) {
-                // Time to fire the gate after offset delay
-                _gateOutput = true;
-                // Gate length: use algorithm-determined percentage
-                _gateTicks = (divisor * _gatePercent) / 100;
-                if (_gateTicks < 1) _gateTicks = 1;  // Minimum 1 tick
-                _pendingGateActivation = false;
-            }
-        }
-
-        // Apply CV with slide/portamento based on cvUpdateMode
-        // Free mode: CV updates every step (continuous evolution)
-        // Gated mode: CV only updates when gate fires (original Tuesday behavior)
-        bool shouldUpdateCv = (_tuesdayTrack.cvUpdateMode() == TuesdayTrack::Free) || gateTriggered;
-
-        if (shouldUpdateCv) {
-            _cvTarget = noteVoltage;
-            if (_slide > 0) {
-                // Calculate slide time: slide * 12 ticks (scaled for our timing)
-                int slideTicks = _slide * 12;
-                _cvDelta = (_cvTarget - _cvCurrent) / slideTicks;
-                _slideCountDown = slideTicks;
-            } else {
-                // Instant change
-                _cvCurrent = _cvTarget;
-                _cvOutput = _cvTarget;
-                _slideCountDown = 0;
-            }
-            // Store this as last gated CV for maintaining output in Gated mode
-            _lastGatedCv = noteVoltage;
-        } else {
-            // Gated mode and no gate - maintain last CV value
-            // Ensure slide continues if in progress, otherwise keep static
-            if (_slideCountDown == 0) {
-                _cvOutput = _lastGatedCv;
-            }
-        }
-
-        // Step advancement and loop handling now done at start of stepTrigger block
-        // via tick-based calculation
-
-        // Setup gate timing counters
-        if (gateTriggered) {
-            _pendingGateActivation = true;
-            _pendingGateOffsetTicks = (CONFIG_SEQUENCE_PPQN * _gateOffset) / 100;
-
-            // If a re-trigger was armed by the algorithm, use the short re-trigger
-            // length for the gate. Otherwise, use the main gate length.
-            if (_retriggerArmed) {
-                _gateLengthTicks = _retriggerLength;
-            } else {
-                _gateLengthTicks = (CONFIG_SEQUENCE_PPQN * _gatePercent) / 100;
-            }
-        }
-
+        
         return TickResult::CvUpdate | TickResult::GateUpdate;
     }
 
@@ -3600,108 +1318,51 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
 }
 
 void TuesdayTrackEngine::update(float dt) {
-    // --- CV Sliding ---
-    // This happens independently of gate logic
+    // CV Slide Update
     if (_slideCountDown > 0) {
         _slideCountDown--;
         _cvCurrent += _cvDelta;
-    } else {
-        _cvCurrent = _cvTarget;
-    }
-    // Only update final CV output if not in a trill, which has its own CV logic
-    if (!_retriggerArmed) {
-        _cvOutput = _cvCurrent;
+        if (!_retriggerArmed) _cvOutput = _cvCurrent;
     }
 
-
-    // --- Gate Timing State Machine ---
-
-    // 1. Handle initial gate offset delay
-    if (_pendingGateOffsetTicks > 0) {
-        _pendingGateOffsetTicks--;
-        return; // Still waiting for the first event to start
-    }
-
-    // 2. Activate the very first gate event if it was pending
-    if (_pendingGateActivation) {
-        _gateOutput = true;
-        _pendingGateActivation = false;
-        // _gateLengthTicks has already been set correctly in tick()
-        // for either a normal note or the first note of a trill.
-
-        // Set the initial CV for the first note
-        _cvOutput = _cvTarget;
-        return; // Gate is now on, wait for next update
-    }
-
-    // 3. Main state machine for gates that are already active or re-triggering
-    if (_gateOutput) {
-        // --- Gate is currently ON ---
-        if (_gateLengthTicks > 0) {
-            _gateLengthTicks--;
-        } else {
-            // ON-time has expired, so turn the gate OFF
-            _gateOutput = false;
-
-            // If we are in a re-trigger chain, set the timer for the silent OFF-time
-            if (_retriggerArmed && _retriggerCount > 0) {
-                _gateLengthTicks = _retriggerPeriod - _retriggerLength; // This now becomes the off-time
+    // Retrigger Logic
+    if (_retriggerArmed) {
+        if (_gateOutput) {
+            // Waiting for ON phase to end
+            if (_gateTicks > 0) _gateTicks--;
+            else {
+                _gateOutput = false; // Gap
+                _gateTicks = _retriggerPeriod - _retriggerLength; // Gap length
             }
-        }
-    } else {
-        // --- Gate is currently OFF ---
-        if (_retriggerArmed) {
-            if (_retriggerCount > 0) {
-                if (_gateLengthTicks > 0) {
-                    _gateLengthTicks--;
-                } else {
-                    // OFF-time has expired, so fire the next re-triggered note
+        } else {
+            // Waiting for OFF phase to end (Gap)
+            if (_gateTicks > 0) _gateTicks--;
+            else {
+                if (_retriggerCount > 0) {
                     _retriggerCount--;
                     _gateOutput = true;
-                    _gateLengthTicks = _retriggerLength; // Set ON-time for this new note
-
-                    // Check if this is a STEPWAVE stepped trill
-                    int algorithm = _tuesdayTrack.algorithm();
-                    if (algorithm == 20 && _stepwave_is_stepped) {
-                        // STEPWAVE: Increment through scale degrees
-                        _stepwave_current_step++;
-                        _stepwave_chromatic_offset += _stepwave_direction;
-
-                        // Get scale info to convert scale degrees to voltage
-                        int trackScaleIdx = _tuesdayTrack.scale();
-                        int trackRootNote = _tuesdayTrack.rootNote();
-                        const Scale &scale = (trackScaleIdx >= 0) ? Scale::get(trackScaleIdx) : _model.project().selectedScale();
-                        int rootNote = (trackRootNote >= 0) ? trackRootNote : _model.project().rootNote();
-
-                        // Calculate new CV using scale degrees (respects project/track scale)
-                        if (_tuesdayTrack.useScale() || trackScaleIdx >= 0 || _model.project().scale() > 0) {
-                            // Scale mode: treat offset as scale degree offset
-                            // _cvTarget is the base note in voltage, we need to find its scale degree
-                            // and add the offset, then convert back to voltage
-                            int baseScaleDegree = 0;  // Root note starts at degree 0
-                            int targetDegree = baseScaleDegree + _stepwave_chromatic_offset;
-                            _cvOutput = scale.noteToVolts(targetDegree) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
-                            _cvOutput += _tuesdayTrack.octave();  // Apply track octave
-                        } else {
-                            // Chromatic/free mode: offset in semitones
-                            _cvOutput = _cvTarget + (_stepwave_chromatic_offset / 12.f);
-                        }
+                    _gateTicks = _retriggerLength;
+                    
+                    // Apply Trill Interval
+                    if (_ratchetInterval != 0) {
+                        // Arp/Step mode
+                         // We need to know current note to offset it.
+                         // This is tricky without persistent note state.
+                         // Simplification: just add voltage
+                         _cvOutput += (_ratchetInterval / 12.f);
                     } else {
-                        // Standard alternating trill for other algorithms
-                        _isTrillNote = !_isTrillNote;
-                        if (_isTrillNote) {
-                            _cvOutput = _trillCvTarget;
-                        } else {
-                            _cvOutput = _cvTarget;
-                        }
+                        // Standard Trill: Toggle
+                        // Need to know interval (e.g. +2 semitones)
+                        // For now, just keep same voltage (Ratchet) or simple offset
+                        // Original code added +2/12v.
+                         _cvOutput += (2.f / 12.f); 
                     }
+                } else {
+                    _retriggerArmed = false;
                 }
-            } else {
-                // Last re-trigger has finished, disarm the system for the next step
-                _retriggerArmed = false;
             }
         }
     }
-
+    
     _activity = _gateOutput || _retriggerArmed;
 }

@@ -32,14 +32,13 @@ private:
         Power,
         // Page 2
         LoopLength,
-        Scan,
         Rotate,
         Glide,
-        // Page 3
         Skew,
+        GateLength,
         GateOffset,
-        CvUpdateMode,
         Trill,
+        Start,
         // Total
         ParamCount
     };

@@ -298,6 +298,153 @@ public:
         str("%d", lastStep() + 1);
     }
 
+    // Chaos
+
+    enum class ChaosAlgorithm : uint8_t {
+        Latoocarfian,
+        Lorenz,
+        Last
+    };
+
+    static const char *chaosAlgorithmName(ChaosAlgorithm algo) {
+        switch (algo) {
+        case ChaosAlgorithm::Latoocarfian: return "Latoocarfian";
+        case ChaosAlgorithm::Lorenz:       return "Lorenz";
+        case ChaosAlgorithm::Last:         break;
+        }
+        return nullptr;
+    }
+
+    // wavefolderFold
+
+    float wavefolderFold() const { return _wavefolderFold.get(isRouted(Routing::Target::WavefolderFold)); }
+    void setWavefolderFold(float value, bool routed = false) {
+        _wavefolderFold.set(clamp(value, 0.f, 1.f), routed);
+    }
+    void editWavefolderFold(int value, bool shift) {
+        if (!isRouted(Routing::Target::WavefolderFold)) {
+            setWavefolderFold(wavefolderFold() + value * (shift ? 0.1f : 0.01f));
+        }
+    }
+    void printWavefolderFold(StringBuilder &str) const {
+        printRouted(str, Routing::Target::WavefolderFold);
+        str("%.2f", wavefolderFold());
+    }
+
+    // wavefolderGain
+
+    float wavefolderGain() const { return _wavefolderGain.get(isRouted(Routing::Target::WavefolderGain)); }
+    void setWavefolderGain(float value, bool routed = false) {
+        _wavefolderGain.set(clamp(value, 0.f, 2.f), routed);
+    }
+    void editWavefolderGain(int value, bool shift) {
+        if (!isRouted(Routing::Target::WavefolderGain)) {
+            setWavefolderGain(wavefolderGain() + value * (shift ? 0.1f : 0.01f));
+        }
+    }
+    void printWavefolderGain(StringBuilder &str) const {
+        printRouted(str, Routing::Target::WavefolderGain);
+        str("%.2f", wavefolderGain());
+    }
+
+    // djFilter
+
+    float djFilter() const { return _djFilter.get(isRouted(Routing::Target::DjFilter)); }
+    void setDjFilter(float value, bool routed = false) {
+        _djFilter.set(clamp(value, -1.f, 1.f), routed);
+    }
+    void editDjFilter(int value, bool shift) {
+        if (!isRouted(Routing::Target::DjFilter)) {
+            setDjFilter(djFilter() + value * (shift ? 0.1f : 0.01f));
+        }
+    }
+    void printDjFilter(StringBuilder &str) const {
+        printRouted(str, Routing::Target::DjFilter);
+        str("%+.2f", djFilter());
+    }
+
+    // xFade
+    float xFade() const { return _xFade.get(isRouted(Routing::Target::XFade)); }
+    void setXFade(float value, bool routed = false) {
+        _xFade.set(clamp(value, 0.f, 1.f), routed);
+    }
+    void editXFade(int value, bool shift) {
+        if (!isRouted(Routing::Target::XFade)) {
+            setXFade(xFade() + value * (shift ? 0.1f : 0.01f));
+        }
+    }
+    void printXFade(StringBuilder &str) const {
+        printRouted(str, Routing::Target::XFade);
+        str("%.2f", xFade());
+    }
+
+    // chaos
+
+    int chaosAmount() const { return _chaosAmount.get(isRouted(Routing::Target::ChaosAmount)); }
+    void setChaosAmount(int value, bool routed = false) {
+        _chaosAmount.set(clamp(value, 0, 100), routed);
+    }
+    void editChaosAmount(int value, bool shift) {
+        if (!isRouted(Routing::Target::ChaosAmount)) {
+            setChaosAmount(chaosAmount() + value * (shift ? 5 : 1));
+        }
+    }
+    void printChaosAmount(StringBuilder &str) const {
+        printRouted(str, Routing::Target::ChaosAmount);
+        str("%d%%", chaosAmount());
+    }
+
+    ChaosAlgorithm chaosAlgo() const { return _chaosAlgo; }
+    void setChaosAlgo(ChaosAlgorithm algo) { _chaosAlgo = ModelUtils::clampedEnum(algo); }
+    void editChaosAlgo(int value, bool shift) { setChaosAlgo(ModelUtils::adjustedEnum(chaosAlgo(), value)); }
+    void printChaosAlgo(StringBuilder &str) const { str(chaosAlgorithmName(chaosAlgo())); }
+
+    int chaosRate() const { return _chaosRate.get(isRouted(Routing::Target::ChaosRate)); }
+    void setChaosRate(int value, bool routed = false) {
+        _chaosRate.set(clamp(value, 0, 127), routed);
+    }
+    void editChaosRate(int value, bool shift) {
+        if (!isRouted(Routing::Target::ChaosRate)) {
+            setChaosRate(chaosRate() + value * (shift ? 5 : 1));
+        }
+    }
+    float chaosHz() const { return 0.1f + std::pow(chaosRate() / 127.f, 4.f) * 100.f; }
+    void printChaosRate(StringBuilder &str) const {
+        printRouted(str, Routing::Target::ChaosRate);
+        float rate = chaosHz();
+        if (rate < 1.f) str("%.2fHz", rate);
+        else if (rate < 10.f) str("%.1fHz", rate);
+        else str("%.0fHz", rate);
+    }
+
+    int chaosParam1() const { return _chaosParam1.get(isRouted(Routing::Target::ChaosParam1)); }
+    void setChaosParam1(int value, bool routed = false) {
+        _chaosParam1.set(clamp(value, 0, 100), routed);
+    }
+    void editChaosParam1(int value, bool shift) {
+        if (!isRouted(Routing::Target::ChaosParam1)) {
+            setChaosParam1(chaosParam1() + value * (shift ? 5 : 1));
+        }
+    }
+    void printChaosParam1(StringBuilder &str) const {
+        printRouted(str, Routing::Target::ChaosParam1);
+        str("%d", chaosParam1());
+    }
+
+    int chaosParam2() const { return _chaosParam2.get(isRouted(Routing::Target::ChaosParam2)); }
+    void setChaosParam2(int value, bool routed = false) {
+        _chaosParam2.set(clamp(value, 0, 100), routed);
+    }
+    void editChaosParam2(int value, bool shift) {
+        if (!isRouted(Routing::Target::ChaosParam2)) {
+            setChaosParam2(chaosParam2() + value * (shift ? 5 : 1));
+        }
+    }
+    void printChaosParam2(StringBuilder &str) const {
+        printRouted(str, Routing::Target::ChaosParam2);
+        str("%d", chaosParam2());
+    }
+
     // steps
 
     const StepArray &steps() const { return _steps; }
@@ -366,6 +513,17 @@ private:
     Routable<Types::RunMode> _runMode;
     Routable<uint8_t> _firstStep;
     Routable<uint8_t> _lastStep;
+
+    Routable<float> _wavefolderFold;
+    Routable<float> _wavefolderGain;
+    Routable<float> _djFilter;
+    Routable<float> _xFade;
+
+    Routable<int> _chaosAmount;
+    ChaosAlgorithm _chaosAlgo;
+    Routable<int> _chaosRate;
+    Routable<int> _chaosParam1;
+    Routable<int> _chaosParam2;
 
     StepArray _steps;
 

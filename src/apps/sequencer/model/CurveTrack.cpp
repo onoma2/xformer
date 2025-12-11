@@ -33,10 +33,6 @@ void CurveTrack::clear() {
     setShapeProbabilityBias(0);
     setGateProbabilityBias(0);
     setGlobalPhase(0.f);
-    setWavefolderFold(0.f);
-    setWavefolderGain(0.f);  // Standard gain maps to 0.0 in the new UI system
-    setDjFilter(0.f);
-    setXFade(1.f);  // Start with fully processed signal
 
     for (auto &sequence : _sequences) {
         sequence.clear();
@@ -53,13 +49,6 @@ void CurveTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_shapeProbabilityBias.base);
     writer.write(_gateProbabilityBias.base);
     writer.write(_globalPhase);
-    writer.write(_wavefolderFold);
-    writer.write(_wavefolderGain);
-    writer.write(0.f); // _wavefolderSymmetry placeholder
-    writer.write(_djFilter);
-    writer.write(0.f); // _foldF placeholder
-    writer.write(0.f); // _filterF placeholder
-    writer.write(_xFade);
     writeArray(writer, _sequences);
 }
 
@@ -80,23 +69,17 @@ void CurveTrack::read(VersionedSerializedReader &reader) {
         setGlobalPhase(float(phaseOffset) / 100.f);
     }
     if (reader.dataVersion() >= ProjectVersion::Version43) {
-        reader.read(_wavefolderFold);
-        reader.read(_wavefolderGain);
-        // For projects created with the old 1.0-5.0 range, convert to new 0.0-2.0 range
-        // Old: 1.0 (min) -> New: 0.0 (min), Old: 5.0 (max) -> New: 2.0 (max)
-        // Use the inverse of the engine mapping: (internalGain - 1.0) / 2.0
-        _wavefolderGain = (_wavefolderGain - 1.0f) / 2.0f;
-        _wavefolderGain = clamp(_wavefolderGain, 0.f, 2.f);
+        float dummyFold;
+        float dummyGain;
+        reader.read(dummyFold);
+        reader.read(dummyGain);
+        // Discard old track-level wavefolder settings
         float dummy;
         reader.read(dummy); // _wavefolderSymmetry (or placeholder)
-    } else {
-        setWavefolderFold(0.f);
-        setWavefolderGain(0.f);  // Standard gain maps to 0.0 in the new UI system
     }
     if (reader.dataVersion() >= ProjectVersion::Version44) {
-        reader.read(_djFilter);
-    } else {
-        setDjFilter(0.f);
+        float dummyFilter;
+        reader.read(dummyFilter);
     }
     if (reader.dataVersion() >= ProjectVersion::Version45) {
         float dummy;
@@ -104,9 +87,22 @@ void CurveTrack::read(VersionedSerializedReader &reader) {
         reader.read(dummy); // _filterF placeholder
     } 
     if (reader.dataVersion() >= ProjectVersion::Version46) {
-        reader.read(_xFade);
-    } else {
-        setXFade(1.f);  // Default to fully processed signal for older projects
+        float dummyXFade;
+        reader.read(dummyXFade);
+    }
+    if (reader.dataVersion() >= ProjectVersion::Version48) {
+        int dummyChaosAmount;
+        int dummyChaosRate;
+        int dummyChaosParam1;
+        int dummyChaosParam2;
+        reader.read(dummyChaosAmount);
+        reader.read(dummyChaosRate);
+        reader.read(dummyChaosParam1);
+        reader.read(dummyChaosParam2);
+    }
+    if (reader.dataVersion() >= ProjectVersion::Version49) {
+        CurveSequence::ChaosAlgorithm dummyChaosAlgo;
+        reader.read(dummyChaosAlgo);
     }
     readArray(reader, _sequences);
 }

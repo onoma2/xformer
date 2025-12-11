@@ -13,6 +13,7 @@
 #include "MidiOutput.h"
 #include "Serialize.h"
 #include "FileDefs.h"
+#include "TuesdaySequence.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -440,6 +441,16 @@ public:
 
     const CurveSequence &selectedCurveSequence() const { return curveSequence(_selectedTrackIndex, selectedPatternIndex()); }
           CurveSequence &selectedCurveSequence()       { return curveSequence(_selectedTrackIndex, selectedPatternIndex()); }
+
+    // tuesdaySequence
+
+    const TuesdaySequence &tuesdaySequence(int trackIndex, int patternIndex) const { return _tracks[trackIndex].tuesdayTrack().sequence(patternIndex); }
+          TuesdaySequence &tuesdaySequence(int trackIndex, int patternIndex)       { return _tracks[trackIndex].tuesdayTrack().sequence(patternIndex); }
+
+    // selectedTuesdaySequence
+
+    const TuesdaySequence &selectedTuesdaySequence() const { return tuesdaySequence(_selectedTrackIndex, selectedPatternIndex()); }
+          TuesdaySequence &selectedTuesdaySequence()       { return tuesdaySequence(_selectedTrackIndex, selectedPatternIndex()); }
 
     //----------------------------------------
     // Routing

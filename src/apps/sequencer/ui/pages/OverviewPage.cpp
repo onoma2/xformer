@@ -2,6 +2,7 @@
 
 #include "model/NoteTrack.h"
 #include "model/TuesdayTrack.h"
+#include "model/TuesdaySequence.h"
 #include "engine/TuesdayTrackEngine.h"
 
 #include "ui/painters/WindowPainter.h"
@@ -95,12 +96,17 @@ static void drawCurveTrack(Canvas &canvas, int trackIndex, const CurveTrackEngin
     }
 }
 
-static void drawTuesdayTrack(Canvas &canvas, int trackIndex, const TuesdayTrackEngine &trackEngine, const TuesdayTrack &tuesdayTrack) {
+static void drawTuesdayTrack(Canvas &canvas, int trackIndex, const TuesdayTrackEngine &trackEngine, const TuesdaySequence &tuesdaySequence) {
     canvas.setBlendMode(BlendMode::Set);
 
     int y = trackIndex * 8;
-    int loopLength = tuesdayTrack.actualLoopLength();
     int currentStep = trackEngine.currentStep();
+    int loopLength = tuesdaySequence.actualLoopLength();
+    int currentStepForDisplay = currentStep;
+    // Wrap current step to actual loop length if needed
+    if (loopLength > 0) {
+        currentStepForDisplay = currentStep % loopLength;
+    }
 
     // Gate indicator square (blinking when active)
     bool gateActive = trackEngine.gateOutput(0);
@@ -112,7 +118,7 @@ static void drawTuesdayTrack(Canvas &canvas, int trackIndex, const TuesdayTrackE
     if (currentStep >= 0) {
         if (loopLength > 0) {
             // Show step/loop format for finite loops
-            canvas.drawText(64 + 12, y + 5, FixedStringBuilder<16>("%d/%d", currentStep + 1, loopLength));
+            canvas.drawText(64 + 12, y + 5, FixedStringBuilder<16>("%d/%d", currentStepForDisplay + 1, loopLength));
         } else {
             // Just show step for infinite loops
             canvas.drawText(64 + 12, y + 5, FixedStringBuilder<16>("%d", currentStep + 1));
@@ -177,7 +183,7 @@ void OverviewPage::draw(Canvas &canvas) {
         case Track::TrackMode::MidiCv:
             break;
         case Track::TrackMode::Tuesday:
-            drawTuesdayTrack(canvas, trackIndex, trackEngine.as<TuesdayTrackEngine>(), track.tuesdayTrack());
+            drawTuesdayTrack(canvas, trackIndex, trackEngine.as<TuesdayTrackEngine>(), track.tuesdayTrack().sequence(trackState.pattern()));
             break;
         case Track::TrackMode::Last:
             break;

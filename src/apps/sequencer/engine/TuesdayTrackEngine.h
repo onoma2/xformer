@@ -5,12 +5,12 @@
 #include "model/Track.h"
 
 #include "core/utils/Random.h"
+#include "SortedQueue.h"
 
 class TuesdayTrackEngine : public TrackEngine {
 public:
     TuesdayTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
-        TrackEngine(engine, model, track, linkedTrackEngine),
-        _tuesdayTrack(track.tuesdayTrack())
+        TrackEngine(engine, model, track, linkedTrackEngine)
     {
         reset();
     }
@@ -25,8 +25,12 @@ public:
     virtual bool activity() const override { return _activity; }
     virtual bool gateOutput(int index) const override { return _gateOutput; }
     virtual float cvOutput(int index) const override { return _cvOutput; }
+
+    const TuesdayTrack &tuesdayTrack() const {
+        return _track.tuesdayTrack();
+    }
     virtual float sequenceProgress() const override {
-        int loopLength = _tuesdayTrack.actualLoopLength();
+        int loopLength = tuesdayTrack().sequence(pattern()).actualLoopLength();
         if (loopLength <= 0) return 0.f;  // Infinite loop shows no progress
         // Use modulo to ensure step is always within bounds
         uint32_t step = _stepIndex % loopLength;
@@ -39,40 +43,55 @@ public:
     // Current step index for UI display
     int currentStep() const { return _displayStep; }
 
-    // Generate pattern buffer for finite loops
-    void generateBuffer();
-
 private:
     void initAlgorithm();
+    
+    // The "Contract": Abstract step result from the generation engine
+    struct TuesdayTickResult {
+        int note = 0;           // Scale Degree
+        int octave = 0;         // Octave Offset
+        uint8_t velocity = 0;   // 0-255 (For Density Gating)
+        bool accent = false;
+        bool slide = false;
 
-    // Structure for pre-generated step data
-    struct BufferedStep {
-        int8_t note;
-        int8_t octave;
-        uint8_t gatePercent;
-        uint8_t slide;
-        uint8_t gateOffset;
-        bool isTrill = false;
+        // TIMING UNIT CONVERSION (Original C → C++):
+        // Original C: maxsubticklength (fixed units: 4-22 subticks at TUESDAY_SUBTICKRES=6)
+        // C++: gateRatio (percentage: 0-200% of step divisor)
+        // At 192 PPQN with 48 PPQN steps: divisor=4 ticks, 75% = 3 ticks ≈ 6 subticks
+        // This percentage-based approach scales properly with variable tempo/divisor.
+        uint16_t gateRatio = 75; // 0-200% (Relative Duration)
+        uint8_t gateOffset = 0;  // 0-100% (Timing Offset)
+
+        uint8_t beatSpread = 0;  // 0-100% → 1x-5x timing window multiplier
+        uint8_t polyCount = 0;   // Number of subdivisions (0=none, 3/5/7=tuplet)
+
+        // Micro-sequencing: Note offsets for each micro-gate (in semitones/scale degrees)
+        int8_t noteOffsets[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+        // Spatial vs Temporal distribution
+        // true = polyrhythm mode (gates spread evenly across 4-beat window)
+        // false = trill mode (gates fired rapidly in succession)
+        bool isSpatial = true;
     };
 
-    // Pattern buffer for finite loops (64 steps, wraps for longer loops)
-    static const int BUFFER_SIZE = 64;
-    BufferedStep _buffer[BUFFER_SIZE];
-    bool _bufferValid = false;
+    // Micro-gate scheduling system (inspired by NoteTrackEngine)
+    struct MicroGate {
+        uint32_t tick;      // Absolute tick when gate should fire
+        bool gate;          // true=ON, false=OFF
+        float cvTarget;     // CV voltage for this gate (for trill intervals)
+    };
 
-    const TuesdayTrack &_tuesdayTrack;
-
-public:
-    // Public type alias for testing
-    using PublicBufferedStep = BufferedStep;
-
-    // Public method to access buffer for testing purposes
-    PublicBufferedStep getBufferAt(int index) const {
-        if (index >= 0 && index < BUFFER_SIZE) {
-            return _buffer[index];
+    struct MicroGateCompare {
+        bool operator()(const MicroGate &a, const MicroGate &b) const {
+            return a.tick < b.tick;
         }
-        return PublicBufferedStep{}; // Return default if out of bounds
-    }
+    };
+
+    // Unified Generation Engine
+    TuesdayTickResult generateStep(uint32_t tick);
+
+    // The "Pipeline": Converts abstract algorithm steps into quantized voltage
+    float scaleToVolts(int noteIndex, int octave) const;
 
     // Dual RNG system (matches original Tuesday)
     // _rng is seeded from seed1 (Flow) or seed2 (Ornament) depending on algorithm
@@ -105,10 +124,10 @@ public:
     // Gate offset from step start (as fraction of divisor, 0-100%)
     uint8_t _gateOffset = 0;  // Default 0% gate offset
 
-    // State for gate offset processing
-    uint32_t _gateLengthTicks = 0;
-    uint32_t _pendingGateOffsetTicks = 0;
-    bool _pendingGateActivation = false;
+    // Micro-gate queue for precise timing
+    // Size 32: supports 7-tuplet (14 entries) with headroom for multiple beats
+    SortedQueue<MicroGate, 32, MicroGateCompare> _microGateQueue;
+    bool _tieActive = false; // Tracks if the current gate is tied from previous
 
     // Retrigger/Trill State
     int _retriggerCount = 0;
@@ -118,6 +137,13 @@ public:
     bool _isTrillNote = false;
     float _trillCvTarget = 0.f;
     bool _retriggerArmed = false;
+    
+    // Polyrhythmic State
+    int _polySubStep = 0;
+    bool _polyAlgoActive = false;
+    
+    // Micro-Sequencing / Ratcheting
+    int8_t _ratchetInterval = 0; // Semitones/Degrees shift per ratchet
 
     // Slide/portamento state
     int _slide = 0;           // Slide amount (0=instant, 1-3=glide)
@@ -156,18 +182,17 @@ public:
     Random _chipRng;
     uint8_t _chipBase = 0;
     uint8_t _chipDir = 0;
-
-    // GOACID algorithm state
-    uint8_t _goaB1 = 0;  // Pattern transpose flag 1
-    uint8_t _goaB2 = 0;  // Pattern transpose flag 2
-
-    // SNH (Sample & Hold) algorithm state
-    uint32_t _snhPhase = 0;
-    uint32_t _snhPhaseSpeed = 0;
-    uint8_t _snhLastVal = 0;
-    int32_t _snhTarget = 0;
-    int32_t _snhCurrent = 0;
-    int32_t _snhCurrentDelta = 0;
+    
+    // CHIPARP2 algorithm state
+    uint8_t _chip2ChordScaler = 0;
+    uint8_t _chip2Offset = 0;
+    uint8_t _chip2Len = 0;
+    uint8_t _chip2TimeMult = 0;
+    uint8_t _chip2DeadTime = 0;
+    uint8_t _chip2Idx = 0;
+    uint8_t _chip2Dir = 0;
+    uint8_t _chip2ChordLen = 0;
+    Random _chip2Rng;
 
     // WOBBLE algorithm state
     uint32_t _wobblePhase = 0;
@@ -175,76 +200,6 @@ public:
     uint32_t _wobblePhase2 = 0;
     uint32_t _wobblePhaseSpeed2 = 0;
     uint8_t _wobbleLastWasHigh = 0;
-
-    // TECHNO algorithm state
-    uint8_t _technoKickPattern = 0;
-    uint8_t _technoHatPattern = 0;
-    uint8_t _technoBassNote = 0;
-
-    // FUNK algorithm state
-    uint8_t _funkPattern = 0;
-    uint8_t _funkSyncopation = 0;
-    uint8_t _funkGhostProb = 0;
-
-    // DRONE algorithm state
-    uint8_t _droneBaseNote = 0;
-    uint8_t _droneInterval = 0;
-    uint8_t _droneSpeed = 1;  // Safe default to avoid division by zero
-
-    // PHASE algorithm state
-    uint32_t _phaseAccum = 0;
-    uint32_t _phaseSpeed = 0;
-    uint8_t _phasePattern[8] = {0};
-    uint8_t _phaseLength = 4;  // Safe default to avoid division by zero
-
-    // RAGA algorithm state
-    uint8_t _ragaScale[7] = {0};
-    uint8_t _ragaDirection = 0;
-    uint8_t _ragaPosition = 0;
-    uint8_t _ragaOrnament = 0;
-
-    // AMBIENT algorithm state (13) - Harmonic Drone & Event Scheduler
-    int8_t _ambient_root_note;
-    int8_t _ambient_drone_notes[3]; // The notes of the drone chord
-    int _ambient_event_timer;       // Countdown to the next sparse event
-    uint8_t _ambient_event_type;    // 0=none, 1=single note, 2=arpeggio
-    uint8_t _ambient_event_step;    // Position within the current event
-
-    // ACID algorithm state (14)
-    uint8_t _acidSequence[8] = {0};
-    uint8_t _acidPosition = 0;
-    uint8_t _acidAccentPattern = 0;
-    uint8_t _acidOctaveMask = 0;
-    int8_t _acidLastNote = 0;
-    uint8_t _acidSlideTarget = 0;
-    uint8_t _acidStepCount = 0;
-
-    // DRILL algorithm state (15)
-    uint8_t _drillHiHatPattern = 0;
-    uint8_t _drillSlideTarget = 0;
-    uint8_t _drillTripletMode = 0;
-    uint8_t _drillRollCount = 0;
-    uint8_t _drillLastNote = 0;
-    uint8_t _drillStepInBar = 0;
-    uint8_t _drillSubdivision = 1;
-
-    // MINIMAL algorithm state (16)
-    uint8_t _minimalBurstLength = 0;
-    uint8_t _minimalSilenceLength = 0;
-    uint8_t _minimalClickDensity = 0;
-    uint8_t _minimalBurstTimer = 0;
-    uint8_t _minimalSilenceTimer = 0;
-    uint8_t _minimalNoteIndex = 0;
-    uint8_t _minimalMode = 0;
-
-    // KRAFT algorithm state (17)
-    uint8_t _kraftSequence[8] = {0};
-    uint8_t _kraftPosition = 0;
-    uint8_t _kraftLockTimer = 0;
-    uint8_t _kraftTranspose = 0;
-    uint8_t _kraftTranspCount = 0;
-    int8_t _kraftBaseNote = 0;
-    uint8_t _kraftGhostMask = 0;
 
     // For APHEX - Polyrhythmic Event Sequencer
     uint8_t _aphex_track1_pattern[4]; // 4-step melodic pattern
@@ -265,6 +220,8 @@ public:
     int8_t _stepwave_chromatic_offset; // Running chromatic offset from base note
     bool _stepwave_is_stepped;      // true=stepped, false=slide
 
+    // SCALEWALKER algorithm state (10) - Scale degree walker with subdivisions
+    int8_t _scalewalker_pos;        // Current position in scale (0-6)
 
     // Output state
     bool _activity = false;

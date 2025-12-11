@@ -6,6 +6,8 @@
 #include "Serialize.h"
 #include "Routing.h"
 
+#include <cmath>
+
 class CurveTrack {
 public:
     //----------------------------------------
@@ -209,33 +211,6 @@ public:
         str("%.2f", globalPhase());
     }
 
-    // wavefolderFold
-
-    float wavefolderFold() const { return _wavefolderFold; }
-    void setWavefolderFold(float value) { _wavefolderFold = clamp(value, 0.f, 1.f); }
-    void editWavefolderFold(int value, bool shift) { setWavefolderFold(wavefolderFold() + value * (shift ? 0.1f : 0.01f)); }
-    void printWavefolderFold(StringBuilder &str) const { str("%.2f", wavefolderFold()); }
-
-    // wavefolderGain
-
-    float wavefolderGain() const { return _wavefolderGain; }
-    void setWavefolderGain(float value) { _wavefolderGain = clamp(value, 0.f, 2.f); }
-    void editWavefolderGain(int value, bool shift) { setWavefolderGain(wavefolderGain() + value * (shift ? 0.1f : 0.01f)); }
-    void printWavefolderGain(StringBuilder &str) const { str("%.2f", wavefolderGain()); }
-
-    // djFilter
-
-    float djFilter() const { return _djFilter; }
-    void setDjFilter(float value) { _djFilter = clamp(value, -1.f, 1.f); }
-    void editDjFilter(int value, bool shift) { setDjFilter(djFilter() + value * (shift ? 0.1f : 0.01f)); }
-    void printDjFilter(StringBuilder &str) const { str("%+.2f", djFilter()); }
-
-    // xFade
-    float xFade() const { return _xFade; }
-    void setXFade(float value) { _xFade = clamp(value, 0.f, 1.f); }
-    void editXFade(int value, bool shift) { setXFade(xFade() + value * (shift ? 0.1f : 0.01f)); }
-    void printXFade(StringBuilder &str) const { str("%.2f", xFade()); }
-
     // sequences
 
     const CurveSequenceArray &sequences() const { return _sequences; }
@@ -292,10 +267,6 @@ private:
     Routable<int8_t> _shapeProbabilityBias;
     Routable<int8_t> _gateProbabilityBias;
     float _globalPhase;
-    float _wavefolderFold;
-    float _wavefolderGain;
-    float _djFilter;
-    float _xFade;
 
     CurveSequenceArray _sequences;
 

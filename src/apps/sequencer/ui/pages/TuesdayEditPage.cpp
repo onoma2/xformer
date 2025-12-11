@@ -58,7 +58,7 @@ void TuesdayEditPage::draw(Canvas &canvas) {
     canvas.drawText(centerX, 50, pageStr);
 
     // Draw algorithm number indicator above F1 button (same style as page indicator)
-    FixedStringBuilder<8> algoStr("[%d]", track.algorithm());
+    FixedStringBuilder<8> algoStr("[%d]", _project.selectedTuesdaySequence().algorithm());
     int algoTextWidth = canvas.textWidth(algoStr);
     // Center horizontally in F1 button region (x=0 to x=51, width=51)
     int algoCenterX = (51 - algoTextWidth) / 2;
@@ -140,8 +140,8 @@ void TuesdayEditPage::encoder(EncoderEvent &event) {
 int TuesdayEditPage::paramForPage(int page, int slot) const {
     static const int pageParams[PageCount][ParamsPerPage] = {
         { Algorithm, Flow, Ornament, Power },           // Page 1
-        { LoopLength, Scan, Rotate, CvUpdateMode },     // Page 2
-        { Skew, GateOffset, Glide, Trill },             // Page 3
+        { LoopLength, Rotate, Glide, Skew },            // Page 2
+        { GateLength, GateOffset, Trill, Start },       // Page 3
     };
 
     if (page < 0 || page >= PageCount || slot < 0 || slot >= ParamsPerPage) {
@@ -157,13 +157,13 @@ const char *TuesdayEditPage::paramName(int param) const {
     case Ornament:      return "Ornament";
     case Power:         return "Power";
     case LoopLength:    return "Loop";
-    case Scan:          return "Scan";
     case Rotate:        return "Rotate";
     case Glide:         return "Glide";
     case Skew:          return "Skew";
+    case GateLength:    return "Gate Length";
     case GateOffset:    return "Gate Offset";
-    case CvUpdateMode:  return "CV Mode";
     case Trill:         return "Trill";
+    case Start:         return "Start";
     default:            return "-";
     }
 }
@@ -175,25 +175,25 @@ const char *TuesdayEditPage::paramShortName(int param) const {
     case Ornament:      return "ORN";
     case Power:         return "POWER";
     case LoopLength:    return "LOOP";
-    case Scan:          return "SCAN";
     case Rotate:        return "ROT";
     case Glide:         return "GLIDE";
     case Skew:          return "SKEW";
+    case GateLength:    return "GATE";
     case GateOffset:    return "GOFS";
-    case CvUpdateMode:  return "CVUPD";
     case Trill:         return "TRILL";
+    case Start:         return "START";
     default:            return "-";
     }
 }
 
 void TuesdayEditPage::formatParamValue(int param, StringBuilder &str) const {
-    const auto &track = tuesdayTrack();
+    const auto &sequence = _project.selectedTuesdaySequence();
 
     switch (param) {
     case Algorithm: {
         // Truncate algorithm name to 7 chars max
         FixedStringBuilder<16> fullName;
-        track.printAlgorithm(fullName);
+        sequence.printAlgorithm(fullName);
         const char *name = fullName;
         int len = 0;
         while (name[len] && len < 7) len++;
@@ -201,41 +201,41 @@ void TuesdayEditPage::formatParamValue(int param, StringBuilder &str) const {
         break;
     }
     case Flow:
-        str("%d", track.flow());
+        str("%d", sequence.flow());
         break;
     case Ornament:
-        str("%d", track.ornament());
+        str("%d", sequence.ornament());
         break;
     case Power:
-        str("%d", track.power());
+        str("%d", sequence.power());
         break;
     case LoopLength:
-        track.printLoopLength(str);
-        break;
-    case Scan:
-        str("%d", track.scan());
+        sequence.printLoopLength(str);
         break;
     case Rotate:
-        if (track.loopLength() == 0) {
+        if (sequence.loopLength() == 0) {
             str("N/A");
         } else {
-            str("%+d", track.rotate());
+            str("%+d", sequence.rotate());
         }
         break;
     case Glide:
-        str("%d%%", track.glide());
+        str("%d%%", sequence.glide());
         break;
     case Skew:
-        str("%+d", track.skew());
+        str("%+d", sequence.skew());
+        break;
+    case GateLength:
+        str("%d%%", sequence.gateLength());
         break;
     case GateOffset:
-        str("%d%%", track.gateOffset());
-        break;
-    case CvUpdateMode:
-        track.printCvUpdateMode(str);
+        str("%d%%", sequence.gateOffset());
         break;
     case Trill:
-        str("%d%%", track.trill());
+        str("%d%%", sequence.stepTrill());
+        break;
+    case Start:
+        str("%d", sequence.start());
         break;
     default:
         str("-");
@@ -244,21 +244,21 @@ void TuesdayEditPage::formatParamValue(int param, StringBuilder &str) const {
 }
 
 int TuesdayEditPage::paramValue(int param) const {
-    const auto &track = tuesdayTrack();
+    const auto &sequence = _project.selectedTuesdaySequence();
 
     switch (param) {
-    case Algorithm:     return track.algorithm();
-    case Flow:          return track.flow();
-    case Ornament:      return track.ornament();
-    case Power:         return track.power();
-    case LoopLength:    return track.loopLength();
-    case Scan:          return track.scan();
-    case Rotate:        return track.rotate();
-    case Glide:         return track.glide();
-    case Skew:          return track.skew();
-    case GateOffset:    return track.gateOffset();
-    case CvUpdateMode:  return track.cvUpdateMode();
-    case Trill:         return track.trill();
+    case Algorithm:     return sequence.algorithm();
+    case Flow:          return sequence.flow();
+    case Ornament:      return sequence.ornament();
+    case Power:         return sequence.power();
+    case LoopLength:    return sequence.loopLength();
+    case Rotate:        return sequence.rotate();
+    case Glide:         return sequence.glide();
+    case Skew:          return sequence.skew();
+    case GateLength:    return sequence.gateLength();
+    case GateOffset:    return sequence.gateOffset();
+    case Trill:         return sequence.stepTrill();
+    case Start:         return sequence.start();
     default:            return 0;
     }
 }
@@ -270,13 +270,13 @@ int TuesdayEditPage::paramMax(int param) const {
     case Ornament:      return 16;
     case Power:         return 16;
     case LoopLength:    return 29;   // Index 0-29 (0=Inf, 29=128)
-    case Scan:          return 127;
     case Rotate:        return 63;   // Bipolar: -63 to +63
     case Glide:         return 100;
     case Skew:          return 8;    // Bipolar: -8 to +8
+    case GateLength:    return 100;  // Percentage: 0-100%
     case GateOffset:    return 100;  // Percentage: 0-100%
-    case CvUpdateMode:  return 1;
     case Trill:         return 100;
+    case Start:         return 16;
     default:            return 0;
     }
 }
@@ -286,46 +286,46 @@ bool TuesdayEditPage::paramIsBipolar(int param) const {
 }
 
 void TuesdayEditPage::editParam(int param, int value, bool shift) {
-    auto &track = tuesdayTrack();
+    auto &sequence = _project.selectedTuesdaySequence();
 
     switch (param) {
     case Algorithm:
-        track.editAlgorithm(value, shift);
+        sequence.editAlgorithm(value, shift);
         break;
     case Flow:
-        track.editFlow(value, shift);
+        sequence.editFlow(value, shift);
         break;
     case Ornament:
-        track.editOrnament(value, shift);
+        sequence.editOrnament(value, shift);
         break;
     case Power:
-        track.editPower(value, shift);
+        sequence.editPower(value, shift);
         break;
     case LoopLength:
-        track.editLoopLength(value, shift);
-        break;
-    case Scan:
-        track.editScan(value, shift);
+        sequence.editLoopLength(value, shift);
         break;
     case Rotate:
-        if (track.loopLength() != 0) {
-            track.editRotate(value, shift);
+        if (sequence.loopLength() != 0) {
+            sequence.editRotate(value, shift);
         }
         break;
     case Glide:
-        track.editGlide(value, shift);
+        sequence.editGlide(value, shift);
         break;
     case Skew:
-        track.editSkew(value, shift);
+        sequence.editSkew(value, shift);
+        break;
+    case GateLength:
+        sequence.editGateLength(value, shift);
         break;
     case GateOffset:
-        track.editGateOffset(value, shift);
-        break;
-    case CvUpdateMode:
-        track.editCvUpdateMode(value, shift);
+        sequence.editGateOffset(value, shift);
         break;
     case Trill:
-        track.editTrill(value, shift);
+        sequence.editStepTrill(value, shift);
+        break;
+    case Start:
+        sequence.editStart(value, shift);
         break;
     default:
         break;
@@ -360,17 +360,6 @@ void TuesdayEditPage::drawParam(Canvas &canvas, int x, int slot, int param) {
         return;
     }
 
-    // For CvUpdateMode: draw value at bar level
-    if (param == CvUpdateMode) {
-        FixedStringBuilder<16> valueStr;
-        formatParamValue(param, valueStr);
-        int textWidth = canvas.textWidth(valueStr);
-        int textX = x + (colWidth - textWidth) / 2;
-        canvas.setColor(_selectedSlot == slot ? Color::Bright : Color::Medium);
-        canvas.drawText(textX, barY + 3, valueStr);
-        return;
-    }
-
     // For numeric params: draw number above, bar below
     FixedStringBuilder<16> valueStr;
     formatParamValue(param, valueStr);
@@ -387,7 +376,7 @@ void TuesdayEditPage::drawParam(Canvas &canvas, int x, int slot, int param) {
     bool bipolar = paramIsBipolar(param);
 
     // Special case: Rotate is N/A for infinite loops
-    if (param == Rotate && tuesdayTrack().loopLength() == 0) {
+    if (param == Rotate && _project.selectedTuesdaySequence().loopLength() == 0) {
         return;
     }
 
@@ -434,7 +423,7 @@ void TuesdayEditPage::drawStatusBox(Canvas &canvas) {
     canvas.setFont(Font::Tiny);
 
     const auto &engine = trackEngine();
-    const auto &track = tuesdayTrack();
+    const auto &sequence = _project.selectedTuesdaySequence();
 
     // Line 1: Note name + gate indicator
     int noteY = boxY + 7;
@@ -473,7 +462,7 @@ void TuesdayEditPage::drawStatusBox(Canvas &canvas) {
     // Line 3: Step / Loop
     int stepY = boxY + 23;
     int currentStep = engine.currentStep();
-    int loopLen = track.actualLoopLength();
+    int loopLen = _project.selectedTuesdaySequence().actualLoopLength();
 
     FixedStringBuilder<12> stepStr;
     if (loopLen == 0) {
@@ -499,7 +488,7 @@ void TuesdayEditPage::selectParam(int slot) {
 void TuesdayEditPage::contextAction(int index) {
     switch (ContextAction(index)) {
     case ContextAction::Init:
-        tuesdayTrack().clear();
+        _project.selectedTuesdaySequence().clear();
         break;
     case ContextAction::Reseed:
         const_cast<TuesdayTrackEngine &>(trackEngine()).reseed();

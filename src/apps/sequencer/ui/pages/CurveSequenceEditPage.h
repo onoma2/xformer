@@ -51,6 +51,14 @@ private:
     void duplicateSequence();
     void generateSequence();
 
+    void settingsContextShow();
+    void settingsContextAction(int index);
+    
+    void initSettings();
+    void randomizeSettings();
+    void copySettings();
+    void pasteSettings();
+
     void quickEdit(int index);
 
     CurveSequence::Layer layer() const { return _project.selectedCurveSequenceLayer(); }
@@ -58,10 +66,27 @@ private:
 
     ContextMenu _contextMenu;
 
+    struct SettingsClipboard {
+        // Wavefolder
+        float wavefolderFold;
+        float wavefolderGain;
+        float djFilter;
+        float xFade;
+        // Chaos
+        int chaosAmount;
+        int chaosRate;
+        int chaosParam1;
+        int chaosParam2;
+        CurveSequence::ChaosAlgorithm chaosAlgo;
+    };
+
+    static SettingsClipboard _settingsClipboard;
+
     enum class EditMode {
         Step,
         GlobalPhase,
-        Wavefolder1
+        Wavefolder1,
+        Chaos
     };
 
     int _section = 0;
@@ -69,6 +94,7 @@ private:
     uint32_t _showDetailTicks;
     EditMode _editMode = EditMode::Step;
     int _wavefolderRow = 0;
+    int _chaosRow = 0;
 
     CurveSequenceListModel _listModel;
 

@@ -8,7 +8,10 @@
 
 #include "model/Curve.h"
 
+#include "core/utils/Random.h"
 #include "core/utils/StringBuilder.h"
+
+static Random rng;
 
 enum class ContextAction {
     Init,
@@ -40,6 +43,21 @@ static const ContextMenuModel::Item lfoContextMenuItems[] = {
     { "SINE" },
     { "SAW" },
     { "SQUA" },
+};
+
+enum class SettingsContextAction {
+    Init,
+    Randomize,
+    Copy,
+    Paste,
+    Last
+};
+
+static const ContextMenuModel::Item settingsContextMenuItems[] = {
+    { "INIT" },
+    { "RAND" },
+    { "COPY" },
+    { "PASTE" },
 };
 
 enum class Function {
@@ -118,6 +136,8 @@ static std::pair<int, int> calculateMultiStepShapeMinMax(size_t stepsSelected,
     return std::make_pair(min, max);
 }
 
+CurveSequenceEditPage::SettingsClipboard CurveSequenceEditPage::_settingsClipboard;
+
 CurveSequenceEditPage::CurveSequenceEditPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
 {
@@ -170,24 +190,24 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
             // Get data for the current parameter
             switch (i) {
             case 0: // FOLD
-                value = track.wavefolderFold();
-                track.printWavefolderFold(valueStr);
+                value = sequence.wavefolderFold();
+                sequence.printWavefolderFold(valueStr);
                 break;
             case 1: // GAIN
-                value = track.wavefolderGain();
+                value = sequence.wavefolderGain();
                 max = 2.f;  // New range is 0.0 to 2.0
-                track.printWavefolderGain(valueStr);
+                sequence.printWavefolderGain(valueStr);
                 break;
             case 2: // FILTER
-                value = track.djFilter();
+                value = sequence.djFilter();
                 max = 1.f;
                 bipolar = true;
-                track.printDjFilter(valueStr);
+                sequence.printDjFilter(valueStr);
                 break;
             case 3: // XFADE
-                value = track.xFade();
+                value = sequence.xFade();
                 max = 1.f;
-                track.printXFade(valueStr);
+                sequence.printXFade(valueStr);
                 break;
             }
 
@@ -216,6 +236,81 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
                 if (fillWidth > 0) {
                     canvas.fillRect(barX, barY, fillWidth, barHeight);
                 }
+            }
+        }
+
+    } else if (_editMode == EditMode::Chaos) {
+        WindowPainter::drawActiveFunction(canvas, "CHAOS");
+        const char *chaosFunctionNames[5] = { "AMT", "HZ", "P1", "P2", "NEXT" };
+        WindowPainter::drawFooter(canvas, chaosFunctionNames, pageKeyState(), _chaosRow);
+
+        const int colWidth = 51;
+        const int valueY = 26;
+        const int barY = 32;
+        const int barHeight = 4;
+        const int barWidth = 40;
+
+        // Draw Algo Name below "AMT"
+        canvas.setFont(Font::Tiny);
+        canvas.setColor(Color::Medium);
+        // Assuming "AMT" is at index 0 (x=0)
+        // Center text under the bar
+        if (sequence.chaosAlgo() == CurveSequence::ChaosAlgorithm::Latoocarfian) {
+             const char* line1 = "Latoo-";
+             const char* line2 = "carfian";
+             int x1 = 0 + (colWidth - canvas.textWidth(line1)) / 2;
+             int x2 = 0 + (colWidth - canvas.textWidth(line2)) / 2;
+             canvas.drawText(x1, 44, line1);
+             canvas.drawText(x2, 50, line2);
+        } else {
+            FixedStringBuilder<16> algoName;
+            sequence.printChaosAlgo(algoName);
+            int algoX = 0 + (colWidth - canvas.textWidth(algoName)) / 2;
+            canvas.drawText(algoX, 44, algoName);
+        }
+
+
+        for (int i = 0; i < 4; ++i) {
+            int x = i * colWidth;
+            int barX = x + (colWidth - barWidth) / 2;
+
+            float value = 0.f;
+            float max = 1.f;
+            FixedStringBuilder<16> valueStr;
+
+            switch (i) {
+            case 0: // AMT
+                value = sequence.chaosAmount();
+                max = 100.f;
+                sequence.printChaosAmount(valueStr);
+                break;
+            case 1: // HZ
+                value = sequence.chaosRate();
+                max = 127.f;
+                sequence.printChaosRate(valueStr);
+                break;
+            case 2: // P1
+                value = sequence.chaosParam1();
+                max = 100.f;
+                sequence.printChaosParam1(valueStr);
+                break;
+            case 3: // P2
+                value = sequence.chaosParam2();
+                max = 100.f;
+                sequence.printChaosParam2(valueStr);
+                break;
+            }
+
+            canvas.setFont(Font::Tiny);
+            canvas.setColor((i == _chaosRow) ? Color::Bright : Color::Medium);
+            int textWidth = canvas.textWidth(valueStr);
+            int textX = x + (colWidth - textWidth) / 2;
+            canvas.drawText(textX, valueY, valueStr);
+
+            canvas.setColor(Color::Bright);
+            int fillWidth = (value * barWidth) / max;
+            if (fillWidth > 0) {
+                canvas.fillRect(barX, barY, fillWidth, barHeight);
             }
         }
 
@@ -460,7 +555,21 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
                 event.consume();
                 return;
             }
+        } else if (_editMode == EditMode::Chaos) {
+        int function = key.function();
+        if (function >= 0 && function < 4) {
+            if (key.shiftModifier() && function == 0) {
+                // Toggle Algo on Shift + F1
+                auto algo = sequence.chaosAlgo();
+                auto newAlgo = CurveSequence::ChaosAlgorithm((int(algo) + 1) % int(CurveSequence::ChaosAlgorithm::Last));
+                sequence.setChaosAlgo(newAlgo);
+            } else {
+                _chaosRow = function;
+            }
+            event.consume();
+            return;
         }
+    }
         // For F5, or any F-key in other modes
         switchLayer(key.function(), key.shiftModifier());
         event.consume();
@@ -499,10 +608,23 @@ void CurveSequenceEditPage::encoder(EncoderEvent &event) {
             _wavefolderRow = clamp(_wavefolderRow + event.value(), 0, 3);
         } else {
             switch (_wavefolderRow) {
-            case 0: track.editWavefolderFold(event.value(), shift); break;
-            case 1: track.editWavefolderGain(event.value(), shift); break;
-            case 2: track.editDjFilter(event.value(), shift); break;
-            case 3: track.editXFade(event.value(), shift); break;
+            case 0: sequence.editWavefolderFold(event.value(), shift); break;
+            case 1: sequence.editWavefolderGain(event.value(), shift); break;
+            case 2: sequence.editDjFilter(event.value(), shift); break;
+            case 3: sequence.editXFade(event.value(), shift); break;
+            }
+        }
+        event.consume();
+        return;
+    case EditMode::Chaos:
+        if (event.pressed()) {
+            _chaosRow = clamp(_chaosRow + event.value(), 0, 3);
+        } else {
+            switch (_chaosRow) {
+            case 0: sequence.editChaosAmount(event.value(), shift); break;
+            case 1: sequence.editChaosRate(event.value(), shift); break;
+            case 2: sequence.editChaosParam1(event.value(), shift); break;
+            case 3: sequence.editChaosParam2(event.value(), shift); break;
             }
         }
         event.consume();
@@ -593,6 +715,10 @@ void CurveSequenceEditPage::switchLayer(int functionKey, bool shift) {
             _wavefolderRow = 0; // Reset row selection
             break;
         case EditMode::Wavefolder1:
+            _editMode = EditMode::Chaos;
+            _chaosRow = 0; // Reset row selection
+            break;
+        case EditMode::Chaos:
             _editMode = EditMode::Step;
             _stepSelection.clear();
             break;
@@ -668,7 +794,7 @@ void CurveSequenceEditPage::switchLayer(int functionKey, bool shift) {
 }
 
 int CurveSequenceEditPage::activeFunctionKey() {
-    if (_editMode == EditMode::GlobalPhase || _editMode == EditMode::Wavefolder1) {
+    if (_editMode == EditMode::GlobalPhase || _editMode == EditMode::Wavefolder1 || _editMode == EditMode::Chaos) {
         return 4; // Function::Phase
     }
 
@@ -756,12 +882,16 @@ void CurveSequenceEditPage::drawDetail(Canvas &canvas, const CurveSequence::Step
 }
 
 void CurveSequenceEditPage::contextShow() {
-    showContextMenu(ContextMenu(
-        contextMenuItems,
-        int(ContextAction::Last),
-        [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
-    ));
+    if (_editMode == EditMode::Step || _editMode == EditMode::GlobalPhase) {
+        showContextMenu(ContextMenu(
+            contextMenuItems,
+            int(ContextAction::Last),
+            [&] (int index) { contextAction(index); },
+            [&] (int index) { return contextActionEnabled(index); }
+        ));
+    } else {
+        settingsContextShow();
+    }
 }
 
 void CurveSequenceEditPage::contextAction(int index) {
@@ -793,6 +923,102 @@ bool CurveSequenceEditPage::contextActionEnabled(int index) const {
     default:
         return true;
     }
+}
+
+void CurveSequenceEditPage::settingsContextShow() {
+    showContextMenu(ContextMenu(
+        settingsContextMenuItems,
+        int(SettingsContextAction::Last),
+        [&] (int index) { settingsContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void CurveSequenceEditPage::settingsContextAction(int index) {
+    switch (SettingsContextAction(index)) {
+    case SettingsContextAction::Init:
+        initSettings();
+        break;
+    case SettingsContextAction::Randomize:
+        randomizeSettings();
+        break;
+    case SettingsContextAction::Copy:
+        copySettings();
+        break;
+    case SettingsContextAction::Paste:
+        pasteSettings();
+        break;
+    case SettingsContextAction::Last:
+        break;
+    }
+}
+
+void CurveSequenceEditPage::initSettings() {
+    auto &sequence = _project.selectedCurveSequence();
+    if (_editMode == EditMode::Wavefolder1) {
+        sequence.setWavefolderFold(0.f);
+        sequence.setWavefolderGain(0.f);
+        sequence.setDjFilter(0.f);
+        sequence.setXFade(1.f);
+        showMessage("WAVEFOLDER INITIALIZED");
+    } else if (_editMode == EditMode::Chaos) {
+        sequence.setChaosAmount(0);
+        sequence.setChaosRate(0);
+        sequence.setChaosParam1(0);
+        sequence.setChaosParam2(0);
+        sequence.setChaosAlgo(CurveSequence::ChaosAlgorithm::Latoocarfian);
+        showMessage("CHAOS INITIALIZED");
+    }
+}
+
+void CurveSequenceEditPage::randomizeSettings() {
+    auto &sequence = _project.selectedCurveSequence();
+    if (_editMode == EditMode::Wavefolder1) {
+        sequence.setWavefolderFold(float(rng.nextRange(100)) / 100.f);
+        sequence.setWavefolderGain(float(rng.nextRange(200)) / 100.f);
+        sequence.setDjFilter((float(rng.nextRange(200)) / 100.f) - 1.f);
+        sequence.setXFade(float(rng.nextRange(100)) / 100.f);
+        showMessage("WAVEFOLDER RANDOMIZED");
+    } else if (_editMode == EditMode::Chaos) {
+        sequence.setChaosAmount(rng.nextRange(101));
+        sequence.setChaosRate(rng.nextRange(128));
+        sequence.setChaosParam1(rng.nextRange(101));
+        sequence.setChaosParam2(rng.nextRange(101));
+        sequence.setChaosAlgo(CurveSequence::ChaosAlgorithm(rng.nextRange(int(CurveSequence::ChaosAlgorithm::Last))));
+        showMessage("CHAOS RANDOMIZED");
+    }
+}
+
+void CurveSequenceEditPage::copySettings() {
+    auto &sequence = _project.selectedCurveSequence();
+    _settingsClipboard.wavefolderFold = sequence.wavefolderFold();
+    _settingsClipboard.wavefolderGain = sequence.wavefolderGain();
+    _settingsClipboard.djFilter = sequence.djFilter();
+    _settingsClipboard.xFade = sequence.xFade();
+    _settingsClipboard.chaosAmount = sequence.chaosAmount();
+    _settingsClipboard.chaosRate = sequence.chaosRate();
+    _settingsClipboard.chaosParam1 = sequence.chaosParam1();
+    _settingsClipboard.chaosParam2 = sequence.chaosParam2();
+    // Cast sequence enum to track enum for clipboard compatibility (if needed, or update clipboard)
+    // Actually clipboard uses CurveTrack::ChaosAlgorithm, but we moved it to CurveSequence.
+    // We should update the Clipboard struct to use CurveSequence::ChaosAlgorithm.
+    // For now, casting is safe as they are identical.
+    _settingsClipboard.chaosAlgo = sequence.chaosAlgo();
+    showMessage("SETTINGS COPIED");
+}
+
+void CurveSequenceEditPage::pasteSettings() {
+    auto &sequence = _project.selectedCurveSequence();
+    sequence.setWavefolderFold(_settingsClipboard.wavefolderFold);
+    sequence.setWavefolderGain(_settingsClipboard.wavefolderGain);
+    sequence.setDjFilter(_settingsClipboard.djFilter);
+    sequence.setXFade(_settingsClipboard.xFade);
+    sequence.setChaosAmount(_settingsClipboard.chaosAmount);
+    sequence.setChaosRate(_settingsClipboard.chaosRate);
+    sequence.setChaosParam1(_settingsClipboard.chaosParam1);
+    sequence.setChaosParam2(_settingsClipboard.chaosParam2);
+    sequence.setChaosAlgo(_settingsClipboard.chaosAlgo);
+    showMessage("SETTINGS PASTED");
 }
 
 void CurveSequenceEditPage::initSequence() {

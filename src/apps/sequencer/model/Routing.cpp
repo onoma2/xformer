@@ -215,7 +215,7 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                 case Track::TrackMode::Curve:
                     if (isTrackTarget(target)) {
                         track.curveTrack().writeRouted(target, intValue, floatValue);
-                    } else {
+                    } else if (isSequenceTarget(target) || isChaosTarget(target) || isWavefolderTarget(target)) {
                         for (int patternIndex = 0; patternIndex < CONFIG_PATTERN_COUNT; ++patternIndex) {
                             track.curveTrack().sequence(patternIndex).writeRouted(target, intValue, floatValue);
                         }
@@ -320,6 +320,25 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::Divisor)]                         = { 1,      768,    6,      24,     1       },
     [int(Routing::Target::Scale)]                           = { 0,      23,     0,      23,     1       },
     [int(Routing::Target::RootNote)]                        = { 0,      11,     0,      11,     1       },
+    // Tuesday targets
+    [int(Routing::Target::Algorithm)]                       = { 0,      20,     0,      20,     1       },
+    [int(Routing::Target::Flow)]                            = { 0,      16,     0,      16,     1       },
+    [int(Routing::Target::Ornament)]                        = { 0,      16,     0,      16,     1       },
+    [int(Routing::Target::Power)]                           = { 0,      16,     0,      16,     1       },
+    [int(Routing::Target::Glide)]                           = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::Trill)]                           = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::GateOffset)]                      = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::GateLength)]                      = { 0,      100,    0,      100,    10      },
+    // Chaos targets
+    [int(Routing::Target::ChaosAmount)]                     = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::ChaosRate)]                       = { 0,      127,    0,      127,    10      },
+    [int(Routing::Target::ChaosParam1)]                     = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::ChaosParam2)]                     = { 0,      100,    0,      100,    10      },
+    // Wavefolder targets
+    [int(Routing::Target::WavefolderFold)]                  = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::WavefolderGain)]                  = { 0,      200,    0,      200,    10      },
+    [int(Routing::Target::DjFilter)]                        = { -100,   100,    -100,   100,    10      },
+    [int(Routing::Target::XFade)]                           = { 0,      100,    0,      100,    10      },
 };
 
 float Routing::normalizeTargetValue(Routing::Target target, float value) {
@@ -399,6 +418,28 @@ void Routing::printTargetValue(Routing::Target target, float normalized, StringB
         break;
     case Target::RootNote:
         Types::printNote(str, intValue);
+        break;
+    case Target::Glide:
+    case Target::Trill:
+    case Target::GateLength:
+    case Target::GateOffset:
+    case Target::ChaosAmount:
+    case Target::ChaosParam1:
+    case Target::ChaosParam2:
+    case Target::XFade:
+        str("%d%%", intValue);
+        break;
+    case Target::ChaosRate:
+        str("%d", intValue);
+        break;
+    case Target::WavefolderFold:
+        str("%.2f", value * 0.01f);
+        break;
+    case Target::WavefolderGain:
+        str("%.2f", value * 0.01f);
+        break;
+    case Target::DjFilter:
+        str("%+.2f", value * 0.01f);
         break;
     default:
         str("%d", intValue);

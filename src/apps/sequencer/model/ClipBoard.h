@@ -5,6 +5,7 @@
 #include "Track.h"
 #include "NoteSequence.h"
 #include "CurveSequence.h"
+#include "TuesdaySequence.h"
 #include "Project.h"
 #include "UserScale.h"
 
@@ -72,6 +73,7 @@ private:
             union {
                 NoteSequence note;
                 CurveSequence curve;
+                TuesdaySequence tuesday;
             } data;
         } sequences[CONFIG_TRACK_COUNT];
     };
