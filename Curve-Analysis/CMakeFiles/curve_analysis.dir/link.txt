@@ -1,1 +1,0 @@
-/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/curve_analysis.dir/main.cpp.o CMakeFiles/curve_analysis.dir/CurveProcessor.cpp.o -o curve_analysis  /opt/homebrew/lib/libSDL2.dylib /opt/homebrew/lib/libSDL2_ttf.dylib -framework OpenGL -framework OpenGL -lm
