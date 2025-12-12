@@ -955,10 +955,15 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStepwave(const
         // 9-16: Spread (4-beat window) - polyrhythmic patterns across beat
         result.isSpatial = (ornament >= 9);
 
-        // Update direction based on flow
-        if (flow <= 7) _algoState.stepwave.direction = -1;      // Descending
-        else if (flow >= 9) _algoState.stepwave.direction = 1;  // Ascending
-        else _algoState.stepwave.direction = 0;                 // Random/static
+        // Update direction based on flow using probability
+        int downwardProbability = (16 - flow) * 6;  // Flow 0: ~96%, Flow 8: ~48%, Flow 16: ~0%
+        downwardProbability = clamp(downwardProbability, 10, 90); // Ensure some randomness at extremes
+
+        if (_rng.nextRange(100) < downwardProbability) {
+            _algoState.stepwave.direction = -1; // Downward
+        } else {
+            _algoState.stepwave.direction = 1;  // Upward
+        }
 
         _algoState.stepwave.step_count = ctx.subdivisions;
 
@@ -972,11 +977,16 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStepwave(const
         result.slide = true;
     }
 
-    // Base note generation (scale-based walking)
+    // Base note generation (scale-based walking) with probabilistic direction
     int dir;
-    if (flow <= 7) dir = -1;
-    else if (flow >= 9) dir = 1;
-    else dir = 1;
+    int downwardProbability = (16 - flow) * 6;  // Flow 0: ~96%, Flow 8: ~48%, Flow 16: ~0%
+    downwardProbability = clamp(downwardProbability, 10, 90); // Ensure some randomness at extremes
+
+    if (_rng.nextRange(100) < downwardProbability) {
+        dir = -1; // Downward
+    } else {
+        dir = 1;  // Upward
+    }
 
     int stepSize = 2 + (_stepIndex % 2);
 
