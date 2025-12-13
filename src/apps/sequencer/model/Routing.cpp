@@ -187,7 +187,7 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
         _project.writeRouted(target, intValue, floatValue);
     } else if (isPlayStateTarget(target)) {
         _project.playState().writeRouted(target, tracks, intValue, floatValue);
-    } else if (isTrackTarget(target) || isSequenceTarget(target)) {
+    } else if (isTrackTarget(target) || isSequenceTarget(target) || isTuesdayTarget(target) || isChaosTarget(target) || isWavefolderTarget(target)) {
         for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
             if (tracks & (1<<trackIndex)) {
                 auto &track = _project.track(trackIndex);
@@ -227,7 +227,7 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                     }
                     break;
                 case Track::TrackMode::Tuesday:
-                    if (isSequenceTarget(target) || isTuesdayTarget(target)) {
+                    if (isTrackTarget(target) || isSequenceTarget(target) || isTuesdayTarget(target)) {
                         for (int patternIndex = 0; patternIndex < CONFIG_PATTERN_COUNT; ++patternIndex) {
                             track.tuesdayTrack().sequence(patternIndex).writeRouted(target, intValue, floatValue);
                         }

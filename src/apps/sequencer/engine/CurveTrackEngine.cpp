@@ -32,8 +32,8 @@ static float applyDjFilter(float input, float &lpfState, float control, float re
     alpha = clamp(alpha * alpha, 0.005f, 0.95f);
 
     // Resonance logic removed for now (was dependent on linearToLogarithmicFeedback)
-    
-    float feedback_input = input; 
+
+    float feedback_input = input;
 
     // Update the internal LPF state
     lpfState = lpfState + alpha * (feedback_input - lpfState);
@@ -121,7 +121,7 @@ void CurveTrackEngine::restart() {
     _phasedStepFraction = 0.f;
     _lpfState = 0.f;
     _feedbackState = 0.f;
-    
+
     _chaosValue = 0.f;
     _chaosPhase = 0.f;
     _latoocarfian.reset();
@@ -248,7 +248,7 @@ void CurveTrackEngine::update(float dt) {
             float rho = 10.0f + p1 * 40.0f;
             // Map P2 to Beta (Geometric factor) - 0.5 to 4.0
             float beta = 0.5f + p2 * 3.5f;
-            
+
             _chaosValue = _lorenz.next(dt * speed, rho, beta);
         }
     }
@@ -325,7 +325,7 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
         bool fillInvert = _fillMode == CurveTrack::FillMode::Invert;
 
         const auto &evalSequence = fillNextPattern ? *_fillSequence : sequence;
-        
+
         int firstStep = evalSequence.firstStep();
         int lastStep = evalSequence.lastStep();
         int sequenceLength = lastStep - firstStep + 1;
@@ -338,7 +338,7 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
         if (globalPhase > 0.f && sequenceLength > 0) {
             float currentGlobalPos = float(_sequenceState.step() - firstStep) + _currentStepFraction;
             float phasedGlobalPos = fmod(currentGlobalPos + globalPhase * sequenceLength, float(sequenceLength));
-            
+
             lookupStep = firstStep + int(phasedGlobalPos);
             lookupFraction = fmod(phasedGlobalPos, 1.0f);
         } else {
@@ -346,7 +346,7 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
             lookupStep = _currentStep;
             lookupFraction = _currentStepFraction;
         }
-        
+
         _phasedStep = lookupStep;
         _phasedStepFraction = lookupFraction;
 
