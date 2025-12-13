@@ -147,6 +147,12 @@ private:
     int _coolDown = 0;
     int _coolDownMax = 0;
 
+    // Microgate-level cooldown (Option 1.5: Nested cooldown)
+    // Same mapping as step cooldown, but applies to individual microgates
+    // Threshold is 2x harder (velDensity must be >= microCoolDown * 2)
+    int _microCoolDown = 0;
+    int _microCoolDownMax = 0;
+
     // Gate length (as fraction of divisor, 0-100%)
     int _gatePercent = 75;  // Default 75% gate length
 

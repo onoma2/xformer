@@ -207,6 +207,8 @@ void TuesdayTrackEngine::reset() {
     _gateTicks = 0;
     _coolDown = 0;
     _coolDownMax = 0;
+    _microCoolDown = 0;
+    _microCoolDownMax = 0;
     _gatePercent = 75;
     _gateOffset = 0;
     _slide = 0;
@@ -1315,9 +1317,19 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         int baseCooldown = 17 - power;
         if (baseCooldown < 1) baseCooldown = 1;
         _coolDownMax = baseCooldown;
+        _microCoolDownMax = baseCooldown;  // Same mapping for microgate cooldown
 
-        // Reset cooldown at start of each step (micro-gate loop manages per-event)
-        _coolDown = 0;
+        // Decrement cooldown once per step (before any gate decisions)
+        if (_coolDown > 0) {
+            _coolDown--;
+            if (_coolDown > _coolDownMax) _coolDown = _coolDownMax;
+        }
+
+        // Decrement microgate cooldown once per step
+        if (_microCoolDown > 0) {
+            _microCoolDown--;
+            if (_microCoolDown > _microCoolDownMax) _microCoolDown = _microCoolDownMax;
+        }
 
         // A. Polyrhythm / Trill Detection
         _retriggerArmed = false;
@@ -1344,38 +1356,57 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             // Apply gate offset to the base tick, then space gates evenly from there
             uint32_t baseTick = tick + gateOffsetTicks;
 
-            // Per-event power gating (uses power/cooldown calculated above)
-            for (int i = 0; i < tupleN; i++) {
-                uint32_t offset = (i * spacing);
+            // STEP-LEVEL POWER CHECK (applies to ALL micro-gates in this step)
+            // Cooldown decrements once per STEP, not once per micro-gate
+            bool stepAllowed = false;
 
-                // Calculate voltage for THIS gate using note offset
-                int noteWithOffset = result.note + result.noteOffsets[i];
-                float volts = scaleToVolts(noteWithOffset, result.octave);
-
-                // PER-EVENT POWER CHECK
-                bool eventAllowed = false;
-
-                if (result.velocity == 0 || power == 0) {
-                    eventAllowed = false;
-                } else if (result.accent) {
-                    eventAllowed = true;
-                } else if (_coolDown == 0) {
-                    eventAllowed = true;
+            if (result.velocity == 0 || power == 0) {
+                stepAllowed = false;
+            } else if (result.accent) {
+                stepAllowed = true;
+            } else if (_coolDown == 0) {
+                stepAllowed = true;
+                _coolDown = _coolDownMax;
+            } else {
+                int velDensity = result.velocity / 16;
+                if (velDensity >= _coolDown) {
+                    stepAllowed = true;
                     _coolDown = _coolDownMax;
-                } else {
-                    int velDensity = result.velocity / 16;
-                    if (velDensity >= _coolDown) {
-                        eventAllowed = true;
-                        _coolDown = _coolDownMax;
-                    }
                 }
+            }
 
-                // Decrement cooldown for next event
-                if (_coolDown > 0) _coolDown--;
+            // Schedule micro-gates if step is allowed
+            if (stepAllowed) {
+                int velDensity = result.velocity / 16;
 
-                if (eventAllowed) {
-                    _microGateQueue.push({ baseTick + offset, true, volts });
-                    _microGateQueue.push({ baseTick + offset + gateLen, false, volts });
+                for (int i = 0; i < tupleN; i++) {
+                    // Microgate-level cooldown check (Option 1.5)
+                    // Each microgate checks independently with 2x harder threshold
+                    bool microgateAllowed = false;
+
+                    if (_microCoolDown == 0) {
+                        // Cooldown expired, microgate fires
+                        microgateAllowed = true;
+                        _microCoolDown = _microCoolDownMax;
+                    } else {
+                        // Velocity override: threshold is 2x harder than step-level
+                        int microThreshold = _microCoolDown * 2;
+                        if (velDensity >= microThreshold) {
+                            microgateAllowed = true;
+                            _microCoolDown = _microCoolDownMax;
+                        }
+                    }
+
+                    if (microgateAllowed) {
+                        uint32_t offset = (i * spacing);
+
+                        // Calculate voltage for THIS gate using note offset
+                        int noteWithOffset = result.note + result.noteOffsets[i];
+                        float volts = scaleToVolts(noteWithOffset, result.octave);
+
+                        _microGateQueue.push({ baseTick + offset, true, volts });
+                        _microGateQueue.push({ baseTick + offset + gateLen, false, volts });
+                    }
                 }
             }
 
@@ -1400,17 +1431,8 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         }
 
         // C. Density (Power Gating)
-        // Power/cooldown already calculated above (lines 1112-1125)
-
-        // Only update cooldown if not using micro-sequencing (which handles power per-event)
-        if (!_retriggerArmed) {
-
-            // Decrement cooldown state
-            if (_coolDown > 0) {
-                _coolDown--;
-                if (_coolDown > _coolDownMax) _coolDown = _coolDownMax;
-            }
-        }
+        // Power/cooldown already calculated and decremented above
+        // Cooldown now decrements once per step regardless of micro-gate vs normal gate path
         
         // Gate Decision:
         // 1. Must satisfy Cooldown (Density)
