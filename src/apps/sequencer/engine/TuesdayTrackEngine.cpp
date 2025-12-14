@@ -135,6 +135,86 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.scalewalker.pos = 0;
         break;
 
+    case 11: // WINDOW
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
+
+        // Initialize phases with random offsets
+        _algoState.window.slowPhase = _rng.next() << 16;
+        _algoState.window.fastPhase = _rng.next() << 16;
+
+        // Initialize Markov memory (3-bit values)
+        _algoState.window.noteMemory = _rng.next() & 0x7;      // 0-7
+        _algoState.window.noteHistory = _rng.next() & 0x7;     // 0-7
+
+        // Initialize mutable parameters
+        _algoState.window.ghostThreshold = _rng.next() & 0x1f; // 0-31
+        _algoState.window.phaseRatio = 3 + (_rng.next() & 0x3);// 3-6
+        break;
+
+    case 12: // MINIMAL
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
+
+        // Burst parameters
+        _algoState.minimal.burstLength = 2 + (_rng.next() % 7);  // 2-8
+        _algoState.minimal.silenceLength = 4 + (flow % 13);      // 4-16
+        _algoState.minimal.clickDensity = ornament * 16;         // 0-255
+
+        // Start in SILENCE mode
+        _algoState.minimal.mode = 0;
+        _algoState.minimal.silenceTimer = _algoState.minimal.silenceLength;
+        _algoState.minimal.burstTimer = 0;
+        _algoState.minimal.noteIndex = 0;
+        break;
+
+    case 13: // GANZ
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
+
+        // Initialize triple phasors with random offsets
+        _algoState.ganz.phaseA = _rng.next() << 16;
+        _algoState.ganz.phaseB = _rng.next() << 16;
+        _algoState.ganz.phaseC = _rng.next() << 16;
+
+        // Initialize melodic memory
+        for (int i = 0; i < 3; i++) {
+            _algoState.ganz.noteHistory[i] = _rng.next() % 7;
+        }
+
+        // Initialize mutable parameters
+        _algoState.ganz.selectMode = _rng.next() % 4;
+        _algoState.ganz.skipDecimator = flow >> 2;  // 0-4
+
+        // Start with no active skip
+        _algoState.ganz.phraseSkipCount = 0;
+
+        // Initialize velocity sample
+        _algoState.ganz.velocitySample = 128 + (_extraRng.next() & 0x7F);
+        break;
+
+    case 14: // BLAKE
+        _rng = Random(flowSeed);
+        _extraRng = Random(ornamentSeed + 0x9e3779b9);
+
+        // Generate stable motif (flow-based seed)
+        for (int i = 0; i < 4; i++) {
+            _algoState.blake.motif[i] = _rng.next() % 7;  // 0-6
+        }
+
+        // Initialize breath LFO with random phase offset
+        _algoState.blake.breathPhase = _rng.next() << 16;
+
+        // Breath pattern: flow-influenced (0-3)
+        _algoState.blake.breathPattern = (flow >> 2) % 4;
+
+        // Breath cycle length: ornament-influenced (4-7)
+        _algoState.blake.breathCycleLength = 4 + ((ornament >> 2) % 4);
+
+        // Sub-bass starts inactive
+        _algoState.blake.subBassCountdown = 0;
+        break;
+
     case 3: // APHEX (Mapped from 18)
     case 18:
         _rng = Random(flowSeed);
@@ -374,6 +454,49 @@ void TuesdayTrackEngine::reseed() {
 
     case 10: // SCALEWALKER
         _algoState.scalewalker.pos = 0;
+        break;
+
+    case 11: // WINDOW
+        _algoState.window.slowPhase = _rng.next() << 16;
+        _algoState.window.fastPhase = _rng.next() << 16;
+        _algoState.window.noteMemory = _rng.next() & 0x7;
+        _algoState.window.noteHistory = _rng.next() & 0x7;
+        _algoState.window.ghostThreshold = _rng.next() & 0x1f;
+        _algoState.window.phaseRatio = 3 + (_rng.next() & 0x3);
+        break;
+
+    case 12: // MINIMAL
+        _algoState.minimal.burstLength = 2 + (_rng.next() % 7);
+        _algoState.minimal.silenceLength = 4 + (_cachedFlow % 13);
+        _algoState.minimal.clickDensity = _cachedOrnament * 16;
+        _algoState.minimal.mode = 0;
+        _algoState.minimal.silenceTimer = _algoState.minimal.silenceLength;
+        _algoState.minimal.burstTimer = 0;
+        _algoState.minimal.noteIndex = 0;
+        break;
+
+    case 13: // GANZ
+        _algoState.ganz.phaseA = _rng.next() << 16;
+        _algoState.ganz.phaseB = _rng.next() << 16;
+        _algoState.ganz.phaseC = _rng.next() << 16;
+        for (int i = 0; i < 3; i++) {
+            _algoState.ganz.noteHistory[i] = _rng.next() % 7;
+        }
+        _algoState.ganz.selectMode = _rng.next() % 4;
+        _algoState.ganz.skipDecimator = _cachedFlow >> 2;
+        _algoState.ganz.phraseSkipCount = 0;
+        _algoState.ganz.velocitySample = 128 + (_extraRng.next() & 0x7F);
+        break;
+
+    case 14: // BLAKE
+        // Regenerate motif with new seed
+        for (int i = 0; i < 4; i++) {
+            _algoState.blake.motif[i] = _rng.next() % 7;
+        }
+        _algoState.blake.breathPhase = _rng.next() << 16;
+        _algoState.blake.breathPattern = (_cachedFlow >> 2) % 4;
+        _algoState.blake.breathCycleLength = 4 + ((_cachedOrnament >> 2) % 4);
+        _algoState.blake.subBassCountdown = 0;
         break;
     }
 }
@@ -1111,6 +1234,394 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateScalewalker(co
     return result;
 }
 
+TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateMinimal(const GenerationContext &ctx) {
+    const auto &sequence = tuesdayTrack().sequence(pattern());
+    TuesdayTickResult result;
+
+    // Get current state
+    auto &state = _algoState.minimal;
+
+    // Timer management - decrement active timer
+    if (state.mode == 0) {
+        // SILENCE mode
+        if (state.silenceTimer > 0) {
+            state.silenceTimer--;
+        }
+
+        // Switch to BURST when silence ends
+        if (state.silenceTimer == 0) {
+            state.mode = 1;  // BURST
+            state.burstTimer = state.burstLength;
+            state.burstLength = 2 + (_rng.next() % 7);  // Randomize next burst: 2-8
+        }
+    } else {
+        // BURST mode
+        if (state.burstTimer > 0) {
+            state.burstTimer--;
+        }
+
+        // Switch to SILENCE when burst ends
+        if (state.burstTimer == 0) {
+            state.mode = 0;  // SILENCE
+            state.silenceTimer = state.silenceLength;
+            state.silenceLength = 4 + (sequence.flow() % 13);  // Update silence: 4-16
+        }
+    }
+
+    // Generate output based on mode
+    if (state.mode == 0) {
+        // SILENCE: no gate
+        result.velocity = 0;
+        result.note = 0;
+        result.octave = 0;
+        result.gateRatio = 25;
+    } else {
+        // BURST: check density
+        bool shouldPlay = true;
+        if (state.clickDensity > 0) {
+            uint8_t rng = _rng.next() & 0xFF;
+            shouldPlay = (rng < state.clickDensity);
+        }
+        // Note: if clickDensity == 0, always play (special case per plan)
+
+        if (shouldPlay) {
+            // Note generation: 0-20 noteIndex wraps to 0-6 note, 0-2 octave
+            result.note = state.noteIndex % 7;
+            result.octave = (state.noteIndex / 7) % 3;
+
+            // Velocity: medium range 128-255
+            result.velocity = 128 + (_extraRng.next() & 0x7F);
+
+            // Staccato gates: 25-50% (base 25%, gateLength param adds up to 25% more)
+            int gatePercent = 25 + (sequence.gateLength() / 4);  // 25-50%
+            result.gateRatio = clamp(gatePercent, 25, 50);
+
+            // Conservative articulation: glide/5, trill/10
+            int glideProb = sequence.glide() / 5;  // Max 20%
+            int trillProb = sequence.stepTrill() / 10;  // Max 10%
+
+            result.slide = (_extraRng.next() % 100) < glideProb;
+
+            if ((_extraRng.next() % 100) < trillProb) {
+                result.trillCount = 2 + (_extraRng.next() % 3);  // 2-4
+            } else {
+                result.trillCount = 1;
+            }
+
+            // Micro-timing jitter: 0-5%
+            result.gateOffset = _extraRng.next() % 6;  // 0-5%
+
+            // Advance note index
+            state.noteIndex = (state.noteIndex + 1) % 21;  // 0-20
+        } else {
+            // Density gated out
+            result.velocity = 0;
+            result.note = 0;
+            result.octave = 0;
+            result.gateRatio = 25;
+        }
+    }
+
+    return result;
+}
+
+TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateWindow(const GenerationContext &ctx) {
+    const auto &sequence = tuesdayTrack().sequence(pattern());
+    TuesdayTickResult result;
+
+    auto &state = _algoState.window;
+
+    // Calculate phase increments
+    uint32_t slowIncrement = (ctx.effectiveLoopLength > 0)
+        ? (0xFFFFFFFF / ctx.effectiveLoopLength)
+        : 0x08000000;  // Fallback for safety
+
+    uint32_t fastDivisor = std::max(1, ctx.effectiveLoopLength / state.phaseRatio);
+    uint32_t fastIncrement = (ctx.effectiveLoopLength > 0)
+        ? (0xFFFFFFFF / fastDivisor)
+        : 0x20000000;  // Fallback for safety
+
+    // Advance phasors
+    uint32_t oldSlowPhase = state.slowPhase;
+    state.slowPhase += slowIncrement;
+    state.fastPhase += fastIncrement;
+
+    // Auto-mutation every N steps
+    if (_stepIndex % 96 == 0 && _stepIndex > 0) {
+        // Mutate phaseRatio: 3-6
+        state.phaseRatio = 3 + (_rng.next() & 0x3);
+    }
+    if (_stepIndex % 64 == 0 && _stepIndex > 0) {
+        // Mutate ghostThreshold: 0-31
+        state.ghostThreshold = _rng.next() & 0x1f;
+    }
+
+    // Decision variables
+    bool isAccent = (state.slowPhase < oldSlowPhase);  // Wrapped (overflow)
+    bool isGhost = ((state.fastPhase >> 27) & 0x1F) > state.ghostThreshold;
+    bool voiceA = (state.fastPhase >> 28) & 1;
+
+    // Generate based on voice selection
+    if (isAccent) {
+        // ACCENT NOTES: Loud, high octave, always slide
+        result.note = state.noteMemory;  // Use current Markov note
+        result.octave = 2 + (_extraRng.next() % 2);  // Octave 2-3
+        result.velocity = 100 + (_extraRng.next() & 0x3F);  // 100-163
+        result.gateRatio = 150 + (_extraRng.next() % 26);  // 150-175%
+        result.slide = true;  // Always slide accents
+    } else if (isGhost) {
+        // GHOST NOTES: Very low velocity, short gates
+        result.note = (state.fastPhase >> 25) & 0x7;
+        result.octave = 0;
+        result.velocity = 5 + (_extraRng.next() & 0x1F);  // 5-36
+        result.gateRatio = 50 + (_extraRng.next() % 26);  // 50-75%
+        result.slide = false;
+    } else if (voiceA) {
+        // VOICE A: Markov Walk
+        // Seed extraRng with (noteHistory + noteMemory) for order-2 Markov
+        Random markovRng(_extraRng.next() + state.noteHistory + state.noteMemory);
+
+        // Random walk: -1, 0, +1
+        int step = (markovRng.next() % 3) - 1;  // 0,1,2 → -1,0,+1
+        int newNote = (state.noteMemory + step + 7) % 7;  // Wrap 0-6
+
+        // Update history
+        state.noteHistory = state.noteMemory;
+        state.noteMemory = newNote;
+
+        result.note = newNote;
+        result.octave = 0;
+        result.velocity = 40 + (_extraRng.next() % 86);  // 40-125
+        result.gateRatio = 75;
+
+        // 25% slide probability for texture
+        result.slide = (_extraRng.next() % 100) < 25;
+    } else {
+        // VOICE B: Arpeggio
+        result.note = (state.fastPhase >> 25) & 0x7;
+        result.octave = 0;
+        result.velocity = 40 + (_extraRng.next() % 86);  // 40-125
+        result.gateRatio = 75;
+        result.slide = false;
+    }
+
+    return result;
+}
+
+TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateBlake(const GenerationContext &ctx) {
+    const auto &sequence = tuesdayTrack().sequence(pattern());
+    TuesdayTickResult result;
+    auto &state = _algoState.blake;
+
+    // 1. BREATH LFO UPDATE (8-bar cycle)
+    uint32_t breathIncrement = (ctx.effectiveLoopLength > 0)
+        ? (0xFFFFFFFF / (ctx.effectiveLoopLength * 8))
+        : 0x02000000;  // Fallback: very slow
+    state.breathPhase += breathIncrement;
+
+    // 2. AUTO-MUTATION
+    if (_stepIndex % 96 == 0 && _stepIndex > 0) {
+        state.breathPattern = _rng.next() % 4;
+    }
+    if (_stepIndex % 64 == 0 && _stepIndex > 0) {
+        state.breathCycleLength = 4 + (_rng.next() % 4);  // 4-7
+    }
+
+    // 3. BREATH PATTERN INTERPRETATION
+    int breathPos = (_stepIndex % state.breathCycleLength);
+
+    enum ArticulationType { REAL, GHOST, WHISPER };
+    ArticulationType articulation = REAL;
+
+    switch (state.breathPattern) {
+    case 0: // R-R-R-G
+        articulation = (breathPos == 3) ? GHOST : REAL;
+        break;
+    case 1: // R-W-R-G
+        if (breathPos == 1) articulation = WHISPER;
+        else if (breathPos == 3) articulation = GHOST;
+        else articulation = REAL;
+        break;
+    case 2: // R-G-W-G
+        if (breathPos == 0) articulation = REAL;
+        else if (breathPos == 2) articulation = WHISPER;
+        else articulation = GHOST;
+        break;
+    case 3: // R-R-G-W
+        if (breathPos < 2) articulation = REAL;
+        else if (breathPos == 2) articulation = GHOST;
+        else articulation = WHISPER;
+        break;
+    }
+
+    // 4. NOTE GENERATION (from stable motif)
+    int motifIdx = _stepIndex % 4;
+    result.note = state.motif[motifIdx];
+    result.octave = 0;
+
+    // 5. SUB-BASS DROPS (override everything)
+    if (state.subBassCountdown > 0) {
+        state.subBassCountdown--;
+        result.octave = -1;
+        result.note = 0;
+        result.velocity = 255;
+        result.accent = true;
+        result.gateRatio = 100;
+        result.slide = (state.subBassCountdown == 0);  // Slide on last sub-bass note
+        return result;
+    }
+
+    // Trigger new sub-bass drop on beat starts
+    if (ctx.isBeatStart) {
+        int dropChance = sequence.power() * 6;  // 0-96%
+        if ((_rng.next() % 100) < static_cast<uint32_t>(dropChance)) {
+            state.subBassCountdown = 2 + (_rng.next() % 3);  // 2-4 steps
+        }
+    }
+
+    // 6. ARTICULATION APPLICATION
+    switch (articulation) {
+    case REAL:
+        // Normal notes: breath LFO modulates velocity
+        {
+            int breathBias = (state.breathPhase >> 24) & 0xFF;  // 0-255
+            result.velocity = 128 + (breathBias / 2);  // 128-255
+            result.gateRatio = 75;
+            // Occasional octave up
+            if ((_extraRng.next() % 100) < 25) {
+                result.octave = 1;
+            }
+        }
+        break;
+
+    case GHOST:
+        // Ghost notes: high octave, very quiet, short gates
+        result.octave = 2;
+        result.velocity = 20 + (_extraRng.next() & 0x0F);  // 20-35
+        result.gateRatio = 40;
+        break;
+
+    case WHISPER:
+        // Whispers: rests (no gate)
+        result.velocity = 0;
+        result.gateRatio = 25;
+        break;
+    }
+
+    // 7. MICRO-TIMING (minimal jitter)
+    result.gateOffset = _extraRng.next() % 5;  // 0-4%
+
+    return result;
+}
+
+TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateGanz(const GenerationContext &ctx) {
+    const auto &sequence = tuesdayTrack().sequence(pattern());
+    TuesdayTickResult result;
+    auto &state = _algoState.ganz;
+
+    // 1. TRIPLE PHASOR UPDATE
+    uint32_t incrementA = (ctx.effectiveLoopLength > 0)
+        ? (0xFFFFFFFF / ctx.effectiveLoopLength)
+        : 0x08000000;
+
+    uint32_t oldPhaseA = state.phaseA;
+    state.phaseA += incrementA;
+    state.phaseB += (incrementA * 5);
+    state.phaseC += (incrementA * 7);
+
+    // 2. AUTO-MUTATION (select mode every 96 ticks)
+    if (_stepIndex % 96 == 0 && _stepIndex > 0) {
+        state.selectMode = _rng.next() % 4;
+    }
+
+    // 3. 5-TUPLET MICRO-RHYTHM GRID
+    int tupletPos = (state.phaseB >> 27) % 5;  // 0-4
+    bool shouldPlay = (tupletPos <= 2);  // Positions 0,1,2 play; 3,4 silent
+
+    if (!shouldPlay) {
+        result.velocity = 0;
+        result.gateRatio = 25;
+        return result;
+    }
+
+    // 4. PHRASE SKIPPING MECHANISM
+    if (state.phraseSkipCount > 0) {
+        state.phraseSkipCount--;
+        result.velocity = 0;
+        return result;
+    }
+
+    // Trigger new skip based on phaseC and decimator
+    if ((state.phaseC >> 28) < (state.skipDecimator * 2)) {
+        int skipLength = 1 + (_rng.next() % 4);  // Skip 1-4 steps
+        state.phraseSkipCount = skipLength;
+        result.velocity = 0;
+        return result;
+    }
+
+    // 5. NOTE SELECTION (4 modes, using noteHistory)
+    int selectedNote = 0;
+
+    switch (state.selectMode) {
+    case 0: // MARKOV WALK
+        {
+            int step = (_extraRng.next() % 3) - 1;  // -1, 0, +1
+            selectedNote = (state.noteHistory[0] + step + 7) % 7;
+        }
+        break;
+
+    case 1: // PHASOR DIRECT
+        selectedNote = (state.phaseA >> 25) % 7;
+        break;
+
+    case 2: // HISTORY CYCLE
+        selectedNote = state.noteHistory[_stepIndex % 3];
+        break;
+
+    case 3: // XOR CHAOS
+        {
+            int xor_val = ((state.phaseA >> 24) ^ (state.phaseC >> 24)) & 0xFF;
+            selectedNote = xor_val % 7;
+        }
+        break;
+    }
+
+    // 6. UPDATE HISTORY (circular buffer)
+    state.noteHistory[2] = state.noteHistory[1];
+    state.noteHistory[1] = state.noteHistory[0];
+    state.noteHistory[0] = selectedNote;
+
+    result.note = selectedNote;
+
+    // 7. OCTAVE SELECTION (phaseC-based)
+    result.octave = (state.phaseC >> 29) % 3;  // 0-2
+
+    // 8. SAMPLE-AND-HOLD VELOCITY (decimated updates)
+    if (_stepIndex % 8 == 0) {
+        state.velocitySample = 64 + (_extraRng.next() & 0xBF);  // 64-255
+    }
+    result.velocity = state.velocitySample;
+
+    // 9. ACCENT VS REGULAR NOTES
+    bool isAccent = (state.phaseA < oldPhaseA);  // Overflow detection
+
+    if (isAccent) {
+        result.accent = true;
+        result.velocity = 255;
+        result.gateRatio = 125;
+        result.slide = true;
+    } else {
+        result.gateRatio = 60 + (tupletPos * 15);  // 60-90 vary by tuplet position
+        // Slide probability based on ornament
+        result.slide = ((_extraRng.next() % 100) < static_cast<uint32_t>(sequence.ornament() * 6));
+    }
+
+    // 10. MICRO-TIMING (moderate swing)
+    result.gateOffset = ((state.phaseB >> 26) & 0x1F) % 20;  // 0-19%
+
+    return result;
+}
+
 float TuesdayTrackEngine::scaleToVolts(int noteIndex, int octave) const {
     const auto &sequence = tuesdayTrack().sequence(pattern());
     const auto &project = _model.project();
@@ -1186,6 +1697,10 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
     case 8:  return generateChipArp2(ctx);
     case 9:  return generateWobble(ctx);
     case 10: return generateScalewalker(ctx);
+    case 11: return generateWindow(ctx);
+    case 12: return generateMinimal(ctx);
+    case 13: return generateGanz(ctx);
+    case 14: return generateBlake(ctx);
     default: return generateTest(ctx);
     }
 }

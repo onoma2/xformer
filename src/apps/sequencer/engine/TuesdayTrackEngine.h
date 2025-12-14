@@ -118,6 +118,10 @@ private:
     TuesdayTickResult generateChipArp2(const GenerationContext &ctx);
     TuesdayTickResult generateWobble(const GenerationContext &ctx);
     TuesdayTickResult generateScalewalker(const GenerationContext &ctx);
+    TuesdayTickResult generateWindow(const GenerationContext &ctx);
+    TuesdayTickResult generateMinimal(const GenerationContext &ctx);
+    TuesdayTickResult generateBlake(const GenerationContext &ctx);
+    TuesdayTickResult generateGanz(const GenerationContext &ctx);
 
     // The "Pipeline": Converts abstract algorithm steps into quantized voltage
     float scaleToVolts(int noteIndex, int octave) const;
@@ -243,6 +247,44 @@ private:
         int8_t pos;
     };  // 1 byte
 
+    struct WindowState {
+        uint32_t slowPhase;      // Slow cycle phasor (anchor notes)
+        uint32_t fastPhase;      // Fast cycle phasor (texture)
+        uint8_t noteMemory;      // Current Markov note (0-7)
+        uint8_t noteHistory;     // Previous Markov note (0-7)
+        uint8_t ghostThreshold;  // Ghost note threshold 0-31 (mutable)
+        uint8_t phaseRatio;      // Polyrhythm ratio 3-6 (mutable)
+    };  // 14 bytes
+
+    struct MinimalState {
+        uint8_t burstLength;     // 2-8 steps per burst
+        uint8_t silenceLength;   // 4-16 steps per silence
+        uint8_t clickDensity;    // 0-255 note probability
+        uint8_t burstTimer;      // Countdown in current burst
+        uint8_t silenceTimer;    // Countdown in current silence
+        uint8_t noteIndex;       // Current note position 0-20
+        uint8_t mode;            // 0=SILENCE, 1=BURST
+    };  // 7 bytes
+
+    struct BlakeState {
+        uint8_t motif[4];           // 4-note melodic core (0-6 scale degrees)
+        uint32_t breathPhase;       // 32-bit phasor for 8-bar breath LFO
+        uint8_t breathPattern;      // 0-3: articulation variant index
+        uint8_t breathCycleLength;  // 4-7 steps (mutable)
+        uint8_t subBassCountdown;   // Stomper-style drop counter
+    };  // 13 bytes
+
+    struct GanzState {
+        uint32_t phaseA;            // 1x speed phasor (base rhythm)
+        uint32_t phaseB;            // 5x speed phasor (micro-rhythm)
+        uint32_t phaseC;            // 7x speed phasor (texture layer)
+        uint8_t noteHistory[3];     // 3-note melodic memory (0-6)
+        uint8_t selectMode;         // 0-3: note selection mode (mutable)
+        uint8_t phraseSkipCount;    // Active skip counter
+        uint8_t velocitySample;     // Sample-and-hold velocity
+        uint8_t skipDecimator;      // Controls skip frequency
+    };  // 20 bytes
+
     // Union for algorithm state (only one active)
     union AlgorithmState {
         TestState test;
@@ -256,6 +298,10 @@ private:
         ChipArp2State chiparp2;
         WobbleState wobble;
         ScalewalkerState scalewalker;
+        WindowState window;
+        MinimalState minimal;
+        BlakeState blake;
+        GanzState ganz;
     };
 
     AlgorithmState _algoState;

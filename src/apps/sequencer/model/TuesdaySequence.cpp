@@ -47,6 +47,10 @@ void TuesdaySequence::printAlgorithm(StringBuilder &str) const {
     case 8:  str("Chip2"); break;
     case 9:  str("Wobble"); break;
     case 10: str("ScaleWlk"); break;
+    case 11: str("Window"); break;
+    case 12: str("Minimal"); break;
+    case 13: str("Ganz"); break;
+    case 14: str("Blake"); break;
     case 18: str("Aphex"); break;
     case 19: str("Autech"); break;
     case 20: str("StepWave"); break;
