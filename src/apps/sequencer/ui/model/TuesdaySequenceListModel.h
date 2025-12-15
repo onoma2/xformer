@@ -71,6 +71,8 @@ public:
             return Routing::Target::None; // Not routable
         case TimeMode:
             return Routing::Target::None; // Not routable
+        case MaskProgression:
+            return Routing::Target::None; // Not routable
         default:
             return Routing::Target::None;
         }
@@ -98,6 +100,7 @@ private:
         RootNote,
         MaskParameter,
         TimeMode,
+        MaskProgression,
         Last
     };
 
@@ -123,6 +126,7 @@ private:
         case RootNote:      return "Root Note";
         case MaskParameter: return "Mask Param";
         case TimeMode: return "Time Mode";
+        case MaskProgression: return "Mask Prog";
         case Last:          break;
         }
         return nullptr;
@@ -194,6 +198,9 @@ private:
         case TimeMode:
             _sequence->printTimeMode(str);
             break;
+        case MaskProgression:
+            _sequence->printMaskProgression(str);
+            break;
         case Last:
             break;
         }
@@ -260,6 +267,9 @@ private:
             break;
         case TimeMode:
             _sequence->editTimeMode(value, shift);
+            break;
+        case MaskProgression:
+            _sequence->editMaskProgression(value, shift);
             break;
         case Last:
             break;

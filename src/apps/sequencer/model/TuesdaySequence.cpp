@@ -149,6 +149,7 @@ void TuesdaySequence::clear() {
     _gateOffset.setBase(0); // Default 0% (Quantized)
     _maskParameter = 0; // Default: ALL (no skipping)
     _timeMode = 0; // Default: FREE mode
+    _maskProgression = 0; // Default: no progression
 }
 
 void TuesdaySequence::write(VersionedSerializedWriter &writer) const {
@@ -174,6 +175,7 @@ void TuesdaySequence::write(VersionedSerializedWriter &writer) const {
     _gateOffset.write(writer);
     writer.write(_maskParameter);
     writer.write(_timeMode);
+    writer.write(_maskProgression);
 }
 
 void TuesdaySequence::read(VersionedSerializedReader &reader) {
@@ -204,16 +206,23 @@ void TuesdaySequence::read(VersionedSerializedReader &reader) {
     _gateLength.read(reader);
     _gateOffset.read(reader);
     // Read mask parameter (backward compatibility with older projects)
-    if (reader.dataVersion() >= ProjectVersion::Version55) {
-        // For newest files, just read the mask parameter
+    if (reader.dataVersion() >= ProjectVersion::Version56) {
+        // For newest files, read the mask parameter and progression
         reader.read(_maskParameter, ProjectVersion::Version55);
         reader.read(_timeMode, ProjectVersion::Version54);
+        reader.read(_maskProgression, ProjectVersion::Version56);
+    } else if (reader.dataVersion() >= ProjectVersion::Version55) {
+        // For version 55 files, read mask parameter and timeMode, set progression to default
+        reader.read(_maskParameter, ProjectVersion::Version55);
+        reader.read(_timeMode, ProjectVersion::Version54);
+        _maskProgression = 0; // Default to no progression for older files
     } else if (reader.dataVersion() >= ProjectVersion::Version53) {
         // For version 53-54 files that have the old primeMaskPattern, read and convert
         uint8_t oldPrimeMaskPattern;
         reader.read(oldPrimeMaskPattern, ProjectVersion::Version53);
         reader.read(_maskParameter, ProjectVersion::Version53);
         reader.read(_timeMode, ProjectVersion::Version54);
+        _maskProgression = 0; // Default to no progression for older files
 
         // Convert old primeMaskPattern to new behavior if needed
         // If old pattern was 1 (ALLOW ALL), keep _maskParameter as is (0 = ALL)
@@ -223,7 +232,9 @@ void TuesdaySequence::read(VersionedSerializedReader &reader) {
         }
         // For old prime/fib patterns, the maskParam values remain the same but will now map to new mask values
     } else {
-        // For even older files, just maintain _maskParameter default of 0 (ALL)
+        // For even older files, just maintain defaults
         reader.read(_timeMode, ProjectVersion::Version54);
+        _maskParameter = 0; // Default to ALL
+        _maskProgression = 0; // Default to no progression
     }
 }

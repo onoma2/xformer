@@ -447,6 +447,30 @@ public:
         }
     }
 
+    // maskProgression (0=NO PROGRESSION, 1=PROGRESS BY 1, 2=BY 5, 3=BY 7)
+    int maskProgression() const { return _maskProgression; }
+    void setMaskProgression(int progression) {
+        _maskProgression = clamp(progression, 0, 3);
+    }
+
+    void editMaskProgression(int value, bool shift) {
+        if (value != 0) {
+            int current = _maskProgression;
+            current = (current + 1) % 4;  // Cycle through 0, 1, 2, 3
+            _maskProgression = current;
+        }
+    }
+
+    void printMaskProgression(StringBuilder &str) const {
+        switch (_maskProgression) {
+            case 0: str("NO PROG"); break;
+            case 1: str("PROG+1"); break;
+            case 2: str("PROG+5"); break;
+            case 3: str("PROG+7"); break;
+            default: str("PROG-%d", _maskProgression); break;
+        }
+    }
+
 
     // rotate (bipolar shift for finite loops, limited by loop length)
 
@@ -525,6 +549,7 @@ private:
     Routable<uint8_t> _gateOffset;  // Default: 0% (no gate timing offset)
     uint8_t _maskParameter = 0;  // Default: 0 (ALL = no skipping)
     uint8_t _timeMode = 0;  // Default: 0 (FREE mode)
+    uint8_t _maskProgression = 0;  // Default: 0 (no progression)
 
     friend class TuesdayTrack;
 };

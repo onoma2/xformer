@@ -321,4 +321,6 @@ private:
     int _cachedPrimeParam = -1;   // Cached value to detect changes
     int _cachedTimeMode = -1;     // Cached value to detect time mode changes
     uint32_t _timeModeStartTick = 0; // Tick when current time mode interval started
+    int _currentMaskArrayIndex = 0;  // Current index in the mask array
+    int _cachedMaskProgression = -1; // Cached value for progression changes
 };

@@ -323,6 +323,8 @@ void TuesdayTrackEngine::reset() {
     _cachedPrimeParam = -1;
     _cachedTimeMode = -1;
     _timeModeStartTick = 0;
+    _currentMaskArrayIndex = 0;
+    _cachedMaskProgression = -1;
 
     // Zero-initialize union
     memset(&_algoState, 0, sizeof(_algoState));
@@ -1758,22 +1760,32 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     }
     tick -= extendedStartTicks;
 
-    // Apply Mask-Based Tick Masking - Hide tick from algorithm based on pattern
+    // Apply Mask-Based Tick Masking with Progression - Hide tick from algorithm based on pattern
     bool tickAllowed = true;
 
     int maskParam = sequence.maskParameter();
     int timeMode = sequence.timeMode();
+    int maskProgression = sequence.maskProgression();
 
-    // Reset state when any parameter changes
-    if (_cachedPrimeParam != maskParam || _cachedTimeMode != timeMode) {
+    // Reset state when any parameter changes (including maskProgression)
+    if (_cachedPrimeParam != maskParam || _cachedTimeMode != timeMode || _cachedMaskProgression != maskProgression) {
         _primeMaskCounter = 0;
         _primeMaskState = 1; // Start in allow state (for time modes: mask first)
+
+        // Initialize array index based on maskParam for backward compatibility
+        if (maskParam > 0 && maskParam < 15) {
+            _currentMaskArrayIndex = (maskParam - 1) % 14; // Map 1-14 to 0-13
+        } else {
+            _currentMaskArrayIndex = 0; // Default for ALL/NONE
+        }
+
         _cachedPrimeParam = maskParam;
         _cachedTimeMode = timeMode;
+        _cachedMaskProgression = maskProgression;
         _timeModeStartTick = tick; // Reset the time mode interval
     }
 
-    // Get the effective mask value based on the parameter (0-15)
+    // Get the effective mask value based on the current array index (may advance due to progression)
     int effectiveParam = 0;  // Default to 0
     if (maskParam == 0) {
         // Special case: parameter 0 means allow all (no skipping)
@@ -1782,11 +1794,13 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         // Special case: parameter 15 means mask all (complete skipping)
         tickAllowed = false;
     } else {
-        // Parameters 1-14 map to specific mask values
+        // Use the current array index to get the mask value
         static const int MASK_VALUES[] = {2, 3, 5, 11, 19, 31, 43, 61, 89, 131, 197, 277, 409, 599};
         const int MASK_COUNT = sizeof(MASK_VALUES) / sizeof(MASK_VALUES[0]);
-        int maskIndex = maskParam - 1; // Adjust to 0-indexed
-        effectiveParam = MASK_VALUES[maskIndex % MASK_COUNT];
+        effectiveParam = MASK_VALUES[_currentMaskArrayIndex % MASK_COUNT];
+
+        // Store the current counter value to detect cycle completion
+        int previousCounter = _primeMaskCounter;
 
         // Apply timing mode logic using the selected mask value
         if (timeMode == 0) {  // FREE mode - toggle based on mask value duration
@@ -1795,6 +1809,15 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             // If we've reached the selected mask value duration, toggle the state
             if (_primeMaskCounter >= effectiveParam) {
                 _primeMaskState = 1 - _primeMaskState; // Toggle between 0 and 1
+
+                // Check if we've completed a full cycle (transition from state to opposite state)
+                // Advance array index if progression is enabled
+                if (maskProgression > 0) {
+                    int increment = (maskProgression == 1) ? 1 :
+                                   (maskProgression == 2) ? 5 : 7; // 1, 5, or 7
+                    _currentMaskArrayIndex = (_currentMaskArrayIndex + increment) % MASK_COUNT;
+                }
+
                 _primeMaskCounter = 0; // Reset counter
             }
 
@@ -1828,7 +1851,13 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
                 // During allow period
                 tickAllowed = true;
             } else {
-                // Cycle complete - reset
+                // Cycle complete - advance to next mask value if progression is enabled
+                if (maskProgression > 0) {
+                    int increment = (maskProgression == 1) ? 1 :
+                                   (maskProgression == 2) ? 5 : 7; // 1, 5, or 7
+                    _currentMaskArrayIndex = (_currentMaskArrayIndex + increment) % MASK_COUNT;
+                }
+
                 _primeMaskCounter = 0;
                 tickAllowed = false; // Start next cycle with mask
             }
