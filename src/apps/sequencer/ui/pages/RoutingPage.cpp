@@ -290,20 +290,28 @@ void RoutingPage::drawBiasOverlay(Canvas &canvas) {
 
     const int colWidth = CONFIG_LCD_WIDTH / CONFIG_FUNCTION_KEY_COUNT; // ~51px, matches F-key spacing
     const int lineSpacing = 10;
-    const int line1XOffset = 0; // centered labels
-    const int line2XOffset = 0; // centered depth line
+    // Align B/D to the same left edge using widest case "D +100"
+    FixedStringBuilder<8> maxLine2("D %+d", 100);
+    const int line2Width = canvas.textWidth(maxLine2);
+    const int line2XOffset = (colWidth - line2Width) / 2;
+    // Track prefix width for widest track number (T8 B )
+    FixedStringBuilder<4> trackPrefix("T8 B ");
+    const int trackPrefixWidth = canvas.textWidth(trackPrefix);
     const int topY = 16; // push 4px below header
 
     auto drawTrackBlock = [&] (int baseX, int baseY, int trackNumber, int bias, int depth, bool focusBias, bool focusDepth) {
-        // Line 1: "Tn B %+d"
+        // Line 1: "Tn B %+d" aligned so the 'B' shares left edge with line2's 'D'
         FixedStringBuilder<12> line1("T%d B %+d", trackNumber, bias);
-        int line1X = baseX + line1XOffset + (colWidth - canvas.textWidth(line1)) / 2;
+        // Compute width of "Tn " prefix to back up from the B start
+        FixedStringBuilder<4> trackPrefixCurrent("T%d ", trackNumber);
+        int currentPrefixWidth = canvas.textWidth(trackPrefixCurrent);
+        int line1X = baseX + line2XOffset - trackPrefixWidth + currentPrefixWidth;
         canvas.setColor(focusBias ? Color::Bright : Color::Medium);
         canvas.drawText(line1X, baseY, line1);
 
         // Line 2: "D %+d"
         FixedStringBuilder<8> depthStr("D %+d", depth);
-        int depthX = baseX + line2XOffset + (colWidth - canvas.textWidth(depthStr)) / 2;
+        int depthX = baseX + line2XOffset;
         canvas.setColor(focusDepth ? Color::Bright : Color::Medium);
         canvas.drawText(depthX, baseY + lineSpacing, depthStr);
     };
