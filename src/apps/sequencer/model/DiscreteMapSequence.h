@@ -128,26 +128,20 @@ public:
     // Scale
     //----------------------------------------
 
-    enum class ScaleSource : uint8_t {
-        Project,
-        Track
-    };
-
-    ScaleSource scaleSource() const { return _scaleSource; }
-    void setScaleSource(ScaleSource source) {
-        _scaleSource = source;
-    }
-
-    // Track-scale selection (only used when ScaleSource::Track)
+    // Track-scale selection (-1 = Default/Project, 0..N = Track Scale)
     int scale() const { return _scale; }
     void setScale(int scale) {
-        _scale = clamp(scale, 0, Scale::Count - 1);
+        _scale = clamp(scale, -1, Scale::Count - 1);
     }
     void editScale(int value, bool shift) {
         setScale(scale() + value);
     }
     void printScale(StringBuilder &str) const {
-        str(Scale::name(scale()));
+        if (scale() < 0) {
+            str("Project");
+        } else {
+            str(Scale::name(scale()));
+        }
     }
 
     // Root note (0-11: C-B)
@@ -195,7 +189,7 @@ public:
 
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
     const Scale &selectedScale(const Scale &projectScale) const {
-        return _scaleSource == ScaleSource::Project ? projectScale : Scale::get(_scale);
+        return scale() < 0 ? projectScale : Scale::get(scale());
     }
 
     // Editing helpers for list UI
@@ -211,7 +205,6 @@ public:
         }
     }
     void printThresholdMode(StringBuilder &str) const { str(_thresholdMode == ThresholdMode::Position ? "Position" : "Length"); }
-    void printScaleSource(StringBuilder &str) const { str(_scaleSource == ScaleSource::Project ? "Project" : "Track"); }
     void editRootNote(int value, bool shift) { setRootNote(rootNote() + value); }
     void printRootNote(StringBuilder &str) const { Types::printNote(str, rootNote()); }
     void printSlew(StringBuilder &str) const { str(slewEnabled() ? "On" : "Off"); }
@@ -225,8 +218,7 @@ private:
 
     ThresholdMode _thresholdMode = ThresholdMode::Position;
 
-    ScaleSource _scaleSource = ScaleSource::Project;
-    int8_t _scale = 0;
+    int8_t _scale = -1;
     int8_t _rootNote = 0;       // C
     bool _slewEnabled = false;
 

@@ -5,12 +5,14 @@
 #include "RoutableListModel.h"
 
 #include "model/DiscreteMapSequence.h"
+#include "model/DiscreteMapTrack.h"
 
 class DiscreteMapSequenceListModel : public RoutableListModel {
 public:
     DiscreteMapSequenceListModel() = default;
 
     void setSequence(DiscreteMapSequence *sequence) { _sequence = sequence; }
+    void setTrack(DiscreteMapTrack *track) { _track = track; }
 
     virtual int rows() const override { return _sequence ? Last : 0; }
     virtual int columns() const override { return 2; }
@@ -41,6 +43,10 @@ public:
             return Routing::Target::Scale;
         case RootNote:
             return Routing::Target::RootNote;
+        case Octave:
+            return Routing::Target::Octave;
+        case Transpose:
+            return Routing::Target::Transpose;
         default:
             return Routing::Target::None;
         }
@@ -53,10 +59,11 @@ private:
         GateLength,
         Loop,
         ThresholdMode,
-        ScaleSource,
         Scale,
         RootNote,
         Slew,
+        Octave,
+        Transpose,
         Last
     };
 
@@ -67,10 +74,11 @@ private:
         case GateLength:    return "Gate Len";
         case Loop:          return "Loop";
         case ThresholdMode: return "Threshold";
-        case ScaleSource:   return "Scale Src";
         case Scale:         return "Scale";
         case RootNote:      return "Root";
         case Slew:          return "Slew";
+        case Octave:        return "Octave";
+        case Transpose:     return "Transpose";
         case Last:          break;
         }
         return nullptr;
@@ -97,9 +105,6 @@ private:
         case ThresholdMode:
             _sequence->printThresholdMode(str);
             break;
-        case ScaleSource:
-            _sequence->printScaleSource(str);
-            break;
         case Scale:
             _sequence->printScale(str);
             break;
@@ -108,6 +113,12 @@ private:
             break;
         case Slew:
             _sequence->printSlew(str);
+            break;
+        case Octave:
+            if (_track) str("%+d", _track->octave());
+            break;
+        case Transpose:
+            if (_track) str("%+d", _track->transpose());
             break;
         case Last:
             break;
@@ -131,12 +142,6 @@ private:
         case ThresholdMode:
             _sequence->toggleThresholdMode();
             break;
-        case ScaleSource:
-            _sequence->setScaleSource(
-                _sequence->scaleSource() == DiscreteMapSequence::ScaleSource::Project
-                    ? DiscreteMapSequence::ScaleSource::Track
-                    : DiscreteMapSequence::ScaleSource::Project);
-            break;
         case Scale:
             _sequence->editScale(value, shift);
             break;
@@ -146,10 +151,17 @@ private:
         case Slew:
             _sequence->toggleSlew();
             break;
+        case Octave:
+            if (_track) _track->setOctave(ModelUtils::adjusted(_track->octave(), value, -10, 10));
+            break;
+        case Transpose:
+            if (_track) _track->setTranspose(ModelUtils::adjusted(_track->transpose(), value, -60, 60));
+            break;
         case Last:
             break;
         }
     }
 
     DiscreteMapSequence *_sequence = nullptr;
+    DiscreteMapTrack *_track = nullptr;
 };

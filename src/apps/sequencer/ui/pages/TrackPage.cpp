@@ -110,6 +110,7 @@ void TrackPage::setTrack(Track &track) {
         break;
     case Track::TrackMode::DiscreteMap:
         _discreteMapSequenceListModel.setSequence(&_project.selectedDiscreteMapSequence());
+        _discreteMapSequenceListModel.setTrack(&_project.selectedTrack().discreteMapTrack());
         newListModel = &_discreteMapSequenceListModel;
         break;
     case Track::TrackMode::Last:

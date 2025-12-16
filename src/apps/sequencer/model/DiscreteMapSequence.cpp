@@ -37,8 +37,7 @@ void DiscreteMapSequence::clear() {
     _gateLength = 1;
     _loop = true;
     _thresholdMode = ThresholdMode::Position;
-    _scaleSource = ScaleSource::Project;
-    _scale = 0;
+    _scale = -1;
     _rootNote = 0;
     _slewEnabled = false;
 
@@ -59,7 +58,6 @@ void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_gateLength);
     writer.write(_loop);
     writer.write(static_cast<uint8_t>(_thresholdMode));
-    writer.write(static_cast<uint8_t>(_scaleSource));
     writer.write(_scale);
     writer.write(_rootNote);
     writer.write(_slewEnabled);
@@ -70,7 +68,7 @@ void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
 }
 
 void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
-    uint8_t clockSource, thresholdMode, scaleSource;
+    uint8_t clockSource, thresholdMode;
 
     reader.read(clockSource);
     _clockSource = static_cast<ClockSource>(clockSource);
@@ -82,13 +80,10 @@ void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
     reader.read(thresholdMode);
     _thresholdMode = static_cast<ThresholdMode>(thresholdMode);
 
-    reader.read(scaleSource);
-    _scaleSource = static_cast<ScaleSource>(scaleSource);
-
     if (reader.dataVersion() >= ProjectVersion::Version58) {
         reader.read(_scale);
     } else {
-        _scale = 0;
+        _scale = -1;
     }
 
     reader.read(_rootNote);
@@ -106,7 +101,6 @@ void DiscreteMapSequence::writeRouted(Routing::Target target, int intValue, floa
         break;
     case Routing::Target::Scale:
         setScale(intValue);
-        setScaleSource(ScaleSource::Track);
         break;
     case Routing::Target::RootNote:
         setRootNote(intValue);

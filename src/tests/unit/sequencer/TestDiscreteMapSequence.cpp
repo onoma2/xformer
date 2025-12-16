@@ -12,8 +12,7 @@ CASE("default_values") {
     expectEqual(seq.gateLength(), 1, "gate length");
     expectTrue(seq.loop(), "loop enabled");
     expectEqual(static_cast<int>(seq.thresholdMode()), static_cast<int>(DiscreteMapSequence::ThresholdMode::Position), "threshold mode");
-    expectEqual(static_cast<int>(seq.scaleSource()), static_cast<int>(DiscreteMapSequence::ScaleSource::Project), "scale source");
-    expectEqual(seq.scale(), 0, "scale index");
+    expectEqual(seq.scale(), -1, "scale default (project)");
     expectEqual(seq.rootNote(), 0, "root note");
     expectFalse(seq.slewEnabled(), "slew off");
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {

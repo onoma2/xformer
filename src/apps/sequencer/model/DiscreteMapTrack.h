@@ -45,6 +45,12 @@ public:
     float routedInput() const { return _routedInput; }
     float routedThresholdBias() const { return _routedThresholdBias; }
 
+    int octave() const { return _octave; }
+    void setOctave(int octave) { _octave = clamp(octave, -10, 10); }
+
+    int transpose() const { return _transpose; }
+    void setTranspose(int transpose) { _transpose = clamp(transpose, -60, 60); }
+
 private:
     void setTrackIndex(int trackIndex) {
         _trackIndex = trackIndex;
@@ -56,8 +62,11 @@ private:
     int8_t _trackIndex = -1;
     DiscreteMapSequenceArray _sequences;
 
+    // Routed state
     float _routedInput = 0.f;
     float _routedThresholdBias = 0.f;
+    int8_t _octave = 0;
+    int8_t _transpose = 0;
 
     friend class Track;
 };

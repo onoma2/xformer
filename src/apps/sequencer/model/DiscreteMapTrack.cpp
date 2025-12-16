@@ -12,16 +12,24 @@ void DiscreteMapTrack::cvOutputName(int index, StringBuilder &str) const {
 void DiscreteMapTrack::clear() {
     _routedInput = 0.f;
     _routedThresholdBias = 0.f;
+    _octave = 0;
+    _transpose = 0;
     for (auto &sequence : _sequences) {
         sequence.clear();
     }
 }
 
 void DiscreteMapTrack::write(VersionedSerializedWriter &writer) const {
+    writer.write(_octave);
+    writer.write(_transpose);
     writeArray(writer, _sequences);
 }
 
 void DiscreteMapTrack::read(VersionedSerializedReader &reader) {
+    if (reader.dataVersion() >= ProjectVersion::Version59) {
+        reader.read(_octave);
+        reader.read(_transpose);
+    }
     readArray(reader, _sequences);
 }
 
@@ -32,6 +40,12 @@ void DiscreteMapTrack::writeRouted(Routing::Target target, int intValue, float f
         break;
     case Routing::Target::DiscreteMapThreshold:
         _routedThresholdBias = floatValue;
+        break;
+    case Routing::Target::Octave:
+        _octave = intValue;
+        break;
+    case Routing::Target::Transpose:
+        _transpose = intValue;
         break;
     default:
         break;

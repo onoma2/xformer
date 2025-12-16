@@ -169,9 +169,9 @@ void DiscreteMapTrackEngine::recalculateLengthThresholds() {
     float cumulative = rangeMin();
 
     for (int i = 0; i < DiscreteMapSequence::StageCount; i++) {
+        _lengthThresholds[i] = cumulative;
         float proportion = std::abs(_sequence->stage(i).threshold()) / totalWeight;
         cumulative += proportion * range;
-        _lengthThresholds[i] = cumulative;
     }
 }
 
@@ -213,8 +213,12 @@ int DiscreteMapTrackEngine::findActiveStage(float input, float prevInput) {
 float DiscreteMapTrackEngine::noteIndexToVoltage(int8_t noteIndex) {
     const Scale &scale = _sequence->selectedScale(_model.project().selectedScale());
 
+    int octave = _discreteMapTrack.octave();
+    int transpose = _discreteMapTrack.transpose();
+    int shift = octave * scale.notesPerOctave() + transpose;
+
     // Convert note index to volts using scale. For chromatic scales add rootNote in semitones.
-    float volts = scale.noteToVolts(noteIndex);
+    float volts = scale.noteToVolts(noteIndex + shift);
     if (scale.isChromatic()) {
         volts += _sequence->rootNote() * (1.f / 12.f);
     }

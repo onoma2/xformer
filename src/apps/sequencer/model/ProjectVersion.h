@@ -159,6 +159,9 @@ enum ProjectVersion {
     // added DiscreteMap track mode
     Version58 = 58,
 
+    // added DiscreteMap track octave/transpose
+    Version59 = 59,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

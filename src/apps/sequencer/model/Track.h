@@ -56,7 +56,7 @@ public:
     case TrackMode::Tuesday:
       return "Algo";
     case TrackMode::DiscreteMap:
-      return "DMap";
+      return "Discrete";
     case TrackMode::Last:
       break;
     }
