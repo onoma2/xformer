@@ -34,6 +34,7 @@ void DiscreteMapSequence::Stage::read(VersionedSerializedReader &reader) {
 void DiscreteMapSequence::clear() {
     _clockSource = ClockSource::Internal;
     _divisor = 192;
+    _gateLength = 75;
     _loop = true;
     _thresholdMode = ThresholdMode::Position;
     _scaleSource = ScaleSource::Project;
@@ -55,6 +56,7 @@ void DiscreteMapSequence::clearStage(int index) {
 void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(static_cast<uint8_t>(_clockSource));
     writer.write(_divisor);
+    writer.write(_gateLength);
     writer.write(_loop);
     writer.write(static_cast<uint8_t>(_thresholdMode));
     writer.write(static_cast<uint8_t>(_scaleSource));
@@ -74,6 +76,7 @@ void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
     _clockSource = static_cast<ClockSource>(clockSource);
 
     reader.read(_divisor);
+    reader.read(_gateLength);
     reader.read(_loop);
 
     reader.read(thresholdMode);

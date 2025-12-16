@@ -9,6 +9,7 @@ CASE("default_values") {
     seq.clear();
     expectEqual(static_cast<int>(seq.clockSource()), static_cast<int>(DiscreteMapSequence::ClockSource::Internal), "clock source");
     expectEqual(seq.divisor(), 192, "divisor");
+    expectEqual(seq.gateLength(), 75, "gate length");
     expectTrue(seq.loop(), "loop enabled");
     expectEqual(static_cast<int>(seq.thresholdMode()), static_cast<int>(DiscreteMapSequence::ThresholdMode::Position), "threshold mode");
     expectEqual(static_cast<int>(seq.scaleSource()), static_cast<int>(DiscreteMapSequence::ScaleSource::Project), "scale source");
@@ -57,6 +58,16 @@ CASE("toggle_methods") {
     expectFalse(seq.loop(), "loop toggled");
     seq.toggleSlew();
     expectTrue(seq.slewEnabled(), "slew toggled");
+}
+
+CASE("gate_length_clamp") {
+    DiscreteMapSequence seq;
+    seq.setGateLength(-10);
+    expectEqual(seq.gateLength(), 0, "clamp min");
+    seq.setGateLength(150);
+    expectEqual(seq.gateLength(), 100, "clamp max");
+    seq.setGateLength(50);
+    expectEqual(seq.gateLength(), 50, "valid");
 }
 
 } // UNIT_TEST

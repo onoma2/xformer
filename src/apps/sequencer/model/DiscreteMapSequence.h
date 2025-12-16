@@ -94,6 +94,18 @@ public:
         _loop = !_loop;
     }
 
+    // Gate Length (0-100%)
+    int gateLength() const { return _gateLength; }
+    void setGateLength(int length) {
+        _gateLength = clamp(length, 0, 100);
+    }
+    void editGateLength(int value, bool shift) {
+        setGateLength(gateLength() + value);
+    }
+    void printGateLength(StringBuilder &str) const {
+        str("%d%%", gateLength());
+    }
+
     //----------------------------------------
     // Threshold
     //----------------------------------------
@@ -208,6 +220,7 @@ public:
 private:
     ClockSource _clockSource = ClockSource::Internal;
     uint16_t _divisor = 192;
+    uint8_t _gateLength = 75;
     bool _loop = true;
 
     ThresholdMode _thresholdMode = ThresholdMode::Position;

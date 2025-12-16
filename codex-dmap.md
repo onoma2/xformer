@@ -20,7 +20,8 @@
 - **Engine (`src/apps/sequencer/engine/DiscreteMapTrackEngine.cpp`)**: Normalizes thresholds against the new range in position mode. `findActiveStage` now validates `_activeStage` to ensure disabled stages don't remain active. Exposed helper methods for testing.
 - **UI (`src/apps/sequencer/ui/pages/DiscreteMapSequencePage.cpp`)**:
     - **Visualization**: Reduced bar height, added numerical thresholds, highlighted active/selected stages. Added vertical brackets to indicate active edit row. Header shows mode. Note display includes octaves.
-    - **Controls**: Swapped rows. Multi-Selection. Encoder Click toggle. Added **Triangle** LFO option to Internal clock.
+    - **Controls**: Swapped rows. Multi-Selection. Encoder Click toggle. Added **Triangle** LFO option.
+    - **Global Params**: Added `GateLength` (0-100%) to Track Page. Increased `Divisor` range to 768 (4 Bars), default 192.
 - **Tests**: `src/tests/unit/sequencer/TestDiscreteMapTrackEngine.cpp` populated with logic tests.
 
 ## Behavior recap

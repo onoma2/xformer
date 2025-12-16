@@ -25,7 +25,7 @@ public:
     virtual void changePattern() override;
 
     virtual bool activity() const override { return _activity; }
-    virtual bool gateOutput(int index) const override { return _activeStage >= 0; }
+    virtual bool gateOutput(int index) const override { return _gateTimer > 0 && _activeStage >= 0; }
     virtual float cvOutput(int index) const override { return _cvOutput; }
     virtual float sequenceProgress() const override { return _rampPhase; }
 
@@ -74,6 +74,7 @@ private:
     // === Output ===
     float _cvOutput = 0.0f;
     float _targetCv = 0.0f;
+    uint32_t _gateTimer = 0;
 
     // === Activity ===
     bool _activity = false;

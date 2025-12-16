@@ -50,6 +50,7 @@ private:
     enum Item {
         ClockSource,
         Divisor,
+        GateLength,
         Loop,
         ThresholdMode,
         ScaleSource,
@@ -63,6 +64,7 @@ private:
         switch (item) {
         case ClockSource:   return "Clock";
         case Divisor:       return "Divisor";
+        case GateLength:    return "Gate Len";
         case Loop:          return "Loop";
         case ThresholdMode: return "Threshold";
         case ScaleSource:   return "Scale Src";
@@ -85,6 +87,9 @@ private:
             break;
         case Divisor:
             _sequence->printDivisor(str);
+            break;
+        case GateLength:
+            _sequence->printGateLength(str);
             break;
         case Loop:
             _sequence->printLoop(str);
@@ -116,6 +121,9 @@ private:
             break;
         case Divisor:
             _sequence->editDivisor(value, shift);
+            break;
+        case GateLength:
+            _sequence->editGateLength(value, shift);
             break;
         case Loop:
             _sequence->toggleLoop();

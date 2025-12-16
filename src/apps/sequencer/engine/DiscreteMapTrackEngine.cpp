@@ -12,6 +12,7 @@ void DiscreteMapTrackEngine::reset() {
     _activeStage = -1;
     _cvOutput = 0.0f;
     _targetCv = 0.0f;
+    _gateTimer = 0;
     _running = true;
     _thresholdsDirty = true;
     _activity = false;
@@ -55,9 +56,21 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     _activity = (newStage != _activeStage && newStage >= 0);
 
     float prevCv = _cvOutput;
+    bool prevGate = _gateTimer > 0;
     bool gateChanged = newStage != _activeStage;
 
+    if (_gateTimer > 0) {
+        --_gateTimer;
+    }
+
     _activeStage = newStage;
+
+    // Trigger Gate
+    if (gateChanged && _activeStage >= 0) {
+        uint32_t stepTicks = _sequence->divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+        if (stepTicks == 0) stepTicks = 1;
+        _gateTimer = (stepTicks * _sequence->gateLength()) / 100;
+    }
 
     // 4. Update CV output
     if (_activeStage >= 0) {
@@ -79,7 +92,8 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
 
     TickResult result = TickResult::NoUpdate;
 
-    if (gateChanged) {
+    bool currentGate = _gateTimer > 0 && _activeStage >= 0;
+    if (currentGate != prevGate) {
         result |= TickResult::GateUpdate;
     }
     if (gateChanged || std::abs(_cvOutput - prevCv) > 1e-6f) {
