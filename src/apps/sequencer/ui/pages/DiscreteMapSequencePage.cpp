@@ -308,7 +308,10 @@ void DiscreteMapSequencePage::handleTopRowKey(int idx, bool shift) {
     if (shift) {
         _editMode = EditMode::NoteValue;
     } else {
-        _editMode = EditMode::Threshold;
+        // Persist current mode, or default to Threshold if None
+        if (_editMode == EditMode::None) {
+            _editMode = EditMode::Threshold;
+        }
     }
 
     // Check if any OTHER key is held (excluding current one)
