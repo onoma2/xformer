@@ -33,10 +33,10 @@ public:
             Off
         };
 
-        // Threshold (-127 to +128)
+        // Threshold (-127 to +127)
         int8_t threshold() const { return _threshold; }
-        void setThreshold(int8_t threshold) {
-            _threshold = clamp(threshold, int8_t(-127), int8_t(128));
+        void setThreshold(int threshold) {
+            _threshold = clamp(threshold, -127, 127);
         }
 
         // Direction

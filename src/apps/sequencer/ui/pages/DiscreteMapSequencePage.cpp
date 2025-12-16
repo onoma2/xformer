@@ -70,7 +70,7 @@ void DiscreteMapSequencePage::draw(Canvas &canvas) {
 
 void DiscreteMapSequencePage::drawThresholdBar(Canvas &canvas) {
     const int barX = 8;
-    const int barY = 20;
+    const int barY = 12;
     const int barW = 240;
     const int barH = 12;
 
@@ -106,7 +106,7 @@ void DiscreteMapSequencePage::drawThresholdBar(Canvas &canvas) {
 }
 
 void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
-    const int y = 44;
+    const int y = 35;
     const int spacing = 30;
 
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
@@ -120,9 +120,9 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
             FixedStringBuilder<8> name;
             const Scale &scale = _sequence->selectedScale(_project.selectedScale());
             scale.noteName(name, stage.noteIndex(), _sequence->rootNote(), Scale::Format::Short1);
-            canvas.drawText(x, y + 10, name);
+            canvas.drawText(x, y + 9, name);
         } else {
-            canvas.drawText(x, y + 10, "--");
+            canvas.drawText(x, y + 9, "--");
         }
     }
 }
@@ -316,7 +316,7 @@ void DiscreteMapSequencePage::handleFunctionKey(int fnIndex) {
 
 float DiscreteMapSequencePage::getThresholdNormalized(int stageIndex) const {
     const auto &stage = _sequence->stage(stageIndex);
-    return (stage.threshold() + 127) / 255.f;
+    return (stage.threshold() + 127) / 254.f;
 }
 
 void DiscreteMapSequencePage::contextShow() {

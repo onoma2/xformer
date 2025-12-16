@@ -31,7 +31,7 @@ CASE("stage_threshold_clamp") {
     stage.setThreshold(120);
     expectEqual(int(stage.threshold()), 120, "positive threshold");
     stage.setThreshold(200);
-    expectEqual(int(stage.threshold()), 128, "clamped max");
+    expectEqual(int(stage.threshold()), 127, "clamped max");
     stage.setThreshold(-200);
     expectEqual(int(stage.threshold()), -127, "clamped min");
 }

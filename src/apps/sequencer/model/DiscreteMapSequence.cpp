@@ -18,7 +18,9 @@ void DiscreteMapSequence::Stage::write(VersionedSerializedWriter &writer) const 
 }
 
 void DiscreteMapSequence::Stage::read(VersionedSerializedReader &reader) {
-    reader.read(_threshold);
+    int8_t threshold;
+    reader.read(threshold);
+    setThreshold(threshold);
     uint8_t dir;
     reader.read(dir);
     _direction = static_cast<TriggerDir>(dir);
