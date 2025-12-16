@@ -95,6 +95,11 @@ std::array<float, CONFIG_TRACK_COUNT> _depth; // 0.0 to 1.0
 - **Per-track quantizer:** Snap the remapped value to a small table (steps/scale). Good for musical modulation; per-track table of a few entries.
 - **Per-track time smear:** Per-track slew/lag/delay on the routed value. Almost no storage; adds a one-pole filter per track for differentiated feel without range changes.
 - **Preset buckets:** A small bank of (min, max, response) presets; each track stores only an index. Lowest per-track cost at the expense of flexibility.
+- **Per-track bias/depth (implemented):** Integer bias and depth per track (-100..100) applied after master min/max to shift and scale the mapped value per track.
+  - **Math:** `base = min + src * span; value = clamp(mid + (base - mid) * depthPct/100 + span * biasPct/100, min, max)`.
+  - **Model:** Route stores per-track bias/depth arrays with serialization version 57.
+  - **Engine:** RoutingEngine applies bias/depth per track for per-track targets.
+  - **UI:** Page+S5 overlay on Routes shows two-line blocks (`B %+d Tn` / `D %+d`), fixed columns, F0–F3 select track pairs/layers, encoder edits, F4 commit, Page+S5 cancel, context menu (Init/Random/Copy/Paste), marker on track bitmask for non-default shaping.
 
 ## Technical Recommendation
 **Proceed with Option 1.** It offers the most flexibility (full range control per track) with the cleanest architecture. The UI workflow (Edit applies to enabled tracks) provides a workable solution without requiring a "Selected Track" UI widget.

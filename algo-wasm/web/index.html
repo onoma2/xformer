@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tuesday WASM Playground</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Tuesday WASM Playground</h1>
+      <p>Algorithms compiled from C++ (simplified clock/scale). Adjust params, run 32 steps, see gates + CV.</p>
+    </div>
+    <button id="run-btn">Run 32 Steps</button>
+  </header>
+
+  <section class="controls">
+    <div class="control">
+      <label>Algorithm</label>
+      <select id="algo">
+        <option value="0">0 Test</option>
+        <option value="1">1 TriTrance</option>
+        <option value="2">2 Stomper</option>
+        <option value="3">3 Aphex</option>
+        <option value="4">4 Autechre</option>
+        <option value="5">5 Stepwave</option>
+        <option value="6">6 Markov</option>
+        <option value="7">7 ChipArp1</option>
+        <option value="8">8 ChipArp2</option>
+        <option value="9">9 Wobble</option>
+        <option value="10">10 Scalewalker</option>
+        <option value="11">11 Window</option>
+        <option value="12">12 Minimal</option>
+        <option value="13">13 Ganz</option>
+        <option value="14">14 Blake</option>
+      </select>
+    </div>
+    <div class="control"><label>Flow</label><input type="range" id="flow" min="0" max="16" value="8"><span class="value"></span></div>
+    <div class="control"><label>Ornament</label><input type="range" id="ornament" min="0" max="16" value="8"><span class="value"></span></div>
+    <div class="control"><label>Power</label><input type="range" id="power" min="0" max="16" value="16"><span class="value"></span></div>
+    <div class="control"><label>Glide</label><input type="range" id="glide" min="0" max="100" value="0"><span class="value"></span></div>
+    <div class="control"><label>Step Trill</label><input type="range" id="stepTrill" min="0" max="100" value="0"><span class="value"></span></div>
+    <div class="control"><label>Gate Len</label><input type="range" id="gateLength" min="1" max="100" value="50"><span class="value"></span></div>
+    <div class="control"><label>Gate Offset</label><input type="range" id="gateOffset" min="0" max="100" value="50"><span class="value"></span></div>
+  </section>
+
+  <section class="results">
+    <div class="grid" id="grid"></div>
+    <pre id="json"></pre>
+  </section>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

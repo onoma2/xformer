@@ -1,9 +1,11 @@
 #include "RoutingPage.h"
 
 #include "ui/painters/WindowPainter.h"
+#include "ui/pages/ContextMenu.h"
 
 #include "core/utils/StringBuilder.h"
 #include "core/math/Math.h"
+#include "core/utils/Random.h"
 
 enum class Function {
     Prev    = 0,
@@ -250,6 +252,11 @@ void RoutingPage::handleBiasOverlayKey(KeyPressEvent &event) {
         event.consume();
         return;
     }
+    if (key.isContextMenu()) {
+        showBiasOverlayContext();
+        event.consume();
+        return;
+    }
     if (key.isFunction()) {
         int fn = key.function();
         if (fn >= 0 && fn <= 3) {
@@ -279,6 +286,59 @@ void RoutingPage::editBiasOverlay(int delta, bool shift) {
     values[track] = clamp(value, -100, 100);
 }
 
+void RoutingPage::showBiasOverlayContext() {
+    static const ContextMenuModel::Item items[] = {
+        { "INIT" },
+        { "RANDOM" },
+        { "COPY" },
+        { "PASTE" },
+    };
+    showContextMenu(ContextMenu(
+        items,
+        int(sizeof(items) / sizeof(items[0])),
+        [this] (int index) { biasOverlayContextAction(index); }
+    ));
+}
+
+void RoutingPage::biasOverlayContextAction(int index) {
+    switch (index) {
+    case 0: { // INIT
+        _biasStaging.fill(Routing::Route::DefaultBiasPct);
+        _depthStaging.fill(Routing::Route::DefaultDepthPct);
+        showMessage("SHAPE INIT");
+        break;
+    }
+    case 1: { // RANDOM
+        static Random rng;
+        for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
+            _biasStaging[i] = clamp<int>(rng.nextRange(201) - 100, -100, 100);
+            _depthStaging[i] = clamp<int>(rng.nextRange(201) - 100, -100, 100);
+        }
+        showMessage("SHAPE RANDOM");
+        break;
+    }
+    case 2: { // COPY
+        _biasClipboard = _biasStaging;
+        _depthClipboard = _depthStaging;
+        _clipboardValid = true;
+        showMessage("PARAMS COPIED");
+        break;
+    }
+    case 3: { // PASTE
+        if (_clipboardValid) {
+            _biasStaging = _biasClipboard;
+            _depthStaging = _depthClipboard;
+            showMessage("PARAMS PASTED");
+        } else {
+            showMessage("CLIPBOARD EMPTY");
+        }
+        break;
+    }
+    default:
+        break;
+    }
+}
+
 void RoutingPage::drawBiasOverlay(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "ROUTE SHAPE");
@@ -290,24 +350,27 @@ void RoutingPage::drawBiasOverlay(Canvas &canvas) {
 
     const int colWidth = CONFIG_LCD_WIDTH / CONFIG_FUNCTION_KEY_COUNT; // ~51px, matches F-key spacing
     const int lineSpacing = 10;
-    // Align B/D to the same left edge using widest case "D +100"
+    // Align B/D to fixed columns: use widest cases so positions don't shift with values
     FixedStringBuilder<8> maxLine2("D %+d", 100);
     const int line2Width = canvas.textWidth(maxLine2);
     const int line2XOffset = (colWidth - line2Width) / 2;
-    // Track prefix width for widest track number (T8 B )
-    FixedStringBuilder<4> trackPrefix("T8 B ");
-    const int trackPrefixWidth = canvas.textWidth(trackPrefix);
+    FixedStringBuilder<8> maxLine1("B %+d T8", 100);
+    const int line1Width = canvas.textWidth(maxLine1);
+    const int line1XOffset = (colWidth - line1Width) / 2;
     const int topY = 16; // push 4px below header
 
     auto drawTrackBlock = [&] (int baseX, int baseY, int trackNumber, int bias, int depth, bool focusBias, bool focusDepth) {
-        // Line 1: "Tn B %+d" aligned so the 'B' shares left edge with line2's 'D'
-        FixedStringBuilder<12> line1("T%d B %+d", trackNumber, bias);
-        // Compute width of "Tn " prefix to back up from the B start
-        FixedStringBuilder<4> trackPrefixCurrent("T%d ", trackNumber);
-        int currentPrefixWidth = canvas.textWidth(trackPrefixCurrent);
-        int line1X = baseX + line2XOffset - trackPrefixWidth + currentPrefixWidth;
+        // Line 1: "B %+d Tn" with T always medium, independent of highlight
+        FixedStringBuilder<12> line1("B %+d T%d", bias, trackNumber);
+        int line1X = baseX + line1XOffset;
+        // draw B %+d part with focus color, then Tn in medium at fixed column
+        FixedStringBuilder<8> prefix("B %+d ", bias);
+        int prefixWidth = canvas.textWidth(prefix);
+        FixedStringBuilder<4> tPart("T%d", trackNumber);
         canvas.setColor(focusBias ? Color::Bright : Color::Medium);
-        canvas.drawText(line1X, baseY, line1);
+        canvas.drawText(line1X, baseY, prefix);
+        canvas.setColor(Color::Medium);
+        canvas.drawText(line1X + prefixWidth, baseY, tPart);
 
         // Line 2: "D %+d"
         FixedStringBuilder<8> depthStr("D %+d", depth);

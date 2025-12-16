@@ -35,6 +35,8 @@ private:
     void drawBiasOverlay(Canvas &canvas);
     void handleBiasOverlayKey(KeyPressEvent &event);
     void editBiasOverlay(int delta, bool shift);
+    void showBiasOverlayContext();
+    void biasOverlayContextAction(int index);
     int focusTrackIndex() const;
     bool overlayActive() const { return _biasOverlayActive; }
 
@@ -49,6 +51,9 @@ private:
     bool _biasOverlayActive = false;
     std::array<int8_t, CONFIG_TRACK_COUNT> _biasStaging;
     std::array<int8_t, CONFIG_TRACK_COUNT> _depthStaging;
+    std::array<int8_t, CONFIG_TRACK_COUNT> _biasClipboard{};
+    std::array<int8_t, CONFIG_TRACK_COUNT> _depthClipboard{};
+    bool _clipboardValid = false;
     std::array<uint8_t, 4> _slotState{}; // 0..3: A bias, A depth, B bias, B depth
     int _activeSlot = 0;
 };
