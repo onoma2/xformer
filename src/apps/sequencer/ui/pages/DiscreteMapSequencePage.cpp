@@ -72,7 +72,7 @@ void DiscreteMapSequencePage::drawThresholdBar(Canvas &canvas) {
     const int barX = 8;
     const int barY = 12;
     const int barW = 240;
-    const int barH = 12;
+    const int barH = 6;
 
     canvas.setColor(Color::Medium);
     canvas.fillRect(barX, barY, barW, barH);
@@ -101,28 +101,36 @@ void DiscreteMapSequencePage::drawThresholdBar(Canvas &canvas) {
         float inputNorm = clamp((_enginePtr->currentInput() - rangeMin()) / (rangeMax() - rangeMin()), 0.f, 1.f);
         int cursorX = barX + int(inputNorm * barW);
         canvas.setColor(Color::Bright);
-        canvas.vline(cursorX, barY - 2, barH + 4);
+        canvas.vline(cursorX, barY - 1, barH + 2);
     }
 }
 
 void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
-    const int y = 35;
+    const int y = 28;
     const int spacing = 30;
 
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
         const auto &stage = _sequence->stage(i);
         int x = 8 + i * spacing;
 
-        FixedStringBuilder<2> num("%d", i + 1);
-        canvas.drawText(x, y, num);
+        bool selected = (i == _selectedStage) || (i == _secondaryStage);
+        bool active = _enginePtr && _enginePtr->activeStage() == i;
+
+        // Draw Threshold Value (replaces stage number)
+        canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
+        FixedStringBuilder<4> thresh("%+d", stage.threshold());
+        canvas.drawText(x, y, thresh);
 
         if (stage.direction() != DiscreteMapSequence::Stage::TriggerDir::Off) {
             FixedStringBuilder<8> name;
             const Scale &scale = _sequence->selectedScale(_project.selectedScale());
             scale.noteName(name, stage.noteIndex(), _sequence->rootNote(), Scale::Format::Short1);
-            canvas.drawText(x, y + 9, name);
+            
+            canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
+            canvas.drawText(x, y + 10, name);
         } else {
-            canvas.drawText(x, y + 9, "--");
+            canvas.setColor(Color::Low);
+            canvas.drawText(x, y + 10, "--");
         }
     }
 }

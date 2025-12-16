@@ -13,7 +13,7 @@
   - Entering the page binds to the selected DiscreteMap sequence; non-DiscreteMap tracks clear the model.
 - **Page wiring**: Page+S2 on a DiscreteMap track opens the stage list; Page+S3 remains the Track page so the standard track params stay accessible (`src/apps/sequencer/ui/pages/TopPage.cpp`, `Pages.h`).
 - **Track page (Page+S3)**: Still uses `DiscreteMapSequenceListModel` for clock/divisor/loop/threshold mode/scale/root/slew (`src/apps/sequencer/ui/pages/TrackPage.cpp`, `src/apps/sequencer/ui/model/DiscreteMapSequenceListModel.h`), unchanged except wiring.
-- **Sequence page**: Graphical stage view retained; only threshold normalization updated (`src/apps/sequencer/ui/pages/DiscreteMapSequencePage.cpp`).
+- **Sequence page**: Graphical stage view retained; updated to show 8 stages with numerical threshold values instead of stage numbers. Bar height reduced to 6px. Active stage and its threshold value are highlighted. Threshold normalization matches the [-127, 127] range.
 
 ## Engine / model
 - **Threshold safety**: Stage thresholds now clamp to `[-127, 127]` and accept `int` to avoid int8 overflow (`src/apps/sequencer/model/DiscreteMapSequence.h`); deserialization clamps through the setter (`src/apps/sequencer/model/DiscreteMapSequence.cpp`).
