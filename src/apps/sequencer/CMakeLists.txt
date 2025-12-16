@@ -9,6 +9,7 @@ set(sources
     engine/CurveTrackEngine.cpp
     engine/CvInput.cpp
     engine/CvOutput.cpp
+    engine/DiscreteMapTrackEngine.cpp
     engine/Engine.cpp
     engine/MidiCvTrackEngine.cpp
     engine/MidiLearn.cpp
@@ -41,6 +42,8 @@ set(sources
     model/ModelUtils.cpp
     model/NoteSequence.cpp
     model/NoteTrack.cpp
+    model/DiscreteMapSequence.cpp
+    model/DiscreteMapTrack.cpp
     model/TuesdayTrack.cpp
     model/PlayState.cpp
     model/Project.cpp
@@ -91,6 +94,7 @@ set(sources
     ui/pages/HarmonyPage.cpp
     ui/pages/TuesdayEditPage.cpp
     ui/pages/TuesdaySequencePage.cpp
+    ui/pages/DiscreteMapSequencePage.cpp
     ui/pages/MonitorPage.cpp
     ui/pages/NoteSequenceEditPage.cpp
     ui/pages/NoteSequencePage.cpp
@@ -111,6 +115,7 @@ set(sources
     # ui/models
     ui/model/AccumulatorListModel.h
     ui/model/AccumulatorStepsListModel.h
+    ui/model/DiscreteMapSequenceListModel.h
     # ui/painters
     ui/painters/SequencePainter.cpp
     ui/painters/SongPainter.cpp

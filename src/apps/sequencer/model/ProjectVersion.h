@@ -156,6 +156,9 @@ enum ProjectVersion {
     // added Routing per-track bias/depth percentages
     Version57 = 57,
 
+    // added DiscreteMap track mode
+    Version58 = 58,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

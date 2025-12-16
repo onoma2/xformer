@@ -253,6 +253,15 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                         }
                     }
                     break;
+                case Track::TrackMode::DiscreteMap:
+                    if (isTrackTarget(target)) {
+                        track.discreteMapTrack().writeRouted(target, intValue, floatValue);
+                    } else if (isSequenceTarget(target)) {
+                        for (int patternIndex = 0; patternIndex < CONFIG_PATTERN_COUNT; ++patternIndex) {
+                            track.discreteMapTrack().sequence(patternIndex).writeRouted(target, intValue, floatValue);
+                        }
+                    }
+                    break;
                 case Track::TrackMode::Last:
                     break;
                 }

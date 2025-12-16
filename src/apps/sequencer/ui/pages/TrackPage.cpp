@@ -108,6 +108,10 @@ void TrackPage::setTrack(Track &track) {
         _tuesdaySequenceListModel.setSequence(&_project.selectedTuesdaySequence());
         newListModel = &_tuesdaySequenceListModel;
         break;
+    case Track::TrackMode::DiscreteMap:
+        _discreteMapSequenceListModel.setSequence(&_project.selectedDiscreteMapSequence());
+        newListModel = &_discreteMapSequenceListModel;
+        break;
     case Track::TrackMode::Last:
         ASSERT(false, "invalid track mode");
         break;

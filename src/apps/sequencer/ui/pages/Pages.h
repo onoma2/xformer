@@ -35,6 +35,7 @@
 #include "HarmonyPage.h"
 #include "TuesdayEditPage.h"
 #include "TuesdaySequencePage.h"
+#include "DiscreteMapSequencePage.h"
 
 #ifdef CONFIG_ENABLE_INTRO
 #include "IntroPage.h"
@@ -65,6 +66,7 @@ struct Pages {
     HarmonyPage harmony;
     TuesdayEditPage tuesdayEdit;
     TuesdaySequencePage tuesdaySequence;
+    DiscreteMapSequencePage discreteMapSequence;
     SystemPage system;
     // modal pages
     TempoPage tempo;
@@ -111,6 +113,7 @@ struct Pages {
         harmony(manager, context),
         tuesdayEdit(manager, context),
         tuesdaySequence(manager, context),
+        discreteMapSequence(manager, context),
         system(manager, context),
         // modal pages
         tempo(manager, context),
@@ -136,4 +139,3 @@ struct Pages {
 #endif
     {}
 };
-

@@ -2,6 +2,7 @@
 
 #include "Config.h"
 #include "CurveTrack.h"
+#include "DiscreteMapTrack.h"
 #include "MidiCvTrack.h"
 #include "ModelUtils.h"
 #include "NoteTrack.h"
@@ -39,6 +40,7 @@ public:
     Curve,
     MidiCv,
     Tuesday,
+    DiscreteMap,
     Last,
     Default = Note
   };
@@ -53,6 +55,8 @@ public:
       return "MIDI/CV";
     case TrackMode::Tuesday:
       return "Algo";
+    case TrackMode::DiscreteMap:
+      return "DMap";
     case TrackMode::Last:
       break;
     }
@@ -69,6 +73,8 @@ public:
       return 2;
     case TrackMode::Tuesday:
       return 3;
+    case TrackMode::DiscreteMap:
+      return 4;
     case TrackMode::Last:
       break;
     }
@@ -192,6 +198,17 @@ public:
     return _container.as<TuesdayTrack>();
   }
 
+  // discreteMapTrack
+
+  const DiscreteMapTrack &discreteMapTrack() const {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::DiscreteMap);
+    return _container.as<DiscreteMapTrack>();
+  }
+  DiscreteMapTrack &discreteMapTrack() {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::DiscreteMap);
+    return _container.as<DiscreteMapTrack>();
+  }
+
   //----------------------------------------
   // Methods
   //----------------------------------------
@@ -227,6 +244,9 @@ private:
       break;
     case TrackMode::Curve:
       _container.as<CurveTrack>().setTrackIndex(trackIndex);
+      break;
+    case TrackMode::DiscreteMap:
+      _container.as<DiscreteMapTrack>().setTrackIndex(trackIndex);
       break;
     case TrackMode::MidiCv:
       _container.as<MidiCvTrack>().setTrackIndex(trackIndex);
@@ -264,6 +284,10 @@ private:
       _track.tuesday = _container.create<TuesdayTrack>();
       _track.tuesday->setTrackIndex(_trackIndex); // Set track index here
       break;
+    case TrackMode::DiscreteMap:
+      _track.discreteMap = _container.create<DiscreteMapTrack>();
+      _track.discreteMap->setTrackIndex(_trackIndex); // Set track index here
+      break;
     case TrackMode::Last:
       break;
     }
@@ -275,12 +299,13 @@ private:
   Routable<int8_t> _cvOutputRotate;
   Routable<int8_t> _gateOutputRotate;
 
-  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack> _container;
+  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack> _container;
   union {
     NoteTrack *note;
     CurveTrack *curve;
     MidiCvTrack *midiCv;
     TuesdayTrack *tuesday;
+    DiscreteMapTrack *discreteMap;
   } _track;
 
   friend class Project;

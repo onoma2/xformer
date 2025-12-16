@@ -6,6 +6,7 @@
 #include "ui/model/CurveTrackListModel.h"
 #include "ui/model/MidiCvTrackListModel.h"
 #include "ui/model/TuesdaySequenceListModel.h"
+#include "ui/model/DiscreteMapSequenceListModel.h"
 
 class TrackPage : public ListPage {
 public:
@@ -37,4 +38,5 @@ private:
     CurveTrackListModel _curveTrackListModel;
     MidiCvTrackListModel _midiCvTrackListModel;
     TuesdaySequenceListModel _tuesdaySequenceListModel;
+    DiscreteMapSequenceListModel _discreteMapSequenceListModel;
 };

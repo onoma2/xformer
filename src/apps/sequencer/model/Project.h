@@ -452,6 +452,16 @@ public:
     const TuesdaySequence &selectedTuesdaySequence() const { return tuesdaySequence(_selectedTrackIndex, selectedPatternIndex()); }
           TuesdaySequence &selectedTuesdaySequence()       { return tuesdaySequence(_selectedTrackIndex, selectedPatternIndex()); }
 
+    // discreteMapSequence
+
+    const DiscreteMapSequence &discreteMapSequence(int trackIndex, int patternIndex) const { return _tracks[trackIndex].discreteMapTrack().sequence(patternIndex); }
+          DiscreteMapSequence &discreteMapSequence(int trackIndex, int patternIndex)       { return _tracks[trackIndex].discreteMapTrack().sequence(patternIndex); }
+
+    // selectedDiscreteMapSequence
+
+    const DiscreteMapSequence &selectedDiscreteMapSequence() const { return discreteMapSequence(_selectedTrackIndex, selectedPatternIndex()); }
+          DiscreteMapSequence &selectedDiscreteMapSequence()       { return discreteMapSequence(_selectedTrackIndex, selectedPatternIndex()); }
+
     //----------------------------------------
     // Routing
     //----------------------------------------
