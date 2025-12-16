@@ -349,36 +349,41 @@ void RoutingPage::drawBiasOverlay(Canvas &canvas) {
     canvas.setBlendMode(BlendMode::Set);
 
     const int colWidth = CONFIG_LCD_WIDTH / CONFIG_FUNCTION_KEY_COUNT; // ~51px, matches F-key spacing
-    const int lineSpacing = 10;
+    const int lineSpacing = 8;
+
     // Align B/D to fixed columns: use widest cases so positions don't shift with values
     FixedStringBuilder<8> maxLine2("D %+d", 100);
     const int line2Width = canvas.textWidth(maxLine2);
     const int line2XOffset = (colWidth - line2Width) / 2;
-    FixedStringBuilder<8> maxLine1("B %+d T8", 100);
-    const int line1Width = canvas.textWidth(maxLine1);
-    const int line1XOffset = (colWidth - line1Width) / 2;
-    const int topY = 16; // push 4px below header
 
-    auto drawTrackBlock = [&] (int baseX, int baseY, int trackNumber, int bias, int depth, bool focusBias, bool focusDepth) {
-        // Line 1: "B %+d Tn" with T always medium, independent of highlight
-        FixedStringBuilder<12> line1("B %+d T%d", bias, trackNumber);
-        int line1X = baseX + line1XOffset;
-        // draw B %+d part with focus color, then Tn in medium at fixed column
-        FixedStringBuilder<8> prefix("B %+d ", bias);
-        int prefixWidth = canvas.textWidth(prefix);
-        FixedStringBuilder<4> tPart("T%d", trackNumber);
-        canvas.setColor(focusBias ? Color::Bright : Color::Medium);
-        canvas.drawText(line1X, baseY, prefix);
-        canvas.setColor(Color::Medium);
-        canvas.drawText(line1X + prefixWidth, baseY, tPart);
+    // Calculate fixed offset for "Tn" based on widest possible Bias string
+    FixedStringBuilder<8> maxBiasPart("B %+d ", -100);
+    const int maxBiasWidth = canvas.textWidth(maxBiasPart);
 
-        // Line 2: "D %+d"
-        FixedStringBuilder<8> depthStr("D %+d", depth);
-        int depthX = baseX + line2XOffset;
-        canvas.setColor(focusDepth ? Color::Bright : Color::Medium);
-        canvas.drawText(depthX, baseY + lineSpacing, depthStr);
-    };
+    const int topY = 18; // push 4px below header
 
+        auto drawTrackBlock = [&] (int baseX, int baseY, int trackNumber, int bias, int depth, bool focusBias, bool focusDepth) {
+            // Line 1: "B %+d ... Tn"
+            // Align B with D (start at line2XOffset)
+            int startX = baseX + line2XOffset;
+            
+            FixedStringBuilder<8> prefix("B %+d ", bias);
+            FixedStringBuilder<4> tPart("T%d", trackNumber);
+            
+            canvas.setColor(focusBias ? Color::Bright : Color::Medium);
+            canvas.drawText(startX, baseY, prefix);
+            
+            // Highlight T part if either Bias or Depth is focused
+            canvas.setColor((focusBias || focusDepth) ? Color::Bright : Color::Medium);
+            // Position T part at fixed offset relative to start, so it doesn't move with bias value length
+            canvas.drawText(startX + maxBiasWidth, baseY, tPart);
+    
+            // Line 2: "D %+d"
+            FixedStringBuilder<8> depthStr("D %+d", depth);
+            int depthX = baseX + line2XOffset;
+            canvas.setColor(focusDepth ? Color::Bright : Color::Medium);
+            canvas.drawText(depthX, baseY + lineSpacing, depthStr);
+        };
     for (int slot = 0; slot < 4; ++slot) {
         int x = slot * colWidth;
         int trackA = slot * 2;
