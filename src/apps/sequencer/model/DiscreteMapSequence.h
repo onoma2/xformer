@@ -220,7 +220,7 @@ public:
 private:
     ClockSource _clockSource = ClockSource::Internal;
     uint16_t _divisor = 192;
-    uint8_t _gateLength = 75;
+    uint8_t _gateLength = 1;
     bool _loop = true;
 
     ThresholdMode _thresholdMode = ThresholdMode::Position;

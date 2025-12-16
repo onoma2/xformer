@@ -9,7 +9,7 @@ CASE("default_values") {
     seq.clear();
     expectEqual(static_cast<int>(seq.clockSource()), static_cast<int>(DiscreteMapSequence::ClockSource::Internal), "clock source");
     expectEqual(seq.divisor(), 192, "divisor");
-    expectEqual(seq.gateLength(), 75, "gate length");
+    expectEqual(seq.gateLength(), 1, "gate length");
     expectTrue(seq.loop(), "loop enabled");
     expectEqual(static_cast<int>(seq.thresholdMode()), static_cast<int>(DiscreteMapSequence::ThresholdMode::Position), "threshold mode");
     expectEqual(static_cast<int>(seq.scaleSource()), static_cast<int>(DiscreteMapSequence::ScaleSource::Project), "scale source");

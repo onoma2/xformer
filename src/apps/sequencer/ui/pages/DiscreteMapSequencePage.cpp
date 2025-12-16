@@ -95,10 +95,7 @@ void DiscreteMapSequencePage::drawThresholdBar(Canvas &canvas) {
 
         canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
         canvas.vline(x, barY, barH);
-
-        char dir = (stage.direction() == DiscreteMapSequence::Stage::TriggerDir::Rise) ? '^' : 'v';
-        char dirStr[2] = { dir, 0 };
-        canvas.drawText(x - 2, barY + barH + 2, dirStr);
+        canvas.vline(x + 1, barY, barH); // 2px wide
     }
 
     if (_enginePtr) {
@@ -110,7 +107,7 @@ void DiscreteMapSequencePage::drawThresholdBar(Canvas &canvas) {
 }
 
 void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
-    const int y = 28;
+    const int y = 24;
     const int spacing = 30;
 
     // Draw row selection brackets
@@ -127,11 +124,12 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
         bool selected = (_selectionMask & (1 << i)) != 0;
         bool active = _enginePtr && _enginePtr->activeStage() == i;
 
-        // Draw Threshold Value (replaces stage number)
+        // Row 1: Threshold
         canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
         FixedStringBuilder<4> thresh("%+d", stage.threshold());
         canvas.drawText(x, y, thresh);
 
+        // Row 2: Note
         if (stage.direction() != DiscreteMapSequence::Stage::TriggerDir::Off || selected) {
             FixedStringBuilder<8> name;
             const Scale &scale = _sequence->selectedScale(_project.selectedScale());
@@ -143,6 +141,17 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
             canvas.setColor(Color::Low);
             canvas.drawText(x, y + 10, "--");
         }
+
+        // Row 3: Direction
+        canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
+        char dirChar = '-';
+        switch (stage.direction()) {
+        case DiscreteMapSequence::Stage::TriggerDir::Rise: dirChar = '^'; break;
+        case DiscreteMapSequence::Stage::TriggerDir::Fall: dirChar = 'v'; break;
+        case DiscreteMapSequence::Stage::TriggerDir::Off:  dirChar = '-'; break;
+        }
+        char dirStr[2] = { dirChar, 0 };
+        canvas.drawText(x + 2, y + 20, dirStr);
     }
 }
 

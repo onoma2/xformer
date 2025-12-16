@@ -81,10 +81,18 @@ void Project::clear() {
     noteSequence(4, 0).setGates({ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 });
     noteSequence(5, 0).setLastStep(15);
     noteSequence(5, 0).setGates({ 0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0 });
-    noteSequence(7, 0).setLastStep(15);
-    noteSequence(7, 0).setGates({ 1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1 });
-    noteSequence(7, 0).setNotes({ 0,0,0,0,12,0,12,1,24,21,22,0,3,6,12,1 });
-    track(7).setTrackMode(Track::TrackMode::Tuesday);
+    
+    // Track 8: Discrete Map
+    track(7).setTrackMode(Track::TrackMode::DiscreteMap);
+    auto &dmap = discreteMapSequence(7, 0);
+    // Distribute thresholds -100 to +100
+    for (int i = 0; i < 8; ++i) {
+        dmap.stage(i).setThreshold(-100 + (200 * i) / 7);
+        dmap.stage(i).setDirection(DiscreteMapSequence::Stage::TriggerDir::Rise);
+        // Simple scale run
+        dmap.stage(i).setNoteIndex(i * 2); 
+    }
+    
     setTempo(80.f);
     setScale(2); // 2 corresponds to Minor scale
 #endif
