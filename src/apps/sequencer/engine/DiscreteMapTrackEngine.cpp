@@ -33,7 +33,7 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     _sequence = &_discreteMapTrack.sequence(pattern());
 
     // 1. Update input source
-    if (_sequence->clockSource() == DiscreteMapSequence::ClockSource::Internal) {
+    if (_sequence->clockSource() != DiscreteMapSequence::ClockSource::External) {
         if (_running || _sequence->loop()) {
             updateRamp(tick);
         }
@@ -107,7 +107,13 @@ void DiscreteMapTrackEngine::updateRamp(uint32_t tick) {
 
     float min = rangeMin();
     float max = rangeMax();
-    _rampValue = min + _rampPhase * (max - min);
+
+    if (sequence.clockSource() == DiscreteMapSequence::ClockSource::InternalTriangle) {
+        float triPhase = (_rampPhase < 0.5f) ? (_rampPhase * 2.0f) : (1.0f - (_rampPhase - 0.5f) * 2.0f);
+        _rampValue = min + triPhase * (max - min);
+    } else {
+        _rampValue = min + _rampPhase * (max - min);
+    }
 
     if (!_sequence->loop() && _running && posInPeriod + 1 >= periodTicks) {
         _running = false;

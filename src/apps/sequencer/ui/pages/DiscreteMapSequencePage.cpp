@@ -135,7 +135,7 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
         if (stage.direction() != DiscreteMapSequence::Stage::TriggerDir::Off || selected) {
             FixedStringBuilder<8> name;
             const Scale &scale = _sequence->selectedScale(_project.selectedScale());
-            scale.noteName(name, stage.noteIndex(), _sequence->rootNote(), Scale::Format::Short1);
+            scale.noteName(name, stage.noteIndex(), _sequence->rootNote(), Scale::Format::Long);
             
             canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
             canvas.drawText(x, y + 10, name);
@@ -147,8 +147,15 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
 }
 
 void DiscreteMapSequencePage::drawFooter(Canvas &canvas) {
+    const char *clockSource = "INT";
+    switch (_sequence->clockSource()) {
+    case DiscreteMapSequence::ClockSource::Internal: clockSource = "SAW"; break;
+    case DiscreteMapSequence::ClockSource::InternalTriangle: clockSource = "TRI"; break;
+    case DiscreteMapSequence::ClockSource::External: clockSource = "EXT"; break;
+    }
+
     const char *fnLabels[5] = {
-        _sequence->clockSource() == DiscreteMapSequence::ClockSource::Internal ? "INT" : "EXT",
+        clockSource,
         nullptr,
         _sequence->thresholdMode() == DiscreteMapSequence::ThresholdMode::Position ? "POS" : "LEN",
         _sequence->loop() ? "LOOP" : "ONCE",

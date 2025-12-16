@@ -66,8 +66,9 @@ public:
     //----------------------------------------
 
     enum class ClockSource : uint8_t {
-        Internal,   // Synced to clock divisor
-        External    // Uses routed CV input
+        Internal,           // Sawtooth ramp
+        InternalTriangle,   // Triangle ramp
+        External            // Routed CV input
     };
 
     ClockSource clockSource() const { return _clockSource; }
@@ -75,8 +76,7 @@ public:
         _clockSource = source;
     }
     void toggleClockSource() {
-        _clockSource = (_clockSource == ClockSource::Internal)
-            ? ClockSource::External : ClockSource::Internal;
+        _clockSource = static_cast<ClockSource>((static_cast<int>(_clockSource) + 1) % 3);
     }
 
     // Divisor (ticks)
@@ -191,7 +191,13 @@ public:
         setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
     }
     void printDivisor(StringBuilder &str) const { ModelUtils::printDivisor(str, divisor()); }
-    void printClockSource(StringBuilder &str) const { str(_clockSource == ClockSource::Internal ? "Internal" : "External"); }
+    void printClockSource(StringBuilder &str) const {
+        switch (_clockSource) {
+        case ClockSource::Internal: str("Internal Saw"); break;
+        case ClockSource::InternalTriangle: str("Internal Tri"); break;
+        case ClockSource::External: str("External"); break;
+        }
+    }
     void printThresholdMode(StringBuilder &str) const { str(_thresholdMode == ThresholdMode::Position ? "Position" : "Length"); }
     void printScaleSource(StringBuilder &str) const { str(_scaleSource == ScaleSource::Project ? "Project" : "Track"); }
     void editRootNote(int value, bool shift) { setRootNote(rootNote() + value); }
