@@ -186,11 +186,7 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
             }
             int midiNote = int(volts * 12.f) + 12;
 
-            // Handle negative midiNote values by using safe modulo for pitch class and floor-divide for octave.
-            int pitchClass = modulo(midiNote, 12);
-            int octave = roundDownDivide(midiNote, 12) - 1;
-            Types::printNote(name, pitchClass);
-            name("%d", octave);
+            Types::printMidiNote(name, midiNote);
 
             canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
             canvas.drawText(x - 4, y + 16, name); // Shift left
@@ -471,7 +467,6 @@ void DiscreteMapSequencePage::contextAction(int index) {
     case ContextAction::Random:
         if (_sequence) {
             _sequence->randomize();
-            refreshPointers();  // Refresh the engine pointer to ensure it's valid
             if (_enginePtr) {
                 _enginePtr->invalidateThresholds();
             }

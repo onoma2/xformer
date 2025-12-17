@@ -1,5 +1,9 @@
 #include "DiscreteMapSequence.h"
 #include "ProjectVersion.h"
+#include "core/utils/Random.h"
+#include "os/os.h"
+
+static Random rng;
 
 //----------------------------------------
 // Stage
@@ -49,6 +53,13 @@ void DiscreteMapSequence::clear() {
 void DiscreteMapSequence::clearStage(int index) {
     if (index >= 0 && index < StageCount) {
         _stages[index].clear();
+    }
+}
+
+void DiscreteMapSequence::randomize() {
+    for (auto &stage : _stages) {
+        stage.setThreshold(rng.nextRange(199) - 99);
+        stage.setNoteIndex(rng.nextRange(49 - 24));
     }
 }
 

@@ -43,6 +43,11 @@ void ClipBoard::copyCurveSequenceSteps(const CurveSequence &curveSequence, const
     curveSequenceSteps.selected = selectedSteps;
 }
 
+void ClipBoard::copyDiscreteMapSequence(const DiscreteMapSequence &sequence) {
+    _type = Type::DiscreteMapSequence;
+    _container.as<DiscreteMapSequence>() = sequence;
+}
+
 void ClipBoard::copyPattern(int patternIndex) {
     _type = Type::Pattern;
     auto &pattern = _container.as<Pattern>();
@@ -58,6 +63,9 @@ void ClipBoard::copyPattern(int patternIndex) {
             break;
         case Track::TrackMode::Tuesday:
             pattern.sequences[trackIndex].data.tuesday = track.tuesdayTrack().sequence(patternIndex);
+            break;
+        case Track::TrackMode::DiscreteMap:
+            pattern.sequences[trackIndex].data.discreteMap = track.discreteMapTrack().sequence(patternIndex);
             break;
         default:
             break;
@@ -106,6 +114,13 @@ void ClipBoard::pasteCurveSequenceSteps(CurveSequence &curveSequence, const Sele
     }
 }
 
+void ClipBoard::pasteDiscreteMapSequence(DiscreteMapSequence &sequence) const {
+    if (canPasteDiscreteMapSequence()) {
+        Model::WriteLock lock;
+        sequence = _container.as<DiscreteMapSequence>();
+    }
+}
+
 void ClipBoard::pastePattern(int patternIndex) const {
     if (canPastePattern()) {
         Model::WriteLock lock;
@@ -122,6 +137,9 @@ void ClipBoard::pastePattern(int patternIndex) const {
                     break;
                 case Track::TrackMode::Tuesday:
                     track.tuesdayTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.tuesday;
+                    break;
+                case Track::TrackMode::DiscreteMap:
+                    track.discreteMapTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.discreteMap;
                     break;
                 default:
                     break;
@@ -155,6 +173,10 @@ bool ClipBoard::canPasteCurveSequence() const {
 
 bool ClipBoard::canPasteCurveSequenceSteps() const {
     return _type == Type::CurveSequenceSteps;
+}
+
+bool ClipBoard::canPasteDiscreteMapSequence() const {
+    return _type == Type::DiscreteMapSequence;
 }
 
 bool ClipBoard::canPastePattern() const {

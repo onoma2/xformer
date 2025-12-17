@@ -6,6 +6,7 @@
 #include "NoteSequence.h"
 #include "CurveSequence.h"
 #include "TuesdaySequence.h"
+#include "DiscreteMapSequence.h"
 #include "Project.h"
 #include "UserScale.h"
 
@@ -26,6 +27,7 @@ public:
     void copyNoteSequenceSteps(const NoteSequence &noteSequence, const SelectedSteps &selectedSteps);
     void copyCurveSequence(const CurveSequence &curveSequence);
     void copyCurveSequenceSteps(const CurveSequence &curveSequence, const SelectedSteps &selectedSteps);
+    void copyDiscreteMapSequence(const DiscreteMapSequence &sequence);
     void copyPattern(int patternIndex);
     void copyUserScale(const UserScale &userScale);
 
@@ -34,6 +36,7 @@ public:
     void pasteNoteSequenceSteps(NoteSequence &noteSequence, const SelectedSteps &selectedSteps) const;
     void pasteCurveSequence(CurveSequence &curveSequence) const;
     void pasteCurveSequenceSteps(CurveSequence &curveSequence, const SelectedSteps &selectedSteps) const;
+    void pasteDiscreteMapSequence(DiscreteMapSequence &sequence) const;
     void pastePattern(int patternIndex) const;
     void pasteUserScale(UserScale &userScale) const;
 
@@ -42,6 +45,7 @@ public:
     bool canPasteNoteSequenceSteps() const;
     bool canPasteCurveSequence() const;
     bool canPasteCurveSequenceSteps() const;
+    bool canPasteDiscreteMapSequence() const;
     bool canPastePattern() const;
     bool canPasteUserScale() const;
 
@@ -53,6 +57,7 @@ private:
         NoteSequenceSteps,
         CurveSequence,
         CurveSequenceSteps,
+        DiscreteMapSequence,
         Pattern,
         UserScale,
     };
@@ -74,11 +79,12 @@ private:
                 NoteSequence note;
                 CurveSequence curve;
                 TuesdaySequence tuesday;
+                DiscreteMapSequence discreteMap;
             } data;
         } sequences[CONFIG_TRACK_COUNT];
     };
 
     Project &_project;
     Type _type = Type::None;
-    Container<Track, NoteSequence, NoteSequenceSteps, CurveSequence, CurveSequenceSteps, Pattern, UserScale> _container;
+    Container<Track, NoteSequence, NoteSequenceSteps, CurveSequence, CurveSequenceSteps, DiscreteMapSequence, Pattern, UserScale> _container;
 };

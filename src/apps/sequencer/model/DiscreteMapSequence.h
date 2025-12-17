@@ -19,7 +19,7 @@ public:
     // Types
     //----------------------------------------
 
-    static constexpr int StageCount = 8;
+    static constexpr int StageCount = 32;
 
     //----------------------------------------
     // Stage
@@ -33,10 +33,10 @@ public:
             Off
         };
 
-        // Threshold (-127 to +127)
+        // Threshold (-100 to +100)
         int8_t threshold() const { return _threshold; }
         void setThreshold(int threshold) {
-            _threshold = clamp(threshold, -127, 127);
+            _threshold = clamp(threshold, -100, 100);
         }
 
         // Direction
@@ -183,6 +183,7 @@ public:
 
     void clear();
     void clearStage(int index);
+    void randomize();
 
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);

@@ -146,8 +146,8 @@ float DiscreteMapTrackEngine::getThresholdVoltage(int stageIndex) {
 
     if (_sequence->thresholdMode() == DiscreteMapSequence::ThresholdMode::Position) {
         // Position mode: use threshold value directly as voltage
-        // Map from -127..+127 to rangeMin..rangeMax
-        float normalizedThreshold = (stage.threshold() + 127) / 254.0f;
+        // Map from -100..+100 to rangeMin..rangeMax
+        float normalizedThreshold = (stage.threshold() + 100) / 200.0f;
         return rangeMin() + normalizedThreshold * (rangeMax() - rangeMin());
     } else {
         // Length mode: use pre-calculated thresholds

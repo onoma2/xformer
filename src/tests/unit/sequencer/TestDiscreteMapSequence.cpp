@@ -28,12 +28,12 @@ CASE("stage_threshold_clamp") {
     auto &stage = seq.stage(0);
     stage.setThreshold(-100);
     expectEqual(int(stage.threshold()), -100, "negative threshold");
-    stage.setThreshold(120);
-    expectEqual(int(stage.threshold()), 120, "positive threshold");
+    stage.setThreshold(50);
+    expectEqual(int(stage.threshold()), 50, "positive threshold");
     stage.setThreshold(200);
-    expectEqual(int(stage.threshold()), 127, "clamped max");
+    expectEqual(int(stage.threshold()), 100, "clamped max");
     stage.setThreshold(-200);
-    expectEqual(int(stage.threshold()), -127, "clamped min");
+    expectEqual(int(stage.threshold()), -100, "clamped min");
 }
 
 CASE("stage_note_index_clamp") {

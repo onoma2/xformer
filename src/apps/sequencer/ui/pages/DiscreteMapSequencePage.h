@@ -49,7 +49,8 @@ private:
     DiscreteMapTrackEngine *_enginePtr = nullptr;
     EditMode _editMode = EditMode::None;
     int _selectedStage = 0;
-    uint16_t _selectionMask = 1;
+    uint32_t _selectionMask = 1;
     bool _shiftHeld = false;
     uint16_t _stepKeysHeld = 0;
+    int _section = 0;
 };
