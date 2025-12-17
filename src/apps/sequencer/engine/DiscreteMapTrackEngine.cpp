@@ -161,23 +161,41 @@ float DiscreteMapTrackEngine::getThresholdVoltage(int stageIndex) {
 }
 
 void DiscreteMapTrackEngine::recalculateLengthThresholds() {
-    // Length mode: distribute thresholds proportionally based on absolute threshold values
+    // Length mode: each threshold value determines the length of the interval
+    // from the previous threshold to the current threshold.
+    // Map bipolar threshold values [-100, +100] to positive range [0, 200]
+    // for length calculation (time unit division)
     float totalWeight = 0;
+
     for (int i = 0; i < DiscreteMapSequence::StageCount; i++) {
-        totalWeight += std::abs(_sequence->stage(i).threshold());
+        // Map from [-100, +100] to [0, 200]
+        int mappedValue = _sequence->stage(i).threshold() + 100;  // -100 -> 0, 0 -> 100, +100 -> 200
+        totalWeight += mappedValue;
     }
 
+    // Handle the special case where all mapped values sum to 0 (all sliders down to -100)
     if (totalWeight == 0) {
-        totalWeight = 1;  // Avoid division by zero
+        // Distribute evenly across the range
+        for (int i = 0; i < DiscreteMapSequence::StageCount; i++) {
+            _lengthThresholds[i] = rangeMin() + (float(i + 1) / float(DiscreteMapSequence::StageCount)) * (rangeMax() - rangeMin());
+        }
+        return;
     }
 
-    float range = rangeMax() - rangeMin();
-    float cumulative = rangeMin();
+    // Calculate cumulative threshold positions
+    float currentVoltage = rangeMin(); // Start from the bottom (-5V)
 
     for (int i = 0; i < DiscreteMapSequence::StageCount; i++) {
-        _lengthThresholds[i] = cumulative;
-        float proportion = std::abs(_sequence->stage(i).threshold()) / totalWeight;
-        cumulative += proportion * range;
+        // Map threshold value to determine proportional length
+        int mappedValue = _sequence->stage(i).threshold() + 100;  // Convert to [0, 200] range
+        float stageProportion = float(mappedValue) / totalWeight;
+        float stageLength = stageProportion * (rangeMax() - rangeMin());
+
+        // Move to the end of this stage's interval
+        currentVoltage += stageLength;
+
+        // Set this stage's threshold voltage (end of its interval)
+        _lengthThresholds[i] = currentVoltage;
     }
 }
 
