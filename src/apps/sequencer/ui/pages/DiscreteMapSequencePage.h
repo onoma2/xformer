@@ -37,17 +37,17 @@ private:
         Last
     };
 
-    enum class RandomContextAction : uint8_t {
-        All,
-        Thr,  // Thresholds
-        Note, // Notes
-        Tog,  // Toggles/Directions
-        Last
+    enum class GeneratorStage : uint8_t {
+        Inactive,
+        ChooseKind,
+        Execute,
     };
 
-    enum class RandomizationMode : uint8_t {
-        Inactive,
-        Active,
+    enum class GeneratorKind : uint8_t {
+        Random,
+        Linear,
+        Logarithmic,
+        Exponential,
     };
 
     void refreshPointers();
@@ -55,7 +55,7 @@ private:
     void drawStageInfo(Canvas &canvas);
     void drawFooter(Canvas &canvas);
 
-    void handleTopRowKey(int idx, bool shift);
+    void handleTopRowKey(int idx);
     void handleBottomRowKey(int idx);
     void handleFunctionKey(int fnIndex);
 
@@ -66,8 +66,10 @@ private:
     void contextShow();
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
-    void randomContextAction(int index);
-    bool randomContextActionEnabled(int index) const;
+    void applyGenerator(bool applyThresholds, bool applyNotes, bool applyToggles = false);
+    void generateThresholds(GeneratorKind kind);
+    void generateNotes(GeneratorKind kind);
+    float shapeValue(float t, GeneratorKind kind) const;
 
     DiscreteMapSequence *_sequence = nullptr;
     DiscreteMapTrackEngine *_enginePtr = nullptr;
@@ -77,5 +79,6 @@ private:
     bool _shiftHeld = false;
     uint16_t _stepKeysHeld = 0;
     int _section = 0;
-    RandomizationMode _randomizationMode = RandomizationMode::Inactive;
+    GeneratorStage _generatorStage = GeneratorStage::Inactive;
+    GeneratorKind _generatorKind = GeneratorKind::Random;
 };

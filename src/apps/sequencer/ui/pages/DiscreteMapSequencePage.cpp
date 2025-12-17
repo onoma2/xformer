@@ -13,35 +13,31 @@
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
 
+#include <cmath>
+
 static const ContextMenuModel::Item contextMenuItems[] = {
     { "INIT" },
     { "COPY" },
     { "PASTE" },
-    { "RAND" },
+    { "GEN" },
     { "ROUTE" },
 };
 
-static const ContextMenuModel::Item randomContextMenuItems[] = {
-    { "ALL" },
-    { "THR" },
-    { "NOTE" },
-    { "TOG" },
-};
-
 DiscreteMapSequencePage::DiscreteMapSequencePage(PageManager &manager, PageContext &context) :
-    BasePage(manager, context),
-    _randomizationMode(RandomizationMode::Inactive)
+    BasePage(manager, context)
 {}
 
 void DiscreteMapSequencePage::enter() {
     refreshPointers();
-    // Reset randomization mode when entering the page to ensure clean state
-    _randomizationMode = RandomizationMode::Inactive;
+    // Reset generator mode when entering the page to ensure clean state
+    _generatorStage = GeneratorStage::Inactive;
+    _generatorKind = GeneratorKind::Random;
 }
 
 void DiscreteMapSequencePage::exit() {
-    // Ensure randomization mode is reset when exiting the page
-    _randomizationMode = RandomizationMode::Inactive;
+    // Ensure generator mode is reset when exiting the page
+    _generatorStage = GeneratorStage::Inactive;
+    _generatorKind = GeneratorKind::Random;
 }
 
 void DiscreteMapSequencePage::refreshPointers() {
@@ -205,36 +201,37 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
 }
 
 void DiscreteMapSequencePage::drawFooter(Canvas &canvas) {
-    if (_randomizationMode == RandomizationMode::Active) {
-        // Show randomization options when in randomization mode
-        const char *fnLabels[5] = {
-            "ALL",      // F1: Randomize all parameters
-            "THR",      // F2: Randomize only thresholds
-            "NOTE",     // F3: Randomize only notes
-            "TOG",      // F4: Randomize only toggles/directions
-            "X"         // F5: Exit randomization mode
-        };
-
+    if (_generatorStage == GeneratorStage::ChooseKind) {
+        const char *fnLabels[5] = { "RAND", "LIN", "LOG", "EXP", "X" };
         WindowPainter::drawFooter(canvas, fnLabels, pageKeyState(), -1);
-    } else {
-        // Original footer display when not in randomization mode
-        const char *clockSource = "INT";
-        switch (_sequence->clockSource()) {
-        case DiscreteMapSequence::ClockSource::Internal: clockSource = "SAW"; break;
-        case DiscreteMapSequence::ClockSource::InternalTriangle: clockSource = "TRI"; break;
-        case DiscreteMapSequence::ClockSource::External: clockSource = "EXT"; break;
-        }
-
-        const char *fnLabels[5] = {
-            clockSource,
-            nullptr,
-            _sequence->thresholdMode() == DiscreteMapSequence::ThresholdMode::Position ? "POS" : "LEN",
-            _sequence->loop() ? "LOOP" : "ONCE",
-            nullptr
-        };
-
-        WindowPainter::drawFooter(canvas, fnLabels, pageKeyState(), -1);
+        return;
     }
+
+    if (_generatorStage == GeneratorStage::Execute) {
+        // Show TOG on F4 only for RAND; otherwise leave empty
+        const bool isRand = _generatorKind == GeneratorKind::Random;
+        const char *fnLabels[5] = { "ALL", "THR", "NOTE", isRand ? "TOG" : nullptr, "X" };
+        WindowPainter::drawFooter(canvas, fnLabels, pageKeyState(), -1);
+        return;
+    }
+
+    // Original footer display when not in generator mode
+    const char *clockSource = "INT";
+    switch (_sequence->clockSource()) {
+    case DiscreteMapSequence::ClockSource::Internal: clockSource = "SAW"; break;
+    case DiscreteMapSequence::ClockSource::InternalTriangle: clockSource = "TRI"; break;
+    case DiscreteMapSequence::ClockSource::External: clockSource = "EXT"; break;
+    }
+
+    const char *fnLabels[5] = {
+        clockSource,
+        nullptr,
+        _sequence->thresholdMode() == DiscreteMapSequence::ThresholdMode::Position ? "POS" : "LEN",
+        _sequence->loop() ? "LOOP" : "ONCE",
+        nullptr
+    };
+
+    WindowPainter::drawFooter(canvas, fnLabels, pageKeyState(), -1);
 }
 
 void DiscreteMapSequencePage::updateLeds(Leds &leds) {
@@ -302,7 +299,7 @@ void DiscreteMapSequencePage::keyDown(KeyEvent &event) {
         int idx = key.step();
         if (idx < 8) {
             _stepKeysHeld |= (1 << idx);
-            handleTopRowKey(stepOffset + idx, key.shiftModifier());
+            handleTopRowKey(stepOffset + idx);
         } else {
             handleBottomRowKey(stepOffset + idx - 8);
         }
@@ -386,20 +383,19 @@ void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
     }
 }
 
-void DiscreteMapSequencePage::handleTopRowKey(int idx, bool shift) {
-    if (shift) {
-        _editMode = EditMode::NoteValue;
-    } else {
-        // Persist current mode, or default to Threshold if None
-        if (_editMode == EditMode::None) {
-            _editMode = EditMode::Threshold;
-        }
-    }
-
+void DiscreteMapSequencePage::handleTopRowKey(int idx) {
+    bool wasSelected = (_selectionMask & (1U << idx)) != 0;
     // Check if any OTHER selection key (0-7) is held
     // idx is logical index. Physical index is idx % 8.
     int physicalIdx = idx % 8;
     bool multiSelect = (_stepKeysHeld & 0xFF & ~(1 << physicalIdx)) != 0;
+
+    // If re-pressing an already selected step (and not multi-selecting), toggle edit mode
+    if (!multiSelect && wasSelected) {
+        _editMode = (_editMode == EditMode::Threshold) ? EditMode::NoteValue : EditMode::Threshold;
+    } else if (_editMode == EditMode::None) {
+        _editMode = EditMode::Threshold;
+    }
 
     if (multiSelect) {
         _selectionMask ^= (1U << idx); // Toggle
@@ -432,61 +428,47 @@ void DiscreteMapSequencePage::handleBottomRowKey(int idx) {
 }
 
 void DiscreteMapSequencePage::handleFunctionKey(int fnIndex) {
-    if (_randomizationMode == RandomizationMode::Active) {
-        // Handle randomization mode function key presses
+    // Generator flow: first choose generator kind, then execute on targets
+    if (_generatorStage == GeneratorStage::ChooseKind) {
         switch (fnIndex) {
-        case 0: // F1: "ALL" - Randomize all parameters
-            if (_sequence) {
-                _sequence->randomize();
-                showMessage("ALL PARAMETERS RANDOMIZED");
-            }
-            _randomizationMode = RandomizationMode::Inactive;
-            break;
-        case 1: // F2: "THR" - Randomize only thresholds
-            if (_sequence) {
-                _sequence->randomizeThresholds();
-                showMessage("THRESHOLDS RANDOMIZED");
-            }
-            _randomizationMode = RandomizationMode::Inactive;
-            break;
-        case 2: // F3: "NOTE" - Randomize only notes
-            if (_sequence) {
-                _sequence->randomizeNotes();
-                showMessage("NOTES RANDOMIZED");
-            }
-            _randomizationMode = RandomizationMode::Inactive;
-            break;
-        case 3: // F4: "TOG" - Randomize only toggles/directions
-            if (_sequence) {
-                _sequence->randomizeDirections();
-                showMessage("DIRECTIONS RANDOMIZED");
-            }
-            _randomizationMode = RandomizationMode::Inactive;
-            break;
-        case 4: // F5: "X" - Exit randomization mode
-            _randomizationMode = RandomizationMode::Inactive;
-            break;
-        default:
-            break;
+        case 0: _generatorKind = GeneratorKind::Random; _generatorStage = GeneratorStage::Execute; break;
+        case 1: _generatorKind = GeneratorKind::Linear; _generatorStage = GeneratorStage::Execute; break;
+        case 2: _generatorKind = GeneratorKind::Logarithmic; _generatorStage = GeneratorStage::Execute; break;
+        case 3: _generatorKind = GeneratorKind::Exponential; _generatorStage = GeneratorStage::Execute; break;
+        case 4: _generatorStage = GeneratorStage::Inactive; break;
+        default: break;
         }
-    } else {
-        // Handle normal mode function key presses
+        return;
+    }
+
+    if (_generatorStage == GeneratorStage::Execute) {
         switch (fnIndex) {
-        case 0:
-            _sequence->toggleClockSource();
-            break;
-        case 2:
-            _sequence->toggleThresholdMode();
-            if (_enginePtr) {
-                _enginePtr->invalidateThresholds();
-            }
-            break;
-        case 3:
-            _sequence->toggleLoop();
-            break;
-        default:
-            break;
+        case 0: applyGenerator(true, true, true); _generatorStage = GeneratorStage::Inactive; break;   // ALL
+        case 1: applyGenerator(true, false, false); _generatorStage = GeneratorStage::Inactive; break; // THR
+        case 2: applyGenerator(false, true, false); _generatorStage = GeneratorStage::Inactive; break; // NOTE
+        case 3: applyGenerator(false, false, true); _generatorStage = GeneratorStage::Inactive; break; // TOG (RAND only)
+        case 4: _generatorStage = GeneratorStage::Inactive; break;                                    // EXIT
+        default: break;
         }
+        return;
+    }
+
+    // Handle normal mode function key presses
+    switch (fnIndex) {
+    case 0:
+        _sequence->toggleClockSource();
+        break;
+    case 2:
+        _sequence->toggleThresholdMode();
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        break;
+    case 3:
+        _sequence->toggleLoop();
+        break;
+    default:
+        break;
     }
 }
 
@@ -527,8 +509,9 @@ void DiscreteMapSequencePage::contextAction(int index) {
         showMessage("PASTED");
         break;
     case ContextAction::Random:
-        // Enter persistent randomization mode
-        _randomizationMode = RandomizationMode::Active;
+        // Enter generator selection mode
+        _generatorStage = GeneratorStage::ChooseKind;
+        _generatorKind = GeneratorKind::Random;
         break;
     case ContextAction::Route:
         _manager.pages().top.editRoute(Routing::Target::Divisor, _project.selectedTrackIndex());
@@ -536,40 +519,6 @@ void DiscreteMapSequencePage::contextAction(int index) {
     case ContextAction::Last:
         break;
     }
-}
-
-void DiscreteMapSequencePage::randomContextAction(int index) {
-    if (!_sequence) return;
-
-    switch (RandomContextAction(index)) {
-    case RandomContextAction::All:
-        _sequence->randomize();
-        showMessage("ALL PARAMETERS RANDOMIZED");
-        break;
-    case RandomContextAction::Thr:
-        _sequence->randomizeThresholds();
-        showMessage("THRESHOLDS RANDOMIZED");
-        break;
-    case RandomContextAction::Note:
-        _sequence->randomizeNotes();
-        showMessage("NOTES RANDOMIZED");
-        break;
-    case RandomContextAction::Tog:
-        _sequence->randomizeDirections();
-        showMessage("DIRECTIONS RANDOMIZED");
-        break;
-    case RandomContextAction::Last:
-        break;
-    }
-
-    refreshPointers();  // Refresh the engine pointer to ensure it's valid
-    if (_enginePtr) {
-        _enginePtr->invalidateThresholds();
-    }
-}
-
-bool DiscreteMapSequencePage::randomContextActionEnabled(int index) const {
-    return _sequence != nullptr;
 }
 
 bool DiscreteMapSequencePage::contextActionEnabled(int index) const {
@@ -583,4 +532,113 @@ bool DiscreteMapSequencePage::contextActionEnabled(int index) const {
     default:
         return true;
     }
+}
+
+void DiscreteMapSequencePage::applyGenerator(bool applyThresholds, bool applyNotes, bool applyToggles) {
+    if (!_sequence) {
+        return;
+    }
+
+    auto generatorName = [] (GeneratorKind kind) -> const char * {
+        switch (kind) {
+        case GeneratorKind::Random:       return "RAND";
+        case GeneratorKind::Linear:       return "LIN";
+        case GeneratorKind::Logarithmic:  return "LOG";
+        case GeneratorKind::Exponential:  return "EXP";
+        }
+        return "";
+    };
+
+    if (_generatorKind == GeneratorKind::Random) {
+        if (applyThresholds && applyNotes && applyToggles) {
+            _sequence->randomize(); // Includes directions
+            showMessage("RAND ALL");
+        } else {
+            if (applyThresholds) {
+                _sequence->randomizeThresholds();
+            }
+            if (applyNotes) {
+                _sequence->randomizeNotes();
+            }
+            if (applyToggles) {
+                _sequence->randomizeDirections();
+            }
+
+            if (applyThresholds && applyNotes && applyToggles) {
+                showMessage("RAND ALL");
+            } else if (applyThresholds) {
+                showMessage("RAND THR");
+            } else if (applyNotes) {
+                showMessage("RAND NOTE");
+            } else if (applyToggles) {
+                showMessage("RAND TOG");
+            }
+        }
+    } else {
+        // LIN/LOG/EXP: ignore toggle requests
+        if (applyThresholds) {
+            generateThresholds(_generatorKind);
+        }
+        if (applyNotes) {
+            generateNotes(_generatorKind);
+        }
+
+        FixedStringBuilder<16> msg;
+        if (applyThresholds && applyNotes) {
+            msg("%s ALL", generatorName(_generatorKind));
+        } else if (applyThresholds) {
+            msg("%s THR", generatorName(_generatorKind));
+        } else if (applyNotes) {
+            msg("%s NOTE", generatorName(_generatorKind));
+        }
+        const char *text = msg;
+        if (text[0] != 0) {
+            showMessage(text);
+        }
+    }
+
+    if (applyThresholds && _enginePtr) {
+        _enginePtr->invalidateThresholds();
+    }
+}
+
+void DiscreteMapSequencePage::generateThresholds(GeneratorKind kind) {
+    const int count = DiscreteMapSequence::StageCount;
+    const float minVal = -99.f;
+    const float maxVal = 99.f;
+
+    for (int i = 0; i < count; ++i) {
+        float t = (count > 1) ? float(i) / float(count - 1) : 0.f;
+        float shaped = shapeValue(t, kind);
+        int val = int(std::round(minVal + shaped * (maxVal - minVal)));
+        _sequence->stage(i).setThreshold(val);
+    }
+}
+
+void DiscreteMapSequencePage::generateNotes(GeneratorKind kind) {
+    const int count = DiscreteMapSequence::StageCount;
+    const float minVal = -63.f;
+    const float maxVal = 64.f;
+
+    for (int i = 0; i < count; ++i) {
+        float t = (count > 1) ? float(i) / float(count - 1) : 0.f;
+        float shaped = shapeValue(t, kind);
+        int val = int(std::round(minVal + shaped * (maxVal - minVal)));
+        _sequence->stage(i).setNoteIndex(val);
+    }
+}
+
+float DiscreteMapSequencePage::shapeValue(float t, GeneratorKind kind) const {
+    t = clamp(t, 0.f, 1.f);
+    switch (kind) {
+    case GeneratorKind::Random:
+        return t; // Should not be used here
+    case GeneratorKind::Linear:
+        return t;
+    case GeneratorKind::Logarithmic:
+        return std::sqrt(t);       // Faster rise near start
+    case GeneratorKind::Exponential:
+        return t * t;              // Slower start, steeper end
+    }
+    return t;
 }
