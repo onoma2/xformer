@@ -103,7 +103,11 @@ public:
         setGateLength(gateLength() + value);
     }
     void printGateLength(StringBuilder &str) const {
-        str("%d%%", gateLength());
+        if (_gateLength == 0) {
+            str("T");
+        } else {
+            str("%d%%", gateLength());
+        }
     }
 
     //----------------------------------------
@@ -217,7 +221,7 @@ public:
 private:
     ClockSource _clockSource = ClockSource::Internal;
     uint16_t _divisor = 192;
-    uint8_t _gateLength = 1;
+    uint8_t _gateLength = 0;     // 0 = 1T pulse
     bool _loop = true;
 
     ThresholdMode _thresholdMode = ThresholdMode::Position;

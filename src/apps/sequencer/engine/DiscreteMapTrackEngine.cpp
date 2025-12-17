@@ -69,7 +69,12 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     if (gateChanged && _activeStage >= 0) {
         uint32_t stepTicks = _sequence->divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
         if (stepTicks == 0) stepTicks = 1;
-        _gateTimer = (stepTicks * _sequence->gateLength()) / 100;
+        int gateLengthPercent = _sequence->gateLength();
+        if (gateLengthPercent == 0) {
+            _gateTimer = 3; // Explicit 1-tick pulse
+        } else {
+            _gateTimer = (stepTicks * gateLengthPercent) / 100;
+        }
     }
 
     // 4. Update CV output
@@ -202,7 +207,7 @@ int DiscreteMapTrackEngine::findActiveStage(float input, float prevInput) {
     }
 
     // No crossing detected
-    
+
     // Check if current active stage is still valid
     if (_activeStage >= 0 && _sequence->stage(_activeStage).direction() == DiscreteMapSequence::Stage::TriggerDir::Off) {
         return -1;

@@ -38,7 +38,7 @@ void DiscreteMapSequence::Stage::read(VersionedSerializedReader &reader) {
 void DiscreteMapSequence::clear() {
     _clockSource = ClockSource::Internal;
     _divisor = 192;
-    _gateLength = 1;
+    _gateLength = 0; // 1T default
     _loop = true;
     _thresholdMode = ThresholdMode::Position;
     _scale = -1;
