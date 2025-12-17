@@ -9,6 +9,9 @@ void DiscreteMapTrackEngine::reset() {
     _rampValue = rangeMin();
     _prevInput = rangeMin() - 0.001f;  // Ensure first RISE can trigger
     _currentInput = rangeMin();
+    _prevSync = _discreteMapTrack.routedSync();
+    _resetTickOffset = 0;
+    _prevLoop = _sequence ? _sequence->loop() : true;
     _activeStage = -1;
     _cvOutput = 0.0f;
     _targetCv = 0.0f;
@@ -23,20 +26,62 @@ void DiscreteMapTrackEngine::reset() {
 void DiscreteMapTrackEngine::restart() {
     _rampPhase = 0.0f;
     _running = true;
+    _resetTickOffset = 0;
+    _prevSync = _discreteMapTrack.routedSync();
+    _prevLoop = _sequence ? _sequence->loop() : true;
 }
 
 void DiscreteMapTrackEngine::changePattern() {
     _sequence = &_discreteMapTrack.sequence(pattern());
     _thresholdsDirty = true;
+    _prevLoop = _sequence->loop();
 }
 
 TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     _sequence = &_discreteMapTrack.sequence(pattern());
 
+    // Handle loop mode toggled from Once->Loop by restarting ramp
+    if (!_prevLoop && _sequence->loop()) {
+        reset();
+        _resetTickOffset = tick;
+    }
+    _prevLoop = _sequence->loop();
+
+    // Sync / reset handling
+    uint32_t relativeTick = tick - _resetTickOffset;
+    bool resetRequested = false;
+    auto syncMode = _sequence->syncMode();
+    switch (syncMode) {
+    case DiscreteMapSequence::SyncMode::ResetMeasure: {
+        uint32_t resetDivisor = _sequence->resetMeasure() * _engine.measureDivisor();
+        if (resetDivisor > 0 && relativeTick % resetDivisor == 0) {
+            resetRequested = true;
+        }
+        break;
+    }
+    case DiscreteMapSequence::SyncMode::External: {
+        float syncVal = _discreteMapTrack.routedSync();
+        if (_prevSync <= 0.f && syncVal > 0.f) {
+            resetRequested = true;
+        }
+        _prevSync = syncVal;
+        break;
+    }
+    case DiscreteMapSequence::SyncMode::Off:
+    case DiscreteMapSequence::SyncMode::Last:
+        break;
+    }
+
+    if (resetRequested) {
+        reset();
+        _resetTickOffset = tick;
+        relativeTick = 0;
+    }
+
     // 1. Update input source
     if (_sequence->clockSource() != DiscreteMapSequence::ClockSource::External) {
         if (_running || _sequence->loop()) {
-            updateRamp(tick);
+            updateRamp(relativeTick);
         }
         _currentInput = _rampValue;
     } else {

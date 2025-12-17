@@ -71,12 +71,40 @@ public:
         External            // Routed CV input
     };
 
+    enum class SyncMode : uint8_t {
+        Off,
+        ResetMeasure,
+        External,
+        Last
+    };
+
     ClockSource clockSource() const { return _clockSource; }
     void setClockSource(ClockSource source) {
         _clockSource = source;
     }
     void toggleClockSource() {
         _clockSource = static_cast<ClockSource>((static_cast<int>(_clockSource) + 1) % 3);
+    }
+
+    SyncMode syncMode() const { return _syncMode; }
+    void setSyncMode(SyncMode mode) {
+        _syncMode = ModelUtils::clampedEnum(mode);
+    }
+    void cycleSyncMode() {
+        auto next = static_cast<int>(_syncMode) + 1;
+        if (next >= static_cast<int>(SyncMode::Last)) next = 0;
+        setSyncMode(static_cast<SyncMode>(next));
+    }
+    void editSyncMode(int value, bool /*shift*/) {
+        setSyncMode(static_cast<SyncMode>(clamp(int(_syncMode) + value, 0, int(SyncMode::Last) - 1)));
+    }
+    void printSyncMode(StringBuilder &str) const {
+        switch (_syncMode) {
+        case SyncMode::Off:          str("Off"); break;
+        case SyncMode::ResetMeasure: str("Reset"); break;
+        case SyncMode::External:     str("Ext"); break;
+        case SyncMode::Last:         break;
+        }
     }
 
     // Divisor (ticks)
@@ -192,6 +220,22 @@ public:
     void randomizeNotes();
     void randomizeDirections();
 
+    // resetMeasure (0-128 bars)
+    int resetMeasure() const { return _resetMeasure; }
+    void setResetMeasure(int resetMeasure) {
+        _resetMeasure = clamp(resetMeasure, 0, 128);
+    }
+    void editResetMeasure(int value, bool shift) {
+        setResetMeasure(ModelUtils::adjustedByPowerOfTwo(resetMeasure(), value, shift));
+    }
+    void printResetMeasure(StringBuilder &str) const {
+        if (resetMeasure() == 0) {
+            str("off");
+        } else {
+            str("%d %s", resetMeasure(), resetMeasure() > 1 ? "bars" : "bar");
+        }
+    }
+
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);
 
@@ -212,6 +256,14 @@ public:
         case ClockSource::External: str("External"); break;
         }
     }
+    void printSyncModeShort(StringBuilder &str) const {
+        switch (_syncMode) {
+        case SyncMode::Off:          str("OFF"); break;
+        case SyncMode::ResetMeasure: str("RM"); break;
+        case SyncMode::External:     str("EXT"); break;
+        case SyncMode::Last:         break;
+        }
+    }
     void printThresholdMode(StringBuilder &str) const { str(_thresholdMode == ThresholdMode::Position ? "Position" : "Length"); }
     void editRootNote(int value, bool shift) { setRootNote(rootNote() + value); }
     void printRootNote(StringBuilder &str) const { Types::printNote(str, rootNote()); }
@@ -220,9 +272,11 @@ public:
 
 private:
     ClockSource _clockSource = ClockSource::Internal;
+    SyncMode _syncMode = SyncMode::Off;
     uint16_t _divisor = 192;
     uint8_t _gateLength = 0;     // 0 = 1T pulse
     bool _loop = true;
+    uint8_t _resetMeasure = 8;   // default 8 bars
 
     ThresholdMode _thresholdMode = ThresholdMode::Position;
 

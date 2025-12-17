@@ -379,6 +379,7 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     // DiscreteMap targets
     [int(Routing::Target::DiscreteMapInput)]                = { -5,     5,      -5,     5,      1       },
     [int(Routing::Target::DiscreteMapThreshold)]            = { -5,     5,      0,      0,      1       },
+    [int(Routing::Target::DiscreteMapSync)]                 = { 0,      1,      0,      1,      1       },
 };
 
 float Routing::normalizeTargetValue(Routing::Target target, float value) {
@@ -484,6 +485,9 @@ void Routing::printTargetValue(Routing::Target target, float normalized, StringB
     case Target::DiscreteMapInput:
     case Target::DiscreteMapThreshold:
         str("%+.2fV", value);
+        break;
+    case Target::DiscreteMapSync:
+        str(intValue ? "on" : "off");
         break;
     default:
         str("%d", intValue);

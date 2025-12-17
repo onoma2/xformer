@@ -222,13 +222,15 @@ void DiscreteMapSequencePage::drawFooter(Canvas &canvas) {
     case DiscreteMapSequence::ClockSource::InternalTriangle: clockSource = "TRI"; break;
     case DiscreteMapSequence::ClockSource::External: clockSource = "EXT"; break;
     }
+    FixedStringBuilder<8> syncLabel;
+    _sequence->printSyncModeShort(syncLabel);
 
     const char *fnLabels[5] = {
         clockSource,
         nullptr,
         _sequence->thresholdMode() == DiscreteMapSequence::ThresholdMode::Position ? "POS" : "LEN",
         _sequence->loop() ? "LOOP" : "ONCE",
-        nullptr
+        syncLabel
     };
 
     WindowPainter::drawFooter(canvas, fnLabels, pageKeyState(), -1);
@@ -478,6 +480,9 @@ void DiscreteMapSequencePage::handleFunctionKey(int fnIndex) {
         break;
     case 3:
         _sequence->toggleLoop();
+        break;
+    case 4:
+        _sequence->cycleSyncMode();
         break;
     default:
         break;

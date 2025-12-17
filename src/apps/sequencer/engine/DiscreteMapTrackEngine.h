@@ -63,6 +63,8 @@ private:
     // === Input ===
     float _currentInput = 0.0f;
     float _prevInput = 0.0f;
+    float _prevSync = 0.0f;
+    bool _prevLoop = true;
 
     // === Threshold Cache (Length mode) ===
     float _lengthThresholds[DiscreteMapSequence::StageCount];
@@ -78,4 +80,7 @@ private:
 
     // === Activity ===
     bool _activity = false;
+
+    // === Sync bookkeeping ===
+    uint32_t _resetTickOffset = 0;
 };

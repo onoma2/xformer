@@ -44,6 +44,7 @@ public:
 
     float routedInput() const { return _routedInput; }
     float routedThresholdBias() const { return _routedThresholdBias; }
+    float routedSync() const { return _routedSync; }
 
     int octave() const { return _octave; }
     void setOctave(int octave) { _octave = clamp(octave, -10, 10); }
@@ -68,6 +69,7 @@ private:
     // Routed state
     float _routedInput = 0.f;
     float _routedThresholdBias = 0.f;
+    float _routedSync = 0.f;
     int8_t _octave = 0;
     int8_t _transpose = 0;
     int16_t _offset = 0;

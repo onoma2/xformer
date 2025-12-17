@@ -37,9 +37,11 @@ void DiscreteMapSequence::Stage::read(VersionedSerializedReader &reader) {
 
 void DiscreteMapSequence::clear() {
     _clockSource = ClockSource::Internal;
+    _syncMode = SyncMode::Off;
     _divisor = 192;
     _gateLength = 0; // 1T default
     _loop = true;
+    _resetMeasure = 8;
     _thresholdMode = ThresholdMode::Position;
     _scale = -1;
     _rootNote = 0;
@@ -88,9 +90,11 @@ void DiscreteMapSequence::randomizeDirections() {
 
 void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(static_cast<uint8_t>(_clockSource));
+    writer.write(static_cast<uint8_t>(_syncMode));
     writer.write(_divisor);
     writer.write(_gateLength);
     writer.write(_loop);
+    writer.write(_resetMeasure);
     writer.write(static_cast<uint8_t>(_thresholdMode));
     writer.write(_scale);
     writer.write(_rootNote);
@@ -103,13 +107,27 @@ void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
 
 void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
     uint8_t clockSource, thresholdMode;
+    uint8_t syncMode;
 
     reader.read(clockSource);
     _clockSource = static_cast<ClockSource>(clockSource);
 
+    if (reader.dataVersion() >= ProjectVersion::Version60) {
+        reader.read(syncMode);
+        _syncMode = ModelUtils::clampedEnum(static_cast<SyncMode>(syncMode));
+    } else {
+        _syncMode = SyncMode::Off;
+    }
+
     reader.read(_divisor);
     reader.read(_gateLength);
     reader.read(_loop);
+
+    if (reader.dataVersion() >= ProjectVersion::Version60) {
+        reader.read(_resetMeasure);
+    } else {
+        _resetMeasure = 8;
+    }
 
     reader.read(thresholdMode);
     _thresholdMode = static_cast<ThresholdMode>(thresholdMode);

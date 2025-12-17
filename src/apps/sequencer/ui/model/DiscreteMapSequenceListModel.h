@@ -55,9 +55,11 @@ public:
 private:
     enum Item {
         ClockSource,
+        SyncMode,
         Divisor,
         GateLength,
         Loop,
+        ResetMeasure,
         ThresholdMode,
         Scale,
         RootNote,
@@ -71,9 +73,11 @@ private:
     static const char *itemName(Item item) {
         switch (item) {
         case ClockSource:   return "Clock";
+        case SyncMode:      return "Sync";
         case Divisor:       return "Divisor";
         case GateLength:    return "Gate Len";
         case Loop:          return "Loop";
+        case ResetMeasure:  return "Reset Measure";
         case ThresholdMode: return "Threshold";
         case Scale:         return "Scale";
         case RootNote:      return "Root";
@@ -95,6 +99,9 @@ private:
         case ClockSource:
             _sequence->printClockSource(str);
             break;
+        case SyncMode:
+            _sequence->printSyncMode(str);
+            break;
         case Divisor:
             _sequence->printDivisor(str);
             break;
@@ -103,6 +110,9 @@ private:
             break;
         case Loop:
             _sequence->printLoop(str);
+            break;
+        case ResetMeasure:
+            _sequence->printResetMeasure(str);
             break;
         case ThresholdMode:
             _sequence->printThresholdMode(str);
@@ -135,6 +145,9 @@ private:
         case ClockSource:
             _sequence->toggleClockSource();
             break;
+        case SyncMode:
+            _sequence->cycleSyncMode();
+            break;
         case Divisor:
             _sequence->editDivisor(value, shift);
             break;
@@ -143,6 +156,9 @@ private:
             break;
         case Loop:
             _sequence->toggleLoop();
+            break;
+        case ResetMeasure:
+            _sequence->editResetMeasure(value, shift);
             break;
         case ThresholdMode:
             _sequence->toggleThresholdMode();

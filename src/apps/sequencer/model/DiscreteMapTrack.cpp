@@ -12,6 +12,7 @@ void DiscreteMapTrack::cvOutputName(int index, StringBuilder &str) const {
 void DiscreteMapTrack::clear() {
     _routedInput = 0.f;
     _routedThresholdBias = 0.f;
+    _routedSync = 0.f;
     _octave = 0;
     _transpose = 0;
     _offset = 0;
@@ -41,6 +42,9 @@ void DiscreteMapTrack::writeRouted(Routing::Target target, int intValue, float f
         break;
     case Routing::Target::DiscreteMapThreshold:
         _routedThresholdBias = floatValue;
+        break;
+    case Routing::Target::DiscreteMapSync:
+        _routedSync = floatValue;
         break;
     case Routing::Target::Octave:
         _octave = intValue;

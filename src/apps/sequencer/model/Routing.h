@@ -109,7 +109,8 @@ public:
         DiscreteMapFirst,
         DiscreteMapInput = DiscreteMapFirst,
         DiscreteMapThreshold,
-        DiscreteMapLast = DiscreteMapThreshold,
+        DiscreteMapSync,
+        DiscreteMapLast = DiscreteMapSync,
 
         Last,
     };
@@ -174,6 +175,7 @@ public:
 
         case Target::DiscreteMapInput:          return "DMap Input";
         case Target::DiscreteMapThreshold:      return "DMap Thresh";
+        case Target::DiscreteMapSync:           return "DMap Sync";
 
         case Target::Last:                      break;
         }
@@ -242,9 +244,10 @@ public:
         case Target::DjFilter:                  return 45;
         case Target::XFade:                     return 46;
 
-        // DiscreteMap Targets (47-48)
+        // DiscreteMap Targets (47-49)
         case Target::DiscreteMapInput:          return 47;
         case Target::DiscreteMapThreshold:      return 48;
+        case Target::DiscreteMapSync:           return 49;
 
         case Target::Last:                      break;
         }
