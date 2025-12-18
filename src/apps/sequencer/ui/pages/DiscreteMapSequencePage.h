@@ -52,13 +52,13 @@ private:
 
     enum class RangeMacro : uint8_t {
         Full,           // -5..+5
-        Unipolar5,      // 0..+5
-        Bipolar2_5,     // -2.5..+2.5
-        Unipolar2_5,    // 0..+2.5
-        Bipolar1,       // -1..+1
-        Unipolar1,      // 0..+1
-        Negative5,      // -5..0
-        Negative2_5,    // -2.5..0
+        Inv,            // +5..-5
+        Pos,            // 0..+5
+        Neg,            // -5..0
+        Top,            // 4..5
+        Btm,            // -5..-4
+        Ass,            // -1..4
+        BAss,           // -2..3
         Last
     };
 

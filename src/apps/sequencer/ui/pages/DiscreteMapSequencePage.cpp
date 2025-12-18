@@ -558,27 +558,27 @@ void DiscreteMapSequencePage::applyRangeMacro(RangeMacro macro) {
 void DiscreteMapSequencePage::getRangeMacroValues(RangeMacro macro, float &low, float &high) const {
     switch (macro) {
     case RangeMacro::Full:         low = -5.f;  high = 5.f;    break;
-    case RangeMacro::Unipolar5:    low = 0.f;   high = 5.f;    break;
-    case RangeMacro::Bipolar2_5:   low = -2.5f; high = 2.5f;   break;
-    case RangeMacro::Unipolar2_5:  low = 0.f;   high = 2.5f;   break;
-    case RangeMacro::Bipolar1:     low = -1.f;  high = 1.f;    break;
-    case RangeMacro::Unipolar1:    low = 0.f;   high = 1.f;    break;
-    case RangeMacro::Negative5:    low = -5.f;  high = 0.f;    break;
-    case RangeMacro::Negative2_5:  low = -2.5f; high = 0.f;    break;
+    case RangeMacro::Inv:          low = 5.f;   high = -5.f;   break;
+    case RangeMacro::Pos:          low = 0.f;   high = 5.f;     break;
+    case RangeMacro::Neg:          low = -5.f;  high = 0.f;    break;
+    case RangeMacro::Top:          low = 4.f;   high = 5.f;    break;
+    case RangeMacro::Btm:          low = -5.f;  high = -4.f;   break;
+    case RangeMacro::Ass:          low = -1.f;  high = 4.f;    break;
+    case RangeMacro::BAss:         low = 3.f;   high = -2.f;   break;
     case RangeMacro::Last:         low = -5.f;  high = 5.f;    break;
     }
 }
 
 const char *DiscreteMapSequencePage::getRangeMacroName(RangeMacro macro) const {
     switch (macro) {
-    case RangeMacro::Full:        return "+/-5";
-    case RangeMacro::Unipolar5:   return "0-5";
-    case RangeMacro::Bipolar2_5:  return "+/-2.5";
-    case RangeMacro::Unipolar2_5: return "0-2.5";
-    case RangeMacro::Bipolar1:    return "+/-1";
-    case RangeMacro::Unipolar1:   return "0-1";
-    case RangeMacro::Negative5:   return "-5-0";
-    case RangeMacro::Negative2_5: return "-2.5-0";
+    case RangeMacro::Full:        return "-5/+5";
+    case RangeMacro::Inv:         return "+5/-5";
+    case RangeMacro::Pos:         return "0/+5";
+    case RangeMacro::Neg:         return "-5/0";
+    case RangeMacro::Top:         return "+4/+5";
+    case RangeMacro::Btm:         return "-5/-4";
+    case RangeMacro::Ass:         return "-1/+4";
+    case RangeMacro::BAss:        return "+3/-2";
     case RangeMacro::Last:        break;
     }
     return "RANGE";
@@ -689,9 +689,6 @@ void DiscreteMapSequencePage::applyGenerator(bool applyThresholds, bool applyNot
         if (applyNotes) {
             generateNotes(_generatorKind, noteSpread);
         }
-        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
-            _sequence->stage(i).setDirection(DiscreteMapSequence::Stage::TriggerDir::Rise);
-        }
 
         FixedStringBuilder<16> msg;
         if (applyThresholds && applyNotes) {
@@ -731,7 +728,7 @@ void DiscreteMapSequencePage::generateNotes(GeneratorKind kind, NoteSpread sprea
     float maxVal = 64.f;
 
     if (spread == NoteSpread::Narrow) {
-        minVal = 0.f;
+        minVal = -16.f;
         maxVal = 32.f;
     }
 
