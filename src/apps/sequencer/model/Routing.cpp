@@ -77,6 +77,7 @@ void Routing::Route::clear() {
     _max = 1.f;
     _biasPct.fill(DefaultBiasPct);
     _depthPct.fill(DefaultDepthPct);
+    _creaseEnabled.fill(false);
     _source = Source::None;
     _cvSource.clear();
     _midiSource.clear();
@@ -90,6 +91,7 @@ void Routing::Route::write(VersionedSerializedWriter &writer) const {
     for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
         writer.write(_biasPct[i]);
         writer.write(_depthPct[i]);
+        writer.write(_creaseEnabled[i]);
     }
     writer.write(_source);
     if (isCvSource(_source)) {
@@ -113,6 +115,13 @@ void Routing::Route::read(VersionedSerializedReader &reader) {
     } else {
         _biasPct.fill(DefaultBiasPct);
         _depthPct.fill(DefaultDepthPct);
+    }
+    if (reader.dataVersion() >= ProjectVersion::Version62) {  // Added creaseEnabled
+        for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
+            reader.read(_creaseEnabled[i]);
+        }
+    } else {
+        _creaseEnabled.fill(false);  // Default to false for older projects
     }
     reader.read(_source);
     if (isCvSource(_source)) {

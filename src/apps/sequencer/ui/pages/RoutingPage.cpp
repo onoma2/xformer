@@ -19,6 +19,8 @@ RoutingPage::RoutingPage(PageManager &manager, PageContext &context) :
     ListPage(manager, context, _routeListModel),
     _routeListModel(_editRoute)
 {
+    _creaseStaging.fill(false);
+    _creaseClipboard.fill(false);
     showRoute(0);
 }
 
@@ -142,6 +144,13 @@ void RoutingPage::showRoute(int routeIndex, const Routing::Route *initialValue) 
     _editRoute = *(initialValue ? initialValue : _route);
     _biasOverlayActive = false;
 
+    // Initialize staging arrays with current route values
+    for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
+        _biasStaging[i] = _editRoute.biasPct(i);
+        _depthStaging[i] = _editRoute.depthPct(i);
+        _creaseStaging[i] = _editRoute.creaseEnabled(i);
+    }
+
     setSelectedRow(0);
     setEdit(false);
 }
@@ -223,6 +232,7 @@ void RoutingPage::enterBiasOverlay() {
     for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
         _biasStaging[i] = _editRoute.biasPct(i);
         _depthStaging[i] = _editRoute.depthPct(i);
+        _creaseStaging[i] = _editRoute.creaseEnabled(i);
     }
     _slotState.fill(0);
     _activeSlot = 0;
@@ -233,16 +243,17 @@ void RoutingPage::exitBiasOverlay(bool commit) {
         for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
             _editRoute.setBiasPct(i, _biasStaging[i]);
             _editRoute.setDepthPct(i, _depthStaging[i]);
+            _editRoute.setCreaseEnabled(i, _creaseStaging[i]);
         }
-        showMessage("BIAS/DEPTH UPDATED");
+        showMessage("BIAS/DEPTH/CREASE UPDATED");
     }
     _biasOverlayActive = false;
 }
 
 int RoutingPage::focusTrackIndex() const {
     int base = _activeSlot * 2;
-    uint8_t state = _slotState[_activeSlot] % 4;
-    return base + (state >= 2 ? 1 : 0);
+    uint8_t state = _slotState[_activeSlot] % 6;  // 6 states: A bias, A depth, A crease, B bias, B depth, B crease
+    return base + (state >= 3 ? 1 : 0);  // Tracks A (0-3) and B (3-5) correspond to track indices
 }
 
 void RoutingPage::handleBiasOverlayKey(KeyPressEvent &event) {
@@ -263,7 +274,7 @@ void RoutingPage::handleBiasOverlayKey(KeyPressEvent &event) {
             if (_activeSlot != fn) {
                 _activeSlot = fn;
             } else {
-                _slotState[fn] = (_slotState[fn] + 1) % 4;
+                _slotState[fn] = (_slotState[fn] + 1) % 6;  // 6 states: A bias, A depth, A crease, B bias, B depth, B crease
             }
             event.consume();
             return;
@@ -275,7 +286,9 @@ void RoutingPage::handleBiasOverlayKey(KeyPressEvent &event) {
                 changed = true;
             } else {
                 for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
-                    if (_biasStaging[i] != _route->biasPct(i) || _depthStaging[i] != _route->depthPct(i)) {
+                    if (_biasStaging[i] != _route->biasPct(i) ||
+                        _depthStaging[i] != _route->depthPct(i) ||
+                        _creaseStaging[i] != _route->creaseEnabled(i)) {
                         changed = true;
                         break;
                     }
@@ -287,6 +300,7 @@ void RoutingPage::handleBiasOverlayKey(KeyPressEvent &event) {
                 for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
                     _editRoute.setBiasPct(i, _biasStaging[i]);
                     _editRoute.setDepthPct(i, _depthStaging[i]);
+                    _editRoute.setCreaseEnabled(i, _creaseStaging[i]);
                 }
 
                 // Check conflict
@@ -309,12 +323,23 @@ void RoutingPage::handleBiasOverlayKey(KeyPressEvent &event) {
 
 void RoutingPage::editBiasOverlay(int delta, bool shift) {
     if (delta == 0) return;
-    int step = shift ? 10 : 1;
     int track = focusTrackIndex();
-    bool editBias = (_slotState[_activeSlot] % 2) == 0;
-    auto &values = editBias ? _biasStaging : _depthStaging;
-    int value = values[track] + delta * step;
-    values[track] = clamp(value, -100, 100);
+    uint8_t state = _slotState[_activeSlot] % 6;
+
+    if (state == 0 || state == 3) {  // Bias adjustment (0 for A bias, 3 for B bias)
+        int step = shift ? 10 : 1;
+        int value = _biasStaging[track] + delta * step;
+        _biasStaging[track] = clamp(value, -100, 100);
+    } else if (state == 1 || state == 4) {  // Depth adjustment (1 for A depth, 4 for B depth)
+        int step = shift ? 10 : 1;
+        int value = _depthStaging[track] + delta * step;
+        _depthStaging[track] = clamp(value, -100, 100);
+    } else {  // Crease toggle (2 for A crease, 5 for B crease)
+        // For crease, delta toggles the state
+        if (delta > 0) {
+            _creaseStaging[track] = !_creaseStaging[track]; // Toggle with positive delta
+        }
+    }
 }
 
 void RoutingPage::showBiasOverlayContext() {
@@ -336,6 +361,7 @@ void RoutingPage::biasOverlayContextAction(int index) {
     case 0: { // INIT
         _biasStaging.fill(Routing::Route::DefaultBiasPct);
         _depthStaging.fill(Routing::Route::DefaultDepthPct);
+        _creaseStaging.fill(false);
         showMessage("SHAPE INIT");
         break;
     }
@@ -344,6 +370,7 @@ void RoutingPage::biasOverlayContextAction(int index) {
         for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
             _biasStaging[i] = clamp<int>(rng.nextRange(201) - 100, -100, 100);
             _depthStaging[i] = clamp<int>(rng.nextRange(201) - 100, -100, 100);
+            _creaseStaging[i] = (rng.next() % 2) == 0;  // Random true/false
         }
         showMessage("SHAPE RANDOM");
         break;
@@ -351,6 +378,7 @@ void RoutingPage::biasOverlayContextAction(int index) {
     case 2: { // COPY
         _biasClipboard = _biasStaging;
         _depthClipboard = _depthStaging;
+        _creaseClipboard = _creaseStaging;
         _clipboardValid = true;
         showMessage("PARAMS COPIED");
         break;
@@ -359,6 +387,7 @@ void RoutingPage::biasOverlayContextAction(int index) {
         if (_clipboardValid) {
             _biasStaging = _biasClipboard;
             _depthStaging = _depthClipboard;
+            _creaseStaging = _creaseClipboard;
             showMessage("PARAMS PASTED");
         } else {
             showMessage("CLIPBOARD EMPTY");
@@ -380,7 +409,9 @@ void RoutingPage::drawBiasOverlay(Canvas &canvas) {
         changed = true;
     } else {
         for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
-            if (_biasStaging[i] != _route->biasPct(i) || _depthStaging[i] != _route->depthPct(i)) {
+            if (_biasStaging[i] != _route->biasPct(i) ||
+                _depthStaging[i] != _route->depthPct(i) ||
+                _creaseStaging[i] != _route->creaseEnabled(i)) {
                 changed = true;
                 break;
             }
@@ -467,7 +498,7 @@ void RoutingPage::drawBiasOverlay(Canvas &canvas) {
         FixedStringBuilder<8> maxBiasPart("B %+d ", -100);
         const int maxBiasWidth = canvas.textWidth(maxBiasPart);
 
-        auto drawTrackBlock = [&] (int baseX, int baseY, int trackNumber, int bias, int depth, bool focusBias, bool focusDepth) {            // Line 1: "B %+d ... Tn"
+        auto drawTrackBlock = [&] (int baseX, int baseY, int trackNumber, int bias, int depth, bool crease, bool focusBias, bool focusDepth, bool focusCrease) {            // Line 1: "B %+d ... Tn"
             // Align B with D (start at line2XOffset)
             int startX = baseX + line2XOffset;
 
@@ -477,30 +508,41 @@ void RoutingPage::drawBiasOverlay(Canvas &canvas) {
             canvas.setColor(focusBias ? Color::Bright : Color::Medium);
             canvas.drawText(startX, baseY, prefix);
 
-            // Highlight T part if either Bias or Depth is focused
-            canvas.setColor((focusBias || focusDepth) ? Color::Bright : Color::Medium);
+            // Highlight T part if either Bias, Depth or Crease is focused
+            canvas.setColor((focusBias || focusDepth || focusCrease) ? Color::Bright : Color::Medium);
             // Position T part at fixed offset relative to start, so it doesn't move with bias value length
             canvas.drawText(startX + maxBiasWidth, baseY, tPart);
 
-            // Line 2: "D %+d"
-            FixedStringBuilder<8> depthStr("D %+d", depth);
+            // Line 2: "D %+d L" or "D %+d C" - draw in parts to allow separate highlighting
+            FixedStringBuilder<8> depthPart("D %+d ", depth);  // The "D %+d " part
+            FixedStringBuilder<2> modePart("%c", crease ? 'C' : 'L');  // The "L" or "C" part
+
             int depthX = baseX + line2XOffset;
+            int modeX = depthX + canvas.textWidth(depthPart);  // Position mode part right after depth part
+
+            // Draw depth part
             canvas.setColor(focusDepth ? Color::Bright : Color::Medium);
-            canvas.drawText(depthX, baseY + lineSpacing, depthStr);
+            canvas.drawText(depthX, baseY + lineSpacing, depthPart);
+
+            // Draw mode part (L/C)
+            canvas.setColor(focusCrease ? Color::Bright : Color::Medium);
+            canvas.drawText(modeX, baseY + lineSpacing, modePart);
         };
     for (int slot = 0; slot < 4; ++slot) {
         int x = slot * colWidth;
         int trackA = slot * 2;
         int trackB = trackA + 1;
-        uint8_t state = _slotState[slot] % 4;
-        bool focusBiasA = slot == _activeSlot && state == 0;
-        bool focusDepthA = slot == _activeSlot && state == 1;
-        bool focusBiasB = slot == _activeSlot && state == 2;
-        bool focusDepthB = slot == _activeSlot && state == 3;
+        uint8_t state = _slotState[slot] % 6;  // 6 states: A bias, A depth, A crease, B bias, B depth, B crease
+        bool focusBiasA = (slot == _activeSlot) && (state == 0);  // A bias
+        bool focusDepthA = (slot == _activeSlot) && (state == 1); // A depth
+        bool focusCreaseA = (slot == _activeSlot) && (state == 2); // A crease
+        bool focusBiasB = (slot == _activeSlot) && (state == 3); // B bias
+        bool focusDepthB = (slot == _activeSlot) && (state == 4); // B depth
+        bool focusCreaseB = (slot == _activeSlot) && (state == 5); // B crease
 
-        drawTrackBlock(x, topY, trackA + 1, _biasStaging[trackA], _depthStaging[trackA], focusBiasA, focusDepthA);
+        drawTrackBlock(x, topY, trackA + 1, _biasStaging[trackA], _depthStaging[trackA], _creaseStaging[trackA], focusBiasA, focusDepthA, focusCreaseA);
         // Place bottom block closer to footer: reduce gap to keep last line 2px above footer
         int bottomY = topY + 2 * lineSpacing + 4;
-        drawTrackBlock(x, bottomY, trackB + 1, _biasStaging[trackB], _depthStaging[trackB], focusBiasB, focusDepthB);
+        drawTrackBlock(x, bottomY, trackB + 1, _biasStaging[trackB], _depthStaging[trackB], _creaseStaging[trackB], focusBiasB, focusDepthB, focusCreaseB);
     }
 }

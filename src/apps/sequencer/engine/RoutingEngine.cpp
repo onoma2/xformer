@@ -4,6 +4,16 @@
 #include "MidiUtils.h"
 #include "core/math/Math.h"
 
+static inline float applyCrease(float value) {
+    // The value here is already in the target parameter range (e.g. -12 to +12)
+    // So we apply the shift based on the zero crossing in that range
+    if (value <= 0.0f) {
+        return value + 5.0f;  // Shift upward for negative (and zero) values
+    } else {
+        return value - 5.0f;  // Shift downward for positive values
+    }
+}
+
 static inline float applyBiasDepth(float srcNormalized, const Routing::Route &route, int trackIndex) {
     float min = route.min();
     float max = route.max();
@@ -13,6 +23,12 @@ static inline float applyBiasDepth(float srcNormalized, const Routing::Route &ro
     float depth = route.depthPct(trackIndex) * 0.01f;
     float bias = route.biasPct(trackIndex) * 0.01f;
     float shaped = mid + (base - mid) * depth + span * bias;
+
+    // Apply crease if enabled for this track
+    if (route.creaseEnabled(trackIndex)) {
+        shaped = applyCrease(shaped);
+    }
+
     return clamp(shaped, min, max);
 }
 

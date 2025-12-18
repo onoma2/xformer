@@ -595,7 +595,14 @@ public:
         }
 
         bool hasNonDefaultShaping(int trackIndex) const {
-            return _biasPct[trackIndex] != DefaultBiasPct || _depthPct[trackIndex] != DefaultDepthPct;
+            return _biasPct[trackIndex] != DefaultBiasPct || _depthPct[trackIndex] != DefaultDepthPct || _creaseEnabled[trackIndex] != false;
+        }
+
+        // per-track crease
+
+        bool creaseEnabled(int trackIndex) const { return _creaseEnabled[trackIndex]; }
+        void setCreaseEnabled(int trackIndex, bool enabled) {
+            _creaseEnabled[trackIndex] = enabled;
         }
 
         // source
@@ -644,6 +651,7 @@ public:
         float _max;
         std::array<int8_t, CONFIG_TRACK_COUNT> _biasPct;
         std::array<int8_t, CONFIG_TRACK_COUNT> _depthPct;
+        std::array<bool, CONFIG_TRACK_COUNT> _creaseEnabled;
         Source _source;
         CvSource _cvSource;
         MidiSource _midiSource;
