@@ -69,8 +69,19 @@ void Project::clear() {
 
     // load demo project on simulator
 #if PLATFORM_SIM
-    noteSequence(0, 0).setLastStep(15);
-    noteSequence(0, 0).setGates({ 1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0 });
+    // Track 1: Curve track as CV source for DiscreteMap
+    track(0).setTrackMode(Track::TrackMode::Curve);
+    auto &curve = curveSequence(0, 0);
+    curve.setDivisor(192);  // Slow sweep
+    curve.setFirstStep(0);
+    curve.setLastStep(0);  // Single step for simple ramp
+
+    // Single curve step sweeping full range
+    auto &cv = curve.step(0);
+    cv.setShape(0);  // Linear
+    cv.setMin(0);    // -5V
+    cv.setMax(255);  // +5V
+
     noteSequence(1, 0).setLastStep(15);
     noteSequence(1, 0).setGates({ 0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0 });
     noteSequence(2, 0).setLastStep(15);
@@ -81,18 +92,27 @@ void Project::clear() {
     noteSequence(4, 0).setGates({ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 });
     noteSequence(5, 0).setLastStep(15);
     noteSequence(5, 0).setGates({ 0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0 });
-    
+
     // Track 8: Discrete Map
     track(7).setTrackMode(Track::TrackMode::DiscreteMap);
     auto &dmap = discreteMapSequence(7, 0);
+    dmap.setClockSource(DiscreteMapSequence::ClockSource::External);
+    dmap.setLoop(false);  // Once mode for testing
     // Distribute thresholds -100 to +100
     for (int i = 0; i < 8; ++i) {
         dmap.stage(i).setThreshold(-100 + (200 * i) / 7);
         dmap.stage(i).setDirection(DiscreteMapSequence::Stage::TriggerDir::Rise);
         // Simple scale run
-        dmap.stage(i).setNoteIndex(i * 2); 
+        dmap.stage(i).setNoteIndex(i * 2);
     }
-    
+
+    // Route Track 1 CV1 output to Track 8 DiscreteMap Input
+    _routing.routes()[0].setSource(Routing::Source::CvOut1);
+    _routing.routes()[0].setTarget(Routing::Target::DiscreteMapInput);
+    _routing.routes()[0].setTracks(1 << 7);  // Enable for track 8 (bit 7)
+    _routing.routes()[0].setMin(0.0f);
+    _routing.routes()[0].setMax(1.0f);
+
     setTempo(80.f);
     setScale(2); // 2 corresponds to Minor scale
 #endif

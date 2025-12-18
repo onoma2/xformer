@@ -159,7 +159,7 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
         bool active = _enginePtr && _enginePtr->activeStage() == stageIndex;
 
         // Row 1: Direction (Top)
-        canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
+        canvas.setColor(active ? Color::Bright : (selected ? Color::MediumBright : Color::Medium));
         char dirChar = '-';
         switch (stage.direction()) {
         case DiscreteMapSequence::Stage::TriggerDir::Rise: dirChar = '^'; break;
@@ -170,7 +170,7 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
         canvas.drawText(x, y, dirStr); // Center aligned x
 
         // Row 2: Threshold
-        canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
+        canvas.setColor(active ? Color::Bright : (selected ? Color::MediumBright : Color::Medium));
         FixedStringBuilder<6> thresh("%+d", stage.threshold());
         // Adjust x for multi-digit numbers if needed?
         // FixedStringBuilder doesn't auto-center.
@@ -204,10 +204,10 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
             Types::printNote(name, pitchClass);
             name("%d", octave);
 
-            canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
+            canvas.setColor(active ? Color::Bright : (selected ? Color::MediumBright : Color::Medium));
             canvas.drawText(x - 4, y + 16, name); // Shift left
         } else {
-            canvas.setColor(Color::Low);
+            canvas.setColor(Color::Medium);
             canvas.drawText(x - 4, y + 16, "--");
         }
     }

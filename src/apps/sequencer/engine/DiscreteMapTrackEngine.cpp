@@ -2,6 +2,7 @@
 
 #include "Engine.h"
 
+#include <algorithm>
 #include <cmath>
 
 void DiscreteMapTrackEngine::reset() {
@@ -25,6 +26,10 @@ void DiscreteMapTrackEngine::reset() {
     _running = true;
     _thresholdsDirty = true;
     _activity = false;
+    _extOnceArmed = false;
+    _extOnceDone = false;
+    _extMinSeen = 0.f;
+    _extMaxSeen = 0.f;
 }
 
 void DiscreteMapTrackEngine::restart() {
@@ -33,12 +38,20 @@ void DiscreteMapTrackEngine::restart() {
     _resetTickOffset = 0;
     _prevSync = _discreteMapTrack.routedSync();
     _prevLoop = _sequence ? _sequence->loop() : true;
+    _extOnceArmed = false;
+    _extOnceDone = false;
+    _extMinSeen = 0.f;
+    _extMaxSeen = 0.f;
 }
 
 void DiscreteMapTrackEngine::changePattern() {
     _sequence = &_discreteMapTrack.sequence(pattern());
     _thresholdsDirty = true;
     _prevLoop = _sequence->loop();
+    _extOnceArmed = false;
+    _extOnceDone = false;
+    _extMinSeen = 0.f;
+    _extMaxSeen = 0.f;
 }
 
 TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
@@ -48,6 +61,12 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     if (!_prevLoop && _sequence->loop()) {
         reset();
         _resetTickOffset = tick;
+    }
+    if (_prevLoop && !_sequence->loop()) {
+        _extOnceArmed = false;
+        _extOnceDone = false;
+        _extMinSeen = 0.f;
+        _extMaxSeen = 0.f;
     }
     _prevLoop = _sequence->loop();
 
@@ -98,6 +117,43 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         _currentInput = getRoutedInput();
     }
 
+    // External ONCE: arm inside window and freeze after one sweep across the defined range
+    bool extOnceFreeze = false;
+    bool extOnceMode = _sequence->clockSource() == DiscreteMapSequence::ClockSource::External && !_sequence->loop();
+    if (extOnceMode) {
+        float winLo = std::min(rangeMin(), rangeMax());
+        float winHi = std::max(rangeMin(), rangeMax());
+        float spanAbs = std::max(0.01f, std::abs(rangeSpan()));
+
+        if (!_extOnceDone) {
+            if (_extOnceArmed) {
+                // Track min/max to detect range coverage
+                _extMinSeen = std::min(_extMinSeen, _currentInput);
+                _extMaxSeen = std::max(_extMaxSeen, _currentInput);
+
+                // Calculate what percentage of the range we've covered
+                float coverageSpan = _extMaxSeen - _extMinSeen;
+                float coveragePercent = coverageSpan / spanAbs;
+
+                // Complete when we've covered 90% of the defined range (direction-agnostic)
+                // This tolerates LFOs/envelopes that don't quite reach the exact endpoints
+                if (coveragePercent >= 0.90f) {
+                    _extOnceArmed = false;
+                    _extOnceDone = true;
+                }
+            } else {
+                // Arm when entering the voltage window (with 5% tolerance)
+                float armTolerance = spanAbs * 0.05f;
+                if (_currentInput >= (winLo - armTolerance) && _currentInput <= (winHi + armTolerance)) {
+                    _extOnceArmed = true;
+                    _extMinSeen = _extMaxSeen = _currentInput;
+                }
+            }
+        }
+
+        extOnceFreeze = _extOnceDone || !_extOnceArmed;
+    }
+
     // 2. Recalc length thresholds if needed
     if (_thresholdsDirty && _sequence->thresholdMode() == DiscreteMapSequence::ThresholdMode::Length) {
         recalculateLengthThresholds();
@@ -105,7 +161,7 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     }
 
     // 3. Find active stage from threshold crossings
-    int newStage = findActiveStage(_currentInput, _prevInput);
+    int newStage = extOnceFreeze ? _activeStage : findActiveStage(_currentInput, _prevInput);
 
     // Activity detection: true if stage changed
     _activity = (newStage != _activeStage && newStage >= 0);

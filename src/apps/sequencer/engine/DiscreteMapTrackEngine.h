@@ -89,6 +89,12 @@ private:
     // === Activity ===
     bool _activity = false;
 
+    // === External ONCE sweep tracking ===
+    bool _extOnceArmed = false;
+    bool _extOnceDone = false;
+    float _extMinSeen = 0.0f;
+    float _extMaxSeen = 0.0f;
+
     // === Sync bookkeeping ===
     uint32_t _resetTickOffset = 0;
 };
