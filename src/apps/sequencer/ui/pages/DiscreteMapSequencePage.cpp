@@ -410,6 +410,14 @@ void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
 }
 
 void DiscreteMapSequencePage::handleTopRowKey(int idx) {
+    // Shift+Click: Latching multi-select (toggle selection without changing edit mode)
+    if (_shiftHeld) {
+        _selectionMask ^= (1U << idx); // Toggle selection
+        if (_selectionMask == 0) _selectionMask = (1U << idx); // Prevent empty selection
+        _selectedStage = idx;
+        return;
+    }
+
     bool wasSelected = (_selectionMask & (1U << idx)) != 0;
     // Check if any OTHER selection key (0-7) is held
     // idx is logical index. Physical index is idx % 8.
@@ -434,6 +442,11 @@ void DiscreteMapSequencePage::handleTopRowKey(int idx) {
 }
 
 void DiscreteMapSequencePage::handleBottomRowKey(int idx) {
+    // Select the stage exclusively (no multi-select)
+    _selectionMask = (1U << idx);
+    _selectedStage = idx;
+
+    // Existing Direction Toggle Logic
     auto &stage = _sequence->stage(idx);
 
     switch (stage.direction()) {
