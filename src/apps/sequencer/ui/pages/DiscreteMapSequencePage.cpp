@@ -424,10 +424,8 @@ void DiscreteMapSequencePage::handleTopRowKey(int idx) {
     int physicalIdx = idx % 8;
     bool multiSelect = (_stepKeysHeld & 0xFF & ~(1 << physicalIdx)) != 0;
 
-    // If re-pressing an already selected step (and not multi-selecting), toggle edit mode
-    if (!multiSelect && wasSelected) {
-        _editMode = (_editMode == EditMode::Threshold) ? EditMode::NoteValue : EditMode::Threshold;
-    } else if (_editMode == EditMode::None) {
+    // Ensure we are in a valid edit mode when selecting
+    if (_editMode == EditMode::None) {
         _editMode = EditMode::Threshold;
     }
 
