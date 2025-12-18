@@ -731,8 +731,8 @@ void DiscreteMapSequencePage::generateNotes(GeneratorKind kind, NoteSpread sprea
     float maxVal = 64.f;
 
     if (spread == NoteSpread::Narrow) {
-        minVal = -16.f;
-        maxVal = 16.f;
+        minVal = 0.f;
+        maxVal = 32.f;
     }
 
     for (int i = 0; i < count; ++i) {

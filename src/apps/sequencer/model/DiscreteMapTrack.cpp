@@ -16,6 +16,7 @@ void DiscreteMapTrack::clear() {
     _octave = 0;
     _transpose = 0;
     _offset = 0;
+    setCvUpdateMode(CvUpdateMode::Gate);  // Initialize default value
     for (auto &sequence : _sequences) {
         sequence.clear();
     }
@@ -24,6 +25,7 @@ void DiscreteMapTrack::clear() {
 void DiscreteMapTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_octave);
     writer.write(_transpose);
+    writer.write(_cvUpdateMode);
     writeArray(writer, _sequences);
 }
 
@@ -31,6 +33,11 @@ void DiscreteMapTrack::read(VersionedSerializedReader &reader) {
     if (reader.dataVersion() >= ProjectVersion::Version59) {
         reader.read(_octave);
         reader.read(_transpose);
+    }
+    if (reader.dataVersion() >= ProjectVersion::Version62) { // Added DiscreteMapTrack cvUpdateMode
+        reader.read(_cvUpdateMode);
+    } else {
+        setCvUpdateMode(CvUpdateMode::Gate); // Default for older projects
     }
     readArray(reader, _sequences);
 }

@@ -51,6 +51,8 @@ public:
             return Routing::Target::Octave;
         case Transpose:
             return Routing::Target::Transpose;
+        case CvUpdateMode:
+            return Routing::Target::None;  // Not routable
         default:
             return Routing::Target::None;
         }
@@ -73,6 +75,7 @@ private:
         Octave,
         Transpose,
         Offset,
+        CvUpdateMode,  // Add this before Last
         Last
     };
 
@@ -93,6 +96,7 @@ private:
         case Octave:        return "Octave";
         case Transpose:     return "Transpose";
         case Offset:        return "Offset";
+        case CvUpdateMode:  return "CV Update";
         case Last:          break;
         }
         return nullptr;
@@ -149,6 +153,9 @@ private:
         case Offset:
             if (_track) str("%+.2fV", _track->offset() * 0.01f);
             break;
+        case CvUpdateMode:
+            if (_track) _track->printCvUpdateMode(str);
+            break;
         case Last:
             break;
         }
@@ -200,6 +207,9 @@ private:
             break;
         case Offset:
             if (_track) _track->setOffset(ModelUtils::adjusted(_track->offset(), value * (shift ? 1 : 10), -500, 500));
+            break;
+        case CvUpdateMode:
+            if (_track) _track->editCvUpdateMode(value, shift);
             break;
         case Last:
             break;

@@ -25,8 +25,14 @@ public:
     virtual void changePattern() override;
 
     virtual bool activity() const override { return _activity; }
-    virtual bool gateOutput(int index) const override { return _gateTimer > 0 && _activeStage >= 0; }
-    virtual float cvOutput(int index) const override { return _cvOutput; }
+    virtual bool gateOutput(int index) const override { return !mute() && _gateTimer > 0 && _activeStage >= 0; }
+    virtual float cvOutput(int index) const override {
+        // When muted and in Gate mode, output should be 0
+        if (mute() && _discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Gate) {
+            return 0.0f;
+        }
+        return _cvOutput;
+    }
     virtual float sequenceProgress() const override { return _rampPhase; }
 
     const DiscreteMapSequence &sequence() const { return *_sequence; }

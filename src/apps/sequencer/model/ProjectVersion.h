@@ -168,6 +168,9 @@ enum ProjectVersion {
     // added DiscreteMapSequence::rangeHigh and rangeLow (ABOVE/BELOW parameters)
     Version61 = 61,
 
+    // added DiscreteMapTrack::cvUpdateMode
+    Version62 = 62,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

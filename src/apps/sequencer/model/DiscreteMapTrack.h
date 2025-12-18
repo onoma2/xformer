@@ -38,6 +38,38 @@ public:
     void gateOutputName(int index, StringBuilder &str) const;
     void cvOutputName(int index, StringBuilder &str) const;
 
+    // CvUpdateMode
+
+    enum class CvUpdateMode : uint8_t {
+        Gate,    // Update CV only when a stage triggers (current behavior)
+        Always,  // Update CV continuously regardless of stages (new)
+        Last
+    };
+
+    static const char *cvUpdateModeName(CvUpdateMode mode) {
+        switch (mode) {
+        case CvUpdateMode::Gate:    return "Gate";
+        case CvUpdateMode::Always:  return "Always";
+        case CvUpdateMode::Last:    break;
+        }
+        return nullptr;
+    }
+
+    // cvUpdateMode
+
+    CvUpdateMode cvUpdateMode() const { return _cvUpdateMode; }
+    void setCvUpdateMode(CvUpdateMode cvUpdateMode) {
+        _cvUpdateMode = ModelUtils::clampedEnum(cvUpdateMode);
+    }
+
+    void editCvUpdateMode(int value, bool shift) {
+        setCvUpdateMode(ModelUtils::adjustedEnum(cvUpdateMode(), value));
+    }
+
+    void printCvUpdateMode(StringBuilder &str) const {
+        str(cvUpdateModeName(cvUpdateMode()));
+    }
+
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);
     void writeRouted(Routing::Target target, int intValue, float floatValue);
@@ -73,6 +105,7 @@ private:
     int8_t _octave = 0;
     int8_t _transpose = 0;
     int16_t _offset = 0;
+    CvUpdateMode _cvUpdateMode = CvUpdateMode::Gate;  // Default to Gate to maintain current behavior
 
     friend class Track;
 };

@@ -83,7 +83,7 @@ private:
     bool contextActionEnabled(int index) const;
     enum class NoteSpread : uint8_t {
         Wide,   // -63..+64 (approx -5..+5V depending on scale)
-        Narrow, // -16..+16 (approx -2V)
+        Narrow, // -1..+31 (approx -2V)
     };
 
     void applyGenerator(bool applyThresholds, bool applyNotes, bool applyToggles = false, NoteSpread noteSpread = NoteSpread::Wide);

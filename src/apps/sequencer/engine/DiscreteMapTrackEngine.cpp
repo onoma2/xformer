@@ -188,10 +188,25 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         }
     }
 
-    // 4. Update CV output
-    if (_activeStage >= 0) {
-        _targetCv = noteIndexToVoltage(_sequence->stage(_activeStage).noteIndex());
-        _targetCv += _discreteMapTrack.offset() * 0.01f;
+    // 4. Update CV output based on CV Update Mode
+    bool shouldOutputCv = false;
+
+    // Condition 1: Track is not muted OR cvUpdateMode is Always
+    bool muteCondition = !mute() || _discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Always;
+
+    // Condition 2: There's an active stage (Gate mode) OR cvUpdateMode is Always
+    bool gateCondition = (_activeStage >= 0) || _discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Always;
+
+    // Update CV if both conditions are satisfied
+    shouldOutputCv = muteCondition && gateCondition;
+
+    if (shouldOutputCv) {
+        if (_activeStage >= 0) {
+            _targetCv = noteIndexToVoltage(_sequence->stage(_activeStage).noteIndex());
+            _targetCv += _discreteMapTrack.offset() * 0.01f;
+        } else {
+            _targetCv = 0.0f;  // Default to 0V when no stage is active in Always mode
+        }
 
         if (_sequence->slewEnabled()) {
             // Simple slew rate (can be made configurable later)
@@ -201,8 +216,6 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         } else {
             _cvOutput = _targetCv;
         }
-    } else {
-        _cvOutput = 0.0f;
     }
 
     _prevInput = _currentInput;
