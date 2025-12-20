@@ -29,9 +29,10 @@ DiscreteMapSequencePage::DiscreteMapSequencePage(PageManager &manager, PageConte
 
 void DiscreteMapSequencePage::enter() {
     refreshPointers();
-    // Reset generator mode when entering the page to ensure clean state
+    // Reset generator and init modes when entering the page to ensure clean state
     _generatorStage = GeneratorStage::Inactive;
     _generatorKind = GeneratorKind::Random;
+    _initStage = InitStage::Inactive;
 
     if (_sequence) {
         // Sync the macro indicator to current Above/Below values if they match a preset
@@ -48,9 +49,10 @@ void DiscreteMapSequencePage::enter() {
 }
 
 void DiscreteMapSequencePage::exit() {
-    // Ensure generator mode is reset when exiting the page
+    // Ensure generator and init modes are reset when exiting the page
     _generatorStage = GeneratorStage::Inactive;
     _generatorKind = GeneratorKind::Random;
+    _initStage = InitStage::Inactive;
 }
 
 void DiscreteMapSequencePage::refreshPointers() {
@@ -214,6 +216,12 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
 }
 
 void DiscreteMapSequencePage::drawFooter(Canvas &canvas) {
+    if (_initStage == InitStage::ChooseTarget) {
+        const char *fnLabels[5] = { "ALL", "THR", "NOTE", "", "X" };
+        WindowPainter::drawFooter(canvas, fnLabels, pageKeyState(), -1);
+        return;
+    }
+
     if (_generatorStage == GeneratorStage::ChooseKind) {
         const char *fnLabels[5] = { "RAND", "LIN", "LOG", "EXP", "X" };
         WindowPainter::drawFooter(canvas, fnLabels, pageKeyState(), -1);
@@ -465,6 +473,45 @@ void DiscreteMapSequencePage::handleBottomRowKey(int idx) {
 }
 
 void DiscreteMapSequencePage::handleFunctionKey(int fnIndex) {
+    // INIT submenu handling
+    if (_initStage == InitStage::ChooseTarget) {
+        switch (fnIndex) {
+        case 0: // ALL
+            if (_sequence) {
+                _sequence->clear();
+                if (_enginePtr) {
+                    _enginePtr->invalidateThresholds();
+                }
+                showMessage("INIT ALL");
+            }
+            _initStage = InitStage::Inactive;
+            break;
+        case 1: // THR (Thresholds)
+            if (_sequence) {
+                _sequence->clearThresholds();
+                if (_enginePtr) {
+                    _enginePtr->invalidateThresholds();
+                }
+                showMessage("INIT THR");
+            }
+            _initStage = InitStage::Inactive;
+            break;
+        case 2: // NOTE (Notes)
+            if (_sequence) {
+                _sequence->clearNotes();
+                showMessage("INIT NOTE");
+            }
+            _initStage = InitStage::Inactive;
+            break;
+        case 4: // X (Exit)
+            _initStage = InitStage::Inactive;
+            break;
+        default:
+            break;
+        }
+        return;
+    }
+
     // Generator flow: first choose generator kind, then execute on targets
     if (_generatorStage == GeneratorStage::ChooseKind) {
         switch (fnIndex) {
@@ -596,13 +643,8 @@ void DiscreteMapSequencePage::contextShow() {
 void DiscreteMapSequencePage::contextAction(int index) {
     switch (ContextAction(index)) {
     case ContextAction::Init:
-        if (_sequence) {
-            _sequence->clear();
-            if (_enginePtr) {
-                _enginePtr->invalidateThresholds();
-            }
-            showMessage("INITIALIZED");
-        }
+        // Enter INIT sublevel menu
+        _initStage = InitStage::ChooseTarget;
         break;
     case ContextAction::Copy:
         _model.clipBoard().copyDiscreteMapSequence(*_sequence);

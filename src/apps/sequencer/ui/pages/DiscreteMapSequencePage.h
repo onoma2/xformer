@@ -50,6 +50,11 @@ private:
         Exponential,
     };
 
+    enum class InitStage : uint8_t {
+        Inactive,
+        ChooseTarget,
+    };
+
     enum class RangeMacro : uint8_t {
         Full,           // -5..+5
         Inv,            // +5..-5
@@ -101,5 +106,6 @@ private:
     int _section = 0;
     GeneratorStage _generatorStage = GeneratorStage::Inactive;
     GeneratorKind _generatorKind = GeneratorKind::Random;
+    InitStage _initStage = InitStage::Inactive;
     RangeMacro _currentRangeMacro = RangeMacro::Full;
 };

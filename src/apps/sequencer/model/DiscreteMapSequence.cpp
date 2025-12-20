@@ -60,6 +60,18 @@ void DiscreteMapSequence::clearStage(int index) {
     }
 }
 
+void DiscreteMapSequence::clearThresholds() {
+    for (auto &stage : _stages) {
+        stage.setThreshold(0);
+    }
+}
+
+void DiscreteMapSequence::clearNotes() {
+    for (auto &stage : _stages) {
+        stage.setNoteIndex(0);
+    }
+}
+
 void DiscreteMapSequence::randomize() {
     for (auto &stage : _stages) {
         stage.setThreshold(rng.nextRange(199) - 99);

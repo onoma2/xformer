@@ -262,6 +262,8 @@ public:
 
     void clear();
     void clearStage(int index);
+    void clearThresholds();
+    void clearNotes();
     void randomize();
     void randomizeThresholds();
     void randomizeNotes();
