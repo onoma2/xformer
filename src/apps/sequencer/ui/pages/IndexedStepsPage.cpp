@@ -9,12 +9,14 @@
 
 enum class ContextAction {
     Insert,
+    Split,
     Delete,
     Last
 };
 
 static const ContextMenuModel::Item contextMenuItems[] = {
     { "INSERT" },
+    { "SPLIT" },
     { "DELETE" },
 };
 
@@ -81,6 +83,9 @@ void IndexedStepsPage::contextAction(int index) {
     case ContextAction::Insert:
         insertStep();
         break;
+    case ContextAction::Split:
+        splitStep();
+        break;
     case ContextAction::Delete:
         deleteStep();
         break;
@@ -95,6 +100,8 @@ bool IndexedStepsPage::contextActionEnabled(int index) const {
     switch (ContextAction(index)) {
     case ContextAction::Insert:
         return _sequence->canInsert();
+    case ContextAction::Split:
+        return _sequence->canInsert(); // Splitting adds a step, so same check
     case ContextAction::Delete:
         return _sequence->canDelete();
     default:
@@ -113,6 +120,18 @@ void IndexedStepsPage::insertStep() {
     _sequence->insertStep(stepIndex);
 
     showMessage("STEP INSERTED");
+}
+
+void IndexedStepsPage::splitStep() {
+    if (!_sequence) return;
+
+    // Get current step index from selected row
+    int currentRow = selectedRow();
+    int stepIndex = currentRow / 3;
+
+    _sequence->splitStep(stepIndex);
+
+    showMessage("STEP SPLIT");
 }
 
 void IndexedStepsPage::deleteStep() {

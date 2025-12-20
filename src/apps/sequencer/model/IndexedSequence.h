@@ -234,6 +234,37 @@ public:
     // Methods
     //----------------------------------------
 
+    // Split step at specified index into two steps
+    // Current step becomes first half (ceil duration), new step at index+1 becomes second half (floor duration)
+    void splitStep(int index) {
+        if (_activeLength >= MaxSteps) return; // Can't exceed max steps
+        
+        index = clamp(index, 0, int(_activeLength) - 1);
+        auto &currentStep = _steps[index];
+        uint16_t totalDuration = currentStep.duration();
+        
+        // Calculate durations
+        // First step gets ceil(total / 2) -> (total + 1) / 2
+        // Second step gets floor(total / 2) -> total / 2
+        uint16_t duration1 = (totalDuration + 1) / 2;
+        uint16_t duration2 = totalDuration / 2;
+        
+        // Shift steps to the right from insertion point (index + 1)
+        for (int i = _activeLength; i > index + 1; i--) {
+            _steps[i] = _steps[i - 1];
+        }
+        
+        // Update current step (first half)
+        currentStep.setDuration(duration1);
+        
+        // Initialize new step (second half) at index + 1
+        // It inherits all properties from the original step except duration
+        _steps[index + 1] = currentStep; 
+        _steps[index + 1].setDuration(duration2);
+        
+        _activeLength++;
+    }
+
     // Insert a new step at the specified index
     // Shifts steps to the right, clones previous step's data
     // Automatically increments activeLength

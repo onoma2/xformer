@@ -44,6 +44,7 @@ private:
     bool contextActionEnabled(int index) const;
 
     void insertStep();
+    void splitStep();
     void deleteStep();
 
     StepListModel _listModel;
