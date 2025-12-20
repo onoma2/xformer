@@ -14,6 +14,7 @@
 #include "Serialize.h"
 #include "FileDefs.h"
 #include "TuesdaySequence.h"
+#include "IndexedSequence.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -461,6 +462,16 @@ public:
 
     const DiscreteMapSequence &selectedDiscreteMapSequence() const { return discreteMapSequence(_selectedTrackIndex, selectedPatternIndex()); }
           DiscreteMapSequence &selectedDiscreteMapSequence()       { return discreteMapSequence(_selectedTrackIndex, selectedPatternIndex()); }
+
+    // indexedSequence
+
+    const IndexedSequence &indexedSequence(int trackIndex, int patternIndex) const { return _tracks[trackIndex].indexedTrack().sequence(patternIndex); }
+          IndexedSequence &indexedSequence(int trackIndex, int patternIndex)       { return _tracks[trackIndex].indexedTrack().sequence(patternIndex); }
+
+    // selectedIndexedSequence
+
+    const IndexedSequence &selectedIndexedSequence() const { return indexedSequence(_selectedTrackIndex, selectedPatternIndex()); }
+          IndexedSequence &selectedIndexedSequence()       { return indexedSequence(_selectedTrackIndex, selectedPatternIndex()); }
 
     //----------------------------------------
     // Routing

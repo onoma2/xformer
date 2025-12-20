@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "CurveTrack.h"
 #include "DiscreteMapTrack.h"
+#include "IndexedTrack.h"
 #include "MidiCvTrack.h"
 #include "ModelUtils.h"
 #include "NoteTrack.h"
@@ -41,6 +42,7 @@ public:
     MidiCv,
     Tuesday,
     DiscreteMap,
+    Indexed,
     Last,
     Default = Note
   };
@@ -57,6 +59,8 @@ public:
       return "Algo";
     case TrackMode::DiscreteMap:
       return "Discrete";
+    case TrackMode::Indexed:
+      return "Indexed";
     case TrackMode::Last:
       break;
     }
@@ -75,6 +79,8 @@ public:
       return 3;
     case TrackMode::DiscreteMap:
       return 4;
+    case TrackMode::Indexed:
+      return 5;
     case TrackMode::Last:
       break;
     }
@@ -209,6 +215,17 @@ public:
     return _container.as<DiscreteMapTrack>();
   }
 
+  // indexedTrack
+
+  const IndexedTrack &indexedTrack() const {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::Indexed);
+    return _container.as<IndexedTrack>();
+  }
+  IndexedTrack &indexedTrack() {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::Indexed);
+    return _container.as<IndexedTrack>();
+  }
+
   //----------------------------------------
   // Methods
   //----------------------------------------
@@ -254,6 +271,9 @@ private:
     case TrackMode::Tuesday:
       _container.as<TuesdayTrack>().setTrackIndex(trackIndex);
       break;
+    case TrackMode::Indexed:
+      _container.as<IndexedTrack>().setTrackIndex(trackIndex);
+      break;
     case TrackMode::Last:
       break;
     }
@@ -288,6 +308,10 @@ private:
       _track.discreteMap = _container.create<DiscreteMapTrack>();
       _track.discreteMap->setTrackIndex(_trackIndex); // Set track index here
       break;
+    case TrackMode::Indexed:
+      _track.indexed = _container.create<IndexedTrack>();
+      _track.indexed->setTrackIndex(_trackIndex); // Set track index here
+      break;
     case TrackMode::Last:
       break;
     }
@@ -299,13 +323,14 @@ private:
   Routable<int8_t> _cvOutputRotate;
   Routable<int8_t> _gateOutputRotate;
 
-  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack> _container;
+  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack> _container;
   union {
     NoteTrack *note;
     CurveTrack *curve;
     MidiCvTrack *midiCv;
     TuesdayTrack *tuesday;
     DiscreteMapTrack *discreteMap;
+    IndexedTrack *indexed;
   } _track;
 
   friend class Project;

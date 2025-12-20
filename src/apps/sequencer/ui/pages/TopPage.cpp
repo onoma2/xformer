@@ -301,6 +301,9 @@ void TopPage::setSequenceView(SequenceView view) {
     case Track::TrackMode::DiscreteMap:
         setMainPage(pages.discreteMapStages);
         break;
+    case Track::TrackMode::Indexed:
+        setMainPage(pages.indexedSteps);
+        break;
     case Track::TrackMode::Last:
         break;
     }
@@ -353,6 +356,9 @@ void TopPage::setTrackView(TrackView view) {
     case Track::TrackMode::DiscreteMap:
         setMainPage(pages.track);
         break;
+    case Track::TrackMode::Indexed:
+        setMainPage(pages.track);
+        break;
     case Track::TrackMode::Last:
         break;
     }
@@ -377,6 +383,9 @@ void TopPage::setSequenceEditPage() {
         break;
     case Track::TrackMode::DiscreteMap:
         setMainPage(pages.discreteMapSequence);
+        break;
+    case Track::TrackMode::Indexed:
+        setMainPage(pages.indexedSteps);
         break;
     case Track::TrackMode::Last:
         break;

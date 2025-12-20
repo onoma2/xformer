@@ -174,6 +174,9 @@ enum ProjectVersion {
     // added Routing::Route shaper mode
     Version63 = 63,
 
+    // added Indexed track mode
+    Version64 = 64,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

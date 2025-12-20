@@ -7,6 +7,7 @@
 #include "ui/model/MidiCvTrackListModel.h"
 #include "ui/model/TuesdaySequenceListModel.h"
 #include "ui/model/DiscreteMapSequenceListModel.h"
+#include "ui/model/IndexedSequenceListModel.h"
 
 class TrackPage : public ListPage {
 public:
@@ -39,4 +40,5 @@ private:
     MidiCvTrackListModel _midiCvTrackListModel;
     TuesdaySequenceListModel _tuesdaySequenceListModel;
     DiscreteMapSequenceListModel _discreteMapSequenceListModel;
+    IndexedSequenceListModel _indexedSequenceListModel;
 };

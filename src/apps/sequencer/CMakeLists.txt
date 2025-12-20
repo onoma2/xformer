@@ -11,6 +11,7 @@ set(sources
     engine/CvOutput.cpp
     engine/DiscreteMapTrackEngine.cpp
     engine/Engine.cpp
+    engine/IndexedTrackEngine.cpp
     engine/MidiCvTrackEngine.cpp
     engine/MidiLearn.cpp
     engine/MidiOutputEngine.cpp
@@ -44,6 +45,8 @@ set(sources
     model/NoteTrack.cpp
     model/DiscreteMapSequence.cpp
     model/DiscreteMapTrack.cpp
+    model/IndexedSequence.cpp
+    model/IndexedTrack.cpp
     model/TuesdayTrack.cpp
     model/PlayState.cpp
     model/Project.cpp
@@ -96,6 +99,8 @@ set(sources
     ui/pages/TuesdaySequencePage.cpp
     ui/pages/DiscreteMapStagesPage.cpp
     ui/pages/DiscreteMapSequencePage.cpp
+    ui/pages/IndexedSequencePage.cpp
+    ui/pages/IndexedStepsPage.cpp
     ui/pages/MonitorPage.cpp
     ui/pages/NoteSequenceEditPage.cpp
     ui/pages/NoteSequencePage.cpp

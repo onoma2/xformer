@@ -27,6 +27,9 @@ void Track::clearPattern(int patternIndex) {
     case TrackMode::DiscreteMap:
         _track.discreteMap->sequence(patternIndex).clear();
         break;
+    case TrackMode::Indexed:
+        _track.indexed->sequence(patternIndex).clear();
+        break;
     case TrackMode::Last:
         break;
     }
@@ -47,6 +50,9 @@ void Track::copyPattern(int src, int dst) {
         break;
     case TrackMode::DiscreteMap:
         _track.discreteMap->sequence(dst) = _track.discreteMap->sequence(src);
+        break;
+    case TrackMode::Indexed:
+        _track.indexed->sequence(dst) = _track.indexed->sequence(src);
         break;
     case TrackMode::Last:
         break;
@@ -76,6 +82,9 @@ void Track::gateOutputName(int index, StringBuilder &str) const {
     case TrackMode::DiscreteMap:
         _track.discreteMap->gateOutputName(index, str);
         break;
+    case TrackMode::Indexed:
+        _track.indexed->gateOutputName(index, str);
+        break;
     case TrackMode::Last:
         break;
     }
@@ -95,6 +104,9 @@ void Track::cvOutputName(int index, StringBuilder &str) const {
         break;
     case TrackMode::DiscreteMap:
         _track.discreteMap->cvOutputName(index, str);
+        break;
+    case TrackMode::Indexed:
+        _track.indexed->cvOutputName(index, str);
         break;
     case TrackMode::Last:
         break;
@@ -122,6 +134,9 @@ void Track::write(VersionedSerializedWriter &writer) const {
         break;
     case TrackMode::DiscreteMap:
         _track.discreteMap->write(writer);
+        break;
+    case TrackMode::Indexed:
+        _track.indexed->write(writer);
         break;
     case TrackMode::Last:
         break;
@@ -157,6 +172,9 @@ void Track::read(VersionedSerializedReader &reader) {
         break;
     case TrackMode::DiscreteMap:
         _track.discreteMap->read(reader);
+        break;
+    case TrackMode::Indexed:
+        _track.indexed->read(reader);
         break;
     case TrackMode::Last:
         break;
