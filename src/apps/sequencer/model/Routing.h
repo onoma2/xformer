@@ -303,6 +303,33 @@ public:
                isDiscreteMapTarget(target);
     }
 
+    enum class Shaper : uint8_t {
+        None,
+        Crease,
+        Location,
+        Envelope,
+        TriangleFold,
+        FrequencyFollower,
+        Activity,
+        ProgressiveDivider,
+        Last,
+    };
+
+    static uint8_t shaperSerialize(Shaper shaper) {
+        switch (shaper) {
+        case Shaper::None:               return 0;
+        case Shaper::Crease:             return 1;
+        case Shaper::Location:           return 2;
+        case Shaper::Envelope:           return 3;
+        case Shaper::TriangleFold:       return 4;
+        case Shaper::FrequencyFollower:  return 5;
+        case Shaper::Activity:           return 6;
+        case Shaper::ProgressiveDivider: return 7;
+        case Shaper::Last:               break;
+        }
+        return 0;
+    }
+
     enum class Source : uint8_t {
         None,
         CvIn1,
@@ -596,7 +623,10 @@ public:
         }
 
         bool hasNonDefaultShaping(int trackIndex) const {
-            return _biasPct[trackIndex] != DefaultBiasPct || _depthPct[trackIndex] != DefaultDepthPct || _creaseEnabled[trackIndex] != false;
+            return _biasPct[trackIndex] != DefaultBiasPct ||
+                   _depthPct[trackIndex] != DefaultDepthPct ||
+                   _creaseEnabled[trackIndex] != false ||
+                   _shaper[trackIndex] != Shaper::None;
         }
 
         // per-track crease
@@ -604,6 +634,13 @@ public:
         bool creaseEnabled(int trackIndex) const { return _creaseEnabled[trackIndex]; }
         void setCreaseEnabled(int trackIndex, bool enabled) {
             _creaseEnabled[trackIndex] = enabled;
+        }
+
+        // shaper (per track)
+
+        Shaper shaper(int trackIndex) const { return _shaper[trackIndex]; }
+        void setShaper(int trackIndex, Shaper shaper) {
+            _shaper[trackIndex] = ModelUtils::clampedEnum(shaper);
         }
 
         // source
@@ -653,6 +690,7 @@ public:
         std::array<int8_t, CONFIG_TRACK_COUNT> _biasPct;
         std::array<int8_t, CONFIG_TRACK_COUNT> _depthPct;
         std::array<bool, CONFIG_TRACK_COUNT> _creaseEnabled;
+        std::array<Shaper, CONFIG_TRACK_COUNT> _shaper;
         Source _source;
         CvSource _cvSource;
         MidiSource _midiSource;

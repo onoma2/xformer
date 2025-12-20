@@ -171,6 +171,9 @@ enum ProjectVersion {
     // added DiscreteMapTrack::cvUpdateMode
     Version62 = 62,
 
+    // added Routing::Route shaper mode
+    Version63 = 63,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

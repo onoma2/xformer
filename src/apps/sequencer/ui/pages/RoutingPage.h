@@ -51,11 +51,11 @@ private:
     bool _biasOverlayActive = false;
     std::array<int8_t, CONFIG_TRACK_COUNT> _biasStaging;
     std::array<int8_t, CONFIG_TRACK_COUNT> _depthStaging;
-    std::array<bool, CONFIG_TRACK_COUNT> _creaseStaging;
+    std::array<Routing::Shaper, CONFIG_TRACK_COUNT> _shaperStaging;
     std::array<int8_t, CONFIG_TRACK_COUNT> _biasClipboard{};
     std::array<int8_t, CONFIG_TRACK_COUNT> _depthClipboard{};
-    std::array<bool, CONFIG_TRACK_COUNT> _creaseClipboard{};
+    std::array<Routing::Shaper, CONFIG_TRACK_COUNT> _shaperClipboard{};
     bool _clipboardValid = false;
-    std::array<uint8_t, 4> _slotState{}; // 0..5: A bias, A depth, A crease, B bias, B depth, B crease
+    std::array<uint8_t, 4> _slotState{}; // 0..5: A bias, A depth, A shaper, B bias, B depth, B shaper
     int _activeSlot = 0;
 };
