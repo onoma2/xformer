@@ -15,6 +15,7 @@ public:
 
     virtual void draw(Canvas &canvas) override;
     virtual void updateLeds(Leds &leds) override;
+    virtual void keyPress(KeyPressEvent &event) override;
 
 private:
     class StepListModel : public ListModel {
@@ -22,7 +23,7 @@ private:
         void setSequence(IndexedSequence *sequence) { _sequence = sequence; }
         void setProject(Project *project) { _project = project; }
 
-        virtual int rows() const override { return _sequence ? IndexedSequence::MaxSteps * 3 : 0; }
+        virtual int rows() const override { return _sequence ? _sequence->activeLength() * 3 : 0; }
         virtual int columns() const override { return 2; }
 
         virtual void cell(int row, int column, StringBuilder &str) const override;
@@ -37,6 +38,13 @@ private:
         static bool isGateRow(int row) { return (row % 3) == 2; }
         static int stepIndex(int row) { return row / 3; }
     };
+
+    void contextShow();
+    void contextAction(int index);
+    bool contextActionEnabled(int index) const;
+
+    void insertStep();
+    void deleteStep();
 
     StepListModel _listModel;
     IndexedSequence *_sequence = nullptr;

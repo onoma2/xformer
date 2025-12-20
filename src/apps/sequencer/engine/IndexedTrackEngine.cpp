@@ -108,7 +108,7 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
         skipCounter++;
         if (skipCounter >= maxSkips) {
             // All steps have zero duration - stop playback to prevent infinite loop
-            _running = false;
+            // _running = false; // Do not stop running, just wait for next tick (user might edit duration)
             return TickResult::NoUpdate;
         }
         advanceStep();

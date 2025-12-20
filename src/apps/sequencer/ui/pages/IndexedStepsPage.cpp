@@ -5,6 +5,18 @@
 #include "ui/painters/WindowPainter.h"
 #include "ui/LedPainter.h"
 #include "model/Project.h"
+#include "core/utils/StringBuilder.h"
+
+enum class ContextAction {
+    Insert,
+    Delete,
+    Last
+};
+
+static const ContextMenuModel::Item contextMenuItems[] = {
+    { "INSERT" },
+    { "DELETE" },
+};
 
 IndexedStepsPage::IndexedStepsPage(PageManager &manager, PageContext &context) :
     ListPage(manager, context, _listModel)
@@ -35,6 +47,84 @@ void IndexedStepsPage::draw(Canvas &canvas) {
 
 void IndexedStepsPage::updateLeds(Leds &leds) {
     ListPage::updateLeds(leds);
+}
+
+void IndexedStepsPage::keyPress(KeyPressEvent &event) {
+    const auto &key = event.key();
+
+    if (key.isContextMenu()) {
+        contextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier()) {
+        return;
+    }
+
+    if (!event.consumed()) {
+        ListPage::keyPress(event);
+    }
+}
+
+void IndexedStepsPage::contextShow() {
+    showContextMenu(ContextMenu(
+        contextMenuItems,
+        int(ContextAction::Last),
+        [&] (int index) { contextAction(index); },
+        [&] (int index) { return contextActionEnabled(index); }
+    ));
+}
+
+void IndexedStepsPage::contextAction(int index) {
+    switch (ContextAction(index)) {
+    case ContextAction::Insert:
+        insertStep();
+        break;
+    case ContextAction::Delete:
+        deleteStep();
+        break;
+    case ContextAction::Last:
+        break;
+    }
+}
+
+bool IndexedStepsPage::contextActionEnabled(int index) const {
+    if (!_sequence) return false;
+
+    switch (ContextAction(index)) {
+    case ContextAction::Insert:
+        return _sequence->canInsert();
+    case ContextAction::Delete:
+        return _sequence->canDelete();
+    default:
+        return true;
+    }
+}
+
+void IndexedStepsPage::insertStep() {
+    if (!_sequence) return;
+
+    // Get current step index from selected row
+    int currentRow = selectedRow();
+    int stepIndex = currentRow / 3;  // 3 rows per step (note/duration/gate)
+
+    // Insert at current step
+    _sequence->insertStep(stepIndex);
+
+    showMessage("STEP INSERTED");
+}
+
+void IndexedStepsPage::deleteStep() {
+    if (!_sequence) return;
+
+    // Get current step index from selected row
+    int currentRow = selectedRow();
+    int stepIndex = currentRow / 3;  // 3 rows per step
+
+    _sequence->deleteStep(stepIndex);
+
+    showMessage("STEP DELETED");
 }
 
 void IndexedStepsPage::StepListModel::cell(int row, int column, StringBuilder &str) const {

@@ -46,7 +46,8 @@ public:
         case RootNote:
             return Routing::Target::RootNote;
         case Loop:
-        case ActiveLength:
+        case SyncMode:
+        case ResetMeasure:
         default:
             return Routing::Target::None;
         }
@@ -56,7 +57,6 @@ private:
     enum Item {
         Divisor,
         Loop,
-        ActiveLength,
         Scale,
         RootNote,
         SyncMode,
@@ -68,7 +68,6 @@ private:
         switch (item) {
         case Divisor:       return "Divisor";
         case Loop:          return "Loop";
-        case ActiveLength:  return "Length";
         case Scale:         return "Scale";
         case RootNote:      return "Root Note";
         case SyncMode:      return "Sync";
@@ -89,9 +88,6 @@ private:
             break;
         case Loop:
             _sequence->printLoop(str);
-            break;
-        case ActiveLength:
-            str("%d", _sequence->activeLength());
             break;
         case Scale:
             _sequence->printScale(str);
@@ -117,9 +113,6 @@ private:
             break;
         case Loop:
             _sequence->toggleLoop();
-            break;
-        case ActiveLength:
-            _sequence->setActiveLength(_sequence->activeLength() + value);
             break;
         case Scale:
             _sequence->editScale(value, shift);

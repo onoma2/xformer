@@ -234,10 +234,69 @@ public:
     // Methods
     //----------------------------------------
 
+    // Insert a new step at the specified index
+    // Shifts steps to the right, clones previous step's data
+    // Automatically increments activeLength
+    void insertStep(int index) {
+        if (_activeLength >= MaxSteps) return;  // Can't exceed 32 steps
+
+        index = clamp(index, 0, int(_activeLength));
+
+        // Shift steps to the right from insertion point
+        for (int i = _activeLength; i > index; i--) {
+            _steps[i] = _steps[i - 1];
+        }
+
+        // Initialize new step
+        if (index == _activeLength) {
+            if (index > 0) {
+                // Appending: Clone previous step
+                _steps[index] = _steps[index - 1];
+            } else {
+                // First step ever: Default initialization
+                _steps[index].clear();
+                _steps[index].setDuration(192);      // Quarter note
+                _steps[index].setGateLength(50);     // 50%
+                _steps[index].setNoteIndex(0);       // Root
+            }
+        }
+        // Else: Inserting in middle. The shift loop above (_steps[i] = _steps[i-1])
+        // effectively duplicated the step at 'index' into 'index+1', leaving 'index'
+        // as the "clone" of the original step. No further action needed.
+
+        _activeLength++;
+    }
+
+    // Delete step at the specified index
+    // Shifts steps to the left
+    // Automatically decrements activeLength
+    void deleteStep(int index) {
+        if (_activeLength <= 1) return;  // Must have at least 1 step
+        if (index >= _activeLength) return;  // Can't delete beyond active range
+
+        index = clamp(index, 0, int(_activeLength) - 1);
+
+        // Shift steps to the left from deletion point
+        for (int i = index; i < _activeLength - 1; i++) {
+            _steps[i] = _steps[i + 1];
+        }
+
+        _activeLength--;
+
+        // Clear the now-unused last step (cleanup)
+        _steps[_activeLength].clear();
+    }
+
+    // Check if insert is possible at current length
+    bool canInsert() const { return _activeLength < MaxSteps; }
+
+    // Check if delete is possible
+    bool canDelete() const { return _activeLength > 1; }
+
     void clear() {
         _divisor = 192;  // Quarter note at 192 PPQN
         _loop = true;
-        _activeLength = 16;
+        _activeLength = 2;
         _scale = -1;  // Use project scale
         _rootNote = 0;
         _syncMode = SyncMode::Off;
