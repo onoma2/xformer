@@ -123,8 +123,16 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         gateStr("%d%%", step.gateLength());
         canvas.drawTextCentered(102, y, 51, 16, gateStr);
     } else {
+        int currentStep = trackEngine.currentStep() + 1;
+        int totalSteps = sequence.activeLength();
+        const auto &timeSig = _project.timeSignature();
+        uint32_t measureTicks = timeSig.measureDivisor();
+        float bars = (float)totalTicks / measureTicks;
+
         canvas.setColor(Color::Medium);
-        canvas.drawTextCentered(0, 40, 256, 16, "SELECT STEP");
+        FixedStringBuilder<32> infoStr;
+        infoStr("STEP %d/%d  BARS %.1f", currentStep, totalSteps, bars);
+        canvas.drawTextCentered(0, 40, 256, 16, infoStr);
     }
 
     // Footer Labels
@@ -345,17 +353,45 @@ void IndexedSequenceEditPage::insertStep() {
 
 void IndexedSequenceEditPage::splitStep() {
     auto &sequence = _project.selectedIndexedSequence();
-    if (_stepSelection.any()) {
-        sequence.splitStep(_stepSelection.first());
-        showMessage("STEP SPLIT");
+    if (!_stepSelection.any()) return;
+
+    int selectedCount = _stepSelection.count();
+    if (sequence.activeLength() + selectedCount > IndexedSequence::MaxSteps) {
+        showMessage("CANNOT SPLIT: FULL");
+        return;
+    }
+
+    // Iterate backwards to avoid index shifting issues
+    bool splitAny = false;
+    for (int i = sequence.activeLength() - 1; i >= 0; --i) {
+        if (_stepSelection[i]) {
+            sequence.splitStep(i);
+            splitAny = true;
+        }
+    }
+
+    if (splitAny) {
+        // Clear selection because indices have shifted
+        _stepSelection.clear(); 
+        showMessage("STEPS SPLIT");
     }
 }
 
 void IndexedSequenceEditPage::deleteStep() {
     auto &sequence = _project.selectedIndexedSequence();
-    if (_stepSelection.any()) {
-        sequence.deleteStep(_stepSelection.first());
-        showMessage("STEP DELETED");
+    if (!_stepSelection.any()) return;
+
+    bool deletedAny = false;
+    for (int i = sequence.activeLength() - 1; i >= 0; --i) {
+        if (_stepSelection[i]) {
+            sequence.deleteStep(i);
+            deletedAny = true;
+        }
+    }
+
+    if (deletedAny) {
+        _stepSelection.clear();
+        showMessage("STEPS DELETED");
     }
 }
 
