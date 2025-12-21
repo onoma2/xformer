@@ -210,7 +210,14 @@ void IndexedStepsPage::StepListModel::cell(int row, int column, StringBuilder &s
             // Display note index with scale note name if available
             if (_project) {
                 const Scale &scale = _sequence->selectedScale(_project->selectedScale());
-                scale.noteName(str, step.noteIndex(), _sequence->rootNote(), Scale::Format::Short1);
+                FixedStringBuilder<8> noteName;
+                int rootNote = _sequence->rootNote() < 0 ? _project->rootNote() : _sequence->rootNote();
+                scale.noteName(noteName, step.noteIndex(), rootNote, Scale::Format::Short1);
+                float volts = scale.noteToVolts(step.noteIndex());
+                if (scale.isChromatic()) {
+                    volts += rootNote * (1.f / 12.f);
+                }
+                str("%.2f %s", volts, static_cast<const char *>(noteName));
             } else {
                 str("%+d", int(step.noteIndex()));
             }

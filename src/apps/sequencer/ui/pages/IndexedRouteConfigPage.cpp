@@ -56,16 +56,25 @@ void IndexedRouteConfigPage::draw(Canvas &canvas) {
 }
 
 void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequence::RouteConfig &cfg, int y, bool active, const char *label) {
-    canvas.setFont(Font::Small);
+    canvas.setFont(Font::Tiny);
     canvas.setBlendMode(BlendMode::Set);
+
+    const int colWidth = CONFIG_LCD_WIDTH / CONFIG_FUNCTION_KEY_COUNT;
+    auto drawCentered = [&canvas, colWidth, y] (int col, const char *text, Color color) {
+        int colX = col * colWidth;
+        int textWidth = canvas.textWidth(text);
+        int x = colX + (colWidth - textWidth) / 2;
+        canvas.setColor(color);
+        canvas.drawText(x, y, text);
+    };
 
     // Route label
     canvas.setColor(active ? Color::Bright : Color::Medium);
-    canvas.drawText(8, y, label);
+    canvas.drawText(2, y, label);
 
     // Enabled status
-    canvas.setColor((_editParam == EditParam::Enabled && active) ? Color::Bright : Color::Medium);
-    canvas.drawText(64, y, cfg.enabled ? "ON" : "OFF");
+    drawCentered(0, cfg.enabled ? "ON" : "OFF",
+                 (_editParam == EditParam::Enabled && active) ? Color::Bright : Color::Medium);
 
     if (!cfg.enabled) {
         // Don't show other params if disabled
@@ -73,12 +82,9 @@ void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequen
     }
 
     // Target Groups
-    canvas.setColor((_editParam == EditParam::TargetGroups && active) ? Color::Bright : Color::Medium);
-    canvas.drawText(96, y, "G:");
-    drawGroupMask(canvas, cfg.targetGroups, 112, y);
+    drawGroupMask(canvas, cfg.targetGroups, colWidth, y, colWidth);
 
     // Target Parameter
-    canvas.setColor((_editParam == EditParam::TargetParam && active) ? Color::Bright : Color::Medium);
     const char* targetName = "?";
     switch (cfg.targetParam) {
     case IndexedSequence::ModTarget::Duration:   targetName = "DUR"; break;
@@ -86,19 +92,19 @@ void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequen
     case IndexedSequence::ModTarget::NoteIndex:  targetName = "NOTE"; break;
     case IndexedSequence::ModTarget::Last:       break;
     }
-    canvas.drawText(152, y, targetName);
+    drawCentered(2, targetName,
+                 (_editParam == EditParam::TargetParam && active) ? Color::Bright : Color::Medium);
 
     // Amount
-    canvas.setColor((_editParam == EditParam::Amount && active) ? Color::Bright : Color::Medium);
     FixedStringBuilder<16> amountStr;
     amountStr("%+.0f%%", cfg.amount);
-    canvas.drawText(192, y, amountStr);
+    drawCentered(3, amountStr,
+                 (_editParam == EditParam::Amount && active) ? Color::Bright : Color::Medium);
 }
 
-void IndexedRouteConfigPage::drawGroupMask(Canvas &canvas, uint8_t groupMask, int x, int y) {
+void IndexedRouteConfigPage::drawGroupMask(Canvas &canvas, uint8_t groupMask, int x, int y, int width) {
     if (groupMask == IndexedSequence::TargetGroupsUngrouped) {
         const char *ungroupedLabel = "UNGR";
-        int width = 4 * 8;
         int textWidth = canvas.textWidth(ungroupedLabel);
         canvas.setColor(Color::Bright);
         canvas.drawText(x + (width - textWidth) / 2, y, ungroupedLabel);
@@ -107,7 +113,6 @@ void IndexedRouteConfigPage::drawGroupMask(Canvas &canvas, uint8_t groupMask, in
 
     if (groupMask == IndexedSequence::TargetGroupsAll) {
         const char *allLabel = "ALL";
-        int width = 4 * 8;
         int textWidth = canvas.textWidth(allLabel);
         canvas.setColor(Color::Bright);
         canvas.drawText(x + (width - textWidth) / 2, y, allLabel);
@@ -115,10 +120,12 @@ void IndexedRouteConfigPage::drawGroupMask(Canvas &canvas, uint8_t groupMask, in
     }
 
     const char* groupLabels[] = {"A", "B", "C", "D"};
+    int groupWidth = 4 * 8;
+    int startX = x + (width - groupWidth) / 2;
     for (int i = 0; i < 4; ++i) {
         bool inGroup = (groupMask & (1 << i)) != 0;
         canvas.setColor(inGroup ? Color::Bright : Color::Low);
-        canvas.drawText(x + i * 8, y, groupLabels[i]);
+        canvas.drawText(startX + i * 8, y, groupLabels[i]);
     }
 }
 

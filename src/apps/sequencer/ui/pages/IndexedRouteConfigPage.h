@@ -40,5 +40,5 @@ private:
     bool stagedChanged() const;
 
     void drawRouteConfig(Canvas &canvas, const IndexedSequence::RouteConfig &cfg, int y, bool active, const char *label);
-    void drawGroupMask(Canvas &canvas, uint8_t groupMask, int x, int y);
+    void drawGroupMask(Canvas &canvas, uint8_t groupMask, int x, int y, int width);
 };

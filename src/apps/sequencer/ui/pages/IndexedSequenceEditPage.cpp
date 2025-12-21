@@ -124,9 +124,16 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             const auto &step = sequence.step(stepIndex);
 
             // F1: Note
-            FixedStringBuilder<16> noteStr;
+            FixedStringBuilder<8> noteName;
             const auto &scale = sequence.selectedScale(_project.selectedScale());
-            scale.noteName(noteStr, step.noteIndex(), sequence.rootNote(), Scale::Format::Short1);
+            int rootNote = sequence.rootNote() < 0 ? _project.rootNote() : sequence.rootNote();
+            scale.noteName(noteName, step.noteIndex(), rootNote, Scale::Format::Short1);
+            float volts = scale.noteToVolts(step.noteIndex());
+            if (scale.isChromatic()) {
+                volts += rootNote * (1.f / 12.f);
+            }
+            FixedStringBuilder<24> noteStr;
+            noteStr("%.2f %s", volts, static_cast<const char *>(noteName));
             canvas.drawTextCentered(0, y, 51, 16, noteStr);
 
             // F2: Duration
