@@ -301,21 +301,9 @@ void RoutingEngine::updateSinks() {
         if (route.active()) {
             auto target = route.target();
 
-            // Debug IndexedA/B routing
-            if (target == Routing::Target::IndexedA || target == Routing::Target::IndexedB) {
-                printf("[ROUTE] routeIndex=%d target=%s active=true\n",
-                       routeIndex,
-                       target == Routing::Target::IndexedA ? "IndexedA" : "IndexedB");
-            }
-
             if (Routing::isPerTrackTarget(target)) {
                 uint8_t tracks = route.tracks();
 
-                // Debug IndexedA/B per-track routing
-                if (target == Routing::Target::IndexedA || target == Routing::Target::IndexedB) {
-                    printf("[ROUTE] isPerTrackTarget=true tracks=0x%02X sourceValue=%f\n",
-                           tracks, _sourceValues[routeIndex]);
-                }
                 float routeSpan = route.max() - route.min();
                 for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
                     if (tracks & (1 << trackIndex)) {
@@ -355,12 +343,6 @@ void RoutingEngine::updateSinks() {
                             shaperOut = applyCreaseSource(shaperOut);
                         }
                         float routed = route.min() + shaperOut * routeSpan;
-
-                        // Debug IndexedA/B writeTarget
-                        if (target == Routing::Target::IndexedA || target == Routing::Target::IndexedB) {
-                            printf("[ROUTE] writeTarget track=%d shapedSource=%f shaperOut=%f routed=%f\n",
-                                   trackIndex, shapedSource, shaperOut, routed);
-                        }
 
                         _routing.writeTarget(target, (1 << trackIndex), routed);
                     }

@@ -173,12 +173,8 @@ void IndexedTrackEngine::triggerStep() {
     // Apply Route B modulation (if enabled and step is in target groups)
     if (_sequence->routeB().enabled) {
         float cvB = _sequence->routedIndexedB();
-        printf("[ENGINE] RouteB enabled, cvB=%f, groupMask=0x%02X, targetGroups=0x%02X\n",
-               cvB, step.groupMask(), _sequence->routeB().targetGroups);
         if (step.groupMask() & _sequence->routeB().targetGroups) {
-            printf("[ENGINE] Applying modulation: duration before=%d\n", baseDuration);
             applyModulation(cvB, _sequence->routeB(), baseDuration, baseGatePercent, baseNote);
-            printf("[ENGINE] Applying modulation: duration after=%d\n", baseDuration);
         }
     }
 

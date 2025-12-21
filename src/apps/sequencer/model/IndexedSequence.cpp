@@ -2,14 +2,6 @@
 #include "ProjectVersion.h"
 
 void IndexedSequence::writeRouted(Routing::Target target, int intValue, float floatValue) {
-    // Debug: log routing writes
-    if (target == Routing::Target::IndexedA || target == Routing::Target::IndexedB) {
-        printf("[INDEXED] writeRouted target=%d (%s) intValue=%d floatValue=%f\n",
-               static_cast<int>(target),
-               target == Routing::Target::IndexedA ? "IndexedA" : "IndexedB",
-               intValue, floatValue);
-    }
-
     switch (target) {
     case Routing::Target::Divisor:
         setDivisor(intValue);
