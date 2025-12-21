@@ -54,12 +54,13 @@ void IndexedMathPage::draw(Canvas &canvas) {
     drawMathConfig(canvas, _opA, 16, _activeOp == ActiveOp::A, "A");
     drawMathConfig(canvas, _opB, 36, _activeOp == ActiveOp::B, "B");
 
+    bool shift = pageKeyState()[Key::Shift];
     const char *footerLabels[] = {
         "TARGET",
         "OP",
         "VALUE",
         "GROUPS",
-        configChanged() ? "COMMIT" : "BACK",
+        shift ? "BACK" : (configChanged() ? "COMMIT" : "BACK"),
     };
     WindowPainter::drawFooter(canvas, footerLabels, pageKeyState(), int(_editParam));
 }
@@ -89,8 +90,7 @@ void IndexedMathPage::keyPress(KeyPressEvent &event) {
             } else if (configChanged()) {
                 applyMath(_opA);
                 applyMath(_opB);
-                _opABase = _opA;
-                _opBBase = _opB;
+                resetConfigs();
                 showMessage("MATH APPLIED");
             } else {
                 _manager.pop();
@@ -253,11 +253,11 @@ void IndexedMathPage::applyMath(const MathConfig &cfg) {
         if (!matchesGroup(step, cfg.targetGroups)) {
             continue;
         }
-        applyMathToStep(step, cfg);
+        applyMathToStep(step, cfg, i, sequence.activeLength());
     }
 }
 
-void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathConfig &cfg) {
+void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathConfig &cfg, int stepIndex, int stepCount) {
     int range = std::abs(cfg.value);
     int randValue = 0;
     if (range > 0) {
@@ -278,6 +278,17 @@ void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathCon
         case MathOp::Set:    duration = cfg.value; break;
         case MathOp::Rand:   duration = randValue; break;
         case MathOp::Jitter: duration += randValue; break;
+        case MathOp::Ramp:
+            if (stepCount > 1) {
+                duration += (cfg.value * stepIndex) / (stepCount - 1);
+            }
+            break;
+        case MathOp::Quant:
+            if (cfg.value > 0) {
+                int q = cfg.value;
+                duration = ((duration + (q / 2)) / q) * q;
+            }
+            break;
         case MathOp::Last:   break;
         }
         duration = clamp(duration, 0, 65535);
@@ -294,6 +305,17 @@ void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathCon
         case MathOp::Set:    gate = cfg.value; break;
         case MathOp::Rand:   gate = randValue; break;
         case MathOp::Jitter: gate += randValue; break;
+        case MathOp::Ramp:
+            if (stepCount > 1) {
+                gate += (cfg.value * stepIndex) / (stepCount - 1);
+            }
+            break;
+        case MathOp::Quant:
+            if (cfg.value > 0) {
+                int q = cfg.value;
+                gate = ((gate + (q / 2)) / q) * q;
+            }
+            break;
         case MathOp::Last:   break;
         }
         gate = clamp(gate, 0, int(IndexedSequence::GateLengthTrigger));
@@ -310,6 +332,21 @@ void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathCon
         case MathOp::Set:    note = cfg.value; break;
         case MathOp::Rand:   note = randValue; break;
         case MathOp::Jitter: note += randValue; break;
+        case MathOp::Ramp:
+            if (stepCount > 1) {
+                note += (cfg.value * stepIndex) / (stepCount - 1);
+            }
+            break;
+        case MathOp::Quant:
+            if (cfg.value > 0) {
+                int q = cfg.value;
+                if (note >= 0) {
+                    note = ((note + (q / 2)) / q) * q;
+                } else {
+                    note = -(((-note + (q / 2)) / q) * q);
+                }
+            }
+            break;
         case MathOp::Last:   break;
         }
         note = clamp(note, -63, 64);
@@ -341,6 +378,15 @@ bool IndexedMathPage::configChanged() const {
     return !equal(_opA, _opABase) || !equal(_opB, _opBBase);
 }
 
+void IndexedMathPage::resetConfigs() {
+    _opA = MathConfig{};
+    _opB = MathConfig{};
+    _opABase = _opA;
+    _opBBase = _opB;
+    _activeOp = ActiveOp::A;
+    _editParam = EditParam::Target;
+}
+
 int IndexedMathPage::valueMin(const MathConfig &cfg) const {
     switch (cfg.op) {
     case MathOp::Set:
@@ -352,6 +398,20 @@ int IndexedMathPage::valueMin(const MathConfig &cfg) const {
         return 0;
     case MathOp::Div:
         return 1;
+    case MathOp::Quant:
+        return 1;
+    case MathOp::Ramp:
+        switch (cfg.target) {
+        case IndexedSequence::ModTarget::Duration:
+            return -65535;
+        case IndexedSequence::ModTarget::GateLength:
+            return -100;
+        case IndexedSequence::ModTarget::NoteIndex:
+            return -64;
+        case IndexedSequence::ModTarget::Last:
+            break;
+        }
+        break;
     default:
         return 0;
     }
@@ -362,6 +422,19 @@ int IndexedMathPage::valueMax(const MathConfig &cfg) const {
     case MathOp::Mul:
     case MathOp::Div:
         return kPercentMax;
+    case MathOp::Quant:
+    case MathOp::Ramp:
+        switch (cfg.target) {
+        case IndexedSequence::ModTarget::Duration:
+            return 65535;
+        case IndexedSequence::ModTarget::GateLength:
+            return IndexedSequence::GateLengthTrigger;
+        case IndexedSequence::ModTarget::NoteIndex:
+            return 64;
+        case IndexedSequence::ModTarget::Last:
+            break;
+        }
+        break;
     case MathOp::Set:
     case MathOp::Add:
     case MathOp::Sub:
@@ -386,14 +459,14 @@ int IndexedMathPage::valueMax(const MathConfig &cfg) const {
 
 int IndexedMathPage::valueStep(const MathConfig &cfg, bool shift) const {
     if (cfg.op == MathOp::Mul || cfg.op == MathOp::Div) {
-        return shift ? 1 : 10;
+        return shift ? 10 : 1;
     }
 
     switch (cfg.target) {
     case IndexedSequence::ModTarget::Duration:
-        return shift ? 1 : _project.selectedIndexedSequence().divisor();
+        return shift ? _project.selectedIndexedSequence().divisor() : 1;
     case IndexedSequence::ModTarget::GateLength:
-        return shift ? 1 : 5;
+        return shift ? 5 : 1;
     case IndexedSequence::ModTarget::NoteIndex:
         return shift ? 12 : 1;
     case IndexedSequence::ModTarget::Last:
@@ -434,6 +507,8 @@ const char *IndexedMathPage::opName(MathOp op) {
     case MathOp::Set:    return "SET";
     case MathOp::Rand:   return "RAND";
     case MathOp::Jitter: return "JIT";
+    case MathOp::Ramp:   return "RAMP";
+    case MathOp::Quant:  return "QNT";
     case MathOp::Last:   break;
     }
     return "?";

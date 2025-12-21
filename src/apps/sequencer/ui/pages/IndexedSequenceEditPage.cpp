@@ -66,26 +66,37 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
     // 1. Top Section: Timeline Bar
     int totalTicks = 0;
     int activeLength = sequence.activeLength();
+    int nonzeroSteps = 0;
     for (int i = 0; i < activeLength; ++i) {
-        totalTicks += sequence.step(i).duration();
+        int duration = sequence.step(i).duration();
+        totalTicks += duration;
+        if (duration > 0) {
+            nonzeroSteps++;
+        }
     }
 
-    if (totalTicks > 0) {
+    if (totalTicks > 0 && nonzeroSteps > 0) {
         const int barX = 8;
         const int barY = 14;
         const int barW = 240;
         const int barH = 16;
+        const int minStepW = 7;
 
         int currentX = barX;
-        float pixelsPerTick = (float)barW / totalTicks;
+        int extraPixels = barW - minStepW * nonzeroSteps;
+        if (extraPixels < 0) {
+            extraPixels = 0;
+        }
+        int error = 0;
 
         for (int i = 0; i < activeLength; ++i) {
             const auto &step = sequence.step(i);
-            int stepW = (int)(step.duration() * pixelsPerTick);
-            if (stepW < 1 && step.duration() > 0) stepW = 1;
-
-            if (i == activeLength - 1) {
-                stepW = (barX + barW) - currentX;
+            int stepW = 0;
+            if (step.duration() > 0) {
+                int scaled = extraPixels * step.duration() + error;
+                int extraW = scaled / totalTicks;
+                error = scaled % totalTicks;
+                stepW = minStepW + extraW;
             }
 
             bool selected = _stepSelection[i];
@@ -222,7 +233,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         footerLabels[4] = shift ? "ROUTE" : "MATH";
     } else {
         footerLabels[0] = "NOTE";
-        footerLabels[1] = "DUR";
+        footerLabels[1] = _durationTransfer ? "DURT" : "DUR";
         footerLabels[2] = "GATE";
         footerLabels[3] = (_contextMode == ContextMode::Sequence) ? "SEQ" : "STEP";
         footerLabels[4] = shift ? "ROUTE" : "MATH";
@@ -317,14 +328,38 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
 
 void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
     auto &sequence = _project.selectedIndexedSequence();
-
+    
     if (!_stepSelection.any()) return;
+
+    if (_editMode == EditMode::Duration && _durationTransfer) {
+        int stepIndex = _stepSelection.first();
+        int activeLength = sequence.activeLength();
+        if (activeLength > 0) {
+            int nextIndex = (stepIndex + 1) % activeLength;
+            auto &step = sequence.step(stepIndex);
+            auto &nextStep = sequence.step(nextIndex);
+            bool shift = globalKeyState()[Key::Shift];
+            int stepVal = shift ? sequence.divisor() : 1;
+            int delta = event.value() * stepVal;
+
+            int cur = step.duration();
+            int next = nextStep.duration();
+            int minDelta = std::max(-cur, next - 65535);
+            int maxDelta = std::min(65535 - cur, next);
+            int clampedDelta = clamp(delta, minDelta, maxDelta);
+
+            step.setDuration(cur + clampedDelta);
+            nextStep.setDuration(next - clampedDelta);
+        }
+        event.consume();
+        return;
+    }
 
     for (int i = 0; i < IndexedSequence::MaxSteps; ++i) {
         if (_stepSelection[i]) {
             auto &step = sequence.step(i);
             bool shift = globalKeyState()[Key::Shift];
-
+            
             switch (_editMode) {
             case EditMode::Note:
                 step.setNoteIndex(step.noteIndex() + event.value() * (shift ? 12 : 1));
@@ -377,9 +412,22 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
             }
         } else {
             // Edit mode: F1-F3 select edit mode
-            if (fn == 0) _editMode = EditMode::Note;
-            if (fn == 1) _editMode = EditMode::Duration;
-            if (fn == 2) _editMode = EditMode::Gate;
+            if (fn == 0) {
+                _editMode = EditMode::Note;
+                _durationTransfer = false;
+            }
+            if (fn == 1) {
+                _editMode = EditMode::Duration;
+                if (key.shiftModifier()) {
+                    _durationTransfer = !_durationTransfer;
+                } else {
+                    _durationTransfer = false;
+                }
+            }
+            if (fn == 2) {
+                _editMode = EditMode::Gate;
+                _durationTransfer = false;
+            }
         }
     }
 }

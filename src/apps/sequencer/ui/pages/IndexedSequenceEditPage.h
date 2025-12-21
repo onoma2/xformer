@@ -61,6 +61,7 @@ private:
     EditMode _editMode = EditMode::Note;
     ContextMode _contextMode = ContextMode::Sequence;
     FunctionMode _functionMode = FunctionMode::Edit;
+    bool _durationTransfer = false;
 
     StepSelection<IndexedSequence::MaxSteps> _stepSelection;
 };

@@ -40,6 +40,8 @@ private:
         Set,
         Rand,
         Jitter,
+        Ramp,
+        Quant,
         Last
     };
 
@@ -58,10 +60,11 @@ private:
     static const char *opName(MathOp op);
 
     void applyMath(const MathConfig &cfg);
-    void applyMathToStep(IndexedSequence::Step &step, const MathConfig &cfg);
+    void applyMathToStep(IndexedSequence::Step &step, const MathConfig &cfg, int stepIndex, int stepCount);
 
     bool matchesGroup(const IndexedSequence::Step &step, uint8_t targetGroups) const;
     bool configChanged() const;
+    void resetConfigs();
 
     int valueMin(const MathConfig &cfg) const;
     int valueMax(const MathConfig &cfg) const;
