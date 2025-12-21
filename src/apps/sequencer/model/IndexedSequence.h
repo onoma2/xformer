@@ -23,6 +23,8 @@ public:
 
     static constexpr int MaxSteps = 32;
     static constexpr int PatternCount = CONFIG_PATTERN_COUNT;  // 8 patterns
+    static constexpr uint8_t TargetGroupsAll = 0;
+    static constexpr uint8_t TargetGroupsUngrouped = 0x10;
 
     //----------------------------------------
     // Step
@@ -113,13 +115,13 @@ public:
     };
 
     struct RouteConfig {
-        uint8_t targetGroups = 0;       // Bitmask: 0b1010 = groups A+C
+        uint8_t targetGroups = TargetGroupsAll; // Bitmask: 0b1010 = groups A+C (0 = ALL, 0x10 = UNGR)
         ModTarget targetParam = ModTarget::Duration;
         float amount = 100.0f;          // Scale factor (-200% to +200%)
         bool enabled = false;
 
         void clear() {
-            targetGroups = 0;
+            targetGroups = TargetGroupsAll;
             targetParam = ModTarget::Duration;
             amount = 100.0f;
             enabled = false;

@@ -45,24 +45,23 @@ void IndexedRouteConfigPage::draw(Canvas &canvas) {
     WindowPainter::drawHeader(canvas, _model, _engine, "ROUTE CONFIG");
 
     // Draw Route A
-    drawRouteConfig(canvas, _routeAStaged, 16, _activeRoute == ActiveRoute::RouteA);
+    drawRouteConfig(canvas, _routeAStaged, 16, _activeRoute == ActiveRoute::RouteA, "A");
 
     // Draw Route B
-    drawRouteConfig(canvas, _routeBStaged, 36, _activeRoute == ActiveRoute::RouteB);
+    drawRouteConfig(canvas, _routeBStaged, 36, _activeRoute == ActiveRoute::RouteB, "B");
 
     // Footer: F1-F4 for parameter selection, F5 to exit
     const char *footerLabels[] = { "ENABLE", "GROUPS", "TARGET", "AMOUNT", stagedChanged() ? "COMMIT" : "BACK" };
     WindowPainter::drawFooter(canvas, footerLabels, pageKeyState(), (int)_editParam);
 }
 
-void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequence::RouteConfig &cfg, int y, bool active) {
+void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequence::RouteConfig &cfg, int y, bool active, const char *label) {
     canvas.setFont(Font::Small);
     canvas.setBlendMode(BlendMode::Set);
 
     // Route label
     canvas.setColor(active ? Color::Bright : Color::Medium);
-    const char* routeName = (active && _activeRoute == ActiveRoute::RouteA) ? "ROUTE A:" : "ROUTE B:";
-    canvas.drawText(8, y, routeName);
+    canvas.drawText(8, y, label);
 
     // Enabled status
     canvas.setColor((_editParam == EditParam::Enabled && active) ? Color::Bright : Color::Medium);
@@ -97,6 +96,24 @@ void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequen
 }
 
 void IndexedRouteConfigPage::drawGroupMask(Canvas &canvas, uint8_t groupMask, int x, int y) {
+    if (groupMask == IndexedSequence::TargetGroupsUngrouped) {
+        const char *ungroupedLabel = "UNGR";
+        int width = 4 * 8;
+        int textWidth = canvas.textWidth(ungroupedLabel);
+        canvas.setColor(Color::Bright);
+        canvas.drawText(x + (width - textWidth) / 2, y, ungroupedLabel);
+        return;
+    }
+
+    if (groupMask == IndexedSequence::TargetGroupsAll) {
+        const char *allLabel = "ALL";
+        int width = 4 * 8;
+        int textWidth = canvas.textWidth(allLabel);
+        canvas.setColor(Color::Bright);
+        canvas.drawText(x + (width - textWidth) / 2, y, allLabel);
+        return;
+    }
+
     const char* groupLabels[] = {"A", "B", "C", "D"};
     for (int i = 0; i < 4; ++i) {
         bool inGroup = (groupMask & (1 << i)) != 0;
@@ -161,10 +178,27 @@ void IndexedRouteConfigPage::encoder(EncoderEvent &event) {
         break;
 
     case EditParam::TargetGroups: {
-        // Cycle through group combinations
-        // For simplicity, increment the bitmask (0-15)
-        int newMask = cfg.targetGroups + event.value();
-        cfg.targetGroups = clamp(newMask, 0, 15) & 0x0F;
+        static const uint8_t groupCycle[] = {
+            1, 2, 3, 4,
+            5, 6, 7, 8,
+            9, 10, 11, 12,
+            13, 14, 15,
+            IndexedSequence::TargetGroupsUngrouped,
+            IndexedSequence::TargetGroupsAll,
+        };
+        static constexpr int cycleSize = int(sizeof(groupCycle) / sizeof(groupCycle[0]));
+        int currentIndex = 0;
+        for (int i = 0; i < cycleSize; ++i) {
+            if (cfg.targetGroups == groupCycle[i]) {
+                currentIndex = i;
+                break;
+            }
+        }
+        int nextIndex = (currentIndex + event.value()) % cycleSize;
+        if (nextIndex < 0) {
+            nextIndex += cycleSize;
+        }
+        cfg.targetGroups = groupCycle[nextIndex];
         break;
     }
 

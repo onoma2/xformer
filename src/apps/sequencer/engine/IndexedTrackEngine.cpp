@@ -165,7 +165,10 @@ void IndexedTrackEngine::triggerStep() {
     // Apply Route A modulation (if enabled and step is in target groups)
     if (_sequence->routeA().enabled) {
         float cvA = _sequence->routedIndexedA();
-        if (step.groupMask() & _sequence->routeA().targetGroups) {
+        auto targetGroups = _sequence->routeA().targetGroups;
+        if (targetGroups == IndexedSequence::TargetGroupsAll ||
+            (targetGroups == IndexedSequence::TargetGroupsUngrouped && step.groupMask() == 0) ||
+            (step.groupMask() & targetGroups)) {
             applyModulation(cvA, _sequence->routeA(), baseDuration, baseGatePercent, baseNote);
         }
     }
@@ -173,7 +176,10 @@ void IndexedTrackEngine::triggerStep() {
     // Apply Route B modulation (if enabled and step is in target groups)
     if (_sequence->routeB().enabled) {
         float cvB = _sequence->routedIndexedB();
-        if (step.groupMask() & _sequence->routeB().targetGroups) {
+        auto targetGroups = _sequence->routeB().targetGroups;
+        if (targetGroups == IndexedSequence::TargetGroupsAll ||
+            (targetGroups == IndexedSequence::TargetGroupsUngrouped && step.groupMask() == 0) ||
+            (step.groupMask() & targetGroups)) {
             applyModulation(cvB, _sequence->routeB(), baseDuration, baseGatePercent, baseNote);
         }
     }
