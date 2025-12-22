@@ -37,6 +37,7 @@ private:
         Mode,
         ShiftMode,
         ClockInputDivisor,
+        ClockInputMultiplier,
         ClockInputMode,
         ClockOutputDivisor,
         ClockOutputSwing,
@@ -54,6 +55,7 @@ private:
         case Mode:              return "Mode";
         case ShiftMode:         return "Shift Mode";
         case ClockInputDivisor: return "Input Divisor";
+        case ClockInputMultiplier: return "Input Mult";
         case ClockInputMode:    return "Input Mode";
         case ClockOutputDivisor:return "Output Divisor";
         case ClockOutputSwing:  return "Output Swing";
@@ -82,6 +84,9 @@ private:
             break;
         case ClockInputDivisor:
             _clockSetup.printClockInputDivisor(str);
+            break;
+        case ClockInputMultiplier:
+            _clockSetup.printClockInputMultiplier(str);
             break;
         case ClockInputMode:
             _clockSetup.printClockInputMode(str);
@@ -125,6 +130,9 @@ private:
             break;
         case ClockInputDivisor:
             _clockSetup.editClockInputDivisor(value, shift);
+            break;
+        case ClockInputMultiplier:
+            _clockSetup.editClockInputMultiplier(value, shift);
             break;
         case ClockInputMode:
             _clockSetup.editClockInputMode(value, shift);

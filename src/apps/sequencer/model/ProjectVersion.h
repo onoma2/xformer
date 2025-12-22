@@ -195,6 +195,9 @@ enum ProjectVersion {
     // added Track::runGate
     Version69 = 69,
 
+    // added ClockSetup::clockInputMultiplier
+    Version70 = 70,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

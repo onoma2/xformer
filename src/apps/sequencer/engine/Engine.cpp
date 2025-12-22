@@ -1004,7 +1004,14 @@ void Engine::updateClockSetup() {
     }
 
     // Configure clock slaves
-    _clock.slaveConfigure(ClockSourceExternal, clockSetup.clockInputDivisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN), true);
+    uint32_t ticksPerPulse = clockSetup.clockInputDivisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+    if (clockSetup.clockInputMultiplier() > 0) {
+        ticksPerPulse *= clockSetup.clockInputMultiplier();
+    } else {
+        ticksPerPulse /= -clockSetup.clockInputMultiplier();
+    }
+    
+    _clock.slaveConfigure(ClockSourceExternal, ticksPerPulse, true);
     _clock.slaveConfigure(ClockSourceMidi, CONFIG_PPQN / 24, clockSetup.midiRx());
     _clock.slaveConfigure(ClockSourceUsbMidi, CONFIG_PPQN / 24, clockSetup.usbRx());
 

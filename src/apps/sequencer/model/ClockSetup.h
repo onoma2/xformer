@@ -116,7 +116,35 @@ public:
         str(shiftModeName(shiftMode()));
     }
 
+    // clockInputMultiplier
+
+    int clockInputMultiplier() const { return _clockInputMultiplier; }
+    void setClockInputMultiplier(int multiplier) {
+        multiplier = clamp(multiplier, -16, 16);
+        if (multiplier == 0) multiplier = 1; // Skip 0
+        if (multiplier != _clockInputMultiplier) {
+            _clockInputMultiplier = multiplier;
+            _dirty = true;
+        }
+    }
+
+    void editClockInputMultiplier(int value, int shift) {
+        int next = clockInputMultiplier() + value;
+        if (value > 0 && next == 0) next = 1;
+        if (value < 0 && next == 0) next = -1;
+        setClockInputMultiplier(next);
+    }
+
+    void printClockInputMultiplier(StringBuilder &str) const {
+        if (_clockInputMultiplier > 0) {
+            str("x%d", _clockInputMultiplier);
+        } else {
+            str("/%d", -_clockInputMultiplier);
+        }
+    }
+
     // clockInputDivisor
+
 
     int clockInputDivisor() const { return _clockInputDivisor; }
     void setClockInputDivisor(int clockInputDivisor) {
@@ -316,6 +344,7 @@ public:
 private:
     Mode _mode;
     ShiftMode _shiftMode;
+    int8_t _clockInputMultiplier;
     uint8_t _clockInputDivisor;
     ClockInputMode _clockInputMode;
     uint8_t _clockOutputDivisor;

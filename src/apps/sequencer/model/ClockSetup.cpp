@@ -5,6 +5,7 @@ void ClockSetup::clear() {
     _mode = Mode::Auto;
     _shiftMode = ShiftMode::Restart;
     _clockInputDivisor = 12;
+    _clockInputMultiplier = 1;
     _clockInputMode = ClockInputMode::Reset;
     _clockOutputDivisor = 12;
     _clockOutputSwing = false;
@@ -21,6 +22,7 @@ void ClockSetup::write(VersionedSerializedWriter &writer) const {
     writer.write(_mode);
     writer.write(_shiftMode);
     writer.write(_clockInputDivisor);
+    writer.write(_clockInputMultiplier);
     writer.write(_clockInputMode);
     writer.write(_clockOutputDivisor);
     writer.write(_clockOutputSwing);
@@ -36,6 +38,11 @@ void ClockSetup::read(VersionedSerializedReader &reader) {
     reader.read(_mode);
     reader.read(_shiftMode);
     reader.read(_clockInputDivisor);
+    if (reader.dataVersion() >= ProjectVersion::Version70) {
+        reader.read(_clockInputMultiplier);
+    } else {
+        _clockInputMultiplier = 1;
+    }
     reader.read(_clockInputMode);
     reader.read(_clockOutputDivisor);
     reader.read(_clockOutputSwing, ProjectVersion::Version11);
