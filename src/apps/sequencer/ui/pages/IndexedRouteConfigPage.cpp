@@ -30,6 +30,7 @@ void IndexedRouteConfigPage::enter() {
     const auto &sequence = _project.selectedIndexedSequence();
     _routeAStaged = sequence.routeA();
     _routeBStaged = sequence.routeB();
+    _combineModeStaged = sequence.routeCombineMode();
 }
 
 void IndexedRouteConfigPage::exit() {
@@ -50,9 +51,13 @@ void IndexedRouteConfigPage::draw(Canvas &canvas) {
     // Draw Route B
     drawRouteConfig(canvas, _routeBStaged, 36, _activeRoute == ActiveRoute::RouteB, "B");
 
+    // Draw Combine Mode (bottom row)
+    drawMixConfig(canvas, _combineModeStaged, 46, _activeRoute == ActiveRoute::Mix);
+
     // Footer: F1-F4 for parameter selection, F5 to exit
     const char *footerLabels[] = { "ENABLE", "GROUPS", "TARGET", "AMOUNT", stagedChanged() ? "COMMIT" : "BACK" };
-    WindowPainter::drawFooter(canvas, footerLabels, pageKeyState(), (int)_editParam);
+    int highlight = (_activeRoute == ActiveRoute::Mix) ? -1 : (int)_editParam;
+    WindowPainter::drawFooter(canvas, footerLabels, pageKeyState(), highlight);
 }
 
 void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequence::RouteConfig &cfg, int y, bool active, const char *label) {
@@ -76,10 +81,20 @@ void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequen
     drawCentered(0, cfg.enabled ? "ON" : "OFF",
                  (_editParam == EditParam::Enabled && active) ? Color::Bright : Color::Medium);
 
-    if (!cfg.enabled) {
-        // Don't show other params if disabled
-        return;
+    int affectedSteps = 0;
+    const auto &sequence = _project.selectedIndexedSequence();
+    for (int i = 0; i < sequence.activeLength(); ++i) {
+        const auto &step = sequence.step(i);
+        uint8_t mask = step.groupMask();
+        if (cfg.targetGroups == IndexedSequence::TargetGroupsAll ||
+            (cfg.targetGroups == IndexedSequence::TargetGroupsUngrouped && mask == 0) ||
+            (mask & cfg.targetGroups)) {
+            affectedSteps++;
+        }
     }
+    FixedStringBuilder<8> countStr;
+    countStr("N=%d", affectedSteps);
+    drawCentered(4, countStr, active ? Color::Bright : Color::Medium);
 
     // Target Groups
     drawGroupMask(canvas, cfg.targetGroups, colWidth, y, colWidth);
@@ -100,6 +115,33 @@ void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequen
     amountStr("%+.0f%%", cfg.amount);
     drawCentered(3, amountStr,
                  (_editParam == EditParam::Amount && active) ? Color::Bright : Color::Medium);
+}
+
+void IndexedRouteConfigPage::drawMixConfig(Canvas &canvas, IndexedSequence::RouteCombineMode mode, int y, bool active) {
+    canvas.setFont(Font::Tiny);
+    canvas.setBlendMode(BlendMode::Set);
+
+    const int colWidth = CONFIG_LCD_WIDTH / CONFIG_FUNCTION_KEY_COUNT;
+    auto drawCentered = [&canvas, colWidth, y] (int col, const char *text, Color color) {
+        int colX = col * colWidth;
+        int textWidth = canvas.textWidth(text);
+        int x = colX + (colWidth - textWidth) / 2;
+        canvas.setColor(color);
+        canvas.drawText(x, y, text);
+    };
+
+    const char *modeName = "?";
+    switch (mode) {
+    case IndexedSequence::RouteCombineMode::AtoB: modeName = "AtoB"; break;
+    case IndexedSequence::RouteCombineMode::Mux:  modeName = "MUX"; break;
+    case IndexedSequence::RouteCombineMode::Min:  modeName = "MIN"; break;
+    case IndexedSequence::RouteCombineMode::Max:  modeName = "MAX"; break;
+    case IndexedSequence::RouteCombineMode::Last: break;
+    }
+
+    canvas.setColor(active ? Color::Bright : Color::Medium);
+    canvas.drawText(2, y, "MIX");
+    drawCentered(2, modeName, active ? Color::Bright : Color::Medium);
 }
 
 void IndexedRouteConfigPage::drawGroupMask(Canvas &canvas, uint8_t groupMask, int x, int y, int width) {
@@ -153,6 +195,7 @@ void IndexedRouteConfigPage::keyPress(KeyPressEvent &event) {
                 auto &sequence = _project.selectedIndexedSequence();
                 sequence.setRouteA(_routeAStaged);
                 sequence.setRouteB(_routeBStaged);
+                sequence.setRouteCombineMode(_combineModeStaged);
                 showMessage("ROUTE UPDATED");
             } else {
                 _manager.pop();
@@ -163,20 +206,46 @@ void IndexedRouteConfigPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Left/Right: Switch between Route A and Route B
+    // Left/Right: Switch between Route A / Route B / Mix
     if (key.isLeft()) {
-        _activeRoute = ActiveRoute::RouteA;
+        if (_activeRoute == ActiveRoute::RouteA) {
+            _activeRoute = ActiveRoute::Mix;
+        } else if (_activeRoute == ActiveRoute::Mix) {
+            _activeRoute = ActiveRoute::RouteB;
+        } else if (_activeRoute == ActiveRoute::RouteB) {
+            _activeRoute = ActiveRoute::RouteA;
+        }
         event.consume();
         return;
     }
     if (key.isRight()) {
-        _activeRoute = ActiveRoute::RouteB;
+        if (_activeRoute == ActiveRoute::RouteA) {
+            _activeRoute = ActiveRoute::RouteB;
+        } else if (_activeRoute == ActiveRoute::RouteB) {
+            _activeRoute = ActiveRoute::Mix;
+        } else if (_activeRoute == ActiveRoute::Mix) {
+            _activeRoute = ActiveRoute::RouteA;
+        }
         event.consume();
         return;
     }
 }
 
 void IndexedRouteConfigPage::encoder(EncoderEvent &event) {
+    if (_activeRoute == ActiveRoute::Mix) {
+        int mode = int(_combineModeStaged) + event.value();
+        int max = int(IndexedSequence::RouteCombineMode::Last);
+        if (max > 0) {
+            mode %= max;
+            if (mode < 0) {
+                mode += max;
+            }
+            _combineModeStaged = static_cast<IndexedSequence::RouteCombineMode>(mode);
+        }
+        event.consume();
+        return;
+    }
+
     auto &cfg = activeRouteConfig();
 
     switch (_editParam) {
@@ -248,5 +317,6 @@ const IndexedSequence::RouteConfig& IndexedRouteConfigPage::activeRouteConfig() 
 bool IndexedRouteConfigPage::stagedChanged() const {
     const auto &sequence = _project.selectedIndexedSequence();
     return !routeConfigEqual(_routeAStaged, sequence.routeA()) ||
-        !routeConfigEqual(_routeBStaged, sequence.routeB());
+        !routeConfigEqual(_routeBStaged, sequence.routeB()) ||
+        _combineModeStaged != sequence.routeCombineMode();
 }

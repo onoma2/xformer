@@ -198,6 +198,9 @@ enum ProjectVersion {
     // added ClockSetup::clockInputMultiplier
     Version70 = 70,
 
+    // added IndexedSequence route combine mode
+    Version71 = 71,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

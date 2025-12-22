@@ -116,6 +116,14 @@ public:
         Last
     };
 
+    enum class RouteCombineMode : uint8_t {
+        AtoB,
+        Mux,
+        Min,
+        Max,
+        Last
+    };
+
     enum class SyncMode : uint8_t {
         Off,
         ResetMeasure,
@@ -294,6 +302,9 @@ public:
     void setRouteB(const RouteConfig& cfg) { _routeB = cfg; }
     float routedIndexedB() const { return _routedIndexedB; }
 
+    RouteCombineMode routeCombineMode() const { return _routeCombineMode; }
+    void setRouteCombineMode(RouteCombineMode mode) { _routeCombineMode = ModelUtils::clampedEnum(mode); }
+
     //----------------------------------------
     // Methods
     //----------------------------------------
@@ -399,6 +410,7 @@ public:
         _resetMeasure = 0;
         _routeA.clear();
         _routeB.clear();
+        _routeCombineMode = RouteCombineMode::AtoB;
 
         // Initialize steps with sensible defaults
         for (int i = 0; i < MaxSteps; ++i) {
@@ -428,6 +440,7 @@ public:
 
         _routeA.write(writer);
         _routeB.write(writer);
+        writer.write(static_cast<uint8_t>(_routeCombineMode));
 
         for (const auto &s : _steps) {
             s.write(writer);
@@ -460,6 +473,13 @@ public:
 
         _routeA.read(reader);
         _routeB.read(reader);
+        if (reader.dataVersion() >= ProjectVersion::Version71) {
+            uint8_t mode;
+            reader.read(mode);
+            _routeCombineMode = ModelUtils::clampedEnum(static_cast<RouteCombineMode>(mode));
+        } else {
+            _routeCombineMode = RouteCombineMode::AtoB;
+        }
 
         for (auto &s : _steps) {
             s.read(reader);
@@ -512,6 +532,7 @@ private:
 
     RouteConfig _routeA;
     RouteConfig _routeB;
+    RouteCombineMode _routeCombineMode = RouteCombineMode::AtoB;
     float _routedIndexedA = 0.f;  // Routed CV value for route A
     float _routedIndexedB = 0.f;  // Routed CV value for route B
 

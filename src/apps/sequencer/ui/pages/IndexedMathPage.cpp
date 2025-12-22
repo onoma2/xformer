@@ -12,7 +12,7 @@
 #include "os/os.h"
 
 namespace {
-constexpr int kPercentMax = 400;
+constexpr int kMulDivMax = 400;
 
 const char *targetName(IndexedSequence::ModTarget target) {
     switch (target) {
@@ -216,6 +216,18 @@ void IndexedMathPage::drawMathConfig(Canvas &canvas, const MathConfig &cfg, int 
 
     Color groupColor = (active && _editParam == EditParam::Groups) ? Color::Bright : Color::Medium;
     drawGroupMask(canvas, cfg.targetGroups, colWidth * 3, y, colWidth, groupColor);
+
+    int affectedSteps = 0;
+    const auto &sequence = _project.selectedIndexedSequence();
+    for (int i = 0; i < sequence.activeLength(); ++i) {
+        const auto &step = sequence.step(i);
+        if (matchesGroup(step, cfg.targetGroups)) {
+            affectedSteps++;
+        }
+    }
+    FixedStringBuilder<8> countStr;
+    countStr("N=%d", affectedSteps);
+    drawCentered(4, countStr, active ? Color::Bright : Color::Medium);
 }
 
 void IndexedMathPage::drawGroupMask(Canvas &canvas, uint8_t groupMask, int x, int y, int width, Color onColor) {
@@ -273,8 +285,8 @@ void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathCon
         switch (cfg.op) {
         case MathOp::Add:    duration += cfg.value; break;
         case MathOp::Sub:    duration -= cfg.value; break;
-        case MathOp::Mul:    duration = (duration * cfg.value) / 100; break;
-        case MathOp::Div:    duration = cfg.value > 0 ? (duration * 100) / cfg.value : duration; break;
+        case MathOp::Mul:    duration = duration * cfg.value; break;
+        case MathOp::Div:    duration = cfg.value > 0 ? duration / cfg.value : duration; break;
         case MathOp::Set:    duration = cfg.value; break;
         case MathOp::Rand:   duration = randValue; break;
         case MathOp::Jitter: duration += randValue; break;
@@ -300,8 +312,8 @@ void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathCon
         switch (cfg.op) {
         case MathOp::Add:    gate += cfg.value; break;
         case MathOp::Sub:    gate -= cfg.value; break;
-        case MathOp::Mul:    gate = (gate * cfg.value) / 100; break;
-        case MathOp::Div:    gate = cfg.value > 0 ? (gate * 100) / cfg.value : gate; break;
+        case MathOp::Mul:    gate = gate * cfg.value; break;
+        case MathOp::Div:    gate = cfg.value > 0 ? gate / cfg.value : gate; break;
         case MathOp::Set:    gate = cfg.value; break;
         case MathOp::Rand:   gate = randValue; break;
         case MathOp::Jitter: gate += randValue; break;
@@ -327,8 +339,8 @@ void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathCon
         switch (cfg.op) {
         case MathOp::Add:    note += cfg.value; break;
         case MathOp::Sub:    note -= cfg.value; break;
-        case MathOp::Mul:    note = (note * cfg.value) / 100; break;
-        case MathOp::Div:    note = cfg.value > 0 ? (note * 100) / cfg.value : note; break;
+        case MathOp::Mul:    note = note * cfg.value; break;
+        case MathOp::Div:    note = cfg.value > 0 ? note / cfg.value : note; break;
         case MathOp::Set:    note = cfg.value; break;
         case MathOp::Rand:   note = randValue; break;
         case MathOp::Jitter: note += randValue; break;
@@ -421,7 +433,7 @@ int IndexedMathPage::valueMax(const MathConfig &cfg) const {
     switch (cfg.op) {
     case MathOp::Mul:
     case MathOp::Div:
-        return kPercentMax;
+        return kMulDivMax;
     case MathOp::Quant:
     case MathOp::Ramp:
         switch (cfg.target) {
@@ -491,7 +503,7 @@ void IndexedMathPage::formatValue(const MathConfig &cfg, StringBuilder &str) con
         break;
     case MathOp::Mul:
     case MathOp::Div:
-        str("%d%%", cfg.value);
+        str("%d", cfg.value);
         break;
     default:
         str("%d", cfg.value);

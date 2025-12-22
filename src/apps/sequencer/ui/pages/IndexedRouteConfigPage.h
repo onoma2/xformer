@@ -20,6 +20,7 @@ public:
 private:
     enum class ActiveRoute {
         RouteA,
+        Mix,
         RouteB
     };
 
@@ -34,11 +35,13 @@ private:
     EditParam _editParam = EditParam::Enabled;
     IndexedSequence::RouteConfig _routeAStaged;
     IndexedSequence::RouteConfig _routeBStaged;
+    IndexedSequence::RouteCombineMode _combineModeStaged = IndexedSequence::RouteCombineMode::AtoB;
 
     IndexedSequence::RouteConfig& activeRouteConfig();
     const IndexedSequence::RouteConfig& activeRouteConfig() const;
     bool stagedChanged() const;
 
     void drawRouteConfig(Canvas &canvas, const IndexedSequence::RouteConfig &cfg, int y, bool active, const char *label);
+    void drawMixConfig(Canvas &canvas, IndexedSequence::RouteCombineMode mode, int y, bool active);
     void drawGroupMask(Canvas &canvas, uint8_t groupMask, int x, int y, int width);
 };

@@ -116,8 +116,10 @@ void Track::cvOutputName(int index, StringBuilder &str) const {
 }
 
 void Track::write(VersionedSerializedWriter &writer) const {
+    writer.write(_trackIndex);
     writer.writeEnum(_trackMode, trackModeSerialize);
     writer.write(_linkTrack);
+    _runGate.write(writer);
     writer.write(_cvOutputRotate.base);
     writer.write(_gateOutputRotate.base);
 

@@ -134,13 +134,32 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             int stepIndex = _stepSelection.first();
             const auto &step = sequence.step(stepIndex);
             uint8_t groupMask = step.groupMask();
+            int groupCounts[4] = {0, 0, 0, 0};
+            int activeLength = sequence.activeLength();
+            for (int i = 0; i < activeLength; ++i) {
+                uint8_t mask = sequence.step(i).groupMask();
+                for (int g = 0; g < 4; ++g) {
+                    if (mask & (1 << g)) {
+                        groupCounts[g]++;
+                    }
+                }
+            }
 
             // F1-F4: Groups A-D
             const char* groupLabels[] = {"A", "B", "C", "D"};
             for (int i = 0; i < 4; ++i) {
                 bool inGroup = (groupMask & (1 << i)) != 0;
-                canvas.setColor(inGroup ? Color::Bright : Color::Medium);
-                canvas.drawTextCentered(i * 51, y, 51, 16, groupLabels[i]);
+                canvas.setColor(Color::Medium);
+                FixedStringBuilder<6> countText;
+                countText("%d", groupCounts[i]);
+                canvas.drawTextCentered(i * 51, y - 8, 51, 8, countText);
+                FixedStringBuilder<4> groupText;
+                if (inGroup) {
+                    groupText("[%s]", groupLabels[i]);
+                } else {
+                    groupText("[-]");
+                }
+                canvas.drawTextCentered(i * 51, y, 51, 16, groupText);
             }
         } else {
             // Edit mode: Show note/duration/gate values
@@ -182,6 +201,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         int totalSteps = sequence.activeLength();
         const auto &timeSig = _project.timeSignature();
         uint32_t measureTicks = timeSig.measureDivisor();
+        uint32_t beatTicks = timeSig.noteDivisor();
         float bars = (float)totalTicks / measureTicks;
 
         // Show current step values above the step/bars info
@@ -215,8 +235,26 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         }
 
         canvas.setColor(Color::Medium);
-        FixedStringBuilder<32> infoStr;
-        infoStr("STEP %d/%d  BARS %.1f", currentStep, totalSteps, bars);
+        FixedStringBuilder<48> infoStr;
+        auto deltaToBoundary = [](int ticks, int period) -> int {
+            if (period <= 0) {
+                return 0;
+            }
+            if (ticks < period) {
+                return period - ticks;
+            }
+            int remainder = ticks % period;
+            if (remainder == 0) {
+                return 0;
+            }
+            int toPrev = -remainder;
+            int toNext = period - remainder;
+            return (abs(toPrev) <= abs(toNext)) ? toPrev : toNext;
+        };
+
+        int deltaBar = deltaToBoundary(totalTicks, int(measureTicks));
+        int deltaBeat = deltaToBoundary(totalTicks, int(beatTicks));
+        infoStr("STEP %d/%d  BARS %.1f  DT %+d / %+d", currentStep, totalSteps, bars, deltaBar, deltaBeat);
         canvas.drawTextCentered(0, 40, 256, 16, infoStr);
     }
 
@@ -230,7 +268,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         footerLabels[1] = "B";
         footerLabels[2] = "C";
         footerLabels[3] = "D";
-        footerLabels[4] = shift ? "ROUTE" : "MATH";
+        footerLabels[4] = "BACK";
     } else {
         footerLabels[0] = "NOTE";
         footerLabels[1] = _durationTransfer ? "DURT" : "DUR";
@@ -304,11 +342,15 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         }
 
         if (fn == 4) {
-            // F5: Navigate to Math page, SHIFT+F5 to Route Config
-            if (shift) {
-                _manager.pages().top.editIndexedRouteConfig();
+            if (_functionMode == FunctionMode::Groups) {
+                _functionMode = FunctionMode::Edit;
             } else {
-                _manager.pages().top.editIndexedMath();
+                // F5: Navigate to Math page, SHIFT+F5 to Route Config
+                if (shift) {
+                    _manager.pages().top.editIndexedRouteConfig();
+                } else {
+                    _manager.pages().top.editIndexedMath();
+                }
             }
         }
 
