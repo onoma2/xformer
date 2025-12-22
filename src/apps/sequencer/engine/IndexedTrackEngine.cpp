@@ -7,6 +7,11 @@
 
 namespace {
 
+// Constants matching IndexedTrackEngine class constants
+constexpr uint16_t MAX_DURATION = 65535;
+constexpr int8_t MIN_NOTE_INDEX = -63;
+constexpr int8_t MAX_NOTE_INDEX = 64;
+
 // Helper: Check if step matches route target groups
 inline bool stepMatchesRouteGroups(const IndexedSequence::Step &step, const IndexedSequence::RouteConfig &cfg) {
     uint8_t targetGroups = cfg.targetGroups;
@@ -35,6 +40,88 @@ inline float resolveModulation(float modA, bool modAActive, float modB, bool mod
         return combineModulation(modA, modB, mode);
     }
     return modAActive ? modA : (modBActive ? modB : 0.0f);
+}
+
+// Helper: Apply duration modulation (multiplicative, percentage-based)
+inline void applyDurationModulation(float modValue, uint16_t &duration) {
+    float modded = static_cast<float>(duration) * (1.0f + modValue);
+    int newDuration = static_cast<int>(std::lround(modded));
+    duration = clamp(newDuration, 0, int(MAX_DURATION));
+}
+
+// Helper: Apply gate length modulation (additive)
+inline void applyGateLengthModulation(float modValue, uint16_t &gatePercent) {
+    if (gatePercent == IndexedSequence::GateLengthTrigger) {
+        return; // Preserve trigger sentinel
+    }
+    int newGate = static_cast<int>(gatePercent + modValue);
+    gatePercent = clamp(newGate, 0, int(IndexedSequence::GateLengthTrigger));
+}
+
+// Helper: Apply note index modulation (additive, semitone transpose)
+inline void applyNoteModulation(float modValue, int8_t &note) {
+    int newNote = static_cast<int>(note + modValue);
+    note = clamp(newNote, int(MIN_NOTE_INDEX), int(MAX_NOTE_INDEX));
+}
+
+// Unified modulation application: handles both combined and sequential routing
+inline void applyStepModulation(
+    IndexedSequence::ModTarget target,
+    float cvA, float cvB,
+    const IndexedSequence::RouteConfig &routeA,
+    const IndexedSequence::RouteConfig &routeB,
+    bool aActive, bool bActive,
+    bool combineMode,
+    IndexedSequence::RouteCombineMode combineType,
+    uint16_t &duration,
+    uint16_t &gatePercent,
+    int8_t &note)
+{
+    // Calculate modulation values from each route
+    float modA = 0.0f;
+    float modB = 0.0f;
+
+    if (aActive && routeA.targetParam == target) {
+        if (target == IndexedSequence::ModTarget::Duration) {
+            modA = cvA * (routeA.amount * 0.01f); // Percentage for duration
+        } else {
+            modA = cvA * routeA.amount; // Direct value for gate/note
+        }
+    }
+
+    if (bActive && routeB.targetParam == target) {
+        if (target == IndexedSequence::ModTarget::Duration) {
+            modB = cvB * (routeB.amount * 0.01f); // Percentage for duration
+        } else {
+            modB = cvB * routeB.amount; // Direct value for gate/note
+        }
+    }
+
+    // Resolve final modulation (combine or sequential)
+    float finalMod = 0.0f;
+    if (combineMode && aActive && bActive) {
+        finalMod = resolveModulation(modA, true, modB, true, combineType);
+    } else {
+        // Sequential: add both (if targeting same param, only one will be non-zero)
+        finalMod = modA + modB;
+    }
+
+    // Apply modulation to appropriate parameter
+    if (finalMod != 0.0f) {
+        switch (target) {
+        case IndexedSequence::ModTarget::Duration:
+            applyDurationModulation(finalMod, duration);
+            break;
+        case IndexedSequence::ModTarget::GateLength:
+            applyGateLengthModulation(finalMod, gatePercent);
+            break;
+        case IndexedSequence::ModTarget::NoteIndex:
+            applyNoteModulation(finalMod, note);
+            break;
+        case IndexedSequence::ModTarget::Last:
+            break;
+        }
+    }
 }
 
 } // anonymous namespace
@@ -224,68 +311,34 @@ void IndexedTrackEngine::triggerStep() {
     uint16_t baseGatePercent = step.gateLength();
     int8_t baseNote = step.noteIndex();
 
-    // Fetch route configurations once
+    // Apply route modulation (unified for both combined and sequential modes)
     const auto &routeA = _sequence->routeA();
     const auto &routeB = _sequence->routeB();
-    const auto combineMode = _sequence->routeCombineMode();
+    const bool aActive = routeA.enabled && stepMatchesRouteGroups(step, routeA);
+    const bool bActive = routeB.enabled && stepMatchesRouteGroups(step, routeB);
 
-    // Check if routes should be combined (both enabled, same target param, not AtoB mode)
-    const bool combineRoutes = combineMode != IndexedSequence::RouteCombineMode::AtoB &&
-        routeA.enabled && routeB.enabled &&
-        routeA.targetParam == routeB.targetParam;
+    if (aActive || bActive) {
+        const float cvA = _sequence->routedIndexedA();
+        const float cvB = _sequence->routedIndexedB();
+        const auto combineMode = _sequence->routeCombineMode();
 
-    if (combineRoutes) {
-        // Check which routes are active for this step's groups
-        const bool aActive = stepMatchesRouteGroups(step, routeA);
-        const bool bActive = stepMatchesRouteGroups(step, routeB);
-        if (aActive || bActive) {
-            const float cvA = _sequence->routedIndexedA();
-            const float cvB = _sequence->routedIndexedB();
+        // Check if routes should be combined
+        const bool shouldCombine = combineMode != IndexedSequence::RouteCombineMode::AtoB &&
+                                   aActive && bActive &&
+                                   routeA.targetParam == routeB.targetParam;
 
-            switch (routeA.targetParam) {
-            case IndexedSequence::ModTarget::Duration: {
-                const float modA = aActive ? cvA * (routeA.amount * 0.01f) : 0.0f;
-                const float modB = bActive ? cvB * (routeB.amount * 0.01f) : 0.0f;
-                const float mod = resolveModulation(modA, aActive, modB, bActive, combineMode);
-                float modded = static_cast<float>(baseDuration) * (1.0f + mod);
-                int newDuration = static_cast<int>(std::lround(modded));
-                baseDuration = clamp(newDuration, 0, int(MAX_DURATION));
-                break;
-            }
-            case IndexedSequence::ModTarget::GateLength: {
-                if (baseGatePercent != IndexedSequence::GateLengthTrigger) {
-                    const float modA = aActive ? cvA * routeA.amount : 0.0f;
-                    const float modB = bActive ? cvB * routeB.amount : 0.0f;
-                    const float mod = resolveModulation(modA, aActive, modB, bActive, combineMode);
-                    const int newGate = static_cast<int>(baseGatePercent + mod);
-                    baseGatePercent = clamp(newGate, 0, int(IndexedSequence::GateLengthTrigger));
-                }
-                break;
-            }
-            case IndexedSequence::ModTarget::NoteIndex: {
-                const float modA = aActive ? cvA * routeA.amount : 0.0f;
-                const float modB = bActive ? cvB * routeB.amount : 0.0f;
-                const float mod = resolveModulation(modA, aActive, modB, bActive, combineMode);
-                const int newNote = static_cast<int>(baseNote + mod);
-                baseNote = clamp(newNote, int(MIN_NOTE_INDEX), int(MAX_NOTE_INDEX));
-                break;
-            }
-            case IndexedSequence::ModTarget::Last:
-                break;
-            }
-        }
-    } else {
-        // Apply Route A modulation (if enabled and step is in target groups)
-        if (routeA.enabled && stepMatchesRouteGroups(step, routeA)) {
-            const float cvA = _sequence->routedIndexedA();
-            applyModulation(cvA, routeA, baseDuration, baseGatePercent, baseNote);
-        }
+        // Apply modulation for each possible target parameter
+        applyStepModulation(IndexedSequence::ModTarget::Duration, cvA, cvB,
+                           routeA, routeB, aActive, bActive, shouldCombine, combineMode,
+                           baseDuration, baseGatePercent, baseNote);
 
-        // Apply Route B modulation (if enabled and step is in target groups)
-        if (routeB.enabled && stepMatchesRouteGroups(step, routeB)) {
-            const float cvB = _sequence->routedIndexedB();
-            applyModulation(cvB, routeB, baseDuration, baseGatePercent, baseNote);
-        }
+        applyStepModulation(IndexedSequence::ModTarget::GateLength, cvA, cvB,
+                           routeA, routeB, aActive, bActive, shouldCombine, combineMode,
+                           baseDuration, baseGatePercent, baseNote);
+
+        applyStepModulation(IndexedSequence::ModTarget::NoteIndex, cvA, cvB,
+                           routeA, routeB, aActive, bActive, shouldCombine, combineMode,
+                           baseDuration, baseGatePercent, baseNote);
     }
 
     // Calculate gate duration in ticks
@@ -330,52 +383,6 @@ float IndexedTrackEngine::noteIndexToVoltage(int8_t noteIndex) const {
     }
 
     return volts;
-}
-
-void IndexedTrackEngine::applyModulation(
-    float cv,
-    const IndexedSequence::RouteConfig &cfg,
-    uint16_t &duration,
-    uint16_t &gate,
-    int8_t &note
-) {
-    // cv is typically -5V to +5V, normalized to -1 to +1 for percentage-based modulation
-    // For now, assume routing engine provides normalized values
-
-    switch (cfg.targetParam) {
-        case IndexedSequence::ModTarget::Duration: {
-            // Scale duration by percentage of base duration
-            float amountPct = cfg.amount * 0.01f;
-            float factor = 1.0f + (cv * amountPct);
-            float modded = static_cast<float>(duration) * factor;
-            int newDuration = static_cast<int>(std::lround(modded));
-            duration = clamp(newDuration, 0, int(MAX_DURATION));
-            break;
-        }
-
-        case IndexedSequence::ModTarget::GateLength: {
-            if (gate == IndexedSequence::GateLengthTrigger) {
-                // Preserve trigger gate length sentinel
-                break;
-            }
-            // Additive percentage modulation
-            int modAmount = static_cast<int>(cv * cfg.amount);
-            int newGate = static_cast<int>(gate) + modAmount;
-            gate = clamp(newGate, 0, int(MAX_GATE_PERCENT));
-            break;
-        }
-
-        case IndexedSequence::ModTarget::NoteIndex: {
-            // Transpose (additive semitones)
-            int modAmount = static_cast<int>(cv * cfg.amount);
-            int newNote = static_cast<int>(note) + modAmount;
-            note = clamp(newNote, int(MIN_NOTE_INDEX), int(MAX_NOTE_INDEX));
-            break;
-        }
-
-        case IndexedSequence::ModTarget::Last:
-            break;
-    }
 }
 
 float IndexedTrackEngine::sequenceProgress() const {

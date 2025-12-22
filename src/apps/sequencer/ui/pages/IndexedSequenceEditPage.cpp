@@ -271,7 +271,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         footerLabels[4] = "BACK";
     } else {
         footerLabels[0] = "NOTE";
-        footerLabels[1] = _durationTransfer ? "DURT" : "DUR";
+        footerLabels[1] = _durationTransfer ? "DUR-TR" : "DUR";
         footerLabels[2] = "GATE";
         footerLabels[3] = (_contextMode == ContextMode::Sequence) ? "SEQ" : "STEP";
         footerLabels[4] = shift ? "ROUTE" : "MATH";
@@ -370,7 +370,7 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
 
 void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
     auto &sequence = _project.selectedIndexedSequence();
-    
+
     if (!_stepSelection.any()) return;
 
     if (_editMode == EditMode::Duration && _durationTransfer) {
@@ -401,7 +401,7 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
         if (_stepSelection[i]) {
             auto &step = sequence.step(i);
             bool shift = globalKeyState()[Key::Shift];
-            
+
             switch (_editMode) {
             case EditMode::Note:
                 step.setNoteIndex(step.noteIndex() + event.value() * (shift ? 12 : 1));

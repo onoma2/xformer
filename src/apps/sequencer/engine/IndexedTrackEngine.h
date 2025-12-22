@@ -49,9 +49,6 @@ private:
     void advanceStep();
     void triggerStep();
     float noteIndexToVoltage(int8_t noteIndex) const;
-    void applyModulation(float cv, const IndexedSequence::RouteConfig &cfg,
-                        uint16_t &duration, uint16_t &gate, int8_t &note);
-
     float routedSync() const;
 
     IndexedTrack &_indexedTrack;
