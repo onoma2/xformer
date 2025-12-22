@@ -10,11 +10,11 @@ void DiscreteMapTrackEngine::reset() {
 
     // Internal ramp always starts at -5V (full range)
     _rampPhase = 0.0f;
-    _rampValue = -5.0f;
+    _rampValue = kInternalRampMin;
 
     // Initialize prevInput below the full range to allow first crossing
-    _prevInput = -5.001f;
-    _currentInput = -5.0f;
+    _prevInput = kPrevInputInit;
+    _currentInput = kInternalRampMin;
 
     _prevSync = _discreteMapTrack.routedSync();
     _resetTickOffset = 0;
@@ -27,6 +27,9 @@ void DiscreteMapTrackEngine::reset() {
     _thresholdsDirty = true;
     _activity = false;
     _lastScannerSegment = -1;
+    _prevRangeHigh = _sequence ? _sequence->rangeHigh() : 0.0f;
+    _prevRangeLow = _sequence ? _sequence->rangeLow() : 0.0f;
+    _prevThresholdMode = _sequence ? _sequence->thresholdMode() : DiscreteMapSequence::ThresholdMode::Position;
 
     // Initialize sampled pitch params (for Gate mode)
     _sampledOctave = _discreteMapTrack.octave();
@@ -38,6 +41,9 @@ void DiscreteMapTrackEngine::changePattern() {
     _sequence = &_discreteMapTrack.sequence(pattern());
     _thresholdsDirty = true;
     _prevLoop = _sequence->loop();
+    _prevRangeHigh = _sequence->rangeHigh();
+    _prevRangeLow = _sequence->rangeLow();
+    _prevThresholdMode = _sequence->thresholdMode();
     _extOnceArmed = false;
     _extOnceDone = false;
     _extMinSeen = 0.f;
@@ -51,6 +57,9 @@ void DiscreteMapTrackEngine::restart() {
     _resetTickOffset = 0;
     _prevSync = _discreteMapTrack.routedSync();
     _prevLoop = _sequence ? _sequence->loop() : true;
+    _prevRangeHigh = _sequence ? _sequence->rangeHigh() : 0.0f;
+    _prevRangeLow = _sequence ? _sequence->rangeLow() : 0.0f;
+    _prevThresholdMode = _sequence ? _sequence->thresholdMode() : DiscreteMapSequence::ThresholdMode::Position;
     _extOnceArmed = false;
     _extOnceDone = false;
     _extMinSeen = 0.f;
@@ -74,10 +83,18 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     }
     _prevLoop = _sequence->loop();
 
-    // Invalidate threshold cache if voltage window is being modulated
-    if (_sequence->isRouted(Routing::Target::DiscreteMapRangeHigh) ||
-        _sequence->isRouted(Routing::Target::DiscreteMapRangeLow)) {
+    float currentRangeHigh = _sequence->rangeHigh();
+    float currentRangeLow = _sequence->rangeLow();
+    if (std::abs(currentRangeHigh - _prevRangeHigh) > kRangeEpsilon ||
+        std::abs(currentRangeLow - _prevRangeLow) > kRangeEpsilon) {
         _thresholdsDirty = true;
+        _prevRangeHigh = currentRangeHigh;
+        _prevRangeLow = currentRangeLow;
+    }
+    auto thresholdMode = _sequence->thresholdMode();
+    if (thresholdMode != _prevThresholdMode) {
+        _thresholdsDirty = true;
+        _prevThresholdMode = thresholdMode;
     }
 
     // Sync / reset handling
@@ -122,41 +139,7 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     }
 
     // External ONCE: arm inside window and freeze after one sweep across the defined range
-    bool extOnceFreeze = false;
-    bool extOnceMode = _sequence->clockSource() == DiscreteMapSequence::ClockSource::External && !_sequence->loop();
-    if (extOnceMode) {
-        float winLo = std::min(rangeMin(), rangeMax());
-        float winHi = std::max(rangeMin(), rangeMax());
-        float spanAbs = std::max(0.01f, std::abs(rangeSpan()));
-
-        if (!_extOnceDone) {
-            if (_extOnceArmed) {
-                // Track min/max to detect range coverage
-                _extMinSeen = std::min(_extMinSeen, _currentInput);
-                _extMaxSeen = std::max(_extMaxSeen, _currentInput);
-
-                // Calculate what percentage of the range we've covered
-                float coverageSpan = _extMaxSeen - _extMinSeen;
-                float coveragePercent = coverageSpan / spanAbs;
-
-                // Complete when we've covered 90% of the defined range (direction-agnostic)
-                // This tolerates LFOs/envelopes that don't quite reach the exact endpoints
-                if (coveragePercent >= 0.90f) {
-                    _extOnceArmed = false;
-                    _extOnceDone = true;
-                }
-            } else {
-                // Arm when entering the voltage window (with 5% tolerance)
-                float armTolerance = spanAbs * 0.05f;
-                if (_currentInput >= (winLo - armTolerance) && _currentInput <= (winHi + armTolerance)) {
-                    _extOnceArmed = true;
-                    _extMinSeen = _extMaxSeen = _currentInput;
-                }
-            }
-        }
-
-        extOnceFreeze = _extOnceDone || !_extOnceArmed;
-    }
+    bool extOnceFreeze = updateExternalOnce();
 
     // Scanner logic: map routed value (0-34) to 34 segments
     // Segment 0: Bottom dead zone, 1..32: Stages 0..31, 33: Top dead zone
@@ -175,9 +158,13 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         _lastScannerSegment = currentSegment;
     }
 
-    // 2. Recalc length thresholds if needed
-    if (_thresholdsDirty && _sequence->thresholdMode() == DiscreteMapSequence::ThresholdMode::Length) {
-        recalculateLengthThresholds();
+    // 2. Recalc thresholds if needed
+    if (_thresholdsDirty) {
+        if (thresholdMode == DiscreteMapSequence::ThresholdMode::Length) {
+            recalculateLengthThresholds();
+        } else {
+            recalculatePositionThresholds();
+        }
         _thresholdsDirty = false;
     }
 
@@ -261,6 +248,45 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     return result;
 }
 
+bool DiscreteMapTrackEngine::updateExternalOnce() {
+    bool extOnceMode = _sequence->clockSource() == DiscreteMapSequence::ClockSource::External && !_sequence->loop();
+    if (!extOnceMode) {
+        return false;
+    }
+
+    float winLo = std::min(rangeMin(), rangeMax());
+    float winHi = std::max(rangeMin(), rangeMax());
+    float spanAbs = std::max(kMinSpanAbs, std::abs(rangeSpan()));
+
+    if (!_extOnceDone) {
+        if (_extOnceArmed) {
+            // Track min/max to detect range coverage
+            _extMinSeen = std::min(_extMinSeen, _currentInput);
+            _extMaxSeen = std::max(_extMaxSeen, _currentInput);
+
+            // Calculate what percentage of the range we've covered
+            float coverageSpan = _extMaxSeen - _extMinSeen;
+            float coveragePercent = coverageSpan / spanAbs;
+
+            // Complete when we've covered 90% of the defined range (direction-agnostic)
+            // This tolerates LFOs/envelopes that don't quite reach the exact endpoints
+            if (coveragePercent >= kCoveragePct) {
+                _extOnceArmed = false;
+                _extOnceDone = true;
+            }
+        } else {
+            // Arm when entering the voltage window (with 5% tolerance)
+            float armTolerance = spanAbs * kArmTolerancePct;
+            if (_currentInput >= (winLo - armTolerance) && _currentInput <= (winHi + armTolerance)) {
+                _extOnceArmed = true;
+                _extMinSeen = _extMaxSeen = _currentInput;
+            }
+        }
+    }
+
+    return _extOnceDone || !_extOnceArmed;
+}
+
 void DiscreteMapTrackEngine::update(float dt) {
     // No per-frame updates needed
     (void)dt;
@@ -279,19 +305,16 @@ void DiscreteMapTrackEngine::updateRamp(uint32_t tick) {
 
     // Internal ramp/triangle always uses full ±5V range (perfect synced modulation source)
     // ABOVE/BELOW parameters only affect threshold positions, not the ramp itself
-    const float INTERNAL_RAMP_MIN = -5.0f;
-    const float INTERNAL_RAMP_MAX = 5.0f;
-
     if (sequence.clockSource() == DiscreteMapSequence::ClockSource::InternalTriangle) {
         float triPhase = (_rampPhase < 0.5f) ? (_rampPhase * 2.0f) : (1.0f - (_rampPhase - 0.5f) * 2.0f);
-        _rampValue = INTERNAL_RAMP_MIN + triPhase * (INTERNAL_RAMP_MAX - INTERNAL_RAMP_MIN);
+        _rampValue = kInternalRampMin + triPhase * (kInternalRampMax - kInternalRampMin);
     } else {
-        _rampValue = INTERNAL_RAMP_MIN + _rampPhase * (INTERNAL_RAMP_MAX - INTERNAL_RAMP_MIN);
+        _rampValue = kInternalRampMin + _rampPhase * (kInternalRampMax - kInternalRampMin);
     }
 
     if (!_sequence->loop() && _running && posInPeriod + 1 >= periodTicks) {
         _running = false;
-        _rampValue = INTERNAL_RAMP_MAX;
+        _rampValue = kInternalRampMax;
         _rampPhase = 1.0f;
     }
 }
@@ -301,16 +324,22 @@ float DiscreteMapTrackEngine::getRoutedInput() {
 }
 
 float DiscreteMapTrackEngine::getThresholdVoltage(int stageIndex) {
-    const auto &stage = _sequence->stage(stageIndex);
-
     if (_sequence->thresholdMode() == DiscreteMapSequence::ThresholdMode::Position) {
+        return _positionThresholds[stageIndex];
+    }
+    return _lengthThresholds[stageIndex];
+}
+
+void DiscreteMapTrackEngine::recalculatePositionThresholds() {
+    float minV = rangeMin();
+    float spanV = rangeMax() - minV;
+
+    for (int i = 0; i < DiscreteMapSequence::StageCount; i++) {
+        const auto &stage = _sequence->stage(i);
         // Position mode: use threshold value directly as voltage
         // Map from -100..+100 to rangeMin..rangeMax
         float normalizedThreshold = (stage.threshold() + 100) / 200.0f;
-        return rangeMin() + normalizedThreshold * (rangeMax() - rangeMin());
-    } else {
-        // Length mode: use pre-calculated thresholds
-        return _lengthThresholds[stageIndex];
+        _positionThresholds[i] = minV + normalizedThreshold * spanV;
     }
 }
 

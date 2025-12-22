@@ -46,12 +46,22 @@ public:
     
     int findActiveStage(float input, float prevInput);
     void recalculateLengthThresholds();
+    void recalculatePositionThresholds();
     float getThresholdVoltage(int stageIndex);
 
 private:
+    static constexpr float kInternalRampMin = -5.0f;
+    static constexpr float kInternalRampMax = 5.0f;
+    static constexpr float kPrevInputInit = -5.001f;
+    static constexpr float kMinSpanAbs = 0.01f;
+    static constexpr float kArmTolerancePct = 0.05f;
+    static constexpr float kCoveragePct = 0.90f;
+    static constexpr float kRangeEpsilon = 1e-6f;
+
     void updateRamp(uint32_t tick);
     float getRoutedInput();
     float noteIndexToVoltage(int8_t noteIndex);
+    bool updateExternalOnce();
 
     // Voltage range helpers (delegated to sequence parameters)
     // rangeMin = START of ramp (rangeLow)
@@ -80,9 +90,13 @@ private:
     float _prevSync = 0.0f;
     bool _prevLoop = true;
 
-    // === Threshold Cache (Length mode) ===
+    // === Threshold Cache ===
     float _lengthThresholds[DiscreteMapSequence::StageCount];
+    float _positionThresholds[DiscreteMapSequence::StageCount];
     bool _thresholdsDirty = true;
+    float _prevRangeHigh = 0.0f;
+    float _prevRangeLow = 0.0f;
+    DiscreteMapSequence::ThresholdMode _prevThresholdMode = DiscreteMapSequence::ThresholdMode::Position;
 
     // === Stage State ===
     int _activeStage = -1;          // -1 = none
