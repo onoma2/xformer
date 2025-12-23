@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BasePage.h"
+#include "ui/model/DiscreteMapSequenceListModel.h"
 
 #include "engine/DiscreteMapTrackEngine.h"
 #include "model/DiscreteMapSequence.h"
@@ -71,6 +72,7 @@ private:
     void drawThresholdBar(Canvas &canvas);
     void drawStageInfo(Canvas &canvas);
     void drawFooter(Canvas &canvas);
+    void quickEdit(int index);
 
     void handleTopRowKey(int idx);
     void handleBottomRowKey(int idx);
@@ -108,4 +110,5 @@ private:
     GeneratorKind _generatorKind = GeneratorKind::Random;
     InitStage _initStage = InitStage::Inactive;
     RangeMacro _currentRangeMacro = RangeMacro::Full;
+    DiscreteMapSequenceListModel _listModel;
 };

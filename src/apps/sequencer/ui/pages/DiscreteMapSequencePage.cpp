@@ -23,6 +23,17 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "ROUTE" },
 };
 
+static const DiscreteMapSequenceListModel::Item quickEditItems[8] = {
+    DiscreteMapSequenceListModel::Item::RangeHigh, // Step 9
+    DiscreteMapSequenceListModel::Item::RangeLow,  // Step 10
+    DiscreteMapSequenceListModel::Item::Divisor,   // Step 11
+    DiscreteMapSequenceListModel::Item::Last,
+    DiscreteMapSequenceListModel::Item::Last,
+    DiscreteMapSequenceListModel::Item::Last,
+    DiscreteMapSequenceListModel::Item::Last,
+    DiscreteMapSequenceListModel::Item::Last,
+};
+
 DiscreteMapSequencePage::DiscreteMapSequencePage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
 {}
@@ -311,6 +322,15 @@ void DiscreteMapSequencePage::updateLeds(Leds &leds) {
             leds.set(ledIndex, false, false);
         }
     }
+
+    if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
+        for (int i = 0; i < 8; ++i) {
+            int index = MatrixMap::fromStep(i + 8);
+            leds.unmask(index);
+            leds.set(index, false, quickEditItems[i] != DiscreteMapSequenceListModel::Item::Last);
+            leds.mask(index);
+        }
+    }
 }
 
 void DiscreteMapSequencePage::keyDown(KeyEvent &event) {
@@ -366,6 +386,12 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.isQuickEdit() && !key.shiftModifier()) {
+        quickEdit(key.quickEdit());
+        event.consume();
+        return;
+    }
+
     if (key.isEncoder()) {
         // In normal mode, toggle between threshold and note value edit modes
         _editMode = (_editMode == EditMode::NoteValue) ? EditMode::Threshold : EditMode::NoteValue;
@@ -381,6 +407,18 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
         _section = std::min(3, _section + 1);
         event.consume();
     }
+}
+
+void DiscreteMapSequencePage::quickEdit(int index) {
+    if (!_sequence || index < 0 || index >= 8) {
+        return;
+    }
+    if (quickEditItems[index] == DiscreteMapSequenceListModel::Item::Last) {
+        return;
+    }
+    _listModel.setSequence(_sequence);
+    _listModel.setTrack(&_project.selectedTrack().discreteMapTrack());
+    _manager.pages().quickEdit.show(_listModel, int(quickEditItems[index]));
 }
 
 void DiscreteMapSequencePage::encoder(EncoderEvent &event) {

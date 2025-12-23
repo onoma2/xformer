@@ -11,6 +11,26 @@ class DiscreteMapSequenceListModel : public RoutableListModel {
 public:
     DiscreteMapSequenceListModel() = default;
 
+    enum Item {
+        ClockSource,
+        SyncMode,
+        Divisor,
+        GateLength,
+        Loop,
+        ResetMeasure,
+        ThresholdMode,
+        RangeHigh,
+        RangeLow,
+        Scale,
+        RootNote,
+        Slew,
+        Octave,
+        Transpose,
+        Offset,
+        CvUpdateMode,  // Add this before Last
+        Last
+    };
+
     void setSequence(DiscreteMapSequence *sequence) { _sequence = sequence; }
     void setTrack(DiscreteMapTrack *track) { _track = track; }
 
@@ -59,26 +79,6 @@ public:
     }
 
 private:
-    enum Item {
-        ClockSource,
-        SyncMode,
-        Divisor,
-        GateLength,
-        Loop,
-        ResetMeasure,
-        ThresholdMode,
-        RangeHigh,
-        RangeLow,
-        Scale,
-        RootNote,
-        Slew,
-        Octave,
-        Transpose,
-        Offset,
-        CvUpdateMode,  // Add this before Last
-        Last
-    };
-
     static const char *itemName(Item item) {
         switch (item) {
         case ClockSource:   return "Clock";
