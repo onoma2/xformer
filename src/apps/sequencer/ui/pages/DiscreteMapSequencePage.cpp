@@ -23,15 +23,20 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "ROUTE" },
 };
 
-static const DiscreteMapSequenceListModel::Item quickEditItems[8] = {
-    DiscreteMapSequenceListModel::Item::RangeHigh, // Step 9
-    DiscreteMapSequenceListModel::Item::RangeLow,  // Step 10
-    DiscreteMapSequenceListModel::Item::Divisor,   // Step 11
-    DiscreteMapSequenceListModel::Item::Last,
-    DiscreteMapSequenceListModel::Item::Last,
-    DiscreteMapSequenceListModel::Item::Last,
-    DiscreteMapSequenceListModel::Item::Last,
-    DiscreteMapSequenceListModel::Item::Last,
+enum {
+    QuickEditNone = -1,
+    QuickEditEven = -2,
+};
+
+static const int quickEditItems[8] = {
+    int(DiscreteMapSequenceListModel::Item::RangeHigh), // Step 9
+    int(DiscreteMapSequenceListModel::Item::RangeLow),  // Step 10
+    int(DiscreteMapSequenceListModel::Item::Divisor),   // Step 11
+    QuickEditEven,                                      // Step 12
+    QuickEditNone,
+    QuickEditNone,
+    QuickEditNone,
+    QuickEditNone,
 };
 
 DiscreteMapSequencePage::DiscreteMapSequencePage(PageManager &manager, PageContext &context) :
@@ -327,7 +332,7 @@ void DiscreteMapSequencePage::updateLeds(Leds &leds) {
         for (int i = 0; i < 8; ++i) {
             int index = MatrixMap::fromStep(i + 8);
             leds.unmask(index);
-            leds.set(index, false, quickEditItems[i] != DiscreteMapSequenceListModel::Item::Last);
+            leds.set(index, false, quickEditItems[i] != QuickEditNone);
             leds.mask(index);
         }
     }
@@ -413,12 +418,59 @@ void DiscreteMapSequencePage::quickEdit(int index) {
     if (!_sequence || index < 0 || index >= 8) {
         return;
     }
-    if (quickEditItems[index] == DiscreteMapSequenceListModel::Item::Last) {
+    int item = quickEditItems[index];
+    if (item == QuickEditNone) {
+        return;
+    }
+    if (item == QuickEditEven) {
+        distributeActiveStagesEvenly();
         return;
     }
     _listModel.setSequence(_sequence);
     _listModel.setTrack(&_project.selectedTrack().discreteMapTrack());
-    _manager.pages().quickEdit.show(_listModel, int(quickEditItems[index]));
+    _manager.pages().quickEdit.show(_listModel, item);
+}
+
+void DiscreteMapSequencePage::distributeActiveStagesEvenly() {
+    if (!_sequence) {
+        return;
+    }
+
+    int activeIndices[DiscreteMapSequence::StageCount];
+    int activeCount = 0;
+    for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+        if (_sequence->stage(i).direction() != DiscreteMapSequence::Stage::TriggerDir::Off) {
+            activeIndices[activeCount++] = i;
+        }
+    }
+
+    if (activeCount <= 1) {
+        showMessage("NO SPREAD");
+        return;
+    }
+
+    if (_sequence->thresholdMode() == DiscreteMapSequence::ThresholdMode::Length) {
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            auto &stage = _sequence->stage(i);
+            if (stage.direction() == DiscreteMapSequence::Stage::TriggerDir::Off) {
+                stage.setThreshold(-99);
+            } else {
+                stage.setThreshold(0);
+            }
+        }
+    } else {
+        for (int i = 0; i < activeCount; ++i) {
+            float t = float(i) / float(activeCount - 1);
+            int value = int(std::round(-99.f + t * 198.f));
+            _sequence->stage(activeIndices[i]).setThreshold(value);
+        }
+    }
+
+    if (_enginePtr) {
+        _enginePtr->invalidateThresholds();
+    }
+
+    showMessage("EVEN THR");
 }
 
 void DiscreteMapSequencePage::encoder(EncoderEvent &event) {

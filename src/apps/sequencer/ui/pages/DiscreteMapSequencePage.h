@@ -73,6 +73,7 @@ private:
     void drawStageInfo(Canvas &canvas);
     void drawFooter(Canvas &canvas);
     void quickEdit(int index);
+    void distributeActiveStagesEvenly();
 
     void handleTopRowKey(int idx);
     void handleBottomRowKey(int idx);
