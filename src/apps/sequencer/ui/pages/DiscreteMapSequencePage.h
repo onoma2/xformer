@@ -68,12 +68,23 @@ private:
         Last
     };
 
+    enum class EvenTarget : uint8_t {
+        None,
+        Rise,
+        Fall,
+        Active,
+        All,
+        Last
+    };
+
     void refreshPointers();
     void drawThresholdBar(Canvas &canvas);
     void drawStageInfo(Canvas &canvas);
     void drawFooter(Canvas &canvas);
     void quickEdit(int index);
-    void distributeActiveStagesEvenly();
+    void distributeActiveStagesEvenly(EvenTarget target);
+    void startEvenQuickEdit();
+    void finishEvenQuickEdit();
 
     void handleTopRowKey(int idx);
     void handleBottomRowKey(int idx);
@@ -112,4 +123,6 @@ private:
     InitStage _initStage = InitStage::Inactive;
     RangeMacro _currentRangeMacro = RangeMacro::Full;
     DiscreteMapSequenceListModel _listModel;
+    bool _evenQuickEditActive = false;
+    EvenTarget _evenQuickEditTarget = EvenTarget::Active;
 };

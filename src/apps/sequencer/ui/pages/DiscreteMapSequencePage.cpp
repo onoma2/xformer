@@ -343,6 +343,12 @@ void DiscreteMapSequencePage::keyDown(KeyEvent &event) {
     _shiftHeld = key.shiftModifier();
     refreshPointers();
 
+    if (key.isQuickEdit() && !key.shiftModifier() && key.quickEdit() == 3) {
+        startEvenQuickEdit();
+        event.consume();
+        return;
+    }
+
     if (key.isContextMenu()) {
         contextShow();
         event.consume();
@@ -373,6 +379,14 @@ void DiscreteMapSequencePage::keyDown(KeyEvent &event) {
 }
 
 void DiscreteMapSequencePage::keyUp(KeyEvent &event) {
+    if (_evenQuickEditActive) {
+        if (event.key().isPage() || (event.key().isStep() && event.key().step() == 11)) {
+            finishEvenQuickEdit();
+            event.consume();
+            return;
+        }
+    }
+
     if (event.key().isStep()) {
         int idx = event.key().step();
         // If it was a Selection Button (Bottom Row: 0-7)
@@ -392,6 +406,10 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
     }
 
     if (key.isQuickEdit() && !key.shiftModifier()) {
+        if (key.quickEdit() == 3) {
+            event.consume();
+            return;
+        }
         quickEdit(key.quickEdit());
         event.consume();
         return;
@@ -423,7 +441,7 @@ void DiscreteMapSequencePage::quickEdit(int index) {
         return;
     }
     if (item == QuickEditEven) {
-        distributeActiveStagesEvenly();
+        distributeActiveStagesEvenly(EvenTarget::Active);
         return;
     }
     _listModel.setSequence(_sequence);
@@ -431,17 +449,62 @@ void DiscreteMapSequencePage::quickEdit(int index) {
     _manager.pages().quickEdit.show(_listModel, item);
 }
 
-void DiscreteMapSequencePage::distributeActiveStagesEvenly() {
+void DiscreteMapSequencePage::startEvenQuickEdit() {
+    if (!_sequence) {
+        return;
+    }
+    _evenQuickEditActive = true;
+    _evenQuickEditTarget = EvenTarget::None;
+    showMessage("EVEN NONE");
+}
+
+void DiscreteMapSequencePage::finishEvenQuickEdit() {
+    if (!_evenQuickEditActive) {
+        return;
+    }
+    _evenQuickEditActive = false;
+    distributeActiveStagesEvenly(_evenQuickEditTarget);
+}
+
+void DiscreteMapSequencePage::distributeActiveStagesEvenly(EvenTarget target) {
     if (!_sequence) {
         return;
     }
 
+    bool targetMask[DiscreteMapSequence::StageCount] = {};
     int activeIndices[DiscreteMapSequence::StageCount];
     int activeCount = 0;
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
-        if (_sequence->stage(i).direction() != DiscreteMapSequence::Stage::TriggerDir::Off) {
+        const auto dir = _sequence->stage(i).direction();
+        bool include = false;
+        switch (target) {
+        case EvenTarget::None:
+            include = false;
+            break;
+        case EvenTarget::Rise:
+            include = (dir == DiscreteMapSequence::Stage::TriggerDir::Rise);
+            break;
+        case EvenTarget::Fall:
+            include = (dir == DiscreteMapSequence::Stage::TriggerDir::Fall);
+            break;
+        case EvenTarget::Active:
+            include = (dir != DiscreteMapSequence::Stage::TriggerDir::Off);
+            break;
+        case EvenTarget::All:
+            include = true;
+            break;
+        case EvenTarget::Last:
+            break;
+        }
+        if (include) {
+            targetMask[i] = true;
             activeIndices[activeCount++] = i;
         }
+    }
+
+    if (target == EvenTarget::None) {
+        showMessage("EVEN NONE");
+        return;
     }
 
     if (activeCount <= 1) {
@@ -450,11 +513,12 @@ void DiscreteMapSequencePage::distributeActiveStagesEvenly() {
     }
 
     if (_sequence->thresholdMode() == DiscreteMapSequence::ThresholdMode::Length) {
+        bool zeroOff = (target == EvenTarget::Active);
         for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
             auto &stage = _sequence->stage(i);
-            if (stage.direction() == DiscreteMapSequence::Stage::TriggerDir::Off) {
+            if (zeroOff && stage.direction() == DiscreteMapSequence::Stage::TriggerDir::Off) {
                 stage.setThreshold(-99);
-            } else {
+            } else if (targetMask[i]) {
                 stage.setThreshold(0);
             }
         }
@@ -475,6 +539,17 @@ void DiscreteMapSequencePage::distributeActiveStagesEvenly() {
 
 void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
     if (!_sequence) {
+        return;
+    }
+
+    if (_evenQuickEditActive) {
+        int next = clamp(int(_evenQuickEditTarget) + event.value(), 0, int(EvenTarget::Last) - 1);
+        _evenQuickEditTarget = static_cast<EvenTarget>(next);
+        static const char *names[] = {"NONE", "RISE", "FALL", "ACTIVE", "ALL"};
+        FixedStringBuilder<16> msg;
+        msg("EVEN %s", names[int(_evenQuickEditTarget)]);
+        showMessage(msg);
+        event.consume();
         return;
     }
 
