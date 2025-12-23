@@ -50,6 +50,8 @@ private:
     void insertStep();
     void splitStep();
     void deleteStep();
+    void mergeStepWithNext();
+    void swapStepWithOffset(int offset);
     void copyStep();
     void pasteStep();
     void copySequence();
@@ -60,6 +62,10 @@ private:
     IndexedSequence::Step& step(int index);
     const IndexedSequence::Step& step(int index) const;
 
+    void quickEdit(int index);
+    void startSwapQuickEdit();
+    void finishSwapQuickEdit();
+
     int _section = 0;
     EditMode _editMode = EditMode::Note;
     ContextMode _contextMode = ContextMode::Sequence;
@@ -67,4 +73,7 @@ private:
     bool _durationTransfer = false;
 
     StepSelection<IndexedSequence::MaxSteps> _stepSelection;
+    bool _swapQuickEditActive = false;
+    int _swapQuickEditBaseIndex = -1;
+    int _swapQuickEditOffset = 0;
 };

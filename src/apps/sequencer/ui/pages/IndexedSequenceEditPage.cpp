@@ -45,6 +45,17 @@ static const ContextAction stepContextActions[] = {
     ContextAction::Paste,
 };
 
+static const bool quickEditItems[8] = {
+    true,  // Split
+    true,  // Swap
+    true,  // Merge
+    false,
+    false,
+    false,
+    false,
+    false
+};
+
 IndexedSequenceEditPage::IndexedSequenceEditPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
 {
@@ -306,6 +317,15 @@ void IndexedSequenceEditPage::updateLeds(Leds &leds) {
     }
 
     LedPainter::drawSelectedSequenceSection(leds, _section);
+
+    if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
+        for (int i = 0; i < 8; ++i) {
+            int index = MatrixMap::fromStep(i + 8);
+            leds.unmask(index);
+            leds.set(index, false, quickEditItems[i]);
+            leds.mask(index);
+        }
+    }
 }
 
 void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
@@ -313,6 +333,12 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
 
     if (key.isContextMenu()) {
         contextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.isQuickEdit() && !key.shiftModifier()) {
+        quickEdit(key.quickEdit());
         event.consume();
         return;
     }
@@ -375,6 +401,25 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
 
 void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
     auto &sequence = _project.selectedIndexedSequence();
+
+    if (_swapQuickEditActive) {
+        int maxOffset = sequence.activeLength() - 1 - _swapQuickEditBaseIndex;
+        if (maxOffset <= 0) {
+            showMessage("NO NEXT");
+            _swapQuickEditActive = false;
+            event.consume();
+            return;
+        }
+        _swapQuickEditOffset = clamp(_swapQuickEditOffset + event.value(), 0, maxOffset);
+        if (_swapQuickEditOffset == 0) {
+            showMessage("NO SWAP");
+        } else {
+            FixedStringBuilder<16> msg("SWAP +%d", _swapQuickEditOffset);
+            showMessage(msg);
+        }
+        event.consume();
+        return;
+    }
 
     if (!_stepSelection.any()) return;
 
@@ -440,6 +485,14 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
 
 void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
     const auto &key = event.key();
+    if (key.isQuickEdit() && !key.shiftModifier()) {
+        if (key.quickEdit() == 1) {
+            startSwapQuickEdit();
+            event.consume();
+            return;
+        }
+    }
+
     if (key.isStep()) {
         _stepSelection.keyDown(event, stepOffset());
     }
@@ -481,6 +534,14 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
 
 void IndexedSequenceEditPage::keyUp(KeyEvent &event) {
     const auto &key = event.key();
+    if (_swapQuickEditActive) {
+        if (key.isPage() || (key.isStep() && key.step() == 9)) {
+            finishSwapQuickEdit();
+            event.consume();
+            return;
+        }
+    }
+
     if (key.isStep()) {
         _stepSelection.keyUp(event, stepOffset());
     }
@@ -630,6 +691,66 @@ void IndexedSequenceEditPage::deleteStep() {
     }
 }
 
+void IndexedSequenceEditPage::mergeStepWithNext() {
+    auto &sequence = _project.selectedIndexedSequence();
+    if (!_stepSelection.any()) {
+        showMessage("NO STEP");
+        return;
+    }
+
+    int stepIndex = _stepSelection.first();
+    if (stepIndex < 0) {
+        stepIndex = _stepSelection.firstSetIndex();
+    }
+    if (stepIndex < 0 || stepIndex >= sequence.activeLength() - 1) {
+        showMessage("NO NEXT");
+        return;
+    }
+
+    auto &current = sequence.step(stepIndex);
+    const auto &next = sequence.step(stepIndex + 1);
+    uint32_t mergedDuration = current.duration() + next.duration();
+    current.setDuration(static_cast<uint16_t>(clamp<uint32_t>(mergedDuration, 0u, 65535u)));
+    sequence.deleteStep(stepIndex + 1);
+    _stepSelection.clear();
+    showMessage("STEP MERGED");
+}
+
+void IndexedSequenceEditPage::swapStepWithOffset(int offset) {
+    if (offset <= 0) {
+        showMessage("NO SWAP");
+        return;
+    }
+
+    auto &sequence = _project.selectedIndexedSequence();
+    int baseIndex = _swapQuickEditBaseIndex;
+    if (baseIndex < 0 || baseIndex >= sequence.activeLength()) {
+        showMessage("NO STEP");
+        return;
+    }
+
+    int targetIndex = baseIndex + offset;
+    if (targetIndex >= sequence.activeLength()) {
+        showMessage("NO NEXT");
+        return;
+    }
+
+    auto &baseStep = sequence.step(baseIndex);
+    auto &targetStep = sequence.step(targetIndex);
+
+    int8_t baseNote = baseStep.noteIndex();
+    uint16_t baseGate = baseStep.gateLength();
+    uint16_t baseDuration = baseStep.duration();
+    baseStep.setNoteIndex(targetStep.noteIndex());
+    baseStep.setGateLength(targetStep.gateLength());
+    baseStep.setDuration(targetStep.duration());
+    targetStep.setNoteIndex(baseNote);
+    targetStep.setGateLength(baseGate);
+    targetStep.setDuration(baseDuration);
+
+    showMessage("STEP SWAPPED");
+}
+
 void IndexedSequenceEditPage::copyStep() {
     auto &sequence = _project.selectedIndexedSequence();
     if (_stepSelection.any()) {
@@ -656,6 +777,61 @@ void IndexedSequenceEditPage::copySequence() {
 void IndexedSequenceEditPage::pasteSequence() {
     _model.clipBoard().pasteIndexedSequence(_project.selectedIndexedSequence());
     showMessage("SEQUENCE PASTED");
+}
+
+void IndexedSequenceEditPage::quickEdit(int index) {
+    if (index == 0) {
+        if (!_stepSelection.any()) {
+            showMessage("NO STEP");
+            return;
+        }
+        splitStep();
+        return;
+    }
+    if (index == 1) {
+        return;
+    }
+    if (index == 2) {
+        mergeStepWithNext();
+    }
+}
+
+void IndexedSequenceEditPage::startSwapQuickEdit() {
+    if (!_stepSelection.any()) {
+        showMessage("NO STEP");
+        return;
+    }
+
+    int stepIndex = _stepSelection.first();
+    if (stepIndex < 0) {
+        stepIndex = _stepSelection.firstSetIndex();
+    }
+    if (stepIndex < 0) {
+        showMessage("NO STEP");
+        return;
+    }
+
+    int maxOffset = _project.selectedIndexedSequence().activeLength() - 1 - stepIndex;
+    if (maxOffset <= 0) {
+        showMessage("NO NEXT");
+        return;
+    }
+
+    _swapQuickEditActive = true;
+    _swapQuickEditBaseIndex = stepIndex;
+    _swapQuickEditOffset = 0;
+    showMessage("NO SWAP");
+}
+
+void IndexedSequenceEditPage::finishSwapQuickEdit() {
+    if (!_swapQuickEditActive) {
+        return;
+    }
+
+    _swapQuickEditActive = false;
+    swapStepWithOffset(_swapQuickEditOffset);
+    _swapQuickEditBaseIndex = -1;
+    _swapQuickEditOffset = 0;
 }
 
 IndexedSequence::Step& IndexedSequenceEditPage::step(int index) {
