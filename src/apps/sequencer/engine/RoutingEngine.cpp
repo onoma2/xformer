@@ -345,6 +345,13 @@ void RoutingEngine::updateSinks() {
                         case Routing::Shaper::ProgressiveDivider:
                             shaperOut = applyProgressiveDivider(shapedSource, st);
                             break;
+                        case Routing::Shaper::VcaNext: {
+                            int nextRouteIndex = (routeIndex + 1) % CONFIG_ROUTE_COUNT;
+                            float neighbor = _sourceValues[nextRouteIndex];
+                            // VCA: Center-referenced amplitude modulation
+                            shaperOut = 0.5f + (shapedSource - 0.5f) * neighbor;
+                            break;
+                        }
                         case Routing::Shaper::Last:
                             break;
                         }

@@ -521,6 +521,7 @@ void RoutingPage::drawBiasOverlay(Canvas &canvas) {
         case Routing::Shaper::FrequencyFollower:  return "FF";
         case Routing::Shaper::Activity:           return "AC";
         case Routing::Shaper::ProgressiveDivider: return "PD";
+        case Routing::Shaper::VcaNext:            return "VC";
         case Routing::Shaper::Last:               break;
         }
         return "?";

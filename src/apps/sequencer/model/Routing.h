@@ -336,6 +336,7 @@ public:
         FrequencyFollower,
         Activity,
         ProgressiveDivider,
+        VcaNext,
         Last,
     };
 
@@ -349,6 +350,7 @@ public:
         case Shaper::FrequencyFollower:  return 5;
         case Shaper::Activity:           return 6;
         case Shaper::ProgressiveDivider: return 7;
+        case Shaper::VcaNext:            return 8;
         case Shaper::Last:               break;
         }
         return 0;
