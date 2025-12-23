@@ -49,6 +49,24 @@ public:
         str(cvUpdateModeName(cvUpdateMode()));
     }
 
+    // slideTime
+
+    int slideTime() const { return _slideTime.get(isRouted(Routing::Target::SlideTime)); }
+    void setSlideTime(int slideTime, bool routed = false) {
+        _slideTime.set(clamp(slideTime, 0, 100), routed);
+    }
+
+    void editSlideTime(int value, bool shift) {
+        if (!isRouted(Routing::Target::SlideTime)) {
+            setSlideTime(ModelUtils::adjustedByStep(slideTime(), value, 5, !shift));
+        }
+    }
+
+    void printSlideTime(StringBuilder &str) const {
+        printRouted(str, Routing::Target::SlideTime);
+        str("%d%%", slideTime());
+    }
+
     // sequences
 
     const IndexedSequenceArray &sequences() const { return _sequences; }
@@ -127,6 +145,7 @@ private:
     float _routedSync = 0.f;
     Routable<int8_t> _octave;
     Routable<int8_t> _transpose;
+    Routable<uint8_t> _slideTime;
 
     friend class Track;
 };

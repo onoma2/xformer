@@ -1,6 +1,7 @@
 #include "IndexedTrackEngine.h"
 
 #include "Engine.h"
+#include "Slide.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8,7 +9,7 @@
 namespace {
 
 // Constants matching IndexedTrackEngine class constants
-constexpr uint16_t MAX_DURATION = 65535;
+constexpr uint16_t MAX_DURATION = IndexedSequence::MaxDuration;
 constexpr int8_t MIN_NOTE_INDEX = -63;
 constexpr int8_t MAX_NOTE_INDEX = 64;
 
@@ -139,8 +140,10 @@ void IndexedTrackEngine::resetSequenceState() {
     _gateTimer = 0;
     _effectiveStepDuration = 0;
     _cvOutput = 0.0f;
+    _cvOutputTarget = 0.0f;
     _running = true;
     _activity = false;
+    _slideActive = false;
 
     if (_sequence->activeLength() > 0) {
         _sequenceState.advanceFree(_sequence->runMode(), 0, _sequence->activeLength() - 1, _rng);
@@ -240,8 +243,11 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
 }
 
 void IndexedTrackEngine::update(float dt) {
-    // Update slew/smoothing if needed in the future
-    // For now, CV output is direct (no slew)
+    if (_slideActive && _indexedTrack.slideTime() > 0) {
+        _cvOutput = Slide::applySlide(_cvOutput, _cvOutputTarget, _indexedTrack.slideTime(), dt);
+    } else {
+        _cvOutput = _cvOutputTarget;
+    }
 }
 
 void IndexedTrackEngine::advanceStep() {
@@ -340,7 +346,13 @@ void IndexedTrackEngine::triggerStep() {
 
     // Calculate CV output (direct Scale lookup, no octave/modulo math)
     if (_indexedTrack.cvUpdateMode() == IndexedTrack::CvUpdateMode::Always || gateTicks > 0) {
-        _cvOutput = noteIndexToVoltage(baseNote);
+        _cvOutputTarget = noteIndexToVoltage(baseNote);
+        _slideActive = step.slide();
+        if (!_slideActive || _indexedTrack.slideTime() == 0) {
+            _cvOutput = _cvOutputTarget;
+        }
+    } else {
+        _slideActive = false;
     }
 
     // Activity indicator

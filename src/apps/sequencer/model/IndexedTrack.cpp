@@ -14,6 +14,7 @@ void IndexedTrack::clear() {
     _routedSync = 0.f;
     setOctave(0);
     setTranspose(0);
+    setSlideTime(25);
     for (auto &sequence : _sequences) {
         sequence.clear();
     }
@@ -23,6 +24,7 @@ void IndexedTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_cvUpdateMode);
     writer.write(_octave.base);
     writer.write(_transpose.base);
+    writer.write(_slideTime.base);
     writeArray(writer, _sequences);
 }
 
@@ -30,8 +32,10 @@ void IndexedTrack::read(VersionedSerializedReader &reader) {
     reader.read(_cvUpdateMode);
     reader.read(_octave.base);
     reader.read(_transpose.base);
+    reader.read(_slideTime.base);
     _octave.routed = 0;
     _transpose.routed = 0;
+    _slideTime.routed = 0;
     readArray(reader, _sequences);
 }
 
@@ -47,6 +51,9 @@ void IndexedTrack::writeRouted(Routing::Target target, int intValue, float float
         break;
     case Routing::Target::Transpose:
         setTranspose(intValue, true);
+        break;
+    case Routing::Target::SlideTime:
+        setSlideTime(intValue, true);
         break;
     default:
         for (auto &sequence : _sequences) {

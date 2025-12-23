@@ -72,6 +72,7 @@ private:
     ContextMode _contextMode = ContextMode::Sequence;
     FunctionMode _functionMode = FunctionMode::Edit;
     bool _durationTransfer = false;
+    bool _noteSlideEdit = false;
 
     IndexedSequenceListModel _listModel;
     StepSelection<IndexedSequence::MaxSteps> _stepSelection;

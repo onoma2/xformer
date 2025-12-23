@@ -315,7 +315,7 @@ void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathCon
             break;
         case MathOp::Last:   break;
         }
-        duration = clamp(duration, 0, 65535);
+        duration = clamp(duration, 0, int(IndexedSequence::MaxDuration));
         step.setDuration(uint16_t(duration));
         break;
     }
@@ -430,7 +430,7 @@ int IndexedMathPage::valueMin(const MathConfig &cfg) const {
     case MathOp::Ramp:
         switch (cfg.target) {
         case IndexedSequence::ModTarget::Duration:
-            return -65535;
+            return -int(IndexedSequence::MaxDuration);
         case IndexedSequence::ModTarget::GateLength:
             return -100;
         case IndexedSequence::ModTarget::NoteIndex:
@@ -454,7 +454,7 @@ int IndexedMathPage::valueMax(const MathConfig &cfg) const {
     case MathOp::Ramp:
         switch (cfg.target) {
         case IndexedSequence::ModTarget::Duration:
-            return 65535;
+            return int(IndexedSequence::MaxDuration);
         case IndexedSequence::ModTarget::GateLength:
             return IndexedSequence::GateLengthTrigger;
         case IndexedSequence::ModTarget::NoteIndex:
@@ -470,7 +470,7 @@ int IndexedMathPage::valueMax(const MathConfig &cfg) const {
     case MathOp::Jitter:
         switch (cfg.target) {
         case IndexedSequence::ModTarget::Duration:
-            return 65535;
+            return int(IndexedSequence::MaxDuration);
         case IndexedSequence::ModTarget::GateLength:
             return IndexedSequence::GateLengthTrigger;
         case IndexedSequence::ModTarget::NoteIndex:

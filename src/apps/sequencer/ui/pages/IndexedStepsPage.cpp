@@ -253,7 +253,7 @@ void IndexedStepsPage::StepListModel::edit(int row, int column, int value, bool 
         // Edit duration: shift = divisor, normal = 1 tick
         int stepSize = shift ? _sequence->divisor() : 1;
         int newDuration = static_cast<int>(step.duration()) + value * stepSize;
-        step.setDuration(clamp(newDuration, 0, 65535));
+        step.setDuration(clamp(newDuration, 0, int(IndexedSequence::MaxDuration)));
     } else if (isGateRow(row)) {
         // Edit gate length: shift = 1%, normal = 10%
         int stepSize = shift ? 1 : 10;

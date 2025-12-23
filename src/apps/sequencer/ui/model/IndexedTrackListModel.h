@@ -34,6 +34,8 @@ public:
 
     virtual Routing::Target routingTarget(int row) const override {
         switch (Item(row)) {
+        case SlideTime:
+            return Routing::Target::SlideTime;
         case Octave:
             return Routing::Target::Octave;
         case Transpose:
@@ -46,6 +48,7 @@ public:
 private:
     enum Item {
         CvUpdateMode,
+        SlideTime,
         Octave,
         Transpose,
         Last
@@ -54,6 +57,7 @@ private:
     static const char *itemName(Item item) {
         switch (item) {
         case CvUpdateMode: return "CV Update";
+        case SlideTime:    return "Slide Time";
         case Octave:       return "Octave";
         case Transpose:    return "Transpose";
         case Last:         break;
@@ -70,6 +74,9 @@ private:
         case CvUpdateMode:
             _track->printCvUpdateMode(str);
             break;
+        case SlideTime:
+            _track->printSlideTime(str);
+            break;
         case Octave:
             _track->printOctave(str);
             break;
@@ -85,6 +92,9 @@ private:
         switch (item) {
         case CvUpdateMode:
             _track->editCvUpdateMode(value, shift);
+            break;
+        case SlideTime:
+            _track->editSlideTime(value, shift);
             break;
         case Octave:
             _track->editOctave(value, shift);

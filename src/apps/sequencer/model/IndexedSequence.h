@@ -23,6 +23,7 @@ public:
 
     static constexpr int MaxSteps = 32;
     static constexpr int PatternCount = CONFIG_PATTERN_COUNT;  // 8 patterns
+    static constexpr uint16_t MaxDuration = 32767;
     static constexpr uint8_t TargetGroupsAll = 0;
     static constexpr uint8_t TargetGroupsUngrouped = 0x10;
     static constexpr uint8_t TargetGroupsSelected = 0x20;
@@ -36,8 +37,9 @@ public:
     public:
         // Bit-packed step data (32 bits):
         // bits 0-6:   note_index (7 bits, signed -63..64 encoded in 7 bits)
-        // bits 7-22:  duration (16 bits = direct tick count, 0-65535)
-        // bits 23-31: gate_length (9 bits = 0-511, 0-100% or GateLengthTrigger)
+        // bits 7-21:  duration (15 bits = direct tick count, 0-32767)
+        // bits 22-30: gate_length (9 bits = 0-511, 0-100% or GateLengthTrigger)
+        // bit 31:     slide (1 bit)
 
         int8_t noteIndex() const {
             uint8_t raw = static_cast<uint8_t>(_packed & 0x7F);
@@ -57,20 +59,37 @@ public:
         }
 
         uint16_t duration() const {
-            return static_cast<uint16_t>((_packed >> 7) & 0xFFFF);
+            return static_cast<uint16_t>((_packed >> 7) & 0x7FFF);
         }
 
         void setDuration(uint16_t ticks) {
-            _packed = (_packed & ~(0xFFFF << 7)) | ((ticks & 0xFFFF) << 7);
+            ticks = clamp(ticks, uint16_t(0), uint16_t(MaxDuration));
+            _packed = (_packed & ~(0x7FFF << 7)) | ((ticks & 0x7FFF) << 7);
         }
 
         uint16_t gateLength() const {
-            return static_cast<uint16_t>((_packed >> 23) & 0x1FF);
+            return static_cast<uint16_t>((_packed >> 22) & 0x1FF);
         }
 
         void setGateLength(uint16_t percentage) {
             percentage = clamp(percentage, uint16_t(0), uint16_t(GateLengthTrigger));
-            _packed = (_packed & ~(0x1FF << 23)) | ((percentage & 0x1FF) << 23);
+            _packed = (_packed & ~(0x1FF << 22)) | ((percentage & 0x1FF) << 22);
+        }
+
+        bool slide() const {
+            return (_packed & (1u << 31)) != 0;
+        }
+
+        void setSlide(bool slide) {
+            if (slide) {
+                _packed |= (1u << 31);
+            } else {
+                _packed &= ~(1u << 31);
+            }
+        }
+
+        void toggleSlide() {
+            setSlide(!slide());
         }
 
         // Group mask (4 bits for groups A-D)
@@ -102,7 +121,7 @@ public:
         }
 
     private:
-        uint32_t _packed = 0;      // Bit-packed: note(7) + duration(16) + gate(9)
+        uint32_t _packed = 0;      // Bit-packed: note(7) + duration(15) + gate(9) + slide(1)
         uint8_t _groupMask = 0;    // Groups A-D (bits 0-3)
     };
 

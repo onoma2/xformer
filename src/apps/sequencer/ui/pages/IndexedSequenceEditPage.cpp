@@ -246,8 +246,14 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             volts += rootNote * (1.f / 12.f);
         }
         FixedStringBuilder<24> noteStr;
-        noteStr("%.2f %s", volts, static_cast<const char *>(noteName));
-        canvas.drawTextCentered(102, y, 51, 16, noteStr);
+        if (step.slide()) {
+            noteStr("%.2f %s/", volts, static_cast<const char *>(noteName));
+        } else {
+            noteStr("%.2f %s", volts, static_cast<const char *>(noteName));
+        }
+        const int noteX = 102;
+        const int noteW = 51;
+        canvas.drawTextCentered(noteX, y, noteW, 16, noteStr);
     } else {
         // No step selected: Show "STEP N/N" with playing step info on row 1
         int currentStep = trackEngine.currentStep() + 1;
@@ -297,7 +303,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
     } else {
         footerLabels[0] = _durationTransfer ? "DUR-TR" : "DUR";
         footerLabels[1] = "GATE";
-        footerLabels[2] = "NOTE";
+        footerLabels[2] = _noteSlideEdit ? "SLIDE" : "NOTE";
         footerLabels[3] = (_contextMode == ContextMode::Sequence) ? "SEQ" : "STEP";
         footerLabels[4] = shift ? "ROUTES" : "MATH";
     }
@@ -467,12 +473,25 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
 
             int cur = step.duration();
             int next = nextStep.duration();
-            int minDelta = std::max(-cur, next - 65535);
-            int maxDelta = std::min(65535 - cur, next);
+            int minDelta = std::max(-cur, next - int(IndexedSequence::MaxDuration));
+            int maxDelta = std::min(int(IndexedSequence::MaxDuration) - cur, next);
             int clampedDelta = clamp(delta, minDelta, maxDelta);
 
             step.setDuration(cur + clampedDelta);
             nextStep.setDuration(next - clampedDelta);
+        }
+        event.consume();
+        return;
+    }
+
+    if (_editMode == EditMode::Note && _noteSlideEdit) {
+        if (event.value() != 0) {
+            bool enable = event.value() > 0;
+            for (int i = 0; i < IndexedSequence::MaxSteps; ++i) {
+                if (_stepSelection[i]) {
+                    sequence.step(i).setSlide(enable);
+                }
+            }
         }
         event.consume();
         return;
@@ -491,7 +510,7 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
                 int div = sequence.divisor();
                 int stepVal = shift ? div : 1;
                 int newDur = step.duration() + event.value() * stepVal;
-                step.setDuration(clamp(newDur, 0, 65535));
+                step.setDuration(clamp(newDur, 0, int(IndexedSequence::MaxDuration)));
                 break;
             }
             case EditMode::Gate:
@@ -550,13 +569,20 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
                     _editMode = EditMode::Duration;
                     _durationTransfer = false;
                 }
+                _noteSlideEdit = false;
             }
             if (fn == 1) {
                 _editMode = EditMode::Gate;
                 _durationTransfer = false;
+                _noteSlideEdit = false;
             }
             if (fn == 2) {
-                _editMode = EditMode::Note;
+                if (_editMode == EditMode::Note) {
+                    _noteSlideEdit = !_noteSlideEdit;
+                } else {
+                    _editMode = EditMode::Note;
+                    _noteSlideEdit = false;
+                }
                 _durationTransfer = false;
             }
         }
@@ -741,7 +767,7 @@ void IndexedSequenceEditPage::mergeStepWithNext() {
     auto &current = sequence.step(stepIndex);
     const auto &next = sequence.step(stepIndex + 1);
     uint32_t mergedDuration = current.duration() + next.duration();
-    current.setDuration(static_cast<uint16_t>(clamp<uint32_t>(mergedDuration, 0u, 65535u)));
+    current.setDuration(static_cast<uint16_t>(clamp<uint32_t>(mergedDuration, 0u, IndexedSequence::MaxDuration)));
     sequence.deleteStep(stepIndex + 1);
     _stepSelection.clear();
     showMessage("STEP MERGED");
