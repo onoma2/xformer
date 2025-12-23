@@ -11,6 +11,7 @@ public:
     enum Item {
         Divisor,
         Length,
+        Active,
         Loop,
         RunMode,
         Scale,
@@ -77,6 +78,7 @@ public:
         case RunMode:
             return Routing::Target::RunMode;
         case Length:
+        case Active:
         case Loop:
         case SyncMode:
         case ResetMeasure:
@@ -90,6 +92,7 @@ private:
         switch (item) {
         case Divisor:       return "Divisor";
         case Length:        return "Length";
+        case Active:        return "Active";
         case Loop:          return "Loop";
         case RunMode:       return "Run Mode";
         case Scale:         return "Scale";
@@ -112,6 +115,9 @@ private:
             _sequence->printDivisor(str);
             break;
         case Length:
+            str("%d", _sequence->activeLength());
+            break;
+        case Active:
             str("%d", _sequence->activeLength());
             break;
         case Loop:
@@ -146,6 +152,13 @@ private:
             _sequence->editDivisor(value, shift);
             break;
         case Length:
+            if (value > 0) {
+                _sequence->appendSteps(value);
+            } else if (value < 0) {
+                _sequence->trimSteps(-value);
+            }
+            break;
+        case Active:
             _sequence->setActiveLength(_sequence->activeLength() + value);
             break;
         case Loop:

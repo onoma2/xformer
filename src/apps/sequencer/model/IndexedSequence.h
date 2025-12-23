@@ -210,6 +210,20 @@ public:
         }
     }
 
+    void appendSteps(int count) {
+        if (count <= 0) return;
+        for (int i = 0; i < count && _activeLength < MaxSteps; ++i) {
+            insertStep(_activeLength);
+        }
+    }
+
+    void trimSteps(int count) {
+        if (count <= 0) return;
+        for (int i = 0; i < count && _activeLength > 1; ++i) {
+            deleteStep(_activeLength - 1);
+        }
+    }
+
     // scale selection (-1 = Project scale, 0..N = Track scale)
     int scale() const { return _scale; }
     void setScale(int scale) {

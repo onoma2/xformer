@@ -58,9 +58,9 @@ static const int quickEditItems[8] = {
     QuickEditSwap,                                    // Step 10
     QuickEditMerge,                                   // Step 11
     QuickEditSetFirst,                                // Step 12
-    int(IndexedSequenceListModel::Item::RunMode),     // Step 13
-    int(IndexedSequenceListModel::Item::ResetMeasure), // Step 14
-    QuickEditNone,
+    int(IndexedSequenceListModel::Item::Length),      // Step 13
+    int(IndexedSequenceListModel::Item::RunMode),     // Step 14
+    int(IndexedSequenceListModel::Item::ResetMeasure), // Step 15
     QuickEditNone
 };
 
@@ -219,7 +219,21 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         int stepIndex = _stepSelection.first();
         const auto &step = sequence.step(stepIndex);
 
-        // F1: Note
+        // F1: Duration
+        FixedStringBuilder<16> durStr;
+        durStr("%d", step.duration());
+        canvas.drawTextCentered(0, y, 51, 16, durStr);
+
+        // F2: Gate
+        FixedStringBuilder<16> gateStr;
+        if (step.gateLength() == IndexedSequence::GateLengthTrigger) {
+            gateStr("T");
+        } else {
+            gateStr("%d%%", step.gateLength());
+        }
+        canvas.drawTextCentered(51, y, 51, 16, gateStr);
+
+        // F3: Note
         FixedStringBuilder<8> noteName;
         const auto &scale = sequence.selectedScale(_project.selectedScale());
         int rootNote = sequence.rootNote() < 0 ? _project.rootNote() : sequence.rootNote();
@@ -233,21 +247,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         }
         FixedStringBuilder<24> noteStr;
         noteStr("%.2f %s", volts, static_cast<const char *>(noteName));
-        canvas.drawTextCentered(0, y, 51, 16, noteStr);
-
-        // F2: Duration
-        FixedStringBuilder<16> durStr;
-        durStr("%d", step.duration());
-        canvas.drawTextCentered(51, y, 51, 16, durStr);
-
-        // F3: Gate
-        FixedStringBuilder<16> gateStr;
-        if (step.gateLength() == IndexedSequence::GateLengthTrigger) {
-            gateStr("T");
-        } else {
-            gateStr("%d%%", step.gateLength());
-        }
-        canvas.drawTextCentered(102, y, 51, 16, gateStr);
+        canvas.drawTextCentered(102, y, 51, 16, noteStr);
     } else {
         // No step selected: Show "STEP N/N" with playing step info on row 1
         int currentStep = trackEngine.currentStep() + 1;
@@ -276,9 +276,9 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             }
 
             canvas.setFont(Font::Tiny);
-            canvas.setColor(Color::Medium);
+            canvas.setColor(Color::MediumBright);
             FixedStringBuilder<48> info;
-            info("STEP %d/%d  %.2f %s %d  %s", currentStep, totalSteps, volts, static_cast<const char *>(noteName), step.duration(), static_cast<const char *>(gateStr));
+            info("STEP %d/%d  %d  %s  %.2f %s", currentStep, totalSteps, step.duration(), static_cast<const char *>(gateStr), volts, static_cast<const char *>(noteName));
             canvas.drawTextCentered(0, 32, 256, 8, info);
         }
     }
@@ -295,13 +295,27 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         footerLabels[3] = "D";
         footerLabels[4] = "BACK";
     } else {
-        footerLabels[0] = "NOTE";
-        footerLabels[1] = _durationTransfer ? "DUR-TR" : "DUR";
-        footerLabels[2] = "GATE";
+        footerLabels[0] = _durationTransfer ? "DUR-TR" : "DUR";
+        footerLabels[1] = "GATE";
+        footerLabels[2] = "NOTE";
         footerLabels[3] = (_contextMode == ContextMode::Sequence) ? "SEQ" : "STEP";
         footerLabels[4] = shift ? "ROUTES" : "MATH";
     }
-    WindowPainter::drawFooter(canvas, footerLabels, pageKeyState(), (_functionMode == FunctionMode::Groups) ? -1 : (int)_editMode);
+    int footerHighlight = -1;
+    if (_functionMode != FunctionMode::Groups) {
+        switch (_editMode) {
+        case EditMode::Duration:
+            footerHighlight = 0;
+            break;
+        case EditMode::Gate:
+            footerHighlight = 1;
+            break;
+        case EditMode::Note:
+            footerHighlight = 2;
+            break;
+        }
+    }
+    WindowPainter::drawFooter(canvas, footerLabels, pageKeyState(), footerHighlight);
 }
 
 void IndexedSequenceEditPage::updateLeds(Leds &leds) {
@@ -530,10 +544,6 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
         } else {
             // Edit mode: F1-F3 select edit mode
             if (fn == 0) {
-                _editMode = EditMode::Note;
-                _durationTransfer = false;
-            }
-            if (fn == 1) {
                 if (_editMode == EditMode::Duration) {
                     _durationTransfer = !_durationTransfer;
                 } else {
@@ -541,8 +551,12 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
                     _durationTransfer = false;
                 }
             }
-            if (fn == 2) {
+            if (fn == 1) {
                 _editMode = EditMode::Gate;
+                _durationTransfer = false;
+            }
+            if (fn == 2) {
+                _editMode = EditMode::Note;
                 _durationTransfer = false;
             }
         }
