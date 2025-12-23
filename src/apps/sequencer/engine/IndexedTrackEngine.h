@@ -1,10 +1,13 @@
 #pragma once
 
 #include "TrackEngine.h"
+#include "SequenceState.h"
 
 #include "model/Track.h"
 #include "model/IndexedSequence.h"
 #include "model/Scale.h"
+
+#include "core/utils/Random.h"
 
 class IndexedTrackEngine : public TrackEngine {
 public:
@@ -46,6 +49,7 @@ private:
 
 private:
     void primeNextStep() { _pendingTrigger = true; }
+    void resetSequenceState();
     void advanceStep();
     void triggerStep();
     float noteIndexToVoltage(int8_t noteIndex) const;
@@ -63,8 +67,12 @@ private:
     bool _running = true;
     bool _pendingTrigger = false;   // Fire step at start of next tick
     float _prevSync = 0.f;          // For external sync edge detection
+    int _stepsRemaining = 0;        // Used for Once mode
 
     // === Output ===
     float _cvOutput = 0.0f;
     bool _activity = false;
+
+    SequenceState _sequenceState;
+    Random _rng;
 };

@@ -45,15 +45,22 @@ static const ContextAction stepContextActions[] = {
     ContextAction::Paste,
 };
 
-static const bool quickEditItems[8] = {
-    true,  // Split
-    true,  // Swap
-    true,  // Merge
-    false,
-    false,
-    false,
-    false,
-    false
+enum {
+    QuickEditNone = -1,
+    QuickEditSplit = -2,
+    QuickEditSwap = -3,
+    QuickEditMerge = -4,
+};
+
+static const int quickEditItems[8] = {
+    QuickEditSplit,                                   // Step 9
+    QuickEditSwap,                                    // Step 10
+    QuickEditMerge,                                   // Step 11
+    int(IndexedSequenceListModel::Item::RunMode),     // Step 12
+    QuickEditNone,
+    QuickEditNone,
+    QuickEditNone,
+    QuickEditNone
 };
 
 IndexedSequenceEditPage::IndexedSequenceEditPage(PageManager &manager, PageContext &context) :
@@ -322,7 +329,7 @@ void IndexedSequenceEditPage::updateLeds(Leds &leds) {
         for (int i = 0; i < 8; ++i) {
             int index = MatrixMap::fromStep(i + 8);
             leds.unmask(index);
-            leds.set(index, false, quickEditItems[i]);
+            leds.set(index, false, quickEditItems[i] != QuickEditNone);
             leds.mask(index);
         }
     }
@@ -780,19 +787,30 @@ void IndexedSequenceEditPage::pasteSequence() {
 }
 
 void IndexedSequenceEditPage::quickEdit(int index) {
-    if (index == 0) {
+    if (index < 0 || index >= 8) {
+        return;
+    }
+
+    int item = quickEditItems[index];
+    switch (item) {
+    case QuickEditSplit:
         if (!_stepSelection.any()) {
             showMessage("NO STEP");
             return;
         }
         splitStep();
         return;
-    }
-    if (index == 1) {
+    case QuickEditSwap:
         return;
-    }
-    if (index == 2) {
+    case QuickEditMerge:
         mergeStepWithNext();
+        return;
+    case QuickEditNone:
+        return;
+    default:
+        _listModel.setSequence(&_project.selectedIndexedSequence());
+        _manager.pages().quickEdit.show(_listModel, item);
+        return;
     }
 }
 

@@ -185,6 +185,21 @@ public:
     void setLoop(bool loop) { _loop = loop; }
     void toggleLoop() { _loop = !_loop; }
 
+    // run mode
+    Types::RunMode runMode() const { return _runMode.get(isRouted(Routing::Target::RunMode)); }
+    void setRunMode(Types::RunMode runMode, bool routed = false) {
+        _runMode.set(ModelUtils::clampedEnum(runMode), routed);
+    }
+    void editRunMode(int value, bool /*shift*/) {
+        if (!isRouted(Routing::Target::RunMode)) {
+            setRunMode(ModelUtils::adjustedEnum(runMode(), value));
+        }
+    }
+    void printRunMode(StringBuilder &str) const {
+        printRouted(str, Routing::Target::RunMode);
+        str(Types::runModeName(runMode()));
+    }
+
     // active length (dynamic step count)
     int activeLength() const { return _activeLength; }
     void setActiveLength(int length) {
@@ -405,8 +420,10 @@ public:
         _loop = true;
         _activeLength = 3;
         _scale = -1;  // Use project scale
+        _runMode.clear();
         _rootNote.clear();
         _firstStep.clear();
+        setRunMode(Types::RunMode::Forward);
         _syncMode = SyncMode::Off;
         _resetMeasure = 0;
         _routeA.clear();
@@ -432,6 +449,7 @@ public:
     void write(VersionedSerializedWriter &writer) const {
         writer.write(_divisor);
         writer.write(_loop);
+        _runMode.write(writer);
         writer.write(_activeLength);
         writer.write(_scale);
         writer.write(_rootNote); // Now writes Routable base
@@ -451,29 +469,30 @@ public:
     void read(VersionedSerializedReader &reader) {
         reader.read(_divisor);
         reader.read(_loop);
+        _runMode.read(reader);
         reader.read(_activeLength);
-            reader.read(_scale);
-            reader.read(_rootNote);
-        
-            uint8_t sync;
-            reader.read(sync);
-            _syncMode = ModelUtils::clampedEnum(static_cast<SyncMode>(sync));
-        
-            reader.read(_resetMeasure);
-        
-            _firstStep.read(reader);
-        
-            _routeA.read(reader);
-            _routeB.read(reader);
-        
-            uint8_t mode;
-            reader.read(mode);
-            _routeCombineMode = ModelUtils::clampedEnum(static_cast<RouteCombineMode>(mode));
-        
-            for (auto &s : _steps) {
-                s.read(reader);
-            }
+        reader.read(_scale);
+        reader.read(_rootNote);
+
+        uint8_t sync;
+        reader.read(sync);
+        _syncMode = ModelUtils::clampedEnum(static_cast<SyncMode>(sync));
+
+        reader.read(_resetMeasure);
+
+        _firstStep.read(reader);
+
+        _routeA.read(reader);
+        _routeB.read(reader);
+
+        uint8_t mode;
+        reader.read(mode);
+        _routeCombineMode = ModelUtils::clampedEnum(static_cast<RouteCombineMode>(mode));
+
+        for (auto &s : _steps) {
+            s.read(reader);
         }
+    }
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
 
     const Scale &selectedScale(const Scale &projectScale) const {
@@ -510,6 +529,7 @@ public:
 private:
     uint16_t _divisor = 192;      // Clock divisor in ticks
     bool _loop = true;            // Loop mode
+    Routable<Types::RunMode> _runMode;
     uint8_t _activeLength = 16;   // Dynamic step count (1-32)
     int8_t _scale = -1;           // Scale selection
     Routable<int8_t> _rootNote;   // Root note (C), now Routable

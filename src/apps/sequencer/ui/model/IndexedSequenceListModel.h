@@ -8,6 +8,19 @@
 
 class IndexedSequenceListModel : public RoutableListModel {
 public:
+    enum Item {
+        Divisor,
+        Length,
+        Loop,
+        RunMode,
+        Scale,
+        RootNote,
+        FirstStep,
+        SyncMode,
+        ResetMeasure,
+        Last
+    };
+
     IndexedSequenceListModel()
     {}
 
@@ -37,6 +50,20 @@ public:
         }
     }
 
+    virtual int indexedCount(int row) const override {
+        return indexedCountValue(Item(row));
+    }
+
+    virtual int indexed(int row) const override {
+        return indexedValue(Item(row));
+    }
+
+    virtual void setIndexed(int row, int index) override {
+        if (index >= 0 && index < indexedCount(row)) {
+            setIndexedValue(Item(row), index);
+        }
+    }
+
     virtual Routing::Target routingTarget(int row) const override {
         switch (Item(row)) {
         case Divisor:
@@ -47,6 +74,8 @@ public:
             return Routing::Target::RootNote;
         case FirstStep:
             return Routing::Target::FirstStep;
+        case RunMode:
+            return Routing::Target::RunMode;
         case Length:
         case Loop:
         case SyncMode:
@@ -57,23 +86,12 @@ public:
     }
 
 private:
-    enum Item {
-        Divisor,
-        Length,
-        Loop,
-        Scale,
-        RootNote,
-        FirstStep,
-        SyncMode,
-        ResetMeasure,
-        Last
-    };
-
     static const char *itemName(Item item) {
         switch (item) {
         case Divisor:       return "Divisor";
         case Length:        return "Length";
         case Loop:          return "Loop";
+        case RunMode:       return "Run Mode";
         case Scale:         return "Scale";
         case RootNote:      return "Root Note";
         case FirstStep:     return "First Step";
@@ -98,6 +116,9 @@ private:
             break;
         case Loop:
             _sequence->printLoop(str);
+            break;
+        case RunMode:
+            _sequence->printRunMode(str);
             break;
         case Scale:
             _sequence->printScale(str);
@@ -130,6 +151,9 @@ private:
         case Loop:
             _sequence->toggleLoop();
             break;
+        case RunMode:
+            _sequence->editRunMode(value, shift);
+            break;
         case Scale:
             _sequence->editScale(value, shift);
             break;
@@ -146,6 +170,36 @@ private:
             _sequence->editResetMeasure(value, shift);
             break;
         case Last:
+            break;
+        }
+    }
+
+    int indexedCountValue(Item item) const {
+        switch (item) {
+        case RunMode:
+            return int(Types::RunMode::Last);
+        default:
+            break;
+        }
+        return 0;
+    }
+
+    int indexedValue(Item item) const {
+        switch (item) {
+        case RunMode:
+            return int(_sequence->runMode());
+        default:
+            break;
+        }
+        return -1;
+    }
+
+    void setIndexedValue(Item item, int index) {
+        switch (item) {
+        case RunMode:
+            _sequence->setRunMode(Types::RunMode(index));
+            break;
+        default:
             break;
         }
     }

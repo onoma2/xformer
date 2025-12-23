@@ -2,6 +2,7 @@
 
 #include "BasePage.h"
 #include "ui/StepSelection.h"
+#include "ui/model/IndexedSequenceListModel.h"
 #include "model/IndexedSequence.h"
 
 class IndexedSequenceEditPage : public BasePage {
@@ -72,6 +73,7 @@ private:
     FunctionMode _functionMode = FunctionMode::Edit;
     bool _durationTransfer = false;
 
+    IndexedSequenceListModel _listModel;
     StepSelection<IndexedSequence::MaxSteps> _stepSelection;
     bool _swapQuickEditActive = false;
     int _swapQuickEditBaseIndex = -1;

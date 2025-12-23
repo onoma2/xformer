@@ -131,11 +131,9 @@ float IndexedTrackEngine::routedSync() const {
     return _indexedTrack.routedSync();
 }
 
-void IndexedTrackEngine::reset() {
-    int currentPattern = pattern();
-    _sequence = &_indexedTrack.sequence(currentPattern);
-    _cachedPattern = currentPattern;
-
+void IndexedTrackEngine::resetSequenceState() {
+    _sequenceState.reset();
+    _stepsRemaining = std::max(0, _sequence->activeLength() - 1);
     _currentStepIndex = 0;
     _stepTimer = 0;
     _gateTimer = 0;
@@ -143,8 +141,21 @@ void IndexedTrackEngine::reset() {
     _cvOutput = 0.0f;
     _running = true;
     _activity = false;
-    _prevSync = routedSync();
+
+    if (_sequence->activeLength() > 0) {
+        _sequenceState.advanceFree(_sequence->runMode(), 0, _sequence->activeLength() - 1, _rng);
+        _currentStepIndex = _sequenceState.step();
+    }
     primeNextStep();
+}
+
+void IndexedTrackEngine::reset() {
+    int currentPattern = pattern();
+    _sequence = &_indexedTrack.sequence(currentPattern);
+    _cachedPattern = currentPattern;
+
+    _prevSync = routedSync();
+    resetSequenceState();
 }
 
 void IndexedTrackEngine::changePattern() {
@@ -156,13 +167,8 @@ void IndexedTrackEngine::changePattern() {
 }
 
 void IndexedTrackEngine::restart() {
-    _currentStepIndex = 0;
-    _stepTimer = 0;
-    _gateTimer = 0;
-    _effectiveStepDuration = 0;
-    _running = true;
     _prevSync = routedSync();
-    primeNextStep();
+    resetSequenceState();
 }
 
 TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
@@ -178,13 +184,7 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
     case IndexedSequence::SyncMode::ResetMeasure: {
         uint32_t resetDivisor = _sequence->resetMeasure() * _engine.measureDivisor();
         if (resetDivisor > 0 && (tick % resetDivisor) == 0) {
-            _currentStepIndex = 0;
-            _stepTimer = 0;
-            _gateTimer = 0;
-            _cvOutput = 0.0f;
-            _running = true;
-            _activity = false;
-            primeNextStep();
+            resetSequenceState();
         }
         break;
     }
@@ -192,13 +192,7 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
         float syncVal = routedSync();
         if (_prevSync <= 0.f && syncVal > 0.f) {
             // External sync reset detected
-            _currentStepIndex = 0;
-            _stepTimer = 0;
-            _gateTimer = 0;
-            _cvOutput = 0.0f;
-            _running = true;
-            _activity = false;
-            primeNextStep();
+            resetSequenceState();
         }
         _prevSync = syncVal;
         break;
@@ -252,53 +246,39 @@ void IndexedTrackEngine::update(float dt) {
 
 void IndexedTrackEngine::advanceStep() {
     const int activeLength = _sequence->activeLength();
+    if (activeLength <= 0) {
+        return;
+    }
 
-    // Advance to next step
-    _currentStepIndex++;
+    if (!_sequence->loop() && _stepsRemaining <= 0) {
+        _running = false;
+        _stepTimer = 0;
+        return;
+    }
 
-    // Handle loop/once mode
-    if (_currentStepIndex >= activeLength) {
-        if (_sequence->loop()) {
-            _currentStepIndex = 0;  // Loop back to start
-        } else {
-            _currentStepIndex = activeLength - 1;  // Stay on last step
-            _running = false;  // Stop playback
+    int skipCounter = 0;
+    while (skipCounter < activeLength) {
+        _sequenceState.advanceFree(_sequence->runMode(), 0, activeLength - 1, _rng);
+        _currentStepIndex = _sequenceState.step();
+
+        if (!_sequence->loop()) {
+            _stepsRemaining--;
+        }
+
+        int effectiveIndex = (_currentStepIndex + _sequence->firstStep()) % activeLength;
+        uint16_t duration = _sequence->step(effectiveIndex).duration();
+        if (duration > 0) {
+            break;
+        }
+
+        skipCounter++;
+        if (!_sequence->loop() && _stepsRemaining <= 0) {
+            _running = false;
             _stepTimer = 0;
             return;
         }
     }
 
-    // Skip over any zero-duration steps
-    int skipCounter = 0;
-    while (skipCounter < activeLength) {
-        int effectiveIndex = (_currentStepIndex + _sequence->firstStep()) % activeLength;
-        uint16_t duration = _sequence->step(effectiveIndex).duration();
-
-        if (duration > 0) {
-            // Found a step with non-zero duration
-            break;
-        }
-
-        // Step has zero duration, advance to next
-        _currentStepIndex++;
-        skipCounter++;
-
-        if (_currentStepIndex >= activeLength) {
-            if (_sequence->loop()) {
-                _currentStepIndex = 0;
-            } else {
-                _currentStepIndex = activeLength - 1;
-                _running = false;
-                _stepTimer = 0;
-                return;
-            }
-        }
-    }
-
-    // If all steps have zero duration, we've looped through everything
-    // Stay on current step (user might edit duration later)
-
-    // Reset step timer for new step
     _stepTimer = 0;
 }
 
