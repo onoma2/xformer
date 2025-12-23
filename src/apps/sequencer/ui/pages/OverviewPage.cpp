@@ -131,117 +131,120 @@ static void drawTuesdayTrack(Canvas &canvas, int trackIndex, const TuesdayTrackE
 }
 
 static void drawIndexedTrack(Canvas &canvas, int trackIndex, const IndexedTrackEngine &trackEngine, const IndexedSequence &sequence) {
+    // Adaptation from IndexedSequenceEditPage timeline bar (lines 66-121)
     canvas.setBlendMode(BlendMode::Set);
 
-    int stepOffset = (std::max(0, trackEngine.currentStep()) / 16) * 16;
-    int y = trackIndex * 8;
+    const int y = trackIndex * 8;
+    const int barX = 64;
+    const int barW = 128;
+    const int barH = 7;
+    const int minStepW = 3;
 
-    for (int i = 0; i < 16; ++i) {
-        int stepIndex = stepOffset + i;
-        if (stepIndex >= sequence.activeLength()) {
-            // Don't draw beyond active length
-            break;
+    int activeLength = sequence.activeLength();
+
+    // Calculate total ticks in active sequence
+    int totalTicks = 0;
+    int nonzeroSteps = 0;
+    for (int i = 0; i < activeLength; ++i) {
+        int duration = sequence.step(i).duration();
+        totalTicks += duration;
+        if (duration > 0) {
+            nonzeroSteps++;
         }
+    }
 
-        const auto &step = sequence.step(stepIndex);
-
-        int x = 64 + i * 8;
-
-        // Determine if step is currently active
-        bool isCurrentStep = (trackEngine.currentStep() == stepIndex);
-
-        // Determine gate state and set color accordingly
-        bool hasNote = step.noteIndex() != 0 || step.duration() > 0; // Non-zero note or non-zero duration
-        uint16_t gateLength = step.gateLength();
-
-        // Calculate the height of the gate based on gateLength percentage
-        int gateHeight = 6; // Maximum height
-        if (gateLength < IndexedSequence::GateLengthTrigger) {
-            gateHeight = (gateLength * 6) / 100; // Scale to 0-6 based on percentage
-        } else {
-            // Special case for trigger (show as thin line)
-            gateHeight = 1;
+    if (totalTicks > 0 && nonzeroSteps > 0) {
+        int currentX = barX;
+        int extraPixels = barW - minStepW * nonzeroSteps;
+        if (extraPixels < 0) {
+            extraPixels = 0;
         }
+        int error = 0;
 
-        if (isCurrentStep) {
-            // Highlight current step
-            canvas.setColor(hasNote ? Color::Bright : Color::MediumBright);
-            canvas.fillRect(x + 1, y + 1, 6, 6);
+        for (int i = 0; i < activeLength; ++i) {
+            const auto &step = sequence.step(i);
+            int stepW = 0;
+            if (step.duration() > 0) {
+                int scaled = extraPixels * step.duration() + error;
+                int extraW = scaled / totalTicks;
+                error = scaled % totalTicks;
+                stepW = minStepW + extraW;
+            }
 
-            // Draw gate length indicator inside the step
-            if (gateLength < IndexedSequence::GateLengthTrigger) {
-                canvas.setColor(Color::Low);
-                canvas.fillRect(x + 1, y + 1 + (6 - gateHeight), 6, gateHeight);
+            bool active = (trackEngine.currentStep() == i);
+
+            // Draw step rectangle
+            canvas.setColor(active ? Color::Bright : Color::Medium);
+            canvas.drawRect(currentX, y, stepW, barH);
+
+            // Draw gate length as filled portion from bottom
+            int gateW = 0;
+            if (step.gateLength() == IndexedSequence::GateLengthTrigger) {
+                gateW = std::min(1, stepW - 2);
             } else {
-                // For trigger, draw a small indicator
-                canvas.setColor(Color::Low);
-                canvas.fillRect(x + 3, y + 3, 2, 2);
+                gateW = (int)(stepW * (step.gateLength() / 100.0f));
             }
-        } else {
-            // Regular step
-            canvas.setColor(hasNote ? Color::Medium : Color::Low);
-            canvas.fillRect(x + 1, y + 1, 6, 6);
+            if (gateW > 0 && stepW > 2) {
+                canvas.setColor(active ? Color::MediumBright : Color::Low);
+                canvas.fillRect(currentX + 1, y + 1, gateW - 1, barH - 2);
+            }
 
-            // Draw gate length indicator inside the step
-            if (hasNote && gateLength < IndexedSequence::GateLengthTrigger) {
-                canvas.setColor(Color::Low);
-                canvas.fillRect(x + 1, y + 1 + (6 - gateHeight), 6, gateHeight);
-            } else if (hasNote && gateLength >= IndexedSequence::GateLengthTrigger) {
-                // For trigger, draw a small indicator
-                canvas.setColor(Color::Low);
-                canvas.fillRect(x + 3, y + 3, 2, 2);
-            }
+            currentX += stepW;
+            if (currentX >= barX + barW) break;
         }
     }
 }
 
 static void drawDiscreteMapTrack(Canvas &canvas, int trackIndex, const DiscreteMapTrackEngine &trackEngine, const DiscreteMapSequence &sequence) {
+    // Adaptation from DiscreteMapSequencePage threshold bar (lines 96-137)
     canvas.setBlendMode(BlendMode::Set);
 
-    int y = trackIndex * 8;
+    const int y = trackIndex * 8;
+    const int barX = 64;
+    const int barW = 128;
+    const int barLineY = y + 6; // Baseline position (near bottom)
 
-    // Draw threshold levels as stepped line
-    // Map all 32 stages to 16 positions by sampling every other stage (0,2,4,...,30)
-    for (int i = 0; i < 16; ++i) {
-        int stageIndex = i * 2; // Even indices: 0,2,4,6,...,30
-        if (stageIndex >= DiscreteMapSequence::StageCount) break; // Don't exceed available stages
-
-        const auto &stage = sequence.stage(stageIndex);
-        int x = 64 + i * 8;
-
-        // Convert threshold (-100 to 100) to Y position (0 to 6)
-        // Invert so that higher thresholds are lower on screen (like voltage)
-        int thresholdY = y + 1 + (int)((1.0f - (stage.threshold() / 100.0f)) * 5.0f);
-        thresholdY = clamp(thresholdY, y + 1, y + 6);
-
-        // Draw the threshold as a single pixel
-        canvas.setColor(Color::Medium);
-        canvas.fillRect(x + 3, thresholdY, 1, 1); // Center the pixel in the step
-        canvas.fillRect(x + 4, thresholdY, 1, 1);
+    // Get range from sequence for normalization
+    float rangeMin = sequence.rangeLow();
+    float rangeMax = sequence.rangeHigh();
+    if (std::abs(rangeMax - rangeMin) < 0.001f) {
+        rangeMin = -5.0f;
+        rangeMax = 5.0f;
     }
 
-    // Highlight the active stage if any
-    int activeStage = trackEngine.activeStage();
-    if (activeStage >= 0) {
-        // Map the actual active stage to the displayed position
-        int displayedPosition = activeStage / 2;
-        if (displayedPosition < 16) { // Only if it's within our display range
-            int x = 64 + displayedPosition * 8;
-            canvas.setColor(Color::Bright);
-            // Draw a rectangle around the active stage
-            canvas.drawRect(x + 1, y + 1, 6, 6);
+    // Draw baseline (2px thick)
+    canvas.setColor(Color::Low);
+    canvas.hline(barX, barLineY, barW);
+
+    // Draw threshold markers for all 32 stages
+    for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+        const auto &stage = sequence.stage(i);
+        if (stage.direction() == DiscreteMapSequence::Stage::TriggerDir::Off) {
+            continue;
         }
+
+        // Normalize threshold (-100 to +100) to 0-1
+        float norm = (stage.threshold() + 100.0f) / 200.0f;
+        norm = clamp(norm, 0.f, 1.f);
+        int x = barX + int(norm * barW);
+
+        bool active = trackEngine.activeStage() == i;
+
+        // Marker height: active=5px, normal=3px
+        int markerHeight = active ? 5 : 3;
+
+        canvas.setColor(active ? Color::Bright : Color::Medium);
+        canvas.vline(x, barLineY - markerHeight, markerHeight); // Grow upward from baseline
     }
 
-    // Draw a cursor showing current input voltage position
-    float currentInput = trackEngine.currentInput();
-    // Map input voltage (-5V to 5V) to position in the 16-step display
-    float inputPosition = (currentInput + 5.0f) / 10.0f; // Normalize to 0-1
-    int cursorX = 64 + (int)(inputPosition * 128); // 128 = 16 * 8 pixels width
+    // Draw input cursor
+    float inputNorm = (trackEngine.currentInput() - rangeMin) / (rangeMax - rangeMin);
+    inputNorm = clamp(inputNorm, 0.f, 1.f);
+    int cursorX = barX + int(inputNorm * barW);
 
-    if (cursorX >= 64 && cursorX <= 192) {
-        canvas.setColor(Color::Low);
-        canvas.vline(cursorX, y, 8);
+    if (cursorX >= barX && cursorX < barX + barW) {
+        canvas.setColor(Color::Bright);
+        canvas.vline(cursorX, y, 7); // Full height cursor
     }
 }
 
