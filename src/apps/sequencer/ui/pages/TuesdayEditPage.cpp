@@ -6,6 +6,9 @@
 
 #include "core/utils/StringBuilder.h"
 
+#include "model/KnownDivisor.h"
+#include "model/ModelUtils.h"
+
 enum class ContextAction {
     Init,
     Reseed,
@@ -72,15 +75,77 @@ void TuesdayEditPage::draw(Canvas &canvas) {
 }
 
 void TuesdayEditPage::updateLeds(Leds &leds) {
-    // LEDs handled by footer highlight mechanism
-    (void)leds;
+    const auto &sequence = _project.selectedTuesdaySequence();
+
+    constexpr int kDefaultOctave = 0;
+    constexpr int kDefaultTranspose = 0;
+    constexpr int kDefaultRootNote = -1;
+    constexpr int kDefaultDivisor = 12;
+    constexpr int kDefaultMaskParam = 0;
+
+    bool octaveUp = sequence.octave() > kDefaultOctave;
+    bool octaveDown = sequence.octave() < kDefaultOctave;
+    bool transposeUp = sequence.transpose() > kDefaultTranspose;
+    bool transposeDown = sequence.transpose() < kDefaultTranspose;
+    bool rootUp = sequence.rootNote() > kDefaultRootNote;
+    bool rootDown = sequence.rootNote() < kDefaultRootNote;
+
+    bool divisorFaster = sequence.divisor() < kDefaultDivisor;
+    bool divisorSlower = sequence.divisor() > kDefaultDivisor;
+
+    bool maskUp = sequence.maskParameter() > kDefaultMaskParam;
+    bool maskDown = sequence.maskParameter() < kDefaultMaskParam;
+
+    auto setTop = [&] (int step, bool on) {
+        leds.set(MatrixMap::fromStep(step), false, on);
+    };
+    auto setBottom = [&] (int step, bool on) {
+        leds.set(MatrixMap::fromStep(step), on, false);
+    };
+
+    setTop(0, octaveUp);
+    setBottom(8, octaveDown);
+
+    setTop(1, transposeUp);
+    setBottom(9, transposeDown);
+
+    setTop(2, rootUp);
+    setBottom(10, rootDown);
+
+    setTop(3, divisorFaster);
+    setBottom(11, divisorSlower);
+
+    setTop(4, divisorFaster);
+    setBottom(12, divisorSlower);
+
+    setTop(5, divisorFaster);
+    setBottom(13, divisorSlower);
+
+    setTop(6, maskUp);
+    setBottom(14, maskDown);
 }
 
 void TuesdayEditPage::keyDown(KeyEvent &event) {
+    const auto &key = event.key();
+
+    if (key.isStep() && !key.pageModifier()) {
+        handleStepKeyDown(key.step(), key.shiftModifier());
+        event.consume();
+        return;
+    }
+
     event.consume();
 }
 
 void TuesdayEditPage::keyUp(KeyEvent &event) {
+    const auto &key = event.key();
+
+    if (key.isStep() && !key.pageModifier()) {
+        handleStepKeyUp(key.step(), key.shiftModifier());
+        event.consume();
+        return;
+    }
+
     event.consume();
 }
 
@@ -94,6 +159,12 @@ void TuesdayEditPage::keyPress(KeyPressEvent &event) {
             [&] (int index) { contextAction(index); },
             [&] (int index) { return true; }
         ));
+        event.consume();
+        return;
+    }
+
+    if (key.isStep() && !key.pageModifier()) {
+        handleStepKeyPress(key.step(), key.shiftModifier());
         event.consume();
         return;
     }
@@ -489,6 +560,166 @@ void TuesdayEditPage::contextAction(int index) {
         break;
     case ContextAction::Last:
         break;
+    }
+}
+
+namespace {
+
+int nextDivisorByType(int currentDivisor, int direction, char type) {
+    if (direction > 0) {
+        for (int i = 0; i < numKnownDivisors; ++i) {
+            const auto &known = knownDivisors[i];
+            if (known.type != type) {
+                continue;
+            }
+            if (known.divisor > currentDivisor) {
+                return known.divisor;
+            }
+        }
+    } else if (direction < 0) {
+        for (int i = numKnownDivisors - 1; i >= 0; --i) {
+            const auto &known = knownDivisors[i];
+            if (known.type != type) {
+                continue;
+            }
+            if (known.divisor < currentDivisor) {
+                return known.divisor;
+            }
+        }
+    }
+    return currentDivisor;
+}
+
+} // namespace
+
+void TuesdayEditPage::handleStepKeyPress(int step, bool shift) {
+    if (step < 0 || step > 15) {
+        return;
+    }
+
+    if (step == 15 && shift) {
+        return;
+    }
+
+    auto &sequence = _project.selectedTuesdaySequence();
+
+    switch (step) {
+    case 0: // Octave up
+        sequence.editOctave(1, false);
+        break;
+    case 1: // Transpose up
+        sequence.editTranspose(1, false);
+        break;
+    case 2: // Root note up
+        sequence.editRootNote(1, false);
+        break;
+    case 3: { // Divisor up (straight)
+        if (!sequence.isRouted(Routing::Target::Divisor)) {
+            int next = nextDivisorByType(sequence.divisor(), -1, '\0');
+            sequence.setDivisor(next);
+        }
+        break;
+    }
+    case 4: { // Divisor up (triplet)
+        if (!sequence.isRouted(Routing::Target::Divisor)) {
+            int next = nextDivisorByType(sequence.divisor(), -1, 'T');
+            sequence.setDivisor(next);
+        }
+        break;
+    }
+    case 5: { // Divisor /2
+        if (!sequence.isRouted(Routing::Target::Divisor)) {
+            int next = ModelUtils::clampDivisor(sequence.divisor() / 2);
+            sequence.setDivisor(next);
+        }
+        break;
+    }
+    case 6: // Mask up
+        sequence.editMaskParameter(1, false);
+        break;
+    case 7: // Run momentary (handled in keyDown)
+        break;
+    case 8: // Octave down
+        sequence.editOctave(-1, false);
+        break;
+    case 9: // Transpose down
+        sequence.editTranspose(-1, false);
+        break;
+    case 10: // Root note down
+        sequence.editRootNote(-1, false);
+        break;
+    case 11: { // Divisor down (straight)
+        if (!sequence.isRouted(Routing::Target::Divisor)) {
+            int next = nextDivisorByType(sequence.divisor(), 1, '\0');
+            sequence.setDivisor(next);
+        }
+        break;
+    }
+    case 12: { // Divisor down (triplet)
+        if (!sequence.isRouted(Routing::Target::Divisor)) {
+            int next = nextDivisorByType(sequence.divisor(), 1, 'T');
+            sequence.setDivisor(next);
+        }
+        break;
+    }
+    case 13: { // Divisor *2
+        if (!sequence.isRouted(Routing::Target::Divisor)) {
+            int next = ModelUtils::clampDivisor(sequence.divisor() * 2);
+            sequence.setDivisor(next);
+        }
+        break;
+    }
+    case 14: // Mask down
+        sequence.editMaskParameter(-1, false);
+        break;
+    case 15: { // Reset
+        auto &engine = const_cast<TuesdayTrackEngine &>(trackEngine());
+        engine.reset();
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+void TuesdayEditPage::handleStepKeyDown(int step, bool shift) {
+    if (step == 7 && !_jamRunHeld) {
+        _jamRunHeld = true;
+        _jamRunTrack = _project.selectedTrackIndex();
+        auto &track = _project.track(_jamRunTrack);
+        _jamPrevRunGate = track.runGate();
+        track.setRunGate(false);
+    }
+
+    if (step == 15 && shift && !_jamMuteHeld) {
+        _jamMuteHeld = true;
+        _jamMuteTrack = _project.selectedTrackIndex();
+        auto &playState = _project.playState();
+        _jamPrevMute = playState.trackState(_jamMuteTrack).mute();
+        playState.muteTrack(_jamMuteTrack, PlayState::Immediate);
+    }
+}
+
+void TuesdayEditPage::handleStepKeyUp(int step, bool shift) {
+    if (step == 7 && _jamRunHeld) {
+        _jamRunHeld = false;
+        if (_jamRunTrack >= 0) {
+            _project.track(_jamRunTrack).setRunGate(_jamPrevRunGate);
+        }
+        _jamRunTrack = -1;
+    }
+
+    if (step == 15 && shift && _jamMuteHeld) {
+        _jamMuteHeld = false;
+        if (_jamMuteTrack >= 0) {
+            auto &playState = _project.playState();
+            if (_jamPrevMute) {
+                playState.muteTrack(_jamMuteTrack, PlayState::Immediate);
+            } else {
+                playState.unmuteTrack(_jamMuteTrack, PlayState::Immediate);
+            }
+        }
+        _jamMuteTrack = -1;
     }
 }
 

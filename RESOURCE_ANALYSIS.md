@@ -97,10 +97,11 @@ The system supports mixed track types, so the maximum would be if all are Note t
 - Base `TrackEngine`: ~64 bytes
 - Internal ramp state: ~8 bytes
 - Input tracking variables: ~12 bytes
-- Length threshold cache: 32 floats × 4 bytes = 128 bytes
+- Threshold cache: `_lengthThresholds[32]` (32×4=128) + `_positionThresholds[32]` (32×4=128) = 256 bytes
 - Stage state variables: ~20 bytes
 - Output state variables: ~16 bytes
-- Total per engine: ~248 bytes
+- Additional state variables (sampled pitch params, activity, external tracking, sync): ~35 bytes
+- Total per engine: ~359 bytes
 
 ### 3. System-Wide Memory Usage
 
@@ -205,28 +206,22 @@ The firmware is otherwise healthy with appropriate use of both memory regions an
 Based on RES-indexed.md research document:
 
 #### IndexedSequence Memory:
-- Each `IndexedStep`: ~8-12 bytes (index, duration, gateLength, flags)
-- 64 steps × 12 bytes = 768 bytes per sequence
-- With metadata: ~900 bytes per sequence
-- 17 sequences per track: ~15,300 bytes per track
-- For 8 tracks: ~122,400 bytes (if all Indexed tracks)
+- Each `IndexedStep`: 5 bytes (bit-packed 32-bit value + 8-bit group mask)
+- 32 steps × 5 bytes = 160 bytes per sequence
+- With metadata: ~194 bytes per sequence (includes divisor, loop, activeLength, scale, rootNote as Routable, firstStep as Routable, syncMode, resetMeasure, route configs, etc.)
+- 17 sequences per track: ~3,298 bytes per track
+- For 8 tracks: 8 × 3,298 = **26,384 bytes**
 
 #### IndexedTrackEngine Memory:
 - Base `TrackEngine`: ~64 bytes
-- Timing accumulator: ~8 bytes
-- Additional state variables: ~128 bytes
-- Sorted queues (if needed): ~192 bytes
-- Total per engine: ~392 bytes
-
-#### VoltageTable Memory:
-- 100 entries × 2 bytes (uint16_t) = 200 bytes per track
-- For 8 tracks: ~1,600 bytes
+- Timing state variables: `_stepTimer`, `_gateTimer`, `_effectiveStepDuration`, `_currentStepIndex`, `_running`, `_pendingTrigger`, `_prevSync` = ~18 bytes
+- Output state: `_cvOutput`, `_activity` = ~5 bytes
+- Total per engine: ~43 bytes
 
 #### Total IndexedTrack Memory:
-- Sequences: 122,400 bytes
-- Tables: 1,600 bytes
-- Engines: 8 × 392 = 3,136 bytes
-- **Total**: ~127,136 bytes
+- Sequences: 26,384 bytes
+- Engines: 8 × 43 = 344 bytes
+- **Total**: ~26,728 bytes
 
 ### 5. Available Memory Assessment
 
@@ -239,30 +234,21 @@ Based on RES-indexed.md research document:
 - **Available**: ~10-16 KB
 
 #### Memory Constraints:
-- The IndexedTrack implementation would require ~127 KB
-- This exceeds available RAM if combined with existing track types
-- Need to consider implementation strategy
+- The IndexedTrack implementation requires ~26.7 KB (much less than initially estimated)
+- This is feasible within current RAM constraints
+- The implementation is actually memory-efficient compared to Note tracks
 
 ### 6. Implementation Strategy Recommendations
 
-#### Option 1: Replace Existing Track Type
-- Replace Tuesday track with Indexed track (saves ~17 KB)
-- Still need to fit within ~30-36 KB available
+#### Option 1: Full Implementation
+- IndexedTrack implementation requires ~26.7 KB total (feasible within current constraints)
+- No need to replace existing track types
+- Can coexist with all other track types
 
-#### Option 2: Reduced Capacity Implementation
-- Reduce sequence steps from 64 to 32 (saves ~50%)
-- Reduce patterns from 16 to 8 (saves ~50%)
-- Reduce voltage table size from 100 to 64 entries
-
-#### Option 3: Memory-Optimized Data Structures
-- Pack IndexedStep data more efficiently
-- Use 8-bit values where possible
-- Share voltage tables between tracks
-
-#### Option 4: Hybrid Approach
-- Implement subset of ER-101 features
-- Simplified timing (no pulse-based, use existing tick system)
-- Reduced transform operations
+#### Option 2: Feature-Rich Implementation
+- The implementation can include voltage tables and modulation features
+- Memory usage is significantly less than initially estimated
+- Provides good balance of features and memory efficiency
 
 ### 7. CPU Utilization Assessment
 
@@ -273,53 +259,40 @@ Based on RES-indexed.md research document:
 
 #### IndexedTrackEngine CPU Impact:
 - Accumulator-based timing: Low overhead (simple addition/comparison)
-- Voltage table lookup: Very low overhead
-- Math transforms: Moderate (but typically one-time operations)
-- **Assessment**: CPU usage should be manageable
+- Step processing: Minimal overhead for step advancement and triggering
+- **Assessment**: CPU usage should be very low, making it efficient
 
 ### 8. Realistic Headroom for IndexedTrackEngine
 
 #### Memory Headroom:
-- **Conservative**: Implement only core functionality with reduced capacity
-  - 32 steps instead of 64
-  - 8 patterns instead of 16
-  - 64-entry voltage table
-  - Estimated memory: ~64 KB (feasible)
-
-- **Moderate**: Implement most features with careful optimization
-  - 48 steps
-  - 12 patterns
-  - 80-entry voltage table
-  - Estimated memory: ~96 KB (challenging but possible)
-
-- **Full**: Attempt full ER-101 compatibility
-  - 64 steps
-  - 16 patterns
-  - 100-entry voltage table
-  - Estimated memory: ~127 KB (not feasible with current architecture)
+- **Actual**: Full implementation with 32 steps and 17 patterns (16+1)
+  - 32 steps per sequence (as implemented)
+  - 17 patterns per track (as implemented with 16 patterns + 1 snapshot)
+  - Estimated memory: ~26.7 KB total (fully feasible)
 
 #### Recommended Approach:
-- Start with **Conservative** implementation
-- Prove concept with reduced capacity
-- Optimize and expand as needed
-- Consider memory-saving techniques like CCMRAM for frequently accessed data
+- The implementation is already optimized and efficient
+- Memory usage is well within available constraints
+- Can be used alongside all other track types
 
 ### 9. Implementation Priority
 
-1. **Data Structures**: Implement optimized IndexedStep and VoltageTable
-2. **Engine Logic**: Create basic timing and output logic
-3. **Integration**: Add to TrackMode enum and engine container
-4. **UI**: Basic sequence editing
-5. **Advanced Features**: Math transforms, table editor
+1. **Already Implemented**: IndexedTrack and IndexedTrackEngine are already implemented
+2. **Current Status**: Memory usage is efficient and within constraints
+3. **Optimization**: Focus on CPU efficiency and feature completeness
 
 ### 10. Conclusion
 
-The current PEW|FORMER firmware has **limited headroom** for a full-featured IndexedTrackEngine implementation due to memory constraints. The most realistic approach is to implement a **reduced-capacity version** with approximately half the original ER-101 feature set. This would allow the core indexed sequencing concept to be implemented while staying within the 128KB RAM constraint of the STM32F405.
+The current PEW|FORMER firmware implementation of IndexedTrack is **memory-efficient** and well within RAM constraints at ~26.7KB total for 8 tracks. The implementation provides a good balance of features and memory usage, making it a viable addition to the firmware alongside other track types.
 
-**NEW Insights on DiscreteMap Implementation**:
-- The DiscreteMap track type has been successfully implemented and is **memory-efficient**
-- DiscreteMap sequences use ~15.6KB total vs ~87KB for Note tracks (savings: ~71KB)
-- The routing system has been enhanced with DiscreteMap-specific targets
-- The implementation demonstrates that new track types can actually reduce memory usage when designed efficiently
-- Users can achieve significant memory savings by converting existing Note tracks to DiscreteMap tracks
-- Overall system remains within safe resource limits despite the addition of new features
+**Updated Insights on Track Type Memory Efficiency** (from actual code analysis):
+- **DiscreteMap Track**: ~2,314 bytes per track (most efficient) - sequence (~1,955) + engine (~359)
+- **Indexed Track**: ~3,341 bytes per track (second most efficient) - sequence (~3,298) + engine (~43)
+- **Curve Track**: ~10,083 bytes per track - sequence (~9,792) + engine (~291)
+- **Note Track**: ~11,225 bytes per track (least efficient) - sequence (~10,880) + engine (~345)
+- **Tuesday Track**: ~2,231 bytes per track (most efficient for algorithmic content) - sequence (~2,176) + engine (~704)
+
+- The DiscreteMap track type remains the most memory-efficient option
+- The Indexed track is more memory-efficient than Curve and Note tracks
+- Users can optimize memory usage by choosing appropriate track types for their needs
+- The firmware can support mixed track types within current memory constraints

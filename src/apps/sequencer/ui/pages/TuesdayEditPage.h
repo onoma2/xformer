@@ -59,6 +59,9 @@ private:
     void nextPage();
     void selectParam(int slot);
     void contextAction(int index);
+    void handleStepKeyPress(int step, bool shift);
+    void handleStepKeyDown(int step, bool shift);
+    void handleStepKeyUp(int step, bool shift);
 
     const TuesdayTrackEngine &trackEngine() const;
     TuesdayTrack &tuesdayTrack();
@@ -66,4 +69,10 @@ private:
 
     int _currentPage = 0;
     int _selectedSlot = 0;  // 0-3 for F1-F4
+    bool _jamRunHeld = false;
+    bool _jamPrevRunGate = true;
+    int _jamRunTrack = -1;
+    bool _jamMuteHeld = false;
+    bool _jamPrevMute = false;
+    int _jamMuteTrack = -1;
 };
