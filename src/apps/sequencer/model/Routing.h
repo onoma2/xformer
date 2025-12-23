@@ -54,6 +54,7 @@ public:
         // Track targets
         TrackFirst,
         Run = TrackFirst,
+        Reset,
         SlideTime,
         Octave,
         Transpose,
@@ -130,6 +131,7 @@ public:
         case Target::None:                      return "None";
 
         case Target::Run:                       return "Run";
+        case Target::Reset:                     return "Reset";
         case Target::Play:                      return "Play";
         case Target::PlayToggle:                return "Play Toggle";
         case Target::Record:                    return "Record";
@@ -272,6 +274,7 @@ public:
         case Target::IndexedB:                  return 53;
 
         case Target::Run:                       return 54;
+        case Target::Reset:                     return 55;
 
         case Target::Last:                      break;
         }

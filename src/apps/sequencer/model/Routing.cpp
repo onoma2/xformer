@@ -360,6 +360,7 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::Pattern)]                         = { 0,      15,     0,      15,     1       },
     // Track targets
     [int(Routing::Target::Run)]                             = { 0,      1,      0,      1,      1       },
+    [int(Routing::Target::Reset)]                           = { 0,      1,      0,      1,      1       },
     [int(Routing::Target::SlideTime)]                       = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::Octave)]                          = { -10,    10,     -1,     1,      1       },
     [int(Routing::Target::Transpose)]                       = { -60,    60,     -12,    12,     12      },
@@ -486,6 +487,7 @@ void Routing::printTargetValue(Routing::Target target, float normalized, StringB
     case Target::Mute:
     case Target::Fill:
     case Target::Run:
+    case Target::Reset:
         str(intValue ? "on" : "off");
         break;
     case Target::Scale:

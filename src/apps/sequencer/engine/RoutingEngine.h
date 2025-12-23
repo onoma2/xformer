@@ -63,6 +63,7 @@ private:
 
     uint8_t _lastPlayToggleActive = false;
     uint8_t _lastRecordToggleActive = false;
+    std::array<uint8_t, CONFIG_TRACK_COUNT> _lastResetActive{};
 
     static float applyProgressiveDivider(float srcNormalized, RouteState::TrackState &st);
 };

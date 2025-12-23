@@ -143,7 +143,9 @@ static_assert(int(MidiPort::UsbMidi) == int(Types::MidiPort::UsbMidi), "invalid 
 RoutingEngine::RoutingEngine(Engine &engine, Model &model) :
     _engine(engine),
     _routing(model.project().routing())
-{}
+{
+    _lastResetActive.fill(false);
+}
 
 void RoutingEngine::resetShaperState() {
     for (auto &routeState : _routeStates) {
@@ -292,6 +294,13 @@ void RoutingEngine::updateSinks() {
             if (routeState.target == Routing::Target::RecordToggle) {
                 _lastRecordToggleActive = false;
             }
+            if (routeState.target == Routing::Target::Reset) {
+                for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
+                    if (routeState.tracks & (1 << i)) {
+                        _lastResetActive[i] = false;
+                    }
+                }
+            }
             // reset shaper state
             for (auto &st : routeState.shaperState) {
                 st = RouteState::TrackState();
@@ -344,7 +353,20 @@ void RoutingEngine::updateSinks() {
                         }
                         float routed = route.min() + shaperOut * routeSpan;
 
-                        _routing.writeTarget(target, (1 << trackIndex), routed);
+                        // Special handling for Reset target
+                        if (target == Routing::Target::Reset) {
+                            bool active = routed > 0.5f;
+                            if (active != _lastResetActive[trackIndex]) {
+                                if (active) {
+                                    // Rising edge detected - reset this track
+                                    _engine.trackEngine(trackIndex).reset();
+                                }
+                                _lastResetActive[trackIndex] = active;
+                            }
+                        } else {
+                            // Normal target handling
+                            _routing.writeTarget(target, (1 << trackIndex), routed);
+                        }
                     }
                 }
             } else if (Routing::isEngineTarget(target)) {
