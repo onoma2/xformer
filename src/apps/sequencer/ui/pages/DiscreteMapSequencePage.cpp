@@ -26,6 +26,7 @@ static const ContextMenuModel::Item contextMenuItems[] = {
 enum {
     QuickEditNone = -1,
     QuickEditEven = -2,
+    QuickEditFlip = -3,
 };
 
 static const int quickEditItems[8] = {
@@ -33,7 +34,7 @@ static const int quickEditItems[8] = {
     int(DiscreteMapSequenceListModel::Item::RangeLow),  // Step 10
     int(DiscreteMapSequenceListModel::Item::Divisor),   // Step 11
     QuickEditEven,                                      // Step 12
-    QuickEditNone,
+    QuickEditFlip,                                      // Step 13
     QuickEditNone,
     QuickEditNone,
     QuickEditNone,
@@ -442,6 +443,16 @@ void DiscreteMapSequencePage::quickEdit(int index) {
     }
     if (item == QuickEditEven) {
         distributeActiveStagesEvenly(EvenTarget::Active);
+        return;
+    }
+    if (item == QuickEditFlip) {
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            _sequence->stage(i).cycleDirection();
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("DIR FLIP");
         return;
     }
     _listModel.setSequence(_sequence);
