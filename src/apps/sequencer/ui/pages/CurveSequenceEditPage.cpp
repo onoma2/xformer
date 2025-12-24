@@ -1093,9 +1093,9 @@ void CurveSequenceEditPage::lfoContextShow() {
 void CurveSequenceEditPage::lfoContextAction(int index) {
     auto &sequence = _project.selectedCurveSequence();
 
-    // Determine range: use selected steps if any, otherwise all steps
-    int firstStep = 0;
-    int lastStep = CONFIG_STEP_COUNT - 1;
+    // Determine range: use selected steps if any, otherwise sequence loop bounds
+    int firstStep = sequence.firstStep();
+    int lastStep = sequence.lastStep();
 
     if (_stepSelection.any()) {
         firstStep = _stepSelection.firstSetIndex();
@@ -1140,9 +1140,9 @@ void CurveSequenceEditPage::macroContextShow() {
 void CurveSequenceEditPage::macroContextAction(int index) {
     auto &sequence = _project.selectedCurveSequence();
 
-    // Determine range: use selected steps if any, otherwise all steps
-    int firstStep = 0;
-    int lastStep = CONFIG_STEP_COUNT - 1;
+    // Determine range: use selected steps if any, otherwise sequence loop bounds
+    int firstStep = sequence.firstStep();
+    int lastStep = sequence.lastStep();
 
     if (_stepSelection.any()) {
         firstStep = _stepSelection.firstSetIndex();

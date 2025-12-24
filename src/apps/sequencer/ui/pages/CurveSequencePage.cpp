@@ -186,25 +186,29 @@ void CurveSequencePage::lfoContextShow() {
 }
 
 void CurveSequencePage::lfoContextAction(int index) {
+    auto &sequence = _project.selectedCurveSequence();
+    int firstStep = sequence.firstStep();
+    int lastStep = sequence.lastStep();
+
     switch (LfoContextAction(index)) {
     case LfoContextAction::Triangle:
-        _project.selectedCurveSequence().populateWithTriangleWaveLfo(0, CONFIG_STEP_COUNT - 1);
+        sequence.populateWithTriangleWaveLfo(firstStep, lastStep);
         showMessage("LFO TRIANGLE POPULATED");
         break;
     case LfoContextAction::Sine:
-        _project.selectedCurveSequence().populateWithSineWaveLfo(0, CONFIG_STEP_COUNT - 1);
+        sequence.populateWithSineWaveLfo(firstStep, lastStep);
         showMessage("LFO SINE POPULATED");
         break;
     case LfoContextAction::Sawtooth:
-        _project.selectedCurveSequence().populateWithSawtoothWaveLfo(0, CONFIG_STEP_COUNT - 1);
+        sequence.populateWithSawtoothWaveLfo(firstStep, lastStep);
         showMessage("LFO SAWTOOTH POPULATED");
         break;
     case LfoContextAction::Square:
-        _project.selectedCurveSequence().populateWithSquareWaveLfo(0, CONFIG_STEP_COUNT - 1);
+        sequence.populateWithSquareWaveLfo(firstStep, lastStep);
         showMessage("LFO SQUARE POPULATED");
         break;
     case LfoContextAction::RandomMinMax:
-        _project.selectedCurveSequence().populateWithRandomMinMax(0, CONFIG_STEP_COUNT - 1);
+        sequence.populateWithRandomMinMax(firstStep, lastStep);
         showMessage("MIN/MAX RANDOMIZED");
         break;
     case LfoContextAction::Last:
@@ -222,17 +226,21 @@ void CurveSequencePage::macroContextShow() {
 }
 
 void CurveSequencePage::macroContextAction(int index) {
+    auto &sequence = _project.selectedCurveSequence();
+    int firstStep = sequence.firstStep();
+    int lastStep = sequence.lastStep();
+
     switch (MacroContextAction(index)) {
     case MacroContextAction::Bell:
-        _project.selectedCurveSequence().populateWithMacroBell(0, CONFIG_STEP_COUNT - 1);
+        sequence.populateWithMacroBell(firstStep, lastStep);
         showMessage("MACRO BELL POPULATED");
         break;
     case MacroContextAction::Triangle:
-        _project.selectedCurveSequence().populateWithMacroTri(0, CONFIG_STEP_COUNT - 1);
+        sequence.populateWithMacroTri(firstStep, lastStep);
         showMessage("MACRO TRIANGLE POPULATED");
         break;
     case MacroContextAction::Ramp:
-        _project.selectedCurveSequence().populateWithMacroRamp(0, CONFIG_STEP_COUNT - 1);
+        sequence.populateWithMacroRamp(firstStep, lastStep);
         showMessage("MACRO RAMP POPULATED");
         break;
     case MacroContextAction::Last:
