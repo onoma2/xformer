@@ -52,11 +52,11 @@ public:
     case TrackMode::Note:
       return "Note";
     case TrackMode::Curve:
-      return "Curve";
+      return "Curve Studio";
     case TrackMode::MidiCv:
       return "MIDI/CV";
     case TrackMode::Tuesday:
-      return "Algo";
+      return "Algo(Tuesday)";
     case TrackMode::DiscreteMap:
       return "Discrete";
     case TrackMode::Indexed:

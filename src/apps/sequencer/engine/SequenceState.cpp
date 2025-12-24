@@ -26,13 +26,16 @@ void SequenceState::advanceFree(Types::RunMode runMode, int firstStep, int lastS
         case Types::RunMode::Pendulum:
         case Types::RunMode::PingPong:
             _step = firstStep;
+            _direction = 1;
             break;
         case Types::RunMode::Backward:
             _step = lastStep;
+            _direction = -1;
             break;
         case Types::RunMode::Random:
         case Types::RunMode::RandomWalk:
             _step = randomStep(firstStep, lastStep, rng);
+            _direction = 1;
             break;
         case Types::RunMode::Last:
             break;
@@ -43,6 +46,7 @@ void SequenceState::advanceFree(Types::RunMode runMode, int firstStep, int lastS
 
         switch (runMode) {
         case Types::RunMode::Forward:
+            _direction = 1;
             if (_step >= lastStep) {
                 _step = firstStep;
                 ++_iteration;
@@ -51,6 +55,7 @@ void SequenceState::advanceFree(Types::RunMode runMode, int firstStep, int lastS
             }
             break;
         case Types::RunMode::Backward:
+            _direction = -1;
             if (_step <= firstStep) {
                 _step = lastStep;
                 ++_iteration;
@@ -65,16 +70,18 @@ void SequenceState::advanceFree(Types::RunMode runMode, int firstStep, int lastS
             } else if (_direction < 0 && _step <= firstStep) {
                 _direction = 1;
                 ++_iteration;
-            } else {
-                if (runMode == Types::RunMode::Pendulum) {
+            }
+            
+            if (runMode == Types::RunMode::Pendulum) {
+                if (_step + _direction >= firstStep && _step + _direction <= lastStep) {
                     _step += _direction;
                 }
-            }
-            if (runMode == Types::RunMode::PingPong) {
+            } else { // PingPong
                 _step += _direction;
             }
             break;
         case Types::RunMode::Random:
+            _direction = 1;
             _step = randomStep(firstStep, lastStep, rng);
             break;
         case Types::RunMode::RandomWalk:
@@ -95,27 +102,33 @@ void SequenceState::advanceAligned(int absoluteStep, Types::RunMode runMode, int
 
     switch (runMode) {
     case Types::RunMode::Forward:
+        _direction = 1;
         _step = firstStep + absoluteStep % stepCount;
         _iteration = absoluteStep / stepCount;
         break;
     case Types::RunMode::Backward:
+        _direction = -1;
         _step = lastStep - absoluteStep % stepCount;
         _iteration = absoluteStep / stepCount;
         break;
     case Types::RunMode::Pendulum:
         _iteration = absoluteStep / (2 * stepCount);
         absoluteStep %= (2 * stepCount);
+        _direction = (absoluteStep < stepCount) ? 1 : -1;
         _step = (absoluteStep < stepCount) ? (firstStep + absoluteStep) : (lastStep - (absoluteStep - stepCount));
         break;
     case Types::RunMode::PingPong:
         _iteration = absoluteStep / (2 * stepCount - 2);
         absoluteStep %= (2 * stepCount - 2);
+        _direction = (absoluteStep < stepCount) ? 1 : -1;
         _step = (absoluteStep < stepCount) ? (firstStep + absoluteStep) : (lastStep - (absoluteStep - stepCount) - 1);
         break;
     case Types::RunMode::Random:
+        _direction = 1;
         _step = firstStep + rng.nextRange(stepCount);
         break;
     case Types::RunMode::RandomWalk:
+        // direction is handled inside advanceRandomWalk
         advanceRandomWalk(firstStep, lastStep, rng);
         break;
     case Types::RunMode::Last:
@@ -126,12 +139,15 @@ void SequenceState::advanceAligned(int absoluteStep, Types::RunMode runMode, int
 void SequenceState::advanceRandomWalk(int firstStep, int lastStep, Random &rng) {
     if (_step == -1) {
         _step = randomStep(firstStep, lastStep, rng);
+        _direction = 1;
     } else {
         int dir = rng.nextRange(2);
         if (dir == 0) {
             _step = _step == firstStep ? lastStep : _step - 1;
+            _direction = -1;
         } else {
             _step = _step == lastStep ? firstStep : _step + 1;
+            _direction = 1;
         }
     }
 }

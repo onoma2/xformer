@@ -295,6 +295,11 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
 
     _currentStepFraction = float(relativeTick % divisor) / divisor;
 
+    // True Reverse: If playing backwards, invert the step fraction so shapes play in reverse
+    if (_sequenceState.direction() < 0) {
+        _currentStepFraction = 1.0f - _currentStepFraction;
+    }
+
     if (mute() || (isRecording() && _curveTrack.globalPhase() > 0.f)) {
         switch (_curveTrack.muteMode()) {
         case CurveTrack::MuteMode::LastValue:
