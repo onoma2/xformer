@@ -488,6 +488,7 @@ public:
     void populateWithTriangleWaveLfo(int firstStep, int lastStep);
     void populateWithSawtoothWaveLfo(int firstStep, int lastStep);
     void populateWithSquareWaveLfo(int firstStep, int lastStep);
+    void populateWithRandomMinMax(int firstStep, int lastStep);
 
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);

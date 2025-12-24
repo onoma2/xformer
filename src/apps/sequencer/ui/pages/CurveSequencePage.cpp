@@ -29,6 +29,7 @@ enum class LfoContextAction {
     Sine,
     Sawtooth,
     Square,
+    RandomMinMax,
     Last
 };
 
@@ -37,6 +38,7 @@ static const ContextMenuModel::Item lfoContextMenuItems[] = {
     { "SINE" },
     { "SAW" },
     { "SQUA" },
+    { "RND" },
 };
 
 CurveSequencePage::CurveSequencePage(PageManager &manager, PageContext &context) :
@@ -181,6 +183,10 @@ void CurveSequencePage::lfoContextAction(int index) {
     case LfoContextAction::Square:
         _project.selectedCurveSequence().populateWithSquareWaveLfo(0, CONFIG_STEP_COUNT - 1);
         showMessage("LFO SQUARE POPULATED");
+        break;
+    case LfoContextAction::RandomMinMax:
+        _project.selectedCurveSequence().populateWithRandomMinMax(0, CONFIG_STEP_COUNT - 1);
+        showMessage("MIN/MAX RANDOMIZED");
         break;
     case LfoContextAction::Last:
         break;

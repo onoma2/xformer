@@ -379,3 +379,15 @@ void CurveSequence::populateWithSquareWaveLfo(int firstStep, int lastStep) {
         _steps[i].setShape(static_cast<int>(Curve::StepUp));
     }
 }
+
+void CurveSequence::populateWithRandomMinMax(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+
+    for (int i = minStep; i <= maxStep; ++i) {
+        int val1 = std::rand() % (Min::Max + 1);
+        int val2 = std::rand() % (Max::Max + 1);
+        _steps[i].setMin(std::min(val1, val2));
+        _steps[i].setMax(std::max(val1, val2));
+    }
+}
