@@ -341,25 +341,12 @@ void CurveSequence::populateWithLfoWaveform(Curve::Type upShape, Curve::Type dow
 
 // Additional LFO pattern functions for more complex waveforms
 void CurveSequence::populateWithSineWaveLfo(int firstStep, int lastStep) {
-    // Create a sine-like LFO pattern using SmoothUp and SmoothDown
+    // Create a sine-like LFO pattern using Bell shape (1 cycle per step)
     int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
     int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
 
-    int rangeSize = maxStep - minStep + 1;
-    if (rangeSize < 2) {
-        if (minStep <= maxStep) {
-            _steps[minStep].setShape(static_cast<int>(Curve::SmoothUp));
-        }
-        return;
-    }
-
-    // Create a sine-like pattern by alternating SmoothUp and SmoothDown shapes
     for (int i = minStep; i <= maxStep; ++i) {
-        if ((i - minStep) % 2 == 0) {
-            _steps[i].setShape(static_cast<int>(Curve::SmoothUp));
-        } else {
-            _steps[i].setShape(static_cast<int>(Curve::SmoothDown));
-        }
+        _steps[i].setShape(static_cast<int>(Curve::Bell));
     }
 }
 
@@ -384,15 +371,11 @@ void CurveSequence::populateWithSawtoothWaveLfo(int firstStep, int lastStep) {
 }
 
 void CurveSequence::populateWithSquareWaveLfo(int firstStep, int lastStep) {
-    // Create a square LFO pattern using StepUp and StepDown shapes alternating
+    // Create a square LFO pattern using StepUp shape (1 cycle per step)
     int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
     int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
 
     for (int i = minStep; i <= maxStep; ++i) {
-        if ((i - minStep) % 2 == 0) {
-            _steps[i].setShape(static_cast<int>(Curve::StepUp));
-        } else {
-            _steps[i].setShape(static_cast<int>(Curve::StepDown));
-        }
+        _steps[i].setShape(static_cast<int>(Curve::StepUp));
     }
 }
