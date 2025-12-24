@@ -47,6 +47,19 @@ static const ContextMenuModel::Item lfoContextMenuItems[] = {
     { "MM-RND" },
 };
 
+enum class MacroContextAction {
+    Bell,
+    Triangle,
+    Ramp,
+    Last
+};
+
+static const ContextMenuModel::Item macroContextMenuItems[] = {
+    { "M-BELL" },
+    { "M-TRI" },
+    { "M-RAMP" },
+};
+
 enum class SettingsContextAction {
     Init,
     Randomize,
@@ -518,6 +531,12 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
 
     if (key.pageModifier() && key.is(Key::Step5)) {
         lfoContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step4)) {
+        macroContextShow();
         event.consume();
         return;
     }
@@ -1105,6 +1124,45 @@ void CurveSequenceEditPage::lfoContextAction(int index) {
         showMessage("MIN/MAX RANDOMIZED");
         break;
     case LfoContextAction::Last:
+        break;
+    }
+}
+
+void CurveSequenceEditPage::macroContextShow() {
+    showContextMenu(ContextMenu(
+        macroContextMenuItems,
+        int(MacroContextAction::Last),
+        [&] (int index) { macroContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void CurveSequenceEditPage::macroContextAction(int index) {
+    auto &sequence = _project.selectedCurveSequence();
+
+    // Determine range: use selected steps if any, otherwise all steps
+    int firstStep = 0;
+    int lastStep = CONFIG_STEP_COUNT - 1;
+
+    if (_stepSelection.any()) {
+        firstStep = _stepSelection.firstSetIndex();
+        lastStep = _stepSelection.lastSetIndex();
+    }
+
+    switch (MacroContextAction(index)) {
+    case MacroContextAction::Bell:
+        sequence.populateWithMacroBell(firstStep, lastStep);
+        showMessage("MACRO BELL POPULATED");
+        break;
+    case MacroContextAction::Triangle:
+        sequence.populateWithMacroTri(firstStep, lastStep);
+        showMessage("MACRO TRIANGLE POPULATED");
+        break;
+    case MacroContextAction::Ramp:
+        sequence.populateWithMacroRamp(firstStep, lastStep);
+        showMessage("MACRO RAMP POPULATED");
+        break;
+    case MacroContextAction::Last:
         break;
     }
 }

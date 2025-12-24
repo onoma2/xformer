@@ -71,14 +71,22 @@ Quickly populate a sequence (or selected steps) with standard LFO shapes.
 
 - **Action**: Press **Page + Step 6** (while in Sequence Page).
 - **Options**:
-  - **TRI**: Triangle waves.
-  - **SINE**: Sine wave approximation (SmoothUp/Down).
-  - **SAW**: Sawtooth waves (RampUp).
-  - **SQUA**: Square waves (StepUp/Down).
-- **Selection**: If steps are selected, only those steps are filled. Otherwise, the entire sequence is filled.
+  - **TRI**: Triangle waves (1 cycle/step).
+  - **SINE**: Sine wave approximation (1 cycle/step).
+  - **SAW**: Sawtooth waves (1 cycle/step).
+  - **SQUA**: Square waves (1 cycle/step).
+  - **MM-RND**: Randomize Min/Max ranges (supports inversion).
 
-### 5.2 Multi-Step Gradient Editing
-Create smooth transitions for Shape, Min, and Max values across multiple steps.
+### 5.2 Macro Shape Menu
+Generate smooth curves that span across multiple steps (using start/end points).
+
+- **Action**: Press **Page + Step 5** (while in Sequence Page).
+- **Options**:
+  - **M-BELL**: Bell curve (0->1->0) spanning selection.
+  - **M-TRI**: Triangle wave (0->1->0) spanning selection.
+  - **M-RAMP**: Ramp Up (0->1) spanning selection.
+
+### 5.3 Multi-Step Gradient EditingCreate smooth transitions for Shape, Min, and Max values across multiple steps.
 
 - **Action**: 
   1. Select multiple steps (Hold first step, press last step).

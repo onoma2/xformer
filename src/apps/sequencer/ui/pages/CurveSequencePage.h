@@ -24,6 +24,9 @@ private:
     void lfoContextShow();
     void lfoContextAction(int index);
 
+    void macroContextShow();
+    void macroContextAction(int index);
+
     void initSequence();
     void copySequence();
     void pasteSequence();

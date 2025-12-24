@@ -41,6 +41,19 @@ static const ContextMenuModel::Item lfoContextMenuItems[] = {
     { "MM-RND" },
 };
 
+enum class MacroContextAction {
+    Bell,
+    Triangle,
+    Ramp,
+    Last
+};
+
+static const ContextMenuModel::Item macroContextMenuItems[] = {
+    { "M-BELL" },
+    { "M-TRI" },
+    { "M-RAMP" },
+};
+
 CurveSequencePage::CurveSequencePage(PageManager &manager, PageContext &context) :
     ListPage(manager, context, _listModel)
 {}
@@ -77,6 +90,12 @@ void CurveSequencePage::keyPress(KeyPressEvent &event) {
 
     if (key.pageModifier() && key.is(Key::Step5)) {
         lfoContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step4)) {
+        macroContextShow();
         event.consume();
         return;
     }
@@ -189,6 +208,34 @@ void CurveSequencePage::lfoContextAction(int index) {
         showMessage("MIN/MAX RANDOMIZED");
         break;
     case LfoContextAction::Last:
+        break;
+    }
+}
+
+void CurveSequencePage::macroContextShow() {
+    showContextMenu(ContextMenu(
+        macroContextMenuItems,
+        int(MacroContextAction::Last),
+        [&] (int index) { macroContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void CurveSequencePage::macroContextAction(int index) {
+    switch (MacroContextAction(index)) {
+    case MacroContextAction::Bell:
+        _project.selectedCurveSequence().populateWithMacroBell(0, CONFIG_STEP_COUNT - 1);
+        showMessage("MACRO BELL POPULATED");
+        break;
+    case MacroContextAction::Triangle:
+        _project.selectedCurveSequence().populateWithMacroTri(0, CONFIG_STEP_COUNT - 1);
+        showMessage("MACRO TRIANGLE POPULATED");
+        break;
+    case MacroContextAction::Ramp:
+        _project.selectedCurveSequence().populateWithMacroRamp(0, CONFIG_STEP_COUNT - 1);
+        showMessage("MACRO RAMP POPULATED");
+        break;
+    case MacroContextAction::Last:
         break;
     }
 }

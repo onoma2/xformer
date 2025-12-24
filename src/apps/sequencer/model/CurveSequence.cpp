@@ -389,3 +389,58 @@ void CurveSequence::populateWithRandomMinMax(int firstStep, int lastStep) {
         _steps[i].setMax(std::rand() % (Max::Max + 1));
     }
 }
+
+void CurveSequence::populateWithMacroBell(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    float stepCount = float(maxStep - minStep + 1);
+
+    for (int i = minStep; i <= maxStep; ++i) {
+        float phaseStart = float(i - minStep) / stepCount;
+        float phaseEnd = float(i - minStep + 1) / stepCount;
+
+        float valStart = Curve::eval(Curve::Bell, phaseStart);
+        float valEnd = Curve::eval(Curve::Bell, phaseEnd);
+
+        _steps[i].setMinNormalized(valStart);
+        _steps[i].setMaxNormalized(valEnd);
+        _steps[i].setShape(static_cast<int>(Curve::RampUp));
+    }
+}
+
+void CurveSequence::populateWithMacroTri(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    float stepCount = float(maxStep - minStep + 1);
+
+    for (int i = minStep; i <= maxStep; ++i) {
+        float phaseStart = float(i - minStep) / stepCount;
+        float phaseEnd = float(i - minStep + 1) / stepCount;
+
+        float valStart = Curve::eval(Curve::Triangle, phaseStart);
+        float valEnd = Curve::eval(Curve::Triangle, phaseEnd);
+
+        _steps[i].setMinNormalized(valStart);
+        _steps[i].setMaxNormalized(valEnd);
+        _steps[i].setShape(static_cast<int>(Curve::RampUp));
+    }
+}
+
+void CurveSequence::populateWithMacroRamp(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    float stepCount = float(maxStep - minStep + 1);
+
+    for (int i = minStep; i <= maxStep; ++i) {
+        float phaseStart = float(i - minStep) / stepCount;
+        float phaseEnd = float(i - minStep + 1) / stepCount;
+
+        // RampUp is just linear 0..1
+        float valStart = phaseStart;
+        float valEnd = phaseEnd;
+
+        _steps[i].setMinNormalized(valStart);
+        _steps[i].setMaxNormalized(valEnd);
+        _steps[i].setShape(static_cast<int>(Curve::RampUp));
+    }
+}

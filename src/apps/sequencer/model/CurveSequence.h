@@ -488,6 +488,11 @@ public:
     void populateWithSquareWaveLfo(int firstStep, int lastStep);
     void populateWithRandomMinMax(int firstStep, int lastStep);
 
+    // Macro Curve functions (multi-step rasterization)
+    void populateWithMacroBell(int firstStep, int lastStep);
+    void populateWithMacroTri(int firstStep, int lastStep);
+    void populateWithMacroRamp(int firstStep, int lastStep);
+
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);
 
