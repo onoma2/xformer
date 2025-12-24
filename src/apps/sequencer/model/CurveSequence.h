@@ -89,7 +89,6 @@ public:
         int min() const { return _data0.min; }
         void setMin(int min) {
             _data0.min = Min::clamp(min);
-            _data0.max = std::max(max(), this->min());
         }
 
         float minNormalized() const { return float(min()) / Min::Max; }
@@ -102,7 +101,6 @@ public:
         int max() const { return _data0.max; }
         void setMax(int max) {
             _data0.max = Max::clamp(max);
-            _data0.min = std::min(min(), this->max());
         }
 
         float maxNormalized() const { return float(max()) / Max::Max; }

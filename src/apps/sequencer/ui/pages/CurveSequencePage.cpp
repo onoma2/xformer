@@ -38,7 +38,7 @@ static const ContextMenuModel::Item lfoContextMenuItems[] = {
     { "SINE" },
     { "SAW" },
     { "SQUA" },
-    { "RND" },
+    { "MM-RND" },
 };
 
 CurveSequencePage::CurveSequencePage(PageManager &manager, PageContext &context) :

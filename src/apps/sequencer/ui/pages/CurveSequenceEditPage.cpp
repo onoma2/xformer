@@ -44,7 +44,7 @@ static const ContextMenuModel::Item lfoContextMenuItems[] = {
     { "SINE" },
     { "SAW" },
     { "SQUA" },
-    { "RND" },
+    { "MM-RND" },
 };
 
 enum class SettingsContextAction {
