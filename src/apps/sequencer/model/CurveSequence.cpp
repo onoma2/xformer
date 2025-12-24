@@ -456,18 +456,34 @@ void CurveSequence::populateWithMacroBounce(int firstStep, int lastStep) {
     }
 }
 
-void CurveSequence::populateWithMacroRamp(int firstStep, int lastStep) {
+void CurveSequence::populateWithRasterizedShape(int firstStep, int lastStep) {
     int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
     int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
     float stepCount = float(maxStep - minStep + 1);
+
+    if (stepCount < 2.f) {
+        return;
+    }
+
+    // Source shape is taken from the first step
+    const auto &sourceStep = _steps[minStep];
+    Curve::Type sourceShape = static_cast<Curve::Type>(sourceStep.shape());
+    float sourceMin = sourceStep.minNormalized();
+    float sourceMax = sourceStep.maxNormalized();
 
     for (int i = minStep; i <= maxStep; ++i) {
         float phaseStart = float(i - minStep) / stepCount;
         float phaseEnd = float(i - minStep + 1) / stepCount;
 
-        // RampUp is just linear 0..1
-        float valStart = phaseStart;
-        float valEnd = phaseEnd;
+        // Evaluate the source shape at the corresponding phase
+        float valStartRaw = Curve::eval(sourceShape, phaseStart);
+        float valEndRaw = Curve::eval(sourceShape, phaseEnd);
+
+        // Scale to source step's Min/Max range
+        // Since we support inversion (Min > Max), this logic holds:
+        // val = min + raw * (max - min)
+        float valStart = sourceMin + valStartRaw * (sourceMax - sourceMin);
+        float valEnd = sourceMin + valEndRaw * (sourceMax - sourceMin);
 
         _steps[i].setMinNormalized(valStart);
         _steps[i].setMaxNormalized(valEnd);

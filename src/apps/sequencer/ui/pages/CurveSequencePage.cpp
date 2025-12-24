@@ -46,7 +46,7 @@ enum class MacroContextAction {
     Damp,
     Rise,
     Bounce,
-    Ramp,
+    Raster,
     Last
 };
 
@@ -55,7 +55,7 @@ static const ContextMenuModel::Item macroContextMenuItems[] = {
     { "M-DAMP" },
     { "M-RISE" },
     { "M-BOUNCE" },
-    { "M-RAMP" },
+    { "M-RSTR" },
 };
 
 CurveSequencePage::CurveSequencePage(PageManager &manager, PageContext &context) :
@@ -251,9 +251,9 @@ void CurveSequencePage::macroContextAction(int index) {
         sequence.populateWithMacroBounce(firstStep, lastStep);
         showMessage("MACRO BOUNCE POPULATED");
         break;
-    case MacroContextAction::Ramp:
-        sequence.populateWithMacroRamp(firstStep, lastStep);
-        showMessage("MACRO RAMP POPULATED");
+    case MacroContextAction::Raster:
+        sequence.populateWithRasterizedShape(firstStep, lastStep);
+        showMessage("SHAPE RASTERIZED");
         break;
     case MacroContextAction::Last:
         break;

@@ -493,7 +493,7 @@ public:
     void populateWithMacroDamp(int firstStep, int lastStep);
     void populateWithMacroRise(int firstStep, int lastStep);
     void populateWithMacroBounce(int firstStep, int lastStep);
-    void populateWithMacroRamp(int firstStep, int lastStep);
+    void populateWithRasterizedShape(int firstStep, int lastStep);
 
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);

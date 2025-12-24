@@ -52,7 +52,7 @@ enum class MacroContextAction {
     Damp,
     Rise,
     Bounce,
-    Ramp,
+    Raster,
     Last
 };
 
@@ -61,7 +61,7 @@ static const ContextMenuModel::Item macroContextMenuItems[] = {
     { "M-DAMP" },
     { "M-RISE" },
     { "M-BOUNCE" },
-    { "M-RAMP" },
+    { "M-RSTR" },
 };
 
 enum class SettingsContextAction {
@@ -1144,13 +1144,25 @@ void CurveSequenceEditPage::macroContextShow() {
 void CurveSequenceEditPage::macroContextAction(int index) {
     auto &sequence = _project.selectedCurveSequence();
 
-    // Determine range: use selected steps if any, otherwise sequence loop bounds
-    int firstStep = sequence.firstStep();
-    int lastStep = sequence.lastStep();
+    // Determine range: 
+    // 1. If multiple steps selected: use selection bounds.
+    // 2. If single step selected: use step as start, sequence last step as end.
+    // 3. If no selection: use sequence loop bounds.
+    int firstStep, lastStep;
 
-    if (_stepSelection.any()) {
+    if (_stepSelection.count() > 1) {
         firstStep = _stepSelection.firstSetIndex();
         lastStep = _stepSelection.lastSetIndex();
+    } else if (_stepSelection.count() == 1) {
+        firstStep = _stepSelection.firstSetIndex();
+        lastStep = sequence.lastStep();
+        // Handle case where selected step is after loop end
+        if (firstStep > lastStep) {
+            lastStep = firstStep; 
+        }
+    } else {
+        firstStep = sequence.firstStep();
+        lastStep = sequence.lastStep();
     }
 
     switch (MacroContextAction(index)) {
@@ -1170,9 +1182,9 @@ void CurveSequenceEditPage::macroContextAction(int index) {
         sequence.populateWithMacroBounce(firstStep, lastStep);
         showMessage("MACRO BOUNCE POPULATED");
         break;
-    case MacroContextAction::Ramp:
-        sequence.populateWithMacroRamp(firstStep, lastStep);
-        showMessage("MACRO RAMP POPULATED");
+    case MacroContextAction::Raster:
+        sequence.populateWithRasterizedShape(firstStep, lastStep);
+        showMessage("SHAPE RASTERIZED");
         break;
     case MacroContextAction::Last:
         break;

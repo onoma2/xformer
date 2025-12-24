@@ -1,84 +1,76 @@
-# Curve Track New Features Manual
+# Curve Studio Manual
 
 ## 1. Introduction
 
-The Curve Track has been significantly enhanced with advanced modulation and signal processing capabilities. This manual covers the new "Phase", "Wavefolder", and "Chaos" features, as well as new workflow shortcuts.
+**Curve Studio** represents a major overhaul of the Curve Track engine, transforming it from a simple LFO sequencer into a complex, "wavetable-style" modulation source. This manual covers the new signal processing chain, generative tools, and advanced playback features.
 
-These features transform the Curve Track from a simple LFO sequencer into a complex modulation source capable of generating evolving, chaotic, and harmonically rich control voltages.
+## 2. Signal Processor
 
-## 2. Global Phase
+The signal path has been expanded to include Chaos, Wavefolding, and Filtering.
 
-The Global Phase feature allows you to offset the playback position of your curve sequence relative to the actual step counter. This effectively "rotates" the sequence in floating-point precision without changing the underlying step data.
-
-### 2.1 Overview
-- **Function**: Adds an offset (0-100%) to the read position of the sequence.
-- **Visuals**: A dimmer vertical line indicates the *phased* playback position, while the bright line shows the *actual* step position.
-- **Use Case**: Phase-shifting LFOs against each other, creating "canon" effects with multiple tracks, or fine-tuning modulation timing.
-
-### 2.2 Controls
-- **Access**: Press **F5** (Function key 5) to cycle the edit mode to **PHASE**.
-- **Edit**: Turn the encoder to adjust phase from 0.00 to 1.00.
-- **Recording**: When recording CV into a Curve Track with Global Phase active, the recorded value is passed through; the phase offset is applied to playback.
-
-## 3. Signal Processor (Wavefolder & Filter)
-
-The signal path now includes a post-processing stage with a Wavefolder and a DJ-style Filter. This allows you to take a simple LFO shape (like a triangle) and fold it into complex harmonics or filter it.
-
-### 3.1 Signal Flow
+### 2.1 Signal Flow
 `Step Shape` -> `Chaos` -> `Wavefolder` -> `Filter` -> `Crossfade` -> `Limiter` -> `Output`
 
-### 3.2 Wavefolder
+### 2.2 Wavefolder
 - **Access**: Press **F5** to cycle to **WAVEFOLDER**.
-- **FOLD**: Controls the amount of wavefolding (sine-based folding).
-  - range: 0.00 to 1.00
-  - Increases the number of folds (harmonics) as you increase the value.
-- **GAIN**: Input gain before the folder.
-  - range: 0.00 to 2.00 (0% to 200%)
-  - Driving the gain harder into the folder creates more aggressive timbres.
+- **FOLD**: Controls the amount of wavefolding (sine-based folding). Range: 0.00-1.00.
+- **GAIN**: Input gain before the folder. Range: 0.00-2.00 (0% to 200%).
 
-### 3.3 DJ Filter
+### 2.3 DJ Filter
 - **FILTER**: One-knob filter control.
   - **Center (0.00)**: Filter off.
-  - **Negative (-1.00 to -0.01)**: Low Pass Filter (LPF). Removes highs.
-  - **Positive (0.01 to 1.00)**: High Pass Filter (HPF). Removes lows.
+  - **Negative**: Low Pass Filter (LPF).
+  - **Positive**: High Pass Filter (HPF).
 
-### 3.4 Crossfade (XFADE)
-- **XFADE**: Blends between the original (dry) signal and the processed (folded/filtered) signal.
-  - **0.00**: Dry signal only.
-  - **1.00**: Wet signal only.
+### 2.4 Crossfade (XFADE)
+- **XFADE**: Blends between the dry signal and the processed (folded/filtered) signal.
 
-## 4. Chaos Engine
+## 3. Chaos Engine
 
-A Chaos Generator has been added to the signal path *before* the wavefolder. This allows for generative, non-repetitive modulation that can still be constrained by the sequence structure.
+A generative engine inserted *before* the wavefolder.
 
-### 4.1 Algorithms
-- **Latoocarfian**: A hyperchaotic map that generates stepped, unpredictable values. Great for sample-and-hold style chaos.
-- **Lorenz**: A fluid, strange attractor system. Generates smooth, orbiting values.
-
-### 4.2 Controls
 - **Access**: Press **F5** to cycle to **CHAOS**.
-- **Toggle Algorithm**: Hold **Shift + F1 (AMT)** to switch between Latoocarfian and Lorenz.
-- **AMT (Amount)**: Depth of chaotic modulation added to the curve signal.
-- **HZ (Rate)**: Speed of the chaos evolution.
-- **P1 / P2**: Shape parameters specific to the algorithm.
-  - *Latoocarfian*: Affects the "a/b" and "c/d" coefficients (attractor shape).
-  - *Lorenz*: Affects "Rho" and "Beta" (orbit size and geometry).
+- **Toggle Algorithm**: Hold **Shift + F1** to switch between **Latoocarfian** (Stepped/Sample&Hold) and **Lorenz** (Smooth/Attractor).
+- **Controls**:
+  - **AMT**: Modulation depth.
+  - **HZ**: Evolution speed.
+  - **P1/P2**: Algorithm-specific shape parameters.
 
-## 5. Workflow Shortcuts
+## 4. Advanced Playback
+
+### 4.1 Global Phase
+- **Function**: Offsets the playback position of the sequence (0-100%).
+- **Access**: Press **F5** to cycle to **PHASE**.
+- **Use Case**: Phase-shifting LFOs, canon effects, fine-tuning timing.
+
+### 4.2 True Reverse Playback
+The engine now supports "True Reverse" playback for shapes.
+- **Backward Mode**: Steps play in reverse order (4, 3, 2...), AND the internal shape plays backwards (100% -> 0%).
+- **Pendulum/PingPong**: Shapes play forward on the "up" phase and backward on the "down" phase, creating perfectly smooth loops.
+
+### 4.3 Min/Max Inversion
+You can now create inverted signal windows by setting **Min > Max**.
+- **Normal**: Min=0, Max=255 (Signal goes UP).
+- **Inverted**: Min=255, Max=0 (Signal goes DOWN).
+- **Step**: The step shape scales from "Start" (Min) to "End" (Max).
+
+## 5. Curve Studio Workflow
+
+Curve Studio introduces powerful context menus for populating sequences.
 
 ### 5.1 LFO Context Menu
-Quickly populate a sequence (or selected steps) with standard LFO shapes.
+Populate steps with single-cycle waveforms. Defaults to the active loop range (First Step to Last Step) unless steps are selected.
 
-- **Action**: Press **Page + Step 6** (while in Sequence Page).
+- **Access**: Press **Page + Step 6** (Button 6).
 - **Options**:
-  - **TRI**: Triangle waves (1 cycle/step).
-  - **SINE**: Sine wave approximation (1 cycle/step).
-  - **SAW**: Sawtooth waves (1 cycle/step).
-  - **SQUA**: Square waves (1 cycle/step).
-  - **MM-RND**: Randomize Min/Max ranges (supports inversion).
+  - **TRI**: Triangle (1 cycle/step).
+  - **SINE**: Sine / Bell (1 cycle/step).
+  - **SAW**: Sawtooth / Ramp (1 cycle/step).
+  - **SQUA**: Square / Pulse (1 cycle/step).
+  - **MM-RND**: Randomize Min/Max values for each step (supports inversion).
 
 ### 5.2 Macro Shape Menu
-Generate smooth curves that span across multiple steps (using start/end points).
+"Draw" complex shapes that span across multiple steps. The system calculates the precise start/end points for each step to create a seamless high-resolution curve.
 
 - **Action**: Press **Page + Step 5** (while in Sequence Page).
 - **Options**:
@@ -86,21 +78,18 @@ Generate smooth curves that span across multiple steps (using start/end points).
   - **M-DAMP**: Decaying Sine wave spanning selection (4 cycles).
   - **M-RISE**: Rising Sine wave spanning selection (4 cycles).
   - **M-BOUNCE**: Bouncing semi-sines spanning selection (4 bounces).
-  - **M-RAMP**: Ramp Up (0->1) spanning selection.
+  - **M-RSTR**: Rasterize (Stretch) the shape of the *first step* across the entire selection.
 
-### 5.3 Multi-Step Gradient EditingCreate smooth transitions for Shape, Min, and Max values across multiple steps.
+### 5.3 Multi-Step Gradient Editing
+Create smooth transitions for Shape, Min, and Max values.
 
 - **Action**: 
   1. Select multiple steps (Hold first step, press last step).
   2. Hold **Shift** and turn the Encoder on **MIN** or **MAX**.
 - **Result**: The values will form a linear gradient from the first selected step to the last.
 
-### 5.3 Settings Management
-You can Copy/Paste/Init the Wavefolder and Chaos settings independently of the sequence steps.
+### 5.4 Settings Management
+Copy/Paste/Init the Wavefolder and Chaos settings independently of the sequence steps.
 
 - **Access**: Long-press **Context Menu** button while in Wavefolder or Chaos page.
-- **Options**:
-  - **INIT**: Reset settings to default.
-  - **RAND**: Randomize current page parameters.
-  - **COPY**: Copy settings to clipboard.
-  - **PASTE**: Paste settings from clipboard.
+- **Options**: **INIT**, **RAND**, **COPY**, **PASTE**.
