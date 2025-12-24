@@ -135,21 +135,18 @@ static void drawTuesdayTrack(Canvas &canvas, int trackIndex, const TuesdayTrackE
     case 0:  algoName = "Test"; break;
     case 1:  algoName = "TriTr"; break;
     case 2:  algoName = "Stomp"; break;
-    case 3:  algoName = "Aphex"; break;
-    case 4:  algoName = "Autec"; break;
-    case 5:  algoName = "StpWv"; break;
-    case 6:  algoName = "Marko"; break;
-    case 7:  algoName = "Chip1"; break;
-    case 8:  algoName = "Chip2"; break;
-    case 9:  algoName = "Wobbl"; break;
-    case 10: algoName = "SclWk"; break;
-    case 11: algoName = "Wndow"; break;
-    case 12: algoName = "Minml"; break;
-    case 13: algoName = "Ganz"; break;
-    case 14: algoName = "Blake"; break;
-    case 18: algoName = "Aphex"; break;
-    case 19: algoName = "Autec"; break;
-    case 20: algoName = "StpWv"; break;
+    case 3:  algoName = "Marko"; break;
+    case 4:  algoName = "Chip1"; break;
+    case 5:  algoName = "Chip2"; break;
+    case 6:  algoName = "Wobbl"; break;
+    case 7:  algoName = "SclWk"; break;
+    case 8:  algoName = "Wndow"; break;
+    case 9:  algoName = "Minml"; break;
+    case 10: algoName = "Ganz"; break;
+    case 11: algoName = "Blake"; break;
+    case 12: algoName = "Aphex"; break;
+    case 13: algoName = "Autec"; break;
+    case 14: algoName = "StpWv"; break;
     }
 
     if (algoName[0] != '\0') {

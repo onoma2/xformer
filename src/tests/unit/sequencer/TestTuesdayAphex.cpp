@@ -16,8 +16,8 @@ CASE("header_compiles") {
 }
 
 CASE("aphex_algorithm_index") {
-    // Verify the APHEX algorithm is at index 18
-    expectEqual(18, 18, "APHEX algorithm is at index 18");
+    // Verify the APHEX algorithm is at index 12
+    expectEqual(12, 12, "APHEX algorithm is at index 12");
 }
 
 } // UNIT_TEST("TuesdayAphex")

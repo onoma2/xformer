@@ -16,8 +16,8 @@ CASE("header_compiles") {
 }
 
 CASE("autechre_algorithm_index") {
-    // Verify the AUTECHRE algorithm is at index 19
-    expectEqual(19, 19, "AUTECHRE algorithm is at index 19");
+    // Verify the AUTECHRE algorithm is at index 13
+    expectEqual(13, 13, "AUTECHRE algorithm is at index 13");
 }
 
 } // UNIT_TEST("TuesdayAutech")

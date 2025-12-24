@@ -6,24 +6,24 @@ static const char *algorithmNames[] = {
     "SIMPLE",     // 0
     "TRITRANCE",  // 1
     "STOMPER",    // 2
-    "RESERVED3",  // 3 (MARKOV - not kept)
-    "RESERVED4",  // 4 (CHIPARP - not kept)
-    "RESERVED5",  // 5 (GOACID - not kept)
-    "RESERVED6",  // 6 (SNH - not kept)
-    "RESERVED7",  // 7 (WOBBLE - not kept)
-    "RESERVED8",  // 8 (TECHNO - not kept)
-    "RESERVED9",  // 9 (FUNK - not kept)
-    "RESERVED10", // 10 (DRONE - not kept)
-    "RESERVED11", // 11 (PHASE - not kept)
-    "RESERVED12", // 12 (RAGA - not kept)
-    "RESERVED13", // 13 (AMBIENT - not kept)
-    "RESERVED14", // 14 (ACID - not kept)
-    "RESERVED15", // 15 (DRILL - not kept)
-    "RESERVED16", // 16 (MINIMAL - not kept)
-    "RESERVED17", // 17 (KRAFT - not kept)
-    "APHEX",      // 18
-    "AUTECH",     // 19
-    "STEPWAVE",   // 20
+    "MARKOV",     // 3
+    "CHIPARP1",   // 4
+    "CHIPARP2",   // 5
+    "WOBBLE",     // 6
+    "SCALEWALK",  // 7
+    "WINDOW",     // 8
+    "MINIMAL",    // 9
+    "GANZ",       // 10
+    "BLAKE",      // 11
+    "APHEX",      // 12
+    "AUTECH",     // 13
+    "STEPWAVE",   // 14
+    "RESERVED15", // 15
+    "RESERVED16", // 16
+    "RESERVED17", // 17
+    "RESERVED18", // 18
+    "RESERVED19", // 19
+    "RESERVED20", // 20
 };
 
 // Loop length values: Inf (0), 1-16, 19, 21, 24, 32, 35, 42, 48, 56, 64, 95, 96, 127, 128
@@ -39,21 +39,18 @@ void TuesdaySequence::printAlgorithm(StringBuilder &str) const {
     case 0:  str("Test"); break;
     case 1:  str("TriTrance"); break;
     case 2:  str("Stomper"); break;
-    case 3:  str("Aphex"); break; // Remapped 18
-    case 4:  str("Autech"); break; // Remapped 19
-    case 5:  str("StepWave"); break; // Remapped 20
-    case 6:  str("Markov"); break;
-    case 7:  str("Chip1"); break;
-    case 8:  str("Chip2"); break;
-    case 9:  str("Wobble"); break;
-    case 10: str("ScaleWlk"); break;
-    case 11: str("Window"); break;
-    case 12: str("Minimal"); break;
-    case 13: str("Ganz"); break;
-    case 14: str("Blake"); break;
-    case 18: str("Aphex"); break;
-    case 19: str("Autech"); break;
-    case 20: str("StepWave"); break;
+    case 3:  str("Markov"); break;
+    case 4:  str("Chip1"); break;
+    case 5:  str("Chip2"); break;
+    case 6:  str("Wobble"); break;
+    case 7:  str("ScaleWlk"); break;
+    case 8:  str("Window"); break;
+    case 9:  str("Minimal"); break;
+    case 10: str("Ganz"); break;
+    case 11: str("Blake"); break;
+    case 12: str("Aphex"); break;
+    case 13: str("Autech"); break;
+    case 14: str("StepWave"); break;
     default: str("%d", algorithm()); break;
     }
 }

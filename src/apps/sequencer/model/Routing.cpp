@@ -381,7 +381,7 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::Scale)]                           = { 0,      23,     0,      23,     1       },
     [int(Routing::Target::RootNote)]                        = { 0,      11,     0,      11,     1       },
     // Tuesday targets
-    [int(Routing::Target::Algorithm)]                       = { 0,      20,     0,      20,     1       },
+    [int(Routing::Target::Algorithm)]                       = { 0,      14,     0,      14,     1       },
     [int(Routing::Target::Flow)]                            = { 0,      16,     0,      16,     1       },
     [int(Routing::Target::Ornament)]                        = { 0,      16,     0,      16,     1       },
     [int(Routing::Target::Power)]                           = { 0,      16,     0,      16,     1       },

@@ -80,7 +80,7 @@ The main page displays sequence settings:
 The Algo track has three parameter pages accessible via F1-F4:
 
 **Page 1** (F1-F4): Algorithm, Flow, Ornament, Power
-- **Algorithm**: Selects the generation algorithm (0-20)
+- **Algorithm**: Selects the generation algorithm (0-14)
 - **Flow**: Controls primary algorithm parameter (0-16)
 - **Ornament**: Controls secondary algorithm parameter (0-16)
 - **Power**: Controls note density/cooldown (0-16)

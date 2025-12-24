@@ -72,7 +72,7 @@ Includes 21 algorithms like **Stomper** (Acid bass), **Markov** (Chains), **Chip
 
 ### 2.4 Common Parameters
 
-- **Algorithm (0-20)**: Selects the generation logic.
+- **Algorithm (0-14)**: Selects the generation logic.
 - **Flow/Ornament (0-16)**: Algorithm-specific macro controls.
 - **Power (0-16)**: Note density and cooldown. 0 = Silence.
 - **Loop (0-29)**: 0=Infinite, >0=Finite loop length.
@@ -297,6 +297,17 @@ Advanced wavefolding accessible through the Phase button (cycle F5).
 - **GAIN**: Input gain.
 - **FILTER**: DJ-style Low/High pass.
 - **XFADE**: Dry/Wet mix.
+
+### Chaos
+
+Chaotic modulation source added to the Curve track signal path (Pre-fold).
+- **Access**: Cycle F5 to **CHAOS** page.
+- **Algorithms**: **Latoocarfian** (Hyperchaotic, stepped) or **Lorenz** (Fluid, smooth).
+    - **Toggle Algo**: Hold **Shift + F1** (AMT).
+- **Parameters**:
+    - **AMT**: Modulation depth.
+    - **HZ**: Speed/Rate.
+    - **P1/P2**: Algorithm-specific parameters (e.g., Rho/Beta for Lorenz).
 
 ### LFO Context Menu
 

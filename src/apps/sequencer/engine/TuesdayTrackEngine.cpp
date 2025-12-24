@@ -81,7 +81,7 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.stomper.highNote[1] = _rng.next() % 5;
         break;
 
-    case 6: // MARKOV
+    case 3: // MARKOV
         _rng = Random(flowSeed);
         // Init History
         _algoState.markov.history1 = (_rng.next() & 0x7);
@@ -95,7 +95,7 @@ void TuesdayTrackEngine::initAlgorithm() {
         }
         break;
 
-    case 7: // CHIPARP 1
+    case 4: // CHIPARP 1
         _rng = Random(flowSeed);
         _algoState.chiparp1.chordSeed = _rng.next();
         _algoState.chiparp1.rngSeed = _algoState.chiparp1.chordSeed;
@@ -103,7 +103,7 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.chiparp1.dir = (_rng.next() >> 7) % 2;
         break;
 
-    case 8: // CHIPARP 2
+    case 5: // CHIPARP 2
         _rng = Random(flowSeed);
         _algoState.chiparp2.rngSeed = _rng.next();
         _algoState.chiparp2.chordScaler = (_rng.next() % 3) + 2;
@@ -116,7 +116,7 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.chiparp2.chordLen = 3 + (flow >> 2);
         break;
 
-    case 9: // WOBBLE
+    case 6: // WOBBLE
         // FIX: Corrected RNG assignment to match Tuesday spec (Law 2)
         // Original C had R=seed2, Extra=seed1 (swapped), which violated the spec.
         // Correct: Flow → main RNG (phase selection), Ornament → extra RNG (velocity)
@@ -132,13 +132,13 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.wobble.phaseSpeed2 = 0x02000000; // Slower (will be overridden)
         break;
 
-    case 10: // SCALEWALKER
+    case 7: // SCALEWALKER
         _rng = Random(flowSeed);
         _extraRng = Random(ornamentSeed + 0x9e3779b9);
         _algoState.scalewalker.pos = 0;
         break;
 
-    case 11: // WINDOW
+    case 8: // WINDOW
         _rng = Random(flowSeed);
         _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
@@ -155,7 +155,7 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.window.phaseRatio = 3 + (_rng.next() & 0x3);// 3-6
         break;
 
-    case 12: // MINIMAL
+    case 9: // MINIMAL
         _rng = Random(flowSeed);
         _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
@@ -171,7 +171,7 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.minimal.noteIndex = 0;
         break;
 
-    case 13: // GANZ
+    case 10: // GANZ
         _rng = Random(flowSeed);
         _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
@@ -196,7 +196,7 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.ganz.velocitySample = 128 + (_extraRng.next() & 0x7F);
         break;
 
-    case 14: // BLAKE
+    case 11: // BLAKE
         _rng = Random(flowSeed);
         _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
@@ -218,8 +218,7 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.blake.subBassCountdown = 0;
         break;
 
-    case 3: // APHEX (Mapped from 18)
-    case 18:
+    case 12: // APHEX
         _rng = Random(flowSeed);
         for (int i = 0; i < 4; ++i) _algoState.aphex.track1_pattern[i] = _rng.next() % 12;
         for (int i = 0; i < 3; ++i) _algoState.aphex.track2_pattern[i] = _rng.next() % 3;
@@ -230,8 +229,7 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.aphex.pos3 = (ornament * 3) % 5;
         break;
 
-    case 4: // AUTECHRE (Mapped from 19)
-    case 19:
+    case 13: { // AUTECHRE
         // Seed pattern with variation based on Flow
         _rng = Random(flowSeed);
         for (int i = 0; i < 8; ++i) {
@@ -246,13 +244,15 @@ void TuesdayTrackEngine::initAlgorithm() {
         }
         _algoState.autechre.rule_timer = 8 + (flow * 4);
 
-        _rng = Random(ornamentSeed);
-        for (int i = 0; i < 8; ++i) _algoState.autechre.rule_sequence[i] = _rng.next() % 5;
+        // Reseed _rng temporarily for rule_sequence (matches initAlgorithm pattern)
+        uint32_t tempSeed = _extraRng.next();
+        Random tempRng(tempSeed);
+        for (int i = 0; i < 8; ++i) _algoState.autechre.rule_sequence[i] = tempRng.next() % 5;
         _algoState.autechre.rule_index = 0;
         break;
+    }
 
-    case 5: // STEPWAVE (Mapped from 20)
-    case 20:
+    case 14: { // STEPWAVE
         _rng = Random(flowSeed);
         _extraRng = Random(ornamentSeed + 0x9e3779b9);
 
@@ -264,8 +264,9 @@ void TuesdayTrackEngine::initAlgorithm() {
         _algoState.stepwave.chromatic_offset = 0;
         _algoState.stepwave.is_stepped = true;
         break;
+    }
 
-    default:
+    default: {
         // Fallback to TEST
         _algoState.test.mode = (flow - 1) >> 3;
         _algoState.test.sweepSpeed = ((flow - 1) & 0x3);
@@ -277,9 +278,9 @@ void TuesdayTrackEngine::initAlgorithm() {
         break;
     }
 }
+}
 
 void TuesdayTrackEngine::reset() {
-    _cachedAlgorithm = -1;
     _cachedFlow = -1;
     _cachedOrnament = -1;
     _cachedLoopLength = -1;
@@ -390,8 +391,92 @@ void TuesdayTrackEngine::reseed() {
         _algoState.stomper.highNote[1] = _rng.next() % 5;
         break;
 
-    case 3: // APHEX (Mapped from 18)
-    case 18:
+    case 3: // MARKOV
+        _algoState.markov.history1 = (_rng.next() & 0x7);
+        _algoState.markov.history3 = (_rng.next() & 0x7);
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                _algoState.markov.matrix[i][j][0] = (_rng.next() % 8);
+                _algoState.markov.matrix[i][j][1] = (_rng.next() % 8);
+            }
+        }
+        break;
+
+    case 4: // CHIPARP1
+        _algoState.chiparp1.chordSeed = _rng.next();
+        _algoState.chiparp1.rngSeed = _algoState.chiparp1.chordSeed;
+        _algoState.chiparp1.base = _rng.next() % 3;
+        _algoState.chiparp1.dir = (_rng.next() >> 7) % 2;
+        break;
+
+    case 5: // CHIPARP2
+        _algoState.chiparp2.rngSeed = _rng.next();
+        _algoState.chiparp2.chordScaler = (_rng.next() % 3) + 2;
+        _algoState.chiparp2.offset = (_rng.next() % 5);
+        _algoState.chiparp2.len = ((_rng.next() & 0x3) + 1) * 2;
+        _algoState.chiparp2.timeMult = _rng.nextBinary() ? (_rng.nextBinary() ? 1 : 0) : 0;
+        _algoState.chiparp2.deadTime = 0;
+        _algoState.chiparp2.idx = 0;
+        _algoState.chiparp2.dir = _rng.nextBinary() ? (_rng.nextBinary() ? 1 : 0) : 0;
+        _algoState.chiparp2.chordLen = 3 + (flow >> 2);
+        break;
+
+    case 6: // WOBBLE
+        _algoState.wobble.phase = 0;
+        _algoState.wobble.phaseSpeed = 0x08000000;
+        _algoState.wobble.phase2 = 0;
+        _algoState.wobble.lastWasHigh = 0;
+        _algoState.wobble.phaseSpeed2 = 0x02000000;
+        break;
+
+    case 7: // SCALEWALKER
+        _algoState.scalewalker.pos = 0;
+        break;
+
+    case 8: // WINDOW
+        _algoState.window.slowPhase = _rng.next() << 16;
+        _algoState.window.fastPhase = _rng.next() << 16;
+        _algoState.window.noteMemory = _rng.next() & 0x7;
+        _algoState.window.noteHistory = _rng.next() & 0x7;
+        _algoState.window.ghostThreshold = _rng.next() & 0x1f;
+        _algoState.window.phaseRatio = 3 + (_rng.next() & 0x3);
+        break;
+
+    case 9: // MINIMAL
+        _algoState.minimal.burstLength = 2 + (_rng.next() % 7);
+        _algoState.minimal.silenceLength = 4 + (_cachedFlow % 13);
+        _algoState.minimal.clickDensity = _cachedOrnament * 16;
+        _algoState.minimal.mode = 0;
+        _algoState.minimal.silenceTimer = _algoState.minimal.silenceLength;
+        _algoState.minimal.burstTimer = 0;
+        _algoState.minimal.noteIndex = 0;
+        break;
+
+    case 10: // GANZ
+        _algoState.ganz.phaseA = _rng.next() << 16;
+        _algoState.ganz.phaseB = _rng.next() << 16;
+        _algoState.ganz.phaseC = _rng.next() << 16;
+        for (int i = 0; i < 3; i++) {
+            _algoState.ganz.noteHistory[i] = _rng.next() % 7;
+        }
+        _algoState.ganz.selectMode = _rng.next() % 4;
+        _algoState.ganz.skipDecimator = _cachedFlow >> 2;
+        _algoState.ganz.phraseSkipCount = 0;
+        _algoState.ganz.velocitySample = 128 + (_extraRng.next() & 0x7F);
+        break;
+
+    case 11: // BLAKE
+        // Regenerate motif with new seed
+        for (int i = 0; i < 4; i++) {
+            _algoState.blake.motif[i] = _rng.next() % 7;
+        }
+        _algoState.blake.breathPhase = _rng.next() << 16;
+        _algoState.blake.breathPattern = (_cachedFlow >> 2) % 4;
+        _algoState.blake.breathCycleLength = 4 + ((_cachedOrnament >> 2) % 4);
+        _algoState.blake.subBassCountdown = 0;
+        break;
+
+    case 12: // APHEX
         for (int i = 0; i < 4; ++i) _algoState.aphex.track1_pattern[i] = _rng.next() % 12;
         for (int i = 0; i < 3; ++i) _algoState.aphex.track2_pattern[i] = _rng.next() % 3;
         for (int i = 0; i < 5; ++i) _algoState.aphex.track3_pattern[i] = (_rng.next() % 8 == 0) ? (_rng.next() % 5) : 0;
@@ -400,8 +485,7 @@ void TuesdayTrackEngine::reseed() {
         _algoState.aphex.pos3 = (ornament * 3) % 5;
         break;
 
-    case 4: // AUTECHRE (Mapped from 19)
-    case 19: {
+    case 13: { // AUTECHRE
         for (int i = 0; i < 8; ++i) {
             int r = _rng.next() % 4;
             if (r == 0) _algoState.autechre.pattern[i] = 12; // +1 oct
@@ -415,102 +499,18 @@ void TuesdayTrackEngine::reseed() {
         Random tempRng(tempSeed);
         for (int i = 0; i < 8; ++i) _algoState.autechre.rule_sequence[i] = tempRng.next() % 5;
         _algoState.autechre.rule_index = 0;
-    } break;
+        break;
+    }
 
-    case 5: // STEPWAVE (Mapped from 20)
-    case 20:
+    case 14: { // STEPWAVE
         _algoState.stepwave.direction = 0;
         _algoState.stepwave.step_count = 3 + (_rng.next() % 5);
         _algoState.stepwave.current_step = 0;
         _algoState.stepwave.chromatic_offset = 0;
         _algoState.stepwave.is_stepped = true;
         break;
-
-    case 6: // MARKOV
-        _algoState.markov.history1 = (_rng.next() & 0x7);
-        _algoState.markov.history3 = (_rng.next() & 0x7);
-        for (int i = 0; i < 8; i++) {
-            for (int j = 0; j < 8; j++) {
-                _algoState.markov.matrix[i][j][0] = (_rng.next() % 8);
-                _algoState.markov.matrix[i][j][1] = (_rng.next() % 8);
-            }
-        }
-        break;
-
-    case 7: // CHIPARP1
-        _algoState.chiparp1.chordSeed = _rng.next();
-        _algoState.chiparp1.rngSeed = _algoState.chiparp1.chordSeed;
-        _algoState.chiparp1.base = _rng.next() % 3;
-        _algoState.chiparp1.dir = (_rng.next() >> 7) % 2;
-        break;
-
-    case 8: // CHIPARP2
-        _algoState.chiparp2.rngSeed = _rng.next();
-        _algoState.chiparp2.chordScaler = (_rng.next() % 3) + 2;
-        _algoState.chiparp2.offset = (_rng.next() % 5);
-        _algoState.chiparp2.len = ((_rng.next() & 0x3) + 1) * 2;
-        _algoState.chiparp2.timeMult = _rng.nextBinary() ? (_rng.nextBinary() ? 1 : 0) : 0;
-        _algoState.chiparp2.deadTime = 0;
-        _algoState.chiparp2.idx = 0;
-        _algoState.chiparp2.dir = _rng.nextBinary() ? (_rng.nextBinary() ? 1 : 0) : 0;
-        _algoState.chiparp2.chordLen = 3 + (flow >> 2);
-        break;
-
-    case 9: // WOBBLE
-        _algoState.wobble.phase = 0;
-        _algoState.wobble.phaseSpeed = 0x08000000;
-        _algoState.wobble.phase2 = 0;
-        _algoState.wobble.lastWasHigh = 0;
-        _algoState.wobble.phaseSpeed2 = 0x02000000;
-        break;
-
-    case 10: // SCALEWALKER
-        _algoState.scalewalker.pos = 0;
-        break;
-
-    case 11: // WINDOW
-        _algoState.window.slowPhase = _rng.next() << 16;
-        _algoState.window.fastPhase = _rng.next() << 16;
-        _algoState.window.noteMemory = _rng.next() & 0x7;
-        _algoState.window.noteHistory = _rng.next() & 0x7;
-        _algoState.window.ghostThreshold = _rng.next() & 0x1f;
-        _algoState.window.phaseRatio = 3 + (_rng.next() & 0x3);
-        break;
-
-    case 12: // MINIMAL
-        _algoState.minimal.burstLength = 2 + (_rng.next() % 7);
-        _algoState.minimal.silenceLength = 4 + (_cachedFlow % 13);
-        _algoState.minimal.clickDensity = _cachedOrnament * 16;
-        _algoState.minimal.mode = 0;
-        _algoState.minimal.silenceTimer = _algoState.minimal.silenceLength;
-        _algoState.minimal.burstTimer = 0;
-        _algoState.minimal.noteIndex = 0;
-        break;
-
-    case 13: // GANZ
-        _algoState.ganz.phaseA = _rng.next() << 16;
-        _algoState.ganz.phaseB = _rng.next() << 16;
-        _algoState.ganz.phaseC = _rng.next() << 16;
-        for (int i = 0; i < 3; i++) {
-            _algoState.ganz.noteHistory[i] = _rng.next() % 7;
-        }
-        _algoState.ganz.selectMode = _rng.next() % 4;
-        _algoState.ganz.skipDecimator = _cachedFlow >> 2;
-        _algoState.ganz.phraseSkipCount = 0;
-        _algoState.ganz.velocitySample = 128 + (_extraRng.next() & 0x7F);
-        break;
-
-    case 14: // BLAKE
-        // Regenerate motif with new seed
-        for (int i = 0; i < 4; i++) {
-            _algoState.blake.motif[i] = _rng.next() % 7;
-        }
-        _algoState.blake.breathPhase = _rng.next() << 16;
-        _algoState.blake.breathPattern = (_cachedFlow >> 2) % 4;
-        _algoState.blake.breathCycleLength = 4 + ((_cachedOrnament >> 2) % 4);
-        _algoState.blake.subBassCountdown = 0;
-        break;
     }
+}
 }
 
 TuesdayTrackEngine::GenerationContext TuesdayTrackEngine::calculateContext(uint32_t tick) const {
@@ -1689,29 +1689,23 @@ TuesdayTrackEngine::TuesdayTickResult TuesdayTrackEngine::generateStep(uint32_t 
     // Calculate shared context for all algorithms
     GenerationContext ctx = calculateContext(tick);
 
-    // Map legacy/alternate algorithms to supported set
-    int algo = algorithm;
-    if (algorithm == 18) algo = 3; // APHEX
-    if (algorithm == 19) algo = 4; // AUTECHRE
-    if (algorithm == 20) algo = 5; // STEPWAVE
-
     // Dispatch to algorithm-specific helper
-    switch (algo) {
+    switch (algorithm) {
     case 0:  return generateTest(ctx);
     case 1:  return generateTritrance(ctx);
     case 2:  return generateStomper(ctx);
-    case 3:  return generateAphex(ctx);
-    case 4:  return generateAutechre(ctx);
-    case 5:  return generateStepwave(ctx);
-    case 6:  return generateMarkov(ctx);
-    case 7:  return generateChipArp1(ctx);
-    case 8:  return generateChipArp2(ctx);
-    case 9:  return generateWobble(ctx);
-    case 10: return generateScalewalker(ctx);
-    case 11: return generateWindow(ctx);
-    case 12: return generateMinimal(ctx);
-    case 13: return generateGanz(ctx);
-    case 14: return generateBlake(ctx);
+    case 3:  return generateMarkov(ctx);
+    case 4:  return generateChipArp1(ctx);
+    case 5:  return generateChipArp2(ctx);
+    case 6:  return generateWobble(ctx);
+    case 7:  return generateScalewalker(ctx);
+    case 8:  return generateWindow(ctx);
+    case 9:  return generateMinimal(ctx);
+    case 10: return generateGanz(ctx);
+    case 11: return generateBlake(ctx);
+    case 12: return generateAphex(ctx);
+    case 13: return generateAutechre(ctx);
+    case 14: return generateStepwave(ctx);
     default: return generateTest(ctx);
     }
 }

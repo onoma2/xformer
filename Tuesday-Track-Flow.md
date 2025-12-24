@@ -43,7 +43,7 @@ Think of TuesdayTrack like a three-layer cake, where each layer has a specific j
 **What it stores:**
 ```cpp
 TuesdaySequence {
-    algorithm    // Which recipe (0-20)
+    algorithm    // Which recipe (0-14)
     flow         // Randomness amount (1-16)
     ornament     // Spice amount (1-16)
     power        // How many notes (1-16)

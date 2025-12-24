@@ -10,7 +10,7 @@
 **Core Algorithm Control**
 | Parameter | Range | Purpose |
 |-----------|-------|---------|
-| **algorithm** | 0-20 | Algorithm selector (e.g., MINIMAL, STOMPER) |
+| **algorithm** | 0-14 | Algorithm selector (e.g., MINIMAL, STOMPER) |
 | **flow** | 0-16 | Primary RNG seed & Structure control |
 | **ornament** | 0-16 | Secondary RNG seed, Detail/Density, & Polyrhythm subdivisions |
 | **power** | 0-16 | Gate density (Step & Microgate level cooldown control) |

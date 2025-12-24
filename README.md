@@ -17,8 +17,20 @@ track features (yet).
 #### Algo Track
 - A special track type that generates musical content algorithmically
 - 21 built-in algorithms that produce deterministic results (same parameters = same outputs)
-- Parameters: Algorithm (0-20), Flow (0-16), Ornament (0-16), Power (0-16)
+- Parameters: Algorithm (0-14), Flow (0-16), Ornament (0-16), Power (0-16)
 - Additional controls: Loop Length, Scan, Rotate, CV Mode, Glide, Gate Offset, Trill, Skew
+
+#### DiscreteMap Track
+- Threshold-based sequencer mapping input voltages (Internal Ramp or External CV) to 32 discrete output stages
+- Each stage has independent Threshold, Direction (Rise/Fall/Off), and Note value
+- **Scanner**: `DMap Scan` routing target allows CV-controlled stage flipping
+- **Generators**: Random, Linear, Logarithmic, Exponential generation of thresholds/notes
+
+#### Indexed Track
+- Duration-based sequencer with independent step lengths (0-65535 ticks)
+- Ideal for polyrhythms, unquantized timing, and complex envelopes
+- **Math Operations**: Batch processing (Add, Sub, Ramp, Quantize, Random, Jitter)
+- **Quick Edit**: Set First Step (Rotate), Active Length, Run Mode
 
 #### NOTE TRACK Harmony Engine
 - Creates harmonic relationships between tracks by generating chords based on scale degrees
@@ -37,13 +49,14 @@ track features (yet).
 - Gate Mode: Controls which of multiple pulses fire a gate signal
 - Four modes: All, First, Hold, FirstLast
 
-#### Curve TRACK Global phase offset, shortcuts, track waveshaping
-
-
 #### Global Output Rotation
 - Dynamically rotate which tracks are assigned to physical CV and Gate outputs
 - Acts like a virtual 8-channel sequential switch
 - Allows modulation patterns to "spin" around connected modules
+
+#### Routing Enhancements
+- **VCA Next Shaper**: Amplitude modulation using the next route's raw source
+- **Per-Track Reset**: Hard reset of track engine via routing target (Rising Edge)
 
 #### Curve Track Features
 - **Global Phase**: Offset the playback position of curve sequences (0.00 to 1.00 range)
