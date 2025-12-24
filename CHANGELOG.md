@@ -3,6 +3,25 @@
 ## [Unreleased]
 
 ### Added
+- **Routing Enhancements**:
+  - **VCA Next Shaper (VC)**: Amplitude modulation using the next route's raw source value
+  - **Per-Track Reset Target**: Hard reset of track engine on rising edge of routed signal
+- **New Track Type: DiscreteMap**:
+  - Threshold-based sequencer mapping input voltages (Internal Ramp or External CV) to 32 discrete output stages
+  - Features: Directional triggering (Rise/Fall), Scale quantization, Slew
+  - **Scanner Target**: `DMap Scan` routing target that toggles stage directions via CV
+  - **Generators**: Random, Toggle, Linear, Logarithmic, Exponential generation of thresholds/notes
+  - **Quick Edit**: `Even` distribution and `Flip` directions shortcuts
+- **New Track Type: Indexed**:
+  - Duration-based sequencer where each step has an independent length in clock ticks
+  - Features: Non-grid timing, Polyrhythms, Group-based modulation
+  - **Math Page**: Batch operations (Add, Sub, Mul, Div, Ramp, Quantize, Random, Jitter)
+  - **Quick Edit**: `Set First Step` (Rotate), `Active Length`, `Run Mode`, `Reset Measure`
+- **Algo (Tuesday) Track Enhancements**:
+  - **Status Box**: Visual feedback for Note, Gate, CV, and Step
+  - **Quick Edit**: Randomize parameters (Step 15)
+  - **Reseed**: Shift+F5 shortcut and Context Menu option
+- **Documentation**: Comprehensive updates to XFORMER_MANUAL and individual track manuals
 - **Accumulator UI Enhancements**: Visual indicators for accumulator state across all Note track pages
   - **Counter display**: Shows current accumulator value (e.g., "+5", "-12") in header at x=176 (aligned with step 12)
     - Uses Font::Tiny to match step number size

@@ -216,6 +216,18 @@ Multiple routes can be combined in different ways:
 **Min**: Use minimum of Route A and Route B values
 **Max**: Use maximum of Route A and Route B values
 
+### 5.4 Math Operations (F5)
+
+The Math page allows you to apply batch operations to selected steps (or all steps/groups).
+
+**Available Operations**:
+- **Add/Sub/Mul/Div**: Basic arithmetic
+- **Set**: Set all values to a fixed number
+- **Rand**: Randomize values
+- **Jitter**: Add random jitter to existing values
+- **Ramp**: Create a linear ramp across selected steps (start to end)
+- **Quant**: Quantize values to nearest multiple (e.g., quantize duration to 16 ticks)
+
 ## 6. External CV Modulation
 
 ### 6.1 Setup for External CV
@@ -313,8 +325,10 @@ The Indexed track uses accumulator-based timing:
 - **Page+Step 9**: Split (requires step selection)
 - **Page+Step 10**: Swap (requires step selection, hold + rotate to choose offset)
 - **Page+Step 11**: Merge with next (first selected step only)
-- **Page+Step 12**: Run Mode
-- **Page+Step 13**: Reset Measure
+- **Page+Step 12**: Set First Step (rotates sequence to start at selected step)
+- **Page+Step 13**: Active Length
+- **Page+Step 14**: Run Mode
+- **Page+Step 15**: Reset Measure
 
 ### 9.3 Editing Tips
 

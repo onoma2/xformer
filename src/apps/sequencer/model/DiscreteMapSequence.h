@@ -30,7 +30,8 @@ public:
         enum class TriggerDir : uint8_t {
             Rise,
             Fall,
-            Off
+            Off,
+            Both
         };
 
         // Threshold (-100 to +100)
@@ -45,11 +46,28 @@ public:
             _direction = dir;
         }
         void cycleDirection() {
-            int next = static_cast<int>(_direction) + 1;
-            if (next > static_cast<int>(TriggerDir::Off)) {
-                next = static_cast<int>(TriggerDir::Rise);
+            _direction = advanceDirection(_direction, 1);
+        }
+        static TriggerDir advanceDirection(TriggerDir dir, int delta) {
+            static constexpr TriggerDir order[] = {
+                TriggerDir::Rise,
+                TriggerDir::Fall,
+                TriggerDir::Off,
+                TriggerDir::Both,
+            };
+            int idx = 0;
+            for (int i = 0; i < int(sizeof(order) / sizeof(order[0])); ++i) {
+                if (order[i] == dir) {
+                    idx = i;
+                    break;
+                }
             }
-            _direction = static_cast<TriggerDir>(next);
+            int count = int(sizeof(order) / sizeof(order[0]));
+            int next = (idx + delta) % count;
+            if (next < 0) {
+                next += count;
+            }
+            return order[next];
         }
 
         // Note index (-63 to +64)

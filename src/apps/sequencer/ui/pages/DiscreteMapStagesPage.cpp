@@ -42,15 +42,13 @@ const char *DiscreteMapStagesPage::StageListModel::dirName(DiscreteMapSequence::
     case DiscreteMapSequence::Stage::TriggerDir::Rise: return "Rise";
     case DiscreteMapSequence::Stage::TriggerDir::Fall: return "Fall";
     case DiscreteMapSequence::Stage::TriggerDir::Off:  return "Off";
+    case DiscreteMapSequence::Stage::TriggerDir::Both: return "Both";
     }
     return "";
 }
 
 DiscreteMapSequence::Stage::TriggerDir DiscreteMapStagesPage::StageListModel::cycleDir(DiscreteMapSequence::Stage::TriggerDir dir, int delta) {
-    int v = int(dir) + delta;
-    while (v < 0) v += 3;
-    v %= 3;
-    return static_cast<DiscreteMapSequence::Stage::TriggerDir>(v);
+    return DiscreteMapSequence::Stage::advanceDirection(dir, delta);
 }
 
 void DiscreteMapStagesPage::StageListModel::cell(int row, int column, StringBuilder &str) const {

@@ -23,10 +23,54 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "ROUTE" },
 };
 
+struct Voicing {
+    const char *name;
+    int8_t semis[6];
+    uint8_t count;
+};
+
+static const Voicing kPianoVoicings[] = {
+    { "MAJ13",   { 0, 4, 7, 11, 14, 21 }, 6 },
+    { "MAJ6/9",  { 0, 4, 7, 9, 14, 0 },   5 },
+    { "MIN13",   { 0, 3, 7, 10, 14, 21 }, 6 },
+    { "MIN6/9",  { 0, 3, 7, 9, 14, 0 },   5 },
+    { "MINMAJ9", { 0, 3, 7, 11, 14, 0 },  5 },
+    { "DOM13",   { 0, 4, 7, 10, 14, 21 }, 6 },
+    { "M9B5",    { 0, 3, 6, 10, 14, 0 },  5 },
+    { "DIM7",    { 0, 3, 6, 9, 0, 0 },    4 },
+    { "AUG9",    { 0, 4, 8, 10, 14, 0 },  5 },
+    { "AUGMAJ9", { 0, 4, 8, 11, 14, 0 },  5 },
+    { "SUS2(9)", { 0, 2, 7, 10, 14, 0 },  5 },
+    { "SUS4(11)",{ 0, 5, 7, 10, 14, 17 }, 6 },
+};
+
+static const Voicing kGuitarVoicings[] = {
+    { "MAJ",   { 0, 4, 7, 12, 16, 0 }, 5 },
+    { "MIN",   { 0, 7, 12, 15, 19, 0 }, 5 },
+    { "7",     { 0, 4, 10, 12, 16, 0 }, 5 },
+    { "MAJ7",  { 0, 7, 11, 16, 19, 0 }, 5 },
+    { "MIN7",  { 0, 7, 10, 15, 19, 0 }, 5 },
+    { "6",     { 0, 4, 9, 12, 16, 0 }, 5 },
+    { "MIN6",  { 0, 7, 12, 15, 21, 0 }, 5 },
+    { "9",     { 0, 7, 10, 16, 26, 0 }, 5 },
+    { "13",    { 0, 7, 10, 16, 21, 0 }, 5 },
+    { "SUS2",  { 0, 7, 12, 14, 19, 0 }, 5 },
+    { "SUS4",  { 0, 7, 12, 17, 19, 0 }, 5 },
+    { "ADD9",  { 0, 4, 7, 14, 19, 0 }, 5 },
+    { "AUG",   { 0, 8, 12, 16, 20, 0 }, 5 },
+    { "M7B5",  { 0, 6, 10, 15, 22, 0 }, 5 },
+    { "DIM7",  { 0, 6, 12, 15, 21, 0 }, 5 },
+};
+
+static const int kPianoVoicingCount = int(sizeof(kPianoVoicings) / sizeof(kPianoVoicings[0]));
+static const int kGuitarVoicingCount = int(sizeof(kGuitarVoicings) / sizeof(kGuitarVoicings[0]));
+
 enum {
     QuickEditNone = -1,
     QuickEditEven = -2,
     QuickEditFlip = -3,
+    QuickEditPiano = -4,
+    QuickEditGuitar = -5,
 };
 
 static const int quickEditItems[8] = {
@@ -35,8 +79,8 @@ static const int quickEditItems[8] = {
     int(DiscreteMapSequenceListModel::Item::Divisor),   // Step 11
     QuickEditEven,                                      // Step 12
     QuickEditFlip,                                      // Step 13
-    QuickEditNone,
-    QuickEditNone,
+    QuickEditPiano,                                     // Step 14
+    QuickEditGuitar,                                    // Step 15
     QuickEditNone,
 };
 
@@ -184,6 +228,7 @@ void DiscreteMapSequencePage::drawStageInfo(Canvas &canvas) {
         case DiscreteMapSequence::Stage::TriggerDir::Rise: dirChar = '^'; break;
         case DiscreteMapSequence::Stage::TriggerDir::Fall: dirChar = 'v'; break;
         case DiscreteMapSequence::Stage::TriggerDir::Off:  dirChar = '-'; break;
+        case DiscreteMapSequence::Stage::TriggerDir::Both: dirChar = 'x'; break;
         }
         char dirStr[2] = { dirChar, 0 };
         canvas.drawText(x, y, dirStr); // Center aligned x
@@ -309,6 +354,9 @@ void DiscreteMapSequencePage::updateLeds(Leds &leds) {
         case DiscreteMapSequence::Stage::TriggerDir::Off:
             leds.set(ledIndex, false, false);
             break;
+        case DiscreteMapSequence::Stage::TriggerDir::Both:
+            leds.set(ledIndex, true, true);
+            break;
         }
     }
 
@@ -344,10 +392,22 @@ void DiscreteMapSequencePage::keyDown(KeyEvent &event) {
     _shiftHeld = key.shiftModifier();
     refreshPointers();
 
-    if (key.isQuickEdit() && !key.shiftModifier() && key.quickEdit() == 3) {
-        startEvenQuickEdit();
-        event.consume();
-        return;
+    if (key.isQuickEdit() && !key.shiftModifier()) {
+        if (key.quickEdit() == 3) {
+            startEvenQuickEdit();
+            event.consume();
+            return;
+        }
+        if (key.quickEdit() == 5) {
+            startVoicingQuickEdit(VoicingBank::Piano, key.quickEdit() + 8);
+            event.consume();
+            return;
+        }
+        if (key.quickEdit() == 6) {
+            startVoicingQuickEdit(VoicingBank::Guitar, key.quickEdit() + 8);
+            event.consume();
+            return;
+        }
     }
 
     if (key.isContextMenu()) {
@@ -380,6 +440,14 @@ void DiscreteMapSequencePage::keyDown(KeyEvent &event) {
 }
 
 void DiscreteMapSequencePage::keyUp(KeyEvent &event) {
+    if (_voicingQuickEditActive) {
+        if (event.key().isPage() || (event.key().isStep() && event.key().step() == _voicingQuickEditStep)) {
+            finishVoicingQuickEdit();
+            event.consume();
+            return;
+        }
+    }
+
     if (_evenQuickEditActive) {
         if (event.key().isPage() || (event.key().isStep() && event.key().step() == 11)) {
             finishEvenQuickEdit();
@@ -407,7 +475,7 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
     }
 
     if (key.isQuickEdit() && !key.shiftModifier()) {
-        if (key.quickEdit() == 3) {
+        if (key.quickEdit() == 3 || key.quickEdit() == 5 || key.quickEdit() == 6) {
             event.consume();
             return;
         }
@@ -455,6 +523,14 @@ void DiscreteMapSequencePage::quickEdit(int index) {
         showMessage("DIR FLIP");
         return;
     }
+    if (item == QuickEditPiano) {
+        applyVoicing(VoicingBank::Piano, _pianoVoicingIndex);
+        return;
+    }
+    if (item == QuickEditGuitar) {
+        applyVoicing(VoicingBank::Guitar, _guitarVoicingIndex);
+        return;
+    }
     _listModel.setSequence(_sequence);
     _listModel.setTrack(&_project.selectedTrack().discreteMapTrack());
     _manager.pages().quickEdit.show(_listModel, item);
@@ -475,6 +551,87 @@ void DiscreteMapSequencePage::finishEvenQuickEdit() {
     }
     _evenQuickEditActive = false;
     distributeActiveStagesEvenly(_evenQuickEditTarget);
+}
+
+void DiscreteMapSequencePage::startVoicingQuickEdit(VoicingBank bank, int stepIndex) {
+    if (!_sequence) {
+        return;
+    }
+    _voicingQuickEditActive = true;
+    _voicingQuickEditBank = bank;
+    _voicingQuickEditStep = stepIndex;
+    _voicingQuickEditIndex = (bank == VoicingBank::Piano) ? _pianoVoicingIndex : _guitarVoicingIndex;
+    _voicingQuickEditDirty = false;
+    showVoicingMessage(bank, _voicingQuickEditIndex);
+}
+
+void DiscreteMapSequencePage::finishVoicingQuickEdit() {
+    if (!_voicingQuickEditActive) {
+        return;
+    }
+    _voicingQuickEditActive = false;
+    if (_voicingQuickEditBank == VoicingBank::Piano) {
+        _pianoVoicingIndex = _voicingQuickEditIndex;
+    } else {
+        _guitarVoicingIndex = _voicingQuickEditIndex;
+    }
+    if (_voicingQuickEditDirty) {
+        applyVoicing(_voicingQuickEditBank, _voicingQuickEditIndex);
+    }
+}
+
+void DiscreteMapSequencePage::showVoicingMessage(VoicingBank bank, int voicingIndex) {
+    const Voicing *voicings = (bank == VoicingBank::Piano) ? kPianoVoicings : kGuitarVoicings;
+    const int count = (bank == VoicingBank::Piano) ? kPianoVoicingCount : kGuitarVoicingCount;
+    int index = clamp(voicingIndex, 0, count - 1);
+    FixedStringBuilder<16> msg;
+    msg("%s %s", bank == VoicingBank::Piano ? "PNO" : "GTR", voicings[index].name);
+    showMessage(msg);
+}
+
+void DiscreteMapSequencePage::applyVoicing(VoicingBank bank, int voicingIndex) {
+    if (!_sequence) {
+        return;
+    }
+
+    int activeIndices[DiscreteMapSequence::StageCount];
+    int activeCount = 0;
+    for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+        if (_sequence->stage(i).direction() != DiscreteMapSequence::Stage::TriggerDir::Off) {
+            activeIndices[activeCount++] = i;
+        }
+    }
+
+    if (activeCount == 0) {
+        showMessage("NO ACT");
+        return;
+    }
+
+    const Voicing *voicings = (bank == VoicingBank::Piano) ? kPianoVoicings : kGuitarVoicings;
+    const int count = (bank == VoicingBank::Piano) ? kPianoVoicingCount : kGuitarVoicingCount;
+    int index = clamp(voicingIndex, 0, count - 1);
+    const auto &voicing = voicings[index];
+
+    const Scale &scale = _sequence->selectedScale(_project.selectedScale());
+    const int rootIndex = _sequence->stage(_selectedStage).noteIndex();
+
+    for (int i = 0; i < activeCount; ++i) {
+        int cycle = voicing.count > 0 ? i / voicing.count : 0;
+        int pos = voicing.count > 0 ? i % voicing.count : 0;
+        int transpose = 0;
+        if (cycle % 3 == 1) {
+            transpose = 7;
+        } else if (cycle % 3 == 2) {
+            transpose = -7;
+        }
+        int semis = int(voicing.semis[pos]) + transpose;
+        float volts = float(semis) / 12.f;
+        int degree = scale.noteFromVolts(volts);
+        int noteIndex = rootIndex + degree;
+        _sequence->stage(activeIndices[i]).setNoteIndex(noteIndex);
+    }
+
+    showVoicingMessage(bank, index);
 }
 
 void DiscreteMapSequencePage::distributeActiveStagesEvenly(EvenTarget target) {
@@ -550,6 +707,18 @@ void DiscreteMapSequencePage::distributeActiveStagesEvenly(EvenTarget target) {
 
 void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
     if (!_sequence) {
+        return;
+    }
+
+    if (_voicingQuickEditActive) {
+        const int count = (_voicingQuickEditBank == VoicingBank::Piano) ? kPianoVoicingCount : kGuitarVoicingCount;
+        int next = clamp(_voicingQuickEditIndex + event.value(), 0, count - 1);
+        if (next != _voicingQuickEditIndex) {
+            _voicingQuickEditIndex = next;
+            _voicingQuickEditDirty = true;
+            showVoicingMessage(_voicingQuickEditBank, _voicingQuickEditIndex);
+        }
+        event.consume();
         return;
     }
 
@@ -630,17 +799,7 @@ void DiscreteMapSequencePage::handleBottomRowKey(int idx) {
     // Existing Direction Toggle Logic
     auto &stage = _sequence->stage(idx);
 
-    switch (stage.direction()) {
-    case DiscreteMapSequence::Stage::TriggerDir::Rise:
-        stage.setDirection(DiscreteMapSequence::Stage::TriggerDir::Fall);
-        break;
-    case DiscreteMapSequence::Stage::TriggerDir::Fall:
-        stage.setDirection(DiscreteMapSequence::Stage::TriggerDir::Off);
-        break;
-    case DiscreteMapSequence::Stage::TriggerDir::Off:
-        stage.setDirection(DiscreteMapSequence::Stage::TriggerDir::Rise);
-        break;
-    }
+    stage.cycleDirection();
 
     if (_enginePtr) {
         _enginePtr->invalidateThresholds();

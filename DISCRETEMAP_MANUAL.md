@@ -92,6 +92,8 @@ The main page displays the threshold mapping:
 - **Gate**: Routing for gate behavior
 - **Fill**: Fill pattern routing
 - **Mute**: Track muting routing
+- **Reset**: Triggers a hard reset of the ramp and active stage on rising edge
+- **Scan**: Interactive stage direction toggling (see 5.4 Scanner)
 
 ### 3.3 Stage Editing
 
@@ -155,11 +157,16 @@ The DiscreteMap track includes powerful generator functions:
 
 **GEN Function**:
 - Access via long-press on STEP button
-- Choose generator type: Random, Linear, Logarithmic, Exponential
-- Apply to thresholds, notes, or both
-- NOTE5 (Wide): Generates notes in full range (-63 to +64, 0 to +32 with recent changes)
-- NOTE2 (Narrow): Generates notes in narrow range (0 to +32)
-- THR: Applies to thresholds only
+- Choose generator type:
+  - **Random**: Classic randomization
+  - **Linear**: Linear ramp/distribution
+  - **Logarithmic**: Logarithmic curve
+  - **Exponential**: Exponential curve
+- Apply to thresholds, notes, or both:
+  - **NOTE5** (Wide): Generates notes in full range (-63 to +64)
+  - **NOTE2** (Narrow): Generates notes in narrow range (0 to +32)
+  - **THR**: Applies to thresholds only
+  - **TOG**: Toggle directions (Random mode only)
 
 ### 5.2 Range Macros
 
@@ -180,6 +187,14 @@ Multiple stages can be selected and edited simultaneously:
 - Encoder adjusts all selected stages together
 - Shift + encoder for fine adjustment of all selected stages
 - Multi-stage threshold editing affects all selected stages
+
+### 5.4 Scanner (DMap Scan)
+
+The Scanner is a unique performance feature that allows external CV to dynamically modify the sequence structure.
+
+- **How it works**: Route a CV source to the **DMap Scan** target.
+- **Behavior**: As the CV value changes, it "scans" through the 32 stages. When the scanner enters a stage's segment, it **toggles the direction** of that stage (cycling through ↑ → ↓ → Off).
+- **Application**: Use a manual fader or a slow LFO to "draw" or evolve the sequence pattern in real-time.
 
 ## 6. External CV Processing
 
@@ -270,7 +285,24 @@ The internal triangle provides a smooth triangle wave:
 - **Long press any stage**: Enter multi-selection mode
 - **Shift + Stage**: Select multiple stages for batch editing
 
-### 9.2 Editing Tips
+### 9.2 Quick Edit (Page+Steps 9-16)
+
+- **Page+Step 9**: Range High
+- **Page+Step 10**: Range Low
+- **Page+Step 11**: Divisor
+- **Page+Step 12**: Even (Distribute active stages evenly)
+- **Page+Step 13**: Flip (Invert all directions)
+- **Page+Step 14**: Piano Voicing (hold, rotate to choose; release to apply)
+- **Page+Step 15**: Guitar Voicing (hold, rotate to choose; release to apply)
+
+**Voicing Quick Edit behavior**:
+- First press shows the current bank/voicing; no notes are changed until the encoder is moved.
+- Applies to active stages only (direction not Off); uses selected stage note as root.
+- If there are fewer active stages than notes in the voicing, it fills as many as possible.
+- If there are more active stages, it repeats the voicing with transposition 0, +7, then -7 semitones (cycle).
+- Reapplying with the same root/scale/voicing yields the same result.
+
+### 9.3 Editing Tips
 
 - Use Length mode for proportional musical mappings
 - Use Position mode for precise voltage control
@@ -278,7 +310,7 @@ The internal triangle provides a smooth triangle wave:
 - Use Slew for smooth transitions between stages
 - Multi-select stages to edit multiple parameters simultaneously
 
-### 9.3 Performance Considerations
+### 9.4 Performance Considerations
 
 - More active stages may consume slightly more CPU
 - External CV routing works with standard routing matrix

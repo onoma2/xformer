@@ -76,7 +76,7 @@ void DiscreteMapSequence::randomize() {
     for (auto &stage : _stages) {
         stage.setThreshold(rng.nextRange(199) - 99);
         stage.setNoteIndex(rng.nextRange(128) - 63);
-        auto randomDir = static_cast<DiscreteMapSequence::Stage::TriggerDir>(rng.nextRange(3));
+        auto randomDir = static_cast<DiscreteMapSequence::Stage::TriggerDir>(rng.nextRange(4));
         stage.setDirection(randomDir);
     }
 }
@@ -96,8 +96,8 @@ void DiscreteMapSequence::randomizeNotes() {
 
 void DiscreteMapSequence::randomizeDirections() {
     for (auto &stage : _stages) {
-        // Randomly select one of the three direction options: Rise, Fall, or Off
-        auto randomDir = static_cast<DiscreteMapSequence::Stage::TriggerDir>(rng.nextRange(3));
+        // Randomly select one of the direction options: Rise, Fall, Off, or Both
+        auto randomDir = static_cast<DiscreteMapSequence::Stage::TriggerDir>(rng.nextRange(4));
         stage.setDirection(randomDir);
     }
 }

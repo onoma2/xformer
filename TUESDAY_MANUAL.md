@@ -72,7 +72,7 @@ The main page displays sequence settings:
 - **Top Row**: Algorithm selection and parameter controls
 - **Middle Row**: Loop and timing controls
 - **Bottom Row**: Gate and start parameters
-- **Status Box**: Current note, voltage, and step position
+- **Status Box**: Visual feedback showing current note (with gate indicator), output voltage, and step position
 - **Context Menu**: Init and Reseed options via long-press
 
 ### 3.2 Parameter Pages
@@ -293,7 +293,13 @@ The Algo track uses mathematical algorithms to generate:
 - **Shift+F5**: Reseed algorithm with new seed
 - **Context Menu**: Long press for Init/Reseed
 
-### 9.2 Editing Tips
+### 9.2 Quick Edit (Page+Steps 9-16)
+
+- **Page+Step 9**: Copy parameters
+- **Page+Step 10**: Paste parameters
+- **Page+Step 15**: Randomize (randomizes all parameters)
+
+### 9.3 Editing Tips
 
 - Start with Algorithm 10 (ScaleWalk) for melodic output
 - Use Power parameter to control note density

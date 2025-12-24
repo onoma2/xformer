@@ -405,19 +405,25 @@ int DiscreteMapTrackEngine::findActiveStage(float input, float prevInput) {
     for (int i = 0; i < DiscreteMapSequence::StageCount; i++) {
         const auto &stage = _sequence->stage(i);
 
-        if (stage.direction() == DiscreteMapSequence::Stage::TriggerDir::Off) {
-            continue;
-        }
-
         float thresh = getThresholdVoltage(i);
         bool crossed = false;
 
-        if (stage.direction() == DiscreteMapSequence::Stage::TriggerDir::Rise) {
+        switch (stage.direction()) {
+        case DiscreteMapSequence::Stage::TriggerDir::Rise:
             // Rising edge: previous was below, current is at or above
             crossed = (prevInput < thresh && input >= thresh);
-        } else {  // Fall
+            break;
+        case DiscreteMapSequence::Stage::TriggerDir::Fall:
             // Falling edge: previous was above, current is at or below
             crossed = (prevInput > thresh && input <= thresh);
+            break;
+        case DiscreteMapSequence::Stage::TriggerDir::Both:
+            crossed = (prevInput < thresh && input >= thresh) ||
+                      (prevInput > thresh && input <= thresh);
+            break;
+        case DiscreteMapSequence::Stage::TriggerDir::Off:
+            crossed = false;
+            break;
         }
 
         if (crossed) {

@@ -206,6 +206,13 @@ Depth-Affected Value = Base + ((Biased Value - 50) * Depth / 100)
 - Creates stepped, quantized modulation
 - Good for rhythmic modulation patterns
 
+**VcaNext (VC)**:
+- Performs amplitude modulation using the **next route's** raw source
+- Formula: `Output = Center + (Input - Center) * NextRouteSource`
+- If next route source is 100%, input passes through
+- If next route source is 0%, input is silenced (flattened to center)
+- Allows one route to control the intensity of another (VCA behavior)
+
 ### 6.2 Shaper Signal Flow
 
 After bias and depth are applied:
@@ -274,6 +281,24 @@ Biased + Depth-Affected Value
    - Track 2: Transpose (Bias 0%, Depth 15%), Slide (Bias 5%, Depth 50%)
    - Track 3: Transpose (Bias 0%, Depth 50%), Slide (Bias 0%, Depth 15%)
 
+### 7.4 VCA Modulation (Sidechaining)
+
+**Goal**: Use an envelope to modulate the intensity of an LFO (VCA effect)
+
+1. **Route 1**: The Signal (Carrier)
+   - Target: Filter Cutoff (or any parameter)
+   - Source: CV In 1 (Fast LFO)
+   - Shaper: **VcaNext (VC)**
+
+2. **Route 2**: The Control (Modulator)
+   - Target: None (Dummy route just for source)
+   - Source: CV In 2 (Slow Envelope)
+
+3. **Result**:
+   - The LFO from Route 1 is amplitude-modulated by the Envelope from Route 2.
+   - When Envelope is high, LFO is full strength.
+   - When Envelope is low, LFO is silenced.
+
 ## 8. Advanced Techniques
 
 ### 8.1 Dynamic Range Control
@@ -302,6 +327,16 @@ Use shapers to create threshold effects:
 - Shaper: Location with extreme settings
 - Bias: Offset to desired threshold
 - Depth: Amount of response above/below threshold
+
+### 8.4 Per-Track Reset
+
+Use the **Reset** target to force a track to restart:
+
+**Behavior**:
+- Target: `Reset`
+- Source: Gate or Trigger (CV In, MIDI Note)
+- **Rising Edge**: When the source signal crosses 50%, the targeted track(s) immediately reset.
+- This overrides internal loop counters and positions.
 
 ## 9. Troubleshooting Common Issues
 

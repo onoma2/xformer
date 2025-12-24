@@ -77,6 +77,11 @@ private:
         Last
     };
 
+    enum class VoicingBank : uint8_t {
+        Piano,
+        Guitar,
+    };
+
     void refreshPointers();
     void drawThresholdBar(Canvas &canvas);
     void drawStageInfo(Canvas &canvas);
@@ -85,6 +90,10 @@ private:
     void distributeActiveStagesEvenly(EvenTarget target);
     void startEvenQuickEdit();
     void finishEvenQuickEdit();
+    void startVoicingQuickEdit(VoicingBank bank, int stepIndex);
+    void finishVoicingQuickEdit();
+    void showVoicingMessage(VoicingBank bank, int voicingIndex);
+    void applyVoicing(VoicingBank bank, int voicingIndex);
 
     void handleTopRowKey(int idx);
     void handleBottomRowKey(int idx);
@@ -125,4 +134,11 @@ private:
     DiscreteMapSequenceListModel _listModel;
     bool _evenQuickEditActive = false;
     EvenTarget _evenQuickEditTarget = EvenTarget::Active;
+    bool _voicingQuickEditActive = false;
+    VoicingBank _voicingQuickEditBank = VoicingBank::Piano;
+    int _voicingQuickEditIndex = 0;
+    int _voicingQuickEditStep = 0;
+    bool _voicingQuickEditDirty = false;
+    int _pianoVoicingIndex = 0;
+    int _guitarVoicingIndex = 0;
 };
