@@ -43,14 +43,18 @@ static const ContextMenuModel::Item lfoContextMenuItems[] = {
 
 enum class MacroContextAction {
     Bell,
-    Triangle,
+    Damp,
+    Rise,
+    Bounce,
     Ramp,
     Last
 };
 
 static const ContextMenuModel::Item macroContextMenuItems[] = {
     { "M-BELL" },
-    { "M-TRI" },
+    { "M-DAMP" },
+    { "M-RISE" },
+    { "M-BOUNCE" },
     { "M-RAMP" },
 };
 
@@ -235,9 +239,17 @@ void CurveSequencePage::macroContextAction(int index) {
         sequence.populateWithMacroBell(firstStep, lastStep);
         showMessage("MACRO BELL POPULATED");
         break;
-    case MacroContextAction::Triangle:
-        sequence.populateWithMacroTri(firstStep, lastStep);
-        showMessage("MACRO TRIANGLE POPULATED");
+    case MacroContextAction::Damp:
+        sequence.populateWithMacroDamp(firstStep, lastStep);
+        showMessage("MACRO DAMP POPULATED");
+        break;
+    case MacroContextAction::Rise:
+        sequence.populateWithMacroRise(firstStep, lastStep);
+        showMessage("MACRO RISE POPULATED");
+        break;
+    case MacroContextAction::Bounce:
+        sequence.populateWithMacroBounce(firstStep, lastStep);
+        showMessage("MACRO BOUNCE POPULATED");
         break;
     case MacroContextAction::Ramp:
         sequence.populateWithMacroRamp(firstStep, lastStep);

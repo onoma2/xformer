@@ -83,7 +83,9 @@ Generate smooth curves that span across multiple steps (using start/end points).
 - **Action**: Press **Page + Step 5** (while in Sequence Page).
 - **Options**:
   - **M-BELL**: Bell curve (0->1->0) spanning selection.
-  - **M-TRI**: Triangle wave (0->1->0) spanning selection.
+  - **M-DAMP**: Decaying Sine wave spanning selection (4 cycles).
+  - **M-RISE**: Rising Sine wave spanning selection (4 cycles).
+  - **M-BOUNCE**: Bouncing semi-sines spanning selection (4 bounces).
   - **M-RAMP**: Ramp Up (0->1) spanning selection.
 
 ### 5.3 Multi-Step Gradient EditingCreate smooth transitions for Shape, Min, and Max values across multiple steps.

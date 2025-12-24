@@ -408,20 +408,50 @@ void CurveSequence::populateWithMacroBell(int firstStep, int lastStep) {
     }
 }
 
-void CurveSequence::populateWithMacroTri(int firstStep, int lastStep) {
+void CurveSequence::populateWithMacroDamp(int firstStep, int lastStep) {
     int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
     int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
     float stepCount = float(maxStep - minStep + 1);
+    const float cycles = 4.0f;
 
     for (int i = minStep; i <= maxStep; ++i) {
-        float phaseStart = float(i - minStep) / stepCount;
-        float phaseEnd = float(i - minStep + 1) / stepCount;
+        auto eval = [&] (float t) {
+            return 0.5f + 0.5f * std::sin(t * 2.0f * M_PI * cycles) * (1.0f - t);
+        };
+        _steps[i].setMinNormalized(eval(float(i - minStep) / stepCount));
+        _steps[i].setMaxNormalized(eval(float(i - minStep + 1) / stepCount));
+        _steps[i].setShape(static_cast<int>(Curve::RampUp));
+    }
+}
 
-        float valStart = Curve::eval(Curve::Triangle, phaseStart);
-        float valEnd = Curve::eval(Curve::Triangle, phaseEnd);
+void CurveSequence::populateWithMacroRise(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    float stepCount = float(maxStep - minStep + 1);
+    const float cycles = 4.0f;
 
-        _steps[i].setMinNormalized(valStart);
-        _steps[i].setMaxNormalized(valEnd);
+    for (int i = minStep; i <= maxStep; ++i) {
+        auto eval = [&] (float t) {
+            return 0.5f + 0.5f * std::sin(t * 2.0f * M_PI * cycles) * t;
+        };
+        _steps[i].setMinNormalized(eval(float(i - minStep) / stepCount));
+        _steps[i].setMaxNormalized(eval(float(i - minStep + 1) / stepCount));
+        _steps[i].setShape(static_cast<int>(Curve::RampUp));
+    }
+}
+
+void CurveSequence::populateWithMacroBounce(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    float stepCount = float(maxStep - minStep + 1);
+    const float bounces = 4.0f;
+
+    for (int i = minStep; i <= maxStep; ++i) {
+        auto eval = [&] (float t) {
+            return std::abs(std::sin(t * M_PI * bounces)) * (1.0f - t);
+        };
+        _steps[i].setMinNormalized(eval(float(i - minStep) / stepCount));
+        _steps[i].setMaxNormalized(eval(float(i - minStep + 1) / stepCount));
         _steps[i].setShape(static_cast<int>(Curve::RampUp));
     }
 }

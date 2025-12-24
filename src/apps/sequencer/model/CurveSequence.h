@@ -490,7 +490,9 @@ public:
 
     // Macro Curve functions (multi-step rasterization)
     void populateWithMacroBell(int firstStep, int lastStep);
-    void populateWithMacroTri(int firstStep, int lastStep);
+    void populateWithMacroDamp(int firstStep, int lastStep);
+    void populateWithMacroRise(int firstStep, int lastStep);
+    void populateWithMacroBounce(int firstStep, int lastStep);
     void populateWithMacroRamp(int firstStep, int lastStep);
 
     void write(VersionedSerializedWriter &writer) const;
