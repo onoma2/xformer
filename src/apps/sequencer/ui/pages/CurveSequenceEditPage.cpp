@@ -532,6 +532,19 @@ void CurveSequenceEditPage::updateLeds(Leds &leds) {
             leds.set(index, false, quickEditItems[i] != CurveSequenceListModel::Item::Last);
             leds.mask(index);
         }
+
+        // Curve Studio Shortcuts (Steps 5, 6, 7, 15) - YELLOW
+        // Step 4 (Btn 5): Macro
+        // Step 5 (Btn 6): LFO
+        // Step 6 (Btn 7): Transform
+        // Step 14 (Btn 15): Gate Presets
+        const int shortcuts[] = { 4, 5, 6, 14 };
+        for (int step : shortcuts) {
+            int index = MatrixMap::fromStep(step);
+            leds.unmask(index);
+            leds.set(index, true, true);
+            leds.mask(index);
+        }
     }
 }
 

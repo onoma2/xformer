@@ -98,6 +98,20 @@ void CurveSequencePage::draw(Canvas &canvas) {
 
 void CurveSequencePage::updateLeds(Leds &leds) {
     ListPage::updateLeds(leds);
+
+    if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
+        // Curve Studio Shortcuts (Steps 5, 6, 7) - YELLOW
+        // Step 4 (Btn 5): Macro
+        // Step 5 (Btn 6): LFO
+        // Step 6 (Btn 7): Transform
+        const int shortcuts[] = { 4, 5, 6 };
+        for (int step : shortcuts) {
+            int index = MatrixMap::fromStep(step);
+            leds.unmask(index);
+            leds.set(index, true, true);
+            leds.mask(index);
+        }
+    }
 }
 
 void CurveSequencePage::keyPress(KeyPressEvent &event) {
