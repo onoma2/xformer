@@ -85,7 +85,13 @@ private:
     float _chaosValue = 0.f;
     float _chaosPhase = 0.f;
 
-    bool _activity;
+    // Gate Logic State
+    float _prevCvOutput = 0.f; // For slope detection
+    bool _wasRising = false;   // For peak/trough detection
+    uint32_t _gateTimer = 0;   // Countdown for triggers
+
+    // Output state
+    bool _activity = false;
     bool _gateOutput;
     float _cvOutput = 0.f;
     float _cvOutputTarget = 0.f;

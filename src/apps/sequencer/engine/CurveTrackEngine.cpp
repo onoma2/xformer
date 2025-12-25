@@ -179,18 +179,7 @@ TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
         _linkData.sequenceState = &_sequenceState;
     }
 
-    TickResult result = TickResult::NoUpdate;
-
-    while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
-        result |= TickResult::GateUpdate;
-        _activity = _gateQueue.front().gate;
-        _gateOutput = (!mute() || fill()) && _activity;
-        _gateQueue.pop();
-
-        _engine.midiOutputEngine().sendGate(_track.trackIndex(), _gateOutput);
-    }
-
-    return result;
+    return TickResult::NoUpdate;
 }
 
 void CurveTrackEngine::update(float dt) {
@@ -262,7 +251,6 @@ void CurveTrackEngine::changePattern() {
 void CurveTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     int rotate = _curveTrack.rotate();
     int shapeProbabilityBias = _curveTrack.shapeProbabilityBias();
-    int gateProbabilityBias = _curveTrack.gateProbabilityBias();
 
     const auto &sequence = *_sequence;
     _currentStep = SequenceUtils::rotateStep(_sequenceState.step(), sequence.firstStep(), sequence.lastStep(), rotate);
@@ -273,16 +261,8 @@ void CurveTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     bool fillStep = fill() && (rng.nextRange(100) < uint32_t(fillAmount()));
     _fillMode = fillStep ? _curveTrack.fillMode() : CurveTrack::FillMode::None;
 
-    // Trigger gate pattern
-    int gate = step.gate();
-    for (int i = 0; i < 4; ++i) {
-        if (gate & (1 << i) && evalGate(step, gateProbabilityBias)) {
-            uint32_t gateStart = (divisor * i) / 4;
-            uint32_t gateLength = divisor / 8;
-            _gateQueue.pushReplace({ Groove::applySwing(tick + gateStart, swing()), true });
-            _gateQueue.pushReplace({ Groove::applySwing(tick + gateStart + gateLength, swing()), false });
-        }
-    }
+    // Legacy gate pattern generation removed.
+    // Gates are now generated dynamically in updateOutput based on curve slope/events.
 }
 
 void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
@@ -324,6 +304,10 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
         }
         _phasedStep = _currentStep;
         _phasedStepFraction = _currentStepFraction;
+        
+        // Mute should silence the gate output
+        _gateOutput = false;
+        _activity = false;
     } else {
         bool fillVariation = _fillMode == CurveTrack::FillMode::Variation;
         bool fillNextPattern = _fillMode == CurveTrack::FillMode::NextPattern;
@@ -411,8 +395,70 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
 
         // 10. Apply final hard limiting to ensure output never exceeds ±5V
         _cvOutputTarget = std::max(-5.0f, std::min(5.0f, voltage));
+
+        // --- GATE LOGIC ---
+        int gateMask = step.gate();
+        int gateParam = step.gateProbability(); // 0-7
+        bool gateHigh = false;
+
+        float current = _cvOutputTarget;
+        float slope = current - _prevCvOutput;
+        
+        // Threshold for slope detection to avoid noise triggering
+        const float slopeThresh = 0.0001f;
+        bool isRising = slope > slopeThresh;
+        bool isFalling = slope < -slopeThresh;
+
+        if (gateMask != 0) {
+            // EVENT MODE
+            bool trigger = false;
+            
+            // Zero Crossings
+            if ((gateMask & CurveSequence::ZeroRise) && (_prevCvOutput <= 0.f && current > 0.f)) trigger = true;
+            if ((gateMask & CurveSequence::ZeroFall) && (_prevCvOutput >= 0.f && current < 0.f)) trigger = true;
+            
+            // Peak/Trough
+            if ((gateMask & CurveSequence::Peak) && _wasRising && isFalling) trigger = true;
+            if ((gateMask & CurveSequence::Trough) && !_wasRising && isRising) trigger = true;
+            
+                    if (trigger) {
+                        // Fixed trigger length of 3 ticks (~7.8ms @ 120BPM)
+                        _gateTimer = 3; 
+                    }        } else {
+            // ADVANCED MODE (Mask == 0)
+            using Mode = CurveSequence::AdvancedGateMode;
+            Mode mode = Mode(gateParam);
+            
+            switch (mode) {
+            case Mode::RisingSlope: gateHigh = isRising; break;
+            case Mode::FallingSlope: gateHigh = isFalling; break;
+            case Mode::AnySlope: gateHigh = (isRising || isFalling); break;
+            case Mode::Compare25: gateHigh = current > range.denormalize(0.25f); break;
+            case Mode::Compare50: gateHigh = current > range.denormalize(0.50f); break;
+            case Mode::Compare75: gateHigh = current > range.denormalize(0.75f); break;
+            case Mode::Window: 
+                gateHigh = (current > range.denormalize(0.25f) && current < range.denormalize(0.75f)); 
+                break;
+            case Mode::Off: break;
+            }
+        }
+        
+        if (_gateTimer > 0) {
+            gateHigh = true;
+            _gateTimer--;
+        }
+        
+        _gateOutput = gateHigh;
+        _activity = gateHigh;
+        // Update history state
+        if (isRising) _wasRising = true;
+        if (isFalling) _wasRising = false;
     }
 
+    _prevCvOutput = _cvOutputTarget;
+    
+    bool finalGate = (!mute() || fill()) && _gateOutput;
+    _engine.midiOutputEngine().sendGate(_track.trackIndex(), finalGate);
     _engine.midiOutputEngine().sendCv(_track.trackIndex(), _cvOutputTarget);
 }
 

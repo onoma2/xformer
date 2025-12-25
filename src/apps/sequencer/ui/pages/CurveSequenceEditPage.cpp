@@ -357,19 +357,13 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
             track.printGlobalPhase(str);
             WindowPainter::drawActiveFunction(canvas, str);
         } else {
-            WindowPainter::drawActiveFunction(canvas, CurveSequence::layerName(layer()));
-        }
-
-        WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), activeFunctionKey());
-
-        canvas.setBlendMode(BlendMode::Add);
-        // Draw Step/Phase UI
-        if (_editMode == EditMode::GlobalPhase) {
-            FixedStringBuilder<16> str("PHASE: ");
-            track.printGlobalPhase(str);
-            WindowPainter::drawActiveFunction(canvas, str);
-        } else {
-            WindowPainter::drawActiveFunction(canvas, CurveSequence::layerName(layer()));
+            const char *functionName = CurveSequence::layerName(layer());
+            if (layer() == Layer::GateProbability) {
+                functionName = "GATE MODE";
+            } else if (layer() == Layer::Gate) {
+                functionName = "GATE EVENTS";
+            }
+            WindowPainter::drawActiveFunction(canvas, functionName);
         }
 
         WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), activeFunctionKey());
@@ -825,14 +819,14 @@ void CurveSequenceEditPage::switchLayer(int functionKey, bool shift) {
         break;
     case Function::Gate:
         switch (layer()) {
-        case Layer::Gate:
-            setLayer(Layer::GateProbability);
-            break;
         case Layer::GateProbability:
             setLayer(Layer::Gate);
             break;
+        case Layer::Gate:
+            setLayer(Layer::GateProbability);
+            break;
         default:
-            setLayer(Layer::Gate);
+            setLayer(Layer::GateProbability);
             break;
         }
         break;
@@ -912,8 +906,6 @@ void CurveSequenceEditPage::drawDetail(Canvas &canvas, const CurveSequence::Step
         break;
     case Layer::Min:
     case Layer::Max:
-    case Layer::Gate:
-    case Layer::GateProbability:
         SequencePainter::drawProbability(
             canvas,
             64 + 32 + 8, 32 - 4, 64 - 16, 8,
@@ -924,6 +916,60 @@ void CurveSequenceEditPage::drawDetail(Canvas &canvas, const CurveSequence::Step
         canvas.setColor(Color::Bright);
         canvas.drawTextCentered(64 + 32 + 64, 32 - 4, 32, 8, str);
         break;
+    case Layer::Gate: {
+        int gate = step.gate();
+        if (gate == 0) {
+            str.reset();
+            str("ADVANCED");
+            canvas.setColor(Color::Bright);
+            canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
+        } else {
+            // Draw bit flags: P, T, Z+, Z-
+            canvas.setFont(Font::Tiny);
+            int y = 32 - 4;
+            int spacing = 16;
+            int startX = 64 + 32 + 8;
+            
+            auto drawBit = [&](int bit, const char* name, int idx) {
+                canvas.setColor((gate & (1<<bit)) ? Color::Bright : Color::Low);
+                canvas.drawText(startX + idx * spacing, y, name);
+            };
+            
+            drawBit(0, "P", 0);
+            drawBit(1, "T", 1);
+            drawBit(2, "Z+", 2);
+            drawBit(3, "Z-", 3);
+        }
+        break;
+    }
+    case Layer::GateProbability: {
+        int gate = step.gate();
+        if (gate == 0) {
+            // Advanced Mode
+            const char* modeName = "OFF";
+            switch (CurveSequence::AdvancedGateMode(step.gateProbability())) {
+                case CurveSequence::AdvancedGateMode::Off: modeName = "OFF"; break;
+                case CurveSequence::AdvancedGateMode::RisingSlope: modeName = "RISE"; break;
+                case CurveSequence::AdvancedGateMode::FallingSlope: modeName = "FALL"; break;
+                case CurveSequence::AdvancedGateMode::AnySlope: modeName = "MOVE"; break;
+                case CurveSequence::AdvancedGateMode::Compare25: modeName = "> 25%"; break;
+                case CurveSequence::AdvancedGateMode::Compare50: modeName = "> 50%"; break;
+                case CurveSequence::AdvancedGateMode::Compare75: modeName = "> 75%"; break;
+                case CurveSequence::AdvancedGateMode::Window: modeName = "WIND"; break;
+            }
+            str.reset();
+            str(modeName);
+            canvas.setColor(Color::Bright);
+            canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
+        } else {
+            // Trigger Length
+            str.reset();
+            str("LEN: %d", step.gateProbability());
+            canvas.setColor(Color::Bright);
+            canvas.drawTextCentered(64 + 32, 16, 64, 32, str);
+        }
+        break;
+    }
     case Layer::Last:
         break;
     }

@@ -40,6 +40,25 @@ public:
         Last
     };
 
+    // New Gate Logic Definitions
+    enum class AdvancedGateMode {
+        Off = 0,
+        RisingSlope = 1,
+        FallingSlope = 2,
+        AnySlope = 3,
+        Compare25 = 4,
+        Compare50 = 5,
+        Compare75 = 6,
+        Window = 7
+    };
+
+    enum EventGateBits {
+        Peak = 1,
+        Trough = 2,
+        ZeroRise = 4,
+        ZeroFall = 8
+    };
+
     static const char *layerName(Layer layer) {
         switch (layer) {
         case Layer::Shape:                      return "SHAPE";

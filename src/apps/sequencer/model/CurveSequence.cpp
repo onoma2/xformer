@@ -397,7 +397,6 @@ void CurveSequence::populateWithMacroInit(int firstStep, int lastStep) {
     for (int i = minStep; i <= maxStep; ++i) {
         _steps[i].setMin(0);
         _steps[i].setMax(255);
-        _steps[i].setShape(static_cast<int>(Curve::Triangle));
     }
 }
 
