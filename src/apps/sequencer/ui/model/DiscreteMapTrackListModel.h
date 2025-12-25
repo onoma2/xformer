@@ -2,11 +2,11 @@
 
 #include "Config.h"
 #include "RoutableListModel.h"
-#include "model/IndexedTrack.h"
+#include "model/DiscreteMapTrack.h"
 
-class IndexedTrackListModel : public RoutableListModel {
+class DiscreteMapTrackListModel : public RoutableListModel {
 public:
-    void setTrack(IndexedTrack *track) {
+    void setTrack(DiscreteMapTrack *track) {
         _track = track;
     }
 
@@ -34,12 +34,6 @@ public:
 
     virtual Routing::Target routingTarget(int row) const override {
         switch (Item(row)) {
-        case SlideTime:
-            return Routing::Target::SlideTime;
-        case Octave:
-            return Routing::Target::Octave;
-        case Transpose:
-            return Routing::Target::Transpose;
         default:
             return Routing::Target::None;
         }
@@ -49,9 +43,6 @@ private:
     enum Item {
         PlayMode,
         CvUpdateMode,
-        SlideTime,
-        Octave,
-        Transpose,
         Last
     };
 
@@ -59,9 +50,6 @@ private:
         switch (item) {
         case PlayMode:     return "Play Mode";
         case CvUpdateMode: return "CV Update";
-        case SlideTime:    return "Slide Time";
-        case Octave:       return "Octave";
-        case Transpose:    return "Transpose";
         case Last:         break;
         }
         return nullptr;
@@ -79,15 +67,6 @@ private:
         case CvUpdateMode:
             _track->printCvUpdateMode(str);
             break;
-        case SlideTime:
-            _track->printSlideTime(str);
-            break;
-        case Octave:
-            _track->printOctave(str);
-            break;
-        case Transpose:
-            _track->printTranspose(str);
-            break;
         case Last:
             break;
         }
@@ -101,19 +80,10 @@ private:
         case CvUpdateMode:
             _track->editCvUpdateMode(value, shift);
             break;
-        case SlideTime:
-            _track->editSlideTime(value, shift);
-            break;
-        case Octave:
-            _track->editOctave(value, shift);
-            break;
-        case Transpose:
-            _track->editTranspose(value, shift);
-            break;
         case Last:
             break;
         }
     }
 
-    IndexedTrack *_track = nullptr;
+    DiscreteMapTrack *_track = nullptr;
 };

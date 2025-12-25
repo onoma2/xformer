@@ -41,8 +41,8 @@ void DiscreteMapTrackEngine::reset() {
     _prevThresholdMode = _sequence ? _sequence->thresholdMode() : DiscreteMapSequence::ThresholdMode::Position;
 
     // Initialize sampled pitch params (for Gate mode)
-    _sampledOctave = _discreteMapTrack.octave();
-    _sampledTranspose = _discreteMapTrack.transpose();
+    _sampledOctave = _sequence ? _sequence->octave() : 0;
+    _sampledTranspose = _sequence ? _sequence->transpose() : 0;
     _sampledRootNote = _sequence ? _sequence->rootNote() : 0;
 }
 
@@ -141,11 +141,35 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
 
     // 1. Update input source
     if (_sequence->clockSource() != DiscreteMapSequence::ClockSource::External) {
-        if (_running || _sequence->loop()) {
-            updateRamp(relativeTick);
+        switch (_discreteMapTrack.playMode()) {
+        case Types::PlayMode::Aligned: {
+            // Sync ramp phase to bar position
+            uint32_t resetDivisor = _sequence->resetMeasure() * _engine.measureDivisor();
+            if (resetDivisor > 0 && (_running || _sequence->loop())) {
+                uint32_t barTick = relativeTick % resetDivisor;
+                _rampPhase = static_cast<float>(barTick) / resetDivisor;
+
+                // Apply triangle wave if InternalTriangle mode
+                if (_sequence->clockSource() == DiscreteMapSequence::ClockSource::InternalTriangle) {
+                    float triPhase = (_rampPhase < 0.5f) ? (_rampPhase * 2.0f) : (1.0f - (_rampPhase - 0.5f) * 2.0f);
+                    _rampValue = kInternalRampMin + triPhase * (kInternalRampMax - kInternalRampMin);
+                } else {
+                    _rampValue = kInternalRampMin + _rampPhase * (kInternalRampMax - kInternalRampMin);
+                }
+            }
+            break;
+        }
+        case Types::PlayMode::Free:
+            if (_running || _sequence->loop()) {
+                updateRamp(relativeTick);
+            }
+            break;
+        case Types::PlayMode::Last:
+            break;
         }
         _currentInput = _rampValue;
     } else {
+        // External mode: ignore PlayMode, use external input
         _currentInput = getRoutedInput();
     }
 
@@ -206,8 +230,8 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     if (gateChanged && _activeStage >= 0) {
         // Sample pitch params for Gate mode (sample-and-hold behavior)
         if (_discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Gate) {
-            _sampledOctave = _discreteMapTrack.octave();
-            _sampledTranspose = _discreteMapTrack.transpose();
+            _sampledOctave = _sequence->octave();
+            _sampledTranspose = _sequence->transpose();
             _sampledRootNote = _sequence->rootNote();
         }
 
@@ -236,7 +260,7 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     if (shouldOutputCv) {
         if (_activeStage >= 0) {
             _targetCv = noteIndexToVoltage(_sequence->stage(_activeStage).noteIndex());
-            _targetCv += _discreteMapTrack.offset() * 0.01f;
+            _targetCv += _sequence->offset() * 0.01f;
         } else {
             _targetCv = 0.0f;  // Default to 0V when no stage is active in Always mode
         }
@@ -451,8 +475,8 @@ float DiscreteMapTrackEngine::noteIndexToVoltage(int8_t noteIndex) {
         transpose = _sampledTranspose;
         rootNote = _sampledRootNote;
     } else {
-        octave = _discreteMapTrack.octave();
-        transpose = _discreteMapTrack.transpose();
+        octave = _sequence->octave();
+        transpose = _sequence->transpose();
         rootNote = _sequence->rootNote();
     }
 

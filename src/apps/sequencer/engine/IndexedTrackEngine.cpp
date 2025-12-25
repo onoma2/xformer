@@ -215,28 +215,56 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
         _pendingTrigger = false;
     }
 
-    // 1. Handle Gate (counts down independently of step progress)
+    // 1. Handle Gate (counts down independently of step progress in both modes)
     if (_gateTimer > 0) {
         _gateTimer--;
     }
 
-    // 2. Get current step duration
-    const uint16_t stepDuration = static_cast<uint16_t>(_effectiveStepDuration);
+    // 2. Step Advancement (mode-specific)
+    switch (_indexedTrack.playMode()) {
+    case Types::PlayMode::Aligned: {
+        // Calculate step from global tick position
+        uint32_t divisor = _sequence->divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+        uint32_t resetDivisor = (_sequence->syncMode() == IndexedSequence::SyncMode::ResetMeasure)
+                                ? _sequence->resetMeasure() * _engine.measureDivisor()
+                                : 0;
+        uint32_t relativeTick = resetDivisor > 0 ? (tick % resetDivisor) : tick;
 
-    // If current step has zero duration, don't advance timer (wait for next tick)
-    // Note: advanceStep() already skips zero-duration steps, so this should rarely happen
-    // except when user edits the current step to zero while playing
-    if (stepDuration == 0) {
-        return TickResult::NoUpdate;
+        // Check if we're on a step boundary
+        if (relativeTick % divisor == 0) {
+            uint32_t absoluteStep = relativeTick / divisor;
+            int oldStep = _sequenceState.step();
+
+            _sequenceState.advanceAligned(absoluteStep, _sequence->runMode(),
+                                         0, _sequence->activeLength() - 1, _rng);
+
+            if (_sequenceState.step() != oldStep) {
+                _currentStepIndex = _sequenceState.step();
+                triggerStep();
+            }
+        }
+        break;
     }
+    case Types::PlayMode::Free: {
+        // Timer-based advancement (original behavior)
+        const uint16_t stepDuration = static_cast<uint16_t>(_effectiveStepDuration);
 
-    // 3. Handle Duration (the accumulator)
-    _stepTimer++;
+        // If current step has zero duration, don't advance timer
+        if (stepDuration == 0) {
+            return TickResult::NoUpdate;
+        }
 
-    // 4. Check for Step Transition
-    if (_stepTimer >= stepDuration) {
-        advanceStep();  // This automatically skips zero-duration steps
-        triggerStep();   // Trigger the new step we just advanced to
+        _stepTimer++;
+
+        // Check for step transition
+        if (_stepTimer >= stepDuration) {
+            advanceStep();  // This automatically skips zero-duration steps
+            triggerStep();   // Trigger the new step we just advanced to
+        }
+        break;
+    }
+    case Types::PlayMode::Last:
+        break;
     }
 
     return TickResult::NoUpdate;

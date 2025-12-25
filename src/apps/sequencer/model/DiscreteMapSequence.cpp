@@ -46,6 +46,9 @@ void DiscreteMapSequence::clear() {
     _scale = -1;
     _rootNote = 0;
     _slewEnabled = false;
+    _octave = 0;
+    _transpose = 0;
+    _offset = 0;
     _rangeHigh = 5.0f;
     _rangeLow = -5.0f;
 
@@ -113,6 +116,9 @@ void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_scale);
     writer.write(_rootNote);
     writer.write(_slewEnabled);
+    writer.write(_octave);
+    writer.write(_transpose);
+    writer.write(_offset);
     writer.write(_rangeHigh);
     writer.write(_rangeLow);
 
@@ -144,6 +150,9 @@ void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
 
     reader.read(_rootNote);
     reader.read(_slewEnabled);
+    reader.read(_octave);
+    reader.read(_transpose);
+    reader.read(_offset);
 
     reader.read(_rangeHigh);
     reader.read(_rangeLow);
@@ -163,6 +172,15 @@ void DiscreteMapSequence::writeRouted(Routing::Target target, int intValue, floa
         break;
     case Routing::Target::RootNote:
         setRootNote(intValue);
+        break;
+    case Routing::Target::Octave:
+        setOctave(intValue);
+        break;
+    case Routing::Target::Transpose:
+        setTranspose(intValue);
+        break;
+    case Routing::Target::Offset:
+        setOffset(intValue);
         break;
     case Routing::Target::DiscreteMapRangeHigh:
         setRangeHigh(floatValue);

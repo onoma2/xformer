@@ -49,6 +49,21 @@ public:
         str(cvUpdateModeName(cvUpdateMode()));
     }
 
+    // playMode
+
+    Types::PlayMode playMode() const { return _playMode; }
+    void setPlayMode(Types::PlayMode playMode) {
+        _playMode = ModelUtils::clampedEnum(playMode);
+    }
+
+    void editPlayMode(int value, bool shift) {
+        setPlayMode(ModelUtils::adjustedEnum(playMode(), value));
+    }
+
+    void printPlayMode(StringBuilder &str) const {
+        str(Types::playModeName(playMode()));
+    }
+
     // slideTime
 
     int slideTime() const { return _slideTime.get(isRouted(Routing::Target::SlideTime)); }
@@ -141,6 +156,7 @@ private:
 
     int8_t _trackIndex = -1;
     CvUpdateMode _cvUpdateMode = CvUpdateMode::Gate;
+    Types::PlayMode _playMode = Types::PlayMode::Aligned;
     IndexedSequenceArray _sequences;
     float _routedSync = 0.f;
     Routable<int8_t> _octave;

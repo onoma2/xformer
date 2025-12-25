@@ -10,15 +10,18 @@ void TuesdayTrack::cvOutputName(int index, StringBuilder &str) const {
 }
 
 void TuesdayTrack::clear() {
+    setPlayMode(Types::PlayMode::Aligned);
     for (auto &sequence : _sequences) {
         sequence.clear();
     }
 }
 
 void TuesdayTrack::write(VersionedSerializedWriter &writer) const {
+    writer.write(_playMode);
     writeArray(writer, _sequences);
 }
 
 void TuesdayTrack::read(VersionedSerializedReader &reader) {
+    reader.read(_playMode);
     readArray(reader, _sequences);
 }

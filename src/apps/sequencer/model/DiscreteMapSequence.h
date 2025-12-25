@@ -216,6 +216,24 @@ public:
         _slewEnabled = !_slewEnabled;
     }
 
+    // Octave
+    int octave() const { return _octave; }
+    void setOctave(int octave) {
+        _octave = clamp(octave, -10, 10);
+    }
+
+    // Transpose
+    int transpose() const { return _transpose; }
+    void setTranspose(int transpose) {
+        _transpose = clamp(transpose, -60, 60);
+    }
+
+    // Offset (in centiv olts: -500 to +500 = -5.00V to +5.00V)
+    int offset() const { return _offset; }
+    void setOffset(int offset) {
+        _offset = clamp(offset, -500, 500);
+    }
+
     // Voltage Range (ABOVE/BELOW)
     float rangeHigh() const { return _rangeHigh; }
     void setRangeHigh(float v) {
@@ -350,6 +368,9 @@ private:
     int8_t _scale = -1;
     int8_t _rootNote = 0;       // C
     bool _slewEnabled = false;
+    int8_t _octave = 0;
+    int8_t _transpose = 0;
+    int16_t _offset = 0;
 
     float _rangeHigh = 5.0f;    // Default +5V (Eurorack standard)
     float _rangeLow = -5.0f;    // Default -5V

@@ -5,7 +5,6 @@
 #include "RoutableListModel.h"
 
 #include "model/DiscreteMapSequence.h"
-#include "model/DiscreteMapTrack.h"
 
 class DiscreteMapSequenceListModel : public RoutableListModel {
 public:
@@ -27,12 +26,10 @@ public:
         Octave,
         Transpose,
         Offset,
-        CvUpdateMode,  // Add this before Last
         Last
     };
 
     void setSequence(DiscreteMapSequence *sequence) { _sequence = sequence; }
-    void setTrack(DiscreteMapTrack *track) { _track = track; }
 
     virtual int rows() const override { return _sequence ? Last : 0; }
     virtual int columns() const override { return 2; }
@@ -71,8 +68,8 @@ public:
             return Routing::Target::Octave;
         case Transpose:
             return Routing::Target::Transpose;
-        case CvUpdateMode:
-            return Routing::Target::None;  // Not routable
+        case Offset:
+            return Routing::Target::Offset;
         default:
             return Routing::Target::None;
         }
@@ -96,7 +93,6 @@ private:
         case Octave:        return "Octave";
         case Transpose:     return "Transpose";
         case Offset:        return "Offset";
-        case CvUpdateMode:  return "CV Update";
         case Last:          break;
         }
         return nullptr;
@@ -145,16 +141,13 @@ private:
             _sequence->printSlew(str);
             break;
         case Octave:
-            if (_track) str("%+d", _track->octave());
+            str("%+d", _sequence->octave());
             break;
         case Transpose:
-            if (_track) str("%+d", _track->transpose());
+            str("%+d", _sequence->transpose());
             break;
         case Offset:
-            if (_track) str("%+.2fV", _track->offset() * 0.01f);
-            break;
-        case CvUpdateMode:
-            if (_track) _track->printCvUpdateMode(str);
+            str("%+.2fV", _sequence->offset() * 0.01f);
             break;
         case Last:
             break;
@@ -200,16 +193,13 @@ private:
             _sequence->toggleSlew();
             break;
         case Octave:
-            if (_track) _track->setOctave(ModelUtils::adjusted(_track->octave(), value, -10, 10));
+            _sequence->setOctave(ModelUtils::adjusted(_sequence->octave(), value, -10, 10));
             break;
         case Transpose:
-            if (_track) _track->setTranspose(ModelUtils::adjusted(_track->transpose(), value, -60, 60));
+            _sequence->setTranspose(ModelUtils::adjusted(_sequence->transpose(), value, -60, 60));
             break;
         case Offset:
-            if (_track) _track->setOffset(ModelUtils::adjusted(_track->offset(), value * (shift ? 1 : 10), -500, 500));
-            break;
-        case CvUpdateMode:
-            if (_track) _track->editCvUpdateMode(value, shift);
+            _sequence->setOffset(ModelUtils::adjusted(_sequence->offset(), value * (shift ? 1 : 10), -500, 500));
             break;
         case Last:
             break;
@@ -217,5 +207,4 @@ private:
     }
 
     DiscreteMapSequence *_sequence = nullptr;
-    DiscreteMapTrack *_track = nullptr;
 };

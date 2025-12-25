@@ -265,11 +265,26 @@ void TopPage::setSequencePage() {
     bool fromSequenceView = (currentPage == &pages.noteSequence ||
                             currentPage == &pages.accumulator ||
                             currentPage == &pages.tuesdaySequence ||
+                            currentPage == &pages.discreteMapSequenceList ||
+                            currentPage == &pages.discreteMapSequence ||
+                            currentPage == &pages.discreteMapStages ||
                             currentPage == &pages.indexedSequence ||
                             currentPage == &pages.indexedSteps);
 
     // Cycle to next view only if we're currently on a sequence view
     if (fromSequenceView) {
+        if (currentPage == &pages.noteSequence || currentPage == &pages.indexedSequence) {
+            _sequenceView = SequenceView::NoteSequence;
+        } else if (currentPage == &pages.accumulator || currentPage == &pages.indexedSteps) {
+            _sequenceView = SequenceView::Accumulator;
+        } else if (currentPage == &pages.discreteMapStages) {
+            _sequenceView = SequenceView::NoteSequence;
+        } else if (currentPage == &pages.discreteMapSequenceList) {
+            _sequenceView = SequenceView::Accumulator;
+        } else {
+            _sequenceView = SequenceView::NoteSequence;
+        }
+
         switch (_sequenceView) {
         case SequenceView::NoteSequence:
             _sequenceView = SequenceView::Accumulator;
@@ -311,7 +326,14 @@ void TopPage::setSequenceView(SequenceView view) {
         setMainPage(pages.tuesdaySequence);
         break;
     case Track::TrackMode::DiscreteMap:
-        setMainPage(pages.discreteMapStages);
+        switch (view) {
+        case SequenceView::NoteSequence:
+            setMainPage(pages.discreteMapStages);
+            break;
+        case SequenceView::Accumulator:
+            setMainPage(pages.discreteMapSequenceList);
+            break;
+        }
         break;
     case Track::TrackMode::Indexed:
         switch (view) {

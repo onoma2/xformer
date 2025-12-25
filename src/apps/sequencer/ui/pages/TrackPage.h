@@ -6,7 +6,9 @@
 #include "ui/model/CurveTrackListModel.h"
 #include "ui/model/MidiCvTrackListModel.h"
 #include "ui/model/TuesdaySequenceListModel.h"
+#include "ui/model/TuesdayTrackListModel.h"
 #include "ui/model/DiscreteMapSequenceListModel.h"
+#include "ui/model/DiscreteMapTrackListModel.h"
 #include "ui/model/IndexedSequenceListModel.h"
 #include "ui/model/IndexedTrackListModel.h"
 
@@ -40,7 +42,9 @@ private:
     CurveTrackListModel _curveTrackListModel;
     MidiCvTrackListModel _midiCvTrackListModel;
     TuesdaySequenceListModel _tuesdaySequenceListModel;
+    TuesdayTrackListModel _tuesdayTrackListModel;
     DiscreteMapSequenceListModel _discreteMapSequenceListModel;
+    DiscreteMapTrackListModel _discreteMapTrackListModel;
     IndexedSequenceListModel _indexedSequenceListModel;
     IndexedTrackListModel _indexedTrackListModel;
 };

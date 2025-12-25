@@ -37,6 +37,7 @@
 #include "TuesdaySequencePage.h"
 #include "DiscreteMapStagesPage.h"
 #include "DiscreteMapSequencePage.h"
+#include "DiscreteMapSequenceListPage.h"
 #include "IndexedSequencePage.h"
 #include "IndexedStepsPage.h"
 #include "IndexedSequenceEditPage.h"
@@ -73,6 +74,7 @@ struct Pages {
     TuesdayEditPage tuesdayEdit;
     TuesdaySequencePage tuesdaySequence;
     DiscreteMapStagesPage discreteMapStages;
+    DiscreteMapSequenceListPage discreteMapSequenceList;
     DiscreteMapSequencePage discreteMapSequence;
     IndexedSequencePage indexedSequence;
     IndexedStepsPage indexedSteps;
@@ -126,6 +128,7 @@ struct Pages {
         tuesdayEdit(manager, context),
         tuesdaySequence(manager, context),
         discreteMapStages(manager, context),
+        discreteMapSequenceList(manager, context),
         discreteMapSequence(manager, context),
         indexedSequence(manager, context),
         indexedSteps(manager, context),

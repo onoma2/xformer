@@ -532,7 +532,6 @@ void DiscreteMapSequencePage::quickEdit(int index) {
         return;
     }
     _listModel.setSequence(_sequence);
-    _listModel.setTrack(&_project.selectedTrack().discreteMapTrack());
     _manager.pages().quickEdit.show(_listModel, item);
 }
 

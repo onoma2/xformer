@@ -11,6 +11,7 @@ void IndexedTrack::cvOutputName(int index, StringBuilder &str) const {
 
 void IndexedTrack::clear() {
     _cvUpdateMode = CvUpdateMode::Gate;
+    setPlayMode(Types::PlayMode::Aligned);
     _routedSync = 0.f;
     setOctave(0);
     setTranspose(0);
@@ -22,6 +23,7 @@ void IndexedTrack::clear() {
 
 void IndexedTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_cvUpdateMode);
+    writer.write(_playMode);
     writer.write(_octave.base);
     writer.write(_transpose.base);
     writer.write(_slideTime.base);
@@ -30,6 +32,7 @@ void IndexedTrack::write(VersionedSerializedWriter &writer) const {
 
 void IndexedTrack::read(VersionedSerializedReader &reader) {
     reader.read(_cvUpdateMode);
+    reader.read(_playMode);
     reader.read(_octave.base);
     reader.read(_transpose.base);
     reader.read(_slideTime.base);

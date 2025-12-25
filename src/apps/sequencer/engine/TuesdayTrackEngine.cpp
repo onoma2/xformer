@@ -1915,10 +1915,24 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     }
 
     if (stepTrigger) {
-        // Advance Step
-        uint32_t calculatedStep = relativeTick / divisor;
-        _stepIndex = calculatedStep;
-        _displayStep = _stepIndex;
+        // Advance Step (mode-specific)
+        switch (tuesdayTrack().playMode()) {
+        case Types::PlayMode::Aligned: {
+            // Global tick-based step calculation (bar-locked)
+            uint32_t calculatedStep = relativeTick / divisor;
+            _stepIndex = calculatedStep;
+            _displayStep = _stepIndex;
+            break;
+        }
+        case Types::PlayMode::Free: {
+            // Internal counter advancement (can drift)
+            _stepIndex++;
+            _displayStep = _stepIndex;
+            break;
+        }
+        case Types::PlayMode::Last:
+            break;
+        }
 
         // 1. GENERATE (The Brain)
         TuesdayTickResult result = generateStep(tick);

@@ -105,13 +105,12 @@ void TrackPage::setTrack(Track &track) {
         newListModel = &_midiCvTrackListModel;
         break;
     case Track::TrackMode::Tuesday:
-        _tuesdaySequenceListModel.setSequence(&_project.selectedTuesdaySequence());
-        newListModel = &_tuesdaySequenceListModel;
+        _tuesdayTrackListModel.setTrack(&track.tuesdayTrack());
+        newListModel = &_tuesdayTrackListModel;
         break;
     case Track::TrackMode::DiscreteMap:
-        _discreteMapSequenceListModel.setSequence(&_project.selectedDiscreteMapSequence());
-        _discreteMapSequenceListModel.setTrack(&_project.selectedTrack().discreteMapTrack());
-        newListModel = &_discreteMapSequenceListModel;
+        _discreteMapTrackListModel.setTrack(&track.discreteMapTrack());
+        newListModel = &_discreteMapTrackListModel;
         break;
     case Track::TrackMode::Indexed:
         _indexedTrackListModel.setTrack(&track.indexedTrack());

@@ -17,6 +17,21 @@ public:
     // Properties
     //----------------------------------------
 
+    // playMode
+
+    Types::PlayMode playMode() const { return _playMode; }
+    void setPlayMode(Types::PlayMode playMode) {
+        _playMode = ModelUtils::clampedEnum(playMode);
+    }
+
+    void editPlayMode(int value, bool shift) {
+        setPlayMode(ModelUtils::adjustedEnum(playMode(), value));
+    }
+
+    void printPlayMode(StringBuilder &str) const {
+        str(Types::playModeName(playMode()));
+    }
+
     // sequences
 
     const TuesdaySequenceArray &sequences() const { return _sequences; }
@@ -49,6 +64,7 @@ private:
 
     int8_t _trackIndex = -1;
     TuesdaySequenceArray _sequences;
+    Types::PlayMode _playMode = Types::PlayMode::Aligned;
 
     friend class Track;
 };

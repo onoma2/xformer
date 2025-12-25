@@ -99,6 +99,7 @@ set(sources
     ui/pages/TuesdaySequencePage.cpp
     ui/pages/DiscreteMapStagesPage.cpp
     ui/pages/DiscreteMapSequencePage.cpp
+    ui/pages/DiscreteMapSequenceListPage.cpp
     ui/pages/IndexedSequencePage.cpp
     ui/pages/IndexedStepsPage.cpp
     ui/pages/IndexedSequenceEditPage.cpp

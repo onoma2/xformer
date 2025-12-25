@@ -53,7 +53,7 @@ CASE("migration from phaseOffset") {
     MemoryFile file;
     VersionedSerializedWriter writer(
         [&file](const void *data, size_t len) { file.write(data, len); },
-        ProjectVersion::Version41
+        ProjectVersion::Version33
     );
     write_v41(track, writer, 75); // write phaseOffset of 75
     writer.writeHash();
