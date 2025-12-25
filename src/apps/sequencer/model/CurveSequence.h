@@ -153,8 +153,8 @@ public:
 
         // Helper: Get trigger length in ticks (exponential scale)
         uint32_t gateTriggerLength() const {
-            // 0→1, 1→2, 2→4, 3→8, 4→16, 5→32, 6→64, 7→128 ticks
-            return 1u << _data1.gateParameter;
+            // 0→4, 1→8, 2→16, 3→32, 4→64, 5→128, 6→256, 7→512 ticks
+            return 4u << _data1.gateParameter;
         }
 
         // Helper: Get advanced mode

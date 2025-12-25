@@ -591,6 +591,31 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    // Double-press step to insert Peak+Trough gate on non-gate layers
+    if (!key.shiftModifier() && key.isStep() && event.count() == 2 &&
+        layer() != Layer::Gate && layer() != Layer::GateProbability) {
+        int stepIndex = stepOffset() + key.step();
+        auto &step = sequence.step(stepIndex);
+
+        // Check if gate is already set to Peak+Trough with 128 ticks
+        bool isAlreadySet = (step.gateEventMask() == (CurveSequence::Peak | CurveSequence::Trough)) &&
+                            (step.gateParameter() == 5);
+
+        if (isAlreadySet) {
+            // Clear gate
+            step.setGateEventMask(0);
+            step.setGateParameter(0);
+            showMessage("GATE CLEARED");
+        } else {
+            // Set Peak+Trough with 128 ticks (value 5 = 67% of beat)
+            step.setGateEventMask(CurveSequence::Peak | CurveSequence::Trough);
+            step.setGateParameter(5);  // 128 ticks
+            showMessage("GATE: PEAK + TROUGH (67%)");
+        }
+        event.consume();
+        return;
+    }
+
     if (key.isEncoder() && layer() == Layer::Shape && globalKeyState()[Key::Shift] && _stepSelection.count() > 1) {
         auto firstStep = sequence.step(_stepSelection.firstSetIndex());
         auto lastStep = sequence.step(_stepSelection.lastSetIndex());
@@ -808,13 +833,16 @@ void CurveSequenceEditPage::encoder(EncoderEvent &event) {
                     msg(modeName);
                     showMessage(msg);
                 } else {
-                    // Event mode - show trigger length in ticks and milliseconds
+                    // Event mode - show gate length as percentage of beat
                     uint32_t ticks = step.gateTriggerLength();
-                    FixedStringBuilder<64> msg;
-                    if (ticks < 10) {
-                        msg("TRIGGER LENGTH: %d TICK (~%.1fms)", ticks, ticks * 0.13f);
+                    float beatPercent = (ticks / 192.0f) * 100.0f;  // 192 PPQN per beat
+                    FixedStringBuilder<64> msg("GATE LENGTH: ");
+                    if (beatPercent < 10.0f) {
+                        msg("%.1f%%", beatPercent);
+                    } else if (beatPercent < 100.0f) {
+                        msg("%.0f%%", beatPercent);
                     } else {
-                        msg("TRIGGER LENGTH: %d TICKS (~%dms)", ticks, int(ticks * 0.13f));
+                        msg("%.0f%%", beatPercent);
                     }
                     showMessage(msg);
                 }
@@ -1428,13 +1456,13 @@ void CurveSequenceEditPage::gatePresetsContextAction(int index) {
     case GatePresetsContextAction::ZeroCross:
         // Zero crossings both directions, short triggers
         eventMask = CurveSequence::ZeroRise | CurveSequence::ZeroFall;
-        parameter = 2; // 4 ticks
+        parameter = 0; // 4 ticks (new scale: 0→4, 1→8, 2→16...)
         showMessage("GATE PRESET: ZERO CROSS");
         break;
     case GatePresetsContextAction::EocEor:
         // End of cycle + End of rise
         eventMask = CurveSequence::Peak | CurveSequence::Trough;
-        parameter = 3; // 8 ticks
+        parameter = 1; // 8 ticks
         showMessage("GATE PRESET: EOC/EOR");
         break;
     case GatePresetsContextAction::RisingGate:

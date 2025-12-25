@@ -112,7 +112,7 @@ void CurveSequence::Step::clear() {
     setMin(0);
     setMax(Max::Max);
     setGate(0);
-    setGateProbability(GateProbability::Max);
+    setGateProbability(0);  // Initialize to 0 (Advanced Mode: OFF)
 }
 
 void CurveSequence::Step::write(VersionedSerializedWriter &writer) const {
