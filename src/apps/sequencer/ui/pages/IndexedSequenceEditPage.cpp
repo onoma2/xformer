@@ -375,6 +375,19 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    // Double-press step to set as first step
+    if (!key.shiftModifier() && key.isStep() && event.count() == 2) {
+        auto &sequence = _project.selectedIndexedSequence();
+        int stepIndex = stepOffset() + key.step();
+        if (stepIndex < sequence.activeLength()) {
+            sequence.setFirstStep(stepIndex);
+            FixedStringBuilder<32> msg("FIRST STEP: %d", stepIndex + 1);
+            showMessage(msg);
+        }
+        event.consume();
+        return;
+    }
+
     if (key.isStep()) {
         int stepIndex = stepOffset() + key.step();
         if (stepIndex < _project.selectedIndexedSequence().activeLength()) {

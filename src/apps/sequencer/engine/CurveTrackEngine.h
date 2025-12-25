@@ -88,6 +88,7 @@ private:
     // Gate Logic State
     float _prevCvOutput = 0.f; // For slope detection
     bool _wasRising = false;   // For peak/trough detection
+    bool _wasFalling = false;  // For trough detection (falling→flat)
     uint32_t _gateTimer = 0;   // Countdown for triggers
 
     // Output state

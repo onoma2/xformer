@@ -591,9 +591,8 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Double-press step to insert Peak+Trough gate on non-gate layers
-    if (!key.shiftModifier() && key.isStep() && event.count() == 2 &&
-        layer() != Layer::Gate && layer() != Layer::GateProbability) {
+    // Double-press step to insert Peak+Trough gate on any layer
+    if (!key.shiftModifier() && key.isStep() && event.count() == 2) {
         int stepIndex = stepOffset() + key.step();
         auto &step = sequence.step(stepIndex);
 

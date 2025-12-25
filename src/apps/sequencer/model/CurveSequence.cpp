@@ -551,9 +551,9 @@ void CurveSequence::transformSmoothWalk(int firstStep, int lastStep) {
     int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
 
     for (int i = minStep; i <= maxStep; ++i) {
-        int startVal = (i == minStep) ? _steps[i].min() : _steps[i - 1].max();
+        int startVal = (i == minStep) ? 127 : _steps[i - 1].max();  // First step always starts at 50%
         int delta = (std::rand() % 121) - 60; // -60 to +60
-        
+
         _steps[i].setMin(startVal);
         _steps[i].setMax(clamp(startVal + delta, 0, 255));
         _steps[i].setShape(static_cast<int>(Curve::SmoothUp));

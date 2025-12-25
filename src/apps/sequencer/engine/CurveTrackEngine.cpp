@@ -110,6 +110,11 @@ void CurveTrackEngine::reset() {
     _recorder.reset();
     _gateQueue.clear();
 
+    _prevCvOutput = 0.f;
+    _wasRising = false;
+    _wasFalling = false;
+    _gateTimer = 0;
+
     changePattern();
 }
 
@@ -126,6 +131,11 @@ void CurveTrackEngine::restart() {
     _chaosPhase = 0.f;
     _latoocarfian.reset();
     _lorenz.reset();
+
+    _prevCvOutput = 0.f;
+    _wasRising = false;
+    _wasFalling = false;
+    _gateTimer = 0;
 }
 
 TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
@@ -417,9 +427,11 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
             if ((gateMask & CurveSequence::ZeroRise) && (_prevCvOutput <= 0.f && current > 0.f)) trigger = true;
             if ((gateMask & CurveSequence::ZeroFall) && (_prevCvOutput >= 0.f && current < 0.f)) trigger = true;
 
-            // Peak/Trough
-            if ((gateMask & CurveSequence::Peak) && _wasRising && isFalling) trigger = true;
-            if ((gateMask & CurveSequence::Trough) && !_wasRising && isRising) trigger = true;
+            // Peak/Trough - includes flat slopes as end points
+            // Peak: end of rise (rising → flat OR rising → falling)
+            if ((gateMask & CurveSequence::Peak) && _wasRising && !isRising) trigger = true;
+            // Trough: end of fall (falling → flat OR falling → rising)
+            if ((gateMask & CurveSequence::Trough) && _wasFalling && !isFalling) trigger = true;
 
             if (trigger) {
                 // Use exponential trigger length: 1, 2, 4, 8, 16, 32, 64, 128 ticks
@@ -451,9 +463,16 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
         
         _gateOutput = gateHigh;
         _activity = gateHigh;
-        // Update history state
-        if (isRising) _wasRising = true;
-        if (isFalling) _wasRising = false;
+
+        // Update history state for next tick
+        if (isRising) {
+            _wasRising = true;
+            _wasFalling = false;
+        } else if (isFalling) {
+            _wasRising = false;
+            _wasFalling = true;
+        }
+        // If flat, keep previous state unchanged
     }
 
     _prevCvOutput = _cvOutputTarget;
