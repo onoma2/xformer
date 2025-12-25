@@ -375,13 +375,13 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Double-press step to set as first step
+    // Double-press step to rotate sequence so that step becomes first step (index 0)
     if (!key.shiftModifier() && key.isStep() && event.count() == 2) {
         auto &sequence = _project.selectedIndexedSequence();
         int stepIndex = stepOffset() + key.step();
-        if (stepIndex < sequence.activeLength()) {
-            sequence.setFirstStep(stepIndex);
-            FixedStringBuilder<32> msg("FIRST STEP: %d", stepIndex + 1);
+        if (stepIndex > 0 && stepIndex < sequence.activeLength()) {
+            sequence.rotateSteps(stepIndex);
+            FixedStringBuilder<32> msg("ROTATED TO STEP: %d", stepIndex + 1);
             showMessage(msg);
         }
         event.consume();

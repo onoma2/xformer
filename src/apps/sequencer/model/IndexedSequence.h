@@ -448,6 +448,14 @@ public:
     // Check if delete is possible
     bool canDelete() const { return _activeLength > 1; }
 
+    // Rotate steps destructively so newFirstIndex becomes step 0
+    // Resets firstStep to 0 after rotation
+    void rotateSteps(int newFirstIndex) {
+        if (newFirstIndex <= 0 || newFirstIndex >= _activeLength) return;
+        std::rotate(_steps.begin(), _steps.begin() + newFirstIndex, _steps.begin() + _activeLength);
+        setFirstStep(0);  // Reset rotation offset to 0
+    }
+
     void clear() {
         _divisor = 12;  // 1/16 note at 192 PPQN
         _loop = true;
