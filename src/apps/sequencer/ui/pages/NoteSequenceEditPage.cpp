@@ -422,6 +422,14 @@ void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    // Double-press step to toggle gate on non-gate layers
+    if (!key.shiftModifier() && key.isStep() && event.count() == 2 && layer() != Layer::Gate) {
+        int stepIndex = stepOffset() + key.step();
+        sequence.step(stepIndex).toggleGate();
+        event.consume();
+        return;
+    }
+
     _stepSelection.keyPress(event, stepOffset());
     updateMonitorStep();
 
