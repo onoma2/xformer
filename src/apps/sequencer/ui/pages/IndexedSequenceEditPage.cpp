@@ -17,7 +17,7 @@ enum class ContextAction {
     Paste,
     Route,
     Insert,
-    Split,
+    MakeFirst,
     Delete,
     Last
 };
@@ -31,7 +31,7 @@ static const ContextMenuModel::Item seqContextMenuItems[] = {
 
 static const ContextMenuModel::Item stepContextMenuItems[] = {
     { "INSERT" },
-    { "SPLIT" },
+    { "MAKE 1ST" },
     { "DELETE" },
     { "COPY" },
     { "PASTE" },
@@ -39,7 +39,7 @@ static const ContextMenuModel::Item stepContextMenuItems[] = {
 
 static const ContextAction stepContextActions[] = {
     ContextAction::Insert,
-    ContextAction::Split,
+    ContextAction::MakeFirst,
     ContextAction::Delete,
     ContextAction::Copy,
     ContextAction::Paste,
@@ -375,14 +375,19 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Double-press step to rotate sequence so that step becomes first step (index 0)
+    // Double-press step to toggle gate between 0 and Trigger
     if (!key.shiftModifier() && key.isStep() && event.count() == 2) {
         auto &sequence = _project.selectedIndexedSequence();
         int stepIndex = stepOffset() + key.step();
-        if (stepIndex > 0 && stepIndex < sequence.activeLength()) {
-            sequence.rotateSteps(stepIndex);
-            FixedStringBuilder<32> msg("ROTATED TO STEP: %d", stepIndex + 1);
-            showMessage(msg);
+        if (stepIndex < sequence.activeLength()) {
+            auto &step = sequence.step(stepIndex);
+            if (step.gateLength() == 0) {
+                step.setGateLength(IndexedSequence::GateLengthTrigger);
+                showMessage("GATE: TRIGGER");
+            } else {
+                step.setGateLength(0);
+                showMessage("GATE: OFF");
+            }
         }
         event.consume();
         return;
@@ -510,35 +515,110 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
         return;
     }
 
-    for (int i = 0; i < IndexedSequence::MaxSteps; ++i) {
-        if (_stepSelection[i]) {
-            auto &step = sequence.step(i);
-            bool shift = globalKeyState()[Key::Shift];
+    bool shift = globalKeyState()[Key::Shift];
+    int selectionCount = _stepSelection.count();
+    const auto &scale = sequence.selectedScale(_project.selectedScale());
 
-            switch (_editMode) {
-            case EditMode::Note:
-                step.setNoteIndex(step.noteIndex() + event.value() * (shift ? 12 : 1));
-                break;
-            case EditMode::Duration: {
-                int div = sequence.divisor();
-                int stepVal = shift ? div : 1;
-                int newDur = step.duration() + event.value() * stepVal;
-                step.setDuration(clamp(newDur, 0, int(IndexedSequence::MaxDuration)));
-                break;
-            }
-            case EditMode::Gate:
-                {
-                    int stepSize = shift ? 1 : 5;
-                    int currentGate = step.gateLength();
-                    int newGate = currentGate + event.value() * stepSize;
-                    if (currentGate == IndexedSequence::GateLengthTrigger && event.value() < 0) {
-                        newGate = 100;
-                    } else if (currentGate <= 100 && newGate > 100) {
-                        newGate = IndexedSequence::GateLengthTrigger;
+    // Gradient Editing: Shift + multiple steps = linear ramp
+    if (shift && selectionCount > 1) {
+        int firstIndex = _stepSelection.firstSetIndex();
+        int lastIndex = _stepSelection.lastSetIndex();
+        auto &firstStep = sequence.step(firstIndex);
+        auto &lastStep = sequence.step(lastIndex);
+
+        static int multiStepsProcessed = 0;
+
+        for (int i = 0; i < IndexedSequence::MaxSteps; ++i) {
+            if (_stepSelection[i]) {
+                auto &step = sequence.step(i);
+
+                // Update the "target" (last step) value with encoder input (first iteration only)
+                if (i == lastIndex && multiStepsProcessed == 0) {
+                    switch (_editMode) {
+                    case EditMode::Note:
+                        lastStep.setNoteIndex(lastStep.noteIndex() + event.value());
+                        break;
+                    case EditMode::Duration: {
+                        int newDur = lastStep.duration() + event.value();
+                        lastStep.setDuration(clamp(newDur, 0, int(IndexedSequence::MaxDuration)));
+                        break;
                     }
-                    step.setGateLength(clamp(newGate, 0, int(IndexedSequence::GateLengthTrigger)));
+                    case EditMode::Gate: {
+                        int currentGate = lastStep.gateLength();
+                        int newGate = currentGate + event.value();
+                        if (currentGate == IndexedSequence::GateLengthTrigger && event.value() < 0) {
+                            newGate = 100;
+                        } else if (currentGate <= 100 && newGate > 100) {
+                            newGate = IndexedSequence::GateLengthTrigger;
+                        }
+                        lastStep.setGateLength(clamp(newGate, 0, int(IndexedSequence::GateLengthTrigger)));
+                        break;
+                    }
+                    }
                 }
-                break;
+
+                // Calculate interpolated value for current step
+                float t = float(i - firstIndex) / (lastIndex - firstIndex);
+
+                switch (_editMode) {
+                case EditMode::Note: {
+                    int startNote = firstStep.noteIndex();
+                    int endNote = lastStep.noteIndex();
+                    int interpolated = startNote + std::round(t * (endNote - startNote));
+                    step.setNoteIndex(interpolated);
+                    break;
+                }
+                case EditMode::Duration: {
+                    int startDur = firstStep.duration();
+                    int endDur = lastStep.duration();
+                    int interpolated = startDur + std::round(t * (endDur - startDur));
+                    step.setDuration(interpolated);
+                    break;
+                }
+                case EditMode::Gate: {
+                    int startGate = firstStep.gateLength();
+                    int endGate = lastStep.gateLength();
+                    int interpolated = startGate + std::round(t * (endGate - startGate));
+                    step.setGateLength(interpolated);
+                    break;
+                }
+                }
+
+                multiStepsProcessed++;
+            }
+        }
+        multiStepsProcessed = 0;
+    } else {
+        // Normal editing: apply same value to all selected steps
+        for (int i = 0; i < IndexedSequence::MaxSteps; ++i) {
+            if (_stepSelection[i]) {
+                auto &step = sequence.step(i);
+
+                switch (_editMode) {
+                case EditMode::Note:
+                    step.setNoteIndex(step.noteIndex() + event.value() * ((shift && scale.isChromatic()) ? scale.notesPerOctave() : 1));
+                    break;
+                case EditMode::Duration: {
+                    int div = sequence.divisor();
+                    int stepVal = shift ? div : 1;
+                    int newDur = step.duration() + event.value() * stepVal;
+                    step.setDuration(clamp(newDur, 0, int(IndexedSequence::MaxDuration)));
+                    break;
+                }
+                case EditMode::Gate:
+                    {
+                        int stepSize = shift ? 1 : 5;
+                        int currentGate = step.gateLength();
+                        int newGate = currentGate + event.value() * stepSize;
+                        if (currentGate == IndexedSequence::GateLengthTrigger && event.value() < 0) {
+                            newGate = 100;
+                        } else if (currentGate <= 100 && newGate > 100) {
+                            newGate = IndexedSequence::GateLengthTrigger;
+                        }
+                        step.setGateLength(clamp(newGate, 0, int(IndexedSequence::GateLengthTrigger)));
+                    }
+                    break;
+                }
             }
         }
     }
@@ -662,8 +742,8 @@ void IndexedSequenceEditPage::contextAction(int index) {
     case ContextAction::Insert:
         insertStep();
         break;
-    case ContextAction::Split:
-        splitStep();
+    case ContextAction::MakeFirst:
+        rotateToFirstSelected();
         break;
     case ContextAction::Delete:
         deleteStep();
@@ -683,8 +763,9 @@ bool IndexedSequenceEditPage::contextActionEnabled(int index) const {
             _model.clipBoard().canPasteIndexedSequence() :
             _model.clipBoard().canPasteIndexedSequenceSteps();
     case ContextAction::Insert:
-    case ContextAction::Split:
         return sequence.canInsert();
+    case ContextAction::MakeFirst:
+        return _stepSelection.any() && _stepSelection.first() > 0;
     case ContextAction::Delete:
         return sequence.canDelete();
     default:
@@ -740,6 +821,19 @@ void IndexedSequenceEditPage::splitStep() {
         // Clear selection because indices have shifted
         _stepSelection.clear();
         showMessage("STEPS SPLIT");
+    }
+}
+
+void IndexedSequenceEditPage::rotateToFirstSelected() {
+    auto &sequence = _project.selectedIndexedSequence();
+    if (!_stepSelection.any()) return;
+
+    int stepIndex = _stepSelection.first();
+    if (stepIndex > 0 && stepIndex < sequence.activeLength()) {
+        sequence.rotateSteps(stepIndex);
+        _stepSelection.clear();
+        FixedStringBuilder<32> msg("ROTATED TO STEP: %d", stepIndex + 1);
+        showMessage(msg);
     }
 }
 

@@ -50,6 +50,7 @@ private:
 
     void insertStep();
     void splitStep();
+    void rotateToFirstSelected();
     void deleteStep();
     void mergeStepWithNext();
     void swapStepWithOffset(int offset);

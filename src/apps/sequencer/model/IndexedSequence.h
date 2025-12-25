@@ -478,7 +478,7 @@ public:
             if (i < 5) {
                 uint16_t duration = (i < 3) ? 154 : 153; // 5 steps over 4 bars (768 ticks total)
                 s.setDuration(duration);
-                s.setGateLength(10);     // 10%
+                s.setGateLength(0);      // Silent by default
                 s.setNoteIndex(0);       // Root note
             } else {
                 s.setDuration(0);        // Silent/skip by default
