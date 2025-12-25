@@ -51,6 +51,9 @@ private:
     void transformContextShow();
     void transformContextAction(int index);
 
+    void gatePresetsContextShow();
+    void gatePresetsContextAction(int index);
+
     void updateSelection();
     void initSequence();
     void copySequence();

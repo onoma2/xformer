@@ -127,18 +127,39 @@ public:
             setMax(int(std::round(max * Max::Max)));
         }
 
-        // gate
+        // gateEventMask (compatible with old gate() getter/setter)
 
-        int gate() const { return _data1.gate; }
+        int gate() const { return _data1.gateEventMask; }
         void setGate(int gate) {
-            _data1.gate = Gate::clamp(gate);
+            _data1.gateEventMask = clamp(gate, 0, 15);
         }
 
-        // gateProbability
+        int gateEventMask() const { return _data1.gateEventMask; }
+        void setGateEventMask(int mask) {
+            _data1.gateEventMask = clamp(mask, 0, 15);
+        }
 
-        int gateProbability() const { return _data1.gateProbability; }
+        // gateParameter (compatible with old gateProbability() getter/setter)
+
+        int gateProbability() const { return _data1.gateParameter; }
         void setGateProbability(int gateProbability) {
-            _data1.gateProbability = GateProbability::clamp(gateProbability);
+            _data1.gateParameter = clamp(gateProbability, 0, 7);
+        }
+
+        int gateParameter() const { return _data1.gateParameter; }
+        void setGateParameter(int param) {
+            _data1.gateParameter = clamp(param, 0, 7);
+        }
+
+        // Helper: Get trigger length in ticks (exponential scale)
+        uint32_t gateTriggerLength() const {
+            // 0→1, 1→2, 2→4, 3→8, 4→16, 5→32, 6→64, 7→128 ticks
+            return 1u << _data1.gateParameter;
+        }
+
+        // Helper: Get advanced mode
+        AdvancedGateMode gateAdvancedMode() const {
+            return AdvancedGateMode(int(_data1.gateParameter));
         }
 
         int layerValue(Layer layer) const;
@@ -174,9 +195,9 @@ public:
         } _data0;
         union {
             uint16_t raw;
-            BitField<uint16_t, 0, Gate::Bits> gate;
-            BitField<uint16_t, 4, GateProbability::Bits> gateProbability;
-            // 9 bits left
+            BitField<uint16_t, 0, 4> gateEventMask;      // bits 0-3: Event enable flags
+            BitField<uint16_t, 4, 3> gateParameter;      // bits 4-6: Trigger length or Advanced mode
+            // 9 bits left (7-15)
         } _data1;
     };
 

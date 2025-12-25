@@ -412,19 +412,20 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
         if (gateMask != 0) {
             // EVENT MODE
             bool trigger = false;
-            
+
             // Zero Crossings
             if ((gateMask & CurveSequence::ZeroRise) && (_prevCvOutput <= 0.f && current > 0.f)) trigger = true;
             if ((gateMask & CurveSequence::ZeroFall) && (_prevCvOutput >= 0.f && current < 0.f)) trigger = true;
-            
+
             // Peak/Trough
             if ((gateMask & CurveSequence::Peak) && _wasRising && isFalling) trigger = true;
             if ((gateMask & CurveSequence::Trough) && !_wasRising && isRising) trigger = true;
-            
-                    if (trigger) {
-                        // Fixed trigger length of 3 ticks (~7.8ms @ 120BPM)
-                        _gateTimer = 3; 
-                    }        } else {
+
+            if (trigger) {
+                // Use exponential trigger length: 1, 2, 4, 8, 16, 32, 64, 128 ticks
+                _gateTimer = step.gateTriggerLength();
+            }
+        } else {
             // ADVANCED MODE (Mask == 0)
             using Mode = CurveSequence::AdvancedGateMode;
             Mode mode = Mode(gateParam);

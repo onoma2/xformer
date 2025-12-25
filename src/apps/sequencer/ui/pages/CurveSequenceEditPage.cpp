@@ -81,6 +81,23 @@ static const ContextMenuModel::Item transformContextMenuItems[] = {
     { "T-WALK" },
 };
 
+enum class GatePresetsContextAction {
+    ZeroCross,
+    EocEor,
+    RisingGate,
+    FallingGate,
+    Comparator50,
+    Last
+};
+
+static const ContextMenuModel::Item gatePresetsContextMenuItems[] = {
+    { "ZC+" },
+    { "EOC/EOR" },
+    { "RISING" },
+    { "FALLING" },
+    { ">50%" },
+};
+
 enum class SettingsContextAction {
     Init,
     Randomize,
@@ -538,12 +555,8 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    if (key.isQuickEdit()) {
-        quickEdit(key.quickEdit());
-        event.consume();
-        return;
-    }
-
+    // Check page modifier shortcuts BEFORE quick edit
+    // (quick edit catches Page + Step 8-15, so we need to intercept first)
     if (key.pageModifier() && key.is(Key::Step5)) {
         lfoContextShow();
         event.consume();
@@ -558,6 +571,18 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
 
     if (key.pageModifier() && key.is(Key::Step6)) {
         transformContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step14)) {
+        gatePresetsContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.isQuickEdit()) {
+        quickEdit(key.quickEdit());
         event.consume();
         return;
     }
@@ -728,12 +753,73 @@ void CurveSequenceEditPage::encoder(EncoderEvent &event) {
                 }
                 break;
             }
-            case Layer::Gate:
+            case Layer::Gate: {
                 step.setGate(step.gate() + event.value());
+                // Show which events are enabled
+                int mask = step.gate();
+                if (mask == 0) {
+                    showMessage("GATE EVENTS: ADVANCED MODE");
+                } else {
+                    FixedStringBuilder<64> msg("EVENTS: ");
+                    bool first = true;
+                    if (mask & CurveSequence::Peak) {
+                        if (!first) msg(" + ");
+                        msg("PEAK");
+                        first = false;
+                    }
+                    if (mask & CurveSequence::Trough) {
+                        if (!first) msg(" + ");
+                        msg("TROUGH");
+                        first = false;
+                    }
+                    if (mask & CurveSequence::ZeroRise) {
+                        if (!first) msg(" + ");
+                        msg("ZERO UP");
+                        first = false;
+                    }
+                    if (mask & CurveSequence::ZeroFall) {
+                        if (!first) msg(" + ");
+                        msg("ZERO DOWN");
+                        first = false;
+                    }
+                    showMessage(msg);
+                }
                 break;
-            case Layer::GateProbability:
+            }
+            case Layer::GateProbability: {
                 step.setGateProbability(step.gateProbability() + event.value());
+                // Show context-aware message
+                int mask = step.gate();
+                int param = step.gateProbability();
+                if (mask == 0) {
+                    // Advanced mode - show mode name
+                    const char* modeName = "OFF";
+                    switch (CurveSequence::AdvancedGateMode(param)) {
+                        case CurveSequence::AdvancedGateMode::Off: modeName = "OFF"; break;
+                        case CurveSequence::AdvancedGateMode::RisingSlope: modeName = "RISING SLOPE"; break;
+                        case CurveSequence::AdvancedGateMode::FallingSlope: modeName = "FALLING SLOPE"; break;
+                        case CurveSequence::AdvancedGateMode::AnySlope: modeName = "ANY SLOPE"; break;
+                        case CurveSequence::AdvancedGateMode::Compare25: modeName = "COMPARATOR > 25%"; break;
+                        case CurveSequence::AdvancedGateMode::Compare50: modeName = "COMPARATOR > 50%"; break;
+                        case CurveSequence::AdvancedGateMode::Compare75: modeName = "COMPARATOR > 75%"; break;
+                        case CurveSequence::AdvancedGateMode::Window: modeName = "WINDOW 25-75%"; break;
+                    }
+                    FixedStringBuilder<64> msg("ADVANCED: ");
+                    msg(modeName);
+                    showMessage(msg);
+                } else {
+                    // Event mode - show trigger length in ticks and milliseconds
+                    uint32_t ticks = step.gateTriggerLength();
+                    FixedStringBuilder<64> msg;
+                    if (ticks < 10) {
+                        msg("TRIGGER LENGTH: %d TICK (~%.1fms)", ticks, ticks * 0.13f);
+                    } else {
+                        msg("TRIGGER LENGTH: %d TICKS (~%dms)", ticks, int(ticks * 0.13f));
+                    }
+                    showMessage(msg);
+                }
                 break;
+            }
             case Layer::Last:
                 break;
             }
@@ -1280,7 +1366,7 @@ void CurveSequenceEditPage::transformContextAction(int index) {
     } else if (_stepSelection.count() == 1) {
         firstStep = _stepSelection.firstSetIndex();
         lastStep = sequence.lastStep();
-        if (firstStep > lastStep) lastStep = firstStep; 
+        if (firstStep > lastStep) lastStep = firstStep;
     } else {
         firstStep = sequence.firstStep();
         lastStep = sequence.lastStep();
@@ -1309,5 +1395,76 @@ void CurveSequenceEditPage::transformContextAction(int index) {
         break;
     case TransformContextAction::Last:
         break;
+    }
+}
+
+void CurveSequenceEditPage::gatePresetsContextShow() {
+    showContextMenu(ContextMenu(
+        gatePresetsContextMenuItems,
+        int(GatePresetsContextAction::Last),
+        [&] (int index) { gatePresetsContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void CurveSequenceEditPage::gatePresetsContextAction(int index) {
+    auto &sequence = _project.selectedCurveSequence();
+
+    // Determine which steps to apply preset to
+    std::bitset<CONFIG_STEP_COUNT> targetSteps;
+    if (_stepSelection.any()) {
+        targetSteps = _stepSelection.selected();
+    } else {
+        // If no selection, apply to loop range
+        for (int i = sequence.firstStep(); i <= sequence.lastStep(); ++i) {
+            targetSteps.set(i);
+        }
+    }
+
+    int eventMask = 0;
+    int parameter = 0;
+
+    switch (GatePresetsContextAction(index)) {
+    case GatePresetsContextAction::ZeroCross:
+        // Zero crossings both directions, short triggers
+        eventMask = CurveSequence::ZeroRise | CurveSequence::ZeroFall;
+        parameter = 2; // 4 ticks
+        showMessage("GATE PRESET: ZERO CROSS");
+        break;
+    case GatePresetsContextAction::EocEor:
+        // End of cycle + End of rise
+        eventMask = CurveSequence::Peak | CurveSequence::Trough;
+        parameter = 3; // 8 ticks
+        showMessage("GATE PRESET: EOC/EOR");
+        break;
+    case GatePresetsContextAction::RisingGate:
+        // Advanced mode: rising slope
+        eventMask = 0;
+        parameter = int(CurveSequence::AdvancedGateMode::RisingSlope);
+        showMessage("GATE PRESET: RISING SLOPE");
+        break;
+    case GatePresetsContextAction::FallingGate:
+        // Advanced mode: falling slope
+        eventMask = 0;
+        parameter = int(CurveSequence::AdvancedGateMode::FallingSlope);
+        showMessage("GATE PRESET: FALLING SLOPE");
+        break;
+    case GatePresetsContextAction::Comparator50:
+        // Advanced mode: comparator > 50%
+        eventMask = 0;
+        parameter = int(CurveSequence::AdvancedGateMode::Compare50);
+        showMessage("GATE PRESET: COMPARATOR > 50%");
+        break;
+    case GatePresetsContextAction::Last:
+        break;
+    }
+
+    // Apply preset to all target steps
+    for (size_t stepIndex = 0; stepIndex < sequence.steps().size(); ++stepIndex) {
+        if (targetSteps[stepIndex]) {
+            auto &step = sequence.step(stepIndex);
+            step.setGateEventMask(eventMask);
+            step.setGateParameter(parameter);
+        }
     }
 }
