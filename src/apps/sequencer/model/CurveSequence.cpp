@@ -524,15 +524,16 @@ void CurveSequence::transformReverse(int firstStep, int lastStep) {
     }
 }
 
-void CurveSequence::transformHumanize(int firstStep, int lastStep) {
+void CurveSequence::transformMirror(int firstStep, int lastStep) {
     int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
     int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
 
     for (int i = minStep; i <= maxStep; ++i) {
-        int jitterMin = (std::rand() % 11) - 5; // -5 to +5
-        int jitterMax = (std::rand() % 11) - 5;
-        _steps[i].setMin(clamp(_steps[i].min() + jitterMin, 0, 255));
-        _steps[i].setMax(clamp(_steps[i].max() + jitterMax, 0, 255));
+        // Mirror across 127.5 (255 range)
+        int newMin = 255 - _steps[i].min();
+        int newMax = 255 - _steps[i].max();
+        _steps[i].setMin(newMin);
+        _steps[i].setMax(newMax);
     }
 }
 

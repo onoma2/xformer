@@ -538,7 +538,7 @@ public:
     // Transformation functions
     void transformInvert(int firstStep, int lastStep);
     void transformReverse(int firstStep, int lastStep);
-    void transformHumanize(int firstStep, int lastStep);
+    void transformMirror(int firstStep, int lastStep);
     void transformAlign(int firstStep, int lastStep);
     void transformSmoothWalk(int firstStep, int lastStep);
 

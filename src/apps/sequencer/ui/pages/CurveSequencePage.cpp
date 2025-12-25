@@ -61,7 +61,7 @@ static const ContextMenuModel::Item macroContextMenuItems[] = {
 enum class TransformContextAction {
     Invert,
     Reverse,
-    Humanize,
+    Mirror,
     Align,
     SmoothWalk,
     Last
@@ -70,7 +70,7 @@ enum class TransformContextAction {
 static const ContextMenuModel::Item transformContextMenuItems[] = {
     { "T-INV" },
     { "T-REV" },
-    { "T-HUM" },
+    { "T-MIRR" },
     { "T-ALGN" },
     { "T-WALK" },
 };
@@ -306,9 +306,9 @@ void CurveSequencePage::transformContextAction(int index) {
         sequence.transformReverse(firstStep, lastStep);
         showMessage("TRANSFORM REVERSED");
         break;
-    case TransformContextAction::Humanize:
-        sequence.transformHumanize(firstStep, lastStep);
-        showMessage("TRANSFORM HUMANISED");
+    case TransformContextAction::Mirror:
+        sequence.transformMirror(firstStep, lastStep);
+        showMessage("TRANSFORM MIRRORED");
         break;
     case TransformContextAction::Align:
         sequence.transformAlign(firstStep, lastStep);

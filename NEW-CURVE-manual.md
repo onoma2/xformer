@@ -90,9 +90,9 @@ Manipulate existing sequence data. Defaults to the active loop range unless step
 
 - **Access**: Press **Page + Step 7** (Button 7).
 - **Options**:
-  - **T-INV**: **Invert**. Flips Min and Max values (Inverts polarity).
+  - **T-INV**: **Invert**. Swaps Min and Max values (Flips slope direction).
   - **T-REV**: **Reverse**. Reverses step order and internal shape direction (True Audio Reverse).
-  - **T-HUM**: **Humanize**. Adds small random offsets to Min/Max.
+  - **T-MIRR**: **Mirror**. Reflects voltages across the centerline (High becomes Low, Low becomes High).
   - **T-ALGN**: **Align**. Ensures continuity by setting each step's Start (Min) to the previous step's End (Max).
   - **T-WALK**: **Smooth Walk**. Generates a continuous random path ("Drunken Sine").
 
