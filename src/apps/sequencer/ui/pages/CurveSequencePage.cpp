@@ -42,20 +42,37 @@ static const ContextMenuModel::Item lfoContextMenuItems[] = {
 };
 
 enum class MacroContextAction {
-    Bell,
+    Init,
+    Fm,
     Damp,
-    Rise,
     Bounce,
     Raster,
     Last
 };
 
 static const ContextMenuModel::Item macroContextMenuItems[] = {
-    { "M-BELL" },
+    { "MM-INIT" },
+    { "M-FM" },
     { "M-DAMP" },
-    { "M-RISE" },
     { "M-BOUNCE" },
     { "M-RSTR" },
+};
+
+enum class TransformContextAction {
+    Invert,
+    Reverse,
+    Humanize,
+    Align,
+    SmoothWalk,
+    Last
+};
+
+static const ContextMenuModel::Item transformContextMenuItems[] = {
+    { "T-INV" },
+    { "T-REV" },
+    { "T-HUM" },
+    { "T-ALGN" },
+    { "T-WALK" },
 };
 
 CurveSequencePage::CurveSequencePage(PageManager &manager, PageContext &context) :
@@ -100,6 +117,12 @@ void CurveSequencePage::keyPress(KeyPressEvent &event) {
 
     if (key.pageModifier() && key.is(Key::Step4)) {
         macroContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step6)) {
+        transformContextShow();
         event.consume();
         return;
     }
@@ -235,17 +258,17 @@ void CurveSequencePage::macroContextAction(int index) {
     int lastStep = sequence.lastStep();
 
     switch (MacroContextAction(index)) {
-    case MacroContextAction::Bell:
-        sequence.populateWithMacroBell(firstStep, lastStep);
-        showMessage("MACRO BELL POPULATED");
+    case MacroContextAction::Init:
+        sequence.populateWithMacroInit(firstStep, lastStep);
+        showMessage("MIN/MAX INITIALISED");
+        break;
+    case MacroContextAction::Fm:
+        sequence.populateWithMacroFm(firstStep, lastStep);
+        showMessage("MACRO FM POPULATED");
         break;
     case MacroContextAction::Damp:
         sequence.populateWithMacroDamp(firstStep, lastStep);
         showMessage("MACRO DAMP POPULATED");
-        break;
-    case MacroContextAction::Rise:
-        sequence.populateWithMacroRise(firstStep, lastStep);
-        showMessage("MACRO RISE POPULATED");
         break;
     case MacroContextAction::Bounce:
         sequence.populateWithMacroBounce(firstStep, lastStep);
@@ -256,6 +279,46 @@ void CurveSequencePage::macroContextAction(int index) {
         showMessage("SHAPE RASTERIZED");
         break;
     case MacroContextAction::Last:
+        break;
+    }
+}
+
+void CurveSequencePage::transformContextShow() {
+    showContextMenu(ContextMenu(
+        transformContextMenuItems,
+        int(TransformContextAction::Last),
+        [&] (int index) { transformContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void CurveSequencePage::transformContextAction(int index) {
+    auto &sequence = _project.selectedCurveSequence();
+    int firstStep = sequence.firstStep();
+    int lastStep = sequence.lastStep();
+
+    switch (TransformContextAction(index)) {
+    case TransformContextAction::Invert:
+        sequence.transformInvert(firstStep, lastStep);
+        showMessage("TRANSFORM INVERTED");
+        break;
+    case TransformContextAction::Reverse:
+        sequence.transformReverse(firstStep, lastStep);
+        showMessage("TRANSFORM REVERSED");
+        break;
+    case TransformContextAction::Humanize:
+        sequence.transformHumanize(firstStep, lastStep);
+        showMessage("TRANSFORM HUMANISED");
+        break;
+    case TransformContextAction::Align:
+        sequence.transformAlign(firstStep, lastStep);
+        showMessage("TRANSFORM ALIGNED");
+        break;
+    case TransformContextAction::SmoothWalk:
+        sequence.transformSmoothWalk(firstStep, lastStep);
+        showMessage("SMOOTH WALK GENERATED");
+        break;
+    case TransformContextAction::Last:
         break;
     }
 }

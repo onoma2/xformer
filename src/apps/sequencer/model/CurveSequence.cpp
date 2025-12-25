@@ -390,20 +390,32 @@ void CurveSequence::populateWithRandomMinMax(int firstStep, int lastStep) {
     }
 }
 
-void CurveSequence::populateWithMacroBell(int firstStep, int lastStep) {
+void CurveSequence::populateWithMacroInit(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+
+    for (int i = minStep; i <= maxStep; ++i) {
+        _steps[i].setMin(0);
+        _steps[i].setMax(255);
+        _steps[i].setShape(static_cast<int>(Curve::Triangle));
+    }
+}
+
+void CurveSequence::populateWithMacroFm(int firstStep, int lastStep) {
     int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
     int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
     float stepCount = float(maxStep - minStep + 1);
+    
+    const float freqMult = 8.0f; // Fixed multiplier for smooth acceleration
 
     for (int i = minStep; i <= maxStep; ++i) {
-        float phaseStart = float(i - minStep) / stepCount;
-        float phaseEnd = float(i - minStep + 1) / stepCount;
-
-        float valStart = Curve::eval(Curve::Bell, phaseStart);
-        float valEnd = Curve::eval(Curve::Bell, phaseEnd);
-
-        _steps[i].setMinNormalized(valStart);
-        _steps[i].setMaxNormalized(valEnd);
+        auto eval = [&] (float t) {
+            // Chirp signal using Triangle basis
+            float phase = std::fmod(t * t * freqMult, 1.0f);
+            return Curve::eval(Curve::Triangle, phase);
+        };
+        _steps[i].setMinNormalized(eval(float(i - minStep) / stepCount));
+        _steps[i].setMaxNormalized(eval(float(i - minStep + 1) / stepCount));
         _steps[i].setShape(static_cast<int>(Curve::RampUp));
     }
 }
@@ -416,23 +428,7 @@ void CurveSequence::populateWithMacroDamp(int firstStep, int lastStep) {
 
     for (int i = minStep; i <= maxStep; ++i) {
         auto eval = [&] (float t) {
-            return 0.5f + 0.5f * std::sin(t * 2.0f * M_PI * cycles) * (1.0f - t);
-        };
-        _steps[i].setMinNormalized(eval(float(i - minStep) / stepCount));
-        _steps[i].setMaxNormalized(eval(float(i - minStep + 1) / stepCount));
-        _steps[i].setShape(static_cast<int>(Curve::RampUp));
-    }
-}
-
-void CurveSequence::populateWithMacroRise(int firstStep, int lastStep) {
-    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
-    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
-    float stepCount = float(maxStep - minStep + 1);
-    const float cycles = 4.0f;
-
-    for (int i = minStep; i <= maxStep; ++i) {
-        auto eval = [&] (float t) {
-            return 0.5f + 0.5f * std::sin(t * 2.0f * M_PI * cycles) * t;
+            return 0.5f + 0.5f * std::sin(t * 2.0f * 3.1415926536f * cycles) * (1.0f - t);
         };
         _steps[i].setMinNormalized(eval(float(i - minStep) / stepCount));
         _steps[i].setMaxNormalized(eval(float(i - minStep + 1) / stepCount));
@@ -488,5 +484,79 @@ void CurveSequence::populateWithRasterizedShape(int firstStep, int lastStep) {
         _steps[i].setMinNormalized(valStart);
         _steps[i].setMaxNormalized(valEnd);
         _steps[i].setShape(static_cast<int>(Curve::RampUp));
+    }
+}
+
+void CurveSequence::transformInvert(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+
+    for (int i = minStep; i <= maxStep; ++i) {
+        int m = _steps[i].min();
+        _steps[i].setMin(_steps[i].max());
+        _steps[i].setMax(m);
+    }
+}
+
+void CurveSequence::transformReverse(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int stepCount = maxStep - minStep + 1;
+
+    if (stepCount < 2) {
+        transformInvert(minStep, maxStep);
+        return;
+    }
+
+    // Copy range
+    Step temp[CONFIG_STEP_COUNT];
+    for (int i = 0; i < stepCount; ++i) {
+        temp[i] = _steps[minStep + i];
+    }
+
+    // Write back reversed
+    for (int i = 0; i < stepCount; ++i) {
+        auto &target = _steps[minStep + i];
+        target = temp[stepCount - 1 - i];
+        // Reverse internal direction too
+        int m = target.min();
+        target.setMin(target.max());
+        target.setMax(m);
+    }
+}
+
+void CurveSequence::transformHumanize(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+
+    for (int i = minStep; i <= maxStep; ++i) {
+        int jitterMin = (std::rand() % 11) - 5; // -5 to +5
+        int jitterMax = (std::rand() % 11) - 5;
+        _steps[i].setMin(clamp(_steps[i].min() + jitterMin, 0, 255));
+        _steps[i].setMax(clamp(_steps[i].max() + jitterMax, 0, 255));
+    }
+}
+
+void CurveSequence::transformAlign(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+
+    // Starting from the second step in the range, align its Min to previous step's Max
+    for (int i = minStep + 1; i <= maxStep; ++i) {
+        _steps[i].setMin(_steps[i - 1].max());
+    }
+}
+
+void CurveSequence::transformSmoothWalk(int firstStep, int lastStep) {
+    int minStep = clamp(std::min(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+    int maxStep = clamp(std::max(firstStep, lastStep), 0, CONFIG_STEP_COUNT - 1);
+
+    for (int i = minStep; i <= maxStep; ++i) {
+        int startVal = (i == minStep) ? _steps[i].min() : _steps[i - 1].max();
+        int delta = (std::rand() % 121) - 60; // -60 to +60
+        
+        _steps[i].setMin(startVal);
+        _steps[i].setMax(clamp(startVal + delta, 0, 255));
+        _steps[i].setShape(static_cast<int>(Curve::SmoothUp));
     }
 }

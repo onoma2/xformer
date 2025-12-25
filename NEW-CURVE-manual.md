@@ -72,15 +72,31 @@ Populate steps with single-cycle waveforms. Defaults to the active loop range (F
 ### 5.2 Macro Shape Menu
 "Draw" complex shapes that span across multiple steps. The system calculates the precise start/end points for each step to create a seamless high-resolution curve.
 
-- **Action**: Press **Page + Step 5** (while in Sequence Page).
-- **Options**:
-  - **M-BELL**: Bell curve (0->1->0) spanning selection.
-  - **M-DAMP**: Decaying Sine wave spanning selection (4 cycles).
-  - **M-RISE**: Rising Sine wave spanning selection (4 cycles).
-  - **M-BOUNCE**: Bouncing semi-sines spanning selection (4 bounces).
-  - **M-RSTR**: Rasterize (Stretch) the shape of the *first step* across the entire selection.
+**Target Range Logic:**
+- **No Selection**: Applies to the entire active loop.
+- **Multiple Steps**: Applies to the selected range.
+- **Single Step**: Applies from the selected step to the end of the loop (perfect for "Rasterize to Right").
 
-### 5.3 Multi-Step Gradient Editing
+- **Access**: Press **Page + Step 5** (Button 5).
+- **Options**:
+  - **MM-INIT**: **Min/Max Reset**. Resets the range to default (Min=0, Max=255, Shape=Triangle).
+  - **M-FM**: **Chirp / FM**. A sine wave that accelerates in frequency over the range.
+  - **M-DAMP**: **Damped Oscillation** (Decaying Sine, 4 cycles). Great for percussive envelopes.
+  - **M-BOUNCE**: **Bouncing Ball** physics (Decaying absolute sines).
+  - **M-RSTR**: **Rasterize**. Takes the shape and range of the *first step* in the range and stretches it across the entire range.
+
+### 5.3 Transform Menu
+Manipulate existing sequence data. Defaults to the active loop range unless steps are selected.
+
+- **Access**: Press **Page + Step 7** (Button 7).
+- **Options**:
+  - **T-INV**: **Invert**. Flips Min and Max values (Inverts polarity).
+  - **T-REV**: **Reverse**. Reverses step order and internal shape direction (True Audio Reverse).
+  - **T-HUM**: **Humanize**. Adds small random offsets to Min/Max.
+  - **T-ALGN**: **Align**. Ensures continuity by setting each step's Start (Min) to the previous step's End (Max).
+  - **T-WALK**: **Smooth Walk**. Generates a continuous random path ("Drunken Sine").
+
+### 5.4 Multi-Step Gradient Editing
 Create smooth transitions for Shape, Min, and Max values.
 
 - **Action**: 

@@ -489,11 +489,18 @@ public:
     void populateWithRandomMinMax(int firstStep, int lastStep);
 
     // Macro Curve functions (multi-step rasterization)
-    void populateWithMacroBell(int firstStep, int lastStep);
+    void populateWithMacroInit(int firstStep, int lastStep);
+    void populateWithMacroFm(int firstStep, int lastStep);
     void populateWithMacroDamp(int firstStep, int lastStep);
-    void populateWithMacroRise(int firstStep, int lastStep);
     void populateWithMacroBounce(int firstStep, int lastStep);
     void populateWithRasterizedShape(int firstStep, int lastStep);
+
+    // Transformation functions
+    void transformInvert(int firstStep, int lastStep);
+    void transformReverse(int firstStep, int lastStep);
+    void transformHumanize(int firstStep, int lastStep);
+    void transformAlign(int firstStep, int lastStep);
+    void transformSmoothWalk(int firstStep, int lastStep);
 
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);

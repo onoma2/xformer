@@ -48,6 +48,9 @@ private:
     void macroContextShow();
     void macroContextAction(int index);
 
+    void transformContextShow();
+    void transformContextAction(int index);
+
     void updateSelection();
     void initSequence();
     void copySequence();
