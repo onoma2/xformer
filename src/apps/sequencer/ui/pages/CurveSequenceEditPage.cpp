@@ -760,19 +760,49 @@ void CurveSequenceEditPage::encoder(EncoderEvent &event) {
                 break;
             case Layer::Min:
             case Layer::Max: {
-                bool functionPressed = globalKeyState()[MatrixMap::fromFunction(activeFunctionKey())];
-                int offset = event.value() * ((shift || event.pressed()) ? 1 : 8);
-                if (functionPressed) {
-                    // adjust both min and max
-                    offset = clamp(offset, -step.min(), CurveSequence::Max::max() - step.max());
-                    step.setMin(step.min() + offset);
-                    step.setMax(step.max() + offset);
-                } else {
-                    // adjust min or max
+                if (shift && _stepSelection.count() > 1) {
+                    // Gradient Editing
+                    int firstIndex = _stepSelection.firstSetIndex();
+                    int lastIndex = _stepSelection.lastSetIndex();
+                    auto &firstStep = sequence.step(firstIndex);
+                    auto &lastStep = sequence.step(lastIndex);
+
+                    // Update the "target" (last step) value with the encoder input
+                    if (multiStepsProcessed == 0) {
+                        int offset = event.value();
+                        if (layer() == Layer::Min) {
+                            lastStep.setMin(lastStep.min() + offset);
+                        } else {
+                            lastStep.setMax(lastStep.max() + offset);
+                        }
+                    }
+
+                    // Calculate interpolated value for the current step in the loop
+                    float t = float(stepIndex - firstIndex) / (lastIndex - firstIndex);
+                    int startVal = (layer() == Layer::Min) ? firstStep.min() : firstStep.max();
+                    int endVal = (layer() == Layer::Min) ? lastStep.min() : lastStep.max();
+                    int interpolated = startVal + std::round(t * (endVal - startVal));
+
                     if (layer() == Layer::Min) {
-                        step.setMin(step.min() + offset);
+                        step.setMin(interpolated);
                     } else {
+                        step.setMax(interpolated);
+                    }
+                } else {
+                    bool functionPressed = globalKeyState()[MatrixMap::fromFunction(activeFunctionKey())];
+                    int offset = event.value() * ((shift || event.pressed()) ? 1 : 8);
+                    if (functionPressed) {
+                        // adjust both min and max
+                        offset = clamp(offset, -step.min(), 255 - step.max());
+                        step.setMin(step.min() + offset);
                         step.setMax(step.max() + offset);
+                    } else {
+                        // adjust min or max
+                        if (layer() == Layer::Min) {
+                            step.setMin(step.min() + offset);
+                        } else {
+                            step.setMax(step.max() + offset);
+                        }
                     }
                 }
                 break;

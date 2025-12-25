@@ -58,8 +58,8 @@ You can now create inverted signal windows by setting **Min > Max**.
 
 Curve Studio introduces powerful context menus for populating sequences.
 
-### 5.1 LFO Context Menu
-Populate steps with single-cycle waveforms. Defaults to the active loop range (First Step to Last Step) unless steps are selected.
+### 5.1 LFO Menu (Step 6)
+Populate steps with single-cycle waveforms. Defaults to active loop range or selection.
 
 - **Access**: Press **Page + Step 6** (Button 6).
 - **Options**:
@@ -69,43 +69,45 @@ Populate steps with single-cycle waveforms. Defaults to the active loop range (F
   - **SQUA**: Square / Pulse (1 cycle/step).
   - **MM-RND**: Randomize Min/Max values for each step (supports inversion).
 
-### 5.2 Macro Shape Menu
-"Draw" complex shapes that span across multiple steps. The system calculates the precise start/end points for each step to create a seamless high-resolution curve.
-
-**Target Range Logic:**
-- **No Selection**: Applies to the entire active loop.
-- **Multiple Steps**: Applies to the selected range.
-- **Single Step**: Applies from the selected step to the end of the loop (perfect for "Rasterize to Right").
+### 5.2 Macro Shape Menu (Step 5)
+"Draw" complex shapes that span multiple steps. Automatically handles selection logic (Single step -> to end of loop).
 
 - **Access**: Press **Page + Step 5** (Button 5).
 - **Options**:
-  - **MM-INIT**: **Min/Max Reset**. Resets the range to default (Min=0, Max=255, Shape=Triangle).
-  - **M-FM**: **Chirp / FM**. A sine wave that accelerates in frequency over the range.
-  - **M-DAMP**: **Damped Oscillation** (Decaying Sine, 4 cycles). Great for percussive envelopes.
+  - **MM-INIT**: **Min/Max Reset**. Resets the range to default (Min=0, Max=255) without changing shapes.
+  - **M-FM**: **Chirp / FM**. A triangle wave that accelerates in frequency over the range.
+  - **M-DAMP**: **Damped Oscillation** (Decaying Sine, 4 cycles).
   - **M-BOUNCE**: **Bouncing Ball** physics (Decaying absolute sines).
-  - **M-RSTR**: **Rasterize**. Takes the shape and range of the *first step* in the range and stretches it across the entire range.
+  - **M-RSTR**: **Rasterize**. Stretches the shape of the *first step* across the entire range.
 
-### 5.3 Transform Menu
-Manipulate existing sequence data. Defaults to the active loop range unless steps are selected.
+### 5.3 Transform Menu (Step 7)
+Manipulate existing sequence data.
 
 - **Access**: Press **Page + Step 7** (Button 7).
 - **Options**:
   - **T-INV**: **Invert**. Swaps Min and Max values (Flips slope direction).
-  - **T-REV**: **Reverse**. Reverses step order and internal shape direction (True Audio Reverse).
-  - **T-MIRR**: **Mirror**. Reflects voltages across the centerline (High becomes Low, Low becomes High).
-  - **T-ALGN**: **Align**. Ensures continuity by setting each step's Start (Min) to the previous step's End (Max).
+  - **T-REV**: **Reverse**. Reverses step order and internal shape direction.
+  - **T-MIRR**: **Mirror**. Reflects voltages across the centerline.
+  - **T-ALGN**: **Align**. Ensures continuity by setting `Min = previous Max`.
   - **T-WALK**: **Smooth Walk**. Generates a continuous random path ("Drunken Sine").
 
-### 5.4 Multi-Step Gradient Editing
-Create smooth transitions for Shape, Min, and Max values.
+### 5.4 Gate Presets Menu (Step 15)
+Quickly assign dynamic gate behaviors based on the curve slope or levels.
 
-- **Action**: 
-  1. Select multiple steps (Hold first step, press last step).
-  2. Hold **Shift** and turn the Encoder on **MIN** or **MAX**.
-- **Result**: The values will form a linear gradient from the first selected step to the last.
+- **Access**: Press **Page + Step 15** (Button 15).
+- **Options**:
+  - **ZC+**: **Zero Cross**. Trigger at every zero crossing (rising + falling).
+  - **EOC/EOR**: **Peaks/Troughs**. Trigger at every local maximum and minimum.
+  - **RISING**: Gate HIGH while voltage is increasing.
+  - **FALLING**: Gate HIGH while voltage is decreasing.
+  - **>50%**: **Comparator**. Gate HIGH when voltage is in the top half of the range.
 
-### 5.4 Settings Management
-Copy/Paste/Init the Wavefolder and Chaos settings independently of the sequence steps.
+## 6. Shortcuts & Gestures
 
-- **Access**: Long-press **Context Menu** button while in Wavefolder or Chaos page.
-- **Options**: **INIT**, **RAND**, **COPY**, **PASTE**.
+### 6.1 Double-Click Toggles
+- **Note Track**: Double-click a step button to toggle the Gate (on any non-gate layer).
+- **Curve Track**: Double-click a step button to toggle the **Peak+Trough** gate preset.
+
+### 6.2 Multi-Step Gradient Editing
+- **Action**: Select multiple steps, hold **Shift** and turn the Encoder on **MIN** or **MAX**.
+- **Result**: Creates a linear ramp of values from the first selected step to the last.
