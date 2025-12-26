@@ -72,6 +72,7 @@ private:
         None,
         Rise,
         Fall,
+        Both,
         Active,
         All,
         Last
@@ -118,6 +119,19 @@ private:
     void generateThresholds(GeneratorKind kind);
     void generateNotes(GeneratorKind kind, NoteSpread spread);
     float shapeValue(float t, GeneratorKind kind) const;
+
+    // Macro context menus
+    void distributionContextShow();
+    void distributionContextAction(int index);
+
+    void clusterContextShow();
+    void clusterContextAction(int index);
+
+    void distributeActiveContextShow();
+    void distributeActiveContextAction(int index);
+
+    void transformContextShow();
+    void transformContextAction(int index);
 
     DiscreteMapSequence *_sequence = nullptr;
     DiscreteMapTrackEngine *_enginePtr = nullptr;

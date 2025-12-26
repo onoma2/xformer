@@ -45,22 +45,66 @@ static const ContextAction stepContextActions[] = {
     ContextAction::Paste,
 };
 
+struct Voicing {
+    const char *name;
+    int8_t semis[6];
+    uint8_t count;
+};
+
+static const Voicing kPianoVoicings[] = {
+    { "MAJ13",   { 0, 4, 7, 11, 14, 21 }, 6 },
+    { "MAJ6/9",  { 0, 4, 7, 9, 14, 0 },   5 },
+    { "MIN13",   { 0, 3, 7, 10, 14, 21 }, 6 },
+    { "MIN6/9",  { 0, 3, 7, 9, 14, 0 },   5 },
+    { "MINMAJ9", { 0, 3, 7, 11, 14, 0 },  5 },
+    { "DOM13",   { 0, 4, 7, 10, 14, 21 }, 6 },
+    { "M9B5",    { 0, 3, 6, 10, 14, 0 },  5 },
+    { "DIM7",    { 0, 3, 6, 9, 0, 0 },    4 },
+    { "AUG9",    { 0, 4, 8, 10, 14, 0 },  5 },
+    { "AUGMAJ9", { 0, 4, 8, 11, 14, 0 },  5 },
+    { "SUS2(9)", { 0, 2, 7, 10, 14, 0 },  5 },
+    { "SUS4(11)",{ 0, 5, 7, 10, 14, 17 }, 6 },
+};
+
+static const Voicing kGuitarVoicings[] = {
+    { "MAJ",   { 0, 4, 7, 12, 16, 0 }, 5 },
+    { "MIN",   { 0, 7, 12, 15, 19, 0 }, 5 },
+    { "7",     { 0, 4, 10, 12, 16, 0 }, 5 },
+    { "MAJ7",  { 0, 7, 11, 16, 19, 0 }, 5 },
+    { "MIN7",  { 0, 7, 10, 15, 19, 0 }, 5 },
+    { "6",     { 0, 4, 9, 12, 16, 0 }, 5 },
+    { "MIN6",  { 0, 7, 12, 15, 21, 0 }, 5 },
+    { "9",     { 0, 7, 10, 16, 26, 0 }, 5 },
+    { "13",    { 0, 7, 10, 16, 21, 0 }, 5 },
+    { "SUS2",  { 0, 7, 12, 14, 19, 0 }, 5 },
+    { "SUS4",  { 0, 7, 12, 17, 19, 0 }, 5 },
+    { "ADD9",  { 0, 4, 7, 14, 19, 0 }, 5 },
+    { "AUG",   { 0, 8, 12, 16, 20, 0 }, 5 },
+    { "M7B5",  { 0, 6, 10, 15, 22, 0 }, 5 },
+    { "DIM7",  { 0, 6, 12, 15, 21, 0 }, 5 },
+};
+
+static const int kPianoVoicingCount = int(sizeof(kPianoVoicings) / sizeof(kPianoVoicings[0]));
+static const int kGuitarVoicingCount = int(sizeof(kGuitarVoicings) / sizeof(kGuitarVoicings[0]));
+
 enum {
     QuickEditNone = -1,
     QuickEditSplit = -2,
     QuickEditSwap = -3,
     QuickEditMerge = -4,
     QuickEditSetFirst = -5,
+    QuickEditPiano = -6,
+    QuickEditGuitar = -7,
 };
 
 static const int quickEditItems[8] = {
     QuickEditSplit,                                   // Step 9
-    QuickEditSwap,                                    // Step 10
-    QuickEditMerge,                                   // Step 11
-    QuickEditSetFirst,                                // Step 12
-    int(IndexedSequenceListModel::Item::Length),      // Step 13
-    int(IndexedSequenceListModel::Item::RunMode),     // Step 14
-    int(IndexedSequenceListModel::Item::ResetMeasure), // Step 15
+    QuickEditMerge,                                   // Step 10
+    QuickEditSetFirst,                                // Step 11
+    QuickEditPiano,                                   // Step 12
+    QuickEditGuitar,                                  // Step 13
+    QuickEditNone,                                    // Step 14 (free for macro)
+    QuickEditNone,                                    // Step 15
     QuickEditNone
 };
 
@@ -353,6 +397,19 @@ void IndexedSequenceEditPage::updateLeds(Leds &leds) {
             leds.set(index, false, quickEditItems[i] != QuickEditNone);
             leds.mask(index);
         }
+
+        // Indexed Macro Shortcuts - YELLOW
+        // Step 4: Rhythm Generators
+        // Step 5: Waveforms
+        // Step 6: Melodic Generators
+        // Step 14: Duration & Transform
+        const int macroShortcuts[] = { 4, 5, 6, 14 };
+        for (int step : macroShortcuts) {
+            int index = MatrixMap::fromStep(step);
+            leds.unmask(index);
+            leds.set(index, true, true);
+            leds.mask(index);
+        }
     }
 }
 
@@ -367,6 +424,30 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
 
     if (key.isQuickEdit() && !key.shiftModifier()) {
         quickEdit(key.quickEdit());
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step4)) {
+        rhythmContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step5)) {
+        waveformContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step6)) {
+        melodicContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step14)) {
+        durationTransformContextShow();
         event.consume();
         return;
     }
@@ -957,6 +1038,12 @@ void IndexedSequenceEditPage::quickEdit(int index) {
         }
         splitStep();
         return;
+    case QuickEditPiano:
+        applyVoicing(true);
+        return;
+    case QuickEditGuitar:
+        applyVoicing(false);
+        return;
     case QuickEditSwap:
         return;
     case QuickEditMerge:
@@ -1052,4 +1139,323 @@ IndexedSequence::Step& IndexedSequenceEditPage::step(int index) {
 
 const IndexedSequence::Step& IndexedSequenceEditPage::step(int index) const {
     return _project.selectedIndexedSequence().step(index);
+}
+
+void IndexedSequenceEditPage::applyVoicing(bool isPiano) {
+    if (!_stepSelection.any()) {
+        showMessage("NO STEP");
+        return;
+    }
+
+    auto &sequence = _project.selectedIndexedSequence();
+
+    // Find first selected step to use as root note
+    int firstSelectedIndex = _stepSelection.firstSetIndex();
+    if (firstSelectedIndex < 0) {
+        showMessage("NO STEP");
+        return;
+    }
+
+    int8_t rootNote = sequence.step(firstSelectedIndex).noteIndex();
+
+    // Get voicing array
+    const Voicing *voicings = isPiano ? kPianoVoicings : kGuitarVoicings;
+    int voicingCount = isPiano ? kPianoVoicingCount : kGuitarVoicingCount;
+    int &voicingIndex = isPiano ? _pianoVoicingIndex : _guitarVoicingIndex;
+
+    // Cycle to next voicing
+    voicingIndex = (voicingIndex + 1) % voicingCount;
+    const Voicing &voicing = voicings[voicingIndex];
+
+    // Apply voicing to selected steps
+    int selectedCount = _stepSelection.count();
+    int stepIndex = firstSelectedIndex;
+
+    for (int i = 0; i < selectedCount && i < voicing.count; ++i) {
+        // Find next selected step
+        while (stepIndex < sequence.activeLength() && !_stepSelection[stepIndex]) {
+            stepIndex++;
+        }
+        if (stepIndex >= sequence.activeLength()) break;
+
+        // Apply interval from voicing relative to root note
+        int8_t newNote = rootNote + voicing.semis[i];
+        sequence.step(stepIndex).setNoteIndex(newNote);
+
+        stepIndex++;
+    }
+
+    // Show voicing name
+    FixedStringBuilder<16> msg;
+    msg(isPiano ? "PIANO: " : "GUITAR: ");
+    msg(voicing.name);
+    showMessage(msg);
+}
+
+// ============================================================================
+// Macro Context Menus
+// ============================================================================
+
+enum class RhythmContextAction {
+    Euclidean,
+    Clave,
+    Tuplet,
+    Poly,
+    RandomRhythm,
+    Last
+};
+
+static const ContextMenuModel::Item rhythmContextMenuItems[] = {
+    { "EUCL" },
+    { "CLAVE" },
+    { "TUPLET" },
+    { "POLY" },
+    { "M-RHY" },
+};
+
+enum class WaveformContextAction {
+    Triangle,
+    Sine,
+    Sawtooth,
+    Pulse,
+    Target,
+    Last
+};
+
+static const ContextMenuModel::Item waveformContextMenuItems[] = {
+    { "TRI" },
+    { "SINE" },
+    { "SAW" },
+    { "PULSE" },
+    { "TARGET" },
+};
+
+enum class MelodicContextAction {
+    Scale,
+    Arpeggio,
+    Chord,
+    Modal,
+    RandomMelody,
+    Last
+};
+
+static const ContextMenuModel::Item melodicContextMenuItems[] = {
+    { "SCALE" },
+    { "ARP" },
+    { "CHORD" },
+    { "MODAL" },
+    { "M-MEL" },
+};
+
+enum class DurationTransformContextAction {
+    DurationLog,
+    DurationExp,
+    DurationTriangle,
+    Reverse,
+    Mirror,
+    Last
+};
+
+static const ContextMenuModel::Item durationTransformContextMenuItems[] = {
+    { "D-LOG" },
+    { "D-EXP" },
+    { "D-TRI" },
+    { "REV" },
+    { "MIRR" },
+};
+
+void IndexedSequenceEditPage::rhythmContextShow() {
+    showContextMenu(ContextMenu(
+        rhythmContextMenuItems,
+        int(RhythmContextAction::Last),
+        [&] (int index) { rhythmContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void IndexedSequenceEditPage::rhythmContextAction(int index) {
+    auto &sequence = _project.selectedIndexedSequence();
+
+    // Determine range: use selected steps if any, otherwise full active length
+    int firstStep, lastStep;
+
+    if (_stepSelection.any()) {
+        firstStep = _stepSelection.firstSetIndex();
+        lastStep = _stepSelection.lastSetIndex();
+    } else {
+        firstStep = 0;
+        lastStep = sequence.activeLength() - 1;
+    }
+
+    switch (RhythmContextAction(index)) {
+    case RhythmContextAction::Euclidean:
+        // TODO: Implement Euclidean rhythm generator
+        showMessage("EUCLIDEAN - NOT YET IMPLEMENTED");
+        break;
+    case RhythmContextAction::Clave:
+        // TODO: Implement Clave patterns
+        showMessage("CLAVE - NOT YET IMPLEMENTED");
+        break;
+    case RhythmContextAction::Tuplet:
+        // TODO: Implement Tuplet subdivision
+        showMessage("TUPLET - NOT YET IMPLEMENTED");
+        break;
+    case RhythmContextAction::Poly:
+        // TODO: Implement Polyrhythmic subdivision
+        showMessage("POLY - NOT YET IMPLEMENTED");
+        break;
+    case RhythmContextAction::RandomRhythm:
+        // TODO: Implement Random rhythm generator
+        showMessage("M-RHY - NOT YET IMPLEMENTED");
+        break;
+    case RhythmContextAction::Last:
+        break;
+    }
+}
+
+void IndexedSequenceEditPage::waveformContextShow() {
+    showContextMenu(ContextMenu(
+        waveformContextMenuItems,
+        int(WaveformContextAction::Last),
+        [&] (int index) { waveformContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void IndexedSequenceEditPage::waveformContextAction(int index) {
+    auto &sequence = _project.selectedIndexedSequence();
+
+    // Determine range: use selected steps if any, otherwise full active length
+    int firstStep, lastStep;
+
+    if (_stepSelection.any()) {
+        firstStep = _stepSelection.firstSetIndex();
+        lastStep = _stepSelection.lastSetIndex();
+    } else {
+        firstStep = 0;
+        lastStep = sequence.activeLength() - 1;
+    }
+
+    switch (WaveformContextAction(index)) {
+    case WaveformContextAction::Triangle:
+        // TODO: Implement Triangle waveform
+        showMessage("TRI - NOT YET IMPLEMENTED");
+        break;
+    case WaveformContextAction::Sine:
+        // TODO: Implement Sine waveform
+        showMessage("SINE - NOT YET IMPLEMENTED");
+        break;
+    case WaveformContextAction::Sawtooth:
+        // TODO: Implement Sawtooth waveform
+        showMessage("SAW - NOT YET IMPLEMENTED");
+        break;
+    case WaveformContextAction::Pulse:
+        // TODO: Implement Pulse waveform
+        showMessage("PULSE - NOT YET IMPLEMENTED");
+        break;
+    case WaveformContextAction::Target:
+        // TODO: Implement Target parameter selector
+        showMessage("TARGET - NOT YET IMPLEMENTED");
+        break;
+    case WaveformContextAction::Last:
+        break;
+    }
+}
+
+void IndexedSequenceEditPage::melodicContextShow() {
+    showContextMenu(ContextMenu(
+        melodicContextMenuItems,
+        int(MelodicContextAction::Last),
+        [&] (int index) { melodicContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void IndexedSequenceEditPage::melodicContextAction(int index) {
+    auto &sequence = _project.selectedIndexedSequence();
+
+    // Determine range: use selected steps if any, otherwise full active length
+    int firstStep, lastStep;
+
+    if (_stepSelection.any()) {
+        firstStep = _stepSelection.firstSetIndex();
+        lastStep = _stepSelection.lastSetIndex();
+    } else {
+        firstStep = 0;
+        lastStep = sequence.activeLength() - 1;
+    }
+
+    switch (MelodicContextAction(index)) {
+    case MelodicContextAction::Scale:
+        // TODO: Implement Scale fill
+        showMessage("SCALE - NOT YET IMPLEMENTED");
+        break;
+    case MelodicContextAction::Arpeggio:
+        // TODO: Implement Arpeggio patterns
+        showMessage("ARP - NOT YET IMPLEMENTED");
+        break;
+    case MelodicContextAction::Chord:
+        // TODO: Implement Chord voicings
+        showMessage("CHORD - NOT YET IMPLEMENTED");
+        break;
+    case MelodicContextAction::Modal:
+        // TODO: Implement Modal melodies
+        showMessage("MODAL - NOT YET IMPLEMENTED");
+        break;
+    case MelodicContextAction::RandomMelody:
+        // TODO: Implement Random melody generator
+        showMessage("M-MEL - NOT YET IMPLEMENTED");
+        break;
+    case MelodicContextAction::Last:
+        break;
+    }
+}
+
+void IndexedSequenceEditPage::durationTransformContextShow() {
+    showContextMenu(ContextMenu(
+        durationTransformContextMenuItems,
+        int(DurationTransformContextAction::Last),
+        [&] (int index) { durationTransformContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void IndexedSequenceEditPage::durationTransformContextAction(int index) {
+    auto &sequence = _project.selectedIndexedSequence();
+
+    // Determine range: use selected steps if any, otherwise full active length
+    int firstStep, lastStep;
+
+    if (_stepSelection.any()) {
+        firstStep = _stepSelection.firstSetIndex();
+        lastStep = _stepSelection.lastSetIndex();
+    } else {
+        firstStep = 0;
+        lastStep = sequence.activeLength() - 1;
+    }
+
+    switch (DurationTransformContextAction(index)) {
+    case DurationTransformContextAction::DurationLog:
+        // TODO: Implement Duration logarithmic curve
+        showMessage("D-LOG - NOT YET IMPLEMENTED");
+        break;
+    case DurationTransformContextAction::DurationExp:
+        // TODO: Implement Duration exponential curve
+        showMessage("D-EXP - NOT YET IMPLEMENTED");
+        break;
+    case DurationTransformContextAction::DurationTriangle:
+        // TODO: Implement Duration triangle curve
+        showMessage("D-TRI - NOT YET IMPLEMENTED");
+        break;
+    case DurationTransformContextAction::Reverse:
+        // TODO: Implement Reverse step order
+        showMessage("REV - NOT YET IMPLEMENTED");
+        break;
+    case DurationTransformContextAction::Mirror:
+        // TODO: Implement Mirror around midpoint
+        showMessage("MIRR - NOT YET IMPLEMENTED");
+        break;
+    case DurationTransformContextAction::Last:
+        break;
+    }
 }

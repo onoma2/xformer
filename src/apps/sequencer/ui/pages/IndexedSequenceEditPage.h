@@ -67,6 +67,17 @@ private:
     void quickEdit(int index);
     void startSwapQuickEdit();
     void finishSwapQuickEdit();
+    void applyVoicing(bool isPiano);
+
+    // Macro context menus
+    void rhythmContextShow();
+    void rhythmContextAction(int index);
+    void waveformContextShow();
+    void waveformContextAction(int index);
+    void melodicContextShow();
+    void melodicContextAction(int index);
+    void durationTransformContextShow();
+    void durationTransformContextAction(int index);
 
     int _section = 0;
     EditMode _editMode = EditMode::Note;
@@ -81,4 +92,6 @@ private:
     int _swapQuickEditBaseIndex = -1;
     int _swapQuickEditOffset = 0;
     int _swapQuickEditPreferredOffset = 0;
+    int _pianoVoicingIndex = 0;
+    int _guitarVoicingIndex = 0;
 };

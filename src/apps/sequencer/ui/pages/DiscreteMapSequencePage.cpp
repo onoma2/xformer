@@ -23,6 +23,66 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "ROUTE" },
 };
 
+enum class DistributionContextAction {
+    Even8,
+    Even16,
+    EvenAll,
+    EvenGroup,
+    EvenInverted,
+    Last
+};
+
+static const ContextMenuModel::Item distributionContextMenuItems[] = {
+    { "EVEN8" },
+    { "EVEN16" },
+    { "EVEN-ALL" },
+    { "EVEN-GRP" },
+    { "EVEN-INV" },
+};
+
+enum class ClusterContextAction {
+    Cluster,
+    Last
+};
+
+static const ContextMenuModel::Item clusterContextMenuItems[] = {
+    { "M-CLUSTER" },
+};
+
+enum class DistributeActiveContextAction {
+    Active,
+    Rise,
+    Fall,
+    Both,
+    Normalize,
+    Last
+};
+
+static const ContextMenuModel::Item distributeActiveContextMenuItems[] = {
+    { "ACT" },
+    { "RISE" },
+    { "FALL" },
+    { "BOTH" },
+    { "NORM" },
+};
+
+enum class TransformContextAction {
+    Flip,
+    ThresholdMirror,
+    ThresholdReverse,
+    NoteMirror,
+    NoteReverse,
+    Last
+};
+
+static const ContextMenuModel::Item transformContextMenuItems[] = {
+    { "FLIP" },
+    { "T-MIRR" },
+    { "T-REV" },
+    { "N-MIRR" },
+    { "N-REV" },
+};
+
 struct Voicing {
     const char *name;
     int8_t semis[6];
@@ -77,10 +137,10 @@ static const int quickEditItems[8] = {
     int(DiscreteMapSequenceListModel::Item::RangeHigh), // Step 9
     int(DiscreteMapSequenceListModel::Item::RangeLow),  // Step 10
     int(DiscreteMapSequenceListModel::Item::Divisor),   // Step 11
-    QuickEditEven,                                      // Step 12
-    QuickEditFlip,                                      // Step 13
-    QuickEditPiano,                                     // Step 14
-    QuickEditGuitar,                                    // Step 15
+    QuickEditPiano,                                     // Step 12
+    QuickEditGuitar,                                    // Step 13
+    QuickEditNone,                                      // Step 14
+    QuickEditNone,                                      // Step 15
     QuickEditNone,
 };
 
@@ -378,10 +438,28 @@ void DiscreteMapSequencePage::updateLeds(Leds &leds) {
     }
 
     if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
+        // Quick Edit items (Step 8-15 in top row)
         for (int i = 0; i < 8; ++i) {
-            int index = MatrixMap::fromStep(i + 8);
+            int step = i + 8;  // Steps 8-15
+            // Skip Step 14 (reserved for Transform macro)
+            if (step == 14) continue;
+
+            int index = MatrixMap::fromStep(step);
             leds.unmask(index);
             leds.set(index, false, quickEditItems[i] != QuickEditNone);
+            leds.mask(index);
+        }
+
+        // DiscreteMap Macro Shortcuts - YELLOW (set after quick edit to ensure visibility)
+        // Step 4: Distribution
+        // Step 5: Cluster
+        // Step 6: Distribute Active
+        // Step 14: Transform
+        const int macroShortcuts[] = { 4, 5, 6, 14 };
+        for (int step : macroShortcuts) {
+            int index = MatrixMap::fromStep(step);
+            leds.unmask(index);
+            leds.set(index, true, true);
             leds.mask(index);
         }
     }
@@ -394,16 +472,11 @@ void DiscreteMapSequencePage::keyDown(KeyEvent &event) {
 
     if (key.isQuickEdit() && !key.shiftModifier()) {
         if (key.quickEdit() == 3) {
-            startEvenQuickEdit();
-            event.consume();
-            return;
-        }
-        if (key.quickEdit() == 5) {
             startVoicingQuickEdit(VoicingBank::Piano, key.quickEdit() + 8);
             event.consume();
             return;
         }
-        if (key.quickEdit() == 6) {
+        if (key.quickEdit() == 4) {
             startVoicingQuickEdit(VoicingBank::Guitar, key.quickEdit() + 8);
             event.consume();
             return;
@@ -470,6 +543,30 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
     if (key.isContextMenu()) {
         contextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step4)) {
+        distributionContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step5)) {
+        clusterContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step6)) {
+        distributeActiveContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.is(Key::Step14)) {
+        transformContextShow();
         event.consume();
         return;
     }
@@ -653,6 +750,9 @@ void DiscreteMapSequencePage::distributeActiveStagesEvenly(EvenTarget target) {
             break;
         case EvenTarget::Fall:
             include = (dir == DiscreteMapSequence::Stage::TriggerDir::Fall);
+            break;
+        case EvenTarget::Both:
+            include = (dir == DiscreteMapSequence::Stage::TriggerDir::Both);
             break;
         case EvenTarget::Active:
             include = (dir != DiscreteMapSequence::Stage::TriggerDir::Off);
@@ -1128,4 +1228,143 @@ float DiscreteMapSequencePage::shapeValue(float t, GeneratorKind kind) const {
         return pow(t, 1.3);              // Slower start, steeper end
     }
     return t;
+}
+
+void DiscreteMapSequencePage::distributionContextShow() {
+    showContextMenu(ContextMenu(
+        distributionContextMenuItems,
+        int(DistributionContextAction::Last),
+        [&] (int index) { distributionContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void DiscreteMapSequencePage::distributionContextAction(int index) {
+    if (!_sequence) return;
+
+    switch (DistributionContextAction(index)) {
+    case DistributionContextAction::Even8:
+        // TODO: Implement Even8 distribution
+        showMessage("EVEN8 - NOT YET IMPLEMENTED");
+        break;
+    case DistributionContextAction::Even16:
+        // TODO: Implement Even16 distribution
+        showMessage("EVEN16 - NOT YET IMPLEMENTED");
+        break;
+    case DistributionContextAction::EvenAll:
+        // TODO: Implement EvenAll distribution
+        showMessage("EVEN-ALL - NOT YET IMPLEMENTED");
+        break;
+    case DistributionContextAction::EvenGroup:
+        // TODO: Implement EvenGroup round-robin
+        showMessage("EVEN-GRP - NOT YET IMPLEMENTED");
+        break;
+    case DistributionContextAction::EvenInverted:
+        // TODO: Implement EvenInverted spacing
+        showMessage("EVEN-INV - NOT YET IMPLEMENTED");
+        break;
+    case DistributionContextAction::Last:
+        break;
+    }
+}
+
+void DiscreteMapSequencePage::clusterContextShow() {
+    showContextMenu(ContextMenu(
+        clusterContextMenuItems,
+        int(ClusterContextAction::Last),
+        [&] (int index) { clusterContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void DiscreteMapSequencePage::clusterContextAction(int index) {
+    if (!_sequence) return;
+
+    switch (ClusterContextAction(index)) {
+    case ClusterContextAction::Cluster:
+        // TODO: Implement M-CLUSTER random clumping
+        showMessage("M-CLUSTER - NOT YET IMPLEMENTED");
+        break;
+    case ClusterContextAction::Last:
+        break;
+    }
+}
+
+void DiscreteMapSequencePage::distributeActiveContextShow() {
+    showContextMenu(ContextMenu(
+        distributeActiveContextMenuItems,
+        int(DistributeActiveContextAction::Last),
+        [&] (int index) { distributeActiveContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void DiscreteMapSequencePage::distributeActiveContextAction(int index) {
+    if (!_sequence) return;
+
+    switch (DistributeActiveContextAction(index)) {
+    case DistributeActiveContextAction::Active:
+        // Reuse existing implementation
+        distributeActiveStagesEvenly(EvenTarget::Active);
+        break;
+    case DistributeActiveContextAction::Rise:
+        distributeActiveStagesEvenly(EvenTarget::Rise);
+        break;
+    case DistributeActiveContextAction::Fall:
+        distributeActiveStagesEvenly(EvenTarget::Fall);
+        break;
+    case DistributeActiveContextAction::Both:
+        distributeActiveStagesEvenly(EvenTarget::Both);
+        break;
+    case DistributeActiveContextAction::Normalize:
+        // TODO: Implement Normalize spacing
+        showMessage("NORM - NOT YET IMPLEMENTED");
+        break;
+    case DistributeActiveContextAction::Last:
+        break;
+    }
+}
+
+void DiscreteMapSequencePage::transformContextShow() {
+    showContextMenu(ContextMenu(
+        transformContextMenuItems,
+        int(TransformContextAction::Last),
+        [&] (int index) { transformContextAction(index); },
+        [&] (int index) { return true; }
+    ));
+}
+
+void DiscreteMapSequencePage::transformContextAction(int index) {
+    if (!_sequence) return;
+
+    switch (TransformContextAction(index)) {
+    case TransformContextAction::Flip:
+        // Reuse existing flip implementation
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            _sequence->stage(i).cycleDirection();
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("DIR FLIP");
+        break;
+    case TransformContextAction::ThresholdMirror:
+        // TODO: Implement Threshold mirror
+        showMessage("T-MIRR - NOT YET IMPLEMENTED");
+        break;
+    case TransformContextAction::ThresholdReverse:
+        // TODO: Implement Threshold reverse
+        showMessage("T-REV - NOT YET IMPLEMENTED");
+        break;
+    case TransformContextAction::NoteMirror:
+        // TODO: Implement Note mirror
+        showMessage("N-MIRR - NOT YET IMPLEMENTED");
+        break;
+    case TransformContextAction::NoteReverse:
+        // TODO: Implement Note reverse
+        showMessage("N-REV - NOT YET IMPLEMENTED");
+        break;
+    case TransformContextAction::Last:
+        break;
+    }
 }

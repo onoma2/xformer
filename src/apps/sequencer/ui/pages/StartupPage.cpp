@@ -35,7 +35,7 @@ void StartupPage::draw(Canvas &canvas) {
   canvas.setFont(Font::Small);
   canvas.drawTextCentered(0, 0, Width, 32, "__X|FORMER");
   canvas.setFont(Font::Tiny);
-  canvas.drawTextCentered(0, 20, Width, 8, "onoma2 (Phazerville based)");
+  canvas.drawTextCentered(0, 20, Width, 8, "by onoma2");
 
   canvas.setFont(Font::Tiny);
   canvas.drawTextCentered(0, 32, Width, 32, "LOADING ...");
