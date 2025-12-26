@@ -285,24 +285,86 @@ The internal triangle provides a smooth triangle wave:
 - **Long press any stage**: Enter multi-selection mode
 - **Shift + Stage**: Select multiple stages for batch editing
 
-### 9.2 Quick Edit (Page+Steps 9-16)
+### 9.2 Quick Edit (Page+Steps 9-15)
 
 - **Page+Step 9**: Range High
 - **Page+Step 10**: Range Low
 - **Page+Step 11**: Divisor
-- **Page+Step 12**: Even (Distribute active stages evenly)
-- **Page+Step 13**: Flip (Invert all directions)
-- **Page+Step 14**: Piano Voicing (hold, rotate to choose; release to apply)
-- **Page+Step 15**: Guitar Voicing (hold, rotate to choose; release to apply)
+- **Page+Step 12**: Piano Voicings (cycles through piano chord voicings, applies to active stages)
+- **Page+Step 13**: Guitar Voicings (cycles through guitar chord voicings, applies to active stages)
+- **Steps 14-15**: Reserved for macros
 
-**Voicing Quick Edit behavior**:
-- First press shows the current bank/voicing; no notes are changed until the encoder is moved.
-- Applies to active stages only (direction not Off); uses selected stage note as root.
-- If there are fewer active stages than notes in the voicing, it fills as many as possible.
-- If there are more active stages, it repeats the voicing with transposition 0, +7, then -7 semitones (cycle).
-- Reapplying with the same root/scale/voicing yields the same result.
+**Voicing Quick Edit**:
+- Each press cycles to next voicing (NO, MAJ13, MAJ6/9, MIN13, etc.)
+- "NO" voicing does nothing (safe exit)
+- Applies to active stages only (direction not Off)
+- Selected stage note becomes the root
+- Voicing intervals are applied to active stages in order
+- More active stages than voicing notes = voicing repeats with transposition (0, +7, -7)
+- Useful for quickly creating chord progressions across threshold map
 
-### 9.3 Editing Tips
+**Double-Click Threshold Auto-Placement**:
+- Double-click any stage button (bottom row) to auto-place threshold
+- Threshold is set to midpoint between left and right active neighbors
+- If no left neighbor: uses range minimum (-100)
+- If no right neighbor: uses range maximum (+100)
+- Skips inactive (Off) stages when finding neighbors
+- Useful for quickly distributing thresholds evenly
+
+### 9.3 Macro Shortcuts (Page+Steps 4, 5, 6, 14)
+
+Macros provide powerful generative and transformative operations on threshold maps. Macros operate on all 32 stages.
+
+**Page+Step 4 - Distribution** (YELLOW LED):
+- **EVEN8**: Distribute first 8 stages evenly across full range (-100 to +100)
+- **EVEN16**: Distribute first 16 stages evenly across full range
+- **EVEN-ALL**: Distribute all 32 stages evenly across full range
+- **EVEN-GRP**: Round-robin interleaving across 4 groups (fret pattern initialization)
+- **EVEN-INV**: Inverted even distribution (max to min)
+
+**Page+Step 5 - Cluster** (YELLOW LED):
+- **M-CLUSTER**: Random clustering - creates 4 random clusters with controlled spread
+
+**Page+Step 6 - Distribute Active** (YELLOW LED):
+- **ACT**: Distribute all active (Rise/Fall/Both) stages evenly across range
+- **RISE**: Distribute only Rise stages evenly across range
+- **FALL**: Distribute only Fall stages evenly across range
+- **BOTH**: Distribute only Both stages evenly across range
+- **NORM**: Normalize thresholds - expand current range to fill full (-100 to +100)
+
+**Page+Step 14 - Transform** (YELLOW LED):
+- **FLIP**: Cycle all stage directions (Rise→Fall→Both→Off)
+- **T-MIRR**: Threshold mirror - copy first 16 to last 16 (reversed)
+- **T-REV**: Threshold reverse - reverse threshold order across all 32 stages
+- **N-MIRR**: Note mirror - copy first 16 note indices to last 16 (reversed)
+- **N-REV**: Note reverse - reverse note index order across all 32 stages
+
+**Macro Usage Tips**:
+- Macros operate on all 32 stages regardless of selection
+- Use distribution macros to create even spacing patterns
+- EVEN-GRP creates optimal guitar-fret-like spacing
+- NORM expands any threshold distribution to fill full range
+- M-CLUSTER creates organic, random groupings
+- Transform macros preserve stage directions
+- Combine FLIP with distribution for creative patterns
+- Use T-MIRR/N-MIRR to create symmetric patterns
+- Use T-REV/N-REV to completely reverse patterns
+
+### 9.4 Initialization Pattern
+
+When a DiscreteMap sequence is initialized (INIT context menu), all 32 stages are set with:
+- **Thresholds**: Interleaved "fret pattern" distribution across -100 to +100
+- **Direction**: Off (all inactive)
+- **Note Index**: 0
+
+**Fret Pattern**:
+The initialization uses round-robin interleaving across all 4 sections:
+- Within each section: stages spaced ~26 units apart
+- Across sections: values interleave to create ~6.5 unit spacing overall
+- Creates optimal threshold distribution for guitar-fret-like CV scanning
+- Simply enable stages (change direction) to activate pre-spaced thresholds
+
+### 9.5 Editing Tips
 
 - Use Length mode for proportional musical mappings
 - Use Position mode for precise voltage control

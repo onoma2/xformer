@@ -30,10 +30,13 @@ This manual covers the XFORMER-specific features:
    - **Curve Track Enhancements**:
 		- Global Phase
 		- Wavefolder
+		- Chaos Engine
+		- Advanced Playback Features
    - **Routing**:
         - CV/Gate Output Rotation
         - VCA Next Shaper
         - Per-Track Reset
+		- Advanced Bias/Depth/Shaper System
 
 It assumes you are already familiar with the standard functionality of the Westlicht PER|FORMER.
 
@@ -72,13 +75,28 @@ Includes 21 algorithms like **Stomper** (Acid bass), **Markov** (Chains), **Chip
 
 ### 2.4 Common Parameters
 
-- **Algorithm (0-14)**: Selects the generation logic.
+- **Algorithm (0-20)**: Selects the generation logic.
 - **Flow/Ornament (0-16)**: Algorithm-specific macro controls.
 - **Power (0-16)**: Note density and cooldown. 0 = Silence.
 - **Loop (0-29)**: 0=Infinite, >0=Finite loop length.
 - **Rotate**: Shifts start point of finite loops.
 - **Scan**: Offsets the window into the infinite pattern buffer.
 - **Skew**: Density bias across the loop (front/back loaded).
+
+### 2.5 Jam Surface (Step Buttons)
+
+| Step | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Top | Octave + | Transpose + | Root Note + | Div up (straight) | Div up (triplet) | Div /2 (faster) | Mask + | Loop +<br>Shift: Run momentary |
+| Bottom | Octave - | Transpose - | Root Note - | Div down (straight) | Div down (triplet) | Div x2 (slower) | Mask - | Loop -<br>Shift: Mute momentary |
+
+Shift modifiers:
+- Shift+Step 8: Run momentary (press = stop)
+- Shift+Step 16: Mute momentary (press = mute)
+
+Behavior notes:
+- Top row moves "up" (faster/greater), bottom row moves "down" (slower/less); for divisors, smaller = faster.
+- Divisor up/down only walks known divisors for straight or triplet types.
 
 ## 3. DiscreteMap Track
 
@@ -102,6 +120,43 @@ DiscreteMap maps an input signal (internal ramp or external CV) to 32 discrete o
 - **Quick Edit**:
     - **Step 12**: Evenly distribute active stages.
     - **Step 13**: Flip all stage directions.
+- **Voicing Quick Edit**:
+    - **Step 14**: Piano voicings (cycling through chord types)
+    - **Step 15**: Guitar voicings (cycling through chord types)
+- **Fret-Style Initialization**: When clearing or initializing the sequence, stages are distributed using an interleaved "fretboard" pattern across the 4 pages of 8 steps each, creating an even distribution of threshold values from -100 to +100 across all 32 stages.
+
+### 3.4 Fret-Style Initialization Pattern
+
+The DiscreteMap track uses a unique "fretboard" or interleaved initialization pattern that distributes threshold values across all 32 stages in a round-robin fashion:
+
+**Initialization Algorithm:**
+- The 32 stages are organized in 4 pages of 8 steps each
+- Threshold values are distributed from -100 to +100 using round-robin interleaving
+- Each step position (0-7) gets evenly spaced threshold values across all 4 pages
+- This creates a "fretboard" pattern where similar threshold values align vertically across pages
+
+**Technical Details:**
+- Page calculation: `page = (i / 8) + 1` (where i is stage index 0-31)
+- Button calculation: `button = i % 8` (where i is stage index 0-31)
+- Global index: `global_index = button * 4 + (page - 1)`
+- Threshold value: `threshold = -100 + (global_index * 200 / 31)`
+
+This pattern ensures that when you're using multiple pages of the DiscreteMap track, similar threshold values are aligned across the pages, making it easier to create coordinated mappings across different sections of your sequence.
+
+### 3.5 All-Stages Selection Behavior
+
+When all 32 stages are selected (selection mask includes all stages):
+
+**Threshold Editing:**
+- **Shift + Encoder**: Rotate all 32 threshold values by 1 position
+- **Encoder only**: Rotate all 32 threshold values by 8 positions
+- Values cyclically shift to the left/right (wrapping around)
+
+**Note Editing:**
+- **Encoder**: Rotate all 32 note indices by 1 position (no shift distinction)
+- Values cyclically shift to the left/right (wrapping around)
+
+This behavior allows for bulk manipulation of all stage parameters simultaneously, enabling complex pattern transformations across the entire DiscreteMap sequence.
 
 ## 4. Indexed Track
 
@@ -111,9 +166,9 @@ Indexed Track is a duration-based sequencer. Unlike standard steps that are lock
 **Use Cases**: Polyrhythms, unquantized timing, complex envelopes.
 
 ### 4.2 Step Parameters
-- **Duration**: Length of step in ticks.
+- **Duration**: Length of step in ticks (0-65535).
 - **Gate**: Gate length % or Trigger mode.
-- **Note**: Output voltage index.
+- **Note**: Output voltage index (-63 to +64).
 
 ### 4.3 Math Operations (F5)
 Apply batch operations to selected steps:
@@ -122,11 +177,45 @@ Apply batch operations to selected steps:
 - **Quant**: Quantize values to nearest multiple.
 - **Rand/Jitter**: Randomization.
 
-### 4.4 Quick Edit
-- **Step 12**: Set First Step (Rotate sequence).
-- **Step 13**: Active Length.
-- **Step 14**: Run Mode.
-- **Step 15**: Reset Measure.
+### 4.4 Quick Edit (Page+Steps 9-15)
+- **Step 9**: Split (requires step selection)
+- **Step 10**: Merge with next (first selected step only)
+- **Step 11**: Set First Step (rotates sequence to start at selected step)
+- **Step 12**: Piano Voicings (cycles through piano chord voicings, applies to selected steps)
+- **Step 13**: Guitar Voicings (cycles through guitar chord voicings, applies to selected steps)
+
+### 4.5 Macro Shortcuts (Page+Steps 4, 5, 6, 14)
+Macros provide powerful generative and transformative operations on sequences. All macros operate on:
+- **Selected steps** (if any are selected)
+- **Full active length** (if no selection)
+
+**Page+Step 4 - Rhythm Generators** (YELLOW LED):
+- **EUCL**: Euclidean rhythm generator
+- **CLAVE**: Clave pattern generator
+- **TUPLET**: Tuplet subdivision generator
+- **POLY**: Polyrhythmic subdivision generator
+- **M-RHY**: Random rhythm generator
+
+**Page+Step 5 - Waveforms** (YELLOW LED):
+- **TRI**: Triangle waveform
+- **SINE**: Sine waveform
+- **SAW**: Sawtooth waveform
+- **PULSE**: Pulse waveform
+- **TARGET**: Target parameter selector
+
+**Page+Step 6 - Melodic Generators** (YELLOW LED):
+- **SCALE**: Scale fill generator
+- **ARP**: Arpeggio pattern generator
+- **CHORD**: Chord progression generator
+- **MODAL**: Modal melody generator
+- **M-MEL**: Random melody generator
+
+**Page+Step 14 - Duration & Transform** (YELLOW LED):
+- **D-LOG**: Duration logarithmic curve
+- **D-EXP**: Duration exponential curve
+- **D-TRI**: Duration triangle curve
+- **REV**: Reverse step order
+- **MIRR**: Mirror steps around midpoint
 
 ## 5. Note Track Enhancements
 
@@ -242,9 +331,119 @@ Determines which pulses fire a gate signal when Pulse Count is active.
 3. **Hold (2)**: One long gate for entire duration.
 4. **FirstLast (3)**: Gates on first and last pulse only.
 
-## 6. Routing & Output Rotation
+## 6. Curve Track Enhancements
 
-### 6.1 Global Output Rotation (CV & Gate)
+### 6.1 Signal Processor
+
+The signal path has been expanded to include Chaos, Wavefolding, and Filtering.
+
+#### 6.1.1 Signal Flow
+`Step Shape` -> `Chaos` -> `Wavefolder` -> `Filter` -> `Crossfade` -> `Limiter` -> `Output`
+
+#### 6.1.2 Wavefolder
+- **Access**: Press **F5** to cycle to **WAVEFOLDER**.
+- **FOLD**: Controls the amount of wavefolding (sine-based folding). Range: 0.00-1.00.
+- **GAIN**: Input gain before the folder. Range: 0.00-2.00 (0% to 200%).
+
+#### 6.1.3 DJ Filter
+- **FILTER**: One-knob filter control.
+  - **Center (0.00)**: Filter off.
+  - **Negative**: Low Pass Filter (LPF).
+  - **Positive**: High Pass Filter (HPF).
+
+#### 6.1.4 Crossfade (XFADE)
+- **XFADE**: Blends between the dry signal and the processed (folded/filtered) signal.
+
+### 6.2 Chaos Engine
+
+A generative engine inserted *before* the wavefolder.
+
+- **Access**: Press **F5** to cycle to **CHAOS**.
+- **Toggle Algorithm**: Hold **Shift + F1** to switch between **Latoocarfian** (Stepped/Sample&Hold) and **Lorenz** (Smooth/Attractor).
+- **Controls**:
+  - **AMT**: Modulation depth.
+  - **HZ**: Evolution speed.
+  - **P1/P2**: Algorithm-specific shape parameters.
+
+### 6.3 Advanced Playback
+
+#### 6.3.1 Global Phase
+- **Function**: Offsets the playback position of the sequence (0-100%).
+- **Access**: Press **F5** to cycle to **PHASE**.
+- **Use Case**: Phase-shifting LFOs, canon effects, fine-tuning timing.
+
+#### 6.3.2 True Reverse Playback
+The engine now supports "True Reverse" playback for shapes.
+- **Backward Mode**: Steps play in reverse order (4, 3, 2...), AND the internal shape plays backwards (100% -> 0%).
+- **Pendulum/PingPong**: Shapes play forward on the "up" phase and backward on the "down" phase, creating perfectly smooth loops.
+
+#### 6.3.3 Min/Max Inversion
+You can now create inverted signal windows by setting **Min > Max**.
+- **Normal**: Min=0, Max=255 (Signal goes UP).
+- **Inverted**: Min=255, Max=0 (Signal goes DOWN).
+- **Step**: The step shape scales from "Start" (Min) to "End" (Max).
+
+### 6.4 Curve Studio Workflow
+
+Curve Studio introduces powerful context menus for populating sequences.
+
+#### 6.4.1 LFO Menu (Step 6)
+Populate steps with single-cycle waveforms. Defaults to active loop range or selection.
+
+- **Access**: Press **Page + Step 6** (Button 6).
+- **Options**:
+  - **TRI**: Triangle (1 cycle/step).
+  - **SINE**: Sine / Bell (1 cycle/step).
+  - **SAW**: Sawtooth / Ramp (1 cycle/step).
+  - **SQUA**: Square / Pulse (1 cycle/step).
+  - **MM-RND**: Randomize Min/Max values for each step (supports inversion).
+
+#### 6.4.2 Macro Shape Menu (Step 5)
+"Draw" complex shapes that span multiple steps. Automatically handles selection logic (Single step -> to end of loop).
+
+- **Access**: Press **Page + Step 5** (Button 5).
+- **Options**:
+  - **MM-INIT**: **Min/Max Reset**. Resets the range to default (Min=0, Max=255) without changing shapes.
+  - **M-FM**: **Chirp / FM**. A triangle wave that accelerates in frequency over the range.
+  - **M-DAMP**: **Damped Oscillation** (Decaying Sine, 4 cycles).
+  - **M-BOUNCE**: **Bouncing Ball** physics (Decaying absolute sines).
+  - **M-RSTR**: **Rasterize**. Stretches the shape of the *first step* across the entire range.
+
+#### 6.4.3 Transform Menu (Step 7)
+Manipulate existing sequence data.
+
+- **Access**: Press **Page + Step 7** (Button 7).
+- **Options**:
+  - **T-INV**: **Invert**. Swaps Min and Max values (Flips slope direction).
+  - **T-REV**: **Reverse**. Reverses step order and internal shape direction.
+  - **T-MIRR**: **Mirror**. Reflects voltages across the centerline.
+  - **T-ALGN**: **Align**. Ensures continuity by setting `Min = previous Max`.
+  - **T-WALK**: **Smooth Walk**. Generates a continuous random path ("Drunken Sine").
+
+#### 6.4.4 Gate Presets Menu (Step 15)
+Quickly assign dynamic gate behaviors based on the curve slope or levels.
+
+- **Access**: Press **Page + Step 15** (Button 15).
+- **Options**:
+  - **ZC+**: **Zero Cross**. Trigger at every zero crossing (rising + falling).
+  - **EOC/EOR**: **Peaks/Troughs**. Trigger at every local maximum and minimum.
+  - **RISING**: Gate HIGH while voltage is increasing.
+  - **FALLING**: Gate HIGH while voltage is decreasing.
+  - **>50%**: **Comparator**. Gate HIGH when voltage is in the top half of the range.
+
+### 6.5 Shortcuts & Gestures
+
+#### 6.5.1 Double-Click Toggles
+- **Note Track**: Double-click a step button to toggle the Gate (on any non-gate layer).
+- **Curve Track**: Double-click a step button to toggle the **Peak+Trough** gate preset.
+
+#### 6.5.2 Multi-Step Gradient Editing
+- **Action**: Select multiple steps, hold **Shift** and turn the Encoder on **MIN** or **MAX**.
+- **Result**: Creates a linear ramp of values from the first selected step to the last.
+
+## 7. Routing & Output Rotation
+
+### 7.1 Global Output Rotation (CV & Gate)
 
 This feature allows you to dynamically rotate which tracks are assigned to physical CV and Gate outputs. It acts like a virtual 8-channel sequential switch.
 
@@ -262,7 +461,7 @@ The rotation applies to the physical output's lookup of its assigned track. Only
 **Example:**
 Rotate 3 LFOs (Track 1, 2, 3) across 3 outputs (CV Out 1, 2, 3). Modulating the route shifts the assignment: T1->Out2, T2->Out3, T3->Out1.
 
-### 6.2 VCA Next Shaper (VC)
+### 7.2 VCA Next Shaper (VC)
 
 The **VCA Next** (VC) shaper allows one route to amplitude-modulate another.
 
@@ -273,7 +472,7 @@ The **VCA Next** (VC) shaper allows one route to amplitude-modulate another.
 - **Result**: The LFO from Route A is multiplied by the Envelope from Route B.
 - **Formula**: `Output = Center + (Input - Center) * NextRouteSource`.
 
-### 6.3 Per-Track Reset
+### 7.3 Per-Track Reset
 
 The **Reset** routing target allows external triggers to hard-reset a track.
 
@@ -281,39 +480,51 @@ The **Reset** routing target allows external triggers to hard-reset a track.
 - **Source**: Gate input, MIDI note, etc.
 - **Action**: On a rising edge, the targeted track(s) immediately reset to their initial state (Step 0, Ramp 0, etc.), overriding internal loop counters.
 
-## 7. New Curve Track Features
+### 7.4 Advanced Bias/Depth/Shaper System
 
-### Global Phase
+The routing system provides sophisticated per-track modulation capabilities using Bias, Depth, and Shaper parameters.
 
-Offsets the playback position of the curve sequence without changing step data.
-- **Access**: Press F5 to cycle edit modes -> **Phase**.
-- **Range**: 0.00 to 1.00.
-- **Visual**: Dimmer vertical line shows phased position.
+#### 7.4.1 Signal Flow Overview
 
-### Wavefolding
+```
+Raw Source Value
+      ↓
+[Normalization] → Converts to 0-100% range
+      ↓
+[Bias + (Raw × Depth/100)] → Per-track adjustment
+      ↓
+[Shaper (if active)] → Non-linear transformation
+      ↓
+[Target Parameter] → Final modulated value
+```
 
-Advanced wavefolding accessible through the Phase button (cycle F5).
-- **FOLD**: Folding amount (harmonics).
-- **GAIN**: Input gain.
-- **FILTER**: DJ-style Low/High pass.
-- **XFADE**: Dry/Wet mix.
+#### 7.4.2 Per-Track Parameters
 
-### Chaos
+Each track has independent bias, depth, and shaper settings:
 
-Chaotic modulation source added to the Curve track signal path (Pre-fold).
-- **Access**: Cycle F5 to **CHAOS** page.
-- **Algorithms**: **Latoocarfian** (Hyperchaotic, stepped) or **Lorenz** (Fluid, smooth).
-    - **Toggle Algo**: Hold **Shift + F1** (AMT).
-- **Parameters**:
-    - **AMT**: Modulation depth.
-    - **HZ**: Speed/Rate.
-    - **P1/P2**: Algorithm-specific parameters (e.g., Rho/Beta for Lorenz).
+**Bias (-100% to +100%)**:
+- Adds offset to normalized source value
+- Positive bias increases source signal
+- Negative bias decreases source signal
 
-### LFO Context Menu
+**Depth (0% to 100%)**:
+- Controls amount of source modulation applied
+- 0% = no modulation (use target base value)
+- 100% = full source range applied to target range
 
-Quickly fill sequences with LFO shapes.
-- **Access**: Hold **STEP 5** button on CurveSequence page.
-- **Options**: TRI, SINE, SAW, SQUA.
+**Shapers**:
+- Apply non-linear transformations to source
+- Each shaper modifies how source affects target
+- Available shapers: None, Crease, Location, Envelope, Triangle Fold, Frequency Follower, Activity, Progressive Divider, VcaNext
 
-### Shortcuts
-- **Shift+Encoder (Multi-step)**: Creates smooth transitions/gradients across selected steps for Shape, Min, and Max values.
+#### 7.4.3 Shaper Functions
+
+**None**: Direct linear mapping
+**Crease**: Creates "crease" or fold in the middle of the range
+**Location**: Shifts where the modulation is most sensitive
+**Envelope**: Applies envelope-like transformation
+**Triangle Fold**: Folds the range like a triangle wave
+**Frequency Follower**: Responds to rate of change in source
+**Activity**: Responds to activity and movement in source
+**Progressive Divider**: Applies different divisions to the source
+**VcaNext (VC)**: Performs amplitude modulation using the next route's raw source

@@ -52,8 +52,35 @@ void DiscreteMapSequence::clear() {
     _rangeHigh = 5.0f;
     _rangeLow = -5.0f;
 
-    for (auto &stage : _stages) {
-        stage.clear();
+    // Initialize with interleaved threshold distribution (fret pattern)
+    // Uses round-robin interleaving across all 4 sections (pages)
+    const int min_val = -100;
+    const int max_val = 100;
+    const int active_pages = 4;
+    const int total_toggles = 8 * active_pages; // 32 stages
+    const float step = (max_val - min_val) / float(total_toggles - 1);
+
+    for (int i = 0; i < StageCount; ++i) {
+        auto &stage = _stages[i];
+
+        // Calculate page (1-based) and button (0-based)
+        int page = (i / 8) + 1;      // 1-4
+        int button = i % 8;          // 0-7
+
+        // Calculate global index using round-robin interleaving
+        int global_index = button * active_pages + (page - 1);
+
+        // Calculate threshold value
+        float value = min_val + global_index * step;
+        int threshold = static_cast<int>(value + 0.5f); // Round to nearest
+
+        // Clamp to range (handles rounding edge cases)
+        if (threshold < min_val) threshold = min_val;
+        if (threshold > max_val) threshold = max_val;
+
+        stage.setThreshold(threshold);
+        stage.setDirection(Stage::TriggerDir::Off); // All inactive by default
+        stage.setNoteIndex(0);
     }
 }
 
@@ -64,8 +91,33 @@ void DiscreteMapSequence::clearStage(int index) {
 }
 
 void DiscreteMapSequence::clearThresholds() {
-    for (auto &stage : _stages) {
-        stage.setThreshold(0);
+    // Initialize with interleaved threshold distribution (fret pattern)
+    // Uses round-robin interleaving across all 4 sections (pages)
+    const int min_val = -100;
+    const int max_val = 100;
+    const int active_pages = 4;
+    const int total_toggles = 8 * active_pages; // 32 stages
+    const float step = (max_val - min_val) / float(total_toggles - 1);
+
+    for (int i = 0; i < StageCount; ++i) {
+        auto &stage = _stages[i];
+
+        // Calculate page (1-based) and button (0-based)
+        int page = (i / 8) + 1;      // 1-4
+        int button = i % 8;          // 0-7
+
+        // Calculate global index using round-robin interleaving
+        int global_index = button * active_pages + (page - 1);
+
+        // Calculate threshold value
+        float value = min_val + global_index * step;
+        int threshold = static_cast<int>(value + 0.5f); // Round to nearest
+
+        // Clamp to range (handles rounding edge cases)
+        if (threshold < min_val) threshold = min_val;
+        if (threshold > max_val) threshold = max_val;
+
+        stage.setThreshold(threshold);
     }
 }
 

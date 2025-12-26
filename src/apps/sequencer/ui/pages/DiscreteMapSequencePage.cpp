@@ -12,8 +12,12 @@
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
+#include "core/utils/Random.h"
 
 #include <cmath>
+#include <algorithm>
+
+static Random rng;
 
 static const ContextMenuModel::Item contextMenuItems[] = {
     { "INIT" },
@@ -90,6 +94,7 @@ struct Voicing {
 };
 
 static const Voicing kPianoVoicings[] = {
+    { "NO",      { 0, 0, 0, 0, 0, 0 },    0 },
     { "MAJ13",   { 0, 4, 7, 11, 14, 21 }, 6 },
     { "MAJ6/9",  { 0, 4, 7, 9, 14, 0 },   5 },
     { "MIN13",   { 0, 3, 7, 10, 14, 21 }, 6 },
@@ -105,6 +110,7 @@ static const Voicing kPianoVoicings[] = {
 };
 
 static const Voicing kGuitarVoicings[] = {
+    { "NO",    { 0, 0, 0, 0, 0, 0 }, 0 },
     { "MAJ",   { 0, 4, 7, 12, 16, 0 }, 5 },
     { "MIN",   { 0, 7, 12, 15, 19, 0 }, 5 },
     { "7",     { 0, 4, 10, 12, 16, 0 }, 5 },
@@ -547,6 +553,46 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    // Double-click on step button: auto-place threshold at midpoint between neighbors
+    if (!key.shiftModifier() && key.isStep() && event.count() == 2 && _sequence) {
+        int stepOffset = _section * 8;
+        int stageIndex = stepOffset + key.step();
+        if (stageIndex < DiscreteMapSequence::StageCount) {
+            auto &stage = _sequence->stage(stageIndex);
+
+            // Find left neighbor threshold (search backwards for active stage)
+            int leftThreshold = -100; // Default to range minimum
+            for (int i = stageIndex - 1; i >= 0; --i) {
+                if (_sequence->stage(i).direction() != DiscreteMapSequence::Stage::TriggerDir::Off) {
+                    leftThreshold = _sequence->stage(i).threshold();
+                    break;
+                }
+            }
+
+            // Find right neighbor threshold (search forwards for active stage)
+            int rightThreshold = 100; // Default to range maximum
+            for (int i = stageIndex + 1; i < DiscreteMapSequence::StageCount; ++i) {
+                if (_sequence->stage(i).direction() != DiscreteMapSequence::Stage::TriggerDir::Off) {
+                    rightThreshold = _sequence->stage(i).threshold();
+                    break;
+                }
+            }
+
+            // Calculate midpoint
+            int midpoint = (leftThreshold + rightThreshold) / 2;
+            stage.setThreshold(midpoint);
+
+            // Invalidate engine cache
+            if (_enginePtr) {
+                _enginePtr->invalidateThresholds();
+            }
+
+            showMessage("THRESHOLD AUTO");
+        }
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier() && key.is(Key::Step4)) {
         distributionContextShow();
         event.consume();
@@ -834,6 +880,59 @@ void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
 
     int delta = event.value();
 
+    // Special handling for rotation when no specific stages selected
+    if (_selectionMask == 0xFFFFFFFF) {  // All stages selected
+        switch (_editMode) {
+        case EditMode::Threshold: {
+            // Rotate all threshold values
+            int rotateAmount = _shiftHeld ? delta : delta * 8;
+            rotateAmount = ((rotateAmount % DiscreteMapSequence::StageCount) + DiscreteMapSequence::StageCount) % DiscreteMapSequence::StageCount;
+
+            if (rotateAmount != 0) {
+                // Store all current thresholds
+                int thresholds[DiscreteMapSequence::StageCount];
+                for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+                    thresholds[i] = _sequence->stage(i).threshold();
+                }
+
+                // Rotate and write back
+                for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+                    int srcIdx = (i + rotateAmount) % DiscreteMapSequence::StageCount;
+                    _sequence->stage(i).setThreshold(thresholds[srcIdx]);
+                }
+
+                if (_enginePtr) {
+                    _enginePtr->invalidateThresholds();
+                }
+            }
+            return;
+        }
+        case EditMode::NoteValue: {
+            // Rotate all note indices
+            int rotateAmount = delta;  // Always single step for notes
+            rotateAmount = ((rotateAmount % DiscreteMapSequence::StageCount) + DiscreteMapSequence::StageCount) % DiscreteMapSequence::StageCount;
+
+            if (rotateAmount != 0) {
+                // Store all current notes
+                int8_t notes[DiscreteMapSequence::StageCount];
+                for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+                    notes[i] = _sequence->stage(i).noteIndex();
+                }
+
+                // Rotate and write back
+                for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+                    int srcIdx = (i + rotateAmount) % DiscreteMapSequence::StageCount;
+                    _sequence->stage(i).setNoteIndex(notes[srcIdx]);
+                }
+            }
+            return;
+        }
+        default:
+            break;
+        }
+    }
+
+    // Individual stage editing (when specific stages are selected)
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
         if (!(_selectionMask & (1U << i))) {
             continue;
@@ -851,7 +950,8 @@ void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
         }
         case EditMode::NoteValue: {
             auto &s = _sequence->stage(i);
-            int step = _shiftHeld ? 12 : 1;
+            const Scale &scale = _sequence->selectedScale(_project.selectedScale());
+            int step = (_shiftHeld && scale.isChromatic()) ? scale.notesPerOctave() : 1;
             s.setNoteIndex(s.noteIndex() + delta * step);
             break;
         }
@@ -1242,27 +1342,86 @@ void DiscreteMapSequencePage::distributionContextShow() {
 void DiscreteMapSequencePage::distributionContextAction(int index) {
     if (!_sequence) return;
 
+    const int min_val = -100;
+    const int max_val = 100;
+
     switch (DistributionContextAction(index)) {
-    case DistributionContextAction::Even8:
-        // TODO: Implement Even8 distribution
-        showMessage("EVEN8 - NOT YET IMPLEMENTED");
+    case DistributionContextAction::Even8: {
+        // Distribute first 8 stages evenly, rest unchanged
+        const float step = (max_val - min_val) / 7.0f;
+        for (int i = 0; i < 8; ++i) {
+            int threshold = min_val + static_cast<int>(i * step + 0.5f);
+            _sequence->stage(i).setThreshold(threshold);
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("EVEN8");
         break;
-    case DistributionContextAction::Even16:
-        // TODO: Implement Even16 distribution
-        showMessage("EVEN16 - NOT YET IMPLEMENTED");
+    }
+    case DistributionContextAction::Even16: {
+        // Distribute first 16 stages evenly, rest unchanged
+        const float step = (max_val - min_val) / 15.0f;
+        for (int i = 0; i < 16; ++i) {
+            int threshold = min_val + static_cast<int>(i * step + 0.5f);
+            _sequence->stage(i).setThreshold(threshold);
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("EVEN16");
         break;
-    case DistributionContextAction::EvenAll:
-        // TODO: Implement EvenAll distribution
-        showMessage("EVEN-ALL - NOT YET IMPLEMENTED");
+    }
+    case DistributionContextAction::EvenAll: {
+        // Distribute all 32 stages evenly
+        const float step = (max_val - min_val) / 31.0f;
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            int threshold = min_val + static_cast<int>(i * step + 0.5f);
+            _sequence->stage(i).setThreshold(threshold);
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("EVEN-ALL");
         break;
-    case DistributionContextAction::EvenGroup:
-        // TODO: Implement EvenGroup round-robin
-        showMessage("EVEN-GRP - NOT YET IMPLEMENTED");
+    }
+    case DistributionContextAction::EvenGroup: {
+        // Round-robin interleaving across 4 groups (fret pattern)
+        const int active_pages = 4;
+        const int total_toggles = 8 * active_pages;
+        const float step = (max_val - min_val) / float(total_toggles - 1);
+
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            int page = (i / 8) + 1;      // 1-4
+            int button = i % 8;          // 0-7
+            int global_index = button * active_pages + (page - 1);
+            float value = min_val + global_index * step;
+            int threshold = static_cast<int>(value + 0.5f);
+
+            if (threshold < min_val) threshold = min_val;
+            if (threshold > max_val) threshold = max_val;
+
+            _sequence->stage(i).setThreshold(threshold);
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("EVEN-GRP");
         break;
-    case DistributionContextAction::EvenInverted:
-        // TODO: Implement EvenInverted spacing
-        showMessage("EVEN-INV - NOT YET IMPLEMENTED");
+    }
+    case DistributionContextAction::EvenInverted: {
+        // Inverted even distribution: max to min
+        const float step = (max_val - min_val) / 31.0f;
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            int threshold = max_val - static_cast<int>(i * step + 0.5f);
+            _sequence->stage(i).setThreshold(threshold);
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("EVEN-INV");
         break;
+    }
     case DistributionContextAction::Last:
         break;
     }
@@ -1281,10 +1440,39 @@ void DiscreteMapSequencePage::clusterContextAction(int index) {
     if (!_sequence) return;
 
     switch (ClusterContextAction(index)) {
-    case ClusterContextAction::Cluster:
-        // TODO: Implement M-CLUSTER random clumping
-        showMessage("M-CLUSTER - NOT YET IMPLEMENTED");
+    case ClusterContextAction::Cluster: {
+        // M-CLUSTER: Create random clusters of thresholds
+        const int min_val = -100;
+        const int max_val = 100;
+        const int clusterCount = 4;  // 4 clusters
+        const int stagesPerCluster = DiscreteMapSequence::StageCount / clusterCount;
+
+        for (int c = 0; c < clusterCount; ++c) {
+            // Random cluster center
+            int centerVal = min_val + rng.nextRange(max_val - min_val + 1);
+            int clusterSpread = 20 + rng.nextRange(40);  // 20-60 unit spread
+
+            for (int i = 0; i < stagesPerCluster; ++i) {
+                int stageIdx = c * stagesPerCluster + i;
+                if (stageIdx >= DiscreteMapSequence::StageCount) break;
+
+                // Random offset within cluster spread
+                int offset = rng.nextRange(clusterSpread) - (clusterSpread / 2);
+                int threshold = centerVal + offset;
+
+                // Clamp to valid range
+                threshold = clamp(threshold, min_val, max_val);
+
+                _sequence->stage(stageIdx).setThreshold(threshold);
+            }
+        }
+
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("M-CLUSTER");
         break;
+    }
     case ClusterContextAction::Last:
         break;
     }
@@ -1316,10 +1504,44 @@ void DiscreteMapSequencePage::distributeActiveContextAction(int index) {
     case DistributeActiveContextAction::Both:
         distributeActiveStagesEvenly(EvenTarget::Both);
         break;
-    case DistributeActiveContextAction::Normalize:
-        // TODO: Implement Normalize spacing
-        showMessage("NORM - NOT YET IMPLEMENTED");
+    case DistributeActiveContextAction::Normalize: {
+        // Normalize: Expand active thresholds to fill full range
+        const int min_val = -100;
+        const int max_val = 100;
+
+        // Find min/max of current thresholds
+        int currentMin = max_val;
+        int currentMax = min_val;
+
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            int threshold = _sequence->stage(i).threshold();
+            if (threshold < currentMin) currentMin = threshold;
+            if (threshold > currentMax) currentMax = threshold;
+        }
+
+        // Avoid division by zero
+        if (currentMax == currentMin) {
+            showMessage("NORM: ALL SAME");
+            break;
+        }
+
+        // Normalize each threshold
+        float scale = float(max_val - min_val) / float(currentMax - currentMin);
+
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            int oldThreshold = _sequence->stage(i).threshold();
+            float normalized = (oldThreshold - currentMin) * scale;
+            int newThreshold = min_val + static_cast<int>(normalized + 0.5f);
+            newThreshold = clamp(newThreshold, min_val, max_val);
+            _sequence->stage(i).setThreshold(newThreshold);
+        }
+
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("NORMALIZE");
         break;
+    }
     case DistributeActiveContextAction::Last:
         break;
     }
@@ -1348,22 +1570,54 @@ void DiscreteMapSequencePage::transformContextAction(int index) {
         }
         showMessage("DIR FLIP");
         break;
-    case TransformContextAction::ThresholdMirror:
-        // TODO: Implement Threshold mirror
-        showMessage("T-MIRR - NOT YET IMPLEMENTED");
+    case TransformContextAction::ThresholdMirror: {
+        // Mirror thresholds: copy first half to second half (reversed)
+        for (int i = 0; i < DiscreteMapSequence::StageCount / 2; ++i) {
+            int mirrorIdx = DiscreteMapSequence::StageCount - 1 - i;
+            int threshold = _sequence->stage(i).threshold();
+            _sequence->stage(mirrorIdx).setThreshold(threshold);
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("T-MIRROR");
         break;
-    case TransformContextAction::ThresholdReverse:
-        // TODO: Implement Threshold reverse
-        showMessage("T-REV - NOT YET IMPLEMENTED");
+    }
+    case TransformContextAction::ThresholdReverse: {
+        // Reverse threshold order
+        for (int i = 0; i < DiscreteMapSequence::StageCount / 2; ++i) {
+            int j = DiscreteMapSequence::StageCount - 1 - i;
+            int tempThreshold = _sequence->stage(i).threshold();
+            _sequence->stage(i).setThreshold(_sequence->stage(j).threshold());
+            _sequence->stage(j).setThreshold(tempThreshold);
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("T-REVERSE");
         break;
-    case TransformContextAction::NoteMirror:
-        // TODO: Implement Note mirror
-        showMessage("N-MIRR - NOT YET IMPLEMENTED");
+    }
+    case TransformContextAction::NoteMirror: {
+        // Mirror note indices: copy first half to second half (reversed)
+        for (int i = 0; i < DiscreteMapSequence::StageCount / 2; ++i) {
+            int mirrorIdx = DiscreteMapSequence::StageCount - 1 - i;
+            int8_t noteIndex = _sequence->stage(i).noteIndex();
+            _sequence->stage(mirrorIdx).setNoteIndex(noteIndex);
+        }
+        showMessage("N-MIRROR");
         break;
-    case TransformContextAction::NoteReverse:
-        // TODO: Implement Note reverse
-        showMessage("N-REV - NOT YET IMPLEMENTED");
+    }
+    case TransformContextAction::NoteReverse: {
+        // Reverse note index order
+        for (int i = 0; i < DiscreteMapSequence::StageCount / 2; ++i) {
+            int j = DiscreteMapSequence::StageCount - 1 - i;
+            int8_t tempNote = _sequence->stage(i).noteIndex();
+            _sequence->stage(i).setNoteIndex(_sequence->stage(j).noteIndex());
+            _sequence->stage(j).setNoteIndex(tempNote);
+        }
+        showMessage("N-REVERSE");
         break;
+    }
     case TransformContextAction::Last:
         break;
     }

@@ -320,17 +320,68 @@ The Indexed track uses accumulator-based timing:
 - **Page+S3**: Jump to track settings page
 - **Context Menu**: Long press on context key for options
 
-### 9.2 Quick Edit (Page+Steps 9-16)
+### 9.2 Quick Edit (Page+Steps 9-15)
 
 - **Page+Step 9**: Split (requires step selection)
-- **Page+Step 10**: Swap (requires step selection, hold + rotate to choose offset)
-- **Page+Step 11**: Merge with next (first selected step only)
-- **Page+Step 12**: Set First Step (rotates sequence to start at selected step)
-- **Page+Step 13**: Active Length
-- **Page+Step 14**: Run Mode
-- **Page+Step 15**: Reset Measure
+- **Page+Step 10**: Merge with next (first selected step only)
+- **Page+Step 11**: Set First Step (rotates sequence to start at selected step)
+- **Page+Step 12**: Piano Voicings (cycles through piano chord voicings, applies to selected steps)
+- **Page+Step 13**: Guitar Voicings (cycles through guitar chord voicings, applies to selected steps)
+- **Steps 14-15**: Reserved for macros
 
-### 9.3 Editing Tips
+**Voicing Quick Edit**:
+- First selected step becomes the root note
+- Each press cycles to next voicing (NO, MAJ13, MAJ6/9, MIN13, etc.)
+- "NO" voicing does nothing (safe exit)
+- Voicing intervals are applied to selected steps in order
+- More steps than voicing notes = extra steps ignored
+- Useful for quickly creating chord progressions
+
+### 9.3 Macro Shortcuts (Page+Steps 4, 5, 6, 14)
+
+Macros provide powerful generative and transformative operations on sequences. All macros operate on:
+- **Selected steps** (if any are selected)
+- **Full active length** (if no selection)
+
+**Page+Step 4 - Rhythm Generators** (YELLOW LED):
+- **EUCL**: Euclidean rhythm generator - distributes pulses evenly using Bjorklund algorithm
+- **CLAVE**: Clave pattern generator - cycles through Son, Rumba, and Bossa nova patterns
+- **TUPLET**: Tuplet subdivision - divides into groups of 3, 5, or 7
+- **POLY**: Polyrhythmic subdivision - creates cross-rhythms (3:4, 5:4, 7:8)
+- **M-RHY**: Random rhythm generator - random durations and gate lengths
+
+**Page+Step 5 - Waveforms** (YELLOW LED):
+- **TRI**: Triangle waveform - maps triangle wave to note indices
+- **SINE**: Sine waveform - maps sine wave to note indices
+- **SAW**: Sawtooth waveform - maps sawtooth to note indices
+- **PULSE**: Pulse waveform - square wave mapped to note indices
+- **TARGET**: Target parameter selector - cycles Note → Duration → Gate
+
+**Page+Step 6 - Melodic Generators** (YELLOW LED):
+- **SCALE**: Scale fill generator - ascending/descending major scale
+- **ARP**: Arpeggio pattern generator - cycles through Up, Down, Up-Down, Triad patterns
+- **CHORD**: Chord progression generator - I-IV-V, I-V-vi, ii-V-I progressions
+- **MODAL**: Modal melody generator - Dorian, Phrygian, Lydian, Mixolydian modes
+- **M-MEL**: Random melody generator - pentatonic scale with random octaves
+
+**Page+Step 14 - Duration & Transform** (YELLOW LED):
+- **D-LOG**: Duration logarithmic curve - slow start, accelerating end
+- **D-EXP**: Duration exponential curve - fast start, slowing end
+- **D-TRI**: Duration triangle curve - accelerate then decelerate
+- **REV**: Reverse step order - mirrors all step properties
+- **MIRR**: Mirror steps around midpoint - copies first half to second half
+
+**Macro Behavior**:
+- Select specific steps to apply macro to that range only
+- Leave no selection to apply to entire active sequence
+- Macros modify existing step data in place
+- Use step selection for surgical edits of specific ranges
+- Combine multiple macros for complex generative results
+- Rhythm generators primarily affect duration and gate length
+- Melodic generators primarily affect note indices
+- Waveforms apply to current TARGET parameter (Note/Duration/Gate)
+
+### 9.4 Editing Tips
 
 - Use Shift+encoder for fine duration adjustments
 - Split function is great for subdividing longer steps

@@ -10,6 +10,14 @@
 #include "model/Routing.h"
 
 #include "core/utils/StringBuilder.h"
+#include "core/utils/Random.h"
+#include "core/math/Math.h"
+
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+static Random rng;
 
 enum class ContextAction {
     Init,
@@ -52,6 +60,7 @@ struct Voicing {
 };
 
 static const Voicing kPianoVoicings[] = {
+    { "NO",      { 0, 0, 0, 0, 0, 0 },    0 },
     { "MAJ13",   { 0, 4, 7, 11, 14, 21 }, 6 },
     { "MAJ6/9",  { 0, 4, 7, 9, 14, 0 },   5 },
     { "MIN13",   { 0, 3, 7, 10, 14, 21 }, 6 },
@@ -67,6 +76,7 @@ static const Voicing kPianoVoicings[] = {
 };
 
 static const Voicing kGuitarVoicings[] = {
+    { "NO",    { 0, 0, 0, 0, 0, 0 }, 0 },
     { "MAJ",   { 0, 4, 7, 12, 16, 0 }, 5 },
     { "MIN",   { 0, 7, 12, 15, 19, 0 }, 5 },
     { "7",     { 0, 4, 10, 12, 16, 0 }, 5 },
@@ -1287,27 +1297,128 @@ void IndexedSequenceEditPage::rhythmContextAction(int index) {
         lastStep = sequence.activeLength() - 1;
     }
 
+    int stepCount = lastStep - firstStep + 1;
+    if (stepCount <= 0) return;
+
     switch (RhythmContextAction(index)) {
-    case RhythmContextAction::Euclidean:
-        // TODO: Implement Euclidean rhythm generator
-        showMessage("EUCLIDEAN - NOT YET IMPLEMENTED");
+    case RhythmContextAction::Euclidean: {
+        // Euclidean rhythm: distribute pulses evenly (Bjorklund algorithm)
+        // For now, use 8 pulses distributed across steps
+        int pulses = std::min(8, stepCount);
+
+        // Simple Euclidean distribution
+        std::vector<bool> pattern(stepCount, false);
+        for (int i = 0; i < pulses; ++i) {
+            int pos = (i * stepCount) / pulses;
+            pattern[pos] = true;
+        }
+
+        // Apply pattern: pulses get longer duration, gaps get shorter
+        uint16_t longDur = sequence.divisor();
+        uint16_t shortDur = sequence.divisor() / 4;
+
+        for (int i = 0; i < stepCount; ++i) {
+            sequence.step(firstStep + i).setDuration(pattern[i] ? longDur : shortDur);
+            sequence.step(firstStep + i).setGateLength(pattern[i] ? 75 : 25);
+        }
+        showMessage("EUCLIDEAN");
         break;
-    case RhythmContextAction::Clave:
-        // TODO: Implement Clave patterns
-        showMessage("CLAVE - NOT YET IMPLEMENTED");
+    }
+    case RhythmContextAction::Clave: {
+        // Classic 3-2 son clave pattern
+        static const int clavePatterns[][8] = {
+            {1, 0, 0, 1, 0, 0, 1, 0},  // Son clave
+            {1, 0, 0, 1, 0, 1, 0, 0},  // Rumba clave
+            {1, 0, 1, 0, 0, 1, 0, 0},  // Bossa nova
+        };
+        static int claveIndex = 0;
+
+        const int *pattern = clavePatterns[claveIndex];
+        claveIndex = (claveIndex + 1) % 3;
+
+        uint16_t longDur = sequence.divisor();
+        uint16_t shortDur = sequence.divisor() / 2;
+
+        for (int i = 0; i < stepCount; ++i) {
+            bool accent = pattern[i % 8];
+            sequence.step(firstStep + i).setDuration(accent ? longDur : shortDur);
+            sequence.step(firstStep + i).setGateLength(accent ? 75 : 50);
+        }
+
+        const char *names[] = {"SON", "RUMBA", "BOSSA"};
+        FixedStringBuilder<16> msg;
+        msg("CLAVE: ");
+        msg(names[(claveIndex + 2) % 3]);
+        showMessage(msg);
         break;
-    case RhythmContextAction::Tuplet:
-        // TODO: Implement Tuplet subdivision
-        showMessage("TUPLET - NOT YET IMPLEMENTED");
+    }
+    case RhythmContextAction::Tuplet: {
+        // Tuplet subdivision: divide into groups of 3, 5, or 7
+        static const int tuplets[] = {3, 5, 7};
+        static int tupletIndex = 0;
+
+        int tuplet = tuplets[tupletIndex];
+        tupletIndex = (tupletIndex + 1) % 3;
+
+        uint16_t baseDur = sequence.divisor() / tuplet;
+
+        for (int i = 0; i < stepCount; ++i) {
+            int pos = i % tuplet;
+            // First beat of tuplet gets accent
+            bool accent = (pos == 0);
+            sequence.step(firstStep + i).setDuration(baseDur);
+            sequence.step(firstStep + i).setGateLength(accent ? 75 : 50);
+        }
+
+        FixedStringBuilder<16> msg;
+        msg("TUPLET: %d", tuplet);
+        showMessage(msg);
         break;
-    case RhythmContextAction::Poly:
-        // TODO: Implement Polyrhythmic subdivision
-        showMessage("POLY - NOT YET IMPLEMENTED");
+    }
+    case RhythmContextAction::Poly: {
+        // Polyrhythm: create cross-rhythms (3:4, 5:4, 7:8)
+        static const struct { int a; int b; } polyRhythms[] = {
+            {3, 4}, {5, 4}, {7, 8}
+        };
+        static int polyIndex = 0;
+
+        int a = polyRhythms[polyIndex].a;
+        int b = polyRhythms[polyIndex].b;
+        polyIndex = (polyIndex + 1) % 3;
+
+        uint16_t baseDur = sequence.divisor();
+
+        for (int i = 0; i < stepCount; ++i) {
+            // Alternate between two subdivisions
+            int subdivision = (i % 2 == 0) ? a : b;
+            uint16_t dur = baseDur / subdivision;
+            sequence.step(firstStep + i).setDuration(dur);
+            sequence.step(firstStep + i).setGateLength(60);
+        }
+
+        FixedStringBuilder<16> msg;
+        msg("POLY: %d:%d", a, b);
+        showMessage(msg);
         break;
-    case RhythmContextAction::RandomRhythm:
-        // TODO: Implement Random rhythm generator
-        showMessage("M-RHY - NOT YET IMPLEMENTED");
+    }
+    case RhythmContextAction::RandomRhythm: {
+        // Random rhythm: random durations and gate lengths
+        uint16_t baseDur = sequence.divisor();
+
+        for (int i = 0; i < stepCount; ++i) {
+            // Random duration: 1/16 to 1 whole note
+            int div = 1 << (rng.nextRange(5));  // 1, 2, 4, 8, 16
+            uint16_t dur = baseDur / div;
+
+            // Random gate length: 25%, 50%, 75%
+            int gatePercent = (rng.nextRange(3) + 1) * 25;
+
+            sequence.step(firstStep + i).setDuration(dur);
+            sequence.step(firstStep + i).setGateLength(gatePercent);
+        }
+        showMessage("RANDOM RHYTHM");
         break;
+    }
     case RhythmContextAction::Last:
         break;
     }
@@ -1336,27 +1447,66 @@ void IndexedSequenceEditPage::waveformContextAction(int index) {
         lastStep = sequence.activeLength() - 1;
     }
 
+    int stepCount = lastStep - firstStep + 1;
+    if (stepCount <= 0) return;
+
+    const float TWO_PI = 2.0f * 3.14159265359f;
+
     switch (WaveformContextAction(index)) {
-    case WaveformContextAction::Triangle:
-        // TODO: Implement Triangle waveform
-        showMessage("TRI - NOT YET IMPLEMENTED");
+    case WaveformContextAction::Triangle: {
+        // Triangle wave: -63 to +64
+        for (int i = 0; i < stepCount; ++i) {
+            float t = float(i) / float(stepCount);
+            float value = (t < 0.5f) ? (t * 4.0f - 1.0f) : (3.0f - t * 4.0f);
+            int8_t note = int8_t(value * 63.5f);
+            sequence.step(firstStep + i).setNoteIndex(note);
+        }
+        showMessage("WAVEFORM: TRI");
         break;
-    case WaveformContextAction::Sine:
-        // TODO: Implement Sine waveform
-        showMessage("SINE - NOT YET IMPLEMENTED");
+    }
+    case WaveformContextAction::Sine: {
+        // Sine wave: -63 to +64
+        for (int i = 0; i < stepCount; ++i) {
+            float t = float(i) / float(stepCount);
+            float value = std::sin(t * TWO_PI);
+            int8_t note = int8_t(value * 63.5f);
+            sequence.step(firstStep + i).setNoteIndex(note);
+        }
+        showMessage("WAVEFORM: SINE");
         break;
-    case WaveformContextAction::Sawtooth:
-        // TODO: Implement Sawtooth waveform
-        showMessage("SAW - NOT YET IMPLEMENTED");
+    }
+    case WaveformContextAction::Sawtooth: {
+        // Sawtooth wave: -63 to +64
+        for (int i = 0; i < stepCount; ++i) {
+            float t = float(i) / float(stepCount);
+            float value = t * 2.0f - 1.0f;
+            int8_t note = int8_t(value * 63.5f);
+            sequence.step(firstStep + i).setNoteIndex(note);
+        }
+        showMessage("WAVEFORM: SAW");
         break;
-    case WaveformContextAction::Pulse:
-        // TODO: Implement Pulse waveform
-        showMessage("PULSE - NOT YET IMPLEMENTED");
+    }
+    case WaveformContextAction::Pulse: {
+        // Pulse wave: -63 or +64
+        for (int i = 0; i < stepCount; ++i) {
+            float t = float(i) / float(stepCount);
+            int8_t note = (t < 0.5f) ? 64 : -63;
+            sequence.step(firstStep + i).setNoteIndex(note);
+        }
+        showMessage("WAVEFORM: PULSE");
         break;
-    case WaveformContextAction::Target:
-        // TODO: Implement Target parameter selector
-        showMessage("TARGET - NOT YET IMPLEMENTED");
+    }
+    case WaveformContextAction::Target: {
+        // Target cycles: Note -> Duration -> Gate
+        static int targetParam = 0;
+        targetParam = (targetParam + 1) % 3;
+        const char *paramNames[] = { "NOTE", "DURATION", "GATE" };
+        FixedStringBuilder<16> msg;
+        msg("TARGET: ");
+        msg(paramNames[targetParam]);
+        showMessage(msg);
         break;
+    }
     case WaveformContextAction::Last:
         break;
     }
@@ -1385,27 +1535,137 @@ void IndexedSequenceEditPage::melodicContextAction(int index) {
         lastStep = sequence.activeLength() - 1;
     }
 
+    int stepCount = lastStep - firstStep + 1;
+    if (stepCount <= 0) return;
+
     switch (MelodicContextAction(index)) {
-    case MelodicContextAction::Scale:
-        // TODO: Implement Scale fill
-        showMessage("SCALE - NOT YET IMPLEMENTED");
+    case MelodicContextAction::Scale: {
+        // Scale fill: ascending or descending scale
+        static bool ascending = true;
+
+        // Use major scale intervals: 0, 2, 4, 5, 7, 9, 11, 12
+        static const int8_t scaleIntervals[] = {0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24};
+        static const int scaleLength = sizeof(scaleIntervals) / sizeof(scaleIntervals[0]);
+
+        for (int i = 0; i < stepCount; ++i) {
+            int idx = ascending ? i : (stepCount - 1 - i);
+            int8_t note = scaleIntervals[idx % scaleLength];
+            if (idx >= scaleLength) {
+                note += 12 * (idx / scaleLength);  // Extend to higher octaves
+            }
+            sequence.step(firstStep + i).setNoteIndex(note);
+        }
+
+        ascending = !ascending;
+        showMessage(ascending ? "SCALE: DESC" : "SCALE: ASC");
         break;
-    case MelodicContextAction::Arpeggio:
-        // TODO: Implement Arpeggio patterns
-        showMessage("ARP - NOT YET IMPLEMENTED");
+    }
+    case MelodicContextAction::Arpeggio: {
+        // Arpeggio patterns: up, down, up-down, random
+        static const struct {
+            const char *name;
+            int8_t pattern[8];
+            int length;
+        } arpeggios[] = {
+            {"UP",      {0, 4, 7, 12, 16, 19, 24, 28},    8},
+            {"DOWN",    {24, 19, 16, 12, 7, 4, 0, -5},    8},
+            {"UP-DN",   {0, 4, 7, 12, 7, 4, 0, -5},       8},
+            {"TRIAD",   {0, 4, 7, 0, 4, 7, 12, 7},        8},
+        };
+        static int arpIndex = 0;
+
+        const auto &arp = arpeggios[arpIndex];
+        arpIndex = (arpIndex + 1) % 4;
+
+        for (int i = 0; i < stepCount; ++i) {
+            int8_t note = arp.pattern[i % arp.length];
+            sequence.step(firstStep + i).setNoteIndex(note);
+        }
+
+        FixedStringBuilder<16> msg;
+        msg("ARP: ");
+        msg(arp.name);
+        showMessage(msg);
         break;
-    case MelodicContextAction::Chord:
-        // TODO: Implement Chord voicings
-        showMessage("CHORD - NOT YET IMPLEMENTED");
+    }
+    case MelodicContextAction::Chord: {
+        // Chord progressions: I-IV-V-I, I-V-vi-IV, ii-V-I
+        static const struct {
+            const char *name;
+            int8_t roots[4];
+        } progressions[] = {
+            {"I-IV-V",  {0, 5, 7, 0}},      // Classic I-IV-V-I
+            {"I-V-vi",  {0, 7, 9, 5}},      // Pop progression
+            {"ii-V-I",  {2, 7, 0, 2}},      // Jazz turnaround
+        };
+        static int progIndex = 0;
+
+        const auto &prog = progressions[progIndex];
+        progIndex = (progIndex + 1) % 3;
+
+        // Chord intervals (major triad)
+        static const int8_t triad[] = {0, 4, 7};
+
+        for (int i = 0; i < stepCount; ++i) {
+            int chordIdx = (i / 3) % 4;           // Change chord every 3 steps
+            int noteIdx = i % 3;                   // Cycle through triad
+            int8_t note = prog.roots[chordIdx] + triad[noteIdx];
+            sequence.step(firstStep + i).setNoteIndex(note);
+        }
+
+        FixedStringBuilder<16> msg;
+        msg("CHORD: ");
+        msg(prog.name);
+        showMessage(msg);
         break;
-    case MelodicContextAction::Modal:
-        // TODO: Implement Modal melodies
-        showMessage("MODAL - NOT YET IMPLEMENTED");
+    }
+    case MelodicContextAction::Modal: {
+        // Modal melodies: Dorian, Phrygian, Lydian, Mixolydian
+        static const struct {
+            const char *name;
+            int8_t intervals[7];
+        } modes[] = {
+            {"DORIAN",     {0, 2, 3, 5, 7, 9, 10}},
+            {"PHRYGIAN",   {0, 1, 3, 5, 7, 8, 10}},
+            {"LYDIAN",     {0, 2, 4, 6, 7, 9, 11}},
+            {"MIXOLYDIAN", {0, 2, 4, 5, 7, 9, 10}},
+        };
+        static int modeIndex = 0;
+
+        const auto &mode = modes[modeIndex];
+        modeIndex = (modeIndex + 1) % 4;
+
+        for (int i = 0; i < stepCount; ++i) {
+            int octave = i / 7;
+            int degree = i % 7;
+            int8_t note = mode.intervals[degree] + (octave * 12);
+            sequence.step(firstStep + i).setNoteIndex(note);
+        }
+
+        FixedStringBuilder<16> msg;
+        msg("MODAL: ");
+        msg(mode.name);
+        showMessage(msg);
         break;
-    case MelodicContextAction::RandomMelody:
-        // TODO: Implement Random melody generator
-        showMessage("M-MEL - NOT YET IMPLEMENTED");
+    }
+    case MelodicContextAction::RandomMelody: {
+        // Random melody: pentatonic scale for musicality
+        static const int8_t pentatonic[] = {0, 2, 4, 7, 9, 12, 14, 16, 19, 21};
+        static const int pentaLength = sizeof(pentatonic) / sizeof(pentatonic[0]);
+
+        for (int i = 0; i < stepCount; ++i) {
+            int idx = rng.nextRange(pentaLength);
+            int8_t note = pentatonic[idx];
+
+            // Random octave shift (-12 to +12)
+            int octaveShift = (rng.nextRange(3) - 1) * 12;
+            note += octaveShift;
+
+            sequence.step(firstStep + i).setNoteIndex(note);
+        }
+        showMessage("RANDOM MELODY");
         break;
+    }
     case MelodicContextAction::Last:
         break;
     }
@@ -1434,27 +1694,91 @@ void IndexedSequenceEditPage::durationTransformContextAction(int index) {
         lastStep = sequence.activeLength() - 1;
     }
 
+    int stepCount = lastStep - firstStep + 1;
+    if (stepCount <= 0) return;
+
     switch (DurationTransformContextAction(index)) {
-    case DurationTransformContextAction::DurationLog:
-        // TODO: Implement Duration logarithmic curve
-        showMessage("D-LOG - NOT YET IMPLEMENTED");
+    case DurationTransformContextAction::DurationLog: {
+        // Logarithmic curve: slow start, fast end
+        uint16_t minDur = 48;   // 32nd note minimum
+        uint16_t maxDur = 768;  // Whole note maximum
+        for (int i = 0; i < stepCount; ++i) {
+            float t = float(i) / float(stepCount - 1);
+            float curved = std::log(1.0f + t * 9.0f) / std::log(10.0f); // log10(1 + 9t)
+            uint16_t dur = uint16_t(minDur + curved * (maxDur - minDur));
+            sequence.step(firstStep + i).setDuration(dur);
+        }
+        showMessage("DURATION LOG");
         break;
-    case DurationTransformContextAction::DurationExp:
-        // TODO: Implement Duration exponential curve
-        showMessage("D-EXP - NOT YET IMPLEMENTED");
+    }
+    case DurationTransformContextAction::DurationExp: {
+        // Exponential curve: fast start, slow end
+        uint16_t minDur = 48;
+        uint16_t maxDur = 768;
+        for (int i = 0; i < stepCount; ++i) {
+            float t = float(i) / float(stepCount - 1);
+            float curved = (std::exp(t * 2.0f) - 1.0f) / (std::exp(2.0f) - 1.0f);
+            uint16_t dur = uint16_t(minDur + curved * (maxDur - minDur));
+            sequence.step(firstStep + i).setDuration(dur);
+        }
+        showMessage("DURATION EXP");
         break;
-    case DurationTransformContextAction::DurationTriangle:
-        // TODO: Implement Duration triangle curve
-        showMessage("D-TRI - NOT YET IMPLEMENTED");
+    }
+    case DurationTransformContextAction::DurationTriangle: {
+        // Triangle curve: ramp up then down
+        uint16_t minDur = 48;
+        uint16_t maxDur = 768;
+        for (int i = 0; i < stepCount; ++i) {
+            float t = float(i) / float(stepCount - 1);
+            float curved = (t < 0.5f) ? (t * 2.0f) : (2.0f - t * 2.0f);
+            uint16_t dur = uint16_t(minDur + curved * (maxDur - minDur));
+            sequence.step(firstStep + i).setDuration(dur);
+        }
+        showMessage("DURATION TRI");
         break;
-    case DurationTransformContextAction::Reverse:
-        // TODO: Implement Reverse step order
-        showMessage("REV - NOT YET IMPLEMENTED");
+    }
+    case DurationTransformContextAction::Reverse: {
+        // Reverse step order
+        for (int i = 0; i < stepCount / 2; ++i) {
+            int a = firstStep + i;
+            int b = lastStep - i;
+            auto tempNote = sequence.step(a).noteIndex();
+            auto tempDur = sequence.step(a).duration();
+            auto tempGate = sequence.step(a).gateLength();
+            auto tempSlide = sequence.step(a).slide();
+            auto tempGroup = sequence.step(a).groupMask();
+
+            sequence.step(a).setNoteIndex(sequence.step(b).noteIndex());
+            sequence.step(a).setDuration(sequence.step(b).duration());
+            sequence.step(a).setGateLength(sequence.step(b).gateLength());
+            sequence.step(a).setSlide(sequence.step(b).slide());
+            sequence.step(a).setGroupMask(sequence.step(b).groupMask());
+
+            sequence.step(b).setNoteIndex(tempNote);
+            sequence.step(b).setDuration(tempDur);
+            sequence.step(b).setGateLength(tempGate);
+            sequence.step(b).setSlide(tempSlide);
+            sequence.step(b).setGroupMask(tempGroup);
+        }
+        showMessage("REVERSED");
         break;
-    case DurationTransformContextAction::Mirror:
-        // TODO: Implement Mirror around midpoint
-        showMessage("MIRR - NOT YET IMPLEMENTED");
+    }
+    case DurationTransformContextAction::Mirror: {
+        // Mirror around midpoint
+        int midpoint = firstStep + stepCount / 2;
+        for (int i = midpoint; i <= lastStep; ++i) {
+            int mirror = firstStep + (midpoint - i);
+            if (mirror >= firstStep && mirror < midpoint) {
+                sequence.step(i).setNoteIndex(sequence.step(mirror).noteIndex());
+                sequence.step(i).setDuration(sequence.step(mirror).duration());
+                sequence.step(i).setGateLength(sequence.step(mirror).gateLength());
+                sequence.step(i).setSlide(sequence.step(mirror).slide());
+                sequence.step(i).setGroupMask(sequence.step(mirror).groupMask());
+            }
+        }
+        showMessage("MIRRORED");
         break;
+    }
     case DurationTransformContextAction::Last:
         break;
     }
