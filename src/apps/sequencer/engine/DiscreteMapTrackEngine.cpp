@@ -239,6 +239,10 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
 
     if (_gateTimer > 0) {
         --_gateTimer;
+        // Send MIDI gate OFF when timer expires
+        if (_gateTimer == 0) {
+            _engine.midiOutputEngine().sendGate(_track.trackIndex(), false);
+        }
     }
 
     _activeStage = newStage;
@@ -260,6 +264,10 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         } else {
             _gateTimer = (stepTicks * gateLengthPercent) / 100;
         }
+
+        // Send MIDI gate ON
+        bool finalGate = (!mute() || fill()) && true;
+        _engine.midiOutputEngine().sendGate(_track.trackIndex(), finalGate);
     }
 
     // 4. Update CV output based on CV Update Mode
@@ -284,6 +292,15 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
 
         if (_sequence->slewTime() == 0) {
             _cvOutput = _targetCv;
+        }
+
+        // Send MIDI CV and slide when it changes (respect CvUpdateMode and mute)
+        if (!mute() || _discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Always) {
+            // Only send if CV actually changed (avoid spam during slew)
+            if (std::abs(_cvOutput - prevCv) > 1e-6f) {
+                _engine.midiOutputEngine().sendCv(_track.trackIndex(), _cvOutput);
+                _engine.midiOutputEngine().sendSlide(_track.trackIndex(), _sequence->slewEnabled());
+            }
         }
     }
 

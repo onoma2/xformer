@@ -218,6 +218,10 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
     // 1. Handle Gate (counts down independently of step progress in both modes)
     if (_gateTimer > 0) {
         _gateTimer--;
+        // Send MIDI gate OFF when timer expires
+        if (_gateTimer == 0) {
+            _engine.midiOutputEngine().sendGate(_track.trackIndex(), false);
+        }
     }
 
     // 2. Step Advancement (mode-specific)
@@ -372,10 +376,21 @@ void IndexedTrackEngine::triggerStep() {
     _gateTimer = gateTicks;
     _effectiveStepDuration = baseDuration;
 
+    // Send MIDI gate ON/OFF
+    bool finalGate = (!mute() || fill()) && (gateTicks > 0);
+    _engine.midiOutputEngine().sendGate(_track.trackIndex(), finalGate);
+
     // Calculate CV output (direct Scale lookup, no octave/modulo math)
     if (_indexedTrack.cvUpdateMode() == IndexedTrack::CvUpdateMode::Always || gateTicks > 0) {
         _cvOutputTarget = noteIndexToVoltage(baseNote);
         _slideActive = step.slide();
+
+        // Send MIDI CV and slide (respect CvUpdateMode)
+        if (!mute() || _indexedTrack.cvUpdateMode() == IndexedTrack::CvUpdateMode::Always) {
+            _engine.midiOutputEngine().sendCv(_track.trackIndex(), _cvOutputTarget);
+            _engine.midiOutputEngine().sendSlide(_track.trackIndex(), _slideActive);
+        }
+
         if (!_slideActive || _indexedTrack.slideTime() == 0) {
             _cvOutput = _cvOutputTarget;
         }

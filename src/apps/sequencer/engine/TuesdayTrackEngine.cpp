@@ -1886,10 +1886,21 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
         _gateOutput = event.gate;
         _activity = event.gate;
 
+        // Send MIDI gate ON/OFF (respect mute/fill)
+        bool finalGate = (!mute() || fill()) && event.gate;
+        _engine.midiOutputEngine().sendGate(_track.trackIndex(), finalGate);
+
         // Update CV from micro-gate queue (always apply when gate fires)
         // Micro-gates store their target CV and should always use it
         if (event.gate) {
             _cvOutput = event.cvTarget;
+
+            // Send MIDI CV when gate fires (respect mute)
+            if (!mute()) {
+                _engine.midiOutputEngine().sendCv(_track.trackIndex(), event.cvTarget);
+                // Send slide state (true if slide interpolation is active)
+                _engine.midiOutputEngine().sendSlide(_track.trackIndex(), _slideCountDown > 0);
+            }
         }
     }
 
