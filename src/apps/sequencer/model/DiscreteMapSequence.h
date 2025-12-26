@@ -207,14 +207,25 @@ public:
         _rootNote = clamp(root, 0, 11);
     }
 
-    // Slew
-    bool slewEnabled() const { return _slewEnabled; }
-    void setSlewEnabled(bool enabled) {
-        _slewEnabled = enabled;
+    // Slew time (0-100%, 0 = off)
+    int slewTime() const { return _slewTime.get(isRouted(Routing::Target::SlideTime)); }
+    void setSlewTime(int time, bool routed = false) {
+        _slewTime.set(clamp(time, 0, 100), routed);
     }
-    void toggleSlew() {
-        _slewEnabled = !_slewEnabled;
+    void editSlewTime(int value, bool shift) {
+        if (!isRouted(Routing::Target::SlideTime)) {
+            setSlewTime(ModelUtils::adjustedByStep(slewTime(), value, 5, !shift));
+        }
     }
+    void printSlewTime(StringBuilder &str) const {
+        int time = slewTime();
+        if (time == 0) {
+            str("Off");
+        } else {
+            str("%d%%", time);
+        }
+    }
+    bool slewEnabled() const { return slewTime() > 0; }
 
     // Octave
     int octave() const { return _octave; }
@@ -352,7 +363,7 @@ public:
     void printThresholdMode(StringBuilder &str) const { str(_thresholdMode == ThresholdMode::Position ? "Position" : "Length"); }
     void editRootNote(int value, bool shift) { setRootNote(rootNote() + value); }
     void printRootNote(StringBuilder &str) const { Types::printNote(str, rootNote()); }
-    void printSlew(StringBuilder &str) const { str(slewEnabled() ? "On" : "Off"); }
+    void printSlew(StringBuilder &str) const { printSlewTime(str); }
     void printLoop(StringBuilder &str) const { str(loop() ? "Loop" : "Once"); }
 
 private:
@@ -367,7 +378,7 @@ private:
 
     int8_t _scale = -1;
     int8_t _rootNote = 0;       // C
-    bool _slewEnabled = false;
+    Routable<uint8_t> _slewTime;
     int8_t _octave = 0;
     int8_t _transpose = 0;
     int16_t _offset = 0;

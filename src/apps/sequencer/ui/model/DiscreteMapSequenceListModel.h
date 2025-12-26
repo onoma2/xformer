@@ -22,7 +22,7 @@ public:
         RangeLow,
         Scale,
         RootNote,
-        Slew,
+        SlewTime,
         Octave,
         Transpose,
         Offset,
@@ -64,6 +64,8 @@ public:
             return Routing::Target::Scale;
         case RootNote:
             return Routing::Target::RootNote;
+        case SlewTime:
+            return Routing::Target::SlideTime;
         case Octave:
             return Routing::Target::Octave;
         case Transpose:
@@ -89,7 +91,7 @@ private:
         case RangeLow:      return "Below";
         case Scale:         return "Scale";
         case RootNote:      return "Root";
-        case Slew:          return "Slew";
+        case SlewTime:      return "Slew Time";
         case Octave:        return "Octave";
         case Transpose:     return "Transpose";
         case Offset:        return "Offset";
@@ -137,8 +139,8 @@ private:
         case RootNote:
             _sequence->printRootNote(str);
             break;
-        case Slew:
-            _sequence->printSlew(str);
+        case SlewTime:
+            _sequence->printSlewTime(str);
             break;
         case Octave:
             str("%+d", _sequence->octave());
@@ -189,8 +191,8 @@ private:
         case RootNote:
             _sequence->editRootNote(value, shift);
             break;
-        case Slew:
-            _sequence->toggleSlew();
+        case SlewTime:
+            _sequence->editSlewTime(value, shift);
             break;
         case Octave:
             _sequence->setOctave(ModelUtils::adjusted(_sequence->octave(), value, -10, 10));

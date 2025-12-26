@@ -45,6 +45,7 @@ void DiscreteMapTrack::writeRouted(Routing::Target target, int intValue, float f
         break;
     case Routing::Target::DiscreteMapRangeHigh:
     case Routing::Target::DiscreteMapRangeLow:
+    case Routing::Target::SlideTime:
     case Routing::Target::Octave:
     case Routing::Target::Transpose:
     case Routing::Target::Offset:

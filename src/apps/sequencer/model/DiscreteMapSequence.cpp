@@ -45,7 +45,7 @@ void DiscreteMapSequence::clear() {
     _thresholdMode = ThresholdMode::Position;
     _scale = -1;
     _rootNote = 0;
-    _slewEnabled = false;
+    setSlewTime(0);
     _octave = 0;
     _transpose = 0;
     _offset = 0;
@@ -115,7 +115,7 @@ void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(static_cast<uint8_t>(_thresholdMode));
     writer.write(_scale);
     writer.write(_rootNote);
-    writer.write(_slewEnabled);
+    _slewTime.write(writer);
     writer.write(_octave);
     writer.write(_transpose);
     writer.write(_offset);
@@ -149,7 +149,7 @@ void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
     reader.read(_scale);
 
     reader.read(_rootNote);
-    reader.read(_slewEnabled);
+    _slewTime.read(reader);
     reader.read(_octave);
     reader.read(_transpose);
     reader.read(_offset);
@@ -181,6 +181,9 @@ void DiscreteMapSequence::writeRouted(Routing::Target target, int intValue, floa
         break;
     case Routing::Target::Offset:
         setOffset(intValue);
+        break;
+    case Routing::Target::SlideTime:
+        setSlewTime(intValue, true);
         break;
     case Routing::Target::DiscreteMapRangeHigh:
         setRangeHigh(floatValue);

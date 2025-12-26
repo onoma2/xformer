@@ -1,6 +1,7 @@
 #include "DiscreteMapTrackEngine.h"
 
 #include "Engine.h"
+#include "Slide.h"
 
 #include <algorithm>
 #include <cmath>
@@ -281,12 +282,7 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
             _targetCv = 0.0f;  // Default to 0V when no stage is active in Always mode
         }
 
-        if (_sequence->slewEnabled()) {
-            // Simple slew rate (can be made configurable later)
-            // Use exponential slew for smooth transitions
-            float slewRate = 0.1f;
-            _cvOutput += (_targetCv - _cvOutput) * slewRate;
-        } else {
+        if (_sequence->slewTime() == 0) {
             _cvOutput = _targetCv;
         }
     }
@@ -346,8 +342,14 @@ bool DiscreteMapTrackEngine::updateExternalOnce() {
 }
 
 void DiscreteMapTrackEngine::update(float dt) {
-    // No per-frame updates needed
-    (void)dt;
+    if (!_sequence) {
+        return;
+    }
+
+    int slewTime = _sequence->slewTime();
+    if (slewTime > 0) {
+        _cvOutput = Slide::applySlide(_cvOutput, _targetCv, slewTime, dt);
+    }
 }
 
 void DiscreteMapTrackEngine::updateRamp(uint32_t tick) {
