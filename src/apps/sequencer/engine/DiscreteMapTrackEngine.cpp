@@ -143,11 +143,18 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
     if (_sequence->clockSource() != DiscreteMapSequence::ClockSource::External) {
         switch (_discreteMapTrack.playMode()) {
         case Types::PlayMode::Aligned: {
-            // Sync ramp phase to bar position
+            // Align ramp phase to bar position while preserving divisor-based period.
+            uint32_t periodTicks = _sequence->divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+            if (periodTicks == 0) {
+                periodTicks = 1;
+            }
+
             uint32_t resetDivisor = _sequence->resetMeasure() * _engine.measureDivisor();
-            if (resetDivisor > 0 && (_running || _sequence->loop())) {
-                uint32_t barTick = relativeTick % resetDivisor;
-                _rampPhase = static_cast<float>(barTick) / resetDivisor;
+            uint32_t alignTick = (resetDivisor > 0) ? (relativeTick % resetDivisor) : relativeTick;
+
+            if (_running || _sequence->loop()) {
+                uint32_t posInPeriod = alignTick % periodTicks;
+                _rampPhase = static_cast<float>(posInPeriod) / periodTicks;
 
                 // Apply triangle wave if InternalTriangle mode
                 if (_sequence->clockSource() == DiscreteMapSequence::ClockSource::InternalTriangle) {
@@ -155,6 +162,15 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
                     _rampValue = kInternalRampMin + triPhase * (kInternalRampMax - kInternalRampMin);
                 } else {
                     _rampValue = kInternalRampMin + _rampPhase * (kInternalRampMax - kInternalRampMin);
+                }
+            }
+
+            if (!_sequence->loop() && _running) {
+                uint32_t posInPeriod = relativeTick % periodTicks;
+                if (posInPeriod + 1 >= periodTicks) {
+                    _running = false;
+                    _rampPhase = 1.0f;
+                    _rampValue = kInternalRampMax;
                 }
             }
             break;
