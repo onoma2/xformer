@@ -241,8 +241,8 @@ void CurveTrackEngine::update(float dt) {
             }
         } else if (_sequence->chaosAlgo() == CurveSequence::ChaosAlgorithm::Lorenz) {
             // Lorenz runs at full update rate (1ms) for smoothness
-            // Map "Hz" rate knob to speed factor (0.1 to 10.0)
-            float speed = 0.1f + powf(_sequence->chaosRate() / 127.f, 4.f) * 10.f;
+            // Use unified Hz calculation for consistent speed control
+            float speed = _sequence->chaosHz();
             // Map P1 to Rho (Rayleigh number) - 10.0 to 50.0
             float rho = 10.0f + p1 * 40.0f;
             // Map P2 to Beta (Geometric factor) - 0.5 to 4.0

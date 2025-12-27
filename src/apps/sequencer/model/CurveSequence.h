@@ -446,7 +446,26 @@ public:
             setChaosRate(chaosRate() + value * (shift ? 5 : 1));
         }
     }
-    float chaosHz() const { return 0.1f + std::pow(chaosRate() / 127.f, 4.f) * 100.f; }
+    float chaosHz() const {
+        float normalized = chaosRate() / 127.f;
+        if (normalized < 0.33f) {
+            // First 1/3: 0.01 Hz to 0.1 Hz (Very Slow)
+            // Range 0.33 maps to 0.09 Hz delta
+            float t = normalized / 0.33f;
+            return 0.01f + t * 0.09f;
+        } else if (normalized < 0.66f) {
+            // Middle 1/3: 0.1 Hz to 2.0 Hz (Musical LFO)
+            // Range 0.33 maps to 1.9 Hz delta
+            float t = (normalized - 0.33f) / 0.33f;
+            // Use quadratic curve for musical feel
+            return 0.1f + (t * t) * 1.9f;
+        } else {
+            // Last 1/3: 2.0 Hz to 50.0 Hz (Fast)
+            float t = (normalized - 0.66f) / 0.34f;
+            // Use cubic curve for fast acceleration
+            return 2.0f + (t * t * t) * 48.0f;
+        }
+    }
     void printChaosRate(StringBuilder &str) const {
         printRouted(str, Routing::Target::ChaosRate);
         float rate = chaosHz();

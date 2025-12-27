@@ -46,11 +46,19 @@ static const ContextMenuModel::Item distributionContextMenuItems[] = {
 
 enum class ClusterContextAction {
     Cluster,
+    AccelRit4,
+    Swell,
+    InverseSwell,
+    Strum,
     Last
 };
 
 static const ContextMenuModel::Item clusterContextMenuItems[] = {
     { "M-CLUSTER" },
+    { "M-AR4" },
+    { "M-SWELL" },
+    { "M-ISWELL" },
+    { "M-STRUM" },
 };
 
 enum class DistributeActiveContextAction {
@@ -1442,6 +1450,27 @@ void DiscreteMapSequencePage::clusterContextShow() {
 void DiscreteMapSequencePage::clusterContextAction(int index) {
     if (!_sequence) return;
 
+    auto fillActiveTargets = [&](int *targets, int &count) {
+        int selectionCount = 0;
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            if (_selectionMask & (1U << i)) {
+                ++selectionCount;
+            }
+        }
+        const bool limitToSelection = selectionCount > 1;
+
+        count = 0;
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            if (_sequence->stage(i).direction() == DiscreteMapSequence::Stage::TriggerDir::Off) {
+                continue;
+            }
+            if (limitToSelection && !(_selectionMask & (1U << i))) {
+                continue;
+            }
+            targets[count++] = i;
+        }
+    };
+
     switch (ClusterContextAction(index)) {
     case ClusterContextAction::Cluster: {
         // M-CLUSTER: Create random clusters of thresholds
@@ -1482,6 +1511,233 @@ void DiscreteMapSequencePage::clusterContextAction(int index) {
             _enginePtr->invalidateThresholds();
         }
         showMessage("M-CLUSTER");
+        break;
+    }
+    case ClusterContextAction::AccelRit4: {
+        int targetIndices[DiscreteMapSequence::StageCount];
+        int targetCount = DiscreteMapSequence::StageCount;
+        for (int i = 0; i < targetCount; ++i) {
+            targetIndices[i] = i;
+        }
+
+        const int min_val = -100;
+        const int max_val = 100;
+        const int range = max_val - min_val;
+
+        const int groupCount = 4;
+        const int baseSize = targetCount / groupCount;
+        const int remainder = targetCount % groupCount;
+
+        int offset = 0;
+        for (int g = 0; g < groupCount; ++g) {
+            const int count = baseSize + (g < remainder ? 1 : 0);
+            if (count <= 0) {
+                continue;
+            }
+
+            if (count == 1) {
+                int start = min_val + rng.nextRange(range + 1);
+                _sequence->stage(targetIndices[offset]).setThreshold(clamp(start, min_val, max_val));
+                offset += 1;
+                continue;
+            }
+
+            int minSpan = std::max(10, (count - 1) * 2);
+            minSpan = std::min(minSpan, range);
+            int maxSpan = std::max(minSpan, (count - 1) * 6);
+            maxSpan = std::min(maxSpan, range);
+            int startRange = range - minSpan;
+            if (startRange < 0) {
+                startRange = 0;
+            }
+
+            int start = min_val + (startRange > 0 ? rng.nextRange(startRange + 1) : 0);
+            int span = minSpan;
+            if (maxSpan > minSpan) {
+                span += rng.nextRange(maxSpan - minSpan + 1);
+            }
+            int end = clamp(start + span, min_val, max_val);
+            if (end <= start) {
+                end = std::min(max_val, start + 1);
+            }
+
+            const int gapCount = count - 1;
+            int totalWeight = 0;
+            int weights[DiscreteMapSequence::StageCount];
+            for (int i = 0; i < gapCount; ++i) {
+                int weight = (g % 2 == 0) ? (gapCount - i) : (i + 1);
+                weights[i] = weight;
+                totalWeight += weight;
+            }
+
+            int cumulative = 0;
+            for (int i = 0; i < count; ++i) {
+                int threshold = start;
+                if (i > 0) {
+                    cumulative += weights[i - 1];
+                    if (i == count - 1) {
+                        threshold = end;
+                    } else {
+                        threshold = start + int(std::round(float(cumulative) / float(totalWeight) * float(end - start)));
+                    }
+                }
+                _sequence->stage(targetIndices[offset + i]).setThreshold(clamp(threshold, min_val, max_val));
+            }
+            offset += count;
+        }
+
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("M-AR4");
+        break;
+    }
+    case ClusterContextAction::Swell: {
+        int targetIndices[DiscreteMapSequence::StageCount];
+        int targetCount = 0;
+        fillActiveTargets(targetIndices, targetCount);
+        if (targetCount == 0) {
+            showMessage("NO ACT");
+            return;
+        }
+        if (targetCount <= 1) {
+            showMessage("NO SPREAD");
+            return;
+        }
+
+        const int min_val = -100;
+        const int max_val = 100;
+        const int range = max_val - min_val;
+        const int gapCount = targetCount - 1;
+
+        int totalWeight = 0;
+        int weights[DiscreteMapSequence::StageCount];
+        const float mid = float(gapCount - 1) * 0.5f;
+        for (int i = 0; i < gapCount; ++i) {
+            int weight = 1 + int(std::abs(float(i) - mid));
+            weights[i] = weight;
+            totalWeight += weight;
+        }
+
+        int cumulative = 0;
+        for (int i = 0; i < targetCount; ++i) {
+            int threshold = min_val;
+            if (i > 0) {
+                cumulative += weights[i - 1];
+                if (i == targetCount - 1) {
+                    threshold = max_val;
+                } else {
+                    threshold = min_val + int(std::round(float(cumulative) / float(totalWeight) * float(range)));
+                }
+            }
+            _sequence->stage(targetIndices[i]).setThreshold(clamp(threshold, min_val, max_val));
+        }
+
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("M-SWELL");
+        break;
+    }
+    case ClusterContextAction::InverseSwell: {
+        int targetIndices[DiscreteMapSequence::StageCount];
+        int targetCount = 0;
+        fillActiveTargets(targetIndices, targetCount);
+        if (targetCount == 0) {
+            showMessage("NO ACT");
+            return;
+        }
+        if (targetCount <= 1) {
+            showMessage("NO SPREAD");
+            return;
+        }
+
+        const int min_val = -100;
+        const int max_val = 100;
+        const int range = max_val - min_val;
+        const int gapCount = targetCount - 1;
+
+        int totalWeight = 0;
+        int weights[DiscreteMapSequence::StageCount];
+        for (int i = 0; i < gapCount; ++i) {
+            int weight = 1 + std::min(i, gapCount - 1 - i);
+            weights[i] = weight;
+            totalWeight += weight;
+        }
+
+        int cumulative = 0;
+        for (int i = 0; i < targetCount; ++i) {
+            int threshold = min_val;
+            if (i > 0) {
+                cumulative += weights[i - 1];
+                if (i == targetCount - 1) {
+                    threshold = max_val;
+                } else {
+                    threshold = min_val + int(std::round(float(cumulative) / float(totalWeight) * float(range)));
+                }
+            }
+            _sequence->stage(targetIndices[i]).setThreshold(clamp(threshold, min_val, max_val));
+        }
+
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("M-ISWELL");
+        break;
+    }
+    case ClusterContextAction::Strum: {
+        int targetIndices[DiscreteMapSequence::StageCount];
+        int targetCount = 0;
+        fillActiveTargets(targetIndices, targetCount);
+        if (targetCount == 0) {
+            showMessage("NO ACT");
+            return;
+        }
+        if (targetCount <= 1) {
+            showMessage("NO SPREAD");
+            return;
+        }
+
+        const int min_val = -100;
+        const int max_val = 100;
+        const int groupCount = std::min(5, targetCount);
+        const int baseSize = targetCount / groupCount;
+        const int remainder = targetCount % groupCount;
+        const int maxGroupSize = baseSize + (remainder > 0 ? 1 : 0);
+        int baseStrumStep = 3;
+        int maxGroupStep = baseStrumStep + (groupCount - 1);
+        int baseMax = max_val - (maxGroupSize - 1) * maxGroupStep;
+        if (baseMax < min_val) {
+            baseStrumStep = 1;
+            maxGroupStep = baseStrumStep + (groupCount - 1);
+            baseMax = max_val - (maxGroupSize - 1) * maxGroupStep;
+        }
+        baseMax = std::max(baseMax, min_val);
+
+        const int baseRange = baseMax - min_val;
+
+        int offset = 0;
+        for (int g = 0; g < groupCount; ++g) {
+            const int count = baseSize + (g < remainder ? 1 : 0);
+            if (count <= 0) {
+                continue;
+            }
+
+            int base = min_val;
+            if (groupCount > 1) {
+                base = min_val + int(std::round(float(baseRange) * float(g) / float(groupCount - 1)));
+            }
+            int strumStep = baseStrumStep + g;
+            for (int i = 0; i < count && offset < targetCount; ++i, ++offset) {
+                int threshold = base + i * strumStep;
+                _sequence->stage(targetIndices[offset]).setThreshold(clamp(threshold, min_val, max_val));
+            }
+        }
+
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("M-STRUM");
         break;
     }
     case ClusterContextAction::Last:
