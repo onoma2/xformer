@@ -710,12 +710,24 @@ void DiscreteMapSequencePage::applyVoicing(VoicingBank bank, int voicingIndex) {
         return;
     }
 
+    int selectionCount = 0;
+    for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+        if (_selectionMask & (1U << i)) {
+            ++selectionCount;
+        }
+    }
+    const bool limitToSelection = selectionCount > 1;
+
     int activeIndices[DiscreteMapSequence::StageCount];
     int activeCount = 0;
     for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
-        if (_sequence->stage(i).direction() != DiscreteMapSequence::Stage::TriggerDir::Off) {
-            activeIndices[activeCount++] = i;
+        if (_sequence->stage(i).direction() == DiscreteMapSequence::Stage::TriggerDir::Off) {
+            continue;
         }
+        if (limitToSelection && !(_selectionMask & (1U << i))) {
+            continue;
+        }
+        activeIndices[activeCount++] = i;
     }
 
     if (activeCount == 0) {
