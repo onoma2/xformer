@@ -95,6 +95,7 @@ void CurveTrackEngine::reset() {
     _currentStepFraction = 0.f;
     _phasedStep = -1;
     _phasedStepFraction = 0.f;
+    _freePhase = 0.0;
     _shapeVariation = false;
     _fillMode = CurveTrack::FillMode::None;
     _activity = false;
@@ -124,6 +125,7 @@ void CurveTrackEngine::restart() {
     _currentStepFraction = 0.f;
     _phasedStep = -1;
     _phasedStepFraction = 0.f;
+    _freePhase = 0.0;
     _lpfState = 0.f;
     _feedbackState = 0.f;
 
@@ -166,18 +168,34 @@ TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
 
         updateRecording(relativeTick, divisor);
 
-        if (relativeTick % divisor == 0) {
-            // advance sequence
+        if (_curveTrack.playMode() == Types::PlayMode::Free) {
+            // Free mode: use phase accumulator with curveRate modulation
+            float curveRate = _curveTrack.curveRate();  // 0.0-4.0
+            float baseSpeed = 1.0 / divisor;             // Speed for 1x rate
+            double speed = baseSpeed * curveRate;
+
+            // Apply Nyquist clamping: max 0.5 phase per tick
+            speed = std::min(speed, 0.5);
+
+            // Increment phase
+            _freePhase += speed;
+
+            // Check for step boundary crossing
+            if (_freePhase >= 1.0) {
+                _freePhase -= 1.0;  // Wrap phase
+                _sequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                triggerStep(tick, divisor);
+            }
+        } else if (relativeTick % divisor == 0) {
+            // Aligned or Last mode: use grid-locked timing
             switch (_curveTrack.playMode()) {
             case Types::PlayMode::Aligned:
                 _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
                 triggerStep(tick, divisor);
                 break;
-            case Types::PlayMode::Free:
-                _sequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
-                triggerStep(tick, divisor);
-                break;
             case Types::PlayMode::Last:
+                break;
+            default:
                 break;
             }
         }
@@ -283,7 +301,14 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
     const auto &sequence = *_sequence;
     const auto &range = Types::voltageRangeInfo(sequence.range());
 
-    _currentStepFraction = float(relativeTick % divisor) / divisor;
+    // Calculate step fraction based on play mode
+    if (_curveTrack.playMode() == Types::PlayMode::Free) {
+        // Free mode: use phase accumulator for smooth FM
+        _currentStepFraction = float(_freePhase);
+    } else {
+        // Aligned mode: use grid-locked timing
+        _currentStepFraction = float(relativeTick % divisor) / divisor;
+    }
 
     // True Reverse: If playing backwards, invert the step fraction so shapes play in reverse
     if (_sequenceState.direction() < 0) {

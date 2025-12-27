@@ -80,6 +80,9 @@ private:
     int _phasedStep;
     float _phasedStepFraction;
 
+    // Free mode phase accumulator for smooth FM
+    double _freePhase = 0.0;
+
     Latoocarfian _latoocarfian;
     Lorenz _lorenz;
     float _chaosValue = 0.f;

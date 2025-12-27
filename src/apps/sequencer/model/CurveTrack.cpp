@@ -18,6 +18,9 @@ void CurveTrack::writeRouted(Routing::Target target, int intValue, float floatVa
     case Routing::Target::GateProbabilityBias:
         setGateProbabilityBias(intValue, true);
         break;
+    case Routing::Target::CurveRate:
+        setCurveRate(floatValue / 100.0f, true);  // Convert 0-400 to 0.0-4.0
+        break;
     default:
         break;
     }
@@ -32,6 +35,7 @@ void CurveTrack::clear() {
     setRotate(0);
     setShapeProbabilityBias(0);
     setGateProbabilityBias(0);
+    setCurveRate(1.f);  // Default to normal speed
     setGlobalPhase(0.f);
 
     for (auto &sequence : _sequences) {
@@ -48,6 +52,7 @@ void CurveTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_rotate.base);
     writer.write(_shapeProbabilityBias.base);
     writer.write(_gateProbabilityBias.base);
+    writer.write(_curveRate.base);
     writer.write(_globalPhase);
     writeArray(writer, _sequences);
 }
@@ -61,6 +66,7 @@ void CurveTrack::read(VersionedSerializedReader &reader) {
     reader.read(_rotate.base);
     reader.read(_shapeProbabilityBias.base, ProjectVersion::Version15);
     reader.read(_gateProbabilityBias.base, ProjectVersion::Version15);
+    reader.read(_curveRate.base);  // No version bump
 
     reader.read(_globalPhase);
 

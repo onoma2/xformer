@@ -164,9 +164,7 @@ void CurveSequence::writeRouted(Routing::Target target, int intValue, float floa
     case Routing::Target::DjFilter:
         setDjFilter(floatValue / 100.0f, true);  // Convert -100 to 100 to -1.0 to 1.0
         break;
-    case Routing::Target::XFade:
-        setXFade(floatValue / 100.0f, true);  // Convert 0-100 to 0.0-1.0
-        break;
+    // XFade is non-routable (UI-only control)
     case Routing::Target::ChaosAmount:
         setChaosAmount(intValue, true);
         break;
@@ -255,7 +253,7 @@ void CurveSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_wavefolderFold.base);
     writer.write(_wavefolderGain.base);
     writer.write(_djFilter.base);
-    writer.write(_xFade.base);
+    writer.write(_xFade);  // Non-routable
     writer.write(_chaosAmount.base);
     writer.write(_chaosRate.base);
     writer.write(_chaosParam1.base);
@@ -280,7 +278,7 @@ void CurveSequence::read(VersionedSerializedReader &reader) {
     reader.read(_wavefolderFold.base);
     reader.read(_wavefolderGain.base);
     reader.read(_djFilter.base);
-    reader.read(_xFade.base);
+    reader.read(_xFade);  // Non-routable
     reader.read(_chaosAmount.base);
     reader.read(_chaosRate.base);
     reader.read(_chaosParam1.base);

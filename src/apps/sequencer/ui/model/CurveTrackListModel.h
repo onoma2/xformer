@@ -46,6 +46,8 @@ public:
             return Routing::Target::ShapeProbabilityBias;
         case GateProbabilityBias:
             return Routing::Target::GateProbabilityBias;
+        case CurveRate:
+            return Routing::Target::CurveRate;
         default:
             return Routing::Target::None;
         }
@@ -61,6 +63,7 @@ private:
         Rotate,
         ShapeProbabilityBias,
         GateProbabilityBias,
+        CurveRate,
         GlobalPhase,
         Last
     };
@@ -75,6 +78,7 @@ private:
         case Rotate:                return "Rotate";
         case ShapeProbabilityBias:  return "Shape P. Bias";
         case GateProbabilityBias:   return "Gate P. Bias";
+        case CurveRate:             return "Curve Rate";
         case GlobalPhase:           return "Global Phase";
         case Last:                  break;
         }
@@ -111,6 +115,9 @@ private:
         case GateProbabilityBias:
             _track->printGateProbabilityBias(str);
             break;
+        case CurveRate:
+            _track->printCurveRate(str);
+            break;
         case GlobalPhase:
             _track->printGlobalPhase(str);
             break;
@@ -144,6 +151,9 @@ private:
             break;
         case GateProbabilityBias:
             _track->editGateProbabilityBias(value, shift);
+            break;
+        case CurveRate:
+            _track->editCurveRate(value, shift);
             break;
         case GlobalPhase:
             _track->editGlobalPhase(value, shift);

@@ -69,24 +69,7 @@ CASE("dj_filter_routing_conversion") {
     seq.writeRouted(Routing::Target::DjFilter, 100, 100.0f);
 }
 
-CASE("xfade_routing_conversion") {
-    CurveSequence seq;
-
-    // Test base values work correctly
-    seq.setXFade(0.0f, false);
-    expectEqual(static_cast<int>(seq.xFade() * 100), 0, "xfade base at 0%");
-
-    seq.setXFade(0.5f, false);
-    expectEqual(static_cast<int>(seq.xFade() * 100), 50, "xfade base at 50%");
-
-    seq.setXFade(1.0f, false);
-    expectEqual(static_cast<int>(seq.xFade() * 100), 100, "xfade base at 100%");
-
-    // Test writeRouted conversion exists (0-100 -> 0.0-1.0)
-    seq.writeRouted(Routing::Target::XFade, 0, 0.0f);
-    seq.writeRouted(Routing::Target::XFade, 50, 50.0f);
-    seq.writeRouted(Routing::Target::XFade, 100, 100.0f);
-}
+// XFade is now non-routable (UI-only control), so no routing test needed
 
 CASE("routing_values_converted_not_clamped") {
     CurveSequence seq;

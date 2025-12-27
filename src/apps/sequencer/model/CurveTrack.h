@@ -211,6 +211,24 @@ public:
         str("%.2f", globalPhase());
     }
 
+    // curveRate (speed multiplier: 0.0 = stop, 1.0 = normal, 4.0 = 4x)
+
+    float curveRate() const { return _curveRate.get(isRouted(Routing::Target::CurveRate)); }
+    void setCurveRate(float curveRate, bool routed = false) {
+        _curveRate.set(clamp(curveRate, 0.f, 4.f), routed);
+    }
+
+    void editCurveRate(int value, bool shift) {
+        if (!isRouted(Routing::Target::CurveRate)) {
+            setCurveRate(curveRate() + value * (shift ? 0.1f : 0.01f));
+        }
+    }
+
+    void printCurveRate(StringBuilder &str) const {
+        printRouted(str, Routing::Target::CurveRate);
+        str("%.2fx", curveRate());
+    }
+
     // sequences
 
     const CurveSequenceArray &sequences() const { return _sequences; }
@@ -266,6 +284,7 @@ private:
     Routable<int8_t> _rotate;
     Routable<int8_t> _shapeProbabilityBias;
     Routable<int8_t> _gateProbabilityBias;
+    Routable<float> _curveRate;  // Speed multiplier 0.0-4.0
     float _globalPhase;
 
     CurveSequenceArray _sequences;

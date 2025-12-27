@@ -401,18 +401,15 @@ public:
         str("%+.2f", djFilter());
     }
 
-    // xFade
-    float xFade() const { return _xFade.get(isRouted(Routing::Target::XFade)); }
-    void setXFade(float value, bool routed = false) {
-        _xFade.set(clamp(value, 0.f, 1.f), routed);
+    // xFade (non-routable, UI-only control)
+    float xFade() const { return _xFade; }
+    void setXFade(float value) {
+        _xFade = clamp(value, 0.f, 1.f);
     }
     void editXFade(int value, bool shift) {
-        if (!isRouted(Routing::Target::XFade)) {
-            setXFade(xFade() + value * (shift ? 0.1f : 0.01f));
-        }
+        setXFade(xFade() + value * (shift ? 0.1f : 0.01f));
     }
     void printXFade(StringBuilder &str) const {
-        printRouted(str, Routing::Target::XFade);
         str("%.2f", xFade());
     }
 
@@ -589,7 +586,7 @@ private:
     Routable<float> _wavefolderFold;
     Routable<float> _wavefolderGain;
     Routable<float> _djFilter;
-    Routable<float> _xFade;
+    float _xFade;  // Non-routable, UI-only control
 
     Routable<int> _chaosAmount;
     ChaosAlgorithm _chaosAlgo;

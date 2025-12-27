@@ -105,8 +105,8 @@ public:
         WavefolderFold = WavefolderFirst,
         WavefolderGain,
         DjFilter,
-        XFade,
-        WavefolderLast = XFade,
+        CurveRate,
+        WavefolderLast = CurveRate,
 
         // DiscreteMap Targets
         DiscreteMapFirst,
@@ -184,7 +184,7 @@ public:
         case Target::WavefolderFold:            return "Fold";
         case Target::WavefolderGain:            return "Fold Gain";
         case Target::DjFilter:                  return "DJ Filter";
-        case Target::XFade:                     return "XFade";
+        case Target::CurveRate:                 return "Curve Rate";
 
         case Target::DiscreteMapInput:          return "DMap Input";
         case Target::DiscreteMapScanner:        return "DMap Scan";
@@ -260,7 +260,7 @@ public:
         case Target::WavefolderFold:            return 43;
         case Target::WavefolderGain:            return 44;
         case Target::DjFilter:                  return 45;
-        case Target::XFade:                     return 46;
+        case Target::CurveRate:                 return 46;
 
         // DiscreteMap Targets (47-51)
         case Target::DiscreteMapInput:          return 47;
