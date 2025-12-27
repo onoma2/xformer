@@ -48,7 +48,7 @@ Macros
 - Page + `Key::Step4` → Distribution menu (`EVEN8`, `EVEN16`, `EVEN-ALL`, `EVEN-GRP`, `EVEN-INV`)
 - Page + `Key::Step5` → Cluster menu (`M-CLUSTER`)
 - Page + `Key::Step6` → Distribute Active menu (`ACTIVE`, `RISE`, `FALL`, `BOTH`, `NORMALIZE`)
-- Page + `Key::Step14` → Transform menu (`DIR FLIP`, `T-MIRROR`, `T-REVERSE`, `N-MIRROR`, `N-REVERSE`)
+- Page + `Key::Step14` → Transform menu (`DIR FLIP`, `T-REVERSE`, `T-INVERT`, `N-MIRROR`, `N-REVERSE`)
 
 Files
 - `src/apps/sequencer/ui/pages/DiscreteMapSequencePage.cpp`

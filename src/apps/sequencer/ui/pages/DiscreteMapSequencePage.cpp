@@ -72,8 +72,8 @@ static const ContextMenuModel::Item distributeActiveContextMenuItems[] = {
 
 enum class TransformContextAction {
     Flip,
-    ThresholdMirror,
     ThresholdReverse,
+    ThresholdInvert,
     NoteMirror,
     NoteReverse,
     Last
@@ -81,8 +81,8 @@ enum class TransformContextAction {
 
 static const ContextMenuModel::Item transformContextMenuItems[] = {
     { "FLIP" },
-    { "T-MIRR" },
     { "T-REV" },
+    { "T-INV" },
     { "N-MIRR" },
     { "N-REV" },
 };
@@ -1537,37 +1537,49 @@ void DiscreteMapSequencePage::transformContextShow() {
 void DiscreteMapSequencePage::transformContextAction(int index) {
     if (!_sequence) return;
 
+    int selectionCount = 0;
+    for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+        if (_selectionMask & (1U << i)) {
+            ++selectionCount;
+        }
+    }
+    const bool limitToSelection = selectionCount > 1;
+
+    int targetIndices[DiscreteMapSequence::StageCount];
+    int targetCount = 0;
+    for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+        if (_sequence->stage(i).direction() == DiscreteMapSequence::Stage::TriggerDir::Off) {
+            continue;
+        }
+        if (limitToSelection && !(_selectionMask & (1U << i))) {
+            continue;
+        }
+        targetIndices[targetCount++] = i;
+    }
+
+    if (targetCount == 0) {
+        showMessage("NO ACT");
+        return;
+    }
+
     switch (TransformContextAction(index)) {
     case TransformContextAction::Flip:
-        // Reuse existing flip implementation
-        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
-            _sequence->stage(i).cycleDirection();
+        for (int i = 0; i < targetCount; ++i) {
+            _sequence->stage(targetIndices[i]).cycleDirection();
         }
         if (_enginePtr) {
             _enginePtr->invalidateThresholds();
         }
         showMessage("DIR FLIP");
         break;
-    case TransformContextAction::ThresholdMirror: {
-        // Mirror thresholds: copy first half to second half (reversed)
-        for (int i = 0; i < DiscreteMapSequence::StageCount / 2; ++i) {
-            int mirrorIdx = DiscreteMapSequence::StageCount - 1 - i;
-            int threshold = _sequence->stage(i).threshold();
-            _sequence->stage(mirrorIdx).setThreshold(threshold);
-        }
-        if (_enginePtr) {
-            _enginePtr->invalidateThresholds();
-        }
-        showMessage("T-MIRROR");
-        break;
-    }
     case TransformContextAction::ThresholdReverse: {
         // Reverse threshold order
-        for (int i = 0; i < DiscreteMapSequence::StageCount / 2; ++i) {
-            int j = DiscreteMapSequence::StageCount - 1 - i;
-            int tempThreshold = _sequence->stage(i).threshold();
-            _sequence->stage(i).setThreshold(_sequence->stage(j).threshold());
-            _sequence->stage(j).setThreshold(tempThreshold);
+        for (int i = 0; i < targetCount / 2; ++i) {
+            int a = targetIndices[i];
+            int b = targetIndices[targetCount - 1 - i];
+            int tempThreshold = _sequence->stage(a).threshold();
+            _sequence->stage(a).setThreshold(_sequence->stage(b).threshold());
+            _sequence->stage(b).setThreshold(tempThreshold);
         }
         if (_enginePtr) {
             _enginePtr->invalidateThresholds();
@@ -1575,11 +1587,24 @@ void DiscreteMapSequencePage::transformContextAction(int index) {
         showMessage("T-REVERSE");
         break;
     }
+    case TransformContextAction::ThresholdInvert: {
+        // Invert thresholds around 0
+        for (int i = 0; i < targetCount; ++i) {
+            int idx = targetIndices[i];
+            _sequence->stage(idx).setThreshold(-_sequence->stage(idx).threshold());
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("T-INVERT");
+        break;
+    }
     case TransformContextAction::NoteMirror: {
         // Mirror note indices: copy first half to second half (reversed)
-        for (int i = 0; i < DiscreteMapSequence::StageCount / 2; ++i) {
-            int mirrorIdx = DiscreteMapSequence::StageCount - 1 - i;
-            int8_t noteIndex = _sequence->stage(i).noteIndex();
+        for (int i = 0; i < targetCount / 2; ++i) {
+            int srcIdx = targetIndices[i];
+            int mirrorIdx = targetIndices[targetCount - 1 - i];
+            int8_t noteIndex = _sequence->stage(srcIdx).noteIndex();
             _sequence->stage(mirrorIdx).setNoteIndex(noteIndex);
         }
         showMessage("N-MIRROR");
@@ -1587,11 +1612,12 @@ void DiscreteMapSequencePage::transformContextAction(int index) {
     }
     case TransformContextAction::NoteReverse: {
         // Reverse note index order
-        for (int i = 0; i < DiscreteMapSequence::StageCount / 2; ++i) {
-            int j = DiscreteMapSequence::StageCount - 1 - i;
-            int8_t tempNote = _sequence->stage(i).noteIndex();
-            _sequence->stage(i).setNoteIndex(_sequence->stage(j).noteIndex());
-            _sequence->stage(j).setNoteIndex(tempNote);
+        for (int i = 0; i < targetCount / 2; ++i) {
+            int a = targetIndices[i];
+            int b = targetIndices[targetCount - 1 - i];
+            int8_t tempNote = _sequence->stage(a).noteIndex();
+            _sequence->stage(a).setNoteIndex(_sequence->stage(b).noteIndex());
+            _sequence->stage(b).setNoteIndex(tempNote);
         }
         showMessage("N-REVERSE");
         break;
