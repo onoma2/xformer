@@ -89,8 +89,6 @@ private:
     void drawFooter(Canvas &canvas);
     void quickEdit(int index);
     void distributeActiveStagesEvenly(EvenTarget target);
-    void startEvenQuickEdit();
-    void finishEvenQuickEdit();
     void startVoicingQuickEdit(VoicingBank bank, int stepIndex);
     void finishVoicingQuickEdit();
     void showVoicingMessage(VoicingBank bank, int voicingIndex);
@@ -146,8 +144,6 @@ private:
     InitStage _initStage = InitStage::Inactive;
     RangeMacro _currentRangeMacro = RangeMacro::Full;
     DiscreteMapSequenceListModel _listModel;
-    bool _evenQuickEditActive = false;
-    EvenTarget _evenQuickEditTarget = EvenTarget::Active;
     bool _voicingQuickEditActive = false;
     VoicingBank _voicingQuickEditBank = VoicingBank::Piano;
     int _voicingQuickEditIndex = -1;

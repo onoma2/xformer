@@ -133,10 +133,8 @@ static const int kGuitarVoicingCount = int(sizeof(kGuitarVoicings) / sizeof(kGui
 
 enum {
     QuickEditNone = -1,
-    QuickEditEven = -2,
-    QuickEditFlip = -3,
-    QuickEditPiano = -4,
-    QuickEditGuitar = -5,
+    QuickEditPiano = -2,
+    QuickEditGuitar = -3,
 };
 
 static const int quickEditItems[8] = {
@@ -527,14 +525,6 @@ void DiscreteMapSequencePage::keyUp(KeyEvent &event) {
         }
     }
 
-    if (_evenQuickEditActive) {
-        if (event.key().isPage() || (event.key().isStep() && event.key().step() == 11)) {
-            finishEvenQuickEdit();
-            event.consume();
-            return;
-        }
-    }
-
     if (event.key().isStep()) {
         int idx = event.key().step();
         // If it was a Selection Button (Bottom Row: 0-7)
@@ -618,7 +608,7 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
     }
 
     if (key.isQuickEdit() && !key.shiftModifier()) {
-        if (key.quickEdit() == 3 || key.quickEdit() == 5 || key.quickEdit() == 6) {
+        if (key.quickEdit() == 3 || key.quickEdit() == 4) {
             event.consume();
             return;
         }
@@ -652,20 +642,6 @@ void DiscreteMapSequencePage::quickEdit(int index) {
     if (item == QuickEditNone) {
         return;
     }
-    if (item == QuickEditEven) {
-        distributeActiveStagesEvenly(EvenTarget::Active);
-        return;
-    }
-    if (item == QuickEditFlip) {
-        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
-            _sequence->stage(i).cycleDirection();
-        }
-        if (_enginePtr) {
-            _enginePtr->invalidateThresholds();
-        }
-        showMessage("DIR FLIP");
-        return;
-    }
     if (item == QuickEditPiano) {
         applyVoicing(VoicingBank::Piano, _pianoVoicingIndex);
         return;
@@ -676,23 +652,6 @@ void DiscreteMapSequencePage::quickEdit(int index) {
     }
     _listModel.setSequence(_sequence);
     _manager.pages().quickEdit.show(_listModel, item);
-}
-
-void DiscreteMapSequencePage::startEvenQuickEdit() {
-    if (!_sequence) {
-        return;
-    }
-    _evenQuickEditActive = true;
-    _evenQuickEditTarget = EvenTarget::None;
-    showMessage("EVEN NONE");
-}
-
-void DiscreteMapSequencePage::finishEvenQuickEdit() {
-    if (!_evenQuickEditActive) {
-        return;
-    }
-    _evenQuickEditActive = false;
-    distributeActiveStagesEvenly(_evenQuickEditTarget);
 }
 
 void DiscreteMapSequencePage::startVoicingQuickEdit(VoicingBank bank, int stepIndex) {
@@ -875,17 +834,6 @@ void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
             _voicingQuickEditDirty = true;
             showVoicingMessage(_voicingQuickEditBank, _voicingQuickEditIndex);
         }
-        event.consume();
-        return;
-    }
-
-    if (_evenQuickEditActive) {
-        int next = clamp(int(_evenQuickEditTarget) + event.value(), 0, int(EvenTarget::Last) - 1);
-        _evenQuickEditTarget = static_cast<EvenTarget>(next);
-        static const char *names[] = {"NONE", "RISE", "FALL", "ACTIVE", "ALL"};
-        FixedStringBuilder<16> msg;
-        msg("EVEN %s", names[int(_evenQuickEditTarget)]);
-        showMessage(msg);
         event.consume();
         return;
     }
