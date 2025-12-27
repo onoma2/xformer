@@ -91,10 +91,12 @@ struct Voicing {
     const char *name;
     int8_t semis[6];
     uint8_t count;
+    bool rootFromC0;
 };
 
 static const Voicing kPianoVoicings[] = {
     { "ROOT",    { 0, 0, 0, 0, 0, 0 },    0 },
+    { "C0",      { 0, 0, 0, 0, 0, 0 },    0, true },
     { "MAJ13",   { 0, 4, 7, 11, 14, 21 }, 6 },
     { "MAJ6/9",  { 0, 4, 7, 9, 14, 0 },   5 },
     { "MIN13",   { 0, 3, 7, 10, 14, 21 }, 6 },
@@ -111,6 +113,7 @@ static const Voicing kPianoVoicings[] = {
 
 static const Voicing kGuitarVoicings[] = {
     { "ROOT",  { 0, 0, 0, 0, 0, 0 }, 0 },
+    { "C0",    { 0, 0, 0, 0, 0, 0 }, 0, true },
     { "MAJ",   { 0, 4, 7, 12, 16, 0 }, 5 },
     { "MIN",   { 0, 7, 12, 15, 19, 0 }, 5 },
     { "7",     { 0, 4, 10, 12, 16, 0 }, 5 },
@@ -726,7 +729,10 @@ void DiscreteMapSequencePage::applyVoicing(VoicingBank bank, int voicingIndex) {
     const auto &voicing = voicings[index];
 
     const Scale &scale = _sequence->selectedScale(_project.selectedScale());
-    const int rootIndex = _sequence->stage(_selectedStage).noteIndex();
+    int rootIndex = _sequence->stage(_selectedStage).noteIndex();
+    if (voicing.rootFromC0) {
+        rootIndex = scale.isChromatic() ? -_sequence->rootNote() : 0;
+    }
 
     for (int i = 0; i < activeCount; ++i) {
         int cycle = voicing.count > 0 ? i / voicing.count : 0;
