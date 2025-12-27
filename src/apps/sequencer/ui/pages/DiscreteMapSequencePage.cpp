@@ -29,19 +29,19 @@ static const ContextMenuModel::Item contextMenuItems[] = {
 
 enum class DistributionContextAction {
     Even8,
-    Even16,
-    EvenAll,
-    EvenGroup,
-    EvenInverted,
+    Even5Page2,
+    Even7Page3,
+    Even9Page4,
+    EvenFret,
     Last
 };
 
 static const ContextMenuModel::Item distributionContextMenuItems[] = {
-    { "EVEN8" },
-    { "EVEN16" },
-    { "EVEN-ALL" },
-    { "EVEN-GRP" },
-    { "EVEN-INV" },
+    { "I-8" },
+    { "I-5(2)" },
+    { "I-7(3)" },
+    { "I-9(4)" },
+    { "I-FRET" },
 };
 
 enum class ClusterContextAction {
@@ -63,10 +63,10 @@ enum class DistributeActiveContextAction {
 };
 
 static const ContextMenuModel::Item distributeActiveContextMenuItems[] = {
-    { "ACT" },
-    { "RISE" },
-    { "FALL" },
-    { "BOTH" },
+    { "E-ACT" },
+    { "E-RISE" },
+    { "E-FALL" },
+    { "E-BOTH" },
     { "NORM" },
 };
 
@@ -805,7 +805,7 @@ void DiscreteMapSequencePage::distributeActiveStagesEvenly(EvenTarget target) {
     }
 
     if (target == EvenTarget::None) {
-        showMessage("EVEN NONE");
+        showMessage("E-NONE");
         return;
     }
 
@@ -836,7 +836,26 @@ void DiscreteMapSequencePage::distributeActiveStagesEvenly(EvenTarget target) {
         _enginePtr->invalidateThresholds();
     }
 
-    showMessage("EVEN THR");
+    switch (target) {
+    case EvenTarget::Active:
+        showMessage("E-ACT");
+        break;
+    case EvenTarget::Rise:
+        showMessage("E-RISE");
+        break;
+    case EvenTarget::Fall:
+        showMessage("E-FALL");
+        break;
+    case EvenTarget::Both:
+        showMessage("E-BOTH");
+        break;
+    case EvenTarget::All:
+        showMessage("E-ALL");
+        break;
+    case EvenTarget::None:
+    case EvenTarget::Last:
+        break;
+    }
 }
 
 void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
@@ -1320,8 +1339,8 @@ void DiscreteMapSequencePage::distributionContextShow() {
 void DiscreteMapSequencePage::distributionContextAction(int index) {
     if (!_sequence) return;
 
-    const int min_val = -100;
-    const int max_val = 100;
+    const int min_val = -99;
+    const int max_val = 99;
 
     switch (DistributionContextAction(index)) {
     case DistributionContextAction::Even8: {
@@ -1334,36 +1353,55 @@ void DiscreteMapSequencePage::distributionContextAction(int index) {
         if (_enginePtr) {
             _enginePtr->invalidateThresholds();
         }
-        showMessage("EVEN8");
+        showMessage("I-8");
         break;
     }
-    case DistributionContextAction::Even16: {
-        // Distribute first 16 stages evenly, rest unchanged
-        const float step = (max_val - min_val) / 15.0f;
-        for (int i = 0; i < 16; ++i) {
+    case DistributionContextAction::Even5Page2: {
+        // Distribute stages 9-13 evenly, rest unchanged
+        const int start = 8;
+        const int count = 5;
+        const float step = (max_val - min_val) / float(count - 1);
+        for (int i = 0; i < count; ++i) {
             int threshold = min_val + static_cast<int>(i * step + 0.5f);
-            _sequence->stage(i).setThreshold(threshold);
+            _sequence->stage(start + i).setThreshold(threshold);
         }
         if (_enginePtr) {
             _enginePtr->invalidateThresholds();
         }
-        showMessage("EVEN16");
+        showMessage("I-5(2)");
         break;
     }
-    case DistributionContextAction::EvenAll: {
-        // Distribute all 32 stages evenly
-        const float step = (max_val - min_val) / 31.0f;
-        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+    case DistributionContextAction::Even7Page3: {
+        // Distribute stages 17-23 evenly, rest unchanged
+        const int start = 16;
+        const int count = 7;
+        const float step = (max_val - min_val) / float(count - 1);
+        for (int i = 0; i < count; ++i) {
             int threshold = min_val + static_cast<int>(i * step + 0.5f);
-            _sequence->stage(i).setThreshold(threshold);
+            _sequence->stage(start + i).setThreshold(threshold);
         }
         if (_enginePtr) {
             _enginePtr->invalidateThresholds();
         }
-        showMessage("EVEN-ALL");
+        showMessage("I-7(3)");
         break;
     }
-    case DistributionContextAction::EvenGroup: {
+    case DistributionContextAction::Even9Page4: {
+        // Distribute stages 24-32 evenly, rest unchanged
+        const int start = 23;
+        const int count = 9;
+        const float step = (max_val - min_val) / float(count - 1);
+        for (int i = 0; i < count; ++i) {
+            int threshold = min_val + static_cast<int>(i * step + 0.5f);
+            _sequence->stage(start + i).setThreshold(threshold);
+        }
+        if (_enginePtr) {
+            _enginePtr->invalidateThresholds();
+        }
+        showMessage("I-9(4)");
+        break;
+    }
+    case DistributionContextAction::EvenFret: {
         // Round-robin interleaving across 4 groups (fret pattern)
         const int active_pages = 4;
         const int total_toggles = 8 * active_pages;
@@ -1384,20 +1422,7 @@ void DiscreteMapSequencePage::distributionContextAction(int index) {
         if (_enginePtr) {
             _enginePtr->invalidateThresholds();
         }
-        showMessage("EVEN-GRP");
-        break;
-    }
-    case DistributionContextAction::EvenInverted: {
-        // Inverted even distribution: max to min
-        const float step = (max_val - min_val) / 31.0f;
-        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
-            int threshold = max_val - static_cast<int>(i * step + 0.5f);
-            _sequence->stage(i).setThreshold(threshold);
-        }
-        if (_enginePtr) {
-            _enginePtr->invalidateThresholds();
-        }
-        showMessage("EVEN-INV");
+        showMessage("I-FRET");
         break;
     }
     case DistributionContextAction::Last:
@@ -1430,6 +1455,7 @@ void DiscreteMapSequencePage::clusterContextAction(int index) {
             int centerVal = min_val + rng.nextRange(max_val - min_val + 1);
             int clusterSpread = 20 + rng.nextRange(40);  // 20-60 unit spread
 
+            int thresholds[8];
             for (int i = 0; i < stagesPerCluster; ++i) {
                 int stageIdx = c * stagesPerCluster + i;
                 if (stageIdx >= DiscreteMapSequence::StageCount) break;
@@ -1441,7 +1467,14 @@ void DiscreteMapSequencePage::clusterContextAction(int index) {
                 // Clamp to valid range
                 threshold = clamp(threshold, min_val, max_val);
 
-                _sequence->stage(stageIdx).setThreshold(threshold);
+                thresholds[i] = threshold;
+            }
+
+            std::sort(std::begin(thresholds), std::begin(thresholds) + stagesPerCluster);
+            for (int i = 0; i < stagesPerCluster; ++i) {
+                int stageIdx = c * stagesPerCluster + i;
+                if (stageIdx >= DiscreteMapSequence::StageCount) break;
+                _sequence->stage(stageIdx).setThreshold(thresholds[i]);
             }
         }
 

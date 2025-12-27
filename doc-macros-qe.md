@@ -45,9 +45,9 @@ Files
 ## DiscreteMap
 
 Macros
-- Page + `Key::Step4` → Distribution menu (`EVEN8`, `EVEN16`, `EVEN-ALL`, `EVEN-GRP`, `EVEN-INV`)
+- Page + `Key::Step4` → Distribution menu (`I-8`, `I-5(2)`, `I-7(3)`, `I-9(4)`, `I-FRET`)
 - Page + `Key::Step5` → Cluster menu (`M-CLUSTER`)
-- Page + `Key::Step6` → Distribute Active menu (`ACTIVE`, `RISE`, `FALL`, `BOTH`, `NORMALIZE`)
+- Page + `Key::Step6` → Distribute Active menu (`E-ACT`, `E-RISE`, `E-FALL`, `E-BOTH`, `NORM`)
 - Page + `Key::Step14` → Transform menu (`DIR FLIP`, `T-REVERSE`, `T-INVERT`, `N-MIRROR`, `N-REVERSE`)
 
 Files

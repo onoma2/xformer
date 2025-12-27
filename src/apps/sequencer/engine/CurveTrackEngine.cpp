@@ -353,10 +353,14 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
 
         float value = evalStepShape(step, _shapeVariation || fillVariation, fillInvert, lookupFraction);
 
-        // Apply Chaos (Pre-fold)
+        // Apply Chaos (Crossfade Mix)
+        // Treats Chaos as a separate signal source and crossfades between the "Clean Shape" and "Pure Chaos".
+        // Pros: Guaranteed to stay within valid ranges. At 100% Amount, you hear pure Chaos.
         if (evalSequence.chaosAmount() > 0) {
             float chaosAmount = evalSequence.chaosAmount() / 100.f;
-            value += _chaosValue * chaosAmount;
+            // Map Chaos (-1..1) to 0..1 to mix with Shape
+            float normalizedChaos = (_chaosValue + 1.f) * 0.5f;
+            value = value * (1.f - chaosAmount) + normalizedChaos * chaosAmount;
         }
 
         // Store original phased value before processing for crossfading
