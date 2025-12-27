@@ -543,8 +543,8 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Double-click on step button: auto-place threshold at midpoint between neighbors
-    if (!key.shiftModifier() && key.isStep() && event.count() == 2 && _sequence) {
+    // Double-click on step button (top row only): auto-place threshold at midpoint between neighbors
+    if (!key.shiftModifier() && key.isStep() && key.step() < 8 && event.count() == 2 && _sequence) {
         int stepOffset = _section * 8;
         int stageIndex = stepOffset + key.step();
         if (stageIndex < DiscreteMapSequence::StageCount) {
@@ -577,7 +577,7 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
                 _enginePtr->invalidateThresholds();
             }
 
-            showMessage("THRESHOLD AUTO");
+            showMessage("THR BETWEEN");
         }
         event.consume();
         return;
@@ -901,7 +901,7 @@ void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
         switch (_editMode) {
         case EditMode::Threshold: {
             auto &s = _sequence->stage(i);
-            int step = _shiftHeld ? 1 : 8;
+            int step = _shiftHeld ? 10 : 1;
             s.setThreshold(clamp(s.threshold() + delta * step, -99, 99));
             if (_enginePtr) {
                 _enginePtr->invalidateThresholds();
