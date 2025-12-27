@@ -94,7 +94,7 @@ struct Voicing {
 };
 
 static const Voicing kPianoVoicings[] = {
-    { "NO",      { 0, 0, 0, 0, 0, 0 },    0 },
+    { "ROOT",    { 0, 0, 0, 0, 0, 0 },    0 },
     { "MAJ13",   { 0, 4, 7, 11, 14, 21 }, 6 },
     { "MAJ6/9",  { 0, 4, 7, 9, 14, 0 },   5 },
     { "MIN13",   { 0, 3, 7, 10, 14, 21 }, 6 },
@@ -110,7 +110,7 @@ static const Voicing kPianoVoicings[] = {
 };
 
 static const Voicing kGuitarVoicings[] = {
-    { "NO",    { 0, 0, 0, 0, 0, 0 }, 0 },
+    { "ROOT",  { 0, 0, 0, 0, 0, 0 }, 0 },
     { "MAJ",   { 0, 4, 7, 12, 16, 0 }, 5 },
     { "MIN",   { 0, 7, 12, 15, 19, 0 }, 5 },
     { "7",     { 0, 4, 10, 12, 16, 0 }, 5 },
@@ -683,7 +683,7 @@ void DiscreteMapSequencePage::finishVoicingQuickEdit() {
 
 void DiscreteMapSequencePage::showVoicingMessage(VoicingBank bank, int voicingIndex) {
     FixedStringBuilder<16> msg;
-    const char *bankName = (bank == VoicingBank::Piano) ? "PNO" : "GTR";
+    const char *bankName = (bank == VoicingBank::Piano) ? "PIANO" : "GUITAR";
     if (voicingIndex < 0) {
         msg("%s OFF", bankName);
         showMessage(msg);
