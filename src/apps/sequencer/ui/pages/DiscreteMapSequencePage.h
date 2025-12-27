@@ -150,9 +150,9 @@ private:
     EvenTarget _evenQuickEditTarget = EvenTarget::Active;
     bool _voicingQuickEditActive = false;
     VoicingBank _voicingQuickEditBank = VoicingBank::Piano;
-    int _voicingQuickEditIndex = 0;
+    int _voicingQuickEditIndex = -1;
     int _voicingQuickEditStep = 0;
     bool _voicingQuickEditDirty = false;
-    int _pianoVoicingIndex = 0;
-    int _guitarVoicingIndex = 0;
+    int _pianoVoicingIndex = -1;
+    int _guitarVoicingIndex = -1;
 };

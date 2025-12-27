@@ -66,6 +66,7 @@ To enable Algo Track:
 - **F5**: Next Page
 - **Shift+F5**: **RESEED** (Generate new random seed for current algorithm)
 - **Context Menu (Long Press)**: INIT, RESEED
+- **Quick Edit (Steps 9-14)**: **Copy/Paste** to 3 clipboard slots
 - **Quick Edit (Step 15)**: **Randomize** all parameters
 
 ### 2.3 The Algorithms
@@ -88,11 +89,11 @@ Includes 21 algorithms like **Stomper** (Acid bass), **Markov** (Chains), **Chip
 | Step | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Top | Octave + | Transpose + | Root Note + | Div up (straight) | Div up (triplet) | Div /2 (faster) | Mask + | Loop +<br>Shift: Run momentary |
-| Bottom | Octave - | Transpose - | Root Note - | Div down (straight) | Div down (triplet) | Div x2 (slower) | Mask - | Loop -<br>Shift: Mute momentary |
+| Bottom | Octave - | Transpose - | Root Note - | Div down (straight) | Div down (triplet) | Div x2 (slower) | Mask - | Loop -<br>Shift: Reset |
 
 Shift modifiers:
 - Shift+Step 8: Run momentary (press = stop)
-- Shift+Step 16: Mute momentary (press = mute)
+- Shift+Step 16: Reset (restart sequence from start)
 
 Behavior notes:
 - Top row moves "up" (faster/greater), bottom row moves "down" (slower/less); for divisors, smaller = faster.

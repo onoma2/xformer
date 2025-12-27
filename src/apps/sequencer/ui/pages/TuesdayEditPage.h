@@ -59,12 +59,13 @@ private:
     void nextPage();
     void selectParam(int slot);
     void contextAction(int index);
+    bool contextActionEnabled(int index) const;
     void handleStepKeyPress(int step, bool shift);
     void handleStepKeyDown(int step, bool shift);
     void handleStepKeyUp(int step, bool shift);
     void randomizeSequence();
-    void copySequenceParams();
-    void pasteSequenceParams();
+    void copySequenceParams(int slot);
+    void pasteSequenceParams(int slot);
 
     const TuesdayTrackEngine &trackEngine() const;
     TuesdayTrack &tuesdayTrack();
@@ -75,9 +76,6 @@ private:
     bool _jamRunHeld = false;
     bool _jamPrevRunGate = true;
     int _jamRunTrack = -1;
-    bool _jamMuteHeld = false;
-    bool _jamPrevMute = false;
-    int _jamMuteTrack = -1;
 
     struct SequenceClipboard {
         bool valid = false;
@@ -93,7 +91,13 @@ private:
         int gateOffset = 0;
         int stepTrill = 0;
         int start = 0;
+        int octave = 0;
+        int transpose = 0;
+        int rootNote = 0;
+        int divisor = 0;
+        int maskParameter = 0;
     };
 
-    SequenceClipboard _sequenceClipboard;
+    static constexpr int ClipboardSlots = 3;
+    SequenceClipboard _sequenceClipboards[ClipboardSlots];
 };

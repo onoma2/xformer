@@ -11,7 +11,7 @@ void IndexedTrack::cvOutputName(int index, StringBuilder &str) const {
 
 void IndexedTrack::clear() {
     _cvUpdateMode = CvUpdateMode::Gate;
-    setPlayMode(Types::PlayMode::Aligned);
+    setPlayMode(Types::PlayMode::Free);
     _routedSync = 0.f;
     setOctave(0);
     setTranspose(0);

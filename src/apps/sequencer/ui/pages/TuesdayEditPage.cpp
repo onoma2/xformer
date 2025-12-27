@@ -15,28 +15,38 @@ static Random rng;
 enum class ContextAction {
     Init,
     Reseed,
+    Rand,
+    Copy,
+    Paste,
     Last
 };
 
 static const ContextMenuModel::Item contextMenuItems[] = {
     { "INIT" },
     { "RESEED" },
+    { "RAND" },
+    { "COPY" },
+    { "PASTE" },
 };
 
 enum {
     QuickEditNone = -1,
-    QuickEditCopy = -2,
-    QuickEditPaste = -3,
-    QuickEditRandomize = -4,
+    QuickEditCopy1 = -2,
+    QuickEditPaste1 = -3,
+    QuickEditCopy2 = -4,
+    QuickEditPaste2 = -5,
+    QuickEditCopy3 = -6,
+    QuickEditPaste3 = -7,
+    QuickEditRandomize = -8,
 };
 
 static const int quickEditItems[8] = {
-    QuickEditCopy,       // Step 9
-    QuickEditPaste,      // Step 10
-    QuickEditNone,
-    QuickEditNone,
-    QuickEditNone,
-    QuickEditNone,
+    QuickEditCopy1,      // Step 9
+    QuickEditCopy2,      // Step 10
+    QuickEditCopy3,      // Step 11
+    QuickEditPaste1,     // Step 12
+    QuickEditPaste2,     // Step 13
+    QuickEditPaste3,     // Step 14
     QuickEditRandomize,  // Step 15
     QuickEditNone,
 };
@@ -149,7 +159,27 @@ void TuesdayEditPage::updateLeds(Leds &leds) {
         for (int i = 0; i < 8; ++i) {
             int index = MatrixMap::fromStep(i + 8);
             leds.unmask(index);
-            leds.set(index, false, quickEditItems[i] != QuickEditNone);
+            
+            bool on = false;
+            switch (quickEditItems[i]) {
+            case QuickEditCopy1:
+            case QuickEditCopy2:
+            case QuickEditCopy3:
+            case QuickEditRandomize:
+                on = true;
+                break;
+            case QuickEditPaste1:
+                on = _sequenceClipboards[0].valid;
+                break;
+            case QuickEditPaste2:
+                on = _sequenceClipboards[1].valid;
+                break;
+            case QuickEditPaste3:
+                on = _sequenceClipboards[2].valid;
+                break;
+            }
+            
+            leds.set(index, false, on);
             leds.mask(index);
         }
     }
@@ -187,7 +217,7 @@ void TuesdayEditPage::keyPress(KeyPressEvent &event) {
             contextMenuItems,
             int(ContextAction::Last),
             [&] (int index) { contextAction(index); },
-            [&] (int index) { return true; }
+            [&] (int index) { return contextActionEnabled(index); }
         ));
         event.consume();
         return;
@@ -195,11 +225,23 @@ void TuesdayEditPage::keyPress(KeyPressEvent &event) {
 
     if (key.isQuickEdit() && !key.shiftModifier()) {
         switch (quickEditItems[key.quickEdit()]) {
-        case QuickEditCopy:
-            copySequenceParams();
+        case QuickEditCopy1:
+            copySequenceParams(0);
             break;
-        case QuickEditPaste:
-            pasteSequenceParams();
+        case QuickEditPaste1:
+            pasteSequenceParams(0);
+            break;
+        case QuickEditCopy2:
+            copySequenceParams(1);
+            break;
+        case QuickEditPaste2:
+            pasteSequenceParams(1);
+            break;
+        case QuickEditCopy3:
+            copySequenceParams(2);
+            break;
+        case QuickEditPaste3:
+            pasteSequenceParams(2);
             break;
         case QuickEditRandomize: {
             randomizeSequence();
@@ -607,8 +649,26 @@ void TuesdayEditPage::contextAction(int index) {
     case ContextAction::Reseed:
         const_cast<TuesdayTrackEngine &>(trackEngine()).reseed();
         break;
+    case ContextAction::Rand:
+        randomizeSequence();
+        break;
+    case ContextAction::Copy:
+        copySequenceParams(0);
+        break;
+    case ContextAction::Paste:
+        pasteSequenceParams(0);
+        break;
     case ContextAction::Last:
         break;
+    }
+}
+
+bool TuesdayEditPage::contextActionEnabled(int index) const {
+    switch (ContextAction(index)) {
+    case ContextAction::Paste:
+        return _sequenceClipboards[0].valid;
+    default:
+        return true;
     }
 }
 
@@ -739,12 +799,9 @@ void TuesdayEditPage::handleStepKeyDown(int step, bool shift) {
         track.setRunGate(false);
     }
 
-    if (step == 15 && shift && !_jamMuteHeld) {
-        _jamMuteHeld = true;
-        _jamMuteTrack = _project.selectedTrackIndex();
-        auto &playState = _project.playState();
-        _jamPrevMute = playState.trackState(_jamMuteTrack).mute();
-        playState.muteTrack(_jamMuteTrack, PlayState::Immediate);
+    if (step == 15 && shift) {
+        const_cast<TuesdayTrackEngine &>(trackEngine()).reset();
+        showMessage("RESET");
     }
 }
 
@@ -755,19 +812,6 @@ void TuesdayEditPage::handleStepKeyUp(int step, bool shift) {
             _project.track(_jamRunTrack).setRunGate(_jamPrevRunGate);
         }
         _jamRunTrack = -1;
-    }
-
-    if (step == 15 && shift && _jamMuteHeld) {
-        _jamMuteHeld = false;
-        if (_jamMuteTrack >= 0) {
-            auto &playState = _project.playState();
-            if (_jamPrevMute) {
-                playState.muteTrack(_jamMuteTrack, PlayState::Immediate);
-            } else {
-                playState.unmuteTrack(_jamMuteTrack, PlayState::Immediate);
-            }
-        }
-        _jamMuteTrack = -1;
     }
 }
 
@@ -802,44 +846,62 @@ void TuesdayEditPage::randomizeSequence() {
     showMessage("SEQUENCE RANDOM");
 }
 
-void TuesdayEditPage::copySequenceParams() {
+void TuesdayEditPage::copySequenceParams(int slot) {
+    if (slot < 0 || slot >= ClipboardSlots) return;
+    
     const auto &sequence = _project.selectedTuesdaySequence();
-    _sequenceClipboard.valid = true;
-    _sequenceClipboard.algorithm = sequence.algorithm();
-    _sequenceClipboard.flow = sequence.flow();
-    _sequenceClipboard.ornament = sequence.ornament();
-    _sequenceClipboard.power = sequence.power();
-    _sequenceClipboard.loopLength = sequence.loopLength();
-    _sequenceClipboard.rotate = sequence.rotate();
-    _sequenceClipboard.glide = sequence.glide();
-    _sequenceClipboard.skew = sequence.skew();
-    _sequenceClipboard.gateLength = sequence.gateLength();
-    _sequenceClipboard.gateOffset = sequence.gateOffset();
-    _sequenceClipboard.stepTrill = sequence.stepTrill();
-    _sequenceClipboard.start = sequence.start();
-    showMessage("COPIED");
+    auto &clipboard = _sequenceClipboards[slot];
+    
+    clipboard.valid = true;
+    clipboard.algorithm = sequence.algorithm();
+    clipboard.flow = sequence.flow();
+    clipboard.ornament = sequence.ornament();
+    clipboard.power = sequence.power();
+    clipboard.loopLength = sequence.loopLength();
+    clipboard.rotate = sequence.rotate();
+    clipboard.glide = sequence.glide();
+    clipboard.skew = sequence.skew();
+    clipboard.gateLength = sequence.gateLength();
+    clipboard.gateOffset = sequence.gateOffset();
+    clipboard.stepTrill = sequence.stepTrill();
+    clipboard.start = sequence.start();
+    clipboard.octave = sequence.octave();
+    clipboard.transpose = sequence.transpose();
+    clipboard.rootNote = sequence.rootNote();
+    clipboard.divisor = sequence.divisor();
+    clipboard.maskParameter = sequence.maskParameter();
+    showMessage("COPIED %d", slot + 1);
 }
 
-void TuesdayEditPage::pasteSequenceParams() {
-    if (!_sequenceClipboard.valid) {
-        showMessage("NO CLIP");
+void TuesdayEditPage::pasteSequenceParams(int slot) {
+    if (slot < 0 || slot >= ClipboardSlots) return;
+
+    const auto &clipboard = _sequenceClipboards[slot];
+    
+    if (!clipboard.valid) {
+        showMessage("NO CLIP %d", slot + 1);
         return;
     }
 
     auto &sequence = _project.selectedTuesdaySequence();
-    sequence.setAlgorithm(_sequenceClipboard.algorithm);
-    sequence.setFlow(_sequenceClipboard.flow);
-    sequence.setOrnament(_sequenceClipboard.ornament);
-    sequence.setPower(_sequenceClipboard.power);
-    sequence.setLoopLength(_sequenceClipboard.loopLength);
-    sequence.setRotate(_sequenceClipboard.rotate);
-    sequence.setGlide(_sequenceClipboard.glide);
-    sequence.setSkew(_sequenceClipboard.skew);
-    sequence.setGateLength(_sequenceClipboard.gateLength);
-    sequence.setGateOffset(_sequenceClipboard.gateOffset);
-    sequence.setStepTrill(_sequenceClipboard.stepTrill);
-    sequence.setStart(_sequenceClipboard.start);
-    showMessage("PASTED");
+    sequence.setAlgorithm(clipboard.algorithm);
+    sequence.setFlow(clipboard.flow);
+    sequence.setOrnament(clipboard.ornament);
+    sequence.setPower(clipboard.power);
+    sequence.setLoopLength(clipboard.loopLength);
+    sequence.setRotate(clipboard.rotate);
+    sequence.setGlide(clipboard.glide);
+    sequence.setSkew(clipboard.skew);
+    sequence.setGateLength(clipboard.gateLength);
+    sequence.setGateOffset(clipboard.gateOffset);
+    sequence.setStepTrill(clipboard.stepTrill);
+    sequence.setStart(clipboard.start);
+    sequence.setOctave(clipboard.octave);
+    sequence.setTranspose(clipboard.transpose);
+    sequence.setRootNote(clipboard.rootNote);
+    sequence.setDivisor(clipboard.divisor);
+    sequence.setMaskParameter(clipboard.maskParameter);
+    showMessage("PASTED %d", slot + 1);
 }
 
 const TuesdayTrackEngine &TuesdayEditPage::trackEngine() const {

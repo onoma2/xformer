@@ -186,7 +186,7 @@ void CurveSequence::writeRouted(Routing::Target target, int intValue, float floa
 
 void CurveSequence::clear() {
     setRange(Types::VoltageRange::Bipolar5V);
-    setDivisor(12);
+    setDivisor(192);
     setResetMeasure(0);
     setRunMode(Types::RunMode::Forward);
     setFirstStep(0);

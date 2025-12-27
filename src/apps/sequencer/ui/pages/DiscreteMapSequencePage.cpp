@@ -723,16 +723,28 @@ void DiscreteMapSequencePage::finishVoicingQuickEdit() {
 }
 
 void DiscreteMapSequencePage::showVoicingMessage(VoicingBank bank, int voicingIndex) {
+    FixedStringBuilder<16> msg;
+    const char *bankName = (bank == VoicingBank::Piano) ? "PNO" : "GTR";
+    if (voicingIndex < 0) {
+        msg("%s OFF", bankName);
+        showMessage(msg);
+        return;
+    }
+
     const Voicing *voicings = (bank == VoicingBank::Piano) ? kPianoVoicings : kGuitarVoicings;
     const int count = (bank == VoicingBank::Piano) ? kPianoVoicingCount : kGuitarVoicingCount;
     int index = clamp(voicingIndex, 0, count - 1);
-    FixedStringBuilder<16> msg;
-    msg("%s %s", bank == VoicingBank::Piano ? "PNO" : "GTR", voicings[index].name);
+    msg("%s %s", bankName, voicings[index].name);
     showMessage(msg);
 }
 
 void DiscreteMapSequencePage::applyVoicing(VoicingBank bank, int voicingIndex) {
     if (!_sequence) {
+        return;
+    }
+
+    if (voicingIndex < 0) {
+        showVoicingMessage(bank, voicingIndex);
         return;
     }
 
@@ -857,7 +869,7 @@ void DiscreteMapSequencePage::encoder(EncoderEvent &event) {
 
     if (_voicingQuickEditActive) {
         const int count = (_voicingQuickEditBank == VoicingBank::Piano) ? kPianoVoicingCount : kGuitarVoicingCount;
-        int next = clamp(_voicingQuickEditIndex + event.value(), 0, count - 1);
+        int next = clamp(_voicingQuickEditIndex + event.value(), -1, count - 1);
         if (next != _voicingQuickEditIndex) {
             _voicingQuickEditIndex = next;
             _voicingQuickEditDirty = true;

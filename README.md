@@ -19,6 +19,9 @@ track features (yet).
 - 21 built-in algorithms that produce deterministic results (same parameters = same outputs)
 - Parameters: Algorithm (0-14), Flow (0-16), Ornament (0-16), Power (0-16)
 - Additional controls: Loop Length, Scan, Rotate, CV Mode, Glide, Gate Offset, Trill, Skew
+- **Context Menu**: Shift+Page or Long-press Shift+F5 to access INIT, RESEED, RAND, COPY, PASTE
+- **Quick Edit**: 3-slot Clipboard (Copy/Paste 1-3) on Steps 9-14, Randomize on Step 15
+- **Jam Shortcuts**: Momentary Run (Shift+Step 7), Reset (Shift+Step 15)
 
 #### DiscreteMap Track
 - Threshold-based sequencer mapping input voltages (Internal Ramp or External CV) to 32 discrete output stages

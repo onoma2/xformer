@@ -295,8 +295,12 @@ The Algo track uses mathematical algorithms to generate:
 
 ### 9.2 Quick Edit (Page+Steps 9-16)
 
-- **Page+Step 9**: Copy parameters
-- **Page+Step 10**: Paste parameters
+- **Page+Step 9**: Copy parameters to Slot 1
+- **Page+Step 10**: Copy parameters to Slot 2
+- **Page+Step 11**: Copy parameters to Slot 3
+- **Page+Step 12**: Paste parameters from Slot 1
+- **Page+Step 13**: Paste parameters from Slot 2
+- **Page+Step 14**: Paste parameters from Slot 3
 - **Page+Step 15**: Randomize (randomizes all parameters)
 
 ### 9.3 Editing Tips
@@ -312,11 +316,11 @@ The Algo track uses mathematical algorithms to generate:
 | Step | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Top | Octave + | Transpose + | Root Note + | Div up (straight) | Div up (triplet) | Div /2 (faster) | Mask + | Loop +<br>Shift: Run momentary |
-| Bottom | Octave - | Transpose - | Root Note - | Div down (straight) | Div down (triplet) | Div x2 (slower) | Mask - | Loop -<br>Shift: Mute momentary |
+| Bottom | Octave - | Transpose - | Root Note - | Div down (straight) | Div down (triplet) | Div x2 (slower) | Mask - | Loop -<br>Shift: Reset |
 
 Shift modifiers:
 - Shift+Step 8: Run momentary (press = stop)
-- Shift+Step 16: Mute momentary (press = mute)
+- Shift+Step 16: Reset (restart sequence from start)
 
 Behavior notes:
 - Top row moves "up" (faster/greater), bottom row moves "down" (slower/less); for divisors, smaller = faster.

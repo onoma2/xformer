@@ -14,7 +14,7 @@ void DiscreteMapTrack::clear() {
     _routedScanner = 0.f;
     _routedSync = 0.f;
     setCvUpdateMode(CvUpdateMode::Gate);  // Initialize default value
-    setPlayMode(Types::PlayMode::Aligned);
+    setPlayMode(Types::PlayMode::Free);
     for (auto &sequence : _sequences) {
         sequence.clear();
     }

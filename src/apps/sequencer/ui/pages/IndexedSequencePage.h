@@ -24,15 +24,5 @@ private:
     void initSequence();
     void initRoute();
 
-    // Macro context menus
-    void rhythmContextShow();
-    void rhythmContextAction(int index);
-    void waveformContextShow();
-    void waveformContextAction(int index);
-    void melodicContextShow();
-    void melodicContextAction(int index);
-    void durationTransformContextShow();
-    void durationTransformContextAction(int index);
-
     IndexedSequenceListModel _listModel;
 };

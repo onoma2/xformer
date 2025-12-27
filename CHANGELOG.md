@@ -3,6 +3,17 @@
 ## [Unreleased]
 
 ### Added
+- **Algo (Tuesday) Track Enhancements**:
+  - **Context Menu**: Added INIT, RESEED, RAND, COPY, PASTE options
+  - **3-Slot Clipboard**: Copy/Paste 1-3 on Steps 9-14 (Quick Edit)
+  - **Expanded Clipboard**: Now includes Octave, Transpose, Root Note, Divisor, Mask
+  - **Reset Shortcut**: Shift+Step 16 (index 15) hard resets the track engine
+  - **Status Box**: Visual feedback for Note, Gate, CV, and Step
+  - **Quick Edit**: Randomize parameters (Step 15)
+  - **Reseed**: Shift+F5 shortcut and Context Menu option
+- **Initialization Defaults**:
+  - Curve, Indexed, and DiscreteMap tracks now default to **Free** play mode
+  - Curve and DiscreteMap sequences now default to **Divisor 192**
 - **Routing Enhancements**:
   - **VCA Next Shaper (VC)**: Amplitude modulation using the next route's raw source value
   - **Per-Track Reset Target**: Hard reset of track engine on rising edge of routed signal
@@ -17,10 +28,6 @@
   - Features: Non-grid timing, Polyrhythms, Group-based modulation
   - **Math Page**: Batch operations (Add, Sub, Mul, Div, Ramp, Quantize, Random, Jitter)
   - **Quick Edit**: `Set First Step` (Rotate), `Active Length`, `Run Mode`, `Reset Measure`
-- **Algo (Tuesday) Track Enhancements**:
-  - **Status Box**: Visual feedback for Note, Gate, CV, and Step
-  - **Quick Edit**: Randomize parameters (Step 15)
-  - **Reseed**: Shift+F5 shortcut and Context Menu option
 - **Documentation**: Comprehensive updates to XFORMER_MANUAL and individual track manuals
 - **Accumulator UI Enhancements**: Visual indicators for accumulator state across all Note track pages
   - **Counter display**: Shows current accumulator value (e.g., "+5", "-12") in header at x=176 (aligned with step 12)

@@ -1,0 +1,57 @@
+ Page+Step 5: Generators (Threshold Patterns)
+
+  - M-CLUSTER: Random clumping - tight bunches with gaps
+
+  Page+Step 6: Note Patterns (Note Index)
+- ACT: Evenly distribute all active stages (Rise/Fall/Both)
+  - RISE: Evenly distribute only Rise stages
+  - FALL: Evenly distribute only Fall stages
+  - BOTH: Evenly distribute only Both stages
+  - NORM: Normalize threshold spacing (equal gaps)
+
+
+
+  Page+Step 6: Transform
+ - FLIP: Cycle directions (Rise→Fall→Both→Off→Rise)
+  - T-MIRR: Mirror thresholds around midpoint
+  - T-REV: Reverse threshold order
+  - N-MIRR: Mirror note indices
+  - N-REV: Reverse note order
+
+
+   Page+Step 15: 
+
+  Remove even and flip Quick Edit. Leave Piano and Guitar Quick edit as is
+
+  ---
+  IndexedTrack Macro Proposal (5 slots per page)
+
+  Page+Step 5: Rhythm Generators
+
+  - EUCL: Euclidean rhythm (F1: steps, F2: pulses, F3: rotation)
+  - CLAVE: Classic patterns (Son/Rumba/Bossa/Bembe)
+  - TUPLET: Subdivide into tuplets (F1: 3/5/7)
+  - POLY: Polyrhythmic subdivision
+  - M-RHY: Random generative rhythm
+
+  Page+Step 6: Waveforms ()
+  - D-LOG: Duration logarithmic curve
+  - D-EXP: Duration exponential curve
+  - D-TRI: Duration triangle (accel→decel)
+
+
+
+  Page+Step 7: Transforms
+
+  Page+Step 15: Duration & Transform
+
+- REV: Reverse step order
+  - MIRR: Mirror around midpoint
+- Rev-D: reverse durations only
+- mirror duration only
+
+  Quick Edit (New Additions)
+
+  - PIANO: Piano voicing from first selected step
+  - GUITAR: Guitar voicing from first selected step
+
