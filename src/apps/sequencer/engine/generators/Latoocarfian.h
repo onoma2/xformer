@@ -28,10 +28,11 @@ public:
         _x = nextX;
         _y = nextY;
         
-        // The output range of this map roughly bounded by |c|+1 and |d|+1.
-        // We scale down by 3.0 to keep it roughly within -1..1 for typical params,
-        // then clamp to ensure safety.
-        return clamp(_x * 0.333f, -1.0f, 1.0f);
+        // The output range of X is bounded by 1 + |c|.
+        // We dynamically normalize so the chaos always fills the -1..1 range 
+        // without hard clipping, regardless of parameter C.
+        float maxVal = 1.0f + std::abs(c);
+        return clamp(_x / maxVal, -1.0f, 1.0f);
     }
 
 private:

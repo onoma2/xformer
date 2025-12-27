@@ -44,10 +44,11 @@ public:
         _z += dz * dt;
 
         // Normalization
-        // Lorenz X typically swings between -20 and +20 for standard params.
-        // We scale by 1/20 to get approx -1..1 range.
-        // Hard clamp to ensure safety.
-        return clamp(_x * 0.05f, -1.0f, 1.0f);
+        // Lorenz X typically swings between -20 and +20 for standard params (rho=28).
+        // At max rho=50, it can reach ~27.
+        // We scale by 0.045 to keep the main action in -1..1 range while allowing 
+        // occasional overshoots/clipping at extreme settings for more energy.
+        return clamp(_x * 0.045f, -1.0f, 1.0f);
     }
 
 private:
