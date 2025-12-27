@@ -108,14 +108,14 @@ enum {
 };
 
 static const int quickEditItems[8] = {
-    QuickEditSplit,                                   // Step 9
-    QuickEditMerge,                                   // Step 10
-    QuickEditSetFirst,                                // Step 11
+    QuickEditSplit,                                   // Step 8
+    QuickEditMerge,                                   // Step 9
+    QuickEditSwap,                                    // Step 10
+    int(IndexedSequenceListModel::Item::RunMode),      // Step 11
     QuickEditPiano,                                   // Step 12
     QuickEditGuitar,                                  // Step 13
-    QuickEditNone,                                    // Step 14 (free for macro)
-    QuickEditNone,                                    // Step 15
-    QuickEditNone
+    QuickEditNone,                                    // Step 14 (macro)
+    QuickEditNone                                     // Step 15
 };
 
 IndexedSequenceEditPage::IndexedSequenceEditPage(PageManager &manager, PageContext &context) :
@@ -547,12 +547,7 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
             event.consume();
             return;
         }
-        int nextOffset = _swapQuickEditOffset;
-        if (_swapQuickEditOffset == 0 && event.value() > 0 && _swapQuickEditPreferredOffset > 0) {
-            nextOffset = _swapQuickEditPreferredOffset;
-        } else {
-            nextOffset += event.value();
-        }
+        int nextOffset = _swapQuickEditOffset + event.value();
         _swapQuickEditOffset = clamp(nextOffset, 0, maxOffset);
         if (_swapQuickEditOffset == 0) {
             showMessage("NO SWAP");
@@ -720,7 +715,7 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
 void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
     const auto &key = event.key();
     if (key.isQuickEdit() && !key.shiftModifier()) {
-        if (key.quickEdit() == 1) {
+        if (key.quickEdit() == 2) {
             startSwapQuickEdit();
             event.consume();
             return;
@@ -776,7 +771,7 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
 void IndexedSequenceEditPage::keyUp(KeyEvent &event) {
     const auto &key = event.key();
     if (_swapQuickEditActive) {
-        if (key.isPage() || (key.isStep() && key.step() == 9)) {
+        if (key.isPage() || (key.isStep() && key.step() == 10)) {
             finishSwapQuickEdit();
             event.consume();
             return;

@@ -78,7 +78,7 @@ void Project::clear() {
 
     // Single curve step sweeping full range
     auto &cv = curve.step(0);
-    cv.setShape(0);  // Linear
+    cv.setShape(3);  // Linear
     cv.setMin(0);    // -5V
     cv.setMax(255);  // +5V
 

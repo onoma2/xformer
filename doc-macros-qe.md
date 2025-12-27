@@ -30,13 +30,12 @@ Files
 - `src/apps/sequencer/ui/pages/IndexedSequenceEditPage.cpp`
 
 Quick edits
-- Page + `Key::Step9` → Split
-- Page + `Key::Step10` → Swap
-- Page + `Key::Step11` → Merge
-- Page + `Key::Step12` → Set First
-- Page + `Key::Step13` → Length (list item)
-- Page + `Key::Step14` → Run Mode (list item)
-- Page + `Key::Step15` → Reset Measure (list item)
+- Page + `Key::Step8` → Split
+- Page + `Key::Step9` → Merge
+- Page + `Key::Step10` → Swap (hold+encoder)
+- Page + `Key::Step11` → Run Mode (list item)
+- Page + `Key::Step12` → Piano Voicing
+- Page + `Key::Step13` → Guitar Voicing
 
 Files
 - `src/apps/sequencer/ui/pages/IndexedSequenceEditPage.cpp`
