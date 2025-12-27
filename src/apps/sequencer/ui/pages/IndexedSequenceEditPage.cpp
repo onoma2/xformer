@@ -389,13 +389,18 @@ void IndexedSequenceEditPage::updateLeds(Leds &leds) {
         int stepIndex = stepOffset + i;
         if (stepIndex >= sequence.activeLength()) break;
 
+        int ledIndex = MatrixMap::fromStep(i);
         bool selected = _stepSelection[stepIndex];
         bool playing = (stepIndex == currentStep);
 
-        bool green = playing;
-        bool red = selected;
-
-        leds.set(MatrixMap::fromStep(i), red, green);
+        // Presence: green, selection: red, playhead: both.
+        leds.set(ledIndex, false, true);
+        if (selected) {
+            leds.set(ledIndex, true, false);
+        }
+        if (playing) {
+            leds.set(ledIndex, true, true);
+        }
     }
 
     LedPainter::drawSelectedSequenceSection(leds, _section);
