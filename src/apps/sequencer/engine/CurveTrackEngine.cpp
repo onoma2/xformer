@@ -170,6 +170,13 @@ TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
 
         if (_curveTrack.playMode() == Types::PlayMode::Free) {
             // Free mode: use phase accumulator with curveRate modulation
+
+            // Trigger initial step if sequence hasn't started
+            if (_sequenceState.step() < 0) {
+                _sequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                triggerStep(tick, divisor);
+            }
+
             float curveRate = _curveTrack.curveRate();  // 0.0-4.0
             float baseSpeed = 1.0 / divisor;             // Speed for 1x rate
             double speed = baseSpeed * curveRate;
