@@ -93,25 +93,14 @@ void Project::clear() {
     noteSequence(5, 0).setLastStep(15);
     noteSequence(5, 0).setGates({ 0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0 });
 
-    // Track 8: Discrete Map
-    track(7).setTrackMode(Track::TrackMode::DiscreteMap);
-    auto &dmap = discreteMapSequence(7, 0);
-    dmap.setClockSource(DiscreteMapSequence::ClockSource::External);
-    dmap.setLoop(false);  // Once mode for testing
-    // Distribute thresholds -100 to +100
-    for (int i = 0; i < 8; ++i) {
-        dmap.stage(i).setThreshold(-100 + (200 * i) / 7);
-        dmap.stage(i).setDirection(DiscreteMapSequence::Stage::TriggerDir::Rise);
-        // Simple scale run
-        dmap.stage(i).setNoteIndex(i * 2);
+    // Track 8: Indexed
+    track(7).setTrackMode(Track::TrackMode::Indexed);
+    auto &indexed = indexedSequence(7, 0);
+    indexed.setActiveLength(5);
+    for (int i = 0; i < 5; ++i) {
+        indexed.step(i).setNoteIndex(i * 2);
+        indexed.step(i).setGateLength(5);
     }
-
-    // Route Track 1 CV1 output to Track 8 DiscreteMap Input
-    _routing.routes()[0].setSource(Routing::Source::CvOut1);
-    _routing.routes()[0].setTarget(Routing::Target::DiscreteMapInput);
-    _routing.routes()[0].setTracks(1 << 7);  // Enable for track 8 (bit 7)
-    _routing.routes()[0].setMin(0.0f);
-    _routing.routes()[0].setMax(1.0f);
 
     setTempo(80.f);
     setScale(2); // 2 corresponds to Minor scale

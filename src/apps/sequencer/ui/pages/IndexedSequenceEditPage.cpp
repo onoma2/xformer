@@ -57,10 +57,12 @@ struct Voicing {
     const char *name;
     int8_t semis[6];
     uint8_t count;
+    bool rootFromC0;
 };
 
 static const Voicing kPianoVoicings[] = {
-    { "NO",      { 0, 0, 0, 0, 0, 0 },    0 },
+    { "ROOT",    { 0, 0, 0, 0, 0, 0 },    0 },
+    { "C0",      { 0, 0, 0, 0, 0, 0 },    0, true },
     { "MAJ13",   { 0, 4, 7, 11, 14, 21 }, 6 },
     { "MAJ6/9",  { 0, 4, 7, 9, 14, 0 },   5 },
     { "MIN13",   { 0, 3, 7, 10, 14, 21 }, 6 },
@@ -76,7 +78,8 @@ static const Voicing kPianoVoicings[] = {
 };
 
 static const Voicing kGuitarVoicings[] = {
-    { "NO",    { 0, 0, 0, 0, 0, 0 }, 0 },
+    { "ROOT",  { 0, 0, 0, 0, 0, 0 }, 0 },
+    { "C0",    { 0, 0, 0, 0, 0, 0 }, 0, true },
     { "MAJ",   { 0, 4, 7, 12, 16, 0 }, 5 },
     { "MIN",   { 0, 7, 12, 15, 19, 0 }, 5 },
     { "7",     { 0, 4, 10, 12, 16, 0 }, 5 },
@@ -438,6 +441,10 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
     }
 
     if (key.isQuickEdit() && !key.shiftModifier()) {
+        if (key.quickEdit() == 4 || key.quickEdit() == 5) {
+            event.consume();
+            return;
+        }
         quickEdit(key.quickEdit());
         event.consume();
         return;
@@ -543,6 +550,18 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
 
 void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
     auto &sequence = _project.selectedIndexedSequence();
+
+    if (_voicingQuickEditActive) {
+        const int count = (_voicingQuickEditBank == VoicingBank::Piano) ? kPianoVoicingCount : kGuitarVoicingCount;
+        int next = clamp(_voicingQuickEditIndex + event.value(), -1, count - 1);
+        if (next != _voicingQuickEditIndex) {
+            _voicingQuickEditIndex = next;
+            _voicingQuickEditDirty = true;
+            showVoicingMessage(_voicingQuickEditBank, _voicingQuickEditIndex);
+        }
+        event.consume();
+        return;
+    }
 
     if (_swapQuickEditActive) {
         int maxOffset = sequence.activeLength() - 1 - _swapQuickEditBaseIndex;
@@ -720,6 +739,16 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
 void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
     const auto &key = event.key();
     if (key.isQuickEdit() && !key.shiftModifier()) {
+        if (key.quickEdit() == 4) {
+            startVoicingQuickEdit(VoicingBank::Piano, key.quickEdit() + 8);
+            event.consume();
+            return;
+        }
+        if (key.quickEdit() == 5) {
+            startVoicingQuickEdit(VoicingBank::Guitar, key.quickEdit() + 8);
+            event.consume();
+            return;
+        }
         if (key.quickEdit() == 2) {
             startSwapQuickEdit();
             event.consume();
@@ -775,6 +804,13 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
 
 void IndexedSequenceEditPage::keyUp(KeyEvent &event) {
     const auto &key = event.key();
+    if (_voicingQuickEditActive) {
+        if (key.isPage() || (key.isStep() && key.step() == _voicingQuickEditStep)) {
+            finishVoicingQuickEdit();
+            event.consume();
+            return;
+        }
+    }
     if (_swapQuickEditActive) {
         if (key.isPage() || (key.isStep() && key.step() == 10)) {
             finishSwapQuickEdit();
@@ -1049,10 +1085,10 @@ void IndexedSequenceEditPage::quickEdit(int index) {
         splitStep();
         return;
     case QuickEditPiano:
-        applyVoicing(true);
+        applyVoicing(VoicingBank::Piano, _pianoVoicingIndex);
         return;
     case QuickEditGuitar:
-        applyVoicing(false);
+        applyVoicing(VoicingBank::Guitar, _guitarVoicingIndex);
         return;
     case QuickEditSwap:
         return;
@@ -1151,7 +1187,53 @@ const IndexedSequence::Step& IndexedSequenceEditPage::step(int index) const {
     return _project.selectedIndexedSequence().step(index);
 }
 
-void IndexedSequenceEditPage::applyVoicing(bool isPiano) {
+void IndexedSequenceEditPage::startVoicingQuickEdit(VoicingBank bank, int stepIndex) {
+    if (!_stepSelection.any()) {
+        showMessage("NO STEP");
+        return;
+    }
+
+    _voicingQuickEditActive = true;
+    _voicingQuickEditBank = bank;
+    _voicingQuickEditStep = stepIndex;
+    _voicingQuickEditIndex = (bank == VoicingBank::Piano) ? _pianoVoicingIndex : _guitarVoicingIndex;
+    _voicingQuickEditDirty = false;
+    showVoicingMessage(bank, _voicingQuickEditIndex);
+}
+
+void IndexedSequenceEditPage::finishVoicingQuickEdit() {
+    if (!_voicingQuickEditActive) {
+        return;
+    }
+
+    _voicingQuickEditActive = false;
+    if (_voicingQuickEditBank == VoicingBank::Piano) {
+        _pianoVoicingIndex = _voicingQuickEditIndex;
+    } else {
+        _guitarVoicingIndex = _voicingQuickEditIndex;
+    }
+    if (_voicingQuickEditDirty) {
+        applyVoicing(_voicingQuickEditBank, _voicingQuickEditIndex);
+    }
+}
+
+void IndexedSequenceEditPage::showVoicingMessage(VoicingBank bank, int voicingIndex) {
+    FixedStringBuilder<16> msg;
+    const char *bankName = (bank == VoicingBank::Piano) ? "PIANO" : "GUITAR";
+    if (voicingIndex < 0) {
+        msg("%s OFF", bankName);
+        showMessage(msg);
+        return;
+    }
+
+    const Voicing *voicings = (bank == VoicingBank::Piano) ? kPianoVoicings : kGuitarVoicings;
+    const int count = (bank == VoicingBank::Piano) ? kPianoVoicingCount : kGuitarVoicingCount;
+    int index = clamp(voicingIndex, 0, count - 1);
+    msg("%s %s", bankName, voicings[index].name);
+    showMessage(msg);
+}
+
+void IndexedSequenceEditPage::applyVoicing(VoicingBank bank, int voicingIndex) {
     if (!_stepSelection.any()) {
         showMessage("NO STEP");
         return;
@@ -1159,47 +1241,67 @@ void IndexedSequenceEditPage::applyVoicing(bool isPiano) {
 
     auto &sequence = _project.selectedIndexedSequence();
 
-    // Find first selected step to use as root note
     int firstSelectedIndex = _stepSelection.firstSetIndex();
     if (firstSelectedIndex < 0) {
         showMessage("NO STEP");
         return;
     }
 
-    int8_t rootNote = sequence.step(firstSelectedIndex).noteIndex();
-
-    // Get voicing array
-    const Voicing *voicings = isPiano ? kPianoVoicings : kGuitarVoicings;
-    int voicingCount = isPiano ? kPianoVoicingCount : kGuitarVoicingCount;
-    int &voicingIndex = isPiano ? _pianoVoicingIndex : _guitarVoicingIndex;
-
-    // Cycle to next voicing
-    voicingIndex = (voicingIndex + 1) % voicingCount;
-    const Voicing &voicing = voicings[voicingIndex];
-
-    // Apply voicing to selected steps
-    int selectedCount = _stepSelection.count();
-    int stepIndex = firstSelectedIndex;
-
-    for (int i = 0; i < selectedCount && i < voicing.count; ++i) {
-        // Find next selected step
-        while (stepIndex < sequence.activeLength() && !_stepSelection[stepIndex]) {
-            stepIndex++;
-        }
-        if (stepIndex >= sequence.activeLength()) break;
-
-        // Apply interval from voicing relative to root note
-        int8_t newNote = rootNote + voicing.semis[i];
-        sequence.step(stepIndex).setNoteIndex(newNote);
-
-        stepIndex++;
+    if (voicingIndex < 0) {
+        showVoicingMessage(bank, voicingIndex);
+        return;
     }
 
-    // Show voicing name
-    FixedStringBuilder<16> msg;
-    msg(isPiano ? "PIANO: " : "GUITAR: ");
-    msg(voicing.name);
-    showMessage(msg);
+    const Voicing *voicings = (bank == VoicingBank::Piano) ? kPianoVoicings : kGuitarVoicings;
+    const int count = (bank == VoicingBank::Piano) ? kPianoVoicingCount : kGuitarVoicingCount;
+    int index = clamp(voicingIndex, 0, count - 1);
+    const auto &voicing = voicings[index];
+
+    const Scale &scale = sequence.selectedScale(_project.selectedScale());
+    int rootIndex = sequence.step(firstSelectedIndex).noteIndex();
+    if (voicing.rootFromC0) {
+        int rootNote = sequence.rootNote();
+        if (rootNote < 0) {
+            rootNote = _project.rootNote();
+        }
+        rootIndex = scale.isChromatic() ? -rootNote : 0;
+    }
+
+    int selectionCount = _stepSelection.count();
+    bool limitToSelection = selectionCount > 1;
+    int targetIndices[IndexedSequence::MaxSteps];
+    int targetCount = 0;
+    int activeLength = sequence.activeLength();
+
+    for (int i = 0; i < activeLength; ++i) {
+        if (limitToSelection && !_stepSelection[i]) {
+            continue;
+        }
+        targetIndices[targetCount++] = i;
+    }
+
+    if (targetCount == 0) {
+        showMessage("NO STEP");
+        return;
+    }
+
+    for (int i = 0; i < targetCount; ++i) {
+        int cycle = voicing.count > 0 ? i / voicing.count : 0;
+        int pos = voicing.count > 0 ? i % voicing.count : 0;
+        int transpose = 0;
+        if (cycle % 3 == 1) {
+            transpose = 7;
+        } else if (cycle % 3 == 2) {
+            transpose = -7;
+        }
+        int semis = int(voicing.semis[pos]) + transpose;
+        float volts = float(semis) / 12.f;
+        int degree = scale.noteFromVolts(volts);
+        int noteIndex = rootIndex + degree;
+        sequence.step(targetIndices[i]).setNoteIndex(noteIndex);
+    }
+
+    showVoicingMessage(bank, index);
 }
 
 // ============================================================================

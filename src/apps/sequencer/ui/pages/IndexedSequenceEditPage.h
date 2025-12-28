@@ -24,6 +24,11 @@ public:
     const StepSelection<IndexedSequence::MaxSteps> &stepSelection() const { return _stepSelection; }
 
 private:
+    enum class VoicingBank {
+        Piano,
+        Guitar
+    };
+
     enum class EditMode {
         Note,
         Duration,
@@ -67,7 +72,10 @@ private:
     void quickEdit(int index);
     void startSwapQuickEdit();
     void finishSwapQuickEdit();
-    void applyVoicing(bool isPiano);
+    void startVoicingQuickEdit(VoicingBank bank, int stepIndex);
+    void finishVoicingQuickEdit();
+    void showVoicingMessage(VoicingBank bank, int voicingIndex);
+    void applyVoicing(VoicingBank bank, int voicingIndex);
 
     // Macro context menus
     void rhythmContextShow();
@@ -92,6 +100,11 @@ private:
     int _swapQuickEditBaseIndex = -1;
     int _swapQuickEditOffset = 0;
     int _swapQuickEditPreferredOffset = 0;
-    int _pianoVoicingIndex = 0;
-    int _guitarVoicingIndex = 0;
+    bool _voicingQuickEditActive = false;
+    VoicingBank _voicingQuickEditBank = VoicingBank::Piano;
+    int _voicingQuickEditIndex = -1;
+    int _voicingQuickEditStep = 0;
+    bool _voicingQuickEditDirty = false;
+    int _pianoVoicingIndex = -1;
+    int _guitarVoicingIndex = -1;
 };

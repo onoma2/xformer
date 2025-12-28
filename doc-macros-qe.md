@@ -34,8 +34,8 @@ Quick edits
 - Page + `Key::Step9` → Merge
 - Page + `Key::Step10` → Swap (hold+encoder)
 - Page + `Key::Step11` → Run Mode (list item)
-- Page + `Key::Step12` → Piano Voicing
-- Page + `Key::Step13` → Guitar Voicing
+- Page + `Key::Step12` → Piano Voicing (hold+encoder)
+- Page + `Key::Step13` → Guitar Voicing (hold+encoder)
 
 Files
 - `src/apps/sequencer/ui/pages/IndexedSequenceEditPage.cpp`

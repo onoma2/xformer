@@ -25,7 +25,302 @@ The signal path has been expanded to include Chaos, Wavefolding, and Filtering.
 ### 2.4 Crossfade (XFADE)
 - **XFADE**: Blends between the dry signal and the processed (folded/filtered) signal.
 
-## 3. Chaos Engine
+## 3. Playback Modes & Signal Flow
+
+The Curve Track engine supports two fundamentally different playback modes: **Aligned** (grid-locked) and **Free** (FM-capable).
+
+### 3.1 Aligned Mode Signal Flow
+
+Grid-locked timing synchronized to the sequencer clock. Steps advance at exact divisor boundaries.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        ALIGNED MODE TICK                             │
+└─────────────────────────────────────────────────────────────────────┘
+
+  Sequencer Tick
+       │
+       ├──> divisor = sequence.divisor() × 4        (e.g., 2 × 4 = 8 ticks)
+       ├──> resetDivisor = resetMeasure × measureDiv
+       │
+       ▼
+  relativeTick = tick % resetDivisor
+       │
+       ├──> if (relativeTick == 0) → reset()
+       │
+       ▼
+  if (relativeTick % divisor == 0)  ← GRID BOUNDARY
+       │
+       ├──> advanceAligned()  ← Advance to next step
+       ├──> triggerStep()     ← Trigger gate events
+       │
+       ▼
+  updateOutput(relativeTick, divisor)
+       │
+       ├──> stepFraction = (relativeTick % divisor) / divisor
+       │                   └─> 0.0 to 1.0 within step
+       │
+       ├──> if (direction < 0) → invert fraction  ← Reverse playback
+       │
+       ▼
+  Lookup step shape at fraction
+       │
+       └──> [Continue to Signal Processing Chain]
+```
+
+**Key Characteristics:**
+- Steps advance **only** at `relativeTick % divisor == 0`
+- Perfectly quantized to sequencer grid
+- No speed modulation possible
+- Step duration = `divisor` ticks (always)
+
+---
+
+### 3.2 Free Mode Signal Flow (FM-Capable)
+
+Phase-accumulator based timing with smooth speed modulation via **Curve Rate**.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         FREE MODE TICK                               │
+└─────────────────────────────────────────────────────────────────────┘
+
+  Sequencer Tick
+       │
+       ├──> divisor = sequence.divisor() × 4
+       │
+       ▼
+  if (_sequenceState.step() < 0)  ← Initial trigger
+       │
+       ├──> advanceFree()   ← Start sequence immediately
+       ├──> triggerStep()
+       │
+       ▼
+  ┌─────────────────────────────────────────────┐
+  │     PHASE ACCUMULATOR (FM Engine)           │
+  └─────────────────────────────────────────────┘
+       │
+       ├──> curveRate = track.curveRate()      ← 0.0 to 4.0
+       ├──> baseSpeed = 1.0 / divisor          ← Base step duration
+       ├──> speed = baseSpeed × curveRate
+       │             └─> Example: 1/8 × 2.0 = 0.25 phase/tick
+       │
+       ├──> speed = min(speed, 0.5)           ← Nyquist clamping
+       │             └─> Prevents aliasing (max 0.5 phase/tick)
+       │
+       ▼
+  _freePhase += speed                          ← Increment every tick
+       │
+       ├──> if (_freePhase >= 1.0)            ← Step boundary crossed
+       │         │
+       │         ├──> _freePhase -= 1.0       ← Wrap phase
+       │         ├──> advanceFree()           ← Advance to next step
+       │         └──> triggerStep()           ← Trigger gates
+       │
+       ▼
+  updateOutput(relativeTick, divisor)
+       │
+       ├──> stepFraction = _freePhase         ← Use phase (0.0-1.0)
+       │                   └─> Smooth, continuous
+       │
+       ├──> if (direction < 0) → invert fraction
+       │
+       ▼
+  Lookup step shape at fraction
+       │
+       └──> [Continue to Signal Processing Chain]
+```
+
+**Key Characteristics:**
+- Steps advance **when phase crosses 1.0** (not grid-locked)
+- Speed modulation range: **0x to 4x** (via curveRate)
+- Nyquist limit: max 0.5 phase/tick (prevents step skipping)
+- Smooth, glitch-free FM modulation
+
+**Curve Rate Values:**
+```
+curveRate = 0.0   →  Freeze (no movement)
+curveRate = 0.5   →  Half speed
+curveRate = 1.0   →  Normal speed (default)
+curveRate = 2.0   →  Double speed
+curveRate = 4.0   →  Quadruple speed (Nyquist-limited)
+```
+
+**Step Duration Calculation:**
+```
+Ticks per step = divisor / curveRate
+
+Examples (divisor = 8):
+  curveRate = 0.1  →  80 ticks/step  (very slow)
+  curveRate = 1.0  →  8 ticks/step   (normal)
+  curveRate = 2.0  →  4 ticks/step   (double speed)
+  curveRate = 4.0  →  2 ticks/step   (max speed)
+```
+
+---
+
+### 3.3 Complete Signal Processing Chain
+
+Both playback modes feed into the same signal processing chain:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                   SIGNAL PROCESSING CHAIN                            │
+└─────────────────────────────────────────────────────────────────────┘
+
+  Step Lookup (currentStep, stepFraction)
+       │
+       ├──> Evaluate step shape at fraction → value (0.0-1.0)
+       │     └─> Uses Curve::function(shapeType)
+       │
+       ├──> Apply min/max scaling
+       │     └─> scaled = min + value × (max - min)
+       │
+       ▼
+  ┌──────────────────────────────────┐
+  │  1. CHAOS MIX (Crossfade)        │
+  └──────────────────────────────────┘
+       │
+       ├──> if (chaosAmount > 0)
+       │     │
+       │     ├──> Get chaos value (-1.0 to +1.0)
+       │     │     └─> Latoocarfian or Lorenz
+       │     │
+       │     ├──> normalizedChaos = (chaos + 1.0) × 0.5
+       │     └──> value = value × (1 - amt) + chaos × amt
+       │
+       ▼
+  originalValue = denormalize(value)  ← Save for XFADE
+       │
+  ┌──────────────────────────────────┐
+  │  2. WAVEFOLDER (Optional)        │
+  └──────────────────────────────────┘
+       │
+       ├──> if (fold > 0)
+       │     │
+       │     ├──> gain = 1.0 + (wavefolderGain × 2.0)
+       │     ├──> fold_exp = fold × fold
+       │     └──> value = applyWavefolder(value, fold_exp, gain)
+       │           └─> Sine-based folding
+       │
+       ▼
+  voltage = denormalize(value)
+       │
+  ┌──────────────────────────────────┐
+  │  3. DJ FILTER (Always Active)    │
+  └──────────────────────────────────┘
+       │
+       ├──> filterControl = djFilter  (-1.0 to +1.0)
+       │     │
+       │     ├──> if (< 0): LPF mode
+       │     └──> if (> 0): HPF mode
+       │
+       └──> voltage = applyDjFilter(voltage, lpfState, control)
+       │
+       ▼
+  ┌──────────────────────────────────┐
+  │  4. CROSSFADE (Dry/Wet Mix)      │
+  └──────────────────────────────────┘
+       │
+       ├──> xFade = sequence.xFade()  (0.0 to 1.0)
+       │     └─> Non-routable, UI-only control
+       │
+       └──> voltage = originalValue × (1 - xFade) + voltage × xFade
+       │              └───── dry ─────┘           └──── wet ────┘
+       │
+       ▼
+  ┌──────────────────────────────────┐
+  │  5. LIMITER (Hard Clamp)         │
+  └──────────────────────────────────┘
+       │
+       └──> cvOutputTarget = clamp(voltage, -5.0, +5.0)
+       │
+  ┌──────────────────────────────────┐
+  │  6. SLIDE (Slew Limiter)         │
+  └──────────────────────────────────┘
+       │
+       ├──> if (slideTime > 0)
+       │     └──> cvOutput = applySlide(cvOutput, target, slideTime, dt)
+       │
+       ├──> else
+       │     └──> cvOutput = cvOutputTarget + offset
+       │
+       ▼
+  CV OUTPUT → DAC
+```
+
+---
+
+### 3.4 Gate Generation Logic
+
+Gate outputs are generated dynamically based on curve events:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                       GATE GENERATION                                │
+└─────────────────────────────────────────────────────────────────────┘
+
+  cvOutputTarget (current voltage)
+       │
+       ├──> slope = current - prevCvOutput
+       │
+       ├──> isRising  = (slope > threshold)
+       ├──> isFalling = (slope < -threshold)
+       │
+       ▼
+  Step Gate Mask (0-255 bitmask)
+       │
+       ├──> Bit 0: Zero Cross Rising (ZC+)
+       ├──> Bit 1: Zero Cross Falling (ZC-)
+       ├──> Bit 2: Peak (local maximum)
+       ├──> Bit 3: Trough (local minimum)
+       ├──> Bit 4: Rising Edge
+       ├──> Bit 5: Falling Edge
+       ├──> Bit 6: Above 50%
+       ├──> Bit 7: Below 50%
+       │
+       ▼
+  Detect Events:
+       │
+       ├──> Zero Cross: (prev < 0) && (current >= 0)
+       ├──> Peak:       wasRising && !isRising
+       ├──> Trough:     wasFalling && !isFalling
+       ├──> Rising:     isRising
+       ├──> Falling:    isFalling
+       ├──> >50%:       voltage > midpoint
+       │
+       ▼
+  if (mask & event)
+       │
+       ├──> Trigger gate (duration based on probability)
+       │
+       └──> gateOutput = HIGH for N ticks
+                         └─> N = f(gateProbability)
+```
+
+**Gate Probability Scale:**
+```
+gateProbability = -1  →  Always OFF
+gateProbability =  0  →  12.5% chance (1 tick)
+gateProbability =  3  →  50% chance (4 ticks)
+gateProbability =  7  →  100% chance (8 ticks)
+```
+
+---
+
+### 3.5 Playback Mode Comparison
+
+| Aspect | Aligned Mode | Free Mode |
+|--------|--------------|-----------|
+| **Step Advance** | Grid-locked (divisor boundaries) | Phase-based (smooth FM) |
+| **Timing** | Quantized | Continuous |
+| **Speed Control** | Fixed (divisor only) | Variable (curveRate 0-4x) |
+| **FM Modulation** | Not possible | Full support via routing |
+| **Step Duration** | `divisor` ticks (constant) | `divisor / curveRate` ticks |
+| **Use Case** | Rhythmic, quantized LFOs | Smooth audio-rate FM, drones |
+| **Aliasing Risk** | None | Nyquist-limited at 0.5 phase/tick |
+
+## 4. Chaos Engine
 
 A generative engine inserted *before* the wavefolder.
 
