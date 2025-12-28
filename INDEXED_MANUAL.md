@@ -39,9 +39,9 @@ The Indexed track uses a duration-based timing system:
 - Provides precise timing control with tick-level accuracy
 
 **Gate Timer**:
-- Counts down independently from calculated gate duration
+- Counts down from the gate length in ticks
 - Determines how long gate output remains high
-- Can be percentage-based or trigger mode
+- Gate length is clamped to step duration (OFF = 0, FULL = duration)
 
 **Duration Control**:
 - Each step has its own duration in clock ticks
@@ -72,7 +72,7 @@ The step editing page shows three rows per step:
 
 - **Note Row**: Edit note index for voltage output (±1 semitone, Shift=±12)
 - **Duration Row**: Edit step duration in clock ticks (±1 tick, Shift=±divisor)
-- **Gate Row**: Edit gate length percentage or trigger mode (±10%, Shift=±1%)
+- **Gate Row**: Edit gate length in ticks (OFF or 4..32767; FULL equals duration). Normal steps 5 positions, Shift steps 1.
 
 **Function Keys (Step Edit)**:
 - **F1**: Note edit mode
@@ -112,7 +112,7 @@ The step editing page shows three rows per step:
 
 Context menu provides:
 - **Insert**: Add new step at cursor position, shifting subsequent steps
-- **Split**: Divide a step's duration into two equal parts
+- **Make First**: Set selected step as the sequence start
 - **Delete**: Remove step, shifting subsequent steps
 - **Copy**: Copy current step to clipboard
 - **Paste**: Paste clipboard content to current step
@@ -143,19 +143,18 @@ Duration determines how long a step remains active:
 
 Gate length determines how long gate output remains high:
 
-**Percentage Mode** (0-100%):
-- Gate duration is percentage of step duration
-- 50% means gate is high for half the step duration
-- 100% means gate stays high for entire step
+**Tick Table**:
+- OFF (0) keeps the gate low
+- 1..126 map to exponential tick lengths from 4 to 32767
+- FULL (127) equals the step duration
 
-**Trigger Mode**:
-- Special value that creates fixed short pulse (3 ticks)
-- Independent of step duration
-- Useful for triggering drums or envelopes
+**Clamping**:
+- Gate length is clamped to step duration
+- If you dial past duration it snaps to FULL (display shows duration ticks)
 
 **Editing**:
-- Normal encoder: ±10% adjustment
-- Shift + encoder: ±1% adjustment for fine control
+- Normal encoder: coarse steps (5 positions in the tick table)
+- Shift + encoder: fine steps (1 position)
 
 ### 4.3 Note Index Parameters
 
@@ -181,6 +180,10 @@ The Indexed track includes powerful step operations:
 - Add new step at current position
 - Shifts subsequent steps to the right
 - Clones properties from previous step
+
+**Make First Function**:
+- Sets the current step as the sequence start
+- Rotates playback so the selected step is first
 
 **Split Function**:
 - Divides a step's duration into two equal parts
@@ -290,7 +293,7 @@ The Indexed track uses accumulator-based timing:
 ### 8.1 Basic Rhythmic Pattern
 
 1. Set up 8 steps with varying durations
-2. Assign gate length of 50% to each step
+2. Assign gate length around half the duration (e.g., 96 ticks for 192-tick steps)
 3. Set different note indices for CV output
 4. Set Loop mode to On for continuous playback
 5. Use short durations for fast notes, longer for sustained notes
@@ -320,22 +323,22 @@ The Indexed track uses accumulator-based timing:
 - **Page+S3**: Jump to track settings page
 - **Context Menu**: Long press on context key for options
 
-### 9.2 Quick Edit (Page+Steps 9-15)
+### 9.2 Quick Edit (Page+Steps 8-15)
 
-- **Page+Step 9**: Split (requires step selection)
-- **Page+Step 10**: Merge with next (first selected step only)
-- **Page+Step 11**: Set First Step (rotates sequence to start at selected step)
-- **Page+Step 12**: Piano Voicings (cycles through piano chord voicings, applies to selected steps)
-- **Page+Step 13**: Guitar Voicings (cycles through guitar chord voicings, applies to selected steps)
+- **Page+Step 8**: Split (requires step selection)
+- **Page+Step 9**: Merge with next (first selected step only)
+- **Page+Step 10**: Swap (hold + encoder to choose offset, release to apply)
+- **Page+Step 11**: Run Mode (quick edit list)
+- **Page+Step 12**: Piano Voicings (hold + encoder)
+- **Page+Step 13**: Guitar Voicings (hold + encoder)
 - **Steps 14-15**: Reserved for macros
 
 **Voicing Quick Edit**:
-- First selected step becomes the root note
-- Each press cycles to next voicing (NO, MAJ13, MAJ6/9, MIN13, etc.)
-- "NO" voicing does nothing (safe exit)
-- Voicing intervals are applied to selected steps in order
-- More steps than voicing notes = extra steps ignored
-- Useful for quickly creating chord progressions
+- Hold the quick edit key and turn the encoder to choose a voicing, release to apply
+- "OFF" leaves notes unchanged
+- "ROOT" uses the first selected step's note index as the root
+- "C0" uses the track/project root from C0 (non-accumulating)
+- One selected step applies across active steps; multiple selected steps apply only to those steps
 
 ### 9.3 Macro Shortcuts (Page+Steps 4, 5, 6, 14)
 
@@ -344,18 +347,17 @@ Macros provide powerful generative and transformative operations on sequences. A
 - **Full active length** (if no selection)
 
 **Page+Step 4 - Rhythm Generators** (YELLOW LED):
-- **EUCL**: Euclidean rhythm generator - distributes pulses evenly using Bjorklund algorithm
-- **CLAVE**: Clave pattern generator - cycles through Son, Rumba, and Bossa nova patterns
-- **TUPLET**: Tuplet subdivision - divides into groups of 3, 5, or 7
-- **POLY**: Polyrhythmic subdivision - creates cross-rhythms (3:4, 5:4, 7:8)
-- **M-RHY**: Random rhythm generator - random durations and gate lengths
+- **3/9**: Cycles even subdivisions with 3 steps, then 9 steps (fills 768 ticks)
+- **5/20**: Cycles even subdivisions with 5 steps, then 20 steps (fills 768 ticks)
+- **7/28**: Cycles even subdivisions with 7 steps, then 28 steps (fills 768 ticks)
+- **3-5/5-7**: Cycles grouped patterns (3+5) and (5+7), each fit to 768 ticks
+- **M-TALA**: Cycles Khand (5+7), Tihai (2-1-2 x3), Dhamar (5-2-3-4)
 
 **Page+Step 5 - Waveforms** (YELLOW LED):
-- **TRI**: Triangle waveform - maps triangle wave to note indices
-- **SINE**: Sine waveform - maps sine wave to note indices
-- **SAW**: Sawtooth waveform - maps sawtooth to note indices
-- **PULSE**: Pulse waveform - square wave mapped to note indices
-- **TARGET**: Target parameter selector - cycles Note → Duration → Gate
+- **TRI**: Single triangle dip (shorter in the middle, longer at the ends)
+- **2TRI**: Two triangle dips across the range
+- **3TRI**: Three triangle dips across the range
+- **5TRI**: Five triangle dips across the range
 
 **Page+Step 6 - Melodic Generators** (YELLOW LED):
 - **SCALE**: Scale fill generator - ascending/descending major scale
@@ -373,13 +375,13 @@ Macros provide powerful generative and transformative operations on sequences. A
 
 **Macro Behavior**:
 - Select specific steps to apply macro to that range only
-- Leave no selection to apply to entire active sequence
+- Leave no selection to apply to the entire active sequence (rhythm macros reset active length to the pattern size)
 - Macros modify existing step data in place
 - Use step selection for surgical edits of specific ranges
 - Combine multiple macros for complex generative results
-- Rhythm generators primarily affect duration and gate length
+- Rhythm generators distribute 768 ticks as evenly as possible, set note index to 0, and gate to minimum ticks
 - Melodic generators primarily affect note indices
-- Waveforms apply to current TARGET parameter (Note/Duration/Gate)
+- Waveforms apply to Duration only and clamp to 8..192 ticks
 
 ### 9.4 Editing Tips
 
@@ -387,7 +389,7 @@ Macros provide powerful generative and transformative operations on sequences. A
 - Split function is great for subdividing longer steps
 - Use rotation (First Step) to start sequence from different points
 - Group modulation allows for complex interactions
-- Trigger mode creates precise short pulses
+- Minimum gate length (4 ticks) creates precise short pulses
 
 ### 9.4 Performance Considerations
 

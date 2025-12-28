@@ -251,8 +251,11 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
         // Timer-based advancement (original behavior)
         const uint16_t stepDuration = static_cast<uint16_t>(_effectiveStepDuration);
 
-        // If current step has zero duration, don't advance timer
+        // Zero duration steps: rapid-fire through immediately
         if (stepDuration == 0) {
+            advanceStep();  // This skips zero-duration steps automatically
+            triggerStep();
+            // Next tick will handle the new step
             return TickResult::NoUpdate;
         }
 
