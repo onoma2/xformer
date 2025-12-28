@@ -628,7 +628,17 @@
             if (config.chaosMix > 0) { processed = processed * (1.0 - config.chaosMix/100) + generateChaos(config.chaos) * (config.chaosMix/100); }
             if (config.fold > 0) { processed = applyWavefolder(processed, config.fold, config.gain); }
             processed = applyDjFilter(processed, config.filter / 100.0);
-            let rawSrc = clamp(pureWaveform * (1.0 - config.xFade/100) + processed * (config.xFade/100) + (config.offset / 5000.0) * 0.5, 0.0, 1.0);
+            // 4. Master XFade (Pure vs Processed)
+            const xFadeMix = config.xFade / 100.0;
+            let rawSrc = pureWaveform * (1.0 - xFadeMix) + processed * xFadeMix;
+
+            // 5. Final Curve Offset
+            // config.offset is +/- 500 (representing +/- 5.00V)
+            // Normalized Range (0..1) represents 10Vpp (-5V to +5V).
+            // So 1.0 (Top) is +5V. 0.5 (Center) is 0V.
+            // An offset of +500 (+5V) should add +0.5 to the normalized signal.
+            // Formula: (offset / 500) * 0.5  ->  offset / 1000.
+            rawSrc = clamp(rawSrc + (config.offset / 1000.0), 0.0, 1.0);
 
             const biasNormalized = config.bias * 0.01;
             const intermediate = applyBiasDepthToSource(rawSrc, config.bias, config.depth);
