@@ -1367,7 +1367,8 @@ enum class WaveformContextAction {
     Triangle,
     Triangle2,
     Triangle3,
-    Triangle5,
+    Saw2,
+    Saw3,
     Last
 };
 
@@ -1375,7 +1376,8 @@ static const ContextMenuModel::Item waveformContextMenuItems[] = {
     { "TRI" },
     { "2TRI" },
     { "3TRI" },
-    { "5TRI" },
+    { "2SAW" },
+    { "3SAW" },
 };
 
 enum class MelodicContextAction {
@@ -1499,11 +1501,6 @@ void IndexedSequenceEditPage::rhythmContextAction(int index) {
             int patternIndex = int(i % patternCount);
             auto &step = sequence.step(targetSteps[i]);
             step.setDuration(pattern[patternIndex]);
-            step.setGateLength(IndexedSequence::gateEncodeTicksForDuration(
-                IndexedSequence::GateLengthTicksMin,
-                step.duration()
-            ));
-            step.setNoteIndex(0);
         }
 
         showMessage(message);
@@ -1599,7 +1596,84 @@ void IndexedSequenceEditPage::waveformContextAction(int index) {
 
     const uint16_t minDur = 8;
     const uint16_t maxDur = 192;
+    const int quantum = 96;
+
+    auto adjustDurationsToQuantum = [&](std::vector<uint16_t> &durations) {
+        if (durations.empty()) {
+            return;
+        }
+        int sum = 0;
+        int slackDown = 0;
+        int slackUp = 0;
+        for (uint16_t dur : durations) {
+            sum += dur;
+            slackDown += int(dur) - int(minDur);
+            slackUp += int(maxDur) - int(dur);
+        }
+        int remainder = sum % quantum;
+        if (remainder == 0) {
+            return;
+        }
+        int down = remainder;
+        int up = quantum - remainder;
+        bool canDown = slackDown >= down;
+        bool canUp = slackUp >= up;
+        int delta = 0;
+        if (canDown && canUp) {
+            delta = (down <= up) ? -down : up;
+        } else if (canDown) {
+            delta = -down;
+        } else if (canUp) {
+            delta = up;
+        }
+
+        int remaining = std::abs(delta);
+        if (remaining == 0) {
+            return;
+        }
+        if (delta > 0) {
+            while (remaining > 0) {
+                bool changed = false;
+                for (int i = 0; i < stepCount && remaining > 0; ++i) {
+                    if (durations[i] < maxDur) {
+                        durations[i]++;
+                        remaining--;
+                        changed = true;
+                    }
+                }
+                if (!changed) {
+                    break;
+                }
+            }
+        } else {
+            while (remaining > 0) {
+                bool changed = false;
+                for (int i = 0; i < stepCount && remaining > 0; ++i) {
+                    if (durations[i] > minDur) {
+                        durations[i]--;
+                        remaining--;
+                        changed = true;
+                    }
+                }
+                if (!changed) {
+                    break;
+                }
+            }
+        }
+    };
+
+    auto applyDurations = [&](const std::vector<uint16_t> &durations, const char *label) {
+        for (int i = 0; i < stepCount; ++i) {
+            sequence.step(firstStep + i).setDuration(durations[i]);
+        }
+        FixedStringBuilder<16> msg("WAVEFORM: ");
+        msg(label);
+        showMessage(msg);
+    };
+
     auto applyTriangle = [&](int bumps, const char *label) {
+        std::vector<uint16_t> durations;
+        durations.reserve(stepCount);
         for (int i = 0; i < stepCount; ++i) {
             float t = (stepCount > 1) ? float(i) / float(stepCount - 1) : 0.f;
             float phase = t * float(bumps);
@@ -1607,11 +1681,25 @@ void IndexedSequenceEditPage::waveformContextAction(int index) {
             float tri = 1.f - std::abs(2.f * frac - 1.f); // 0 at edges, 1 at mid
             float normalized = 1.f - tri; // shorter in the middle
             uint16_t dur = uint16_t(std::round(minDur + normalized * (maxDur - minDur)));
-            sequence.step(firstStep + i).setDuration(clamp<uint16_t>(dur, minDur, maxDur));
+            durations.push_back(clamp<uint16_t>(dur, minDur, maxDur));
         }
-        FixedStringBuilder<16> msg("WAVEFORM: ");
-        msg(label);
-        showMessage(msg);
+        adjustDurationsToQuantum(durations);
+        applyDurations(durations, label);
+    };
+
+    auto applySaw = [&](int bumps, const char *label) {
+        std::vector<uint16_t> durations;
+        durations.reserve(stepCount);
+        for (int i = 0; i < stepCount; ++i) {
+            float t = (stepCount > 1) ? float(i) / float(stepCount - 1) : 0.f;
+            float phase = t * float(bumps);
+            float frac = phase - std::floor(phase);
+            float normalized = frac; // shorter at the start of each segment
+            uint16_t dur = uint16_t(std::round(minDur + normalized * (maxDur - minDur)));
+            durations.push_back(clamp<uint16_t>(dur, minDur, maxDur));
+        }
+        adjustDurationsToQuantum(durations);
+        applyDurations(durations, label);
     };
 
     switch (WaveformContextAction(index)) {
@@ -1627,8 +1715,12 @@ void IndexedSequenceEditPage::waveformContextAction(int index) {
         applyTriangle(3, "3TRI");
         break;
     }
-    case WaveformContextAction::Triangle5: {
-        applyTriangle(5, "5TRI");
+    case WaveformContextAction::Saw2: {
+        applySaw(2, "2SAW");
+        break;
+    }
+    case WaveformContextAction::Saw3: {
+        applySaw(3, "3SAW");
         break;
     }
     case WaveformContextAction::Last:

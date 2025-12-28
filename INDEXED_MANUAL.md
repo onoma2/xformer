@@ -357,7 +357,8 @@ Macros provide powerful generative and transformative operations on sequences. A
 - **TRI**: Single triangle dip (shorter in the middle, longer at the ends)
 - **2TRI**: Two triangle dips across the range
 - **3TRI**: Three triangle dips across the range
-- **5TRI**: Five triangle dips across the range
+- **2SAW**: Two saw ramps (short at the start of each segment)
+- **3SAW**: Three saw ramps (short at the start of each segment)
 
 **Page+Step 6 - Melodic Generators** (YELLOW LED):
 - **SCALE**: Scale fill generator - ascending/descending major scale
@@ -381,7 +382,7 @@ Macros provide powerful generative and transformative operations on sequences. A
 - Combine multiple macros for complex generative results
 - Rhythm generators distribute 768 ticks as evenly as possible, set note index to 0, and gate to minimum ticks
 - Melodic generators primarily affect note indices
-- Waveforms apply to Duration only and clamp to 8..192 ticks
+- Waveforms apply to Duration only, clamp to 8..192 ticks, and quantize total to a multiple of 96
 
 ### 9.4 Editing Tips
 

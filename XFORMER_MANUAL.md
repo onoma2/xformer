@@ -205,7 +205,8 @@ Macros provide powerful generative and transformative operations on sequences. A
 - **TRI**: Single triangle dip (shorter in the middle, longer at the ends)
 - **2TRI**: Two triangle dips across the range
 - **3TRI**: Three triangle dips across the range
-- **5TRI**: Five triangle dips across the range
+- **2SAW**: Two saw ramps (short at the start of each segment)
+- **3SAW**: Three saw ramps (short at the start of each segment)
 
 **Page+Step 6 - Melodic Generators** (YELLOW LED):
 - **SCALE**: Scale fill generator
@@ -363,11 +364,25 @@ The signal path has been expanded to include Chaos, Wavefolding, and Filtering.
 A generative engine inserted *before* the wavefolder.
 
 - **Access**: Press **F5** to cycle to **CHAOS**.
-- **Toggle Algorithm**: Hold **Shift + F1** to switch between **Latoocarfian** (Stepped/Sample&Hold) and **Lorenz** (Smooth/Attractor).
 - **Controls**:
-  - **AMT**: Modulation depth.
-  - **HZ**: Evolution speed.
-  - **P1/P2**: Algorithm-specific shape parameters.
+  - **AMT**: Modulation depth (0-100%).
+  - **HZ**: Evolution speed (0.01Hz-50Hz).
+  - **P1**: Algorithm-specific parameter 1 (0-100, default: 50).
+  - **P2**: Algorithm-specific parameter 2 (0-100, default: 50).
+
+#### 6.2.1 Chaos Range Offset
+- **Function**: Shifts the centerpoint of chaos wiggling within the voltage range.
+- **Access**: Hold **Shift + F1** to cycle through range modes.
+- **Modes**:
+  - **Mid**: Wiggles around centerpoint (0V for bipolar ranges, +2.5V for unipolar 5V).
+  - **Below**: Wiggles around bottom quarter (e.g., -2.5V for bipolar 5V, peaks at 0V, bottoms at -5V).
+  - **Above**: Wiggles around top quarter (e.g., +2.5V for bipolar 5V, dips to 0V, peaks at +5V).
+- **Use Case**: Asymmetric chaos modulation - chaos affects only positive or negative swings when mixed with bipolar shapes.
+
+#### 6.2.2 Chaos Algorithms
+- **Toggle**: Hold **Shift + F2** to switch between algorithms.
+- **Latoocarfian**: Stepped/Sample&Hold character, chaotic jumps.
+- **Lorenz**: Smooth/Attractor character, flowing modulation.
 
 ### 6.3 Advanced Playback
 

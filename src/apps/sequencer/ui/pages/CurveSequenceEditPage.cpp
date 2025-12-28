@@ -303,22 +303,26 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
         const int barHeight = 4;
         const int barWidth = 40;
 
-        // Draw Algo Name below "AMT"
+        // Draw Range offset below "AMT" (column 0)
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Medium);
-        // Assuming "AMT" is at index 0 (x=0)
-        // Center text under the bar
+        FixedStringBuilder<16> rangeName;
+        sequence.printChaosRange(rangeName);
+        int rangeX = 0 + (colWidth - canvas.textWidth(rangeName)) / 2;
+        canvas.drawText(rangeX, 44, rangeName);
+
+        // Draw Algo Name below "HZ" (column 1)
         if (sequence.chaosAlgo() == CurveSequence::ChaosAlgorithm::Latoocarfian) {
              const char* line1 = "Latoo-";
              const char* line2 = "carfian";
-             int x1 = 0 + (colWidth - canvas.textWidth(line1)) / 2;
-             int x2 = 0 + (colWidth - canvas.textWidth(line2)) / 2;
+             int x1 = colWidth + (colWidth - canvas.textWidth(line1)) / 2;
+             int x2 = colWidth + (colWidth - canvas.textWidth(line2)) / 2;
              canvas.drawText(x1, 44, line1);
              canvas.drawText(x2, 50, line2);
         } else {
             FixedStringBuilder<16> algoName;
             sequence.printChaosAlgo(algoName);
-            int algoX = 0 + (colWidth - canvas.textWidth(algoName)) / 2;
+            int algoX = colWidth + (colWidth - canvas.textWidth(algoName)) / 2;
             canvas.drawText(algoX, 44, algoName);
         }
 
@@ -663,7 +667,12 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
         int function = key.function();
         if (function >= 0 && function < 4) {
             if (key.shiftModifier() && function == 0) {
-                // Toggle Algo on Shift + F1
+                // Cycle Range Offset on Shift + F1
+                auto range = sequence.chaosRange();
+                auto newRange = CurveSequence::ChaosRange((int(range) + 1) % int(CurveSequence::ChaosRange::Last));
+                sequence.setChaosRange(newRange);
+            } else if (key.shiftModifier() && function == 1) {
+                // Cycle Algo on Shift + F2
                 auto algo = sequence.chaosAlgo();
                 auto newAlgo = CurveSequence::ChaosAlgorithm((int(algo) + 1) % int(CurveSequence::ChaosAlgorithm::Last));
                 sequence.setChaosAlgo(newAlgo);
@@ -1214,9 +1223,10 @@ void CurveSequenceEditPage::initSettings() {
     } else if (_editMode == EditMode::Chaos) {
         sequence.setChaosAmount(0);
         sequence.setChaosRate(0);
-        sequence.setChaosParam1(0);
-        sequence.setChaosParam2(0);
+        sequence.setChaosParam1(50);
+        sequence.setChaosParam2(50);
         sequence.setChaosAlgo(CurveSequence::ChaosAlgorithm::Latoocarfian);
+        sequence.setChaosRange(CurveSequence::ChaosRange::Mid);
         showMessage("CHAOS INITIALIZED");
     }
 }
@@ -1235,6 +1245,7 @@ void CurveSequenceEditPage::randomizeSettings() {
         sequence.setChaosParam1(rng.nextRange(101));
         sequence.setChaosParam2(rng.nextRange(101));
         sequence.setChaosAlgo(CurveSequence::ChaosAlgorithm(rng.nextRange(int(CurveSequence::ChaosAlgorithm::Last))));
+        sequence.setChaosRange(CurveSequence::ChaosRange(rng.nextRange(int(CurveSequence::ChaosRange::Last))));
         showMessage("CHAOS RANDOMIZED");
     }
 }
@@ -1254,6 +1265,7 @@ void CurveSequenceEditPage::copySettings() {
     // We should update the Clipboard struct to use CurveSequence::ChaosAlgorithm.
     // For now, casting is safe as they are identical.
     _settingsClipboard.chaosAlgo = sequence.chaosAlgo();
+    _settingsClipboard.chaosRange = sequence.chaosRange();
     showMessage("SETTINGS COPIED");
 }
 
@@ -1268,6 +1280,7 @@ void CurveSequenceEditPage::pasteSettings() {
     sequence.setChaosParam1(_settingsClipboard.chaosParam1);
     sequence.setChaosParam2(_settingsClipboard.chaosParam2);
     sequence.setChaosAlgo(_settingsClipboard.chaosAlgo);
+    sequence.setChaosRange(_settingsClipboard.chaosRange);
     showMessage("SETTINGS PASTED");
 }
 

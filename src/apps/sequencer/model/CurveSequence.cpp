@@ -197,9 +197,10 @@ void CurveSequence::clear() {
     
     setChaosAmount(0);
     setChaosAlgo(ChaosAlgorithm::Latoocarfian);
+    setChaosRange(ChaosRange::Mid);
     setChaosRate(0);
-    setChaosParam1(0);
-    setChaosParam2(0);
+    setChaosParam1(50);
+    setChaosParam2(50);
 
     clearSteps();
 }
@@ -259,6 +260,7 @@ void CurveSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_chaosParam1.base);
     writer.write(_chaosParam2.base);
     writer.write(_chaosAlgo);
+    writer.write(_chaosRange);
 
     writeArray(writer, _steps);
 }
@@ -284,6 +286,7 @@ void CurveSequence::read(VersionedSerializedReader &reader) {
     reader.read(_chaosParam1.base);
     reader.read(_chaosParam2.base);
     reader.read(_chaosAlgo);
+    reader.read(_chaosRange);
 
     readArray(reader, _steps);
 }

@@ -353,6 +353,23 @@ public:
         return nullptr;
     }
 
+    enum class ChaosRange : uint8_t {
+        Mid,    // 0.5 offset (wiggles around center)
+        Below,  // 0.25 offset (wiggles around bottom quarter)
+        Above,  // 0.75 offset (wiggles around top quarter)
+        Last
+    };
+
+    static const char *chaosRangeName(ChaosRange range) {
+        switch (range) {
+        case ChaosRange::Mid:   return "Mid";
+        case ChaosRange::Below: return "Below";
+        case ChaosRange::Above: return "Above";
+        case ChaosRange::Last: break;
+        }
+        return nullptr;
+    }
+
     // wavefolderFold
 
     float wavefolderFold() const { return _wavefolderFold.get(isRouted(Routing::Target::WavefolderFold)); }
@@ -433,6 +450,11 @@ public:
     void setChaosAlgo(ChaosAlgorithm algo) { _chaosAlgo = ModelUtils::clampedEnum(algo); }
     void editChaosAlgo(int value, bool shift) { setChaosAlgo(ModelUtils::adjustedEnum(chaosAlgo(), value)); }
     void printChaosAlgo(StringBuilder &str) const { str(chaosAlgorithmName(chaosAlgo())); }
+
+    ChaosRange chaosRange() const { return _chaosRange; }
+    void setChaosRange(ChaosRange range) { _chaosRange = ModelUtils::clampedEnum(range); }
+    void editChaosRange(int value, bool shift) { setChaosRange(ModelUtils::adjustedEnum(chaosRange(), value)); }
+    void printChaosRange(StringBuilder &str) const { str(chaosRangeName(chaosRange())); }
 
     int chaosRate() const { return _chaosRate.get(isRouted(Routing::Target::ChaosRate)); }
     void setChaosRate(int value, bool routed = false) {
@@ -590,6 +612,7 @@ private:
 
     Routable<int> _chaosAmount;
     ChaosAlgorithm _chaosAlgo;
+    ChaosRange _chaosRange;
     Routable<int> _chaosRate;
     Routable<int> _chaosParam1;
     Routable<int> _chaosParam2;

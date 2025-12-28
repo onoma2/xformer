@@ -88,6 +88,7 @@ private:
         int chaosParam1;
         int chaosParam2;
         CurveSequence::ChaosAlgorithm chaosAlgo;
+        CurveSequence::ChaosRange chaosRange;
     };
 
     static SettingsClipboard _settingsClipboard;

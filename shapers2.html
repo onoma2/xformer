@@ -98,43 +98,50 @@
     <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
 
         <!-- Controls Sidebar -->
-        <aside class="w-full lg:w-80 bg-[#18181b] border-r border-gray-800 p-6 overflow-y-auto flex-shrink-0 z-10 custom-scrollbar">
-
-            <!-- Source Control -->
-            <div class="mb-8">
-                <div class="flex items-center gap-2 mb-4 text-emerald-400 font-bold uppercase text-[10px] tracking-widest">
-                    <!-- Icon: Activity -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                    1. Signal Source
+        <aside class="w-full lg:w-80 bg-[#18181b] border-r border-gray-800 p-5 overflow-y-auto flex-shrink-0 z-10 custom-scrollbar space-y-6">
+            
+            <!-- 1. SIGNAL GENERATION (Curve Track Stage) -->
+            <div class="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5 shadow-inner mb-6">
+                <div class="flex items-center gap-2 mb-5 text-orange-400 font-bold uppercase text-[10px] tracking-widest border-b border-orange-500/10 pb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    1. Signal Generation
                 </div>
-                <div class="space-y-4">
+
+                <div class="space-y-5">
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1.5 font-medium">Waveform Type</label>
-                        <select id="waveformSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2.5 text-sm text-gray-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all">
-                            <option value="bipolarSine">Bipolar Sine LFO (-5V to +5V)</option>
-                            <option value="bipolarTriangle">Bipolar Triangle LFO (-5V to +5V)</option>
-                            <option value="bipolarSaw">Bipolar Sawtooth LFO (-5V to +5V)</option>
-                            <option value="unipolarAdsr">Unipolar ADSR Envelope (0V to +5V)</option>
+                        <label class="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-tighter">Waveform Type</label>
+                        <select id="waveformSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-all">
+                            <option value="bipolarSine">Bipolar Sine LFO</option>
+                            <option value="bipolarTriangle">Bipolar Triangle LFO</option>
+                            <option value="bipolarSaw">Bipolar Sawtooth LFO</option>
+                            <option value="unipolarAdsr">Unipolar ADSR Envelope</option>
                         </select>
                     </div>
 
-                    <!-- Chaos System -->
-                    <div class="mt-6 border-t border-gray-800 pt-6">
-                        <div class="flex items-center gap-2 mb-4 text-orange-400 font-bold uppercase text-[10px] tracking-widest">
-                            <!-- Icon: Shuffle -->
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+                    <div>
+                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                            <span>Step Length (Divisor)</span>
+                            <span id="divisorVal" class="text-white bg-gray-800 px-1.5 py-0.5 rounded">48 (1/4)</span>
+                        </label>
+                        <!-- Divisor range: 6 (1/32t) to 192 (1 bar) -->
+                        <input type="range" id="divisorSlider" min="6" max="192" step="6" value="48">
+                    </div>
+
+                    <!-- Chaos Engine Sub-Block -->
+                    <div class="mt-4 pt-4 border-t border-orange-500/10">
+                        <div class="flex items-center gap-2 mb-3 text-orange-400/70 font-bold uppercase text-[9px] tracking-widest">
                             Chaos Engine
                         </div>
 
-                        <div class="mb-4">
-                            <label class="block text-xs text-gray-500 mb-1.5 font-medium">Chaos Algorithm</label>
-                            <select id="chaosSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2.5 text-sm text-gray-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-all">
-                                <option value="latoocarfian">Latoocarfian</option>
-                                <option value="lorenz">Lorenz Attractor</option>
-                            </select>
-                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1.5 font-medium">Algorithm</label>
+                                <select id="chaosSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-orange-500 focus:outline-none">
+                                    <option value="latoocarfian">Latoocarfian</option>
+                                    <option value="lorenz">Lorenz Attractor</option>
+                                </select>
+                            </div>
 
-                        <div id="chaosControls" class="space-y-4">
                             <!-- Mix Slider -->
                             <div>
                                 <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
@@ -147,7 +154,6 @@
                                 </div>
                             </div>
 
-                            <!-- Chaos Rate Slider -->
                             <div>
                                 <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
                                     <span>Chaos Rate (Hz)</span>
@@ -156,89 +162,60 @@
                                 <input type="range" id="chaosSpeedSlider" min="0.01" max="10" step="0.01" value="1.0">
                             </div>
 
-                            <!-- P1 / P2 Params -->
-                            <div class="p-3 bg-orange-500/5 border border-orange-500/20 rounded">
-                                <div class="mb-3">
-                                    <label class="flex justify-between text-xs text-gray-400 mb-1.5 font-medium">
-                                        <span>Param 1 (Structure)</span>
-                                        <span id="p1Val" class="text-orange-400 font-bold">50%</span>
-                                    </label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[10px] text-gray-600 mb-1 font-medium">Param 1</label>
                                     <input type="range" id="p1Slider" min="0" max="100" value="50">
                                 </div>
                                 <div>
-                                    <label class="flex justify-between text-xs text-gray-400 mb-1.5 font-medium">
-                                        <span>Param 2 (Complexity)</span>
-                                        <span id="p2Val" class="text-orange-400 font-bold">50%</span>
-                                    </label>
+                                    <label class="block text-[10px] text-gray-600 mb-1 font-medium">Param 2</label>
                                     <input type="range" id="p2Slider" min="0" max="100" value="50">
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Flow Arrow -->
+            <div class="flex justify-center -my-2 opacity-30 mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+            </div>
+
+            <!-- 
+            ========================================================================
+            DO NOT EDIT ROUTE PROCESSING SECTION BELOW
+            MATHEMATICAL MODEL AND UI ARE FINAL AND SYNCED WITH C++
+            ========================================================================
+            -->
+
+            <!-- 2. ROUTE PROCESSING (Routing Engine Stage) -->
+            <div class="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 shadow-inner">
+                <div class="flex items-center gap-2 mb-5 text-blue-400 font-bold uppercase text-[10px] tracking-widest border-b border-blue-500/10 pb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>
+                    2. Route Processing
+                </div>
+
+                <div class="space-y-5">
+                    <div>
+                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                            <span>Depth (Scale)</span>
+                            <span id="depthVal" class="text-blue-400 font-bold bg-blue-400/10 px-1.5 py-0.5 rounded">100%</span>
+                        </label>
+                        <input type="range" id="depthSlider" min="-100" max="100" value="100">
+                    </div>
 
                     <div>
                         <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                            <span>Source Frequency</span>
-                            <span id="speedVal" class="text-white bg-gray-800 px-1.5 py-0.5 rounded">1.0x</span>
+                            <span>Bias (Offset)</span>
+                            <span id="biasVal" class="text-blue-400 font-bold bg-blue-400/10 px-1.5 py-0.5 rounded">0%</span>
                         </label>
-                        <input type="range" id="speedSlider" min="0.1" max="10" step="0.1" value="1">
+                        <input type="range" id="biasSlider" min="-75" max="75" value="0">
                     </div>
-                </div>
-            </div>
 
-            <hr class="border-gray-800 mb-8 opacity-50">
-
-            <!-- Bias/Depth Control -->
-            <div class="mb-8">
-                <div class="flex items-center gap-2 mb-4 text-blue-400 font-bold uppercase text-[10px] tracking-widest">
-                    <!-- Icon: Sliders -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>
-                    2. Bias & Depth
-                </div>
-
-                <!-- Depth -->
-                <div class="mb-5">
-                    <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                        <span>Depth (Scale)</span>
-                        <span id="depthVal" class="text-blue-400 font-bold bg-blue-400/10 px-1.5 py-0.5 rounded">100%</span>
-                    </label>
-                    <div class="relative h-6 flex items-center">
-                        <div class="absolute w-full h-1 bg-gray-800 rounded"></div>
-                        <div class="absolute w-0.5 h-3 bg-gray-600 left-1/2 -ml-[1px]"></div> <!-- Center marker -->
-                        <input type="range" id="depthSlider" min="-100" max="100" value="100" class="relative z-10">
-                    </div>
-                    <p class="text-[10px] text-gray-600 mt-1">Scales amplitude around center (0.5). Negative inverts.</p>
-                </div>
-
-                <!-- Bias -->
-                <div>
-                    <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                        <span>Bias (Offset)</span>
-                        <span id="biasVal" class="text-blue-400 font-bold bg-blue-400/10 px-1.5 py-0.5 rounded">0%</span>
-                    </label>
-                    <div class="relative h-6 flex items-center">
-                        <div class="absolute w-full h-1 bg-gray-800 rounded"></div>
-                        <div class="absolute w-0.5 h-3 bg-gray-600 left-1/2 -ml-[1px]"></div> <!-- Center marker -->
-                        <input type="range" id="biasSlider" min="-75" max="75" value="0" class="relative z-10">
-                    </div>
-                    <p class="text-[10px] text-gray-600 mt-1">Shifts entire signal up or down.</p>
-                </div>
-            </div>
-
-            <hr class="border-gray-800 mb-8 opacity-50">
-
-            <!-- Shaper Control -->
-            <div class="mb-8">
-                <div class="flex items-center gap-2 mb-4 text-purple-400 font-bold uppercase text-[10px] tracking-widest">
-                    <!-- Icon: Zap -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    3. Shaper Processing
-                </div>
-
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-1.5 font-medium">Shaper Mode</label>
-                        <select id="shaperSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2.5 text-sm text-gray-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none transition-all">
+                    <div class="pt-4 border-t border-blue-500/10">
+                        <label class="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-tighter">Shaper Mode</label>
+                        <select id="shaperSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none transition-all">
                             <option value="none">None (Pass-through)</option>
                             <option value="crease">Crease (Fold at 0.5)</option>
                             <option value="triangleFold">Triangle Fold</option>
@@ -251,21 +228,25 @@
                         </select>
                     </div>
 
-                    <!-- Dynamic Shaper Description -->
-                    <div id="shaperDesc" class="p-3 bg-[#202025] rounded border border-gray-800 text-xs text-gray-400 leading-relaxed">
+                    <div id="shaperDesc" class="p-3 bg-[#202025] rounded border border-gray-800 text-[10px] text-gray-400 leading-relaxed italic">
                         Passes the signal through unchanged.
                     </div>
 
-                    <!-- Extra Control for VCA Next -->
                     <div id="vcaControl" class="hidden pt-2 p-3 bg-purple-500/5 border border-purple-500/20 rounded">
                         <label class="flex justify-between text-xs text-gray-400 mb-2 font-medium">
-                            <span>Modulator Speed (Simulated Sine)</span>
+                            <span>VCA Modulator Speed</span>
                             <span id="vcaVal" class="text-purple-400 font-bold">1.0x</span>
                         </label>
                         <input type="range" id="vcaSlider" min="0.1" max="10.0" step="0.1" value="1.0">
                     </div>
                 </div>
             </div>
+
+            <!-- 
+            ========================================================================
+            END OF ROUTE PROCESSING SECTION
+            ========================================================================
+            -->
 
             <button id="resetBtn" class="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-widest rounded border border-gray-700 hover:border-gray-600 transition-all">
                 Reset All Parameters
@@ -364,7 +345,7 @@
         // State & Configuration
         const config = {
             waveform: 'bipolarSine',
-            speed: 1.0,
+            divisor: 48, // Replaces speed. Default 48 (1/4 note)
             depth: 100, // percentage
             bias: 0,    // percentage
             shaper: 'none',
@@ -463,7 +444,8 @@
 
             // Calibration: 1 Hz means 1 cycle per second.
             // At 60fps, step size = 1.0 / 60.0 = 0.01666...
-            const frameRateScalar = 0.01666;
+            // Reduced by 10x for slow visualization
+            const frameRateScalar = 0.001666;
 
             if (type === 'latoocarfian') {
                 // Latoocarfian advances phase by rate * dt
@@ -493,8 +475,9 @@
                 
                 // Normalize output
                 const maxVal = 1.0 + Math.abs(0.5 + (config.p2/100.0) * 2.5);
-                const normLatoo = clamp(shaperState.latooX / maxVal, -1.0, 1.0);
-                return (normLatoo + 1.0) * 0.5;
+                // Return normalized X (0..1)
+                const x = clamp(shaperState.latooX / maxVal, -1.0, 1.0);
+                return (x + 1.0) * 0.5;
             }
 
             if (type === 'lorenz') {
@@ -507,13 +490,8 @@
                 const beta = 0.5 + p2 * 3.5;
                 
                 // Lorenz integration time step
-                // In C++, dt is 0.001 (1ms). At 60fps, we simulate a larger chunk of time per frame?
-                // Or simply map speed so it looks right.
-                // If we want "Hz" to mean "Speed Multiplier" for the integration:
-                // C++: next(dt * speed, ...) where dt=0.001.
-                // To match visual speed, let's treat "1 Hz" as "Standard Speed".
-                // We'll use a fixed visual dt scaled by Hz.
-                const dt = 0.005 * config.chaosHz;
+                // Reduced by 10x: 0.005 -> 0.0005
+                const dt = 0.0005 * config.chaosHz;
 
                 const dx = sigma * (shaperState.lorenzY - shaperState.lorenzX);
                 const dy = shaperState.lorenzX * (rho - shaperState.lorenzZ) - shaperState.lorenzY;
@@ -524,6 +502,7 @@
                 shaperState.lorenzZ += dz * dt;
 
                 // Output scaling
+                // Return normalized X (0..1)
                 const lorenzOut = clamp(shaperState.lorenzX * 0.045, -1.0, 1.0);
                 return (lorenzOut + 1.0) * 0.5;
             }
@@ -681,8 +660,9 @@
                     // Output Slew - adjusted for 60fps from C++ value
                     // At high input frequencies, we may need faster slewing to follow rapid changes
                     const baseSlew = 0.017; // Approximately 0.001*(1000/60) for equivalent time constant
-                    // Adjust slew based on input speed to reduce flickering at high frequencies
-                    const adjustedSlew = Math.min(baseSlew * config.speed, 0.1); // Cap at 0.1 to prevent instability
+                    // Adjust slew based on input speed (inferred from divisor) to reduce flickering
+                    const effectiveSpeed = 48.0 / config.divisor;
+                    const adjustedSlew = Math.min(baseSlew * effectiveSpeed, 0.1); // Cap at 0.1 to prevent instability
                     shaperState.progOutSlewed += (shaperState.progOut - shaperState.progOutSlewed) * adjustedSlew;
                     return shaperState.progOutSlewed;
 
@@ -719,13 +699,18 @@
             // Clear entire canvas including high-dpi overdraw areas
             ctx.clearRect(0, 0, w, h);
 
-            // Time Step for main signal
-            const timeStep = 0.01 * config.speed;
+            // Time Step for main signal (Curve Track)
+            // Divisor 48 = 1/4 note. At 120BPM, 1/4 note = 0.5s.
+            // At 60fps, 0.5s = 30 frames.
+            // So we want 1 cycle per 30 frames at Divisor 48.
+            // Phase increment = 1.0 / 30 = 0.0333... (calibrated for 120BPM @ 60fps)
+            // Reduced by 10x for slower visualization
+            const timeStep = (48.0 / config.divisor) * 0.00333;
             time += timeStep;
 
             // Time Step for VCA Modulator (Independent)
-            // Using 0.02 base for visible modulation
-            modTime += 0.02 * config.vcaSpeed;
+            // Reduced by 10x
+            modTime += 0.002 * config.vcaSpeed;
 
             // Calculate Modulator (Simulated "Next Route" Sine Wave)
             config.currentVcaVal = (Math.sin(modTime) + 1.0) * 0.5;
@@ -742,6 +727,8 @@
 
             const biasNormalized = config.bias * 0.01;
             const intermediate = applyBiasDepthToSource(rawSrc, config.bias, config.depth);
+            // Pass effective speed to shaper if needed (e.g. for slew rate adjustment)
+            // For now, shaper slew uses fixed constants optimized for 60fps
             const final = applyShaper(config.shaper, intermediate, biasNormalized);
 
             // Update Buffers
@@ -878,9 +865,19 @@
             document.getElementById('p2Val').textContent = config.p2 + "%";
         });
 
-        document.getElementById('speedSlider').addEventListener('input', (e) => {
-            config.speed = parseFloat(e.target.value);
-            document.getElementById('speedVal').textContent = config.speed.toFixed(1) + "x";
+        document.getElementById('divisorSlider').addEventListener('input', (e) => {
+            config.divisor = parseInt(e.target.value);
+            
+            // Format display
+            let text = config.divisor;
+            if (config.divisor === 6) text += " (1/32t)";
+            else if (config.divisor === 12) text += " (1/16)";
+            else if (config.divisor === 24) text += " (1/8)";
+            else if (config.divisor === 48) text += " (1/4)";
+            else if (config.divisor === 96) text += " (1/2)";
+            else if (config.divisor === 192) text += " (1 Bar)";
+            
+            document.getElementById('divisorVal').textContent = text;
         });
 
         document.getElementById('depthSlider').addEventListener('input', (e) => {
@@ -929,9 +926,10 @@
             const inputs = [
                 {id: 'depthSlider', val: 100},
                 {id: 'biasSlider', val: 0},
-                {id: 'speedSlider', val: 1},
+                {id: 'divisorSlider', val: 48},
                 {id: 'shaperSelect', val: 'none'},
                 {id: 'waveformSelect', val: 'bipolarSine'},
+                {id: 'chaosSelect', val: 'latoocarfian'},
                 {id: 'chaosMixSlider', val: 0},
                 {id: 'chaosSpeedSlider', val: 1.0},
                 {id: 'p1Slider', val: 50},

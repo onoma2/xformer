@@ -211,7 +211,13 @@ Both playback modes feed into the same signal processing chain:
        │     ├──> Get chaos value (-1.0 to +1.0)
        │     │     └─> Latoocarfian or Lorenz
        │     │
-       │     ├──> normalizedChaos = (chaos + 1.0) × 0.5
+       │     ├──> normalizedChaos = (chaos + 1.0) × 0.5  (0.0-1.0)
+       │     │
+       │     ├──> Apply range offset:
+       │     │     └─> Below: -0.25  (wiggles around 0.25)
+       │     │     └─> Mid:    0.0   (wiggles around 0.5)
+       │     │     └─> Above: +0.25  (wiggles around 0.75)
+       │     │
        │     └──> value = value × (1 - amt) + chaos × amt
        │
        ▼
@@ -408,35 +414,49 @@ The combination of quality limiting and 1kHz interpolation ensures clean output:
 A generative engine inserted *before* the wavefolder.
 
 - **Access**: Press **F5** to cycle to **CHAOS**.
-- **Toggle Algorithm**: Hold **Shift + F1** to switch between **Latoocarfian** (Stepped/Sample&Hold) and **Lorenz** (Smooth/Attractor).
 - **Controls**:
-  - **AMT**: Modulation depth.
-  - **HZ**: Evolution speed.
-  - **P1/P2**: Algorithm-specific shape parameters.
+  - **AMT**: Modulation depth (0-100%).
+  - **HZ**: Evolution speed (0.01Hz-50Hz).
+  - **P1**: Algorithm-specific parameter 1 (0-100, default: 50).
+  - **P2**: Algorithm-specific parameter 2 (0-100, default: 50).
 
-## 4. Advanced Playback
+### 4.1 Chaos Range Offset
+- **Function**: Shifts the centerpoint of chaos wiggling within the voltage range.
+- **Access**: Hold **Shift + F1** to cycle through range modes.
+- **Modes**:
+  - **Mid**: Wiggles around centerpoint (0V for bipolar ranges, +2.5V for unipolar 5V).
+  - **Below**: Wiggles around bottom quarter (e.g., -2.5V for bipolar 5V, peaks at 0V, bottoms at -5V).
+  - **Above**: Wiggles around top quarter (e.g., +2.5V for bipolar 5V, dips to 0V, peaks at +5V).
+- **Use Case**: Asymmetric chaos modulation - chaos affects only positive or negative swings when mixed with bipolar shapes.
 
-### 4.1 Global Phase
+### 4.2 Chaos Algorithms
+- **Toggle**: Hold **Shift + F2** to switch between algorithms.
+- **Latoocarfian**: Stepped/Sample&Hold character, chaotic jumps.
+- **Lorenz**: Smooth/Attractor character, flowing modulation.
+
+## 5. Advanced Playback
+
+### 5.1 Global Phase
 - **Function**: Offsets the playback position of the sequence (0-100%).
 - **Access**: Press **F5** to cycle to **PHASE**.
 - **Use Case**: Phase-shifting LFOs, canon effects, fine-tuning timing.
 
-### 4.2 True Reverse Playback
+### 5.2 True Reverse Playback
 The engine now supports "True Reverse" playback for shapes.
 - **Backward Mode**: Steps play in reverse order (4, 3, 2...), AND the internal shape plays backwards (100% -> 0%).
 - **Pendulum/PingPong**: Shapes play forward on the "up" phase and backward on the "down" phase, creating perfectly smooth loops.
 
-### 4.3 Min/Max Inversion
+### 5.3 Min/Max Inversion
 You can now create inverted signal windows by setting **Min > Max**.
 - **Normal**: Min=0, Max=255 (Signal goes UP).
 - **Inverted**: Min=255, Max=0 (Signal goes DOWN).
 - **Step**: The step shape scales from "Start" (Min) to "End" (Max).
 
-## 5. Curve Studio Workflow
+## 6. Curve Studio Workflow
 
 Curve Studio introduces powerful context menus for populating sequences.
 
-### 5.1 LFO Menu (Step 6)
+### 6.1 LFO Menu (Step 6)
 Populate steps with single-cycle waveforms. Defaults to active loop range or selection.
 
 - **Access**: Press **Page + Step 6** (Button 6).
@@ -447,7 +467,7 @@ Populate steps with single-cycle waveforms. Defaults to active loop range or sel
   - **SQUA**: Square / Pulse (1 cycle/step).
   - **MM-RND**: Randomize Min/Max values for each step (supports inversion).
 
-### 5.2 Macro Shape Menu (Step 5)
+### 6.2 Macro Shape Menu (Step 5)
 "Draw" complex shapes that span multiple steps. Automatically handles selection logic (Single step -> to end of loop).
 
 - **Access**: Press **Page + Step 5** (Button 5).
@@ -458,7 +478,7 @@ Populate steps with single-cycle waveforms. Defaults to active loop range or sel
   - **M-BOUNCE**: **Bouncing Ball** physics (Decaying absolute sines).
   - **M-RSTR**: **Rasterize**. Stretches the shape of the *first step* across the entire range.
 
-### 5.3 Transform Menu (Step 7)
+### 6.3 Transform Menu (Step 7)
 Manipulate existing sequence data.
 
 - **Access**: Press **Page + Step 7** (Button 7).
@@ -469,7 +489,7 @@ Manipulate existing sequence data.
   - **T-ALGN**: **Align**. Ensures continuity by setting `Min = previous Max`.
   - **T-WALK**: **Smooth Walk**. Generates a continuous random path ("Drunken Sine").
 
-### 5.4 Gate Presets Menu (Step 15)
+### 6.4 Gate Presets Menu (Step 15)
 Quickly assign dynamic gate behaviors based on the curve slope or levels.
 
 - **Access**: Press **Page + Step 15** (Button 15).
@@ -480,12 +500,12 @@ Quickly assign dynamic gate behaviors based on the curve slope or levels.
   - **FALLING**: Gate HIGH while voltage is decreasing.
   - **>50%**: **Comparator**. Gate HIGH when voltage is in the top half of the range.
 
-## 6. Shortcuts & Gestures
+## 7. Shortcuts & Gestures
 
-### 6.1 Double-Click Toggles
+### 7.1 Double-Click Toggles
 - **Note Track**: Double-click a step button to toggle the Gate (on any non-gate layer).
 - **Curve Track**: Double-click a step button to toggle the **Peak+Trough** gate preset.
 
-### 6.2 Multi-Step Gradient Editing
+### 7.2 Multi-Step Gradient Editing
 - **Action**: Select multiple steps, hold **Shift** and turn the Encoder on **MIN** or **MAX**.
 - **Result**: Creates a linear ramp of values from the first selected step to the last.
