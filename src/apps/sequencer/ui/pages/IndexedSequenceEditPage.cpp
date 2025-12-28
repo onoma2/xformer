@@ -767,9 +767,28 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
             // Groups mode: F1-F4 toggle group membership (A-D)
             if (fn >= 0 && fn < 4) {
                 auto &sequence = _project.selectedIndexedSequence();
-                for (int i = 0; i < IndexedSequence::MaxSteps; ++i) {
-                    if (_stepSelection[i]) {
-                        sequence.step(i).toggleGroup(fn);
+
+                if (_stepSelection.any()) {
+                    // Steps selected: toggle group membership
+                    for (int i = 0; i < IndexedSequence::MaxSteps; ++i) {
+                        if (_stepSelection[i]) {
+                            sequence.step(i).toggleGroup(fn);
+                        }
+                    }
+                } else {
+                    // No steps selected: select all steps in this group
+                    int groupBit = (1 << fn);
+                    int selectedCount = 0;
+                    for (int i = 0; i < sequence.activeLength(); ++i) {
+                        if (sequence.step(i).groupMask() & groupBit) {
+                            _stepSelection.select(i);
+                            selectedCount++;
+                        }
+                    }
+                    if (selectedCount > 0) {
+                        FixedStringBuilder<16> msg;
+                        msg("GRP %c: %d", 'A' + fn, selectedCount);
+                        showMessage(msg);
                     }
                 }
             }

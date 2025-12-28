@@ -171,6 +171,11 @@ public:
         return _selected[index];
     }
 
+    void select(int index) {
+        _selected.set(index);
+        _mode = Mode::Persist;
+    }
+
 private:
     int otherPressedStepKey(const KeyState &keyState, int step) const {
         bool found = false;
