@@ -51,12 +51,10 @@ inline void applyDurationModulation(float modValue, uint16_t &duration) {
 }
 
 // Helper: Apply gate length modulation (additive)
-inline void applyGateLengthModulation(float modValue, uint16_t &gatePercent) {
-    if (gatePercent == IndexedSequence::GateLengthTrigger) {
-        return; // Preserve trigger sentinel
-    }
-    int newGate = static_cast<int>(gatePercent + modValue);
-    gatePercent = clamp(newGate, 0, int(IndexedSequence::GateLengthTrigger));
+inline void applyGateLengthModulation(float modValue, uint16_t &gateValue, uint16_t durationTicks) {
+    int ticks = int(IndexedSequence::gateTicks(gateValue, durationTicks));
+    int newTicks = ticks + int(std::lround(modValue));
+    gateValue = IndexedSequence::gateEncodeTicksForDuration(newTicks, durationTicks);
 }
 
 // Helper: Apply note index modulation (additive, semitone transpose)
@@ -75,7 +73,7 @@ inline void applyStepModulation(
     bool combineMode,
     IndexedSequence::RouteCombineMode combineType,
     uint16_t &duration,
-    uint16_t &gatePercent,
+    uint16_t &gateValue,
     int8_t &note)
 {
     // Calculate modulation values from each route
@@ -114,7 +112,7 @@ inline void applyStepModulation(
             applyDurationModulation(finalMod, duration);
             break;
         case IndexedSequence::ModTarget::GateLength:
-            applyGateLengthModulation(finalMod, gatePercent);
+            applyGateLengthModulation(finalMod, gateValue, duration);
             break;
         case IndexedSequence::ModTarget::NoteIndex:
             applyNoteModulation(finalMod, note);
@@ -326,7 +324,7 @@ void IndexedTrackEngine::triggerStep() {
 
     // Get base values from step
     uint16_t baseDuration = step.duration();
-    uint16_t baseGatePercent = step.gateLength();
+    uint16_t baseGateValue = step.gateLength();
     int8_t baseNote = step.noteIndex();
 
     // Apply route modulation (unified for both combined and sequential modes)
@@ -352,28 +350,21 @@ void IndexedTrackEngine::triggerStep() {
         // Apply modulation for each possible target parameter
         applyStepModulation(IndexedSequence::ModTarget::Duration, routeAValue, routeBValue,
                            routeA, routeB, aActive, bActive, shouldCombine, combineMode,
-                           baseDuration, baseGatePercent, baseNote);
+                           baseDuration, baseGateValue, baseNote);
 
         applyStepModulation(IndexedSequence::ModTarget::GateLength, routeAValue, routeBValue,
                            routeA, routeB, aActive, bActive, shouldCombine, combineMode,
-                           baseDuration, baseGatePercent, baseNote);
+                           baseDuration, baseGateValue, baseNote);
 
         applyStepModulation(IndexedSequence::ModTarget::NoteIndex, routeAValue, routeBValue,
                            routeA, routeB, aActive, bActive, shouldCombine, combineMode,
-                           baseDuration, baseGatePercent, baseNote);
+                           baseDuration, baseGateValue, baseNote);
     }
 
     // Calculate gate duration in ticks
-    uint32_t gateTicks = 0;
-    if (baseGatePercent == IndexedSequence::GateLengthTrigger) {
-        gateTicks = TRIGGER_PULSE_TICKS;
-    } else {
-        // gateLength is stored as percentage (0-100)
-        // Convert to ticks: (duration * percentage / 100)
-        gateTicks = (baseDuration * baseGatePercent) / 100;
-        if (gateTicks == 0 && baseGatePercent > 0) {
-            gateTicks = 1;  // Minimum 1 tick gate if non-zero percentage
-        }
+    uint32_t gateTicks = IndexedSequence::gateTicks(baseGateValue, baseDuration);
+    if (baseDuration > 0) {
+        gateTicks = std::min<uint32_t>(gateTicks, baseDuration);
     }
 
     // Set gate timer

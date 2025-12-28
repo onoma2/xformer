@@ -14,6 +14,14 @@
 namespace {
 constexpr int kMulDivMax = 400;
 
+void formatGateValue(StringBuilder &str, int gateValue) {
+    if (gateValue <= 0) {
+        str("OFF");
+    } else {
+        str("%d", gateValue);
+    }
+}
+
 const char *targetName(IndexedSequence::ModTarget target) {
     switch (target) {
     case IndexedSequence::ModTarget::Duration:   return "DUR";
@@ -320,7 +328,7 @@ void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathCon
         break;
     }
     case IndexedSequence::ModTarget::GateLength: {
-        int gate = step.gateLength();
+        int gate = IndexedSequence::gateTicks(step.gateLength(), step.duration());
         switch (cfg.op) {
         case MathOp::Add:    gate += cfg.value; break;
         case MathOp::Sub:    gate -= cfg.value; break;
@@ -342,8 +350,8 @@ void IndexedMathPage::applyMathToStep(IndexedSequence::Step &step, const MathCon
             break;
         case MathOp::Last:   break;
         }
-        gate = clamp(gate, 0, int(IndexedSequence::GateLengthTrigger));
-        step.setGateLength(uint16_t(gate));
+        gate = clamp(gate, 0, int(IndexedSequence::GateLengthTicksMax));
+        step.setGateLength(IndexedSequence::gateEncodeTicksForDuration(gate, step.duration()));
         break;
     }
     case IndexedSequence::ModTarget::NoteIndex: {
@@ -432,7 +440,7 @@ int IndexedMathPage::valueMin(const MathConfig &cfg) const {
         case IndexedSequence::ModTarget::Duration:
             return -int(IndexedSequence::MaxDuration);
         case IndexedSequence::ModTarget::GateLength:
-            return -100;
+            return -int(IndexedSequence::GateLengthTicksMax);
         case IndexedSequence::ModTarget::NoteIndex:
             return -64;
         case IndexedSequence::ModTarget::Last:
@@ -456,7 +464,7 @@ int IndexedMathPage::valueMax(const MathConfig &cfg) const {
         case IndexedSequence::ModTarget::Duration:
             return int(IndexedSequence::MaxDuration);
         case IndexedSequence::ModTarget::GateLength:
-            return IndexedSequence::GateLengthTrigger;
+            return IndexedSequence::GateLengthTicksMax;
         case IndexedSequence::ModTarget::NoteIndex:
             return 64;
         case IndexedSequence::ModTarget::Last:
@@ -472,7 +480,7 @@ int IndexedMathPage::valueMax(const MathConfig &cfg) const {
         case IndexedSequence::ModTarget::Duration:
             return int(IndexedSequence::MaxDuration);
         case IndexedSequence::ModTarget::GateLength:
-            return IndexedSequence::GateLengthTrigger;
+            return IndexedSequence::GateLengthTicksMax;
         case IndexedSequence::ModTarget::NoteIndex:
             return 64;
         case IndexedSequence::ModTarget::Last:
@@ -510,9 +518,8 @@ void IndexedMathPage::clampValue(MathConfig &cfg) const {
 void IndexedMathPage::formatValue(const MathConfig &cfg, StringBuilder &str) const {
     switch (cfg.op) {
     case MathOp::Set:
-        if (cfg.target == IndexedSequence::ModTarget::GateLength &&
-            cfg.value == IndexedSequence::GateLengthTrigger) {
-            str("T");
+        if (cfg.target == IndexedSequence::ModTarget::GateLength) {
+            formatGateValue(str, cfg.value);
         } else {
             str("%d", cfg.value);
         }

@@ -99,7 +99,7 @@ void Project::clear() {
     indexed.setActiveLength(5);
     for (int i = 0; i < 5; ++i) {
         indexed.step(i).setNoteIndex(i * 2);
-        indexed.step(i).setGateLength(5);
+        indexed.step(i).setGateLength(IndexedSequence::gateEncodeTicks(4));
     }
 
     setTempo(80.f);

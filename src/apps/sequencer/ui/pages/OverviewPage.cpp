@@ -205,11 +205,12 @@ static void drawIndexedTrack(Canvas &canvas, int trackIndex, const IndexedTrackE
 
             // Draw gate length as filled portion from bottom
             int gateW = 0;
-            if (step.gateLength() == IndexedSequence::GateLengthTrigger) {
-                gateW = std::min(1, stepW - 2);
-            } else {
-                gateW = (int)(stepW * (step.gateLength() / 100.0f));
+            uint16_t gateValue = step.gateLength();
+            if (step.duration() > 0) {
+                uint16_t gateTicks = std::min<uint16_t>(IndexedSequence::gateTicks(gateValue, step.duration()), step.duration());
+                gateW = int((float(stepW) * gateTicks) / float(step.duration()));
             }
+            gateW = clamp(gateW, 0, std::max(0, stepW - 2));
             if (gateW > 0 && stepW > 2) {
                 canvas.setColor(active ? Color::MediumBright : Color::Low);
                 canvas.fillRect(currentX + 1, y + 1, gateW - 1, barH - 2);

@@ -14,6 +14,7 @@
 #include <array>
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 
 class IndexedSequence {
 public:
@@ -27,7 +28,54 @@ public:
     static constexpr uint8_t TargetGroupsAll = 0;
     static constexpr uint8_t TargetGroupsUngrouped = 0x10;
     static constexpr uint8_t TargetGroupsSelected = 0x20;
-    static constexpr uint16_t GateLengthTrigger = 101; // Special: fixed short trigger pulse
+    static constexpr uint8_t GateLengthOff = 0;
+    static constexpr uint8_t GateLengthMax = 127;
+    static constexpr uint8_t GateLengthFull = GateLengthMax;
+    static constexpr uint8_t GateLengthTableSize = GateLengthMax - 1;
+    static constexpr uint16_t GateLengthTicksMin = 4;
+    static constexpr uint16_t GateLengthTicksMax = MaxDuration;
+
+    static const uint16_t GateTickTable[GateLengthTableSize];
+
+    static bool gateIsOff(uint16_t gateValue) {
+        return gateValue == GateLengthOff;
+    }
+
+    static uint16_t gateTicks(uint16_t gateValue, uint16_t durationTicks) {
+        if (gateValue == GateLengthOff) {
+            return 0;
+        }
+        if (gateValue == GateLengthFull) {
+            return durationTicks;
+        }
+        gateValue = clamp(gateValue, uint16_t(1), uint16_t(GateLengthTableSize));
+        return GateTickTable[gateValue - 1];
+    }
+
+    static uint16_t gateEncodeTicks(int ticks) {
+        if (ticks <= 0) {
+            return GateLengthOff;
+        }
+        ticks = clamp(ticks, int(GateLengthTicksMin), int(GateLengthTicksMax));
+        int bestIndex = 0;
+        for (int i = 0; i < GateLengthTableSize; ++i) {
+            if (GateTickTable[i] > ticks) {
+                break;
+            }
+            bestIndex = i;
+        }
+        return uint16_t(bestIndex + 1);
+    }
+
+    static uint16_t gateEncodeTicksForDuration(int ticks, uint16_t durationTicks) {
+        if (durationTicks == 0) {
+            return GateLengthOff;
+        }
+        if (ticks >= int(durationTicks)) {
+            return GateLengthFull;
+        }
+        return gateEncodeTicks(ticks);
+    }
 
     //----------------------------------------
     // Step
@@ -38,7 +86,8 @@ public:
         // Bit-packed step data (32 bits):
         // bits 0-6:   note_index (7 bits, signed -63..64 encoded in 7 bits)
         // bits 7-21:  duration (15 bits = direct tick count, 0-32767)
-        // bits 22-30: gate_length (9 bits = 0-511, 0-100% or GateLengthTrigger)
+        // bits 22-28: gate_length (7 bits = 0-127, encoded)
+        // bits 29-30: unused (reserved)
         // bit 31:     slide (1 bit)
 
         int8_t noteIndex() const {
@@ -65,15 +114,34 @@ public:
         void setDuration(uint16_t ticks) {
             ticks = clamp(ticks, uint16_t(0), uint16_t(MaxDuration));
             _packed = (_packed & ~(0x7FFF << 7)) | ((ticks & 0x7FFF) << 7);
+            uint16_t gateValue = gateLength();
+            if (gateValue != GateLengthOff) {
+                setGateLength(gateValue);
+            }
         }
 
         uint16_t gateLength() const {
-            return static_cast<uint16_t>((_packed >> 22) & 0x1FF);
+            return static_cast<uint16_t>((_packed >> 22) & 0x7F);
         }
 
-        void setGateLength(uint16_t percentage) {
-            percentage = clamp(percentage, uint16_t(0), uint16_t(GateLengthTrigger));
-            _packed = (_packed & ~(0x1FF << 22)) | ((percentage & 0x1FF) << 22);
+        void setGateLength(uint16_t value) {
+            value = clamp(value, uint16_t(0), uint16_t(GateLengthMax));
+            uint16_t durationTicks = duration();
+            if (value == GateLengthFull) {
+                if (durationTicks == 0) {
+                    value = GateLengthOff;
+                }
+            } else if (value != GateLengthOff) {
+                if (durationTicks == 0) {
+                    value = GateLengthOff;
+                } else {
+                    uint16_t ticks = gateTicks(value, durationTicks);
+                    if (ticks >= durationTicks) {
+                        value = GateLengthFull;
+                    }
+                }
+            }
+            _packed = (_packed & ~(0x7F << 22)) | ((value & 0x7F) << 22);
         }
 
         bool slide() const {
@@ -121,7 +189,7 @@ public:
         }
 
     private:
-        uint32_t _packed = 0;      // Bit-packed: note(7) + duration(15) + gate(9) + slide(1)
+        uint32_t _packed = 0;      // Bit-packed: note(7) + duration(15) + gate(7) + unused(2) + slide(1)
         uint8_t _groupMask = 0;    // Groups A-D (bits 0-3)
     };
 

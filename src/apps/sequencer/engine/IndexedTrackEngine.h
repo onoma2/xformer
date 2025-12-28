@@ -41,7 +41,6 @@ public:
 
 private:
     // Constants for step parameters
-    static constexpr uint32_t TRIGGER_PULSE_TICKS = 3;
     static constexpr uint16_t MAX_DURATION = IndexedSequence::MaxDuration;
     static constexpr uint16_t MAX_GATE_PERCENT = 100;
     static constexpr int8_t MIN_NOTE_INDEX = -63;

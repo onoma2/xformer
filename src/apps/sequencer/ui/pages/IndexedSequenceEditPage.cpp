@@ -19,6 +19,14 @@
 
 static Random rng;
 
+static void formatGateValue(StringBuilder &str, uint16_t gateValue, uint16_t durationTicks) {
+    if (IndexedSequence::gateIsOff(gateValue)) {
+        str("OFF");
+    } else {
+        str("%d", IndexedSequence::gateTicks(gateValue, durationTicks));
+    }
+}
+
 enum class ContextAction {
     Init,
     Copy,
@@ -182,12 +190,13 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             canvas.drawRect(currentX, barY, stepW, barH);
 
             int gateW = 0;
-            if (step.gateLength() == IndexedSequence::GateLengthTrigger) {
-                gateW = std::min(2, stepW);
-            } else {
-                gateW = (int)(stepW * (step.gateLength() / 100.0f));
+            uint16_t gateValue = step.gateLength();
+            if (step.duration() > 0) {
+                uint16_t gateTicks = std::min<uint16_t>(IndexedSequence::gateTicks(gateValue, step.duration()), step.duration());
+                gateW = int((float(stepW) * gateTicks) / float(step.duration()));
             }
-            if (gateW > 0) {
+            gateW = clamp(gateW, 0, std::max(0, stepW - 2));
+            if (gateW > 0 && stepW > 2) {
                 canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Low));
                 canvas.fillRect(currentX + 1, barY + 1, gateW, barH - 2);
             }
@@ -283,11 +292,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
 
         // F2: Gate
         FixedStringBuilder<16> gateStr;
-        if (step.gateLength() == IndexedSequence::GateLengthTrigger) {
-            gateStr("T");
-        } else {
-            gateStr("%d%%", step.gateLength());
-        }
+        formatGateValue(gateStr, step.gateLength(), step.duration());
         canvas.drawTextCentered(51, y, 51, 16, gateStr);
 
         // F3: Note
@@ -332,11 +337,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             }
 
             FixedStringBuilder<12> gateStr;
-            if (step.gateLength() == IndexedSequence::GateLengthTrigger) {
-                gateStr("T");
-            } else {
-                gateStr("%d%%", step.gateLength());
-            }
+            formatGateValue(gateStr, step.gateLength(), step.duration());
 
             canvas.setFont(Font::Tiny);
             canvas.setColor(Color::MediumBright);
@@ -478,17 +479,23 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Double-press step to toggle gate between 0 and Trigger
+    // Double-press step to toggle gate between OFF and min ticks
     if (!key.shiftModifier() && key.isStep() && event.count() == 2) {
         auto &sequence = _project.selectedIndexedSequence();
         int stepIndex = stepOffset() + key.step();
         if (stepIndex < sequence.activeLength()) {
             auto &step = sequence.step(stepIndex);
-            if (step.gateLength() == 0) {
-                step.setGateLength(IndexedSequence::GateLengthTrigger);
-                showMessage("GATE: TRIGGER");
+            if (step.gateLength() == IndexedSequence::GateLengthOff) {
+                uint16_t firstGate = IndexedSequence::gateEncodeTicksForDuration(
+                    IndexedSequence::GateLengthTicksMin,
+                    step.duration()
+                );
+                step.setGateLength(firstGate);
+                FixedStringBuilder<16> msg("GATE: ");
+                formatGateValue(msg, step.gateLength(), step.duration());
+                showMessage(msg);
             } else {
-                step.setGateLength(0);
+                step.setGateLength(IndexedSequence::GateLengthOff);
                 showMessage("GATE: OFF");
             }
         }
@@ -655,13 +662,17 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
                     }
                     case EditMode::Gate: {
                         int currentGate = lastStep.gateLength();
-                        int newGate = currentGate + event.value();
-                        if (currentGate == IndexedSequence::GateLengthTrigger && event.value() < 0) {
-                            newGate = 100;
-                        } else if (currentGate <= 100 && newGate > 100) {
-                            newGate = IndexedSequence::GateLengthTrigger;
+                        if (currentGate == IndexedSequence::GateLengthFull && event.value() < 0) {
+                            uint16_t duration = lastStep.duration();
+                            if (duration <= IndexedSequence::GateLengthTicksMin) {
+                                lastStep.setGateLength(IndexedSequence::GateLengthOff);
+                            } else {
+                                lastStep.setGateLength(IndexedSequence::gateEncodeTicks(duration - 1));
+                            }
+                        } else {
+                            int newGate = currentGate + event.value();
+                            lastStep.setGateLength(clamp(newGate, 0, int(IndexedSequence::GateLengthMax)));
                         }
-                        lastStep.setGateLength(clamp(newGate, 0, int(IndexedSequence::GateLengthTrigger)));
                         break;
                     }
                     }
@@ -686,10 +697,10 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
                     break;
                 }
                 case EditMode::Gate: {
-                    int startGate = firstStep.gateLength();
-                    int endGate = lastStep.gateLength();
-                    int interpolated = startGate + std::round(t * (endGate - startGate));
-                    step.setGateLength(interpolated);
+                    int startTicks = IndexedSequence::gateTicks(firstStep.gateLength(), firstStep.duration());
+                    int endTicks = IndexedSequence::gateTicks(lastStep.gateLength(), lastStep.duration());
+                    int interpolated = startTicks + std::round(t * (endTicks - startTicks));
+                    step.setGateLength(IndexedSequence::gateEncodeTicksForDuration(interpolated, step.duration()));
                     break;
                 }
                 }
@@ -719,13 +730,17 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
                     {
                         int stepSize = shift ? 1 : 5;
                         int currentGate = step.gateLength();
-                        int newGate = currentGate + event.value() * stepSize;
-                        if (currentGate == IndexedSequence::GateLengthTrigger && event.value() < 0) {
-                            newGate = 100;
-                        } else if (currentGate <= 100 && newGate > 100) {
-                            newGate = IndexedSequence::GateLengthTrigger;
+                        if (currentGate == IndexedSequence::GateLengthFull && event.value() < 0) {
+                            uint16_t duration = step.duration();
+                            if (duration <= IndexedSequence::GateLengthTicksMin) {
+                                step.setGateLength(IndexedSequence::GateLengthOff);
+                            } else {
+                                step.setGateLength(IndexedSequence::gateEncodeTicks(duration - 1));
+                            }
+                        } else {
+                            int newGate = currentGate + event.value() * stepSize;
+                            step.setGateLength(clamp(newGate, 0, int(IndexedSequence::GateLengthMax)));
                         }
-                        step.setGateLength(clamp(newGate, 0, int(IndexedSequence::GateLengthTrigger)));
                     }
                     break;
                 }
@@ -1473,7 +1488,10 @@ void IndexedSequenceEditPage::rhythmContextAction(int index) {
             int patternIndex = int(i % patternCount);
             auto &step = sequence.step(targetSteps[i]);
             step.setDuration(pattern[patternIndex]);
-            step.setGateLength(IndexedSequence::GateLengthTrigger);
+            step.setGateLength(IndexedSequence::gateEncodeTicksForDuration(
+                IndexedSequence::GateLengthTicksMin,
+                step.duration()
+            ));
             step.setNoteIndex(0);
         }
 

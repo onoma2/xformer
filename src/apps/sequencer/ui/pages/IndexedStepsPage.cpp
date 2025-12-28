@@ -7,6 +7,14 @@
 #include "model/Project.h"
 #include "core/utils/StringBuilder.h"
 
+static void formatGateValue(StringBuilder &str, uint16_t gateValue, uint16_t durationTicks) {
+    if (IndexedSequence::gateIsOff(gateValue)) {
+        str("OFF");
+    } else {
+        str("%d", IndexedSequence::gateTicks(gateValue, durationTicks));
+    }
+}
+
 enum class ContextAction {
     Insert,
     Split,
@@ -229,11 +237,7 @@ void IndexedStepsPage::StepListModel::cell(int row, int column, StringBuilder &s
             str("%d", step.duration());
         } else if (isGateRow(row)) {
             // Display gate length as percentage or trigger
-            if (step.gateLength() == IndexedSequence::GateLengthTrigger) {
-                str("T");
-            } else {
-                str("%d%%", step.gateLength());
-            }
+            formatGateValue(str, step.gateLength(), step.duration());
         }
     }
 }
@@ -255,15 +259,19 @@ void IndexedStepsPage::StepListModel::edit(int row, int column, int value, bool 
         int newDuration = static_cast<int>(step.duration()) + value * stepSize;
         step.setDuration(clamp(newDuration, 0, int(IndexedSequence::MaxDuration)));
     } else if (isGateRow(row)) {
-        // Edit gate length: shift = 1%, normal = 10%
-        int stepSize = shift ? 1 : 10;
+        // Edit gate length: shift = fine, normal = coarse
+        int stepSize = shift ? 1 : 5;
         int currentGate = step.gateLength();
-        int newGate = currentGate + value * stepSize;
-        if (currentGate == IndexedSequence::GateLengthTrigger && value < 0) {
-            newGate = 100;
-        } else if (currentGate <= 100 && newGate > 100) {
-            newGate = IndexedSequence::GateLengthTrigger;
+        if (currentGate == IndexedSequence::GateLengthFull && value < 0) {
+            uint16_t duration = step.duration();
+            if (duration <= IndexedSequence::GateLengthTicksMin) {
+                step.setGateLength(IndexedSequence::GateLengthOff);
+            } else {
+                step.setGateLength(IndexedSequence::gateEncodeTicks(duration - 1));
+            }
+        } else {
+            int newGate = currentGate + value * stepSize;
+            step.setGateLength(clamp(newGate, 0, int(IndexedSequence::GateLengthMax)));
         }
-        step.setGateLength(clamp(newGate, 0, int(IndexedSequence::GateLengthTrigger)));
     }
 }
