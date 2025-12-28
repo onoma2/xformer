@@ -25,6 +25,8 @@ Macros
 - Page + `Key::Step5` → Waveform menu (`TRI`, `2TRI`, `3TRI`, `5TRI`)
 - Page + `Key::Step6` → Melodic menu (`SCALE`, `ARP`, `CHORD`, `MODAL`, `M-MEL`)
 - Page + `Key::Step14` → Duration/Transform menu (`D-LOG`, `D-EXP`, `D-TRI`, `REV`, `MIRR`)
+Rhythm macros set note index to root (0), gate to Trigger, and fill 768 total ticks; if any steps are selected, the pattern cycles across the selected steps, otherwise active length is set to the pattern length.
+M-TALA cycles Khand (5+7), Tihai (2-1-2 ×3), and Dhamar (5-2-3-4).
 
 Files
 - `src/apps/sequencer/ui/pages/IndexedSequenceEditPage.cpp`
@@ -65,6 +67,4 @@ Files
 
 ## Future macros to think about
 
-- M-KHAND: 5/7 alternating gap weights
-- M-TIHAI: 2-1-2 phrase repeated 3x
-- M-DHAMAR: 5-2-3-4 gap weights
+- TBD

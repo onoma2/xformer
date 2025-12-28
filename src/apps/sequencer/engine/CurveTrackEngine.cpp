@@ -116,6 +116,9 @@ void CurveTrackEngine::reset() {
     _wasFalling = false;
     _gateTimer = 0;
 
+    _prevCvOutputTarget = 0.f;
+    _tickPhase = 0.f;
+
     changePattern();
 }
 
@@ -138,6 +141,9 @@ void CurveTrackEngine::restart() {
     _wasRising = false;
     _wasFalling = false;
     _gateTimer = 0;
+
+    _prevCvOutputTarget = 0.f;
+    _tickPhase = 0.f;
 }
 
 TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
@@ -181,6 +187,11 @@ TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
             float baseSpeed = 1.0 / divisor;             // Speed for 1x rate
             double speed = baseSpeed * curveRate;
 
+            // Option 1: Enforce minimum sample density (8 ticks per step minimum)
+            const float minTicksPerStep = 8.0f;
+            const float maxSpeedForQuality = 1.0f / minTicksPerStep;  // 0.125
+            speed = std::min(speed, static_cast<double>(maxSpeedForQuality));
+
             // Apply Nyquist clamping: max 0.5 phase per tick
             speed = std::min(speed, 0.5);
 
@@ -206,6 +217,10 @@ TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
                 break;
             }
         }
+
+        // Option 2: Save previous target and reset tick phase for 1kHz interpolation
+        _prevCvOutputTarget = _cvOutputTarget;
+        _tickPhase = 0.0f;
 
         updateOutput(relativeTick, divisor);
 
@@ -241,10 +256,24 @@ void CurveTrackEngine::update(float dt) {
 
     float offset = mute() ? 0.f : _curveTrack.offsetVolts();
 
+    // Option 2: 1kHz interpolation between tick samples
+    float interpolatedTarget = _cvOutputTarget;
+    if (running && _engine.clock().isRunning()) {
+        // Update tick phase (fraction through current tick)
+        float tickDuration = _engine.clock().tickDuration();
+        if (tickDuration > 0.f) {
+            _tickPhase += dt / tickDuration;
+            _tickPhase = std::min(_tickPhase, 1.0f);
+        }
+
+        // Linear interpolation between previous and current tick samples
+        interpolatedTarget = _prevCvOutputTarget + (_cvOutputTarget - _prevCvOutputTarget) * _tickPhase;
+    }
+
     if (_curveTrack.slideTime() > 0) {
-        _cvOutput = Slide::applySlide(_cvOutput, _cvOutputTarget + offset, _curveTrack.slideTime(), dt);
+        _cvOutput = Slide::applySlide(_cvOutput, interpolatedTarget + offset, _curveTrack.slideTime(), dt);
     } else {
-        _cvOutput = _cvOutputTarget + offset;
+        _cvOutput = interpolatedTarget + offset;
     }
 
     // Update Chaos

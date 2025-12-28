@@ -102,6 +102,10 @@ private:
     float _lpfState = 0.f;
     float _feedbackState = 0.f;
 
+    // 1kHz interpolation state (Option 2)
+    float _prevCvOutputTarget = 0.f;
+    float _tickPhase = 0.f;  // 0.0-1.0 fraction through current tick
+
     struct Gate {
         uint32_t tick;
         bool gate;
