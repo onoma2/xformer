@@ -129,13 +129,12 @@
                         <div class="mb-4">
                             <label class="block text-xs text-gray-500 mb-1.5 font-medium">Chaos Algorithm</label>
                             <select id="chaosSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2.5 text-sm text-gray-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-all">
-                                <option value="none">None</option>
                                 <option value="latoocarfian">Latoocarfian</option>
                                 <option value="lorenz">Lorenz Attractor</option>
                             </select>
                         </div>
 
-                        <div id="chaosControls" class="hidden space-y-4">
+                        <div id="chaosControls" class="space-y-4">
                             <!-- Mix Slider -->
                             <div>
                                 <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
@@ -371,7 +370,7 @@
             shaper: 'none',
             vcaSpeed: 1.0,
             currentVcaVal: 0.5,
-            chaos: 'none',
+            chaos: 'latoocarfian',
             chaosMix: 0,
             chaosHz: 1.0,
             p1: 50,
@@ -854,15 +853,9 @@
 
         document.getElementById('chaosSelect').addEventListener('change', (e) => {
             config.chaos = e.target.value;
-            const ctrl = document.getElementById('chaosControls');
-            if (config.chaos === 'none') {
-                ctrl.classList.add('hidden');
-            } else {
-                ctrl.classList.remove('hidden');
-                // Reset state
-                shaperState.latooX = 0.5; shaperState.latooY = 0.5;
-                shaperState.lorenzX = 0.1; shaperState.lorenzY = 0.0; shaperState.lorenzZ = 0.0;
-            }
+            // Reset state
+            shaperState.latooX = 0.5; shaperState.latooY = 0.5;
+            shaperState.lorenzX = 0.1; shaperState.lorenzY = 0.0; shaperState.lorenzZ = 0.0;
         });
 
         document.getElementById('chaosMixSlider').addEventListener('input', (e) => {
@@ -939,7 +932,6 @@
                 {id: 'speedSlider', val: 1},
                 {id: 'shaperSelect', val: 'none'},
                 {id: 'waveformSelect', val: 'bipolarSine'},
-                {id: 'chaosSelect', val: 'none'},
                 {id: 'chaosMixSlider', val: 0},
                 {id: 'chaosSpeedSlider', val: 1.0},
                 {id: 'p1Slider', val: 50},
