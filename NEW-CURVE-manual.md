@@ -105,8 +105,12 @@ Phase-accumulator based timing with smooth speed modulation via **Curve Rate**.
        ├──> speed = baseSpeed × curveRate
        │             └─> Example: 1/8 × 2.0 = 0.25 phase/tick
        │
+       ├──> QUALITY LIMIT: min 8 ticks/step   ← Anti-aliasing
+       │     speed = min(speed, 1.0 / 8.0)
+       │             └─> Guarantees clean waveform reproduction
+       │
        ├──> speed = min(speed, 0.5)           ← Nyquist clamping
-       │             └─> Prevents aliasing (max 0.5 phase/tick)
+       │             └─> Prevents step skipping (max 0.5 phase/tick)
        │
        ▼
   _freePhase += speed                          ← Increment every tick
@@ -134,7 +138,9 @@ Phase-accumulator based timing with smooth speed modulation via **Curve Rate**.
 **Key Characteristics:**
 - Steps advance **when phase crosses 1.0** (not grid-locked)
 - Speed modulation range: **0x to 4x** (via curveRate)
-- Nyquist limit: max 0.5 phase/tick (prevents step skipping)
+- **Quality limit:** minimum 8 ticks/step (prevents aliasing/undersampling)
+- **Nyquist limit:** max 0.5 phase/tick (prevents step skipping)
+- **1kHz interpolation:** smooth output between tick samples
 - Smooth, glitch-free FM modulation
 
 **Curve Rate Values:**
@@ -148,13 +154,32 @@ curveRate = 4.0   →  Quadruple speed (Nyquist-limited)
 
 **Step Duration Calculation:**
 ```
-Ticks per step = divisor / curveRate
+Ticks per step = divisor / curveRate (minimum 8 ticks enforced)
 
-Examples (divisor = 8):
-  curveRate = 0.1  →  80 ticks/step  (very slow)
-  curveRate = 1.0  →  8 ticks/step   (normal)
-  curveRate = 2.0  →  4 ticks/step   (double speed)
-  curveRate = 4.0  →  2 ticks/step   (max speed)
+Examples with Quality Limit:
+  divisor = 2:
+    curveRate = 1.0  →  8 ticks/step   (quality limit reached)
+    curveRate = 2.0  →  8 ticks/step   (clamped to 1.0x for quality)
+    curveRate = 4.0  →  8 ticks/step   (clamped to 1.0x for quality)
+    Effective max rate: 1.0x
+
+  divisor = 8:
+    curveRate = 1.0  →  8 ticks/step   (normal)
+    curveRate = 2.0  →  8 ticks/step   (clamped to 1.0x for quality)
+    curveRate = 4.0  →  8 ticks/step   (clamped to 1.0x for quality)
+    Effective max rate: 1.0x
+
+  divisor = 32:
+    curveRate = 1.0  →  32 ticks/step  (normal)
+    curveRate = 2.0  →  16 ticks/step  (double speed)
+    curveRate = 4.0  →  8 ticks/step   (quadruple speed, quality limit)
+    Effective max rate: 4.0x
+
+  divisor = 64:
+    curveRate = 1.0  →  64 ticks/step  (normal)
+    curveRate = 2.0  →  32 ticks/step  (double speed)
+    curveRate = 4.0  →  16 ticks/step  (quadruple speed)
+    Effective max rate: 4.0x (very smooth)
 ```
 
 ---
@@ -235,18 +260,34 @@ Both playback modes feed into the same signal processing chain:
        │
        └──> cvOutputTarget = clamp(voltage, -5.0, +5.0)
        │
+       └──> prevCvOutputTarget saved  ← For interpolation
+       │
+       └──> [END OF TICK @ 384 Hz]
+       │
+       ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │  6. 1kHz INTERPOLATION (in update(), ~1000 Hz)          │
+  └─────────────────────────────────────────────────────────┘
+       │
+       ├──> tickPhase += dt / tickDuration  ← Fraction through tick (0.0-1.0)
+       │
+       └──> interpolatedTarget = prevCvOutputTarget +
+                                 (cvOutputTarget - prevCvOutputTarget) × tickPhase
+       │              └─> Linear interpolation between tick samples
+       │
+       ▼
   ┌──────────────────────────────────┐
-  │  6. SLIDE (Slew Limiter)         │
+  │  7. SLIDE (Slew Limiter)         │
   └──────────────────────────────────┘
        │
        ├──> if (slideTime > 0)
-       │     └──> cvOutput = applySlide(cvOutput, target, slideTime, dt)
+       │     └──> cvOutput = applySlide(cvOutput, interpolatedTarget + offset, slideTime, dt)
        │
        ├──> else
-       │     └──> cvOutput = cvOutputTarget + offset
+       │     └──> cvOutput = interpolatedTarget + offset
        │
        ▼
-  CV OUTPUT → DAC
+  CV OUTPUT → DAC @ 1kHz
 ```
 
 ---
@@ -316,9 +357,51 @@ gateProbability =  7  →  100% chance (8 ticks)
 | **Timing** | Quantized | Continuous |
 | **Speed Control** | Fixed (divisor only) | Variable (curveRate 0-4x) |
 | **FM Modulation** | Not possible | Full support via routing |
-| **Step Duration** | `divisor` ticks (constant) | `divisor / curveRate` ticks |
+| **Step Duration** | `divisor` ticks (constant) | `divisor / curveRate` ticks (min 8) |
+| **Output Rate** | 1kHz (interpolated) | 1kHz (interpolated) |
+| **Quality Limit** | N/A | Min 8 ticks/step (anti-aliasing) |
 | **Use Case** | Rhythmic, quantized LFOs | Smooth audio-rate FM, drones |
-| **Aliasing Risk** | None | Nyquist-limited at 0.5 phase/tick |
+| **Aliasing Risk** | None | Quality-limited + 1kHz interpolation |
+
+### 3.6 Routing Curve Rate
+
+The **Curve Rate** parameter can be modulated via CV routing for dynamic FM effects:
+
+**Routing Range:** 0 to 400
+- **0** → 0.0x (freeze)
+- **100** → 1.0x (normal speed, default)
+- **200** → 2.0x (double speed)
+- **400** → 4.0x (quadruple speed)
+
+**Effective Range (depends on divisor):**
+```
+divisor = 2:   Max effective = 1.0x  (quality-limited)
+divisor = 8:   Max effective = 1.0x  (quality-limited)
+divisor = 32:  Max effective = 4.0x
+divisor = 64:  Max effective = 4.0x  (smoothest)
+```
+
+**Example Routing:**
+- **CV1 → Curve Rate** with min=100, max=400
+  - CV at 0V → 1.0x speed (normal)
+  - CV at +5V → 4.0x speed (or quality limit)
+
+**Quality Guarantees:**
+
+The combination of quality limiting and 1kHz interpolation ensures clean output:
+
+1. **Quality Limit (8 ticks/step minimum)**
+   - Prevents severe undersampling at low divisor values
+   - Ensures bell/sine curves render with at least 8 samples per cycle
+   - Automatically caps speed based on divisor for clean waveform reproduction
+
+2. **1kHz Interpolation**
+   - Smooths tick-rate samples (384 Hz @ 120 BPM) to 1kHz output
+   - Eliminates staircase artifacts
+   - Works even without slide/slew enabled
+   - Provides smooth FM modulation at all speeds
+
+**Result:** You can safely use fast LFO rates (divisor=32, rate=4x) for audio-rate FM without aliasing or clicking artifacts.
 
 ## 4. Chaos Engine
 

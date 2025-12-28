@@ -399,7 +399,7 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::WavefolderFold)]                  = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::WavefolderGain)]                  = { 0,      200,    0,      200,    10      },
     [int(Routing::Target::DjFilter)]                        = { -100,   100,    -100,   100,    10      },
-    [int(Routing::Target::CurveRate)]                       = { -100,   100,    0,      0,      10      },
+    [int(Routing::Target::CurveRate)]                       = { 0,      400,    100,    100,    10      },
     // DiscreteMap targets
     [int(Routing::Target::DiscreteMapInput)]                = { -5,     5,      -5,     5,      1       },
     [int(Routing::Target::DiscreteMapScanner)]              = { 0,      34,     0,      34,     1       },
