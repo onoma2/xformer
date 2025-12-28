@@ -118,12 +118,15 @@ DiscreteMap maps an input signal (internal ramp or external CV) to 32 discrete o
 - **Generator (Long Press GEN)**:
     - **Types**: Random, Linear, Log, Exp.
     - **Targets**: Thresholds (THR), Notes (NOTE2/NOTE5), Toggles (TOG).
-- **Quick Edit**:
-    - **Step 12**: Evenly distribute active stages.
-    - **Step 13**: Flip all stage directions.
-- **Voicing Quick Edit**:
-    - **Step 14**: Piano voicings (cycling through chord types)
-    - **Step 15**: Guitar voicings (cycling through chord types)
+- **Voicing Quick Edit (hold + encoder)**:
+    - **Step 12**: Piano voicings
+    - **Step 13**: Guitar voicings
+- **Transform Menu (Page + Step 14)**:
+    - **FLIP**: Toggle stage directions
+    - **T-REV**: Reverse threshold order
+    - **T-INV**: Invert thresholds around 0
+    - **N-MIRR**: Mirror note indices (copy first half into second half, reversed)
+    - **N-REV**: Reverse note index order
 - **Fret-Style Initialization**: When clearing or initializing the sequence, stages are distributed using an interleaved "fretboard" pattern across the 4 pages of 8 steps each, creating an even distribution of threshold values from -100 to +100 across all 32 stages.
 
 ### 3.4 Fret-Style Initialization Pattern
@@ -168,7 +171,7 @@ Indexed Track is a duration-based sequencer. Unlike standard steps that are lock
 
 ### 4.2 Step Parameters
 - **Duration**: Length of step in ticks (0-65535).
-- **Gate**: Gate length % or Trigger mode.
+- **Gate**: Gate length in ticks (OFF or 4..32767). FULL equals step duration.
 - **Note**: Output voltage index (-63 to +64).
 
 ### 4.3 Math Operations (F5)
@@ -178,12 +181,13 @@ Apply batch operations to selected steps:
 - **Quant**: Quantize values to nearest multiple.
 - **Rand/Jitter**: Randomization.
 
-### 4.4 Quick Edit (Page+Steps 9-15)
-- **Step 9**: Split (requires step selection)
-- **Step 10**: Merge with next (first selected step only)
-- **Step 11**: Set First Step (rotates sequence to start at selected step)
-- **Step 12**: Piano Voicings (cycles through piano chord voicings, applies to selected steps)
-- **Step 13**: Guitar Voicings (cycles through guitar chord voicings, applies to selected steps)
+### 4.4 Quick Edit (Page+Steps 8-15)
+- **Step 8**: Split (requires step selection)
+- **Step 9**: Merge with next (first selected step only)
+- **Step 10**: Swap (hold + encoder to choose offset, release to apply)
+- **Step 11**: Run Mode (quick edit list)
+- **Step 12**: Piano Voicings (hold + encoder)
+- **Step 13**: Guitar Voicings (hold + encoder)
 
 ### 4.5 Macro Shortcuts (Page+Steps 4, 5, 6, 14)
 Macros provide powerful generative and transformative operations on sequences. All macros operate on:
@@ -191,18 +195,17 @@ Macros provide powerful generative and transformative operations on sequences. A
 - **Full active length** (if no selection)
 
 **Page+Step 4 - Rhythm Generators** (YELLOW LED):
-- **EUCL**: Euclidean rhythm generator
-- **CLAVE**: Clave pattern generator
-- **TUPLET**: Tuplet subdivision generator
-- **POLY**: Polyrhythmic subdivision generator
-- **M-RHY**: Random rhythm generator
+- **3/9**: Cycles even subdivisions with 3 steps, then 9 steps (fills 768 ticks)
+- **5/20**: Cycles even subdivisions with 5 steps, then 20 steps (fills 768 ticks)
+- **7/28**: Cycles even subdivisions with 7 steps, then 28 steps (fills 768 ticks)
+- **3-5/5-7**: Cycles grouped patterns (3+5) and (5+7), each fit to 768 ticks
+- **M-TALA**: Cycles Khand (5+7), Tihai (2-1-2 x3), Dhamar (5-2-3-4)
 
 **Page+Step 5 - Waveforms** (YELLOW LED):
-- **TRI**: Triangle waveform
-- **SINE**: Sine waveform
-- **SAW**: Sawtooth waveform
-- **PULSE**: Pulse waveform
-- **TARGET**: Target parameter selector
+- **TRI**: Single triangle dip (shorter in the middle, longer at the ends)
+- **2TRI**: Two triangle dips across the range
+- **3TRI**: Three triangle dips across the range
+- **5TRI**: Five triangle dips across the range
 
 **Page+Step 6 - Melodic Generators** (YELLOW LED):
 - **SCALE**: Scale fill generator

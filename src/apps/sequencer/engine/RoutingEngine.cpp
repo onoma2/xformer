@@ -13,9 +13,11 @@ static inline float applyBiasDepthToSource(float srcNormalized, const Routing::R
 }
 
 // Target-agnostic waveslicer: fold around 0.5 in normalized source space with a fixed ±0.5 jump.
-static inline float applyCreaseSource(float normalized) {
+static inline float applyCreaseSource(float normalized, float bias) {
+    // threshold moves inversely to bias by 30%
+    float threshold = 0.5f + (bias * -0.3f);
     constexpr float creaseAmount = 0.5f;
-    float creased = normalized + (normalized <= 0.5f ? creaseAmount : -creaseAmount);
+    float creased = normalized + (normalized <= threshold ? creaseAmount : -creaseAmount);
     return clamp(creased, 0.f, 1.f);
 }
 
@@ -36,8 +38,10 @@ static inline float applyEnvelope(float srcNormalized, float &envState) {
     return clamp(envState, 0.f, 1.f);
 }
 
-static inline float applyTriangleFold(float srcNormalized) {
-    float x = 2.f * (srcNormalized - 0.5f); // -1..1
+static inline float applyTriangleFold(float srcNormalized, float bias) {
+    // center point moves with bias by 50%
+    float center = 0.5f + (bias * 0.5f);
+    float x = 2.f * (srcNormalized - center); // -1..1
     float folded = (x > 0.f) ? 1.f - 2.f * fabsf(x - 0.5f) : -1.f + 2.f * fabsf(x + 0.5f);
     return clamp(0.5f + 0.5f * folded, 0.f, 1.f);
 }
@@ -317,6 +321,7 @@ void RoutingEngine::updateSinks() {
                 for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
                     if (tracks & (1 << trackIndex)) {
                         float shapedSource = applyBiasDepthToSource(_sourceValues[routeIndex], route, trackIndex);
+                        float biasNormalized = route.biasPct(trackIndex) * 0.01f;
                         // select shaper
                         float shaperOut = shapedSource;
                         auto shaper = route.shaper(trackIndex);
@@ -325,7 +330,7 @@ void RoutingEngine::updateSinks() {
                         case Routing::Shaper::None:
                             break;
                         case Routing::Shaper::Crease:
-                            shaperOut = applyCreaseSource(shapedSource);
+                            shaperOut = applyCreaseSource(shapedSource, biasNormalized);
                             break;
                         case Routing::Shaper::Location:
                             shaperOut = applyLocation(shapedSource, st.location);
@@ -334,7 +339,7 @@ void RoutingEngine::updateSinks() {
                             shaperOut = applyEnvelope(shapedSource, st.envelope);
                             break;
                         case Routing::Shaper::TriangleFold:
-                            shaperOut = applyTriangleFold(shapedSource);
+                            shaperOut = applyTriangleFold(shapedSource, biasNormalized);
                             break;
                         case Routing::Shaper::FrequencyFollower:
                             shaperOut = applyFrequencyFollower(shapedSource, st);
@@ -356,7 +361,7 @@ void RoutingEngine::updateSinks() {
                             break;
                         }
                         if (route.creaseEnabled(trackIndex) && shaper != Routing::Shaper::Crease) {
-                            shaperOut = applyCreaseSource(shaperOut);
+                            shaperOut = applyCreaseSource(shaperOut, biasNormalized);
                         }
                         float routed = route.min() + shaperOut * routeSpan;
 

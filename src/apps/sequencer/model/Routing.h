@@ -638,7 +638,7 @@ public:
 
         int biasPct(int trackIndex) const { return _biasPct[trackIndex]; }
         void setBiasPct(int trackIndex, int bias) {
-            _biasPct[trackIndex] = clamp(bias, -100, 100);
+            _biasPct[trackIndex] = clamp(bias, -75, 75);
         }
 
         // per-track depth
