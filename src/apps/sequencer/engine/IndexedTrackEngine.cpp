@@ -332,13 +332,17 @@ void IndexedTrackEngine::triggerStep() {
     // Apply route modulation (unified for both combined and sequential modes)
     const auto &routeA = _sequence->routeA();
     const auto &routeB = _sequence->routeB();
-    const bool aActive = routeA.enabled && stepMatchesRouteGroups(step, routeA);
-    const bool bActive = routeB.enabled && stepMatchesRouteGroups(step, routeB);
+    const bool aActive = routeA.source != IndexedSequence::RouteSource::Off && stepMatchesRouteGroups(step, routeA);
+    const bool bActive = routeB.source != IndexedSequence::RouteSource::Off && stepMatchesRouteGroups(step, routeB);
 
     if (aActive || bActive) {
         const float cvA = _sequence->routedIndexedA();
         const float cvB = _sequence->routedIndexedB();
         const auto combineMode = _sequence->routeCombineMode();
+
+        // Get CV value based on route source
+        const float routeAValue = (routeA.source == IndexedSequence::RouteSource::A) ? cvA : cvB;
+        const float routeBValue = (routeB.source == IndexedSequence::RouteSource::A) ? cvA : cvB;
 
         // Check if routes should be combined
         const bool shouldCombine = combineMode != IndexedSequence::RouteCombineMode::AtoB &&
@@ -346,15 +350,15 @@ void IndexedTrackEngine::triggerStep() {
                                    routeA.targetParam == routeB.targetParam;
 
         // Apply modulation for each possible target parameter
-        applyStepModulation(IndexedSequence::ModTarget::Duration, cvA, cvB,
+        applyStepModulation(IndexedSequence::ModTarget::Duration, routeAValue, routeBValue,
                            routeA, routeB, aActive, bActive, shouldCombine, combineMode,
                            baseDuration, baseGatePercent, baseNote);
 
-        applyStepModulation(IndexedSequence::ModTarget::GateLength, cvA, cvB,
+        applyStepModulation(IndexedSequence::ModTarget::GateLength, routeAValue, routeBValue,
                            routeA, routeB, aActive, bActive, shouldCombine, combineMode,
                            baseDuration, baseGatePercent, baseNote);
 
-        applyStepModulation(IndexedSequence::ModTarget::NoteIndex, cvA, cvB,
+        applyStepModulation(IndexedSequence::ModTarget::NoteIndex, routeAValue, routeBValue,
                            routeA, routeB, aActive, bActive, shouldCombine, combineMode,
                            baseDuration, baseGatePercent, baseNote);
     }

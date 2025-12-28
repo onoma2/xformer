@@ -151,24 +151,31 @@ public:
         Last
     };
 
+    enum class RouteSource : uint8_t {
+        Off,
+        A,
+        B,
+        Last
+    };
+
     struct RouteConfig {
         uint8_t targetGroups = TargetGroupsAll; // Bitmask: 0b1010 = groups A+C (0 = ALL, 0x10 = UNGR)
         ModTarget targetParam = ModTarget::Duration;
         float amount = 100.0f;          // Scale factor (-200% to +200%)
-        bool enabled = false;
+        RouteSource source = RouteSource::Off;
 
         void clear() {
             targetGroups = TargetGroupsAll;
             targetParam = ModTarget::Duration;
             amount = 100.0f;
-            enabled = false;
+            source = RouteSource::Off;
         }
 
         void write(VersionedSerializedWriter &writer) const {
             writer.write(targetGroups);
             writer.write(static_cast<uint8_t>(targetParam));
             writer.write(amount);
-            writer.write(enabled);
+            writer.write(static_cast<uint8_t>(source));
         }
 
         void read(VersionedSerializedReader &reader) {
@@ -177,7 +184,17 @@ public:
             reader.read(param);
             targetParam = static_cast<ModTarget>(param);
             reader.read(amount);
-            reader.read(enabled);
+
+            // Handle migration from old bool enabled format
+            if (reader.dataVersion() < 67) {
+                bool enabled;
+                reader.read(enabled);
+                source = enabled ? RouteSource::A : RouteSource::Off;
+            } else {
+                uint8_t src;
+                reader.read(src);
+                source = static_cast<RouteSource>(src);
+            }
         }
     };
 

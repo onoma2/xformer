@@ -15,7 +15,7 @@ bool routeConfigEqual(const IndexedSequence::RouteConfig &a, const IndexedSequen
     return a.targetGroups == b.targetGroups &&
         a.targetParam == b.targetParam &&
         std::fabs(a.amount - b.amount) < 0.0001f &&
-        a.enabled == b.enabled;
+        a.source == b.source;
 }
 } // namespace
 
@@ -56,7 +56,7 @@ void IndexedRouteConfigPage::draw(Canvas &canvas) {
 
     // Footer: F1-F4 for parameter selection, F5 to exit
     bool shift = pageKeyState()[Key::Shift];
-    const char *footerLabels[] = { "ENABLE", "GROUPS", "TARGET", "AMOUNT", shift ? "BACK" : (stagedChanged() ? "COMMIT" : "BACK") };
+    const char *footerLabels[] = { "SOURCE", "GROUPS", "TARGET", "AMOUNT", shift ? "BACK" : (stagedChanged() ? "COMMIT" : "BACK") };
     int highlight = (_activeRoute == ActiveRoute::Mix) ? -1 : (int)_editParam;
     WindowPainter::drawFooter(canvas, footerLabels, pageKeyState(), highlight);
 }
@@ -78,8 +78,15 @@ void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequen
     canvas.setColor(active ? Color::Bright : Color::Medium);
     canvas.drawText(2, y, label);
 
-    // Enabled status
-    drawCentered(0, cfg.enabled ? "ON" : "OFF",
+    // Route source (Off/A/B)
+    const char* sourceLabel = "?";
+    switch (cfg.source) {
+    case IndexedSequence::RouteSource::Off: sourceLabel = "OFF"; break;
+    case IndexedSequence::RouteSource::A:   sourceLabel = "A"; break;
+    case IndexedSequence::RouteSource::B:   sourceLabel = "B"; break;
+    case IndexedSequence::RouteSource::Last: break;
+    }
+    drawCentered(0, sourceLabel,
                  (_editParam == EditParam::Enabled && active) ? Color::Bright : Color::Medium);
 
     int affectedSteps = 0;
@@ -252,9 +259,14 @@ void IndexedRouteConfigPage::encoder(EncoderEvent &event) {
     auto &cfg = activeRouteConfig();
 
     switch (_editParam) {
-    case EditParam::Enabled:
-        cfg.enabled = !cfg.enabled;
+    case EditParam::Enabled: {
+        int source = static_cast<int>(cfg.source);
+        source += event.value();
+        if (source < 0) source = static_cast<int>(IndexedSequence::RouteSource::Last) - 1;
+        if (source >= static_cast<int>(IndexedSequence::RouteSource::Last)) source = 0;
+        cfg.source = static_cast<IndexedSequence::RouteSource>(source);
         break;
+    }
 
     case EditParam::TargetGroups: {
         static const uint8_t groupCycle[] = {
