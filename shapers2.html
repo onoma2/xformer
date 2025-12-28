@@ -98,33 +98,24 @@
     <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
 
         <!-- Controls Sidebar -->
-        <aside class="w-full lg:w-80 bg-[#18181b] border-r border-gray-800 p-5 overflow-y-auto flex-shrink-0 z-10 custom-scrollbar space-y-6">
+        <aside class="w-full lg:w-80 bg-[#18181b] border-r border-gray-800 p-5 overflow-y-auto flex-shrink-0 z-10 custom-scrollbar space-y-4">
             
-            <!-- 
-            ========================================================================
-            CURVE TRACK SIGNAL GENERATOR (WIP)
-            CONTAINS: WAVEFORM SOURCE, CHAOS ENGINE, WAVEFOLDER, DJ FILTER
-            ========================================================================
-            -->
-
-            <!-- 1. SIGNAL GENERATION (Curve Track Stage) -->
-            <div class="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5 shadow-inner mb-6">
-                <div class="flex items-center gap-2 mb-5 text-orange-400 font-bold uppercase text-[10px] tracking-widest border-b border-orange-500/10 pb-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                    1. Signal Generation
+            <!-- 1. SOURCE GENERATOR -->
+            <div class="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5 shadow-inner">
+                <div class="flex items-center gap-2 mb-4 text-orange-400 font-bold uppercase text-[10px] tracking-widest border-b border-orange-500/10 pb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    1. Source Generator
                 </div>
-
-                <div class="space-y-5">
+                <div class="space-y-4">
                     <div>
-                        <label class="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-tighter">Waveform Type</label>
-                        <select id="waveformSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-all">
-                            <option value="bipolarSine">Bipolar Sine LFO</option>
-                            <option value="bipolarTriangle">Bipolar Triangle LFO</option>
-                            <option value="bipolarSaw">Bipolar Sawtooth LFO</option>
-                            <option value="unipolarAdsr">Unipolar ADSR Envelope</option>
+                        <label class="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-tighter">Waveform</label>
+                        <select id="waveformSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-orange-500 focus:outline-none">
+                            <option value="bipolarSine">Bipolar Sine</option>
+                            <option value="bipolarTriangle">Bipolar Triangle</option>
+                            <option value="bipolarSaw">Bipolar Sawtooth</option>
+                            <option value="unipolarAdsr">Unipolar ADSR</option>
                         </select>
                     </div>
-
                     <div>
                         <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
                             <span>Step Length (Divisor)</span>
@@ -132,126 +123,123 @@
                         </label>
                         <input type="range" id="divisorSlider" min="6" max="192" step="6" value="48">
                     </div>
+                </div>
+            </div>
 
-                    <!-- Chaos Engine Sub-Block -->
-                    <div class="mt-4 pt-4 border-t border-orange-500/10">
-                        <div class="flex items-center gap-2 mb-3 text-orange-400/70 font-bold uppercase text-[9px] tracking-widest">
-                            Chaos Engine
+            <div class="flex justify-center -my-2 opacity-20"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>
+
+            <!-- 2. CHAOS ENGINE -->
+            <div class="p-4 rounded-xl border border-red-500/20 bg-red-500/5 shadow-inner">
+                <div class="flex items-center gap-2 mb-4 text-red-400 font-bold uppercase text-[10px] tracking-widest border-b border-red-500/10 pb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+                    2. Chaos Engine
+                </div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-gray-500 mb-1">Algorithm</label>
+                            <select id="chaosSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-1.5 text-xs text-gray-200 focus:border-red-500 focus:outline-none">
+                                <option value="latoocarfian">Latoocarfian</option>
+                                <option value="lorenz">Lorenz</option>
+                            </select>
                         </div>
-
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-xs text-gray-500 mb-1.5 font-medium">Algorithm</label>
-                                <select id="chaosSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-orange-500 focus:outline-none">
-                                    <option value="latoocarfian">Latoocarfian</option>
-                                    <option value="lorenz">Lorenz Attractor</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs text-gray-500 mb-1.5 font-medium">Chaos Range</label>
-                                <select id="chaosRangeSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-orange-500 focus:outline-none">
-                                    <option value="mid">Mid (Center)</option>
-                                    <option value="above">Above (+0.25)</option>
-                                    <option value="below">Below (-0.25)</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                                    <span>Chaos Mix</span>
-                                    <span id="chaosMixVal" class="text-orange-400 font-bold">0%</span>
-                                </label>
-                                <input type="range" id="chaosMixSlider" min="0" max="100" value="0">
-                            </div>
-
-                            <div>
-                                <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                                    <span>Chaos Rate (Hz)</span>
-                                    <span id="chaosSpeedVal" class="text-orange-400 font-bold">1.0 Hz</span>
-                                </label>
-                                <input type="range" id="chaosSpeedSlider" min="0.01" max="10" step="0.01" value="1.0">
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-3 pb-4">
-                                <div>
-                                    <label class="block text-[10px] text-gray-600 mb-1 font-medium">Param 1</label>
-                                    <input type="range" id="p1Slider" min="0" max="100" value="50">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] text-gray-600 mb-1 font-medium">Param 2</label>
-                                    <input type="range" id="p2Slider" min="0" max="100" value="50">
-                                </div>
-                            </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-500 mb-1">Range</label>
+                            <select id="chaosRangeSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-1.5 text-xs text-gray-200 focus:border-red-500 focus:outline-none">
+                                <option value="mid">Mid</option>
+                                <option value="above">Above</option>
+                                <option value="below">Below</option>
+                            </select>
                         </div>
                     </div>
-
-                    <!-- Effects Sub-Block -->
-                    <div class="mt-4 pt-4 border-t border-orange-500/10 space-y-5">
-                        <div class="flex items-center gap-2 mb-1 text-orange-400/70 font-bold uppercase text-[9px] tracking-widest">
-                            Signal Processing
-                        </div>
-
+                    <div>
+                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                            <span>Chaos Mix</span>
+                            <span id="chaosMixVal" class="text-red-400 font-bold">0%</span>
+                        </label>
+                        <input type="range" id="chaosMixSlider" min="0" max="100" value="0">
+                    </div>
+                    <div>
+                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                            <span>Rate (Hz)</span>
+                            <span id="chaosSpeedVal" class="text-red-400 font-bold">1.0 Hz</span>
+                        </label>
+                        <input type="range" id="chaosSpeedSlider" min="0.01" max="10" step="0.01" value="1.0">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                                <span>Wavefolder (Fold)</span>
-                                <span id="foldVal" class="text-orange-400 font-bold">0%</span>
-                            </label>
-                            <input type="range" id="foldSlider" min="0" max="100" value="0">
+                            <label class="block text-[10px] text-gray-600 mb-1">P1</label>
+                            <input type="range" id="p1Slider" min="0" max="100" value="50">
                         </div>
-
                         <div>
-                            <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                                <span>Folder Gain</span>
-                                <span id="gainVal" class="text-orange-400 font-bold">1.0x</span>
-                            </label>
-                            <input type="range" id="gainSlider" min="0" max="200" value="0">
-                        </div>
-
-                        <div>
-                            <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                                <span>DJ Filter (LPF <-> HPF)</span>
-                                <span id="filterVal" class="text-orange-400 font-bold">Off</span>
-                            </label>
-                            <input type="range" id="filterSlider" min="-100" max="100" value="0">
-                        </div>
-
-                        <div class="pt-4 border-t border-orange-500/20">
-                            <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                                <span class="uppercase tracking-widest font-bold text-orange-400">Master XFade</span>
-                                <span id="xFadeVal" class="text-orange-400 font-bold bg-orange-400/10 px-1.5 py-0.5 rounded">100%</span>
-                            </label>
-                            <input type="range" id="xFadeSlider" min="0" max="100" value="100">
-                        </div>
-
-                        <div>
-                            <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium text-orange-400/60">
-                                <span>Curve Offset (Final)</span>
-                                <span id="offsetVal" class="font-bold">0.0V</span>
-                            </label>
-                            <input type="range" id="offsetSlider" min="-500" max="500" value="0">
+                            <label class="block text-[10px] text-gray-600 mb-1">P2</label>
+                            <input type="range" id="p2Slider" min="0" max="100" value="50">
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Flow Arrow -->
-            <div class="flex justify-center -my-2 opacity-30 mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+            <div class="flex justify-center -my-2 opacity-20"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>
+
+            <!-- 3. SIGNAL PROCESSOR -->
+            <div class="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 shadow-inner">
+                <div class="flex items-center gap-2 mb-4 text-yellow-400 font-bold uppercase text-[10px] tracking-widest border-b border-yellow-500/10 pb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg>
+                    3. Signal Processor
+                </div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] text-gray-500 mb-1">Fold</label>
+                            <input type="range" id="foldSlider" min="0" max="100" value="0">
+                            <div id="foldVal" class="text-right text-[10px] text-yellow-400 mt-1">0%</div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-500 mb-1">Gain</label>
+                            <input type="range" id="gainSlider" min="0" max="200" value="0">
+                            <div id="gainVal" class="text-right text-[10px] text-yellow-400 mt-1">1.0x</div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                            <span>DJ Filter</span>
+                            <span id="filterVal" class="text-yellow-400 font-bold">Off</span>
+                        </label>
+                        <input type="range" id="filterSlider" min="-100" max="100" value="0">
+                    </div>
+                    <div class="pt-2 border-t border-yellow-500/10">
+                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                            <span class="uppercase tracking-widest text-yellow-400">Master XFade</span>
+                            <span id="xFadeVal" class="text-yellow-400 font-bold">100%</span>
+                        </label>
+                        <input type="range" id="xFadeSlider" min="0" max="100" value="100">
+                    </div>
+                </div>
             </div>
 
-            <!-- 
-            ========================================================================
-            DO NOT EDIT ROUTE PROCESSING SECTION BELOW
-            MATHEMATICAL MODEL AND UI ARE FINAL AND SYNCED WITH C++
-            ========================================================================
-            -->
+            <div class="flex justify-center -my-2 opacity-20"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>
 
-            <!-- 2. ROUTE PROCESSING (Routing Engine Stage) -->
+            <!-- 4. FINAL OFFSET -->
+            <div class="p-4 rounded-xl border border-green-500/20 bg-green-500/5 shadow-inner">
+                <div class="flex items-center gap-2 mb-2 text-green-400 font-bold uppercase text-[10px] tracking-widest border-b border-green-500/10 pb-2">
+                    4. Final Offset
+                </div>
+                <div>
+                    <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                        <span>Curve Offset</span>
+                        <span id="offsetVal" class="text-green-400 font-bold">0.0V</span>
+                    </label>
+                    <input type="range" id="offsetSlider" min="-500" max="500" value="0">
+                </div>
+            </div>
+
+            <div class="flex justify-center -my-2 opacity-20"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>
+
+            <!-- 5. ROUTE PROCESSING -->
             <div class="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 shadow-inner">
                 <div class="flex items-center gap-2 mb-5 text-blue-400 font-bold uppercase text-[10px] tracking-widest border-b border-blue-500/10 pb-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>
-                    2. Route Processing
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>
+                    5. Route Processing
                 </div>
 
                 <div class="space-y-5">
@@ -628,17 +616,7 @@
             if (config.chaosMix > 0) { processed = processed * (1.0 - config.chaosMix/100) + generateChaos(config.chaos) * (config.chaosMix/100); }
             if (config.fold > 0) { processed = applyWavefolder(processed, config.fold, config.gain); }
             processed = applyDjFilter(processed, config.filter / 100.0);
-            // 4. Master XFade (Pure vs Processed)
-            const xFadeMix = config.xFade / 100.0;
-            let rawSrc = pureWaveform * (1.0 - xFadeMix) + processed * xFadeMix;
-
-            // 5. Final Curve Offset
-            // config.offset is +/- 500 (representing +/- 5.00V)
-            // Normalized Range (0..1) represents 10Vpp (-5V to +5V).
-            // So 1.0 (Top) is +5V. 0.5 (Center) is 0V.
-            // An offset of +500 (+5V) should add +0.5 to the normalized signal.
-            // Formula: (offset / 500) * 0.5  ->  offset / 1000.
-            rawSrc = clamp(rawSrc + (config.offset / 1000.0), 0.0, 1.0);
+            let rawSrc = clamp(pureWaveform * (1.0 - config.xFade/100) + processed * (config.xFade/100) + (config.offset / 1000.0), 0.0, 1.0);
 
             const biasNormalized = config.bias * 0.01;
             const intermediate = applyBiasDepthToSource(rawSrc, config.bias, config.depth);
