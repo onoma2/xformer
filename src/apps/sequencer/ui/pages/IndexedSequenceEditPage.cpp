@@ -396,12 +396,12 @@ void IndexedSequenceEditPage::updateLeds(Leds &leds) {
         bool selected = _stepSelection[stepIndex];
         bool hasGate = sequence.step(stepIndex).gateLength() != 0;
 
-        // Presence: green, selection: red, gate: both.
+        // Presence: green, gate: red, selection: yellow.
         leds.set(ledIndex, false, true);
-        if (selected) {
+        if (hasGate) {
             leds.set(ledIndex, true, false);
         }
-        if (hasGate) {
+        if (selected) {
             leds.set(ledIndex, true, true);
         }
     }
