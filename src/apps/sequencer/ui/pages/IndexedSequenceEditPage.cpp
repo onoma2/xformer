@@ -155,9 +155,13 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
 
     for (int i = 0; i < activeLength; ++i) {
         // Use modulated duration for currently playing step, programmed for others
-        int duration = (i == currentStepIndex)
-            ? trackEngine.effectiveStepDuration()
-            : sequence.step(i).duration();
+        int duration = sequence.step(i).duration();
+        if (i == currentStepIndex) {
+            uint16_t effectiveDur = trackEngine.effectiveStepDuration();
+            if (effectiveDur > 0) {
+                duration = effectiveDur;
+            }
+        }
         totalTicks += duration;
         if (duration > 0) {
             nonzeroSteps++;
@@ -183,7 +187,13 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             bool active = (i == currentStepIndex);
 
             // Use modulated duration for currently playing step, programmed for others
-            int duration = active ? trackEngine.effectiveStepDuration() : step.duration();
+            int duration = step.duration();
+            if (active) {
+                uint16_t effectiveDur = trackEngine.effectiveStepDuration();
+                if (effectiveDur > 0) {
+                    duration = effectiveDur;
+                }
+            }
 
             int stepW = 0;
             if (duration > 0) {
@@ -395,8 +405,6 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
 
 void IndexedSequenceEditPage::updateLeds(Leds &leds) {
     const auto &sequence = _project.selectedIndexedSequence();
-    const auto &trackEngine = _engine.selectedTrackEngine().as<IndexedTrackEngine>();
-    int currentStep = trackEngine.currentStep();
 
     int stepOffset = this->stepOffset();
 
