@@ -394,14 +394,14 @@ void IndexedSequenceEditPage::updateLeds(Leds &leds) {
 
         int ledIndex = MatrixMap::fromStep(i);
         bool selected = _stepSelection[stepIndex];
-        bool playing = (stepIndex == currentStep);
+        bool hasGate = sequence.step(stepIndex).gateLength() != 0;
 
-        // Presence: green, selection: red, playhead: both.
+        // Presence: green, selection: red, gate: both.
         leds.set(ledIndex, false, true);
         if (selected) {
             leds.set(ledIndex, true, false);
         }
-        if (playing) {
+        if (hasGate) {
             leds.set(ledIndex, true, true);
         }
     }
@@ -440,16 +440,6 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    if (key.isQuickEdit() && !key.shiftModifier()) {
-        if (key.quickEdit() == 4 || key.quickEdit() == 5) {
-            event.consume();
-            return;
-        }
-        quickEdit(key.quickEdit());
-        event.consume();
-        return;
-    }
-
     if (key.pageModifier() && key.is(Key::Step4)) {
         rhythmContextShow();
         event.consume();
@@ -470,6 +460,16 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
 
     if (key.pageModifier() && key.is(Key::Step14)) {
         durationTransformContextShow();
+        event.consume();
+        return;
+    }
+
+    if (key.isQuickEdit() && !key.shiftModifier()) {
+        if (key.quickEdit() == 4 || key.quickEdit() == 5) {
+            event.consume();
+            return;
+        }
+        quickEdit(key.quickEdit());
         event.consume();
         return;
     }
@@ -1311,28 +1311,26 @@ enum class RhythmContextAction {
 };
 
 static const ContextMenuModel::Item rhythmContextMenuItems[] = {
-    { "EUCL" },
-    { "CLAVE" },
-    { "TUPLET" },
-    { "POLY" },
-    { "M-RHY" },
+    { "3/9" },
+    { "5/20" },
+    { "7/28" },
+    { "3-5/5-7" },
+    { "M-TALA" },
 };
 
 enum class WaveformContextAction {
     Triangle,
-    Sine,
-    Sawtooth,
-    Pulse,
-    Target,
+    Triangle2,
+    Triangle3,
+    Triangle5,
     Last
 };
 
 static const ContextMenuModel::Item waveformContextMenuItems[] = {
     { "TRI" },
-    { "SINE" },
-    { "SAW" },
-    { "PULSE" },
-    { "TARGET" },
+    { "2TRI" },
+    { "3TRI" },
+    { "5TRI" },
 };
 
 enum class MelodicContextAction {
@@ -1381,137 +1379,143 @@ void IndexedSequenceEditPage::rhythmContextShow() {
 void IndexedSequenceEditPage::rhythmContextAction(int index) {
     auto &sequence = _project.selectedIndexedSequence();
 
-    // Determine range: use selected steps if any, otherwise full active length
-    int firstStep, lastStep;
+    auto applyGroups = [&](const int *groups, int groupCount, const char *message) {
+        if (groupCount <= 0) {
+            return;
+        }
+        int totalSteps = 0;
+        for (int i = 0; i < groupCount; ++i) {
+            totalSteps += groups[i];
+        }
+        if (totalSteps <= 0) {
+            return;
+        }
 
-    if (_stepSelection.any()) {
-        firstStep = _stepSelection.firstSetIndex();
-        lastStep = _stepSelection.lastSetIndex();
-    } else {
-        firstStep = 0;
-        lastStep = sequence.activeLength() - 1;
-    }
+        std::vector<int> targetSteps;
+        bool hasSelection = _stepSelection.any();
+        if (hasSelection) {
+            targetSteps.reserve(IndexedSequence::MaxSteps);
+            for (int i = 0; i < IndexedSequence::MaxSteps; ++i) {
+                if (_stepSelection[i]) {
+                    targetSteps.push_back(i);
+                }
+            }
+            if (targetSteps.empty()) {
+                hasSelection = false;
+            }
+        }
 
-    int stepCount = lastStep - firstStep + 1;
-    if (stepCount <= 0) return;
+        if (!hasSelection) {
+            sequence.setActiveLength(totalSteps);
+            targetSteps.clear();
+            targetSteps.reserve(totalSteps);
+            for (int i = 0; i < totalSteps; ++i) {
+                targetSteps.push_back(i);
+            }
+        } else {
+            int lastIndex = targetSteps.back();
+            if (lastIndex + 1 > sequence.activeLength()) {
+                sequence.setActiveLength(lastIndex + 1);
+            }
+        }
+
+        if (targetSteps.empty()) {
+            showMessage("NO STEP");
+            return;
+        }
+
+        const int totalTicks = 768;
+        const int baseGroupTicks = totalTicks / groupCount;
+        const int groupRemainder = totalTicks % groupCount;
+
+        std::vector<uint16_t> pattern;
+        pattern.reserve(totalSteps);
+        for (int g = 0; g < groupCount; ++g) {
+            int groupSteps = groups[g];
+            if (groupSteps <= 0) {
+                continue;
+            }
+            int groupTicks = baseGroupTicks + (g < groupRemainder ? 1 : 0);
+            int baseStepTicks = groupTicks / groupSteps;
+            int stepRemainder = groupTicks % groupSteps;
+
+            for (int i = 0; i < groupSteps; ++i) {
+                int dur = baseStepTicks + (i < stepRemainder ? 1 : 0);
+                pattern.push_back(uint16_t(dur));
+            }
+        }
+
+        if (pattern.empty()) {
+            return;
+        }
+
+        const int patternCount = int(pattern.size());
+        for (size_t i = 0; i < targetSteps.size(); ++i) {
+            int patternIndex = int(i % patternCount);
+            auto &step = sequence.step(targetSteps[i]);
+            step.setDuration(pattern[patternIndex]);
+            step.setGateLength(IndexedSequence::GateLengthTrigger);
+            step.setNoteIndex(0);
+        }
+
+        showMessage(message);
+    };
 
     switch (RhythmContextAction(index)) {
     case RhythmContextAction::Euclidean: {
-        // Euclidean rhythm: distribute pulses evenly (Bjorklund algorithm)
-        // For now, use 8 pulses distributed across steps
-        int pulses = std::min(8, stepCount);
-
-        // Simple Euclidean distribution
-        std::vector<bool> pattern(stepCount, false);
-        for (int i = 0; i < pulses; ++i) {
-            int pos = (i * stepCount) / pulses;
-            pattern[pos] = true;
-        }
-
-        // Apply pattern: pulses get longer duration, gaps get shorter
-        uint16_t longDur = sequence.divisor();
-        uint16_t shortDur = sequence.divisor() / 4;
-
-        for (int i = 0; i < stepCount; ++i) {
-            sequence.step(firstStep + i).setDuration(pattern[i] ? longDur : shortDur);
-            sequence.step(firstStep + i).setGateLength(pattern[i] ? 75 : 25);
-        }
-        showMessage("EUCLIDEAN");
+        static bool longCycle = false;
+        const int steps = longCycle ? 9 : 3;
+        const int groups[] = { steps };
+        applyGroups(groups, 1, longCycle ? "3/9 9" : "3/9 3");
+        longCycle = !longCycle;
         break;
     }
     case RhythmContextAction::Clave: {
-        // Classic 3-2 son clave pattern
-        static const int clavePatterns[][8] = {
-            {1, 0, 0, 1, 0, 0, 1, 0},  // Son clave
-            {1, 0, 0, 1, 0, 1, 0, 0},  // Rumba clave
-            {1, 0, 1, 0, 0, 1, 0, 0},  // Bossa nova
-        };
-        static int claveIndex = 0;
-
-        const int *pattern = clavePatterns[claveIndex];
-        claveIndex = (claveIndex + 1) % 3;
-
-        uint16_t longDur = sequence.divisor();
-        uint16_t shortDur = sequence.divisor() / 2;
-
-        for (int i = 0; i < stepCount; ++i) {
-            bool accent = pattern[i % 8];
-            sequence.step(firstStep + i).setDuration(accent ? longDur : shortDur);
-            sequence.step(firstStep + i).setGateLength(accent ? 75 : 50);
-        }
-
-        const char *names[] = {"SON", "RUMBA", "BOSSA"};
-        FixedStringBuilder<16> msg;
-        msg("CLAVE: ");
-        msg(names[(claveIndex + 2) % 3]);
-        showMessage(msg);
+        static bool longCycle = false;
+        const int steps = longCycle ? 20 : 5;
+        const int groups[] = { steps };
+        applyGroups(groups, 1, longCycle ? "5/20 20" : "5/20 5");
+        longCycle = !longCycle;
         break;
     }
     case RhythmContextAction::Tuplet: {
-        // Tuplet subdivision: divide into groups of 3, 5, or 7
-        static const int tuplets[] = {3, 5, 7};
-        static int tupletIndex = 0;
-
-        int tuplet = tuplets[tupletIndex];
-        tupletIndex = (tupletIndex + 1) % 3;
-
-        uint16_t baseDur = sequence.divisor() / tuplet;
-
-        for (int i = 0; i < stepCount; ++i) {
-            int pos = i % tuplet;
-            // First beat of tuplet gets accent
-            bool accent = (pos == 0);
-            sequence.step(firstStep + i).setDuration(baseDur);
-            sequence.step(firstStep + i).setGateLength(accent ? 75 : 50);
-        }
-
-        FixedStringBuilder<16> msg;
-        msg("TUPLET: %d", tuplet);
-        showMessage(msg);
+        static bool longCycle = false;
+        const int steps = longCycle ? 28 : 7;
+        const int groups[] = { steps };
+        applyGroups(groups, 1, longCycle ? "7/28 28" : "7/28 7");
+        longCycle = !longCycle;
         break;
     }
     case RhythmContextAction::Poly: {
-        // Polyrhythm: create cross-rhythms (3:4, 5:4, 7:8)
-        static const struct { int a; int b; } polyRhythms[] = {
-            {3, 4}, {5, 4}, {7, 8}
-        };
-        static int polyIndex = 0;
-
-        int a = polyRhythms[polyIndex].a;
-        int b = polyRhythms[polyIndex].b;
-        polyIndex = (polyIndex + 1) % 3;
-
-        uint16_t baseDur = sequence.divisor();
-
-        for (int i = 0; i < stepCount; ++i) {
-            // Alternate between two subdivisions
-            int subdivision = (i % 2 == 0) ? a : b;
-            uint16_t dur = baseDur / subdivision;
-            sequence.step(firstStep + i).setDuration(dur);
-            sequence.step(firstStep + i).setGateLength(60);
+        static bool longCycle = false;
+        if (longCycle) {
+            const int groups[] = { 5, 7 };
+            applyGroups(groups, 2, "5-7");
+        } else {
+            const int groups[] = { 3, 5 };
+            applyGroups(groups, 2, "3-5");
         }
-
-        FixedStringBuilder<16> msg;
-        msg("POLY: %d:%d", a, b);
-        showMessage(msg);
+        longCycle = !longCycle;
         break;
     }
     case RhythmContextAction::RandomRhythm: {
-        // Random rhythm: random durations and gate lengths
-        uint16_t baseDur = sequence.divisor();
+        static int patternIndex = 0;
+        const int khand[] = { 5, 7 };
+        const int tihai[] = { 2, 1, 2, 2, 1, 2, 2, 1, 2 };
+        const int dhamar[] = { 5, 2, 3, 4 };
 
-        for (int i = 0; i < stepCount; ++i) {
-            // Random duration: 1/16 to 1 whole note
-            int div = 1 << (rng.nextRange(5));  // 1, 2, 4, 8, 16
-            uint16_t dur = baseDur / div;
-
-            // Random gate length: 25%, 50%, 75%
-            int gatePercent = (rng.nextRange(3) + 1) * 25;
-
-            sequence.step(firstStep + i).setDuration(dur);
-            sequence.step(firstStep + i).setGateLength(gatePercent);
+        switch (patternIndex) {
+        case 0:
+            applyGroups(khand, int(sizeof(khand) / sizeof(khand[0])), "M-KHAND");
+            break;
+        case 1:
+            applyGroups(tihai, int(sizeof(tihai) / sizeof(tihai[0])), "M-TIHAI");
+            break;
+        case 2:
+            applyGroups(dhamar, int(sizeof(dhamar) / sizeof(dhamar[0])), "M-DHAMAR");
+            break;
         }
-        showMessage("RANDOM RHYTHM");
+        patternIndex = (patternIndex + 1) % 3;
         break;
     }
     case RhythmContextAction::Last:
@@ -1545,61 +1549,38 @@ void IndexedSequenceEditPage::waveformContextAction(int index) {
     int stepCount = lastStep - firstStep + 1;
     if (stepCount <= 0) return;
 
-    const float TWO_PI = 2.0f * 3.14159265359f;
+    const uint16_t minDur = 8;
+    const uint16_t maxDur = 192;
+    auto applyTriangle = [&](int bumps, const char *label) {
+        for (int i = 0; i < stepCount; ++i) {
+            float t = (stepCount > 1) ? float(i) / float(stepCount - 1) : 0.f;
+            float phase = t * float(bumps);
+            float frac = phase - std::floor(phase);
+            float tri = 1.f - std::abs(2.f * frac - 1.f); // 0 at edges, 1 at mid
+            float normalized = 1.f - tri; // shorter in the middle
+            uint16_t dur = uint16_t(std::round(minDur + normalized * (maxDur - minDur)));
+            sequence.step(firstStep + i).setDuration(clamp<uint16_t>(dur, minDur, maxDur));
+        }
+        FixedStringBuilder<16> msg("WAVEFORM: ");
+        msg(label);
+        showMessage(msg);
+    };
 
     switch (WaveformContextAction(index)) {
     case WaveformContextAction::Triangle: {
-        // Triangle wave: -63 to +64
-        for (int i = 0; i < stepCount; ++i) {
-            float t = float(i) / float(stepCount);
-            float value = (t < 0.5f) ? (t * 4.0f - 1.0f) : (3.0f - t * 4.0f);
-            int8_t note = int8_t(value * 63.5f);
-            sequence.step(firstStep + i).setNoteIndex(note);
-        }
-        showMessage("WAVEFORM: TRI");
+        applyTriangle(1, "TRI");
         break;
     }
-    case WaveformContextAction::Sine: {
-        // Sine wave: -63 to +64
-        for (int i = 0; i < stepCount; ++i) {
-            float t = float(i) / float(stepCount);
-            float value = std::sin(t * TWO_PI);
-            int8_t note = int8_t(value * 63.5f);
-            sequence.step(firstStep + i).setNoteIndex(note);
-        }
-        showMessage("WAVEFORM: SINE");
+    case WaveformContextAction::Triangle2: {
+        applyTriangle(2, "2TRI");
         break;
     }
-    case WaveformContextAction::Sawtooth: {
-        // Sawtooth wave: -63 to +64
-        for (int i = 0; i < stepCount; ++i) {
-            float t = float(i) / float(stepCount);
-            float value = t * 2.0f - 1.0f;
-            int8_t note = int8_t(value * 63.5f);
-            sequence.step(firstStep + i).setNoteIndex(note);
-        }
-        showMessage("WAVEFORM: SAW");
+    case WaveformContextAction::Triangle3: {
+        applyTriangle(3, "3TRI");
         break;
     }
-    case WaveformContextAction::Pulse: {
-        // Pulse wave: -63 or +64
-        for (int i = 0; i < stepCount; ++i) {
-            float t = float(i) / float(stepCount);
-            int8_t note = (t < 0.5f) ? 64 : -63;
-            sequence.step(firstStep + i).setNoteIndex(note);
-        }
-        showMessage("WAVEFORM: PULSE");
-        break;
-    }
-    case WaveformContextAction::Target: {
-        // Target cycles: Note -> Duration -> Gate
-        static int targetParam = 0;
-        targetParam = (targetParam + 1) % 3;
-        const char *paramNames[] = { "NOTE", "DURATION", "GATE" };
-        FixedStringBuilder<16> msg;
-        msg("TARGET: ");
-        msg(paramNames[targetParam]);
-        showMessage(msg);
+    case WaveformContextAction::Triangle5: {
+        applyTriangle(5, "5TRI");
         break;
     }
     case WaveformContextAction::Last:

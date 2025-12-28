@@ -21,8 +21,8 @@ Quick edits
 ## Indexed
 
 Macros
-- Page + `Key::Step4` → Rhythm menu (`EUCLIDEAN`, `CLAVE`, `TUPLET`, `POLY`, `M-RHY`)
-- Page + `Key::Step5` → Waveform menu (`TRI`, `SINE`, `SAW`, `PULSE`, `TARGET`)
+- Page + `Key::Step4` → Rhythm menu (`3/9`, `5/20`, `7/28`, `3-5/5-7`, `M-TALA`)
+- Page + `Key::Step5` → Waveform menu (`TRI`, `2TRI`, `3TRI`, `5TRI`)
 - Page + `Key::Step6` → Melodic menu (`SCALE`, `ARP`, `CHORD`, `MODAL`, `M-MEL`)
 - Page + `Key::Step14` → Duration/Transform menu (`D-LOG`, `D-EXP`, `D-TRI`, `REV`, `MIRR`)
 
