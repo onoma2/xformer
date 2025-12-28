@@ -1188,11 +1188,6 @@ const IndexedSequence::Step& IndexedSequenceEditPage::step(int index) const {
 }
 
 void IndexedSequenceEditPage::startVoicingQuickEdit(VoicingBank bank, int stepIndex) {
-    if (!_stepSelection.any()) {
-        showMessage("NO STEP");
-        return;
-    }
-
     _voicingQuickEditActive = true;
     _voicingQuickEditBank = bank;
     _voicingQuickEditStep = stepIndex;
@@ -1234,17 +1229,16 @@ void IndexedSequenceEditPage::showVoicingMessage(VoicingBank bank, int voicingIn
 }
 
 void IndexedSequenceEditPage::applyVoicing(VoicingBank bank, int voicingIndex) {
-    if (!_stepSelection.any()) {
+    auto &sequence = _project.selectedIndexedSequence();
+    int activeLength = sequence.activeLength();
+    if (activeLength <= 0) {
         showMessage("NO STEP");
         return;
     }
 
-    auto &sequence = _project.selectedIndexedSequence();
-
     int firstSelectedIndex = _stepSelection.firstSetIndex();
-    if (firstSelectedIndex < 0) {
-        showMessage("NO STEP");
-        return;
+    if (firstSelectedIndex < 0 || firstSelectedIndex >= activeLength) {
+        firstSelectedIndex = 0;
     }
 
     if (voicingIndex < 0) {
@@ -1271,7 +1265,6 @@ void IndexedSequenceEditPage::applyVoicing(VoicingBank bank, int voicingIndex) {
     bool limitToSelection = selectionCount > 1;
     int targetIndices[IndexedSequence::MaxSteps];
     int targetCount = 0;
-    int activeLength = sequence.activeLength();
 
     for (int i = 0; i < activeLength; ++i) {
         if (limitToSelection && !_stepSelection[i]) {
