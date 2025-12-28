@@ -422,6 +422,20 @@ void CurveTrackEngine::updateOutput(uint32_t relativeTick, uint32_t divisor) {
             float chaosAmount = evalSequence.chaosAmount() / 100.f;
             // Map Chaos (-1..1) to 0..1 to mix with Shape
             float normalizedChaos = (_chaosValue + 1.f) * 0.5f;
+
+            // Apply range offset based on chaos range setting
+            switch (evalSequence.chaosRange()) {
+            case CurveSequence::ChaosRange::Below:
+                normalizedChaos -= 0.25f;  // Wiggle around bottom quarter
+                break;
+            case CurveSequence::ChaosRange::Above:
+                normalizedChaos += 0.25f;  // Wiggle around top quarter
+                break;
+            case CurveSequence::ChaosRange::Mid:
+            case CurveSequence::ChaosRange::Last:
+                break;  // No offset (wiggle around center)
+            }
+
             value = value * (1.f - chaosAmount) + normalizedChaos * chaosAmount;
         }
 
