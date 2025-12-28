@@ -161,7 +161,7 @@
                     <div class="relative h-6 flex items-center">
                         <div class="absolute w-full h-1 bg-gray-800 rounded"></div>
                         <div class="absolute w-0.5 h-3 bg-gray-600 left-1/2 -ml-[1px]"></div> <!-- Center marker -->
-                        <input type="range" id="biasSlider" min="-100" max="100" value="0" class="relative z-10">
+                        <input type="range" id="biasSlider" min="-75" max="75" value="0" class="relative z-10">
                     </div>
                     <p class="text-[10px] text-gray-600 mt-1">Shifts entire signal up or down.</p>
                 </div>
@@ -412,8 +412,8 @@
                     return clamp(creased, 0.0, 1.0);
 
                 case 'triangleFold':
-                    // center point moves with bias by 30%
-                    let center = 0.5 + (bias * 0.3);
+                    // center point moves with bias by 50%
+                    let center = 0.5 + (bias * 0.5);
                     let x = 2.0 * (src - center); // -1..1 (approx)
                     let folded = (x > 0.0) ? 1.0 - 2.0 * Math.abs(x - 0.5) : -1.0 + 2.0 * Math.abs(x + 0.5);
                     return clamp(0.5 + 0.5 * folded, 0.0, 1.0);
@@ -605,14 +605,14 @@
         // --- Visual Descriptions ---
         const descriptions = {
             none: "Passes the signal through unchanged.",
-            crease: "Creates a discontinuity at 0.5 by folding. Values <= 0.5 shift up, values > 0.5 shift down. Useful for creating sharp, rhythmic transitions from smooth LFOs.",
-            triangleFold: "Applies a triangular folding pattern to the signal. Creates complex harmonic content by folding waves back on themselves.",
-            envelope: "Follows the amplitude of the signal (distance from center). Acts like an envelope follower with attack and release.",
-            location: "Integrates the input to create a position accumulator. The output wanders based on the input's position relative to center.",
-            frequency: "Detects frequency by counting zero-crossings (crossing 0.5). Output rises when the input signal oscillates faster.",
-            activity: "Measures how much the signal is changing. Higher output for more chaotic or fast-moving signals, lower for static ones.",
-            divider: "Binary output that toggles based on input crossings. The threshold for toggling increases with each toggle, creating complex rhythmic divisions.",
-            vcanext: "Amplitude Modulation. Uses a neighbor track (simulated by a sine LFO below) to scale the amplitude of this signal. Adjust the slider to change the modulator speed."
+            crease: "Wave-slicer that folds the signal around a threshold. Bias modulates this threshold by -30%, creating dynamic pulse-width effects and rhythmic shifts.",
+            triangleFold: "Wave-folder that creates complex harmonics. Bias shifts the folding center by +50%, morphing the symmetry of the resulting waveform.",
+            envelope: "Follows signal amplitude (absolute distance from center). Uses fast attack and exponential release to generate a unipolar modulation envelope.",
+            location: "Integrates input polarity to create a position accumulator. Effectively an 'inertial' wanderer that moves based on the signal's offset from center.",
+            frequency: "Zero-crossing counter that tracks oscillation speed. Includes exponential leaking, a hold timer for sustained high frequencies, and a smooth automated reset.",
+            activity: "Change detector that measures signal chaos. Accumulates absolute deltas with exponential decay. Features a hold timer and graceful reset at maximum activity.",
+            divider: "Rhythmic binary divider. Toggles output based on crossings; the required count grows with each toggle and decays over time. Output is slewed and includes an auto-reset at max division.",
+            vcanext: "Amplitude Modulation (AM). Scales signal amplitude using the value of the next route as a modulator. Allows for complex rhythmic gating and ducking."
         };
 
         // --- Drawing Loop ---

@@ -72,6 +72,7 @@ inline void applyStepModulation(
     bool aActive, bool bActive,
     bool combineMode,
     IndexedSequence::RouteCombineMode combineType,
+    int scaleSize,
     uint16_t &duration,
     uint16_t &gateValue,
     int8_t &note)
@@ -83,16 +84,20 @@ inline void applyStepModulation(
     if (aActive && routeA.targetParam == target) {
         if (target == IndexedSequence::ModTarget::Duration) {
             modA = cvA * (routeA.amount * 0.01f); // Percentage for duration
+        } else if (target == IndexedSequence::ModTarget::NoteIndex) {
+            modA = cvA * (routeA.amount * 0.01f * scaleSize); // 100% = 1 octave in current scale
         } else {
-            modA = cvA * routeA.amount; // Direct value for gate/note
+            modA = cvA * routeA.amount; // Direct value for gate ticks
         }
     }
 
     if (bActive && routeB.targetParam == target) {
         if (target == IndexedSequence::ModTarget::Duration) {
             modB = cvB * (routeB.amount * 0.01f); // Percentage for duration
+        } else if (target == IndexedSequence::ModTarget::NoteIndex) {
+            modB = cvB * (routeB.amount * 0.01f * scaleSize); // 100% = 1 octave in current scale
         } else {
-            modB = cvB * routeB.amount; // Direct value for gate/note
+            modB = cvB * routeB.amount; // Direct value for gate ticks
         }
     }
 
@@ -345,6 +350,10 @@ void IndexedTrackEngine::triggerStep() {
         const float routeAValue = (routeA.source == IndexedSequence::RouteSource::A) ? cvA : cvB;
         const float routeBValue = (routeB.source == IndexedSequence::RouteSource::A) ? cvA : cvB;
 
+        // Get scale size for note index routing (100% = 1 octave)
+        const Scale &scale = _sequence->selectedScale(_model.project().selectedScale());
+        int scaleSize = scale.notesPerOctave();
+
         // Check if routes should be combined
         const bool shouldCombine = combineMode != IndexedSequence::RouteCombineMode::AtoB &&
                                    aActive && bActive &&
@@ -353,15 +362,15 @@ void IndexedTrackEngine::triggerStep() {
         // Apply modulation for each possible target parameter
         applyStepModulation(IndexedSequence::ModTarget::Duration, routeAValue, routeBValue,
                            routeA, routeB, aActive, bActive, shouldCombine, combineMode,
-                           baseDuration, baseGateValue, baseNote);
+                           scaleSize, baseDuration, baseGateValue, baseNote);
 
         applyStepModulation(IndexedSequence::ModTarget::GateLength, routeAValue, routeBValue,
                            routeA, routeB, aActive, bActive, shouldCombine, combineMode,
-                           baseDuration, baseGateValue, baseNote);
+                           scaleSize, baseDuration, baseGateValue, baseNote);
 
         applyStepModulation(IndexedSequence::ModTarget::NoteIndex, routeAValue, routeBValue,
                            routeA, routeB, aActive, bActive, shouldCombine, combineMode,
-                           baseDuration, baseGateValue, baseNote);
+                           scaleSize, baseDuration, baseGateValue, baseNote);
     }
 
     // Calculate gate duration in ticks
