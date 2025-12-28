@@ -151,8 +151,13 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
     int totalTicks = 0;
     int activeLength = sequence.activeLength();
     int nonzeroSteps = 0;
+    int currentStepIndex = trackEngine.currentStep();
+
     for (int i = 0; i < activeLength; ++i) {
-        int duration = sequence.step(i).duration();
+        // Use modulated duration for currently playing step, programmed for others
+        int duration = (i == currentStepIndex)
+            ? trackEngine.effectiveStepDuration()
+            : sequence.step(i).duration();
         totalTicks += duration;
         if (duration > 0) {
             nonzeroSteps++;
@@ -175,25 +180,31 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
 
         for (int i = 0; i < activeLength; ++i) {
             const auto &step = sequence.step(i);
+            bool active = (i == currentStepIndex);
+
+            // Use modulated duration for currently playing step, programmed for others
+            int duration = active ? trackEngine.effectiveStepDuration() : step.duration();
+
             int stepW = 0;
-            if (step.duration() > 0) {
-                int scaled = extraPixels * step.duration() + error;
+            if (duration > 0) {
+                int scaled = extraPixels * duration + error;
                 int extraW = scaled / totalTicks;
                 error = scaled % totalTicks;
                 stepW = minStepW + extraW;
             }
 
             bool selected = _stepSelection[i];
-            bool active = (trackEngine.currentStep() == i);
 
             canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Medium));
             canvas.drawRect(currentX, barY, stepW, barH);
 
+            // Use modulated gate ticks for currently playing step, programmed for others
             int gateW = 0;
-            uint16_t gateValue = step.gateLength();
-            if (step.duration() > 0) {
-                uint16_t gateTicks = std::min<uint16_t>(IndexedSequence::gateTicks(gateValue, step.duration()), step.duration());
-                gateW = int((float(stepW) * gateTicks) / float(step.duration()));
+            if (duration > 0) {
+                uint16_t gateTicks = active
+                    ? trackEngine.effectiveGateTicks()
+                    : std::min<uint16_t>(IndexedSequence::gateTicks(step.gateLength(), duration), duration);
+                gateW = int((float(stepW) * gateTicks) / float(duration));
             }
             gateW = clamp(gateW, 0, std::max(0, stepW - 2));
             if (gateW > 0 && stepW > 2) {

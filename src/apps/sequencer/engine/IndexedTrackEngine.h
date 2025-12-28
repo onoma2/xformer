@@ -38,6 +38,8 @@ public:
 
     // For Testing/UI
     int currentStep() const { return _currentStepIndex; }
+    uint16_t effectiveStepDuration() const { return _effectiveStepDuration; }
+    uint32_t effectiveGateTicks() const { return _gateTimer; }
 
 private:
     // Constants for step parameters

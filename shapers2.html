@@ -148,6 +148,15 @@
                                 </div>
                             </div>
 
+                            <!-- Chaos Rate Slider -->
+                            <div>
+                                <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                                    <span>Chaos Rate (Hz)</span>
+                                    <span id="chaosSpeedVal" class="text-orange-400 font-bold bg-orange-400/10 px-1.5 py-0.5 rounded">1.0 Hz</span>
+                                </label>
+                                <input type="range" id="chaosSpeedSlider" min="0.01" max="10" step="0.01" value="1.0">
+                            </div>
+
                             <!-- P1 / P2 Params -->
                             <div class="p-3 bg-orange-500/5 border border-orange-500/20 rounded">
                                 <div class="mb-3">
@@ -170,7 +179,7 @@
 
                     <div>
                         <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                            <span>Frequency / Speed</span>
+                            <span>Source Frequency</span>
                             <span id="speedVal" class="text-white bg-gray-800 px-1.5 py-0.5 rounded">1.0x</span>
                         </label>
                         <input type="range" id="speedSlider" min="0.1" max="10" step="0.1" value="1">
@@ -364,6 +373,7 @@
             currentVcaVal: 0.5,
             chaos: 'none',
             chaosMix: 0,
+            chaosHz: 1.0,
             p1: 50,
             p2: 50
         };
@@ -452,9 +462,14 @@
         function generateChaos(type) {
             if (type === 'none') return 0.5;
 
+            // Calibration: 1 Hz means 1 cycle per second.
+            // At 60fps, step size = 1.0 / 60.0 = 0.01666...
+            const frameRateScalar = 0.01666;
+
             if (type === 'latoocarfian') {
-                // Map Hz rate. Assume speed 1.0 = ~10Hz for visualizer visibility
-                const rate = 0.2 * config.speed; 
+                // Latoocarfian advances phase by rate * dt
+                // rate = Hz
+                const rate = config.chaosHz * frameRateScalar;
                 shaperState.latooPhase += rate;
                 
                 if (shaperState.latooPhase >= 1.0) {
@@ -492,8 +507,14 @@
                 const rho = 10.0 + p1 * 40.0;
                 const beta = 0.5 + p2 * 3.5;
                 
-                // Time step (Speed modulates dt)
-                const dt = 0.005 * config.speed;
+                // Lorenz integration time step
+                // In C++, dt is 0.001 (1ms). At 60fps, we simulate a larger chunk of time per frame?
+                // Or simply map speed so it looks right.
+                // If we want "Hz" to mean "Speed Multiplier" for the integration:
+                // C++: next(dt * speed, ...) where dt=0.001.
+                // To match visual speed, let's treat "1 Hz" as "Standard Speed".
+                // We'll use a fixed visual dt scaled by Hz.
+                const dt = 0.005 * config.chaosHz;
 
                 const dx = sigma * (shaperState.lorenzY - shaperState.lorenzX);
                 const dy = shaperState.lorenzX * (rho - shaperState.lorenzZ) - shaperState.lorenzY;
@@ -849,6 +870,11 @@
             document.getElementById('chaosMixVal').textContent = config.chaosMix + "%";
         });
 
+        document.getElementById('chaosSpeedSlider').addEventListener('input', (e) => {
+            config.chaosHz = parseFloat(e.target.value);
+            document.getElementById('chaosSpeedVal').textContent = config.chaosHz.toFixed(2) + " Hz";
+        });
+
         document.getElementById('p1Slider').addEventListener('input', (e) => {
             config.p1 = parseInt(e.target.value);
             document.getElementById('p1Val').textContent = config.p1 + "%";
@@ -915,6 +941,7 @@
                 {id: 'waveformSelect', val: 'bipolarSine'},
                 {id: 'chaosSelect', val: 'none'},
                 {id: 'chaosMixSlider', val: 0},
+                {id: 'chaosSpeedSlider', val: 1.0},
                 {id: 'p1Slider', val: 50},
                 {id: 'p2Slider', val: 50}
             ];
