@@ -758,7 +758,11 @@
             const w = canvas.logicalWidth;
             const h = canvas.logicalHeight;
             ctx.clearRect(0, 0, w, h);
-            const timeStep = (48.0 / config.divisor) * 0.00333;
+
+            // Time Base: 1 Visual Frame = 1 Clock Tick.
+            const ticksPerStep = config.divisor * 4.0;
+            const timeStep = 1.0 / ticksPerStep;
+            
             time += timeStep;
             modTime += 0.002 * config.vcaSpeed;
             config.currentVcaVal = (Math.sin(modTime) + 1.0) * 0.5;
@@ -784,14 +788,10 @@
             let active = false;
 
             if (config.gateMask > 0) { // Event Mode
-                if ((config.gateMask & 4) && prev <= 0.5 && current > 0.5) trigger = true; // ZeroRise (Bit 2)
-                if ((config.gateMask & 8) && prev >= 0.5 && current < 0.5) trigger = true; // ZeroFall (Bit 3)
-                if ((config.gateMask & 1) && shaperState.wasRising && !isRising) trigger = true; // Peak (Bit 0)
-                if ((config.gateMask & 2) && shaperState.wasFalling && !isFalling) trigger = true; // Trough (Bit 1)
-                
-                // Trigger Length: 4 << gateParam ticks. 
-                // Visualizer: 1 tick = 1 frame? Let's say 4 * (2^param) frames.
-                // 60fps. Param 0=4 frames (66ms), Param 7=512 frames (8.5s).
+                if ((config.gateMask & 4) && prev <= 0.5 && current > 0.5) trigger = true; 
+                if ((config.gateMask & 8) && prev >= 0.5 && current < 0.5) trigger = true; 
+                if ((config.gateMask & 1) && shaperState.wasRising && !isRising) trigger = true; 
+                if ((config.gateMask & 2) && shaperState.wasFalling && !isFalling) trigger = true; 
                 if (trigger) shaperState.gateTimer = 4 << config.gateParam;
             } else { // Advanced Mode (Mask == 0)
                 switch(config.gateParam) {
@@ -893,7 +893,7 @@
         // Gate UI Logic
         const gateMaskNames = ["OFF (Adv)", "Peak", "Trough", "Pk+Tr", "ZeroRs", "Pk+Rs", "Tr+Rs", "PkTrRs", "ZeroFl", "Pk+Fl", "Tr+Fl", "PkTrFl", "Rs+Fl", "PkRsFl", "TrRsFl", "All"];
         const gateParamNamesAdv = ["Off", "Rise", "Fall", "Any", ">25%", ">50%", ">75%", "Window"];
-        const gateParamNamesTrig = ["1/192 Bar", "1/96 Bar", "1/48 Bar", "1/24 Bar", "1/12 Bar", "1/6 Bar", "1/3 Bar", "2/3 Bar"];
+        const gateParamNamesTrig = ["4 Ticks", "8 Ticks", "16 Ticks", "32 Ticks", "64 Ticks", "128 Ticks", "256 Ticks", "512 Ticks"];
 
         function updateGateLabels() {
             const mask = config.gateMask;
@@ -910,7 +910,7 @@
                 if (mask & 2) events.push("Trough");
                 if (mask & 4) events.push("Rise Zero");
                 if (mask & 8) events.push("Fall Zero");
-                exp.textContent = `Trigger pulse of ${gateParamNamesTrig[param]} length on: ${events.join(', ')}.`;
+                exp.textContent = `Trigger pulse of ${gateParamNamesTrig[param]} on: ${events.join(', ')}.`;
             } else {
                 document.getElementById('gateParamVal').textContent = gateParamNamesAdv[param];
                 const descriptions = [
