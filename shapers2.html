@@ -1101,7 +1101,7 @@
             const current = rawSrc;
             const prev = shaperState.prevOut;
             const slope = current - prev;
-            const slopeThresh = 0.005; // Increased threshold to reject noise
+            const slopeThresh = 0.0001; // Low threshold to catch gentle chaos slopes
             const isRising = slope > slopeThresh;
             const isFalling = slope < -slopeThresh;
             let trigger = false;
