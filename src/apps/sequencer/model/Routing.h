@@ -789,11 +789,16 @@ struct Routable {
         T values[2];
     };
 
-    inline void set(T value, bool selectRouted) { values[selectRouted] = value; }
+    inline void set(T value, bool selectRouted) {
+        values[selectRouted] = value;
+        if (!selectRouted) {
+            values[1] = value;  // Also initialize routed when setting base
+        }
+    }
     inline T get(bool selectRouted) const { return values[selectRouted]; }
 
     inline void clear() { base = T{}; routed = T{}; }
-    inline void setBase(T value) { base = value; }
+    inline void setBase(T value) { base = value; routed = value; }  // Initialize routed to same value
     inline void write(int value) { routed = value; } // For Routing::writeTarget (writes to routed slot)
 
     inline void write(VersionedSerializedWriter &writer) const {
@@ -802,6 +807,6 @@ struct Routable {
 
     inline void read(VersionedSerializedReader &reader) {
         reader.read(base);
-        routed = T{}; // Reset routed value on read
+        routed = base; // Initialize routed to base value on read
     }
 };

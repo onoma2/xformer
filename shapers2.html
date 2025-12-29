@@ -100,6 +100,13 @@
         <!-- Controls Sidebar -->
         <aside class="w-full lg:w-80 bg-[#18181b] border-r border-gray-800 p-5 overflow-y-auto flex-shrink-0 z-10 custom-scrollbar space-y-4">
             
+            <!-- 
+            ========================================================================
+            CURVE TRACK SIGNAL GENERATOR - DONE - DONT CHANGE
+            MATHEMATICAL MODEL AND UI ARE FINAL AND SYNCED WITH C++
+            ========================================================================
+            -->
+
             <!-- 1. SOURCE GENERATOR -->
             <div class="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5 shadow-inner">
                 <div class="flex items-center gap-2 mb-4 text-orange-400 font-bold uppercase text-[10px] tracking-widest border-b border-orange-500/10 pb-2">
@@ -114,6 +121,8 @@
                             <option value="bipolarTriangle">Bipolar Triangle</option>
                             <option value="bipolarSaw">Bipolar Sawtooth</option>
                             <option value="unipolarAdsr">Unipolar ADSR</option>
+                            <option value="sequencedCurve">Sequenced Curve (8-Step Demo)</option>
+                            <option value="sequencedCurveFull">Sequenced Curve (8-Step Full)</option>
                         </select>
                     </div>
                     <div>
@@ -233,7 +242,20 @@
                 </div>
             </div>
 
+            <!-- 
+            ========================================================================
+            END OF CURVE TRACK SECTION - DONE - DONT CHANGE
+            ========================================================================
+            -->
+
             <div class="flex justify-center -my-2 opacity-20"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>
+
+            <!-- 
+            ========================================================================
+            ROUTE PROCESSING SECTION - DONE - DONT CHANGE
+            MATHEMATICAL MODEL AND UI ARE FINAL AND SYNCED WITH C++
+            ========================================================================
+            -->
 
             <!-- 5. ROUTE PROCESSING -->
             <div class="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 shadow-inner">
@@ -288,9 +310,39 @@
                 </div>
             </div>
 
+            <!-- 
+            ========================================================================
+            END OF ROUTE PROCESSING SECTION - DONE - DONT CHANGE
+            ========================================================================
+            -->
+
             <button id="resetBtn" class="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-widest rounded border border-gray-700 hover:border-gray-600 transition-all">
                 Reset All Parameters
             </button>
+
+            <!-- Audio Monitor -->
+            <div class="p-4 rounded-xl border border-gray-700 bg-gray-800/20">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Audio Monitor</div>
+                    <button id="audioToggle" class="px-3 py-1 bg-gray-700 text-gray-300 text-[10px] font-bold rounded uppercase hover:bg-gray-600 transition-all">Enable</button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                            <span>Volume</span>
+                            <span id="volVal" class="text-gray-400">50%</span>
+                        </label>
+                        <input type="range" id="volSlider" min="0" max="100" value="50">
+                    </div>
+                    <div>
+                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                            <span>Drone Pitch</span>
+                            <span id="pitchVal" class="text-gray-400">110 Hz</span>
+                        </label>
+                        <input type="range" id="pitchSlider" min="50" max="400" value="110">
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <!-- Visualization Area -->
@@ -431,6 +483,55 @@
         let modTime = 0; 
         let animationId;
 
+        // Audio Engine
+        let audioCtx;
+        let osc;
+        let filter;
+        let mainGain;
+        let isAudioOn = false;
+
+        function initAudio() {
+            if (audioCtx) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.value = 110;
+
+            filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.Q.value = 5; 
+
+            mainGain = audioCtx.createGain();
+            mainGain.gain.value = 0.5;
+
+            osc.connect(filter);
+            filter.connect(mainGain);
+            mainGain.connect(audioCtx.destination);
+            
+            osc.start();
+        }
+
+        function toggleAudio() {
+            if (!isAudioOn) {
+                initAudio();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                mainGain.gain.exponentialRampToValueAtTime(parseFloat(document.getElementById('volSlider').value)/100, audioCtx.currentTime + 0.1);
+                document.getElementById('audioToggle').textContent = "Disable";
+                document.getElementById('audioToggle').classList.add('bg-emerald-600', 'text-white');
+                document.getElementById('audioToggle').classList.remove('bg-gray-700', 'text-gray-300');
+                isAudioOn = true;
+            } else {
+                mainGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+                setTimeout(() => { if(audioCtx) audioCtx.suspend(); }, 100);
+                document.getElementById('audioToggle').textContent = "Enable";
+                document.getElementById('audioToggle').classList.remove('bg-emerald-600', 'text-white');
+                document.getElementById('audioToggle').classList.add('bg-gray-700', 'text-gray-300');
+                isAudioOn = false;
+            }
+        }
+
         function clamp(val, min, max) {
             return Math.max(min, Math.min(max, val));
         }
@@ -453,6 +554,28 @@
                     else if (p < 0.9) env = 0.7;
                     else env = 0.7 - ((p - 0.9) / 0.1) * 0.7;
                     return 0.5 + (env * 0.5);
+                case 'sequencedCurve':
+                    const stepIdx = Math.floor(t) % 8;
+                    const f = t % 1.0;
+                    const shapes = [
+                        (x) => x, (x) => x < 0.5 ? 0 : 1, (x) => Math.sqrt(1-x),
+                        (x) => 0.5 - 0.5 * Math.cos(x * Math.PI * 2), (x) => x*x,
+                        (x) => (x < 0.5 ? x : 1-x)*2, (x) => 1-x, (x) => x*x*(3-2*x)
+                    ];
+                    const ranges = [
+                        {min: 0.0, max: 1.0}, {min: 0.2, max: 0.8}, {min: 1.0, max: 0.0}, {min: 0.0, max: 0.5},
+                        {min: 0.5, max: 1.0}, {min: 0.0, max: 1.0}, {min: 0.8, max: 0.2}, {min: 0.1, max: 0.9}
+                    ];
+                    return ranges[stepIdx].min + shapes[stepIdx](f) * (ranges[stepIdx].max - ranges[stepIdx].min);
+                case 'sequencedCurveFull':
+                    const stepIdxFull = Math.floor(t) % 8;
+                    const fFull = t % 1.0;
+                    const shapesFull = [
+                        (x) => x, (x) => x < 0.5 ? 0 : 1, (x) => Math.sqrt(1-x),
+                        (x) => 0.5 - 0.5 * Math.cos(x * Math.PI * 2), (x) => x*x,
+                        (x) => (x < 0.5 ? x : 1-x)*2, (x) => 1-x, (x) => x*x*(3-2*x)
+                    ];
+                    return shapesFull[stepIdxFull](fFull);
                 default:
                     return 0.5;
             }
@@ -622,6 +745,11 @@
             const intermediate = applyBiasDepthToSource(rawSrc, config.bias, config.depth);
             const final = applyShaper(config.shaper, intermediate, biasNormalized);
 
+            if (isAudioOn && filter && audioCtx.state === 'running') {
+                const cutoff = 50 + Math.pow(final, 3) * 8000;
+                filter.frequency.setTargetAtTime(cutoff, audioCtx.currentTime, 0.01);
+            }
+
             history.source.shift(); history.source.push(rawSrc);
             history.intermediate.shift(); history.intermediate.push(intermediate);
             history.output.shift(); history.output.push(final);
@@ -669,6 +797,9 @@
         document.getElementById('shaperSelect').addEventListener('change', (e) => { config.shaper = e.target.value; document.getElementById('shaperDesc').textContent = descriptions[config.shaper] || ""; });
         document.getElementById('vcaSlider').addEventListener('input', (e) => { config.vcaSpeed = parseFloat(e.target.value); document.getElementById('vcaVal').textContent = config.vcaSpeed.toFixed(1) + "x"; });
         document.getElementById('resetBtn').addEventListener('click', () => { location.reload(); });
+        document.getElementById('audioToggle').addEventListener('click', toggleAudio);
+        document.getElementById('volSlider').addEventListener('input', (e) => { const val = parseInt(e.target.value); document.getElementById('volVal').textContent = val + "%"; if (isAudioOn && mainGain) mainGain.gain.setTargetAtTime(val/100, audioCtx.currentTime, 0.01); });
+        document.getElementById('pitchSlider').addEventListener('input', (e) => { const val = parseInt(e.target.value); document.getElementById('pitchVal').textContent = val + " Hz"; if (isAudioOn && osc) osc.frequency.setTargetAtTime(val, audioCtx.currentTime, 0.01); });
 
         animationId = requestAnimationFrame(draw);
     </script>
