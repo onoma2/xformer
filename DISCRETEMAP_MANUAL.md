@@ -303,6 +303,12 @@ The internal triangle provides a smooth triangle wave:
 - More active stages than voicing notes = voicing repeats with transposition (0, +7, -7)
 - Useful for quickly creating chord progressions across threshold map
 
+**Voicing Quick Edit Improvements**:
+- Fixed voicing behavior for selected vs active stages
+- Corrected C0 voicing functionality (uses track/project root from C0, non-accumulating)
+- Improved voicing quickedit handling for more reliable operation
+- Better selection logic for voicing application
+
 **Double-Click Threshold Auto-Placement**:
 - Double-click any stage button (bottom row) to auto-place threshold
 - Threshold is set to midpoint between left and right active neighbors

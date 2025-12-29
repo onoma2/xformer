@@ -402,6 +402,21 @@ You can now create inverted signal windows by setting **Min > Max**.
 - **Inverted**: Min=255, Max=0 (Signal goes DOWN).
 - **Step**: The step shape scales from "Start" (Min) to "End" (Max).
 
+#### 6.3.4 Free vs Aligned Play Modes
+The Curve track now supports different play modes:
+
+**Free Mode**:
+- Uses phase accumulator system for smooth FM modulation
+- Allows for speed modulation via Curve Rate parameter
+- Provides continuous, non-grid-locked timing
+- Best for audio-rate FM and smooth modulation
+
+**Aligned Mode**:
+- Grid-locked to sequencer clock
+- Steps advance at divisor boundaries
+- Quantized timing perfect for rhythmic LFOs
+- No speed modulation possible (Curve Rate has no effect)
+
 ### 6.4 Curve Studio Workflow
 
 Curve Studio introduces powerful context menus for populating sequences.
@@ -459,6 +474,45 @@ Quickly assign dynamic gate behaviors based on the curve slope or levels.
 #### 6.5.2 Multi-Step Gradient Editing
 - **Action**: Select multiple steps, hold **Shift** and turn the Encoder on **MIN** or **MAX**.
 - **Result**: Creates a linear ramp of values from the first selected step to the last.
+
+#### 6.5.3 Shaper Gates
+Curve tracks now support advanced gate generation based on curve analysis:
+
+**Available Shaper Gate Types**:
+- **Zero Cross (ZC+)**: Trigger at every zero crossing (rising + falling)
+- **End of Cycle/End of Rise (EOC/EOR)**: Trigger at every local maximum and minimum (peaks/troughs)
+- **Rising**: Gate HIGH while voltage is increasing
+- **Falling**: Gate HIGH while voltage is decreasing
+- **>50%**: Comparator - gate HIGH when voltage is in the top half of the range
+
+**Advanced Gate Modes**:
+The Gate Probability parameter in Curve tracks has been repurposed as an Advanced Gate Mode selector:
+- Range: 0 to 7 with different behaviors:
+  - 0: OFF (no gate output)
+  - 1: RISE (gate triggers on rising slope)
+  - 2: FALL (gate triggers on falling slope)
+  - 3: MOVE (gate triggers on any slope movement)
+  - 4: > 25% (gate HIGH when voltage is above 25% of range)
+  - 5: > 50% (gate HIGH when voltage is above 50% of range)
+  - 6: > 75% (gate HIGH when voltage is above 75% of range)
+  - 7: WIND (Window mode - gate HIGH when voltage is within a specific window)
+
+#### 6.5.4 Curve Rate Routing
+The Curve Rate parameter can be modulated via CV routing for dynamic FM effects:
+
+**Routing Range:** 0 to 400
+- **0** → 0.0x (freeze)
+- **100** → 1.0x (normal speed, default)
+- **200** → 2.0x (double speed)
+- **400** → 4.0x (quadruple speed)
+
+**Setup**:
+- Target: Curve Rate (available in routing menu)
+- Source: CV Input, MIDI CC, or other modulation source
+- Min/Max: Set range for modulation depth (e.g., 100-200 for 1x to 2x speed)
+- Track Selection: Apply to specific curve tracks only
+- Bias/Depth: Use per-track bias/depth for individual control
+- Allows for FM modulation in Free mode
 
 ## 7. Routing & Output Rotation
 

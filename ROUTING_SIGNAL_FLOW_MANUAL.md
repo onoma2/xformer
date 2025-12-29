@@ -338,6 +338,28 @@ Use the **Reset** target to force a track to restart:
 - **Rising Edge**: When the source signal crosses 50%, the targeted track(s) immediately reset.
 - This overrides internal loop counters and positions.
 
+### 8.5 Global Routing Changes
+
+Recent updates to the routing system include:
+
+**Enhanced Routing System**:
+- Improved routing note handling for more accurate modulation
+- Better integration between different track types and routing parameters
+- Corrected routing source selection for various track types
+- Enhanced LED feedback for routing status
+- More responsive routing assignment
+
+**VCA Next Shaper Improvements**:
+- Enhanced VCA Next (VC) shaper functionality
+- Better amplitude modulation between routes
+- Improved carrier/modulator relationship handling
+- More stable VCA behavior with dynamic sources
+
+**Per-Track Parameter Improvements**:
+- More reliable per-track bias and depth settings
+- Better handling of track-specific shaper parameters
+- Improved memory management for routing parameters
+
 ## 9. Troubleshooting Common Issues
 
 ### 9.1 No Modulation Visible
@@ -367,6 +389,14 @@ Use the **Reset** target to force a track to restart:
 - Shaper is correctly selected
 - Source is actually changing (shapers affect dynamic signals)
 - Per-track shaper settings are properly configured
+
+### 9.5 Routing Issues
+
+**Common Routing Problems**:
+- Check that routing targets are properly assigned
+- Verify that track selection in routes is correct
+- Ensure source values are within expected ranges
+- Confirm that bias/depth settings are appropriate for the target parameter
 
 ## 10. Performance Tips
 

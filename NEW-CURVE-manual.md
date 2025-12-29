@@ -557,18 +557,23 @@ Shaper Gates provide advanced gate generation based on curve analysis:
 - **Falling**: Gate HIGH while voltage is decreasing
 - **>50%**: Comparator - gate HIGH when voltage is in the top half of the range
 
-**Gate Probability:**
-- Controls the likelihood and duration of gate events
-- Range: -1 to 7 with different behaviors:
-  - -1: Always OFF
-  - 0: 12.5% chance (1 tick duration)
-  - 3: 50% chance (4 ticks duration)
-  - 7: 100% chance (8 ticks duration)
-
 **Setting Shaper Gates:**
 - Access via Gate Presets Menu (Page + Step 15)
 - Or configure directly in step gate settings
 - Combine with curve shape and Min/Max values for complex gate patterns
+
+**Advanced Gate Modes:**
+- The Gate Probability parameter in Curve tracks has been repurposed as an Advanced Gate Mode selector
+- Range: 0 to 7 with different behaviors:
+  - 0: OFF (no gate output)
+  - 1: RISE (gate triggers on rising slope)
+  - 2: FALL (gate triggers on falling slope)
+  - 3: MOVE (gate triggers on any slope movement)
+  - 4: > 25% (gate HIGH when voltage is above 25% of range)
+  - 5: > 50% (gate HIGH when voltage is above 50% of range)
+  - 6: > 75% (gate HIGH when voltage is above 75% of range)
+  - 7: WIND (Window mode - gate HIGH when voltage is within a specific window)
+- When combined with Shaper Gates, enables sophisticated gate generation based on curve events (zero crossings, peaks, slopes)
 
 ### 7.3 Multi-Step Gradient Editing
 - **Action**: Select multiple steps, hold **Shift** and turn the Encoder on **MIN** or **MAX**.

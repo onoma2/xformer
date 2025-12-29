@@ -177,11 +177,17 @@
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-[10px] text-gray-600 mb-1">P1</label>
+                            <label class="flex justify-between text-[10px] text-gray-600 mb-1">
+                                <span>P1</span>
+                                <span id="p1Val" class="text-red-400">50%</span>
+                            </label>
                             <input type="range" id="p1Slider" min="0" max="100" value="50">
                         </div>
                         <div>
-                            <label class="block text-[10px] text-gray-600 mb-1">P2</label>
+                            <label class="flex justify-between text-[10px] text-gray-600 mb-1">
+                                <span>P2</span>
+                                <span id="p2Val" class="text-red-400">50%</span>
+                            </label>
                             <input type="range" id="p2Slider" min="0" max="100" value="50">
                         </div>
                     </div>
@@ -559,7 +565,7 @@
         }
 
         function initAudio() {
-            if (audioCtx) return;
+            if (audioCtx && audioCtx.state !== 'closed') return;
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
             
@@ -970,6 +976,39 @@
             document.getElementById('statInput').textContent = rawSrc.toFixed(3);
             document.getElementById('statInter').textContent = intermediate.toFixed(3);
             document.getElementById('statOutput').textContent = final.toFixed(3);
+
+            // Update state monitor for stateful shapers
+            const stateMon = document.getElementById('stateMonitor');
+            let stateTxt = "";
+            let showState = false;
+
+            if (config.shaper === 'location') {
+                stateTxt = shaperState.location.toFixed(2);
+                showState = true;
+            } else if (config.shaper === 'envelope') {
+                stateTxt = shaperState.envelope.toFixed(2);
+                showState = true;
+            } else if (config.shaper === 'frequency') {
+                stateTxt = `FF:${shaperState.frequencyAcc.toFixed(2)} H:${shaperState.ffHold}`;
+                showState = true;
+            } else if (config.shaper === 'activity') {
+                stateTxt = `AD:${shaperState.activityLevel.toFixed(2)} H:${shaperState.actHold}`;
+                showState = true;
+            } else if (config.shaper === 'divider') {
+                stateTxt = `Tr:${shaperState.progThreshold.toFixed(1)} C:${shaperState.progCount.toFixed(0)} H:${shaperState.progHold}`;
+                showState = true;
+            } else if (config.shaper === 'vcanext') {
+                stateTxt = `ModVal:${config.currentVcaVal.toFixed(2)}`;
+                showState = true;
+            }
+
+            if (showState) {
+                stateMon.style.opacity = '1';
+                document.getElementById('statState').textContent = stateTxt;
+            } else {
+                stateMon.style.opacity = '0';
+            }
+
             requestAnimationFrame(draw);
         }
 
@@ -984,11 +1023,27 @@
         document.getElementById('gainSlider').addEventListener('input', (e) => { config.gain = parseInt(e.target.value); document.getElementById('gainVal').textContent = (1.0 + (config.gain/100*2)).toFixed(1) + "x"; });
         document.getElementById('filterSlider').addEventListener('input', (e) => { config.filter = parseInt(e.target.value); document.getElementById('filterVal').textContent = config.filter === 0 ? "Off" : (config.filter < 0 ? "LPF " : "HPF ") + Math.abs(config.filter) + "%"; });
         document.getElementById('xFadeSlider').addEventListener('input', (e) => { config.xFade = parseInt(e.target.value); document.getElementById('xFadeVal').textContent = config.xFade + "%"; });
-        document.getElementById('divisorSlider').addEventListener('input', (e) => { config.divisor = parseInt(e.target.value); document.getElementById('divisorVal').textContent = config.divisor; });
+        document.getElementById('divisorSlider').addEventListener('input', (e) => {
+            config.divisor = parseInt(e.target.value);
+            const noteNames = {6: '1/32', 12: '1/16', 24: '1/8', 48: '1/4', 96: '1/2', 192: '1'};
+            const note = noteNames[config.divisor] || `${config.divisor}`;
+            document.getElementById('divisorVal').textContent = `${config.divisor} (${note})`;
+        });
         document.getElementById('depthSlider').addEventListener('input', (e) => { config.depth = parseInt(e.target.value); document.getElementById('depthVal').textContent = config.depth + "%"; });
         document.getElementById('biasSlider').addEventListener('input', (e) => { config.bias = parseInt(e.target.value); document.getElementById('biasVal').textContent = config.bias + "%"; });
         document.getElementById('offsetSlider').addEventListener('input', (e) => { config.offset = parseInt(e.target.value); document.getElementById('offsetVal').textContent = (config.offset / 100.0).toFixed(1) + "V"; });
-        document.getElementById('shaperSelect').addEventListener('change', (e) => { config.shaper = e.target.value; document.getElementById('shaperDesc').textContent = descriptions[config.shaper] || ""; });
+        document.getElementById('shaperSelect').addEventListener('change', (e) => {
+            config.shaper = e.target.value;
+            document.getElementById('shaperDesc').textContent = descriptions[config.shaper] || "";
+
+            // Show/hide VCA control
+            const vcaControl = document.getElementById('vcaControl');
+            if (config.shaper === 'vcanext') {
+                vcaControl.classList.remove('hidden');
+            } else {
+                vcaControl.classList.add('hidden');
+            }
+        });
         document.getElementById('vcaSlider').addEventListener('input', (e) => { config.vcaSpeed = parseFloat(e.target.value); document.getElementById('vcaVal').textContent = config.vcaSpeed.toFixed(1) + "x"; });
         document.getElementById('resetBtn').addEventListener('click', () => { location.reload(); });
         document.getElementById('audioToggle').addEventListener('click', toggleDrone);
