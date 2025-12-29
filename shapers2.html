@@ -382,15 +382,33 @@
                         <input type="range" id="plucky1VolSlider" min="0" max="100" value="50">
                     </div>
                     <div>
-                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                            <span>Rate</span>
-                            <span id="plucky1RateVal" class="text-gray-400">×8</span>
+                        <label class="text-xs text-gray-500 mb-2 font-medium block">Rate</label>
+                        <div class="flex gap-3 text-xs">
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="plucky1Rate" value="1" class="accent-blue-500">
+                                <span class="text-gray-300">×1</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="plucky1Rate" value="8" checked class="accent-blue-500">
+                                <span class="text-gray-300">×8</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="plucky1Rate" value="16" class="accent-blue-500">
+                                <span class="text-gray-300">×16</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-400">
+                            <input type="checkbox" id="plucky1ModToggle" class="accent-blue-500">
+                            <span>CV Modulation</span>
                         </label>
-                        <select id="plucky1RateSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-1.5 text-xs text-gray-200">
-                            <option value="1">×1</option>
-                            <option value="8" selected>×8</option>
-                            <option value="16">×16</option>
-                        </select>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-400">
+                            <input type="checkbox" id="plucky1GateToggle" class="accent-blue-500">
+                            <span>Gate Trigger</span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -410,15 +428,33 @@
                         <input type="range" id="plucky2VolSlider" min="0" max="100" value="50">
                     </div>
                     <div>
-                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                            <span>Rate</span>
-                            <span id="plucky2RateVal" class="text-gray-400">×8</span>
+                        <label class="text-xs text-gray-500 mb-2 font-medium block">Rate</label>
+                        <div class="flex gap-3 text-xs">
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="plucky2Rate" value="1" class="accent-purple-500">
+                                <span class="text-gray-300">×1</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="plucky2Rate" value="8" checked class="accent-purple-500">
+                                <span class="text-gray-300">×8</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="plucky2Rate" value="16" class="accent-purple-500">
+                                <span class="text-gray-300">×16</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-400">
+                            <input type="checkbox" id="plucky2ModToggle" class="accent-purple-500">
+                            <span>CV Modulation</span>
                         </label>
-                        <select id="plucky2RateSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-1.5 text-xs text-gray-200">
-                            <option value="1">×1</option>
-                            <option value="8" selected>×8</option>
-                            <option value="16">×16</option>
-                        </select>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-400">
+                            <input type="checkbox" id="plucky2GateToggle" class="accent-purple-500">
+                            <span>Gate Trigger</span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -558,9 +594,13 @@
             isPlucky1On: false,
             plucky1Vol: 50,
             plucky1Rate: 8,
+            plucky1Mod: false,
+            plucky1Gate: false,
             isPlucky2On: false,
             plucky2Vol: 50,
-            plucky2Rate: 8
+            plucky2Rate: 8,
+            plucky2Mod: false,
+            plucky2Gate: false
         };
 
         const shaperState = {
@@ -602,11 +642,21 @@
             source: new Array(bufferSize).fill(0.5),
             intermediate: new Array(bufferSize).fill(0.5),
             output: new Array(bufferSize).fill(0.5),
-            gate: new Array(bufferSize).fill(0)
+            gate: new Array(bufferSize).fill(0),
+            index: 0  // Circular buffer index for O(1) updates
+        };
+
+        // Cache for performance optimization
+        const perfCache = {
+            prevInput: 0,
+            prevInter: 0,
+            prevOutput: 0,
+            prevStateTxt: "",
+            ledState: false
         };
 
         let time = 0;
-        let modTime = 0; 
+        let modTime = 0;
         let animationId;
 
         // Audio Engine
@@ -1015,9 +1065,18 @@
         };
 
         function draw() {
-            const w = canvas.logicalWidth;
-            const h = canvas.logicalHeight;
+            const w = canvas.logicalWidth || canvas.width;
+            const h = canvas.logicalHeight || canvas.height;
+
+            if (!w || !h) {
+                requestAnimationFrame(draw);
+                return;
+            }
+
             ctx.clearRect(0, 0, w, h);
+
+            // Calculate step for this frame
+            const step = w / (bufferSize - 1);
 
             // Time Base: 1 Visual Frame = 1 Clock Tick.
             const ticksPerStep = config.divisor * 4.0;
@@ -1117,11 +1176,20 @@
                 // PLUCKY SYNTH LOGIC (Shared counter for sync)
                 shaperState.pluckyCounter++;
 
-                // Plucky 1: Triggered by rawSrc at divisor*rate intervals
-                const plucky1Interval = Math.floor(ticksPerStep / config.plucky1Rate);
-                if (config.isPlucky1On && shaperState.pluckyCounter >= plucky1Interval && (shaperState.pluckyCounter % plucky1Interval === 0)) {
-                    // Sample rawSrc for note modulation
-                    const freq1 = cvToFrequency(rawSrc);
+                // Plucky 1: Triggered by counter OR gate
+                let plucky1Trigger = false;
+                if (config.plucky1Gate) {
+                    // Gate trigger mode: use same trigger as noise
+                    plucky1Trigger = trigger || active;
+                } else {
+                    // Counter mode: trigger at divisor*rate intervals
+                    const plucky1Interval = Math.floor(ticksPerStep / config.plucky1Rate);
+                    plucky1Trigger = shaperState.pluckyCounter >= plucky1Interval && (shaperState.pluckyCounter % plucky1Interval === 0);
+                }
+
+                if (config.isPlucky1On && plucky1Trigger) {
+                    // Apply frequency modulation if enabled, otherwise constant pitch
+                    const freq1 = config.plucky1Mod ? cvToFrequency(rawSrc) : 220.0;
                     if (plucky1Osc) plucky1Osc.frequency.setTargetAtTime(freq1, now, 0.001);
 
                     // Trigger envelope
@@ -1132,11 +1200,20 @@
                     }
                 }
 
-                // Plucky 2: Triggered by final (routed) at divisor*rate intervals
-                const plucky2Interval = Math.floor(ticksPerStep / config.plucky2Rate);
-                if (config.isPlucky2On && shaperState.pluckyCounter >= plucky2Interval && (shaperState.pluckyCounter % plucky2Interval === 0)) {
-                    // Sample final (after routing) for note modulation
-                    const freq2 = cvToFrequency(final);
+                // Plucky 2: Triggered by counter OR gate
+                let plucky2Trigger = false;
+                if (config.plucky2Gate) {
+                    // Gate trigger mode: use same trigger as noise
+                    plucky2Trigger = trigger || active;
+                } else {
+                    // Counter mode: trigger at divisor*rate intervals
+                    const plucky2Interval = Math.floor(ticksPerStep / config.plucky2Rate);
+                    plucky2Trigger = shaperState.pluckyCounter >= plucky2Interval && (shaperState.pluckyCounter % plucky2Interval === 0);
+                }
+
+                if (config.isPlucky2On && plucky2Trigger) {
+                    // Apply frequency modulation if enabled, otherwise constant pitch
+                    const freq2 = config.plucky2Mod ? cvToFrequency(final) : 220.0;
                     if (plucky2Osc) plucky2Osc.frequency.setTargetAtTime(freq2, now, 0.001);
 
                     // Trigger envelope
@@ -1148,17 +1225,21 @@
                 }
             }
 
-            history.source.shift(); history.source.push(rawSrc);
-            history.intermediate.shift(); history.intermediate.push(intermediate);
-            history.output.shift(); history.output.push(final);
-            history.gate.shift(); history.gate.push(shaperState.gateHigh ? 1 : 0);
+            // Circular buffer write (O(1) instead of O(n) shift/push)
+            history.source[history.index] = rawSrc;
+            history.intermediate[history.index] = intermediate;
+            history.output[history.index] = final;
+            history.gate[history.index] = shaperState.gateHigh ? 1 : 0;
+            history.index = (history.index + 1) % bufferSize;
 
             function drawWave(data, color, width, alpha, glow) {
                 ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.globalAlpha = alpha;
                 if(glow) { ctx.shadowBlur = 15; ctx.shadowColor = color; }
-                const step = w / (bufferSize - 1);
+                // Read from circular buffer: oldest to newest
                 for (let i = 0; i < bufferSize; i++) {
-                    const x = i * step; const y = h - (data[i] * h);
+                    const bufIdx = (history.index + i) % bufferSize;
+                    const x = i * step;
+                    const y = h - (data[bufIdx] * h);
                     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                 }
                 ctx.stroke(); ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
@@ -1166,33 +1247,49 @@
 
             // Draw Gate Lane
             ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
-            const step = w / (bufferSize - 1);
             for (let i = 0; i < bufferSize; i++) {
-                if (history.gate[i]) ctx.fillRect(i * step, h - 20, step + 1, 20);
+                const bufIdx = (history.index + i) % bufferSize;
+                if (history.gate[bufIdx]) ctx.fillRect(i * step, h - 20, step + 1, 20);
             }
 
             drawWave(history.source, '#52525b', 3, 0.5, false);
             drawWave(history.intermediate, '#3b82f6', 3, 0.8, false);
             drawWave(history.output, '#10b981', 4, 1.0, true);
 
-            const lastY = h - (history.output[bufferSize-1] * h);
+            // Draw current value indicator (read from newest buffer position)
+            const newestIdx = (history.index - 1 + bufferSize) % bufferSize;
+            const lastY = h - (history.output[newestIdx] * h);
             ctx.fillStyle = '#10b981'; ctx.shadowBlur = 10; ctx.shadowColor = '#10b981';
             ctx.beginPath(); ctx.arc(w - 6, lastY, 5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
 
-            const led = document.getElementById('gateLed');
-            if (shaperState.gateHigh) {
-                led.classList.remove('bg-red-900', 'border-red-900/50');
-                led.classList.add('bg-red-500', 'border-red-400', 'shadow-[0_0_10px_rgba(239,68,68,0.8)]');
-            } else {
-                led.classList.add('bg-red-900', 'border-red-900/50');
-                led.classList.remove('bg-red-500', 'border-red-400', 'shadow-[0_0_10px_rgba(239,68,68,0.8)]');
+            // Update LED state (only when changed)
+            if (shaperState.gateHigh !== perfCache.ledState) {
+                perfCache.ledState = shaperState.gateHigh;
+                const led = document.getElementById('gateLed');
+                if (shaperState.gateHigh) {
+                    led.classList.remove('bg-red-900', 'border-red-900/50');
+                    led.classList.add('bg-red-500', 'border-red-400', 'shadow-[0_0_10px_rgba(239,68,68,0.8)]');
+                } else {
+                    led.classList.add('bg-red-900', 'border-red-900/50');
+                    led.classList.remove('bg-red-500', 'border-red-400', 'shadow-[0_0_10px_rgba(239,68,68,0.8)]');
+                }
             }
 
-            document.getElementById('statInput').textContent = rawSrc.toFixed(3);
-            document.getElementById('statInter').textContent = intermediate.toFixed(3);
-            document.getElementById('statOutput').textContent = final.toFixed(3);
+            // Update value displays (only when changed by > 0.001)
+            if (Math.abs(rawSrc - perfCache.prevInput) > 0.001) {
+                document.getElementById('statInput').textContent = rawSrc.toFixed(3);
+                perfCache.prevInput = rawSrc;
+            }
+            if (Math.abs(intermediate - perfCache.prevInter) > 0.001) {
+                document.getElementById('statInter').textContent = intermediate.toFixed(3);
+                perfCache.prevInter = intermediate;
+            }
+            if (Math.abs(final - perfCache.prevOutput) > 0.001) {
+                document.getElementById('statOutput').textContent = final.toFixed(3);
+                perfCache.prevOutput = final;
+            }
 
-            // Update state monitor for stateful shapers
+            // Update state monitor for stateful shapers (only when changed)
             const stateMon = document.getElementById('stateMonitor');
             let stateTxt = "";
             let showState = false;
@@ -1217,11 +1314,15 @@
                 showState = true;
             }
 
-            if (showState) {
-                stateMon.style.opacity = '1';
-                document.getElementById('statState').textContent = stateTxt;
-            } else {
-                stateMon.style.opacity = '0';
+            // Only update DOM when state text changes
+            if (stateTxt !== perfCache.prevStateTxt) {
+                if (showState) {
+                    stateMon.style.opacity = '1';
+                    document.getElementById('statState').textContent = stateTxt;
+                } else {
+                    stateMon.style.opacity = '0';
+                }
+                perfCache.prevStateTxt = stateTxt;
             }
 
             requestAnimationFrame(draw);
@@ -1273,10 +1374,17 @@
             document.getElementById('plucky1VolVal').textContent = config.plucky1Vol + "%";
             if (config.isPlucky1On && plucky1Gain) plucky1Gain.gain.value = config.plucky1Vol / 100.0;
         });
-        document.getElementById('plucky1RateSelect').addEventListener('change', (e) => {
-            config.plucky1Rate = parseFloat(e.target.value);
-            document.getElementById('plucky1RateVal').textContent = e.target.options[e.target.selectedIndex].text;
-            shaperState.pluckyCounter = 0; // Reset shared counter when rate changes
+        document.querySelectorAll('input[name="plucky1Rate"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                config.plucky1Rate = parseFloat(e.target.value);
+                shaperState.pluckyCounter = 0; // Reset shared counter when rate changes
+            });
+        });
+        document.getElementById('plucky1ModToggle').addEventListener('change', (e) => {
+            config.plucky1Mod = e.target.checked;
+        });
+        document.getElementById('plucky1GateToggle').addEventListener('change', (e) => {
+            config.plucky1Gate = e.target.checked;
         });
 
         document.getElementById('plucky2Toggle').addEventListener('click', togglePlucky2);
@@ -1285,10 +1393,17 @@
             document.getElementById('plucky2VolVal').textContent = config.plucky2Vol + "%";
             if (config.isPlucky2On && plucky2Gain) plucky2Gain.gain.value = config.plucky2Vol / 100.0;
         });
-        document.getElementById('plucky2RateSelect').addEventListener('change', (e) => {
-            config.plucky2Rate = parseFloat(e.target.value);
-            document.getElementById('plucky2RateVal').textContent = e.target.options[e.target.selectedIndex].text;
-            shaperState.pluckyCounter = 0; // Reset shared counter when rate changes
+        document.querySelectorAll('input[name="plucky2Rate"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                config.plucky2Rate = parseFloat(e.target.value);
+                shaperState.pluckyCounter = 0; // Reset shared counter when rate changes
+            });
+        });
+        document.getElementById('plucky2ModToggle').addEventListener('change', (e) => {
+            config.plucky2Mod = e.target.checked;
+        });
+        document.getElementById('plucky2GateToggle').addEventListener('change', (e) => {
+            config.plucky2Gate = e.target.checked;
         });
 
         document.getElementById('gateMaskSlider').addEventListener('input', (e) => { config.gateMask = parseInt(e.target.value); updateGateLabels(); });
