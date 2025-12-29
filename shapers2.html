@@ -384,12 +384,12 @@
                     <div>
                         <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
                             <span>Rate</span>
-                            <span id="plucky1RateVal" class="text-gray-400">×1</span>
+                            <span id="plucky1RateVal" class="text-gray-400">×8</span>
                         </label>
                         <select id="plucky1RateSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-1.5 text-xs text-gray-200">
-                            <option value="0.5">÷2</option>
-                            <option value="1" selected>×1</option>
-                            <option value="2">×2</option>
+                            <option value="1">×1</option>
+                            <option value="8" selected>×8</option>
+                            <option value="16">×16</option>
                         </select>
                     </div>
                 </div>
@@ -412,12 +412,12 @@
                     <div>
                         <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
                             <span>Rate</span>
-                            <span id="plucky2RateVal" class="text-gray-400">×1</span>
+                            <span id="plucky2RateVal" class="text-gray-400">×8</span>
                         </label>
                         <select id="plucky2RateSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-1.5 text-xs text-gray-200">
-                            <option value="0.5">÷2</option>
-                            <option value="1" selected>×1</option>
-                            <option value="2">×2</option>
+                            <option value="1">×1</option>
+                            <option value="8" selected>×8</option>
+                            <option value="16">×16</option>
                         </select>
                     </div>
                 </div>
@@ -557,10 +557,10 @@
             noiseVol: 50,
             isPlucky1On: false,
             plucky1Vol: 50,
-            plucky1Rate: 1,
+            plucky1Rate: 8,
             isPlucky2On: false,
             plucky2Vol: 50,
-            plucky2Rate: 1
+            plucky2Rate: 8
         };
 
         const shaperState = {
@@ -592,9 +592,8 @@
             wasRising: false,
             wasFalling: false,
             noiseGainCurrent: 0.0, // Manual envelope state
-            plucky1Counter: 0,
+            pluckyCounter: 0, // Shared counter for both plucky synths
             plucky1Env: 0.0,
-            plucky2Counter: 0,
             plucky2Env: 0.0
         };
 
@@ -673,7 +672,7 @@
             // 3. Plucky 1 (Square wave with filter for plucky sound)
             plucky1Osc = audioCtx.createOscillator();
             plucky1Osc.type = 'square';
-            plucky1Osc.frequency.value = 110; // A2
+            plucky1Osc.frequency.value = 220; // A3
 
             plucky1Filter = audioCtx.createBiquadFilter();
             plucky1Filter.type = 'lowpass';
@@ -695,7 +694,7 @@
             // 4. Plucky 2 (Sawtooth with different filter for distinct timbre)
             plucky2Osc = audioCtx.createOscillator();
             plucky2Osc.type = 'sawtooth';
-            plucky2Osc.frequency.value = 110; // A2
+            plucky2Osc.frequency.value = 220; // A3
 
             plucky2Filter = audioCtx.createBiquadFilter();
             plucky2Filter.type = 'lowpass';
@@ -798,10 +797,10 @@
         }
 
         // Map 0.0-1.0 CV to frequency in A major scale
-        // 0.5 = A2 (110Hz), -1 octave to +1 octave range
+        // 0.5 = A3 (220Hz), -1 octave to +1 octave range
         function cvToFrequency(cv) {
             const aMajorScale = [0, 2, 4, 5, 7, 9, 11]; // A major scale in semitones from A
-            const baseFreq = 110.0; // A2
+            const baseFreq = 220.0; // A3
 
             // Map 0.0-1.0 to -12 to +12 semitones (2 octave range centered on A)
             const semitoneRange = 24; // 2 octaves
@@ -1040,7 +1039,7 @@
             const final = applyShaper(config.shaper, intermediate, biasNormalized);
 
             // Gate Logic
-            const current = final;
+            const current = rawSrc;
             const prev = shaperState.prevOut;
             const slope = current - prev;
             const slopeThresh = 0.005; // Increased threshold to reject noise
@@ -1087,7 +1086,7 @@
                 const now = audioCtx.currentTime;
                 // DRONE MODULATION
                 if (isDroneOn) {
-                    const cutoff = 50 + Math.pow(final, 3) * 8000;
+                    const cutoff = 50 + Math.pow(rawSrc, 3) * 8000;
                     filter.frequency.setTargetAtTime(cutoff, now, 0.01);
                 }
 
@@ -1115,13 +1114,12 @@
                 // Apply to Node
                 if(noiseEnv) noiseEnv.gain.value = shaperState.noiseGainCurrent;
 
-                // PLUCKY SYNTH LOGIC
-                // Plucky 1: Triggered by rawSrc at divisor*rate intervals
-                shaperState.plucky1Counter++;
-                const plucky1Interval = Math.floor(ticksPerStep / config.plucky1Rate);
-                if (config.isPlucky1On && shaperState.plucky1Counter >= plucky1Interval) {
-                    shaperState.plucky1Counter = 0;
+                // PLUCKY SYNTH LOGIC (Shared counter for sync)
+                shaperState.pluckyCounter++;
 
+                // Plucky 1: Triggered by rawSrc at divisor*rate intervals
+                const plucky1Interval = Math.floor(ticksPerStep / config.plucky1Rate);
+                if (config.isPlucky1On && shaperState.pluckyCounter >= plucky1Interval && (shaperState.pluckyCounter % plucky1Interval === 0)) {
                     // Sample rawSrc for note modulation
                     const freq1 = cvToFrequency(rawSrc);
                     if (plucky1Osc) plucky1Osc.frequency.setTargetAtTime(freq1, now, 0.001);
@@ -1130,16 +1128,13 @@
                     if (plucky1Env) {
                         plucky1Env.gain.cancelScheduledValues(now);
                         plucky1Env.gain.setValueAtTime(0.8, now);
-                        plucky1Env.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                        plucky1Env.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
                     }
                 }
 
                 // Plucky 2: Triggered by final (routed) at divisor*rate intervals
-                shaperState.plucky2Counter++;
                 const plucky2Interval = Math.floor(ticksPerStep / config.plucky2Rate);
-                if (config.isPlucky2On && shaperState.plucky2Counter >= plucky2Interval) {
-                    shaperState.plucky2Counter = 0;
-
+                if (config.isPlucky2On && shaperState.pluckyCounter >= plucky2Interval && (shaperState.pluckyCounter % plucky2Interval === 0)) {
                     // Sample final (after routing) for note modulation
                     const freq2 = cvToFrequency(final);
                     if (plucky2Osc) plucky2Osc.frequency.setTargetAtTime(freq2, now, 0.001);
@@ -1148,7 +1143,7 @@
                     if (plucky2Env) {
                         plucky2Env.gain.cancelScheduledValues(now);
                         plucky2Env.gain.setValueAtTime(0.8, now);
-                        plucky2Env.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                        plucky2Env.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
                     }
                 }
             }
@@ -1281,7 +1276,7 @@
         document.getElementById('plucky1RateSelect').addEventListener('change', (e) => {
             config.plucky1Rate = parseFloat(e.target.value);
             document.getElementById('plucky1RateVal').textContent = e.target.options[e.target.selectedIndex].text;
-            shaperState.plucky1Counter = 0; // Reset counter when rate changes
+            shaperState.pluckyCounter = 0; // Reset shared counter when rate changes
         });
 
         document.getElementById('plucky2Toggle').addEventListener('click', togglePlucky2);
@@ -1293,7 +1288,7 @@
         document.getElementById('plucky2RateSelect').addEventListener('change', (e) => {
             config.plucky2Rate = parseFloat(e.target.value);
             document.getElementById('plucky2RateVal').textContent = e.target.options[e.target.selectedIndex].text;
-            shaperState.plucky2Counter = 0; // Reset counter when rate changes
+            shaperState.pluckyCounter = 0; // Reset shared counter when rate changes
         });
 
         document.getElementById('gateMaskSlider').addEventListener('input', (e) => { config.gateMask = parseInt(e.target.value); updateGateLabels(); });

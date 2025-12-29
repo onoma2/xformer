@@ -90,7 +90,12 @@ void IndexedMathPage::keyPress(KeyPressEvent &event) {
     if (key.isFunction()) {
         int fn = key.function();
         if (fn >= 0 && fn <= 3) {
-            _editParam = static_cast<EditParam>(fn);
+            auto nextParam = static_cast<EditParam>(fn);
+            if (_editParam == nextParam) {
+                _activeOp = (_activeOp == ActiveOp::A) ? ActiveOp::B : ActiveOp::A;
+            } else {
+                _editParam = nextParam;
+            }
             event.consume();
             return;
         }

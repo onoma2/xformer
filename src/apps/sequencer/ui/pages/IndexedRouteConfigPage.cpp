@@ -194,7 +194,19 @@ void IndexedRouteConfigPage::keyPress(KeyPressEvent &event) {
     if (key.isFunction()) {
         int fn = key.function();
         if (fn >= 0 && fn <= 3) {
-            _editParam = static_cast<EditParam>(fn);
+            auto nextParam = static_cast<EditParam>(fn);
+            if (_editParam == nextParam) {
+                if (_activeRoute == ActiveRoute::RouteA) {
+                    _activeRoute = ActiveRoute::RouteB;
+                } else {
+                    _activeRoute = ActiveRoute::RouteA;
+                }
+            } else {
+                _editParam = nextParam;
+                if (_activeRoute == ActiveRoute::Mix) {
+                    _activeRoute = ActiveRoute::RouteA;
+                }
+            }
         }
 
         // F5: Commit changes (if any) or go back, SHIFT+F5 to cancel
