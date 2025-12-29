@@ -1094,12 +1094,12 @@ void CurveSequenceEditPage::drawDetail(Canvas &canvas, const CurveSequence::Step
             int y = 32 - 4;
             int spacing = 16;
             int startX = 64 + 32 + 8;
-            
+
             auto drawBit = [&](int bit, const char* name, int idx) {
                 canvas.setColor((gate & (1<<bit)) ? Color::Bright : Color::Low);
                 canvas.drawText(startX + idx * spacing, y, name);
             };
-            
+
             drawBit(0, "P", 0);
             drawBit(1, "T", 1);
             drawBit(2, "Z+", 2);
@@ -1223,8 +1223,8 @@ void CurveSequenceEditPage::initSettings() {
     } else if (_editMode == EditMode::Chaos) {
         sequence.setChaosAmount(0);
         sequence.setChaosRate(0);
-        sequence.setChaosParam1(50);
-        sequence.setChaosParam2(50);
+        sequence.setChaosParam1(34);
+        sequence.setChaosParam2(73);
         sequence.setChaosAlgo(CurveSequence::ChaosAlgorithm::Latoocarfian);
         sequence.setChaosRange(CurveSequence::ChaosRange::Mid);
         showMessage("CHAOS INITIALIZED");
@@ -1382,7 +1382,7 @@ void CurveSequenceEditPage::macroContextShow() {
 void CurveSequenceEditPage::macroContextAction(int index) {
     auto &sequence = _project.selectedCurveSequence();
 
-    // Determine range: 
+    // Determine range:
     // 1. If multiple steps selected: use selection bounds.
     // 2. If single step selected: use step as start, sequence last step as end.
     // 3. If no selection: use sequence loop bounds.
@@ -1396,7 +1396,7 @@ void CurveSequenceEditPage::macroContextAction(int index) {
         lastStep = sequence.lastStep();
         // Handle case where selected step is after loop end
         if (firstStep > lastStep) {
-            lastStep = firstStep; 
+            lastStep = firstStep;
         }
     } else {
         firstStep = sequence.firstStep();

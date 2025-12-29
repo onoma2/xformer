@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>__X FORMER Routing Shaper Visualizer</title>
+    <title>__X FORMER Curve and Routing Shaper Visualizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
@@ -85,10 +85,10 @@
     <header class="h-14 border-b border-gray-800 bg-[#1e1e24] flex justify-between items-center px-6 z-20 shrink-0">
         <div class="flex items-center gap-3">
             <div class="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center font-bold text-black shadow-[0_0_15px_rgba(16,185,129,0.4)]">X</div>
-            <h1 class="text-lg font-bold tracking-tight text-white">__X FORMER <span class="text-gray-500 font-normal ml-2 text-sm">Routing Shaper Visualizer</span></h1>
+            <h1 class="text-lg font-bold tracking-tight text-white">__X FORMER <span class="text-gray-500 font-normal ml-2 text-sm">Curve and Routing Shaper Visualizer</span></h1>
         </div>
         <div class="text-xs text-gray-500 flex gap-4">
-            <span class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-gray-600"></div> Source</span>
+            <span class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-gray-600"></div>Curve/Source</span>
             <span class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-blue-500"></div> Bias/Depth</span>
             <span class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div> Output</span>
         </div>
@@ -99,8 +99,8 @@
 
         <!-- Controls Sidebar -->
         <aside class="w-full lg:w-80 bg-[#18181b] border-r border-gray-800 p-5 overflow-y-auto flex-shrink-0 z-10 custom-scrollbar space-y-4">
-            
-            <!-- 
+
+            <!--
             ========================================================================
             CURVE TRACK SIGNAL GENERATOR - DONE - DONT CHANGE
             MATHEMATICAL MODEL AND UI ARE FINAL AND SYNCED WITH C++
@@ -127,7 +127,7 @@
                     </div>
                     <div>
                         <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                            <span>Step Length (Divisor)</span>
+                            <span>Divisor</span>
                             <span id="divisorVal" class="text-white bg-gray-800 px-1.5 py-0.5 rounded">48 (1/4)</span>
                         </label>
                         <input type="range" id="divisorSlider" min="6" max="192" step="6" value="48">
@@ -248,7 +248,7 @@
                 </div>
             </div>
 
-            <!-- 
+            <!--
             ========================================================================
             END OF CURVE TRACK SECTION - DONE - DONT CHANGE
             ========================================================================
@@ -256,7 +256,7 @@
 
             <div class="flex justify-center -my-2 opacity-20"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>
 
-            <!-- 
+            <!--
             ========================================================================
             ROUTE PROCESSING SECTION - DONE - DONT CHANGE
             MATHEMATICAL MODEL AND UI ARE FINAL AND SYNCED WITH C++
@@ -316,7 +316,7 @@
                 </div>
             </div>
 
-            <!-- 
+            <!--
             ========================================================================
             END OF ROUTE PROCESSING SECTION - DONE - DONT CHANGE
             ========================================================================
@@ -570,9 +570,9 @@
 
         const config = {
             waveform: 'bipolarSine',
-            divisor: 48, 
-            depth: 100, 
-            bias: 0,    
+            divisor: 48,
+            depth: 100,
+            bias: 0,
             shaper: 'none',
             vcaSpeed: 1.0,
             currentVcaVal: 0.5,
@@ -685,14 +685,14 @@
             if (audioCtx && audioCtx.state !== 'closed') return;
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
-            
+
             // 1. Drone (Sawtooth)
             osc = audioCtx.createOscillator();
             osc.type = 'sawtooth';
             osc.frequency.value = 110;
             filter = audioCtx.createBiquadFilter();
             filter.type = 'lowpass';
-            filter.Q.value = 5; 
+            filter.Q.value = 5;
             mainGain = audioCtx.createGain();
             mainGain.gain.value = 0; // Start silent
 
@@ -706,10 +706,10 @@
             noiseNode = audioCtx.createBufferSource();
             noiseNode.buffer = noiseBuffer;
             noiseNode.loop = true;
-            
+
             noiseFilter = audioCtx.createBiquadFilter();
             noiseFilter.type = 'highpass';
-            noiseFilter.frequency.value = 3000; 
+            noiseFilter.frequency.value = 3000;
 
             noiseEnv = audioCtx.createGain();
             noiseEnv.gain.value = 0;
@@ -767,10 +767,10 @@
         function toggleDrone() {
             initAudio();
             if (audioCtx.state === 'suspended') audioCtx.resume();
-            
+
             isDroneOn = !isDroneOn;
             const btn = document.getElementById('audioToggle');
-            
+
             if (isDroneOn) {
                 mainGain.gain.setTargetAtTime(parseFloat(document.getElementById('volSlider').value)/100, audioCtx.currentTime, 0.05);
                 btn.textContent = "Disable";
@@ -923,7 +923,7 @@
         function applyDjFilter(input, control) {
             if (control > -0.02 && control < 0.02) return input;
             let alpha = control < 0.0 ? 1.0 - Math.abs(control) : 0.1 + Math.abs(control) * 0.85;
-            alpha = clamp(alpha * alpha, 0.005, 0.95) * 0.1; 
+            alpha = clamp(alpha * alpha, 0.005, 0.95) * 0.1;
             shaperState.lpfState = shaperState.lpfState + alpha * (input - shaperState.lpfState);
             shaperState.lpfState = clamp(shaperState.lpfState, 0.0, 1.0);
             if (control < 0.0) return shaperState.lpfState;
@@ -1081,7 +1081,7 @@
             // Time Base: 1 Visual Frame = 1 Clock Tick.
             const ticksPerStep = config.divisor * 4.0;
             const timeStep = 1.0 / ticksPerStep;
-            
+
             time += timeStep;
             modTime += 0.002 * config.vcaSpeed;
             config.currentVcaVal = (Math.sin(modTime) + 1.0) * 0.5;
@@ -1162,14 +1162,14 @@
                 const attackRate = 0.5;  // Fast attack (~2 frames)
                 const releaseRate = 0.5; // Fast release (~2 frames)
                 const rate = targetGain > shaperState.noiseGainCurrent ? attackRate : releaseRate;
-                
+
                 shaperState.noiseGainCurrent += (targetGain - shaperState.noiseGainCurrent) * rate;
-                
+
                 // Snap to silence
                 if (targetGain === 0 && shaperState.noiseGainCurrent < 0.001) {
                     shaperState.noiseGainCurrent = 0;
                 }
-                
+
                 // Apply to Node
                 if(noiseEnv) noiseEnv.gain.value = shaperState.noiseGainCurrent;
 
@@ -1418,9 +1418,9 @@
             const mask = config.gateMask;
             const param = config.gateParam;
             const exp = document.getElementById('gateExplanation');
-            
+
             document.getElementById('gateMaskVal').textContent = gateMaskNames[mask];
-            
+
             if (mask > 0) {
                 document.getElementById('gateParamVal').textContent = gateParamNamesTrig[param];
                 // Build event string
@@ -1439,13 +1439,13 @@
                     "Gate High while voltage is Changing (Any Slope).",
                     "Gate High when voltage > 25% (+1.25V).",
                     "Gate High when voltage > 50% (0V).",
-                    "Gate High when voltage > 75% (+2.5V).", 
+                    "Gate High when voltage > 75% (+2.5V).",
                     "Gate High when voltage is between 25% and 75%."
                 ];
                 exp.textContent = descriptions[param];
             }
         }
-        
+
         updateGateLabels();
         animationId = requestAnimationFrame(draw);
     </script>
