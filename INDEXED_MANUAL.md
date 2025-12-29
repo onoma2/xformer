@@ -219,7 +219,22 @@ Multiple routes can be combined in different ways:
 **Min**: Use minimum of Route A and Route B values
 **Max**: Use maximum of Route A and Route B values
 
-### 5.4 Math Operations (F5)
+### 5.4 Routing Improvements
+
+Recent updates to the routing system include:
+
+**Enhanced Indexed Routing**:
+- Improved routing note handling for more accurate modulation
+- Better integration between groups and routing parameters
+- Corrected routing source selection for Indexed tracks
+- Enhanced LED feedback for routing status
+
+**Group Routing Enhancements**:
+- More responsive group assignment
+- Improved visual feedback when groups are active
+- Better handling of multiple simultaneous group assignments
+
+### 5.5 Math Operations (F5)
 
 The Math page allows you to apply batch operations to selected steps (or all steps/groups).
 
@@ -374,15 +389,13 @@ Macros provide powerful generative and transformative operations on sequences. A
 - **REV**: Reverse step order - mirrors all step properties
 - **MIRR**: Mirror steps around midpoint - copies first half to second half
 
-**Macro Behavior**:
-- Select specific steps to apply macro to that range only
-- Leave no selection to apply to the entire active sequence (rhythm macros reset active length to the pattern size)
-- Macros modify existing step data in place
-- Use step selection for surgical edits of specific ranges
-- Combine multiple macros for complex generative results
-- Rhythm generators distribute 768 ticks as evenly as possible, set note index to 0, and gate to minimum ticks
-- Melodic generators primarily affect note indices
-- Waveforms apply to Duration only, clamp to 8..192 ticks, and quantize total to a multiple of 96
+**New Macro Features**:
+- **Improved Macro Selection**: Macros now operate more reliably with step selection
+- **Enhanced Rhythm Generators**: Better distribution algorithms for more musical results
+- **Advanced Melodic Generators**: Improved scale and chord generation algorithms
+- **Waveform Macros**: More sophisticated waveform generation with better timing quantization
+- **Macro Persistence**: Macro settings are now properly saved and restored
+- **Enhanced Group Operations**: Better handling of group-based operations in macros
 
 ### 9.4 Editing Tips
 

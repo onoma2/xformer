@@ -409,6 +409,34 @@ The combination of quality limiting and 1kHz interpolation ensures clean output:
 
 **Result:** You can safely use fast LFO rates (divisor=32, rate=4x) for audio-rate FM without aliasing or clicking artifacts.
 
+**Curve Rate Routing Setup:**
+- Target: Curve Rate (available in routing menu)
+- Source: CV Input, MIDI CC, or other modulation source
+- Min/Max: Set range for modulation depth (e.g., 100-200 for 1x to 2x speed)
+- Track Selection: Apply to specific curve tracks only
+- Bias/Depth: Use per-track bias/depth for individual control
+
+### 3.7 Play Mode Configuration
+
+The Curve track now supports different play modes that determine how the sequence advances:
+
+**Free Mode**:
+- Uses the phase accumulator system described above
+- Allows for FM modulation via Curve Rate
+- Provides continuous, non-grid-locked timing
+- Best for audio-rate FM and smooth modulation
+
+**Aligned Mode**:
+- Grid-locked to sequencer clock
+- Steps advance at divisor boundaries
+- Quantized timing perfect for rhythmic LFOs
+- No speed modulation possible (Curve Rate has no effect)
+
+**Setting Play Mode**:
+- Access via Track settings page (Shift+S3)
+- Select "Play Mode" parameter
+- Choose between "Free" or "Aligned"
+
 ## 4. Chaos Engine
 
 A generative engine inserted *before* the wavefolder.
@@ -433,6 +461,19 @@ A generative engine inserted *before* the wavefolder.
 - **Toggle**: Hold **Shift + F2** to switch between algorithms.
 - **Latoocarfian**: Stepped/Sample&Hold character, chaotic jumps.
 - **Lorenz**: Smooth/Attractor character, flowing modulation.
+
+### 4.3 Chaos Engine Enhancements
+Recent updates to the chaos engine include:
+
+**Above/Below Engine Integration**:
+- Enhanced chaos behavior with range control
+- Improved voltage range handling for more musical results
+- Better integration with curve shapes and wavefolding
+
+**Crossfade Original Shape**:
+- Option to blend between original shape and chaos-modified shape
+- Access via XFADE parameter when in chaos mode
+- Allows for subtle chaos application without complete signal transformation
 
 ## 5. Advanced Playback
 
@@ -506,6 +547,29 @@ Quickly assign dynamic gate behaviors based on the curve slope or levels.
 - **Note Track**: Double-click a step button to toggle the Gate (on any non-gate layer).
 - **Curve Track**: Double-click a step button to toggle the **Peak+Trough** gate preset.
 
-### 7.2 Multi-Step Gradient Editing
+### 7.2 Shaper Gates
+Shaper Gates provide advanced gate generation based on curve analysis:
+
+**Available Shaper Gate Types:**
+- **Zero Cross (ZC+)**: Trigger at every zero crossing (rising + falling)
+- **End of Cycle/End of Rise (EOC/EOR)**: Trigger at every local maximum and minimum (peaks/troughs)
+- **Rising**: Gate HIGH while voltage is increasing
+- **Falling**: Gate HIGH while voltage is decreasing
+- **>50%**: Comparator - gate HIGH when voltage is in the top half of the range
+
+**Gate Probability:**
+- Controls the likelihood and duration of gate events
+- Range: -1 to 7 with different behaviors:
+  - -1: Always OFF
+  - 0: 12.5% chance (1 tick duration)
+  - 3: 50% chance (4 ticks duration)
+  - 7: 100% chance (8 ticks duration)
+
+**Setting Shaper Gates:**
+- Access via Gate Presets Menu (Page + Step 15)
+- Or configure directly in step gate settings
+- Combine with curve shape and Min/Max values for complex gate patterns
+
+### 7.3 Multi-Step Gradient Editing
 - **Action**: Select multiple steps, hold **Shift** and turn the Encoder on **MIN** or **MAX**.
 - **Result**: Creates a linear ramp of values from the first selected step to the last.

@@ -350,7 +350,25 @@ Macros provide powerful generative and transformative operations on threshold ma
 - Use T-MIRR/N-MIRR to create symmetric patterns
 - Use T-REV/N-REV to completely reverse patterns
 
-### 9.4 Initialization Pattern
+### 9.4 Macro Improvements
+
+Recent updates to DiscreteMap macros include:
+
+**Enhanced Macro Operations**:
+- Improved I_8, I_5(2), I_7(3), I_9(4) distribution macros for better even spacing
+- More reasonable M-CLUSTER algorithm with controlled spread
+- Fixed threshold inversion (T-INV) operation
+- Better handling of voicing for selected/active stages
+- Corrected voicing C0 behavior
+- Improved voicing quickedit functionality
+- Fixed double-click threshold editing
+
+**Macro Selection Logic**:
+- Macros now properly respect stage selection when appropriate
+- Active stage detection improved for more accurate macro application
+- Better handling of mixed active/inactive stages during macro operations
+
+### 9.5 Initialization Pattern
 
 When a DiscreteMap sequence is initialized (INIT context menu), all 32 stages are set with:
 - **Thresholds**: Interleaved "fret pattern" distribution across -100 to +100
@@ -364,7 +382,7 @@ The initialization uses round-robin interleaving across all 4 sections:
 - Creates optimal threshold distribution for guitar-fret-like CV scanning
 - Simply enable stages (change direction) to activate pre-spaced thresholds
 
-### 9.5 Editing Tips
+### 9.6 Editing Tips
 
 - Use Length mode for proportional musical mappings
 - Use Position mode for precise voltage control
@@ -372,7 +390,7 @@ The initialization uses round-robin interleaving across all 4 sections:
 - Use Slew for smooth transitions between stages
 - Multi-select stages to edit multiple parameters simultaneously
 
-### 9.4 Performance Considerations
+### 9.7 Performance Considerations
 
 - More active stages may consume slightly more CPU
 - External CV routing works with standard routing matrix

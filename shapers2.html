@@ -116,7 +116,7 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-tighter">Waveform</label>
-                        <select id="waveformSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-orange-500 focus:outline-none transition-all">
+                        <select id="waveformSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-orange-500 focus:outline-none">
                             <option value="bipolarSine">Bipolar Sine</option>
                             <option value="bipolarTriangle">Bipolar Triangle</option>
                             <option value="bipolarSaw">Bipolar Sawtooth</option>
@@ -310,6 +310,12 @@
                 </div>
             </div>
 
+            <!-- 
+            ========================================================================
+            END OF ROUTE PROCESSING SECTION - DONE - DONT CHANGE
+            ========================================================================
+            -->
+
             <button id="resetBtn" class="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-widest rounded border border-gray-700 hover:border-gray-600 transition-all">
                 Reset All Parameters
             </button>
@@ -317,7 +323,7 @@
             <!-- Audio Monitor -->
             <div class="p-4 rounded-xl border border-gray-700 bg-gray-800/20">
                 <div class="flex items-center justify-between mb-4">
-                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Audio Monitor</div>
+                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-emerald-400/60">Drone Monitor</div>
                     <button id="audioToggle" class="px-3 py-1 bg-gray-700 text-gray-300 text-[10px] font-bold rounded uppercase hover:bg-gray-600 transition-all">Enable</button>
                 </div>
                 <div class="space-y-4">
@@ -330,10 +336,27 @@
                     </div>
                     <div>
                         <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
-                            <span>Drone Pitch</span>
+                            <span>Pitch</span>
                             <span id="pitchVal" class="text-gray-400">110 Hz</span>
                         </label>
                         <input type="range" id="pitchSlider" min="50" max="400" value="110">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Noise Monitor -->
+            <div class="p-4 rounded-xl border border-gray-700 bg-gray-800/20">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-red-400/60">Noise Monitor</div>
+                    <button id="noiseToggle" class="px-3 py-1 bg-gray-700 text-gray-300 text-[10px] font-bold rounded uppercase hover:bg-gray-600 transition-all">Enable</button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="flex justify-between text-xs text-gray-500 mb-2 font-medium">
+                            <span>Volume</span>
+                            <span id="noiseVolVal" class="text-gray-400">50%</span>
+                        </label>
+                        <input type="range" id="noiseVolSlider" min="0" max="100" value="50">
                     </div>
                 </div>
             </div>
@@ -467,7 +490,9 @@
             xFade: 100,
             offset: 0,
             gateMask: 0,
-            gateParam: 0
+            gateParam: 0,
+            isNoiseOn: false,
+            noiseVol: 50
         };
 
         const shaperState = {
@@ -497,7 +522,8 @@
             gateHigh: false,
             prevOut: 0.5,
             wasRising: false,
-            wasFalling: false
+            wasFalling: false,
+            noiseGainCurrent: 0.0 // Manual envelope state
         };
 
         const bufferSize = 800;
@@ -514,50 +540,98 @@
 
         // Audio Engine
         let audioCtx;
-        let osc;
-        let filter;
-        let mainGain;
-        let isAudioOn = false;
+        let osc, filter, mainGain;
+        let noiseNode, noiseEnv, noiseFilter;
+        let isDroneOn = false;
+
+        function createBlueNoiseBuffer() {
+            const bufferSize = audioCtx.sampleRate * 2; // 2 seconds
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            let lastOut = 0;
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                // High-pass filter white noise to get blue-ish noise
+                data[i] = (white - lastOut) * 0.5;
+                lastOut = white;
+            }
+            return buffer;
+        }
 
         function initAudio() {
             if (audioCtx) return;
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
             
+            // 1. Drone (Sawtooth)
             osc = audioCtx.createOscillator();
             osc.type = 'sawtooth';
             osc.frequency.value = 110;
-
             filter = audioCtx.createBiquadFilter();
             filter.type = 'lowpass';
             filter.Q.value = 5; 
-
             mainGain = audioCtx.createGain();
-            mainGain.gain.value = 0.5;
+            mainGain.gain.value = 0; // Start silent
 
             osc.connect(filter);
             filter.connect(mainGain);
             mainGain.connect(audioCtx.destination);
-            
             osc.start();
+
+            // 2. Percussion (Blue Noise)
+            const noiseBuffer = createBlueNoiseBuffer();
+            noiseNode = audioCtx.createBufferSource();
+            noiseNode.buffer = noiseBuffer;
+            noiseNode.loop = true;
+            
+            noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.value = 3000; 
+
+            noiseEnv = audioCtx.createGain();
+            noiseEnv.gain.value = 0;
+
+            noiseNode.connect(noiseFilter);
+            noiseFilter.connect(noiseEnv);
+            noiseEnv.connect(audioCtx.destination);
+            noiseNode.start();
         }
 
-        function toggleAudio() {
-            if (!isAudioOn) {
-                initAudio();
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-                mainGain.gain.exponentialRampToValueAtTime(parseFloat(document.getElementById('volSlider').value)/100, audioCtx.currentTime + 0.1);
-                document.getElementById('audioToggle').textContent = "Disable";
-                document.getElementById('audioToggle').classList.add('bg-emerald-600', 'text-white');
-                document.getElementById('audioToggle').classList.remove('bg-gray-700', 'text-gray-300');
-                isAudioOn = true;
+        function toggleDrone() {
+            initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            isDroneOn = !isDroneOn;
+            const btn = document.getElementById('audioToggle');
+            
+            if (isDroneOn) {
+                mainGain.gain.setTargetAtTime(parseFloat(document.getElementById('volSlider').value)/100, audioCtx.currentTime, 0.05);
+                btn.textContent = "Disable";
+                btn.classList.add('bg-emerald-600', 'text-white');
+                btn.classList.remove('bg-gray-700', 'text-gray-300');
             } else {
-                mainGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-                setTimeout(() => { if(audioCtx) audioCtx.suspend(); }, 100);
-                document.getElementById('audioToggle').textContent = "Enable";
-                document.getElementById('audioToggle').classList.remove('bg-emerald-600', 'text-white');
-                document.getElementById('audioToggle').classList.add('bg-gray-700', 'text-gray-300');
-                isAudioOn = false;
+                mainGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+                btn.textContent = "Enable";
+                btn.classList.remove('bg-emerald-600', 'text-white');
+                btn.classList.add('bg-gray-700', 'text-gray-300');
+            }
+        }
+
+        function toggleNoise() {
+            initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            config.isNoiseOn = !config.isNoiseOn;
+            const btn = document.getElementById('noiseToggle');
+            
+            if (config.isNoiseOn) {
+                btn.textContent = "Disable";
+                btn.classList.add('bg-red-600', 'text-white');
+                btn.classList.remove('bg-gray-700', 'text-gray-300');
+            } else {
+                btn.textContent = "Enable";
+                btn.classList.remove('bg-red-600', 'text-white');
+                btn.classList.add('bg-gray-700', 'text-gray-300');
             }
         }
 
@@ -782,8 +856,9 @@
             const current = final;
             const prev = shaperState.prevOut;
             const slope = current - prev;
-            const isRising = slope > 0.0001;
-            const isFalling = slope < -0.0001;
+            const slopeThresh = 0.005; // Increased threshold to reject noise
+            const isRising = slope > slopeThresh;
+            const isFalling = slope < -slopeThresh;
             let trigger = false;
             let active = false;
 
@@ -792,6 +867,8 @@
                 if ((config.gateMask & 8) && prev >= 0.5 && current < 0.5) trigger = true; 
                 if ((config.gateMask & 1) && shaperState.wasRising && !isRising) trigger = true; 
                 if ((config.gateMask & 2) && shaperState.wasFalling && !isFalling) trigger = true; 
+                
+                // Trigger Length in Ticks (Frames)
                 if (trigger) shaperState.gateTimer = 4 << config.gateParam;
             } else { // Advanced Mode (Mask == 0)
                 switch(config.gateParam) {
@@ -816,10 +893,38 @@
             if (isRising) { shaperState.wasRising = true; shaperState.wasFalling = false; }
             else if (isFalling) { shaperState.wasRising = false; shaperState.wasFalling = true; }
 
-            // Audio Modulation
-            if (isAudioOn && filter && audioCtx.state === 'running') {
-                const cutoff = 50 + Math.pow(final, 3) * 8000;
-                filter.frequency.setTargetAtTime(cutoff, audioCtx.currentTime, 0.01);
+            // Audio Trigger Logic
+            if (audioCtx && audioCtx.state === 'running') {
+                const now = audioCtx.currentTime;
+                // DRONE MODULATION
+                if (isDroneOn) {
+                    const cutoff = 50 + Math.pow(final, 3) * 8000;
+                    filter.frequency.setTargetAtTime(cutoff, now, 0.01);
+                }
+
+                // NOISE ENVELOPE (Manual per-frame update)
+                let targetGain = 0;
+                if (config.isNoiseOn) {
+                    // If Trigger just fired (Pulse) OR Gate is Active (Sustain)
+                    if (trigger || active) {
+                        targetGain = config.noiseVol / 100.0;
+                    }
+                }
+
+                // Slew Logic (Attack vs Release)
+                const attackRate = 0.5;  // Instant attack
+                const releaseRate = 0.1; // Fast release
+                const rate = targetGain > shaperState.noiseGainCurrent ? attackRate : releaseRate;
+                
+                shaperState.noiseGainCurrent += (targetGain - shaperState.noiseGainCurrent) * rate;
+                
+                // Snap to silence
+                if (targetGain === 0 && shaperState.noiseGainCurrent < 0.001) {
+                    shaperState.noiseGainCurrent = 0;
+                }
+                
+                // Apply to Node
+                if(noiseEnv) noiseEnv.gain.value = shaperState.noiseGainCurrent;
             }
 
             history.source.shift(); history.source.push(rawSrc);
@@ -886,9 +991,13 @@
         document.getElementById('shaperSelect').addEventListener('change', (e) => { config.shaper = e.target.value; document.getElementById('shaperDesc').textContent = descriptions[config.shaper] || ""; });
         document.getElementById('vcaSlider').addEventListener('input', (e) => { config.vcaSpeed = parseFloat(e.target.value); document.getElementById('vcaVal').textContent = config.vcaSpeed.toFixed(1) + "x"; });
         document.getElementById('resetBtn').addEventListener('click', () => { location.reload(); });
-        document.getElementById('audioToggle').addEventListener('click', toggleAudio);
-        document.getElementById('volSlider').addEventListener('input', (e) => { const val = parseInt(e.target.value); document.getElementById('volVal').textContent = val + "%"; if (isAudioOn && mainGain) mainGain.gain.setTargetAtTime(val/100, audioCtx.currentTime, 0.01); });
-        document.getElementById('pitchSlider').addEventListener('input', (e) => { const val = parseInt(e.target.value); document.getElementById('pitchVal').textContent = val + " Hz"; if (isAudioOn && osc) osc.frequency.setTargetAtTime(val, audioCtx.currentTime, 0.01); });
+        document.getElementById('audioToggle').addEventListener('click', toggleDrone);
+        document.getElementById('noiseToggle').addEventListener('click', toggleNoise);
+        document.getElementById('volSlider').addEventListener('input', (e) => { const val = parseInt(e.target.value); document.getElementById('volVal').textContent = val + "%"; if (isDroneOn && mainGain) mainGain.gain.setTargetAtTime(val/100, audioCtx.currentTime, 0.05); });
+        document.getElementById('pitchSlider').addEventListener('input', (e) => { const val = parseInt(e.target.value); document.getElementById('pitchVal').textContent = val + " Hz"; if (audioCtx && osc) osc.frequency.setTargetAtTime(val, audioCtx.currentTime, 0.01); });
+        document.getElementById('noiseVolSlider').addEventListener('input', (e) => { config.noiseVol = parseInt(e.target.value); document.getElementById('noiseVolVal').textContent = config.noiseVol + "%"; });
+        document.getElementById('gateMaskSlider').addEventListener('input', (e) => { config.gateMask = parseInt(e.target.value); updateGateLabels(); });
+        document.getElementById('gateParamSlider').addEventListener('input', (e) => { config.gateParam = parseInt(e.target.value); updateGateLabels(); });
 
         // Gate UI Logic
         const gateMaskNames = ["OFF (Adv)", "Peak", "Trough", "Pk+Tr", "ZeroRs", "Pk+Rs", "Tr+Rs", "PkTrRs", "ZeroFl", "Pk+Fl", "Tr+Fl", "PkTrFl", "Rs+Fl", "PkRsFl", "TrRsFl", "All"];
@@ -920,16 +1029,14 @@
                     "Gate High while voltage is Changing (Any Slope).",
                     "Gate High when voltage > 25% (+1.25V).",
                     "Gate High when voltage > 50% (0V).",
-                    "Gate High when voltage > 75% (-1.25V).", 
+                    "Gate High when voltage > 75% (+2.5V).", 
                     "Gate High when voltage is between 25% and 75%."
                 ];
                 exp.textContent = descriptions[param];
             }
         }
-
-        document.getElementById('gateMaskSlider').addEventListener('input', (e) => { config.gateMask = parseInt(e.target.value); updateGateLabels(); });
-        document.getElementById('gateParamSlider').addEventListener('input', (e) => { config.gateParam = parseInt(e.target.value); updateGateLabels(); });
-
+        
+        updateGateLabels();
         animationId = requestAnimationFrame(draw);
     </script>
 </body>
