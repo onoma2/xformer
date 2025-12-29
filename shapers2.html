@@ -116,7 +116,7 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-tighter">Waveform</label>
-                        <select id="waveformSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-orange-500 focus:outline-none">
+                        <select id="waveformSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-orange-500 focus:outline-none transition-all">
                             <option value="bipolarSine">Bipolar Sine</option>
                             <option value="bipolarTriangle">Bipolar Triangle</option>
                             <option value="bipolarSaw">Bipolar Sawtooth</option>
@@ -310,12 +310,6 @@
                 </div>
             </div>
 
-            <!-- 
-            ========================================================================
-            END OF ROUTE PROCESSING SECTION - DONE - DONT CHANGE
-            ========================================================================
-            -->
-
             <button id="resetBtn" class="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white text-xs font-bold uppercase tracking-widest rounded border border-gray-700 hover:border-gray-600 transition-all">
                 Reset All Parameters
             </button>
@@ -363,6 +357,28 @@
 
             <!-- Stats/Debug Footer -->
             <div class="h-20 bg-[#121214] border-t border-gray-800 flex items-center px-6 gap-6 md:gap-12 overflow-x-auto whitespace-nowrap shrink-0">
+
+                <!-- Gate Control & Monitor -->
+                <div class="flex flex-col min-w-[120px]">
+                    <div class="text-[10px] text-red-500/70 font-bold uppercase tracking-widest mb-1 flex justify-between">
+                        <span>Gate Logic</span>
+                        <div id="gateLed" class="w-3 h-3 rounded-full bg-red-900 border border-red-900/50 transition-colors duration-75"></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="w-1/2">
+                            <label class="block text-[8px] text-gray-600 mb-0.5">Event</label>
+                            <input type="range" id="gateMaskSlider" min="0" max="15" value="0" class="h-1 bg-gray-800 rounded appearance-none w-full">
+                            <div id="gateMaskVal" class="text-[9px] text-red-400 mt-0.5 truncate">OFF (Adv)</div>
+                        </div>
+                        <div class="w-1/2">
+                            <label class="block text-[8px] text-gray-600 mb-0.5">Param</label>
+                            <input type="range" id="gateParamSlider" min="0" max="7" value="0" class="h-1 bg-gray-800 rounded appearance-none w-full">
+                            <div id="gateParamVal" class="text-[9px] text-red-400 mt-0.5 truncate">Off</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="w-px h-10 bg-gray-800"></div>
 
                 <!-- Input Stat -->
                 <div class="flex flex-col">
@@ -444,7 +460,9 @@
             gain: 0,
             filter: 0,
             xFade: 100,
-            offset: 0 
+            offset: 0,
+            gateMask: 0,
+            gateParam: 0
         };
 
         const shaperState = {
@@ -469,14 +487,20 @@
             lorenzX: 0.1,
             lorenzY: 0.0,
             lorenzZ: 0.0,
-            lpfState: 0.5
+            lpfState: 0.5,
+            gateTimer: 0,
+            gateHigh: false,
+            prevOut: 0.5,
+            wasRising: false,
+            wasFalling: false
         };
 
         const bufferSize = 800;
         const history = {
             source: new Array(bufferSize).fill(0.5),
             intermediate: new Array(bufferSize).fill(0.5),
-            output: new Array(bufferSize).fill(0.5)
+            output: new Array(bufferSize).fill(0.5),
+            gate: new Array(bufferSize).fill(0)
         };
 
         let time = 0;
@@ -745,6 +769,49 @@
             const intermediate = applyBiasDepthToSource(rawSrc, config.bias, config.depth);
             const final = applyShaper(config.shaper, intermediate, biasNormalized);
 
+            // Gate Logic
+            const current = final;
+            const prev = shaperState.prevOut;
+            const slope = current - prev;
+            const isRising = slope > 0.0001;
+            const isFalling = slope < -0.0001;
+            let trigger = false;
+            let active = false;
+
+            if (config.gateMask > 0) { // Event Mode
+                if ((config.gateMask & 4) && prev <= 0.5 && current > 0.5) trigger = true; // ZeroRise (Bit 2)
+                if ((config.gateMask & 8) && prev >= 0.5 && current < 0.5) trigger = true; // ZeroFall (Bit 3)
+                if ((config.gateMask & 1) && shaperState.wasRising && !isRising) trigger = true; // Peak (Bit 0)
+                if ((config.gateMask & 2) && shaperState.wasFalling && !isFalling) trigger = true; // Trough (Bit 1)
+                
+                // Trigger Length: 4 << gateParam ticks. 
+                // Visualizer: 1 tick = 1 frame? Let's say 4 * (2^param) frames.
+                // 60fps. Param 0=4 frames (66ms), Param 7=512 frames (8.5s).
+                if (trigger) shaperState.gateTimer = 4 << config.gateParam;
+            } else { // Advanced Mode (Mask == 0)
+                switch(config.gateParam) {
+                    case 0: active = false; break; // Off
+                    case 1: active = isRising; break; // RisingSlope
+                    case 2: active = isFalling; break; // FallingSlope
+                    case 3: active = isRising || isFalling; break; // AnySlope
+                    case 4: active = current > 0.25; break; // > 25%
+                    case 5: active = current > 0.50; break; // > 50%
+                    case 6: active = current > 0.75; break; // > 75%
+                    case 7: active = (current > 0.25 && current < 0.75); break; // Window
+                }
+            }
+
+            if (shaperState.gateTimer > 0) {
+                active = true;
+                shaperState.gateTimer--;
+            }
+
+            shaperState.gateHigh = active;
+            shaperState.prevOut = current;
+            if (isRising) { shaperState.wasRising = true; shaperState.wasFalling = false; }
+            else if (isFalling) { shaperState.wasRising = false; shaperState.wasFalling = true; }
+
+            // Audio Modulation
             if (isAudioOn && filter && audioCtx.state === 'running') {
                 const cutoff = 50 + Math.pow(final, 3) * 8000;
                 filter.frequency.setTargetAtTime(cutoff, audioCtx.currentTime, 0.01);
@@ -753,6 +820,7 @@
             history.source.shift(); history.source.push(rawSrc);
             history.intermediate.shift(); history.intermediate.push(intermediate);
             history.output.shift(); history.output.push(final);
+            history.gate.shift(); history.gate.push(shaperState.gateHigh ? 1 : 0);
 
             function drawWave(data, color, width, alpha, glow) {
                 ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.globalAlpha = alpha;
@@ -765,6 +833,13 @@
                 ctx.stroke(); ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
             }
 
+            // Draw Gate Lane
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+            const step = w / (bufferSize - 1);
+            for (let i = 0; i < bufferSize; i++) {
+                if (history.gate[i]) ctx.fillRect(i * step, h - 20, step + 1, 20);
+            }
+
             drawWave(history.source, '#52525b', 3, 0.5, false);
             drawWave(history.intermediate, '#3b82f6', 3, 0.8, false);
             drawWave(history.output, '#10b981', 4, 1.0, true);
@@ -772,6 +847,15 @@
             const lastY = h - (history.output[bufferSize-1] * h);
             ctx.fillStyle = '#10b981'; ctx.shadowBlur = 10; ctx.shadowColor = '#10b981';
             ctx.beginPath(); ctx.arc(w - 6, lastY, 5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+
+            const led = document.getElementById('gateLed');
+            if (shaperState.gateHigh) {
+                led.classList.remove('bg-red-900', 'border-red-900/50');
+                led.classList.add('bg-red-500', 'border-red-400', 'shadow-[0_0_10px_rgba(239,68,68,0.8)]');
+            } else {
+                led.classList.add('bg-red-900', 'border-red-900/50');
+                led.classList.remove('bg-red-500', 'border-red-400', 'shadow-[0_0_10px_rgba(239,68,68,0.8)]');
+            }
 
             document.getElementById('statInput').textContent = rawSrc.toFixed(3);
             document.getElementById('statInter').textContent = intermediate.toFixed(3);
@@ -800,6 +884,25 @@
         document.getElementById('audioToggle').addEventListener('click', toggleAudio);
         document.getElementById('volSlider').addEventListener('input', (e) => { const val = parseInt(e.target.value); document.getElementById('volVal').textContent = val + "%"; if (isAudioOn && mainGain) mainGain.gain.setTargetAtTime(val/100, audioCtx.currentTime, 0.01); });
         document.getElementById('pitchSlider').addEventListener('input', (e) => { const val = parseInt(e.target.value); document.getElementById('pitchVal').textContent = val + " Hz"; if (isAudioOn && osc) osc.frequency.setTargetAtTime(val, audioCtx.currentTime, 0.01); });
+
+        // Gate UI Logic
+        const gateMaskNames = ["OFF (Adv)", "Peak", "Trough", "Pk+Tr", "ZeroRs", "Pk+Rs", "Tr+Rs", "PkTrRs", "ZeroFl", "Pk+Fl", "Tr+Fl", "PkTrFl", "Rs+Fl", "PkRsFl", "TrRsFl", "All"];
+        const gateParamNamesAdv = ["Off", "Rise", "Fall", "Any", ">25%", ">50%", ">75%", "Window"];
+        const gateParamNamesTrig = ["Len:1/192", "Len:1/96", "Len:1/48", "Len:1/24", "Len:1/12", "Len:1/6", "Len:1/3", "Len:2/3"];
+
+        function updateGateLabels() {
+            const mask = config.gateMask;
+            const param = config.gateParam;
+            document.getElementById('gateMaskVal').textContent = gateMaskNames[mask];
+            if (mask > 0) {
+                document.getElementById('gateParamVal').textContent = gateParamNamesTrig[param];
+            } else {
+                document.getElementById('gateParamVal').textContent = gateParamNamesAdv[param];
+            }
+        }
+
+        document.getElementById('gateMaskSlider').addEventListener('input', (e) => { config.gateMask = parseInt(e.target.value); updateGateLabels(); });
+        document.getElementById('gateParamSlider').addEventListener('input', (e) => { config.gateParam = parseInt(e.target.value); updateGateLabels(); });
 
         animationId = requestAnimationFrame(draw);
     </script>
