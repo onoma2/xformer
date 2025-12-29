@@ -378,6 +378,11 @@
                     </div>
                 </div>
 
+                <!-- Gate Explanation -->
+                <div id="gateExplanation" class="text-[9px] text-gray-500 w-32 leading-tight whitespace-normal border-l border-gray-800 pl-3">
+                    Gate is Disabled (Always Low).
+                </div>
+
                 <div class="w-px h-10 bg-gray-800"></div>
 
                 <!-- Input Stat -->
@@ -888,16 +893,37 @@
         // Gate UI Logic
         const gateMaskNames = ["OFF (Adv)", "Peak", "Trough", "Pk+Tr", "ZeroRs", "Pk+Rs", "Tr+Rs", "PkTrRs", "ZeroFl", "Pk+Fl", "Tr+Fl", "PkTrFl", "Rs+Fl", "PkRsFl", "TrRsFl", "All"];
         const gateParamNamesAdv = ["Off", "Rise", "Fall", "Any", ">25%", ">50%", ">75%", "Window"];
-        const gateParamNamesTrig = ["Len:1/192", "Len:1/96", "Len:1/48", "Len:1/24", "Len:1/12", "Len:1/6", "Len:1/3", "Len:2/3"];
+        const gateParamNamesTrig = ["1/192 Bar", "1/96 Bar", "1/48 Bar", "1/24 Bar", "1/12 Bar", "1/6 Bar", "1/3 Bar", "2/3 Bar"];
 
         function updateGateLabels() {
             const mask = config.gateMask;
             const param = config.gateParam;
+            const exp = document.getElementById('gateExplanation');
+            
             document.getElementById('gateMaskVal').textContent = gateMaskNames[mask];
+            
             if (mask > 0) {
                 document.getElementById('gateParamVal').textContent = gateParamNamesTrig[param];
+                // Build event string
+                let events = [];
+                if (mask & 1) events.push("Peak");
+                if (mask & 2) events.push("Trough");
+                if (mask & 4) events.push("Rise Zero");
+                if (mask & 8) events.push("Fall Zero");
+                exp.textContent = `Trigger pulse of ${gateParamNamesTrig[param]} length on: ${events.join(', ')}.`;
             } else {
                 document.getElementById('gateParamVal').textContent = gateParamNamesAdv[param];
+                const descriptions = [
+                    "Gate is Disabled (Always Low).",
+                    "Gate High while voltage is Rising.",
+                    "Gate High while voltage is Falling.",
+                    "Gate High while voltage is Changing (Any Slope).",
+                    "Gate High when voltage > 25% (+1.25V).",
+                    "Gate High when voltage > 50% (0V).",
+                    "Gate High when voltage > 75% (-1.25V).", 
+                    "Gate High when voltage is between 25% and 75%."
+                ];
+                exp.textContent = descriptions[param];
             }
         }
 
