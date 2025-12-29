@@ -869,13 +869,15 @@
             let active = false;
 
             if (config.gateMask > 0) { // Event Mode
-                if ((config.gateMask & 4) && prev <= 0.5 && current > 0.5) trigger = true; 
-                if ((config.gateMask & 8) && prev >= 0.5 && current < 0.5) trigger = true; 
-                if ((config.gateMask & 1) && shaperState.wasRising && !isRising) trigger = true; 
-                if ((config.gateMask & 2) && shaperState.wasFalling && !isFalling) trigger = true; 
-                
-                // Trigger Length in Ticks (Frames)
-                if (trigger) shaperState.gateTimer = 4 << config.gateParam;
+                if ((config.gateMask & 4) && prev <= 0.5 && current > 0.5) trigger = true;
+                if ((config.gateMask & 8) && prev >= 0.5 && current < 0.5) trigger = true;
+                if ((config.gateMask & 1) && shaperState.wasRising && !isRising) trigger = true;
+                if ((config.gateMask & 2) && shaperState.wasFalling && !isFalling) trigger = true;
+
+                // Trigger Length in Ticks (Frames) - Only retrigger if gate already low
+                if (trigger && shaperState.gateTimer === 0) {
+                    shaperState.gateTimer = 4 << config.gateParam;
+                }
             } else { // Advanced Mode (Mask == 0)
                 switch(config.gateParam) {
                     case 0: active = false; break; // Off
@@ -918,8 +920,8 @@
                 }
 
                 // Slew Logic (Attack vs Release)
-                const attackRate = 0.5;  // Instant attack
-                const releaseRate = 0.1; // Fast release
+                const attackRate = 0.5;  // Fast attack (~2 frames)
+                const releaseRate = 0.5; // Fast release (~2 frames)
                 const rate = targetGain > shaperState.noiseGainCurrent ? attackRate : releaseRate;
                 
                 shaperState.noiseGainCurrent += (targetGain - shaperState.noiseGainCurrent) * rate;
