@@ -258,6 +258,12 @@
   - Fix: Extended Scan functionality to finite loops
   - Impact: Scan now works with all loop types
 - **Tuesday Track Rotate Parameter**: Limited Rotate to loop length for easier use
+### Fixed (5.1)
+- Indexed gate length bitmask now preserves reserved bits when writing gate length
+- Indexed and DiscreteMap note ranges aligned to -63..+63 (no +64 special case)
+- DiscreteMap selection: Shift + bottom row selects stages with the same direction
+- DiscreteMap selection: Shift + double-click on top row selects stages with matching values
+- Indexed selection: Shift + double-press selects steps with matching values per edit mode
   - Root cause: Rotate values beyond loop length were confusing
   - Fix: Constrained Rotate to valid loop range
   - Impact: More intuitive Rotate parameter behavior

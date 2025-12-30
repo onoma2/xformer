@@ -554,6 +554,39 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    // Shift + double-click on step button (top row only): select all stages with same value
+    if (key.shiftModifier() && key.isStep() && key.step() < 8 && event.count() == 2 && _sequence) {
+        int stepOffset = _section * 8;
+        int stageIndex = stepOffset + key.step();
+        if (stageIndex < DiscreteMapSequence::StageCount) {
+            const auto &sourceStage = _sequence->stage(stageIndex);
+            uint32_t mask = 0;
+            for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+                const auto &stage = _sequence->stage(i);
+                bool match = false;
+                switch (_editMode) {
+                case EditMode::NoteValue:
+                    match = stage.noteIndex() == sourceStage.noteIndex();
+                    break;
+                case EditMode::Threshold:
+                case EditMode::DualThreshold:
+                case EditMode::None:
+                    match = stage.threshold() == sourceStage.threshold();
+                    break;
+                }
+                if (match) {
+                    mask |= (1U << i);
+                }
+            }
+            if (mask != 0) {
+                _selectionMask = mask;
+                _selectedStage = stageIndex;
+            }
+        }
+        event.consume();
+        return;
+    }
+
     // Double-click on step button (top row only): auto-place threshold at midpoint between neighbors
     if (!key.shiftModifier() && key.isStep() && key.step() < 8 && event.count() == 2 && _sequence) {
         int stepOffset = _section * 8;
@@ -996,6 +1029,22 @@ void DiscreteMapSequencePage::handleTopRowKey(int idx) {
 }
 
 void DiscreteMapSequencePage::handleBottomRowKey(int idx) {
+    // Shift + bottom row: select stages with matching direction
+    if (_shiftHeld) {
+        auto targetDir = _sequence->stage(idx).direction();
+        uint32_t mask = 0;
+        for (int i = 0; i < DiscreteMapSequence::StageCount; ++i) {
+            if (_sequence->stage(i).direction() == targetDir) {
+                mask |= (1U << i);
+            }
+        }
+        if (mask != 0) {
+            _selectionMask = mask;
+            _selectedStage = idx;
+        }
+        return;
+    }
+
     // Select the stage exclusively (no multi-select)
     _selectionMask = (1U << idx);
     _selectedStage = idx;
