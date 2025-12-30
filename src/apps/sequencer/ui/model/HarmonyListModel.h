@@ -5,6 +5,7 @@
 #include "model/NoteSequence.h"
 #include "model/Model.h"
 #include "model/Track.h"
+#include "Config.h"
 
 class HarmonyListModel : public ListModel {
 public:
@@ -29,7 +30,18 @@ public:
     }
 
     virtual int rows() const override {
-        return _sequence ? Last : 0;
+        if (!_sequence) return 0;
+
+        auto role = _sequence->harmonyRole();
+
+        switch (role) {
+        case NoteSequence::HarmonyOff:
+            return 1; // Role only
+        case NoteSequence::HarmonyMaster:
+            return 4; // Role, Mode, Inversion, Voicing
+        default: // Follower roles
+            return 4; // Role, MasterTrack, Mode, Transpose
+        }
     }
 
     virtual int columns() const override {
@@ -39,37 +51,47 @@ public:
     virtual void cell(int row, int column, StringBuilder &str) const override {
         if (!_sequence) return;
 
+        Item item = rowToItem(row);
+        if (item == Last) return;
+
         if (column == 0) {
-            formatName(Item(row), str);
+            formatName(item, str);
         } else if (column == 1) {
-            formatValue(Item(row), str);
+            formatValue(item, str);
         }
     }
 
     virtual void edit(int row, int column, int value, bool shift) override {
         if (!_sequence || column != 1) return;
 
-        // Check if this row has indexed values (HarmonyRole or HarmonyScale)
-        int count = indexedCount(row);
+        Item item = rowToItem(row);
+        if (item == Last) return;
+
+        int count = indexedCount(item);
         if (count > 0) {
             // For indexed values, cycle through the options
-            int current = indexed(row);
+            int current = indexed(item);
             if (current >= 0) {
                 int next = (current + value) % count;
                 // Handle negative values properly
                 if (next < 0) next += count;
-                setIndexed(row, next);
+                setIndexed(item, next);
             }
         } else {
             // For non-indexed values, use the original editValue method
-            editValue(Item(row), value, shift);
+            editValue(item, value, shift);
         }
     }
 
     virtual int indexedCount(int row) const override {
         if (!_sequence) return 0;
+        return indexedCount(rowToItem(row));
+    }
 
-        switch (Item(row)) {
+    int indexedCount(Item item) const {
+        if (!_sequence) return 0;
+
+        switch (item) {
         case HarmonyRole:
             return 6; // Off, Master, FollowerRoot, Follower3rd, Follower5th, Follower7th
         case HarmonyScale:
@@ -85,8 +107,13 @@ public:
 
     virtual int indexed(int row) const override {
         if (!_sequence) return -1;
+        return indexed(rowToItem(row));
+    }
 
-        switch (Item(row)) {
+    int indexed(Item item) const {
+        if (!_sequence) return -1;
+
+        switch (item) {
         case HarmonyRole:
             return static_cast<int>(_sequence->harmonyRole());
         case HarmonyScale:
@@ -102,44 +129,83 @@ public:
 
     virtual void setIndexed(int row, int index) override {
         if (!_sequence || index < 0) return;
+        setIndexed(rowToItem(row), index);
+    }
 
-        if (index < indexedCount(row)) {
-            switch (Item(row)) {
-            case HarmonyRole: {
-                // Save old role before changing
-                auto oldRole = _sequence->harmonyRole();
-                auto newRole = static_cast<NoteSequence::HarmonyRole>(index);
+    void setIndexed(Item item, int index) {
+        if (!_sequence || index < 0) return;
 
-                // Set new role
-                _sequence->setHarmonyRole(newRole);
+        if (index >= indexedCount(item)) return;
 
-                // Copy master's mode when changing from non-follower to follower
-                bool wasFollower = (oldRole >= NoteSequence::HarmonyFollowerRoot);
-                bool isFollower = (newRole >= NoteSequence::HarmonyFollowerRoot);
+        switch (item) {
+        case HarmonyRole: {
+            auto newRole = static_cast<NoteSequence::HarmonyRole>(index);
 
-                if (!wasFollower && isFollower && _model) {
-                    int masterIdx = _sequence->masterTrackIndex();
-                    const auto &masterTrack = _model->project().track(masterIdx);
-                    if (masterTrack.trackMode() == Track::TrackMode::Note) {
-                        const auto &masterSequence = masterTrack.noteTrack().sequence(0);
-                        int masterMode = masterSequence.harmonyScale();
-                        _sequence->setHarmonyScale(masterMode);
-                    }
+            // ===== BECOMING FOLLOWER =====
+            if (newRole >= NoteSequence::HarmonyFollowerRoot) {
+                // Find valid master
+                int proposedMaster = findValidMaster();
+                int selfIndex = _sequence->trackIndex();
+
+                // Validate master
+                if (proposedMaster == selfIndex) {
+                    // Can't follow self - block change
+                    return;
                 }
-                break;
+
+                if (!isValidNoteTrack(proposedMaster)) {
+                    // No valid Note tracks available - block change
+                    return;
+                }
+
+                if (wouldCreateCycle(proposedMaster)) {
+                    // Would create circular dependency - block change
+                    return;
+                }
+
+                // Apply changes
+                _sequence->setMasterTrackIndex(proposedMaster);
+                _sequence->setHarmonyTranspose(0); // Reset transpose
+
+                // Keep follower's own Mode (engine uses follower harmonyScale)
+                // Inversion/Voicing come from master sequence/step in the engine
             }
-            case HarmonyScale:
-                _sequence->setHarmonyScale(index);
-                break;
-            case HarmonyInversion:
-                _sequence->setHarmonyInversion(index);
-                break;
-            case HarmonyVoicing:
-                _sequence->setHarmonyVoicing(index);
-                break;
-            default:
-                break;
+
+            // ===== BECOMING MASTER =====
+            else if (newRole == NoteSequence::HarmonyMaster) {
+                // Set safe defaults if never configured
+                if (_sequence->harmonyScale() > 6) {
+                    _sequence->setHarmonyScale(0); // Ionian
+                }
+                if (_sequence->harmonyInversion() > 3) {
+                    _sequence->setHarmonyInversion(0); // Root position
+                }
+                if (_sequence->harmonyVoicing() > 3) {
+                    _sequence->setHarmonyVoicing(0); // Close voicing
+                }
+
+                // Force transpose to 0 (unused by master)
+                _sequence->setHarmonyTranspose(0);
             }
+
+            // ===== BECOMING OFF =====
+            // No special handling needed
+
+            // Set new role
+            _sequence->setHarmonyRole(newRole);
+            break;
+        }
+        case HarmonyScale:
+            _sequence->setHarmonyScale(index);
+            break;
+        case HarmonyInversion:
+            _sequence->setHarmonyInversion(index);
+            break;
+        case HarmonyVoicing:
+            _sequence->setHarmonyVoicing(index);
+            break;
+        default:
+            break;
         }
     }
 
@@ -228,10 +294,16 @@ private:
         if (!_sequence) return;
 
         switch (item) {
-        case MasterTrack:
-            _sequence->setMasterTrackIndex(
-                clamp(_sequence->masterTrackIndex() + value, 0, 7)); // 0-7 for 8 tracks
+        case MasterTrack: {
+            int currentMaster = _sequence->masterTrackIndex();
+            int direction = value >= 0 ? 1 : -1;
+            int proposedMaster = findNextValidMaster(currentMaster, direction);
+
+            if (proposedMaster != currentMaster) {
+                _sequence->setMasterTrackIndex(proposedMaster);
+            }
             break;
+        }
         case HarmonyTranspose:
             _sequence->setHarmonyTranspose(
                 clamp(_sequence->harmonyTranspose() + value, -24, 24));
@@ -245,6 +317,117 @@ private:
         if (value < min) return min;
         if (value > max) return max;
         return value;
+    }
+
+    // Map physical row to logical item based on current role
+    Item rowToItem(int row) const {
+        if (!_sequence || row < 0) return Last;
+
+        auto role = _sequence->harmonyRole();
+
+        // Row 0 is always Role
+        if (row == 0) return HarmonyRole;
+
+        // Role-specific mapping
+        if (role == NoteSequence::HarmonyMaster) {
+            switch (row) {
+            case 1: return HarmonyScale;
+            case 2: return HarmonyInversion;
+            case 3: return HarmonyVoicing;
+            default: return Last;
+            }
+        } else if (role >= NoteSequence::HarmonyFollowerRoot) {
+            switch (row) {
+            case 1: return MasterTrack;
+            case 2: return HarmonyScale;
+            case 3: return HarmonyTranspose;
+            default: return Last;
+            }
+        }
+
+        return Last;
+    }
+
+    // Check if a track index points to a valid Note track
+    bool isValidNoteTrack(int trackIndex) const {
+        if (!_model || trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+            return false;
+        }
+        return _model->project().track(trackIndex).trackMode() == Track::TrackMode::Note;
+    }
+
+    // Find first valid Note track that isn't self
+    int findValidMaster() const {
+        if (!_sequence || !_model) return 0;
+
+        int selfIndex = _sequence->trackIndex();
+
+        // Try current masterTrackIndex first
+        int current = _sequence->masterTrackIndex();
+        if (current != selfIndex && isValidNoteTrack(current)) {
+            return current;
+        }
+
+        // Find first valid Note track
+        for (int i = 0; i < CONFIG_TRACK_COUNT; i++) {
+            if (i != selfIndex && isValidNoteTrack(i)) {
+                return i;
+            }
+        }
+
+        // Fallback to 0 (will fail validation)
+        return 0;
+    }
+
+    // Check if changing to this master would create a cycle
+    bool wouldCreateCycle(int proposedMasterIdx) const {
+        if (!_sequence || !_model || !isValidNoteTrack(proposedMasterIdx)) {
+            return false;
+        }
+
+        int selfIndex = _sequence->trackIndex();
+        int current = proposedMasterIdx;
+
+        // Walk the master chain until it ends or loops back to self
+        for (int depth = 0; depth < CONFIG_TRACK_COUNT; ++depth) {
+            if (current == selfIndex) {
+                return true; // Cycle detected
+            }
+
+            const auto &track = _model->project().track(current);
+            if (track.trackMode() != Track::TrackMode::Note) {
+                return false; // Chain ends at non-Note track
+            }
+
+            const auto &seq = track.noteTrack().sequence(0);
+            if (seq.harmonyRole() < NoteSequence::HarmonyFollowerRoot) {
+                return false; // Chain ends at non-follower
+            }
+
+            current = seq.masterTrackIndex();
+        }
+
+        return false; // No cycle within track count
+    }
+
+    // Find next valid master, scanning in the edit direction
+    int findNextValidMaster(int startIndex, int direction) const {
+        if (!_sequence || !_model) return startIndex;
+
+        int selfIndex = _sequence->trackIndex();
+
+        for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
+            int candidate = (startIndex + direction + CONFIG_TRACK_COUNT) % CONFIG_TRACK_COUNT;
+            startIndex = candidate;
+
+            if (candidate == selfIndex) continue;
+            if (!isValidNoteTrack(candidate)) continue;
+            if (wouldCreateCycle(candidate)) continue;
+
+            return candidate;
+        }
+
+        return startIndex; // No valid master found, return current
     }
 
     NoteSequence *_sequence;

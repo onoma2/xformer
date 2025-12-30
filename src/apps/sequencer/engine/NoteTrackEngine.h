@@ -72,6 +72,7 @@ private:
     void triggerStep(uint32_t tick, uint32_t divisor);
     void recordStep(uint32_t tick, uint32_t divisor);
     int noteFromMidiNote(uint8_t midiNote) const;
+    float applyHarmony(float baseNote, const NoteSequence::Step &step, const NoteSequence &sequence, const Scale &scale, int octave, int transpose);
 
     bool fill() const {
         return (_noteTrack.fillMuted() || !TrackEngine::mute()) ? TrackEngine::fill() : false;

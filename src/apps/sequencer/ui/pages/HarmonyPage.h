@@ -19,6 +19,8 @@ public:
 
 private:
     void updateListModel();
+    void drawStatusLine(Canvas &canvas);
 
     HarmonyListModel _listModel;
+    NoteSequence *_sequence = nullptr;
 };

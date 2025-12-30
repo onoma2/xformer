@@ -69,85 +69,8 @@ static int evalTransposition(const Scale &scale, int octave, int transpose) {
 }
 
 // evaluate note voltage
-static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, const Scale &scale, int rootNote, int octave, int transpose, const NoteSequence &sequence, const Model &model, int currentStepIndex, bool useVariation = true) {
+static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, const Scale &scale, int rootNote, int octave, int transpose, const NoteSequence &sequence, bool useVariation = true) {
     int note = step.note() + evalTransposition(scale, octave, transpose);
-
-    // Apply harmony modulation if this sequence is a harmony follower
-    // Check per-step harmony role override first
-    int harmonyRoleOverride = step.harmonyRoleOverride();
-    NoteSequence::HarmonyRole harmonyRole;
-
-    if (harmonyRoleOverride == 0) {
-        // UseSequence: use sequence-level role
-        harmonyRole = sequence.harmonyRole();
-    } else if (harmonyRoleOverride >= 1 && harmonyRoleOverride <= 4) {
-        // Map override values to follower roles: 1=Root, 2=3rd, 3=5th, 4=7th
-        harmonyRole = static_cast<NoteSequence::HarmonyRole>(harmonyRoleOverride + 1);
-    } else {
-        // harmonyRoleOverride == 5: Off (no harmony)
-        harmonyRole = NoteSequence::HarmonyOff;
-    }
-
-    if (harmonyRole != NoteSequence::HarmonyOff && harmonyRole != NoteSequence::HarmonyMaster) {
-        // Get master track and sequence
-        int masterTrackIndex = sequence.masterTrackIndex();
-        const auto &masterTrack = model.project().track(masterTrackIndex);
-        const auto &masterSequence = masterTrack.noteTrack().sequence(0); // Use pattern 0 for now
-
-        // Get master's note at the same step index (synchronized playback)
-        int masterStepIndex = clamp(currentStepIndex, masterSequence.firstStep(), masterSequence.lastStep());
-        const auto &masterStep = masterSequence.step(masterStepIndex);
-        int masterNote = masterStep.note();
-
-        // Convert to MIDI note number (middle C = 60)
-        // Note values are -64 to +63, where 0 = middle C
-        int midiNote = masterNote + 60;
-
-        // Get scale degree (0-6 for 7-note scales)
-        // For simplicity, use note modulo 7 as scale degree
-        int scaleDegree = ((masterNote % 7) + 7) % 7;
-
-        // Get harmony mode from sequence's harmonyScale setting
-        HarmonyEngine::Mode harmonyMode = static_cast<HarmonyEngine::Mode>(sequence.harmonyScale());
-
-        // Check master step for per-step inversion/voicing overrides
-        int inversionValue = masterStep.inversionOverride();
-        int voicingValue = masterStep.voicingOverride();
-
-        // Use master step overrides if set, otherwise use master's sequence-level settings
-        int inversion = (inversionValue == 0) ? masterSequence.harmonyInversion() : (inversionValue - 1);
-        int voicing = (voicingValue == 0) ? masterSequence.harmonyVoicing() : (voicingValue - 1);
-
-        // Create a local HarmonyEngine for harmonization
-        HarmonyEngine harmonyEngine;
-        harmonyEngine.setMode(harmonyMode);
-        harmonyEngine.setInversion(inversion);
-        harmonyEngine.setVoicing(static_cast<HarmonyEngine::Voicing>(voicing));
-        harmonyEngine.setTranspose(sequence.harmonyTranspose());
-        auto chord = harmonyEngine.harmonize(midiNote, scaleDegree);
-
-        // Extract the appropriate chord tone based on follower role
-        int harmonizedMidi = midiNote;
-        switch (harmonyRole) {
-        case NoteSequence::HarmonyFollowerRoot:
-            harmonizedMidi = chord.root;
-            break;
-        case NoteSequence::HarmonyFollower3rd:
-            harmonizedMidi = chord.third;
-            break;
-        case NoteSequence::HarmonyFollower5th:
-            harmonizedMidi = chord.fifth;
-            break;
-        case NoteSequence::HarmonyFollower7th:
-            harmonizedMidi = chord.seventh;
-            break;
-        default:
-            break;
-        }
-
-        // Convert back to note value (-64 to +63 range)
-        note = (harmonizedMidi - 60) + evalTransposition(scale, octave, transpose);
-    }
 
     // Apply accumulator modulation if enabled
     if (sequence.accumulator().enabled()) {
@@ -403,7 +326,7 @@ void NoteTrackEngine::update(float dt) {
 
     if (stepMonitoring) {
         const auto &step = sequence.step(_monitorStepIndex);
-        setOverride(evalStepNote(step, 0, scale, rootNote, octave, transpose, sequence, _model, _monitorStepIndex, false));
+        setOverride(evalStepNote(step, 0, scale, rootNote, octave, transpose, sequence, false));
     } else if (liveMonitoring && _recordHistory.isNoteActive()) {
         int note = noteFromMidiNote(_recordHistory.activeNote()) + evalTransposition(scale, octave, transpose);
         setOverride(scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f));
@@ -675,7 +598,14 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     if (stepGate || _noteTrack.cvUpdateMode() == NoteTrack::CvUpdateMode::Always) {
         const auto &scale = evalSequence.selectedScale(_model.project().scale());
         int rootNote = evalSequence.selectedRootNote(_model.project().rootNote());
-        _cvQueue.push({ Groove::applySwing(tick + gateOffset, swing()), evalStepNote(step, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose, evalSequence, _model, _currentStep), step.slide() });
+
+        // Evaluate base note (without harmony)
+        float baseNote = evalStepNote(step, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose, evalSequence);
+
+        // Apply harmony if this track is a follower (has engine-level access)
+        float finalNote = applyHarmony(baseNote, step, evalSequence, scale, octave, transpose);
+
+        _cvQueue.push({ Groove::applySwing(tick + gateOffset, swing()), finalNote, step.slide() });
     }
 }
 
@@ -756,4 +686,115 @@ int NoteTrackEngine::noteFromMidiNote(uint8_t midiNote) const {
     } else {
         return scale.noteFromVolts((midiNote - 60) * (1.f / 12.f));
     }
+}
+
+float NoteTrackEngine::applyHarmony(float baseNote, const NoteSequence::Step &step, const NoteSequence &sequence, const Scale &scale, int octave, int transpose) {
+    // Check per-step harmony role override first
+    int harmonyRoleOverride = step.harmonyRoleOverride();
+    NoteSequence::HarmonyRole harmonyRole;
+
+    if (harmonyRoleOverride == 0) {
+        // UseSequence: use sequence-level role
+        harmonyRole = sequence.harmonyRole();
+    } else if (harmonyRoleOverride >= 1 && harmonyRoleOverride <= 4) {
+        // Map override values to follower roles: 1=Root, 2=3rd, 3=5th, 4=7th
+        harmonyRole = static_cast<NoteSequence::HarmonyRole>(harmonyRoleOverride + 1);
+    } else {
+        // harmonyRoleOverride == 5: Off (no harmony)
+        harmonyRole = NoteSequence::HarmonyOff;
+    }
+
+    // If not a follower, return base note unchanged
+    if (harmonyRole == NoteSequence::HarmonyOff || harmonyRole == NoteSequence::HarmonyMaster) {
+        return baseNote;
+    }
+
+    // Get master track index
+    int masterTrackIndex = sequence.masterTrackIndex();
+
+    // CRITICAL FIX 1: Self-reference check
+    if (masterTrackIndex == sequence.trackIndex()) {
+        return baseNote; // Can't follow self
+    }
+
+    // Get master track
+    const auto &masterTrack = _model.project().track(masterTrackIndex);
+
+    // CRITICAL FIX 2: Track type validation
+    if (masterTrack.trackMode() != Track::TrackMode::Note) {
+        return baseNote; // Master must be a Note track
+    }
+
+    // PATTERN FIX: Get master's ACTIVE sequence from the engine
+    const TrackEngine &masterTrackEngine = _engine.trackEngine(masterTrackIndex);
+    if (masterTrackEngine.trackMode() != Track::TrackMode::Note) {
+        return baseNote; // Safety check
+    }
+
+    const NoteTrackEngine &masterNoteEngine = static_cast<const NoteTrackEngine&>(masterTrackEngine);
+    const NoteSequence &masterSequence = masterNoteEngine.sequence();
+
+    // Get master's current step (use master's playback position)
+    int masterStepIndex = masterNoteEngine.currentStep();
+
+    // Validate master step index
+    if (masterStepIndex < masterSequence.firstStep() || masterStepIndex > masterSequence.lastStep()) {
+        // Master not playing or out of range - use follower's step as fallback
+        masterStepIndex = clamp(_currentStep, masterSequence.firstStep(), masterSequence.lastStep());
+    }
+
+    const auto &masterStep = masterSequence.step(masterStepIndex);
+    int masterNote = masterStep.note();
+
+    // Convert to MIDI note number (middle C = 60)
+    // Note values are -64 to +63, where 0 = middle C
+    int midiNote = masterNote + 60;
+
+    // Get scale degree (0-6 for 7-note scales)
+    // For simplicity, use note modulo 7 as scale degree
+    int scaleDegree = ((masterNote % 7) + 7) % 7;
+
+    // Get harmony mode from follower's harmonyScale setting
+    HarmonyEngine::Mode harmonyMode = static_cast<HarmonyEngine::Mode>(sequence.harmonyScale());
+
+    // Check master step for per-step inversion/voicing overrides
+    int inversionValue = masterStep.inversionOverride();
+    int voicingValue = masterStep.voicingOverride();
+
+    // Use master step overrides if set, otherwise use master's sequence-level settings
+    int inversion = (inversionValue == 0) ? masterSequence.harmonyInversion() : (inversionValue - 1);
+    int voicing = (voicingValue == 0) ? masterSequence.harmonyVoicing() : (voicingValue - 1);
+
+    // Create a local HarmonyEngine for harmonization
+    HarmonyEngine harmonyEngine;
+    harmonyEngine.setMode(harmonyMode);
+    harmonyEngine.setInversion(inversion);
+    harmonyEngine.setVoicing(static_cast<HarmonyEngine::Voicing>(voicing));
+    harmonyEngine.setTranspose(sequence.harmonyTranspose());
+    auto chord = harmonyEngine.harmonize(midiNote, scaleDegree);
+
+    // Extract the appropriate chord tone based on follower role
+    int harmonizedMidi = midiNote;
+    switch (harmonyRole) {
+    case NoteSequence::HarmonyFollowerRoot:
+        harmonizedMidi = chord.root;
+        break;
+    case NoteSequence::HarmonyFollower3rd:
+        harmonizedMidi = chord.third;
+        break;
+    case NoteSequence::HarmonyFollower5th:
+        harmonizedMidi = chord.fifth;
+        break;
+    case NoteSequence::HarmonyFollower7th:
+        harmonizedMidi = chord.seventh;
+        break;
+    default:
+        break;
+    }
+
+    // Convert back to note value and apply transposition
+    int harmonizedNote = (harmonizedMidi - 60) + evalTransposition(scale, octave, transpose);
+
+    // Convert note to voltage
+    return scale.noteToVolts(harmonizedNote);
 }

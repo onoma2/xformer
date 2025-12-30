@@ -6,6 +6,7 @@
 #include "ui/painters/WindowPainter.h"
 
 #include "core/math/Math.h"
+#include "Config.h"
 
 HarmonyPage::HarmonyPage(PageManager &manager, PageContext &context) :
     ListPage(manager, context, _listModel)
@@ -14,11 +15,13 @@ HarmonyPage::HarmonyPage(PageManager &manager, PageContext &context) :
 
 void HarmonyPage::enter() {
     updateListModel();
+    _sequence = &_project.selectedNoteSequence();
 }
 
 void HarmonyPage::exit() {
     _listModel.setSequence(nullptr);
     _listModel.setModel(nullptr);
+    _sequence = nullptr;
 }
 
 void HarmonyPage::draw(Canvas &canvas) {
@@ -32,6 +35,11 @@ void HarmonyPage::draw(Canvas &canvas) {
     WindowPainter::drawFooter(canvas);
 
     ListPage::draw(canvas);
+
+    // Draw status line after list content
+    if (_sequence) {
+        drawStatusLine(canvas);
+    }
 }
 
 void HarmonyPage::updateLeds(Leds &leds) {
@@ -53,6 +61,69 @@ void HarmonyPage::keyPress(KeyPressEvent &event) {
 void HarmonyPage::encoder(EncoderEvent &event) {
     if (!event.consumed()) {
         ListPage::encoder(event);
+    }
+}
+
+void HarmonyPage::drawStatusLine(Canvas &canvas) {
+    auto role = _sequence->harmonyRole();
+
+    canvas.setFont(Font::Tiny);
+
+    // ===== FOLLOWER STATUS =====
+    if (role >= NoteSequence::HarmonyFollowerRoot) {
+        int masterIdx = _sequence->masterTrackIndex();
+        const auto &masterTrack = _model.project().track(masterIdx);
+
+        // Check master track type
+        if (masterTrack.trackMode() != Track::TrackMode::Note) {
+            canvas.setColor(Color::Bright);
+            canvas.drawText(2, 56, "MASTER NOT NOTE");
+            return;
+        }
+
+        // Check step range mismatch
+        const auto &masterSeq = masterTrack.noteTrack().sequence(0);
+        int masterRange = masterSeq.lastStep() - masterSeq.firstStep() + 1;
+        int followerRange = _sequence->lastStep() - _sequence->firstStep() + 1;
+
+        if (followerRange > masterRange) {
+            canvas.setColor(Color::Medium);
+            canvas.drawText(2, 56, "MASTER RANGE SHORT");
+        } else {
+            // All OK - show active status
+            canvas.setColor(Color::Bright);
+            canvas.drawText(2, 56, "FOLLOWING ACTIVE");
+        }
+    }
+
+    // ===== MASTER STATUS =====
+    else if (role == NoteSequence::HarmonyMaster) {
+        // Count active followers
+        int followerCount = 0;
+        int selfIndex = _sequence->trackIndex();
+
+        for (int i = 0; i < CONFIG_TRACK_COUNT; i++) {
+            if (i == selfIndex) continue;
+
+            const auto &track = _model.project().track(i);
+            if (track.trackMode() != Track::TrackMode::Note) continue;
+
+            const auto &seq = track.noteTrack().sequence(0);
+            if (seq.harmonyRole() >= NoteSequence::HarmonyFollowerRoot &&
+                seq.masterTrackIndex() == selfIndex) {
+                followerCount++;
+            }
+        }
+
+        if (followerCount > 0) {
+            canvas.setColor(Color::Bright);
+            FixedStringBuilder<32> str("%d FOLLOWER%s ACTIVE",
+                followerCount, followerCount == 1 ? "" : "S");
+            canvas.drawText(2, 56, str);
+        } else {
+            canvas.setColor(Color::Low);
+            canvas.drawText(2, 56, "NO FOLLOWERS");
+        }
     }
 }
 
