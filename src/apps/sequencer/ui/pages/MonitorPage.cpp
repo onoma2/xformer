@@ -5,6 +5,7 @@
 #include "engine/CvInput.h"
 #include "engine/CvOutput.h"
 
+#include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
 
 enum class Function {
@@ -86,6 +87,11 @@ void MonitorPage::exit() {
 }
 
 void MonitorPage::draw(Canvas &canvas) {
+    if (_scopeActive) {
+        drawScope(canvas);
+        return;
+    }
+
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "MONITOR");
     WindowPainter::drawActiveFunction(canvas, functionNames[int(_mode)]);
@@ -152,6 +158,20 @@ void MonitorPage::midi(MidiEvent &event) {
     _lastMidiMessage = event.message();
     _lastMidiMessagePort = event.port();
     _lastMidiMessageTicks = os::ticks();
+}
+
+void MonitorPage::setScopeActive(bool active) {
+    if (_scopeActive == active) {
+        return;
+    }
+    _scopeActive = active;
+    if (_scopeActive) {
+        resetScope();
+    }
+}
+
+void MonitorPage::toggleScope() {
+    setScopeActive(!_scopeActive);
 }
 
 void MonitorPage::drawCvIn(Canvas &canvas) {
@@ -239,4 +259,75 @@ void MonitorPage::drawVersion(Canvas &canvas) {
     canvas.drawTextCentered(0, 10, Width, 16, CONFIG_VERSION_NAME);
     FixedStringBuilder<16> str("Version %d.%d.%d", CONFIG_VERSION_MAJOR, CONFIG_VERSION_MINOR, CONFIG_VERSION_REVISION);
     canvas.drawTextCentered(0, 25, Width, 16, str);
+}
+
+void MonitorPage::sampleScope() {
+    const auto &trackEngine = _engine.selectedTrackEngine();
+    _scopeCv[_scopeWriteIndex] = trackEngine.cvOutput(0);
+    _scopeGate[_scopeWriteIndex] = trackEngine.gateOutput(0) ? 1 : 0;
+    _scopeWriteIndex = (_scopeWriteIndex + 1) % ScopeWidth;
+}
+
+void MonitorPage::resetScope() {
+    _scopeCv.fill(0.f);
+    _scopeGate.fill(0);
+    _scopeWriteIndex = 0;
+}
+
+void MonitorPage::drawScope(Canvas &canvas) {
+    WindowPainter::clear(canvas);
+    sampleScope();
+
+    const int gateHeight = 3;
+    const int gateTop = ScopeHeight - 3 - (gateHeight - 1);
+    const int gateBottom = gateTop + gateHeight - 1;
+    const int cvBottom = gateTop - 1;
+    const float cvCenter = cvBottom * 0.5f;
+    const float cvScale = cvBottom / (2.f * 6.f);
+
+    canvas.setBlendMode(BlendMode::Set);
+    canvas.setColor(Color::MediumBright);
+
+    int lastY = 0;
+    {
+        int idx = _scopeWriteIndex % ScopeWidth;
+        float cv = _scopeCv[idx];
+        lastY = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
+    }
+
+    for (int x = 1; x < ScopeWidth; ++x) {
+        int idx = (_scopeWriteIndex + x) % ScopeWidth;
+        float cv = _scopeCv[idx];
+        int y = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
+        int y0 = std::min(lastY, y);
+        int y1 = std::max(lastY, y);
+        canvas.vline(x, y0, y1 - y0 + 1);
+        lastY = y;
+    }
+
+    canvas.setColor(Color::Medium);
+    int runStart = -1;
+    for (int x = 0; x < ScopeWidth; ++x) {
+        int idx = (_scopeWriteIndex + x) % ScopeWidth;
+        bool gate = _scopeGate[idx] != 0;
+        if (gate) {
+            if (runStart < 0) {
+                runStart = x;
+            }
+        } else if (runStart >= 0) {
+            canvas.fillRect(runStart, gateTop, x - runStart, gateHeight);
+            runStart = -1;
+        }
+    }
+    if (runStart >= 0) {
+        canvas.fillRect(runStart, gateTop, ScopeWidth - runStart, gateHeight);
+    }
+
+    int lastIndex = (_scopeWriteIndex + ScopeWidth - 1) % ScopeWidth;
+    float lastCv = _scopeCv[lastIndex];
+    FixedStringBuilder<8> cvStr("%+5.2f", lastCv);
+    canvas.setFont(Font::Tiny);
+    canvas.setColor(Color::Low);
+    int x = Width - 2 - canvas.textWidth(cvStr);
+    canvas.drawText(x, 8, cvStr);
 }

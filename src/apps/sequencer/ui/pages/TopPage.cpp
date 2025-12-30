@@ -101,6 +101,14 @@ void TopPage::keyPress(KeyPressEvent &event) {
     auto &pages = _manager.pages();
     const auto &key = event.key();
 
+    if (key.pageModifier() && key.code() == PageKeyMap::Monitor) {
+        if (_mode == Mode::Monitor && _manager.top() == &pages.monitor) {
+            pages.monitor.toggleScope();
+            event.consume();
+            return;
+        }
+    }
+
     if (key.isTrackSelect()) {
         // Store which page we're on BEFORE changing track
         Page* currentPage = _manager.top();
@@ -230,6 +238,9 @@ void TopPage::setMode(Mode mode) {
         setMainPage(pages.userScale);
         break;
     case Mode::Monitor:
+        if (mode != _mode) {
+            pages.monitor.setScopeActive(false);
+        }
         setMainPage(pages.monitor);
         break;
     case Mode::System:

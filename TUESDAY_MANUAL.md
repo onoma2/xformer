@@ -25,7 +25,7 @@ The Algo track provides:
 The Algo track generates musical sequences using mathematical algorithms rather than fixed step data. Each algorithm has its own unique approach to generating note values, rhythms, and patterns. The track processes these algorithms on each clock tick to determine the current note and gate outputs.
 
 Key concepts:
-- **Algorithms**: 15+ different generation algorithms with unique behaviors
+- **Algorithms**: 15 different generation algorithms with unique behaviors
 - **Parameters**: Flow, Ornament, and Power control algorithm behavior
 - **Loop Length**: Controls pattern repetition (0 = infinite/evolving)
 - **Glide/Trill**: Smooth transitions and rapid note repetitions
@@ -35,33 +35,57 @@ Key concepts:
 The Algo track includes several algorithm categories:
 
 **Melodic Algorithms**:
-- **ScaleWalker**: Walks up/down scale degrees
+- **ScaleWlk**: Walks up/down scale degrees
 - **Markov**: Markov chain-based note generation
 - **Blake**: Breath-like melodic phrases
 - **Window**: Slow anchor notes with fast texture
 
 **Rhythmic Algorithms**:
-- **Tritrance**: Bouncy, rhythmic patterns
+- **TriTrance**: Bouncy, rhythmic patterns
 - **Stomper**: Stomping rhythmic sequences
-- **Autechre**: Complex pattern-based sequences
+- **Autech**: Complex pattern-based sequences
 - **Minimal**: Burst/silence rhythmic patterns
 
 **Harmonic Algorithms**:
-- **Chip Arp 1/2**: Arpeggiated chord progressions
+- **Chip1/Chip2**: Arpeggiated chord progressions
 - **Aphex**: Multi-voice pattern sequences
 - **Ganz**: Multi-layered harmonic structures
 
 **Experimental Algorithms**:
 - **Wobble**: Phase-based oscillating patterns
-- **Autechre**: Rule-based pattern generation
-- **Step**: Stepped wave patterns
+- **StepWave**: Stepped wave patterns
 
 ### 2.3 Output Modes
 
-The track has two main output behaviors:
+The track has two main output behaviors (selectable in List View):
 
-**Free Mode**: CV output updates every step regardless of gate state
-**Gated Mode**: CV output only updates when a gate fires
+**Free Mode**: CV output updates every step regardless of gate state. Best for continuous modulation.
+**Gated Mode**: CV output only updates when a gate fires. Best for traditional note sequencing.
+
+### 2.4 List View Parameters
+
+In addition to the main Edit Page, the Algo track offers a comprehensive List View containing all available parameters. This view provides access to advanced settings not found on the main pages.
+
+**Full Parameter List:**
+- **Algorithm**: Generation algorithm selection
+- **Flow/Ornament/Power**: Core algorithm controls
+- **Loop Length**: Pattern repetition length
+- **Rotate**: Loop offset
+- **Glide**: Slide probability
+- **Skew**: Density distribution
+- **Gate Length**: Note duration scaling
+- **Gate Offset**: Gate timing offset
+- **CV Mode**: Free or Gated CV update behavior
+- **Retrig Prob**: (Old Trill) Probability of re-triggering the envelope
+- **Trill**: (Step Trill) Intra-step subdivision probability (New Trill)
+- **Start**: Start offset
+- **Octave/Transpose**: Pitch offsets
+- **Divisor**: Clock division
+- **Reset Measure**: Automatic reset interval
+- **Scale/Root Note**: Quantization settings
+- **Mask Param**: Rhythmic masking control
+- **Time Mode**: Advanced mask timing behavior
+- **Mask Prog**: Automatic mask progression
 
 ## 3. UI Overview
 
@@ -73,7 +97,7 @@ The main page displays sequence settings:
 - **Middle Row**: Loop and timing controls
 - **Bottom Row**: Gate and start parameters
 - **Status Box**: Visual feedback showing current note (with gate indicator), output voltage, and step position
-- **Context Menu**: Init and Reseed options via long-press
+- **Context Menu**: Init, Reseed, Randomize, Copy, and Paste options
 
 ### 3.2 Parameter Pages
 
@@ -94,7 +118,7 @@ The Algo track has three parameter pages accessible via F1-F4:
 **Page 3** (F1-F4): Gate Length, Gate Offset, Trill, Start
 - **Gate Length**: Gate duration scaling (0-100%)
 - **Gate Offset**: Gate timing offset (0-100%)
-- **Trill**: Intra-step subdivision probability (0-100%)
+- **Trill**: (Step Trill) Intra-step subdivision probability (0-100%)
 - **Start**: Starting position (0-16)
 
 ### 3.3 Footer Controls (Function Keys)
@@ -105,8 +129,13 @@ The Algo track has three parameter pages accessible via F1-F4:
 
 ### 3.4 Context Menu
 
-**Init**: Clear and reset sequence to defaults
-**Reseed**: Restart algorithm with new random seed
+Accessible via long-press on the menu button:
+
+- **INIT**: Clear and reset sequence to defaults
+- **RESEED**: Restart algorithm with new random seed
+- **RAND**: Randomize all parameters for the current sequence
+- **COPY**: Copy sequence parameters
+- **PASTE**: Paste sequence parameters
 
 ## 4. Algorithm Parameters
 
@@ -114,22 +143,22 @@ The Algo track has three parameter pages accessible via F1-F4:
 
 Controls which generation algorithm is active:
 
-**Range**: 0 to 20 with specific algorithms:
-- 0: Test - Basic algorithm for testing
-- 1: Tri - Triangular/trance-like patterns
-- 2: Stomper - Stomping rhythmic patterns
-- 6: Markov - Markov chain note generation
-- 7: Chip1 - Arpeggiated chip-tune patterns
-- 8: Chip2 - Alternative chip-tune patterns
-- 9: Wobble - Phase-based oscillating patterns
-- 10: ScaleWalk - Walking scale patterns
-- 11: Window - Anchor notes with texture
-- 12: Minimal - Burst/silence patterns
-- 13: Ganz - Multi-layered structures
-- 14: Blake - Breath-like phrases
-- 18: Aphex - Multi-voice patterns
-- 19: Autechre - Rule-based patterns
-- 20: Step - Stepped wave patterns
+**Range**: 0 to 14:
+- 0: **Test** - Basic algorithm for testing
+- 1: **TriTrance** - Triangular/trance-like patterns
+- 2: **Stomper** - Stomping rhythmic patterns
+- 3: **Markov** - Markov chain note generation
+- 4: **Chip1** - Arpeggiated chip-tune patterns 1
+- 5: **Chip2** - Arpeggiated chip-tune patterns 2
+- 6: **Wobble** - Phase-based oscillating patterns
+- 7: **ScaleWlk** - Walking scale patterns
+- 8: **Window** - Anchor notes with texture
+- 9: **Minimal** - Burst/silence patterns
+- 10: **Ganz** - Multi-layered structures
+- 11: **Blake** - Breath-like phrases
+- 12: **Aphex** - Multi-voice patterns
+- 13: **Autech** - Rule-based patterns
+- 14: **StepWave** - Stepped wave patterns
 
 ### 4.2 Flow and Ornament Parameters
 
@@ -182,10 +211,15 @@ The Algo track includes sophisticated loop controls:
 - Creates portamento/sliding effects
 - Adds expressiveness to algorithmic output
 
-**Trill** (0-100%):
-- Probability of rapid note subdivisions
+**Trill (Step Trill)** (0-100%):
+- Probability of rapid note subdivisions (intra-step)
 - Creates rapid note repetitions
 - Adds rhythmic complexity
+
+**Retrig Prob (Old Trill)** (0-100%):
+- Probability of re-triggering the envelope
+- Available in List View only
+- Independent of Step Trill
 
 **Gate Offset** (0-100%):
 - Timing offset for gate firing
@@ -198,6 +232,32 @@ The Algo track includes sophisticated loop controls:
 - Restarts algorithm with new random seed
 - Creates new variation of same algorithm
 - Useful for live performance to refresh patterns
+
+### 5.4 Mask Parameter (Jam Surface Only)
+
+**Mask**:
+- Accessible via Jam Surface (Step 7 for increment, Step 14 for decrement)
+- Controls a rhythmic masking effect that hides specific ticks based on a prime-number sequence.
+- Creates evolving polyrhythms and rests by filtering the algorithm's output.
+- 0 = All (No masking)
+- 15 = None (Mute all)
+- 1-14 = Prime-based rhythmic masks
+
+### 5.5 Advanced Masking (List View Only)
+
+**Time Mode**:
+- Controls how the mask timing interacts with the grid.
+- **FREE**: Masking toggles based on tick count (free-running).
+- **QRT**: Masking aligns to quarter-note grid.
+- **1.5Q**: Masking aligns to 1.5 quarter-note grid.
+- **3QRT**: Masking aligns to 3 quarter-note grid.
+
+**Mask Progression**:
+- Automatically evolves the mask parameter over time.
+- **NO PROG**: Static mask.
+- **PROG+1**: Increments mask index by 1 per cycle.
+- **PROG+5**: Increments mask index by 5 per cycle.
+- **PROG+7**: Increments mask index by 7 per cycle.
 
 ## 6. External CV Integration
 
@@ -259,7 +319,7 @@ The Algo track uses mathematical algorithms to generate:
 
 ### 8.1 Ambient Pad Generation
 
-1. Select Algorithm 10 (ScaleWalk)
+1. Select Algorithm 7 (ScaleWlk)
 2. Set Flow to 8, Ornament to 6
 3. Set Power to 4 for sparse notes
 4. Set Glide to 75% for smooth transitions
@@ -277,7 +337,7 @@ The Algo track uses mathematical algorithms to generate:
 
 ### 8.3 Melodic Variation
 
-1. Select Algorithm 6 (Markov)
+1. Select Algorithm 3 (Markov)
 2. Set Flow to 5 for conservative changes
 3. Set Ornament to 12 for variation
 4. Set Gate Length to 50% for note separation
@@ -291,7 +351,7 @@ The Algo track uses mathematical algorithms to generate:
 - **F1-F4**: Select parameter for encoder control
 - **F5**: Cycle between parameter pages
 - **Shift+F5**: Reseed algorithm with new seed
-- **Context Menu**: Long press for Init/Reseed
+- **Context Menu**: Long press for options
 
 ### 9.2 Quick Edit (Page+Steps 9-16)
 
@@ -305,33 +365,27 @@ The Algo track uses mathematical algorithms to generate:
 
 ### 9.3 Editing Tips
 
-- Start with Algorithm 10 (ScaleWalk) for melodic output
+- Start with Algorithm 7 (ScaleWlk) for melodic output
 - Use Power parameter to control note density
 - Set Loop Length to 0 for infinite evolution
 - Use Gate Length to control note overlap
 - Try different scales for harmonic variety
 
-### 9.3 Jam Surface (Step Buttons)
+### 9.4 Jam Surface (Step Buttons)
 
 | Step | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Top | Octave + | Transpose + | Root Note + | Div up (straight) | Div up (triplet) | Div /2 (faster) | Mask + | Loop +<br>Shift: Run momentary |
 | Bottom | Octave - | Transpose - | Root Note - | Div down (straight) | Div down (triplet) | Div x2 (slower) | Mask - | Loop -<br>Shift: Reset |
 
-Shift modifiers:
-- Shift+Step 8: Run momentary (press = stop)
-- Shift+Step 16: Reset (restart sequence from start)
+**Shift modifiers:**
+- **Shift+Step 8**: Run momentary (press = stop, release = play if running, or hold to temporarily run if stopped)
+- **Shift+Step 16**: Reset (restart sequence from start)
 
-Behavior notes:
-- Top row moves "up" (faster/greater), bottom row moves "down" (slower/less); for divisors, smaller = faster.
-- Divisor up/down only walks known divisors for straight or triplet types.
-
-### 9.4 Performance Considerations
-
-- Algorithm processing uses moderate CPU resources
-- Complex algorithms may have slightly higher load
-- Glide and trill add additional processing overhead
-- All algorithms are optimized for real-time performance
+**Behavior notes:**
+- Top row buttons generally increase values or speed up (smaller divisor).
+- Bottom row buttons generally decrease values or slow down (larger divisor).
+- Mask parameter allows for rhythmic filtering of the algorithm's output.
 
 ## 10. Troubleshooting
 
