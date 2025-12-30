@@ -198,6 +198,27 @@ Macros provide powerful generative and transformative operations on sequences. A
 - **3/9**: Cycles even subdivisions with 3 steps, then 9 steps (fills 768 ticks)
 - **5/20**: Cycles even subdivisions with 5 steps, then 20 steps (fills 768 ticks)
 - **7/28**: Cycles even subdivisions with 7 steps, then 28 steps (fills 768 ticks)
+
+## 5. Monitor Scope
+
+The Monitor page includes a full-screen scope view for the selected track.
+
+**Access:**
+- Press **Page + Step 7** to open Monitor.
+- Press **Page + Step 7** again to toggle Scope.
+
+**Scope View:**
+- Full-screen (no header/footer).
+- **CV trace** shows the selected track output.
+- **Gate band** appears only while gate is high (3px tall, near the bottom).
+- CV scale is fixed to **±6V**.
+- **Top right**: current CV value (low intensity, fixed width to avoid jitter).
+- **Top left**: secondary track label (low intensity).
+
+**Secondary Trace (optional):**
+- **Encoder** cycles through **OFF + 7 other tracks** (never the selected track).
+- When enabled, a second CV trace is drawn at low intensity.
+- Label shows **OFF** or **Tn** for the secondary track.
 - **3-5/5-7**: Cycles grouped patterns (3+5) and (5+7), each fit to 768 ticks
 - **M-TALA**: Cycles Khand (5+7), Tihai (2-1-2 x3), Dhamar (5-2-3-4)
 
@@ -230,15 +251,15 @@ The Harmony Engine creates complex harmonic relationships between tracks by gene
 
 The system uses a combination of:
 
-- **Scale intervals:** Based on the selected mode (Ionian, Dorian, Phrygian, etc.)
+- **Scale intervals:** Based on the selected **Harmony Mode** (Ionian, Dorian, Phrygian, etc.)
 - **Chord qualities:** Determined by the mode (Major7, Minor7, Dominant7, HalfDim7)
-- **Inversions:** Root, 1st, 2nd, and 3rd inversions
-- **Voicings:** Close, Drop2, Drop3, and Spread voicings
-- **Transpose:** Global transposition of all chord tones
+- **Inversions:** Root, 1st, 2nd, and 3rd inversions (Sequence-level or Per-step)
+- **Voicings:** Close, Drop2, Drop3, and Spread voicings (Sequence-level or Per-step)
+- **Transpose:** Global transposition of all chord tones (CH-TRNSP)
 
 #### Modes and Settings
 
-**Harmony Modes:**
+**Harmony Modes:** (UI Label: **MODE**)
 
 - **Ionian (0):** Major scale - I∆7, ii-7, iii-7, IV∆7, V7, vi-7, viiø
 - **Dorian (1):** Dorian mode - i-7, ii-7, ♭III∆7, IV7, v-7, viø, ♭VII∆7
@@ -250,34 +271,79 @@ The system uses a combination of:
 
 **Voicing Options:**
 
-- **Close (0):** All chord tones in closest possible position
+- **Close (0):** All chord tones in closest possible position within an octave
 - **Drop2 (1):** Second highest note dropped down an octave
 - **Drop3 (2):** Third highest note dropped down an octave
-- **Spread (3):** Third and fifth above root, seventh an octave higher
+- **Spread (3):** Open voicing - Third and fifth above root, seventh an octave higher
+
+**Global Transpose:**
+- **CH-TRNSP:** ±24 semitones. Transposes the entire chord structure after harmonization.
 
 #### Harmony Roles (Master/Follower)
 
 **Setting up Master/Follower Relationships:**
-1. Configure one track as the "Master" track (typically a Note track playing scale degrees)
-2. Enable Harmony Engine on the Master track with desired settings
+1. Configure ANY note track as the "Master" track (typically playing scale degrees)
+2. Enable Harmony Engine on the Master track with desired settings (Mode, Inversion, etc.)
 3. Set Following type on ANOTHER note track
 4. Each Master track can generate up to 4 harmonized outputs (root, third, fifth, seventh)
 5. By default Performer settings tracks designated as Followers will update their CV output on Gate events. So enable gates where you want to hear a chord.
 
 **Master Track Configuration:**
 - The root note of the chord is determined by the Master track's current note
-- The Harmony Engine converts these scale degrees to chord tones based on the selected mode
-- Per step overrides of Inversion and Voicing are available on the NOTE(F4) button layer for Master tracks
+- The Harmony Engine converts these scale degrees to chord tones based on the selected Mode
+- **Per-step Overrides**:
+    - **Inversion**: Override sequence inversion per step. Access via **F4** (Length) cycle: `Length -> Range -> Prob -> INVERSION -> VOICING`.
+    - **Voicing**: Override sequence voicing per step. Access via **F4** cycle.
+    - Abbreviations:
+        - **Inversion**: S (Seq), R (Root), 1 (1st), 2 (2nd), 3 (3rd)
+        - **Voicing**: S (Seq), C (Close), 2 (Drop2), 3 (Drop3), W (Wide/Spread)
 
 **Follower Track Configuration:**
 - Follower tracks receive the harmonized chord tones from the Master
 - Each Follower can be assigned to a specific chord tone (root, third, fifth, or seventh)
-- Multiple Followers can be assigned to the same chord tone for thickening
-- **Note**: Followers DON'T change their Harmony Scale automatically if you change master!
+- **Per-step Role Override**:
+    - You can override the follower role (e.g., change from 3rd to 5th) on a per-step basis.
+    - Access via **F3** (Note) cycle: `Note -> Range -> Prob -> Accum -> HARMONY ROLE`.
+    - Options: SEQ (Default), ROOT, 3RD, 5TH, 7TH, OFF.
+    - This allows for arpeggiated chord lines within a single track.
+- **Note**: When you switch a track to a Follower role, it automatically copies the Harmony Mode from the Master track as a starting point.
+
+#### Setting up 2 Chord Progressions in 2 Patterns
+
+This example demonstrates how to create two distinct chord progressions that switch when you change patterns.
+
+**1. Track Configuration:**
+   - **Track 1 (Master):** Set to Note Track. This will play the root notes (the progression).
+   - **Track 2 (Follower):** Set to Note Track.
+   - **Track 3 (Follower):** Set to Note Track.
+
+**2. Pattern 1 Setup (Progression A):**
+   - Select **Track 1**, **Pattern 1**.
+   - Go to Harmony Page (Shift+S3 -> Harmony).
+   - Set **Mode** to **Ionian (0)**.
+   - Enter root notes for your first progression (e.g., C, F, G, C) on steps 1, 5, 9, 13.
+   - Select **Track 2**. Set Harmony Role to **3rd**.
+   - Select **Track 3**. Set Harmony Role to **5th**.
+   - Enable gates on Tracks 2 & 3 where you want the chords to play (steps 1, 5, 9, 13).
+
+**3. Pattern 2 Setup (Progression B):**
+   - Switch to **Pattern 2**.
+   - Select **Track 1**.
+   - Go to Harmony Page. Set **Mode** to **Aeolian (5)** (Natural Minor).
+   - Enter root notes for your second progression (e.g., A, F, G, E).
+   - Select **Track 2**. Set Harmony Role to **3rd**.
+   - Select **Track 3**. Set Harmony Role to **7th** (for a jazzier feel).
+   - Enable gates on Tracks 2 & 3.
+
+**4. Performance:**
+   - Switch between Pattern 1 and Pattern 2.
+   - Track 1 changes the root notes *and* the Harmony Mode (Major vs Minor).
+   - Tracks 2 & 3 follow the new roots and scale intervals automatically.
+   - Track 3 changes its interval from 5th to 7th automatically because the Harmony Role is stored per-pattern.
 
 #### Shortcuts Related to Harmony
 
-- **SECOND PRESS of Shift-S3**: Harmony Engine
+- **SECOND PRESS of Shift-S3**: Harmony Engine Page
 - **Voicing Quick Switch**: Use encoder to cycle through voicing options
 - **Inversion Control**: Use parameter to cycle through inversions
 - **Transpose Adjust**: Use encoder with shift to adjust transpose in larger steps

@@ -1,5 +1,6 @@
 #include "MonitorPage.h"
 
+#include "Config.h"
 #include "ui/painters/WindowPainter.h"
 
 #include "engine/CvInput.h"
@@ -152,6 +153,19 @@ void MonitorPage::keyPress(KeyPressEvent &event) {
 }
 
 void MonitorPage::encoder(EncoderEvent &event) {
+    if (!_scopeActive) {
+        return;
+    }
+
+    int optionCount = CONFIG_TRACK_COUNT;
+    int option = scopeOptionFromTrack(_scopeSecondaryTrack);
+    int next = option + event.value();
+    if (next >= optionCount) {
+        next %= optionCount;
+    } else if (next < 0) {
+        next = (next % optionCount + optionCount) % optionCount;
+    }
+    _scopeSecondaryTrack = scopeTrackFromOption(next);
 }
 
 void MonitorPage::midi(MidiEvent &event) {
@@ -265,12 +279,23 @@ void MonitorPage::sampleScope() {
     const auto &trackEngine = _engine.selectedTrackEngine();
     _scopeCv[_scopeWriteIndex] = trackEngine.cvOutput(0);
     _scopeGate[_scopeWriteIndex] = trackEngine.gateOutput(0) ? 1 : 0;
+
+    int selectedTrack = _project.selectedTrackIndex();
+    if (_scopeSecondaryTrack == selectedTrack) {
+        _scopeSecondaryTrack = -1;
+    }
+    if (_scopeSecondaryTrack >= 0) {
+        _scopeCvSecondary[_scopeWriteIndex] = _engine.trackEngine(_scopeSecondaryTrack).cvOutput(0);
+    } else {
+        _scopeCvSecondary[_scopeWriteIndex] = 0.f;
+    }
     _scopeWriteIndex = (_scopeWriteIndex + 1) % ScopeWidth;
 }
 
 void MonitorPage::resetScope() {
     _scopeCv.fill(0.f);
     _scopeGate.fill(0);
+    _scopeCvSecondary.fill(0.f);
     _scopeWriteIndex = 0;
 }
 
@@ -305,6 +330,25 @@ void MonitorPage::drawScope(Canvas &canvas) {
         lastY = y;
     }
 
+    if (_scopeSecondaryTrack >= 0) {
+        canvas.setColor(Color::Low);
+        int lastSecondaryY = 0;
+        {
+            int idx = _scopeWriteIndex % ScopeWidth;
+            float cv = _scopeCvSecondary[idx];
+            lastSecondaryY = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
+        }
+        for (int x = 1; x < ScopeWidth; ++x) {
+            int idx = (_scopeWriteIndex + x) % ScopeWidth;
+            float cv = _scopeCvSecondary[idx];
+            int y = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
+            int y0 = std::min(lastSecondaryY, y);
+            int y1 = std::max(lastSecondaryY, y);
+            canvas.vline(x, y0, y1 - y0 + 1);
+            lastSecondaryY = y;
+        }
+    }
+
     canvas.setColor(Color::Medium);
     int runStart = -1;
     for (int x = 0; x < ScopeWidth; ++x) {
@@ -330,4 +374,39 @@ void MonitorPage::drawScope(Canvas &canvas) {
     canvas.setColor(Color::Low);
     int x = Width - 2 - canvas.textWidth(cvStr);
     canvas.drawText(x, 8, cvStr);
+
+    FixedStringBuilder<8> secondaryStr;
+    if (_scopeSecondaryTrack < 0) {
+        secondaryStr("OFF");
+    } else {
+        secondaryStr("T%d", _scopeSecondaryTrack + 1);
+    }
+    canvas.drawText(2, 8, secondaryStr);
+}
+
+int MonitorPage::scopeTrackFromOption(int option) const {
+    if (option <= 0) {
+        return -1;
+    }
+    int selected = _project.selectedTrackIndex();
+    int track = option - 1;
+    if (track >= selected) {
+        track += 1;
+    }
+    return track;
+}
+
+int MonitorPage::scopeOptionFromTrack(int trackIndex) const {
+    if (trackIndex < 0) {
+        return 0;
+    }
+    int selected = _project.selectedTrackIndex();
+    if (trackIndex == selected) {
+        return 0;
+    }
+    int option = trackIndex + 1;
+    if (trackIndex > selected) {
+        option -= 1;
+    }
+    return option;
 }

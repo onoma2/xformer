@@ -1427,7 +1427,7 @@ static const ContextMenuModel::Item melodicContextMenuItems[] = {
 enum class DurationTransformContextAction {
     DurationLog,
     DurationExp,
-    DurationTriangle,
+    QuantizeMeasure,
     Reverse,
     Mirror,
     Last
@@ -1436,7 +1436,7 @@ enum class DurationTransformContextAction {
 static const ContextMenuModel::Item durationTransformContextMenuItems[] = {
     { "D-LOG" },
     { "D-EXP" },
-    { "D-TRI" },
+    { "Q-MEAS" },
     { "REV" },
     { "MIRR" },
 };
@@ -1967,17 +1967,61 @@ void IndexedSequenceEditPage::durationTransformContextAction(int index) {
         showMessage("DURATION EXP");
         break;
     }
-    case DurationTransformContextAction::DurationTriangle: {
-        // Triangle curve: ramp up then down
-        uint16_t minDur = 48;
-        uint16_t maxDur = 768;
-        for (int i = 0; i < stepCount; ++i) {
-            float t = float(i) / float(stepCount - 1);
-            float curved = (t < 0.5f) ? (t * 2.0f) : (2.0f - t * 2.0f);
-            uint16_t dur = uint16_t(minDur + curved * (maxDur - minDur));
-            sequence.step(firstStep + i).setDuration(dur);
+    case DurationTransformContextAction::QuantizeMeasure: {
+        // Calculate current total duration
+        uint32_t totalDuration = 0;
+        for (int i = firstStep; i <= lastStep; ++i) {
+            totalDuration += sequence.step(i).duration();
         }
-        showMessage("DURATION TRI");
+
+        if (totalDuration == 0) {
+            showMessage("Q-MEAS: EMPTY");
+            break;
+        }
+
+        // Find nearest measure (multiples of 768 = 4 beats)
+        const uint32_t barTicks = 768;   // 4 beats = 1 bar at 192 PPQN
+
+        // Round to nearest bar
+        uint32_t targetDuration = ((totalDuration + barTicks / 2) / barTicks) * barTicks;
+
+        // Ensure at least 1 bar
+        if (targetDuration == 0) {
+            targetDuration = barTicks;
+        }
+
+        // Calculate scaling factor
+        float scalingFactor = float(targetDuration) / float(totalDuration);
+
+        // Apply scaling with rounding error distribution
+        uint32_t scaledTotal = 0;
+        for (int i = firstStep; i <= lastStep; ++i) {
+            uint16_t originalDur = sequence.step(i).duration();
+            uint16_t scaledDur = uint16_t(std::round(originalDur * scalingFactor));
+
+            // Clamp to valid range
+            scaledDur = clamp<uint16_t>(scaledDur, 1, IndexedSequence::MaxDuration);
+
+            sequence.step(i).setDuration(scaledDur);
+            scaledTotal += scaledDur;
+        }
+
+        // Distribute rounding error on last step
+        if (scaledTotal != targetDuration) {
+            int diff = int(targetDuration) - int(scaledTotal);
+            uint16_t lastDur = sequence.step(lastStep).duration();
+            uint16_t adjustedDur = clamp<uint16_t>(
+                int(lastDur) + diff,
+                1,
+                IndexedSequence::MaxDuration
+            );
+            sequence.step(lastStep).setDuration(adjustedDur);
+        }
+
+        // Show result
+        int bars = targetDuration / barTicks;
+        FixedStringBuilder<32> msg("Q-MEAS: %d BAR%s", bars, bars == 1 ? "" : "S");
+        showMessage(msg);
         break;
     }
     case DurationTransformContextAction::Reverse: {

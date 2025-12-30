@@ -34,7 +34,6 @@ private:
     void drawScope(Canvas &canvas);
     void sampleScope();
     void resetScope();
-    int scopeTrackOption() const;
     int scopeTrackFromOption(int option) const;
     int scopeOptionFromTrack(int trackIndex) const;
 
