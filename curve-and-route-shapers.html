@@ -14,6 +14,11 @@
             color: #e0e0e0;
         }
 
+        :root {
+            --raw-color: #52525b;
+            --final-color: #10b981;
+        }
+
         /* Custom Range Slider Styling */
         input[type=range] {
             -webkit-appearance: none;
@@ -62,6 +67,33 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
         }
 
+        .panel-raw {
+            background: rgba(82, 82, 91, 0.12);
+            border: 1px solid rgba(82, 82, 91, 0.35);
+        }
+
+        .panel-final {
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+
+        .badge-raw {
+            background: rgba(82, 82, 91, 0.18);
+            border: 1px solid rgba(82, 82, 91, 0.4);
+            color: #a1a1aa;
+        }
+
+        .badge-final {
+            background: rgba(16, 185, 129, 0.18);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #34d399;
+        }
+
+        .panel-sound {
+            background: rgba(74, 29, 70, 0.18);
+            border: 1px solid rgba(119, 58, 108, 0.45);
+        }
+
         .signal-legend {
             display: inline-block;
             width: 12px;
@@ -107,8 +139,12 @@
             ========================================================================
             -->
 
+            <div class="px-3 py-1 rounded-full text-[9px] uppercase tracking-widest font-bold badge-raw">
+                Raw Output Path
+            </div>
+
             <!-- 1. SOURCE GENERATOR -->
-            <div class="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5 shadow-inner">
+            <div class="p-4 rounded-xl shadow-inner panel-raw">
                 <div class="flex items-center gap-2 mb-4 text-orange-400 font-bold uppercase text-[10px] tracking-widest border-b border-orange-500/10 pb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     1. Source Generator
@@ -138,7 +174,7 @@
             <div class="flex justify-center -my-2 opacity-20"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>
 
             <!-- 2. CHAOS ENGINE -->
-            <div class="p-4 rounded-xl border border-red-500/20 bg-red-500/5 shadow-inner">
+            <div class="p-4 rounded-xl shadow-inner panel-raw">
                 <div class="flex items-center gap-2 mb-4 text-red-400 font-bold uppercase text-[10px] tracking-widest border-b border-red-500/10 pb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
                     2. Chaos Engine
@@ -197,7 +233,7 @@
             <div class="flex justify-center -my-2 opacity-20"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>
 
             <!-- 3. SIGNAL PROCESSOR -->
-            <div class="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 shadow-inner">
+            <div class="p-4 rounded-xl shadow-inner panel-raw">
                 <div class="flex items-center gap-2 mb-4 text-yellow-400 font-bold uppercase text-[10px] tracking-widest border-b border-yellow-500/10 pb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg>
                     3. Signal Processor
@@ -235,7 +271,7 @@
             <div class="flex justify-center -my-2 opacity-20"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg></div>
 
             <!-- 4. FINAL OFFSET -->
-            <div class="p-4 rounded-xl border border-green-500/20 bg-green-500/5 shadow-inner">
+            <div class="p-4 rounded-xl shadow-inner panel-raw">
                 <div class="flex items-center gap-2 mb-2 text-green-400 font-bold uppercase text-[10px] tracking-widest border-b border-green-500/10 pb-2">
                     4. Final Offset
                 </div>
@@ -263,8 +299,12 @@
             ========================================================================
             -->
 
+            <div class="px-3 py-1 rounded-full text-[9px] uppercase tracking-widest font-bold badge-final">
+                Final Output Path
+            </div>
+
             <!-- 5. ROUTE PROCESSING -->
-            <div class="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 shadow-inner">
+            <div class="p-4 rounded-xl shadow-inner panel-final">
                 <div class="flex items-center gap-2 mb-5 text-blue-400 font-bold uppercase text-[10px] tracking-widest border-b border-blue-500/10 pb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>
                     5. Route Processing
@@ -289,7 +329,7 @@
 
                     <div class="pt-4 border-t border-blue-500/10">
                         <label class="block text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-tighter">Shaper Mode</label>
-                        <select id="shaperSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none transition-all">
+                        <select id="shaperSelect" class="w-full bg-[#27272a] border border-gray-700 rounded p-2 text-sm text-gray-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-all">
                             <option value="none">None (Pass-through)</option>
                             <option value="crease">Crease (Fold at 0.5)</option>
                             <option value="triangleFold">Triangle Fold</option>
@@ -302,14 +342,14 @@
                         </select>
                     </div>
 
-                    <div id="shaperDesc" class="p-3 bg-[#202025] rounded border border-gray-800 text-[10px] text-gray-400 leading-relaxed italic">
+                    <div id="shaperDesc" class="p-3 rounded border border-emerald-500/20 bg-emerald-500/5 text-[10px] text-gray-400 leading-relaxed italic">
                         Passes the signal through unchanged.
                     </div>
 
-                    <div id="vcaControl" class="hidden pt-2 p-3 bg-purple-500/5 border border-purple-500/20 rounded">
+                    <div id="vcaControl" class="hidden pt-2 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded">
                         <label class="flex justify-between text-xs text-gray-400 mb-2 font-medium">
                             <span>VCA Modulator Speed</span>
-                            <span id="vcaVal" class="text-purple-400 font-bold">1.0x</span>
+                            <span id="vcaVal" class="text-emerald-400 font-bold">1.0x</span>
                         </label>
                         <input type="range" id="vcaSlider" min="0.1" max="10.0" step="0.1" value="1.0">
                     </div>
@@ -327,9 +367,9 @@
             </button>
 
             <!-- Audio Monitor -->
-            <div class="p-4 rounded-xl border border-gray-700 bg-gray-800/20">
+            <div class="p-4 rounded-xl panel-sound">
                 <div class="flex items-center justify-between mb-4">
-                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-emerald-400/60">Drone Monitor</div>
+                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-emerald-400/60">External CV - Filter</div>
                     <button id="audioToggle" class="px-3 py-1 bg-gray-700 text-gray-300 text-[10px] font-bold rounded uppercase hover:bg-gray-600 transition-all">Enable</button>
                 </div>
                 <div class="space-y-4">
@@ -351,9 +391,9 @@
             </div>
 
             <!-- Noise Monitor -->
-            <div class="p-4 rounded-xl border border-gray-700 bg-gray-800/20">
+            <div class="p-4 rounded-xl panel-sound">
                 <div class="flex items-center justify-between mb-4">
-                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-red-400/60">Noise Monitor</div>
+                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-red-400/60">External Gate</div>
                     <button id="noiseToggle" class="px-3 py-1 bg-gray-700 text-gray-300 text-[10px] font-bold rounded uppercase hover:bg-gray-600 transition-all">Enable</button>
                 </div>
                 <div class="space-y-4">
@@ -368,9 +408,9 @@
             </div>
 
             <!-- Plucky 1 (Raw Source) -->
-            <div class="p-4 rounded-xl border border-gray-700 bg-gray-800/20">
+            <div class="p-4 rounded-xl panel-sound">
                 <div class="flex items-center justify-between mb-4">
-                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-blue-400/60">Plucky 1 (Raw)</div>
+                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-blue-400/60">Internal Route to Transpose no Shapers</div>
                     <button id="plucky1Toggle" class="px-3 py-1 bg-gray-700 text-gray-300 text-[10px] font-bold rounded uppercase hover:bg-gray-600 transition-all">Enable</button>
                 </div>
                 <div class="space-y-4">
@@ -414,9 +454,9 @@
             </div>
 
             <!-- Plucky 2 (Routed) -->
-            <div class="p-4 rounded-xl border border-gray-700 bg-gray-800/20">
+            <div class="p-4 rounded-xl panel-sound">
                 <div class="flex items-center justify-between mb-4">
-                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-purple-400/60">Plucky 2 (Routed)</div>
+                    <div class="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-purple-400/60">Internal Route to Transpose through Shapers</div>
                     <button id="plucky2Toggle" class="px-3 py-1 bg-gray-700 text-gray-300 text-[10px] font-bold rounded uppercase hover:bg-gray-600 transition-all">Enable</button>
                 </div>
                 <div class="space-y-4">
@@ -1447,6 +1487,15 @@
         }
 
         updateGateLabels();
+        document.querySelectorAll('input[type="range"]').forEach((slider) => {
+            if (!slider.dataset.defaultValue) {
+                slider.dataset.defaultValue = slider.value;
+            }
+            slider.addEventListener('dblclick', () => {
+                slider.value = slider.dataset.defaultValue;
+                slider.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        });
         animationId = requestAnimationFrame(draw);
     </script>
 </body>
