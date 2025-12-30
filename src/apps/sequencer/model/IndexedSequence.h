@@ -84,7 +84,7 @@ public:
     class Step {
     public:
         // Bit-packed step data (32 bits):
-        // bits 0-6:   note_index (7 bits, signed -63..64 encoded in 7 bits)
+        // bits 0-6:   note_index (7 bits, signed -63..63 encoded in 7 bits)
         // bits 7-21:  duration (15 bits = direct tick count, 0-32767)
         // bits 22-28: gate_length (7 bits = 0-127, encoded)
         // bits 29-30: unused (reserved)
@@ -92,17 +92,20 @@ public:
 
         int8_t noteIndex() const {
             uint8_t raw = static_cast<uint8_t>(_packed & 0x7F);
+            if (raw <= 63) {
+                return static_cast<int8_t>(raw);
+            }
             if (raw == 64) {
-                return 64;
+                return 63;
             }
             if (raw > 64) {
                 return static_cast<int8_t>(int(raw) - 128);
             }
-            return static_cast<int8_t>(raw);
+            return 0;
         }
 
         void setNoteIndex(int8_t index) {
-            index = clamp(index, int8_t(-63), int8_t(64));
+            index = clamp(index, int8_t(-63), int8_t(63));
             uint8_t raw = index < 0 ? (static_cast<uint8_t>(index) & 0x7F) : static_cast<uint8_t>(index);
             _packed = (_packed & ~0x7F) | raw;
         }

@@ -172,7 +172,7 @@ Indexed Track is a duration-based sequencer. Unlike standard steps that are lock
 ### 4.2 Step Parameters
 - **Duration**: Length of step in ticks (0-65535).
 - **Gate**: Gate length in ticks (OFF or 4..32767). FULL equals step duration.
-- **Note**: Output voltage index (-63 to +64).
+- **Note**: Output voltage index (-63 to +63).
 
 ### 4.3 Math Operations (F5)
 Apply batch operations to selected steps:

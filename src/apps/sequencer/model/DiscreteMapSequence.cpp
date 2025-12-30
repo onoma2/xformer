@@ -130,7 +130,7 @@ void DiscreteMapSequence::clearNotes() {
 void DiscreteMapSequence::randomize() {
     for (auto &stage : _stages) {
         stage.setThreshold(rng.nextRange(199) - 99);
-        stage.setNoteIndex(rng.nextRange(128) - 63);
+        stage.setNoteIndex(rng.nextRange(127) - 63);
         auto randomDir = static_cast<DiscreteMapSequence::Stage::TriggerDir>(rng.nextRange(4));
         stage.setDirection(randomDir);
     }
@@ -144,8 +144,8 @@ void DiscreteMapSequence::randomizeThresholds() {
 
 void DiscreteMapSequence::randomizeNotes() {
     for (auto &stage : _stages) {
-        // Note index range is -63 to +64, so we need a range of 128 values
-        stage.setNoteIndex(rng.nextRange(128) - 63);
+        // Note index range is -63 to +63, so we need a range of 127 values
+        stage.setNoteIndex(rng.nextRange(127) - 63);
     }
 }
 

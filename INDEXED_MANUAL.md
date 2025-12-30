@@ -26,7 +26,7 @@ The Indexed track creates a sequence where each step has an independent duration
 Key concepts:
 - **Steps**: 32 controllable positions with independent duration and note values
 - **Durations**: Clock tick counts (0-65535) that determine step length
-- **Note Indices**: Voltage lookup indices (-63 to +64) that determine output voltage
+- **Note Indices**: Voltage lookup indices (-63 to +63) that determine output voltage
 - **Groups**: A, B, C, D group membership for conditional CV modulation
 
 ### 2.2 Timing System
@@ -160,14 +160,14 @@ Gate length determines how long gate output remains high:
 
 Note index determines output voltage when step is active:
 
-**Range**: -63 to +64 maps to output voltage
+**Range**: -63 to +63 maps to output voltage
 - Direct lookup in selected scale
 - No octave math or modulo operations
-- -63 = lowest possible voltage, +64 = highest
+- -63 = lowest possible voltage, +63 = highest
 
 **Scale Mapping**:
 - Based on selected scale and root note settings
-- -63 = lowest scale note, +64 = highest scale note
+- -63 = lowest scale note, +63 = highest scale note
 - Converted using scale's note-to-voltage mapping
 
 ## 5. Advanced Features

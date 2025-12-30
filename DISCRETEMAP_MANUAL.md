@@ -144,9 +144,9 @@ Thresholds define voltage levels where stages trigger:
 
 Note values determine output voltage when a stage is active:
 
-**Range**: -63 to +64 maps to output voltage
+**Range**: -63 to +63 maps to output voltage
 - Based on selected scale and root note settings
-- -63 = lowest possible voltage, +64 = highest
+- -63 = lowest possible voltage, +63 = highest
 - Converted using scale's note-to-voltage mapping
 
 ## 5. Advanced Features
@@ -163,7 +163,7 @@ The DiscreteMap track includes powerful generator functions:
   - **Logarithmic**: Logarithmic curve
   - **Exponential**: Exponential curve
 - Apply to thresholds, notes, or both:
-  - **NOTE5** (Wide): Generates notes in full range (-63 to +64)
+  - **NOTE5** (Wide): Generates notes in full range (-63 to +63)
   - **NOTE2** (Narrow): Generates notes in narrow range (0 to +32)
   - **THR**: Applies to thresholds only
   - **TOG**: Toggle directions (Random mode only)

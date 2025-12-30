@@ -109,7 +109,7 @@ private:
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
     enum class NoteSpread : uint8_t {
-        Wide,   // -63..+64 (approx -5..+5V depending on scale)
+        Wide,   // -63..+63 (approx -5..+5V depending on scale)
         Narrow, // -1..+31 (approx -2V)
     };
 

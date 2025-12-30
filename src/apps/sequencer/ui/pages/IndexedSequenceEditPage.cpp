@@ -132,6 +132,25 @@ static const int quickEditItems[8] = {
 IndexedSequenceEditPage::IndexedSequenceEditPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
 {
+    _stepSelection.setStepCompare([this] (int a, int b) {
+        const auto &sequence = _project.selectedIndexedSequence();
+        const auto &stepA = sequence.step(a);
+        const auto &stepB = sequence.step(b);
+
+        switch (_editMode) {
+        case EditMode::Note:
+            if (_noteSlideEdit) {
+                return stepA.slide() == stepB.slide();
+            }
+            return stepA.noteIndex() == stepB.noteIndex();
+        case EditMode::Duration:
+            return stepA.duration() == stepB.duration();
+        case EditMode::Gate:
+            return IndexedSequence::gateTicks(stepA.gateLength(), stepA.duration()) ==
+                IndexedSequence::gateTicks(stepB.gateLength(), stepB.duration());
+        }
+        return false;
+    });
 }
 
 void IndexedSequenceEditPage::enter() {

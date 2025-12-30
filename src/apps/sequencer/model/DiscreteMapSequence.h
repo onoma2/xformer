@@ -70,10 +70,10 @@ public:
             return order[next];
         }
 
-        // Note index (-63 to +64)
+        // Note index (-63 to +63)
         int8_t noteIndex() const { return _noteIndex; }
         void setNoteIndex(int8_t index) {
-            _noteIndex = clamp(index, int8_t(-63), int8_t(64));
+            _noteIndex = clamp(index, int8_t(-63), int8_t(63));
         }
 
         void clear();
