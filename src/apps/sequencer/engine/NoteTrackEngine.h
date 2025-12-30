@@ -23,6 +23,7 @@ public:
 #if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
         bool shouldTickAccumulator;  // Should this gate tick accumulator when fired?
         uint8_t sequenceId;           // Which sequence's accumulator (0=main, 1=fill)
+        float cvTarget;               // Pre-calculated CV for this gate (for accumulator-driven CV)
 #endif
     };
 

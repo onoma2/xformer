@@ -230,7 +230,7 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
         }
 
 #if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
-        // SPREAD MODE (flag=1): Tick accumulator when gate fires
+        // SPREAD MODE (flag=1): Handle accumulator and CV for retriggers
         if (event.shouldTickAccumulator) {
             // Lookup sequence by ID (0=main, 1=fill)
             const NoteSequence* targetSeq = nullptr;
@@ -245,6 +245,18 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                 targetSeq->accumulator().enabled() &&
                 targetSeq->accumulator().triggerMode() == Accumulator::Retrigger) {
                 const_cast<Accumulator&>(targetSeq->accumulator()).tick();
+
+                // Use pre-calculated CV if available (for per-retrigger CV variation)
+                if (event.gate && event.cvTarget != 0.f && !_monitorOverrideActive) {
+                    result |= TickResult::CvUpdate;
+                    _cvOutputTarget = event.cvTarget;
+                    // No slide on retriggers
+                    _slideActive = false;
+                    if (!mute() || _noteTrack.cvUpdateMode() == NoteTrack::CvUpdateMode::Always) {
+                        midiOutputEngine.sendCv(_track.trackIndex(), _cvOutputTarget);
+                        midiOutputEngine.sendSlide(_track.trackIndex(), _slideActive);
+                    }
+                }
             }
         }
 #endif
@@ -551,19 +563,50 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     targetSequence.accumulator().triggerMode() == Accumulator::Retrigger
                 );
                 uint8_t seqId = useFillSequence ? NoteTrackEngine::FillSequenceId : NoteTrackEngine::MainSequenceId;
+
+                // Pre-calculate base CV for accumulator-driven retriggers
+                const auto &scale = evalSequence.selectedScale(_model.project().scale());
+                int rootNote = evalSequence.selectedRootNote(_model.project().rootNote());
+                float baseCv = 0.f;
+                int retrigIndex = 0;
+
+                if (shouldTickAccum) {
+                    // Evaluate base note
+                    float baseNote = evalStepNote(step, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose, evalSequence);
+                    // Apply harmony if follower
+                    baseCv = applyHarmony(baseNote, step, evalSequence, scale, octave, transpose);
+                }
 #endif
 
                 while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
 #if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
-                    // SPREAD MODE: Schedule gates with metadata (tick accumulator when gate fires)
-                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true, shouldTickAccum, seqId });
-                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false, false, seqId });
+                    // SPREAD MODE: Calculate CV for this retrigger
+                    float retrigCv = 0.f;
+                    if (shouldTickAccum) {
+                        // Simulate accumulator value after N ticks
+                        int accumOffset = 0;
+                        Accumulator tempAccum = targetSequence.accumulator();
+                        for (int i = 0; i < retrigIndex; i++) {
+                            tempAccum.tick();
+                        }
+                        accumOffset = tempAccum.currentValue();
+
+                        // Add accumulator offset to base CV
+                        retrigCv = baseCv + scale.noteToVolts(accumOffset);
+                    }
+
+                    // Schedule gates with metadata (tick accumulator when gate fires)
+                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true, shouldTickAccum, seqId, retrigCv });
+                    _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false, false, seqId, 0.f });
 #else
                     // BURST MODE: Schedule gates without metadata (accumulator already ticked)
                     _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset, swing()), true });
                     _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + retriggerOffset + retriggerLength / 2, swing()), false });
 #endif
                     retriggerOffset += retriggerLength;
+#if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
+                    retrigIndex++;
+#endif
                 }
             } else {
 #if !CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
@@ -588,8 +631,21 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 );
                 uint8_t seqId = useFillSequence ? NoteTrackEngine::FillSequenceId : NoteTrackEngine::MainSequenceId;
 
-                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true, shouldTickAccum, seqId });
-                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false, false, seqId });
+                // Calculate CV for single retrigger
+                float retrigCv = 0.f;
+                if (shouldTickAccum) {
+                    const auto &scale = evalSequence.selectedScale(_model.project().scale());
+                    int rootNote = evalSequence.selectedRootNote(_model.project().rootNote());
+                    // Evaluate base note
+                    float baseNote = evalStepNote(step, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose, evalSequence);
+                    // Apply harmony if follower
+                    retrigCv = applyHarmony(baseNote, step, evalSequence, scale, octave, transpose);
+                    // For first retrigger, use current accumulator value (before tick)
+                    retrigCv += scale.noteToVolts(targetSequence.accumulator().currentValue());
+                }
+
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset, swing()), true, shouldTickAccum, seqId, retrigCv });
+                _gateQueue.pushReplace({ Groove::applySwing(tick + gateOffset + stepLength, swing()), false, false, seqId, 0.f });
 #endif
             }
         }

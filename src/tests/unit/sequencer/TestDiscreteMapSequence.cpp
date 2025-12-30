@@ -55,8 +55,8 @@ CASE("toggle_methods") {
     expectEqual(static_cast<int>(seq.thresholdMode()), static_cast<int>(DiscreteMapSequence::ThresholdMode::Length), "threshold toggled");
     seq.toggleLoop();
     expectFalse(seq.loop(), "loop toggled");
-    seq.toggleSlew();
-    expectTrue(seq.slewEnabled(), "slew toggled");
+    seq.setSlewTime(50);
+    expectTrue(seq.slewEnabled(), "slew enabled");
 }
 
 CASE("gate_length_clamp") {
