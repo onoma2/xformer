@@ -1,6 +1,11 @@
 ## XFORMER Summary
 
-XFORMER is a fork of the Phazerville PER|FORMER firmware with several algorithmic and musical enhancement features:
+
+
+
+
+
+XFORMER is a fork of the Phazerville PER|FORMER version of original firmw.
 
 ### Warnings
 - The update is based on Phazerville fork of the original firmware, so no
