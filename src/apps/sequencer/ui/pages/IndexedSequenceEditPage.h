@@ -70,6 +70,12 @@ private:
     const IndexedSequence::Step& step(int index) const;
 
     void quickEdit(int index);
+    void startSplitQuickEdit();
+    void finishSplitQuickEdit();
+    void splitStepInto(int pieces);
+    void startMergeQuickEdit();
+    void finishMergeQuickEdit();
+    void mergeSteps(int count);
     void startSwapQuickEdit();
     void finishSwapQuickEdit();
     void startVoicingQuickEdit(VoicingBank bank, int stepIndex);
@@ -96,6 +102,10 @@ private:
 
     IndexedSequenceListModel _listModel;
     StepSelection<IndexedSequence::MaxSteps> _stepSelection;
+    bool _splitQuickEditActive = false;
+    int _splitQuickEditCount = 2;
+    bool _mergeQuickEditActive = false;
+    int _mergeQuickEditCount = 2;
     bool _swapQuickEditActive = false;
     int _swapQuickEditBaseIndex = -1;
     int _swapQuickEditOffset = 0;

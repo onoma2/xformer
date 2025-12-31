@@ -26,6 +26,7 @@ public:
 private:
     enum class Mode : uint8_t {
         Calibration = 0,
+        Info        = 1,
         Utilities   = 2,
         Update      = 3,
         Settings    = 4,
@@ -34,6 +35,8 @@ private:
     void setMode(Mode mode);
     void setOutputIndex(int index);
     void updateOutputs();
+
+    void drawInfoSizes(Canvas &canvas);
 
     void executeUtilityItem(UtilitiesListModel::Item item);
 

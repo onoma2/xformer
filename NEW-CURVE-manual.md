@@ -444,9 +444,9 @@ A generative engine inserted *before* the wavefolder.
 - **Access**: Press **F5** to cycle to **CHAOS**.
 - **Controls**:
   - **AMT**: Modulation depth (0-100%).
-  - **HZ**: Evolution speed (0.01Hz-50Hz).
-  - **P1**: Algorithm-specific parameter 1 (0-100, default: 50).
-  - **P2**: Algorithm-specific parameter 2 (0-100, default: 50).
+  - **HZ**: Evolution speed (0.01Hz-50Hz, default ~0.7Hz).
+  - **HEAT**: Chaos intensity parameter (0-100, default: 45).
+  - **DAMP**: Chaos damping parameter (0-100, default: 62).
 
 ### 4.1 Chaos Range Offset
 - **Function**: Shifts the centerpoint of chaos wiggling within the voltage range.

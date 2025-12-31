@@ -198,9 +198,9 @@ void CurveSequence::clear() {
     setChaosAmount(0);
     setChaosAlgo(ChaosAlgorithm::Latoocarfian);
     setChaosRange(ChaosRange::Mid);
-    setChaosRate(0);
-    setChaosParam1(50);
-    setChaosParam2(50);
+    setChaosRate(65);
+    setChaosParam1(45);
+    setChaosParam2(62);
 
     clearSteps();
 }

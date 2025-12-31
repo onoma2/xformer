@@ -596,6 +596,24 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
 void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
     auto &sequence = _project.selectedIndexedSequence();
 
+    if (_splitQuickEditActive) {
+        _splitQuickEditCount = clamp(_splitQuickEditCount + event.value(), 2, 8);
+        FixedStringBuilder<16> msg("SPLIT: %d", _splitQuickEditCount);
+        showMessage(msg);
+        event.consume();
+        return;
+    }
+
+    if (_mergeQuickEditActive) {
+        int baseIndex = _stepSelection.first();
+        int maxMerge = sequence.activeLength() - baseIndex;
+        _mergeQuickEditCount = clamp(_mergeQuickEditCount + event.value(), 2, maxMerge);
+        FixedStringBuilder<16> msg("MERGE: %d", _mergeQuickEditCount);
+        showMessage(msg);
+        event.consume();
+        return;
+    }
+
     if (_voicingQuickEditActive) {
         const int count = (_voicingQuickEditBank == VoicingBank::Piano) ? kPianoVoicingCount : kGuitarVoicingCount;
         int next = clamp(_voicingQuickEditIndex + event.value(), -1, count - 1);
@@ -809,6 +827,19 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
         }
     }
 
+    if (key.isQuickEdit() && key.shiftModifier()) {
+        if (key.quickEdit() == 0) {
+            startSplitQuickEdit();
+            event.consume();
+            return;
+        }
+        if (key.quickEdit() == 1) {
+            startMergeQuickEdit();
+            event.consume();
+            return;
+        }
+    }
+
     if (key.isStep()) {
         _stepSelection.keyDown(event, stepOffset());
     }
@@ -876,6 +907,20 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
 
 void IndexedSequenceEditPage::keyUp(KeyEvent &event) {
     const auto &key = event.key();
+    if (_splitQuickEditActive) {
+        if (key.isPage() || (key.isStep() && key.step() == 8)) {
+            finishSplitQuickEdit();
+            event.consume();
+            return;
+        }
+    }
+    if (_mergeQuickEditActive) {
+        if (key.isPage() || (key.isStep() && key.step() == 9)) {
+            finishMergeQuickEdit();
+            event.consume();
+            return;
+        }
+    }
     if (_voicingQuickEditActive) {
         if (key.isPage() || (key.isStep() && key.step() == _voicingQuickEditStep)) {
             finishVoicingQuickEdit();
@@ -1249,6 +1294,131 @@ void IndexedSequenceEditPage::finishSwapQuickEdit() {
     swapStepWithOffset(_swapQuickEditOffset);
     _swapQuickEditBaseIndex = -1;
     _swapQuickEditOffset = 0;
+}
+
+void IndexedSequenceEditPage::startSplitQuickEdit() {
+    if (!_stepSelection.any()) {
+        showMessage("NO STEP");
+        return;
+    }
+
+    _splitQuickEditActive = true;
+    _splitQuickEditCount = 2;
+    showMessage("SPLIT: 2");
+}
+
+void IndexedSequenceEditPage::finishSplitQuickEdit() {
+    if (!_splitQuickEditActive) {
+        return;
+    }
+
+    _splitQuickEditActive = false;
+    splitStepInto(_splitQuickEditCount);
+    _splitQuickEditCount = 2;
+}
+
+void IndexedSequenceEditPage::splitStepInto(int pieces) {
+    auto &sequence = _project.selectedIndexedSequence();
+
+    // Check capacity
+    int selectedCount = _stepSelection.count();
+    int newSteps = selectedCount * (pieces - 1);
+    if (sequence.activeLength() + newSteps > IndexedSequence::MaxSteps) {
+        showMessage("CANNOT SPLIT: FULL");
+        return;
+    }
+
+    // Iterate backwards to avoid index shifting issues
+    bool splitAny = false;
+    for (int i = sequence.activeLength() - 1; i >= 0; --i) {
+        if (_stepSelection[i]) {
+            auto &originalStep = sequence.step(i);
+            uint16_t totalDur = originalStep.duration();
+            uint16_t baseDur = totalDur / pieces;
+            uint16_t remainder = totalDur % pieces;
+
+            // First piece keeps the original position
+            originalStep.setDuration(baseDur + (remainder > 0 ? 1 : 0));
+
+            // Insert remaining pieces
+            for (int p = 1; p < pieces; ++p) {
+                sequence.insertStep(i + 1);
+                auto &newStep = sequence.step(i + p);
+                newStep.setNoteIndex(originalStep.noteIndex());
+                newStep.setGateLength(originalStep.gateLength());
+                newStep.setSlide(originalStep.slide());
+                newStep.setGroupMask(originalStep.groupMask());
+                newStep.setDuration(baseDur + (p < remainder ? 1 : 0));
+            }
+            splitAny = true;
+        }
+    }
+
+    if (splitAny) {
+        _stepSelection.clear();
+        FixedStringBuilder<32> msg("SPLIT: %d PIECES", pieces);
+        showMessage(msg);
+    }
+}
+
+void IndexedSequenceEditPage::startMergeQuickEdit() {
+    if (!_stepSelection.any()) {
+        showMessage("NO STEP");
+        return;
+    }
+
+    int baseIndex = _stepSelection.first();
+    auto &sequence = _project.selectedIndexedSequence();
+    int maxMerge = sequence.activeLength() - baseIndex;
+
+    if (maxMerge < 2) {
+        showMessage("NO NEXT");
+        return;
+    }
+
+    _mergeQuickEditActive = true;
+    _mergeQuickEditCount = 2;
+    showMessage("MERGE: 2");
+}
+
+void IndexedSequenceEditPage::finishMergeQuickEdit() {
+    if (!_mergeQuickEditActive) {
+        return;
+    }
+
+    _mergeQuickEditActive = false;
+    mergeSteps(_mergeQuickEditCount);
+    _mergeQuickEditCount = 2;
+}
+
+void IndexedSequenceEditPage::mergeSteps(int count) {
+    auto &sequence = _project.selectedIndexedSequence();
+    int baseIndex = _stepSelection.first();
+
+    if (baseIndex + count > sequence.activeLength()) {
+        showMessage("NOT ENOUGH");
+        return;
+    }
+
+    // Sum durations
+    uint32_t totalDuration = 0;
+    for (int i = 0; i < count; ++i) {
+        totalDuration += sequence.step(baseIndex + i).duration();
+    }
+
+    // Update first step
+    sequence.step(baseIndex).setDuration(
+        clamp<uint32_t>(totalDuration, 0, IndexedSequence::MaxDuration)
+    );
+
+    // Delete following steps
+    for (int i = 0; i < count - 1; ++i) {
+        sequence.deleteStep(baseIndex + 1);
+    }
+
+    _stepSelection.clear();
+    FixedStringBuilder<32> msg("MERGED: %d STEPS", count);
+    showMessage(msg);
 }
 
 IndexedSequence::Step& IndexedSequenceEditPage::step(int index) {

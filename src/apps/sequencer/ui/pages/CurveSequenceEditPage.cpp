@@ -294,7 +294,7 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
 
     } else if (_editMode == EditMode::Chaos) {
         WindowPainter::drawActiveFunction(canvas, "CHAOS");
-        const char *chaosFunctionNames[5] = { "AMT", "HZ", "P1", "P2", "NEXT" };
+        const char *chaosFunctionNames[5] = { "AMT", "HZ", "HEAT", "DAMP", "NEXT" };
         WindowPainter::drawFooter(canvas, chaosFunctionNames, pageKeyState(), _chaosRow);
 
         const int colWidth = 51;
@@ -346,12 +346,12 @@ void CurveSequenceEditPage::draw(Canvas &canvas) {
                 max = 127.f;
                 sequence.printChaosRate(valueStr);
                 break;
-            case 2: // P1
+            case 2: // HEAT
                 value = sequence.chaosParam1();
                 max = 100.f;
                 sequence.printChaosParam1(valueStr);
                 break;
-            case 3: // P2
+            case 3: // DAMP
                 value = sequence.chaosParam2();
                 max = 100.f;
                 sequence.printChaosParam2(valueStr);
@@ -1222,9 +1222,9 @@ void CurveSequenceEditPage::initSettings() {
         showMessage("WAVEFOLDER INITIALIZED");
     } else if (_editMode == EditMode::Chaos) {
         sequence.setChaosAmount(0);
-        sequence.setChaosRate(0);
-        sequence.setChaosParam1(34);
-        sequence.setChaosParam2(73);
+        sequence.setChaosRate(65);
+        sequence.setChaosParam1(45);
+        sequence.setChaosParam2(62);
         sequence.setChaosAlgo(CurveSequence::ChaosAlgorithm::Latoocarfian);
         sequence.setChaosRange(CurveSequence::ChaosRange::Mid);
         showMessage("CHAOS INITIALIZED");

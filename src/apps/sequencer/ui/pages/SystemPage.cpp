@@ -3,6 +3,14 @@
 #include "ui/pages/Pages.h"
 #include "ui/painters/WindowPainter.h"
 
+#include "model/ClipBoard.h"
+#include "model/DiscreteMapTrack.h"
+#include "model/IndexedTrack.h"
+#include "model/Model.h"
+#include "model/NoteTrack.h"
+#include "model/Project.h"
+#include "model/Track.h"
+
 #include "core/utils/StringBuilder.h"
 
 #ifdef PLATFORM_STM32
@@ -11,12 +19,13 @@
 
 enum Function {
     Calibration = 0,
+    Info        = 1,
     Utilities   = 2,
     Update      = 3,
     Settings    = 4,
 };
 
-static const char *functionNames[] = { "CAL", nullptr, "UTILS", "UPDATE", "SETTINGS" };
+static const char *functionNames[] = { "CAL", "INFO", "UTILS", "UPDATE", "SETTINGS" };
 
 enum CalibrationEditFunction {
     Auto        = 0,
@@ -80,6 +89,12 @@ void SystemPage::draw(Canvas &canvas) {
             WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), int(_mode));
         }
         ListPage::draw(canvas);
+        break;
+    }
+    case Mode::Info: {
+        WindowPainter::drawActiveFunction(canvas, "INFO");
+        WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), int(_mode));
+        drawInfoSizes(canvas);
         break;
     }
     case Mode::Utilities: {
@@ -177,6 +192,9 @@ void SystemPage::keyPress(KeyPressEvent &event) {
             case Function::Calibration:
                 setMode(Mode::Calibration);
                 break;
+            case Function::Info:
+                setMode(Mode::Info);
+                break;
             case Function::Utilities:
                 setMode(Mode::Utilities);
                 break;
@@ -201,6 +219,8 @@ void SystemPage::keyPress(KeyPressEvent &event) {
         ListPage::keyPress(event);
         updateOutputs();
         break;
+    case Mode::Info:
+        break;
     case Mode::Utilities:
         if (key.isEncoder()) {
             executeUtilityItem(UtilitiesListModel::Item(selectedRow()));
@@ -222,6 +242,8 @@ void SystemPage::encoder(EncoderEvent &event) {
         ListPage::encoder(event);
         updateOutputs();
         break;
+    case Mode::Info:
+        break;
     case Mode::Utilities:
         ListPage::encoder(event);
         break;
@@ -238,6 +260,8 @@ void SystemPage::setMode(Mode mode) {
     switch (_mode) {
     case Mode::Calibration:
         setListModel(_cvOutputListModel);
+        break;
+    case Mode::Info:
         break;
     case Mode::Utilities:
         setListModel(_utilitiesListModel);
@@ -259,6 +283,38 @@ void SystemPage::updateOutputs() {
     float volts = Calibration::CvOutput::itemToVolts(selectedRow());
     for (int i = 0; i < CONFIG_CV_OUTPUT_CHANNELS; ++i) {
         _engine.setCvOutput(i, volts);
+    }
+}
+
+void SystemPage::drawInfoSizes(Canvas &canvas) {
+    struct SizeItem {
+        const char *label;
+        size_t size;
+    };
+
+    const SizeItem items[] = {
+        { "TRACK", sizeof(Track) },
+        { "PROJECT", sizeof(Project) },
+        { "MODEL", sizeof(Model) },
+        { "CLIPBD", sizeof(ClipBoard) },
+        { "NOTE", sizeof(NoteTrack) },
+        { "INDEX", sizeof(IndexedTrack) },
+        { "DMAP", sizeof(DiscreteMapTrack) },
+    };
+
+    canvas.setBlendMode(BlendMode::Set);
+    canvas.setFont(Font::Tiny);
+
+    int y = 14;
+    const int lineHeight = 8;
+    for (const auto &item : items) {
+        FixedStringBuilder<16> sizeStr("%u", unsigned(item.size));
+        canvas.setColor(Color::Medium);
+        canvas.drawText(8, y, item.label);
+        canvas.setColor(Color::Bright);
+        int x = Width - 8 - canvas.textWidth(sizeStr);
+        canvas.drawText(x, y, sizeStr);
+        y += lineHeight;
     }
 }
 
