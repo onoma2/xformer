@@ -2,13 +2,17 @@
 
 XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific track types and sequencing enhancements. It assumes familiarity with the standard PER|FORMER workflow.
 
+
+<a href="manuals/xformer.jpeg"><img src="manuals/xformer.jpeg"/></a>
+
+
 ### Key Features
-- **Algo Track** (inspired by TINRS Tuesday): Generative sequencing with deterministic behavior.
-- **Discrete Track** (inspired by New Systems Instruments Discrete Map): Threshold-based sequencing mapping inputs to stages.
-- **Indexed Track** (inspired by Orthogonal Devices ER-101/102): Duration-based sequencing with independent step lengths.
+- **Algo Track** (inspired by [TINRS Tuesday](https://www.thisisnotrocketscience.nl/eurorack/tuesday/)): Generative sequencing with deterministic behavior.
+- **Discrete Track** (inspired by [New Systems Instruments Discrete Map](https://nsinstruments.com/modules/dmap.html)): Threshold-based sequencing mapping inputs to stages.
+- **Indexed Track** (inspired by [Orthogonal Devices ER-101/102](https://www.orthogonaldevices.com/er-101.html)): Duration-based sequencing with independent step lengths.
 - **Note Track Enhancements**:
-  - **Accumulator** (inspired by Intellijel Metropolix).
-  - **Harmony Engine** (inspired by Instruo Harmonaig).
+  - **Accumulator** (inspired by [Intellijel Metropolix](https://intellijel.com/shop/eurorack/metropolix/)).
+  - **Harmony Engine** (inspired by [Instruo Harmonaig](https://www.instruomodular.com/product/harmonaig/)).
   - Pulse Count and Gate Modes.
 - **Curve Track Enhancements**: Global Phase, Wavefolder, Chaos Engine, advanced playback features.
 - **Scope View**: Monitor page oscilloscope for track CV with optional second track overlay.
@@ -26,6 +30,8 @@ XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific t
 - [INDEXED Manual](./manuals/INDEXED_MANUAL.md) - Indexed track (duration-based sequencing) guide
 - [CURVE Studio](./manuals/CURVE_Stidio.md) - Curve track enhancements and features
 - [ROUTES](./manuals/ROUTES.md) - Routing and signal flow documentation
+- [HTML Shapes Visualizer](./manuals/curve-and-route-shapers.html) - helper to
+visualize Curve Studio shapes and routing additions with a sound engine
 
 
 ### Warnings
