@@ -55,6 +55,8 @@ public:
     float bpm() const { return _state == State::SlaveRunning ? _slaveBpm : _masterBpm; }
     uint32_t tick() const { return _tick; }
     float tickDuration() const { return 60.f / (bpm() * _ppqn); }
+    uint32_t tickPeriodUs() const;
+    double tickPosition() const;
 
     // Master clock control
     void masterStart();
@@ -148,6 +150,7 @@ private:
 
     volatile uint32_t _tick;
     volatile uint32_t _tickProcessed;
+    volatile uint32_t _lastTickUs = 0;
 
     volatile int32_t _activeSlave = -1;
 

@@ -12,6 +12,8 @@
 #include "model/Scale.h"
 #include "model/HarmonyEngine.h"
 
+#include <cmath>
+
 static Random rng;
 
 // evaluate if step gate is active
@@ -100,7 +102,7 @@ static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, c
 }
 
 void NoteTrackEngine::reset() {
-    _freeRelativeTick = 0;
+    _lastFreeStepIndex = -1;
     _sequenceState.reset();
     _currentStep = -1;
     _prevCondition = false;
@@ -126,7 +128,7 @@ void NoteTrackEngine::reset() {
 }
 
 void NoteTrackEngine::restart() {
-    _freeRelativeTick = 0;
+    _lastFreeStepIndex = -1;
     _sequenceState.reset();
     _currentStep = -1;
     _pulseCounter = 0;
@@ -182,11 +184,17 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
             }
             break;
         case Types::PlayMode::Free:
-            relativeTick = _freeRelativeTick;
-            if (++_freeRelativeTick >= divisor) {
-                _freeRelativeTick = 0;
+        {
+            double tickPos = _engine.clock().tickPosition();
+            double baseTick = resetDivisor == 0 ? tickPos : std::fmod(tickPos, double(resetDivisor));
+            if (baseTick < 0.0) {
+                baseTick = 0.0;
             }
-            if (relativeTick == 0) {
+            int stepIndex = int(std::floor(baseTick / divisor));
+            relativeTick = static_cast<uint32_t>(baseTick);
+
+            if (stepIndex != _lastFreeStepIndex) {
+                _lastFreeStepIndex = stepIndex;
                 // Pulse count logic: Get current step's pulse count from sequence state
                 int currentStepIndex = _sequenceState.step();
                 int stepPulseCount = sequence.step(currentStepIndex).pulseCount();
@@ -207,6 +215,7 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                 }
             }
             break;
+        }
         case Types::PlayMode::Last:
             break;
         }

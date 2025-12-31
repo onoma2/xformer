@@ -86,7 +86,7 @@ private:
     NoteSequence *_sequence = nullptr;
     const NoteSequence *_fillSequence = nullptr;
 
-    uint32_t _freeRelativeTick;
+    int _lastFreeStepIndex = -1;
     SequenceState _sequenceState;
     int _currentStep;
     bool _prevCondition;

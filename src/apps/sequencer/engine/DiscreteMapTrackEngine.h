@@ -59,7 +59,7 @@ private:
     static constexpr float kRangeEpsilon = 1e-6f;
     static constexpr uint32_t kActivityPulseTicks = 12;
 
-    void updateRamp(uint32_t tick);
+    void updateRamp(double tickPos);
     uint32_t scaledDivisorTicks() const;
     float getRoutedInput();
     float noteIndexToVoltage(int8_t noteIndex);

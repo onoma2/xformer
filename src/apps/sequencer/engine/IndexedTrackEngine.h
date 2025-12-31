@@ -61,7 +61,7 @@ private:
     int _cachedPattern = -1;        // Cached pattern index to avoid redundant lookups
 
     // === Timing state ===
-    uint32_t _stepTimer = 0;        // Counts up to step.duration
+    double _stepTimer = 0.0;        // Counts up to step.duration (ticks)
     uint32_t _gateTimer = 0;        // Counts down from step.gateLength
     uint32_t _effectiveStepDuration = 0; // Sampled duration for current step
     int _currentStepIndex = 0;      // Current step (0 to activeLength-1)
@@ -69,6 +69,7 @@ private:
     bool _pendingTrigger = false;   // Fire step at start of next tick
     float _prevSync = 0.f;          // For external sync edge detection
     int _stepsRemaining = 0;        // Used for Once mode
+    double _lastFreeTickPos = 0.0;
 
     // === Output ===
     float _cvOutput = 0.0f;

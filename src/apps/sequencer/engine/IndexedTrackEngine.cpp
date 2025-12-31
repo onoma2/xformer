@@ -139,7 +139,7 @@ void IndexedTrackEngine::resetSequenceState() {
     _sequenceState.reset();
     _stepsRemaining = std::max(0, _sequence->activeLength() - 1);
     _currentStepIndex = 0;
-    _stepTimer = 0;
+    _stepTimer = 0.0;
     _gateTimer = 0;
     _effectiveStepDuration = 0;
     _cvOutput = 0.0f;
@@ -147,6 +147,7 @@ void IndexedTrackEngine::resetSequenceState() {
     _running = true;
     _activity = false;
     _slideActive = false;
+    _lastFreeTickPos = _engine.clock().tickPosition();
 
     if (_sequence->activeLength() > 0) {
         _sequenceState.advanceFree(_sequence->runMode(), 0, _sequence->activeLength() - 1, _rng);
@@ -255,7 +256,7 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
         break;
     }
     case Types::PlayMode::Free: {
-        // Timer-based advancement (original behavior)
+        // Timer-based advancement using wallclock-derived tick position
         const uint16_t stepDuration = static_cast<uint16_t>(_effectiveStepDuration);
 
         // Zero duration steps: rapid-fire through immediately
@@ -266,7 +267,21 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
             return TickResult::NoUpdate;
         }
 
-        _stepTimer++;
+        double tickPos = _engine.clock().tickPosition();
+        double deltaTicks = tickPos - _lastFreeTickPos;
+        if (deltaTicks < 0.0) {
+            deltaTicks = 0.0;
+        }
+        _lastFreeTickPos = tickPos;
+
+        if (_effectiveStepDuration > 0) {
+            const double maxDeltaTicks = _effectiveStepDuration * 2.0;
+            if (deltaTicks > maxDeltaTicks) {
+                deltaTicks = maxDeltaTicks;
+            }
+        }
+
+        _stepTimer += deltaTicks;
 
         // Check for step transition
         if (_stepTimer >= stepDuration) {
@@ -298,7 +313,7 @@ void IndexedTrackEngine::advanceStep() {
 
     if (!_sequence->loop() && _stepsRemaining <= 0) {
         _running = false;
-        _stepTimer = 0;
+        _stepTimer = 0.0;
         return;
     }
 
@@ -320,12 +335,12 @@ void IndexedTrackEngine::advanceStep() {
         skipCounter++;
         if (!_sequence->loop() && _stepsRemaining <= 0) {
             _running = false;
-            _stepTimer = 0;
+            _stepTimer = 0.0;
             return;
         }
     }
 
-    _stepTimer = 0;
+    _stepTimer = 0.0;
 }
 
 void IndexedTrackEngine::triggerStep() {

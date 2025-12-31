@@ -175,7 +175,12 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         }
         case Types::PlayMode::Free:
             if (_running || _sequence->loop()) {
-                updateRamp(relativeTick);
+                double tickPos = _engine.clock().tickPosition();
+                double relativeTickPos = tickPos - double(_resetTickOffset);
+                if (relativeTickPos < 0.0) {
+                    relativeTickPos = 0.0;
+                }
+                updateRamp(relativeTickPos);
             }
             break;
         case Types::PlayMode::Last:
@@ -374,13 +379,16 @@ uint32_t DiscreteMapTrackEngine::scaledDivisorTicks() const {
     return std::max<uint32_t>(1, std::lround(divisor / clockMult));
 }
 
-void DiscreteMapTrackEngine::updateRamp(uint32_t tick) {
+void DiscreteMapTrackEngine::updateRamp(double tickPos) {
     const auto &sequence = *_sequence;
 
-    uint32_t periodTicks = scaledDivisorTicks();
+    double periodTicks = static_cast<double>(scaledDivisorTicks());
 
-    uint32_t posInPeriod = _running ? (tick % periodTicks) : periodTicks;
-    _rampPhase = float(posInPeriod) / float(periodTicks);
+    double posInPeriod = _running ? std::fmod(tickPos, periodTicks) : periodTicks;
+    if (posInPeriod < 0.0) {
+        posInPeriod = 0.0;
+    }
+    _rampPhase = periodTicks > 0.0 ? float(posInPeriod / periodTicks) : 0.0f;
 
     // Internal ramp/triangle always uses full ±5V range (perfect synced modulation source)
     // ABOVE/BELOW parameters only affect threshold positions, not the ramp itself
@@ -391,7 +399,7 @@ void DiscreteMapTrackEngine::updateRamp(uint32_t tick) {
         _rampValue = kInternalRampMin + _rampPhase * (kInternalRampMax - kInternalRampMin);
     }
 
-    if (!_sequence->loop() && _running && posInPeriod + 1 >= periodTicks) {
+    if (!_sequence->loop() && _running && posInPeriod + 1.0 >= periodTicks) {
         _running = false;
         _rampValue = kInternalRampMax;
         _rampPhase = 1.0f;

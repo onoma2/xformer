@@ -1875,10 +1875,27 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     // Finite Loop Reset
     if (resetDivisor > 0 && relativeTick == 0) {
         initAlgorithm(); // Reset RNGs to loop start state
-        _stepIndex = 0;
+        if (tuesdayTrack().playMode() == Types::PlayMode::Free) {
+            _stepIndex = -1; // force step trigger on loop restart
+        } else {
+            _stepIndex = 0;
+        }
     }
 
     bool stepTrigger = (relativeTick % divisor == 0);
+    if (tuesdayTrack().playMode() == Types::PlayMode::Free) {
+        double tickPos = _engine.clock().tickPosition();
+        double baseTick = resetDivisor == 0 ? tickPos : std::fmod(tickPos, double(resetDivisor));
+        if (baseTick < 0.0) {
+            baseTick = 0.0;
+        }
+        int stepIndex = int(std::floor(baseTick / divisor));
+        stepTrigger = (stepIndex != _stepIndex);
+        if (stepTrigger) {
+            _stepIndex = stepIndex;
+            _displayStep = _stepIndex;
+        }
+    }
 
     // --- MICRO-GATE QUEUE PROCESSING ---
 
@@ -1940,9 +1957,7 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
             break;
         }
         case Types::PlayMode::Free: {
-            // Internal counter advancement (can drift)
-            _stepIndex++;
-            _displayStep = _stepIndex;
+            // Step index already computed from wallclock
             break;
         }
         case Types::PlayMode::Last:
