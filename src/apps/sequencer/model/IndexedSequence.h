@@ -287,6 +287,12 @@ public:
         _divisor = clamp(div, 1, 768);
     }
 
+    // clockMultiplier
+    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    void setClockMultiplier(int clockMultiplier, bool routed = false) {
+        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    }
+
     // loop mode
     bool loop() const { return _loop; }
     void setLoop(bool loop) { _loop = loop; }
@@ -546,6 +552,8 @@ public:
 
     void clear() {
         _divisor = 12;  // 1/16 note at 192 PPQN
+        _clockMultiplier.clear();
+        _clockMultiplier.setBase(100);
         _loop = true;
         _activeLength = 5;
         _scale = -1;  // Use project scale
@@ -578,6 +586,7 @@ public:
 
     void write(VersionedSerializedWriter &writer) const {
         writer.write(_divisor);
+        writer.write(_clockMultiplier.base);
         writer.write(_loop);
         _runMode.write(writer);
         writer.write(_activeLength);
@@ -598,6 +607,7 @@ public:
 
     void read(VersionedSerializedReader &reader) {
         reader.read(_divisor);
+        reader.read(_clockMultiplier.base);
         reader.read(_loop);
         _runMode.read(reader);
         reader.read(_activeLength);
@@ -638,6 +648,17 @@ public:
         ModelUtils::printDivisor(str, divisor());
     }
 
+    void editClockMultiplier(int value, bool shift) {
+        if (!isRouted(Routing::Target::ClockMult)) {
+            setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
+        }
+    }
+
+    void printClockMultiplier(StringBuilder &str) const {
+        printRouted(str, Routing::Target::ClockMult);
+        str("%.2fx", clockMultiplier() * 0.01f);
+    }
+
     void editScale(int value, bool shift) {
         setScale(scale() + value);
     }
@@ -658,6 +679,7 @@ public:
 
 private:
     uint16_t _divisor = 192;      // Clock divisor in ticks
+    Routable<uint8_t> _clockMultiplier;
     bool _loop = true;            // Loop mode
     Routable<Types::RunMode> _runMode;
     uint8_t _activeLength = 16;   // Dynamic step count (1-32)

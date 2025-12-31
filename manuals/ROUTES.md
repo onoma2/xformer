@@ -360,6 +360,65 @@ Recent updates to the routing system include:
 - Better handling of track-specific shaper parameters
 - Improved memory management for routing parameters
 
+### 8.6 Special Routing Targets
+
+#### 8.6.1 Clock Multiplier (ClockMult)
+
+**Target**: `Clock Mult`
+- **Type**: Sequence target (per-track)
+- **Range**: 50% to 150% (normalized)
+- **Function**: Controls the clock multiplier for sequences
+- **Effect**: Adjusts how sequences respond to clock input
+  - 100% = normal speed (1.0x)
+  - Below 100% = slower playback
+  - Above 100% = faster playback
+- **Use Case**: Create rhythmic variations by modulating clock speed
+
+#### 8.6.2 CV Output Rotation
+
+**Target**: `CV Out Rot`
+- **Type**: Track target (per-track)
+- **Range**: -8 to +8
+- **Function**: Rotates the CV output values for a track
+- **Effect**: Shifts CV values by a specified number of steps
+  - Positive values: Rotate CV values forward in sequence
+  - Negative values: Rotate CV values backward in sequence
+- **Use Case**: Create evolving CV patterns by rotating output values
+
+#### 8.6.3 Gate Output Rotation
+
+**Target**: `Gate Out Rot`
+- **Type**: Track target (per-track)
+- **Range**: -8 to +8
+- **Function**: Rotates the gate output values for a track
+- **Effect**: Shifts gate timing by a specified number of steps
+  - Positive values: Rotate gate timing forward
+  - Negative values: Rotate gate timing backward
+- **Use Case**: Create rhythmic variations by rotating gate patterns
+
+#### 8.6.4 Track Run Control
+
+**Target**: `Run`
+- **Type**: Track target (per-track)
+- **Range**: Binary (0 or 1)
+- **Function**: Controls whether a track is running or stopped
+- **Effect**:
+  - 0 (off): Track stops advancing
+  - 1 (on): Track continues advancing
+- **Use Case**: Remotely start/stop tracks using CV or MIDI sources
+
+#### 8.6.5 Track Reset Control
+
+**Target**: `Reset`
+- **Type**: Track target (per-track)
+- **Range**: Binary (0 or 1)
+- **Function**: Resets track position to beginning
+- **Effect**:
+  - Rising edge detection (triggers when signal crosses 50%)
+  - Immediately resets the targeted track(s)
+  - Overrides internal loop counters and positions
+- **Use Case**: Synchronize tracks to a common start point using external triggers
+
 ## 9. Troubleshooting Common Issues
 
 ### 9.1 No Modulation Visible

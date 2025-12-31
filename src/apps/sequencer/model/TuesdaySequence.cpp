@@ -104,6 +104,9 @@ void TuesdaySequence::writeRouted(Routing::Target target, int intValue, float fl
     case Routing::Target::Divisor:
         setDivisor(intValue, true);
         break;
+    case Routing::Target::ClockMult:
+        setClockMultiplier(intValue, true);
+        break;
     case Routing::Target::Rotate:
         setRotate(intValue, true);
         break;
@@ -136,6 +139,8 @@ void TuesdaySequence::clear() {
     _transpose.clear();
     _divisor.clear();
     _divisor.setBase(12); // 1/16
+    _clockMultiplier.clear();
+    _clockMultiplier.setBase(100);
     _resetMeasure = 0;
     _scale = -1;  // Project
     _rootNote = -1;
@@ -164,6 +169,7 @@ void TuesdaySequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_octave.base);
     writer.write(_transpose.base);
     writer.write(_divisor.base);
+    writer.write(_clockMultiplier.base);
     writer.write(_resetMeasure);
     writer.write(_scale);
     writer.write(_rootNote);
@@ -192,6 +198,7 @@ void TuesdaySequence::read(VersionedSerializedReader &reader) {
     reader.read(_octave.base);
     reader.read(_transpose.base);
     reader.read(_divisor.base);
+    reader.read(_clockMultiplier.base);
     reader.read(_resetMeasure);
     reader.read(_scale);
     reader.read(_rootNote);

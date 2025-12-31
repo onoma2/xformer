@@ -40,11 +40,11 @@
 - Per track: 17 sequences × 128 bytes = 2,176 bytes
 - For 8 tracks: 8 × 2,176 = **17,408 bytes**
 
-#### DiscreteMapSequence Memory:
-- Each `DiscreteMapStage` uses 3 bytes (threshold, direction, noteIndex)
-- Each `DiscreteMapSequence` has 32 stages × 3 bytes = 96 bytes
-- Each `DiscreteMapSequence` has additional metadata: ~19 bytes
-- Total per `DiscreteMapSequence`: ~115 bytes
+#### DiscreteSequence Memory:
+- Each `DiscreteStage` uses 3 bytes (threshold, direction, noteIndex)
+- Each `DiscreteSequence` has 32 stages × 3 bytes = 96 bytes
+- Each `DiscreteSequence` has additional metadata: ~19 bytes
+- Total per `DiscreteSequence`: ~115 bytes
 - Per track: 17 sequences (16 patterns + 1 snapshot) × 115 bytes = 1,955 bytes
 - For 8 tracks: 8 × 1,955 = **15,640 bytes**
 
@@ -54,14 +54,14 @@ Wait, this exceeds the available RAM. Let me recalculate more carefully.
 ### Corrected Memory Analysis
 
 Actually, looking at the Track model, only one track type is active per track at a time:
-- Each track can be Note, Curve, MidiCv, Tuesday, or DiscreteMap (not all simultaneously)
+- Each track can be Note, Curve, MidiCv, Tuesday, or Discrete (not all simultaneously)
 - Each track contains only its relevant sequence type
 
 So the memory is:
 - If all tracks were Note tracks: 8 × 10,880 = 87,040 bytes
 - If all tracks were Curve tracks: 8 × 9,792 = 78,336 bytes
 - If all tracks were Tuesday tracks: 8 × 2,176 = 17,408 bytes
-- If all tracks were DiscreteMap tracks: 8 × 1,955 = 15,640 bytes
+- If all tracks were Discrete tracks: 8 × 1,955 = 15,640 bytes
 
 The system supports mixed track types, so the maximum would be if all are Note tracks: **~87 KB**
 
@@ -93,7 +93,7 @@ The system supports mixed track types, so the maximum would be if all are Note t
 - Additional state variables: ~128 bytes
 - Total per engine: ~704 bytes
 
-#### DiscreteMapTrackEngine Memory:
+#### DiscreteTrackEngine Memory:
 - Base `TrackEngine`: ~64 bytes
 - Internal ramp state: ~8 bytes
 - Input tracking variables: ~12 bytes
@@ -124,7 +124,7 @@ The system supports mixed track types, so the maximum would be if all are Note t
 #### Project/Model Memory:
 - Project metadata: ~2-4 KB
 - PlayState: ~1-2 KB
-- Routing tables: ~4.5 KB (with DiscreteMap targets)
+- Routing tables: ~4.5 KB (with Discrete targets)
 - Settings: ~1 KB
 - **Total Project Overhead**: ~8-11 KB
 
@@ -142,26 +142,26 @@ The system supports mixed track types, so the maximum would be if all are Note t
 - **Free SRAM**: ~18KB remaining (concerning)
 - **Free CCMRAM**: ~19KB remaining (acceptable)
 
-### DiscreteMap and Routing Resource Analysis
+### Discrete and Routing Resource Analysis
 
-#### Memory Efficiency of DiscreteMap:
-- **DiscreteMap tracks are memory-efficient** compared to other track types
+#### Memory Efficiency of Discrete:
+- **Discrete tracks are memory-efficient** compared to other track types
 - Memory usage: ~15.6KB for all sequences (vs ~87KB for Note tracks)
 - Engine memory: ~248 bytes per engine (vs ~600 bytes for NoteTrackEngine)
-- **Conversion from Note to DiscreteMap tracks saves ~70KB+ of memory**
+- **Conversion from Note to Discrete tracks saves ~70KB+ of memory**
 
 #### Routing System:
 - Fixed overhead: ~4.5KB for routing tables (increased from ~2KB)
-- Added DiscreteMap targets: `DiscreteMapInput`, `DiscreteMapScanner`, `DiscreteMapSync`, `DiscreteMapRangeHigh`, `DiscreteMapRangeLow`
+- Added Discrete targets: `DiscreteInput`, `DiscreteScanner`, `DiscreteSync`, `DiscreteRangeHigh`, `DiscreteRangeLow`
 - No per-track overhead increase - uses existing routing infrastructure
 - Maintains full compatibility with other track types
 
 #### Resource Safety Assessment:
-- ✅ DiscreteMap implementation is memory-efficient
+- ✅ Discrete implementation is memory-efficient
 - ✅ Routing integration is well-implemented
 - ⚠️ Overall system memory pressure remains high
 - ⚠️ Limited headroom for future large feature additions
-- 💡 Converting Note tracks to DiscreteMap tracks can free significant memory
+- 💡 Converting Note tracks to Discrete tracks can free significant memory
 
 ### CPU Usage Analysis
 
@@ -184,8 +184,8 @@ The system supports mixed track types, so the maximum would be if all are Note t
 **Strengths:**
 1. Efficient memory management with proper use of CCMRAM vs SRAM for DMA requirements
 2. Well-architected task priorities for real-time operation
-3. Scalable track system supporting multiple track types including memory-efficient DiscreteMap
-4. **NEW**: Well-integrated routing system with support for DiscreteMap targets
+3. Scalable track system supporting multiple track types including memory-efficient Discrete
+4. **NEW**: Well-integrated routing system with support for Discrete targets
 
 **Potential Concerns:**
 1. **SRAM Pressure**: Only ~18KB free SRAM remains, which is limiting for future feature expansion
@@ -196,8 +196,8 @@ The system supports mixed track types, so the maximum would be if all are Note t
 1. Consider bit-packing for sequence data to reduce memory footprint
 2. Evaluate optimization opportunities in the Tuesday track engine
 3. Monitor memory usage closely as new features are added
-4. **NEW**: Consider promoting use of memory-efficient track types like DiscreteMap and Curve for projects with many tracks
-5. **NEW**: The DiscreteMap implementation can actually free up significant memory when replacing Note tracks (~70KB+ per track conversion)
+4. **NEW**: Consider promoting use of memory-efficient track types like Discrete and Curve for projects with many tracks
+5. **NEW**: The Discrete implementation can actually free up significant memory when replacing Note tracks (~70KB+ per track conversion)
 
 The firmware is otherwise healthy with appropriate use of both memory regions and proper real-time task scheduling. The flash storage shows plenty of room for growth, but SRAM usage should be monitored carefully.
 
@@ -286,13 +286,13 @@ Based on RES-indexed.md research document:
 The current PEW|FORMER firmware implementation of IndexedTrack is **memory-efficient** and well within RAM constraints at ~26.7KB total for 8 tracks. The implementation provides a good balance of features and memory usage, making it a viable addition to the firmware alongside other track types.
 
 **Updated Insights on Track Type Memory Efficiency** (from actual code analysis):
-- **DiscreteMap Track**: ~2,314 bytes per track (most efficient) - sequence (~1,955) + engine (~359)
+- **Discrete Track**: ~2,314 bytes per track (most efficient) - sequence (~1,955) + engine (~359)
 - **Indexed Track**: ~3,341 bytes per track (second most efficient) - sequence (~3,298) + engine (~43)
 - **Curve Track**: ~10,083 bytes per track - sequence (~9,792) + engine (~291)
 - **Note Track**: ~11,225 bytes per track (least efficient) - sequence (~10,880) + engine (~345)
 - **Tuesday Track**: ~2,231 bytes per track (most efficient for algorithmic content) - sequence (~2,176) + engine (~704)
 
-- The DiscreteMap track type remains the most memory-efficient option
+- The Discrete track type remains the most memory-efficient option
 - The Indexed track is more memory-efficient than Curve and Note tracks
 - Users can optimize memory usage by choosing appropriate track types for their needs
 - The firmware can support mixed track types within current memory constraints

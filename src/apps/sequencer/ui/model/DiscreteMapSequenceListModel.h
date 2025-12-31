@@ -14,6 +14,7 @@ public:
         ClockSource,
         SyncMode,
         Divisor,
+        ClockMult,
         GateLength,
         Loop,
         ResetMeasure,
@@ -56,6 +57,8 @@ public:
         switch (Item(row)) {
         case Divisor:
             return Routing::Target::Divisor;
+        case ClockMult:
+            return Routing::Target::ClockMult;
         case RangeHigh:
             return Routing::Target::DiscreteMapRangeHigh;
         case RangeLow:
@@ -83,6 +86,7 @@ private:
         case ClockSource:   return "Clock";
         case SyncMode:      return "Sync";
         case Divisor:       return "Divisor";
+        case ClockMult:     return "Clock Mult";
         case GateLength:    return "Gate Len";
         case Loop:          return "Loop";
         case ResetMeasure:  return "Reset Measure";
@@ -114,6 +118,9 @@ private:
             break;
         case Divisor:
             _sequence->printDivisor(str);
+            break;
+        case ClockMult:
+            _sequence->printClockMultiplier(str);
             break;
         case GateLength:
             _sequence->printGateLength(str);
@@ -166,6 +173,9 @@ private:
             break;
         case Divisor:
             _sequence->editDivisor(value, shift);
+            break;
+        case ClockMult:
+            _sequence->editClockMultiplier(value, shift);
             break;
         case GateLength:
             _sequence->editGateLength(value, shift);

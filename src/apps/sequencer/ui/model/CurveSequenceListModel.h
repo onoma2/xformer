@@ -13,6 +13,7 @@ public:
         LastStep,
         RunMode,
         Divisor,
+        ClockMult,
         ResetMeasure,
         Range,
         Last
@@ -65,6 +66,8 @@ public:
         switch (Item(row)) {
         case Divisor:
             return Routing::Target::Divisor;
+        case ClockMult:
+            return Routing::Target::ClockMult;
         case FirstStep:
             return Routing::Target::FirstStep;
         case LastStep:
@@ -83,6 +86,7 @@ private:
         case LastStep:          return "Last Step";
         case RunMode:           return "Run Mode";
         case Divisor:           return "Divisor";
+        case ClockMult:         return "Clock Mult";
         case ResetMeasure:      return "Reset Measure";
         case Range:             return "Range";
         case Last:              break;
@@ -107,6 +111,9 @@ private:
             break;
         case Divisor:
             _sequence->printDivisor(str);
+            break;
+        case ClockMult:
+            _sequence->printClockMultiplier(str);
             break;
         case ResetMeasure:
             _sequence->printResetMeasure(str);
@@ -133,6 +140,9 @@ private:
         case Divisor:
             _sequence->editDivisor(value, shift);
             break;
+        case ClockMult:
+            _sequence->editClockMultiplier(value, shift);
+            break;
         case ResetMeasure:
             _sequence->editResetMeasure(value, shift);
             break;
@@ -154,6 +164,8 @@ private:
         case Divisor:
         case ResetMeasure:
             return 16;
+        case ClockMult:
+            return 101;
         case Range:
             return int(Types::VoltageRange::Last);
         case Last:
@@ -172,6 +184,8 @@ private:
             return int(_sequence->runMode());
         case Divisor:
             return _sequence->indexedDivisor();
+        case ClockMult:
+            return _sequence->clockMultiplier() - 50;
         case ResetMeasure:
             return _sequence->resetMeasure();
         case Range:
@@ -192,6 +206,8 @@ private:
             return _sequence->setRunMode(Types::RunMode(index));
         case Divisor:
             return _sequence->setIndexedDivisor(index);
+        case ClockMult:
+            return _sequence->setClockMultiplier(index + 50);
         case ResetMeasure:
             return _sequence->setResetMeasure(index);
         case Range:

@@ -257,6 +257,9 @@ void NoteSequence::writeRouted(Routing::Target target, int intValue, float float
     case Routing::Target::Divisor:
         setDivisor(intValue, true);
         break;
+    case Routing::Target::ClockMult:
+        setClockMultiplier(intValue, true);
+        break;
     case Routing::Target::RunMode:
         setRunMode(Types::RunMode(intValue), true);
         break;
@@ -275,6 +278,7 @@ void NoteSequence::clear() {
     setScale(-1);
     setRootNote(-1);
     setDivisor(12);
+    setClockMultiplier(100);
     setResetMeasure(0);
     setRunMode(Types::RunMode::Forward);
     setFirstStep(0);
@@ -334,6 +338,7 @@ void NoteSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_scale.base);
     writer.write(_rootNote.base);
     writer.write(_divisor.base);
+    writer.write(_clockMultiplier.base);
     writer.write(_resetMeasure);
     writer.write(_runMode.base);
     writer.write(_firstStep.base);
@@ -368,6 +373,7 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
     } else {
         reader.read(_divisor.base);
     }
+    reader.read(_clockMultiplier.base);
     reader.read(_resetMeasure);
     reader.read(_runMode.base);
     reader.read(_firstStep.base);

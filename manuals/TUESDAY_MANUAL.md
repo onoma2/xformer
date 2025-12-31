@@ -81,6 +81,7 @@ In addition to the main Edit Page, the Algo track offers a comprehensive List Vi
 - **Start**: Start offset
 - **Octave/Transpose**: Pitch offsets
 - **Divisor**: Clock division
+- **Clock Mult**: Per-sequence clock multiplier (0.50x-1.50x)
 - **Reset Measure**: Automatic reset interval
 - **Scale/Root Note**: Quantization settings
 - **Mask Param**: Rhythmic masking control
@@ -268,7 +269,7 @@ The Algo track supports CV routing to parameters:
 **Routable Parameters**:
 - Algorithm, Flow, Ornament, Power
 - Glide, Trill, Gate Length, Gate Offset
-- Divisor, Rotate, Octave, Transpose
+- Divisor, Clock Mult, Rotate, Octave, Transpose
 
 **Usage**:
 - Route CV sources to algorithm parameters
@@ -300,6 +301,7 @@ The Algo track uses mathematical algorithms to generate:
 ### 7.2 Timing Control
 
 **Divisor**: Clock division (1-768) controls step rate
+**Clock Mult**: Per-sequence multiplier (0.50x-1.50x) applied to divisor timing
 **Gate Length**: Controls gate duration scaling (0-100%)
 **Reset Measure**: Bar-based reset timing (0-128 bars)
 

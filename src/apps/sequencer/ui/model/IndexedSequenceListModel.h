@@ -10,6 +10,7 @@ class IndexedSequenceListModel : public RoutableListModel {
 public:
     enum Item {
         Divisor,
+        ClockMult,
         Length,
         Active,
         Loop,
@@ -69,6 +70,8 @@ public:
         switch (Item(row)) {
         case Divisor:
             return Routing::Target::Divisor;
+        case ClockMult:
+            return Routing::Target::ClockMult;
         case Scale:
             return Routing::Target::Scale;
         case RootNote:
@@ -91,6 +94,7 @@ private:
     static const char *itemName(Item item) {
         switch (item) {
         case Divisor:       return "Divisor";
+        case ClockMult:     return "Clock Mult";
         case Length:        return "Length";
         case Active:        return "Active";
         case Loop:          return "Loop";
@@ -113,6 +117,9 @@ private:
         switch (item) {
         case Divisor:
             _sequence->printDivisor(str);
+            break;
+        case ClockMult:
+            _sequence->printClockMultiplier(str);
             break;
         case Length:
             str("%d", _sequence->activeLength());
@@ -150,6 +157,9 @@ private:
         switch (item) {
         case Divisor:
             _sequence->editDivisor(value, shift);
+            break;
+        case ClockMult:
+            _sequence->editClockMultiplier(value, shift);
             break;
         case Length:
             if (value > 0) {
@@ -189,6 +199,8 @@ private:
 
     int indexedCountValue(Item item) const {
         switch (item) {
+        case ClockMult:
+            return 101;
         case RunMode:
             return int(Types::RunMode::Last);
         default:
@@ -199,6 +211,8 @@ private:
 
     int indexedValue(Item item) const {
         switch (item) {
+        case ClockMult:
+            return _sequence->clockMultiplier() - 50;
         case RunMode:
             return int(_sequence->runMode());
         default:
@@ -209,6 +223,9 @@ private:
 
     void setIndexedValue(Item item, int index) {
         switch (item) {
+        case ClockMult:
+            _sequence->setClockMultiplier(index + 50);
+            break;
         case RunMode:
             _sequence->setRunMode(Types::RunMode(index));
             break;

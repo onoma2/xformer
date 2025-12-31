@@ -61,6 +61,8 @@ public:
             return Routing::Target::Transpose;
         case Divisor:
             return Routing::Target::Divisor;
+        case ClockMult:
+            return Routing::Target::ClockMult;
         case Scale:
             return Routing::Target::Scale;
         case RootNote:
@@ -95,6 +97,7 @@ private:
         Octave,
         Transpose,
         Divisor,
+        ClockMult,
         ResetMeasure,
         Scale,
         RootNote,
@@ -121,6 +124,7 @@ private:
         case Octave:        return "Octave";
         case Transpose:     return "Transpose";
         case Divisor:       return "Divisor";
+        case ClockMult:     return "Clock Mult";
         case ResetMeasure:  return "Reset Measure";
         case Scale:         return "Scale";
         case RootNote:      return "Root Note";
@@ -182,6 +186,9 @@ private:
             break;
         case Divisor:
             _sequence->printDivisor(str);
+            break;
+        case ClockMult:
+            _sequence->printClockMultiplier(str);
             break;
         case ResetMeasure:
             _sequence->printResetMeasure(str);
@@ -252,6 +259,9 @@ private:
             break;
         case Divisor:
             _sequence->editDivisor(value, shift);
+            break;
+        case ClockMult:
+            _sequence->editClockMultiplier(value, shift);
             break;
         case ResetMeasure:
             _sequence->editResetMeasure(value, shift);

@@ -61,7 +61,7 @@ The track has two main output behaviors:
 
 The main page displays sequence settings:
 
-- **Top Row**: Divisor, loop mode, active length settings
+- **Top Row**: Divisor, Clock Mult, loop mode, active length settings
 - **Middle Row**: Scale selection and root note settings
 - **Bottom Row**: Sync mode and reset measure settings
 - **Context Menu**: Init and Route options via long-press
@@ -90,6 +90,7 @@ The step editing page shows three rows per step:
 
 **F1 - Clock Settings**:
 - **Divisor**: Clock division (1-768) with power-of-2 adjustments
+- **Clock Mult**: Per-sequence multiplier (0.50x-1.50x) applied to divisor timing
 - **Loop**: On/Once mode for sequence behavior
 - **Active Length**: Dynamic step count (1-32) for sequence length
 

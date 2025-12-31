@@ -252,6 +252,24 @@ public:
         ModelUtils::printDivisor(str, divisor());
     }
 
+    // clockMultiplier
+
+    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    void setClockMultiplier(int clockMultiplier, bool routed = false) {
+        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    }
+
+    void editClockMultiplier(int value, bool shift) {
+        if (!isRouted(Routing::Target::ClockMult)) {
+            setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
+        }
+    }
+
+    void printClockMultiplier(StringBuilder &str) const {
+        printRouted(str, Routing::Target::ClockMult);
+        str("%.2fx", clockMultiplier() * 0.01f);
+    }
+
     // resetMeasure
 
     int resetMeasure() const { return _resetMeasure; }
@@ -600,6 +618,7 @@ private:
     int8_t _trackIndex = -1;
     Types::VoltageRange _range;
     Routable<uint16_t> _divisor;
+    Routable<uint8_t> _clockMultiplier;
     uint8_t _resetMeasure;
     Routable<Types::RunMode> _runMode;
     Routable<uint8_t> _firstStep;

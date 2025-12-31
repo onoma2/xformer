@@ -25,6 +25,9 @@ void IndexedSequence::writeRouted(Routing::Target target, int intValue, float fl
     case Routing::Target::Divisor:
         setDivisor(intValue);
         break;
+    case Routing::Target::ClockMult:
+        setClockMultiplier(intValue, true);
+        break;
     case Routing::Target::Scale:
         setScale(intValue);
         break;

@@ -295,6 +295,24 @@ public:
         ModelUtils::printDivisor(str, divisor());
     }
 
+    // clockMultiplier
+
+    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    void setClockMultiplier(int clockMultiplier, bool routed = false) {
+        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    }
+
+    void editClockMultiplier(int value, bool shift) {
+        if (!isRouted(Routing::Target::ClockMult)) {
+            setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
+        }
+    }
+
+    void printClockMultiplier(StringBuilder &str) const {
+        printRouted(str, Routing::Target::ClockMult);
+        str("%.2fx", clockMultiplier() * 0.01f);
+    }
+
     // resetMeasure (0-128)
 
     int resetMeasure() const { return _resetMeasure; }
@@ -540,6 +558,7 @@ private:
     Routable<int8_t> _octave;  // Default: 0 (no transposition)
     Routable<int8_t> _transpose;  // Default: 0 (no transposition)
     Routable<uint16_t> _divisor;  // Default: 1/16 note
+    Routable<uint8_t> _clockMultiplier;
     uint8_t _resetMeasure = 8;  // Default: 8 bars
     int8_t _scale = -1;  // Default: -1 (Project Scale)
     int8_t _rootNote = -1;  // Default: -1 (use project root)

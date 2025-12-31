@@ -1,77 +1,39 @@
 ## XFORMER Summary
 
-
-
-
-
-
-XFORMER is a fork of the Phazerville PER|FORMER version of original firmw.
-
-### Warnings
-- The update is based on Phazerville fork of the original firmware, so no
-  Mebitek or other features. No new modulation ROUTES are implemented for new
-track features (yet).
-  MIDI and Launchpad functionalities WERE NOT tested at all.
-- It is important to note that 99,5% of the code was written by musician little
-  helpers aka LLMs, that you can by for couple of dollars a month.
-- I have tested it on my unit and it seems that everything that I care about works. But no backwards compatibility, no guarantees, no sincere or not condolences are planned to happen.
-- Use at your own risk. Make a backup of your projects on a separate SD.
+XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific track types and sequencing enhancements. It assumes familiarity with the standard PER|FORMER workflow.
 
 ### Key Features
+- **Algo Track** (inspired by TINRS Tuesday): Generative sequencing with deterministic behavior.
+- **Discrete Track** (inspired by New Systems Instruments Discrete Map): Threshold-based sequencing mapping inputs to stages.
+- **Indexed Track** (inspired by Orthogonal Devices ER-101/102): Duration-based sequencing with independent step lengths.
+- **Note Track Enhancements**:
+  - **Accumulator** (inspired by Intellijel Metropolix).
+  - **Harmony Engine** (inspired by Instruo Harmonaig).
+  - Pulse Count and Gate Modes.
+- **Curve Track Enhancements**: Global Phase, Wavefolder, Chaos Engine, advanced playback features.
+- **Scope View**: Monitor page oscilloscope for track CV with optional second track overlay.
+- **Routing**:
+  - CV/Gate Output Rotation, Run, Reset.
+  - VCA Next Shaper, advanced Bias/Depth/Shaper system.
+- **Clock Mult**: Per-sequence 0.50x–1.50x timing multiplier.
 
-#### Algo Track
-- A special track type that generates musical content algorithmically
-- 21 built-in algorithms that produce deterministic results (same parameters = same outputs)
-- Parameters: Algorithm (0-14), Flow (0-16), Ornament (0-16), Power (0-16)
-- Additional controls: Loop Length, Scan, Rotate, CV Mode, Glide, Gate Offset, Trill, Skew
-- **Context Menu**: Shift+Page or Long-press Shift+F5 to access INIT, RESEED, RAND, COPY, PASTE
-- **Quick Edit**: 3-slot Clipboard (Copy/Paste 1-3) on Steps 9-14, Randomize on Step 15
-- **Jam Shortcuts**: Momentary Run (Shift+Step 7), Reset (Shift+Step 15)
 
-#### DiscreteMap Track
-- Threshold-based sequencer mapping input voltages (Internal Ramp or External CV) to 32 discrete output stages
-- Each stage has independent Threshold, Direction (Rise/Fall/Off), and Note value
-- **Scanner**: `DMap Scan` routing target allows CV-controlled stage flipping
-- **Generators**: Random, Linear, Logarithmic, Exponential generation of thresholds/notes
+### Manuals
 
-#### Indexed Track
-- Duration-based sequencer with independent step lengths (0-65535 ticks)
-- Ideal for polyrhythms, unquantized timing, and complex envelopes
-- **Math Operations**: Batch processing (Add, Sub, Ramp, Quantize, Random, Jitter)
-- **Quick Edit**: Set First Step (Rotate), Active Length, Run Mode
+- [XFORMER Manual](./manuals/XFORMER_MANUAL.md) - Complete guide to XFORMER firmware features
+- [TUESDAY Manual](./manuals/TUESDAY_MANUAL.md) - Algo track (generative sequencing) documentation
+- [DISCRETE Manual](./manuals/DISCRETEMAP_MANUAL.md) - Discrete track (threshold-based sequencing) guide
+- [INDEXED Manual](./manuals/INDEXED_MANUAL.md) - Indexed track (duration-based sequencing) guide
+- [CURVE Studio](./manuals/CURVE_Stidio.md) - Curve track enhancements and features
+- [ROUTES](./manuals/ROUTES.md) - Routing and signal flow documentation
 
-#### NOTE TRACK Harmony Engine
-- Creates harmonic relationships between tracks by generating chords based on scale degrees
-- Supports 7 harmony modes: Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian
-- Voicing options: Close, Drop2, Drop3, and Spread
-- Master/Follower system for harmonizing tracks
 
-#### NOTE TRACK Accumulator
-- Counter that can count up, down, or in complex patterns based on trigger inputs
-- Multiple counting modes: Wrap, Pendulum, Random, Hold
-- Can be triggered by step events, gate events, or retrigger events
-
-#### NOTE TRACK Pulse Count and Gate Mode
-- Pulse Count: Allows steps to play for multiple clock pulses before advancing
-- Values range from 0 to 7 (1 to 8 pulses total)
-- Gate Mode: Controls which of multiple pulses fire a gate signal
-- Four modes: All, First, Hold, FirstLast
-
-#### Global Output Rotation
-- Dynamically rotate which tracks are assigned to physical CV and Gate outputs
-- Acts like a virtual 8-channel sequential switch
-- Allows modulation patterns to "spin" around connected modules
-
-#### Routing Enhancements
-- **VCA Next Shaper**: Amplitude modulation using the next route's raw source
-- **Per-Track Reset**: Hard reset of track engine via routing target (Rising Edge)
-
-#### Curve Track Features
-- **Global Phase**: Offset the playback position of curve sequences (0.00 to 1.00 range)
-- **Wavefolding**: Advanced signal processing with FOLD, GAIN, FILTER, and XFADE parameters
-- **Shift+Step Shortcut**: Create smooth transitions across multiple selected steps
-- **LFO Context Menu**: Quick fill options for common LFO waveforms (Triangle, Sine, Sawtooth, Square)
-- **Phase Visualization**: Visual feedback showing both actual and phased step positions
+### Warnings
+- Based on the Phazerville fork of the original firmware.
+- MIDI support exists for the new tracks; Launchpad support is not fully tested.
+- It is important to note that 99,5% of the code was written by musician little
+helpers, that you can by for couple of dollars a month.
+- I have tested it on my unit and it seems that everything that I care about works. The firmware is provided AS IS, I'd appreciate feedback, but not sure if will be able to fix many things.
 
 
 # PEW|FORMER

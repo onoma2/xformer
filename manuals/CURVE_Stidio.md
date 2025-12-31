@@ -40,7 +40,7 @@ Grid-locked timing synchronized to the sequencer clock. Steps advance at exact d
 
   Sequencer Tick
        │
-       ├──> divisor = sequence.divisor() × 4        (e.g., 2 × 4 = 8 ticks)
+       ├──> divisor = sequence.divisor() × 4 ÷ clockMult
        ├──> resetDivisor = resetMeasure × measureDiv
        │
        ▼
@@ -73,6 +73,7 @@ Grid-locked timing synchronized to the sequencer clock. Steps advance at exact d
 - Perfectly quantized to sequencer grid
 - No speed modulation possible
 - Step duration = `divisor` ticks (always)
+- Clock Mult scales divisor timing per sequence (0.50x-1.50x)
 
 ---
 
@@ -87,7 +88,7 @@ Phase-accumulator based timing with smooth speed modulation via **Curve Rate**.
 
   Sequencer Tick
        │
-       ├──> divisor = sequence.divisor() × 4
+       ├──> divisor = sequence.divisor() × 4 ÷ clockMult
        │
        ▼
   if (_sequenceState.step() < 0)  ← Initial trigger

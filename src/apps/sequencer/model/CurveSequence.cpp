@@ -146,6 +146,9 @@ void CurveSequence::writeRouted(Routing::Target target, int intValue, float floa
     case Routing::Target::Divisor:
         setDivisor(intValue, true);
         break;
+    case Routing::Target::ClockMult:
+        setClockMultiplier(intValue, true);
+        break;
     case Routing::Target::RunMode:
         setRunMode(Types::RunMode(intValue), true);
         break;
@@ -185,6 +188,7 @@ void CurveSequence::writeRouted(Routing::Target target, int intValue, float floa
 void CurveSequence::clear() {
     setRange(Types::VoltageRange::Bipolar5V);
     setDivisor(192);
+    setClockMultiplier(100);
     setResetMeasure(0);
     setRunMode(Types::RunMode::Forward);
     setFirstStep(0);
@@ -246,6 +250,7 @@ void CurveSequence::duplicateSteps() {
 void CurveSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_range);
     writer.write(_divisor.base);
+    writer.write(_clockMultiplier.base);
     writer.write(_resetMeasure);
     writer.write(_runMode.base);
     writer.write(_firstStep.base);
@@ -272,6 +277,7 @@ void CurveSequence::read(VersionedSerializedReader &reader) {
     } else {
         reader.read(_divisor.base);
     }
+    reader.read(_clockMultiplier.base);
     reader.read(_resetMeasure);
     reader.read(_runMode.base);
     reader.read(_firstStep.base);

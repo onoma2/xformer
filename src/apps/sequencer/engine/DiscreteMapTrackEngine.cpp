@@ -145,10 +145,7 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         switch (_discreteMapTrack.playMode()) {
         case Types::PlayMode::Aligned: {
             // Align ramp phase to bar position while preserving divisor-based period.
-            uint32_t periodTicks = _sequence->divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-            if (periodTicks == 0) {
-                periodTicks = 1;
-            }
+            uint32_t periodTicks = scaledDivisorTicks();
 
             uint32_t resetDivisor = _sequence->resetMeasure() * _engine.measureDivisor();
             uint32_t alignTick = (resetDivisor > 0) ? (relativeTick % resetDivisor) : relativeTick;
@@ -256,8 +253,7 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
             _sampledRootNote = _sequence->rootNote();
         }
 
-        uint32_t stepTicks = _sequence->divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-        if (stepTicks == 0) stepTicks = 1;
+        uint32_t stepTicks = scaledDivisorTicks();
         int gateLengthPercent = _sequence->gateLength();
         if (gateLengthPercent == 0) {
             _gateTimer = 3; // Explicit 1-tick pulse
@@ -369,13 +365,19 @@ void DiscreteMapTrackEngine::update(float dt) {
     }
 }
 
+uint32_t DiscreteMapTrackEngine::scaledDivisorTicks() const {
+    if (!_sequence) {
+        return 1;
+    }
+    float clockMult = _sequence->clockMultiplier() * 0.01f;
+    uint32_t divisor = _sequence->divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+    return std::max<uint32_t>(1, std::lround(divisor / clockMult));
+}
+
 void DiscreteMapTrackEngine::updateRamp(uint32_t tick) {
     const auto &sequence = *_sequence;
 
-    uint32_t periodTicks = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-    if (periodTicks == 0) {
-        periodTicks = 1;
-    }
+    uint32_t periodTicks = scaledDivisorTicks();
 
     uint32_t posInPeriod = _running ? (tick % periodTicks) : periodTicks;
     _rampPhase = float(posInPeriod) / float(periodTicks);

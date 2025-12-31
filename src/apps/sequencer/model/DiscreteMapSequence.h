@@ -138,6 +138,12 @@ public:
         _divisor = clamp(div, 1, 768);
     }
 
+    // clockMultiplier
+    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    void setClockMultiplier(int clockMultiplier, bool routed = false) {
+        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    }
+
     // Loop mode
     bool loop() const { return _loop; }
     void setLoop(bool loop) {
@@ -301,6 +307,7 @@ public:
     //----------------------------------------
 
     inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
+    inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
     void writeRouted(Routing::Target target, int intValue, float floatValue);
 
     //----------------------------------------
@@ -345,6 +352,15 @@ public:
         setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
     }
     void printDivisor(StringBuilder &str) const { ModelUtils::printDivisor(str, divisor()); }
+    void editClockMultiplier(int value, bool shift) {
+        if (!isRouted(Routing::Target::ClockMult)) {
+            setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
+        }
+    }
+    void printClockMultiplier(StringBuilder &str) const {
+        printRouted(str, Routing::Target::ClockMult);
+        str("%.2fx", clockMultiplier() * 0.01f);
+    }
     void printClockSource(StringBuilder &str) const {
         switch (_clockSource) {
         case ClockSource::Internal: str("Internal Saw"); break;
@@ -370,6 +386,7 @@ private:
     ClockSource _clockSource = ClockSource::Internal;
     SyncMode _syncMode = SyncMode::Off;
     uint16_t _divisor = 192;
+    Routable<uint8_t> _clockMultiplier;
     uint8_t _gateLength = 0;     // 0 = 1T pulse
     bool _loop = true;
     uint8_t _resetMeasure = 8;   // default 8 bars

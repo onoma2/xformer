@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.5.1]
+
+### Added
+- System monitor stats page
+- Scope view (single + dual-line)
+- Indexed Merge/Split operations
+- Indexed quick measure shortcut
+- NoteTrack accumulator Retrig mode
+- Discrete multi-select toggles
+
+### Changed
+- Chaos initialization defaults
+
+### Fixed
+- NoteTrack harmony mode behavior
+- Note values and indices in Discrete and Indexed tracks
+
 ### Added
 - **Algo (Tuesday) Track Enhancements**:
   - **Context Menu**: Added INIT, RESEED, RAND, COPY, PASTE options
@@ -12,12 +29,12 @@
   - **Quick Edit**: Randomize parameters (Step 15)
   - **Reseed**: Shift+F5 shortcut and Context Menu option
 - **Initialization Defaults**:
-  - Curve, Indexed, and DiscreteMap tracks now default to **Free** play mode
-  - Curve and DiscreteMap sequences now default to **Divisor 192**
+  - Curve, Indexed, and Discrete tracks now default to **Free** play mode
+  - Curve and Discrete sequences now default to **Divisor 192**
 - **Routing Enhancements**:
   - **VCA Next Shaper (VC)**: Amplitude modulation using the next route's raw source value
   - **Per-Track Reset Target**: Hard reset of track engine on rising edge of routed signal
-- **New Track Type: DiscreteMap**:
+- **New Track Type: Discrete**:
   - Threshold-based sequencer mapping input voltages (Internal Ramp or External CV) to 32 discrete output stages
   - Features: Directional triggering (Rise/Fall), Scale quantization, Slew
   - **Scanner Target**: `DMap Scan` routing target that toggles stage directions via CV
@@ -260,9 +277,9 @@
 - **Tuesday Track Rotate Parameter**: Limited Rotate to loop length for easier use
 ### Fixed (5.1)
 - Indexed gate length bitmask now preserves reserved bits when writing gate length
-- Indexed and DiscreteMap note ranges aligned to -63..+63 (no +64 special case)
-- DiscreteMap selection: Shift + bottom row selects stages with the same direction
-- DiscreteMap selection: Shift + double-click on top row selects stages with matching values
+- Indexed and Discrete note ranges aligned to -63..+63 (no +64 special case)
+- Discrete selection: Shift + bottom row selects stages with the same direction
+- Discrete selection: Shift + double-click on top row selects stages with matching values
 - Indexed selection: Shift + double-press selects steps with matching values per edit mode
   - Root cause: Rotate values beyond loop length were confusing
   - Fix: Constrained Rotate to valid loop range

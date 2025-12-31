@@ -517,7 +517,9 @@ TuesdayTrackEngine::GenerationContext TuesdayTrackEngine::calculateContext(uint3
     const auto &sequence = tuesdayTrack().sequence(pattern());
     GenerationContext ctx;
 
+    float clockMult = sequence.clockMultiplier() * 0.01f;
     ctx.divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+    ctx.divisor = std::max<uint32_t>(1, std::lround(ctx.divisor / clockMult));
     ctx.stepsPerBeat = (ctx.divisor > 0) ? (CONFIG_PPQN / ctx.divisor) : 0;
     ctx.isBeatStart = (ctx.stepsPerBeat > 0) && ((_stepIndex % ctx.stepsPerBeat) == 0);
 
@@ -1727,7 +1729,9 @@ TrackEngine::TickResult TuesdayTrackEngine::tick(uint32_t tick) {
     }
 
     // Time Calculation
+    float clockMult = sequence.clockMultiplier() * 0.01f;
     uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+    divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
 
     // Apply Start Delay with Mask Extension (Time Shift)
     uint32_t baseStartTicks = sequence.start() * divisor;

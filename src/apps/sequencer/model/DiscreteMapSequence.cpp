@@ -39,6 +39,8 @@ void DiscreteMapSequence::clear() {
     _clockSource = ClockSource::Internal;
     _syncMode = SyncMode::Off;
     _divisor = 192;
+    _clockMultiplier.clear();
+    _clockMultiplier.setBase(100);
     _gateLength = 0; // 1T default
     _loop = true;
     _resetMeasure = 8;
@@ -161,6 +163,7 @@ void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(static_cast<uint8_t>(_clockSource));
     writer.write(static_cast<uint8_t>(_syncMode));
     writer.write(_divisor);
+    writer.write(_clockMultiplier.base);
     writer.write(_gateLength);
     writer.write(_loop);
     writer.write(_resetMeasure);
@@ -190,6 +193,7 @@ void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
     _syncMode = ModelUtils::clampedEnum(static_cast<SyncMode>(syncMode));
 
     reader.read(_divisor);
+    reader.read(_clockMultiplier.base);
     reader.read(_gateLength);
     reader.read(_loop);
 
@@ -218,6 +222,9 @@ void DiscreteMapSequence::writeRouted(Routing::Target target, int intValue, floa
     switch (target) {
     case Routing::Target::Divisor:
         setDivisor(intValue);
+        break;
+    case Routing::Target::ClockMult:
+        setClockMultiplier(intValue, true);
         break;
     case Routing::Target::Scale:
         setScale(intValue);

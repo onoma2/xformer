@@ -2,17 +2,13 @@
 
 ## 0. WARININGS
 
-The update is based on Phazerville fork of the original firmware, so no
-Mebitek or other features. No new modulation ROUTES are implemented (yet).
-MIDI and Launchpad functionalities WERE NOT tested at all.
+The update is based on Phazerville fork of the original firmware. Launchpad functionalities for new addutiobs WERE NOT tested at all.
 
-It is important to note that 99,5% of the code was written by musician littel
+It is important to note that 99,5% of the code was written by musician little
 helpers, that you can by for couple of dollars a month.
 
-I have tested it on my unit and it seems that everything that I care about works. But no backwards compartibility, no guaranties, no sincere or not condolecenses are planned to happen.
-
-Use at your own risk. Make a backup of your projects on a separate SD.
-
+I have tested it on my unit and it seems that everything that I care about works. The firmware is provided AS IS, I'd appreciate feedback, but not sure if will be able to fix many things.
+.
 
 
 
@@ -21,7 +17,7 @@ Use at your own risk. Make a backup of your projects on a separate SD.
 This manual covers the XFORMER-specific features:
 
    - **Algo Track**: Generative sequencing based on TINRS Tuesday algorithms.
-   - **DiscreteMap Track**: Threshold-based sequencing mapping inputs to stages.
+   - **Discrete Track**: Threshold-based sequencing mapping inputs to stages.
    - **Indexed Track**: Duration-based sequencing with independent step lengths.
    - **Note Track Enhancements**:
    	- Harmony Engine (Inspired by Instruo Harmonaig)
@@ -58,7 +54,7 @@ To enable Algo Track:
     - **Page 3:** Gate Length, Gate Offset, Trill, Start
     - **Status Box:** Visual feedback showing current note, gate status, voltage, and step position.
 
-- **Shift-S2**: Divisor, Root, Octave
+- **Shift-S2**: Divisor, Clock Mult, Root, Octave
 - **Shift-S3**: Menu with same controls as main UI
 
 **Shortcuts:**
@@ -99,10 +95,10 @@ Behavior notes:
 - Top row moves "up" (faster/greater), bottom row moves "down" (slower/less); for divisors, smaller = faster.
 - Divisor up/down only walks known divisors for straight or triplet types.
 
-## 3. DiscreteMap Track
+## 3. Discrete Track
 
 ### 3.1 Overview
-DiscreteMap maps an input signal (internal ramp or external CV) to 32 discrete output "Stages". Each stage triggers when the input crosses a specific voltage threshold.
+Discrete maps an input signal (internal ramp or external CV) to 32 discrete output "Stages". Each stage triggers when the input crosses a specific voltage threshold.
 
 **Key Features:**
 - **Thresholds**: Voltage levels (-100 to +100) that trigger stages.
@@ -110,7 +106,7 @@ DiscreteMap maps an input signal (internal ramp or external CV) to 32 discrete o
 - **Notes**: Output note/voltage for each stage.
 
 ### 3.2 Input Sources
-- **Internal Saw/Tri**: LFO-like ramps (synced to Divisor).
+- **Internal Saw/Tri**: LFO-like ramps (synced to Divisor × Clock Mult).
 - **External**: Uses routed CV Input. Great for wave-shaping or envelope following.
 
 ### 3.3 Advanced Features
@@ -131,7 +127,7 @@ DiscreteMap maps an input signal (internal ramp or external CV) to 32 discrete o
 
 ### 3.4 Fret-Style Initialization Pattern
 
-The DiscreteMap track uses a unique "fretboard" or interleaved initialization pattern that distributes threshold values across all 32 stages in a round-robin fashion:
+The Discrete track uses a unique "fretboard" or interleaved initialization pattern that distributes threshold values across all 32 stages in a round-robin fashion:
 
 **Initialization Algorithm:**
 - The 32 stages are organized in 4 pages of 8 steps each
@@ -145,7 +141,7 @@ The DiscreteMap track uses a unique "fretboard" or interleaved initialization pa
 - Global index: `global_index = button * 4 + (page - 1)`
 - Threshold value: `threshold = -100 + (global_index * 200 / 31)`
 
-This pattern ensures that when you're using multiple pages of the DiscreteMap track, similar threshold values are aligned across the pages, making it easier to create coordinated mappings across different sections of your sequence.
+This pattern ensures that when you're using multiple pages of the Discrete track, similar threshold values are aligned across the pages, making it easier to create coordinated mappings across different sections of your sequence.
 
 ### 3.5 All-Stages Selection Behavior
 
@@ -160,7 +156,7 @@ When all 32 stages are selected (selection mask includes all stages):
 - **Encoder**: Rotate all 32 note indices by 1 position (no shift distinction)
 - Values cyclically shift to the left/right (wrapping around)
 
-This behavior allows for bulk manipulation of all stage parameters simultaneously, enabling complex pattern transformations across the entire DiscreteMap sequence.
+This behavior allows for bulk manipulation of all stage parameters simultaneously, enabling complex pattern transformations across the entire Discrete sequence.
 
 ## 4. Indexed Track
 

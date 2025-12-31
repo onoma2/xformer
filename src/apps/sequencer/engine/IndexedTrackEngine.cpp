@@ -231,7 +231,9 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
     switch (_indexedTrack.playMode()) {
     case Types::PlayMode::Aligned: {
         // Calculate step from global tick position
+        float clockMult = _sequence->clockMultiplier() * 0.01f;
         uint32_t divisor = _sequence->divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+        divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
         uint32_t resetDivisor = (_sequence->syncMode() == IndexedSequence::SyncMode::ResetMeasure)
                                 ? _sequence->resetMeasure() * _engine.measureDivisor()
                                 : 0;
@@ -374,14 +376,23 @@ void IndexedTrackEngine::triggerStep() {
     }
 
     // Calculate gate duration in ticks
-    uint32_t gateTicks = IndexedSequence::gateTicks(baseGateValue, baseDuration);
+    uint16_t effectiveDuration = baseDuration;
     if (baseDuration > 0) {
-        gateTicks = std::min<uint32_t>(gateTicks, baseDuration);
+        float clockMult = _sequence->clockMultiplier() * 0.01f;
+        uint32_t scaledDuration = std::lround(baseDuration / clockMult);
+        scaledDuration = std::max<uint32_t>(1, scaledDuration);
+        scaledDuration = std::min<uint32_t>(scaledDuration, 65535u);
+        effectiveDuration = static_cast<uint16_t>(scaledDuration);
+    }
+
+    uint32_t gateTicks = IndexedSequence::gateTicks(baseGateValue, effectiveDuration);
+    if (effectiveDuration > 0) {
+        gateTicks = std::min<uint32_t>(gateTicks, effectiveDuration);
     }
 
     // Set gate timer
     _gateTimer = gateTicks;
-    _effectiveStepDuration = baseDuration;
+    _effectiveStepDuration = effectiveDuration;
 
     // Send MIDI gate ON/OFF
     bool finalGate = (!mute() || fill()) && (gateTicks > 0);

@@ -1,8 +1,8 @@
-# DiscreteMap Track User Manual
+# Discrete Track User Manual
 
 ## 1. Introduction
 
-The DiscreteMap Track is a sophisticated sequencer track type that maps input voltages or internal ramps to discrete output stages. Each stage has a threshold, direction (Rise, Fall, Off), and note value that determines when and what voltage is output.
+The Discrete Track is a sophisticated sequencer track type that maps input voltages or internal ramps to discrete output stages. Each stage has a threshold, direction (Rise, Fall, Off), and note value that determines when and what voltage is output.
 
 This track type is ideal for:
 - External CV processing and mapping
@@ -10,18 +10,18 @@ This track type is ideal for:
 - Threshold-based musical triggers
 - LFO and envelope following applications
 
-The DiscreteMap track provides:
+The Discrete track provides:
 - Up to 32 controllable stages per sequence
 - Flexible input sources (Internal ramps or external CV)
 - Position and Length threshold modes
 - Voltage range control
 - Built-in slew processing
 
-## 2. DiscreteMap Track Overview
+## 2. Discrete Track Overview
 
-### 2.1 What is DiscreteMap?
+### 2.1 What is Discrete?
 
-The DiscreteMap track creates a mapping between input values (from internal ramps or external CV sources) and output stages. When the input crosses a stage's threshold in the specified direction, that stage becomes active and its note value is converted to CV output.
+The Discrete track creates a mapping between input values (from internal ramps or external CV sources) and output stages. When the input crosses a stage's threshold in the specified direction, that stage becomes active and its note value is converted to CV output.
 
 Key concepts:
 - **Stages**: 32 controllable positions that respond to input thresholds
@@ -31,7 +31,7 @@ Key concepts:
 
 ### 2.2 Input Sources
 
-The DiscreteMap track supports multiple input sources:
+The Discrete track supports multiple input sources:
 
 **Internal Sawtooth**:
 - A bipolar ±5V ramp that cycles based on the track divisor
@@ -73,6 +73,7 @@ The main page displays the threshold mapping:
 **F1 - Clock Settings**:
 - **Source**: Internal Saw, Internal Tri, External
 - **Divisor**: Clock division (1-768) with power-of-2 adjustments
+- **Clock Mult**: Per-sequence multiplier (0.50x-1.50x) applied to divisor timing
 - **Loop**: On/Once mode for sweep behavior
 - **Gate Length**: 0% (pulse) to 100% gate duration
 
@@ -153,7 +154,7 @@ Note values determine output voltage when a stage is active:
 
 ### 5.1 Generator Functions
 
-The DiscreteMap track includes powerful generator functions:
+The Discrete track includes powerful generator functions:
 
 **GEN Function**:
 - Access via long-press on STEP button
@@ -200,7 +201,7 @@ The Scanner is a unique performance feature that allows external CV to dynamical
 
 ### 6.1 Setup for External CV
 
-To use external CV with DiscreteMap:
+To use external CV with Discrete:
 
 1. Set Input Source to "External"
 2. Configure CV Input routing to specify source track
@@ -358,7 +359,7 @@ Macros provide powerful generative and transformative operations on threshold ma
 
 ### 9.4 Macro Improvements
 
-Recent updates to DiscreteMap macros include:
+Recent updates to Discrete macros include:
 
 **Enhanced Macro Operations**:
 - Improved I_8, I_5(2), I_7(3), I_9(4) distribution macros for better even spacing
@@ -376,7 +377,7 @@ Recent updates to DiscreteMap macros include:
 
 ### 9.5 Initialization Pattern
 
-When a DiscreteMap sequence is initialized (INIT context menu), all 32 stages are set with:
+When a Discrete sequence is initialized (INIT context menu), all 32 stages are set with:
 - **Thresholds**: Interleaved "fret pattern" distribution across -100 to +100
 - **Direction**: Off (all inactive)
 - **Note Index**: 0

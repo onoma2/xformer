@@ -146,7 +146,9 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
             triggerStep(tick, linkData->divisor);
         }
     } else {
+        float clockMult = sequence.clockMultiplier() * 0.01f;
         uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+        divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
         uint32_t resetDivisor = sequence.resetMeasure() * _engine.measureDivisor();
         uint32_t relativeTick = resetDivisor == 0 ? tick : tick % resetDivisor;
 
