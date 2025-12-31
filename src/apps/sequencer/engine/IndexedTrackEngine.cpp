@@ -230,33 +230,10 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
 
     // 2. Step Advancement (mode-specific)
     switch (_indexedTrack.playMode()) {
-    case Types::PlayMode::Aligned: {
-        // Calculate step from global tick position
-        float clockMult = _sequence->clockMultiplier() * 0.01f;
-        uint32_t divisor = _sequence->divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-        divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
-        uint32_t resetDivisor = (_sequence->syncMode() == IndexedSequence::SyncMode::ResetMeasure)
-                                ? _sequence->resetMeasure() * _engine.measureDivisor()
-                                : 0;
-        uint32_t relativeTick = resetDivisor > 0 ? (tick % resetDivisor) : tick;
-
-        // Check if we're on a step boundary
-        if (relativeTick % divisor == 0) {
-            uint32_t absoluteStep = relativeTick / divisor;
-            int oldStep = _sequenceState.step();
-
-            _sequenceState.advanceAligned(absoluteStep, _sequence->runMode(),
-                                         0, _sequence->activeLength() - 1, _rng);
-
-            if (_sequenceState.step() != oldStep) {
-                _currentStepIndex = _sequenceState.step();
-                triggerStep();
-            }
-        }
-        break;
-    }
+    case Types::PlayMode::Aligned:
     case Types::PlayMode::Free: {
-        // Timer-based advancement using wallclock-derived tick position
+        // Duration-based advancement using wallclock-derived tick position.
+        // ResetMeasure/external sync are handled above, so this stays phase-locked.
         const uint16_t stepDuration = static_cast<uint16_t>(_effectiveStepDuration);
 
         // Zero duration steps: rapid-fire through immediately
