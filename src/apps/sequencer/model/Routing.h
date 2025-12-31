@@ -376,6 +376,14 @@ public:
         CvOut8,
         CvLast = CvOut8,
         Midi,
+        GateOut1,
+        GateOut2,
+        GateOut3,
+        GateOut4,
+        GateOut5,
+        GateOut6,
+        GateOut7,
+        GateOut8,
         Last
     };
 
@@ -405,6 +413,17 @@ public:
             break;
         case Source::Midi:
             str("MIDI");
+            break;
+        case Source::GateOut1:
+        case Source::GateOut2:
+        case Source::GateOut3:
+        case Source::GateOut4:
+        case Source::GateOut5:
+        case Source::GateOut6:
+        case Source::GateOut7:
+        case Source::GateOut8:
+            str("Gate Out %d", int(source) - int(Source::GateOut1) + 1);
+            break;
         case Source::Last:
             break;
         }

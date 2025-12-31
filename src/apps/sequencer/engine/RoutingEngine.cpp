@@ -263,6 +263,18 @@ void RoutingEngine::updateSources() {
                 sourceValue = range.normalize(_engine.cvOutput().channel(index));
                 break;
             }
+            case Routing::Source::GateOut1:
+            case Routing::Source::GateOut2:
+            case Routing::Source::GateOut3:
+            case Routing::Source::GateOut4:
+            case Routing::Source::GateOut5:
+            case Routing::Source::GateOut6:
+            case Routing::Source::GateOut7:
+            case Routing::Source::GateOut8: {
+                int index = int(route.source()) - int(Routing::Source::GateOut1);
+                sourceValue = (_engine.gateOutput() & (1 << index)) ? 1.f : 0.f;
+                break;
+            }
             case Routing::Source::Midi:
                 // handled in receiveMidi
                 break;
