@@ -16,6 +16,19 @@
 
 ## Memory Usage Analysis
 
+### Important Correction: Per-Track RAM Is Fixed by Container Max Size
+Tracks are stored in a `Container<...>` that reserves memory equal to the
+largest track type in the set. This means:
+- Every track allocates the same RAM regardless of current mode.
+- Switching a track to a "smaller" type does not reduce RAM usage.
+- Any new track type that exceeds the current max size increases RAM for all
+  tracks.
+
+Code references:
+- Model tracks: `src/apps/sequencer/model/Track.h`
+- Engine tracks: `src/apps/sequencer/engine/Engine.h`
+- Container behavior: `src/core/utils/Container.h`
+
 ### 1. Sequence Memory Footprint
 
 #### NoteSequence Memory:
