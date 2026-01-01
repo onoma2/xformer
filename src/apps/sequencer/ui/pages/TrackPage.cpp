@@ -117,6 +117,7 @@ void TrackPage::setTrack(Track &track) {
         newListModel = &_indexedTrackListModel;
         break;
     case Track::TrackMode::Teletype:
+        _teletypeTrackListModel.setTrack(track.teletypeTrack());
         newListModel = &_teletypeTrackListModel;
         break;
     case Track::TrackMode::Last:

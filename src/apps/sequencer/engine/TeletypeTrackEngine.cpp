@@ -35,13 +35,13 @@ void TeletypeTrackEngine::reset() {
     _metroRemainingMs = 0.f;
     _metroPeriodMs = 0;
     _metroActive = false;
-    _gateOutput.fill(false);
-    _cvOutput.fill(0.f);
-    _cvRaw.fill(0);
-    _cvOffset.fill(0);
-    _pulseRemainingMs.fill(0.f);
-    _inputState.fill(false);
-    _prevInputState.fill(false);
+    _performerGateOutput.fill(false);
+    _performerCvOutput.fill(0.f);
+    _teletypeCvRaw.fill(0);
+    _teletypeCvOffset.fill(0);
+    _teletypePulseRemainingMs.fill(0.f);
+    _teletypeInputState.fill(false);
+    _teletypePrevInputState.fill(false);
     _manualScriptIndex = 0;
     installBootScript();
     syncMetroFromState();
@@ -73,49 +73,67 @@ void TeletypeTrackEngine::update(float dt) {
 }
 
 void TeletypeTrackEngine::handleTr(uint8_t index, int16_t value) {
-    if (index >= GateCount) {
+    if (index >= TriggerOutputCount) {
         return;
     }
+
+    // Map TO-TRA-D to actual gate output
+    auto dest = _teletypeTrack.triggerOutputDest(index);
+    int destIndex = int(dest);  // GateOut1=0, GateOut2=1, etc
+
+    if (destIndex < 0 || destIndex >= PerformerGateCount) {
+        return;
+    }
+
     bool next = value != 0;
-    if (_gateOutput[index] != next) {
-        _gateOutput[index] = next;
+    if (_performerGateOutput[destIndex] != next) {
+        _performerGateOutput[destIndex] = next;
         _activity = true;
         _activityCountdownMs = kActivityHoldMs;
     }
 }
 
 void TeletypeTrackEngine::beginPulse(uint8_t index, int16_t timeMs) {
-    if (index >= GateCount || timeMs <= 0) {
+    if (index >= TriggerOutputCount || timeMs <= 0) {
         return;
     }
-    _pulseRemainingMs[index] = timeMs;
+    _teletypePulseRemainingMs[index] = timeMs;
 }
 
 void TeletypeTrackEngine::clearPulse(uint8_t index) {
-    if (index >= GateCount) {
+    if (index >= TriggerOutputCount) {
         return;
     }
-    _pulseRemainingMs[index] = 0.f;
+    _teletypePulseRemainingMs[index] = 0.f;
 }
 
 void TeletypeTrackEngine::setPulseTime(uint8_t index, int16_t timeMs) {
-    if (index >= GateCount || timeMs <= 0) {
+    if (index >= TriggerOutputCount || timeMs <= 0) {
         return;
     }
-    if (_pulseRemainingMs[index] > 0.f) {
-        _pulseRemainingMs[index] = timeMs;
+    if (_teletypePulseRemainingMs[index] > 0.f) {
+        _teletypePulseRemainingMs[index] = timeMs;
     }
 }
 
 void TeletypeTrackEngine::handleCv(uint8_t index, int16_t value, bool slew) {
     (void)slew;
-    if (index >= CvCount) {
+    if (index >= CvOutputCount) {
         return;
     }
-    int32_t rawValue = value + _cvOffset[index];
+
+    // Map TO-CV1-4 to actual CV output
+    auto dest = _teletypeTrack.cvOutputDest(index);
+    int destIndex = int(dest);  // CvOut1=0, CvOut2=1, etc
+
+    if (destIndex < 0 || destIndex >= PerformerCvCount) {
+        return;
+    }
+
+    int32_t rawValue = value + _teletypeCvOffset[index];
     int16_t raw = static_cast<int16_t>(clamp<int32_t>(rawValue, 0, 16383));
-    _cvRaw[index] = raw;
-    _cvOutput[index] = rawToVolts(raw);
+    _teletypeCvRaw[index] = raw;
+    _performerCvOutput[destIndex] = rawToVolts(raw);
     _activity = true;
     _activityCountdownMs = kActivityHoldMs;
 }
@@ -126,40 +144,91 @@ void TeletypeTrackEngine::setCvSlew(uint8_t index, int16_t value) {
 }
 
 void TeletypeTrackEngine::setCvOffset(uint8_t index, int16_t value) {
-    if (index >= CvCount) {
+    if (index >= CvOutputCount) {
         return;
     }
-    _cvOffset[index] = value;
+    _teletypeCvOffset[index] = value;
 }
 
 uint16_t TeletypeTrackEngine::cvRaw(uint8_t index) const {
-    if (index >= CvCount) {
+    if (index >= CvOutputCount) {
         return 0;
     }
-    return _cvRaw[index];
+    return _teletypeCvRaw[index];
 }
 
 void TeletypeTrackEngine::updateAdc(bool force) {
     (void)force;
     scene_state_t &state = _teletypeTrack.state();
+
+    auto inSource = _teletypeTrack.cvInSource();
+    auto paramSource = _teletypeTrack.cvParamSource();
+
     float inVoltage = 0.f;
     float paramVoltage = 0.f;
-    if (CvInput::Channels > 0) {
-        inVoltage = _engine.cvInput().channel(0);
+
+    // Read TI-IN from mapped source
+    if (inSource >= TeletypeTrack::CvInputSource::CvIn1 &&
+        inSource <= TeletypeTrack::CvInputSource::CvIn4) {
+        // Physical CV input
+        int channel = int(inSource) - int(TeletypeTrack::CvInputSource::CvIn1);
+        if (channel < CvInput::Channels) {
+            inVoltage = _engine.cvInput().channel(channel);
+        }
     }
-    if (CvInput::Channels > 1) {
-        paramVoltage = _engine.cvInput().channel(1);
+    // TODO: Add CV output readback support later
+    // else if (inSource >= TeletypeTrack::CvInputSource::CvOut1 &&
+    //          inSource <= TeletypeTrack::CvInputSource::CvOut8) {
+    //     // Physical CV output (read back) - needs implementation
+    // }
+
+    // Read TI-PARAM from mapped source
+    if (paramSource >= TeletypeTrack::CvInputSource::CvIn1 &&
+        paramSource <= TeletypeTrack::CvInputSource::CvIn4) {
+        // Physical CV input
+        int channel = int(paramSource) - int(TeletypeTrack::CvInputSource::CvIn1);
+        if (channel < CvInput::Channels) {
+            paramVoltage = _engine.cvInput().channel(channel);
+        }
     }
+    // TODO: Add CV output readback support later
+    // else if (paramSource >= TeletypeTrack::CvInputSource::CvOut1 &&
+    //          paramSource <= TeletypeTrack::CvInputSource::CvOut8) {
+    //     // Physical CV output (read back) - needs implementation
+    // }
+
     ss_set_in(&state, voltsToRaw(inVoltage));
     ss_set_param(&state, voltsToRaw(paramVoltage));
 }
 
 bool TeletypeTrackEngine::inputState(uint8_t index) const {
-    if (index >= GateCount) {
+    if (index >= TriggerInputCount) {  // Only 4 trigger inputs (TI-TR1-4)
         return false;
     }
-    uint8_t gates = _engine.gateOutput();
-    return (gates >> (index + 4)) & 0x1;
+
+    // Map TI-TR1-4 to physical source
+    auto source = _teletypeTrack.triggerInputSource(index);
+
+    // Check CV inputs (with threshold)
+    if (source >= TeletypeTrack::TriggerInputSource::CvIn1 &&
+        source <= TeletypeTrack::TriggerInputSource::CvIn4) {
+        int channel = int(source) - int(TeletypeTrack::TriggerInputSource::CvIn1);
+        if (channel < CvInput::Channels) {
+            float voltage = _engine.cvInput().channel(channel);
+            return voltage > 1.0f;  // Gate threshold at 1V
+        }
+        return false;
+    }
+
+    // Check gate outputs (read back)
+    if (source >= TeletypeTrack::TriggerInputSource::GateOut1 &&
+        source <= TeletypeTrack::TriggerInputSource::GateOut8) {
+        int gateIndex = int(source) - int(TeletypeTrack::TriggerInputSource::GateOut1);
+        uint8_t gates = _engine.gateOutput();
+        return (gates >> gateIndex) & 0x1;
+    }
+
+    return false;
 }
 
 void TeletypeTrackEngine::triggerManualScript() {
@@ -213,12 +282,12 @@ void TeletypeTrackEngine::advanceTime(float dt) {
 }
 
 void TeletypeTrackEngine::updateInputTriggers() {
-    for (uint8_t i = 0; i < GateCount; ++i) {
-        _inputState[i] = inputState(i);
-        if (_inputState[i] && !_prevInputState[i]) {
+    for (uint8_t i = 0; i < TriggerInputCount; ++i) {
+        _teletypeInputState[i] = inputState(i);
+        if (_teletypeInputState[i] && !_teletypePrevInputState[i]) {
             runScript(i);
         }
-        _prevInputState[i] = _inputState[i];
+        _teletypePrevInputState[i] = _teletypeInputState[i];
     }
 }
 
@@ -257,13 +326,13 @@ void TeletypeTrackEngine::runMetro(float dt) {
 
 void TeletypeTrackEngine::updatePulses(float dt) {
     float dtMs = dt * 1000.f;
-    for (size_t i = 0; i < _pulseRemainingMs.size(); ++i) {
-        if (_pulseRemainingMs[i] <= 0.f) {
+    for (size_t i = 0; i < _teletypePulseRemainingMs.size(); ++i) {
+        if (_teletypePulseRemainingMs[i] <= 0.f) {
             continue;
         }
-        _pulseRemainingMs[i] -= dtMs;
-        if (_pulseRemainingMs[i] <= 0.f) {
-            _pulseRemainingMs[i] = 0.f;
+        _teletypePulseRemainingMs[i] -= dtMs;
+        if (_teletypePulseRemainingMs[i] <= 0.f) {
+            _teletypePulseRemainingMs[i] = 0.f;
             tele_tr_pulse_end(&_teletypeTrack.state(), static_cast<uint8_t>(i));
         }
     }
@@ -301,25 +370,25 @@ void TeletypeTrackEngine::installTestScripts() {
     };
     constexpr ScriptDef scripts[kManualScriptCount] = {
         { 0,
-          { "EVERY 2: A FLIP",
-            "CV + 1 A N 24 ; TR.PULSE + 1 A",
+          { "EVERY 2: TR.PULSE 1 ; CV 1 N 24",
+            nullptr,
             nullptr },
-          2 },
+          1 },
         { 1,
-          { "EVERY 3: B FLIP",
-            "CV + 3 B N 36 ; TR.PULSE + 3 B",
+          { "EVERY 3: TR.PULSE 2 ; CV 2 N 36",
+            nullptr,
             nullptr },
-          2 },
+          1 },
         { 2,
-          { "EVERY 4: C FLIP",
-            "CV + 1 C N 48 ; TR.PULSE + 1 C",
-            "DEL 100: CV + 1 C N 60 ; TR.PULSE + 1 C" },
-          3 },
+          { "EVERY 4: TR.PULSE 3 ; CV 3 N 48",
+            nullptr,
+            nullptr },
+          1 },
         { 3,
-          { "EVERY 5: D FLIP",
-            "CV + 3 D N 60 ; TR.PULSE + 3 D",
-            "DEL 200: CV + 3 D N 72 ; TR.PULSE + 3 D" },
-          3 },
+          { "EVERY 5: TR.PULSE 4 ; CV 4 N 60",
+            nullptr,
+            nullptr },
+          1 },
     };
 
     scene_state_t &state = _teletypeTrack.state();

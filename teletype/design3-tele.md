@@ -102,7 +102,7 @@
 - [x] Build Teletype VM into a new track mode with a stub IO bridge.
   - Implemented `TeletypeTrack` + `TeletypeTrackEngine` + `TeletypeBridge` and wired into engine/track containers.
 - [x] Run a hardcoded script on track init and verify no crash.
-  - Boot script runs `CV 1 N + 24 * 12 FLIP ; TR.PULSE 1` on script 0 + METRO (repeating).
+  - Boot script installs the test scripts and runs script 0 once on boot.
   - Pruned non-core ops (I2C/WW/MP/ES/ANS/etc.) and regenerated `op_enum.h` + `match_token.c` (Telex kept).
 - [x] Integrate `tele_tick` with dt-accumulator timing.
   - Engine accumulates ms and calls `tele_tick` in 1–255 ms chunks.
@@ -118,23 +118,51 @@
 - [x] Provide fixed IN/PARAM sources (single route source each).
   - IN = CV input 1, PARAM = CV input 2 (scaled -5..+5 -> 0..16383).
 - [x] Validate script-triggered TR pulses and CV updates.
-  - Manual Step1 trigger + IN1–IN4 gate inputs run scripts 1–4; all scripts map to CV1/TR1 for audible confirmation.
+  - Manual Step1 trigger + IN1–IN4 gate inputs run scripts 1–4; each script drives its own TR/CV pair for clear mapping.
+- [x] **Configurable I/O Mapping System (COMPLETE)**
+  - Implemented full mapping model in `TeletypeTrack.h/cpp`:
+    - **TI-TR1-4** (trigger inputs): configurable sources (None, CvIn1-4, GateOut1-8)
+    - **TI-IN, TI-PARAM** (CV inputs): configurable sources (CvIn1-4, CvOut1-8)
+    - **TO-TRA-D** (trigger outputs): configurable destinations (GateOut1-8)
+    - **TO-CV1-4** (CV outputs): configurable destinations (CvOut1-8)
+  - Default mapping:
+    - TI-TR1-4 → GateOut5-8 (read back)
+    - TI-IN → CvIn1, TI-PARAM → CvIn2
+    - TO-TRA-D → GateOut1-4
+    - TO-CV1-4 → CvOut1-4
+  - **Conflict detection**: prevents outputs being both inputs AND outputs simultaneously
+    - `isGateOutputUsedAsOutput()`, `isGateOutputUsedAsInput()`
+    - `isCvOutputUsedAsOutput()`, `isCvOutputUsedAsInput()`
+  - **UI helpers**: `getAvailable*Sources/Dests()` return only valid (non-conflicting) options
+  - **Edit/Print methods**: complete UI accessor pattern
+    - `editTriggerInputSource()`, `printTriggerInputSource()`
+    - `editCvInSource()`, `printCvInSource()`
+    - `editCvParamSource()`, `printCvParamSource()`
+    - `editTriggerOutputDest()`, `printTriggerOutputDest()`
+    - `editCvOutputDest()`, `printCvOutputDest()`
+  - **Serialization**: all mappings persist to/from project file
+  - **Bridge implementation** in `TeletypeTrackEngine.cpp`:
+    - `inputState()`: reads trigger inputs from mapped sources (CV threshold or gate readback)
+    - `handleTr()`: writes trigger outputs to mapped destinations
+    - `handleCv()`: writes CV outputs to mapped destinations
+    - `updateAdc()`: reads TI-IN/TI-PARAM from mapped sources
+  - **TODO**: CV output voltage sensing for cross-track modulation (TI-IN/TI-PARAM reading from CvOut sources)
 - Current I/O mapping summary:
-  - TR1–TR4 -> track gate outputs 1–4.
-  - CV1–CV4 -> track CV outputs 1–4 (per-track output index 0–3).
-  - To use physical CV outputs 5–8, assign those outputs to the Teletype track in the layout/routing.
-  - IN -> CV input 1, PARAM -> CV input 2.
-  - Trigger inputs 1–4 read physical gate outputs 5–8.
+  - TR1–TR4 -> configurable gate outputs (default: GateOut1-4).
+  - CV1–CV4 -> configurable CV outputs (default: CvOut1-4).
+  - IN -> configurable CV input (default: CvIn1).
+  - PARAM -> configurable CV input (default: CvIn2).
+  - Trigger inputs 1–4 -> configurable sources (default: GateOut5-8 read back).
   - Manual: Step1 triggers current script, Step2 selects next script (wraps 1–4).
 - Teletype manual conventions in this build:
   - Use numeric TR indices (1–4) instead of lettered outputs (A–D).
   - Examples: `TR 1 1`, `TR 1`, `TR.TOG 2`, `TR.PULSE 1`, `TR.TIME 1 200`.
 - Initial test scripts (slots 1–4) behavior:
-  - Script 1: `EVERY 2` flips A and routes CV/TR between 1 and 2 at C1.
-  - Script 2: `EVERY 3` flips B and routes CV/TR between 3 and 4 at C2.
-  - Script 3: `EVERY 4` flips C and routes CV/TR between 1 and 2 at C3, then delayed C4 (100 ms).
-  - Script 4: `EVERY 5` flips D and routes CV/TR between 3 and 4 at C4, then delayed C5 (200 ms).
-- [ ] Decision: output expansion model (mapping table vs TELEX vs banks vs CV/TR 1-20).
+  - Script 1: `EVERY 2` → `TR.PULSE 1 ; CV 1 N 24` (C1).
+  - Script 2: `EVERY 3` → `TR.PULSE 2 ; CV 2 N 36` (C2).
+  - Script 3: `EVERY 4` → `TR.PULSE 3 ; CV 3 N 48` (C3).
+  - Script 4: `EVERY 5` → `TR.PULSE 4 ; CV 4 N 60` (C4).
+- [x] Decision: output expansion model → **Configurable mapping with conflict detection**
 
 ### Stage 3 - Metro + timing policy
 - [ ] Implement ms-based metro (Teletype `M` behavior).

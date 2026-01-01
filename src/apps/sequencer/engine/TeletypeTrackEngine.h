@@ -9,8 +9,11 @@
 
 class TeletypeTrackEngine : public TrackEngine {
 public:
-    static constexpr int GateCount = 4;
-    static constexpr int CvCount = 4;
+    static constexpr int TriggerInputCount = 4;
+    static constexpr int TriggerOutputCount = 4;
+    static constexpr int CvOutputCount = 4;
+    static constexpr int PerformerGateCount = 8;
+    static constexpr int PerformerCvCount = 8;
 
     TeletypeTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine);
 
@@ -23,16 +26,16 @@ public:
 
     virtual bool activity() const override { return _activity; }
     virtual bool gateOutput(int index) const override {
-        if (index < 0 || index >= GateCount) {
+        if (index < 0 || index >= PerformerGateCount) {
             return false;
         }
-        return _gateOutput[index];
+        return _performerGateOutput[index];
     }
     virtual float cvOutput(int index) const override {
-        if (index < 0 || index >= CvCount) {
+        if (index < 0 || index >= PerformerCvCount) {
             return 0.f;
         }
-        return _cvOutput[index];
+        return _performerCvOutput[index];
     }
 
     void handleTr(uint8_t index, int16_t value);
@@ -75,12 +78,12 @@ private:
     int16_t _metroPeriodMs = 0;
     bool _metroActive = false;
 
-    std::array<bool, GateCount> _gateOutput{};
-    std::array<float, CvCount> _cvOutput{};
-    std::array<int16_t, CvCount> _cvRaw{};
-    std::array<int16_t, CvCount> _cvOffset{};
-    std::array<float, GateCount> _pulseRemainingMs{};
-    std::array<bool, GateCount> _inputState{};
-    std::array<bool, GateCount> _prevInputState{};
+    std::array<bool, PerformerGateCount> _performerGateOutput{};
+    std::array<float, PerformerCvCount> _performerCvOutput{};
+    std::array<int16_t, CvOutputCount> _teletypeCvRaw{};
+    std::array<int16_t, CvOutputCount> _teletypeCvOffset{};
+    std::array<float, TriggerOutputCount> _teletypePulseRemainingMs{};
+    std::array<bool, TriggerInputCount> _teletypeInputState{};
+    std::array<bool, TriggerInputCount> _teletypePrevInputState{};
     uint8_t _manualScriptIndex = 0;
 };
