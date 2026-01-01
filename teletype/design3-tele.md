@@ -154,14 +154,17 @@
   - PARAM -> configurable CV input (default: CvIn2).
   - Trigger inputs 1–4 -> configurable sources (default: GateOut5-8 read back).
   - Manual: Step1 triggers current script, Step2 selects next script (wraps 1–4).
+- Layout note: Performer only reads as many outputs from a track as are routed in Layout.
+  - If only Gate1/CV1 are assigned to the Teletype track, you will only hear TR1/CV1.
+  - To hear TR2–TR4/CV2–CV4, assign additional Gate/CV outputs to the same track in the Layout page.
 - Teletype manual conventions in this build:
   - Use numeric TR indices (1–4) instead of lettered outputs (A–D).
   - Examples: `TR 1 1`, `TR 1`, `TR.TOG 2`, `TR.PULSE 1`, `TR.TIME 1 200`.
 - Initial test scripts (slots 1–4) behavior:
-  - Script 1: `EVERY 2` → `TR.PULSE 1 ; CV 1 N 24` (C1).
-  - Script 2: `EVERY 3` → `TR.PULSE 2 ; CV 2 N 36` (C2).
-  - Script 3: `EVERY 4` → `TR.PULSE 3 ; CV 3 N 48` (C3).
-  - Script 4: `EVERY 5` → `TR.PULSE 4 ; CV 4 N 60` (C4).
+  - Script 1: `TR.PULSE 1 ; CV 1 N 24` (C1).
+  - Script 2: `TR.PULSE 2 ; CV 2 N 36` (C2).
+  - Script 3: `TR.PULSE 3 ; CV 3 N 48` (C3).
+  - Script 4: `TR.PULSE 4 ; CV 4 N 60` (C4).
 - [x] Decision: output expansion model → **Configurable mapping with conflict detection**
 
 ### Stage 3 - Metro + timing policy
