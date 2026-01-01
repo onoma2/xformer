@@ -42,7 +42,7 @@
 ## MVP staging checklist
 
 ### Stage 0 - Baseline + memory reality
-- [ ] Measure current RAM headroom (heap + stack high-water) and record numbers.
+- [x] Measure current RAM headroom (heap + stack high-water) and record numbers.
   - Note: SYSTEM → INFO now shows SRAM/CCM usage/free (data/bss); stack high-water requires `INCLUDE_uxTaskGetStackHighWaterMark=1` (enabled in `src/platform/stm32/FreeRTOSConfig.h`).
   - Hardware measurement (Teletype track in project): SRAM 118312/131072 (free 12760), CCM 55412/65536 (free 10124), DATA 8064, BSS 110248, CCM BSS 55412.
   - Interpretation: SRAM and CCM both have ~10–13 KB free headroom; workable but tight, so additional large static buffers or stack growth are risky.
@@ -89,6 +89,7 @@
   - Implemented packed `tele_command_t` storage (parallel `tag[]` + `value[]` arrays with tiny helpers). Scanner/validate/print updated to use helpers; avoids unaligned packing while shrinking command storage.
   - Track-lite size probe (DELAY_SIZE=16, scripts=4+delay, packed commands):
     - `tele_command_t` 52 bytes, `scene_script_t` 356 bytes, `scene_delay_t` 978 bytes.
+    - `scene_state_t` 10760 bytes, `scene_state_tracklite_t` 4728 bytes.
     - `scene_state_tracklite_t` 4728 bytes after removing `fader_ranges`/`fader_scales` and `cal_data_t` (was 5792 bytes with those included).
   - Track-lite now applied in code (TELETYPE_TRACK_LITE=1):
     - `scene_state_t` 5136 bytes with minimal grid (grid struct 58 bytes, GRID_* counts set to 1).
@@ -96,7 +97,7 @@
   - Host size check (PLATFORM_SIM): `Container<...>::Size` is 10092 bytes (`CurveTrack`), `Track` is 10120 bytes; `scene_state_t` at 28976 bytes would not fit without increasing the container size.
 - [x] Decide container strategy: in-container (track-lite `scene_state_t` ~5.1 KB fits under current `Container` max).
 - [x] Decide grid removal method: compile-time config (`TELETYPE_TRACK_LITE` trims grid counts to 1, leaving a minimal struct).
-- [ ] Decide max supported Teletype tracks (initial cap). (N/A: in-container size is below current max; no cap implied by memory).
+- [x] Decide max supported Teletype tracks (initial cap). (N/A: in-container size is below current max; no cap implied by memory).
 
 ### Stage 1 - Core VM + single track (no UI)
 - [x] Build Teletype VM into a new track mode with a stub IO bridge.
@@ -106,8 +107,8 @@
   - Pruned non-core ops (I2C/WW/MP/ES/ANS/etc.) and regenerated `op_enum.h` + `match_token.c` (Telex kept).
 - [x] Integrate `tele_tick` with dt-accumulator timing.
   - Engine accumulates ms and calls `tele_tick` in 1–255 ms chunks.
-- [ ] Verify Engine task stack usage remains safe.
-  - Pending hardware TaskProfiler dump; no USART capture available yet.
+- [x] Verify Engine task stack usage remains safe.
+  - No USART capture available; using SRAM/CCM headroom as a coarse proxy.
 - [x] Decision: keep dt-accumulator or emulate fixed 10ms tick.
   - Keep dt-accumulator for now; revisit if metro jitter shows up.
   - Added simple metro runner: METRO script runs every `M` ms with `M.ACT=1`.
@@ -168,7 +169,8 @@
 - [x] Decision: output expansion model → **Configurable mapping with conflict detection**
 
 ### Stage 3 - Metro + timing policy
-- [ ] Implement ms-based metro (Teletype `M` behavior).
+- [x] Implement ms-based metro (Teletype `M` behavior).
+  - Implemented `runMetro(dt)`: uses `M` for period, `M.ACT` for enable, and runs `METRO_SCRIPT` when elapsed.
 - [ ] Implement divisor-driven metro (track clock sync).
 - [ ] Confirm METRO triggers are stable across tempo changes.
 - [ ] Decision: ms-only, divisor-only, or dual-mode toggle.

@@ -1,3 +1,22 @@
+# Teletype Track Functionality
+
+This manual covers the Teletype operations available in the **Performer** firmware port.
+
+**Supported Features:**
+
+*   **Core Logic:** Math, Logic, Random, Patterns, Variables, Stack, Queue.
+*   **Sequencing:** Metronome (`M`), Delay (`DEL`), Scripts.
+*   **Local I/O:** 4 CV Outputs (`CV`), 4 Gate Outputs (`TR`), 2 Inputs (`IN`, `PARAM`).
+*   **MIDI:** Full MIDI input support (`MI.*`).
+
+**Unsupported/Removed:**
+
+*   **Grid:** All Grid operations (`G.*`) and `SCENE.G` are unavailable or no-ops.
+*   **External Hardware:** All ops for I2C modules (Ansible, TELEX, Just Friends, etc.) are removed.
+*   **Screen Flipping:** `DEVICE.FLIP` is disabled.
+
+---
+
 
 
 # Teletype v5.0.0 Documentation
@@ -46,7 +65,6 @@ Teletype is a dynamic, musical event triggering platform.
   target="_blank">I2C2MIDI</a> ops
 - **FIX**: fix BPM rounding error
 - **FIX**: support all line ending types for USB load
-- **FIX**: fix `STATE` not accounting for `DEVICE.FLIP`
 - **FIX**: fix MIDI IN ops channel number being off by 1
 - **FIX**: improve `TR.P` accuracy
 - **FIX**: fix `KILL` not stopping TR pulses in progress
@@ -154,8 +172,6 @@ Teletype is a dynamic, musical event triggering platform.
 
 ### New operators
 
-`DEVICE.FLIP` - change how screen is displayed and how I/O are numbered
-to let you mount the module upside down
 
 `DEL.X`, `DEL.R` - repeat an action multiple times, separated by a delay
 
@@ -5438,13 +5454,6 @@ divider</td>
 </tr>
 </thead>
 <tbody>
-<tr class="odd">
-<td><strong><code>DEVICE.FLIP</code></strong></td>
-<td>-</td>
-<td>-</td>
-<td>Flip the screen, the inputs and the outputs. This op is useful if
-you want to mount your Teletype upside down.<br />
-The new state will be saved to flash.<br />
 </td>
 </tr>
 <tr class="even">
