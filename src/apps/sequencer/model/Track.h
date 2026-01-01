@@ -8,6 +8,7 @@
 #include "ModelUtils.h"
 #include "NoteTrack.h"
 #include "Serialize.h"
+#include "TeletypeTrack.h"
 #include "TuesdayTrack.h"
 #include "Types.h"
 
@@ -43,6 +44,7 @@ public:
     Tuesday,
     DiscreteMap,
     Indexed,
+    Teletype,
     Last,
     Default = Note
   };
@@ -61,6 +63,8 @@ public:
       return "Discrete";
     case TrackMode::Indexed:
       return "Indexed";
+    case TrackMode::Teletype:
+      return "Teletype";
     case TrackMode::Last:
       break;
     }
@@ -81,6 +85,8 @@ public:
       return 4;
     case TrackMode::Indexed:
       return 5;
+    case TrackMode::Teletype:
+      return 6;
     case TrackMode::Last:
       break;
     }
@@ -243,6 +249,17 @@ public:
     return _container.as<IndexedTrack>();
   }
 
+  // teletypeTrack
+
+  const TeletypeTrack &teletypeTrack() const {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::Teletype);
+    return _container.as<TeletypeTrack>();
+  }
+  TeletypeTrack &teletypeTrack() {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::Teletype);
+    return _container.as<TeletypeTrack>();
+  }
+
   //----------------------------------------
   // Methods
   //----------------------------------------
@@ -291,6 +308,9 @@ private:
     case TrackMode::Indexed:
       _container.as<IndexedTrack>().setTrackIndex(trackIndex);
       break;
+    case TrackMode::Teletype:
+      _container.as<TeletypeTrack>().setTrackIndex(trackIndex);
+      break;
     case TrackMode::Last:
       break;
     }
@@ -329,6 +349,10 @@ private:
       _track.indexed = _container.create<IndexedTrack>();
       _track.indexed->setTrackIndex(_trackIndex); // Set track index here
       break;
+    case TrackMode::Teletype:
+      _track.teletype = _container.create<TeletypeTrack>();
+      _track.teletype->setTrackIndex(_trackIndex); // Set track index here
+      break;
     case TrackMode::Last:
       break;
     }
@@ -341,7 +365,7 @@ private:
   Routable<int8_t> _cvOutputRotate;
   Routable<int8_t> _gateOutputRotate;
 
-  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack> _container;
+  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack> _container;
   union {
     NoteTrack *note;
     CurveTrack *curve;
@@ -349,6 +373,7 @@ private:
     TuesdayTrack *tuesday;
     DiscreteMapTrack *discreteMap;
     IndexedTrack *indexed;
+    TeletypeTrack *teletype;
   } _track;
 
   friend class Project;

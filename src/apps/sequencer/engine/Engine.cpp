@@ -451,6 +451,9 @@ void Engine::updateTrackSetups() {
             case Track::TrackMode::Indexed:
                 trackEngine = trackContainer.create<IndexedTrackEngine>(*this, _model, track, linkedTrackEngine);
                 break;
+            case Track::TrackMode::Teletype:
+                trackEngine = trackContainer.create<TeletypeTrackEngine>(*this, _model, track, linkedTrackEngine);
+                break;
             case Track::TrackMode::Last:
                 break;
             }

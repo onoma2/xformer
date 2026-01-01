@@ -11,6 +11,7 @@
 #include "ui/model/DiscreteMapTrackListModel.h"
 #include "ui/model/IndexedSequenceListModel.h"
 #include "ui/model/IndexedTrackListModel.h"
+#include "ui/model/TeletypeTrackListModel.h"
 
 class TrackPage : public ListPage {
 public:
@@ -47,4 +48,5 @@ private:
     DiscreteMapTrackListModel _discreteMapTrackListModel;
     IndexedSequenceListModel _indexedSequenceListModel;
     IndexedTrackListModel _indexedTrackListModel;
+    TeletypeTrackListModel _teletypeTrackListModel;
 };

@@ -265,6 +265,7 @@ void register_project(py::module &m) {
         .value("Note", Track::TrackMode::Note)
         .value("Curve", Track::TrackMode::Curve)
         .value("MidiCv", Track::TrackMode::MidiCv)
+        .value("Teletype", Track::TrackMode::Teletype)
         .export_values()
     ;
 

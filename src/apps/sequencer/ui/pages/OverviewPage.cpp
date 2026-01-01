@@ -340,6 +340,8 @@ void OverviewPage::draw(Canvas &canvas) {
         case Track::TrackMode::Indexed:
             drawIndexedTrack(canvas, trackIndex, trackEngine.as<IndexedTrackEngine>(), track.indexedTrack().sequence(trackState.pattern()));
             break;
+        case Track::TrackMode::Teletype:
+            break;
         case Track::TrackMode::Last:
             break;
         }

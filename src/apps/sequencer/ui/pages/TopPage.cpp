@@ -356,6 +356,9 @@ void TopPage::setSequenceView(SequenceView view) {
             break;
         }
         break;
+    case Track::TrackMode::Teletype:
+        setMainPage(pages.track);
+        break;
     case Track::TrackMode::Last:
         break;
     }
@@ -402,6 +405,7 @@ void TopPage::setTrackView(TrackView view) {
     case Track::TrackMode::Curve:
     case Track::TrackMode::MidiCv:
     case Track::TrackMode::Tuesday:
+    case Track::TrackMode::Teletype:
         // For non-note tracks, always show track page
         setMainPage(pages.track);
         break;
@@ -438,6 +442,9 @@ void TopPage::setSequenceEditPage() {
         break;
     case Track::TrackMode::Indexed:
         setMainPage(pages.indexedSequenceEdit);
+        break;
+    case Track::TrackMode::Teletype:
+        setMainPage(pages.track);
         break;
     case Track::TrackMode::Last:
         break;

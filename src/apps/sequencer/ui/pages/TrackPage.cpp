@@ -116,6 +116,9 @@ void TrackPage::setTrack(Track &track) {
         _indexedTrackListModel.setTrack(&track.indexedTrack());
         newListModel = &_indexedTrackListModel;
         break;
+    case Track::TrackMode::Teletype:
+        newListModel = &_teletypeTrackListModel;
+        break;
     case Track::TrackMode::Last:
         ASSERT(false, "invalid track mode");
         break;

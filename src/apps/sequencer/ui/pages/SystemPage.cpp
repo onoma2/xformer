@@ -3,19 +3,13 @@
 #include "ui/pages/Pages.h"
 #include "ui/painters/WindowPainter.h"
 
-#include "model/ClipBoard.h"
-#include "model/DiscreteMapTrack.h"
-#include "model/IndexedTrack.h"
-#include "model/Model.h"
-#include "model/NoteTrack.h"
-#include "model/Project.h"
-#include "model/Track.h"
-
 #include "core/utils/StringBuilder.h"
 
 #ifdef PLATFORM_STM32
 #include "drivers/System.h"
 #endif
+
+#include <cstdint>
 
 enum Function {
     Calibration = 0,
@@ -287,35 +281,62 @@ void SystemPage::updateOutputs() {
 }
 
 void SystemPage::drawInfoSizes(Canvas &canvas) {
-    struct SizeItem {
-        const char *label;
-        size_t size;
-    };
-
-    const SizeItem items[] = {
-        { "TRACK", sizeof(Track) },
-        { "PROJECT", sizeof(Project) },
-        { "MODEL", sizeof(Model) },
-        { "CLIPBD", sizeof(ClipBoard) },
-        { "NOTE", sizeof(NoteTrack) },
-        { "INDEX", sizeof(IndexedTrack) },
-        { "DMAP", sizeof(DiscreteMapTrack) },
-    };
-
     canvas.setBlendMode(BlendMode::Set);
     canvas.setFont(Font::Tiny);
 
     int y = 14;
     const int lineHeight = 8;
-    for (const auto &item : items) {
-        FixedStringBuilder<16> sizeStr("%u", unsigned(item.size));
+    auto drawLine = [&](const char *label, const char *value) {
         canvas.setColor(Color::Medium);
-        canvas.drawText(8, y, item.label);
+        canvas.drawText(8, y, label);
         canvas.setColor(Color::Bright);
-        int x = Width - 8 - canvas.textWidth(sizeStr);
-        canvas.drawText(x, y, sizeStr);
+        int x = Width - 8 - canvas.textWidth(value);
+        canvas.drawText(x, y, value);
         y += lineHeight;
-    }
+    };
+
+#ifdef PLATFORM_STM32
+    extern unsigned _data, _edata, _ebss;
+    extern unsigned _sccmram_bss, _eccmram_bss;
+
+    constexpr uint32_t sramTotal = 128u * 1024u;
+    constexpr uint32_t ccmTotal = 64u * 1024u;
+
+    const uint32_t dataSize = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&_edata) - reinterpret_cast<uintptr_t>(&_data));
+    const uint32_t bssSize = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&_ebss) - reinterpret_cast<uintptr_t>(&_edata));
+    const uint32_t sramUsed = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&_ebss) - reinterpret_cast<uintptr_t>(&_data));
+    const uint32_t sramFree = sramTotal > sramUsed ? (sramTotal - sramUsed) : 0u;
+    const uint32_t ccmUsed = static_cast<uint32_t>(
+        reinterpret_cast<uintptr_t>(&_eccmram_bss) - reinterpret_cast<uintptr_t>(&_sccmram_bss));
+    const uint32_t ccmFree = ccmTotal > ccmUsed ? (ccmTotal - ccmUsed) : 0u;
+
+    FixedStringBuilder<20> sramUsedStr("%u/%u", unsigned(sramUsed), unsigned(sramTotal));
+    FixedStringBuilder<20> sramFreeStr("%u", unsigned(sramFree));
+    FixedStringBuilder<20> ccmUsedStr("%u/%u", unsigned(ccmUsed), unsigned(ccmTotal));
+    FixedStringBuilder<20> ccmFreeStr("%u", unsigned(ccmFree));
+    FixedStringBuilder<20> dataStr("%u", unsigned(dataSize));
+    FixedStringBuilder<20> bssStr("%u", unsigned(bssSize));
+    FixedStringBuilder<20> ccmBssStr("%u", unsigned(ccmUsed));
+
+    drawLine("SRAM", sramUsedStr);
+    drawLine("S-FREE", sramFreeStr);
+    drawLine("CCM", ccmUsedStr);
+    drawLine("C-FREE", ccmFreeStr);
+    drawLine("DATA", dataStr);
+    drawLine("BSS", bssStr);
+    drawLine("CCMBSS", ccmBssStr);
+#else
+    drawLine("SRAM", "N/A");
+    drawLine("S-FREE", "N/A");
+    drawLine("CCM", "N/A");
+    drawLine("C-FREE", "N/A");
+    drawLine("DATA", "N/A");
+    drawLine("BSS", "N/A");
+    drawLine("CCMBSS", "N/A");
+#endif
 }
 
 void SystemPage::executeUtilityItem(UtilitiesListModel::Item item) {
