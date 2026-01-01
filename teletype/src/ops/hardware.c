@@ -69,8 +69,6 @@ static void op_MUTE_set(const void *data, scene_state_t *ss, exec_state_t *es,
                         command_state_t *cs);
 static void op_STATE_get(const void *data, scene_state_t *ss, exec_state_t *es,
                          command_state_t *cs);
-static void op_DEVICE_FLIP_get(const void *data, scene_state_t *ss,
-                               exec_state_t *es, command_state_t *cs);
 static void op_LIVE_OFF_get(const void *data, scene_state_t *ss,
                             exec_state_t *es, command_state_t *cs);
 static void op_LIVE_DASH_get(const void *data, scene_state_t *ss,
@@ -112,7 +110,6 @@ const tele_op_t op_IN_CAL_RESET  = MAKE_GET_OP (IN.CAL.RESET, op_IN_CAL_RESET_se
 const tele_op_t op_PARAM_CAL_MIN = MAKE_GET_OP (PARAM.CAL.MIN, op_PARAM_CAL_MIN_set, 0, true);
 const tele_op_t op_PARAM_CAL_MAX = MAKE_GET_OP (PARAM.CAL.MAX, op_PARAM_CAL_MAX_set, 0, true);
 const tele_op_t op_PARAM_CAL_RESET  = MAKE_GET_OP (PARAM.CAL.RESET, op_PARAM_CAL_RESET_set, 0, false);
-const tele_op_t op_DEVICE_FLIP   = MAKE_GET_OP (DEVICE.FLIP, op_DEVICE_FLIP_get, 0, false);
 const tele_op_t op_LIVE_OFF      = MAKE_GET_OP (LIVE.OFF, op_LIVE_OFF_get, 0, false);
 const tele_op_t op_LIVE_O        = MAKE_ALIAS_OP (LIVE.O, op_LIVE_OFF_get, NULL, 0, false);
 const tele_op_t op_LIVE_DASH     = MAKE_GET_OP (LIVE.DASH, op_LIVE_DASH_get, 1, false);
@@ -556,12 +553,6 @@ static void op_STATE_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
     }
     else
         cs_push(cs, 0);
-}
-
-static void op_DEVICE_FLIP_get(const void *NOTUSED(data),
-                               scene_state_t *NOTUSED(ss),
-                               exec_state_t *NOTUSED(es), command_state_t *cs) {
-    device_flip();
 }
 
 static void op_LIVE_OFF_get(const void *NOTUSED(data),

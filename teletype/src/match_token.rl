@@ -181,7 +181,6 @@
         "CV.SET"      => { MATCH_OP(E_OP_CV_SET); };
         "MUTE"        => { MATCH_OP(E_OP_MUTE); };
         "STATE"       => { MATCH_OP(E_OP_STATE); };
-        "DEVICE.FLIP" => { MATCH_OP(E_OP_DEVICE_FLIP); };
         "LIVE.OFF"    => { MATCH_OP(E_OP_LIVE_OFF); };
         "LIVE.O"      => { MATCH_OP(E_OP_LIVE_O); };
         "LIVE.DASH"   => { MATCH_OP(E_OP_LIVE_DASH); };

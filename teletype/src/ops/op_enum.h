@@ -153,7 +153,6 @@ typedef enum {
     E_OP_CV_SET,
     E_OP_MUTE,
     E_OP_STATE,
-    E_OP_DEVICE_FLIP,
     E_OP_LIVE_OFF,
     E_OP_LIVE_O,
     E_OP_LIVE_DASH,

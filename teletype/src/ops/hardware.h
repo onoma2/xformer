@@ -29,7 +29,6 @@ extern const tele_op_t op_CV_GET;
 extern const tele_op_t op_CV_SET;
 extern const tele_op_t op_MUTE;
 extern const tele_op_t op_STATE;
-extern const tele_op_t op_DEVICE_FLIP;
 extern const tele_op_t op_LIVE_OFF;
 extern const tele_op_t op_LIVE_O;
 extern const tele_op_t op_LIVE_DASH;
