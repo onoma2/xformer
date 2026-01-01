@@ -161,7 +161,6 @@ set(sources
     ../../../teletype/src/ops/queue.c
     ../../../teletype/src/ops/seed.c
     ../../../teletype/src/ops/stack.c
-    ../../../teletype/src/ops/telex.c
     ../../../teletype/src/ops/turtle.c
     ../../../teletype/src/ops/variables.c
     ../../../teletype/libavr32/src/euclidean/data.c
