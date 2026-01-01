@@ -1,0 +1,148 @@
+[A]
+prototype = "A"
+prototype_set = "A x"
+short = "get / set the variable `A`, default `1`"
+
+[B]
+prototype = "B"
+prototype_set = "B x"
+short = "get / set the variable `B`, default `2`"
+
+[C]
+prototype = "C"
+prototype_set = "C x"
+short = "get / set the variable `C`, default `3`"
+
+[D]
+prototype = "D"
+prototype_set = "D x"
+short = "get / set the variable `D`, default `4`"
+
+[FLIP]
+prototype = "FLIP"
+prototype_set = "FLIP x"
+short = "returns the opposite of its previous state (`0` or `1`) on each read (also settable)"
+
+[I]
+prototype = "I"
+prototype_set = "I x"
+short = """get / set the per-script variable `I`. *See also `L:` in control flow*"""
+description="""
+Get / set the variable `I`. This variable is overwritten by `L`, but can be used
+freely outside an `L` loop. Each script gets its own `I` variable, so if you call
+a script from another script's loop you can still use and modify `I` without
+affecting the calling loop. In this scenario the script getting called will have
+its `I` value initialized with the calling loop's current `I` value.
+"""
+
+[J]
+prototype = "J"
+prototype_set = "J x"
+short = """get / set the per-script variable `J`"""
+description="""
+get / set the variable `J`, each script gets its own `J` variable, so if you call
+a script from another script you can still use and modify `J` without affecting the calling script.
+"""
+
+[K]
+prototype = "K"
+prototype_set = "K x"
+short = """get / set the per-script variable `K`"""
+description="""
+get / set the variable `K`, each script gets its own `K` variable, so if you call
+a script from another script you can still use and modify `K` without affecting the calling script.
+"""
+
+[O]
+prototype = "O"
+prototype_set = "O x"
+short = "auto-increments _after_ each access, can be set, starting value `0`"
+description="""
+Auto-increments by `O.INC` _after_ each access. The initial value is `0`. The
+lower and upper bounds can be set by `O.MIN` (default `0`) and `O.MAX`
+(default `63`). `O.WRAP` controls if the value wraps when it reaches a bound
+(default is `1`).
+
+Example:
+
+```
+O           => 0
+O           => 1
+X O
+X           => 2
+O.INC 2
+O           => 3 (O increments after it's accessed)
+O           => 5
+O.INC -2
+O 2
+O           => 2
+O           => 0
+O           => 63
+O           => 61
+```
+"""
+
+["O.INC"]
+prototype = "O.INC"
+prototype_set = "O.INC x"
+short = "how much to increment `O` by on each invocation, default `1`"
+
+["O.MIN"]
+prototype = "O.MIN"
+prototype_set = "O.MIN x"
+short = "the lower bound for `O`, default `0`"
+
+["O.MAX"]
+prototype = "O.MAX"
+prototype_set = "O.MAX x"
+short = "the upper bound for `O`, default `63`"
+
+["O.WRAP"]
+prototype = "O.WRAP"
+prototype_set = "O.WRAP x"
+short = "should `O` wrap when it reaches its bounds, default `1`"
+
+[T]
+prototype = "T"
+prototype_set = "T x"
+short = "get / set the variable `T`, typically used for time, default `0`"
+
+[TIME]
+prototype = "TIME"
+prototype_set = "TIME x"
+short = "timer value, counts up in ms., wraps after 32s, can be set"
+
+["TIME.ACT"]
+prototype = "TIME.ACT"
+prototype_set = "TIME.ACT x"
+short = "enable or disable timer counting, default `1`"
+
+[LAST]
+prototype = "LAST x"
+short = "get value in milliseconds since last script run time"
+description = """
+Gets the number of milliseconds since the given script was run, where `M` is script 9 and `I` is script 10. From the live mode, `LAST SCRIPT` gives the time elapsed since last run of I script.
+
+For example, one-line tap tempo:
+
+```
+M LAST SCRIPT
+```
+
+Running this script twice will set the metronome to be the time between runs.
+"""
+
+[X]
+prototype = "X"
+prototype_set = "X x"
+short = "get / set the variable `X`, default `0`"
+
+[Y]
+prototype = "Y"
+prototype_set = "Y x"
+short = "get / set the variable `Y`, default `0`"
+
+[Z]
+prototype = "Z"
+prototype_set = "Z x"
+short = "get / set the variable `Z`, default `0`"

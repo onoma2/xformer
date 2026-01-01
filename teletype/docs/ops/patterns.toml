@@ -1,0 +1,288 @@
+["P.N"]
+prototype = "P.N"
+prototype_set = "P.N x"
+short = "get/set the pattern number for the working pattern, default `0`"
+description = "get/set the pattern number for the working pattern, default `0`. All `P` ops refer to this pattern."
+
+[P]
+prototype = "P x"
+prototype_set = "P x y"
+short = "get/set the value of the working pattern at index `x`"
+
+description = """get/set the value of the working pattern at index `x`. All positive values (`0-63`) can be set or returned while index values greater than 63 clip to 63. Negative `x` values are indexed backwards from the end of the pattern length of the working pattern.
+
+Example:
+
+with a pattern length of 6 for the working pattern:
+
+`P 10`
+retrieves the working pattern value at index 6
+
+`P.I -2`
+retrieves the working pattern value at index 4
+
+This applies to `PN` as well, except the pattern number is the first variable and a second variable specifies the index.
+"""
+
+[PN]
+prototype = "PN x y"
+prototype_set = "PN x y z"
+short = "get/set the value of pattern `x` at index `y`"
+
+["P.L"]
+prototype = "P.L"
+prototype_set = "P.L x"
+short = "get/set pattern length of the working pattern, non-destructive to data"
+
+["PN.L"]
+prototype = "PN.L x"
+prototype_set = "PN.L x y"
+short = "get/set pattern length of pattern x. non-destructive to data"
+
+["P.WRAP"]
+prototype = "P.WRAP"
+prototype_set = "P.WRAP x"
+short = "when the working pattern reaches its bounds does it wrap (`0/1`), default `1` (enabled)"
+
+description = """when the working pattern reaches its bounds does it wrap (`0/1`). With `PN.WRAP` enabled (`1`), when an index reaches its upper or lower bound using `P.NEXT` or `P.PREV` it will wrap to the other end of the pattern and you can continue advancing. The bounds of P.WRAP are defined through `P.L`, `P.START`, and `P.END`.
+
+If wrap is enabled (`P.WRAP 1`) a pattern will begin at its start location and advance to the lesser index of either its end location or the end of its pattern length
+
+Examples:
+
+With wrap enabled, a pattern length of 6, a start location of 2 , and an end location of 8.
+
+`P.WRAP 1; P.L 6; P.START 2; P.END 8`
+
+The pattern will wrap between the indexes `2` and `5`.
+
+With wrap enabled, a pattern length of 10, a start location of 3, and an end location of 6.
+
+`P.WRAP 1; P.L 10; P.START 3; P.END 6`
+
+The pattern will wrap between the indexes `3` and `6`.
+
+If wrap is disabled (`P.WRAP 0`) a pattern will run between its start and end locations and halt at either bound.
+
+This applies to `PN.WRAP` as well, except the pattern number is the first variable and a second variable specifies the wrap behavior (`0/1`).
+"""
+
+["PN.WRAP"]
+prototype = "PN.WRAP x"
+prototype_set = "PN.WRAP x y"
+short = "when pattern `x` reaches its bounds does it wrap (`0/1`), default `1` (enabled)"
+
+["P.START"]
+prototype = "P.START"
+prototype_set = "P.START x"
+short = "get/set the start location of the working pattern, default `0`"
+
+["PN.START"]
+prototype = "PN.START x"
+prototype_set =  "PN.START x y"
+short = "get/set the start location of pattern `x`, default `0`"
+
+["P.END"]
+prototype = "P.END"
+prototype_set = "P.END x"
+short = "get/set the end location of the working pattern, default `63`"
+
+["PN.END"]
+prototype = "PN.END x"
+prototype_set = "PN.END x y"
+short = "get/set the end location of the pattern `x`, default `63`"
+
+["P.I"]
+prototype = "P.I"
+prototype_set = "P.I x"
+short = "get/set index position for the working pattern."
+description = """
+get/set index position for the working pattern. all values greater than pattern length return the first step beyond the pattern length. negative values are indexed backwards from the end of the pattern length.
+
+Example:
+
+With a pattern length of `6` (`P.L 6`), yielding an index range of `0-5`:
+
+`P.I 3`
+
+moves the index of the working pattern to `3`
+
+`P.I 10`
+
+moves the index of the working pattern to `6`
+
+`P.I -2`
+
+moves the index of the working pattern to `4`
+
+This applies to `PN.I`, except the pattern number is the first variable and a second variable specifics the index.
+"""
+
+["PN.I"]
+prototype = "PN.I x"
+prototype_set = "PN.I x y"
+short = "get/set index position for pattern `x`"
+
+["P.HERE"]
+prototype = "P.HERE"
+prototype_set = "P.HERE x"
+short = "get/set value at current index of working pattern"
+
+["PN.HERE"]
+prototype = "PN.HERE x"
+prototype_set = "PN.HERE x y"
+short = "get/set value at current index of pattern `x`"
+
+["P.NEXT"]
+prototype = "P.NEXT"
+prototype_set = "P.NEXT x"
+short = "increment index of working pattern then get/set value"
+
+["PN.NEXT"]
+prototype = "PN.NEXT x"
+prototype_set = "PN.NEXT x y"
+short = "increment index of pattern `x` then get/set value"
+
+["P.PREV"]
+prototype = "P.PREV"
+prototype_set = "P.PREV x"
+short = "decrement index of working pattern then get/set value"
+
+["PN.PREV"]
+prototype = "PN.PREV x"
+prototype_set = "PN.PREV x y"
+short = "decrement index of pattern `x` then get/set value"
+
+["P.INS"]
+prototype = "P.INS x y"
+short = "insert value `y` at index `x` of working pattern, shift later values down, destructive to loop length"
+
+["PN.INS"]
+prototype = "PN.INS x y z"
+short = "insert value `z` at index `y` of pattern `x`, shift later values down, destructive to loop length"
+
+["P.RM"]
+prototype = "P.RM x"
+short = "delete index `x` of working pattern, shift later values up, destructive to loop length"
+
+["PN.RM"]
+prototype = "PN.RM x y"
+short = "delete index `y` of pattern `x`, shift later values up, destructive to loop length"
+
+["P.PUSH"]
+prototype = "P.PUSH x"
+short = "insert value `x` to the end of the working pattern (like a stack), destructive to loop length"
+
+["PN.PUSH"]
+prototype = "PN.PUSH x y"
+short = "insert value `y` to the end of pattern `x` (like a stack), destructive to loop length"
+
+["P.POP"]
+prototype = "P.POP"
+short = "return and remove the value from the end of the working pattern (like a stack), destructive to loop length"
+
+["PN.POP"]
+prototype = "PN.POP x"
+short = "return and remove the value from the end of pattern `x` (like a stack), destructive to loop length"
+
+
+["P.MIN"]
+prototype = "P.MIN"
+short = "find the first minimum value in the pattern between the START and END for the working pattern and return its index"
+
+["PN.MIN"]
+prototype = "PN.MIN x"
+short = "find the first minimum value in the pattern between the START and END for pattern `x` and return its index"
+
+
+["P.MAX"]
+prototype = "P.MAX"
+short = "find the first maximum value in the pattern between the START and END for the working pattern and return its index"
+
+["PN.MAX"]
+prototype = "PN.MAX x"
+short = "find the first maximum value in the pattern between the START and END for pattern `x` and return its index"
+
+["P.SHUF"]
+prototype = "P.SHUF"
+short = "shuffle the values in active pattern (between its START and END)"
+
+["PN.SHUF"]
+prototype = "PN.SHUF x"
+short = "shuffle the values in pattern `x` (between its START and END)"
+
+["P.ROT"]
+prototype = "P.ROT n"
+short = "rotate the values in the active pattern `n` steps (between its START and END, negative rotates backward)"
+
+["PN.ROT"]
+prototype = "PN.ROT x n"
+short = "rotate the values in pattern `x` (between its START and END, negative rotates backward)"
+
+["P.REV"]
+prototype = "P.REV"
+short = "reverse the values in the active pattern (between its START and END)"
+
+["PN.REV"]
+prototype = "PN.REV x"
+short = "reverse the values in pattern `x`"
+
+["P.RND"]
+prototype = "P.RND"
+short = "return a value randomly selected between the start and the end position"
+
+["PN.RND"]
+prototype = "PN.RND x"
+short = "return a value randomly selected between the start and the end position of pattern `x`"
+
+["P.+"]
+prototype = "P.+ x y"
+short = "increase the value of the working pattern at index `x` by `y`"
+
+["PN.+"]
+prototype = "PN.+ x y z"
+short = "increase the value of pattern `x` at index `y` by `z`"
+
+["P.-"]
+prototype = "P.- x y"
+short = "decrease the value of the working pattern at index `x` by `y`"
+
+["PN.-"]
+prototype = "PN.- x y z"
+short = "decrease the value of pattern `x` at index `y` by `z`"
+
+["P.+W"]
+prototype = "P.+W x y a b"
+short = "increase the value of the working pattern at index `x` by `y` and wrap it to `a`..`b` range"
+
+["PN.+W"]
+prototype = "PN.+W x y z a b"
+short = "increase the value of pattern `x` at index `y` by `z` and wrap it to `a`..`b` range"
+
+["P.-W"]
+prototype = "P.-W x y a b"
+short = "decrease the value of the working pattern at index `x` by `y` and wrap it to `a`..`b` range"
+
+["PN.-W"]
+prototype = "PN.-W x y z a b"
+short = "decrease the value of pattern `x` at index `y` by `z` and wrap it to `a`..`b` range"
+
+["P.MAP"]
+prototype = "P.MAP: ..."
+short = "apply the 'function' to each value in the active pattern, `I` takes each pattern value"
+description = """
+Replace each cell in the active pattern (between the START and END of the pattern) by assigning
+the variable I to the current value of the cell, evaluating the command after the mod, and
+assigning that pattern cell with the result. The 'map' higher-order function from functional
+programming, with the command giving the function of `I` to map over the pattern.
+
+For example:
+
+```
+P.MAP: * 2 I  => double each cell in the active pattern
+```
+"""
+
+["PN.MAP"]
+prototype = "PN.MAP x: ..."
+short = "apply the 'function' to each value in pattern `x`, `I` takes each pattern value"

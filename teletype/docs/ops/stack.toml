@@ -1,0 +1,36 @@
+["S"]
+prototype = "S: ..."
+short = "Place a command onto the stack"
+description = """
+Add the command following the colon to the top of the stack. If the stack
+is full, the command will be discarded.
+"""
+
+["S.CLR"]
+prototype = "S.CLR"
+short = "Clear all entries in the stack"
+description = """
+Clear the stack, cancelling all of the commands.
+"""
+
+["S.ALL"]
+prototype = "S.ALL"
+short = "Execute all entries in the stack"
+description = """
+Execute all entries in the stack (last in, first out), clearing the stack in
+the process.
+"""
+
+["S.POP"]
+prototype = "S.POP"
+short = "Execute the most recent entry"
+description = """
+Pop the most recent command off the stack and execute it.
+"""
+
+["S.L"]
+prototype = "S.L"
+short = "Get the length of the stack"
+description = """
+Get the number of entries in the stack.
+"""

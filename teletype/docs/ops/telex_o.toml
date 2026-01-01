@@ -1,0 +1,615 @@
+["TO.TR"]
+prototype = "TO.TR x y"
+short = "sets the `TR` value for output `x` to `y` (0/1)"
+
+["TO.TR.TOG"]
+prototype = "TO.TR.TOG x"
+short = "toggles the `TR` value for output `x`"
+
+["TO.TR.PULSE"]
+prototype = "TO.TR.PULSE x"
+aliases = ["TO.TR.P"]
+short = "pulses the `TR` value for output `x` for the duration set by `TO.TR.TIME/S/M`"
+
+["TO.TR.PULSE.DIV"]
+prototype = "TO.TR.PULSE.DIV x y"
+aliases = ["TO.TR.P.DIV"]
+short = "sets the clock division factor for `TR` output `x` to `y`"
+description = """
+The pulse divider will output one trigger pulse every `y` pulse commands. For example, setting the `DIV` factor to `2` like this:
+```
+TO.TR.P.DIV 1 2
+```
+Will cause every other `TO.TR.P 1` command to emit a pulse.
+
+Reset it to one (`TO.TR.P.DIV 1 1`) or initialize the output (`TO.TR.INIT 1`) to return to the default behavior.
+"""
+
+["TO.TR.PULSE.MUTE"]
+prototype = "TO.TR.PULSE.MUTE x y"
+aliases = ["TO.TR.P.MUTE"]
+short = "mutes or un-mutes `TR` output `x`; `y` is 1 (mute) or 0 (un-mute)"
+
+["TO.TR.TIME"]
+prototype = "TO.TR.TIME x y"
+short = "sets the time for `TR.PULSE` on output `n`; `y` in milliseconds"
+
+["TO.TR.TIME.S"]
+prototype = "TO.TR.TIME.S x y"
+short = "sets the time for `TR.PULSE` on output `n`; `y` in seconds"
+
+["TO.TR.TIME.M"]
+prototype = "TO.TR.TIME.M x y"
+short = "sets the time for `TR.PULSE` on output `n`; `y` in minutes"
+
+["TO.TR.WIDTH"]
+prototype = "TO.TR.WIDTH x y"
+short = "sets the time for `TR.PULSE` on output `n` based on the width of its current metronomic value; `y` in percentage (0-100)"
+description = """
+The actual time value for the trigger pulse when set by the `WIDTH` command is relative to the current value for `TO.TR.M`. Changes to `TO.TR.M` will change the duration of `TR.PULSE` when using the `WIDTH` mode to set its value. Values for `y` are set in percentage (0-100).
+
+For example:
+
+```
+TO.TR.M 1 1000
+TO.TR.WIDTH 1 50
+```
+
+The length of a `TR.PULSE` is now 500ms.
+
+```
+TO.TR.M 1 500
+```
+
+The length of a `TR.PULSE` is now 250ms. Note that you don't need to use the width command again as it automatically tracks the value for `TO.TR.M`.
+"""
+
+["TO.TR.POL"]
+prototype = "TO.TR.POL x y"
+short = "sets the polarity for `TR` output `n`"
+
+["TO.TR.M.ACT"]
+prototype = "TO.TR.M.ACT x y"
+short = "sets the active status for the independent metronome for output `x` to `y` (`0`/`1`); default `0` (disabled)"
+description = """
+Each `TR` output has its own independent metronome that will execute a `TR.PULSE` at a specified interval. The `ACT` command enables (1) or disables (0) the metronome.
+"""
+
+["TO.TR.M"]
+prototype = "TO.TR.M x y"
+short = "sets the independent metronome interval for output `x` to `y` in milliseconds; default `1000`"
+
+["TO.TR.M.S"]
+prototype = "TO.TR.M.S x y"
+short = "sets the independent metronome interval for output `x` to `y` in seconds; default `1`"
+
+["TO.TR.M.M"]
+prototype = "TO.TR.M.M x y"
+short = "sets the independent metronome interval for output `x` to `y` in minutes"
+
+["TO.TR.M.BPM"]
+prototype = "TO.TR.M.BPM x y"
+short = "sets the independent metronome interval for output `x` to `y` in Beats Per Minute"
+
+["TO.TR.M.COUNT"]
+prototype = "TO.TR.M.COUNT x y"
+short = "sets the number of repeats before deactivating for output `x` to `y`; default `0` (infinity)"
+description = """
+This allows for setting a limit to the number of times `TO.TR.M` will `PULSE` when active before automatically disabling itself. For example, let's set it to pulse 5 times with 500ms between pulses:
+
+```
+TO.TR.M 1 500
+TO.TR.M.COUNT 1 5
+```
+
+Now, each time we activate it, the metronome will pulse 5 times - each a half-second apart.
+
+```
+TO.TR.M.ACT 1 1
+```
+
+`PULSE` ... `PULSE` ... `PULSE` ... `PULSE` ... `PULSE`.
+
+The metronome is now disabled after pulsing five times. If you call `ACT` again, it will emit five more pulses.
+
+To reset, either set your `COUNT` to zero (`TO.TR.M.COUNT 1 0`) or call init on the output (`TO.TR.INIT 1 1`).
+"""
+
+["TO.TR.M.MUL"]
+prototype = "TO.TR.M.MUL x y"
+short = "multiplies the `M` rate on `TR` output `x` by `y`; `y` defaults to `1` - no multiplication"
+description = """
+The following example will cause 2 against 3 patterns to pulse out of `TO.TR` outputs `3` and `4`.
+
+```
+TO.TR.M.MUL 3 2
+TO.TR.M.MUL 4 3
+L 3 4: TO.TR.M.ACT I 1
+```
+"""
+
+["TO.TR.M.SYNC"]
+prototype = "TO.TR.M.SYNC x"
+short = "synchronizes the `PULSE` for metronome on `TR` output number `x`"
+
+["TO.M.ACT"]
+prototype = "TO.M.ACT d y"
+short = "sets the active status for the 4 independent metronomes on device `d` (1-8) to `y` (`0`/`1`); default `0` (disabled)"
+
+["TO.M"]
+prototype = "TO.M d y"
+short = "sets the 4 independent metronome intervals for device `d` (1-8) to `y` in milliseconds; default `1000`"
+
+["TO.M.S"]
+prototype = "TO.M.S d y"
+short = "sets the 4 independent metronome intervals for device `d` to `y` in seconds; default `1`"
+
+["TO.M.M"]
+prototype = "TO.M.M d y"
+short = "sets the 4 independent metronome intervals for device `d` to `y` in minutes"
+
+["TO.M.BPM"]
+prototype = "TO.M.BPM d y"
+short = "sets the 4 independent metronome intervals for device `d` to `y` in Beats Per Minute"
+
+["TO.M.COUNT"]
+prototype = "TO.M.COUNT d y"
+short = "sets the number of repeats before deactivating for the 4 metronomes on device `d` to `y`; default `0` (infinity)"
+
+["TO.M.SYNC"]
+prototype = "TO.M.SYNC d"
+short = "synchronizes the 4 metronomes for device number `d` (1-8)"
+description = """
+This command causes the TXo at device `d` to synchronize all of its independent metronomes to the moment it receives the command. Each will then continue to pulse at its own independent `M` rate.
+"""
+
+["TO.CV"]
+prototype = "TO.CV x"
+short = "CV target output `x`; `y` values are bipolar (-16384 to +16383) and map to -10 to +10"
+
+["TO.CV.SLEW"]
+prototype = "TO.CV.SLEW x y"
+short = "set the slew amount for output `x`; `y` in milliseconds"
+
+["TO.CV.SLEW.S"]
+prototype = "TO.CV.SLEW.S x y"
+short = "set the slew amount for output `x`; `y` in seconds"
+
+["TO.CV.SLEW.M"]
+prototype = "TO.CV.SLEW.M x y"
+short = "set the slew amount for output `x`; `y` in minutes"
+
+["TO.CV.SET"]
+prototype = "TO.CV.SET x y"
+short = "set the CV for output `x` (ignoring `SLEW`); `y` values are bipolar (-16384 to +16383) and map to -10 to +10"
+
+["TO.CV.OFF"]
+prototype = "TO.CV.OFF x y"
+short = "set the CV offset for output `x`; `y` values are added at the final stage"
+
+["TO.CV.QT"]
+prototype = "TO.CV.QT x y"
+short = "CV target output `x`; `y` is quantized to output's current `CV.SCALE`"
+
+["TO.CV.QT.SET"]
+prototype = "TO.CV.QT.SET x y"
+short = "set the CV for output `x` (ignoring `SLEW`); `y` is quantized to output's current `CV.SCALE`"
+
+["TO.CV.N"]
+prototype = "TO.CV.N x y"
+short = "target the CV to note `y` for output `x`; `y` is indexed in the output's current `CV.SCALE`"
+
+["TO.CV.N.SET"]
+prototype = "TO.CV.N.SET x y"
+short = "set the CV to note `y` for output `x`; `y` is indexed in the output's current `CV.SCALE` (ignoring `SLEW`)"
+
+["TO.CV.SCALE"]
+prototype = "TO.CV.SCALE x y"
+short = "select scale # `y` for CV output `x`; scales listed in full description"
+description = """
+### Quantization Scales
+0. Equal Temperament [DEFAULT]
+1. 12-tone Pythagorean scale
+2. Vallotti & Young scale (Vallotti version) also known as Tartini-Vallotti (1754)
+3. Andreas Werckmeister's temperament III (the most famous one, 1681)
+4. Wendy Carlos' Alpha scale with perfect fifth divided in nine
+5. Wendy Carlos' Beta scale with perfect fifth divided by eleven
+6. Wendy Carlos' Gamma scale with third divided by eleven or fifth by twenty
+7. Carlos Harmonic & Ben Johnston's scale of 'Blues' from Suite f.micr.piano (1977) & David Beardsley's scale of 'Science Friction'
+8. Carlos Super Just
+9. Kurzweil "Empirical Arabic"
+10. Kurzweil "Just with natural b7th", is Sauveur Just with 7/4
+11. Kurzweil "Empirical Bali/Java Harmonic Pelog"
+12. Kurzweil "Empirical Bali/Java Slendro, Siam 7"
+13. Kurzweil "Empirical Tibetian Ceremonial"
+14. Harry Partch's 43-tone pure scale
+15. Partch's Indian Chromatic, Exposition of Monophony, 1933. 
+16. Partch Greek scales from "Two Studies on Ancient Greek Scales" on black/white 
+"""
+
+["TO.CV.LOG"]
+prototype = "TO.CV.LOG x y"
+short = "translates the output for `CV` output `x` to logarithmic mode `y`; `y` defaults to `0` (off); mode `1` is for 0-16384 (0V-10V), mode `2` is for 0-8192 (0V-5V), mode `3` is for 0-4096 (0V-2.5V), etc."
+description = """
+The following example creates an envelope that ramps to 5V over a logarithmic curve:
+
+```
+TO.CV.SET 1 V 5
+TO.CV.LOG 1 2
+TO.ENV.ATT 1 500
+TO.ENV.DEC.S 1 2
+TO.ENV.ACT 1 1
+```
+
+When triggered (`TO.ENV.TRIG 1`), the envelope will rise to 5V over a half a second and then decay back to zero over two seconds. The curve used is `2`, which covers 0V-5V. 
+
+If a curve is too small for the range being covered, values above the range will be limited to the range's ceiling. In the above example, voltages above 5V will all return as 5V. 
+
+"""
+
+["TO.CV.CALIB"]
+prototype = "TO.CV.CALIB x"
+short = "Locks the current offset (`CV.OFF`) as a calibration offset and saves it to persist between power cycles for output `x`."
+description = """
+
+To calibrate your TXo outputs, follow these steps. Before you start, let your expander warm up for a few minutes. It won't take long - but you want to make sure that it is calibrated at a more representative temperature.
+
+Then, first adjust your offset (CV.OFF) until the output is at zero volts (0). For example:
+
+```
+CV.OFF 1 8
+```
+
+Once that output measures at zero volts, you want to lock it in as the calibration by calling the following operator:
+
+```
+CV.CALIB 1
+```
+
+You will find that the offset is now zero, but the output is at the value that you targeted during your prior adjustment. To reset to normal (and forget this calibration offset), use the `TO.CV.RESET` command.
+
+"""
+
+["TO.CV.RESET"]
+prototype = "TO.CV.RESET x"
+short = "Clears the calibration offset for output `x`"
+
+["TO.OSC"]
+prototype = "TO.OSC x y"
+short = "Targets oscillation for CV output `x` to `y`"
+description = """
+Targets oscillation for CV output `x` to `y` with the portamento rate determined by the `TO.OSC.SLEW` value.
+`y` is 1V/oct translated from the standard range (1-16384).
+A value of `0` disables oscillation; `CV` amplitude is used as the peak for oscillation and needs to be `> 0` for it to be perceivable.
+
+Setting an `OSC` frequency greater than zero for a `CV` output will start that output oscillating. It will swing its voltage between to the current `CV` value and its polar opposite. For example:
+
+```
+TO.CV 1 V 5
+TO.OSC 1 N 69
+```
+
+This will emit the audio-rate note A (at 440Hz) swinging from '+5V' to '-5V'. The `CV` value acts as an amplitude control. For example:
+
+```
+TO.CV.SLEW.M 1 1
+TO.CV 1 V 10
+```
+
+This will cause the oscillations to gradually increase in amplitude from `5V` to `10V` over a period of one minute.
+
+**IMPORANT:** if you do not set a `CV` value, the oscillator will not emit a signal.
+
+If you want to go back to regular `CV` behavior, you need to set the oscillation frequency to zero. E.g. `TO.OSC 1 0`. You can also initialize the `CV` output with `TO.CV.INIT 1`, which resets all of its settings back to start-up default.
+
+"""
+
+["TO.OSC.SET"]
+prototype = "TO.OSC.SET x y"
+short = "set oscillation for CV output `x` to `y` (ignores slew)"
+description = """
+Set oscillation for CV output `x` to `y` (ignores `CV.OSC.SLEW`.) `y` is 1V/oct translated from the standard range (1-16384); 
+a value of `0` disables oscillation. `CV` amplitude is used as the peak for oscillation and needs to be `> 0` for it to be perceivable.
+"""
+
+["TO.OSC.QT"]
+prototype = "TO.OSC.QT x y"
+short = "targets oscillation for CV output `x` to `y`"
+description = """
+Targets oscillation for CV output `x` to `y` with the portamento rate determined by the `TO.OSC.SLEW` value. 
+`y` is 1V/oct translated from the standard range (1-16384) and quantized to current `OSC.SCALE`. 
+A value of `0` disables oscillation; `CV` amplitude is used as the peak for oscillation and needs to be `> 0` for it to be perceivable.
+"""
+
+["TO.OSC.QT.SET"]
+prototype = "TO.OSC.QT.SET x y"
+short = "set oscillation for CV output `x` to `y`, quantized to the current scale (ignores slew)"
+description = """
+Set oscillation for CV output `x` to the 1V/oct value `y` (ignores `CV.OSC.SLEW`.) 
+`y` is 1v/oct translated from the standard range (1-16384) and quantized to current `OSC.SCALE`.
+A value of `0` disables oscillation; `CV` amplitude is used as the peak for oscillation and needs to be `> 0` for it to be perceivable.
+"""
+
+["TO.OSC.N"]
+prototype = "TO.OSC.N x y"
+short = "targets oscillation for CV output `x` to note `y`"
+description = """
+Targets oscillation for CV output `x` to note `y` with the portamento rate determined by the `TO.OSC.SLEW` value.
+See quantization scale reference for `y`; `CV` amplitude is used as the peak for oscillation and needs to be `> 0` for it to be perceivable.
+"""
+
+["TO.OSC.N.SET"]
+prototype = "TO.OSC.N.SET x y"
+short = "sets oscillation for CV output `x` to note `y` (ignores slew)"
+description = """
+Sets oscillation for CV output `x` to note `y` (ignores `CV.OSC.SLEW`.) 
+See quantization scale reference for `y`; `CV` amplitude is used as the peak for oscillation and needs to be `> 0` for it to be perceivable.
+"""
+
+["TO.OSC.FQ"]
+prototype = "TO.OSC.FQ x y"
+short = "targets oscillation for CV output `x` to frequency `y` in Hertz"
+description = """
+Targets oscillation for CV output `x` to frequency `y` with the portamento rate determined by the `TO.OSC.SLEW` value.
+`y` is in Hz; a value of `0` disables oscillation. `CV` amplitude is used as the peak for oscillation and needs to be `> 0` for it to be perceivable.
+"""
+
+["TO.OSC.FQ.SET"]
+prototype = "TO.OSC.FQ.SET x y"
+short = "targets oscillation for CV output `x` to frequency `y` in Hertz (ignores slew)"
+description = """
+Sets oscillation for CV output `x` to frequency `y` (ignores `CV.OSC.SLEW`.) 
+`y` is in Hz; a value of `0` disables oscillation. `CV` amplitude is used as the peak for oscillation and needs to be `> 0` for it to be perceivable.
+"""
+
+["TO.OSC.LFO"]
+prototype = "TO.OSC.LFO x y"
+short = "Targets oscillation for CV output `x` to LFO frequency `y` in millihertz"
+description = """
+Targets oscillation for CV output `x` to LFO frequency `y` with the portamento rate determined by the `TO.OSC.SLEW` value.
+`y` is in mHz (millihertz: 10^-3 Hz); a value of `0` disables oscillation.
+`CV` amplitude is used as the peak for oscillation and needs to be `> 0` for it to be perceivable.
+"""
+
+["TO.OSC.LFO.SET"]
+prototype = "TO.OSC.LFO.SET x y"
+short = "Targets oscillation for CV output `x` to LFO frequency `y` in millihertz (ignores slew)"
+description = """
+Sets oscillation for CV output `x` to LFO frequency `y` (ignores `CV.OSC.SLEW`.)
+`y` is in mHz (millihertz: 10^-3 Hz); a value of `0` disables oscillation.
+`CV` amplitude is used as the peak for oscillation and needs to be `> 0` for it to be perceivable.
+"""
+
+["TO.OSC.CYC"]
+prototype = "TO.OSC.CYC x y"
+short = "targets the oscillator cycle length to `y` for CV output `x` with the portamento rate determined by the `TO.OSC.SLEW` value; `y` is in milliseconds"
+
+["TO.OSC.CYC.SET"]
+prototype = "TO.OSC.CYC.SET x y"
+short = "sets the oscillator cycle length to `y` for CV output `x` (ignores `CV.OSC.SLEW`); `y` is in milliseconds"
+
+["TO.OSC.CYC.S"]
+prototype = "TO.OSC.CYC.S x y"
+short = "targets the oscillator cycle length to `y` for CV output `x` with the portamento rate determined by the `TO.OSC.SLEW` value; `y` is in seconds"
+
+["TO.OSC.CYC.S.SET"]
+prototype = "TO.OSC.CYC.S.SET x y"
+short = "sets the oscillator cycle length to `y` for CV output `x` (ignores `CV.OSC.SLEW`); `y` is in seconds"
+
+["TO.OSC.CYC.M"]
+prototype = "TO.OSC.CYC.M x y"
+short = "targets the oscillator cycle length to `y` for CV output `x` with the portamento rate determined by the `TO.OSC.SLEW` value; `y` is in minutes"
+
+["TO.OSC.CYC.M.SET"]
+prototype = "TO.OSC.CYC.M.SET x y"
+short = "sets the oscillator cycle length to `y` for CV output `x` (ignores `CV.OSC.SLEW`); `y` is in minutes"
+
+["TO.OSC.SCALE"]
+prototype = "TO.OSC.SCALE x y"
+short = "select scale # `y` for CV output `x`; scales listed in full description"
+description = """
+### Quantization Scales
+0. Equal Temperament [DEFAULT]
+1. 12-tone Pythagorean scale
+2. Vallotti & Young scale (Vallotti version) also known as Tartini-Vallotti (1754)
+3. Andreas Werckmeister's temperament III (the most famous one, 1681)
+4. Wendy Carlos' Alpha scale with perfect fifth divided in nine
+5. Wendy Carlos' Beta scale with perfect fifth divided by eleven
+6. Wendy Carlos' Gamma scale with third divided by eleven or fifth by twenty
+7. Carlos Harmonic & Ben Johnston's scale of 'Blues' from Suite f.micr.piano (1977) & David Beardsley's scale of 'Science Friction'
+8. Carlos Super Just
+9. Kurzweil "Empirical Arabic"
+10. Kurzweil "Just with natural b7th", is Sauveur Just with 7/4
+11. Kurzweil "Empirical Bali/Java Harmonic Pelog"
+12. Kurzweil "Empirical Bali/Java Slendro, Siam 7"
+13. Kurzweil "Empirical Tibetian Ceremonial"
+14. Harry Partch's 43-tone pure scale
+15. Partch's Indian Chromatic, Exposition of Monophony, 1933. 
+16. Partch Greek scales from "Two Studies on Ancient Greek Scales" on black/white 
+"""
+
+["TO.OSC.WAVE"]
+prototype = "TO.OSC.WAVE x y"
+short = "set the waveform for output `x` to `y`; `y` range is `0-4500`, blending between 45 waveforms"
+description = """
+There are 45 different waveforms, values translate to sine (0), triangle (100), saw (200), pulse (300) all the way to random/noise (4500).
+Oscillator shape between values is a blend of the pure waveforms.
+"""
+
+["TO.OSC.RECT"]
+prototype = "TO.OSC.RECT x y"
+short = "rectifies the polarity of the oscillator for output `x` to `y`; 0 is no rectification, +/-1 is partial rectification, +/-2 is full rectification"
+description = """
+The rectification command performs a couple of levels of rectification based on how you have it set. The following values for `y` work as follows:
+
+* `y = 2`: "full-positive" - inverts negative values, making them positive
+* `y = 1`: "half-positive" - omits all negative values (values below zero are set to zero)
+* `y = 0`: no rectification (default)
+* `y = -1`: "half-negative" - omits all positive values (values above zero are set to zero)
+* `y = -2`: "full-negative" - inverts positive values, making them negative
+"""
+
+["TO.OSC.WIDTH"]
+prototype = "TO.OSC.WIDTH x y"
+short = "sets the width of the pulse wave on output `x` to `y`; `y` is a percentage of total width (0 to 100); only affects waveform `3000`"
+
+["TO.OSC.SYNC"]
+prototype = "TO.OSC.SYNC x"
+short = "resets the phase of the oscillator on `CV` output `x` (relative to `TO.OSC.PHASE`)"
+
+["TO.OSC.PHASE"]
+prototype = "TO.OSC.PHASE x y"
+short = "sets the phase offset of the oscillator on CV output `x` to `y` (0 to 16383); `y` is the range of one cycle"
+
+["TO.OSC.SLEW"]
+prototype = "TO.OSC.SLEW x y"
+short = "sets the frequency slew time (portamento) for the oscillator on CV output `x` to `y`; `y` in milliseconds"
+description = """
+This parameter acts as a frequency slew for the targeted `CV` output. It allows you to gradually slide from one frequency to another, creating a portamento like effect. It is also great for smoothing transitions between different `LFO` rates on the oscillator. For example:
+
+```
+TO.CV 1 V 5
+TO.OSC.SLEW 1 30000
+TO.OSC.LFO.SET 1 1000
+TO.OSC.LFO 1 100
+```
+
+This will start an LFO on `CV 1` with a rate of 1000mHz. Then, over the next 30 seconds, it will gradually decrease in rate to 100mHz.
+"""
+
+["TO.OSC.SLEW.S"]
+prototype = "TO.OSC.SLEW.S x y"
+short = "sets the frequency slew time (portamento) for the oscillator on CV output `x` to `y`; `y` in seconds"
+
+["TO.OSC.SLEW.M"]
+prototype = "TO.OSC.SLEW.M x y"
+short = "sets the frequency slew time (portamento) for the oscillator on CV output `x` to `y`; `y` in minutes"
+
+["TO.OSC.CTR"]
+prototype = "TO.OSC.CTR x y"
+short = "centers the oscillation on CV output `x` to `y`; `y` values are bipolar (-16384 to +16383) and map to -10 to +10"
+description = """
+For example, to create a sine wave that is centered at 2.5V and swings up to +5V and down to 0V, you would do this:
+
+```
+TO.CV 1 VV 250
+TO.OSC.CTR 1 VV 250
+TO.OSC.LFO 1 500
+```
+"""
+
+["TO.ENV.ACT"]
+prototype = "TO.ENV.ACT x y"
+short = "activates/deactivates the AD envelope generator for the CV output `x`; `y` turns the envelope generator off (0 - default) or on (1);  `CV` amplitude is used as the peak for the envelope and needs to be `> 0` for the envelope to be perceivable"
+description = """
+This setting activates (1) or deactivates (0) the envelope generator on `CV` output `y`. The envelope generator is dependent on the current voltage setting for the output. Upon activation, the targeted output will go to zero. Then, when triggered (`TO.ENV.TRIG`), it will ramp the voltage from zero to the currently set peak voltage (`TO.CV`) over the attack time (`TO.ENV.ATT`) and then decay back to zero over the decay time (`TO.ENV.DEC`). For example:
+
+```
+TO.CV.SET 1 V 8
+TO.ENV.ACT 1 1
+TO.ENV.ATT.S 1 1
+TO.ENV.DEC.S 1 30
+```
+
+This will initialize the `CV 1` output to have an envelope that will ramp to `+8V` over one second and decay back to zero over thirty seconds. To trigger the envelope, you need to send the trigger command `TO.ENV.TRIG 1`. Envelopes currently re-trigger from the start of the cycle.
+
+To return your `CV` output to normal function, either deactivate the envelope (`TO.ENV.ACT 1 0`) or reinitialize the output (`TO.CV.INIT 1`).
+"""
+
+["TO.ENV"]
+prototype = "TO.ENV x y"
+short = "trigger the attack stage of output `x` when `y` changes to 1, or decay stage when it changes to 0"
+description = """
+This parameter essentially allows output `x` to act as a gate between the 0 and 1 state. Changing this value from 0 to 1
+causes the envelope to trigger the attack phase and hold at the peak CV value; changing this value from 1 to 0 causes the
+decay stage of the envelope to be triggered.
+"""
+
+["TO.ENV.TRIG"]
+prototype = "TO.ENV.TRIG x"
+short = "triggers the envelope at `CV` output `x` to cycle;  `CV` amplitude is used as the peak for the envelope and needs to be `> 0` for the envelope to be perceivable"
+
+["TO.ENV.ATT"]
+prototype = "TO.ENV.ATT x y"
+short = "set the envelope attack time to `y` for `CV` output `x`; `y` in milliseconds (default 12 ms)"
+
+["TO.ENV.ATT.S"]
+prototype = "TO.ENV.ATT.S x y"
+short = "set the envelope attack time to `y` for `CV` output `x`; `y` in seconds"
+
+["TO.ENV.ATT.M"]
+prototype = "TO.ENV.ATT.M x y"
+short = "set the envelope attack time to `y` for `CV` output `x`; `y` in minutes"
+
+["TO.ENV.DEC"]
+prototype = "TO.ENV.DEC x y"
+short = "set the envelope decay time to `y` for `CV` output `x`; `y` in milliseconds (default 250 ms)"
+
+["TO.ENV.DEC.S"]
+prototype = "TO.ENV.DEC.S x y"
+short = "set the envelope decay time to `y` for `CV` output `x`; `y` in seconds"
+
+["TO.ENV.DEC.M"]
+prototype = "TO.ENV.DEC.M x y"
+short = "set the envelope decay time to `y` for `CV` output `x`; `y` in minutes"
+
+["TO.ENV.EOR"]
+prototype = "TO.ENV.EOR x n"
+short = "at the end of rise of `CV` output `x`, fires a `PULSE` to the trigget output `n`"
+description = """
+Fires a `PULSE` at the End of Rise to the unit-local trigger output `n` for the envelope on `CV` output `x`; 
+`n` refers to trigger output 1-4 on the same TXo as CV output `x`.
+
+The most important thing to know with this operator is that you can only cause the EOR trigger to fire on the same device as the TXo with the envelope. For this command, the outputs are numbered LOCALLY to the unit with the envelope.
+
+For example, if you have an envelope running on your second TXo, you can only send the EOR pulse to the four outputs on that device:
+
+```
+TO.ENV.EOR 5 1
+```
+
+This will cause the first output on TXo #2 (`TO.TR 5`) to pulse after the envelope's attack segment.
+"""
+
+["TO.ENV.EOC"]
+prototype = "TO.ENV.EOC x n"
+short = "at the end of cycle of `CV` output `x`, fires a `PULSE` to the trigget output `n`"
+description = """
+Fires a `PULSE` at the End of Cycle to the unit-local trigger output `n` for the envelope on `CV` output `x`.
+`n` refers to trigger output 1-4 on the same TXo as CV output 'y'.
+
+The most important thing to know with this operator is that you can only cause the EOC trigger to fire on the same device as the TXo with the envelope. For this command, the outputs are numbered LOCALLY to the unit with the envelope.
+
+For example, if you have an envelope running on your second TXo, you can only send the EOC pulse to the four outputs on that device:
+
+```
+TO.ENV.EOC 5 1
+```
+
+This will cause the first output on TXo #2 (`TO.TR 5`) to pulse after the envelope's decay segment.
+"""
+
+["TO.ENV.LOOP"]
+prototype = "TO.ENV.LOOP x y"
+short = "causes the envelope on `CV` output `x` to loop for `y` times"
+description = """
+Causes the envelope on `CV` output `x` to loop for `y` times.
+A `y` of `0` will cause the envelope to loop infinitely; setting `y` to 1 (default) disables looping and (if currently looping) will
+cause it to finish its current cycle and cease.
+"""
+
+["TO.TR.INIT"]
+prototype = "TO.TR.INIT x"
+short = "initializes `TR` output `x` back to the default boot settings and behaviors; neutralizes metronomes, dividers, pulse counters, etc."
+
+["TO.CV.INIT"]
+prototype = "TO.CV.INIT x"
+short = "initializes `CV` output `x` back to the default boot settings and behaviors; neutralizes offsets, slews, envelopes, oscillation, etc."
+
+["TO.INIT"]
+prototype = "TO.INIT d"
+short = "initializes all of the `TR` and `CV` outputs for device number `d` (1-8)"
+
+["TO.KILL"]
+prototype = "TO.KILL d"
+short = "cancels all `TR` pulses and `CV` slews for device number `d` (1-8)"

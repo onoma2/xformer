@@ -1,0 +1,67 @@
+["ES.PRESET"]
+prototype = "ES.PRESET x"
+short = "Recall preset `x` (0-7)"
+description = """
+Recall the preset in location `x`. This will stop the currently playing pattern.
+"""
+
+["ES.MODE"]
+prototype = "ES.MODE x"
+short = "Set pattern clock mode. (0=normal, 1=II clock)"
+description = """
+Sets the pattern clock mode. Setting `x` to 0 sets Earthsea to use it's internal clock. Setting `x` to 1 clocks Earthsea via the `ES.CLOCK` command.
+"""
+
+["ES.CLOCK"]
+prototype = "ES.CLOCK x"
+short = "If II clocked, next pattern event"
+description = """
+If Earthsea is II clocked (see `ES.MODE`), and `x` is non-zero, advance to the next pattern event.
+"""
+
+["ES.RESET"]
+prototype = "ES.RESET x"
+short = "Reset pattern to start (and start playing)"
+description = """
+If `x` is non-zero, reset the position in the current pattern to the start and start playing.
+"""
+
+["ES.PATTERN"]
+prototype = "ES.PATTERN x"
+short = "Select playing pattern (0-15)"
+description = """
+Select pattern (0-15) from the current preset.
+"""
+
+["ES.TRANS"]
+prototype = "ES.TRANS x"
+short = "Transpose the current pattern"
+description = """
+Apply a transposition relative to the current 'root' position. Integer divisions of `x` shift the root note up or down a row, `x` modulo 5 will shift the position
+left or right up to 4 notes.
+"""
+
+["ES.STOP"]
+prototype = "ES.STOP x"
+short = "Stop pattern playback."
+description = """
+If `x` is non-zero, stop pattern playback, or stop record if currently recording.
+"""
+
+["ES.TRIPLE"]
+prototype = "ES.TRIPLE x"
+short = "Recall triple shape (1-4)"
+description = """
+Recall triple shape (1-4).
+"""
+
+["ES.MAGIC"]
+prototype = "ES.MAGIC x"
+short = "Magic shape (1= halfspeed, 2=doublespeed, 3=linearize)"
+description = """
+Apply one of the magic shapes, (1= halfspeed, 2=doublespeed, 3=linearize). Other shapes are not currently available via II ops.
+"""
+
+["ES.CV"]
+prototype = "ES.CV x "
+short = "get the current CV value for channel `x`"

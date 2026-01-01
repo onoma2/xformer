@@ -1,0 +1,57 @@
+.DS_Store
+*.zip
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+*.d
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Atmel binary artifacts
+*.bin
+*.lss
+*.sym
+*.map
+
+# Debug files
+*.dSYM/
+
+# Python
+__pycache__/
+
+# Build outputs
+/src/match_token.c
+/src/scanner.c
+/simulator/tt
+/module/gitversion.c
+/tests/tests
+/docs/*.pdf
+/docs/*.html
+/docs/cheatsheet/*
+!/docs/cheatsheet/cs-common.tex
+/docs/testServe/

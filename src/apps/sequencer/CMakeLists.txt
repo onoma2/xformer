@@ -149,27 +149,14 @@ set(sources
     ../../../teletype/src/table.c
     ../../../teletype/src/teletype.c
     ../../../teletype/src/turtle.c
-    ../../../teletype/src/ops/ansible.c
     ../../../teletype/src/ops/controlflow.c
-    ../../../teletype/src/ops/crow.c
     ../../../teletype/src/ops/delay.c
-    ../../../teletype/src/ops/disting.c
-    ../../../teletype/src/ops/earthsea.c
-    ../../../teletype/src/ops/er301.c
-    ../../../teletype/src/ops/fader.c
-    ../../../teletype/src/ops/grid_ops.c
     ../../../teletype/src/ops/hardware.c
-    ../../../teletype/src/ops/i2c.c
-    ../../../teletype/src/ops/i2c2midi.c
     ../../../teletype/src/ops/init.c
-    ../../../teletype/src/ops/justfriends.c
     ../../../teletype/src/ops/maths.c
-    ../../../teletype/src/ops/matrixarchate.c
-    ../../../teletype/src/ops/meadowphysics.c
     ../../../teletype/src/ops/metronome.c
     ../../../teletype/src/ops/midi.c
     ../../../teletype/src/ops/op.c
-    ../../../teletype/src/ops/orca.c
     ../../../teletype/src/ops/patterns.c
     ../../../teletype/src/ops/queue.c
     ../../../teletype/src/ops/seed.c
@@ -177,12 +164,6 @@ set(sources
     ../../../teletype/src/ops/telex.c
     ../../../teletype/src/ops/turtle.c
     ../../../teletype/src/ops/variables.c
-    ../../../teletype/src/ops/whitewhale.c
-    ../../../teletype/src/ops/wslash.c
-    ../../../teletype/src/ops/wslash_shared.c
-    ../../../teletype/src/ops/wslashdelay.c
-    ../../../teletype/src/ops/wslashsynth.c
-    ../../../teletype/src/ops/wslashtape.c
     ../../../teletype/libavr32/src/euclidean/data.c
     ../../../teletype/libavr32/src/euclidean/euclidean.c
     ../../../teletype/libavr32/src/music.c

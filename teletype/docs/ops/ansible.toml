@@ -1,0 +1,282 @@
+["ANS.G.LED"]
+prototype = "ANS.G.LED x y"
+short = "get grid LED buffer at position `x`, `y`"
+
+["ANS.G"]
+prototype = "ANS.G x y"
+prototype_set = "ANS.G x y z"
+short = "get/set grid key on/off state (`z`) at position `x`, `y`"
+
+["ANS.G.P"]
+prototype = "ANS.G.P x y"
+short = "simulate grid key press at position (`x`, `y`)"
+
+["ANS.A.LED"]
+prototype = "ANS.A.LED n x"
+short = "read arc LED buffer for ring `n`, LED `x` clockwise from north"
+
+["ANS.A"]
+prototype = "ANS.A"
+prototype_set = "ANS.A n d"
+short = "send arc encoder event for ring `n`, delta `d`"
+
+["ANS.APP"]
+prototype = "ANS.APP"
+prototype_set = "ANS.APP x"
+short = "get/set active app"
+description = """
+Get or change the app that is active on Ansible. Numbering:
+
+ - `0` = levels
+ - `1` = cycles
+ - `2` = kria
+ - `3` = meadowphysics
+ - `4` = midi standard
+ - `5` = midi arp
+ - `6` = teletype expander
+"""
+
+["KR.PRE"]
+prototype = "KR.PRE"
+prototype_set = "KR.PRE x"
+short = "return current preset / load preset `x`"
+
+["KR.PERIOD"]
+prototype = "KR.PERIOD"
+prototype_set = "KR.PERIOD x"
+short = "get/set internal clock period"
+
+["KR.PAT"]
+prototype = "KR.PAT"
+prototype_set = "KR.PAT x"
+short = "get/set current pattern"
+
+["KR.SCALE"]
+prototype = "KR.SCALE"
+prototype_set = "KR.SCALE x"
+short = "get/set current scale"
+
+["KR.POS"]
+prototype = "KR.POS x y"
+prototype_set = "KR.POS x y z"
+short = "get/set position `z` for track `z`, parameter `y`"
+description = """
+Set position to `z` for track `x`, parameter `y`.
+
+A value of `0` for `x` means all tracks.
+
+A value of `0` for `y` means all parameters
+
+Parameters:
+
+ - `0` = all
+ - `1` = trigger
+ - `2` = note
+ - `3` = octave
+ - `4` = length
+"""
+
+["KR.L.ST"]
+prototype = "KR.L.ST x y"
+prototype_set = "KR.L.ST x y z"
+short = "get loop start for track `x`, parameter `y` / set to `z`"
+
+["KR.L.LEN"]
+prototype = "KR.L.LEN x y"
+prototype_set = "KR.L.LEN x y z"
+short = "get length of track `x`, parameter `y` / set to `z`"
+
+["KR.RES"]
+prototype = "KR.RES x y"
+short = "reset position to loop start for track `x`, parameter `y`"
+
+["KR.CV"]
+prototype = "KR.CV x "
+short = "get the current CV value for channel `x`"
+
+["KR.MUTE"]
+prototype = "KR.MUTE x"
+prototype_set = "KR.MUTE x y"
+short = "get/set mute state for channel `x` (`1` = muted, `0` = unmuted)"
+
+["KR.TMUTE"]
+prototype = "KR.TMUTE x"
+short = "toggle mute state for channel `x`"
+
+["KR.CLK"]
+prototype = "KR.CLK x"
+short = "advance the clock for channel `x` (channel must have teletype clocking enabled)"
+
+["KR.PG"]
+prototype = "KR.PG"
+prototype_set = "KR.PG x"
+short = "get/set the active page"
+description = """
+Get or change the current parameter page. Numbering:
+
+ - `0` = trigger
+ - `1` = ratchet
+ - `2` = note
+ - `3` = alt note
+ - `4` = octave
+ - `5` = glide
+ - `6` = duration
+ - `7` = TBD
+ - `8` = scale
+ - `9` = pattern
+"""
+
+["KR.CUE"]
+prototype = "KR.CUE"
+prototype_set = "KR.CUE x"
+short = "get/set the cued pattern"
+description = """
+Get or change the cued pattern. Numbered from 0.
+"""
+
+["KR.DIR"]
+prototype = "KR.DIR"
+prototype_set = "KR.DIR x"
+short = "get/set the step direction"
+description = """
+Get or change the step direction. Numbered from 0.
+"""
+
+["KR.DUR"]
+prototype = "KR.DUR x "
+short = "get the current duration value for channel `x`"
+
+
+["ME.PRE"]
+prototype = "ME.PRE"
+prototype_set = "ME.PRE x"
+short = "return current preset / load preset `x`"
+
+["ME.SCALE"]
+prototype = "ME.SCALE"
+prototype_set = "ME.SCALE x"
+short = "get/set current scale"
+
+["ME.PERIOD"]
+prototype = "ME.PERIOD"
+prototype_set = "ME.PERIOD x"
+short = "get/set internal clock period"
+
+["ME.STOP"]
+prototype = "ME.STOP x"
+short = "stop channel `x` (`0` = all)"
+
+["ME.RES"]
+prototype = "ME.RES x"
+short = "reset channel `x` (`0` = all), also used as \"start\""
+
+["ME.CV"]
+prototype = "ME.CV x"
+short = "get the current CV value for channel `x`"
+
+["LV.PRE"]
+prototype = "LV.PRE"
+prototype_set = "LV.PRE x"
+short = "return current preset / load preset `x`"
+
+["LV.RES"]
+prototype = "LV.RES x"
+short = "reset, `0` for soft reset (on next ext. clock), `1` for hard reset"
+
+["LV.POS"]
+prototype = "LV.POS"
+prototype_set = "LV.POS x"
+short = "get/set current position"
+
+["LV.L.ST"]
+prototype = "LV.L.ST"
+prototype_set = "LV.L.ST x"
+short = "get/set loop start"
+
+["LV.L.LEN"]
+prototype = "LV.L.LEN"
+prototype_set = "LV.L.LEN x"
+short = "get/set loop length"
+
+["LV.L.DIR"]
+prototype = "LV.L.DIR"
+prototype_set = "LV.L.DIR x"
+short = "get/set loop direction"
+
+["LV.CV"]
+prototype = "LV.CV x"
+short = "get the current CV value for channel `x`"
+
+["CY.PRE"]
+prototype = "CY.PRE"
+prototype_set = "CY.PRE x"
+short = "return current preset / load preset `x`"
+
+["CY.RES"]
+prototype = "CY.RES x"
+short = "reset channel `x` (`0` = all)"
+
+["CY.POS"]
+prototype = "CY.POS x"
+prototype_set = "CY.POS x y"
+short = "get / set position of channel `x` (`x = 0` to set all), position between `0-255`"
+
+["CY.REV"]
+prototype = "CY.REV x"
+short = "reverse channel `x` (`0` = all)"
+
+["CY.CV"]
+prototype = "CY.CV x"
+short = "get the current CV value for channel `x`"
+
+["MID.SLEW"]
+prototype = "MID.SLEW t"
+short = "set pitch slew time in ms (applies to all allocation styles except FIXED)"
+
+["MID.SHIFT"]
+prototype = "MID.SHIFT o"
+short = "shift pitch CV by standard Teletype pitch value (e.g. `N 6`, `V -1`, etc)"
+
+["ARP.HLD"]
+prototype = "ARP.HLD h"
+short = "`0` disables key hold mode, other values enable"
+
+["ARP.STY"]
+prototype = "ARP.STY y"
+short = "set base arp style [0-7]"
+
+["ARP.GT"]
+prototype = "ARP.GT v g"
+short = "set voice gate length [0-127], scaled/synced to course divisions of voice clock"
+
+["ARP.SLEW"]
+prototype = "ARP.SLEW v t"
+short = "set voice slew time in ms"
+
+["ARP.RPT"]
+prototype = "ARP.RPT v n s"
+short = "set voice pattern repeat, `n` times [0-8], shifted by `s` semitones [-24, 24]"
+
+["ARP.DIV"]
+prototype = "ARP.DIV v d"
+short = "set voice clock divisor (euclidean length), range [1-32]"
+
+["ARP.FIL"]
+prototype = "ARP.FIL v f"
+short = "set voice euclidean fill, use 1 for straight clock division, range [1-32]"
+
+["ARP.ROT"]
+prototype = "ARP.ROT v r"
+short = "set voice euclidean rotation, range [-32, 32]"
+
+["ARP.ER"]
+prototype = "ARP.ER v f d r"
+short = "set all euclidean rhythm"
+
+["ARP.RES"]
+prototype = "ARP.RES v"
+short = "reset voice clock/pattern on next base clock tick"
+
+["ARP.SHIFT"]
+prototype = "ARP.SHIFT v o"
+short = "shift voice cv by standard tt pitch value (e.g. N 6, V -1, etc)"

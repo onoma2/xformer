@@ -1,0 +1,67 @@
+["MA.SELECT"]
+prototype = "MA.SELECT x"
+short = "select the default matrixarchate module, default `1`"
+
+["MA.STEP"]
+prototype = "MA.STEP"
+short = "advance program sequencer"
+
+["MA.RESET"]
+prototype = "MA.RESET"
+short = "reset program sequencer"
+
+["MA.PGM"]
+prototype = "MA.PGM pgm"
+short = "select the current program (1-based)"
+
+["MA.ON"]
+prototype = "MA.ON x y"
+short = "connect row `x` and column `y` in the current program (rows/columns are 0-based)"
+
+["MA.PON"]
+prototype = "MA.PON pgm x y"
+short = "connect row `x` and column `y` in program `pgm`"
+
+["MA.OFF"]
+prototype = "MA.OFF x y"
+short = "disconnect row `x` and column `y` in the current program"
+
+["MA.POFF"]
+prototype = "MA.POFF x y pgm"
+short = "connect row `x` and column `y` in program `pgm`"
+
+["MA.SET"]
+prototype = "MA.SET x y state"
+short = "set the connection at row `x` and column `y` to `state` (1 - on, 0 - off)"
+
+["MA.PSET"]
+prototype = "MA.PSET pgm x y state"
+short = "set the connection at row `x` and column `y` in program `pgm` to `state` (1 - on, 0 - off)"
+
+["MA.COL"]
+prototype = "MA.COL col"
+prototype_set = "MA.COL col value"
+short = "get or set column `col` (as a 16 bit unsigned value where each bit represents a connection)"
+
+["MA.PCOL"]
+prototype = "MA.PCOL pgm col"
+prototype_set = "MA.PCOL pgm col value"
+short = "get or set column `col` in program `pgm`"
+
+["MA.ROW"]
+prototype = "MA.ROW row"
+prototype_set = "MA.ROW row value"
+short = "get or set row `row`"
+
+["MA.PROW"]
+prototype = "MA.PROW pgm row"
+prototype_set = "MA.PROW pgm row value"
+short = "get or set row `row` in program `pgm`"
+
+["MA.CLR"]
+prototype = "MA.CLR"
+short = "clear all connections"
+
+["MA.PCLR"]
+prototype = "MA.PCLR pgm"
+short = "clear all connections in program `pgm`"

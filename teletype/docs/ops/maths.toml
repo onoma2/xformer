@@ -1,0 +1,243 @@
+[ADD]
+prototype = "ADD x y"
+aliases = ["+"]
+short = "add `x` and `y` together"
+
+[SUB]
+prototype = "SUB x y"
+aliases = ["-"]
+short = "subtract `y` from `x`"
+
+[MUL]
+prototype = "MUL x y"
+aliases = ["*"]
+short = "multiply `x` and `y` together"
+description = "returns `x` times `y`, bounded to integer limits"
+
+[DIV]
+prototype = "DIV x y"
+aliases = ["/"]
+short = "divide `x` by `y`"
+
+[MOD]
+prototype = "MOD x y"
+aliases = ["%"]
+short = "find the remainder after division of `x` by `y`"
+
+["?"]
+prototype = "? x y z"
+short = "if condition `x` is true return `y`, otherwise return `z`"
+
+[MIN]
+prototype = "MIN x y"
+short = "return the minimum of `x` and `y`"
+
+[MAX]
+prototype = "MAX x y"
+short = "return the maximum of `x` and `y`"
+
+[LIM]
+prototype = "LIM x y z"
+short = "limit the value `x` to the range `y` to `z` inclusive"
+
+[WRAP]
+prototype = "WRAP x y z"
+aliases = ["WRP"]
+short = "limit the value `x` to the range `y` to `z` inclusive, but with wrapping"
+
+[QT]
+prototype = "QT x y"
+short = "round `x` to the closest multiple of `y` (quantise)"
+description = """
+Round `x` to the closest multiple of `y`.
+*See also: `QT.S`, `QT.CS`, `QT.B`, `QT.BX` in the Pitch section*.
+"""
+
+[AVG]
+prototype = "AVG x y"
+short = "the average of `x` and `y`"
+
+[EQ]
+prototype = "EQ x y"
+aliases = ["=="]
+short = "does `x` equal `y`"
+
+[NE]
+prototype = "NE x y"
+aliases = ["!=", "XOR"]
+short = "`x` is not equal to `y`"
+
+[LT]
+prototype = "LT x y"
+aliases = ["<"]
+short = "`x` is less than `y`"
+
+[GT]
+prototype = "GT x y"
+aliases = [">"]
+short = "`x` is greater than `y`"
+
+[LTE]
+prototype = "LTE x y"
+aliases = ["<="]
+short  = "`x` is less than or equal to `y`"
+
+[GTE]
+prototype = "GTE x y"
+aliases = [">="]
+short = "`x` is greater than or equal to `y`"
+
+[INR]
+prototype = "INR l x h"
+aliases = ["><"]
+short = "`x` is greater than `l` and less than `h` (within range)"
+
+[OUTR]
+prototype = "OUTR l x h"
+aliases = ["<>"]
+short = "`x` is less than `l` or greater than `h` (out of range)"
+
+[INRI]
+prototype = "INRI l x h"
+aliases = [">=<"]
+short = "`x` is greater than or equal to `l` and less than or equal to `h` (within range, inclusive)"
+
+[OUTRI]
+prototype = "OUTRI l x h"
+aliases = ["<=>"]
+short = "`x` is less than or equal to `l` or greater than or equal to `h` (out of range, inclusive)"
+
+[EZ]
+prototype = "EZ x"
+aliases = ["!"]
+short  = "`x` is `0`, equivalent to logical NOT"
+
+[NZ]
+prototype = "NZ x"
+short = "`x` is not `0`"
+
+[LSH]
+prototype = "LSH x y"
+aliases = ["<<"]
+short = "left shift `x` by `y` bits, in effect multiply `x` by `2` to the power of `y`"
+
+[RSH]
+prototype = "RSH x y"
+aliases = [">>"]
+short = "right shift `x` by `y` bits, in effect divide `x` by `2` to the power of `y`"
+
+[LROT]
+prototype = "LROT x y"
+aliases = ["<<<"]
+short = "circular left shift `x` by `y` bits, wrapping around when bits fall off the end"
+
+[RROT]
+prototype = "RROT x y"
+aliases = [">>>"]
+short = "circular right shift `x` by `y` bits, wrapping around when bits fall off the end"
+
+["|"]
+prototype = "| x y"
+short = "bitwise or `x` | `y`"
+
+["&"]
+prototype = "& x y"
+short = "bitwise and `x` & `y`"
+
+["^"]
+prototype = "^ x y"
+short = "bitwise xor `x` ^ `y`"
+
+["~"]
+prototype = "~ x"
+short = "bitwise not, i.e.: inversion of `x`"
+
+[BSET]
+prototype = "BSET x y"
+short = "set bit `y` in value `x`"
+
+[BGET]
+prototype = "BGET x y"
+short = "get bit `y` in value `x`"
+
+[BCLR]
+prototype = "BCLR x y"
+short = "clear bit `y` in value `x`"
+
+[BTOG]
+prototype = "BTOG x y"
+short = "toggle bit `y` in value `x`"
+
+[BREV]
+prototype = "BREV x"
+short = "reverse bit order in value `x`"
+
+[ABS]
+prototype = "ABS x"
+short = "absolute value of `x`"
+
+[AND]
+prototype = "AND x y"
+aliases = ["&&"]
+short = "logical AND of `x` and `y`"
+description = """
+Logical AND of `x` and `y`. Returns `1` if both `x` and `y` are greater than `0`, otherwise it returns `0`.
+"""
+
+[AND3]
+prototype = "AND3 x y z"
+aliases = ["&&&"]
+short = "logical AND of `x`, `y` and `z`"
+description = """
+Logical AND of `x`, `y` and `z`. Returns `1` if both `x`, `y` and `z` are greater than `0`, otherwise it returns `0`.
+"""
+
+[AND4]
+prototype = "AND4 x y z a"
+aliases = ["&&&&"]
+short = "logical AND of `x`, `y`, `z` and `a`"
+description = """
+Logical AND of `x`, `y`, `z` and `a`. Returns `1` if both `x`, `y`, `z` and `a` are greater than `0`, otherwise it returns `0`.
+"""
+
+[OR]
+prototype = "OR x y"
+aliases = ["||"]
+short = "logical OR of `x` and `y`"
+description = """
+Logical OR of `x` and `y`. Returns `1` if either `x` or `y` are greater than `0`, otherwise it returns `0`.
+"""
+
+[OR3]
+prototype = "OR3 x y z"
+aliases = ["|||"]
+short = "logical OR of `x`, `y` and `z`"
+description = """
+Logical OR of `x`, `y` and `z`. Returns `1` if either `x`, `y` or `z` are greater than `0`, otherwise it returns `0`.
+"""
+
+[OR4]
+prototype = "OR4 x y z a"
+aliases = ["||||"]
+short = "logical OR of `x`, `y`, `z` and `a`"
+description = """
+Logical OR of `x`, `y`, `z` and `a`. Returns `1` if either `x`, `y`, `z` or `a` are greater than `0`, otherwise it returns `0`.
+"""
+
+[SCALE]
+prototype = "SCALE a b x y i"
+aliases = ["SCL"]
+short = "scale `i` from range `a` to `b` to range `x` to `y`, i.e. `i * (y - x) / (b - a)`"
+
+[SCALE0]
+prototype = "SCALE a b i"
+aliases = ["SCL0"]
+short = "scale `i` from range `0` to `a` to range `0` to `b`"
+
+[EXP]
+prototype = "EXP x"
+short = "exponentiation table lookup. `0-16383` range (V `0-10`)"
+
+[SGN]
+prototype = "SGN x"
+short = "sign function: 1 for positive, -1 for negative, 0 for 0"
