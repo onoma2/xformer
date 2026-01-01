@@ -4,11 +4,11 @@ void TeletypeTrack::clear() {
     ss_init(&_state);
 
     // Default I/O mapping
-    // TI-TR1-4 → Gate outputs 5-8 (read back)
-    _triggerInputSource[0] = TriggerInputSource::GateOut5;
-    _triggerInputSource[1] = TriggerInputSource::GateOut6;
-    _triggerInputSource[2] = TriggerInputSource::GateOut7;
-    _triggerInputSource[3] = TriggerInputSource::GateOut8;
+    // TI-TR1-4 → None (avoid cross-triggering by default)
+    _triggerInputSource[0] = TriggerInputSource::None;
+    _triggerInputSource[1] = TriggerInputSource::None;
+    _triggerInputSource[2] = TriggerInputSource::None;
+    _triggerInputSource[3] = TriggerInputSource::None;
 
     // TI-IN → CV input 1, TI-PARAM → CV input 2
     _cvInSource = CvInputSource::CvIn1;

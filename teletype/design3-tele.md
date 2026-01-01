@@ -126,7 +126,7 @@
     - **TO-TRA-D** (trigger outputs): configurable destinations (GateOut1-8)
     - **TO-CV1-4** (CV outputs): configurable destinations (CvOut1-8)
   - Default mapping:
-    - TI-TR1-4 → GateOut5-8 (read back)
+    - TI-TR1-4 → None (avoid cross-triggering by default)
     - TI-IN → CvIn1, TI-PARAM → CvIn2
     - TO-TRA-D → GateOut1-4
     - TO-CV1-4 → CvOut1-4
@@ -152,7 +152,7 @@
   - CV1–CV4 -> configurable CV outputs (default: CvOut1-4).
   - IN -> configurable CV input (default: CvIn1).
   - PARAM -> configurable CV input (default: CvIn2).
-  - Trigger inputs 1–4 -> configurable sources (default: GateOut5-8 read back).
+  - Trigger inputs 1–4 -> configurable sources (default: None).
   - Manual: Step1 triggers current script, Step2 selects next script (wraps 1–4).
 - Layout note: Performer only reads as many outputs from a track as are routed in Layout.
   - If only Gate1/CV1 are assigned to the Teletype track, you will only hear TR1/CV1.
