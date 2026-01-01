@@ -22,8 +22,18 @@ public:
     virtual void update(float dt) override;
 
     virtual bool activity() const override { return _activity; }
-    virtual bool gateOutput(int index) const override { return _gateOutput[index % GateCount]; }
-    virtual float cvOutput(int index) const override { return _cvOutput[index % CvCount]; }
+    virtual bool gateOutput(int index) const override {
+        if (index < 0 || index >= GateCount) {
+            return false;
+        }
+        return _gateOutput[index];
+    }
+    virtual float cvOutput(int index) const override {
+        if (index < 0 || index >= CvCount) {
+            return 0.f;
+        }
+        return _cvOutput[index];
+    }
 
     void handleTr(uint8_t index, int16_t value);
     void beginPulse(uint8_t index, int16_t timeMs);
@@ -34,6 +44,11 @@ public:
     void setCvSlew(uint8_t index, int16_t value);
     void setCvOffset(uint8_t index, int16_t value);
     uint16_t cvRaw(uint8_t index) const;
+    void updateAdc(bool force);
+    bool inputState(uint8_t index) const;
+    void triggerManualScript();
+    void selectNextManualScript();
+    uint8_t manualScriptIndex() const { return _manualScriptIndex; }
     void syncMetroFromState();
     void resetMetroTimer();
 
@@ -43,8 +58,12 @@ private:
     void advanceTime(float dt);
     void runMetro(float dt);
     void updatePulses(float dt);
+    void updateInputTriggers();
     void refreshActivity(float dt);
     float rawToVolts(int16_t value) const;
+    int16_t voltsToRaw(float volts) const;
+    void installTestScripts();
+    void runScript(int scriptIndex);
 
     TeletypeTrack &_teletypeTrack;
 
@@ -61,4 +80,7 @@ private:
     std::array<int16_t, CvCount> _cvRaw{};
     std::array<int16_t, CvCount> _cvOffset{};
     std::array<float, GateCount> _pulseRemainingMs{};
+    std::array<bool, GateCount> _inputState{};
+    std::array<bool, GateCount> _prevInputState{};
+    uint8_t _manualScriptIndex = 0;
 };

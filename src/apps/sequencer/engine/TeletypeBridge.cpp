@@ -102,7 +102,9 @@ void tele_cv_cal(uint8_t n, int32_t b, int32_t m) {
 }
 
 void tele_update_adc(uint8_t force) {
-    (void)force;
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->updateAdc(force != 0);
+    }
 }
 
 void tele_has_delays(bool has_delays) {
@@ -147,7 +149,9 @@ void tele_kill(void) {}
 void tele_mute(void) {}
 
 bool tele_get_input_state(uint8_t i) {
-    (void)i;
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->inputState(i);
+    }
     return false;
 }
 

@@ -44,6 +44,8 @@
 ### Stage 0 - Baseline + memory reality
 - [ ] Measure current RAM headroom (heap + stack high-water) and record numbers.
   - Note: SYSTEM → INFO now shows SRAM/CCM usage/free (data/bss); stack high-water requires `INCLUDE_uxTaskGetStackHighWaterMark=1` (enabled in `src/platform/stm32/FreeRTOSConfig.h`).
+  - Hardware measurement (Teletype track in project): SRAM 118312/131072 (free 12760), CCM 55412/65536 (free 10124), DATA 8064, BSS 110248, CCM BSS 55412.
+  - Interpretation: SRAM and CCM both have ~10–13 KB free headroom; workable but tight, so additional large static buffers or stack growth are risky.
 - [x] Measure `sizeof(scene_state_t)` with grid enabled and with grid removed.
   - Host `sizeof` (libavr32 headers): `scene_state_t` 28976 bytes, `scene_state_no_grid_t` 24008 bytes, `scene_grid_t` 4970 bytes (~4.9 KB delta).
   - Breakdown (key contributors): `scene_delay_t` 9284 bytes (64 queued delayed commands + timing/origin metadata), `scene_script_t` 860 bytes each × 12 scripts = 10320 bytes (6 command slots + EVERY state + last_time per script), `scene_grid_t` 4970 bytes (grid LED + group/button/fader/xypad state).
@@ -100,19 +102,38 @@
 - [x] Build Teletype VM into a new track mode with a stub IO bridge.
   - Implemented `TeletypeTrack` + `TeletypeTrackEngine` + `TeletypeBridge` and wired into engine/track containers.
 - [x] Run a hardcoded script on track init and verify no crash.
-  - Boot script runs `TR.PULSE 1` (track 8 gate in sim when track 8 is Teletype).
+  - Boot script runs `CV 1 N + 24 * 12 FLIP ; TR.PULSE 1` on script 0 + METRO (repeating).
+  - Pruned non-core ops (I2C/WW/MP/ES/ANS/etc.) and regenerated `op_enum.h` + `match_token.c` (Telex kept).
 - [x] Integrate `tele_tick` with dt-accumulator timing.
   - Engine accumulates ms and calls `tele_tick` in 1–255 ms chunks.
 - [ ] Verify Engine task stack usage remains safe.
+  - Pending hardware TaskProfiler dump; no USART capture available yet.
 - [x] Decision: keep dt-accumulator or emulate fixed 10ms tick.
   - Keep dt-accumulator for now; revisit if metro jitter shows up.
   - Added simple metro runner: METRO script runs every `M` ms with `M.ACT=1`.
 
 ### Stage 2 - Minimal IO mapping
-- [ ] Map Teletype CV1-4 to track CV outputs.
-- [ ] Map Teletype TR1-4 to track Gate outputs.
-- [ ] Provide fixed IN/PARAM sources (single route source each).
-- [ ] Validate script-triggered TR pulses and CV updates.
+- [x] Map Teletype CV1-4 to track CV outputs.
+- [x] Map Teletype TR1-4 to track Gate outputs.
+- [x] Provide fixed IN/PARAM sources (single route source each).
+  - IN = CV input 1, PARAM = CV input 2 (scaled -5..+5 -> 0..16383).
+- [x] Validate script-triggered TR pulses and CV updates.
+  - Manual Step1 trigger + IN1–IN4 gate inputs run scripts 1–4; all scripts map to CV1/TR1 for audible confirmation.
+- Current I/O mapping summary:
+  - TR1–TR4 -> track gate outputs 1–4.
+  - CV1–CV4 -> track CV outputs 1–4 (per-track output index 0–3).
+  - To use physical CV outputs 5–8, assign those outputs to the Teletype track in the layout/routing.
+  - IN -> CV input 1, PARAM -> CV input 2.
+  - Trigger inputs 1–4 read physical gate outputs 5–8.
+  - Manual: Step1 triggers current script, Step2 selects next script (wraps 1–4).
+- Teletype manual conventions in this build:
+  - Use numeric TR indices (1–4) instead of lettered outputs (A–D).
+  - Examples: `TR 1 1`, `TR 1`, `TR.TOG 2`, `TR.PULSE 1`, `TR.TIME 1 200`.
+- Initial test scripts (slots 1–4) behavior:
+  - Script 1: `EVERY 2` flips A and routes CV/TR between 1 and 2 at C1.
+  - Script 2: `EVERY 3` flips B and routes CV/TR between 3 and 4 at C2.
+  - Script 3: `EVERY 4` flips C and routes CV/TR between 1 and 2 at C3, then delayed C4 (100 ms).
+  - Script 4: `EVERY 5` flips D and routes CV/TR between 3 and 4 at C4, then delayed C5 (200 ms).
 - [ ] Decision: output expansion model (mapping table vs TELEX vs banks vs CV/TR 1-20).
 
 ### Stage 3 - Metro + timing policy

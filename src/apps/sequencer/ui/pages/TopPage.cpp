@@ -3,10 +3,14 @@
 #include "Pages.h"
 #include "ui/PageKeyMap.h"
 
+#include "engine/TeletypeTrackEngine.h"
+
 #include "ui/model/NoteSequenceListModel.h"
 #include "ui/model/CurveSequenceListModel.h"
 
 #include "ui/LedPainter.h"
+
+#include <cstdio>
 
 TopPage::TopPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
@@ -100,6 +104,25 @@ void TopPage::keyUp(KeyEvent &event) {
 void TopPage::keyPress(KeyPressEvent &event) {
     auto &pages = _manager.pages();
     const auto &key = event.key();
+
+    if (!key.pageModifier() && key.isStep() &&
+        _project.selectedTrack().trackMode() == Track::TrackMode::Teletype) {
+        auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+        if (key.step() == 1) {
+            trackEngine.triggerManualScript();
+            event.consume();
+            return;
+        }
+        if (key.step() == 2) {
+            trackEngine.selectNextManualScript();
+            char message[32] = {};
+            std::snprintf(message, sizeof(message), "TT script %u",
+                          static_cast<unsigned>(trackEngine.manualScriptIndex() + 1));
+            showMessage(message);
+            event.consume();
+            return;
+        }
+    }
 
     if (key.pageModifier() && key.code() == PageKeyMap::Monitor) {
         if (_mode == Mode::Monitor && _manager.top() == &pages.monitor) {

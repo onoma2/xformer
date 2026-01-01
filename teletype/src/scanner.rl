@@ -15,7 +15,7 @@ const size_t kMaxTokenLength = 32;
     write data;      # write any ragel data here
 }%%
 
-error_t scanner(const char *data, tele_command_t *out,
+tele_error_t scanner(const char *data, tele_command_t *out,
                 char error_msg[TELE_ERROR_MSG_LENGTH]) {
     const size_t len = strlen(data);
 

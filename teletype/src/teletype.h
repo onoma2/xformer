@@ -25,7 +25,7 @@ typedef enum {
     E_NOT_LEFT,
     E_NEED_SPACE_PRE_SEP,
     E_NEED_SPACE_SUB_SEP
-} error_t;
+} tele_error_t;
 
 typedef struct {
     bool has_value;
@@ -33,9 +33,9 @@ typedef struct {
 } process_result_t;
 
 
-error_t parse(const char *cmd, tele_command_t *out,
+tele_error_t parse(const char *cmd, tele_command_t *out,
               char error_msg[TELE_ERROR_MSG_LENGTH]);
-error_t validate(const tele_command_t *c,
+tele_error_t validate(const tele_command_t *c,
                  char error_msg[TELE_ERROR_MSG_LENGTH]);
 process_result_t run_script(scene_state_t *ss, size_t script_no);
 process_result_t run_script_with_exec_state(scene_state_t *ss, exec_state_t *es,
@@ -56,6 +56,6 @@ void clear_delays(scene_state_t *ss);
 
 void tele_tr_pulse_end(scene_state_t *ss, uint8_t i);
 
-const char *tele_error(error_t);
+const char *tele_error(tele_error_t);
 
 #endif

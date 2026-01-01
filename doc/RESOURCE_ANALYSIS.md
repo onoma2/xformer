@@ -118,6 +118,14 @@ Code references:
 
 ## Resource Usage Health Assessment
 
+### Latest Hardware Snapshot (Teletype Track)
+- SRAM: 118,312 / 131,072 (free 12,760)
+- CCM: 55,412 / 65,536 (free 10,124)
+- DATA: 8,064
+- BSS: 110,248
+- CCM BSS: 55,412
+- Interpretation: both SRAM and CCM have ~10–13 KB free headroom; usable but tight, so any new large static buffers or stack growth will be high risk.
+
 ### Memory Usage Analysis (New Data Based on Current Analysis)
 
 **Current Memory Distribution:**

@@ -239,7 +239,7 @@ void deserialize_scene(tt_deserializer_t* stream, scene_state_t* scene,
                 if (p && l < SCRIPT_MAX_COMMANDS) {
                     tele_command_t temp;
                     temp.comment = false;
-                    error_t status;
+                    tele_error_t status;
                     char error_msg[TELE_ERROR_MSG_LENGTH];
                     status = parse(input, &temp, error_msg);
 

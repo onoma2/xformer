@@ -37,7 +37,7 @@ void clear_delays(scene_state_t *ss) {
 /////////////////////////////////////////////////////////////////
 // PARSE ////////////////////////////////////////////////////////
 
-error_t parse(const char *cmd, tele_command_t *out,
+tele_error_t parse(const char *cmd, tele_command_t *out,
               char error_msg[TELE_ERROR_MSG_LENGTH]) {
     // call the Ragel generated scanner function
     return scanner(cmd, out, error_msg);
@@ -46,7 +46,7 @@ error_t parse(const char *cmd, tele_command_t *out,
 /////////////////////////////////////////////////////////////////
 // VALIDATE /////////////////////////////////////////////////////
 
-error_t validate(const tele_command_t *c,
+tele_error_t validate(const tele_command_t *c,
                  char error_msg[TELE_ERROR_MSG_LENGTH]) {
     error_msg[0] = 0;
     int16_t stack_depth = 0;
@@ -90,7 +90,7 @@ error_t validate(const tele_command_t *c,
             if (first_cmd && op->set != NULL) stack_depth--;
         }
         else if (word_type == MOD) {
-            error_t mod_error = E_OK;
+            tele_error_t mod_error = E_OK;
 
             if (idx != 0)
                 mod_error = E_NO_MOD_HERE;
@@ -399,7 +399,7 @@ void tele_tr_pulse_end(scene_state_t *ss, uint8_t i) {
 /////////////////////////////////////////////////////////////////
 // ERROR MESSAGES ///////////////////////////////////////////////
 
-const char *tele_error(error_t e) {
+const char *tele_error(tele_error_t e) {
     const char *error_string[] = { "OK",
                                    "UNKNOWN WORD",
                                    "COMMAND TOO LONG",
