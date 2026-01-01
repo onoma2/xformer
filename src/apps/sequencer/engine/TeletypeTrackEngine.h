@@ -68,6 +68,7 @@ private:
     void refreshActivity(float dt);
     float rawToVolts(int16_t value) const;
     int16_t voltsToRaw(float volts) const;
+    static float midiNoteToVolts(int note);
     void installPresetScripts();
     bool applyPresetLine(scene_state_t &state, int scriptIndex, size_t lineIndex, const char *cmd);
     void runScript(int scriptIndex);
@@ -89,5 +90,11 @@ private:
     std::array<float, TriggerOutputCount> _teletypePulseRemainingMs{};
     std::array<bool, TriggerInputCount> _teletypeInputState{};
     std::array<bool, TriggerInputCount> _teletypePrevInputState{};
+
+    // CV slew state
+    std::array<float, CvOutputCount> _cvOutputTarget{};
+    std::array<int16_t, CvOutputCount> _cvSlewTime{};
+    std::array<bool, CvOutputCount> _cvSlewActive{};
+
     uint8_t _manualScriptIndex = 0;
 };

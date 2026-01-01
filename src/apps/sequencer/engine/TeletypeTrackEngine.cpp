@@ -3,6 +3,7 @@
 #include "TeletypeBridge.h"
 
 #include "Engine.h"
+#include "Slide.h"
 
 #include "core/Debug.h"
 #include "core/math/Math.h"
@@ -26,39 +27,47 @@ struct PresetScript {
 };
 
 constexpr PresetScript kPresetScripts[kPresetScriptCount] = {
-    { "Test 1", { "TR.PULSE 1 ; CV 1 N 24", nullptr, nullptr }, 1 },
-    { "Test 2", { "TR.PULSE 2 ; CV 2 N 36", nullptr, nullptr }, 1 },
-    { "Test 3", { "TR.PULSE 3 ; CV 3 N 48", nullptr, nullptr }, 1 },
+    { "Test 1",
+      { "EVERY 2: CV.SLEW 1 200",
+        "CV 1 N 42 ; TR.PULSE 1",
+        nullptr },
+      2 },
+    { "Test 2",
+      { "CV.SLEW 2 RAND 2000",
+        "CV 2 N 48 ; TR.PULSE 2",
+        nullptr },
+      2 },
+    { "Test 3", { "TR.PULSE 3 ; CV 3 N 54", nullptr, nullptr }, 1 },
     { "Test 4", { "TR.PULSE 4 ; CV 4 N 60", nullptr, nullptr }, 1 },
     { "Avg Clamp",
-      { "CV 1 MAX MIN AVG IN PARAM 16383 0",
-        "TR.PULSE 1",
+      { "X LIM SUB AVG IN PARAM 8000 -1500 1500",
+        "CV 1 ADD 8000 X ; TR.PULSE 1",
         nullptr },
       2 },
     { "Param QT",
-      { "CV 2 QT PARAM 1024",
-        "TR.PULSE 2",
+      { "X LIM SUB QT PARAM 1024 8000 -1500 1500",
+        "CV 2 ADD 8000 X ; TR.PULSE 2",
         nullptr },
       2 },
     { "Shift Wrap",
-      { "CV 3 WRAP LSH IN 1 0 16383",
-        "TR.PULSE 3",
+      { "X LIM SUB WRAP LSH IN 1 0 16383 8000 -1500 1500",
+        "CV 3 ADD 8000 X ; TR.PULSE 3",
         nullptr },
       2 },
     { "Rsh Mix",
-      { "CV 4 DIV ADD RSH IN 1 PARAM 2",
-        "TR.PULSE 4",
+      { "X LIM SUB DIV ADD RSH IN 1 PARAM 2 8000 -1500 1500",
+        "CV 4 ADD 8000 X ; TR.PULSE 4",
         nullptr },
       2 },
     { "Time Mod",
       { "TIME.ACT 1",
-        "CV 1 MOD TIME 16384",
-        "TR.PULSE 1" },
+        "X LIM SUB MOD TIME 16384 8000 -1500 1500",
+        "CV 1 ADD 8000 X ; TR.PULSE 1" },
       3 },
     { "Rand/Drunk",
       { "X RAND 16383 ; Y RRAND 0 16383",
         "DRUNK 64",
-        "CV 2 LIM MUL SUB X PARAM 2 0 16383 ; TR.PULSE ADD 2 TOSS" },
+        "Z LIM SUB LIM MUL SUB X PARAM 2 0 16383 8000 -1500 1500 ; CV 2 ADD 8000 Z ; TR.PULSE ADD 2 TOSS" },
       3 },
 };
 } // namespace
@@ -86,6 +95,9 @@ void TeletypeTrackEngine::reset() {
     _teletypePulseRemainingMs.fill(0.f);
     _teletypeInputState.fill(false);
     _teletypePrevInputState.fill(false);
+    _cvOutputTarget.fill(0.f);
+    _cvSlewTime.fill(1);  // Match Teletype default: 1ms
+    _cvSlewActive.fill(false);
     _manualScriptIndex = 0;
     installBootScript();
     syncMetroFromState();
@@ -108,6 +120,39 @@ void TeletypeTrackEngine::update(float dt) {
     if (dt <= 0.f) {
         return;
     }
+
+    // Apply CV slew using Performer's Slide mechanism
+    for (uint8_t i = 0; i < CvOutputCount; ++i) {
+        if (!_cvSlewActive[i] || _cvSlewTime[i] <= 0) {
+            continue;
+        }
+
+        auto dest = _teletypeTrack.cvOutputDest(i);
+        int destIndex = int(dest);
+
+        if (destIndex < 0 || destIndex >= PerformerCvCount) {
+            continue;
+        }
+
+        // Convert Teletype slew time (1-32767 ms) to Performer slide time (1-100)
+        // Teletype uses LINEAR interpolation over time T milliseconds
+        // Performer uses EXPONENTIAL smoothing: tau = (slideTime/100)^2 * 2
+        // For exponential to reach ~99% in time T: slideTime ≈ sqrt(T)
+        // Examples: 100ms→10, 1000ms→31.6, 10000ms→100
+        int slideTime = clamp(static_cast<int>(std::sqrt(_cvSlewTime[i])), 1, 100);
+
+        // Apply slew using Performer's existing mechanism
+        float current = _performerCvOutput[destIndex];
+        float slewed = Slide::applySlide(current, _cvOutputTarget[i], slideTime, dt);
+        _performerCvOutput[destIndex] = slewed;
+
+        // Check if we've reached target (within small epsilon)
+        if (std::abs(slewed - _cvOutputTarget[i]) < 0.001f) {
+            _performerCvOutput[destIndex] = _cvOutputTarget[i];
+            _cvSlewActive[i] = false;
+        }
+    }
+
     TeletypeBridge::ScopedEngine scope(*this);
     advanceTime(dt);
     updateInputTriggers();
@@ -161,10 +206,15 @@ void TeletypeTrackEngine::setPulseTime(uint8_t index, int16_t timeMs) {
 }
 
 void TeletypeTrackEngine::handleCv(uint8_t index, int16_t value, bool slew) {
-    (void)slew;
     if (index >= CvOutputCount) {
         return;
     }
+
+    // Calculate target voltage
+    int32_t rawValue = value + _teletypeCvOffset[index];
+    int16_t raw = static_cast<int16_t>(clamp<int32_t>(rawValue, 0, 16383));
+    _teletypeCvRaw[index] = raw;
+    float targetVoltage = rawToVolts(raw);
 
     // Map TO-CV1-4 to actual CV output
     auto dest = _teletypeTrack.cvOutputDest(index);
@@ -174,17 +224,27 @@ void TeletypeTrackEngine::handleCv(uint8_t index, int16_t value, bool slew) {
         return;
     }
 
-    int32_t rawValue = value + _teletypeCvOffset[index];
-    int16_t raw = static_cast<int16_t>(clamp<int32_t>(rawValue, 0, 16383));
-    _teletypeCvRaw[index] = raw;
-    _performerCvOutput[destIndex] = rawToVolts(raw);
+    if (slew && _cvSlewTime[index] > 0) {
+        // Slew to new value
+        _cvOutputTarget[index] = targetVoltage;
+        _cvSlewActive[index] = true;
+    } else {
+        // Snap immediately
+        _cvOutputTarget[index] = targetVoltage;
+        _performerCvOutput[destIndex] = targetVoltage;
+        _cvSlewActive[index] = false;
+    }
+
     _activity = true;
     _activityCountdownMs = kActivityHoldMs;
 }
 
 void TeletypeTrackEngine::setCvSlew(uint8_t index, int16_t value) {
-    (void)index;
-    (void)value;
+    if (index >= CvOutputCount) {
+        return;
+    }
+    // Teletype CV.SLEW range is 1-32767 ms
+    _cvSlewTime[index] = clamp<int16_t>(value, 1, 32767);
 }
 
 void TeletypeTrackEngine::setCvOffset(uint8_t index, int16_t value) {
@@ -404,6 +464,14 @@ int16_t TeletypeTrackEngine::voltsToRaw(float volts) const {
     float norm = (clamped + 5.f) / 10.f;
     int32_t raw = static_cast<int32_t>(std::lround(norm * 16383.f));
     return static_cast<int16_t>(clamp<int32_t>(raw, 0, 16383));
+}
+
+float TeletypeTrackEngine::midiNoteToVolts(int note) {
+    // Simple 1V/octave chromatic conversion
+    // MIDI note 60 = middle C = 5V
+    // Each semitone = 1/12V (83.33mV)
+    // Range: approximately -10.58V (note -127) to +10.58V (note 127)
+    return note / 12.0f;
 }
 
 void TeletypeTrackEngine::installPresetScripts() {

@@ -8,7 +8,7 @@ These operations explicitly call external functions defined in `teletype_io.h`. 
 
 *   **CV Output (`CV.*`, `V`, `VV`)**
     *   **Calls:** `tele_cv`, `tele_cv_slew`, `tele_get_cv`, `tele_cv_off`.
-    *   **Status:** Wrapped, but `CV.SLEW` implementation in `TeletypeTrackEngine` is currently empty.
+    *   **Status:** Wrapped. `CV.SLEW` is implemented in `TeletypeTrackEngine` (slew target + Slide smoothing).
 *   **Gate/Trigger (`TR.*`)**
     *   **Calls:** `tele_tr`, `tele_tr_pulse`, `tele_tr_pulse_clear`, `tele_tr_pulse_time`.
     *   **Status:** Wrapped.
@@ -70,3 +70,11 @@ These operations are the "brain" of Teletype. They manipulate internal memory or
 *   **Turtle Graphics:** `T.*` (Internal movement logic).
 *   **MIDI Data Reads (`MI.N`, `MI.V`, `MI.CC`, etc.)**
     *   *Note:* While these ops do not call external functions (they just read `scene_state.midi`), they require the **Engine** to inject MIDI data into that struct to be useful.
+
+## Proposed Next Steps (Wrapping Roadmap)
+
+*   **Decide CV voltage convention**: confirm whether Teletype CV should be 0–10V or bipolar -5..+5V in Performer, and adjust `rawToVolts`/`voltsToRaw` (and related docs/presets) accordingly.
+*   **SCENE persistence**: implement `tele_scene` to load/save Teletype scenes within Performer projects (or explicitly disable ops).
+*   **MIDI injection**: populate `scene_state.midi` from Performer’s MIDI input so `MI.*` reads are meaningful.
+*   **UI hooks**: wire `tele_pattern_updated`, `tele_vars_updated`, `print_dashboard_value`, `tele_has_delays`, and `tele_has_stack` into relevant UI overlays/pages.
+*   **Metronome hooks**: optionally plumb `tele_metro_updated`/`tele_metro_reset` if you want engine-driven state to reflect UI or external clocks.

@@ -148,6 +148,44 @@
     - `handleCv()`: writes CV outputs to mapped destinations
     - `updateAdc()`: reads TI-IN/TI-PARAM from mapped sources
   - **TODO**: CV output voltage sensing for cross-track modulation (TI-IN/TI-PARAM reading from CvOut sources)
+- [x] **CV.SLEW Implementation (COMPLETE)**
+  - Wraps Teletype's `CV.SLEW` operation to use Performer's existing `Slide::applySlide()` exponential smoothing
+  - **Original Teletype behavior** (analyzed from module/main.c):
+    - Uses LINEAR interpolation over time T milliseconds
+    - Updates every 6ms with fixed delta: `delta = (target - current) / (T/6)`
+    - Reaches target in exactly T milliseconds
+  - **Performer's Slide behavior**:
+    - Uses EXPONENTIAL smoothing with time constant `tau = (slideTime/100)^2 * 2`
+    - Reaches ~63% in tau, ~95% in 3*tau, ~99% in 5*tau
+  - **Mapping algorithm**:
+    - For exponential to reach 99% in time T: `slideTime = sqrt(T)`
+    - Examples: 100ms→10, 1000ms→31.6, 10000ms→100
+  - **Storage**:
+    - `_cvSlewTime[4]`: slew time in milliseconds (1-32767 ms, defaults to 1)
+    - `_cvOutputTarget[4]`: target voltage for each CV output
+    - `_cvSlewActive[4]`: whether slew is currently active
+  - **Bridge function**: `setCvSlew(index, value)` stores slew time (clamped 1-32767 ms)
+  - **Slew activation**: `handleCv()` checks slew flag; if true and slew time > 0, sets target and activates slewing
+  - **Interpolation**: `update()` applies `Slide::applySlide()` each frame:
+    - Converts Teletype slew time using `sqrt(T)` to approximate linear behavior
+    - Uses exponential smoothing (same as NoteTrack slide)
+    - Deactivates when within 0.001V of target
+  - **Behavior**:
+    - `CV.SLEW 1 100` sets 100ms slew for output 1
+    - `CV 1 V 5` → smoothly transitions to 5V over ~100ms (CV always respects slew)
+    - `CV.SET 1 V 3` → snaps immediately to 3V (CV.SET always ignores slew)
+- [x] **MIDI Note to Voltage Conversion (COMPLETE)**
+  - Added `midiNoteToVolts(note)` static helper function (note: not wired into Teletype `N` ops yet, so it has no effect)
+  - **Implementation**: Simple standalone converter (not using Performer's Scale system)
+    - Uses standard 1V/octave: `voltage = note / 12.0f`
+    - MIDI note 60 = middle C = 5V
+    - Each semitone = 1/12V (83.33mV)
+  - **Rationale**:
+    - Teletype's `N` operation is always chromatic (12-TET)
+    - Scripts expect exact voltages independent of project scale
+    - Teletype has separate scale ops (`N.S`, `N.C`) for scale quantization
+  - **Usage**: Available for any code that needs MIDI→voltage conversion
+  - **Note**: Teletype's internal `N` op uses its own lookup table (`table_n`) which produces equivalent results
 - Current I/O mapping summary:
   - TR1–TR4 -> configurable gate outputs (default: GateOut1-4).
   - CV1–CV4 -> configurable CV outputs (default: CvOut1-4).
@@ -162,23 +200,23 @@
   - Use numeric TR indices (1–4) instead of lettered outputs (A–D).
   - Examples: `TR 1 1`, `TR 1`, `TR.TOG 2`, `TR.PULSE 1`, `TR.TIME 1 200`.
 - Initial test scripts (slots 1–4) behavior:
-  - Script 1: `TR.PULSE 1 ; CV 1 N 24` (C1).
-  - Script 2: `TR.PULSE 2 ; CV 2 N 36` (C2).
-  - Script 3: `TR.PULSE 3 ; CV 3 N 48` (C3).
-  - Script 4: `TR.PULSE 4 ; CV 4 N 60` (C4).
+  - Script 1: `EVERY 2: CV.SLEW 1 200` then `CV 1 N 42 ; TR.PULSE 1` (C1-ish with current bipolar mapping, 200ms slew).
+  - Script 2: `CV.SLEW 2 RAND 2000` then `CV 2 N 48 ; TR.PULSE 2` (C2-ish with current bipolar mapping, random slew).
+  - Script 3: `TR.PULSE 3 ; CV 3 N 54` (C3-ish with current bipolar mapping).
+  - Script 4: `TR.PULSE 4 ; CV 4 N 60` (C4-ish with current bipolar mapping).
 - Additional preset scripts (slots 5–10) behavior:
-  - Avg Clamp: `CV 1 MAX MIN AVG IN PARAM 16383 0 ; TR.PULSE 1`
-    - Average IN/PARAM, clamp to 0–16383, output on CV1, then pulse TR1.
-  - Param QT: `CV 2 QT PARAM 1024 ; TR.PULSE 2`
-    - Quantize PARAM to a 1024-step ladder (16 steps across 0–16383), output on CV2, then pulse TR2.
-  - Shift Wrap: `CV 3 WRAP LSH IN 1 0 16383 ; TR.PULSE 3`
-    - Left-shift IN by 1 (≈x2), wrap to 0–16383, output on CV3, then pulse TR3.
-  - Rsh Mix: `CV 4 DIV ADD RSH IN 1 PARAM 2 ; TR.PULSE 4`
-    - Right-shift IN by 1 (≈/2), add PARAM, divide by 2, output on CV4, then pulse TR4.
-  - Time Mod: `TIME.ACT 1 ; CV 1 MOD TIME 16384 ; TR.PULSE 1`
-    - Enable TIME and output TIME mod 16384 on CV1, then pulse TR1 (ramp wraps ~16.384s if TIME is ms).
-  - Rand/Drunk: `X RAND 16383 ; Y RRAND 0 16383 ; DRUNK 64 ; CV 2 LIM MUL SUB X PARAM 2 0 16383 ; TR.PULSE ADD 2 TOSS`
-    - Randomize X/Y, set DRUNK to 64, clamp (X - PARAM) * 2 to CV2, and pulse TR2 or TR3 based on TOSS.
+  - Avg Clamp: `X LIM SUB AVG IN PARAM 8000 -1500 1500 ; CV 1 ADD 8000 X ; TR.PULSE 1`
+    - Average IN/PARAM, clamp around 8000 (±1500), output on CV1, then pulse TR1.
+  - Param QT: `X LIM SUB QT PARAM 1024 8000 -1500 1500 ; CV 2 ADD 8000 X ; TR.PULSE 2`
+    - Quantize PARAM, clamp around 8000 (±1500), output on CV2, then pulse TR2.
+  - Shift Wrap: `X LIM SUB WRAP LSH IN 1 0 16383 8000 -1500 1500 ; CV 3 ADD 8000 X ; TR.PULSE 3`
+    - Left-shift IN by 1 (≈x2), wrap to 0–16383, clamp around 8000 (±1500), output on CV3, then pulse TR3.
+  - Rsh Mix: `X LIM SUB DIV ADD RSH IN 1 PARAM 2 8000 -1500 1500 ; CV 4 ADD 8000 X ; TR.PULSE 4`
+    - Right-shift IN by 1 (≈/2), add PARAM, divide by 2, clamp around 8000 (±1500), output on CV4, then pulse TR4.
+  - Time Mod: `TIME.ACT 1 ; X LIM SUB MOD TIME 16384 8000 -1500 1500 ; CV 1 ADD 8000 X ; TR.PULSE 1`
+    - Enable TIME, clamp TIME mod 16384 around 8000 (±1500), output on CV1, then pulse TR1.
+  - Rand/Drunk: `X RAND 16383 ; Y RRAND 0 16383 ; DRUNK 64 ; Z LIM SUB LIM MUL SUB X PARAM 2 0 16383 8000 -1500 1500 ; CV 2 ADD 8000 Z ; TR.PULSE ADD 2 TOSS`
+    - Randomize X/Y, set DRUNK to 64, clamp (X - PARAM) * 2 around 8000 (±1500) to CV2, and pulse TR2 or TR3 based on TOSS.
 - [x] Decision: output expansion model → **Configurable mapping with conflict detection**
 
 ### Stage 3 - Metro + timing policy
