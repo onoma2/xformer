@@ -15,6 +15,11 @@ extern "C" {
 
 class TeletypeTrack {
 public:
+    static constexpr int TriggerInputCount = 4;
+    static constexpr int TriggerOutputCount = 4;
+    static constexpr int CvOutputCount = 4;
+    static constexpr int ScriptSlotCount = 4;
+
     //----------------------------------------
     // I/O Mapping Enums
     //----------------------------------------
@@ -99,21 +104,21 @@ public:
 
     // TI-TR1 to TI-TR4 (4 trigger inputs)
     TriggerInputSource triggerInputSource(int index) const {
-        if (index < 0 || index >= 4) return TriggerInputSource::None;
+        if (index < 0 || index >= TriggerInputCount) return TriggerInputSource::None;
         return _triggerInputSource[index];
     }
     void setTriggerInputSource(int index, TriggerInputSource source) {
-        if (index >= 0 && index < 4) {
+        if (index >= 0 && index < TriggerInputCount) {
             _triggerInputSource[index] = ModelUtils::clampedEnum(source);
         }
     }
     void editTriggerInputSource(int index, int value, bool shift) {
-        if (index >= 0 && index < 4) {
+        if (index >= 0 && index < TriggerInputCount) {
             setTriggerInputSource(index, ModelUtils::adjustedEnum(_triggerInputSource[index], value));
         }
     }
     void printTriggerInputSource(int index, StringBuilder &str) const {
-        if (index >= 0 && index < 4) {
+        if (index >= 0 && index < TriggerInputCount) {
             str(triggerInputSourceName(_triggerInputSource[index]));
         }
     }
@@ -144,42 +149,42 @@ public:
 
     // TO-TRA to TO-TRD (4 trigger outputs)
     TriggerOutputDest triggerOutputDest(int index) const {
-        if (index < 0 || index >= 4) return TriggerOutputDest::GateOut1;
+        if (index < 0 || index >= TriggerOutputCount) return TriggerOutputDest::GateOut1;
         return _triggerOutputDest[index];
     }
     void setTriggerOutputDest(int index, TriggerOutputDest dest) {
-        if (index >= 0 && index < 4) {
+        if (index >= 0 && index < TriggerOutputCount) {
             _triggerOutputDest[index] = ModelUtils::clampedEnum(dest);
         }
     }
     void editTriggerOutputDest(int index, int value, bool shift) {
-        if (index >= 0 && index < 4) {
+        if (index >= 0 && index < TriggerOutputCount) {
             setTriggerOutputDest(index, ModelUtils::adjustedEnum(_triggerOutputDest[index], value));
         }
     }
     void printTriggerOutputDest(int index, StringBuilder &str) const {
-        if (index >= 0 && index < 4) {
+        if (index >= 0 && index < TriggerOutputCount) {
             str(triggerOutputDestName(_triggerOutputDest[index]));
         }
     }
 
     // TO-CV1 to TO-CV4 (4 CV outputs)
     CvOutputDest cvOutputDest(int index) const {
-        if (index < 0 || index >= 4) return CvOutputDest::CvOut1;
+        if (index < 0 || index >= CvOutputCount) return CvOutputDest::CvOut1;
         return _cvOutputDest[index];
     }
     void setCvOutputDest(int index, CvOutputDest dest) {
-        if (index >= 0 && index < 4) {
+        if (index >= 0 && index < CvOutputCount) {
             _cvOutputDest[index] = ModelUtils::clampedEnum(dest);
         }
     }
     void editCvOutputDest(int index, int value, bool shift) {
-        if (index >= 0 && index < 4) {
+        if (index >= 0 && index < CvOutputCount) {
             setCvOutputDest(index, ModelUtils::adjustedEnum(_cvOutputDest[index], value));
         }
     }
     void printCvOutputDest(int index, StringBuilder &str) const {
-        if (index >= 0 && index < 4) {
+        if (index >= 0 && index < CvOutputCount) {
             str(cvOutputDestName(_cvOutputDest[index]));
         }
     }
@@ -190,7 +195,7 @@ public:
 
     // Check if a CV output is already used as CV OUTPUT destination
     bool isCvOutputUsedAsOutput(int cvOutIndex) const {
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < CvOutputCount; ++i) {
             if (int(_cvOutputDest[i]) == cvOutIndex) {
                 return true;
             }
@@ -223,7 +228,7 @@ public:
 
     // Check if a gate output is already used as trigger OUTPUT
     bool isGateOutputUsedAsOutput(int gateIndex) const {
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < TriggerOutputCount; ++i) {
             if (int(_triggerOutputDest[i]) == gateIndex) {
                 return true;
             }
@@ -233,7 +238,7 @@ public:
 
     // Check if a gate output is already used as trigger INPUT
     bool isGateOutputUsedAsInput(int gateIndex) const {
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < TriggerInputCount; ++i) {
             auto src = _triggerInputSource[i];
             if (src >= TriggerInputSource::GateOut1 &&
                 src <= TriggerInputSource::GateOut8) {
@@ -333,6 +338,21 @@ public:
     }
 
     //----------------------------------------
+    // Script preset selection (session-only)
+    //----------------------------------------
+    int scriptPresetIndex(int slot) const {
+        if (slot < 0 || slot >= ScriptSlotCount) {
+            return 0;
+        }
+        return _scriptPresetIndex[slot];
+    }
+    void setScriptPresetIndex(int slot, int index) {
+        if (slot >= 0 && slot < ScriptSlotCount) {
+            _scriptPresetIndex[slot] = static_cast<uint8_t>(index);
+        }
+    }
+
+    //----------------------------------------
     // Name printing helpers
     //----------------------------------------
 
@@ -350,11 +370,12 @@ private:
     scene_state_t _state;
 
     // I/O Mapping configuration
-    std::array<TriggerInputSource, 4> _triggerInputSource;  // TI-TR1 to TI-TR4
+    std::array<TriggerInputSource, TriggerInputCount> _triggerInputSource;  // TI-TR1 to TI-TR4
     CvInputSource _cvInSource;                              // TI-IN
     CvInputSource _cvParamSource;                           // TI-PARAM
-    std::array<TriggerOutputDest, 4> _triggerOutputDest;   // TO-TRA to TO-TRD
-    std::array<CvOutputDest, 4> _cvOutputDest;             // TO-CV1 to TO-CV4
+    std::array<TriggerOutputDest, TriggerOutputCount> _triggerOutputDest;  // TO-TRA to TO-TRD
+    std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
+    std::array<uint8_t, ScriptSlotCount> _scriptPresetIndex{};             // S0-S3 (session-only)
 
     friend class Track;
 };

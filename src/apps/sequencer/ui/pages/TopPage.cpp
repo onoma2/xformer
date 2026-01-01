@@ -380,7 +380,7 @@ void TopPage::setSequenceView(SequenceView view) {
         }
         break;
     case Track::TrackMode::Teletype:
-        setMainPage(pages.track);
+        setMainPage(pages.teletypeEdit);
         break;
     case Track::TrackMode::Last:
         break;

@@ -25,6 +25,11 @@ void TeletypeTrack::clear() {
     _cvOutputDest[1] = CvOutputDest::CvOut2;
     _cvOutputDest[2] = CvOutputDest::CvOut3;
     _cvOutputDest[3] = CvOutputDest::CvOut4;
+
+    // Script presets (S0-S3) default to presets 0-3
+    for (int i = 0; i < ScriptSlotCount; ++i) {
+        _scriptPresetIndex[i] = static_cast<uint8_t>(i);
+    }
 }
 
 void TeletypeTrack::gateOutputName(int index, StringBuilder &str) const {

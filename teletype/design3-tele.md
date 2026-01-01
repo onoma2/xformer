@@ -166,6 +166,19 @@
   - Script 2: `TR.PULSE 2 ; CV 2 N 36` (C2).
   - Script 3: `TR.PULSE 3 ; CV 3 N 48` (C3).
   - Script 4: `TR.PULSE 4 ; CV 4 N 60` (C4).
+- Additional preset scripts (slots 5–10) behavior:
+  - Avg Clamp: `CV 1 MAX MIN AVG IN PARAM 16383 0 ; TR.PULSE 1`
+    - Average IN/PARAM, clamp to 0–16383, output on CV1, then pulse TR1.
+  - Param QT: `CV 2 QT PARAM 1024 ; TR.PULSE 2`
+    - Quantize PARAM to a 1024-step ladder (16 steps across 0–16383), output on CV2, then pulse TR2.
+  - Shift Wrap: `CV 3 WRAP LSH IN 1 0 16383 ; TR.PULSE 3`
+    - Left-shift IN by 1 (≈x2), wrap to 0–16383, output on CV3, then pulse TR3.
+  - Rsh Mix: `CV 4 DIV ADD RSH IN 1 PARAM 2 ; TR.PULSE 4`
+    - Right-shift IN by 1 (≈/2), add PARAM, divide by 2, output on CV4, then pulse TR4.
+  - Time Mod: `TIME.ACT 1 ; CV 1 MOD TIME 16384 ; TR.PULSE 1`
+    - Enable TIME and output TIME mod 16384 on CV1, then pulse TR1 (ramp wraps ~16.384s if TIME is ms).
+  - Rand/Drunk: `X RAND 16383 ; Y RRAND 0 16383 ; DRUNK 64 ; CV 2 LIM MUL SUB X PARAM 2 0 16383 ; TR.PULSE ADD 2 TOSS`
+    - Randomize X/Y, set DRUNK to 64, clamp (X - PARAM) * 2 to CV2, and pulse TR2 or TR3 based on TOSS.
 - [x] Decision: output expansion model → **Configurable mapping with conflict detection**
 
 ### Stage 3 - Metro + timing policy
