@@ -58,58 +58,58 @@ T9-style cycling per step key. Base layer includes digits plus full A-Z. Modifie
 16: `EVERY` `IF`
 
 ### Shift (Shift + Step)
-1: `!`  
-2: `<`  
-3: `>`  
-4: `*`  
-5: `/`  
-6: `%`  
-7: `(`  
-8: `)`  
-9: `[`  
-10: `]`  
-11: `&`  
-12: `|`  
-13: `^`  
-14: `'`  
-15: `,`  
-16: `#`
+1: `+`  
+2: `-`  
+3: `*`  
+4: `/`  
+5: `%`  
+6: `=`  
+7: `<`  
+8: `>`  
+9: `!`  
+10: `&`  
+11: `|`  
+12: `^`  
+13: `$`  
+14: `@`  
+15: `?`  
+16: `;`
 
 ### Page (Page + Step) = Op Tokens
-1: `CV`  
-2: `CV.SLEW`  
-3: `CV.OFF`  
-4: `CV.SET`  
-5: `TR.P`  
-6: `TR`  
-7: `TR.TOG`  
-8: `TR.TIME`  
-9: `IN`  
-10: `PARAM`  
-11: `STATE`  
-12: `P`  
-13: `PN`  
-14: `P.NEXT`  
-15: `P.I`  
-16: `P.L`
+1: `CV.SLEW`  
+2: `CV.OFF`  
+3: `CV.SET`  
+4: `TR.P`  
+5: `TR.TOG`  
+6: `TR.TIME`  
+7: `STATE`  
+8: `M`  
+9: `DEL`  
+10: `P`  
+11: `PN`  
+12: `P.NEXT`  
+13: `P.I`  
+14: `P.L`  
+15: `RAND`  
+16: `RRAND`
 
 ### Shift+Page (Shift + Page + Step) = Logic/Math
-1: `IF`  
-2: `ELIF`  
-3: `ELSE`  
-4: `EVERY`  
-5: `SKIP`  
-6: `L`  
-7: `W`  
-8: `ADD`  
-9: `SUB`  
-10: `MUL`  
-11: `DIV`  
-12: `MOD`  
-13: `MIN`  
-14: `MAX`  
-15: `LIM`  
-16: `AVG`
+1: `ELIF`  
+2: `ELSE`  
+3: `SKIP`  
+4: `L`  
+5: `W`  
+6: `BREAK`  
+7: `SCRIPT`  
+8: `AND`  
+9: `OR`  
+10: `XOR`  
+11: `NOT`  
+12: `GT`  
+13: `LT`  
+14: `EQ`  
+15: `NE`  
+16: `Q.*`
 
 ---
 

@@ -5,6 +5,7 @@
 #include "ui/LedPainter.h"
 
 #include <cstring>
+#include <cstdint>
 
 #include "os/os.h"
 
@@ -114,6 +115,12 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.isStep()) {
+        handleStepKey(key.step(), key.shiftModifier());
+        event.consume();
+        return;
+    }
+
     if (key.isLeft()) {
         if (key.shiftModifier()) {
             moveCursorLeft();
@@ -154,6 +161,66 @@ void TeletypeScriptViewPage::encoder(EncoderEvent &event) {
     event.consume();
 }
 
+void TeletypeScriptViewPage::handleStepKey(int step, bool shift) {
+    if (step < 0 || step >= 16) {
+        return;
+    }
+
+    if (shift) {
+        static const char *const kShiftMap[16] = {
+            "+", "-", "*", "/", "%", "=", "<", ">", "!", "&", "|", "^", "$", "@", "?", ";"
+        };
+        insertText(kShiftMap[step], false);
+        _lastStepKey = -1;
+        return;
+    }
+
+    static const char *const kBaseMap[16][3] = {
+        { "1", "A", "B" },
+        { "2", "C", "D" },
+        { "3", "E", "F" },
+        { "4", "G", "H" },
+        { "5", "I", "J" },
+        { "6", "K", "L" },
+        { "7", "M", "N" },
+        { "8", "O", "P" },
+        { "9", "Q", "R" },
+        { "0", "S", "T" },
+        { ".", "U", "V" },
+        { ":", "W", "X" },
+        { ";", "Y", "Z" },
+        { "CV", "IN", nullptr },
+        { "TR", "PARAM", nullptr },
+        { "EVERY", "IF", nullptr }
+    };
+    static const int kBaseCount[16] = {
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2
+    };
+
+    const uint32_t now = os::ticks();
+    const bool canCycle = (_lastStepKey == step && !_lastKeyShift &&
+                           (now - _lastKeyTime) < os::time::ms(700));
+
+    int index = 0;
+    if (canCycle) {
+        index = (_lastKeyIndex + 1) % kBaseCount[step];
+        removeLastInsert(_lastInsertLength);
+    }
+
+    const char *token = kBaseMap[step][index];
+    if (!token) {
+        return;
+    }
+    const bool addSpace = std::strlen(token) > 1;
+    insertText(token, addSpace);
+
+    _lastStepKey = step;
+    _lastKeyIndex = index;
+    _lastKeyTime = now;
+    _lastInsertLength = int(std::strlen(token) + (addSpace ? 1 : 0));
+    _lastKeyShift = false;
+}
+
 void TeletypeScriptViewPage::loadEditBuffer(int line) {
     _selectedLine = clamp(line, 0, kLineCount - 1);
     _editBuffer[0] = '\0';
@@ -169,6 +236,33 @@ void TeletypeScriptViewPage::loadEditBuffer(int line) {
             _cursor = int(std::strlen(_editBuffer));
         }
     }
+}
+
+void TeletypeScriptViewPage::insertText(const char *text, bool addSpace) {
+    if (!text) {
+        return;
+    }
+    const int len = int(std::strlen(_editBuffer));
+    const int insertLen = int(std::strlen(text)) + (addSpace ? 1 : 0);
+    if (len + insertLen >= EditBufferSize) {
+        return;
+    }
+    std::memmove(_editBuffer + _cursor + insertLen, _editBuffer + _cursor, len - _cursor + 1);
+    std::memcpy(_editBuffer + _cursor, text, std::strlen(text));
+    if (addSpace) {
+        _editBuffer[_cursor + std::strlen(text)] = ' ';
+    }
+    _cursor += insertLen;
+}
+
+void TeletypeScriptViewPage::removeLastInsert(int count) {
+    if (count <= 0 || _cursor < count) {
+        return;
+    }
+    int len = int(std::strlen(_editBuffer));
+    int start = _cursor - count;
+    std::memmove(_editBuffer + start, _editBuffer + _cursor, len - _cursor + 1);
+    _cursor = start;
 }
 
 void TeletypeScriptViewPage::insertChar(char c) {
