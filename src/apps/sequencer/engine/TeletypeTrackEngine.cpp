@@ -651,6 +651,9 @@ void TeletypeTrackEngine::loadScriptsFromModel() {
             applyScriptLine(state, script, line, text);
         }
     }
+    for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
+        state.patterns[pattern] = _teletypeTrack.pattern(pattern);
+    }
 }
 
 void TeletypeTrackEngine::seedScriptsFromPresets() {

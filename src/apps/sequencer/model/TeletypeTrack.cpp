@@ -43,6 +43,9 @@ void TeletypeTrack::clear() {
         _cvOutputRange[i] = Types::VoltageRange::Bipolar5V;
         _cvOutputOffset[i] = 0;
     }
+    for (int i = 0; i < PATTERN_COUNT; ++i) {
+        _patterns[i] = _state.patterns[i];
+    }
 }
 
 void TeletypeTrack::gateOutputName(int index, StringBuilder &str) const {
@@ -147,6 +150,9 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
             writer.write(_scriptLines[script][line].data(), ScriptLineLength);
         }
     }
+    for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
+        writer.write(_patterns[pattern]);
+    }
 }
 
 void TeletypeTrack::read(VersionedSerializedReader &reader) {
@@ -193,6 +199,9 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
             reader.read(_scriptLines[script][line].data(), ScriptLineLength, 0);
             _scriptLines[script][line][ScriptLineLength - 1] = '\0';
         }
+    }
+    for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
+        reader.read(_patterns[pattern], 0);
     }
     _scriptsDirty = true;
 }

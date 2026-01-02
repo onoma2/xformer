@@ -485,6 +485,14 @@ public:
         _scriptsDirty = false;
         return dirty;
     }
+    const scene_pattern_t &pattern(int index) const {
+        int clamped = clamp(index, 0, PATTERN_COUNT - 1);
+        return _patterns[clamped];
+    }
+    void setPattern(int index, const scene_pattern_t &pattern) {
+        int clamped = clamp(index, 0, PATTERN_COUNT - 1);
+        _patterns[clamped] = pattern;
+    }
 
     int scriptPresetIndex(int slot) const {
         if (slot < 0 || slot >= ScriptSlotCount) {
@@ -531,6 +539,7 @@ private:
     std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
     std::array<uint8_t, ScriptSlotCount> _scriptPresetIndex{};             // S0-S3 (session-only)
     std::array<std::array<std::array<char, ScriptLineLength>, ScriptLineCount>, EditableScriptCount> _scriptLines{};
+    std::array<scene_pattern_t, PATTERN_COUNT> _patterns{};
     bool _scriptsDirty = false;
     TimeBase _timeBase = TimeBase::Ms;
     uint16_t _clockDivisor = 12;
