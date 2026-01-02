@@ -134,6 +134,10 @@ void TeletypeTrackEngine::update(float dt) {
         return;
     }
 
+    if (_teletypeTrack.consumeScriptsDirty()) {
+        loadScriptsFromModel();
+    }
+
     // Apply CV slew using Performer's Slide mechanism
     for (uint8_t i = 0; i < CvOutputCount; ++i) {
         if (!_cvSlewActive[i] || _cvSlewTime[i] <= 0) {

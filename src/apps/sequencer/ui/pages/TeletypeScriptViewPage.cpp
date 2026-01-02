@@ -11,6 +11,7 @@
 
 extern "C" {
 #include "command.h"
+#include "script.h"
 #include "state.h"
 #include "teletype.h"
 }
@@ -29,6 +30,7 @@ TeletypeScriptViewPage::TeletypeScriptViewPage(PageManager &manager, PageContext
 }
 
 void TeletypeScriptViewPage::enter() {
+    _scriptIndex = 0;
     loadEditBuffer(0);
 }
 
@@ -45,10 +47,15 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
 
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
-    const int scriptIndex = 0; // S0
+    const int scriptIndex = _scriptIndex;
     const uint8_t len = ss_get_script_len(&state, scriptIndex);
 
-    FixedStringBuilder<4> scriptLabel("%d", scriptIndex);
+    FixedStringBuilder<4> scriptLabel;
+    if (scriptIndex == METRO_SCRIPT) {
+        scriptLabel("M");
+    } else {
+        scriptLabel("S%d", scriptIndex);
+    }
     canvas.setColor(Color::Medium);
     int scriptX = Width - 2 - canvas.textWidth(scriptLabel);
     canvas.drawText(scriptX, 6, scriptLabel);
@@ -105,14 +112,23 @@ void TeletypeScriptViewPage::updateLeds(Leds &leds) {
 void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
+    if (key.pageModifier() && key.isFunction() && key.function() == 4) {
+        _manager.pop();
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier()) {
         return;
     }
 
-    if (key.isFunction() && key.function() == 4) {
-        _manager.pop();
-        event.consume();
-        return;
+    if (key.isFunction()) {
+        int fn = key.function();
+        if (fn >= 0 && fn < TeletypeTrack::EditableScriptCount) {
+            setScriptIndex(fn);
+            event.consume();
+            return;
+        }
     }
 
     if (key.isStep()) {
@@ -142,21 +158,42 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
     }
 
     if (key.is(Key::Encoder)) {
-        commitLine();
+        if (key.shiftModifier()) {
+            commitLine();
+        } else {
+            loadEditBuffer(_selectedLine);
+        }
         event.consume();
         return;
     }
 }
 
 void TeletypeScriptViewPage::encoder(EncoderEvent &event) {
-    int next = _selectedLine + event.value();
-    if (next < 0) {
-        next = 0;
-    } else if (next >= kLineCount) {
-        next = kLineCount - 1;
-    }
-    if (next != _selectedLine) {
-        loadEditBuffer(next);
+    if (globalKeyState()[Key::Shift]) {
+        int next = _selectedLine + event.value();
+        if (next < 0) {
+            next = 0;
+        } else if (next >= kLineCount) {
+            next = kLineCount - 1;
+        }
+        if (next != _selectedLine) {
+            loadEditBuffer(next);
+        }
+    } else {
+        int steps = std::abs(event.value());
+        if (steps == 0) {
+            event.consume();
+            return;
+        }
+        if (event.value() > 0) {
+            for (int i = 0; i < steps; ++i) {
+                moveCursorRight();
+            }
+        } else {
+            for (int i = 0; i < steps; ++i) {
+                moveCursorLeft();
+            }
+        }
     }
     event.consume();
 }
@@ -228,13 +265,23 @@ void TeletypeScriptViewPage::loadEditBuffer(int line) {
 
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
-    const int scriptIndex = 0; // S0
+    const int scriptIndex = _scriptIndex;
     const uint8_t len = ss_get_script_len(&state, scriptIndex);
     if (_selectedLine < len) {
         if (const tele_command_t *cmd = ss_get_script_command(&state, scriptIndex, _selectedLine)) {
             print_command(cmd, _editBuffer);
             _cursor = int(std::strlen(_editBuffer));
         }
+    }
+}
+
+void TeletypeScriptViewPage::setScriptIndex(int scriptIndex) {
+    if (scriptIndex < 0 || scriptIndex >= TeletypeTrack::EditableScriptCount) {
+        return;
+    }
+    if (_scriptIndex != scriptIndex) {
+        _scriptIndex = scriptIndex;
+        loadEditBuffer(0);
     }
 }
 
@@ -317,7 +364,7 @@ void TeletypeScriptViewPage::commitLine() {
 
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
-    const int scriptIndex = 0; // S0
+    const int scriptIndex = _scriptIndex;
     ss_overwrite_script_command(&state, scriptIndex, _selectedLine, &parsed);
     track.setScriptLine(scriptIndex, _selectedLine, _editBuffer);
     // Commit succeeded; no UI message per current workflow.

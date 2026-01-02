@@ -31,6 +31,7 @@ void TeletypeTrack::clear() {
         _scriptPresetIndex[i] = static_cast<uint8_t>(i);
     }
     clearScripts();
+    _scriptsDirty = false;
 
     // Timing defaults
     _timeBase = TimeBase::Ms;
@@ -193,4 +194,5 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
             _scriptLines[script][line][ScriptLineLength - 1] = '\0';
         }
     }
+    _scriptsDirty = true;
 }

@@ -478,6 +478,13 @@ public:
         }
         return false;
     }
+    bool scriptsDirty() const { return _scriptsDirty; }
+    void markScriptsDirty() { _scriptsDirty = true; }
+    bool consumeScriptsDirty() {
+        bool dirty = _scriptsDirty;
+        _scriptsDirty = false;
+        return dirty;
+    }
 
     int scriptPresetIndex(int slot) const {
         if (slot < 0 || slot >= ScriptSlotCount) {
@@ -524,6 +531,7 @@ private:
     std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
     std::array<uint8_t, ScriptSlotCount> _scriptPresetIndex{};             // S0-S3 (session-only)
     std::array<std::array<std::array<char, ScriptLineLength>, ScriptLineCount>, EditableScriptCount> _scriptLines{};
+    bool _scriptsDirty = false;
     TimeBase _timeBase = TimeBase::Ms;
     uint16_t _clockDivisor = 12;
     int16_t _clockMultiplier = 100;

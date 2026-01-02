@@ -17,6 +17,7 @@ public:
 private:
     void handleStepKey(int step, bool shift);
     void loadEditBuffer(int line);
+    void setScriptIndex(int scriptIndex);
     void insertText(const char *text, bool addSpace);
     void removeLastInsert(int count);
     void insertChar(char c);
@@ -27,6 +28,7 @@ private:
 
     int _selectedLine = 0;
     int _cursor = 0;
+    int _scriptIndex = 0;
     int _lastStepKey = -1;
     int _lastKeyIndex = 0;
     uint32_t _lastKeyTime = 0;
