@@ -8,6 +8,7 @@
 #include "core/utils/StringBuilder.h"
 
 #include <array>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -446,8 +447,7 @@ public:
             buffer[0] = '\0';
             return;
         }
-        std::strncpy(buffer.data(), text, ScriptLineLength - 1);
-        buffer[ScriptLineLength - 1] = '\0';
+        std::snprintf(buffer.data(), buffer.size(), "%s", text);
     }
     void clearScriptLine(int script, int line) {
         if (script < 0 || script >= EditableScriptCount || line < 0 || line >= ScriptLineCount) {

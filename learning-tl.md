@@ -1,5 +1,63 @@
 # Teletype Track Learning Tutorial for Performer
 
+## Performer Teletype Keyboard Shortcuts
+
+The Performer implementation of Teletype includes specific keyboard shortcuts for editing scripts:
+
+### Function Keys (F1-F8)
+- **F1-F8**: Select script 0-7 (F1=Script 0, F2=Script 1, etc.)
+
+### Step Keys (Steps 1-16)
+- **Steps 1-16**: Insert common teletype commands/variables (cycles through options)
+  - **Step 1**: 1 → A → B (cycles through 1→A→B)
+  - **Step 2**: 2 → C → D (cycles through 2→C→D)
+  - **Step 3**: 3 → E → F (cycles through 3→E→F)
+  - **Step 4**: 4 → G → H (cycles through 4→G→H)
+  - **Step 5**: 5 → I → J (cycles through 5→I→J)
+  - **Step 6**: 6 → K → L (cycles through 6→K→L)
+  - **Step 7**: 7 → M → N (cycles through 7→M→N)
+  - **Step 8**: 8 → O → P (cycles through 8→O→P)
+  - **Step 9**: 9 → Q → R (cycles through 9→Q→R)
+  - **Step 10**: 0 → S → T (cycles through 0→S→T)
+  - **Step 11**: . → U → V (cycles through .→U→V)
+  - **Step 12**: : → W → X (cycles through :→W→X)
+  - **Step 13**: ; → Y → Z (cycles through ;→Y→Z)
+  - **Step 14**: CV → IN (cycles through CV→IN)
+  - **Step 15**: TR → PARAM (cycles through TR→PARAM)
+  - **Step 16**: EVERY → IF (cycles through EVERY→IF)
+
+### Shift + Step Keys (Steps 1-16)
+- **Shift + Steps 1-16**: Insert special characters
+  - **Shift + Step 1**: + (Plus)
+  - **Shift + Step 2**: - (Minus)
+  - **Shift + Step 3**: * (Multiply)
+  - **Shift + Step 4**: / (Divide)
+  - **Shift + Step 5**: % (Modulo)
+  - **Shift + Step 6**: = (Equals)
+  - **Shift + Step 7**: < (Less than)
+  - **Shift + Step 8**: > (Greater than)
+  - **Shift + Step 9**: ! (Logical NOT)
+  - **Shift + Step 10**: & (Bitwise AND)
+  - **Shift + Step 11**: | (Bitwise OR)
+  - **Shift + Step 12**: ^ (Bitwise XOR)
+  - **Shift + Step 13**: $ (Dollar sign)
+  - **Shift + Step 14**: @ (At symbol)
+  - **Shift + Step 15**: ? (Question mark)
+  - **Shift + Step 16**: ; (Semicolon)
+
+### Navigation and Editing
+- **Left Arrow**: Backspace (delete character to the left)
+- **Shift + Left Arrow**: Move cursor left
+- **Right Arrow**: Insert space
+- **Shift + Right Arrow**: Move cursor right
+- **Encoder Press**: Load selected line into edit buffer
+- **Shift + Encoder Press**: Commit line (save changes)
+- **Encoder Turn**: Move cursor left/right (normal) or select line (with Shift)
+
+### Other Controls
+- **Page + F4**: Exit script view
+- **Page + Function Keys**: Not handled (reserved for other functions)
+
 ## Introduction
 
 This tutorial is designed for intermediate teletype users who want to learn how to use the Teletype Track functionality within the Performer firmware. The Teletype Track in Performer provides a powerful way to integrate teletype scripts with your sequencer, allowing for complex musical patterns and interactions.

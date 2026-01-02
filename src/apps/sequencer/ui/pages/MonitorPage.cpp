@@ -305,7 +305,6 @@ void MonitorPage::drawScope(Canvas &canvas) {
 
     const int gateHeight = 3;
     const int gateTop = ScopeHeight - 3 - (gateHeight - 1);
-    const int gateBottom = gateTop + gateHeight - 1;
     const int cvBottom = gateTop - 1;
     const float cvCenter = cvBottom * 0.5f;
     const float cvScale = cvBottom / (2.f * 6.f);

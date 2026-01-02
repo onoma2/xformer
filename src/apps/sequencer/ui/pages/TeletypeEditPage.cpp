@@ -70,6 +70,11 @@ void TeletypeEditPage::keyPress(KeyPressEvent &event) {
 
     if (key.isFunction()) {
         int fn = key.function();
+        if (fn == 0 && key.shiftModifier()) {
+            _manager.push(&_manager.pages().teletypePatternView);
+            event.consume();
+            return;
+        }
         if (fn == 4) {
             _manager.push(&_manager.pages().teletypeScriptView);
             event.consume();
