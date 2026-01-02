@@ -13,5 +13,15 @@ public:
     void encoder(EncoderEvent &event) override;
 
 private:
+    void loadEditBuffer(int line);
+    void insertChar(char c);
+    void backspace();
+    void moveCursorLeft();
+    void moveCursorRight();
+    void commitLine();
+
     int _selectedLine = 0;
+    int _cursor = 0;
+    static constexpr int EditBufferSize = 96;
+    char _editBuffer[EditBufferSize] = {};
 };
