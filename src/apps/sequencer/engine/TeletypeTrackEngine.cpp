@@ -393,8 +393,11 @@ uint32_t TeletypeTrackEngine::timeTicks() const {
 
 void TeletypeTrackEngine::installBootScript() {
     scene_state_t &state = _teletypeTrack.state();
-    installPresetScripts();
-    ss_clear_script(&state, METRO_SCRIPT);
+    if (_teletypeTrack.hasAnyScriptText()) {
+        loadScriptsFromModel();
+    } else {
+        seedScriptsFromPresets();
+    }
     state.variables.m_act = 0;
 }
 
@@ -542,7 +545,6 @@ float TeletypeTrackEngine::midiNoteToVolts(int note) {
 }
 
 void TeletypeTrackEngine::installPresetScripts() {
-    scene_state_t &state = _teletypeTrack.state();
     for (int slot = 0; slot < kManualScriptCount; ++slot) {
         int presetIndex = _teletypeTrack.scriptPresetIndex(slot);
         applyPresetToScript(slot, presetIndex);
@@ -590,6 +592,26 @@ bool TeletypeTrackEngine::applyPresetLine(scene_state_t &state, int scriptIndex,
     return true;
 }
 
+bool TeletypeTrackEngine::applyScriptLine(scene_state_t &state, int scriptIndex, size_t lineIndex, const char *cmd) {
+    if (!cmd || cmd[0] == '\0') {
+        return false;
+    }
+    tele_command_t parsed = {};
+    char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
+    tele_error_t error = parse(cmd, &parsed, errorMsg);
+    if (error != E_OK) {
+        DBG("TT parse error: %s (%s)", tele_error(error), errorMsg);
+        return false;
+    }
+    error = validate(&parsed, errorMsg);
+    if (error != E_OK) {
+        DBG("TT validate error: %s (%s)", tele_error(error), errorMsg);
+        return false;
+    }
+    ss_overwrite_script_command(&state, scriptIndex, lineIndex, &parsed);
+    return true;
+}
+
 void TeletypeTrackEngine::applyPresetToScript(int scriptIndex, int presetIndex) {
     if (scriptIndex < 0 || scriptIndex >= kManualScriptCount) {
         return;
@@ -600,9 +622,37 @@ void TeletypeTrackEngine::applyPresetToScript(int scriptIndex, int presetIndex) 
 
     scene_state_t &state = _teletypeTrack.state();
     ss_clear_script(&state, scriptIndex);
+    _teletypeTrack.clearScript(scriptIndex);
 
     const auto &preset = kPresetScripts[presetIndex];
     for (size_t line = 0; line < preset.lineCount; ++line) {
-        applyPresetLine(state, scriptIndex, line, preset.lines[line]);
+        const char *cmd = preset.lines[line];
+        if (!cmd) {
+            continue;
+        }
+        applyPresetLine(state, scriptIndex, line, cmd);
+        _teletypeTrack.setScriptLine(scriptIndex, static_cast<int>(line), cmd);
     }
+}
+
+void TeletypeTrackEngine::loadScriptsFromModel() {
+    scene_state_t &state = _teletypeTrack.state();
+    for (int script = 0; script < TeletypeTrack::EditableScriptCount; ++script) {
+        ss_clear_script(&state, script);
+        for (int line = 0; line < TeletypeTrack::ScriptLineCount; ++line) {
+            const char *text = _teletypeTrack.scriptLine(script, line);
+            if (text[0] == '\0') {
+                continue;
+            }
+            applyScriptLine(state, script, line, text);
+        }
+    }
+}
+
+void TeletypeTrackEngine::seedScriptsFromPresets() {
+    scene_state_t &state = _teletypeTrack.state();
+    _teletypeTrack.clearScripts();
+    installPresetScripts();
+    ss_clear_script(&state, METRO_SCRIPT);
+    _teletypeTrack.clearScript(METRO_SCRIPT);
 }

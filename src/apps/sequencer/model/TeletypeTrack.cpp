@@ -30,6 +30,7 @@ void TeletypeTrack::clear() {
     for (int i = 0; i < ScriptSlotCount; ++i) {
         _scriptPresetIndex[i] = static_cast<uint8_t>(i);
     }
+    clearScripts();
 
     // Timing defaults
     _timeBase = TimeBase::Ms;
@@ -140,6 +141,11 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
         writer.write(uint8_t(_cvOutputRange[i]));
         writer.write(_cvOutputOffset[i]);
     }
+    for (int script = 0; script < EditableScriptCount; ++script) {
+        for (int line = 0; line < ScriptLineCount; ++line) {
+            writer.write(_scriptLines[script][line].data(), ScriptLineLength);
+        }
+    }
 }
 
 void TeletypeTrack::read(VersionedSerializedReader &reader) {
@@ -180,5 +186,11 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         _cvOutputRange[i] = ModelUtils::clampedEnum(Types::VoltageRange(rangeVal));
         reader.read(_cvOutputOffset[i]);
         _cvOutputOffset[i] = clamp<int16_t>(_cvOutputOffset[i], -500, 500);
+    }
+    for (int script = 0; script < EditableScriptCount; ++script) {
+        for (int line = 0; line < ScriptLineCount; ++line) {
+            reader.read(_scriptLines[script][line].data(), ScriptLineLength, 0);
+            _scriptLines[script][line][ScriptLineLength - 1] = '\0';
+        }
     }
 }

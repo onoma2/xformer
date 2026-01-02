@@ -8,6 +8,7 @@
 #include "core/utils/StringBuilder.h"
 
 #include <array>
+#include <cstring>
 #include <vector>
 
 extern "C" {
@@ -20,6 +21,9 @@ public:
     static constexpr int TriggerOutputCount = 4;
     static constexpr int CvOutputCount = 4;
     static constexpr int ScriptSlotCount = 4;
+    static constexpr int EditableScriptCount = EDITABLE_SCRIPT_COUNT;
+    static constexpr int ScriptLineCount = SCRIPT_MAX_COMMANDS;
+    static constexpr int ScriptLineLength = 96;
     enum class TimeBase : uint8_t {
         Ms,
         Clock,
@@ -427,6 +431,54 @@ public:
     //----------------------------------------
     // Script preset selection (session-only)
     //----------------------------------------
+    const char *scriptLine(int script, int line) const {
+        if (script < 0 || script >= EditableScriptCount || line < 0 || line >= ScriptLineCount) {
+            return "";
+        }
+        return _scriptLines[script][line].data();
+    }
+    void setScriptLine(int script, int line, const char *text) {
+        if (script < 0 || script >= EditableScriptCount || line < 0 || line >= ScriptLineCount) {
+            return;
+        }
+        auto &buffer = _scriptLines[script][line];
+        if (!text) {
+            buffer[0] = '\0';
+            return;
+        }
+        std::strncpy(buffer.data(), text, ScriptLineLength - 1);
+        buffer[ScriptLineLength - 1] = '\0';
+    }
+    void clearScriptLine(int script, int line) {
+        if (script < 0 || script >= EditableScriptCount || line < 0 || line >= ScriptLineCount) {
+            return;
+        }
+        _scriptLines[script][line][0] = '\0';
+    }
+    void clearScript(int script) {
+        if (script < 0 || script >= EditableScriptCount) {
+            return;
+        }
+        for (int line = 0; line < ScriptLineCount; ++line) {
+            _scriptLines[script][line][0] = '\0';
+        }
+    }
+    void clearScripts() {
+        for (int script = 0; script < EditableScriptCount; ++script) {
+            clearScript(script);
+        }
+    }
+    bool hasAnyScriptText() const {
+        for (int script = 0; script < EditableScriptCount; ++script) {
+            for (int line = 0; line < ScriptLineCount; ++line) {
+                if (_scriptLines[script][line][0] != '\0') {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     int scriptPresetIndex(int slot) const {
         if (slot < 0 || slot >= ScriptSlotCount) {
             return 0;
@@ -471,6 +523,7 @@ private:
     std::array<TriggerOutputDest, TriggerOutputCount> _triggerOutputDest;  // TO-TRA to TO-TRD
     std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
     std::array<uint8_t, ScriptSlotCount> _scriptPresetIndex{};             // S0-S3 (session-only)
+    std::array<std::array<std::array<char, ScriptLineLength>, ScriptLineCount>, EditableScriptCount> _scriptLines{};
     TimeBase _timeBase = TimeBase::Ms;
     uint16_t _clockDivisor = 12;
     int16_t _clockMultiplier = 100;

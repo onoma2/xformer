@@ -319,5 +319,6 @@ void TeletypeScriptViewPage::commitLine() {
     scene_state_t &state = track.state();
     const int scriptIndex = 0; // S0
     ss_overwrite_script_command(&state, scriptIndex, _selectedLine, &parsed);
+    track.setScriptLine(scriptIndex, _selectedLine, _editBuffer);
     // Commit succeeded; no UI message per current workflow.
 }

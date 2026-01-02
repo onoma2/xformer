@@ -62,6 +62,8 @@ public:
 private:
     void installBootScript();
     void runBootScript();
+    void loadScriptsFromModel();
+    void seedScriptsFromPresets();
     float advanceTime(float dt);
     float advanceClockTime();
     void runMetro(float timeDelta);
@@ -73,6 +75,7 @@ private:
     static float midiNoteToVolts(int note);
     void installPresetScripts();
     bool applyPresetLine(scene_state_t &state, int scriptIndex, size_t lineIndex, const char *cmd);
+    bool applyScriptLine(scene_state_t &state, int scriptIndex, size_t lineIndex, const char *cmd);
     void runScript(int scriptIndex);
 
     TeletypeTrack &_teletypeTrack;
