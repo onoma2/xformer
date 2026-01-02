@@ -11,14 +11,19 @@ extern "C" {
 
 namespace {
 constexpr int kLineCount = 6;
-constexpr int kRowStartY = 6;
-constexpr int kRowStepY = 10;
-constexpr int kLabelX = 2;
-constexpr int kTextX = 14;
+constexpr int kRowStartY = 4; // Right position do not touch!
+constexpr int kRowStepY = 8;
+constexpr int kEditLineY = 54;
+constexpr int kLabelX = 4;
+constexpr int kTextX = 16;
 } // namespace
 
 TeletypeScriptViewPage::TeletypeScriptViewPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context) {
+}
+
+void TeletypeScriptViewPage::enter() {
+    _selectedLine = 0;
 }
 
 void TeletypeScriptViewPage::draw(Canvas &canvas) {
@@ -49,11 +54,20 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         }
 
         FixedStringBuilder<4> lineLabel("%d", i + 1);
-        canvas.setColor(Color::Medium);
-        canvas.drawText(kLabelX, y, lineLabel);
-        canvas.setColor(Color::Bright);
-        canvas.drawText(kTextX, y, lineText);
+        canvas.setColor(i == _selectedLine ? Color::Bright : Color::Medium);
+        canvas.drawText(kLabelX, y + 4, lineLabel);
+        canvas.drawText(kTextX, y + 4, lineText);
     }
+
+    char editCommand[128] = {};
+    if (_selectedLine < len) {
+        if (const tele_command_t *cmd = ss_get_script_command(&state, scriptIndex, _selectedLine)) {
+            print_command(cmd, editCommand);
+        }
+    }
+    FixedStringBuilder<128> editLine("E %s", editCommand);
+    canvas.setColor(Color::Bright);
+    canvas.drawText(kLabelX, kEditLineY + 4, editLine);
 }
 
 void TeletypeScriptViewPage::updateLeds(Leds &leds) {
@@ -71,4 +85,15 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
         _manager.pop();
         event.consume();
     }
+}
+
+void TeletypeScriptViewPage::encoder(EncoderEvent &event) {
+    int next = _selectedLine + event.value();
+    if (next < 0) {
+        next = 0;
+    } else if (next >= kLineCount) {
+        next = kLineCount - 1;
+    }
+    _selectedLine = next;
+    event.consume();
 }
