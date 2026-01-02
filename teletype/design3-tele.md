@@ -199,11 +199,15 @@
 - Teletype manual conventions in this build:
   - Use numeric TR indices (1–4) instead of lettered outputs (A–D).
   - Examples: `TR 1 1`, `TR 1`, `TR.TOG 2`, `TR.PULSE 1`, `TR.TIME 1 200`.
-- Initial test scripts (slots 1–4) behavior:
-  - Script 1: `EVERY 2: CV.SLEW 1 200` then `CV 1 N 42 ; TR.PULSE 1` (C1-ish with current bipolar mapping, 200ms slew).
-  - Script 2: `CV.SLEW 2 RAND 2000` then `CV 2 N 48 ; TR.PULSE 2` (C2-ish with current bipolar mapping, random slew).
-  - Script 3: `TR.PULSE 3 ; CV 3 N 54` (C3-ish with current bipolar mapping).
-  - Script 4: `TR.PULSE 4 ; CV 4 N 60` (C4-ish with current bipolar mapping).
+- Initial test scripts (slots 1–4) behavior (time-base checks):
+  - Script 1: `TIME.ACT 1 ; X LIM SUB MOD TIME 16384 8000 -1500 1500 ; CV 1 ADD 8000 X ; TR.PULSE 1`
+    - Time ramp (TIME), centered around 8000 with ±1500 range.
+  - Script 2: `X LIM SUB MOD LAST 2 16384 8000 -1500 1500 ; CV 2 ADD 8000 X ; TR.PULSE 2`
+    - LAST since script 2 was last run (manual trigger cadence).
+  - Script 3: `X LIM SUB MOD LAST 1 16384 8000 -1500 1500 ; CV 3 ADD 8000 X ; TR.PULSE 3`
+    - LAST since script 1 was last run.
+  - Script 4: `X LIM SUB MOD TIME 16384 8000 -1500 1500 ; CV 4 ADD 8000 X ; TR.PULSE 4`
+    - Second TIME ramp for a separate output.
 - Additional preset scripts (slots 5–10) behavior:
   - Avg Clamp: `X LIM SUB AVG IN PARAM 8000 -1500 1500 ; CV 1 ADD 8000 X ; TR.PULSE 1`
     - Average IN/PARAM, clamp around 8000 (±1500), output on CV1, then pulse TR1.
@@ -222,9 +226,11 @@
 ### Stage 3 - Metro + timing policy
 - [x] Implement ms-based metro (Teletype `M` behavior).
   - Implemented `runMetro(dt)`: uses `M` for period, `M.ACT` for enable, and runs `METRO_SCRIPT` when elapsed.
-- [ ] Implement divisor-driven metro (track clock sync).
+- [x] Implement divisor-driven metro (track clock sync).
+  - Added Teletype timing mode: `MS` or `Clock` with clock divisor + multiplier.
+  - In `Clock` mode, `TIME/LAST/EVERY/M` and delays advance from `clock.tickPosition()` with divisor/multiplier scaling.
 - [ ] Confirm METRO triggers are stable across tempo changes.
-- [ ] Decision: ms-only, divisor-only, or dual-mode toggle.
+- [x] Decision: dual-mode toggle (MS vs Clock).
 
 ### Stage 4 - Scale + track parity
 - [ ] Apply project scale + root note to Teletype note ops.

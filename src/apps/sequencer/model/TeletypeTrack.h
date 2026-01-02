@@ -19,6 +19,11 @@ public:
     static constexpr int TriggerOutputCount = 4;
     static constexpr int CvOutputCount = 4;
     static constexpr int ScriptSlotCount = 4;
+    enum class TimeBase : uint8_t {
+        Ms,
+        Clock,
+        Last
+    };
 
     //----------------------------------------
     // I/O Mapping Enums
@@ -97,6 +102,42 @@ public:
 
     scene_state_t &state() { return _state; }
     const scene_state_t &state() const { return _state; }
+
+    //----------------------------------------
+    // Timing (time base + divisor/multiplier)
+    //----------------------------------------
+
+    TimeBase timeBase() const { return _timeBase; }
+    void setTimeBase(TimeBase mode) { _timeBase = ModelUtils::clampedEnum(mode); }
+    void editTimeBase(int value, bool shift) {
+        (void)shift;
+        setTimeBase(ModelUtils::adjustedEnum(_timeBase, value));
+    }
+    void printTimeBase(StringBuilder &str) const {
+        str(timeBaseName(_timeBase));
+    }
+
+    int clockDivisor() const { return _clockDivisor; }
+    void setClockDivisor(int divisor) {
+        _clockDivisor = ModelUtils::clampDivisor(divisor);
+    }
+    void editClockDivisor(int value, bool shift) {
+        setClockDivisor(ModelUtils::adjustedByDivisor(_clockDivisor, value, shift));
+    }
+    void printClockDivisor(StringBuilder &str) const {
+        ModelUtils::printDivisor(str, _clockDivisor);
+    }
+
+    int clockMultiplier() const { return _clockMultiplier; }
+    void setClockMultiplier(int multiplier) {
+        _clockMultiplier = clamp(multiplier, 50, 150);
+    }
+    void editClockMultiplier(int value, bool shift) {
+        setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
+    }
+    void printClockMultiplier(StringBuilder &str) const {
+        str("%.2fx", _clockMultiplier * 0.01f);
+    }
 
     //----------------------------------------
     // I/O Mapping Accessors
@@ -360,6 +401,14 @@ public:
     static const char *cvInputSourceName(CvInputSource source);
     static const char *triggerOutputDestName(TriggerOutputDest dest);
     static const char *cvOutputDestName(CvOutputDest dest);
+    static const char *timeBaseName(TimeBase mode) {
+        switch (mode) {
+        case TimeBase::Ms:    return "MS";
+        case TimeBase::Clock: return "Clock";
+        case TimeBase::Last:  break;
+        }
+        return nullptr;
+    }
 
 private:
     void setTrackIndex(int trackIndex) {
@@ -376,6 +425,9 @@ private:
     std::array<TriggerOutputDest, TriggerOutputCount> _triggerOutputDest;  // TO-TRA to TO-TRD
     std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
     std::array<uint8_t, ScriptSlotCount> _scriptPresetIndex{};             // S0-S3 (session-only)
+    TimeBase _timeBase = TimeBase::Ms;
+    uint16_t _clockDivisor = 12;
+    int16_t _clockMultiplier = 100;
 
     friend class Track;
 };

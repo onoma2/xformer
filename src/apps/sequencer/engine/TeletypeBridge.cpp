@@ -37,6 +37,9 @@ uint32_t TeletypeBridge::ticksMs() {
 extern "C" {
 
 uint32_t tele_get_ticks(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->timeTicks();
+    }
     return TeletypeBridge::ticksMs();
 }
 

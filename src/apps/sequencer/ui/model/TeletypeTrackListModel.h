@@ -38,6 +38,9 @@ public:
 
 private:
     enum Item {
+        TimeBase,
+        ClockDivisor,
+        ClockMultiplier,
         TriggerIn1,
         TriggerIn2,
         TriggerIn3,
@@ -57,6 +60,9 @@ private:
 
     static const char *itemName(Item item) {
         switch (item) {
+        case TimeBase:    return "TIMEBASE";
+        case ClockDivisor: return "CLK.DIV";
+        case ClockMultiplier: return "CLK.MULT";
         case TriggerIn1:  return "TI-TR1";
         case TriggerIn2:  return "TI-TR2";
         case TriggerIn3:  return "TI-TR3";
@@ -82,6 +88,15 @@ private:
 
     void formatValue(Item item, StringBuilder &str) const {
         switch (item) {
+        case TimeBase:
+            _track->printTimeBase(str);
+            break;
+        case ClockDivisor:
+            _track->printClockDivisor(str);
+            break;
+        case ClockMultiplier:
+            _track->printClockMultiplier(str);
+            break;
         case TriggerIn1:
         case TriggerIn2:
         case TriggerIn3:
@@ -119,6 +134,15 @@ private:
 
     void editValue(Item item, int value, bool shift) {
         switch (item) {
+        case TimeBase:
+            _track->editTimeBase(value, shift);
+            break;
+        case ClockDivisor:
+            _track->editClockDivisor(value, shift);
+            break;
+        case ClockMultiplier:
+            _track->editClockMultiplier(value, shift);
+            break;
         case TriggerIn1:
         case TriggerIn2:
         case TriggerIn3:

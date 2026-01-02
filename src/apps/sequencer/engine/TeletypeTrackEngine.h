@@ -57,13 +57,15 @@ public:
     static const char *presetName(int presetIndex);
     void syncMetroFromState();
     void resetMetroTimer();
+    uint32_t timeTicks() const;
 
 private:
     void installBootScript();
     void runBootScript();
-    void advanceTime(float dt);
-    void runMetro(float dt);
-    void updatePulses(float dt);
+    float advanceTime(float dt);
+    float advanceClockTime();
+    void runMetro(float timeDelta);
+    void updatePulses(float timeDelta);
     void updateInputTriggers();
     void refreshActivity(float dt);
     float rawToVolts(int16_t value) const;
@@ -79,6 +81,10 @@ private:
     bool _activity = false;
     float _activityCountdownMs = 0.f;
     float _tickRemainderMs = 0.f;
+    double _clockRemainder = 0.0;
+    double _lastClockPos = 0.0;
+    bool _clockPosValid = false;
+    uint32_t _clockTickCounter = 0;
     float _metroRemainingMs = 0.f;
     int16_t _metroPeriodMs = 0;
     bool _metroActive = false;

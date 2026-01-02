@@ -20,7 +20,7 @@ These operations explicitly call external functions defined in `teletype_io.h`. 
     *   **Status:** Wrapped (reads mapped trigger input sources).
 *   **System Time (`TIME`, `LAST`)**
     *   **Calls:** `tele_get_ticks` (to calculate elapsed time).
-    *   **Status:** Wrapped.
+    *   **Status:** Wrapped; `tele_get_ticks` now follows Teletype time base (MS or Clock).
 *   **Metronome (`M`, `M!`)**
     *   **Calls:** `tele_metro_updated`, `tele_metro_reset`.
     *   **Status:** Hooks are stubbed; metro is driven by `TeletypeTrackEngine::runMetro`.

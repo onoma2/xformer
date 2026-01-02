@@ -30,6 +30,11 @@ void TeletypeTrack::clear() {
     for (int i = 0; i < ScriptSlotCount; ++i) {
         _scriptPresetIndex[i] = static_cast<uint8_t>(i);
     }
+
+    // Timing defaults
+    _timeBase = TimeBase::Ms;
+    _clockDivisor = 12;
+    _clockMultiplier = 100;
 }
 
 void TeletypeTrack::gateOutputName(int index, StringBuilder &str) const {
@@ -122,6 +127,9 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     for (int i = 0; i < 4; ++i) {
         writer.write(uint8_t(_cvOutputDest[i]));
     }
+    writer.write(uint8_t(_timeBase));
+    writer.write(_clockDivisor);
+    writer.write(_clockMultiplier);
 }
 
 void TeletypeTrack::read(VersionedSerializedReader &reader) {
@@ -149,4 +157,11 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         reader.read(val);
         _cvOutputDest[i] = ModelUtils::clampedEnum(CvOutputDest(val));
     }
+    uint8_t timeBaseVal;
+    reader.read(timeBaseVal);
+    _timeBase = ModelUtils::clampedEnum(TimeBase(timeBaseVal));
+    reader.read(_clockDivisor);
+    _clockDivisor = ModelUtils::clampDivisor(_clockDivisor);
+    reader.read(_clockMultiplier);
+    _clockMultiplier = clamp<int16_t>(_clockMultiplier, 50, 150);
 }

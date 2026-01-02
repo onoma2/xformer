@@ -28,17 +28,25 @@ struct PresetScript {
 
 constexpr PresetScript kPresetScripts[kPresetScriptCount] = {
     { "Test 1",
-      { "EVERY 2: CV.SLEW 1 200",
-        "CV 1 N 42 ; TR.PULSE 1",
-        nullptr },
-      2 },
+      { "TIME.ACT 1",
+        "X LIM SUB MOD TIME 16384 8000 -1500 1500",
+        "CV 1 ADD 8000 X ; TR.PULSE 1" },
+      3 },
     { "Test 2",
-      { "CV.SLEW 2 RAND 2000",
-        "CV 2 N 48 ; TR.PULSE 2",
+      { "X LIM SUB MOD LAST 2 16384 8000 -1500 1500",
+        "CV 2 ADD 8000 X ; TR.PULSE 2",
         nullptr },
       2 },
-    { "Test 3", { "TR.PULSE 3 ; CV 3 N 54", nullptr, nullptr }, 1 },
-    { "Test 4", { "TR.PULSE 4 ; CV 4 N 60", nullptr, nullptr }, 1 },
+    { "Test 3",
+      { "X LIM SUB MOD LAST 1 16384 8000 -1500 1500",
+        "CV 3 ADD 8000 X ; TR.PULSE 3",
+        nullptr },
+      2 },
+    { "Test 4",
+      { "X LIM SUB MOD TIME 16384 8000 -1500 1500",
+        "CV 4 ADD 8000 X ; TR.PULSE 4",
+        nullptr },
+      2 },
     { "Avg Clamp",
       { "X LIM SUB AVG IN PARAM 8000 -1500 1500",
         "CV 1 ADD 8000 X ; TR.PULSE 1",
@@ -85,6 +93,10 @@ void TeletypeTrackEngine::reset() {
     _activity = false;
     _activityCountdownMs = 0.f;
     _tickRemainderMs = 0.f;
+    _clockRemainder = 0.0;
+    _lastClockPos = 0.0;
+    _clockPosValid = false;
+    _clockTickCounter = 0;
     _metroRemainingMs = 0.f;
     _metroPeriodMs = 0;
     _metroActive = false;
@@ -154,10 +166,10 @@ void TeletypeTrackEngine::update(float dt) {
     }
 
     TeletypeBridge::ScopedEngine scope(*this);
-    advanceTime(dt);
+    float timeDelta = advanceTime(dt);
     updateInputTriggers();
-    runMetro(dt);
-    updatePulses(dt);
+    runMetro(timeDelta);
+    updatePulses(timeDelta);
     refreshActivity(dt);
 }
 
@@ -346,8 +358,11 @@ void TeletypeTrackEngine::selectNextManualScript() {
 void TeletypeTrackEngine::syncMetroFromState() {
     scene_state_t &state = _teletypeTrack.state();
     int16_t period = state.variables.m;
-    if (period < METRO_MIN_UNSUPPORTED_MS) {
-        period = METRO_MIN_UNSUPPORTED_MS;
+    int16_t minPeriod = _teletypeTrack.timeBase() == TeletypeTrack::TimeBase::Clock
+                            ? 1
+                            : METRO_MIN_UNSUPPORTED_MS;
+    if (period < minPeriod) {
+        period = minPeriod;
     }
     _metroPeriodMs = period;
     _metroActive = state.variables.m_act;
@@ -360,6 +375,13 @@ void TeletypeTrackEngine::resetMetroTimer() {
     if (_metroActive && _metroPeriodMs > 0) {
         _metroRemainingMs = _metroPeriodMs;
     }
+}
+
+uint32_t TeletypeTrackEngine::timeTicks() const {
+    if (_teletypeTrack.timeBase() == TeletypeTrack::TimeBase::Clock) {
+        return _clockTickCounter;
+    }
+    return TeletypeBridge::ticksMs();
 }
 
 void TeletypeTrackEngine::installBootScript() {
@@ -376,13 +398,49 @@ void TeletypeTrackEngine::runBootScript() {
     _activityCountdownMs = kActivityHoldMs;
 }
 
-void TeletypeTrackEngine::advanceTime(float dt) {
-    _tickRemainderMs += dt * 1000.f;
+float TeletypeTrackEngine::advanceTime(float dt) {
+    if (_teletypeTrack.timeBase() == TeletypeTrack::TimeBase::Clock) {
+        return advanceClockTime();
+    }
+
+    float deltaMs = dt * 1000.f;
+    _tickRemainderMs += deltaMs;
     while (_tickRemainderMs >= 1.f) {
         float step = std::min(_tickRemainderMs, 255.f);
         tele_tick(&_teletypeTrack.state(), static_cast<uint8_t>(step));
         _tickRemainderMs -= step;
     }
+    return deltaMs;
+}
+
+float TeletypeTrackEngine::advanceClockTime() {
+    double tickPos = _engine.clock().tickPosition();
+    double clockMult = _teletypeTrack.clockMultiplier() * 0.01;
+    double divisor = _teletypeTrack.clockDivisor();
+    double effectiveDivisor = std::max(1.0, divisor / clockMult);
+    double telePos = tickPos / effectiveDivisor;
+
+    if (!_clockPosValid) {
+        _lastClockPos = telePos;
+        _clockPosValid = true;
+        return 0.f;
+    }
+
+    double delta = telePos - _lastClockPos;
+    if (delta < 0.0) {
+        delta = 0.0;
+    }
+    _lastClockPos = telePos;
+    _clockRemainder += delta;
+
+    while (_clockRemainder >= 1.0) {
+        double step = std::min(_clockRemainder, 255.0);
+        tele_tick(&_teletypeTrack.state(), static_cast<uint8_t>(step));
+        _clockRemainder -= step;
+        _clockTickCounter += static_cast<uint32_t>(step);
+    }
+
+    return static_cast<float>(delta);
 }
 
 void TeletypeTrackEngine::updateInputTriggers() {
@@ -395,7 +453,7 @@ void TeletypeTrackEngine::updateInputTriggers() {
     }
 }
 
-void TeletypeTrackEngine::runMetro(float dt) {
+void TeletypeTrackEngine::runMetro(float timeDelta) {
     scene_state_t &state = _teletypeTrack.state();
     bool active = state.variables.m_act;
     if (!active) {
@@ -405,8 +463,11 @@ void TeletypeTrackEngine::runMetro(float dt) {
     }
 
     int16_t period = state.variables.m;
-    if (period < METRO_MIN_UNSUPPORTED_MS) {
-        period = METRO_MIN_UNSUPPORTED_MS;
+    int16_t minPeriod = _teletypeTrack.timeBase() == TeletypeTrack::TimeBase::Clock
+                            ? 1
+                            : METRO_MIN_UNSUPPORTED_MS;
+    if (period < minPeriod) {
+        period = minPeriod;
     }
 
     if (_metroPeriodMs != period || !_metroActive) {
@@ -419,7 +480,7 @@ void TeletypeTrackEngine::runMetro(float dt) {
         return;
     }
 
-    _metroRemainingMs -= dt * 1000.f;
+    _metroRemainingMs -= timeDelta;
     while (_metroRemainingMs <= 0.f) {
         run_script(&state, METRO_SCRIPT);
         _metroRemainingMs += _metroPeriodMs;
@@ -428,13 +489,12 @@ void TeletypeTrackEngine::runMetro(float dt) {
     }
 }
 
-void TeletypeTrackEngine::updatePulses(float dt) {
-    float dtMs = dt * 1000.f;
+void TeletypeTrackEngine::updatePulses(float timeDelta) {
     for (size_t i = 0; i < _teletypePulseRemainingMs.size(); ++i) {
         if (_teletypePulseRemainingMs[i] <= 0.f) {
             continue;
         }
-        _teletypePulseRemainingMs[i] -= dtMs;
+        _teletypePulseRemainingMs[i] -= timeDelta;
         if (_teletypePulseRemainingMs[i] <= 0.f) {
             _teletypePulseRemainingMs[i] = 0.f;
             tele_tr_pulse_end(&_teletypeTrack.state(), static_cast<uint8_t>(i));
