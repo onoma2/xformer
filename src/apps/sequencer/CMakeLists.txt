@@ -125,6 +125,7 @@ set(sources
     ui/pages/TopPage.cpp
     ui/pages/TrackPage.cpp
     ui/pages/TeletypeEditPage.cpp
+    ui/pages/TeletypeScriptViewPage.cpp
     ui/pages/UserScalePage.cpp
     # ui/models
     ui/model/AccumulatorListModel.h

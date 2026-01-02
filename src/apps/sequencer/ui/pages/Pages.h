@@ -44,6 +44,7 @@
 #include "IndexedRouteConfigPage.h"
 #include "IndexedMathPage.h"
 #include "TeletypeEditPage.h"
+#include "TeletypeScriptViewPage.h"
 
 #ifdef CONFIG_ENABLE_INTRO
 #include "IntroPage.h"
@@ -83,6 +84,7 @@ struct Pages {
     IndexedRouteConfigPage indexedRouteConfig;
     IndexedMathPage indexedMath;
     TeletypeEditPage teletypeEdit;
+    TeletypeScriptViewPage teletypeScriptView;
     SystemPage system;
     // modal pages
     TempoPage tempo;
@@ -138,6 +140,7 @@ struct Pages {
         indexedRouteConfig(manager, context),
         indexedMath(manager, context),
         teletypeEdit(manager, context),
+        teletypeScriptView(manager, context),
         system(manager, context),
         // modal pages
         tempo(manager, context),
