@@ -42,6 +42,11 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
     const int scriptIndex = 0; // S0
     const uint8_t len = ss_get_script_len(&state, scriptIndex);
 
+    FixedStringBuilder<4> scriptLabel("S%d", scriptIndex);
+    canvas.setColor(Color::Medium);
+    int scriptX = Width - 4 - canvas.textWidth(scriptLabel);
+    canvas.drawText(scriptX, 4, scriptLabel);
+
     for (int i = 0; i < kLineCount; ++i) {
         int y = kRowStartY + i * kRowStepY;
         char lineText[128] = {};
