@@ -36,35 +36,114 @@ These represent the non-typing physical interactions needed to manage the editor
 
 ---
 
-## 3. Estimated Frequency & Priority
+## 3. Step Button T9 Map (Draft)
+T9-style cycling per step key. Base layer includes digits plus full A-Z. Modifiers add symbols and op tokens.
+
+### Base (no modifier)
+1: `1 A B`  
+2: `2 C D`  
+3: `3 E F`  
+4: `4 G H`  
+5: `5 I J`  
+6: `6 K L`  
+7: `7 M N`  
+8: `8 O P`  
+9: `9 Q R`  
+10: `0 S T`  
+11: `. U V`  
+12: `:` `W X`  
+13: `;` `Y Z`  
+14: `CV` `IN`  
+15: `TR` `PARAM`  
+16: `EVERY` `IF`
+
+### Shift (Shift + Step)
+1: `!`  
+2: `<`  
+3: `>`  
+4: `*`  
+5: `/`  
+6: `%`  
+7: `(`  
+8: `)`  
+9: `[`  
+10: `]`  
+11: `&`  
+12: `|`  
+13: `^`  
+14: `'`  
+15: `,`  
+16: `#`
+
+### Page (Page + Step) = Op Tokens
+1: `CV`  
+2: `CV.SLEW`  
+3: `CV.OFF`  
+4: `CV.SET`  
+5: `TR.P`  
+6: `TR`  
+7: `TR.TOG`  
+8: `TR.TIME`  
+9: `IN`  
+10: `PARAM`  
+11: `STATE`  
+12: `P`  
+13: `PN`  
+14: `P.NEXT`  
+15: `P.I`  
+16: `P.L`
+
+### Shift+Page (Shift + Page + Step) = Logic/Math
+1: `IF`  
+2: `ELIF`  
+3: `ELSE`  
+4: `EVERY`  
+5: `SKIP`  
+6: `L`  
+7: `W`  
+8: `ADD`  
+9: `SUB`  
+10: `MUL`  
+11: `DIV`  
+12: `MOD`  
+13: `MIN`  
+14: `MAX`  
+15: `LIM`  
+16: `AVG`
+
+---
+
+## 4. Estimated Frequency & Priority
 Prioritizing these inputs is essential for a smooth "encoder + button" workflow.
 
 ### Token Frequency Breakdown
 
 | Tier | Category | Tokens / Characters | Purpose |
 | :--- | :--- | :--- | :--- |
-| **1. Constant** | **Essential** | `Space`, `0-9`, `CV`, `TR`, `TR.P` | Basic I/O and values used in almost every line. |
-| **2. High** | **Logic & Math** | `IF`, `:`, `.`, `X`, `Y`, `A`, `B`, `+`, `-`, `RAND` | Control flow, common variables, and arithmetic. |
-| **3. Medium** | **State & Timing** | `M`, `DEL`, `PARAM`, `IN`, `I`, `J`, `K`, `O`, `P.NEXT` | Setup, metro, hardware inputs, and pattern access. |
-| **4. Low** | **Advanced** | `ELSE`, `ELIF`, `L`, `W`, `Q.*`, `@`, `$`, `?` | Loops, complex logic, queues, and turtle graphics. |
+| **1. Constant** | **Essential** | `Space`, `0-9`, `.` (Dot) | The dot is critical for namespacing (P.N, TR.P). Used in 90% of lines. |
+| **2. Very High** | **Core IO & Logic** | `CV`, `TR`, `IF`, `:`, `X`, `Y`, `A`, `B` | The colon is mandatory for all logic/timing modifiers. |
+| **3. High** | **Math & Structure** | `+`, `-`, `;`, `RAND`, `PARAM` | Plus/Minus are popular aliases. Semicolon essential for multi-cmd lines. |
+| **4. Medium** | **State & Timing** | `M`, `DEL`, `IN`, `P.NEXT`, `PN` | Setup, metro, hardware inputs, and pattern access. |
+| **5. Low** | **Advanced** | `ELSE`, `ELIF`, `L`, `W`, `Q.*`, `@`, `$`, `?` | Loops, complex logic, queues, and turtle graphics. |
+| **unused** | **Ignored** | `,` (Comma) | Not used in script syntax. Only for comments. |
 
 ### Character vs. Token Priority
 
 | Frequency | Items | Integration Priority |
 | :--- | :--- | :--- |
-| **Very High** | `Enter`, `Space`, `0-9`, `Navigation` | **Tier 1 (Direct Physical Access):** Map to dedicated buttons or encoder clicks. |
-| **High** | `Backspace`, `X, Y, A, B`, `. (Dot)`, `CV`, `TR`, `IF`, `DEL` | **Tier 2 (Top-Level UI):** First items in the character scroll or Op palette. |
-| **Medium** | `: (Colon)`, `+ - * /`, `P.N`, `M`, `Script Select` | **Tier 3 (Sub-Menus):** Accessible via category-based context menus. |
-| **Low** | `A-Z` (Full list), `;`, `=`, `! & \| ^`, `@`, `$`, `?` | **Tier 4 (Full Picker):** Buried in the full alphanumeric list or advanced menus. |
+| **Very High** | `Enter`, `Space`, `0-9`, `Navigation`, `.` | **Tier 1 (Direct Physical Access):** Map to dedicated buttons or encoder clicks. |
+| **High** | `Backspace`, `X, Y, A, B`, `:`, `CV`, `TR`, `IF` | **Tier 2 (Top-Level UI):** First items in the character scroll or Op palette. |
+| **Medium** | `;`, `+ -`, `DEL`, `P.N`, `M`, `Script Select` | **Tier 3 (Sub-Menus):** Accessible via category-based context menus. |
+| **Low** | `A-Z` (Full list), `* /`, `! & \| ^`, `@`, `$`, `?` | **Tier 4 (Full Picker):** Buried in the full alphanumeric list or advanced menus. |
 
 ---
 
-## 4. Design Insights for Performer
+## 5. Design Insights for Performer
 *   **Space is King:** Since every command requires multiple spaces (e.g., `CV 1 N 60`), mapping `Space` to a dedicated physical button (like a Shift+Encoder click) will double the editing speed.
 *   **Token over Character:** Selecting "ADD" from a menu is significantly faster than scrolling to `A`, then `D`, then `D`. The UI should favor inserting full Op tokens.
 *   **Numbers:** Direct access to numbers 0-9 (perhaps via the 8 Step buttons) would greatly benefit the 50% of scripting that involves entering values.
 
-## 5. Proposed Op Palette Layout (Context Menu)
+## 6. Proposed Op Palette Layout (Context Menu)
 
 To minimize character-by-character typing, the UI should provide a category-based context menu. Here is the layout for the two most frequent categories:
 

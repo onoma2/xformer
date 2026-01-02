@@ -69,11 +69,11 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         canvas.drawText(kTextX, y + 4, lineText);
     }
 
-    FixedStringBuilder<128> editLine("E %s", _editBuffer);
+    FixedStringBuilder<128> editLine("> %s", _editBuffer);
     canvas.setColor(Color::Bright);
     canvas.drawText(kLabelX, kEditLineY + 4, editLine);
 
-    int prefixWidth = canvas.textWidth("E ");
+    int prefixWidth = canvas.textWidth("> ");
     int cursorOffset = 0;
     for (int i = 0; i < _cursor; ++i) {
         const char str[2] = { _editBuffer[i] == '\0' ? ' ' : _editBuffer[i], '\0' };
@@ -87,12 +87,12 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
     }
     int cursorX = kLabelX + prefixWidth + cursorOffset;
     int cursorY = kEditLineY;
-    if (os::ticks() % os::time::ms(600) < os::time::ms(300)) {
+    if (os::ticks() % os::time::ms(800) < os::time::ms(400)) {
         canvas.setColor(Color::Medium);
         canvas.fillRect(cursorX, cursorY, cursorWidth - 1, kRowStepY - 1);
         canvas.setBlendMode(BlendMode::Sub);
         canvas.setColor(Color::Bright);
-        canvas.drawText(cursorX, kEditLineY + 4, cursorStr);
+        canvas.drawText(cursorX, kEditLineY, cursorStr);
         canvas.setBlendMode(BlendMode::Set);
     }
 }
