@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "Serialize.h"
 #include "ModelUtils.h"
+#include "Types.h"
 
 #include "core/utils/StringBuilder.h"
 
@@ -230,6 +231,51 @@ public:
         }
     }
 
+    // Per-output range/offset
+    Types::VoltageRange cvOutputRange(int index) const {
+        if (index < 0 || index >= CvOutputCount) return Types::VoltageRange::Bipolar5V;
+        return _cvOutputRange[index];
+    }
+    void setCvOutputRange(int index, Types::VoltageRange range) {
+        if (index >= 0 && index < CvOutputCount) {
+            _cvOutputRange[index] = ModelUtils::clampedEnum(range);
+        }
+    }
+    void editCvOutputRange(int index, int value, bool shift) {
+        (void)shift;
+        if (index >= 0 && index < CvOutputCount) {
+            setCvOutputRange(index, ModelUtils::adjustedEnum(_cvOutputRange[index], value));
+        }
+    }
+    void printCvOutputRange(int index, StringBuilder &str) const {
+        if (index >= 0 && index < CvOutputCount) {
+            str(Types::voltageRangeName(_cvOutputRange[index]));
+        }
+    }
+
+    int cvOutputOffset(int index) const {
+        if (index < 0 || index >= CvOutputCount) return 0;
+        return _cvOutputOffset[index];
+    }
+    float cvOutputOffsetVolts(int index) const {
+        return cvOutputOffset(index) * 0.01f;
+    }
+    void setCvOutputOffset(int index, int offset) {
+        if (index >= 0 && index < CvOutputCount) {
+            _cvOutputOffset[index] = clamp(offset, -500, 500);
+        }
+    }
+    void editCvOutputOffset(int index, int value, bool shift) {
+        if (index >= 0 && index < CvOutputCount) {
+            setCvOutputOffset(index, _cvOutputOffset[index] + value * (shift ? 100 : 1));
+        }
+    }
+    void printCvOutputOffset(int index, StringBuilder &str) const {
+        if (index >= 0 && index < CvOutputCount) {
+            str("%+.2fV", cvOutputOffsetVolts(index));
+        }
+    }
+
     //----------------------------------------
     // Conflict Detection
     //----------------------------------------
@@ -428,6 +474,8 @@ private:
     TimeBase _timeBase = TimeBase::Ms;
     uint16_t _clockDivisor = 12;
     int16_t _clockMultiplier = 100;
+    std::array<Types::VoltageRange, CvOutputCount> _cvOutputRange{};
+    std::array<int16_t, CvOutputCount> _cvOutputOffset{};
 
     friend class Track;
 };

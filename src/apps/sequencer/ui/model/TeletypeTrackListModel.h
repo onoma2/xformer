@@ -55,6 +55,14 @@ private:
         CvOut2,
         CvOut3,
         CvOut4,
+        Cv1Range,
+        Cv1Offset,
+        Cv2Range,
+        Cv2Offset,
+        Cv3Range,
+        Cv3Offset,
+        Cv4Range,
+        Cv4Offset,
         Last
     };
 
@@ -77,6 +85,14 @@ private:
         case CvOut2:      return "TO-CV2";
         case CvOut3:      return "TO-CV3";
         case CvOut4:      return "TO-CV4";
+        case Cv1Range:    return "CV1 RNG";
+        case Cv1Offset:   return "CV1 OFF";
+        case Cv2Range:    return "CV2 RNG";
+        case Cv2Offset:   return "CV2 OFF";
+        case Cv3Range:    return "CV3 RNG";
+        case Cv3Offset:   return "CV3 OFF";
+        case Cv4Range:    return "CV4 RNG";
+        case Cv4Offset:   return "CV4 OFF";
         case Last:        break;
         }
         return nullptr;
@@ -127,6 +143,22 @@ private:
             _track->printCvOutputDest(index, str);
             break;
         }
+        case Cv1Range:
+        case Cv2Range:
+        case Cv3Range:
+        case Cv4Range: {
+            int index = (int(item) - int(Cv1Range)) / 2;
+            _track->printCvOutputRange(index, str);
+            break;
+        }
+        case Cv1Offset:
+        case Cv2Offset:
+        case Cv3Offset:
+        case Cv4Offset: {
+            int index = (int(item) - int(Cv1Offset)) / 2;
+            _track->printCvOutputOffset(index, str);
+            break;
+        }
         case Last:
             break;
         }
@@ -171,6 +203,22 @@ private:
         case CvOut4: {
             int index = int(item) - int(CvOut1);
             _track->editCvOutputDest(index, value, shift);
+            break;
+        }
+        case Cv1Range:
+        case Cv2Range:
+        case Cv3Range:
+        case Cv4Range: {
+            int index = (int(item) - int(Cv1Range)) / 2;
+            _track->editCvOutputRange(index, value, shift);
+            break;
+        }
+        case Cv1Offset:
+        case Cv2Offset:
+        case Cv3Offset:
+        case Cv4Offset: {
+            int index = (int(item) - int(Cv1Offset)) / 2;
+            _track->editCvOutputOffset(index, value, shift);
             break;
         }
         case Last:

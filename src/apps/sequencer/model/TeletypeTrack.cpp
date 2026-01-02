@@ -35,6 +35,12 @@ void TeletypeTrack::clear() {
     _timeBase = TimeBase::Ms;
     _clockDivisor = 12;
     _clockMultiplier = 100;
+
+    // CV range/offset defaults
+    for (int i = 0; i < CvOutputCount; ++i) {
+        _cvOutputRange[i] = Types::VoltageRange::Bipolar5V;
+        _cvOutputOffset[i] = 0;
+    }
 }
 
 void TeletypeTrack::gateOutputName(int index, StringBuilder &str) const {
@@ -130,6 +136,10 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(uint8_t(_timeBase));
     writer.write(_clockDivisor);
     writer.write(_clockMultiplier);
+    for (int i = 0; i < 4; ++i) {
+        writer.write(uint8_t(_cvOutputRange[i]));
+        writer.write(_cvOutputOffset[i]);
+    }
 }
 
 void TeletypeTrack::read(VersionedSerializedReader &reader) {
@@ -164,4 +174,11 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
     _clockDivisor = ModelUtils::clampDivisor(_clockDivisor);
     reader.read(_clockMultiplier);
     _clockMultiplier = clamp<int16_t>(_clockMultiplier, 50, 150);
+    for (int i = 0; i < 4; ++i) {
+        uint8_t rangeVal;
+        reader.read(rangeVal);
+        _cvOutputRange[i] = ModelUtils::clampedEnum(Types::VoltageRange(rangeVal));
+        reader.read(_cvOutputOffset[i]);
+        _cvOutputOffset[i] = clamp<int16_t>(_cvOutputOffset[i], -500, 500);
+    }
 }

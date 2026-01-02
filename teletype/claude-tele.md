@@ -1648,7 +1648,7 @@ void op_stub_unsupported(const void *data, scene_state_t *ss,
 
 ### Challenge
 Teletype uses a keyboard and 128x64 screen. Performer uses:
-- **Input**: 8 step buttons, Left/Right, Function, Page, Shift, Step Encoder
+- **Input**: 16 step buttons, Left/Right, Function, Page, Shift, Step Encoder
 - **Display**: 256x64 OLED (larger, but no keyboard)
 
 ### Solution: Modal UI with Contextual Menus

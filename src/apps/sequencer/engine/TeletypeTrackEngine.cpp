@@ -7,6 +7,7 @@
 
 #include "core/Debug.h"
 #include "core/math/Math.h"
+#include "model/Types.h"
 
 #include <algorithm>
 #include <cmath>
@@ -227,6 +228,12 @@ void TeletypeTrackEngine::handleCv(uint8_t index, int16_t value, bool slew) {
     int16_t raw = static_cast<int16_t>(clamp<int32_t>(rawValue, 0, 16383));
     _teletypeCvRaw[index] = raw;
     float targetVoltage = rawToVolts(raw);
+    const auto &baseRange = Types::voltageRangeInfo(Types::VoltageRange::Bipolar5V);
+    const auto &outRange = Types::voltageRangeInfo(_teletypeTrack.cvOutputRange(index));
+    float normalized = baseRange.normalize(targetVoltage);
+    targetVoltage = outRange.denormalize(normalized);
+    targetVoltage += _teletypeTrack.cvOutputOffsetVolts(index);
+    targetVoltage = clamp(targetVoltage, -5.f, 5.f);
 
     // Map TO-CV1-4 to actual CV output
     auto dest = _teletypeTrack.cvOutputDest(index);

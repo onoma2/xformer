@@ -467,7 +467,7 @@ void TopPage::setSequenceEditPage() {
         setMainPage(pages.indexedSequenceEdit);
         break;
     case Track::TrackMode::Teletype:
-        setMainPage(pages.track);
+        setMainPage(pages.teletypeEdit);
         break;
     case Track::TrackMode::Last:
         break;
