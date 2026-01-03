@@ -1,5 +1,8 @@
 include_directories(../../../apps/sequencer)
 include_directories(../../../apps/sequencer/model) # Add include for model files
+include_directories(../../../../teletype/src)
+include_directories(../../../../teletype/libavr32/src)
+include_directories(../../../../platform/sim/sim)
 include_directories(..) # Add current directory for utils
 
 # Modify register_test to link against sequencer_shared
@@ -36,6 +39,7 @@ register_sequencer_test(TestHarmonyInversionIssue TestHarmonyInversionIssue.cpp)
 register_sequencer_test(TestHarmonyInversionBug TestHarmonyInversionBug.cpp)
 register_sequencer_test(TestHarmonyVoicing TestHarmonyVoicing.cpp)
 register_sequencer_test(TestModel TestModel.cpp)
+register_sequencer_test(TestTeletypeTrackNoText TestTeletypeTrackNoText.cpp)
 register_sequencer_test(TestTuesdayTrack TestTuesdayTrack.cpp)
 register_sequencer_test(TestTuesdayTrackIntegration TestTuesdayTrackIntegration.cpp)
 register_sequencer_test(TestTuesdayTrackEngine TestTuesdayTrackEngine.cpp)

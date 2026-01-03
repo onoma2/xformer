@@ -33,7 +33,6 @@ private:
     void pushHistory(const char *line);
     void recallHistory(int direction);
     void setEditBuffer(const char *text);
-    void syncScriptLines();
 
     int _selectedLine = 0;
     int _cursor = 0;

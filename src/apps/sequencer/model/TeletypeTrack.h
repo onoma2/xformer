@@ -491,58 +491,16 @@ public:
     //----------------------------------------
     // Script preset selection (session-only)
     //----------------------------------------
-    const char *scriptLine(int script, int line) const {
-        if (script < 0 || script >= EditableScriptCount || line < 0 || line >= ScriptLineCount) {
-            return "";
-        }
-        return _scriptLines[script][line].data();
-    }
-    void setScriptLine(int script, int line, const char *text) {
-        if (script < 0 || script >= EditableScriptCount || line < 0 || line >= ScriptLineCount) {
-            return;
-        }
-        auto &buffer = _scriptLines[script][line];
-        if (!text) {
-            buffer[0] = '\0';
-            return;
-        }
-        std::snprintf(buffer.data(), buffer.size(), "%s", text);
-    }
-    void clearScriptLine(int script, int line) {
-        if (script < 0 || script >= EditableScriptCount || line < 0 || line >= ScriptLineCount) {
-            return;
-        }
-        _scriptLines[script][line][0] = '\0';
-    }
-    void clearScript(int script) {
-        if (script < 0 || script >= EditableScriptCount) {
-            return;
-        }
-        for (int line = 0; line < ScriptLineCount; ++line) {
-            _scriptLines[script][line][0] = '\0';
-        }
-    }
-    void clearScripts() {
-        for (int script = 0; script < EditableScriptCount; ++script) {
-            clearScript(script);
-        }
-    }
-    bool hasAnyScriptText() const {
+    bool hasAnyScriptCommands() const {
         for (int script = 0; script < EditableScriptCount; ++script) {
             for (int line = 0; line < ScriptLineCount; ++line) {
-                if (_scriptLines[script][line][0] != '\0') {
+                const tele_command_t *cmd = ss_get_script_command(const_cast<scene_state_t *>(&_state), script, line);
+                if (cmd && cmd->length > 0) {
                     return true;
                 }
             }
         }
         return false;
-    }
-    bool scriptsDirty() const { return _scriptsDirty; }
-    void markScriptsDirty() { _scriptsDirty = true; }
-    bool consumeScriptsDirty() {
-        bool dirty = _scriptsDirty;
-        _scriptsDirty = false;
-        return dirty;
     }
     const scene_pattern_t &pattern(int index) const {
         int clamped = clamp(index, 0, PATTERN_COUNT - 1);
@@ -612,9 +570,7 @@ private:
     std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
     std::array<uint8_t, ScriptSlotCount> _scriptPresetIndex{};             // S0-S3 (session-only)
     int8_t _bootScriptIndex = 0;
-    std::array<std::array<std::array<char, ScriptLineLength>, ScriptLineCount>, EditableScriptCount> _scriptLines{};
     std::array<scene_pattern_t, PATTERN_COUNT> _patterns{};
-    bool _scriptsDirty = false;
     bool _resetMetroOnLoad = true;
     TimeBase _timeBase = TimeBase::Ms;
     uint16_t _clockDivisor = 12;

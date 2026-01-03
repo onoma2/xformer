@@ -486,7 +486,6 @@ void TeletypeScriptViewPage::commitLine() {
     scene_state_t &state = track.state();
     const int scriptIndex = _scriptIndex;
     ss_overwrite_script_command(&state, scriptIndex, _selectedLine, &parsed);
-    track.setScriptLine(scriptIndex, _selectedLine, _editBuffer);
     // Commit succeeded; no UI message per current workflow.
 }
 
@@ -515,7 +514,6 @@ void TeletypeScriptViewPage::duplicateLine() {
         return;
     }
     ss_insert_script_command(&state, scriptIndex, _selectedLine + 1, cmd);
-    syncScriptLines();
     if (_selectedLine < kLineCount - 1) {
         _selectedLine += 1;
     }
@@ -538,7 +536,6 @@ void TeletypeScriptViewPage::deleteLine() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
     ss_delete_script_command(&state, _scriptIndex, _selectedLine);
-    syncScriptLines();
     loadEditBuffer(_selectedLine);
 }
 
@@ -583,22 +580,4 @@ void TeletypeScriptViewPage::setEditBuffer(const char *text) {
     std::strncpy(_editBuffer, text, EditBufferSize - 1);
     _editBuffer[EditBufferSize - 1] = '\0';
     _cursor = int(std::strlen(_editBuffer));
-}
-
-void TeletypeScriptViewPage::syncScriptLines() {
-    auto &track = _project.selectedTrack().teletypeTrack();
-    scene_state_t &state = track.state();
-    const uint8_t len = ss_get_script_len(&state, _scriptIndex);
-    for (int i = 0; i < TeletypeTrack::ScriptLineCount; ++i) {
-        if (i < len) {
-            const tele_command_t *cmd = ss_get_script_command(&state, _scriptIndex, i);
-            if (cmd && cmd->length > 0) {
-                char lineText[EditBufferSize] = {};
-                print_command(cmd, lineText);
-                track.setScriptLine(_scriptIndex, i, lineText);
-                continue;
-            }
-        }
-        track.clearScriptLine(_scriptIndex, i);
-    }
 }

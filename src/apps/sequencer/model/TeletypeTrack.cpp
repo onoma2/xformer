@@ -1,5 +1,9 @@
 #include "TeletypeTrack.h"
 
+extern "C" {
+#include "teletype.h"
+}
+
 void TeletypeTrack::clear() {
     ss_init(&_state);
 
@@ -36,8 +40,7 @@ void TeletypeTrack::clear() {
         _scriptPresetIndex[i] = static_cast<uint8_t>(i);
     }
     _bootScriptIndex = 0;
-    clearScripts();
-    _scriptsDirty = false;
+    // Scripts are stored in scene_state; nothing else to clear.
     _resetMetroOnLoad = true;
 
     // Timing defaults
@@ -176,7 +179,12 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     }
     for (int script = 0; script < EditableScriptCount; ++script) {
         for (int line = 0; line < ScriptLineCount; ++line) {
-            writer.write(_scriptLines[script][line].data(), ScriptLineLength);
+            char lineBuffer[ScriptLineLength] = {};
+            const tele_command_t *cmd = ss_get_script_command(const_cast<scene_state_t *>(&_state), script, line);
+            if (cmd && cmd->length > 0) {
+                print_command(cmd, lineBuffer);
+            }
+            writer.write(lineBuffer, ScriptLineLength);
         }
     }
     for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
@@ -233,15 +241,30 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         reader.read(_cvOutputOffset[i]);
         _cvOutputOffset[i] = clamp<int16_t>(_cvOutputOffset[i], -500, 500);
     }
+    char lineBuffer[ScriptLineLength] = {};
     for (int script = 0; script < EditableScriptCount; ++script) {
+        ss_clear_script(&_state, script);
         for (int line = 0; line < ScriptLineCount; ++line) {
-            reader.read(_scriptLines[script][line].data(), ScriptLineLength, 0);
-            _scriptLines[script][line][ScriptLineLength - 1] = '\0';
+            reader.read(lineBuffer, ScriptLineLength, 0);
+            lineBuffer[ScriptLineLength - 1] = '\0';
+            if (lineBuffer[0] == '\0') {
+                continue;
+            }
+            tele_command_t cmd = {};
+            char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
+            tele_error_t error = parse(lineBuffer, &cmd, errorMsg);
+            if (error != E_OK) {
+                continue;
+            }
+            error = validate(&cmd, errorMsg);
+            if (error != E_OK) {
+                continue;
+            }
+            ss_overwrite_script_command(&_state, script, line, &cmd);
         }
     }
     for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
         reader.read(_patterns[pattern], 0);
     }
-    _scriptsDirty = true;
     _resetMetroOnLoad = true;
 }

@@ -135,10 +135,6 @@ void TeletypeTrackEngine::update(float dt) {
         return;
     }
 
-    if (_teletypeTrack.consumeScriptsDirty()) {
-        loadScriptsFromModel();
-    }
-
     updateAdc(false);
 
     // Apply CV slew using Performer's Slide mechanism
@@ -451,9 +447,8 @@ void TeletypeTrackEngine::setBusCv(int index, float volts) {
 
 void TeletypeTrackEngine::installBootScript() {
     scene_state_t &state = _teletypeTrack.state();
-    if (_teletypeTrack.hasAnyScriptText()) {
-        loadScriptsFromModel();
-    } else {
+    loadScriptsFromModel();
+    if (!_teletypeTrack.hasAnyScriptCommands()) {
         seedScriptsFromPresets();
     }
     if (_teletypeTrack.consumeMetroResetOnLoad()) {
@@ -682,7 +677,6 @@ void TeletypeTrackEngine::applyPresetToScript(int scriptIndex, int presetIndex) 
 
     scene_state_t &state = _teletypeTrack.state();
     ss_clear_script(&state, scriptIndex);
-    _teletypeTrack.clearScript(scriptIndex);
 
     const auto &preset = kPresetScripts[presetIndex];
     for (size_t line = 0; line < preset.lineCount; ++line) {
@@ -691,22 +685,12 @@ void TeletypeTrackEngine::applyPresetToScript(int scriptIndex, int presetIndex) 
             continue;
         }
         applyPresetLine(state, scriptIndex, line, cmd);
-        _teletypeTrack.setScriptLine(scriptIndex, static_cast<int>(line), cmd);
     }
 }
 
 void TeletypeTrackEngine::loadScriptsFromModel() {
+    // No-op: scripts are loaded into scene_state during track deserialization.
     scene_state_t &state = _teletypeTrack.state();
-    for (int script = 0; script < TeletypeTrack::EditableScriptCount; ++script) {
-        ss_clear_script(&state, script);
-        for (int line = 0; line < TeletypeTrack::ScriptLineCount; ++line) {
-            const char *text = _teletypeTrack.scriptLine(script, line);
-            if (text[0] == '\0') {
-                continue;
-            }
-            applyScriptLine(state, script, line, text);
-        }
-    }
     for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
         state.patterns[pattern] = _teletypeTrack.pattern(pattern);
     }
@@ -714,10 +698,8 @@ void TeletypeTrackEngine::loadScriptsFromModel() {
 
 void TeletypeTrackEngine::seedScriptsFromPresets() {
     scene_state_t &state = _teletypeTrack.state();
-    _teletypeTrack.clearScripts();
     installPresetScripts();
     ss_clear_script(&state, METRO_SCRIPT);
-    _teletypeTrack.clearScript(METRO_SCRIPT);
 }
 
 // ====================================================================================
