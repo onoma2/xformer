@@ -3,6 +3,8 @@
 void TeletypeTrack::clear() {
     ss_init(&_state);
 
+    _midiSource.clear();  // Default to MIDI port, Omni channel
+
     // Default I/O mapping
     // TI-TR1-4 → None (avoid cross-triggering by default)
     _triggerInputSource[0] = TriggerInputSource::None;
@@ -140,6 +142,7 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     for (int i = 0; i < 4; ++i) {
         writer.write(uint8_t(_cvOutputDest[i]));
     }
+    _midiSource.write(writer);
     writer.write(uint8_t(_bootScriptIndex));
     writer.write(uint8_t(_timeBase));
     writer.write(_clockDivisor);
@@ -183,6 +186,7 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         reader.read(val);
         _cvOutputDest[i] = ModelUtils::clampedEnum(CvOutputDest(val));
     }
+    _midiSource.read(reader);
     uint8_t bootScriptVal = 0;
     reader.read(bootScriptVal);
     _bootScriptIndex = clamp<int8_t>(bootScriptVal, 0, ScriptSlotCount - 1);

@@ -7,6 +7,7 @@
 
 #include "core/Debug.h"
 #include "core/math/Math.h"
+#include "MidiUtils.h"
 #include "model/Types.h"
 
 #include <algorithm>
@@ -677,4 +678,119 @@ void TeletypeTrackEngine::seedScriptsFromPresets() {
     installPresetScripts();
     ss_clear_script(&state, METRO_SCRIPT);
     _teletypeTrack.clearScript(METRO_SCRIPT);
+}
+
+// ====================================================================================
+// MIDI Integration
+// ====================================================================================
+
+void TeletypeTrackEngine::clearMidiMonitoring() {
+    scene_state_t &state = _teletypeTrack.state();
+    scene_midi_t &midi = state.midi;
+
+    // Clear event counts
+    midi.on_count = 0;
+    midi.off_count = 0;
+    midi.cc_count = 0;
+
+    // Reset last event tracking
+    midi.last_event_type = 0;
+    midi.last_channel = 0;
+    midi.last_note = 0;
+    midi.last_velocity = 0;
+    midi.last_controller = 0;
+    midi.last_cc = 0;
+}
+
+bool TeletypeTrackEngine::receiveMidi(MidiPort port, const MidiMessage &message) {
+    // Filter by MIDI source (port + channel)
+    if (!MidiUtils::matchSource(port, message, _teletypeTrack.midiSource())) {
+        return false;  // Not our source - allow other tracks to process
+    }
+
+    // Process the message (populate data + trigger script)
+    processMidiMessage(message);
+
+    // CRITICAL: Return true to consume message
+    // - Prevents other tracks from seeing this message
+    // - User controls which track gets which MIDI via source config
+    // - Example: Track 1 set to "USB Ch 2" won't consume "MIDI Ch 1"
+    return true;
+}
+
+void TeletypeTrackEngine::processMidiMessage(const MidiMessage &message) {
+    // Clear buffers for fresh state
+    clearMidiMonitoring();
+
+    scene_state_t &state = _teletypeTrack.state();
+    scene_midi_t &midi = state.midi;
+
+    int8_t scriptToRun = -1;
+
+    // Handle Note On
+    if (message.isNoteOn() && message.velocity() > 0) {
+        if (midi.on_count < MAX_MIDI_EVENTS) {
+            midi.note_on[midi.on_count] = message.note();
+            midi.note_vel[midi.on_count] = message.velocity();
+            midi.on_channel[midi.on_count] = message.channel();
+            midi.on_count++;
+        }
+        midi.last_event_type = 1;
+        midi.last_channel = message.channel();
+        midi.last_note = message.note();
+        midi.last_velocity = message.velocity();
+
+        // Check if script assigned to Note On
+        scriptToRun = midi.on_script;
+    }
+    // Handle Note Off (including velocity-0 note-ons)
+    else if (message.isNoteOff() || (message.isNoteOn() && message.velocity() == 0)) {
+        if (midi.off_count < MAX_MIDI_EVENTS) {
+            midi.note_off[midi.off_count] = message.note();
+            midi.off_channel[midi.off_count] = message.channel();
+            midi.off_count++;
+        }
+        midi.last_event_type = 0;
+        midi.last_channel = message.channel();
+        midi.last_note = message.note();
+        midi.last_velocity = 0;
+
+        // Check if script assigned to Note Off
+        scriptToRun = midi.off_script;
+    }
+    // Handle Control Change
+    else if (message.isControlChange()) {
+        if (midi.cc_count < MAX_MIDI_EVENTS) {
+            midi.cn[midi.cc_count] = message.controlNumber();
+            midi.cc[midi.cc_count] = message.controlValue();
+            midi.cc_channel[midi.cc_count] = message.channel();
+            midi.cc_count++;
+        }
+        midi.last_event_type = 2;
+        midi.last_channel = message.channel();
+        midi.last_controller = message.controlNumber();
+        midi.last_cc = message.controlValue();
+
+        // Check if script assigned to CC
+        scriptToRun = midi.cc_script;
+    }
+
+    // Trigger assigned script if valid (0-3 are S0-S3)
+    if (scriptToRun >= 0 && scriptToRun < EDITABLE_SCRIPT_COUNT) {
+        runMidiTriggeredScript(scriptToRun);
+    }
+}
+
+void TeletypeTrackEngine::runMidiTriggeredScript(int scriptIndex) {
+    // Set active engine so teletype callbacks (tele_tr, tele_cv, etc.) work correctly
+    TeletypeBridge::ScopedEngine scopedEngine(*this);
+
+    scene_state_t &state = _teletypeTrack.state();
+
+    // Use teletype VM's run_script function
+    // Declared in teletype/src/teletype.h
+    run_script(&state, scriptIndex);
+
+    // Note: run_script() executes all lines of the script synchronously
+    // CV/TR/DELAY ops are handled by the VM and engine callbacks
 }

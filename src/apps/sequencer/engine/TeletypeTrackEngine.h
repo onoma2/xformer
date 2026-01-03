@@ -39,6 +39,9 @@ public:
         return _performerCvOutput[index];
     }
 
+    virtual bool receiveMidi(MidiPort port, const MidiMessage &message) override;
+    virtual void clearMidiMonitoring() override;
+
     void handleTr(uint8_t index, int16_t value);
     void beginPulse(uint8_t index, int16_t timeMs);
     void clearPulse(uint8_t index);
@@ -62,6 +65,9 @@ public:
     uint32_t timeTicks() const;
 
 private:
+    void runMidiTriggeredScript(int scriptIndex);
+    void processMidiMessage(const MidiMessage &message);
+
     void installBootScript();
     void runBootScript();
     void loadScriptsFromModel();

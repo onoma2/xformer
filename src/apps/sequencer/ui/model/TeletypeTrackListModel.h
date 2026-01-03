@@ -38,6 +38,7 @@ public:
 
 private:
     enum Item {
+        MidiSource,
         TimeBase,
         ClockDivisor,
         ClockMultiplier,
@@ -69,6 +70,7 @@ private:
 
     static const char *itemName(Item item) {
         switch (item) {
+        case MidiSource:  return "MIDI SRC";
         case TimeBase:    return "TIMEBASE";
         case ClockDivisor: return "CLK.DIV";
         case ClockMultiplier: return "CLK.MULT";
@@ -106,6 +108,9 @@ private:
 
     void formatValue(Item item, StringBuilder &str) const {
         switch (item) {
+        case MidiSource:
+            _track->midiSource().print(str);
+            break;
         case TimeBase:
             _track->printTimeBase(str);
             break;
@@ -171,6 +176,9 @@ private:
 
     void editValue(Item item, int value, bool shift) {
         switch (item) {
+        case MidiSource:
+            _track->midiSource().edit(value, shift);
+            break;
         case TimeBase:
             _track->editTimeBase(value, shift);
             break;

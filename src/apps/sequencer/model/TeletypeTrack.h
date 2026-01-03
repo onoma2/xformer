@@ -4,6 +4,7 @@
 #include "Serialize.h"
 #include "ModelUtils.h"
 #include "Types.h"
+#include "MidiConfig.h"
 
 #include "core/utils/StringBuilder.h"
 
@@ -108,6 +109,10 @@ public:
 
     scene_state_t &state() { return _state; }
     const scene_state_t &state() const { return _state; }
+
+    // midiSource
+    const MidiSourceConfig &midiSource() const { return _midiSource; }
+          MidiSourceConfig &midiSource()       { return _midiSource; }
 
     //----------------------------------------
     // Timing (time base + divisor/multiplier)
@@ -542,6 +547,7 @@ private:
     scene_state_t _state;
 
     // I/O Mapping configuration
+    MidiSourceConfig _midiSource;
     std::array<TriggerInputSource, TriggerInputCount> _triggerInputSource;  // TI-TR1 to TI-TR4
     CvInputSource _cvInSource;                              // TI-IN
     CvInputSource _cvParamSource;                           // TI-PARAM
