@@ -58,6 +58,28 @@ The Performer implementation of Teletype includes specific keyboard shortcuts fo
 - **Page + F4**: Exit script view
 - **Page + Function Keys**: Not handled (reserved for other functions)
 
+## Teletype Pattern View Keyboard Shortcuts
+
+The Performer implementation also includes a pattern view for editing teletype patterns:
+
+### Function Keys
+- **F1-F4**: Select pattern 0-3 (F1=Pattern 0, F2=Pattern 1, etc.)
+
+### Step Keys (Steps 1-16)
+- **Steps 1-9**: Insert digits 1-9 into the currently selected pattern position
+- **Step 10 (0)**: Insert digit 0 into the currently selected pattern position
+- **Step 14**: Set pattern length to current row position
+- **Step 15**: Set pattern start position to current row
+- **Step 16**: Set pattern end position to current row
+
+### Navigation and Editing
+- **Left Arrow**: Backspace digit (while editing) or delete current row (with Shift)
+- **Right Arrow**: Insert new row at current position (with Shift toggles turtle display)
+- **Encoder Turn**: Move up/down through pattern rows
+- **Encoder Press**: Negate current value (make positive/negative)
+- **Shift + Encoder Press**: Commit edited value
+- **Page + F4**: Exit pattern view
+
 ## Introduction
 
 This tutorial is designed for intermediate teletype users who want to learn how to use the Teletype Track functionality within the Performer firmware. The Teletype Track in Performer provides a powerful way to integrate teletype scripts with your sequencer, allowing for complex musical patterns and interactions.
