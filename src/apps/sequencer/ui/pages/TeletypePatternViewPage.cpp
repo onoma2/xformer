@@ -61,6 +61,9 @@ void TeletypePatternViewPage::draw(Canvas &canvas) {
     int16_t *varPtr = &state.variables.a;
     const char *varNames[] = { "A", "B", "C", "D", "X", "Y", "Z", "T" };
     const int varIndices[] = { 0, 2, 4, 6, 1, 3, 5, 7 };
+    const int varsValueRight = kVarsX + 18;
+    const int varsDotX = varsValueRight + 2;
+    const int varsLabelX = varsValueRight + 6;
     scene_turtle_t *turtle = ss_turtle_get(&state);
     const bool turtleShown = turtle_get_shown(turtle);
     const uint8_t turtleX = turtle_get_x(turtle);
@@ -126,11 +129,13 @@ void TeletypePatternViewPage::draw(Canvas &canvas) {
         if (rowIndex < 8) {
             const char *label = varNames[rowIndex];
             int16_t value = varPtr[varIndices[rowIndex]];
-            canvas.setColor(Color::Medium);
-            canvas.drawText(kVarsX, y + kTextYOffset, label);
             char valueText[12];
             std::snprintf(valueText, sizeof(valueText), "%d", value);
-            canvas.drawText(kVarsX + 6, y + kTextYOffset, valueText);
+            int valueWidth = canvas.textWidth(valueText);
+            canvas.setColor(Color::Medium);
+            canvas.drawText(varsValueRight - valueWidth, y + kTextYOffset, valueText);
+            canvas.drawText(varsDotX, y + kTextYOffset, ".");
+            canvas.drawText(varsLabelX, y + kTextYOffset, label);
         }
     }
 }

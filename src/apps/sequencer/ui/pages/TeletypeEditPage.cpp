@@ -23,7 +23,7 @@ void TeletypeEditPage::draw(Canvas &canvas) {
     }
 
     WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "TELETYPE");
+    WindowPainter::drawHeader(canvas, _model, _engine, "T9type");
 }
 
 void TeletypeEditPage::updateLeds(Leds &leds) {

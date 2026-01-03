@@ -93,6 +93,9 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         if (_liveMode) {
             if (i == 4 && _hasLiveResult) {
                 std::snprintf(lineText, sizeof(lineText), "%d", _liveResult);
+            } else if (i == 3 && _historyCount > 0 && _historyHead >= 0) {
+                std::strncpy(lineText, _history[_historyHead], sizeof(lineText) - 1);
+                lineText[sizeof(lineText) - 1] = '\0';
             } else {
                 lineText[0] = '\0';
             }
@@ -103,7 +106,13 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
             }
         }
 
-        if (!_liveMode && ss_get_script_comment(&state, scriptIndex, i)) {
+        if (_liveMode) {
+            if (i == 3 && _historyCount > 0 && _historyHead >= 0) {
+                canvas.setColor(Color::Low);
+            } else {
+                canvas.setColor(Color::Medium);
+            }
+        } else if (ss_get_script_comment(&state, scriptIndex, i)) {
             canvas.setColor(Color::Low);
         } else {
             canvas.setColor(i == _selectedLine ? Color::Bright : Color::Medium);
@@ -112,7 +121,11 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
             FixedStringBuilder<4> lineLabel("%d", i + 1);
             canvas.drawText(kLabelX, y + 4, lineLabel);
         }
-        canvas.drawText(kTextX, y + 4, lineText);
+        int textY = y + 4;
+        if (_liveMode && i == 3 && _historyCount > 0 && _historyHead >= 0) {
+            textY -= 4;
+        }
+        canvas.drawText(kTextX, textY, lineText);
     }
 
     FixedStringBuilder<128> editLine("> %s", _editBuffer);

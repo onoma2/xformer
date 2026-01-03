@@ -64,7 +64,7 @@ public:
     case TrackMode::Indexed:
       return "Indexed";
     case TrackMode::Teletype:
-      return "Teletype";
+      return "T9type";
     case TrackMode::Last:
       break;
     }
