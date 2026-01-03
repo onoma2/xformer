@@ -11,6 +11,8 @@
 namespace {
 TeletypeTrackEngine *g_activeEngine = nullptr;
 std::array<int16_t, 16> g_dashboardValues{};
+bool g_hasDelays = false;
+bool g_hasStack = false;
 } // namespace
 
 TeletypeBridge::ScopedEngine::ScopedEngine(TeletypeTrackEngine &engine) {
@@ -32,6 +34,14 @@ void TeletypeBridge::setActiveEngine(TeletypeTrackEngine *engine) {
 
 uint32_t TeletypeBridge::ticksMs() {
     return os::ticks() / os::time::ms(1);
+}
+
+bool TeletypeBridge::hasDelays() {
+    return g_hasDelays;
+}
+
+bool TeletypeBridge::hasStack() {
+    return g_hasStack;
 }
 
 extern "C" {
@@ -111,11 +121,11 @@ void tele_update_adc(uint8_t force) {
 }
 
 void tele_has_delays(bool has_delays) {
-    (void)has_delays;
+    g_hasDelays = has_delays;
 }
 
 void tele_has_stack(bool has_stack) {
-    (void)has_stack;
+    g_hasStack = has_stack;
 }
 
 void tele_cv_off(uint8_t i, int16_t v) {

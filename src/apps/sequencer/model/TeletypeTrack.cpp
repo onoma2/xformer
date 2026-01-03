@@ -30,8 +30,10 @@ void TeletypeTrack::clear() {
     for (int i = 0; i < ScriptSlotCount; ++i) {
         _scriptPresetIndex[i] = static_cast<uint8_t>(i);
     }
+    _bootScriptIndex = 0;
     clearScripts();
     _scriptsDirty = false;
+    _resetMetroOnLoad = true;
 
     // Timing defaults
     _timeBase = TimeBase::Ms;
@@ -138,6 +140,7 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     for (int i = 0; i < 4; ++i) {
         writer.write(uint8_t(_cvOutputDest[i]));
     }
+    writer.write(uint8_t(_bootScriptIndex));
     writer.write(uint8_t(_timeBase));
     writer.write(_clockDivisor);
     writer.write(_clockMultiplier);
@@ -180,6 +183,9 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         reader.read(val);
         _cvOutputDest[i] = ModelUtils::clampedEnum(CvOutputDest(val));
     }
+    uint8_t bootScriptVal = 0;
+    reader.read(bootScriptVal);
+    _bootScriptIndex = clamp<int8_t>(bootScriptVal, 0, ScriptSlotCount - 1);
     uint8_t timeBaseVal;
     reader.read(timeBaseVal);
     _timeBase = ModelUtils::clampedEnum(TimeBase(timeBaseVal));
@@ -204,4 +210,5 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         reader.read(_patterns[pattern], 0);
     }
     _scriptsDirty = true;
+    _resetMetroOnLoad = true;
 }

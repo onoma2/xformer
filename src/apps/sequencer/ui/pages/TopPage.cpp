@@ -105,25 +105,6 @@ void TopPage::keyPress(KeyPressEvent &event) {
     auto &pages = _manager.pages();
     const auto &key = event.key();
 
-    if (!key.pageModifier() && key.isStep() &&
-        _project.selectedTrack().trackMode() == Track::TrackMode::Teletype) {
-        auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
-        if (key.step() == 1) {
-            trackEngine.triggerManualScript();
-            event.consume();
-            return;
-        }
-        if (key.step() == 2) {
-            trackEngine.selectNextManualScript();
-            char message[32] = {};
-            std::snprintf(message, sizeof(message), "TT script %u",
-                          static_cast<unsigned>(trackEngine.manualScriptIndex() + 1));
-            showMessage(message);
-            event.consume();
-            return;
-        }
-    }
-
     if (key.pageModifier() && key.code() == PageKeyMap::Monitor) {
         if (_mode == Mode::Monitor && _manager.top() == &pages.monitor) {
             pages.monitor.toggleScope();

@@ -41,6 +41,7 @@ private:
         TimeBase,
         ClockDivisor,
         ClockMultiplier,
+        BootScript,
         TriggerIn1,
         TriggerIn2,
         TriggerIn3,
@@ -71,6 +72,7 @@ private:
         case TimeBase:    return "TIMEBASE";
         case ClockDivisor: return "CLK.DIV";
         case ClockMultiplier: return "CLK.MULT";
+        case BootScript:  return "INIT SCR";
         case TriggerIn1:  return "TI-TR1";
         case TriggerIn2:  return "TI-TR2";
         case TriggerIn3:  return "TI-TR3";
@@ -112,6 +114,9 @@ private:
             break;
         case ClockMultiplier:
             _track->printClockMultiplier(str);
+            break;
+        case BootScript:
+            str("S%d", _track->bootScriptIndex() + 1);
             break;
         case TriggerIn1:
         case TriggerIn2:
@@ -174,6 +179,9 @@ private:
             break;
         case ClockMultiplier:
             _track->editClockMultiplier(value, shift);
+            break;
+        case BootScript:
+            _track->setBootScriptIndex(_track->bootScriptIndex() + value);
             break;
         case TriggerIn1:
         case TriggerIn2:

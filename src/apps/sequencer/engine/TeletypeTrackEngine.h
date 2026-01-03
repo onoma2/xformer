@@ -47,12 +47,14 @@ public:
     void handleCv(uint8_t index, int16_t value, bool slew);
     void setCvSlew(uint8_t index, int16_t value);
     void setCvOffset(uint8_t index, int16_t value);
+    bool anyCvSlewActive() const;
     uint16_t cvRaw(uint8_t index) const;
     void updateAdc(bool force);
     bool inputState(uint8_t index) const;
     void triggerManualScript();
     void selectNextManualScript();
     uint8_t manualScriptIndex() const { return _manualScriptIndex; }
+    void triggerScript(int scriptIndex);
     void applyPresetToScript(int scriptIndex, int presetIndex);
     static const char *presetName(int presetIndex);
     void syncMetroFromState();

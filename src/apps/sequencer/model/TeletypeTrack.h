@@ -506,6 +506,16 @@ public:
         }
     }
 
+    int bootScriptIndex() const { return _bootScriptIndex; }
+    void setBootScriptIndex(int index) {
+        _bootScriptIndex = clamp<int8_t>(index, 0, ScriptSlotCount - 1);
+    }
+    bool consumeMetroResetOnLoad() {
+        bool pending = _resetMetroOnLoad;
+        _resetMetroOnLoad = false;
+        return pending;
+    }
+
     //----------------------------------------
     // Name printing helpers
     //----------------------------------------
@@ -538,9 +548,11 @@ private:
     std::array<TriggerOutputDest, TriggerOutputCount> _triggerOutputDest;  // TO-TRA to TO-TRD
     std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
     std::array<uint8_t, ScriptSlotCount> _scriptPresetIndex{};             // S0-S3 (session-only)
+    int8_t _bootScriptIndex = 0;
     std::array<std::array<std::array<char, ScriptLineLength>, ScriptLineCount>, EditableScriptCount> _scriptLines{};
     std::array<scene_pattern_t, PATTERN_COUNT> _patterns{};
     bool _scriptsDirty = false;
+    bool _resetMetroOnLoad = true;
     TimeBase _timeBase = TimeBase::Ms;
     uint16_t _clockDivisor = 12;
     int16_t _clockMultiplier = 100;

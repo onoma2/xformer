@@ -18,4 +18,6 @@ public:
     static TeletypeTrackEngine *activeEngine();
     static void setActiveEngine(TeletypeTrackEngine *engine);
     static uint32_t ticksMs();
+    static bool hasDelays();
+    static bool hasStack();
 };

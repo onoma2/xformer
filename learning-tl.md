@@ -1,11 +1,42 @@
 # Teletype Track Learning Tutorial for Performer
 
+## Teletype Track Setup (I/O Mapping)
+
+If your Teletype track is new, set up its I/O first so scripts can see the correct inputs/outputs.
+
+1. **Select the Teletype track**  
+   Press the Track button for the track slot where Teletype is loaded.
+
+2. **Open the Track page (I/O list)**  
+   Press **Page + Track** to open the track list model for the selected track.
+
+3. **Map Teletype inputs**  
+   - **TI-TR1..TI-TR4**: assign trigger sources (CV inputs or gate outputs).  
+   - **TI-IN**: select the CV source for `IN`.  
+   - **TI-PARAM**: select the CV source for `PARAM`.  
+   - **Note**: CV inputs here are direct hardware inputs (no routing needed).
+
+4. **Map Teletype outputs**  
+   - **TO-TRA..TO-TRD**: map Teletype trigger outputs A–D to Performer gate outputs.  
+   - **TO-CV1..TO-CV4**: map Teletype CV outputs 1–4 to Performer CV outputs.
+   - **Tip**: Make sure the corresponding gate/CV outputs are enabled in the **Layout** page.
+
+5. **(Optional) Adjust ranges/offsets**  
+   - **CV1 RNG/OFF .. CV4 RNG/OFF**: set per-output voltage range and offset.
+
+After this, proceed to Script View and start editing scripts.
+
 ## Performer Teletype Keyboard Shortcuts
 
 The Performer implementation of Teletype includes specific keyboard shortcuts for editing scripts:
 
-### Function Keys (F1-F8)
-- **F1-F8**: Select script 0-7 (F1=Script 0, F2=Script 1, etc.)
+### Function Keys (F0-F4)
+- **F0**: Toggle LIVE ↔ S0
+- **F1**: Select S1
+- **F2**: Select S2
+- **F3**: Toggle S3 ↔ Metro
+- **F4**: Toggle Pattern View
+- **Shift + F0-F3**: Fire script S0-S3 (TI-TR1..4)
 
 ### Step Keys (Steps 1-16)
 - **Steps 1-16**: Insert common teletype commands/variables (cycles through options)
@@ -22,11 +53,17 @@ The Performer implementation of Teletype includes specific keyboard shortcuts fo
   - **Step 11**: . → U → V (cycles through .→U→V)
   - **Step 12**: : → W → X (cycles through :→W→X)
   - **Step 13**: ; → Y → Z (cycles through ;→Y→Z)
-  - **Step 14**: CV → IN (cycles through CV→IN)
-  - **Step 15**: TR → PARAM (cycles through TR→PARAM)
-  - **Step 16**: EVERY → IF (cycles through EVERY→IF)
+  - **Step 14**: CV → CV.SLEW → RRAND
+  - **Step 15**: TR.P → PARAM → ELIF
+  - **Step 16**: M.ACT → P.NEXT → DEL
 
 
+### Page + Step Keys (Steps 1-16)
+- **Page + Step 9**: Copy current line
+- **Page + Step 10**: Paste line
+- **Page + Step 11**: Duplicate line
+- **Page + Step 12**: Comment/uncomment line
+- **Page + Step 13**: Delete line
 
 ### Shift + Step Keys (Steps 1-16)
 - **Shift + Steps 1-16**: Insert special characters
@@ -57,15 +94,15 @@ The Performer implementation of Teletype includes specific keyboard shortcuts fo
 - **Encoder Turn**: Move cursor left/right (normal) or select line (with Shift)
 
 ### Other Controls
-- **Page + F4**: Exit script view
-- **Page + Function Keys**: Not handled (reserved for other functions)
+- **Page + Left/Right**: History prev/next (live/edit)
 
 ## Teletype Pattern View Keyboard Shortcuts
 
 The Performer implementation also includes a pattern view for editing teletype patterns:
 
 ### Function Keys
-- **F1-F4**: Select pattern 0-3 (F1=Pattern 0, F2=Pattern 1, etc.)
+- **F0-F3**: Select pattern 0-3
+- **F4**: Toggle back to Script View
 
 ### Step Keys (Steps 1-16)
 - **Steps 1-9**: Insert digits 1-9 into the currently selected pattern position
@@ -75,12 +112,11 @@ The Performer implementation also includes a pattern view for editing teletype p
 - **Step 16**: Set pattern end position to current row
 
 ### Navigation and Editing
-- **Left Arrow**: Backspace digit (while editing) or delete current row (with Shift)
-- **Right Arrow**: Insert new row at current position (with Shift toggles turtle display)
+- **Left Arrow**: Backspace digit (while editing); **Shift + Left** deletes row
+- **Right Arrow**: Insert row; **Shift + Right** toggles turtle display
 - **Encoder Turn**: Move up/down through pattern rows
 - **Encoder Press**: Negate current value (make positive/negative)
 - **Shift + Encoder Press**: Commit edited value
-- **Page + F4**: Exit pattern view
 
 ## Introduction
 

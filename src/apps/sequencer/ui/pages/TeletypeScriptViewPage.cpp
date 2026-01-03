@@ -62,11 +62,29 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
     } else if (scriptIndex == METRO_SCRIPT) {
         scriptLabel("M");
     } else {
-        scriptLabel("S%d", scriptIndex);
+        scriptLabel("S%d", scriptIndex + 1);
     }
     canvas.setColor(Color::Medium);
     int scriptX = Width - 2 - canvas.textWidth(scriptLabel);
     canvas.drawText(scriptX, 6, scriptLabel);
+
+    if (_liveMode) {
+        auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+        const int iconY = 6;
+        int x = kLabelX;
+        const char *icons[] = { "M", "S", "D", "St" };
+        bool states[] = {
+            state.variables.m_act && ss_get_script_len(&state, METRO_SCRIPT) > 0,
+            trackEngine.anyCvSlewActive(),
+            TeletypeBridge::hasDelays(),
+            TeletypeBridge::hasStack()
+        };
+        for (int i = 0; i < 4; ++i) {
+            canvas.setColor(states[i] ? Color::Bright : Color::Low);
+            canvas.drawText(x, iconY, icons[i]);
+            x += canvas.textWidth(icons[i]) + 4;
+        }
+    }
 
     for (int i = 0; i < kLineCount; ++i) {
         int y = kRowStartY + i * kRowStepY;
@@ -85,7 +103,11 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
             }
         }
 
-        canvas.setColor(i == _selectedLine ? Color::Bright : Color::Medium);
+        if (!_liveMode && ss_get_script_comment(&state, scriptIndex, i)) {
+            canvas.setColor(Color::Low);
+        } else {
+            canvas.setColor(i == _selectedLine ? Color::Bright : Color::Medium);
+        }
         if (!_liveMode) {
             FixedStringBuilder<4> lineLabel("%d", i + 1);
             canvas.drawText(kLabelX, y + 4, lineLabel);
@@ -142,6 +164,15 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
             } else if (key.step() == 9) {
                 pasteLine();
                 event.consume();
+            } else if (key.step() == 10) {
+                duplicateLine();
+                event.consume();
+            } else if (key.step() == 11) {
+                commentLine();
+                event.consume();
+            } else if (key.step() == 12) {
+                deleteLine();
+                event.consume();
             }
         }
         return;
@@ -149,6 +180,14 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
 
     if (key.isFunction()) {
         int fn = key.function();
+        if (key.shiftModifier()) {
+            if (fn >= 0 && fn < TeletypeTrack::ScriptSlotCount) {
+                auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+                trackEngine.triggerScript(fn);
+                event.consume();
+                return;
+            }
+        }
         if (fn == 4) {
             _manager.push(&_manager.pages().teletypePatternView);
             event.consume();
@@ -273,12 +312,12 @@ void TeletypeScriptViewPage::handleStepKey(int step, bool shift) {
         { ".", "U", "V" },
         { ":", "W", "X" },
         { ";", "Y", "Z" },
-        { "CV", "IN", nullptr },
-        { "TR", "PARAM", nullptr },
-        { "EVERY", "IF", nullptr }
+        { "CV", "CV.SLEW", "RRAND" },
+        { "TR.P", "PARAM", "ELIF" },
+        { "M.ACT", "P.NEXT", "DEL" }
     };
     static const int kBaseCount[16] = {
-        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
     };
 
     const uint32_t now = os::ticks();
@@ -451,6 +490,45 @@ void TeletypeScriptViewPage::pasteLine() {
     setEditBuffer(_clipboard);
 }
 
+void TeletypeScriptViewPage::duplicateLine() {
+    if (_liveMode) {
+        return;
+    }
+    auto &track = _project.selectedTrack().teletypeTrack();
+    scene_state_t &state = track.state();
+    const int scriptIndex = _scriptIndex;
+    const tele_command_t *cmd = ss_get_script_command(&state, scriptIndex, _selectedLine);
+    if (!cmd) {
+        return;
+    }
+    ss_insert_script_command(&state, scriptIndex, _selectedLine + 1, cmd);
+    syncScriptLines();
+    if (_selectedLine < kLineCount - 1) {
+        _selectedLine += 1;
+    }
+    loadEditBuffer(_selectedLine);
+}
+
+void TeletypeScriptViewPage::commentLine() {
+    if (_liveMode) {
+        return;
+    }
+    auto &track = _project.selectedTrack().teletypeTrack();
+    scene_state_t &state = track.state();
+    ss_toggle_script_comment(&state, _scriptIndex, _selectedLine);
+}
+
+void TeletypeScriptViewPage::deleteLine() {
+    if (_liveMode) {
+        return;
+    }
+    auto &track = _project.selectedTrack().teletypeTrack();
+    scene_state_t &state = track.state();
+    ss_delete_script_command(&state, _scriptIndex, _selectedLine);
+    syncScriptLines();
+    loadEditBuffer(_selectedLine);
+}
+
 void TeletypeScriptViewPage::pushHistory(const char *line) {
     if (!line || line[0] == '\0') {
         return;
@@ -492,4 +570,22 @@ void TeletypeScriptViewPage::setEditBuffer(const char *text) {
     std::strncpy(_editBuffer, text, EditBufferSize - 1);
     _editBuffer[EditBufferSize - 1] = '\0';
     _cursor = int(std::strlen(_editBuffer));
+}
+
+void TeletypeScriptViewPage::syncScriptLines() {
+    auto &track = _project.selectedTrack().teletypeTrack();
+    scene_state_t &state = track.state();
+    const uint8_t len = ss_get_script_len(&state, _scriptIndex);
+    for (int i = 0; i < TeletypeTrack::ScriptLineCount; ++i) {
+        if (i < len) {
+            const tele_command_t *cmd = ss_get_script_command(&state, _scriptIndex, i);
+            if (cmd && cmd->length > 0) {
+                char lineText[EditBufferSize] = {};
+                print_command(cmd, lineText);
+                track.setScriptLine(_scriptIndex, i, lineText);
+                continue;
+            }
+        }
+        track.clearScriptLine(_scriptIndex, i);
+    }
 }

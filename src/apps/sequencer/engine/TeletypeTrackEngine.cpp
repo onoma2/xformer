@@ -277,6 +277,15 @@ void TeletypeTrackEngine::setCvOffset(uint8_t index, int16_t value) {
     _teletypeCvOffset[index] = value;
 }
 
+bool TeletypeTrackEngine::anyCvSlewActive() const {
+    for (bool active : _cvSlewActive) {
+        if (active) {
+            return true;
+        }
+    }
+    return false;
+}
+
 uint16_t TeletypeTrackEngine::cvRaw(uint8_t index) const {
     if (index >= CvOutputCount) {
         return 0;
@@ -366,6 +375,10 @@ void TeletypeTrackEngine::selectNextManualScript() {
     _manualScriptIndex = (_manualScriptIndex + 1) % kManualScriptCount;
 }
 
+void TeletypeTrackEngine::triggerScript(int scriptIndex) {
+    runScript(scriptIndex);
+}
+
 void TeletypeTrackEngine::syncMetroFromState() {
     scene_state_t &state = _teletypeTrack.state();
     int16_t period = state.variables.m;
@@ -402,12 +415,14 @@ void TeletypeTrackEngine::installBootScript() {
     } else {
         seedScriptsFromPresets();
     }
-    state.variables.m_act = 0;
+    if (_teletypeTrack.consumeMetroResetOnLoad()) {
+        state.variables.m_act = 0;
+    }
 }
 
 void TeletypeTrackEngine::runBootScript() {
     TeletypeBridge::ScopedEngine scope(*this);
-    run_script(&_teletypeTrack.state(), 0);
+    run_script(&_teletypeTrack.state(), static_cast<uint8_t>(_teletypeTrack.bootScriptIndex()));
     _activity = true;
     _activityCountdownMs = kActivityHoldMs;
 }
