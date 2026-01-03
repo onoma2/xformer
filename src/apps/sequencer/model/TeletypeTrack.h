@@ -51,6 +51,14 @@ public:
         GateOut6,   // Gate output 6
         GateOut7,   // Gate output 7
         GateOut8,   // Gate output 8
+        LogicalGate1, // Track 1 gate (pre-layout)
+        LogicalGate2,
+        LogicalGate3,
+        LogicalGate4,
+        LogicalGate5,
+        LogicalGate6,
+        LogicalGate7,
+        LogicalGate8,
         Last
     };
 
@@ -68,6 +76,15 @@ public:
         CvOut6,     // Physical CV output 6
         CvOut7,     // Physical CV output 7
         CvOut8,     // Physical CV output 8
+        LogicalCv1, // Track 1 CV (pre-layout)
+        LogicalCv2,
+        LogicalCv3,
+        LogicalCv4,
+        LogicalCv5,
+        LogicalCv6,
+        LogicalCv7,
+        LogicalCv8,
+        None,
         Last
     };
 
@@ -197,6 +214,43 @@ public:
     }
     void printCvParamSource(StringBuilder &str) const {
         str(cvInputSourceName(_cvParamSource));
+    }
+
+    // TI-X, TI-Y, TI-Z: CV input sources for variables
+    CvInputSource cvXSource() const { return _cvXSource; }
+    void setCvXSource(CvInputSource source) {
+        _cvXSource = ModelUtils::clampedEnum(source);
+    }
+    void editCvXSource(int value, bool shift) {
+        (void)shift;
+        setCvXSource(ModelUtils::adjustedEnum(_cvXSource, value));
+    }
+    void printCvXSource(StringBuilder &str) const {
+        str(cvInputSourceName(_cvXSource));
+    }
+
+    CvInputSource cvYSource() const { return _cvYSource; }
+    void setCvYSource(CvInputSource source) {
+        _cvYSource = ModelUtils::clampedEnum(source);
+    }
+    void editCvYSource(int value, bool shift) {
+        (void)shift;
+        setCvYSource(ModelUtils::adjustedEnum(_cvYSource, value));
+    }
+    void printCvYSource(StringBuilder &str) const {
+        str(cvInputSourceName(_cvYSource));
+    }
+
+    CvInputSource cvZSource() const { return _cvZSource; }
+    void setCvZSource(CvInputSource source) {
+        _cvZSource = ModelUtils::clampedEnum(source);
+    }
+    void editCvZSource(int value, bool shift) {
+        (void)shift;
+        setCvZSource(ModelUtils::adjustedEnum(_cvZSource, value));
+    }
+    void printCvZSource(StringBuilder &str) const {
+        str(cvInputSourceName(_cvZSource));
     }
 
     // TO-TRA to TO-TRD (4 trigger outputs)
@@ -551,6 +605,9 @@ private:
     std::array<TriggerInputSource, TriggerInputCount> _triggerInputSource;  // TI-TR1 to TI-TR4
     CvInputSource _cvInSource;                              // TI-IN
     CvInputSource _cvParamSource;                           // TI-PARAM
+    CvInputSource _cvXSource;                               // TI-X
+    CvInputSource _cvYSource;                               // TI-Y
+    CvInputSource _cvZSource;                               // TI-Z
     std::array<TriggerOutputDest, TriggerOutputCount> _triggerOutputDest;  // TO-TRA to TO-TRD
     std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
     std::array<uint8_t, ScriptSlotCount> _scriptPresetIndex{};             // S0-S3 (session-only)

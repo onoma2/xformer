@@ -15,6 +15,9 @@ void TeletypeTrack::clear() {
     // TI-IN → CV input 1, TI-PARAM → CV input 2
     _cvInSource = CvInputSource::CvIn1;
     _cvParamSource = CvInputSource::CvIn2;
+    _cvXSource = CvInputSource::None;
+    _cvYSource = CvInputSource::None;
+    _cvZSource = CvInputSource::None;
 
     // TO-TRA-D → Gate outputs 1-4
     _triggerOutputDest[0] = TriggerOutputDest::GateOut1;
@@ -75,6 +78,14 @@ const char *TeletypeTrack::triggerInputSourceName(TriggerInputSource source) {
     case TriggerInputSource::GateOut6: return "Gate Out 6";
     case TriggerInputSource::GateOut7: return "Gate Out 7";
     case TriggerInputSource::GateOut8: return "Gate Out 8";
+    case TriggerInputSource::LogicalGate1: return "L-G1";
+    case TriggerInputSource::LogicalGate2: return "L-G2";
+    case TriggerInputSource::LogicalGate3: return "L-G3";
+    case TriggerInputSource::LogicalGate4: return "L-G4";
+    case TriggerInputSource::LogicalGate5: return "L-G5";
+    case TriggerInputSource::LogicalGate6: return "L-G6";
+    case TriggerInputSource::LogicalGate7: return "L-G7";
+    case TriggerInputSource::LogicalGate8: return "L-G8";
     case TriggerInputSource::Last:     break;
     }
     return nullptr;
@@ -94,6 +105,15 @@ const char *TeletypeTrack::cvInputSourceName(CvInputSource source) {
     case CvInputSource::CvOut6: return "CV Out 6";
     case CvInputSource::CvOut7: return "CV Out 7";
     case CvInputSource::CvOut8: return "CV Out 8";
+    case CvInputSource::LogicalCv1: return "L-CV1";
+    case CvInputSource::LogicalCv2: return "L-CV2";
+    case CvInputSource::LogicalCv3: return "L-CV3";
+    case CvInputSource::LogicalCv4: return "L-CV4";
+    case CvInputSource::LogicalCv5: return "L-CV5";
+    case CvInputSource::LogicalCv6: return "L-CV6";
+    case CvInputSource::LogicalCv7: return "L-CV7";
+    case CvInputSource::LogicalCv8: return "L-CV8";
+    case CvInputSource::None:   return "Off";
     case CvInputSource::Last:   break;
     }
     return nullptr;
@@ -136,6 +156,9 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     }
     writer.write(uint8_t(_cvInSource));
     writer.write(uint8_t(_cvParamSource));
+    writer.write(uint8_t(_cvXSource));
+    writer.write(uint8_t(_cvYSource));
+    writer.write(uint8_t(_cvZSource));
     for (int i = 0; i < 4; ++i) {
         writer.write(uint8_t(_triggerOutputDest[i]));
     }
@@ -170,11 +193,17 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         reader.read(val);
         _triggerInputSource[i] = ModelUtils::clampedEnum(TriggerInputSource(val));
     }
-    uint8_t cvInVal, cvParamVal;
+    uint8_t cvInVal, cvParamVal, cvXVal, cvYVal, cvZVal;
     reader.read(cvInVal);
     reader.read(cvParamVal);
+    reader.read(cvXVal);
+    reader.read(cvYVal);
+    reader.read(cvZVal);
     _cvInSource = ModelUtils::clampedEnum(CvInputSource(cvInVal));
     _cvParamSource = ModelUtils::clampedEnum(CvInputSource(cvParamVal));
+    _cvXSource = ModelUtils::clampedEnum(CvInputSource(cvXVal));
+    _cvYSource = ModelUtils::clampedEnum(CvInputSource(cvYVal));
+    _cvZSource = ModelUtils::clampedEnum(CvInputSource(cvZVal));
 
     for (int i = 0; i < 4; ++i) {
         uint8_t val;

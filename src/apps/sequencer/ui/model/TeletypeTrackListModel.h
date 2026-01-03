@@ -49,6 +49,9 @@ private:
         TriggerIn4,
         CvIn,
         CvParam,
+        CvX,
+        CvY,
+        CvZ,
         TriggerOutA,
         TriggerOutB,
         TriggerOutC,
@@ -81,6 +84,9 @@ private:
         case TriggerIn4:  return "TI-TR4";
         case CvIn:        return "TI-IN";
         case CvParam:     return "TI-PARAM";
+        case CvX:         return "TI-X";
+        case CvY:         return "TI-Y";
+        case CvZ:         return "TI-Z";
         case TriggerOutA: return "TO-TRA";
         case TriggerOutB: return "TO-TRB";
         case TriggerOutC: return "TO-TRC";
@@ -136,6 +142,15 @@ private:
             break;
         case CvParam:
             _track->printCvParamSource(str);
+            break;
+        case CvX:
+            _track->printCvXSource(str);
+            break;
+        case CvY:
+            _track->printCvYSource(str);
+            break;
+        case CvZ:
+            _track->printCvZSource(str);
             break;
         case TriggerOutA:
         case TriggerOutB:
@@ -204,6 +219,15 @@ private:
             break;
         case CvParam:
             _track->editCvParamSource(value, shift);
+            break;
+        case CvX:
+            _track->editCvXSource(value, shift);
+            break;
+        case CvY:
+            _track->editCvYSource(value, shift);
+            break;
+        case CvZ:
+            _track->editCvZSource(value, shift);
             break;
         case TriggerOutA:
         case TriggerOutB:

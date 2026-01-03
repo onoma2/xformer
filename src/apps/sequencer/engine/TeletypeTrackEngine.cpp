@@ -300,42 +300,64 @@ void TeletypeTrackEngine::updateAdc(bool force) {
 
     auto inSource = _teletypeTrack.cvInSource();
     auto paramSource = _teletypeTrack.cvParamSource();
+    auto xSource = _teletypeTrack.cvXSource();
+    auto ySource = _teletypeTrack.cvYSource();
+    auto zSource = _teletypeTrack.cvZSource();
+
+    auto readCvSource = [this](TeletypeTrack::CvInputSource source, float &volts) -> bool {
+        if (source == TeletypeTrack::CvInputSource::None) {
+            return false;
+        }
+        if (source >= TeletypeTrack::CvInputSource::CvIn1 &&
+            source <= TeletypeTrack::CvInputSource::CvIn4) {
+            int channel = int(source) - int(TeletypeTrack::CvInputSource::CvIn1);
+            if (channel < CvInput::Channels) {
+                volts = _engine.cvInput().channel(channel);
+                return true;
+            }
+            return false;
+        }
+        if (source >= TeletypeTrack::CvInputSource::CvOut1 &&
+            source <= TeletypeTrack::CvInputSource::CvOut8) {
+            int channel = int(source) - int(TeletypeTrack::CvInputSource::CvOut1);
+            volts = _engine.cvOutput().channel(channel);
+            return true;
+        }
+        if (source >= TeletypeTrack::CvInputSource::LogicalCv1 &&
+            source <= TeletypeTrack::CvInputSource::LogicalCv8) {
+            int trackIndex = int(source) - int(TeletypeTrack::CvInputSource::LogicalCv1);
+            if (trackIndex >= 0 && trackIndex < CONFIG_TRACK_COUNT) {
+                volts = _engine.trackEngine(trackIndex).cvOutput(0);
+                return true;
+            }
+        }
+        return false;
+    };
 
     float inVoltage = 0.f;
     float paramVoltage = 0.f;
 
     // Read TI-IN from mapped source
-    if (inSource >= TeletypeTrack::CvInputSource::CvIn1 &&
-        inSource <= TeletypeTrack::CvInputSource::CvIn4) {
-        // Physical CV input
-        int channel = int(inSource) - int(TeletypeTrack::CvInputSource::CvIn1);
-        if (channel < CvInput::Channels) {
-            inVoltage = _engine.cvInput().channel(channel);
-        }
-    }
-    // TODO: Add CV output readback support later
-    // else if (inSource >= TeletypeTrack::CvInputSource::CvOut1 &&
-    //          inSource <= TeletypeTrack::CvInputSource::CvOut8) {
-    //     // Physical CV output (read back) - needs implementation
-    // }
+    readCvSource(inSource, inVoltage);
 
     // Read TI-PARAM from mapped source
-    if (paramSource >= TeletypeTrack::CvInputSource::CvIn1 &&
-        paramSource <= TeletypeTrack::CvInputSource::CvIn4) {
-        // Physical CV input
-        int channel = int(paramSource) - int(TeletypeTrack::CvInputSource::CvIn1);
-        if (channel < CvInput::Channels) {
-            paramVoltage = _engine.cvInput().channel(channel);
-        }
-    }
-    // TODO: Add CV output readback support later
-    // else if (paramSource >= TeletypeTrack::CvInputSource::CvOut1 &&
-    //          paramSource <= TeletypeTrack::CvInputSource::CvOut8) {
-    //     // Physical CV output (read back) - needs implementation
-    // }
+    readCvSource(paramSource, paramVoltage);
 
     ss_set_in(&state, voltsToRaw(inVoltage));
     ss_set_param(&state, voltsToRaw(paramVoltage));
+
+    float xVoltage = 0.f;
+    if (readCvSource(xSource, xVoltage)) {
+        state.variables.x = voltsToRaw(xVoltage);
+    }
+    float yVoltage = 0.f;
+    if (readCvSource(ySource, yVoltage)) {
+        state.variables.y = voltsToRaw(yVoltage);
+    }
+    float zVoltage = 0.f;
+    if (readCvSource(zSource, zVoltage)) {
+        state.variables.z = voltsToRaw(zVoltage);
+    }
 }
 
 bool TeletypeTrackEngine::inputState(uint8_t index) const {
@@ -363,6 +385,14 @@ bool TeletypeTrackEngine::inputState(uint8_t index) const {
         int gateIndex = int(source) - int(TeletypeTrack::TriggerInputSource::GateOut1);
         uint8_t gates = _engine.gateOutput();
         return (gates >> gateIndex) & 0x1;
+    }
+
+    if (source >= TeletypeTrack::TriggerInputSource::LogicalGate1 &&
+        source <= TeletypeTrack::TriggerInputSource::LogicalGate8) {
+        int trackIndex = int(source) - int(TeletypeTrack::TriggerInputSource::LogicalGate1);
+        if (trackIndex >= 0 && trackIndex < CONFIG_TRACK_COUNT) {
+            return _engine.trackEngine(trackIndex).gateOutput(0);
+        }
     }
 
     return false;
