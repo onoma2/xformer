@@ -142,18 +142,17 @@ void TeletypePatternViewPage::updateLeds(Leds &leds) {
 void TeletypePatternViewPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
-    if (key.pageModifier() && key.isFunction() && key.function() == 4) {
-        _manager.pop();
-        event.consume();
-        return;
-    }
-
     if (key.pageModifier()) {
         return;
     }
 
     if (key.isFunction()) {
         int fn = key.function();
+        if (fn == 4) {
+            _manager.pop();
+            event.consume();
+            return;
+        }
         if (fn >= 0 && fn < 4) {
             setPatternIndex(fn);
             event.consume();

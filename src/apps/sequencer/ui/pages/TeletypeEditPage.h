@@ -14,6 +14,4 @@ public:
     void encoder(EncoderEvent &event) override;
 
 private:
-    void setSelectedSlot(int slot);
-    int _selectedSlot = 0;
 };

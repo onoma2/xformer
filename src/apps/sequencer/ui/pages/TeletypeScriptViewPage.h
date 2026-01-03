@@ -25,6 +25,11 @@ private:
     void moveCursorLeft();
     void moveCursorRight();
     void commitLine();
+    void copyLine();
+    void pasteLine();
+    void pushHistory(const char *line);
+    void recallHistory(int direction);
+    void setEditBuffer(const char *text);
 
     int _selectedLine = 0;
     int _cursor = 0;
@@ -36,4 +41,14 @@ private:
     bool _lastKeyShift = false;
     static constexpr int EditBufferSize = 96;
     char _editBuffer[EditBufferSize] = {};
+    char _clipboard[EditBufferSize] = {};
+    bool _hasClipboard = false;
+    bool _liveMode = false;
+    bool _hasLiveResult = false;
+    int16_t _liveResult = 0;
+    static constexpr int HistorySize = 4;
+    char _history[HistorySize][EditBufferSize] = {};
+    int _historyCount = 0;
+    int _historyHead = -1;
+    int _historyCursor = -1;
 };

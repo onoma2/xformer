@@ -2,6 +2,8 @@
 
 #include "Pages.h"
 
+#include "engine/TeletypeBridge.h"
+#include "engine/TeletypeTrackEngine.h"
 #include "ui/LedPainter.h"
 
 #include <cstring>
@@ -14,6 +16,7 @@ extern "C" {
 #include "script.h"
 #include "state.h"
 #include "teletype.h"
+#include "teletype_io.h"
 }
 
 namespace {
@@ -31,7 +34,10 @@ TeletypeScriptViewPage::TeletypeScriptViewPage(PageManager &manager, PageContext
 
 void TeletypeScriptViewPage::enter() {
     _scriptIndex = 0;
-    loadEditBuffer(0);
+    _liveMode = true;
+    _selectedLine = 0;
+    _hasLiveResult = false;
+    setEditBuffer("");
 }
 
 void TeletypeScriptViewPage::draw(Canvas &canvas) {
@@ -42,7 +48,7 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
 
     canvas.setColor(Color::None);
     canvas.fill();
-    canvas.setFont(Font::Tiny);
+    canvas.setFont(_liveMode ? Font::Small : Font::Tiny);
     canvas.setBlendMode(BlendMode::Set);
 
     auto &track = _project.selectedTrack().teletypeTrack();
@@ -51,7 +57,9 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
     const uint8_t len = ss_get_script_len(&state, scriptIndex);
 
     FixedStringBuilder<4> scriptLabel;
-    if (scriptIndex == METRO_SCRIPT) {
+    if (_liveMode) {
+        scriptLabel("L");
+    } else if (scriptIndex == METRO_SCRIPT) {
         scriptLabel("M");
     } else {
         scriptLabel("S%d", scriptIndex);
@@ -64,16 +72,24 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         int y = kRowStartY + i * kRowStepY;
         char lineText[128] = {};
 
-        if (i < len) {
+        if (_liveMode) {
+            if (i == 4 && _hasLiveResult) {
+                std::snprintf(lineText, sizeof(lineText), "%d", _liveResult);
+            } else {
+                lineText[0] = '\0';
+            }
+        } else if (i < len) {
             const tele_command_t *cmd = ss_get_script_command(&state, scriptIndex, i);
             if (cmd) {
                 print_command(cmd, lineText);
             }
         }
 
-        FixedStringBuilder<4> lineLabel("%d", i + 1);
         canvas.setColor(i == _selectedLine ? Color::Bright : Color::Medium);
-        canvas.drawText(kLabelX, y + 4, lineLabel);
+        if (!_liveMode) {
+            FixedStringBuilder<4> lineLabel("%d", i + 1);
+            canvas.drawText(kLabelX, y + 4, lineLabel);
+        }
         canvas.drawText(kTextX, y + 4, lineText);
     }
 
@@ -112,18 +128,49 @@ void TeletypeScriptViewPage::updateLeds(Leds &leds) {
 void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
-    if (key.pageModifier() && key.isFunction() && key.function() == 4) {
-        _manager.pop();
-        event.consume();
-        return;
-    }
-
     if (key.pageModifier()) {
+        if (key.isLeft()) {
+            recallHistory(-1);
+            event.consume();
+        } else if (key.isRight()) {
+            recallHistory(1);
+            event.consume();
+        } else if (key.isStep()) {
+            if (key.step() == 8) {
+                copyLine();
+                event.consume();
+            } else if (key.step() == 9) {
+                pasteLine();
+                event.consume();
+            }
+        }
         return;
     }
 
     if (key.isFunction()) {
         int fn = key.function();
+        if (fn == 4) {
+            _manager.push(&_manager.pages().teletypePatternView);
+            event.consume();
+            return;
+        }
+        if (fn == 0) {
+            if (_liveMode) {
+                setScriptIndex(0);
+            } else if (_scriptIndex == 0) {
+                _liveMode = true;
+                _hasLiveResult = false;
+            } else {
+                setScriptIndex(0);
+            }
+            event.consume();
+            return;
+        }
+        if (fn == 3) {
+            setScriptIndex(_scriptIndex == METRO_SCRIPT ? 3 : METRO_SCRIPT);
+            event.consume();
+            return;
+        }
         if (fn >= 0 && fn < TeletypeTrack::EditableScriptCount) {
             setScriptIndex(fn);
             event.consume();
@@ -279,6 +326,7 @@ void TeletypeScriptViewPage::setScriptIndex(int scriptIndex) {
     if (scriptIndex < 0 || scriptIndex >= TeletypeTrack::EditableScriptCount) {
         return;
     }
+    _liveMode = false;
     if (_scriptIndex != scriptIndex) {
         _scriptIndex = scriptIndex;
         loadEditBuffer(0);
@@ -362,10 +410,86 @@ void TeletypeScriptViewPage::commitLine() {
         return;
     }
 
+    pushHistory(_editBuffer);
+
+    if (_liveMode) {
+        auto &track = _project.selectedTrack().teletypeTrack();
+        scene_state_t &state = track.state();
+        auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+        TeletypeBridge::ScopedEngine scope(trackEngine);
+        exec_state_t es;
+        es_init(&es);
+        es_push(&es);
+        es_set_script_number(&es, LIVE_SCRIPT);
+        es_set_line_number(&es, 0);
+        process_result_t result = process_command(&state, &es, &parsed);
+        _hasLiveResult = result.has_value;
+        if (result.has_value) {
+            _liveResult = result.value;
+        }
+        return;
+    }
+
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
     const int scriptIndex = _scriptIndex;
     ss_overwrite_script_command(&state, scriptIndex, _selectedLine, &parsed);
     track.setScriptLine(scriptIndex, _selectedLine, _editBuffer);
     // Commit succeeded; no UI message per current workflow.
+}
+
+void TeletypeScriptViewPage::copyLine() {
+    std::strncpy(_clipboard, _editBuffer, EditBufferSize - 1);
+    _clipboard[EditBufferSize - 1] = '\0';
+    _hasClipboard = true;
+}
+
+void TeletypeScriptViewPage::pasteLine() {
+    if (!_hasClipboard) {
+        return;
+    }
+    setEditBuffer(_clipboard);
+}
+
+void TeletypeScriptViewPage::pushHistory(const char *line) {
+    if (!line || line[0] == '\0') {
+        return;
+    }
+    _historyHead = (_historyHead + 1) % HistorySize;
+    std::strncpy(_history[_historyHead], line, EditBufferSize - 1);
+    _history[_historyHead][EditBufferSize - 1] = '\0';
+    if (_historyCount < HistorySize) {
+        _historyCount += 1;
+    }
+    _historyCursor = -1;
+}
+
+void TeletypeScriptViewPage::recallHistory(int direction) {
+    if (_historyCount == 0) {
+        return;
+    }
+    const int oldest = (_historyHead - (_historyCount - 1) + HistorySize) % HistorySize;
+    if (_historyCursor < 0) {
+        _historyCursor = _historyHead;
+    } else if (direction < 0) {
+        if (_historyCursor != oldest) {
+            _historyCursor = (_historyCursor - 1 + HistorySize) % HistorySize;
+        }
+    } else if (direction > 0) {
+        if (_historyCursor != _historyHead) {
+            _historyCursor = (_historyCursor + 1) % HistorySize;
+        }
+    }
+    setEditBuffer(_history[_historyCursor]);
+}
+
+void TeletypeScriptViewPage::setEditBuffer(const char *text) {
+    if (!text) {
+        _editBuffer[0] = '\0';
+        _cursor = 0;
+        return;
+    }
+    std::strncpy(_editBuffer, text, EditBufferSize - 1);
+    _editBuffer[EditBufferSize - 1] = '\0';
+    _cursor = int(std::strlen(_editBuffer));
 }

@@ -26,6 +26,8 @@ The Performer implementation of Teletype includes specific keyboard shortcuts fo
   - **Step 15**: TR → PARAM (cycles through TR→PARAM)
   - **Step 16**: EVERY → IF (cycles through EVERY→IF)
 
+
+
 ### Shift + Step Keys (Steps 1-16)
 - **Shift + Steps 1-16**: Insert special characters
   - **Shift + Step 1**: + (Plus)
@@ -514,3 +516,36 @@ This tutorial has covered the fundamental concepts of using Teletype in the Perf
 Remember to experiment with different combinations of operations, and don't hesitate to refer back to the teletype manual for more detailed information about specific operations.
 
 The key to mastering Teletype in Performer is practice and experimentation. Try modifying the examples in this tutorial to create your own unique patterns and behaviors.
+## Hardware Mapping Summary (Reference)
+
+### 1. TeletypeScriptViewPage (The Editor)
+
+| Action | Hardware Control | Performer Function |
+| :--- | :--- | :--- |
+| **Select Line** | **Shift + Encoder Turn** | Moves the vertical selection (Lines 1-6). |
+| **Edit Line** | **Encoder Press** | Loads selected line into the edit buffer. |
+| **Commit Line** | **Shift + Encoder Press** | Compiles buffer and saves it to the script. |
+| **Select Script** | **Fn 1 - Fn 9** | Switches between Scripts (S1-S8, Metro). |
+| **Move Cursor** | **Encoder Turn** | Moves edit cursor horizontally. |
+| **Cursor Left** | **Shift + Page Left** | Moves cursor left in edit buffer. |
+| **Cursor Right** | **Shift + Page Right** | Moves cursor right in edit buffer. |
+| **Backspace** | **Page Left** | Deletes character before cursor. |
+| **Space** | **Page Right** | Inserts a space. |
+| **Insert Text** | **Step Keys 1-16** | Cycles through characters (0-9, A-Z, symbols). |
+
+### 2. TeletypePatternViewPage (The Tracker)
+
+| Action | Hardware Control | Performer Function |
+| :--- | :--- | :--- |
+| **Select Row** | **Encoder Turn** | Moves the vertical selection (Index 0-63). |
+| **Select Col** | **Fn 1 - Fn 4** | Switches between Pattern 0 to 3. |
+| **Negate Value** | **Encoder Press** | Toggles sign of value or buffer. |
+| **Commit Value** | **Shift + Encoder Press** | Writes buffer to pattern and advances length. |
+| **Insert Digit** | **Step Keys 1-10** | Enables numeric entry (digits 0-9). |
+| **Backspace** | **Page Left** | Deletes last digit from buffer. |
+| **Delete Row** | **Shift + Page Left** | Deletes current row (shifts subsequent rows up). |
+| **Insert Row** | **Page Right** | Duplicates current row (shifts subsequent rows down). |
+| **Toggle Turtle**| **Shift + Page Right** | Toggles Turtle visibility on the grid. |
+| **Set Length** | **Step Key 14** | Sets Pattern Length to current row + 1. |
+| **Set Start** | **Step Key 15** | Sets Loop Start to current row. |
+| **Set End** | **Step Key 16** | Sets Loop End to current row. |
