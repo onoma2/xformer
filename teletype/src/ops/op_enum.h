@@ -147,6 +147,7 @@ typedef enum {
     E_OP_BAR,
     E_OP_WP,
     E_OP_WR,
+    E_OP_RT,
     E_OP_PRM,
     E_OP_TR,
     E_OP_TR_POL,

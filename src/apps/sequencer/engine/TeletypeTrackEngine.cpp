@@ -289,6 +289,10 @@ bool TeletypeTrackEngine::isTransportRunning() const {
     return _engine.clock().isRunning();
 }
 
+float TeletypeTrackEngine::routingSource(int index) const {
+    return _engine.routingEngine().routeSource(index);
+}
+
 uint16_t TeletypeTrackEngine::cvRaw(uint8_t index) const {
     if (index >= CvOutputCount) {
         return 0;

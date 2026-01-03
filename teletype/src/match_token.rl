@@ -174,6 +174,7 @@
         "BAR"         => { MATCH_OP(E_OP_BAR); };
         "WP"          => { MATCH_OP(E_OP_WP); };
         "WR"          => { MATCH_OP(E_OP_WR); };
+        "RT"          => { MATCH_OP(E_OP_RT); };
         "PRM"         => { MATCH_OP(E_OP_PRM); };
         "TR"          => { MATCH_OP(E_OP_TR); };
         "TR.POL"      => { MATCH_OP(E_OP_TR_POL); };

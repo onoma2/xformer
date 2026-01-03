@@ -159,6 +159,15 @@ int16_t tele_wr(void) {
     return 0;
 }
 
+int16_t tele_rt(uint8_t routeIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        float normalized = engine->routingSource(routeIndex);
+        int32_t raw = static_cast<int32_t>(std::lround(normalized * 16383.f));
+        return static_cast<int16_t>(clamp<int32_t>(raw, 0, 16383));
+    }
+    return 0;
+}
+
 void tele_cv_cal(uint8_t n, int32_t b, int32_t m) {
     (void)n;
     (void)b;

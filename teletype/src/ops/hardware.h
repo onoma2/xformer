@@ -22,6 +22,7 @@ extern const tele_op_t op_BUS;
 extern const tele_op_t op_BAR;
 extern const tele_op_t op_WP;
 extern const tele_op_t op_WR;
+extern const tele_op_t op_RT;
 extern const tele_op_t op_PRM;
 extern const tele_op_t op_TR;
 extern const tele_op_t op_TR_POL;

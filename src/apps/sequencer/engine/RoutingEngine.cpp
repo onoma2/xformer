@@ -151,6 +151,13 @@ RoutingEngine::RoutingEngine(Engine &engine, Model &model) :
     _lastResetActive.fill(false);
 }
 
+float RoutingEngine::routeSource(int index) const {
+    if (index < 0 || index >= CONFIG_ROUTE_COUNT) {
+        return 0.f;
+    }
+    return clamp(_sourceValues[index], 0.f, 1.f);
+}
+
 void RoutingEngine::resetShaperState() {
     for (auto &routeState : _routeStates) {
         for (auto &st : routeState.shaperState) {

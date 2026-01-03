@@ -52,6 +52,7 @@ public:
     void setCvOffset(uint8_t index, int16_t value);
     bool anyCvSlewActive() const;
     bool isTransportRunning() const;
+    float routingSource(int index) const;
     uint16_t cvRaw(uint8_t index) const;
     void updateAdc(bool force);
     bool inputState(uint8_t index) const;

@@ -23,6 +23,7 @@ public:
     bool receiveMidi(MidiPort port, const MidiMessage &message);
 
     void resetShaperState();
+    float routeSource(int index) const;
 
     struct RouteState {
         Routing::Target target = Routing::Target::None;

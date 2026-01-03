@@ -15,6 +15,7 @@ This manual covers the Teletype operations available in the **Performer** firmwa
 *   **Local I/O:** 4 CV Outputs (`CV`), 4 Gate Outputs (`TR`), 2 Inputs (`IN`, `PARAM`).
 *   **BUS (Performer):** Shared CV bus slots (`BUS`), usable in routing.
 *   **WR (Performer):** Transport running flag (`WR`).
+*   **RT (Performer):** Route source readback (`RT`).
 *   **MIDI:** Full MIDI input support (`MI.*`).
 
 **Unsupported/Removed:**
@@ -91,6 +92,16 @@ WR returns whether the Performer transport is currently running.
 
 Notes:
 - Read-only (no setter).
+
+## RT (Performer-only)
+
+RT reads the current source value for a routing slot (pre-shaper), scaled to Teletype's 0–16383 range.
+
+- `RT n` → read routing slot n (1–16), returns 0–16383
+
+Notes:
+- Read-only (no setter).
+- Returns the normalized source value (0–1) for that route before shapers and per-track processing.
 - Updates every tick at 192 PPQN resolution
 - Synchronized across all tracks in the project
 - Uses Engine's `measureFraction()` - zero computational overhead

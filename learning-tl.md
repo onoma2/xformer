@@ -167,6 +167,24 @@ CV 1 V X
 
 WR returns `1` when the sequencer is playing and `0` when stopped.
 
+## RT Route Source Readback (Performer)
+
+RT reads the current source value for a routing slot (pre-shaper), scaled to Teletype's 0–16383 range.
+
+### Basic Usage
+
+**Mirror Route 1 source to a CV output:**
+```
+CV 1 V RT 1
+```
+
+**Use Route 2 source as a condition:**
+```
+IF GT RT 2 8192: TR.P 1
+```
+
+RT returns the normalized source value (0–1) of the route before shapers and per-track processing.
+
 ## WP - Pattern-Aware Scripting (Performer)
 
 The `WP` (Which Pattern) opcode allows Teletype scripts to query the current pattern index (0-15) of any track in the Performer project. This enables pattern-aware scripting where behavior changes based on which patterns are playing across all 8 tracks.
