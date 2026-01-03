@@ -1,65 +1,15 @@
-# Research: Reducing Teletype Track Size and Implementing Script Saving/Loading
+# Research: Teletype Script Saving/Loading and Ideas from Monikit Rust
 
 ## Current State Analysis
 
-### Memory Usage of TeletypeTrack
+### Current TeletypeTrack Structure
 The current `TeletypeTrack` class contains:
-1. **`scene_state_t _state`** - The main teletype state (large structure)
+1. **`scene_state_t _state`** - The main teletype state structure
 2. **Script text storage** - `_scriptLines` array storing scripts as text
 3. **Pattern storage** - `_patterns` array for pattern data
 4. **I/O mapping configuration** - Various enums for routing
 5. **Timing parameters** - Clock divisor/multiplier settings
 6. **CV/Gate output configuration** - Range and offset settings
-
-### Size Issues
-The main memory concerns are:
-- `scene_state_t` contains the full teletype state including all variables, patterns, scripts, delay buffer, etc.
-- Script text is stored in addition to the compiled `tele_command_t` in the state
-- Pattern data is duplicated between the state and the `_patterns` array
-
-## Hacking Approaches to Reduce Size
-
-### 1. Lazy State Initialization
-Instead of storing the full `scene_state_t` in each track, only initialize it when needed:
-
-```cpp
-class TeletypeTrack {
-private:
-    // Instead of: scene_state_t _state;
-    // Use a pointer that's only allocated when needed
-    mutable scene_state_t *_state = nullptr;
-    
-    scene_state_t &state() const {
-        if (!_state) {
-            _state = new scene_state_t;
-            ss_init(_state);
-        }
-        return *_state;
-    }
-};
-```
-
-### 2. Script Text Compression
-Store scripts in a more compact format:
-- Store only the text when different from compiled state
-- Use a hash to detect changes and only store diffs
-- Implement compression for common patterns
-
-### 3. Selective State Storage
-Only store the parts of the state that are different from default:
-```cpp
-// Instead of storing the full state, store only deltas
-struct TeletypeStateDelta {
-    std::vector<std::pair<int, int16_t>> variables;  // var_index, value
-    std::vector<scene_pattern_t> patterns;           // Only non-default patterns
-    // etc.
-};
-```
-
-### 4. On-Demand Script Loading
-Load scripts from SD card only when needed:
-- Store script references (file paths) instead of full text
-- Load scripts into memory only when editing or executing
 
 ## Implementing Script Saving/Loading to SD Card
 
@@ -181,10 +131,10 @@ private:
         time_t lastModified;
         bool loaded;
     };
-    
+
     std::vector<ScriptInfo> _scriptLibrary;
     std::queue<std::string> _loadQueue;
-    
+
 public:
     void scanScriptDirectory();
     void loadScriptAsync(const std::string &path);
@@ -192,53 +142,7 @@ public:
 };
 ```
 
-### 5. Memory Optimization Techniques
-
-#### A. String Pool for Common Commands
-Use string interning for frequently used commands:
-
-```cpp
-class StringPool {
-private:
-    static std::unordered_map<std::string, const char*> _pool;
-    
-public:
-    static const char* intern(const std::string &str) {
-        auto it = _pool.find(str);
-        if (it != _pool.end()) {
-            return it->second;
-        }
-        return _pool.emplace(str, strdup(str.c_str())).first->second;
-    }
-};
-```
-
-#### B. Command Compression
-Store commands in a more compact binary format:
-
-```cpp
-// Instead of storing full text, store opcodes
-struct CompactCommand {
-    uint8_t opCode;      // Compressed opcode
-    uint8_t argCount;    // Number of arguments
-    int16_t args[4];     // Arguments
-    uint8_t flags;       // Modifiers, etc.
-};
-```
-
-#### C. Script Template System
-Allow for script templates to reduce storage:
-
-```cpp
-// Template: "CV {output} V {voltage}"
-// Instance: "CV 1 V 5" (just the parameters)
-struct ScriptTemplate {
-    std::string templateString;  // "CV {output} V {voltage}"
-    std::vector<std::string> placeholders;  // ["output", "voltage"]
-};
-```
-
-### 6. UI Integration
+### 5. UI Integration
 
 #### A. Script Browser
 Add a page to browse and load scripts from SD:
@@ -249,7 +153,7 @@ private:
     std::vector<std::string> _scriptFiles;
     int _selectedIndex = 0;
     int _offset = 0;
-    
+
 public:
     void loadScript(int index);
     void loadScriptToSlot(int scriptSlot, int fileIndex);
@@ -265,42 +169,371 @@ class TeletypePatternBrowserPage : public BasePage {
 };
 ```
 
-### 7. Performance Considerations
+## Ideas from Monikit Rust Implementation
 
-#### A. Caching System
-Cache frequently used scripts in RAM:
+### 1. JSON Serialization Approach
 
+#### Monikit Implementation
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Preset {
+    pub version: u32,
+    pub name: String,
+    pub category: String,
+    pub lines: Vec<String>,
+    pub j: i16,
+    pub k: i16,
+    pub description: String,
+}
+```
+
+#### Adaptation for Embedded C++
 ```cpp
-template<typename T, size_t N>
-class LRUCache {
-private:
-    std::array<T, N> _items;
-    std::array<bool, N> _valid;
-    std::array<uint32_t, N> _accessTime;
-    
-public:
-    T* get(const std::string &key);
-    void put(const std::string &key, const T &value);
+// Use a lightweight JSON library like cjson or implement a simple serializer
+struct TeletypePreset {
+    uint32_t version;
+    char name[32];
+    char category[16];
+    std::array<char[64], 6> lines;  // Assuming max 6 lines per script
+    int16_t j;
+    int16_t k;
+    char description[64];
+
+    void serialize(char* buffer, size_t bufferSize) const;
+    bool deserialize(const char* buffer);
 };
 ```
 
-#### B. Lazy Loading
-Only load scripts when they're actually needed:
+### 2. Factory vs User Preset Distinction
 
+#### Monikit Implementation
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PresetType {
+    Factory,
+    User,
+}
+```
+
+#### Adaptation for Embedded C++
 ```cpp
-class LazyScript {
-private:
-    std::string _filePath;
-    std::unique_ptr<tele_command_t[]> _commands;
-    bool _loaded = false;
-    
+enum class PresetType : uint8_t {
+    Factory,
+    User,
+    Last
+};
+
+// In preset loading function
+PresetType getPresetType(const char* name) {
+    // Check if it's a factory preset first
+    if (isFactoryPreset(name)) {
+        return PresetType::Factory;
+    }
+    // Otherwise check user presets
+    return PresetType::User;
+}
+```
+
+### 3. Sanitization and Path Management
+
+#### Monikit Implementation
+```rust
+pub fn sanitize_name(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string()
+}
+```
+
+#### Adaptation for Embedded C++
+```cpp
+class PresetUtils {
 public:
-    const tele_command_t* getCommands() {
-        if (!_loaded) {
-            loadFromFile(_filePath);
-            _loaded = true;
+    static void sanitizeName(char* name, size_t maxLength) {
+        size_t len = strlen(name);
+        for (size_t i = 0; i < len && i < maxLength - 1; i++) {
+            char c = name[i];
+            if (!isalnum(c) && c != '-' && c != '_') {
+                name[i] = '_';
+            }
         }
-        return _commands.get();
+        // Trim leading/trailing underscores
+        trimEdges(name, maxLength, '_');
+    }
+
+private:
+    static void trimEdges(char* str, size_t maxLength, char trimChar) {
+        // Implementation to trim leading/trailing chars
+        size_t len = strlen(str);
+        size_t start = 0;
+        while (start < len && str[start] == trimChar) start++;
+        if (start > 0) {
+            memmove(str, str + start, len - start + 1);
+            len -= start;
+        }
+        while (len > 0 && str[len-1] == trimChar) len--;
+        str[len] = '\0';
+    }
+};
+```
+
+### 4. Error Handling Pattern
+
+#### Monikit Implementation
+```rust
+pub enum PresetError {
+    IoError(std::io::Error),
+    NotFound(String),
+    ParseError(String),
+}
+```
+
+#### Adaptation for Embedded C++
+```cpp
+enum class PresetError {
+    OK,
+    IoError,
+    NotFound,
+    ParseError,
+    InvalidFormat,
+    BufferTooSmall,
+    OutOfMemory
+};
+
+// Using a result pattern similar to Rust
+template<typename T>
+class Result {
+private:
+    T _value;
+    PresetError _error;
+    bool _hasValue;
+
+public:
+    Result(T value) : _value(value), _error(PresetError::OK), _hasValue(true) {}
+    Result(PresetError error) : _error(error), _hasValue(false) {}
+
+    bool isOk() const { return _hasValue; }
+    PresetError error() const { return _error; }
+    T& value() { return _value; }
+    const T& value() const { return _value; }
+};
+```
+
+### 5. Factory Preset Integration
+
+#### Monikit Implementation
+```rust
+pub fn get_preset(name: &str) -> Result<(Preset, PresetType), PresetError> {
+    if let Some(preset) = factory::get_factory_preset(name) {
+        return Ok((preset, PresetType::Factory));
+    }
+    // ... check user presets
+}
+```
+
+#### Adaptation for Embedded C++
+```cpp
+class TeletypePresetManager {
+private:
+    static const TeletypePreset _factoryPresets[];
+    static const size_t _factoryPresetCount;
+
+public:
+    static Result<TeletypePreset> getPreset(const char* name) {
+        // Check factory presets first
+        for (size_t i = 0; i < _factoryPresetCount; i++) {
+            if (strcmp(_factoryPresets[i].name, name) == 0) {
+                return Result<TeletypePreset>(_factoryPresets[i]);
+            }
+        }
+
+        // Then check user presets on SD card
+        return loadUserPreset(name);
+    }
+
+    static void listAllPresets(std::vector<std::pair<std::string, PresetType>>& presets) {
+        // Add factory presets
+        for (size_t i = 0; i < _factoryPresetCount; i++) {
+            presets.emplace_back(_factoryPresets[i].name, PresetType::Factory);
+        }
+
+        // Add user presets
+        addSdCardPresets(presets);
+    }
+};
+```
+
+### 6. Command Processing Pattern
+
+#### Monikit Implementation
+```rust
+pub fn handle_pset_save<F>(
+    parts: &[&str],
+    scripts: &ScriptStorage,
+    debug_level: u8,
+    out_ess: bool,
+    mut output: F,
+) where
+    F: FnMut(String),
+{
+    // Process command parts
+    // Validate inputs
+    // Save preset
+    // Output result
+}
+```
+
+#### Adaptation for Embedded C++
+```cpp
+class TeletypePresetCommands {
+public:
+    static void handlePsetSave(const std::vector<std::string>& parts,
+                              const TeletypeTrack& track,
+                              StringBuilder& output) {
+        if (parts.size() < 3) {
+            output("ERROR: PSET.SAVE REQUIRES SCRIPT# AND NAME");
+            return;
+        }
+
+        int scriptNum = atoi(parts[1].c_str());
+        if (scriptNum < 1 || scriptNum > 8) {
+            output("ERROR: SCRIPT NUMBER MUST BE 1-8");
+            return;
+        }
+
+        std::string name = parts[2];
+        // Additional parts get concatenated to name
+        for (size_t i = 3; i < parts.size(); i++) {
+            name += " " + parts[i];
+        }
+
+        // Sanitize name
+        char sanitizedName[32];
+        strcpy(sanitizedName, name.c_str());
+        PresetUtils::sanitizeName(sanitizedName, sizeof(sanitizedName));
+
+        // Extract script data
+        TeletypePreset preset = extractPresetFromScript(track, scriptNum - 1);
+
+        // Save to SD card
+        PresetError result = TeletypePresetManager::savePreset(sanitizedName, preset);
+
+        if (result == PresetError::OK) {
+            output("SAVED PRESET: ");
+            output(sanitizedName);
+        } else {
+            output("ERROR SAVING PRESET");
+        }
+    }
+
+private:
+    static TeletypePreset extractPresetFromScript(const TeletypeTrack& track, int scriptIndex) {
+        TeletypePreset preset = {};
+        // Extract script lines and variables
+        for (int i = 0; i < TeletypeTrack::ScriptLineCount; i++) {
+            const char* line = track.scriptLine(scriptIndex, i);
+            if (line && strlen(line) > 0) {
+                strncpy(preset.lines[i].data(), line, sizeof(preset.lines[i]) - 1);
+                preset.lines[i][sizeof(preset.lines[i]) - 1] = '\0';
+            }
+        }
+        // Extract J, K variables if available
+        // This would require accessing the state variables
+        return preset;
+    }
+};
+```
+
+### 7. Directory Management
+
+#### Monikit Implementation
+```rust
+pub fn get_presets_dir() -> PathBuf {
+    crate::config::monokit_config_dir()
+        .unwrap_or_else(|_| {
+            let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            PathBuf::from(home).join(".config").join("monokit")
+        })
+        .join("presets")
+}
+```
+
+#### Adaptation for Embedded C++
+```cpp
+class PresetPaths {
+public:
+    static void getPresetPath(const char* name, char* path, size_t pathSize) {
+        // Construct path: "TEL/SCRIPTS/{name}.TTS"
+        snprintf(path, pathSize, "TEL/SCRIPTS/%s.TTS", name);
+    }
+
+    static void getPresetsDir(char* path, size_t pathSize) {
+        strncpy(path, "TEL/SCRIPTS/", pathSize);
+    }
+
+    static bool ensurePresetDirectories() {
+        // Create directory structure on SD card if needed
+        // This would use the filesystem API
+        return FileSystem::createDirectory("TEL") &&
+               FileSystem::createDirectory("TEL/SCRIPTS");
+    }
+};
+```
+
+### 8. Lazy Loading Pattern
+
+#### Monikit Implementation
+The Rust implementation loads presets on demand, which is similar to the lazy loading concept in feat-propored.
+
+#### Adaptation for Embedded C++
+```cpp
+class LazyPresetLoader {
+private:
+    std::unordered_map<std::string, TeletypePreset> _cache;
+    static const size_t _maxCacheSize = 16;  // Limited by embedded constraints
+
+public:
+    const TeletypePreset* getPreset(const char* name) {
+        auto it = _cache.find(name);
+        if (it != _cache.end()) {
+            return &it->second;
+        }
+
+        // Load from SD card
+        TeletypePreset preset;
+        if (loadPresetFromSd(name, preset)) {
+            if (_cache.size() >= _maxCacheSize) {
+                // Simple eviction: remove first element
+                _cache.erase(_cache.begin());
+            }
+            auto result = _cache.emplace(name, preset);
+            return &result.first->second;
+        }
+
+        return nullptr;  // Not found
+    }
+
+private:
+    bool loadPresetFromSd(const char* name, TeletypePreset& preset) {
+        char path[64];
+        PresetPaths::getPresetPath(name, path, sizeof(path));
+
+        File file = FileSystem::open(path, "r");
+        if (!file.isValid()) {
+            return false;
+        }
+
+        // Read and parse the preset file
+        // Implementation depends on chosen serialization format
+        return preset.deserialize(file);
     }
 };
 ```
@@ -312,19 +545,14 @@ public:
 2. Implement basic read/write functions
 3. Create directory structure on SD card
 
-### Phase 2: Memory Optimization
-1. Implement lazy state initialization
-2. Add script compression
-3. Create string pooling system
-
-### Phase 3: UI Integration
+### Phase 2: UI Integration
 1. Add script browser pages
 2. Integrate with existing teletype UI
 3. Add load/save functionality
 
-### Phase 4: Advanced Features
-1. Implement caching system
-2. Add template support
-3. Optimize for performance
+### Phase 3: Advanced Features
+1. Implement factory preset system
+2. Add command processing (PSET.SAVE, PSET)
+3. Add error handling system
 
-This approach would significantly reduce the memory footprint of teletype tracks while providing robust script saving/loading capabilities to the SD card, making the system much more flexible for complex musical arrangements.
+This approach would provide robust script saving/loading capabilities to the SD card, making the system much more flexible for complex musical arrangements, while incorporating valuable design patterns from the monikit Rust implementation.

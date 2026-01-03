@@ -160,6 +160,15 @@ void TeletypeScriptViewPage::updateLeds(Leds &leds) {
     LedPainter::drawSelectedSequenceSection(leds, 0);
 }
 
+void TeletypeScriptViewPage::setLiveMode(bool enabled) {
+    _liveMode = enabled;
+    _hasLiveResult = false;
+    _historyCursor = -1;
+    if (!_liveMode) {
+        loadEditBuffer(_selectedLine);
+    }
+}
+
 void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
@@ -202,19 +211,16 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
             }
         }
         if (fn == 4) {
-            _manager.push(&_manager.pages().teletypePatternView);
+            if (_liveMode) {
+                setLiveMode(false);
+            } else {
+                _manager.push(&_manager.pages().teletypePatternView);
+            }
             event.consume();
             return;
         }
         if (fn == 0) {
-            if (_liveMode) {
-                setScriptIndex(0);
-            } else if (_scriptIndex == 0) {
-                _liveMode = true;
-                _hasLiveResult = false;
-            } else {
-                setScriptIndex(0);
-            }
+            setScriptIndex(0);
             event.consume();
             return;
         }
@@ -493,6 +499,7 @@ void TeletypeScriptViewPage::copyLine() {
     std::strncpy(_clipboard, _editBuffer, EditBufferSize - 1);
     _clipboard[EditBufferSize - 1] = '\0';
     _hasClipboard = true;
+    showMessage("Line copied");
 }
 
 void TeletypeScriptViewPage::pasteLine() {
@@ -500,6 +507,7 @@ void TeletypeScriptViewPage::pasteLine() {
         return;
     }
     setEditBuffer(_clipboard);
+    showMessage("Line pasted");
 }
 
 void TeletypeScriptViewPage::duplicateLine() {
@@ -535,8 +543,15 @@ void TeletypeScriptViewPage::deleteLine() {
     }
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
+    if (const tele_command_t *cmd = ss_get_script_command(&state, _scriptIndex, _selectedLine)) {
+        char lineBuffer[EditBufferSize] = {};
+        print_command(cmd, lineBuffer);
+        setEditBuffer(lineBuffer);
+        copyLine();
+    }
     ss_delete_script_command(&state, _scriptIndex, _selectedLine);
     loadEditBuffer(_selectedLine);
+    showMessage("Line deleted");
 }
 
 void TeletypeScriptViewPage::pushHistory(const char *line) {

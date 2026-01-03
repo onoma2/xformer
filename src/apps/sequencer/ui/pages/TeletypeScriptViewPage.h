@@ -13,6 +13,7 @@ public:
     void updateLeds(Leds &leds) override;
     void keyPress(KeyPressEvent &event) override;
     void encoder(EncoderEvent &event) override;
+    void setLiveMode(bool enabled);
 
 private:
     void handleStepKey(int step, bool shift);

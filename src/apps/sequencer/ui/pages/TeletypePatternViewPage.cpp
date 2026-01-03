@@ -155,6 +155,7 @@ void TeletypePatternViewPage::keyPress(KeyPressEvent &event) {
         int fn = key.function();
         if (fn == 4) {
             _manager.pop();
+            _manager.pages().teletypeScriptView.setLiveMode(true);
             event.consume();
             return;
         }

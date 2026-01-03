@@ -95,6 +95,14 @@
     - `scene_state_t` 5136 bytes with minimal grid (grid struct 58 bytes, GRID_* counts set to 1).
 - [x] Confirm whether Teletype fits under the current `Container` max track size.
   - Host size check (PLATFORM_SIM): `Container<...>::Size` is 10092 bytes (`CurveTrack`), `Track` is 10120 bytes; `scene_state_t` at 28976 bytes would not fit without increasing the container size.
+- [x] Current tool output (manual build, no CMake target):
+  - Build: `c++ -std=c++17 -I src -I src/apps/sequencer -I src/platform/sim -I teletype/src -I teletype/libavr32/src tools/track_component_sizes.cpp -o build/track_component_sizes_new`
+  - Output:
+    - `TeletypeTrack=5744`
+    - `scene_state_t=5136`
+    - `TT._state=5136`
+    - `TT._patterns=552`
+    - Remaining fields (mappings/timing/range/offset) account for ~56 bytes.
 - [x] Decide container strategy: in-container (track-lite `scene_state_t` ~5.1 KB fits under current `Container` max).
 - [x] Decide grid removal method: compile-time config (`TELETYPE_TRACK_LITE` trims grid counts to 1, leaving a minimal struct).
 - [x] Decide max supported Teletype tracks (initial cap). (N/A: in-container size is below current max; no cap implied by memory).
