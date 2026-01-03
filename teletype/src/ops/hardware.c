@@ -388,7 +388,7 @@ static void op_WP_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
         cs_push(cs, 0);  // Out of bounds
         return;
     }
-    cs_push(cs, tele_wpat((uint8_t)trackIndex));
+    cs_push(cs, tele_wpat((uint8_t)trackIndex) + 1);
 }
 
 static void op_WR_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),

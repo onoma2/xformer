@@ -175,7 +175,7 @@ The `WP` (Which Pattern) opcode allows Teletype scripts to query the current pat
 
 **Syntax:** `WP i` where `i` = track number (1-8)
 
-**Returns:** Pattern index (0-15) for the specified track
+**Returns:** Pattern index (1-16) for the specified track (matches Performer UI)
 
 ```
 # Query pattern on track 1

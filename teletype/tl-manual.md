@@ -108,7 +108,7 @@ WP queries the current pattern index for any track in the Performer project. Eac
 
 ```
 # Query current track's pattern
-WP 1           # Returns 0-15 (pattern on track 1)
+WP 1           # Returns 1-16 (pattern on track 1)
 
 # Conditional logic based on pattern
 IF EQ WP 1 5: CV 1 V 5    # If track 1 on pattern 5, output 5V
@@ -117,7 +117,7 @@ IF EQ WP 1 5: CV 1 V 5    # If track 1 on pattern 5, output 5V
 IF EQ WP 1 WP 2: TR.PULSE 1  # Pulse when tracks 1 & 2 on same pattern
 
 # Use pattern as modulation source
-CV 2 N SCALE WP 3 0 127 60 72  # Map track 3's pattern to note range
+CV 2 N SCALE WP 3 1 16 60 72   # Map track 3's pattern to note range
 
 # Pattern-dependent randomization
 RAND.SEED WP 1             # Seed based on current pattern
@@ -144,7 +144,7 @@ IF OR4 EQ WP 1 0 EQ WP 2 0 EQ WP 3 0 EQ WP 4 0: TR 1 1  # Gate high
 - Returns 0 for invalid track indices (< 1 or > 8)
 - Track numbers are **1-indexed** (1-8), pattern indices are **0-indexed** (0-15)
 - Zero computational overhead - reads cached pattern state
-- Snapshots use pattern index 16 (not accessible via WP, returns current pattern)
+- Snapshots use pattern index 16 (WP returns 16 when snapshot is active)
 
 ## Performer Teletype Keyboard Shortcuts
 
