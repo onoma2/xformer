@@ -10,8 +10,8 @@ Current Exposure (Reality Check)
 - CV inputs only read physical CV In 1-4; CV-out-as-input is not enabled.
 
 Phase 1: Low-Risk, High-Impact
-- Add shared bus:
-  - BUS.CV n / BUS.TR n read+write shared slots (4–8 slots).
+- Add shared bus: ✅ done (BUS 1–4 CV slots)
+  - BUS n read/write shared CV slots.
   - Purpose: clean, safe cross-track modulation without touching track internals.
 - Add track output readback:
   - TK.CV t / TK.TR t read current outputs for feedback loops.

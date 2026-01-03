@@ -114,7 +114,7 @@ public:
     const CvOutput &cvOutput() const { return _cvOutput; }
     const uint8_t gateOutput() const { return _gateOutput.gates(); }
 
-    static constexpr int BusCvCount = 3;
+    static constexpr int BusCvCount = 4;
     float busCv(int index) const {
         if (index < 0 || index >= BusCvCount) {
             return 0.f;

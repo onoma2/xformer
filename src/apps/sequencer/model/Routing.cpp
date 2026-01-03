@@ -421,6 +421,7 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::BusCv1)]                          = { -500,   500,    -500,   500,    10      },
     [int(Routing::Target::BusCv2)]                          = { -500,   500,    -500,   500,    10      },
     [int(Routing::Target::BusCv3)]                          = { -500,   500,    -500,   500,    10      },
+    [int(Routing::Target::BusCv4)]                          = { -500,   500,    -500,   500,    10      },
 };
 
 float Routing::normalizeTargetValue(Routing::Target target, float value) {
@@ -543,6 +544,7 @@ void Routing::printTargetValue(Routing::Target target, float normalized, StringB
     case Target::BusCv1:
     case Target::BusCv2:
     case Target::BusCv3:
+    case Target::BusCv4:
         str("%+.2fV", value * 0.01f);
         break;
     case Target::DiscreteMapScanner:

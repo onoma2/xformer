@@ -347,7 +347,7 @@ static void op_BUS_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
                        exec_state_t *NOTUSED(es), command_state_t *cs) {
     int16_t a = cs_pop(cs);
     a--;
-    if (a < 0 || a >= 3) {
+    if (a < 0 || a >= 4) {
         cs_push(cs, 0);
         return;
     }
@@ -360,7 +360,7 @@ static void op_BUS_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
     int16_t b = cs_pop(cs);
     b = normalise_value(0, 16383, 0, b);
     a--;
-    if (a < 0 || a >= 3) {
+    if (a < 0 || a >= 4) {
         return;
     }
     tele_bus_cv_set((uint8_t)a, b);

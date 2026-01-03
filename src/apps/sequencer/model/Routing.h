@@ -129,7 +129,8 @@ public:
         BusCv1 = BusFirst,
         BusCv2,
         BusCv3,
-        BusLast = BusCv3,
+        BusCv4,
+        BusLast = BusCv4,
 
         Last,
     };
@@ -206,6 +207,7 @@ public:
         case Target::BusCv1:                    return "BUS 1";
         case Target::BusCv2:                    return "BUS 2";
         case Target::BusCv3:                    return "BUS 3";
+        case Target::BusCv4:                    return "BUS 4";
 
         case Target::Last:                      break;
         }
@@ -288,6 +290,7 @@ public:
         case Target::BusCv1:                    return 57;
         case Target::BusCv2:                    return 58;
         case Target::BusCv3:                    return 59;
+        case Target::BusCv4:                    return 60;
 
         case Target::Run:                       return 54;
         case Target::Reset:                     return 55;
@@ -393,7 +396,8 @@ public:
         BusCv1,
         BusCv2,
         BusCv3,
-        CvLast = BusCv3,
+        BusCv4,
+        CvLast = BusCv4,
         Midi,
         GateOut1,
         GateOut2,
@@ -408,7 +412,7 @@ public:
 
     static bool isCvSource(Source source) { return source >= Source::CvFirst && source <= Source::CvLast; }
     static bool isMidiSource(Source source) { return source == Source::Midi; }
-    static bool isBusSource(Source source) { return source >= Source::BusCv1 && source <= Source::BusCv3; }
+    static bool isBusSource(Source source) { return source >= Source::BusCv1 && source <= Source::BusCv4; }
     static int busSourceIndex(Source source) {
         return isBusSource(source) ? int(source) - int(Source::BusCv1) : -1;
     }
@@ -444,6 +448,7 @@ public:
         case Source::BusCv1:
         case Source::BusCv2:
         case Source::BusCv3:
+        case Source::BusCv4:
             str("BUS %d", int(source) - int(Source::BusCv1) + 1);
             break;
         case Source::Midi:

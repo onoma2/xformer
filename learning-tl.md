@@ -28,7 +28,7 @@ After this, proceed to Script View and start editing scripts.
 
 ## BUS Routing Example (Performer)
 
-BUS is a shared CV bus (3 slots) that lets Teletype modulate other tracks without using hardware CV outputs.
+BUS is a shared CV bus (4 slots) that lets Teletype modulate other tracks without using hardware CV outputs.
 
 Example: Teletype drives NoteTrack transpose via BUS 1.
 

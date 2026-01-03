@@ -265,7 +265,8 @@ void RoutingEngine::updateSources() {
             }
             case Routing::Source::BusCv1:
             case Routing::Source::BusCv2:
-            case Routing::Source::BusCv3: {
+            case Routing::Source::BusCv3:
+            case Routing::Source::BusCv4: {
                 const auto &range = Types::voltageRangeInfo(route.cvSource().range());
                 int index = int(route.source()) - int(Routing::Source::BusCv1);
                 sourceValue = range.normalize(_engine.busCv(index));

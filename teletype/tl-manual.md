@@ -25,16 +25,16 @@ This manual covers the Teletype operations available in the **Performer** firmwa
 ---
 ## BUS (Performer-only)
 
-BUS is a shared CV bus with 3 slots. It stores voltages in the Performer domain (-5V..+5V),
+BUS is a shared CV bus with 4 slots. It stores voltages in the Performer domain (-5V..+5V),
 and Teletype reads/writes in raw 0–16383 units.
 
 Syntax:
-- `BUS n` → read BUS slot n (1..3)
-- `BUS n x` → write raw value x to BUS slot n (1..3)
+- `BUS n` → read BUS slot n (1..4)
+- `BUS n x` → write raw value x to BUS slot n (1..4)
 
 Notes:
 - Slots are 1-based (like `SCRIPT`).
-- Use routing to map BUS 1–3 to any track target.
+- Use routing to map BUS 1–4 to any track target.
 - BUS is global: multiple Teletype tracks can read/write the same slots without routing.
 
 ## Performer Teletype Keyboard Shortcuts
