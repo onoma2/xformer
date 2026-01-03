@@ -144,6 +144,21 @@ int16_t tele_bar(void) {
     return 0;
 }
 
+int16_t tele_wpat(uint8_t trackIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return static_cast<int16_t>(engine->trackPattern(trackIndex));
+    }
+    return 0;
+}
+
+int16_t tele_wr(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        // Return 1 when transport is running (flip to invert behavior).
+        return engine->isTransportRunning() ? 1 : 0;
+    }
+    return 0;
+}
+
 void tele_cv_cal(uint8_t n, int32_t b, int32_t m) {
     (void)n;
     (void)b;

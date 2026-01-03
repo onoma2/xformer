@@ -14,6 +14,7 @@ This manual covers the Teletype operations available in the **Performer** firmwa
 *   **Sequencing:** Metronome (`M`), Delay (`DEL`), Scripts.
 *   **Local I/O:** 4 CV Outputs (`CV`), 4 Gate Outputs (`TR`), 2 Inputs (`IN`, `PARAM`).
 *   **BUS (Performer):** Shared CV bus slots (`BUS`), usable in routing.
+*   **WR (Performer):** Transport running flag (`WR`).
 *   **MIDI:** Full MIDI input support (`MI.*`).
 
 **Unsupported/Removed:**
@@ -36,6 +37,114 @@ Notes:
 - Slots are 1-based (like `SCRIPT`).
 - Use routing to map BUS 1–4 to any track target.
 - BUS is global: multiple Teletype tracks can read/write the same slots without routing.
+
+## BAR (Performer-only)
+
+BAR is a tempo-locked phase indicator that returns the position within the current bar (measure).
+It provides zero-overhead access to Performer's internal Engine timing for creating tempo-synced modulation.
+
+Syntax:
+- `BAR` → read current bar phase (0..16383)
+
+Returns:
+- `0` at the start of a bar
+- `8192` at the midpoint of a bar (e.g., beat 3 in 4/4 time)
+- `16383` near the end of a bar
+
+Voltage mapping (via `V` scale):
+- Raw value 0–16383 maps to 0–10V output
+- Example: `CV 1 V BAR` creates a sawtooth LFO ramping 0V→10V per bar
+
+Time signature awareness:
+- Automatically adjusts to project time signature (4/4, 3/4, 5/8, etc.)
+- Bar length changes with time signature setting in Performer
+
+Example uses:
+```
+# Sawtooth LFO synced to bar
+CV 1 V BAR
+
+# Pulse gate only in 2nd half of bar
+IF BAR > 8192: TR.P 1
+
+# Divide bar into 4 sections (0, 1, 2, 3)
+X DIV BAR 4096
+IF EQ X 0: SCRIPT 1
+
+# Bipolar centered output (-5V to +5V)
+CV 2 V SUB BAR 8192
+
+# Linear interpolation across bar
+START 1000
+END 5000
+CV 3 V ADD START MUL SUB END START DIV BAR 16384
+```
+
+Notes:
+- BAR is read-only (no setter)
+
+## WR (Performer-only)
+
+WR returns whether the Performer transport is currently running.
+
+- `WR` → read transport running flag (0/1)
+
+Notes:
+- Read-only (no setter).
+- Updates every tick at 192 PPQN resolution
+- Synchronized across all tracks in the project
+- Uses Engine's `measureFraction()` - zero computational overhead
+
+### WP (Which Pattern) - Read Current Pattern Index
+
+**Syntax:** `WP i` where `i` = track number (1-8)
+
+**Returns:** Pattern index (0-15) currently playing on the specified track
+
+**Description:**
+WP queries the current pattern index for any track in the Performer project. Each track can be on a different pattern (0-15), and WP allows scripts to respond to the global pattern state across all 8 tracks.
+
+**Examples:**
+
+```
+# Query current track's pattern
+WP 1           # Returns 0-15 (pattern on track 1)
+
+# Conditional logic based on pattern
+IF EQ WP 1 5: CV 1 V 5    # If track 1 on pattern 5, output 5V
+
+# Cross-track pattern detection
+IF EQ WP 1 WP 2: TR.PULSE 1  # Pulse when tracks 1 & 2 on same pattern
+
+# Use pattern as modulation source
+CV 2 N SCALE WP 3 0 127 60 72  # Map track 3's pattern to note range
+
+# Pattern-dependent randomization
+RAND.SEED WP 1             # Seed based on current pattern
+CV 3 N RND 60 72           # Pattern-stable random notes
+
+# Sum all track patterns as variation source
+X 0
+L 1 8: X ADD X WP I        # Sum patterns from all 8 tracks
+CV 4 N SCALE X 0 120 48 84 # Map sum to note range
+
+# Detect when any track hits pattern 0
+IF OR4 EQ WP 1 0 EQ WP 2 0 EQ WP 3 0 EQ WP 4 0: TR 1 1  # Gate high
+```
+
+**Use Cases:**
+- **Pattern-aware scripts**: Change behavior based on which patterns are playing
+- **Global state detection**: Scripts that respond to pattern combinations
+- **Deterministic randomization**: Use pattern index to seed RAND for repeatable variation
+- **Cross-track coordination**: Scripts that detect when tracks are on the same pattern
+- **Pattern-driven modulation**: Map pattern indices to CV values for variation
+
+**Technical Notes:**
+- WP is read-only (no pattern change via teletype)
+- Returns 0 for invalid track indices (< 1 or > 8)
+- Track numbers are **1-indexed** (1-8), pattern indices are **0-indexed** (0-15)
+- Zero computational overhead - reads cached pattern state
+- Snapshots use pattern index 16 (not accessible via WP, returns current pattern)
 
 ## Performer Teletype Keyboard Shortcuts
 

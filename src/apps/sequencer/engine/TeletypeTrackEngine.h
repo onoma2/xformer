@@ -51,6 +51,7 @@ public:
     void setCvSlew(uint8_t index, int16_t value);
     void setCvOffset(uint8_t index, int16_t value);
     bool anyCvSlewActive() const;
+    bool isTransportRunning() const;
     uint16_t cvRaw(uint8_t index) const;
     void updateAdc(bool force);
     bool inputState(uint8_t index) const;
@@ -66,6 +67,7 @@ public:
     float busCv(int index) const;
     void setBusCv(int index, float volts);
     float measureFraction() const;
+    int trackPattern(int trackIndex) const;
 
 private:
     void runMidiTriggeredScript(int scriptIndex);

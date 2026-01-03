@@ -49,6 +49,10 @@ static void op_BUS_set(const void *NOTUSED(data), scene_state_t *ss,
                        exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_BAR_get(const void *NOTUSED(data), scene_state_t *ss,
                        exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WP_get(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WR_get(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_TR_get(const void *data, scene_state_t *ss, exec_state_t *es,
                       command_state_t *cs);
 static void op_TR_set(const void *data, scene_state_t *ss, exec_state_t *es,
@@ -118,6 +122,8 @@ const tele_op_t op_PARAM_CAL_MAX = MAKE_GET_OP (PARAM.CAL.MAX, op_PARAM_CAL_MAX_
 const tele_op_t op_PARAM_CAL_RESET  = MAKE_GET_OP (PARAM.CAL.RESET, op_PARAM_CAL_RESET_set, 0, false);
 const tele_op_t op_BUS           = MAKE_GET_SET_OP(BUS, op_BUS_get, op_BUS_set, 1, true);
 const tele_op_t op_BAR           = MAKE_GET_OP(BAR, op_BAR_get, 0, false);
+const tele_op_t op_WP            = MAKE_GET_OP(WP, op_WP_get, 1, true);
+const tele_op_t op_WR            = MAKE_GET_OP(WR, op_WR_get, 0, true);
 const tele_op_t op_LIVE_OFF      = MAKE_GET_OP (LIVE.OFF, op_LIVE_OFF_get, 0, false);
 const tele_op_t op_LIVE_O        = MAKE_ALIAS_OP (LIVE.O, op_LIVE_OFF_get, NULL, 0, false);
 const tele_op_t op_LIVE_DASH     = MAKE_GET_OP (LIVE.DASH, op_LIVE_DASH_get, 1, false);
@@ -372,6 +378,22 @@ static void op_BUS_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
 static void op_BAR_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
                        exec_state_t *NOTUSED(es), command_state_t *cs) {
     cs_push(cs, tele_bar());
+}
+
+static void op_WP_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                      exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    trackIndex--;  // Convert from 1-indexed to 0-indexed
+    if (trackIndex < 0 || trackIndex >= 8) {
+        cs_push(cs, 0);  // Out of bounds
+        return;
+    }
+    cs_push(cs, tele_wpat((uint8_t)trackIndex));
+}
+
+static void op_WR_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                      exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_wr());
 }
 
 static void op_TR_get(const void *NOTUSED(data), scene_state_t *ss,

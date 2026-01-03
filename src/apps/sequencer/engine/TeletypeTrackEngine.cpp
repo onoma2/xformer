@@ -285,6 +285,10 @@ bool TeletypeTrackEngine::anyCvSlewActive() const {
     return false;
 }
 
+bool TeletypeTrackEngine::isTransportRunning() const {
+    return _engine.clock().isRunning();
+}
+
 uint16_t TeletypeTrackEngine::cvRaw(uint8_t index) const {
     if (index >= CvOutputCount) {
         return 0;
@@ -447,6 +451,13 @@ void TeletypeTrackEngine::setBusCv(int index, float volts) {
 
 float TeletypeTrackEngine::measureFraction() const {
     return _engine.measureFraction();
+}
+
+int TeletypeTrackEngine::trackPattern(int trackIndex) const {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return 0;
+    }
+    return _engine.trackEngine(trackIndex).pattern();
 }
 
 void TeletypeTrackEngine::installBootScript() {

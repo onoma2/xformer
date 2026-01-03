@@ -172,6 +172,8 @@
         "PARAM.CAL.RESET" => { MATCH_OP(E_OP_PARAM_CAL_RESET); };
         "BUS"         => { MATCH_OP(E_OP_BUS); };
         "BAR"         => { MATCH_OP(E_OP_BAR); };
+        "WP"          => { MATCH_OP(E_OP_WP); };
+        "WR"          => { MATCH_OP(E_OP_WR); };
         "PRM"         => { MATCH_OP(E_OP_PRM); };
         "TR"          => { MATCH_OP(E_OP_TR); };
         "TR.POL"      => { MATCH_OP(E_OP_TR_POL); };

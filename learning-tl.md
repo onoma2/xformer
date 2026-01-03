@@ -44,6 +44,312 @@ BUS 1 X
 
 Note: BUS is global. Multiple Teletype tracks can read/write the same BUS slot directly without routing.
 
+## BAR Tempo-Locked Modulation (Performer)
+
+BAR is a read-only opcode that returns the position within the current musical bar (0–16383).
+It provides zero-overhead tempo-synced modulation that automatically adjusts to your project's time signature.
+
+### Basic Usage
+
+**Simple sawtooth LFO synced to bar:**
+```
+CV 1 V BAR
+```
+This outputs a ramp from 0V to 10V over each bar. At bar start, BAR=0 (0V). At bar end, BAR=16383 (~10V).
+
+**Bipolar centered output (-5V to +5V):**
+```
+CV 2 V SUB BAR 8192
+```
+Subtracting 8192 centers the output around 0V, creating a -5V to +5V ramp.
+
+### Conditional Logic Based on Bar Position
+
+**Pulse gate only in 2nd half of bar:**
+```
+IF GT BAR 8192: TR.P A
+```
+When BAR exceeds 8192 (midpoint), pulse gate A.
+
+**Divide bar into sections:**
+```
+X DIV BAR 4096
+IF EQ X 0: SCRIPT 2
+IF EQ X 1: SCRIPT 3
+IF EQ X 2: SCRIPT 4
+IF EQ X 3: SCRIPT 5
+```
+This divides each bar into 4 sections (0, 1, 2, 3) and runs different scripts based on which section you're in.
+
+### Time Signature Awareness
+
+BAR automatically adjusts to your project's time signature setting:
+- **4/4 time**: BAR completes one cycle (0→16383) every 4 beats
+- **3/4 time**: BAR completes one cycle every 3 beats
+- **5/8 time**: BAR completes one cycle every 5 eighth-notes
+
+No configuration needed—BAR always represents one complete bar regardless of time signature.
+
+### Musical Examples
+
+**Create a bar-synced triangle wave:**
+```
+# S0: Triggered each tick
+IF LT BAR 8192: CV 1 V BAR
+ELSE: CV 1 V SUB 16383 BAR
+```
+
+**Bar-locked random sample & hold:**
+```
+# S0: Runs on bar start
+IF LT BAR 100: X RAND 16383
+CV 1 V X
+```
+When BAR resets to 0 (start of bar), generate new random value and hold it for entire bar.
+
+**Cross-fade between two values over a bar:**
+```
+START 2000
+END 8000
+PROGRESS DIV BAR 16384
+CV 1 V ADD START MUL SUB END START PROGRESS
+```
+Linear interpolation from START voltage to END voltage across the bar.
+
+### Combining BAR with Patterns
+
+**Bar-synced pattern playback:**
+```
+# M script (metro)
+X DIV BAR 2048       # Divide bar into 8 sections
+P.I X                # Set pattern index to section
+CV 2 N P.HERE        # Output current pattern value
+```
+
+### Integration with Routing
+
+BAR is a Teletype-internal value and cannot be directly routed to other tracks.
+To modulate other tracks with BAR, write it to a CV output or BUS slot:
+
+```
+# Write BAR to CV output
+CV 1 V BAR
+
+# Write BAR to BUS for routing
+BUS 1 BAR
+```
+
+Then use Performer's Routing page to route CV 1 or BUS 1 to any track parameter.
+
+### Performance Notes
+
+- **Zero overhead**: BAR reads Engine's `measureFraction()` which is already computed every tick
+- **High resolution**: Updates at 192 PPQN (192 times per quarter note)
+- **Synchronized**: All Teletype tracks see the same BAR value (global project timing)
+- **Read-only**: `BAR` has no setter—it always reflects current bar position
+
+## WR Transport Flag (Performer)
+
+WR is a read-only opcode that returns whether the Performer transport is running.
+
+### Basic Usage
+
+**Gate only when transport is running:**
+```
+IF WR: TR.P A
+```
+
+**Hold a value when stopped:**
+```
+IF WR: X RAND 16383
+CV 1 V X
+```
+
+WR returns `1` when the sequencer is playing and `0` when stopped.
+
+## WP - Pattern-Aware Scripting (Performer)
+
+The `WP` (Which Pattern) opcode allows Teletype scripts to query the current pattern index (0-15) of any track in the Performer project. This enables pattern-aware scripting where behavior changes based on which patterns are playing across all 8 tracks.
+
+### Basic Usage
+
+**Syntax:** `WP i` where `i` = track number (1-8)
+
+**Returns:** Pattern index (0-15) for the specified track
+
+```
+# Query pattern on track 1
+CV 1 N SCALE WP 1 0 15 60 75    # Map pattern 0-15 to notes C4-Eb5
+
+# Conditional based on pattern
+IF EQ WP 1 5: TR.PULSE 1        # Trigger when track 1 on pattern 5
+
+# Store pattern for later use
+X WP 2                          # Store track 2's pattern in X
+```
+
+### Pattern-Dependent Behavior
+
+Use WP to create scripts that change based on which pattern is playing:
+
+```
+# Different CV output per pattern on track 1
+X WP 1
+IF EQ X 0: CV 1 V 2
+IF EQ X 1: CV 1 V 4
+IF EQ X 2: CV 1 V 6
+IF EQ X 3: CV 1 V 8
+
+# Pattern-stable randomization
+RAND.SEED WP 1                  # Same seed = same random sequence
+CV 2 N RND 60 84                # Pattern 0 always gives same notes
+TR.PULSE 2
+```
+
+### Cross-Track Pattern Detection
+
+Detect when multiple tracks are on specific patterns:
+
+```
+# Trigger when tracks 1 and 2 are on the same pattern
+IF EQ WP 1 WP 2: TR 1 1
+IF NE WP 1 WP 2: TR 1 0
+
+# Detect when all drum tracks on pattern 0 (intro)
+IF AND4 EQ WP 1 0 EQ WP 2 0 EQ WP 3 0 EQ WP 4 0: CV 1 V 10
+
+# Complex pattern combinations
+IF AND EQ WP 1 5 EQ WP 3 7: CV 2 V 7   # Tracks 1&3 on specific patterns
+```
+
+### Pattern as Modulation Source
+
+Map pattern indices to CV values for dynamic variation:
+
+```
+# Linear mapping: pattern 0→C3, pattern 15→C5
+CV 1 N SCALE WP 1 0 15 48 72
+
+# Quantized steps: each pattern = semitone
+CV 2 N ADD 60 WP 2              # C4 + pattern offset
+
+# Exponential-ish: square the pattern index
+X WP 3
+CV 3 N ADD 60 DIV MUL X X 4     # C4 + (pattern²/4)
+
+# Use sum of all patterns
+X 0
+L 1 8: X ADD X WP I             # Sum all 8 track patterns
+CV 4 N SCALE X 0 120 36 96      # Map to 5-octave range
+```
+
+### Pattern-Driven Rhythm
+
+Create rhythmic variations based on pattern state:
+
+```
+# Metro script with pattern-dependent tempo
+M DIV 1000 ADD 4 WP 1           # Faster on higher patterns
+M!                              # Trigger metro
+
+# Pattern-dependent probability
+PROB SCALE WP 2 0 15 10 90      # 10% on pattern 0, 90% on pattern 15
+IF TOSS: TR.PULSE 3
+```
+
+### Global Pattern State Hash
+
+Create a fingerprint of all patterns playing across all tracks:
+
+```
+# Simple sum (0-120 range)
+X 0
+L 1 8: X ADD X WP I
+CV 1 N SCALE X 0 120 48 84
+
+# Weighted combination
+X 0
+L 1 8: X ADD X MUL WP I I       # Weight by track number
+CV 2 N SCALE X 0 252 36 96      # Max = 1*15 + 2*15 + ... + 8*15 = 540
+
+# XOR combination for variation
+X WP 1
+L 2 8: X XOR X WP I
+CV 3 N SCALE X 0 15 60 75
+```
+
+### Pattern Change Detection
+
+Store previous pattern and trigger on changes:
+
+```
+# In Init script (S0):
+A WP 1                          # Store initial pattern in A
+
+# In Metro script:
+B WP 1                          # Get current pattern
+IF NE A B: TR.PULSE 1           # Pulse on pattern change
+A B                             # Update stored pattern
+```
+
+### Use Cases
+
+**Song sections:**
+```
+# Different behavior for verse/chorus/bridge
+IF LT WP 1 4: CV 1 V 3          # Patterns 0-3 = verse
+IF INRI WP 1 4 7: CV 1 V 5      # Patterns 4-7 = chorus
+IF GT WP 1 7: CV 1 V 8          # Patterns 8-15 = bridge
+```
+
+**Euclidean density control:**
+```
+# Use pattern as Euclidean fill parameter
+ER 16 WP 1                      # Pattern 0 = 0/16, pattern 15 = 15/16
+IF NZ: TR.PULSE 1
+```
+
+**Deterministic generative:**
+```
+# Pattern-stable generative sequences
+SEED ADD WP 1 MUL WP 2 16       # Combine 2 track patterns for seed
+L 1 8: CV I N RND 48 84         # Same patterns = same notes every time
+```
+
+### Routing Integration
+
+Combine WP with Performer's routing system:
+
+```
+# Route pattern-dependent CV
+CV 1 N SCALE WP 1 0 15 60 75
+# In Performer routing: CV 1 → Track 5 Transpose
+
+# Gate based on pattern match
+IF EQ WP 2 WP 3: TR 1 1         # Gate when patterns match
+# In Performer routing: Gate 1 → Track 6 Gate
+
+# Dynamic sequencer control
+CV 2 V MUL WP 4 200             # 0-3V based on pattern
+# In Performer routing: CV 2 → Track 7 Clock Divisor CV
+```
+
+### Performance Characteristics
+
+- **Zero overhead**: WP reads cached pattern state from TrackEngine
+- **Instant**: No pattern lookup or computation required
+- **Global view**: All 8 tracks accessible from any Teletype track
+- **Read-only**: Cannot change patterns via WP (use Performer UI or MIDI Program Change)
+- **Boundary safe**: Invalid track numbers return 0
+
+### Notes
+
+- Track numbers are **1-indexed** (1-8 for users)
+- Pattern indices are **0-indexed** (0-15 returned by WP)
+- Snapshots internally use pattern index 16, but WP returns the active pattern index
+- Out-of-bounds track numbers (< 1 or > 8) return 0
+- WP works even when called from a Teletype track that isn't the selected track
+
 ## Performer Teletype Keyboard Shortcuts
 
 The Performer implementation of Teletype includes specific keyboard shortcuts for editing scripts:
