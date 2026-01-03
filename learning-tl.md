@@ -371,6 +371,142 @@ Q.N 4                // Set queue length to 4
 CV 2 V Q.AVG         // Set CV 2 to average of queue
 ```
 
+## Example Scripts from Teletype Codex
+
+Here are some practical example scripts from the Teletype Codex that demonstrate advanced techniques:
+
+### Example 1: Tetra Sequencer
+This script creates 4 independent CV and trigger sequencers:
+
+```
+#1 (Main sequencer)
+SCRIPT 2; SCRIPT 3; SCRIPT 4
+
+#2 (Sequencer 1 & 2)
+P.N 0; A P.HERE
+IF NZ A: TR.P 1; CV 1 N A
+P.NEXT
+P.N 1; B P.HERE
+IF NZ B: TR.P 2; CV 2 N B
+P.NEXT
+
+#3 (Sequencer 3 & 4)
+P.N 2; C P.HERE
+IF NZ C: TR.P 3; CV 3 N C
+P.NEXT
+P.N 3; D P.HERE
+IF NZ D: TR.P 4; CV 4 N D
+P.NEXT
+
+#4 (Parameter control)
+Y DIV PARAM 2
+IF NZ PARAM: P.HERE Y
+
+#5-8 (Randomize sequencers)
+#5: P.N 0; P.INS 0 RRAND 0 1; PN.POP 0
+#6: P.N 1; P.INS 0 RRAND 0 200; PN.POP 1
+#7: P.N 2; P.INS 0 RRAND 0 200; PN.POP 2
+#8: P.N 3; P.INS 0 RRAND 1 200; PN.POP 3
+
+#I (Init script)
+P.N 0; P.START 0; P.END 16
+P.N 1; P.START 0; P.END 16
+P.N 2; P.START 0; P.END 16
+P.N 3; P.START 0; P.END 16
+PN.I 0 0; PN.I 1 0; PN.I 2 0; PN.I 3 0
+```
+
+**What it does:** This creates a 4-channel sequencer where each pattern bank (0-3) controls a different CV and trigger output. When triggered, it advances all 4 patterns simultaneously, sending CV values to outputs 1-4 and triggering gates when the pattern value is non-zero.
+
+**What to expect:** You'll get 4 synchronized sequencers that can play different patterns. Pattern 0 controls CV 1 and TR A, Pattern 1 controls CV 2 and TR B, and so on. The randomize scripts (5-8) will add random values to each pattern.
+
+### Example 2: Turing Machine
+A generative sequencer using probability:
+
+```
+#5 (Copy pattern 0 to 1)
+L 0 7 : PN 1 I PN 0 I
+
+#6 (Clock out pattern 1)
+P.N 1
+P.INS 0 P.POP
+X 0
+L 0 4 : X ADD X LSH P I I
+CV 2 N PN 4 X
+TR.PULSE 2
+
+#7 (Parameter control)
+P.N 0
+I SCALE 100 16000 0 100 PARAM
+PROB I : P.PUSH EZ P.POP
+
+#8 (Clock trigger)
+P.N 0
+P.INS 0 P.POP
+X 0
+L 0 4 : X ADD X LSH P I I
+CV 1 N PN 4 X
+TR.PULSE 1
+
+#I (Init script)
+P.N 0
+L 0 63 : P.POP
+L 0 7 : P.PUSH TOSS
+P.N 1
+L 0 63 : P.POP
+L 0 7 : P.PUSH PN 0 I
+```
+
+**What it does:** This creates a Turing machine-style generative sequencer that uses probability to determine whether to add new values to the pattern. It uses the PARAM knob to control the probability of adding new values.
+
+**What to expect:** The sequencer will generate evolving patterns based on probability. When you press script 8, it will clock out a value from pattern 0 and send it to CV 1. Script 7 uses the PARAM knob to control the probability of adding new values to the pattern. The higher the PARAM value, the more likely it is to add new values.
+
+### Example 3: Triangle Mountain
+A melodic sequencer with scale control:
+
+```
+#1 (Reset position)
+P.I 0
+
+#2 (Next scale)
+P.N WRAP ADD P.N 1 0 3
+P.I P.END
+
+#3 (Shorten loop)
+P.END WRAP SUB P.END 1 1 7
+
+#4 (Toggle forward/reverse)
+X EZ X
+
+#5 (Throw CV 2 a new note)
+S : CV 2 ADD N P.HERE V 1
+S : TR.PULSE B
+
+#6 (Randomize loop length)
+P.END RRAND 1 7
+
+#7 (Set root to CV in)
+Z IN
+
+#8 (Add 1 semi to CV 4)
+CV 4 N WRAP 0 0 11
+
+#M (Metro script)
+IF X : P.PREV
+ELSE : P.NEXT
+CV 1 ADD N P.HERE Z
+M SUB 320 RSH PARAM 6
+S.ALL
+TR.PULSE A
+
+#I (Init script)
+L A B : TR.TIME I 40
+```
+
+**What it does:** This creates a melodic sequencer that can play forward or backward through a pattern, with tempo controlled by the PARAM knob. It allows transposition via CV input and can play in different scales.
+
+**What to expect:** The sequencer will play through your pattern at a tempo set by the PARAM knob (higher PARAM = faster). Script 1 resets the position to 0, script 2 cycles through different pattern banks, script 3 shortens the loop, script 4 toggles between forward and reverse playback, script 5 sends a new note to CV 2, script 6 randomizes the loop length, script 7 sets the root note based on CV input, and script 8 adds 1 semitone to CV 4. The metro script runs automatically and sends the current pattern value to CV 1, transposed by the root note.
+
 ## Conclusion
 
 This tutorial has covered the fundamental concepts of using Teletype in the Performer firmware. From basic scripts to complex pattern operations, you now have the tools to create intricate musical sequences and interactions.
