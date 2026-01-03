@@ -26,6 +26,24 @@ If your Teletype track is new, set up its I/O first so scripts can see the corre
 
 After this, proceed to Script View and start editing scripts.
 
+## BUS Routing Example (Performer)
+
+BUS is a shared CV bus (3 slots) that lets Teletype modulate other tracks without using hardware CV outputs.
+
+Example: Teletype drives NoteTrack transpose via BUS 1.
+
+1. In Teletype Script View (LIVE or S0), set BUS 1:
+```
+BUS 1 X
+```
+2. In the Routing page, create a route:
+   - **Source**: BUS 1
+   - **Target**: Transpose (or any track target)
+   - **Tracks**: select the target track(s)
+3. Now changing X in Teletype updates BUS 1 and modulates the route target.
+
+Note: BUS is global. Multiple Teletype tracks can read/write the same BUS slot directly without routing.
+
 ## Performer Teletype Keyboard Shortcuts
 
 The Performer implementation of Teletype includes specific keyboard shortcuts for editing scripts:
@@ -55,7 +73,7 @@ The Performer implementation of Teletype includes specific keyboard shortcuts fo
   - **Step 13**: ; → Y → Z (cycles through ;→Y→Z)
   - **Step 14**: CV → CV.SLEW → RRAND
   - **Step 15**: TR.P → PARAM → ELIF
-  - **Step 16**: M.ACT → P.NEXT → DEL
+  - **Step 16**: M.ACT → P.NEXT → BUS
 
 
 ### Page + Step Keys (Steps 1-16)

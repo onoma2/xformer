@@ -3,9 +3,11 @@
 #include "TeletypeTrackEngine.h"
 
 #include "core/Debug.h"
+#include "core/math/Math.h"
 #include "os/os.h"
 
 #include <array>
+#include <cmath>
 #include <cstring>
 
 namespace {
@@ -13,6 +15,19 @@ TeletypeTrackEngine *g_activeEngine = nullptr;
 std::array<int16_t, 16> g_dashboardValues{};
 bool g_hasDelays = false;
 bool g_hasStack = false;
+
+float busRawToVolts(int16_t value) {
+    int16_t clamped = clamp<int16_t>(value, 0, 16383);
+    float norm = clamped / 16383.f;
+    return norm * 10.f - 5.f;
+}
+
+int16_t busVoltsToRaw(float volts) {
+    float clamped = clamp(volts, -5.f, 5.f);
+    float norm = (clamped + 5.f) / 10.f;
+    int32_t raw = static_cast<int32_t>(std::lround(norm * 16383.f));
+    return static_cast<int16_t>(clamp<int32_t>(raw, 0, 16383));
+}
 } // namespace
 
 TeletypeBridge::ScopedEngine::ScopedEngine(TeletypeTrackEngine &engine) {
@@ -106,6 +121,19 @@ uint16_t tele_get_cv(uint8_t i) {
         return engine->cvRaw(i);
     }
     return 0;
+}
+
+uint16_t tele_bus_cv_get(uint8_t i) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return busVoltsToRaw(engine->busCv(i));
+    }
+    return 0;
+}
+
+void tele_bus_cv_set(uint8_t i, int16_t v) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setBusCv(i, busRawToVolts(v));
+    }
 }
 
 void tele_cv_cal(uint8_t n, int32_t b, int32_t m) {

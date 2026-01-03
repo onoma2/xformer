@@ -124,6 +124,13 @@ public:
         IndexedB,
         IndexedLast = IndexedB,
 
+        // Bus Targets
+        BusFirst,
+        BusCv1 = BusFirst,
+        BusCv2,
+        BusCv3,
+        BusLast = BusCv3,
+
         Last,
     };
 
@@ -196,6 +203,9 @@ public:
 
         case Target::IndexedA:                  return "Indexed A";
         case Target::IndexedB:                  return "Indexed B";
+        case Target::BusCv1:                    return "BUS 1";
+        case Target::BusCv2:                    return "BUS 2";
+        case Target::BusCv3:                    return "BUS 3";
 
         case Target::Last:                      break;
         }
@@ -275,6 +285,9 @@ public:
         // Indexed Targets (52-53)
         case Target::IndexedA:                  return 52;
         case Target::IndexedB:                  return 53;
+        case Target::BusCv1:                    return 57;
+        case Target::BusCv2:                    return 58;
+        case Target::BusCv3:                    return 59;
 
         case Target::Run:                       return 54;
         case Target::Reset:                     return 55;
@@ -322,6 +335,9 @@ public:
 
     static bool isIndexedTarget(Target target) {
         return target >= Target::IndexedFirst && target <= Target::IndexedLast;
+    }
+    static bool isBusTarget(Target target) {
+        return target >= Target::BusFirst && target <= Target::BusLast;
     }
 
     static bool isPerTrackTarget(Target target) {
@@ -374,7 +390,10 @@ public:
         CvOut6,
         CvOut7,
         CvOut8,
-        CvLast = CvOut8,
+        BusCv1,
+        BusCv2,
+        BusCv3,
+        CvLast = BusCv3,
         Midi,
         GateOut1,
         GateOut2,
@@ -389,6 +408,17 @@ public:
 
     static bool isCvSource(Source source) { return source >= Source::CvFirst && source <= Source::CvLast; }
     static bool isMidiSource(Source source) { return source == Source::Midi; }
+    static bool isBusSource(Source source) { return source >= Source::BusCv1 && source <= Source::BusCv3; }
+    static int busSourceIndex(Source source) {
+        return isBusSource(source) ? int(source) - int(Source::BusCv1) : -1;
+    }
+    static int busTargetIndex(Target target) {
+        return isBusTarget(target) ? int(target) - int(Target::BusCv1) : -1;
+    }
+    static bool isBusSelfRoute(Source source, Target target) {
+        return isBusSource(source) && isBusTarget(target) &&
+               busSourceIndex(source) == busTargetIndex(target);
+    }
 
     static void printSource(Source source, StringBuilder &str) {
         switch (source) {
@@ -410,6 +440,11 @@ public:
         case Source::CvOut7:
         case Source::CvOut8:
             str("CV Out %d", int(source) - int(Source::CvOut1) + 1);
+            break;
+        case Source::BusCv1:
+        case Source::BusCv2:
+        case Source::BusCv3:
+            str("BUS %d", int(source) - int(Source::BusCv1) + 1);
             break;
         case Source::Midi:
             str("MIDI");
@@ -582,6 +617,9 @@ public:
                 _target = target;
                 std::tie(_min, _max) = normalizedDefaultRange(target);
             }
+            if (isBusSelfRoute(_source, _target)) {
+                _source = Source::None;
+            }
         }
 
         void editTarget(int value, bool shift) {
@@ -695,7 +733,12 @@ public:
 
         Source source() const { return _source; }
         void setSource(Source source) {
-            _source = ModelUtils::clampedEnum(source);
+            source = ModelUtils::clampedEnum(source);
+            if (isBusSelfRoute(source, _target)) {
+                _source = Source::None;
+            } else {
+                _source = source;
+            }
         }
 
         void editSource(int value, bool shift) {

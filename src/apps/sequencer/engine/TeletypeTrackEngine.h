@@ -63,6 +63,8 @@ public:
     void syncMetroFromState();
     void resetMetroTimer();
     uint32_t timeTicks() const;
+    float busCv(int index) const;
+    void setBusCv(int index, float volts);
 
 private:
     void runMidiTriggeredScript(int scriptIndex);

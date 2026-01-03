@@ -327,7 +327,7 @@ void TeletypeScriptViewPage::handleStepKey(int step, bool shift) {
         { ";", "Y", "Z" },
         { "CV", "CV.SLEW", "RRAND" },
         { "TR.P", "PARAM", "ELIF" },
-        { "M.ACT", "P.NEXT", "DEL" }
+        { "M.ACT", "P.NEXT", "BUS" }
     };
     static const int kBaseCount[16] = {
         3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3

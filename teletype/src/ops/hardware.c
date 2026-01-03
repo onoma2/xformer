@@ -43,6 +43,10 @@ static void op_PARAM_CAL_MAX_set(const void *NOTUSED(data), scene_state_t *ss,
 static void op_PARAM_CAL_RESET_set(const void *NOTUSED(data), scene_state_t *ss,
                                    exec_state_t *NOTUSED(es),
                                    command_state_t *cs);
+static void op_BUS_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_BUS_set(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_TR_get(const void *data, scene_state_t *ss, exec_state_t *es,
                       command_state_t *cs);
 static void op_TR_set(const void *data, scene_state_t *ss, exec_state_t *es,
@@ -110,6 +114,7 @@ const tele_op_t op_IN_CAL_RESET  = MAKE_GET_OP (IN.CAL.RESET, op_IN_CAL_RESET_se
 const tele_op_t op_PARAM_CAL_MIN = MAKE_GET_OP (PARAM.CAL.MIN, op_PARAM_CAL_MIN_set, 0, true);
 const tele_op_t op_PARAM_CAL_MAX = MAKE_GET_OP (PARAM.CAL.MAX, op_PARAM_CAL_MAX_set, 0, true);
 const tele_op_t op_PARAM_CAL_RESET  = MAKE_GET_OP (PARAM.CAL.RESET, op_PARAM_CAL_RESET_set, 0, false);
+const tele_op_t op_BUS           = MAKE_GET_SET_OP(BUS, op_BUS_get, op_BUS_set, 1, true);
 const tele_op_t op_LIVE_OFF      = MAKE_GET_OP (LIVE.OFF, op_LIVE_OFF_get, 0, false);
 const tele_op_t op_LIVE_O        = MAKE_ALIAS_OP (LIVE.O, op_LIVE_OFF_get, NULL, 0, false);
 const tele_op_t op_LIVE_DASH     = MAKE_GET_OP (LIVE.DASH, op_LIVE_DASH_get, 1, false);
@@ -336,6 +341,29 @@ static void op_PARAM_CAL_RESET_set(const void *NOTUSED(data), scene_state_t *ss,
                                    exec_state_t *NOTUSED(es),
                                    command_state_t *cs) {
     ss_reset_param_cal(ss);
+}
+
+static void op_BUS_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 3) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_bus_cv_get((uint8_t)a));
+}
+
+static void op_BUS_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    b = normalise_value(0, 16383, 0, b);
+    a--;
+    if (a < 0 || a >= 3) {
+        return;
+    }
+    tele_bus_cv_set((uint8_t)a, b);
 }
 
 static void op_TR_get(const void *NOTUSED(data), scene_state_t *ss,

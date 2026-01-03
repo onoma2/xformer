@@ -263,6 +263,14 @@ void RoutingEngine::updateSources() {
                 sourceValue = range.normalize(_engine.cvOutput().channel(index));
                 break;
             }
+            case Routing::Source::BusCv1:
+            case Routing::Source::BusCv2:
+            case Routing::Source::BusCv3: {
+                const auto &range = Types::voltageRangeInfo(route.cvSource().range());
+                int index = int(route.source()) - int(Routing::Source::BusCv1);
+                sourceValue = range.normalize(_engine.busCv(index));
+                break;
+            }
             case Routing::Source::GateOut1:
             case Routing::Source::GateOut2:
             case Routing::Source::GateOut3:
@@ -326,7 +334,11 @@ void RoutingEngine::updateSinks() {
         if (route.active()) {
             auto target = route.target();
 
-            if (Routing::isPerTrackTarget(target)) {
+            if (Routing::isBusTarget(target)) {
+                float baseValue = route.min() + _sourceValues[routeIndex] * (route.max() - route.min());
+                int busIndex = int(target) - int(Routing::Target::BusCv1);
+                _engine.setBusCv(busIndex, baseValue);
+            } else if (Routing::isPerTrackTarget(target)) {
                 uint8_t tracks = route.tracks();
 
                 float routeSpan = route.max() - route.min();

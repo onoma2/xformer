@@ -13,6 +13,7 @@ This manual covers the Teletype operations available in the **Performer** firmwa
 *   **Core Logic:** Math, Logic, Random, Patterns, Variables, Stack, Queue.
 *   **Sequencing:** Metronome (`M`), Delay (`DEL`), Scripts.
 *   **Local I/O:** 4 CV Outputs (`CV`), 4 Gate Outputs (`TR`), 2 Inputs (`IN`, `PARAM`).
+*   **BUS (Performer):** Shared CV bus slots (`BUS`), usable in routing.
 *   **MIDI:** Full MIDI input support (`MI.*`).
 
 **Unsupported/Removed:**
@@ -22,6 +23,20 @@ This manual covers the Teletype operations available in the **Performer** firmwa
 *   **Screen Flipping:** `DEVICE.FLIP` is disabled.
 
 ---
+## BUS (Performer-only)
+
+BUS is a shared CV bus with 3 slots. It stores voltages in the Performer domain (-5V..+5V),
+and Teletype reads/writes in raw 0–16383 units.
+
+Syntax:
+- `BUS n` → read BUS slot n (1..3)
+- `BUS n x` → write raw value x to BUS slot n (1..3)
+
+Notes:
+- Slots are 1-based (like `SCRIPT`).
+- Use routing to map BUS 1–3 to any track target.
+- BUS is global: multiple Teletype tracks can read/write the same slots without routing.
+
 ## Performer Teletype Keyboard Shortcuts
 
 The Performer implementation of Teletype includes specific keyboard shortcuts for editing scripts:

@@ -128,6 +128,9 @@ void Routing::Route::read(VersionedSerializedReader &reader) {
     if (isMidiSource(_source)) {
         _midiSource.read(reader);
     }
+    if (isBusSelfRoute(_source, _target)) {
+        _source = Source::None;
+    }
 }
 
 bool Routing::Route::operator==(const Route &other) const {
@@ -291,6 +294,8 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                 }
             }
         }
+    } else if (isBusTarget(target)) {
+        // handled in RoutingEngine (engine-owned bus)
     }
 }
 
@@ -412,6 +417,10 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     // Indexed modulation targets
     [int(Routing::Target::IndexedA)]                        = { -100,   100,    -100,   100,    1       },
     [int(Routing::Target::IndexedB)]                        = { -100,   100,    -100,   100,    1       },
+    // Bus targets (centivolts: -5.00V..+5.00V)
+    [int(Routing::Target::BusCv1)]                          = { -500,   500,    -500,   500,    10      },
+    [int(Routing::Target::BusCv2)]                          = { -500,   500,    -500,   500,    10      },
+    [int(Routing::Target::BusCv3)]                          = { -500,   500,    -500,   500,    10      },
 };
 
 float Routing::normalizeTargetValue(Routing::Target target, float value) {
@@ -530,6 +539,11 @@ void Routing::printTargetValue(Routing::Target target, float normalized, StringB
     case Target::DiscreteMapRangeHigh:
     case Target::DiscreteMapRangeLow:
         str("%+.2fV", value);
+        break;
+    case Target::BusCv1:
+    case Target::BusCv2:
+    case Target::BusCv3:
+        str("%+.2fV", value * 0.01f);
         break;
     case Target::DiscreteMapScanner:
         str("%.1f", value);

@@ -23,6 +23,7 @@ Engine::Engine(Model &model, ClockTimer &clockTimer, Adc &adc, Dac &dac, Dio &di
 {
     _cvOutputOverrideValues.fill(0.f);
     _trackEngines.fill(nullptr);
+    _busCv.fill(0.f);
 
     _usbMidi.setConnectHandler([this] (uint16_t vendorId, uint16_t productId) { usbMidiConnect(vendorId, productId); });
     _usbMidi.setDisconnectHandler([this] () { usbMidiDisconnect(); });

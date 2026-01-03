@@ -114,6 +114,20 @@ public:
     const CvOutput &cvOutput() const { return _cvOutput; }
     const uint8_t gateOutput() const { return _gateOutput.gates(); }
 
+    static constexpr int BusCvCount = 3;
+    float busCv(int index) const {
+        if (index < 0 || index >= BusCvCount) {
+            return 0.f;
+        }
+        return _busCv[index];
+    }
+    void setBusCv(int index, float volts) {
+        if (index < 0 || index >= BusCvCount) {
+            return;
+        }
+        _busCv[index] = clamp(volts, -5.f, 5.f);
+    }
+
     // gate overrides
     bool gateOutputOverride() const { return _gateOutputOverride; }
     void setGateOutputOverride(bool enabled) { _gateOutputOverride = enabled; }
@@ -271,6 +285,7 @@ private:
     // cv output overrides
     bool _cvOutputOverride = false;
     std::array<float, CvOutput::Channels> _cvOutputOverrideValues;
+    std::array<float, BusCvCount> _busCv{};
 
     MessageHandler _messageHandler;
 };

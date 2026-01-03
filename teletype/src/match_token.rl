@@ -170,6 +170,7 @@
         "PARAM.CAL.MIN"  => { MATCH_OP(E_OP_PARAM_CAL_MIN); };
         "PARAM.CAL.MAX"  => { MATCH_OP(E_OP_PARAM_CAL_MAX); };
         "PARAM.CAL.RESET" => { MATCH_OP(E_OP_PARAM_CAL_RESET); };
+        "BUS"         => { MATCH_OP(E_OP_BUS); };
         "PRM"         => { MATCH_OP(E_OP_PRM); };
         "TR"          => { MATCH_OP(E_OP_TR); };
         "TR.POL"      => { MATCH_OP(E_OP_TR_POL); };

@@ -409,6 +409,14 @@ uint32_t TeletypeTrackEngine::timeTicks() const {
     return TeletypeBridge::ticksMs();
 }
 
+float TeletypeTrackEngine::busCv(int index) const {
+    return _engine.busCv(index);
+}
+
+void TeletypeTrackEngine::setBusCv(int index, float volts) {
+    _engine.setBusCv(index, volts);
+}
+
 void TeletypeTrackEngine::installBootScript() {
     scene_state_t &state = _teletypeTrack.state();
     if (_teletypeTrack.hasAnyScriptText()) {
