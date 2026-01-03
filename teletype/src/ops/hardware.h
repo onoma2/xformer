@@ -19,6 +19,7 @@ extern const tele_op_t op_PARAM_CAL_MIN;
 extern const tele_op_t op_PARAM_CAL_MAX;
 extern const tele_op_t op_PARAM_CAL_RESET;
 extern const tele_op_t op_BUS;
+extern const tele_op_t op_BAR;
 extern const tele_op_t op_PRM;
 extern const tele_op_t op_TR;
 extern const tele_op_t op_TR_POL;

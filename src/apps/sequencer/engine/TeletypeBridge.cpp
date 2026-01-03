@@ -136,6 +136,14 @@ void tele_bus_cv_set(uint8_t i, int16_t v) {
     }
 }
 
+int16_t tele_bar(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        float fraction = engine->measureFraction();
+        return static_cast<int16_t>(fraction * 16383.0f);
+    }
+    return 0;
+}
+
 void tele_cv_cal(uint8_t n, int32_t b, int32_t m) {
     (void)n;
     (void)b;

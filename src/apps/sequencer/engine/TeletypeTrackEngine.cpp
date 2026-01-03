@@ -445,6 +445,10 @@ void TeletypeTrackEngine::setBusCv(int index, float volts) {
     _engine.setBusCv(index, volts);
 }
 
+float TeletypeTrackEngine::measureFraction() const {
+    return _engine.measureFraction();
+}
+
 void TeletypeTrackEngine::installBootScript() {
     scene_state_t &state = _teletypeTrack.state();
     loadScriptsFromModel();

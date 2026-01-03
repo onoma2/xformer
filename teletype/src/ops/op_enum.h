@@ -144,6 +144,7 @@ typedef enum {
     E_OP_PARAM_CAL_MAX,
     E_OP_PARAM_CAL_RESET,
     E_OP_BUS,
+    E_OP_BAR,
     E_OP_PRM,
     E_OP_TR,
     E_OP_TR_POL,

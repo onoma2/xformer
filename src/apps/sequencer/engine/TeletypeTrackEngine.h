@@ -65,6 +65,7 @@ public:
     uint32_t timeTicks() const;
     float busCv(int index) const;
     void setBusCv(int index, float volts);
+    float measureFraction() const;
 
 private:
     void runMidiTriggeredScript(int scriptIndex);

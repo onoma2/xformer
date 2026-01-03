@@ -32,6 +32,7 @@ extern uint16_t tele_get_cv(uint8_t i);
 extern void tele_cv_cal(uint8_t n, int32_t b, int32_t m);
 extern uint16_t tele_bus_cv_get(uint8_t i);
 extern void tele_bus_cv_set(uint8_t i, int16_t v);
+extern int16_t tele_bar(void);
 
 extern void tele_update_adc(uint8_t force);
 
