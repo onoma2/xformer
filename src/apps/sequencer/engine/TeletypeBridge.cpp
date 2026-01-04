@@ -92,6 +92,13 @@ void tele_tr_pulse(uint8_t i, int16_t time) {
     }
 }
 
+bool tele_tr_pulse_allow(uint8_t i) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->allowPulse(i);
+    }
+    return false;
+}
+
 void tele_tr_pulse_clear(uint8_t i) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         engine->clearPulse(i);

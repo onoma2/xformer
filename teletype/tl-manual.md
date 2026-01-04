@@ -109,6 +109,7 @@ Per-output trigger divider and width.
 
 - `TR.D n div` → only let every `div`th pulse through (n = 1–4, div ≥ 1)
 - `TR.W n pct` → pulse width as % of post-div interval (1–100)
+  - `TR.W n 0` disables width mode and returns to `TR.TIME`
 
 ## E.* (Performer-only)
 

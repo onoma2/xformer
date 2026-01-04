@@ -174,16 +174,6 @@ void TeletypeTrackEngine::beginPulse(uint8_t index, int16_t timeMs) {
     if (index >= TriggerOutputCount || timeMs <= 0) {
         return;
     }
-    uint8_t div = _trDiv[index];
-    if (div > 1) {
-        uint8_t counter = static_cast<uint8_t>(_trDivCounter[index] + 1);
-        if (counter < div) {
-            _trDivCounter[index] = counter;
-            return;
-        }
-        _trDivCounter[index] = 0;
-    }
-
     float interval = _trLastIntervalMs[index];
     if (interval <= 0.f && _metroActive && _metroPeriodMs > 0) {
         interval = _metroPeriodMs * std::max<uint8_t>(1, _trDiv[index]);
@@ -206,6 +196,23 @@ void TeletypeTrackEngine::beginPulse(uint8_t index, int16_t timeMs) {
     _teletypePulseRemainingMs[index] = timeMs;
     _trLastPulseMs[index] = _pulseClockMs;
     _trLastIntervalMs[index] = interval > 0.f ? interval : static_cast<float>(timeMs);
+}
+
+bool TeletypeTrackEngine::allowPulse(uint8_t index) {
+    if (index >= TriggerOutputCount) {
+        return false;
+    }
+    uint8_t div = _trDiv[index];
+    if (div <= 1) {
+        return true;
+    }
+    uint8_t counter = static_cast<uint8_t>(_trDivCounter[index] + 1);
+    if (counter < div) {
+        _trDivCounter[index] = counter;
+        return false;
+    }
+    _trDivCounter[index] = 0;
+    return true;
 }
 
 void TeletypeTrackEngine::clearPulse(uint8_t index) {

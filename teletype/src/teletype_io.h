@@ -24,6 +24,7 @@ extern void tele_metro_reset(void);
 
 extern void tele_tr(uint8_t i, int16_t v);
 extern void tele_tr_pulse(uint8_t i, int16_t time);
+extern bool tele_tr_pulse_allow(uint8_t i);
 extern void tele_tr_pulse_clear(uint8_t i);
 extern void tele_tr_pulse_time(uint8_t i, int16_t time);
 extern void tele_tr_div(uint8_t i, int16_t div);

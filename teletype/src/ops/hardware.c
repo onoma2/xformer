@@ -659,6 +659,9 @@ static void op_TR_PULSE_get(const void *NOTUSED(data), scene_state_t *ss,
     if (a < 0)
         return;
     else if (a < 4) {
+        if (!tele_tr_pulse_allow((uint8_t)a)) {
+            return;
+        }
         int16_t time = ss->variables.tr_time[a];  // pulse time
         if (time <= 0) return;  // if time <= 0 don't do anything
         ss->variables.tr[a] = ss->variables.tr_pol[a];

@@ -43,6 +43,7 @@ public:
 
     void handleTr(uint8_t index, int16_t value);
     void beginPulse(uint8_t index, int16_t timeMs);
+    bool allowPulse(uint8_t index);
     void clearPulse(uint8_t index);
     void setPulseTime(uint8_t index, int16_t timeMs);
     void setTrDiv(uint8_t index, int16_t div);
