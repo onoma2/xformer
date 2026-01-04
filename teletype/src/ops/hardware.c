@@ -69,6 +69,10 @@ static void op_TR_get(const void *data, scene_state_t *ss, exec_state_t *es,
                       command_state_t *cs);
 static void op_TR_set(const void *data, scene_state_t *ss, exec_state_t *es,
                       command_state_t *cs);
+static void op_TR_D_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                        command_state_t *cs);
+static void op_TR_W_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                        command_state_t *cs);
 static void op_TR_POL_get(const void *data, scene_state_t *ss, exec_state_t *es,
                           command_state_t *cs);
 static void op_TR_POL_set(const void *data, scene_state_t *ss, exec_state_t *es,
@@ -103,6 +107,22 @@ static void op_PRINT_get(const void *data, scene_state_t *ss, exec_state_t *es,
                          command_state_t *cs);
 static void op_PRINT_set(const void *data, scene_state_t *ss, exec_state_t *es,
                          command_state_t *cs);
+static void op_E_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                     command_state_t *cs);
+static void op_E_A_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_D_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_T_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_O_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_L_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_R_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_C_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
 
 
 // clang-format off
@@ -117,6 +137,8 @@ const tele_op_t op_PARAM    = MAKE_GET_OP    (PARAM   , op_PARAM_get   , 0, true
 const tele_op_t op_PARAM_SCALE = MAKE_GET_OP (PARAM.SCALE, op_PARAM_SCALE_set, 2, false);
 const tele_op_t op_PRM      = MAKE_ALIAS_OP  (PRM     , op_PARAM_get   , NULL,           0, true);
 const tele_op_t op_TR       = MAKE_GET_SET_OP(TR      , op_TR_get      , op_TR_set     , 1, true);
+const tele_op_t op_TR_D     = MAKE_GET_OP    (TR.D    , op_TR_D_get    , 2, false);
+const tele_op_t op_TR_W     = MAKE_GET_OP    (TR.W    , op_TR_W_get    , 2, false);
 const tele_op_t op_TR_POL   = MAKE_GET_SET_OP(TR.POL  , op_TR_POL_get  , op_TR_POL_set , 1, true);
 const tele_op_t op_TR_TIME  = MAKE_GET_SET_OP(TR.TIME , op_TR_TIME_get , op_TR_TIME_set, 1, true);
 const tele_op_t op_TR_TOG   = MAKE_GET_OP    (TR.TOG  , op_TR_TOG_get  , 1, false);
@@ -151,6 +173,14 @@ const tele_op_t op_LIVE_VARS     = MAKE_GET_OP (LIVE.VARS, op_LIVE_VARS_get, 0, 
 const tele_op_t op_LIVE_V        = MAKE_ALIAS_OP (LIVE.V, op_LIVE_VARS_get, NULL, 0, false);
 const tele_op_t op_PRINT         = MAKE_GET_SET_OP (PRINT, op_PRINT_get, op_PRINT_set, 1, true);
 const tele_op_t op_PRT           = MAKE_ALIAS_OP (PRT, op_PRINT_get, op_PRINT_set, 1, true);
+const tele_op_t op_E             = MAKE_GET_OP(E, op_E_get, 2, false);
+const tele_op_t op_E_A           = MAKE_GET_OP(E.A, op_E_A_get, 2, false);
+const tele_op_t op_E_D           = MAKE_GET_OP(E.D, op_E_D_get, 2, false);
+const tele_op_t op_E_T           = MAKE_GET_OP(E.T, op_E_T_get, 1, false);
+const tele_op_t op_E_O           = MAKE_GET_OP(E.O, op_E_O_get, 2, false);
+const tele_op_t op_E_L           = MAKE_GET_OP(E.L, op_E_L_get, 2, false);
+const tele_op_t op_E_R           = MAKE_GET_OP(E.R, op_E_R_get, 2, false);
+const tele_op_t op_E_C           = MAKE_GET_OP(E.C, op_E_C_get, 2, false);
 // clang-format on
 
 static void op_CV_get(const void *NOTUSED(data), scene_state_t *ss,
@@ -505,6 +535,28 @@ static void op_TR_set(const void *NOTUSED(data), scene_state_t *ss,
     }
 }
 
+static void op_TR_D_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_tr_div((uint8_t)a, b);
+}
+
+static void op_TR_W_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_tr_width((uint8_t)a, b);
+}
+
 static void op_TR_POL_get(const void *NOTUSED(data), scene_state_t *ss,
                           exec_state_t *NOTUSED(es), command_state_t *cs) {
     int16_t a = cs_pop(cs);
@@ -719,4 +771,91 @@ static void op_PRINT_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
     int16_t index = cs_pop(cs);
     int16_t value = cs_pop(cs);
     print_dashboard_value(index - 1, value);
+}
+
+static void op_E_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                     exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_target((uint8_t)a, b);
+}
+
+static void op_E_A_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_attack((uint8_t)a, b);
+}
+
+static void op_E_D_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_decay((uint8_t)a, b);
+}
+
+static void op_E_T_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_trigger((uint8_t)a);
+}
+
+static void op_E_O_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_offset((uint8_t)a, b);
+}
+
+static void op_E_L_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_loop((uint8_t)a, b);
+}
+
+static void op_E_R_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_eor((uint8_t)a, b);
+}
+
+static void op_E_C_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_eoc((uint8_t)a, b);
 }

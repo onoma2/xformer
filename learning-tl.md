@@ -292,6 +292,36 @@ RND.PN 2
 RND.PN 2 0 4095
 ```
 
+## Trigger Divider & Width (TR.D / TR.W)
+
+Divide or shape trigger pulses per output:
+
+```
+TR.D 1 2     # every other pulse on TR1
+TR.W 1 50    # 50% width based on post-div interval
+TR.P 1       # emit (subject to divider/width)
+```
+
+## Envelope (E.*)
+
+Per-CV attack/decay envelope with target/offset:
+
+```
+E 1 12000     # target (raw 0–16383)
+E.O 1 4000    # offset/baseline
+E.A 1 200     # attack ms
+E.D 1 400     # decay ms
+E.T 1         # trigger envelope
+```
+
+Optional triggers and looping:
+
+```
+E.R 1 1       # pulse TR1 at end of rise
+E.C 1 2       # pulse TR2 at end of cycle
+E.L 1 4       # loop 4 cycles (0 = infinite)
+```
+
 ## WP - Pattern-Aware Scripting (Performer)
 
 The `WP` (Which Pattern) opcode allows Teletype scripts to query the current pattern index (0-15) of any track in the Performer project. This enables pattern-aware scripting where behavior changes based on which patterns are playing across all 8 tracks.

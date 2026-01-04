@@ -16,6 +16,17 @@
 - Script library formats and locations conflict across docs (.tele, .TT, .tts, and Teletype-style sets in different directories). (`codex-tele.md:363`, `qwen-tele.md:1367`, `claude-tele.md:96`, `gemini-tele.md:67`)
 - Script count/exposure is inconsistent: Codex focuses on 8+M+I, while Qwen/Claude include LIVE/DELAY scripts; Gemini's standalone save format only mentions 1-8/M/I. (`codex-tele.md:21`, `qwen-tele.md:183`, `claude-tele.md:183`, `gemini-tele.md:71`)
 
+## RAM delta log (Teletype track)
+Keep a running tally of per-track RAM impact for newly added ops/features.
+
+- 2025-XX-XX: `WBPM`/`WBPM.S`, `WR.ACT`, `WP.SET` (control-only ops) → **0 bytes** (no new state).
+- 2025-XX-XX: `RND.P`/`RND.PN` optional min/max → **0 bytes** (logic-only).
+- 2025-XX-XX: `BUS` slots (routing-backed) → **0 bytes** (state in Engine, not per-track).
+- 2025-XX-XX: `E.*` envelope + `TR.D`/`TR.W` (per-output state) → **~0.1 KB** per track.
+- Pending: `CV.SLEW.S/M/BPM` → **0 bytes** (conversion-only).
+- Pending: `TR.DIV`/`TR.M`/`TR.WIDTH` → **+N bytes** (per-output counters/state).
+- Pending: `ENV.*` → **+N bytes** (per-CV envelope state).
+
 ## Decisions to make (questions)
 
 **Memory and feasibility**

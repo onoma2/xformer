@@ -104,6 +104,18 @@ void tele_tr_pulse_time(uint8_t i, int16_t time) {
     }
 }
 
+void tele_tr_div(uint8_t i, int16_t div) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setTrDiv(i, div);
+    }
+}
+
+void tele_tr_width(uint8_t i, int16_t pct) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setTrWidth(i, pct);
+    }
+}
+
 void tele_cv(uint8_t i, int16_t v, uint8_t s) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         engine->handleCv(i, v, s != 0);
@@ -121,6 +133,54 @@ uint16_t tele_get_cv(uint8_t i) {
         return engine->cvRaw(i);
     }
     return 0;
+}
+
+void tele_env_target(uint8_t i, int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setEnvTarget(i, value);
+    }
+}
+
+void tele_env_attack(uint8_t i, int16_t ms) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setEnvAttack(i, ms);
+    }
+}
+
+void tele_env_decay(uint8_t i, int16_t ms) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setEnvDecay(i, ms);
+    }
+}
+
+void tele_env_trigger(uint8_t i) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->triggerEnv(i);
+    }
+}
+
+void tele_env_offset(uint8_t i, int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setEnvOffset(i, value);
+    }
+}
+
+void tele_env_loop(uint8_t i, int16_t count) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setEnvLoop(i, count);
+    }
+}
+
+void tele_env_eor(uint8_t i, int16_t tr) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setEnvEor(i, tr);
+    }
+}
+
+void tele_env_eoc(uint8_t i, int16_t tr) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setEnvEoc(i, tr);
+    }
 }
 
 uint16_t tele_bus_cv_get(uint8_t i) {

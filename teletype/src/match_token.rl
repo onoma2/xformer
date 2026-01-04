@@ -205,6 +205,8 @@
         "RT"          => { MATCH_OP(E_OP_RT); };
         "PRM"         => { MATCH_OP(E_OP_PRM); };
         "TR"          => { MATCH_OP(E_OP_TR); };
+        "TR.D"        => { MATCH_OP(E_OP_TR_D); };
+        "TR.W"        => { MATCH_OP(E_OP_TR_W); };
         "TR.POL"      => { MATCH_OP(E_OP_TR_POL); };
         "TR.TIME"     => { MATCH_OP(E_OP_TR_TIME); };
         "TR.TOG"      => { MATCH_OP(E_OP_TR_TOG); };
@@ -224,6 +226,14 @@
         "LIVE.V"      => { MATCH_OP(E_OP_LIVE_V); };
         "PRINT"       => { MATCH_OP(E_OP_PRINT); };
         "PRT"         => { MATCH_OP(E_OP_PRT); };
+        "E.A"         => { MATCH_OP(E_OP_E_A); };
+        "E.D"         => { MATCH_OP(E_OP_E_D); };
+        "E.T"         => { MATCH_OP(E_OP_E_T); };
+        "E.O"         => { MATCH_OP(E_OP_E_O); };
+        "E.L"         => { MATCH_OP(E_OP_E_L); };
+        "E.R"         => { MATCH_OP(E_OP_E_R); };
+        "E.C"         => { MATCH_OP(E_OP_E_C); };
+        "E"           => { MATCH_OP(E_OP_E); };
 
         # maths
         "ADD"         => { MATCH_OP(E_OP_ADD); };

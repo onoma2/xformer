@@ -103,6 +103,26 @@ WBPM reads or sets the project tempo in BPM.
 - `WBPM` → read current tempo (1–1000 BPM)
 - `WBPM.S x` → set tempo to x BPM (clamped to 1–1000)
 
+## TR.D / TR.W (Performer-only)
+
+Per-output trigger divider and width.
+
+- `TR.D n div` → only let every `div`th pulse through (n = 1–4, div ≥ 1)
+- `TR.W n pct` → pulse width as % of post-div interval (1–100)
+
+## E.* (Performer-only)
+
+Per-CV envelope (attack → decay → offset) with optional loop and TR hooks.
+
+- `E n x` → set target (raw 0–16383)
+- `E.O n x` → set offset/baseline (raw 0–16383)
+- `E.A n ms` → set attack time (ms)
+- `E.D n ms` → set decay time (ms)
+- `E.T n` → trigger envelope
+- `E.L n k` → loop k cycles (0 = infinite)
+- `E.R n tr` → pulse TR at end of rise (tr = 1–4, 0 = off)
+- `E.C n tr` → pulse TR at end of cycle (tr = 1–4, 0 = off)
+
 ## RT (Performer-only)
 
 RT reads the current source value for a routing slot (pre-shaper), scaled to Teletype's 0–16383 range.

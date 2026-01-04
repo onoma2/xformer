@@ -26,6 +26,8 @@ extern void tele_tr(uint8_t i, int16_t v);
 extern void tele_tr_pulse(uint8_t i, int16_t time);
 extern void tele_tr_pulse_clear(uint8_t i);
 extern void tele_tr_pulse_time(uint8_t i, int16_t time);
+extern void tele_tr_div(uint8_t i, int16_t div);
+extern void tele_tr_width(uint8_t i, int16_t pct);
 extern void tele_cv(uint8_t i, int16_t v, uint8_t s);
 extern void tele_cv_slew(uint8_t i, int16_t v);
 extern uint16_t tele_get_cv(uint8_t i);
@@ -40,6 +42,15 @@ extern void tele_wpat_set(uint8_t trackIndex, uint8_t patternIndex);
 extern int16_t tele_wr(void);
 extern void tele_wr_act(int16_t state);
 extern int16_t tele_rt(uint8_t routeIndex);
+
+extern void tele_env_target(uint8_t i, int16_t value);
+extern void tele_env_attack(uint8_t i, int16_t ms);
+extern void tele_env_decay(uint8_t i, int16_t ms);
+extern void tele_env_trigger(uint8_t i);
+extern void tele_env_offset(uint8_t i, int16_t value);
+extern void tele_env_loop(uint8_t i, int16_t count);
+extern void tele_env_eor(uint8_t i, int16_t tr);
+extern void tele_env_eoc(uint8_t i, int16_t tr);
 
 extern void tele_update_adc(uint8_t force);
 

@@ -21,6 +21,9 @@ extern "C" {
 namespace {
 constexpr float kActivityHoldMs = 200.f;
 constexpr uint8_t kManualScriptCount = 4;
+constexpr uint8_t kEnvIdle = 0;
+constexpr uint8_t kEnvAttack = 1;
+constexpr uint8_t kEnvDecay = 2;
 } // namespace
 
 TeletypeTrackEngine::TeletypeTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
@@ -43,6 +46,13 @@ void TeletypeTrackEngine::reset() {
     _metroRemainingMs = 0.f;
     _metroPeriodMs = 0;
     _metroActive = false;
+    _pulseClockMs = 0.f;
+    _trDiv.fill(1);
+    _trDivCounter.fill(0);
+    _trWidthPct.fill(0);
+    _trWidthEnabled.fill(false);
+    _trLastPulseMs.fill(0.f);
+    _trLastIntervalMs.fill(0.f);
     _performerGateOutput.fill(false);
     _performerCvOutput.fill(0.f);
     _teletypeCvRaw.fill(0);
@@ -53,6 +63,16 @@ void TeletypeTrackEngine::reset() {
     _cvOutputTarget.fill(0.f);
     _cvSlewTime.fill(1);  // Match Teletype default: 1ms
     _cvSlewActive.fill(false);
+    _envTargetRaw.fill(0);
+    _envOffsetRaw.fill(0);
+    _envAttackMs.fill(1);
+    _envDecayMs.fill(1);
+    _envLoopSetting.fill(1);
+    _envLoopsRemaining.fill(0);
+    _envSlewMs.fill(0);
+    _envEorTr.fill(-1);
+    _envEocTr.fill(-1);
+    _envState.fill(kEnvIdle);
     _manualScriptIndex = 0;
     _cachedPattern = -1;
     installBootScript();
@@ -76,6 +96,7 @@ void TeletypeTrackEngine::update(float dt) {
     if (dt <= 0.f) {
         return;
     }
+    _pulseClockMs += dt * 1000.f;
 
     const int currentPattern = pattern();
     if (currentPattern != _cachedPattern) {
@@ -87,7 +108,9 @@ void TeletypeTrackEngine::update(float dt) {
 
     // Apply CV slew using Performer's Slide mechanism
     for (uint8_t i = 0; i < CvOutputCount; ++i) {
-        if (!_cvSlewActive[i] || _cvSlewTime[i] <= 0) {
+        const bool envActive = _envState[i] != kEnvIdle;
+        const int16_t slewMs = envActive ? _envSlewMs[i] : _cvSlewTime[i];
+        if (!_cvSlewActive[i] || slewMs <= 0) {
             continue;
         }
 
@@ -103,7 +126,7 @@ void TeletypeTrackEngine::update(float dt) {
         // Performer uses EXPONENTIAL smoothing: tau = (slideTime/100)^2 * 2
         // For exponential to reach ~99% in time T: slideTime ≈ sqrt(T)
         // Examples: 100ms→10, 1000ms→31.6, 10000ms→100
-        int slideTime = clamp(static_cast<int>(std::sqrt(_cvSlewTime[i])), 1, 100);
+        int slideTime = clamp(static_cast<int>(std::sqrt(slewMs)), 1, 100);
 
         // Apply slew using Performer's existing mechanism
         float current = _performerCvOutput[destIndex];
@@ -122,6 +145,7 @@ void TeletypeTrackEngine::update(float dt) {
     updateInputTriggers();
     runMetro(timeDelta);
     updatePulses(timeDelta);
+    updateEnvelopes();
     refreshActivity(dt);
 }
 
@@ -150,7 +174,38 @@ void TeletypeTrackEngine::beginPulse(uint8_t index, int16_t timeMs) {
     if (index >= TriggerOutputCount || timeMs <= 0) {
         return;
     }
+    uint8_t div = _trDiv[index];
+    if (div > 1) {
+        uint8_t counter = static_cast<uint8_t>(_trDivCounter[index] + 1);
+        if (counter < div) {
+            _trDivCounter[index] = counter;
+            return;
+        }
+        _trDivCounter[index] = 0;
+    }
+
+    float interval = _trLastIntervalMs[index];
+    if (interval <= 0.f && _metroActive && _metroPeriodMs > 0) {
+        interval = _metroPeriodMs * std::max<uint8_t>(1, _trDiv[index]);
+    }
+    if (_trLastPulseMs[index] > 0.f) {
+        float elapsed = _pulseClockMs - _trLastPulseMs[index];
+        if (elapsed > 0.f) {
+            interval = elapsed;
+        }
+    }
+
+    if (_trWidthEnabled[index]) {
+        int16_t width = static_cast<int16_t>(std::lround(interval * (_trWidthPct[index] / 100.f)));
+        if (width <= 0) {
+            width = 1;
+        }
+        timeMs = width;
+    }
+
     _teletypePulseRemainingMs[index] = timeMs;
+    _trLastPulseMs[index] = _pulseClockMs;
+    _trLastIntervalMs[index] = interval > 0.f ? interval : static_cast<float>(timeMs);
 }
 
 void TeletypeTrackEngine::clearPulse(uint8_t index) {
@@ -167,6 +222,33 @@ void TeletypeTrackEngine::setPulseTime(uint8_t index, int16_t timeMs) {
     if (_teletypePulseRemainingMs[index] > 0.f) {
         _teletypePulseRemainingMs[index] = timeMs;
     }
+}
+
+void TeletypeTrackEngine::setTrDiv(uint8_t index, int16_t div) {
+    if (index >= TriggerOutputCount) {
+        return;
+    }
+    if (div < 1) {
+        div = 1;
+    }
+    _trDiv[index] = static_cast<uint8_t>(div);
+    _trDivCounter[index] = 0;
+}
+
+void TeletypeTrackEngine::setTrWidth(uint8_t index, int16_t pct) {
+    if (index >= TriggerOutputCount) {
+        return;
+    }
+    if (pct <= 0) {
+        _trWidthEnabled[index] = false;
+        _trWidthPct[index] = 0;
+        return;
+    }
+    if (pct > 100) {
+        pct = 100;
+    }
+    _trWidthEnabled[index] = true;
+    _trWidthPct[index] = static_cast<uint8_t>(pct);
 }
 
 void TeletypeTrackEngine::handleCv(uint8_t index, int16_t value, bool slew) {
@@ -208,6 +290,76 @@ void TeletypeTrackEngine::handleCv(uint8_t index, int16_t value, bool slew) {
 
     _activity = true;
     _activityCountdownMs = kActivityHoldMs;
+}
+
+void TeletypeTrackEngine::setEnvTarget(uint8_t index, int16_t value) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    _envTargetRaw[index] = clamp<int16_t>(value, 0, 16383);
+}
+
+void TeletypeTrackEngine::setEnvAttack(uint8_t index, int16_t ms) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    _envAttackMs[index] = clamp<int16_t>(ms, 1, 32767);
+}
+
+void TeletypeTrackEngine::setEnvDecay(uint8_t index, int16_t ms) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    _envDecayMs[index] = clamp<int16_t>(ms, 1, 32767);
+}
+
+void TeletypeTrackEngine::setEnvOffset(uint8_t index, int16_t value) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    _envOffsetRaw[index] = clamp<int16_t>(value, 0, 16383);
+}
+
+void TeletypeTrackEngine::setEnvLoop(uint8_t index, int16_t count) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    _envLoopSetting[index] = clamp<int16_t>(count, 0, 127);
+}
+
+void TeletypeTrackEngine::setEnvEor(uint8_t index, int16_t tr) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    if (tr <= 0 || tr > TriggerOutputCount) {
+        _envEorTr[index] = -1;
+        return;
+    }
+    _envEorTr[index] = static_cast<int8_t>(tr - 1);
+}
+
+void TeletypeTrackEngine::setEnvEoc(uint8_t index, int16_t tr) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    if (tr <= 0 || tr > TriggerOutputCount) {
+        _envEocTr[index] = -1;
+        return;
+    }
+    _envEocTr[index] = static_cast<int8_t>(tr - 1);
+}
+
+void TeletypeTrackEngine::triggerEnv(uint8_t index) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    _envState[index] = kEnvAttack;
+    _envSlewMs[index] = _envAttackMs[index];
+    int16_t loops = _envLoopSetting[index];
+    _envLoopsRemaining[index] = loops == 0 ? -1 : loops;
+
+    handleCv(index, _envOffsetRaw[index], false);
+    handleCv(index, _envTargetRaw[index], true);
 }
 
 void TeletypeTrackEngine::setCvSlew(uint8_t index, int16_t value) {
@@ -566,6 +718,60 @@ void TeletypeTrackEngine::updatePulses(float timeDelta) {
         if (_teletypePulseRemainingMs[i] <= 0.f) {
             _teletypePulseRemainingMs[i] = 0.f;
             tele_tr_pulse_end(&_teletypeTrack.state(), static_cast<uint8_t>(i));
+        }
+    }
+}
+
+void TeletypeTrackEngine::updateEnvelopes() {
+    scene_state_t &state = _teletypeTrack.state();
+    for (uint8_t i = 0; i < CvOutputCount; ++i) {
+        if (_envState[i] == kEnvIdle) {
+            continue;
+        }
+        if (_cvSlewActive[i]) {
+            continue;
+        }
+
+        if (_envState[i] == kEnvAttack) {
+            const int8_t eor = _envEorTr[i];
+            if (eor >= 0) {
+                int16_t timeMs = state.variables.tr_time[eor];
+                if (timeMs > 0) {
+                    beginPulse(static_cast<uint8_t>(eor), timeMs);
+                }
+            }
+            _envState[i] = kEnvDecay;
+            _envSlewMs[i] = _envDecayMs[i];
+            handleCv(i, _envOffsetRaw[i], true);
+            continue;
+        }
+
+        if (_envState[i] == kEnvDecay) {
+            const int8_t eoc = _envEocTr[i];
+            if (eoc >= 0) {
+                int16_t timeMs = state.variables.tr_time[eoc];
+                if (timeMs > 0) {
+                    beginPulse(static_cast<uint8_t>(eoc), timeMs);
+                }
+            }
+
+            if (_envLoopsRemaining[i] < 0) {
+                _envState[i] = kEnvAttack;
+                _envSlewMs[i] = _envAttackMs[i];
+                handleCv(i, _envTargetRaw[i], true);
+                continue;
+            }
+
+            if (_envLoopsRemaining[i] > 0) {
+                _envLoopsRemaining[i] -= 1;
+            }
+            if (_envLoopsRemaining[i] > 0) {
+                _envState[i] = kEnvAttack;
+                _envSlewMs[i] = _envAttackMs[i];
+                handleCv(i, _envTargetRaw[i], true);
+            } else {
+                _envState[i] = kEnvIdle;
+            }
         }
     }
 }

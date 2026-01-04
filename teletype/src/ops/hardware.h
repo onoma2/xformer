@@ -29,6 +29,8 @@ extern const tele_op_t op_WR_ACT;
 extern const tele_op_t op_RT;
 extern const tele_op_t op_PRM;
 extern const tele_op_t op_TR;
+extern const tele_op_t op_TR_D;
+extern const tele_op_t op_TR_W;
 extern const tele_op_t op_TR_POL;
 extern const tele_op_t op_TR_TIME;
 extern const tele_op_t op_TR_TOG;
@@ -48,5 +50,14 @@ extern const tele_op_t op_LIVE_VARS;
 extern const tele_op_t op_LIVE_V;
 extern const tele_op_t op_PRINT;
 extern const tele_op_t op_PRT;
+
+extern const tele_op_t op_E;
+extern const tele_op_t op_E_A;
+extern const tele_op_t op_E_D;
+extern const tele_op_t op_E_T;
+extern const tele_op_t op_E_O;
+extern const tele_op_t op_E_L;
+extern const tele_op_t op_E_R;
+extern const tele_op_t op_E_C;
 
 #endif

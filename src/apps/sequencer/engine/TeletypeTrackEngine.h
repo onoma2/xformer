@@ -45,6 +45,8 @@ public:
     void beginPulse(uint8_t index, int16_t timeMs);
     void clearPulse(uint8_t index);
     void setPulseTime(uint8_t index, int16_t timeMs);
+    void setTrDiv(uint8_t index, int16_t div);
+    void setTrWidth(uint8_t index, int16_t pct);
 
     void handleCv(uint8_t index, int16_t value, bool slew);
     void setCvSlew(uint8_t index, int16_t value);
@@ -70,6 +72,14 @@ public:
     void setTempo(float bpm);
     void setTrackPattern(int trackIndex, int patternIndex);
     void setTransportRunning(int16_t state);
+    void setEnvTarget(uint8_t index, int16_t value);
+    void setEnvAttack(uint8_t index, int16_t ms);
+    void setEnvDecay(uint8_t index, int16_t ms);
+    void triggerEnv(uint8_t index);
+    void setEnvOffset(uint8_t index, int16_t value);
+    void setEnvLoop(uint8_t index, int16_t count);
+    void setEnvEor(uint8_t index, int16_t tr);
+    void setEnvEoc(uint8_t index, int16_t tr);
 
 private:
     void runMidiTriggeredScript(int scriptIndex);
@@ -83,6 +93,7 @@ private:
     float advanceClockTime();
     void runMetro(float timeDelta);
     void updatePulses(float timeDelta);
+    void updateEnvelopes();
     void updateInputTriggers();
     void refreshActivity(float dt);
     float rawToVolts(int16_t value) const;
@@ -113,12 +124,29 @@ private:
     std::array<float, TriggerOutputCount> _teletypePulseRemainingMs{};
     std::array<bool, TriggerInputCount> _teletypeInputState{};
     std::array<bool, TriggerInputCount> _teletypePrevInputState{};
+    std::array<uint8_t, TriggerOutputCount> _trDiv{};
+    std::array<uint8_t, TriggerOutputCount> _trDivCounter{};
+    std::array<uint8_t, TriggerOutputCount> _trWidthPct{};
+    std::array<bool, TriggerOutputCount> _trWidthEnabled{};
+    std::array<float, TriggerOutputCount> _trLastPulseMs{};
+    std::array<float, TriggerOutputCount> _trLastIntervalMs{};
 
     // CV slew state
     std::array<float, CvOutputCount> _cvOutputTarget{};
     std::array<int16_t, CvOutputCount> _cvSlewTime{};
     std::array<bool, CvOutputCount> _cvSlewActive{};
+    std::array<int16_t, CvOutputCount> _envTargetRaw{};
+    std::array<int16_t, CvOutputCount> _envOffsetRaw{};
+    std::array<int16_t, CvOutputCount> _envAttackMs{};
+    std::array<int16_t, CvOutputCount> _envDecayMs{};
+    std::array<int16_t, CvOutputCount> _envLoopSetting{};
+    std::array<int16_t, CvOutputCount> _envLoopsRemaining{};
+    std::array<int16_t, CvOutputCount> _envSlewMs{};
+    std::array<int8_t, CvOutputCount> _envEorTr{};
+    std::array<int8_t, CvOutputCount> _envEocTr{};
+    std::array<uint8_t, CvOutputCount> _envState{};
 
     uint8_t _manualScriptIndex = 0;
     int _cachedPattern = -1;
+    float _pulseClockMs = 0.f;
 };
