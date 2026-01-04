@@ -3800,14 +3800,14 @@ position of pattern <code>x</code></td>
 <td>-</td>
 <td>-</td>
 <td>randomize values between START and END of the working pattern
-(0..16383)</td>
+(0..16383). Optional min/max: <code>RND.P min max</code></td>
 </tr>
 <tr class="odd">
 <td><strong><code>RND.PN x</code></strong></td>
 <td>-</td>
 <td>-</td>
 <td>randomize values between START and END of pattern <code>x</code>
-(0..16383)</td>
+(0..16383). Optional min/max: <code>RND.PN x min max</code></td>
 </tr>
 <tr class="even">
 <td><strong><code>P.PA y</code></strong></td>

@@ -277,17 +277,19 @@ B P.MAXV
 
 ## Pattern Randomize (RND.P / RND.PN)
 
-Randomizes all steps in the active range `P.START..P.END` using the full
-0–16383 range.
+Randomizes all steps in the active range `P.START..P.END`. Defaults to full
+0–16383 range, or pass min/max bounds.
 
 **Randomize working pattern:**
 ```
 RND.P
+RND.P 0 4095
 ```
 
 **Randomize pattern 2:**
 ```
 RND.PN 2
+RND.PN 2 0 4095
 ```
 
 ## WP - Pattern-Aware Scripting (Performer)
