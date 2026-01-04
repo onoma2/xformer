@@ -141,4 +141,208 @@
   - Text generation only for export/display (optional, in Engine/UI task)
 
   This is exactly what original Teletype does for flash storage, and why it never overflows.
+Performer TeletypeScriptView LIVE Mode vs Original Teletype
 
+  Architecture Comparison
+
+  | Aspect            | Original Teletype          | Performer TeletypeScriptView  |
+  |-------------------|----------------------------|-------------------------------|
+  | Execution Context | Main loop (8KB+ stack)     | UI task (4096 bytes stack)    |
+  | Edit Buffer       | line_editor_t.buffer[32]   | char _editBuffer[96]          |
+  | History Storage   | Binary tele_command_t[16]  | Text char[4][96]              |
+  | History Size      | 16 commands (binary)       | 4 commands (text)             |
+  | Trigger           | Enter key → execute_line() | Shift+Encoder → commitLine()  |
+  | LIVE Script Slot  | Uses LIVE_SCRIPT (slot 11) | Uses LIVE_SCRIPT context      |
+  | Result Display    | Immediate console output   | Stored in _liveResult (int16) |
+
+  Key Differences in Implementation
+
+  1. History Storage: TEXT vs BINARY
+
+  Original Teletype (live_mode.c:30):
+  static tele_command_t history[MAX_HISTORY_SIZE];  // 16 × ~52 bytes = 832 bytes BINARY
+
+  Performer (TeletypeScriptViewPage.h:58):
+  char _history[HistorySize][EditBufferSize];  // 4 × 96 bytes = 384 bytes TEXT
+
+  Implication:
+  - Original: Can replay history without re-parsing (just memcpy to script slot)
+  - Performer: Must re-parse from text when recalling history
+  - Stack impact: When user navigates history and commits, Performer parses again
+
+  2. Commit Execution Flow
+
+  Original Teletype (live_mode.c:319-369):
+
+  void execute_line() {
+      // Stage 1: Parse text → binary (line 326-332)
+      tele_command_t command;
+      parse(line_editor_get(&le), &command, error_msg);
+      validate(&command, error_msg);
+
+      // Stage 2: Store binary in history (line 355)
+      memcpy(&history[0], &command, sizeof(command));
+
+      // Stage 3: Write binary to LIVE_SCRIPT slot (line 357-358)
+      ss_clear_script(&scene_state, LIVE_SCRIPT);
+      ss_overwrite_script_command(&scene_state, LIVE_SCRIPT, 0, &command);
+
+      // Stage 4: Execute via run_script (line 364)
+      run_script_with_exec_state(&scene_state, &es, LIVE_SCRIPT);
+  }
+
+  Performer (TeletypeScriptViewPage.cpp:452-496):
+
+  void TeletypeScriptViewPage::commitLine() {
+      // Stage 1: Parse text → binary (line 458-469)
+      tele_command_t parsed = {};
+      parse(_editBuffer, &parsed, errorMsg);
+      validate(&parsed, errorMsg);
+
+      // Stage 2: Store TEXT in history (line 471)
+      pushHistory(_editBuffer);  // ← Stores text, not binary!
+
+      if (_liveMode) {
+          // Stage 3: NO write to LIVE_SCRIPT slot!
+          TeletypeBridge::ScopedEngine scope(trackEngine);
+          exec_state_t es;
+          es_init(&es);
+          es_set_script_number(&es, LIVE_SCRIPT);
+
+          // Stage 4: Execute DIRECTLY via process_command (line 483)
+          process_result_t result = process_command(&state, &es, &parsed);
+
+          // Stage 5: Store result for display (line 484-487)
+          _hasLiveResult = result.has_value;
+          _liveResult = result.value;
+          return;
+      }
+
+      // Non-live mode: write to actual script (line 494)
+      ss_overwrite_script_command(&state, scriptIndex, _selectedLine, &parsed);
+  }
+
+  Critical Differences
+
+  1. LIVE_SCRIPT Slot Usage
+
+  Original:
+  - Writes parsed command to scene_state.scripts[LIVE_SCRIPT]
+  - Uses standard run_script() path
+  - LIVE_SCRIPT slot contains the executed command
+
+  Performer:
+  - Never writes to LIVE_SCRIPT slot!
+  - Calls process_command() directly with local parsed variable
+  - LIVE_SCRIPT is just a context flag (script_number)
+  - parsed exists only on stack, never persisted
+
+  Implication: Performer's parsed command is stack-local only.
+
+  2. Stack Frame Analysis
+
+  commitLine() stack frame (TeletypeScriptViewPage.cpp:452-496):
+
+  void TeletypeScriptViewPage::commitLine() {
+      // Local variables:
+      tele_command_t parsed = {};        // ~52 bytes
+      char errorMsg[16] = {};            // 16 bytes
+
+      // Call chain:
+      parse(_editBuffer, &parsed, errorMsg);     // → scanner() (~150-200 bytes)
+      validate(&parsed, errorMsg);               // (~20 bytes)
+
+      if (_liveMode) {
+          TeletypeBridge::ScopedEngine scope(...);  // ~8 bytes (pointer + state)
+          exec_state_t es;                          // ~40 bytes
+          es_init(&es);
+
+          // Direct execution:
+          process_command(&state, &es, &parsed);    // → stack evaluator (~100-200 bytes)
+      }
+  }
+
+  Estimated stack usage:
+  - commitLine() frame: ~88 bytes (parsed + errorMsg + locals)
+  - parse() → scanner(): ~150-200 bytes
+  - validate(): ~20 bytes
+  - process_command(): ~100-200 bytes (command_state_t, sub command processing)
+  - Total: ~358-508 bytes
+
+  UI task stack budget: 4096 bytes
+  - commitLine path: ~500 bytes
+  - UI task overhead: ~300-500 bytes
+  - PageManager/Context: ~200-300 bytes
+  - Remaining: ~3000+ bytes ✅ No overflow risk
+
+  Why Performer Doesn't Overflow (in LIVE mode)
+
+  UI Task has 4096 bytes vs FILE Task's 2048 bytes:
+  - 2× more stack space
+  - commitLine() uses ~500 bytes (12% of stack)
+  - FILE task's TeletypeTrack::read() uses ~900-1350 bytes (44-66% of stack)
+
+  Only parses ONE command at a time:
+  - LIVE mode: 1 command per Enter
+  - FILE task: 24-54 commands in loop (accumulative stack pressure)
+
+  No nested loops:
+  - LIVE: Single parse → execute → done
+  - FILE: Script loop × Line loop × parse()
+
+  History Behavior Difference
+
+  Original Teletype:
+  // Recall history[3] (4th oldest command)
+  history_prev();  // Sets history_line = 3
+  execute_line();  // Just runs the BINARY command again (no re-parse!)
+
+  Performer:
+  // Recall history[2]
+  recallHistory(-1);              // Copies TEXT to _editBuffer
+  commitLine();                   // RE-PARSES the text!
+  parse(_editBuffer, &parsed);    // Full parse again
+
+  Stack impact: Performer re-parses every history recall, but since UI task has 4KB stack, this is fine.
+
+  Result Storage
+
+  Original:
+  - process_result_t output (local)
+  - Displayed immediately to console
+  - Not persisted
+
+  Performer:
+  _hasLiveResult = result.has_value;  // Line 484
+  _liveResult = result.value;         // Line 486
+  - Stored in page member variables
+  - Displayed in next draw() call (line 94-95)
+  - Persists until next execution
+
+  Summary Table
+
+  | Feature         | Original Teletype    | Performer                |
+  |-----------------|----------------------|--------------------------|
+  | Stack context   | Main loop (8KB+)     | UI task (4KB)            |
+  | History format  | Binary (832 bytes)   | Text (384 bytes)         |
+  | History size    | 16 commands          | 4 commands               |
+  | Parse frequency | Once per new command | Every history recall     |
+  | LIVE slot usage | Writes to slot 11    | Context only (no write)  |
+  | Execution       | run_script()         | process_command() direct |
+  | Result display  | Immediate console    | Stored + draw()          |
+  | Stack safety    | ✅ Deep stack        | ✅ Adequate (4KB)        |
+  | Re-parse risk   | None (binary)        | Low (one-at-a-time)      |
+
+  Why This Matters for FILE Task Overflow
+
+  The lesson:
+  - LIVE mode works in both because it parses one command at a time
+  - FILE task fails because it parses 24-54 commands in nested loops
+  - Performer's LIVE mode uses 12% of UI task stack (safe)
+  - Performer's FILE load uses 44-66% of FILE task stack (dangerous)
+
+  The solution remains:
+  - Either increase FILE task stack to 4096 bytes
+  - Or store binary tele_command_t in project files (like original flash storage)
+
+  The difference in LIVE mode implementation shows that parsing itself isn't the problem - it's parsing 50+ times in a shallow stack that causes overflow.

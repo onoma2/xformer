@@ -19,6 +19,9 @@ private:
     void handleStepKey(int step, bool shift);
     void loadEditBuffer(int line);
     void setScriptIndex(int scriptIndex);
+    void contextShow();
+    void contextAction(int index);
+    bool contextActionEnabled(int index) const;
     void insertText(const char *text, bool addSpace);
     void removeLastInsert(int count);
     void insertChar(char c);
@@ -33,6 +36,7 @@ private:
     void deleteLine();
     void saveScript();
     void loadScript();
+    void saveScriptAs();
     void saveScriptToSlot(int slot);
     void loadScriptFromSlot(int slot);
     void pushHistory(const char *line);
@@ -59,4 +63,6 @@ private:
     int _historyCount = 0;
     int _historyHead = -1;
     int _historyCursor = -1;
+    int _scriptSlot = 0;
+    bool _scriptSlotAssigned = false;
 };

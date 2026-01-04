@@ -4,7 +4,10 @@
 
 #include "engine/TeletypeBridge.h"
 #include "engine/TeletypeTrackEngine.h"
+#include "model/FileManager.h"
 #include "ui/LedPainter.h"
+
+#include "core/utils/StringBuilder.h"
 
 #include <cstring>
 #include <cstdint>
@@ -26,7 +29,24 @@ constexpr int kRowStepY = 8;
 constexpr int kEditLineY = 54;
 constexpr int kLabelX = 4;
 constexpr int kTextX = 16;
+// Flip to false for hardware testing without engine suspend.
+constexpr bool kSuspendEngineForScriptIO = true;
 } // namespace
+
+enum class ContextAction {
+    Init,
+    Load,
+    Save,
+    SaveAs,
+    Last
+};
+
+static const ContextMenuModel::Item contextMenuItems[] = {
+    { "INIT" },
+    { "LOAD" },
+    { "SAVE" },
+    { "SAVE AS" },
+};
 
 TeletypeScriptViewPage::TeletypeScriptViewPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context) {
@@ -37,6 +57,8 @@ void TeletypeScriptViewPage::enter() {
     _liveMode = true;
     _selectedLine = 0;
     _hasLiveResult = false;
+    _scriptSlot = 0;
+    _scriptSlotAssigned = false;
     setEditBuffer("");
 }
 
@@ -172,6 +194,12 @@ void TeletypeScriptViewPage::setLiveMode(bool enabled) {
 void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
+    if (key.isContextMenu()) {
+        contextShow();
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier()) {
         if (key.isLeft()) {
             recallHistory(-1);
@@ -270,6 +298,44 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
         }
         event.consume();
         return;
+    }
+}
+
+void TeletypeScriptViewPage::contextShow() {
+    showContextMenu(ContextMenu(
+        contextMenuItems,
+        int(ContextAction::Last),
+        [&] (int index) { contextAction(index); },
+        [&] (int index) { return contextActionEnabled(index); }
+    ));
+}
+
+void TeletypeScriptViewPage::contextAction(int index) {
+    switch (ContextAction(index)) {
+    case ContextAction::Init:
+        break;
+    case ContextAction::Load:
+        loadScript();
+        break;
+    case ContextAction::Save:
+        saveScript();
+        break;
+    case ContextAction::SaveAs:
+        saveScriptAs();
+        break;
+    case ContextAction::Last:
+        break;
+    }
+}
+
+bool TeletypeScriptViewPage::contextActionEnabled(int index) const {
+    switch (ContextAction(index)) {
+    case ContextAction::Load:
+    case ContextAction::Save:
+    case ContextAction::SaveAs:
+        return FileManager::volumeMounted();
+    default:
+        return true;
     }
 }
 
@@ -552,6 +618,109 @@ void TeletypeScriptViewPage::deleteLine() {
     ss_delete_script_command(&state, _scriptIndex, _selectedLine);
     loadEditBuffer(_selectedLine);
     showMessage("Line deleted");
+}
+
+void TeletypeScriptViewPage::saveScript() {
+    if (_scriptIndex >= TeletypeTrack::EditableScriptCount) {
+        showMessage("SCRIPT ONLY");
+        return;
+    }
+    if (!_scriptSlotAssigned) {
+        saveScriptAs();
+        return;
+    }
+    saveScriptToSlot(_scriptSlot);
+}
+
+void TeletypeScriptViewPage::saveScriptAs() {
+    if (_scriptIndex >= TeletypeTrack::EditableScriptCount) {
+        showMessage("SCRIPT ONLY");
+        return;
+    }
+    _manager.pages().fileSelect.show("SAVE SCRIPT", FileType::TeletypeScript, _scriptSlotAssigned ? _scriptSlot : 0, true,
+        [this] (bool result, int slot) {
+            if (!result) {
+                return;
+            }
+            if (FileManager::slotUsed(FileType::TeletypeScript, slot)) {
+                _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                    if (result) {
+                        saveScriptToSlot(slot);
+                    }
+                });
+            } else {
+                saveScriptToSlot(slot);
+            }
+        });
+}
+
+void TeletypeScriptViewPage::loadScript() {
+    if (_scriptIndex >= TeletypeTrack::EditableScriptCount) {
+        showMessage("SCRIPT ONLY");
+        return;
+    }
+    _manager.pages().fileSelect.show("LOAD SCRIPT", FileType::TeletypeScript, _scriptSlotAssigned ? _scriptSlot : 0, false,
+        [this] (bool result, int slot) {
+            if (!result) {
+                return;
+            }
+            _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                if (result) {
+                    loadScriptFromSlot(slot);
+                }
+            });
+        });
+}
+
+void TeletypeScriptViewPage::saveScriptToSlot(int slot) {
+    if (kSuspendEngineForScriptIO) {
+        _engine.suspend();
+    }
+    _manager.pages().busy.show("SAVING SCRIPT ...");
+
+    FileManager::task([this, slot] () {
+        auto &track = _project.selectedTrack().teletypeTrack();
+        return FileManager::writeTeletypeScript(track, _scriptIndex, slot);
+    }, [this, slot] (fs::Error result) {
+        if (result == fs::OK) {
+            showMessage("SCRIPT SAVED");
+            _scriptSlot = slot;
+            _scriptSlotAssigned = true;
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        if (kSuspendEngineForScriptIO) {
+            _engine.resume();
+        }
+    });
+}
+
+void TeletypeScriptViewPage::loadScriptFromSlot(int slot) {
+    if (kSuspendEngineForScriptIO) {
+        _engine.suspend();
+    }
+    _manager.pages().busy.show("LOADING SCRIPT ...");
+
+    FileManager::task([this, slot] () {
+        auto &track = _project.selectedTrack().teletypeTrack();
+        return FileManager::readTeletypeScript(track, _scriptIndex, slot);
+    }, [this, slot] (fs::Error result) {
+        if (result == fs::OK) {
+            showMessage("SCRIPT LOADED");
+            _scriptSlot = slot;
+            _scriptSlotAssigned = true;
+            loadEditBuffer(_selectedLine);
+        } else if (result == fs::INVALID_CHECKSUM) {
+            showMessage("INVALID SCRIPT FILE");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        if (kSuspendEngineForScriptIO) {
+            _engine.resume();
+        }
+    });
 }
 
 void TeletypeScriptViewPage::pushHistory(const char *line) {
