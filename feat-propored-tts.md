@@ -1,7 +1,66 @@
 # Research: Teletype Script Saving/Loading and Ideas from Monikit Rust
 
-## Current State Analysis
 
+MVP plan: Teletype script save/load (single‑script slots)
+
+  Goal
+
+  - Save/load a single Teletype script (S0–S3 or M) to SD using the existing slot picker, minimal new UI and minimal file format.
+
+  Scope
+
+  - Only scripts (no patterns/scenes).
+  - Slot‑based file storage (like sequences).
+  - Uses current compiled script state (print_command) — no text buffers.
+
+  1. File system + file type
+
+  - Add FileType::TeletypeScript in FileManager.h / FileType enum.
+  - Add fileTypeInfos entry: {"TEL", "TTS"}.
+  - Create directory TEL/ (like SEQS); use slotPath() for naming.
+
+  2. File format
+
+  - Use same binary format pattern as sequences:
+      - FileHeader (type + version + name)
+      - Write 6 lines as fixed 96‑byte text (current ScriptLineLength), per line: print_command() if present, else empty.
+  - No metadata, no patterns.
+
+  3. FileManager API
+
+  - Add:
+      - fs::Error writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, int slot)
+      - fs::Error readTeletypeScript(TeletypeTrack &track, int scriptIndex, int slot)
+  - Use VersionedSerializedWriter/Reader like other assets.
+  - Parsing on read:
+      - ss_clear_script()
+      - For each line: parse/validate; if ok, overwrite command.
+  - Keep async task wrapper same as sequences.
+
+  4. UI hook (minimal)
+
+  - In Teletype Script View:
+      - Add context actions SAVE / LOAD.
+      - Use existing file select page (FileType::TeletypeScript).
+      - Save/load for current script (S0–S3 or M).
+
+  5. Serialization stability
+
+  - Version 0. Use fixed 96‑byte lines (same as current project storage), so no migration.
+
+  6. Docs
+
+  - Add short section in teletype/tl-manual.md and learning-tl.md:
+      - “Save/Load Script (TEL slots)”
+      - Mention that it saves only the current script, not patterns.
+
+  Optional (later)
+
+  - Extend to full scene (scripts + patterns).
+  - Add script browser with names.
+  - Add per‑slot names in header.
+
+  If you want me to proceed, say “implement MVP”, and I’ll start with FileType + FileManager changes.
 ### Current TeletypeTrack Structure
 The current `TeletypeTrack` class contains:
 1. **`scene_state_t _state`** - The main teletype state structure

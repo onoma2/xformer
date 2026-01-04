@@ -14,7 +14,6 @@ public:
     static constexpr int CvOutputCount = 4;
     static constexpr int PerformerGateCount = 8;
     static constexpr int PerformerCvCount = 8;
-    static constexpr int PresetScriptCount = 10;
 
     TeletypeTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine);
 
@@ -60,8 +59,6 @@ public:
     void selectNextManualScript();
     uint8_t manualScriptIndex() const { return _manualScriptIndex; }
     void triggerScript(int scriptIndex);
-    void applyPresetToScript(int scriptIndex, int presetIndex);
-    static const char *presetName(int presetIndex);
     void syncMetroFromState();
     void resetMetroTimer();
     uint32_t timeTicks() const;
@@ -88,8 +85,6 @@ private:
     int16_t voltsToRaw(float volts) const;
     float applyCvQuantize(int index, float volts) const;
     static float midiNoteToVolts(int note);
-    void installPresetScripts();
-    bool applyPresetLine(scene_state_t &state, int scriptIndex, size_t lineIndex, const char *cmd);
     bool applyScriptLine(scene_state_t &state, int scriptIndex, size_t lineIndex, const char *cmd);
     void runScript(int scriptIndex);
 

@@ -21,66 +21,6 @@ extern "C" {
 namespace {
 constexpr float kActivityHoldMs = 200.f;
 constexpr uint8_t kManualScriptCount = 4;
-constexpr uint8_t kPresetScriptCount = TeletypeTrackEngine::PresetScriptCount;
-
-struct PresetScript {
-    const char *name;
-    const char *lines[3];
-    size_t lineCount;
-};
-
-constexpr PresetScript kPresetScripts[kPresetScriptCount] = {
-    { "Test 1",
-      { "TIME.ACT 1",
-        "X LIM SUB MOD TIME 16384 8000 -1500 1500",
-        "CV 1 ADD 8000 X ; TR.PULSE 1" },
-      3 },
-    { "Test 2",
-      { "X LIM SUB MOD LAST 2 16384 8000 -1500 1500",
-        "CV 2 ADD 8000 X ; TR.PULSE 2",
-        nullptr },
-      2 },
-    { "Test 3",
-      { "X LIM SUB MOD LAST 1 16384 8000 -1500 1500",
-        "CV 3 ADD 8000 X ; TR.PULSE 3",
-        nullptr },
-      2 },
-    { "Test 4",
-      { "X LIM SUB MOD TIME 16384 8000 -1500 1500",
-        "CV 4 ADD 8000 X ; TR.PULSE 4",
-        nullptr },
-      2 },
-    { "Avg Clamp",
-      { "X LIM SUB AVG IN PARAM 8000 -1500 1500",
-        "CV 1 ADD 8000 X ; TR.PULSE 1",
-        nullptr },
-      2 },
-    { "Param QT",
-      { "X LIM SUB QT PARAM 1024 8000 -1500 1500",
-        "CV 2 ADD 8000 X ; TR.PULSE 2",
-        nullptr },
-      2 },
-    { "Shift Wrap",
-      { "X LIM SUB WRAP LSH IN 1 0 16383 8000 -1500 1500",
-        "CV 3 ADD 8000 X ; TR.PULSE 3",
-        nullptr },
-      2 },
-    { "Rsh Mix",
-      { "X LIM SUB DIV ADD RSH IN 1 PARAM 2 8000 -1500 1500",
-        "CV 4 ADD 8000 X ; TR.PULSE 4",
-        nullptr },
-      2 },
-    { "Time Mod",
-      { "TIME.ACT 1",
-        "X LIM SUB MOD TIME 16384 8000 -1500 1500",
-        "CV 1 ADD 8000 X ; TR.PULSE 1" },
-      3 },
-    { "Rand/Drunk",
-      { "X RAND 16383 ; Y RRAND 0 16383",
-        "DRUNK 64",
-        "Z LIM SUB LIM MUL SUB X PARAM 2 0 16383 8000 -1500 1500 ; CV 2 ADD 8000 Z ; TR.PULSE ADD 2 TOSS" },
-      3 },
-};
 } // namespace
 
 TeletypeTrackEngine::TeletypeTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
@@ -647,13 +587,6 @@ float TeletypeTrackEngine::midiNoteToVolts(int note) {
     return note / 12.0f;
 }
 
-void TeletypeTrackEngine::installPresetScripts() {
-    for (int slot = 0; slot < kManualScriptCount; ++slot) {
-        int presetIndex = _teletypeTrack.scriptPresetIndex(slot);
-        applyPresetToScript(slot, presetIndex);
-    }
-}
-
 void TeletypeTrackEngine::runScript(int scriptIndex) {
     if (scriptIndex < 0 || scriptIndex >= kManualScriptCount) {
         return;
@@ -666,33 +599,6 @@ void TeletypeTrackEngine::runScript(int scriptIndex) {
     run_script(&state, static_cast<uint8_t>(scriptIndex));
     _activity = true;
     _activityCountdownMs = kActivityHoldMs;
-}
-
-const char *TeletypeTrackEngine::presetName(int presetIndex) {
-    if (presetIndex < 0 || presetIndex >= kPresetScriptCount) {
-        return "Unknown";
-    }
-    return kPresetScripts[presetIndex].name;
-}
-
-bool TeletypeTrackEngine::applyPresetLine(scene_state_t &state, int scriptIndex, size_t lineIndex, const char *cmd) {
-    if (!cmd) {
-        return false;
-    }
-    tele_command_t parsed = {};
-    char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
-    tele_error_t error = parse(cmd, &parsed, errorMsg);
-    if (error != E_OK) {
-        DBG("TT parse error: %s (%s)", tele_error(error), errorMsg);
-        return false;
-    }
-    error = validate(&parsed, errorMsg);
-    if (error != E_OK) {
-        DBG("TT validate error: %s (%s)", tele_error(error), errorMsg);
-        return false;
-    }
-    ss_overwrite_script_command(&state, scriptIndex, lineIndex, &parsed);
-    return true;
 }
 
 bool TeletypeTrackEngine::applyScriptLine(scene_state_t &state, int scriptIndex, size_t lineIndex, const char *cmd) {
@@ -715,27 +621,6 @@ bool TeletypeTrackEngine::applyScriptLine(scene_state_t &state, int scriptIndex,
     return true;
 }
 
-void TeletypeTrackEngine::applyPresetToScript(int scriptIndex, int presetIndex) {
-    if (scriptIndex < 0 || scriptIndex >= kManualScriptCount) {
-        return;
-    }
-    if (presetIndex < 0 || presetIndex >= kPresetScriptCount) {
-        return;
-    }
-
-    scene_state_t &state = _teletypeTrack.state();
-    ss_clear_script(&state, scriptIndex);
-
-    const auto &preset = kPresetScripts[presetIndex];
-    for (size_t line = 0; line < preset.lineCount; ++line) {
-        const char *cmd = preset.lines[line];
-        if (!cmd) {
-            continue;
-        }
-        applyPresetLine(state, scriptIndex, line, cmd);
-    }
-}
-
 void TeletypeTrackEngine::loadScriptsFromModel() {
     // No-op: scripts are loaded into scene_state during track deserialization.
     scene_state_t &state = _teletypeTrack.state();
@@ -746,8 +631,10 @@ void TeletypeTrackEngine::loadScriptsFromModel() {
 
 void TeletypeTrackEngine::seedScriptsFromPresets() {
     scene_state_t &state = _teletypeTrack.state();
-    installPresetScripts();
+    ss_clear_script(&state, 0);
+    applyScriptLine(state, 0, 0, "M.ACT 1");
     ss_clear_script(&state, METRO_SCRIPT);
+    applyScriptLine(state, METRO_SCRIPT, 0, "CV 1 N 48 ; TR.P 1");
 }
 
 // ====================================================================================

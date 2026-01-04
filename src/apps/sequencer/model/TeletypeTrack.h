@@ -545,9 +545,6 @@ public:
         return available;
     }
 
-    //----------------------------------------
-    // Script preset selection (session-only)
-    //----------------------------------------
     bool hasAnyScriptCommands() const {
         for (int script = 0; script < EditableScriptCount; ++script) {
             for (int line = 0; line < ScriptLineCount; ++line) {
@@ -566,18 +563,6 @@ public:
     void setPattern(int index, const scene_pattern_t &pattern) {
         int clamped = clamp(index, 0, PATTERN_COUNT - 1);
         _patterns[clamped] = pattern;
-    }
-
-    int scriptPresetIndex(int slot) const {
-        if (slot < 0 || slot >= ScriptSlotCount) {
-            return 0;
-        }
-        return _scriptPresetIndex[slot];
-    }
-    void setScriptPresetIndex(int slot, int index) {
-        if (slot >= 0 && slot < ScriptSlotCount) {
-            _scriptPresetIndex[slot] = static_cast<uint8_t>(index);
-        }
     }
 
     int bootScriptIndex() const { return _bootScriptIndex; }
@@ -625,7 +610,6 @@ private:
     CvInputSource _cvZSource;                               // TI-Z
     std::array<TriggerOutputDest, TriggerOutputCount> _triggerOutputDest;  // TO-TRA to TO-TRD
     std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
-    std::array<uint8_t, ScriptSlotCount> _scriptPresetIndex{};             // S0-S3 (session-only)
     int8_t _bootScriptIndex = 0;
     std::array<scene_pattern_t, PATTERN_COUNT> _patterns{};
     bool _resetMetroOnLoad = true;
