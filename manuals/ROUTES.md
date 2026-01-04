@@ -83,6 +83,23 @@ Each track has independent bias, depth, and shaper settings:
    - Use Track selection to choose which tracks are affected
    - Multiple tracks can share the same route with different bias/depth
 
+### 3.3 BUS Targets (Global)
+
+BUS targets (`BUS 1–4`) are global CV slots that can be routed to any target or read by Teletype.
+Unlike per-track targets, BUS targets do not have a track mask; they are single global values.
+
+**BUS shaping controls:**
+- **Bias / Depth / Shaper** are still available for BUS targets.
+- These use **track slot A (track index 0)** as the shared shaping slot.
+- The shaper is applied before the BUS value is written.
+
+**UI behavior:**
+- When the target is a BUS, the route list shows three extra rows:
+  - `Bias`
+  - `Depth`
+  - `Shaper`
+- These rows control the BUS shaping slot directly.
+
 ### 3.2 Per-Track Parameter Assignment
 
 Once route is created, per-track parameters are accessible:

@@ -22,6 +22,9 @@ public:
         MidiControlNumber = FirstMidiEventConfig,
         MidiNote = FirstMidiEventConfig,
         MidiNoteRange,
+        BusBias,
+        BusDepth,
+        BusShaper,
         Last
     };
 
@@ -33,17 +36,23 @@ public:
         bool isEmpty = _route.target() == Routing::Target::None;
         bool isCvSource = Routing::isCvSource(_route.source());
         bool isMidiSource = Routing::isMidiSource(_route.source());
+        bool isBusTarget = Routing::isBusTarget(_route.target());
         bool hasNoteOrController = _route.midiSource().event() != Routing::MidiSource::Event::PitchBend;
         bool hasNoteRange = _route.midiSource().event() == Routing::MidiSource::Event::NoteRange;
+        int baseRows = 1;
         if (isEmpty) {
-            return 1;
+            baseRows = 1;
         } else if (isCvSource) {
-            return FirstSource + 1;
+            baseRows = FirstSource + 1;
         } else if (isMidiSource) {
-            return hasNoteOrController ? (hasNoteRange ? Last : int(Last) - 1) : int(Last) - 2;
+            baseRows = hasNoteOrController ? (hasNoteRange ? Last : int(Last) - 1) : int(Last) - 2;
         } else {
-            return FirstSource;
+            baseRows = FirstSource;
         }
+        if (isBusTarget && !isEmpty) {
+            baseRows += 3;
+        }
+        return baseRows;
     }
 
     virtual int columns() const override {
@@ -51,20 +60,47 @@ public:
     }
 
     virtual void cell(int row, int column, StringBuilder &str) const override {
+        Item item = itemForRow(row);
         if (column == 0) {
-            formatName(Item(row), str);
+            formatName(item, str);
         } else if (column == 1) {
-            formatValue(Item(row), str);
+            formatValue(item, str);
         }
     }
 
     virtual void edit(int row, int column, int value, bool shift) override {
         if (column == 1) {
-            editValue(Item(row), value, shift);
+            editValue(itemForRow(row), value, shift);
         }
     }
 
 private:
+    Item itemForRow(int row) const {
+        bool isEmpty = _route.target() == Routing::Target::None;
+        bool isCvSource = Routing::isCvSource(_route.source());
+        bool isMidiSource = Routing::isMidiSource(_route.source());
+        bool isBusTarget = Routing::isBusTarget(_route.target());
+        bool hasNoteOrController = _route.midiSource().event() != Routing::MidiSource::Event::PitchBend;
+        bool hasNoteRange = _route.midiSource().event() == Routing::MidiSource::Event::NoteRange;
+        int baseRows = 1;
+        if (isEmpty) {
+            baseRows = 1;
+        } else if (isCvSource) {
+            baseRows = FirstSource + 1;
+        } else if (isMidiSource) {
+            baseRows = hasNoteOrController ? (hasNoteRange ? Last : int(Last) - 1) : int(Last) - 2;
+        } else {
+            baseRows = FirstSource;
+        }
+        if (isBusTarget && !isEmpty && row >= baseRows) {
+            int offset = row - baseRows;
+            if (offset == 0) return BusBias;
+            if (offset == 1) return BusDepth;
+            if (offset == 2) return BusShaper;
+        }
+        return Item(row);
+    }
+
     const char *itemName(Item item) const {
         switch (item) {
         case Target:        return "Target";
@@ -79,6 +115,9 @@ private:
         case MidiNote:
                             return _route.midiSource().isControlEvent() ? "CC Number" : "Note";
         case MidiNoteRange: return "Note Range";
+        case BusBias:       return "Bias";
+        case BusDepth:      return "Depth";
+        case BusShaper:     return "Shaper";
         case Last:          break;
         }
         return nullptr;
@@ -127,6 +166,15 @@ private:
         case MidiNoteRange:
             _route.midiSource().printNoteRange(str);
             break;
+        case BusBias:
+            str("%d%%", _route.biasPct(0));
+            break;
+        case BusDepth:
+            str("%d%%", _route.depthPct(0));
+            break;
+        case BusShaper:
+            str(shaperShort(_route.shaper(0)));
+            break;
         case Last:
             break;
         }
@@ -171,9 +219,40 @@ private:
         case MidiNoteRange:
             _route.midiSource().editNoteRange(value, shift);
             break;
+        case BusBias:
+            _route.setBiasPct(0, _route.biasPct(0) + value * (shift ? 10 : 1));
+            break;
+        case BusDepth:
+            _route.setDepthPct(0, _route.depthPct(0) + value * (shift ? 10 : 1));
+            break;
+        case BusShaper: {
+            int next = int(_route.shaper(0)) + value;
+            if (next < 0) next = int(Routing::Shaper::Last) - 1;
+            if (next >= int(Routing::Shaper::Last)) next = 0;
+            auto shaper = Routing::Shaper(next);
+            _route.setShaper(0, shaper);
+            _route.setCreaseEnabled(0, shaper == Routing::Shaper::Crease);
+            break;
+        }
         case Last:
             break;
         }
+    }
+
+    const char *shaperShort(Routing::Shaper shaper) const {
+        switch (shaper) {
+        case Routing::Shaper::None:               return "NO";
+        case Routing::Shaper::Crease:             return "CR";
+        case Routing::Shaper::Location:           return "LO";
+        case Routing::Shaper::Envelope:           return "EN";
+        case Routing::Shaper::TriangleFold:       return "TF";
+        case Routing::Shaper::FrequencyFollower:  return "FF";
+        case Routing::Shaper::Activity:           return "AC";
+        case Routing::Shaper::ProgressiveDivider: return "PD";
+        case Routing::Shaper::VcaNext:            return "VC";
+        case Routing::Shaper::Last:               break;
+        }
+        return "NO";
     }
 
     Routing::Route &_route;

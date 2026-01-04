@@ -343,7 +343,49 @@ void RoutingEngine::updateSinks() {
             auto target = route.target();
 
             if (Routing::isBusTarget(target)) {
-                float baseValue = route.min() + _sourceValues[routeIndex] * (route.max() - route.min());
+                constexpr int kBusShaperTrack = 0;
+                float shapedSource = applyBiasDepthToSource(_sourceValues[routeIndex], route, kBusShaperTrack);
+                float biasNormalized = route.biasPct(kBusShaperTrack) * 0.01f;
+                float shaperOut = shapedSource;
+                auto shaper = route.shaper(kBusShaperTrack);
+                auto &st = routeState.shaperState[kBusShaperTrack];
+                switch (shaper) {
+                case Routing::Shaper::None:
+                    break;
+                case Routing::Shaper::Crease:
+                    shaperOut = applyCreaseSource(shapedSource, biasNormalized);
+                    break;
+                case Routing::Shaper::Location:
+                    shaperOut = applyLocation(shapedSource, st.location);
+                    break;
+                case Routing::Shaper::Envelope:
+                    shaperOut = applyEnvelope(shapedSource, st.envelope);
+                    break;
+                case Routing::Shaper::TriangleFold:
+                    shaperOut = applyTriangleFold(shapedSource, biasNormalized);
+                    break;
+                case Routing::Shaper::FrequencyFollower:
+                    shaperOut = applyFrequencyFollower(shapedSource, st);
+                    break;
+                case Routing::Shaper::Activity:
+                    shaperOut = applyActivity(shapedSource, st);
+                    break;
+                case Routing::Shaper::ProgressiveDivider:
+                    shaperOut = applyProgressiveDivider(shapedSource, st);
+                    break;
+                case Routing::Shaper::VcaNext: {
+                    int nextRouteIndex = (routeIndex + 1) % CONFIG_ROUTE_COUNT;
+                    float neighbor = _sourceValues[nextRouteIndex];
+                    shaperOut = 0.5f + (shapedSource - 0.5f) * neighbor;
+                    break;
+                }
+                case Routing::Shaper::Last:
+                    break;
+                }
+                if (route.creaseEnabled(kBusShaperTrack) && shaper != Routing::Shaper::Crease) {
+                    shaperOut = applyCreaseSource(shaperOut, biasNormalized);
+                }
+                float baseValue = route.min() + shaperOut * (route.max() - route.min());
                 int busIndex = int(target) - int(Routing::Target::BusCv1);
                 _engine.setBusCv(busIndex, baseValue);
             } else if (Routing::isPerTrackTarget(target)) {
