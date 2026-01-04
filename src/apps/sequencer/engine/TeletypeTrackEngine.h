@@ -69,7 +69,7 @@ public:
     float tempo() const;
     void setTempo(float bpm);
     void setTrackPattern(int trackIndex, int patternIndex);
-    void setTransportRunning(bool running);
+    void setTransportRunning(int16_t state);
 
 private:
     void runMidiTriggeredScript(int scriptIndex);

@@ -431,11 +431,20 @@ void TeletypeTrackEngine::setTrackPattern(int trackIndex, int patternIndex) {
     _engine.selectTrackPattern(trackIndex, patternIndex);
 }
 
-void TeletypeTrackEngine::setTransportRunning(bool running) {
-    if (running) {
-        _engine.clockStart();
+void TeletypeTrackEngine::setTransportRunning(int16_t state) {
+    if (state == 1) {
+        if (!_engine.clockRunning()) {
+            _engine.clockStart();
+        }
+    } else if (state == 0) {
+        if (_engine.clockRunning()) {
+            // Use reset to mirror start/stop behavior; switch to clockStop() for pause semantics.
+            _engine.clockReset();
+        }
     } else {
-        _engine.clockStop();
+        if (_engine.clockRunning()) {
+            _engine.clockStop();
+        }
     }
 }
 

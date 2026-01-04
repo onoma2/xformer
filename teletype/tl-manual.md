@@ -92,8 +92,9 @@ WR returns whether the Performer transport is currently running.
 - `WR` → read transport running flag (0/1)
 
 Notes:
-- Use `WR.ACT x` to start/stop transport.
-- `WR.ACT 1` starts, `WR.ACT 0` stops.
+- Use `WR.ACT x` to control transport.
+- `WR.ACT 1` starts, `WR.ACT 0` stops (reset).
+- Any other value pauses (clock stop).
 
 ## WBPM (Performer-only)
 

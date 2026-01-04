@@ -179,9 +179,9 @@ int16_t tele_wr(void) {
     return 0;
 }
 
-void tele_wr_act(uint8_t running) {
+void tele_wr_act(int16_t state) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
-        engine->setTransportRunning(running != 0);
+        engine->setTransportRunning(state);
     }
 }
 

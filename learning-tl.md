@@ -182,6 +182,7 @@ WR returns `1` when the sequencer is playing and `0` when stopped.
 ```
 WR.ACT 1   # start
 WR.ACT 0   # stop
+WR.ACT 2   # pause
 ```
 
 ## WBPM Tempo Control (Performer)

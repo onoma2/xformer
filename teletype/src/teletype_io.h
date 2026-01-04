@@ -38,7 +38,7 @@ extern int16_t tele_bar(void);
 extern int16_t tele_wpat(uint8_t trackIndex);
 extern void tele_wpat_set(uint8_t trackIndex, uint8_t patternIndex);
 extern int16_t tele_wr(void);
-extern void tele_wr_act(uint8_t running);
+extern void tele_wr_act(int16_t state);
 extern int16_t tele_rt(uint8_t routeIndex);
 
 extern void tele_update_adc(uint8_t force);
