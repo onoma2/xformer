@@ -204,6 +204,7 @@ WBPM.S 87
 Notes:
 - Valid range: 1–1000 BPM.
 - WBPM is a direct BPM value (no scaling to 0–16383).
+- WBPM.S clamps to 1–1000 BPM.
 
 ## RT Route Source Readback (Performer)
 

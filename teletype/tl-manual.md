@@ -100,7 +100,7 @@ Notes:
 WBPM reads or sets the project tempo in BPM.
 
 - `WBPM` → read current tempo (1–1000 BPM)
-- `WBPM.S x` → set tempo to x BPM
+- `WBPM.S x` → set tempo to x BPM (clamped to 1–1000)
 
 ## RT (Performer-only)
 

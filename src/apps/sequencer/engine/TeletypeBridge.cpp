@@ -145,7 +145,7 @@ int16_t tele_wbpm_get(void) {
 
 void tele_wbpm_set(int16_t bpm) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
-        int16_t clamped = clamp<int16_t>(bpm, 1, 1000);
+        int32_t clamped = clamp<int32_t>(bpm, 1, 1000);
         engine->setTempo(static_cast<float>(clamped));
     }
 }

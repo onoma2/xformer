@@ -400,6 +400,7 @@ static void op_WBPM_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
 static void op_WBPM_S_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
                           exec_state_t *NOTUSED(es), command_state_t *cs) {
     int16_t bpm = cs_pop(cs);
+    bpm = clamp<int16_t>(bpm, 1, 1000);
     tele_wbpm_set(bpm);
 }
 
