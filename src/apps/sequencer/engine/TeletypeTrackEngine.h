@@ -86,6 +86,7 @@ private:
     void refreshActivity(float dt);
     float rawToVolts(int16_t value) const;
     int16_t voltsToRaw(float volts) const;
+    float applyCvQuantize(int index, float volts) const;
     static float midiNoteToVolts(int note);
     void installPresetScripts();
     bool applyPresetLine(scene_state_t &state, int scriptIndex, size_t lineIndex, const char *cmd);

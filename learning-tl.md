@@ -185,6 +185,71 @@ IF GT RT 2 8192: TR.P 1
 
 RT returns the normalized source value (0–1) of the route before shapers and per-track processing.
 
+## Pattern Math Ops (P.PA / P.PS / P.PM / P.PD / P.PMOD)
+
+These ops process the active pattern range between `P.START` and `P.END`.
+Use `PN.*` variants to target a specific pattern number.
+
+**Shift all steps up by 100:**
+```
+P.PA 100
+```
+
+**Scale down by 2:**
+```
+P.PD 2
+```
+
+**Wrap steps into a 0–11 range:**
+```
+P.PMOD 12
+```
+
+**Remap pattern values to MIDI note range:**
+```
+P.SCALE 0 16383 48 72
+```
+
+## Pattern Analysis Ops (P.SUM / P.AVG / P.MINV / P.MAXV / P.FND)
+
+These return values computed over `P.START`..`P.END`.
+
+**Density check (sum of 0/1 gates):**
+```
+X P.SUM
+```
+
+**Average step value:**
+```
+Y P.AVG
+```
+
+**Find first zero in the active range:**
+```
+I P.FND 0
+```
+
+**Read min/max values:**
+```
+A P.MINV
+B P.MAXV
+```
+
+## Pattern Randomize (RND.P / RND.PN)
+
+Randomizes all steps in the active range `P.START..P.END` using the full
+0–16383 range.
+
+**Randomize working pattern:**
+```
+RND.P
+```
+
+**Randomize pattern 2:**
+```
+RND.PN 2
+```
+
 ## WP - Pattern-Aware Scripting (Performer)
 
 The `WP` (Which Pattern) opcode allows Teletype scripts to query the current pattern index (0-15) of any track in the Performer project. This enables pattern-aware scripting where behavior changes based on which patterns are playing across all 8 tracks.

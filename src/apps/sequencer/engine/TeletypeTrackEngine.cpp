@@ -8,6 +8,7 @@
 #include "core/Debug.h"
 #include "core/math/Math.h"
 #include "MidiUtils.h"
+#include "model/Scale.h"
 #include "model/Types.h"
 
 #include <algorithm>
@@ -237,6 +238,7 @@ void TeletypeTrackEngine::handleCv(uint8_t index, int16_t value, bool slew) {
     targetVoltage = outRange.denormalize(normalized);
     targetVoltage += _teletypeTrack.cvOutputOffsetVolts(index);
     targetVoltage = clamp(targetVoltage, -5.f, 5.f);
+    targetVoltage = applyCvQuantize(index, targetVoltage);
 
     // Map TO-CV1-4 to actual CV output
     auto dest = _teletypeTrack.cvOutputDest(index);
@@ -608,6 +610,33 @@ int16_t TeletypeTrackEngine::voltsToRaw(float volts) const {
     float norm = (clamped + 5.f) / 10.f;
     int32_t raw = static_cast<int32_t>(std::lround(norm * 16383.f));
     return static_cast<int16_t>(clamp<int32_t>(raw, 0, 16383));
+}
+
+float TeletypeTrackEngine::applyCvQuantize(int index, float volts) const {
+    int scaleIndex = _teletypeTrack.cvOutputQuantizeScale(index);
+    if (scaleIndex == TeletypeTrack::QuantizeOff) {
+        return volts;
+    }
+
+    const Scale &scale = (scaleIndex < 0) ? _model.project().selectedScale()
+                                          : Scale::get(scaleIndex);
+    int rootNote = _teletypeTrack.cvOutputRootNote(index);
+    if (rootNote < 0) {
+        rootNote = _model.project().rootNote();
+    }
+
+    if (scale.isChromatic()) {
+        volts -= rootNote * (1.f / 12.f);
+    }
+
+    int note = scale.noteFromVolts(volts);
+    volts = scale.noteToVolts(note);
+
+    if (scale.isChromatic()) {
+        volts += rootNote * (1.f / 12.f);
+    }
+
+    return clamp(volts, -5.f, 5.f);
 }
 
 float TeletypeTrackEngine::midiNoteToVolts(int note) {

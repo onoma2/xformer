@@ -52,6 +52,8 @@ void TeletypeTrack::clear() {
     for (int i = 0; i < CvOutputCount; ++i) {
         _cvOutputRange[i] = Types::VoltageRange::Bipolar5V;
         _cvOutputOffset[i] = 0;
+        _cvOutputQuantizeScale[i] = QuantizeOff;
+        _cvOutputRootNote[i] = -1;
     }
     for (int i = 0; i < PATTERN_COUNT; ++i) {
         _patterns[i] = _state.patterns[i];
@@ -177,6 +179,10 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
         writer.write(uint8_t(_cvOutputRange[i]));
         writer.write(_cvOutputOffset[i]);
     }
+    for (int i = 0; i < 4; ++i) {
+        writer.write(_cvOutputQuantizeScale[i]);
+        writer.write(_cvOutputRootNote[i]);
+    }
     for (int script = 0; script < EditableScriptCount; ++script) {
         for (int line = 0; line < ScriptLineCount; ++line) {
             char lineBuffer[ScriptLineLength] = {};
@@ -240,6 +246,12 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         _cvOutputRange[i] = ModelUtils::clampedEnum(Types::VoltageRange(rangeVal));
         reader.read(_cvOutputOffset[i]);
         _cvOutputOffset[i] = clamp<int16_t>(_cvOutputOffset[i], -500, 500);
+    }
+    for (int i = 0; i < 4; ++i) {
+        reader.read(_cvOutputQuantizeScale[i]);
+        _cvOutputQuantizeScale[i] = clamp<int8_t>(_cvOutputQuantizeScale[i], QuantizeOff, Scale::Count - 1);
+        reader.read(_cvOutputRootNote[i]);
+        _cvOutputRootNote[i] = clamp<int8_t>(_cvOutputRootNote[i], -1, 11);
     }
     char lineBuffer[ScriptLineLength] = {};
     for (int script = 0; script < EditableScriptCount; ++script) {

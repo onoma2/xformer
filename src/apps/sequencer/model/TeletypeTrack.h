@@ -4,6 +4,7 @@
 #include "Serialize.h"
 #include "ModelUtils.h"
 #include "Types.h"
+#include "model/Scale.h"
 #include "MidiConfig.h"
 
 #include "core/utils/StringBuilder.h"
@@ -22,6 +23,8 @@ public:
     static constexpr int TriggerInputCount = 4;
     static constexpr int TriggerOutputCount = 4;
     static constexpr int CvOutputCount = 4;
+    static constexpr int8_t QuantizeOff = -2;
+    static constexpr int8_t QuantizeDefault = -1;
     static constexpr int ScriptSlotCount = 4;
     static constexpr int EditableScriptCount = EDITABLE_SCRIPT_COUNT;
     static constexpr int ScriptLineCount = SCRIPT_MAX_COMMANDS;
@@ -340,6 +343,60 @@ public:
         }
     }
 
+    // Per-output quantize scale (Off/Default/Scale)
+    int cvOutputQuantizeScale(int index) const {
+        if (index < 0 || index >= CvOutputCount) return QuantizeOff;
+        return _cvOutputQuantizeScale[index];
+    }
+    void setCvOutputQuantizeScale(int index, int scale) {
+        if (index >= 0 && index < CvOutputCount) {
+            _cvOutputQuantizeScale[index] = clamp<int8_t>(scale, QuantizeOff, Scale::Count - 1);
+        }
+    }
+    void editCvOutputQuantizeScale(int index, int value, bool shift) {
+        (void)shift;
+        if (index >= 0 && index < CvOutputCount) {
+            setCvOutputQuantizeScale(index, _cvOutputQuantizeScale[index] + value);
+        }
+    }
+    void printCvOutputQuantizeScale(int index, StringBuilder &str) const {
+        if (index < 0 || index >= CvOutputCount) return;
+        int scale = _cvOutputQuantizeScale[index];
+        if (scale == QuantizeOff) {
+            str("Off");
+        } else if (scale == QuantizeDefault) {
+            str("Default");
+        } else {
+            str(Scale::name(scale));
+        }
+    }
+
+    // Per-output root note (Default or 0-11)
+    int cvOutputRootNote(int index) const {
+        if (index < 0 || index >= CvOutputCount) return -1;
+        return _cvOutputRootNote[index];
+    }
+    void setCvOutputRootNote(int index, int note) {
+        if (index >= 0 && index < CvOutputCount) {
+            _cvOutputRootNote[index] = clamp<int8_t>(note, -1, 11);
+        }
+    }
+    void editCvOutputRootNote(int index, int value, bool shift) {
+        (void)shift;
+        if (index >= 0 && index < CvOutputCount) {
+            setCvOutputRootNote(index, _cvOutputRootNote[index] + value);
+        }
+    }
+    void printCvOutputRootNote(int index, StringBuilder &str) const {
+        if (index < 0 || index >= CvOutputCount) return;
+        int note = _cvOutputRootNote[index];
+        if (note < 0) {
+            str("Default");
+        } else {
+            Types::printNote(str, note);
+        }
+    }
+
     //----------------------------------------
     // Conflict Detection
     //----------------------------------------
@@ -577,6 +634,8 @@ private:
     int16_t _clockMultiplier = 100;
     std::array<Types::VoltageRange, CvOutputCount> _cvOutputRange{};
     std::array<int16_t, CvOutputCount> _cvOutputOffset{};
+    std::array<int8_t, CvOutputCount> _cvOutputQuantizeScale{};
+    std::array<int8_t, CvOutputCount> _cvOutputRootNote{};
 
     friend class Track;
 };

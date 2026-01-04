@@ -60,6 +60,14 @@ private:
         CvOut2,
         CvOut3,
         CvOut4,
+        CvQuantize1,
+        CvQuantize2,
+        CvQuantize3,
+        CvQuantize4,
+        CvRoot1,
+        CvRoot2,
+        CvRoot3,
+        CvRoot4,
         Cv1Range,
         Cv1Offset,
         Cv2Range,
@@ -95,6 +103,14 @@ private:
         case CvOut2:      return "TO-CV2";
         case CvOut3:      return "TO-CV3";
         case CvOut4:      return "TO-CV4";
+        case CvQuantize1: return "QTO-CV1";
+        case CvQuantize2: return "QTO-CV2";
+        case CvQuantize3: return "QTO-CV3";
+        case CvQuantize4: return "QTO-CV4";
+        case CvRoot1:     return "RTO-CV1";
+        case CvRoot2:     return "RTO-CV2";
+        case CvRoot3:     return "RTO-CV3";
+        case CvRoot4:     return "RTO-CV4";
         case Cv1Range:    return "CV1 RNG";
         case Cv1Offset:   return "CV1 OFF";
         case Cv2Range:    return "CV2 RNG";
@@ -166,6 +182,22 @@ private:
         case CvOut4: {
             int index = int(item) - int(CvOut1);
             _track->printCvOutputDest(index, str);
+            break;
+        }
+        case CvQuantize1:
+        case CvQuantize2:
+        case CvQuantize3:
+        case CvQuantize4: {
+            int index = int(item) - int(CvQuantize1);
+            _track->printCvOutputQuantizeScale(index, str);
+            break;
+        }
+        case CvRoot1:
+        case CvRoot2:
+        case CvRoot3:
+        case CvRoot4: {
+            int index = int(item) - int(CvRoot1);
+            _track->printCvOutputRootNote(index, str);
             break;
         }
         case Cv1Range:
@@ -243,6 +275,22 @@ private:
         case CvOut4: {
             int index = int(item) - int(CvOut1);
             _track->editCvOutputDest(index, value, shift);
+            break;
+        }
+        case CvQuantize1:
+        case CvQuantize2:
+        case CvQuantize3:
+        case CvQuantize4: {
+            int index = int(item) - int(CvQuantize1);
+            _track->editCvOutputQuantizeScale(index, value, shift);
+            break;
+        }
+        case CvRoot1:
+        case CvRoot2:
+        case CvRoot3:
+        case CvRoot4: {
+            int index = int(item) - int(CvRoot1);
+            _track->editCvOutputRootNote(index, value, shift);
             break;
         }
         case Cv1Range:
