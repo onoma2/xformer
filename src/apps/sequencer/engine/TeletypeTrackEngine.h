@@ -116,4 +116,5 @@ private:
     std::array<bool, CvOutputCount> _cvSlewActive{};
 
     uint8_t _manualScriptIndex = 0;
+    int _cachedPattern = -1;
 };

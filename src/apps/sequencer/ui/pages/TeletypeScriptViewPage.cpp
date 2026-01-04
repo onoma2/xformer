@@ -87,7 +87,14 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         scriptLabel("S%d", scriptIndex + 1);
     }
     canvas.setColor(Color::Medium);
-    int scriptX = Width - 2 - canvas.textWidth(scriptLabel);
+    int scriptWidth = canvas.textWidth(scriptLabel);
+    int scriptX = Width - 2 - scriptWidth;
+    if (scriptIndex == 0 || scriptIndex == METRO_SCRIPT) {
+        FixedStringBuilder<4> slotLabel("P%d", track.activePatternSlot() + 1);
+        int slotWidth = canvas.textWidth(slotLabel);
+        int slotX = scriptX - slotWidth - 4;
+        canvas.drawText(slotX, 6, slotLabel);
+    }
     canvas.drawText(scriptX, 6, scriptLabel);
 
     if (_liveMode) {
@@ -558,6 +565,9 @@ void TeletypeScriptViewPage::commitLine() {
     scene_state_t &state = track.state();
     const int scriptIndex = _scriptIndex;
     ss_overwrite_script_command(&state, scriptIndex, _selectedLine, &parsed);
+    if (scriptIndex == 0 || scriptIndex == METRO_SCRIPT) {
+        track.syncActiveSlotScripts();
+    }
     // Commit succeeded; no UI message per current workflow.
 }
 
@@ -592,6 +602,9 @@ void TeletypeScriptViewPage::duplicateLine() {
         _selectedLine += 1;
     }
     loadEditBuffer(_selectedLine);
+    if (scriptIndex == 0 || scriptIndex == METRO_SCRIPT) {
+        track.syncActiveSlotScripts();
+    }
 }
 
 void TeletypeScriptViewPage::commentLine() {
@@ -601,6 +614,9 @@ void TeletypeScriptViewPage::commentLine() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
     ss_toggle_script_comment(&state, _scriptIndex, _selectedLine);
+    if (_scriptIndex == 0 || _scriptIndex == METRO_SCRIPT) {
+        track.syncActiveSlotScripts();
+    }
 }
 
 void TeletypeScriptViewPage::deleteLine() {
@@ -617,6 +633,9 @@ void TeletypeScriptViewPage::deleteLine() {
     }
     ss_delete_script_command(&state, _scriptIndex, _selectedLine);
     loadEditBuffer(_selectedLine);
+    if (_scriptIndex == 0 || _scriptIndex == METRO_SCRIPT) {
+        track.syncActiveSlotScripts();
+    }
     showMessage("Line deleted");
 }
 

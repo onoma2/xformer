@@ -554,6 +554,9 @@ The Teletype Track in Performer provides:
 - 2 CV inputs (TI-IN and TI-PARAM) from Performer's CV inputs
 - Integration with Performer's clock system
 - Pattern and variable storage
+- Two pattern slots (P1/P2) for S0 + Metro + I/O mapping + TT patterns
+  - Slot = Performer pattern index % 2
+  - Script/Pattern View shows the active slot label before the script name (or top right in Pattern View)
 
 ## Section 1: Basic Script Setup
 
@@ -974,6 +977,7 @@ The key to mastering Teletype in Performer is practice and experimentation. Try 
 
 | Action | Hardware Control | Performer Function |
 | :--- | :--- | :--- |
+| **Active Slot** | **P1/P2 label (top right)** | Shows the current pattern slot (pattern % 2). |
 | **Select Line** | **Shift + Encoder Turn** | Moves the vertical selection (Lines 1-6). |
 | **Edit Line** | **Encoder Press** | Loads selected line into the edit buffer. |
 | **Commit Line** | **Shift + Encoder Press** | Compiles buffer and saves it to the script. |
@@ -984,6 +988,9 @@ The key to mastering Teletype in Performer is practice and experimentation. Try 
 | **Backspace** | **Page Left** | Deletes character before cursor. |
 | **Space** | **Page Right** | Inserts a space. |
 | **Insert Text** | **Step Keys 1-16** | Cycles through characters (0-9, A-Z, symbols). |
+
+Notes:
+- S0 and Metro are per-slot (P1/P2). S1–S3 are global across patterns.
 
 ### 2. TeletypePatternViewPage (The Tracker)
 

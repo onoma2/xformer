@@ -54,6 +54,7 @@ void TeletypeTrackEngine::reset() {
     _cvSlewTime.fill(1);  // Match Teletype default: 1ms
     _cvSlewActive.fill(false);
     _manualScriptIndex = 0;
+    _cachedPattern = -1;
     installBootScript();
     syncMetroFromState();
 }
@@ -74,6 +75,12 @@ TrackEngine::TickResult TeletypeTrackEngine::tick(uint32_t tick) {
 void TeletypeTrackEngine::update(float dt) {
     if (dt <= 0.f) {
         return;
+    }
+
+    const int currentPattern = pattern();
+    if (currentPattern != _cachedPattern) {
+        _teletypeTrack.onPatternChanged(currentPattern);
+        _cachedPattern = currentPattern;
     }
 
     updateAdc(false);
@@ -622,11 +629,7 @@ bool TeletypeTrackEngine::applyScriptLine(scene_state_t &state, int scriptIndex,
 }
 
 void TeletypeTrackEngine::loadScriptsFromModel() {
-    // No-op: scripts are loaded into scene_state during track deserialization.
-    scene_state_t &state = _teletypeTrack.state();
-    for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
-        state.patterns[pattern] = _teletypeTrack.pattern(pattern);
-    }
+    _teletypeTrack.applyActivePatternSlot();
 }
 
 void TeletypeTrackEngine::seedScriptsFromPresets() {

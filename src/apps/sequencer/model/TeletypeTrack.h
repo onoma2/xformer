@@ -29,6 +29,7 @@ public:
     static constexpr int EditableScriptCount = EDITABLE_SCRIPT_COUNT;
     static constexpr int ScriptLineCount = SCRIPT_MAX_COMMANDS;
     static constexpr int ScriptLineLength = 96;
+    static constexpr int PatternSlotCount = 2;
     enum class TimeBase : uint8_t {
         Ms,
         Clock,
@@ -117,6 +118,32 @@ public:
         Last
     };
 
+    struct PatternSlot {
+        std::array<tele_command_t, ScriptLineCount> s0{};
+        std::array<tele_command_t, ScriptLineCount> metro{};
+        uint8_t s0Length = 0;
+        uint8_t metroLength = 0;
+        std::array<scene_pattern_t, PATTERN_COUNT> patterns{};
+        std::array<TriggerInputSource, TriggerInputCount> triggerInputSource{};
+        CvInputSource cvInSource = CvInputSource::CvIn1;
+        CvInputSource cvParamSource = CvInputSource::CvIn2;
+        CvInputSource cvXSource = CvInputSource::None;
+        CvInputSource cvYSource = CvInputSource::None;
+        CvInputSource cvZSource = CvInputSource::None;
+        std::array<TriggerOutputDest, TriggerOutputCount> triggerOutputDest{};
+        std::array<CvOutputDest, CvOutputCount> cvOutputDest{};
+        std::array<Types::VoltageRange, CvOutputCount> cvOutputRange{};
+        std::array<int16_t, CvOutputCount> cvOutputOffset{};
+        std::array<int8_t, CvOutputCount> cvOutputQuantizeScale{};
+        std::array<int8_t, CvOutputCount> cvOutputRootNote{};
+        MidiSourceConfig midiSource{};
+        uint8_t bootScriptIndex = 0;
+        TimeBase timeBase = TimeBase::Ms;
+        int16_t clockDivisor = 12;
+        int16_t clockMultiplier = 100;
+        bool resetMetroOnLoad = true;
+    };
+
     TeletypeTrack() { clear(); }
 
     void clear();
@@ -139,7 +166,10 @@ public:
     //----------------------------------------
 
     TimeBase timeBase() const { return _timeBase; }
-    void setTimeBase(TimeBase mode) { _timeBase = ModelUtils::clampedEnum(mode); }
+    void setTimeBase(TimeBase mode) {
+        _timeBase = ModelUtils::clampedEnum(mode);
+        syncActiveSlotMappings();
+    }
     void editTimeBase(int value, bool shift) {
         (void)shift;
         setTimeBase(ModelUtils::adjustedEnum(_timeBase, value));
@@ -151,6 +181,7 @@ public:
     int clockDivisor() const { return _clockDivisor; }
     void setClockDivisor(int divisor) {
         _clockDivisor = ModelUtils::clampDivisor(divisor);
+        syncActiveSlotMappings();
     }
     void editClockDivisor(int value, bool shift) {
         setClockDivisor(ModelUtils::adjustedByDivisor(_clockDivisor, value, shift));
@@ -162,6 +193,7 @@ public:
     int clockMultiplier() const { return _clockMultiplier; }
     void setClockMultiplier(int multiplier) {
         _clockMultiplier = clamp(multiplier, 50, 150);
+        syncActiveSlotMappings();
     }
     void editClockMultiplier(int value, bool shift) {
         setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
@@ -182,6 +214,7 @@ public:
     void setTriggerInputSource(int index, TriggerInputSource source) {
         if (index >= 0 && index < TriggerInputCount) {
             _triggerInputSource[index] = ModelUtils::clampedEnum(source);
+            syncActiveSlotMappings();
         }
     }
     void editTriggerInputSource(int index, int value, bool shift) {
@@ -199,6 +232,7 @@ public:
     CvInputSource cvInSource() const { return _cvInSource; }
     void setCvInSource(CvInputSource source) {
         _cvInSource = ModelUtils::clampedEnum(source);
+        syncActiveSlotMappings();
     }
     void editCvInSource(int value, bool shift) {
         setCvInSource(ModelUtils::adjustedEnum(_cvInSource, value));
@@ -211,6 +245,7 @@ public:
     CvInputSource cvParamSource() const { return _cvParamSource; }
     void setCvParamSource(CvInputSource source) {
         _cvParamSource = ModelUtils::clampedEnum(source);
+        syncActiveSlotMappings();
     }
     void editCvParamSource(int value, bool shift) {
         setCvParamSource(ModelUtils::adjustedEnum(_cvParamSource, value));
@@ -223,6 +258,7 @@ public:
     CvInputSource cvXSource() const { return _cvXSource; }
     void setCvXSource(CvInputSource source) {
         _cvXSource = ModelUtils::clampedEnum(source);
+        syncActiveSlotMappings();
     }
     void editCvXSource(int value, bool shift) {
         (void)shift;
@@ -235,6 +271,7 @@ public:
     CvInputSource cvYSource() const { return _cvYSource; }
     void setCvYSource(CvInputSource source) {
         _cvYSource = ModelUtils::clampedEnum(source);
+        syncActiveSlotMappings();
     }
     void editCvYSource(int value, bool shift) {
         (void)shift;
@@ -247,6 +284,7 @@ public:
     CvInputSource cvZSource() const { return _cvZSource; }
     void setCvZSource(CvInputSource source) {
         _cvZSource = ModelUtils::clampedEnum(source);
+        syncActiveSlotMappings();
     }
     void editCvZSource(int value, bool shift) {
         (void)shift;
@@ -264,6 +302,7 @@ public:
     void setTriggerOutputDest(int index, TriggerOutputDest dest) {
         if (index >= 0 && index < TriggerOutputCount) {
             _triggerOutputDest[index] = ModelUtils::clampedEnum(dest);
+            syncActiveSlotMappings();
         }
     }
     void editTriggerOutputDest(int index, int value, bool shift) {
@@ -285,6 +324,7 @@ public:
     void setCvOutputDest(int index, CvOutputDest dest) {
         if (index >= 0 && index < CvOutputCount) {
             _cvOutputDest[index] = ModelUtils::clampedEnum(dest);
+            syncActiveSlotMappings();
         }
     }
     void editCvOutputDest(int index, int value, bool shift) {
@@ -306,6 +346,7 @@ public:
     void setCvOutputRange(int index, Types::VoltageRange range) {
         if (index >= 0 && index < CvOutputCount) {
             _cvOutputRange[index] = ModelUtils::clampedEnum(range);
+            syncActiveSlotMappings();
         }
     }
     void editCvOutputRange(int index, int value, bool shift) {
@@ -330,6 +371,7 @@ public:
     void setCvOutputOffset(int index, int offset) {
         if (index >= 0 && index < CvOutputCount) {
             _cvOutputOffset[index] = clamp(offset, -500, 500);
+            syncActiveSlotMappings();
         }
     }
     void editCvOutputOffset(int index, int value, bool shift) {
@@ -351,6 +393,7 @@ public:
     void setCvOutputQuantizeScale(int index, int scale) {
         if (index >= 0 && index < CvOutputCount) {
             _cvOutputQuantizeScale[index] = clamp<int8_t>(scale, QuantizeOff, Scale::Count - 1);
+            syncActiveSlotMappings();
         }
     }
     void editCvOutputQuantizeScale(int index, int value, bool shift) {
@@ -379,6 +422,7 @@ public:
     void setCvOutputRootNote(int index, int note) {
         if (index >= 0 && index < CvOutputCount) {
             _cvOutputRootNote[index] = clamp<int8_t>(note, -1, 11);
+            syncActiveSlotMappings();
         }
     }
     void editCvOutputRootNote(int index, int value, bool shift) {
@@ -563,17 +607,30 @@ public:
     void setPattern(int index, const scene_pattern_t &pattern) {
         int clamped = clamp(index, 0, PATTERN_COUNT - 1);
         _patterns[clamped] = pattern;
+        syncActiveSlotPatterns();
     }
 
     int bootScriptIndex() const { return _bootScriptIndex; }
     void setBootScriptIndex(int index) {
         _bootScriptIndex = clamp<int8_t>(index, 0, ScriptSlotCount - 1);
+        syncActiveSlotMappings();
     }
     bool consumeMetroResetOnLoad() {
         bool pending = _resetMetroOnLoad;
         _resetMetroOnLoad = false;
         return pending;
     }
+
+    int activePatternSlot() const { return _activePatternSlot; }
+    int patternSlotForPattern(int patternIndex) const {
+        return clamp(patternIndex, 0, CONFIG_PATTERN_COUNT - 1) % PatternSlotCount;
+    }
+    void onPatternChanged(int patternIndex);
+    void applyPatternSlot(int slotIndex);
+    void applyActivePatternSlot();
+    void syncActiveSlotScripts();
+    void syncActiveSlotPatterns();
+    void syncActiveSlotMappings();
 
     //----------------------------------------
     // Name printing helpers
@@ -612,6 +669,8 @@ private:
     std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
     int8_t _bootScriptIndex = 0;
     std::array<scene_pattern_t, PATTERN_COUNT> _patterns{};
+    std::array<PatternSlot, PatternSlotCount> _patternSlots{};
+    uint8_t _activePatternSlot = 0;
     bool _resetMetroOnLoad = true;
     TimeBase _timeBase = TimeBase::Ms;
     uint16_t _clockDivisor = 12;

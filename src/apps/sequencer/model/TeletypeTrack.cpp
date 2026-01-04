@@ -54,6 +54,15 @@ void TeletypeTrack::clear() {
     for (int i = 0; i < PATTERN_COUNT; ++i) {
         _patterns[i] = _state.patterns[i];
     }
+
+    _activePatternSlot = 0;
+    for (int slot = 0; slot < PatternSlotCount; ++slot) {
+        _activePatternSlot = slot;
+        syncActiveSlotScripts();
+        syncActiveSlotPatterns();
+        syncActiveSlotMappings();
+    }
+    _activePatternSlot = 0;
 }
 
 void TeletypeTrack::gateOutputName(int index, StringBuilder &str) const {
@@ -151,6 +160,11 @@ const char *TeletypeTrack::cvOutputDestName(CvOutputDest dest) {
 }
 
 void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
+    auto *self = const_cast<TeletypeTrack *>(this);
+    self->syncActiveSlotScripts();
+    self->syncActiveSlotPatterns();
+    self->syncActiveSlotMappings();
+
     // Write I/O mapping configuration
     for (int i = 0; i < 4; ++i) {
         writer.write(uint8_t(_triggerInputSource[i]));
@@ -189,6 +203,46 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     }
     for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
         writer.write(_patterns[pattern]);
+    }
+
+    writer.write(_activePatternSlot);
+    for (int slot = 0; slot < PatternSlotCount; ++slot) {
+        const auto &patternSlot = _patternSlots[slot];
+        writer.write(patternSlot.s0Length);
+        writer.write(patternSlot.metroLength);
+        writer.write(patternSlot.s0);
+        writer.write(patternSlot.metro);
+        for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
+            writer.write(patternSlot.patterns[pattern]);
+        }
+        for (int i = 0; i < 4; ++i) {
+            writer.write(uint8_t(patternSlot.triggerInputSource[i]));
+        }
+        writer.write(uint8_t(patternSlot.cvInSource));
+        writer.write(uint8_t(patternSlot.cvParamSource));
+        writer.write(uint8_t(patternSlot.cvXSource));
+        writer.write(uint8_t(patternSlot.cvYSource));
+        writer.write(uint8_t(patternSlot.cvZSource));
+        for (int i = 0; i < 4; ++i) {
+            writer.write(uint8_t(patternSlot.triggerOutputDest[i]));
+        }
+        for (int i = 0; i < 4; ++i) {
+            writer.write(uint8_t(patternSlot.cvOutputDest[i]));
+        }
+        patternSlot.midiSource.write(writer);
+        writer.write(uint8_t(patternSlot.bootScriptIndex));
+        writer.write(uint8_t(patternSlot.timeBase));
+        writer.write(patternSlot.clockDivisor);
+        writer.write(patternSlot.clockMultiplier);
+        for (int i = 0; i < 4; ++i) {
+            writer.write(uint8_t(patternSlot.cvOutputRange[i]));
+            writer.write(patternSlot.cvOutputOffset[i]);
+        }
+        for (int i = 0; i < 4; ++i) {
+            writer.write(patternSlot.cvOutputQuantizeScale[i]);
+            writer.write(patternSlot.cvOutputRootNote[i]);
+        }
+        writer.write(uint8_t(patternSlot.resetMetroOnLoad));
     }
 }
 
@@ -259,5 +313,156 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
     for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
         reader.read(_patterns[pattern], 0);
     }
+    uint8_t activeSlot = 0;
+    reader.read(activeSlot);
+    _activePatternSlot = clamp<uint8_t>(activeSlot, 0, PatternSlotCount - 1);
+    for (int slot = 0; slot < PatternSlotCount; ++slot) {
+        auto &patternSlot = _patternSlots[slot];
+        reader.read(patternSlot.s0Length, 0);
+        reader.read(patternSlot.metroLength, 0);
+        reader.read(patternSlot.s0, 0);
+        reader.read(patternSlot.metro, 0);
+        for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
+            reader.read(patternSlot.patterns[pattern], 0);
+        }
+        for (int i = 0; i < 4; ++i) {
+            uint8_t val;
+            reader.read(val, 0);
+            patternSlot.triggerInputSource[i] = ModelUtils::clampedEnum(TriggerInputSource(val));
+        }
+        uint8_t cvInVal, cvParamVal, cvXVal, cvYVal, cvZVal;
+        reader.read(cvInVal, 0);
+        reader.read(cvParamVal, 0);
+        reader.read(cvXVal, 0);
+        reader.read(cvYVal, 0);
+        reader.read(cvZVal, 0);
+        patternSlot.cvInSource = ModelUtils::clampedEnum(CvInputSource(cvInVal));
+        patternSlot.cvParamSource = ModelUtils::clampedEnum(CvInputSource(cvParamVal));
+        patternSlot.cvXSource = ModelUtils::clampedEnum(CvInputSource(cvXVal));
+        patternSlot.cvYSource = ModelUtils::clampedEnum(CvInputSource(cvYVal));
+        patternSlot.cvZSource = ModelUtils::clampedEnum(CvInputSource(cvZVal));
+        for (int i = 0; i < 4; ++i) {
+            uint8_t val;
+            reader.read(val, 0);
+            patternSlot.triggerOutputDest[i] = ModelUtils::clampedEnum(TriggerOutputDest(val));
+        }
+        for (int i = 0; i < 4; ++i) {
+            uint8_t val;
+            reader.read(val, 0);
+            patternSlot.cvOutputDest[i] = ModelUtils::clampedEnum(CvOutputDest(val));
+        }
+        patternSlot.midiSource.read(reader);
+        uint8_t bootScriptVal = 0;
+        reader.read(bootScriptVal, 0);
+        patternSlot.bootScriptIndex = clamp<uint8_t>(bootScriptVal, 0, ScriptSlotCount - 1);
+        uint8_t timeBaseVal = 0;
+        reader.read(timeBaseVal, 0);
+        patternSlot.timeBase = ModelUtils::clampedEnum(TimeBase(timeBaseVal));
+        reader.read(patternSlot.clockDivisor, 0);
+        patternSlot.clockDivisor = ModelUtils::clampDivisor(patternSlot.clockDivisor);
+        reader.read(patternSlot.clockMultiplier, 0);
+        patternSlot.clockMultiplier = clamp<int16_t>(patternSlot.clockMultiplier, 50, 150);
+        for (int i = 0; i < 4; ++i) {
+            uint8_t rangeVal;
+            reader.read(rangeVal, 0);
+            patternSlot.cvOutputRange[i] = ModelUtils::clampedEnum(Types::VoltageRange(rangeVal));
+            reader.read(patternSlot.cvOutputOffset[i], 0);
+            patternSlot.cvOutputOffset[i] = clamp<int16_t>(patternSlot.cvOutputOffset[i], -500, 500);
+        }
+        for (int i = 0; i < 4; ++i) {
+            reader.read(patternSlot.cvOutputQuantizeScale[i], 0);
+            patternSlot.cvOutputQuantizeScale[i] = clamp<int8_t>(patternSlot.cvOutputQuantizeScale[i], QuantizeOff, Scale::Count - 1);
+            reader.read(patternSlot.cvOutputRootNote[i], 0);
+            patternSlot.cvOutputRootNote[i] = clamp<int8_t>(patternSlot.cvOutputRootNote[i], -1, 11);
+        }
+        uint8_t resetMetroVal = 0;
+        reader.read(resetMetroVal, 0);
+        patternSlot.resetMetroOnLoad = resetMetroVal != 0;
+    }
     _resetMetroOnLoad = true;
+}
+
+void TeletypeTrack::onPatternChanged(int patternIndex) {
+    const int slot = patternSlotForPattern(patternIndex);
+    if (slot == _activePatternSlot) {
+        return;
+    }
+    syncActiveSlotScripts();
+    syncActiveSlotPatterns();
+    syncActiveSlotMappings();
+
+    applyPatternSlot(slot);
+}
+
+void TeletypeTrack::applyPatternSlot(int slotIndex) {
+    const int slot = clamp(slotIndex, 0, PatternSlotCount - 1);
+    _activePatternSlot = slot;
+    const auto &patternSlot = _patternSlots[_activePatternSlot];
+    _state.scripts[0].l = clamp<uint8_t>(patternSlot.s0Length, 0, ScriptLineCount);
+    _state.scripts[METRO_SCRIPT].l = clamp<uint8_t>(patternSlot.metroLength, 0, ScriptLineCount);
+    std::memcpy(_state.scripts[0].c, patternSlot.s0.data(), sizeof(patternSlot.s0));
+    std::memcpy(_state.scripts[METRO_SCRIPT].c, patternSlot.metro.data(), sizeof(patternSlot.metro));
+    for (int i = 0; i < PATTERN_COUNT; ++i) {
+        _patterns[i] = patternSlot.patterns[i];
+        _state.patterns[i] = patternSlot.patterns[i];
+    }
+    _triggerInputSource = patternSlot.triggerInputSource;
+    _cvInSource = patternSlot.cvInSource;
+    _cvParamSource = patternSlot.cvParamSource;
+    _cvXSource = patternSlot.cvXSource;
+    _cvYSource = patternSlot.cvYSource;
+    _cvZSource = patternSlot.cvZSource;
+    _triggerOutputDest = patternSlot.triggerOutputDest;
+    _cvOutputDest = patternSlot.cvOutputDest;
+    _cvOutputRange = patternSlot.cvOutputRange;
+    _cvOutputOffset = patternSlot.cvOutputOffset;
+    _cvOutputQuantizeScale = patternSlot.cvOutputQuantizeScale;
+    _cvOutputRootNote = patternSlot.cvOutputRootNote;
+    _midiSource = patternSlot.midiSource;
+    _bootScriptIndex = patternSlot.bootScriptIndex;
+    _timeBase = patternSlot.timeBase;
+    _clockDivisor = patternSlot.clockDivisor;
+    _clockMultiplier = patternSlot.clockMultiplier;
+    _resetMetroOnLoad = patternSlot.resetMetroOnLoad;
+}
+
+void TeletypeTrack::applyActivePatternSlot() {
+    applyPatternSlot(_activePatternSlot);
+}
+
+void TeletypeTrack::syncActiveSlotScripts() {
+    auto &patternSlot = _patternSlots[_activePatternSlot];
+    patternSlot.s0Length = _state.scripts[0].l;
+    patternSlot.metroLength = _state.scripts[METRO_SCRIPT].l;
+    std::memcpy(patternSlot.s0.data(), _state.scripts[0].c, sizeof(patternSlot.s0));
+    std::memcpy(patternSlot.metro.data(), _state.scripts[METRO_SCRIPT].c, sizeof(patternSlot.metro));
+}
+
+void TeletypeTrack::syncActiveSlotPatterns() {
+    auto &patternSlot = _patternSlots[_activePatternSlot];
+    for (int i = 0; i < PATTERN_COUNT; ++i) {
+        patternSlot.patterns[i] = _patterns[i];
+    }
+}
+
+void TeletypeTrack::syncActiveSlotMappings() {
+    auto &patternSlot = _patternSlots[_activePatternSlot];
+    patternSlot.triggerInputSource = _triggerInputSource;
+    patternSlot.cvInSource = _cvInSource;
+    patternSlot.cvParamSource = _cvParamSource;
+    patternSlot.cvXSource = _cvXSource;
+    patternSlot.cvYSource = _cvYSource;
+    patternSlot.cvZSource = _cvZSource;
+    patternSlot.triggerOutputDest = _triggerOutputDest;
+    patternSlot.cvOutputDest = _cvOutputDest;
+    patternSlot.cvOutputRange = _cvOutputRange;
+    patternSlot.cvOutputOffset = _cvOutputOffset;
+    patternSlot.cvOutputQuantizeScale = _cvOutputQuantizeScale;
+    patternSlot.cvOutputRootNote = _cvOutputRootNote;
+    patternSlot.midiSource = _midiSource;
+    patternSlot.bootScriptIndex = _bootScriptIndex;
+    patternSlot.timeBase = _timeBase;
+    patternSlot.clockDivisor = _clockDivisor;
+    patternSlot.clockMultiplier = _clockMultiplier;
+    patternSlot.resetMetroOnLoad = _resetMetroOnLoad;
 }
