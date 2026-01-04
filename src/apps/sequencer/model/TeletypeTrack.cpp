@@ -179,14 +179,12 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
         writer.write(_cvOutputQuantizeScale[i]);
         writer.write(_cvOutputRootNote[i]);
     }
+    scene_state_t &state = const_cast<scene_state_t &>(_state);
     for (int script = 0; script < EditableScriptCount; ++script) {
+        writer.write(state.scripts[script].l);
         for (int line = 0; line < ScriptLineCount; ++line) {
-            char lineBuffer[ScriptLineLength] = {};
-            const tele_command_t *cmd = ss_get_script_command(const_cast<scene_state_t *>(&_state), script, line);
-            if (cmd && cmd->length > 0) {
-                print_command(cmd, lineBuffer);
-            }
-            writer.write(lineBuffer, ScriptLineLength);
+            const tele_command_t *cmd = ss_get_script_command(&state, script, line);
+            writer.write(cmd, sizeof(tele_command_t));
         }
     }
     for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
@@ -249,26 +247,13 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         reader.read(_cvOutputRootNote[i]);
         _cvOutputRootNote[i] = clamp<int8_t>(_cvOutputRootNote[i], -1, 11);
     }
-    char lineBuffer[ScriptLineLength] = {};
     for (int script = 0; script < EditableScriptCount; ++script) {
         ss_clear_script(&_state, script);
+        uint8_t scriptLen = 0;
+        reader.read(scriptLen);
+        _state.scripts[script].l = clamp<uint8_t>(scriptLen, 0, ScriptLineCount);
         for (int line = 0; line < ScriptLineCount; ++line) {
-            reader.read(lineBuffer, ScriptLineLength, 0);
-            lineBuffer[ScriptLineLength - 1] = '\0';
-            if (lineBuffer[0] == '\0') {
-                continue;
-            }
-            tele_command_t cmd = {};
-            char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
-            tele_error_t error = parse(lineBuffer, &cmd, errorMsg);
-            if (error != E_OK) {
-                continue;
-            }
-            error = validate(&cmd, errorMsg);
-            if (error != E_OK) {
-                continue;
-            }
-            ss_overwrite_script_command(&_state, script, line, &cmd);
+            reader.read(_state.scripts[script].c[line], 0);
         }
     }
     for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {

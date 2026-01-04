@@ -8,6 +8,7 @@
 enum class FileType : uint8_t {
     Project     = 0,
     UserScale   = 1,
+    TeletypeScript = 2,
     Settings    = 255
 };
 
@@ -34,4 +35,3 @@ struct FileHeader {
     }
 
 } __attribute__((packed));
-

@@ -26,6 +26,15 @@ If your Teletype track is new, set up its I/O first so scripts can see the corre
 
 After this, proceed to Script View and start editing scripts.
 
+## Default Scripts on New Teletype Track
+
+When a Teletype track has no scripts, it seeds two defaults:
+
+- **S0**: `M.ACT 1` (enables metro)
+- **M (Metro)**: `CV 1 N 48 ; TR.P 1` (C3 on CV1 + trigger pulse)
+
+You can overwrite these immediately in Script View.
+
 ## BUS Routing Example (Performer)
 
 BUS is a shared CV bus (4 slots) that lets Teletype modulate other tracks without using hardware CV outputs.

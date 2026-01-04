@@ -31,6 +31,10 @@ private:
     void duplicateLine();
     void commentLine();
     void deleteLine();
+    void saveScript();
+    void loadScript();
+    void saveScriptToSlot(int slot);
+    void loadScriptFromSlot(int slot);
     void pushHistory(const char *line);
     void recallHistory(int direction);
     void setEditBuffer(const char *text);
