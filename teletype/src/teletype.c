@@ -67,6 +67,15 @@ tele_error_t validate(const tele_command_t *c,
         }
         else if (word_type == OP) {
             const tele_op_t *op = tele_ops[word_value];
+            int16_t params = op->params;
+
+            if (word_value == E_OP_RND_P || word_value == E_OP_RND_PN) {
+                if (stack_depth == 1) {
+                    strcpy(error_msg, op->name);
+                    return E_NEED_PARAMS;
+                }
+                params = stack_depth >= 2 ? 2 : 0;
+            }
 
             // if we're not a first_cmd we need to return something
             if (!first_cmd && !op->returns) {
@@ -74,7 +83,7 @@ tele_error_t validate(const tele_command_t *c,
                 return E_NOT_LEFT;
             }
 
-            stack_depth -= op->params;
+            stack_depth -= params;
 
             if (stack_depth < 0) {
                 strcpy(error_msg, op->name);

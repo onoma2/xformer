@@ -1401,14 +1401,12 @@ const tele_op_t op_PN_FND = MAKE_GET_OP(PN.FND, op_PN_FND_get, 2, true);
 ////////////////////////////////////////////////////////////////////////////////
 // RND.P, RND.PN ///////////////////////////////////////////////////////////////
 
-static void rnd_p_fill(scene_state_t *ss, int16_t pn) {
+static void rnd_p_fill(scene_state_t *ss, int16_t pn, int16_t min, int16_t max) {
     pn = normalise_pn(pn);
     int16_t start = ss_get_pattern_start(ss, pn);
     int16_t end = ss_get_pattern_end(ss, pn);
     if (end < start) return;
 
-    const int16_t min = 0;
-    const int16_t max = 16383;
     random_state_t *r = &ss->rand_states.s.pattern.rand;
 
     for (int16_t idx = start; idx <= end; idx++) {
@@ -1419,14 +1417,36 @@ static void rnd_p_fill(scene_state_t *ss, int16_t pn) {
 
 static void op_RND_P_get(const void *NOTUSED(data), scene_state_t *ss,
                          exec_state_t *NOTUSED(es), command_state_t *cs) {
-    rnd_p_fill(ss, ss->variables.p_n);
+    int16_t min = 0;
+    int16_t max = 16383;
+    if (cs_stack_size(cs) >= 2) {
+        min = cs_pop(cs);
+        max = cs_pop(cs);
+    }
+    if (min > max) {
+        int16_t tmp = min;
+        min = max;
+        max = tmp;
+    }
+    rnd_p_fill(ss, ss->variables.p_n, min, max);
     tele_pattern_updated();
 }
 
 static void op_RND_PN_get(const void *NOTUSED(data), scene_state_t *ss,
                           exec_state_t *NOTUSED(es), command_state_t *cs) {
     int16_t pn = cs_pop(cs);
-    rnd_p_fill(ss, pn);
+    int16_t min = 0;
+    int16_t max = 16383;
+    if (cs_stack_size(cs) >= 2) {
+        min = cs_pop(cs);
+        max = cs_pop(cs);
+    }
+    if (min > max) {
+        int16_t tmp = min;
+        min = max;
+        max = tmp;
+    }
+    rnd_p_fill(ss, pn, min, max);
     tele_pattern_updated();
 }
 
