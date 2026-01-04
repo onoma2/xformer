@@ -131,6 +131,30 @@
         "PN.+W"       => { MATCH_OP(E_OP_PN_ADDW); };
         "P.-W"        => { MATCH_OP(E_OP_P_SUBW); };
         "PN.-W"       => { MATCH_OP(E_OP_PN_SUBW); };
+        "P.PA"        => { MATCH_OP(E_OP_P_PA); };
+        "PN.PA"       => { MATCH_OP(E_OP_PN_PA); };
+        "P.PS"        => { MATCH_OP(E_OP_P_PS); };
+        "PN.PS"       => { MATCH_OP(E_OP_PN_PS); };
+        "P.PM"        => { MATCH_OP(E_OP_P_PM); };
+        "PN.PM"       => { MATCH_OP(E_OP_PN_PM); };
+        "P.PD"        => { MATCH_OP(E_OP_P_PD); };
+        "PN.PD"       => { MATCH_OP(E_OP_PN_PD); };
+        "P.PMOD"      => { MATCH_OP(E_OP_P_PMOD); };
+        "PN.PMOD"     => { MATCH_OP(E_OP_PN_PMOD); };
+        "P.SCALE"     => { MATCH_OP(E_OP_P_SCALE); };
+        "PN.SCALE"    => { MATCH_OP(E_OP_PN_SCALE); };
+        "P.SUM"       => { MATCH_OP(E_OP_P_SUM); };
+        "PN.SUM"      => { MATCH_OP(E_OP_PN_SUM); };
+        "P.AVG"       => { MATCH_OP(E_OP_P_AVG); };
+        "PN.AVG"      => { MATCH_OP(E_OP_PN_AVG); };
+        "P.MINV"      => { MATCH_OP(E_OP_P_MINV); };
+        "PN.MINV"     => { MATCH_OP(E_OP_PN_MINV); };
+        "P.MAXV"      => { MATCH_OP(E_OP_P_MAXV); };
+        "PN.MAXV"     => { MATCH_OP(E_OP_PN_MAXV); };
+        "P.FND"       => { MATCH_OP(E_OP_P_FND); };
+        "PN.FND"      => { MATCH_OP(E_OP_PN_FND); };
+        "RND.P"       => { MATCH_OP(E_OP_RND_P); };
+        "RND.PN"      => { MATCH_OP(E_OP_RND_PN); };
 
         # queue
         "Q"           => { MATCH_OP(E_OP_Q); };

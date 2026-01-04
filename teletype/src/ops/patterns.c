@@ -1,5 +1,7 @@
 #include "ops/patterns.h"
 
+#include <limits.h>
+
 #include "helpers.h"
 #include "random.h"
 #include "teletype.h"
@@ -49,6 +51,28 @@ static int16_t wrap(int16_t value, int16_t a, int16_t b) {
         while (i < b) i += c;
     }
     return i;
+}
+
+static int16_t clamp_int32(int32_t value) {
+    if (value > INT16_MAX) return INT16_MAX;
+    if (value < INT16_MIN) return INT16_MIN;
+    return (int16_t)value;
+}
+
+static int16_t scale_val(int16_t value, int16_t in_min, int16_t in_max,
+                         int16_t out_min, int16_t out_max) {
+    if (in_min == in_max) return out_min;
+
+    int16_t in_lo = in_min < in_max ? in_min : in_max;
+    int16_t in_hi = in_min < in_max ? in_max : in_min;
+    int32_t v = value;
+    if (v < in_lo) v = in_lo;
+    if (v > in_hi) v = in_hi;
+
+    int32_t numerator = (v - in_min) * (out_max - out_min);
+    int32_t denom = (in_max - in_min);
+    int32_t mapped = out_min + (numerator / denom);
+    return clamp_int32(mapped);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1039,6 +1063,375 @@ const tele_op_t op_PN_SUB = MAKE_GET_OP(PN.-, op_PN_SUB_get, 3, false);
 const tele_op_t op_P_SUBW = MAKE_GET_OP(P.-W, op_P_SUBW_get, 4, false);
 const tele_op_t op_PN_SUBW = MAKE_GET_OP(PN.-W, op_PN_SUBW_get, 5, false);
 // clang-format on
+
+////////////////////////////////////////////////////////////////////////////////
+// P.PA, P.PS, P.PM, P.PD, P.PMOD /////////////////////////////////////////////
+
+static void p_pat_add(scene_state_t *ss, int16_t pn, int16_t delta) {
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return;
+
+    for (int16_t idx = start; idx <= end; idx++) {
+        int32_t value = ss_get_pattern_val(ss, pn, idx) + delta;
+        ss_set_pattern_val(ss, pn, idx, clamp_int32(value));
+    }
+}
+
+static void p_pat_sub(scene_state_t *ss, int16_t pn, int16_t delta) {
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return;
+
+    for (int16_t idx = start; idx <= end; idx++) {
+        int32_t value = ss_get_pattern_val(ss, pn, idx) - delta;
+        ss_set_pattern_val(ss, pn, idx, clamp_int32(value));
+    }
+}
+
+static void p_pat_mul(scene_state_t *ss, int16_t pn, int16_t factor) {
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return;
+
+    for (int16_t idx = start; idx <= end; idx++) {
+        int32_t value = ss_get_pattern_val(ss, pn, idx) * (int32_t)factor;
+        ss_set_pattern_val(ss, pn, idx, clamp_int32(value));
+    }
+}
+
+static void p_pat_div(scene_state_t *ss, int16_t pn, int16_t divisor) {
+    if (divisor == 0) return;
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return;
+
+    for (int16_t idx = start; idx <= end; idx++) {
+        int32_t value = ss_get_pattern_val(ss, pn, idx) / divisor;
+        ss_set_pattern_val(ss, pn, idx, clamp_int32(value));
+    }
+}
+
+static void p_pat_mod(scene_state_t *ss, int16_t pn, int16_t divisor) {
+    if (divisor == 0) return;
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return;
+
+    for (int16_t idx = start; idx <= end; idx++) {
+        int16_t value = ss_get_pattern_val(ss, pn, idx) % divisor;
+        ss_set_pattern_val(ss, pn, idx, value);
+    }
+}
+
+static void op_P_PA_get(const void *NOTUSED(data), scene_state_t *ss,
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t delta = cs_pop(cs);
+    p_pat_add(ss, ss->variables.p_n, delta);
+    tele_pattern_updated();
+}
+
+static void op_PN_PA_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    int16_t delta = cs_pop(cs);
+    p_pat_add(ss, pn, delta);
+    tele_pattern_updated();
+}
+
+static void op_P_PS_get(const void *NOTUSED(data), scene_state_t *ss,
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t delta = cs_pop(cs);
+    p_pat_sub(ss, ss->variables.p_n, delta);
+    tele_pattern_updated();
+}
+
+static void op_PN_PS_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    int16_t delta = cs_pop(cs);
+    p_pat_sub(ss, pn, delta);
+    tele_pattern_updated();
+}
+
+static void op_P_PM_get(const void *NOTUSED(data), scene_state_t *ss,
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t factor = cs_pop(cs);
+    p_pat_mul(ss, ss->variables.p_n, factor);
+    tele_pattern_updated();
+}
+
+static void op_PN_PM_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    int16_t factor = cs_pop(cs);
+    p_pat_mul(ss, pn, factor);
+    tele_pattern_updated();
+}
+
+static void op_P_PD_get(const void *NOTUSED(data), scene_state_t *ss,
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t divisor = cs_pop(cs);
+    p_pat_div(ss, ss->variables.p_n, divisor);
+    tele_pattern_updated();
+}
+
+static void op_PN_PD_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    int16_t divisor = cs_pop(cs);
+    p_pat_div(ss, pn, divisor);
+    tele_pattern_updated();
+}
+
+static void op_P_PMOD_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t divisor = cs_pop(cs);
+    p_pat_mod(ss, ss->variables.p_n, divisor);
+    tele_pattern_updated();
+}
+
+static void op_PN_PMOD_get(const void *NOTUSED(data), scene_state_t *ss,
+                           exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    int16_t divisor = cs_pop(cs);
+    p_pat_mod(ss, pn, divisor);
+    tele_pattern_updated();
+}
+
+// clang-format off
+const tele_op_t op_P_PA = MAKE_GET_OP(P.PA, op_P_PA_get, 1, false);
+const tele_op_t op_PN_PA = MAKE_GET_OP(PN.PA, op_PN_PA_get, 2, false);
+const tele_op_t op_P_PS = MAKE_GET_OP(P.PS, op_P_PS_get, 1, false);
+const tele_op_t op_PN_PS = MAKE_GET_OP(PN.PS, op_PN_PS_get, 2, false);
+const tele_op_t op_P_PM = MAKE_GET_OP(P.PM, op_P_PM_get, 1, false);
+const tele_op_t op_PN_PM = MAKE_GET_OP(PN.PM, op_PN_PM_get, 2, false);
+const tele_op_t op_P_PD = MAKE_GET_OP(P.PD, op_P_PD_get, 1, false);
+const tele_op_t op_PN_PD = MAKE_GET_OP(PN.PD, op_PN_PD_get, 2, false);
+const tele_op_t op_P_PMOD = MAKE_GET_OP(P.PMOD, op_P_PMOD_get, 1, false);
+const tele_op_t op_PN_PMOD = MAKE_GET_OP(PN.PMOD, op_PN_PMOD_get, 2, false);
+// clang-format on
+
+////////////////////////////////////////////////////////////////////////////////
+// P.SCALE /////////////////////////////////////////////////////////////////////
+
+static void p_pat_scale(scene_state_t *ss, int16_t pn, int16_t in_min,
+                        int16_t in_max, int16_t out_min, int16_t out_max) {
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return;
+
+    for (int16_t idx = start; idx <= end; idx++) {
+        int16_t value = ss_get_pattern_val(ss, pn, idx);
+        ss_set_pattern_val(ss, pn, idx,
+                           scale_val(value, in_min, in_max, out_min, out_max));
+    }
+}
+
+static void op_P_SCALE_get(const void *NOTUSED(data), scene_state_t *ss,
+                           exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t out_max = cs_pop(cs);
+    int16_t out_min = cs_pop(cs);
+    int16_t in_max = cs_pop(cs);
+    int16_t in_min = cs_pop(cs);
+    p_pat_scale(ss, ss->variables.p_n, in_min, in_max, out_min, out_max);
+    tele_pattern_updated();
+}
+
+static void op_PN_SCALE_get(const void *NOTUSED(data), scene_state_t *ss,
+                            exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    int16_t out_max = cs_pop(cs);
+    int16_t out_min = cs_pop(cs);
+    int16_t in_max = cs_pop(cs);
+    int16_t in_min = cs_pop(cs);
+    p_pat_scale(ss, pn, in_min, in_max, out_min, out_max);
+    tele_pattern_updated();
+}
+
+const tele_op_t op_P_SCALE = MAKE_GET_OP(P.SCALE, op_P_SCALE_get, 4, false);
+const tele_op_t op_PN_SCALE = MAKE_GET_OP(PN.SCALE, op_PN_SCALE_get, 5, false);
+
+////////////////////////////////////////////////////////////////////////////////
+// P.SUM, P.AVG, P.MINV, P.MAXV, P.FND ////////////////////////////////////////
+
+static int16_t p_sum_get(scene_state_t *ss, int16_t pn) {
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return 0;
+
+    int32_t sum = 0;
+    for (int16_t idx = start; idx <= end; idx++) {
+        sum += ss_get_pattern_val(ss, pn, idx);
+    }
+    return clamp_int32(sum);
+}
+
+static int16_t p_avg_get(scene_state_t *ss, int16_t pn) {
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return 0;
+
+    int32_t sum = 0;
+    int32_t count = end - start + 1;
+    for (int16_t idx = start; idx <= end; idx++) {
+        sum += ss_get_pattern_val(ss, pn, idx);
+    }
+    return clamp_int32(sum / count);
+}
+
+static int16_t p_minv_get(scene_state_t *ss, int16_t pn) {
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return 0;
+
+    int16_t val = ss_get_pattern_val(ss, pn, start);
+    for (int16_t idx = start + 1; idx <= end; idx++) {
+        int16_t temp = ss_get_pattern_val(ss, pn, idx);
+        if (temp < val) val = temp;
+    }
+    return val;
+}
+
+static int16_t p_maxv_get(scene_state_t *ss, int16_t pn) {
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return 0;
+
+    int16_t val = ss_get_pattern_val(ss, pn, start);
+    for (int16_t idx = start + 1; idx <= end; idx++) {
+        int16_t temp = ss_get_pattern_val(ss, pn, idx);
+        if (temp > val) val = temp;
+    }
+    return val;
+}
+
+static int16_t p_fnd_get(scene_state_t *ss, int16_t pn, int16_t target) {
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return -1;
+
+    for (int16_t idx = start; idx <= end; idx++) {
+        if (ss_get_pattern_val(ss, pn, idx) == target) return idx;
+    }
+    return -1;
+}
+
+static void op_P_SUM_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, p_sum_get(ss, ss->variables.p_n));
+}
+
+static void op_PN_SUM_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    cs_push(cs, p_sum_get(ss, pn));
+}
+
+static void op_P_AVG_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, p_avg_get(ss, ss->variables.p_n));
+}
+
+static void op_PN_AVG_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    cs_push(cs, p_avg_get(ss, pn));
+}
+
+static void op_P_MINV_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, p_minv_get(ss, ss->variables.p_n));
+}
+
+static void op_PN_MINV_get(const void *NOTUSED(data), scene_state_t *ss,
+                           exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    cs_push(cs, p_minv_get(ss, pn));
+}
+
+static void op_P_MAXV_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, p_maxv_get(ss, ss->variables.p_n));
+}
+
+static void op_PN_MAXV_get(const void *NOTUSED(data), scene_state_t *ss,
+                           exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    cs_push(cs, p_maxv_get(ss, pn));
+}
+
+static void op_P_FND_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t target = cs_pop(cs);
+    cs_push(cs, p_fnd_get(ss, ss->variables.p_n, target));
+}
+
+static void op_PN_FND_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    int16_t target = cs_pop(cs);
+    cs_push(cs, p_fnd_get(ss, pn, target));
+}
+
+// clang-format off
+const tele_op_t op_P_SUM = MAKE_GET_OP(P.SUM, op_P_SUM_get, 0, true);
+const tele_op_t op_PN_SUM = MAKE_GET_OP(PN.SUM, op_PN_SUM_get, 1, true);
+const tele_op_t op_P_AVG = MAKE_GET_OP(P.AVG, op_P_AVG_get, 0, true);
+const tele_op_t op_PN_AVG = MAKE_GET_OP(PN.AVG, op_PN_AVG_get, 1, true);
+const tele_op_t op_P_MINV = MAKE_GET_OP(P.MINV, op_P_MINV_get, 0, true);
+const tele_op_t op_PN_MINV = MAKE_GET_OP(PN.MINV, op_PN_MINV_get, 1, true);
+const tele_op_t op_P_MAXV = MAKE_GET_OP(P.MAXV, op_P_MAXV_get, 0, true);
+const tele_op_t op_PN_MAXV = MAKE_GET_OP(PN.MAXV, op_PN_MAXV_get, 1, true);
+const tele_op_t op_P_FND = MAKE_GET_OP(P.FND, op_P_FND_get, 1, true);
+const tele_op_t op_PN_FND = MAKE_GET_OP(PN.FND, op_PN_FND_get, 2, true);
+// clang-format on
+
+////////////////////////////////////////////////////////////////////////////////
+// RND.P, RND.PN ///////////////////////////////////////////////////////////////
+
+static void rnd_p_fill(scene_state_t *ss, int16_t pn) {
+    pn = normalise_pn(pn);
+    int16_t start = ss_get_pattern_start(ss, pn);
+    int16_t end = ss_get_pattern_end(ss, pn);
+    if (end < start) return;
+
+    const int16_t min = 0;
+    const int16_t max = 16383;
+    random_state_t *r = &ss->rand_states.s.pattern.rand;
+
+    for (int16_t idx = start; idx <= end; idx++) {
+        int16_t value = (random_next(r) % (max - min + 1)) + min;
+        ss_set_pattern_val(ss, pn, idx, value);
+    }
+}
+
+static void op_RND_P_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    rnd_p_fill(ss, ss->variables.p_n);
+    tele_pattern_updated();
+}
+
+static void op_RND_PN_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t pn = cs_pop(cs);
+    rnd_p_fill(ss, pn);
+    tele_pattern_updated();
+}
+
+const tele_op_t op_RND_P = MAKE_GET_OP(RND.P, op_RND_P_get, 0, false);
+const tele_op_t op_RND_PN = MAKE_GET_OP(RND.PN, op_RND_PN_get, 1, false);
 
 ////////////////////////////////////////////////////////////////////////////////
 // mods: P.MAP, PN.MAP /////////////////////////////////////////////////////////

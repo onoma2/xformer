@@ -3783,6 +3783,166 @@ position</td>
 position of pattern <code>x</code></td>
 </tr>
 <tr class="even">
+<td><strong><code>RND.P</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>randomize values between START and END of the working pattern
+(0..16383)</td>
+</tr>
+<tr class="odd">
+<td><strong><code>RND.PN x</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>randomize values between START and END of pattern <code>x</code>
+(0..16383)</td>
+</tr>
+<tr class="even">
+<td><strong><code>P.PA y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>add <code>y</code> to each value between START and END of the working
+pattern</td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.PA x y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>add <code>y</code> to each value between START and END of pattern
+<code>x</code></td>
+</tr>
+<tr class="even">
+<td><strong><code>P.PS y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>subtract <code>y</code> from each value between START and END of the
+working pattern</td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.PS x y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>subtract <code>y</code> from each value between START and END of
+pattern <code>x</code></td>
+</tr>
+<tr class="even">
+<td><strong><code>P.PM y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>multiply each value between START and END of the working pattern by
+<code>y</code></td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.PM x y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>multiply each value between START and END of pattern <code>x</code> by
+<code>y</code></td>
+</tr>
+<tr class="even">
+<td><strong><code>P.PD y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>divide each value between START and END of the working pattern by
+<code>y</code> (no-op if <code>y</code>=0)</td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.PD x y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>divide each value between START and END of pattern <code>x</code> by
+<code>y</code> (no-op if <code>y</code>=0)</td>
+</tr>
+<tr class="even">
+<td><strong><code>P.PMOD y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>apply modulo <code>y</code> to each value between START and END of the
+working pattern (no-op if <code>y</code>=0)</td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.PMOD x y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>apply modulo <code>y</code> to each value between START and END of
+pattern <code>x</code> (no-op if <code>y</code>=0)</td>
+</tr>
+<tr class="even">
+<td><strong><code>P.SCALE a b c d</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>scale each value between START and END of the working pattern from
+range <code>a</code>..<code>b</code> to <code>c</code>..<code>d</code></td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.SCALE x a b c d</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>scale each value between START and END of pattern <code>x</code> from
+range <code>a</code>..<code>b</code> to <code>c</code>..<code>d</code></td>
+</tr>
+<tr class="even">
+<td><strong><code>P.SUM</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>sum values between START and END of the working pattern</td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.SUM x</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>sum values between START and END of pattern <code>x</code></td>
+</tr>
+<tr class="even">
+<td><strong><code>P.AVG</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>average values between START and END of the working pattern</td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.AVG x</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>average values between START and END of pattern <code>x</code></td>
+</tr>
+<tr class="even">
+<td><strong><code>P.MINV</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>minimum value between START and END of the working pattern</td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.MINV x</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>minimum value between START and END of pattern <code>x</code></td>
+</tr>
+<tr class="even">
+<td><strong><code>P.MAXV</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>maximum value between START and END of the working pattern</td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.MAXV x</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>maximum value between START and END of pattern <code>x</code></td>
+</tr>
+<tr class="even">
+<td><strong><code>P.FND y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>return first index between START and END where value equals
+<code>y</code> (or -1 if not found)</td>
+</tr>
+<tr class="odd">
+<td><strong><code>PN.FND x y</code></strong></td>
+<td>-</td>
+<td>-</td>
+<td>return first index between START and END where value equals
+<code>y</code> in pattern <code>x</code> (or -1 if not found)</td>
+</tr>
+<tr class="even">
 <td><strong><code>P.+ x y</code></strong></td>
 <td>-</td>
 <td>-</td>
