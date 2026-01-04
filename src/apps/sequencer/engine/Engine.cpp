@@ -293,6 +293,14 @@ float Engine::nudgeTempoStrength() const {
     return _nudgeTempo.strength();
 }
 
+void Engine::setTempo(float bpm) {
+    _model.project().setTempo(bpm);
+}
+
+void Engine::selectTrackPattern(int trackIndex, int patternIndex) {
+    _model.project().playState().selectTrackPattern(trackIndex, patternIndex, PlayState::ExecuteType::Immediate);
+}
+
 uint32_t Engine::noteDivisor() const {
     return _project.timeSignature().noteDivisor();
 }

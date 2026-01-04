@@ -93,6 +93,7 @@ public:
 
     // tempo
     float tempo() const { return _clock.bpm(); }
+    void setTempo(float bpm);
 
     // tap tempo
     void tapTempoReset();
@@ -137,6 +138,8 @@ public:
     bool cvOutputOverride() const { return _cvOutputOverride; }
     void setCvOutputOverride(bool enabled) { _cvOutputOverride = enabled; }
     void setCvOutput(int channel, float value) { _cvOutputOverrideValues[channel] = value; }
+
+    void selectTrackPattern(int trackIndex, int patternIndex);
 
     const Clock &clock() const { return _clock; }
           Clock &clock()       { return _clock; }

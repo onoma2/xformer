@@ -14,7 +14,8 @@ This manual covers the Teletype operations available in the **Performer** firmwa
 *   **Sequencing:** Metronome (`M`), Delay (`DEL`), Scripts.
 *   **Local I/O:** 4 CV Outputs (`CV`), 4 Gate Outputs (`TR`), 2 Inputs (`IN`, `PARAM`).
 *   **BUS (Performer):** Shared CV bus slots (`BUS`), usable in routing.
-*   **WR (Performer):** Transport running flag (`WR`).
+*   **WBPM (Performer):** Tempo read/write (`WBPM`, `WBPM.S`).
+*   **WR (Performer):** Transport running flag (`WR`, `WR.ACT`).
 *   **RT (Performer):** Route source readback (`RT`).
 *   **MIDI:** Full MIDI input support (`MI.*`).
 
@@ -91,7 +92,15 @@ WR returns whether the Performer transport is currently running.
 - `WR` → read transport running flag (0/1)
 
 Notes:
-- Read-only (no setter).
+- Use `WR.ACT x` to start/stop transport.
+- `WR.ACT 1` starts, `WR.ACT 0` stops.
+
+## WBPM (Performer-only)
+
+WBPM reads or sets the project tempo in BPM.
+
+- `WBPM` → read current tempo (1–1000 BPM)
+- `WBPM.S x` → set tempo to x BPM
 
 ## RT (Performer-only)
 
@@ -110,10 +119,13 @@ Notes:
 
 **Syntax:** `WP i` where `i` = track number (1-8)
 
-**Returns:** Pattern index (0-15) currently playing on the specified track
+**Returns:** Pattern index (1-16) currently playing on the specified track
 
 **Description:**
-WP queries the current pattern index for any track in the Performer project. Each track can be on a different pattern (0-15), and WP allows scripts to respond to the global pattern state across all 8 tracks.
+WP queries the current pattern index for any track in the Performer project. Each track can be on a different pattern (1-16), and WP allows scripts to respond to the global pattern state across all 8 tracks.
+
+**Setter:** `WP.SET track pattern`
+- Both inputs are 1-based (track 1–8, pattern 1–16).
 
 **Examples:**
 
@@ -139,8 +151,8 @@ X 0
 L 1 8: X ADD X WP I        # Sum patterns from all 8 tracks
 CV 4 N SCALE X 0 120 48 84 # Map sum to note range
 
-# Detect when any track hits pattern 0
-IF OR4 EQ WP 1 0 EQ WP 2 0 EQ WP 3 0 EQ WP 4 0: TR 1 1  # Gate high
+# Detect when any track hits pattern 1
+IF OR4 EQ WP 1 1 EQ WP 2 1 EQ WP 3 1 EQ WP 4 1: TR 1 1  # Gate high
 ```
 
 **Use Cases:**
@@ -151,9 +163,9 @@ IF OR4 EQ WP 1 0 EQ WP 2 0 EQ WP 3 0 EQ WP 4 0: TR 1 1  # Gate high
 - **Pattern-driven modulation**: Map pattern indices to CV values for variation
 
 **Technical Notes:**
-- WP is read-only (no pattern change via teletype)
+- WP is read-only, use `WP.SET` to change patterns.
 - Returns 0 for invalid track indices (< 1 or > 8)
-- Track numbers are **1-indexed** (1-8), pattern indices are **0-indexed** (0-15)
+- Track numbers and pattern indices are **1-indexed** (1-8, 1-16)
 - Zero computational overhead - reads cached pattern state
 - Snapshots use pattern index 16 (WP returns 16 when snapshot is active)
 

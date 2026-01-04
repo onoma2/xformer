@@ -160,6 +160,7 @@ Then use Performer's Routing page to route CV 1 or BUS 1 to any track parameter.
 ## WR Transport Flag (Performer)
 
 WR is a read-only opcode that returns whether the Performer transport is running.
+Use WR.ACT to start/stop the transport.
 
 ### Basic Usage
 
@@ -175,6 +176,34 @@ CV 1 V X
 ```
 
 WR returns `1` when the sequencer is playing and `0` when stopped.
+
+**Set transport (run/stop):**
+
+```
+WR.ACT 1   # start
+WR.ACT 0   # stop
+```
+
+## WBPM Tempo Control (Performer)
+
+WBPM reads the current project tempo in BPM. WBPM.S sets the tempo.
+
+**Read tempo:**
+
+```
+X WBPM     # X = current BPM
+```
+
+**Set tempo:**
+
+```
+WBPM.S 120
+WBPM.S 87
+```
+
+Notes:
+- Valid range: 1–1000 BPM.
+- WBPM is a direct BPM value (no scaling to 0–16383).
 
 ## RT Route Source Readback (Performer)
 
@@ -271,13 +300,15 @@ The `WP` (Which Pattern) opcode allows Teletype scripts to query the current pat
 
 ```
 # Query pattern on track 1
-CV 1 N SCALE WP 1 0 15 60 75    # Map pattern 0-15 to notes C4-Eb5
+CV 1 N SCALE WP 1 1 16 60 75    # Map pattern 1-16 to notes C4-Eb5
 
 # Conditional based on pattern
 IF EQ WP 1 5: TR.PULSE 1        # Trigger when track 1 on pattern 5
 
 # Store pattern for later use
 X WP 2                          # Store track 2's pattern in X
+
+WP.SET 1 2                      # Force track 1 to pattern 2 (1-based)
 ```
 
 ### Pattern-Dependent Behavior
@@ -308,7 +339,7 @@ IF EQ WP 1 WP 2: TR 1 1
 IF NE WP 1 WP 2: TR 1 0
 
 # Detect when all drum tracks on pattern 0 (intro)
-IF AND4 EQ WP 1 0 EQ WP 2 0 EQ WP 3 0 EQ WP 4 0: CV 1 V 10
+IF AND4 EQ WP 1 1 EQ WP 2 1 EQ WP 3 1 EQ WP 4 1: CV 1 V 10
 
 # Complex pattern combinations
 IF AND EQ WP 1 5 EQ WP 3 7: CV 2 V 7   # Tracks 1&3 on specific patterns
@@ -320,7 +351,7 @@ Map pattern indices to CV values for dynamic variation:
 
 ```
 # Linear mapping: pattern 0→C3, pattern 15→C5
-CV 1 N SCALE WP 1 0 15 48 72
+CV 1 N SCALE WP 1 1 16 48 72
 
 # Quantized steps: each pattern = semitone
 CV 2 N ADD 60 WP 2              # C4 + pattern offset
@@ -345,7 +376,7 @@ M DIV 1000 ADD 4 WP 1           # Faster on higher patterns
 M!                              # Trigger metro
 
 # Pattern-dependent probability
-PROB SCALE WP 2 0 15 10 90      # 10% on pattern 0, 90% on pattern 15
+PROB SCALE WP 2 1 16 10 90      # 10% on pattern 1, 90% on pattern 16
 IF TOSS: TR.PULSE 3
 ```
 
@@ -367,7 +398,7 @@ CV 2 N SCALE X 0 252 36 96      # Max = 1*15 + 2*15 + ... + 8*15 = 540
 # XOR combination for variation
 X WP 1
 L 2 8: X XOR X WP I
-CV 3 N SCALE X 0 15 60 75
+CV 3 N SCALE X 1 16 60 75
 ```
 
 ### Pattern Change Detection
@@ -414,7 +445,7 @@ Combine WP with Performer's routing system:
 
 ```
 # Route pattern-dependent CV
-CV 1 N SCALE WP 1 0 15 60 75
+CV 1 N SCALE WP 1 1 16 60 75
 # In Performer routing: CV 1 → Track 5 Transpose
 
 # Gate based on pattern match
@@ -432,12 +463,14 @@ CV 2 V MUL WP 4 200             # 0-3V based on pattern
 - **Instant**: No pattern lookup or computation required
 - **Global view**: All 8 tracks accessible from any Teletype track
 - **Read-only**: Cannot change patterns via WP (use Performer UI or MIDI Program Change)
+- **Settable via WP.SET**: Use `WP.SET track pattern` (both 1-based)
 - **Boundary safe**: Invalid track numbers return 0
 
 ### Notes
 
 - Track numbers are **1-indexed** (1-8 for users)
-- Pattern indices are **0-indexed** (0-15 returned by WP)
+- Pattern indices are **1-indexed** (1-16 returned by WP)
+- WP.SET uses **1-indexed** inputs (1-16)
 - Snapshots internally use pattern index 16, but WP returns the active pattern index
 - Out-of-bounds track numbers (< 1 or > 8) return 0
 - WP works even when called from a Teletype track that isn't the selected track

@@ -136,6 +136,20 @@ void tele_bus_cv_set(uint8_t i, int16_t v) {
     }
 }
 
+int16_t tele_wbpm_get(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return static_cast<int16_t>(std::lround(engine->tempo()));
+    }
+    return 0;
+}
+
+void tele_wbpm_set(int16_t bpm) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        int16_t clamped = clamp<int16_t>(bpm, 1, 1000);
+        engine->setTempo(static_cast<float>(clamped));
+    }
+}
+
 int16_t tele_bar(void) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         float fraction = engine->measureFraction();
@@ -151,12 +165,24 @@ int16_t tele_wpat(uint8_t trackIndex) {
     return 0;
 }
 
+void tele_wpat_set(uint8_t trackIndex, uint8_t patternIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setTrackPattern(trackIndex, patternIndex);
+    }
+}
+
 int16_t tele_wr(void) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         // Return 1 when transport is running (flip to invert behavior).
         return engine->isTransportRunning() ? 1 : 0;
     }
     return 0;
+}
+
+void tele_wr_act(uint8_t running) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setTransportRunning(running != 0);
+    }
 }
 
 int16_t tele_rt(uint8_t routeIndex) {

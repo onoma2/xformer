@@ -195,8 +195,12 @@
         "PARAM.CAL.MAX"  => { MATCH_OP(E_OP_PARAM_CAL_MAX); };
         "PARAM.CAL.RESET" => { MATCH_OP(E_OP_PARAM_CAL_RESET); };
         "BUS"         => { MATCH_OP(E_OP_BUS); };
+        "WBPM.S"      => { MATCH_OP(E_OP_WBPM_S); };
+        "WBPM"        => { MATCH_OP(E_OP_WBPM); };
         "BAR"         => { MATCH_OP(E_OP_BAR); };
+        "WP.SET"      => { MATCH_OP(E_OP_WP_SET); };
         "WP"          => { MATCH_OP(E_OP_WP); };
+        "WR.ACT"      => { MATCH_OP(E_OP_WR_ACT); };
         "WR"          => { MATCH_OP(E_OP_WR); };
         "RT"          => { MATCH_OP(E_OP_RT); };
         "PRM"         => { MATCH_OP(E_OP_PRM); };

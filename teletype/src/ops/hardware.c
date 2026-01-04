@@ -47,12 +47,22 @@ static void op_BUS_get(const void *NOTUSED(data), scene_state_t *ss,
                        exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_BUS_set(const void *NOTUSED(data), scene_state_t *ss,
                        exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WBPM_get(const void *NOTUSED(data), scene_state_t *ss,
+                        exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WBPM_S_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_BAR_get(const void *NOTUSED(data), scene_state_t *ss,
                        exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_WP_get(const void *NOTUSED(data), scene_state_t *ss,
                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WP_SET_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_WR_get(const void *NOTUSED(data), scene_state_t *ss,
                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WR_ACT_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WR_ACT_set(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_RT_get(const void *NOTUSED(data), scene_state_t *ss,
                       exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_TR_get(const void *data, scene_state_t *ss, exec_state_t *es,
@@ -123,9 +133,13 @@ const tele_op_t op_PARAM_CAL_MIN = MAKE_GET_OP (PARAM.CAL.MIN, op_PARAM_CAL_MIN_
 const tele_op_t op_PARAM_CAL_MAX = MAKE_GET_OP (PARAM.CAL.MAX, op_PARAM_CAL_MAX_set, 0, true);
 const tele_op_t op_PARAM_CAL_RESET  = MAKE_GET_OP (PARAM.CAL.RESET, op_PARAM_CAL_RESET_set, 0, false);
 const tele_op_t op_BUS           = MAKE_GET_SET_OP(BUS, op_BUS_get, op_BUS_set, 1, true);
+const tele_op_t op_WBPM          = MAKE_GET_OP(WBPM, op_WBPM_get, 0, true);
+const tele_op_t op_WBPM_S        = MAKE_GET_OP(WBPM.S, op_WBPM_S_get, 1, false);
 const tele_op_t op_BAR           = MAKE_GET_OP(BAR, op_BAR_get, 0, true);
 const tele_op_t op_WP            = MAKE_GET_OP(WP, op_WP_get, 1, true);
+const tele_op_t op_WP_SET        = MAKE_GET_OP(WP.SET, op_WP_SET_get, 2, false);
 const tele_op_t op_WR            = MAKE_GET_OP(WR, op_WR_get, 0, true);
+const tele_op_t op_WR_ACT        = MAKE_GET_SET_OP(WR.ACT, op_WR_ACT_get, op_WR_ACT_set, 0, true);
 const tele_op_t op_RT            = MAKE_GET_OP(RT, op_RT_get, 1, true);
 const tele_op_t op_LIVE_OFF      = MAKE_GET_OP (LIVE.OFF, op_LIVE_OFF_get, 0, false);
 const tele_op_t op_LIVE_O        = MAKE_ALIAS_OP (LIVE.O, op_LIVE_OFF_get, NULL, 0, false);
@@ -378,6 +392,17 @@ static void op_BUS_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
     tele_bus_cv_set((uint8_t)a, b);
 }
 
+static void op_WBPM_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_wbpm_get());
+}
+
+static void op_WBPM_S_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t bpm = cs_pop(cs);
+    tele_wbpm_set(bpm);
+}
+
 static void op_BAR_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
                        exec_state_t *NOTUSED(es), command_state_t *cs) {
     cs_push(cs, tele_bar());
@@ -394,9 +419,35 @@ static void op_WP_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
     cs_push(cs, tele_wpat((uint8_t)trackIndex) + 1);
 }
 
+static void op_WP_SET_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t patternIndex = cs_pop(cs);
+    int16_t trackIndex = cs_pop(cs);
+    trackIndex--;
+    patternIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        return;
+    }
+    if (patternIndex < 0 || patternIndex >= 16) {
+        return;
+    }
+    tele_wpat_set((uint8_t)trackIndex, (uint8_t)patternIndex);
+}
+
 static void op_WR_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
                       exec_state_t *NOTUSED(es), command_state_t *cs) {
     cs_push(cs, tele_wr());
+}
+
+static void op_WR_ACT_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_wr());
+}
+
+static void op_WR_ACT_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t running = cs_pop(cs);
+    tele_wr_act(running != 0);
 }
 
 static void op_RT_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),

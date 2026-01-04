@@ -66,6 +66,10 @@ public:
     void setBusCv(int index, float volts);
     float measureFraction() const;
     int trackPattern(int trackIndex) const;
+    float tempo() const;
+    void setTempo(float bpm);
+    void setTrackPattern(int trackIndex, int patternIndex);
+    void setTransportRunning(bool running);
 
 private:
     void runMidiTriggeredScript(int scriptIndex);

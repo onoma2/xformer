@@ -413,6 +413,32 @@ int TeletypeTrackEngine::trackPattern(int trackIndex) const {
     return _engine.trackEngine(trackIndex).pattern();
 }
 
+float TeletypeTrackEngine::tempo() const {
+    return _engine.tempo();
+}
+
+void TeletypeTrackEngine::setTempo(float bpm) {
+    _engine.setTempo(bpm);
+}
+
+void TeletypeTrackEngine::setTrackPattern(int trackIndex, int patternIndex) {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return;
+    }
+    if (patternIndex < 0 || patternIndex >= CONFIG_PATTERN_COUNT) {
+        return;
+    }
+    _engine.selectTrackPattern(trackIndex, patternIndex);
+}
+
+void TeletypeTrackEngine::setTransportRunning(bool running) {
+    if (running) {
+        _engine.clockStart();
+    } else {
+        _engine.clockStop();
+    }
+}
+
 void TeletypeTrackEngine::installBootScript() {
     scene_state_t &state = _teletypeTrack.state();
     loadScriptsFromModel();
