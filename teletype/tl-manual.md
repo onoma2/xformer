@@ -47,6 +47,7 @@ It provides zero-overhead access to Performer's internal Engine timing for creat
 
 Syntax:
 - `BAR` → read current bar phase (0..16383)
+- `BAR x` → read phase across `x` bars (1..128, default 1)
 
 Returns:
 - `0` at the start of a bar
@@ -80,6 +81,9 @@ CV 2 V SUB BAR 8192
 START 1000
 END 5000
 CV 3 V ADD START MUL SUB END START DIV BAR 16384
+
+# Four-bar ramp
+CV 1 V BAR 4
 ```
 
 Notes:
@@ -428,6 +432,11 @@ metronome entirely with `M.ACT`:
 
 Now the metronome is off, and the `M` script will not be executed. Set
 `M.ACT` to 1 to re-enable.
+
+Performer-only global controls:
+- `M.A x` sets the metronome period for all Teletype tracks.
+- `M.ACT.A x` enables/disables the metronome for all Teletype tracks.
+- `M.RESET.A` resets the metronome timers for all Teletype tracks.
 
 ## Patterns
 

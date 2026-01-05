@@ -78,6 +78,12 @@ CV 1 V BAR
 ```
 This outputs a ramp from 0V to 10V over each bar. At bar start, BAR=0 (0V). At bar end, BAR=16383 (~10V).
 
+**Multi-bar phase (1–128 bars):**
+```
+CV 1 V BAR 4
+```
+This outputs a ramp that spans 4 full bars before wrapping.
+
 **Bipolar centered output (-5V to +5V):**
 ```
 CV 2 V SUB BAR 8192
@@ -755,6 +761,9 @@ In Performer, you can set the Teletype track to use clock timing instead of ms t
 ```
 M.ACT 1              // Enable metronome
 M 500                // Set metronome to 500ms (120 BPM)
+M.A 500              // Set all Teletype track metros to 500ms
+M.ACT.A 1            // Enable metros on all Teletype tracks
+M.RESET.A            // Reset all Teletype metro timers
 ```
 
 ### Step 11: Using Metro Script

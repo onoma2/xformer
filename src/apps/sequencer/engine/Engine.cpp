@@ -309,6 +309,30 @@ void Engine::panicTeletype() {
     }
 }
 
+void Engine::setTeletypeMetroAll(int16_t periodMs) {
+    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).setMetroPeriod(periodMs);
+        }
+    }
+}
+
+void Engine::setTeletypeMetroActiveAll(bool active) {
+    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).setMetroActive(active);
+        }
+    }
+}
+
+void Engine::resetTeletypeMetroAll() {
+    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).resetMetroTimer();
+        }
+    }
+}
+
 uint32_t Engine::noteDivisor() const {
     return _project.timeSignature().noteDivisor();
 }

@@ -81,7 +81,10 @@
         "M"           => { MATCH_OP(E_OP_M); };
         "M!"          => { MATCH_OP(E_OP_M_SYM_EXCLAMATION); };
         "M.ACT"       => { MATCH_OP(E_OP_M_ACT); };
+        "M.A"         => { MATCH_OP(E_OP_M_A); };
+        "M.ACT.A"     => { MATCH_OP(E_OP_M_ACT_A); };
         "M.RESET"     => { MATCH_OP(E_OP_M_RESET); };
+        "M.RESET.A"   => { MATCH_OP(E_OP_M_RESET_A); };
 
         # patterns
         "P.N"         => { MATCH_OP(E_OP_P_N); };

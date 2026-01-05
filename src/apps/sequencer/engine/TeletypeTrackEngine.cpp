@@ -578,6 +578,16 @@ void TeletypeTrackEngine::resetMetroTimer() {
     }
 }
 
+void TeletypeTrackEngine::setMetroPeriod(int16_t periodMs) {
+    _teletypeTrack.state().variables.m = periodMs;
+    syncMetroFromState();
+}
+
+void TeletypeTrackEngine::setMetroActive(bool active) {
+    _teletypeTrack.state().variables.m_act = active;
+    syncMetroFromState();
+}
+
 uint32_t TeletypeTrackEngine::timeTicks() const {
     if (_teletypeTrack.timeBase() == TeletypeTrack::TimeBase::Clock) {
         return _clockTickCounter;
@@ -595,6 +605,19 @@ void TeletypeTrackEngine::setBusCv(int index, float volts) {
 
 float TeletypeTrackEngine::measureFraction() const {
     return _engine.measureFraction();
+}
+
+float TeletypeTrackEngine::measureFractionBars(uint8_t bars) const {
+    if (bars <= 1) {
+        return measureFraction();
+    }
+    uint32_t divisor = _engine.measureDivisor();
+    uint32_t span = divisor * static_cast<uint32_t>(bars);
+    if (span == 0) {
+        return 0.f;
+    }
+    uint32_t tick = _engine.tick();
+    return float(tick % span) / span;
 }
 
 int TeletypeTrackEngine::trackPattern(int trackIndex) const {
@@ -637,6 +660,18 @@ void TeletypeTrackEngine::setTransportRunning(int16_t state) {
             _engine.clockStop();
         }
     }
+}
+
+void TeletypeTrackEngine::setMetroAllPeriod(int16_t periodMs) {
+    _engine.setTeletypeMetroAll(periodMs);
+}
+
+void TeletypeTrackEngine::setMetroAllActive(bool active) {
+    _engine.setTeletypeMetroActiveAll(active);
+}
+
+void TeletypeTrackEngine::resetMetroAll() {
+    _engine.resetTeletypeMetroAll();
 }
 
 void TeletypeTrackEngine::installBootScript() {

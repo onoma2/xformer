@@ -141,6 +141,9 @@ public:
 
     void selectTrackPattern(int trackIndex, int patternIndex);
     void panicTeletype();
+    void setTeletypeMetroAll(int16_t periodMs);
+    void setTeletypeMetroActiveAll(bool active);
+    void resetTeletypeMetroAll();
 
     const Clock &clock() const { return _clock; }
           Clock &clock()       { return _clock; }

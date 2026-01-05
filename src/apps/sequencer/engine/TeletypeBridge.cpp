@@ -74,6 +74,24 @@ void tele_metro_updated(void) {
     }
 }
 
+void tele_metro_all_set(int16_t m) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setMetroAllPeriod(m);
+    }
+}
+
+void tele_metro_all_act(int16_t state) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setMetroAllActive(state > 0);
+    }
+}
+
+void tele_metro_all_reset(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->resetMetroAll();
+    }
+}
+
 void tele_metro_reset(void) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         engine->resetMetroTimer();
@@ -217,9 +235,9 @@ void tele_wbpm_set(int16_t bpm) {
     }
 }
 
-int16_t tele_bar(void) {
+int16_t tele_bar(uint8_t bars) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
-        float fraction = engine->measureFraction();
+        float fraction = engine->measureFractionBars(bars);
         return static_cast<int16_t>(fraction * 16383.0f);
     }
     return 0;

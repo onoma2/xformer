@@ -18,6 +18,9 @@ extern uint32_t tele_get_ticks(void);
 
 // called when M or M.ACT are updated
 extern void tele_metro_updated(void);
+extern void tele_metro_all_set(int16_t m);
+extern void tele_metro_all_act(int16_t state);
+extern void tele_metro_all_reset(void);
 
 // called by M.RESET
 extern void tele_metro_reset(void);
@@ -37,7 +40,7 @@ extern uint16_t tele_bus_cv_get(uint8_t i);
 extern void tele_bus_cv_set(uint8_t i, int16_t v);
 extern int16_t tele_wbpm_get(void);
 extern void tele_wbpm_set(int16_t bpm);
-extern int16_t tele_bar(void);
+extern int16_t tele_bar(uint8_t bars);
 extern int16_t tele_wpat(uint8_t trackIndex);
 extern void tele_wpat_set(uint8_t trackIndex, uint8_t patternIndex);
 extern int16_t tele_wr(void);

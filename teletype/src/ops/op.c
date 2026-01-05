@@ -42,7 +42,8 @@ const tele_op_t *tele_ops[E_OP__LENGTH] = {
     &op_TURTLE_WRAP, &op_TURTLE_BOUNCE, &op_TURTLE_SCRIPT, &op_TURTLE_SHOW,
 
     // metronome
-    &op_M, &op_M_SYM_EXCLAMATION, &op_M_ACT, &op_M_RESET,
+    &op_M, &op_M_SYM_EXCLAMATION, &op_M_ACT, &op_M_A, &op_M_ACT_A, &op_M_RESET,
+    &op_M_RESET_A,
 
     // patterns
     &op_P_N, &op_P, &op_PN, &op_P_L, &op_PN_L, &op_P_WRAP, &op_PN_WRAP,
