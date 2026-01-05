@@ -11,17 +11,17 @@ void TeletypeTrack::clear() {
 
     // Default I/O mapping
     // TI-TR1-4 → None (avoid cross-triggering by default)
-    _triggerInputSource[0] = TriggerInputSource::None;
-    _triggerInputSource[1] = TriggerInputSource::None;
-    _triggerInputSource[2] = TriggerInputSource::None;
-    _triggerInputSource[3] = TriggerInputSource::None;
+    _triggerInputSource[0] = TriggerInputSource::CvIn1;
+    _triggerInputSource[1] = TriggerInputSource::CvIn2;
+    _triggerInputSource[2] = TriggerInputSource::LogicalGate3;
+    _triggerInputSource[3] = TriggerInputSource::LogicalGate4;
 
-    // TI-IN → CV input 1, TI-PARAM → CV input 2
-    _cvInSource = CvInputSource::CvIn1;
-    _cvParamSource = CvInputSource::CvIn2;
+    // TI-IN → CV input 3, TI-PARAM → CV input 4
+    _cvInSource = CvInputSource::CvIn3;
+    _cvParamSource = CvInputSource::CvIn4;
     _cvXSource = CvInputSource::None;
     _cvYSource = CvInputSource::None;
-    _cvZSource = CvInputSource::None;
+    _cvZSource = CvInputSource::LogicalCv4;
 
     // TO-TRA-D → Gate outputs 1-4
     _triggerOutputDest[0] = TriggerOutputDest::GateOut1;
@@ -48,7 +48,7 @@ void TeletypeTrack::clear() {
     for (int i = 0; i < CvOutputCount; ++i) {
         _cvOutputRange[i] = Types::VoltageRange::Bipolar5V;
         _cvOutputOffset[i] = 0;
-        _cvOutputQuantizeScale[i] = QuantizeOff;
+        _cvOutputQuantizeScale[i] = (i == 0) ? QuantizeDefault : QuantizeOff;
         _cvOutputRootNote[i] = -1;
     }
     for (int i = 0; i < PATTERN_COUNT; ++i) {
