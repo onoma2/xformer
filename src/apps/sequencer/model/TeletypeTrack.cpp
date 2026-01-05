@@ -382,6 +382,61 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
     _resetMetroOnLoad = true;
 }
 
+TeletypeTrack::PatternSlot TeletypeTrack::patternSlotSnapshot(int patternIndex) const {
+    auto *self = const_cast<TeletypeTrack *>(this);
+    self->syncActiveSlotScripts();
+    self->syncActiveSlotPatterns();
+    self->syncActiveSlotMappings();
+    const int slot = patternSlotForPattern(patternIndex);
+    return self->_patternSlots[slot];
+}
+
+void TeletypeTrack::setPatternSlotForPattern(int patternIndex, const PatternSlot &slot) {
+    syncActiveSlotScripts();
+    syncActiveSlotPatterns();
+    syncActiveSlotMappings();
+    const int slotIndex = patternSlotForPattern(patternIndex);
+    _patternSlots[slotIndex] = slot;
+    if (slotIndex == _activePatternSlot) {
+        applyPatternSlot(slotIndex);
+    }
+}
+
+void TeletypeTrack::clearPatternSlot(int patternIndex) {
+    syncActiveSlotScripts();
+    syncActiveSlotPatterns();
+    syncActiveSlotMappings();
+    const int slotIndex = patternSlotForPattern(patternIndex);
+    auto &slot = _patternSlots[slotIndex];
+    slot.s0Length = 0;
+    slot.metroLength = 0;
+    std::memset(slot.s0.data(), 0, sizeof(slot.s0));
+    std::memset(slot.metro.data(), 0, sizeof(slot.metro));
+    scene_state_t defaults{};
+    ss_init(&defaults);
+    for (int i = 0; i < PATTERN_COUNT; ++i) {
+        slot.patterns[i] = defaults.patterns[i];
+    }
+    if (slotIndex == _activePatternSlot) {
+        applyPatternSlot(slotIndex);
+    }
+}
+
+void TeletypeTrack::copyPatternSlot(int srcPatternIndex, int dstPatternIndex) {
+    syncActiveSlotScripts();
+    syncActiveSlotPatterns();
+    syncActiveSlotMappings();
+    const int srcSlot = patternSlotForPattern(srcPatternIndex);
+    const int dstSlot = patternSlotForPattern(dstPatternIndex);
+    if (srcSlot == dstSlot) {
+        return;
+    }
+    _patternSlots[dstSlot] = _patternSlots[srcSlot];
+    if (dstSlot == _activePatternSlot) {
+        applyPatternSlot(dstSlot);
+    }
+}
+
 void TeletypeTrack::onPatternChanged(int patternIndex) {
     const int slot = patternSlotForPattern(patternIndex);
     if (slot == _activePatternSlot) {

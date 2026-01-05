@@ -625,6 +625,10 @@ public:
     int patternSlotForPattern(int patternIndex) const {
         return clamp(patternIndex, 0, CONFIG_PATTERN_COUNT - 1) % PatternSlotCount;
     }
+    PatternSlot patternSlotSnapshot(int patternIndex) const;
+    void setPatternSlotForPattern(int patternIndex, const PatternSlot &slot);
+    void clearPatternSlot(int patternIndex);
+    void copyPatternSlot(int srcPatternIndex, int dstPatternIndex);
     void onPatternChanged(int patternIndex);
     void applyPatternSlot(int slotIndex);
     void applyActivePatternSlot();

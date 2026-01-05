@@ -88,6 +88,7 @@ void ClipBoard::copyPattern(int patternIndex) {
             pattern.sequences[trackIndex].data.indexed = track.indexedTrack().sequence(patternIndex);
             break;
         case Track::TrackMode::Teletype:
+            pattern.sequences[trackIndex].data.teletype = track.teletypeTrack().patternSlotSnapshot(patternIndex);
             break;
         default:
             break;
@@ -246,6 +247,7 @@ void ClipBoard::pastePattern(int patternIndex) const {
                     track.indexedTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.indexed;
                     break;
                 case Track::TrackMode::Teletype:
+                    track.teletypeTrack().setPatternSlotForPattern(patternIndex, pattern.sequences[trackIndex].data.teletype);
                     break;
                 default:
                     break;
