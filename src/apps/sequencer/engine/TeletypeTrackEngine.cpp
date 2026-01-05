@@ -83,6 +83,11 @@ void TeletypeTrackEngine::restart() {
     _bootScriptPending = true;
 }
 
+void TeletypeTrackEngine::runBootScriptNow() {
+    _bootScriptPending = false;
+    runBootScript();
+}
+
 TrackEngine::TickResult TeletypeTrackEngine::tick(uint32_t tick) {
     (void)tick;
     if (_bootScriptPending) {
@@ -95,6 +100,9 @@ TrackEngine::TickResult TeletypeTrackEngine::tick(uint32_t tick) {
 void TeletypeTrackEngine::update(float dt) {
     if (dt <= 0.f) {
         return;
+    }
+    if (_teletypeTrack.consumeBootScriptRequest()) {
+        runBootScriptNow();
     }
     _pulseClockMs += dt * 1000.f;
 

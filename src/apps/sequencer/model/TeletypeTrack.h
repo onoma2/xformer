@@ -615,6 +615,12 @@ public:
         _bootScriptIndex = clamp<int8_t>(index, 0, ScriptSlotCount - 1);
         syncActiveSlotMappings();
     }
+    void requestBootScriptRun() { _bootScriptRequested = true; }
+    bool consumeBootScriptRequest() {
+        bool pending = _bootScriptRequested;
+        _bootScriptRequested = false;
+        return pending;
+    }
     bool consumeMetroResetOnLoad() {
         bool pending = _resetMetroOnLoad;
         _resetMetroOnLoad = false;
@@ -676,6 +682,7 @@ private:
     std::array<PatternSlot, PatternSlotCount> _patternSlots{};
     uint8_t _activePatternSlot = 0;
     bool _resetMetroOnLoad = true;
+    bool _bootScriptRequested = false;
     TimeBase _timeBase = TimeBase::Ms;
     uint16_t _clockDivisor = 12;
     int16_t _clockMultiplier = 100;

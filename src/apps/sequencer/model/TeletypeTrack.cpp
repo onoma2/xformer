@@ -380,6 +380,7 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         patternSlot.resetMetroOnLoad = resetMetroVal != 0;
     }
     _resetMetroOnLoad = true;
+    _bootScriptRequested = false;
 }
 
 TeletypeTrack::PatternSlot TeletypeTrack::patternSlotSnapshot(int patternIndex) const {

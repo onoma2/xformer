@@ -43,6 +43,11 @@ void LayoutPage::keyPress(KeyPressEvent &event) {
                     // we are about to change track engines -> lock the engine to avoid inconsistent state
                     _engine.lock();
                     _trackModeListModel.toProject(_project);
+                    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+                        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+                            _project.track(trackIndex).teletypeTrack().requestBootScriptRun();
+                        }
+                    }
                     _engine.unlock();
                     showMessage("LAYOUT CHANGED");
                 }

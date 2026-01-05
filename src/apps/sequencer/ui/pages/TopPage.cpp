@@ -9,6 +9,7 @@
 #include "ui/model/CurveSequenceListModel.h"
 
 #include "ui/LedPainter.h"
+#include "model/Track.h"
 
 #include <cstdio>
 
@@ -30,6 +31,13 @@ void TopPage::init() {
             pages.midiOutput.reset();
             pages.song.reset();
             setMode(_mode);
+            if (event == Project::Event::ProjectRead) {
+                for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+                    if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+                        _project.track(trackIndex).teletypeTrack().requestBootScriptRun();
+                    }
+                }
+            }
             break;
         case Project::Event::TrackModeChanged:
         case Project::Event::SelectedTrackIndexChanged:

@@ -21,6 +21,7 @@ public:
 
     virtual void reset() override;
     virtual void restart() override;
+    void runBootScriptNow();
     virtual TickResult tick(uint32_t tick) override;
     virtual void update(float dt) override;
 
