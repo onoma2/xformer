@@ -148,6 +148,7 @@ private:
     std::array<int8_t, CvOutputCount> _envEorTr{};
     std::array<int8_t, CvOutputCount> _envEocTr{};
     std::array<uint8_t, CvOutputCount> _envState{};
+    bool _initialized = false;
 
     uint8_t _manualScriptIndex = 0;
     int _cachedPattern = -1;

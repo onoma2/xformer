@@ -34,6 +34,10 @@ TeletypeTrackEngine::TeletypeTrackEngine(Engine &engine, const Model &model, Tra
 }
 
 void TeletypeTrackEngine::reset() {
+    if (_initialized) {
+        return;
+    }
+    _initialized = true;
     uint8_t prevMetroActive = _teletypeTrack.state().variables.m_act;
     ss_init(&_teletypeTrack.state());
     _teletypeTrack.state().variables.m_act = prevMetroActive;

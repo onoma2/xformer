@@ -241,6 +241,19 @@ Keep a running tally of per-track RAM impact for newly added ops/features.
   - Rand/Drunk: `X RAND 16383 ; Y RRAND 0 16383 ; DRUNK 64 ; Z LIM SUB LIM MUL SUB X PARAM 2 0 16383 8000 -1500 1500 ; CV 2 ADD 8000 Z ; TR.PULSE ADD 2 TOSS`
     - Randomize X/Y, set DRUNK to 64, clamp (X - PARAM) * 2 around 8000 (±1500) to CV2, and pulse TR2 or TR3 based on TOSS.
 - [x] Decision: output expansion model → **Configurable mapping with conflict detection**
+- [x] Teletype reset behavior (current)
+  - `TeletypeTrackEngine::reset()` performs a full VM/runtime reset, then restores `m_act`.
+  - Steps:
+    - `ss_init()` clears Teletype VM state, then `state.variables.m_act` is restored.
+    - Clears activity + tick/clock accumulators.
+    - Resets metro timing (`_metroRemainingMs`, `_metroPeriodMs`, `_metroActive`).
+    - Resets TR pulse/div/width state.
+    - Clears output caches (CV/Gate, raw CV, offsets, input states).
+    - Clears CV slew + env state.
+    - Resets manual script index + cached pattern.
+    - Installs boot scripts (does not run them).
+    - Calls `syncMetroFromState()`.
+  - Result: metro **stays enabled across Play/Stop**, but its phase is reset (timers cleared).
 
 ### Stage 3 - Metro + timing policy
 - [x] Implement ms-based metro (Teletype `M` behavior).
