@@ -301,6 +301,14 @@ void Engine::selectTrackPattern(int trackIndex, int patternIndex) {
     _model.project().playState().selectTrackPattern(trackIndex, patternIndex, PlayState::ExecuteType::Immediate);
 }
 
+void Engine::panicTeletype() {
+    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).panic();
+        }
+    }
+}
+
 uint32_t Engine::noteDivisor() const {
     return _project.timeSignature().noteDivisor();
 }

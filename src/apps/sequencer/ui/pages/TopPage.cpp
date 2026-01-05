@@ -174,6 +174,12 @@ void TopPage::keyPress(KeyPressEvent &event) {
         }
     }
 
+    if (key.pageModifier() && key.isTrack() && key.track() == 6) {
+        _engine.panicTeletype();
+        showMessage("TT PANIC");
+        event.consume();
+    }
+
     if (key.isPlay()) {
         if (key.pageModifier()) {
             _engine.toggleRecording();

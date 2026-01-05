@@ -140,6 +140,7 @@ public:
     void setCvOutput(int channel, float value) { _cvOutputOverrideValues[channel] = value; }
 
     void selectTrackPattern(int trackIndex, int patternIndex);
+    void panicTeletype();
 
     const Clock &clock() const { return _clock; }
           Clock &clock()       { return _clock; }

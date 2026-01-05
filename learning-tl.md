@@ -26,6 +26,18 @@ If your Teletype track is new, set up its I/O first so scripts can see the corre
 
 After this, proceed to Script View and start editing scripts.
 
+## Teletype Panic (Page + Track 6)
+
+Need to instantly silence all Teletype activity? Use the global panic:
+
+**Page + Track 6** → `TT PANIC`
+
+This stops **all Teletype tracks** by:
+- disabling metro (M.ACT = 0)
+- clearing pending DEL commands
+- clearing TR pulses and forcing gates low
+- zeroing all Teletype CV outputs
+
 ## Default Scripts on New Teletype Track
 
 When a Teletype track has no scripts, it seeds two defaults:

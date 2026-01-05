@@ -34,7 +34,9 @@ TeletypeTrackEngine::TeletypeTrackEngine(Engine &engine, const Model &model, Tra
 }
 
 void TeletypeTrackEngine::reset() {
+    uint8_t prevMetroActive = _teletypeTrack.state().variables.m_act;
     ss_init(&_teletypeTrack.state());
+    _teletypeTrack.state().variables.m_act = prevMetroActive;
     _bootScriptPending = false;
     _activity = false;
     _activityCountdownMs = 0.f;
@@ -84,8 +86,26 @@ void TeletypeTrackEngine::restart() {
 }
 
 void TeletypeTrackEngine::runBootScriptNow() {
+    if (_teletypeTrack.consumeMetroResetOnLoad()) {
+        _teletypeTrack.state().variables.m_act = 0;
+        syncMetroFromState();
+    }
     _bootScriptPending = false;
     runBootScript();
+}
+
+void TeletypeTrackEngine::panic() {
+    TeletypeBridge::ScopedEngine scope(*this);
+    clear_delays(&_teletypeTrack.state());
+    _teletypeTrack.state().variables.m_act = 0;
+    syncMetroFromState();
+    for (uint8_t i = 0; i < TriggerOutputCount; ++i) {
+        clearPulse(i);
+        handleTr(i, 0);
+    }
+    for (uint8_t i = 0; i < CvOutputCount; ++i) {
+        handleCv(i, 8192, false);
+    }
 }
 
 TrackEngine::TickResult TeletypeTrackEngine::tick(uint32_t tick) {
@@ -621,9 +641,7 @@ void TeletypeTrackEngine::installBootScript() {
     if (!_teletypeTrack.hasAnyScriptCommands()) {
         seedScriptsFromPresets();
     }
-    if (_teletypeTrack.consumeMetroResetOnLoad()) {
-        state.variables.m_act = 0;
-    }
+    (void)state;
 }
 
 void TeletypeTrackEngine::runBootScript() {
