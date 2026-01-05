@@ -73,6 +73,8 @@ public:
     void setBusCv(int index, float volts);
     float measureFraction() const;
     float measureFractionBars(uint8_t bars) const;
+    TeletypeTrack::TimeBase timeBase() const { return _teletypeTrack.timeBase(); }
+    void showMessage(const char *text);
     int trackPattern(int trackIndex) const;
     float tempo() const;
     void setTempo(float bpm);

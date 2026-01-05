@@ -10,7 +10,7 @@ public:
     }
 
     virtual int rows() const override {
-        return _track ? Last : 0;
+        return _track ? rowCount() : 0;
     }
 
     virtual int columns() const override {
@@ -18,16 +18,17 @@ public:
     }
 
     virtual void cell(int row, int column, StringBuilder &str) const override {
+        Item item = itemForRow(row);
         if (column == 0) {
-            formatName(Item(row), str);
+            formatName(item, str);
         } else if (column == 1) {
-            formatValue(Item(row), str);
+            formatValue(item, str);
         }
     }
 
     virtual void edit(int row, int column, int value, bool shift) override {
         if (column == 1) {
-            editValue(Item(row), value, shift);
+            editValue(itemForRow(row), value, shift);
         }
     }
 
@@ -313,6 +314,21 @@ private:
         case Last:
             break;
         }
+    }
+
+    bool showClockParams() const {
+        return _track && _track->timeBase() == TeletypeTrack::TimeBase::Clock;
+    }
+
+    int rowCount() const {
+        return showClockParams() ? Last : Last - 2;
+    }
+
+    Item itemForRow(int row) const {
+        if (!showClockParams() && row >= int(ClockDivisor)) {
+            row += 2;
+        }
+        return Item(row);
     }
 
     TeletypeTrack *_track = nullptr;

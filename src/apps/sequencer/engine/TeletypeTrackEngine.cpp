@@ -631,6 +631,10 @@ float TeletypeTrackEngine::tempo() const {
     return _engine.tempo();
 }
 
+void TeletypeTrackEngine::showMessage(const char *text) {
+    _engine.showMessage(text);
+}
+
 void TeletypeTrackEngine::setTempo(float bpm) {
     _engine.setTempo(bpm);
 }
@@ -707,23 +711,21 @@ float TeletypeTrackEngine::advanceTime(float dt) {
 
 float TeletypeTrackEngine::advanceClockTime() {
     double tickPos = _engine.clock().tickPosition();
-    double clockMult = _teletypeTrack.clockMultiplier() * 0.01;
-    double divisor = _teletypeTrack.clockDivisor();
-    double effectiveDivisor = std::max(1.0, divisor / clockMult);
-    double telePos = tickPos / effectiveDivisor;
+    double tickMs = _engine.clock().tickDuration() * 1000.0;
 
     if (!_clockPosValid) {
-        _lastClockPos = telePos;
+        _lastClockPos = tickPos;
         _clockPosValid = true;
         return 0.f;
     }
 
-    double delta = telePos - _lastClockPos;
+    double delta = tickPos - _lastClockPos;
     if (delta < 0.0) {
         delta = 0.0;
     }
-    _lastClockPos = telePos;
-    _clockRemainder += delta;
+    _lastClockPos = tickPos;
+    double deltaMs = delta * tickMs;
+    _clockRemainder += deltaMs;
 
     while (_clockRemainder >= 1.0) {
         double step = std::min(_clockRemainder, 255.0);
@@ -732,7 +734,7 @@ float TeletypeTrackEngine::advanceClockTime() {
         _clockTickCounter += static_cast<uint32_t>(step);
     }
 
-    return static_cast<float>(delta);
+    return static_cast<float>(deltaMs);
 }
 
 void TeletypeTrackEngine::updateInputTriggers() {
@@ -755,9 +757,18 @@ void TeletypeTrackEngine::runMetro(float timeDelta) {
     }
 
     int16_t period = state.variables.m;
-    int16_t minPeriod = _teletypeTrack.timeBase() == TeletypeTrack::TimeBase::Clock
-                            ? 1
-                            : METRO_MIN_UNSUPPORTED_MS;
+    int16_t minPeriod = METRO_MIN_UNSUPPORTED_MS;
+    if (_teletypeTrack.timeBase() == TeletypeTrack::TimeBase::Clock) {
+        double bpm = _engine.clock().bpm();
+        double clockMult = _teletypeTrack.clockMultiplier() * 0.01;
+        double divisor = _teletypeTrack.clockDivisor();
+        double beatMs = bpm > 0.0 ? 60000.0 / bpm : 0.0;
+        double periodMs = beatMs * (divisor / double(CONFIG_SEQUENCE_PPQN)) / std::max(0.01, clockMult);
+        int16_t derived = clamp<int16_t>(static_cast<int16_t>(std::lround(periodMs)), 1, 32767);
+        state.variables.m = derived;
+        period = derived;
+        minPeriod = 1;
+    }
     if (period < minPeriod) {
         period = minPeriod;
     }

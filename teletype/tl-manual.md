@@ -438,6 +438,9 @@ Performer-only global controls:
 - `M.ACT.A x` enables/disables the metronome for all Teletype tracks.
 - `M.RESET.A` resets the metronome timers for all Teletype tracks.
 
+Clock timebase note:
+- In Clock timebase, `M`/`M!`/`M.A` are read-only (derived from clock). Attempting to set them shows "Clock Mode".
+
 ## Patterns
 
 Patterns facilitate musical data manipulation– lists of numbers that can

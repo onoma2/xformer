@@ -279,6 +279,25 @@ int16_t tele_rt(uint8_t routeIndex) {
     return 0;
 }
 
+bool tele_timebase_is_clock(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->timeBase() == TeletypeTrack::TimeBase::Clock;
+    }
+    return false;
+}
+
+void tele_clock_mode_notice(void) {
+    static uint32_t lastNoticeMs = 0;
+    uint32_t nowMs = TeletypeBridge::ticksMs();
+    if (nowMs - lastNoticeMs < 1000) {
+        return;
+    }
+    lastNoticeMs = nowMs;
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->showMessage("Clock Mode");
+    }
+}
+
 void tele_cv_cal(uint8_t n, int32_t b, int32_t m) {
     (void)n;
     (void)b;

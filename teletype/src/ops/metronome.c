@@ -35,7 +35,12 @@ static void op_M_get(const void *NOTUSED(data), scene_state_t *ss,
 static void op_M_set(const void *NOTUSED(data), scene_state_t *ss,
                      exec_state_t *NOTUSED(es), command_state_t *cs) {
     int16_t m = cs_pop(cs);
-    if (m < METRO_MIN_MS) m = METRO_MIN_MS;
+    if (tele_timebase_is_clock()) {
+        tele_clock_mode_notice();
+        return;
+    } else {
+        if (m < 2) m = 2;
+    }
     ss->variables.m = m;
     tele_metro_updated();
 }
@@ -58,7 +63,11 @@ static void op_M_SYM_EXCLAMATION_set(const void *NOTUSED(data),
                                      exec_state_t *NOTUSED(es),
                                      command_state_t *cs) {
     int16_t m = cs_pop(cs);
-    if (m < METRO_MIN_UNSUPPORTED_MS) m = METRO_MIN_UNSUPPORTED_MS;
+    if (tele_timebase_is_clock()) {
+        tele_clock_mode_notice();
+        return;
+    }
+    if (m < 1) m = 1;
     ss->variables.m = m;
     tele_metro_updated();
 }
@@ -85,7 +94,11 @@ static void op_M_ACT_set(const void *NOTUSED(data), scene_state_t *ss,
 static void op_M_A_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
                        exec_state_t *NOTUSED(es), command_state_t *cs) {
     int16_t m = cs_pop(cs);
-    if (m < METRO_MIN_MS) m = METRO_MIN_MS;
+    if (tele_timebase_is_clock()) {
+        tele_clock_mode_notice();
+        return;
+    }
+    if (m < 2) m = 2;
     tele_metro_all_set(m);
 }
 

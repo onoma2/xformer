@@ -46,6 +46,8 @@ extern void tele_wpat_set(uint8_t trackIndex, uint8_t patternIndex);
 extern int16_t tele_wr(void);
 extern void tele_wr_act(int16_t state);
 extern int16_t tele_rt(uint8_t routeIndex);
+extern bool tele_timebase_is_clock(void);
+extern void tele_clock_mode_notice(void);
 
 extern void tele_env_target(uint8_t i, int16_t value);
 extern void tele_env_attack(uint8_t i, int16_t ms);

@@ -756,11 +756,11 @@ CV 1 N RAND 24       // Random note in 2-octave range
 
 ### Step 10: Clock-Based Timing
 
-In Performer, you can set the Teletype track to use clock timing instead of ms timing:
+In Performer, you can set the Teletype track to use clock timing instead of ms timing. In Clock mode, `M`/`M!`/`M.A` are derived from the current tempo/div/mult and are read-only (edits show "Clock Mode").
 
 ```
 M.ACT 1              // Enable metronome
-M 500                // Set metronome to 500ms (120 BPM)
+M 500                // Set metronome to 500ms (120 BPM) [MS timebase only]
 M.A 500              // Set all Teletype track metros to 500ms
 M.ACT.A 1            // Enable metros on all Teletype tracks
 M.RESET.A            // Reset all Teletype metro timers
