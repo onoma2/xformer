@@ -68,6 +68,12 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         return;
     }
 
+    // CRITICAL: Check engine track mode too - model may have changed but engines not rebuilt yet
+    if (_engine.selectedTrackEngine().trackMode() != Track::TrackMode::Teletype) {
+        close();
+        return;
+    }
+
     canvas.setColor(Color::None);
     canvas.fill();
     canvas.setFont(_liveMode ? Font::Small : Font::Tiny);
@@ -239,6 +245,11 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
         int fn = key.function();
         if (key.shiftModifier()) {
             if (fn >= 0 && fn < TeletypeTrack::ScriptSlotCount) {
+                // Guard against race condition - engine may not be rebuilt yet
+                if (_engine.selectedTrackEngine().trackMode() != Track::TrackMode::Teletype) {
+                    event.consume();
+                    return;
+                }
                 auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
                 trackEngine.triggerScript(fn);
                 event.consume();
@@ -544,6 +555,11 @@ void TeletypeScriptViewPage::commitLine() {
     pushHistory(_editBuffer);
 
     if (_liveMode) {
+        // Guard against race condition - engine may not be rebuilt yet
+        if (_engine.selectedTrackEngine().trackMode() != Track::TrackMode::Teletype) {
+            showMessage("ENGINE NOT READY");
+            return;
+        }
         auto &track = _project.selectedTrack().teletypeTrack();
         scene_state_t &state = track.state();
         auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();

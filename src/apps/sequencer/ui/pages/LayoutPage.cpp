@@ -5,6 +5,7 @@
 #include "ui/painters/WindowPainter.h"
 
 #include "core/utils/StringBuilder.h"
+#include "model/Track.h"
 
 
 LayoutPage::LayoutPage(PageManager &manager, PageContext &context) :
@@ -42,9 +43,14 @@ void LayoutPage::keyPress(KeyPressEvent &event) {
                     setEdit(false);
                     // we are about to change track engines -> lock the engine to avoid inconsistent state
                     _engine.lock();
+                    Track::TrackMode oldModes[CONFIG_TRACK_COUNT];
+                    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+                        oldModes[trackIndex] = _project.track(trackIndex).trackMode();
+                    }
                     _trackModeListModel.toProject(_project);
                     for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-                        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+                        Track::TrackMode newMode = _project.track(trackIndex).trackMode();
+                        if (oldModes[trackIndex] != newMode && newMode == Track::TrackMode::Teletype) {
                             _project.track(trackIndex).teletypeTrack().requestBootScriptRun();
                         }
                     }

@@ -35,7 +35,7 @@ TeletypeTrackEngine::TeletypeTrackEngine(Engine &engine, const Model &model, Tra
 
 void TeletypeTrackEngine::reset() {
     ss_init(&_teletypeTrack.state());
-    _bootScriptPending = true;
+    _bootScriptPending = false;
     _activity = false;
     _activityCountdownMs = 0.f;
     _tickRemainderMs = 0.f;
@@ -80,7 +80,7 @@ void TeletypeTrackEngine::reset() {
 }
 
 void TeletypeTrackEngine::restart() {
-    _bootScriptPending = true;
+    _bootScriptPending = false;
 }
 
 void TeletypeTrackEngine::runBootScriptNow() {
