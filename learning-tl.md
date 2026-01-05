@@ -300,6 +300,7 @@ Divide or shape trigger pulses per output:
 TR.D 1 2     # every other pulse on TR1
 TR.W 1 50    # 50% width based on post-div interval
 TR.P 1       # emit (subject to divider/width)
+TR.W 1 0     # disable width mode (back to TR.TIME)
 ```
 
 ## Envelope (E.*)

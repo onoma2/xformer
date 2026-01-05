@@ -82,10 +82,26 @@ This honors Teletype's heritage while maintaining backward compatibility with Pe
 ### 4. Hardware Note
 - The STM32F4 OTG FS port provides power (`USB_PWR_EN`), so most standard keyboards will work without an external power supply, provided they don't exceed the power limit.
 
-## Implementation Strategy
-- **Phase 1 (Simulated):** Current approach using Performer's Encoder + Step Keys (working).
-- **Phase 2 (Driver):** Porting a lightweight HID class driver to the `usbh` stack.
-- **Phase 3 (Mapping):** Routing HID events to the active Teletype track page.
+## Implementation Strategy (Phased MVP)
+
+### Phase A (MVP, Quick Win)
+- Register HID driver.
+- Add `KeyboardEvent` (keycode + modifiers) to the event system.
+- Minimal editor support in TeletypeScriptViewPage + TeletypePatternViewPage:
+  - ASCII letters/numbers
+  - Space, Backspace, Enter
+  - Arrow Left/Right (cursor move)
+  - Arrow Up/Down (line/row selection)
+
+### Phase B (Parity + Shortcuts)
+- Ctrl+A / Ctrl+E (home/end)
+- Word navigation (Alt+F/B)
+- Kill line/word (Ctrl+K/U/W)
+- Optional copy/paste integration
+
+### Phase C (Polish)
+- Multi-device HID
+- Mouse support (if desired)
 
 ## UPDATE: Existing HID Driver Found
 
