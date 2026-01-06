@@ -67,7 +67,7 @@ void TeletypePatternViewPage::draw(Canvas &canvas) {
 
     canvas.setColor(Color::None);
     canvas.fill();
-    canvas.setFont(Font::Tiny);
+    canvas.setFont(Font::Tele);
     canvas.setBlendMode(BlendMode::Set);
 
     auto &track = _project.selectedTrack().teletypeTrack();

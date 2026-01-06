@@ -76,7 +76,7 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
 
     canvas.setColor(Color::None);
     canvas.fill();
-    canvas.setFont(_liveMode ? Font::Small : Font::Tiny);
+    canvas.setFont(_liveMode ? Font::Small : Font::Tele);
     canvas.setBlendMode(BlendMode::Set);
 
     auto &track = _project.selectedTrack().teletypeTrack();
