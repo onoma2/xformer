@@ -27,6 +27,13 @@ private:
     void setStart();
     void setEnd();
     void syncPattern();
+    void contextShow();
+    void contextAction(int index);
+    bool contextActionEnabled(int index) const;
+    void saveTrack();
+    void loadTrack();
+    void saveTrackToSlot(int slot);
+    void loadTrackFromSlot(int slot);
 
     int _patternIndex = 0;
     int _row = 0;   // absolute row 0..63

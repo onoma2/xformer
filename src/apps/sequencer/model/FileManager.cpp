@@ -10,7 +10,8 @@
 #include "os/os.h"
 
 #include <algorithm>
-
+#include <cctype>
+#include <cstdlib>
 #include <cstring>
 
 extern "C" {
@@ -36,6 +37,7 @@ FileTypeInfo fileTypeInfos[] = {
     { "PROJECTS", "PRO" },
     { "SCALES", "SCA" },
     { "TELS", "TXT" },
+    { "TELT", "TXT" },
 };
 
 static void slotPath(StringBuilder &str, FileType type, int slot) {
@@ -81,6 +83,186 @@ static bool readLine(fs::FileReader &reader, char *buffer, size_t max) {
     }
 
     return got || pos > 0;
+}
+
+static const char *skipSpace(const char *text) {
+    while (text && *text && std::isspace(static_cast<unsigned char>(*text))) {
+        ++text;
+    }
+    return text;
+}
+
+static void trimRight(char *text) {
+    if (!text) {
+        return;
+    }
+    size_t len = std::strlen(text);
+    while (len > 0 && std::isspace(static_cast<unsigned char>(text[len - 1]))) {
+        text[len - 1] = '\0';
+        --len;
+    }
+}
+
+static bool parseInt(const char *text, int &out) {
+    if (!text) {
+        return false;
+    }
+    char *end = nullptr;
+    long value = std::strtol(text, &end, 10);
+    if (end == text) {
+        return false;
+    }
+    out = static_cast<int>(value);
+    return true;
+}
+
+static bool parseTriggerInputSource(const char *text, TeletypeTrack::TriggerInputSource &out) {
+    if (!text) {
+        return false;
+    }
+    for (int i = 0; i < int(TeletypeTrack::TriggerInputSource::Last); ++i) {
+        auto value = TeletypeTrack::TriggerInputSource(i);
+        const char *name = TeletypeTrack::triggerInputSourceName(value);
+        if (name && std::strcmp(text, name) == 0) {
+            out = value;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool parseCvInputSource(const char *text, TeletypeTrack::CvInputSource &out) {
+    if (!text) {
+        return false;
+    }
+    for (int i = 0; i < int(TeletypeTrack::CvInputSource::Last); ++i) {
+        auto value = TeletypeTrack::CvInputSource(i);
+        const char *name = TeletypeTrack::cvInputSourceName(value);
+        if (name && std::strcmp(text, name) == 0) {
+            out = value;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool parseTriggerOutputDest(const char *text, TeletypeTrack::TriggerOutputDest &out) {
+    if (!text) {
+        return false;
+    }
+    for (int i = 0; i < int(TeletypeTrack::TriggerOutputDest::Last); ++i) {
+        auto value = TeletypeTrack::TriggerOutputDest(i);
+        const char *name = TeletypeTrack::triggerOutputDestName(value);
+        if (name && std::strcmp(text, name) == 0) {
+            out = value;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool parseCvOutputDest(const char *text, TeletypeTrack::CvOutputDest &out) {
+    if (!text) {
+        return false;
+    }
+    for (int i = 0; i < int(TeletypeTrack::CvOutputDest::Last); ++i) {
+        auto value = TeletypeTrack::CvOutputDest(i);
+        const char *name = TeletypeTrack::cvOutputDestName(value);
+        if (name && std::strcmp(text, name) == 0) {
+            out = value;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool parseVoltageRange(const char *text, Types::VoltageRange &out) {
+    if (!text) {
+        return false;
+    }
+    for (int i = 0; i < int(Types::VoltageRange::Last); ++i) {
+        auto value = Types::VoltageRange(i);
+        const char *name = Types::voltageRangeName(value);
+        if (name && std::strcmp(text, name) == 0) {
+            out = value;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool parseMidiPort(const char *text, Types::MidiPort &out) {
+    if (!text) {
+        return false;
+    }
+    for (int i = 0; i < int(Types::MidiPort::Last); ++i) {
+        auto value = Types::MidiPort(i);
+        const char *name = Types::midiPortName(value);
+        if (name && std::strcmp(text, name) == 0) {
+            out = value;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool parseTimeBase(const char *text, TeletypeTrack::TimeBase &out) {
+    if (!text) {
+        return false;
+    }
+    if (std::strcmp(text, "MS") == 0) {
+        out = TeletypeTrack::TimeBase::Ms;
+        return true;
+    }
+    if (std::strcmp(text, "Clock") == 0) {
+        out = TeletypeTrack::TimeBase::Clock;
+        return true;
+    }
+    return false;
+}
+
+static bool parseQuantizeScale(const char *text, int8_t &out) {
+    if (!text) {
+        return false;
+    }
+    if (std::strcmp(text, "Off") == 0) {
+        out = TeletypeTrack::QuantizeOff;
+        return true;
+    }
+    if (std::strcmp(text, "Default") == 0) {
+        out = TeletypeTrack::QuantizeDefault;
+        return true;
+    }
+    for (int i = 0; i < Scale::Count; ++i) {
+        if (std::strcmp(text, Scale::name(i)) == 0) {
+            out = static_cast<int8_t>(i);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool parseRootNote(const char *text, int8_t &out) {
+    if (!text) {
+        return false;
+    }
+    if (std::strcmp(text, "Default") == 0) {
+        out = -1;
+        return true;
+    }
+    static const char *names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    for (int i = 0; i < 12; ++i) {
+        if (std::strcmp(text, names[i]) == 0) {
+            out = static_cast<int8_t>(i);
+            return true;
+        }
+    }
+    int value = 0;
+    if (parseInt(text, value)) {
+        out = clamp<int8_t>(value, -1, 11);
+        return true;
+    }
+    return false;
 }
 
 void FileManager::init() {
@@ -160,6 +342,18 @@ fs::Error FileManager::writeTeletypeScript(const TeletypeTrack &track, int scrip
 fs::Error FileManager::readTeletypeScript(TeletypeTrack &track, int scriptIndex, int slot) {
     return readFile(FileType::TeletypeScript, slot, [&] (const char *path) {
         return readTeletypeScript(track, scriptIndex, path);
+    });
+}
+
+fs::Error FileManager::writeTeletypeTrack(const TeletypeTrack &track, const char *name, int slot) {
+    return writeFile(FileType::TeletypeTrack, slot, [&] (const char *path) {
+        return writeTeletypeTrack(track, name, path);
+    });
+}
+
+fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, int slot) {
+    return readFile(FileType::TeletypeTrack, slot, [&] (const char *path) {
+        return readTeletypeTrack(track, path);
     });
 }
 
@@ -259,7 +453,7 @@ fs::Error FileManager::writeTeletypeScript(const TeletypeTrack &track, int scrip
         return fileWriter.error();
     }
 
-    char lineBuffer[TeletypeTrack::ScriptLineLength] = {};
+    char lineBuffer[256] = {};
     scene_state_t &state = const_cast<scene_state_t &>(track.state());
     for (int line = 0; line < TeletypeTrack::ScriptLineCount; ++line) {
         lineBuffer[0] = '\0';
@@ -285,7 +479,7 @@ fs::Error FileManager::readTeletypeScript(TeletypeTrack &track, int scriptIndex,
     }
 
     bool success = true;
-    char lineBuffer[TeletypeTrack::ScriptLineLength] = {};
+    char lineBuffer[256] = {};
     scene_state_t &state = track.state();
     ss_clear_script(&state, scriptIndex);
     for (int line = 0; line < TeletypeTrack::ScriptLineCount; ++line) {
@@ -311,10 +505,574 @@ fs::Error FileManager::readTeletypeScript(TeletypeTrack &track, int scriptIndex,
     }
 
     auto error = fileReader.finish();
+    if (error == fs::END_OF_FILE) {
+        error = fs::OK;
+    }
     if (error == fs::OK && !success) {
         error = fs::INVALID_CHECKSUM;
     }
 
+    return error;
+}
+
+static void writeLine(fs::FileWriter &writer, const char *line) {
+    if (!line) {
+        return;
+    }
+    writer.write(line, std::strlen(line));
+    writer.write("\n", 1);
+}
+
+static bool readFirstLine(const char *path, char *line, size_t max) {
+    if (max == 0) {
+        return false;
+    }
+    fs::File file(path, fs::File::Read);
+    if (file.error() != fs::OK) {
+        line[0] = '\0';
+        return false;
+    }
+    // Use a static SRAM buffer to keep SD DMA happy (UI stack is in CCM).
+    static uint8_t sramBuffer[128];
+    size_t lenRead = 0;
+    if (file.read(sramBuffer, sizeof(sramBuffer), &lenRead) != fs::OK || lenRead == 0) {
+        line[0] = '\0';
+        return false;
+    }
+    size_t i = 0;
+    while (i + 1 < max && i < lenRead) {
+        char c = static_cast<char>(sramBuffer[i]);
+        if (c == '\n' || c == '\r') {
+            break;
+        }
+        line[i] = c;
+        ++i;
+    }
+    line[i] = '\0';
+    return true;
+}
+
+template<size_t N>
+static void writeLine(fs::FileWriter &writer, const FixedStringBuilder<N> &line) {
+    writeLine(writer, static_cast<const char *>(line));
+}
+
+static void writeScriptSection(fs::FileWriter &writer, const char *header,
+                               const std::array<tele_command_t, TeletypeTrack::ScriptLineCount> &lines,
+                               uint8_t length) {
+    writeLine(writer, header);
+    char buffer[256] = {};
+    const uint8_t count = clamp<uint8_t>(length, 0, TeletypeTrack::ScriptLineCount);
+    for (uint8_t i = 0; i < count; ++i) {
+        buffer[0] = '\0';
+        if (lines[i].length > 0) {
+            print_command(&lines[i], buffer);
+        }
+        writeLine(writer, buffer);
+    }
+}
+
+static void writeScriptSectionRaw(fs::FileWriter &writer, const char *header,
+                                  const tele_command_t *lines, uint8_t length) {
+    writeLine(writer, header);
+    char buffer[256] = {};
+    const uint8_t count = clamp<uint8_t>(length, 0, TeletypeTrack::ScriptLineCount);
+    for (uint8_t i = 0; i < count; ++i) {
+        buffer[0] = '\0';
+        if (lines[i].length > 0) {
+            print_command(&lines[i], buffer);
+        }
+        writeLine(writer, buffer);
+    }
+}
+
+static const char *quantizeScaleName(int8_t scale) {
+    if (scale == TeletypeTrack::QuantizeOff) {
+        return "Off";
+    }
+    if (scale == TeletypeTrack::QuantizeDefault) {
+        return "Default";
+    }
+    if (scale >= 0 && scale < Scale::Count) {
+        return Scale::name(scale);
+    }
+    return "Off";
+}
+
+static const char *rootNoteName(int8_t note, FixedStringBuilder<8> &buffer) {
+    if (note < 0) {
+        return "Default";
+    }
+    buffer.reset();
+    Types::printNote(buffer, note);
+    return buffer;
+}
+
+static void writeSlotIo(fs::FileWriter &writer, int slotIndex, const TeletypeTrack::PatternSlot &slot) {
+    writeLine(writer, FixedStringBuilder<8>("SLOT %d", slotIndex + 1));
+
+    for (int i = 0; i < TeletypeTrack::TriggerInputCount; ++i) {
+        const char *name = TeletypeTrack::triggerInputSourceName(slot.triggerInputSource[i]);
+        writeLine(writer, FixedStringBuilder<32>("TI-TR%d %s", i + 1, name ? name : "None"));
+    }
+    writeLine(writer, FixedStringBuilder<32>("TI-IN %s", TeletypeTrack::cvInputSourceName(slot.cvInSource)));
+    writeLine(writer, FixedStringBuilder<32>("TI-PARAM %s", TeletypeTrack::cvInputSourceName(slot.cvParamSource)));
+    writeLine(writer, FixedStringBuilder<32>("TI-X %s", TeletypeTrack::cvInputSourceName(slot.cvXSource)));
+    writeLine(writer, FixedStringBuilder<32>("TI-Y %s", TeletypeTrack::cvInputSourceName(slot.cvYSource)));
+    writeLine(writer, FixedStringBuilder<32>("TI-Z %s", TeletypeTrack::cvInputSourceName(slot.cvZSource)));
+
+    for (int i = 0; i < TeletypeTrack::TriggerOutputCount; ++i) {
+        const char *name = TeletypeTrack::triggerOutputDestName(slot.triggerOutputDest[i]);
+        writeLine(writer, FixedStringBuilder<32>("TO-TR%d %s", i + 1, name ? name : "Gate Out 1"));
+    }
+    for (int i = 0; i < TeletypeTrack::CvOutputCount; ++i) {
+        const char *name = TeletypeTrack::cvOutputDestName(slot.cvOutputDest[i]);
+        writeLine(writer, FixedStringBuilder<32>("TO-CV%d %s", i + 1, name ? name : "CV Out 1"));
+    }
+
+    for (int i = 0; i < TeletypeTrack::CvOutputCount; ++i) {
+        const char *range = Types::voltageRangeName(slot.cvOutputRange[i]);
+        writeLine(writer, FixedStringBuilder<32>("CV%d RNG %s", i + 1, range ? range : "5V Bipolar"));
+        writeLine(writer, FixedStringBuilder<32>("CV%d OFF %d", i + 1, slot.cvOutputOffset[i]));
+        writeLine(writer, FixedStringBuilder<32>("CV%d Q %s", i + 1, quantizeScaleName(slot.cvOutputQuantizeScale[i])));
+        FixedStringBuilder<8> noteStr;
+        writeLine(writer, FixedStringBuilder<32>("CV%d ROOT %s", i + 1, rootNoteName(slot.cvOutputRootNote[i], noteStr)));
+    }
+
+    FixedStringBuilder<8> midiPort;
+    midiPort.reset();
+    midiPort(Types::midiPortName(slot.midiSource.port()));
+    writeLine(writer, FixedStringBuilder<32>("MIDI PORT %s", midiPort));
+
+    FixedStringBuilder<8> midiChan;
+    midiChan.reset();
+    Types::printMidiChannel(midiChan, slot.midiSource.channel());
+    writeLine(writer, FixedStringBuilder<32>("MIDI CH %s", midiChan));
+
+    writeLine(writer, FixedStringBuilder<16>("BOOT %d", slot.bootScriptIndex + 1));
+    writeLine(writer, FixedStringBuilder<16>("TIMEBASE %s", TeletypeTrack::timeBaseName(slot.timeBase)));
+    writeLine(writer, FixedStringBuilder<16>("CLK.DIV %d", slot.clockDivisor));
+    writeLine(writer, FixedStringBuilder<16>("CLK.MULT %d", slot.clockMultiplier));
+    writeLine(writer, FixedStringBuilder<16>("RESET.METRO %d", slot.resetMetroOnLoad ? 1 : 0));
+}
+
+static void writePatterns(fs::FileWriter &writer, int slotIndex, const TeletypeTrack::PatternSlot &slot) {
+    writeLine(writer, FixedStringBuilder<8>("SLOT %d", slotIndex + 1));
+    for (int p = 0; p < PATTERN_COUNT; ++p) {
+        const auto &pat = slot.patterns[p];
+        writeLine(writer, FixedStringBuilder<24>("P%d LEN %d", p + 1, pat.len));
+        writeLine(writer, FixedStringBuilder<24>("P%d WRAP %d", p + 1, pat.wrap));
+        writeLine(writer, FixedStringBuilder<24>("P%d START %d", p + 1, pat.start));
+        writeLine(writer, FixedStringBuilder<24>("P%d END %d", p + 1, pat.end));
+        for (int chunk = 0; chunk < 4; ++chunk) {
+            FixedStringBuilder<128> line("P%d VALS", p + 1);
+            for (int i = 0; i < 16; ++i) {
+                int idx = chunk * 16 + i;
+                line(" %d", pat.val[idx]);
+            }
+            writeLine(writer, line);
+        }
+    }
+}
+
+fs::Error FileManager::writeTeletypeTrack(const TeletypeTrack &track, const char *name, const char *path) {
+    fs::FileWriter fileWriter(path);
+    if (fileWriter.error() != fs::OK) {
+        return fileWriter.error();
+    }
+
+    const char *safeName = (name && name[0]) ? name : "TELETYPE";
+    writeLine(fileWriter, FixedStringBuilder<64>("NAME %s", safeName));
+
+    // Avoid large PatternSlot copies on the file task stack.
+    static TeletypeTrack::PatternSlot slot1;
+    static TeletypeTrack::PatternSlot slot2;
+    slot1 = track.patternSlotSnapshot(0);
+    slot2 = track.patternSlotSnapshot(1);
+
+    writeLine(fileWriter, "#IO");
+    writeSlotIo(fileWriter, 0, slot1);
+    writeSlotIo(fileWriter, 1, slot2);
+
+    writeScriptSection(fileWriter, "#S1P1", slot1.s0, slot1.s0Length);
+    writeScriptSection(fileWriter, "#M1", slot1.metro, slot1.metroLength);
+    writeScriptSection(fileWriter, "#S1P2", slot2.s0, slot2.s0Length);
+    writeScriptSection(fileWriter, "#M2", slot2.metro, slot2.metroLength);
+    const scene_state_t &state = track.state();
+    writeScriptSectionRaw(fileWriter, "#S1", state.scripts[1].c, state.scripts[1].l);
+    writeScriptSectionRaw(fileWriter, "#S2", state.scripts[2].c, state.scripts[2].l);
+    writeScriptSectionRaw(fileWriter, "#S3", state.scripts[3].c, state.scripts[3].l);
+
+    writeLine(fileWriter, "#PATS");
+    writePatterns(fileWriter, 0, slot1);
+    writePatterns(fileWriter, 1, slot2);
+
+    return fileWriter.finish();
+}
+
+static void clearScriptBuffer(TeletypeTrack::PatternSlot &slot, bool metro) {
+    if (metro) {
+        slot.metroLength = 0;
+        std::memset(slot.metro.data(), 0, sizeof(slot.metro));
+    } else {
+        slot.s0Length = 0;
+        std::memset(slot.s0.data(), 0, sizeof(slot.s0));
+    }
+}
+
+fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path) {
+    fs::FileReader fileReader(path);
+    if (fileReader.error() != fs::OK) {
+        return fileReader.error();
+    }
+
+    track.clear();
+    scene_state_t &state = track.state();
+    for (int script = 1; script < TeletypeTrack::ScriptSlotCount; ++script) {
+        ss_clear_script(&state, script);
+    }
+    // Avoid large PatternSlot copies on the file task stack.
+    static TeletypeTrack::PatternSlot slot1;
+    static TeletypeTrack::PatternSlot slot2;
+    slot1 = track.patternSlotSnapshot(0);
+    slot2 = track.patternSlotSnapshot(1);
+    clearScriptBuffer(slot1, false);
+    clearScriptBuffer(slot1, true);
+    clearScriptBuffer(slot2, false);
+    clearScriptBuffer(slot2, true);
+
+    enum class Section {
+        None,
+        IO,
+        Pats,
+        ScriptS0P1,
+        ScriptS0P2,
+        ScriptM1,
+        ScriptM2,
+        ScriptS1,
+        ScriptS2,
+        ScriptS3,
+    };
+
+    Section section = Section::None;
+    int currentSlot = 0;
+    int currentPatternSlot = 0;
+    int patternValueIndex[2][PATTERN_COUNT] = {};
+
+    auto parseSlot = [&] () -> TeletypeTrack::PatternSlot & {
+        return currentSlot == 0 ? slot1 : slot2;
+    };
+
+    static char lineBuffer[256];
+    lineBuffer[0] = '\0';
+    while (readLine(fileReader, lineBuffer, sizeof(lineBuffer))) {
+        trimRight(lineBuffer);
+        const char *line = skipSpace(lineBuffer);
+        if (!line || *line == '\0') {
+            continue;
+        }
+
+        if (line[0] == '#') {
+            if (std::strcmp(line, "#IO") == 0) {
+                section = Section::IO;
+            } else if (std::strcmp(line, "#PATS") == 0) {
+                section = Section::Pats;
+            } else if (std::strcmp(line, "#S1P1") == 0) {
+                section = Section::ScriptS0P1;
+            } else if (std::strcmp(line, "#S1P2") == 0) {
+                section = Section::ScriptS0P2;
+            } else if (std::strcmp(line, "#M1") == 0) {
+                section = Section::ScriptM1;
+            } else if (std::strcmp(line, "#M2") == 0) {
+                section = Section::ScriptM2;
+            } else if (std::strcmp(line, "#S1") == 0) {
+                section = Section::ScriptS1;
+            } else if (std::strcmp(line, "#S2") == 0) {
+                section = Section::ScriptS2;
+            } else if (std::strcmp(line, "#S3") == 0) {
+                section = Section::ScriptS3;
+            } else {
+                section = Section::None;
+            }
+            continue;
+        }
+
+        if (std::strncmp(line, "NAME ", 5) == 0) {
+            continue;
+        }
+
+        if (section == Section::IO || section == Section::Pats) {
+            if (std::strncmp(line, "SLOT ", 5) == 0) {
+                int slotIndex = 0;
+                if (parseInt(line + 5, slotIndex)) {
+                    currentSlot = clamp(slotIndex - 1, 0, TeletypeTrack::PatternSlotCount - 1);
+                    if (section == Section::Pats) {
+                        currentPatternSlot = currentSlot;
+                    }
+                }
+                continue;
+            }
+        }
+
+        if (section == Section::IO) {
+            auto &slot = parseSlot();
+            const char *value = nullptr;
+
+            if (std::strncmp(line, "TI-TR", 5) == 0 && std::isdigit(line[5])) {
+                int idx = line[5] - '1';
+                value = skipSpace(line + 6);
+                TeletypeTrack::TriggerInputSource source{};
+                if (idx >= 0 && idx < TeletypeTrack::TriggerInputCount &&
+                    parseTriggerInputSource(value, source)) {
+                    slot.triggerInputSource[idx] = source;
+                }
+                continue;
+            }
+            if (std::strncmp(line, "TI-IN ", 6) == 0) {
+                value = skipSpace(line + 6);
+                TeletypeTrack::CvInputSource source{};
+                if (parseCvInputSource(value, source)) {
+                    slot.cvInSource = source;
+                }
+                continue;
+            }
+            if (std::strncmp(line, "TI-PARAM ", 9) == 0) {
+                value = skipSpace(line + 9);
+                TeletypeTrack::CvInputSource source{};
+                if (parseCvInputSource(value, source)) {
+                    slot.cvParamSource = source;
+                }
+                continue;
+            }
+            if (std::strncmp(line, "TI-X ", 5) == 0) {
+                value = skipSpace(line + 5);
+                TeletypeTrack::CvInputSource source{};
+                if (parseCvInputSource(value, source)) {
+                    slot.cvXSource = source;
+                }
+                continue;
+            }
+            if (std::strncmp(line, "TI-Y ", 5) == 0) {
+                value = skipSpace(line + 5);
+                TeletypeTrack::CvInputSource source{};
+                if (parseCvInputSource(value, source)) {
+                    slot.cvYSource = source;
+                }
+                continue;
+            }
+            if (std::strncmp(line, "TI-Z ", 5) == 0) {
+                value = skipSpace(line + 5);
+                TeletypeTrack::CvInputSource source{};
+                if (parseCvInputSource(value, source)) {
+                    slot.cvZSource = source;
+                }
+                continue;
+            }
+            if (std::strncmp(line, "TO-TR", 5) == 0 && std::isdigit(line[5])) {
+                int idx = line[5] - '1';
+                value = skipSpace(line + 6);
+                TeletypeTrack::TriggerOutputDest dest{};
+                if (idx >= 0 && idx < TeletypeTrack::TriggerOutputCount &&
+                    parseTriggerOutputDest(value, dest)) {
+                    slot.triggerOutputDest[idx] = dest;
+                }
+                continue;
+            }
+            if (std::strncmp(line, "TO-CV", 5) == 0 && std::isdigit(line[5])) {
+                int idx = line[5] - '1';
+                value = skipSpace(line + 6);
+                TeletypeTrack::CvOutputDest dest{};
+                if (idx >= 0 && idx < TeletypeTrack::CvOutputCount &&
+                    parseCvOutputDest(value, dest)) {
+                    slot.cvOutputDest[idx] = dest;
+                }
+                continue;
+            }
+
+            if (std::strncmp(line, "CV", 2) == 0 && std::isdigit(line[2])) {
+                int idx = line[2] - '1';
+                if (idx >= 0 && idx < TeletypeTrack::CvOutputCount) {
+                    if (std::strncmp(line + 3, " RNG ", 5) == 0) {
+                        value = skipSpace(line + 8);
+                        Types::VoltageRange range{};
+                        if (parseVoltageRange(value, range)) {
+                            slot.cvOutputRange[idx] = range;
+                        }
+                    } else if (std::strncmp(line + 3, " OFF ", 5) == 0) {
+                        int off = 0;
+                        if (parseInt(line + 8, off)) {
+                            slot.cvOutputOffset[idx] = clamp<int16_t>(off, -500, 500);
+                        }
+                    } else if (std::strncmp(line + 3, " Q ", 3) == 0) {
+                        value = skipSpace(line + 6);
+                        int8_t q = slot.cvOutputQuantizeScale[idx];
+                        if (parseQuantizeScale(value, q)) {
+                            slot.cvOutputQuantizeScale[idx] = q;
+                        }
+                    } else if (std::strncmp(line + 3, " ROOT ", 6) == 0) {
+                        value = skipSpace(line + 9);
+                        int8_t note = slot.cvOutputRootNote[idx];
+                        if (parseRootNote(value, note)) {
+                            slot.cvOutputRootNote[idx] = note;
+                        }
+                    }
+                }
+                continue;
+            }
+
+            if (std::strncmp(line, "MIDI PORT ", 10) == 0) {
+                value = skipSpace(line + 10);
+                Types::MidiPort port{};
+                if (parseMidiPort(value, port)) {
+                    slot.midiSource.setPort(port);
+                }
+                continue;
+            }
+            if (std::strncmp(line, "MIDI CH ", 8) == 0) {
+                value = skipSpace(line + 8);
+                if (std::strcmp(value, "Omni") == 0) {
+                    slot.midiSource.setChannel(-1);
+                } else {
+                    int ch = 0;
+                    if (parseInt(value, ch)) {
+                        slot.midiSource.setChannel(ch - 1);
+                    }
+                }
+                continue;
+            }
+            if (std::strncmp(line, "BOOT ", 5) == 0) {
+                int boot = 0;
+                if (parseInt(line + 5, boot)) {
+                    slot.bootScriptIndex = clamp<int8_t>(boot - 1, 0, TeletypeTrack::ScriptSlotCount - 1);
+                }
+                continue;
+            }
+            if (std::strncmp(line, "TIMEBASE ", 9) == 0) {
+                value = skipSpace(line + 9);
+                TeletypeTrack::TimeBase base{};
+                if (parseTimeBase(value, base)) {
+                    slot.timeBase = base;
+                }
+                continue;
+            }
+            if (std::strncmp(line, "CLK.DIV ", 8) == 0) {
+                int div = 0;
+                if (parseInt(line + 8, div)) {
+                    slot.clockDivisor = ModelUtils::clampDivisor(div);
+                }
+                continue;
+            }
+            if (std::strncmp(line, "CLK.MULT ", 9) == 0) {
+                int mult = 0;
+                if (parseInt(line + 9, mult)) {
+                    slot.clockMultiplier = clamp<int16_t>(mult, 50, 150);
+                }
+                continue;
+            }
+            if (std::strncmp(line, "RESET.METRO ", 12) == 0) {
+                int value = 0;
+                if (parseInt(line + 12, value)) {
+                    slot.resetMetroOnLoad = value != 0;
+                }
+                continue;
+            }
+        }
+
+        if (section == Section::ScriptS0P1 || section == Section::ScriptS0P2 ||
+            section == Section::ScriptM1 || section == Section::ScriptM2) {
+            TeletypeTrack::PatternSlot &slot = (section == Section::ScriptS0P1 || section == Section::ScriptM1) ? slot1 : slot2;
+            bool metro = (section == Section::ScriptM1 || section == Section::ScriptM2);
+            auto &buffer = metro ? slot.metro : slot.s0;
+            uint8_t &length = metro ? slot.metroLength : slot.s0Length;
+            if (length >= TeletypeTrack::ScriptLineCount) {
+                continue;
+            }
+            tele_command_t cmd = {};
+            char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
+            if (parse(line, &cmd, errorMsg) != E_OK) {
+                continue;
+            }
+            if (validate(&cmd, errorMsg) != E_OK) {
+                continue;
+            }
+            buffer[length] = cmd;
+            length++;
+            continue;
+        }
+
+        if (section == Section::ScriptS1 || section == Section::ScriptS2 || section == Section::ScriptS3) {
+            const int scriptIndex = (section == Section::ScriptS1) ? 1 : (section == Section::ScriptS2 ? 2 : 3);
+            auto &script = state.scripts[scriptIndex];
+            if (script.l >= TeletypeTrack::ScriptLineCount) {
+                continue;
+            }
+            tele_command_t cmd = {};
+            char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
+            if (parse(line, &cmd, errorMsg) != E_OK) {
+                continue;
+            }
+            if (validate(&cmd, errorMsg) != E_OK) {
+                continue;
+            }
+            script.c[script.l] = cmd;
+            script.l++;
+            continue;
+        }
+
+        if (section == Section::Pats) {
+            if (line[0] == 'P' && std::isdigit(line[1])) {
+                int patternIndex = line[1] - '1';
+                if (patternIndex < 0 || patternIndex >= PATTERN_COUNT) {
+                    continue;
+                }
+                auto &slot = (currentPatternSlot == 0) ? slot1 : slot2;
+                auto &pat = slot.patterns[patternIndex];
+                const char *rest = skipSpace(line + 2);
+                if (std::strncmp(rest, "LEN ", 4) == 0) {
+                    int value = 0;
+                    if (parseInt(rest + 4, value)) {
+                        pat.len = clamp<int16_t>(value, 0, 64);
+                    }
+                } else if (std::strncmp(rest, "WRAP ", 5) == 0) {
+                    int value = 0;
+                    if (parseInt(rest + 5, value)) {
+                        pat.wrap = clamp<int16_t>(value, 0, 64);
+                    }
+                } else if (std::strncmp(rest, "START ", 6) == 0) {
+                    int value = 0;
+                    if (parseInt(rest + 6, value)) {
+                        pat.start = clamp<int16_t>(value, 0, 63);
+                    }
+                } else if (std::strncmp(rest, "END ", 4) == 0) {
+                    int value = 0;
+                    if (parseInt(rest + 4, value)) {
+                        pat.end = clamp<int16_t>(value, 0, 63);
+                    }
+                } else if (std::strncmp(rest, "VALS", 4) == 0) {
+                    const char *values = skipSpace(rest + 4);
+                    int &idx = patternValueIndex[currentPatternSlot][patternIndex];
+                    while (values && *values && idx < 64) {
+                        char *end = nullptr;
+                        long val = std::strtol(values, &end, 10);
+                        if (end == values) {
+                            break;
+                        }
+                        pat.val[idx++] = clamp<int16_t>(val, -32768, 32767);
+                        values = skipSpace(end);
+                    }
+                }
+            }
+        }
+    }
+
+    track.setPatternSlotForPattern(0, slot1);
+    track.setPatternSlotForPattern(1, slot2);
+    track.applyActivePatternSlot();
+
+    auto error = fileReader.finish();
+    if (error == fs::END_OF_FILE) {
+        error = fs::OK;
+    }
     return error;
 }
 
@@ -375,6 +1133,28 @@ void FileManager::slotInfo(FileType type, int slot, SlotInfo &info) {
         if (type == FileType::TeletypeScript) {
             FixedStringBuilder<9> name("TS%03d", slot + 1);
             std::strncpy(info.name, name, sizeof(info.name));
+            info.name[sizeof(info.name) - 1] = '\0';
+            info.used = true;
+        } else if (type == FileType::TeletypeTrack) {
+            FixedStringBuilder<9> name("TT%03d", slot + 1);
+            info.name[0] = '\0';
+
+            char line[64] = {};
+            if (readFirstLine(path, line, sizeof(line))) {
+                trimRight(line);
+                const char *text = skipSpace(line);
+                if (std::strncmp(text, "NAME ", 5) == 0) {
+                    text = skipSpace(text + 5);
+                    if (*text) {
+                        std::strncpy(info.name, text, sizeof(info.name) - 1);
+                        info.name[sizeof(info.name) - 1] = '\0';
+                    }
+                }
+            }
+
+            if (info.name[0] == '\0') {
+                std::strncpy(info.name, name, sizeof(info.name));
+            }
             info.name[sizeof(info.name) - 1] = '\0';
             info.used = true;
         } else {

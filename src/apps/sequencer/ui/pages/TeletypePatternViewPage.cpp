@@ -2,6 +2,8 @@
 
 #include "Pages.h"
 
+#include "model/FileManager.h"
+
 #include "ui/LedPainter.h"
 
 #include "core/math/Math.h"
@@ -30,7 +32,20 @@ constexpr int kValueWidth = kColumnWidth - 6;
 constexpr int kValueOffsetX = 2;
 
 constexpr int kVarsX = kGridX + kGridWidth + 18;
+
+constexpr bool kSuspendEngineForTrackIO = true;
 } // namespace
+
+enum class ContextAction {
+    LoadTrack,
+    SaveTrack,
+    Last
+};
+
+static const ContextMenuModel::Item contextMenuItems[] = {
+    { "LOAD TRACK" },
+    { "SAVE TRACK" },
+};
 
 TeletypePatternViewPage::TeletypePatternViewPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context) {
@@ -150,6 +165,12 @@ void TeletypePatternViewPage::updateLeds(Leds &leds) {
 void TeletypePatternViewPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
+    if (key.isContextMenu()) {
+        contextShow();
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier()) {
         return;
     }
@@ -225,6 +246,118 @@ void TeletypePatternViewPage::keyPress(KeyPressEvent &event) {
         event.consume();
         return;
     }
+}
+
+void TeletypePatternViewPage::contextShow() {
+    showContextMenu(ContextMenu(
+        contextMenuItems,
+        int(ContextAction::Last),
+        [&] (int index) { contextAction(index); },
+        [&] (int index) { return contextActionEnabled(index); }
+    ));
+}
+
+void TeletypePatternViewPage::contextAction(int index) {
+    switch (ContextAction(index)) {
+    case ContextAction::LoadTrack:
+        loadTrack();
+        break;
+    case ContextAction::SaveTrack:
+        saveTrack();
+        break;
+    case ContextAction::Last:
+        break;
+    }
+}
+
+bool TeletypePatternViewPage::contextActionEnabled(int index) const {
+    switch (ContextAction(index)) {
+    case ContextAction::LoadTrack:
+    case ContextAction::SaveTrack:
+        return FileManager::volumeMounted();
+    default:
+        return true;
+    }
+}
+
+void TeletypePatternViewPage::saveTrack() {
+    _manager.pages().fileSelect.show("SAVE TRACK", FileType::TeletypeTrack, 0, true,
+        [this] (bool result, int slot) {
+            if (!result) {
+                return;
+            }
+            if (FileManager::slotUsed(FileType::TeletypeTrack, slot)) {
+                _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                    if (result) {
+                        saveTrackToSlot(slot);
+                    }
+                });
+            } else {
+                saveTrackToSlot(slot);
+            }
+        });
+}
+
+void TeletypePatternViewPage::loadTrack() {
+    _manager.pages().fileSelect.show("LOAD TRACK", FileType::TeletypeTrack, 0, false,
+        [this] (bool result, int slot) {
+            if (!result) {
+                return;
+            }
+            _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                if (result) {
+                    loadTrackFromSlot(slot);
+                }
+            });
+        });
+}
+
+void TeletypePatternViewPage::saveTrackToSlot(int slot) {
+    if (kSuspendEngineForTrackIO) {
+        _engine.suspend();
+    }
+    _manager.pages().busy.show("SAVING TRACK ...");
+
+    FileManager::task([this, slot] () {
+        auto &track = _project.selectedTrack().teletypeTrack();
+        return FileManager::writeTeletypeTrack(track, _project.name(), slot);
+    }, [this] (fs::Error result) {
+        if (result == fs::OK) {
+            showMessage("TRACK SAVED");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        if (kSuspendEngineForTrackIO) {
+            _engine.resume();
+        }
+    });
+}
+
+void TeletypePatternViewPage::loadTrackFromSlot(int slot) {
+    if (kSuspendEngineForTrackIO) {
+        _engine.suspend();
+    }
+    _manager.pages().busy.show("LOADING TRACK ...");
+
+    FileManager::task([this, slot] () {
+        auto &track = _project.selectedTrack().teletypeTrack();
+        return FileManager::readTeletypeTrack(track, slot);
+    }, [this] (fs::Error result) {
+        if (result == fs::OK) {
+            showMessage("TRACK LOADED");
+            syncPattern();
+            ensureRowVisible();
+        } else if (result == fs::INVALID_CHECKSUM) {
+            showMessage("INVALID TRACK FILE");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        if (kSuspendEngineForTrackIO) {
+            _engine.resume();
+        }
+    });
 }
 
 void TeletypePatternViewPage::encoder(EncoderEvent &event) {

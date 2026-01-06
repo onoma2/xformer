@@ -451,11 +451,16 @@ bool SdCard::writeBlock(uint32_t address, const void *buffer) {
     const uint32_t DATA_TX_SUCCESS_FLAGS = (SDIO_STA_DBCKEND |
                                             SDIO_STA_DATAEND);
 
+    uint32_t timeout = os::ticks() + os::time::ms(1000);
     while (!dma_get_interrupt_flag(DMA2, DMA_STREAM3, DMA_TCIF)) {
+        if (os::ticks() >= timeout) {
+            return false;
+        }
         // allow other tasks to run
         os::this_task::yield();
     }
 
+    timeout = os::ticks() + os::time::ms(1000);
     while (true) {
         volatile uint32_t result = SDIO_STA;
         // DBG("STA = 0x%x", result);
@@ -466,6 +471,9 @@ bool SdCard::writeBlock(uint32_t address, const void *buffer) {
             } else if (result & DATA_TX_SUCCESS_FLAGS) {
                 break;
             }
+        }
+        if (os::ticks() >= timeout) {
+            return false;
         }
 
         // allow other tasks to run

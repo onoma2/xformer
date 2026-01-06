@@ -758,6 +758,7 @@ void TeletypeScriptViewPage::loadScriptFromSlot(int slot) {
     });
 }
 
+
 void TeletypeScriptViewPage::pushHistory(const char *line) {
     if (!line || line[0] == '\0') {
         return;
