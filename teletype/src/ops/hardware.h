@@ -21,6 +21,8 @@ extern const tele_op_t op_PARAM_CAL_RESET;
 extern const tele_op_t op_BUS;
 extern const tele_op_t op_WBPM;
 extern const tele_op_t op_WBPM_S;
+extern const tele_op_t op_WMS;
+extern const tele_op_t op_WTU;
 extern const tele_op_t op_BAR;
 extern const tele_op_t op_WP;
 extern const tele_op_t op_WP_SET;

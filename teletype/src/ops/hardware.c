@@ -51,6 +51,10 @@ static void op_WBPM_get(const void *NOTUSED(data), scene_state_t *ss,
                         exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_WBPM_S_get(const void *NOTUSED(data), scene_state_t *ss,
                           exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WMS_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WTU_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_BAR_get(const void *NOTUSED(data), scene_state_t *ss,
                        exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_WP_get(const void *NOTUSED(data), scene_state_t *ss,
@@ -157,6 +161,8 @@ const tele_op_t op_PARAM_CAL_RESET  = MAKE_GET_OP (PARAM.CAL.RESET, op_PARAM_CAL
 const tele_op_t op_BUS           = MAKE_GET_SET_OP(BUS, op_BUS_get, op_BUS_set, 1, true);
 const tele_op_t op_WBPM          = MAKE_GET_OP(WBPM, op_WBPM_get, 0, true);
 const tele_op_t op_WBPM_S        = MAKE_GET_OP(WBPM.S, op_WBPM_S_get, 1, false);
+const tele_op_t op_WMS           = MAKE_GET_OP(WMS, op_WMS_get, 1, true);
+const tele_op_t op_WTU           = MAKE_GET_OP(WTU, op_WTU_get, 2, true);
 const tele_op_t op_BAR           = MAKE_GET_OP(BAR, op_BAR_get, 1, true);
 const tele_op_t op_WP            = MAKE_GET_OP(WP, op_WP_get, 1, true);
 const tele_op_t op_WP_SET        = MAKE_GET_OP(WP.SET, op_WP_SET_get, 2, false);
@@ -436,6 +442,42 @@ static void op_WBPM_S_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
         bpm = 1000;
     }
     tele_wbpm_set(bpm);
+}
+
+static void op_WMS_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    uint8_t mult = 1;
+    if (cs_stack_size(cs) > 0) {
+        int16_t value = cs_pop(cs);
+        if (value < 1) {
+            value = 1;
+        } else if (value > 128) {
+            value = 128;
+        }
+        mult = (uint8_t)value;
+    }
+    cs_push(cs, tele_wms(mult));
+}
+
+static void op_WTU_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t div = cs_pop(cs);
+    if (div < 1) {
+        div = 1;
+    } else if (div > 128) {
+        div = 128;
+    }
+    uint8_t mult = 1;
+    if (cs_stack_size(cs) > 0) {
+        int16_t value = cs_pop(cs);
+        if (value < 1) {
+            value = 1;
+        } else if (value > 128) {
+            value = 128;
+        }
+        mult = (uint8_t)value;
+    }
+    cs_push(cs, tele_wtu((uint8_t)div, mult));
 }
 
 static void op_BAR_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),

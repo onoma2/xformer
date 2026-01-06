@@ -107,6 +107,35 @@ WBPM reads or sets the project tempo in BPM.
 - `WBPM` → read current tempo (1–1000 BPM)
 - `WBPM.S x` → set tempo to x BPM (clamped to 1–1000)
 
+## WMS / WTU (Performer-only)
+
+Tempo-derived millisecond helpers.
+
+**WMS** returns the duration of a 1/16 note in milliseconds, multiplied by `n`.
+
+- `WMS` → 1/16 note in ms
+- `WMS n` → n × (1/16 note) in ms, n=1..128
+
+**WTU** returns beat_ms / n, multiplied by `m`.
+
+- `WTU n` → beat_ms / n
+- `WTU n m` → m × (beat_ms / n), n=1..128, m=1..128
+
+Examples:
+```
+# 1/16 note in ms
+X WMS
+
+# one beat (4x 1/16)
+X WMS 4
+
+# triplet timing (beat / 3)
+X WTU 3
+
+# 2x septuplet division (2 * beat / 7)
+X WTU 7 2
+```
+
 ## TR.D / TR.W (Performer-only)
 
 Per-output trigger divider and width.

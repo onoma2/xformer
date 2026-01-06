@@ -28,6 +28,18 @@ int16_t busVoltsToRaw(float volts) {
     int32_t raw = static_cast<int32_t>(std::lround(norm * 16383.f));
     return static_cast<int16_t>(clamp<int32_t>(raw, 0, 16383));
 }
+
+double beatMsForActiveEngine() {
+    auto *engine = TeletypeBridge::activeEngine();
+    if (!engine) {
+        return 0.0;
+    }
+    double bpm = engine->tempo();
+    if (bpm <= 0.0) {
+        return 0.0;
+    }
+    return 60000.0 / bpm;
+}
 } // namespace
 
 TeletypeBridge::ScopedEngine::ScopedEngine(TeletypeTrackEngine &engine) {
@@ -233,6 +245,29 @@ void tele_wbpm_set(int16_t bpm) {
         int32_t clamped = clamp<int32_t>(bpm, 1, 1000);
         engine->setTempo(static_cast<float>(clamped));
     }
+}
+
+int16_t tele_wms(uint8_t mult) {
+    double beatMs = beatMsForActiveEngine();
+    if (beatMs <= 0.0) {
+        return 0;
+    }
+    double ms = (beatMs / 4.0) * mult;
+    int32_t raw = static_cast<int32_t>(std::lround(ms));
+    return static_cast<int16_t>(clamp<int32_t>(raw, 1, 32767));
+}
+
+int16_t tele_wtu(uint8_t div, uint8_t mult) {
+    double beatMs = beatMsForActiveEngine();
+    if (beatMs <= 0.0) {
+        return 0;
+    }
+    if (div == 0) {
+        div = 1;
+    }
+    double ms = (beatMs / static_cast<double>(div)) * mult;
+    int32_t raw = static_cast<int32_t>(std::lround(ms));
+    return static_cast<int16_t>(clamp<int32_t>(raw, 1, 32767));
 }
 
 int16_t tele_bar(uint8_t bars) {

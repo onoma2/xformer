@@ -200,6 +200,8 @@
         "BUS"         => { MATCH_OP(E_OP_BUS); };
         "WBPM.S"      => { MATCH_OP(E_OP_WBPM_S); };
         "WBPM"        => { MATCH_OP(E_OP_WBPM); };
+        "WMS"         => { MATCH_OP(E_OP_WMS); };
+        "WTU"         => { MATCH_OP(E_OP_WTU); };
         "BAR"         => { MATCH_OP(E_OP_BAR); };
         "WP.SET"      => { MATCH_OP(E_OP_WP_SET); };
         "WP"          => { MATCH_OP(E_OP_WP); };

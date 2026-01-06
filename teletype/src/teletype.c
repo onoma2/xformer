@@ -76,12 +76,23 @@ tele_error_t validate(const tele_command_t *c,
                 }
                 params = stack_depth >= 2 ? 2 : 0;
             }
-            else if (word_value == E_OP_BAR) {
+            else if (word_value == E_OP_BAR || word_value == E_OP_WMS) {
                 if (stack_depth > 1) {
                     strcpy(error_msg, op->name);
                     return E_EXTRA_PARAMS;
                 }
                 params = stack_depth >= 1 ? 1 : 0;
+            }
+            else if (word_value == E_OP_WTU) {
+                if (stack_depth < 1) {
+                    strcpy(error_msg, op->name);
+                    return E_NEED_PARAMS;
+                }
+                if (stack_depth > 2) {
+                    strcpy(error_msg, op->name);
+                    return E_EXTRA_PARAMS;
+                }
+                params = stack_depth >= 2 ? 2 : 1;
             }
 
             // if we're not a first_cmd we need to return something

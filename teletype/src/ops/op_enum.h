@@ -173,6 +173,8 @@ typedef enum {
     E_OP_BUS,
     E_OP_WBPM,
     E_OP_WBPM_S,
+    E_OP_WMS,
+    E_OP_WTU,
     E_OP_BAR,
     E_OP_WP,
     E_OP_WP_SET,

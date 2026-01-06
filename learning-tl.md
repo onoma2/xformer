@@ -220,6 +220,30 @@ WBPM.S 120
 WBPM.S 87
 ```
 
+## WMS / WTU Timing Helpers (Performer)
+
+WMS and WTU return tempo-derived durations in **milliseconds**.
+
+### WMS (1/16 note in ms)
+
+```
+X WMS       # 1/16 note duration in ms
+X WMS 4     # one beat (4x 1/16)
+X WMS 16    # one bar in 4/4
+```
+
+### WTU (beat divided by n)
+
+```
+X WTU 3     # beat / 3 (triplet timing)
+X WTU 5     # beat / 5 (quintuplet timing)
+X WTU 7 2   # 2 * (beat / 7)
+```
+
+Notes:
+- `WMS n` and `WTU n m` clamp `n` and `m` to 1–128.
+- Use these values directly with `M` in MS timebase.
+
 Notes:
 - Valid range: 1–1000 BPM.
 - WBPM is a direct BPM value (no scaling to 0–16383).

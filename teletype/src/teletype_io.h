@@ -40,6 +40,8 @@ extern uint16_t tele_bus_cv_get(uint8_t i);
 extern void tele_bus_cv_set(uint8_t i, int16_t v);
 extern int16_t tele_wbpm_get(void);
 extern void tele_wbpm_set(int16_t bpm);
+extern int16_t tele_wms(uint8_t mult);
+extern int16_t tele_wtu(uint8_t div, uint8_t mult);
 extern int16_t tele_bar(uint8_t bars);
 extern int16_t tele_wpat(uint8_t trackIndex);
 extern void tele_wpat_set(uint8_t trackIndex, uint8_t patternIndex);
