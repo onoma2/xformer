@@ -35,12 +35,52 @@ struct FileTypeInfo {
 FileTypeInfo fileTypeInfos[] = {
     { "PROJECTS", "PRO" },
     { "SCALES", "SCA" },
-    { "TEL", "TXT" },
+    { "TELS", "TXT" },
 };
 
 static void slotPath(StringBuilder &str, FileType type, int slot) {
     const auto &info = fileTypeInfos[int(type)];
     str("%s/%03d.%s", info.dir, slot + 1, info.ext);
+}
+
+static bool readLine(fs::FileReader &reader, char *buffer, size_t max) {
+    size_t pos = 0;
+    bool got = false;
+    char c = '\0';
+    while (true) {
+        fs::Error err = reader.read(&c, 1);
+        if (err == fs::END_OF_FILE) {
+            break;
+        }
+        if (err != fs::OK) {
+            return false;
+        }
+        got = true;
+        if (c == '\r') {
+            continue;
+        }
+        if (c == '\n') {
+            break;
+        }
+        if (pos + 1 < max) {
+            buffer[pos++] = c;
+        }
+    }
+    buffer[pos] = '\0';
+
+    if (pos + 1 >= max) {
+        while (true) {
+            fs::Error err = reader.read(&c, 1);
+            if (err == fs::END_OF_FILE || err != fs::OK) {
+                break;
+            }
+            if (c == '\n') {
+                break;
+            }
+        }
+    }
+
+    return got || pos > 0;
 }
 
 void FileManager::init() {
@@ -219,14 +259,6 @@ fs::Error FileManager::writeTeletypeScript(const TeletypeTrack &track, int scrip
         return fileWriter.error();
     }
 
-    FileHeader header(FileType::TeletypeScript, 0, "TT SCR");
-    fileWriter.write(&header, sizeof(header));
-
-    VersionedSerializedWriter writer(
-        [&fileWriter] (const void *data, size_t len) { fileWriter.write(data, len); },
-        ProjectVersion::Latest
-    );
-
     char lineBuffer[TeletypeTrack::ScriptLineLength] = {};
     scene_state_t &state = const_cast<scene_state_t &>(track.state());
     for (int line = 0; line < TeletypeTrack::ScriptLineCount; ++line) {
@@ -235,7 +267,8 @@ fs::Error FileManager::writeTeletypeScript(const TeletypeTrack &track, int scrip
         if (cmd && cmd->length > 0) {
             print_command(cmd, lineBuffer);
         }
-        writer.write(lineBuffer, TeletypeTrack::ScriptLineLength);
+        fileWriter.write(lineBuffer, strlen(lineBuffer));
+        fileWriter.write("\n", 1);
     }
 
     return fileWriter.finish();
@@ -251,21 +284,14 @@ fs::Error FileManager::readTeletypeScript(TeletypeTrack &track, int scriptIndex,
         return fileReader.error();
     }
 
-    FileHeader header;
-    fileReader.read(&header, sizeof(header));
-
-    VersionedSerializedReader reader(
-        [&fileReader] (void *data, size_t len) { fileReader.read(data, len); },
-        ProjectVersion::Latest
-    );
-
     bool success = true;
     char lineBuffer[TeletypeTrack::ScriptLineLength] = {};
     scene_state_t &state = track.state();
     ss_clear_script(&state, scriptIndex);
     for (int line = 0; line < TeletypeTrack::ScriptLineCount; ++line) {
-        reader.read(lineBuffer, TeletypeTrack::ScriptLineLength, 0);
-        lineBuffer[TeletypeTrack::ScriptLineLength - 1] = '\0';
+        if (!readLine(fileReader, lineBuffer, sizeof(lineBuffer))) {
+            break;
+        }
         if (lineBuffer[0] == '\0') {
             continue;
         }
@@ -346,12 +372,19 @@ void FileManager::slotInfo(FileType type, int slot, SlotInfo &info) {
     slotPath(path, type, slot);
 
     if (fs::exists(path)) {
-        fs::File file(path, fs::File::Read);
-        FileHeader header;
-        size_t lenRead;
-        if (file.read(&header, sizeof(header), &lenRead) == fs::OK && lenRead == sizeof(header)) {
-            header.readName(info.name, sizeof(info.name));
+        if (type == FileType::TeletypeScript) {
+            FixedStringBuilder<9> name("TS%03d", slot + 1);
+            std::strncpy(info.name, name, sizeof(info.name));
+            info.name[sizeof(info.name) - 1] = '\0';
             info.used = true;
+        } else {
+            fs::File file(path, fs::File::Read);
+            FileHeader header;
+            size_t lenRead;
+            if (file.read(&header, sizeof(header), &lenRead) == fs::OK && lenRead == sizeof(header)) {
+                header.readName(info.name, sizeof(info.name));
+                info.used = true;
+            }
         }
     }
 
