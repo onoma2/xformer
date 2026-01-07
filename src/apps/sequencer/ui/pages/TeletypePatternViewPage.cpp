@@ -74,7 +74,7 @@ void TeletypePatternViewPage::draw(Canvas &canvas) {
     scene_state_t &state = track.state();
     FixedStringBuilder<4> slotLabel("P%d", track.activePatternSlot() + 1);
     canvas.setColor(Color::Medium);
-    canvas.drawText(Width - 2 - canvas.textWidth(slotLabel), 6, slotLabel);
+    canvas.drawText(Width - 2 - canvas.textWidth(slotLabel), 7, slotLabel);
 
     int16_t *varPtr = &state.variables.a;
     const char *varNames[] = { "A", "B", "C", "D", "X", "Y", "Z", "T" };

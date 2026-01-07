@@ -103,13 +103,13 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         FixedStringBuilder<4> slotLabel("P%d", track.activePatternSlot() + 1);
         int slotWidth = canvas.textWidth(slotLabel);
         int slotX = scriptX - slotWidth - 4;
-        canvas.drawText(slotX, 6, slotLabel);
+        canvas.drawText(slotX, 8, slotLabel);
     }
-    canvas.drawText(scriptX, 6, scriptLabel);
+    canvas.drawText(scriptX, 8, scriptLabel);
 
     if (_liveMode) {
         auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
-        const int iconY = 6;
+        const int iconY = 8;
         int x = kLabelX;
         const char *icons[] = { "M", "S", "D", "St" };
         bool states[] = {
