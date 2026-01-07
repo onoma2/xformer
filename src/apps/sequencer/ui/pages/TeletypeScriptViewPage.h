@@ -43,6 +43,8 @@ private:
     void recallHistory(int direction);
     void setEditBuffer(const char *text);
 
+    void drawIoGrid(Canvas &canvas);
+
     int _selectedLine = 0;
     int _cursor = 0;
     int _scriptIndex = 0;

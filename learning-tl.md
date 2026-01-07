@@ -1121,3 +1121,30 @@ Notes:
 | **Set Length** | **Step Key 14** | Sets Pattern Length to current row + 1. |
 | **Set Start** | **Step Key 15** | Sets Loop Start to current row. |
 | **Set End** | **Step Key 16** | Sets Loop End to current row. |
+
+### 3. Teletype Script View - I/O Grid
+
+The Script View now features a 4x4 visualization grid in the top-right corner, providing real-time feedback on Teletype I/O states.
+
+**Grid Layout (3 Rows):**
+
+1.  **TI (Trigger Inputs)** - Top Row
+    -   Displays the state of `TI-TR1` through `TI-TR4`.
+    -   **Dim (Low):** Input is unassigned (None).
+    -   **Medium:** Input is assigned but inactive.
+    -   **Bright:** Input is assigned and receiving a high signal (Gate High).
+
+2.  **TO (Trigger Outputs)** - Middle Row
+    -   Displays the state of `TO-TRA` through `TO-TRD` (mapped to Performer Gate outputs).
+    -   **Dim (Low):** The target Gate Output is assigned to a *different* track in the global Layout. (Signal is generated but effectively disconnected from this track).
+    -   **Medium:** Output is owned by this track but inactive.
+    -   **Bright:** Output is owned and pulsing (Active).
+
+3.  **CV (CV Outputs)** - Bottom Section (Double Height)
+    -   Displays the state of `TO-CV1` through `TO-CV4` (mapped to Performer CV outputs).
+    -   **Visualization:** A vertical bar graph growing from the center (Bipolar).
+    -   **Center Line:** Represents 0V.
+    -   **Upward Bar:** Positive voltage (> 0V).
+    -   **Downward Bar:** Negative voltage (< 0V).
+    -   **Ownership:** If the target CV Output is assigned to another track, the bar is **hidden** (only the dim container frame is visible), indicating the signal is disconnected.
+

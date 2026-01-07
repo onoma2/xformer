@@ -29,6 +29,10 @@ constexpr int kRowStepY = 8;
 constexpr int kEditLineY = 54;
 constexpr int kLabelX = 4;
 constexpr int kTextX = 16;
+constexpr int kGridX = 222;
+constexpr int kGridY = 15;
+constexpr int kGridColW = 8;
+constexpr int kGridRowH = 8;
 // Flip to false for hardware testing without engine suspend.
 constexpr bool kSuspendEngineForScriptIO = true;
 } // namespace
@@ -188,6 +192,73 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         canvas.setColor(Color::Bright);
         canvas.drawText(cursorX, kEditLineY, cursorStr);
         canvas.setBlendMode(BlendMode::Set);
+    }
+
+    drawIoGrid(canvas);
+}
+
+void TeletypeScriptViewPage::drawIoGrid(Canvas &canvas) {
+    const int trackIndex = _project.selectedTrackIndex();
+    const auto &track = _project.selectedTrack().teletypeTrack();
+    const auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+
+    for (int i = 0; i < 4; ++i) {
+        int x = kGridX + i * kGridColW;
+
+        // --- Row 1: TI ---
+        int yTi = kGridY;
+        bool tiAssigned = track.triggerInputSource(i) != TeletypeTrack::TriggerInputSource::None;
+        bool tiActive = trackEngine.inputState(i);
+
+        canvas.setColor(tiAssigned ? (tiActive ? Color::MediumBright : Color::Medium) : Color::Low);
+        canvas.fillRect(x + 1, yTi + 1, 6, 6);
+
+        // --- Row 2: TO ---
+        int yTo = kGridY + kGridRowH;
+        auto toDest = track.triggerOutputDest(i);
+        int gateIdx = int(toDest);
+        bool toOwned = _project.gateOutputTrack(gateIdx) == trackIndex;
+        bool toActive = trackEngine.gateOutput(gateIdx);
+
+        if (toOwned) {
+            canvas.setColor(toActive ? Color::MediumBright : Color::Medium);
+        } else {
+            canvas.setColor(Color::Low);
+        }
+        canvas.fillRect(x + 1, yTo + 1, 6, 6);
+
+        // --- Row 3: CV ---
+        int yCv = kGridY + kGridRowH * 2;
+        auto cvDest = track.cvOutputDest(i);
+        int cvIdx = int(cvDest);
+        bool cvOwned = _project.cvOutputTrack(cvIdx) == trackIndex;
+        uint16_t raw = trackEngine.cvRaw(i);
+
+        // Container
+        canvas.setColor(Color::Low);
+        canvas.drawRect(x + 1, yCv + 1, 6, 14);
+
+        if (cvOwned) {
+            canvas.setColor(Color::MediumBright);
+            int32_t val = int32_t(raw) - 8192;
+            int h = (std::abs(val) * 5) / 8192;
+            h = clamp(h, 0, 5);
+
+            int centerY = yCv + 8;
+
+            // Draw Center Line
+            canvas.fillRect(x + 2, centerY, 4, 1);
+
+            if (h > 0) {
+                if (val >= 0) {
+                    // Grow Up: y = CenterY - h
+                    canvas.fillRect(x + 2, centerY - h, 4, h);
+                } else {
+                    // Grow Down: y = CenterY + 1
+                    canvas.fillRect(x + 2, centerY + 1, 4, h);
+                }
+            }
+        }
     }
 }
 
