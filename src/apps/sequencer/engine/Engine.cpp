@@ -140,14 +140,14 @@ void Engine::update() {
         for (size_t trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
                 auto &track = _model.project().track(trackIndex);
                 auto &trackEngine = *_trackEngines[trackIndex];
-                
+
                 TrackEngine::TickResult result = TrackEngine::TickResult::NoUpdate;
-        
+
                 if (track.runGate()) {
                     result = trackEngine.tick(tick);
                 }
-        
-                trackEngine.update(0.001f);
+
+            //    trackEngine.update(0.001f); // commented out to solve timing discrepansy in Ms when engine is stopped for Teletype metro
             // update track outputs and routings if tick results in updating the track's CV output
             if ((result & TrackEngine::TickResult::CvUpdate) && _trackUpdateReducers[trackIndex].update()) {
                 trackEngine.update(0.f);
@@ -520,7 +520,7 @@ void Engine::updateTrackOutputs() {
     // --- Gate Rotation Logic ---
     int gatePool[CONFIG_CHANNEL_COUNT];
     int gatePoolSize = 0;
-    
+
     // Identify Gate Pool
     for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
         int trackIndex = gateOutputTracks[i];
@@ -547,17 +547,17 @@ void Engine::updateTrackOutputs() {
         // Check if this output is in the pool
         int gatePoolIndex = -1;
         for (int k = 0; k < gatePoolSize; ++k) { if (gatePool[k] == i) { gatePoolIndex = k; break; } }
-        
+
         if (gatePoolIndex != -1) {
             // It's rotating!
             int originalTrack = gateOutputTracks[i];
             int rotation = _project.track(originalTrack).gateOutputRotate();
-            
+
             // Wrap rotation within pool size
             // Note: standard % operator can return negative values, handle carefully
             int rotatedIndex = (gatePoolIndex - rotation) % gatePoolSize;
             if (rotatedIndex < 0) rotatedIndex += gatePoolSize;
-            
+
             gateSourceOutputIndex = gatePool[rotatedIndex];
         }
 
@@ -571,16 +571,16 @@ void Engine::updateTrackOutputs() {
         // Check if this output is in the pool
         int cvPoolIndex = -1;
         for (int k = 0; k < cvPoolSize; ++k) { if (cvPool[k] == i) { cvPoolIndex = k; break; } }
-        
+
         if (cvPoolIndex != -1) {
             // It's rotating!
             int originalTrack = cvOutputTracks[i];
             int rotation = _project.track(originalTrack).cvOutputRotate();
-            
+
             // Wrap rotation within pool size
             int rotatedIndex = (cvPoolIndex - rotation) % cvPoolSize;
             if (rotatedIndex < 0) rotatedIndex += cvPoolSize;
-            
+
             cvSourceOutputIndex = cvPool[rotatedIndex];
         }
 
@@ -1054,7 +1054,7 @@ void Engine::updateClockSetup() {
     } else {
         ticksPerPulse /= -clockSetup.clockInputMultiplier();
     }
-    
+
     _clock.slaveConfigure(ClockSourceExternal, ticksPerPulse, true);
     _clock.slaveConfigure(ClockSourceMidi, CONFIG_PPQN / 24, clockSetup.midiRx());
     _clock.slaveConfigure(ClockSourceUsbMidi, CONFIG_PPQN / 24, clockSetup.usbRx());
