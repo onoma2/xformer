@@ -29,7 +29,9 @@ constexpr int kRowStepY = 8;
 constexpr int kEditLineY = 54;
 constexpr int kLabelX = 4;
 constexpr int kTextX = 16;
-constexpr int kGridX = 222;
+constexpr int kGridBusX = 196;
+constexpr int kGridMainX = 214;
+constexpr int kGridInParamX = 246;
 constexpr int kGridY = 15;
 constexpr int kGridColW = 8;
 constexpr int kGridRowH = 8;
@@ -202,62 +204,71 @@ void TeletypeScriptViewPage::drawIoGrid(Canvas &canvas) {
     const auto &track = _project.selectedTrack().teletypeTrack();
     const auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
 
+    // --- BUS BLOCK (x=196) ---
     for (int i = 0; i < 4; ++i) {
-        int x = kGridX + i * kGridColW;
+        int x = kGridBusX + (i % 2) * kGridColW;
+        int y = kGridY + (i / 2) * 16;
+        float volts = trackEngine.busCv(i);
+        uint16_t raw = clamp(int((volts + 5.0f) / 10.0f * 16383.0f), 0, 16383);
+        drawBipolarBar(canvas, x, y, raw, Color::MediumBright);
+    }
 
-        // --- Row 1: TI ---
-        int yTi = kGridY;
+    // --- MAIN GRID (x=214) ---
+    for (int i = 0; i < 4; ++i) {
+        int x = kGridMainX + i * kGridColW;
+
+        // Row 1: TI
         bool tiAssigned = track.triggerInputSource(i) != TeletypeTrack::TriggerInputSource::None;
         bool tiActive = trackEngine.inputState(i);
+        canvas.setColor(tiAssigned ? (tiActive ? Color::Bright : Color::Medium) : Color::Low);
+        canvas.fillRect(x + 1, kGridY + 1, 6, 6);
 
-        canvas.setColor(tiAssigned ? (tiActive ? Color::MediumBright : Color::Medium) : Color::Low);
-        canvas.fillRect(x + 1, yTi + 1, 6, 6);
-
-        // --- Row 2: TO ---
-        int yTo = kGridY + kGridRowH;
+        // Row 2: TO
         auto toDest = track.triggerOutputDest(i);
         int gateIdx = int(toDest);
         bool toOwned = _project.gateOutputTrack(gateIdx) == trackIndex;
         bool toActive = trackEngine.gateOutput(gateIdx);
-
         if (toOwned) {
-            canvas.setColor(toActive ? Color::MediumBright : Color::Medium);
+            canvas.setColor(toActive ? Color::Bright : Color::Medium);
         } else {
             canvas.setColor(Color::Low);
         }
-        canvas.fillRect(x + 1, yTo + 1, 6, 6);
+        canvas.fillRect(x + 1, kGridY + kGridRowH + 1, 6, 6);
 
-        // --- Row 3: CV ---
-        int yCv = kGridY + kGridRowH * 2;
+        // Row 3: CV
         auto cvDest = track.cvOutputDest(i);
         int cvIdx = int(cvDest);
         bool cvOwned = _project.cvOutputTrack(cvIdx) == trackIndex;
-        uint16_t raw = trackEngine.cvRaw(i);
+        uint16_t cvRaw = trackEngine.cvRaw(i);
+        drawBipolarBar(canvas, x, kGridY + kGridRowH * 2, cvRaw, cvOwned ? Color::MediumBright : Color::Low);
+    }
 
-        // Container
-        canvas.setColor(Color::Low);
-        canvas.drawRect(x + 1, yCv + 1, 6, 14);
+    // --- IN/PARAM COLUMN (x=246) ---
+    // IN (Top)
+    bool inAssigned = track.cvInSource() != TeletypeTrack::CvInputSource::None;
+    drawBipolarBar(canvas, kGridInParamX, kGridY, track.state().variables.in, inAssigned ? Color::MediumBright : Color::Low);
+    // PARAM (Bot)
+    bool paramAssigned = track.cvParamSource() != TeletypeTrack::CvInputSource::None;
+    drawBipolarBar(canvas, kGridInParamX, kGridY + 16, track.state().variables.param, paramAssigned ? Color::MediumBright : Color::Low);
+}
 
-        if (cvOwned) {
-            canvas.setColor(Color::MediumBright);
-            int32_t val = int32_t(raw) - 8192;
-            int h = (std::abs(val) * 5) / 8192;
-            h = clamp(h, 0, 5);
+void TeletypeScriptViewPage::drawBipolarBar(Canvas &canvas, int x, int y, uint16_t value, Color color) {
+    canvas.setColor(Color::Low);
+    canvas.drawRect(x + 1, y + 1, 6, 14);
 
-            int centerY = yCv + 8;
+    canvas.setColor(color);
+    int32_t val = int32_t(value) - 8192;
+    int h = (std::abs(val) * 5) / 8192;
+    h = clamp(h, 0, 5);
 
-            // Draw Center Line
-            canvas.fillRect(x + 2, centerY, 4, 1);
+    int centerY = y + 8;
+    canvas.fillRect(x + 2, centerY, 4, 1); // Center Line
 
-            if (h > 0) {
-                if (val >= 0) {
-                    // Grow Up: y = CenterY - h
-                    canvas.fillRect(x + 2, centerY - h, 4, h);
-                } else {
-                    // Grow Down: y = CenterY + 1
-                    canvas.fillRect(x + 2, centerY + 1, 4, h);
-                }
-            }
+    if (h > 0) {
+        if (val >= 0) {
+            canvas.fillRect(x + 2, centerY - h, 4, h);
+        } else {
+            canvas.fillRect(x + 2, centerY + 1, 4, h);
         }
     }
 }
