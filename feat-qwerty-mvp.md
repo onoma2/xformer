@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document details the plan to add **professional USB keyboard support** to Performer's Teletype track implementation, achieving **feature parity with the original Monome Teletype hardware**.
+This document details the plan to add **USB keyboard support** to Performer's Teletype track implementation, achieving **feature parity with the original Monome Teletype hardware**.
 
 ### Goals
 
@@ -92,16 +92,6 @@ This honors Teletype's heritage while maintaining backward compatibility with Pe
   - Space, Backspace, Enter
   - Arrow Left/Right (cursor move)
   - Arrow Up/Down (line/row selection)
-
-### Phase B (Parity + Shortcuts)
-- Ctrl+A / Ctrl+E (home/end)
-- Word navigation (Alt+F/B)
-- Kill line/word (Ctrl+K/U/W)
-- Optional copy/paste integration
-
-### Phase C (Polish)
-- Multi-device HID
-- Mouse support (if desired)
 
 ## UPDATE: Existing HID Driver Found
 
@@ -471,10 +461,6 @@ bool KeyboardHelper::isSpecialKey(uint8_t keycode) {
 
 **Location:** `src/apps/sequencer/ui/pages/TeletypeScriptViewPage.h` and `.cpp`
 
-**IMPORTANT DESIGN DECISION:**
-
-The original plan routed keyboard input through the T9-style step-key abstraction. However, the **original Teletype** (see `teletype/module/line_editor.c:45-198`) had a professional-grade line editor with Emacs-style shortcuts. We should honor this heritage rather than limiting keyboard users to the minimal T9 interface.
-
 **Dual Input Mode:**
 - **Step Keys:** Continue using T9-style cycling (for hardware-only users)
 - **USB Keyboard:** Direct professional editing with shortcuts (matches original Teletype)
@@ -507,83 +493,14 @@ void TeletypeScriptViewPage::event(const Event &event) {
 }
 ```
 
-**Implement Professional Line Editor (TeletypeScriptViewPage.cpp):**
+**Implement Line Editor (TeletypeScriptViewPage.cpp):**
 
 ```cpp
 void TeletypeScriptViewPage::handleKeyboardEvent(const KeyboardEvent &event) {
     uint8_t k = event.keycode();
     uint8_t m = event.modifiers();
 
-    // ===== EMACS-STYLE SHORTCUTS (Original Teletype Heritage) =====
-
-    // Ctrl-A or Home: jump to beginning
-    if ((m & 0x11 && k == 0x04) || k == 0x4A) {  // Ctrl-A or Home
-        _cursor = 0;
-        return;
-    }
-
-    // Ctrl-E or End: jump to end of line
-    if ((m & 0x11 && k == 0x08) || k == 0x4D) {  // Ctrl-E or End
-        _cursor = int(std::strlen(_editBuffer));
-        return;
-    }
-
-    // Ctrl-K: delete from cursor to end of line
-    if (m & 0x11 && k == 0x0E) {  // Ctrl-K
-        deleteToEndOfLine();
-        return;
-    }
-
-    // Ctrl-U: delete from cursor to beginning
-    if (m & 0x11 && k == 0x18) {  // Ctrl-U
-        deleteToBeginningOfLine();
-        return;
-    }
-
-    // Ctrl-W: delete word backward
-    if (m & 0x11 && k == 0x1A) {  // Ctrl-W
-        deleteWordBackward();
-        return;
-    }
-
-    // Alt-D: delete word forward
-    if (m & 0x44 && k == 0x07) {  // Alt-D
-        deleteWordForward();
-        return;
-    }
-
-    // Alt-F or Ctrl-Right: move to next word
-    if ((m & 0x44 && k == 0x09) || (m & 0x11 && k == 0x4F)) {  // Alt-F or Ctrl-Right
-        moveToNextWord();
-        return;
-    }
-
-    // Alt-B or Ctrl-Left: move to previous word
-    if ((m & 0x44 && k == 0x05) || (m & 0x11 && k == 0x50)) {  // Alt-B or Ctrl-Left
-        moveToPreviousWord();
-        return;
-    }
-
-    // Ctrl-X or Alt-X: cut entire line to clipboard
-    if ((m & 0x11 && k == 0x1B) || (m & 0x44 && k == 0x1B)) {  // Ctrl-X or Alt-X
-        copyLine();
-        setEditBuffer("");
-        return;
-    }
-
-    // Ctrl-C or Alt-C: copy entire line to clipboard
-    if ((m & 0x11 && k == 0x06) || (m & 0x44 && k == 0x06)) {  // Ctrl-C or Alt-C
-        copyLine();
-        return;
-    }
-
-    // Ctrl-V or Alt-V: paste from clipboard
-    if ((m & 0x11 && k == 0x19) || (m & 0x44 && k == 0x19)) {  // Ctrl-V or Alt-V
-        pasteLine();
-        return;
-    }
-
-    // ===== ARROW KEYS (Original Teletype supported these) =====
+   // ===== ARROW KEYS (Original Teletype supported these) =====
 
     if (k == 0x50) {  // Left arrow
         moveCursorLeft();
@@ -639,83 +556,7 @@ void TeletypeScriptViewPage::handleKeyboardEvent(const KeyboardEvent &event) {
     }
 }
 
-// Advanced editing operations (matching original Teletype)
 
-void TeletypeScriptViewPage::deleteToEndOfLine() {
-    _editBuffer[_cursor] = '\0';
-}
-
-void TeletypeScriptViewPage::deleteToBeginningOfLine() {
-    int len = int(std::strlen(_editBuffer));
-    std::memmove(_editBuffer, _editBuffer + _cursor, len - _cursor + 1);
-    _cursor = 0;
-}
-
-void TeletypeScriptViewPage::deleteWordBackward() {
-    if (_cursor == 0) return;
-
-    // Skip trailing spaces
-    while (_cursor > 0 && _editBuffer[_cursor - 1] == ' ') {
-        backspace();
-    }
-
-    // Delete word characters
-    while (_cursor > 0 && _editBuffer[_cursor - 1] != ' ') {
-        backspace();
-    }
-}
-
-void TeletypeScriptViewPage::deleteWordForward() {
-    int len = int(std::strlen(_editBuffer));
-    if (_cursor >= len) return;
-
-    int deleteCount = 0;
-    int pos = _cursor;
-
-    // Skip leading spaces
-    while (pos < len && _editBuffer[pos] == ' ') {
-        pos++;
-        deleteCount++;
-    }
-
-    // Delete word characters
-    while (pos < len && _editBuffer[pos] != ' ') {
-        pos++;
-        deleteCount++;
-    }
-
-    // Remove characters
-    std::memmove(_editBuffer + _cursor, _editBuffer + _cursor + deleteCount,
-                 len - _cursor - deleteCount + 1);
-}
-
-void TeletypeScriptViewPage::moveToNextWord() {
-    int len = int(std::strlen(_editBuffer));
-
-    // Skip current word
-    while (_cursor < len && _editBuffer[_cursor] != ' ') {
-        _cursor++;
-    }
-
-    // Skip spaces
-    while (_cursor < len && _editBuffer[_cursor] == ' ') {
-        _cursor++;
-    }
-}
-
-void TeletypeScriptViewPage::moveToPreviousWord() {
-    if (_cursor == 0) return;
-
-    // Skip trailing spaces
-    while (_cursor > 0 && _editBuffer[_cursor - 1] == ' ') {
-        _cursor--;
-    }
-
-    // Move to start of word
-    while (_cursor > 0 && _editBuffer[_cursor - 1] != ' ') {
-        _cursor--;
-    }
-}
 ```
 
 **Visual Feedback - Show Keyboard Connected:**
@@ -771,66 +612,6 @@ Alternatively, map SDL keyboard events to HID keycodes in simulator for full tes
 
 ---
 
-## Keyboard Shortcuts Reference
-
-This section documents all keyboard shortcuts, matching the original Teletype's professional line editor.
-
-### Navigation Shortcuts
-
-| Shortcut | Action | Notes |
-|----------|--------|-------|
-| `←` | Move cursor left | Arrow key |
-| `→` | Move cursor right | Arrow key |
-| `Ctrl-B` | Move cursor left | Emacs-style alternative |
-| `Ctrl-F` | Move cursor right | Emacs-style alternative |
-| `Home` or `Ctrl-A` | Jump to beginning of line | |
-| `End` or `Ctrl-E` | Jump to end of line | |
-| `Alt-B` or `Ctrl-←` | Move to previous word | |
-| `Alt-F` or `Ctrl-→` | Move to next word | |
-
-### Editing Shortcuts
-
-| Shortcut | Action | Notes |
-|----------|--------|-------|
-| `Backspace` or `Ctrl-H` | Delete previous character | |
-| `Delete` or `Ctrl-D` | Delete next character | |
-| `Ctrl-K` | Delete from cursor to end of line | "Kill to end" |
-| `Ctrl-U` | Delete from cursor to beginning | "Kill to start" |
-| `Ctrl-W` | Delete word backward | "Kill word" |
-| `Alt-D` | Delete word forward | |
-| `Escape` | Clear entire line | |
-| `Enter` | Execute command | Immediate execution in Live mode |
-| `Tab` | Insert space | No tab completion |
-
-### Clipboard Shortcuts
-
-| Shortcut | Action | Notes |
-|----------|--------|-------|
-| `Ctrl-X` or `Alt-X` | Cut entire line | |
-| `Ctrl-C` or `Alt-C` | Copy entire line | |
-| `Ctrl-V` or `Alt-V` | Paste from clipboard | |
-
-### Why Emacs-style?
-
-The original Teletype used Emacs-style shortcuts because:
-1. **No arrow keys assumption:** Early USB keyboards might not have arrows
-2. **Professional standard:** Emacs bindings are widely known among programmers
-3. **Efficient:** Hands stay on home row
-4. **Both options:** We support both arrow keys AND Emacs shortcuts for maximum compatibility
-
-### Comparison to Step-Key Input
-
-| Task | Step Keys (T9-style) | USB Keyboard |
-|------|---------------------|--------------|
-| Type "CV 1 V 5" | ~20 button presses | 9 key presses |
-| Edit middle of line | Load line, retype all | Arrow to position, edit |
-| Delete word | Delete char-by-char | Ctrl-W (one key) |
-| Navigate history | Page+Left/Right | Same (or add Up/Down later) |
-| Copy/paste | Page+Step8/Step9 | Ctrl-C/Ctrl-V |
-
-**Both input methods coexist:** Users can mix step-keys and keyboard freely.
-
----
 
 ## Testing Strategy
 
@@ -879,67 +660,6 @@ The original Teletype used Emacs-style shortcuts because:
 
 1. **Hardware Testing Checklist:**
    - [ ] Standard USB keyboard (104-key)
-   - [ ] Compact keyboard (87-key, 60%)
-   - [ ] Wireless keyboard with USB dongle
-   - [ ] Mechanical keyboard (test power draw)
-   - [ ] Keyboard with numpad
-   - [ ] Test all printable ASCII characters
-   - [ ] Test modifier combinations (Shift, Ctrl, Alt)
-   - [ ] Test key repeat/rollover (press multiple keys)
-   - [ ] Test hot-plug (connect/disconnect during operation)
-   - [ ] Test with USB hub (powered and unpowered)
-
-2. **UI Integration Testing:**
-
-   **Basic Input:**
-   - [ ] Enter Teletype commands via keyboard (type "CV 1 V 5")
-   - [ ] Execute commands with Enter key (verify CV output changes)
-   - [ ] All printable ASCII characters work (A-Z, 0-9, symbols)
-   - [ ] Clear buffer with Escape
-   - [ ] Navigate between Live mode and Script mode
-
-   **Cursor Navigation:**
-   - [ ] Arrow keys move cursor left/right
-   - [ ] Ctrl-A / Home jumps to beginning
-   - [ ] Ctrl-E / End jumps to end
-   - [ ] Ctrl-B moves cursor left (Emacs-style)
-   - [ ] Ctrl-F moves cursor right (Emacs-style)
-   - [ ] Alt-F / Ctrl-Right moves to next word
-   - [ ] Alt-B / Ctrl-Left moves to previous word
-
-   **Editing Operations:**
-   - [ ] Backspace deletes previous character
-   - [ ] Delete / Ctrl-D deletes next character
-   - [ ] Ctrl-K deletes to end of line (kill)
-   - [ ] Ctrl-U deletes to beginning of line
-   - [ ] Ctrl-W deletes word backward
-   - [ ] Alt-D deletes word forward
-   - [ ] Tab inserts space
-
-   **Clipboard:**
-   - [ ] Ctrl-C / Alt-C copies line to clipboard
-   - [ ] Ctrl-X / Alt-X cuts line to clipboard
-   - [ ] Ctrl-V / Alt-V pastes from clipboard
-   - [ ] Clipboard persists across commands
-
-   **Mixed Input:**
-   - [ ] Verify keyboard works alongside encoder/buttons
-   - [ ] Can use step-keys and keyboard in same session
-   - [ ] Encoder still moves cursor when Shift held
-   - [ ] Function keys still work (F1-F5 for scripts)
-
-   **Visual Feedback:**
-   - [ ] Test keyboard indicator shows connection status ("KB")
-   - [ ] Cursor position updates correctly
-   - [ ] Verify no audio noise increase (OLED refresh rate stable)
-
-3. **Stress Testing:**
-   - [ ] Type rapidly for 5 minutes
-   - [ ] Hold down keys (test repeat)
-   - [ ] Test all 104 keys systematically
-   - [ ] Monitor queue overflow (should never drop keys in normal typing)
-   - [ ] Check memory usage (stack/heap)
-
 ---
 
 ## Implementation Checklist
@@ -974,13 +694,8 @@ The original Teletype used Emacs-style shortcuts because:
 
 ### Phase 5: UI Integration ✓
 - [ ] Add keyboard event handler to TeletypeScriptViewPage
-- [ ] Implement professional line editor (Emacs-style shortcuts)
-- [ ] Implement navigation shortcuts (Ctrl-A/E, Alt-F/B, arrows)
-- [ ] Implement editing shortcuts (Ctrl-K/U/W, Alt-D)
-- [ ] Implement clipboard shortcuts (Ctrl-X/C/V)
 - [ ] Implement character input to edit buffer
 - [ ] Implement special key handling (Enter/Backspace/Escape/Delete)
-- [ ] Add word-based operations (deleteWordBackward, etc.)
 - [ ] Add keyboard connected indicator to UI
 - [ ] Update PageContext to include UsbH reference
 - [ ] Test dual input mode (keyboard + step keys)
@@ -1038,9 +753,7 @@ void handleKeyboardEvent(const KeyboardEvent &event) {
 
 ### What We Reuse from Teletype
 
-✅ **Keyboard shortcuts mapping** (Emacs-style bindings)
 ✅ **HID keycode-to-ASCII conversion** (`hid_to_ascii` logic)
-✅ **Professional editing philosophy** (word-based ops, kill commands)
 
 ### What We Adapt for Performer
 
@@ -1061,26 +774,8 @@ void handleKeyboardEvent(const KeyboardEvent &event) {
    - Most keyboards support boot protocol, but some advanced features may not work
    - **Impact:** 99% of keyboards work fine; exotic gaming keyboards may not
 
-2. **No Keyboard Remapping:**
-   - US QWERTY layout assumed
-   - International layouts not supported (requires report descriptor parsing)
-   - **Impact:** Non-US keyboards work but symbols may be wrong (use physical labels)
 
-3. **No Key Repeat:**
-   - OS-level key repeat not implemented
-   - User must release and re-press for repeated characters
-   - **Future work:** Could add timer-based repeat (200ms delay, 30ms interval)
-
-4. **Single Active Keyboard:**
-   - Only one keyboard's input processed at a time
-   - Multiple keyboards supported but share event queue
-   - **Impact:** Minimal - users rarely connect multiple keyboards
-
-5. **No Mouse Support:**
-   - HID driver supports mice but not integrated into UI
-   - **Future work:** Use mouse for parameter control? Unlikely use case for Eurorack
-
-6. **No Up/Down Arrow for History:**
+2. **No Up/Down Arrow for History:**
    - Original Teletype didn't have command history
    - Performer has history via Page+Left/Right
    - **Future work:** Map Up/Down to history navigation (easy addition)
@@ -1104,22 +799,7 @@ void handleKeyboardEvent(const KeyboardEvent &event) {
 - **GPIO Current Limit:** 25mA per pin (USB_PWR_EN)
 - **Actual Limit:** Determined by external power switch circuit
 
-**Typical Keyboard Power Draw:**
-| Keyboard Type | Typical Current | Max Current |
-|---------------|----------------|-------------|
-| Basic membrane | 50-80mA | 100mA |
-| Mechanical (no LED) | 80-120mA | 150mA |
-| Backlit membrane | 100-200mA | 250mA |
-| RGB mechanical | 200-400mA | 500mA+ |
-| Wireless dongle | 20-50mA | 80mA |
-
-**Testing Recommendations:**
-- Use USB current meter during development
-- Document tested keyboards with current draw
-- Add warning in manual about RGB/gaming keyboards
-- Consider adding over-current detection in future (read USB_PWR_FAULT)
-
----
+--
 
 ## Debug & Diagnostics
 
@@ -1177,44 +857,3 @@ Byte 2-7: Keypress array (up to 6 simultaneous key codes)
 
 ---
 
-## Success Criteria
-
-Implementation is complete when:
-
-**Core Functionality:**
-- [ ] HID driver registered and initializing
-- [ ] Keyboards detected and connected in debug logs
-- [ ] Events flow from USB → Queue → UI
-- [ ] All printable ASCII characters work
-- [ ] Special keys work (Enter, Backspace, Escape, Delete)
-- [ ] Modifier keys work (Shift for symbols, Ctrl, Alt)
-- [ ] UI shows keyboard connection status ("KB" indicator)
-
-**Professional Line Editor (Teletype Heritage):**
-- [ ] Navigation shortcuts work (Ctrl-A/E, Alt-F/B, Home/End, arrows)
-- [ ] Editing shortcuts work (Ctrl-K/U/W/D/H, Alt-D)
-- [ ] Clipboard shortcuts work (Ctrl-X/C/V, Alt-X/C/V)
-- [ ] Word-based operations work (forward/backward)
-- [ ] Cursor positioning accurate across all operations
-- [ ] Live command execution works (Enter → immediate CV/gate response)
-
-**Dual Input Mode:**
-- [ ] Step-key input still works (T9-style for hardware-only users)
-- [ ] Keyboard and step-keys can be used interchangeably
-- [ ] Encoder cursor navigation still works (Shift+Encoder)
-- [ ] No conflicts between input methods
-
-**Quality & Compatibility:**
-- [ ] No regression in existing MIDI/USB functionality
-- [ ] No audio noise increase from USB polling
-- [ ] Tested with ≥3 different keyboard models
-- [ ] Unit tests pass for KeyboardHelper
-- [ ] Integration tests pass on hardware
-- [ ] All 20+ keyboard shortcuts tested and documented
-- [ ] Documentation updated in CLAUDE.md
-
-**User Experience Match:**
-- [ ] Typing speed comparable to original Teletype
-- [ ] Latency <50ms from keypress to screen update
-- [ ] Professional editing feels natural (Emacs users feel at home)
-- [ ] Hardware-only users unaffected (step-keys unchanged)
