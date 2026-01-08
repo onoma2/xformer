@@ -246,10 +246,10 @@ void TeletypeScriptViewPage::drawIoGrid(Canvas &canvas) {
     // --- IN/PARAM COLUMN (x=246) ---
     // IN (Top)
     bool inAssigned = track.cvInSource() != TeletypeTrack::CvInputSource::None;
-    drawBipolarBar(canvas, kGridInParamX, kGridY, track.state().variables.in, inAssigned ? Color::MediumBright : Color::Low);
+    drawBipolarBar(canvas, kGridInParamX, kGridY, static_cast<uint16_t>(track.state().variables.in), inAssigned ? Color::MediumBright : Color::Low);
     // PARAM (Bot)
     bool paramAssigned = track.cvParamSource() != TeletypeTrack::CvInputSource::None;
-    drawBipolarBar(canvas, kGridInParamX, kGridY + 16, track.state().variables.param, paramAssigned ? Color::MediumBright : Color::Low);
+    drawBipolarBar(canvas, kGridInParamX, kGridY + 16, static_cast<uint16_t>(track.state().variables.param), paramAssigned ? Color::MediumBright : Color::Low);
 }
 
 void TeletypeScriptViewPage::drawBipolarBar(Canvas &canvas, int x, int y, uint16_t value, Color color) {
@@ -258,17 +258,14 @@ void TeletypeScriptViewPage::drawBipolarBar(Canvas &canvas, int x, int y, uint16
 
     canvas.setColor(color);
     int32_t val = int32_t(value) - 8192;
-    int h = (std::abs(val) * 6) / 8192;
-    h = clamp(h, 0, 6);
+    int h = (std::abs(val) * 7) / 8192;
+    h = clamp(h, 0, 7);
 
-    int centerY = y + 8;
-    canvas.setColor(Color::Low); // Center line with low intensity
-    canvas.fillRect(x + 2, centerY, 4, 1); // Center Line
+    int centerY = y + 7;
 
     if (h > 0) {
-        canvas.setColor(color); // Restore original color for the bar
         if (val >= 0) {
-            canvas.fillRect(x + 2, centerY - h, 4, h);
+            canvas.fillRect(x + 2, centerY - h + 1, 4, h);
         } else {
             canvas.fillRect(x + 2, centerY + 1, 4, h);
         }

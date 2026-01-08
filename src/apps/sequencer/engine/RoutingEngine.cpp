@@ -386,8 +386,10 @@ void RoutingEngine::updateSinks() {
                     shaperOut = applyCreaseSource(shaperOut, biasNormalized);
                 }
                 float baseValue = route.min() + shaperOut * (route.max() - route.min());
+                float centivolts = Routing::denormalizeTargetValue(target, baseValue);
+                float volts = centivolts * 0.01f;  // Convert centivolts to volts
                 int busIndex = int(target) - int(Routing::Target::BusCv1);
-                _engine.setBusCv(busIndex, baseValue);
+                _engine.setBusCv(busIndex, volts);
             } else if (Routing::isPerTrackTarget(target)) {
                 uint8_t tracks = route.tracks();
 
