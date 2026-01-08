@@ -42,6 +42,7 @@ private:
     void pushHistory(const char *line);
     void recallHistory(int direction);
     void setEditBuffer(const char *text);
+    void commitLineAndAdvance();
 
     void drawIoGrid(Canvas &canvas);
     void drawBipolarBar(Canvas &canvas, int x, int y, uint16_t value, Color color);

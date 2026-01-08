@@ -94,7 +94,7 @@ The Performer implementation of Teletype includes specific keyboard shortcuts fo
   - **Step 13**: ; → Y → Z (cycles through ;→Y→Z)
   - **Step 14**: Backspace (delete character before cursor) - DUPLICATED FROM LEFT ARROW
   - **Step 15**: Insert space (insert space character) - DUPLICATED FROM RIGHT ARROW
-  - **Step 16**: Commit line (commit the current line) - DUPLICATED FROM SHIFT+ENCODER
+  - **Step 16**: Commit line and advance (commit current line and move to next line) - REPLACES ORIGINAL FUNCTION
 
 
 ### Page + Step Keys (Steps 1-16)

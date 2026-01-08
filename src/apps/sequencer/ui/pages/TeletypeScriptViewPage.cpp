@@ -483,8 +483,8 @@ void TeletypeScriptViewPage::handleStepKey(int step, bool shift) {
             case 14: // Step 15 in docs - insert space
                 insertChar(' ');
                 return;
-            case 15: // Step 16 in docs - commit
-                commitLine();
+            case 15: // Step 16 in docs - commit and advance
+                commitLineAndAdvance();
                 return;
         }
     }
@@ -938,4 +938,12 @@ void TeletypeScriptViewPage::setEditBuffer(const char *text) {
     std::strncpy(_editBuffer, text, EditBufferSize - 1);
     _editBuffer[EditBufferSize - 1] = '\0';
     _cursor = int(std::strlen(_editBuffer));
+}
+
+void TeletypeScriptViewPage::commitLineAndAdvance() {
+    commitLine();
+    // Move to the next line if possible
+    if (_selectedLine < kLineCount - 1) {
+        loadEditBuffer(_selectedLine + 1);
+    }
 }
