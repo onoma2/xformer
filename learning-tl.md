@@ -92,9 +92,9 @@ The Performer implementation of Teletype includes specific keyboard shortcuts fo
   - **Step 11**: . → U → V (cycles through .→U→V)
   - **Step 12**: : → W → X (cycles through :→W→X)
   - **Step 13**: ; → Y → Z (cycles through ;→Y→Z)
-  - **Step 14**: CV → CV.SLEW → RRAND
-  - **Step 15**: TR.P → PARAM → ELIF
-  - **Step 16**: M.ACT → P.NEXT → BUS
+  - **Step 14**: Backspace (delete character before cursor) - DUPLICATED FROM LEFT ARROW
+  - **Step 15**: Insert space (insert space character) - DUPLICATED FROM RIGHT ARROW
+  - **Step 16**: Commit line (commit the current line) - DUPLICATED FROM SHIFT+ENCODER
 
 
 ### Page + Step Keys (Steps 1-16)
@@ -107,24 +107,24 @@ The Performer implementation of Teletype includes specific keyboard shortcuts fo
 
 ### Shift + Step Keys (Steps 1-16)
 
-- **Shift + Steps 1-16**: Insert special characters
+- **Shift + Steps 1-16**: Insert special characters with rotation
 
-  - **Shift + Step 1**: + (Plus)
-  - **Shift + Step 2**: - (Minus)
-  - **Shift + Step 3**: * (Multiply)
-  - **Shift + Step 4**: / (Divide)
-  - **Shift + Step 5**: % (Modulo)
-  - **Shift + Step 6**: = (Equals)
-  - **Shift + Step 7**: < (Less than)
-  - **Shift + Step 8**: > (Greater than)
-  - **Shift + Step 9**: ! (Logical NOT)
-  - **Shift + Step 10**: & (Bitwise AND)
-  - **Shift + Step 11**: | (Bitwise OR)
-  - **Shift + Step 12**: ^ (Bitwise XOR)
-  - **Shift + Step 13**: $ (Dollar sign)
-  - **Shift + Step 14**: @ (At symbol)
-  - **Shift + Step 15**: ? (Question mark)
-  - **Shift + Step 16**: ; (Semicolon)
+  - **Shift + Step 1**: + → - (Plus → Minus, cycles)
+  - **Shift + Step 2**: * → / (Multiply → Divide, cycles)
+  - **Shift + Step 3**: = → ! (Equals → Logical NOT, cycles)
+  - **Shift + Step 4**: < → > (Less than → Greater than, cycles)
+  - **Shift + Step 5**: % → ^ (Modulo → Bitwise XOR, cycles)
+  - **Shift + Step 6**: & → | (Bitwise AND → Bitwise OR, cycles)
+  - **Shift + Step 7**: $ → @ (Dollar → At symbol, cycles)
+  - **Shift + Step 8**: ? → ; (Question mark → Semicolon, cycles)
+  - **Shift + Step 9**: CV → CV.SLEW (CV vs Slewed CV, cycles)
+  - **Shift + Step 10**: TR. → TR.TIME (Trigger vs Trigger timing, cycles)
+  - **Shift + Step 11**: PARAM → SCL (Parameter vs Scale, cycles)
+  - **Shift + Step 12**: P.NEXT → P.HERE (Next pattern vs Current pattern, cycles)
+  - **Shift + Step 13**: ELIF → OTHER (Else-if vs Other, cycles)
+  - **Shift + Step 14**: RRAND → RND.P (Random range vs Random pattern, cycles)
+  - **Shift + Step 15**: DRUNK → WRAP (Drunk walk vs Wrap, cycles)
+  - **Shift + Step 16**: M.ACT → M.RESET (Metro activate vs Metro reset, cycles)
 
 ### Navigation and Editing
 

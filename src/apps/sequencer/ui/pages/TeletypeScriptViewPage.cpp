@@ -474,12 +474,68 @@ void TeletypeScriptViewPage::handleStepKey(int step, bool shift) {
         return;
     }
 
+    // Handle special duplication functions for steps 14, 15, 16 (docs: 14, 15, 16)
+    if (!shift && step >= 13 && step <= 15) {
+        switch (step) {
+            case 13: // Step 14 in docs - backspace
+                backspace();
+                return;
+            case 14: // Step 15 in docs - insert space
+                insertChar(' ');
+                return;
+            case 15: // Step 16 in docs - commit
+                commitLine();
+                return;
+        }
+    }
+
     if (shift) {
-        static const char *const kShiftMap[16] = {
-            "+", "-", "*", "/", "%", "=", "<", ">", "!", "&", "|", "^", "$", "@", "?", ";"
+        // Define 2-symbol rotation for steps 0-15 (Steps 1-16 in documentation)
+        static const char *const kShiftMap[16][2] = {
+            {"+", "-"},           // Step 0: +, -
+            {"*", "/"},           // Step 1: *, /
+            {"=", "!"},           // Step 2: =, !
+            {"<", ">"},           // Step 3: <, >
+            {"%", "^"},           // Step 4: %, ^
+            {"&", "|"},           // Step 5: &, |
+            {"$", "@"},           // Step 6: $, @
+            {"?", ";"},           // Step 7: ?, ;
+            {"CV", "CV.SLEW"},    // Step 8: CV, CV.SLEW
+            {"TR.", "TR.TIME"},   // Step 9: TR., TR.TIME
+            {"PARAM", "SCL"},     // Step 10: PARAM, SCL
+            {"P.NEXT", "P.HERE"}, // Step 11: P.NEXT, P.HERE
+            {"ELIF", "OTHER"},    // Step 12: ELIF, OTHER
+            {"RRAND", "RND.P"},   // Step 13: RRAND, RND.P
+            {"DRUNK", "WRAP"},    // Step 14: DRUNK, WRAP
+            {"M.ACT", "M.RESET"}  // Step 15: M.ACT, M.RESET
         };
-        insertText(kShiftMap[step], false);
-        _lastStepKey = -1;
+        static const int kShiftCount[16] = {
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2
+        };
+
+        // Enable rotation for all steps 0-15 (Steps 1-16 in documentation)
+        const uint32_t now = os::ticks();
+        const bool canCycle = (_lastStepKey == step && _lastKeyShift &&
+                               (now - _lastKeyTime) < os::time::ms(700));
+
+        int index = 0;
+        if (canCycle) {
+            index = (_lastKeyIndex + 1) % kShiftCount[step];
+            removeLastInsert(_lastInsertLength);
+        }
+
+        const char *token = kShiftMap[step][index];
+        if (!token) {
+            return;
+        }
+        const bool addSpace = std::strlen(token) > 1;
+        insertText(token, addSpace);
+
+        _lastStepKey = step;
+        _lastKeyIndex = index;
+        _lastKeyTime = now;
+        _lastKeyShift = true;
+        _lastInsertLength = int(std::strlen(token) + (addSpace ? 1 : 0));
         return;
     }
 
