@@ -258,13 +258,15 @@ void TeletypeScriptViewPage::drawBipolarBar(Canvas &canvas, int x, int y, uint16
 
     canvas.setColor(color);
     int32_t val = int32_t(value) - 8192;
-    int h = (std::abs(val) * 5) / 8192;
-    h = clamp(h, 0, 5);
+    int h = (std::abs(val) * 6) / 8192;
+    h = clamp(h, 0, 6);
 
     int centerY = y + 8;
+    canvas.setColor(Color::Low); // Center line with low intensity
     canvas.fillRect(x + 2, centerY, 4, 1); // Center Line
 
     if (h > 0) {
+        canvas.setColor(color); // Restore original color for the bar
         if (val >= 0) {
             canvas.fillRect(x + 2, centerY - h, 4, h);
         } else {
