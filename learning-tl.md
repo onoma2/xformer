@@ -1,5 +1,167 @@
 # Teletype Track Learning Tutorial for Performer
 
+## Introduction
+
+This tutorial is designed for intermediate teletype users who want to learn how to use the Teletype Track functionality within the Performer firmware. The Teletype Track in Performer provides a powerful way to integrate teletype scripts with your sequencer, allowing for complex musical patterns and interactions.
+
+## Prerequisites
+
+Before starting this tutorial, you should have:
+- Basic understanding of teletype operations and syntax
+- Familiarity with the Performer sequencer interface
+- Understanding of CV/Gate concepts in modular synthesis
+
+## Overview of Teletype in Performer
+
+The Teletype Track in Performer provides:
+- 4 CV outputs (CV 1-4) mapped to Performer's CV outputs
+- 4 Gate outputs (TR A-D) mapped to Performer's gate outputs
+- 4 trigger inputs (TI-TR1-4) to trigger scripts
+- 2 CV inputs (TI-IN and TI-PARAM) from Performer's CV inputs
+- Integration with Performer's clock system
+- Pattern and variable storage
+- Two pattern slots (P1/P2) for S0 + Metro + I/O mapping + TT patterns
+  - Slot = Performer pattern index % 2
+  - Script/Pattern View shows the active slot label before the script name (or top right in Pattern View)
+
+## The T9 Type (Reference)
+
+### 1. Script View Page (The Editor)
+
+| Action | Hardware Control | Performer Function |
+| :--- | :--- | :--- |
+| **Active Slot** | **P1/P2 label (top right)** | Shows the current pattern slot (pattern % 2). |
+| **Select Line** | **Shift + Encoder Turn** | Moves the vertical selection (Lines 1-6). |
+| **Edit Line** | **Encoder Press** | Loads selected line into the edit buffer. |
+| **Commit Line** | **Shift + Encoder Press** | Compiles buffer and saves it to the script. |
+| **Select Script** | **Fn 1 - Fn 9** | Switches between Scripts (S1-S8, Metro). |
+| **Move Cursor** | **Encoder Turn** | Moves edit cursor horizontally. |
+| **Cursor Left** | **Shift + Page Left** | Moves cursor left in edit buffer. |
+| **Cursor Right** | **Shift + Page Right** | Moves cursor right in edit buffer. |
+| **Backspace** | **Page Left** | Deletes character before cursor. |
+| **Space** | **Page Right** | Inserts a space. |
+| **Insert Text** | **Step Keys 1-16** | Cycles through characters (0-9, A-Z, symbols). |
+
+Notes:
+- S0 and Metro are per-slot (P1/P2). S1–S3 are global across patterns.
+
+### 2. Pattern View Page (The Tracker)
+
+| Action | Hardware Control | Performer Function |
+| :--- | :--- | :--- |
+| **Select Row** | **Encoder Turn** | Moves the vertical selection (Index 0-63). |
+| **Select Col** | **Fn 1 - Fn 4** | Switches between Pattern 0 to 3. |
+| **Negate Value** | **Encoder Press** | Toggles sign of value or buffer. |
+| **Commit Value** | **Shift + Encoder Press** | Writes buffer to pattern and advances length. |
+| **Insert Digit** | **Step Keys 1-10** | Enables numeric entry (digits 0-9). |
+| **Backspace** | **Page Left** | Deletes last digit from buffer. |
+| **Delete Row** | **Shift + Page Left** | Deletes current row (shifts subsequent rows up). |
+| **Insert Row** | **Page Right** | Duplicates current row (shifts subsequent rows down). |
+| **Toggle Turtle**| **Shift + Page Right** | Toggles Turtle visibility on the grid. |
+| **Set Length** | **Step Key 14** | Sets Pattern Length to current row + 1. |
+| **Set Start** | **Step Key 15** | Sets Loop Start to current row. |
+| **Set End** | **Step Key 16** | Sets Loop End to current row. |
+
+
+## Performer Teletype Keyboard Shortcuts
+
+The Performer implementation of Teletype includes specific keyboard shortcuts for editing scripts:
+
+### Function Keys (F0-F4)
+- **F1**: Select S0
+- **F2**: Select S1
+- **F3**: Select S2
+- **F4**: Toggle S3 ↔ Metro
+- **F5**: Toggle Pattern View - Live view - Script View
+
+- **Shift + F1-F4**: Fire script S0-S3 (TI-TR1..4)
+
+### Step Keys (Steps 1-16)
+- **Steps 1-16**: Insert common teletype commands/variables (cycles through options)
+-
+  - **Step 1**: 1 → A → B (cycles through 1→A→B)
+  - **Step 2**: 2 → C → D (cycles through 2→C→D)
+  - **Step 3**: 3 → E → F (cycles through 3→E→F)
+  - **Step 4**: 4 → G → H (cycles through 4→G→H)
+  - **Step 5**: 5 → I → J (cycles through 5→I→J)
+  - **Step 6**: 6 → K → L (cycles through 6→K→L)
+  - **Step 7**: 7 → M → N (cycles through 7→M→N)
+  - **Step 8**: 8 → O → P (cycles through 8→O→P)
+  - **Step 9**: 9 → Q → R (cycles through 9→Q→R)
+  - **Step 10**: 0 → S → T (cycles through 0→S→T)
+  - **Step 11**: . → U → V (cycles through .→U→V)
+  - **Step 12**: : → W → X (cycles through :→W→X)
+  - **Step 13**: ; → Y → Z (cycles through ;→Y→Z)
+  - **Step 14**: CV → CV.SLEW → RRAND
+  - **Step 15**: TR.P → PARAM → ELIF
+  - **Step 16**: M.ACT → P.NEXT → BUS
+
+
+### Page + Step Keys (Steps 1-16)
+
+- **Page + Step 9**: Copy current line
+- **Page + Step 10**: Paste line
+- **Page + Step 11**: Duplicate line
+- **Page + Step 12**: Comment/uncomment line
+- **Page + Step 13**: Delete line
+
+### Shift + Step Keys (Steps 1-16)
+
+- **Shift + Steps 1-16**: Insert special characters
+
+  - **Shift + Step 1**: + (Plus)
+  - **Shift + Step 2**: - (Minus)
+  - **Shift + Step 3**: * (Multiply)
+  - **Shift + Step 4**: / (Divide)
+  - **Shift + Step 5**: % (Modulo)
+  - **Shift + Step 6**: = (Equals)
+  - **Shift + Step 7**: < (Less than)
+  - **Shift + Step 8**: > (Greater than)
+  - **Shift + Step 9**: ! (Logical NOT)
+  - **Shift + Step 10**: & (Bitwise AND)
+  - **Shift + Step 11**: | (Bitwise OR)
+  - **Shift + Step 12**: ^ (Bitwise XOR)
+  - **Shift + Step 13**: $ (Dollar sign)
+  - **Shift + Step 14**: @ (At symbol)
+  - **Shift + Step 15**: ? (Question mark)
+  - **Shift + Step 16**: ; (Semicolon)
+
+### Navigation and Editing
+
+- **Left Arrow**: **Backspace** (delete character to the left)
+- **Shift + Left Arrow**: Move cursor left
+- **Right Arrow**: Insert space (**Spacebar**)
+- **Shift + Right Arrow**: Move cursor right
+- **Encoder Press**: Load selected line into edit buffer
+- **Shift + Encoder Press**: Commit line (save changes - **Enter**)
+- **Encoder Turn**: Move cursor left/right (normal) or select line (with Shift)
+
+### Other Controls
+
+- **Page + Left/Right**: History prev/next (live/edit)
+
+## Teletype Pattern View Keyboard Shortcuts
+
+The Performer implementation also includes a pattern view for editing teletype patterns:
+
+### Function Keys
+- **F1-F4**: Select pattern 0-3
+- **F4**: Toggle back to Script View
+
+### Step Keys (Steps 1-16)
+- **Steps 1-9**: Insert digits 1-9 into the currently selected pattern position
+- **Step 10 (0)**: Insert digit 0 into the currently selected pattern position
+- **Step 14**: Set pattern length to current row position
+- **Step 15**: Set pattern start position to current row
+- **Step 16**: Set pattern end position to current row
+
+### Navigation and Editing
+- **Left Arrow**: Backspace digit (while editing); **Shift + Left** deletes row
+- **Right Arrow**: Insert row; **Shift + Right** toggles turtle display
+- **Encoder Turn**: Move up/down through pattern rows
+- **Encoder Press**: Negate current value (make positive/negative)
+- **Shift + Encoder Press**: Commit edited value
+
 ## Teletype Track Setup (I/O Mapping)
 
 If your Teletype track is new, set up its I/O first so scripts can see the correct inputs/outputs.
@@ -33,12 +195,13 @@ Need to instantly silence all Teletype activity? Use the global panic:
 **Page + Track 6** → `TT PANIC`
 
 This stops **all Teletype tracks** by:
+
 - disabling metro (M.ACT = 0)
 - clearing pending DEL commands
 - clearing TR pulses and forcing gates low
 - zeroing all Teletype CV outputs
 
-## Default Scripts on New Teletype Track
+## Default Scripts on New T9type Track
 
 When a Teletype track has no scripts, it seeds two defaults:
 
@@ -46,6 +209,45 @@ When a Teletype track has no scripts, it seeds two defaults:
 - **M (Metro)**: `CV 1 N 48 ; TR.P 1` (C3 on CV1 + trigger pulse)
 
 You can overwrite these immediately in Script View.
+
+
+### 3. Teletype Script View - I/O Grid
+
+The Script View now features a 4x4 visualization grid in the top-right corner, providing real-time feedback on Teletype I/O states.
+
+**Grid Layout (3 Rows):**
+
+1.  **TI (Trigger Inputs)** - Top Row
+    -   Displays the state of `TI-TR1` through `TI-TR4`.
+    -   **Dim (Low):** Input is unassigned (None).
+    -   **Medium:** Input is assigned but inactive.
+    -   **Bright:** Input is assigned and receiving a high signal (Gate High).
+
+2.  **TO (Trigger Outputs)** - Middle Row
+    -   Displays the state of `TO-TRA` through `TO-TRD` (mapped to Performer Gate outputs).
+    -   **Dim (Low):** The target Gate Output is assigned to a *different* track in the global Layout. (Signal is generated but effectively disconnected from this track).
+    -   **Medium:** Output is owned by this track but inactive.
+    -   **Bright:** Output is owned and pulsing (Active).
+
+3.  **CV (CV Outputs)** - Bottom Section (Double Height)
+    -   Displays the state of `TO-CV1` through `TO-CV4` (mapped to Performer CV outputs).
+    -   **Visualization:** A vertical bar graph growing from the center (Bipolar).
+    -   **Center Line:** Represents 0V.
+    -   **Upward Bar:** Positive voltage (> 0V).
+    -   **Downward Bar:** Negative voltage (< 0V).
+    -   **Ownership:** If the target CV Output is assigned to another track, the bar is **hidden** (only the dim container frame is visible), indicating the signal is disconnected.
+
+4. **In and Param values** 
+
+	- Top is In
+	- Bottom is param
+
+5. **Bus 1-4 values** 
+
+To the left of track specific params there is a display of bus values.
+
+	- Top is BUS 1-2
+	- Bottom is BUS 2-4
 
 ## BUS Routing Example (Performer)
 
@@ -111,6 +313,7 @@ This divides each bar into 4 sections (0, 1, 2, 3) and runs different scripts ba
 ### Time Signature Awareness
 
 BAR automatically adjusts to your project's time signature setting:
+
 - **4/4 time**: BAR completes one cycle (0→16383) every 4 beats
 - **3/4 time**: BAR completes one cycle every 3 beats
 - **5/8 time**: BAR completes one cycle every 5 eighth-notes
@@ -120,13 +323,16 @@ No configuration needed—BAR always represents one complete bar regardless of t
 ### Musical Examples
 
 **Create a bar-synced triangle wave:**
+
 ```
 # S0: Triggered each tick
 IF LT BAR 8192: CV 1 V BAR
 ELSE: CV 1 V SUB 16383 BAR
 ```
 
+
 **Bar-locked random sample & hold:**
+
 ```
 # S0: Runs on bar start
 IF LT BAR 100: X RAND 16383
@@ -134,18 +340,22 @@ CV 1 V X
 ```
 When BAR resets to 0 (start of bar), generate new random value and hold it for entire bar.
 
+
 **Cross-fade between two values over a bar:**
+
 ```
 START 2000
 END 8000
 PROGRESS DIV BAR 16384
 CV 1 V ADD START MUL SUB END START PROGRESS
 ```
+
 Linear interpolation from START voltage to END voltage across the bar.
 
 ### Combining BAR with Patterns
 
 **Bar-synced pattern playback:**
+
 ```
 # M script (metro)
 X DIV BAR 2048       # Divide bar into 8 sections
@@ -178,16 +388,19 @@ Then use Performer's Routing page to route CV 1 or BUS 1 to any track parameter.
 ## WR Transport Flag (Performer)
 
 WR is a read-only opcode that returns whether the Performer transport is running.
+
 Use WR.ACT to start/stop the transport.
 
 ### Basic Usage
 
 **Gate only when transport is running:**
+
 ```
 IF WR: TR.P A
 ```
 
 **Hold a value when stopped:**
+
 ```
 IF WR: X RAND 16383
 CV 1 V X
@@ -196,6 +409,7 @@ CV 1 V X
 WR returns `1` when the sequencer is playing and `0` when stopped.
 
 **Set transport (run/stop):**
+
 
 ```
 WR.ACT 1   # start
@@ -241,10 +455,12 @@ X WTU 7 2   # 2 * (beat / 7)
 ```
 
 Notes:
+
 - `WMS n` and `WTU n m` clamp `n` and `m` to 1–128.
 - Use these values directly with `M` in MS timebase.
 
 Notes:
+
 - Valid range: 1–1000 BPM.
 - WBPM is a direct BPM value (no scaling to 0–16383).
 - WBPM.S clamps to 1–1000 BPM.
@@ -256,11 +472,13 @@ RT reads the current source value for a routing slot (pre-shaper), scaled to Tel
 ### Basic Usage
 
 **Mirror Route 1 source to a CV output:**
+
 ```
 CV 1 V RT 1
 ```
 
 **Use Route 2 source as a condition:**
+
 ```
 IF GT RT 2 8192: TR.P 1
 ```
@@ -272,17 +490,20 @@ RT returns the normalized source value (0–1) of the route before shapers and p
 These ops process the active pattern range between `P.START` and `P.END`.
 Use `PN.*` variants to target a specific pattern number.
 
-**Shift all steps up by 100:**
+**Shift all steps up by 100 - Pattern.PatternAdd:**
+
 ```
 P.PA 100
 ```
 
-**Scale down by 2:**
+**Scale down by 2 - Pattern.PatternDivide :**
+
 ```
 P.PD 2
 ```
 
-**Wrap steps into a 0–11 range:**
+**Wrap steps into a 0–11 range - Pattern.PatternModulo:**
+
 ```
 P.PMOD 12
 ```
@@ -294,24 +515,29 @@ P.SCALE 0 16383 48 72
 
 ## Pattern Analysis Ops (P.SUM / P.AVG / P.MINV / P.MAXV / P.FND)
 
+
 These return values computed over `P.START`..`P.END`.
 
 **Density check (sum of 0/1 gates):**
+
 ```
 X P.SUM
 ```
 
 **Average step value:**
+
 ```
 Y P.AVG
 ```
 
 **Find first zero in the active range:**
+
 ```
 I P.FND 0
 ```
 
 **Read min/max values:**
+
 ```
 A P.MINV
 B P.MAXV
@@ -323,12 +549,14 @@ Randomizes all steps in the active range `P.START..P.END`. Defaults to full
 0–16383 range, or pass min/max bounds.
 
 **Randomize working pattern:**
+
 ```
 RND.P
 RND.P 0 4095
 ```
 
 **Randomize pattern 2:**
+
 ```
 RND.PN 2
 RND.PN 2 0 4095
@@ -337,6 +565,7 @@ RND.PN 2 0 4095
 ## Trigger Divider & Width (TR.D / TR.W)
 
 Divide or shape trigger pulses per output:
+
 
 ```
 TR.D 1 2     # every other pulse on TR1
@@ -359,6 +588,7 @@ E.T 1         # trigger envelope
 
 Optional triggers and looping:
 
+
 ```
 E.R 1 1       # pulse TR1 at end of rise
 E.C 1 2       # pulse TR2 at end of cycle
@@ -367,13 +597,19 @@ E.L 1 4       # loop 4 cycles (0 = infinite)
 
 ## WP - Pattern-Aware Scripting (Performer)
 
-The `WP` (Which Pattern) opcode allows Teletype scripts to query the current pattern index (0-15) of any track in the Performer project. This enables pattern-aware scripting where behavior changes based on which patterns are playing across all 8 tracks.
+
+The `WP` (Westlicht Pattern) opcode allows Teletype scripts to query the current pattern index (0-15) of any track in the Performer project. This enables pattern-aware scripting where behavior changes based on which patterns are playing across all 8 tracks.
 
 ### Basic Usage
 
-**Syntax:** `WP i` where `i` = track number (1-8)
+**Syntax:** 
 
-**Returns:** Pattern index (1-16) for the specified track (matches Performer UI)
+`WP i` where `i` = track number (1-8)
+
+**Returns:** 
+
+Pattern index (1-16) for the specified track (matches Performer UI)
+
 
 ```
 # Query pattern on track 1
@@ -387,6 +623,7 @@ X WP 2                          # Store track 2's pattern in X
 
 WP.SET 1 2                      # Force track 1 to pattern 2 (1-based)
 ```
+
 
 ### Pattern-Dependent Behavior
 
@@ -426,6 +663,7 @@ IF AND EQ WP 1 5 EQ WP 3 7: CV 2 V 7   # Tracks 1&3 on specific patterns
 
 Map pattern indices to CV values for dynamic variation:
 
+
 ```
 # Linear mapping: pattern 0→C3, pattern 15→C5
 CV 1 N SCALE WP 1 1 16 48 72
@@ -447,6 +685,7 @@ CV 4 N SCALE X 0 120 36 96      # Map to 5-octave range
 
 Create rhythmic variations based on pattern state:
 
+
 ```
 # Metro script with pattern-dependent tempo
 M DIV 1000 ADD 4 WP 1           # Faster on higher patterns
@@ -457,11 +696,13 @@ PROB SCALE WP 2 1 16 10 90      # 10% on pattern 1, 90% on pattern 16
 IF TOSS: TR.PULSE 3
 ```
 
+
 ### Global Pattern State Hash
 
 Create a fingerprint of all patterns playing across all tracks:
 
 ```
+
 # Simple sum (0-120 range)
 X 0
 L 1 8: X ADD X WP I
@@ -482,6 +723,7 @@ CV 3 N SCALE X 1 16 60 75
 
 Store previous pattern and trigger on changes:
 
+
 ```
 # In Init script (S0):
 A WP 1                          # Store initial pattern in A
@@ -495,6 +737,7 @@ A B                             # Update stored pattern
 ### Use Cases
 
 **Song sections:**
+
 ```
 # Different behavior for verse/chorus/bridge
 IF LT WP 1 4: CV 1 V 3          # Patterns 0-3 = verse
@@ -503,6 +746,7 @@ IF GT WP 1 7: CV 1 V 8          # Patterns 8-15 = bridge
 ```
 
 **Euclidean density control:**
+
 ```
 # Use pattern as Euclidean fill parameter
 ER 16 WP 1                      # Pattern 0 = 0/16, pattern 15 = 15/16
@@ -510,6 +754,7 @@ IF NZ: TR.PULSE 1
 ```
 
 **Deterministic generative:**
+
 ```
 # Pattern-stable generative sequences
 SEED ADD WP 1 MUL WP 2 16       # Combine 2 track patterns for seed
@@ -552,121 +797,9 @@ CV 2 V MUL WP 4 200             # 0-3V based on pattern
 - Out-of-bounds track numbers (< 1 or > 8) return 0
 - WP works even when called from a Teletype track that isn't the selected track
 
-## Performer Teletype Keyboard Shortcuts
-
-The Performer implementation of Teletype includes specific keyboard shortcuts for editing scripts:
-
-### Function Keys (F0-F4)
-- **F0**: Toggle LIVE ↔ S0
-- **F1**: Select S1
-- **F2**: Select S2
-- **F3**: Toggle S3 ↔ Metro
-- **F4**: Toggle Pattern View
-- **Shift + F0-F3**: Fire script S0-S3 (TI-TR1..4)
-
-### Step Keys (Steps 1-16)
-- **Steps 1-16**: Insert common teletype commands/variables (cycles through options)
-  - **Step 1**: 1 → A → B (cycles through 1→A→B)
-  - **Step 2**: 2 → C → D (cycles through 2→C→D)
-  - **Step 3**: 3 → E → F (cycles through 3→E→F)
-  - **Step 4**: 4 → G → H (cycles through 4→G→H)
-  - **Step 5**: 5 → I → J (cycles through 5→I→J)
-  - **Step 6**: 6 → K → L (cycles through 6→K→L)
-  - **Step 7**: 7 → M → N (cycles through 7→M→N)
-  - **Step 8**: 8 → O → P (cycles through 8→O→P)
-  - **Step 9**: 9 → Q → R (cycles through 9→Q→R)
-  - **Step 10**: 0 → S → T (cycles through 0→S→T)
-  - **Step 11**: . → U → V (cycles through .→U→V)
-  - **Step 12**: : → W → X (cycles through :→W→X)
-  - **Step 13**: ; → Y → Z (cycles through ;→Y→Z)
-  - **Step 14**: CV → CV.SLEW → RRAND
-  - **Step 15**: TR.P → PARAM → ELIF
-  - **Step 16**: M.ACT → P.NEXT → BUS
 
 
-### Page + Step Keys (Steps 1-16)
-- **Page + Step 9**: Copy current line
-- **Page + Step 10**: Paste line
-- **Page + Step 11**: Duplicate line
-- **Page + Step 12**: Comment/uncomment line
-- **Page + Step 13**: Delete line
 
-### Shift + Step Keys (Steps 1-16)
-- **Shift + Steps 1-16**: Insert special characters
-  - **Shift + Step 1**: + (Plus)
-  - **Shift + Step 2**: - (Minus)
-  - **Shift + Step 3**: * (Multiply)
-  - **Shift + Step 4**: / (Divide)
-  - **Shift + Step 5**: % (Modulo)
-  - **Shift + Step 6**: = (Equals)
-  - **Shift + Step 7**: < (Less than)
-  - **Shift + Step 8**: > (Greater than)
-  - **Shift + Step 9**: ! (Logical NOT)
-  - **Shift + Step 10**: & (Bitwise AND)
-  - **Shift + Step 11**: | (Bitwise OR)
-  - **Shift + Step 12**: ^ (Bitwise XOR)
-  - **Shift + Step 13**: $ (Dollar sign)
-  - **Shift + Step 14**: @ (At symbol)
-  - **Shift + Step 15**: ? (Question mark)
-  - **Shift + Step 16**: ; (Semicolon)
-
-### Navigation and Editing
-- **Left Arrow**: Backspace (delete character to the left)
-- **Shift + Left Arrow**: Move cursor left
-- **Right Arrow**: Insert space
-- **Shift + Right Arrow**: Move cursor right
-- **Encoder Press**: Load selected line into edit buffer
-- **Shift + Encoder Press**: Commit line (save changes)
-- **Encoder Turn**: Move cursor left/right (normal) or select line (with Shift)
-
-### Other Controls
-- **Page + Left/Right**: History prev/next (live/edit)
-
-## Teletype Pattern View Keyboard Shortcuts
-
-The Performer implementation also includes a pattern view for editing teletype patterns:
-
-### Function Keys
-- **F0-F3**: Select pattern 0-3
-- **F4**: Toggle back to Script View
-
-### Step Keys (Steps 1-16)
-- **Steps 1-9**: Insert digits 1-9 into the currently selected pattern position
-- **Step 10 (0)**: Insert digit 0 into the currently selected pattern position
-- **Step 14**: Set pattern length to current row position
-- **Step 15**: Set pattern start position to current row
-- **Step 16**: Set pattern end position to current row
-
-### Navigation and Editing
-- **Left Arrow**: Backspace digit (while editing); **Shift + Left** deletes row
-- **Right Arrow**: Insert row; **Shift + Right** toggles turtle display
-- **Encoder Turn**: Move up/down through pattern rows
-- **Encoder Press**: Negate current value (make positive/negative)
-- **Shift + Encoder Press**: Commit edited value
-
-## Introduction
-
-This tutorial is designed for intermediate teletype users who want to learn how to use the Teletype Track functionality within the Performer firmware. The Teletype Track in Performer provides a powerful way to integrate teletype scripts with your sequencer, allowing for complex musical patterns and interactions.
-
-## Prerequisites
-
-Before starting this tutorial, you should have:
-- Basic understanding of teletype operations and syntax
-- Familiarity with the Performer sequencer interface
-- Understanding of CV/Gate concepts in modular synthesis
-
-## Overview of Teletype in Performer
-
-The Teletype Track in Performer provides:
-- 4 CV outputs (CV 1-4) mapped to Performer's CV outputs
-- 4 Gate outputs (TR A-D) mapped to Performer's gate outputs
-- 4 trigger inputs (TI-TR1-4) to trigger scripts
-- 2 CV inputs (TI-IN and TI-PARAM) from Performer's CV inputs
-- Integration with Performer's clock system
-- Pattern and variable storage
-- Two pattern slots (P1/P2) for S0 + Metro + I/O mapping + TT patterns
-  - Slot = Performer pattern index % 2
-  - Script/Pattern View shows the active slot label before the script name (or top right in Pattern View)
 
 ## Section 1: Basic Script Setup
 
@@ -931,6 +1064,96 @@ SCRIPT 3             // Call script 3
 CV 2 V ADD CV 2 1    // Increment CV 2
 ```
 
+### Step 23: Script Function Operations ($F, $F1, $F2, $L, $L1, $L2, $S, $S1, $S2)
+
+Advanced function operations allow you to treat scripts as functions that return values:
+
+```
+// $F: Execute script as function
+# Script 1: Define a function that returns the square of X
+* X X
+
+# In another script: Call script 1 as a function and use its return value
+A $F 1    // A gets the square of X
+
+// $F1: Execute script as function with 1 parameter
+# Script 1: Function that returns the square of the input parameter
+FR * I1 I1
+
+# In another script: Call script 1 with parameter 5
+A $F1 1 5    // A gets 25 (5 squared)
+
+// $F2: Execute script as function with 2 parameters
+# Script 1: Function that returns the sum of two input parameters
+FR + I1 I2
+
+# In another script: Call script 1 with parameters 3 and 4
+A $F2 1 3 4    // A gets 7 (3 + 4)
+
+// $L: Execute specific line as function
+# Script 1:
+X + A B    // Line 1: X = A + B
+Y * C D    // Line 2: Y = C * D
+
+# In another script: Execute line 1 of script 1 and get its result
+Z $L 1 1   // Z gets the result of A + B
+
+// $L1: Execute specific line as function with 1 parameter
+# Script 1:
+X + I1 10  // Line 1: X = parameter + 10
+
+# In another script: Execute line 1 of script 1 with parameter 5
+Z $L1 1 1 5   // Z gets 15 (5 + 10)
+
+// $L2: Execute specific line as function with 2 parameters
+# Script 1:
+X + I1 I2  // Line 1: X = parameter1 + parameter2
+
+# In another script: Execute line 1 of script 1 with parameters 3 and 4
+Z $L2 1 1 3 4   // Z gets 7 (3 + 4)
+
+// $S: Execute line in same script as function
+# In any script:
+X + A B    // Line 1: X = A + B
+Y $S 1     // Line 2: Y gets the result of line 1 (A + B)
+
+// $S1: Execute line in same script as function with 1 parameter
+# In any script:
+X + I1 10  // Line 1: X = parameter + 10
+Y $S1 1 5  // Line 2: Y gets 15 (5 + 10)
+
+// $S2: Execute line in same script as function with 2 parameters
+# In any script:
+X + I1 I2  // Line 1: X = parameter1 + parameter2
+Y $S2 1 3 4  // Line 2: Y gets 7 (3 + 4)
+
+// Practical example combining all concepts:
+# Script 1: A function to calculate a note value based on scale degree
+# Input: I1 = scale degree (0-7), I2 = root note
+FR N.S I2 0 I1    // Return note from major scale at root I2, degree I1
+
+# Script 2: A function to calculate probability
+# Input: I1 = base probability, I2 = modifier
+X + I1 I2
+FR MIN X 100        // Return probability capped at 100%
+
+# Script 3: Main logic using the functions
+ROOT_NOTE 60        // C4 as root
+DEGREE RAND 7       // Random scale degree
+
+# Get note from scale
+NOTE $F1 1 DEGREE ROOT_NOTE
+
+# Output the note
+CV 1 N NOTE
+
+# Calculate probability based on pattern position
+PROBABILITY $F2 2 50 WP 1    // Base 50% + pattern position
+
+# Use probability to conditionally trigger
+PROB PROBABILITY: TR.P 1
+```
+
 ### Step 23: Queue Operations
 
 Use queues for smoothing or averaging:
@@ -1084,67 +1307,9 @@ This tutorial has covered the fundamental concepts of using Teletype in the Perf
 Remember to experiment with different combinations of operations, and don't hesitate to refer back to the teletype manual for more detailed information about specific operations.
 
 The key to mastering Teletype in Performer is practice and experimentation. Try modifying the examples in this tutorial to create your own unique patterns and behaviors.
-## Hardware Mapping Summary (Reference)
 
-### 1. TeletypeScriptViewPage (The Editor)
 
-| Action | Hardware Control | Performer Function |
-| :--- | :--- | :--- |
-| **Active Slot** | **P1/P2 label (top right)** | Shows the current pattern slot (pattern % 2). |
-| **Select Line** | **Shift + Encoder Turn** | Moves the vertical selection (Lines 1-6). |
-| **Edit Line** | **Encoder Press** | Loads selected line into the edit buffer. |
-| **Commit Line** | **Shift + Encoder Press** | Compiles buffer and saves it to the script. |
-| **Select Script** | **Fn 1 - Fn 9** | Switches between Scripts (S1-S8, Metro). |
-| **Move Cursor** | **Encoder Turn** | Moves edit cursor horizontally. |
-| **Cursor Left** | **Shift + Page Left** | Moves cursor left in edit buffer. |
-| **Cursor Right** | **Shift + Page Right** | Moves cursor right in edit buffer. |
-| **Backspace** | **Page Left** | Deletes character before cursor. |
-| **Space** | **Page Right** | Inserts a space. |
-| **Insert Text** | **Step Keys 1-16** | Cycles through characters (0-9, A-Z, symbols). |
 
-Notes:
-- S0 and Metro are per-slot (P1/P2). S1–S3 are global across patterns.
 
-### 2. TeletypePatternViewPage (The Tracker)
 
-| Action | Hardware Control | Performer Function |
-| :--- | :--- | :--- |
-| **Select Row** | **Encoder Turn** | Moves the vertical selection (Index 0-63). |
-| **Select Col** | **Fn 1 - Fn 4** | Switches between Pattern 0 to 3. |
-| **Negate Value** | **Encoder Press** | Toggles sign of value or buffer. |
-| **Commit Value** | **Shift + Encoder Press** | Writes buffer to pattern and advances length. |
-| **Insert Digit** | **Step Keys 1-10** | Enables numeric entry (digits 0-9). |
-| **Backspace** | **Page Left** | Deletes last digit from buffer. |
-| **Delete Row** | **Shift + Page Left** | Deletes current row (shifts subsequent rows up). |
-| **Insert Row** | **Page Right** | Duplicates current row (shifts subsequent rows down). |
-| **Toggle Turtle**| **Shift + Page Right** | Toggles Turtle visibility on the grid. |
-| **Set Length** | **Step Key 14** | Sets Pattern Length to current row + 1. |
-| **Set Start** | **Step Key 15** | Sets Loop Start to current row. |
-| **Set End** | **Step Key 16** | Sets Loop End to current row. |
-
-### 3. Teletype Script View - I/O Grid
-
-The Script View now features a 4x4 visualization grid in the top-right corner, providing real-time feedback on Teletype I/O states.
-
-**Grid Layout (3 Rows):**
-
-1.  **TI (Trigger Inputs)** - Top Row
-    -   Displays the state of `TI-TR1` through `TI-TR4`.
-    -   **Dim (Low):** Input is unassigned (None).
-    -   **Medium:** Input is assigned but inactive.
-    -   **Bright:** Input is assigned and receiving a high signal (Gate High).
-
-2.  **TO (Trigger Outputs)** - Middle Row
-    -   Displays the state of `TO-TRA` through `TO-TRD` (mapped to Performer Gate outputs).
-    -   **Dim (Low):** The target Gate Output is assigned to a *different* track in the global Layout. (Signal is generated but effectively disconnected from this track).
-    -   **Medium:** Output is owned by this track but inactive.
-    -   **Bright:** Output is owned and pulsing (Active).
-
-3.  **CV (CV Outputs)** - Bottom Section (Double Height)
-    -   Displays the state of `TO-CV1` through `TO-CV4` (mapped to Performer CV outputs).
-    -   **Visualization:** A vertical bar graph growing from the center (Bipolar).
-    -   **Center Line:** Represents 0V.
-    -   **Upward Bar:** Positive voltage (> 0V).
-    -   **Downward Bar:** Negative voltage (< 0V).
-    -   **Ownership:** If the target CV Output is assigned to another track, the bar is **hidden** (only the dim container frame is visible), indicating the signal is disconnected.
 

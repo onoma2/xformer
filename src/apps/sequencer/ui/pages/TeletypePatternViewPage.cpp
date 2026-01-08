@@ -43,8 +43,8 @@ enum class ContextAction {
 };
 
 static const ContextMenuModel::Item contextMenuItems[] = {
-    { "LOAD TRACK" },
-    { "SAVE TRACK" },
+    { "LOAD TT" },
+    { "SAVE TT" },
 };
 
 TeletypePatternViewPage::TeletypePatternViewPage(PageManager &manager, PageContext &context) :
@@ -172,6 +172,22 @@ void TeletypePatternViewPage::keyPress(KeyPressEvent &event) {
     }
 
     if (key.pageModifier()) {
+        if (key.isStep()) {
+            int step = key.step();
+            if (step == 4) {
+                setLength();
+                event.consume();
+                return;
+            } else if (step == 5) {
+                setStart();
+                event.consume();
+                return;
+            } else if (step == 6) {
+                setEnd();
+                event.consume();
+                return;
+            }
+        }
         return;
     }
 
@@ -213,22 +229,8 @@ void TeletypePatternViewPage::keyPress(KeyPressEvent &event) {
     if (key.isStep()) {
         int step = key.step();
         int digit = -1;
-        if (step >= 0 && step <= 8) {
-            digit = step + 1;
-        } else if (step == 9) {
-            digit = 0;
-        } else if (step == 13) {
-            setLength();
-            event.consume();
-            return;
-        } else if (step == 14) {
-            setStart();
-            event.consume();
-            return;
-        } else if (step == 15) {
-            setEnd();
-            event.consume();
-            return;
+        if (step >= 0 && step <= 9) {
+            digit = (step == 9) ? 0 : step + 1;
         }
         if (digit >= 0) {
             insertDigit(digit);

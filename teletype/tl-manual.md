@@ -170,7 +170,7 @@ Notes:
 - Synchronized across all tracks in the project
 - Uses Engine's `measureFraction()` - zero computational overhead
 
-### WP (Which Pattern) - Read Current Pattern Index
+### WP (Westlicht Pattern) - Read Current Pattern Index
 
 **Syntax:** `WP i` where `i` = track number (1-8)
 
@@ -2804,6 +2804,111 @@ script is called using other ops, this op will return zero.<br />
 <td>-</td>
 <td>Use this op to get or set the return value in a script that is
 called as a function.<br />
+</td>
+</tr>
+<tr class="odd">
+<td><strong><code>SYM.AMPERSAND.x3</code></strong></td>
+<td>-</td>
+<td><strong><code>&amp;&amp;&amp;</code></strong></td>
+<td>Triple ampersand (AND3) - Logical AND of three values<br />
+</td>
+</tr>
+<tr class="even">
+<td><strong><code>SYM.AMPERSAND.x4</code></strong></td>
+<td>-</td>
+<td><strong><code>&amp;&amp;&amp;&amp;</code></strong></td>
+<td>Quadruple ampersand (AND4) - Logical AND of four values<br />
+</td>
+</tr>
+<tr class="odd">
+<td><strong><code>SYM.PIPE.x3</code></strong></td>
+<td>-</td>
+<td><strong><code>|||</code></strong></td>
+<td>Triple pipe (OR3) - Logical OR of three values<br />
+</td>
+</tr>
+<tr class="even">
+<td><strong><code>SYM.PIPE.x4</code></strong></td>
+<td>-</td>
+<td><strong><code>||||</code></strong></td>
+<td>Quadruple pipe (OR4) - Logical OR of four values<br />
+</td>
+</tr>
+<tr class="odd">
+<td><strong><code>SYM.LEFT.ANGLED.x3</code></strong></td>
+<td>-</td>
+<td><strong><code>&lt;&gt;</code></strong></td>
+<td>Triple left angled bracket (OUTR) - Out of range operator<br />
+</td>
+</tr>
+<tr class="even">
+<td><strong><code>SYM.RIGHT.ANGLED.x3</code></strong></td>
+<td>-</td>
+<td><strong><code>&gt;&lt;</code></strong></td>
+<td>Triple right angled bracket (OUTR) - Out of range operator<br />
+</td>
+</tr>
+<tr class="odd">
+<td><strong><code>SYM.DOLLAR.F</code></strong></td>
+<td>-</td>
+<td><strong><code>$F</code></strong></td>
+<td>Symbolic representation of $F - Execute script as function<br />
+</td>
+</tr>
+<tr class="even">
+<td><strong><code>SYM.DOLLAR.F1</code></strong></td>
+<td>-</td>
+<td><strong><code>$F1</code></strong></td>
+<td>Symbolic representation of $F1 - Execute script as function with 1 parameter<br />
+</td>
+</tr>
+<tr class="odd">
+<td><strong><code>SYM.DOLLAR.F2</code></strong></td>
+<td>-</td>
+<td><strong><code>$F2</code></strong></td>
+<td>Symbolic representation of $F2 - Execute script as function with 2 parameters<br />
+</td>
+</tr>
+<tr class="even">
+<td><strong><code>SYM.DOLLAR.L</code></strong></td>
+<td>-</td>
+<td><strong><code>$L</code></strong></td>
+<td>Symbolic representation of $L - Execute specific script line as function<br />
+</td>
+</tr>
+<tr class="odd">
+<td><strong><code>SYM.DOLLAR.L1</code></strong></td>
+<td>-</td>
+<td><strong><code>$L1</code></strong></td>
+<td>Symbolic representation of $L1 - Execute specific script line as function with 1 parameter<br />
+</td>
+</tr>
+<tr class="even">
+<td><strong><code>SYM.DOLLAR.L2</code></strong></td>
+<td>-</td>
+<td><strong><code>$L2</code></strong></td>
+<td>Symbolic representation of $L2 - Execute specific script line as function with 2 parameters<br />
+</td>
+</tr>
+<tr class="odd">
+<td><strong><code>SYM.DOLLAR.S</code></strong></td>
+<td>-</td>
+<td><strong><code>$S</code></strong></td>
+<td>Symbolic representation of $S - Execute line in same script as function<br />
+</td>
+</tr>
+<tr class="even">
+<td><strong><code>SYM.DOLLAR.S1</code></strong></td>
+<td>-</td>
+<td><strong><code>$S1</code></strong></td>
+<td>Symbolic representation of $S1 - Execute line in same script as function with 1 parameter<br />
+</td>
+</tr>
+<tr class="odd">
+<td><strong><code>SYM.DOLLAR.S2</code></strong></td>
+<td>-</td>
+<td><strong><code>$S2</code></strong></td>
+<td>Symbolic representation of $S2 - Execute line in same script as function with 2 parameters<br />
 </td>
 </tr>
 <tr class="odd">
