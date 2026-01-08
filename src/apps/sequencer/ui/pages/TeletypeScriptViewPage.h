@@ -45,7 +45,7 @@ private:
     void commitLineAndAdvance();
 
     void drawIoGrid(Canvas &canvas);
-    void drawBipolarBar(Canvas &canvas, int x, int y, uint16_t value, Color color);
+    void drawBipolarBar(Canvas &canvas, int x, int y, uint16_t value, Color fillColor, Color outlineColor);
 
     int _selectedLine = 0;
     int _cursor = 0;
