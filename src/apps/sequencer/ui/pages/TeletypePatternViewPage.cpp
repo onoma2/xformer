@@ -237,6 +237,15 @@ void TeletypePatternViewPage::keyPress(KeyPressEvent &event) {
             event.consume();
             return;
         }
+        if (step == 13) {
+            backspaceDigit();
+            event.consume();
+            return;
+        } else if (step == 15) {
+            commitEdit();
+            event.consume();
+            return;
+        }
     }
 
     if (key.is(Key::Encoder)) {

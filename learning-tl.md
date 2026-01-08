@@ -151,9 +151,13 @@ The Performer implementation also includes a pattern view for editing teletype p
 ### Step Keys (Steps 1-16)
 - **Steps 1-9**: Insert digits 1-9 into the currently selected pattern position
 - **Step 10 (0)**: Insert digit 0 into the currently selected pattern position
-- **Step 14**: Set pattern length to current row position
-- **Step 15**: Set pattern start position to current row
-- **Step 16**: Set pattern end position to current row
+- **Step 14**: Backspace digit (delete last digit from buffer) - DUPLICATED FROM LEFT ARROW
+- **Step 16**: Commit edited value - DUPLICATED FROM SHIFT+ENCODER
+
+### Page + Step Keys (Steps 4-6)
+- **Page + Step 4**: Set pattern length to current row position (moved from Step 14)
+- **Page + Step 5**: Set pattern start position to current row (moved from Step 15)
+- **Page + Step 6**: Set pattern end position to current row (moved from Step 16)
 
 ### Navigation and Editing
 - **Left Arrow**: Backspace digit (while editing); **Shift + Left** deletes row
