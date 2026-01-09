@@ -13,6 +13,8 @@
 #include "ui/model/IndexedTrackListModel.h"
 #include "ui/model/TeletypeTrackListModel.h"
 
+#include <array>
+
 class TrackPage : public ListPage {
 public:
     TrackPage(PageManager &manager, PageContext &context);
@@ -37,6 +39,7 @@ private:
     void pasteTrackSetup();
     void initRoute();
     void reseedTuesday();
+    void applyTeletypeTriggerPreset(TeletypeTrack &track, int presetIndex);
 
     RoutableListModel *_listModel;
     NoteTrackListModel _noteTrackListModel;
@@ -49,4 +52,5 @@ private:
     IndexedSequenceListModel _indexedSequenceListModel;
     IndexedTrackListModel _indexedTrackListModel;
     TeletypeTrackListModel _teletypeTrackListModel;
+    std::array<int, CONFIG_TRACK_COUNT> _teletypeTriggerPresetIndex{};
 };

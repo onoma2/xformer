@@ -45,6 +45,19 @@ The Teletype Track in Performer provides:
 Notes:
 - S0 and Metro are per-slot (P1/P2). S1–S3 are global across patterns.
 
+### Script View I/O Grid Highlights
+
+The right-side I/O grid shows live Teletype input/output activity and ownership:
+- **BUS block**: four CV bus meters (A–D) showing current bus voltages.
+- **TI row**: filled block indicates TI-TR assigned; brighter when active.
+- **TO (gates) row**:
+  - Solid block = destination owned by this track in Layout (bright when active).
+  - Outline block = destination owned by a different track (Layout mismatch).
+- **CV row**:
+  - Bright bar = destination owned by this track in Layout.
+  - Dim bar = destination owned by a different track (Layout mismatch).
+- **IN/PARAM bars**: brighter when assigned; dim when unassigned.
+
 ### 2. Pattern View Page (The Tracker)
 
 | Action | Hardware Control | Performer Function |
@@ -185,12 +198,22 @@ If your Teletype track is new, set up its I/O first so scripts can see the corre
 4. **Map Teletype outputs**  
    - **TO-TRA..TO-TRD**: map Teletype trigger outputs A–D to Performer gate outputs.  
    - **TO-CV1..TO-CV4**: map Teletype CV outputs 1–4 to Performer CV outputs.
-   - **Tip**: Make sure the corresponding gate/CV outputs are enabled in the **Layout** page.
+   - **Tip**: If a TO entry shows `!`, it is mapped to a physical output not owned by this track in **Layout**.
+   - **Sync**: **F5 (SYNC OUTS)** on the Track page fills TO-CV/TO-TR from the Layout-owned outputs (does not overwrite unmatched slots).
 
 5. **(Optional) Adjust ranges/offsets**  
    - **CV1 RNG/OFF .. CV4 RNG/OFF**: set per-output voltage range and offset.
 
+6. **Trigger input presets**  
+   - **F1 (TI PRESET)** cycles TI-TR presets: CV1-4, G1-4, G5-8, L-G1-4, L-G5-8, None.
+
 After this, proceed to Script View and start editing scripts.
+
+## Layout Prompt for Teletype Tracks
+
+When you commit a track mode change to Teletype from the Layout page, a prompt asks:
+`ASSIGN OUTS i-i+3?`
+Answering **Yes** assigns both gate and CV outputs in that range to the Teletype track (no wrap beyond output 8).
 
 ## Teletype Panic (Page + Track 6)
 
@@ -1311,9 +1334,5 @@ This tutorial has covered the fundamental concepts of using Teletype in the Perf
 Remember to experiment with different combinations of operations, and don't hesitate to refer back to the teletype manual for more detailed information about specific operations.
 
 The key to mastering Teletype in Performer is practice and experimentation. Try modifying the examples in this tutorial to create your own unique patterns and behaviors.
-
-
-
-
 
 
