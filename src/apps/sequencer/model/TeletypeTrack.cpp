@@ -73,6 +73,19 @@ void TeletypeTrack::cvOutputName(int index, StringBuilder &str) const {
     str("TT CV%d", (index % 4) + 1);
 }
 
+void TeletypeTrack::seedOutputDestsFromTrackIndex(int trackIndex) {
+    int start = clamp(trackIndex, 0, CONFIG_CHANNEL_COUNT - 1);
+    for (int i = 0; i < TriggerOutputCount; ++i) {
+        int outputIndex = (start + i) % CONFIG_CHANNEL_COUNT;
+        _triggerOutputDest[i] = TriggerOutputDest(outputIndex);
+    }
+    for (int i = 0; i < CvOutputCount; ++i) {
+        int outputIndex = (start + i) % CONFIG_CHANNEL_COUNT;
+        _cvOutputDest[i] = CvOutputDest(outputIndex);
+    }
+    syncActiveSlotMappings();
+}
+
 const char *TeletypeTrack::triggerInputSourceName(TriggerInputSource source) {
     switch (source) {
     case TriggerInputSource::None:     return "None";

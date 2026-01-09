@@ -119,6 +119,9 @@ void Project::setTrackMode(int trackIndex, Track::TrackMode trackMode) {
     // TODO make sure engine is synced to this before updating UI
     _playState.revertSnapshot();
     _tracks[trackIndex].setTrackMode(trackMode);
+    if (trackMode == Track::TrackMode::Teletype) {
+        _tracks[trackIndex].teletypeTrack().seedOutputDestsFromTrackIndex(trackIndex);
+    }
     _observable.notify(TrackModeChanged);
 }
 

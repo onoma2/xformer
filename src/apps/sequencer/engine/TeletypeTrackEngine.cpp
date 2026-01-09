@@ -148,8 +148,23 @@ void TeletypeTrackEngine::update(float dt) {
 
         auto dest = _teletypeTrack.cvOutputDest(i);
         int destIndex = int(dest);
+        int trackSlot = -1;
+        {
+            int slot = 0;
+            const auto &cvOutputTracks = _model.project().cvOutputTracks();
+            int trackIndex = _track.trackIndex();
+            for (int channel = 0; channel < CONFIG_CHANNEL_COUNT; ++channel) {
+                if (cvOutputTracks[channel] == trackIndex) {
+                    if (channel == destIndex) {
+                        trackSlot = slot;
+                        break;
+                    }
+                    ++slot;
+                }
+            }
+        }
 
-        if (destIndex < 0 || destIndex >= PerformerCvCount) {
+        if (trackSlot < 0 || trackSlot >= PerformerCvCount) {
             continue;
         }
 
@@ -161,13 +176,13 @@ void TeletypeTrackEngine::update(float dt) {
         int slideTime = clamp(static_cast<int>(std::sqrt(slewMs)), 1, 100);
 
         // Apply slew using Performer's existing mechanism
-        float current = _performerCvOutput[destIndex];
+        float current = _performerCvOutput[trackSlot];
         float slewed = Slide::applySlide(current, _cvOutputTarget[i], slideTime, dt);
-        _performerCvOutput[destIndex] = slewed;
+        _performerCvOutput[trackSlot] = slewed;
 
         // Check if we've reached target (within small epsilon)
         if (std::abs(slewed - _cvOutputTarget[i]) < 0.001f) {
-            _performerCvOutput[destIndex] = _cvOutputTarget[i];
+            _performerCvOutput[trackSlot] = _cvOutputTarget[i];
             _cvSlewActive[i] = false;
         }
     }
@@ -189,14 +204,29 @@ void TeletypeTrackEngine::handleTr(uint8_t index, int16_t value) {
     // Map TO-TRA-D to actual gate output
     auto dest = _teletypeTrack.triggerOutputDest(index);
     int destIndex = int(dest);  // GateOut1=0, GateOut2=1, etc
+    int trackSlot = -1;
+    {
+        int slot = 0;
+        const auto &gateOutputTracks = _model.project().gateOutputTracks();
+        int trackIndex = _track.trackIndex();
+        for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+            if (gateOutputTracks[i] == trackIndex) {
+                if (i == destIndex) {
+                    trackSlot = slot;
+                    break;
+                }
+                ++slot;
+            }
+        }
+    }
 
-    if (destIndex < 0 || destIndex >= PerformerGateCount) {
+    if (trackSlot < 0 || trackSlot >= PerformerGateCount) {
         return;
     }
 
     bool next = value != 0;
-    if (_performerGateOutput[destIndex] != next) {
-        _performerGateOutput[destIndex] = next;
+    if (_performerGateOutput[trackSlot] != next) {
+        _performerGateOutput[trackSlot] = next;
         _activity = true;
         _activityCountdownMs = kActivityHoldMs;
     }
@@ -311,8 +341,23 @@ void TeletypeTrackEngine::handleCv(uint8_t index, int16_t value, bool slew) {
     // Map TO-CV1-4 to actual CV output
     auto dest = _teletypeTrack.cvOutputDest(index);
     int destIndex = int(dest);  // CvOut1=0, CvOut2=1, etc
+    int trackSlot = -1;
+    {
+        int slot = 0;
+        const auto &cvOutputTracks = _model.project().cvOutputTracks();
+        int trackIndex = _track.trackIndex();
+        for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+            if (cvOutputTracks[i] == trackIndex) {
+                if (i == destIndex) {
+                    trackSlot = slot;
+                    break;
+                }
+                ++slot;
+            }
+        }
+    }
 
-    if (destIndex < 0 || destIndex >= PerformerCvCount) {
+    if (trackSlot < 0 || trackSlot >= PerformerCvCount) {
         return;
     }
 
@@ -323,7 +368,7 @@ void TeletypeTrackEngine::handleCv(uint8_t index, int16_t value, bool slew) {
     } else {
         // Snap immediately
         _cvOutputTarget[index] = targetVoltage;
-        _performerCvOutput[destIndex] = targetVoltage;
+        _performerCvOutput[trackSlot] = targetVoltage;
         _cvSlewActive[index] = false;
     }
 

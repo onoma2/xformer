@@ -214,6 +214,32 @@ void TeletypeScriptViewPage::drawIoGrid(Canvas &canvas) {
     }
 
     // --- MAIN GRID (x=214) ---
+    auto gateSlotForPhysical = [this, trackIndex] (int gateOutIndex) -> int {
+        int slot = 0;
+        const auto &gateOutputTracks = _project.gateOutputTracks();
+        for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+            if (gateOutputTracks[i] == trackIndex) {
+                if (i == gateOutIndex) {
+                    return slot;
+                }
+                ++slot;
+            }
+        }
+        return -1;
+    };
+    auto cvSlotForPhysical = [this, trackIndex] (int cvOutIndex) -> int {
+        int slot = 0;
+        const auto &cvOutputTracks = _project.cvOutputTracks();
+        for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+            if (cvOutputTracks[i] == trackIndex) {
+                if (i == cvOutIndex) {
+                    return slot;
+                }
+                ++slot;
+            }
+        }
+        return -1;
+    };
     for (int i = 0; i < 4; ++i) {
         int x = kGridMainX + i * kGridColW;
 
@@ -227,21 +253,28 @@ void TeletypeScriptViewPage::drawIoGrid(Canvas &canvas) {
         auto toDest = track.triggerOutputDest(i);
         int gateIdx = int(toDest);
         bool toOwned = _project.gateOutputTrack(gateIdx) == trackIndex;
-        bool toActive = trackEngine.gateOutput(gateIdx);
+        int gateSlot = gateSlotForPhysical(gateIdx);
+        bool toActive = gateSlot >= 0 ? trackEngine.gateOutput(gateSlot) : false;
         if (toOwned) {
             canvas.setColor(toActive ? Color::Bright : Color::Medium);
+            canvas.fillRect(x + 1, kGridY + kGridRowH + 1, 6, 6);
         } else {
-            canvas.setColor(Color::Low);
+            // Outline indicates layout mismatch (mapped, but not owned by this track).
+            canvas.setColor(Color::MediumLow);
+            canvas.drawRect(x + 1, kGridY + kGridRowH + 1, 6, 6);
+            if (toActive) {
+                canvas.fillRect(x + 2, kGridY + kGridRowH + 2, 4, 4);
+            }
         }
-        canvas.fillRect(x + 1, kGridY + kGridRowH + 1, 6, 6);
 
         // Row 3: CV
         auto cvDest = track.cvOutputDest(i);
         int cvIdx = int(cvDest);
         bool cvOwned = _project.cvOutputTrack(cvIdx) == trackIndex;
         uint16_t cvRaw = trackEngine.cvRaw(i);
-        Color cvColor = cvOwned ? Color::MediumBright : Color::Low;
-        drawBipolarBar(canvas, x, kGridY + kGridRowH * 2, cvRaw, cvColor, cvColor);
+        Color cvFill = cvOwned ? Color::MediumBright : Color::MediumLow;
+        Color cvOutline = cvOwned ? cvFill : Color::MediumLow;
+        drawBipolarBar(canvas, x, kGridY + kGridRowH * 2, cvRaw, cvFill, cvOutline);
     }
 
     // --- IN/PARAM COLUMN (x=246) ---
