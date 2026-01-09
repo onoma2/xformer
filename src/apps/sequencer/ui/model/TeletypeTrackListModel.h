@@ -1,12 +1,15 @@
 #pragma once
 
 #include "RoutableListModel.h"
+#include "model/Project.h"
 #include "model/TeletypeTrack.h"
 
 class TeletypeTrackListModel : public RoutableListModel {
 public:
-    void setTrack(TeletypeTrack &track) {
+    void setTrack(TeletypeTrack &track, Project &project, int trackIndex) {
         _track = &track;
+        _project = &project;
+        _trackIndex = trackIndex;
     }
 
     virtual int rows() const override {
@@ -175,6 +178,12 @@ private:
         case TriggerOutD: {
             int index = int(item) - int(TriggerOutA);
             _track->printTriggerOutputDest(index, str);
+            if (_project) {
+                int gateIdx = int(_track->triggerOutputDest(index));
+                if (_project->gateOutputTrack(gateIdx) != _trackIndex) {
+                    str(" !");
+                }
+            }
             break;
         }
         case CvOut1:
@@ -183,6 +192,12 @@ private:
         case CvOut4: {
             int index = int(item) - int(CvOut1);
             _track->printCvOutputDest(index, str);
+            if (_project) {
+                int cvIdx = int(_track->cvOutputDest(index));
+                if (_project->cvOutputTrack(cvIdx) != _trackIndex) {
+                    str(" !");
+                }
+            }
             break;
         }
         case CvQuantize1:
@@ -332,4 +347,6 @@ private:
     }
 
     TeletypeTrack *_track = nullptr;
+    Project *_project = nullptr;
+    int _trackIndex = -1;
 };

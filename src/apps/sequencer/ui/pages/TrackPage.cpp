@@ -41,7 +41,12 @@ void TrackPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "TRACK");
     WindowPainter::drawActiveFunction(canvas, Track::trackModeName(_project.selectedTrack().trackMode()));
-    WindowPainter::drawFooter(canvas);
+    if (_project.selectedTrack().trackMode() == Track::TrackMode::Teletype) {
+        const char *functionNames[] = { nullptr, nullptr, nullptr, nullptr, "SYNC OUTS" };
+        WindowPainter::drawFooter(canvas, functionNames, pageKeyState());
+    } else {
+        WindowPainter::drawFooter(canvas);
+    }
 
     ListPage::draw(canvas);
 }
@@ -70,6 +75,36 @@ void TrackPage::keyPress(KeyPressEvent &event) {
                 auto *tuesdayEngine = static_cast<TuesdayTrackEngine *>(&trackEngine);
                 tuesdayEngine->reseed();
                 showMessage("LOOP RESEEDED");
+                event.consume();
+                return;
+            }
+        }
+        if (!key.shiftModifier() && key.function() == 4) {
+            auto &track = _project.selectedTrack();
+            if (track.trackMode() == Track::TrackMode::Teletype) {
+                int trackIndex = _project.selectedTrackIndex();
+                auto &teletypeTrack = track.teletypeTrack();
+                int cvSlot = 0;
+                for (int outputIndex = 0; outputIndex < CONFIG_CHANNEL_COUNT; ++outputIndex) {
+                    if (_project.cvOutputTrack(outputIndex) == trackIndex) {
+                        teletypeTrack.setCvOutputDest(cvSlot, TeletypeTrack::CvOutputDest(outputIndex));
+                        ++cvSlot;
+                        if (cvSlot >= TeletypeTrack::CvOutputCount) {
+                            break;
+                        }
+                    }
+                }
+                int gateSlot = 0;
+                for (int outputIndex = 0; outputIndex < CONFIG_CHANNEL_COUNT; ++outputIndex) {
+                    if (_project.gateOutputTrack(outputIndex) == trackIndex) {
+                        teletypeTrack.setTriggerOutputDest(gateSlot, TeletypeTrack::TriggerOutputDest(outputIndex));
+                        ++gateSlot;
+                        if (gateSlot >= TeletypeTrack::TriggerOutputCount) {
+                            break;
+                        }
+                    }
+                }
+                showMessage("TT OUTS SYNCED");
                 event.consume();
                 return;
             }
@@ -117,7 +152,7 @@ void TrackPage::setTrack(Track &track) {
         newListModel = &_indexedTrackListModel;
         break;
     case Track::TrackMode::Teletype:
-        _teletypeTrackListModel.setTrack(track.teletypeTrack());
+        _teletypeTrackListModel.setTrack(track.teletypeTrack(), _project, track.trackIndex());
         newListModel = &_teletypeTrackListModel;
         break;
     case Track::TrackMode::Last:
