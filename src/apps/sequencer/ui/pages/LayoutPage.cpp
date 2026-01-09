@@ -113,7 +113,7 @@ void LayoutPage::promptNextTeletypeOutputAssignment() {
     int startOut = trackIndex + 1;
     int endOut = std::min(trackIndex + 4, CONFIG_CHANNEL_COUNT);
     _teletypePromptText.reset();
-    _teletypePromptText("ASSIGN OUTS %d-%d TO THIS T9TYPE TRACK?", startOut, endOut);
+    _teletypePromptText("T%d T9Type ASSIGN %d-%d?", trackIndex + 1, startOut, endOut);
     _manager.pages().confirmation.show(_teletypePromptText, [this, trackIndex] (bool result) {
         if (result) {
             assignOutputsForTeletypeTrack(trackIndex);
