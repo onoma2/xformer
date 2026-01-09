@@ -38,9 +38,26 @@ void TeletypeTrackEngine::reset() {
         return;
     }
     _initialized = true;
-    uint8_t prevMetroActive = _teletypeTrack.state().variables.m_act;
-    ss_init(&_teletypeTrack.state());
-    _teletypeTrack.state().variables.m_act = prevMetroActive;
+    scene_state_t &state = _teletypeTrack.state();
+    tele_command_t savedScripts[3][TeletypeTrack::ScriptLineCount] = {};
+    uint8_t savedLengths[3] = {};
+    for (int script = 1; script <= 3; ++script) {
+        savedLengths[script - 1] = state.scripts[script].l;
+        for (int line = 0; line < TeletypeTrack::ScriptLineCount; ++line) {
+            savedScripts[script - 1][line] = state.scripts[script].c[line];
+        }
+    }
+
+    uint8_t prevMetroActive = state.variables.m_act;
+    ss_init(&state);
+    state.variables.m_act = prevMetroActive;
+    for (int script = 1; script <= 3; ++script) {
+        state.scripts[script].l = savedLengths[script - 1];
+        for (int line = 0; line < TeletypeTrack::ScriptLineCount; ++line) {
+            state.scripts[script].c[line] = savedScripts[script - 1][line];
+        }
+    }
+    _teletypeTrack.applyPatternSlot(_teletypeTrack.patternSlotForPattern(_trackState.pattern()));
     _bootScriptPending = false;
     _activity = false;
     _activityCountdownMs = 0.f;
