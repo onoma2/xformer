@@ -492,6 +492,16 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
     // STEP mode: Tick accumulator once per step (first pulse only)
     if (step.isAccumulatorTrigger() && _pulseCounter == 1) {
+        bool accumCondition = true;
+        if (step.condition() != Types::Condition::Off) {
+            bool tempPrevCondition = _prevCondition;
+            accumCondition = evalStepCondition(step, _sequenceState.iteration(), useFillCondition, tempPrevCondition);
+        }
+
+        if (!accumCondition) {
+            return;
+        }
+
         const auto &targetSequence = useFillSequence ? *_fillSequence : sequence; // Use the same sequence as evalSequence
         if (targetSequence.accumulator().enabled() &&
             targetSequence.accumulator().triggerMode() == Accumulator::Step) {
