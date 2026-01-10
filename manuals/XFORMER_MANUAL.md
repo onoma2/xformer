@@ -424,6 +424,22 @@ Re:Rene turns the Note sequence into a cartesian 8x8 grid of locations. X and Y 
 - **First Step/Last Step** define which locations are allowed.
 - This window does not resize the grid; it only allows/denies locations.
 
+### 5.5 Ikra Mode (Note Track)
+
+Ikra separates **note timing** from **gate timing**. Gates/conditions/length stay on the main clock and loop, while notes advance on their own divisor and loop range.
+
+**Setup:**
+- Open the Note Sequence list.
+- **Mode**: Ikra.
+- **Div X**: master divisor for gates/conditions/length.
+- **Div N**: note divisor (uses the Div Y slot).
+- **Note First/Note Last**: note loop range (independent from First/Last).
+
+**Behavior:**
+- Gates follow the main loop and divisor.
+- Notes advance on Div N and wrap within Note First/Note Last.
+- In Ikra mode the UI shows a separate note playhead marker on the Steps page.
+
 ## 6. Curve Track Enhancements
 
 ### 6.1 Signal Processor

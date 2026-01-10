@@ -84,6 +84,10 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
     WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), activeFunctionKey());
     const auto &scale = sequence.selectedScale(_project.scale());
     int currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
+    int currentNoteStep = -1;
+    if (sequence.mode() == NoteSequence::Mode::Ikra && trackEngine.isActiveSequence(sequence)) {
+        currentNoteStep = trackEngine.currentNoteStep();
+    }
     int currentRecordStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentRecordStep() : -1;
 
     const int stepWidth = Width / StepCount;
@@ -123,6 +127,14 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
         if (step.gate()) {
             canvas.setColor(_context.model.settings().userSettings().get<DimSequenceSetting>(SettingDimSequence)->getValue() ? Color::Low : Color::Bright);
             canvas.fillRect(x + 4, y + 4, stepWidth - 8, stepWidth - 8);
+        }
+
+        // Ikra note playhead indicator (bright dot)
+        if (currentNoteStep >= 0 && stepIndex == currentNoteStep) {
+            canvas.setColor(Color::Bright);
+            int dotX = x + stepWidth / 2;
+            int dotY = y + stepWidth + 15;
+            canvas.vline(dotX, dotY, 2);
         }
 
         // accumulator trigger indicator (top-right corner dot)

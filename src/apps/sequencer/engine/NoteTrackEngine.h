@@ -65,6 +65,7 @@ public:
     bool isActiveSequence(const NoteSequence &sequence) const { return &sequence == _sequence; }
 
     int currentStep() const { return _currentStep; }
+    int currentNoteStep() const { return _noteSequenceState.step(); }
     int currentRecordStep() const { return _stepRecorder.stepIndex(); }
 
     void setMonitorStep(int index);
