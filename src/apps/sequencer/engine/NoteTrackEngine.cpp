@@ -201,7 +201,7 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                 }
             }
             if (sequence.mode() == NoteSequence::Mode::Ikra && relativeTick % noteDivisor == 0) {
-                _noteSequenceState.advanceAligned(relativeTick / noteDivisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                _noteSequenceState.advanceAligned(relativeTick / noteDivisor, sequence.runMode(), sequence.noteFirstStep(), sequence.noteLastStep(), rng);
             }
             break;
         case Types::PlayMode::Free:
@@ -287,7 +287,7 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                 divisor = stepDivisor;
             } else if (sequence.mode() == NoteSequence::Mode::Ikra && noteStepIndex != _lastNoteFreeStepIndex) {
                 _lastNoteFreeStepIndex = noteStepIndex;
-                _noteSequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                _noteSequenceState.advanceFree(sequence.runMode(), sequence.noteFirstStep(), sequence.noteLastStep(), rng);
             } else if (stepIndex != _lastFreeStepIndex) {
                 _lastFreeStepIndex = stepIndex;
                 // Pulse count logic: Get current step's pulse count from sequence state
@@ -509,9 +509,9 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     int noteStepIndex = _currentStep;
     if (sequence.mode() == NoteSequence::Mode::Ikra) {
         if (_noteSequenceState.step() < 0) {
-            _noteSequenceState.setStep(sequence.firstStep(), sequence.firstStep(), sequence.lastStep());
+            _noteSequenceState.setStep(sequence.noteFirstStep(), sequence.noteFirstStep(), sequence.noteLastStep());
         }
-        noteStepIndex = SequenceUtils::rotateStep(_noteSequenceState.step(), sequence.firstStep(), sequence.lastStep(), rotate);
+        noteStepIndex = SequenceUtils::rotateStep(_noteSequenceState.step(), sequence.noteFirstStep(), sequence.noteLastStep(), rotate);
     }
     const auto &noteStep = evalSequence.step(noteStepIndex);
 

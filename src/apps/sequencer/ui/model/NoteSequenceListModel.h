@@ -13,6 +13,8 @@ public:
         Mode,
         FirstStep,
         LastStep,
+        NoteFirstStep,
+        NoteLastStep,
         RunMode,
         DivisorX,
         DivisorY,
@@ -93,6 +95,8 @@ private:
         case Mode:              return "Mode";
         case FirstStep:         return "First Step";
         case LastStep:          return "Last Step";
+        case NoteFirstStep:     return "Note First";
+        case NoteLastStep:      return "Note Last";
         case RunMode:           return "Run Mode";
         case DivisorX:          return "Div X";
         case DivisorY:          return _sequence->mode() == NoteSequence::Mode::Ikra ? "Div N" : "Div Y";
@@ -119,6 +123,12 @@ private:
             break;
         case LastStep:
             _sequence->printLastStep(str);
+            break;
+        case NoteFirstStep:
+            _sequence->printNoteFirstStep(str);
+            break;
+        case NoteLastStep:
+            _sequence->printNoteLastStep(str);
             break;
         case RunMode:
             _sequence->printRunMode(str);
@@ -157,6 +167,12 @@ private:
         case LastStep:
             _sequence->editLastStep(value, shift);
             break;
+        case NoteFirstStep:
+            _sequence->editNoteFirstStep(value, shift);
+            break;
+        case NoteLastStep:
+            _sequence->editNoteLastStep(value, shift);
+            break;
         case RunMode:
             _sequence->editRunMode(value, shift);
             break;
@@ -189,6 +205,8 @@ private:
             return int(NoteSequence::Mode::Last);
         case FirstStep:
         case LastStep:
+        case NoteFirstStep:
+        case NoteLastStep:
             return 16;
         case RunMode:
             return int(Types::RunMode::Last);
@@ -216,6 +234,10 @@ private:
             return _sequence->firstStep();
         case LastStep:
             return _sequence->lastStep();
+        case NoteFirstStep:
+            return _sequence->noteFirstStep();
+        case NoteLastStep:
+            return _sequence->noteLastStep();
         case RunMode:
             return int(_sequence->runMode());
         case DivisorX:
@@ -244,6 +266,10 @@ private:
             return _sequence->setFirstStep(index);
         case LastStep:
             return _sequence->setLastStep(index);
+        case NoteFirstStep:
+            return _sequence->setNoteFirstStep(index);
+        case NoteLastStep:
+            return _sequence->setNoteLastStep(index);
         case RunMode:
             return _sequence->setRunMode(Types::RunMode(index));
         case DivisorX:
@@ -269,11 +295,16 @@ private:
 
     static const Item reneItems[];
 
+    static const Item ikraItems[];
+
     int itemCount() const {
         int count = 0;
-        const Item *items = (_sequence->mode() == NoteSequence::Mode::ReRene || _sequence->mode() == NoteSequence::Mode::Ikra)
-            ? reneItems
-            : linearItems;
+        const Item *items = linearItems;
+        if (_sequence->mode() == NoteSequence::Mode::Ikra) {
+            items = ikraItems;
+        } else if (_sequence->mode() == NoteSequence::Mode::ReRene) {
+            items = reneItems;
+        }
         while (items[count] != Last) {
             ++count;
         }
@@ -281,9 +312,12 @@ private:
     }
 
     Item itemForRow(int row) const {
-        const Item *items = (_sequence->mode() == NoteSequence::Mode::ReRene || _sequence->mode() == NoteSequence::Mode::Ikra)
-            ? reneItems
-            : linearItems;
+        const Item *items = linearItems;
+        if (_sequence->mode() == NoteSequence::Mode::Ikra) {
+            items = ikraItems;
+        } else if (_sequence->mode() == NoteSequence::Mode::ReRene) {
+            items = reneItems;
+        }
         int count = itemCount();
         if (row < 0 || row >= count) {
             return items[0];

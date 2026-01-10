@@ -285,6 +285,8 @@ void NoteSequence::clear() {
     setMode(Mode::Linear);
     setFirstStep(0);
     setLastStep(15);
+    setNoteFirstStep(0);
+    setNoteLastStep(15);
 
     clearSteps();
 }
@@ -347,6 +349,8 @@ void NoteSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(static_cast<uint8_t>(_mode));
     writer.write(_firstStep.base);
     writer.write(_lastStep.base);
+    writer.write(_noteFirstStep);
+    writer.write(_noteLastStep);
 
     writeArray(writer, _steps);
 
@@ -387,6 +391,8 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
         _mode = static_cast<Mode>(mode);
         reader.read(_firstStep.base);
         reader.read(_lastStep.base);
+        reader.read(_noteFirstStep);
+        reader.read(_noteLastStep);
     } else {
         reader.read(_clockMultiplier.base);
         reader.read(_resetMeasure);
@@ -395,6 +401,8 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
         reader.read(_lastStep.base);
         _divisorY = _divisor.base;
         _mode = Mode::Linear;
+        _noteFirstStep = _firstStep.base;
+        _noteLastStep = _lastStep.base;
     }
 
     readArray(reader, _steps);

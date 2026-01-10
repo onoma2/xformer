@@ -26,3 +26,19 @@ const NoteSequenceListModel::Item NoteSequenceListModel::reneItems[] = {
     RootNote,
     Last
 };
+
+const NoteSequenceListModel::Item NoteSequenceListModel::ikraItems[] = {
+    Mode,
+    FirstStep,
+    LastStep,
+    NoteFirstStep,
+    NoteLastStep,
+    RunMode,
+    DivisorX,
+    DivisorY,
+    ClockMult,
+    ResetMeasure,
+    Scale,
+    RootNote,
+    Last
+};

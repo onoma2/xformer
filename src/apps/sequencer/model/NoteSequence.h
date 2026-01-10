@@ -614,6 +614,42 @@ public:
         str("%d", lastStep() + 1);
     }
 
+    // noteFirstStep (Ikra note loop)
+
+    int noteFirstStep() const {
+        return _noteFirstStep;
+    }
+
+    void setNoteFirstStep(int noteFirstStep) {
+        _noteFirstStep = clamp(noteFirstStep, 0, noteLastStep());
+    }
+
+    void editNoteFirstStep(int value, bool shift) {
+        setNoteFirstStep(noteFirstStep() + value);
+    }
+
+    void printNoteFirstStep(StringBuilder &str) const {
+        str("%d", noteFirstStep() + 1);
+    }
+
+    // noteLastStep (Ikra note loop)
+
+    int noteLastStep() const {
+        return std::max(noteFirstStep(), int(_noteLastStep));
+    }
+
+    void setNoteLastStep(int noteLastStep) {
+        _noteLastStep = clamp(noteLastStep, noteFirstStep(), CONFIG_STEP_COUNT - 1);
+    }
+
+    void editNoteLastStep(int value, bool shift) {
+        setNoteLastStep(noteLastStep() + value);
+    }
+
+    void printNoteLastStep(StringBuilder &str) const {
+        str("%d", noteLastStep() + 1);
+    }
+
     // steps
 
     const StepArray &steps() const { return _steps; }
@@ -722,6 +758,8 @@ private:
     Mode _mode;
     Routable<uint8_t> _firstStep;
     Routable<uint8_t> _lastStep;
+    uint8_t _noteFirstStep;
+    uint8_t _noteLastStep;
 
     StepArray _steps;
 
