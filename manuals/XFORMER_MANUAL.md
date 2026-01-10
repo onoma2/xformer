@@ -383,6 +383,11 @@ Accumulator is enabled by default. Push NOTE(F4) several times to get to Accumul
 - **THIRD PRESS of Shift-S3**: Access detailed parameter controls (ACCST)
 - **Shift+F4**: Resets accum to 0
 
+**Condition Handling:**
+- **Trigger Mode: Step** respects step **Conditions** only.
+- **Trigger Mode: Step** ignores gate on/off and gate probability.
+- **Trigger Modes: Gate/Retrigger** follow gate logic (so Conditions and gate probability apply).
+
 ### 5.3 Pulse Count and Gate Mode
 
 #### Pulse Count

@@ -62,6 +62,7 @@ public:
     enum class Mode : uint8_t {
         Linear,
         ReRene,
+        Ikra,
         Last
     };
 
@@ -557,6 +558,9 @@ public:
             break;
         case Mode::ReRene:
             str("Re:Rene");
+            break;
+        case Mode::Ikra:
+            str("Ikra");
             break;
         case Mode::Last:
             break;

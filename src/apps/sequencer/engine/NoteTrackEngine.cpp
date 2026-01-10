@@ -103,11 +103,13 @@ static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, c
 
 void NoteTrackEngine::reset() {
     _lastFreeStepIndex = -1;
+    _lastNoteFreeStepIndex = -1;
     _reReneX = 0;
     _reReneY = 0;
     _reReneLastXTick = -1;
     _reReneLastYTick = -1;
     _sequenceState.reset();
+    _noteSequenceState.reset();
     _currentStep = -1;
     _prevCondition = false;
     _pulseCounter = 0;
@@ -133,7 +135,9 @@ void NoteTrackEngine::reset() {
 
 void NoteTrackEngine::restart() {
     _lastFreeStepIndex = -1;
+    _lastNoteFreeStepIndex = -1;
     _sequenceState.reset();
+    _noteSequenceState.reset();
     _currentStep = -1;
     _pulseCounter = 0;
     _reReneX = 0;
@@ -147,20 +151,26 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
     const auto &sequence = *_sequence;
     const auto *linkData = _linkedTrackEngine ? _linkedTrackEngine->linkData() : nullptr;
 
-    if (linkData) {
-        _linkData = *linkData;
-        _sequenceState = *linkData->sequenceState;
+        if (linkData) {
+            _linkData = *linkData;
+            _sequenceState = *linkData->sequenceState;
+            _noteSequenceState = *linkData->sequenceState;
 
         if (linkData->relativeTick % linkData->divisor == 0) {
             recordStep(tick, linkData->divisor);
             triggerStep(tick, linkData->divisor);
         }
-    } else {
-        float clockMult = sequence.clockMultiplier() * 0.01f;
-        uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-        divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
-        uint32_t resetDivisor = sequence.resetMeasure() * _engine.measureDivisor();
-        uint32_t relativeTick = resetDivisor == 0 ? tick : tick % resetDivisor;
+        } else {
+            float clockMult = sequence.clockMultiplier() * 0.01f;
+            uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+            divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
+            uint32_t noteDivisor = divisor;
+            if (sequence.mode() == NoteSequence::Mode::Ikra) {
+                noteDivisor = sequence.divisorY() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+                noteDivisor = std::max<uint32_t>(1, std::lround(noteDivisor / clockMult));
+            }
+            uint32_t resetDivisor = sequence.resetMeasure() * _engine.measureDivisor();
+            uint32_t relativeTick = resetDivisor == 0 ? tick : tick % resetDivisor;
 
         // handle reset measure
         if (relativeTick == 0) {
@@ -190,6 +200,9 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                     _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
                 }
             }
+            if (sequence.mode() == NoteSequence::Mode::Ikra && relativeTick % noteDivisor == 0) {
+                _noteSequenceState.advanceAligned(relativeTick / noteDivisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+            }
             break;
         case Types::PlayMode::Free:
         {
@@ -199,6 +212,7 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                 baseTick = 0.0;
             }
             int stepIndex = int(std::floor(baseTick / divisor));
+            int noteStepIndex = int(std::floor(baseTick / noteDivisor));
             relativeTick = static_cast<uint32_t>(baseTick);
 
             if (sequence.mode() == NoteSequence::Mode::ReRene) {
@@ -271,6 +285,9 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                     triggerStep(tick, stepDivisor);
                 }
                 divisor = stepDivisor;
+            } else if (sequence.mode() == NoteSequence::Mode::Ikra && noteStepIndex != _lastNoteFreeStepIndex) {
+                _lastNoteFreeStepIndex = noteStepIndex;
+                _noteSequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
             } else if (stepIndex != _lastFreeStepIndex) {
                 _lastFreeStepIndex = stepIndex;
                 // Pulse count logic: Get current step's pulse count from sequence state
@@ -489,6 +506,14 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     const auto &evalSequence = useFillSequence ? *_fillSequence : *_sequence;
     _currentStep = SequenceUtils::rotateStep(_sequenceState.step(), sequence.firstStep(), sequence.lastStep(), rotate);
     const auto &step = evalSequence.step(_currentStep);
+    int noteStepIndex = _currentStep;
+    if (sequence.mode() == NoteSequence::Mode::Ikra) {
+        if (_noteSequenceState.step() < 0) {
+            _noteSequenceState.setStep(sequence.firstStep(), sequence.firstStep(), sequence.lastStep());
+        }
+        noteStepIndex = SequenceUtils::rotateStep(_noteSequenceState.step(), sequence.firstStep(), sequence.lastStep(), rotate);
+    }
+    const auto &noteStep = evalSequence.step(noteStepIndex);
 
     // STEP mode: Tick accumulator once per step (first pulse only)
     if (step.isAccumulatorTrigger() && _pulseCounter == 1) {
@@ -755,12 +780,12 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         int rootNote = evalSequence.selectedRootNote(_model.project().rootNote());
 
         // Evaluate base note (without harmony)
-        float baseNote = evalStepNote(step, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose, evalSequence);
+        float baseNote = evalStepNote(noteStep, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose, evalSequence);
 
         // Apply harmony if this track is a follower (has engine-level access)
-        float finalNote = applyHarmony(baseNote, step, evalSequence, scale, octave, transpose);
+        float finalNote = applyHarmony(baseNote, noteStep, evalSequence, scale, octave, transpose);
 
-        _cvQueue.push({ Groove::applySwing(tick + gateOffset, swing()), finalNote, step.slide() });
+        _cvQueue.push({ Groove::applySwing(tick + gateOffset, swing()), finalNote, noteStep.slide() });
     }
 }
 

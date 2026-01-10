@@ -88,14 +88,14 @@ public:
     }
 
 private:
-    static const char *itemName(Item item) {
+    const char *itemName(Item item) const {
         switch (item) {
         case Mode:              return "Mode";
         case FirstStep:         return "First Step";
         case LastStep:          return "Last Step";
         case RunMode:           return "Run Mode";
         case DivisorX:          return "Div X";
-        case DivisorY:          return "Div Y";
+        case DivisorY:          return _sequence->mode() == NoteSequence::Mode::Ikra ? "Div N" : "Div Y";
         case ClockMult:         return "Clock Mult";
         case ResetMeasure:      return "Reset Measure";
         case Scale:             return "Scale";
@@ -271,7 +271,9 @@ private:
 
     int itemCount() const {
         int count = 0;
-        const Item *items = (_sequence->mode() == NoteSequence::Mode::ReRene) ? reneItems : linearItems;
+        const Item *items = (_sequence->mode() == NoteSequence::Mode::ReRene || _sequence->mode() == NoteSequence::Mode::Ikra)
+            ? reneItems
+            : linearItems;
         while (items[count] != Last) {
             ++count;
         }
@@ -279,7 +281,9 @@ private:
     }
 
     Item itemForRow(int row) const {
-        const Item *items = (_sequence->mode() == NoteSequence::Mode::ReRene) ? reneItems : linearItems;
+        const Item *items = (_sequence->mode() == NoteSequence::Mode::ReRene || _sequence->mode() == NoteSequence::Mode::Ikra)
+            ? reneItems
+            : linearItems;
         int count = itemCount();
         if (row < 0 || row >= count) {
             return items[0];
