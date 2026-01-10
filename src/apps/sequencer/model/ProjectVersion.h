@@ -99,6 +99,9 @@ enum ProjectVersion {
     // BASELINE VERSION: Contains all features (Accumulator, Tuesday, Discrete, Indexed, etc.)
     Version33 = 33,
 
+    // added NoteSequence::Mode and NoteSequence::divisorY
+    Version34 = 34,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

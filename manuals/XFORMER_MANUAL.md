@@ -398,6 +398,27 @@ Determines which pulses fire a gate signal when Pulse Count is active.
 3. **Hold (2)**: One long gate for entire duration.
 4. **FirstLast (3)**: Gates on first and last pulse only.
 
+### 5.4 Re:Rene Mode (Note Track)
+
+Re:Rene turns the Note sequence into a cartesian 8x8 grid of locations. X and Y advance independently using two divisors, and the active loop range acts like an ACCESS window that allows or denies locations.
+
+**Setup:**
+- Open the Note Sequence list.
+- **Mode**: Linear or Re:Rene.
+- **Div X**: X-axis clock divisor (uses the existing Divisor).
+- **Div Y**: Y-axis clock divisor (new).
+
+**Behavior (Free mode only):**
+- The grid is always 8x8 (64 locations).
+- X steps on **Div X**, Y steps on **Div Y**.
+- If a location is denied (outside First/Last), the engine **seeks forward** within the same row/column until it finds the next allowed location.
+- Timing does not pause on denied locations; they are skipped instantly (fast-forward seek).
+- Gate timing uses the faster of the two clocks: `min(Div X, Div Y)`.
+
+**ACCESS window:**
+- **First Step/Last Step** define which locations are allowed.
+- This window does not resize the grid; it only allows/denies locations.
+
 ## 6. Curve Track Enhancements
 
 ### 6.1 Signal Processor

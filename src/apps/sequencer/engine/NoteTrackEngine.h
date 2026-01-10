@@ -87,6 +87,10 @@ private:
     const NoteSequence *_fillSequence = nullptr;
 
     int _lastFreeStepIndex = -1;
+    int _reReneX = 0;
+    int _reReneY = 0;
+    int _reReneLastXTick = -1;
+    int _reReneLastYTick = -1;
     SequenceState _sequenceState;
     int _currentStep;
     bool _prevCondition;

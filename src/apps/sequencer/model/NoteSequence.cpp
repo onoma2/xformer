@@ -278,9 +278,11 @@ void NoteSequence::clear() {
     setScale(-1);
     setRootNote(-1);
     setDivisor(12);
+    setDivisorY(12);
     setClockMultiplier(100);
     setResetMeasure(0);
     setRunMode(Types::RunMode::Forward);
+    setMode(Mode::Linear);
     setFirstStep(0);
     setLastStep(15);
 
@@ -338,9 +340,11 @@ void NoteSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_scale.base);
     writer.write(_rootNote.base);
     writer.write(_divisor.base);
+    writer.write(_divisorY);
     writer.write(_clockMultiplier.base);
     writer.write(_resetMeasure);
     writer.write(_runMode.base);
+    writer.write(static_cast<uint8_t>(_mode));
     writer.write(_firstStep.base);
     writer.write(_lastStep.base);
 
@@ -373,11 +377,25 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
     } else {
         reader.read(_divisor.base);
     }
-    reader.read(_clockMultiplier.base);
-    reader.read(_resetMeasure);
-    reader.read(_runMode.base);
-    reader.read(_firstStep.base);
-    reader.read(_lastStep.base);
+    if (reader.dataVersion() >= ProjectVersion::Version34) {
+        reader.read(_divisorY);
+        reader.read(_clockMultiplier.base);
+        reader.read(_resetMeasure);
+        reader.read(_runMode.base);
+        uint8_t mode;
+        reader.read(mode);
+        _mode = static_cast<Mode>(mode);
+        reader.read(_firstStep.base);
+        reader.read(_lastStep.base);
+    } else {
+        reader.read(_clockMultiplier.base);
+        reader.read(_resetMeasure);
+        reader.read(_runMode.base);
+        reader.read(_firstStep.base);
+        reader.read(_lastStep.base);
+        _divisorY = _divisor.base;
+        _mode = Mode::Linear;
+    }
 
     readArray(reader, _steps);
 

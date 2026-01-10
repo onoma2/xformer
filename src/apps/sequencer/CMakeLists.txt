@@ -133,6 +133,7 @@ set(sources
     ui/model/AccumulatorStepsListModel.h
     ui/model/DiscreteMapSequenceListModel.h
     ui/model/IndexedTrackListModel.h
+    ui/model/NoteSequenceListModel.cpp
     ui/model/TeletypeTrackListModel.h
     # ui/painters
     ui/painters/SequencePainter.cpp

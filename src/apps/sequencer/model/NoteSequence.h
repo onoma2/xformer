@@ -59,6 +59,12 @@ public:
         Last
     };
 
+    enum class Mode : uint8_t {
+        Linear,
+        ReRene,
+        Last
+    };
+
     enum class InversionOverrideType {
         UseSequence = 0,  // Use sequence-level inversion (default)
         RootPosition = 1, // Override to root position
@@ -455,6 +461,29 @@ public:
         ModelUtils::printDivisor(str, divisor());
     }
 
+    // divisorY (Re:Rene mode)
+
+    int divisorY() const { return _divisorY; }
+    void setDivisorY(int divisorY) {
+        _divisorY = ModelUtils::clampDivisor(divisorY);
+    }
+
+    int indexedDivisorY() const { return ModelUtils::divisorToIndex(divisorY()); }
+    void setIndexedDivisorY(int index) {
+        int divisor = ModelUtils::indexToDivisor(index);
+        if (divisor > 0) {
+            setDivisorY(divisor);
+        }
+    }
+
+    void editDivisorY(int value, bool shift) {
+        setDivisorY(ModelUtils::adjustedByDivisor(divisorY(), value, shift));
+    }
+
+    void printDivisorY(StringBuilder &str) const {
+        ModelUtils::printDivisor(str, divisorY());
+    }
+
     // clockMultiplier
 
     int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
@@ -508,6 +537,30 @@ public:
     void printRunMode(StringBuilder &str) const {
         printRouted(str, Routing::Target::RunMode);
         str(Types::runModeName(runMode()));
+    }
+
+    // mode
+
+    Mode mode() const { return _mode; }
+    void setMode(Mode mode) {
+        _mode = ModelUtils::clampedEnum(mode);
+    }
+
+    void editMode(int value, bool shift) {
+        setMode(ModelUtils::adjustedEnum(mode(), value));
+    }
+
+    void printMode(StringBuilder &str) const {
+        switch (mode()) {
+        case Mode::Linear:
+            str("Linear");
+            break;
+        case Mode::ReRene:
+            str("Re:Rene");
+            break;
+        case Mode::Last:
+            break;
+        }
     }
 
     // firstStep
@@ -658,9 +711,11 @@ private:
     Routable<int8_t> _scale;
     Routable<int8_t> _rootNote;
     Routable<uint16_t> _divisor;
+    uint16_t _divisorY;
     Routable<uint8_t> _clockMultiplier;
     uint8_t _resetMeasure;
     Routable<Types::RunMode> _runMode;
+    Mode _mode;
     Routable<uint8_t> _firstStep;
     Routable<uint8_t> _lastStep;
 

@@ -10,10 +10,12 @@
 class NoteSequenceListModel : public RoutableListModel {
 public:
     enum Item {
+        Mode,
         FirstStep,
         LastStep,
         RunMode,
-        Divisor,
+        DivisorX,
+        DivisorY,
         ClockMult,
         ResetMeasure,
         Scale,
@@ -29,7 +31,7 @@ public:
     }
 
     virtual int rows() const override {
-        return _sequence ? Last : 0;
+        return _sequence ? itemCount() : 0;
     }
 
     virtual int columns() const override {
@@ -38,35 +40,35 @@ public:
 
     virtual void cell(int row, int column, StringBuilder &str) const override {
         if (column == 0) {
-            formatName(Item(row), str);
+            formatName(itemForRow(row), str);
         } else if (column == 1) {
-            formatValue(Item(row), str);
+            formatValue(itemForRow(row), str);
         }
     }
 
     virtual void edit(int row, int column, int value, bool shift) override {
         if (column == 1) {
-            editValue(Item(row), value, shift);
+            editValue(itemForRow(row), value, shift);
         }
     }
 
     virtual int indexedCount(int row) const override {
-        return indexedCountValue(Item(row));
+        return indexedCountValue(itemForRow(row));
     }
 
     virtual int indexed(int row) const override {
-        return indexedValue(Item(row));
+        return indexedValue(itemForRow(row));
     }
 
     virtual void setIndexed(int row, int index) override {
         if (index >= 0 && index < indexedCount(row)) {
-            setIndexedValue(Item(row), index);
+            setIndexedValue(itemForRow(row), index);
         }
     }
 
     virtual Routing::Target routingTarget(int row) const override {
-        switch (Item(row)) {
-        case Divisor:
+        switch (itemForRow(row)) {
+        case DivisorX:
             return Routing::Target::Divisor;
         case ClockMult:
             return Routing::Target::ClockMult;
@@ -88,10 +90,12 @@ public:
 private:
     static const char *itemName(Item item) {
         switch (item) {
+        case Mode:              return "Mode";
         case FirstStep:         return "First Step";
         case LastStep:          return "Last Step";
         case RunMode:           return "Run Mode";
-        case Divisor:           return "Divisor";
+        case DivisorX:          return "Div X";
+        case DivisorY:          return "Div Y";
         case ClockMult:         return "Clock Mult";
         case ResetMeasure:      return "Reset Measure";
         case Scale:             return "Scale";
@@ -107,6 +111,9 @@ private:
 
     void formatValue(Item item, StringBuilder &str) const {
         switch (item) {
+        case Mode:
+            _sequence->printMode(str);
+            break;
         case FirstStep:
             _sequence->printFirstStep(str);
             break;
@@ -116,8 +123,11 @@ private:
         case RunMode:
             _sequence->printRunMode(str);
             break;
-        case Divisor:
+        case DivisorX:
             _sequence->printDivisor(str);
+            break;
+        case DivisorY:
+            _sequence->printDivisorY(str);
             break;
         case ClockMult:
             _sequence->printClockMultiplier(str);
@@ -138,6 +148,9 @@ private:
 
     void editValue(Item item, int value, bool shift) {
         switch (item) {
+        case Mode:
+            _sequence->editMode(value, shift);
+            break;
         case FirstStep:
             _sequence->editFirstStep(value, shift);
             break;
@@ -147,8 +160,11 @@ private:
         case RunMode:
             _sequence->editRunMode(value, shift);
             break;
-        case Divisor:
+        case DivisorX:
             _sequence->editDivisor(value, shift);
+            break;
+        case DivisorY:
+            _sequence->editDivisorY(value, shift);
             break;
         case ClockMult:
             _sequence->editClockMultiplier(value, shift);
@@ -169,12 +185,15 @@ private:
 
     int indexedCountValue(Item item) const {
         switch (item) {
+        case Mode:
+            return int(NoteSequence::Mode::Last);
         case FirstStep:
         case LastStep:
             return 16;
         case RunMode:
             return int(Types::RunMode::Last);
-        case Divisor:
+        case DivisorX:
+        case DivisorY:
         case ResetMeasure:
             return 16;
         case ClockMult:
@@ -191,14 +210,18 @@ private:
 
     int indexedValue(Item item) const {
         switch (item) {
+        case Mode:
+            return int(_sequence->mode());
         case FirstStep:
             return _sequence->firstStep();
         case LastStep:
             return _sequence->lastStep();
         case RunMode:
             return int(_sequence->runMode());
-        case Divisor:
+        case DivisorX:
             return _sequence->indexedDivisor();
+        case DivisorY:
+            return _sequence->indexedDivisorY();
         case ClockMult:
             return _sequence->clockMultiplier() - 50;
         case ResetMeasure:
@@ -215,14 +238,18 @@ private:
 
     void setIndexedValue(Item item, int index) {
         switch (item) {
+        case Mode:
+            return _sequence->setMode(NoteSequence::Mode(index));
         case FirstStep:
             return _sequence->setFirstStep(index);
         case LastStep:
             return _sequence->setLastStep(index);
         case RunMode:
             return _sequence->setRunMode(Types::RunMode(index));
-        case Divisor:
+        case DivisorX:
             return _sequence->setIndexedDivisor(index);
+        case DivisorY:
+            return _sequence->setIndexedDivisorY(index);
         case ClockMult:
             return _sequence->setClockMultiplier(index + 50);
         case ResetMeasure:
@@ -237,4 +264,26 @@ private:
     }
 
     NoteSequence *_sequence;
+
+    static const Item linearItems[];
+
+    static const Item reneItems[];
+
+    int itemCount() const {
+        int count = 0;
+        const Item *items = (_sequence->mode() == NoteSequence::Mode::ReRene) ? reneItems : linearItems;
+        while (items[count] != Last) {
+            ++count;
+        }
+        return count;
+    }
+
+    Item itemForRow(int row) const {
+        const Item *items = (_sequence->mode() == NoteSequence::Mode::ReRene) ? reneItems : linearItems;
+        int count = itemCount();
+        if (row < 0 || row >= count) {
+            return items[0];
+        }
+        return items[row];
+    }
 };
