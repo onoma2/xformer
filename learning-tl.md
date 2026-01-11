@@ -444,6 +444,21 @@ W.ACT 0   # stop
 W.ACT 2   # pause
 ```
 
+## WNG / WNN Note Step Ops (Performer)
+
+Per-step gate and note access for Note tracks (track index 1..8, step index 1..64).
+
+- `WNG t s` -> get gate (0/1) at step s
+- `WNG t s v` -> set gate (v != 0 => on)
+- `WNN t s` -> get note at step s (0..127)
+- `WNN t s v` -> set note at step s (0..127, clamped)
+- `WNG.H t` -> get gate at current gate step
+- `WNN.H t` -> get note at current note step
+
+Notes:
+- These operate on the playing pattern for that track.
+- If the track is not a Note track, getters return 0 and setters do nothing.
+
 ## WBPM Tempo Control (Performer)
 
 WBPM reads the current project tempo in BPM. WBPM.S sets the tempo.
@@ -1334,4 +1349,3 @@ This tutorial has covered the fundamental concepts of using Teletype in the Perf
 Remember to experiment with different combinations of operations, and don't hesitate to refer back to the teletype manual for more detailed information about specific operations.
 
 The key to mastering Teletype in Performer is practice and experimentation. Try modifying the examples in this tutorial to create your own unique patterns and behaviors.
-

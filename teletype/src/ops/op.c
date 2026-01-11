@@ -69,7 +69,7 @@ const tele_op_t *tele_ops[E_OP__LENGTH] = {
     &op_PARAM_SCALE, &op_IN_CAL_MIN, &op_IN_CAL_MAX, &op_IN_CAL_RESET,
     &op_PARAM_CAL_MIN, &op_PARAM_CAL_MAX, &op_PARAM_CAL_RESET, &op_BUS,
     &op_WBPM, &op_WBPM_S, &op_WMS, &op_WTU, &op_BAR, &op_WP, &op_WP_SET,
-    &op_WR, &op_WR_ACT, &op_RT, &op_PRM,
+    &op_WR, &op_WR_ACT, &op_WNG, &op_WNN, &op_WNG_H, &op_WNN_H, &op_RT, &op_PRM,
     &op_TR, &op_TR_D, &op_TR_W, &op_TR_POL, &op_TR_TIME, &op_TR_TOG,
     &op_TR_PULSE, &op_TR_P, &op_CV_SET, &op_MUTE, &op_STATE, &op_LIVE_OFF,
     &op_LIVE_O,

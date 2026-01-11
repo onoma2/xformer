@@ -168,6 +168,9 @@ public:
     const MidiLearn &midiLearn() const { return _midiLearn; }
           MidiLearn &midiLearn()       { return _midiLearn; }
 
+    const Model &model() const { return _model; }
+          Model &model()       { return _model; }
+
     bool trackEnginesConsistent() const;
     bool trackPatternsConsistent() const;
 

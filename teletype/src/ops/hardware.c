@@ -67,6 +67,18 @@ static void op_WR_ACT_get(const void *NOTUSED(data), scene_state_t *ss,
                           exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_WR_ACT_set(const void *NOTUSED(data), scene_state_t *ss,
                           exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNG_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNG_set(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNN_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNN_set(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNG_H_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNN_H_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_RT_get(const void *NOTUSED(data), scene_state_t *ss,
                       exec_state_t *NOTUSED(es), command_state_t *cs);
 static void op_TR_get(const void *data, scene_state_t *ss, exec_state_t *es,
@@ -168,6 +180,10 @@ const tele_op_t op_WP            = MAKE_GET_OP(WP, op_WP_get, 1, true);
 const tele_op_t op_WP_SET        = MAKE_GET_OP(WP.SET, op_WP_SET_get, 2, false);
 const tele_op_t op_WR            = MAKE_GET_OP(WR, op_WR_get, 0, true);
 const tele_op_t op_WR_ACT        = MAKE_GET_SET_OP(W.ACT, op_WR_ACT_get, op_WR_ACT_set, 0, true);
+const tele_op_t op_WNG           = MAKE_GET_SET_OP(WNG, op_WNG_get, op_WNG_set, 2, true);
+const tele_op_t op_WNN           = MAKE_GET_SET_OP(WNN, op_WNN_get, op_WNN_set, 2, true);
+const tele_op_t op_WNG_H         = MAKE_GET_OP(WNG.H, op_WNG_H_get, 1, true);
+const tele_op_t op_WNN_H         = MAKE_GET_OP(WNN.H, op_WNN_H_get, 1, true);
 const tele_op_t op_RT            = MAKE_GET_OP(RT, op_RT_get, 1, true);
 const tele_op_t op_LIVE_OFF      = MAKE_GET_OP (LIVE.OFF, op_LIVE_OFF_get, 0, false);
 const tele_op_t op_LIVE_O        = MAKE_ALIAS_OP (LIVE.O, op_LIVE_OFF_get, NULL, 0, false);
@@ -535,6 +551,94 @@ static void op_WR_ACT_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
                           exec_state_t *NOTUSED(es), command_state_t *cs) {
     int16_t state = cs_pop(cs);
     tele_wr_act(state);
+}
+
+static void op_WNG_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    int16_t stepIndex = cs_pop(cs);
+    trackIndex--;
+    stepIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        cs_push(cs, 0);
+        return;
+    }
+    if (stepIndex < 0 || stepIndex >= 64) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_wng((uint8_t)trackIndex, (uint8_t)stepIndex));
+}
+
+static void op_WNG_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    int16_t stepIndex = cs_pop(cs);
+    int16_t value = cs_pop(cs);
+    trackIndex--;
+    stepIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        return;
+    }
+    if (stepIndex < 0 || stepIndex >= 64) {
+        return;
+    }
+    tele_wng_set((uint8_t)trackIndex, (uint8_t)stepIndex, value);
+}
+
+static void op_WNN_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    int16_t stepIndex = cs_pop(cs);
+    trackIndex--;
+    stepIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        cs_push(cs, 0);
+        return;
+    }
+    if (stepIndex < 0 || stepIndex >= 64) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_wnn((uint8_t)trackIndex, (uint8_t)stepIndex));
+}
+
+static void op_WNN_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    int16_t stepIndex = cs_pop(cs);
+    int16_t value = cs_pop(cs);
+    trackIndex--;
+    stepIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        return;
+    }
+    if (stepIndex < 0 || stepIndex >= 64) {
+        return;
+    }
+    tele_wnn_set((uint8_t)trackIndex, (uint8_t)stepIndex, value);
+}
+
+static void op_WNG_H_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    trackIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_wng_here((uint8_t)trackIndex));
+}
+
+static void op_WNN_H_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    trackIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_wnn_here((uint8_t)trackIndex));
 }
 
 static void op_RT_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),

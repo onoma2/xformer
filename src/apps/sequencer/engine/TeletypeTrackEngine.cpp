@@ -3,12 +3,14 @@
 #include "TeletypeBridge.h"
 
 #include "Engine.h"
+#include "NoteTrackEngine.h"
 #include "Slide.h"
 
 #include "core/Debug.h"
 #include "core/math/Math.h"
 #include "MidiUtils.h"
 #include "model/Scale.h"
+#include "model/Track.h"
 #include "model/Types.h"
 
 #include <algorithm>
@@ -24,6 +26,36 @@ constexpr uint8_t kManualScriptCount = 4;
 constexpr uint8_t kEnvIdle = 0;
 constexpr uint8_t kEnvAttack = 1;
 constexpr uint8_t kEnvDecay = 2;
+
+const NoteSequence *noteSequenceForTrack(const Model &model, int trackIndex) {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return nullptr;
+    }
+    const Track &track = model.project().track(trackIndex);
+    if (track.trackMode() != Track::TrackMode::Note) {
+        return nullptr;
+    }
+    int patternIndex = model.project().playState().trackState(trackIndex).pattern();
+    if (patternIndex < 0 || patternIndex >= CONFIG_PATTERN_COUNT) {
+        return nullptr;
+    }
+    return &track.noteTrack().sequence(patternIndex);
+}
+
+NoteSequence *noteSequenceForTrack(Model &model, int trackIndex) {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return nullptr;
+    }
+    Track &track = model.project().track(trackIndex);
+    if (track.trackMode() != Track::TrackMode::Note) {
+        return nullptr;
+    }
+    int patternIndex = model.project().playState().trackState(trackIndex).pattern();
+    if (patternIndex < 0 || patternIndex >= CONFIG_PATTERN_COUNT) {
+        return nullptr;
+    }
+    return &track.noteTrack().sequence(patternIndex);
+}
 } // namespace
 
 TeletypeTrackEngine::TeletypeTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
@@ -448,6 +480,91 @@ void TeletypeTrackEngine::setEnvEoc(uint8_t index, int16_t tr) {
         return;
     }
     _envEocTr[index] = static_cast<int8_t>(tr - 1);
+}
+
+int16_t TeletypeTrackEngine::noteGateGet(int trackIndex, int stepIndex) const {
+    const NoteSequence *sequence = noteSequenceForTrack(_model, trackIndex);
+    if (!sequence) {
+        return 0;
+    }
+    if (stepIndex < 0 || stepIndex >= CONFIG_STEP_COUNT) {
+        return 0;
+    }
+    return sequence->step(stepIndex).gate() ? 1 : 0;
+}
+
+void TeletypeTrackEngine::noteGateSet(int trackIndex, int stepIndex, int16_t value) {
+    NoteSequence *sequence = noteSequenceForTrack(_engine.model(), trackIndex);
+    if (!sequence) {
+        return;
+    }
+    if (stepIndex < 0 || stepIndex >= CONFIG_STEP_COUNT) {
+        return;
+    }
+    sequence->step(stepIndex).setGate(value != 0);
+}
+
+int16_t TeletypeTrackEngine::noteNoteGet(int trackIndex, int stepIndex) const {
+    const NoteSequence *sequence = noteSequenceForTrack(_model, trackIndex);
+    if (!sequence) {
+        return 0;
+    }
+    if (stepIndex < 0 || stepIndex >= CONFIG_STEP_COUNT) {
+        return 0;
+    }
+    return sequence->step(stepIndex).note() - NoteSequence::Note::Min;
+}
+
+void TeletypeTrackEngine::noteNoteSet(int trackIndex, int stepIndex, int16_t value) {
+    NoteSequence *sequence = noteSequenceForTrack(_engine.model(), trackIndex);
+    if (!sequence) {
+        return;
+    }
+    if (stepIndex < 0 || stepIndex >= CONFIG_STEP_COUNT) {
+        return;
+    }
+    int16_t clamped = clamp<int16_t>(value, 0, NoteSequence::Note::Range - 1);
+    sequence->step(stepIndex).setNote(clamped + NoteSequence::Note::Min);
+}
+
+int16_t TeletypeTrackEngine::noteGateHere(int trackIndex) const {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return 0;
+    }
+    const TrackEngine &trackEngine = _engine.trackEngine(trackIndex);
+    if (trackEngine.trackMode() != Track::TrackMode::Note) {
+        return 0;
+    }
+    const auto &noteEngine = trackEngine.as<NoteTrackEngine>();
+    int stepIndex = noteEngine.currentStep();
+    if (stepIndex < 0 || stepIndex >= CONFIG_STEP_COUNT) {
+        return 0;
+    }
+    const NoteSequence *sequence = noteSequenceForTrack(_model, trackIndex);
+    if (!sequence) {
+        return 0;
+    }
+    return sequence->step(stepIndex).gate() ? 1 : 0;
+}
+
+int16_t TeletypeTrackEngine::noteNoteHere(int trackIndex) const {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return 0;
+    }
+    const TrackEngine &trackEngine = _engine.trackEngine(trackIndex);
+    if (trackEngine.trackMode() != Track::TrackMode::Note) {
+        return 0;
+    }
+    const auto &noteEngine = trackEngine.as<NoteTrackEngine>();
+    int stepIndex = noteEngine.currentNoteStep();
+    if (stepIndex < 0 || stepIndex >= CONFIG_STEP_COUNT) {
+        return 0;
+    }
+    const NoteSequence *sequence = noteSequenceForTrack(_model, trackIndex);
+    if (!sequence) {
+        return 0;
+    }
+    return sequence->step(stepIndex).note() - NoteSequence::Note::Min;
 }
 
 void TeletypeTrackEngine::triggerEnv(uint8_t index) {

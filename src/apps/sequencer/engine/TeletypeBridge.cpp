@@ -305,6 +305,46 @@ void tele_wr_act(int16_t state) {
     }
 }
 
+int16_t tele_wng(uint8_t trackIndex, uint8_t stepIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->noteGateGet(trackIndex, stepIndex);
+    }
+    return 0;
+}
+
+void tele_wng_set(uint8_t trackIndex, uint8_t stepIndex, int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->noteGateSet(trackIndex, stepIndex, value);
+    }
+}
+
+int16_t tele_wnn(uint8_t trackIndex, uint8_t stepIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->noteNoteGet(trackIndex, stepIndex);
+    }
+    return 0;
+}
+
+void tele_wnn_set(uint8_t trackIndex, uint8_t stepIndex, int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->noteNoteSet(trackIndex, stepIndex, value);
+    }
+}
+
+int16_t tele_wng_here(uint8_t trackIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->noteGateHere(trackIndex);
+    }
+    return 0;
+}
+
+int16_t tele_wnn_here(uint8_t trackIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->noteNoteHere(trackIndex);
+    }
+    return 0;
+}
+
 int16_t tele_rt(uint8_t routeIndex) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         float normalized = engine->routingSource(routeIndex);

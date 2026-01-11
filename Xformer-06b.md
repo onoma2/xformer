@@ -8,132 +8,79 @@
     *   Replaces direct signal addition with a blend: `Shape * (1-Amount) + NormalizedChaos * Amount`.
     *   Prevents DC offset drift and keeps the signal strictly within the 0-1 range before wavefolding.
 *   **Frequency Modulation (FM):**
-    *   **Free Play Mode:** Now uses a **Phase Accumulator** engine.
-    *   **Curve Rate:** Controls the frequency of the phase accumulator, allowing for smooth, click-free FM.
-    *   **Routing:** The `XFade` routing target was temporarily repurposed but has been **restored** as a manual parameter. FM is controlled via the `Curve Rate` parameter.
-*   **Initialization:**
-    *   Defaults to **Free** play mode.
-    *   Sequences default to **Divisor 192**.
+    *   **Free Play Mode:** Now uses a **Phase Accumulator** engine for smooth, click-free FM.
+    *   **Curve Rate:** Repurposed from the manual `XFade` parameter to control the frequency of the phase accumulator.
+*   **Initialization:** Defaults to **Free** play mode with **Divisor 192**.
 
 ### Algo (Tuesday) Track
-*   **3-Slot Clipboard (Quick Edit):**
-    *   Implemented a dedicated clipboard system for Algo tracks.
-    *   **Shortcuts:** Accessed via `Shift` + `Page` (Steps 9-14).
-        *   **Steps 9-11:** Copy to Slot 1-3.
-        *   **Steps 12-14:** Paste from Slot 1-3.
-    *   **Content:** Clipboard stores Algorithm, Flow, Ornament, Power, Loop, Rotate, Glide, Skew, Gate params, **plus** Octave, Transpose, Root Note, Divisor, and Mask.
-*   **Context Menu:**
-    *   Added `INIT`, `RESEED`, `RAND` (Randomize), `COPY`, `PASTE`.
+*   **3-Slot Clipboard (Quick Edit):** Dedicated clipboard system accessed via `Shift` + `Page` (Steps 9-14) for Slot 1-3 Copy/Paste.
+*   **Enhanced Content:** Clipboard now includes Octave, Transpose, Root Note, Divisor, and Mask in addition to core algorithm parameters.
+*   **Context Menu:** Added `INIT`, `RESEED`, `RAND`, `COPY`, `PASTE`.
 *   **Shortcuts:**
-    *   `Shift` + `F5`: **Reseed** (Generate new random values for Flow/Ornament).
-    *   `Shift` + `Step 16`: **Reset** (Hard reset of the track engine).
-    *   `Step 15` (Quick Edit): **Randomize** parameters.
-*   **Status Box:**
-    *   New visual feedback element showing Current Note, Gate Status, CV Voltage, and Current Step/Loop position.
+    *   `Shift` + `F5`: **Reseed** Flow/Ornament RNG.
+    *   `Shift` + `Step 16`: **Hard Reset** of track engine.
+*   **Status Box:** Real-time feedback for Note, Gate, CV Voltage, and Step position.
 
 ### Note Track
 *   **New Play Modes:**
-    *   **Ikra:** Inspired by the Flux sequencer. Features a separate **Note Loop** (`Note First Step`, `Note Last Step`) that runs independently of the main rhythm/gate sequence. The Note Loop has its own divisor (`Divisor Y`), allowing for complex phasing effects between rhythm and pitch.
-    *   **Re:Rene:** A Cartesian sequencer mode (X/Y) with **XY Seek Mode**. Steps are accessed via X and Y coordinates with independent divisors (`Divisor` for X, `Divisor Y` for Y) and constrained step ranges. The "Seek" logic ensures the playhead stays within the defined `First Step` and `Last Step` bounds by skipping invalid coordinates.
+    *   **Ikra:** Features a separate **Note Loop** (`Note First/Last Step`) running independently of the rhythm sequence with its own divisor (`Divisor Y`).
+    *   **Re:Rene:** Cartesian sequencer (X/Y) with independent divisors and **XY Seek Mode** to keep the playhead within defined step bounds.
 *   **Pulse Count & Gate Modes:**
-    *   **Pulse Count:** Per-step repetition count (1-8 pulses).
-    *   **Gate Modes:**
-        *   **A (All):** Fires gates on every pulse.
-        *   **1 (First):** Fires gate only on the first pulse.
-        *   **H (Hold):** Fires one long gate covering all pulses.
-        *   **1L (FirstLast):** Fires gates on the first and last pulse.
-    *   **Burst/Spread:** Retriggers now support Burst (all at once) or Spread (distributed) logic, with Accumulator integration.
+    *   Per-step repetition (1-8 pulses) with modes: **All**, **First**, **Hold**, **FirstLast**.
+    *   Support for **Burst** (immediate) or **Spread** (distributed) retrigger logic with Accumulator integration.
 
 ### Discrete Map Track
-*   **Pluck Effect:**
-    *   Added a **Pluck** parameter that introduces a decay envelope to the CV output when a gate fires.
-    *   Controls pitch depth and direction.
-    *   Includes random **Jitter** for organic variation in depth and decay time.
-*   **Linear Slew:**
-    *   Implemented constant-rate slew limiting for predictable glides between voltages.
-*   **Monitor Mode:** Added monitor mode support for both layers.
+*   **Pluck Effect:** Decay envelope applied to CV output on gate fire, featuring adjustable depth, direction, and random **Jitter**.
+*   **Linear Slew:** Constant-rate slew limiting for smooth voltage transitions.
+*   **Monitor Mode:** Added to both layers for easier stage/pitch auditing.
 
 ### Indexed Track
-*   **Step Count:** Increased maximum step count to **48 steps**.
-*   **Monitor Mode:** Added monitor mode support for the Note layer.
-*   **Initialization:**
-    *   Defaults to **Free** play mode.
+*   **Step Count:** Increased to **48 steps**.
+*   **Monitor Mode:** Added to the Note layer.
+*   **Initialization:** Defaults to **Free** play mode.
 
 ### Accumulator Enhancements
-*   **Visual Indicators:**
-    *   **Counter Display:** Shows current accumulator value (e.g., "+5") in the header.
-    *   **Trigger Dots:** Small indicators on steps where the accumulator trigger is enabled.
-*   **Trigger Modes:**
-    *   **STEP:** Increment once per step.
-    *   **GATE:** Increment per gate pulse (respects pulse count).
-    *   **RTRIG:** Increment N times for N retriggers (Burst mode).
-*   **Logic:** Accumulator evaluations now respect per-step conditions.
+*   **UI Indicators:** Header counter display and per-step trigger dots.
+*   **Trigger Modes:** **STEP**, **GATE**, and **RTRIG** (Retrigger) modes.
+*   **Conditional Logic:** Accumulator evaluations now respect per-step conditions.
 
 ---
 
 ## 2. New Functionality
 
+### CV Router Engine
+*   **4x4 Matrix Routing:** Independently maps 4 inputs to 4 outputs at a 1000Hz control rate.
+*   **Scanning & Routing:**
+    *   **Scan:** Crossfades between the 4 selected input sources (CV In, Bus, or Off).
+    *   **Route:** Distributes the scanned signal across 4 selected destinations (CV Out, Bus, or None) using weighted distribution.
+*   **Integration:** Controllable via `CVR Scan` and `CVR Route` targets in the Routing system.
+
 ### Routing System
-*   **CV Router Engine:** Comprehensive updates to the CV routing backend.
-*   **VCA Next Shaper (VC):** Amplitude modulation using the next route's raw source value.
-*   **Per-Track Reset Target:** Hard reset of track engine on the rising edge of a routed signal.
-*   **Bus Route Shapers:** Added routing shapers for internal buses.
+*   **VCA Next Shaper (VC):** Center-referenced amplitude modulation using the next route's raw source value.
+*   **Per-Track Reset:** Hard reset of track engines via routed signals.
+*   **Bus Route Shapers:** Full shaper support (Crease, Envelope, Follower, etc.) for internal Bus targets.
 
 ---
 
 ## 3. T9type (Teletype) Track
 
-The **T9type** track is a new track mode integrating a subset of the Monome Teletype scripting language, tailored for the Performer environment.
+Integration of the Monome Teletype scripting language into the Performer environment.
 
 ### Core Architecture
-*   **Scripts:**
-    *   **4 Trigger Scripts (1-4):** Triggered by input events or manually.
-    *   **1 Metro Script (M):** Runs periodically based on a timer or clock division.
-    *   **Init Script (I):** Runs on project load/boot.
-    *   **Script Scope:** Scripts 1-3 are **Global** (shared across patterns), while Script 4 and Metro are **Slot Owned** (stored per pattern slot).
-*   **Variables:**
-    *   Standard Teletype variables: `X`, `Y`, `Z`, `T` (delta time).
-    *   `M` / `M.ACT`: Metronome interval and active state.
-    *   `TR.TIME`: Pulse widths for trigger outputs.
-*   **State:** Binary Teletype state is now stored within the project file.
-
-### I/O System
-Flexible I/O mapping system bridging physical/logical Performer signals with the virtual Teletype environment.
-
-#### Inputs (to Teletype)
-*   **TI-TR1...TI-TR4 (Trigger Inputs):**
-    *   Mapped to physical **CV Inputs** (Threshold > 1V), **Gate Outputs** (Loopback), or **Logical Track Gates**.
-*   **TI-IN / TI-PARAM (CV Inputs):**
-    *   Mapped to `IN` and `PARAM` variables.
-    *   Sources: Physical CV Inputs, Physical CV Outputs (Loopback), or Logical Track CVs.
-*   **TI-X / TI-Y / TI-Z:**
-    *   Direct mapping of sources to `X`, `Y`, `Z` variables.
-
-#### Outputs (from Teletype)
-*   **TO-TRA...TO-TRD (Trigger Outputs):** Mapped to physical **Gate Outputs**.
-*   **TO-CV1...TO-CV4 (CV Outputs):** Mapped to physical **CV Outputs** with Range, Offset, Quantize, and Root Note processing.
+*   **Scripts:** 4 Trigger scripts, 1 Metro script, and 1 Init script.
+*   **Scope:** Scripts 1-3 are **Global**; Script 4 and Metro are **Slot Owned** (per pattern).
+*   **I/O Mapping:** Flexible virtual-to-physical mapping for Triggers (TI-TR / TO-TR) and CV (TI-IN-PARAM / TO-CV).
+*   **Persistence:** Binary Teletype state and plain-text scripts are saved within the project file.
 
 ### New & Enhanced Ops
-*   **Hardware Control:**
-    *   `WBPM val`: Write system BPM (1-1000).
-    *   `WBPM.S`: Write BPM Sync mode.
-    *   `WP / WP.SET`: Pattern selection and control.
-    *   `WR / WR.ACT`: Record state and control.
-    *   `RT`: Read Route source value.
-    *   `M.A / M.ACT.A / M.RESET.A`: Global Metronome controls.
-    *   `PANIC`: Stop all triggers and reset state.
-*   **Timing & Delays:**
-    *   `WMS val`: Wait (sleep) for milliseconds.
-    *   `WTU val`: Wait until absolute time.
-    *   `BAR`: Barrier op for synchronization.
-*   **Pattern Ops:** `P.PA`, `P.PS`, `P.PM`, `P.PD`, `P.PMOD`, `P.SCALE`, `P.SUM`, `P.AVG`, `P.MINV`, `P.MAXV`, `P.FND`, `RND.P`, `RND.PN`.
+*   **WBPM / WBPM.S:** System BPM control.
+*   **WMS / WTU / BAR:** Timing, sleep, and barrier synchronization.
+*   **WP / WP.SET / WR / WR.ACT:** Pattern and Record state management.
+*   **RT:** Read Route source values directly into scripts.
+*   **M.A / M.ACT.A / M.RESET.A:** Global metronome control.
+*   **PANIC:** Emergency reset of all triggers and state.
 
-### User Interface & Shortcuts
-*   **Keyboard MVP:** Implemented QWERTY keyboard support for script editing.
-*   **Script View:**
-    *   `Shift` + `Encoder`: Line rotation/scrolling.
-    *   `Step 16`: Commit line changes.
-    *   Display showing I/O grid and CV bars.
-*   **Pattern View:**
-    *   `Enter` (Encoder Press) / `Backspace`: Navigation shortcuts.
-*   **Layout:** Consistent Teletype I/O and layout management.
+### User Interface
+*   **Keyboard Support:** QWERTY keyboard integration for script editing.
+*   **Script View:** Features line rotation (`Shift` + `Enc`), I/O grid visualization, and CV bars.
+*   **Pattern View:** Optimized navigation with `Enter` and `Backspace` shortcuts.

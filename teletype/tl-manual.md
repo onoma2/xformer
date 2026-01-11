@@ -16,6 +16,7 @@ This manual covers the Teletype operations available in the **Performer** firmwa
 *   **BUS (Performer):** Shared CV bus slots (`BUS`), usable in routing.
 *   **WBPM (Performer):** Tempo read/write (`WBPM`, `WBPM.S`).
 *   **WR (Performer):** Transport running flag (`WR`, `W.ACT`).
+*   **WNG/WNN (Performer):** Note track step gate/note access (`WNG`, `WNN`, `.H`).
 *   **RT (Performer):** Route source readback (`RT`).
 *   **MIDI:** Full MIDI input support (`MI.*`).
 
@@ -99,6 +100,21 @@ Notes:
 - Use `W.ACT x` (alias `WR.ACT`) to control transport.
 - `W.ACT 1` starts, `W.ACT 0` stops (reset).
 - Any other value pauses (clock stop).
+
+## WNG / WNN (Performer-only)
+
+Per-step access for Note tracks (track 1..8, step 1..64).
+
+- `WNG t s` -> get gate (0/1) at step s
+- `WNG t s v` -> set gate (v != 0 => on)
+- `WNN t s` -> get note at step s (0..127)
+- `WNN t s v` -> set note at step s (0..127, clamped)
+- `WNG.H t` -> get gate at current gate step
+- `WNN.H t` -> get note at current note step
+
+Notes:
+- These operate on the playing pattern for that track.
+- If the track is not a Note track, getters return 0 and setters do nothing.
 
 ## WBPM (Performer-only)
 

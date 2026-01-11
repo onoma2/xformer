@@ -91,6 +91,12 @@ public:
     void setEnvLoop(uint8_t index, int16_t count);
     void setEnvEor(uint8_t index, int16_t tr);
     void setEnvEoc(uint8_t index, int16_t tr);
+    int16_t noteGateGet(int trackIndex, int stepIndex) const;
+    void noteGateSet(int trackIndex, int stepIndex, int16_t value);
+    int16_t noteNoteGet(int trackIndex, int stepIndex) const;
+    void noteNoteSet(int trackIndex, int stepIndex, int16_t value);
+    int16_t noteGateHere(int trackIndex) const;
+    int16_t noteNoteHere(int trackIndex) const;
 
 private:
     void runMidiTriggeredScript(int scriptIndex);
