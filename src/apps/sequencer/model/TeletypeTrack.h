@@ -30,6 +30,8 @@ public:
     static constexpr int ScriptLineCount = SCRIPT_MAX_COMMANDS;
     static constexpr int ScriptLineLength = 96;
     static constexpr int PatternSlotCount = 2;
+    static constexpr int SlotScriptIndex = 3;
+    static_assert(SlotScriptIndex < EditableScriptCount, "SlotScriptIndex out of range");
     enum class TimeBase : uint8_t {
         Ms,
         Clock,
@@ -119,9 +121,9 @@ public:
     };
 
     struct PatternSlot {
-        std::array<tele_command_t, ScriptLineCount> s0{};
+        std::array<tele_command_t, ScriptLineCount> slotScript{};
         std::array<tele_command_t, ScriptLineCount> metro{};
-        uint8_t s0Length = 0;
+        uint8_t slotScriptLength = 0;
         uint8_t metroLength = 0;
         std::array<scene_pattern_t, PATTERN_COUNT> patterns{};
         std::array<TriggerInputSource, TriggerInputCount> triggerInputSource{};

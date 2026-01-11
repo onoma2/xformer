@@ -608,6 +608,13 @@ static const char *rootNoteName(int8_t note, FixedStringBuilder<8> &buffer) {
     return buffer;
 }
 
+namespace {
+    // Shared Teletype slot buffers to avoid large stack usage in file task.
+    TeletypeTrack::PatternSlot ttSlot1;
+    TeletypeTrack::PatternSlot ttSlot2;
+    char ttLineBuffer[256];
+}
+
 static void writeSlotIo(fs::FileWriter &writer, int slotIndex, const TeletypeTrack::PatternSlot &slot) {
     writeLine(writer, FixedStringBuilder<8>("SLOT %d", slotIndex + 1));
 
@@ -685,27 +692,25 @@ fs::Error FileManager::writeTeletypeTrack(const TeletypeTrack &track, const char
     writeLine(fileWriter, FixedStringBuilder<64>("NAME %s", safeName));
 
     // Avoid large PatternSlot copies on the file task stack.
-    static TeletypeTrack::PatternSlot slot1;
-    static TeletypeTrack::PatternSlot slot2;
-    slot1 = track.patternSlotSnapshot(0);
-    slot2 = track.patternSlotSnapshot(1);
+    ttSlot1 = track.patternSlotSnapshot(0);
+    ttSlot2 = track.patternSlotSnapshot(1);
 
     writeLine(fileWriter, "#IO");
-    writeSlotIo(fileWriter, 0, slot1);
-    writeSlotIo(fileWriter, 1, slot2);
+    writeSlotIo(fileWriter, 0, ttSlot1);
+    writeSlotIo(fileWriter, 1, ttSlot2);
 
-    writeScriptSection(fileWriter, "#S1P1", slot1.s0, slot1.s0Length);
-    writeScriptSection(fileWriter, "#M1", slot1.metro, slot1.metroLength);
-    writeScriptSection(fileWriter, "#S1P2", slot2.s0, slot2.s0Length);
-    writeScriptSection(fileWriter, "#M2", slot2.metro, slot2.metroLength);
+    writeScriptSection(fileWriter, "#S4P1", ttSlot1.slotScript, ttSlot1.slotScriptLength);
+    writeScriptSection(fileWriter, "#M1", ttSlot1.metro, ttSlot1.metroLength);
+    writeScriptSection(fileWriter, "#S4P2", ttSlot2.slotScript, ttSlot2.slotScriptLength);
+    writeScriptSection(fileWriter, "#M2", ttSlot2.metro, ttSlot2.metroLength);
     const scene_state_t &state = track.state();
-    writeScriptSectionRaw(fileWriter, "#S1", state.scripts[1].c, state.scripts[1].l);
-    writeScriptSectionRaw(fileWriter, "#S2", state.scripts[2].c, state.scripts[2].l);
-    writeScriptSectionRaw(fileWriter, "#S3", state.scripts[3].c, state.scripts[3].l);
+    writeScriptSectionRaw(fileWriter, "#S1", state.scripts[0].c, state.scripts[0].l);
+    writeScriptSectionRaw(fileWriter, "#S2", state.scripts[1].c, state.scripts[1].l);
+    writeScriptSectionRaw(fileWriter, "#S3", state.scripts[2].c, state.scripts[2].l);
 
     writeLine(fileWriter, "#PATS");
-    writePatterns(fileWriter, 0, slot1);
-    writePatterns(fileWriter, 1, slot2);
+    writePatterns(fileWriter, 0, ttSlot1);
+    writePatterns(fileWriter, 1, ttSlot2);
 
     return fileWriter.finish();
 }
@@ -715,8 +720,8 @@ static void clearScriptBuffer(TeletypeTrack::PatternSlot &slot, bool metro) {
         slot.metroLength = 0;
         std::memset(slot.metro.data(), 0, sizeof(slot.metro));
     } else {
-        slot.s0Length = 0;
-        std::memset(slot.s0.data(), 0, sizeof(slot.s0));
+        slot.slotScriptLength = 0;
+        std::memset(slot.slotScript.data(), 0, sizeof(slot.slotScript));
     }
 }
 
@@ -728,25 +733,23 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
 
     track.clear();
     scene_state_t &state = track.state();
-    for (int script = 1; script < TeletypeTrack::ScriptSlotCount; ++script) {
+    for (int script = 0; script < TeletypeTrack::EditableScriptCount; ++script) {
         ss_clear_script(&state, script);
     }
     // Avoid large PatternSlot copies on the file task stack.
-    static TeletypeTrack::PatternSlot slot1;
-    static TeletypeTrack::PatternSlot slot2;
-    slot1 = track.patternSlotSnapshot(0);
-    slot2 = track.patternSlotSnapshot(1);
-    clearScriptBuffer(slot1, false);
-    clearScriptBuffer(slot1, true);
-    clearScriptBuffer(slot2, false);
-    clearScriptBuffer(slot2, true);
+    ttSlot1 = track.patternSlotSnapshot(0);
+    ttSlot2 = track.patternSlotSnapshot(1);
+    clearScriptBuffer(ttSlot1, false);
+    clearScriptBuffer(ttSlot1, true);
+    clearScriptBuffer(ttSlot2, false);
+    clearScriptBuffer(ttSlot2, true);
 
     enum class Section {
         None,
         IO,
         Pats,
-        ScriptS0P1,
-        ScriptS0P2,
+        ScriptSlotP1,
+        ScriptSlotP2,
         ScriptM1,
         ScriptM2,
         ScriptS1,
@@ -760,14 +763,13 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     int patternValueIndex[2][PATTERN_COUNT] = {};
 
     auto parseSlot = [&] () -> TeletypeTrack::PatternSlot & {
-        return currentSlot == 0 ? slot1 : slot2;
+        return currentSlot == 0 ? ttSlot1 : ttSlot2;
     };
 
-    static char lineBuffer[256];
-    lineBuffer[0] = '\0';
-    while (readLine(fileReader, lineBuffer, sizeof(lineBuffer))) {
-        trimRight(lineBuffer);
-        const char *line = skipSpace(lineBuffer);
+    ttLineBuffer[0] = '\0';
+    while (readLine(fileReader, ttLineBuffer, sizeof(ttLineBuffer))) {
+        trimRight(ttLineBuffer);
+        const char *line = skipSpace(ttLineBuffer);
         if (!line || *line == '\0') {
             continue;
         }
@@ -777,10 +779,10 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 section = Section::IO;
             } else if (std::strcmp(line, "#PATS") == 0) {
                 section = Section::Pats;
-            } else if (std::strcmp(line, "#S1P1") == 0) {
-                section = Section::ScriptS0P1;
-            } else if (std::strcmp(line, "#S1P2") == 0) {
-                section = Section::ScriptS0P2;
+            } else if (std::strcmp(line, "#S4P1") == 0 || std::strcmp(line, "#S1P1") == 0) {
+                section = Section::ScriptSlotP1;
+            } else if (std::strcmp(line, "#S4P2") == 0 || std::strcmp(line, "#S1P2") == 0) {
+                section = Section::ScriptSlotP2;
             } else if (std::strcmp(line, "#M1") == 0) {
                 section = Section::ScriptM1;
             } else if (std::strcmp(line, "#M2") == 0) {
@@ -978,12 +980,13 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
             }
         }
 
-        if (section == Section::ScriptS0P1 || section == Section::ScriptS0P2 ||
+        if (section == Section::ScriptSlotP1 || section == Section::ScriptSlotP2 ||
             section == Section::ScriptM1 || section == Section::ScriptM2) {
-            TeletypeTrack::PatternSlot &slot = (section == Section::ScriptS0P1 || section == Section::ScriptM1) ? slot1 : slot2;
+            TeletypeTrack::PatternSlot &slot =
+                (section == Section::ScriptSlotP1 || section == Section::ScriptM1) ? ttSlot1 : ttSlot2;
             bool metro = (section == Section::ScriptM1 || section == Section::ScriptM2);
-            auto &buffer = metro ? slot.metro : slot.s0;
-            uint8_t &length = metro ? slot.metroLength : slot.s0Length;
+            auto &buffer = metro ? slot.metro : slot.slotScript;
+            uint8_t &length = metro ? slot.metroLength : slot.slotScriptLength;
             if (length >= TeletypeTrack::ScriptLineCount) {
                 continue;
             }
@@ -1001,7 +1004,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
         }
 
         if (section == Section::ScriptS1 || section == Section::ScriptS2 || section == Section::ScriptS3) {
-            const int scriptIndex = (section == Section::ScriptS1) ? 1 : (section == Section::ScriptS2 ? 2 : 3);
+            const int scriptIndex = (section == Section::ScriptS1) ? 0 : (section == Section::ScriptS2 ? 1 : 2);
             auto &script = state.scripts[scriptIndex];
             if (script.l >= TeletypeTrack::ScriptLineCount) {
                 continue;
@@ -1025,7 +1028,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 if (patternIndex < 0 || patternIndex >= PATTERN_COUNT) {
                     continue;
                 }
-                auto &slot = (currentPatternSlot == 0) ? slot1 : slot2;
+                auto &slot = (currentPatternSlot == 0) ? ttSlot1 : ttSlot2;
                 auto &pat = slot.patterns[patternIndex];
                 const char *rest = skipSpace(line + 2);
                 if (std::strncmp(rest, "LEN ", 4) == 0) {
@@ -1065,8 +1068,8 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
         }
     }
 
-    track.setPatternSlotForPattern(0, slot1);
-    track.setPatternSlotForPattern(1, slot2);
+    track.setPatternSlotForPattern(0, ttSlot1);
+    track.setPatternSlotForPattern(1, ttSlot2);
     track.applyActivePatternSlot();
 
     auto error = fileReader.finish();

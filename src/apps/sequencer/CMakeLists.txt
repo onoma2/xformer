@@ -201,12 +201,17 @@ if(${PLATFORM} STREQUAL "stm32")
 endif()
 
 if(${PLATFORM} STREQUAL "sim")
+    if(APPLE)
+        set(SEQUENCER_MAP_FLAG "-Wl,-map,${CMAKE_BINARY_DIR}/sequencer.map")
+    else()
+        set(SEQUENCER_MAP_FLAG "-Wl,-Map,${CMAKE_BINARY_DIR}/sequencer.map")
+    endif()
     add_library(sequencer_shared ${sources})
     target_link_libraries(sequencer_shared core)
 
     add_executable(sequencer SequencerSim.cpp)
     target_link_libraries(sequencer sequencer_shared)
-    target_link_options(sequencer PRIVATE "-Wl,-Map,${CMAKE_BINARY_DIR}/sequencer.map")
+    target_link_options(sequencer PRIVATE "${SEQUENCER_MAP_FLAG}")
     platform_postprocess_executable(sequencer)
     add_custom_command(TARGET sequencer COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/../../platform/sim/assets ${CMAKE_BINARY_DIR}/assets)
 

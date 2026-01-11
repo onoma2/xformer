@@ -221,9 +221,9 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_activePatternSlot);
     for (int slot = 0; slot < PatternSlotCount; ++slot) {
         const auto &patternSlot = _patternSlots[slot];
-        writer.write(patternSlot.s0Length);
+        writer.write(patternSlot.slotScriptLength);
         writer.write(patternSlot.metroLength);
-        writer.write(patternSlot.s0);
+        writer.write(patternSlot.slotScript);
         writer.write(patternSlot.metro);
         for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
             writer.write(patternSlot.patterns[pattern]);
@@ -331,9 +331,9 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
     _activePatternSlot = clamp<uint8_t>(activeSlot, 0, PatternSlotCount - 1);
     for (int slot = 0; slot < PatternSlotCount; ++slot) {
         auto &patternSlot = _patternSlots[slot];
-        reader.read(patternSlot.s0Length, 0);
+        reader.read(patternSlot.slotScriptLength, 0);
         reader.read(patternSlot.metroLength, 0);
-        reader.read(patternSlot.s0, 0);
+        reader.read(patternSlot.slotScript, 0);
         reader.read(patternSlot.metro, 0);
         for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
             reader.read(patternSlot.patterns[pattern], 0);
@@ -422,9 +422,9 @@ void TeletypeTrack::clearPatternSlot(int patternIndex) {
     syncActiveSlotMappings();
     const int slotIndex = patternSlotForPattern(patternIndex);
     auto &slot = _patternSlots[slotIndex];
-    slot.s0Length = 0;
+    slot.slotScriptLength = 0;
     slot.metroLength = 0;
-    std::memset(slot.s0.data(), 0, sizeof(slot.s0));
+    std::memset(slot.slotScript.data(), 0, sizeof(slot.slotScript));
     std::memset(slot.metro.data(), 0, sizeof(slot.metro));
     scene_state_t defaults{};
     ss_init(&defaults);
@@ -467,9 +467,9 @@ void TeletypeTrack::applyPatternSlot(int slotIndex) {
     const int slot = clamp(slotIndex, 0, PatternSlotCount - 1);
     _activePatternSlot = slot;
     const auto &patternSlot = _patternSlots[_activePatternSlot];
-    _state.scripts[0].l = clamp<uint8_t>(patternSlot.s0Length, 0, ScriptLineCount);
+    _state.scripts[SlotScriptIndex].l = clamp<uint8_t>(patternSlot.slotScriptLength, 0, ScriptLineCount);
     _state.scripts[METRO_SCRIPT].l = clamp<uint8_t>(patternSlot.metroLength, 0, ScriptLineCount);
-    std::memcpy(_state.scripts[0].c, patternSlot.s0.data(), sizeof(patternSlot.s0));
+    std::memcpy(_state.scripts[SlotScriptIndex].c, patternSlot.slotScript.data(), sizeof(patternSlot.slotScript));
     std::memcpy(_state.scripts[METRO_SCRIPT].c, patternSlot.metro.data(), sizeof(patternSlot.metro));
     for (int i = 0; i < PATTERN_COUNT; ++i) {
         _patterns[i] = patternSlot.patterns[i];
@@ -501,9 +501,9 @@ void TeletypeTrack::applyActivePatternSlot() {
 
 void TeletypeTrack::syncActiveSlotScripts() {
     auto &patternSlot = _patternSlots[_activePatternSlot];
-    patternSlot.s0Length = _state.scripts[0].l;
+    patternSlot.slotScriptLength = _state.scripts[SlotScriptIndex].l;
     patternSlot.metroLength = _state.scripts[METRO_SCRIPT].l;
-    std::memcpy(patternSlot.s0.data(), _state.scripts[0].c, sizeof(patternSlot.s0));
+    std::memcpy(patternSlot.slotScript.data(), _state.scripts[SlotScriptIndex].c, sizeof(patternSlot.slotScript));
     std::memcpy(patternSlot.metro.data(), _state.scripts[METRO_SCRIPT].c, sizeof(patternSlot.metro));
 }
 
