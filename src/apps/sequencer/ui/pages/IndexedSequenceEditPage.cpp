@@ -511,6 +511,10 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
             event.consume();
             return;
         }
+        if (key.quickEdit() == 0 || key.quickEdit() == 1) {
+            event.consume();
+            return;
+        }
         quickEdit(key.quickEdit());
         event.consume();
         return;
@@ -814,6 +818,16 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
 void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
     const auto &key = event.key();
     if (key.isQuickEdit() && !key.shiftModifier()) {
+        if (key.quickEdit() == 0) {
+            startSplitQuickEdit();
+            event.consume();
+            return;
+        }
+        if (key.quickEdit() == 1) {
+            startMergeQuickEdit();
+            event.consume();
+            return;
+        }
         if (key.quickEdit() == 4) {
             startVoicingQuickEdit(VoicingBank::Piano, key.quickEdit() + 8);
             event.consume();
@@ -826,19 +840,6 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
         }
         if (key.quickEdit() == 2) {
             startSwapQuickEdit();
-            event.consume();
-            return;
-        }
-    }
-
-    if (key.isQuickEdit() && key.shiftModifier()) {
-        if (key.quickEdit() == 0) {
-            startSplitQuickEdit();
-            event.consume();
-            return;
-        }
-        if (key.quickEdit() == 1) {
-            startMergeQuickEdit();
             event.consume();
             return;
         }
@@ -1212,11 +1213,6 @@ void IndexedSequenceEditPage::quickEdit(int index) {
     int item = quickEditItems[index];
     switch (item) {
     case QuickEditSplit:
-        if (!_stepSelection.any()) {
-            showMessage("NO STEP");
-            return;
-        }
-        splitStep();
         return;
     case QuickEditPiano:
         applyVoicing(VoicingBank::Piano, _pianoVoicingIndex);
@@ -1227,7 +1223,6 @@ void IndexedSequenceEditPage::quickEdit(int index) {
     case QuickEditSwap:
         return;
     case QuickEditMerge:
-        mergeStepWithNext();
         return;
     case QuickEditSetFirst: {
         if (!_stepSelection.any()) {
