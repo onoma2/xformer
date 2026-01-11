@@ -275,6 +275,42 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
 }
 
 void IndexedTrackEngine::update(float dt) {
+    bool running = _engine.state().running();
+    bool stepMonitoring = (!running && _monitorStepIndex >= 0);
+
+    auto sendToMidiOutputEngine = [this] (bool gate, float cv = 0.f) {
+        auto &midiOutputEngine = _engine.midiOutputEngine();
+        midiOutputEngine.sendGate(_track.trackIndex(), gate);
+        if (gate) {
+            midiOutputEngine.sendCv(_track.trackIndex(), cv);
+            midiOutputEngine.sendSlide(_track.trackIndex(), false);
+        }
+    };
+
+    auto setOverride = [&] (float cv) {
+        _cvOutputTarget = cv;
+        _cvOutput = cv;
+        _slideActive = false;
+        _activity = _gateOutput = true;
+        _monitorOverrideActive = true;
+        sendToMidiOutputEngine(true, cv);
+    };
+
+    auto clearOverride = [&] () {
+        if (_monitorOverrideActive) {
+            _activity = _gateOutput = false;
+            _monitorOverrideActive = false;
+            sendToMidiOutputEngine(false);
+        }
+    };
+
+    if (stepMonitoring) {
+        const auto &step = _sequence->step(_monitorStepIndex);
+        setOverride(noteIndexToVoltage(step.noteIndex()));
+    } else {
+        clearOverride();
+    }
+
     if (_slideActive && _indexedTrack.slideTime() > 0) {
         _cvOutput = Slide::applySlide(_cvOutput, _cvOutputTarget, _indexedTrack.slideTime(), dt);
     } else {
@@ -448,6 +484,17 @@ float IndexedTrackEngine::sequenceProgress() const {
 }
 
 bool IndexedTrackEngine::gateOutput(int index) const {
+    if (_monitorOverrideActive) {
+        return _gateOutput;
+    }
     // Drop gate when transport is stopped
     return _engine.state().running() && !mute() && _gateTimer > 0;
+}
+
+void IndexedTrackEngine::setMonitorStep(int index) {
+    if (index >= 0 && index < _sequence->activeLength()) {
+        _monitorStepIndex = index;
+    } else {
+        _monitorStepIndex = -1;
+    }
 }

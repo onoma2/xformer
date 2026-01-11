@@ -154,9 +154,11 @@ IndexedSequenceEditPage::IndexedSequenceEditPage(PageManager &manager, PageConte
 }
 
 void IndexedSequenceEditPage::enter() {
+    updateMonitorStep();
 }
 
 void IndexedSequenceEditPage::exit() {
+    _engine.selectedTrackEngine().as<IndexedTrackEngine>().setMonitorStep(-1);
 }
 
 void IndexedSequenceEditPage::draw(Canvas &canvas) {
@@ -546,6 +548,7 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         int stepIndex = stepOffset() + key.step();
         if (stepIndex < _project.selectedIndexedSequence().activeLength()) {
             _stepSelection.keyPress(event, stepOffset());
+            updateMonitorStep();
         }
         event.consume();
         return;
@@ -843,6 +846,7 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
 
     if (key.isStep()) {
         _stepSelection.keyDown(event, stepOffset());
+        updateMonitorStep();
     }
 
     if (key.isFunction()) {
@@ -903,6 +907,7 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
                 _durationTransfer = false;
             }
         }
+        updateMonitorStep();
     }
 }
 
@@ -939,6 +944,17 @@ void IndexedSequenceEditPage::keyUp(KeyEvent &event) {
 
     if (key.isStep()) {
         _stepSelection.keyUp(event, stepOffset());
+        updateMonitorStep();
+    }
+}
+
+void IndexedSequenceEditPage::updateMonitorStep() {
+    auto &trackEngine = _engine.selectedTrackEngine().as<IndexedTrackEngine>();
+
+    if (_editMode == EditMode::Note && !_stepSelection.isPersisted() && _stepSelection.any()) {
+        trackEngine.setMonitorStep(_stepSelection.first());
+    } else {
+        trackEngine.setMonitorStep(-1);
     }
 }
 

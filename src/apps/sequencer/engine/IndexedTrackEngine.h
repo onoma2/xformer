@@ -36,6 +36,8 @@ public:
     const IndexedSequence &sequence() const { return *_sequence; }
     bool isActiveSequence(const IndexedSequence &sequence) const { return &sequence == _sequence; }
 
+    void setMonitorStep(int index);
+
     // For Testing/UI
     int currentStep() const { return _currentStepIndex; }
     uint16_t effectiveStepDuration() const { return _effectiveStepDuration; }
@@ -74,8 +76,11 @@ private:
     // === Output ===
     float _cvOutput = 0.0f;
     float _cvOutputTarget = 0.0f;
+    bool _gateOutput = false;
     bool _activity = false;
     bool _slideActive = false;
+    bool _monitorOverrideActive = false;
+    int _monitorStepIndex = -1;
 
     SequenceState _sequenceState;
     Random _rng;
