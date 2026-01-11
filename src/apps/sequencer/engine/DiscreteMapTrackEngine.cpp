@@ -1,8 +1,6 @@
 #include "DiscreteMapTrackEngine.h"
 
 #include "Engine.h"
-#include "Slide.h"
-
 #include <algorithm>
 #include <cmath>
 
@@ -30,8 +28,13 @@ void DiscreteMapTrackEngine::reset() {
     _prevLoop = _sequence ? _sequence->loop() : true;
     _activeStage = -1;
     _cvOutput = 0.0f;
+    _cvOutputBase = 0.0f;
     _targetCv = 0.0f;
     _gateTimer = 0;
+    _pluckOffset = 0.0f;
+    _pluckDepth = 0.0f;
+    _pluckTimeRemaining = 0.0f;
+    _pluckTimeTotal = 0.0f;
     _running = true;
     _thresholdsDirty = true;
     _activity = false;
@@ -60,6 +63,10 @@ void DiscreteMapTrackEngine::changePattern() {
     _extMaxSeen = 0.f;
     _lastScannerSegment = -1;
     _activityTimer = 0;
+    _pluckOffset = 0.0f;
+    _pluckDepth = 0.0f;
+    _pluckTimeRemaining = 0.0f;
+    _pluckTimeTotal = 0.0f;
 }
 
 void DiscreteMapTrackEngine::restart() {
@@ -77,6 +84,10 @@ void DiscreteMapTrackEngine::restart() {
     _extMaxSeen = 0.f;
     _lastScannerSegment = -1;
     _activityTimer = 0;
+    _pluckOffset = 0.0f;
+    _pluckDepth = 0.0f;
+    _pluckTimeRemaining = 0.0f;
+    _pluckTimeTotal = 0.0f;
 }
 
 TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
@@ -269,6 +280,27 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         // Send MIDI gate ON
         bool finalGate = (!mute() || fill()) && true;
         _engine.midiOutputEngine().sendGate(_track.trackIndex(), finalGate);
+
+        int pluck = _sequence->pluck();
+        if (pluck == 0) {
+            _pluckOffset = 0.0f;
+            _pluckDepth = 0.0f;
+            _pluckTimeRemaining = 0.0f;
+            _pluckTimeTotal = 0.0f;
+        } else {
+            float norm = std::abs(pluck) / 100.0f;
+            float curve = norm * norm;
+            float depthCents = curve * kPluckMaxCents;
+            float depthVolts = depthCents / 1200.0f;
+            if (pluck < 0) {
+                depthVolts = -depthVolts;
+            }
+            float durationMs = kPluckMinMs + curve * (kPluckMaxMs - kPluckMinMs);
+            _pluckDepth = depthVolts;
+            _pluckTimeTotal = durationMs * 0.001f;
+            _pluckTimeRemaining = _pluckTimeTotal;
+            _pluckOffset = _pluckDepth;
+        }
     }
 
     // 4. Update CV output based on CV Update Mode
@@ -292,7 +324,8 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         }
 
         if (_sequence->slewTime() == 0) {
-            _cvOutput = _targetCv;
+            _cvOutputBase = _targetCv;
+            _cvOutput = _cvOutputBase + _pluckOffset;
         }
 
         // Send MIDI CV and slide when it changes (respect CvUpdateMode and mute)
@@ -378,9 +411,14 @@ void DiscreteMapTrackEngine::update(float dt) {
 
     auto setOverride = [&] (float cv) {
         _targetCv = cv;
+        _cvOutputBase = cv;
         _cvOutput = cv;
         _monitorGateOutput = true;
         _monitorOverrideActive = true;
+        _pluckOffset = 0.0f;
+        _pluckDepth = 0.0f;
+        _pluckTimeRemaining = 0.0f;
+        _pluckTimeTotal = 0.0f;
         _activityTimer = kActivityPulseTicks;
         _activity = true;
         sendToMidiOutputEngine(true, cv);
@@ -405,10 +443,32 @@ void DiscreteMapTrackEngine::update(float dt) {
         return;
     }
 
-    int slewTime = _sequence->slewTime();
-    if (slewTime > 0) {
-        _cvOutput = Slide::applySlide(_cvOutput, _targetCv, slewTime, dt);
+    int slewRate = _sequence->slewTime();
+    if (slewRate == 0) {
+        _cvOutputBase = _targetCv;
+    } else {
+        float rateVoltsPerSec = slewRate / 12.0f;
+        float maxDelta = rateVoltsPerSec * dt;
+        float delta = _targetCv - _cvOutputBase;
+        if (std::abs(delta) <= maxDelta) {
+            _cvOutputBase = _targetCv;
+        } else {
+            _cvOutputBase += (delta > 0.0f) ? maxDelta : -maxDelta;
+        }
     }
+
+    if (_pluckTimeRemaining > 0.0f) {
+        _pluckTimeRemaining = std::max(0.0f, _pluckTimeRemaining - dt);
+        if (_pluckTimeRemaining == 0.0f || _pluckTimeTotal <= 0.0f) {
+            _pluckOffset = 0.0f;
+        } else {
+            _pluckOffset = _pluckDepth * (_pluckTimeRemaining / _pluckTimeTotal);
+        }
+    } else {
+        _pluckOffset = 0.0f;
+    }
+
+    _cvOutput = _cvOutputBase + _pluckOffset;
 }
 
 uint32_t DiscreteMapTrackEngine::scaledDivisorTicks() const {

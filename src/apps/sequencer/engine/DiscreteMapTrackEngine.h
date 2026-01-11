@@ -67,6 +67,9 @@ private:
     static constexpr float kCoveragePct = 0.90f;
     static constexpr float kRangeEpsilon = 1e-6f;
     static constexpr uint32_t kActivityPulseTicks = 12;
+    static constexpr float kPluckMaxCents = 50.0f;
+    static constexpr float kPluckMinMs = 10.0f;
+    static constexpr float kPluckMaxMs = 120.0f;
 
     void updateRamp(double tickPos);
     uint32_t scaledDivisorTicks() const;
@@ -114,11 +117,16 @@ private:
 
     // === Output ===
     float _cvOutput = 0.0f;
+    float _cvOutputBase = 0.0f;
     float _targetCv = 0.0f;
     uint32_t _gateTimer = 0;
     bool _monitorGateOutput = false;
     bool _monitorOverrideActive = false;
     int _monitorStageIndex = -1;
+    float _pluckOffset = 0.0f;
+    float _pluckDepth = 0.0f;
+    float _pluckTimeRemaining = 0.0f;
+    float _pluckTimeTotal = 0.0f;
 
     // === Sampled pitch params (Gate mode) ===
     int _sampledOctave = 0;

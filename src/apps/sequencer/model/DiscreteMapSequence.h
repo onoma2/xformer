@@ -213,7 +213,7 @@ public:
         _rootNote = clamp(root, 0, 11);
     }
 
-    // Slew time (0-100%, 0 = off)
+    // Slew rate in semitones/sec (0-100, 0 = off)
     int slewTime() const { return _slewTime.get(isRouted(Routing::Target::SlideTime)); }
     void setSlewTime(int time, bool routed = false) {
         _slewTime.set(clamp(time, 0, 100), routed);
@@ -224,14 +224,30 @@ public:
         }
     }
     void printSlewTime(StringBuilder &str) const {
-        int time = slewTime();
-        if (time == 0) {
+        int rate = slewTime();
+        if (rate == 0) {
             str("Off");
         } else {
-            str("%d%%", time);
+            str("%d st/s", rate);
         }
     }
     bool slewEnabled() const { return slewTime() > 0; }
+
+    // Pluck (bipolar, -100..100)
+    int pluck() const { return _pluck; }
+    void setPluck(int value) {
+        _pluck = clamp(value, -100, 100);
+    }
+    void editPluck(int value, bool shift) {
+        setPluck(ModelUtils::adjustedByStep(pluck(), value, 5, !shift));
+    }
+    void printPluck(StringBuilder &str) const {
+        if (pluck() == 0) {
+            str("Off");
+        } else {
+            str("%+d", pluck());
+        }
+    }
 
     // Octave
     int octave() const { return _octave; }
@@ -396,6 +412,7 @@ private:
     int8_t _scale = -1;
     int8_t _rootNote = 0;       // C
     Routable<uint8_t> _slewTime;
+    int8_t _pluck = 0;
     int8_t _octave = 0;
     int8_t _transpose = 0;
     int16_t _offset = 0;

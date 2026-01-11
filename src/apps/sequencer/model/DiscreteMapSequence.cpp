@@ -48,6 +48,7 @@ void DiscreteMapSequence::clear() {
     _scale = -1;
     _rootNote = 0;
     setSlewTime(0);
+    _pluck = 0;
     _octave = 0;
     _transpose = 0;
     _offset = 0;
@@ -171,6 +172,7 @@ void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_scale);
     writer.write(_rootNote);
     _slewTime.write(writer);
+    writer.write(_pluck);
     writer.write(_octave);
     writer.write(_transpose);
     writer.write(_offset);
@@ -206,6 +208,7 @@ void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
 
     reader.read(_rootNote);
     _slewTime.read(reader);
+    reader.read(_pluck);
     reader.read(_octave);
     reader.read(_transpose);
     reader.read(_offset);
