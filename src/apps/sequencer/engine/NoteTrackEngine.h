@@ -94,6 +94,8 @@ private:
     int _reReneY = 0;
     int _reReneLastXTick = -1;
     int _reReneLastYTick = -1;
+    uint32_t _reReneDivisorX = 0;
+    uint32_t _reReneDivisorY = 0;
     SequenceState _sequenceState;
     int _currentStep;
     bool _prevCondition;

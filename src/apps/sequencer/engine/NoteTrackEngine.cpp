@@ -108,6 +108,8 @@ void NoteTrackEngine::reset() {
     _reReneY = 0;
     _reReneLastXTick = -1;
     _reReneLastYTick = -1;
+    _reReneDivisorX = 0;
+    _reReneDivisorY = 0;
     _sequenceState.reset();
     _noteSequenceState.reset();
     _currentStep = -1;
@@ -144,6 +146,8 @@ void NoteTrackEngine::restart() {
     _reReneY = 0;
     _reReneLastXTick = -1;
     _reReneLastYTick = -1;
+    _reReneDivisorX = 0;
+    _reReneDivisorY = 0;
 }
 
 TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
@@ -254,6 +258,15 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
 
                 int xTickIndex = int(std::floor(baseTick / divisorX));
                 int yTickIndex = int(std::floor(baseTick / divisorY));
+                bool divisorChanged = (_reReneDivisorX != divisorX) || (_reReneDivisorY != divisorY);
+                if (divisorChanged || xTickIndex < _reReneLastXTick || yTickIndex < _reReneLastYTick) {
+                    _reReneLastXTick = xTickIndex;
+                    _reReneLastYTick = yTickIndex;
+                    _reReneX = xTickIndex & 7;
+                    _reReneY = yTickIndex & 7;
+                    _reReneDivisorX = divisorX;
+                    _reReneDivisorY = divisorY;
+                }
 
                 if (_reReneLastXTick < 0) {
                     _reReneLastXTick = xTickIndex;
