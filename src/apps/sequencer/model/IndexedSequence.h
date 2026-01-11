@@ -22,7 +22,7 @@ public:
     // Types
     //----------------------------------------
 
-    static constexpr int MaxSteps = 32;
+    static constexpr int MaxSteps = 48;
     static constexpr int PatternCount = CONFIG_PATTERN_COUNT;  // 8 patterns
     static constexpr uint16_t MaxDuration = 32767;
     static constexpr uint8_t TargetGroupsAll = 0;

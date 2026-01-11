@@ -161,7 +161,8 @@ void IndexedSequenceEditPage::exit() {
 
 void IndexedSequenceEditPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "INDEXED EDIT");
+    FixedStringBuilder<20> header("INDEXED EDIT %d/%d", _section + 1, SectionCount);
+    WindowPainter::drawHeader(canvas, _model, _engine, header);
 
     const auto &sequence = _project.selectedIndexedSequence();
     const auto &trackEngine = _engine.selectedTrackEngine().as<IndexedTrackEngine>();
@@ -588,7 +589,7 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         event.consume();
     }
     if (key.isRight()) {
-        _section = std::min(1, _section + 1);
+        _section = std::min(SectionCount - 1, _section + 1);
         event.consume();
     }
 }
