@@ -416,7 +416,7 @@ Then use Performer's Routing page to route CV 1 or BUS 1 to any track parameter.
 
 WR is a read-only opcode that returns whether the Performer transport is running.
 
-Use WR.ACT to start/stop the transport.
+Use W.ACT (alias WR.ACT) to start/stop the transport.
 
 ### Basic Usage
 
@@ -439,9 +439,9 @@ WR returns `1` when the sequencer is playing and `0` when stopped.
 
 
 ```
-WR.ACT 1   # start
-WR.ACT 0   # stop
-WR.ACT 2   # pause
+W.ACT 1   # start
+W.ACT 0   # stop
+W.ACT 2   # pause
 ```
 
 ## WBPM Tempo Control (Performer)
@@ -1334,5 +1334,4 @@ This tutorial has covered the fundamental concepts of using Teletype in the Perf
 Remember to experiment with different combinations of operations, and don't hesitate to refer back to the teletype manual for more detailed information about specific operations.
 
 The key to mastering Teletype in Performer is practice and experimentation. Try modifying the examples in this tutorial to create your own unique patterns and behaviors.
-
 

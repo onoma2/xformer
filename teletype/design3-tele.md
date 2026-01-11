@@ -19,7 +19,7 @@
 ## RAM delta log (Teletype track)
 Keep a running tally of per-track RAM impact for newly added ops/features.
 
-- 2025-XX-XX: `WBPM`/`WBPM.S`, `WR.ACT`, `WP.SET` (control-only ops) → **0 bytes** (no new state).
+- 2025-XX-XX: `WBPM`/`WBPM.S`, `W.ACT` (alias `WR.ACT`), `WP.SET` (control-only ops) → **0 bytes** (no new state).
 - 2025-XX-XX: `RND.P`/`RND.PN` optional min/max → **0 bytes** (logic-only).
 - 2025-XX-XX: `BUS` slots (routing-backed) → **0 bytes** (state in Engine, not per-track).
 - 2025-XX-XX: `E.*` envelope + `TR.D`/`TR.W` (per-output state) → **~0.1 KB** per track.

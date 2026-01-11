@@ -205,6 +205,7 @@
         "BAR"         => { MATCH_OP(E_OP_BAR); };
         "WP.SET"      => { MATCH_OP(E_OP_WP_SET); };
         "WP"          => { MATCH_OP(E_OP_WP); };
+        "W.ACT"       => { MATCH_OP(E_OP_WR_ACT); };
         "WR.ACT"      => { MATCH_OP(E_OP_WR_ACT); };
         "WR"          => { MATCH_OP(E_OP_WR); };
         "RT"          => { MATCH_OP(E_OP_RT); };

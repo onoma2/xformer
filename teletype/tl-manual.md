@@ -15,7 +15,7 @@ This manual covers the Teletype operations available in the **Performer** firmwa
 *   **Local I/O:** 4 CV Outputs (`CV`), 4 Gate Outputs (`TR`), 2 Inputs (`IN`, `PARAM`).
 *   **BUS (Performer):** Shared CV bus slots (`BUS`), usable in routing.
 *   **WBPM (Performer):** Tempo read/write (`WBPM`, `WBPM.S`).
-*   **WR (Performer):** Transport running flag (`WR`, `WR.ACT`).
+*   **WR (Performer):** Transport running flag (`WR`, `W.ACT`).
 *   **RT (Performer):** Route source readback (`RT`).
 *   **MIDI:** Full MIDI input support (`MI.*`).
 
@@ -96,8 +96,8 @@ WR returns whether the Performer transport is currently running.
 - `WR` → read transport running flag (0/1)
 
 Notes:
-- Use `WR.ACT x` to control transport.
-- `WR.ACT 1` starts, `WR.ACT 0` stops (reset).
+- Use `W.ACT x` (alias `WR.ACT`) to control transport.
+- `W.ACT 1` starts, `W.ACT 0` stops (reset).
 - Any other value pauses (clock stop).
 
 ## WBPM (Performer-only)
