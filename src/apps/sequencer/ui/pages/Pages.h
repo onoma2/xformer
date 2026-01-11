@@ -8,6 +8,7 @@
 #include "ContextMenuPage.h"
 #include "CurveSequenceEditPage.h"
 #include "CurveSequencePage.h"
+#include "CvRoutePage.h"
 #include "FileSelectPage.h"
 #include "GeneratorPage.h"
 #include "GeneratorSelectPage.h"
@@ -69,6 +70,7 @@ struct Pages {
     SongPage song;
     RoutingPage routing;
     MidiOutputPage midiOutput;
+    CvRoutePage cvRoute;
     UserScalePage userScale;
     OverviewPage overview;
     AccumulatorPage accumulator;
@@ -126,6 +128,7 @@ struct Pages {
         song(manager, context),
         routing(manager, context),
         midiOutput(manager, context),
+        cvRoute(manager, context),
         userScale(manager, context),
         overview(manager, context),
         accumulator(manager, context),

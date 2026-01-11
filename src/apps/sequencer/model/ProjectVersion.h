@@ -102,6 +102,9 @@ enum ProjectVersion {
     // added NoteSequence::Mode and NoteSequence::divisorY
     Version34 = 34,
 
+    // added CvRoute settings
+    Version35 = 35,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

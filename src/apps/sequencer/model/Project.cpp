@@ -20,6 +20,12 @@ void Project::writeRouted(Routing::Target target, int intValue, float floatValue
     case Routing::Target::Swing:
         setSwing(intValue, true);
         break;
+    case Routing::Target::CvRouteScan:
+        setCvRouteScan(intValue, true);
+        break;
+    case Routing::Target::CvRouteRoute:
+        setCvRouteRoute(intValue, true);
+        break;
     default:
         break;
     }
@@ -59,6 +65,7 @@ void Project::clear() {
     _playState.clear();
     _routing.clear();
     _midiOutput.clear();
+    _cvRoute.clear();
 
     for (auto &userScale : UserScale::userScales) {
         userScale.clear();
@@ -153,6 +160,7 @@ void Project::write(VersionedSerializedWriter &writer) const {
     _playState.write(writer);
     _routing.write(writer);
     _midiOutput.write(writer);
+    _cvRoute.write(writer);
 
     writeArray(writer, UserScale::userScales);
 
@@ -202,6 +210,9 @@ bool Project::read(VersionedSerializedReader &reader) {
     _playState.read(reader);
     _routing.read(reader);
     _midiOutput.read(reader);
+    if (reader.dataVersion() >= ProjectVersion::Version35) {
+        _cvRoute.read(reader);
+    }
 
     if (reader.dataVersion() >= ProjectVersion::Version5) {
         readArray(reader, UserScale::userScales);

@@ -620,6 +620,43 @@ The Curve Rate parameter can be modulated via CV routing for dynamic FM effects:
 
 ## 7. Routing & Output Rotation
 
+### 7.0 CVRoute (Matrix Scan/Route)
+
+CVRoute is a minimalist 4×4 scan-and-route matrix controlled by two global values: **Scan** (input selection) and **Route** (output selection). It blends between I/O pairs rather than stepping hard.
+
+**Access**: Page key Track5.
+
+**Layout**:
+- Row 1: Inputs 1–4 plus `SCAN`
+- Row 2: Outputs 1–4 plus `ROUTE`
+
+**Input sources (per lane)**:
+- `CV1..CV4`
+- `BUS1..BUS4`
+- `0V`
+
+**Output destinations (per lane)**:
+- `CVR1..CVR4`
+- `BUS1..BUS4`
+- `NONE`
+
+**Scan/Route range**:
+- `0` = I/O 1
+- `100` = I/O 4
+- Values in-between interpolate between adjacent lanes.
+
+**Controls**:
+- `F1–F4`: Select column 1–4 and toggle between input/output row.
+- Encoder: Adjust selected I/O source/destination (cols 1–4) or Scan/Route value (col 5).
+- `F5`: Select column 5 and toggle between Scan/Route row.
+
+**Routing targets**:
+- `CVR Scan` and `CVR Route` are routable targets (0–100%).
+
+**Layout integration**:
+- `CVR1..CVR4` only reach hardware CV outputs if you assign physical CV outs to `CVR` in the Layout page.
+  (Outputs assigned to CVR are filled in order: CVR1, CVR2, CVR3, CVR4.)
+
 ### 7.1 Global Output Rotation (CV & Gate)
 
 This feature allows you to dynamically rotate which tracks are assigned to physical CV and Gate outputs. It acts like a virtual 8-channel sequential switch.

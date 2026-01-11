@@ -88,6 +88,7 @@ set(sources
     ui/pages/ContextMenuPage.cpp
     ui/pages/CurveSequenceEditPage.cpp
     ui/pages/CurveSequencePage.cpp
+    ui/pages/CvRoutePage.cpp
     ui/pages/FileSelectPage.cpp
     ui/pages/GeneratorPage.cpp
     ui/pages/GeneratorSelectPage.cpp
@@ -184,6 +185,7 @@ if(${PLATFORM} STREQUAL "stm32")
 
     add_executable(sequencer Sequencer.cpp)
     target_link_libraries(sequencer sequencer_shared)
+    target_link_options(sequencer PRIVATE "-Wl,-Map,${CMAKE_BINARY_DIR}/sequencer.map")
     platform_postprocess_executable(sequencer)
     # override linker script
     set_target_properties(sequencer PROPERTIES LINK_FLAGS "-T ${CMAKE_CURRENT_SOURCE_DIR}/sequencer.ld")
@@ -204,6 +206,7 @@ if(${PLATFORM} STREQUAL "sim")
 
     add_executable(sequencer SequencerSim.cpp)
     target_link_libraries(sequencer sequencer_shared)
+    target_link_options(sequencer PRIVATE "-Wl,-Map,${CMAKE_BINARY_DIR}/sequencer.map")
     platform_postprocess_executable(sequencer)
     add_custom_command(TARGET sequencer COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/../../platform/sim/assets ${CMAKE_BINARY_DIR}/assets)
 

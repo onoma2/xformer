@@ -192,6 +192,7 @@ private:
 
     void updateTrackSetups();
     void updateTrackOutputs();
+    void updateCvRouteOutputs();
     void reset();
     void updatePlayState(bool ticked);
     void updateOverrides();
@@ -293,6 +294,7 @@ private:
     bool _cvOutputOverride = false;
     std::array<float, CvOutput::Channels> _cvOutputOverrideValues;
     std::array<float, BusCvCount> _busCv{};
+    std::array<float, CvRoute::LaneCount> _cvRouteOutputs{};
 
     MessageHandler _messageHandler;
 };

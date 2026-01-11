@@ -41,7 +41,9 @@ public:
         ProjectFirst,
         Tempo = ProjectFirst,
         Swing,
-        ProjectLast = Swing,
+        CvRouteScan,
+        CvRouteRoute,
+        ProjectLast = CvRouteRoute,
 
         // PlayState targets
         PlayStateFirst,
@@ -149,6 +151,8 @@ public:
 
         case Target::Tempo:                     return "Tempo";
         case Target::Swing:                     return "Swing";
+        case Target::CvRouteScan:               return "CVR Scan";
+        case Target::CvRouteRoute:              return "CVR Route";
 
         case Target::Mute:                      return "Mute";
         case Target::Fill:                      return "Fill";
@@ -221,6 +225,8 @@ public:
         case Target::Record:                    return 2;
         case Target::Tempo:                     return 3;
         case Target::Swing:                     return 4;
+        case Target::CvRouteScan:               return 61;
+        case Target::CvRouteRoute:              return 62;
         case Target::SlideTime:                 return 5;
         case Target::Octave:                    return 6;
         case Target::Transpose:                    return 7;

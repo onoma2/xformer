@@ -360,6 +360,8 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     // Project targets
     [int(Routing::Target::Tempo)]                           = { 1,      1000,   100,    200,    10      },
     [int(Routing::Target::Swing)]                           = { 50,     75,     50,     75,     5       },
+    [int(Routing::Target::CvRouteScan)]                     = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::CvRouteRoute)]                    = { 0,      100,    0,      100,    10      },
     // PlayState targets
     [int(Routing::Target::Mute)]                            = { 0,      1,      0,      1,      1       },
     [int(Routing::Target::Fill)]                            = { 0,      1,      0,      1,      1       },
@@ -462,6 +464,8 @@ void Routing::printTargetValue(Routing::Target target, float normalized, StringB
     case Target::Swing:
     case Target::SlideTime:
     case Target::FillAmount:
+    case Target::CvRouteScan:
+    case Target::CvRouteRoute:
         str("%d%%", intValue);
         break;
     case Target::Octave:

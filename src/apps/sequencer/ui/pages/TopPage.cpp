@@ -252,6 +252,9 @@ void TopPage::setMode(Mode mode) {
     case Mode::MidiOutput:
         setMainPage(pages.midiOutput);
         break;
+    case Mode::CvRoute:
+        setMainPage(pages.cvRoute);
+        break;
     case Mode::UserScale:
         setMainPage(pages.userScale);
         break;

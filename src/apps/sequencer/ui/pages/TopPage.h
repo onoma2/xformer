@@ -38,6 +38,7 @@ private:
         Performer       = PageKeyMap::Performer,
         Overview        = PageKeyMap::Overview,
         Clock           = PageKeyMap::Clock,
+        CvRoute         = PageKeyMap::CvRoute,
 
         // aux modes
         UserScale       = PageKeyMap::UserScale,
