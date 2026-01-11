@@ -1,6 +1,8 @@
 #include "DiscreteMapTrackEngine.h"
 
 #include "Engine.h"
+#include "core/utils/Random.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -11,6 +13,8 @@ constexpr float DiscreteMapTrackEngine::kMinSpanAbs;
 constexpr float DiscreteMapTrackEngine::kArmTolerancePct;
 constexpr float DiscreteMapTrackEngine::kCoveragePct;
 constexpr float DiscreteMapTrackEngine::kRangeEpsilon;
+
+static Random rng;
 
 void DiscreteMapTrackEngine::reset() {
     _sequence = &_discreteMapTrack.sequence(pattern());
@@ -288,16 +292,27 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
             _pluckTimeRemaining = 0.0f;
             _pluckTimeTotal = 0.0f;
         } else {
-            float norm = std::abs(pluck) / 100.0f;
+            float absPluck = std::abs(pluck);
+            float norm = absPluck / 100.0f;
             float curve = norm * norm;
             float depthCents = curve * kPluckMaxCents;
+            float durationMs = kPluckMinMs + curve * (kPluckMaxMs - kPluckMinMs);
+
+            float ratio = (absPluck - 1.0f) / 99.0f;
+            ratio = clamp(ratio, 0.0f, 1.0f);
+            float jitterPct = 0.10f + (0.40f * ratio);
+            float jitterDepth = (rng.nextFloat() * 2.0f - 1.0f) * jitterPct;
+            float jitterTime = (rng.nextFloat() * 2.0f - 1.0f) * jitterPct;
+
+            depthCents *= (1.0f + jitterDepth);
+            durationMs *= (1.0f + jitterTime);
+
             float depthVolts = depthCents / 1200.0f;
             if (pluck < 0) {
                 depthVolts = -depthVolts;
             }
-            float durationMs = kPluckMinMs + curve * (kPluckMaxMs - kPluckMinMs);
             _pluckDepth = depthVolts;
-            _pluckTimeTotal = durationMs * 0.001f;
+            _pluckTimeTotal = std::max(0.001f, durationMs * 0.001f);
             _pluckTimeRemaining = _pluckTimeTotal;
             _pluckOffset = _pluckDepth;
         }
@@ -443,11 +458,12 @@ void DiscreteMapTrackEngine::update(float dt) {
         return;
     }
 
-    int slewRate = _sequence->slewTime();
-    if (slewRate == 0) {
+    int slewRatePercent = _sequence->slewTime();
+    if (slewRatePercent == 0) {
         _cvOutputBase = _targetCv;
     } else {
-        float rateVoltsPerSec = slewRate / 12.0f;
+        float rateStPerSec = ((101.0f - slewRatePercent) / 100.0f) * kMaxSlewRateStPerSec;
+        float rateVoltsPerSec = rateStPerSec / 12.0f;
         float maxDelta = rateVoltsPerSec * dt;
         float delta = _targetCv - _cvOutputBase;
         if (std::abs(delta) <= maxDelta) {

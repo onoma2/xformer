@@ -98,7 +98,7 @@ private:
         case RangeLow:      return "Below";
         case Scale:         return "Scale";
         case RootNote:      return "Root";
-        case SlewTime:      return "Slew Rate";
+        case SlewTime:      return "Slew";
         case Pluck:         return "Pluck";
         case Octave:        return "Octave";
         case Transpose:     return "Transpose";

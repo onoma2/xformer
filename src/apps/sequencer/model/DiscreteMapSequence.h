@@ -213,22 +213,22 @@ public:
         _rootNote = clamp(root, 0, 11);
     }
 
-    // Slew rate in semitones/sec (0-100, 0 = off)
+    // Slew rate percent (0 = off, 1-100)
     int slewTime() const { return _slewTime.get(isRouted(Routing::Target::SlideTime)); }
     void setSlewTime(int time, bool routed = false) {
         _slewTime.set(clamp(time, 0, 100), routed);
     }
     void editSlewTime(int value, bool shift) {
         if (!isRouted(Routing::Target::SlideTime)) {
-            setSlewTime(ModelUtils::adjustedByStep(slewTime(), value, 5, !shift));
+            int step = shift ? 5 : 1;
+            setSlewTime(clamp(slewTime() + value * step, 0, 100));
         }
     }
     void printSlewTime(StringBuilder &str) const {
-        int rate = slewTime();
-        if (rate == 0) {
+        if (slewTime() == 0) {
             str("Off");
         } else {
-            str("%d st/s", rate);
+            str("%d%%", slewTime());
         }
     }
     bool slewEnabled() const { return slewTime() > 0; }
@@ -248,6 +248,7 @@ public:
             str("%+d", pluck());
         }
     }
+
 
     // Octave
     int octave() const { return _octave; }

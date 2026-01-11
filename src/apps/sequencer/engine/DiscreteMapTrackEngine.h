@@ -67,9 +67,10 @@ private:
     static constexpr float kCoveragePct = 0.90f;
     static constexpr float kRangeEpsilon = 1e-6f;
     static constexpr uint32_t kActivityPulseTicks = 12;
-    static constexpr float kPluckMaxCents = 50.0f;
+    static constexpr float kPluckMaxCents = 200.0f;
     static constexpr float kPluckMinMs = 10.0f;
-    static constexpr float kPluckMaxMs = 120.0f;
+    static constexpr float kPluckMaxMs = 450.0f;
+    static constexpr float kMaxSlewRateStPerSec = 48.0f;
 
     void updateRamp(double tickPos);
     uint32_t scaledDivisorTicks() const;
