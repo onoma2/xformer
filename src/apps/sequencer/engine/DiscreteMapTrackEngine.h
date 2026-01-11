@@ -25,8 +25,16 @@ public:
     virtual void changePattern() override;
 
     virtual bool activity() const override { return _activityTimer > 0; }
-    virtual bool gateOutput(int index) const override { return !mute() && _gateTimer > 0 && _activeStage >= 0; }
+    virtual bool gateOutput(int index) const override {
+        if (_monitorOverrideActive) {
+            return _monitorGateOutput;
+        }
+        return !mute() && _gateTimer > 0 && _activeStage >= 0;
+    }
     virtual float cvOutput(int index) const override {
+        if (_monitorOverrideActive) {
+            return _cvOutput;
+        }
         // When muted and in Gate mode, output should be 0
         if (mute() && _discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Gate) {
             return 0.0f;
@@ -38,6 +46,7 @@ public:
     const DiscreteMapSequence &sequence() const { return *_sequence; }
     bool isActiveSequence(const DiscreteMapSequence &sequence) const { return &sequence == _sequence; }
     void invalidateThresholds() { _thresholdsDirty = true; }
+    void setMonitorStage(int index);
 
     // For Testing/UI
     int activeStage() const { return _activeStage; }
@@ -62,7 +71,7 @@ private:
     void updateRamp(double tickPos);
     uint32_t scaledDivisorTicks() const;
     float getRoutedInput();
-    float noteIndexToVoltage(int8_t noteIndex);
+    float noteIndexToVoltage(int8_t noteIndex, bool useSampled = true);
     bool updateExternalOnce();
 
     // Voltage range helpers (delegated to sequence parameters)
@@ -107,6 +116,9 @@ private:
     float _cvOutput = 0.0f;
     float _targetCv = 0.0f;
     uint32_t _gateTimer = 0;
+    bool _monitorGateOutput = false;
+    bool _monitorOverrideActive = false;
+    int _monitorStageIndex = -1;
 
     // === Sampled pitch params (Gate mode) ===
     int _sampledOctave = 0;

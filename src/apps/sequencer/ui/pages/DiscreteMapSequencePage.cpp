@@ -189,6 +189,10 @@ void DiscreteMapSequencePage::exit() {
     _generatorStage = GeneratorStage::Inactive;
     _generatorKind = GeneratorKind::Random;
     _initStage = InitStage::Inactive;
+    refreshPointers();
+    if (_enginePtr) {
+        _enginePtr->setMonitorStage(-1);
+    }
 }
 
 void DiscreteMapSequencePage::refreshPointers() {
@@ -514,6 +518,7 @@ void DiscreteMapSequencePage::keyDown(KeyEvent &event) {
         if (idx < 8) {
             _stepKeysHeld |= (1 << idx);
             handleTopRowKey(stepOffset + idx);
+            updateMonitorStage();
         } else {
             handleBottomRowKey(stepOffset + idx - 8);
         }
@@ -541,6 +546,7 @@ void DiscreteMapSequencePage::keyUp(KeyEvent &event) {
         // If it was a Selection Button (Bottom Row: 0-7)
         if (idx < 8) {
             _stepKeysHeld &= ~(1 << idx);
+            updateMonitorStage();
         }
     }
     _shiftHeld = event.key().shiftModifier();
@@ -675,6 +681,29 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
     if (key.isRight()) {
         _section = std::min(3, _section + 1);
         event.consume();
+    }
+}
+
+void DiscreteMapSequencePage::updateMonitorStage() {
+    if (!_enginePtr || !_sequence) {
+        return;
+    }
+
+    if (_stepKeysHeld == 0) {
+        _enginePtr->setMonitorStage(-1);
+        return;
+    }
+
+    for (int i = 0; i < 8; ++i) {
+        if (_stepKeysHeld & (1 << i)) {
+            int stageIndex = _section * 8 + i;
+            if (stageIndex < DiscreteMapSequence::StageCount) {
+                _enginePtr->setMonitorStage(stageIndex);
+            } else {
+                _enginePtr->setMonitorStage(-1);
+            }
+            return;
+        }
     }
 }
 

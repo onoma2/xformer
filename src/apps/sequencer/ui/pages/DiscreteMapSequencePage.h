@@ -100,6 +100,7 @@ private:
     void applyRangeMacro(RangeMacro macro);
     void getRangeMacroValues(RangeMacro macro, float &low, float &high) const;
     const char *getRangeMacroName(RangeMacro macro) const;
+    void updateMonitorStage();
 
     float getThresholdNormalized(int stageIndex) const;
     float rangeMin() const { return -5.f; }

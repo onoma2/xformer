@@ -364,6 +364,47 @@ void DiscreteMapTrackEngine::update(float dt) {
         return;
     }
 
+    bool running = _engine.state().running();
+    bool stepMonitoring = (!running && _monitorStageIndex >= 0);
+
+    auto sendToMidiOutputEngine = [this] (bool gate, float cv = 0.f) {
+        auto &midiOutputEngine = _engine.midiOutputEngine();
+        midiOutputEngine.sendGate(_track.trackIndex(), gate);
+        if (gate) {
+            midiOutputEngine.sendCv(_track.trackIndex(), cv);
+            midiOutputEngine.sendSlide(_track.trackIndex(), false);
+        }
+    };
+
+    auto setOverride = [&] (float cv) {
+        _targetCv = cv;
+        _cvOutput = cv;
+        _monitorGateOutput = true;
+        _monitorOverrideActive = true;
+        _activityTimer = kActivityPulseTicks;
+        _activity = true;
+        sendToMidiOutputEngine(true, cv);
+    };
+
+    auto clearOverride = [&] () {
+        if (_monitorOverrideActive) {
+            _monitorGateOutput = false;
+            _monitorOverrideActive = false;
+            sendToMidiOutputEngine(false);
+        }
+    };
+
+    if (stepMonitoring) {
+        const auto &stage = _sequence->stage(_monitorStageIndex);
+        setOverride(noteIndexToVoltage(stage.noteIndex(), false));
+    } else {
+        clearOverride();
+    }
+
+    if (_monitorOverrideActive) {
+        return;
+    }
+
     int slewTime = _sequence->slewTime();
     if (slewTime > 0) {
         _cvOutput = Slide::applySlide(_cvOutput, _targetCv, slewTime, dt);
@@ -510,12 +551,12 @@ int DiscreteMapTrackEngine::findActiveStage(float input, float prevInput) {
     return _activeStage;
 }
 
-float DiscreteMapTrackEngine::noteIndexToVoltage(int8_t noteIndex) {
+float DiscreteMapTrackEngine::noteIndexToVoltage(int8_t noteIndex, bool useSampled) {
     const Scale &scale = _sequence->selectedScale(_model.project().selectedScale());
 
     // Use sampled values in Gate mode, current values in Always mode
     int octave, transpose, rootNote;
-    if (_discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Gate) {
+    if (useSampled && _discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Gate) {
         octave = _sampledOctave;
         transpose = _sampledTranspose;
         rootNote = _sampledRootNote;
@@ -533,4 +574,12 @@ float DiscreteMapTrackEngine::noteIndexToVoltage(int8_t noteIndex) {
         volts += rootNote * (1.f / 12.f);
     }
     return volts;
+}
+
+void DiscreteMapTrackEngine::setMonitorStage(int index) {
+    if (index >= 0 && index < DiscreteMapSequence::StageCount) {
+        _monitorStageIndex = index;
+    } else {
+        _monitorStageIndex = -1;
+    }
 }
