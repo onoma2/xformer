@@ -125,6 +125,7 @@ void TeletypeTrackEngine::reset() {
     _envLoopSetting.fill(1);
     _envLoopsRemaining.fill(0);
     _envSlewMs.fill(0);
+    _envStageRemainingMs.fill(0.f);
     _envEorTr.fill(-1);
     _envEocTr.fill(-1);
     _envState.fill(kEnvIdle);
@@ -241,6 +242,44 @@ void TeletypeTrackEngine::update(float dt) {
     updateInputTriggers();
     runMetro(timeDelta);
     updatePulses(timeDelta);
+    if (timeDelta > 0.f) {
+        for (uint8_t i = 0; i < CvOutputCount; ++i) {
+            if (_envState[i] == kEnvIdle) {
+                continue;
+            }
+            if (_envStageRemainingMs[i] <= 0.f) {
+                continue;
+            }
+            _envStageRemainingMs[i] -= timeDelta;
+            if (_envStageRemainingMs[i] > 0.f) {
+                continue;
+            }
+            _envStageRemainingMs[i] = 0.f;
+            _cvSlewActive[i] = false;
+
+            auto dest = _teletypeTrack.cvOutputDest(i);
+            int destIndex = int(dest);
+            int trackSlot = -1;
+            {
+                int slot = 0;
+                const auto &cvOutputTracks = _model.project().cvOutputTracks();
+                int trackIndex = _track.trackIndex();
+                for (int channel = 0; channel < CONFIG_CHANNEL_COUNT; ++channel) {
+                    if (cvOutputTracks[channel] == trackIndex) {
+                        if (channel == destIndex) {
+                            trackSlot = slot;
+                            break;
+                        }
+                        ++slot;
+                    }
+                }
+            }
+
+            if (trackSlot >= 0 && trackSlot < PerformerCvCount) {
+                _performerCvOutput[trackSlot] = _cvOutputTarget[i];
+            }
+        }
+    }
     updateEnvelopes();
     refreshActivity(dt);
 }
@@ -573,6 +612,7 @@ void TeletypeTrackEngine::triggerEnv(uint8_t index) {
     }
     _envState[index] = kEnvAttack;
     _envSlewMs[index] = _envAttackMs[index];
+    _envStageRemainingMs[index] = static_cast<float>(_envAttackMs[index]);
     int16_t loops = _envLoopSetting[index];
     _envLoopsRemaining[index] = loops == 0 ? -1 : loops;
 
@@ -990,7 +1030,7 @@ void TeletypeTrackEngine::updateEnvelopes() {
         if (_envState[i] == kEnvIdle) {
             continue;
         }
-        if (_cvSlewActive[i]) {
+        if (_envStageRemainingMs[i] > 0.f) {
             continue;
         }
 
@@ -999,11 +1039,14 @@ void TeletypeTrackEngine::updateEnvelopes() {
             if (eor >= 0) {
                 int16_t timeMs = state.variables.tr_time[eor];
                 if (timeMs > 0) {
+                    state.variables.tr[eor] = state.variables.tr_pol[eor];
+                    handleTr(static_cast<uint8_t>(eor), state.variables.tr[eor]);
                     beginPulse(static_cast<uint8_t>(eor), timeMs);
                 }
             }
             _envState[i] = kEnvDecay;
             _envSlewMs[i] = _envDecayMs[i];
+            _envStageRemainingMs[i] = static_cast<float>(_envDecayMs[i]);
             handleCv(i, _envOffsetRaw[i], true);
             continue;
         }
@@ -1013,6 +1056,8 @@ void TeletypeTrackEngine::updateEnvelopes() {
             if (eoc >= 0) {
                 int16_t timeMs = state.variables.tr_time[eoc];
                 if (timeMs > 0) {
+                    state.variables.tr[eoc] = state.variables.tr_pol[eoc];
+                    handleTr(static_cast<uint8_t>(eoc), state.variables.tr[eoc]);
                     beginPulse(static_cast<uint8_t>(eoc), timeMs);
                 }
             }
@@ -1020,6 +1065,7 @@ void TeletypeTrackEngine::updateEnvelopes() {
             if (_envLoopsRemaining[i] < 0) {
                 _envState[i] = kEnvAttack;
                 _envSlewMs[i] = _envAttackMs[i];
+                _envStageRemainingMs[i] = static_cast<float>(_envAttackMs[i]);
                 handleCv(i, _envTargetRaw[i], true);
                 continue;
             }
@@ -1030,9 +1076,11 @@ void TeletypeTrackEngine::updateEnvelopes() {
             if (_envLoopsRemaining[i] > 0) {
                 _envState[i] = kEnvAttack;
                 _envSlewMs[i] = _envAttackMs[i];
+                _envStageRemainingMs[i] = static_cast<float>(_envAttackMs[i]);
                 handleCv(i, _envTargetRaw[i], true);
             } else {
                 _envState[i] = kEnvIdle;
+                _envStageRemainingMs[i] = 0.f;
             }
         }
     }

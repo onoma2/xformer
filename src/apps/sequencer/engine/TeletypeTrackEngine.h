@@ -159,6 +159,7 @@ private:
     std::array<int16_t, CvOutputCount> _envLoopSetting{};
     std::array<int16_t, CvOutputCount> _envLoopsRemaining{};
     std::array<int16_t, CvOutputCount> _envSlewMs{};
+    std::array<float, CvOutputCount> _envStageRemainingMs{};
     std::array<int8_t, CvOutputCount> _envEorTr{};
     std::array<int8_t, CvOutputCount> _envEocTr{};
     std::array<uint8_t, CvOutputCount> _envState{};
