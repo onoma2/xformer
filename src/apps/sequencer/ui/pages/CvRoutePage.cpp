@@ -19,13 +19,27 @@ void CvRoutePage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
 
     const int startX = 8;
-    const int startY = 20;
+    const int startY = 30;
     const int rowHeight = 12;
     const int colCount = 5;
     const int colWidth = (CONFIG_LCD_WIDTH - startX * 2) / colCount;
 
     canvas.setFont(Font::Tiny);
     canvas.setBlendMode(BlendMode::Set);
+
+    {
+        const int logoX = startX;
+        const int logoW = CONFIG_LCD_WIDTH - startX * 2;
+        const int midX = logoX + logoW / 2;
+        const int logoY1 = 8;
+        const int logoY2 = 12;
+        canvas.setColor(Color::MediumBright);
+        canvas.line(logoX, logoY2, midX, logoY1);
+        canvas.line(midX, logoY1, logoX + logoW, logoY2);
+        canvas.setColor(Color::Medium);
+        canvas.line(logoX, logoY1, midX, logoY2);
+        canvas.line(midX, logoY2, logoX + logoW, logoY1);
+    }
 
     auto drawCell = [&canvas, colWidth, startX] (int col, int y, const char *text, Color color) {
         int colX = startX + col * colWidth;

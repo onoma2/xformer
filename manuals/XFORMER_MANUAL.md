@@ -668,6 +668,7 @@ The rotation applies to the physical output's lookup of its assigned track. Only
 1.  **Configure Track Layout:** Map Tracks to CV/Gate Outputs in Layout Page (Shift+S2 -> LAYOUT).
 2.  **Create a Rotation Route:**
     *   **Target**: `CV Out Rot` or `Gate Out Rot`.
+        *   CV and Gate rotations use separate pools.
     *   **Source**: Modulation source (e.g., `CV In 1`).
     *   **Tracks**: Select the tracks to participate in the rotation pool.
     *   **Range**: 0-8 (unipolar) or -8 to +8 (bipolar).

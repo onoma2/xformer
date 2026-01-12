@@ -402,6 +402,41 @@ Recent updates to the routing system include:
   - Negative values: Rotate CV values backward in sequence
 - **Use Case**: Create evolving CV patterns by rotating output values
 
+**How Rotation Pools Work**
+- Rotation only applies within the pool of outputs whose tracks are routed to `CV Out Rot`.
+- The rotation value is an integer (rounded) and wraps within the pool size.
+- CV and Gate rotations use separate pools.
+
+**Source Range -> Rotation Value**
+Routing maps the source (normalized 0..1) to the target range:
+`r = round(min + src * (max - min))`
+
+Examples assume the source range is set correctly in the route:
+
+**Micro Rotation (neighbor swap)**
+- **Min/Max**: `-1 .. +1`
+- **Input range**: Unipolar 0..5V or Bipolar -5..+5V
+- **Result**: r in {-1, 0, +1}
+- **Use**: Gentle movement within the pool.
+
+**Full Pool Rotation (all positions)**
+- **Min/Max**: `0 .. (poolSize-1)`
+- **Input range**: Unipolar 0..5V
+- **Result**: r covers every pool position.
+- **Use**: Sweep through every output in the pool.
+
+**Wide Span (wrap-heavy)**
+- **Min/Max**: `-8 .. +8`
+- **Input range**: Bipolar -5..+5V
+- **Result**: Large rotations that wrap in smaller pools.
+- **Use**: Fast, chaotic reshuffling.
+
+**Example Mapping (pool size 3)**
+- r = 0: 1->1, 2->2, 3->3
+- r = +1: 1<-2, 2<-3, 3<-1
+- r = +2: 1<-3, 2<-1, 3<-2
+- r = -1: 1<-3, 2<-1, 3<-2
+
 #### 8.6.3 Gate Output Rotation
 
 **Target**: `Gate Out Rot`
@@ -412,6 +447,8 @@ Recent updates to the routing system include:
   - Positive values: Rotate gate timing forward
   - Negative values: Rotate gate timing backward
 - **Use Case**: Create rhythmic variations by rotating gate patterns
+ 
+Gate rotation uses the same min/max mapping as CV rotation, but has its own pool.
 
 #### 8.6.4 Track Run Control
 
