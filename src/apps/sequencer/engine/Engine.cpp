@@ -514,10 +514,18 @@ void Engine::updateTrackOutputs() {
 
     int trackGateIndex[CONFIG_TRACK_COUNT];
     int trackCvIndex[CONFIG_TRACK_COUNT];
+    int cvOutputTrackIndex[CONFIG_CHANNEL_COUNT];
+    int cvOutputTrackSlot[CONFIG_CHANNEL_COUNT];
+    int cvOutputCvRouteLane[CONFIG_CHANNEL_COUNT];
 
     for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
         trackGateIndex[trackIndex] = 0;
         trackCvIndex[trackIndex] = 0;
+    }
+    for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+        cvOutputTrackIndex[i] = -1;
+        cvOutputTrackSlot[i] = -1;
+        cvOutputCvRouteLane[i] = -1;
     }
 
     // --- Gate Rotation Logic ---
@@ -543,6 +551,18 @@ void Engine::updateTrackOutputs() {
         if (trackIndex < CONFIG_TRACK_COUNT &&
             _project.track(trackIndex).isCvOutputRotated()) {
             cvPool[cvPoolSize++] = i;
+        }
+    }
+
+    // Precompute CV output track slots and CV route lanes
+    int cvRouteLane = 0;
+    for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+        int trackIndex = cvOutputTracks[i];
+        if (trackIndex < CONFIG_TRACK_COUNT) {
+            cvOutputTrackIndex[i] = trackIndex;
+            cvOutputTrackSlot[i] = trackCvIndex[trackIndex]++;
+        } else if (trackIndex == CONFIG_TRACK_COUNT) {
+            cvOutputCvRouteLane[i] = cvRouteLane++;
         }
     }
 
@@ -580,13 +600,38 @@ void Engine::updateTrackOutputs() {
         if (cvPoolIndex != -1) {
             // It's rotating!
             int originalTrack = cvOutputTracks[i];
-            int rotation = _project.track(originalTrack).cvOutputRotate();
+            if (_routingEngine.cvRotateInterpolated(originalTrack) && cvPoolSize > 0) {
+                float rotation = _routingEngine.cvRotateValue(originalTrack);
+                float pos = float(cvPoolIndex) - rotation;
+                float wrapped = std::fmod(pos, float(cvPoolSize));
+                if (wrapped < 0.f) {
+                    wrapped += float(cvPoolSize);
+                }
+                int lowIndex = int(std::floor(wrapped));
+                float t = wrapped - float(lowIndex);
+                int highIndex = (lowIndex + 1) % cvPoolSize;
+                int lowOutputIndex = cvPool[lowIndex];
+                int highOutputIndex = cvPool[highIndex];
+                int lowTrack = cvOutputTrackIndex[lowOutputIndex];
+                int highTrack = cvOutputTrackIndex[highOutputIndex];
+                int lowSlot = cvOutputTrackSlot[lowOutputIndex];
+                int highSlot = cvOutputTrackSlot[highOutputIndex];
+                float lowValue = (lowTrack >= 0 && lowSlot >= 0) ? _trackEngines[lowTrack]->cvOutput(lowSlot) : 0.f;
+                float highValue = (highTrack >= 0 && highSlot >= 0) ? _trackEngines[highTrack]->cvOutput(highSlot) : 0.f;
+                float mixed = lowValue * (1.f - t) + highValue * t;
+                if (!_cvOutputOverride) {
+                    _cvOutput.setChannel(i, mixed);
+                }
+                continue;
+            } else {
+                int rotation = _project.track(originalTrack).cvOutputRotate();
 
-            // Wrap rotation within pool size
-            int rotatedIndex = (cvPoolIndex - rotation) % cvPoolSize;
-            if (rotatedIndex < 0) rotatedIndex += cvPoolSize;
+                // Wrap rotation within pool size
+                int rotatedIndex = (cvPoolIndex - rotation) % cvPoolSize;
+                if (rotatedIndex < 0) rotatedIndex += cvPoolSize;
 
-            cvSourceOutputIndex = cvPool[rotatedIndex];
+                cvSourceOutputIndex = cvPool[rotatedIndex];
+            }
         }
 
         int cvOutputTrack = cvOutputTracks[cvSourceOutputIndex];
@@ -594,15 +639,11 @@ void Engine::updateTrackOutputs() {
             continue;
         }
         if (cvOutputTrack < CONFIG_TRACK_COUNT) {
-            _cvOutput.setChannel(i, _trackEngines[cvOutputTrack]->cvOutput(trackCvIndex[cvOutputTrack]++));
+            int cvSlot = cvOutputTrackSlot[cvSourceOutputIndex];
+            _cvOutput.setChannel(i, _trackEngines[cvOutputTrack]->cvOutput(cvSlot));
         } else if (cvOutputTrack == CONFIG_TRACK_COUNT) {
-            int lane = 0;
-            for (int index = 0; index < cvSourceOutputIndex; ++index) {
-                if (cvOutputTracks[index] == CONFIG_TRACK_COUNT) {
-                    ++lane;
-                }
-            }
-            if (lane < int(_cvRouteOutputs.size())) {
+            int lane = cvOutputCvRouteLane[cvSourceOutputIndex];
+            if (lane >= 0 && lane < int(_cvRouteOutputs.size())) {
                 _cvOutput.setChannel(i, _cvRouteOutputs[lane]);
             }
         }

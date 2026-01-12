@@ -149,6 +149,8 @@ RoutingEngine::RoutingEngine(Engine &engine, Model &model) :
     _routing(model.project().routing())
 {
     _lastResetActive.fill(false);
+    _cvRotateValues.fill(0.f);
+    _cvRotateInterp.fill(false);
 }
 
 float RoutingEngine::routeSource(int index) const {
@@ -156,6 +158,20 @@ float RoutingEngine::routeSource(int index) const {
         return 0.f;
     }
     return clamp(_sourceValues[index], 0.f, 1.f);
+}
+
+bool RoutingEngine::cvRotateInterpolated(int trackIndex) const {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return false;
+    }
+    return _cvRotateInterp[trackIndex];
+}
+
+float RoutingEngine::cvRotateValue(int trackIndex) const {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return 0.f;
+    }
+    return _cvRotateValues[trackIndex];
 }
 
 void RoutingEngine::resetShaperState() {
@@ -302,6 +318,9 @@ void RoutingEngine::updateSources() {
 }
 
 void RoutingEngine::updateSinks() {
+    _cvRotateValues.fill(0.f);
+    _cvRotateInterp.fill(false);
+
     for (int routeIndex = 0; routeIndex < CONFIG_ROUTE_COUNT; ++routeIndex) {
         const auto &route = _routing.route(routeIndex);
         auto &routeState = _routeStates[routeIndex];
@@ -454,6 +473,11 @@ void RoutingEngine::updateSinks() {
                         } else {
                             // Normal target handling
                             _routing.writeTarget(target, (1 << trackIndex), routed);
+                        }
+
+                        if (target == Routing::Target::CvOutputRotate) {
+                            _cvRotateValues[trackIndex] = Routing::denormalizeTargetValue(target, routed);
+                            _cvRotateInterp[trackIndex] = route.cvRotateInterpolate();
                         }
                     }
                 }

@@ -401,6 +401,7 @@ Recent updates to the routing system include:
   - Positive values: Rotate CV values forward in sequence
   - Negative values: Rotate CV values backward in sequence
 - **Use Case**: Create evolving CV patterns by rotating output values
+- **Route Mode**: `Step` (default) or `Interp` (crossfade between adjacent rotated outputs; CV only)
 
 **How Rotation Pools Work**
 - Rotation only applies within the pool of outputs whose tracks are routed to `CV Out Rot`.

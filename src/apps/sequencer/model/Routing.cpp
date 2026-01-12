@@ -82,6 +82,7 @@ void Routing::Route::clear() {
     _source = Source::None;
     _cvSource.clear();
     _midiSource.clear();
+    _cvRotateInterpolate = false;
 }
 
 void Routing::Route::write(VersionedSerializedWriter &writer) const {
@@ -89,6 +90,7 @@ void Routing::Route::write(VersionedSerializedWriter &writer) const {
     writer.write(_tracks);
     writer.write(_min);
     writer.write(_max);
+    writer.write(_cvRotateInterpolate);
     for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
         writer.write(_biasPct[i]);
         writer.write(_depthPct[i]);
@@ -109,6 +111,7 @@ void Routing::Route::read(VersionedSerializedReader &reader) {
     reader.read(_tracks);
     reader.read(_min);
     reader.read(_max);
+    reader.read(_cvRotateInterpolate);
     for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
         reader.read(_biasPct[i]);
         reader.read(_depthPct[i]);
@@ -139,6 +142,7 @@ bool Routing::Route::operator==(const Route &other) const {
         _tracks == other._tracks &&
         _min == other._min &&
         _max == other._max &&
+        _cvRotateInterpolate == other._cvRotateInterpolate &&
         _source == other._source &&
         (!isCvSource(_source) || _cvSource == other._cvSource) &&
         (!isMidiSource(_source) || _midiSource == other._midiSource) &&

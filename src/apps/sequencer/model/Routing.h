@@ -770,6 +770,11 @@ public:
         const MidiSource &midiSource() const { return _midiSource; }
               MidiSource &midiSource()       { return _midiSource; }
 
+        // cvRotateInterpolate (CV Out Rot only)
+
+        bool cvRotateInterpolate() const { return _cvRotateInterpolate; }
+        void setCvRotateInterpolate(bool enabled) { _cvRotateInterpolate = enabled; }
+
         Route();
 
         void clear();
@@ -796,6 +801,7 @@ public:
         Source _source;
         CvSource _cvSource;
         MidiSource _midiSource;
+        bool _cvRotateInterpolate = false;
 
         friend class Routing;
     };

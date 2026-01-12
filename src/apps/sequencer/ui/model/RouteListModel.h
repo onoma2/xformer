@@ -25,6 +25,7 @@ public:
         BusBias,
         BusDepth,
         BusShaper,
+        RotateMode,
         Last
     };
 
@@ -37,20 +38,25 @@ public:
         bool isCvSource = Routing::isCvSource(_route.source());
         bool isMidiSource = Routing::isMidiSource(_route.source());
         bool isBusTarget = Routing::isBusTarget(_route.target());
+        bool showRotateMode = _route.target() == Routing::Target::CvOutputRotate;
         bool hasNoteOrController = _route.midiSource().event() != Routing::MidiSource::Event::PitchBend;
         bool hasNoteRange = _route.midiSource().event() == Routing::MidiSource::Event::NoteRange;
+        const int baseLast = int(BusShaper) + 1;
         int baseRows = 1;
         if (isEmpty) {
             baseRows = 1;
         } else if (isCvSource) {
             baseRows = FirstSource + 1;
         } else if (isMidiSource) {
-            baseRows = hasNoteOrController ? (hasNoteRange ? Last : int(Last) - 1) : int(Last) - 2;
+            baseRows = hasNoteOrController ? (hasNoteRange ? baseLast : baseLast - 1) : baseLast - 2;
         } else {
             baseRows = FirstSource;
         }
         if (isBusTarget && !isEmpty) {
             baseRows += 3;
+        }
+        if (showRotateMode && !isEmpty) {
+            baseRows += 1;
         }
         return baseRows;
     }
@@ -80,15 +86,17 @@ private:
         bool isCvSource = Routing::isCvSource(_route.source());
         bool isMidiSource = Routing::isMidiSource(_route.source());
         bool isBusTarget = Routing::isBusTarget(_route.target());
+        bool showRotateMode = _route.target() == Routing::Target::CvOutputRotate;
         bool hasNoteOrController = _route.midiSource().event() != Routing::MidiSource::Event::PitchBend;
         bool hasNoteRange = _route.midiSource().event() == Routing::MidiSource::Event::NoteRange;
+        const int baseLast = int(BusShaper) + 1;
         int baseRows = 1;
         if (isEmpty) {
             baseRows = 1;
         } else if (isCvSource) {
             baseRows = FirstSource + 1;
         } else if (isMidiSource) {
-            baseRows = hasNoteOrController ? (hasNoteRange ? Last : int(Last) - 1) : int(Last) - 2;
+            baseRows = hasNoteOrController ? (hasNoteRange ? baseLast : baseLast - 1) : baseLast - 2;
         } else {
             baseRows = FirstSource;
         }
@@ -98,6 +106,13 @@ private:
             if (offset == 1) return BusDepth;
             if (offset == 2) return BusShaper;
         }
+        int baseRowsNoRotate = baseRows;
+        if (isBusTarget && !isEmpty) {
+            baseRowsNoRotate += 3;
+        }
+        if (showRotateMode && !isEmpty && row == baseRowsNoRotate) {
+            return RotateMode;
+        }
         return Item(row);
     }
 
@@ -106,6 +121,7 @@ private:
         case Target:        return "Target";
         case Min:           return "Min";
         case Max:           return "Max";
+        case RotateMode:    return "Mode";
         case Tracks:        return "Tracks";
         case Source:        return "Source";
         // case CvRange:
@@ -137,6 +153,9 @@ private:
             break;
         case Max:
             _route.printMax(str);
+            break;
+        case RotateMode:
+            str(_route.cvRotateInterpolate() ? "Interp" : "Step");
             break;
         case Tracks:
             _route.printTracks(str);
@@ -190,6 +209,11 @@ private:
             break;
         case Max:
             _route.editMax(value, shift);
+            break;
+        case RotateMode:
+            if (value != 0) {
+                _route.setCvRotateInterpolate(!_route.cvRotateInterpolate());
+            }
             break;
         case Tracks:
             // handled in RoutePage
