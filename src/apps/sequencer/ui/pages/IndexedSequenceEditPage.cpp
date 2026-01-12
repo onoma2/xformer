@@ -197,9 +197,13 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         const int barW = 240;
         const int barH = 16;
         const int minStepW = 7;
+        const bool twoRows = (minStepW * nonzeroSteps) > barW;
+        const int rowH = twoRows ? (barH / 2) : barH;
+        const int totalW = twoRows ? (barW * 2) : barW;
 
         int currentX = barX;
-        int extraPixels = barW - minStepW * nonzeroSteps;
+        int row = 0;
+        int extraPixels = totalW - minStepW * nonzeroSteps;
         if (extraPixels < 0) {
             extraPixels = 0;
         }
@@ -228,9 +232,6 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
 
             bool selected = _stepSelection[i];
 
-            canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Medium));
-            canvas.drawRect(currentX, barY, stepW, barH);
-
             // Use modulated gate ticks for currently playing step, programmed for others
             int gateW = 0;
             if (duration > 0) {
@@ -240,12 +241,46 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
                 gateW = int((float(stepW) * gateTicks) / float(duration));
             }
             gateW = clamp(gateW, 0, std::max(0, stepW - 2));
-            if (gateW > 0 && stepW > 2) {
-                canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Low));
-                canvas.fillRect(currentX + 1, barY + 1, gateW, barH - 2);
+
+            auto drawSegment = [&](int segX, int segY, int segW, int gateRemaining) -> int {
+                if (segW <= 0) {
+                    return gateRemaining;
+                }
+                canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Medium));
+                canvas.drawRect(segX, segY, segW, rowH);
+
+                if (gateRemaining > 0 && segW > 2 && rowH > 2) {
+                    int gateSeg = std::min(gateRemaining, segW - 2);
+                    canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Low));
+                    canvas.fillRect(segX + 1, segY + 1, gateSeg, rowH - 2);
+                    gateRemaining -= gateSeg;
+                }
+                return gateRemaining;
+            };
+
+            int segGate = gateW;
+            int segRow = row;
+            int segX = currentX;
+            int remaining = stepW;
+            while (remaining > 0) {
+                int rowY = barY + segRow * rowH;
+                int rowRemaining = (barX + barW) - segX;
+                int segW = std::min(remaining, rowRemaining);
+                segGate = drawSegment(segX, rowY, segW, segGate);
+                remaining -= segW;
+                if (remaining > 0 && twoRows && segRow == 0) {
+                    segRow = 1;
+                    segX = barX;
+                    continue;
+                }
+                break;
             }
 
             currentX += stepW;
+            if (twoRows && currentX >= barX + barW) {
+                currentX = barX + (currentX - (barX + barW));
+                row = 1;
+            }
         }
     }
 
