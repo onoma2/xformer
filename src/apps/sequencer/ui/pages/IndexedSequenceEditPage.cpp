@@ -151,6 +151,7 @@ IndexedSequenceEditPage::IndexedSequenceEditPage(PageManager &manager, PageConte
         }
         return false;
     });
+
 }
 
 void IndexedSequenceEditPage::enter() {

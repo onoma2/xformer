@@ -35,11 +35,58 @@ void CvRoutePage::draw(Canvas &canvas) {
         canvas.drawText(x, y, text);
     };
 
+    auto laneColor = [] (int value, int lane) {
+        const int laneValue = lane == 0 ? 0 : (lane == 1 ? 33 : (lane == 2 ? 66 : 100));
+        if (value == laneValue) {
+            return Color::Bright;
+        }
+        if (value > 0 && value < 33) {
+            if (lane == 0 || lane == 1) {
+                Color base = Color::Medium;
+                if (lane == 0 && value <= 8) {
+                    return Color::MediumBright;
+                }
+                if (lane == 1 && value >= 25) {
+                    return Color::MediumBright;
+                }
+                return base;
+            }
+        }
+        if (value > 33 && value < 66) {
+            if (lane == 1 || lane == 2) {
+                Color base = Color::Medium;
+                if (lane == 1 && value <= 41) {
+                    return Color::MediumBright;
+                }
+                if (lane == 2 && value >= 58) {
+                    return Color::MediumBright;
+                }
+                return base;
+            }
+        }
+        if (value > 66 && value < 100) {
+            if (lane == 2 || lane == 3) {
+                Color base = Color::Medium;
+                if (lane == 2 && value <= 74) {
+                    return Color::MediumBright;
+                }
+                if (lane == 3 && value >= 92) {
+                    return Color::MediumBright;
+                }
+                return base;
+            }
+        }
+        return Color::Low;
+    };
+
     const auto &cvRoute = _project.cvRoute();
 
     // Row 1: Inputs + Scan
     for (int lane = 0; lane < 4; ++lane) {
-        Color color = (_editRow == EditRow::Input && _activeCol == lane) ? Color::Bright : Color::Medium;
+        Color color = laneColor(cvRoute.scan(), lane);
+        if (_editRow == EditRow::Input && _activeCol == lane) {
+            color = Color::Bright;
+        }
         drawCell(lane, startY, inputLabel(lane, int(cvRoute.inputSource(lane))), color);
     }
     {
@@ -52,7 +99,10 @@ void CvRoutePage::draw(Canvas &canvas) {
     // Row 2: Outputs + Route
     int row2Y = startY + rowHeight + 8;
     for (int lane = 0; lane < 4; ++lane) {
-        Color color = (_editRow == EditRow::Output && _activeCol == lane) ? Color::Bright : Color::Medium;
+        Color color = laneColor(cvRoute.route(), lane);
+        if (_editRow == EditRow::Output && _activeCol == lane) {
+            color = Color::Bright;
+        }
         drawCell(lane, row2Y, outputLabel(lane, int(cvRoute.outputDest(lane))), color);
     }
     {
