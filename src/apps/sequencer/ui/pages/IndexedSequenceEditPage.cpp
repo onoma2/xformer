@@ -242,17 +242,24 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             }
             gateW = clamp(gateW, 0, std::max(0, stepW - 2));
 
-            auto drawSegment = [&](int segX, int segY, int segW, int gateRemaining) -> int {
+            auto drawSegment = [&](int segX, int segY, int segW, int gateRemaining, int xOffset) -> int {
                 if (segW <= 0) {
                     return gateRemaining;
                 }
+                int drawX = segX + xOffset;
+                int drawW = segW - xOffset;
+                if (drawX < barX) {
+                    int shift = barX - drawX;
+                    drawX = barX;
+                    drawW = std::max(0, drawW - shift);
+                }
                 canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Medium));
-                canvas.drawRect(segX, segY, segW, rowH);
+                canvas.drawRect(drawX, segY, drawW, rowH);
 
-                if (gateRemaining > 0 && segW > 2 && rowH > 2) {
-                    int gateSeg = std::min(gateRemaining, segW - 2);
+                if (gateRemaining > 0 && drawW > 2 && rowH > 2) {
+                    int gateSeg = std::min(gateRemaining, drawW - 2);
                     canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Low));
-                    canvas.fillRect(segX + 1, segY + 1, gateSeg, rowH - 2);
+                    canvas.fillRect(drawX + 1, segY + 1, gateSeg, rowH - 2);
                     gateRemaining -= gateSeg;
                 }
                 return gateRemaining;
@@ -262,11 +269,12 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             int segRow = row;
             int segX = currentX;
             int remaining = stepW;
+            const int xOffset = (i > 0) ? -1 : 0;
             while (remaining > 0) {
-                int rowY = barY + segRow * rowH;
+                int rowY = barY + segRow * rowH + (segRow == 1 ? -1 : 0);
                 int rowRemaining = (barX + barW) - segX;
                 int segW = std::min(remaining, rowRemaining);
-                segGate = drawSegment(segX, rowY, segW, segGate);
+                segGate = drawSegment(segX, rowY, segW, segGate, xOffset);
                 remaining -= segW;
                 if (remaining > 0 && twoRows && segRow == 0) {
                     segRow = 1;
