@@ -24,18 +24,15 @@ public:
 
     static constexpr int MaxSteps = 48;
     static constexpr int PatternCount = CONFIG_PATTERN_COUNT;  // 8 patterns
-    static constexpr uint16_t MaxDuration = 32767;
+    static constexpr uint16_t MaxDuration = 1023;
     static constexpr uint8_t TargetGroupsAll = 0;
     static constexpr uint8_t TargetGroupsUngrouped = 0x10;
     static constexpr uint8_t TargetGroupsSelected = 0x20;
-    static constexpr uint8_t GateLengthOff = 0;
-    static constexpr uint8_t GateLengthMax = 127;
-    static constexpr uint8_t GateLengthFull = GateLengthMax;
-    static constexpr uint8_t GateLengthTableSize = GateLengthMax - 1;
-    static constexpr uint16_t GateLengthTicksMin = 4;
+    static constexpr uint16_t GateLengthOff = 0;
+    static constexpr uint16_t GateLengthMax = 1023;
+    static constexpr uint16_t GateLengthFull = GateLengthMax;
+    static constexpr uint16_t GateLengthTicksMin = 1;
     static constexpr uint16_t GateLengthTicksMax = MaxDuration;
-
-    static const uint16_t GateTickTable[GateLengthTableSize];
 
     static bool gateIsOff(uint16_t gateValue) {
         return gateValue == GateLengthOff;
@@ -45,11 +42,8 @@ public:
         if (gateValue == GateLengthOff) {
             return 0;
         }
-        if (gateValue == GateLengthFull) {
-            return durationTicks;
-        }
-        gateValue = clamp(gateValue, uint16_t(1), uint16_t(GateLengthTableSize));
-        return GateTickTable[gateValue - 1];
+        gateValue = clamp(gateValue, uint16_t(1), uint16_t(GateLengthMax));
+        return std::min<uint16_t>(gateValue, durationTicks);
     }
 
     static uint16_t gateEncodeTicks(int ticks) {
@@ -57,24 +51,14 @@ public:
             return GateLengthOff;
         }
         ticks = clamp(ticks, int(GateLengthTicksMin), int(GateLengthTicksMax));
-        int bestIndex = 0;
-        for (int i = 0; i < GateLengthTableSize; ++i) {
-            if (GateTickTable[i] > ticks) {
-                break;
-            }
-            bestIndex = i;
-        }
-        return uint16_t(bestIndex + 1);
+        return static_cast<uint16_t>(ticks);
     }
 
     static uint16_t gateEncodeTicksForDuration(int ticks, uint16_t durationTicks) {
         if (durationTicks == 0) {
             return GateLengthOff;
         }
-        if (ticks >= int(durationTicks)) {
-            return GateLengthFull;
-        }
-        return gateEncodeTicks(ticks);
+        return gateEncodeTicks(std::min(ticks, int(durationTicks)));
     }
 
     //----------------------------------------
@@ -85,10 +69,10 @@ public:
     public:
         // Bit-packed step data (32 bits):
         // bits 0-6:   note_index (7 bits, signed -63..63 encoded in 7 bits)
-        // bits 7-21:  duration (15 bits = direct tick count, 0-32767)
-        // bits 22-28: gate_length (7 bits = 0-127, encoded)
-        // bits 29-30: unused (reserved)
-        // bit 31:     slide (1 bit)
+        // bits 7-16:  duration (10 bits = tick count, 0-1023)
+        // bits 17-26: gate_length (10 bits = tick count, 0-1023)
+        // bit 27:     slide (1 bit)
+        // bits 28-31: unused (reserved)
 
         int8_t noteIndex() const {
             uint8_t raw = static_cast<uint8_t>(_packed & 0x7F);
@@ -111,51 +95,39 @@ public:
         }
 
         uint16_t duration() const {
-            return static_cast<uint16_t>((_packed >> 7) & 0x7FFF);
+            return static_cast<uint16_t>((_packed >> 7) & 0x3FF);
         }
 
         void setDuration(uint16_t ticks) {
             ticks = clamp(ticks, uint16_t(0), uint16_t(MaxDuration));
-            _packed = (_packed & ~(0x7FFF << 7)) | ((ticks & 0x7FFF) << 7);
-            uint16_t gateValue = gateLength();
-            if (gateValue != GateLengthOff) {
-                setGateLength(gateValue);
-            }
+            _packed = (_packed & ~(0x3FFu << 7)) | ((ticks & 0x3FFu) << 7);
+            setGateLength(gateLength());
         }
 
         uint16_t gateLength() const {
-            return static_cast<uint16_t>((_packed >> 22) & 0x7F);
+            return static_cast<uint16_t>((_packed >> 17) & 0x3FF);
         }
 
         void setGateLength(uint16_t value) {
-            value = clamp(value, uint16_t(0), uint16_t(GateLengthMax));
             uint16_t durationTicks = duration();
-            if (value == GateLengthFull) {
-                if (durationTicks == 0) {
-                    value = GateLengthOff;
-                }
-            } else if (value != GateLengthOff) {
-                if (durationTicks == 0) {
-                    value = GateLengthOff;
-                } else {
-                    uint16_t ticks = gateTicks(value, durationTicks);
-                    if (ticks >= durationTicks) {
-                        value = GateLengthFull;
-                    }
-                }
+            value = clamp(value, uint16_t(0), uint16_t(GateLengthMax));
+            if (durationTicks == 0) {
+                value = GateLengthOff;
+            } else if (value > durationTicks) {
+                value = durationTicks;
             }
-            _packed = (_packed & ~(0x7F << 22)) | ((value & 0x7F) << 22);
+            _packed = (_packed & ~(0x3FFu << 17)) | ((value & 0x3FFu) << 17);
         }
 
         bool slide() const {
-            return (_packed & (1u << 31)) != 0;
+            return (_packed & (1u << 27)) != 0;
         }
 
         void setSlide(bool slide) {
             if (slide) {
-                _packed |= (1u << 31);
+                _packed |= (1u << 27);
             } else {
-                _packed &= ~(1u << 31);
+                _packed &= ~(1u << 27);
             }
         }
 
@@ -192,7 +164,7 @@ public:
         }
 
     private:
-        uint32_t _packed = 0;      // Bit-packed: note(7) + duration(15) + gate(7) + unused(2) + slide(1)
+        uint32_t _packed = 0;      // Bit-packed: note(7) + duration(10) + gate(10) + slide(1) + unused(4)
         uint8_t _groupMask = 0;    // Groups A-D (bits 0-3)
     };
 
@@ -551,7 +523,7 @@ public:
     }
 
     void clear() {
-        _divisor = 12;  // 1/16 note at 192 PPQN
+        _divisor = 1;   // 1 tick per stored tick
         _clockMultiplier.clear();
         _clockMultiplier.setBase(100);
         _loop = true;
@@ -678,7 +650,7 @@ public:
     }
 
 private:
-    uint16_t _divisor = 192;      // Clock divisor in ticks
+    uint16_t _divisor = 1;        // Time scale (ticks per stored tick)
     Routable<uint8_t> _clockMultiplier;
     bool _loop = true;            // Loop mode
     Routable<Types::RunMode> _runMode;

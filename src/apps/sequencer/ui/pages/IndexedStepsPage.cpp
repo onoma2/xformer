@@ -262,8 +262,8 @@ void IndexedStepsPage::StepListModel::edit(int row, int column, int value, bool 
         // Edit gate length: shift = fine, normal = coarse
         int stepSize = shift ? 1 : 5;
         int currentGate = step.gateLength();
-        if (currentGate == IndexedSequence::GateLengthFull && value < 0) {
-            uint16_t duration = step.duration();
+        uint16_t duration = step.duration();
+        if (duration > 0 && currentGate >= duration && value < 0) {
             if (duration <= IndexedSequence::GateLengthTicksMin) {
                 step.setGateLength(IndexedSequence::GateLengthOff);
             } else {

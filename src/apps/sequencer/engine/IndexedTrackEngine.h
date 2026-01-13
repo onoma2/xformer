@@ -41,7 +41,7 @@ public:
     // For Testing/UI
     int currentStep() const { return _currentStepIndex; }
     uint16_t effectiveStepDuration() const { return _effectiveStepDuration; }
-    uint32_t effectiveGateTicks() const { return _gateTimer; }
+    uint32_t effectiveGateTicks() const { return _gateTimer > 0.0 ? static_cast<uint32_t>(_gateTimer) : 0u; }
 
 private:
     // Constants for step parameters
@@ -64,7 +64,7 @@ private:
 
     // === Timing state ===
     double _stepTimer = 0.0;        // Counts up to step.duration (ticks)
-    uint32_t _gateTimer = 0;        // Counts down from step.gateLength
+    double _gateTimer = 0.0;        // Counts down from step.gateLength
     uint32_t _effectiveStepDuration = 0; // Sampled duration for current step
     int _currentStepIndex = 0;      // Current step (0 to activeLength-1)
     bool _running = true;

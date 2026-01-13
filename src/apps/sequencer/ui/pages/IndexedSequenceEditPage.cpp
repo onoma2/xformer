@@ -176,6 +176,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
     int nonzeroSteps = 0;
     int currentStepIndex = trackEngine.currentStep();
 
+    const int divisor = sequence.divisor();
     for (int i = 0; i < activeLength; ++i) {
         // Use modulated duration for currently playing step, programmed for others
         int duration = sequence.step(i).duration();
@@ -184,6 +185,8 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             if (effectiveDur > 0) {
                 duration = effectiveDur;
             }
+        } else {
+            duration *= divisor;
         }
         totalTicks += duration;
         if (duration > 0) {
@@ -220,6 +223,8 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
                 if (effectiveDur > 0) {
                     duration = effectiveDur;
                 }
+            } else {
+                duration *= divisor;
             }
 
             int stepW = 0;
@@ -235,9 +240,10 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             // Use modulated gate ticks for currently playing step, programmed for others
             int gateW = 0;
             if (duration > 0) {
-                uint16_t gateTicks = active
+                uint32_t gateTicks = active
                     ? trackEngine.effectiveGateTicks()
-                    : std::min<uint16_t>(IndexedSequence::gateTicks(step.gateLength(), duration), duration);
+                    : std::min<uint32_t>(uint32_t(IndexedSequence::gateTicks(step.gateLength(), step.duration()) * divisor),
+                                         uint32_t(duration));
                 gateW = int((float(stepW) * gateTicks) / float(duration));
             }
             gateW = clamp(gateW, 0, std::max(0, stepW - 2));
@@ -770,8 +776,8 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
                     }
                     case EditMode::Gate: {
                         int currentGate = lastStep.gateLength();
-                        if (currentGate == IndexedSequence::GateLengthFull && event.value() < 0) {
-                            uint16_t duration = lastStep.duration();
+                        uint16_t duration = lastStep.duration();
+                        if (duration > 0 && currentGate >= duration && event.value() < 0) {
                             if (duration <= IndexedSequence::GateLengthTicksMin) {
                                 lastStep.setGateLength(IndexedSequence::GateLengthOff);
                             } else {
@@ -838,8 +844,8 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
                     {
                         int stepSize = shift ? 1 : 5;
                         int currentGate = step.gateLength();
-                        if (currentGate == IndexedSequence::GateLengthFull && event.value() < 0) {
-                            uint16_t duration = step.duration();
+                        uint16_t duration = step.duration();
+                        if (duration > 0 && currentGate >= duration && event.value() < 0) {
                             if (duration <= IndexedSequence::GateLengthTicksMin) {
                                 step.setGateLength(IndexedSequence::GateLengthOff);
                             } else {

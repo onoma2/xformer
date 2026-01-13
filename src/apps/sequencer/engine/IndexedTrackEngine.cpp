@@ -52,9 +52,12 @@ inline void applyDurationModulation(float modValue, uint16_t &duration) {
 
 // Helper: Apply gate length modulation (additive)
 inline void applyGateLengthModulation(float modValue, uint16_t &gateValue, uint16_t durationTicks) {
-    int ticks = int(IndexedSequence::gateTicks(gateValue, durationTicks));
-    int newTicks = ticks + int(std::lround(modValue));
-    gateValue = IndexedSequence::gateEncodeTicksForDuration(newTicks, durationTicks);
+    int newTicks = int(gateValue) + int(std::lround(modValue));
+    newTicks = clamp(newTicks, 0, int(IndexedSequence::GateLengthMax));
+    if (durationTicks > 0) {
+        newTicks = std::min(newTicks, int(durationTicks));
+    }
+    gateValue = static_cast<uint16_t>(newTicks);
 }
 
 // Helper: Apply note index modulation (additive, semitone transpose)
@@ -140,7 +143,7 @@ void IndexedTrackEngine::resetSequenceState() {
     _stepsRemaining = std::max(0, _sequence->activeLength() - 1);
     _currentStepIndex = 0;
     _stepTimer = 0.0;
-    _gateTimer = 0;
+    _gateTimer = 0.0;
     _effectiveStepDuration = 0;
     _cvOutput = 0.0f;
     _cvOutputTarget = 0.0f;
@@ -219,22 +222,14 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
         _pendingTrigger = false;
     }
 
-    // 1. Handle Gate (counts down independently of step progress in both modes)
-    if (_gateTimer > 0) {
-        _gateTimer--;
-        // Send MIDI gate OFF when timer expires
-        if (_gateTimer == 0) {
-            _engine.midiOutputEngine().sendGate(_track.trackIndex(), false);
-        }
-    }
-
-    // 2. Step Advancement (mode-specific)
+    // Step Advancement (mode-specific)
     switch (_indexedTrack.playMode()) {
     case Types::PlayMode::Aligned:
     case Types::PlayMode::Free: {
         // Duration-based advancement using wallclock-derived tick position.
         // ResetMeasure/external sync are handled above, so this stays phase-locked.
         const uint16_t stepDuration = static_cast<uint16_t>(_effectiveStepDuration);
+        const float clockMult = _sequence->clockMultiplier() * 0.01f;
 
         // Zero duration steps: rapid-fire through immediately
         if (stepDuration == 0) {
@@ -251,14 +246,23 @@ TrackEngine::TickResult IndexedTrackEngine::tick(uint32_t tick) {
         }
         _lastFreeTickPos = tickPos;
 
+        double scaledDelta = deltaTicks * clockMult;
         if (_effectiveStepDuration > 0) {
             const double maxDeltaTicks = _effectiveStepDuration * 2.0;
-            if (deltaTicks > maxDeltaTicks) {
-                deltaTicks = maxDeltaTicks;
+            if (scaledDelta > maxDeltaTicks) {
+                scaledDelta = maxDeltaTicks;
             }
         }
 
-        _stepTimer += deltaTicks;
+        if (_gateTimer > 0.0) {
+            _gateTimer -= scaledDelta;
+            if (_gateTimer <= 0.0) {
+                _gateTimer = 0.0;
+                _engine.midiOutputEngine().sendGate(_track.trackIndex(), false);
+            }
+        }
+
+        _stepTimer += scaledDelta;
 
         // Check for step transition
         if (_stepTimer >= stepDuration) {
@@ -403,24 +407,24 @@ void IndexedTrackEngine::triggerStep() {
                            scaleSize, baseDuration, baseGateValue, baseNote);
     }
 
-    // Calculate gate duration in ticks
-    uint16_t effectiveDuration = baseDuration;
-    if (baseDuration > 0) {
-        float clockMult = _sequence->clockMultiplier() * 0.01f;
-        uint32_t scaledDuration = std::lround(baseDuration / clockMult);
-        scaledDuration = std::max<uint32_t>(1, scaledDuration);
-        scaledDuration = std::min<uint32_t>(scaledDuration, 65535u);
-        effectiveDuration = static_cast<uint16_t>(scaledDuration);
+    // Clamp gate to duration (both in tick units)
+    if (baseDuration == 0) {
+        baseGateValue = 0;
+    } else if (baseGateValue > baseDuration) {
+        baseGateValue = baseDuration;
     }
 
-    uint32_t gateTicks = IndexedSequence::gateTicks(baseGateValue, effectiveDuration);
+    // Apply divisor scaling
+    const uint32_t divisor = static_cast<uint32_t>(_sequence->divisor());
+    uint32_t effectiveDuration = baseDuration * divisor;
+    uint32_t gateTicks = baseGateValue * divisor;
     if (effectiveDuration > 0) {
         gateTicks = std::min<uint32_t>(gateTicks, effectiveDuration);
     }
 
     // Set gate timer
-    _gateTimer = gateTicks;
-    _effectiveStepDuration = effectiveDuration;
+    _gateTimer = static_cast<double>(gateTicks);
+    _effectiveStepDuration = static_cast<uint32_t>(effectiveDuration);
 
     // Send MIDI gate ON/OFF
     bool finalGate = (!mute() || fill()) && (gateTicks > 0);
