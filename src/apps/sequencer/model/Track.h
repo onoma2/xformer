@@ -52,7 +52,7 @@ public:
   static const char *trackModeName(TrackMode trackMode) {
     switch (trackMode) {
     case TrackMode::Note:
-      return "Note";
+      return "Note Circus";
     case TrackMode::Curve:
       return "Curve Studio";
     case TrackMode::MidiCv:

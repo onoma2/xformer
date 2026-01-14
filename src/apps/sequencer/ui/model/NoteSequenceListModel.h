@@ -18,6 +18,8 @@ public:
         RunMode,
         DivisorX,
         DivisorY,
+        DivisorYSource,
+        DivisorYTrack,
         ClockMult,
         ResetMeasure,
         Scale,
@@ -100,6 +102,8 @@ private:
         case RunMode:           return "Run Mode";
         case DivisorX:          return "Div X";
         case DivisorY:          return _sequence->mode() == NoteSequence::Mode::Ikra ? "Div N" : "Div Y";
+        case DivisorYSource:    return "Y Src";
+        case DivisorYTrack:     return "Y Trk";
         case ClockMult:         return "Clock Mult";
         case ResetMeasure:      return "Reset Measure";
         case Scale:             return "Scale";
@@ -138,6 +142,12 @@ private:
             break;
         case DivisorY:
             _sequence->printDivisorY(str);
+            break;
+        case DivisorYSource:
+            _sequence->printDivisorYSource(str);
+            break;
+        case DivisorYTrack:
+            _sequence->printDivisorYTrack(str);
             break;
         case ClockMult:
             _sequence->printClockMultiplier(str);
@@ -182,6 +192,12 @@ private:
         case DivisorY:
             _sequence->editDivisorY(value, shift);
             break;
+        case DivisorYSource:
+            _sequence->editDivisorYSource(value, shift);
+            break;
+        case DivisorYTrack:
+            _sequence->editDivisorYTrack(value, shift);
+            break;
         case ClockMult:
             _sequence->editClockMultiplier(value, shift);
             break;
@@ -214,6 +230,10 @@ private:
         case DivisorY:
         case ResetMeasure:
             return 16;
+        case DivisorYSource:
+            return int(NoteSequence::DivYSource::Last);
+        case DivisorYTrack:
+            return CONFIG_TRACK_COUNT;
         case ClockMult:
             return 101;
         case Scale:
@@ -244,6 +264,10 @@ private:
             return _sequence->indexedDivisor();
         case DivisorY:
             return _sequence->indexedDivisorY();
+        case DivisorYSource:
+            return int(_sequence->divisorYSource());
+        case DivisorYTrack:
+            return _sequence->divisorYTrack();
         case ClockMult:
             return _sequence->clockMultiplier() - 50;
         case ResetMeasure:
@@ -276,6 +300,10 @@ private:
             return _sequence->setIndexedDivisor(index);
         case DivisorY:
             return _sequence->setIndexedDivisorY(index);
+        case DivisorYSource:
+            return _sequence->setDivisorYSource(NoteSequence::DivYSource(index));
+        case DivisorYTrack:
+            return _sequence->setDivisorYTrack(index);
         case ClockMult:
             return _sequence->setClockMultiplier(index + 50);
         case ResetMeasure:

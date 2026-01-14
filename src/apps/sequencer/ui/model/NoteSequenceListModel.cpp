@@ -20,6 +20,8 @@ const NoteSequenceListModel::Item NoteSequenceListModel::reneItems[] = {
     RunMode,
     DivisorX,
     DivisorY,
+    DivisorYSource,
+    DivisorYTrack,
     ClockMult,
     ResetMeasure,
     Scale,

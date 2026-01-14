@@ -96,6 +96,9 @@ private:
     int _reReneLastYTick = -1;
     uint32_t _reReneDivisorX = 0;
     uint32_t _reReneDivisorY = 0;
+    NoteSequence::DivYSource _reReneDivYSource = NoteSequence::DivYSource::Divisor;
+    int _reReneDivYTrack = 0;
+    bool _reReneYGatePrev = false;
     SequenceState _sequenceState;
     int _currentStep;
     bool _prevCondition;

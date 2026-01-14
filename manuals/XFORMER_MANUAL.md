@@ -411,11 +411,14 @@ Re:Rene turns the Note sequence into a cartesian 8x8 grid of locations. X and Y 
 - Open the Note Sequence list.
 - **Mode**: Linear or Re:Rene.
 - **Div X**: X-axis clock divisor (uses the existing Divisor).
-- **Div Y**: Y-axis clock divisor (new).
+- **Div Y**: Y-axis clock divisor.
+- **Y Src**: Y source (Div or Gate).
+- **Y Trk**: Track whose logical gate drives Y when Y Src = Gate.
 
 **Behavior (Free mode only):**
 - The grid is always 8x8 (64 locations).
 - X steps on **Div X**, Y steps on **Div Y**.
+- If **Y Src = Gate**, Y advances on rising edges of the selected track’s logical gate output (tick‑quantized).
 - If a location is denied (outside First/Last), the engine **seeks forward** within the same row/column until it finds the next allowed location.
 - Timing does not pause on denied locations; they are skipped instantly (fast-forward seek).
 - Gate timing uses the faster of the two clocks: `min(Div X, Div Y)`.

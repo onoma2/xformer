@@ -110,6 +110,12 @@ void NoteTrackEngine::reset() {
     _reReneLastYTick = -1;
     _reReneDivisorX = 0;
     _reReneDivisorY = 0;
+    _reReneDivYSource = NoteSequence::DivYSource::Divisor;
+    _reReneDivYTrack = 0;
+    _reReneYGatePrev = false;
+    _reReneDivYSource = NoteSequence::DivYSource::Divisor;
+    _reReneDivYTrack = 0;
+    _reReneYGatePrev = false;
     _sequenceState.reset();
     _noteSequenceState.reset();
     _currentStep = -1;
@@ -221,11 +227,28 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
 
             if (sequence.mode() == NoteSequence::Mode::ReRene) {
                 uint32_t divisorX = divisor;
-                uint32_t divisorY = sequence.divisorY() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-                divisorY = std::max<uint32_t>(1, std::lround(divisorY / clockMult));
-                uint32_t stepDivisor = std::min(divisorX, divisorY);
+                uint32_t divisorY = 0;
+                uint32_t stepDivisor = divisorX;
                 int firstStep = sequence.firstStep();
                 int lastStep = sequence.lastStep();
+
+                NoteSequence::DivYSource ySource = sequence.divisorYSource();
+                int yTrack = sequence.divisorYTrack();
+                bool yGate = false;
+                bool yRising = false;
+                if (ySource == NoteSequence::DivYSource::TrackGate) {
+                    if (yTrack >= 0 && yTrack < CONFIG_TRACK_COUNT) {
+                        yGate = _engine.trackEngine(yTrack).gateOutput(0);
+                    }
+                    yRising = yGate && !_reReneYGatePrev;
+                    _reReneYGatePrev = yGate;
+                    divisorY = divisorX;
+                    stepDivisor = divisorX;
+                } else {
+                    divisorY = sequence.divisorY() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+                    divisorY = std::max<uint32_t>(1, std::lround(divisorY / clockMult));
+                    stepDivisor = std::min(divisorX, divisorY);
+                }
 
                 auto isAllowed = [firstStep, lastStep](int x, int y) {
                     int index = x + (y * 8);
@@ -257,8 +280,20 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                 };
 
                 int xTickIndex = int(std::floor(baseTick / divisorX));
-                int yTickIndex = int(std::floor(baseTick / divisorY));
-                bool divisorChanged = (_reReneDivisorX != divisorX) || (_reReneDivisorY != divisorY);
+                int yTickIndex = 0;
+                if (ySource == NoteSequence::DivYSource::TrackGate) {
+                    if (_reReneLastYTick < 0) {
+                        _reReneLastYTick = 0;
+                        _reReneY = 0;
+                    }
+                    yTickIndex = _reReneLastYTick + (yRising ? 1 : 0);
+                } else {
+                    yTickIndex = int(std::floor(baseTick / divisorY));
+                }
+                bool divisorChanged = (_reReneDivisorX != divisorX)
+                    || (_reReneDivisorY != divisorY)
+                    || (_reReneDivYSource != ySource)
+                    || (_reReneDivYTrack != yTrack);
                 if (divisorChanged || xTickIndex < _reReneLastXTick || yTickIndex < _reReneLastYTick) {
                     _reReneLastXTick = xTickIndex;
                     _reReneLastYTick = yTickIndex;
@@ -266,6 +301,11 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                     _reReneY = yTickIndex & 7;
                     _reReneDivisorX = divisorX;
                     _reReneDivisorY = divisorY;
+                    _reReneDivYSource = ySource;
+                    _reReneDivYTrack = yTrack;
+                    if (ySource != NoteSequence::DivYSource::TrackGate) {
+                        _reReneYGatePrev = false;
+                    }
                 }
 
                 if (_reReneLastXTick < 0) {

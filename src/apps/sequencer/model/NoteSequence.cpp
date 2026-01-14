@@ -279,6 +279,8 @@ void NoteSequence::clear() {
     setRootNote(-1);
     setDivisor(12);
     setDivisorY(12);
+    setDivisorYSource(DivYSource::Divisor);
+    setDivisorYTrack(0);
     setClockMultiplier(100);
     setResetMeasure(0);
     setRunMode(Types::RunMode::Forward);
@@ -343,6 +345,8 @@ void NoteSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_rootNote.base);
     writer.write(_divisor.base);
     writer.write(_divisorY);
+    writer.write(static_cast<uint8_t>(_divisorYSource));
+    writer.write(_divisorYTrack);
     writer.write(_clockMultiplier.base);
     writer.write(_resetMeasure);
     writer.write(_runMode.base);
@@ -383,6 +387,10 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
     }
     if (reader.dataVersion() >= ProjectVersion::Version34) {
         reader.read(_divisorY);
+        uint8_t divYSource;
+        reader.read(divYSource);
+        _divisorYSource = ModelUtils::clampedEnum(DivYSource(divYSource));
+        reader.read(_divisorYTrack);
         reader.read(_clockMultiplier.base);
         reader.read(_resetMeasure);
         reader.read(_runMode.base);
@@ -400,6 +408,8 @@ void NoteSequence::read(VersionedSerializedReader &reader) {
         reader.read(_firstStep.base);
         reader.read(_lastStep.base);
         _divisorY = _divisor.base;
+        _divisorYSource = DivYSource::Divisor;
+        _divisorYTrack = 0;
         _mode = Mode::Linear;
         _noteFirstStep = _firstStep.base;
         _noteLastStep = _lastStep.base;
