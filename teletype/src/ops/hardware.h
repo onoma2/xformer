@@ -65,5 +65,10 @@ extern const tele_op_t op_E_O;
 extern const tele_op_t op_E_L;
 extern const tele_op_t op_E_R;
 extern const tele_op_t op_E_C;
+extern const tele_op_t op_LFO_R;
+extern const tele_op_t op_LFO_W;
+extern const tele_op_t op_LFO_A;
+extern const tele_op_t op_LFO_F;
+extern const tele_op_t op_LFO_S;
 
 #endif

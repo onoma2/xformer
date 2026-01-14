@@ -139,6 +139,16 @@ static void op_E_R_get(const void *data, scene_state_t *ss, exec_state_t *es,
                        command_state_t *cs);
 static void op_E_C_get(const void *data, scene_state_t *ss, exec_state_t *es,
                        command_state_t *cs);
+static void op_LFO_R_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_LFO_W_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_LFO_A_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_LFO_F_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_LFO_S_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
 
 
 // clang-format off
@@ -203,6 +213,11 @@ const tele_op_t op_E_O           = MAKE_GET_OP(E.O, op_E_O_get, 2, false);
 const tele_op_t op_E_L           = MAKE_GET_OP(E.L, op_E_L_get, 2, false);
 const tele_op_t op_E_R           = MAKE_GET_OP(E.R, op_E_R_get, 2, false);
 const tele_op_t op_E_C           = MAKE_GET_OP(E.C, op_E_C_get, 2, false);
+const tele_op_t op_LFO_R         = MAKE_GET_OP(LFO.R, op_LFO_R_get, 2, false);
+const tele_op_t op_LFO_W         = MAKE_GET_OP(LFO.W, op_LFO_W_get, 2, false);
+const tele_op_t op_LFO_A         = MAKE_GET_OP(LFO.A, op_LFO_A_get, 2, false);
+const tele_op_t op_LFO_F         = MAKE_GET_OP(LFO.F, op_LFO_F_get, 2, false);
+const tele_op_t op_LFO_S         = MAKE_GET_OP(LFO.S, op_LFO_S_get, 2, false);
 // clang-format on
 
 static void op_CV_get(const void *NOTUSED(data), scene_state_t *ss,
@@ -1017,4 +1032,59 @@ static void op_E_C_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
         return;
     }
     tele_env_eoc((uint8_t)a, b);
+}
+
+static void op_LFO_R_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_rate((uint8_t)a, b);
+}
+
+static void op_LFO_W_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_wave((uint8_t)a, b);
+}
+
+static void op_LFO_A_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_amp((uint8_t)a, b);
+}
+
+static void op_LFO_F_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_fold((uint8_t)a, b);
+}
+
+static void op_LFO_S_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_start((uint8_t)a, b);
 }

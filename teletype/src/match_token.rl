@@ -244,6 +244,11 @@
         "E.R"         => { MATCH_OP(E_OP_E_R); };
         "E.C"         => { MATCH_OP(E_OP_E_C); };
         "E"           => { MATCH_OP(E_OP_E); };
+        "LFO.R"       => { MATCH_OP(E_OP_LFO_R); };
+        "LFO.W"       => { MATCH_OP(E_OP_LFO_W); };
+        "LFO.A"       => { MATCH_OP(E_OP_LFO_A); };
+        "LFO.F"       => { MATCH_OP(E_OP_LFO_F); };
+        "LFO.S"       => { MATCH_OP(E_OP_LFO_S); };
 
         # maths
         "ADD"         => { MATCH_OP(E_OP_ADD); };

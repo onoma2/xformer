@@ -91,6 +91,11 @@ public:
     void setEnvLoop(uint8_t index, int16_t count);
     void setEnvEor(uint8_t index, int16_t tr);
     void setEnvEoc(uint8_t index, int16_t tr);
+    void setLfoRate(uint8_t index, int16_t ms);
+    void setLfoWave(uint8_t index, int16_t value);
+    void setLfoAmp(uint8_t index, int16_t value);
+    void setLfoFold(uint8_t index, int16_t value);
+    void setLfoStart(uint8_t index, int16_t state);
     int16_t noteGateGet(int trackIndex, int stepIndex) const;
     void noteGateSet(int trackIndex, int stepIndex, int16_t value);
     int16_t noteNoteGet(int trackIndex, int stepIndex) const;
@@ -111,6 +116,7 @@ private:
     void runMetro(float timeDelta);
     void updatePulses(float timeDelta);
     void updateEnvelopes();
+    void updateLfos(float timeDeltaMs);
     void updateInputTriggers();
     void refreshActivity(float dt);
     float rawToVolts(int16_t value) const;
@@ -163,6 +169,12 @@ private:
     std::array<int8_t, CvOutputCount> _envEorTr{};
     std::array<int8_t, CvOutputCount> _envEocTr{};
     std::array<uint8_t, CvOutputCount> _envState{};
+    std::array<bool, CvOutputCount> _lfoActive{};
+    std::array<int16_t, CvOutputCount> _lfoCycleMs{};
+    std::array<uint8_t, CvOutputCount> _lfoWave{};
+    std::array<uint8_t, CvOutputCount> _lfoAmp{};
+    std::array<uint8_t, CvOutputCount> _lfoFold{};
+    std::array<float, CvOutputCount> _lfoPhase{};
     bool _initialized = false;
 
     uint8_t _manualScriptIndex = 0;

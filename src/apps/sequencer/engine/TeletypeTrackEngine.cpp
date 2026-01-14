@@ -129,6 +129,12 @@ void TeletypeTrackEngine::reset() {
     _envEorTr.fill(-1);
     _envEocTr.fill(-1);
     _envState.fill(kEnvIdle);
+    _lfoActive.fill(false);
+    _lfoCycleMs.fill(0);
+    _lfoWave.fill(0);
+    _lfoAmp.fill(0);
+    _lfoFold.fill(0);
+    _lfoPhase.fill(0.f);
     _manualScriptIndex = 0;
     _cachedPattern = -1;
     installBootScript();
@@ -281,6 +287,9 @@ void TeletypeTrackEngine::update(float dt) {
         }
     }
     updateEnvelopes();
+    if (timeDelta > 0.f) {
+        updateLfos(timeDelta);
+    }
     refreshActivity(dt);
 }
 
@@ -519,6 +528,65 @@ void TeletypeTrackEngine::setEnvEoc(uint8_t index, int16_t tr) {
         return;
     }
     _envEocTr[index] = static_cast<int8_t>(tr - 1);
+}
+
+void TeletypeTrackEngine::setLfoRate(uint8_t index, int16_t ms) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    if (ms <= 0) {
+        _lfoCycleMs[index] = 0;
+        return;
+    }
+    _lfoCycleMs[index] = clamp<int16_t>(ms, 20, 32767);
+}
+
+void TeletypeTrackEngine::setLfoWave(uint8_t index, int16_t value) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    if (value < 0) {
+        value = 0;
+    } else if (value > 100) {
+        value = 100;
+    }
+    _lfoWave[index] = static_cast<uint8_t>(value);
+}
+
+void TeletypeTrackEngine::setLfoAmp(uint8_t index, int16_t value) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    if (value < 0) {
+        value = 0;
+    } else if (value > 100) {
+        value = 100;
+    }
+    _lfoAmp[index] = static_cast<uint8_t>(value);
+}
+
+void TeletypeTrackEngine::setLfoFold(uint8_t index, int16_t value) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    if (value < 0) {
+        value = 0;
+    } else if (value > 100) {
+        value = 100;
+    }
+    _lfoFold[index] = static_cast<uint8_t>(value);
+}
+
+void TeletypeTrackEngine::setLfoStart(uint8_t index, int16_t state) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    if (state <= 0) {
+        _lfoActive[index] = false;
+        return;
+    }
+    _lfoActive[index] = true;
+    _lfoPhase[index] = 0.f;
 }
 
 int16_t TeletypeTrackEngine::noteGateGet(int trackIndex, int stepIndex) const {
@@ -1083,6 +1151,63 @@ void TeletypeTrackEngine::updateEnvelopes() {
                 _envStageRemainingMs[i] = 0.f;
             }
         }
+    }
+}
+
+void TeletypeTrackEngine::updateLfos(float timeDeltaMs) {
+    if (timeDeltaMs <= 0.f) {
+        return;
+    }
+
+    auto smoothstep = [] (float t) -> float {
+        t = clamp(t, 0.f, 1.f);
+        return t * t * (3.f - 2.f * t);
+    };
+
+    for (uint8_t i = 0; i < CvOutputCount; ++i) {
+        if (!_lfoActive[i]) {
+            continue;
+        }
+        const int16_t cycleMs = _lfoCycleMs[i];
+        if (cycleMs <= 0) {
+            continue;
+        }
+
+        float phase = _lfoPhase[i] + (timeDeltaMs / static_cast<float>(cycleMs));
+        if (phase >= 1.f) {
+            phase -= std::floor(phase);
+        }
+        _lfoPhase[i] = phase;
+
+        float triangle = 1.f - 4.f * std::abs(phase - 0.5f);
+        float saw = phase * 2.f - 1.f;
+
+        float wave = triangle;
+        uint8_t waveParam = _lfoWave[i];
+        if (waveParam <= 33) {
+            float t = smoothstep(waveParam / 33.f);
+            wave = triangle + (saw - triangle) * t;
+        } else if (waveParam <= 67) {
+            float t = smoothstep((waveParam - 34.f) / 33.f);
+            float pulse = phase < 0.5f ? 1.f : -1.f;
+            wave = saw + (pulse - saw) * t;
+        } else {
+            float t = smoothstep((waveParam - 68.f) / 32.f);
+            float duty = 0.5f + (0.05f - 0.5f) * t;
+            wave = phase < duty ? 1.f : -1.f;
+        }
+
+        float ampVolts = (_lfoAmp[i] / 100.f) * 5.f;
+        float output = wave * ampVolts;
+
+        float foldThreshold = -5.f + (_lfoFold[i] / 100.f) * 10.f;
+        if (output < foldThreshold) {
+            output = 2.f * foldThreshold - output;
+        }
+        output = clamp(output, -5.f, 5.f);
+
+        int16_t raw = voltsToRaw(output);
+        handleCv(i, raw, false);
     }
 }
 

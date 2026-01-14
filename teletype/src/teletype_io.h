@@ -65,6 +65,11 @@ extern void tele_env_offset(uint8_t i, int16_t value);
 extern void tele_env_loop(uint8_t i, int16_t count);
 extern void tele_env_eor(uint8_t i, int16_t tr);
 extern void tele_env_eoc(uint8_t i, int16_t tr);
+extern void tele_lfo_rate(uint8_t i, int16_t ms);
+extern void tele_lfo_wave(uint8_t i, int16_t value);
+extern void tele_lfo_amp(uint8_t i, int16_t value);
+extern void tele_lfo_fold(uint8_t i, int16_t value);
+extern void tele_lfo_start(uint8_t i, int16_t state);
 
 extern void tele_update_adc(uint8_t force);
 

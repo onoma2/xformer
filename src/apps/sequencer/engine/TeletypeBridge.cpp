@@ -220,6 +220,36 @@ void tele_env_eoc(uint8_t i, int16_t tr) {
     }
 }
 
+void tele_lfo_rate(uint8_t i, int16_t ms) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setLfoRate(i, ms);
+    }
+}
+
+void tele_lfo_wave(uint8_t i, int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setLfoWave(i, value);
+    }
+}
+
+void tele_lfo_amp(uint8_t i, int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setLfoAmp(i, value);
+    }
+}
+
+void tele_lfo_fold(uint8_t i, int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setLfoFold(i, value);
+    }
+}
+
+void tele_lfo_start(uint8_t i, int16_t state) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setLfoStart(i, state);
+    }
+}
+
 uint16_t tele_bus_cv_get(uint8_t i) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         return busVoltsToRaw(engine->busCv(i));

@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Curve Raster Demo</title>
+  <style>
+    :root {
+      --bg: #0f1012;
+      --fg: #e8e8e8;
+      --muted: #9aa0a6;
+      --accent: #7bdcff;
+      --accent2: #ffb86b;
+      --accent3: #9cff84;
+    }
+    body {
+      margin: 0;
+      font-family: "SF Mono", "Menlo", "Consolas", monospace;
+      background: var(--bg);
+      color: var(--fg);
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 24px auto;
+      padding: 0 16px 24px 16px;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 8px 0 16px 0;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    .panel {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input, select, button {
+      width: 100%;
+      background: #17191d;
+      color: var(--fg);
+      border: 1px solid #2b2f36;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    button {
+      cursor: pointer;
+    }
+    canvas {
+      width: 100%;
+      height: 420px;
+      background: #14161a;
+      border: 1px solid #2b2f36;
+      border-radius: 10px;
+    }
+    .legend {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 8px 0 0 0;
+      flex-wrap: wrap;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .swatch {
+      width: 12px;
+      height: 2px;
+      background: var(--muted);
+      display: inline-block;
+    }
+    .swatch.bell { background: var(--accent); }
+    .swatch.ramp { background: var(--accent2); }
+    .swatch.mul { background: var(--accent3); }
+    .swatch.diff { background: #ff6b9a; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Curve Raster Demo</h1>
+    <div class="panel">
+      <div>
+        <label>Steps</label>
+        <input id="steps" type="number" min="2" max="64" value="16">
+      </div>
+      <div>
+        <label>Min</label>
+        <input id="minVal" type="number" min="0" max="255" value="0">
+      </div>
+      <div>
+        <label>Max</label>
+        <input id="maxVal" type="number" min="0" max="255" value="255">
+      </div>
+      <div>
+        <label>MUL %</label>
+        <input id="mulVal" type="number" min="0" max="300" value="200">
+      </div>
+      <div>
+        <label>Track 1 Shape</label>
+        <select id="shapeA">
+          <option value="bell">Bell</option>
+          <option value="ramp">Ramp</option>
+          <option value="triangle">Triangle</option>
+          <option value="sine">Sine</option>
+        </select>
+      </div>
+      <div>
+        <label>Track 2 Shape</label>
+        <select id="shapeB">
+          <option value="ramp">Ramp</option>
+          <option value="bell">Bell</option>
+          <option value="triangle">Triangle</option>
+          <option value="sine">Sine</option>
+        </select>
+      </div>
+      <div>
+        <label>Track 2 Steps</label>
+        <input id="stepsB" type="number" min="2" max="64" value="16">
+      </div>
+      <div>
+        <label>Track 2 Full Range</label>
+        <select id="fullRangeB">
+          <option value="off">Use Min/Max</option>
+          <option value="on">Force 0..255</option>
+        </select>
+      </div>
+      <div>
+        <label>Track 2 Raster Mode</label>
+        <select id="rasterModeB">
+          <option value="baked">Baked Shape</option>
+          <option value="perstep">Per-Step Ramp</option>
+        </select>
+      </div>
+      <div>
+        <label>Show</label>
+        <select id="mode">
+          <option value="a">Track 1</option>
+          <option value="b">Track 2</option>
+          <option value="mul">Bell * MUL</option>
+          <option value="diff">Track 1 - Track 2</option>
+          <option value="add">Track 1 + Track 2</option>
+          <option value="avg">Average (1 & 2)</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div>
+        <label>Style</label>
+        <select id="style">
+          <option value="bars">Bars</option>
+          <option value="segments">Segments</option>
+          <option value="curves">Step Curves</option>
+        </select>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button id="drawBtn">Draw</button>
+      </div>
+    </div>
+
+    <canvas id="plot" width="980" height="420"></canvas>
+    <div class="legend">
+      <span>Min &gt; Max is allowed (inversion preserved).</span>
+    </div>
+    <div class="legend">
+      <span><i class="swatch bell"></i>Bell</span>
+      <span><i class="swatch ramp"></i>Ramp</span>
+      <span><i class="swatch mul"></i>Bell * MUL</span>
+      <span><i class="swatch diff"></i>Bell - Ramp</span>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("plot");
+    const ctx = canvas.getContext("2d");
+
+    function clamp(v, lo, hi) {
+      return Math.min(hi, Math.max(lo, v));
+    }
+
+    function bellShape(x) {
+      return Math.sin(Math.PI * clamp(x, 0, 1));
+    }
+
+    function triangleShape(x) {
+      const t = clamp(x, 0, 1);
+      return 1.0 - Math.abs(2.0 * t - 1.0);
+    }
+
+    function sineShape(x) {
+      return 0.5 + 0.5 * Math.sin(2.0 * Math.PI * clamp(x, 0, 1));
+    }
+
+    function rampShape(x) {
+      return clamp(x, 0, 1);
+    }
+
+    function shapeFn(name) {
+      switch (name) {
+        case "bell": return bellShape;
+        case "ramp": return rampShape;
+        case "triangle": return triangleShape;
+        case "sine": return sineShape;
+        default: return bellShape;
+      }
+    }
+
+    function bakeShape(fn, steps, minVal, maxVal) {
+      const out = [];
+      for (let i = 0; i < steps; i++) {
+        const phaseStart = i / steps;
+        const phaseEnd = (i + 1) / steps;
+        const v0 = minVal + fn(phaseStart) * (maxVal - minVal);
+        const v1 = minVal + fn(phaseEnd) * (maxVal - minVal);
+        out.push([v0, v1]);
+      }
+      return out;
+    }
+
+    function perStepRange(steps, minVal, maxVal) {
+      const out = [];
+      for (let i = 0; i < steps; i++) {
+        out.push([minVal, maxVal]);
+      }
+      return out;
+    }
+
+    function mulSteps(steps, mulPercent) {
+      const scale = mulPercent / 100.0;
+      return steps.map(([mn, mx]) => {
+        const center = (mn + mx) / 2.0;
+        const halfRange = (mx - mn) * scale / 2.0;
+        const nmin = clamp(center - halfRange, 0, 255);
+        const nmax = clamp(center + halfRange, 0, 255);
+        return [nmin, nmax];
+      });
+    }
+
+    function subSteps(a, b) {
+      const out = a.map(([aMin, aMax]) => [aMin, aMax]);
+      const count = Math.min(a.length, b.length);
+      for (let i = 0; i < count; i++) {
+        out[i][0] = clamp(a[i][0] - b[i][0], 0, 255);
+        out[i][1] = clamp(a[i][1] - b[i][1], 0, 255);
+      }
+      return out;
+    }
+
+    function addSteps(a, b) {
+      const out = a.map(([aMin, aMax]) => [aMin, aMax]);
+      const count = Math.min(a.length, b.length);
+      for (let i = 0; i < count; i++) {
+        out[i][0] = clamp(a[i][0] + b[i][0], 0, 255);
+        out[i][1] = clamp(a[i][1] + b[i][1], 0, 255);
+      }
+      return out;
+    }
+
+    function avgSteps(a, b) {
+      const out = a.map(([aMin, aMax]) => [aMin, aMax]);
+      const count = Math.min(a.length, b.length);
+      for (let i = 0; i < count; i++) {
+        out[i][0] = (a[i][0] + b[i][0]) / 2.0;
+        out[i][1] = (a[i][1] + b[i][1]) / 2.0;
+      }
+      return out;
+    }
+
+    function drawSegments(steps, color, alpha = 1.0, width = 1) {
+      const pad = 24;
+      const w = canvas.width - pad * 2;
+      const h = canvas.height - pad * 2;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      for (let i = 0; i < steps.length; i++) {
+        const x0 = pad + (i / steps.length) * w;
+        const x1 = pad + ((i + 1) / steps.length) * w;
+        const y0 = pad + h - (steps[i][0] / 255.0) * h;
+        const y1 = pad + h - (steps[i][1] / 255.0) * h;
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+      }
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 1.0;
+    }
+
+    function drawCurves(steps, color, shapeFnLocal, alpha = 1.0, width = 1) {
+      const pad = 24;
+      const w = canvas.width - pad * 2;
+      const h = canvas.height - pad * 2;
+      const sampleCount = 16;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.globalAlpha = alpha;
+      for (let i = 0; i < steps.length; i++) {
+        const x0 = pad + (i / steps.length) * w;
+        const x1 = pad + ((i + 1) / steps.length) * w;
+        ctx.beginPath();
+        for (let s = 0; s <= sampleCount; s++) {
+          const t = s / sampleCount;
+          const x = x0 + (x1 - x0) * t;
+          const raw = shapeFnLocal(t);
+          const yVal = steps[i][0] + raw * (steps[i][1] - steps[i][0]);
+          const y = pad + h - (yVal / 255.0) * h;
+          if (s === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.stroke();
+      }
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 1.0;
+    }
+
+    function drawBars(steps, color, alpha = 1.0, width = 2) {
+      const pad = 24;
+      const w = canvas.width - pad * 2;
+      const h = canvas.height - pad * 2;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.globalAlpha = alpha;
+      for (let i = 0; i < steps.length; i++) {
+        const xc = pad + ((i + 0.5) / steps.length) * w;
+        const y0 = pad + h - (steps[i][0] / 255.0) * h;
+        const y1 = pad + h - (steps[i][1] / 255.0) * h;
+        ctx.beginPath();
+        ctx.moveTo(xc, y0);
+        ctx.lineTo(xc, y1);
+        ctx.stroke();
+      }
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 1.0;
+    }
+
+    function drawGrid() {
+      const pad = 24;
+      const w = canvas.width - pad * 2;
+      const h = canvas.height - pad * 2;
+      ctx.strokeStyle = "#242830";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = pad + (i / 4) * h;
+        ctx.beginPath();
+        ctx.moveTo(pad, y);
+        ctx.lineTo(pad + w, y);
+        ctx.stroke();
+      }
+    }
+
+    function draw() {
+      const steps = clamp(parseInt(document.getElementById("steps").value, 10), 2, 64);
+      const minVal = clamp(parseInt(document.getElementById("minVal").value, 10), 0, 255);
+      const maxVal = clamp(parseInt(document.getElementById("maxVal").value, 10), 0, 255);
+      const mulVal = clamp(parseInt(document.getElementById("mulVal").value, 10), 0, 300);
+      const stepsB = clamp(parseInt(document.getElementById("stepsB").value, 10), 2, 64);
+      const mode = document.getElementById("mode").value;
+      const style = document.getElementById("style").value;
+      const fullRangeB = document.getElementById("fullRangeB").value === "on";
+      const rasterModeB = document.getElementById("rasterModeB").value;
+
+      const aName = document.getElementById("shapeA").value;
+      const bName = document.getElementById("shapeB").value;
+      const aShape = bakeShape(shapeFn(aName), steps, minVal, maxVal);
+      const bMin = fullRangeB ? 0 : minVal;
+      const bMax = fullRangeB ? 255 : maxVal;
+      const bShape = rasterModeB === "perstep"
+        ? perStepRange(stepsB, bMin, bMax)
+        : bakeShape(shapeFn(bName), stepsB, bMin, bMax);
+      const mul = mulSteps(aShape, mulVal);
+      const diff = subSteps(aShape, bShape);
+      const add = addSteps(aShape, bShape);
+      const avg = avgSteps(aShape, bShape);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+
+      if (style === "curves") {
+        if (mode === "a" || mode === "all") drawCurves(aShape, "#7bdcff", rampShape, 1.0, 2);
+        if (mode === "b" || mode === "all") drawCurves(bShape, "#ffb86b", rampShape, mode === "all" ? 0.7 : 1.0, 2);
+        if (mode === "mul" || mode === "all") drawCurves(mul, "#9cff84", rampShape, 1.0, 3);
+        if (mode === "diff" || mode === "all") drawCurves(diff, "#ff6b9a", rampShape, 1.0, 2);
+        if (mode === "add" || mode === "all") drawCurves(add, "#c4a7ff", rampShape, 1.0, 2);
+        if (mode === "avg" || mode === "all") drawCurves(avg, "#ffd86b", rampShape, 1.0, 2);
+      } else {
+        const draw = style === "segments" ? drawSegments : drawBars;
+        if (mode === "a" || mode === "all") draw(aShape, "#7bdcff", 1.0, 2);
+        if (mode === "b" || mode === "all") draw(bShape, "#ffb86b", mode === "all" ? 0.7 : 1.0, 2);
+        if (mode === "mul" || mode === "all") draw(mul, "#9cff84", 1.0, 3);
+        if (mode === "diff" || mode === "all") draw(diff, "#ff6b9a", 1.0, 2);
+        if (mode === "add" || mode === "all") draw(add, "#c4a7ff", 1.0, 2);
+        if (mode === "avg" || mode === "all") draw(avg, "#ffd86b", 1.0, 2);
+      }
+    }
+
+    document.getElementById("drawBtn").addEventListener("click", draw);
+    document.getElementById("mode").addEventListener("change", draw);
+    document.getElementById("style").addEventListener("change", draw);
+    ["steps", "stepsB", "minVal", "maxVal", "mulVal", "shapeA", "shapeB", "fullRangeB", "rasterModeB"].forEach(id => {
+      document.getElementById(id).addEventListener("input", draw);
+    });
+
+    draw();
+  </script>
+</body>
+</html>

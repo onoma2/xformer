@@ -173,6 +173,17 @@ Per-CV envelope (attack → decay → offset) with optional loop and TR hooks.
 - `E.R n tr` → pulse TR at end of rise (tr = 1–4, 0 = off)
 - `E.C n tr` → pulse TR at end of cycle (tr = 1–4, 0 = off)
 
+## LFO.* (Performer-only)
+
+Per-CV LFO with ms-based rate, wave morph, amplitude, and fold threshold.
+Stops hold the last output.
+
+- `LFO.R n ms` → set cycle length (20..32767 ms, <=0 stops)
+- `LFO.W n x` → wave morph (0..100)
+- `LFO.A n x` → amplitude (0..100 → 0..±5V)
+- `LFO.F n x` → fold threshold (0..100 → -5V..+5V)
+- `LFO.S n x` → start/stop (<=0 stops)
+
 ## RT (Performer-only)
 
 RT reads the current source value for a routing slot (pre-shaper), scaled to Teletype's 0–16383 range.
