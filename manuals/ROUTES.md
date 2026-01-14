@@ -100,6 +100,11 @@ Unlike per-track targets, BUS targets do not have a track mask; they are single 
   - `Shaper`
 - These rows control the BUS shaping slot directly.
 
+**BUS Safety (per project):**
+- **Safe**: Adds per-tick slew limiting and decay to 0V when BUS is not written that tick.
+- **Raw**: No slew or decay (only the hard ±5V clamp).
+- Set in Project page → `Bus Safety`.
+
 ### 3.2 Per-Track Parameter Assignment
 
 Once route is created, per-track parameters are accessible:

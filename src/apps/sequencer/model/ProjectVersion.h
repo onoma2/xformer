@@ -105,6 +105,9 @@ enum ProjectVersion {
     // added CvRoute settings
     Version35 = 35,
 
+    // added Project::busSafety
+    Version36 = 36,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

@@ -94,6 +94,18 @@ void CvRoutePage::draw(Canvas &canvas) {
     };
 
     const auto &cvRoute = _project.cvRoute();
+    bool hasBusInput = false;
+    bool hasBusOutput = false;
+    for (int lane = 0; lane < 4; ++lane) {
+        hasBusInput |= cvRoute.inputSource(lane) == CvRoute::InputSource::Bus;
+        hasBusOutput |= cvRoute.outputDest(lane) == CvRoute::OutputDest::Bus;
+    }
+    if (hasBusInput && hasBusOutput) {
+        const char *fb = "FB";
+        int textWidth = canvas.textWidth(fb);
+        canvas.setColor(Color::MediumBright);
+        canvas.drawText(CONFIG_LCD_WIDTH - startX - textWidth, 4, fb);
+    }
 
     // Row 1: Inputs + Scan
     for (int lane = 0; lane < 4; ++lane) {

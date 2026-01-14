@@ -49,6 +49,7 @@ void Project::clear() {
     setMidiProgramOffset(0);
     setCvGateInput(Types::CvGateInput::Off);
     setCurveCvInput(Types::CurveCvInput::Off);
+    setBusSafety(true);
 
     _clockSetup.clear();
 
@@ -149,6 +150,7 @@ void Project::write(VersionedSerializedWriter &writer) const {
     _midiInputSource.write(writer);
     writer.write(_cvGateInput);
     writer.write(_curveCvInput);
+    writer.write(_busSafety);
 
     _clockSetup.write(writer);
 
@@ -199,6 +201,9 @@ bool Project::read(VersionedSerializedReader &reader) {
     }
     reader.read(_cvGateInput, ProjectVersion::Version6);
     reader.read(_curveCvInput, ProjectVersion::Version11);
+    if (reader.dataVersion() >= ProjectVersion::Version36) {
+        reader.read(_busSafety);
+    }
 
     _clockSetup.read(reader);
 

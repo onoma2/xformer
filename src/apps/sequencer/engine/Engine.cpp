@@ -86,6 +86,9 @@ void Engine::update() {
         return;
     }
 
+    updateBusSafetyMode();
+    _busCvWritten.fill(false);
+
     // process clock events
     while (Clock::Event event = _clock.checkEvent()) {
         switch (event) {
@@ -174,10 +177,26 @@ void Engine::update() {
 
     updateTrackOutputs();
     updateOverrides();
+    applyBusSafety();
 
     // update cv/gate outputs
     _cvOutput.update();
     _gateOutput.update();
+}
+
+void Engine::updateBusSafetyMode() {
+    _busCvSafeMode = _model.project().busSafety();
+}
+
+void Engine::applyBusSafety() {
+    if (!_busCvSafeMode) {
+        return;
+    }
+    for (int i = 0; i < BusCvCount; ++i) {
+        if (!_busCvWritten[i]) {
+            _busCv[i] *= BusCvDecay;
+        }
+    }
 }
 
 void Engine::lock() {

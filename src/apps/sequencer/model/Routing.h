@@ -753,7 +753,29 @@ public:
         }
 
         void editSource(int value, bool shift) {
-            setSource(ModelUtils::adjustedEnum(source(), value));
+            if (value == 0) {
+                return;
+            }
+            int dir = value > 0 ? 1 : -1;
+            int steps = std::abs(value);
+            int current = int(source());
+            for (int step = 0; step < steps; ++step) {
+                for (int i = 0; i < int(Source::Last); ++i) {
+                    int next = current + dir;
+                    if (next < 0) {
+                        next = int(Source::Last) - 1;
+                    } else if (next >= int(Source::Last)) {
+                        next = 0;
+                    }
+                    current = next;
+                    auto candidate = Source(current);
+                    if (isBusSelfRoute(candidate, _target)) {
+                        continue;
+                    }
+                    _source = candidate;
+                    break;
+                }
+            }
         }
 
         void printSource(StringBuilder &str) const {

@@ -660,6 +660,16 @@ CVRoute is a minimalist 4×4 scan-and-route matrix controlled by two global valu
 - `CVR1..CVR4` only reach hardware CV outputs if you assign physical CV outs to `CVR` in the Layout page.
   (Outputs assigned to CVR are filled in order: CVR1, CVR2, CVR3, CVR4.)
 
+### 7.0.1 BUS Safety (Safe/Raw)
+
+BUS values are clamped to ±5V. Each project has a **Bus Safety** mode:
+
+- **Safe**: Adds per-tick slew limiting and decay to 0V when BUS is not written that tick.
+  This stabilizes feedback loops and prevents hard latching.
+- **Raw**: Keeps only the hard clamp (no slew, no decay).
+
+**Where**: Project page → `Bus Safety`.
+
 ### 7.1 Global Output Rotation (CV & Gate)
 
 This feature allows you to dynamically rotate which tracks are assigned to physical CV and Gate outputs. It acts like a virtual 8-channel sequential switch.

@@ -126,7 +126,16 @@ public:
         if (index < 0 || index >= BusCvCount) {
             return;
         }
-        _busCv[index] = clamp(volts, -5.f, 5.f);
+        _busCvWritten[index] = true;
+        if (_busCvSafeMode) {
+            float delta = volts - _busCv[index];
+            float maxDelta = BusCvSlewPerTick;
+            if (delta > maxDelta) delta = maxDelta;
+            if (delta < -maxDelta) delta = -maxDelta;
+            _busCv[index] = clamp(_busCv[index] + delta, -5.f, 5.f);
+        } else {
+            _busCv[index] = clamp(volts, -5.f, 5.f);
+        }
     }
 
     // gate overrides
@@ -147,6 +156,9 @@ public:
 
     const Clock &clock() const { return _clock; }
           Clock &clock()       { return _clock; }
+
+    void updateBusSafetyMode();
+    void applyBusSafety();
 
     const EngineState &state() const { return _state; }
 
@@ -297,6 +309,10 @@ private:
     bool _cvOutputOverride = false;
     std::array<float, CvOutput::Channels> _cvOutputOverrideValues;
     std::array<float, BusCvCount> _busCv{};
+    std::array<bool, BusCvCount> _busCvWritten{};
+    bool _busCvSafeMode = true;
+    static constexpr float BusCvSlewPerTick = 1.0f;
+    static constexpr float BusCvDecay = 0.9995f;
     std::array<float, CvRoute::LaneCount> _cvRouteOutputs{};
 
     MessageHandler _messageHandler;

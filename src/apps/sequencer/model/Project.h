@@ -320,6 +320,19 @@ public:
         str(Types::curveCvInput(_curveCvInput));
     }
 
+    // busSafety
+
+    bool busSafety() const { return _busSafety; }
+    void setBusSafety(bool safe) { _busSafety = safe; }
+
+    void editBusSafety(int value, bool shift) {
+        _busSafety = value == 1;
+    }
+
+    void printBusSafety(StringBuilder &str) const {
+        str(_busSafety ? "Safe" : "Raw");
+    }
+
     // curveMidiInput
 
     // clockSetup
@@ -541,6 +554,7 @@ private:
     uint8_t _midiProgramOffset;
     Types::CvGateInput _cvGateInput;
     Types::CurveCvInput _curveCvInput;
+    bool _busSafety = true;
 
     ClockSetup _clockSetup;
     TrackArray _tracks;
