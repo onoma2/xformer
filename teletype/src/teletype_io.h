@@ -70,6 +70,7 @@ extern void tele_lfo_rate(uint8_t i, int16_t ms);
 extern void tele_lfo_wave(uint8_t i, int16_t value);
 extern void tele_lfo_amp(uint8_t i, int16_t value);
 extern void tele_lfo_fold(uint8_t i, int16_t value);
+extern void tele_lfo_offset(uint8_t i, int16_t value);
 extern void tele_lfo_start(uint8_t i, int16_t state);
 
 extern void tele_update_adc(uint8_t force);

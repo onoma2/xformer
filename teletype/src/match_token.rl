@@ -248,6 +248,7 @@
         "LFO.W"       => { MATCH_OP(E_OP_LFO_W); };
         "LFO.A"       => { MATCH_OP(E_OP_LFO_A); };
         "LFO.F"       => { MATCH_OP(E_OP_LFO_F); };
+        "LFO.O"       => { MATCH_OP(E_OP_LFO_O); };
         "LFO.S"       => { MATCH_OP(E_OP_LFO_S); };
 
         # maths

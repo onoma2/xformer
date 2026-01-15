@@ -147,6 +147,8 @@ static void op_LFO_A_get(const void *data, scene_state_t *ss, exec_state_t *es,
                          command_state_t *cs);
 static void op_LFO_F_get(const void *data, scene_state_t *ss, exec_state_t *es,
                          command_state_t *cs);
+static void op_LFO_O_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
 static void op_LFO_S_get(const void *data, scene_state_t *ss, exec_state_t *es,
                          command_state_t *cs);
 
@@ -217,6 +219,7 @@ const tele_op_t op_LFO_R         = MAKE_GET_OP(LFO.R, op_LFO_R_get, 2, false);
 const tele_op_t op_LFO_W         = MAKE_GET_OP(LFO.W, op_LFO_W_get, 2, false);
 const tele_op_t op_LFO_A         = MAKE_GET_OP(LFO.A, op_LFO_A_get, 2, false);
 const tele_op_t op_LFO_F         = MAKE_GET_OP(LFO.F, op_LFO_F_get, 2, false);
+const tele_op_t op_LFO_O         = MAKE_GET_OP(LFO.O, op_LFO_O_get, 2, false);
 const tele_op_t op_LFO_S         = MAKE_GET_OP(LFO.S, op_LFO_S_get, 2, false);
 // clang-format on
 
@@ -1079,6 +1082,17 @@ static void op_LFO_F_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
         return;
     }
     tele_lfo_fold((uint8_t)a, b);
+}
+
+static void op_LFO_O_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_offset((uint8_t)a, b);
 }
 
 static void op_LFO_S_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),

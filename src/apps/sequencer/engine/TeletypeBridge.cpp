@@ -255,6 +255,12 @@ void tele_lfo_fold(uint8_t i, int16_t value) {
     }
 }
 
+void tele_lfo_offset(uint8_t i, int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setLfoOffset(i, value);
+    }
+}
+
 void tele_lfo_start(uint8_t i, int16_t state) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         engine->setLfoStart(i, state);

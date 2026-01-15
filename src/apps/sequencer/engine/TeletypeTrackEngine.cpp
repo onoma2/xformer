@@ -584,12 +584,7 @@ void TeletypeTrackEngine::setLfoWave(uint8_t index, int16_t value) {
     if (index >= CvOutputCount) {
         return;
     }
-    if (value < 0) {
-        value = 0;
-    } else if (value > 100) {
-        value = 100;
-    }
-    _lfoWave[index] = static_cast<uint8_t>(value);
+    _lfoWave[index] = clamp<int16_t>(value, 0, 16383);
 }
 
 void TeletypeTrackEngine::setLfoAmp(uint8_t index, int16_t value) {
@@ -614,6 +609,13 @@ void TeletypeTrackEngine::setLfoFold(uint8_t index, int16_t value) {
         value = 100;
     }
     _lfoFold[index] = static_cast<uint8_t>(value);
+}
+
+void TeletypeTrackEngine::setLfoOffset(uint8_t index, int16_t value) {
+    if (index >= CvOutputCount) {
+        return;
+    }
+    _lfoOffsetRaw[index] = clamp<int16_t>(value, 0, 16383);
 }
 
 void TeletypeTrackEngine::setLfoStart(uint8_t index, int16_t state) {
@@ -1211,11 +1213,6 @@ void TeletypeTrackEngine::updateLfos(float timeDeltaMs) {
         return;
     }
 
-    auto smoothstep = [] (float t) -> float {
-        t = clamp(t, 0.f, 1.f);
-        return t * t * (3.f - 2.f * t);
-    };
-
     for (uint8_t i = 0; i < CvOutputCount; ++i) {
         if (!_lfoActive[i]) {
             continue;
@@ -1231,31 +1228,51 @@ void TeletypeTrackEngine::updateLfos(float timeDeltaMs) {
         }
         _lfoPhase[i] = phase;
 
-        float triangle = 1.f - 4.f * std::abs(phase - 0.5f);
-        float saw = phase * 2.f - 1.f;
+        // Waveform generation
+        float wave = 0.f;
+        const int16_t waveParam = _lfoWave[i];
 
-        float wave = triangle;
-        uint8_t waveParam = _lfoWave[i];
-        if (waveParam <= 33) {
-            float t = smoothstep(waveParam / 33.f);
-            wave = triangle + (saw - triangle) * t;
-        } else if (waveParam <= 67) {
-            float t = smoothstep((waveParam - 34.f) / 33.f);
-            float pulse = phase < 0.5f ? 1.f : -1.f;
-            wave = saw + (pulse - saw) * t;
+        if (waveParam <= 12287) {
+            // Sections 1-3: Skewed triangle (saw → triangle → ramp)
+            // Peak position: 100% → 50% → 0%
+            float peakPos = 1.f - (waveParam / 12287.f);
+
+            if (phase < peakPos) {
+                // Rising portion: -1 to +1
+                if (peakPos > 0.f) {
+                    wave = (phase / peakPos) * 2.f - 1.f;
+                } else {
+                    wave = 1.f;  // Already at peak
+                }
+            } else {
+                // Falling portion: +1 to -1
+                float fallRange = 1.f - peakPos;
+                if (fallRange > 0.f) {
+                    wave = 1.f - ((phase - peakPos) / fallRange) * 2.f;
+                } else {
+                    wave = 1.f;  // Stay at peak
+                }
+            }
         } else {
-            float t = smoothstep((waveParam - 68.f) / 32.f);
-            float duty = 0.5f + (0.05f - 0.5f) * t;
+            // Section 4: Pulse (50% → 5% duty cycle)
+            float t = (waveParam - 12288) / (16383.f - 12288.f);
+            float duty = 0.5f - (0.5f - 0.05f) * t;  // 0.5 → 0.05
             wave = phase < duty ? 1.f : -1.f;
         }
 
+        // Apply amplitude
         float ampVolts = (_lfoAmp[i] / 100.f) * 5.f;
         float output = wave * ampVolts;
 
+        // Apply fold
         float foldThreshold = -5.f + (_lfoFold[i] / 100.f) * 10.f;
         if (output < foldThreshold) {
             output = 2.f * foldThreshold - output;
         }
+
+        // Apply offset and clamp once
+        float offsetVolts = rawToVolts(_lfoOffsetRaw[i]);
+        output += offsetVolts;
         output = clamp(output, -5.f, 5.f);
 
         int16_t raw = voltsToRaw(output);

@@ -219,6 +219,7 @@ typedef enum {
     E_OP_LFO_W,
     E_OP_LFO_A,
     E_OP_LFO_F,
+    E_OP_LFO_O,
     E_OP_LFO_S,
     E_OP_CV_GET,
     E_OP_CV_CAL,

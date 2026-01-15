@@ -76,7 +76,7 @@ const tele_op_t *tele_ops[E_OP__LENGTH] = {
     &op_LIVE_DASH, &op_LIVE_D, &op_LIVE_GRID, &op_LIVE_G, &op_LIVE_VARS,
     &op_LIVE_V, &op_PRINT, &op_PRT, &op_E, &op_E_A, &op_E_D, &op_E_T,
     &op_E_O, &op_E_L, &op_E_R, &op_E_C, &op_LFO_R, &op_LFO_W, &op_LFO_A,
-    &op_LFO_F, &op_LFO_S, &op_CV_GET, &op_CV_CAL,
+    &op_LFO_F, &op_LFO_O, &op_LFO_S, &op_CV_GET, &op_CV_CAL,
     &op_CV_CAL_RESET,
 
     // maths

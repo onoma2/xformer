@@ -95,6 +95,7 @@ public:
     void setLfoWave(uint8_t index, int16_t value);
     void setLfoAmp(uint8_t index, int16_t value);
     void setLfoFold(uint8_t index, int16_t value);
+    void setLfoOffset(uint8_t index, int16_t value);
     void setLfoStart(uint8_t index, int16_t state);
     void setCvInterpolation(int index, bool enabled);
     int16_t noteGateGet(int trackIndex, int stepIndex) const;
@@ -172,9 +173,10 @@ private:
     std::array<uint8_t, CvOutputCount> _envState{};
     std::array<bool, CvOutputCount> _lfoActive{};
     std::array<int16_t, CvOutputCount> _lfoCycleMs{};
-    std::array<uint8_t, CvOutputCount> _lfoWave{};
+    std::array<int16_t, CvOutputCount> _lfoWave{};
     std::array<uint8_t, CvOutputCount> _lfoAmp{};
     std::array<uint8_t, CvOutputCount> _lfoFold{};
+    std::array<int16_t, CvOutputCount> _lfoOffsetRaw{};
     std::array<float, CvOutputCount> _lfoPhase{};
 
     // Tick interpolation state (for smooth LFO/envelope outputs)
