@@ -6,55 +6,62 @@ extern "C" {
 
 void TeletypeTrack::clear() {
     ss_init(&_state);
-
-    _midiSource.clear();  // Default to MIDI port, Omni channel
-
-    // Default I/O mapping
-    // TI-TR1-4 → None (avoid cross-triggering by default)
-    _triggerInputSource[0] = TriggerInputSource::CvIn1;
-    _triggerInputSource[1] = TriggerInputSource::CvIn2;
-    _triggerInputSource[2] = TriggerInputSource::LogicalGate3;
-    _triggerInputSource[3] = TriggerInputSource::LogicalGate4;
-
-    // TI-IN → CV input 3, TI-PARAM → CV input 4
-    _cvInSource = CvInputSource::CvIn3;
-    _cvParamSource = CvInputSource::CvIn4;
-    _cvXSource = CvInputSource::None;
-    _cvYSource = CvInputSource::None;
-    _cvZSource = CvInputSource::LogicalCv4;
-
-    // TO-TRA-D → Gate outputs 1-4
-    _triggerOutputDest[0] = TriggerOutputDest::GateOut1;
-    _triggerOutputDest[1] = TriggerOutputDest::GateOut2;
-    _triggerOutputDest[2] = TriggerOutputDest::GateOut3;
-    _triggerOutputDest[3] = TriggerOutputDest::GateOut4;
-
-    // TO-CV1-4 → CV outputs 1-4
-    _cvOutputDest[0] = CvOutputDest::CvOut1;
-    _cvOutputDest[1] = CvOutputDest::CvOut2;
-    _cvOutputDest[2] = CvOutputDest::CvOut3;
-    _cvOutputDest[3] = CvOutputDest::CvOut4;
-
-    _bootScriptIndex = 0;
-    // Scripts are stored in scene_state; nothing else to clear.
     _resetMetroOnLoad = true;
+    _bootScriptRequested = false;
 
-    // Timing defaults
-    _timeBase = TimeBase::Ms;
-    _clockDivisor = 12;
-    _clockMultiplier = 100;
-
-    // CV range/offset defaults
-    for (int i = 0; i < CvOutputCount; ++i) {
-        _cvOutputRange[i] = Types::VoltageRange::Bipolar5V;
-        _cvOutputOffset[i] = 0;
-        _cvOutputQuantizeScale[i] = (i == 0) ? QuantizeDefault : QuantizeOff;
-        _cvOutputRootNote[i] = -1;
-    }
-    _activePatternSlot = 0;
+    // Initialize both pattern slots with default values
     for (int slot = 0; slot < PatternSlotCount; ++slot) {
-        _activePatternSlot = slot;
-        syncToActiveSlot();
+        auto &ps = _patternSlots[slot];
+
+        ps.midiSource.clear();
+
+        // Default trigger inputs
+        ps.triggerInputSource[0] = TriggerInputSource::CvIn1;
+        ps.triggerInputSource[1] = TriggerInputSource::CvIn2;
+        ps.triggerInputSource[2] = TriggerInputSource::LogicalGate3;
+        ps.triggerInputSource[3] = TriggerInputSource::LogicalGate4;
+
+        // Default CV inputs
+        ps.cvInSource = CvInputSource::CvIn3;
+        ps.cvParamSource = CvInputSource::CvIn4;
+        ps.cvXSource = CvInputSource::None;
+        ps.cvYSource = CvInputSource::None;
+        ps.cvZSource = CvInputSource::LogicalCv4;
+
+        // Default trigger outputs
+        ps.triggerOutputDest[0] = TriggerOutputDest::GateOut1;
+        ps.triggerOutputDest[1] = TriggerOutputDest::GateOut2;
+        ps.triggerOutputDest[2] = TriggerOutputDest::GateOut3;
+        ps.triggerOutputDest[3] = TriggerOutputDest::GateOut4;
+
+        // Default CV outputs
+        ps.cvOutputDest[0] = CvOutputDest::CvOut1;
+        ps.cvOutputDest[1] = CvOutputDest::CvOut2;
+        ps.cvOutputDest[2] = CvOutputDest::CvOut3;
+        ps.cvOutputDest[3] = CvOutputDest::CvOut4;
+
+        ps.bootScriptIndex = 0;
+        ps.timeBase = TimeBase::Ms;
+        ps.clockDivisor = 12;
+        ps.clockMultiplier = 100;
+        ps.resetMetroOnLoad = true;
+
+        // CV output config defaults
+        for (int i = 0; i < CvOutputCount; ++i) {
+            ps.cvOutputRange[i] = Types::VoltageRange::Bipolar5V;
+            ps.cvOutputOffset[i] = 0;
+            ps.cvOutputQuantizeScale[i] = (i == 0) ? QuantizeDefault : QuantizeOff;
+            ps.cvOutputRootNote[i] = -1;
+        }
+
+        // Clear slot scripts and patterns
+        ps.slotScriptLength = 0;
+        ps.metroLength = 0;
+        std::memset(ps.slotScript.data(), 0, sizeof(ps.slotScript));
+        std::memset(ps.metro.data(), 0, sizeof(ps.metro));
+        for (int i = 0; i < PATTERN_COUNT; ++i) {
+            ps.patterns[i] = _state.patterns[i];  // Copy from initialized VM state
+        }
     }
     _activePatternSlot = 0;
 }
@@ -69,15 +76,15 @@ void TeletypeTrack::cvOutputName(int index, StringBuilder &str) const {
 
 void TeletypeTrack::seedOutputDestsFromTrackIndex(int trackIndex) {
     int start = clamp(trackIndex, 0, CONFIG_CHANNEL_COUNT - 1);
+    auto &slot = activeSlot();
     for (int i = 0; i < TriggerOutputCount; ++i) {
         int outputIndex = (start + i) % CONFIG_CHANNEL_COUNT;
-        _triggerOutputDest[i] = TriggerOutputDest(outputIndex);
+        slot.triggerOutputDest[i] = TriggerOutputDest(outputIndex);
     }
     for (int i = 0; i < CvOutputCount; ++i) {
         int outputIndex = (start + i) % CONFIG_CHANNEL_COUNT;
-        _cvOutputDest[i] = CvOutputDest(outputIndex);
+        slot.cvOutputDest[i] = CvOutputDest(outputIndex);
     }
-    syncToActiveSlot();
 }
 
 const char *TeletypeTrack::triggerInputSourceName(TriggerInputSource source) {
@@ -170,33 +177,35 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     auto *self = const_cast<TeletypeTrack *>(this);
     self->syncToActiveSlot();
 
-    // Write I/O mapping configuration
+    const auto &slot = activeSlot();
+
+    // Write I/O mapping configuration from active slot
     for (int i = 0; i < 4; ++i) {
-        writer.write(uint8_t(_triggerInputSource[i]));
+        writer.write(uint8_t(slot.triggerInputSource[i]));
     }
-    writer.write(uint8_t(_cvInSource));
-    writer.write(uint8_t(_cvParamSource));
-    writer.write(uint8_t(_cvXSource));
-    writer.write(uint8_t(_cvYSource));
-    writer.write(uint8_t(_cvZSource));
+    writer.write(uint8_t(slot.cvInSource));
+    writer.write(uint8_t(slot.cvParamSource));
+    writer.write(uint8_t(slot.cvXSource));
+    writer.write(uint8_t(slot.cvYSource));
+    writer.write(uint8_t(slot.cvZSource));
     for (int i = 0; i < 4; ++i) {
-        writer.write(uint8_t(_triggerOutputDest[i]));
-    }
-    for (int i = 0; i < 4; ++i) {
-        writer.write(uint8_t(_cvOutputDest[i]));
-    }
-    _midiSource.write(writer);
-    writer.write(uint8_t(_bootScriptIndex));
-    writer.write(uint8_t(_timeBase));
-    writer.write(_clockDivisor);
-    writer.write(_clockMultiplier);
-    for (int i = 0; i < 4; ++i) {
-        writer.write(uint8_t(_cvOutputRange[i]));
-        writer.write(_cvOutputOffset[i]);
+        writer.write(uint8_t(slot.triggerOutputDest[i]));
     }
     for (int i = 0; i < 4; ++i) {
-        writer.write(_cvOutputQuantizeScale[i]);
-        writer.write(_cvOutputRootNote[i]);
+        writer.write(uint8_t(slot.cvOutputDest[i]));
+    }
+    slot.midiSource.write(writer);
+    writer.write(uint8_t(slot.bootScriptIndex));
+    writer.write(uint8_t(slot.timeBase));
+    writer.write(slot.clockDivisor);
+    writer.write(slot.clockMultiplier);
+    for (int i = 0; i < 4; ++i) {
+        writer.write(uint8_t(slot.cvOutputRange[i]));
+        writer.write(slot.cvOutputOffset[i]);
+    }
+    for (int i = 0; i < 4; ++i) {
+        writer.write(slot.cvOutputQuantizeScale[i]);
+        writer.write(slot.cvOutputRootNote[i]);
     }
     scene_state_t &state = const_cast<scene_state_t &>(_state);
     for (int script = 0; script < EditableScriptCount; ++script) {
@@ -211,8 +220,8 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     }
 
     writer.write(_activePatternSlot);
-    for (int slot = 0; slot < PatternSlotCount; ++slot) {
-        const auto &patternSlot = _patternSlots[slot];
+    for (int slotIdx = 0; slotIdx < PatternSlotCount; ++slotIdx) {
+        const auto &patternSlot = _patternSlots[slotIdx];
         writer.write(patternSlot.slotScriptLength);
         writer.write(patternSlot.metroLength);
         writer.write(patternSlot.slotScript);
@@ -254,11 +263,13 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
 void TeletypeTrack::read(VersionedSerializedReader &reader) {
     clear();
 
-    // Read I/O mapping configuration
+    // Read legacy I/O mapping into slot 0 (for backwards compatibility)
+    // If slot data is present in file, it will be overwritten below
+    auto &legacySlot = _patternSlots[0];
     for (int i = 0; i < 4; ++i) {
         uint8_t val;
         reader.read(val);
-        _triggerInputSource[i] = ModelUtils::clampedEnum(TriggerInputSource(val));
+        legacySlot.triggerInputSource[i] = ModelUtils::clampedEnum(TriggerInputSource(val));
     }
     uint8_t cvInVal, cvParamVal, cvXVal, cvYVal, cvZVal;
     reader.read(cvInVal);
@@ -266,46 +277,48 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
     reader.read(cvXVal);
     reader.read(cvYVal);
     reader.read(cvZVal);
-    _cvInSource = ModelUtils::clampedEnum(CvInputSource(cvInVal));
-    _cvParamSource = ModelUtils::clampedEnum(CvInputSource(cvParamVal));
-    _cvXSource = ModelUtils::clampedEnum(CvInputSource(cvXVal));
-    _cvYSource = ModelUtils::clampedEnum(CvInputSource(cvYVal));
-    _cvZSource = ModelUtils::clampedEnum(CvInputSource(cvZVal));
+    legacySlot.cvInSource = ModelUtils::clampedEnum(CvInputSource(cvInVal));
+    legacySlot.cvParamSource = ModelUtils::clampedEnum(CvInputSource(cvParamVal));
+    legacySlot.cvXSource = ModelUtils::clampedEnum(CvInputSource(cvXVal));
+    legacySlot.cvYSource = ModelUtils::clampedEnum(CvInputSource(cvYVal));
+    legacySlot.cvZSource = ModelUtils::clampedEnum(CvInputSource(cvZVal));
 
     for (int i = 0; i < 4; ++i) {
         uint8_t val;
         reader.read(val);
-        _triggerOutputDest[i] = ModelUtils::clampedEnum(TriggerOutputDest(val));
+        legacySlot.triggerOutputDest[i] = ModelUtils::clampedEnum(TriggerOutputDest(val));
     }
     for (int i = 0; i < 4; ++i) {
         uint8_t val;
         reader.read(val);
-        _cvOutputDest[i] = ModelUtils::clampedEnum(CvOutputDest(val));
+        legacySlot.cvOutputDest[i] = ModelUtils::clampedEnum(CvOutputDest(val));
     }
-    _midiSource.read(reader);
+    legacySlot.midiSource.read(reader);
     uint8_t bootScriptVal = 0;
     reader.read(bootScriptVal);
-    _bootScriptIndex = clamp<int8_t>(bootScriptVal, 0, ScriptSlotCount - 1);
+    legacySlot.bootScriptIndex = clamp<uint8_t>(bootScriptVal, 0, ScriptSlotCount - 1);
     uint8_t timeBaseVal;
     reader.read(timeBaseVal);
-    _timeBase = ModelUtils::clampedEnum(TimeBase(timeBaseVal));
-    reader.read(_clockDivisor);
-    _clockDivisor = ModelUtils::clampDivisor(_clockDivisor);
-    reader.read(_clockMultiplier);
-    _clockMultiplier = clamp<int16_t>(_clockMultiplier, 50, 150);
+    legacySlot.timeBase = ModelUtils::clampedEnum(TimeBase(timeBaseVal));
+    reader.read(legacySlot.clockDivisor);
+    legacySlot.clockDivisor = ModelUtils::clampDivisor(legacySlot.clockDivisor);
+    reader.read(legacySlot.clockMultiplier);
+    legacySlot.clockMultiplier = clamp<int16_t>(legacySlot.clockMultiplier, 50, 150);
     for (int i = 0; i < 4; ++i) {
         uint8_t rangeVal;
         reader.read(rangeVal);
-        _cvOutputRange[i] = ModelUtils::clampedEnum(Types::VoltageRange(rangeVal));
-        reader.read(_cvOutputOffset[i]);
-        _cvOutputOffset[i] = clamp<int16_t>(_cvOutputOffset[i], -500, 500);
+        legacySlot.cvOutputRange[i] = ModelUtils::clampedEnum(Types::VoltageRange(rangeVal));
+        reader.read(legacySlot.cvOutputOffset[i]);
+        legacySlot.cvOutputOffset[i] = clamp<int16_t>(legacySlot.cvOutputOffset[i], -500, 500);
     }
     for (int i = 0; i < 4; ++i) {
-        reader.read(_cvOutputQuantizeScale[i]);
-        _cvOutputQuantizeScale[i] = clamp<int8_t>(_cvOutputQuantizeScale[i], QuantizeOff, Scale::Count - 1);
-        reader.read(_cvOutputRootNote[i]);
-        _cvOutputRootNote[i] = clamp<int8_t>(_cvOutputRootNote[i], -1, 11);
+        reader.read(legacySlot.cvOutputQuantizeScale[i]);
+        legacySlot.cvOutputQuantizeScale[i] = clamp<int8_t>(legacySlot.cvOutputQuantizeScale[i], QuantizeOff, Scale::Count - 1);
+        reader.read(legacySlot.cvOutputRootNote[i]);
+        legacySlot.cvOutputRootNote[i] = clamp<int8_t>(legacySlot.cvOutputRootNote[i], -1, 11);
     }
+
+    // Read VM scripts
     for (int script = 0; script < EditableScriptCount; ++script) {
         ss_clear_script(&_state, script);
         uint8_t scriptLen = 0;
@@ -318,11 +331,13 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
     for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
         reader.read(_state.patterns[pattern], 0);
     }
-    uint8_t activeSlot = 0;
-    reader.read(activeSlot);
-    _activePatternSlot = clamp<uint8_t>(activeSlot, 0, PatternSlotCount - 1);
-    for (int slot = 0; slot < PatternSlotCount; ++slot) {
-        auto &patternSlot = _patternSlots[slot];
+
+    // Read pattern slots (overwrites legacy data if present)
+    uint8_t activeSlotVal = 0;
+    reader.read(activeSlotVal);
+    _activePatternSlot = clamp<uint8_t>(activeSlotVal, 0, PatternSlotCount - 1);
+    for (int slotIdx = 0; slotIdx < PatternSlotCount; ++slotIdx) {
+        auto &patternSlot = _patternSlots[slotIdx];
         reader.read(patternSlot.slotScriptLength, 0);
         reader.read(patternSlot.metroLength, 0);
         reader.read(patternSlot.slotScript, 0);
@@ -335,17 +350,17 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
             reader.read(val, 0);
             patternSlot.triggerInputSource[i] = ModelUtils::clampedEnum(TriggerInputSource(val));
         }
-        uint8_t cvInVal, cvParamVal, cvXVal, cvYVal, cvZVal;
-        reader.read(cvInVal, 0);
-        reader.read(cvParamVal, 0);
-        reader.read(cvXVal, 0);
-        reader.read(cvYVal, 0);
-        reader.read(cvZVal, 0);
-        patternSlot.cvInSource = ModelUtils::clampedEnum(CvInputSource(cvInVal));
-        patternSlot.cvParamSource = ModelUtils::clampedEnum(CvInputSource(cvParamVal));
-        patternSlot.cvXSource = ModelUtils::clampedEnum(CvInputSource(cvXVal));
-        patternSlot.cvYSource = ModelUtils::clampedEnum(CvInputSource(cvYVal));
-        patternSlot.cvZSource = ModelUtils::clampedEnum(CvInputSource(cvZVal));
+        uint8_t cvInVal2, cvParamVal2, cvXVal2, cvYVal2, cvZVal2;
+        reader.read(cvInVal2, 0);
+        reader.read(cvParamVal2, 0);
+        reader.read(cvXVal2, 0);
+        reader.read(cvYVal2, 0);
+        reader.read(cvZVal2, 0);
+        patternSlot.cvInSource = ModelUtils::clampedEnum(CvInputSource(cvInVal2));
+        patternSlot.cvParamSource = ModelUtils::clampedEnum(CvInputSource(cvParamVal2));
+        patternSlot.cvXSource = ModelUtils::clampedEnum(CvInputSource(cvXVal2));
+        patternSlot.cvYSource = ModelUtils::clampedEnum(CvInputSource(cvYVal2));
+        patternSlot.cvZSource = ModelUtils::clampedEnum(CvInputSource(cvZVal2));
         for (int i = 0; i < 4; ++i) {
             uint8_t val;
             reader.read(val, 0);
@@ -357,12 +372,12 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
             patternSlot.cvOutputDest[i] = ModelUtils::clampedEnum(CvOutputDest(val));
         }
         patternSlot.midiSource.read(reader);
-        uint8_t bootScriptVal = 0;
-        reader.read(bootScriptVal, 0);
-        patternSlot.bootScriptIndex = clamp<uint8_t>(bootScriptVal, 0, ScriptSlotCount - 1);
-        uint8_t timeBaseVal = 0;
-        reader.read(timeBaseVal, 0);
-        patternSlot.timeBase = ModelUtils::clampedEnum(TimeBase(timeBaseVal));
+        uint8_t bootVal = 0;
+        reader.read(bootVal, 0);
+        patternSlot.bootScriptIndex = clamp<uint8_t>(bootVal, 0, ScriptSlotCount - 1);
+        uint8_t tbVal = 0;
+        reader.read(tbVal, 0);
+        patternSlot.timeBase = ModelUtils::clampedEnum(TimeBase(tbVal));
         reader.read(patternSlot.clockDivisor, 0);
         patternSlot.clockDivisor = ModelUtils::clampDivisor(patternSlot.clockDivisor);
         reader.read(patternSlot.clockMultiplier, 0);
@@ -449,6 +464,8 @@ void TeletypeTrack::onPatternChanged(int patternIndex) {
 void TeletypeTrack::applyPatternSlot(int slotIndex) {
     const int slot = clamp(slotIndex, 0, PatternSlotCount - 1);
     _activePatternSlot = slot;
+
+    // Copy slot-specific VM state (scripts and patterns) into the VM
     const auto &patternSlot = _patternSlots[_activePatternSlot];
     _state.scripts[SlotScriptIndex].l = clamp<uint8_t>(patternSlot.slotScriptLength, 0, ScriptLineCount);
     _state.scripts[METRO_SCRIPT].l = clamp<uint8_t>(patternSlot.metroLength, 0, ScriptLineCount);
@@ -457,23 +474,6 @@ void TeletypeTrack::applyPatternSlot(int slotIndex) {
     for (int i = 0; i < PATTERN_COUNT; ++i) {
         _state.patterns[i] = patternSlot.patterns[i];
     }
-    _triggerInputSource = patternSlot.triggerInputSource;
-    _cvInSource = patternSlot.cvInSource;
-    _cvParamSource = patternSlot.cvParamSource;
-    _cvXSource = patternSlot.cvXSource;
-    _cvYSource = patternSlot.cvYSource;
-    _cvZSource = patternSlot.cvZSource;
-    _triggerOutputDest = patternSlot.triggerOutputDest;
-    _cvOutputDest = patternSlot.cvOutputDest;
-    _cvOutputRange = patternSlot.cvOutputRange;
-    _cvOutputOffset = patternSlot.cvOutputOffset;
-    _cvOutputQuantizeScale = patternSlot.cvOutputQuantizeScale;
-    _cvOutputRootNote = patternSlot.cvOutputRootNote;
-    _midiSource = patternSlot.midiSource;
-    _bootScriptIndex = patternSlot.bootScriptIndex;
-    _timeBase = patternSlot.timeBase;
-    _clockDivisor = patternSlot.clockDivisor;
-    _clockMultiplier = patternSlot.clockMultiplier;
     _resetMetroOnLoad = patternSlot.resetMetroOnLoad;
 }
 
@@ -482,6 +482,7 @@ void TeletypeTrack::applyActivePatternSlot() {
 }
 
 void TeletypeTrack::syncToActiveSlot() {
+    // Sync VM state (scripts and patterns) back to the active slot
     auto &patternSlot = _patternSlots[_activePatternSlot];
     patternSlot.slotScriptLength = _state.scripts[SlotScriptIndex].l;
     patternSlot.metroLength = _state.scripts[METRO_SCRIPT].l;
@@ -491,23 +492,5 @@ void TeletypeTrack::syncToActiveSlot() {
     for (int i = 0; i < PATTERN_COUNT; ++i) {
         patternSlot.patterns[i] = _state.patterns[i];
     }
-
-    patternSlot.triggerInputSource = _triggerInputSource;
-    patternSlot.cvInSource = _cvInSource;
-    patternSlot.cvParamSource = _cvParamSource;
-    patternSlot.cvXSource = _cvXSource;
-    patternSlot.cvYSource = _cvYSource;
-    patternSlot.cvZSource = _cvZSource;
-    patternSlot.triggerOutputDest = _triggerOutputDest;
-    patternSlot.cvOutputDest = _cvOutputDest;
-    patternSlot.cvOutputRange = _cvOutputRange;
-    patternSlot.cvOutputOffset = _cvOutputOffset;
-    patternSlot.cvOutputQuantizeScale = _cvOutputQuantizeScale;
-    patternSlot.cvOutputRootNote = _cvOutputRootNote;
-    patternSlot.midiSource = _midiSource;
-    patternSlot.bootScriptIndex = _bootScriptIndex;
-    patternSlot.timeBase = _timeBase;
-    patternSlot.clockDivisor = _clockDivisor;
-    patternSlot.clockMultiplier = _clockMultiplier;
     patternSlot.resetMetroOnLoad = _resetMetroOnLoad;
 }

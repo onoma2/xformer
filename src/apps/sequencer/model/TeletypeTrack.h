@@ -160,49 +160,50 @@ public:
     scene_state_t &state() { return _state; }
     const scene_state_t &state() const { return _state; }
 
+    // Active slot helper
+    PatternSlot &activeSlot() { return _patternSlots[_activePatternSlot]; }
+    const PatternSlot &activeSlot() const { return _patternSlots[_activePatternSlot]; }
+
     // midiSource
-    const MidiSourceConfig &midiSource() const { return _midiSource; }
-          MidiSourceConfig &midiSource()       { return _midiSource; }
+    const MidiSourceConfig &midiSource() const { return activeSlot().midiSource; }
+          MidiSourceConfig &midiSource()       { return activeSlot().midiSource; }
 
     //----------------------------------------
     // Timing (time base + divisor/multiplier)
     //----------------------------------------
 
-    TimeBase timeBase() const { return _timeBase; }
+    TimeBase timeBase() const { return activeSlot().timeBase; }
     void setTimeBase(TimeBase mode) {
-        _timeBase = ModelUtils::clampedEnum(mode);
-        syncToActiveSlot();
+        activeSlot().timeBase = ModelUtils::clampedEnum(mode);
     }
     void editTimeBase(int value, bool shift) {
         (void)shift;
-        setTimeBase(ModelUtils::adjustedEnum(_timeBase, value));
+        setTimeBase(ModelUtils::adjustedEnum(activeSlot().timeBase, value));
     }
     void printTimeBase(StringBuilder &str) const {
-        str(timeBaseName(_timeBase));
+        str(timeBaseName(activeSlot().timeBase));
     }
 
-    int clockDivisor() const { return _clockDivisor; }
+    int clockDivisor() const { return activeSlot().clockDivisor; }
     void setClockDivisor(int divisor) {
-        _clockDivisor = ModelUtils::clampDivisor(divisor);
-        syncToActiveSlot();
+        activeSlot().clockDivisor = ModelUtils::clampDivisor(divisor);
     }
     void editClockDivisor(int value, bool shift) {
-        setClockDivisor(ModelUtils::adjustedByDivisor(_clockDivisor, value, shift));
+        setClockDivisor(ModelUtils::adjustedByDivisor(activeSlot().clockDivisor, value, shift));
     }
     void printClockDivisor(StringBuilder &str) const {
-        ModelUtils::printDivisor(str, _clockDivisor);
+        ModelUtils::printDivisor(str, activeSlot().clockDivisor);
     }
 
-    int clockMultiplier() const { return _clockMultiplier; }
+    int clockMultiplier() const { return activeSlot().clockMultiplier; }
     void setClockMultiplier(int multiplier) {
-        _clockMultiplier = clamp(multiplier, 50, 150);
-        syncToActiveSlot();
+        activeSlot().clockMultiplier = clamp(multiplier, 50, 150);
     }
     void editClockMultiplier(int value, bool shift) {
-        setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
+        setClockMultiplier(activeSlot().clockMultiplier + value * (shift ? 10 : 1));
     }
     void printClockMultiplier(StringBuilder &str) const {
-        str("%.2fx", _clockMultiplier * 0.01f);
+        str("%.2fx", activeSlot().clockMultiplier * 0.01f);
     }
 
     //----------------------------------------
@@ -212,174 +213,164 @@ public:
     // TI-TR1 to TI-TR4 (4 trigger inputs)
     TriggerInputSource triggerInputSource(int index) const {
         if (index < 0 || index >= TriggerInputCount) return TriggerInputSource::None;
-        return _triggerInputSource[index];
+        return activeSlot().triggerInputSource[index];
     }
     void setTriggerInputSource(int index, TriggerInputSource source) {
         if (index >= 0 && index < TriggerInputCount) {
-            _triggerInputSource[index] = ModelUtils::clampedEnum(source);
-            syncToActiveSlot();
+            activeSlot().triggerInputSource[index] = ModelUtils::clampedEnum(source);
         }
     }
     void editTriggerInputSource(int index, int value, bool shift) {
         if (index >= 0 && index < TriggerInputCount) {
-            setTriggerInputSource(index, ModelUtils::adjustedEnum(_triggerInputSource[index], value));
+            setTriggerInputSource(index, ModelUtils::adjustedEnum(activeSlot().triggerInputSource[index], value));
         }
     }
     void printTriggerInputSource(int index, StringBuilder &str) const {
         if (index >= 0 && index < TriggerInputCount) {
-            str(triggerInputSourceName(_triggerInputSource[index]));
+            str(triggerInputSourceName(activeSlot().triggerInputSource[index]));
         }
     }
 
     // TI-IN (Teletype IN variable)
-    CvInputSource cvInSource() const { return _cvInSource; }
+    CvInputSource cvInSource() const { return activeSlot().cvInSource; }
     void setCvInSource(CvInputSource source) {
-        _cvInSource = ModelUtils::clampedEnum(source);
-        syncToActiveSlot();
+        activeSlot().cvInSource = ModelUtils::clampedEnum(source);
     }
     void editCvInSource(int value, bool shift) {
-        setCvInSource(ModelUtils::adjustedEnum(_cvInSource, value));
+        setCvInSource(ModelUtils::adjustedEnum(activeSlot().cvInSource, value));
     }
     void printCvInSource(StringBuilder &str) const {
-        str(cvInputSourceName(_cvInSource));
+        str(cvInputSourceName(activeSlot().cvInSource));
     }
 
     // TI-PARAM (Teletype PARAM variable)
-    CvInputSource cvParamSource() const { return _cvParamSource; }
+    CvInputSource cvParamSource() const { return activeSlot().cvParamSource; }
     void setCvParamSource(CvInputSource source) {
-        _cvParamSource = ModelUtils::clampedEnum(source);
-        syncToActiveSlot();
+        activeSlot().cvParamSource = ModelUtils::clampedEnum(source);
     }
     void editCvParamSource(int value, bool shift) {
-        setCvParamSource(ModelUtils::adjustedEnum(_cvParamSource, value));
+        setCvParamSource(ModelUtils::adjustedEnum(activeSlot().cvParamSource, value));
     }
     void printCvParamSource(StringBuilder &str) const {
-        str(cvInputSourceName(_cvParamSource));
+        str(cvInputSourceName(activeSlot().cvParamSource));
     }
 
     // TI-X, TI-Y, TI-Z: CV input sources for variables
-    CvInputSource cvXSource() const { return _cvXSource; }
+    CvInputSource cvXSource() const { return activeSlot().cvXSource; }
     void setCvXSource(CvInputSource source) {
-        _cvXSource = ModelUtils::clampedEnum(source);
-        syncToActiveSlot();
+        activeSlot().cvXSource = ModelUtils::clampedEnum(source);
     }
     void editCvXSource(int value, bool shift) {
         (void)shift;
-        setCvXSource(ModelUtils::adjustedEnum(_cvXSource, value));
+        setCvXSource(ModelUtils::adjustedEnum(activeSlot().cvXSource, value));
     }
     void printCvXSource(StringBuilder &str) const {
-        str(cvInputSourceName(_cvXSource));
+        str(cvInputSourceName(activeSlot().cvXSource));
     }
 
-    CvInputSource cvYSource() const { return _cvYSource; }
+    CvInputSource cvYSource() const { return activeSlot().cvYSource; }
     void setCvYSource(CvInputSource source) {
-        _cvYSource = ModelUtils::clampedEnum(source);
-        syncToActiveSlot();
+        activeSlot().cvYSource = ModelUtils::clampedEnum(source);
     }
     void editCvYSource(int value, bool shift) {
         (void)shift;
-        setCvYSource(ModelUtils::adjustedEnum(_cvYSource, value));
+        setCvYSource(ModelUtils::adjustedEnum(activeSlot().cvYSource, value));
     }
     void printCvYSource(StringBuilder &str) const {
-        str(cvInputSourceName(_cvYSource));
+        str(cvInputSourceName(activeSlot().cvYSource));
     }
 
-    CvInputSource cvZSource() const { return _cvZSource; }
+    CvInputSource cvZSource() const { return activeSlot().cvZSource; }
     void setCvZSource(CvInputSource source) {
-        _cvZSource = ModelUtils::clampedEnum(source);
-        syncToActiveSlot();
+        activeSlot().cvZSource = ModelUtils::clampedEnum(source);
     }
     void editCvZSource(int value, bool shift) {
         (void)shift;
-        setCvZSource(ModelUtils::adjustedEnum(_cvZSource, value));
+        setCvZSource(ModelUtils::adjustedEnum(activeSlot().cvZSource, value));
     }
     void printCvZSource(StringBuilder &str) const {
-        str(cvInputSourceName(_cvZSource));
+        str(cvInputSourceName(activeSlot().cvZSource));
     }
 
     // TO-TRA to TO-TRD (4 trigger outputs)
     TriggerOutputDest triggerOutputDest(int index) const {
         if (index < 0 || index >= TriggerOutputCount) return TriggerOutputDest::GateOut1;
-        return _triggerOutputDest[index];
+        return activeSlot().triggerOutputDest[index];
     }
     void setTriggerOutputDest(int index, TriggerOutputDest dest) {
         if (index >= 0 && index < TriggerOutputCount) {
-            _triggerOutputDest[index] = ModelUtils::clampedEnum(dest);
-            syncToActiveSlot();
+            activeSlot().triggerOutputDest[index] = ModelUtils::clampedEnum(dest);
         }
     }
     void editTriggerOutputDest(int index, int value, bool shift) {
         if (index >= 0 && index < TriggerOutputCount) {
-            setTriggerOutputDest(index, ModelUtils::adjustedEnum(_triggerOutputDest[index], value));
+            setTriggerOutputDest(index, ModelUtils::adjustedEnum(activeSlot().triggerOutputDest[index], value));
         }
     }
     void printTriggerOutputDest(int index, StringBuilder &str) const {
         if (index >= 0 && index < TriggerOutputCount) {
-            str(triggerOutputDestName(_triggerOutputDest[index]));
+            str(triggerOutputDestName(activeSlot().triggerOutputDest[index]));
         }
     }
 
     // TO-CV1 to TO-CV4 (4 CV outputs)
     CvOutputDest cvOutputDest(int index) const {
         if (index < 0 || index >= CvOutputCount) return CvOutputDest::CvOut1;
-        return _cvOutputDest[index];
+        return activeSlot().cvOutputDest[index];
     }
     void setCvOutputDest(int index, CvOutputDest dest) {
         if (index >= 0 && index < CvOutputCount) {
-            _cvOutputDest[index] = ModelUtils::clampedEnum(dest);
-            syncToActiveSlot();
+            activeSlot().cvOutputDest[index] = ModelUtils::clampedEnum(dest);
         }
     }
     void editCvOutputDest(int index, int value, bool shift) {
         if (index >= 0 && index < CvOutputCount) {
-            setCvOutputDest(index, ModelUtils::adjustedEnum(_cvOutputDest[index], value));
+            setCvOutputDest(index, ModelUtils::adjustedEnum(activeSlot().cvOutputDest[index], value));
         }
     }
     void printCvOutputDest(int index, StringBuilder &str) const {
         if (index >= 0 && index < CvOutputCount) {
-            str(cvOutputDestName(_cvOutputDest[index]));
+            str(cvOutputDestName(activeSlot().cvOutputDest[index]));
         }
     }
 
     // Per-output range/offset
     Types::VoltageRange cvOutputRange(int index) const {
         if (index < 0 || index >= CvOutputCount) return Types::VoltageRange::Bipolar5V;
-        return _cvOutputRange[index];
+        return activeSlot().cvOutputRange[index];
     }
     void setCvOutputRange(int index, Types::VoltageRange range) {
         if (index >= 0 && index < CvOutputCount) {
-            _cvOutputRange[index] = ModelUtils::clampedEnum(range);
-            syncToActiveSlot();
+            activeSlot().cvOutputRange[index] = ModelUtils::clampedEnum(range);
         }
     }
     void editCvOutputRange(int index, int value, bool shift) {
         (void)shift;
         if (index >= 0 && index < CvOutputCount) {
-            setCvOutputRange(index, ModelUtils::adjustedEnum(_cvOutputRange[index], value));
+            setCvOutputRange(index, ModelUtils::adjustedEnum(activeSlot().cvOutputRange[index], value));
         }
     }
     void printCvOutputRange(int index, StringBuilder &str) const {
         if (index >= 0 && index < CvOutputCount) {
-            str(Types::voltageRangeName(_cvOutputRange[index]));
+            str(Types::voltageRangeName(activeSlot().cvOutputRange[index]));
         }
     }
 
     int cvOutputOffset(int index) const {
         if (index < 0 || index >= CvOutputCount) return 0;
-        return _cvOutputOffset[index];
+        return activeSlot().cvOutputOffset[index];
     }
     float cvOutputOffsetVolts(int index) const {
         return cvOutputOffset(index) * 0.01f;
     }
     void setCvOutputOffset(int index, int offset) {
         if (index >= 0 && index < CvOutputCount) {
-            _cvOutputOffset[index] = clamp(offset, -500, 500);
-            syncToActiveSlot();
+            activeSlot().cvOutputOffset[index] = clamp(offset, -500, 500);
         }
     }
     void editCvOutputOffset(int index, int value, bool shift) {
         if (index >= 0 && index < CvOutputCount) {
-            setCvOutputOffset(index, _cvOutputOffset[index] + value * (shift ? 100 : 1));
+            setCvOutputOffset(index, activeSlot().cvOutputOffset[index] + value * (shift ? 100 : 1));
         }
     }
     void printCvOutputOffset(int index, StringBuilder &str) const {
@@ -391,23 +382,22 @@ public:
     // Per-output quantize scale (Off/Default/Scale)
     int cvOutputQuantizeScale(int index) const {
         if (index < 0 || index >= CvOutputCount) return QuantizeOff;
-        return _cvOutputQuantizeScale[index];
+        return activeSlot().cvOutputQuantizeScale[index];
     }
     void setCvOutputQuantizeScale(int index, int scale) {
         if (index >= 0 && index < CvOutputCount) {
-            _cvOutputQuantizeScale[index] = clamp<int8_t>(scale, QuantizeOff, Scale::Count - 1);
-            syncToActiveSlot();
+            activeSlot().cvOutputQuantizeScale[index] = clamp<int8_t>(scale, QuantizeOff, Scale::Count - 1);
         }
     }
     void editCvOutputQuantizeScale(int index, int value, bool shift) {
         (void)shift;
         if (index >= 0 && index < CvOutputCount) {
-            setCvOutputQuantizeScale(index, _cvOutputQuantizeScale[index] + value);
+            setCvOutputQuantizeScale(index, activeSlot().cvOutputQuantizeScale[index] + value);
         }
     }
     void printCvOutputQuantizeScale(int index, StringBuilder &str) const {
         if (index < 0 || index >= CvOutputCount) return;
-        int scale = _cvOutputQuantizeScale[index];
+        int scale = activeSlot().cvOutputQuantizeScale[index];
         if (scale == QuantizeOff) {
             str("Off");
         } else if (scale == QuantizeDefault) {
@@ -420,23 +410,22 @@ public:
     // Per-output root note (Default or 0-11)
     int cvOutputRootNote(int index) const {
         if (index < 0 || index >= CvOutputCount) return -1;
-        return _cvOutputRootNote[index];
+        return activeSlot().cvOutputRootNote[index];
     }
     void setCvOutputRootNote(int index, int note) {
         if (index >= 0 && index < CvOutputCount) {
-            _cvOutputRootNote[index] = clamp<int8_t>(note, -1, 11);
-            syncToActiveSlot();
+            activeSlot().cvOutputRootNote[index] = clamp<int8_t>(note, -1, 11);
         }
     }
     void editCvOutputRootNote(int index, int value, bool shift) {
         (void)shift;
         if (index >= 0 && index < CvOutputCount) {
-            setCvOutputRootNote(index, _cvOutputRootNote[index] + value);
+            setCvOutputRootNote(index, activeSlot().cvOutputRootNote[index] + value);
         }
     }
     void printCvOutputRootNote(int index, StringBuilder &str) const {
         if (index < 0 || index >= CvOutputCount) return;
-        int note = _cvOutputRootNote[index];
+        int note = activeSlot().cvOutputRootNote[index];
         if (note < 0) {
             str("Default");
         } else {
@@ -451,7 +440,7 @@ public:
     // Check if a CV output is already used as CV OUTPUT destination
     bool isCvOutputUsedAsOutput(int cvOutIndex) const {
         for (int i = 0; i < CvOutputCount; ++i) {
-            if (int(_cvOutputDest[i]) == cvOutIndex) {
+            if (int(activeSlot().cvOutputDest[i]) == cvOutIndex) {
                 return true;
             }
         }
@@ -460,19 +449,20 @@ public:
 
     // Check if a CV output is already used as CV INPUT source (TI-IN or TI-PARAM)
     bool isCvOutputUsedAsInput(int cvOutIndex) const {
+        const auto &slot = activeSlot();
         // Check TI-IN
-        if (_cvInSource >= CvInputSource::CvOut1 &&
-            _cvInSource <= CvInputSource::CvOut8) {
-            int srcCv = int(_cvInSource) - int(CvInputSource::CvOut1);
+        if (slot.cvInSource >= CvInputSource::CvOut1 &&
+            slot.cvInSource <= CvInputSource::CvOut8) {
+            int srcCv = int(slot.cvInSource) - int(CvInputSource::CvOut1);
             if (srcCv == cvOutIndex) {
                 return true;
             }
         }
 
         // Check TI-PARAM
-        if (_cvParamSource >= CvInputSource::CvOut1 &&
-            _cvParamSource <= CvInputSource::CvOut8) {
-            int srcCv = int(_cvParamSource) - int(CvInputSource::CvOut1);
+        if (slot.cvParamSource >= CvInputSource::CvOut1 &&
+            slot.cvParamSource <= CvInputSource::CvOut8) {
+            int srcCv = int(slot.cvParamSource) - int(CvInputSource::CvOut1);
             if (srcCv == cvOutIndex) {
                 return true;
             }
@@ -484,7 +474,7 @@ public:
     // Check if a gate output is already used as trigger OUTPUT
     bool isGateOutputUsedAsOutput(int gateIndex) const {
         for (int i = 0; i < TriggerOutputCount; ++i) {
-            if (int(_triggerOutputDest[i]) == gateIndex) {
+            if (int(activeSlot().triggerOutputDest[i]) == gateIndex) {
                 return true;
             }
         }
@@ -494,7 +484,7 @@ public:
     // Check if a gate output is already used as trigger INPUT
     bool isGateOutputUsedAsInput(int gateIndex) const {
         for (int i = 0; i < TriggerInputCount; ++i) {
-            auto src = _triggerInputSource[i];
+            auto src = activeSlot().triggerInputSource[i];
             if (src >= TriggerInputSource::GateOut1 &&
                 src <= TriggerInputSource::GateOut8) {
                 int srcGate = int(src) - int(TriggerInputSource::GateOut1);
@@ -613,10 +603,9 @@ public:
         syncToActiveSlot();
     }
 
-    int bootScriptIndex() const { return _bootScriptIndex; }
+    int bootScriptIndex() const { return activeSlot().bootScriptIndex; }
     void setBootScriptIndex(int index) {
-        _bootScriptIndex = clamp<int8_t>(index, 0, ScriptSlotCount - 1);
-        syncToActiveSlot();
+        activeSlot().bootScriptIndex = clamp<uint8_t>(index, 0, ScriptSlotCount - 1);
     }
     void requestBootScriptRun() { _bootScriptRequested = true; }
     bool consumeBootScriptRequest() {
@@ -668,28 +657,10 @@ private:
     int8_t _trackIndex = -1;
     scene_state_t _state;
 
-    // I/O Mapping configuration
-    MidiSourceConfig _midiSource;
-    std::array<TriggerInputSource, TriggerInputCount> _triggerInputSource;  // TI-TR1 to TI-TR4
-    CvInputSource _cvInSource;                              // TI-IN
-    CvInputSource _cvParamSource;                           // TI-PARAM
-    CvInputSource _cvXSource;                               // TI-X
-    CvInputSource _cvYSource;                               // TI-Y
-    CvInputSource _cvZSource;                               // TI-Z
-    std::array<TriggerOutputDest, TriggerOutputCount> _triggerOutputDest;  // TO-TRA to TO-TRD
-    std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
-    int8_t _bootScriptIndex = 0;
     std::array<PatternSlot, PatternSlotCount> _patternSlots{};
     uint8_t _activePatternSlot = 0;
     bool _resetMetroOnLoad = true;
     bool _bootScriptRequested = false;
-    TimeBase _timeBase = TimeBase::Ms;
-    uint16_t _clockDivisor = 12;
-    int16_t _clockMultiplier = 100;
-    std::array<Types::VoltageRange, CvOutputCount> _cvOutputRange{};
-    std::array<int16_t, CvOutputCount> _cvOutputOffset{};
-    std::array<int8_t, CvOutputCount> _cvOutputQuantizeScale{};
-    std::array<int8_t, CvOutputCount> _cvOutputRootNote{};
 
     friend class Track;
 };

@@ -44,10 +44,10 @@ static const NoteSequenceListModel::Item quickEditItems[8] = {
     NoteSequenceListModel::Item::LastStep,
     NoteSequenceListModel::Item::RunMode,
     NoteSequenceListModel::Item::DivisorX,
-    NoteSequenceListModel::Item::ClockMult,
     NoteSequenceListModel::Item::ResetMeasure,
     NoteSequenceListModel::Item::Scale,
-    NoteSequenceListModel::Item::RootNote
+    NoteSequenceListModel::Item::RootNote,
+    NoteSequenceListModel::Item::Last
 };
 
 NoteSequenceEditPage::NoteSequenceEditPage(PageManager &manager, PageContext &context) :
