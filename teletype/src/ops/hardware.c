@@ -251,6 +251,7 @@ static void op_CV_set(const void *NOTUSED(data), scene_state_t *ss,
         return;
     else if (a < 4) {
         ss->variables.cv[a] = b;
+        tele_cv_interpolate(a, 0);  // Disable interpolation for direct CV sets
         tele_cv(a, b, 1);
     }
     else if (a < 20) {
@@ -867,6 +868,7 @@ static void op_CV_SET_get(const void *NOTUSED(data), scene_state_t *ss,
         return;
     else if (a < 4) {
         ss->variables.cv[a] = b;
+        tele_cv_interpolate(a, 0);  // Disable interpolation for direct CV sets
         tele_cv(a, b, 0);
     }
     else if (a < 20) {
@@ -987,6 +989,7 @@ static void op_E_T_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
     if (a < 0 || a >= 4) {
         return;
     }
+    tele_cv_interpolate((uint8_t)a, 1);  // Enable interpolation for envelope
     tele_env_trigger((uint8_t)a);
 }
 
@@ -1085,6 +1088,9 @@ static void op_LFO_S_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
     a--;
     if (a < 0 || a >= 4) {
         return;
+    }
+    if (b != 0) {
+        tele_cv_interpolate((uint8_t)a, 1);  // Enable interpolation when LFO starts
     }
     tele_lfo_start((uint8_t)a, b);
 }

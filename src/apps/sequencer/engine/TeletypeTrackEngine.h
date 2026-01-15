@@ -96,6 +96,7 @@ public:
     void setLfoAmp(uint8_t index, int16_t value);
     void setLfoFold(uint8_t index, int16_t value);
     void setLfoStart(uint8_t index, int16_t state);
+    void setCvInterpolation(int index, bool enabled);
     int16_t noteGateGet(int trackIndex, int stepIndex) const;
     void noteGateSet(int trackIndex, int stepIndex, int16_t value);
     int16_t noteNoteGet(int trackIndex, int stepIndex) const;
@@ -175,6 +176,14 @@ private:
     std::array<uint8_t, CvOutputCount> _lfoAmp{};
     std::array<uint8_t, CvOutputCount> _lfoFold{};
     std::array<float, CvOutputCount> _lfoPhase{};
+
+    // Tick interpolation state (for smooth LFO/envelope outputs)
+    std::array<bool, CvOutputCount> _cvInterpolationEnabled{};
+    std::array<float, CvOutputCount> _cvRealTarget{};  // Actual target set by script
+    std::array<float, CvOutputCount> _prevCvOutputTarget{};
+    std::array<float, CvOutputCount> _cvTickPhase{};
+    float _tickDurationMs = 20.0f;  // Updated from clock tick
+
     bool _initialized = false;
 
     uint8_t _manualScriptIndex = 0;

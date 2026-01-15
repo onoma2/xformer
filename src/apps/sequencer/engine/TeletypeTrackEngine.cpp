@@ -192,6 +192,31 @@ void TeletypeTrackEngine::update(float dt) {
         _cachedPattern = currentPattern;
     }
 
+    // Update tick duration from clock (for interpolation)
+    if (_teletypeTrack.timeBase() == TeletypeTrack::TimeBase::Clock) {
+        _tickDurationMs = static_cast<float>(_engine.clock().tickDuration() * 1000.0);
+    } else {
+        _tickDurationMs = 1.0f;  // 1ms timebase
+    }
+
+    // Advance CV interpolation phase and apply interpolation
+    float dtMs = dt * 1000.0f;
+    for (uint8_t i = 0; i < CvOutputCount; ++i) {
+        if (!_cvInterpolationEnabled[i]) {
+            continue;
+        }
+
+        // Advance phase (0.0 to 1.0 over one tick)
+        _cvTickPhase[i] = std::min(1.0f, _cvTickPhase[i] + dtMs / _tickDurationMs);
+
+        // Linear interpolation from previous to real target
+        float interpolated = _prevCvOutputTarget[i] +
+                             (_cvRealTarget[i] - _prevCvOutputTarget[i]) * _cvTickPhase[i];
+
+        // Update _cvOutputTarget with interpolated value (used by slew/output logic)
+        _cvOutputTarget[i] = interpolated;
+    }
+
     updateAdc(false);
 
     // Apply CV slew using Performer's Slide mechanism
@@ -458,14 +483,28 @@ void TeletypeTrackEngine::handleCv(uint8_t index, int16_t value, bool slew) {
         return;
     }
 
+    // Handle interpolation (if enabled)
+    if (_cvInterpolationEnabled[index]) {
+        _prevCvOutputTarget[index] = _cvOutputTarget[index];
+        _cvRealTarget[index] = targetVoltage;
+        _cvTickPhase[index] = 0.0f;  // Start new interpolation
+        // _cvOutputTarget will be updated by interpolation logic in update()
+    } else {
+        _cvRealTarget[index] = targetVoltage;
+    }
+
     if (slew && _cvSlewTime[index] > 0) {
         // Slew to new value
-        _cvOutputTarget[index] = targetVoltage;
+        if (!_cvInterpolationEnabled[index]) {
+            _cvOutputTarget[index] = targetVoltage;
+        }
         _cvSlewActive[index] = true;
     } else {
         // Snap immediately
-        _cvOutputTarget[index] = targetVoltage;
-        _performerCvOutput[trackSlot] = targetVoltage;
+        if (!_cvInterpolationEnabled[index]) {
+            _cvOutputTarget[index] = targetVoltage;
+            _performerCvOutput[trackSlot] = targetVoltage;
+        }
         _cvSlewActive[index] = false;
     }
 
@@ -587,6 +626,19 @@ void TeletypeTrackEngine::setLfoStart(uint8_t index, int16_t state) {
     }
     _lfoActive[index] = true;
     _lfoPhase[index] = 0.f;
+}
+
+void TeletypeTrackEngine::setCvInterpolation(int index, bool enabled) {
+    if (index < 0 || index >= CvOutputCount) {
+        return;
+    }
+    _cvInterpolationEnabled[index] = enabled;
+    if (enabled) {
+        // Initialize interpolation state
+        _cvRealTarget[index] = _cvOutputTarget[index];
+        _prevCvOutputTarget[index] = _cvOutputTarget[index];
+        _cvTickPhase[index] = 1.0f;  // Start at end of phase (stable)
+    }
 }
 
 int16_t TeletypeTrackEngine::noteGateGet(int trackIndex, int stepIndex) const {

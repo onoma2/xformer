@@ -76,6 +76,12 @@ int TeletypeBridge::dashboardScreen() {
     return g_dashboardScreen;
 }
 
+void TeletypeBridge::setCvInterpolation(int cvIndex, bool enabled) {
+    if (auto *engine = g_activeEngine) {
+        engine->setCvInterpolation(cvIndex, enabled);
+    }
+}
+
 extern "C" {
 
 uint32_t tele_get_ticks(void) {
@@ -505,5 +511,11 @@ int16_t get_dashboard_value(uint8_t index) {
 }
 
 void reset_midi_counter(void) {}
+
+void tele_cv_interpolate(uint8_t i, int16_t enabled) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setCvInterpolation(i, enabled != 0);
+    }
+}
 
 } // extern "C"

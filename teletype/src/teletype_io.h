@@ -34,6 +34,7 @@ extern void tele_tr_div(uint8_t i, int16_t div);
 extern void tele_tr_width(uint8_t i, int16_t pct);
 extern void tele_cv(uint8_t i, int16_t v, uint8_t s);
 extern void tele_cv_slew(uint8_t i, int16_t v);
+extern void tele_cv_interpolate(uint8_t i, int16_t enabled);
 extern uint16_t tele_get_cv(uint8_t i);
 extern void tele_cv_cal(uint8_t n, int32_t b, int32_t m);
 extern uint16_t tele_bus_cv_get(uint8_t i);

@@ -21,4 +21,7 @@ public:
     static bool hasDelays();
     static bool hasStack();
     static int dashboardScreen();
+
+    // CV interpolation control
+    static void setCvInterpolation(int cvIndex, bool enabled);
 };
