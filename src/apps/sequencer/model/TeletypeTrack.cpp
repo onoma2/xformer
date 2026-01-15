@@ -394,7 +394,6 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
     }
     _resetMetroOnLoad = true;
     _bootScriptRequested = false;
-    syncActiveSlotScripts();
     applyPatternSlot(_activePatternSlot);
 }
 
