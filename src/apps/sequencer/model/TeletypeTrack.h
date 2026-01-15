@@ -171,7 +171,7 @@ public:
     TimeBase timeBase() const { return _timeBase; }
     void setTimeBase(TimeBase mode) {
         _timeBase = ModelUtils::clampedEnum(mode);
-        syncActiveSlotMappings();
+        syncToActiveSlot();
     }
     void editTimeBase(int value, bool shift) {
         (void)shift;
@@ -184,7 +184,7 @@ public:
     int clockDivisor() const { return _clockDivisor; }
     void setClockDivisor(int divisor) {
         _clockDivisor = ModelUtils::clampDivisor(divisor);
-        syncActiveSlotMappings();
+        syncToActiveSlot();
     }
     void editClockDivisor(int value, bool shift) {
         setClockDivisor(ModelUtils::adjustedByDivisor(_clockDivisor, value, shift));
@@ -196,7 +196,7 @@ public:
     int clockMultiplier() const { return _clockMultiplier; }
     void setClockMultiplier(int multiplier) {
         _clockMultiplier = clamp(multiplier, 50, 150);
-        syncActiveSlotMappings();
+        syncToActiveSlot();
     }
     void editClockMultiplier(int value, bool shift) {
         setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
@@ -217,7 +217,7 @@ public:
     void setTriggerInputSource(int index, TriggerInputSource source) {
         if (index >= 0 && index < TriggerInputCount) {
             _triggerInputSource[index] = ModelUtils::clampedEnum(source);
-            syncActiveSlotMappings();
+            syncToActiveSlot();
         }
     }
     void editTriggerInputSource(int index, int value, bool shift) {
@@ -235,7 +235,7 @@ public:
     CvInputSource cvInSource() const { return _cvInSource; }
     void setCvInSource(CvInputSource source) {
         _cvInSource = ModelUtils::clampedEnum(source);
-        syncActiveSlotMappings();
+        syncToActiveSlot();
     }
     void editCvInSource(int value, bool shift) {
         setCvInSource(ModelUtils::adjustedEnum(_cvInSource, value));
@@ -248,7 +248,7 @@ public:
     CvInputSource cvParamSource() const { return _cvParamSource; }
     void setCvParamSource(CvInputSource source) {
         _cvParamSource = ModelUtils::clampedEnum(source);
-        syncActiveSlotMappings();
+        syncToActiveSlot();
     }
     void editCvParamSource(int value, bool shift) {
         setCvParamSource(ModelUtils::adjustedEnum(_cvParamSource, value));
@@ -261,7 +261,7 @@ public:
     CvInputSource cvXSource() const { return _cvXSource; }
     void setCvXSource(CvInputSource source) {
         _cvXSource = ModelUtils::clampedEnum(source);
-        syncActiveSlotMappings();
+        syncToActiveSlot();
     }
     void editCvXSource(int value, bool shift) {
         (void)shift;
@@ -274,7 +274,7 @@ public:
     CvInputSource cvYSource() const { return _cvYSource; }
     void setCvYSource(CvInputSource source) {
         _cvYSource = ModelUtils::clampedEnum(source);
-        syncActiveSlotMappings();
+        syncToActiveSlot();
     }
     void editCvYSource(int value, bool shift) {
         (void)shift;
@@ -287,7 +287,7 @@ public:
     CvInputSource cvZSource() const { return _cvZSource; }
     void setCvZSource(CvInputSource source) {
         _cvZSource = ModelUtils::clampedEnum(source);
-        syncActiveSlotMappings();
+        syncToActiveSlot();
     }
     void editCvZSource(int value, bool shift) {
         (void)shift;
@@ -305,7 +305,7 @@ public:
     void setTriggerOutputDest(int index, TriggerOutputDest dest) {
         if (index >= 0 && index < TriggerOutputCount) {
             _triggerOutputDest[index] = ModelUtils::clampedEnum(dest);
-            syncActiveSlotMappings();
+            syncToActiveSlot();
         }
     }
     void editTriggerOutputDest(int index, int value, bool shift) {
@@ -327,7 +327,7 @@ public:
     void setCvOutputDest(int index, CvOutputDest dest) {
         if (index >= 0 && index < CvOutputCount) {
             _cvOutputDest[index] = ModelUtils::clampedEnum(dest);
-            syncActiveSlotMappings();
+            syncToActiveSlot();
         }
     }
     void editCvOutputDest(int index, int value, bool shift) {
@@ -349,7 +349,7 @@ public:
     void setCvOutputRange(int index, Types::VoltageRange range) {
         if (index >= 0 && index < CvOutputCount) {
             _cvOutputRange[index] = ModelUtils::clampedEnum(range);
-            syncActiveSlotMappings();
+            syncToActiveSlot();
         }
     }
     void editCvOutputRange(int index, int value, bool shift) {
@@ -374,7 +374,7 @@ public:
     void setCvOutputOffset(int index, int offset) {
         if (index >= 0 && index < CvOutputCount) {
             _cvOutputOffset[index] = clamp(offset, -500, 500);
-            syncActiveSlotMappings();
+            syncToActiveSlot();
         }
     }
     void editCvOutputOffset(int index, int value, bool shift) {
@@ -396,7 +396,7 @@ public:
     void setCvOutputQuantizeScale(int index, int scale) {
         if (index >= 0 && index < CvOutputCount) {
             _cvOutputQuantizeScale[index] = clamp<int8_t>(scale, QuantizeOff, Scale::Count - 1);
-            syncActiveSlotMappings();
+            syncToActiveSlot();
         }
     }
     void editCvOutputQuantizeScale(int index, int value, bool shift) {
@@ -425,7 +425,7 @@ public:
     void setCvOutputRootNote(int index, int note) {
         if (index >= 0 && index < CvOutputCount) {
             _cvOutputRootNote[index] = clamp<int8_t>(note, -1, 11);
-            syncActiveSlotMappings();
+            syncToActiveSlot();
         }
     }
     void editCvOutputRootNote(int index, int value, bool shift) {
@@ -605,18 +605,18 @@ public:
     }
     const scene_pattern_t &pattern(int index) const {
         int clamped = clamp(index, 0, PATTERN_COUNT - 1);
-        return _patterns[clamped];
+        return _state.patterns[clamped];
     }
     void setPattern(int index, const scene_pattern_t &pattern) {
         int clamped = clamp(index, 0, PATTERN_COUNT - 1);
-        _patterns[clamped] = pattern;
-        syncActiveSlotPatterns();
+        _state.patterns[clamped] = pattern;
+        syncToActiveSlot();
     }
 
     int bootScriptIndex() const { return _bootScriptIndex; }
     void setBootScriptIndex(int index) {
         _bootScriptIndex = clamp<int8_t>(index, 0, ScriptSlotCount - 1);
-        syncActiveSlotMappings();
+        syncToActiveSlot();
     }
     void requestBootScriptRun() { _bootScriptRequested = true; }
     bool consumeBootScriptRequest() {
@@ -641,9 +641,7 @@ public:
     void onPatternChanged(int patternIndex);
     void applyPatternSlot(int slotIndex);
     void applyActivePatternSlot();
-    void syncActiveSlotScripts();
-    void syncActiveSlotPatterns();
-    void syncActiveSlotMappings();
+    void syncToActiveSlot();
 
     //----------------------------------------
     // Name printing helpers
@@ -681,7 +679,6 @@ private:
     std::array<TriggerOutputDest, TriggerOutputCount> _triggerOutputDest;  // TO-TRA to TO-TRD
     std::array<CvOutputDest, CvOutputCount> _cvOutputDest;                 // TO-CV1 to TO-CV4
     int8_t _bootScriptIndex = 0;
-    std::array<scene_pattern_t, PATTERN_COUNT> _patterns{};
     std::array<PatternSlot, PatternSlotCount> _patternSlots{};
     uint8_t _activePatternSlot = 0;
     bool _resetMetroOnLoad = true;

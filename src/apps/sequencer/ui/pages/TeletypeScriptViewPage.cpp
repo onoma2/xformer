@@ -762,7 +762,7 @@ void TeletypeScriptViewPage::commitLine() {
     const int scriptIndex = _scriptIndex;
     ss_overwrite_script_command(&state, scriptIndex, _selectedLine, &parsed);
     if (scriptIndex == TeletypeTrack::SlotScriptIndex || scriptIndex == METRO_SCRIPT) {
-        track.syncActiveSlotScripts();
+        track.syncToActiveSlot();
     }
     // Commit succeeded; no UI message per current workflow.
 }
@@ -799,7 +799,7 @@ void TeletypeScriptViewPage::duplicateLine() {
     }
     loadEditBuffer(_selectedLine);
     if (scriptIndex == TeletypeTrack::SlotScriptIndex || scriptIndex == METRO_SCRIPT) {
-        track.syncActiveSlotScripts();
+        track.syncToActiveSlot();
     }
 }
 
@@ -811,7 +811,7 @@ void TeletypeScriptViewPage::commentLine() {
     scene_state_t &state = track.state();
     ss_toggle_script_comment(&state, _scriptIndex, _selectedLine);
     if (_scriptIndex == TeletypeTrack::SlotScriptIndex || _scriptIndex == METRO_SCRIPT) {
-        track.syncActiveSlotScripts();
+        track.syncToActiveSlot();
     }
 }
 
@@ -830,7 +830,7 @@ void TeletypeScriptViewPage::deleteLine() {
     ss_delete_script_command(&state, _scriptIndex, _selectedLine);
     loadEditBuffer(_selectedLine);
     if (_scriptIndex == TeletypeTrack::SlotScriptIndex || _scriptIndex == METRO_SCRIPT) {
-        track.syncActiveSlotScripts();
+        track.syncToActiveSlot();
     }
     showMessage("Line deleted");
 }

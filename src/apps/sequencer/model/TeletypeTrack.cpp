@@ -51,16 +51,10 @@ void TeletypeTrack::clear() {
         _cvOutputQuantizeScale[i] = (i == 0) ? QuantizeDefault : QuantizeOff;
         _cvOutputRootNote[i] = -1;
     }
-    for (int i = 0; i < PATTERN_COUNT; ++i) {
-        _patterns[i] = _state.patterns[i];
-    }
-
     _activePatternSlot = 0;
     for (int slot = 0; slot < PatternSlotCount; ++slot) {
         _activePatternSlot = slot;
-        syncActiveSlotScripts();
-        syncActiveSlotPatterns();
-        syncActiveSlotMappings();
+        syncToActiveSlot();
     }
     _activePatternSlot = 0;
 }
@@ -83,7 +77,7 @@ void TeletypeTrack::seedOutputDestsFromTrackIndex(int trackIndex) {
         int outputIndex = (start + i) % CONFIG_CHANNEL_COUNT;
         _cvOutputDest[i] = CvOutputDest(outputIndex);
     }
-    syncActiveSlotMappings();
+    syncToActiveSlot();
 }
 
 const char *TeletypeTrack::triggerInputSourceName(TriggerInputSource source) {
@@ -174,9 +168,7 @@ const char *TeletypeTrack::cvOutputDestName(CvOutputDest dest) {
 
 void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     auto *self = const_cast<TeletypeTrack *>(this);
-    self->syncActiveSlotScripts();
-    self->syncActiveSlotPatterns();
-    self->syncActiveSlotMappings();
+    self->syncToActiveSlot();
 
     // Write I/O mapping configuration
     for (int i = 0; i < 4; ++i) {
@@ -215,7 +207,7 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
         }
     }
     for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
-        writer.write(_patterns[pattern]);
+        writer.write(_state.patterns[pattern]);
     }
 
     writer.write(_activePatternSlot);
@@ -324,7 +316,7 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         }
     }
     for (int pattern = 0; pattern < PATTERN_COUNT; ++pattern) {
-        reader.read(_patterns[pattern], 0);
+        reader.read(_state.patterns[pattern], 0);
     }
     uint8_t activeSlot = 0;
     reader.read(activeSlot);
@@ -399,17 +391,13 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
 
 TeletypeTrack::PatternSlot TeletypeTrack::patternSlotSnapshot(int patternIndex) const {
     auto *self = const_cast<TeletypeTrack *>(this);
-    self->syncActiveSlotScripts();
-    self->syncActiveSlotPatterns();
-    self->syncActiveSlotMappings();
+    self->syncToActiveSlot();
     const int slot = patternSlotForPattern(patternIndex);
     return self->_patternSlots[slot];
 }
 
 void TeletypeTrack::setPatternSlotForPattern(int patternIndex, const PatternSlot &slot) {
-    syncActiveSlotScripts();
-    syncActiveSlotPatterns();
-    syncActiveSlotMappings();
+    syncToActiveSlot();
     const int slotIndex = patternSlotForPattern(patternIndex);
     _patternSlots[slotIndex] = slot;
     if (slotIndex == _activePatternSlot) {
@@ -418,9 +406,7 @@ void TeletypeTrack::setPatternSlotForPattern(int patternIndex, const PatternSlot
 }
 
 void TeletypeTrack::clearPatternSlot(int patternIndex) {
-    syncActiveSlotScripts();
-    syncActiveSlotPatterns();
-    syncActiveSlotMappings();
+    syncToActiveSlot();
     const int slotIndex = patternSlotForPattern(patternIndex);
     auto &slot = _patternSlots[slotIndex];
     slot.slotScriptLength = 0;
@@ -438,9 +424,7 @@ void TeletypeTrack::clearPatternSlot(int patternIndex) {
 }
 
 void TeletypeTrack::copyPatternSlot(int srcPatternIndex, int dstPatternIndex) {
-    syncActiveSlotScripts();
-    syncActiveSlotPatterns();
-    syncActiveSlotMappings();
+    syncToActiveSlot();
     const int srcSlot = patternSlotForPattern(srcPatternIndex);
     const int dstSlot = patternSlotForPattern(dstPatternIndex);
     if (srcSlot == dstSlot) {
@@ -457,9 +441,7 @@ void TeletypeTrack::onPatternChanged(int patternIndex) {
     if (slot == _activePatternSlot) {
         return;
     }
-    syncActiveSlotScripts();
-    syncActiveSlotPatterns();
-    syncActiveSlotMappings();
+    syncToActiveSlot();
 
     applyPatternSlot(slot);
 }
@@ -473,7 +455,6 @@ void TeletypeTrack::applyPatternSlot(int slotIndex) {
     std::memcpy(_state.scripts[SlotScriptIndex].c, patternSlot.slotScript.data(), sizeof(patternSlot.slotScript));
     std::memcpy(_state.scripts[METRO_SCRIPT].c, patternSlot.metro.data(), sizeof(patternSlot.metro));
     for (int i = 0; i < PATTERN_COUNT; ++i) {
-        _patterns[i] = patternSlot.patterns[i];
         _state.patterns[i] = patternSlot.patterns[i];
     }
     _triggerInputSource = patternSlot.triggerInputSource;
@@ -500,24 +481,17 @@ void TeletypeTrack::applyActivePatternSlot() {
     applyPatternSlot(_activePatternSlot);
 }
 
-void TeletypeTrack::syncActiveSlotScripts() {
+void TeletypeTrack::syncToActiveSlot() {
     auto &patternSlot = _patternSlots[_activePatternSlot];
     patternSlot.slotScriptLength = _state.scripts[SlotScriptIndex].l;
     patternSlot.metroLength = _state.scripts[METRO_SCRIPT].l;
     std::memcpy(patternSlot.slotScript.data(), _state.scripts[SlotScriptIndex].c, sizeof(patternSlot.slotScript));
     std::memcpy(patternSlot.metro.data(), _state.scripts[METRO_SCRIPT].c, sizeof(patternSlot.metro));
-}
 
-void TeletypeTrack::syncActiveSlotPatterns() {
-    auto &patternSlot = _patternSlots[_activePatternSlot];
     for (int i = 0; i < PATTERN_COUNT; ++i) {
-        _patterns[i] = _state.patterns[i];  // Sync from VM state first
-        patternSlot.patterns[i] = _patterns[i];
+        patternSlot.patterns[i] = _state.patterns[i];
     }
-}
 
-void TeletypeTrack::syncActiveSlotMappings() {
-    auto &patternSlot = _patternSlots[_activePatternSlot];
     patternSlot.triggerInputSource = _triggerInputSource;
     patternSlot.cvInSource = _cvInSource;
     patternSlot.cvParamSource = _cvParamSource;

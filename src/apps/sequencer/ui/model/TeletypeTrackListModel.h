@@ -241,7 +241,7 @@ private:
         switch (item) {
         case MidiSource:
             _track->midiSource().edit(value, shift);
-            _track->syncActiveSlotMappings();
+            _track->syncToActiveSlot();
             break;
         case TimeBase:
             _track->editTimeBase(value, shift);
