@@ -23,6 +23,7 @@ The Teletype Track in Performer provides:
 - Two pattern slots (P1/P2) for S0 + Metro + I/O mapping + TT patterns
   - Slot = Performer pattern index % 2
   - Script/Pattern View shows the active slot label before the script name (or top right in Pattern View)
+- Performer-only CV modulation ops: per-CV envelopes (`E.*`) and per-CV LFOs (`LFO.*`)
 
 ## The T9 Type (Reference)
 
@@ -198,6 +199,28 @@ If your Teletype track is new, set up its I/O first so scripts can see the corre
 4. **Map Teletype outputs**  
    - **TO-TRA..TO-TRD**: map Teletype trigger outputs A–D to Performer gate outputs.  
    - **TO-CV1..TO-CV4**: map Teletype CV outputs 1–4 to Performer CV outputs.
+
+## Performer-only CV Modulation (Quick Start)
+
+Use these ops to modulate CV outputs without writing loops.
+
+**LFO example (CV 1):**
+```
+LFO.R 1 2000   # 2s cycle
+LFO.W 1 15     # triangle → saw
+LFO.A 1 80     # amplitude
+LFO.F 1 0      # no fold
+LFO.S 1 1      # start
+```
+
+**Envelope example (CV 1):**
+```
+E.O 1 0
+E 1 12000
+E.A 1 10
+E.D 1 80
+E.T 1
+```
    - **Tip**: If a TO entry shows `!`, it is mapped to a physical output not owned by this track in **Layout**.
    - **Sync**: **F5 (SYNC OUTS)** on the Track page fills TO-CV/TO-TR from the Layout-owned outputs (does not overwrite unmatched slots).
 

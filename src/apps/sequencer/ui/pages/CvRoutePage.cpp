@@ -41,7 +41,7 @@ void CvRoutePage::draw(Canvas &canvas) {
         canvas.line(midX, logoY2, logoX + logoW, logoY1);
     }
 
-    auto drawCell = [&canvas, colWidth, startX] (int col, int y, const char *text, Color color) {
+    auto drawCell = [&canvas] (int col, int y, const char *text, Color color) {
         int colX = startX + col * colWidth;
         int textWidth = canvas.textWidth(text);
         int x = colX + (colWidth - textWidth) / 2;

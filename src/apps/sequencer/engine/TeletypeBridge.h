@@ -20,4 +20,5 @@ public:
     static uint32_t ticksMs();
     static bool hasDelays();
     static bool hasStack();
+    static int dashboardScreen();
 };

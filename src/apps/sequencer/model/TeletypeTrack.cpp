@@ -394,6 +394,8 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
     }
     _resetMetroOnLoad = true;
     _bootScriptRequested = false;
+    syncActiveSlotScripts();
+    applyPatternSlot(_activePatternSlot);
 }
 
 TeletypeTrack::PatternSlot TeletypeTrack::patternSlotSnapshot(int patternIndex) const {
@@ -510,6 +512,7 @@ void TeletypeTrack::syncActiveSlotScripts() {
 void TeletypeTrack::syncActiveSlotPatterns() {
     auto &patternSlot = _patternSlots[_activePatternSlot];
     for (int i = 0; i < PATTERN_COUNT; ++i) {
+        _patterns[i] = _state.patterns[i];  // Sync from VM state first
         patternSlot.patterns[i] = _patterns[i];
     }
 }

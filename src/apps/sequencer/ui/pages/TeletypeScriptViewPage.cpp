@@ -39,6 +39,16 @@ constexpr int kGridRowH = 8;
 constexpr bool kSuspendEngineForScriptIO = true;
 } // namespace
 
+void clampTextToWidth(Canvas &canvas, char *text, int maxWidth) {
+    if (!text || maxWidth <= 0) {
+        return;
+    }
+    int length = static_cast<int>(std::strlen(text));
+    while (length > 0 && canvas.textWidth(text) > maxWidth) {
+        text[--length] = '\0';
+    }
+}
+
 enum class ContextAction {
     Init,
     Load,
@@ -132,8 +142,13 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         char lineText[128] = {};
 
         if (_liveMode) {
-            if (i == 4 && _hasLiveResult) {
-                std::snprintf(lineText, sizeof(lineText), "%d", _liveResult);
+            if (i == 4) {
+                int dashScreen = TeletypeBridge::dashboardScreen();
+                if (dashScreen >= 0 && dashScreen < 16) {
+                    std::snprintf(lineText, sizeof(lineText), "%d", get_dashboard_value(dashScreen));
+                } else if (_hasLiveResult) {
+                    std::snprintf(lineText, sizeof(lineText), "%d", _liveResult);
+                }
             } else if (i == 3 && _historyCount > 0 && _historyHead >= 0) {
                 std::strncpy(lineText, _history[_historyHead], sizeof(lineText) - 1);
                 lineText[sizeof(lineText) - 1] = '\0';
@@ -166,12 +181,17 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
         if (_liveMode && i == 3 && _historyCount > 0 && _historyHead >= 0) {
             textY -= 4;
         }
+        const int maxTextWidth = kGridBusX - 2 - kTextX;
+        clampTextToWidth(canvas, lineText, maxTextWidth);
         canvas.drawText(kTextX, textY, lineText);
     }
 
-    FixedStringBuilder<128> editLine("> %s", _editBuffer);
+    char editText[128] = {};
+    std::snprintf(editText, sizeof(editText), "> %s", _editBuffer);
     canvas.setColor(Color::Bright);
-    canvas.drawText(kLabelX, kEditLineY + 4, editLine);
+    const int maxEditWidth = kGridBusX - 2 - kLabelX;
+    clampTextToWidth(canvas, editText, maxEditWidth);
+    canvas.drawText(kLabelX, kEditLineY + 4, editText);
 
     int prefixWidth = canvas.textWidth("> ");
     int cursorOffset = 0;
@@ -187,7 +207,9 @@ void TeletypeScriptViewPage::draw(Canvas &canvas) {
     }
     int cursorX = kLabelX + prefixWidth + cursorOffset;
     int cursorY = kEditLineY;
-    if (os::ticks() % os::time::ms(800) < os::time::ms(400)) {
+    const int maxCursorX = kGridBusX - 2;
+    if (os::ticks() % os::time::ms(800) < os::time::ms(400) &&
+        cursorX + cursorWidth <= maxCursorX) {
         canvas.setColor(Color::Medium);
         canvas.fillRect(cursorX, cursorY, cursorWidth - 1, kRowStepY - 1);
         canvas.setBlendMode(BlendMode::Sub);
@@ -220,19 +242,6 @@ void TeletypeScriptViewPage::drawIoGrid(Canvas &canvas) {
         for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
             if (gateOutputTracks[i] == trackIndex) {
                 if (i == gateOutIndex) {
-                    return slot;
-                }
-                ++slot;
-            }
-        }
-        return -1;
-    };
-    auto cvSlotForPhysical = [this, trackIndex] (int cvOutIndex) -> int {
-        int slot = 0;
-        const auto &cvOutputTracks = _project.cvOutputTracks();
-        for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
-            if (cvOutputTracks[i] == trackIndex) {
-                if (i == cvOutIndex) {
                     return slot;
                 }
                 ++slot;

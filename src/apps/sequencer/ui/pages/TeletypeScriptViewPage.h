@@ -62,7 +62,7 @@ private:
     bool _liveMode = false;
     bool _hasLiveResult = false;
     int16_t _liveResult = 0;
-    static constexpr int HistorySize = 4;
+    static constexpr int HistorySize = 6;
     char _history[HistorySize][EditBufferSize] = {};
     int _historyCount = 0;
     int _historyHead = -1;

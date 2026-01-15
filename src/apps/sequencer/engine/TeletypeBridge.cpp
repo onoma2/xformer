@@ -13,6 +13,7 @@
 namespace {
 TeletypeTrackEngine *g_activeEngine = nullptr;
 std::array<int16_t, 16> g_dashboardValues{};
+int g_dashboardScreen = -1;
 bool g_hasDelays = false;
 bool g_hasStack = false;
 
@@ -69,6 +70,10 @@ bool TeletypeBridge::hasDelays() {
 
 bool TeletypeBridge::hasStack() {
     return g_hasStack;
+}
+
+int TeletypeBridge::dashboardScreen() {
+    return g_dashboardScreen;
 }
 
 extern "C" {
@@ -478,7 +483,11 @@ void set_live_submode(uint8_t submode) {
 }
 
 void select_dash_screen(uint8_t screen) {
-    (void)screen;
+    if (screen >= g_dashboardValues.size()) {
+        g_dashboardScreen = -1;
+        return;
+    }
+    g_dashboardScreen = static_cast<int>(screen);
 }
 
 void print_dashboard_value(uint8_t index, int16_t value) {

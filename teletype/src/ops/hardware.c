@@ -539,8 +539,8 @@ static void op_WP_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
 
 static void op_WP_SET_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
                           exec_state_t *NOTUSED(es), command_state_t *cs) {
-    int16_t patternIndex = cs_pop(cs);
     int16_t trackIndex = cs_pop(cs);
+    int16_t patternIndex = cs_pop(cs);
     trackIndex--;
     patternIndex--;
     if (trackIndex < 0 || trackIndex >= 8) {
