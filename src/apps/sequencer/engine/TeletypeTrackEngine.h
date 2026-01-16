@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TrackEngine.h"
+#include "GeodeEngine.h"
 
 #include "model/TeletypeTrack.h"
 
@@ -105,6 +106,30 @@ public:
     int16_t noteGateHere(int trackIndex) const;
     int16_t noteNoteHere(int trackIndex) const;
 
+    // Geode engine control
+    void setGeodeTime(int16_t value);
+    void setGeodeIntone(int16_t value);
+    void setGeodeRamp(int16_t value);
+    void setGeodeCurve(int16_t value);
+    void setGeodeRun(int16_t value);
+    void setGeodeMode(int16_t value);
+    void setGeodeOffset(int16_t value);
+    void setGeodeTune(uint8_t voiceIndex, int16_t numerator, int16_t denominator);
+    void setGeodeOut(uint8_t cvIndex, int16_t voiceIndex);
+    void triggerGeodeVoice(uint8_t voiceIndex, int16_t divs, int16_t repeats);
+
+    int16_t getGeodeTime() const;
+    int16_t getGeodeIntone() const;
+    int16_t getGeodeRamp() const;
+    int16_t getGeodeCurve() const;
+    int16_t getGeodeRun() const;
+    int16_t getGeodeMode() const;
+    int16_t getGeodeOffset() const;
+    int16_t getGeodeVal() const;
+    int16_t getGeodeVoice(uint8_t voiceIndex) const;
+    int16_t getGeodeTuneNumerator(uint8_t voiceIndex) const;
+    int16_t getGeodeTuneDenominator(uint8_t voiceIndex) const;
+
 private:
     void runMidiTriggeredScript(int scriptIndex);
     void processMidiMessage(const MidiMessage &message);
@@ -121,8 +146,11 @@ private:
     void updateLfos(float timeDeltaMs);
     void updateInputTriggers();
     void refreshActivity(float dt);
+    void updateGeode(float dt);
     float rawToVolts(int16_t value) const;
     int16_t voltsToRaw(float volts) const;
+    float normalizeUnipolar(int16_t value) const;
+    float normalizeBipolar(int16_t value) const;
     float applyCvQuantize(int index, float volts) const;
     static float midiNoteToVolts(int note);
     bool applyScriptLine(scene_state_t &state, int scriptIndex, size_t lineIndex, const char *cmd);
@@ -191,4 +219,36 @@ private:
     uint8_t _manualScriptIndex = 0;
     int _cachedPattern = -1;
     float _pulseClockMs = 0.f;
+
+    // Geode engine state
+    struct GeodeParams {
+        int16_t time = 8192;
+        int16_t intone = 8192;
+        int16_t ramp = 8192;
+        int16_t curve = 8192;
+        int16_t run = 0;
+        int16_t offset = 0;
+        uint8_t mode = 0;
+        std::array<int16_t, GeodeEngine::VoiceCount> tuneNum{};
+        std::array<int16_t, GeodeEngine::VoiceCount> tuneDen{};
+
+        void clear() {
+            time = 8192;
+            intone = 8192;
+            ramp = 8192;
+            curve = 8192;
+            run = 0;
+            offset = 0;
+            mode = 0;
+            for (int i = 0; i < GeodeEngine::VoiceCount; ++i) {
+                tuneNum[i] = i + 1;
+                tuneDen[i] = 1;
+            }
+        }
+    };
+
+    GeodeParams _geodeParams;
+    GeodeEngine _geodeEngine;
+    bool _geodeActive = false;
+    std::array<int8_t, CvOutputCount> _geodeOutRouting{};
 };

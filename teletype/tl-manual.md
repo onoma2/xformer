@@ -173,6 +173,8 @@ Per-CV envelope (attack → decay → offset) with optional loop and TR hooks.
 - `E.R n tr` → pulse TR at end of rise (tr = 1–4, 0 = off)
 - `E.C n tr` → pulse TR at end of cycle (tr = 1–4, 0 = off)
 
+Defaults: `E`=16383, `E.A`=50 ms, `E.D`=300 ms, `E.O`=0, `E.L`=1.
+
 ## LFO.* (Performer-only)
 
 Per-CV LFO with ms-based rate, wave morph, amplitude, and fold threshold.
@@ -182,11 +184,32 @@ Stops hold the last output.
 - `LFO.W n x` → wave morph (0..100)
 - `LFO.A n x` → amplitude (0..100 → 0..±5V)
 - `LFO.F n x` → fold threshold (0..100 → -5V..+5V)
+- `LFO.O n x` → offset/bias (raw 0–16383)
 - `LFO.S n x` → start/stop (<=0 stops)
+
+Defaults: `LFO.R`=1000 ms, `LFO.W`=0, `LFO.A`=100, `LFO.F`=0, `LFO.O`=8192, `LFO.S`=0.
 
 ## RT (Performer-only)
 
 RT reads the current source value for a routing slot (pre-shaper), scaled to Teletype's 0–16383 range.
+
+## G.* (Performer-only Geode)
+
+Geode is a 6‑voice envelope engine. Use `G.R` to route mix/voice outputs to CV lanes.
+
+- `G.TIME x` → base time (0..16383)
+- `G.TONE x` → intone spread (0..16383, 8192 = noon)
+- `G.RAMP x` → attack/decay balance (0..16383)
+- `G.CURV x` → curve shape (0..16383, 8192 = linear)
+- `G.RUN x` → physics macro (0..16383)
+- `G.MODE x` → 0=Transient, 1=Sustain, 2=Cycle
+- `G.O x` → output offset (raw 0–16383)
+- `G.TUNE v num den` → per-voice ratio (v=0 all, 1–6), 0/0 resets defaults
+- `G.V v divs reps` → trigger voice (v=0 all, divs 1–64, reps -1..255)
+- `G.R cv v` → route mix/voice to CV out (cv=1–4, v=0 mix, 1–6 voice, <0 none)
+- `G.VAL` → read mixed output (raw 0–16383)
+
+Defaults: `G.TIME`=8192, `G.TONE`=8192, `G.RAMP`=8192, `G.CURV`=8192, `G.RUN`=0, `G.MODE`=0, `G.O`=0, tune ratios 1/1..6/1.
 
 - `RT n` → read routing slot n (1–16), returns 0–16383
 

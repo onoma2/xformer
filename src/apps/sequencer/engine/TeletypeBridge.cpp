@@ -267,6 +267,143 @@ void tele_lfo_start(uint8_t i, int16_t state) {
     }
 }
 
+void tele_g_time(int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setGeodeTime(value);
+    }
+}
+
+void tele_g_intone(int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setGeodeIntone(value);
+    }
+}
+
+void tele_g_ramp(int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setGeodeRamp(value);
+    }
+}
+
+void tele_g_curve(int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setGeodeCurve(value);
+    }
+}
+
+void tele_g_run(int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setGeodeRun(value);
+    }
+}
+
+void tele_g_mode(int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setGeodeMode(value);
+    }
+}
+
+void tele_g_offset(int16_t value) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setGeodeOffset(value);
+    }
+}
+
+void tele_g_tune(uint8_t voiceIndex, int16_t numerator, int16_t denominator) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setGeodeTune(voiceIndex, numerator, denominator);
+    }
+}
+
+void tele_g_out(uint8_t cvIndex, int16_t voiceIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setGeodeOut(cvIndex, voiceIndex);
+    }
+}
+
+void tele_g_vox(uint8_t voiceIndex, int16_t divs, int16_t repeats) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->triggerGeodeVoice(voiceIndex, divs, repeats);
+    }
+}
+
+int16_t tele_g_get_time(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeTime();
+    }
+    return 0;
+}
+
+int16_t tele_g_get_intone(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeIntone();
+    }
+    return 0;
+}
+
+int16_t tele_g_get_ramp(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeRamp();
+    }
+    return 0;
+}
+
+int16_t tele_g_get_curve(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeCurve();
+    }
+    return 0;
+}
+
+int16_t tele_g_get_run(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeRun();
+    }
+    return 0;
+}
+
+int16_t tele_g_get_mode(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeMode();
+    }
+    return 0;
+}
+
+int16_t tele_g_get_offset(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeOffset();
+    }
+    return 0;
+}
+
+int16_t tele_g_get_val(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeVal();
+    }
+    return 0;
+}
+
+int16_t tele_g_get_voice(uint8_t voiceIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeVoice(voiceIndex);
+    }
+    return 0;
+}
+
+int16_t tele_g_get_tune_num(uint8_t voiceIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeTuneNumerator(voiceIndex);
+    }
+    return 1;
+}
+
+int16_t tele_g_get_tune_den(uint8_t voiceIndex) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeTuneDenominator(voiceIndex);
+    }
+    return 1;
+}
+
 uint16_t tele_bus_cv_get(uint8_t i) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         return busVoltsToRaw(engine->busCv(i));

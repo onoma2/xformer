@@ -118,10 +118,10 @@ void TeletypeTrackEngine::reset() {
     _cvOutputTarget.fill(0.f);
     _cvSlewTime.fill(1);  // Match Teletype default: 1ms
     _cvSlewActive.fill(false);
-    _envTargetRaw.fill(0);
+    _envTargetRaw.fill(16383);
     _envOffsetRaw.fill(0);
-    _envAttackMs.fill(1);
-    _envDecayMs.fill(1);
+    _envAttackMs.fill(50);
+    _envDecayMs.fill(300);
     _envLoopSetting.fill(1);
     _envLoopsRemaining.fill(0);
     _envSlewMs.fill(0);
@@ -130,13 +130,18 @@ void TeletypeTrackEngine::reset() {
     _envEocTr.fill(-1);
     _envState.fill(kEnvIdle);
     _lfoActive.fill(false);
-    _lfoCycleMs.fill(0);
+    _lfoCycleMs.fill(1000);
     _lfoWave.fill(0);
-    _lfoAmp.fill(0);
+    _lfoAmp.fill(100);
     _lfoFold.fill(0);
+    _lfoOffsetRaw.fill(8192);
     _lfoPhase.fill(0.f);
     _manualScriptIndex = 0;
     _cachedPattern = -1;
+    _geodeOutRouting.fill(-1);
+    _geodeParams.clear();
+    _geodeEngine.reset();
+    _geodeActive = false;
     installBootScript();
     syncMetroFromState();
 }
@@ -315,6 +320,7 @@ void TeletypeTrackEngine::update(float dt) {
     if (timeDelta > 0.f) {
         updateLfos(timeDelta);
     }
+    updateGeode(dt);
     refreshActivity(dt);
 }
 
@@ -626,8 +632,11 @@ void TeletypeTrackEngine::setLfoStart(uint8_t index, int16_t state) {
         _lfoActive[index] = false;
         return;
     }
+    if (!_lfoActive[index]) {
+        // Only reset phase on fresh start, not repeated calls
+        _lfoPhase[index] = 0.f;
+    }
     _lfoActive[index] = true;
-    _lfoPhase[index] = 0.f;
 }
 
 void TeletypeTrackEngine::setCvInterpolation(int index, bool enabled) {
@@ -1383,6 +1392,192 @@ void TeletypeTrackEngine::seedScriptsFromPresets() {
     applyScriptLine(state, 0, 0, "M.ACT 1");
     ss_clear_script(&state, METRO_SCRIPT);
     applyScriptLine(state, METRO_SCRIPT, 0, "CV 1 N 48 ; TR.P 1");
+}
+
+// ====================================================================================
+// Geode Engine Integration
+// ====================================================================================
+
+void TeletypeTrackEngine::setGeodeTime(int16_t value) {
+    _geodeParams.time = clamp<int16_t>(value, 0, 16383);
+}
+
+void TeletypeTrackEngine::setGeodeIntone(int16_t value) {
+    _geodeParams.intone = clamp<int16_t>(value, 0, 16383);
+}
+
+void TeletypeTrackEngine::setGeodeRamp(int16_t value) {
+    _geodeParams.ramp = clamp<int16_t>(value, 0, 16383);
+}
+
+void TeletypeTrackEngine::setGeodeCurve(int16_t value) {
+    _geodeParams.curve = clamp<int16_t>(value, 0, 16383);
+}
+
+void TeletypeTrackEngine::setGeodeRun(int16_t value) {
+    _geodeParams.run = clamp<int16_t>(value, 0, 16383);
+}
+
+void TeletypeTrackEngine::setGeodeMode(int16_t value) {
+    _geodeParams.mode = static_cast<uint8_t>(clamp<int16_t>(value, 0, 2));
+}
+
+void TeletypeTrackEngine::setGeodeOffset(int16_t value) {
+    _geodeParams.offset = clamp<int16_t>(value, 0, 16383);
+}
+
+void TeletypeTrackEngine::setGeodeTune(uint8_t voiceIndex, int16_t numerator, int16_t denominator) {
+    if (voiceIndex == 0) {
+        for (int i = 0; i < GeodeEngine::VoiceCount; ++i) {
+            _geodeParams.tuneNum[i] = numerator;
+            _geodeParams.tuneDen[i] = denominator;
+            _geodeEngine.setVoiceTune(i, numerator, denominator);
+        }
+        return;
+    }
+    if (voiceIndex > GeodeEngine::VoiceCount) {
+        return;
+    }
+    int index = voiceIndex - 1;
+    _geodeParams.tuneNum[index] = numerator;
+    _geodeParams.tuneDen[index] = denominator;
+    _geodeEngine.setVoiceTune(index, numerator, denominator);
+}
+
+void TeletypeTrackEngine::setGeodeOut(uint8_t cvIndex, int16_t voiceIndex) {
+    if (cvIndex == 0 || cvIndex > CvOutputCount) {
+        return;
+    }
+    int8_t mapping = -1;
+    if (voiceIndex >= 0 && voiceIndex <= GeodeEngine::VoiceCount) {
+        mapping = static_cast<int8_t>(voiceIndex);
+    }
+    _geodeOutRouting[cvIndex - 1] = mapping;
+}
+
+void TeletypeTrackEngine::triggerGeodeVoice(uint8_t voiceIndex, int16_t divs, int16_t repeats) {
+    if (voiceIndex == 0) {
+        // Voice 0 = all voices
+        _geodeEngine.triggerAllVoices(divs, repeats);
+    } else if (voiceIndex <= GeodeEngine::VoiceCount) {
+        // Voice 1-6 → internal index 0-5
+        _geodeEngine.triggerVoice(voiceIndex - 1, divs, repeats);
+    }
+    _geodeActive = true;
+}
+
+int16_t TeletypeTrackEngine::getGeodeTime() const {
+    return _geodeParams.time;
+}
+
+int16_t TeletypeTrackEngine::getGeodeIntone() const {
+    return _geodeParams.intone;
+}
+
+int16_t TeletypeTrackEngine::getGeodeRamp() const {
+    return _geodeParams.ramp;
+}
+
+int16_t TeletypeTrackEngine::getGeodeCurve() const {
+    return _geodeParams.curve;
+}
+
+int16_t TeletypeTrackEngine::getGeodeRun() const {
+    return _geodeParams.run;
+}
+
+int16_t TeletypeTrackEngine::getGeodeMode() const {
+    return static_cast<int16_t>(_geodeParams.mode);
+}
+
+int16_t TeletypeTrackEngine::getGeodeOffset() const {
+    return _geodeParams.offset;
+}
+
+int16_t TeletypeTrackEngine::getGeodeVal() const {
+    return _geodeEngine.outputRaw(_geodeParams.offset);
+}
+
+int16_t TeletypeTrackEngine::getGeodeVoice(uint8_t voiceIndex) const {
+    if (voiceIndex == 0 || voiceIndex > GeodeEngine::VoiceCount) {
+        return 0;
+    }
+    // Voice 1-6 → internal index 0-5
+    return _geodeEngine.voiceOutputRaw(voiceIndex - 1, _geodeParams.offset);
+}
+
+int16_t TeletypeTrackEngine::getGeodeTuneNumerator(uint8_t voiceIndex) const {
+    if (voiceIndex == 0 || voiceIndex > GeodeEngine::VoiceCount) {
+        return 1;
+    }
+    return _geodeParams.tuneNum[voiceIndex - 1];
+}
+
+int16_t TeletypeTrackEngine::getGeodeTuneDenominator(uint8_t voiceIndex) const {
+    if (voiceIndex == 0 || voiceIndex > GeodeEngine::VoiceCount) {
+        return 1;
+    }
+    return _geodeParams.tuneDen[voiceIndex - 1];
+}
+
+float TeletypeTrackEngine::normalizeUnipolar(int16_t value) const {
+    // 0-16383 → 0.0-1.0
+    return clamp<int16_t>(value, 0, 16383) / 16383.f;
+}
+
+float TeletypeTrackEngine::normalizeBipolar(int16_t value) const {
+    // 0-16383 → -1.0 to +1.0 (8192 = center/zero)
+    return (clamp<int16_t>(value, 0, 16383) - 8192) / 8191.f;
+}
+
+void TeletypeTrackEngine::updateGeode(float dt) {
+    bool hasRouting = false;
+    for (int i = 0; i < CvOutputCount; ++i) {
+        if (_geodeOutRouting[i] >= 0) {
+            hasRouting = true;
+            break;
+        }
+    }
+    if (!_geodeActive && !_geodeEngine.anyVoiceActive() && !hasRouting) {
+        return;
+    }
+
+    // Normalize parameters for GeodeEngine
+    float time = normalizeUnipolar(_geodeParams.time);
+    float intone = normalizeBipolar(_geodeParams.intone);
+    float ramp = normalizeUnipolar(_geodeParams.ramp);
+    float curve = normalizeBipolar(_geodeParams.curve);
+    float run = normalizeUnipolar(_geodeParams.run);
+    uint8_t mode = _geodeParams.mode;
+
+    // Get measure fraction from engine
+    float mf = measureFraction();
+
+    // Update Geode engine
+    _geodeEngine.update(dt, mf, time, intone, ramp, curve, run, mode);
+
+    // Route Geode output to CVs (mix or per-voice)
+    for (int i = 0; i < CvOutputCount; ++i) {
+        int8_t mapping = _geodeOutRouting[i];
+        if (mapping < 0) {
+            continue;
+        }
+        int16_t raw = (mapping == 0)
+            ? _geodeEngine.outputRaw(_geodeParams.offset)
+            : _geodeEngine.voiceOutputRaw(mapping - 1, _geodeParams.offset);
+        handleCv(static_cast<uint8_t>(i), raw, false);
+    }
+
+    // Deactivate if no voices remain active
+    if (!_geodeEngine.anyVoiceActive()) {
+        _geodeActive = false;
+    }
+
+    // Set activity indicator when Geode is running
+    if (_geodeActive) {
+        _activity = true;
+        _activityCountdownMs = kActivityHoldMs;
+    }
 }
 
 // ====================================================================================

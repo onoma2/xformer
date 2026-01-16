@@ -72,6 +72,27 @@ extern void tele_lfo_amp(uint8_t i, int16_t value);
 extern void tele_lfo_fold(uint8_t i, int16_t value);
 extern void tele_lfo_offset(uint8_t i, int16_t value);
 extern void tele_lfo_start(uint8_t i, int16_t state);
+extern void tele_g_time(int16_t value);
+extern void tele_g_intone(int16_t value);
+extern void tele_g_ramp(int16_t value);
+extern void tele_g_curve(int16_t value);
+extern void tele_g_run(int16_t value);
+extern void tele_g_mode(int16_t value);
+extern void tele_g_offset(int16_t value);
+extern void tele_g_tune(uint8_t voiceIndex, int16_t numerator, int16_t denominator);
+extern void tele_g_out(uint8_t cvIndex, int16_t voiceIndex);
+extern void tele_g_vox(uint8_t voiceIndex, int16_t divs, int16_t repeats);
+extern int16_t tele_g_get_time(void);
+extern int16_t tele_g_get_intone(void);
+extern int16_t tele_g_get_ramp(void);
+extern int16_t tele_g_get_curve(void);
+extern int16_t tele_g_get_run(void);
+extern int16_t tele_g_get_mode(void);
+extern int16_t tele_g_get_offset(void);
+extern int16_t tele_g_get_val(void);
+extern int16_t tele_g_get_voice(uint8_t voiceIndex);
+extern int16_t tele_g_get_tune_num(uint8_t voiceIndex);
+extern int16_t tele_g_get_tune_den(uint8_t voiceIndex);
 
 extern void tele_update_adc(uint8_t force);
 

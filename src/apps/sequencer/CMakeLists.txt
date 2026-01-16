@@ -11,6 +11,7 @@ set(sources
     engine/CvOutput.cpp
     engine/DiscreteMapTrackEngine.cpp
     engine/Engine.cpp
+    engine/GeodeEngine.cpp
     engine/IndexedTrackEngine.cpp
     engine/MidiCvTrackEngine.cpp
     engine/MidiLearn.cpp

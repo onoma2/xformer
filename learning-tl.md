@@ -210,8 +210,11 @@ LFO.R 1 2000   # 2s cycle
 LFO.W 1 15     # triangle → saw
 LFO.A 1 80     # amplitude
 LFO.F 1 0      # no fold
+LFO.O 1 8192   # offset/bias
 LFO.S 1 1      # start
 ```
+
+Defaults: `LFO.R`=1000 ms, `LFO.W`=0, `LFO.A`=100, `LFO.F`=0, `LFO.O`=8192, `LFO.S`=0.
 
 **Envelope example (CV 1):**
 ```
@@ -221,6 +224,14 @@ E.A 1 10
 E.D 1 80
 E.T 1
 ```
+Defaults: `E`=16383, `E.A`=50 ms, `E.D`=300 ms, `E.O`=0, `E.L`=1.
+
+**Geode example (CV 1):**
+```
+G.R 1 0       # mix to CV1
+G.V 1 7 8     # voice 1: 7‑div, 8 repeats
+```
+Defaults: `G.TIME`=8192, `G.TONE`=8192, `G.RAMP`=8192, `G.CURV`=8192, `G.RUN`=0, `G.MODE`=0, `G.O`=0, tune ratios 1/1..6/1.
    - **Tip**: If a TO entry shows `!`, it is mapped to a physical output not owned by this track in **Layout**.
    - **Sync**: **F5 (SYNC OUTS)** on the Track page fills TO-CV/TO-TR from the Layout-owned outputs (does not overwrite unmatched slots).
 

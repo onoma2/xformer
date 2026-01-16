@@ -250,6 +250,17 @@
         "LFO.F"       => { MATCH_OP(E_OP_LFO_F); };
         "LFO.O"       => { MATCH_OP(E_OP_LFO_O); };
         "LFO.S"       => { MATCH_OP(E_OP_LFO_S); };
+        "G.TIME"      => { MATCH_OP(E_OP_G_TIME); };
+        "G.TONE"      => { MATCH_OP(E_OP_G_TONE); };
+        "G.RAMP"      => { MATCH_OP(E_OP_G_RAMP); };
+        "G.CURV"      => { MATCH_OP(E_OP_G_CURV); };
+        "G.RUN"       => { MATCH_OP(E_OP_G_RUN); };
+        "G.MODE"      => { MATCH_OP(E_OP_G_MODE); };
+        "G.O"         => { MATCH_OP(E_OP_G_O); };
+        "G.TUNE"      => { MATCH_OP(E_OP_G_TUNE); };
+        "G.V"         => { MATCH_OP(E_OP_G_V); };
+        "G.VAL"       => { MATCH_OP(E_OP_G_VAL); };
+        "G.R"         => { MATCH_OP(E_OP_G_R); };
 
         # maths
         "ADD"         => { MATCH_OP(E_OP_ADD); };
