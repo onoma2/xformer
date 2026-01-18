@@ -41,6 +41,11 @@ void GeodeEngine::reset() {
     for (int i = 0; i < VoiceCount; ++i) {
         _tuneNum[i] = i + 1;
         _tuneDen[i] = 1;
+        _cachedTimeScale[i] = 1.0f;
+        _cachedIntone[i] = 0.0f;
+        _cachedTuneNum[i] = _tuneNum[i];
+        _cachedTuneDen[i] = _tuneDen[i];
+        _timeScaleValid[i] = false;
     }
 }
 
@@ -82,7 +87,7 @@ void GeodeEngine::triggerImmediate(int voiceIndex, float time, float intone, flo
     float baseTimeMs = timeParamToMs(time);
     float voiceTimeScale = getVoiceTimeScale(voiceIndex, intone);
     float voiceTimeMs = baseTimeMs * voiceTimeScale;
-    triggerVoiceEnvelope(voice, velocity, voiceTimeMs, intone, voiceIndex);
+    triggerVoiceEnvelope(voice, velocity, voiceTimeMs);
     if (voice.repeatsRemaining == 0) {
         // No scheduled repeats after the immediate trigger.
         voice.active = false;
@@ -122,13 +127,37 @@ float GeodeEngine::timeParamToMs(float time) const {
 float GeodeEngine::getVoiceTimeScale(int voiceIndex, float intone) const {
     // JF-style mapping: scale = ratio^intone
     // intone: -1.0 (undertones) to 0.0 (noon) to +1.0 (overtones)
+    if (voiceIndex < 0 || voiceIndex >= VoiceCount) {
+        return 1.0f;
+    }
+    if (std::fabs(intone) < 0.000001f) {
+        _cachedTimeScale[voiceIndex] = 1.0f;
+        _cachedIntone[voiceIndex] = 0.0f;
+        _cachedTuneNum[voiceIndex] = voiceTuneNumerator(voiceIndex);
+        _cachedTuneDen[voiceIndex] = voiceTuneDenominator(voiceIndex);
+        _timeScaleValid[voiceIndex] = true;
+        return 1.0f;
+    }
     int16_t num = voiceTuneNumerator(voiceIndex);
     int16_t den = voiceTuneDenominator(voiceIndex);
     if (den == 0) {
         return 1.0f;
     }
+    if (_timeScaleValid[voiceIndex] &&
+        _cachedIntone[voiceIndex] == intone &&
+        _cachedTuneNum[voiceIndex] == num &&
+        _cachedTuneDen[voiceIndex] == den) {
+        return _cachedTimeScale[voiceIndex];
+    }
+
     float ratio = static_cast<float>(num) / static_cast<float>(den);
-    return std::pow(ratio, intone);
+    float scale = std::pow(ratio, intone);
+    _cachedTimeScale[voiceIndex] = scale;
+    _cachedIntone[voiceIndex] = intone;
+    _cachedTuneNum[voiceIndex] = num;
+    _cachedTuneDen[voiceIndex] = den;
+    _timeScaleValid[voiceIndex] = true;
+    return scale;
 }
 
 void GeodeEngine::setVoiceTune(int voiceIndex, int16_t numerator, int16_t denominator) {
@@ -138,10 +167,12 @@ void GeodeEngine::setVoiceTune(int voiceIndex, int16_t numerator, int16_t denomi
     if (numerator == 0 || denominator == 0) {
         _tuneNum[voiceIndex] = voiceIndex + 1;
         _tuneDen[voiceIndex] = 1;
+        _timeScaleValid[voiceIndex] = false;
         return;
     }
     _tuneNum[voiceIndex] = numerator;
     _tuneDen[voiceIndex] = denominator;
+    _timeScaleValid[voiceIndex] = false;
 }
 
 int16_t GeodeEngine::voiceTuneNumerator(int voiceIndex) const {
@@ -197,7 +228,7 @@ void GeodeEngine::update(float dt, float measureFraction,
             float voiceTimeMs = baseTimeMs * voiceTimeScale;
 
             // Trigger envelope
-            triggerVoiceEnvelope(voice, velocity, voiceTimeMs, intone, i);
+            triggerVoiceEnvelope(voice, velocity, voiceTimeMs);
         }
 
         // Update envelope
@@ -245,12 +276,23 @@ bool GeodeEngine::updateVoicePhase(int voiceIndex, Voice &voice, float measureDe
 }
 
 float GeodeEngine::calculatePhysics(const Voice &voice, float run, uint8_t mode) const {
+    // Physics tuning constants for RUN scaling and cycle shaping.
+    static constexpr float kTransientCycleScale = 9.0f;
+    static constexpr float kSustainFoldCyclesScale = 4.0f;
+    static constexpr float kSustainFoldMixScale = 5.0f;
+    static constexpr float kCycleRateScalePos = 3.0f;
+    static constexpr float kCycleRateScaleNeg = 12.0f;
+    static constexpr float kCycleSlowRateMin = 0.25f;
+    static constexpr float kCycleSlowRateSpan = 0.75f;
+    static constexpr float kCycleModDepthMin = 0.15f;
+    static constexpr float kCycleModDepthSpan = 0.35f;
+
     float absRun = std::fabs(run);
     switch (mode) {
     case 0: // Transient (Rhythmic Accent)
         {
             // Map |run| to cycle 1-10, reverse saw when run < 0
-            int cycle = static_cast<int>(absRun * 9.0f) + 1;
+            int cycle = static_cast<int>(absRun * kTransientCycleScale) + 1;
             int pos = (cycle > 0) ? (voice.stepIndex % cycle) : 0;
             float t = (cycle <= 1) ? 0.0f : (pos / static_cast<float>(cycle - 1));
             float amp = (run >= 0.0f) ? (1.0f - t) : t;
@@ -266,11 +308,11 @@ float GeodeEngine::calculatePhysics(const Voice &voice, float run, uint8_t mode)
             if (run >= 0.0f) {
                 // Linear decay at RUN=0, blend in fold/bounce as RUN increases
                 float base = 1.0f - clamp(t, 0.0f, 1.0f);
-                int cycles = static_cast<int>(absRun * 4.0f) + 1;
+                int cycles = static_cast<int>(absRun * kSustainFoldCyclesScale) + 1;
                 float phase = t * cycles;
                 float frac = phase - std::floor(phase);
                 float tri = 1.0f - std::fabs(2.0f * frac - 1.0f);
-                float mix = clamp(absRun * 5.0f, 0.0f, 1.0f);
+                float mix = clamp(absRun * kSustainFoldMixScale, 0.0f, 1.0f);
                 float velocity = base * (1.0f - mix) + tri * mix;
                 return clamp(velocity, 0.0f, 1.0f);
             } else {
@@ -284,18 +326,20 @@ float GeodeEngine::calculatePhysics(const Voice &voice, float run, uint8_t mode)
     case 2: // Cycle (Amplitude LFO)
         {
             // Bipolar rate: positive = slow emphasis, negative = dense cycling
-            float rate = (run >= 0.0f) ? (1.0f + absRun * 3.0f) : (1.0f + absRun * 12.0f);
+            float rate = (run >= 0.0f)
+                ? (1.0f + absRun * kCycleRateScalePos)
+                : (1.0f + absRun * kCycleRateScaleNeg);
             int burstLength = (voice.repeatsTotal > 0) ? voice.repeatsTotal : 16;
             float t = (burstLength > 0)
                 ? (static_cast<float>(voice.stepIndex % burstLength) / static_cast<float>(burstLength))
                 : 0.0f;
             if (run < 0.0f) {
                 // Slow secondary tri to add chaotic feel at negative RUN
-                float slowRate = 0.25f + absRun * 0.75f; // 0.25..1.0 cycles per burst
+                float slowRate = kCycleSlowRateMin + absRun * kCycleSlowRateSpan;
                 float slowPhase = t * slowRate;
                 float slowFrac = slowPhase - std::floor(slowPhase);
                 float tri = 1.0f - std::fabs(2.0f * slowFrac - 1.0f);
-                float modDepth = 0.15f + absRun * 0.35f; // 0.15..0.5
+                float modDepth = kCycleModDepthMin + absRun * kCycleModDepthSpan;
                 float rateMod = 1.0f + (tri - 0.5f) * 2.0f * modDepth;
                 rate *= rateMod;
             }
@@ -308,8 +352,7 @@ float GeodeEngine::calculatePhysics(const Voice &voice, float run, uint8_t mode)
     }
 }
 
-void GeodeEngine::triggerVoiceEnvelope(Voice &voice, float velocity,
-                                        float timeMs, float intone, int voiceIndex) {
+void GeodeEngine::triggerVoiceEnvelope(Voice &voice, float velocity, float timeMs) {
     voice.targetLevel = clamp(velocity, 0.f, 1.f);
     voice.envelopePhase = 0.f;
     voice.inAttack = true;
@@ -407,7 +450,7 @@ float GeodeEngine::mixLevel() const {
 }
 
 int16_t GeodeEngine::outputRaw(int16_t offsetRaw) const {
-    float mix = computeMixLevel();
+    float mix = mixLevel();
 
     // Interpolate between offset (silence) and 16383 (max)
     int16_t targetRaw = 16383;

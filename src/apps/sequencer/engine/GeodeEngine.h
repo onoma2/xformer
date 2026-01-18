@@ -73,11 +73,15 @@ private:
     float _prevMeasureFraction;
     std::array<int16_t, VoiceCount> _tuneNum;
     std::array<int16_t, VoiceCount> _tuneDen;
+    mutable std::array<float, VoiceCount> _cachedTimeScale;
+    mutable std::array<float, VoiceCount> _cachedIntone;
+    mutable std::array<int16_t, VoiceCount> _cachedTuneNum;
+    mutable std::array<int16_t, VoiceCount> _cachedTuneDen;
+    mutable std::array<bool, VoiceCount> _timeScaleValid;
 
     // Helper functions
     bool updateVoicePhase(int voiceIndex, Voice &voice, float measureDelta);
-    void triggerVoiceEnvelope(Voice &voice, float velocity,
-                               float timeMs, float intone, int voiceIndex);
+    void triggerVoiceEnvelope(Voice &voice, float velocity, float timeMs);
     float calculatePhysics(const Voice &voice, float run, uint8_t mode) const;
     void updateVoiceEnvelope(Voice &voice, float dt, float ramp, float curve);
     float computeMixLevel() const;
