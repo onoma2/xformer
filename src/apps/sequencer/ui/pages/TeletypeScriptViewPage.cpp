@@ -984,6 +984,11 @@ void TeletypeScriptViewPage::setEditBuffer(const char *text) {
 
 void TeletypeScriptViewPage::commitLineAndAdvance() {
     commitLine();
+    if (_liveMode) {
+        _editBuffer[0] = '\0';
+        _cursor = 0;
+        return;
+    }
     // Move to the next line if possible
     if (_selectedLine < kLineCount - 1) {
         loadEditBuffer(_selectedLine + 1);
