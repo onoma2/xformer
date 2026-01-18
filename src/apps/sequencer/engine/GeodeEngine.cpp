@@ -9,9 +9,9 @@
 static constexpr float Pi = 3.1415926536f;
 static constexpr float TwoPi = 2.f * Pi;
 
-// Time mapping: 0.0-1.0 → 5ms to 5000ms (logarithmic feel)
-static constexpr float MinTimeMs = 5.f;
-static constexpr float MaxTimeMs = 5000.f;
+// Time mapping: 0.0-1.0 → 6Hz (166.7ms) to 60s (logarithmic feel)
+static constexpr float MinTimeMs = 1000.f / 6.f;
+static constexpr float MaxTimeMs = 60000.f;
 
 GeodeEngine::GeodeEngine() {
     reset();

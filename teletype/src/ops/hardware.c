@@ -175,10 +175,6 @@ static void op_G_MODE_get(const void *data, scene_state_t *ss, exec_state_t *es,
                           command_state_t *cs);
 static void op_G_MODE_set(const void *data, scene_state_t *ss, exec_state_t *es,
                           command_state_t *cs);
-static void op_G_O_get(const void *data, scene_state_t *ss, exec_state_t *es,
-                       command_state_t *cs);
-static void op_G_O_set(const void *data, scene_state_t *ss, exec_state_t *es,
-                       command_state_t *cs);
 static void op_G_BAR_get(const void *data, scene_state_t *ss, exec_state_t *es,
                          command_state_t *cs);
 static void op_G_BAR_set(const void *data, scene_state_t *ss, exec_state_t *es,
@@ -190,6 +186,42 @@ static void op_G_V_get(const void *data, scene_state_t *ss, exec_state_t *es,
 static void op_G_VAL_get(const void *data, scene_state_t *ss, exec_state_t *es,
                          command_state_t *cs);
 static void op_G_R_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_T_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_T_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_I_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_I_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_RA_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                        command_state_t *cs);
+static void op_G_RA_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                        command_state_t *cs);
+static void op_G_C_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_C_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_N_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_N_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_M_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_M_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_O_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_O_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_B_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_B_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_L_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_S_get(const void *data, scene_state_t *ss, exec_state_t *es,
                        command_state_t *cs);
 
 
@@ -267,12 +299,21 @@ const tele_op_t op_G_RAMP        = MAKE_GET_SET_OP(G.RAMP, op_G_RAMP_get, op_G_R
 const tele_op_t op_G_CURV        = MAKE_GET_SET_OP(G.CURV, op_G_CURV_get, op_G_CURV_set, 0, true);
 const tele_op_t op_G_RUN         = MAKE_GET_SET_OP(G.RUN, op_G_RUN_get, op_G_RUN_set, 0, true);
 const tele_op_t op_G_MODE        = MAKE_GET_SET_OP(G.MODE, op_G_MODE_get, op_G_MODE_set, 0, true);
-const tele_op_t op_G_O           = MAKE_GET_SET_OP(G.O, op_G_O_get, op_G_O_set, 0, true);
 const tele_op_t op_G_BAR         = MAKE_GET_SET_OP(G.BAR, op_G_BAR_get, op_G_BAR_set, 0, true);
 const tele_op_t op_G_TUNE        = MAKE_GET_OP(G.TUNE, op_G_TUNE_get, 3, false);
 const tele_op_t op_G_V           = MAKE_GET_OP(G.V, op_G_V_get, 3, false);
 const tele_op_t op_G_VAL         = MAKE_GET_OP(G.VAL, op_G_VAL_get, 0, true);
 const tele_op_t op_G_R           = MAKE_GET_OP(G.R, op_G_R_get, 2, false);
+const tele_op_t op_G_T           = MAKE_GET_SET_OP(G.T, op_G_T_get, op_G_T_set, 0, true);
+const tele_op_t op_G_I           = MAKE_GET_SET_OP(G.I, op_G_I_get, op_G_I_set, 0, true);
+const tele_op_t op_G_RA          = MAKE_GET_SET_OP(G.RA, op_G_RA_get, op_G_RA_set, 0, true);
+const tele_op_t op_G_C           = MAKE_GET_SET_OP(G.C, op_G_C_get, op_G_C_set, 0, true);
+const tele_op_t op_G_N           = MAKE_GET_SET_OP(G.N, op_G_N_get, op_G_N_set, 0, true);
+const tele_op_t op_G_M           = MAKE_GET_SET_OP(G.M, op_G_M_get, op_G_M_set, 0, true);
+const tele_op_t op_G_O           = MAKE_GET_SET_OP(G.O, op_G_O_get, op_G_O_set, 0, true);
+const tele_op_t op_G_B           = MAKE_GET_SET_OP(G.B, op_G_B_get, op_G_B_set, 0, true);
+const tele_op_t op_G_L           = MAKE_GET_OP(G.L, op_G_L_get, 0, true);
+const tele_op_t op_G_S           = MAKE_GET_OP(G.S, op_G_S_get, 3, false);
 // clang-format on
 
 static void op_CV_get(const void *NOTUSED(data), scene_state_t *ss,
@@ -1275,4 +1316,90 @@ static void op_G_R_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
     int16_t cvIndex = cs_pop(cs);
     int16_t voiceIndex = cs_pop(cs);
     tele_g_out((uint8_t)cvIndex, voiceIndex);
+}
+
+static void op_G_T_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_time());
+}
+
+static void op_G_T_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_time(cs_pop(cs));
+}
+
+static void op_G_I_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_intone());
+}
+
+static void op_G_I_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_intone(cs_pop(cs));
+}
+
+static void op_G_RA_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_ramp());
+}
+
+static void op_G_RA_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_ramp(cs_pop(cs));
+}
+
+static void op_G_C_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_curve());
+}
+
+static void op_G_C_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_curve(cs_pop(cs));
+}
+
+static void op_G_N_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_run());
+}
+
+static void op_G_N_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_run(cs_pop(cs));
+}
+
+static void op_G_M_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_mode());
+}
+
+static void op_G_M_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_mode(cs_pop(cs));
+}
+
+
+static void op_G_B_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_bar());
+}
+
+static void op_G_B_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_bar(cs_pop(cs));
+}
+
+static void op_G_L_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_val());
+}
+
+static void op_G_S_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t run = cs_pop(cs);
+    int16_t intone = cs_pop(cs);
+    int16_t time = cs_pop(cs);
+    tele_g_time(time);
+    tele_g_intone(intone);
+    tele_g_run(run);
 }

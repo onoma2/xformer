@@ -249,6 +249,62 @@ Defaults:
 `G.TIME`=8192, `G.TONE`=8192, `G.RAMP`=8192, `G.CURV`=8192, `G.RUN`=8192, `G.MODE`=0, `G.O`=0, `G.BAR`=4, tune ratios 1/1..6/1.
 When transport is stopped, Geode free-runs using the last known bar duration (defaults to 120 BPM if none).
 
+Aliases (short ops):
+`G.T`=G.TIME, `G.I`=G.TONE, `G.RA`=G.RAMP, `G.C`=G.CURV, `G.N`=G.RUN, `G.M`=G.MODE, `G.B`=G.BAR, `G.L`=G.VAL.
+
+Compound ops:
+`G.S t i n` sets TIME, TONE, RUN (no trigger).
+
+Behavior notes:
+- `G.TIME`: 0 fast (~166.7 ms / 6 Hz), 16383 slow (~60 s)
+
+TIME knob literal for Voice 1 (Identity)
+
+TIME knob spans 6 Hz (166.7 ms) to 60 s (60000 ms) for Voice 1.
+Then intone spreads other voices by the ratio.
+
+- G.TONE = 0 (intone = -1, undertones → divide by ratio)
+
+  At TIME min (166.7 ms):
+  - V1 166.7 ms
+  - V2 83.3 ms
+  - V3 55.6 ms
+  - V4 41.7 ms
+  - V5 33.3 ms
+  - V6 27.8 ms
+
+  At TIME max (60000 ms):
+  - V1 60000 ms
+  - V2 30000 ms
+  - V3 20000 ms
+  - V4 15000 ms
+  - V5 12000 ms
+  - V6 10000 ms
+
+- G.TONE = max (intone = +1, overtones → multiply by ratio)
+
+  At TIME min (166.7 ms):
+  - V1 166.7 ms
+  - V2 333.3 ms
+  - V3 500 ms
+  - V4 666.7 ms
+  - V5 833.3 ms
+  - V6 1000 ms
+
+  At TIME max (60000 ms):
+  - V1 60000 ms
+  - V2 120000 ms
+  - V3 180000 ms
+  - V4 240000 ms
+  - V5 300000 ms
+  - V6 360000 ms
+- `G.TONE`: 8192 no spread; <8192 undertones; >8192 overtones
+- `G.RAMP`: 0 percussive, 8192 triangle, 16383 reverse
+- `G.CURV`: low step/log, 8192 linear, high smooth
+- `G.RUN`: 8192 neutral; positive emphasizes; negative reverses/slow
+- `G.MODE`: 0 Transient, 1 Sustain, 2 Cycle
+- `G.V v divs reps`: immediate trigger; `divs` events per bar; `reps` additional hits (0 single, -1 infinite)
+
    - **Tip**: If a TO entry shows `!`, it is mapped to a physical output not owned by this track in **Layout**.
    
    - **Sync**: **F5 (SYNC OUTS)** on the Track page fills TO-CV/TO-TR from the Layout-owned outputs (does not overwrite unmatched slots).

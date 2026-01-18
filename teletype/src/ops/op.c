@@ -78,7 +78,8 @@ const tele_op_t *tele_ops[E_OP__LENGTH] = {
     &op_E_O, &op_E_L, &op_E_R, &op_E_C, &op_LFO_R, &op_LFO_W, &op_LFO_A,
     &op_LFO_F, &op_LFO_O, &op_LFO_S, &op_G_TIME, &op_G_TONE, &op_G_RAMP,
     &op_G_CURV, &op_G_RUN, &op_G_MODE, &op_G_O, &op_G_BAR, &op_G_TUNE, &op_G_V,
-    &op_G_VAL, &op_G_R, &op_CV_GET, &op_CV_CAL,
+    &op_G_VAL, &op_G_R, &op_G_T, &op_G_I, &op_G_RA, &op_G_C, &op_G_N, &op_G_M,
+    &op_G_B, &op_G_L, &op_G_S, &op_CV_GET, &op_CV_CAL,
     &op_CV_CAL_RESET,
 
     // maths

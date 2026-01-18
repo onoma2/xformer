@@ -262,6 +262,15 @@
         "G.V"         => { MATCH_OP(E_OP_G_V); };
         "G.VAL"       => { MATCH_OP(E_OP_G_VAL); };
         "G.R"         => { MATCH_OP(E_OP_G_R); };
+        "G.T"         => { MATCH_OP(E_OP_G_T); };
+        "G.I"         => { MATCH_OP(E_OP_G_I); };
+        "G.RA"        => { MATCH_OP(E_OP_G_RA); };
+        "G.C"         => { MATCH_OP(E_OP_G_C); };
+        "G.N"         => { MATCH_OP(E_OP_G_N); };
+        "G.M"         => { MATCH_OP(E_OP_G_M); };
+        "G.B"         => { MATCH_OP(E_OP_G_B); };
+        "G.L"         => { MATCH_OP(E_OP_G_L); };
+        "G.S"         => { MATCH_OP(E_OP_G_S); };
 
         # maths
         "ADD"         => { MATCH_OP(E_OP_ADD); };

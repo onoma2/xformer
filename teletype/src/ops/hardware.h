@@ -77,11 +77,20 @@ extern const tele_op_t op_G_RAMP;
 extern const tele_op_t op_G_CURV;
 extern const tele_op_t op_G_RUN;
 extern const tele_op_t op_G_MODE;
-extern const tele_op_t op_G_O;
 extern const tele_op_t op_G_BAR;
 extern const tele_op_t op_G_TUNE;
 extern const tele_op_t op_G_V;
 extern const tele_op_t op_G_VAL;
 extern const tele_op_t op_G_R;
+extern const tele_op_t op_G_T;
+extern const tele_op_t op_G_I;
+extern const tele_op_t op_G_RA;
+extern const tele_op_t op_G_C;
+extern const tele_op_t op_G_N;
+extern const tele_op_t op_G_M;
+extern const tele_op_t op_G_O;
+extern const tele_op_t op_G_B;
+extern const tele_op_t op_G_L;
+extern const tele_op_t op_G_S;
 
 #endif
