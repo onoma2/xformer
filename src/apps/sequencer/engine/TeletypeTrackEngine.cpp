@@ -1498,14 +1498,16 @@ void TeletypeTrackEngine::triggerGeodeVoice(uint8_t voiceIndex, int16_t divs, in
         // Voice 0 = all voices
         _geodeEngine.triggerAllVoices(divs, repeats);
         for (int i = 0; i < GeodeEngine::VoiceCount; ++i) {
-            _geodeEngine.setVoicePhase(i, std::fmod(mf * divs, 1.0f));
+            _geodeEngine.setVoicePhase(i, 0.f);
+            _geodeEngine.markVoiceTriggered(i);
         }
         _geodeEngine.triggerImmediateAll(time, intone, run, mode);
     } else if (voiceIndex <= GeodeEngine::VoiceCount) {
         // Voice 1-6 → internal index 0-5
         int index = voiceIndex - 1;
         _geodeEngine.triggerVoice(index, divs, repeats);
-        _geodeEngine.setVoicePhase(index, std::fmod(mf * divs, 1.0f));
+        _geodeEngine.setVoicePhase(index, 0.f);
+        _geodeEngine.markVoiceTriggered(index);
         _geodeEngine.triggerImmediate(voiceIndex - 1, time, intone, run, mode);
     }
     _geodeActive = true;

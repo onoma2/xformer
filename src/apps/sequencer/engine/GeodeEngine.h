@@ -16,6 +16,7 @@ public:
     void triggerImmediateAll(float time, float intone, float run, uint8_t mode);
     void syncMeasureFraction(float measureFraction);
     void setVoicePhase(int voiceIndex, float phase);
+    void markVoiceTriggered(int voiceIndex);
 
     // Main update (1kHz, called from TeletypeTrackEngine)
     // Parameters are normalized floats:
@@ -55,6 +56,7 @@ private:
         int repeatsRemaining;     // Countdown
         int stepIndex;            // Current step in burst (for physics)
         bool active;              // Voice is running
+        bool justTriggered;       // Suppress wrap-trigger after immediate trigger
 
         // Envelope state
         float level;              // Current output level (0.0-1.0)
@@ -73,7 +75,7 @@ private:
     std::array<int16_t, VoiceCount> _tuneDen;
 
     // Helper functions
-    bool updateVoicePhase(Voice &voice, float measureDelta);
+    bool updateVoicePhase(int voiceIndex, Voice &voice, float measureDelta);
     void triggerVoiceEnvelope(Voice &voice, float velocity,
                                float timeMs, float intone, int voiceIndex);
     float calculatePhysics(const Voice &voice, float run, uint8_t mode) const;

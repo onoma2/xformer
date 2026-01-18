@@ -228,7 +228,7 @@ private:
         int16_t intone = 8192;
         int16_t ramp = 8192;
         int16_t curve = 8192;
-        int16_t run = 0;
+        int16_t run = 8192;
         int16_t offset = 0;
         int16_t bars = 4;
         uint8_t mode = 0;
@@ -240,7 +240,7 @@ private:
             intone = 8192;
             ramp = 8192;
             curve = 8192;
-            run = 0;
+            run = 8192;
             offset = 0;
             bars = 4;
             mode = 0;

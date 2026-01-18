@@ -24,6 +24,7 @@ void GeodeEngine::Voice::reset() {
     repeatsRemaining = 0;
     stepIndex = 0;
     active = false;
+    justTriggered = false;
     level = 0.f;
     targetLevel = 0.f;
     riseTimeMs = 100.f;
@@ -82,6 +83,10 @@ void GeodeEngine::triggerImmediate(int voiceIndex, float time, float intone, flo
     float voiceTimeScale = getVoiceTimeScale(voiceIndex, intone);
     float voiceTimeMs = baseTimeMs * voiceTimeScale;
     triggerVoiceEnvelope(voice, velocity, voiceTimeMs, intone, voiceIndex);
+    if (voice.repeatsRemaining == 0) {
+        // No scheduled repeats after the immediate trigger.
+        voice.active = false;
+    }
 }
 
 void GeodeEngine::triggerImmediateAll(float time, float intone, float run, uint8_t mode) {
@@ -99,6 +104,13 @@ void GeodeEngine::setVoicePhase(int voiceIndex, float phase) {
         return;
     }
     _voices[voiceIndex].phase = clamp(phase, 0.f, 1.f);
+}
+
+void GeodeEngine::markVoiceTriggered(int voiceIndex) {
+    if (voiceIndex < 0 || voiceIndex >= VoiceCount) {
+        return;
+    }
+    _voices[voiceIndex].justTriggered = true;
 }
 
 float GeodeEngine::timeParamToMs(float time) const {
@@ -171,7 +183,7 @@ void GeodeEngine::update(float dt, float measureFraction,
         }
 
         // Check for phase wrap (trigger event)
-        bool triggered = updateVoicePhase(voice, measureDelta);
+        bool triggered = updateVoicePhase(i, voice, measureDelta);
 
         if (triggered) {
             // Calculate velocity from physics (uses current stepIndex)
@@ -191,9 +203,10 @@ void GeodeEngine::update(float dt, float measureFraction,
         // Update envelope
         updateVoiceEnvelope(voice, dt * 1000.f, ramp, curve);
     }
+
 }
 
-bool GeodeEngine::updateVoicePhase(Voice &voice, float measureDelta) {
+bool GeodeEngine::updateVoicePhase(int voiceIndex, Voice &voice, float measureDelta) {
     if (!voice.active) {
         return false;
     }
@@ -204,6 +217,12 @@ bool GeodeEngine::updateVoicePhase(Voice &voice, float measureDelta) {
     // Detect wrap (trigger event)
     if (voice.phase >= 1.0f) {
         voice.phase = std::fmod(voice.phase, 1.0f);
+        if (voice.justTriggered) {
+            // Suppress a wrap-trigger caused by a large measure delta right after G.V.
+            voice.justTriggered = false;
+            return false;
+        }
+        voice.justTriggered = false;
 
         // Check if repeats remaining
         if (voice.repeatsRemaining > 0) {
@@ -221,6 +240,7 @@ bool GeodeEngine::updateVoicePhase(Voice &voice, float measureDelta) {
         }
     }
 
+    voice.justTriggered = false;
     return false;
 }
 
@@ -364,7 +384,8 @@ void GeodeEngine::updateVoiceEnvelope(Voice &voice, float dtMs, float ramp, floa
         if (voice.inAttack) {
             voice.level = shapedPhase * voice.targetLevel;
         } else {
-            voice.level = (1.f - shapedPhase) * voice.targetLevel;
+            // shapedPhase already goes 1→0 for down curves
+            voice.level = shapedPhase * voice.targetLevel;
         }
     }
 }
