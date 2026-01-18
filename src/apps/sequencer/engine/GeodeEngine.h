@@ -78,6 +78,7 @@ private:
     mutable std::array<int16_t, VoiceCount> _cachedTuneNum;
     mutable std::array<int16_t, VoiceCount> _cachedTuneDen;
     mutable std::array<bool, VoiceCount> _timeScaleValid;
+    float _cachedMixLevel = 0.0f;
 
     // Helper functions
     bool updateVoicePhase(int voiceIndex, Voice &voice, float measureDelta);

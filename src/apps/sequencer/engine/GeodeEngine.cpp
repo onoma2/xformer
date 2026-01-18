@@ -235,6 +235,7 @@ void GeodeEngine::update(float dt, float measureFraction,
         updateVoiceEnvelope(voice, dt * 1000.f, ramp, curve);
     }
 
+    _cachedMixLevel = computeMixLevel();
 }
 
 bool GeodeEngine::updateVoicePhase(int voiceIndex, Voice &voice, float measureDelta) {
@@ -446,11 +447,11 @@ float GeodeEngine::computeMixLevel() const {
 }
 
 float GeodeEngine::mixLevel() const {
-    return computeMixLevel();
+    return _cachedMixLevel;
 }
 
 int16_t GeodeEngine::outputRaw(int16_t offsetRaw) const {
-    float mix = mixLevel();
+    float mix = _cachedMixLevel;
 
     // Interpolate between offset (silence) and 16383 (max)
     int16_t targetRaw = 16383;
