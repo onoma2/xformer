@@ -56,14 +56,49 @@ void GeodeEngine::triggerVoice(int voiceIndex, int divs, int repeats) {
     voice.stepIndex = 0;
     voice.active = true;
     voice.level = 0.f;
-    voice.envelopePhase = 0.f;
+    voice.targetLevel = 0.f;
+    voice.envelopePhase = 1.f;
     voice.inAttack = false;
+    voice.riseTimeMs = 100.f;  // Defaults updated on first update()
+    voice.fallTimeMs = 100.f;
 }
 
 void GeodeEngine::triggerAllVoices(int divs, int repeats) {
     for (int i = 0; i < VoiceCount; i++) {
         triggerVoice(i, divs, repeats);
     }
+}
+
+void GeodeEngine::triggerImmediate(int voiceIndex, float time, float intone, float run, uint8_t mode) {
+    if (voiceIndex < 0 || voiceIndex >= VoiceCount) {
+        return;
+    }
+    Voice &voice = _voices[voiceIndex];
+    if (!voice.active) {
+        return;
+    }
+    float velocity = calculatePhysics(voice, run, mode);
+    float baseTimeMs = timeParamToMs(time);
+    float voiceTimeScale = getVoiceTimeScale(voiceIndex, intone);
+    float voiceTimeMs = baseTimeMs * voiceTimeScale;
+    triggerVoiceEnvelope(voice, velocity, voiceTimeMs, intone, voiceIndex);
+}
+
+void GeodeEngine::triggerImmediateAll(float time, float intone, float run, uint8_t mode) {
+    for (int i = 0; i < VoiceCount; ++i) {
+        triggerImmediate(i, time, intone, run, mode);
+    }
+}
+
+void GeodeEngine::syncMeasureFraction(float measureFraction) {
+    _prevMeasureFraction = measureFraction;
+}
+
+void GeodeEngine::setVoicePhase(int voiceIndex, float phase) {
+    if (voiceIndex < 0 || voiceIndex >= VoiceCount) {
+        return;
+    }
+    _voices[voiceIndex].phase = clamp(phase, 0.f, 1.f);
 }
 
 float GeodeEngine::timeParamToMs(float time) const {
@@ -73,18 +108,15 @@ float GeodeEngine::timeParamToMs(float time) const {
 }
 
 float GeodeEngine::getVoiceTimeScale(int voiceIndex, float intone) const {
-    // JF formula: scale = 2^(intone * (voiceIndex - 3.5) / 5.0)
-    // voiceIndex: 0-5 for voices 1-6
+    // JF-style mapping: scale = ratio^intone
     // intone: -1.0 (undertones) to 0.0 (noon) to +1.0 (overtones)
-    float exponent = intone * ((voiceIndex + 1) - 3.5f) / 5.0f;
-    float baseScale = std::pow(2.0f, exponent);
     int16_t num = voiceTuneNumerator(voiceIndex);
     int16_t den = voiceTuneDenominator(voiceIndex);
     if (den == 0) {
-        return baseScale;
+        return 1.0f;
     }
     float ratio = static_cast<float>(num) / static_cast<float>(den);
-    return baseScale * ratio;
+    return std::pow(ratio, intone);
 }
 
 void GeodeEngine::setVoiceTune(int voiceIndex, int16_t numerator, int16_t denominator) {
@@ -142,8 +174,11 @@ void GeodeEngine::update(float dt, float measureFraction,
         bool triggered = updateVoicePhase(voice, measureDelta);
 
         if (triggered) {
-            // Calculate velocity from physics
+            // Calculate velocity from physics (uses current stepIndex)
             float velocity = calculatePhysics(voice, run, mode);
+
+            // Increment stepIndex AFTER physics calculation
+            voice.stepIndex++;
 
             // Calculate voice-specific time (INTONE scaled)
             float voiceTimeScale = getVoiceTimeScale(i, intone);
@@ -173,11 +208,11 @@ bool GeodeEngine::updateVoicePhase(Voice &voice, float measureDelta) {
         // Check if repeats remaining
         if (voice.repeatsRemaining > 0) {
             voice.repeatsRemaining--;
-            voice.stepIndex++;
+            // Note: stepIndex incremented in update() AFTER physics calculation
             return true;
         } else if (voice.repeatsRemaining < 0) {
             // Infinite repeats (-1)
-            voice.stepIndex++;
+            // Note: stepIndex incremented in update() AFTER physics calculation
             return true;
         } else {
             // Exhausted - stop voice
@@ -190,31 +225,61 @@ bool GeodeEngine::updateVoicePhase(Voice &voice, float measureDelta) {
 }
 
 float GeodeEngine::calculatePhysics(const Voice &voice, float run, uint8_t mode) const {
+    float absRun = std::fabs(run);
     switch (mode) {
     case 0: // Transient (Rhythmic Accent)
         {
-            // Map run 0-1 to cycle 1-8
-            int cycle = static_cast<int>(run * 7.0f) + 1;
-            bool accent = (voice.stepIndex % cycle) == 0;
-            return accent ? 1.0f : 0.3f;
+            // Map |run| to cycle 1-10, reverse saw when run < 0
+            int cycle = static_cast<int>(absRun * 9.0f) + 1;
+            int pos = (cycle > 0) ? (voice.stepIndex % cycle) : 0;
+            float t = (cycle <= 1) ? 0.0f : (pos / static_cast<float>(cycle - 1));
+            float amp = (run >= 0.0f) ? (1.0f - t) : t;
+            return clamp(amp, 0.0f, 1.0f);
         }
 
     case 1: // Sustain (Decay/Gravity)
         {
-            // Map run 0-1 to damping 0.05-0.25
-            float damp = 0.05f + run * 0.20f;
-            float velocity = std::pow(1.0f - damp, static_cast<float>(voice.stepIndex));
-            return velocity;
+            int burstLength = (voice.repeatsTotal > 0) ? voice.repeatsTotal : 16;
+            float t = (burstLength > 0)
+                ? (static_cast<float>(voice.stepIndex % burstLength) / static_cast<float>(burstLength))
+                : 0.0f;
+            if (run >= 0.0f) {
+                // Linear decay at RUN=0, blend in fold/bounce as RUN increases
+                float base = 1.0f - clamp(t, 0.0f, 1.0f);
+                int cycles = static_cast<int>(absRun * 4.0f) + 1;
+                float phase = t * cycles;
+                float frac = phase - std::floor(phase);
+                float tri = 1.0f - std::fabs(2.0f * frac - 1.0f);
+                float mix = clamp(absRun * 5.0f, 0.0f, 1.0f);
+                float velocity = base * (1.0f - mix) + tri * mix;
+                return clamp(velocity, 0.0f, 1.0f);
+            } else {
+                // Slow decay as run goes negative
+                float exponent = 1.0f - absRun * 0.8f;
+                float velocity = std::pow(1.0f - clamp(t, 0.0f, 1.0f), exponent);
+                return clamp(velocity, 0.0f, 1.0f);
+            }
         }
 
     case 2: // Cycle (Amplitude LFO)
         {
-            // Map run 0-1 to rate 1-4 cycles per burst
-            float rate = 1.0f + run * 3.0f;
-            float burstProgress = (voice.repeatsTotal > 0)
-                ? static_cast<float>(voice.stepIndex) / static_cast<float>(voice.repeatsTotal)
+            // Bipolar rate: positive = slow emphasis, negative = dense cycling
+            float rate = (run >= 0.0f) ? (1.0f + absRun * 3.0f) : (1.0f + absRun * 12.0f);
+            int burstLength = (voice.repeatsTotal > 0) ? voice.repeatsTotal : 16;
+            float t = (burstLength > 0)
+                ? (static_cast<float>(voice.stepIndex % burstLength) / static_cast<float>(burstLength))
                 : 0.0f;
-            float lfoPhase = burstProgress * rate * TwoPi;
+            if (run < 0.0f) {
+                // Slow secondary tri to add chaotic feel at negative RUN
+                float slowRate = 0.25f + absRun * 0.75f; // 0.25..1.0 cycles per burst
+                float slowPhase = t * slowRate;
+                float slowFrac = slowPhase - std::floor(slowPhase);
+                float tri = 1.0f - std::fabs(2.0f * slowFrac - 1.0f);
+                float modDepth = 0.15f + absRun * 0.35f; // 0.15..0.5
+                float rateMod = 1.0f + (tri - 0.5f) * 2.0f * modDepth;
+                rate *= rateMod;
+            }
+            float lfoPhase = t * rate * TwoPi;
             return 0.5f + 0.5f * std::sin(lfoPhase);
         }
 

@@ -309,6 +309,12 @@ void tele_g_offset(int16_t value) {
     }
 }
 
+void tele_g_bar(int16_t bars) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        engine->setGeodeBars(bars);
+    }
+}
+
 void tele_g_tune(uint8_t voiceIndex, int16_t numerator, int16_t denominator) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         engine->setGeodeTune(voiceIndex, numerator, denominator);
@@ -372,6 +378,13 @@ int16_t tele_g_get_mode(void) {
 int16_t tele_g_get_offset(void) {
     if (auto *engine = TeletypeBridge::activeEngine()) {
         return engine->getGeodeOffset();
+    }
+    return 0;
+}
+
+int16_t tele_g_get_bar(void) {
+    if (auto *engine = TeletypeBridge::activeEngine()) {
+        return engine->getGeodeBars();
     }
     return 0;
 }

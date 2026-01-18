@@ -398,7 +398,9 @@ void NoteSequenceEditPage::updateLeds(Leds &leds) {
         for (int i = 0; i < 8; ++i) {
             int index = MatrixMap::fromStep(i + 8);
             leds.unmask(index);
-            leds.set(index, false, quickEditItems[i] != NoteSequenceListModel::Item::Last);
+            bool available = quickEditItems[i] != NoteSequenceListModel::Item::Last &&
+                _listModel.rowForItem(quickEditItems[i]) >= 0;
+            leds.set(index, false, available);
             leds.mask(index);
         }
     }
@@ -1073,9 +1075,14 @@ void NoteSequenceEditPage::generateSequence() {
 
 void NoteSequenceEditPage::quickEdit(int index) {
     _listModel.setSequence(&_project.selectedNoteSequence());
-    if (quickEditItems[index] != NoteSequenceListModel::Item::Last) {
-        _manager.pages().quickEdit.show(_listModel, int(quickEditItems[index]));
+    if (quickEditItems[index] == NoteSequenceListModel::Item::Last) {
+        return;
     }
+    int row = _listModel.rowForItem(quickEditItems[index]);
+    if (row < 0) {
+        return;
+    }
+    _manager.pages().quickEdit.show(_listModel, row);
 }
 
 bool NoteSequenceEditPage::allSelectedStepsActive() const {

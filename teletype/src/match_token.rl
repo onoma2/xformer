@@ -257,6 +257,7 @@
         "G.RUN"       => { MATCH_OP(E_OP_G_RUN); };
         "G.MODE"      => { MATCH_OP(E_OP_G_MODE); };
         "G.O"         => { MATCH_OP(E_OP_G_O); };
+        "G.BAR"       => { MATCH_OP(E_OP_G_BAR); };
         "G.TUNE"      => { MATCH_OP(E_OP_G_TUNE); };
         "G.V"         => { MATCH_OP(E_OP_G_V); };
         "G.VAL"       => { MATCH_OP(E_OP_G_VAL); };

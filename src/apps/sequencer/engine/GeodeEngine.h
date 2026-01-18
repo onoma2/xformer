@@ -12,6 +12,10 @@ public:
     // Voice triggering (called from G.V operation)
     void triggerVoice(int voiceIndex, int divs, int repeats);
     void triggerAllVoices(int divs, int repeats);
+    void triggerImmediate(int voiceIndex, float time, float intone, float run, uint8_t mode);
+    void triggerImmediateAll(float time, float intone, float run, uint8_t mode);
+    void syncMeasureFraction(float measureFraction);
+    void setVoicePhase(int voiceIndex, float phase);
 
     // Main update (1kHz, called from TeletypeTrackEngine)
     // Parameters are normalized floats:

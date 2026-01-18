@@ -352,4 +352,23 @@ private:
         }
         return items[row];
     }
+
+public:
+    int rowForItem(Item item) const {
+        const Item *items = linearItems;
+        if (_sequence->mode() == NoteSequence::Mode::Ikra) {
+            items = ikraItems;
+        } else if (_sequence->mode() == NoteSequence::Mode::ReRene) {
+            items = reneItems;
+        }
+        int row = 0;
+        while (items[row] != Last) {
+            if (items[row] == item) {
+                return row;
+            }
+            ++row;
+        }
+        return -1;
+    }
+private:
 };

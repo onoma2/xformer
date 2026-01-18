@@ -142,6 +142,10 @@ void TeletypeTrackEngine::reset() {
     _geodeParams.clear();
     _geodeEngine.reset();
     _geodeActive = false;
+    _geodeFreePhase = 0.f;
+    _geodePhaseOffset = 0.f;
+    _geodeBarSeconds = 2.f;
+    _geodeWasClockRunning = false;
     installBootScript();
     syncMetroFromState();
 }
@@ -164,6 +168,12 @@ void TeletypeTrackEngine::panic() {
     clear_delays(&_teletypeTrack.state());
     _teletypeTrack.state().variables.m_act = 0;
     syncMetroFromState();
+    _lfoActive.fill(false);
+    _envState.fill(kEnvIdle);
+    _geodeActive = false;
+    _geodeOutRouting.fill(-1);
+    _geodeFreePhase = 0.f;
+    _geodePhaseOffset = 0.f;
     for (uint8_t i = 0; i < TriggerOutputCount; ++i) {
         clearPulse(i);
         handleTr(i, 0);
@@ -1444,6 +1454,10 @@ void TeletypeTrackEngine::setGeodeTune(uint8_t voiceIndex, int16_t numerator, in
     _geodeEngine.setVoiceTune(index, numerator, denominator);
 }
 
+void TeletypeTrackEngine::setGeodeBars(int16_t bars) {
+    _geodeParams.bars = clamp<int16_t>(bars, 1, 128);
+}
+
 void TeletypeTrackEngine::setGeodeOut(uint8_t cvIndex, int16_t voiceIndex) {
     if (cvIndex == 0 || cvIndex > CvOutputCount) {
         return;
@@ -1456,12 +1470,43 @@ void TeletypeTrackEngine::setGeodeOut(uint8_t cvIndex, int16_t voiceIndex) {
 }
 
 void TeletypeTrackEngine::triggerGeodeVoice(uint8_t voiceIndex, int16_t divs, int16_t repeats) {
+    float time = normalizeUnipolar(_geodeParams.time);
+    float intone = normalizeBipolar(_geodeParams.intone);
+    float run = normalizeBipolar(_geodeParams.run);
+    uint8_t mode = _geodeParams.mode;
+    float mf = _geodeFreePhase;
+    const bool clockRunning = _engine.clockRunning();
+    const float bars = static_cast<float>(clamp<int16_t>(_geodeParams.bars, 1, 128));
+    if (clockRunning) {
+        float transportPhase = measureFractionBars(static_cast<uint8_t>(bars));
+        if (!_geodeWasClockRunning) {
+            float offset = _geodeFreePhase - transportPhase;
+            _geodePhaseOffset = offset - std::floor(offset);
+        }
+        mf = transportPhase + _geodePhaseOffset;
+        mf -= std::floor(mf);
+        _geodeFreePhase = mf;
+        double tickSec = _engine.clock().tickDuration();
+        if (tickSec > 0.0) {
+            _geodeBarSeconds = static_cast<float>(tickSec * _engine.measureDivisor());
+        }
+    }
+    _geodeWasClockRunning = clockRunning;
+    _geodeEngine.syncMeasureFraction(mf);
+
     if (voiceIndex == 0) {
         // Voice 0 = all voices
         _geodeEngine.triggerAllVoices(divs, repeats);
+        for (int i = 0; i < GeodeEngine::VoiceCount; ++i) {
+            _geodeEngine.setVoicePhase(i, std::fmod(mf * divs, 1.0f));
+        }
+        _geodeEngine.triggerImmediateAll(time, intone, run, mode);
     } else if (voiceIndex <= GeodeEngine::VoiceCount) {
         // Voice 1-6 → internal index 0-5
-        _geodeEngine.triggerVoice(voiceIndex - 1, divs, repeats);
+        int index = voiceIndex - 1;
+        _geodeEngine.triggerVoice(index, divs, repeats);
+        _geodeEngine.setVoicePhase(index, std::fmod(mf * divs, 1.0f));
+        _geodeEngine.triggerImmediate(voiceIndex - 1, time, intone, run, mode);
     }
     _geodeActive = true;
 }
@@ -1492,6 +1537,10 @@ int16_t TeletypeTrackEngine::getGeodeMode() const {
 
 int16_t TeletypeTrackEngine::getGeodeOffset() const {
     return _geodeParams.offset;
+}
+
+int16_t TeletypeTrackEngine::getGeodeBars() const {
+    return _geodeParams.bars;
 }
 
 int16_t TeletypeTrackEngine::getGeodeVal() const {
@@ -1547,11 +1596,37 @@ void TeletypeTrackEngine::updateGeode(float dt) {
     float intone = normalizeBipolar(_geodeParams.intone);
     float ramp = normalizeUnipolar(_geodeParams.ramp);
     float curve = normalizeBipolar(_geodeParams.curve);
-    float run = normalizeUnipolar(_geodeParams.run);
+    float run = normalizeBipolar(_geodeParams.run);
     uint8_t mode = _geodeParams.mode;
 
-    // Get measure fraction from engine
-    float mf = measureFraction();
+    // Get measure fraction (transport-locked or freerun with cached bar length)
+    float mf = 0.f;
+    const bool clockRunning = _engine.clockRunning();
+    const float bars = static_cast<float>(clamp<int16_t>(_geodeParams.bars, 1, 128));
+    if (clockRunning) {
+        float transportPhase = measureFractionBars(static_cast<uint8_t>(bars));
+        if (!_geodeWasClockRunning) {
+            float offset = _geodeFreePhase - transportPhase;
+            _geodePhaseOffset = offset - std::floor(offset);
+        }
+        mf = transportPhase + _geodePhaseOffset;
+        mf -= std::floor(mf);
+        _geodeFreePhase = mf;
+        double tickSec = _engine.clock().tickDuration();
+        if (tickSec > 0.0) {
+            _geodeBarSeconds = static_cast<float>(tickSec * _engine.measureDivisor());
+        }
+    } else {
+        float barSeconds = _geodeBarSeconds > 0.f ? _geodeBarSeconds : 2.f;
+        float periodSec = barSeconds * bars;
+        if (periodSec <= 0.f) {
+            periodSec = 2.f * bars;
+        }
+        _geodeFreePhase += dt / periodSec;
+        _geodeFreePhase -= std::floor(_geodeFreePhase);
+        mf = _geodeFreePhase;
+    }
+    _geodeWasClockRunning = clockRunning;
 
     // Update Geode engine
     _geodeEngine.update(dt, mf, time, intone, ramp, curve, run, mode);

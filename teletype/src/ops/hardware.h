@@ -78,6 +78,7 @@ extern const tele_op_t op_G_CURV;
 extern const tele_op_t op_G_RUN;
 extern const tele_op_t op_G_MODE;
 extern const tele_op_t op_G_O;
+extern const tele_op_t op_G_BAR;
 extern const tele_op_t op_G_TUNE;
 extern const tele_op_t op_G_V;
 extern const tele_op_t op_G_VAL;

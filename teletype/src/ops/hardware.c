@@ -179,6 +179,10 @@ static void op_G_O_get(const void *data, scene_state_t *ss, exec_state_t *es,
                        command_state_t *cs);
 static void op_G_O_set(const void *data, scene_state_t *ss, exec_state_t *es,
                        command_state_t *cs);
+static void op_G_BAR_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_G_BAR_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
 static void op_G_TUNE_get(const void *data, scene_state_t *ss, exec_state_t *es,
                           command_state_t *cs);
 static void op_G_V_get(const void *data, scene_state_t *ss, exec_state_t *es,
@@ -264,6 +268,7 @@ const tele_op_t op_G_CURV        = MAKE_GET_SET_OP(G.CURV, op_G_CURV_get, op_G_C
 const tele_op_t op_G_RUN         = MAKE_GET_SET_OP(G.RUN, op_G_RUN_get, op_G_RUN_set, 0, true);
 const tele_op_t op_G_MODE        = MAKE_GET_SET_OP(G.MODE, op_G_MODE_get, op_G_MODE_set, 0, true);
 const tele_op_t op_G_O           = MAKE_GET_SET_OP(G.O, op_G_O_get, op_G_O_set, 0, true);
+const tele_op_t op_G_BAR         = MAKE_GET_SET_OP(G.BAR, op_G_BAR_get, op_G_BAR_set, 0, true);
 const tele_op_t op_G_TUNE        = MAKE_GET_OP(G.TUNE, op_G_TUNE_get, 3, false);
 const tele_op_t op_G_V           = MAKE_GET_OP(G.V, op_G_V_get, 3, false);
 const tele_op_t op_G_VAL         = MAKE_GET_OP(G.VAL, op_G_VAL_get, 0, true);
@@ -1231,6 +1236,17 @@ static void op_G_O_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
                        exec_state_t *NOTUSED(es), command_state_t *cs) {
     int16_t value = cs_pop(cs);
     tele_g_offset(value);
+}
+
+static void op_G_BAR_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_bar());
+}
+
+static void op_G_BAR_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t value = cs_pop(cs);
+    tele_g_bar(value);
 }
 
 static void op_G_TUNE_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),

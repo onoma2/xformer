@@ -14,6 +14,7 @@ Before starting this tutorial, you should have:
 ## Overview of Teletype in Performer
 
 The Teletype Track in Performer provides:
+
 - 4 CV outputs (CV 1-4) mapped to Performer's CV outputs
 - 4 Gate outputs (TR A-D) mapped to Performer's gate outputs
 - 4 trigger inputs (TI-TR1-4) to trigger scripts
@@ -28,6 +29,8 @@ The Teletype Track in Performer provides:
 ## The T9 Type (Reference)
 
 ### 1. Script View Page (The Editor)
+
+
 
 | Action | Hardware Control | Performer Function |
 | :--- | :--- | :--- |
@@ -44,11 +47,14 @@ The Teletype Track in Performer provides:
 | **Insert Text** | **Step Keys 1-16** | Cycles through characters (0-9, A-Z, symbols). |
 
 Notes:
+
 - S0 and Metro are per-slot (P1/P2). S1–S3 are global across patterns.
 
 ### Script View I/O Grid Highlights
 
+
 The right-side I/O grid shows live Teletype input/output activity and ownership:
+
 - **BUS block**: four CV bus meters (A–D) showing current bus voltages.
 - **TI row**: filled block indicates TI-TR assigned; brighter when active.
 - **TO (gates) row**:
@@ -205,6 +211,7 @@ If your Teletype track is new, set up its I/O first so scripts can see the corre
 Use these ops to modulate CV outputs without writing loops.
 
 **LFO example (CV 1):**
+
 ```
 LFO.R 1 2000   # 2s cycle
 LFO.W 1 15     # triangle → saw
@@ -214,9 +221,12 @@ LFO.O 1 8192   # offset/bias
 LFO.S 1 1      # start
 ```
 
-Defaults: `LFO.R`=1000 ms, `LFO.W`=0, `LFO.A`=100, `LFO.F`=0, `LFO.O`=8192, `LFO.S`=0.
+Defaults: 
+
+`LFO.R`=1000 ms, `LFO.W`=0, `LFO.A`=100, `LFO.F`=0, `LFO.O`=8192, `LFO.S`=0.
 
 **Envelope example (CV 1):**
+
 ```
 E.O 1 0
 E 1 12000
@@ -224,15 +234,23 @@ E.A 1 10
 E.D 1 80
 E.T 1
 ```
-Defaults: `E`=16383, `E.A`=50 ms, `E.D`=300 ms, `E.O`=0, `E.L`=1.
+Defaults: 
+`E`=16383, `E.A`=50 ms, `E.D`=300 ms, `E.O`=0, `E.L`=1.
 
 **Geode example (CV 1):**
+
 ```
 G.R 1 0       # mix to CV1
-G.V 1 7 8     # voice 1: 7‑div, 8 repeats
+G.V 1 7 8     # voice 1: 7‑div, 8 repeats (immediate trigger)
 ```
-Defaults: `G.TIME`=8192, `G.TONE`=8192, `G.RAMP`=8192, `G.CURV`=8192, `G.RUN`=0, `G.MODE`=0, `G.O`=0, tune ratios 1/1..6/1.
+
+Defaults: 
+
+`G.TIME`=8192, `G.TONE`=8192, `G.RAMP`=8192, `G.CURV`=8192, `G.RUN`=8192, `G.MODE`=0, `G.O`=0, `G.BAR`=4, tune ratios 1/1..6/1.
+When transport is stopped, Geode free-runs using the last known bar duration (defaults to 120 BPM if none).
+
    - **Tip**: If a TO entry shows `!`, it is mapped to a physical output not owned by this track in **Layout**.
+   
    - **Sync**: **F5 (SYNC OUTS)** on the Track page fills TO-CV/TO-TR from the Layout-owned outputs (does not overwrite unmatched slots).
 
 5. **(Optional) Adjust ranges/offsets**  
@@ -261,6 +279,8 @@ This stops **all Teletype tracks** by:
 - clearing pending DEL commands
 - clearing TR pulses and forcing gates low
 - zeroing all Teletype CV outputs
+- stopping E.*, LFO.*, and G.* modulation
+- clearing Geode routing and phase
 
 ## Default Scripts on New T9type Track
 

@@ -228,6 +228,7 @@ typedef enum {
     E_OP_G_RUN,
     E_OP_G_MODE,
     E_OP_G_O,
+    E_OP_G_BAR,
     E_OP_G_TUNE,
     E_OP_G_V,
     E_OP_G_VAL,

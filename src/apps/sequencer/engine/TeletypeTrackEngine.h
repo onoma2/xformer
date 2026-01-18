@@ -115,6 +115,7 @@ public:
     void setGeodeMode(int16_t value);
     void setGeodeOffset(int16_t value);
     void setGeodeTune(uint8_t voiceIndex, int16_t numerator, int16_t denominator);
+    void setGeodeBars(int16_t bars);
     void setGeodeOut(uint8_t cvIndex, int16_t voiceIndex);
     void triggerGeodeVoice(uint8_t voiceIndex, int16_t divs, int16_t repeats);
 
@@ -125,6 +126,7 @@ public:
     int16_t getGeodeRun() const;
     int16_t getGeodeMode() const;
     int16_t getGeodeOffset() const;
+    int16_t getGeodeBars() const;
     int16_t getGeodeVal() const;
     int16_t getGeodeVoice(uint8_t voiceIndex) const;
     int16_t getGeodeTuneNumerator(uint8_t voiceIndex) const;
@@ -228,6 +230,7 @@ private:
         int16_t curve = 8192;
         int16_t run = 0;
         int16_t offset = 0;
+        int16_t bars = 4;
         uint8_t mode = 0;
         std::array<int16_t, GeodeEngine::VoiceCount> tuneNum{};
         std::array<int16_t, GeodeEngine::VoiceCount> tuneDen{};
@@ -239,6 +242,7 @@ private:
             curve = 8192;
             run = 0;
             offset = 0;
+            bars = 4;
             mode = 0;
             for (int i = 0; i < GeodeEngine::VoiceCount; ++i) {
                 tuneNum[i] = i + 1;
@@ -251,4 +255,8 @@ private:
     GeodeEngine _geodeEngine;
     bool _geodeActive = false;
     std::array<int8_t, CvOutputCount> _geodeOutRouting{};
+    float _geodeFreePhase = 0.f;
+    float _geodePhaseOffset = 0.f;
+    float _geodeBarSeconds = 2.f;
+    bool _geodeWasClockRunning = false;
 };

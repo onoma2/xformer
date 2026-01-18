@@ -201,15 +201,18 @@ Geode is a 6‑voice envelope engine. Use `G.R` to route mix/voice outputs to CV
 - `G.TONE x` → intone spread (0..16383, 8192 = noon)
 - `G.RAMP x` → attack/decay balance (0..16383)
 - `G.CURV x` → curve shape (0..16383, 8192 = linear)
-- `G.RUN x` → physics macro (0..16383)
+- `G.RUN x` → physics macro (0..16383, 8192 = noon)
 - `G.MODE x` → 0=Transient, 1=Sustain, 2=Cycle
 - `G.O x` → output offset (raw 0–16383)
+- `G.BAR x` → cycle length in bars (1–128)
 - `G.TUNE v num den` → per-voice ratio (v=0 all, 1–6), 0/0 resets defaults
-- `G.V v divs reps` → trigger voice (v=0 all, divs 1–64, reps -1..255)
+- `G.V v divs reps` → trigger voice immediately (v=0 all, divs 1–64, reps -1..255; reps are additional hits)
 - `G.R cv v` → route mix/voice to CV out (cv=1–4, v=0 mix, 1–6 voice, <0 none)
 - `G.VAL` → read mixed output (raw 0–16383)
 
-Defaults: `G.TIME`=8192, `G.TONE`=8192, `G.RAMP`=8192, `G.CURV`=8192, `G.RUN`=0, `G.MODE`=0, `G.O`=0, tune ratios 1/1..6/1.
+Defaults: `G.TIME`=8192, `G.TONE`=8192, `G.RAMP`=8192, `G.CURV`=8192, `G.RUN`=8192, `G.MODE`=0, `G.O`=0, `G.BAR`=4, tune ratios 1/1..6/1.
+
+When transport is stopped, Geode free-runs using the last known bar duration (defaults to 120 BPM if none).
 
 - `RT n` → read routing slot n (1–16), returns 0–16383
 
