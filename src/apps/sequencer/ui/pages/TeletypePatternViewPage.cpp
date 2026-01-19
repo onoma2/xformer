@@ -162,41 +162,34 @@ void TeletypePatternViewPage::draw(Canvas &canvas) {
 void TeletypePatternViewPage::updateLeds(Leds &leds) {
     const bool page = globalKeyState()[Key::Page];
 
-    if (page) {
-        // Page mode: Pattern structure controls
-        // Clear all first
-        for (int i = 0; i < 16; ++i) {
-            leds.set(MatrixMap::fromStep(i), false, false);
-        }
-        // Step 4: Set Length (yellow)
-        leds.set(MatrixMap::fromStep(4), true, true);
-        // Step 5: Set Start (yellow)
-        leds.set(MatrixMap::fromStep(5), true, true);
-        // Step 6: Set End (yellow)
-        leds.set(MatrixMap::fromStep(6), true, true);
-    } else {
-        // Default mode: Digit input + control keys
-        // Steps 0-9: Digit input (green) - maps to digits 1-9, 0
-        for (int i = 0; i < 10; ++i) {
-            leds.set(MatrixMap::fromStep(i), false, true);
-        }
-        // Steps 10-12: Unused (off)
-        for (int i = 10; i < 13; ++i) {
-            leds.set(MatrixMap::fromStep(i), false, false);
-        }
-        // Step 13: Backspace (red - destructive)
-        leds.set(MatrixMap::fromStep(13), true, false);
-        // Step 14: Unused (off)
-        leds.set(MatrixMap::fromStep(14), false, false);
-        // Step 15: Commit (yellow - action)
-        leds.set(MatrixMap::fromStep(15), true, true);
+    // Default mode: Digit input + control keys
+    // Steps 0-9: Digit input (green) - maps to digits 1-9, 0
+    for (int i = 0; i < 10; ++i) {
+        leds.set(MatrixMap::fromStep(i), false, true);
     }
+    // Steps 10-12: Unused (off)
+    for (int i = 10; i < 13; ++i) {
+        leds.set(MatrixMap::fromStep(i), false, false);
+    }
+    // Step 13: Backspace (red - destructive)
+    leds.set(MatrixMap::fromStep(13), true, false);
+    // Step 14: Unused (off)
+    leds.set(MatrixMap::fromStep(14), false, false);
+    // Step 15: Commit (yellow - action)
+    leds.set(MatrixMap::fromStep(15), true, true);
 
-    // Show pattern index on function keys (F1-F4 for patterns 0-3)
-    for (int i = 0; i < 4; ++i) {
-        bool selected = (i == _patternIndex);
-        // Selected pattern: yellow, others: green
-        leds.set(MatrixMap::fromFunction(i), selected, true);
+    // Override with Page mode actions (using unmask/mask pattern)
+    if (page) {
+        // Page mode: Pattern structure controls on steps 4-6
+        // Step 4: Set Length (yellow)
+        // Step 5: Set Start (yellow)
+        // Step 6: Set End (yellow)
+        for (int i = 4; i <= 6; ++i) {
+            int index = MatrixMap::fromStep(i);
+            leds.unmask(index);
+            leds.set(index, true, true);  // Yellow
+            leds.mask(index);
+        }
     }
 }
 

@@ -320,47 +320,53 @@ void TeletypeScriptViewPage::updateLeds(Leds &leds) {
     const bool shift = globalKeyState()[Key::Shift];
     const bool page = globalKeyState()[Key::Page];
 
-    if (page && !shift) {
-        // Page mode: Clipboard/edit actions on steps 8-12
-        // Step 8: Copy (yellow)
-        leds.set(MatrixMap::fromStep(8), true, true);
-        // Step 9: Paste (green if clipboard valid, dim if empty)
-        leds.set(MatrixMap::fromStep(9), false, _hasClipboard);
-        // Step 10: Duplicate (yellow)
-        leds.set(MatrixMap::fromStep(10), true, true);
-        // Step 11: Comment (red - toggle)
-        leds.set(MatrixMap::fromStep(11), true, false);
-        // Step 12: Delete (red - destructive)
-        leds.set(MatrixMap::fromStep(12), true, false);
-        // Clear unused steps
-        for (int i = 0; i < 8; ++i) {
-            leds.set(MatrixMap::fromStep(i), false, false);
-        }
-        for (int i = 13; i < 16; ++i) {
-            leds.set(MatrixMap::fromStep(i), false, false);
-        }
-    } else if (shift) {
-        // Shift mode: All symbols (green)
-        for (int i = 0; i < 16; ++i) {
-            leds.set(MatrixMap::fromStep(i), false, true);
-        }
-    } else {
-        // Default mode: Character input + control keys
-        // Steps 0-12: Character input (green)
-        for (int i = 0; i < 13; ++i) {
-            leds.set(MatrixMap::fromStep(i), false, true);
-        }
-        // Step 13: Backspace (red - destructive)
-        leds.set(MatrixMap::fromStep(13), true, false);
-        // Step 14: Space (yellow - control)
-        leds.set(MatrixMap::fromStep(14), true, true);
-        // Step 15: Commit+Advance (yellow - action)
-        leds.set(MatrixMap::fromStep(15), true, true);
+    // Default mode: Character input + control keys
+    // Steps 0-12: Character input (green)
+    for (int i = 0; i < 13; ++i) {
+        leds.set(MatrixMap::fromStep(i), false, true);
     }
+    // Step 13: Backspace (red - destructive)
+    leds.set(MatrixMap::fromStep(13), true, false);
+    // Step 14: Space (yellow - control)
+    leds.set(MatrixMap::fromStep(14), true, true);
+    // Step 15: Commit+Advance (yellow - action)
+    leds.set(MatrixMap::fromStep(15), true, true);
 
     // Show script indicator on function keys if in script edit mode
     if (!_liveMode) {
         LedPainter::drawSelectedSequenceSection(leds, 0);
+    }
+
+    // Override with Page mode actions (using unmask/mask pattern)
+    if (page && !shift) {
+        // Page mode: Clipboard/edit actions on steps 8-12
+        const bool pageStepRed[8] = {
+            true,   // Step 8: Copy (yellow)
+            false,  // Step 9: Paste (green)
+            true,   // Step 10: Duplicate (yellow)
+            true,   // Step 11: Comment (red)
+            true,   // Step 12: Delete (red)
+            false,  // Step 13
+            false,  // Step 14
+            false   // Step 15
+        };
+        const bool pageStepGreen[8] = {
+            true,           // Step 8: Copy (yellow)
+            _hasClipboard,  // Step 9: Paste (green if valid)
+            true,           // Step 10: Duplicate (yellow)
+            false,          // Step 11: Comment (red)
+            false,          // Step 12: Delete (red)
+            false,          // Step 13
+            false,          // Step 14
+            false           // Step 15
+        };
+
+        for (int i = 0; i < 8; ++i) {
+            int index = MatrixMap::fromStep(i + 8);
+            leds.unmask(index);
+            leds.set(index, pageStepRed[i], pageStepGreen[i]);
+            leds.mask(index);
+        }
     }
 }
 
