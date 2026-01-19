@@ -1,31 +1,6 @@
 #include "TuesdaySequence.h"
 #include "ProjectVersion.h"
 
-// Algorithm names for display
-static const char *algorithmNames[] = {
-    "SIMPLE",     // 0
-    "TRITRANCE",  // 1
-    "STOMPER",    // 2
-    "MARKOV",     // 3
-    "CHIPARP1",   // 4
-    "CHIPARP2",   // 5
-    "WOBBLE",     // 6
-    "SCALEWALK",  // 7
-    "WINDOW",     // 8
-    "MINIMAL",    // 9
-    "GANZ",       // 10
-    "BLAKE",      // 11
-    "APHEX",      // 12
-    "AUTECH",     // 13
-    "STEPWAVE",   // 14
-    "RESERVED15", // 15
-    "RESERVED16", // 16
-    "RESERVED17", // 17
-    "RESERVED18", // 18
-    "RESERVED19", // 19
-    "RESERVED20", // 20
-};
-
 // Loop length values: Inf (0), 1-16, 19, 21, 24, 32, 35, 42, 48, 56, 64, 95, 96, 127, 128
 static const int loopLengthValues[] = {
     0,   // Inf (infinite/evolving)
