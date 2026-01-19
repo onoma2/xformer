@@ -201,9 +201,7 @@ bool Project::read(VersionedSerializedReader &reader) {
     }
     reader.read(_cvGateInput, ProjectVersion::Version6);
     reader.read(_curveCvInput, ProjectVersion::Version11);
-    if (reader.dataVersion() >= ProjectVersion::Version36) {
-        reader.read(_busSafety);
-    }
+    reader.read(_busSafety);
 
     _clockSetup.read(reader);
 
@@ -215,9 +213,7 @@ bool Project::read(VersionedSerializedReader &reader) {
     _playState.read(reader);
     _routing.read(reader);
     _midiOutput.read(reader);
-    if (reader.dataVersion() >= ProjectVersion::Version35) {
-        _cvRoute.read(reader);
-    }
+    _cvRoute.read(reader);
 
     if (reader.dataVersion() >= ProjectVersion::Version5) {
         readArray(reader, UserScale::userScales);

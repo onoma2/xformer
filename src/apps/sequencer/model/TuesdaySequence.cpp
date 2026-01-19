@@ -182,7 +182,6 @@ void TuesdaySequence::write(VersionedSerializedWriter &writer) const {
 }
 
 void TuesdaySequence::read(VersionedSerializedReader &reader) {
-    // All fields need version guards since TuesdayTrack is new in Version35
     // Defaults come from member initialization in TuesdayTrack.h
     reader.read(_algorithm.base);
     reader.read(_flow.base);
