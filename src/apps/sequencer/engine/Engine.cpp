@@ -729,6 +729,13 @@ void Engine::updateCvRouteOutputs() {
     }
 }
 
+float Engine::cvRouteOutput(int lane) const {
+    if (lane < 0 || lane >= int(_cvRouteOutputs.size())) {
+        return 0.f;
+    }
+    return _cvRouteOutputs[lane];
+}
+
 void Engine::reset() {
     for (auto trackEngine : _trackEngines) {
         trackEngine->reset();

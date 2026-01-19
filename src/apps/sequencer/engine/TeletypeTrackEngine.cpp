@@ -830,6 +830,12 @@ void TeletypeTrackEngine::updateAdc(bool force) {
             volts = _engine.cvOutput().channel(channel);
             return true;
         }
+        if (source >= TeletypeTrack::CvInputSource::CvRoute1 &&
+            source <= TeletypeTrack::CvInputSource::CvRoute4) {
+            int lane = int(source) - int(TeletypeTrack::CvInputSource::CvRoute1);
+            volts = _engine.cvRouteOutput(lane);
+            return true;
+        }
         if (source >= TeletypeTrack::CvInputSource::LogicalCv1 &&
             source <= TeletypeTrack::CvInputSource::LogicalCv8) {
             int trackIndex = int(source) - int(TeletypeTrack::CvInputSource::LogicalCv1);

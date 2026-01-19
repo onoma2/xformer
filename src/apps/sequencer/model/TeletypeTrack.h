@@ -82,6 +82,10 @@ public:
         CvOut6,     // Physical CV output 6
         CvOut7,     // Physical CV output 7
         CvOut8,     // Physical CV output 8
+        CvRoute1,   // CV Router output lane 1
+        CvRoute2,   // CV Router output lane 2
+        CvRoute3,   // CV Router output lane 3
+        CvRoute4,   // CV Router output lane 4
         LogicalCv1, // Track 1 CV (pre-layout)
         LogicalCv2,
         LogicalCv3,

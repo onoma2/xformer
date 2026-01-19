@@ -122,6 +122,7 @@ public:
         }
         return _busCv[index];
     }
+    float cvRouteOutput(int lane) const;
     void setBusCv(int index, float volts) {
         if (index < 0 || index >= BusCvCount) {
             return;

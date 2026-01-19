@@ -130,6 +130,10 @@ const char *TeletypeTrack::cvInputSourceName(CvInputSource source) {
     case CvInputSource::CvOut6: return "CV Out 6";
     case CvInputSource::CvOut7: return "CV Out 7";
     case CvInputSource::CvOut8: return "CV Out 8";
+    case CvInputSource::CvRoute1: return "CVR 1";
+    case CvInputSource::CvRoute2: return "CVR 2";
+    case CvInputSource::CvRoute3: return "CVR 3";
+    case CvInputSource::CvRoute4: return "CVR 4";
     case CvInputSource::LogicalCv1: return "L-CV1";
     case CvInputSource::LogicalCv2: return "L-CV2";
     case CvInputSource::LogicalCv3: return "L-CV3";
