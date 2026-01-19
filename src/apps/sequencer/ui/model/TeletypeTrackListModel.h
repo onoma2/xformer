@@ -56,6 +56,7 @@ private:
         CvX,
         CvY,
         CvZ,
+        CvT,
         TriggerOutA,
         TriggerOutB,
         TriggerOutC,
@@ -99,6 +100,7 @@ private:
         case CvX:         return "TI-X";
         case CvY:         return "TI-Y";
         case CvZ:         return "TI-Z";
+        case CvT:         return "TI-T";
         case TriggerOutA: return "TO-TRA";
         case TriggerOutB: return "TO-TRB";
         case TriggerOutC: return "TO-TRC";
@@ -171,6 +173,9 @@ private:
             break;
         case CvZ:
             _track->printCvZSource(str);
+            break;
+        case CvT:
+            _track->printCvTSource(str);
             break;
         case TriggerOutA:
         case TriggerOutB:
@@ -277,6 +282,9 @@ private:
             break;
         case CvZ:
             _track->editCvZSource(value, shift);
+            break;
+        case CvT:
+            _track->editCvTSource(value, shift);
             break;
         case TriggerOutA:
         case TriggerOutB:

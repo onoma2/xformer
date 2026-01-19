@@ -132,6 +132,7 @@ public:
         CvInputSource cvXSource = CvInputSource::None;
         CvInputSource cvYSource = CvInputSource::None;
         CvInputSource cvZSource = CvInputSource::None;
+        CvInputSource cvTSource = CvInputSource::None;
         std::array<TriggerOutputDest, TriggerOutputCount> triggerOutputDest{};
         std::array<CvOutputDest, CvOutputCount> cvOutputDest{};
         std::array<Types::VoltageRange, CvOutputCount> cvOutputRange{};
@@ -290,6 +291,17 @@ public:
     }
     void printCvZSource(StringBuilder &str) const {
         str(cvInputSourceName(activeSlot().cvZSource));
+    }
+    CvInputSource cvTSource() const { return activeSlot().cvTSource; }
+    void setCvTSource(CvInputSource source) {
+        activeSlot().cvTSource = ModelUtils::clampedEnum(source);
+    }
+    void editCvTSource(int value, bool shift) {
+        (void)shift;
+        setCvTSource(ModelUtils::adjustedEnum(activeSlot().cvTSource, value));
+    }
+    void printCvTSource(StringBuilder &str) const {
+        str(cvInputSourceName(activeSlot().cvTSource));
     }
 
     // TO-TRA to TO-TRD (4 trigger outputs)
@@ -463,6 +475,14 @@ public:
         if (slot.cvParamSource >= CvInputSource::CvOut1 &&
             slot.cvParamSource <= CvInputSource::CvOut8) {
             int srcCv = int(slot.cvParamSource) - int(CvInputSource::CvOut1);
+            if (srcCv == cvOutIndex) {
+                return true;
+            }
+        }
+        // Check TI-T
+        if (slot.cvTSource >= CvInputSource::CvOut1 &&
+            slot.cvTSource <= CvInputSource::CvOut8) {
+            int srcCv = int(slot.cvTSource) - int(CvInputSource::CvOut1);
             if (srcCv == cvOutIndex) {
                 return true;
             }

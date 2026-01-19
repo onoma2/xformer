@@ -809,6 +809,7 @@ void TeletypeTrackEngine::updateAdc(bool force) {
     auto xSource = _teletypeTrack.cvXSource();
     auto ySource = _teletypeTrack.cvYSource();
     auto zSource = _teletypeTrack.cvZSource();
+    auto tSource = _teletypeTrack.cvTSource();
 
     auto readCvSource = [this](TeletypeTrack::CvInputSource source, float &volts) -> bool {
         if (source == TeletypeTrack::CvInputSource::None) {
@@ -863,6 +864,10 @@ void TeletypeTrackEngine::updateAdc(bool force) {
     float zVoltage = 0.f;
     if (readCvSource(zSource, zVoltage)) {
         state.variables.z = voltsToRaw(zVoltage);
+    }
+    float tVoltage = 0.f;
+    if (readCvSource(tSource, tVoltage)) {
+        state.variables.t = voltsToRaw(tVoltage);
     }
 }
 

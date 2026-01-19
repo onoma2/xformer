@@ -627,6 +627,7 @@ static void writeSlotIo(fs::FileWriter &writer, int slotIndex, const TeletypeTra
     writeLine(writer, FixedStringBuilder<32>("TI-X %s", TeletypeTrack::cvInputSourceName(slot.cvXSource)));
     writeLine(writer, FixedStringBuilder<32>("TI-Y %s", TeletypeTrack::cvInputSourceName(slot.cvYSource)));
     writeLine(writer, FixedStringBuilder<32>("TI-Z %s", TeletypeTrack::cvInputSourceName(slot.cvZSource)));
+    writeLine(writer, FixedStringBuilder<32>("TI-T %s", TeletypeTrack::cvInputSourceName(slot.cvTSource)));
 
     for (int i = 0; i < TeletypeTrack::TriggerOutputCount; ++i) {
         const char *name = TeletypeTrack::triggerOutputDestName(slot.triggerOutputDest[i]);
@@ -867,6 +868,14 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 TeletypeTrack::CvInputSource source{};
                 if (parseCvInputSource(value, source)) {
                     slot.cvZSource = source;
+                }
+                continue;
+            }
+            if (std::strncmp(line, "TI-T ", 5) == 0) {
+                value = skipSpace(line + 5);
+                TeletypeTrack::CvInputSource source{};
+                if (parseCvInputSource(value, source)) {
+                    slot.cvTSource = source;
                 }
                 continue;
             }

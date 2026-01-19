@@ -27,6 +27,7 @@ void TeletypeTrack::clear() {
         ps.cvXSource = CvInputSource::None;
         ps.cvYSource = CvInputSource::None;
         ps.cvZSource = CvInputSource::LogicalCv4;
+        ps.cvTSource = CvInputSource::None;
 
         // Default trigger outputs
         ps.triggerOutputDest[0] = TriggerOutputDest::GateOut1;
@@ -188,6 +189,7 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(uint8_t(slot.cvXSource));
     writer.write(uint8_t(slot.cvYSource));
     writer.write(uint8_t(slot.cvZSource));
+    writer.write(uint8_t(slot.cvTSource));
     for (int i = 0; i < 4; ++i) {
         writer.write(uint8_t(slot.triggerOutputDest[i]));
     }
@@ -237,6 +239,7 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
         writer.write(uint8_t(patternSlot.cvXSource));
         writer.write(uint8_t(patternSlot.cvYSource));
         writer.write(uint8_t(patternSlot.cvZSource));
+        writer.write(uint8_t(patternSlot.cvTSource));
         for (int i = 0; i < 4; ++i) {
             writer.write(uint8_t(patternSlot.triggerOutputDest[i]));
         }
@@ -271,17 +274,19 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         reader.read(val);
         legacySlot.triggerInputSource[i] = ModelUtils::clampedEnum(TriggerInputSource(val));
     }
-    uint8_t cvInVal, cvParamVal, cvXVal, cvYVal, cvZVal;
+    uint8_t cvInVal, cvParamVal, cvXVal, cvYVal, cvZVal, cvTVal;
     reader.read(cvInVal);
     reader.read(cvParamVal);
     reader.read(cvXVal);
     reader.read(cvYVal);
     reader.read(cvZVal);
+    reader.read(cvTVal);
     legacySlot.cvInSource = ModelUtils::clampedEnum(CvInputSource(cvInVal));
     legacySlot.cvParamSource = ModelUtils::clampedEnum(CvInputSource(cvParamVal));
     legacySlot.cvXSource = ModelUtils::clampedEnum(CvInputSource(cvXVal));
     legacySlot.cvYSource = ModelUtils::clampedEnum(CvInputSource(cvYVal));
     legacySlot.cvZSource = ModelUtils::clampedEnum(CvInputSource(cvZVal));
+    legacySlot.cvTSource = ModelUtils::clampedEnum(CvInputSource(cvTVal));
 
     for (int i = 0; i < 4; ++i) {
         uint8_t val;
@@ -350,17 +355,19 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
             reader.read(val, 0);
             patternSlot.triggerInputSource[i] = ModelUtils::clampedEnum(TriggerInputSource(val));
         }
-        uint8_t cvInVal2, cvParamVal2, cvXVal2, cvYVal2, cvZVal2;
+        uint8_t cvInVal2, cvParamVal2, cvXVal2, cvYVal2, cvZVal2, cvTVal2;
         reader.read(cvInVal2, 0);
         reader.read(cvParamVal2, 0);
         reader.read(cvXVal2, 0);
         reader.read(cvYVal2, 0);
         reader.read(cvZVal2, 0);
+        reader.read(cvTVal2, 0);
         patternSlot.cvInSource = ModelUtils::clampedEnum(CvInputSource(cvInVal2));
         patternSlot.cvParamSource = ModelUtils::clampedEnum(CvInputSource(cvParamVal2));
         patternSlot.cvXSource = ModelUtils::clampedEnum(CvInputSource(cvXVal2));
         patternSlot.cvYSource = ModelUtils::clampedEnum(CvInputSource(cvYVal2));
         patternSlot.cvZSource = ModelUtils::clampedEnum(CvInputSource(cvZVal2));
+        patternSlot.cvTSource = ModelUtils::clampedEnum(CvInputSource(cvTVal2));
         for (int i = 0; i < 4; ++i) {
             uint8_t val;
             reader.read(val, 0);
