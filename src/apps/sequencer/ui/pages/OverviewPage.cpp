@@ -8,6 +8,7 @@
 #include "engine/IndexedTrackEngine.h"
 #include "model/DiscreteMapTrack.h"
 #include "engine/DiscreteMapTrackEngine.h"
+#include "engine/TeletypeTrackEngine.h"
 
 #include "ui/painters/WindowPainter.h"
 
@@ -275,6 +276,51 @@ static void drawDiscreteMapTrack(Canvas &canvas, int trackIndex, const DiscreteM
     }
 }
 
+static void drawTeletypeTrack(Canvas &canvas, int trackIndex, const TeletypeTrackEngine &trackEngine, const TeletypeTrack &track) {
+    canvas.setBlendMode(BlendMode::Set);
+
+    const int y = trackIndex * 8;
+
+    auto drawCell = [&] (int cellIndex, Color color) {
+        int x = 64 + cellIndex * 8;
+        canvas.setColor(color);
+        canvas.fillRect(x + 1, y + 1, 6, 6);
+    };
+
+    int cell = 2;
+
+    // TI1-4 (assigned + activity)
+    for (int i = 0; i < 4; ++i) {
+        bool assigned = track.triggerInputSource(i) != TeletypeTrack::TriggerInputSource::None;
+        bool active = trackEngine.inputState(i);
+        Color color = assigned ? (active ? Color::Bright : Color::Medium) : Color::Low;
+        drawCell(cell + i, color);
+    }
+    cell += 4;
+    cell += 1; // gap
+
+    // TR1-4 (activity)
+    for (int i = 0; i < 4; ++i) {
+        bool active = trackEngine.trActivity(i);
+        Color color = active ? Color::Bright : Color::Medium;
+        drawCell(cell + i, color);
+    }
+    cell += 4;
+    cell += 1; // gap
+
+    // CV1-4 (bipolar level)
+    for (int i = 0; i < 4; ++i) {
+        int32_t magnitude = std::abs(int32_t(trackEngine.cvRaw(i)) - 8192);
+        Color color = Color::Low;
+        if (magnitude > 2048) {
+            color = Color::Bright;
+        } else if (magnitude > 512) {
+            color = Color::Medium;
+        }
+        drawCell(cell + i, color);
+    }
+}
+
 
 OverviewPage::OverviewPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
@@ -341,6 +387,7 @@ void OverviewPage::draw(Canvas &canvas) {
             drawIndexedTrack(canvas, trackIndex, trackEngine.as<IndexedTrackEngine>(), track.indexedTrack().sequence(trackState.pattern()));
             break;
         case Track::TrackMode::Teletype:
+            drawTeletypeTrack(canvas, trackIndex, trackEngine.as<TeletypeTrackEngine>(), track.teletypeTrack());
             break;
         case Track::TrackMode::Last:
             break;
