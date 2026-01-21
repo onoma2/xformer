@@ -337,6 +337,18 @@ void TeletypeScriptViewPage::updateLeds(Leds &leds) {
         LedPainter::drawSelectedSequenceSection(leds, 0);
     }
 
+    // Shift mode: Symbol/command input
+    if (shift && !page) {
+        // Steps 0-7: Symbols (+/-, *//, =!, etc.)
+        for (int i = 0; i < 8; ++i) {
+            leds.set(MatrixMap::fromStep(i), true, true);
+        }
+        // Steps 8-15: Commands (CV, TR., PARAM, etc.)
+        for (int i = 8; i < 16; ++i) {
+            leds.set(MatrixMap::fromStep(i), false, true);
+        }
+    }
+
     // Override with Page mode actions (using unmask/mask pattern)
     if (page && !shift) {
         // Page mode: Clipboard/edit actions on steps 8-12
