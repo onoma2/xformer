@@ -93,6 +93,7 @@ void TeletypeTrackEngine::reset() {
     _bootScriptPending = false;
     _activity = false;
     _activityCountdownMs = 0.f;
+    _trActivityCountdownMs.fill(0.f);
     _tickRemainderMs = 0.f;
     _clockRemainder = 0.0;
     _lastClockPos = 0.0;
@@ -367,6 +368,7 @@ void TeletypeTrackEngine::handleTr(uint8_t index, int16_t value) {
         _performerGateOutput[trackSlot] = next;
         _activity = true;
         _activityCountdownMs = kActivityHoldMs;
+        _trActivityCountdownMs[index] = kActivityHoldMs;
     }
 }
 
@@ -1311,13 +1313,21 @@ void TeletypeTrackEngine::updateLfos(float timeDeltaMs) {
 }
 
 void TeletypeTrackEngine::refreshActivity(float dt) {
-    if (_activityCountdownMs <= 0.f) {
-        _activity = false;
-        return;
+    if (_activityCountdownMs > 0.f) {
+        _activityCountdownMs -= dt * 1000.f;
     }
-    _activityCountdownMs -= dt * 1000.f;
     if (_activityCountdownMs <= 0.f) {
         _activity = false;
+        _activityCountdownMs = 0.f;
+    }
+
+    for (size_t i = 0; i < _trActivityCountdownMs.size(); ++i) {
+        if (_trActivityCountdownMs[i] > 0.f) {
+            _trActivityCountdownMs[i] -= dt * 1000.f;
+            if (_trActivityCountdownMs[i] <= 0.f) {
+                _trActivityCountdownMs[i] = 0.f;
+            }
+        }
     }
 }
 

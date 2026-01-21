@@ -28,6 +28,12 @@ public:
     virtual void update(float dt) override;
 
     virtual bool activity() const override { return _activity; }
+    bool trActivity(int index) const {
+        if (index < 0 || index >= TriggerOutputCount) {
+            return false;
+        }
+        return _trActivityCountdownMs[index] > 0.f;
+    }
     virtual bool gateOutput(int index) const override {
         if (index < 0 || index >= PerformerGateCount) {
             return false;
@@ -163,6 +169,7 @@ private:
     bool _bootScriptPending = true;
     bool _activity = false;
     float _activityCountdownMs = 0.f;
+    std::array<float, TriggerOutputCount> _trActivityCountdownMs{};
     float _tickRemainderMs = 0.f;
     double _clockRemainder = 0.0;
     double _lastClockPos = 0.0;

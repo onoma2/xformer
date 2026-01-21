@@ -395,6 +395,7 @@ void NoteSequenceEditPage::updateLeds(Leds &leds) {
 
     // show quick edit keys
     if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
+        _listModel.setSequence(&_project.selectedNoteSequence());
         for (int i = 0; i < 8; ++i) {
             int index = MatrixMap::fromStep(i + 8);
             leds.unmask(index);

@@ -323,6 +323,8 @@ When you commit a track mode change to Teletype from the Layout page, a prompt a
 `ASSIGN OUTS i-i+3?`
 Answering **Yes** assigns both gate and CV outputs in that range to the Teletype track (no wrap beyond output 8).
 
+Track LED note: when a track is in Teletype mode, its TR activity captures the track LEDs regardless of CV/gate output mapping. TR1 uses the assigned track LED; TR2-TR4 use the next track LEDs (no wrap).
+
 ## Teletype Panic (Page + Track 6)
 
 Need to instantly silence all Teletype activity? Use the global panic:
