@@ -20,6 +20,12 @@ void Project::writeRouted(Routing::Target target, int intValue, float floatValue
     case Routing::Target::Swing:
         setSwing(intValue, true);
         break;
+    case Routing::Target::CvRouteScan:
+        setCvRouteScan(intValue, true);
+        break;
+    case Routing::Target::CvRouteRoute:
+        setCvRouteRoute(intValue, true);
+        break;
     default:
         break;
     }
@@ -43,6 +49,7 @@ void Project::clear() {
     setMidiProgramOffset(0);
     setCvGateInput(Types::CvGateInput::Off);
     setCurveCvInput(Types::CurveCvInput::Off);
+    setBusSafety(true);
 
     _clockSetup.clear();
 
@@ -59,6 +66,7 @@ void Project::clear() {
     _playState.clear();
     _routing.clear();
     _midiOutput.clear();
+    _cvRoute.clear();
 
     for (auto &userScale : UserScale::userScales) {
         userScale.clear();
@@ -119,6 +127,9 @@ void Project::setTrackMode(int trackIndex, Track::TrackMode trackMode) {
     // TODO make sure engine is synced to this before updating UI
     _playState.revertSnapshot();
     _tracks[trackIndex].setTrackMode(trackMode);
+    if (trackMode == Track::TrackMode::Teletype) {
+        _tracks[trackIndex].teletypeTrack().seedOutputDestsFromTrackIndex(trackIndex);
+    }
     _observable.notify(TrackModeChanged);
 }
 
@@ -139,6 +150,7 @@ void Project::write(VersionedSerializedWriter &writer) const {
     _midiInputSource.write(writer);
     writer.write(_cvGateInput);
     writer.write(_curveCvInput);
+    writer.write(_busSafety);
 
     _clockSetup.write(writer);
 
@@ -150,6 +162,7 @@ void Project::write(VersionedSerializedWriter &writer) const {
     _playState.write(writer);
     _routing.write(writer);
     _midiOutput.write(writer);
+    _cvRoute.write(writer);
 
     writeArray(writer, UserScale::userScales);
 
@@ -188,6 +201,7 @@ bool Project::read(VersionedSerializedReader &reader) {
     }
     reader.read(_cvGateInput, ProjectVersion::Version6);
     reader.read(_curveCvInput, ProjectVersion::Version11);
+    reader.read(_busSafety);
 
     _clockSetup.read(reader);
 
@@ -199,6 +213,7 @@ bool Project::read(VersionedSerializedReader &reader) {
     _playState.read(reader);
     _routing.read(reader);
     _midiOutput.read(reader);
+    _cvRoute.read(reader);
 
     if (reader.dataVersion() >= ProjectVersion::Version5) {
         readArray(reader, UserScale::userScales);

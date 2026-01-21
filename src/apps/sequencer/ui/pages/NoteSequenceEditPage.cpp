@@ -43,11 +43,11 @@ static const NoteSequenceListModel::Item quickEditItems[8] = {
     NoteSequenceListModel::Item::FirstStep,
     NoteSequenceListModel::Item::LastStep,
     NoteSequenceListModel::Item::RunMode,
-    NoteSequenceListModel::Item::Divisor,
-    NoteSequenceListModel::Item::ClockMult,
+    NoteSequenceListModel::Item::DivisorX,
     NoteSequenceListModel::Item::ResetMeasure,
     NoteSequenceListModel::Item::Scale,
-    NoteSequenceListModel::Item::RootNote
+    NoteSequenceListModel::Item::RootNote,
+    NoteSequenceListModel::Item::Last
 };
 
 NoteSequenceEditPage::NoteSequenceEditPage(PageManager &manager, PageContext &context) :
@@ -84,6 +84,10 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
     WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), activeFunctionKey());
     const auto &scale = sequence.selectedScale(_project.scale());
     int currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
+    int currentNoteStep = -1;
+    if (sequence.mode() == NoteSequence::Mode::Ikra && trackEngine.isActiveSequence(sequence)) {
+        currentNoteStep = trackEngine.currentNoteStep();
+    }
     int currentRecordStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentRecordStep() : -1;
 
     const int stepWidth = Width / StepCount;
@@ -123,6 +127,14 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
         if (step.gate()) {
             canvas.setColor(_context.model.settings().userSettings().get<DimSequenceSetting>(SettingDimSequence)->getValue() ? Color::Low : Color::Bright);
             canvas.fillRect(x + 4, y + 4, stepWidth - 8, stepWidth - 8);
+        }
+
+        // Ikra note playhead indicator (bright dot)
+        if (currentNoteStep >= 0 && stepIndex == currentNoteStep) {
+            canvas.setColor(Color::Bright);
+            int dotX = x + stepWidth / 2;
+            int dotY = y + stepWidth + 15;
+            canvas.vline(dotX, dotY, 2);
         }
 
         // accumulator trigger indicator (top-right corner dot)
@@ -383,10 +395,13 @@ void NoteSequenceEditPage::updateLeds(Leds &leds) {
 
     // show quick edit keys
     if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
+        _listModel.setSequence(&_project.selectedNoteSequence());
         for (int i = 0; i < 8; ++i) {
             int index = MatrixMap::fromStep(i + 8);
             leds.unmask(index);
-            leds.set(index, false, quickEditItems[i] != NoteSequenceListModel::Item::Last);
+            bool available = quickEditItems[i] != NoteSequenceListModel::Item::Last &&
+                _listModel.rowForItem(quickEditItems[i]) >= 0;
+            leds.set(index, false, available);
             leds.mask(index);
         }
     }
@@ -1061,9 +1076,14 @@ void NoteSequenceEditPage::generateSequence() {
 
 void NoteSequenceEditPage::quickEdit(int index) {
     _listModel.setSequence(&_project.selectedNoteSequence());
-    if (quickEditItems[index] != NoteSequenceListModel::Item::Last) {
-        _manager.pages().quickEdit.show(_listModel, int(quickEditItems[index]));
+    if (quickEditItems[index] == NoteSequenceListModel::Item::Last) {
+        return;
     }
+    int row = _listModel.rowForItem(quickEditItems[index]);
+    if (row < 0) {
+        return;
+    }
+    _manager.pages().quickEdit.show(_listModel, row);
 }
 
 bool NoteSequenceEditPage::allSelectedStepsActive() const {

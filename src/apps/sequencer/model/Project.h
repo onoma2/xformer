@@ -10,6 +10,7 @@
 #include "PlayState.h"
 #include "UserScale.h"
 #include "Routing.h"
+#include "CvRoute.h"
 #include "MidiOutput.h"
 #include "Serialize.h"
 #include "FileDefs.h"
@@ -95,6 +96,17 @@ public:
         printRouted(str, Routing::Target::Swing);
         str("%d%%", swing());
     }
+
+    // cv route
+
+    const CvRoute &cvRoute() const { return _cvRoute; }
+          CvRoute &cvRoute()       { return _cvRoute; }
+
+    int cvRouteScan() const { return _cvRoute.scan(); }
+    int cvRouteRoute() const { return _cvRoute.route(); }
+
+    void setCvRouteScan(int value, bool routed = false) { _cvRoute.setScan(value, routed); }
+    void setCvRouteRoute(int value, bool routed = false) { _cvRoute.setRoute(value, routed); }
 
     // timeSignature
 
@@ -308,6 +320,19 @@ public:
         str(Types::curveCvInput(_curveCvInput));
     }
 
+    // busSafety
+
+    bool busSafety() const { return _busSafety; }
+    void setBusSafety(bool safe) { _busSafety = safe; }
+
+    void editBusSafety(int value, bool shift) {
+        _busSafety = value == 1;
+    }
+
+    void printBusSafety(StringBuilder &str) const {
+        str(_busSafety ? "Safe" : "Raw");
+    }
+
     // curveMidiInput
 
     // clockSetup
@@ -329,7 +354,7 @@ public:
           CvOutputTrackArray &cvOutputTracks()       { return _cvOutputTracks; }
 
     int cvOutputTrack(int index) const { return _cvOutputTracks[index]; }
-    void setCvOutputTrack(int index, int trackIndex) { _cvOutputTracks[index] = clamp(trackIndex, 0, CONFIG_TRACK_COUNT - 1); }
+    void setCvOutputTrack(int index, int trackIndex) { _cvOutputTracks[index] = clamp(trackIndex, 0, CONFIG_TRACK_COUNT); }
 
     void editCvOutputTrack(int index, int value, bool shift) {
         setCvOutputTrack(index, cvOutputTrack(index) + value);
@@ -515,6 +540,7 @@ private:
     mutable uint8_t _autoLoaded = 0;
     Routable<float> _tempo;
     Routable<uint8_t> _swing;
+    CvRoute _cvRoute;
     TimeSignature _timeSignature;
     uint8_t _syncMeasure;
     bool _alwaysSyncPatterns;
@@ -528,6 +554,7 @@ private:
     uint8_t _midiProgramOffset;
     Types::CvGateInput _cvGateInput;
     Types::CurveCvInput _curveCvInput;
+    bool _busSafety = true;
 
     ClockSetup _clockSetup;
     TrackArray _tracks;

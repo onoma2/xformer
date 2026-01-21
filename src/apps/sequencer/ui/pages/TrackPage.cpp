@@ -41,7 +41,12 @@ void TrackPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "TRACK");
     WindowPainter::drawActiveFunction(canvas, Track::trackModeName(_project.selectedTrack().trackMode()));
-    WindowPainter::drawFooter(canvas);
+    if (_project.selectedTrack().trackMode() == Track::TrackMode::Teletype) {
+        const char *functionNames[] = { "TI PRESET", nullptr, nullptr, nullptr, "SYNC OUTS" };
+        WindowPainter::drawFooter(canvas, functionNames, pageKeyState());
+    } else {
+        WindowPainter::drawFooter(canvas);
+    }
 
     ListPage::draw(canvas);
 }
@@ -70,6 +75,56 @@ void TrackPage::keyPress(KeyPressEvent &event) {
                 auto *tuesdayEngine = static_cast<TuesdayTrackEngine *>(&trackEngine);
                 tuesdayEngine->reseed();
                 showMessage("LOOP RESEEDED");
+                event.consume();
+                return;
+            }
+        }
+        if (!key.shiftModifier() && key.function() == 0) {
+            auto &track = _project.selectedTrack();
+            if (track.trackMode() == Track::TrackMode::Teletype) {
+                int trackIndex = _project.selectedTrackIndex();
+                int &presetIndex = _teletypeTriggerPresetIndex[trackIndex];
+                presetIndex = (presetIndex + 1) % 6;
+                applyTeletypeTriggerPreset(track.teletypeTrack(), presetIndex);
+                static const char *presetNames[] = {
+                    "TI-TR CV1-4",
+                    "TI-TR G1-4",
+                    "TI-TR G5-8",
+                    "TI-TR L-G1-4",
+                    "TI-TR L-G5-8",
+                    "TI-TR NONE",
+                };
+                showMessage(presetNames[presetIndex]);
+                event.consume();
+                return;
+            }
+        }
+        if (!key.shiftModifier() && key.function() == 4) {
+            auto &track = _project.selectedTrack();
+            if (track.trackMode() == Track::TrackMode::Teletype) {
+                int trackIndex = _project.selectedTrackIndex();
+                auto &teletypeTrack = track.teletypeTrack();
+                int cvSlot = 0;
+                for (int outputIndex = 0; outputIndex < CONFIG_CHANNEL_COUNT; ++outputIndex) {
+                    if (_project.cvOutputTrack(outputIndex) == trackIndex) {
+                        teletypeTrack.setCvOutputDest(cvSlot, TeletypeTrack::CvOutputDest(outputIndex));
+                        ++cvSlot;
+                        if (cvSlot >= TeletypeTrack::CvOutputCount) {
+                            break;
+                        }
+                    }
+                }
+                int gateSlot = 0;
+                for (int outputIndex = 0; outputIndex < CONFIG_CHANNEL_COUNT; ++outputIndex) {
+                    if (_project.gateOutputTrack(outputIndex) == trackIndex) {
+                        teletypeTrack.setTriggerOutputDest(gateSlot, TeletypeTrack::TriggerOutputDest(outputIndex));
+                        ++gateSlot;
+                        if (gateSlot >= TeletypeTrack::TriggerOutputCount) {
+                            break;
+                        }
+                    }
+                }
+                showMessage("TT OUTS SYNCED");
                 event.consume();
                 return;
             }
@@ -115,6 +170,10 @@ void TrackPage::setTrack(Track &track) {
     case Track::TrackMode::Indexed:
         _indexedTrackListModel.setTrack(&track.indexedTrack());
         newListModel = &_indexedTrackListModel;
+        break;
+    case Track::TrackMode::Teletype:
+        _teletypeTrackListModel.setTrack(track.teletypeTrack(), _project, track.trackIndex());
+        newListModel = &_teletypeTrackListModel;
         break;
     case Track::TrackMode::Last:
         ASSERT(false, "invalid track mode");
@@ -203,5 +262,21 @@ void TrackPage::reseedTuesday() {
         auto *tuesdayEngine = static_cast<TuesdayTrackEngine *>(&trackEngine);
         tuesdayEngine->reseed();
         showMessage("LOOP RESEEDED");
+    }
+}
+
+void TrackPage::applyTeletypeTriggerPreset(TeletypeTrack &track, int presetIndex) {
+    using Source = TeletypeTrack::TriggerInputSource;
+    static const Source presets[][4] = {
+        { Source::CvIn1, Source::CvIn2, Source::CvIn3, Source::CvIn4 },
+        { Source::GateOut1, Source::GateOut2, Source::GateOut3, Source::GateOut4 },
+        { Source::GateOut5, Source::GateOut6, Source::GateOut7, Source::GateOut8 },
+        { Source::LogicalGate1, Source::LogicalGate2, Source::LogicalGate3, Source::LogicalGate4 },
+        { Source::LogicalGate5, Source::LogicalGate6, Source::LogicalGate7, Source::LogicalGate8 },
+        { Source::None, Source::None, Source::None, Source::None },
+    };
+    int index = clamp(presetIndex, 0, 5);
+    for (int i = 0; i < 4; ++i) {
+        track.setTriggerInputSource(i, presets[index][i]);
     }
 }

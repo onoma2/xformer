@@ -16,54 +16,42 @@
 
 ## Memory Usage Analysis
 
-### 1. Sequence Memory Footprint
+### Important Correction: Per-Track RAM Is Fixed by Container Max Size
+Tracks are stored in a `Container<...>` that reserves memory equal to the
+largest track type in the set. This means:
+- Every track allocates the same RAM regardless of current mode.
+- Switching a track to a "smaller" type does not reduce RAM usage.
+- Any new track type that exceeds the current max size increases RAM for all
+  tracks.
 
-#### NoteSequence Memory:
-- Each `NoteSequence::Step` uses 2 x 32-bit unions = 8 bytes
-- Each `NoteSequence` has 64 steps × 8 bytes = 512 bytes
-- Each `NoteSequence` has additional metadata: ~128 bytes
-- Total per `NoteSequence`: ~640 bytes
-- Per track: 17 sequences (16 patterns + 1 snapshot) × 640 bytes = 10,880 bytes
-- For 8 tracks: 8 × 10,880 = **87,040 bytes**
+Code references:
+- Model tracks: `src/apps/sequencer/model/Track.h`
+- Engine tracks: `src/apps/sequencer/engine/Engine.h`
+- Container behavior: `src/core/utils/Container.h`
 
-#### CurveSequence Memory:
-- Each `CurveSequence::Step` uses 1 × 32-bit + 1 × 16-bit unions = 6 bytes
-- Each `CurveSequence` has 64 steps × 6 bytes = 384 bytes
-- Each `CurveSequence` has additional metadata: ~192 bytes
-- Total per `CurveSequence`: ~576 bytes
-- Per track: 17 sequences × 576 bytes = 9,792 bytes
-- For 8 tracks: 8 × 9,792 = **78,336 bytes**
+### 1. Sequence + Track Memory Footprint (Measured `sizeof`, PLATFORM_SIM)
 
-#### TuesdaySequence Memory:
-- Each `TuesdaySequence` is metadata-only (no per-step data)
-- Each `TuesdaySequence` has ~128 bytes of parameters
-- Per track: 17 sequences × 128 bytes = 2,176 bytes
-- For 8 tracks: 8 × 2,176 = **17,408 bytes**
+#### NoteSequence / NoteTrack:
+- `NoteSequence::Step` = 8 bytes
+- `NoteSequence` = 556 bytes
+- Per track sequences: 17 × 556 = 9,452 bytes
+- `NoteTrack` (full object) = 9,476 bytes
 
-#### DiscreteSequence Memory:
-- Each `DiscreteStage` uses 3 bytes (threshold, direction, noteIndex)
-- Each `DiscreteSequence` has 32 stages × 3 bytes = 96 bytes
-- Each `DiscreteSequence` has additional metadata: ~19 bytes
-- Total per `DiscreteSequence`: ~115 bytes
-- Per track: 17 sequences (16 patterns + 1 snapshot) × 115 bytes = 1,955 bytes
-- For 8 tracks: 8 × 1,955 = **15,640 bytes**
+#### CurveSequence / CurveTrack:
+- `CurveSequence::Step` = 8 bytes
+- `CurveSequence` = 592 bytes
+- Per track sequences: 17 × 592 = 10,064 bytes
+- `CurveTrack` (full object) = 10,092 bytes
 
-#### Total Sequence Memory: ~182,784 bytes
-Wait, this exceeds the available RAM. Let me recalculate more carefully.
+#### Other track types (full object sizes):
+- `MidiCvTrack` = 24 bytes
+- `TuesdayTrack` = 718 bytes
+- `DiscreteMapTrack` = 2,196 bytes
+- `IndexedTrack` = 5,320 bytes
 
-### Corrected Memory Analysis
-
-Actually, looking at the Track model, only one track type is active per track at a time:
-- Each track can be Note, Curve, MidiCv, Tuesday, or Discrete (not all simultaneously)
-- Each track contains only its relevant sequence type
-
-So the memory is:
-- If all tracks were Note tracks: 8 × 10,880 = 87,040 bytes
-- If all tracks were Curve tracks: 8 × 9,792 = 78,336 bytes
-- If all tracks were Tuesday tracks: 8 × 2,176 = 17,408 bytes
-- If all tracks were Discrete tracks: 8 × 1,955 = 15,640 bytes
-
-The system supports mixed track types, so the maximum would be if all are Note tracks: **~87 KB**
+#### Container sizing impact:
+- `Container<...>::Size` = 10,092 bytes (max track type is `CurveTrack`)
+- `Track` = 10,120 bytes (container + per-track metadata)
 
 ### 2. Track Engine Memory Footprint
 
@@ -130,17 +118,25 @@ The system supports mixed track types, so the maximum would be if all are Note t
 
 ## Resource Usage Health Assessment
 
+### Latest Hardware Snapshot (Teletype Track)
+- SRAM: 118,312 / 131,072 (free 12,760)
+- CCM: 55,412 / 65,536 (free 10,124)
+- DATA: 8,064
+- BSS: 110,248
+- CCM BSS: 55,412
+- Interpretation: both SRAM and CCM have ~10–13 KB free headroom; usable but tight, so any new large static buffers or stack growth will be high risk.
+
 ### Memory Usage Analysis (New Data Based on Current Analysis)
 
 **Current Memory Distribution:**
 - **SRAM (128KB)**: Used for main data structures (Model, sequences, project data)
 - **CCMRAM (64KB)**: Used for real-time critical objects (Engine, UI, drivers)
 
-**Memory Consumption:**
-- **SRAM Utilization**: ~110KB out of 128KB (86%)
-- **CCMRAM Utilization**: ~45KB out of 64KB (70%)
-- **Free SRAM**: ~18KB remaining (concerning)
-- **Free CCMRAM**: ~19KB remaining (acceptable)
+**Memory Consumption (STM32 release map):**
+- **SRAM Utilization**: 116,384 / 131,072 bytes (~88.8%)
+- **CCMRAM Utilization**: 55,404 / 65,536 bytes (~84.5%)
+- **Free SRAM**: 14,688 bytes (~14.3 KB, concerning)
+- **Free CCMRAM**: 10,132 bytes (~9.9 KB, tight)
 
 ### Discrete and Routing Resource Analysis
 
@@ -188,7 +184,7 @@ The system supports mixed track types, so the maximum would be if all are Note t
 4. **NEW**: Well-integrated routing system with support for Discrete targets
 
 **Potential Concerns:**
-1. **SRAM Pressure**: Only ~18KB free SRAM remains, which is limiting for future feature expansion
+1. **SRAM Pressure**: ~14.3KB free SRAM remains, which is limiting for future feature expansion
 2. The complex Tuesday track engine adds significant computational overhead
 3. Memory constraints may limit future feature additions
 

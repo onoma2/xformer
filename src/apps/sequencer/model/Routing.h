@@ -41,7 +41,9 @@ public:
         ProjectFirst,
         Tempo = ProjectFirst,
         Swing,
-        ProjectLast = Swing,
+        CvRouteScan,
+        CvRouteRoute,
+        ProjectLast = CvRouteRoute,
 
         // PlayState targets
         PlayStateFirst,
@@ -124,6 +126,14 @@ public:
         IndexedB,
         IndexedLast = IndexedB,
 
+        // Bus Targets
+        BusFirst,
+        BusCv1 = BusFirst,
+        BusCv2,
+        BusCv3,
+        BusCv4,
+        BusLast = BusCv4,
+
         Last,
     };
 
@@ -141,6 +151,8 @@ public:
 
         case Target::Tempo:                     return "Tempo";
         case Target::Swing:                     return "Swing";
+        case Target::CvRouteScan:               return "CVR Scan";
+        case Target::CvRouteRoute:              return "CVR Route";
 
         case Target::Mute:                      return "Mute";
         case Target::Fill:                      return "Fill";
@@ -196,6 +208,10 @@ public:
 
         case Target::IndexedA:                  return "Indexed A";
         case Target::IndexedB:                  return "Indexed B";
+        case Target::BusCv1:                    return "BUS 1";
+        case Target::BusCv2:                    return "BUS 2";
+        case Target::BusCv3:                    return "BUS 3";
+        case Target::BusCv4:                    return "BUS 4";
 
         case Target::Last:                      break;
         }
@@ -209,6 +225,8 @@ public:
         case Target::Record:                    return 2;
         case Target::Tempo:                     return 3;
         case Target::Swing:                     return 4;
+        case Target::CvRouteScan:               return 61;
+        case Target::CvRouteRoute:              return 62;
         case Target::SlideTime:                 return 5;
         case Target::Octave:                    return 6;
         case Target::Transpose:                    return 7;
@@ -275,6 +293,10 @@ public:
         // Indexed Targets (52-53)
         case Target::IndexedA:                  return 52;
         case Target::IndexedB:                  return 53;
+        case Target::BusCv1:                    return 57;
+        case Target::BusCv2:                    return 58;
+        case Target::BusCv3:                    return 59;
+        case Target::BusCv4:                    return 60;
 
         case Target::Run:                       return 54;
         case Target::Reset:                     return 55;
@@ -322,6 +344,9 @@ public:
 
     static bool isIndexedTarget(Target target) {
         return target >= Target::IndexedFirst && target <= Target::IndexedLast;
+    }
+    static bool isBusTarget(Target target) {
+        return target >= Target::BusFirst && target <= Target::BusLast;
     }
 
     static bool isPerTrackTarget(Target target) {
@@ -374,13 +399,36 @@ public:
         CvOut6,
         CvOut7,
         CvOut8,
-        CvLast = CvOut8,
+        BusCv1,
+        BusCv2,
+        BusCv3,
+        BusCv4,
+        CvLast = BusCv4,
         Midi,
+        GateOut1,
+        GateOut2,
+        GateOut3,
+        GateOut4,
+        GateOut5,
+        GateOut6,
+        GateOut7,
+        GateOut8,
         Last
     };
 
     static bool isCvSource(Source source) { return source >= Source::CvFirst && source <= Source::CvLast; }
     static bool isMidiSource(Source source) { return source == Source::Midi; }
+    static bool isBusSource(Source source) { return source >= Source::BusCv1 && source <= Source::BusCv4; }
+    static int busSourceIndex(Source source) {
+        return isBusSource(source) ? int(source) - int(Source::BusCv1) : -1;
+    }
+    static int busTargetIndex(Target target) {
+        return isBusTarget(target) ? int(target) - int(Target::BusCv1) : -1;
+    }
+    static bool isBusSelfRoute(Source source, Target target) {
+        return isBusSource(source) && isBusTarget(target) &&
+               busSourceIndex(source) == busTargetIndex(target);
+    }
 
     static void printSource(Source source, StringBuilder &str) {
         switch (source) {
@@ -403,8 +451,25 @@ public:
         case Source::CvOut8:
             str("CV Out %d", int(source) - int(Source::CvOut1) + 1);
             break;
+        case Source::BusCv1:
+        case Source::BusCv2:
+        case Source::BusCv3:
+        case Source::BusCv4:
+            str("BUS %d", int(source) - int(Source::BusCv1) + 1);
+            break;
         case Source::Midi:
             str("MIDI");
+            break;
+        case Source::GateOut1:
+        case Source::GateOut2:
+        case Source::GateOut3:
+        case Source::GateOut4:
+        case Source::GateOut5:
+        case Source::GateOut6:
+        case Source::GateOut7:
+        case Source::GateOut8:
+            str("Gate Out %d", int(source) - int(Source::GateOut1) + 1);
+            break;
         case Source::Last:
             break;
         }
@@ -563,6 +628,9 @@ public:
                 _target = target;
                 std::tie(_min, _max) = normalizedDefaultRange(target);
             }
+            if (isBusSelfRoute(_source, _target)) {
+                _source = Source::None;
+            }
         }
 
         void editTarget(int value, bool shift) {
@@ -676,11 +744,38 @@ public:
 
         Source source() const { return _source; }
         void setSource(Source source) {
-            _source = ModelUtils::clampedEnum(source);
+            source = ModelUtils::clampedEnum(source);
+            if (isBusSelfRoute(source, _target)) {
+                _source = Source::None;
+            } else {
+                _source = source;
+            }
         }
 
         void editSource(int value, bool shift) {
-            setSource(ModelUtils::adjustedEnum(source(), value));
+            if (value == 0) {
+                return;
+            }
+            int dir = value > 0 ? 1 : -1;
+            int steps = std::abs(value);
+            int current = int(source());
+            for (int step = 0; step < steps; ++step) {
+                for (int i = 0; i < int(Source::Last); ++i) {
+                    int next = current + dir;
+                    if (next < 0) {
+                        next = int(Source::Last) - 1;
+                    } else if (next >= int(Source::Last)) {
+                        next = 0;
+                    }
+                    current = next;
+                    auto candidate = Source(current);
+                    if (isBusSelfRoute(candidate, _target)) {
+                        continue;
+                    }
+                    _source = candidate;
+                    break;
+                }
+            }
         }
 
         void printSource(StringBuilder &str) const {
@@ -696,6 +791,11 @@ public:
 
         const MidiSource &midiSource() const { return _midiSource; }
               MidiSource &midiSource()       { return _midiSource; }
+
+        // cvRotateInterpolate (CV Out Rot only)
+
+        bool cvRotateInterpolate() const { return _cvRotateInterpolate; }
+        void setCvRotateInterpolate(bool enabled) { _cvRotateInterpolate = enabled; }
 
         Route();
 
@@ -723,6 +823,7 @@ public:
         Source _source;
         CvSource _cvSource;
         MidiSource _midiSource;
+        bool _cvRotateInterpolate = false;
 
         friend class Routing;
     };

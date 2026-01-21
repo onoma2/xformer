@@ -62,6 +62,7 @@ private:
         MidiProgramOffset,
         CvGateInput,
         CurveCvInput,
+        BusSafety,
         Last
     };
 
@@ -82,6 +83,7 @@ private:
         case MidiProgramOffset:     return "MIDI Pgm Off.";
         case CvGateInput:           return "CV/Gate Input";
         case CurveCvInput:          return "Curve CV Input";
+        case BusSafety:             return "Bus Safety";
         case Last:                  break;
         }
         return nullptr;
@@ -138,6 +140,9 @@ private:
         case CurveCvInput:
             _project.printCurveCvInput(str);
             break;
+        case BusSafety:
+            _project.printBusSafety(str);
+            break;
         case Last:
             break;
         }
@@ -188,6 +193,9 @@ private:
             break;
         case CurveCvInput:
             _project.editCurveCvInput(value, shift);
+            break;
+        case BusSafety:
+            _project.editBusSafety(value, shift);
             break;
         case Last:
             break;

@@ -1,0 +1,147 @@
+["TI.PARAM"]
+prototype = "TI.PARAM x"
+aliases = ["TI.PRM"]
+short = "reads the value of `PARAM` knob `x`; default return range is from 0 to 16383; return range can be altered by the `TI.PARAM.MAP` command"
+
+["TI.PARAM.QT"]
+prototype = "TI.PARAM.QT x"
+aliases = ["TI.PRM.QT"]
+short = "return the quantized value for `PARAM` knob `x` using the scale set by `TI.PARAM.SCALE`; default return range is from 0 to 16383"
+
+["TI.PARAM.N"]
+prototype = "TI.PARAM.N x"
+aliases = ["TI.PRM.N"]
+short = "return the quantized note number for `PARAM` knob `x` using the scale set by `TI.PARAM.SCALE`"
+
+["TI.PARAM.SCALE"]
+prototype = "TI.PARAM.SCALE x"
+aliases = ["TI.PRM.SCALE"]
+short = "select scale # `y` for `PARAM` knob `x`; scales listed in full description"
+description = """
+### Quantization Scales
+0. Equal Temperament [DEFAULT]
+1. 12-tone Pythagorean scale
+2. Vallotti & Young scale (Vallotti version) also known as Tartini-Vallotti (1754)
+3. Andreas Werckmeister's temperament III (the most famous one, 1681)
+4. Wendy Carlos' Alpha scale with perfect fifth divided in nine
+5. Wendy Carlos' Beta scale with perfect fifth divided by eleven
+6. Wendy Carlos' Gamma scale with third divided by eleven or fifth by twenty
+7. Carlos Harmonic & Ben Johnston's scale of 'Blues' from Suite f.micr.piano (1977) & David Beardsley's scale of 'Science Friction'
+8. Carlos Super Just
+9. Kurzweil "Empirical Arabic"
+10. Kurzweil "Just with natural b7th", is Sauveur Just with 7/4
+11. Kurzweil "Empirical Bali/Java Harmonic Pelog"
+12. Kurzweil "Empirical Bali/Java Slendro, Siam 7"
+13. Kurzweil "Empirical Tibetian Ceremonial"
+14. Harry Partch's 43-tone pure scale
+15. Partch's Indian Chromatic, Exposition of Monophony, 1933. 
+16. Partch Greek scales from "Two Studies on Ancient Greek Scales" on black/white 
+"""
+
+["TI.PARAM.MAP"]
+prototype = "TI.PARAM.MAP x y z"
+aliases = ["TI.PRM.MAP"]
+short = "maps the PARAM values for input `x` across the range y - z (defaults 0-16383)"
+description = """
+If you would like to have a `PARAM` knob values over a specific range, you can offload the processing for this to the TXo by mapping the range of the potentiometer using the `MAP` command. It works a lot like the `MAP` operator, but does the heavy lifting on the TXi, saving you space in your code and cycles on your processor.
+
+For instance, let's have the first knob return a range from 0 to 100.
+
+```
+TI.PARAM.MAP 1 0 100
+```
+
+You can reset the mapping by either calling the map command with the default range or by using the `INIT` command (`TO.PARAM.INIT 1`).
+"""
+
+["TI.IN"]
+prototype = "TI.IN x"
+short = "reads the value of IN jack `x`; default return range is from -16384 to 16383 - representing -10V to +10V; return range can be altered by the `TI.IN.MAP` command"
+
+["TI.IN.QT"]
+prototype = "TI.IN.QT x"
+short = "return the quantized value for `IN` jack `x` using the scale set by `TI.IN.SCALE`; default return range is from -16384 to 16383 - representing -10V to +10V"
+
+["TI.IN.N"]
+prototype = "TI.IN.N x"
+short = "return the quantized note number for `IN` jack `x` using the scale set by `TI.IN.SCALE`"
+
+["TI.IN.SCALE"]
+prototype = "TI.IN.SCALE x"
+short = "select scale # `y` for `IN` jack `x`; scales listed in full description"
+description = """
+### Quantization Scales
+0. Equal Temperament [DEFAULT]
+1. 12-tone Pythagorean scale
+2. Vallotti & Young scale (Vallotti version) also known as Tartini-Vallotti (1754)
+3. Andreas Werckmeister's temperament III (the most famous one, 1681)
+4. Wendy Carlos' Alpha scale with perfect fifth divided in nine
+5. Wendy Carlos' Beta scale with perfect fifth divided by eleven
+6. Wendy Carlos' Gamma scale with third divided by eleven or fifth by twenty
+7. Carlos Harmonic & Ben Johnston's scale of 'Blues' from Suite f.micr.piano (1977) & David Beardsley's scale of 'Science Friction'
+8. Carlos Super Just
+9. Kurzweil "Empirical Arabic"
+10. Kurzweil "Just with natural b7th", is Sauveur Just with 7/4
+11. Kurzweil "Empirical Bali/Java Harmonic Pelog"
+12. Kurzweil "Empirical Bali/Java Slendro, Siam 7"
+13. Kurzweil "Empirical Tibetian Ceremonial"
+14. Harry Partch's 43-tone pure scale
+15. Partch's Indian Chromatic, Exposition of Monophony, 1933. 
+16. Partch Greek scales from "Two Studies on Ancient Greek Scales" on black/white 
+"""
+
+["TI.IN.MAP"]
+prototype = "TI.IN.MAP x y z"
+short = "maps the IN values for input jack `x` across the range y - z (default range is -16384 to 16383 - representing -10V to +10V)"
+
+["TI.PARAM.INIT"]
+prototype = "TI.PARAM.INIT x"
+aliases = ["TI.PRM.INIT"]
+short = "initializes `PARAM` knob `x` back to the default boot settings and behaviors; neutralizes mapping (but not calibration)"
+
+["TI.IN.INIT"]
+prototype = "TI.IN.INIT x"
+short = "initializes `IN` jack `x` back to the default boot settings and behaviors; neutralizes mapping (but not calibration)"
+
+["TI.INIT"]
+prototype = "TI.INIT d"
+short = "initializes all of the `PARAM` and `IN` inputs for device number `d` (1-8)"
+
+["TI.PARAM.CALIB"]
+prototype = "TI.PARAM.CALIB x y"
+aliases = ["TI.PRM.CALIB"]
+short = "calibrates the scaling for PARAM knob `x`; `y` of `0` sets the bottom bound; `y` of `1` sets the top bound"
+description = """
+You can calibrate your `PARAM` knob by using this command. The steps for full calibration are as follows:
+
+1. Turn the PARAM knob `x` all the way to the left
+2. Send the command 'TI.PARAM.CALIBRATE x 0'
+3. Turn the PARAM knob `x` all the way to the right
+4. Send the command 'TI.PARAM.CALIBRATE x 1'
+
+Don't forget to call the `TI.STORE` command to save your calibration between sessions.
+"""
+
+["TI.IN.CALIB"]
+prototype = "TI.IN.CALIB x y"
+short = "calibrates the scaling for IN jack `x`; `y` of `-1` sets the `-10V` point; `y` of `0` sets the `0V` point; `y` of `1` sets the `+10V` point"
+description = """
+You can calibrate your `IN` jack to external voltages by using this command. The steps for full calibration are as follows:
+
+1. Send a `-10V` signal to the input `x`
+2. Send the command 'TI.IN.CALIBRATE x -1'
+3. Send a `0V` signal to the input `x`
+4. Send the command 'TI.IN.CALIBRATE x 0'
+5. Send a `10V` signal to the input `x`
+6. Send the command 'TI.IN.CALIBRATE x 1'
+
+Don't forget to call the `TI.STORE` command to save your calibration between sessions.
+"""
+
+["TI.STORE"]
+prototype = "TI.STORE d"
+short = "stores the calibration data for TXi number `d` (1-8) to its internal flash memory"
+
+["TI.RESET"]
+prototype = "TI.RESET d"
+short = "resets the calibration data for TXi number `d` (1-8) to its factory defaults (no calibration)"

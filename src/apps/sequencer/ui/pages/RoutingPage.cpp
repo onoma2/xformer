@@ -110,9 +110,10 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
             if (conflict >= 0) {
                 showMessage(FixedStringBuilder<64>("ROUTE SETTINGS CONFLICT WITH ROUTE %d", conflict + 1));
             } else {
+                bool busFeedback = Routing::isBusSource(_editRoute.source()) && Routing::isBusTarget(_editRoute.target());
                 *_route = _editRoute;
                 setEdit(false);
-                showMessage("ROUTE CHANGED");
+                showMessage(busFeedback ? "ROUTE CHG FB" : "ROUTE CHANGED");
             }
             break;
         }

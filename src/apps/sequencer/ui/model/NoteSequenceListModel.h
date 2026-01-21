@@ -10,10 +10,16 @@
 class NoteSequenceListModel : public RoutableListModel {
 public:
     enum Item {
+        Mode,
         FirstStep,
         LastStep,
+        NoteFirstStep,
+        NoteLastStep,
         RunMode,
-        Divisor,
+        DivisorX,
+        DivisorY,
+        DivisorYSource,
+        DivisorYTrack,
         ClockMult,
         ResetMeasure,
         Scale,
@@ -29,7 +35,7 @@ public:
     }
 
     virtual int rows() const override {
-        return _sequence ? Last : 0;
+        return _sequence ? itemCount() : 0;
     }
 
     virtual int columns() const override {
@@ -38,35 +44,35 @@ public:
 
     virtual void cell(int row, int column, StringBuilder &str) const override {
         if (column == 0) {
-            formatName(Item(row), str);
+            formatName(itemForRow(row), str);
         } else if (column == 1) {
-            formatValue(Item(row), str);
+            formatValue(itemForRow(row), str);
         }
     }
 
     virtual void edit(int row, int column, int value, bool shift) override {
         if (column == 1) {
-            editValue(Item(row), value, shift);
+            editValue(itemForRow(row), value, shift);
         }
     }
 
     virtual int indexedCount(int row) const override {
-        return indexedCountValue(Item(row));
+        return indexedCountValue(itemForRow(row));
     }
 
     virtual int indexed(int row) const override {
-        return indexedValue(Item(row));
+        return indexedValue(itemForRow(row));
     }
 
     virtual void setIndexed(int row, int index) override {
         if (index >= 0 && index < indexedCount(row)) {
-            setIndexedValue(Item(row), index);
+            setIndexedValue(itemForRow(row), index);
         }
     }
 
     virtual Routing::Target routingTarget(int row) const override {
-        switch (Item(row)) {
-        case Divisor:
+        switch (itemForRow(row)) {
+        case DivisorX:
             return Routing::Target::Divisor;
         case ClockMult:
             return Routing::Target::ClockMult;
@@ -86,12 +92,18 @@ public:
     }
 
 private:
-    static const char *itemName(Item item) {
+    const char *itemName(Item item) const {
         switch (item) {
+        case Mode:              return "Mode";
         case FirstStep:         return "First Step";
         case LastStep:          return "Last Step";
+        case NoteFirstStep:     return "Note First";
+        case NoteLastStep:      return "Note Last";
         case RunMode:           return "Run Mode";
-        case Divisor:           return "Divisor";
+        case DivisorX:          return "Div X";
+        case DivisorY:          return _sequence->mode() == NoteSequence::Mode::Ikra ? "Div N" : "Div Y";
+        case DivisorYSource:    return "Y Src";
+        case DivisorYTrack:     return "Y Trk";
         case ClockMult:         return "Clock Mult";
         case ResetMeasure:      return "Reset Measure";
         case Scale:             return "Scale";
@@ -107,17 +119,35 @@ private:
 
     void formatValue(Item item, StringBuilder &str) const {
         switch (item) {
+        case Mode:
+            _sequence->printMode(str);
+            break;
         case FirstStep:
             _sequence->printFirstStep(str);
             break;
         case LastStep:
             _sequence->printLastStep(str);
             break;
+        case NoteFirstStep:
+            _sequence->printNoteFirstStep(str);
+            break;
+        case NoteLastStep:
+            _sequence->printNoteLastStep(str);
+            break;
         case RunMode:
             _sequence->printRunMode(str);
             break;
-        case Divisor:
+        case DivisorX:
             _sequence->printDivisor(str);
+            break;
+        case DivisorY:
+            _sequence->printDivisorY(str);
+            break;
+        case DivisorYSource:
+            _sequence->printDivisorYSource(str);
+            break;
+        case DivisorYTrack:
+            _sequence->printDivisorYTrack(str);
             break;
         case ClockMult:
             _sequence->printClockMultiplier(str);
@@ -138,17 +168,35 @@ private:
 
     void editValue(Item item, int value, bool shift) {
         switch (item) {
+        case Mode:
+            _sequence->editMode(value, shift);
+            break;
         case FirstStep:
             _sequence->editFirstStep(value, shift);
             break;
         case LastStep:
             _sequence->editLastStep(value, shift);
             break;
+        case NoteFirstStep:
+            _sequence->editNoteFirstStep(value, shift);
+            break;
+        case NoteLastStep:
+            _sequence->editNoteLastStep(value, shift);
+            break;
         case RunMode:
             _sequence->editRunMode(value, shift);
             break;
-        case Divisor:
+        case DivisorX:
             _sequence->editDivisor(value, shift);
+            break;
+        case DivisorY:
+            _sequence->editDivisorY(value, shift);
+            break;
+        case DivisorYSource:
+            _sequence->editDivisorYSource(value, shift);
+            break;
+        case DivisorYTrack:
+            _sequence->editDivisorYTrack(value, shift);
             break;
         case ClockMult:
             _sequence->editClockMultiplier(value, shift);
@@ -169,14 +217,23 @@ private:
 
     int indexedCountValue(Item item) const {
         switch (item) {
+        case Mode:
+            return int(NoteSequence::Mode::Last);
         case FirstStep:
         case LastStep:
+        case NoteFirstStep:
+        case NoteLastStep:
             return 16;
         case RunMode:
             return int(Types::RunMode::Last);
-        case Divisor:
+        case DivisorX:
+        case DivisorY:
         case ResetMeasure:
             return 16;
+        case DivisorYSource:
+            return int(NoteSequence::DivYSource::Last);
+        case DivisorYTrack:
+            return CONFIG_TRACK_COUNT;
         case ClockMult:
             return 101;
         case Scale:
@@ -191,14 +248,26 @@ private:
 
     int indexedValue(Item item) const {
         switch (item) {
+        case Mode:
+            return int(_sequence->mode());
         case FirstStep:
             return _sequence->firstStep();
         case LastStep:
             return _sequence->lastStep();
+        case NoteFirstStep:
+            return _sequence->noteFirstStep();
+        case NoteLastStep:
+            return _sequence->noteLastStep();
         case RunMode:
             return int(_sequence->runMode());
-        case Divisor:
+        case DivisorX:
             return _sequence->indexedDivisor();
+        case DivisorY:
+            return _sequence->indexedDivisorY();
+        case DivisorYSource:
+            return int(_sequence->divisorYSource());
+        case DivisorYTrack:
+            return _sequence->divisorYTrack();
         case ClockMult:
             return _sequence->clockMultiplier() - 50;
         case ResetMeasure:
@@ -215,14 +284,26 @@ private:
 
     void setIndexedValue(Item item, int index) {
         switch (item) {
+        case Mode:
+            return _sequence->setMode(NoteSequence::Mode(index));
         case FirstStep:
             return _sequence->setFirstStep(index);
         case LastStep:
             return _sequence->setLastStep(index);
+        case NoteFirstStep:
+            return _sequence->setNoteFirstStep(index);
+        case NoteLastStep:
+            return _sequence->setNoteLastStep(index);
         case RunMode:
             return _sequence->setRunMode(Types::RunMode(index));
-        case Divisor:
+        case DivisorX:
             return _sequence->setIndexedDivisor(index);
+        case DivisorY:
+            return _sequence->setIndexedDivisorY(index);
+        case DivisorYSource:
+            return _sequence->setDivisorYSource(NoteSequence::DivYSource(index));
+        case DivisorYTrack:
+            return _sequence->setDivisorYTrack(index);
         case ClockMult:
             return _sequence->setClockMultiplier(index + 50);
         case ResetMeasure:
@@ -237,4 +318,57 @@ private:
     }
 
     NoteSequence *_sequence;
+
+    static const Item linearItems[];
+
+    static const Item reneItems[];
+
+    static const Item ikraItems[];
+
+    int itemCount() const {
+        int count = 0;
+        const Item *items = linearItems;
+        if (_sequence->mode() == NoteSequence::Mode::Ikra) {
+            items = ikraItems;
+        } else if (_sequence->mode() == NoteSequence::Mode::ReRene) {
+            items = reneItems;
+        }
+        while (items[count] != Last) {
+            ++count;
+        }
+        return count;
+    }
+
+    Item itemForRow(int row) const {
+        const Item *items = linearItems;
+        if (_sequence->mode() == NoteSequence::Mode::Ikra) {
+            items = ikraItems;
+        } else if (_sequence->mode() == NoteSequence::Mode::ReRene) {
+            items = reneItems;
+        }
+        int count = itemCount();
+        if (row < 0 || row >= count) {
+            return items[0];
+        }
+        return items[row];
+    }
+
+public:
+    int rowForItem(Item item) const {
+        const Item *items = linearItems;
+        if (_sequence->mode() == NoteSequence::Mode::Ikra) {
+            items = ikraItems;
+        } else if (_sequence->mode() == NoteSequence::Mode::ReRene) {
+            items = reneItems;
+        }
+        int row = 0;
+        while (items[row] != Last) {
+            if (items[row] == item) {
+                return row;
+            }
+            ++row;
+        }
+        return -1;
+    }
+private:
 };

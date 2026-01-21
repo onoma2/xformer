@@ -12,6 +12,8 @@
 #include "model/Scale.h"
 #include "model/HarmonyEngine.h"
 
+#include <cmath>
+
 static Random rng;
 
 // evaluate if step gate is active
@@ -100,8 +102,22 @@ static float evalStepNote(const NoteSequence::Step &step, int probabilityBias, c
 }
 
 void NoteTrackEngine::reset() {
-    _freeRelativeTick = 0;
+    _lastFreeStepIndex = -1;
+    _lastNoteFreeStepIndex = -1;
+    _reReneX = 0;
+    _reReneY = 0;
+    _reReneLastXTick = -1;
+    _reReneLastYTick = -1;
+    _reReneDivisorX = 0;
+    _reReneDivisorY = 0;
+    _reReneDivYSource = NoteSequence::DivYSource::Divisor;
+    _reReneDivYTrack = 0;
+    _reReneYGatePrev = false;
+    _reReneDivYSource = NoteSequence::DivYSource::Divisor;
+    _reReneDivYTrack = 0;
+    _reReneYGatePrev = false;
     _sequenceState.reset();
+    _noteSequenceState.reset();
     _currentStep = -1;
     _prevCondition = false;
     _pulseCounter = 0;
@@ -126,10 +142,18 @@ void NoteTrackEngine::reset() {
 }
 
 void NoteTrackEngine::restart() {
-    _freeRelativeTick = 0;
+    _lastFreeStepIndex = -1;
+    _lastNoteFreeStepIndex = -1;
     _sequenceState.reset();
+    _noteSequenceState.reset();
     _currentStep = -1;
     _pulseCounter = 0;
+    _reReneX = 0;
+    _reReneY = 0;
+    _reReneLastXTick = -1;
+    _reReneLastYTick = -1;
+    _reReneDivisorX = 0;
+    _reReneDivisorY = 0;
 }
 
 TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
@@ -137,20 +161,26 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
     const auto &sequence = *_sequence;
     const auto *linkData = _linkedTrackEngine ? _linkedTrackEngine->linkData() : nullptr;
 
-    if (linkData) {
-        _linkData = *linkData;
-        _sequenceState = *linkData->sequenceState;
+        if (linkData) {
+            _linkData = *linkData;
+            _sequenceState = *linkData->sequenceState;
+            _noteSequenceState = *linkData->sequenceState;
 
         if (linkData->relativeTick % linkData->divisor == 0) {
             recordStep(tick, linkData->divisor);
             triggerStep(tick, linkData->divisor);
         }
-    } else {
-        float clockMult = sequence.clockMultiplier() * 0.01f;
-        uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-        divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
-        uint32_t resetDivisor = sequence.resetMeasure() * _engine.measureDivisor();
-        uint32_t relativeTick = resetDivisor == 0 ? tick : tick % resetDivisor;
+        } else {
+            float clockMult = sequence.clockMultiplier() * 0.01f;
+            uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+            divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
+            uint32_t noteDivisor = divisor;
+            if (sequence.mode() == NoteSequence::Mode::Ikra) {
+                noteDivisor = sequence.divisorY() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+                noteDivisor = std::max<uint32_t>(1, std::lround(noteDivisor / clockMult));
+            }
+            uint32_t resetDivisor = sequence.resetMeasure() * _engine.measureDivisor();
+            uint32_t relativeTick = resetDivisor == 0 ? tick : tick % resetDivisor;
 
         // handle reset measure
         if (relativeTick == 0) {
@@ -180,13 +210,139 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                     _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
                 }
             }
+            if (sequence.mode() == NoteSequence::Mode::Ikra && relativeTick % noteDivisor == 0) {
+                _noteSequenceState.advanceAligned(relativeTick / noteDivisor, sequence.runMode(), sequence.noteFirstStep(), sequence.noteLastStep(), rng);
+            }
             break;
         case Types::PlayMode::Free:
-            relativeTick = _freeRelativeTick;
-            if (++_freeRelativeTick >= divisor) {
-                _freeRelativeTick = 0;
+        {
+            double tickPos = _engine.clock().tickPosition();
+            double baseTick = resetDivisor == 0 ? tickPos : std::fmod(tickPos, double(resetDivisor));
+            if (baseTick < 0.0) {
+                baseTick = 0.0;
             }
-            if (relativeTick == 0) {
+            int stepIndex = int(std::floor(baseTick / divisor));
+            int noteStepIndex = int(std::floor(baseTick / noteDivisor));
+            relativeTick = static_cast<uint32_t>(baseTick);
+
+            if (sequence.mode() == NoteSequence::Mode::ReRene) {
+                uint32_t divisorX = divisor;
+                uint32_t divisorY = 0;
+                uint32_t stepDivisor = divisorX;
+                int firstStep = sequence.firstStep();
+                int lastStep = sequence.lastStep();
+
+                NoteSequence::DivYSource ySource = sequence.divisorYSource();
+                int yTrack = sequence.divisorYTrack();
+                bool yGate = false;
+                bool yRising = false;
+                if (ySource == NoteSequence::DivYSource::TrackGate) {
+                    if (yTrack >= 0 && yTrack < CONFIG_TRACK_COUNT) {
+                        yGate = _engine.trackEngine(yTrack).gateOutput(0);
+                    }
+                    yRising = yGate && !_reReneYGatePrev;
+                    _reReneYGatePrev = yGate;
+                    divisorY = divisorX;
+                    stepDivisor = divisorX;
+                } else {
+                    divisorY = sequence.divisorY() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+                    divisorY = std::max<uint32_t>(1, std::lround(divisorY / clockMult));
+                    stepDivisor = std::min(divisorX, divisorY);
+                }
+
+                auto isAllowed = [firstStep, lastStep](int x, int y) {
+                    int index = x + (y * 8);
+                    return index >= firstStep && index <= lastStep;
+                };
+
+                auto seekX = [&](int &x, int y) {
+                    int next = x;
+                    for (int i = 0; i < 8; ++i) {
+                        next = (next + 1) & 7;
+                        if (isAllowed(next, y)) {
+                            x = next;
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+
+                auto seekY = [&](int x, int &y) {
+                    int next = y;
+                    for (int i = 0; i < 8; ++i) {
+                        next = (next + 1) & 7;
+                        if (isAllowed(x, next)) {
+                            y = next;
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+
+                int xTickIndex = int(std::floor(baseTick / divisorX));
+                int yTickIndex = 0;
+                if (ySource == NoteSequence::DivYSource::TrackGate) {
+                    if (_reReneLastYTick < 0) {
+                        _reReneLastYTick = 0;
+                        _reReneY = 0;
+                    }
+                    yTickIndex = _reReneLastYTick + (yRising ? 1 : 0);
+                } else {
+                    yTickIndex = int(std::floor(baseTick / divisorY));
+                }
+                bool divisorChanged = (_reReneDivisorX != divisorX)
+                    || (_reReneDivisorY != divisorY)
+                    || (_reReneDivYSource != ySource)
+                    || (_reReneDivYTrack != yTrack);
+                if (divisorChanged || xTickIndex < _reReneLastXTick || yTickIndex < _reReneLastYTick) {
+                    _reReneLastXTick = xTickIndex;
+                    _reReneLastYTick = yTickIndex;
+                    _reReneX = xTickIndex & 7;
+                    _reReneY = yTickIndex & 7;
+                    _reReneDivisorX = divisorX;
+                    _reReneDivisorY = divisorY;
+                    _reReneDivYSource = ySource;
+                    _reReneDivYTrack = yTrack;
+                    if (ySource != NoteSequence::DivYSource::TrackGate) {
+                        _reReneYGatePrev = false;
+                    }
+                }
+
+                if (_reReneLastXTick < 0) {
+                    _reReneLastXTick = xTickIndex;
+                    _reReneX = xTickIndex & 7;
+                }
+                if (_reReneLastYTick < 0) {
+                    _reReneLastYTick = yTickIndex;
+                    _reReneY = yTickIndex & 7;
+                }
+
+                bool stepped = false;
+                while (_reReneLastXTick < xTickIndex) {
+                    ++_reReneLastXTick;
+                    stepped |= seekX(_reReneX, _reReneY);
+                }
+                while (_reReneLastYTick < yTickIndex) {
+                    ++_reReneLastYTick;
+                    stepped |= seekY(_reReneX, _reReneY);
+                }
+
+                if (stepped) {
+                    stepIndex = _reReneX + (_reReneY * 8);
+                    _lastFreeStepIndex = stepIndex;
+                    _pulseCounter = 0;
+                    _sequenceState.setStep(stepIndex, firstStep, lastStep);
+                    _pulseCounter++;
+
+                    recordStep(tick, stepDivisor);
+                    triggerStep(tick, stepDivisor);
+                }
+                divisor = stepDivisor;
+            } else if (sequence.mode() == NoteSequence::Mode::Ikra && noteStepIndex != _lastNoteFreeStepIndex) {
+                _lastNoteFreeStepIndex = noteStepIndex;
+                _noteSequenceState.advanceFree(sequence.runMode(), sequence.noteFirstStep(), sequence.noteLastStep(), rng);
+            } else if (stepIndex != _lastFreeStepIndex) {
+                _lastFreeStepIndex = stepIndex;
                 // Pulse count logic: Get current step's pulse count from sequence state
                 int currentStepIndex = _sequenceState.step();
                 int stepPulseCount = sequence.step(currentStepIndex).pulseCount();
@@ -207,6 +363,7 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                 }
             }
             break;
+        }
         case Types::PlayMode::Last:
             break;
         }
@@ -402,9 +559,27 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     const auto &evalSequence = useFillSequence ? *_fillSequence : *_sequence;
     _currentStep = SequenceUtils::rotateStep(_sequenceState.step(), sequence.firstStep(), sequence.lastStep(), rotate);
     const auto &step = evalSequence.step(_currentStep);
+    int noteStepIndex = _currentStep;
+    if (sequence.mode() == NoteSequence::Mode::Ikra) {
+        if (_noteSequenceState.step() < 0) {
+            _noteSequenceState.setStep(sequence.noteFirstStep(), sequence.noteFirstStep(), sequence.noteLastStep());
+        }
+        noteStepIndex = SequenceUtils::rotateStep(_noteSequenceState.step(), sequence.noteFirstStep(), sequence.noteLastStep(), rotate);
+    }
+    const auto &noteStep = evalSequence.step(noteStepIndex);
 
     // STEP mode: Tick accumulator once per step (first pulse only)
     if (step.isAccumulatorTrigger() && _pulseCounter == 1) {
+        bool accumCondition = true;
+        if (step.condition() != Types::Condition::Off) {
+            bool tempPrevCondition = _prevCondition;
+            accumCondition = evalStepCondition(step, _sequenceState.iteration(), useFillCondition, tempPrevCondition);
+        }
+
+        if (!accumCondition) {
+            return;
+        }
+
         const auto &targetSequence = useFillSequence ? *_fillSequence : sequence; // Use the same sequence as evalSequence
         if (targetSequence.accumulator().enabled() &&
             targetSequence.accumulator().triggerMode() == Accumulator::Step) {
@@ -658,12 +833,12 @@ void NoteTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         int rootNote = evalSequence.selectedRootNote(_model.project().rootNote());
 
         // Evaluate base note (without harmony)
-        float baseNote = evalStepNote(step, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose, evalSequence);
+        float baseNote = evalStepNote(noteStep, _noteTrack.noteProbabilityBias(), scale, rootNote, octave, transpose, evalSequence);
 
         // Apply harmony if this track is a follower (has engine-level access)
-        float finalNote = applyHarmony(baseNote, step, evalSequence, scale, octave, transpose);
+        float finalNote = applyHarmony(baseNote, noteStep, evalSequence, scale, octave, transpose);
 
-        _cvQueue.push({ Groove::applySwing(tick + gateOffset, swing()), finalNote, step.slide() });
+        _cvQueue.push({ Groove::applySwing(tick + gateOffset, swing()), finalNote, noteStep.slide() });
     }
 }
 

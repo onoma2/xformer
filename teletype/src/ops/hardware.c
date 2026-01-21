@@ -1,0 +1,1405 @@
+#include "ops/hardware.h"
+
+#include "helpers.h"
+#include "ii.h"
+#include "teletype_io.h"
+
+static void op_CV_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                      command_state_t *cs);
+static void op_CV_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                      command_state_t *cs);
+static void op_CV_SLEW_get(const void *data, scene_state_t *ss,
+                           exec_state_t *es, command_state_t *cs);
+static void op_CV_SLEW_set(const void *data, scene_state_t *ss,
+                           exec_state_t *es, command_state_t *cs);
+static void op_CV_OFF_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_CV_OFF_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_CV_CAL_set(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_CV_CAL_RESET_set(const void *NOTUSED(data), scene_state_t *ss,
+                                exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_IN_get(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_IN_SCALE_set(const void *NOTUSED(data), scene_state_t *ss,
+                            exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_IN_CAL_MIN_set(const void *NOTUSED(data), scene_state_t *ss,
+                              exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_IN_CAL_MAX_set(const void *NOTUSED(data), scene_state_t *ss,
+                              exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_IN_CAL_RESET_set(const void *NOTUSED(data), scene_state_t *ss,
+                                exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_PARAM_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_PARAM_SCALE_set(const void *NOTUSED(data), scene_state_t *ss,
+                               exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_PARAM_CAL_MIN_set(const void *NOTUSED(data), scene_state_t *ss,
+                                 exec_state_t *NOTUSED(es),
+                                 command_state_t *cs);
+static void op_PARAM_CAL_MAX_set(const void *NOTUSED(data), scene_state_t *ss,
+                                 exec_state_t *NOTUSED(es),
+                                 command_state_t *cs);
+static void op_PARAM_CAL_RESET_set(const void *NOTUSED(data), scene_state_t *ss,
+                                   exec_state_t *NOTUSED(es),
+                                   command_state_t *cs);
+static void op_BUS_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_BUS_set(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WBPM_get(const void *NOTUSED(data), scene_state_t *ss,
+                        exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WBPM_S_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WMS_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WTU_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_BAR_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WP_get(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WP_SET_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WR_get(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WR_ACT_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WR_ACT_set(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNG_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNG_set(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNN_get(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNN_set(const void *NOTUSED(data), scene_state_t *ss,
+                       exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNG_H_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_WNN_H_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_RT_get(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs);
+static void op_TR_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                      command_state_t *cs);
+static void op_TR_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                      command_state_t *cs);
+static void op_TR_D_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                        command_state_t *cs);
+static void op_TR_W_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                        command_state_t *cs);
+static void op_TR_POL_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_TR_POL_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_TR_TIME_get(const void *data, scene_state_t *ss,
+                           exec_state_t *es, command_state_t *cs);
+static void op_TR_TIME_set(const void *data, scene_state_t *ss,
+                           exec_state_t *es, command_state_t *cs);
+static void op_TR_TOG_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_TR_PULSE_get(const void *data, scene_state_t *ss,
+                            exec_state_t *es, command_state_t *cs);
+static void op_CV_GET_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_CV_SET_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_MUTE_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                        command_state_t *cs);
+static void op_MUTE_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                        command_state_t *cs);
+static void op_STATE_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_LIVE_OFF_get(const void *data, scene_state_t *ss,
+                            exec_state_t *es, command_state_t *cs);
+static void op_LIVE_DASH_get(const void *data, scene_state_t *ss,
+                             exec_state_t *es, command_state_t *cs);
+static void op_LIVE_GRID_get(const void *data, scene_state_t *ss,
+                             exec_state_t *es, command_state_t *cs);
+static void op_LIVE_VARS_get(const void *data, scene_state_t *ss,
+                             exec_state_t *es, command_state_t *cs);
+static void op_PRINT_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_PRINT_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_E_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                     command_state_t *cs);
+static void op_E_A_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_D_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_T_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_O_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_L_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_R_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_E_C_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_LFO_R_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_LFO_W_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_LFO_A_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_LFO_F_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_LFO_O_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_LFO_S_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_G_TIME_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_TIME_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_TONE_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_TONE_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_RAMP_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_RAMP_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_CURV_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_CURV_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_RUN_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_G_RUN_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_G_MODE_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_MODE_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_BAR_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_G_BAR_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_G_TUNE_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                          command_state_t *cs);
+static void op_G_V_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_VAL_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                         command_state_t *cs);
+static void op_G_R_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_T_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_T_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_I_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_I_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_RA_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                        command_state_t *cs);
+static void op_G_RA_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                        command_state_t *cs);
+static void op_G_C_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_C_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_N_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_N_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_M_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_M_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_O_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_O_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_B_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_B_set(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_L_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+static void op_G_S_get(const void *data, scene_state_t *ss, exec_state_t *es,
+                       command_state_t *cs);
+
+
+// clang-format off
+const tele_op_t op_CV       = MAKE_GET_SET_OP(CV      , op_CV_get      , op_CV_set     , 1, true);
+const tele_op_t op_CV_OFF   = MAKE_GET_SET_OP(CV.OFF  , op_CV_OFF_get  , op_CV_OFF_set , 1, true);
+const tele_op_t op_CV_SLEW  = MAKE_GET_SET_OP(CV.SLEW , op_CV_SLEW_get , op_CV_SLEW_set, 1, true);
+const tele_op_t op_CV_CAL   = MAKE_GET_OP(CV.CAL , op_CV_CAL_set, 3, false);
+const tele_op_t op_CV_CAL_RESET = MAKE_GET_OP(CV.CAL.RESET , op_CV_CAL_RESET_set, 1, false);
+const tele_op_t op_IN       = MAKE_GET_OP    (IN      , op_IN_get      , 0, true);
+const tele_op_t op_IN_SCALE = MAKE_GET_OP    (IN.SCALE, op_IN_SCALE_set, 2, false);
+const tele_op_t op_PARAM    = MAKE_GET_OP    (PARAM   , op_PARAM_get   , 0, true);
+const tele_op_t op_PARAM_SCALE = MAKE_GET_OP (PARAM.SCALE, op_PARAM_SCALE_set, 2, false);
+const tele_op_t op_PRM      = MAKE_ALIAS_OP  (PRM     , op_PARAM_get   , NULL,           0, true);
+const tele_op_t op_TR       = MAKE_GET_SET_OP(TR      , op_TR_get      , op_TR_set     , 1, true);
+const tele_op_t op_TR_D     = MAKE_GET_OP    (TR.D    , op_TR_D_get    , 2, false);
+const tele_op_t op_TR_W     = MAKE_GET_OP    (TR.W    , op_TR_W_get    , 2, false);
+const tele_op_t op_TR_POL   = MAKE_GET_SET_OP(TR.POL  , op_TR_POL_get  , op_TR_POL_set , 1, true);
+const tele_op_t op_TR_TIME  = MAKE_GET_SET_OP(TR.TIME , op_TR_TIME_get , op_TR_TIME_set, 1, true);
+const tele_op_t op_TR_TOG   = MAKE_GET_OP    (TR.TOG  , op_TR_TOG_get  , 1, false);
+const tele_op_t op_TR_PULSE = MAKE_GET_OP    (TR.PULSE, op_TR_PULSE_get, 1, false);
+const tele_op_t op_TR_P     = MAKE_ALIAS_OP  (TR.P    , op_TR_PULSE_get, NULL, 1, false);
+const tele_op_t op_CV_GET   = MAKE_GET_OP    (CV.GET  , op_CV_GET_get  , 1, true);
+const tele_op_t op_CV_SET   = MAKE_GET_OP    (CV.SET  , op_CV_SET_get  , 2, false);
+const tele_op_t op_MUTE     = MAKE_GET_SET_OP(MUTE    , op_MUTE_get    , op_MUTE_set   , 1, true);
+const tele_op_t op_STATE    = MAKE_GET_OP    (STATE   , op_STATE_get   , 1, true );
+const tele_op_t op_IN_CAL_MIN    = MAKE_GET_OP (IN.CAL.MIN, op_IN_CAL_MIN_set, 0, true);
+const tele_op_t op_IN_CAL_MAX    = MAKE_GET_OP (IN.CAL.MAX, op_IN_CAL_MAX_set, 0, true);
+const tele_op_t op_IN_CAL_RESET  = MAKE_GET_OP (IN.CAL.RESET, op_IN_CAL_RESET_set, 0, false);
+const tele_op_t op_PARAM_CAL_MIN = MAKE_GET_OP (PARAM.CAL.MIN, op_PARAM_CAL_MIN_set, 0, true);
+const tele_op_t op_PARAM_CAL_MAX = MAKE_GET_OP (PARAM.CAL.MAX, op_PARAM_CAL_MAX_set, 0, true);
+const tele_op_t op_PARAM_CAL_RESET  = MAKE_GET_OP (PARAM.CAL.RESET, op_PARAM_CAL_RESET_set, 0, false);
+const tele_op_t op_BUS           = MAKE_GET_SET_OP(BUS, op_BUS_get, op_BUS_set, 1, true);
+const tele_op_t op_WBPM          = MAKE_GET_OP(WBPM, op_WBPM_get, 0, true);
+const tele_op_t op_WBPM_S        = MAKE_GET_OP(WBPM.S, op_WBPM_S_get, 1, false);
+const tele_op_t op_WMS           = MAKE_GET_OP(WMS, op_WMS_get, 1, true);
+const tele_op_t op_WTU           = MAKE_GET_OP(WTU, op_WTU_get, 2, true);
+const tele_op_t op_BAR           = MAKE_GET_OP(BAR, op_BAR_get, 1, true);
+const tele_op_t op_WP            = MAKE_GET_OP(WP, op_WP_get, 1, true);
+const tele_op_t op_WP_SET        = MAKE_GET_OP(WP.SET, op_WP_SET_get, 2, false);
+const tele_op_t op_WR            = MAKE_GET_OP(WR, op_WR_get, 0, true);
+const tele_op_t op_WR_ACT        = MAKE_GET_SET_OP(W.ACT, op_WR_ACT_get, op_WR_ACT_set, 0, true);
+const tele_op_t op_WNG           = MAKE_GET_SET_OP(WNG, op_WNG_get, op_WNG_set, 2, true);
+const tele_op_t op_WNN           = MAKE_GET_SET_OP(WNN, op_WNN_get, op_WNN_set, 2, true);
+const tele_op_t op_WNG_H         = MAKE_GET_OP(WNG.H, op_WNG_H_get, 1, true);
+const tele_op_t op_WNN_H         = MAKE_GET_OP(WNN.H, op_WNN_H_get, 1, true);
+const tele_op_t op_RT            = MAKE_GET_OP(RT, op_RT_get, 1, true);
+const tele_op_t op_LIVE_OFF      = MAKE_GET_OP (LIVE.OFF, op_LIVE_OFF_get, 0, false);
+const tele_op_t op_LIVE_O        = MAKE_ALIAS_OP (LIVE.O, op_LIVE_OFF_get, NULL, 0, false);
+const tele_op_t op_LIVE_DASH     = MAKE_GET_OP (LIVE.DASH, op_LIVE_DASH_get, 1, false);
+const tele_op_t op_LIVE_D        = MAKE_ALIAS_OP (LIVE.D, op_LIVE_DASH_get, NULL, 1, false);
+const tele_op_t op_LIVE_GRID     = MAKE_GET_OP (LIVE.GRID, op_LIVE_GRID_get, 0, false);
+const tele_op_t op_LIVE_G        = MAKE_ALIAS_OP (LIVE.G, op_LIVE_GRID_get, NULL, 0, false);
+const tele_op_t op_LIVE_VARS     = MAKE_GET_OP (LIVE.VARS, op_LIVE_VARS_get, 0, false);
+const tele_op_t op_LIVE_V        = MAKE_ALIAS_OP (LIVE.V, op_LIVE_VARS_get, NULL, 0, false);
+const tele_op_t op_PRINT         = MAKE_GET_SET_OP (PRINT, op_PRINT_get, op_PRINT_set, 1, true);
+const tele_op_t op_PRT           = MAKE_ALIAS_OP (PRT, op_PRINT_get, op_PRINT_set, 1, true);
+const tele_op_t op_E             = MAKE_GET_OP(E, op_E_get, 2, false);
+const tele_op_t op_E_A           = MAKE_GET_OP(E.A, op_E_A_get, 2, false);
+const tele_op_t op_E_D           = MAKE_GET_OP(E.D, op_E_D_get, 2, false);
+const tele_op_t op_E_T           = MAKE_GET_OP(E.T, op_E_T_get, 1, false);
+const tele_op_t op_E_O           = MAKE_GET_OP(E.O, op_E_O_get, 2, false);
+const tele_op_t op_E_L           = MAKE_GET_OP(E.L, op_E_L_get, 2, false);
+const tele_op_t op_E_R           = MAKE_GET_OP(E.R, op_E_R_get, 2, false);
+const tele_op_t op_E_C           = MAKE_GET_OP(E.C, op_E_C_get, 2, false);
+const tele_op_t op_LFO_R         = MAKE_GET_OP(LFO.R, op_LFO_R_get, 2, false);
+const tele_op_t op_LFO_W         = MAKE_GET_OP(LFO.W, op_LFO_W_get, 2, false);
+const tele_op_t op_LFO_A         = MAKE_GET_OP(LFO.A, op_LFO_A_get, 2, false);
+const tele_op_t op_LFO_F         = MAKE_GET_OP(LFO.F, op_LFO_F_get, 2, false);
+const tele_op_t op_LFO_O         = MAKE_GET_OP(LFO.O, op_LFO_O_get, 2, false);
+const tele_op_t op_LFO_S         = MAKE_GET_OP(LFO.S, op_LFO_S_get, 2, false);
+const tele_op_t op_G_TIME        = MAKE_GET_SET_OP(G.TIME, op_G_TIME_get, op_G_TIME_set, 0, true);
+const tele_op_t op_G_TONE        = MAKE_GET_SET_OP(G.TONE, op_G_TONE_get, op_G_TONE_set, 0, true);
+const tele_op_t op_G_RAMP        = MAKE_GET_SET_OP(G.RAMP, op_G_RAMP_get, op_G_RAMP_set, 0, true);
+const tele_op_t op_G_CURV        = MAKE_GET_SET_OP(G.CURV, op_G_CURV_get, op_G_CURV_set, 0, true);
+const tele_op_t op_G_RUN         = MAKE_GET_SET_OP(G.RUN, op_G_RUN_get, op_G_RUN_set, 0, true);
+const tele_op_t op_G_MODE        = MAKE_GET_SET_OP(G.MODE, op_G_MODE_get, op_G_MODE_set, 0, true);
+const tele_op_t op_G_BAR         = MAKE_GET_SET_OP(G.BAR, op_G_BAR_get, op_G_BAR_set, 0, true);
+const tele_op_t op_G_TUNE        = MAKE_GET_OP(G.TUNE, op_G_TUNE_get, 3, false);
+const tele_op_t op_G_V           = MAKE_GET_OP(G.V, op_G_V_get, 3, false);
+const tele_op_t op_G_VAL         = MAKE_GET_OP(G.VAL, op_G_VAL_get, 0, true);
+const tele_op_t op_G_R           = MAKE_GET_OP(G.R, op_G_R_get, 2, false);
+const tele_op_t op_G_T           = MAKE_GET_SET_OP(G.T, op_G_T_get, op_G_T_set, 0, true);
+const tele_op_t op_G_I           = MAKE_GET_SET_OP(G.I, op_G_I_get, op_G_I_set, 0, true);
+const tele_op_t op_G_RA          = MAKE_GET_SET_OP(G.RA, op_G_RA_get, op_G_RA_set, 0, true);
+const tele_op_t op_G_C           = MAKE_GET_SET_OP(G.C, op_G_C_get, op_G_C_set, 0, true);
+const tele_op_t op_G_N           = MAKE_GET_SET_OP(G.N, op_G_N_get, op_G_N_set, 0, true);
+const tele_op_t op_G_M           = MAKE_GET_SET_OP(G.M, op_G_M_get, op_G_M_set, 0, true);
+const tele_op_t op_G_O           = MAKE_GET_SET_OP(G.O, op_G_O_get, op_G_O_set, 0, true);
+const tele_op_t op_G_B           = MAKE_GET_SET_OP(G.B, op_G_B_get, op_G_B_set, 0, true);
+const tele_op_t op_G_L           = MAKE_GET_OP(G.L, op_G_L_get, 0, true);
+const tele_op_t op_G_S           = MAKE_GET_OP(G.S, op_G_S_get, 3, false);
+// clang-format on
+
+static void op_CV_get(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0)
+        cs_push(cs, 0);
+    else if (a < 4)
+        cs_push(cs, ss->variables.cv[a]);
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_CV | II_GET, a & 0x3 };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 2);
+        d[0] = 0;
+        d[1] = 0;
+        tele_ii_rx(addr, d, 2);
+        cs_push(cs, (d[0] << 8) + d[1]);
+    }
+    else
+        cs_push(cs, 0);
+}
+
+static void op_CV_set(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    b = normalise_value(0, 16383, 0, b);
+    a--;
+    if (a < 0)
+        return;
+    else if (a < 4) {
+        ss->variables.cv[a] = b;
+        tele_cv_interpolate(a, 0);  // Disable interpolation for direct CV sets
+        tele_cv(a, b, 1);
+    }
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_CV, a & 0x3, b >> 8, b & 0xff };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+
+        tele_ii_tx(addr, d, 4);
+    }
+}
+
+static void op_CV_SLEW_get(const void *NOTUSED(data), scene_state_t *ss,
+                           exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0)
+        cs_push(cs, 0);
+    else if (a < 4)
+        cs_push(cs, ss->variables.cv_slew[a]);
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_CV_SLEW | II_GET, a & 0x3 };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 2);
+        d[0] = 0;
+        d[1] = 0;
+        tele_ii_rx(addr, d, 2);
+        cs_push(cs, (d[0] << 8) + d[1]);
+    }
+    else
+        cs_push(cs, 0);
+}
+
+static void op_CV_SLEW_set(const void *NOTUSED(data), scene_state_t *ss,
+                           exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    b = normalise_value(1, 32767, 0, b);  // min slew = 1
+    a--;
+    if (a < 0)
+        return;
+    else if (a < 4) {
+        ss->variables.cv_slew[a] = b;
+        tele_cv_slew(a, b);
+    }
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_CV_SLEW, a & 0x3, b >> 8, b & 0xff };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 4);
+    }
+}
+
+static void op_CV_OFF_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0)
+        cs_push(cs, 0);
+    else if (a < 4)
+        cs_push(cs, ss->variables.cv_off[a]);
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_CV_OFF | II_GET, a & 0x3 };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 2);
+        d[0] = 0;
+        d[1] = 0;
+        tele_ii_rx(addr, d, 2);
+        cs_push(cs, (d[0] << 8) + d[1]);
+    }
+    else
+        cs_push(cs, 0);
+}
+
+static void op_CV_OFF_set(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0)
+        return;
+    else if (a < 4) {
+        ss->variables.cv_off[a] = b;
+        tele_cv_off(a, b);
+        tele_cv(a, ss->variables.cv[a], 1);
+    }
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_CV_OFF, a & 0x3, b >> 8, b & 0xff };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 4);
+    }
+}
+
+static void op_CV_CAL_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t n = cs_pop(cs);
+    int16_t vv1v = cs_pop(cs);
+    int16_t vv3v = cs_pop(cs);
+    n -= 1;
+    if (n < 0 || n > 3) { return; }
+
+    // using slow software floating point here is okay,
+    // this is ideally a one-time op and doesn't need to be fast.
+    double scale = (4915.0 - 1638.0) / ((vv3v - vv1v) * 1.6383);
+    double offset = 4915.0 / scale - vv3v * 1.6383;
+    int32_t m = (int32_t)(scale * (1 << 15));
+    int32_t b = (int32_t)(offset * (1 << 15));
+
+    tele_cv_cal(n, b, m);
+}
+
+static void op_CV_CAL_RESET_set(const void *NOTUSED(data),
+                                scene_state_t *NOTUSED(ss),
+                                exec_state_t *NOTUSED(es),
+                                command_state_t *cs) {
+    int16_t n = cs_pop(cs);
+    n -= 1;
+    if (n < 0 || n > 3) { return; }
+
+    tele_cv_cal(n, 0, 1);
+}
+
+
+static void op_IN_get(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_update_adc(0);
+    cs_push(cs, ss_get_in(ss));
+}
+
+static void op_IN_SCALE_set(const void *NOTUSED(data), scene_state_t *ss,
+                            exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t min = cs_pop(cs);
+    int16_t max = cs_pop(cs);
+    ss_set_in_scale(ss, min, max);
+}
+
+static void op_IN_CAL_MIN_set(const void *NOTUSED(data), scene_state_t *ss,
+                              exec_state_t *NOTUSED(es), command_state_t *cs) {
+    ss_set_in_min(ss, ss->variables.in);
+    cs_push(cs, ss->variables.in);
+}
+
+static void op_IN_CAL_MAX_set(const void *NOTUSED(data), scene_state_t *ss,
+                              exec_state_t *NOTUSED(es), command_state_t *cs) {
+    ss_set_in_max(ss, ss->variables.in);
+    cs_push(cs, ss->variables.in);
+}
+
+static void op_IN_CAL_RESET_set(const void *NOTUSED(data), scene_state_t *ss,
+                                exec_state_t *NOTUSED(es),
+                                command_state_t *NOTUSED(cs)) {
+    ss_reset_in_cal(ss);
+}
+
+
+static void op_PARAM_get(const void *NOTUSED(data), scene_state_t *ss,
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_update_adc(0);
+    cs_push(cs, ss_get_param(ss));
+}
+
+static void op_PARAM_SCALE_set(const void *NOTUSED(data), scene_state_t *ss,
+                               exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t min = cs_pop(cs);
+    int16_t max = cs_pop(cs);
+    ss_set_param_scale(ss, min, max);
+}
+
+static void op_PARAM_CAL_MIN_set(const void *NOTUSED(data), scene_state_t *ss,
+                                 exec_state_t *NOTUSED(es),
+                                 command_state_t *cs) {
+    ss_set_param_min(ss, ss->variables.param);
+    cs_push(cs, ss->variables.param);
+}
+
+static void op_PARAM_CAL_MAX_set(const void *NOTUSED(data), scene_state_t *ss,
+                                 exec_state_t *NOTUSED(es),
+                                 command_state_t *cs) {
+    ss_set_param_max(ss, ss->variables.param);
+    cs_push(cs, ss->variables.param);
+}
+
+static void op_PARAM_CAL_RESET_set(const void *NOTUSED(data), scene_state_t *ss,
+                                   exec_state_t *NOTUSED(es),
+                                   command_state_t *cs) {
+    ss_reset_param_cal(ss);
+}
+
+static void op_BUS_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_bus_cv_get((uint8_t)a));
+}
+
+static void op_BUS_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    b = normalise_value(0, 16383, 0, b);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_bus_cv_set((uint8_t)a, b);
+}
+
+static void op_WBPM_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_wbpm_get());
+}
+
+static void op_WBPM_S_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t bpm = cs_pop(cs);
+    if (bpm < 1) {
+        bpm = 1;
+    } else if (bpm > 1000) {
+        bpm = 1000;
+    }
+    tele_wbpm_set(bpm);
+}
+
+static void op_WMS_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    uint8_t mult = 1;
+    if (cs_stack_size(cs) > 0) {
+        int16_t value = cs_pop(cs);
+        if (value < 1) {
+            value = 1;
+        } else if (value > 128) {
+            value = 128;
+        }
+        mult = (uint8_t)value;
+    }
+    cs_push(cs, tele_wms(mult));
+}
+
+static void op_WTU_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t div = cs_pop(cs);
+    if (div < 1) {
+        div = 1;
+    } else if (div > 128) {
+        div = 128;
+    }
+    uint8_t mult = 1;
+    if (cs_stack_size(cs) > 0) {
+        int16_t value = cs_pop(cs);
+        if (value < 1) {
+            value = 1;
+        } else if (value > 128) {
+            value = 128;
+        }
+        mult = (uint8_t)value;
+    }
+    cs_push(cs, tele_wtu((uint8_t)div, mult));
+}
+
+static void op_BAR_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    uint8_t bars = 1;
+    if (cs_stack_size(cs) > 0) {
+        int16_t value = cs_pop(cs);
+        if (value < 1) {
+            value = 1;
+        } else if (value > 128) {
+            value = 128;
+        }
+        bars = (uint8_t)value;
+    }
+    cs_push(cs, tele_bar(bars));
+}
+
+static void op_WP_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                      exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    trackIndex--;  // Convert from 1-indexed to 0-indexed
+    if (trackIndex < 0 || trackIndex >= 8) {
+        cs_push(cs, 0);  // Out of bounds
+        return;
+    }
+    cs_push(cs, tele_wpat((uint8_t)trackIndex) + 1);
+}
+
+static void op_WP_SET_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    int16_t patternIndex = cs_pop(cs);
+    trackIndex--;
+    patternIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        return;
+    }
+    if (patternIndex < 0 || patternIndex >= 16) {
+        return;
+    }
+    tele_wpat_set((uint8_t)trackIndex, (uint8_t)patternIndex);
+}
+
+static void op_WR_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                      exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_wr());
+}
+
+static void op_WR_ACT_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_wr());
+}
+
+static void op_WR_ACT_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t state = cs_pop(cs);
+    tele_wr_act(state);
+}
+
+static void op_WNG_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    int16_t stepIndex = cs_pop(cs);
+    trackIndex--;
+    stepIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        cs_push(cs, 0);
+        return;
+    }
+    if (stepIndex < 0 || stepIndex >= 64) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_wng((uint8_t)trackIndex, (uint8_t)stepIndex));
+}
+
+static void op_WNG_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    int16_t stepIndex = cs_pop(cs);
+    int16_t value = cs_pop(cs);
+    trackIndex--;
+    stepIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        return;
+    }
+    if (stepIndex < 0 || stepIndex >= 64) {
+        return;
+    }
+    tele_wng_set((uint8_t)trackIndex, (uint8_t)stepIndex, value);
+}
+
+static void op_WNN_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    int16_t stepIndex = cs_pop(cs);
+    trackIndex--;
+    stepIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        cs_push(cs, 0);
+        return;
+    }
+    if (stepIndex < 0 || stepIndex >= 64) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_wnn((uint8_t)trackIndex, (uint8_t)stepIndex));
+}
+
+static void op_WNN_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    int16_t stepIndex = cs_pop(cs);
+    int16_t value = cs_pop(cs);
+    trackIndex--;
+    stepIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        return;
+    }
+    if (stepIndex < 0 || stepIndex >= 64) {
+        return;
+    }
+    tele_wnn_set((uint8_t)trackIndex, (uint8_t)stepIndex, value);
+}
+
+static void op_WNG_H_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    trackIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_wng_here((uint8_t)trackIndex));
+}
+
+static void op_WNN_H_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t trackIndex = cs_pop(cs);
+    trackIndex--;
+    if (trackIndex < 0 || trackIndex >= 8) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_wnn_here((uint8_t)trackIndex));
+}
+
+static void op_RT_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                      exec_state_t *NOTUSED(es), command_state_t *cs) {
+    static const int16_t kRouteCount = 16;
+    int16_t routeIndex = cs_pop(cs);
+    routeIndex--;  // Convert from 1-indexed to 0-indexed
+    if (routeIndex < 0 || routeIndex >= kRouteCount) {
+        cs_push(cs, 0);
+        return;
+    }
+    cs_push(cs, tele_rt((uint8_t)routeIndex));
+}
+
+static void op_TR_get(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0)
+        cs_push(cs, 0);
+    else if (a < 4)
+        cs_push(cs, ss->variables.tr[a]);
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_TR | II_GET, a & 0x3 };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 2);
+        d[0] = 0;
+        tele_ii_rx(addr, d, 1);
+        cs_push(cs, d[0]);
+    }
+    else
+        cs_push(cs, 0);
+}
+
+static void op_TR_set(const void *NOTUSED(data), scene_state_t *ss,
+                      exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0)
+        return;
+    else if (a < 4) {
+        ss->variables.tr[a] = b != 0;
+        tele_tr(a, b);
+    }
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_TR, a & 0x3, b };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 3);
+    }
+}
+
+static void op_TR_D_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_tr_div((uint8_t)a, b);
+}
+
+static void op_TR_W_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_tr_width((uint8_t)a, b);
+}
+
+static void op_TR_POL_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0)
+        cs_push(cs, 0);
+    else if (a < 4)
+        cs_push(cs, ss->variables.tr_pol[a]);
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_TR_POL | II_GET, a & 0x3 };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 2);
+        d[0] = 0;
+        tele_ii_rx(addr, d, 1);
+        cs_push(cs, d[0]);
+    }
+    else
+        cs_push(cs, 0);
+}
+
+static void op_TR_POL_set(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0)
+        return;
+    else if (a < 4) { ss->variables.tr_pol[a] = b > 0; }
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_TR_POL, a & 0x3, b > 0 };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 3);
+    }
+}
+
+static void op_TR_TIME_get(const void *NOTUSED(data), scene_state_t *ss,
+                           exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0)
+        cs_push(cs, 0);
+    else if (a < 4)
+        cs_push(cs, ss->variables.tr_time[a]);
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_TR_TIME | II_GET, a & 0x3 };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 2);
+        d[0] = 0;
+        d[1] = 0;
+        tele_ii_rx(addr, d, 2);
+        cs_push(cs, (d[0] << 8) + d[1]);
+    }
+    else
+        cs_push(cs, 0);
+}
+
+static void op_TR_TIME_set(const void *NOTUSED(data), scene_state_t *ss,
+                           exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    if (b < 0) b = 0;
+    a--;
+    if (a < 0)
+        return;
+    else if (a < 4) {
+        ss->variables.tr_time[a] = b;
+        tele_tr_pulse_time(a, b);
+    }
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_TR_TIME, a & 0x3, b >> 8, b & 0xff };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 4);
+    }
+}
+
+static void op_TR_TOG_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0)
+        return;
+    else if (a < 4) {
+        if (ss->variables.tr[a])
+            ss->variables.tr[a] = 0;
+        else
+            ss->variables.tr[a] = 1;
+        tele_tr(a, ss->variables.tr[a]);
+    }
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_TR_TOG, a & 0x3 };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 2);
+    }
+}
+
+static void op_TR_PULSE_get(const void *NOTUSED(data), scene_state_t *ss,
+                            exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0)
+        return;
+    else if (a < 4) {
+        if (!tele_tr_pulse_allow((uint8_t)a)) {
+            return;
+        }
+        int16_t time = ss->variables.tr_time[a];  // pulse time
+        if (time <= 0) return;  // if time <= 0 don't do anything
+        ss->variables.tr[a] = ss->variables.tr_pol[a];
+        tele_tr(a, ss->variables.tr[a]);
+        tele_tr_pulse(a, time);
+    }
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_TR_PULSE, a & 0x3 };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 2);
+    }
+}
+
+static void op_CV_GET_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    uint8_t i = cs_pop(cs) - 1;
+    cs_push(cs, i < 4 ? tele_get_cv(i) : 0);
+}
+
+static void op_CV_SET_get(const void *NOTUSED(data), scene_state_t *ss,
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+
+    if (b < 0)
+        b = 0;
+    else if (b > 16383)
+        b = 16383;
+
+    a--;
+    if (a < 0)
+        return;
+    else if (a < 4) {
+        ss->variables.cv[a] = b;
+        tele_cv_interpolate(a, 0);  // Disable interpolation for direct CV sets
+        tele_cv(a, b, 0);
+    }
+    else if (a < 20) {
+        uint8_t d[] = { II_ANSIBLE_CV_SET, a & 0x3, b >> 8, b & 0xff };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 4) >> 2) << 1);
+        tele_ii_tx(addr, d, 4);
+    }
+}
+
+static void op_MUTE_get(const void *NOTUSED(data), scene_state_t *ss,
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs) - 1;
+    if (a >= 0 && a < TRIGGER_INPUTS) { cs_push(cs, ss_get_mute(ss, a)); }
+    else { cs_push(cs, 0); }
+}
+
+static void op_MUTE_set(const void *NOTUSED(data), scene_state_t *ss,
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs) - 1;
+    bool b = cs_pop(cs) > 0;
+    if (a >= 0 && a < TRIGGER_INPUTS) { ss_set_mute(ss, a, b); }
+}
+
+static void op_STATE_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0)
+        cs_push(cs, 0);
+    else if (a < 8)
+        cs_push(cs, tele_get_input_state(a));
+    else if (a < 24) {
+        uint8_t d[] = { II_ANSIBLE_INPUT | II_GET, a & 0x3 };
+        uint8_t addr = II_ANSIBLE_ADDR + (((a - 8) >> 2) << 1);
+        tele_ii_tx(addr, d, 2);
+        d[0] = 0;
+        tele_ii_rx(addr, d, 1);
+        cs_push(cs, d[0]);
+    }
+    else
+        cs_push(cs, 0);
+}
+
+static void op_LIVE_OFF_get(const void *NOTUSED(data),
+                            scene_state_t *NOTUSED(ss),
+                            exec_state_t *NOTUSED(es), command_state_t *cs) {
+    set_live_submode(SUB_MODE_OFF);
+}
+
+static void op_LIVE_DASH_get(const void *NOTUSED(data),
+                             scene_state_t *NOTUSED(ss),
+                             exec_state_t *NOTUSED(es), command_state_t *cs) {
+    select_dash_screen(cs_pop(cs) - 1);
+}
+
+static void op_LIVE_GRID_get(const void *NOTUSED(data),
+                             scene_state_t *NOTUSED(ss),
+                             exec_state_t *NOTUSED(es), command_state_t *cs) {
+    set_live_submode(SUB_MODE_GRID);
+}
+
+static void op_LIVE_VARS_get(const void *NOTUSED(data),
+                             scene_state_t *NOTUSED(ss),
+                             exec_state_t *NOTUSED(es), command_state_t *cs) {
+    set_live_submode(SUB_MODE_VARS);
+}
+
+static void op_PRINT_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t index = cs_pop(cs);
+    cs_push(cs, get_dashboard_value(index - 1));
+}
+
+static void op_PRINT_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t index = cs_pop(cs);
+    int16_t value = cs_pop(cs);
+    print_dashboard_value(index - 1, value);
+}
+
+static void op_E_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                     exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_target((uint8_t)a, b);
+}
+
+static void op_E_A_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_attack((uint8_t)a, b);
+}
+
+static void op_E_D_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_decay((uint8_t)a, b);
+}
+
+static void op_E_T_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_cv_interpolate((uint8_t)a, 1);  // Enable interpolation for envelope
+    tele_env_trigger((uint8_t)a);
+}
+
+static void op_E_O_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_offset((uint8_t)a, b);
+}
+
+static void op_E_L_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_loop((uint8_t)a, b);
+}
+
+static void op_E_R_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_eor((uint8_t)a, b);
+}
+
+static void op_E_C_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_env_eoc((uint8_t)a, b);
+}
+
+static void op_LFO_R_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_rate((uint8_t)a, b);
+}
+
+static void op_LFO_W_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_wave((uint8_t)a, b);
+}
+
+static void op_LFO_A_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_amp((uint8_t)a, b);
+}
+
+static void op_LFO_F_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_fold((uint8_t)a, b);
+}
+
+static void op_LFO_O_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    tele_lfo_offset((uint8_t)a, b);
+}
+
+static void op_LFO_S_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t a = cs_pop(cs);
+    int16_t b = cs_pop(cs);
+    a--;
+    if (a < 0 || a >= 4) {
+        return;
+    }
+    if (b != 0) {
+        tele_cv_interpolate((uint8_t)a, 1);  // Enable interpolation when LFO starts
+    }
+    tele_lfo_start((uint8_t)a, b);
+}
+
+static void op_G_TIME_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_time());
+}
+
+static void op_G_TIME_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t value = cs_pop(cs);
+    tele_g_time(value);
+}
+
+static void op_G_TONE_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_intone());
+}
+
+static void op_G_TONE_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t value = cs_pop(cs);
+    tele_g_intone(value);
+}
+
+static void op_G_RAMP_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_ramp());
+}
+
+static void op_G_RAMP_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t value = cs_pop(cs);
+    tele_g_ramp(value);
+}
+
+static void op_G_CURV_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_curve());
+}
+
+static void op_G_CURV_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t value = cs_pop(cs);
+    tele_g_curve(value);
+}
+
+static void op_G_RUN_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_run());
+}
+
+static void op_G_RUN_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t value = cs_pop(cs);
+    tele_g_run(value);
+}
+
+static void op_G_MODE_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_mode());
+}
+
+static void op_G_MODE_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t value = cs_pop(cs);
+    tele_g_mode(value);
+}
+
+static void op_G_O_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_offset());
+}
+
+static void op_G_O_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t value = cs_pop(cs);
+    tele_g_offset(value);
+}
+
+static void op_G_BAR_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_bar());
+}
+
+static void op_G_BAR_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t value = cs_pop(cs);
+    tele_g_bar(value);
+}
+
+static void op_G_TUNE_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                          exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t voiceIndex = cs_pop(cs);
+    int16_t numerator = cs_pop(cs);
+    int16_t denominator = cs_pop(cs);
+    tele_g_tune((uint8_t)voiceIndex, numerator, denominator);
+}
+
+static void op_G_V_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t voiceIndex = cs_pop(cs);
+    int16_t divs = cs_pop(cs);
+    int16_t repeats = cs_pop(cs);
+    tele_g_vox((uint8_t)voiceIndex, divs, repeats);
+}
+
+static void op_G_VAL_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                         exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_val());
+}
+
+static void op_G_R_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t cvIndex = cs_pop(cs);
+    int16_t voiceIndex = cs_pop(cs);
+    tele_g_out((uint8_t)cvIndex, voiceIndex);
+}
+
+static void op_G_T_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_time());
+}
+
+static void op_G_T_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_time(cs_pop(cs));
+}
+
+static void op_G_I_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_intone());
+}
+
+static void op_G_I_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_intone(cs_pop(cs));
+}
+
+static void op_G_RA_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_ramp());
+}
+
+static void op_G_RA_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                        exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_ramp(cs_pop(cs));
+}
+
+static void op_G_C_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_curve());
+}
+
+static void op_G_C_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_curve(cs_pop(cs));
+}
+
+static void op_G_N_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_run());
+}
+
+static void op_G_N_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_run(cs_pop(cs));
+}
+
+static void op_G_M_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_mode());
+}
+
+static void op_G_M_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_mode(cs_pop(cs));
+}
+
+
+static void op_G_B_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_bar());
+}
+
+static void op_G_B_set(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    tele_g_bar(cs_pop(cs));
+}
+
+static void op_G_L_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    cs_push(cs, tele_g_get_val());
+}
+
+static void op_G_S_get(const void *NOTUSED(data), scene_state_t *NOTUSED(ss),
+                       exec_state_t *NOTUSED(es), command_state_t *cs) {
+    int16_t run = cs_pop(cs);
+    int16_t intone = cs_pop(cs);
+    int16_t time = cs_pop(cs);
+    tele_g_time(time);
+    tele_g_intone(intone);
+    tele_g_run(run);
+}

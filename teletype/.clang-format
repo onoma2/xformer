@@ -1,0 +1,30 @@
+---
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 80
+---
+Language: Cpp
+
+AllowShortBlocksOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Empty
+
+BreakBeforeBraces: Custom
+BraceWrapping:   
+  AfterClass:            false
+  AfterControlStatement: false
+  AfterEnum:             false
+  AfterFunction:         false
+  AfterNamespace:        false
+  AfterObjCDeclaration:  false
+  AfterStruct:           false
+  AfterUnion:            false
+  BeforeCatch:           false
+  BeforeElse:            true
+  IndentBraces:          false
+
+Cpp11BracedListStyle: false
+
+MaxEmptyLinesToKeep: 2
+---
+

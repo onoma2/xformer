@@ -33,7 +33,7 @@ void NoteTrack::writeRouted(Routing::Target target, int intValue, float floatVal
 }
 
 void NoteTrack::clear() {
-    setPlayMode(Types::PlayMode::Aligned);
+    setPlayMode(Types::PlayMode::Free);
     setFillMode(FillMode::Gates);
     setFillMuted(true);
     setCvUpdateMode(CvUpdateMode::Gate);

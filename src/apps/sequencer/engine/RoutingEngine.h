@@ -23,6 +23,9 @@ public:
     bool receiveMidi(MidiPort port, const MidiMessage &message);
 
     void resetShaperState();
+    float routeSource(int index) const;
+    bool cvRotateInterpolated(int trackIndex) const;
+    float cvRotateValue(int trackIndex) const;
 
     struct RouteState {
         Routing::Target target = Routing::Target::None;
@@ -60,6 +63,8 @@ private:
     std::array<float, CONFIG_ROUTE_COUNT> _sourceValues;
 
     std::array<RouteState, CONFIG_ROUTE_COUNT> _routeStates;
+    std::array<float, CONFIG_TRACK_COUNT> _cvRotateValues{};
+    std::array<bool, CONFIG_TRACK_COUNT> _cvRotateInterp{};
 
     uint8_t _lastPlayToggleActive = false;
     uint8_t _lastRecordToggleActive = false;

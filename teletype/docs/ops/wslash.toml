@@ -1,0 +1,15 @@
+["WS.PLAY"]
+prototype = "WS.PLAY x"
+short = "Set playback state and direction. `0` stops playback. `1` sets forward motion, while `-1` plays in reverse"
+
+["WS.REC"]
+prototype = "WS.REC x"
+short = "Set recording mode. `0` is playback only. `1` sets overdub mode for additive recording. `-1` sets overwrite mode to replace the tape with your input"
+
+["WS.CUE"]
+prototype = "WS.CUE x"
+short = "Go to a cuepoint relative to the playhead position. `0` retriggers the current location. `1` jumps to the next cue forward. `-1` jumps to the previous cue in the reverse. These actions are relative to playback direction such that `0` always retriggers the most recently passed location"
+
+["WS.LOOP"]
+prototype = "WS.LOOP x"
+short = "Set the loop state on/off. `0` is off. Any other value turns loop on"

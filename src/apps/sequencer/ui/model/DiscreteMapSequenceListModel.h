@@ -24,6 +24,7 @@ public:
         Scale,
         RootNote,
         SlewTime,
+        Pluck,
         Octave,
         Transpose,
         Offset,
@@ -69,6 +70,8 @@ public:
             return Routing::Target::RootNote;
         case SlewTime:
             return Routing::Target::SlideTime;
+        case Pluck:
+            return Routing::Target::None;
         case Octave:
             return Routing::Target::Octave;
         case Transpose:
@@ -95,7 +98,8 @@ private:
         case RangeLow:      return "Below";
         case Scale:         return "Scale";
         case RootNote:      return "Root";
-        case SlewTime:      return "Slew Time";
+        case SlewTime:      return "Slew";
+        case Pluck:         return "Pluck";
         case Octave:        return "Octave";
         case Transpose:     return "Transpose";
         case Offset:        return "Offset";
@@ -148,6 +152,9 @@ private:
             break;
         case SlewTime:
             _sequence->printSlewTime(str);
+            break;
+        case Pluck:
+            _sequence->printPluck(str);
             break;
         case Octave:
             str("%+d", _sequence->octave());
@@ -203,6 +210,9 @@ private:
             break;
         case SlewTime:
             _sequence->editSlewTime(value, shift);
+            break;
+        case Pluck:
+            _sequence->editPluck(value, shift);
             break;
         case Octave:
             _sequence->setOctave(ModelUtils::adjusted(_sequence->octave(), value, -10, 10));

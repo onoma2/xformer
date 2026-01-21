@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-The Indexed Track is a sophisticated sequencer track type that maps step indices to discrete output voltages using duration-based timing. Each step has an independent duration in clock ticks and a note index that determines the output voltage when the step is active.
+The Indexed Track is a sophisticated sequencer track type that maps step indices to discrete output voltages using duration-based timing. Each step has an independent duration in clock ticks (scaled by the sequence divisor) and a note index that determines the output voltage when the step is active.
 
 This track type is ideal for:
 - Precise timing control with arbitrary step durations
@@ -11,8 +11,8 @@ This track type is ideal for:
 - External modulation of step parameters
 
 The Indexed track provides:
-- Up to 32 controllable steps per sequence
-- Independent duration control for each step (0-65535 ticks)
+- Up to 48 controllable steps per sequence
+- Independent duration control for each step (0-1023 ticks)
 - Direct voltage lookup without octave math
 - Group-based CV modulation
 - Flexible sync modes
@@ -24,8 +24,8 @@ The Indexed track provides:
 The Indexed track creates a sequence where each step has an independent duration and note value. Unlike traditional sequencers that divide a measure into equal parts, each step in an Indexed sequence can have completely different timing, allowing for complex rhythmic patterns and precise timing control.
 
 Key concepts:
-- **Steps**: 32 controllable positions with independent duration and note values
-- **Durations**: Clock tick counts (0-65535) that determine step length
+- **Steps**: 48 controllable positions with independent duration and note values
+- **Durations**: Clock tick counts (0-1023) that determine step length (then scaled by divisor)
 - **Note Indices**: Voltage lookup indices (-63 to +63) that determine output voltage
 - **Groups**: A, B, C, D group membership for conditional CV modulation
 
@@ -34,19 +34,21 @@ Key concepts:
 The Indexed track uses a duration-based timing system:
 
 **Step Timer**:
-- Counts up from 0 to the current step's duration
+- Counts up from 0 to the current step's effective duration
+- Effective duration = step duration × divisor
 - When reaching the duration value, advances to the next step
 - Provides precise timing control with tick-level accuracy
 
 **Gate Timer**:
-- Counts down from the gate length in ticks
+- Counts down from the effective gate length in ticks
+- Effective gate = step gate × divisor
 - Determines how long gate output remains high
 - Gate length is clamped to step duration (OFF = 0, FULL = duration)
 
 **Duration Control**:
-- Each step has its own duration in clock ticks
-- Allows for completely arbitrary timing relationships
-- Can create complex polyrhythms and non-musical divisions
+- Each step has its own duration in clock ticks (0-1023)
+- Divisor scales all step durations and gate lengths
+- Allows arbitrary timing relationships while keeping a consistent scale for gate and duration
 
 ### 2.3 Output Modes
 
@@ -71,8 +73,8 @@ The main page displays sequence settings:
 The step editing page shows three rows per step:
 
 - **Note Row**: Edit note index for voltage output (±1 semitone, Shift=±12)
-- **Duration Row**: Edit step duration in clock ticks (±1 tick, Shift=±divisor)
-- **Gate Row**: Edit gate length in ticks (OFF or 4..32767; FULL equals duration). Normal steps 5 positions, Shift steps 1.
+- **Duration Row**: Edit step duration in ticks (±1 tick, Shift=±divisor)
+- **Gate Row**: Edit gate length in ticks (OFF or 1..1023; FULL equals duration). Normal steps 5 ticks, Shift steps 1.
 
 **Function Keys (Step Edit)**:
 - **F1**: Note edit mode
@@ -89,10 +91,10 @@ The step editing page shows three rows per step:
 ### 3.3 Footer Controls (Function Keys)
 
 **F1 - Clock Settings**:
-- **Divisor**: Clock division (1-768) with power-of-2 adjustments
-- **Clock Mult**: Per-sequence multiplier (0.50x-1.50x) applied to divisor timing
+- **Divisor**: Time scale (1-768) applied to duration and gate ticks
+- **Clock Mult**: Per-sequence rate multiplier (0.50x-1.50x) that scales tick rate
 - **Loop**: On/Once mode for sequence behavior
-- **Active Length**: Dynamic step count (1-32) for sequence length
+- **Active Length**: Dynamic step count (1-48) for sequence length
 
 **F2 - Scale Settings**:
 - **Scale**: Project scale or track-specific scale selection
@@ -124,7 +126,7 @@ Context menu provides:
 
 Duration determines how long a step remains active:
 
-**Range**: 0 to 65535 clock ticks
+**Range**: 0 to 1023 clock ticks
 - 0 duration steps are skipped immediately
 - Higher values create longer step durations
 - Independent for each step in sequence
@@ -135,27 +137,27 @@ Duration determines how long a step remains active:
 - Allows for precise timing relationships
 
 **Practical Ranges**:
-- 1 tick: Shortest possible step (rarely used)
-- 48 ticks: 32nd note at 192 PPQN
-- 192 ticks: Quarter note at 192 PPQN
-- 768 ticks: Whole note at 192 PPQN
+- 1 tick: Shortest possible step
+- 48 ticks: 32nd note at 192 PPQN (divisor = 1)
+- 192 ticks: Quarter note at 192 PPQN (divisor = 1)
+- 768 ticks: Whole note at 192 PPQN (divisor = 1)
 
 ### 4.2 Gate Parameters
 
 Gate length determines how long gate output remains high:
 
-**Tick Table**:
+**Gate Scale**:
 - OFF (0) keeps the gate low
-- 1..126 map to exponential tick lengths from 4 to 32767
-- FULL (127) equals the step duration
+- 1..1023 are direct tick lengths
+- FULL equals the step duration
 
 **Clamping**:
 - Gate length is clamped to step duration
 - If you dial past duration it snaps to FULL (display shows duration ticks)
 
 **Editing**:
-- Normal encoder: coarse steps (5 positions in the tick table)
-- Shift + encoder: fine steps (1 position)
+- Normal encoder: coarse steps (5 ticks)
+- Shift + encoder: fine steps (1 tick)
 
 ### 4.3 Note Index Parameters
 
@@ -404,14 +406,14 @@ Macros provide powerful generative and transformative operations on sequences. A
 - Split function is great for subdividing longer steps
 - Use rotation (First Step) to start sequence from different points
 - Group modulation allows for complex interactions
-- Minimum gate length (4 ticks) creates precise short pulses
+- Minimum gate length (1 tick) creates precise short pulses
 
 ### 9.4 Performance Considerations
 
 - Duration calculations use minimal CPU resources
 - Group-based modulation adds some processing overhead
 - Complex scale mappings may have slight performance impact
-- Maximum 32 steps keeps memory usage reasonable
+- Maximum 48 steps keeps memory usage reasonable
 
 ## 10. Troubleshooting
 

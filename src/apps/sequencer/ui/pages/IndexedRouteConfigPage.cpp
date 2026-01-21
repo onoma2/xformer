@@ -66,7 +66,7 @@ void IndexedRouteConfigPage::drawRouteConfig(Canvas &canvas, const IndexedSequen
     canvas.setBlendMode(BlendMode::Set);
 
     const int colWidth = CONFIG_LCD_WIDTH / CONFIG_FUNCTION_KEY_COUNT;
-    auto drawCentered = [&canvas, colWidth, y] (int col, const char *text, Color color) {
+    auto drawCentered = [&canvas, y] (int col, const char *text, Color color) {
         int colX = col * colWidth;
         int textWidth = canvas.textWidth(text);
         int x = colX + (colWidth - textWidth) / 2;
@@ -130,7 +130,7 @@ void IndexedRouteConfigPage::drawMixConfig(Canvas &canvas, IndexedSequence::Rout
     canvas.setBlendMode(BlendMode::Set);
 
     const int colWidth = CONFIG_LCD_WIDTH / CONFIG_FUNCTION_KEY_COUNT;
-    auto drawCentered = [&canvas, colWidth, y] (int col, const char *text, Color color) {
+    auto drawCentered = [&canvas, y] (int col, const char *text, Color color) {
         int colX = col * colWidth;
         int textWidth = canvas.textWidth(text);
         int x = colX + (colWidth - textWidth) / 2;

@@ -383,6 +383,11 @@ Accumulator is enabled by default. Push NOTE(F4) several times to get to Accumul
 - **THIRD PRESS of Shift-S3**: Access detailed parameter controls (ACCST)
 - **Shift+F4**: Resets accum to 0
 
+**Condition Handling:**
+- **Trigger Mode: Step** respects step **Conditions** only.
+- **Trigger Mode: Step** ignores gate on/off and gate probability.
+- **Trigger Modes: Gate/Retrigger** follow gate logic (so Conditions and gate probability apply).
+
 ### 5.3 Pulse Count and Gate Mode
 
 #### Pulse Count
@@ -397,6 +402,46 @@ Determines which pulses fire a gate signal when Pulse Count is active.
 2. **First (1)**: Single gate on first pulse only.
 3. **Hold (2)**: One long gate for entire duration.
 4. **FirstLast (3)**: Gates on first and last pulse only.
+
+### 5.4 Re:Rene Mode (Note Track)
+
+Re:Rene turns the Note sequence into a cartesian 8x8 grid of locations. X and Y advance independently using two divisors, and the active loop range acts like an ACCESS window that allows or denies locations.
+
+**Setup:**
+- Open the Note Sequence list.
+- **Mode**: Linear or Re:Rene.
+- **Div X**: X-axis clock divisor (uses the existing Divisor).
+- **Div Y**: Y-axis clock divisor.
+- **Y Src**: Y source (Div or Gate).
+- **Y Trk**: Track whose logical gate drives Y when Y Src = Gate.
+
+**Behavior (Free mode only):**
+- The grid is always 8x8 (64 locations).
+- X steps on **Div X**, Y steps on **Div Y**.
+- If **Y Src = Gate**, Y advances on rising edges of the selected track’s logical gate output (tick‑quantized).
+- If a location is denied (outside First/Last), the engine **seeks forward** within the same row/column until it finds the next allowed location.
+- Timing does not pause on denied locations; they are skipped instantly (fast-forward seek).
+- Gate timing uses the faster of the two clocks: `min(Div X, Div Y)`.
+
+**ACCESS window:**
+- **First Step/Last Step** define which locations are allowed.
+- This window does not resize the grid; it only allows/denies locations.
+
+### 5.5 Ikra Mode (Note Track)
+
+Ikra separates **note timing** from **gate timing**. Gates/conditions/length stay on the main clock and loop, while notes advance on their own divisor and loop range.
+
+**Setup:**
+- Open the Note Sequence list.
+- **Mode**: Ikra.
+- **Div X**: master divisor for gates/conditions/length.
+- **Div N**: note divisor (uses the Div Y slot).
+- **Note First/Note Last**: note loop range (independent from First/Last).
+
+**Behavior:**
+- Gates follow the main loop and divisor.
+- Notes advance on Div N and wrap within Note First/Note Last.
+- In Ikra mode the UI shows a separate note playhead marker on the Steps page.
 
 ## 6. Curve Track Enhancements
 
@@ -578,6 +623,53 @@ The Curve Rate parameter can be modulated via CV routing for dynamic FM effects:
 
 ## 7. Routing & Output Rotation
 
+### 7.0 CVRoute (Matrix Scan/Route)
+
+CVRoute is a minimalist 4×4 scan-and-route matrix controlled by two global values: **Scan** (input selection) and **Route** (output selection). It blends between I/O pairs rather than stepping hard.
+
+**Access**: Page key Track5.
+
+**Layout**:
+- Row 1: Inputs 1–4 plus `SCAN`
+- Row 2: Outputs 1–4 plus `ROUTE`
+
+**Input sources (per lane)**:
+- `CV1..CV4`
+- `BUS1..BUS4`
+- `0V`
+
+**Output destinations (per lane)**:
+- `CVR1..CVR4`
+- `BUS1..BUS4`
+- `NONE`
+
+**Scan/Route range**:
+- `0` = I/O 1
+- `100` = I/O 4
+- Values in-between interpolate between adjacent lanes.
+
+**Controls**:
+- `F1–F4`: Select column 1–4 and toggle between input/output row.
+- Encoder: Adjust selected I/O source/destination (cols 1–4) or Scan/Route value (col 5).
+- `F5`: Select column 5 and toggle between Scan/Route row.
+
+**Routing targets**:
+- `CVR Scan` and `CVR Route` are routable targets (0–100%).
+
+**Layout integration**:
+- `CVR1..CVR4` only reach hardware CV outputs if you assign physical CV outs to `CVR` in the Layout page.
+  (Outputs assigned to CVR are filled in order: CVR1, CVR2, CVR3, CVR4.)
+
+### 7.0.1 BUS Safety (Safe/Raw)
+
+BUS values are clamped to ±5V. Each project has a **Bus Safety** mode:
+
+- **Safe**: Adds per-tick slew limiting and decay to 0V when BUS is not written that tick.
+  This stabilizes feedback loops and prevents hard latching.
+- **Raw**: Keeps only the hard clamp (no slew, no decay).
+
+**Where**: Project page → `Bus Safety`.
+
 ### 7.1 Global Output Rotation (CV & Gate)
 
 This feature allows you to dynamically rotate which tracks are assigned to physical CV and Gate outputs. It acts like a virtual 8-channel sequential switch.
@@ -589,6 +681,7 @@ The rotation applies to the physical output's lookup of its assigned track. Only
 1.  **Configure Track Layout:** Map Tracks to CV/Gate Outputs in Layout Page (Shift+S2 -> LAYOUT).
 2.  **Create a Rotation Route:**
     *   **Target**: `CV Out Rot` or `Gate Out Rot`.
+        *   CV and Gate rotations use separate pools.
     *   **Source**: Modulation source (e.g., `CV In 1`).
     *   **Tracks**: Select the tracks to participate in the rotation pool.
     *   **Range**: 0-8 (unipolar) or -8 to +8 (bipolar).

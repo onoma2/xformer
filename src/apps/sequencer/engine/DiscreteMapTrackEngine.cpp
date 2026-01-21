@@ -1,7 +1,7 @@
 #include "DiscreteMapTrackEngine.h"
 
 #include "Engine.h"
-#include "Slide.h"
+#include "core/utils/Random.h"
 
 #include <algorithm>
 #include <cmath>
@@ -13,6 +13,8 @@ constexpr float DiscreteMapTrackEngine::kMinSpanAbs;
 constexpr float DiscreteMapTrackEngine::kArmTolerancePct;
 constexpr float DiscreteMapTrackEngine::kCoveragePct;
 constexpr float DiscreteMapTrackEngine::kRangeEpsilon;
+
+static Random rng;
 
 void DiscreteMapTrackEngine::reset() {
     _sequence = &_discreteMapTrack.sequence(pattern());
@@ -30,8 +32,13 @@ void DiscreteMapTrackEngine::reset() {
     _prevLoop = _sequence ? _sequence->loop() : true;
     _activeStage = -1;
     _cvOutput = 0.0f;
+    _cvOutputBase = 0.0f;
     _targetCv = 0.0f;
     _gateTimer = 0;
+    _pluckOffset = 0.0f;
+    _pluckDepth = 0.0f;
+    _pluckTimeRemaining = 0.0f;
+    _pluckTimeTotal = 0.0f;
     _running = true;
     _thresholdsDirty = true;
     _activity = false;
@@ -60,6 +67,10 @@ void DiscreteMapTrackEngine::changePattern() {
     _extMaxSeen = 0.f;
     _lastScannerSegment = -1;
     _activityTimer = 0;
+    _pluckOffset = 0.0f;
+    _pluckDepth = 0.0f;
+    _pluckTimeRemaining = 0.0f;
+    _pluckTimeTotal = 0.0f;
 }
 
 void DiscreteMapTrackEngine::restart() {
@@ -77,6 +88,10 @@ void DiscreteMapTrackEngine::restart() {
     _extMaxSeen = 0.f;
     _lastScannerSegment = -1;
     _activityTimer = 0;
+    _pluckOffset = 0.0f;
+    _pluckDepth = 0.0f;
+    _pluckTimeRemaining = 0.0f;
+    _pluckTimeTotal = 0.0f;
 }
 
 TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
@@ -175,7 +190,12 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         }
         case Types::PlayMode::Free:
             if (_running || _sequence->loop()) {
-                updateRamp(relativeTick);
+                double tickPos = _engine.clock().tickPosition();
+                double relativeTickPos = tickPos - double(_resetTickOffset);
+                if (relativeTickPos < 0.0) {
+                    relativeTickPos = 0.0;
+                }
+                updateRamp(relativeTickPos);
             }
             break;
         case Types::PlayMode::Last:
@@ -264,6 +284,38 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         // Send MIDI gate ON
         bool finalGate = (!mute() || fill()) && true;
         _engine.midiOutputEngine().sendGate(_track.trackIndex(), finalGate);
+
+        int pluck = _sequence->pluck();
+        if (pluck == 0) {
+            _pluckOffset = 0.0f;
+            _pluckDepth = 0.0f;
+            _pluckTimeRemaining = 0.0f;
+            _pluckTimeTotal = 0.0f;
+        } else {
+            float absPluck = std::abs(pluck);
+            float norm = absPluck / 100.0f;
+            float curve = norm * norm;
+            float depthCents = curve * kPluckMaxCents;
+            float durationMs = kPluckMinMs + curve * (kPluckMaxMs - kPluckMinMs);
+
+            float ratio = (absPluck - 1.0f) / 99.0f;
+            ratio = clamp(ratio, 0.0f, 1.0f);
+            float jitterPct = 0.10f + (0.40f * ratio);
+            float jitterDepth = (rng.nextFloat() * 2.0f - 1.0f) * jitterPct;
+            float jitterTime = (rng.nextFloat() * 2.0f - 1.0f) * jitterPct;
+
+            depthCents *= (1.0f + jitterDepth);
+            durationMs *= (1.0f + jitterTime);
+
+            float depthVolts = depthCents / 1200.0f;
+            if (pluck < 0) {
+                depthVolts = -depthVolts;
+            }
+            _pluckDepth = depthVolts;
+            _pluckTimeTotal = std::max(0.001f, durationMs * 0.001f);
+            _pluckTimeRemaining = _pluckTimeTotal;
+            _pluckOffset = _pluckDepth;
+        }
     }
 
     // 4. Update CV output based on CV Update Mode
@@ -287,7 +339,8 @@ TrackEngine::TickResult DiscreteMapTrackEngine::tick(uint32_t tick) {
         }
 
         if (_sequence->slewTime() == 0) {
-            _cvOutput = _targetCv;
+            _cvOutputBase = _targetCv;
+            _cvOutput = _cvOutputBase + _pluckOffset;
         }
 
         // Send MIDI CV and slide when it changes (respect CvUpdateMode and mute)
@@ -359,10 +412,79 @@ void DiscreteMapTrackEngine::update(float dt) {
         return;
     }
 
-    int slewTime = _sequence->slewTime();
-    if (slewTime > 0) {
-        _cvOutput = Slide::applySlide(_cvOutput, _targetCv, slewTime, dt);
+    bool running = _engine.state().running();
+    bool stepMonitoring = (!running && _monitorStageIndex >= 0);
+
+    auto sendToMidiOutputEngine = [this] (bool gate, float cv = 0.f) {
+        auto &midiOutputEngine = _engine.midiOutputEngine();
+        midiOutputEngine.sendGate(_track.trackIndex(), gate);
+        if (gate) {
+            midiOutputEngine.sendCv(_track.trackIndex(), cv);
+            midiOutputEngine.sendSlide(_track.trackIndex(), false);
+        }
+    };
+
+    auto setOverride = [&] (float cv) {
+        _targetCv = cv;
+        _cvOutputBase = cv;
+        _cvOutput = cv;
+        _monitorGateOutput = true;
+        _monitorOverrideActive = true;
+        _pluckOffset = 0.0f;
+        _pluckDepth = 0.0f;
+        _pluckTimeRemaining = 0.0f;
+        _pluckTimeTotal = 0.0f;
+        _activityTimer = kActivityPulseTicks;
+        _activity = true;
+        sendToMidiOutputEngine(true, cv);
+    };
+
+    auto clearOverride = [&] () {
+        if (_monitorOverrideActive) {
+            _monitorGateOutput = false;
+            _monitorOverrideActive = false;
+            sendToMidiOutputEngine(false);
+        }
+    };
+
+    if (stepMonitoring) {
+        const auto &stage = _sequence->stage(_monitorStageIndex);
+        setOverride(noteIndexToVoltage(stage.noteIndex(), false));
+    } else {
+        clearOverride();
     }
+
+    if (_monitorOverrideActive) {
+        return;
+    }
+
+    int slewRatePercent = _sequence->slewTime();
+    if (slewRatePercent == 0) {
+        _cvOutputBase = _targetCv;
+    } else {
+        float rateStPerSec = ((101.0f - slewRatePercent) / 100.0f) * kMaxSlewRateStPerSec;
+        float rateVoltsPerSec = rateStPerSec / 12.0f;
+        float maxDelta = rateVoltsPerSec * dt;
+        float delta = _targetCv - _cvOutputBase;
+        if (std::abs(delta) <= maxDelta) {
+            _cvOutputBase = _targetCv;
+        } else {
+            _cvOutputBase += (delta > 0.0f) ? maxDelta : -maxDelta;
+        }
+    }
+
+    if (_pluckTimeRemaining > 0.0f) {
+        _pluckTimeRemaining = std::max(0.0f, _pluckTimeRemaining - dt);
+        if (_pluckTimeRemaining == 0.0f || _pluckTimeTotal <= 0.0f) {
+            _pluckOffset = 0.0f;
+        } else {
+            _pluckOffset = _pluckDepth * (_pluckTimeRemaining / _pluckTimeTotal);
+        }
+    } else {
+        _pluckOffset = 0.0f;
+    }
+
+    _cvOutput = _cvOutputBase + _pluckOffset;
 }
 
 uint32_t DiscreteMapTrackEngine::scaledDivisorTicks() const {
@@ -374,13 +496,16 @@ uint32_t DiscreteMapTrackEngine::scaledDivisorTicks() const {
     return std::max<uint32_t>(1, std::lround(divisor / clockMult));
 }
 
-void DiscreteMapTrackEngine::updateRamp(uint32_t tick) {
+void DiscreteMapTrackEngine::updateRamp(double tickPos) {
     const auto &sequence = *_sequence;
 
-    uint32_t periodTicks = scaledDivisorTicks();
+    double periodTicks = static_cast<double>(scaledDivisorTicks());
 
-    uint32_t posInPeriod = _running ? (tick % periodTicks) : periodTicks;
-    _rampPhase = float(posInPeriod) / float(periodTicks);
+    double posInPeriod = _running ? std::fmod(tickPos, periodTicks) : periodTicks;
+    if (posInPeriod < 0.0) {
+        posInPeriod = 0.0;
+    }
+    _rampPhase = periodTicks > 0.0 ? float(posInPeriod / periodTicks) : 0.0f;
 
     // Internal ramp/triangle always uses full ±5V range (perfect synced modulation source)
     // ABOVE/BELOW parameters only affect threshold positions, not the ramp itself
@@ -391,7 +516,7 @@ void DiscreteMapTrackEngine::updateRamp(uint32_t tick) {
         _rampValue = kInternalRampMin + _rampPhase * (kInternalRampMax - kInternalRampMin);
     }
 
-    if (!_sequence->loop() && _running && posInPeriod + 1 >= periodTicks) {
+    if (!_sequence->loop() && _running && posInPeriod + 1.0 >= periodTicks) {
         _running = false;
         _rampValue = kInternalRampMax;
         _rampPhase = 1.0f;
@@ -502,12 +627,12 @@ int DiscreteMapTrackEngine::findActiveStage(float input, float prevInput) {
     return _activeStage;
 }
 
-float DiscreteMapTrackEngine::noteIndexToVoltage(int8_t noteIndex) {
+float DiscreteMapTrackEngine::noteIndexToVoltage(int8_t noteIndex, bool useSampled) {
     const Scale &scale = _sequence->selectedScale(_model.project().selectedScale());
 
     // Use sampled values in Gate mode, current values in Always mode
     int octave, transpose, rootNote;
-    if (_discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Gate) {
+    if (useSampled && _discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Gate) {
         octave = _sampledOctave;
         transpose = _sampledTranspose;
         rootNote = _sampledRootNote;
@@ -525,4 +650,12 @@ float DiscreteMapTrackEngine::noteIndexToVoltage(int8_t noteIndex) {
         volts += rootNote * (1.f / 12.f);
     }
     return volts;
+}
+
+void DiscreteMapTrackEngine::setMonitorStage(int index) {
+    if (index >= 0 && index < DiscreteMapSequence::StageCount) {
+        _monitorStageIndex = index;
+    } else {
+        _monitorStageIndex = -1;
+    }
 }

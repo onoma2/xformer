@@ -6,11 +6,13 @@
 // Font definitions
 #include "fonts/tiny5x5.h"
 #include "fonts/ati8x8.h"
+#include "fonts/tele.h"
 
 static const BitmapFont &bitmapFont(Font font) {
     switch (font) {
     case Font::Tiny: return tiny5x5;
     case Font::Small: return ati8x8;
+    case Font::Tele: return tele;
     default: return tiny5x5;
     }
 }
@@ -19,6 +21,7 @@ static const int bitmapFontHeight(Font font) {
     switch (font) {
     case Font::Tiny: return 6;
     case Font::Small: return 10;
+    case Font::Tele: return 8;
     default: return 0;
     }
 }
@@ -27,6 +30,7 @@ static const int bitmapFontOffset(Font font) {
     switch (font) {
     case Font::Tiny: return 5;
     case Font::Small: return 8;
+    case Font::Tele: return 8;
     default: return 0;
     }
 }

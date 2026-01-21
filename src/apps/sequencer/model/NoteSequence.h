@@ -59,6 +59,19 @@ public:
         Last
     };
 
+    enum class Mode : uint8_t {
+        Linear,
+        ReRene,
+        Ikra,
+        Last
+    };
+
+    enum class DivYSource : uint8_t {
+        Divisor,
+        TrackGate,
+        Last
+    };
+
     enum class InversionOverrideType {
         UseSequence = 0,  // Use sequence-level inversion (default)
         RootPosition = 1, // Override to root position
@@ -455,6 +468,66 @@ public:
         ModelUtils::printDivisor(str, divisor());
     }
 
+    // divisorY (Re:Rene mode)
+
+    int divisorY() const { return _divisorY; }
+    void setDivisorY(int divisorY) {
+        _divisorY = ModelUtils::clampDivisor(divisorY);
+    }
+
+    int indexedDivisorY() const { return ModelUtils::divisorToIndex(divisorY()); }
+    void setIndexedDivisorY(int index) {
+        int divisor = ModelUtils::indexToDivisor(index);
+        if (divisor > 0) {
+            setDivisorY(divisor);
+        }
+    }
+
+    void editDivisorY(int value, bool shift) {
+        setDivisorY(ModelUtils::adjustedByDivisor(divisorY(), value, shift));
+    }
+
+    void printDivisorY(StringBuilder &str) const {
+        ModelUtils::printDivisor(str, divisorY());
+    }
+
+    // divisorY source (Re:Rene mode)
+
+    DivYSource divisorYSource() const { return _divisorYSource; }
+    void setDivisorYSource(DivYSource source) {
+        _divisorYSource = ModelUtils::clampedEnum(source);
+    }
+
+    void editDivisorYSource(int value, bool /*shift*/) {
+        setDivisorYSource(ModelUtils::adjustedEnum(divisorYSource(), value));
+    }
+
+    void printDivisorYSource(StringBuilder &str) const {
+        switch (divisorYSource()) {
+        case DivYSource::Divisor:
+            str("Div");
+            break;
+        case DivYSource::TrackGate:
+            str("Gate");
+            break;
+        case DivYSource::Last:
+            break;
+        }
+    }
+
+    int divisorYTrack() const { return _divisorYTrack; }
+    void setDivisorYTrack(int track) {
+        _divisorYTrack = clamp(track, 0, CONFIG_TRACK_COUNT - 1);
+    }
+
+    void editDivisorYTrack(int value, bool /*shift*/) {
+        setDivisorYTrack(divisorYTrack() + value);
+    }
+
+    void printDivisorYTrack(StringBuilder &str) const {
+        str("T%d", divisorYTrack() + 1);
+    }
+
     // clockMultiplier
 
     int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
@@ -510,6 +583,33 @@ public:
         str(Types::runModeName(runMode()));
     }
 
+    // mode
+
+    Mode mode() const { return _mode; }
+    void setMode(Mode mode) {
+        _mode = ModelUtils::clampedEnum(mode);
+    }
+
+    void editMode(int value, bool shift) {
+        setMode(ModelUtils::adjustedEnum(mode(), value));
+    }
+
+    void printMode(StringBuilder &str) const {
+        switch (mode()) {
+        case Mode::Linear:
+            str("Linear");
+            break;
+        case Mode::ReRene:
+            str("Re:Rene");
+            break;
+        case Mode::Ikra:
+            str("Ikra");
+            break;
+        case Mode::Last:
+            break;
+        }
+    }
+
     // firstStep
 
     int firstStep() const {
@@ -555,6 +655,42 @@ public:
     void printLastStep(StringBuilder &str) const {
         printRouted(str, Routing::Target::LastStep);
         str("%d", lastStep() + 1);
+    }
+
+    // noteFirstStep (Ikra note loop)
+
+    int noteFirstStep() const {
+        return _noteFirstStep;
+    }
+
+    void setNoteFirstStep(int noteFirstStep) {
+        _noteFirstStep = clamp(noteFirstStep, 0, noteLastStep());
+    }
+
+    void editNoteFirstStep(int value, bool shift) {
+        setNoteFirstStep(noteFirstStep() + value);
+    }
+
+    void printNoteFirstStep(StringBuilder &str) const {
+        str("%d", noteFirstStep() + 1);
+    }
+
+    // noteLastStep (Ikra note loop)
+
+    int noteLastStep() const {
+        return std::max(noteFirstStep(), int(_noteLastStep));
+    }
+
+    void setNoteLastStep(int noteLastStep) {
+        _noteLastStep = clamp(noteLastStep, noteFirstStep(), CONFIG_STEP_COUNT - 1);
+    }
+
+    void editNoteLastStep(int value, bool shift) {
+        setNoteLastStep(noteLastStep() + value);
+    }
+
+    void printNoteLastStep(StringBuilder &str) const {
+        str("%d", noteLastStep() + 1);
     }
 
     // steps
@@ -658,11 +794,17 @@ private:
     Routable<int8_t> _scale;
     Routable<int8_t> _rootNote;
     Routable<uint16_t> _divisor;
+    uint16_t _divisorY;
+    DivYSource _divisorYSource = DivYSource::Divisor;
+    int8_t _divisorYTrack = 0;
     Routable<uint8_t> _clockMultiplier;
     uint8_t _resetMeasure;
     Routable<Types::RunMode> _runMode;
+    Mode _mode;
     Routable<uint8_t> _firstStep;
     Routable<uint8_t> _lastStep;
+    uint8_t _noteFirstStep;
+    uint8_t _noteLastStep;
 
     StepArray _steps;
 

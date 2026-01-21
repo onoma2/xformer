@@ -65,6 +65,7 @@ public:
     bool isActiveSequence(const NoteSequence &sequence) const { return &sequence == _sequence; }
 
     int currentStep() const { return _currentStep; }
+    int currentNoteStep() const { return _noteSequenceState.step(); }
     int currentRecordStep() const { return _stepRecorder.stepIndex(); }
 
     void setMonitorStep(int index);
@@ -86,7 +87,18 @@ private:
     NoteSequence *_sequence = nullptr;
     const NoteSequence *_fillSequence = nullptr;
 
-    uint32_t _freeRelativeTick;
+    int _lastFreeStepIndex = -1;
+    int _lastNoteFreeStepIndex = -1;
+    SequenceState _noteSequenceState;
+    int _reReneX = 0;
+    int _reReneY = 0;
+    int _reReneLastXTick = -1;
+    int _reReneLastYTick = -1;
+    uint32_t _reReneDivisorX = 0;
+    uint32_t _reReneDivisorY = 0;
+    NoteSequence::DivYSource _reReneDivYSource = NoteSequence::DivYSource::Divisor;
+    int _reReneDivYTrack = 0;
+    bool _reReneYGatePrev = false;
     SequenceState _sequenceState;
     int _currentStep;
     bool _prevCondition;

@@ -82,6 +82,7 @@ private:
 
     // Free mode phase accumulator for smooth FM
     double _freePhase = 0.0;
+    double _lastFreeTickPos = 0.0;
 
     Latoocarfian _latoocarfian;
     Lorenz _lorenz;

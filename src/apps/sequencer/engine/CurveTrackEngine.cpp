@@ -96,6 +96,7 @@ void CurveTrackEngine::reset() {
     _phasedStep = -1;
     _phasedStepFraction = 0.f;
     _freePhase = 0.0;
+    _lastFreeTickPos = _engine.clock().tickPosition();
     _shapeVariation = false;
     _fillMode = CurveTrack::FillMode::None;
     _activity = false;
@@ -129,6 +130,7 @@ void CurveTrackEngine::restart() {
     _phasedStep = -1;
     _phasedStepFraction = 0.f;
     _freePhase = 0.0;
+    _lastFreeTickPos = _engine.clock().tickPosition();
     _lpfState = 0.f;
     _feedbackState = 0.f;
 
@@ -197,8 +199,15 @@ TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
             // Apply Nyquist clamping: max 0.5 phase per tick
             speed = std::min(speed, 0.5);
 
+            double tickPos = _engine.clock().tickPosition();
+            double deltaTicks = tickPos - _lastFreeTickPos;
+            if (deltaTicks < 0.0) {
+                deltaTicks = 0.0;
+            }
+            _lastFreeTickPos = tickPos;
+
             // Increment phase
-            _freePhase += speed;
+            _freePhase += deltaTicks * speed;
 
             // Check for step boundary crossing
             if (_freePhase >= 1.0) {

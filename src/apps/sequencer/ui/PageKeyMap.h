@@ -2,7 +2,7 @@
 
 #include "Key.h"
 
-//  Project     Layout      Routing     MidiOutput  UserScale   -       -       System
+//  Project     Layout      Routing     MidiOutput  UserScale   CvRoute  -       System
 //  SequenceEdt Sequence    Track       Song        -           -       -       Monitor
 
 namespace PageKeyMap {
@@ -18,6 +18,7 @@ namespace PageKeyMap {
         Routing         = Key::Track2,
         MidiOutput      = Key::Track3,
         UserScale       = Key::Track4,
+        CvRoute         = Key::Track5,
 
         SequenceEdit    = Key::Step0,
         Sequence        = Key::Step1,
@@ -40,6 +41,7 @@ namespace PageKeyMap {
         case Routing:
         case MidiOutput:
         case UserScale:
+        case CvRoute:
 
         case SequenceEdit:
         case Sequence:

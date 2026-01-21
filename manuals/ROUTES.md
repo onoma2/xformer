@@ -83,6 +83,28 @@ Each track has independent bias, depth, and shaper settings:
    - Use Track selection to choose which tracks are affected
    - Multiple tracks can share the same route with different bias/depth
 
+### 3.3 BUS Targets (Global)
+
+BUS targets (`BUS 1–4`) are global CV slots that can be routed to any target or read by Teletype.
+Unlike per-track targets, BUS targets do not have a track mask; they are single global values.
+
+**BUS shaping controls:**
+- **Bias / Depth / Shaper** are still available for BUS targets.
+- These use **track slot A (track index 0)** as the shared shaping slot.
+- The shaper is applied before the BUS value is written.
+
+**UI behavior:**
+- When the target is a BUS, the route list shows three extra rows:
+  - `Bias`
+  - `Depth`
+  - `Shaper`
+- These rows control the BUS shaping slot directly.
+
+**BUS Safety (per project):**
+- **Safe**: Adds per-tick slew limiting and decay to 0V when BUS is not written that tick.
+- **Raw**: No slew or decay (only the hard ±5V clamp).
+- Set in Project page → `Bus Safety`.
+
 ### 3.2 Per-Track Parameter Assignment
 
 Once route is created, per-track parameters are accessible:
@@ -384,6 +406,42 @@ Recent updates to the routing system include:
   - Positive values: Rotate CV values forward in sequence
   - Negative values: Rotate CV values backward in sequence
 - **Use Case**: Create evolving CV patterns by rotating output values
+- **Route Mode**: `Step` (default) or `Interp` (crossfade between adjacent rotated outputs; CV only)
+
+**How Rotation Pools Work**
+- Rotation only applies within the pool of outputs whose tracks are routed to `CV Out Rot`.
+- The rotation value is an integer (rounded) and wraps within the pool size.
+- CV and Gate rotations use separate pools.
+
+**Source Range -> Rotation Value**
+Routing maps the source (normalized 0..1) to the target range:
+`r = round(min + src * (max - min))`
+
+Examples assume the source range is set correctly in the route:
+
+**Micro Rotation (neighbor swap)**
+- **Min/Max**: `-1 .. +1`
+- **Input range**: Unipolar 0..5V or Bipolar -5..+5V
+- **Result**: r in {-1, 0, +1}
+- **Use**: Gentle movement within the pool.
+
+**Full Pool Rotation (all positions)**
+- **Min/Max**: `0 .. (poolSize-1)`
+- **Input range**: Unipolar 0..5V
+- **Result**: r covers every pool position.
+- **Use**: Sweep through every output in the pool.
+
+**Wide Span (wrap-heavy)**
+- **Min/Max**: `-8 .. +8`
+- **Input range**: Bipolar -5..+5V
+- **Result**: Large rotations that wrap in smaller pools.
+- **Use**: Fast, chaotic reshuffling.
+
+**Example Mapping (pool size 3)**
+- r = 0: 1->1, 2->2, 3->3
+- r = +1: 1<-2, 2<-3, 3<-1
+- r = +2: 1<-3, 2<-1, 3<-2
+- r = -1: 1<-3, 2<-1, 3<-2
 
 #### 8.6.3 Gate Output Rotation
 
@@ -395,6 +453,8 @@ Recent updates to the routing system include:
   - Positive values: Rotate gate timing forward
   - Negative values: Rotate gate timing backward
 - **Use Case**: Create rhythmic variations by rotating gate patterns
+ 
+Gate rotation uses the same min/max mapping as CV rotation, but has its own pool.
 
 #### 8.6.4 Track Run Control
 

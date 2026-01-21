@@ -1,0 +1,11 @@
+["MP.PRESET"]
+prototype = "MP.PRESET x"
+short = "set Meadowphysics to preset `x` (indexed from `0`)"
+
+["MP.RESET"]
+prototype = "MP.RESET x"
+short = "reset countdown for channel `x` (`0` = all, `1-8` = individual channels)"
+
+["MP.STOP"]
+prototype = "MP.STOP x"
+short = "reset channel `x` (`0` = all, `1-8` = individual channels)"

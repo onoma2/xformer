@@ -6,8 +6,8 @@
 #define CONFIG_VERSION_MAGIC            0xfadebabe
 #define CONFIG_VERSION_NAME             "__X|FORMER SEQUENCER"
 #define CONFIG_VERSION_MAJOR            0
-#define CONFIG_VERSION_MINOR            5
-#define CONFIG_VERSION_REVISION         1
+#define CONFIG_VERSION_MINOR            6
+#define CONFIG_VERSION_REVISION         0
 
 // Task priorities
 #define CONFIG_DRIVER_TASK_PRIORITY     5
@@ -22,7 +22,7 @@
 #define CONFIG_ENGINE_TASK_STACK_SIZE   4096
 #define CONFIG_USBH_TASK_STACK_SIZE     2048
 #define CONFIG_UI_TASK_STACK_SIZE       4096
-#define CONFIG_FILE_TASK_STACK_SIZE     2048
+#define CONFIG_FILE_TASK_STACK_SIZE     4096
 #define CONFIG_PROFILER_TASK_STACK_SIZE 2048
 
 // Settings flash storage

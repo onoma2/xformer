@@ -1,0 +1,429 @@
+[IF]
+prototype = "IF x: ..."
+short = "if `x` is not zero execute command"
+description = """
+If `x` is not zero execute command
+
+#### Advanced `IF` / `ELIF` / `ELSE` usage
+
+  1. Intermediate statements always run
+
+    ```text
+    SCRIPT 1:
+    IF 0: 0        => do nothing
+    TR.P 1         => always happens
+    ELSE: TR.P 2   => else branch runs because of the previous IF
+    ```
+
+  2. `ELSE` without an `IF`
+
+    ```text
+    SCRIPT 1:
+    ELSE: TR.P 1   => never runs, as there is no preceding IF
+    ```
+
+
+  3. `ELIF` without an `IF`
+
+    ```text
+    SCRIPT 1:
+    ELIF 1: TR.P 1  => never runs, as there is no preceding IF
+    ```
+
+  4. Independent scripts
+
+    ```text
+    SCRIPT 1:
+    IF 1: TR.P 1    => pulse output 1
+
+    SCRIPT 2:
+    ELSE: TR.P 2    => never runs regardless of what happens in script 1
+                       (see example 2)
+    ```
+
+  5. Dependent scripts
+
+    ```text
+    SCRIPT 1:
+    IF 0: TR.P 1    => do nothing
+    SCRIPT 2        => will pulse output 2
+
+    SCRIPT 2:
+    ELSE: TR.P 2    => will not pulse output 2 if called directly,
+                       but will if called from script 1
+    ```
+"""
+
+[ELIF]
+prototype = "ELIF x: ..."
+short = "if all previous `IF` / `ELIF` fail, and `x` is not zero, execute command"
+
+[ELSE]
+prototype = "ELSE: ..."
+short = "if all previous `IF` / `ELIF` fail, excute command"
+
+[L]
+prototype = "L x y: ..."
+short = "run the command sequentially with `I` values from `x` to `y`"
+description = """
+Run the command sequentially with `I` values from `x` to `y`.
+
+For example:
+
+```
+L 1 4: TR.PULSE I   => pulse outputs 1, 2, 3 and 4
+L 4 1: TR.PULSE I   => pulse outputs 4, 3, 2 and 1
+```
+"""
+
+[W]
+prototype = "W x: ..."
+short = "run the command while condition x is true"
+description = """
+Runs the command while the condition `x` is true or the loop iterations exceed 10000.
+
+For example, to find the first iterated power of 2 greater than 100:
+
+```
+A 2
+W LT A 100: A * A A
+```
+
+A will be 256.
+"""
+
+[EVERY]
+prototype = "EVERY x: ..."
+aliases = ["EV"]
+short = "run the command every `x` times the command is called"
+description = """
+Runs the command every `x` times the line is executed.  This is tracked on a per-line basis, so each script can have 6 different "dividers".
+
+Here is a 1-script clock divider:
+
+```
+EVERY 2: TR.P 1
+EVERY 4: TR.P 2
+EVERY 8: TR.P 3
+EVERY 16: TR.P 4
+```
+
+The numbers do _not_ need to be evenly divisible by each other, so there is no problem with:
+
+```
+EVERY 2: TR.P 1
+EVERY 3: TR.P 2
+```
+"""
+
+[SKIP]
+prototype = "SKIP x: ..."
+short = "run the command every time except the `x`th time."
+description = """
+This is the corollary function to `EVERY`, essentially behaving as its exact opposite.
+"""
+
+
+[OTHER]
+prototype = "OTHER: ..."
+short = "runs the command when the previous `EVERY`/`SKIP` did not run its command."
+description = """
+`OTHER` can be used to do somthing alternately with a preceding `EVERY` or `SKIP` command.
+
+For example, here is a script that alternates between two triggers to make a four-on-the-floor beat with hats between the beats:
+
+```
+EVERY 4: TR.P 1
+OTHER: TR.P 2
+```
+
+You could add snares on beats 2 and 4 with:
+
+```
+SKIP 2: TR.P 3
+```
+"""
+
+[SYNC]
+prototype = "SYNC x"
+short = "synchronizes _all_ `EVERY` and `SKIP` counters to offset `x`."
+description = """
+Causes all of the `EVERY` and `SYNC` counters to synchronize their offsets, respecting their individual divisor values.
+
+Negative numbers will synchronize to to the divisor value, such that `SYNC -1` causes all every counters to be 1 number before their divisor, causing each `EVERY` to be true on its next call, and each `SKIP` to be false.
+"""
+
+[PROB]
+prototype = "PROB x: ..."
+short = "potentially execute command with probability `x` (0-100)"
+
+[SCRIPT]
+prototype = "SCRIPT"
+prototype_set = "SCRIPT x"
+aliases = ["$"]
+short = "get current script number, or execute script `x` (1-10), recursion allowed"
+description = """
+Execute script `x` (1-10, 9 = metro, 10 = init), recursion allowed.
+
+There is a limit of 8 for the maximum number of nested calls to `SCRIPT` to stop infinite loops from locking up the Teletype.
+"""
+
+["SCRIPT.POL"]
+prototype = "SCRIPT.POL x"
+prototype_set = "SCRIPT.POL x p"
+aliases = ["$.POL"]
+short = "get script x trigger polarity, or set polarity p (1 rising edge, 2 falling, 3 both)"
+description = """
+Get or set the trigger polarity of script `x`, determining which trigger edges the script will fire on.
+
+1: rising edge (default)
+2: falling edge
+3: either edge
+"""
+
+["$F"]
+prototype = "$F script"
+short = "execute script as a function"
+description = """
+This op will execute a script similarly to `SCRIPT` op but it will also return a value,
+which means you can define a script that calculates something and then use it in an expression.
+To set the return value, either place an expression at the end of the script without
+assigning it to anything or assign it to the special function return variable `FR`. If you do
+both, `FR` will be used, and if you don't do either, zero will be returned.
+
+Let's say you update script 1 to return the square of `X`: `* X X` (which you could also
+write as `FR * X X`). Then you can use it in an expression like this: `A + A $F 1`.
+
+This op can save space if you have a calculation that is used in multiple places.
+Other than returning a value, a function script isn't different from a regular script
+and can perform other actions in addition to calculating something, including calling
+other scripts. The same limit of 8 maximum nested calls applies here to prevent infinite loops.
+
+If you need to be able to pass parameters into your function, use `$F1` or `$F2` ops.
+"""
+
+["$F1"]
+prototype = "$F1 script param"
+short = "execute script as a function with 1 parameter"
+description = """
+Same as `$F` but you can also pass a single parameter into the function. Inside the function
+script you can get the parameter using `I1` op.
+
+Let's say you create a script that returns the square of the passed parameter: `FR * I1 I1`.
+You can then calculate the square of a number by executing `$F1 value`.
+
+See the description of `$F` op for more details on executing scripts as functions.
+"""
+
+["$F2"]
+prototype = "$F2 script param1 param2"
+short = "execute script as a function with 2 parameters"
+description = """
+Same as `$F` but you can also pass two parameters into a function. Inside the function script
+you can get them using `I1` and `I2` ops.
+
+Let's say you create a script that returns a randomly selected value out of the two
+provided values: `FR ? TOSS I1 I2`. You can then save space by using `$F2 1 X Y` instead of
+`? TOSS X Y`. More importantly, you could use it in multiple places, and if you later
+want to change the calculation to something else, you just need to update the function script.
+
+See the description of `$F` op for more details on executing scripts as functions.
+"""
+
+["$L"]
+prototype = "$L script line"
+short = "execute script line"
+description = """
+This op executes the specified script line. This allows you to use a script as a library of sorts,
+where each line does something different, so you can use the same script for multiple purposes.
+It also allows you to use free lines in a script to extend another script.
+
+This op behaves similarly to `$F` op in that it can be used as a function in an expression
+by setting the return value with `FR`. Let's say the first line in script 1 is this: `FR * X X`.
+You can then get the square of `X` by executing `$L 1 1`.
+
+If you want to use it as a function and you need to pass some parameters into it, use
+`$L1` / `$L2` ops.
+
+This op is also useful if you have a loop that doesn't fit on one line - define the line
+later in the script and then reference it in the loop:
+
+```
+#1
+L 1 6: A + A $L 1 3
+BREAK
+SCALE X Y C D I
+```
+
+Don't forget to add `BREAK` before the line so that it's not executed when the whole script
+is executed. If you use this technique, you can also save space by using `$S` op which executes
+a line within the same script.
+"""
+
+["$L1"]
+prototype = "$L1 script line param"
+short = "execute script line as a function with 1 parameter"
+description = """
+Execute the specified script line as a function that takes 1 parameter. See the description of
+`$L` and `$F1` ops for more details.
+"""
+
+["$L2"]
+prototype = "$L2 script line param1 param2"
+short = "execute script line as a function with 2 parameters"
+description = """
+Execute the specified script line as a function that takes 2 parameters. See the description of
+`$L` and `$F2` ops for more details.
+"""
+
+["$S"]
+prototype = "$S line"
+short = "execute script line within the same script as a function"
+description = """
+This is exactly the same as `$L $ line` but saves you space on not having to specify the script
+number if the line you want to execute is within the same script.
+
+See the description of `$L` for more details.
+"""
+
+["$S1"]
+prototype = "$S1 line param"
+short = "execute script line within the same script as a function with 1 parameter"
+description = """
+This is exactly the same as `$L1 $ line param` but saves you space on not having to specify
+the script number if the line you want to execute is within the same script.
+
+See the description of `$L1` for more details.
+"""
+
+["$S2"]
+prototype = "$S2 line param1 param2"
+short = "execute script line within the same script as a function with 2 parameters"
+description = """
+This is exactly the same as `$L2 $ line param1 param2` but saves you space on not having
+to specify the script number if the line you want to execute is within the same script.
+
+See the description of `$L2` for more details.
+"""
+
+[I1]
+prototype = "I1"
+short = "get the first parameter when executing a script as a function"
+description = """
+This op returns the first parameter when a script is called as a function using
+`$F1` / `$F2` / `$L1` / `$L2` / `$S1` / `$S2` ops. If the script is called
+using other ops, this op will return zero.
+"""
+
+[I2]
+prototype = "I2"
+short = "get the second parameter when executing a script as a function"
+description = """
+This op returns the second parameter when a script is called as a function using
+`$F2` / `$L2` / `$S2` ops. If the script is called using other ops, this op will return zero.
+"""
+
+[FR]
+prototype = "FR"
+prototype_set = "FR x"
+short = "get/set the return value when a script is called as a function"
+description = """
+Use this op to get or set the return value in a script that is called as a function.
+"""
+
+[SCENE]
+prototype = "SCENE"
+prototype_set = "SCENE x"
+short = "get the current scene number, or load scene `x` (0-31)"
+description = """
+Load scene `x` (0-31).
+
+Does _not_ execute the `I` script.
+Will _not_ execute from the `I` script on scene load.  Will execute on subsequent calls to the `I` script.
+
+**WARNING**: You will lose any unsaved changes to your scene.
+"""
+
+["SCENE.G"]
+prototype = "SCENE.G x"
+short = "load scene `x` (0-31) without loading grid control states"
+description = """
+Load scene `x` (0-31) without loading grid button and fader states.
+
+**WARNING**: You will lose any unsaved changes to your scene.
+"""
+
+["SCENE.P"]
+prototype = "SCENE.P x"
+short = "load scene `x` (0-31) without loading pattern state"
+description = """
+Load scene `x` (0-31) without loading pattern data.
+
+**WARNING**: You will lose any unsaved changes to your scene.
+"""
+
+[KILL]
+prototype = "KILL"
+short = "clears stack, clears delays, cancels pulses, cancels slews, disables metronome"
+
+[BREAK]
+prototype = "BREAK"
+aliases = ["BRK"]
+short = "halts execution of the current script"
+
+[INIT]
+prototype = "INIT"
+short = "clears all state data"
+description = """
+
+**WARNING**: You will lose all settings when you initialize using `INIT` - there is NO undo!
+"""
+
+["INIT.CV"]
+prototype = "INIT.CV x"
+short = "clears all parameters on CV associated with output x"
+
+["INIT.CV.ALL"]
+prototype = "INIT.CV.ALL"
+short = "clears all parameters on all CV's"
+
+["INIT.DATA"]
+prototype = "INIT.DATA"
+short = "clears all data held in all variables"
+description = """
+
+Clears the following variables and resets them to default values: A, B, C, D, CV slew, Drunk min/max, M, O, Q, R, T, TR.
+Does not affect the CV input (IN) or the Parameter knob (PARAM) values.
+"""
+
+["INIT.P"]
+prototype = "INIT.P x"
+short = "clears pattern number x"
+
+["INIT.P.ALL"]
+prototype = "INIT.P.ALL"
+short = "clears all patterns"
+
+["INIT.SCENE"]
+prototype = "INIT.SCENE"
+short = "loads a blank scene"
+
+["INIT.SCRIPT"]
+prototype = "INIT.SCRIPT x"
+short = "clear script number x"
+
+["INIT.SCRIPT.ALL"]
+prototype = "INIT.SCRIPT.ALL"
+short = "clear all scripts"
+
+["INIT.TIME"]
+prototype = "INIT.TIME x"
+short = "clear time on trigger x"
+
+["INIT.TR"]
+prototype = "INIT.TR x"
+short = "clear all parameters on trigger x"
+
+["INIT.TR.ALL"]
+prototype = "INIT.TR.ALL"
+short = "clear all triggers"

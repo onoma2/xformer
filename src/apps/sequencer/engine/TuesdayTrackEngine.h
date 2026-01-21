@@ -177,10 +177,6 @@ private:
     float _trillCvTarget = 0.f;
     bool _retriggerArmed = false;
     
-    // Polyrhythmic State
-    int _polySubStep = 0;
-    bool _polyAlgoActive = false;
-    
     // Micro-Sequencing / Ratcheting
     int8_t _ratchetInterval = 0; // Semitones/Degrees shift per ratchet
 
@@ -317,7 +313,6 @@ private:
     // Prime masking state variables
     int _primeMaskCounter = 0;  // Counter for consecutive ticks to allow
     int _primeMaskState = 1;    // 0=mask, 1=allow
-    int _cachedPrimePattern = -1; // Cached value to detect changes
     int _cachedPrimeParam = -1;   // Cached value to detect changes
     int _cachedTimeMode = -1;     // Cached value to detect time mode changes
     uint32_t _timeModeStartTick = 0; // Tick when current time mode interval started

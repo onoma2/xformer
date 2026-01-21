@@ -1,0 +1,633 @@
+["G.RST"]
+prototype = "G.RST"
+short = "full grid reset"
+description = """
+Full grid reset - hide all controls and reset their properties to the default
+values, clear all LEDs, reset the dim level and the grid rotation.
+"""
+
+["G.CLR"]
+prototype = "G.CLR"
+short = "clear all LEDs"
+description = """
+Clear all LEDs set with `G.LED`, `G.REC` or `G.RCT`.
+"""
+
+["G.DIM"]
+prototype = "G.DIM level"
+short = "set dim level"
+description = """
+Set the dim level (0..14, higher values dim more). To remove set to 0.
+"""
+
+["G.ROTATE"]
+prototype = "G.ROTATE x"
+short = "set grid rotation"
+description = """
+Set the grid rotation (0 - no rotation, 1 - rotate by 180 degrees).
+"""
+
+["G.KEY"]
+prototype = "G.KEY x y action"
+short = "emulate grid press"
+description = """
+Emulate a grid key press at the specified coordinates (0-based). Set `action`
+to 1 to emulate a press, 0 to emulate a release. You can also emulate a button
+press with `G.BTN.PR` and a fader press with `G.FDR.PR`.
+"""
+
+["G.GRP"]
+prototype = "G.GRP"
+prototype_set = "G.GRP id"
+short = "get/set current group"
+description = """
+Get or set the current group. Grid controls created without specifying a group
+will be assigned to the current group. This op doesn't enable/disable groups -
+use `G.GRP.EN` for that. The default current group is 0. 64 groups are
+available.
+"""
+
+["G.GRP.EN"]
+prototype = "G.GRP.EN id"
+prototype_set = "G.GRP.EN id x"
+short = "enable/disable group or check if enabled"
+description = """
+Enable or disable the specified group or check if it's currently enabled.
+1 means enabled, 0 means disabled. Enabling or disabling a group enables /
+disables all controls assigned to that group (disabled controls are not shown 
+and receive no input). This allows groups to be used as pages - initialize
+controls in different groups, and then simply enable one group at a time.
+"""
+
+["G.GRP.RST"]
+prototype = "G.GRP.RST id"
+short = "reset all group controls"
+description = """
+Reset all controls associated with the specified group. This will disable
+the controls and reset their properties to the default values. This will also
+reset the fader scale range to 0..16383.
+"""
+
+["G.GRP.SW"]
+prototype = "G.GRP.SW id"
+short = "switch groups"
+description = """
+Switch groups. Enables the specified group, disables all others.
+"""
+
+["G.GRP.SC"]
+prototype = "G.GRP.SC id"
+prototype_set = "G.GRP.SC id script"
+short = "get/set group script"
+description = """
+Assign a script to the specified group, or get the currently assigned script.
+The script gets executed whenever a control associated with the group receives
+input. It is possible to have different scripts assigned to a control and
+the group it belongs to. Use 9 for Metro and 10 for Init. To unassign, set it
+to 0.
+"""
+
+["G.GRPI"]
+prototype = "G.GRPI"
+short = "get last group"
+description = """
+Get the id of the last group that received input. This is useful when sharing
+a script between multiple groups.
+"""
+
+["G.LED"]
+prototype = "G.LED x y"
+prototype_set = "G.LED x y level"
+short = "get/set LED"
+description = """
+Set the LED level or get the current level at the specified coordinates.
+Possible level range is 0..15 (on non varibright grids anything below 8 is
+'off', 8 or above is 'on'). 
+
+Grid controls get rendered first, and LEDs are rendered last. This means you can
+use LEDs to accentuate certain areas of the UI. This also means that any LEDs
+that are set will block whatever is underneath them, even with the level of 0.
+In order to completely clear an LED set its level to -3. There are two other
+special values for brightness: -1 will dim, and -2 will brighten what's
+underneath. They can be useful to highlight the current sequence step, for
+instance.
+"""
+
+["G.LED.C"]
+prototype = "G.LED.C x y"
+short = "clear LED"
+description = """
+Clear the LED at the specified coordinates. This is the same as setting
+the brightness level to -3. To clear all LEDs use `G.CLR`.
+"""
+
+["G.REC"]
+prototype = "G.REC x y w h fill border"
+short = "draw rectangle"
+description = """
+Draw a rectangle with the specified width and height. `x` and `y` are
+the coordinates of the top left corner. Coordinates are 0-based, with the 0,0
+point located at the top left corner of the grid. You can draw rectangles that
+are partially outside of the visible area, and they will be properly cropped.
+
+`fill` and `border` specify the brightness levels for the inner area and
+the one-LED-wide border respectively, 0..15 range. You can use the three special
+brightness levels: -1 to dim, -2 to brighten and -3 for transparency (you could
+draw just a frame by setting `fill` to -3, for instance).
+
+To draw lines, set the width or the height to 1. In this case only `border`
+brightness level is used.
+"""
+
+["G.RCT"]
+prototype = "G.RCT x1 y1 x2 y2 fill border"
+short = "draw rectangle"
+description = """
+Same as `G.REC` but instead of specifying the width and height you specify
+the coordinates of the top left corner and the bottom right corner. 
+"""
+
+["G.BTN"]
+prototype = "G.BTN id x y w h type level script"
+short = "initialize button"
+description = """
+Initializes and enables a button with the specified id. 256 buttons are
+available (ids are 0-based so the possible id range is 0..255. The button will
+be assigned to the current group (set with `G.GRP`). Buttons can be 
+reinitialized at any point.
+
+`x` and `y` specify the coordinates of the top left corner, and `w` and `h`
+specify width and height respectively. `type` determines whether the button is
+latching (1) or momentary (0). `level` sets the "off" brightness level, possible
+rand is -3..15 (the brightness level for pressed buttons is fixed at 13).
+
+`script` specifies the script to be executed when the button is pressed or
+released (the latter only for momentary buttons). Use 9 for Metro and 10 for
+Init. Use 0 if you don't need a script assigned.
+"""
+
+["G.GBT"]
+prototype = "G.GBT group id x y w h type level script"
+short = "initialize button in group"
+description = """
+Initialize and enable a button. Same as `G.BTN` but you can also choose which
+group to assign the button too.
+"""
+
+["G.BTX"]
+prototype = "G.BTX id x y w h type level script columns rows"
+short = "initialize multiple buttons"
+description = """
+Initialize and enable a block of buttons in the current group with the specified
+number of columns and rows . Ids are incremented sequentially by columns and
+then by rows.
+"""
+
+["G.GBX"]
+prototype = "G.GBX group id x y w h type level script columns rows"
+short = "initialize multiple buttons in group"
+description = """
+Initialize and enable a block of buttons. Same as `G.BTX` but you can also
+choose which group to assign the buttons too. 
+"""
+
+["G.BTN.EN"]
+prototype = "G.BTN.EN id"
+prototype_set = "G.BTN.EN id x"
+short = "enable/disable button or check if enabled"
+description = """
+Enable (set `x` to 1) or disable (set `x` to 0) a button with the specified id,
+or check if it's currently enabled. Disabling a button hides it and stops it
+from receiving input but keeps all the other properties (size/location etc)
+intact.
+"""
+
+["G.BTN.X"]
+prototype = "G.BTN.X id"
+prototype_set = "G.BTN.X id x"
+short = "get/set button x coordinate"
+description = """
+Get or set `x` coordinate for the specified button's top left corner.
+"""
+
+["G.BTN.Y"]
+prototype = "G.BTN.Y id"
+prototype_set = "G.BTN.Y id y"
+short = "get/set button y coordinate"
+description = """
+Get or set `y` coordinate for the specified button's top left corner.
+"""
+
+["G.BTN.V"]
+prototype = "G.BTN.V id"
+prototype_set = "G.BTN.V id value"
+short = "get/set button value"
+description = """
+Get or set the specified button's value. For buttons the value of 1 means
+the button is pressed and 0 means it's not. If there is a script assigned
+to the button it will not be triggered if you change the value - use 
+`G.BTN.PR` for that.
+
+Button values don't change when a button is disabled. Button values are stored
+with the scene (both to flash and to USB sticks).
+"""
+
+["G.BTN.L"]
+prototype = "G.BTN.L id"
+prototype_set = "G.BTN.L id level"
+short = "get/set button level"
+description = """
+Get or set the specified button's brightness level (-3..15). Please note you 
+can only set the level for unpressed buttons, the level for pressed buttons is
+fixed at 13.
+"""
+
+["G.BTNI"]
+prototype = "G.BTNI"
+short = "id of last pressed button"
+description = """
+Get the id of the last pressed button. This is useful when multiple buttons are
+assigned to the same script.
+"""
+
+["G.BTNX"]
+prototype = "G.BTNX"
+prototype_set = "G.BTNX x"
+short = "get/set x of last pressed button"
+description = """
+Get or set `x` coordinate of the last pressed button's top left corner. This is
+the same as `G.BTN.X G.BTNI`.
+"""
+
+["G.BTNY"]
+prototype = "G.BTNY"
+prototype_set = "G.BTNY y"
+short = "get/set y of last pressed button"
+description = """
+Get or set `y` coordinate of the last pressed button's top left corner. This is
+the same as `G.BTN.Y G.BTNI`.
+"""
+
+["G.BTNV"]
+prototype = "G.BTNV"
+prototype_set = "G.BTNV value"
+short = "get/set value of last pressed button"
+description = """
+Get or set the value of the last pressed button. This is the same as
+`G.BTN.V G.BTNI`. This op is especially useful with momentary buttons when you
+want to react to presses or releases only - just put `IF EZ G.BTNV: BREAK` in
+the beginning of the assigned script (this will ignore releases, to ignore
+presses replace `NZ` with `EZ`).
+"""
+
+["G.BTNL"]
+prototype = "G.BTNL"
+prototype_set = "G.BTNL level"
+short = "get/set level of last pressed button"
+description = """
+Get or set the brightness level of the last pressed button. This is the same as
+`G.BTN.L G.BTNI`.
+"""
+
+["G.BTN.SW"]
+prototype = "G.BTN.SW id"
+short = "switch button"
+description = """
+Set the value of the specified button to 1 (pressed), set it to 0 (not pressed)
+for all other buttons within the same group (useful for creating radio buttons).
+"""
+
+["G.BTN.PR"]
+prototype = "G.BTN.PR id action"
+short = "emulate button press/release"
+description = """
+Emulate pressing/releasing the specified button. Set `action` to `1` for press,
+`0` for release (`action` is ignored for latching buttons). 
+"""
+
+["G.GBTN.V"]
+prototype = "G.GBTN.V group value"
+short = "set value for group buttons"
+description = """
+Set the value for all buttons in the specified group. 
+"""
+
+["G.GBTN.L"]
+prototype = "G.GBTN.L group odd_level even_level"
+short = "set level for group buttons"
+description = """
+Set the brightness level (0..15) for all buttons in the specified group. You can
+use different values for odd and even buttons (based on their index within the 
+group, not their id) - this can be a good way to provide some visual guidance.
+"""
+
+["G.GBTN.C"]
+prototype = "G.GBTN.C group"
+short = "get count of currently pressed"
+description = """
+Get the total count of all the buttons in the specified group that are currently
+pressed.
+"""
+
+["G.GBTN.I"]
+prototype = "G.GBTN.I group index"
+short = "get id of pressed button"
+description = """
+Get the id of a currently pressed button within the specified group by its index
+(0-based). The index should be between 0 and C-1 where C is the total count of
+all pressed buttons (you can get it using `G.GBTN.C`).
+"""
+
+["G.GBTN.W"]
+prototype = "G.GBTN.W group"
+short = "get button block width"
+description = """
+Get the width of the rectangle formed by pressed buttons within the specified
+group. This is basically the distance between the leftmost and the rightmost
+pressed buttons, inclusive. This op is useful for things like setting a loop's
+length, for instance. To do so, check if there is more than one button pressed
+(using `G.GBTN.C`) and if there is, use `G.GBTN.W` to set the length.
+"""
+
+["G.GBTN.H"]
+prototype = "G.GBTN.H group"
+short = "get button block height"
+description = """
+Get the height of the rectangle formed by pressed buttons within the specified
+group (see `G.GBTN.W` for more details).
+"""
+
+["G.GBTN.X1"]
+prototype = "G.GBTN.X1 group"
+short = "get leftmost pressed x"
+description = """
+Get the X coordinate of the leftmost pressed button in the specified group. If
+no buttons are currently pressed it will return -1.
+"""
+
+["G.GBTN.X2"]
+prototype = "G.GBTN.X2 group"
+short = "get rightmost pressed x"
+description = """
+Get the X coordinate of the rightmost pressed button in the specified group. If
+no buttons are currently pressed it will return -1.
+"""
+
+["G.GBTN.Y1"]
+prototype = "G.GBTN.Y1 group"
+short = "get highest pressed y"
+description = """
+Get the Y coordinate of the highest pressed button in the specified group. If no
+buttons are currently pressed it will return -1.
+"""
+
+["G.GBTN.Y2"]
+prototype = "G.GBTN.Y2 group"
+short = "get lowest pressed y"
+description = """
+Get the Y coordinate of the lowest pressed button in the specified group. If no
+buttons are currently pressed it will return -1.
+"""
+
+["G.FDR"]
+prototype = "G.FDR id x y w h type level script"
+short = "initialize fader"
+description = """
+Initializes and enables a fader with the specified id. 64 faders are available
+(ids are 0-based so the possible id range is 0..63). The fader will be assigned
+to the current group (set with `G.GRP`). Faders can be reinitialized at any
+point.
+
+`x` and `y` specify the coordinates of the top left corner, and `w` and `h`
+specify width and height respectively. 
+
+`type` determines the fader type and orientation. Possible values are:
+
+* 0 - coarse, horizontal bar
+* 1 - coarse, vertical bar
+* 2 - coarse, horizontal dot
+* 3 - coarse, vertical dot
+* 4 - fine, horizontal bar
+* 5 - fine, vertical bar
+* 6 - fine, horizontal dot
+* 7 - fine, vertical dot
+
+Coarse faders have the possible range of 0..N-1 where N is width for horizontal
+faders or height for vertical faders. Pressing anywhere within the fader area
+sets the fader value accordingly. Fine faders allow selecting a bigger range
+of values by mapping the range to the fader's height or width and dedicating
+the edge buttons for incrementing/decrementing. Fine faders employ
+varibrightness to reflect the current value.
+
+`level` has a different meaning for coarse and fine faders. For coarse faders
+it selects the background brightness level (similar to buttons). For fine faders
+this is the maximum value level (the minimum level being 0). In order to show
+each value distinctly using varibright the maximum level possible is the number
+of available buttons multiplied by 16 minus 1 (since range is 0-based). Remember
+that 2 buttons are always reserved for increment/decrement. Using a larger
+number is allowed - it will be automatically adjusted to what's possible. 
+
+`script` specifies the script to be executed when the fader value is changed.
+Use 9 for Metro and 10 for Init. Use 0 if you don't need a script assigned.
+"""
+  
+["G.GFD"]
+prototype = "G.GFD grp id x y w h type level script"
+short = "initialize fader in group"
+description = """
+Initialize and enable a fader. Same as `G.FDR` but you can also choose which
+group to assign the fader too.
+"""
+
+["G.FDX"]
+prototype = "G.FDX id x y w h type level script columns rows"
+short = "initialize multiple faders"
+description = """
+Initialize and enable a block of faders with the specified number of columns
+and rows in the current group. Ids are incremented sequentially by columns and
+then by rows.
+"""
+
+["G.GFX"]
+prototype = "G.GFX group id x y w h type level script columns rows"
+short = "initialize multiple faders in group"
+description = """
+Initialize and enable a block of faders. Same as `G.FDX` but you can also
+choose which group to assign the faders too. 
+"""
+
+["G.FDR.EN"]
+prototype = "G.FDR.EN id"
+prototype_set = "G.FDR.EN id x"
+short = "enable/disable fader or check if enabled"
+description = """
+Enable (set `x` to 1) or disable (set `x` to 0) a fader with the specified id,
+or check if it's currently enabled. Disabling a fader hides it and stops it
+from receiving input but keeps all the other properties (size/location etc)
+intact.
+"""
+
+["G.FDR.X"]
+prototype = "G.FDR.X id"
+prototype_set = "G.FDR.X id x"
+short = "get/set fader x coordinate"
+description = """
+Get or set `x` coordinate for the specified fader's top left corner.
+"""
+
+["G.FDR.Y"]
+prototype = "G.FDR.Y id"
+prototype_set = "G.FDR.Y id y"
+short = "get/set fader y coordinate"
+description = """
+Get or set `y` coordinate for the specified fader's top left corner.
+"""
+
+["G.FDR.N"]
+prototype = "G.FDR.N id"
+prototype_set = "G.FDR.N id value"
+short = "get/set fader value"
+description = """
+Get or set the specified fader's value. The possible range for coarse faders is
+0..N-1 where N is fader's width (for horizontal faders) or height (for vertical
+faders). For fine faders the possible range is 0..N where N is the maximum level
+set when the fader was initialized (see `G.FDR` for more details).
+
+Sometimes it's more convenient to map the possible fader range to a different
+range (when using it to control a CV, for instance). Use `G.FDR.V` for that.
+
+If there is a script assigned to the fader it will not be triggered if you change
+the value - use `G.FDR.PR` for that.
+
+Fader values don't change when a fader is disabled. Fader values are stored
+with the scene (both to flash and to USB sticks).
+"""
+
+["G.FDR.V"]
+prototype = "G.FDR.V id"
+prototype_set = "G.FDR.V id value"
+short = "get/set scaled fader value"
+description = """
+Get or set the specified fader's value mapped to a range set with `G.GFDR.RN`.
+This op is very convenient for using faders to control a known range, such as CV
+- simply create a fader and set a range and then assign values directly without
+any additional calculations, like this: `CV 1 G.FDR.V 1`.
+"""
+
+["G.FDR.L"]
+prototype = "G.FDR.L id"
+prototype_set = "G.FDR.L id level"
+short = "get/set fader level"
+description = """
+Get or set the specified fader's brightness level (for coarse faders), or the 
+maximum value level (for fine faders).
+"""
+
+["G.FDRI"]
+prototype = "G.FDRI"
+short = "id of last pressed fader"
+description = """
+Get the id of the last pressed fader. This is useful when multiple faders are
+assigned to the same script.
+"""
+
+["G.FDRX"]
+prototype = "G.FDRX"
+prototype_set = "G.FDRX x"
+short = "get/set x of last pressed fader"
+description = """
+Get or set `x` coordinate of the last pressed fader's top left corner. This is
+the same as `G.FDR.X G.FDRI`.
+"""
+
+["G.FDRY"]
+prototype = "G.FDRY"
+prototype_set = "G.FDRY y"
+short = "get/set y of last pressed fader"
+description = """
+Get or set `y` coordinate of the last pressed fader's top left corner. This is
+the same as `G.BTN.Y G.BTNI`.
+"""
+
+["G.FDRN"]
+prototype = "G.FDRN"
+prototype_set = "G.FDRN value"
+short = "get/set value of last pressed fader"
+description = """
+Get or set the value of the last pressed fader. This is the same as
+`G.FDR.N G.FDRI`. See `G.FDR.N` for more details.
+"""
+
+["G.FDRV"]
+prototype = "G.FDRV"
+prototype_set = "G.FDRV value"
+short = "get/set scaled value of last pressed fader"
+description = """
+Get or set the scaled value of the last pressed fader. This is the same as
+`G.FDR.V G.FDRI`. See `G.FDR.V` for more details.
+"""
+
+["G.FDRL"]
+prototype = "G.FDRL"
+prototype_set = "G.FDRL level"
+short = "get/set level of last pressed fader"
+description = """
+Get or set the brightness level (for coarse faders), or the maximum value level
+(for fine faders) of the last pressed fader. This is the same as
+`G.FDR.L G.BTNI`. For more details on levels see `G.FDR`.
+"""
+
+["G.FDR.PR"]
+prototype = "G.FDR.PR id value"
+short = "emulate fader press"
+description = """
+Emulate pressing the specified fader. Fader value will be set to the specified
+value, and if there is a script assigned it will be executed.
+"""
+
+["G.GFDR.N"]
+prototype = "G.GFDR.N group value"
+short = "set value for group faders"
+description = """
+Set the value for all faders in the specified group. This can be useful for
+resetting all faders in a group. See `G.FDR.N` for more details.
+"""
+
+["G.GFDR.V"]
+prototype = "G.GFDR.V group value"
+short = "set scaled value for group faders"
+description = """
+Set the scaled value for all faders in the specified group. This can be useful
+for resetting all faders in a group. See `G.FDR.V` for more details.
+"""
+
+["G.GFDR.L"]
+prototype = "G.GFDR.L group odd_level even_level"
+short = "set level for group faders"
+description = """
+Set the brightness level (0..15) for all faders in the specified group. You can
+use different values for odd and even faders (based on their index within the
+group, not their id) - this can be a good way to provide some visual guidance.
+"""
+
+["G.GFDR.RN"]
+prototype = "G.GFDR.RN group min max"
+short = "set range for group faders"
+description = """
+Set the range to be used for `V` fader values (`G.FDR.V`, `G.FDRV`, `G.GFDR.V`).
+While the `.N` ops provide the actual fader value sometimes it's more convenient
+to map it to a different range so it can be used directly for something like
+a CV without having to scale it each time.
+
+An example: let's say you create a coarse fader with the width of 8 which will
+be used to control a CV output where the voltage must be in the 2V..5V range. 
+Using `G.FDR.N` you would need to do this: `CV 1 SCL 0 7 V 2 V 5 G.FDR.N 0`. 
+Instead you can set the range for scaling once: `G.GFDR.RN 0 V 2 V 5` (assuming
+the fader is in group 0) and then simply do `CV 1 G.FDR.V 0`.
+
+The range is shared by all faders within the same group. If you need to use a
+different range use a different group when initializing a fader.
+
+The default range is 0..16383. `G.RST` and `G.GRP.RST` reset ranges to the
+default value.
+"""

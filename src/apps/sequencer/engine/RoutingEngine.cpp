@@ -149,6 +149,29 @@ RoutingEngine::RoutingEngine(Engine &engine, Model &model) :
     _routing(model.project().routing())
 {
     _lastResetActive.fill(false);
+    _cvRotateValues.fill(0.f);
+    _cvRotateInterp.fill(false);
+}
+
+float RoutingEngine::routeSource(int index) const {
+    if (index < 0 || index >= CONFIG_ROUTE_COUNT) {
+        return 0.f;
+    }
+    return clamp(_sourceValues[index], 0.f, 1.f);
+}
+
+bool RoutingEngine::cvRotateInterpolated(int trackIndex) const {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return false;
+    }
+    return _cvRotateInterp[trackIndex];
+}
+
+float RoutingEngine::cvRotateValue(int trackIndex) const {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return 0.f;
+    }
+    return _cvRotateValues[trackIndex];
 }
 
 void RoutingEngine::resetShaperState() {
@@ -263,6 +286,27 @@ void RoutingEngine::updateSources() {
                 sourceValue = range.normalize(_engine.cvOutput().channel(index));
                 break;
             }
+            case Routing::Source::BusCv1:
+            case Routing::Source::BusCv2:
+            case Routing::Source::BusCv3:
+            case Routing::Source::BusCv4: {
+                const auto &range = Types::voltageRangeInfo(route.cvSource().range());
+                int index = int(route.source()) - int(Routing::Source::BusCv1);
+                sourceValue = range.normalize(_engine.busCv(index));
+                break;
+            }
+            case Routing::Source::GateOut1:
+            case Routing::Source::GateOut2:
+            case Routing::Source::GateOut3:
+            case Routing::Source::GateOut4:
+            case Routing::Source::GateOut5:
+            case Routing::Source::GateOut6:
+            case Routing::Source::GateOut7:
+            case Routing::Source::GateOut8: {
+                int index = int(route.source()) - int(Routing::Source::GateOut1);
+                sourceValue = (_engine.gateOutput() & (1 << index)) ? 1.f : 0.f;
+                break;
+            }
             case Routing::Source::Midi:
                 // handled in receiveMidi
                 break;
@@ -274,6 +318,9 @@ void RoutingEngine::updateSources() {
 }
 
 void RoutingEngine::updateSinks() {
+    _cvRotateValues.fill(0.f);
+    _cvRotateInterp.fill(false);
+
     for (int routeIndex = 0; routeIndex < CONFIG_ROUTE_COUNT; ++routeIndex) {
         const auto &route = _routing.route(routeIndex);
         auto &routeState = _routeStates[routeIndex];
@@ -314,7 +361,55 @@ void RoutingEngine::updateSinks() {
         if (route.active()) {
             auto target = route.target();
 
-            if (Routing::isPerTrackTarget(target)) {
+            if (Routing::isBusTarget(target)) {
+                constexpr int kBusShaperTrack = 0;
+                float shapedSource = applyBiasDepthToSource(_sourceValues[routeIndex], route, kBusShaperTrack);
+                float biasNormalized = route.biasPct(kBusShaperTrack) * 0.01f;
+                float shaperOut = shapedSource;
+                auto shaper = route.shaper(kBusShaperTrack);
+                auto &st = routeState.shaperState[kBusShaperTrack];
+                switch (shaper) {
+                case Routing::Shaper::None:
+                    break;
+                case Routing::Shaper::Crease:
+                    shaperOut = applyCreaseSource(shapedSource, biasNormalized);
+                    break;
+                case Routing::Shaper::Location:
+                    shaperOut = applyLocation(shapedSource, st.location);
+                    break;
+                case Routing::Shaper::Envelope:
+                    shaperOut = applyEnvelope(shapedSource, st.envelope);
+                    break;
+                case Routing::Shaper::TriangleFold:
+                    shaperOut = applyTriangleFold(shapedSource, biasNormalized);
+                    break;
+                case Routing::Shaper::FrequencyFollower:
+                    shaperOut = applyFrequencyFollower(shapedSource, st);
+                    break;
+                case Routing::Shaper::Activity:
+                    shaperOut = applyActivity(shapedSource, st);
+                    break;
+                case Routing::Shaper::ProgressiveDivider:
+                    shaperOut = applyProgressiveDivider(shapedSource, st);
+                    break;
+                case Routing::Shaper::VcaNext: {
+                    int nextRouteIndex = (routeIndex + 1) % CONFIG_ROUTE_COUNT;
+                    float neighbor = _sourceValues[nextRouteIndex];
+                    shaperOut = 0.5f + (shapedSource - 0.5f) * neighbor;
+                    break;
+                }
+                case Routing::Shaper::Last:
+                    break;
+                }
+                if (route.creaseEnabled(kBusShaperTrack) && shaper != Routing::Shaper::Crease) {
+                    shaperOut = applyCreaseSource(shaperOut, biasNormalized);
+                }
+                float baseValue = route.min() + shaperOut * (route.max() - route.min());
+                float centivolts = Routing::denormalizeTargetValue(target, baseValue);
+                float volts = centivolts * 0.01f;  // Convert centivolts to volts
+                int busIndex = int(target) - int(Routing::Target::BusCv1);
+                _engine.setBusCv(busIndex, volts);
+            } else if (Routing::isPerTrackTarget(target)) {
                 uint8_t tracks = route.tracks();
 
                 float routeSpan = route.max() - route.min();
@@ -378,6 +473,11 @@ void RoutingEngine::updateSinks() {
                         } else {
                             // Normal target handling
                             _routing.writeTarget(target, (1 << trackIndex), routed);
+                        }
+
+                        if (target == Routing::Target::CvOutputRotate) {
+                            _cvRotateValues[trackIndex] = Routing::denormalizeTargetValue(target, routed);
+                            _cvRotateInterp[trackIndex] = route.cvRotateInterpolate();
                         }
                     }
                 }

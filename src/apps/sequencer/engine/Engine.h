@@ -11,6 +11,7 @@
 #include "TuesdayTrackEngine.h"
 #include "DiscreteMapTrackEngine.h"
 #include "IndexedTrackEngine.h"
+#include "TeletypeTrackEngine.h"
 #include "CvInput.h"
 #include "CvOutput.h"
 #include "RoutingEngine.h"
@@ -36,7 +37,7 @@
 
 class Engine : private Clock::Listener {
 public:
-    using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine>;
+    using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine, TeletypeTrackEngine>;
     using TrackEngineContainerArray = std::array<TrackEngineContainer, CONFIG_TRACK_COUNT>;
     using TrackEngineArray = std::array<TrackEngine *, CONFIG_TRACK_COUNT>;
     using TrackUpdateReducerArray = std::array<UpdateReducer<os::time::ms(25)>, CONFIG_TRACK_COUNT>;
@@ -92,6 +93,7 @@ public:
 
     // tempo
     float tempo() const { return _clock.bpm(); }
+    void setTempo(float bpm);
 
     // tap tempo
     void tapTempoReset();
@@ -113,6 +115,30 @@ public:
     const CvOutput &cvOutput() const { return _cvOutput; }
     const uint8_t gateOutput() const { return _gateOutput.gates(); }
 
+    static constexpr int BusCvCount = 4;
+    float busCv(int index) const {
+        if (index < 0 || index >= BusCvCount) {
+            return 0.f;
+        }
+        return _busCv[index];
+    }
+    float cvRouteOutput(int lane) const;
+    void setBusCv(int index, float volts) {
+        if (index < 0 || index >= BusCvCount) {
+            return;
+        }
+        _busCvWritten[index] = true;
+        if (_busCvSafeMode) {
+            float delta = volts - _busCv[index];
+            float maxDelta = BusCvSlewPerTick;
+            if (delta > maxDelta) delta = maxDelta;
+            if (delta < -maxDelta) delta = -maxDelta;
+            _busCv[index] = clamp(_busCv[index] + delta, -5.f, 5.f);
+        } else {
+            _busCv[index] = clamp(volts, -5.f, 5.f);
+        }
+    }
+
     // gate overrides
     bool gateOutputOverride() const { return _gateOutputOverride; }
     void setGateOutputOverride(bool enabled) { _gateOutputOverride = enabled; }
@@ -123,8 +149,17 @@ public:
     void setCvOutputOverride(bool enabled) { _cvOutputOverride = enabled; }
     void setCvOutput(int channel, float value) { _cvOutputOverrideValues[channel] = value; }
 
+    void selectTrackPattern(int trackIndex, int patternIndex);
+    void panicTeletype();
+    void setTeletypeMetroAll(int16_t periodMs);
+    void setTeletypeMetroActiveAll(bool active);
+    void resetTeletypeMetroAll();
+
     const Clock &clock() const { return _clock; }
           Clock &clock()       { return _clock; }
+
+    void updateBusSafetyMode();
+    void applyBusSafety();
 
     const EngineState &state() const { return _state; }
 
@@ -145,6 +180,9 @@ public:
 
     const MidiLearn &midiLearn() const { return _midiLearn; }
           MidiLearn &midiLearn()       { return _midiLearn; }
+
+    const Model &model() const { return _model; }
+          Model &model()       { return _model; }
 
     bool trackEnginesConsistent() const;
     bool trackPatternsConsistent() const;
@@ -170,6 +208,7 @@ private:
 
     void updateTrackSetups();
     void updateTrackOutputs();
+    void updateCvRouteOutputs();
     void reset();
     void updatePlayState(bool ticked);
     void updateOverrides();
@@ -270,6 +309,12 @@ private:
     // cv output overrides
     bool _cvOutputOverride = false;
     std::array<float, CvOutput::Channels> _cvOutputOverrideValues;
+    std::array<float, BusCvCount> _busCv{};
+    std::array<bool, BusCvCount> _busCvWritten{};
+    bool _busCvSafeMode = true;
+    static constexpr float BusCvSlewPerTick = 1.0f;
+    static constexpr float BusCvDecay = 0.9995f;
+    std::array<float, CvRoute::LaneCount> _cvRouteOutputs{};
 
     MessageHandler _messageHandler;
 };

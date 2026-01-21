@@ -1,0 +1,106 @@
+["WW.PRESET"]
+prototype = "WW.PRESET x"
+short = "Recall preset (0-7)"
+description = """
+Set White Whale to preset `x` (0-7). This takes effect immediately. The current playback 
+position is not changed.
+"""
+
+["WW.POS"]
+prototype = "WW.POS x"
+short = "Cut to position (0-15)"
+description = """
+Cut immediately to position (0-15) in the currently playing pattern.
+"""
+
+["WW.SYNC"]
+prototype = "WW.SYNC x"
+short = "Cut to position (0-15) and hard-sync the clock (if clocked internally)"
+description = """
+Cut to position (0-15) in the currently playing pattern. If White Whale is being clocked internaly, 
+this also hard-syncs the clock.
+"""
+
+["WW.START"]
+prototype = "WW.START x"
+short = "Set the loop start position (0-15)"
+description = """
+Set the loop start position (0-15). This does not impact the current playback position. If the 
+playback position is outside of the defined loop it will continue to step until it enters the 
+loop. If the start position is after the end position, the loop will wrap around the ends of the 
+grid.
+"""
+
+["WW.END"]
+prototype = "WW.END x"
+short = "Set the loop end position (0-15)"
+description = """
+Set the loop end position (0-15). This does not impact the current playback position. If the 
+playback position is outside of the defined loop it will continue to step until it enters the 
+loop. If the end position is before the end position, the loop will wrap around the ends of the 
+grid.
+"""
+
+["WW.PMODE"]
+prototype = "WW.PMODE x"
+short = "Set the loop play mode (0-5)"
+description = """
+Set the loop play mode. The available modes are: 0 - forward, 1 - reverse, 2 - drunk, 3 - random, 4 - pingpong, 5 - pingpong with repeated end points.
+"""
+
+["WW.PATTERN"]
+prototype = "WW.PATTERN x"
+short = "Change pattern (0-15)"
+description = """
+Change pattern. This does not impact the current playback position.
+"""
+
+["WW.QPATTERN"]
+prototype = "WW.QPATTERN x"
+short = "Change pattern (0-15) after current pattern ends"
+description = """
+Change pattern (0-15) after current pattern ends
+"""
+
+["WW.MUTE1"]
+prototype = "WW.MUTE1 x"
+short = "Mute trigger 1 (0 = on, 1 = mute)"
+description = """
+Mute trigger 1 (0 = on, 1 = mute).
+"""
+
+["WW.MUTE2"]
+prototype = "WW.MUTE2 x"
+short = "Mute trigger 2 (0 = on, 1 = mute)"
+description = """
+Mute trigger 2 (0 = on, 1 = mute).
+"""
+
+["WW.MUTE3"]
+prototype = "WW.MUTE3 x"
+short = "Mute trigger 3 (0 = on, 1 = mute)"
+description = """
+Mute trigger 3 (0 = on, 1 = mute).
+"""
+
+["WW.MUTE4"]
+prototype = "WW.MUTE4 x"
+short = "Mute trigger 4 (0 = on, 1 = mute)"
+description = """
+Mute trigger 4 (0 = on, 1 = mute).
+"""
+
+["WW.MUTEA"]
+prototype = "WW.MUTEA x"
+short = "Mute CV A (0 = on, 1 = mute)"
+description = """
+Mute CV A (0 = on, 1 = mute).
+"""
+
+["WW.MUTEB"]
+prototype = "WW.MUTEB x"
+short = "Mute CV B (0 = on, 1 = mute)"
+description = """
+Mute CV B (0 = on, 1 = mute).
+"""
+

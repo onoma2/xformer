@@ -1,0 +1,187 @@
+["CV"]
+prototype = "CV x"
+prototype_set = "CV x y"
+short = "CV target value"
+description = """
+Get the value of CV associated with output `x`, or set the CV output of `x` to 
+`y`.
+"""
+
+["CV.OFF"]
+prototype = "CV.OFF x"
+prototype_set = "CV.OFF x y"
+short = "CV offset added to output"
+description = """
+Get the value of the offset added to the CV value at output `x`. The offset is
+added at the final stage. Set the value of the offset added to the CV value at 
+output `x` to `y`.
+"""
+
+["CV.SET"]
+prototype = "CV.SET x y"
+short = "Set CV value, ignoring slew"
+description = """
+Set the CV value at output `x` bypassing any slew settings.
+"""
+
+["CV.GET"]
+prototype = "CV.GET x"
+short = "Get current CV value"
+description = """
+Get the current CV value at output `x` with slew and offset applied.
+"""
+
+["CV.SLEW"]
+prototype = "CV.SLEW x"
+prototype_set = "CV.SLEW x y"
+short = "Get/set the CV slew time in ms"
+description = """
+Get the slew time in ms associated with CV output `x`. Set the slew time 
+associated with CV output `x` to `y` ms.
+"""
+
+[V]
+prototype = "V x"
+short = "converts a voltage to a value usable by the CV outputs (`x` between `0` and `10`)"
+
+[VV]
+prototype = "VV x"
+short = "converts a voltage to a value usable by the CV outputs (`x` between `0` and `1000`, `100` represents 1V)"
+
+["IN"]
+prototype = "IN"
+short = "Get the value of IN jack (0-16383)"
+description = """
+Get the value of the IN jack. This returns a valuue in the range 0-16383.
+"""
+
+["IN.SCALE"]
+prototype = "IN.SCALE min max"
+short = "Set static scaling of the `IN` CV to between `min` and `max`."
+
+["PARAM"]
+prototype = "PARAM"
+aliases = ["PRM"]
+short = "Get the value of PARAM knob (0-16383)"
+description = """
+Get the value of the PARAM knob. This returns a valuue in the range 0-16383.
+"""
+
+["PARAM.SCALE"]
+prototype = "PARAM.SCALE min max"
+short = "Set static scaling of the PARAM knob to between `min` and `max`."
+
+["TR"]
+prototype = "TR x"
+prototype_set = "TR x y"
+short = "Set trigger output x to y (0-1)"
+description = """
+Get the current state of trigger output `x`. Set the state of trigger 
+output `x` to `y` (0-1).
+"""
+
+["TR.PULSE"]
+prototype = "TR.PULSE x"
+aliases = ["TR.P"]
+short = "Pulse trigger output x"
+description = """
+Pulse trigger output x.
+"""
+
+["TR.TIME"]
+prototype = "TR.TIME x"
+prototype_set = "TR.TIME x y"
+short = "Set the pulse time of trigger x to y ms"
+description = """
+Get the pulse time of trigger output `x`. Set the pulse time of trigger
+output `x` to `y`ms.
+"""
+
+["TR.TOG"]
+prototype = "TR.TOG x"
+short = "Flip the state of trigger output x"
+description = """
+Flip the state of trigger output `x`.
+"""
+
+["TR.POL"]
+prototype = "TR.POL x"
+prototype_set = "TR.POL x y"
+short = "Set polarity of trigger output x to y (0-1)"
+description = """
+Get the current polarity of trigger output `x`. Set the polarity of trigger 
+output `x` to `y` (0-1). When TR.POL = 1, the pulse is 0 to 1 then back to 0.
+When TR.POL = 0, the inverse is true, 1 to 0 to 1.
+"""
+
+["MUTE"]
+prototype = "MUTE x"
+prototype_set = "MUTE x y"
+short = "Disable trigger input x"
+description = """
+Mute the trigger input on `x` (1-8) when `y` is non-zero.
+"""
+
+["STATE"]
+prototype = "STATE x"
+short = "Read the current state of input x"
+description = """
+Read the current state of trigger input `x` (0=low, 1=high). 
+"""
+
+["LIVE.OFF"]
+prototype = "LIVE.OFF"
+aliases = ["LIVE.O"]
+short = "Show the default live mode screen"
+
+["LIVE.VARS"]
+prototype = "LIVE.VARS"
+aliases = ["LIVE.V"]
+short = "Show variables in live mode"
+
+["LIVE.GRID"]
+prototype = "LIVE.GRID"
+aliases = ["LIVE.G"]
+short = "Show grid visualizer in live mode"
+
+["LIVE.DASH"]
+prototype = "LIVE.DASH x"
+aliases = ["LIVE.D"]
+short = "Show the dashboard with index `x`"
+description = """
+This allows you to show custom text and print values on the live mode screen.
+To create a dashboard, simply edit the scene description. You can define 
+multiple dashboards by separating them with `===`, and you can select them
+by specifying the dashboard number as the op parameter. 
+
+You can also print up to 16 values using `PRINT` op. To create a placeholder
+for a value, place `%##` where you want the number to be, where `##` is
+a value index between 1 and 16. Please note: if you define multiple placeholders
+for the same value, only the last one will be used, and the rest will be 
+treated as plain text. By default, values are printed in decimal format,
+but you can also use hex, binary and reversed binary formats by using `%X##`,
+`%B##` and `%R##` placeholders respectively.
+
+An example of a dashboard:
+
+```
+THIS IS A DASHBOARD
+
+CURRENT METRO RATE IS: %1
+```
+
+You can use this dashboard by entering the above in a scene description,
+placing `LIVE.DASH 1` in the init script and placing `PRINT 1 M` in the metro script.
+"""
+
+["PRINT"]
+prototype = "PRINT x"
+prototype_set = "PRINT x y"
+aliases = ["PRT"]
+short = "Print a value on a live mode dashboard or get the printed value"
+description = """
+This op allows you to display up to 16 values on a live mode dashboard and
+should be used in conjunction with `LIVE.DASH` op. See `LIVE.DASH`
+description for information on how to use it. You can also use this op
+to store up to 16 additional values.
+"""

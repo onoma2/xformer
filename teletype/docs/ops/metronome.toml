@@ -1,0 +1,19 @@
+[M]
+prototype = "M"
+prototype_set = "M x"
+short = "get/set metronome interval to `x` (in ms), default `1000`, minimum value `25`"
+
+["M!"]
+prototype = "M!"
+prototype_set = "M! x"
+short = "get/set metronome to experimental interval `x` (in ms), minimum value `2`"
+
+["M.ACT"]
+prototype = "M.ACT"
+prototype_set = "M.ACT x"
+short = "get/set metronome activation to `x` (`0/1`), default `1` (enabled)"
+
+["M.RESET"]
+prototype = "M.RESET"
+short = "hard reset metronome count without triggering"
+ 

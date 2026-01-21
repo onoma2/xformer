@@ -3,10 +3,15 @@
 #include "Pages.h"
 #include "ui/PageKeyMap.h"
 
+#include "engine/TeletypeTrackEngine.h"
+
 #include "ui/model/NoteSequenceListModel.h"
 #include "ui/model/CurveSequenceListModel.h"
 
 #include "ui/LedPainter.h"
+#include "model/Track.h"
+
+#include <cstdio>
 
 TopPage::TopPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
@@ -26,6 +31,13 @@ void TopPage::init() {
             pages.midiOutput.reset();
             pages.song.reset();
             setMode(_mode);
+            if (event == Project::Event::ProjectRead) {
+                for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+                    if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+                        _project.track(trackIndex).teletypeTrack().requestBootScriptRun();
+                    }
+                }
+            }
             break;
         case Project::Event::TrackModeChanged:
         case Project::Event::SelectedTrackIndexChanged:
@@ -162,6 +174,12 @@ void TopPage::keyPress(KeyPressEvent &event) {
         }
     }
 
+    if (key.pageModifier() && key.isTrack() && key.track() == 6) {
+        _engine.panicTeletype();
+        showMessage("TT PANIC");
+        event.consume();
+    }
+
     if (key.isPlay()) {
         if (key.pageModifier()) {
             _engine.toggleRecording();
@@ -233,6 +251,9 @@ void TopPage::setMode(Mode mode) {
         break;
     case Mode::MidiOutput:
         setMainPage(pages.midiOutput);
+        break;
+    case Mode::CvRoute:
+        setMainPage(pages.cvRoute);
         break;
     case Mode::UserScale:
         setMainPage(pages.userScale);
@@ -356,6 +377,9 @@ void TopPage::setSequenceView(SequenceView view) {
             break;
         }
         break;
+    case Track::TrackMode::Teletype:
+        setMainPage(pages.teletypeScriptView);
+        break;
     case Track::TrackMode::Last:
         break;
     }
@@ -402,6 +426,7 @@ void TopPage::setTrackView(TrackView view) {
     case Track::TrackMode::Curve:
     case Track::TrackMode::MidiCv:
     case Track::TrackMode::Tuesday:
+    case Track::TrackMode::Teletype:
         // For non-note tracks, always show track page
         setMainPage(pages.track);
         break;
@@ -438,6 +463,9 @@ void TopPage::setSequenceEditPage() {
         break;
     case Track::TrackMode::Indexed:
         setMainPage(pages.indexedSequenceEdit);
+        break;
+    case Track::TrackMode::Teletype:
+        setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Last:
         break;

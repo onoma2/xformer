@@ -25,8 +25,16 @@ public:
     virtual void changePattern() override;
 
     virtual bool activity() const override { return _activityTimer > 0; }
-    virtual bool gateOutput(int index) const override { return !mute() && _gateTimer > 0 && _activeStage >= 0; }
+    virtual bool gateOutput(int index) const override {
+        if (_monitorOverrideActive) {
+            return _monitorGateOutput;
+        }
+        return !mute() && _gateTimer > 0 && _activeStage >= 0;
+    }
     virtual float cvOutput(int index) const override {
+        if (_monitorOverrideActive) {
+            return _cvOutput;
+        }
         // When muted and in Gate mode, output should be 0
         if (mute() && _discreteMapTrack.cvUpdateMode() == DiscreteMapTrack::CvUpdateMode::Gate) {
             return 0.0f;
@@ -38,6 +46,7 @@ public:
     const DiscreteMapSequence &sequence() const { return *_sequence; }
     bool isActiveSequence(const DiscreteMapSequence &sequence) const { return &sequence == _sequence; }
     void invalidateThresholds() { _thresholdsDirty = true; }
+    void setMonitorStage(int index);
 
     // For Testing/UI
     int activeStage() const { return _activeStage; }
@@ -58,11 +67,15 @@ private:
     static constexpr float kCoveragePct = 0.90f;
     static constexpr float kRangeEpsilon = 1e-6f;
     static constexpr uint32_t kActivityPulseTicks = 12;
+    static constexpr float kPluckMaxCents = 200.0f;
+    static constexpr float kPluckMinMs = 10.0f;
+    static constexpr float kPluckMaxMs = 450.0f;
+    static constexpr float kMaxSlewRateStPerSec = 48.0f;
 
-    void updateRamp(uint32_t tick);
+    void updateRamp(double tickPos);
     uint32_t scaledDivisorTicks() const;
     float getRoutedInput();
-    float noteIndexToVoltage(int8_t noteIndex);
+    float noteIndexToVoltage(int8_t noteIndex, bool useSampled = true);
     bool updateExternalOnce();
 
     // Voltage range helpers (delegated to sequence parameters)
@@ -105,8 +118,16 @@ private:
 
     // === Output ===
     float _cvOutput = 0.0f;
+    float _cvOutputBase = 0.0f;
     float _targetCv = 0.0f;
     uint32_t _gateTimer = 0;
+    bool _monitorGateOutput = false;
+    bool _monitorOverrideActive = false;
+    int _monitorStageIndex = -1;
+    float _pluckOffset = 0.0f;
+    float _pluckDepth = 0.0f;
+    float _pluckTimeRemaining = 0.0f;
+    float _pluckTimeTotal = 0.0f;
 
     // === Sampled pitch params (Gate mode) ===
     int _sampledOctave = 0;

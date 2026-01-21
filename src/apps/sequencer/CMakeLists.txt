@@ -11,11 +11,14 @@ set(sources
     engine/CvOutput.cpp
     engine/DiscreteMapTrackEngine.cpp
     engine/Engine.cpp
+    engine/GeodeEngine.cpp
     engine/IndexedTrackEngine.cpp
     engine/MidiCvTrackEngine.cpp
     engine/MidiLearn.cpp
     engine/MidiOutputEngine.cpp
     engine/NoteTrackEngine.cpp
+    engine/TeletypeBridge.cpp
+    engine/TeletypeTrackEngine.cpp
     engine/TuesdayTrackEngine.cpp
     engine/RoutingEngine.cpp
     engine/SequenceState.cpp
@@ -47,6 +50,7 @@ set(sources
     model/DiscreteMapTrack.cpp
     model/IndexedSequence.cpp
     model/IndexedTrack.cpp
+    model/TeletypeTrack.cpp
     model/TuesdayTrack.cpp
     model/PlayState.cpp
     model/Project.cpp
@@ -85,6 +89,7 @@ set(sources
     ui/pages/ContextMenuPage.cpp
     ui/pages/CurveSequenceEditPage.cpp
     ui/pages/CurveSequencePage.cpp
+    ui/pages/CvRoutePage.cpp
     ui/pages/FileSelectPage.cpp
     ui/pages/GeneratorPage.cpp
     ui/pages/GeneratorSelectPage.cpp
@@ -121,19 +126,59 @@ set(sources
     ui/pages/TextInputPage.cpp
     ui/pages/TopPage.cpp
     ui/pages/TrackPage.cpp
+    ui/pages/TeletypeEditPage.cpp
+    ui/pages/TeletypePatternViewPage.cpp
+    ui/pages/TeletypeScriptViewPage.cpp
     ui/pages/UserScalePage.cpp
     # ui/models
     ui/model/AccumulatorListModel.h
     ui/model/AccumulatorStepsListModel.h
     ui/model/DiscreteMapSequenceListModel.h
     ui/model/IndexedTrackListModel.h
+    ui/model/NoteSequenceListModel.cpp
+    ui/model/TeletypeTrackListModel.h
     # ui/painters
     ui/painters/SequencePainter.cpp
     ui/painters/SongPainter.cpp
     ui/painters/WindowPainter.cpp
+    # teletype
+    ../../../teletype/src/chaos.c
+    ../../../teletype/src/command.c
+    ../../../teletype/src/drum_helpers.c
+    ../../../teletype/src/every.c
+    ../../../teletype/src/helpers.c
+    ../../../teletype/src/match_token.c
+    ../../../teletype/src/scale.c
+    ../../../teletype/src/scanner.c
+    ../../../teletype/src/scene_serialization.c
+    ../../../teletype/src/state.c
+    ../../../teletype/src/table.c
+    ../../../teletype/src/teletype.c
+    ../../../teletype/src/turtle.c
+    ../../../teletype/src/ops/controlflow.c
+    ../../../teletype/src/ops/delay.c
+    ../../../teletype/src/ops/hardware.c
+    ../../../teletype/src/ops/init.c
+    ../../../teletype/src/ops/maths.c
+    ../../../teletype/src/ops/metronome.c
+    ../../../teletype/src/ops/midi.c
+    ../../../teletype/src/ops/op.c
+    ../../../teletype/src/ops/patterns.c
+    ../../../teletype/src/ops/queue.c
+    ../../../teletype/src/ops/seed.c
+    ../../../teletype/src/ops/stack.c
+    ../../../teletype/src/ops/turtle.c
+    ../../../teletype/src/ops/variables.c
+    ../../../teletype/libavr32/src/euclidean/data.c
+    ../../../teletype/libavr32/src/euclidean/euclidean.c
+    ../../../teletype/libavr32/src/music.c
+    ../../../teletype/libavr32/src/random.c
+    ../../../teletype/libavr32/src/util.c
 )
 
 include_directories(.)
+include_directories(../../../teletype/src)
+include_directories(../../../teletype/libavr32/src)
 
 if(${PLATFORM} STREQUAL "stm32")
     add_library(sequencer_shared ${sources})
@@ -141,6 +186,7 @@ if(${PLATFORM} STREQUAL "stm32")
 
     add_executable(sequencer Sequencer.cpp)
     target_link_libraries(sequencer sequencer_shared)
+    target_link_options(sequencer PRIVATE "-Wl,-Map,${CMAKE_BINARY_DIR}/sequencer.map")
     platform_postprocess_executable(sequencer)
     # override linker script
     set_target_properties(sequencer PROPERTIES LINK_FLAGS "-T ${CMAKE_CURRENT_SOURCE_DIR}/sequencer.ld")
@@ -156,11 +202,17 @@ if(${PLATFORM} STREQUAL "stm32")
 endif()
 
 if(${PLATFORM} STREQUAL "sim")
+    if(APPLE)
+        set(SEQUENCER_MAP_FLAG "-Wl,-map,${CMAKE_BINARY_DIR}/sequencer.map")
+    else()
+        set(SEQUENCER_MAP_FLAG "-Wl,-Map,${CMAKE_BINARY_DIR}/sequencer.map")
+    endif()
     add_library(sequencer_shared ${sources})
     target_link_libraries(sequencer_shared core)
 
     add_executable(sequencer SequencerSim.cpp)
     target_link_libraries(sequencer sequencer_shared)
+    target_link_options(sequencer PRIVATE "${SEQUENCER_MAP_FLAG}")
     platform_postprocess_executable(sequencer)
     add_custom_command(TARGET sequencer COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/../../platform/sim/assets ${CMAKE_BINARY_DIR}/assets)
 

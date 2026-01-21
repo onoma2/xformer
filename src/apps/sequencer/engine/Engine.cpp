@@ -8,6 +8,8 @@
 
 #include "os/os.h"
 
+#include <cmath>
+
 Engine::Engine(Model &model, ClockTimer &clockTimer, Adc &adc, Dac &dac, Dio &dio, GateOutput &gateOutput, Midi &midi, UsbMidi &usbMidi) :
     _model(model),
     _project(model.project()),
@@ -22,7 +24,9 @@ Engine::Engine(Model &model, ClockTimer &clockTimer, Adc &adc, Dac &dac, Dio &di
     _routingEngine(*this, model)
 {
     _cvOutputOverrideValues.fill(0.f);
+    _cvRouteOutputs.fill(0.f);
     _trackEngines.fill(nullptr);
+    _busCv.fill(0.f);
 
     _usbMidi.setConnectHandler([this] (uint16_t vendorId, uint16_t productId) { usbMidiConnect(vendorId, productId); });
     _usbMidi.setDisconnectHandler([this] () { usbMidiDisconnect(); });
@@ -82,6 +86,9 @@ void Engine::update() {
         return;
     }
 
+    updateBusSafetyMode();
+    _busCvWritten.fill(false);
+
     // process clock events
     while (Clock::Event event = _clock.checkEvent()) {
         switch (event) {
@@ -139,14 +146,14 @@ void Engine::update() {
         for (size_t trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
                 auto &track = _model.project().track(trackIndex);
                 auto &trackEngine = *_trackEngines[trackIndex];
-                
+
                 TrackEngine::TickResult result = TrackEngine::TickResult::NoUpdate;
-        
+
                 if (track.runGate()) {
                     result = trackEngine.tick(tick);
                 }
-        
-                trackEngine.update(0.001f);
+
+            //    trackEngine.update(0.001f); // commented out to solve timing discrepansy in Ms when engine is stopped for Teletype metro
             // update track outputs and routings if tick results in updating the track's CV output
             if ((result & TrackEngine::TickResult::CvUpdate) && _trackUpdateReducers[trackIndex].update()) {
                 trackEngine.update(0.f);
@@ -170,10 +177,26 @@ void Engine::update() {
 
     updateTrackOutputs();
     updateOverrides();
+    applyBusSafety();
 
     // update cv/gate outputs
     _cvOutput.update();
     _gateOutput.update();
+}
+
+void Engine::updateBusSafetyMode() {
+    _busCvSafeMode = _model.project().busSafety();
+}
+
+void Engine::applyBusSafety() {
+    if (!_busCvSafeMode) {
+        return;
+    }
+    for (int i = 0; i < BusCvCount; ++i) {
+        if (!_busCvWritten[i]) {
+            _busCv[i] *= BusCvDecay;
+        }
+    }
 }
 
 void Engine::lock() {
@@ -290,6 +313,46 @@ void Engine::nudgeTempoSetDirection(int direction) {
 
 float Engine::nudgeTempoStrength() const {
     return _nudgeTempo.strength();
+}
+
+void Engine::setTempo(float bpm) {
+    _model.project().setTempo(bpm);
+}
+
+void Engine::selectTrackPattern(int trackIndex, int patternIndex) {
+    _model.project().playState().selectTrackPattern(trackIndex, patternIndex, PlayState::ExecuteType::Immediate);
+}
+
+void Engine::panicTeletype() {
+    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).panic();
+        }
+    }
+}
+
+void Engine::setTeletypeMetroAll(int16_t periodMs) {
+    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).setMetroPeriod(periodMs);
+        }
+    }
+}
+
+void Engine::setTeletypeMetroActiveAll(bool active) {
+    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).setMetroActive(active);
+        }
+    }
+}
+
+void Engine::resetTeletypeMetroAll() {
+    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+        if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
+            static_cast<TeletypeTrackEngine &>(*_trackEngines[trackIndex]).resetMetroTimer();
+        }
+    }
 }
 
 uint32_t Engine::noteDivisor() const {
@@ -451,6 +514,9 @@ void Engine::updateTrackSetups() {
             case Track::TrackMode::Indexed:
                 trackEngine = trackContainer.create<IndexedTrackEngine>(*this, _model, track, linkedTrackEngine);
                 break;
+            case Track::TrackMode::Teletype:
+                trackEngine = trackContainer.create<TeletypeTrackEngine>(*this, _model, track, linkedTrackEngine);
+                break;
             case Track::TrackMode::Last:
                 break;
             }
@@ -467,20 +533,29 @@ void Engine::updateTrackOutputs() {
 
     int trackGateIndex[CONFIG_TRACK_COUNT];
     int trackCvIndex[CONFIG_TRACK_COUNT];
+    int cvOutputTrackIndex[CONFIG_CHANNEL_COUNT];
+    int cvOutputTrackSlot[CONFIG_CHANNEL_COUNT];
+    int cvOutputCvRouteLane[CONFIG_CHANNEL_COUNT];
 
     for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
         trackGateIndex[trackIndex] = 0;
         trackCvIndex[trackIndex] = 0;
     }
+    for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+        cvOutputTrackIndex[i] = -1;
+        cvOutputTrackSlot[i] = -1;
+        cvOutputCvRouteLane[i] = -1;
+    }
 
     // --- Gate Rotation Logic ---
     int gatePool[CONFIG_CHANNEL_COUNT];
     int gatePoolSize = 0;
-    
+
     // Identify Gate Pool
     for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
         int trackIndex = gateOutputTracks[i];
-        if (_project.track(trackIndex).isGateOutputRotated()) {
+        if (trackIndex < CONFIG_TRACK_COUNT &&
+            _project.track(trackIndex).isGateOutputRotated()) {
             gatePool[gatePoolSize++] = i;
         }
     }
@@ -492,8 +567,21 @@ void Engine::updateTrackOutputs() {
     // Identify CV Pool
     for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
         int trackIndex = cvOutputTracks[i];
-        if (_project.track(trackIndex).isCvOutputRotated()) {
+        if (trackIndex < CONFIG_TRACK_COUNT &&
+            _project.track(trackIndex).isCvOutputRotated()) {
             cvPool[cvPoolSize++] = i;
+        }
+    }
+
+    // Precompute CV output track slots and CV route lanes
+    int cvRouteLane = 0;
+    for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+        int trackIndex = cvOutputTracks[i];
+        if (trackIndex < CONFIG_TRACK_COUNT) {
+            cvOutputTrackIndex[i] = trackIndex;
+            cvOutputTrackSlot[i] = trackCvIndex[trackIndex]++;
+        } else if (trackIndex == CONFIG_TRACK_COUNT) {
+            cvOutputCvRouteLane[i] = cvRouteLane++;
         }
     }
 
@@ -503,22 +591,22 @@ void Engine::updateTrackOutputs() {
         // Check if this output is in the pool
         int gatePoolIndex = -1;
         for (int k = 0; k < gatePoolSize; ++k) { if (gatePool[k] == i) { gatePoolIndex = k; break; } }
-        
+
         if (gatePoolIndex != -1) {
             // It's rotating!
             int originalTrack = gateOutputTracks[i];
             int rotation = _project.track(originalTrack).gateOutputRotate();
-            
+
             // Wrap rotation within pool size
             // Note: standard % operator can return negative values, handle carefully
             int rotatedIndex = (gatePoolIndex - rotation) % gatePoolSize;
             if (rotatedIndex < 0) rotatedIndex += gatePoolSize;
-            
+
             gateSourceOutputIndex = gatePool[rotatedIndex];
         }
 
         int gateOutputTrack = gateOutputTracks[gateSourceOutputIndex];
-        if (!_gateOutputOverride) {
+        if (!_gateOutputOverride && gateOutputTrack < CONFIG_TRACK_COUNT) {
             _gateOutput.setGate(i, _trackEngines[gateOutputTrack]->gateOutput(trackGateIndex[gateOutputTrack]++));
         }
 
@@ -527,24 +615,125 @@ void Engine::updateTrackOutputs() {
         // Check if this output is in the pool
         int cvPoolIndex = -1;
         for (int k = 0; k < cvPoolSize; ++k) { if (cvPool[k] == i) { cvPoolIndex = k; break; } }
-        
+
         if (cvPoolIndex != -1) {
             // It's rotating!
             int originalTrack = cvOutputTracks[i];
-            int rotation = _project.track(originalTrack).cvOutputRotate();
-            
-            // Wrap rotation within pool size
-            int rotatedIndex = (cvPoolIndex - rotation) % cvPoolSize;
-            if (rotatedIndex < 0) rotatedIndex += cvPoolSize;
-            
-            cvSourceOutputIndex = cvPool[rotatedIndex];
+            if (_routingEngine.cvRotateInterpolated(originalTrack) && cvPoolSize > 0) {
+                float rotation = _routingEngine.cvRotateValue(originalTrack);
+                float pos = float(cvPoolIndex) - rotation;
+                float wrapped = std::fmod(pos, float(cvPoolSize));
+                if (wrapped < 0.f) {
+                    wrapped += float(cvPoolSize);
+                }
+                int lowIndex = int(std::floor(wrapped));
+                float t = wrapped - float(lowIndex);
+                int highIndex = (lowIndex + 1) % cvPoolSize;
+                int lowOutputIndex = cvPool[lowIndex];
+                int highOutputIndex = cvPool[highIndex];
+                int lowTrack = cvOutputTrackIndex[lowOutputIndex];
+                int highTrack = cvOutputTrackIndex[highOutputIndex];
+                int lowSlot = cvOutputTrackSlot[lowOutputIndex];
+                int highSlot = cvOutputTrackSlot[highOutputIndex];
+                float lowValue = (lowTrack >= 0 && lowSlot >= 0) ? _trackEngines[lowTrack]->cvOutput(lowSlot) : 0.f;
+                float highValue = (highTrack >= 0 && highSlot >= 0) ? _trackEngines[highTrack]->cvOutput(highSlot) : 0.f;
+                float mixed = lowValue * (1.f - t) + highValue * t;
+                if (!_cvOutputOverride) {
+                    _cvOutput.setChannel(i, mixed);
+                }
+                continue;
+            } else {
+                int rotation = _project.track(originalTrack).cvOutputRotate();
+
+                // Wrap rotation within pool size
+                int rotatedIndex = (cvPoolIndex - rotation) % cvPoolSize;
+                if (rotatedIndex < 0) rotatedIndex += cvPoolSize;
+
+                cvSourceOutputIndex = cvPool[rotatedIndex];
+            }
         }
 
         int cvOutputTrack = cvOutputTracks[cvSourceOutputIndex];
-        if (!_cvOutputOverride) {
-            _cvOutput.setChannel(i, _trackEngines[cvOutputTrack]->cvOutput(trackCvIndex[cvOutputTrack]++));
+        if (_cvOutputOverride) {
+            continue;
+        }
+        if (cvOutputTrack < CONFIG_TRACK_COUNT) {
+            int cvSlot = cvOutputTrackSlot[cvSourceOutputIndex];
+            _cvOutput.setChannel(i, _trackEngines[cvOutputTrack]->cvOutput(cvSlot));
+        } else if (cvOutputTrack == CONFIG_TRACK_COUNT) {
+            int lane = cvOutputCvRouteLane[cvSourceOutputIndex];
+            if (lane >= 0 && lane < int(_cvRouteOutputs.size())) {
+                _cvOutput.setChannel(i, _cvRouteOutputs[lane]);
+            }
         }
     }
+}
+
+void Engine::updateCvRouteOutputs() {
+    const auto &cvRoute = _project.cvRoute();
+    float inputs[CvRoute::LaneCount];
+
+    for (int lane = 0; lane < CvRoute::LaneCount; ++lane) {
+        switch (cvRoute.inputSource(lane)) {
+        case CvRoute::InputSource::CvIn:
+            inputs[lane] = _cvInput.channel(lane);
+            break;
+        case CvRoute::InputSource::Bus:
+            inputs[lane] = busCv(lane);
+            break;
+        case CvRoute::InputSource::Off:
+            inputs[lane] = 0.f;
+            break;
+        case CvRoute::InputSource::Last:
+            inputs[lane] = 0.f;
+            break;
+        }
+    }
+
+    float scanNorm = clamp(cvRoute.scan(), 0, 100) * 0.01f;
+    float scanPos = scanNorm * float(CvRoute::LaneCount - 1);
+    int scanLow = clamp(int(std::floor(scanPos)), 0, CvRoute::LaneCount - 1);
+    int scanHigh = clamp(int(std::ceil(scanPos)), 0, CvRoute::LaneCount - 1);
+    float scanT = scanPos - scanLow;
+    float signal = inputs[scanLow] * (1.f - scanT) + inputs[scanHigh] * scanT;
+
+    float routeNorm = clamp(cvRoute.route(), 0, 100) * 0.01f;
+    float routePos = routeNorm * float(CvRoute::LaneCount - 1);
+    int routeLow = clamp(int(std::floor(routePos)), 0, CvRoute::LaneCount - 1);
+    int routeHigh = clamp(int(std::ceil(routePos)), 0, CvRoute::LaneCount - 1);
+    float routeT = routePos - routeLow;
+
+    float weights[CvRoute::LaneCount] = {};
+    if (routeLow == routeHigh) {
+        weights[routeLow] = 1.f;
+    } else {
+        weights[routeLow] = 1.f - routeT;
+        weights[routeHigh] = routeT;
+    }
+
+    for (int lane = 0; lane < CvRoute::LaneCount; ++lane) {
+        float out = signal * weights[lane];
+        switch (cvRoute.outputDest(lane)) {
+        case CvRoute::OutputDest::CvOut:
+            _cvRouteOutputs[lane] = clamp(out, -5.f, 5.f);
+            break;
+        case CvRoute::OutputDest::Bus:
+            setBusCv(lane, out);
+            _cvRouteOutputs[lane] = 0.f;
+            break;
+        case CvRoute::OutputDest::None:
+        case CvRoute::OutputDest::Last:
+            _cvRouteOutputs[lane] = 0.f;
+            break;
+        }
+    }
+}
+
+float Engine::cvRouteOutput(int lane) const {
+    if (lane < 0 || lane >= int(_cvRouteOutputs.size())) {
+        return 0.f;
+    }
+    return _cvRouteOutputs[lane];
 }
 
 void Engine::reset() {
@@ -758,6 +947,8 @@ void Engine::updateOverrides() {
         for (size_t i = 0; i < _cvOutputOverrideValues.size(); ++i) {
             _cvOutput.setChannel(i, _cvOutputOverrideValues[i]);
         }
+    } else {
+        updateCvRouteOutputs();
     }
 }
 
@@ -1010,7 +1201,7 @@ void Engine::updateClockSetup() {
     } else {
         ticksPerPulse /= -clockSetup.clockInputMultiplier();
     }
-    
+
     _clock.slaveConfigure(ClockSourceExternal, ticksPerPulse, true);
     _clock.slaveConfigure(ClockSourceMidi, CONFIG_PPQN / 24, clockSetup.midiRx());
     _clock.slaveConfigure(ClockSourceUsbMidi, CONFIG_PPQN / 24, clockSetup.usbRx());

@@ -82,6 +82,7 @@ void Routing::Route::clear() {
     _source = Source::None;
     _cvSource.clear();
     _midiSource.clear();
+    _cvRotateInterpolate = false;
 }
 
 void Routing::Route::write(VersionedSerializedWriter &writer) const {
@@ -89,6 +90,7 @@ void Routing::Route::write(VersionedSerializedWriter &writer) const {
     writer.write(_tracks);
     writer.write(_min);
     writer.write(_max);
+    writer.write(_cvRotateInterpolate);
     for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
         writer.write(_biasPct[i]);
         writer.write(_depthPct[i]);
@@ -109,6 +111,7 @@ void Routing::Route::read(VersionedSerializedReader &reader) {
     reader.read(_tracks);
     reader.read(_min);
     reader.read(_max);
+    reader.read(_cvRotateInterpolate);
     for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
         reader.read(_biasPct[i]);
         reader.read(_depthPct[i]);
@@ -128,6 +131,9 @@ void Routing::Route::read(VersionedSerializedReader &reader) {
     if (isMidiSource(_source)) {
         _midiSource.read(reader);
     }
+    if (isBusSelfRoute(_source, _target)) {
+        _source = Source::None;
+    }
 }
 
 bool Routing::Route::operator==(const Route &other) const {
@@ -136,6 +142,7 @@ bool Routing::Route::operator==(const Route &other) const {
         _tracks == other._tracks &&
         _min == other._min &&
         _max == other._max &&
+        _cvRotateInterpolate == other._cvRotateInterpolate &&
         _source == other._source &&
         (!isCvSource(_source) || _cvSource == other._cvSource) &&
         (!isMidiSource(_source) || _midiSource == other._midiSource) &&
@@ -284,11 +291,15 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                         }
                     }
                     break;
+                case Track::TrackMode::Teletype:
+                    break;
                 case Track::TrackMode::Last:
                     break;
                 }
             }
         }
+    } else if (isBusTarget(target)) {
+        // handled in RoutingEngine (engine-owned bus)
     }
 }
 
@@ -353,6 +364,8 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     // Project targets
     [int(Routing::Target::Tempo)]                           = { 1,      1000,   100,    200,    10      },
     [int(Routing::Target::Swing)]                           = { 50,     75,     50,     75,     5       },
+    [int(Routing::Target::CvRouteScan)]                     = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::CvRouteRoute)]                    = { 0,      100,    0,      100,    10      },
     // PlayState targets
     [int(Routing::Target::Mute)]                            = { 0,      1,      0,      1,      1       },
     [int(Routing::Target::Fill)]                            = { 0,      1,      0,      1,      1       },
@@ -410,6 +423,11 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     // Indexed modulation targets
     [int(Routing::Target::IndexedA)]                        = { -100,   100,    -100,   100,    1       },
     [int(Routing::Target::IndexedB)]                        = { -100,   100,    -100,   100,    1       },
+    // Bus targets (centivolts: -5.00V..+5.00V)
+    [int(Routing::Target::BusCv1)]                          = { -500,   500,    -500,   500,    10      },
+    [int(Routing::Target::BusCv2)]                          = { -500,   500,    -500,   500,    10      },
+    [int(Routing::Target::BusCv3)]                          = { -500,   500,    -500,   500,    10      },
+    [int(Routing::Target::BusCv4)]                          = { -500,   500,    -500,   500,    10      },
 };
 
 float Routing::normalizeTargetValue(Routing::Target target, float value) {
@@ -450,6 +468,8 @@ void Routing::printTargetValue(Routing::Target target, float normalized, StringB
     case Target::Swing:
     case Target::SlideTime:
     case Target::FillAmount:
+    case Target::CvRouteScan:
+    case Target::CvRouteRoute:
         str("%d%%", intValue);
         break;
     case Target::Octave:
@@ -528,6 +548,12 @@ void Routing::printTargetValue(Routing::Target target, float normalized, StringB
     case Target::DiscreteMapRangeHigh:
     case Target::DiscreteMapRangeLow:
         str("%+.2fV", value);
+        break;
+    case Target::BusCv1:
+    case Target::BusCv2:
+    case Target::BusCv3:
+    case Target::BusCv4:
+        str("%+.2fV", value * 0.01f);
         break;
     case Target::DiscreteMapScanner:
         str("%.1f", value);

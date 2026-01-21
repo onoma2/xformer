@@ -25,6 +25,7 @@ enum Color {
 enum class Font {
     Tiny,
     Small,
+    Tele,
     Default = Tiny,
 };
 

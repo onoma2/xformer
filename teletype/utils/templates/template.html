@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html$if(lang)$ lang="$lang$"$endif$$if(dir)$ dir="$dir$"$endif$>
+    <head>
+        <meta charset="utf-8">
+        <meta name="generator" content="pandoc">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+        $for(author-meta)$
+            <meta name="author" content="$author-meta$">
+        $endfor$
+
+        $if(date-meta)$
+            <meta name="dcterms.date" content="$date-meta$">
+        $endif$
+
+        $if(keywords)$
+            <meta name="keywords" content="$for(keywords)$$keywords$$sep$, $endfor$">
+        $endif$
+
+        <title>$if(title-prefix)$$title-prefix$ – $endif$$pagetitle$</title>
+
+        $if(quotes)$
+            <style type="text/css">q { quotes: "“" "”" "‘" "’"; }</style>
+        $endif$
+
+        $if(highlighting-css)$
+            <style type="text/css">
+                $highlighting-css$
+            </style>
+        $endif$
+
+        $for(css)$
+            <link rel="stylesheet" href="$css$">
+        $endfor$
+
+        $if(math)$
+            $math$
+        $endif$
+
+        <!--[if lt IE 9]>
+            <script
+                src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js">
+            </script>
+        <![endif]-->
+
+        $for(header-includes)$
+            $header-includes$
+        $endfor$
+    </head>
+    <body>
+        $for(include-before)$
+            $include-before$
+        $endfor$
+
+        <svg style="display: none;">
+            <symbol id="custom-hamburger-icon" viewBox="0 0 22 17"
+                xmlns="http://www.w3.org/2000/svg">
+                    <g
+                        id="Page-1"
+                        stroke-width="1"
+                        fill="none"
+                        fill-rule="evenodd"
+                        stroke-linecap="round">
+                            <g
+                                id="Artboard"
+                                transform="translate(-180.000000, -130.000000)"
+                                stroke-width="2">
+                                    <g
+                                        id="Group"
+                                        transform="translate(181.000000, 131.000000)">
+                                            <path d="M0,0.5 L20,0.5" id="Line"/>
+                                            <path d="M0,7.5 L20,7.5" id="Line-Copy"/>
+                                            <path d="M0,14.5 L20,14.5" id="Line-Copy-2"/>
+                                    </g>
+                            </g>
+                    </g>
+            </symbol>
+            <symbol id="custom-close-icon" viewBox="0 0 18 18"
+                xmlns="http://www.w3.org/2000/svg">
+                    <g
+                        id="Page-1"
+                        stroke-width="1"
+                        fill="none"
+                        fill-rule="evenodd"
+                        stroke-linecap="round">
+                            <g
+                                id="Artboard"
+                                transform="translate(-180.000000, -73.000000)"
+                                stroke-width="2">
+                                    <g
+                                        id="Group-Copy"
+                                        transform="translate(181.000000, 74.000000)">
+                                            <path
+                                                d="M0,0 L16,16"
+                                                id="Path"/>
+                                            <path
+                                                d="M0,0 L16,16"
+                                                id="Path"
+                                                transform="translate(8.000000, 8.000000)
+                                                scale(-1, 1)
+                                                translate(-8.000000, -8.000000) "/>
+                                    </g>
+                            </g>
+                    </g>
+            </symbol>
+        </svg>
+
+        $if(toc)$
+            <div class="NavigationArea" id="NavigationArea">
+                <div class="NavigationArea-actionContainer" id="NavigationAreaActionContainer">
+                    <svg class="NavigationArea-icon NavigationArea-icon--open">
+                        <use xlink:href="#custom-hamburger-icon"></use>
+                    </svg>
+                    <svg class="NavigationArea-icon NavigationArea-icon--close">
+                        <use xlink:href="#custom-close-icon"></use>
+                    </svg>
+                </div>
+                <nav class="NavigationArea-linkContainer" id="$idprefix$TOC">
+                    $toc$
+                </nav>
+            </div>
+        $endif$
+        <div class="Content">
+            <div class="Content-inner Content-inner--hidden">
+                $body$
+
+                $for(include-after)$
+                    $include-after$
+                $endfor$
+
+            </div>
+        </div>
+        <script>
+            // show and hide navigation pane
+            var toggleNavigationArea = function () {
+                if (hidden) {
+                    nav.classList.remove('NavigationArea--closed');
+                } else {
+                    nav.classList.add('NavigationArea--closed');
+                }
+                hidden = !hidden;
+            };
+
+            // showing and hide nav links based on current active link
+            var updateAnchor = function () {
+                var hrefClicked;
+                if (this.getAttribute) {
+                    hrefClicked = this.getAttribute("href");
+                } else {
+                    hrefClicked = "#" + window.location.hash.substring(1);
+                }
+                var parentHrefClicked;
+                var navElements = document
+                    .getElementsByClassName("NavigationArea-navLi");
+                for (var i = 0; i < navElements.length; i++) {
+                    if (navElements[i]
+                        .getAttribute("active-parent-anchor") === hrefClicked) {
+                            navElements[i]
+                                .classList
+                                .remove("NavigationArea-navLi--closed");
+                            navElements[i]
+                                .classList
+                                .remove("NavigationArea-navLi--selected");
+                    } else if (navElements[i]
+                        .getAttribute("active-anchor") === hrefClicked) {
+                            navElements[i]
+                                .classList
+                                .remove("NavigationArea-navLi--closed");
+                            navElements[i]
+                                .classList
+                                .add("NavigationArea-navLi--selected");
+                        if (navElements[i]
+                            .getAttribute("active-parent-anchor")) {
+                                parentHrefClicked = navElements[i]
+                                    .getAttribute("active-parent-anchor");
+                        }
+                    } else {
+                        navElements[i]
+                            .classList
+                            .remove("NavigationArea-navLi--selected");
+                    }
+                }
+
+                for (var j = 0; j < navElements.length; j++) {
+                    if (parentHrefClicked &&
+                        navElements[j]
+                            .classList
+                            .contains("NavigationArea-navLi--secondary") &&
+                        navElements[j]
+                            .getAttribute("active-parent-anchor") !== parentHrefClicked) {
+                                navElements[j]
+                                    .classList
+                                    .add("NavigationArea-navLi--closed");
+                    } else if (!parentHrefClicked &&
+                        hrefClicked &&
+                        navElements[j]
+                            .classList
+                            .contains("NavigationArea-navLi--secondary") &&
+                        navElements[j]
+                            .getAttribute("active-parent-anchor") !== hrefClicked) {
+                                navElements[j]
+                                    .classList
+                                    .add("NavigationArea-navLi--closed");
+                    } else if (parentHrefClicked &&
+                        navElements[j]
+                            .getAttribute("active-parent-anchor") === parentHrefClicked) {
+                                navElements[j]
+                                    .classList
+                                    .remove("NavigationArea-navLi--closed");
+                    }
+                }
+            };
+
+            // adds separators between some of the nav links, hides the first one
+            var initSidebar = function () {
+                for (var index = 0; index < navElements.length; index++) {
+                    var li = navElements[index];
+                    if (index === 0) {
+                        // hide title nav element from sidebar
+                        li.classList.add("NavigationArea-navLi--alwaysHidden");
+                    } else if (index === 4) {
+                        var spacer1 = document.createElement("div");
+                        spacer1.classList.add("NavigationArea-spacer");
+                        li.parentElement.insertBefore(spacer1, li);
+                    } else if (index === navElements.length - 3) {
+                        var spacer2 = document.createElement("div");
+                        spacer2.classList.add("NavigationArea-spacer");
+                        li.parentElement.insertBefore(spacer2, li);
+                        li.classList.add("NavigationArea-navLi--smaller");
+                    } else if (index > navElements.length - 3) {
+                        li.classList.add("NavigationArea-navLi--smaller");
+                    }
+                    var linkAnchor = li.children[0].getAttribute("href");
+                    li.children[0].onclick = updateAnchor;
+                    li.classList.add("NavigationArea-navLi");
+                    li.classList.add("NavigationArea-navLi--primary");
+                    li.setAttribute("active-anchor", linkAnchor);
+                    var subList = li.children[1];
+                    if (subList) {
+                        subList = li.children[1];
+                        for (var i = 0; i < subList.children.length; i++) {
+                            var subLi = subList.children[i];
+                            subLi.classList.add("NavigationArea-navLi");
+                            subLi.classList.add("NavigationArea-navLi--secondary");
+                            subLi.classList.add("NavigationArea-navLi--closed");
+                            var subLinkAnchor = subLi
+                                .children[0]
+                                .getAttribute("href");
+                            subLi.children[0].onclick = updateAnchor;
+                            subLi.setAttribute("active-parent-anchor", linkAnchor);
+                            subLi.setAttribute("active-anchor", subLinkAnchor);
+                        }
+                    }
+                }
+            };
+
+            // handler for navigating to a new nav link
+            var navToSection = function () {
+                // for phone-size screens, navigation pane should
+                // hide as soon as a nav element is clicked
+                if (window.innerWidth < 700) {
+                    hidden = false;
+                    toggleNavigationArea();
+                }
+                if (window.location.hash) {
+                    window.location = window.location.hash;
+                }
+            }
+
+
+            var onFirstLoad = function () {
+                // All non-internal links should open new tab/window
+                var linksToNewTab = function () {
+                    var aTags = document.getElementsByTagName("a");
+                    for (var i = 0; i < aTags.length; i++) {
+                        if (aTags[i].getAttribute("href").charAt(0) !== '#') {
+                            aTags[i].setAttribute("target", "_blank");
+                        }
+                    }
+                };
+
+                // Fix <br/> issue with code blocks
+                // As well as issue where multi-line code blocks non-first
+                // lines were starting with spaces
+                var fixCodeTagWhitespace = function () {
+                    var codeTags = document.getElementsByTagName("code");
+                    for (var i = 0; i < codeTags.length; i++) {
+                        var breaks = codeTags[i].textContent.split("<br/>");
+                        for (var j = 0; j < breaks.length; j++) {
+                            if (breaks[j].split("\n").length > 1) {
+                                splitBreak = breaks[j].split("\n");
+                                for (var k = 0; k < splitBreak.length; k++) {
+                                    splitBreak[k] = splitBreak[k].trim();
+                                }
+                                breaks[j] = splitBreak.join("\n");
+                            }
+                        }
+                        if (breaks.length > 1) {
+                            var str = breaks.slice(1, breaks.length - 1).join("\n");
+                            codeTags[i].outerHTML = "<pre><code>" + str + "</code></pre>";
+                        } else {
+                            codeTags[i].textContent = breaks;
+                        }
+                    }
+                };
+
+                linksToNewTab();
+                fixCodeTagWhitespace();
+               
+                // don't show main content until after all navigation changes and
+                // DOM modifications have been made, to prevent unnecessary reflows
+                // and to make sure hash links navigate to the right place
+                document.getElementsByClassName("Content-inner")[0]
+                    .classList.remove("Content-inner--hidden");
+            };
+
+            // this makes back button work for navigating between links
+            var changedHashHandler = function () {
+                updateAnchor();
+                navToSection();
+            };
+
+            var navActionContainer = document
+                .getElementById("NavigationAreaActionContainer");
+            var nav = document
+                .getElementById("NavigationArea");
+            var navElements = document.querySelectorAll("#TOC > ul > li");
+            var hidden = (window.innerWidth < 700) ? false : true;
+
+            toggleNavigationArea();
+            initSidebar();
+            updateAnchor();
+            navActionContainer.onclick = toggleNavigationArea;
+            window.onhashchange = changedHashHandler;
+            window.onload = onFirstLoad;
+        </script>
+    </body>
+</html>

@@ -8,6 +8,7 @@
 #include "ContextMenuPage.h"
 #include "CurveSequenceEditPage.h"
 #include "CurveSequencePage.h"
+#include "CvRoutePage.h"
 #include "FileSelectPage.h"
 #include "GeneratorPage.h"
 #include "GeneratorSelectPage.h"
@@ -43,6 +44,9 @@
 #include "IndexedSequenceEditPage.h"
 #include "IndexedRouteConfigPage.h"
 #include "IndexedMathPage.h"
+#include "TeletypeEditPage.h"
+#include "TeletypePatternViewPage.h"
+#include "TeletypeScriptViewPage.h"
 
 #ifdef CONFIG_ENABLE_INTRO
 #include "IntroPage.h"
@@ -66,6 +70,7 @@ struct Pages {
     SongPage song;
     RoutingPage routing;
     MidiOutputPage midiOutput;
+    CvRoutePage cvRoute;
     UserScalePage userScale;
     OverviewPage overview;
     AccumulatorPage accumulator;
@@ -81,6 +86,9 @@ struct Pages {
     IndexedSequenceEditPage indexedSequenceEdit;
     IndexedRouteConfigPage indexedRouteConfig;
     IndexedMathPage indexedMath;
+    TeletypeEditPage teletypeEdit;
+    TeletypePatternViewPage teletypePatternView;
+    TeletypeScriptViewPage teletypeScriptView;
     SystemPage system;
     // modal pages
     TempoPage tempo;
@@ -120,6 +128,7 @@ struct Pages {
         song(manager, context),
         routing(manager, context),
         midiOutput(manager, context),
+        cvRoute(manager, context),
         userScale(manager, context),
         overview(manager, context),
         accumulator(manager, context),
@@ -135,6 +144,9 @@ struct Pages {
         indexedSequenceEdit(manager, context),
         indexedRouteConfig(manager, context),
         indexedMath(manager, context),
+        teletypeEdit(manager, context),
+        teletypePatternView(manager, context),
+        teletypeScriptView(manager, context),
         system(manager, context),
         // modal pages
         tempo(manager, context),

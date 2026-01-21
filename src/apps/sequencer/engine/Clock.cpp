@@ -7,6 +7,7 @@
 #include "core/math/Math.h"
 #include "core/midi/MidiMessage.h"
 #include "drivers/ClockTimer.h"
+#include "drivers/HighResolutionTimer.h"
 
 #include <cmath>
 
@@ -63,6 +64,7 @@ void Clock::masterStart() {
     setState(State::MasterRunning);
     requestStart();
     resetTicks();
+    _lastTickUs = HighResolutionTimer::us();
 
     _timer.disable();
     setupMasterTimer();
@@ -91,6 +93,7 @@ void Clock::masterContinue() {
 
     setState(State::MasterRunning);
     requestContinue();
+    _lastTickUs = HighResolutionTimer::us();
 
     _timer.disable();
     setupMasterTimer();
@@ -184,6 +187,7 @@ void Clock::slaveStart(int slave) {
     requestStart();
 
     resetTicks();
+    _lastTickUs = HighResolutionTimer::us();
 
     _timer.disable();
     setupSlaveTimer();
@@ -222,6 +226,7 @@ void Clock::slaveContinue(int slave) {
     setState(State::SlaveRunning);
     _activeSlave = slave;
     requestContinue();
+    _lastTickUs = HighResolutionTimer::us();
 
     setupSlaveTimer();
     _timer.enable();
@@ -344,6 +349,7 @@ void Clock::resetTicks() {
     _tickProcessed = 0;
     _slaveSubTicksPending = 0;
     _output.nextTick = 0;
+    _lastTickUs = HighResolutionTimer::us();
 }
 
 void Clock::requestStart() {
@@ -405,6 +411,7 @@ void Clock::outputMidiMessage(uint8_t msg) {
 }
 
 void Clock::outputTick(uint32_t tick) {
+    _lastTickUs = HighResolutionTimer::us();
     outputReset(false);
 
     if (tick % (_ppqn / 24) == 0) {
@@ -434,6 +441,37 @@ void Clock::outputTick(uint32_t tick) {
     if (tick == _output.nextTickOff) {
         outputClock(false);
     }
+}
+
+uint32_t Clock::tickPeriodUs() const {
+    os::InterruptLock lock;
+    if (_state == State::SlaveRunning) {
+        return _slaveSubTickPeriodUs;
+    }
+    if (_state == State::MasterRunning) {
+        return _timer.period();
+    }
+    return 0;
+}
+
+double Clock::tickPosition() const {
+    const uint32_t periodUs = tickPeriodUs();
+    uint32_t tick = 0;
+    uint32_t lastTickUs = 0;
+    {
+        os::InterruptLock lock;
+        tick = _tick;
+        lastTickUs = _lastTickUs;
+    }
+
+    if (periodUs == 0 || lastTickUs == 0) {
+        return double(tick);
+    }
+
+    const uint32_t now = HighResolutionTimer::us();
+    const uint32_t elapsed = now - lastTickUs;
+    const uint32_t baseTick = tick > 0 ? tick - 1 : 0;
+    return double(baseTick) + (double(elapsed) / double(periodUs));
 }
 
 void Clock::outputClock(bool clock) {

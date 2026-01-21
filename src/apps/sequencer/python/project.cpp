@@ -265,6 +265,7 @@ void register_project(py::module &m) {
         .value("Note", Track::TrackMode::Note)
         .value("Curve", Track::TrackMode::Curve)
         .value("MidiCv", Track::TrackMode::MidiCv)
+        .value("Teletype", Track::TrackMode::Teletype)
         .export_values()
     ;
 
@@ -585,6 +586,8 @@ void register_project(py::module &m) {
         .value("TapTempo", Routing::Target::TapTempo)
         .value("Tempo", Routing::Target::Tempo)
         .value("Swing", Routing::Target::Swing)
+        .value("CvRouteScan", Routing::Target::CvRouteScan)
+        .value("CvRouteRoute", Routing::Target::CvRouteRoute)
         .value("Mute", Routing::Target::Mute)
         .value("Fill", Routing::Target::Fill)
         .value("FillAmount", Routing::Target::FillAmount)

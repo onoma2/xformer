@@ -12,6 +12,8 @@
 
 #include <cstdint>
 
+class TeletypeTrack;
+
 class FileManager {
 public:
     static void init();
@@ -28,11 +30,21 @@ public:
     static fs::Error writeUserScale(const UserScale &userScale, int slot);
     static fs::Error readUserScale(UserScale &userScale, int slot);
 
+    static fs::Error writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, int slot);
+    static fs::Error readTeletypeScript(TeletypeTrack &track, int scriptIndex, int slot);
+    static fs::Error writeTeletypeTrack(const TeletypeTrack &track, const char *name, int slot);
+    static fs::Error readTeletypeTrack(TeletypeTrack &track, int slot);
+
     static fs::Error writeProject(const Project &project, const char *path);
     static fs::Error readProject(Project &project, const char *path);
 
     static fs::Error writeUserScale(const UserScale &userScale, const char *path);
     static fs::Error readUserScale(UserScale &userScale, const char *path);
+
+    static fs::Error writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, const char *path);
+    static fs::Error readTeletypeScript(TeletypeTrack &track, int scriptIndex, const char *path);
+    static fs::Error writeTeletypeTrack(const TeletypeTrack &track, const char *name, const char *path);
+    static fs::Error readTeletypeTrack(TeletypeTrack &track, const char *path);
 
     static fs::Error writeSettings(const Settings &settings, const char *path);
     static fs::Error readSettings(Settings &settings, const char *path);

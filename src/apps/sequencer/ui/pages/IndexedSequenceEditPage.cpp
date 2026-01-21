@@ -151,17 +151,21 @@ IndexedSequenceEditPage::IndexedSequenceEditPage(PageManager &manager, PageConte
         }
         return false;
     });
+
 }
 
 void IndexedSequenceEditPage::enter() {
+    updateMonitorStep();
 }
 
 void IndexedSequenceEditPage::exit() {
+    _engine.selectedTrackEngine().as<IndexedTrackEngine>().setMonitorStep(-1);
 }
 
 void IndexedSequenceEditPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "INDEXED EDIT");
+    FixedStringBuilder<20> header("INDEXED EDIT %d/%d", _section + 1, SectionCount);
+    WindowPainter::drawHeader(canvas, _model, _engine, header);
 
     const auto &sequence = _project.selectedIndexedSequence();
     const auto &trackEngine = _engine.selectedTrackEngine().as<IndexedTrackEngine>();
@@ -172,6 +176,7 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
     int nonzeroSteps = 0;
     int currentStepIndex = trackEngine.currentStep();
 
+    const int divisor = sequence.divisor();
     for (int i = 0; i < activeLength; ++i) {
         // Use modulated duration for currently playing step, programmed for others
         int duration = sequence.step(i).duration();
@@ -180,6 +185,8 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
             if (effectiveDur > 0) {
                 duration = effectiveDur;
             }
+        } else {
+            duration *= divisor;
         }
         totalTicks += duration;
         if (duration > 0) {
@@ -193,9 +200,13 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
         const int barW = 240;
         const int barH = 16;
         const int minStepW = 7;
+        const bool twoRows = (minStepW * nonzeroSteps) > barW;
+        const int rowH = twoRows ? (barH / 2) : barH;
+        const int totalW = twoRows ? (barW * 2) : barW;
 
         int currentX = barX;
-        int extraPixels = barW - minStepW * nonzeroSteps;
+        int row = 0;
+        int extraPixels = totalW - minStepW * nonzeroSteps;
         if (extraPixels < 0) {
             extraPixels = 0;
         }
@@ -212,6 +223,8 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
                 if (effectiveDur > 0) {
                     duration = effectiveDur;
                 }
+            } else {
+                duration *= divisor;
             }
 
             int stepW = 0;
@@ -224,24 +237,64 @@ void IndexedSequenceEditPage::draw(Canvas &canvas) {
 
             bool selected = _stepSelection[i];
 
-            canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Medium));
-            canvas.drawRect(currentX, barY, stepW, barH);
-
             // Use modulated gate ticks for currently playing step, programmed for others
             int gateW = 0;
             if (duration > 0) {
-                uint16_t gateTicks = active
+                uint32_t gateTicks = active
                     ? trackEngine.effectiveGateTicks()
-                    : std::min<uint16_t>(IndexedSequence::gateTicks(step.gateLength(), duration), duration);
+                    : std::min<uint32_t>(uint32_t(IndexedSequence::gateTicks(step.gateLength(), step.duration()) * divisor),
+                                         uint32_t(duration));
                 gateW = int((float(stepW) * gateTicks) / float(duration));
             }
             gateW = clamp(gateW, 0, std::max(0, stepW - 2));
-            if (gateW > 0 && stepW > 2) {
-                canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Low));
-                canvas.fillRect(currentX + 1, barY + 1, gateW, barH - 2);
+
+            auto drawSegment = [&](int segX, int segY, int segW, int gateRemaining, int xOffset) -> int {
+                if (segW <= 0) {
+                    return gateRemaining;
+                }
+                int drawX = segX + xOffset;
+                int drawW = segW - xOffset;
+                if (drawX < barX) {
+                    int shift = barX - drawX;
+                    drawX = barX;
+                    drawW = std::max(0, drawW - shift);
+                }
+                canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Medium));
+                canvas.drawRect(drawX, segY, drawW, rowH);
+
+                if (gateRemaining > 0 && drawW > 2 && rowH > 2) {
+                    int gateSeg = std::min(gateRemaining, drawW - 2);
+                    canvas.setColor(selected ? Color::Bright : (active ? Color::MediumBright : Color::Low));
+                    canvas.fillRect(drawX + 1, segY + 1, gateSeg, rowH - 2);
+                    gateRemaining -= gateSeg;
+                }
+                return gateRemaining;
+            };
+
+            int segGate = gateW;
+            int segRow = row;
+            int segX = currentX;
+            int remaining = stepW;
+            const int xOffset = (i > 0) ? -1 : 0;
+            while (remaining > 0) {
+                int rowY = barY + segRow * rowH + (segRow == 1 ? -1 : 0);
+                int rowRemaining = (barX + barW) - segX;
+                int segW = std::min(remaining, rowRemaining);
+                segGate = drawSegment(segX, rowY, segW, segGate, xOffset);
+                remaining -= segW;
+                if (remaining > 0 && twoRows && segRow == 0) {
+                    segRow = 1;
+                    segX = barX;
+                    continue;
+                }
+                break;
             }
 
             currentX += stepW;
+            if (twoRows && currentX >= barX + barW) {
+                currentX = barX + (currentX - (barX + barW));
+                row = 1;
+            }
         }
     }
 
@@ -508,6 +561,10 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
             event.consume();
             return;
         }
+        if (key.quickEdit() == 0 || key.quickEdit() == 1) {
+            event.consume();
+            return;
+        }
         quickEdit(key.quickEdit());
         event.consume();
         return;
@@ -545,6 +602,7 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         int stepIndex = stepOffset() + key.step();
         if (stepIndex < _project.selectedIndexedSequence().activeLength()) {
             _stepSelection.keyPress(event, stepOffset());
+            updateMonitorStep();
         }
         event.consume();
         return;
@@ -588,7 +646,7 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         event.consume();
     }
     if (key.isRight()) {
-        _section = std::min(1, _section + 1);
+        _section = std::min(SectionCount - 1, _section + 1);
         event.consume();
     }
 }
@@ -718,8 +776,8 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
                     }
                     case EditMode::Gate: {
                         int currentGate = lastStep.gateLength();
-                        if (currentGate == IndexedSequence::GateLengthFull && event.value() < 0) {
-                            uint16_t duration = lastStep.duration();
+                        uint16_t duration = lastStep.duration();
+                        if (duration > 0 && currentGate >= duration && event.value() < 0) {
                             if (duration <= IndexedSequence::GateLengthTicksMin) {
                                 lastStep.setGateLength(IndexedSequence::GateLengthOff);
                             } else {
@@ -786,8 +844,8 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
                     {
                         int stepSize = shift ? 1 : 5;
                         int currentGate = step.gateLength();
-                        if (currentGate == IndexedSequence::GateLengthFull && event.value() < 0) {
-                            uint16_t duration = step.duration();
+                        uint16_t duration = step.duration();
+                        if (duration > 0 && currentGate >= duration && event.value() < 0) {
                             if (duration <= IndexedSequence::GateLengthTicksMin) {
                                 step.setGateLength(IndexedSequence::GateLengthOff);
                             } else {
@@ -810,6 +868,16 @@ void IndexedSequenceEditPage::encoder(EncoderEvent &event) {
 void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
     const auto &key = event.key();
     if (key.isQuickEdit() && !key.shiftModifier()) {
+        if (key.quickEdit() == 0) {
+            startSplitQuickEdit();
+            event.consume();
+            return;
+        }
+        if (key.quickEdit() == 1) {
+            startMergeQuickEdit();
+            event.consume();
+            return;
+        }
         if (key.quickEdit() == 4) {
             startVoicingQuickEdit(VoicingBank::Piano, key.quickEdit() + 8);
             event.consume();
@@ -827,21 +895,9 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
         }
     }
 
-    if (key.isQuickEdit() && key.shiftModifier()) {
-        if (key.quickEdit() == 0) {
-            startSplitQuickEdit();
-            event.consume();
-            return;
-        }
-        if (key.quickEdit() == 1) {
-            startMergeQuickEdit();
-            event.consume();
-            return;
-        }
-    }
-
     if (key.isStep()) {
         _stepSelection.keyDown(event, stepOffset());
+        updateMonitorStep();
     }
 
     if (key.isFunction()) {
@@ -902,6 +958,7 @@ void IndexedSequenceEditPage::keyDown(KeyEvent &event) {
                 _durationTransfer = false;
             }
         }
+        updateMonitorStep();
     }
 }
 
@@ -938,6 +995,17 @@ void IndexedSequenceEditPage::keyUp(KeyEvent &event) {
 
     if (key.isStep()) {
         _stepSelection.keyUp(event, stepOffset());
+        updateMonitorStep();
+    }
+}
+
+void IndexedSequenceEditPage::updateMonitorStep() {
+    auto &trackEngine = _engine.selectedTrackEngine().as<IndexedTrackEngine>();
+
+    if (_editMode == EditMode::Note && !_stepSelection.isPersisted() && _stepSelection.any()) {
+        trackEngine.setMonitorStep(_stepSelection.first());
+    } else {
+        trackEngine.setMonitorStep(-1);
     }
 }
 
@@ -1195,11 +1263,6 @@ void IndexedSequenceEditPage::quickEdit(int index) {
     int item = quickEditItems[index];
     switch (item) {
     case QuickEditSplit:
-        if (!_stepSelection.any()) {
-            showMessage("NO STEP");
-            return;
-        }
-        splitStep();
         return;
     case QuickEditPiano:
         applyVoicing(VoicingBank::Piano, _pianoVoicingIndex);
@@ -1210,7 +1273,6 @@ void IndexedSequenceEditPage::quickEdit(int index) {
     case QuickEditSwap:
         return;
     case QuickEditMerge:
-        mergeStepWithNext();
         return;
     case QuickEditSetFirst: {
         if (!_stepSelection.any()) {

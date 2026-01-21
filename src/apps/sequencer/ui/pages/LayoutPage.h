@@ -7,6 +7,10 @@
 #include "ui/model/GateOutputListModel.h"
 #include "ui/model/CvOutputListModel.h"
 
+#include "core/utils/StringBuilder.h"
+
+#include <array>
+
 class LayoutPage : public ListPage {
 public:
     LayoutPage(PageManager &manager, PageContext &context);
@@ -36,10 +40,17 @@ private:
     }
 
     void setMode(Mode mode);
+    void startTeletypeOutputAssignments(const std::array<int, CONFIG_TRACK_COUNT> &tracks, int count);
+    void promptNextTeletypeOutputAssignment();
+    void assignOutputsForTeletypeTrack(int trackIndex);
 
     Mode _mode = Mode::TrackMode;
     TrackModeListModel _trackModeListModel;
     LinkTrackListModel _linkTrackListModel;
     GateOutputListModel _gateOutputListModel;
     CvOutputListModel _cvOutputListModel;
+    FixedStringBuilder<32> _teletypePromptText;
+    std::array<int, CONFIG_TRACK_COUNT> _pendingTeletypeTracks{};
+    int _pendingTeletypeCount = 0;
+    int _pendingTeletypeIndex = 0;
 };

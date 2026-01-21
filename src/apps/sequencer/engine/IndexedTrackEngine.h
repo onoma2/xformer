@@ -36,10 +36,12 @@ public:
     const IndexedSequence &sequence() const { return *_sequence; }
     bool isActiveSequence(const IndexedSequence &sequence) const { return &sequence == _sequence; }
 
+    void setMonitorStep(int index);
+
     // For Testing/UI
     int currentStep() const { return _currentStepIndex; }
     uint16_t effectiveStepDuration() const { return _effectiveStepDuration; }
-    uint32_t effectiveGateTicks() const { return _gateTimer; }
+    uint32_t effectiveGateTicks() const { return _gateTimer > 0.0 ? static_cast<uint32_t>(_gateTimer) : 0u; }
 
 private:
     // Constants for step parameters
@@ -61,20 +63,24 @@ private:
     int _cachedPattern = -1;        // Cached pattern index to avoid redundant lookups
 
     // === Timing state ===
-    uint32_t _stepTimer = 0;        // Counts up to step.duration
-    uint32_t _gateTimer = 0;        // Counts down from step.gateLength
+    double _stepTimer = 0.0;        // Counts up to step.duration (ticks)
+    double _gateTimer = 0.0;        // Counts down from step.gateLength
     uint32_t _effectiveStepDuration = 0; // Sampled duration for current step
     int _currentStepIndex = 0;      // Current step (0 to activeLength-1)
     bool _running = true;
     bool _pendingTrigger = false;   // Fire step at start of next tick
     float _prevSync = 0.f;          // For external sync edge detection
     int _stepsRemaining = 0;        // Used for Once mode
+    double _lastFreeTickPos = 0.0;
 
     // === Output ===
     float _cvOutput = 0.0f;
     float _cvOutputTarget = 0.0f;
+    bool _gateOutput = false;
     bool _activity = false;
     bool _slideActive = false;
+    bool _monitorOverrideActive = false;
+    int _monitorStepIndex = -1;
 
     SequenceState _sequenceState;
     Random _rng;

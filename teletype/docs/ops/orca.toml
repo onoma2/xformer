@@ -1,0 +1,84 @@
+["OR.CLK"]
+prototype = "OR.CLK x"
+short = "Advance track `x` (`1-4`)"
+description = """
+Gives you the ability to clock individual tracks. The master clock will still advance all 4 tracks.
+"""
+
+["OR.RST"]
+prototype = "OR.RST x"
+short = "Reset track `x` (`1-4`)"
+
+["OR.GRST"]
+prototype = "OR.GRST x"
+short = "Global reset (`x` can be any value)"
+
+["OR.TRK"]
+prototype = "OR.TRK x"
+short = "Choose track `x` (`1-4`) to be used by `OR.DIV`, `OR.PHASE`, `OR.WGT` or `OR.MUTE`"
+
+["OR.DIV"]
+prototype = "OR.DIV x"
+short = "Set divisor for selected track to `x` (`1-16`)"
+
+["OR.PHASE"]
+prototype = "OR.PHASE x"
+short = "Set phase for selected track to `x` (`0-16`)"
+
+["OR.WGT"]
+prototype = "OR.WGT x"
+short = "Set weight for selected track to `x` (`1-8`)"
+
+["OR.MUTE"]
+prototype = "OR.MUTE x"
+short = "Mute trigger selected by `OR.TRK` (`0` = on, `1` = mute)"
+
+["OR.SCALE"]
+prototype = "OR.SCALE x"
+short = "Select scale `x` (`1-16`)"
+description = """
+Value of `1-16` will select scale for both CV A and CV B. To select individual scales append their numbers, for instance, `105` will select scale 1 for CV A and scale 5 for CV B, and `1005` will select scale 10 for CV A and scale 5 for CV B.
+"""
+
+["OR.BANK"]
+prototype = "OR.BANK x"
+short = "Select preset bank `x` (`1-8`)"
+
+["OR.PRESET"]
+prototype = "OR.PRESET x"
+short = "Select preset `x` (`1-8`)"
+
+["OR.RELOAD"]
+prototype = "OR.RELOAD x"
+short = "Reload preset or bank (`0` - current preset, `1` - current bank, `2` - all banks)"
+description = """
+Abandons any unsaved changes and reloads selected presets/banks from flash. Could be useful in `I` script.
+"""
+
+["OR.ROTS"]
+prototype = "OR.ROTS x"
+short = "Rotate scales by `x` (`1-15`)"
+description = """
+Rotates scales up. To rotate them down set `x` to `16` minus the amount.
+"""
+
+["OR.ROTW"]
+prototype = "OR.ROTW x"
+short = "Rotate weights by `x` (`1-3`)"
+description = """
+Rotates weights up. To rotate them down set `x` to `4` minus the amount.
+"""
+
+["OR.CVA"]
+prototype = "OR.CVA x"
+short = "Select tracks for CV A where `x` is a binary number representing the tracks"
+description = """
+Convert a binary number representing selected tracks (so `1001` will select tracks 1 and 4, for instance) and set `x` to that.
+"""
+
+["OR.CVB"]
+prototype = "OR.CVB x"
+short = "Select tracks for CV B where `x` is a binary number representing the tracks"
+description = """
+Convert a binary number representing selected tracks (so `1001` will select tracks 1 and 4, for instance) and set `x` to that.
+"""

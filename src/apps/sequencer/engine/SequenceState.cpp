@@ -136,6 +136,17 @@ void SequenceState::advanceAligned(int absoluteStep, Types::RunMode runMode, int
     }
 }
 
+void SequenceState::setStep(int step, int firstStep, int lastStep) {
+    ASSERT(firstStep <= lastStep, "invalid first/last step");
+
+    _prevStep = _step;
+    _step = clamp(step, firstStep, lastStep);
+    _direction = (_prevStep <= _step) ? 1 : -1;
+    if (_prevStep > _step) {
+        ++_iteration;
+    }
+}
+
 void SequenceState::advanceRandomWalk(int firstStep, int lastStep, Random &rng) {
     if (_step == -1) {
         _step = randomStep(firstStep, lastStep, rng);
