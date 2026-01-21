@@ -4,6 +4,15 @@ monome eurorack module
 
 http://monome.org/docs/teletype
 
+Original Repo is [in Monome github](https://github.com/monome/teletype). It required some hacking and slashing to be able to compile into T9Type track and I could not find a better option to keep it simple. 
+
+Main changes are:
+ 
+- number of active scripts (5), 
+- all the i2c/grid related OPs are removed
+- added several Performer related ops, and internal TT ops simulating i2c hardvare (E.* , LFO.* , G.*). Hardware processing is done on the Performers engine side.
+- othervise its 100% Teletype.
+
 ## Directories
 
 - `src`: source code for the teletype algorithm

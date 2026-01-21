@@ -3,26 +3,32 @@
 XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific track types and sequencing enhancements. It assumes familiarity with the standard PER|FORMER workflow.
 
 
-<a href="manuals/xformer.jpeg"><img src="manuals/xformer.jpeg"/></a>
+<a href="manuals/xformer.jpeg"><img src="manuals/xformer.jpeg"/></a> <a href="manuals/xformer.jpeg"><img src="manuals/xformer6.jpg"/></a>
 
 
 ### Key Features
 - **Algo Track** (inspired by [TINRS Tuesday](https://www.thisisnotrocketscience.nl/eurorack/tuesday/)): Generative sequencing with deterministic behavior.
 - **Discrete Track** (inspired by [New Systems Instruments Discrete Map](https://nsinstruments.com/modules/dmap.html)): Threshold-based sequencing mapping inputs to stages.
 - **Indexed Track** (inspired by [Orthogonal Devices ER-101/102](https://www.orthogonaldevices.com/er-101.html)): Duration-based sequencing with independent step lengths.
-- **Note Track Enhancements**:
-  - **Accumulator** (inspired by [Intellijel Metropolix](https://intellijel.com/shop/eurorack/metropolix/)).
-  - **Harmony Engine** (inspired by [Instruo Harmonaig](https://www.instruomodular.com/product/harmonaig/)).
-  - Pulse Count and Gate Modes.
-- **Curve Track Enhancements**: Global Phase, Wavefolder, Chaos Engine, advanced playback features.
+- **T9Type Track** (a mildly stripped down version of [Monome Teletype](https://monome.org/past/teletype.html): Full TT VM running withing a track, yes you can have 8 T9types running. No USB keyboard support, no I2C, No Grid.
+
+- **Note Circus Track Enhancements**:  **Accumulator** (inspired by [Intellijel Metropolix](https://intellijel.com/shop/eurorack/metropolix/)). **Harmony Engine** (inspired by [Instruo Harmonaig](https://www.instruomodular.com/product/harmonaig/)). Pulse Count,Modes, ReRene and Ikra playmodes
+ 
+- **Curve Studio Track Enhancements**: Global Phase, Wavefolder, Chaos Engine, advanced playback features.
+
 - **Scope View**: Monitor page oscilloscope for track CV with optional second track overlay.
+
+
 - **Routing**:
-  - CV/Gate Output Rotation, Run, Reset.
-  - VCA Next Shaper, advanced Bias/Depth/Shaper system.
-- **Clock Mult**: Per-sequence 0.50x–1.50x timing multiplier.
+	- additional BUS 1-4 routing Targets	
+	- CV/Gate Output Rotation, Run, Reset.
+	- Advanced Bias/Depth/Shaper system.
+	- Independent interpolating CV Router (think [Vostok Trace](https://www.vostokinstruments.com/trace)
+	
 
 
-### Manuals
+
+### Manuals and Tools
 
 - [XFORMER Manual](./manuals/XFORMER_MANUAL.md) - Complete guide to XFORMER firmware features
 - [TUESDAY Manual](./manuals/TUESDAY_MANUAL.md) - Algo track (generative sequencing) documentation
@@ -30,6 +36,10 @@ XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific t
 - [INDEXED Manual](./manuals/INDEXED_MANUAL.md) - Indexed track (duration-based sequencing) guide
 - [CURVE Studio](./manuals/CURVE_Stidio.md) - Curve track enhancements and features
 - [ROUTES](./manuals/ROUTES.md) - Routing and signal flow documentation
+- T9Type - [Full](./manuals/T9Type-manual.md), [Ops](./manuals/T9Type-ops.md), [Track](./manuals/T9Type-learn.md)
+
+
+- [Scala (.scl) to .SCA (performer SCA)](./scripts/SCL-TO-SCA/) - conversion script 
 - [HTML Shapes Visualizer](./manuals/curve-and-route-shapers.html) - helper to
 visualize Curve Studio shapes and routing additions with a sound engine
 
