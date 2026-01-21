@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.6.0]
+
+### Added
+- Wallclock reference so freerunning tracks stay in sync (no drift over long runs)
+- Note (Circus) Track play modes: Ikra (separate note loop + Divisor Y), Re:Rene (Cartesian X/Y with seek bounds)
+- Accumulator trigger modes: STEP, GATE, RTRIG; accumulator respects per-step conditions
+- Discrete Map Track pluck effect (decay envelope with depth/direction/jitter)
+- Discrete Map Track linear slew and monitor mode
+- Indexed Track: 48 steps, gate/duration share 0–1023 scale, monitor mode, defaults to Free
+- CV Router Engine: 4x4 matrix routing with Scan/Route targets
+- Routing: 4 bus routes with full shaper support
+- T9type Track (Teletype integration; button editing, no grid/USB keyboard)
+- Teletype ops: WBPM/WBPM.S, WMS/WTU/BAR, WP/WP.SET/WR/W.ACT/WNG, RT, M.A/M.ACT.A/M.RESET.A, E.*/LFO.*/G.*
+
 ## [0.5.1]
 
 ### Added
