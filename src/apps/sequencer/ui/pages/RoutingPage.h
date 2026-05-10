@@ -23,6 +23,7 @@ public:
 
     virtual void keyPress(KeyPressEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
 
     void showRoute(int routeIndex, const Routing::Route *initialValue = nullptr);
 

@@ -17,6 +17,7 @@ public:
     virtual void keyDown(KeyEvent &event) override;
     virtual void keyUp(KeyEvent &event) override;
     virtual void keyPress(KeyPressEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
 
 private:

@@ -33,6 +33,10 @@ protected:
     const KeyState &pageKeyState() const { return _context.pageKeyState; }
     const KeyState &globalKeyState() const { return _context.globalKeyState; }
 
+    // Dispatch a function button press (F1=0 .. F5=4) to keyPress().
+    // Used by keyboard() to map USB F-keys to hardware button actions.
+    void pressFunctionButton(int functionIndex, bool shift = false);
+
     PageContext &_context;
     Model &_model;
     Project &_project;

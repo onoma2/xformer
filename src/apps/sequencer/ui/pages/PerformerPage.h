@@ -20,6 +20,7 @@ public:
     virtual void keyUp(KeyEvent &event) override;
     virtual void keyPress(KeyPressEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
 
 private:
     void updateFills();
