@@ -191,24 +191,25 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
         switch (_noteTrack.playMode()) {
         case Types::PlayMode::Aligned:
             if (relativeTick % divisor == 0) {
-                // Pulse count logic: Get current step's pulse count from sequence state
-                int currentStepIndex = _sequenceState.step();
-                int stepPulseCount = sequence.step(currentStepIndex).pulseCount();
+                // Advance BEFORE trigger (matches CurveTrackEngine pattern)
+                if (_sequenceState.step() < 0) {
+                    // Initial: use advanceFree to respect run mode
+                    _sequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                    _pulseCounter = 0;
+                } else {
+                    // Check if current step's pulses are complete
+                    int currentStepIndex = _sequenceState.step();
+                    int stepPulseCount = sequence.step(currentStepIndex).pulseCount();
+                    if (_pulseCounter > stepPulseCount) {
+                        _pulseCounter = 0;
+                        _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                    }
+                }
 
-                // Increment pulse counter
+                // Now trigger the current step
                 _pulseCounter++;
-
-                // Fire the current step BEFORE advancing
                 recordStep(tick, divisor);
                 triggerStep(tick, divisor);
-
-                // Only advance to next step when all pulses for current step are complete
-                bool shouldAdvanceStep = (_pulseCounter > stepPulseCount);
-
-                if (shouldAdvanceStep) {
-                    _pulseCounter = 0;
-                    _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
-                }
             }
             if (sequence.mode() == NoteSequence::Mode::Ikra && relativeTick % noteDivisor == 0) {
                 _noteSequenceState.advanceAligned(relativeTick / noteDivisor, sequence.runMode(), sequence.noteFirstStep(), sequence.noteLastStep(), rng);
@@ -343,24 +344,16 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
                 _noteSequenceState.advanceFree(sequence.runMode(), sequence.noteFirstStep(), sequence.noteLastStep(), rng);
             } else if (stepIndex != _lastFreeStepIndex) {
                 _lastFreeStepIndex = stepIndex;
-                // Pulse count logic: Get current step's pulse count from sequence state
-                int currentStepIndex = _sequenceState.step();
-                int stepPulseCount = sequence.step(currentStepIndex).pulseCount();
 
-                // Increment pulse counter
+                // Phase-lock: always sync sequence step to clock stepIndex
+                // advanceAligned maps stepIndex to correct sequence step based on run mode
+                _sequenceState.advanceAligned(stepIndex, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
+                _pulseCounter = 0;
+
+                // Trigger the (now current) step
                 _pulseCounter++;
-
-                // Fire the current step BEFORE advancing
                 recordStep(tick, divisor);
                 triggerStep(tick, divisor);
-
-                // Only advance to next step when all pulses for current step are complete
-                bool shouldAdvanceStep = (_pulseCounter > stepPulseCount);
-
-                if (shouldAdvanceStep) {
-                    _pulseCounter = 0;
-                    _sequenceState.advanceFree(sequence.runMode(), sequence.firstStep(), sequence.lastStep(), rng);
-                }
             }
             break;
         }
