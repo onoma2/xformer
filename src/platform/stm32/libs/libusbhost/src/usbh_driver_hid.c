@@ -107,8 +107,6 @@ static void *init(usbh_device_t *usbh_dev, const usbh_dev_driver_info_t * device
 	for (i = 0; i < USBH_HID_MAX_DEVICES; i++) {
 		if (hid_device[i].state_next == STATE_INACTIVE) {
 			drvdata = &hid_device[i];
-			drvdata->vendorId = device_info->vendorId;
-			drvdata->productId = device_info->productId;
 			drvdata->device_id = i;
 			drvdata->endpoint_in_address = 0;
 			drvdata->endpoint_in_toggle = 0;
@@ -379,7 +377,7 @@ bool hid_is_connected(uint8_t device_id)
 		LOG_PRINTF("is connected: invalid device id");
 		return false;
 	}
-	return hid_device[device_id].state_next == STATE_INACTIVE;
+	return hid_device[device_id].state_next != STATE_INACTIVE;
 }
 
 

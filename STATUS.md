@@ -6,21 +6,23 @@ This project develops firmware for the PER|FORMER/XFORMER sequencer, targeting S
 ## Current Work
 
 ### USB HID Keyboard Implementation
-**Status:** Planning  
-**Priority:** High  
+**Status:** In Progress
+**Priority:** High
 
 Efforts to add USB HID keyboard support have been undertaken in three branches, all failing with the symptom that the keyboard is never detected (connect callback never fires). The root cause analysis indicates the HID driver is never matched during enumeration.
 
-**Current State (master branch):**
-- Missing `#include "usbh_driver_hid.h"` in `src/platform/stm32/drivers/UsbH.cpp`
-- Missing `&usbh_hid_driver` from the `device_drivers[]` array
-- No call to `hid_driver_init()` in `UsbH::init()`
-- No HID event handling implemented
+**Current State (after changes):**
+- **Present**: `#include "usbh_driver_hid.h"` in `src/platform/stm32/drivers/UsbH.cpp`
+- **Present**: `&usbh_hid_driver` in the `device_drivers[]` array
+- **Present**: Call to `hid_driver_init()` in `UsbH::init()`
+- **Implemented**: HID event handling (connect/disconnect/message)
 
-**Planned Solution:**
-1. Integrate the HID driver correctly (add header, add to driver list, initialize with appropriate callbacks).
-2. Implement HID event handling in `UsbH` (connect/disconnect/message handlers that forward events to the UI/engine).
-3. If initial integration fails, diagnose low-level USB issues using:
+**Completed Steps:**
+1. **Integrate the HID driver correctly** – **DONE** (header added, driver listed, initialized with callbacks).
+2. **Implement HID event handling in `UsbH`** – **DONE** (connect/disconnect/message handlers added).
+
+**Next Steps (if needed):**
+3. If integration still fails, diagnose low-level USB issues using:
    - USB debug logging
    - Testing with low-speed and full-speed keyboards
    - Checking for PHY speed negotiation problems
@@ -35,8 +37,8 @@ Efforts to add USB HID keyboard support have been undertaken in three branches, 
 - Task breakdown: `.tasks/usb-hid-implementation/TASK.md`
 
 ### Launchpad Controller Extension
-**Status:** Planning  
-**Priority:** Medium  
+**Status:** Planning
+**Priority:** Medium
 
 Effort to extend Launchpad controller support to all six track types (Note, Curve, Indexed, DiscreteMap, Tuesday, Teletype) is in the planning phase. The work involves fixing regressions in the Note track, adding macro grid functionality, and implementing full grid-based editing for each track type.
 

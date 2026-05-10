@@ -26,6 +26,7 @@
 #include "model/FileManager.h"
 #include "engine/Engine.h"
 #include "ui/Ui.h"
+#include "ui/MessageManager.h"
 
 #include "../hwconfig/HardwareConfig.h"
 
@@ -180,6 +181,14 @@ int main(void) {
 
     engine.init();
     ui.init();
+
+    {
+        static auto usbDebugMsg = [](const char *msg, void *context) {
+            auto *mm = static_cast<MessageManager *>(context);
+            mm->showMessage(msg, 3000);
+        };
+        usbh.setDebugMessageCallback(usbDebugMsg, &ui.messageManager());
+    }
 
     System::resetWatchdog();
 

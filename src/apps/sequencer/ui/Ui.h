@@ -36,6 +36,8 @@ public:
 
     void showAssert(const char *filename, int line, const char *msg);
 
+    MessageManager &messageManager() { return _messageManager; }
+
 private:
     void handleKeys();
     void handleEncoder();

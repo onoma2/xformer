@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UsbMidi.h"
+#include "usbh_driver_hid.h"
 
 #include <cstdint>
 
@@ -15,6 +16,23 @@ public:
     void powerOn();
     void powerOff();
     bool powerFault();
+
+    using HidConnectCallback = void(*)(uint8_t device_id, HID_TYPE type, void *context);
+    using HidDisconnectCallback = void(*)(uint8_t device_id, void *context);
+    using HidKeyCallback = void(*)(uint8_t modifiers, uint8_t keycode, void *context);
+    using DebugMessageCallback = void(*)(const char *msg, void *context);
+
+    void setHidCallbacks(HidConnectCallback onConnect, HidDisconnectCallback onDisconnect, HidKeyCallback onKey, void *context) {
+        _hidConnectCallback = onConnect;
+        _hidDisconnectCallback = onDisconnect;
+        _hidKeyCallback = onKey;
+        _hidCallbackContext = context;
+    }
+
+    void setDebugMessageCallback(DebugMessageCallback cb, void *context) {
+        _debugMsgCallback = cb;
+        _debugMsgContext = context;
+    }
 
 private:
     void midiConnectDevice(uint8_t device, uint16_t vendorId, uint16_t productId) {
@@ -44,9 +62,33 @@ private:
         return _usbMidi.dequeueMessage(cable, message);
     }
 
+    void hidConnectDevice(uint8_t device, HID_TYPE type) {
+        _hidDevices |= (1 << device);
+        if (_hidConnectCallback) {
+            _hidConnectCallback(device, type, _hidCallbackContext);
+        }
+    }
+
+    void hidDisconnectDevice(uint8_t device) {
+        _hidDevices &= ~(1 << device);
+        if (_hidDisconnectCallback) {
+            _hidDisconnectCallback(device, _hidCallbackContext);
+        }
+    }
+
     UsbMidi &_usbMidi;
 
     uint8_t _midiDevices = 0;
+    uint8_t _hidDevices = 0;
+
+    HidConnectCallback _hidConnectCallback = nullptr;
+    HidDisconnectCallback _hidDisconnectCallback = nullptr;
+    HidKeyCallback _hidKeyCallback = nullptr;
+    void *_hidCallbackContext = nullptr;
+
+    DebugMessageCallback _debugMsgCallback = nullptr;
+    void *_debugMsgContext = nullptr;
 
     friend struct MidiDriverHandler;
+    friend struct HidDriverHandler;
 };
