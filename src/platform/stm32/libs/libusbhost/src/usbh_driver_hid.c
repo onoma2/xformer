@@ -159,12 +159,13 @@ static bool analyze_descriptor(void *drvdata, void *descriptor)
 	case USB_DT_INTERFACE:
 		{
 			const struct usb_interface_descriptor *ifDesc = (const struct usb_interface_descriptor *)descriptor;
+			hid->interface_number = ifDesc->bInterfaceNumber;
 			if (ifDesc->bInterfaceProtocol == 0x01) {
 				hid->hid_type = HID_TYPE_KEYBOARD;
-				hid->interface_number = ifDesc->bInterfaceNumber;
 			} else if (ifDesc->bInterfaceProtocol == 0x02) {
 				hid->hid_type = HID_TYPE_MOUSE;
-				hid->interface_number = ifDesc->bInterfaceNumber;
+			} else {
+				hid->hid_type = HID_TYPE_OTHER;
 			}
 		}
 		break;
@@ -383,7 +384,7 @@ bool hid_is_connected(uint8_t device_id)
 
 enum HID_TYPE hid_get_type(uint8_t device_id)
 {
-	if (hid_is_connected(device_id)) {
+	if (!hid_is_connected(device_id)) {
 		return HID_TYPE_NONE;
 	}
 	return hid_device[device_id].hid_type;

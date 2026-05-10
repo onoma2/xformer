@@ -59,6 +59,7 @@ bool hid_set_report(uint8_t device_id, uint8_t val);
 
 enum HID_TYPE {
 	HID_TYPE_NONE,
+	HID_TYPE_OTHER,
 	HID_TYPE_MOUSE,
 	HID_TYPE_KEYBOARD,
 };

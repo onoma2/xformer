@@ -1,10 +1,10 @@
 # Task Board
-_Updated: 2026-05-10_
+_Updated: 2026-05-11_
 
 ## 🔴 usb-hid-implementation — USB HID keyboard support
-**Status:** in progress (hardware tested, investigating descriptor parsing)
-**Where I stopped:** Hardware test shows MIDI Launchpad works, mouse/keyboard detected but `analyze_descriptor()` returns `HID_TYPE_NONE`. The `HID 0 t=0` message on OLED confirms HID driver init fires but descriptor parsing fails.
-**Next action:** Investigate why `analyze_descriptor()` in `usbh_driver_hid.c:140-207` returns false for HID keyboards/mice. Consider enabling `CONFIG_ENABLE_USBH_DEBUG` for USART trace or adding minimal safe instrumentation to `usbh_core.c`.
+**Status:** in progress — `hid_get_type()` bug fixed, awaiting hardware test
+**Where I stopped:** Fixed `hid_get_type()` inverted condition (`if (hid_is_connected())` → `if (!hid_is_connected())`) and added `HID_TYPE_OTHER` for protocol 0x00 devices. The `HID 0 t=0` on hardware was caused by `hid_get_type()` returning NONE for connected devices.
+**Next action:** Flash build, test keyboard shows `HID 0 t=2` (KEYBOARD). If type correct but no key data, investigate HID polling and SET_IDLE/SET_PROTOCOL.
 **Branch:** feat/USB-keyboard4
 
 ---
