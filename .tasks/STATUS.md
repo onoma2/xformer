@@ -2,9 +2,9 @@
 _Updated: 2026-05-11_
 
 ## 🔴 usb-hid-implementation — USB HID keyboard support
-**Status:** in progress — `hid_get_type()` bug fixed, awaiting hardware test
-**Where I stopped:** Fixed `hid_get_type()` inverted condition (`if (hid_is_connected())` → `if (!hid_is_connected())`) and added `HID_TYPE_OTHER` for protocol 0x00 devices. The `HID 0 t=0` on hardware was caused by `hid_get_type()` returning NONE for connected devices.
-**Next action:** Flash build, test keyboard shows `HID 0 t=2` (KEYBOARD). If type correct but no key data, investigate HID polling and SET_IDLE/SET_PROTOCOL.
+**Status:** in progress — debug diagnostics added, awaiting hardware test
+**Where I stopped:** Added `debug_msg` callback to HID driver (5 diagnostic points). Previous `HID 0 t=0` was a false positive caused by inverted `hid_is_connected()`. Real issue: HID enumeration never reaches connected state.
+**Next action:** Flash build, check OLED for "HID init" / "HID desc ok" / "HID rm" messages to diagnose where enumeration fails.
 **Branch:** feat/USB-keyboard4
 
 ---

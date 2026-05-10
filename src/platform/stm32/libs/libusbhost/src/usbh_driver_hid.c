@@ -114,10 +114,14 @@ static void *init(usbh_device_t *usbh_dev, const usbh_dev_driver_info_t * device
 			drvdata->usbh_device = usbh_dev;
 			drvdata->report_state = REPORT_STATE_NULL;
 			drvdata->hid_type = HID_TYPE_NONE;
+			if (hid_config.debug_msg) { hid_config.debug_msg("HID init"); }
 			break;
 		}
 	}
 
+	if (!drvdata) {
+		if (hid_config.debug_msg) { hid_config.debug_msg("HID no slot"); }
+	}
 	return drvdata;
 }
 
@@ -202,6 +206,7 @@ static bool analyze_descriptor(void *drvdata, void *descriptor)
 
 	if (hid->endpoint_in_address && hid->report0_length) {
 		hid->state_next = STATE_GET_REPORT_DESCRIPTOR_READ_SETUP;
+		if (hid_config.debug_msg) { hid_config.debug_msg("HID desc ok"); }
 		return true;
 	}
 
@@ -253,6 +258,7 @@ static void event(usbh_device_t *dev, usbh_packet_callback_data_t cb_data)
 
 			default:
 				ERROR(cb_data.status);
+				if (hid_config.debug_msg) { hid_config.debug_msg("HID rdesc fail"); }
 				hid->state_next = STATE_INACTIVE;
 				break;
 			}
@@ -335,6 +341,7 @@ static void poll(void *drvdata, uint32_t time_curr_us)
 static void remove(void *drvdata)
 {
 	hid_device_t *hid = (hid_device_t *)drvdata;
+	if (hid_config.debug_msg) { hid_config.debug_msg("HID rm"); }
 	hid->state_next = STATE_INACTIVE;
 	hid->endpoint_in_address = 0;
 }

@@ -197,6 +197,14 @@ static const midi_config_t midi_config = {
 
 static hid_config_t hid_config = {};
 
+struct HidDebugHandler {
+    static void debugMsg(const char *msg) {
+        if (g_usbh && g_usbh->_debugMsgCallback) {
+            g_usbh->_debugMsgCallback(msg, g_usbh->_debugMsgContext);
+        }
+    }
+};
+
 struct HidDriverHandler {
     static void connectHandler(uint8_t device_id, HID_TYPE type) {
         DBG("HID device connected (id=%d, type=%d)", device_id, type);
@@ -256,6 +264,7 @@ void UsbH::init() {
 	hub_driver_init();
 	midi_driver_init(&midi_config);
 	hid_config.hid_in_message_handler = &HidDriverHandler::messageHandler;
+	hid_config.debug_msg = &HidDebugHandler::debugMsg;
 	hid_driver_init(&hid_config);
 	usbh_init(lld_drivers, device_drivers);
 }

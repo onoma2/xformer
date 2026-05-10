@@ -40,6 +40,11 @@ struct _hid_mouse_config {
 	 *
 	 */
 	void (*hid_in_message_handler)(uint8_t device_id, const uint8_t *data, uint32_t length);
+	/**
+	 * @brief debug message callback for HID driver diagnostics
+	 * @param msg null-terminated debug string
+	 */
+	void (*debug_msg)(const char *msg);
 };
 typedef struct _hid_mouse_config hid_config_t;
 

@@ -91,4 +91,5 @@ private:
 
     friend struct MidiDriverHandler;
     friend struct HidDriverHandler;
+    friend struct HidDebugHandler;
 };
