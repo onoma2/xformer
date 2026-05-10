@@ -1,18 +1,16 @@
 # Task Board
-_Updated: 2026-05-11_
+_Updated: 2026-05-10_
 
-## 🔴 usb-hid-implementation — USB HID keyboard support
-**Status:** in progress — enumeration working, testing keyboard polling
-**Where I stopped:** Mouse shows T=2 (MOUSE), keyboard shows T=3 (KEYBOARD). Both connect/disconnect correctly. Added `K:XX M:XX` keypress debug display. Awaiting keyboard polling test.
-**Next action:** Flash latest build, press keys on keyboard — check for `K:XX M:XX` messages on OLED showing keycodes.
+## 🔴 usb-hid-implementation — USB HID keyboard/mouse driver end-to-end working
+**Status:** active
+**Where I stopped:** Keyboard keypresses verified end-to-end (`K:04 M:XX` on OLED). Ring buffer approach working. Next: design KeyboardController class and wire keypresses to sequencer actions.
+**Next action:** Design `KeyboardController` class (similar to `LaunchpadController`) to map QWERTY keys to sequencer actions
 **Branch:** feat/USB-keyboard4
 
 ---
 
-## 🟡 launchpad-track-port — Launchpad controller for all 7 track types
-**Status:** paused
-**Where I stopped:** Planning phase complete, full implementation plan documented in TASK.md.
-**Next action:** Begin implementation of track type grid layouts.
-**Branch:** (TBD)
-
----
+## ⚪ launchpad-track-port — Extend Launchpad controller to all 6 track types
+**Status:** ready
+**Where I stopped:** Planning phase
+**Next action:** Begin implementation after USB HID work stabilizes
+**Branch:** TBD

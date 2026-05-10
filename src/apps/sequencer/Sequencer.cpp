@@ -190,6 +190,29 @@ int main(void) {
         usbh.setDebugMessageCallback(usbDebugMsg, &ui.messageManager());
     }
 
+    {
+        static auto hidKeyHandler = [](uint8_t modifiers, uint8_t keycode, void *context) {
+            auto *mm = static_cast<MessageManager *>(context);
+            char buf[32];
+            snprintf(buf, sizeof(buf), "K:%02x M:%02x", keycode, modifiers);
+            mm->showMessage(buf, 500);
+        };
+        usbh.setHidCallbacks(
+            [](uint8_t id, HID_TYPE type, void *ctx) {
+                auto *mm = static_cast<MessageManager *>(ctx);
+                char buf[32];
+                snprintf(buf, sizeof(buf), "HID %d t=%d", id, (int)type);
+                mm->showMessage(buf, 3000);
+            },
+            [](uint8_t id, void *ctx) {
+                auto *mm = static_cast<MessageManager *>(ctx);
+                mm->showMessage("HID rm", 3000);
+            },
+            hidKeyHandler,
+            &ui.messageManager()
+        );
+    }
+
     System::resetWatchdog();
 
 	os::startScheduler();

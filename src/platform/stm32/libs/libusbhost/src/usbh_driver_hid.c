@@ -76,10 +76,16 @@ struct hid_report_decriptor {
 	} __attribute__((packed)) report_descriptors_info[];
 } __attribute__((packed));
 
+static void enqueue_key(uint8_t device_id, uint8_t modifiers, uint8_t keycode);
+
 static hid_device_t hid_device[USBH_HID_MAX_DEVICES];
 static hid_config_t hid_config;
 
 static bool initialized = false;
+
+static HidKeyEvent key_buffer[HID_KEY_BUFFER_SIZE];
+static volatile uint8_t key_buffer_head = 0;
+static volatile uint8_t key_buffer_tail = 0;
 
 void hid_driver_init(const hid_config_t *config)
 {
@@ -91,6 +97,8 @@ void hid_driver_init(const hid_config_t *config)
 	for (i = 0; i < USBH_HID_MAX_DEVICES; i++) {
 		hid_device[i].state_next = STATE_INACTIVE;
 	}
+	key_buffer_head = 0;
+	key_buffer_tail = 0;
 }
 
 static void *init(usbh_device_t *usbh_dev, const usbh_dev_driver_info_t * device_info)
@@ -226,8 +234,16 @@ static void event(usbh_device_t *dev, usbh_packet_callback_data_t cb_data)
 			switch (cb_data.status) {
 			case USBH_PACKET_CALLBACK_STATUS_OK:
 			case USBH_PACKET_CALLBACK_STATUS_ERRSIZ:
-				if (hid_config.hid_in_message_handler) {
+				if (cb_data.transferred_length >= 8 && hid_config.hid_in_message_handler) {
 					hid_config.hid_in_message_handler(hid->device_id, hid->buffer, cb_data.transferred_length);
+				}
+				if (cb_data.transferred_length >= 3) {
+					uint8_t modifiers = hid->buffer[0];
+					for (int i = 2; i < 8 && i < (int)cb_data.transferred_length; i++) {
+						if (hid->buffer[i] != 0) {
+							enqueue_key(hid->device_id, modifiers, hid->buffer[i]);
+						}
+					}
 				}
 				hid->state_next = STATE_READING_REQUEST;
 				break;
@@ -388,6 +404,27 @@ enum HID_TYPE hid_get_type(uint8_t device_id)
 		return HID_TYPE_NONE;
 	}
 	return hid_device[device_id].hid_type;
+}
+
+bool hid_read_key(HidKeyEvent *event) {
+	if (key_buffer_tail == key_buffer_head) {
+		return false;
+	}
+	*event = key_buffer[key_buffer_tail];
+	key_buffer_tail = (key_buffer_tail + 1) % HID_KEY_BUFFER_SIZE;
+	return true;
+}
+
+static void enqueue_key(uint8_t device_id, uint8_t modifiers, uint8_t keycode) {
+	uint8_t next_head = (key_buffer_head + 1) % HID_KEY_BUFFER_SIZE;
+	if (next_head == key_buffer_tail) {
+		return; // buffer full, drop event
+	}
+	key_buffer[key_buffer_head].device_id = device_id;
+	key_buffer[key_buffer_head].modifiers = modifiers;
+	key_buffer[key_buffer_head].keycode = keycode;
+	key_buffer[key_buffer_head].pressed = (keycode != 0);
+	key_buffer_head = next_head;
 }
 
 static const usbh_dev_driver_info_t driver_info = {

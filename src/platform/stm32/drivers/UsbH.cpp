@@ -218,17 +218,9 @@ struct HidDriverHandler {
     }
 
     static void messageHandler(uint8_t device_id, const uint8_t *data, uint32_t length) {
-        if (length != 8) return;
-        uint8_t modifiers = data[0];
-        for (int i = 2; i < 8; i++) {
-            uint8_t keycode = data[i];
-            if (keycode == 0) continue;
-            DBG("HID key: mod=%02x key=%02x", modifiers, keycode);
-
-            if (g_usbh && g_usbh->_hidKeyCallback) {
-                g_usbh->_hidKeyCallback(modifiers, keycode, g_usbh->_hidCallbackContext);
-            }
-        }
+        (void)device_id; (void)data; (void)length;
+        // Key parsing and enqueue happens in C layer (usbh_driver_hid.c)
+        // UsbH::process() dequeues via hid_read_key() and calls _hidKeyCallback
     }
 };
 
@@ -291,6 +283,13 @@ void UsbH::process() {
     }
     if (!flushed) {
         MidiDriverHandler::flush(device);
+    }
+
+    HidKeyEvent keyEvent;
+    while (hid_read_key(&keyEvent)) {
+        if (_hidKeyCallback) {
+            _hidKeyCallback(keyEvent.modifiers, keyEvent.keycode, _hidCallbackContext);
+        }
     }
 }
 
