@@ -69,12 +69,17 @@ void Ui::init() {
     });
 
     _engine.setHidConnectHandler([this] (uint8_t device_id, int type) {
-        FixedStringBuilder<32> buf("HID %d t=%d", device_id, type);
-        _messageManager.showMessage(buf, 3000);
+        (void)device_id;
+        switch (type) {
+        case 3: _messageManager.showMessage("KEYBOARD CONNECTED", 3000); break;
+        case 2: _messageManager.showMessage("MOUSE CONNECTED", 3000); break;
+        default: _messageManager.showMessage("HID CONNECTED", 3000); break;
+        }
     });
 
     _engine.setHidDisconnectHandler([this] (uint8_t device_id) {
-        _messageManager.showMessage("HID rm", 3000);
+        (void)device_id;
+        _messageManager.showMessage("DEVICE REMOVED", 3000);
     });
 
     _engine.setMessageHandler([this] (const char *text, uint32_t duration) {
