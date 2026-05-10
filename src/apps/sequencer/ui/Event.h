@@ -124,6 +124,11 @@ public:
     static constexpr uint8_t KeyDelete = 0x4C;
     static constexpr uint8_t KeyHome = 0x4A;
     static constexpr uint8_t KeyEnd = 0x4D;
+    static constexpr uint8_t KeyF1 = 0x3A;
+    static constexpr uint8_t KeyF2 = 0x3B;
+    static constexpr uint8_t KeyF3 = 0x3C;
+    static constexpr uint8_t KeyF4 = 0x3D;
+    static constexpr uint8_t KeyF5 = 0x3E;
 
 private:
     uint8_t _keycode;

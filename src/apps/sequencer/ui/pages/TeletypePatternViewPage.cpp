@@ -492,13 +492,21 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
         return;
     }
     if (keycode == KeyboardEvent::KeyLeft) {
-        setPatternIndex(std::max(_patternIndex - 1, 0));
+        if (event.alt()) {
+            setPatternIndex(0);  // Alt+Left: first pattern (hardware pattern_mode.c behavior)
+        } else {
+            setPatternIndex(std::max(_patternIndex - 1, 0));
+        }
         _editingNumber = false;
         event.consume();
         return;
     }
     if (keycode == KeyboardEvent::KeyRight) {
-        setPatternIndex(std::min(_patternIndex + 1, kColumnCount - 1));
+        if (event.alt()) {
+            setPatternIndex(kColumnCount - 1);  // Alt+Right: last pattern
+        } else {
+            setPatternIndex(std::min(_patternIndex + 1, kColumnCount - 1));
+        }
         _editingNumber = false;
         event.consume();
         return;

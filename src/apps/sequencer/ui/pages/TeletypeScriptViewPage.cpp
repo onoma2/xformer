@@ -1048,6 +1048,47 @@ void TeletypeScriptViewPage::setEditBuffer(const char *text) {
 void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
     const uint8_t keycode = event.keycode();
 
+    // F1-F5: run scripts or metro
+    if (!event.ctrl() && !event.alt() && !event.shift()) {
+        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF4) {
+            const int scriptIdx = keycode - KeyboardEvent::KeyF1;  // F1 → 0, F2 → 1, ...
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Teletype) {
+                auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+                trackEngine.triggerScript(scriptIdx);
+            }
+            event.consume();
+            return;
+        }
+        if (keycode == KeyboardEvent::KeyF5) {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Teletype) {
+                auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+                trackEngine.triggerScript(METRO_SCRIPT);
+            }
+            event.consume();
+            return;
+        }
+    }
+
+    // Alt+F1-F5: jump to edit script/metro
+    if (event.alt() && !event.ctrl() && !event.shift()) {
+        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF4) {
+            setScriptIndex(keycode - KeyboardEvent::KeyF1);
+            event.consume();
+            return;
+        }
+        if (keycode == KeyboardEvent::KeyF5) {
+            setScriptIndex(METRO_SCRIPT);
+            event.consume();
+            return;
+        }
+        // Alt+/ : toggle line comment (hardware edit_mode.c behavior)
+        if (keycode == 0x38) {  // HID_SLASH
+            commentLine();
+            event.consume();
+            return;
+        }
+    }
+
     if (event.ctrl()) {
         // Ctrl+shortcuts
         switch (keycode) {
