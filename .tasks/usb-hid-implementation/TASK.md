@@ -1,88 +1,121 @@
 # USB HID Keyboard Implementation — Task Status
 
-Status: Planning
+Status: Active — USB keyboard end-to-end working, routed through Engine
 Priority: High
 
 ## Overview
 
-Add USB HID keyboard support to the PER|FORMER/XFORMER sequencer firmware. Currently the master branch lacks HID driver registration and initialization, causing keyboards to never be detected. Three previous attempts failed with the same symptom (connect callback never fires) due to low‑level USB issues and missing driver integration.
+USB keyboard input flows through Engine to both TeletypeScriptViewPage and TeletypePatternViewPage. The architecture mirrors MIDI: UsbH → Engine polls → handler → Ui ring buffer → page dispatch. All external input now goes through Engine.
 
 ## Key Files
 
 | File | Role |
 |------|------|
-| `src/platform/stm32/drivers/UsbH.cpp` | Main USB host initialization, driver registration |
-| `src/platform/stm32/libs/libusbhost/include/usbh_driver_hid.h` | HID driver header |
-| `src/platform/stm32/libs/libusbhost/src/usbh_driver_hid.c` | HID driver implementation |
-| `src/platform/stm32/libs/libusbhost/src/usbh_core.c` | USB host core (device enumeration, driver matching) |
-| `src/platform/stm32/libs/libusbhost/include/usbh_config.h` | USB host configuration (enable debug logging) |
+| `src/apps/sequencer/ui/Event.h` | KeyboardEvent class with HID keycode constants, modifiers, ASCII decode |
+| `src/apps/sequencer/ui/Page.h/cpp` | keyboard() virtual handler + dispatchEvent routing |
+| `src/apps/sequencer/ui/Ui.h/cpp` | Keyboard ring buffer, handleKeyboard(), hidKeycodeToAscii(), enqueueKeyboardEvent() |
+| `src/apps/sequencer/ui/Screensaver.h/cpp` | consumeKey(KeyboardEvent) — wake on any key |
+| `src/apps/sequencer/ui/pages/TeletypeScriptViewPage.h/cpp` | keyboard() override — script editor |
+| `src/apps/sequencer/ui/pages/TeletypePatternViewPage.h/cpp` | keyboard() override — pattern editor |
+| `src/apps/sequencer/engine/Engine.h/cpp` | Keyboard/HID handlers, receiveKeyboard(), UsbH ref |
+| `src/platform/stm32/drivers/UsbH.h/cpp` | recvKey() polling API, HID connect/disconnect callbacks |
+| `src/platform/stm32/libs/libusbhost/src/usbh_driver_hid.c` | HID key deduplication, ring buffer |
+| `src/apps/sequencer/Sequencer.cpp` | Engine←→UsbH wiring, debug message callback |
 
-## Current Blockers (master)
+## Keyboard Shortcuts — TeletypeScriptViewPage (Script Editor)
 
-- Missing `#include "usbh_driver_hid.h"` in `UsbH.cpp`
-- Missing `&usbh_hid_driver` from `device_drivers[]` array
-- No call to `hid_driver_init()` in `UsbH::init()`
-- No HID event handling (connect/disconnect/message) implemented.
+Matches hardware Teletype edit mode where applicable. Hardware has multi-line selection model; Performer uses single-line edit buffer.
 
-## Root‑Cause Analysis (from failed branches)
+| Shortcut | Action | Hardware match? |
+|----------|--------|-----------------|
+| Enter | Commit line, advance | Yes |
+| Shift+Enter | Commit, insert blank line | Yes (inserts new cmd) |
+| Backspace | Delete char before cursor | Yes |
+| Delete | Delete char after cursor | No hardware equivalent |
+| Arrows | Cursor left/right, history up/down | Yes |
+| Escape | Clear edit buffer | No hardware equivalent |
+| Tab | Insert space | No hardware equivalent |
+| Home/End | Cursor start/end | Yes |
+| Ctrl+Home/End | Cursor start/end | Yes |
+| Ctrl+C | Copy line | Yes |
+| Ctrl+V | Paste line | Yes |
+| Ctrl+X | Cut line (copy+clear) | Yes |
+| [ / ] | Previous/next script | Yes |
+| Letters a-z | Auto-uppercased for parser | Required by parser |
 
-All three failed branches showed that the HID driver’s `init()` was never called, proving `find_driver()` never matched the HID driver during enumeration. Five hypotheses were identified:
+**What's NOT implemented** (requires architecture changes):
+- Ctrl+Z (undo) — needs undo stack
+- Multi-line selection clipboard — needs selection model
+- Alt+Up/Down (move lines) — needs selection model
+- Ctrl+N/P (emacs nav) — trivial, arrows already work
 
-1. **Single‑device slot contamination** – failed enumeration leaves `usbh_device[0]` in a bad state.
-2. **Low‑speed vs. full‑speed negotiation** – PHY speed detection fails, preventing enumeration completion.
-3. **HID descriptor parsing failure** – `analyze_descriptor()` never returns `true` because `bDescriptorType` in the HID descriptor doesn’t match `USB_DT_REPORT` (padding/alignment/device variation).
-4. **Port connect/detection race** – `PCDET` bit not cleared, port stuck in `DEVCONN` state.
-5. **USB power/sequencing** – VBUS droop due to over‑current disconnects the device.
+## Keyboard Shortcuts — TeletypePatternViewPage (Pattern Editor)
 
-## Proposed Solution (No Code Writing)
+Matches hardware Teletype pattern mode. Performer uses same cell-based editing model.
 
-### Step 1: Integrate HID Driver Correctly
-1. Add `#include "usbh_driver_hid.h"` to `src/platform/stm32/drivers/UsbH.cpp`.
-2. Add `&usbh_hid_driver` to the `device_drivers[]` array (after `&usbh_midi_driver`).
-3. Define a `hid_config_t` with appropriate callback functions (connect, disconnect, message) that forward events to the `UsbH` class.
-4. Call `hid_driver_init(&hid_config)` in `UsbH::init()` after `midi_driver_init()`.
+| Shortcut | Action | Hardware match? |
+|----------|--------|-----------------|
+| ↑/↓ | Move up/down | Yes |
+| Alt+↑/↓ | Page up/down (8 rows) | Yes |
+| ←/→ | Move left/right | Yes |
+| Enter | Commit edit, advance | Yes |
+| Shift+Enter | Insert/duplicate row | Yes |
+| Backspace | Backspace digit | Yes |
+| Delete | Delete row | Alt+Delete in HW |
+| Space | Toggle 0/1 | Yes |
+| Escape | Cancel edit | No hardware equivalent |
+| Ctrl+Home/End | Jump to start/end | No direct match |
+| Ctrl+C/V/X | Copy/paste/cut value | Alt+C/V/X in HW |
+| [ / ] | Decrement/increment by 1 | Yes |
+| Digits 0-9 | Numeric entry | Yes |
+| - / _ | Negate value | Yes |
 
-### Step 2: Implement HID Event Handling in `UsbH`
-Add static handler functions (e.g., `HidDriverHandler::connectHandler`, `disconnectHandler`, `messageHandler`) that:
-- On connect: call `g_usbh->hidConnectDevice(device, type)` (add stubs in `UsbH` if needed).
-- On disconnect: call `g_usbh->hidDisconnectDevice(device)`.
-- On message: decode the 8‑byte boot‑protocol keyboard report (modifiers + keycodes) and enqueue UI/engine events.
-Ensure handlers match the signature expected by `hid_config_t`.
+## Analysis: Universal Keyboard Shortcuts Across Pages
 
-### Step 3: Diagnose Low‑Level USB Issues (If Needed)
-If Step 1‑2 still fails, enable debugging and test hypotheses:
-1. **Enable USB debug logging**: Set `CONFIG_ENABLE_USBH_DEBUG 1` in `src/platform/stm32/libs/libusbhost/include/usbh_config.h`.
-2. **Test multiple keyboards**: Try both low‑speed and full‑speed models.
-3. **Add explicit PCDET clearing**: In `usbh_lld_stm32f4.c`, after detecting a connect event, add `REBASE(OTG_HPRT) |= OTG_HPRT_PCDET;`.
-4. **Add diagnostic indicators**: Toggle a GPIO/LED in `hid_driver_init()` and/or `hid_device_t::init()`.
-5. **Check power sequencing**: Ensure VBUS enable GPIO can supply sufficient current.
-6. **Apply ERRSIZ patch only if needed**: If config‑descriptor reads fail, consider the patch from `try/USB-keyboard3`, but regression‑test MIDI.
+The hardware Teletype has per-mode keyboard handling (edit_mode.c, pattern_mode.c, etc.) — each mode defines its own shortcuts. This matches Performer's architecture where each Page can override `keyboard()`.
 
-### Step 4: Verify End‑to‑End
-- Confirm connect/disconnect messages appear in logs.
-- Verify keypresses are decoded and forwarded to Engine/UI.
-- Ensure existing MIDI and hub functionality remains unaffected.
+**What could be universal** (Page base class, available everywhere):
+- Space: toggle play/stop
+- Escape: close current page/modal
 
-## Implementation Order
+**What is page-specific** and should stay that way:
+- Ctrl+C/V/X — different meaning per page (text clipboard vs value clipboard vs pattern clipboard)
+- Arrow keys — navigation semantics vary per page
+- [/] — script nav vs value increment
+- Enter — commit edits vs confirm dialogs
 
-1. **Integrate driver** (Steps 1‑2) – expected to enable basic HID detection.
-2. **If still failing, run diagnostics** (Step 3) to isolate the failure point among the five hypotheses.
-3. **Apply targeted remedy** and regression‑test.
-4. **Final verification** (Step 4).
+## Key Files
 
-## Effort Estimate
+### New or modified for TeletypePatternViewPage keyboard
+- `TeletypePatternViewPage.h` — added `_valueCopyBuffer` (int16_t) member, `keyboard()` override
+- `TeletypePatternViewPage.cpp` — 184-line `keyboard()` handler with all shortcuts
 
-- Driver integration & event handling: ~2‑3 hours
-- Diagnostics & low‑level fixes (if needed): ~2‑5 hours depending on issue
-- Verification: ~1 hour
+## Decisions log
 
-## Risks
+- 2026-05-10: Ring buffer approach for HID keys (ISR-safe, no rendering in USB context)
+- 2026-05-10: Fixed `hid_get_type()` inversion
+- 2026-05-11: Keyboard keypresses verified end-to-end
+- 2026-05-10: KeyboardEvent class, Page dispatch, TeletypeScriptViewPage handler
+- 2026-05-10: Fixed type confusion crash (Ui* vs MessageManager* context)
+- 2026-05-10: Route keyboard through Engine (mirrors MIDI pattern)
+- 2026-05-10: Uppercase letter conversion for Teletype parser
+- 2026-05-10: Analyzed hardware Teletype shortcuts — single-line clipboard safe, multi-line needs arch change
+- 2026-05-10: Added Ctrl+C/V/X, Shift+Enter, [/] to ScriptViewPage
+- 2026-05-10: Added full keyboard handler to PatternViewPage matching hardware
+- 2026-05-10: **BUG**: USB mouse enumeration corrupts USB host state machine permanently. After mouse connection, keyboard and Launchpad fail until power cycle. Root cause unknown — likely mouse SET_IDLE or report descriptor interaction. Fix: reject mice at driver level.
+- 2026-05-10: **Hardware test PASS**: Keyboard works on both Teletype pages. Mouse rejected without side effects. Launchpad still works. Human-readable messages confirmed. All shortcuts functional.
 
-- Low‑level USB issues may persist; debug logs essential.
-- Ensure MIDI remains functional after any core.c patches.
-- USB power budget: verify keyboard current draw <500 mA.
+## Completed steps
+- [x] HID driver fixes (hid_get_type, dedup, ring buffer)
+- [x] KeyboardEvent class, page dispatch, Engine routing
+- [x] Ui keyboard ring buffer, handleKeyboard(), ASCII mapping
+- [x] TeletypeScriptViewPage::keyboard() — char input, Ctrl+C/V/X, Shift+Enter, [/], etc.
+- [x] TeletypePatternViewPage::keyboard() — arrow nav, Ctrl+C/V/X, Enter, digits, Space, [/], etc.
+- [x] Screensaver wake on keyboard
+- [x] Human-readable HID connect/disconnect
+- [x] Mouse rejection at driver level
+- [x] Hardware test confirmed — everything working
+- [x] Task wiki updated
 
-## References
-
-- `new_usb/usb-history.md` – detailed history of three failed attempts.
-- `new_usb/solution.md` – condensed analysis and solution outline.
+## Next actions
+(none — task complete, ready for squash/merge)

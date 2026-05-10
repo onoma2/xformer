@@ -29,6 +29,7 @@ public:
     virtual void keyPress(KeyPressEvent &event) {}
     virtual void encoder(EncoderEvent &event) {}
     virtual void midi(MidiEvent &event) {}
+    virtual void keyboard(KeyboardEvent &event) {}
 
     virtual void show();
     virtual void close();

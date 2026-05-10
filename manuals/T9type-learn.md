@@ -19,8 +19,8 @@ Before starting this tutorial, you should have:
 
 The Teletype Track in Performer provides:
 
-- NO GRID NO USB KEYBOARD SUPPORT,
 - 4 Scripts + Metro + 4 TT-Patterns.
+- USB Keyboard support (see Keyboard Shortcuts section below).
 - 4 CV outputs (CV 1-4) freely mapped to Performer's CV outputs
 - 4 Gate outputs (TR A-D) freely mapped to Performer's gate outputs
 - 4 trigger inputs (TI-TR1-4) to trigger scripts
@@ -100,6 +100,32 @@ The Teletype Track in Performer provides:
 - **Encoder Turn**: Move cursor left/right (normal) or select line (with Shift)
 - **Page + Left/Right**: History prev/next (live/edit)
 
+### USB Keyboard Shortcuts (Script View)
+
+Connect a USB keyboard via the USB Host port. Letters are auto-uppercased for the Teletype parser.
+
+| Key | Action |
+|-----|--------|
+| **Enter** | Commit line and advance |
+| **Shift + Enter** | Commit line, insert blank line |
+| **Backspace** | Delete character before cursor |
+| **Delete** | Delete character after cursor |
+| **Left / Right** | Move cursor left/right |
+| **Up / Down** | Recall history (previous/next) |
+| **Escape** | Clear edit buffer |
+| **Tab** | Insert space |
+| **Home / End** | Cursor to start/end of line |
+| **Ctrl + Home / Ctrl + End** | Cursor to start/end |
+| **Ctrl + C** | Copy current line |
+| **Ctrl + V** | Paste clipboard |
+| **Ctrl + X** | Cut current line |
+| **[ / ]** | Previous/next script |
+| **F1-F4** | Run script S0-S3 |
+| **F5** | Run metro script |
+| **Alt + F1-F4** | Jump to edit script S0-S3 |
+| **Alt + F5** | Jump to edit metro script |
+| **Alt + /** | Toggle line comment |
+
 ## Pattern View Shortcuts
 
 ### Function Keys
@@ -123,6 +149,28 @@ The Teletype Track in Performer provides:
 - **Encoder Turn**: Move up/down through pattern rows
 - **Encoder Press**: Negate current value
 - **Shift + Encoder Press**: Commit edited value
+
+### USB Keyboard Shortcuts (Pattern View)
+
+| Key | Action |
+|-----|--------|
+| **Up / Down** | Move up/down through rows |
+| **Alt + Up / Alt + Down** | Page up/down (8 rows) |
+| **Left / Right** | Previous/next pattern column |
+| **Alt + Left / Alt + Right** | Jump to first/last pattern column |
+| **Enter** | Commit edit, advance to next row |
+| **Shift + Enter** | Insert/duplicate row |
+| **Backspace** | Backspace digit |
+| **Delete** | Delete row |
+| **Space** | Toggle 0/1 |
+| **Escape** | Cancel edit |
+| **Ctrl + Home / Ctrl + End** | Jump to first/last row |
+| **Ctrl + C** | Copy cell value |
+| **Ctrl + V** | Paste cell value |
+| **Ctrl + X** | Cut cell value |
+| **[ / ]** | Decrement/increment value by 1 |
+| **- / _** | Negate value |
+| **Digits 0-9** | Numeric entry (enters edit mode) |
 
 ---
 

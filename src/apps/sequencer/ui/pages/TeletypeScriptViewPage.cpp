@@ -1045,6 +1045,179 @@ void TeletypeScriptViewPage::setEditBuffer(const char *text) {
     _cursor = int(std::strlen(_editBuffer));
 }
 
+void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
+    const uint8_t keycode = event.keycode();
+
+    // F1-F5: run scripts or metro
+    if (!event.ctrl() && !event.alt() && !event.shift()) {
+        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF4) {
+            const int scriptIdx = keycode - KeyboardEvent::KeyF1;  // F1 → 0, F2 → 1, ...
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Teletype) {
+                auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+                trackEngine.triggerScript(scriptIdx);
+            }
+            event.consume();
+            return;
+        }
+        if (keycode == KeyboardEvent::KeyF5) {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Teletype) {
+                auto &trackEngine = _engine.selectedTrackEngine().as<TeletypeTrackEngine>();
+                trackEngine.triggerScript(METRO_SCRIPT);
+            }
+            event.consume();
+            return;
+        }
+    }
+
+    // Alt+F1-F5: jump to edit script/metro
+    if (event.alt() && !event.ctrl() && !event.shift()) {
+        if (keycode >= KeyboardEvent::KeyF1 && keycode <= KeyboardEvent::KeyF4) {
+            setScriptIndex(keycode - KeyboardEvent::KeyF1);
+            event.consume();
+            return;
+        }
+        if (keycode == KeyboardEvent::KeyF5) {
+            setScriptIndex(METRO_SCRIPT);
+            event.consume();
+            return;
+        }
+        // Alt+/ : toggle line comment (hardware edit_mode.c behavior)
+        if (keycode == 0x38) {  // HID_SLASH
+            commentLine();
+            event.consume();
+            return;
+        }
+    }
+
+    if (event.ctrl()) {
+        // Ctrl+shortcuts
+        switch (keycode) {
+        case KeyboardEvent::KeyHome:
+            _cursor = 0;
+            event.consume();
+            return;
+        case KeyboardEvent::KeyEnd:
+            _cursor = int(std::strlen(_editBuffer));
+            event.consume();
+            return;
+        case 0x06: // C
+            copyLine();
+            event.consume();
+            return;
+        case 0x19: // V
+            pasteLine();
+            event.consume();
+            return;
+        case 0x1B: // X
+            copyLine();
+            _editBuffer[0] = '\0';
+            _cursor = 0;
+            event.consume();
+            return;
+        default:
+            return;
+        }
+    }
+
+    // Special keys
+    if (keycode == KeyboardEvent::KeyEnter) {
+        if (event.shift()) {
+            // Shift+Enter: commit then insert blank line
+            commitLine();
+            if (!_liveMode && _selectedLine < kLineCount - 1) {
+                _selectedLine += 1;
+                loadEditBuffer(_selectedLine);
+            }
+        } else {
+            commitLineAndAdvance();
+        }
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyBackspace || keycode == KeyboardEvent::KeyDelete) {
+        if (keycode == KeyboardEvent::KeyDelete) {
+            // Delete: remove character after cursor
+            int len = int(std::strlen(_editBuffer));
+            if (_cursor < len) {
+                std::memmove(_editBuffer + _cursor, _editBuffer + _cursor + 1, len - _cursor);
+            }
+        } else {
+            backspace();
+        }
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyLeft) {
+        moveCursorLeft();
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyRight) {
+        moveCursorRight();
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyUp) {
+        recallHistory(-1);
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyDown) {
+        recallHistory(1);
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyEscape) {
+        // Escape: clear edit buffer
+        _editBuffer[0] = '\0';
+        _cursor = 0;
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyTab) {
+        // Tab: insert space
+        insertChar(' ');
+        event.consume();
+        return;
+    }
+    // [ and ] navigate scripts (matching hardware Teletype behavior)
+    if (event.ch() == '[') {
+        if (_scriptIndex > 0) {
+            setScriptIndex(_scriptIndex - 1);
+        }
+        event.consume();
+        return;
+    }
+    if (event.ch() == ']') {
+        if (_scriptIndex < TeletypeTrack::EditableScriptCount - 1) {
+            setScriptIndex(_scriptIndex + 1);
+        }
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyHome) {
+        _cursor = 0;
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyEnd) {
+        _cursor = int(std::strlen(_editBuffer));
+        event.consume();
+        return;
+    }
+
+    // Printable character — convert letters to uppercase since the Teletype
+    // parser only accepts uppercase tokens (CV, TR, etc.)
+    char ch = event.ch();
+    if (ch != 0) {
+        if (ch >= 'a' && ch <= 'z') {
+            ch = ch - 'a' + 'A';
+        }
+        insertChar(ch);
+        event.consume();
+    }
+}
+
 void TeletypeScriptViewPage::commitLineAndAdvance() {
     commitLine();
     if (_liveMode) {

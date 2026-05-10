@@ -6,10 +6,13 @@
 #include "core/Debug.h"
 #include "core/midi/MidiMessage.h"
 
-#include "usbh_core.h"				/// provides usbh_init() and usbh_poll()
-#include "usbh_lld_stm32f4.h"		/// provides low level usb host driver for stm32f4 platform
-#include "usbh_driver_hub.h"		/// provides usb full speed hub driver (Low speed devices on hub are not supported)
-#include "usbh_driver_ac_midi.h"	/// provides usb device driver for midi class devices
+#include "usbh_core.h"
+#include "usbh_lld_stm32f4.h"
+#include "usbh_driver_hub.h"
+#include "usbh_driver_ac_midi.h"
+#include "usbh_driver_hid.h"
+
+#include <cstdio>
 
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
@@ -28,16 +31,16 @@ static UsbH *g_usbh;
 static const usbh_dev_driver_t *device_drivers[] = {
 	&usbh_hub_driver,
 	&usbh_midi_driver,
+	&usbh_hid_driver,
 	nullptr
 };
 
 static const usbh_low_level_driver_t * const lld_drivers[] = {
 #ifdef USE_STM32F4_USBH_DRIVER_FS
-	&usbh_lld_stm32f4_driver_fs, // Make sure USE_STM32F4_USBH_DRIVER_FS is defined in usbh_config.h
+	&usbh_lld_stm32f4_driver_fs,
 #endif
-
 #ifdef USE_STM32F4_USBH_DRIVER_HS
-	&usbh_lld_stm32f4_driver_hs, // Make sure USE_STM32F4_USBH_DRIVER_HS is defined in usbh_config.h
+	&usbh_lld_stm32f4_driver_hs,
 #endif
 	nullptr
 };
@@ -52,48 +55,52 @@ struct MidiDriverHandler {
 
     static void connectHandler(int device, uint16_t vendorId, uint16_t productId, uint32_t maxPacketSize) {
         DBG("MIDI device connected (id=%d, vendorId=%04x, productId=%04x, maxPacketSize=%ld)", device, vendorId, productId, maxPacketSize);
-        g_usbh->midiConnectDevice(device, vendorId, productId);
+        if (g_usbh) {
+            g_usbh->midiConnectDevice(device, vendorId, productId);
+        }
         writeBufferSize = std::min(WriteBufferSize, size_t(maxPacketSize));
     }
 
     static void disconnectHandler(int device) {
         DBG("MIDI device disconnected (id=%d)", device);
-        g_usbh->midiDisconnectDevice(device);
+        if (g_usbh) {
+            g_usbh->midiDisconnectDevice(device);
+        }
     }
 
     static void recvHandler(int device, uint8_t *data) {
+        if (!g_usbh) return;
         uint8_t cable = data[0] >> 4;
         uint8_t code = data[0] & 0xf;
         MidiMessage message;
 
         switch (code) {
-        case 0x0: // (1, 2 or 3 bytes) Miscellaneous function codes. Reserved for future extensions.
-        case 0x1: // (1, 2 or 3 bytes) Cable events. Reserved for future expansion.
-        case 0x4: // (3 bytes) SysEx starts or continues
-        case 0x6: // (2 bytes) SysEx ends with following two bytes.
-        case 0x7: // (3 bytes) SysEx ends with following three bytes.
-            // ignore for now
+        case 0x0:
+        case 0x1:
+        case 0x4:
+        case 0x6:
+        case 0x7:
             return;
-        case 0x5: // (1 bytes) Single-byte System Common Message or SysEx ends with following single byte.
+        case 0x5:
             message = MidiMessage(data[1]);
             g_usbh->midiEnqueueMessage(device, cable, message);
             break;
-        case 0x2: // (2 bytes) Two-byte System Common messages like MTC, SongSelect, etc.
-        case 0xC: // (2 bytes) Program Change
-        case 0xD: // (2 bytes) Channel Pressure
+        case 0x2:
+        case 0xC:
+        case 0xD:
             message = MidiMessage(data[1], data[2]);
             g_usbh->midiEnqueueMessage(device, cable, message);
             break;
-        case 0x3: // (3 bytes) Three-byte System Common messages like SPP, etc.
-        case 0x8: // (3 bytes) Note-off
-        case 0x9: // (3 bytes) Note-on
-        case 0xA: // (3 bytes) Poly-KeyPress
-        case 0xB: // (3 bytes) Control Change
-        case 0xE: // (3 bytes) PitchBend Change
+        case 0x3:
+        case 0x8:
+        case 0x9:
+        case 0xA:
+        case 0xB:
+        case 0xE:
             message = MidiMessage(data[1], data[2], data[3]);
             g_usbh->midiEnqueueMessage(device, cable, message);
             break;
-        case 0xF: // (1 bytes) Single Byte
+        case 0xF:
             g_usbh->midiEnqueueData(device, cable, data[1]);
             return;
         }
@@ -188,6 +195,34 @@ static const midi_config_t midi_config = {
     .notify_disconnected = &MidiDriverHandler::disconnectHandler,
 };
 
+static hid_config_t hid_config = {};
+
+struct HidDriverHandler {
+    static void connectHandler(uint8_t device_id, HID_TYPE type) {
+        DBG("HID device connected (id=%d, type=%d)", device_id, type);
+        if (g_usbh) {
+            g_usbh->hidConnectDevice(device_id, type);
+            if (g_usbh->_debugMsgCallback) {
+                char msg[64];
+                snprintf(msg, sizeof(msg), "HID %d t=%d", device_id, (int)type);
+                g_usbh->_debugMsgCallback(msg, g_usbh->_debugMsgContext);
+            }
+        }
+    }
+
+    static void disconnectHandler(uint8_t device_id) {
+        DBG("HID device disconnected (id=%d)", device_id);
+        if (g_usbh) {
+            g_usbh->hidDisconnectDevice(device_id);
+        }
+    }
+
+    static void messageHandler(uint8_t device_id, const uint8_t *data, uint32_t length) {
+        (void)device_id; (void)data; (void)length;
+        // Key parsing and enqueue happens in C layer (usbh_driver_hid.c)
+        // UsbH::process() dequeues via hid_read_key() and calls _hidKeyCallback
+    }
+};
 
 
 
@@ -198,25 +233,23 @@ UsbH::UsbH(UsbMidi &usbMidi) :
 void UsbH::init() {
     g_usbh = this;
 
-	rcc_periph_clock_enable(RCC_GPIOA); // OTG_FS + USB_PWR_FAULT
-	rcc_periph_clock_enable(RCC_GPIOC); // USB_PWR_EN
+	rcc_periph_clock_enable(RCC_GPIOA);
+	rcc_periph_clock_enable(RCC_GPIOC);
 
-    // USB_PWR_EN
 	gpio_mode_setup(USB_PWR_EN_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, USB_PWR_EN_PIN);
     gpio_clear(USB_PWR_EN_PORT, USB_PWR_EN_PIN);
 
-    // USB_PWR_FAULT
 	gpio_mode_setup(USB_PWR_FAULT_PORT, GPIO_MODE_INPUT, GPIO_PUPD_NONE, USB_PWR_FAULT_PIN);
 
-	// periphery
-	rcc_periph_clock_enable(RCC_OTGFS); // OTG_FS
+	rcc_periph_clock_enable(RCC_OTGFS);
 
-	// OTG_FS
 	gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO11 | GPIO12);
 	gpio_set_af(GPIOA, GPIO_AF10, GPIO11 | GPIO12);
 
 	hub_driver_init();
 	midi_driver_init(&midi_config);
+	hid_config.hid_in_message_handler = &HidDriverHandler::messageHandler;
+	hid_driver_init(&hid_config);
 	usbh_init(lld_drivers, device_drivers);
 }
 
@@ -225,9 +258,19 @@ void UsbH::process() {
 
     usbh_poll(time_us);
 
-    // Start sending MIDI messages
-    uint8_t device;
-    uint8_t cable;
+    for (int i = 0; i < USBH_HID_MAX_DEVICES; ++i) {
+        bool connected = hid_is_connected(i);
+        bool wasConnected = (_hidDevices & (1 << i));
+
+        if (connected && !wasConnected) {
+            HidDriverHandler::connectHandler(i, hid_get_type(i));
+        } else if (!connected && wasConnected) {
+            HidDriverHandler::disconnectHandler(i);
+        }
+    }
+
+    uint8_t device = 0;
+    uint8_t cable = 0;
     MidiMessage message;
     bool flushed = false;
     while (midiDequeueMessage(&device, &cable, &message)) {
@@ -241,6 +284,7 @@ void UsbH::process() {
     if (!flushed) {
         MidiDriverHandler::flush(device);
     }
+
 }
 
 void UsbH::powerOn() {

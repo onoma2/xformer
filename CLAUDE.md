@@ -33,6 +33,11 @@ This project uses CMake with platform-specific toolchains. Build directories are
 3. Faster iteration cycle
 4. Port to hardware once stable
 
+**When modifying hardware drivers (USB, MIDI, DAC, ADC, GPIO):**
+- Never commit changes untested on hardware
+- Simulator tests are insufficient for hardware-specific code
+- Flash to hardware and verify before committing
+
 **When modifying timing-critical code:**
 - Test on actual hardware - simulator timing differs
 - Check `Engine::update()` execution time

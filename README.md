@@ -10,7 +10,7 @@ XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific t
 - **Algo Track** (inspired by [TINRS Tuesday](https://www.thisisnotrocketscience.nl/eurorack/tuesday/)): Generative sequencing with deterministic behavior.
 - **Discrete Track** (inspired by [New Systems Instruments Discrete Map](https://nsinstruments.com/modules/dmap.html)): Threshold-based sequencing mapping inputs to stages.
 - **Indexed Track** (inspired by [Orthogonal Devices ER-101/102](https://www.orthogonaldevices.com/er-101.html)): Duration-based sequencing with independent step lengths.
-- **T9Type Track** (a mildly stripped down version of [Monome Teletype](https://monome.org/past/teletype.html): Full TT VM running withing a track, yes you can have 8 T9types running. No USB keyboard support, no I2C, No Grid.
+- **T9Type Track** (a mildly stripped down version of [Monome Teletype](https://monome.org/past/teletype.html): Full TT VM running withing a track, yes you can have 8 T9types running. USB keyboard supported for script editing (see Keyboard Shortcuts in the manual). No I2C, No Grid.
 
 - **Note Circus Track Enhancements**:  **Accumulator** (inspired by [Intellijel Metropolix](https://intellijel.com/shop/eurorack/metropolix/)). **Harmony Engine** (inspired by [Instruo Harmonaig](https://www.instruomodular.com/product/harmonaig/)). Pulse Count,Modes, ReRene and Ikra playmodes
  

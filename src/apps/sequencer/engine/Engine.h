@@ -30,6 +30,7 @@
 #include "drivers/GateOutput.h"
 #include "drivers/Midi.h"
 #include "drivers/UsbMidi.h"
+#include "drivers/UsbH.h"
 
 #include <array>
 
@@ -47,6 +48,10 @@ public:
     using UsbMidiConnectHandler = std::function<void(uint16_t vendorId, uint16_t productId)>;
     using UsbMidiDisconnectHandler = std::function<void()>;
 
+    using KeyboardReceiveHandler = std::function<void(uint8_t keycode, uint8_t modifiers)>;
+    using HidConnectHandler = std::function<void(uint8_t device_id, int type)>;
+    using HidDisconnectHandler = std::function<void(uint8_t device_id)>;
+
     using MessageHandler = std::function<void(const char *text, uint32_t duration)>;
 
     enum ClockSource {
@@ -61,7 +66,7 @@ public:
         uint32_t usbMidiRxOverflow;
     };
 
-    Engine(Model &model, ClockTimer &clockTimer, Adc &adc, Dac &dac, Dio &dio, GateOutput &gateOutput, Midi &midi, UsbMidi &usbMidi);
+    Engine(Model &model, ClockTimer &clockTimer, Adc &adc, Dac &dac, Dio &dio, GateOutput &gateOutput, Midi &midi, UsbMidi &usbMidi, UsbH &usbH);
 
     void init();
     void update();
@@ -191,6 +196,10 @@ public:
     void setMidiReceiveHandler(MidiReceiveHandler handler) { _midiReceiveHandler = handler; }
     void setUsbMidiConnectHandler(UsbMidiConnectHandler handler) { _usbMidiConnectHandler = handler; }
     void setUsbMidiDisconnectHandler(UsbMidiDisconnectHandler handler) { _usbMidiDisconnectHandler = handler; }
+
+    void setKeyboardReceiveHandler(KeyboardReceiveHandler handler) { _keyboardReceiveHandler = handler; }
+    void setHidConnectHandler(HidConnectHandler handler) { _hidConnectHandler = handler; }
+    void setHidDisconnectHandler(HidDisconnectHandler handler) { _hidDisconnectHandler = handler; }
     bool midiProgramChangesEnabled();
     void sendMidiProgramChange(int programNumber);
     void sendMidiProgramSave(int programNumber);
@@ -215,9 +224,12 @@ private:
 
     void usbMidiConnect(uint16_t vendorId, uint16_t productId);
     void usbMidiDisconnect();
+    void hidConnect(uint8_t device_id, int type);
+    void hidDisconnect(uint8_t device_id);
 
     void receiveMidi();
     void receiveMidi(MidiPort port, uint8_t cable, const MidiMessage &message);
+    void receiveKeyboard();
     void monitorMidi(const MidiMessage &message);
 
     void initClock();
@@ -229,6 +241,7 @@ private:
     GateOutput &_gateOutput;
     Midi &_midi;
     UsbMidi &_usbMidi;
+    UsbH &_usbH;
 
     EngineState _state;
 
@@ -250,6 +263,9 @@ private:
     MidiReceiveHandler _midiReceiveHandler;
     UsbMidiConnectHandler _usbMidiConnectHandler;
     UsbMidiDisconnectHandler _usbMidiDisconnectHandler;
+    KeyboardReceiveHandler _keyboardReceiveHandler;
+    HidConnectHandler _hidConnectHandler;
+    HidDisconnectHandler _hidDisconnectHandler;
 
     CvGateToMidiConverter _cvGateToMidiConverter;
 

@@ -28,6 +28,7 @@
 #include <libopencm3/usb/usbstd.h>
 #include <libopencm3/usb/hid.h>
 #include <stdint.h>
+#include <string.h>
 #include <stddef.h>
 
 #define USB_HID_SET_REPORT 0x09
@@ -76,10 +77,19 @@ struct hid_report_decriptor {
 	} __attribute__((packed)) report_descriptors_info[];
 } __attribute__((packed));
 
+static void enqueue_key(uint8_t device_id, uint8_t modifiers, uint8_t keycode);
+
 static hid_device_t hid_device[USBH_HID_MAX_DEVICES];
 static hid_config_t hid_config;
 
 static bool initialized = false;
+
+static HidKeyEvent key_buffer[HID_KEY_BUFFER_SIZE];
+static volatile uint8_t key_buffer_head = 0;
+static volatile uint8_t key_buffer_tail = 0;
+
+static uint8_t prev_keys[USBH_HID_MAX_DEVICES][6];
+static uint8_t prev_key_count[USBH_HID_MAX_DEVICES];
 
 void hid_driver_init(const hid_config_t *config)
 {
@@ -91,6 +101,10 @@ void hid_driver_init(const hid_config_t *config)
 	for (i = 0; i < USBH_HID_MAX_DEVICES; i++) {
 		hid_device[i].state_next = STATE_INACTIVE;
 	}
+	key_buffer_head = 0;
+	key_buffer_tail = 0;
+	memset(prev_keys, 0, sizeof(prev_keys));
+	memset(prev_key_count, 0, sizeof(prev_key_count));
 }
 
 static void *init(usbh_device_t *usbh_dev, const usbh_dev_driver_info_t * device_info)
@@ -107,8 +121,6 @@ static void *init(usbh_device_t *usbh_dev, const usbh_dev_driver_info_t * device
 	for (i = 0; i < USBH_HID_MAX_DEVICES; i++) {
 		if (hid_device[i].state_next == STATE_INACTIVE) {
 			drvdata = &hid_device[i];
-			drvdata->vendorId = device_info->vendorId;
-			drvdata->productId = device_info->productId;
 			drvdata->device_id = i;
 			drvdata->endpoint_in_address = 0;
 			drvdata->endpoint_in_toggle = 0;
@@ -161,12 +173,13 @@ static bool analyze_descriptor(void *drvdata, void *descriptor)
 	case USB_DT_INTERFACE:
 		{
 			const struct usb_interface_descriptor *ifDesc = (const struct usb_interface_descriptor *)descriptor;
+			hid->interface_number = ifDesc->bInterfaceNumber;
 			if (ifDesc->bInterfaceProtocol == 0x01) {
 				hid->hid_type = HID_TYPE_KEYBOARD;
-				hid->interface_number = ifDesc->bInterfaceNumber;
 			} else if (ifDesc->bInterfaceProtocol == 0x02) {
 				hid->hid_type = HID_TYPE_MOUSE;
-				hid->interface_number = ifDesc->bInterfaceNumber;
+			} else {
+				hid->hid_type = HID_TYPE_OTHER;
 			}
 		}
 		break;
@@ -202,6 +215,13 @@ static bool analyze_descriptor(void *drvdata, void *descriptor)
 	}
 
 	if (hid->endpoint_in_address && hid->report0_length) {
+		// Reject mice — they corrupt the USB host state machine.
+		// The cheap HID parser/report descriptor interaction causes
+		// permanent failure affecting all subsequent USB devices.
+		if (hid->hid_type == HID_TYPE_MOUSE) {
+			hid->state_next = STATE_INACTIVE;
+			return false;
+		}
 		hid->state_next = STATE_GET_REPORT_DESCRIPTOR_READ_SETUP;
 		return true;
 	}
@@ -227,8 +247,33 @@ static void event(usbh_device_t *dev, usbh_packet_callback_data_t cb_data)
 			switch (cb_data.status) {
 			case USBH_PACKET_CALLBACK_STATUS_OK:
 			case USBH_PACKET_CALLBACK_STATUS_ERRSIZ:
-				if (hid_config.hid_in_message_handler) {
+				if (cb_data.transferred_length >= 8 && hid_config.hid_in_message_handler) {
 					hid_config.hid_in_message_handler(hid->device_id, hid->buffer, cb_data.transferred_length);
+				}
+				if (cb_data.transferred_length >= 3) {
+					uint8_t modifiers = hid->buffer[0];
+					uint8_t id = hid->device_id;
+					uint8_t cur_keys[6];
+					uint8_t cur_count = 0;
+					for (int i = 2; i < 8 && i < (int)cb_data.transferred_length; i++) {
+						if (hid->buffer[i] != 0 && cur_count < 6) {
+							cur_keys[cur_count++] = hid->buffer[i];
+						}
+					}
+					for (int ci = 0; ci < cur_count; ci++) {
+						bool found = false;
+						for (int pi = 0; pi < prev_key_count[id]; pi++) {
+							if (cur_keys[ci] == prev_keys[id][pi]) {
+								found = true;
+								break;
+							}
+						}
+						if (!found) {
+							enqueue_key(id, modifiers, cur_keys[ci]);
+						}
+					}
+					memcpy(prev_keys[id], cur_keys, cur_count);
+					prev_key_count[id] = cur_count;
 				}
 				hid->state_next = STATE_READING_REQUEST;
 				break;
@@ -379,16 +424,37 @@ bool hid_is_connected(uint8_t device_id)
 		LOG_PRINTF("is connected: invalid device id");
 		return false;
 	}
-	return hid_device[device_id].state_next == STATE_INACTIVE;
+	return hid_device[device_id].state_next != STATE_INACTIVE;
 }
 
 
 enum HID_TYPE hid_get_type(uint8_t device_id)
 {
-	if (hid_is_connected(device_id)) {
+	if (!hid_is_connected(device_id)) {
 		return HID_TYPE_NONE;
 	}
 	return hid_device[device_id].hid_type;
+}
+
+bool hid_read_key(HidKeyEvent *event) {
+	if (key_buffer_tail == key_buffer_head) {
+		return false;
+	}
+	*event = key_buffer[key_buffer_tail];
+	key_buffer_tail = (key_buffer_tail + 1) % HID_KEY_BUFFER_SIZE;
+	return true;
+}
+
+static void enqueue_key(uint8_t device_id, uint8_t modifiers, uint8_t keycode) {
+	uint8_t next_head = (key_buffer_head + 1) % HID_KEY_BUFFER_SIZE;
+	if (next_head == key_buffer_tail) {
+		return; // buffer full, drop event
+	}
+	key_buffer[key_buffer_head].device_id = device_id;
+	key_buffer[key_buffer_head].modifiers = modifiers;
+	key_buffer[key_buffer_head].keycode = keycode;
+	key_buffer[key_buffer_head].pressed = (keycode != 0);
+	key_buffer_head = next_head;
 }
 
 static const usbh_dev_driver_info_t driver_info = {

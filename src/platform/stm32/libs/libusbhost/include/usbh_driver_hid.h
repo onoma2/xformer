@@ -59,6 +59,7 @@ bool hid_set_report(uint8_t device_id, uint8_t val);
 
 enum HID_TYPE {
 	HID_TYPE_NONE,
+	HID_TYPE_OTHER,
 	HID_TYPE_MOUSE,
 	HID_TYPE_KEYBOARD,
 };
@@ -77,6 +78,22 @@ enum HID_TYPE hid_get_type(uint8_t device_id);
  * @return true if the device with device_id is connected
  */
 bool hid_is_connected(uint8_t device_id);
+
+#define HID_KEY_BUFFER_SIZE 8
+
+typedef struct HidKeyEvent {
+	uint8_t device_id;
+	uint8_t modifiers;
+	uint8_t keycode;
+	uint8_t pressed;  // 1=key down, 0=key up (key up sends keycode 0)
+} HidKeyEvent;
+
+/**
+ * @brief Read a key event from the HID key buffer
+ * @param event pointer to store the event
+ * @return true if an event was read, false if buffer empty
+ */
+bool hid_read_key(HidKeyEvent *event);
 
 extern const usbh_dev_driver_t usbh_hid_driver;
 

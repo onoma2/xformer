@@ -10,13 +10,14 @@
 
 #include <cmath>
 
-Engine::Engine(Model &model, ClockTimer &clockTimer, Adc &adc, Dac &dac, Dio &dio, GateOutput &gateOutput, Midi &midi, UsbMidi &usbMidi) :
+Engine::Engine(Model &model, ClockTimer &clockTimer, Adc &adc, Dac &dac, Dio &dio, GateOutput &gateOutput, Midi &midi, UsbMidi &usbMidi, UsbH &usbH) :
     _model(model),
     _project(model.project()),
     _dio(dio),
     _gateOutput(gateOutput),
     _midi(midi),
     _usbMidi(usbMidi),
+    _usbH(usbH),
     _cvInput(adc),
     _cvOutput(dac, model.settings().calibration()),
     _clock(clockTimer),
@@ -30,6 +31,18 @@ Engine::Engine(Model &model, ClockTimer &clockTimer, Adc &adc, Dac &dac, Dio &di
 
     _usbMidi.setConnectHandler([this] (uint16_t vendorId, uint16_t productId) { usbMidiConnect(vendorId, productId); });
     _usbMidi.setDisconnectHandler([this] () { usbMidiDisconnect(); });
+
+    _usbH.setHidCallbacks(
+        [](uint8_t device_id, HID_TYPE type, void *ctx) {
+            auto *engine = static_cast<Engine *>(ctx);
+            engine->hidConnect(device_id, static_cast<int>(type));
+        },
+        [](uint8_t device_id, void *ctx) {
+            auto *engine = static_cast<Engine *>(ctx);
+            engine->hidDisconnect(device_id);
+        },
+        this
+    );
 
     _midiMonitoring.inputChanged(_project);
 }
@@ -131,6 +144,9 @@ void Engine::update() {
 
     // receive midi events
     receiveMidi();
+
+    // receive keyboard events
+    receiveKeyboard();
 
     // update routings
     _routingEngine.update();
@@ -961,6 +977,27 @@ void Engine::usbMidiConnect(uint16_t vendorId, uint16_t productId) {
 void Engine::usbMidiDisconnect() {
     if (_usbMidiDisconnectHandler) {
         _usbMidiDisconnectHandler();
+    }
+}
+
+void Engine::hidConnect(uint8_t device_id, int type) {
+    if (_hidConnectHandler) {
+        _hidConnectHandler(device_id, type);
+    }
+}
+
+void Engine::hidDisconnect(uint8_t device_id) {
+    if (_hidDisconnectHandler) {
+        _hidDisconnectHandler(device_id);
+    }
+}
+
+void Engine::receiveKeyboard() {
+    HidKeyEvent keyEvent;
+    while (_usbH.recvKey(&keyEvent)) {
+        if (_keyboardReceiveHandler) {
+            _keyboardReceiveHandler(keyEvent.keycode, keyEvent.modifiers);
+        }
     }
 }
 

@@ -6,53 +6,35 @@ This project develops firmware for the PER|FORMER/XFORMER sequencer, targeting S
 ## Current Work
 
 ### USB HID Keyboard Implementation
-**Status:** Planning  
-**Priority:** High  
+**Status:** Active, keyboard keypresses verified end-to-end
+**Priority:** High
 
-Efforts to add USB HID keyboard support have been undertaken in three branches, all failing with the symptom that the keyboard is never detected (connect callback never fires). The root cause analysis indicates the HID driver is never matched during enumeration.
+USB HID driver is working end-to-end: keyboard and mouse enumerate correctly, keypresses arrive via interrupt IN polling and display on OLED. Seven bugs were found and fixed across two sessions. A regression from debug callbacks was identified and reverted. Key events use a safe ring buffer pattern (no UI callbacks during USB state machine).
 
-**Current State (master branch):**
-- Missing `#include "usbh_driver_hid.h"` in `src/platform/stm32/drivers/UsbH.cpp`
-- Missing `&usbh_hid_driver` from the `device_drivers[]` array
-- No call to `hid_driver_init()` in `UsbH::init()`
-- No HID event handling implemented
+**Completed:**
+- HID driver integration (header, driver list, init, callbacks)
+- 7 bugs fixed (inverted logic x2, missing interface_number, layer violation, blocking delay, g_usbh ordering, debug callback regression)
+- Key event ring buffer (enqueue in USB task, dequeue in UI task)
+- Keyboard keypresses verified: `K:04 M:00` (keycode 0x04 = 'a') on OLED
+- MIDI Launchpad works with no regression
 
-**Planned Solution:**
-1. Integrate the HID driver correctly (add header, add to driver list, initialize with appropriate callbacks).
-2. Implement HID event handling in `UsbH` (connect/disconnect/message handlers that forward events to the UI/engine).
-3. If initial integration fails, diagnose low-level USB issues using:
-   - USB debug logging
-   - Testing with low-speed and full-speed keyboards
-   - Checking for PHY speed negotiation problems
-   - Verifying HID descriptor parsing
-   - Adding explicit PCDET clearing in the low-level driver
-   - Verifying power sequencing and current supply
-4. Verify end-to-end functionality: device detection, keypress decoding, and integration with existing MIDI and hub functionality.
+**Next Steps:**
+1. Design `KeyboardController` class (similar to `LaunchpadController`) for sequencer UI integration
+2. Map QWERTY keys to sequencer actions
+3. Add SET_IDLE(0) and SET_PROTOCOL(boot) for reliable keyboard operation
+4. Fix GET_REPORT_DESCRIPTOR `wIndex` to use `interface_number`
 
 **References:**
-- Detailed history of attempts: `new_usb/usb-history.md`
-- Solution outline: `new_usb/solution.md`
-- Task breakdown: `.tasks/usb-hid-implementation/TASK.md`
+- `.tasks/usb-hid-implementation/TASK.md`
 
 ### Launchpad Controller Extension
-**Status:** Planning  
-**Priority:** Medium  
-
-Effort to extend Launchpad controller support to all six track types (Note, Curve, Indexed, DiscreteMap, Tuesday, Teletype) is in the planning phase. The work involves fixing regressions in the Note track, adding macro grid functionality, and implementing full grid-based editing for each track type.
+**Status:** Planning
+**Priority:** Medium
 
 **References:**
-- Detailed plan: `.tasks/launchpad-track-port/TASK.md`
+- `.tasks/launchpad-track-port/TASK.md`
 
 ## Resource Footprint (Current Release Build)
 - **Flash:** `.text` ~413 KB (≈39% of 1 MB), ample headroom.
 - **SRAM (128 KB):** `.data` 6 KB + `.bss` ~110 KB → ~15 KB free.
-  - Largest blocks: `Model` (~93 KB), LCD driver buffer (8 KB).
 - **CCM RAM (64 KB):** `.ccmram_bss` ~44.7 KB → ~21 KB free.
-  - Largest blocks: `Ui` (~22.9 KB), FreeRTOS static stacks, `Engine` (~6.5 KB).
-
-## Recent Developments
-No recent commits to report; the above outlines planned work.
-
-## Next Steps
-1. Begin implementation of USB HID keyboard support by integrating the driver into the main branch.
-2. Following USB work, proceed with Launchpad controller extensions as per the staged plan.

@@ -26,6 +26,7 @@
 #include "model/FileManager.h"
 #include "engine/Engine.h"
 #include "ui/Ui.h"
+#include "ui/MessageManager.h"
 
 #include "../hwconfig/HardwareConfig.h"
 
@@ -79,7 +80,7 @@ static CCMRAM_BSS uint8_t midiMessagePayloadPool[32];
 static CCMRAM_BSS Profiler profiler;
 
 static Model model;
-static CCMRAM_BSS Engine engine(model, clockTimer, adc, dac, dio, gateOutput, midi, usbMidi);
+static CCMRAM_BSS Engine engine(model, clockTimer, adc, dac, dio, gateOutput, midi, usbMidi, usbh);
 static CCMRAM_BSS Ui ui(model, engine, lcd, blm, encoder, model.settings());
 
 
@@ -180,6 +181,14 @@ int main(void) {
 
     engine.init();
     ui.init();
+
+    {
+        static auto usbDebugMsg = [](const char *msg, void *context) {
+            auto *mm = static_cast<MessageManager *>(context);
+            mm->showMessage(msg, 3000);
+        };
+        usbh.setDebugMessageCallback(usbDebugMsg, &ui.messageManager());
+    }
 
     System::resetWatchdog();
 

@@ -29,6 +29,11 @@ void Screensaver::consumeKey(KeyPressEvent &event) {
     consumeKey(event, event.key());
 }
 
+void Screensaver::consumeKey(KeyboardEvent &event) {
+    // Any keyboard input wakes the screensaver
+    off();
+}
+
 void Screensaver::consumeKey(Event &event, Key key) {
     if (_screenSaved && key.code() == Key::Code::Encoder) {
         event.consume();
