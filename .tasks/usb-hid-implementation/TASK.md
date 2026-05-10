@@ -102,6 +102,8 @@ The hardware Teletype has per-mode keyboard handling (edit_mode.c, pattern_mode.
 - 2026-05-10: Analyzed hardware Teletype shortcuts — single-line clipboard safe, multi-line needs arch change
 - 2026-05-10: Added Ctrl+C/V/X, Shift+Enter, [/] to ScriptViewPage
 - 2026-05-10: Added full keyboard handler to PatternViewPage matching hardware
+- 2026-05-10: **BUG**: USB mouse enumeration corrupts USB host state machine permanently. After mouse connection, keyboard and Launchpad fail until power cycle. Root cause unknown — likely mouse SET_IDLE or report descriptor interaction. Fix: reject mice at driver level.
+- 2026-05-10: **Hardware test PASS**: Keyboard works on both Teletype pages. Mouse rejected without side effects. Launchpad still works. Human-readable messages confirmed. All shortcuts functional.
 
 ## Completed steps
 - [x] HID driver fixes (hid_get_type, dedup, ring buffer)
@@ -111,9 +113,9 @@ The hardware Teletype has per-mode keyboard handling (edit_mode.c, pattern_mode.
 - [x] TeletypePatternViewPage::keyboard() — arrow nav, Ctrl+C/V/X, Enter, digits, Space, [/], etc.
 - [x] Screensaver wake on keyboard
 - [x] Human-readable HID connect/disconnect
-- [x] Task wiki updated with full shortcut analysis
+- [x] Mouse rejection at driver level
+- [x] Hardware test confirmed — everything working
+- [x] Task wiki updated
 
 ## Next actions
-1. Test both keyboards on hardware
-2. Consider adding Space/Escape as universal shortcuts in Page base class
-3. After hardware test: squash/cleanup branch for merge
+(none — task complete, ready for squash/merge)
