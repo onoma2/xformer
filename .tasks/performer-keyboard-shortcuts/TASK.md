@@ -137,6 +137,7 @@ KeyboardEvent flow:
 - 2026-05-10: **Hardware test PASS**: Keyboard works, mouse rejected, Launchpad works, messages confirmed.
 - 2026-05-11: **BUG fix**: Removed UsbH.cpp debug HUD message callback that overwrote "KEYBOARD CONNECTED" with "HID 0 t=3". Also removed DBG() prints from connect/disconnect handlers.
 - 2026-05-11: **Architecture decision**: TopPage::keyboard() as global catch-all (stack position 0). No separate global handler needed. Preserves consume mechanism. Zero-conflict with Teletype pages by design.
+- 2026-05-11: **Phase 1 hardware test PASS**: Escape=back, Space=play/stop, Alt+letter nav, digits 1-8 track select, Alt+digits track select all working. Alt+digits kept as redundant but safe fallback (Alt strips printability from Teletype). No conflicts with Teletype pages.
 
 ## Completed steps
 
@@ -150,6 +151,7 @@ KeyboardEvent flow:
 - [x] Mouse rejection at driver level
 - [x] Hardware test confirmed — everything working
 - [x] Architecture analysis for global shortcuts (TopPage::keyboard catch-all)
+- [x] Phase 1: TopPage::keyboard() — Escape=back, Space=play, Alt+letter nav, 1-8 track select, Alt+digits track select
 
 ## Next actions
 

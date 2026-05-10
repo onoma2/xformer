@@ -22,6 +22,7 @@ public:
     virtual void keyUp(KeyEvent &event) override;
     virtual void keyPress(KeyPressEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
 
 private:
     enum Mode : uint8_t {
@@ -70,6 +71,7 @@ private:
     void setSequencePage();
     void setTrackPage();
     void setSequenceEditPage();
+    void selectTrackWithViewSync(int trackIndex);
 
     Mode _mode;
     Mode _lastMode;

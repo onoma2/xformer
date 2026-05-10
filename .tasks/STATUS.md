@@ -3,9 +3,9 @@ _Updated: 2026-05-11_
 
 ## 🔴 performer-keyboard-shortcuts — Full Performer UI keyboard shortcuts
 **Status:** active
-**Where I stopped:** Architecture decided: TopPage::keyboard() as global catch-all (stack position 0, only sees unconsumed events). Bug fix done: removed debug HID message that overwrote "KEYBOARD CONNECTED".
-**Next action:** Implement TopPage::keyboard() with Alt+letter navigation + Space=play + Escape=back
-**Branch:** feat/USB-keyboard4
+**Where I stopped:** Phase 1 hardware-tested and passing. TopPage::keyboard() handles Escape, Space, Alt+letter nav, digits 1-8 track select. Alt+digits kept as redundant fallback (no practical difference from plain digits currently).
+**Next action:** Phase 2: Add F1-F5 keyboard shortcuts to each page type (PatternPage, NoteSequenceEditPage, LayoutPage, etc.)
+**Branch:** feat/global-keyboard
 **Files involved:** TopPage.h/cpp, Event.h, Ui.cpp (handleKeyboard), Page.h/cpp
 
 ---
