@@ -1128,9 +1128,13 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         return;
     }
 
-    // Printable character
+    // Printable character — convert letters to uppercase since the Teletype
+    // parser only accepts uppercase tokens (CV, TR, etc.)
     char ch = event.ch();
     if (ch != 0) {
+        if (ch >= 'a' && ch <= 'z') {
+            ch = ch - 'a' + 'A';
+        }
         insertChar(ch);
         event.consume();
     }
