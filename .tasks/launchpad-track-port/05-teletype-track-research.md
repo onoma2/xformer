@@ -1,5 +1,7 @@
 # Launchpad Support - TeletypeTrack Interface Research
 
+> **STATUS: DISCARDED FROM PLAN** — TeletypeTrack is a VM-based script environment, not a grid-editable sequencer. Text input, script management, and pattern editing do not map to an 8×8 Launchpad grid. Any future Teletype Launchpad integration should be a separate dedicated task. This document is kept for historical reference only.
+
 ## Task Summary
 Research TeletypeTrack interface and implementation peculiarities to inform Launchpad support.
 
@@ -60,7 +62,7 @@ TeletypeTrack is a complete Teletype VM integration with script and pattern mana
 - Editing interaction patterns
 
 ## Status
-Pending
+Discarded - Not Needed
 
 ## Priority
 Low

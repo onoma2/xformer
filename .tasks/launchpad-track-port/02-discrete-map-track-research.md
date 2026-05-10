@@ -134,8 +134,16 @@ static const RangeMap transposeRangeMap = { { -60, 0 }, { 60, 7 } };
 - **Sync Mode Toggle**: Function button 6 (Off/Reset Measure/External)
 - **Loop Toggle**: Function button 7 (Loop/Once)
 
+**Page 3 - Quickactions & Macros**:
+- **Generator Functions**: Random, Linear, Logarithmic, Exponential threshold/note generation
+- **Distribution Macros**: Even spacing (8/5/7/9 stages), Fret pattern distribution
+- **Cluster Macros**: Cluster, AccelRit4, Swell, InverseSwell, Strum patterns
+- **Distribution Actions**: Even distribution of active stages by direction, normalize range
+- **Transform Actions**: Flip direction, reverse/invert thresholds, mirror/reverse notes
+- **Voicing Quick Edit**: Piano voicings (14 types), Guitar voicings (17 types)
+
 **Navigation Between Pages**:
-- Hold Shift + Navigate button to switch between Page 1 (Main) and Page 2 (Toggles)
+- Hold Shift + Navigate button to switch between Page 1 (Main), Page 2 (Toggles), and Page 3 (Quickactions)
 - Visual feedback: Navigate button lights up when in toggle page
 
 **Multiple Button Hold Support**:
@@ -145,9 +153,53 @@ static const RangeMap transposeRangeMap = { { -60, 0 }, { 60, 7 } };
 - **Multiple Stage Buttons**: Batch selection/editing
 - **Function Buttons with Grid**: Layer-specific operations
 
+**Quickactions and Macros (from DiscreteMapSequencePage)**:
+```
+Main Context Menu:
+- INIT: Clear all, thresholds, or notes
+- COPY: Copy sequence to clipboard
+- PASTE: Paste sequence from clipboard
+- GEN: Random/Linear/Log/Exp generator with note spread options
+- ROUTE: Route configuration
+
+Distribution Context (I-*):
+- I-8: Even distribution (first 8 stages)
+- I-5(2): Even distribution (stages 9-13)
+- I-7(3): Even distribution (stages 17-23)
+- I-9(4): Even distribution (stages 24-32)
+- I-FRET: Round-robin fret pattern distribution
+
+Cluster Context (M-*):
+- M-CLUSTER: Random threshold clusters
+- M-AR4: Acceleration/ritardando patterns
+- M-SWELL: Swell-shaped threshold distribution
+- M-ISWELL: Inverse swell-shaped distribution
+- M-STRUM: Strum pattern distribution
+
+Distribute Active Context (E-*):
+- E-ACT: Even distribution of active stages
+- E-RISE: Even distribution of rising stages
+- E-FALL: Even distribution of falling stages
+- E-BOTH: Even distribution of both direction stages
+- NORM: Normalize thresholds to full range
+
+Transform Context:
+- FLIP: Flip stage directions
+- T-REV: Reverse threshold order
+- T-INV: Invert thresholds around 0
+- N-MIRR: Mirror note indices
+- N-REV: Reverse note order
+
+Voicing Quick Edit:
+- Piano: 14 voicings (MAJ13, MIN6/9, DOM13, etc.)
+- Guitar: 17 voicings (MAJ, MIN, 7, MAJ7, etc.)
+- Root from C0 option for fixed root note
+```
+
 **Advantages of This Approach**:
 - All 32 stages visible at once on Page 1 - no pagination needed
 - Separate Page 2 for toggle controls keeps interface clean
+- Page 3 for comprehensive quickactions and macros
 - Intuitive top-bottom split for threshold/note relationships
 - Direct selection of stage-pitch or stage-threshold
 - Four-way toggle on separate page simplifies complex operations

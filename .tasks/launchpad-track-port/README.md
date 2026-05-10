@@ -1,7 +1,7 @@
 # Launchpad Track Porting
 
 ## Task Summary
-Extend Launchpad controller support to all 6 track types in PER|FORMER/XFORMER sequencer.
+Extend Launchpad controller support to all 5 grid-editable track types in PER|FORMER/XFORMER sequencer.
 
 ## Phase 1 - Track Interface Research (In Progress)
 
@@ -9,8 +9,6 @@ Extend Launchpad controller support to all 6 track types in PER|FORMER/XFORMER s
 1. **IndexedTrack Research** - Duration-based sequencer with 1-48 steps
 2. **DiscreteMapTrack Research** - Threshold-based sequencer with 32 stages  
 3. **TuesdayTrack Research** - Algorithmic/generative sequencer
-4. **MidiCvTrack Research** - MIDI to CV conversion with voice management
-5. **TeletypeTrack Research** - Teletype VM integration
 
 Each research task includes:
 - Data structure analysis
@@ -24,11 +22,11 @@ Each research task includes:
 ### Track Support Status
 - ✅ **NoteTrack**: Fully supported with complete layer-based editing
 - ✅ **CurveTrack**: Fully supported with complete layer-based editing  
-- ❌ **TeletypeTrack**: No support - only referenced in switch statements with `break;`
 - ❌ **IndexedTrack**: No support
 - ❌ **DiscreteMapTrack**: No support
 - ❌ **TuesdayTrack**: No support
-- ❌ **MidiCvTrack**: No support
+- ❌ **MidiCvTrack**: No support — removed from plan (no sequence data)
+- ❌ **TeletypeTrack**: No support — discarded from plan (VM text-input, not grid-editable)
 
 ## Current Launchpad Architecture
 
@@ -95,31 +93,11 @@ Each research task includes:
 
 ### 4. MidiCvTrack
 
-**Structure**: MIDI input handling with voice configuration
-**Key Properties**: voices, voice config, note priority, pitch bend range, arpeggiator
-
-**Implementation Needs**:
-- Layer mapping array: `midiCvLayerMap[]`
-- Voice management and arpeggiator settings
-- Drawing method: `sequenceDrawMidiCvSequence()`
-- Editing method: `sequenceEditMidiCvStep()`
-- Real-time MIDI visualization
-
-**Challenges**: Real-time MIDI input requires efficient handling
+**Status**: REMOVED — no sequence data, arpeggiator only. Lowest value for Launchpad grid editing.
 
 ### 5. TeletypeTrack
 
-**Structure**: Teletype VM with scripts and patterns
-**Key Properties**: scripts, patterns, I/O mapping, time base
-
-**Implementation Needs**:
-- Script and pattern visualization
-- Track-specific UI for VM control
-- Drawing method: `sequenceDrawTeletypeSequence()`
-- Editing method: `sequenceEditTeletypeStep()`
-- Script and pattern management
-
-**Challenges**: Complex VM integration and state management
+**Status**: DISCARDED — not a grid-editable track type. Teletype is a VM-based script environment; text input and script management do not map to an 8×8 step grid. Any future Teletype Launchpad integration should be a separate dedicated task.
 
 ## Implementation Strategy
 
@@ -129,12 +107,12 @@ Each research task includes:
 3. Add pagination/navigation system for tracks with >8 steps
 
 ### Phase 2: Track Implementations (Medium Priority)
-1. Implement DiscreteMapTrack support
-2. Add TuesdayTrack support with algorithmic UI
-3. Implement MidiCvTrack with MIDI visualization
+1. Implement TuesdayTrack support with algorithmic UI
+2. Implement DiscreteMapTrack support
+3. Implement IndexedTrack support
 
-### Phase 3: Complex Tracks (Low Priority)
-1. Implement TeletypeTrack support
+### Phase 3: Polish & Deferred Features (Low Priority)
+1. Add Macro Grid v2 (Indexed macros after model refactor)
 2. Optimize performance and responsiveness
 3. Add comprehensive test coverage
 
@@ -143,6 +121,25 @@ Each research task includes:
 - `/src/apps/sequencer/ui/controllers/launchpad/LaunchpadController.h`
 - Test files for each new track type
 
+## VinxScorza / Modulove Launchpad Improvements (Merged)
+
+The following improvements from the `vinx-modulove-improvements` task have been merged into this workstream:
+
+| # | Segment | Effort | Description |
+|---|---------|--------|-------------|
+| A | **LP Style / LP Note Style settings** | ~1.5h | `classic`/`blue` color schemes + `classic`/`circuit` note entry styles |
+| B | **Circuit Keyboard** | ~2h | Circuit-style keyboard overlay for Note track note layer |
+| C | **Generators Mode** | ~4h | Split architecture (Note vs. non-Note), preview/apply workflow with A/B state |
+| D | **1-Level Undo/Redo** | ~1h | `Shift + Play` shortcut mirroring hardware `PAGE + S7` undo |
+| E | **Track Selection Locking** | ~1.5h | Modal/UI-kind/top-page locking to prevent accidental track/scene switches |
+| F | **Performer Mode** | ~3h | Scene mute/solo/fill, track selection, follow mode |
+| G | **Enhanced Button Events** | ~1.5h | Double-tap, long-press, improved state tracking |
+| H | **Visual Feedback** | ~2h | Octave lines, pattern visualization, requested-pattern dimmed colors, mute status on scene buttons |
+| I | **Interaction Improvements** | ~1h | Fill functionality, range editing, run mode selection enhancements |
+| J | **Layer Selection Optimization** | ~1h | Better layer mapping visualization and quick access |
+
+**Vinx/Modulove subtotal: ~18.5h**
+
 ## Reference Implementation
 The `/temp-ref/mebitek-performer/` directory contains:
 - Additional track types: Stochastic, Logic, Arp
@@ -150,8 +147,58 @@ The `/temp-ref/mebitek-performer/` directory contains:
 - Enhanced note keyboard functionality
 - More layer types and visualizations
 
+The `/temp-ref/vinx-performer/` directory contains:
+- LP Style / LP Note Style settings
+- Generators mode with preview/apply
+- Circuit keyboard implementation
+- Track selection locking
+
+The `/temp-ref/modulove-performer/` directory contains:
+- Enhanced button event handling
+- Visual feedback enhancements
+- Performer mode with scene control
+
+## Updated Implementation Strategy
+
+### Phase 0: Pre-implementation (Required)
+1. Split `LaunchpadController.cpp` into per-track files
+2. Add `isEdited()` to DiscreteMapSequence, IndexedSequence, TuesdaySequence
+3. Verify all `Project.h` accessors compile
+4. Add `selectedLayer` to `_sequence` state struct
+
+### Phase 1: Foundation + NoteTrack Fixes (~3h)
+1. Add LP Style and LP Note Style settings (`UserSettings.h`)
+2. Fix 6 missing NoteSequence layers, step highlighting, mode selector
+3. Implement circuit keyboard for note editing
+
+### Phase 2: Track Implementations (~8.5h)
+1. Implement TuesdayTrack step-key grid (~2.5h)
+2. Implement DiscreteMapTrack 32-stage editor (~3h)
+3. Implement IndexedTrack 48-step grid editor (~3.5h)
+
+### Phase 3: Vinx/Modulove Enhancements (~12h)
+1. Performer mode with scene mute/solo/fill (~3h)
+2. Generators mode with preview/apply workflow (~4h)
+3. Enhanced button events + undo/redo (~2.5h)
+4. Visual feedback + layer optimization + track status (~2.5h)
+
+### Phase 4: Polish & Deferred (~3h)
+1. Add Macro Grid v2 (Curve + DiscreteMap; **Indexed blocked by `indexed-sequence-macro-refactor`**)
+2. Optimize performance and responsiveness
+3. Add comprehensive test coverage
+
+**Updated Total: ~26.5h** (track port ~10–13h + vinx/modulove ~18.5h with overlap)
+
+## Dependencies
+
+| Task | Relationship | Notes |
+|------|-------------|-------|
+| `indexed-sequence-macro-refactor` | **Blocks Phase 4 Macro Grid v2** for IndexedTrack | ~4.5h separate task; can run in parallel with Phases 1-3 |
+| `teletype-file-reliability` | Independent | No overlap |
+| `vinx-modulove-improvements` | LP items merged here | Non-LP items (microtiming, LFOs) remain separate |
+
 ## Status
-Active - analysis complete, ready to begin implementation with IndexedTrack
+Active — planning reviewed, corrected, and expanded with vinx/modulove segments. Ready to begin implementation.
 
 ## Next Action
-Begin implementing support for IndexedTrack following the existing patterns for Note and Curve tracks
+Split `LaunchpadController.cpp` into per-track files, then begin Phase 0 pre-flight tasks.

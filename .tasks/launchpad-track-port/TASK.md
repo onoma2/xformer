@@ -5,7 +5,7 @@ Priority: Medium
 
 ## Overview
 
-Rebuild LaunchpadController.cpp to fully support all 7 track types of PER|FORMER/XFORMER. Each track type differs radically in data model, requiring customized grid layouts per type. The dispatch architecture (switch on `trackMode()`) stays the same; we add cases for each new type.
+Rebuild LaunchpadController.cpp to support all 5 grid-editable track types of PER|FORMER/XFORMER (Note, Curve, Tuesday, DiscreteMap, Indexed). MidiCvTrack and TeletypeTrack are out of scope. Each track type differs radically in data model, requiring customized grid layouts per type. The dispatch architecture (switch on `trackMode()`) stays the same; we add cases for each new type.
 
 ## Key Files
 
@@ -18,12 +18,12 @@ Rebuild LaunchpadController.cpp to fully support all 7 track types of PER|FORMER
 | `src/.../model/IndexedSequence.h` | ~610 | Indexed sequence (48 steps, no layers) |
 | `src/.../model/DiscreteMapSequence.h` | ~365 | DiscreteMap (32 stages, no layers) |
 | `src/.../model/TuesdaySequence.h` | ~540 | Tuesday (algorithm params, no steps) |
-| `src/.../model/TeletypeTrack.h` | ~200 | Teletype (script slots, trigger/CV I/O) |
+
 | `src/.../model/Project.h` | ~600 | Track/sequence accessors |
 
 ## Dispatch Points (Every Function)
 
-Every function in LaunchpadController.cpp uses `switch(_project.selectedTrack().trackMode())`. All 7 track types need cases in every switch:
+Every function in LaunchpadController.cpp uses `switch(_project.selectedTrack().trackMode())`. All 5 supported track types need cases in every switch:
 
 **Sequence mode (11 dispatch points):**
 
@@ -189,8 +189,6 @@ Macros are batch operations modifying multiple steps at once. Currently only acc
 **TuesdayTrack** has no macros (algorithm parameters only — edited directly as parameters).
 
 **TuesdayTrack** has no macros (algorithm parameters only — edited directly as parameters).
-
-**TeletypeTrack** has no macros (script-based — the scripts ARE the macros).
 
 #### Macro Sub-Mode Design
 
@@ -568,185 +566,6 @@ void sequenceHoldTuesdayAction(int row, int col, bool held);  // Jam Run hold/re
 
 ---
 
-### Phase 6: TeletypeTrack — Script Control + Text Input Grid (HIGH PRIORITY)
-
-**Characteristics:**
-
-| Property | Value |
-|----------|-------|
-| Sequence | **None** (script-based) |
-| Steps | **None** |
-| Layers | **None** |
-| Physical step keys | **16 buttons** as a 2×8 text-input grid with multi-tap rotation (2-3 levels) |
-| Engine API | `activity()`, `trActivity(4)`, `gateOutput(8)`, `cvOutput(8)`, `manualScriptIndex()`, `tempo()`, Envelope/LFO system (30+ methods) |
-
-#### 7a. Existing Step Button Map — Script View (text input mode)
-
-The hardware's 16 step buttons serve as a **character input keyboard** with multi-tap. On Launchpad, the 2×8 grid shows per-cell labels:
-
-**Unshifted — 3-level multi-tap rotation:**
-
-| Col | Step | Level 1 | Level 2 | Level 3 |
-|-----|------|---------|---------|---------|
-| 0 | 0 | **1** | **A** | **B** |
-| 1 | 1 | **2** | **C** | **D** |
-| 2 | 2 | **3** | **E** | **F** |
-| 3 | 3 | **4** | **G** | **H** |
-| 4 | 4 | **5** | **I** | **J** |
-| 5 | 5 | **6** | **K** | **L** |
-| 6 | 6 | **7** | **M** | **N** |
-| 7 | 7 | **8** | **O** | **P** |
-
-**Row 1 (steps 8-15):**
-
-| Col | Step | Level 1 | Level 2 | Level 3 |
-|-----|------|---------|---------|---------|
-| 0 | 8 | **9** | **Q** | **R** |
-| 1 | 9 | **0** | **S** | **T** |
-| 2 | 10 | **.** | **U** | **V** |
-| 3 | 11 | **:** | **W** | **X** |
-| 4 | 12 | **;** | **Y** | **Z** |
-| 5 | 13 | **CV** | **CV.SL** | **RRND** |
-| 6 | 14 | **TR.P** | **PARAM** | **ELIF** |
-| 7 | 15 | **M.ACT** | **P.NXT** | **BUS** |
-
-**Shifted — 2-level rotation:**
-
-| Col | Step | Level 1 | Level 2 |
-|-----|------|---------|---------|
-| 0 | 0 | **+** | **-** |
-| 1 | 1 | ***** | **/** |
-| 2 | 2 | **=** | **!** |
-| 3 | 3 | **<** | **>** |
-| 4 | 4 | **%** | **^** |
-| 5 | 5 | **&** | **\|** |
-| 6 | 6 | **$** | **@** |
-| 7 | 7 | **?** | **;** |
-| 0 | 8 | **CV** | **CV.SL** |
-| 1 | 9 | **TR.** | **TR.T** |
-| 2 | 10 | **PRM** | **SCL** |
-| 3 | 11 | **P.NX** | **P.HR** |
-| 4 | 12 | **ELIF** | **OTHR** |
-| 5 | 13 | **RRND** | **RND.P** |
-| 6 | 14 | **DRNK** | **WRP** |
-| 7 | 15 | **M.AC** | **M.RS** |
-
-**Special non-char steps (unshifted):**
-
-| Step | Action | Label |
-|------|--------|-------|
-| 13 | Backspace | **DEL** |
-| 14 | Insert Space | **SP** |
-| 15 | Commit + Advance | **EXEC** |
-
-#### 7b. Script Control Overlay (Page+Step held)
-
-When Page button is held, steps 8-12 become edit actions:
-
-| Step | Action | Label |
-|------|--------|-------|
-| 8 | **Copy Line** | CPY |
-| 9 | **Paste Line** | PST |
-| 10 | **Duplicate Line** | DUP |
-| 11 | **Comment Line** | CMNT |
-| 12 | **Delete Line** | DEL |
-
-#### 7c. Script Trigger Grid (Shift+Function keys)
-
-Function keys 1-4 with Shift trigger scripts:
-
-| Key | Action | Launchpad Mapping |
-|-----|--------|-------------------|
-| Shift+F1 | **Trigger Script 0** | Fill (col 6) + Scene 0 |
-| Shift+F2 | **Trigger Script 1** | Fill (col 6) + Scene 1 |
-| Shift+F3 | **Trigger Script 2** | Fill (col 6) + Scene 2 |
-| Shift+F4 | **Trigger Script 3** | Fill (col 6) + Scene 3 |
-
-#### 7d. Pattern View — Digit Input Grid
-
-When editing patterns, steps 0-9 become digit entry:
-
-| Step | Action |
-|------|--------|
-| 0-9 | Insert digit (1-9, 0) |
-| 13 | Backspace digit |
-| 15 | Commit edit |
-
-**Page+Step (pattern structure):**
-
-| Step | Action |
-|------|--------|
-| 4 | Set pattern length |
-| 5 | Set loop start |
-| 6 | Set loop end |
-
-**Pattern columns (Function keys):**
-| Key | Action |
-|-----|--------|
-| F1-F4 | Select pattern column 0-3 |
-
-#### 7e. Launchpad Grid Layout (3 modes via Layer button)
-
-**Mode 1 — Live Dashboard (default):**
-
-| Row | Content |
-|-----|---------|
-| 0-1 | Script trigger buttons (slots 0-3) + live indicators |
-| 2-3 | Pattern slot A/B selector + Transport start/stop |
-| 4-7 | CV1-CV4 output bars (live monitor) |
-
-**Mode 2 — Text Input Grid (Rows 0-1: character keyboard):**
-
-Rows 0-1 = character input grid as mapped above.
-Rows 2-7 = script line preview, cursor position indicator.
-
-**Mode 3 — Output Monitor:**
-
-| Row | Content |
-|-----|---------|
-| 0-3 | TR1-TR4 pulse monitor (flash on pulse) |
-| 4-7 | CV1-CV4 value bars |
-
-#### 7f. Button Remapping
-
-| Button | Action |
-|--------|--------|
-| **Navigate** | Move cursor left/right in edit buffer |
-| **Layer** | Cycle: Dashboard → Text Input → Output Monitor |
-| **FirstStep** | Select script 0 (slot 1) |
-| **LastStep** | Select script 3 / Metro toggle |
-| **RunMode** | Toggle Live mode vs Script Edit mode |
-| **Fill** | Execute current line / commit |
-| **Shift+Fill** | Trigger selected script |
-| **Scene buttons** | Select script slot (when Shift held) |
-
-#### 7g. Declarations (LaunchpadController.h)
-
-```cpp
-// Teletype dashboard
-void sequenceDrawTeletypeDashboard();     // Mode 1: live performance
-void sequenceDrawTeletypeTextInput();     // Mode 2: character keyboard
-void sequenceDrawTeletypeOutputMonitor(); // Mode 3: TR/CV monitor
-
-// Edit handlers
-void sequenceEditTeletypeDashboard(int row, int col);
-void sequenceEditTeletypeTextInput(int row, int col);
-void sequenceHandleTeletypeText(int step, bool shiftModifier); // multi-tap dispatch
-void sequenceHandleTeletypeSpecial(int step);                   // backspace/space/exec
-
-// Script control
-void sequenceTriggerTeletypeScript(int slotIndex);
-void sequenceSelectTeletypeScript(int slotIndex);
-```
-
-#### 7h. Effort: ~3h
-
-- 2×8 character grid with labels + multi-tap tracking
-- 3 dashboard pages (live, text input, output monitor)
-- Script trigger integration via Shift+Scene/Fill
-- Pattern view digits + page+step structure actions
-- Text input requires tracking `_teletypeMultiTapStep` and `_teletypeMultiTapLevel` state in LaunchpadController
-
 ---
 
 ## Summary: Function Count Per Track Type
@@ -759,10 +578,9 @@ void sequenceSelectTeletypeScript(int slotIndex);
 | Indexed | 4 | 4 | 4 | 11 |
 | DiscreteMap | 7 | 7 | 7 | 11 |
 | Tuesday | 3 | 3 | 4 | 11 |
-| Teletype | 3 | 4 | 6 | 11 |
 
-**Total new declarations:** ~37 methods in LaunchpadController.h
-**Total new code:** ~1200-1600 lines in LaunchpadController.cpp (current: 974 lines, estimated final: ~2200-2600 lines)
+**Total new declarations:** ~31 methods in LaunchpadController.h
+**Total new code:** ~1000–1400 lines in LaunchpadController.cpp (current: 974 lines, estimated final: ~1800–2200 lines)
 
 ---
 
@@ -776,9 +594,8 @@ void sequenceSelectTeletypeScript(int slotIndex);
 | 4 | IndexedTrack full | ~3.5h | High — pitch/timing/gate-slide grid editing, 48 steps |
 | 5 | DiscreteMapTrack full | ~3h | High — 32-stage grid editor, 7 param views |
 | 6 | TuesdayTrack step keys | ~2.5h | **High** — 2×8 step-key grid (1:1 HW map) + parameter editor |
-| 7 | TeletypeTrack full | ~4-5h | **High** — text input grid + script triggers + output monitor |
 
-**Total: ~15-18h**
+**Total: ~10–13h**
 
 ### Incremental Deliverables
 
@@ -788,7 +605,7 @@ void sequenceSelectTeletypeScript(int slotIndex);
 | M2 | After Phase 2 | All macros available on Launchpad (populate/transform/clear/randomize) |
 | M3 | After Phase 5 | Indexed + DiscreteMap have full grid editing |
 | M4 | After Phase 6 | **Tuesday step-key grid** — full 1:1 HW parity |
-| M5 | After Phase 7 | **All 6 track types** fully supported on Launchpad grid |
+| M5 | After Phase 5 | **All 5 track types** fully supported on Launchpad grid |
 
 ---
 
@@ -814,7 +631,7 @@ Re-examined `temp-ref/mebitek-performer/controllers/launchpad/LaunchpadControlle
 | No chaos/wavefolder params | We expose them |
 | No Tuesday-style algorithmic params | We have full Tuesday step-key grid |
 | No DiscreteMap stage editing | We have 7-param stage grid |
-| No Teletype text input dashboard | We have 3-page dashboard |
+
 | No ReRene/Ikra modes | We fix NoteTrack for these |
 | No CALL_MODE_FUNCTION for Macro | We add macro sub-mode via Shift+Fill |
 
@@ -879,9 +696,8 @@ The plan is architecturally sound, but several phases are mis-scoped, some metho
 | 3 | Indexed | High | **High** | Low-Med | ~3h | **~3.5h** (grid only, no macros) |
 | 4 | DiscreteMap | High | **High** | Low | ~3h | ~3h |
 | 5 | Tuesday | High | **High** | Low-Med | ~2h | **~2.5h** |
-| 6 | Teletype | Medium | **High** | Med-High | ~3h | **~4-5h** |
 
-**Corrected total: ~15-18h** (plan says 17h — close, but only if Indexed macros deferred)
+**Corrected total: ~10–13h** (plan says 17h — close, but only if Indexed macros deferred and Teletype removed)
 
 ### Reordered Phases (recommended)
 
@@ -891,8 +707,7 @@ The plan is architecturally sound, but several phases are mis-scoped, some metho
 | 2 | Tuesday step keys | High value, low complexity. Good early win. |
 | 3 | DiscreteMap full | High value, mechanical — builds confidence. |
 | 4 | Indexed grid only | Skip macros. Get the 48-step grid working first. |
-| 5 | Teletype full | Complex, but by now patterns are established. |
-| 6 | Curve chaos | **Deferred.** Low value, add later if requested. |
+| 5 | Curve chaos | **Deferred.** Low value, add later if requested. |
 | 7 | Macro Grid v2 | **New phase:** Refactor Indexed macros into model, then add to Launchpad. |
 
 ### Top Risks and Mitigations
@@ -900,7 +715,7 @@ The plan is architecturally sound, but several phases are mis-scoped, some metho
 | # | Risk | Severity | Mitigation |
 |---|------|:--------:|------------|
 | 1 | **Indexed macros don't exist in the model.** They're ~700 lines of UI code in `IndexedSequenceEditPage.cpp` (2,304 lines total; macros start at line ~1605). Plan claims "no model changes needed" — this is **false**. | 🔴 High | **Defer Indexed macros.** Ship basic Indexed grid editing first. Create follow-up task to refactor macros into `IndexedSequence` model methods. Do NOT duplicate macro logic into LaunchpadController. |
-| 2 | **LaunchpadController.cpp will explode from 974 → ~2600 lines.** A 2600-line file with 14 dispatch points × 7 track types is unmaintainable and slows compilation. | 🟡 Medium | **Split the file BEFORE starting.** Create per-track files: `LaunchpadNoteController.cpp`, `LaunchpadCurveController.cpp`, etc. Keep dispatch in main file, move per-track logic out. |
+| 2 | **LaunchpadController.cpp will explode from 974 → ~2000 lines.** A 2000-line file with 14 dispatch points × 5 track types is unmaintainable and slows compilation. | 🟡 Medium | **Split the file BEFORE starting.** Create per-track files: `LaunchpadNoteController.cpp`, `LaunchpadCurveController.cpp`, etc. Keep dispatch in main file, move per-track logic out. |
 | 3 | **Incorrect method names in plan.** `transformSmooth`, `transformWalk`, `transformRandom` listed but only `transformSmoothWalk` exists. `clearNotes()` **does exist** but `clearDirs()` does not. | 🟡 Medium | Audit all macro method names against headers before coding. Use `clearNotes()` directly; for `clearDirs()` use `randomizeDirections()` or add trivial method. |
 
 ### API Verification: Confirmed vs Missing
@@ -959,7 +774,7 @@ Adding `isEdited()` is safe — it's computed, no backing field, doesn't affect 
 | **Indexed** | 4-view grid + Macros (deferred) | 48 steps | Pitch/Duration/GateSlide/Route views; rotation offset |
 | **DiscreteMap** | 6-view stage grid + Macros + Range | 32 stages | Threshold/Direction/Note/GateLen/Slew/Pluck views; 16 macros |
 | **Tuesday** | **2×8 step-key grid** | 16 steps | 1:1 HW parity — Octave, Transpose, Root, Divisor, Mask, Loop shortcuts + Jam Run hold + Reseed |
-| **Teletype** | **2×8 text input grid** + Dashboard | 16 steps | Multi-tap character keyboard + script trigger grid + TR/CV output monitor |
+
 
 ---
 
@@ -1088,7 +903,7 @@ Requires binding `TargetState`, `LedState`, `GateOutputState`, `DacState` to pyb
 | 2 (Tuesday step keys) | `TestTuesdaySequence` — parameter clamping, boundary values | Press step keys → verify correct parameter edits via model |
 | 3 (DiscreteMap) | `TestDiscreteMapSequence` — stage threshold/note/direction round-trip | Navigate stages → verify stage data visible in model |
 | 4 (Indexed) | `TestIndexedSequence` — `isEdited()`, step access, layer switching | Navigate 48 steps → verify pitch/duration/gate display |
-| 5 (Teletype) | `TestTeletype` — script trigger, text input state tracking | Press character grid → verify edit buffer changes |
+
 | 7 (Macro Grid) | Verify macro invocation maps to correct model method | Press macro buttons → verify Curve/DMap sequence transforms |
 
 ### TDD Infrastructure Tasks (adds ~3h total)

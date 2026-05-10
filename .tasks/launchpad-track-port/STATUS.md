@@ -6,16 +6,20 @@
 
 - Investigated all Launchpad-related files (12 files, 2 core)
 - Mapped all 14 dispatch points in LaunchpadController.cpp that switch on `trackMode()`
-- Analyzed all 7 track types for grid-suitability
-- Deep-dived into DiscreteMapSequence, IndexedSequence, TuesdaySequence, TeletypeTrack APIs
+- Analyzed all 5 track types for grid-suitability
+- Deep-dived into DiscreteMapSequence, IndexedSequence, TuesdaySequence APIs
 - Checked model drift since last Launchpad commit (`888f183c`)
 - Examined `temp-ref/mebitek-performer/` reference implementation (3240-line .cpp)
 - **Re-examined mebitek with fresh context** — extracted LayerMapItem pattern, Performer mode, circuit keyboard
+- **Merged vinx-modulove Launchpad improvements** — LP Style/Note Style, circuit keyboard, generators mode, undo/redo, performer mode, enhanced button events, visual feedback
 - **Performed feasibility/priority/risk review** — found Indexed macros don't exist in model, several method name errors, file size risk
 - **Removed MidiCvTrack** — no sequence data, arpeggiator only; lowest value for Launchpad grid
-- **Created corrected implementation plan** with 6 track types, reordered phases, deferred items
+- **Created corrected implementation plan** with 5 track types, reordered phases, deferred items
+- **Discarded TeletypeTrack** — VM text-input integration is 2–3× underscoped; no Launchpad grid value
 
 ## Plan Summary (Corrected)
+
+### Track Port Phases
 
 | Phase | Track | Effort | Description | Status |
 |-------|-------|--------|-------------|--------|
@@ -23,11 +27,29 @@
 | 2 | Tuesday | ~2.5h | **2×8 step-key grid** — 1:1 HW parity + parameter editor | Must-do |
 | 3 | DiscreteMap | ~3h | 32-stage editor: threshold/direction/note/params + 16 macros | Must-do |
 | 4 | Indexed | ~3.5h | 48-step grid editor (Pitch/Duration/GateSlide/Route). **No macros yet** | Must-do |
-| 5 | Teletype | ~4-5h | Text input grid + script triggers + TR/CV output monitor | Must-do |
-| 6 | Curve chaos | — | **DEFERRED** — low value, revisit later | Deferred |
-| 7 | Macro Grid v2 | ~3h | Curve (12) + DiscreteMap (16). **Indexed macros need model refactor** | Phase 2.5 → v2 |
+| 5 | Curve chaos | — | **DEFERRED** — low value, revisit later | Deferred |
+| 6 | Macro Grid v2 | ~3h | Curve (12) + DiscreteMap (16). **Indexed macros blocked by `indexed-sequence-macro-refactor`** | Phase 2.5 → v2 |
 
-**Total: ~15-18h** (was 17h, corrected with realistic estimates and MidiCv removed)
+**Track port subtotal: ~10–13h**
+
+### VinxScorza / Modulove Launchpad Improvements (Merged)
+
+| Segment | Effort | Description | Source |
+|---------|--------|-------------|--------|
+| A | **LP Style / LP Note Style settings** | ~1.5h | `classic`/`blue` color schemes + `classic`/`circuit` note entry | Vinx |
+| B | **Circuit Keyboard** | ~2h | Circuit-style keyboard overlay for Note track | Vinx |
+| C | **Generators Mode** | ~4h | Split architecture + preview/apply workflow with A/B | Vinx |
+| D | **1-Level Undo/Redo** | ~1h | `Shift + Play` shortcut | Vinx |
+| E | **Track Selection Locking** | ~1.5h | Modal/UI-kind/top-page locking | Vinx |
+| F | **Performer Mode** | ~3h | Scene mute/solo/fill, follow mode | Vinx/Modulove |
+| G | **Enhanced Button Events** | ~1.5h | Double-tap, long-press | Modulove |
+| H | **Visual Feedback** | ~2h | Octave lines, pattern viz, mute status LEDs | Modulove |
+| I | **Interaction Improvements** | ~1h | Fill, range editing, run mode enhancements | Modulove |
+| J | **Layer Selection Optimization** | ~1h | Better layer mapping visualization | Modulove |
+
+**Vinx/Modulove subtotal: ~18.5h**
+
+**Combined total: ~26.5h** (with ~2h overlap between track port and vinx/modulove foundation work)
 
 ## Removed: MidiCvTrack
 
@@ -51,8 +73,10 @@ MidiCvTrack has no step sequence, no per-step data, and no `isActiveSequence()`.
 - **FirstStep/LastStep** available only on tracks that have those concepts
 - **No model changes needed** — *except* `isEdited()` for 3 sequence types (~45 min total)
 - **Split `LaunchpadController.cpp`** into per-track files before implementing
-- **Indexed macros deferred** — they need model refactoring first
+- **Indexed macros deferred** — extracted to separate task `indexed-sequence-macro-refactor` (~4.5h). Must complete before Macro Grid v2
 - **MidiCvTrack removed** — no sequence data, lowest value for grid
+- **TeletypeTrack discarded** — complex VM text-input integration; not a grid-editable track type
+- **Vinx/Modulove LP improvements merged** — style settings, circuit keyboard, generators, undo/redo, performer mode, button events, visual feedback all in scope
 
 ## Pre-implementation checklist
 

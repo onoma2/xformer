@@ -13,6 +13,18 @@ _Updated: 2026-05-10_
 **Next action:** Test on hardware
 **Branch:** feat/USB-keyboard4
 
+## 🟡 performer-keyboard-shortcuts — Full Performer UI keyboard shortcuts
+**Status:** paused
+**Where I stopped:** Full analysis complete:
+- **Architecture research**: All ~50 page types inventoried, event flow understood (top-to-bottom, clean slate — zero non-Teletype pages override `keyboard()`)
+- **Workflow analysis**: Full 22-step hardware button sequence documented for typical Note track setup (Layout → Sequence → Step Edit → Routing → Play). Core friction = encoder scroll+click repetition on list pages + no batch step operations
+- **Feasibility**: No non-Teletype page has a `keyboard()` override, meaning all pages are clean slate with zero conflicts. `ListModel::edit()` only supports relative (+/-1) edits, but calling model methods directly from page keyboard handlers is trivial
+- **3 approaches proposed**: (A) Form mode — Tab through list fields, type values directly. Very high feasibility, ~20 lines per page. (C) Step type-in command line — `5N E4` syntax on NoteSequenceEditPage. High feasibility, modeled on Teletype's `_editBuffer`. (B) Command palette — `Ctrl+K` overlay search. Moderate feasibility, ~200 lines.
+- **Recommendation**: Phase A (form mode) + Phase C (step type-in) first, then command palette later
+**Next action:** Implement Phase 1a: Universal shortcuts (Space=play, Esc=back, 1-8=track select) + TopPage Alt+letter nav
+**Branch:** feat/USB-keyboard4
+**Files involved:** Page.h/cpp, PageManager.h/cpp, TopPage.cpp, all page .cpp files with F1-F5
+
 ---
 
 ## 🟡 teletype-file-reliability — Improve TeletypeTrack file loading/saving reliability
@@ -23,42 +35,46 @@ _Updated: 2026-05-10_
 
 ---
 
-## 🟡 launchpad-track-port — Extend Launchpad controller to all 6 track types
-**Status:** active - Phase 1: Track Interface Research (Complete)
-**Where I stopped:** Completed comprehensive research of other performer forks
-**Next action:** Begin Phase 2: NoteTrack & CurveTrack Improvements with layer map updates
+## 🟡 launchpad-track-port — Extend Launchpad controller to all 5 track types + Vinx/Modulove enhancements
+**Status:** active - Planning complete, feasibility reviewed
+**Where I stopped:** Comprehensive research done across all forks (mebitek, vinx, modulove, cavian, extracadian). Track port plan corrected (MidiCv + Teletype removed). Vinx/Modulove LP improvements identified for merge.
+**Next action:** Split LaunchpadController.cpp into per-track files, then begin Phase 1: NoteTrack fixes + Foundation (LP Style / LP Note Style settings)
+**Branch:** TBD
+
+---
+
+## ⚪ indexed-sequence-macro-refactor — Extract macro logic into IndexedSequence model
+**Status:** ready — not started
+**Where I stopped:** Identified ~700 lines of macro logic in `IndexedSequenceEditPage.cpp:1605-2304` that must move to `IndexedSequence` model methods. 20 macros across rhythm, waveform, melodic, and duration categories. Blocks Launchpad Macro Grid v2 for Indexed.
+**Next action:** Read macro code, catalog functions, design model API (individual methods vs. enum dispatch)
 **Branch:** TBD
 
 ---
 
 ## 🟡 vinx-modulove-improvements — Integrate VinxScorza and Modulove performer improvements
-**Status:** active - Implementation Plan Complete
-**Where I stopped:** Created comprehensive implementation plan for VinxScorza and Modulove performer improvements
-- **Launchpad as First-Class Layer**: LP Style and LP Note Style settings with blue and circuit note editor styles
-- **Generators Mode**: Split architecture for note/non-note track generators with preview/apply workflow
-- **Circuit Keyboard**: Innovative note editing interface for intuitive operation
-- **1-Level Undo/Redo**: Launchpad shortcut for undo/redo functionality
-- **Track Selection Locking**: Modal, UI kind, and top page locking for modal contexts
-- **Performer Mode**: Scene mute/solo/fill with track selection and follow mode
-- **Enhanced Button Event Handling**: Double-tap, long-press, and improved state tracking
-- **Visual Feedback Enhancements**: Octave lines, pattern visualization, requested patterns display
-- **Interaction Improvements**: Fill functionality, range editing, run mode selection
-- **Layer Selection Optimization**: Improved layer mapping visualization and quick access
-- **Track Status Visualization**: Track mute status and active track indicators
-**Next action:** Begin Phase 1: Foundation with style settings and circuit keyboard
+**Status:** active - Launchpad items merged into `launchpad-track-port`
+**Where I stopped:** All Launchpad-specific improvements from this task have been merged into `launchpad-track-port`. Remaining non-Launchpad items (microtiming, LFO modulators, 16-track dual bank research, chaos generators) stay here or move to `other-forks-improvements`.
+**Next action:** Continue non-Launchpad Vinx/Modulove work (microtiming, enhanced performer page) after LP track port completes
 **Branch:** TBD
 
 ---
 
 ## 🟡 other-forks-improvements — Integrate non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
-**Status:** paused - Implementation Plan Complete
-**Where I stopped:** Created comprehensive implementation plan for all non-Launchpad improvements from other performer forks
-- **Core Sequencing**: Step engine stabilization, crash path fixes, chaos generators evolution
-- **16-Track Support**: Dual bank system with 2 banks of 8 tracks, extended MIDI routing
-- **8 LFO Modulators**: Multiple waveform shapes, waveform preview, quick-map popup, musical divisions
-- **Microtiming Recording**: 7-bit resolution (-63 to +63), bidirectional timing, timing quantize
-- **UI/UX Enhancements**: 64-step context visualization, menu wrap, screensaver/wake refinement
-- **Technical Improvements**: Toolchain update, memory optimization, GitHub Actions CI
-- **Generators**: Preview/apply workflow, generator families reorganization, uniform layouts
+**Status:** paused - Implementation Plan Updated with Feasibility Analysis
+**Where I stopped:** Reorganized task against current XFORMER codebase with feasibility, design decisions, and priority:
+- **Current XFORMER Analysis**: 7 track types (4 XFORMER-unique), 8 tracks, no LFOs, no microtiming, unique Harmony system
+- **High Feasibility (weeks 1-4)**: Microtiming recording, enhanced performer page, quick octave change, steps to stop, menu wrap
+- **Medium Feasibility (weeks 5-10)**: Generator preview/apply, curve undo, submenu shortcuts, backward playback
+- **Low Feasibility (weeks 11-16)**: Chaos generators, random gen improvements, LFO modulators, 64-step visualization
+- **Not Feasible Now**: 16-track dual bank (architecture too invasive), Arpeggiator track (no track type)
+- **Already Present**: Curve gate offset/length, bypass voltage table
 **Next action:** To be determined after Launchpad improvements
+**Branch:** TBD
+
+---
+
+## ⚪ fractal-track-implementation — Smart Mutation Engine track type (FractalTrack)
+**Status:** paused
+**Where I stopped:** Full design doc read (`doc/fractal-track-research.md`, ~12K words). Architecture defined as new TrackMode following TuesdayTrack pattern. Parent-child inheritance from NoteTrack/Curve/Indexed/Tuesday/DiscreteMap via FractalSourceInterface. MutationHistory (16-record buffer) + SelectionPressure for learning. Extended rules (Markov, L-System, CA, Fibonacci, Perlin, echo, symmetry, tension). Bloom v2 features (ratchet, slew, trill, 8-slot branches).
+**Next action:** Phase 1: model layer (`FractalSequence.h` + `FractalTrack.h`) + Track integration
 **Branch:** TBD
