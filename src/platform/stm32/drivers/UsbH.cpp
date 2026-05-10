@@ -232,6 +232,11 @@ struct HidDriverHandler {
             uint8_t keycode = data[i];
             if (keycode == 0) continue;
             DBG("HID key: mod=%02x key=%02x", modifiers, keycode);
+            if (g_usbh && g_usbh->_debugMsgCallback) {
+                char msg[32];
+                snprintf(msg, sizeof(msg), "K:%02x M:%02x", keycode, modifiers);
+                g_usbh->_debugMsgCallback(msg, g_usbh->_debugMsgContext);
+            }
             if (g_usbh && g_usbh->_hidKeyCallback) {
                 g_usbh->_hidKeyCallback(modifiers, keycode, g_usbh->_hidCallbackContext);
             }

@@ -2,9 +2,9 @@
 _Updated: 2026-05-11_
 
 ## 🔴 usb-hid-implementation — USB HID keyboard support
-**Status:** in progress — debug diagnostics added, awaiting hardware test
-**Where I stopped:** Added `debug_msg` callback to HID driver (5 diagnostic points). Previous `HID 0 t=0` was a false positive caused by inverted `hid_is_connected()`. Real issue: HID enumeration never reaches connected state.
-**Next action:** Flash build, check OLED for "HID init" / "HID desc ok" / "HID rm" messages to diagnose where enumeration fails.
+**Status:** in progress — enumeration working, testing keyboard polling
+**Where I stopped:** Mouse shows T=2 (MOUSE), keyboard shows T=3 (KEYBOARD). Both connect/disconnect correctly. Added `K:XX M:XX` keypress debug display. Awaiting keyboard polling test.
+**Next action:** Flash latest build, press keys on keyboard — check for `K:XX M:XX` messages on OLED showing keycodes.
 **Branch:** feat/USB-keyboard4
 
 ---
