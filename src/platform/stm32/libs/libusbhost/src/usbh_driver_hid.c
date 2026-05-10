@@ -215,6 +215,13 @@ static bool analyze_descriptor(void *drvdata, void *descriptor)
 	}
 
 	if (hid->endpoint_in_address && hid->report0_length) {
+		// Reject mice — they corrupt the USB host state machine.
+		// The cheap HID parser/report descriptor interaction causes
+		// permanent failure affecting all subsequent USB devices.
+		if (hid->hid_type == HID_TYPE_MOUSE) {
+			hid->state_next = STATE_INACTIVE;
+			return false;
+		}
 		hid->state_next = STATE_GET_REPORT_DESCRIPTOR_READ_SETUP;
 		return true;
 	}
