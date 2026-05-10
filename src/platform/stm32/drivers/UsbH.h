@@ -17,15 +17,17 @@ public:
     void powerOff();
     bool powerFault();
 
+    bool recvKey(HidKeyEvent *event) {
+        return hid_read_key(event);
+    }
+
     using HidConnectCallback = void(*)(uint8_t device_id, HID_TYPE type, void *context);
     using HidDisconnectCallback = void(*)(uint8_t device_id, void *context);
-    using HidKeyCallback = void(*)(uint8_t modifiers, uint8_t keycode, void *context);
     using DebugMessageCallback = void(*)(const char *msg, void *context);
 
-    void setHidCallbacks(HidConnectCallback onConnect, HidDisconnectCallback onDisconnect, HidKeyCallback onKey, void *context) {
+    void setHidCallbacks(HidConnectCallback onConnect, HidDisconnectCallback onDisconnect, void *context) {
         _hidConnectCallback = onConnect;
         _hidDisconnectCallback = onDisconnect;
-        _hidKeyCallback = onKey;
         _hidCallbackContext = context;
     }
 
@@ -83,7 +85,6 @@ private:
 
     HidConnectCallback _hidConnectCallback = nullptr;
     HidDisconnectCallback _hidDisconnectCallback = nullptr;
-    HidKeyCallback _hidKeyCallback = nullptr;
     void *_hidCallbackContext = nullptr;
 
     DebugMessageCallback _debugMsgCallback = nullptr;

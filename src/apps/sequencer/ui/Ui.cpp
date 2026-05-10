@@ -64,6 +64,19 @@ void Ui::init() {
         _controllerManager.disconnect();
     });
 
+    _engine.setKeyboardReceiveHandler([this] (uint8_t keycode, uint8_t modifiers) {
+        enqueueKeyboardEvent(keycode, modifiers);
+    });
+
+    _engine.setHidConnectHandler([this] (uint8_t device_id, int type) {
+        FixedStringBuilder<32> buf("HID %d t=%d", device_id, type);
+        _messageManager.showMessage(buf, 3000);
+    });
+
+    _engine.setHidDisconnectHandler([this] (uint8_t device_id) {
+        _messageManager.showMessage("HID rm", 3000);
+    });
+
     _engine.setMessageHandler([this] (const char *text, uint32_t duration) {
         _messageManager.showMessage(text, duration);
     });

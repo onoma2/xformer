@@ -80,7 +80,7 @@ static CCMRAM_BSS uint8_t midiMessagePayloadPool[32];
 static CCMRAM_BSS Profiler profiler;
 
 static Model model;
-static CCMRAM_BSS Engine engine(model, clockTimer, adc, dac, dio, gateOutput, midi, usbMidi);
+static CCMRAM_BSS Engine engine(model, clockTimer, adc, dac, dio, gateOutput, midi, usbMidi, usbh);
 static CCMRAM_BSS Ui ui(model, engine, lcd, blm, encoder, model.settings());
 
 
@@ -188,27 +188,6 @@ int main(void) {
             mm->showMessage(msg, 3000);
         };
         usbh.setDebugMessageCallback(usbDebugMsg, &ui.messageManager());
-    }
-
-    {
-        static auto hidKeyHandler = [](uint8_t modifiers, uint8_t keycode, void *context) {
-            auto *ui = static_cast<Ui *>(context);
-            ui->enqueueKeyboardEvent(keycode, modifiers);
-        };
-        usbh.setHidCallbacks(
-            [](uint8_t id, HID_TYPE type, void *ctx) {
-                auto *ui = static_cast<Ui *>(ctx);
-                char buf[32];
-                snprintf(buf, sizeof(buf), "HID %d t=%d", id, (int)type);
-                ui->messageManager().showMessage(buf, 3000);
-            },
-            [](uint8_t id, void *ctx) {
-                auto *ui = static_cast<Ui *>(ctx);
-                ui->messageManager().showMessage("HID rm", 3000);
-            },
-            hidKeyHandler,
-            &ui
-        );
     }
 
     System::resetWatchdog();

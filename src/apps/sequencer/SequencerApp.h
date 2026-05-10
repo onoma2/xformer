@@ -11,6 +11,7 @@
 #include "drivers/Midi.h"
 #include "drivers/SdCard.h"
 #include "drivers/UsbMidi.h"
+#include "drivers/UsbH.h"
 
 #include "core/fs/Volume.h"
 
@@ -37,6 +38,7 @@ struct SequencerApp {
     GateOutput gateOutput;
     Midi midi;
     UsbMidi usbMidi;
+    UsbH usbH;
     SdCard sdCard;
 
     // filesystem
@@ -51,7 +53,7 @@ struct SequencerApp {
 
     SequencerApp() :
         volume(sdCard),
-        engine(model, clockTimer, adc, dac, dio, gateOutput, midi, usbMidi),
+        engine(model, clockTimer, adc, dac, dio, gateOutput, midi, usbMidi, usbH),
         ui(model, engine, lcd, blm, encoder, model.settings())
     {
         MidiMessage::setPayloadPool(midiMessagePayloadPool, sizeof(midiMessagePayloadPool));

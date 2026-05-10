@@ -285,12 +285,6 @@ void UsbH::process() {
         MidiDriverHandler::flush(device);
     }
 
-    HidKeyEvent keyEvent;
-    while (hid_read_key(&keyEvent)) {
-        if (_hidKeyCallback) {
-            _hidKeyCallback(keyEvent.modifiers, keyEvent.keycode, _hidCallbackContext);
-        }
-    }
 }
 
 void UsbH::powerOn() {
