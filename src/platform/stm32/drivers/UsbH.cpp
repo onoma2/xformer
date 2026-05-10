@@ -199,19 +199,12 @@ static hid_config_t hid_config = {};
 
 struct HidDriverHandler {
     static void connectHandler(uint8_t device_id, HID_TYPE type) {
-        DBG("HID device connected (id=%d, type=%d)", device_id, type);
         if (g_usbh) {
             g_usbh->hidConnectDevice(device_id, type);
-            if (g_usbh->_debugMsgCallback) {
-                char msg[64];
-                snprintf(msg, sizeof(msg), "HID %d t=%d", device_id, (int)type);
-                g_usbh->_debugMsgCallback(msg, g_usbh->_debugMsgContext);
-            }
         }
     }
 
     static void disconnectHandler(uint8_t device_id) {
-        DBG("HID device disconnected (id=%d)", device_id);
         if (g_usbh) {
             g_usbh->hidDisconnectDevice(device_id);
         }
