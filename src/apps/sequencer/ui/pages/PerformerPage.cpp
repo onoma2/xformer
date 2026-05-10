@@ -245,10 +245,21 @@ void PerformerPage::updateFills() {
 
 void PerformerPage::keyboard(KeyboardEvent &event) {
     switch (event.keycode()) {
-    case KeyboardEvent::KeyF1: pressFunctionButton(0, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF2: pressFunctionButton(1, event.shift()); event.consume(); break;
+    case KeyboardEvent::KeyF1:
+        _latching = !_latching;
+        if (!_latching) { _project.playState().commitLatchedRequests(); }
+        event.consume();
+        break;
+    case KeyboardEvent::KeyF2:
+        _syncing = !_syncing;
+        event.consume();
+        break;
     case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
+    case KeyboardEvent::KeyF4:
+        _project.playState().commitLatchedRequests();
+        updateFills();
+        event.consume();
+        break;
     case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
     default: break;
     }
