@@ -407,6 +407,190 @@ void TeletypePatternViewPage::encoder(EncoderEvent &event) {
     event.consume();
 }
 
+void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
+    const uint8_t keycode = event.keycode();
+
+    // Ctrl+shortcuts
+    if (event.ctrl()) {
+        switch (keycode) {
+        case KeyboardEvent::KeyHome:
+            _row = 0;
+            _offset = 0;
+            _editingNumber = false;
+            event.consume();
+            return;
+        case KeyboardEvent::KeyEnd:
+            _row = PATTERN_LENGTH - 1;
+            ensureRowVisible();
+            _editingNumber = false;
+            event.consume();
+            return;
+        case 0x06: // C
+            // Copy current cell value
+            {
+                auto &track = _project.selectedTrack().teletypeTrack();
+                scene_state_t &state = track.state();
+                if (_editingNumber) {
+                    _valueCopyBuffer = _editBuffer;
+                } else {
+                    _valueCopyBuffer = ss_get_pattern_val(&state, _patternIndex, _row);
+                }
+                showMessage("VALUE COPIED");
+            }
+            event.consume();
+            return;
+        case 0x19: // V
+            // Paste value
+            {
+                auto &track = _project.selectedTrack().teletypeTrack();
+                scene_state_t &state = track.state();
+                ss_set_pattern_val(&state, _patternIndex, _row, _valueCopyBuffer);
+                syncPattern();
+                _editingNumber = false;
+            }
+            event.consume();
+            return;
+        case 0x1B: // X
+            // Cut: copy + delete
+            {
+                auto &track = _project.selectedTrack().teletypeTrack();
+                scene_state_t &state = track.state();
+                _valueCopyBuffer = ss_get_pattern_val(&state, _patternIndex, _row);
+                deleteRow();
+                showMessage("VALUE CUT");
+            }
+            event.consume();
+            return;
+        default:
+            return;
+        }
+    }
+
+    // Arrow keys
+    if (keycode == KeyboardEvent::KeyUp) {
+        if (event.alt()) {
+            // Alt+Up: page up
+            _row = std::max(_row - 8, 0);
+            ensureRowVisible();
+        } else {
+            moveRow(-1);
+        }
+        _editingNumber = false;
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyDown) {
+        if (event.alt()) {
+            // Alt+Down: page down
+            _row = std::min(_row + 8, PATTERN_LENGTH - 1);
+            ensureRowVisible();
+        } else {
+            moveRow(1);
+        }
+        _editingNumber = false;
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyLeft) {
+        setPatternIndex(std::max(_patternIndex - 1, 0));
+        _editingNumber = false;
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyRight) {
+        setPatternIndex(std::min(_patternIndex + 1, kColumnCount - 1));
+        _editingNumber = false;
+        event.consume();
+        return;
+    }
+
+    // Enter
+    if (keycode == KeyboardEvent::KeyEnter) {
+        if (event.shift()) {
+            insertRow();
+        } else {
+            commitEdit();
+            // Move down after commit
+            if (_row < PATTERN_LENGTH - 1) {
+                _row++;
+                ensureRowVisible();
+            }
+        }
+        event.consume();
+        return;
+    }
+
+    // Backspace
+    if (keycode == KeyboardEvent::KeyBackspace) {
+        backspaceDigit();
+        event.consume();
+        return;
+    }
+
+    // Delete
+    if (keycode == KeyboardEvent::KeyDelete) {
+        deleteRow();
+        event.consume();
+        return;
+    }
+
+    // Escape: cancel edit
+    if (keycode == KeyboardEvent::KeyEscape) {
+        _editingNumber = false;
+        event.consume();
+        return;
+    }
+
+    // Space: toggle between 0 and 1
+    if (keycode == KeyboardEvent::KeySpace) {
+        auto &track = _project.selectedTrack().teletypeTrack();
+        scene_state_t &state = track.state();
+        int16_t val = ss_get_pattern_val(&state, _patternIndex, _row);
+        ss_set_pattern_val(&state, _patternIndex, _row, val ? 0 : 1);
+        syncPattern();
+        _editingNumber = false;
+        event.consume();
+        return;
+    }
+
+    // Minus/underscore: negate
+    if (event.ch() == '-' || event.ch() == '_') {
+        negateValue();
+        event.consume();
+        return;
+    }
+
+    // [ and ]: decrement/increment value by 1
+    if (event.ch() == '[') {
+        auto &track = _project.selectedTrack().teletypeTrack();
+        scene_state_t &state = track.state();
+        int16_t val = ss_get_pattern_val(&state, _patternIndex, _row);
+        ss_set_pattern_val(&state, _patternIndex, _row, val == INT16_MIN ? INT16_MAX : val - 1);
+        syncPattern();
+        _editingNumber = false;
+        event.consume();
+        return;
+    }
+    if (event.ch() == ']') {
+        auto &track = _project.selectedTrack().teletypeTrack();
+        scene_state_t &state = track.state();
+        int16_t val = ss_get_pattern_val(&state, _patternIndex, _row);
+        ss_set_pattern_val(&state, _patternIndex, _row, val == INT16_MAX ? INT16_MIN : val + 1);
+        syncPattern();
+        _editingNumber = false;
+        event.consume();
+        return;
+    }
+
+    // Digit input (0-9)
+    char ch = event.ch();
+    if (ch >= '0' && ch <= '9') {
+        insertDigit(ch - '0');
+        event.consume();
+        return;
+    }
+}
+
 void TeletypePatternViewPage::setPatternIndex(int pattern) {
     if (pattern < 0 || pattern >= kColumnCount) {
         return;

@@ -11,6 +11,7 @@ public:
     void updateLeds(Leds &leds) override;
     void keyPress(KeyPressEvent &event) override;
     void encoder(EncoderEvent &event) override;
+    void keyboard(KeyboardEvent &event) override;
 
 private:
     void setPatternIndex(int pattern);
@@ -40,4 +41,5 @@ private:
     int _offset = 0;
     bool _editingNumber = false;
     int32_t _editBuffer = 0;
+    int16_t _valueCopyBuffer = 0;
 };
