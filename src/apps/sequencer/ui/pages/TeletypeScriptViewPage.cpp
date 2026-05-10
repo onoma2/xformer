@@ -1050,24 +1050,46 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
 
     if (event.ctrl()) {
         // Ctrl+shortcuts
-        if (keycode == KeyboardEvent::KeyHome) {
-            // Ctrl+Home: move cursor to start
+        switch (keycode) {
+        case KeyboardEvent::KeyHome:
             _cursor = 0;
             event.consume();
             return;
-        }
-        if (keycode == KeyboardEvent::KeyEnd) {
-            // Ctrl+End: move cursor to end
+        case KeyboardEvent::KeyEnd:
             _cursor = int(std::strlen(_editBuffer));
             event.consume();
             return;
+        case 0x06: // C
+            copyLine();
+            event.consume();
+            return;
+        case 0x19: // V
+            pasteLine();
+            event.consume();
+            return;
+        case 0x1B: // X
+            copyLine();
+            _editBuffer[0] = '\0';
+            _cursor = 0;
+            event.consume();
+            return;
+        default:
+            return;
         }
-        return;
     }
 
     // Special keys
     if (keycode == KeyboardEvent::KeyEnter) {
-        commitLineAndAdvance();
+        if (event.shift()) {
+            // Shift+Enter: commit then insert blank line
+            commitLine();
+            if (!_liveMode && _selectedLine < kLineCount - 1) {
+                _selectedLine += 1;
+                loadEditBuffer(_selectedLine);
+            }
+        } else {
+            commitLineAndAdvance();
+        }
         event.consume();
         return;
     }
@@ -1114,6 +1136,21 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
     if (keycode == KeyboardEvent::KeyTab) {
         // Tab: insert space
         insertChar(' ');
+        event.consume();
+        return;
+    }
+    // [ and ] navigate scripts (matching hardware Teletype behavior)
+    if (event.ch() == '[') {
+        if (_scriptIndex > 0) {
+            setScriptIndex(_scriptIndex - 1);
+        }
+        event.consume();
+        return;
+    }
+    if (event.ch() == ']') {
+        if (_scriptIndex < TeletypeTrack::EditableScriptCount - 1) {
+            setScriptIndex(_scriptIndex + 1);
+        }
         event.consume();
         return;
     }
