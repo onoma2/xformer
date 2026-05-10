@@ -14,6 +14,7 @@ public:
         KeyPress,
         Encoder,
         Midi,
+        Keyboard,
     };
 
     Event(Type type) :
@@ -92,4 +93,40 @@ public:
 private:
     MidiPort _port;
     MidiMessage _message;
+};
+
+class KeyboardEvent : public Event {
+public:
+    KeyboardEvent(uint8_t keycode, uint8_t modifiers, char ch) :
+        Event(Event::Keyboard),
+        _keycode(keycode),
+        _modifiers(modifiers),
+        _ch(ch)
+    {}
+
+    uint8_t keycode() const { return _keycode; }
+    uint8_t modifiers() const { return _modifiers; }
+    char ch() const { return _ch; }
+
+    bool shift() const { return _modifiers & 0x22; }
+    bool ctrl() const { return _modifiers & 0x11; }
+    bool alt() const { return _modifiers & 0x44; }
+
+    static constexpr uint8_t KeyEnter = 0x28;
+    static constexpr uint8_t KeyEscape = 0x29;
+    static constexpr uint8_t KeyBackspace = 0x2A;
+    static constexpr uint8_t KeyTab = 0x2B;
+    static constexpr uint8_t KeySpace = 0x2C;
+    static constexpr uint8_t KeyLeft = 0x50;
+    static constexpr uint8_t KeyRight = 0x4F;
+    static constexpr uint8_t KeyUp = 0x52;
+    static constexpr uint8_t KeyDown = 0x51;
+    static constexpr uint8_t KeyDelete = 0x4C;
+    static constexpr uint8_t KeyHome = 0x4A;
+    static constexpr uint8_t KeyEnd = 0x4D;
+
+private:
+    uint8_t _keycode;
+    uint8_t _modifiers;
+    char _ch;
 };

@@ -26,6 +26,7 @@ public:
 
     void consumeKey(KeyEvent &event);
     void consumeKey(KeyPressEvent &event);
+    void consumeKey(KeyboardEvent &event);
     void consumeEncoder(EncoderEvent &event);
 
 private:

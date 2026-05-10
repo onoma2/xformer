@@ -28,6 +28,7 @@
 #include <libopencm3/usb/usbstd.h>
 #include <libopencm3/usb/hid.h>
 #include <stdint.h>
+#include <string.h>
 #include <stddef.h>
 
 #define USB_HID_SET_REPORT 0x09
@@ -87,6 +88,9 @@ static HidKeyEvent key_buffer[HID_KEY_BUFFER_SIZE];
 static volatile uint8_t key_buffer_head = 0;
 static volatile uint8_t key_buffer_tail = 0;
 
+static uint8_t prev_keys[USBH_HID_MAX_DEVICES][6];
+static uint8_t prev_key_count[USBH_HID_MAX_DEVICES];
+
 void hid_driver_init(const hid_config_t *config)
 {
 	uint32_t i;
@@ -99,6 +103,8 @@ void hid_driver_init(const hid_config_t *config)
 	}
 	key_buffer_head = 0;
 	key_buffer_tail = 0;
+	memset(prev_keys, 0, sizeof(prev_keys));
+	memset(prev_key_count, 0, sizeof(prev_key_count));
 }
 
 static void *init(usbh_device_t *usbh_dev, const usbh_dev_driver_info_t * device_info)
@@ -239,11 +245,28 @@ static void event(usbh_device_t *dev, usbh_packet_callback_data_t cb_data)
 				}
 				if (cb_data.transferred_length >= 3) {
 					uint8_t modifiers = hid->buffer[0];
+					uint8_t id = hid->device_id;
+					uint8_t cur_keys[6];
+					uint8_t cur_count = 0;
 					for (int i = 2; i < 8 && i < (int)cb_data.transferred_length; i++) {
-						if (hid->buffer[i] != 0) {
-							enqueue_key(hid->device_id, modifiers, hid->buffer[i]);
+						if (hid->buffer[i] != 0 && cur_count < 6) {
+							cur_keys[cur_count++] = hid->buffer[i];
 						}
 					}
+					for (int ci = 0; ci < cur_count; ci++) {
+						bool found = false;
+						for (int pi = 0; pi < prev_key_count[id]; pi++) {
+							if (cur_keys[ci] == prev_keys[id][pi]) {
+								found = true;
+								break;
+							}
+						}
+						if (!found) {
+							enqueue_key(id, modifiers, cur_keys[ci]);
+						}
+					}
+					memcpy(prev_keys[id], cur_keys, cur_count);
+					prev_key_count[id] = cur_count;
 				}
 				hid->state_next = STATE_READING_REQUEST;
 				break;

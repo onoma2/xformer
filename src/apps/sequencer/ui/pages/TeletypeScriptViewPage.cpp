@@ -1045,6 +1045,97 @@ void TeletypeScriptViewPage::setEditBuffer(const char *text) {
     _cursor = int(std::strlen(_editBuffer));
 }
 
+void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
+    const uint8_t keycode = event.keycode();
+
+    if (event.ctrl()) {
+        // Ctrl+shortcuts
+        if (keycode == KeyboardEvent::KeyHome) {
+            // Ctrl+Home: move cursor to start
+            _cursor = 0;
+            event.consume();
+            return;
+        }
+        if (keycode == KeyboardEvent::KeyEnd) {
+            // Ctrl+End: move cursor to end
+            _cursor = int(std::strlen(_editBuffer));
+            event.consume();
+            return;
+        }
+        return;
+    }
+
+    // Special keys
+    if (keycode == KeyboardEvent::KeyEnter) {
+        commitLineAndAdvance();
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyBackspace || keycode == KeyboardEvent::KeyDelete) {
+        if (keycode == KeyboardEvent::KeyDelete) {
+            // Delete: remove character after cursor
+            int len = int(std::strlen(_editBuffer));
+            if (_cursor < len) {
+                std::memmove(_editBuffer + _cursor, _editBuffer + _cursor + 1, len - _cursor);
+            }
+        } else {
+            backspace();
+        }
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyLeft) {
+        moveCursorLeft();
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyRight) {
+        moveCursorRight();
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyUp) {
+        recallHistory(-1);
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyDown) {
+        recallHistory(1);
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyEscape) {
+        // Escape: clear edit buffer
+        _editBuffer[0] = '\0';
+        _cursor = 0;
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyTab) {
+        // Tab: insert space
+        insertChar(' ');
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyHome) {
+        _cursor = 0;
+        event.consume();
+        return;
+    }
+    if (keycode == KeyboardEvent::KeyEnd) {
+        _cursor = int(std::strlen(_editBuffer));
+        event.consume();
+        return;
+    }
+
+    // Printable character
+    char ch = event.ch();
+    if (ch != 0) {
+        insertChar(ch);
+        event.consume();
+    }
+}
+
 void TeletypeScriptViewPage::commitLineAndAdvance() {
     commitLine();
     if (_liveMode) {

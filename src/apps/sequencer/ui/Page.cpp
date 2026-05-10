@@ -38,5 +38,8 @@ void Page::dispatchEvent(Event &event) {
     case Event::Midi:
         midi(event.as<MidiEvent>());
         break;
+    case Event::Keyboard:
+        keyboard(event.as<KeyboardEvent>());
+        break;
     }
 }
