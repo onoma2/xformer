@@ -24,6 +24,10 @@
 - `Ui`: framebuffer, `Pages` aggregate of all page instances and list/selection models, MIDI receive ring buffer.
 - Misc: FS pools, USB/MIDI state, idle/timer stacks are small compared to above.
 
+## Build & test
+- STM32 release build: `cd build/stm32/release && make sequencer`
+- Simulator builds are not needed for testing — always use the STM32 release build to verify compilation.
+
 ## Considerations
 - RAM is the tight constraint; flash has plenty of margin.
 - To free RAM: shrink note-step fields/pattern count/snapshots, reduce UI/page caches, or trim task stack sizes; prefer moving non-DMA data to CCM if SRAM pressure rises.

@@ -87,14 +87,27 @@ void KeyboardManager::process(KeyState &pageKeyState, KeyState &globalKeyState,
         if (!_engine->isSuspended()) {
             int step = -1;
             if (mapStepKeys) {
-                step = (event.modifiers & 0x55) ? -1 : hidKeycodeToStep(event.keycode);
+                step = (event.modifiers & 0x44) ? -1 : hidKeycodeToStep(event.keycode);
             }
             if (step >= 0) {
                 bool isDown = event.pressed != 0;
                 int keyCode = MatrixMap::fromStep(step);
                 pageKeyState[keyCode] = isDown;
                 globalKeyState[keyCode] = isDown;
-                Key key(keyCode, globalKeyState);
+
+                // Build a local key state that includes USB modifier bits.
+                // USB HID reports modifiers as a bitmask (byte 0) with no
+                // separate key events for Shift/Ctrl. We OR the USB modifier
+                // state into a copy of globalKeyState so that
+                // Key::shiftModifier() and Key::pageModifier() see the USB
+                // keyboard's Shift/Ctrl state. This copy is ephemeral — we
+                // never write USB modifier bits into globalKeyState itself,
+                // so they can't persist after the USB keyboard is disconnected
+                // or after modifiers are released without a new key event.
+                KeyState localKeyState = globalKeyState;
+                if (event.modifiers & 0x22) localKeyState[Key::Shift] = true;
+                if (event.modifiers & 0x11) localKeyState[Key::Page] = true;
+                Key key(keyCode, localKeyState);
 
                 KeyEvent keyEvent(isDown ? Event::KeyDown : Event::KeyUp, key);
                 screensaver.consumeKey(keyEvent);
