@@ -26,7 +26,8 @@ public:
     void process(KeyState &pageKeyState, KeyState &globalKeyState,
                  KeyPressEventTracker &tracker,
                  Screensaver &screensaver,
-                 PageManager &pageManager);
+                 PageManager &pageManager,
+                 bool mapStepKeys = true);
     void enqueue(uint8_t keycode, uint8_t modifiers, uint8_t pressed);
 
 private:

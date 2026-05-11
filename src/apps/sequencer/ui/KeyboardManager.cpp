@@ -77,14 +77,18 @@ void KeyboardManager::init(Engine &engine, MessageManager &messageManager)
 void KeyboardManager::process(KeyState &pageKeyState, KeyState &globalKeyState,
                                KeyPressEventTracker &tracker,
                                Screensaver &screensaver,
-                               PageManager &pageManager)
+                               PageManager &pageManager,
+                               bool mapStepKeys)
 {
     while (_receiveKeyboardEvents.readable()) {
         auto event = _receiveKeyboardEvents.read();
         char ch = hidKeycodeToAscii(event.keycode, event.modifiers);
 
         if (!_engine->isSuspended()) {
-            int step = (event.modifiers & 0x55) ? -1 : hidKeycodeToStep(event.keycode);
+            int step = -1;
+            if (mapStepKeys) {
+                step = (event.modifiers & 0x55) ? -1 : hidKeycodeToStep(event.keycode);
+            }
             if (step >= 0) {
                 bool isDown = event.pressed != 0;
                 int keyCode = MatrixMap::fromStep(step);
