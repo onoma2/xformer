@@ -3,10 +3,10 @@ _Updated: 2026-05-11_
 
 ## 🔴 performer-keyboard-shortcuts — Full Performer UI keyboard shortcuts
 **Status:** active
-**Where I stopped:** Phase 1 hardware-tested and passing. TopPage::keyboard() handles Escape, Space, Alt+letter nav, digits 1-8 track select. Alt+digits kept as redundant fallback (no practical difference from plain digits currently).
-**Next action:** Phase 2: Add F1-F5 keyboard shortcuts to each page type (PatternPage, NoteSequenceEditPage, LayoutPage, etc.)
+**Where I stopped:** Shift+Alt and Caps Lock USB keyboard context menu triggers DO NOT WORK on hardware. Root cause: USB HID path (KeyboardEvent via BasePage::keyboard()) only fires for USB keyboards connected to STM32 USB host — but the Alt keycode (0xE2) may not arrive correctly, or modifier-only keypresses generate no HID report at all. Hardware Shift+Page buttons work through a completely different path (Key::isContextMenu via button matrix). Need alternative approach.
+**Next action:** Decide on working approach for USB keyboard context menu trigger — options: (1) dedicated single key like Tab/Menu, (2) track modifier state across KeyboardEvents in Ui and fire contextShow when both held, (3) remove the non-working code
 **Branch:** feat/global-keyboard
-**Files involved:** TopPage.h/cpp, Event.h, Ui.cpp (handleKeyboard), Page.h/cpp
+**Files involved:** BasePage.cpp, Event.h, Key.h, Ui.cpp (handleKeyboard), KeyPressEventTracker.h
 
 ---
 
