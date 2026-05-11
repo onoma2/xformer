@@ -17,13 +17,31 @@ Implement USB keyboard shortcuts for the full Performer UI — all ~50 page type
 
 **Why NOT a separate global handler before dispatch**: Would need to duplicate consume logic. TopPage is the natural "catch-all" in the existing architecture.
 
+## Architecture Decision — BasePage::keyboard() Chain for Shift+Alt
+
+**Problem**: Context menu (Page+Shift on hardware) needs a keyboard equivalent on every page. Putting it in each page's `keyboard()` is 19 copy-pastes.
+
+**Solution**: `BasePage::keyboard()` virtual method handles Shift+Alt → calls `contextShow()`. Pages that override `keyboard()` forward unconsumed events to `BasePage::keyboard()` (or `ListPage::keyboard()` which chains to it). `contextShow()` is virtual on BasePage (default no-op), overridden by the 19 pages that define context menus.
+
+**ContextMenuPage** gets its own `keyboard()` for F1-F5 item selection and Escape to close.
+
+## Architecture Decision — ListPage Arrow Navigation
+
+**Problem**: The biggest keyboard efficiency gap wasn't F-buttons or letter shortcuts — it was that 20+ list-based pages had no keyboard navigation at all. You needed the encoder for everything.
+
+**Solution**: Single `ListPage::keyboard()` implementation gives all 20 list pages arrow-key navigation:
+- Up/Down = scroll rows
+- Left/Right = edit value (always, no mode toggle needed — keyboard has separate keys for nav vs edit)
+- Enter = toggle edit mode (for visual cursor feedback only)
+- Shift+Left/Right = coarse edit (same as encoder+shift)
+
+**Why not letter shortcuts (Phase 3)**: Mnemonic letter shortcuts are a hardware paradigm. On keyboard, the real bottleneck is encoder interaction. Arrows solve this universally for all 20 list pages with one implementation.
+
 ## Implementation Plan
 
-### Phase 1: TopPage::keyboard() — Global Navigation
+### Phase 1: TopPage::keyboard() — Global Navigation ✅
 
-Add `keyboard()` override to TopPage.h/cpp. This is the catch-all at the bottom of the page stack.
-
-| Shortcut | Action | Maps to |
+|| Shortcut | Action | Maps to |
 |----------|--------|---------|
 | Alt+Q | Sequence page | Page+Step1 |
 | Alt+W | Track page | Page+Step2 |
@@ -41,57 +59,56 @@ Add `keyboard()` override to TopPage.h/cpp. This is the catch-all at the bottom 
 | Alt+1..8 | Track select 1-8 | Track1..8 buttons |
 | Space | Toggle play/stop | Play button |
 | Escape | Pop page / go back | Back navigation |
-| Alt+Shift | Open context menu | Page+Shift |
 
-**Conflict safety**: Alt+key combos never conflict with Teletype text entry because `hidKeycodeToAscii()` strips Alt modifier — Teletype's char handler sees alt-modified keys as their base letter (or `\0`), which means Alt+letter is always "unclaimed" by Teletype pages.
+### Phase 2: Per-page F1-F5 Shortcuts ✅
 
-**Space caution**: TeletypeScriptViewPage doesn't handle Space (it uses Tab for indentation). TeletypePatternViewPage uses Space for toggle 0/1 — it consumes Space, so TopPage never sees it there. On non-Teletype pages Space is safe as toggle play.
-
-**Escape caution**: TeletypeScriptViewPage consumes Escape (clears edit buffer). Pages that need Escape will consume it; TopPage only sees unconsumed Escapes.
-
-**Files to modify**:
-- `TopPage.h` — add `void keyboard(KeyboardEvent &event) override;`
-- `TopPage.cpp` — implement keyboard() with Alt+letter, Space, Escape, 1-8
-
-### Phase 2: Per-page F1-F5 Shortcuts
-
-Each page adds `keyboard()` override mapping F1-F5 to its hardware button equivalents. Higher pages consume first, so no conflicts with Phase 1 globals.
-
-| Page | F1 | F2 | F3 | F4 | F5 |
+|| Page | F1 | F2 | F3 | F4 | F5 |
 |------|----|----|----|----|----|
-| PatternPage | Latch | Sync | Snap | Commit | Cancel |
+| PatternPage | Latch† | Sync† | Snap | Commit | Cancel |
 | NoteSequenceEditPage | Gate cycle | Retrig cycle | Length cycle | Note cycle | Condition |
 | LayoutPage | Mode | Link | Gate | CV | Commit |
 | RoutingPage | Prev route | Next route | Init | Learn | Commit |
 | SongPage | Chain | Insert | Remove | Duplicate | Play/Stop |
-| PerformerPage | Latch | Sync | Unmute | Fill | Cancel |
+| PerformerPage | Latch† | Sync† | Unmute | Fill† | Cancel |
 | SystemPage | Cal | Info | Utils | Update | — |
 | TrackPage | TI Preset | — | — | Sync Outs | — |
 | MonitorPage | CV In | CV Out | MIDI | Stats | Version |
+| CurveSequenceEditPage | — | — | — | — | — |
+| IndexedSequenceEditPage | — | — | — | — | — |
+| IndexedMathPage | — | — | — | — | — |
+| IndexedRouteConfigPage | — | — | — | — | — |
+| DiscreteMapSequencePage | — | — | — | — | — |
+| TuesdayEditPage | — | — | — | — | — |
 
-**Files to modify**: Each page's .h (add `keyboard()` override) and .cpp (implement F-key mapping).
+† held-state buttons use toggle semantics on keyboard (press = toggle on/off, not hold)
 
-### Phase 3: Per-page Letter Shortcuts
+### Phase 2b: ListPage Arrow Navigation ✅
 
-Context-sensitive letter keys for modal actions. Each page's `keyboard()` handles letters specific to its mode.
+Single `ListPage::keyboard()` implementation covers 20 pages:
+- Up/Down = scroll rows
+- Left/Right = edit value (always, no mode toggle needed)
+- Enter = toggle edit mode (visual cursor feedback)
+- Shift+Left/Right = coarse edit
 
-| Page | Key | Action |
-|------|-----|--------|
-| PerformerPage | M | Toggle mute |
-| PerformerPage | S | Solo |
-| LayoutPage | M | Track mode |
-| LayoutPage | L | Track link |
-| LayoutPage | G | Gate assign |
-| LayoutPage | V | CV assign |
-| RoutingPage | L | MIDI learn toggle |
+All ListPage subclasses inherit this. Pages with existing `keyboard()` (Layout/Routing/System/Track) forward unconsumed events to `ListPage::keyboard()`. FileSelectPage adds Enter=OK, Escape=Cancel.
+
+### Phase 2c: Shift+Alt Context Menu + ContextMenuPage Keyboard ✅
+
+- Shift+Alt on any page → calls `contextShow()` (opens Init/Copy/Paste/etc menu)
+- F1-F5 in context menu → select menu item
+- Escape in context menu → close menu
+
+### Phase 3: Per-page Letter Shortcuts (DEFERRED)
+
+Replaced by ListPage arrow navigation (Phase 2b) which covers 20+ pages with a single implementation. Letter shortcuts may still be added for specific high-value actions (e.g., Performer mute/solo) but are not a priority.
 
 ### Phase 4: Step Type-In (NoteSequenceEditPage)
 
-`5N E4` syntax command line for direct step value entry. Modeled on TeletypeScriptViewPage's `_editBuffer`.
+`5N E4` syntax command line for direct step value entry. Modeled on TeletypeScriptViewPage's `_editBuffer`. Not yet started.
 
-### Phase 5: Form Mode (List Pages)
+### Phase 5: Form Mode (List Pages) (DEFERRED)
 
-Tab through list fields, type values directly. Requires `setAbsolute()` on ListModel or direct model setter calls.
+Arrow navigation in Phase 2b covers list page interaction. Direct value type-in could be added later but is not currently needed.
 
 ## Key Files
 
@@ -101,7 +118,10 @@ Tab through list fields, type values directly. Requires `setAbsolute()` on ListM
 | `src/apps/sequencer/ui/Page.h/cpp` | Page base class, `keyboard()` virtual (default no-op), `dispatchEvent()` routing |
 | `src/apps/sequencer/ui/PageManager.h/cpp` | Page stack, `dispatchEvent()` top-to-bottom with consume |
 | `src/apps/sequencer/ui/Ui.h/cpp` | `handleKeyboard()`, `enqueueKeyboardEvent()`, `hidKeycodeToAscii()` |
-| `src/apps/sequencer/ui/pages/TopPage.h/cpp` | **Primary target** — add `keyboard()` override for global shortcuts |
+| `src/apps/sequencer/ui/pages/BasePage.h/cpp` | `keyboard()` virtual — Shift+Alt context menu, `contextShow()` virtual (default no-op), `pressFunctionButton()` |
+| `src/apps/sequencer/ui/pages/ListPage.h/cpp` | `keyboard()` — arrow nav (Up/Down/Left/Right/Enter) for all 20 list pages |
+| `src/apps/sequencer/ui/pages/TopPage.h/cpp` | Global catch-all — Escape, Space, Alt+letter, digits |
+| `src/apps/sequencer/ui/pages/ContextMenuPage.h/cpp` | `keyboard()` — F1-F5 item select, Escape close |
 | `src/apps/sequencer/ui/Screensaver.h/cpp` | `consumeKey()` — runs before page dispatch |
 
 ## Event Dispatch Reference
@@ -117,6 +137,19 @@ KeyboardEvent flow:
         └─ Else: top→bottom, stop at event.consumed()
             TopPage (stack[0]) is LAST to see events
             Teletype pages (stack[1+]) see events FIRST
+```
+
+Keyboard dispatch chain for page-specific handling:
+```
+Page::keyboard() (virtual, default → BasePage::keyboard())
+  ├─ Shift+Alt? → contextShow()   ← handled by BasePage
+  └─ (unconsumed) → falls through to TopPage::keyboard() for globals
+ListPage::keyboard() (overrides BasePage::keyboard())
+  ├─ Arrow keys / Enter → list nav & edit
+  └─ BasePage::keyboard() for Shift+Alt
+Pages with their own keyboard() (Layout, Routing, System, Track, etc.)
+  ├─ F1-F5 handling
+  └─ ListPage::keyboard() for arrows → BasePage::keyboard() for Shift+Alt
 ```
 
 **Key property**: TopPage::keyboard() only sees events that NO higher page consumed. This guarantees zero conflict with Teletype or any future page-specific handler.
@@ -138,6 +171,11 @@ KeyboardEvent flow:
 - 2026-05-11: **BUG fix**: Removed UsbH.cpp debug HUD message callback that overwrote "KEYBOARD CONNECTED" with "HID 0 t=3". Also removed DBG() prints from connect/disconnect handlers.
 - 2026-05-11: **Architecture decision**: TopPage::keyboard() as global catch-all (stack position 0). No separate global handler needed. Preserves consume mechanism. Zero-conflict with Teletype pages by design.
 - 2026-05-11: **Phase 1 hardware test PASS**: Escape=back, Space=play/stop, Alt+letter nav, digits 1-8 track select, Alt+digits track select all working. Alt+digits kept as redundant but safe fallback (Alt strips printability from Teletype). No conflicts with Teletype pages.
+- 2026-05-11: **Phase 2 hardware test PASS**: F1-F5 working on all 15 pages. Held-state buttons (Latch/Sync/Fill) on PerformerPage and PatternPage use toggle semantics instead of instant keyDown→keyUp.
+- 2026-05-11: **Bug fix**: PerformerPage F1(Latch), F2(Sync), F4(Fill) and PatternPage F1(Latch), F2(Sync) were held-state buttons — `pressFunctionButton()` did instant keyDown→keyPress→keyUp which immediately undid the state. Fixed to use toggle semantics (`_latching = !_latching` with commit on release).
+- 2026-05-11: **Phase 2b decision**: ListPage arrow navigation replaces per-page letter shortcuts. Arrow keys are universal metaphor (no memorization), covers 20 pages with one implementation, and solves the real bottleneck (encoder dependency). Phase 3 deferred.
+- 2026-05-11: **Phase 2c decision**: Shift+Alt for context menu. BasePage::keyboard() virtual method with contextShow() virtual (default no-op). Pages with context menus override it. ContextMenuPage gets keyboard() for F1-F5 and Escape. All existing keyboard() overrides forward unconsumed to BasePage::keyboard() for Shift+Alt.
+- 2026-05-11: **Arrow nav design**: Up/Down always scrolls rows. Left/Right always edits (no mode toggle — keyboard has dedicated keys unlike hardware encoder which doubles up). Enter toggles edit mode for visual cursor feedback only.
 
 ## Completed steps
 
@@ -152,9 +190,15 @@ KeyboardEvent flow:
 - [x] Hardware test confirmed — everything working
 - [x] Architecture analysis for global shortcuts (TopPage::keyboard catch-all)
 - [x] Phase 1: TopPage::keyboard() — Escape=back, Space=play, Alt+letter nav, 1-8 track select, Alt+digits track select
+- [x] Phase 2: F1-F5 on all 15 page types (with toggle semantics for held-state buttons)
+- [x] Phase 2b: ListPage::keyboard() — Up/Down/Left/Right/Enter arrow nav for all 20 list pages
+- [x] Phase 2b: FileSelectPage — Enter=OK, Escape=Cancel
+- [x] Phase 2c: BasePage::keyboard() — Shift+Alt context menu trigger (virtual contextShow)
+- [x] Phase 2c: ContextMenuPage::keyboard() — F1-F5 select, Escape close
+- [x] Bug fix: PerformerPage/PatternPage held-state F-buttons use toggle semantics
 
 ## Next actions
 
-1. Add `keyboard()` override to TopPage.h/cpp with Alt+letter navigation, Space=play, Escape=back
-2. Test on hardware that Alt+letter works on Teletype pages (should not intercept — Teletype consumes chars first)
-3. Add Space=toggle play handling, verify PatternView's Space (toggle 0/1) still works (it consumes first)
+1. Hardware test: verify Shift+Alt opens context menus, arrows work in list pages, Enter toggles edit mode
+2. Hardware test: verify ContextMenuPage F1-F5 and Escape work
+3. Phase 4: Step type-in on NoteSequenceEditPage (if desired)
