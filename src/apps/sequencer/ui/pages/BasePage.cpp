@@ -37,17 +37,42 @@ void BasePage::pressFunctionButton(int functionIndex, bool shift) {
 }
 
 void BasePage::keyboard(KeyboardEvent &event) {
-    if (event.keycode() == KeyboardEvent::KeyTab && event.isPressed()) {
-        // Simulate hardware Shift+Page press via proven keyDown/keyPress path.
-        // No keyUp — let the user close menu via Escape/Fn keys.
-        KeyState state;
-        state.set(Key::Shift);
-        state.set(Key::Page);
-        Key key(Key::Page, state);
-        KeyEvent downEvent(KeyEvent::KeyDown, key);
-        keyDown(downEvent);
-        KeyPressEvent pressEvent(KeyEvent::KeyPress, key, 1);
-        keyPress(pressEvent);
-        event.consume();
+    if (event.isPressed()) {
+        if (event.keycode() == KeyboardEvent::KeyTab) {
+            KeyState state;
+            state.set(Key::Shift);
+            state.set(Key::Page);
+            Key key(Key::Page, state);
+            KeyEvent downEvent(KeyEvent::KeyDown, key);
+            keyDown(downEvent);
+            KeyPressEvent pressEvent(KeyEvent::KeyPress, key, 1);
+            keyPress(pressEvent);
+            event.consume();
+            return;
+        }
+
+        if (event.keycode() == KeyboardEvent::KeyLeft) {
+            KeyState state;
+            if (event.shift()) { state.set(Key::Shift); }
+            Key key(Key::Left, state);
+            KeyEvent downEvent(KeyEvent::KeyDown, key);
+            keyDown(downEvent);
+            KeyPressEvent pressEvent(KeyEvent::KeyPress, key, 1);
+            keyPress(pressEvent);
+            event.consume();
+            return;
+        }
+
+        if (event.keycode() == KeyboardEvent::KeyRight) {
+            KeyState state;
+            if (event.shift()) { state.set(Key::Shift); }
+            Key key(Key::Right, state);
+            KeyEvent downEvent(KeyEvent::KeyDown, key);
+            keyDown(downEvent);
+            KeyPressEvent pressEvent(KeyEvent::KeyPress, key, 1);
+            keyPress(pressEvent);
+            event.consume();
+            return;
+        }
     }
 }
