@@ -38,7 +38,7 @@ public:
 
     MessageManager &messageManager() { return _messageManager; }
 
-    void enqueueKeyboardEvent(uint8_t keycode, uint8_t modifiers, uint8_t pressed);
+    void enqueueKeyboardEvent(uint8_t keycode, uint8_t modifiers);
 
 private:
     void handleKeys();
@@ -63,7 +63,6 @@ private:
     struct ReceiveKeyboardEvent {
         uint8_t keycode;
         uint8_t modifiers;
-        uint8_t pressed;
     };
     RingBuffer<ReceiveKeyboardEvent, 16> _receiveKeyboardEvents;
 

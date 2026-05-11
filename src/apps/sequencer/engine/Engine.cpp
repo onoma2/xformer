@@ -996,7 +996,7 @@ void Engine::receiveKeyboard() {
     HidKeyEvent keyEvent;
     while (_usbH.recvKey(&keyEvent)) {
         if (_keyboardReceiveHandler) {
-            _keyboardReceiveHandler(keyEvent.keycode, keyEvent.modifiers, keyEvent.pressed);
+            _keyboardReceiveHandler(keyEvent.keycode, keyEvent.modifiers);
         }
     }
 }

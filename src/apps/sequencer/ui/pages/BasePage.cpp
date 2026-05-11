@@ -37,31 +37,9 @@ void BasePage::pressFunctionButton(int functionIndex, bool shift) {
 }
 
 void BasePage::keyboard(KeyboardEvent &event) {
-    static constexpr uint8_t stepKeycodes[] = {
-        KeyboardEvent::KeyQ, KeyboardEvent::KeyW, KeyboardEvent::KeyE, KeyboardEvent::KeyR,
-        KeyboardEvent::KeyT, KeyboardEvent::KeyY, KeyboardEvent::KeyU, KeyboardEvent::KeyI,
-        KeyboardEvent::KeyA, KeyboardEvent::KeyS, KeyboardEvent::KeyD, KeyboardEvent::KeyF,
-        KeyboardEvent::KeyG, KeyboardEvent::KeyH, KeyboardEvent::KeyJ, KeyboardEvent::KeyK,
-    };
-
-    for (int i = 0; i < 16; i++) {
-        if (event.keycode() == stepKeycodes[i]) {
-            Key key(MatrixMap::fromStep(i), _context.globalKeyState);
-            if (event.isPressed()) {
-                KeyEvent downEvent(KeyEvent::KeyDown, key);
-                keyDown(downEvent);
-                KeyPressEvent pressEvent(KeyEvent::KeyPress, key, 1);
-                keyPress(pressEvent);
-            } else {
-                KeyEvent upEvent(KeyEvent::KeyUp, key);
-                keyUp(upEvent);
-            }
-            event.consume();
-            return;
-        }
-    }
-
-    if (event.keycode() == KeyboardEvent::KeyTab && event.isPressed()) {
+    if (event.keycode() == KeyboardEvent::KeyTab) {
+        // Simulate hardware Shift+Page press via proven keyDown/keyPress path.
+        // No keyUp — let the user close menu via Escape/Fn keys.
         KeyState state;
         state.set(Key::Shift);
         state.set(Key::Page);

@@ -48,7 +48,7 @@ public:
     using UsbMidiConnectHandler = std::function<void(uint16_t vendorId, uint16_t productId)>;
     using UsbMidiDisconnectHandler = std::function<void()>;
 
-    using KeyboardReceiveHandler = std::function<void(uint8_t keycode, uint8_t modifiers, uint8_t pressed)>;
+    using KeyboardReceiveHandler = std::function<void(uint8_t keycode, uint8_t modifiers)>;
     using HidConnectHandler = std::function<void(uint8_t device_id, int type)>;
     using HidDisconnectHandler = std::function<void(uint8_t device_id)>;
 

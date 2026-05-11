@@ -77,7 +77,7 @@ struct hid_report_decriptor {
 	} __attribute__((packed)) report_descriptors_info[];
 } __attribute__((packed));
 
-static void enqueue_key(uint8_t device_id, uint8_t modifiers, uint8_t keycode, uint8_t pressed);
+static void enqueue_key(uint8_t device_id, uint8_t modifiers, uint8_t keycode);
 
 static hid_device_t hid_device[USBH_HID_MAX_DEVICES];
 static hid_config_t hid_config;
@@ -269,20 +269,7 @@ static void event(usbh_device_t *dev, usbh_packet_callback_data_t cb_data)
 							}
 						}
 						if (!found) {
-							enqueue_key(id, modifiers, cur_keys[ci], 1);
-						}
-					}
-					// Detect released keys
-					for (int pi = 0; pi < prev_key_count[id]; pi++) {
-						bool found = false;
-						for (int ci = 0; ci < cur_count; ci++) {
-							if (prev_keys[id][pi] == cur_keys[ci]) {
-								found = true;
-								break;
-							}
-						}
-						if (!found) {
-							enqueue_key(id, modifiers, prev_keys[id][pi], 0);
+							enqueue_key(id, modifiers, cur_keys[ci]);
 						}
 					}
 					memcpy(prev_keys[id], cur_keys, cur_count);
@@ -394,9 +381,6 @@ static void poll(void *drvdata, uint32_t time_curr_us)
 static void remove(void *drvdata)
 {
 	hid_device_t *hid = (hid_device_t *)drvdata;
-	uint8_t id = hid->device_id;
-	prev_key_count[id] = 0;
-	memset(prev_keys[id], 0, sizeof(prev_keys[id]));
 	hid->state_next = STATE_INACTIVE;
 	hid->endpoint_in_address = 0;
 }
@@ -461,15 +445,15 @@ bool hid_read_key(HidKeyEvent *event) {
 	return true;
 }
 
-static void enqueue_key(uint8_t device_id, uint8_t modifiers, uint8_t keycode, uint8_t pressed) {
+static void enqueue_key(uint8_t device_id, uint8_t modifiers, uint8_t keycode) {
 	uint8_t next_head = (key_buffer_head + 1) % HID_KEY_BUFFER_SIZE;
 	if (next_head == key_buffer_tail) {
-		return;
+		return; // buffer full, drop event
 	}
 	key_buffer[key_buffer_head].device_id = device_id;
 	key_buffer[key_buffer_head].modifiers = modifiers;
 	key_buffer[key_buffer_head].keycode = keycode;
-	key_buffer[key_buffer_head].pressed = pressed;
+	key_buffer[key_buffer_head].pressed = (keycode != 0);
 	key_buffer_head = next_head;
 }
 

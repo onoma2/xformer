@@ -10,7 +10,6 @@
 
 #include "engine/Engine.h"
 
-#include <bitset>
 #include <cstdint>
 
 struct PageContext {

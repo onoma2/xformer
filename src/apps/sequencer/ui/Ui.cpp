@@ -64,8 +64,8 @@ void Ui::init() {
         _controllerManager.disconnect();
     });
 
-    _engine.setKeyboardReceiveHandler([this] (uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
-        enqueueKeyboardEvent(keycode, modifiers, pressed);
+    _engine.setKeyboardReceiveHandler([this] (uint8_t keycode, uint8_t modifiers) {
+        enqueueKeyboardEvent(keycode, modifiers);
     });
 
     _engine.setHidConnectHandler([this] (uint8_t device_id, int type) {
@@ -250,7 +250,7 @@ void Ui::handleKeyboard() {
     while (_receiveKeyboardEvents.readable()) {
         auto event = _receiveKeyboardEvents.read();
         char ch = hidKeycodeToAscii(event.keycode, event.modifiers);
-        KeyboardEvent kbEvent(event.keycode, event.modifiers, ch, event.pressed);
+        KeyboardEvent kbEvent(event.keycode, event.modifiers, ch);
 
         if (!_engine.isSuspended()) {
             _screensaver.consumeKey(kbEvent);
@@ -259,9 +259,9 @@ void Ui::handleKeyboard() {
     }
 }
 
-void Ui::enqueueKeyboardEvent(uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
+void Ui::enqueueKeyboardEvent(uint8_t keycode, uint8_t modifiers) {
     if (!_receiveKeyboardEvents.writable()) {
         _receiveKeyboardEvents.read();
     }
-    _receiveKeyboardEvents.write({ keycode, modifiers, pressed });
+    _receiveKeyboardEvents.write({ keycode, modifiers });
 }
