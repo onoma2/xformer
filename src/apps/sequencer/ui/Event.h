@@ -97,16 +97,18 @@ private:
 
 class KeyboardEvent : public Event {
 public:
-    KeyboardEvent(uint8_t keycode, uint8_t modifiers, char ch) :
+    KeyboardEvent(uint8_t keycode, uint8_t modifiers, char ch, uint8_t pressed = 1) :
         Event(Event::Keyboard),
         _keycode(keycode),
         _modifiers(modifiers),
-        _ch(ch)
+        _ch(ch),
+        _pressed(pressed)
     {}
 
     uint8_t keycode() const { return _keycode; }
     uint8_t modifiers() const { return _modifiers; }
     char ch() const { return _ch; }
+    bool isPressed() const { return _pressed; }
 
     bool shift() const { return _modifiers & 0x22; }
     bool ctrl() const { return _modifiers & 0x11; }
@@ -131,8 +133,27 @@ public:
     static constexpr uint8_t KeyF5 = 0x3E;
     static constexpr uint8_t KeyF6 = 0x3F;
 
+    // QWERTY step mapping: letters Q-I = S0-S7, A-K = S8-S15
+    static constexpr uint8_t KeyQ = 0x14;
+    static constexpr uint8_t KeyW = 0x1A;
+    static constexpr uint8_t KeyE = 0x08;
+    static constexpr uint8_t KeyR = 0x15;
+    static constexpr uint8_t KeyT = 0x17;
+    static constexpr uint8_t KeyY = 0x1C;
+    static constexpr uint8_t KeyU = 0x18;
+    static constexpr uint8_t KeyI = 0x0C;
+    static constexpr uint8_t KeyA = 0x04;
+    static constexpr uint8_t KeyS = 0x16;
+    static constexpr uint8_t KeyD = 0x07;
+    static constexpr uint8_t KeyF = 0x09;
+    static constexpr uint8_t KeyG = 0x0A;
+    static constexpr uint8_t KeyH = 0x0B;
+    static constexpr uint8_t KeyJ = 0x0D;
+    static constexpr uint8_t KeyK = 0x0E;
+
 private:
     uint8_t _keycode;
     uint8_t _modifiers;
     char _ch;
+    uint8_t _pressed;
 };
