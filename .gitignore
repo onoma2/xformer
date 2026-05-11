@@ -105,3 +105,4 @@ dkms.conf
 *.dwo
 
 temp-ref/
+skills/
