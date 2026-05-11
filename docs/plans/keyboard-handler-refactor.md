@@ -3,7 +3,7 @@ id: keyboard-handler-refactor
 schema: plan
 date: 2026-05-11
 topic: keyboard-manager-refactor
-status: design-draft
+status: implemented
 branch: feat/global-keyboard
 predecessor: .tasks/usb-keyboard-manager-refactor.md
 ---
