@@ -104,6 +104,12 @@ void ContextMenuPage::keyboard(KeyboardEvent &event) {
         if (_contextMenuModel->itemEnabled(4)) { closeAndCallback(4); }
         event.consume();
         break;
+    case KeyboardEvent::KeyEnter:
+        if (_contextMenuModel->itemEnabled(0)) {
+            closeAndCallback(0);
+        }
+        event.consume();
+        break;
     case KeyboardEvent::KeyEscape:
         close();
         event.consume();
