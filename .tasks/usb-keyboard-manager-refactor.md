@@ -51,7 +51,7 @@ Refactor the USB HID Keyboard handling towards a `KeyboardManager` inspired by t
 - [x] Initial research into current keyboard data flow
 - [x] Brainstorm and adversarial analysis of the refactor plan
 - [x] **Phase 1**: Create skeleton `KeyboardManager` — class created, wired into `Ui`, delegates `process()` via callback to `Ui::handleKeyboard()`. Builds cleanly for sim target.
-- [x] **Phase 4**: Move all dispatch logic (KeyState mutation, event synthesis, screensaver/page dispatch) into `KeyboardManager::process(KeyState&, KeyState&, KeyPressEventTracker&, Screensaver&, PageManager&)`. Removed `handleKeyboardEvent()` from `Ui`. Ui calls `_keyboardManager.process(...)` with its state objects.
+- [x] **Phase 5**: Move HID connect/disconnect and keyboard receive handler registrations into `KeyboardManager::init()`. Added `MessageManager &` reference. Removed all three handler lambdas from `Ui::init()`.
 
 ## Notes
 - Reference `src/apps/sequencer/ui/ControllerManager.cpp` for pattern matching.

@@ -45,13 +45,33 @@ int KeyboardManager::hidKeycodeToStep(uint8_t keycode) {
 }
 
 KeyboardManager::KeyboardManager() :
-    _engine(nullptr)
+    _engine(nullptr),
+    _messageManager(nullptr)
 {
 }
 
-void KeyboardManager::init(Engine &engine)
+void KeyboardManager::init(Engine &engine, MessageManager &messageManager)
 {
     _engine = &engine;
+    _messageManager = &messageManager;
+
+    _engine->setKeyboardReceiveHandler([this] (uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
+        enqueue(keycode, modifiers, pressed);
+    });
+
+    _engine->setHidConnectHandler([this] (uint8_t device_id, int type) {
+        (void)device_id;
+        switch (type) {
+        case 3: _messageManager->showMessage("KEYBOARD CONNECTED", 3000); break;
+        case 2: _messageManager->showMessage("MOUSE CONNECTED", 3000); break;
+        default: _messageManager->showMessage("HID CONNECTED", 3000); break;
+        }
+    });
+
+    _engine->setHidDisconnectHandler([this] (uint8_t device_id) {
+        (void)device_id;
+        _messageManager->showMessage("DEVICE REMOVED", 3000);
+    });
 }
 
 void KeyboardManager::process(KeyState &pageKeyState, KeyState &globalKeyState,

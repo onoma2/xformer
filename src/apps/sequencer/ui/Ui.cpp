@@ -65,25 +65,7 @@ void Ui::init() {
         _controllerManager.disconnect();
     });
 
-    _keyboardManager.init(_engine);
-
-    _engine.setKeyboardReceiveHandler([this] (uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
-        _keyboardManager.enqueue(keycode, modifiers, pressed);
-    });
-
-    _engine.setHidConnectHandler([this] (uint8_t device_id, int type) {
-        (void)device_id;
-        switch (type) {
-        case 3: _messageManager.showMessage("KEYBOARD CONNECTED", 3000); break;
-        case 2: _messageManager.showMessage("MOUSE CONNECTED", 3000); break;
-        default: _messageManager.showMessage("HID CONNECTED", 3000); break;
-        }
-    });
-
-    _engine.setHidDisconnectHandler([this] (uint8_t device_id) {
-        (void)device_id;
-        _messageManager.showMessage("DEVICE REMOVED", 3000);
-    });
+    _keyboardManager.init(_engine, _messageManager);
 
     _engine.setMessageHandler([this] (const char *text, uint32_t duration) {
         _messageManager.showMessage(text, duration);

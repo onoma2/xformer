@@ -9,6 +9,7 @@
 #include "Screensaver.h"
 #include "PageManager.h"
 #include "MatrixMap.h"
+#include "MessageManager.h"
 
 #include "core/utils/RingBuffer.h"
 
@@ -21,7 +22,7 @@ public:
 
     KeyboardManager();
 
-    void init(Engine &engine);
+    void init(Engine &engine, MessageManager &messageManager);
     void process(KeyState &pageKeyState, KeyState &globalKeyState,
                  KeyPressEventTracker &tracker,
                  Screensaver &screensaver,
@@ -36,4 +37,5 @@ private:
     };
     RingBuffer<ReceiveKeyboardEvent, 16> _receiveKeyboardEvents;
     Engine *_engine;
+    MessageManager *_messageManager;
 };
