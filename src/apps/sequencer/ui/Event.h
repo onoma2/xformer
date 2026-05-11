@@ -129,6 +129,7 @@ public:
     static constexpr uint8_t KeyF3 = 0x3C;
     static constexpr uint8_t KeyF4 = 0x3D;
     static constexpr uint8_t KeyF5 = 0x3E;
+    static constexpr uint8_t KeyF6 = 0x3F;
 
 private:
     uint8_t _keycode;

@@ -24,3 +24,4 @@
 ## Considerations
 - RAM is the tight constraint; flash has plenty of margin.
 - To free RAM: shrink note-step fields/pattern count/snapshots, reduce UI/page caches, or trim task stack sizes; prefer moving non-DMA data to CCM if SRAM pressure rises.
+- **Never commit ANY changes without testing on hardware.** Every commit must be flashed and verified on the STM32 module before pushing.

@@ -1216,6 +1216,10 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         insertChar(ch);
         event.consume();
     }
+
+    // Forward unconsumed events (including modifier-only combos like Shift+Alt)
+    // to BasePage for context menu detection.
+    BasePage::keyboard(event);
 }
 
 void TeletypeScriptViewPage::commitLineAndAdvance() {

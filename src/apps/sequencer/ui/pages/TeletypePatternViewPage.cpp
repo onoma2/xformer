@@ -597,6 +597,10 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
         event.consume();
         return;
     }
+
+    // Forward unconsumed events (including modifier-only combos like Shift+Alt)
+    // to BasePage for context menu detection.
+    BasePage::keyboard(event);
 }
 
 void TeletypePatternViewPage::setPatternIndex(int pattern) {

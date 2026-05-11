@@ -271,6 +271,8 @@ void TopPage::keyboard(KeyboardEvent &event) {
             return;
         }
     }
+
+    BasePage::keyboard(event);
 }
 
 void TopPage::selectTrackWithViewSync(int trackIndex) {

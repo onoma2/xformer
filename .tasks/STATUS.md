@@ -3,10 +3,10 @@ _Updated: 2026-05-11_
 
 ## 🔴 performer-keyboard-shortcuts — Full Performer UI keyboard shortcuts
 **Status:** active
-**Where I stopped:** Shift+Alt and Caps Lock USB keyboard context menu triggers DO NOT WORK on hardware. Root cause: USB HID path (KeyboardEvent via BasePage::keyboard()) only fires for USB keyboards connected to STM32 USB host — but the Alt keycode (0xE2) may not arrive correctly, or modifier-only keypresses generate no HID report at all. Hardware Shift+Page buttons work through a completely different path (Key::isContextMenu via button matrix). Need alternative approach.
-**Next action:** Decide on working approach for USB keyboard context menu trigger — options: (1) dedicated single key like Tab/Menu, (2) track modifier state across KeyboardEvents in Ui and fire contextShow when both held, (3) remove the non-working code
+**Where I stopped:** Tab and Alt+M context menu triggers NOT working on hardware. Root cause: TopPage::keyboard() was not chaining to BasePage::keyboard() — fixed with one-line addition. But even with the fix, Tab (0x2B) and Alt+M do not open the context menu on hardware. F1-F5 and letter keys work fine for their respective shortcuts. The USB HID driver is enqueuing regular keycodes correctly but Tab and Alt+letter combos may not be reaching BasePage::keyboard() for unknown reasons. Need to investigate whether the keycodes are being enqueued at all, or if something in the dispatch chain is consuming them.
+**Next action:** Add debug message to TopPage::keyboard() to log every KeyboardEvent keycode received, then test on hardware
 **Branch:** feat/global-keyboard
-**Files involved:** BasePage.cpp, Event.h, Key.h, Ui.cpp (handleKeyboard), KeyPressEventTracker.h
+**Files involved:** TopPage.cpp, BasePage.cpp, Event.h, usbh_driver_hid.c, TeletypeScriptViewPage.cpp, TeletypePatternViewPage.cpp
 
 ---
 

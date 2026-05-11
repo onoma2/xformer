@@ -38,7 +38,10 @@ void BasePage::pressFunctionButton(int functionIndex, bool shift) {
 }
 
 void BasePage::keyboard(KeyboardEvent &event) {
-    if (event.shift() && event.alt()) {
+    if (event.keycode() == KeyboardEvent::KeyTab) {
+        contextShow();
+        event.consume();
+    } else if (event.alt() && event.ch() == 'M') {
         contextShow();
         event.consume();
     }
