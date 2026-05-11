@@ -107,12 +107,18 @@ public:
 
     uint8_t keycode() const { return _keycode; }
     uint8_t modifiers() const { return _modifiers; }
-    char ch() const { return _ch; }
     bool isPressed() const { return _pressed; }
 
     bool shift() const { return _modifiers & 0x22; }
     bool ctrl() const { return _modifiers & 0x11; }
     bool alt() const { return _modifiers & 0x44; }
+    bool gui() const { return _modifiers & 0x88; }
+
+    char chRaw() const { return _ch; }
+    char ch() const {
+        if (_modifiers & (0x11 | 0x44 | 0x88)) return 0;
+        return _ch;
+    }
 
     static constexpr uint8_t KeyEnter = 0x28;
     static constexpr uint8_t KeyEscape = 0x29;

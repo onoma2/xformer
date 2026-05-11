@@ -228,7 +228,7 @@ void TopPage::keyboard(KeyboardEvent &event) {
     // Alt + key combos: page navigation & track select
     if (event.alt()) {
         bool handled = true;
-        switch (event.ch()) {
+        switch (event.chRaw()) {
         case '1': selectTrackWithViewSync(0); break;
         case '2': selectTrackWithViewSync(1); break;
         case '3': selectTrackWithViewSync(2); break;
