@@ -96,19 +96,11 @@ void ListPage::keyboard(KeyboardEvent &event) {
         event.consume();
         break;
     case KeyboardEvent::KeyLeft:
-        if (_edit) {
-            _listModel->edit(_selectedRow, 1, -1, event.shift());
-        } else {
-            setSelectedRow(selectedRow() - 1);
-        }
+        _listModel->edit(_selectedRow, 1, -1, event.shift());
         event.consume();
         break;
     case KeyboardEvent::KeyRight:
-        if (_edit) {
-            _listModel->edit(_selectedRow, 1, 1, event.shift());
-        } else {
-            setSelectedRow(selectedRow() + 1);
-        }
+        _listModel->edit(_selectedRow, 1, 1, event.shift());
         event.consume();
         break;
     case KeyboardEvent::KeyEnter:
