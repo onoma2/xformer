@@ -3,21 +3,15 @@ _Updated: 2026-05-11_
 
 ## 🔴 performer-keyboard-shortcuts — USB keyboard context menu
 **Status:** active
-**Where I stopped:** 8 approaches tried, ALL failed on hardware. Tab keycode 43 confirmed reaching BasePage::keyboard(). Latest A8: hardware Key injection without KeyUp — debug messages gone, no menu. Fundamental issue: KeyboardEvent path is a separate dispatch from hardware KeyEvent path, and contextShow() or Key injection from within keyboard() do not produce visible results. Need fundamentally different approach — possibly route KeyboardEvent through PageManager::dispatchEvent as a KeyEvent.
-**Next action:** Investigate converting KeyboardEvent to KeyPressEvent and dispatching via PageManager instead of calling page handlers directly
+**Where I stopped:** BREAKTHROUGH — A8 hardware Key injection WORKS on NoteSequencePage (Tab opens context menu). Does NOT work on NoteSequenceEditPage (step edit view). CTX! debug message added to NoteSequenceEditPage::keyPress() to check if isContextMenu() is reached. Edit page overrides keyDown() which calls StepSelection — may interfere but shouldn't. Need hardware test.
+**Next action:** Flash CTX! debug build, press Tab on NoteSequenceEditPage, check if "CTX!" message appears
 **Branch:** feat/global-keyboard
 
 ---
 
 ## Approach history
-- **A1: Shift+Alt via `event.shift() && event.alt()`** — Broken: USB HID driver enqueues keycodes only, not modifier-only events.
-- **A2: CapsLock keycode (0x39)** — Same root cause as A1. Keyboards may not report it in boot protocol.
-- **A3: F12 keycode** — Not tested, superseded.
-- **A4: Tab & Alt+M via KeyboardEvent → contextShow()** — TopPage::keyboard() wasn't chaining. Fixed. Still no menu.
-- **A5: Tab & Alt+M via KeyboardEvent → hardware Key injection (with KeyUp)** — Immediate KeyUp closes the menu.
-- **A6: Tab & Alt+M via KeyboardEvent → contextShow() (retry with TopPage chain)** — No menu.
-- **A7: Debug build showMessage("KB:")** — Confirmed Tab keycode 43 reaches BasePage::keyboard() on NoteSequencePage. contextShow() called but no menu.
-- **A8: Tab via KeyboardEvent → hardware Key injection (no KeyUp)** — Debug messages gone, no menu. Broken.
+- **A8 (PARTIAL SUCCESS):** Tab via KeyboardEvent → hardware Key injection (keyDown + keyPress, no keyUp) → Works on NoteSequencePage. Does not work on NoteSequenceEditPage — investigating.
+- **A1-A7:** All failed — see previous commits.
 
 ---
 
