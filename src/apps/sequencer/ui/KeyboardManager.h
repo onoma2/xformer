@@ -11,6 +11,9 @@ class KeyboardManager {
 public:
     using ProcessHandler = std::function<void(uint8_t keycode, uint8_t modifiers, uint8_t pressed)>;
 
+    static char hidKeycodeToAscii(uint8_t keycode, uint8_t modifiers);
+    static int hidKeycodeToStep(uint8_t keycode);
+
     KeyboardManager();
 
     void init(Engine &engine);

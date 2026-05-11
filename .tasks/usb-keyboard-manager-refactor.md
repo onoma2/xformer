@@ -51,7 +51,7 @@ Refactor the USB HID Keyboard handling towards a `KeyboardManager` inspired by t
 - [x] Initial research into current keyboard data flow
 - [x] Brainstorm and adversarial analysis of the refactor plan
 - [x] **Phase 1**: Create skeleton `KeyboardManager` — class created, wired into `Ui`, delegates `process()` via callback to `Ui::handleKeyboard()`. Builds cleanly for sim target.
-- [x] **Phase 2**: Move `ReceiveKeyboardEvent` struct, ring buffer, and `enqueue()` into `KeyboardManager`. Engine callback now calls `_keyboardManager.enqueue()`. KeyboardManager processes buffer and calls per-event handler. Old members removed from `Ui.h`.
+- [x] **Phase 3**: Extract `hidKeycodeToAscii()` and `hidKeycodeToStep()` into `KeyboardManager` as public static methods. Removed old static functions from `Ui.cpp`. Ui calls `KeyboardManager::hidKeycodeToAscii/Step()` directly.
 
 ## Notes
 - Reference `src/apps/sequencer/ui/ControllerManager.cpp` for pattern matching.
