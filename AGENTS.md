@@ -1,5 +1,8 @@
 # AGENTS Session Notes
 
+## RULES
+- Never make user-facing out-of-scope additions/changes without asking the user first.
+
 ## Codebase overview
 - Firmware for PER|FORMER/XFORMER sequencer: STM32F405 hardware app plus macOS/Linux simulator.
 - Main app `src/apps/sequencer/Sequencer.cpp` sets up drivers (ADC/DAC/gates/MIDI/LCD/SD), model/engine/UI, and FreeRTOS tasks.
