@@ -1,12 +1,23 @@
 # Task Board
 _Updated: 2026-05-11_
 
-## 🔴 performer-keyboard-shortcuts — Full Performer UI keyboard shortcuts
+## 🔴 performer-keyboard-shortcuts — USB keyboard context menu
 **Status:** active
-**Where I stopped:** Tab and Alt+M context menu triggers NOT working on hardware. Root cause: TopPage::keyboard() was not chaining to BasePage::keyboard() — fixed with one-line addition. But even with the fix, Tab (0x2B) and Alt+M do not open the context menu on hardware. F1-F5 and letter keys work fine for their respective shortcuts. The USB HID driver is enqueuing regular keycodes correctly but Tab and Alt+letter combos may not be reaching BasePage::keyboard() for unknown reasons. Need to investigate whether the keycodes are being enqueued at all, or if something in the dispatch chain is consuming them.
-**Next action:** Add debug message to TopPage::keyboard() to log every KeyboardEvent keycode received, then test on hardware
+**Where I stopped:** Debug build deployed — showMessage("KB:%d", 2000) added to BasePage::keyboard() to verify if KeyboardEvents reach it at all. Three previous approaches tried and failed on hardware: (1) Shift+Alt via shift()&&alt() — USB HID driver only enqueues keycodes, not modifier-only events; (2) CapsLock keycode — keyboards may not report it in boot protocol; (3) Tab/Alt+M via KeyboardEvent path — keycodes reach pages but contextShow() didn't fire; (4) Tab/Alt+M via hardware Key injection — immediate KeyUp closes the menu. TopPage::keyboard() now chains to BasePage::keyboard(). All need hardware testing.
+**Next action:** Flash debug build, press any USB key on NoteSequence page, check if "KB:" message appears
 **Branch:** feat/global-keyboard
-**Files involved:** TopPage.cpp, BasePage.cpp, Event.h, usbh_driver_hid.c, TeletypeScriptViewPage.cpp, TeletypePatternViewPage.cpp
+**Files involved:** TopPage.cpp, BasePage.cpp, Event.h, TeletypeScriptViewPage.cpp, TeletypePatternViewPage.cpp
+
+---
+
+## Approach history
+- **A1: Shift+Alt via `event.shift() && event.alt()`** — Broken: USB HID driver only enqueues events for new keycodes, not modifier-only changes. CapsLock keycode (0x39) also unreliable across keyboards.
+- **A2: CapsLock keycode** — Same root cause as A1.
+- **A3: F12 keycode** — Not tested, superseded by A5.
+- **A4: Tab & Alt+M via KeyboardEvent → contextShow()** — TopPage::keyboard() wasn't chaining to BasePage. Fixed. But Tab (0x2B) and Alt+letter combos still don't open menu on hardware despite F1-F5 working. Root cause unknown.
+- **A5: Tab & Alt+M via KeyboardEvent → hardware Key event injection** — Immediate KeyUp closes the menu. Wrong approach.
+- **A6: Tab & Alt+M via KeyboardEvent → contextShow()** — Back to direct call. Same as A4, still untested with TopPage chain fix.
+- **A7: Debug build with showMessage("KB:%d")** — Current. Awaiting hardware test.
 
 ---
 
