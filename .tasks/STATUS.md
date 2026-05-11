@@ -3,15 +3,14 @@ _Updated: 2026-05-11_
 
 ## 🔴 performer-keyboard-shortcuts — USB keyboard context menu
 **Status:** active
-**Where I stopped:** BREAKTHROUGH — A8 hardware Key injection WORKS on NoteSequencePage (Tab opens context menu). Does NOT work on NoteSequenceEditPage (step edit view). CTX! debug message added to NoteSequenceEditPage::keyPress() to check if isContextMenu() is reached. Edit page overrides keyDown() which calls StepSelection — may interfere but shouldn't. Need hardware test.
-**Next action:** Flash CTX! debug build, press Tab on NoteSequenceEditPage, check if "CTX!" message appears
+**Where I stopped:** Tab shortcut confirmed WORKING on hardware for both NoteSequencePage and NoteSequenceEditPage. Same switch bug fixed across all 9 pages: 4 edit pages (NoteSequence, CurveSequence, IndexedSequence, Tuesday) + 5 others (Song, Monitor, DiscreteMapSequence, IndexedRouteConfig, IndexedMath). Remaining pages either chain correctly (Pattern, Performer via switch default:) or route through ListPage/TopPage. Build ready for full hardware test.
+**Next action:** Flash build, test Tab across all track types (Note, Curve, Tuesday, Indexed, DiscreteMap) on both list and edit views
 **Branch:** feat/global-keyboard
 
 ---
 
 ## Approach history
-- **A8 (PARTIAL SUCCESS):** Tab via KeyboardEvent → hardware Key injection (keyDown + keyPress, no keyUp) → Works on NoteSequencePage. Does not work on NoteSequenceEditPage — investigating.
-- **A1-A7:** All failed — see previous commits.
+- **A8 (SUCCESS):** Tab via KeyboardEvent → hardware Key injection (keyDown + keyPress, no keyUp). Switch bug in 9 pages prevented BasePage chaining — all fixed.
 
 ---
 
