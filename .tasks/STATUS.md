@@ -1,8 +1,8 @@
 # Task Board
 _Updated: 2026-05-11_
 
-## 🔴 performer-keyboard-shortcuts — USB keyboard context menu
-**Status:** active
+## 🟡 performer-keyboard-shortcuts — USB keyboard context menu
+**Status:** paused
 **Where I stopped:** Plan B v3 WORKS on hardware. QWERTY step mapping (Q-I = S0-S7, A-K = S8-S15) confirmed working with proper press/release. Tab context menu confirmed. Key release detection lives in UsbH::processHidReports() (C++), not the fragile C driver. Keyboard detection, Launchpad, MIDI all stable.
 **Next action:** Verify across all track types. Then consider adding remaining keyboard shortcuts (shift modifier, encoder emulation, etc.)
 **Branch:** feat/global-keyboard
@@ -30,10 +30,10 @@ _Updated: 2026-05-11_
 
 ---
 
-## 🟡 teletype-file-reliability — Improve TeletypeTrack file loading/saving reliability
-**Status:** paused
-**Where I stopped:** Complete analysis of file loading/saving across track types, identified key risks and improvement opportunities for TeletypeTrack
-**Next action:** Begin implementing fixes for serialization, error handling, and parsing robustness
+## 🔴 teletype-file-reliability — Improve TeletypeTrack file loading/saving reliability
+**Status:** active
+**Where I stopped:** Identified critical 32-byte stack buffer overflow in FileManager `writeScriptSection`. The user requested to streamline the track binary format (drop backward compatibility) and expand memory bounds.
+**Next action:** Apply the agreed plan: expand the write buffer in `FileManager` to 128 bytes and streamline `TeletypeTrack::read/write` to drop legacy I/O mappings.
 **Branch:** TBD
 
 ---
