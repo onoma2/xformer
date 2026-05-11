@@ -22,6 +22,10 @@ Refactor the USB HID Keyboard handling towards a `KeyboardManager` inspired by t
 - **Layout Strategy**: The `KeyboardManager` will be designed to support pluggable layout mappings. This anticipates future support for AZERTY/other layouts via a system setting without requiring UI refactors.
 - **Event Integrity**: `KeyEvent` (hardware) and `KeyboardEvent` (USB) will remain distinct types in the dispatch layer. This prevents regressions in the complex hardware-button shortcut logic while allowing the keyboard to "emulate" physical buttons through targeted translation.
 
+## Full Design Document
+
+→ `docs/plans/keyboard-handler-refactor.md` — Complete phased implementation plan with hardware validation procedures.
+
 ## Brainstorm Materials
 ### Proposed Architecture
 - **Ownership**: `Ui` owns a `KeyboardManager` (constructed with `Model &` and `Engine &`).
@@ -46,6 +50,7 @@ Refactor the USB HID Keyboard handling towards a `KeyboardManager` inspired by t
 ## Completed steps
 - [x] Initial research into current keyboard data flow
 - [x] Brainstorm and adversarial analysis of the refactor plan
+- [x] **Phase 1**: Create skeleton `KeyboardManager` — class created, wired into `Ui`, delegates `process()` via callback to `Ui::handleKeyboard()`. Builds cleanly for sim target.
 
 ## Notes
 - Reference `src/apps/sequencer/ui/ControllerManager.cpp` for pattern matching.

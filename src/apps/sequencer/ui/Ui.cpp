@@ -21,6 +21,7 @@ Ui::Ui(Model &model, Engine &engine, Lcd &lcd, ButtonLedMatrix &blm, Encoder &en
         _pageContext({ _messageManager, _pageKeyState, _globalKeyState, _model, _engine }),
         _pages(_pageManager, _pageContext),
         _controllerManager(model, engine),
+        _keyboardManager(),
         // TODO pass as arg
         _screensaver(Screensaver(
                 _canvas,
@@ -64,6 +65,11 @@ void Ui::init() {
         _controllerManager.disconnect();
     });
 
+    _keyboardManager.setProcessHandler([this] () {
+        handleKeyboard();
+    });
+    _keyboardManager.init(_engine);
+
     _engine.setKeyboardReceiveHandler([this] (uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
         enqueueKeyboardEvent(keycode, modifiers, pressed);
     });
@@ -94,7 +100,7 @@ void Ui::update() {
     handleKeys();
     handleEncoder();
     handleMidi();
-    handleKeyboard();
+    _keyboardManager.process();
 
     // abort if track engines are not consistent with model
     if (!_engine.trackEnginesConsistent()) {

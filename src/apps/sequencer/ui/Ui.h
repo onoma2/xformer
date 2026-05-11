@@ -8,6 +8,7 @@
 #include "KeyPressEventTracker.h"
 #include "Leds.h"
 #include "ControllerManager.h"
+#include "KeyboardManager.h"
 
 #include "pages/Pages.h"
 
@@ -85,6 +86,8 @@ private:
 
     ControllerManager _controllerManager;
     uint32_t _lastControllerUpdateTicks;
+
+    KeyboardManager _keyboardManager;
 
     Screensaver _screensaver;
 };
