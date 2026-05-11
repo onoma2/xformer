@@ -97,16 +97,18 @@ private:
 
 class KeyboardEvent : public Event {
 public:
-    KeyboardEvent(uint8_t keycode, uint8_t modifiers, char ch) :
+    KeyboardEvent(uint8_t keycode, uint8_t modifiers, char ch, uint8_t pressed = 1) :
         Event(Event::Keyboard),
         _keycode(keycode),
         _modifiers(modifiers),
-        _ch(ch)
+        _ch(ch),
+        _pressed(pressed)
     {}
 
     uint8_t keycode() const { return _keycode; }
     uint8_t modifiers() const { return _modifiers; }
     char ch() const { return _ch; }
+    bool isPressed() const { return _pressed; }
 
     bool shift() const { return _modifiers & 0x22; }
     bool ctrl() const { return _modifiers & 0x11; }
@@ -135,4 +137,5 @@ private:
     uint8_t _keycode;
     uint8_t _modifiers;
     char _ch;
+    uint8_t _pressed;
 };

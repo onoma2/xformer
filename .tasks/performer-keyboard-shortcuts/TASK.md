@@ -156,6 +156,7 @@ Pages with their own keyboard() (Layout, Routing, System, Track, etc.)
 
 ## Decisions log
 
+- 2026-05-11: **A9 reverted / A10 debug path**: HID-driver press/release tracking in `usbh_driver_hid.c` was treated as unsafe after USB crash reports. New debug build keeps `usbh_driver_hid.c` at the stable reverted path, copies raw 8-byte keyboard reports in `UsbH::messageHandler()`, diffs press/release in `UsbH::process()`, and lets `Ui::handleKeyboard()` synthesize real hardware step `KeyDown/KeyPress/KeyUp` events for Q-I/A-K.
 - 2026-05-10: Ring buffer approach for HID keys (ISR-safe, no rendering in USB context)
 - 2026-05-10: Fixed `hid_get_type()` inversion
 - 2026-05-11: Keyboard keypresses verified end-to-end
@@ -199,6 +200,7 @@ Pages with their own keyboard() (Layout, Routing, System, Track, etc.)
 
 ## Next actions
 
-1. Hardware test: verify Shift+Alt opens context menus, arrows work in list pages, Enter toggles edit mode
-2. Hardware test: verify ContextMenuPage F1-F5 and Escape work
-3. Phase 4: Step type-in on NoteSequenceEditPage (if desired)
+1. Hardware test: keyboard still shows "KEYBOARD CONNECTED"
+2. Hardware test: Tab still opens quick menu
+3. Hardware test: Q-I/A-K press/release toggles/clears steps on NoteSequenceEditPage
+4. Hardware test: Launchpad/MIDI still enumerate after keyboard step-key use

@@ -37,7 +37,7 @@ void BasePage::pressFunctionButton(int functionIndex, bool shift) {
 }
 
 void BasePage::keyboard(KeyboardEvent &event) {
-    if (event.keycode() == KeyboardEvent::KeyTab) {
+    if (event.keycode() == KeyboardEvent::KeyTab && event.isPressed()) {
         // Simulate hardware Shift+Page press via proven keyDown/keyPress path.
         // No keyUp — let the user close menu via Escape/Fn keys.
         KeyState state;
