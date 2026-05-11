@@ -261,6 +261,6 @@ void PerformerPage::keyboard(KeyboardEvent &event) {
         event.consume();
         break;
     case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default: break;
+    default: BasePage::keyboard(event); break;
     }
 }

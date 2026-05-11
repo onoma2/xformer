@@ -108,6 +108,7 @@ void ListPage::keyboard(KeyboardEvent &event) {
         event.consume();
         break;
     default:
+        BasePage::keyboard(event);
         break;
     }
 }

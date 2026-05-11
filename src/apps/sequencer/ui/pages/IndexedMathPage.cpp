@@ -561,6 +561,6 @@ void IndexedMathPage::keyboard(KeyboardEvent &event) {
     case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
     case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
     case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default: break;
+    BasePage::keyboard(event); break;
     }
 }

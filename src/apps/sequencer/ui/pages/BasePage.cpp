@@ -36,3 +36,10 @@ void BasePage::pressFunctionButton(int functionIndex, bool shift) {
     KeyEvent upEvent(KeyEvent::KeyUp, key);
     keyUp(upEvent);
 }
+
+void BasePage::keyboard(KeyboardEvent &event) {
+    if (event.shift() && event.alt()) {
+        contextShow();
+        event.consume();
+    }
+}
