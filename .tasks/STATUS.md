@@ -3,16 +3,16 @@ _Updated: 2026-05-11_
 
 ## 🔴 performer-keyboard-shortcuts — USB keyboard context menu
 **Status:** active
-**Where I stopped:** Plan B v2 was reverted after USB-driver crash risk; debug build now leaves `usbh_driver_hid.c` stable and parses raw HID reports in `UsbH::process()` before UI synthesizes QWERTY step button press/release.
-**Next action:** Flash build. Test keyboard "KEYBOARD CONNECTED", Tab quick menu, Q-I/A-K step press/release on NoteSequenceEditPage, and Launchpad/MIDI still enumerate after keyboard use.
+**Where I stopped:** Plan B v3 WORKS on hardware. QWERTY step mapping (Q-I = S0-S7, A-K = S8-S15) confirmed working with proper press/release. Tab context menu confirmed. Key release detection lives in UsbH::processHidReports() (C++), not the fragile C driver. Keyboard detection, Launchpad, MIDI all stable.
+**Next action:** Verify across all track types. Then consider adding remaining keyboard shortcuts (shift modifier, encoder emulation, etc.)
 **Branch:** feat/global-keyboard
 
 ---
 
 ## Approach history
 - **A8 (SUCCESS):** Tab context menu via hardware Key injection.
-- **A9 (FAILED/REVERTED):** HID driver press/release tracking + QWERTY step mapping crashed USB path.
-- **A10 (DEBUG):** Raw HID report ring in `UsbH`, no new state-machine changes in `usbh_driver_hid.c`.
+- **A9 (FAILED):** HID driver press/release tracking crashed USB path — reverted.
+- **A10 (SUCCESS):** Key release diffing moved to UsbH::processHidReports() in C++ layer. Stable. QWERTY step mapping + Tab context menu both work.
 
 ---
 
