@@ -65,13 +65,13 @@ void Ui::init() {
         _controllerManager.disconnect();
     });
 
-    _keyboardManager.setProcessHandler([this] () {
-        handleKeyboard();
+    _keyboardManager.setProcessHandler([this] (uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
+        handleKeyboardEvent(keycode, modifiers, pressed);
     });
     _keyboardManager.init(_engine);
 
     _engine.setKeyboardReceiveHandler([this] (uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
-        enqueueKeyboardEvent(keycode, modifiers, pressed);
+        _keyboardManager.enqueue(keycode, modifiers, pressed);
     });
 
     _engine.setHidConnectHandler([this] (uint8_t device_id, int type) {
@@ -265,43 +265,33 @@ static int hidKeycodeToStep(uint8_t keycode) {
     return -1;
 }
 
-void Ui::handleKeyboard() {
-    while (_receiveKeyboardEvents.readable()) {
-        auto event = _receiveKeyboardEvents.read();
-        char ch = hidKeycodeToAscii(event.keycode, event.modifiers);
+void Ui::handleKeyboardEvent(uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
+    char ch = hidKeycodeToAscii(keycode, modifiers);
 
-        if (!_engine.isSuspended()) {
-            int step = (event.modifiers & 0x55) ? -1 : hidKeycodeToStep(event.keycode);
-            if (step >= 0) {
-                bool isDown = event.pressed != 0;
-                int keyCode = MatrixMap::fromStep(step);
-                _pageKeyState[keyCode] = isDown;
-                _globalKeyState[keyCode] = isDown;
-                Key key(keyCode, _globalKeyState);
+    if (!_engine.isSuspended()) {
+        int step = (modifiers & 0x55) ? -1 : hidKeycodeToStep(keycode);
+        if (step >= 0) {
+            bool isDown = pressed != 0;
+            int keyCode = MatrixMap::fromStep(step);
+            _pageKeyState[keyCode] = isDown;
+            _globalKeyState[keyCode] = isDown;
+            Key key(keyCode, _globalKeyState);
 
-                KeyEvent keyEvent(isDown ? Event::KeyDown : Event::KeyUp, key);
-                _screensaver.consumeKey(keyEvent);
-                _pageManager.dispatchEvent(keyEvent);
-                if (isDown) {
-                    KeyPressEvent keyPressEvent = _keyPressEventTracker.process(key);
-                    _screensaver.consumeKey(keyPressEvent);
-                    _pageManager.dispatchEvent(keyPressEvent);
-                }
-                continue;
+            KeyEvent keyEvent(isDown ? Event::KeyDown : Event::KeyUp, key);
+            _screensaver.consumeKey(keyEvent);
+            _pageManager.dispatchEvent(keyEvent);
+            if (isDown) {
+                KeyPressEvent keyPressEvent = _keyPressEventTracker.process(key);
+                _screensaver.consumeKey(keyPressEvent);
+                _pageManager.dispatchEvent(keyPressEvent);
             }
+            return;
+        }
 
-            if (event.pressed) {
-                KeyboardEvent kbEvent(event.keycode, event.modifiers, ch, event.pressed);
-                _screensaver.consumeKey(kbEvent);
-                _pageManager.dispatchEvent(kbEvent);
-            }
+        if (pressed) {
+            KeyboardEvent kbEvent(keycode, modifiers, ch, pressed);
+            _screensaver.consumeKey(kbEvent);
+            _pageManager.dispatchEvent(kbEvent);
         }
     }
-}
-
-void Ui::enqueueKeyboardEvent(uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
-    if (!_receiveKeyboardEvents.writable()) {
-        _receiveKeyboardEvents.read();
-    }
-    _receiveKeyboardEvents.write({ keycode, modifiers, pressed });
 }

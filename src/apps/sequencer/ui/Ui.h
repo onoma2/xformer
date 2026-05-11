@@ -39,13 +39,11 @@ public:
 
     MessageManager &messageManager() { return _messageManager; }
 
-    void enqueueKeyboardEvent(uint8_t keycode, uint8_t modifiers, uint8_t pressed);
-
 private:
     void handleKeys();
     void handleEncoder();
     void handleMidi();
-    void handleKeyboard();
+    void handleKeyboardEvent(uint8_t keycode, uint8_t modifiers, uint8_t pressed);
 
     Model &_model;
     Engine &_engine;
@@ -60,13 +58,6 @@ private:
         MidiMessage message;
     };
     RingBuffer<ReceiveMidiEvent, 16> _receiveMidiEvents;
-
-    struct ReceiveKeyboardEvent {
-        uint8_t keycode;
-        uint8_t modifiers;
-        uint8_t pressed;
-    };
-    RingBuffer<ReceiveKeyboardEvent, 16> _receiveKeyboardEvents;
 
     uint8_t _frameBufferData[CONFIG_LCD_WIDTH * CONFIG_LCD_HEIGHT];
     FrameBuffer8bit _frameBuffer;
