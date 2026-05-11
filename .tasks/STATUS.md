@@ -3,14 +3,15 @@ _Updated: 2026-05-11_
 
 ## 🔴 performer-keyboard-shortcuts — USB keyboard context menu
 **Status:** active
-**Where I stopped:** Tab shortcut confirmed WORKING on hardware for both NoteSequencePage and NoteSequenceEditPage. Same switch bug fixed across all 9 pages: 4 edit pages (NoteSequence, CurveSequence, IndexedSequence, Tuesday) + 5 others (Song, Monitor, DiscreteMapSequence, IndexedRouteConfig, IndexedMath). Remaining pages either chain correctly (Pattern, Performer via switch default:) or route through ListPage/TopPage. Build ready for full hardware test.
-**Next action:** Flash build, test Tab across all track types (Note, Curve, Tuesday, Indexed, DiscreteMap) on both list and edit views
+**Where I stopped:** Plan B v2 implemented: HID driver now tracks key press/release. Full chain: usbh_driver_hid.c → Engine → Ui → KeyboardEvent carries `pressed` field. BasePage::keyboard() maps QWERTY rows to step buttons: Q-I = S0-S7, A-K = S8-S15. KeyDown/KeyPress injected on press, KeyUp on release. Tab still triggers context menu. Build ready for hardware test.
+**Next action:** Flash build. Test keyboard "KEYBOARD CONNECTED" message still appears. Test step keys (Q-I/A-K) on NoteSequenceEditPage — steps should toggle. Test Tab context menu still works. Test key release properly clears step selection (StepSelection Immediate mode).
 **Branch:** feat/global-keyboard
 
 ---
 
 ## Approach history
-- **A8 (SUCCESS):** Tab via KeyboardEvent → hardware Key injection (keyDown + keyPress, no keyUp). Switch bug in 9 pages prevented BasePage chaining — all fixed.
+- **A8 (SUCCESS):** Tab context menu via hardware Key injection.
+- **A9 (Plan B v2):** HID driver press/release tracking + QWERTY step mapping.
 
 ---
 

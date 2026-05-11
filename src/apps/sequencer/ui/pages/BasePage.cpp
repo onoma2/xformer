@@ -1,7 +1,6 @@
 #include "BasePage.h"
 #include "Pages.h"
 #include "ui/MatrixMap.h"
-#include <cstdio>
 
 #include "ui/model/ContextMenuModel.h"
 
