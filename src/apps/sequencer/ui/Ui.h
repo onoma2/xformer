@@ -43,7 +43,6 @@ private:
     void handleKeys();
     void handleEncoder();
     void handleMidi();
-    void handleKeyboardEvent(uint8_t keycode, uint8_t modifiers, uint8_t pressed);
 
     Model &_model;
     Engine &_engine;

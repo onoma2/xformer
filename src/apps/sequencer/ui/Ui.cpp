@@ -65,9 +65,6 @@ void Ui::init() {
         _controllerManager.disconnect();
     });
 
-    _keyboardManager.setProcessHandler([this] (uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
-        handleKeyboardEvent(keycode, modifiers, pressed);
-    });
     _keyboardManager.init(_engine);
 
     _engine.setKeyboardReceiveHandler([this] (uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
@@ -100,7 +97,7 @@ void Ui::update() {
     handleKeys();
     handleEncoder();
     handleMidi();
-    _keyboardManager.process();
+    _keyboardManager.process(_pageKeyState, _globalKeyState, _keyPressEventTracker, _screensaver, _pageManager);
 
     // abort if track engines are not consistent with model
     if (!_engine.trackEnginesConsistent()) {
@@ -216,37 +213,6 @@ void Ui::handleMidi() {
                 MidiEvent midiEvent(receiveEvent.port, receiveEvent.message);
                 _pageManager.dispatchEvent(midiEvent);
             }
-        }
-    }
-}
-
-void Ui::handleKeyboardEvent(uint8_t keycode, uint8_t modifiers, uint8_t pressed) {
-    char ch = KeyboardManager::hidKeycodeToAscii(keycode, modifiers);
-
-    if (!_engine.isSuspended()) {
-        int step = (modifiers & 0x55) ? -1 : KeyboardManager::hidKeycodeToStep(keycode);
-        if (step >= 0) {
-            bool isDown = pressed != 0;
-            int keyCode = MatrixMap::fromStep(step);
-            _pageKeyState[keyCode] = isDown;
-            _globalKeyState[keyCode] = isDown;
-            Key key(keyCode, _globalKeyState);
-
-            KeyEvent keyEvent(isDown ? Event::KeyDown : Event::KeyUp, key);
-            _screensaver.consumeKey(keyEvent);
-            _pageManager.dispatchEvent(keyEvent);
-            if (isDown) {
-                KeyPressEvent keyPressEvent = _keyPressEventTracker.process(key);
-                _screensaver.consumeKey(keyPressEvent);
-                _pageManager.dispatchEvent(keyPressEvent);
-            }
-            return;
-        }
-
-        if (pressed) {
-            KeyboardEvent kbEvent(keycode, modifiers, ch, pressed);
-            _screensaver.consumeKey(kbEvent);
-            _pageManager.dispatchEvent(kbEvent);
         }
     }
 }
