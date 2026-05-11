@@ -288,6 +288,8 @@ void TrackPage::keyboard(KeyboardEvent &event) {
     case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
     case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
     case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default: break;
+    default:
+        ListPage::keyboard(event);
+        break;
     }
 }

@@ -78,3 +78,19 @@ void FileSelectPage::closeWithResult(bool result) {
         _callback(result, selectedRow());
     }
 }
+
+void FileSelectPage::keyboard(KeyboardEvent &event) {
+    switch (event.keycode()) {
+    case KeyboardEvent::KeyEnter:
+        closeWithResult(true);
+        event.consume();
+        break;
+    case KeyboardEvent::KeyEscape:
+        closeWithResult(false);
+        event.consume();
+        break;
+    default:
+        ListPage::keyboard(event);
+        break;
+    }
+}
