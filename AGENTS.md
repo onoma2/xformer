@@ -25,8 +25,9 @@
 - Misc: FS pools, USB/MIDI state, idle/timer stacks are small compared to above.
 
 ## Build & test
-- STM32 release build: `cd build/stm32/release && make sequencer`
-- Simulator builds are not needed for testing — always use the STM32 release build to verify compilation.
+- **STM32 release build (REQUIRED for all compile checks):** `cd build/stm32/release && make sequencer`
+- Simulator build: `cd build/sim/debug && make sequencer` — **DO ONLY IF USER EXPLICITLY ASKS.**
+- **Always use the STM32 release build to verify compilation.** The sim build uses a different toolchain (host clang vs arm-none-eabi-gcc) and can mask STM32-specific issues. Only the STM32 build catches cross-compilation errors.
 
 ## Considerations
 - RAM is the tight constraint; flash has plenty of margin.

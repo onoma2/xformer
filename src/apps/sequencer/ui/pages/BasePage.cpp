@@ -74,5 +74,16 @@ void BasePage::keyboard(KeyboardEvent &event) {
             event.consume();
             return;
         }
+
+        // Up/Down arrows map to encoder rotation — acts like turning the
+        // hardware encoder one click per keypress.
+        if (event.keycode() == KeyboardEvent::KeyUp || event.keycode() == KeyboardEvent::KeyDown) {
+            int direction = (event.keycode() == KeyboardEvent::KeyUp) ? 1 : -1;
+            bool pressed = _context.pageKeyState[Key::Encoder];
+            EncoderEvent encoderEvent(direction, pressed);
+            encoder(encoderEvent);
+            event.consume();
+            return;
+        }
     }
 }
