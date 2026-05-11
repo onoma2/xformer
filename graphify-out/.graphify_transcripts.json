@@ -1,0 +1,9 @@
+  warning: could not transcribe /Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/assets/drumkit/tom1.wav: Video transcription requires faster-whisper. Run: pip install 'graphifyy[video]'
+  warning: could not transcribe /Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/assets/drumkit/tom2.wav: Video transcription requires faster-whisper. Run: pip install 'graphifyy[video]'
+  warning: could not transcribe /Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/assets/drumkit/rim.wav: Video transcription requires faster-whisper. Run: pip install 'graphifyy[video]'
+  warning: could not transcribe /Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/assets/drumkit/kick.wav: Video transcription requires faster-whisper. Run: pip install 'graphifyy[video]'
+  warning: could not transcribe /Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/assets/drumkit/snare.wav: Video transcription requires faster-whisper. Run: pip install 'graphifyy[video]'
+  warning: could not transcribe /Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/assets/drumkit/clap.wav: Video transcription requires faster-whisper. Run: pip install 'graphifyy[video]'
+  warning: could not transcribe /Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/assets/drumkit/hh1.wav: Video transcription requires faster-whisper. Run: pip install 'graphifyy[video]'
+  warning: could not transcribe /Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/sim/assets/drumkit/hh2.wav: Video transcription requires faster-whisper. Run: pip install 'graphifyy[video]'
+[]

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "users_foronoma_work_code_eurorack_performer_phazer_src_platform_stm32_libs_libopencm3_lib_stm32_l1_vector_nvic_c", "label": "vector_nvic.c", "file_type": "code", "source_file": "/Users/foronoma/Work/Code/Eurorack/performer-phazer/src/platform/stm32/libs/libopencm3/lib/stm32/l1/vector_nvic.c", "source_location": "L1"}], "edges": [], "raw_calls": []}
