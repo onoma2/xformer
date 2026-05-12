@@ -1230,12 +1230,20 @@ void TeletypeScriptViewPage::keyboard(KeyboardEvent &event) {
         return;
     }
     if (keycode == KeyboardEvent::KeyUp) {
-        recallHistory(-1);
+        if (event.shift() || _liveMode) {
+            recallHistory(-1);
+        } else if (_selectedLine > 0) {
+            loadEditBuffer(_selectedLine - 1);
+        }
         event.consume();
         return;
     }
     if (keycode == KeyboardEvent::KeyDown) {
-        recallHistory(1);
+        if (event.shift() || _liveMode) {
+            recallHistory(1);
+        } else if (_selectedLine < kLineCount - 1) {
+            loadEditBuffer(_selectedLine + 1);
+        }
         event.consume();
         return;
     }
