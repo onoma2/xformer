@@ -1,8 +1,10 @@
-# Other Performer Forks Improvements for XFORMER
+# Performer Improvements — Non-Launchpad Fork Integrations
 
 ## Overview
 
 This task documents all non-Launchpad-related improvements from the VinxScorza, Modulove, and Mebitek performer forks that should be integrated into the XFORMER project, reorganized against current XFORMER codebase with feasibility analysis and design decisions.
+
+Launchpad-specific improvements (LP Style, Circuit Keyboard, Performer Mode, etc.) live in `launchpad-track-port`.
 
 ## Current XFORMER Codebase Analysis
 
@@ -60,6 +62,8 @@ This task documents all non-Launchpad-related improvements from the VinxScorza, 
 | Safer commit/cancel flow | Medium | Extend context menu commit logic |
 | Uniform footer/context layouts | Low | Cosmetic — lower priority |
 
+**Relation to `launchpad-track-port`:** The core A/B preview state machine and GeneratorPage refactor live here. The Launchpad grid trigger for generators (Generators Mode) lives in `launchpad-track-port`.
+
 **Files to modify:**
 - `src/apps/sequencer/ui/page/GeneratorPage.h`
 - `src/apps/sequencer/ui/page/GeneratorPage.cpp`
@@ -93,19 +97,7 @@ This task documents all non-Launchpad-related improvements from the VinxScorza, 
 
 ## Modulove Improvements
 
-### 1. 16-Track Support
-**Source:** `temp-ref/modulove-performer/src/apps/sequencer/model/Track.h`
-
-| Improvement | Feasibility | Risk | Design Decision |
-|-------------|------------|------|----------------|
-| Dual bank system (16 tracks) | Low | High | CONFIG_TRACK_COUNT=8 — requires major architecture change |
-| Bank switching on all pages | Low | High | Every page references track by index — invasive |
-| Bank 2 red LED visual distinction | Low | Medium | Requires HW LED driver changes |
-| Extended MIDI routing for 16 tracks | Low | High | Routing table sized for 8 |
-
-**Verdict:** Not feasible for initial release. Consider for future major version only.
-
-### 2. 8 LFO Modulators
+### 1. 8 LFO Modulators
 **Source:** `temp-ref/modulove-performer/src/apps/sequencer/model/Modulator.h`
 
 | Requirement | Feasibility | Effort |
@@ -121,7 +113,7 @@ This task documents all non-Launchpad-related improvements from the VinxScorza, 
 - `src/apps/sequencer/engine/ModulatorEngine.h`
 - `src/apps/sequencer/ui/page/ModulatorPage.h`
 
-### 3. Microtiming Recording
+### 2. Microtiming Recording
 **Source:** `temp-ref/modulove-performer/src/apps/sequencer/model/NoteSequence.h`
 
 | Requirement | Feasibility | Effort |
@@ -136,7 +128,7 @@ This task documents all non-Launchpad-related improvements from the VinxScorza, 
 - `src/apps/sequencer/engine/StepRecorder.h` — capture timing
 - `src/apps/sequencer/engine/NoteTrackEngine.h` — apply offset during playback
 
-### 4. Enhanced Performer Page
+### 3. Enhanced Performer Page
 **Source:** `temp-ref/modulove-performer/src/apps/sequencer/ui/page/PerformerPage.h`
 
 | Improvement | Feasibility | Design Decision |
@@ -145,6 +137,8 @@ This task documents all non-Launchpad-related improvements from the VinxScorza, 
 | Dimmed pattern numbers for muted | High | Add alpha/grey in canvas |
 | All-tracks view for 8 tracks | High | Already have 8, just enhance |
 | Consistent LED across banks | N/A | No bank system in XFORMER |
+
+**Relation to `launchpad-track-port`:** This is about on-device OLED/LED rendering (PerformerPage). The Launchpad-based Performer Mode (scene mute/solo/fill via Launchpad grid) lives in `launchpad-track-port`. They are independent.
 
 ---
 
@@ -165,7 +159,7 @@ This task documents all non-Launchpad-related improvements from the VinxScorza, 
 | Improvement | Feasibility | Design Decision |
 |-------------|------------|----------------|
 | Quick octave change (Step+F1-F5) | High | Add page-level shortcut handler |
-| Quick gate accent on Launchpad | High | Part of LP work (see vinx-modulove task) |
+| Quick gate accent on Launchpad | High | Lives in `launchpad-track-port` (LP work) |
 | Steps to stop feature | High | Add to Project properties + ClockEngine |
 
 **Files to modify:**
@@ -189,25 +183,27 @@ This task documents all non-Launchpad-related improvements from the VinxScorza, 
 | Bypass voltage table per step | Already present | NoteSequence already has this |
 | Prevent short clock pulses | High | Add min pulse width to ClockEngine |
 
+**Relation to `launchpad-track-port`:** The core undo/redo state management lives here. The Launchpad Shift+Play undo shortcut lives in `launchpad-track-port`.
+
 ---
 
 ## Implementation Plan (Prioritized)
 
-### Phase 1: High Priority (Weeks 1-4)
+### Phase 1: High Priority
 1. **Microtiming recording** — NoteSequence step offset field + StepRecorder capture
 2. **Enhanced Performer Page** — LED color coding, muted display
 3. **Quick octave change** — Page shortcut handler
 4. **Steps to stop** — Project + ClockEngine
 5. **Menu wrap** — UI navigation modulo
 
-### Phase 2: Medium Priority (Weeks 5-10)
-1. **Generator preview/apply workflow** — GeneratorPage refactor
+### Phase 2: Medium Priority
+1. **Generator preview/apply workflow** — GeneratorPage refactor (core state machine; LP trigger in `launchpad-track-port`)
 2. **Curve undo restoration** — CurveTrackEngine undo state
 3. **Submenu shortcuts** — Double-click detection
 4. **Screensaver/wake refinement** — Existing screensaver improvements
 5. **Curve backward playback** — Run mode in CurveTrackEngine
 
-### Phase 3: Low Priority (Weeks 11-16)
+### Phase 3: Low Priority
 1. **Chaos generators (Vandalize + Wreck)** — Generator page refactor
 2. **Random generator preview/apply** — RandomizePage enhancements
 3. **LFO modulators** — New ModulatorEngine + ModulatorPage
@@ -215,8 +211,20 @@ This task documents all non-Launchpad-related improvements from the VinxScorza, 
 5. **Prevent short clock pulses** — ClockEngine min pulse width
 
 ### Phase 4: Future
-1. **16-track / dual bank** — Architecture exploration only
-2. **Arpeggiator track** — Evaluate vs Tuesday approach
+1. **Arpeggiator track** — Evaluate vs Tuesday approach
+
+### Items Not in Phases (System & Defaults)
+- Harden system save flow (checksum + atomic write)
+- Chaos defaults persistence
+- Save prompts for unsaved changes
+- Memory optimization
+- Step engine stabilization (all tracks)
+- Crash path fixes
+- Non-zero subrange shifting
+- Scale/MIDI capture consistency
+- Smart cycling on pattern follow
+- Context menu via double-click page
+- 30fps dirty-rect tracking
 
 ## Success Criteria
 
@@ -230,6 +238,12 @@ Paused
 
 ## Priority
 High
+
+## Dependencies
+
+| Task | Relationship |
+|------|-------------|
+| `launchpad-track-port` | **Independent.** Shared features (Generators, Undo, Performer Page) have core logic here, triggers there. Can implement in either order. |
 
 ## Current Codebase Reference Files
 

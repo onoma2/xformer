@@ -55,10 +55,10 @@ _Updated: 2026-05-12_
 
 ---
 
-## 🟡 other-forks-improvements — Integrate non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
+## 🟡 performer-improvements — Non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
 **Status:** paused
-**Where I stopped:** Merged with the vinx-modulove-improvements task. Reorganized task against current XFORMER codebase with feasibility, design decisions, and priority. The implementation plan spans 4 phases (Microtiming, Generator workflows, Advanced Track features).
-**Next action:** To be determined after Launchpad improvements
+**Where I stopped:** Restructured from `other-forks-improvements`. All non-LP items from Vinx (sequencing, generators, UI, system), Modulove (microtiming, LFOs, performer page), and Mebitek (shortcuts, steps-to-stop, undo). Launchpad triggers for shared features (Generators Mode, Undo shortcut, Performer Mode) live in `launchpad-track-port`.
+**Next action:** Phase 1 (microtiming, performer page, quick octave, steps to stop, menu wrap)
 **Branch:** TBD
 
 ---

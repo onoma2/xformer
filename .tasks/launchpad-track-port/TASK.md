@@ -3,6 +3,33 @@
 Status: Planning
 Priority: Medium
 
+## Relation to performer-improvements
+
+Non-Launchpad fork improvements (microtiming, LFO modulators, generator core state machine, undo core state, enhanced performer page, menu wrap, etc.) live in the companion task `performer-improvements`. The three shared features are split as follows:
+
+| Feature | Core state machine | Launchpad trigger |
+|---------|-------------------|-------------------|
+| **Generators** | `performer-improvements` (GeneratorPage A/B state, ORIGINAL, commit/cancel) | This task (Generators Mode — Launchpad grid control) |
+| **Undo/Redo** | `performer-improvements` (undo stack in Project/Engine) | This task (Shift+Play shortcut) |
+| **Performer Page** | `performer-improvements` (OLED/LED rendering: LED coding, dimmed patterns, all-tracks view) | This task (Performer Mode — Launchpad scene mute/solo/fill) |
+
+## Vinx/Modulove Launchpad Improvements (In Scope)
+
+The following VinxScorza and Modulove LP-specific improvements are merged into this workstream (detailed in `README.md`):
+
+| # | Segment | Effort | Source |
+|---|---------|--------|--------|
+| A | LP Style / LP Note Style settings | ~1.5h | Vinx |
+| B | Circuit Keyboard | ~2h | Vinx |
+| C | Generators Mode (~4h) — Launchpad grid trigger; core A/B state machine in `performer-improvements` |
+| D | 1-Level Undo/Redo (~1h) — Launchpad Shift+Play shortcut; core undo state in `performer-improvements` |
+| E | Track Selection Locking | ~1.5h | Vinx |
+| F | Performer Mode (~3h) — Launchpad scene mute/solo/fill; OLED PerformerPage in `performer-improvements` |
+| G | Enhanced Button Events | ~1.5h | Modulove |
+| H | Visual Feedback | ~2h | Modulove |
+| I | Interaction Improvements | ~1h | Modulove |
+| J | Layer Selection Optimization | ~1h | Modulove |
+
 ## Overview
 
 Rebuild LaunchpadController.cpp to support all 5 grid-editable track types of PER|FORMER/XFORMER (Note, Curve, Tuesday, DiscreteMap, Indexed). MidiCvTrack and TeletypeTrack are out of scope. Each track type differs radically in data model, requiring customized grid layouts per type. The dispatch architecture (switch on `trackMode()`) stays the same; we add cases for each new type.
