@@ -1,47 +1,39 @@
-# Teletype File Reliability: Shadow Binary Design Spec
+# Teletype File Reliability: Unified Architecture Spec
 **Date**: 2026-05-12
-**Topic**: Teletype Track File Serialization Refactor
+**Topic**: Teletype Track File Serialization & Library Management
 
 ## 1. Goal
-Untangle the massive Teletype virtual machine state (Scripts, Patterns, Pattern Slots) from the core Performer project serialization loop (`.PRO` files). By isolating Teletype data into its own parallel binary file, we prevent stream corruption, eliminate `ProjectVersion` thrashing for non-Teletype users, and ensure safe, robust serialization.
+Provide a robust, dual-path architecture for Teletype file management. 
+1. **Automatic Project Persistence**: Untangle the massive Teletype virtual machine state from the core Performer project serialization (`.PRO` files) using a Shadow Binary (`.T9B`). This prevents stream corruption and memory faults during automated save/load cycles.
+2. **Manual Library Curation**: Preserve and clarify the existing user-facing UI actions (`SAVE SCRIPT` and `SAVE TT`) which export human-readable text files (`.TXT`) for manual hacking, sharing, and library building.
 
-## 2. Architecture (Approach A: Shadow Binary)
-Instead of serializing the heavy Teletype structs directly inside the `Project::write` / `Project::read` payload, `FileManager` will orchestrate a parallel save/load process.
+## 2. Architecture: The Split Model
 
-### 2.1 Components
-*   **`FileManager`**: Modified `writeProject` and `readProject` methods. After handling the primary `.PRO` file, `FileManager` will check if any track is a `TeletypeTrack`. If true, it opens a parallel file (e.g., `PROJECTS/001.T9B`) and delegates serialization to the track.
-*   **`TeletypeTrack`**: The existing `write()` and `read()` methods (called by `Project` via `VersionedSerializedWriter`) will be heavily stripped down. They will now *only* serialize lightweight configuration (like I/O routing or active track states).
-*   **`TeletypeTrack::writeShadow` / `readShadow`**: New methods designed specifically to read/write the massive `scene_state_t` and `_patternSlots` arrays using a direct file stream (or a dedicated serializer), totally bypassing the primary `ProjectVersion` stream.
+### 2.1 The Shadow Binary (Automatic Project State)
+Instead of serializing heavy Teletype structs directly inside the `Project::write` payload, `FileManager` orchestrates a parallel binary save/load process.
 
-## 3. Data Flow
-### Save Flow:
-1. User presses "Save Project".
-2. `FileManager::writeProject` handles the main `.PRO` serialization.
-3. `TeletypeTrack::write` writes 0-2 bytes to the `.PRO` stream (e.g., just confirming the track mode).
-4. `FileManager::writeProject` concludes the `.PRO` file.
-5. `FileManager` detects Teletype usage, creates `PROJECTS/001.T9B`.
-6. `FileManager` calls `TeletypeTrack::writeShadow(writer)`.
-7. `TeletypeTrack` writes all scripts and pattern slots to `.T9B`.
+*   **`FileManager::writeProject`**: After handling the primary `.PRO` file, it checks if any track is a `TeletypeTrack`. If true, it opens a parallel file (e.g., `PROJECTS/001.T9B`) and delegates serialization.
+*   **`TeletypeTrack::writeShadow` / `readShadow`**: New methods specifically designed to read/write the `scene_state_t` and `_patternSlots` arrays as raw, contiguous binary data. This is the fastest, safest method for the MCU and bypasses the fragile `ProjectVersion` stream.
+*   **Data Flow**: User presses "Save Project" -> `.PRO` is written (skipping heavy TT data) -> `.T9B` is written silently in the background.
 
-### Load Flow:
-1. User presses "Load Project".
-2. `FileManager::readProject` loads `.PRO`.
-3. `TeletypeTrack::read` parses its minimal data.
-4. `FileManager` looks for `PROJECTS/001.T9B`.
-    *   **Success**: Calls `TeletypeTrack::readShadow(reader)`.
-    *   **Failure (File Missing)**: Gracefully initializes `TeletypeTrack` to a blank default state (no crash).
+### 2.2 The Text Library (Manual User State)
+The UI provides explicit actions for users to manage their Teletype code independently of the sequencer project.
 
-## 4. Error Handling & Edge Cases
-*   **Missing `.T9B` File**: If a user shares a `.PRO` file without its matching `.T9B` shadow file, the sequencer must not crash. `FileManager` will catch the `FILE_NOT_FOUND` error and `TeletypeTrack` will automatically call `clear()` to instantiate a blank, functional script environment.
-*   **Stack Overflows**: By isolating the read/write logic into dedicated `Shadow` methods, we avoid deeply nested stack allocation inside `VersionedSerializedWriter`. Buffer boundaries will be strictly clamped during `.T9B` read operations to prevent memory corruption.
+*   **Single Script Export (`SAVE SCRIPT` / `LOAD SCRIPT`)**:
+    *   Triggered from `TeletypeScriptViewPage`.
+    *   Calls `FileManager::writeTeletypeScript()`.
+    *   Outputs `TELS/*.TXT`: A plain text file containing exactly one script (e.g., Script 1).
+*   **Full Track Export (`SAVE TT` / `LOAD TT`)**:
+    *   Triggered from `TeletypePatternViewPage`.
+    *   Calls `FileManager::writeTeletypeTrack()`.
+    *   Outputs `TELT/*.TXT`: A comprehensive text file containing the *entire* track state (Global scripts 1-3, plus both A and B PatternSlots including their local scripts, metros, P-patterns, and I/O routing).
 
-## 5. Testing Strategy
+## 3. Error Handling & Edge Cases
+*   **Missing `.T9B` File**: If a user shares a `.PRO` file without its matching `.T9B` shadow file, the sequencer must not crash. `FileManager` catches the `FILE_NOT_FOUND` error and initializes the `TeletypeTrack` to a blank default state.
+*   **Text File Parsing**: If a user manually edits a `TELT/*.TXT` file on their computer and introduces a syntax error, `FileManager::readTeletypeTrack` will safely reject the invalid line and preserve the rest of the valid state, without causing an MCU hard fault.
+*   **Stack Overflows**: By isolating the read/write logic into dedicated `Shadow` methods, we avoid deeply nested stack allocation inside `VersionedSerializedWriter`. Buffer boundaries will be strictly clamped during `.T9B` read operations.
+
+## 4. Testing Strategy
 *   **Simulator (`build/sim/debug`)**: Mandatory first verification.
-*   **Save Cycle Verification**: Save a project with a Teletype track -> verify both `.PRO` and `.T9B` are created on the virtual SD card.
-*   **Load Cycle Verification**: Close simulator, reopen, load project -> verify scripts and patterns restore correctly.
-*   **Fault Injection**: Delete the `.T9B` file from the virtual SD card, load the `.PRO` project -> verify Performer continues running safely with a blank Teletype track.
-
-## 6. Discarded Approaches
-During brainstorming, two other approaches were considered and explicitly rejected:
-*   **Approach B (Auto-Folder with Text Files)**: Exporting the project as a folder containing `project.pro` alongside individual `.txt` script files. *Discarded due to severe SD card latency risks when opening/writing/closing 20+ small text files during a performance-critical save operation.*
-*   **Approach C (Flattened Internal Binary)**: Keeping the data inside the `.PRO` file but dumping raw memory blocks. *Discarded due to extreme fragility; any future struct changes would irreversibly corrupt all legacy `.PRO` files via stream misalignment.*
+*   **Shadow Binary Test**: Save a project with a Teletype track -> verify both `.PRO` and `.T9B` are created. Delete `.T9B` -> verify project loads safely with a blank Teletype track.
+*   **Text Library Test**: Ensure `SAVE SCRIPT` and `SAVE TT` still produce valid, readable `.TXT` files that can be loaded back into a blank project successfully.
