@@ -29,6 +29,7 @@ The following VinxScorza and Modulove LP-specific improvements are merged into t
 | H | Visual Feedback | ~2h | Modulove |
 | I | Interaction Improvements | ~1h | Modulove |
 | J | Layer Selection Optimization | ~1h | Modulove |
+| K | Smart cycling on pattern follow (moved from `performer-improvements`) | ~0.5h | Mebitek |
 
 ## Overview
 

@@ -22,7 +22,7 @@ Launchpad-specific improvements (LP Style, Circuit Keyboard, Performer Mode, etc
 ### Key Architecture Differences
 - **8 tracks** (CONFIG_TRACK_COUNT=8) vs Modulove's 16-track dual bank
 - **No built-in LFO modulators** — no ModulatorEngine exists in codebase
-- **No microtiming recording** — no microtiming fields in NoteSequence::Step
+- **No microtiming recording** — no microtiming fields in NoteSequence::Step (NO-GO: kept for reference)
 - **Unique track types** — Tuesday, Discrete, Indexed, Teletype have no counterpart in other forks
 - **No Logic/Stochastic/Arp tracks** — XFORMER does not have these track types
 - **Unique Harmony system** — NoteSequence has HarmonyRole, InversionOverride, VoicingOverride not found in other forks
@@ -113,7 +113,7 @@ Launchpad-specific improvements (LP Style, Circuit Keyboard, Performer Mode, etc
 - `src/apps/sequencer/engine/ModulatorEngine.h`
 - `src/apps/sequencer/ui/page/ModulatorPage.h`
 
-### 2. Microtiming Recording
+### 2. Microtiming Recording — 🔴 NO-GO (reference only)
 **Source:** `temp-ref/modulove-performer/src/apps/sequencer/model/NoteSequence.h`
 
 | Requirement | Feasibility | Effort |
@@ -123,10 +123,12 @@ Launchpad-specific improvements (LP Style, Circuit Keyboard, Performer Mode, etc
 | Timing quantize (0-100%) | High | Add quantize logic in engine |
 | Bidirectional timing (early/late) | High | Simple signed arithmetic |
 
-**Files to modify:**
+**Files to modify (kept for reference):**
 - `src/apps/sequencer/model/NoteSequence.h` — add offset field (7 bits)
 - `src/apps/sequencer/engine/StepRecorder.h` — capture timing
 - `src/apps/sequencer/engine/NoteTrackEngine.h` — apply offset during playback
+
+**Decision:** Not implementing. Changes bitfield layout and serialization format with insufficient payoff for XFORMER's use case.
 
 ### 3. Enhanced Performer Page
 **Source:** `temp-ref/modulove-performer/src/apps/sequencer/ui/page/PerformerPage.h`
@@ -171,7 +173,6 @@ Launchpad-specific improvements (LP Style, Circuit Keyboard, Performer Mode, etc
 | Improvement | Feasibility | Design Decision |
 |-------------|------------|----------------|
 | Submenu shortcuts (double-click F1-F5) | High | Add double-click detection to key handler |
-| Smart cycling on pattern follow | High | Add Launchpad-connected check |
 | Context menu via double-click page | High | Add timer-based key event detection |
 
 ### 4. Technical Improvements
@@ -179,7 +180,7 @@ Launchpad-specific improvements (LP Style, Circuit Keyboard, Performer Mode, etc
 | Improvement | Feasibility | Design Decision |
 |-------------|------------|----------------|
 | Undo function | Partially present | Enhance existing undo system |
-| Curve backward playback | High | Add run mode to CurveTrackEngine |
+| Curve backward playback — 🔴 NO-GO | High | Add run mode to CurveTrackEngine (reference only) |
 | Bypass voltage table per step | Already present | NoteSequence already has this |
 | Prevent short clock pulses | High | Add min pulse width to ClockEngine |
 
@@ -190,18 +191,17 @@ Launchpad-specific improvements (LP Style, Circuit Keyboard, Performer Mode, etc
 ## Implementation Plan (Prioritized)
 
 ### Phase 1: High Priority
-1. **Microtiming recording** — NoteSequence step offset field + StepRecorder capture
-2. **Enhanced Performer Page** — LED color coding, muted display
-3. **Quick octave change** — Page shortcut handler
-4. **Steps to stop** — Project + ClockEngine
-5. **Menu wrap** — UI navigation modulo
+1. **Quick octave change** (Step+F1-F5) — Page shortcut handler
+2. **Submenu shortcuts** (double-click F1-F5) — Double-click detection
+3. **Context menu via double-click page** — Timer-based key event detection
+4. **Menu wrap** — UI navigation modulo
+5. **Enhanced Performer Page** — LED color coding, muted display
 
 ### Phase 2: Medium Priority
 1. **Generator preview/apply workflow** — GeneratorPage refactor (core state machine; LP trigger in `launchpad-track-port`)
 2. **Curve undo restoration** — CurveTrackEngine undo state
-3. **Submenu shortcuts** — Double-click detection
+3. **Steps to stop** — Project + ClockEngine
 4. **Screensaver/wake refinement** — Existing screensaver improvements
-5. **Curve backward playback** — Run mode in CurveTrackEngine
 
 ### Phase 3: Low Priority
 1. **Chaos generators (Vandalize + Wreck)** — Generator page refactor
@@ -222,16 +222,23 @@ Launchpad-specific improvements (LP Style, Circuit Keyboard, Performer Mode, etc
 - Crash path fixes
 - Non-zero subrange shifting
 - Scale/MIDI capture consistency
-- Smart cycling on pattern follow
-- Context menu via double-click page
 - 30fps dirty-rect tracking
 
 ## Success Criteria
 
-- **Phase 1**: Microtiming working, performer page enhanced, shortcuts functional
+- **Phase 1**: Performer page enhanced, shortcuts functional
 - **Phase 2**: Undo restored, generators have preview/apply, UI responsiveness improved
 - **Phase 3**: Advanced generators working, LFO modulators operational (if done)
 - **Phase 4**: Research outputs only — no commitment
+
+## No-Go Items (Kept for Reference)
+
+These were researched and documented but explicitly not implementing. Code reference preserved for future evaluation.
+
+| Item | Source | Rationale |
+|------|--------|-----------|
+| **Microtiming Recording** | Modulove | Changes NoteSequence::Step bitfield layout + serialization. Insufficient payoff for XFORMER's composition-focused use case. |
+| **Curve Backward Playback** | Mebitek | Curve forward playback already covers core use. Backward adds engine complexity with marginal musical value. |
 
 ## Status
 Paused
