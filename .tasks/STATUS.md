@@ -30,10 +30,10 @@ _Updated: 2026-05-12_
 
 ---
 
-## 🔴 teletype-file-reliability — Fix real Teletype file saving/loading bugs
-**Status:** active
-**Where I stopped:** Graphify audit debunked Shadow Binary spec — no stack overflows, no race conditions, no stream corruption. Real problems: (1) redundant legacy I/O block in binary serialization, (2) `readTeletypeTrack` silently drops unparseable lines, (3) no rollback on failed text load wipes working track.
-**Next action:** Phase 0: streamline binary write/read per existing plan `docs/plans/2026-05-12-teletype-save-load-fixes.md`. Then Phase 1 (strict parse) and Phase 2 (rollback).
+## 🟡 teletype-file-reliability — Fix real Teletype file saving/loading bugs
+**Status:** paused — Phase 0 complete, hardware verified
+**Where I stopped:** Phase 0 done. Removed legacy I/O block from TeletypeTrack binary write/read. Hardware verified: save/load round-trips correctly with minimal scripts.
+**Next action:** Phase 1 — add strict parsing to `readTeletypeTrack()` (track `success`, return `fs::INVALID_DATA` on parse failure, wire UI to show error)
 **Governing spec:** `docs/superpowers/specs/2026-05-12-teletype-saving-reality-check.md`
 **Branch:** TBD
 

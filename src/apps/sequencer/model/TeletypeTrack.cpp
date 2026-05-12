@@ -182,37 +182,6 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
     auto *self = const_cast<TeletypeTrack *>(this);
     self->syncToActiveSlot();
 
-    const auto &slot = activeSlot();
-
-    // Write I/O mapping configuration from active slot
-    for (int i = 0; i < 4; ++i) {
-        writer.write(uint8_t(slot.triggerInputSource[i]));
-    }
-    writer.write(uint8_t(slot.cvInSource));
-    writer.write(uint8_t(slot.cvParamSource));
-    writer.write(uint8_t(slot.cvXSource));
-    writer.write(uint8_t(slot.cvYSource));
-    writer.write(uint8_t(slot.cvZSource));
-    writer.write(uint8_t(slot.cvTSource));
-    for (int i = 0; i < 4; ++i) {
-        writer.write(uint8_t(slot.triggerOutputDest[i]));
-    }
-    for (int i = 0; i < 4; ++i) {
-        writer.write(uint8_t(slot.cvOutputDest[i]));
-    }
-    slot.midiSource.write(writer);
-    writer.write(uint8_t(slot.bootScriptIndex));
-    writer.write(uint8_t(slot.timeBase));
-    writer.write(slot.clockDivisor);
-    writer.write(slot.clockMultiplier);
-    for (int i = 0; i < 4; ++i) {
-        writer.write(uint8_t(slot.cvOutputRange[i]));
-        writer.write(slot.cvOutputOffset[i]);
-    }
-    for (int i = 0; i < 4; ++i) {
-        writer.write(slot.cvOutputQuantizeScale[i]);
-        writer.write(slot.cvOutputRootNote[i]);
-    }
     scene_state_t &state = const_cast<scene_state_t &>(_state);
     for (int script = 0; script < EditableScriptCount; ++script) {
         writer.write(state.scripts[script].l);
@@ -270,63 +239,6 @@ void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
 void TeletypeTrack::read(VersionedSerializedReader &reader) {
     clear();
 
-    // Read legacy I/O mapping into slot 0 (for backwards compatibility)
-    // If slot data is present in file, it will be overwritten below
-    auto &legacySlot = _patternSlots[0];
-    for (int i = 0; i < 4; ++i) {
-        uint8_t val;
-        reader.read(val);
-        legacySlot.triggerInputSource[i] = ModelUtils::clampedEnum(TriggerInputSource(val));
-    }
-    uint8_t cvInVal, cvParamVal, cvXVal, cvYVal, cvZVal, cvTVal;
-    reader.read(cvInVal);
-    reader.read(cvParamVal);
-    reader.read(cvXVal);
-    reader.read(cvYVal);
-    reader.read(cvZVal);
-    reader.read(cvTVal);
-    legacySlot.cvInSource = ModelUtils::clampedEnum(CvInputSource(cvInVal));
-    legacySlot.cvParamSource = ModelUtils::clampedEnum(CvInputSource(cvParamVal));
-    legacySlot.cvXSource = ModelUtils::clampedEnum(CvInputSource(cvXVal));
-    legacySlot.cvYSource = ModelUtils::clampedEnum(CvInputSource(cvYVal));
-    legacySlot.cvZSource = ModelUtils::clampedEnum(CvInputSource(cvZVal));
-    legacySlot.cvTSource = ModelUtils::clampedEnum(CvInputSource(cvTVal));
-
-    for (int i = 0; i < 4; ++i) {
-        uint8_t val;
-        reader.read(val);
-        legacySlot.triggerOutputDest[i] = ModelUtils::clampedEnum(TriggerOutputDest(val));
-    }
-    for (int i = 0; i < 4; ++i) {
-        uint8_t val;
-        reader.read(val);
-        legacySlot.cvOutputDest[i] = ModelUtils::clampedEnum(CvOutputDest(val));
-    }
-    legacySlot.midiSource.read(reader);
-    uint8_t bootScriptVal = 0;
-    reader.read(bootScriptVal);
-    legacySlot.bootScriptIndex = clamp<uint8_t>(bootScriptVal, 0, ScriptSlotCount - 1);
-    uint8_t timeBaseVal;
-    reader.read(timeBaseVal);
-    legacySlot.timeBase = ModelUtils::clampedEnum(TimeBase(timeBaseVal));
-    reader.read(legacySlot.clockDivisor);
-    legacySlot.clockDivisor = ModelUtils::clampDivisor(legacySlot.clockDivisor);
-    reader.read(legacySlot.clockMultiplier);
-    legacySlot.clockMultiplier = clamp<int16_t>(legacySlot.clockMultiplier, 50, 150);
-    for (int i = 0; i < 4; ++i) {
-        uint8_t rangeVal;
-        reader.read(rangeVal);
-        legacySlot.cvOutputRange[i] = ModelUtils::clampedEnum(Types::VoltageRange(rangeVal));
-        reader.read(legacySlot.cvOutputOffset[i]);
-        legacySlot.cvOutputOffset[i] = clamp<int16_t>(legacySlot.cvOutputOffset[i], -500, 500);
-    }
-    for (int i = 0; i < 4; ++i) {
-        reader.read(legacySlot.cvOutputQuantizeScale[i]);
-        legacySlot.cvOutputQuantizeScale[i] = clamp<int8_t>(legacySlot.cvOutputQuantizeScale[i], QuantizeOff, Scale::Count - 1);
-        reader.read(legacySlot.cvOutputRootNote[i]);
-        legacySlot.cvOutputRootNote[i] = clamp<int8_t>(legacySlot.cvOutputRootNote[i], -1, 11);
-    }
-
     // Read VM scripts
     for (int script = 0; script < EditableScriptCount; ++script) {
         ss_clear_script(&_state, script);
@@ -341,7 +253,7 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
         reader.read(_state.patterns[pattern], 0);
     }
 
-    // Read pattern slots (overwrites legacy data if present)
+    // Read pattern slots
     uint8_t activeSlotVal = 0;
     reader.read(activeSlotVal);
     _activePatternSlot = clamp<uint8_t>(activeSlotVal, 0, PatternSlotCount - 1);

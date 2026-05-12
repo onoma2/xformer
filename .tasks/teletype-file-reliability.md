@@ -26,8 +26,10 @@ Fix the three real bugs in TeletypeTrack file saving/loading: redundant legacy I
 - [x] Graphify audit mapped full save/load call chains through 17,340-node codebase graph.
 - [x] Debunked Shadow Binary spec claims (no stack overflow, no race condition, no stream corruption).
 - [x] Wrote reality-check spec identifying 3 real problems with phased fix plan.
+- [x] Phase 0: Removed legacy I/O block from `TeletypeTrack::write()` and `read()`. Hardware verified — save/load round-trips correctly with minimal scripts.
 
 ## Notes
+- Phase 0 saved ~46 bytes per project file by eliminating redundant legacy I/O serialization.
 - Binary payload is ~4.5KB total (TeletypeTrack). Tiny relative to full project.
 - `ttSlot1`/`ttSlot2` are anonymous-namespace globals, not static. Protected by cooperative single-task model — no mutex needed.
 - `readTeletypeScript` already has `success` tracking and returns `INVALID_CHECKSUM` on parse failure. `readTeletypeTrack` does not — this is the asymmetry Phase 1 fixes.
