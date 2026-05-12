@@ -32,8 +32,8 @@ _Updated: 2026-05-11_
 
 ## 🔴 teletype-file-reliability — Improve TeletypeTrack file loading/saving reliability
 **Status:** active
-**Where I stopped:** Identified critical 32-byte stack buffer overflow in FileManager `writeScriptSection`. The user requested to streamline the track binary format (drop backward compatibility) and expand memory bounds.
-**Next action:** Apply the agreed plan: expand the write buffer in `FileManager` to 128 bytes and streamline `TeletypeTrack::read/write` to drop legacy I/O mappings.
+**Where I stopped:** Finalized Unified Architecture Spec marrying Shadow Binary (`.T9B`) for robust project persistence with existing Text workflows (`.TXT`) for library management. Adversarial review completed; identified race conditions and parsing flaws in text workflow to be fixed.
+**Next action:** Implement Shadow Binary Save/Load logic and harden existing text parser as per spec: `docs/superpowers/specs/2026-05-12-teletype-shadow-binary-design.md`
 **Branch:** TBD
 
 ---
