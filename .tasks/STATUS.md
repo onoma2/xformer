@@ -30,10 +30,10 @@ _Updated: 2026-05-12_
 
 ---
 
-## 🟡 teletype-file-reliability — Fix real Teletype file saving/loading bugs
-**Status:** paused — Phase 0 & 1 complete, hardware verified
-**Where I stopped:** Phase 1 done. `readTeletypeTrack()` now tracks parse failures and returns `INVALID_DATA`. UI shows "INVALID TRACK FILE" on bad data.
-**Next action:** Phase 2 — add snapshot/rollback to `readTeletypeTrack()` so failed load doesn't wipe the working track
+## 🟢 teletype-file-reliability — Fix real Teletype file saving/loading bugs
+**Status:** done — all 3 phases complete, hardware verified
+**Where I stopped:** Phase 2 done. Failed text loads now restore previous track/script state via snapshot/rollback. All three real bugs fixed.
+**Next action:** Squash branch for merge
 **Governing spec:** `docs/superpowers/specs/2026-05-12-teletype-saving-reality-check.md`
 **Branch:** fix/teletype-files
 

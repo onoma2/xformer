@@ -481,6 +481,12 @@ fs::Error FileManager::readTeletypeScript(TeletypeTrack &track, int scriptIndex,
     bool success = true;
     char lineBuffer[256] = {};
     scene_state_t &state = track.state();
+
+    // Save script for rollback
+    uint8_t savedLength = state.scripts[scriptIndex].l;
+    tele_command_t savedCommands[TeletypeTrack::ScriptLineCount];
+    std::memcpy(savedCommands, state.scripts[scriptIndex].c, sizeof(savedCommands));
+
     ss_clear_script(&state, scriptIndex);
     for (int line = 0; line < TeletypeTrack::ScriptLineCount; ++line) {
         if (!readLine(fileReader, lineBuffer, sizeof(lineBuffer))) {
@@ -510,6 +516,11 @@ fs::Error FileManager::readTeletypeScript(TeletypeTrack &track, int scriptIndex,
     }
     if (error == fs::OK && !success) {
         error = fs::INVALID_CHECKSUM;
+    }
+
+    if (error != fs::OK) {
+        state.scripts[scriptIndex].l = savedLength;
+        std::memcpy(state.scripts[scriptIndex].c, savedCommands, sizeof(savedCommands));
     }
 
     return error;
@@ -612,6 +623,8 @@ namespace {
     // Shared Teletype slot buffers to avoid large stack usage in file task.
     TeletypeTrack::PatternSlot ttSlot1;
     TeletypeTrack::PatternSlot ttSlot2;
+    TeletypeTrack::PatternSlot ttSlot1Backup;  // Rollback backup for readTeletypeTrack
+    TeletypeTrack::PatternSlot ttSlot2Backup;  // Rollback backup for readTeletypeTrack
     char ttLineBuffer[256];
 }
 
@@ -731,6 +744,10 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     if (fileReader.error() != fs::OK) {
         return fileReader.error();
     }
+
+    // Snapshot current state for rollback before clearing
+    ttSlot1Backup = track.patternSlotSnapshot(0);
+    ttSlot2Backup = track.patternSlotSnapshot(1);
 
     track.clear();
     scene_state_t &state = track.state();
@@ -1087,10 +1104,6 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
         }
     }
 
-    track.setPatternSlotForPattern(0, ttSlot1);
-    track.setPatternSlotForPattern(1, ttSlot2);
-    track.applyActivePatternSlot();
-
     auto error = fileReader.finish();
     if (error == fs::END_OF_FILE) {
         error = fs::OK;
@@ -1098,6 +1111,18 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     if (error == fs::OK && !success) {
         error = fs::INVALID_DATA;
     }
+
+    if (error == fs::OK) {
+        track.setPatternSlotForPattern(0, ttSlot1);
+        track.setPatternSlotForPattern(1, ttSlot2);
+        track.applyActivePatternSlot();
+    } else {
+        // Restore from backup on failure
+        track.setPatternSlotForPattern(0, ttSlot1Backup);
+        track.setPatternSlotForPattern(1, ttSlot2Backup);
+        track.applyActivePatternSlot();
+    }
+
     return error;
 }
 

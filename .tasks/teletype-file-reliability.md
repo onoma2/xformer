@@ -28,6 +28,7 @@ Fix the three real bugs in TeletypeTrack file saving/loading: redundant legacy I
 - [x] Wrote reality-check spec identifying 3 real problems with phased fix plan.
 - [x] Phase 0: Removed legacy I/O block from `TeletypeTrack::write()` and `read()`. Hardware verified — save/load round-trips correctly with minimal scripts.
 - [x] Phase 1: Added strict parsing to `readTeletypeTrack()` — tracks `success`, returns `fs::INVALID_DATA` on parse failure. UI shows "INVALID TRACK FILE". New `INVALID_DATA` error code added to `fs::Error`. Hardware verified.
+- [x] Phase 2: Added snapshot/rollback to `readTeletypeTrack()` and `readTeletypeScript()`. Failed load restores previous track/script state instead of wiping. Hardware verified.
 
 ## Notes
 - Phase 0 saved ~46 bytes per project file by eliminating redundant legacy I/O serialization.
