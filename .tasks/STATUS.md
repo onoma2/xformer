@@ -1,5 +1,5 @@
 # Task Board
-_Updated: 2026-05-11_
+_Updated: 2026-05-12_
 
 ## 🟡 performer-keyboard-shortcuts — USB keyboard context menu
 **Status:** paused
@@ -30,10 +30,11 @@ _Updated: 2026-05-11_
 
 ---
 
-## 🔴 teletype-file-reliability — Improve TeletypeTrack file loading/saving reliability
+## 🔴 teletype-file-reliability — Fix real Teletype file saving/loading bugs
 **Status:** active
-**Where I stopped:** Finalized Unified Architecture Spec marrying Shadow Binary (`.T9B`) for robust project persistence with existing Text workflows (`.TXT`) for library management. Adversarial review completed; identified race conditions and parsing flaws in text workflow to be fixed.
-**Next action:** Implement Shadow Binary Save/Load logic and harden existing text parser as per spec: `docs/superpowers/specs/2026-05-12-teletype-shadow-binary-design.md`
+**Where I stopped:** Graphify audit debunked Shadow Binary spec — no stack overflows, no race conditions, no stream corruption. Real problems: (1) redundant legacy I/O block in binary serialization, (2) `readTeletypeTrack` silently drops unparseable lines, (3) no rollback on failed text load wipes working track.
+**Next action:** Phase 0: streamline binary write/read per existing plan `docs/plans/2026-05-12-teletype-save-load-fixes.md`. Then Phase 1 (strict parse) and Phase 2 (rollback).
+**Governing spec:** `docs/superpowers/specs/2026-05-12-teletype-saving-reality-check.md`
 **Branch:** TBD
 
 ---

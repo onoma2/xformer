@@ -1,23 +1,34 @@
 # teletype-file-reliability
 
 ## Goal
-Improve the reliability of TeletypeTrack saving and loading in the Performer project. The primary goal is to resolve random crashes and silent save failures caused by a critical stack buffer overflow, while simultaneously streamlining the binary project format by removing backwards compatibility.
+Fix the three real bugs in TeletypeTrack file saving/loading: redundant legacy I/O in binary serialization, silent parse failures in the text track loader, and no rollback when a text load fails (wipes the working track).
 
-**Plan:** [Teletype File Reliability: Unified Architecture Spec](../docs/superpowers/specs/2026-05-12-teletype-shadow-binary-design.md)
+**Governing spec:** [Teletype File Saving: Actual Problems & Minimal Fixes](../docs/superpowers/specs/2026-05-12-teletype-saving-reality-check.md)
+**Supersedes:** `docs/superpowers/specs/2026-05-12-teletype-shadow-binary-design.md` (Shadow Binary was debunked by graphify audit — no stack overflows, no race conditions, no stream corruption exist)
 
 ## Key files
-- `src/apps/sequencer/model/FileManager.cpp` — Implement Shadow Binary (`.T9B`) Save/Load logic and harden existing text parser (thread safety, strict parsing).
-- `src/apps/sequencer/model/TeletypeTrack.cpp` — Implement `writeShadow()` and `readShadow()` for raw VM state dumping.
+- `src/apps/sequencer/model/TeletypeTrack.cpp` — Phase 0: streamline binary write/read (remove legacy I/O block)
+- `src/apps/sequencer/model/FileManager.cpp` — Phase 1: add strict parsing to `readTeletypeTrack()`. Phase 2: add snapshot/rollback.
+- `src/apps/sequencer/ui/pages/TeletypePatternViewPage.cpp` — Phase 1: wire `fs::INVALID_DATA` to "INVALID TRACK FILE" message
 
 ## Decisions log
 - 2026-05-12: Discovered a 32-byte stack buffer overflow in `FileManager.cpp` when reconstructing Teletype scripts. This corrupts the File Task stack on large scripts. (Resolved/Verified: already fixed in codebase).
 - 2026-05-12: User confirmed that breaking backward compatibility for `.PRO` files is acceptable. Decided to streamline the `TeletypeTrack::read` and `write` methods, removing the legacy slot `0` I/O mapping checks, allowing for a cleaner serialization stream.
-- 2026-05-12: Finalized Unified Architecture Spec marrying Shadow Binary for projects with Text for libraries. Identified critical race condition in static global buffers `ttSlot1`/`ttSlot2` and silent failures in script parsing.
+- 2026-05-12: Graphify audit (17,340-node graph) debunked Shadow Binary spec. No evidence of stream corruption, stack overflow, or RTOS race conditions. Real problems are: (1) ~46 bytes redundant legacy I/O in binary write, (2) `readTeletypeTrack` silently drops bad lines, (3) no rollback on failed text load. New spec: `2026-05-12-teletype-saving-reality-check.md`.
+- 2026-05-12: Shadow Binary `.T9B` rejected. `scene_state_t` contains pointers and can't be raw-dumped. FNV hash already catches binary corruption. Cooperative single-task model means no race conditions on `ttSlot1`/`ttSlot2`.
+
+## Open questions
+- [ ] Should `#S4P1`/`#S4P2` text labels be renamed? Deferred — breaking change for existing user files, not a correctness issue.
 
 ## Completed steps
 - [x] Researched the T9type storage architecture and compared it with original Monome Teletype.
 - [x] Identified the `buffer[32]` overflow in text export.
+- [x] Graphify audit mapped full save/load call chains through 17,340-node codebase graph.
+- [x] Debunked Shadow Binary spec claims (no stack overflow, no race condition, no stream corruption).
+- [x] Wrote reality-check spec identifying 3 real problems with phased fix plan.
 
 ## Notes
-- Original Monome uses internal MCU flash; T9type uses the central SD-based Performer binary state.
-- Keep an eye on File Task stack usage (~2048 bytes).
+- Binary payload is ~4.5KB total (TeletypeTrack). Tiny relative to full project.
+- `ttSlot1`/`ttSlot2` are anonymous-namespace globals, not static. Protected by cooperative single-task model — no mutex needed.
+- `readTeletypeScript` already has `success` tracking and returns `INVALID_CHECKSUM` on parse failure. `readTeletypeTrack` does not — this is the asymmetry Phase 1 fixes.
+- Existing plan in `docs/plans/2026-05-12-teletype-save-load-fixes.md` is Phase 0 of this task — already has code provided.
