@@ -75,6 +75,20 @@ void UserScalePage::keyPress(KeyPressEvent &event) {
     ListPage::keyPress(event);
 }
 
+void UserScalePage::keyboard(KeyboardEvent &event) {
+    if (event.isPressed() && event.keycode() == KeyboardEvent::KeyEnter && selectedRow() == 0) {
+        _manager.pages().textInput.show("NAME:", _userScale->name(), UserScale::NameLength,
+            [this] (bool result, const char *text) {
+                if (result) {
+                    _userScale->setName(text);
+                }
+            });
+        event.consume();
+        return;
+    }
+    ListPage::keyboard(event);
+}
+
 void UserScalePage::setSelectedIndex(int index) {
     _selectedIndex = index;
     _userScale = &UserScale::userScales[index];

@@ -82,6 +82,20 @@ void ProjectPage::encoder(EncoderEvent &event) {
     ListPage::encoder(event);
 }
 
+void ProjectPage::keyboard(KeyboardEvent &event) {
+    if (event.isPressed() && event.keycode() == KeyboardEvent::KeyEnter && selectedRow() == 0) {
+        _manager.pages().textInput.show("NAME:", _project.name(), Project::NameLength,
+            [this] (bool result, const char *text) {
+                if (result) {
+                    _project.setName(text);
+                }
+            });
+        event.consume();
+        return;
+    }
+    ListPage::keyboard(event);
+}
+
 void ProjectPage::contextShow() {
     showContextMenu(ContextMenu(
         contextMenuItems,

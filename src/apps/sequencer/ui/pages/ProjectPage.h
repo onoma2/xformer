@@ -16,6 +16,7 @@ public:
 
     virtual void keyPress(KeyPressEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
 
 private:
     void contextShow();

@@ -80,7 +80,7 @@ void Ui::update() {
     handleEncoder();
     handleMidi();
     auto topPage = _pageManager.top();
-    bool mapStepKeys = (topPage != &_pages.teletypeScriptView && topPage != &_pages.teletypePatternView);
+    bool mapStepKeys = (topPage != &_pages.teletypeScriptView && topPage != &_pages.teletypePatternView && topPage != &_pages.textInput);
     _keyboardManager.process(_pageKeyState, _globalKeyState, _keyPressEventTracker, _screensaver, _pageManager, mapStepKeys);
 
     // abort if track engines are not consistent with model

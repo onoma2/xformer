@@ -151,6 +151,63 @@ void TextInputPage::encoder(EncoderEvent &event) {
     _selectedIndex = (_selectedIndex + event.value() + sizeof(characterSet)) % sizeof(characterSet);
 }
 
+void TextInputPage::keyboard(KeyboardEvent &event) {
+    if (!event.isPressed()) {
+        return;
+    }
+
+    switch (event.keycode()) {
+    case KeyboardEvent::KeyEnter:
+        closeWithResult(true);
+        event.consume();
+        return;
+    case KeyboardEvent::KeyEscape:
+        closeWithResult(false);
+        event.consume();
+        return;
+    case KeyboardEvent::KeyBackspace:
+        backspace();
+        event.consume();
+        return;
+    case KeyboardEvent::KeyDelete:
+        del();
+        event.consume();
+        return;
+    case KeyboardEvent::KeyLeft:
+        moveLeft();
+        event.consume();
+        return;
+    case KeyboardEvent::KeyRight:
+        moveRight();
+        event.consume();
+        return;
+    }
+
+    if (event.keycode() >= KeyboardEvent::KeyF1 && event.keycode() <= KeyboardEvent::KeyF5) {
+        switch (Function(event.keycode() - KeyboardEvent::KeyF1)) {
+        case Function::Backspace: backspace();                      break;
+        case Function::Delete:    del();                            break;
+        case Function::Clear:     clear();                          break;
+        case Function::Cancel:    closeWithResult(false);           break;
+        case Function::OK:        closeWithResult(true);            break;
+        }
+        event.consume();
+        return;
+    }
+
+    char c = event.ch();
+    if (c >= 'a' && c <= 'z') {
+        c = c - 'a' + 'A';
+    }
+    if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == ' ') {
+        insert(c);
+        event.consume();
+        return;
+    }
+
+    BasePage::keyboard(event);
+}
+
 void TextInputPage::closeWithResult(bool result) {
     Page::close();
     if (_callback) {

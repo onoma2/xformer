@@ -16,6 +16,7 @@ public:
     virtual void draw(Canvas &canvas) override;
 
     virtual void keyPress(KeyPressEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
 
 private:
     void setSelectedIndex(int index);
