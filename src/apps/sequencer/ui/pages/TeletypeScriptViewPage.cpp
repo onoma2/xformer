@@ -4,7 +4,9 @@
 
 #include "engine/TeletypeBridge.h"
 #include "engine/TeletypeTrackEngine.h"
+#include "model/FileDefs.h"
 #include "model/FileManager.h"
+#include "model/TeletypeTrack.h"
 #include "ui/LedPainter.h"
 #include "ui/MatrixMap.h"
 
@@ -946,7 +948,15 @@ void TeletypeScriptViewPage::saveScriptToSlot(int slot) {
 
     FileManager::task([this, slot] () {
         auto &track = _project.selectedTrack().teletypeTrack();
-        return FileManager::writeTeletypeScript(track, _scriptIndex, slot);
+        FixedStringBuilder<FileHeader::NameLength> scriptName;
+        if (_scriptIndex == TeletypeTrack::SlotScriptIndex) {
+            scriptName("%.5s-S%d", _project.name(), track.activePatternSlot() + 1);
+        } else if (_scriptIndex == METRO_SCRIPT) {
+            scriptName("%.7s-M", _project.name());
+        } else {
+            scriptName("%.6s-S%d", _project.name(), _scriptIndex + 1);
+        }
+        return FileManager::writeTeletypeScript(track, _scriptIndex, scriptName, slot);
     }, [this] (fs::Error result) {
         if (result == fs::OK) {
             showMessage("SCRIPT SAVED");

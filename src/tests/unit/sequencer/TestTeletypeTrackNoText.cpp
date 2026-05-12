@@ -147,7 +147,7 @@ UNIT_TEST("TeletypeTrackNoText") {
         ss_overwrite_script_command(&track.state(), 0, 1, &cmd);
 
         const char *path = "tt_script_test.txt";
-        fs::Error writeResult = FileManager::writeTeletypeScript(track, 0, path);
+        fs::Error writeResult = FileManager::writeTeletypeScript(track, 0, "TEST", path);
         expectEqual(int(writeResult), int(fs::OK), "script write");
 
         TeletypeTrack restored;

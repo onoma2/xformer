@@ -30,7 +30,7 @@ public:
     static fs::Error writeUserScale(const UserScale &userScale, int slot);
     static fs::Error readUserScale(UserScale &userScale, int slot);
 
-    static fs::Error writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, int slot);
+    static fs::Error writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, const char *name, int slot);
     static fs::Error readTeletypeScript(TeletypeTrack &track, int scriptIndex, int slot);
     static fs::Error writeTeletypeTrack(const TeletypeTrack &track, const char *name, int slot);
     static fs::Error readTeletypeTrack(TeletypeTrack &track, int slot);
@@ -41,7 +41,7 @@ public:
     static fs::Error writeUserScale(const UserScale &userScale, const char *path);
     static fs::Error readUserScale(UserScale &userScale, const char *path);
 
-    static fs::Error writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, const char *path);
+    static fs::Error writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, const char *name, const char *path);
     static fs::Error readTeletypeScript(TeletypeTrack &track, int scriptIndex, const char *path);
     static fs::Error writeTeletypeTrack(const TeletypeTrack &track, const char *name, const char *path);
     static fs::Error readTeletypeTrack(TeletypeTrack &track, const char *path);

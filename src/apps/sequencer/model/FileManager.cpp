@@ -333,9 +333,9 @@ fs::Error FileManager::readUserScale(UserScale &userScale, int slot) {
     });
 }
 
-fs::Error FileManager::writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, int slot) {
+fs::Error FileManager::writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, const char *name, int slot) {
     return writeFile(FileType::TeletypeScript, slot, [&] (const char *path) {
-        return writeTeletypeScript(track, scriptIndex, path);
+        return writeTeletypeScript(track, scriptIndex, name, path);
     });
 }
 
@@ -443,7 +443,7 @@ fs::Error FileManager::readUserScale(UserScale &userScale, const char *path) {
     return error;
 }
 
-fs::Error FileManager::writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, const char *path) {
+fs::Error FileManager::writeTeletypeScript(const TeletypeTrack &track, int scriptIndex, const char *name, const char *path) {
     if (scriptIndex < 0 || scriptIndex >= TeletypeTrack::EditableScriptCount) {
         return fs::INVALID_PARAMETER;
     }
@@ -452,6 +452,9 @@ fs::Error FileManager::writeTeletypeScript(const TeletypeTrack &track, int scrip
     if (fileWriter.error() != fs::OK) {
         return fileWriter.error();
     }
+
+    FixedStringBuilder<64> nameLine("NAME %s\n", name);
+    fileWriter.write(nameLine, strlen(nameLine));
 
     char lineBuffer[256] = {};
     scene_state_t &state = const_cast<scene_state_t &>(track.state());
@@ -491,6 +494,9 @@ fs::Error FileManager::readTeletypeScript(TeletypeTrack &track, int scriptIndex,
     for (int line = 0; line < TeletypeTrack::ScriptLineCount; ++line) {
         if (!readLine(fileReader, lineBuffer, sizeof(lineBuffer))) {
             break;
+        }
+        if (std::strncmp(lineBuffer, "NAME ", 5) == 0) {
+            continue;
         }
         if (lineBuffer[0] == '\0') {
             continue;
@@ -1182,8 +1188,25 @@ void FileManager::slotInfo(FileType type, int slot, SlotInfo &info) {
     if (fs::exists(path)) {
         if (type == FileType::TeletypeScript) {
             FixedStringBuilder<9> name("TS%03d", slot + 1);
-            std::strncpy(info.name, name, sizeof(info.name));
-            info.name[sizeof(info.name) - 1] = '\0';
+            info.name[0] = '\0';
+
+            char line[64] = {};
+            if (readFirstLine(path, line, sizeof(line))) {
+                trimRight(line);
+                const char *text = skipSpace(line);
+                if (std::strncmp(text, "NAME ", 5) == 0) {
+                    text = skipSpace(text + 5);
+                    if (*text) {
+                        std::strncpy(info.name, text, sizeof(info.name) - 1);
+                        info.name[sizeof(info.name) - 1] = '\0';
+                    }
+                }
+            }
+
+            if (info.name[0] == '\0') {
+                std::strncpy(info.name, name, sizeof(info.name));
+                info.name[sizeof(info.name) - 1] = '\0';
+            }
             info.used = true;
         } else if (type == FileType::TeletypeTrack) {
             FixedStringBuilder<9> name("TT%03d", slot + 1);
