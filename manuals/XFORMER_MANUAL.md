@@ -36,6 +36,47 @@ This manual covers the XFORMER-specific features:
 
 It assumes you are already familiar with the standard functionality of the Westlicht PER|FORMER.
 
+## USB Keyboard Support
+
+Connect any USB HID keyboard to the USB Host port. Most keyboard shortcuts map directly to hardware buttons; if you know the button, you know the key.
+
+### Global Shortcuts (work everywhere)
+
+| Key | Hardware Equivalent |
+|-----|-------------------|
+| Escape | Back / Pop page |
+| Space | Play / Stop |
+| 1-8 | Track Select 1-8 |
+| Alt + 1-8 | Track Select (redundant, strips modifiers) |
+| Alt + Q/W/E/R/T/Y/U/I/O/P | Page navigation (Page+Step buttons) |
+| Alt + A/S/D/F/G/H | Page navigation (Page+Step / Page+buttons) |
+| Tab | Context menu (Page+Shift) |
+| Shift + Alt | Open context menu (long-press) |
+| Up/Down | Encoder rotate (value up/down) |
+
+### On Edit Pages (Note, Curve, Indexed)
+
+| Key | Hardware Equivalent |
+|-----|-------------------|
+| Q-P (row) | Steps 0-7 (gate toggle / selection) |
+| A-K (row) | Steps 8-15 (gate toggle / selection) |
+| Shift + step key | Persistent selection (shift+step hold) |
+| Left/Right | Section navigation (Prev/Next page) |
+| Shift + Left/Right | Shift step data |
+
+### On List Pages (Tracks, Settings, etc.)
+
+| Key | Hardware Equivalent |
+|-----|-------------------|
+| Up/Down | Scroll rows (encoder rotate) |
+| Left/Right | Edit value (encoder left/right) |
+| Enter | Toggle edit mode (encoder press) |
+| Shift + Left/Right | Coarse edit (shift+encoder) |
+
+### On Teletype Pages
+
+See the Teletype manual (`T9type-learn.md`) for full Teletype keyboard shortcuts — Enter, Backspace, Home/End, Ctrl+C/V/X, F1-F5, Alt+F1-F5, and more. Teletype pages consume their keys first so global shortcuts don't conflict.
+
 ## 2. Algo Track
 
 ### 2.1 What is Algo Track?

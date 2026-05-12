@@ -1,6 +1,6 @@
 # Performer Keyboard Shortcuts — Task Status
 
-Status: Active
+Status: Complete
 Priority: High
 
 ## Overview
@@ -102,13 +102,11 @@ All ListPage subclasses inherit this. Pages with existing `keyboard()` (Layout/R
 
 Replaced by ListPage arrow navigation (Phase 2b) which covers 20+ pages with a single implementation. Letter shortcuts may still be added for specific high-value actions (e.g., Performer mute/solo) but are not a priority.
 
-### Phase 4: Step Type-In (NoteSequenceEditPage)
+### Phase 5b: Arrow Keys → Encoder Rotation ✅
 
-`5N E4` syntax command line for direct step value entry. Modeled on TeletypeScriptViewPage's `_editBuffer`. Not yet started.
+Up/Down arrow keys mapped to encoder rotation events in `BasePage::keyboard()`. Works on every page that has an `encoder()` handler. Pages that handle arrows themselves (ListPage, Teletype) consume the event first — zero conflicts.
 
-### Phase 5: Form Mode (List Pages) (DEFERRED)
-
-Arrow navigation in Phase 2b covers list page interaction. Direct value type-in could be added later but is not currently needed.
+This supersedes the numeric-entry plan (Phase 4). Arrow keys give the same "hold step, turn encoder" interaction via keyboard, with no text buffer, parsers, or per-page code.
 
 ## Key Files
 
@@ -118,7 +116,8 @@ Arrow navigation in Phase 2b covers list page interaction. Direct value type-in 
 | `src/apps/sequencer/ui/Page.h/cpp` | Page base class, `keyboard()` virtual (default no-op), `dispatchEvent()` routing |
 | `src/apps/sequencer/ui/PageManager.h/cpp` | Page stack, `dispatchEvent()` top-to-bottom with consume |
 | `src/apps/sequencer/ui/Ui.h/cpp` | `handleKeyboard()`, `enqueueKeyboardEvent()`, `hidKeycodeToAscii()` |
-| `src/apps/sequencer/ui/pages/BasePage.h/cpp` | `keyboard()` virtual — Shift+Alt context menu, `contextShow()` virtual (default no-op), `pressFunctionButton()` |
+| `src/apps/sequencer/ui/pages/BasePage.h/cpp` | `keyboard()` virtual — Shift+Alt context menu, Up/Down→encoder, `contextShow()` virtual (default no-op), `pressFunctionButton()` |
+| `src/apps/sequencer/ui/KeyboardManager.h/cpp` | HID keycode→ASCII/step mapping, USB modifier→KeyState, event ring buffer, process() dispatch |
 | `src/apps/sequencer/ui/pages/ListPage.h/cpp` | `keyboard()` — arrow nav (Up/Down/Left/Right/Enter) for all 20 list pages |
 | `src/apps/sequencer/ui/pages/TopPage.h/cpp` | Global catch-all — Escape, Space, Alt+letter, digits |
 | `src/apps/sequencer/ui/pages/ContextMenuPage.h/cpp` | `keyboard()` — F1-F5 item select, Escape close |
@@ -197,10 +196,12 @@ Pages with their own keyboard() (Layout, Routing, System, Track, etc.)
 - [x] Phase 2c: BasePage::keyboard() — Shift+Alt context menu trigger (virtual contextShow)
 - [x] Phase 2c: ContextMenuPage::keyboard() — F1-F5 select, Escape close
 - [x] Bug fix: PerformerPage/PatternPage held-state F-buttons use toggle semantics
+- [x] KeyboardManager refactor (Phases 1-5): moved ring buffer, HID translation, step mapping, core dispatch, engine handler registrations
+- [x] USB keyboard Shift/Ctrl → hardware Shift/Page mapping for step selection
+- [x] Arrow Up/Down → encoder rotation (BasePage::keyboard, works on all pages globally)
 
-## Next actions
+## Completion notes
 
-1. Hardware test: keyboard still shows "KEYBOARD CONNECTED"
-2. Hardware test: Tab still opens quick menu
-3. Hardware test: Q-I/A-K press/release toggles/clears steps on NoteSequenceEditPage
-4. Hardware test: Launchpad/MIDI still enumerate after keyboard step-key use
+- All phases 1-5 complete. Phase 3 (per-page letter shortcuts) and Phase 5 (form mode) were explicitly deferred — arrow navigation and encoder emulation cover these use cases.
+- Phase 4 (numeric type-in) was superseded by Phase 5b (arrow→encoder mapping), which is simpler and more consistent with the hardware interaction model.
+- Hardware-verified on STM32: keyboard connect/disconnect, step keys, Shift/Ctrl modifiers, arrow keys, F1-F5, Alt+letter nav, Tab context menu, Escape back.
