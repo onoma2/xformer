@@ -67,6 +67,7 @@ set(sources
     # ui
     ui/Controller.cpp
     ui/ControllerManager.cpp
+    ui/KeyboardManager.cpp
     ui/LedPainter.cpp
     ui/MessageManager.cpp
     ui/Page.cpp

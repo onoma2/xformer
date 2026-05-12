@@ -81,3 +81,35 @@ void ContextMenuPage::closeAndCallback(int index) {
         _callback(index);
     }
 }
+
+void ContextMenuPage::keyboard(KeyboardEvent &event) {
+    switch (event.keycode()) {
+    case KeyboardEvent::KeyF1:
+        if (_contextMenuModel->itemEnabled(0)) { closeAndCallback(0); }
+        event.consume();
+        break;
+    case KeyboardEvent::KeyF2:
+        if (_contextMenuModel->itemEnabled(1)) { closeAndCallback(1); }
+        event.consume();
+        break;
+    case KeyboardEvent::KeyF3:
+        if (_contextMenuModel->itemEnabled(2)) { closeAndCallback(2); }
+        event.consume();
+        break;
+    case KeyboardEvent::KeyF4:
+        if (_contextMenuModel->itemEnabled(3)) { closeAndCallback(3); }
+        event.consume();
+        break;
+    case KeyboardEvent::KeyF5:
+        if (_contextMenuModel->itemEnabled(4)) { closeAndCallback(4); }
+        event.consume();
+        break;
+    case KeyboardEvent::KeyEscape:
+    case KeyboardEvent::KeyTab:
+        close();
+        event.consume();
+        break;
+    default:
+        break;
+    }
+}

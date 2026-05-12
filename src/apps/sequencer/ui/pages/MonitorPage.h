@@ -21,6 +21,7 @@ public:
     virtual void keyPress(KeyPressEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
     virtual void midi(MidiEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
 
     void setScopeActive(bool active);
     void toggleScope();

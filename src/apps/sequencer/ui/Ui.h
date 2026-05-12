@@ -8,6 +8,7 @@
 #include "KeyPressEventTracker.h"
 #include "Leds.h"
 #include "ControllerManager.h"
+#include "KeyboardManager.h"
 
 #include "pages/Pages.h"
 
@@ -38,13 +39,10 @@ public:
 
     MessageManager &messageManager() { return _messageManager; }
 
-    void enqueueKeyboardEvent(uint8_t keycode, uint8_t modifiers);
-
 private:
     void handleKeys();
     void handleEncoder();
     void handleMidi();
-    void handleKeyboard();
 
     Model &_model;
     Engine &_engine;
@@ -59,12 +57,6 @@ private:
         MidiMessage message;
     };
     RingBuffer<ReceiveMidiEvent, 16> _receiveMidiEvents;
-
-    struct ReceiveKeyboardEvent {
-        uint8_t keycode;
-        uint8_t modifiers;
-    };
-    RingBuffer<ReceiveKeyboardEvent, 16> _receiveKeyboardEvents;
 
     uint8_t _frameBufferData[CONFIG_LCD_WIDTH * CONFIG_LCD_HEIGHT];
     FrameBuffer8bit _frameBuffer;
@@ -84,6 +76,8 @@ private:
 
     ControllerManager _controllerManager;
     uint32_t _lastControllerUpdateTicks;
+
+    KeyboardManager _keyboardManager;
 
     Screensaver _screensaver;
 };

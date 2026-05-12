@@ -1,6 +1,6 @@
 #include "BasePage.h"
-
 #include "Pages.h"
+#include "ui/MatrixMap.h"
 
 #include "ui/model/ContextMenuModel.h"
 
@@ -19,4 +19,71 @@ void BasePage::showMessage(const char *text, uint32_t duration) {
 void BasePage::showContextMenu(const ContextMenu &contextMenu) {
     _context.contextMenu = contextMenu;
     _manager.pages().contextMenu.show(_context.contextMenu, _context.contextMenu.actionCallback());
+}
+
+void BasePage::pressFunctionButton(int functionIndex, bool shift) {
+    KeyState state;
+    state.reset();
+    if (shift) {
+        state.set(Key::Shift);
+    }
+    Key key(MatrixMap::fromFunction(functionIndex), state);
+    KeyEvent downEvent(KeyEvent::KeyDown, key);
+    keyDown(downEvent);
+    KeyPressEvent pressEvent(KeyEvent::KeyPress, key, 1);
+    keyPress(pressEvent);
+    KeyEvent upEvent(KeyEvent::KeyUp, key);
+    keyUp(upEvent);
+}
+
+void BasePage::keyboard(KeyboardEvent &event) {
+    if (event.isPressed()) {
+        if (event.keycode() == KeyboardEvent::KeyTab) {
+            KeyState state;
+            state.set(Key::Shift);
+            state.set(Key::Page);
+            Key key(Key::Page, state);
+            KeyEvent downEvent(KeyEvent::KeyDown, key);
+            keyDown(downEvent);
+            KeyPressEvent pressEvent(KeyEvent::KeyPress, key, 1);
+            keyPress(pressEvent);
+            event.consume();
+            return;
+        }
+
+        if (event.keycode() == KeyboardEvent::KeyLeft) {
+            KeyState state;
+            if (event.shift()) { state.set(Key::Shift); }
+            Key key(Key::Left, state);
+            KeyEvent downEvent(KeyEvent::KeyDown, key);
+            keyDown(downEvent);
+            KeyPressEvent pressEvent(KeyEvent::KeyPress, key, 1);
+            keyPress(pressEvent);
+            event.consume();
+            return;
+        }
+
+        if (event.keycode() == KeyboardEvent::KeyRight) {
+            KeyState state;
+            if (event.shift()) { state.set(Key::Shift); }
+            Key key(Key::Right, state);
+            KeyEvent downEvent(KeyEvent::KeyDown, key);
+            keyDown(downEvent);
+            KeyPressEvent pressEvent(KeyEvent::KeyPress, key, 1);
+            keyPress(pressEvent);
+            event.consume();
+            return;
+        }
+
+        // Up/Down arrows map to encoder rotation — acts like turning the
+        // hardware encoder one click per keypress.
+        if (event.keycode() == KeyboardEvent::KeyUp || event.keycode() == KeyboardEvent::KeyDown) {
+            int direction = (event.keycode() == KeyboardEvent::KeyUp) ? 1 : -1;
+            bool pressed = _context.pageKeyState[Key::Encoder];
+            EncoderEvent encoderEvent(direction, pressed);
+            encoder(encoderEvent);
+            event.consume();
+            return;
+        }
+    }
 }

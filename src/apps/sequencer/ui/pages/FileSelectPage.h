@@ -24,6 +24,7 @@ public:
     virtual bool isModal() const override { return true; }
 
     virtual void keyPress(KeyPressEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
 
 private:
     void closeWithResult(bool result);

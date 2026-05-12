@@ -30,8 +30,16 @@ protected:
     void showMessage(const char *text, uint32_t duration = 1000);
     void showContextMenu(const ContextMenu &contextMenu);
 
+    virtual void contextShow() {}
+
     const KeyState &pageKeyState() const { return _context.pageKeyState; }
     const KeyState &globalKeyState() const { return _context.globalKeyState; }
+
+    // Dispatch a function button press (F1=0 .. F5=4) to keyPress().
+    // Used by keyboard() to map USB F-keys to hardware button actions.
+    void pressFunctionButton(int functionIndex, bool shift = false);
+
+    virtual void keyboard(KeyboardEvent &event) override;
 
     PageContext &_context;
     Model &_model;

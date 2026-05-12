@@ -61,3 +61,18 @@ void ConfirmationPage::closeWithResult(bool result) {
         _callback(result);
     }
 }
+
+void ConfirmationPage::keyboard(KeyboardEvent &event) {
+    switch (event.keycode()) {
+    case KeyboardEvent::KeyEnter:
+        closeWithResult(true);
+        event.consume();
+        break;
+    case KeyboardEvent::KeyEscape:
+        closeWithResult(false);
+        event.consume();
+        break;
+    default:
+        break;
+    }
+}

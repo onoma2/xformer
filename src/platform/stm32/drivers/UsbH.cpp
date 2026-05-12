@@ -199,28 +199,22 @@ static hid_config_t hid_config = {};
 
 struct HidDriverHandler {
     static void connectHandler(uint8_t device_id, HID_TYPE type) {
-        DBG("HID device connected (id=%d, type=%d)", device_id, type);
         if (g_usbh) {
             g_usbh->hidConnectDevice(device_id, type);
-            if (g_usbh->_debugMsgCallback) {
-                char msg[64];
-                snprintf(msg, sizeof(msg), "HID %d t=%d", device_id, (int)type);
-                g_usbh->_debugMsgCallback(msg, g_usbh->_debugMsgContext);
-            }
         }
     }
 
     static void disconnectHandler(uint8_t device_id) {
-        DBG("HID device disconnected (id=%d)", device_id);
         if (g_usbh) {
             g_usbh->hidDisconnectDevice(device_id);
         }
     }
 
     static void messageHandler(uint8_t device_id, const uint8_t *data, uint32_t length) {
-        (void)device_id; (void)data; (void)length;
-        // Key parsing and enqueue happens in C layer (usbh_driver_hid.c)
-        // UsbH::process() dequeues via hid_read_key() and calls _hidKeyCallback
+        if (g_usbh) {
+            // Keep the C HID driver close to the hardware-tested path; parse reports after usbh_poll().
+            g_usbh->enqueueHidReport(device_id, data, length);
+        }
     }
 };
 
@@ -257,6 +251,7 @@ void UsbH::process() {
     uint32_t time_us = HighResolutionTimer::us();
 
     usbh_poll(time_us);
+    processHidReports();
 
     for (int i = 0; i < USBH_HID_MAX_DEVICES; ++i) {
         bool connected = hid_is_connected(i);
@@ -285,6 +280,108 @@ void UsbH::process() {
         MidiDriverHandler::flush(device);
     }
 
+}
+
+bool UsbH::recvKey(HidKeyEvent *event) {
+    if (_hidKeyTail == _hidKeyHead) {
+        return false;
+    }
+    *event = _hidKeyEvents[_hidKeyTail];
+    _hidKeyTail = (_hidKeyTail + 1) % HidKeyEventBufferSize;
+    return true;
+}
+
+void UsbH::enqueueHidReport(uint8_t device, const uint8_t *data, uint32_t length) {
+    if (device >= USBH_HID_MAX_DEVICES || !data || length < 8) {
+        return;
+    }
+
+    uint8_t nextHead = (_hidReportHead + 1) % HidReportBufferSize;
+    if (nextHead == _hidReportTail) {
+        _hidReportTail = (_hidReportTail + 1) % HidReportBufferSize;
+    }
+
+    HidReport &report = _hidReports[_hidReportHead];
+    report.device = device;
+    report.length = 8;
+    for (uint8_t i = 0; i < report.length; ++i) {
+        report.data[i] = data[i];
+    }
+    _hidReportHead = nextHead;
+}
+
+void UsbH::processHidReports() {
+    while (_hidReportTail != _hidReportHead) {
+        HidReport report = _hidReports[_hidReportTail];
+        _hidReportTail = (_hidReportTail + 1) % HidReportBufferSize;
+
+        uint8_t currentKeys[6] = {};
+        uint8_t currentCount = 0;
+        for (uint8_t i = 2; i < report.length && currentCount < 6; ++i) {
+            if (report.data[i] != 0) {
+                currentKeys[currentCount++] = report.data[i];
+            }
+        }
+
+        uint8_t *previousKeys = _hidPrevKeys[report.device];
+        uint8_t previousCount = _hidPrevKeyCount[report.device];
+        uint8_t modifiers = report.data[0];
+
+        for (uint8_t ci = 0; ci < currentCount; ++ci) {
+            bool found = false;
+            for (uint8_t pi = 0; pi < previousCount; ++pi) {
+                if (currentKeys[ci] == previousKeys[pi]) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                enqueueHidKey(report.device, modifiers, currentKeys[ci], 1);
+            }
+        }
+
+        for (uint8_t pi = 0; pi < previousCount; ++pi) {
+            bool found = false;
+            for (uint8_t ci = 0; ci < currentCount; ++ci) {
+                if (previousKeys[pi] == currentKeys[ci]) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                enqueueHidKey(report.device, modifiers, previousKeys[pi], 0);
+            }
+        }
+
+        for (uint8_t i = 0; i < 6; ++i) {
+            previousKeys[i] = currentKeys[i];
+        }
+        _hidPrevKeyCount[report.device] = currentCount;
+    }
+}
+
+void UsbH::clearHidState(uint8_t device) {
+    if (device >= USBH_HID_MAX_DEVICES) {
+        return;
+    }
+    _hidPrevKeyCount[device] = 0;
+    for (uint8_t i = 0; i < 6; ++i) {
+        _hidPrevKeys[device][i] = 0;
+    }
+}
+
+void UsbH::enqueueHidKey(uint8_t device, uint8_t modifiers, uint8_t keycode, uint8_t pressed) {
+    uint8_t nextHead = (_hidKeyHead + 1) % HidKeyEventBufferSize;
+    if (nextHead == _hidKeyTail) {
+        _hidKeyTail = (_hidKeyTail + 1) % HidKeyEventBufferSize;
+    }
+
+    HidKeyEvent &event = _hidKeyEvents[_hidKeyHead];
+    event.device_id = device;
+    event.modifiers = modifiers;
+    event.keycode = keycode;
+    event.pressed = pressed;
+    _hidKeyHead = nextHead;
 }
 
 void UsbH::powerOn() {

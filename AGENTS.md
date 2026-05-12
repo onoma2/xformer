@@ -1,5 +1,8 @@
 # AGENTS Session Notes
 
+## RULES
+- Never make user-facing out-of-scope additions/changes without asking the user first.
+
 ## Codebase overview
 - Firmware for PER|FORMER/XFORMER sequencer: STM32F405 hardware app plus macOS/Linux simulator.
 - Main app `src/apps/sequencer/Sequencer.cpp` sets up drivers (ADC/DAC/gates/MIDI/LCD/SD), model/engine/UI, and FreeRTOS tasks.
@@ -21,6 +24,12 @@
 - `Ui`: framebuffer, `Pages` aggregate of all page instances and list/selection models, MIDI receive ring buffer.
 - Misc: FS pools, USB/MIDI state, idle/timer stacks are small compared to above.
 
+## Build & test
+- **STM32 release build (REQUIRED for all compile checks):** `cd build/stm32/release && make sequencer`
+- Simulator build: `cd build/sim/debug && make sequencer` — **DO ONLY IF USER EXPLICITLY ASKS.**
+- **Always use the STM32 release build to verify compilation.** The sim build uses a different toolchain (host clang vs arm-none-eabi-gcc) and can mask STM32-specific issues. Only the STM32 build catches cross-compilation errors.
+
 ## Considerations
 - RAM is the tight constraint; flash has plenty of margin.
 - To free RAM: shrink note-step fields/pattern count/snapshots, reduce UI/page caches, or trim task stack sizes; prefer moving non-DMA data to CCM if SRAM pressure rises.
+- **Never commit ANY changes without testing on hardware.** Every commit must be flashed and verified on the STM32 module before pushing.

@@ -85,6 +85,34 @@ void ListPage::encoder(EncoderEvent &event) {
     event.consume();
 }
 
+void ListPage::keyboard(KeyboardEvent &event) {
+    switch (event.keycode()) {
+    case KeyboardEvent::KeyUp:
+        setSelectedRow(selectedRow() - 1);
+        event.consume();
+        break;
+    case KeyboardEvent::KeyDown:
+        setSelectedRow(selectedRow() + 1);
+        event.consume();
+        break;
+    case KeyboardEvent::KeyLeft:
+        _listModel->edit(_selectedRow, 1, -1, event.shift());
+        event.consume();
+        break;
+    case KeyboardEvent::KeyRight:
+        _listModel->edit(_selectedRow, 1, 1, event.shift());
+        event.consume();
+        break;
+    case KeyboardEvent::KeyEnter:
+        _edit = !_edit;
+        event.consume();
+        break;
+    default:
+        BasePage::keyboard(event);
+        break;
+    }
+}
+
 void ListPage::setSelectedRow(int selectedRow) {
     if (selectedRow != _selectedRow) {
         _selectedRow = clamp(selectedRow, 0, _listModel->rows() - 1);;

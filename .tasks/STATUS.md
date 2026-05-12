@@ -1,9 +1,24 @@
 # Task Board
-_Updated: 2026-05-10_
+_Updated: 2026-05-11_
+
+## 🟡 performer-keyboard-shortcuts — USB keyboard context menu
+**Status:** paused
+**Where I stopped:** Plan B v3 WORKS on hardware. QWERTY step mapping (Q-I = S0-S7, A-K = S8-S15) confirmed working with proper press/release. Tab context menu confirmed. Key release detection lives in UsbH::processHidReports() (C++), not the fragile C driver. Keyboard detection, Launchpad, MIDI all stable.
+**Next action:** Verify across all track types. Then consider adding remaining keyboard shortcuts (shift modifier, encoder emulation, etc.)
+**Branch:** feat/global-keyboard
+
+---
+
+## Approach history
+- **A8 (SUCCESS):** Tab context menu via hardware Key injection.
+- **A9 (FAILED):** HID driver press/release tracking crashed USB path — reverted.
+- **A10 (SUCCESS):** Key release diffing moved to UsbH::processHidReports() in C++ layer. Stable. QWERTY step mapping + Tab context menu both work.
+
+---
 
 ## 🟢 usb-hid-implementation — USB keyboard end-to-end, mouse rejected
 **Status:** done
-**Where I stopped:** All hardware tested — USB keyboard works on both TeletypeScriptView and TeletypePatternView pages. Mice rejected at driver level. Launchpad still works. Engine integration, human-readable messages, uppercase conversion, shortcut mapping all complete.
+**Where I stopped:** All hardware tested. Bug fixed: removed UsbH.cpp debug callback that overwrote "KEYBOARD CONNECTED" LCD message with "HID 0 t=3". Also removed DBG() prints from connect/disconnect handlers.
 **Next action:** Squash branch for merge
 **Branch:** feat/USB-keyboard4
 
@@ -13,30 +28,18 @@ _Updated: 2026-05-10_
 **Next action:** Test on hardware
 **Branch:** feat/USB-keyboard4
 
-## 🟡 performer-keyboard-shortcuts — Full Performer UI keyboard shortcuts
-**Status:** paused
-**Where I stopped:** Full analysis complete:
-- **Architecture research**: All ~50 page types inventoried, event flow understood (top-to-bottom, clean slate — zero non-Teletype pages override `keyboard()`)
-- **Workflow analysis**: Full 22-step hardware button sequence documented for typical Note track setup (Layout → Sequence → Step Edit → Routing → Play). Core friction = encoder scroll+click repetition on list pages + no batch step operations
-- **Feasibility**: No non-Teletype page has a `keyboard()` override, meaning all pages are clean slate with zero conflicts. `ListModel::edit()` only supports relative (+/-1) edits, but calling model methods directly from page keyboard handlers is trivial
-- **3 approaches proposed**: (A) Form mode — Tab through list fields, type values directly. Very high feasibility, ~20 lines per page. (C) Step type-in command line — `5N E4` syntax on NoteSequenceEditPage. High feasibility, modeled on Teletype's `_editBuffer`. (B) Command palette — `Ctrl+K` overlay search. Moderate feasibility, ~200 lines.
-- **Recommendation**: Phase A (form mode) + Phase C (step type-in) first, then command palette later
-**Next action:** Implement Phase 1a: Universal shortcuts (Space=play, Esc=back, 1-8=track select) + TopPage Alt+letter nav
-**Branch:** feat/USB-keyboard4
-**Files involved:** Page.h/cpp, PageManager.h/cpp, TopPage.cpp, all page .cpp files with F1-F5
-
 ---
 
-## 🟡 teletype-file-reliability — Improve TeletypeTrack file loading/saving reliability
-**Status:** paused
-**Where I stopped:** Complete analysis of file loading/saving across track types, identified key risks and improvement opportunities for TeletypeTrack
-**Next action:** Begin implementing fixes for serialization, error handling, and parsing robustness
+## 🔴 teletype-file-reliability — Improve TeletypeTrack file loading/saving reliability
+**Status:** active
+**Where I stopped:** Identified critical 32-byte stack buffer overflow in FileManager `writeScriptSection`. The user requested to streamline the track binary format (drop backward compatibility) and expand memory bounds.
+**Next action:** Apply the agreed plan: expand the write buffer in `FileManager` to 128 bytes and streamline `TeletypeTrack::read/write` to drop legacy I/O mappings.
 **Branch:** TBD
 
 ---
 
 ## 🟡 launchpad-track-port — Extend Launchpad controller to all 5 track types + Vinx/Modulove enhancements
-**Status:** active - Planning complete, feasibility reviewed
+**Status:** paused
 **Where I stopped:** Comprehensive research done across all forks (mebitek, vinx, modulove, cavian, extracadian). Track port plan corrected (MidiCv + Teletype removed). Vinx/Modulove LP improvements identified for merge.
 **Next action:** Split LaunchpadController.cpp into per-track files, then begin Phase 1: NoteTrack fixes + Foundation (LP Style / LP Note Style settings)
 **Branch:** TBD
@@ -51,23 +54,9 @@ _Updated: 2026-05-10_
 
 ---
 
-## 🟡 vinx-modulove-improvements — Integrate VinxScorza and Modulove performer improvements
-**Status:** active - Launchpad items merged into `launchpad-track-port`
-**Where I stopped:** All Launchpad-specific improvements from this task have been merged into `launchpad-track-port`. Remaining non-Launchpad items (microtiming, LFO modulators, 16-track dual bank research, chaos generators) stay here or move to `other-forks-improvements`.
-**Next action:** Continue non-Launchpad Vinx/Modulove work (microtiming, enhanced performer page) after LP track port completes
-**Branch:** TBD
-
----
-
 ## 🟡 other-forks-improvements — Integrate non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
-**Status:** paused - Implementation Plan Updated with Feasibility Analysis
-**Where I stopped:** Reorganized task against current XFORMER codebase with feasibility, design decisions, and priority:
-- **Current XFORMER Analysis**: 7 track types (4 XFORMER-unique), 8 tracks, no LFOs, no microtiming, unique Harmony system
-- **High Feasibility (weeks 1-4)**: Microtiming recording, enhanced performer page, quick octave change, steps to stop, menu wrap
-- **Medium Feasibility (weeks 5-10)**: Generator preview/apply, curve undo, submenu shortcuts, backward playback
-- **Low Feasibility (weeks 11-16)**: Chaos generators, random gen improvements, LFO modulators, 64-step visualization
-- **Not Feasible Now**: 16-track dual bank (architecture too invasive), Arpeggiator track (no track type)
-- **Already Present**: Curve gate offset/length, bypass voltage table
+**Status:** paused
+**Where I stopped:** Merged with the vinx-modulove-improvements task. Reorganized task against current XFORMER codebase with feasibility, design decisions, and priority. The implementation plan spans 4 phases (Microtiming, Generator workflows, Advanced Track features).
 **Next action:** To be determined after Launchpad improvements
 **Branch:** TBD
 
@@ -75,6 +64,6 @@ _Updated: 2026-05-10_
 
 ## ⚪ fractal-track-implementation — Smart Mutation Engine track type (FractalTrack)
 **Status:** paused
-**Where I stopped:** Full design doc read (`doc/fractal-track-research.md`, ~12K words). Architecture defined as new TrackMode following TuesdayTrack pattern. Parent-child inheritance from NoteTrack/Curve/Indexed/Tuesday/DiscreteMap via FractalSourceInterface. MutationHistory (16-record buffer) + SelectionPressure for learning. Extended rules (Markov, L-System, CA, Fibonacci, Perlin, echo, symmetry, tension). Bloom v2 features (ratchet, slew, trill, 8-slot branches).
+**Where I stopped:** Full design doc read. Architecture defined as new TrackMode following TuesdayTrack pattern.
 **Next action:** Phase 1: model layer (`FractalSequence.h` + `FractalTrack.h`) + Track integration
 **Branch:** TBD

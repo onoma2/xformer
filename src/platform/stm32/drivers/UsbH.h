@@ -17,9 +17,7 @@ public:
     void powerOff();
     bool powerFault();
 
-    bool recvKey(HidKeyEvent *event) {
-        return hid_read_key(event);
-    }
+    bool recvKey(HidKeyEvent *event);
 
     using HidConnectCallback = void(*)(uint8_t device_id, HID_TYPE type, void *context);
     using HidDisconnectCallback = void(*)(uint8_t device_id, void *context);
@@ -73,15 +71,41 @@ private:
 
     void hidDisconnectDevice(uint8_t device) {
         _hidDevices &= ~(1 << device);
+        clearHidState(device);
         if (_hidDisconnectCallback) {
             _hidDisconnectCallback(device, _hidCallbackContext);
         }
     }
 
+    void enqueueHidReport(uint8_t device, const uint8_t *data, uint32_t length);
+    void processHidReports();
+    void clearHidState(uint8_t device);
+    void enqueueHidKey(uint8_t device, uint8_t modifiers, uint8_t keycode, uint8_t pressed);
+
+    struct HidReport {
+        uint8_t device;
+        uint8_t length;
+        uint8_t data[8];
+    };
+
+    static constexpr uint8_t HidReportBufferSize = 8;
+    static constexpr uint8_t HidKeyEventBufferSize = 16;
+
     UsbMidi &_usbMidi;
 
     uint8_t _midiDevices = 0;
     uint8_t _hidDevices = 0;
+
+    HidReport _hidReports[HidReportBufferSize];
+    volatile uint8_t _hidReportHead = 0;
+    volatile uint8_t _hidReportTail = 0;
+
+    HidKeyEvent _hidKeyEvents[HidKeyEventBufferSize];
+    volatile uint8_t _hidKeyHead = 0;
+    volatile uint8_t _hidKeyTail = 0;
+
+    uint8_t _hidPrevKeys[USBH_HID_MAX_DEVICES][6] = {};
+    uint8_t _hidPrevKeyCount[USBH_HID_MAX_DEVICES] = {};
 
     HidConnectCallback _hidConnectCallback = nullptr;
     HidDisconnectCallback _hidDisconnectCallback = nullptr;

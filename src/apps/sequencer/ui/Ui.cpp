@@ -21,6 +21,7 @@ Ui::Ui(Model &model, Engine &engine, Lcd &lcd, ButtonLedMatrix &blm, Encoder &en
         _pageContext({ _messageManager, _pageKeyState, _globalKeyState, _model, _engine }),
         _pages(_pageManager, _pageContext),
         _controllerManager(model, engine),
+        _keyboardManager(),
         // TODO pass as arg
         _screensaver(Screensaver(
                 _canvas,
@@ -64,23 +65,7 @@ void Ui::init() {
         _controllerManager.disconnect();
     });
 
-    _engine.setKeyboardReceiveHandler([this] (uint8_t keycode, uint8_t modifiers) {
-        enqueueKeyboardEvent(keycode, modifiers);
-    });
-
-    _engine.setHidConnectHandler([this] (uint8_t device_id, int type) {
-        (void)device_id;
-        switch (type) {
-        case 3: _messageManager.showMessage("KEYBOARD CONNECTED", 3000); break;
-        case 2: _messageManager.showMessage("MOUSE CONNECTED", 3000); break;
-        default: _messageManager.showMessage("HID CONNECTED", 3000); break;
-        }
-    });
-
-    _engine.setHidDisconnectHandler([this] (uint8_t device_id) {
-        (void)device_id;
-        _messageManager.showMessage("DEVICE REMOVED", 3000);
-    });
+    _keyboardManager.init(_engine, _messageManager);
 
     _engine.setMessageHandler([this] (const char *text, uint32_t duration) {
         _messageManager.showMessage(text, duration);
@@ -94,7 +79,9 @@ void Ui::update() {
     handleKeys();
     handleEncoder();
     handleMidi();
-    handleKeyboard();
+    auto topPage = _pageManager.top();
+    bool mapStepKeys = (topPage != &_pages.teletypeScriptView && topPage != &_pages.teletypePatternView);
+    _keyboardManager.process(_pageKeyState, _globalKeyState, _keyPressEventTracker, _screensaver, _pageManager, mapStepKeys);
 
     // abort if track engines are not consistent with model
     if (!_engine.trackEnginesConsistent()) {
@@ -212,56 +199,4 @@ void Ui::handleMidi() {
             }
         }
     }
-}
-
-static char hidKeycodeToAscii(uint8_t keycode, uint8_t modifiers) {
-    bool shifted = modifiers & 0x22; // Left or right shift
-
-    if (keycode >= 0x04 && keycode <= 0x1D) {
-        return shifted ? keycode - 0x04 + 'A' : keycode - 0x04 + 'a';
-    }
-    if (keycode >= 0x1E && keycode <= 0x26) {
-        if (shifted) {
-            static const char shiftedNums[] = "!@#$%^&*(";
-            return shiftedNums[keycode - 0x1E];
-        }
-        return keycode - 0x1E + '1';
-    }
-    if (keycode == 0x27) return shifted ? ')' : '0';
-    if (keycode == 0x2C) return ' ';
-
-    // Punctuation
-    if (keycode == 0x2D) return shifted ? '_' : '-';
-    if (keycode == 0x2E) return shifted ? '+' : '=';
-    if (keycode == 0x2F) return shifted ? '{' : '[';
-    if (keycode == 0x30) return shifted ? '}' : ']';
-    if (keycode == 0x31) return shifted ? '|' : '\\';
-    if (keycode == 0x33) return shifted ? ':' : ';';
-    if (keycode == 0x34) return shifted ? '"' : '\'';
-    if (keycode == 0x35) return shifted ? '~' : '`';
-    if (keycode == 0x36) return shifted ? '<' : ',';
-    if (keycode == 0x37) return shifted ? '>' : '.';
-    if (keycode == 0x38) return shifted ? '?' : '/';
-
-    return 0;
-}
-
-void Ui::handleKeyboard() {
-    while (_receiveKeyboardEvents.readable()) {
-        auto event = _receiveKeyboardEvents.read();
-        char ch = hidKeycodeToAscii(event.keycode, event.modifiers);
-        KeyboardEvent kbEvent(event.keycode, event.modifiers, ch);
-
-        if (!_engine.isSuspended()) {
-            _screensaver.consumeKey(kbEvent);
-            _pageManager.dispatchEvent(kbEvent);
-        }
-    }
-}
-
-void Ui::enqueueKeyboardEvent(uint8_t keycode, uint8_t modifiers) {
-    if (!_receiveKeyboardEvents.writable()) {
-        _receiveKeyboardEvents.read();
-    }
-    _receiveKeyboardEvents.write({ keycode, modifiers });
 }

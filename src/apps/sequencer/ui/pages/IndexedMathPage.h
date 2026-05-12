@@ -17,6 +17,7 @@ public:
     virtual void updateLeds(Leds &leds) override;
 
     virtual void keyPress(KeyPressEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
 
     virtual bool isModal() const override { return true; }

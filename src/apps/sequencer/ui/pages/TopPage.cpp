@@ -203,6 +203,107 @@ void TopPage::encoder(EncoderEvent &event) {
     event.consume();
 }
 
+void TopPage::keyboard(KeyboardEvent &event) {
+    // TopPage is at stack position 0 — it only sees events
+    // that no higher page consumed. This makes it the ideal
+    // global shortcut handler: Teletype pages consume their
+    // keys first (F1-F5, letters, Escape), so no conflicts.
+
+    // Escape: pop page / go back
+    if (event.keycode() == KeyboardEvent::KeyEscape) {
+        if (_manager.stackSize() > 1) {
+            _manager.pop();
+        }
+        event.consume();
+        return;
+    }
+
+    // Space: toggle play/stop
+    if (event.keycode() == KeyboardEvent::KeySpace) {
+        _engine.togglePlay(event.shift());
+        event.consume();
+        return;
+    }
+
+    // Alt + key combos: page navigation & track select
+    if (event.alt()) {
+        bool handled = true;
+        switch (event.chRaw()) {
+        case '1': selectTrackWithViewSync(0); break;
+        case '2': selectTrackWithViewSync(1); break;
+        case '3': selectTrackWithViewSync(2); break;
+        case '4': selectTrackWithViewSync(3); break;
+        case '5': selectTrackWithViewSync(4); break;
+        case '6': selectTrackWithViewSync(5); break;
+        case '7': selectTrackWithViewSync(6); break;
+        case '8': selectTrackWithViewSync(7); break;
+        // Alt + letter: page navigation (mirrors hardware Page+Key)
+        case 'a': case 'A': setMode(Mode::Project);       break;
+        case 'l': case 'L': setMode(Mode::Layout);         break;
+        case 'q': case 'Q': setMode(Mode::SequenceEdit);  break;
+        case 'w': case 'W': setMode(Mode::Sequence);       break;
+        case 'e': case 'E': setMode(Mode::Song);           break;
+        case 'r': case 'R': setMode(Mode::Routing);         break;
+        case 't': case 'T': setMode(Mode::Clock);           break;
+        case 'y': case 'Y': setMode(Mode::MidiOutput);      break;
+        case 'u': case 'U': setMode(Mode::UserScale);       break;
+        case 'i': case 'I': setMode(Mode::CvRoute);         break;
+        case 'o': case 'O': setMode(Mode::Overview);        break;
+        case 's': case 'S': setMode(Mode::Monitor);          break;
+        case 'c': case 'C': setMode(Mode::System);           break;
+        case 'p': case 'P': setMode(Mode::Pattern);          break;
+        case 'g': case 'G': setMode(Mode::Performer);        break;
+        case 'd': case 'D': setMode(Mode::Overview);         break;
+        case 'h': case 'H': setMode(Mode::Track);            break;
+        default: handled = false; break;
+        }
+        if (handled) {
+            event.consume();
+        }
+        return;
+    }
+
+    // Digits 1-8 without modifier: track select
+    if (!event.alt() && !event.ctrl() && !event.shift()) {
+        if (event.ch() >= '1' && event.ch() <= '8') {
+            selectTrackWithViewSync(event.ch() - '1');
+            event.consume();
+            return;
+        }
+    }
+
+    BasePage::keyboard(event);
+}
+
+void TopPage::selectTrackWithViewSync(int trackIndex) {
+    auto &pages = _manager.pages();
+    Page *currentPage = _manager.top();
+    bool onSequenceView = (currentPage == &pages.noteSequence ||
+                          currentPage == &pages.accumulator);
+    bool onTrackView = (currentPage == &pages.track ||
+                       currentPage == &pages.harmony);
+
+    // Sync view states with current page before track change
+    if (currentPage == &pages.noteSequence) {
+        _sequenceView = SequenceView::NoteSequence;
+    } else if (currentPage == &pages.accumulator) {
+        _sequenceView = SequenceView::Accumulator;
+    } else if (currentPage == &pages.track) {
+        _trackView = TrackView::Track;
+    } else if (currentPage == &pages.harmony) {
+        _trackView = TrackView::Harmony;
+    }
+
+    _project.setSelectedTrackIndex(trackIndex);
+
+    // Navigate to same view for new track
+    if (onSequenceView) {
+        setSequenceView(_sequenceView);
+    } else if (onTrackView) {
+        setTrackView(_trackView);
+    }
+}
+
 void TopPage::setMode(Mode mode) {
     auto &pages = _manager.pages();
 
