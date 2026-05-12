@@ -27,6 +27,7 @@ const char *errorToString(Error error) {
     case DISK_FULL:             return "DISK_FULL";
     case END_OF_FILE:           return "END_OF_FILE";
     case INVALID_CHECKSUM:      return "INVALID_CHECKSUM";
+    case INVALID_DATA:          return "INVALID_DATA";
     default:                    return "unknown";
     }
 }

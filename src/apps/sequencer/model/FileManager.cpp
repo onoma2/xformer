@@ -737,6 +737,8 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     for (int script = 0; script < TeletypeTrack::EditableScriptCount; ++script) {
         ss_clear_script(&state, script);
     }
+    bool success = true;
+
     // Avoid large PatternSlot copies on the file task stack.
     ttSlot1 = track.patternSlotSnapshot(0);
     ttSlot2 = track.patternSlotSnapshot(1);
@@ -1002,12 +1004,16 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
             tele_command_t cmd = {};
             char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
             if (parse(line, &cmd, errorMsg) != E_OK) {
+                success = false;
+            } else if (validate(&cmd, errorMsg) != E_OK) {
+                success = false;
+            } else {
+                buffer[length] = cmd;
+                length++;
                 continue;
             }
-            if (validate(&cmd, errorMsg) != E_OK) {
-                continue;
-            }
-            buffer[length] = cmd;
+            // Preserve script geometry: write blank line at failed position
+            buffer[length] = tele_command_t{};
             length++;
             continue;
         }
@@ -1021,12 +1027,16 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
             tele_command_t cmd = {};
             char errorMsg[TELE_ERROR_MSG_LENGTH] = {};
             if (parse(line, &cmd, errorMsg) != E_OK) {
+                success = false;
+            } else if (validate(&cmd, errorMsg) != E_OK) {
+                success = false;
+            } else {
+                script.c[script.l] = cmd;
+                script.l++;
                 continue;
             }
-            if (validate(&cmd, errorMsg) != E_OK) {
-                continue;
-            }
-            script.c[script.l] = cmd;
+            // Preserve script geometry: write blank line at failed position
+            script.c[script.l] = tele_command_t{};
             script.l++;
             continue;
         }
@@ -1084,6 +1094,9 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     auto error = fileReader.finish();
     if (error == fs::END_OF_FILE) {
         error = fs::OK;
+    }
+    if (error == fs::OK && !success) {
+        error = fs::INVALID_DATA;
     }
     return error;
 }

@@ -28,6 +28,7 @@ enum Error {
     DISK_FULL,
     END_OF_FILE,
     INVALID_CHECKSUM,
+    INVALID_DATA,
 };
 
 const char *errorToString(Error error);

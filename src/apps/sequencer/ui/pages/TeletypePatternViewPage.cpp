@@ -390,7 +390,7 @@ void TeletypePatternViewPage::loadTrackFromSlot(int slot) {
             showMessage("TRACK LOADED");
             syncPattern();
             ensureRowVisible();
-        } else if (result == fs::INVALID_CHECKSUM) {
+        } else if (result == fs::INVALID_CHECKSUM || result == fs::INVALID_DATA) {
             showMessage("INVALID TRACK FILE");
         } else {
             showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
