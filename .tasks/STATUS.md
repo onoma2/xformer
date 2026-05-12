@@ -54,17 +54,9 @@ _Updated: 2026-05-11_
 
 ---
 
-## 🟡 vinx-modulove-improvements — Integrate VinxScorza and Modulove performer improvements
-**Status:** paused
-**Where I stopped:** All Launchpad-specific improvements from this task have been merged into `launchpad-track-port`. Remaining non-Launchpad items (microtiming, LFO modulators, 16-track dual bank research, chaos generators) stay here or move to `other-forks-improvements`.
-**Next action:** Continue non-Launchpad Vinx/Modulove work (microtiming, enhanced performer page) after LP track port completes
-**Branch:** TBD
-
----
-
 ## 🟡 other-forks-improvements — Integrate non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
-**Status:** paused - Implementation Plan Updated with Feasibility Analysis
-**Where I stopped:** Reorganized task against current XFORMER codebase with feasibility, design decisions, and priority
+**Status:** paused
+**Where I stopped:** Merged with the vinx-modulove-improvements task. Reorganized task against current XFORMER codebase with feasibility, design decisions, and priority. The implementation plan spans 4 phases (Microtiming, Generator workflows, Advanced Track features).
 **Next action:** To be determined after Launchpad improvements
 **Branch:** TBD
 
