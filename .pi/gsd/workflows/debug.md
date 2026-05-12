@@ -139,7 +139,9 @@ Milestone: {milestone}
 <files_to_read>
 - .planning/STATE.md (Project state and recent decisions)
 - .planning/ROADMAP.md (Phase context)
-- ./GEMINI.md or ./CLAUDE.md (Project-specific guidelines, if exists)
+- ./AGENTS.md (Core reasoning topology and methodology)
+- ./PROJECT.md (Project-specific details, architecture, and conventions)
+- ./GEMINI.md or ./CLAUDE.md (AI provider-specific configurations, if exists)
 </files_to_read>
 
 ${AGENT_SKILLS_DEBUGGER}

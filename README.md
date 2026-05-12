@@ -291,7 +291,7 @@ Gate mode controls how gates are fired during pulse count repetitions, providing
 - Backward compatible (default mode maintains existing behavior)
 - Fully integrated with all play modes
 
-For complete technical documentation, see `CLAUDE.md`.
+For complete technical documentation, see `AGENTS.md` (core reasoning methodology) and `PROJECT.md` (project-specific details, conventions, and architecture).
 
 Flashing to the hardware is done using OpenOCD. By default, this expects an Olimex ARM-USB-OCD-H JTAG to be attached to the USB port. You can easily reconfigure this to use a different JTAG by editing the `OPENOCD_INTERFACE` variable in the `src/platform/stm32/CMakeLists.txt` file. Make sure to change both occurrences. A list of available interfaces can be found in the `tools/openocd/share/openocd/scripts/interface` directory (or `/home/vagrant/tools/openocd/share/openocd/scripts/interface` when running the virtual machine).
 
