@@ -37,9 +37,12 @@ private:
     void deleteLine();
     void saveScript();
     void loadScript();
-    void saveScriptAs();
     void saveScriptToSlot(int slot);
     void loadScriptFromSlot(int slot);
+    void saveTrack();
+    void loadTrack();
+    void saveTrackToSlot(int slot);
+    void loadTrackFromSlot(int slot);
     void pushHistory(const char *line);
     void recallHistory(int direction);
     void setEditBuffer(const char *text);
@@ -68,6 +71,4 @@ private:
     int _historyCount = 0;
     int _historyHead = -1;
     int _historyCursor = -1;
-    int _scriptSlot = 0;
-    bool _scriptSlotAssigned = false;
 };

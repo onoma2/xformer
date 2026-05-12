@@ -51,18 +51,18 @@ void clampTextToWidth(Canvas &canvas, char *text, int maxWidth) {
 }
 
 enum class ContextAction {
-    Init,
-    Load,
-    Save,
-    SaveAs,
+    SaveScript,
+    LoadScript,
+    SaveTrack,
+    LoadTrack,
     Last
 };
 
 static const ContextMenuModel::Item contextMenuItems[] = {
-    { "INIT" },
-    { "LOAD" },
-    { "SAVE" },
-    { "SAVE AS" },
+    { "SAVE Sc" },
+    { "LOAD Sc" },
+    { "SAVE T9" },
+    { "LOAD T9" },
 };
 
 TeletypeScriptViewPage::TeletypeScriptViewPage(PageManager &manager, PageContext &context) :
@@ -74,8 +74,6 @@ void TeletypeScriptViewPage::enter() {
     _liveMode = true;
     _selectedLine = 0;
     _hasLiveResult = false;
-    _scriptSlot = 0;
-    _scriptSlotAssigned = false;
     setEditBuffer("");
 }
 
@@ -517,16 +515,17 @@ void TeletypeScriptViewPage::contextShow() {
 
 void TeletypeScriptViewPage::contextAction(int index) {
     switch (ContextAction(index)) {
-    case ContextAction::Init:
-        break;
-    case ContextAction::Load:
-        loadScript();
-        break;
-    case ContextAction::Save:
+    case ContextAction::SaveScript:
         saveScript();
         break;
-    case ContextAction::SaveAs:
-        saveScriptAs();
+    case ContextAction::LoadScript:
+        loadScript();
+        break;
+    case ContextAction::SaveTrack:
+        saveTrack();
+        break;
+    case ContextAction::LoadTrack:
+        loadTrack();
         break;
     case ContextAction::Last:
         break;
@@ -535,9 +534,10 @@ void TeletypeScriptViewPage::contextAction(int index) {
 
 bool TeletypeScriptViewPage::contextActionEnabled(int index) const {
     switch (ContextAction(index)) {
-    case ContextAction::Load:
-    case ContextAction::Save:
-    case ContextAction::SaveAs:
+    case ContextAction::SaveScript:
+    case ContextAction::LoadScript:
+    case ContextAction::SaveTrack:
+    case ContextAction::LoadTrack:
         return FileManager::volumeMounted();
     default:
         return true;
@@ -903,19 +903,7 @@ void TeletypeScriptViewPage::saveScript() {
         showMessage("SCRIPT ONLY");
         return;
     }
-    if (!_scriptSlotAssigned) {
-        saveScriptAs();
-        return;
-    }
-    saveScriptToSlot(_scriptSlot);
-}
-
-void TeletypeScriptViewPage::saveScriptAs() {
-    if (_scriptIndex >= TeletypeTrack::EditableScriptCount) {
-        showMessage("SCRIPT ONLY");
-        return;
-    }
-    _manager.pages().fileSelect.show("SAVE SCRIPT", FileType::TeletypeScript, _scriptSlotAssigned ? _scriptSlot : 0, true,
+    _manager.pages().fileSelect.show("SAVE SCRIPT", FileType::TeletypeScript, 0, true,
         [this] (bool result, int slot) {
             if (!result) {
                 return;
@@ -937,7 +925,7 @@ void TeletypeScriptViewPage::loadScript() {
         showMessage("SCRIPT ONLY");
         return;
     }
-    _manager.pages().fileSelect.show("LOAD SCRIPT", FileType::TeletypeScript, _scriptSlotAssigned ? _scriptSlot : 0, false,
+    _manager.pages().fileSelect.show("LOAD SCRIPT", FileType::TeletypeScript, 0, false,
         [this] (bool result, int slot) {
             if (!result) {
                 return;
@@ -959,11 +947,9 @@ void TeletypeScriptViewPage::saveScriptToSlot(int slot) {
     FileManager::task([this, slot] () {
         auto &track = _project.selectedTrack().teletypeTrack();
         return FileManager::writeTeletypeScript(track, _scriptIndex, slot);
-    }, [this, slot] (fs::Error result) {
+    }, [this] (fs::Error result) {
         if (result == fs::OK) {
             showMessage("SCRIPT SAVED");
-            _scriptSlot = slot;
-            _scriptSlotAssigned = true;
         } else {
             showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
         }
@@ -983,14 +969,90 @@ void TeletypeScriptViewPage::loadScriptFromSlot(int slot) {
     FileManager::task([this, slot] () {
         auto &track = _project.selectedTrack().teletypeTrack();
         return FileManager::readTeletypeScript(track, _scriptIndex, slot);
-    }, [this, slot] (fs::Error result) {
+    }, [this] (fs::Error result) {
         if (result == fs::OK) {
             showMessage("SCRIPT LOADED");
-            _scriptSlot = slot;
-            _scriptSlotAssigned = true;
             loadEditBuffer(_selectedLine);
         } else if (result == fs::INVALID_CHECKSUM) {
             showMessage("INVALID SCRIPT FILE");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        if (kSuspendEngineForScriptIO) {
+            _engine.resume();
+        }
+    });
+}
+
+void TeletypeScriptViewPage::saveTrack() {
+    _manager.pages().fileSelect.show("SAVE TRACK", FileType::TeletypeTrack, 0, true,
+        [this] (bool result, int slot) {
+            if (!result) {
+                return;
+            }
+            if (FileManager::slotUsed(FileType::TeletypeTrack, slot)) {
+                _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                    if (result) {
+                        saveTrackToSlot(slot);
+                    }
+                });
+            } else {
+                saveTrackToSlot(slot);
+            }
+        });
+}
+
+void TeletypeScriptViewPage::loadTrack() {
+    _manager.pages().fileSelect.show("LOAD TRACK", FileType::TeletypeTrack, 0, false,
+        [this] (bool result, int slot) {
+            if (!result) {
+                return;
+            }
+            _manager.pages().confirmation.show("ARE YOU SURE?", [this, slot] (bool result) {
+                if (result) {
+                    loadTrackFromSlot(slot);
+                }
+            });
+        });
+}
+
+void TeletypeScriptViewPage::saveTrackToSlot(int slot) {
+    if (kSuspendEngineForScriptIO) {
+        _engine.suspend();
+    }
+    _manager.pages().busy.show("SAVING TRACK ...");
+
+    FileManager::task([this, slot] () {
+        auto &track = _project.selectedTrack().teletypeTrack();
+        return FileManager::writeTeletypeTrack(track, _project.name(), slot);
+    }, [this] (fs::Error result) {
+        if (result == fs::OK) {
+            showMessage("TRACK SAVED");
+        } else {
+            showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
+        }
+        _manager.pages().busy.close();
+        if (kSuspendEngineForScriptIO) {
+            _engine.resume();
+        }
+    });
+}
+
+void TeletypeScriptViewPage::loadTrackFromSlot(int slot) {
+    if (kSuspendEngineForScriptIO) {
+        _engine.suspend();
+    }
+    _manager.pages().busy.show("LOADING TRACK ...");
+
+    FileManager::task([this, slot] () {
+        auto &track = _project.selectedTrack().teletypeTrack();
+        return FileManager::readTeletypeTrack(track, slot);
+    }, [this] (fs::Error result) {
+        if (result == fs::OK) {
+            showMessage("TRACK LOADED");
+        } else if (result == fs::INVALID_CHECKSUM || result == fs::INVALID_DATA) {
+            showMessage("INVALID TRACK FILE");
         } else {
             showMessage(FixedStringBuilder<32>("FAILED (%s)", fs::errorToString(result)));
         }
