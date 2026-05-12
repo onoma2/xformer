@@ -68,6 +68,7 @@ If any are unclear on non-trivial work → flag it explicitly and ask or defer.
 - Security issues
 - Creating significant complexity debt
 - Unknown unknowns on non-trivial changes
+- **State-altering git operations: NEVER use git commit, add, checkout, restore, push, or pull without explicit user confirmation**
 
 ## Execution
 
