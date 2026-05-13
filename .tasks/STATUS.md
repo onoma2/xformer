@@ -1,41 +1,52 @@
 # Task Board
-_Updated: 2026-05-12_
+_Updated: 2026-05-13_
 
-## 🟡 performer-keyboard-shortcuts — USB keyboard context menu
+## 🟡 teletype-performer-ecosystem-redesign — Map full architecture from script input to CV/gate output
 **Status:** paused
-**Where I stopped:** Plan B v3 WORKS on hardware. QWERTY step mapping (Q-I = S0-S7, A-K = S8-S15) confirmed working with proper press/release. Tab context menu confirmed. Key release detection lives in UsbH::processHidReports() (C++), not the fragile C driver. Keyboard detection, Launchpad, MIDI all stable.
-**Next action:** Verify across all track types. Then consider adding remaining keyboard shortcuts (shift modifier, encoder emulation, etc.)
-**Branch:** feat/global-keyboard
+**Where I stopped:** 6-layer pipeline mapped (UI→Model→VM→Bridge→Engine→Output). Static/dynamic ownership documented. 2-stage I/O routing + 3-stage CV pipeline identified.
+**Next action:** Design boundary decisions — what goes on TeletypeEditPage vs LayoutPage vs ScriptViewPage
+**Branch:** TBD
 
 ---
 
-## Approach history
-- **A8 (SUCCESS):** Tab context menu via hardware Key injection.
-- **A9 (FAILED):** HID driver press/release tracking crashed USB path — reverted.
-- **A10 (SUCCESS):** Key release diffing moved to UsbH::processHidReports() in C++ layer. Stable. QWERTY step mapping + Tab context menu both work.
+## 🟡 teletype-edit-page — Build TeletypeEditPage as multi-mode config page
+**Status:** paused
+**Where I stopped:** Design finalized — 4-mode ListPage (INPUT/OUTPUT/CV/TIMING) with 4 new ListModels. LayoutPage stays untouched.
+**Next action:** Create `TeletypeInputListModel.h`, first of 4 ListModel files
+**Branch:** TBD
+
+---
+
+## 🔵 resource-optimization — RAM & Flash budget recovery
+**Status:** ready — research complete
+**Where I stopped:** Measured XFORMER RAM at 97% (127KB/128KB) vs Vinx baseline at 86% (113KB/128KB). Flash 94 KB larger. 14 KB RAM gap mostly from XFORMER-unique track types (Teletype, Tuesday, Discrete, Indexed). No headroom for features — blocks performer-improvements and all future feature work.
+**Next action:** Identify and trim large .bss consumers from `sequencer.list`
+**Branch:** TBD
+
+## 🟢 performer-keyboard-shortcuts — USB keyboard: context menu, refactoring, teletype nav
+**Status:** done — KeyboardManager refactor merged via `feat/global-keyboard-refactoring`
+**Where I stopped:** Keyboard dispatch extracted into KeyboardManager (Phases 1-6, merged). QWERTY step mapping (Q-I=S0-S7, A-K=S8-S15), Tab context menu, key release in UsbH::processHidReports(). Teletype follow-on: Up/Down script line nav with Shift recall, A-Z text input for NAME fields.
+**Branch:** feat/global-keyboard-refactoring (merged)
 
 ---
 
 ## 🟢 usb-hid-implementation — USB keyboard end-to-end, mouse rejected
-**Status:** done
-**Where I stopped:** All hardware tested. Bug fixed: removed UsbH.cpp debug callback that overwrote "KEYBOARD CONNECTED" LCD message with "HID 0 t=3". Also removed DBG() prints from connect/disconnect handlers.
-**Next action:** Squash branch for merge
-**Branch:** feat/USB-keyboard4
+**Status:** done — merged
+**Where I stopped:** All hardware tested. Bug fixed: removed UsbH.cpp debug callback that overwrote "KEYBOARD CONNECTED" LCD message with "HID 0 t=3". Also removed DBG() prints from connect/disconnect handlers. Branch already fully merged.
+**Branch:** feat/USB-keyboard4 (stale, can delete)
 
 ## 🟢 teletype-keyboard-shortcuts — Hardware shortcut keys implemented
 **Status:** done
-**Where I stopped:** All 6 shortcuts implemented and build passes. F1-F4 run scripts 0-3, F5 runs metro. Alt+F1-F4 jump to edit scripts 0-3, Alt+F5 jump to metro. Alt+/ toggles line comment. Alt+Left/Right jumps to first/last pattern.
-**Next action:** Test on hardware
-**Branch:** feat/USB-keyboard4
+**Where I stopped:** All 6 shortcuts implemented. F1-F4 run scripts 0-3, F5 runs metro. Alt+F1-F4 jump to edit scripts 0-3, Alt+F5 jump to metro. Alt+/ toggles line comment. Alt+Left/Right jumps to first/last pattern.
+**Branch:** feat/USB-keyboard4 (merged)
 
 ---
 
 ## 🟢 teletype-file-reliability — Fix real Teletype file saving/loading bugs
-**Status:** done — all 3 phases complete, hardware verified
-**Where I stopped:** Phase 2 done. Failed text loads now restore previous track/script state via snapshot/rollback. All three real bugs fixed.
-**Next action:** Squash branch for merge
+**Status:** done — all 3 phases complete, merged to master
+**Where I stopped:** Phases 0-2 merged. Follow-on on master: script files show project name in slot picker (`8a829819`), USB keyboard text input for NAME fields (`2f4f38dc`).
 **Governing spec:** `docs/superpowers/specs/2026-05-12-teletype-saving-reality-check.md`
-**Branch:** fix/teletype-files
+**Branch:** fix/teletype-files (stale, can delete)
 
 ---
 
@@ -56,15 +67,15 @@ _Updated: 2026-05-12_
 ---
 
 ## 🟡 performer-improvements — Non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
-**Status:** paused
-**Where I stopped:** Restructured from `other-forks-improvements`. All non-LP items from Vinx (sequencing, generators, UI, system), Modulove (microtiming, LFOs, performer page), and Mebitek (shortcuts, steps-to-stop, undo). Launchpad triggers for shared features (Generators Mode, Undo shortcut, Performer Mode) live in `launchpad-track-port`.
-**Next action:** Phase 1 (microtiming, performer page, quick octave, steps to stop, menu wrap)
+**Status:** blocked — blocked by resource-optimization
+**Where I stopped:** Landed master: wrap list selection without settings (`10efe3c4`). MenuWrapSetting wired (Settings::Version=2, dynamic_cast gate, default=on). Tested firmware builds but hardware crashes on boot — RAM at 97% (127KB/128KB), no headroom.
+**Next action:** Unblocked by resource-optimization
 **Branch:** TBD
 
 ---
 
-## ⚪ fractal-track-implementation — Smart Mutation Engine track type (FractalTrack)
-**Status:** paused
+## 🔵 fractal-track-implementation — Smart Mutation Engine track type (FractalTrack)
+**Status:** blocked
 **Where I stopped:** Full design doc read. Architecture defined as new TrackMode following TuesdayTrack pattern.
 **Next action:** Phase 1: model layer (`FractalSequence.h` + `FractalTrack.h`) + Track integration
 **Branch:** TBD
