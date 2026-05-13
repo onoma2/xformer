@@ -279,8 +279,22 @@ Task stack sizes are mostly in line with other forks, but `_ZL6fsTask` (4,256 B 
 
 High — blocks all further feature development.
 
+## Key documents
+- `../../docs/superpowers/plans/2026-05-14-resource-optimization-hardware-ram-plan.md` — Go-to-market RAM recovery specification (Phase 1: P2+P4+P14+P14b, 6.5 KB target)
+- `../../teletype-performer-ecosystem-redesign/OVERVIEW.md` — 6-layer pipeline architecture map (absorbed from merged teletype-performer-ecosystem-redesign task)
+- `../../teletype-performer-ecosystem-redesign/savings-plan.md` — 12 verified RAM optimization proposals with phased implementation plan
+- `../../engine-subobject-size-comparison.md` — superseded preliminary analysis (now fully covered in symbol section above)
+
 ## Status
-Paused
+Active — Phase 1
+
+## Next action
+Implement Phase 1 per `docs/superpowers/plans/2026-05-14-resource-optimization-hardware-ram-plan.md`:
+1. P2 — Pack `mutes[8]` into `uint8_t` bitfield (56 B)
+2. P4 — Reduce `DELAY_SIZE` 16→8 (3,904 B)
+3. P14 — Move `tele_glyphs`/`tele_bitmap` to flash via `const` (1,040 B)
+4. P14b — Move `tele_ops[]` to flash if const-able (1,664 B)
+Total Phase 1 target: ~6.5 KB
 
 ## Branch
-TBD
+feat/resource-optimization

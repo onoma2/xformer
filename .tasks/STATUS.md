@@ -1,11 +1,12 @@
 # Task Board
-_Updated: 2026-05-13_
+_Updated: 2026-05-14_
 
-## 🟡 teletype-performer-ecosystem-redesign — Map full architecture from script input to CV/gate output
-**Status:** paused
-**Where I stopped:** 6-layer pipeline mapped (UI→Model→VM→Bridge→Engine→Output). Static/dynamic ownership documented. 2-stage I/O routing + 3-stage CV pipeline identified.
-**Next action:** Design boundary decisions — what goes on TeletypeEditPage vs LayoutPage vs ScriptViewPage
-**Branch:** TBD
+## 🔴 resource-optimization — RAM & Flash budget recovery (includes teletype-performer-ecosystem-redesign analysis)
+**Status:** active
+**Where I stopped:** Adversarial review completed. savings-plan.md finalized with 12 verified proposals across 3 phases: Phase 1 (6.5 KB safe), Phase 2 (9.8 KB medium), Phase 3 (9.6 KB risk). Total target ~26 KB. 6-layer pipeline architecture mapped in OVERVIEW.md.
+**Next action:** Begin Phase 1 implementation — P2 (mutes bitfield), P4 (DELAY_SIZE 16→8), P14 (font data to flash), P14b (tele_ops to flash)
+**Depends on:** nothing
+**Branch:** feat/resource-optimization
 
 ---
 
@@ -13,63 +14,35 @@ _Updated: 2026-05-13_
 **Status:** paused
 **Where I stopped:** Design finalized — 4-mode ListPage (INPUT/OUTPUT/CV/TIMING) with 4 new ListModels. LayoutPage stays untouched.
 **Next action:** Create `TeletypeInputListModel.h`, first of 4 ListModel files
+**Depends on:** resource-optimization (needs RAM headroom)
 **Branch:** TBD
 
 ---
 
-## 🔵 resource-optimization — RAM & Flash budget recovery
-**Status:** ready — research complete
-**Where I stopped:** Measured XFORMER RAM at 97% (127KB/128KB) vs Vinx baseline at 86% (113KB/128KB). Flash 94 KB larger. 14 KB RAM gap mostly from XFORMER-unique track types (Teletype, Tuesday, Discrete, Indexed). No headroom for features — blocks performer-improvements and all future feature work.
-**Next action:** Identify and trim large .bss consumers from `sequencer.list`
-**Branch:** TBD
-
-## 🟢 performer-keyboard-shortcuts — USB keyboard: context menu, refactoring, teletype nav
-**Status:** done — KeyboardManager refactor merged via `feat/global-keyboard-refactoring`
-**Where I stopped:** Keyboard dispatch extracted into KeyboardManager (Phases 1-6, merged). QWERTY step mapping (Q-I=S0-S7, A-K=S8-S15), Tab context menu, key release in UsbH::processHidReports(). Teletype follow-on: Up/Down script line nav with Shift recall, A-Z text input for NAME fields.
-**Branch:** feat/global-keyboard-refactoring (merged)
-
----
-
-## 🟢 usb-hid-implementation — USB keyboard end-to-end, mouse rejected
-**Status:** done — merged
-**Where I stopped:** All hardware tested. Bug fixed: removed UsbH.cpp debug callback that overwrote "KEYBOARD CONNECTED" LCD message with "HID 0 t=3". Also removed DBG() prints from connect/disconnect handlers. Branch already fully merged.
-**Branch:** feat/USB-keyboard4 (stale, can delete)
-
-## 🟢 teletype-keyboard-shortcuts — Hardware shortcut keys implemented
-**Status:** done
-**Where I stopped:** All 6 shortcuts implemented. F1-F4 run scripts 0-3, F5 runs metro. Alt+F1-F4 jump to edit scripts 0-3, Alt+F5 jump to metro. Alt+/ toggles line comment. Alt+Left/Right jumps to first/last pattern.
-**Branch:** feat/USB-keyboard4 (merged)
-
----
-
-## 🟢 teletype-file-reliability — Fix real Teletype file saving/loading bugs
-**Status:** done — all 3 phases complete, merged to master
-**Where I stopped:** Phases 0-2 merged. Follow-on on master: script files show project name in slot picker (`8a829819`), USB keyboard text input for NAME fields (`2f4f38dc`).
-**Governing spec:** `docs/superpowers/specs/2026-05-12-teletype-saving-reality-check.md`
-**Branch:** fix/teletype-files (stale, can delete)
-
----
-
-## 🟡 launchpad-track-port — Extend Launchpad controller to all 5 track types + Vinx/Modulove enhancements
+## 🟡 launchpad-track-port — Extend Launchpad controller to all 5 grid-editable track types + Vinx/Modulove enhancements
 **Status:** paused
-**Where I stopped:** Comprehensive research done across all forks (mebitek, vinx, modulove, cavian, extracadian). Track port plan corrected (MidiCv + Teletype removed). Vinx/Modulove LP improvements identified for merge.
+**Where I stopped:** Comprehensive research done across all forks. Track port plan corrected (MidiCv + Teletype removed). Vinx/Modulove LP improvements identified.
 **Next action:** Split LaunchpadController.cpp into per-track files, then begin Phase 1: NoteTrack fixes + Foundation (LP Style / LP Note Style settings)
+**Depends on:** indexed-sequence-macro-refactor (Phase 4: Macro Grid v2 for Indexed)
 **Branch:** TBD
 
 ---
 
 ## ⚪ indexed-sequence-macro-refactor — Extract macro logic into IndexedSequence model
 **Status:** ready — not started
-**Where I stopped:** Identified ~700 lines of macro logic in `IndexedSequenceEditPage.cpp:1605-2304` that must move to `IndexedSequence` model methods. 20 macros across rhythm, waveform, melodic, and duration categories. Blocks Launchpad Macro Grid v2 for Indexed.
+**Where I stopped:** Identified ~700 lines of macro logic in `IndexedSequenceEditPage.cpp:1605-2304` that must move to `IndexedSequence` model methods. 20 macros across rhythm, waveform, melodic, and duration categories.
 **Next action:** Read macro code, catalog functions, design model API (individual methods vs. enum dispatch)
+**Depends on:** nothing
+**Blocks:** launchpad-track-port Phase 4 (Macro Grid v2 for Indexed)
 **Branch:** TBD
 
 ---
 
 ## 🟡 performer-improvements — Non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
-**Status:** blocked — blocked by resource-optimization
-**Where I stopped:** Landed master: wrap list selection without settings (`10efe3c4`). MenuWrapSetting wired (Settings::Version=2, dynamic_cast gate, default=on). Tested firmware builds but hardware crashes on boot — RAM at 97% (127KB/128KB), no headroom.
+**Status:** blocked
+**Where I stopped:** MenuWrapSetting wired (Settings::Version=2, dynamic_cast gate, default=on). Hardware crashes on boot — RAM at 97%, no headroom.
 **Next action:** Unblocked by resource-optimization
+**Depends on:** resource-optimization (needs RAM headroom)
 **Branch:** TBD
 
 ---
@@ -78,4 +51,19 @@ _Updated: 2026-05-13_
 **Status:** blocked
 **Where I stopped:** Full design doc read. Architecture defined as new TrackMode following TuesdayTrack pattern.
 **Next action:** Phase 1: model layer (`FractalSequence.h` + `FractalTrack.h`) + Track integration
+**Depends on:** resource-optimization (needs RAM headroom)
 **Branch:** TBD
+
+---
+
+## 🟢 usb-keyboard-system — Full USB keyboard pipeline (driver, manager, global shortcuts, Teletype shortcuts)
+**Status:** done — all 4 phases merged to master
+**Where I stopped:** HID driver fixed (dedup, ring buffer, mouse rejected). KeyboardManager extracted. Global shortcuts (Tab context menu, arrow keys, Alt+letter). Teletype shortcuts (F1-F5, Alt+F1-F5, Alt+/, Alt+arrows). Branches: feat/USB-keyboard4, feat/global-keyboard-refactoring (merged).
+**Components:** usb-hid-implementation, usb-keyboard-manager-refactor, performer-keyboard-shortcuts, teletype-keyboard-shortcuts
+
+---
+
+## 🟢 teletype-file-reliability — Fix real Teletype file saving/loading bugs
+**Status:** done — all 3 phases complete, merged to master
+**Where I stopped:** Phases 0-2 merged. Follow-on on master: script files show project name in slot picker (`8a829819`), USB keyboard text input for NAME fields (`2f4f38dc`).
+**Branch:** fix/teletype-files (stale, can delete)

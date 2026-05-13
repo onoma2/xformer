@@ -4,10 +4,10 @@
 Full architectural understanding of the Teletype→Performer pipeline from script input through CV/gate generation. Map layer boundaries, static vs dynamic ownership, and data flow to inform redesign decisions — where the TeletypeEditPage, LayoutPage, and ScriptViewPage should split responsibilities.
 
 ## Status
-**paused** — 6-layer pipeline mapped. See `OVERVIEW.md` for full helicopter view.
+**done** — consumed by `resource-optimization` task. 6-layer pipeline mapped in `OVERVIEW.md`. 12 verified RAM optimization proposals in `savings-plan.md`. All tangible outputs feed into `resource-optimization/TASK.md` Phase 1-3 execution plan.
 
 ## Next action
-Design boundary decisions — what goes on TeletypeEditPage vs LayoutPage vs ScriptViewPage
+N/A. See `../resource-optimization/TASK.md` for active execution.
 
 ## See also
 - `savings-plan.md` — RAM optimization proposals (redundancies, conflicts, stale patterns with impact/effort/savings)
