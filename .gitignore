@@ -106,3 +106,6 @@ dkms.conf
 
 temp-ref/
 skills/
+
+# graphify cache
+graphify-out/cache/
