@@ -246,12 +246,16 @@ void ss_set_script_pol(scene_state_t *ss, size_t idx, uint8_t value) {
 
 // mutes
 bool ss_get_mute(scene_state_t *ss, uint8_t idx) {
-    return ss->variables.mutes[idx];
+    return (ss->variables.mutes >> idx) & 1;
 }
 
 void ss_set_mute(scene_state_t *ss, uint8_t idx, bool value) {
     if (idx >= TRIGGER_INPUTS) return;
-    ss->variables.mutes[idx] = value;
+    if (value) {
+        ss->variables.mutes |= (1 << idx);
+    } else {
+        ss->variables.mutes &= ~(1 << idx);
+    }
     tele_mute();
 }
 

@@ -2,11 +2,19 @@
 _Updated: 2026-05-14_
 
 ## 🔴 resource-optimization — RAM & Flash budget recovery (includes teletype-performer-ecosystem-redesign analysis)
-**Status:** active
-**Where I stopped:** Adversarial review completed. savings-plan.md finalized with 12 verified proposals across 3 phases: Phase 1 (6.5 KB safe), Phase 2 (9.8 KB medium), Phase 3 (9.6 KB risk). Total target ~26 KB. 6-layer pipeline architecture mapped in OVERVIEW.md.
-**Next action:** Begin Phase 1 implementation — P2 (mutes bitfield), P4 (DELAY_SIZE 16→8), P14 (font data to flash), P14b (tele_ops to flash)
+**Status:** active — Phase 1 complete. Phase 2 prep.
+**Where I stopped:** Phase 1 implemented (P2+P4+P14+P14b). Measured .data reduction 9,020→6,316 = 2,704 B saved; P2/P4 are internal Teletype cleanup with no current .bss effect because Track container remains NoteTrack-sized.
+**Next action:** Plan Phase 2 around P5 (RoutingEngine TrackState union) and P6 (non-per-track routes); keep P7 as future research because it only saves RAM if live Teletype engine count is capped.
 **Depends on:** nothing
 **Branch:** feat/resource-optimization
+
+---
+
+## 🟡 core-architecture-optimization — Research XFORMER core mechanics after expansion beyond original Note/Curve Performer
+**Status:** research complete — restructured into two docs per user direction.
+**Where I stopped:** Restructured into `architecture-research-directions.md` (broad architecture: 7 mismatches, ranked directions, keep/change/research-later) and `ram-recovery-experiments.md` (narrow RAM experiments: 5 experiments with baselines, exit criteria, rollback). Key architectural finding: RoutingEngine evolved from sidecar to modulation engine (7,488 B unconditional state, no lifecycle). Key structural finding: model Container Note/Curve-driven (~9.5 KB each), engine Container Teletype-driven (~904 B). Next: run Experiment C/D (measurement-only) then Experiment A (RoutingEngine conditional state).
+**Depends on:** resource-optimization (for baseline measurements)
+**Branch:** TBD
 
 ---
 

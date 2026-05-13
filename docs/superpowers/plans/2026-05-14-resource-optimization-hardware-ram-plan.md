@@ -29,10 +29,10 @@ The active savings plan ranks the work as:
 
 | Phase | Proposals | Target savings | Risk |
 |---|---|---:|---|
-| 1 | P2 + P4 + P14 + P14b | ~6,664 B | none-low |
+| 1 | P2/P4 internal cleanup + P14 + P14b | 2,704 B measured .data | none-low |
 | 2A | P4b | ~1,226 B | low-medium |
 | 2B | P5 + P6 | ~6,784 B | medium |
-| 2C | P7 | ~1,832 B | medium |
+| 2C | P7 | future research only; conditional on capped live Teletype engine pool | medium-high |
 | 3 | P8 + P13, maybe P5a only by explicit decision | ~2,080 B safe subset; +7,488 B risky | medium-high |
 
 ## Measurement Protocol
@@ -110,7 +110,7 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 - Modify: `src/core/gfx/fonts/tele.h`
 - Modify: `teletype/src/ops/op.c`
 
-**Expected savings:** about 6,664 B total. Most should come from `.bss`/`.data`; P14/P14b should move read-only tables out of RAM into flash.
+**Expected savings:** updated after Phase 1 measurement. P14/P14b recover 2,704 B from `.data`; P2/P4 are internal Teletype footprint cleanup and do not currently reduce top-level `.bss` because `Track::_container` remains sized by NoteTrack.
 
 - [ ] P2: pack `scene_state_t::mutes[8]` into one `uint8_t`; keep access through `ss_get_mute()` / `ss_set_mute()`.
 - [ ] P4: reduce `DELAY_SIZE` from 16 to 8 in the active Performer Teletype config only.
@@ -181,7 +181,7 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 - Route target classification is unclear.
 - CCMRAM saving is much smaller than expected and cannot be explained.
 
-## Phase 2C: Extract TeletypeTrackEngine From Engine Container
+## Phase 2C: Future Research: Extract TeletypeTrackEngine From Engine Container
 
 **Proposal:** P7
 
@@ -190,9 +190,11 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 - Modify: `src/apps/sequencer/engine/Engine.cpp`
 - Read: `src/apps/sequencer/engine/TeletypeTrackEngine.h`
 
-**Expected savings:** about 1,832 B direct from `.ccmram_bss`.
+**Expected savings:** conditional. About 1,832 B direct from `.ccmram_bss` only if the product accepts a capped live Teletype engine pool. If any/all 8 tracks must remain valid Teletype tracks, separate storage for 8 TeletypeTrackEngines cancels the container saving.
 
 - [ ] Map the current track-engine construction/destruction path in `Engine::updateTrackSetups()`.
+- [ ] Decide the product rule for maximum live Teletype tracks before implementation.
+- [ ] Define load-time behavior for projects with more Teletype tracks than the cap.
 - [ ] Design separate static storage for Teletype engines without heap allocation unless the project already has an accepted allocator pattern for this subsystem.
 - [ ] Remove `TeletypeTrackEngine` from the general track-engine `Container<>` only after lifecycle ordering is clear.
 - [ ] Build STM32 `sequencer`.

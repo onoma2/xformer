@@ -197,10 +197,10 @@ Each variant ~16-24 B vs current ~56 B. Non-shaper tracks (None, Crease, Triangl
 
 **What**: TeletypeTrackEngine (~904 B) inflates all 8 container slots. Remove it from the `Container<...>` type — the container max drops from 904 B to the next largest (~675 B).
 
-**Savings**: (904 - 675) × 8 = **1,832 B direct** in CCMRAM  
+**Savings**: Conditional. (904 - 675) × 8 = **1,832 B direct** in CCMRAM only if live Teletype engines are capped below 8. If Performer preserves the current behavior where any/all 8 tracks can be Teletype, separate storage for 8 TeletypeTrackEngines cancels the container saving.  
 **Note**: Verified 904 is 8-byte aligned (904 % 8 = 0). No alignment cascade mechanism identified in Engine.h member ordering. The 4,304 B "cascade" figure from resource-optimization task requires further source validation.  
 **Effort**: Medium — separate TTE storage array, update `updateTrackSetups()`  
-**Risk**: Medium — track mode switch lifecycle; ensure proper construct/destruct ordering
+**Risk**: Medium-High — track mode switch lifecycle plus product semantics around maximum live Teletype tracks. Future research only until the cap/semantics question is decided.
 
 **Files**: `src/apps/sequencer/engine/Engine.h`, `Engine.cpp`
 
@@ -292,19 +292,19 @@ Key corrections from adversarial review of v1:
 
 | Phase | Proposals | Verified Savings | Cumulative | Risk |
 |---|---|---|---|---|
-| **Phase 1 (Safe)** | P2 (56 B) + P4 (3,904 B) + P14 (1,040 B) + P14b (1,664 B) | **~6,664 B** | ~6.5 KB | None-Low |
-| **Phase 2 (Medium)** | P4b (1,226 B) + P5 (4,096 B) + P6 (2,688 B) + P7 (1,832 B) | **~9,842 B** | ~16.5 KB | Low-Medium |
+| **Phase 1 (Safe)** | P2/P4 internal Teletype cleanup + P14 (1,040 B) + P14b (1,664 B) | **2,704 B measured .data** | ~2.7 KB | None-Low |
+| **Phase 2 (Medium)** | P4b (1,226 B) + P5 (4,096 B) + P6 (2,688 B) | **~8,010 B** | ~10.7 KB | Low-Medium |
 | **Phase 3 (Risk)** | P5a (7,488 B, only if shapers unused) + P8 (544 B) + P13 (1,536 B, after measurement) | **~9,568 B** | ~26.0 KB | Medium-High |
 
-**Phase 1 alone**: ~6.5 KB recovers → RAM ~121 KB (~94%). Enough to unblock minor feature work.  
-**Phases 1+2**: ~16.5 KB → RAM ~111 KB (~87%). Matches Vinx baseline.  
+**Phase 1 alone**: 2,704 B recovers from .data → RAM ~124.7 KB (~95.2%).  
+**Phases 1+2**: ~10.7 KB → RAM ~116.7 KB before any later risk-tier work.  
 **All phases**: ~26 KB → RAM ~101 KB (~79%). Comfortable headroom.
 
 Recommended order:
-1. **P2+P4+P14+P14b** (6.7 KB, 4 files, ~2 days) — safest quick wins  
+1. **P14+P14b** (2.7 KB measured) plus P2/P4 internal cleanup — completed  
 2. **P5+P6** (6.8 KB, 2 files, ~1 week) — biggest single structural change  
 3. **P4b** (1.2 KB, 1 file, ~1 day) — Teletype file I/O cleanup  
-4. **P7** (1.8 KB, 2 files, ~1 week) — invasive but high value  
+4. **P7** — future research only; useful only with a capped live Teletype engine pool  
 5. **P8** (0.5 KB, 2 files, ~2 days) — final pattern savings  
 6. **P13** (1.5 KB, after verification) — stack trim only if safe
 

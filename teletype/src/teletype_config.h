@@ -6,7 +6,7 @@
 #endif
 
 #if TELETYPE_TRACK_LITE
-#define DELAY_SIZE 16
+#define DELAY_SIZE 8
 #define REGULAR_SCRIPT_COUNT 4
 #define GRID_GROUP_COUNT 1
 #define GRID_MAX_DIMENSION 1

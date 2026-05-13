@@ -280,21 +280,32 @@ Task stack sizes are mostly in line with other forks, but `_ZL6fsTask` (4,256 B 
 High — blocks all further feature development.
 
 ## Key documents
-- `../../docs/superpowers/plans/2026-05-14-resource-optimization-hardware-ram-plan.md` — Go-to-market RAM recovery specification (Phase 1: P2+P4+P14+P14b, 6.5 KB target)
+- `../../docs/superpowers/plans/2026-05-14-resource-optimization-hardware-ram-plan.md` — Go-to-market RAM recovery specification (Phase 1 measured: 2.7 KB .data recovered; P2/P4 are internal Teletype cleanup only)
 - `../../teletype-performer-ecosystem-redesign/OVERVIEW.md` — 6-layer pipeline architecture map (absorbed from merged teletype-performer-ecosystem-redesign task)
 - `../../teletype-performer-ecosystem-redesign/savings-plan.md` — 12 verified RAM optimization proposals with phased implementation plan
 - `../../engine-subobject-size-comparison.md` — superseded preliminary analysis (now fully covered in symbol section above)
 
 ## Status
-Active — Phase 1
+Active — Phase 1 complete. Phase 2 prep.
 
-## Next action
-Implement Phase 1 per `docs/superpowers/plans/2026-05-14-resource-optimization-hardware-ram-plan.md`:
-1. P2 — Pack `mutes[8]` into `uint8_t` bitfield (56 B)
-2. P4 — Reduce `DELAY_SIZE` 16→8 (3,904 B)
-3. P14 — Move `tele_glyphs`/`tele_bitmap` to flash via `const` (1,040 B)
-4. P14b — Move `tele_ops[]` to flash if const-able (1,664 B)
-Total Phase 1 target: ~6.5 KB
+## Phase 1 Results (verified by build)
+| Proposal | Savings | Status |
+|----------|---------|--------|
+| P2 — mutes bool[8]→uint8_t | 7 B/TT track internal cleanup; no current top-level .bss reduction | ✅ Merged |
+| P4 — DELAY_SIZE 16→8 | 488 B/TT track internal cleanup; no current top-level .bss reduction | ✅ Merged |
+| P14 — tele_glyphs/bitmap to flash | 1,040 B from .data | ✅ Merged |
+| P14b — tele_ops[] to flash | 1,664 B from .data | ✅ Merged |
+| **Total .data reduction** | **9,020 → 6,316 = 2,704 B** | **SRAM: 97.4% → 95.2%** |
+
+**Key finding**: P2+P4 are valid Teletype footprint cleanup, but they do not currently count toward the 15-20 KB RAM-headroom goal. The owning storage is inside `Track::_container`, whose size is still dominated by NoteTrack. The .bss total (118,400) stayed unchanged. The immediate headroom win came entirely from P14/P14b moving read-only data to flash.
+
+## Next action (Phase 2 prep)
+Plan and implement Phase 2 proposals:
+- P5 — Union-based TrackState by shaper type (~4,096 B CCMRAM)
+- P6 — Skip TrackState for non-per-track routes (~2,688 B CCMRAM)
+
+## Future research
+- P7 — Extract TeletypeTrackEngine from Container variant. Graphify/source review shows this only saves RAM if the firmware accepts a capped live Teletype engine pool. Preserving "any/all 8 tracks can be Teletype" requires separate storage for all 8 TeletypeTrackEngines and does not recover RAM.
 
 ## Branch
 feat/resource-optimization

@@ -101,7 +101,7 @@ typedef struct {
     int16_t in;
     int16_t m;
     bool m_act;
-    bool mutes[TRIGGER_INPUTS];  // TODO: replace with uint8_t bits
+    uint8_t mutes;
     int16_t o;
     int16_t o_inc;
     int16_t o_min;
