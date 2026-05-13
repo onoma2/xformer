@@ -265,3 +265,54 @@ High
 - `src/apps/sequencer/engine/ClockEngine.h` — clock/reset/stop logic
 - `src/apps/sequencer/ui/page/PerformerPage.h` — performer page
 - `src/apps/sequencer/ui/page/GeneratorPage.h` — generator page base
+
+---
+
+## Chaos & Entropy — Vinx vs XFORMER Analysis
+
+### What XFORMER Already Has
+- **RandomGenerator** (`src/apps/sequencer/engine/generators/RandomGenerator.h/.cpp`) — euclidean + random generators only; `Generator::Mode` enum: `InitLayer, Euclidean, Random, Last`
+- **SequenceBuilder** (`src/apps/sequencer/engine/generators/SequenceBuilder.h`) — template-based, no `apply()`, `showOriginal()`, `showPreview()`, `showingPreview()`, `applyEntropy()`, or `_preview` state; only simple original→edit model
+- **EntropyTargets.h** — does **not** exist in XFORMER
+- **GeneratorPage** — no preview/apply A/B workflow, no chaos/entropy target mask UI
+- **UserSettings** — only Brightness, Screensaver, WakeMode, DimSequence; Settings::Version = 1
+
+### What Vinx Adds
+
+| Feature | Vinx Implementation | XFORMER Gap |
+|---------|-------------------|-------------|
+| **ChaosGenerator** | `ChaosGenerator.h/.cpp` — seed-based blend randomization of 14 targets across Note sequence layers | No generator with blend/randomize semantics exists; RandomGenerator is pattern-based, not blend-based |
+| **EntropyTargets** | `EntropyTargets.h` — 14-target enum (Gate, GateOffset, GateProbability, Retrigger, etc.) with `targetMask` bitfield | Missing entirely — no target mask abstraction |
+| **SequenceBuilder A/B preview** | `revert()`, `apply()`, `showOriginal()`, `showPreview()`, `showingPreview()`, plus `_preview` copy | XFORMER's SequenceBuilder has only `_edit` + `_original`, no preview/apply state machine |
+| **ChaosSequenceBuilder** | Pattern-scoped (single track or all tracks) with per-track backup/restore | No equivalent — XFORMER has no cross-track generator application |
+| **Generator page preview/apply** | `GeneratorPage` A/B state: ORIGINAL → preview → commit/cancel flow | XFORMER's GeneratorPage has no preview/commit — just immediate application |
+| **WreckPatternWarningPage** | Confirmation dialog for destructive pattern-scope chaos | No equivalent |
+| **ChaosSeqLayersSetting** | Persists chaos target mask per-sequence (uint16_t, addedInVersion=3) | No persistence of target masks |
+| **ChaosPatLayersSetting** | Persists chaos target mask per-pattern (uint16_t, addedInVersion=3) | No persistence of target masks |
+| **EntropyLayersSetting** | Persists entropy target mask (uint16_t, addedInVersion=5) | No persistence of target masks |
+| **MenuWrapSetting** | Menu wrap toggle (uint8_t, addedInVersion=4, default=on) | Not present |
+| **PatternChange** | Immediate/sync pattern change toggle | Not present |
+| **SyncSong** | Song sync toggle | Not present |
+| **LPStyle/LPNoteStyle** | Launchpad style settings | Belongs in launchpad-track-port |
+
+### Chaos vs Entropy — Key Distinction
+
+**Chaos** (VinxScorzia): Operates on `NoteSequence::Step` fields directly via `ChaosGenerator` + `ChaosSequenceBuilder`. Has its own target enum (`ChaosGenerator::Target`, 14 targets). Supports **per-pattern** scope (all note tracks at once). Uses `blendRandomValue()` with amount% to interpolate between original and random.
+
+**Entropy**: Operates generically on any sequence type's layers via `SequenceBuilderImpl::applyEntropy()`. Uses `EntropyTarget` enum (14 targets). Works per-layer with template specialization for `NoteSequence`, `CurveSequence`, `StochasticSequence`, `LogicSequence`, `ArpSequence`. This is the **unified, generalized** approach.
+
+**Decision**: XFORMER should adopt the **Entropy** approach (template-based, multi-sequence-type) rather than the Chaos approach (Note-only, separate builder). Entropy is already partially ported in the Vinx `SequenceBuilder.h` — it has `applyEntropy()` and the full `entropy_detail` template system — but XFORMER's `SequenceBuilder` lacks these.
+
+### Settings Version Impact
+
+Adding chaos/entropy persistence requires bumping `Settings::Version`. The Vinx fork shows the version progression:
+
+| Version | Added |
+|---------|-------|
+| 1 | Brightness, Screensaver, WakeMode, DimSequence |
+| 2 | (not documented — likely PatternChange, SyncSong, LPStyle, LPNoteStyle) |
+| 3 | ChaosSeqLayers, ChaosPatLayers |
+| 4 | MenuWrap |
+| 5 | EntropyLayers |
+
+For XFORMER (currently Version=1), adding MenuWrap requires Version=2 at minimum. Adding chaos/entropy layer persistence would require Version=3+. These can be staggered — each new setting uses `addedInVersion` guards in `UserSettings::read()` so old settings files load safely with defaults for missing fields.
