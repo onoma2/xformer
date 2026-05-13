@@ -13,7 +13,8 @@ ListPage::ListPage(PageManager &manager, PageContext &context, ListModel &listMo
 
 void ListPage::setListModel(ListModel &listModel) {
     _listModel = &listModel;
-    setSelectedRow(0);
+    _selectedRow = 0;
+    _displayRow = 0;
     _edit = false;
 }
 
@@ -114,8 +115,20 @@ void ListPage::keyboard(KeyboardEvent &event) {
 }
 
 void ListPage::setSelectedRow(int selectedRow) {
-    if (selectedRow != _selectedRow) {
-        _selectedRow = clamp(selectedRow, 0, _listModel->rows() - 1);;
+    int rows = _listModel->rows();
+    if (rows <= 0) {
+        _selectedRow = 0;
+        _displayRow = 0;
+        return;
+    }
+
+    int nextRow = selectedRow % rows;
+    if (nextRow < 0) {
+        nextRow += rows;
+    }
+
+    if (nextRow != _selectedRow) {
+        _selectedRow = nextRow;
         scrollTo(_selectedRow);
     }
 }
