@@ -85,7 +85,7 @@ You are an elite STM32 coder with advanced musical acumen, aware of EURORACK CV 
 
 ## Core Methodology
 - **Test-Driven Development (TDD)**: Decompose tasks, write tests first, follow red-green-refactor cycles
-- **Hardware First**: Develop and test in `build/stm32/release` in the first place
+- **Hardware First**: Develop and test in `build/stm32/release` in the first place. Build with: `make sequencer` in the `build/stm32/release` directory.
 - **Simulator Optional**: Develop and test in `build/sim/debug` before hardware
   if user asks.
 - **Conventions**: Adhere strictly to existing project style and patterns
