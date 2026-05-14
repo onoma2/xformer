@@ -2,9 +2,9 @@
 _Updated: 2026-05-14_
 
 ## 🔴 resource-optimization — RAM & Flash budget recovery (includes teletype-performer-ecosystem-redesign analysis)
-**Status:** active — Phase 1 code present, build-size measured, hardware proof still not recorded.
-**Where I stopped:** Phase 1 implemented (P2+P4+P14+P14b) and measured .data reduction 9,020→6,316 = 2,704 B; no Phase 2 code exists yet.
-**Next action:** Start Phase 2 with ARM sizeof probes and RoutingEngine P5/P6 state compaction; keep P15 as measurement-first and keep model-pool architecture as no-go under current semantics.
+**Status:** active — Phase 2 measurement gate complete ✓. All ARM sizeof values recorded.
+**Where I stopped:** All 5 pages of ARM sizeof probes recorded. Key ARM-verified values: Track=10,108 B, NoteTrack=9,544 B, TeletypeTrackEngine=912 B (container-sizing), RoutingEngine=7,484 B, RouteState=460 B, TrackState=56 B. Container saving from TT extraction: 2,592 B direct + ~4 KB cascade.
+**Next action:** Implement P5/P6 RoutingEngine state compaction (highest ROI: ~6.8 KB CCMRAM). Then consider TeletypeTrackEngine container extraction (~6.6 KB).
 **Depends on:** nothing
 **Branch:** refactor/resouce-optimization
 

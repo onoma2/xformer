@@ -5,19 +5,43 @@
 
 #include "engine/CvInput.h"
 #include "engine/CvOutput.h"
+#include "engine/Engine.h"
+#include "engine/RoutingEngine.h"
+#include "engine/NoteTrackEngine.h"
+#include "engine/CurveTrackEngine.h"
+#include "engine/MidiCvTrackEngine.h"
+#include "engine/TuesdayTrackEngine.h"
+#include "engine/DiscreteMapTrackEngine.h"
+#include "engine/IndexedTrackEngine.h"
+#include "engine/TeletypeTrackEngine.h"
+#include "engine/TrackEngine.h"
+#include "model/NoteSequence.h"
+#include "model/CurveSequence.h"
+#include "model/NoteTrack.h"
+#include "model/CurveTrack.h"
+#include "model/MidiCvTrack.h"
+#include "model/TuesdayTrack.h"
+#include "model/DiscreteMapTrack.h"
+#include "model/IndexedTrack.h"
+#include "model/TeletypeTrack.h"
+#include "model/Track.h"
+#include "model/Model.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
+
+// ARM sizeof probes — temporary, remove after recording phase 2 measurements
 
 enum class Function {
     CvIn    = 0,
     CvOut   = 1,
     Midi    = 2,
     Stats   = 3,
-    Version = 4,
+    Sizes   = 4,
+    Version = 5,
 };
 
-static const char *functionNames[] = { "CV IN", "CV OUT", "MIDI", "STATS", "Version", nullptr };
+static const char *functionNames[] = { "CV IN", "CV OUT", "MIDI", "STATS", "SIZES", "Ver", nullptr };
 
 static void formatMidiMessage(StringBuilder &eventStr, StringBuilder &dataStr, const MidiMessage &msg) {
     if (msg.isChannelMessage()) {
@@ -115,6 +139,9 @@ void MonitorPage::draw(Canvas &canvas) {
     case Mode::Stats:
         drawStats(canvas);
         break;
+    case Mode::Sizes:
+        drawSizes(canvas);
+        break;
     case Mode::Version:
         drawVersion(canvas);
         break;
@@ -145,6 +172,9 @@ void MonitorPage::keyPress(KeyPressEvent &event) {
         case Function::Stats:
             _mode = Mode::Stats;
             break;
+        case Function::Sizes:
+            _mode = Mode::Sizes;
+            break;
         case Function::Version:
             _mode = Mode::Version;
             break;
@@ -153,6 +183,12 @@ void MonitorPage::keyPress(KeyPressEvent &event) {
 }
 
 void MonitorPage::encoder(EncoderEvent &event) {
+    if (_mode == Mode::Sizes) {
+        int next = _sizePage + event.value();
+        _sizePage = clamp(next, 0, SizePageCount - 1);
+        return;
+    }
+
     if (!_scopeActive) {
         return;
     }
@@ -305,6 +341,79 @@ void MonitorPage::resetScope() {
     _scopeWriteIndex = 0;
 }
 
+void MonitorPage::drawSizes(Canvas &canvas) {
+    // ARM sizeof probe display — temporary measurement gate for Phase 2
+    canvas.setFont(Font::Tiny);
+    canvas.setColor(Color::Bright);
+
+    auto drawRow = [&](int row, const char *label, size_t size) {
+        int y = 12 + row * 8;
+        FixedStringBuilder<24> str("%s:%u", label, (unsigned)size);
+        canvas.drawText(2, y, str);
+    };
+
+    auto drawRow2 = [&](int row, const char *label, size_t size1, size_t size2) {
+        int y = 12 + row * 8;
+        FixedStringBuilder<24> str("%s:%u/%u", label, (unsigned)size1, (unsigned)size2);
+        canvas.drawText(2, y, str);
+    };
+
+    switch (_sizePage) {
+    case 0: // Track & container
+        drawRow(0, "Track", sizeof(Track));
+        drawRow(1, "NoteTrack", sizeof(NoteTrack));
+        drawRow(2, "CurveTrack", sizeof(CurveTrack));
+        drawRow(3, "MidiCvTrack", sizeof(MidiCvTrack));
+        drawRow(4, "TuesdayTrack", sizeof(TuesdayTrack));
+        drawRow(5, "DiscreteMapTrack", sizeof(DiscreteMapTrack));
+        drawRow(6, "IndexedTrack", sizeof(IndexedTrack));
+        drawRow(7, "TeletypeTrack", sizeof(TeletypeTrack));
+        drawRow2(8, "Container", sizeof(Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack>), sizeof(Engine::TrackEngineContainer));
+        break;
+    case 1: // Sequences
+        drawRow(0, "NoteSeq", sizeof(NoteSequence));
+        drawRow(1, "NoteSeq::Step", sizeof(NoteSequence::Step));
+        drawRow2(2, "NoteStep[]", sizeof(NoteSequence::Step) * CONFIG_STEP_COUNT, CONFIG_STEP_COUNT);
+        drawRow(3, "CurveSeq", sizeof(CurveSequence));
+        drawRow(4, "CurveSeq::Step", sizeof(CurveSequence::Step));
+        drawRow2(5, "CurveStep[]", sizeof(CurveSequence::Step) * CONFIG_STEP_COUNT, CONFIG_STEP_COUNT);
+        break;
+    case 2: // RoutingEngine
+        drawRow(0, "RoutingEngine", sizeof(RoutingEngine));
+        drawRow(1, "RouteState", sizeof(RoutingEngine::RouteState));
+        drawRow(2, "RouteState::TrackState", sizeof(RoutingEngine::RouteState::TrackState));
+        drawRow(3, "Shaper", sizeof(Routing::Shaper));
+        drawRow2(4, "RouteStates[]", sizeof(RoutingEngine::RouteState) * CONFIG_ROUTE_COUNT, CONFIG_ROUTE_COUNT);
+        drawRow2(5, "TrackStates[]", sizeof(RoutingEngine::RouteState::TrackState) * CONFIG_ROUTE_COUNT * CONFIG_TRACK_COUNT, CONFIG_ROUTE_COUNT * CONFIG_TRACK_COUNT);
+        break;
+    case 3: // TrackEngine container sizes
+        drawRow(0, "NoteTrackEngine", sizeof(NoteTrackEngine));
+        drawRow(1, "CurveTrackEngine", sizeof(CurveTrackEngine));
+        drawRow(2, "MidiCvTrackEngine", sizeof(MidiCvTrackEngine));
+        drawRow(3, "TuesdayTrackEngine", sizeof(TuesdayTrackEngine));
+        drawRow(4, "DiscreteMapTE", sizeof(DiscreteMapTrackEngine));
+        drawRow(5, "IndexedTrackEngine", sizeof(IndexedTrackEngine));
+        drawRow(6, "TeletypeTE", sizeof(TeletypeTrackEngine));
+        drawRow(7, "TrackEngine", sizeof(TrackEngine));
+        break;
+    case 4: // Engine & Model & global
+        drawRow(0, "Engine", sizeof(Engine));
+        drawRow(1, "Model", sizeof(Model));
+        drawRow(2, "Project", sizeof(Project));
+        drawRow(3, "Clock", sizeof(Clock));
+        drawRow(4, "RoutingEngine", sizeof(RoutingEngine));
+        drawRow2(5, "TEContainer[]", sizeof(Engine::TrackEngineContainerArray), sizeof(Engine::TrackEngineContainer));
+        drawRow(6, "TEArray", sizeof(Engine::TrackEngineArray));
+        drawRow(7, "MidiOutEngine", sizeof(MidiOutputEngine));
+        break;
+    }
+
+    // Page indicator
+    FixedStringBuilder<8> pageStr("%d/%d", _sizePage + 1, SizePageCount);
+    canvas.setColor(Color::Low);
+    canvas.drawText(Width - canvas.textWidth(pageStr) - 2, 8, pageStr);
+}
+
 void MonitorPage::drawScope(Canvas &canvas) {
     WindowPainter::clear(canvas);
     sampleScope();
@@ -401,6 +510,7 @@ void MonitorPage::keyboard(KeyboardEvent &event) {
     case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
     case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
     case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
+    case KeyboardEvent::KeyF6: pressFunctionButton(5, event.shift()); event.consume(); break;
     default: break;
     }
     BasePage::keyboard(event);

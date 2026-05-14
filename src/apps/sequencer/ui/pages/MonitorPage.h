@@ -32,6 +32,7 @@ private:
     void drawMidi(Canvas &canvas);
     void drawStats(Canvas &canvas);
     void drawVersion(Canvas &canvas);
+    void drawSizes(Canvas &canvas);
     void drawScope(Canvas &canvas);
     void sampleScope();
     void resetScope();
@@ -41,6 +42,7 @@ private:
         CvOut,
         Midi,
         Stats,
+        Sizes,
         Version,
     };
 
@@ -49,6 +51,8 @@ private:
     MidiMessage _lastMidiMessage;
     MidiPort _lastMidiMessagePort;
     uint32_t _lastMidiMessageTicks = -1;
+    int _sizePage = 0;
+    static constexpr int SizePageCount = 5;
 
     static constexpr int ScopeWidth = Width;
     static constexpr int ScopeHeight = Height;

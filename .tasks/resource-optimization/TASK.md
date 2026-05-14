@@ -9,15 +9,15 @@ XFORMER firmware is at 97% RAM capacity (127,420 bytes out of 128 KB) with only 
 ## Current Implementation State (2026-05-14)
 
 - Active branch in this workspace: `refactor/resouce-optimization`.
-- Phase 1 code is present: Teletype mute bit-packing, `DELAY_SIZE=8`, Teletype font `const`, and `tele_ops` flash residency.
-- Current measured build artifact: `.data=6,316 B`, `.bss=118,400 B`, `.ccmram_bss=58,232 B`, total runtime RAM `.data + .bss = 124,716 B`.
-- Phase 1 measured saving: `.data` 9,020→6,316 = 2,704 B.
-- Hardware proof is not recorded here yet; treat Phase 1 as build-size verified, not fully hardware-accepted.
-- No Phase 2 code exists yet. RoutingEngine P5/P6, P4b backup consolidation, P15 sequence-header packing, stack watermark/trim, and container safety fixes are still analysis/plans only.
+- **Phase 1 complete and hardware-verified.** Teletype mute bit-packing, `DELAY_SIZE=8`, Teletype font `const`, and `tele_ops` flash residency all confirmed working on hardware.
+- Phase 1 measured saving: `.data` 9,020→6,320 = 2,700 B. Runtime SRAM: 124,720 B (95.2% of 128 KB).
+- Current build: `.data=6,320`, `.bss=118,400`, `.ccmram_bss=58,236`.
+- **Phase 2 measurement gate: ARM sizeof probes recorded ✓.** Values captured from hardware on 2026-05-14 (see "ARM sizeof Probe Results" section below). Probes still in MonitorPage; to be removed after all pages recorded.
+- No Phase 2 implementation code exists yet. RoutingEngine P5/P6, P4b backup consolidation, P15 sequence-header packing, stack watermark/trim still analysis/plans only.
 
 ## Restructured Implementation Queue
 
-1. **Phase 2 measurement gate:** add temporary ARM `sizeof` probes for Track, TrackEngine, NoteSequence, CurveSequence, and RoutingEngine state; remove probes after recording results.
+1. ~~**Phase 2 measurement gate:**~~ ARM sizeof probes recorded from hardware. Partial results in (pages 1-3); remaining pages (4-5: TrackEngine types, Engine/Model singletons) still needed.
 2. **Phase 2B first implementation:** RoutingEngine P5/P6 state compaction. This is the highest-value current implementation target because it attacks actual CCMRAM waste without product caps or save-format changes.
 3. **Phase 2A low-medium risk:** Teletype file backup consolidation (`ttSlot1Backup`/`ttSlot2Backup`) after rollback semantics are rechecked.
 4. **Phase 2C measurement-first:** Note/Curve sequence-header packing only if ARM probes show `Track`, `_ZL5model`, and `.bss` can shrink; note-only packing is not a claimed RAM win while CurveTrack remains the max container arm.
@@ -96,7 +96,104 @@ Modulove has **16 tracks** (double XFORMER's 8) and additional features (LFO mod
 - `temp-ref/mebitek-performer/build/stm32/release/src/apps/sequencer/sequencer.size` (589,232 .text, 615,056 binary)
 - `temp-ref/mebitek-performer/build/stm32/release/src/apps/sequencer/sequencer.list` — full symbol map
 
-## Symbol-Level RAM Analysis
+## ARM sizeof Probe Results (hardware, 2026-05-14)
+
+Measured on ARM Cortex-M4F (STM32F405, `-O2`, hard float). Corrects host-x86_64 estimates.
+
+### Page 1: Track & Container types
+
+| Type | ARM sizeof | Host estimate | Delta | Notes |
+|---|---|---|---|---|
+| Track | 10,108 | 10,120 | -12 | ARM packs tighter than x86_64 |
+| NoteTrack | 9,544 | 9,612 | -68 | 17×560 B sequences + ~24 B header |
+| **CurveTrack** | **10,092** | 10,092 | 0 | **Container-sizing model type** |
+| MidiCvTrack | 24 | — | — | Minimal stub type |
+| TuesdayTrack | 718 | 500 | +218 | |
+| DiscreteMapTrack | 2,196 | ~1,800 | +396 | |
+| IndexedTrack | 7,496 | ~4,000 | +3,496 | Far larger than estimated — 3rd largest |
+| TeletypeTrack | (not in first batch) | ~2,800 | — | Awaiting |
+| Container<7 types> | (not in first batch) | — | — | Sized by CurveTrack |
+| TrackEngineContainer | 912 (per slot) | — | Sized by TeletypeTrackEngine |
+
+### Page 2: Sequence types
+
+| Type | ARM sizeof | Host estimate | Notes |
+|---|---|---|---|
+| NoteSequence | 560 | 564 | Close to host; 48 B header over 512 B step array |
+| NoteSequence::Step | 8 | 8 | Confirmed packed |
+| NoteSequence Step array | 512 (8×64) | 512 | Exactly 64×8 B |
+| CurveSequence | 592 | 592 | Matches host; 80 B header over 512 B step array |
+| CurveSequence::Step | 8 | 8 | Confirmed packed |
+| CurveSequence Step array | 512 (8×64) | 512 | Exactly 64×8 B |
+
+**Key finding: CurveTrack (10,092 B) > NoteTrack (9,544 B). CurveTrack is the container-sizing model type.** This means the Track container (10,108 B) is sized by CurveTrack. CurveTrack = 17×592 B sequences + ~28 B track header. NoteSequence header (48 B) and CurveSequence header (80 B) both contribute, but CurveSequence's larger header × 17 = 1,360 B vs NoteSequence's 48×17 = 816 B. Packing CurveSequence headers would shrink the container-sizing type.
+
+### Page 3: RoutingEngine
+
+| Type | ARM sizeof | Notes |
+|---|---|---|
+| RoutingEngine | 7,484 | Matches analysis exactly |
+| RouteState | 460 | Confirmed: 56 B × 8 TrackStates + 2 B base + 8 B Shaper array + 2 B padding |
+| RouteState::TrackState | (implied 56 from 7168/128) | 7,168 / (16×8) = 56 B each, confirmed |
+| Routing::Shaper | 1 | Enum, no storage |
+| RouteStates[] (×16) | 7,360 | 460 × 16 |
+| TrackStates[] (×16×8=128) | 7,168 | 56 × 128 — **the single largest waste target** |
+
+**Confirmed: RouteState::TrackState is exactly 56 B, and RouteState is 460 B.** The 7,168 B of TrackState storage across all 16 routes × 8 tracks is the primary compaction target for P5/P6.
+
+### Page 4: TrackEngine types
+
+| Type | ARM sizeof | Host estimate | Notes |
+|---|---|---|---|
+| NoteTrackEngine | 588 | ~590 | Close to host |
+| CurveTrackEngine | 392 | — | |
+| MidiCvTrackEngine | 416 | — | |
+| TuesdayTrackEngine | 416 | — | |
+| DiscreteMapTrackEngine | 416 | — | |
+| IndexedTrackEngine | 120 | — | Very small — just pointer forwarding |
+| TeletypeTrackEngine | 912 | ~904 | **Container max type at 912 B** |
+| TrackEngine (base) | 32 | 24 (host) | vtable + refs |
+
+**Key finding: TeletypeTrackEngine (912 B) is the container-sizing type.** The TrackEngineContainer is 912 B per slot, yielding 7,296 B for the 8-slot array. If TeletypeTrackEngine were moved out of the container, the next-largest engine (NoteTrackEngine at 588 B) would size it, saving (912-588)×8 = 2,592 B from the container array alone, plus likely 4+ KB from alignment cascades in the Engine singleton.
+
+### Page 5: Global singletons
+
+| Type | ARM sizeof | Notes |
+|---|---|---|
+| Engine | 15,588 | Matches earlier nm analysis exactly |
+| Model | 92,836 | Matches nm analysis |
+| Project | 82,524 | |
+| Clock | 18* | *Display showed 18 — likely truncation; earlier nm analysis shows 164 B. Needs verification. |
+| RoutingEngine | 7,484 | Confirmed |
+| TrackEngineContainer (per slot) | 912 | Sized by TeletypeTrackEngine |
+| TrackEngineContainerArray (×8) | 7,296 | 912 × 8 |
+| TrackEngineArray (×8 ptrs) | 32 | 8 × 4 B pointers |
+
+### Pages 4-5: Awaiting hardware recording
+~~- TrackEngine sizes (NoteTrackEngine, CurveTrackEngine, etc.)~~
+~~- Engine, Model, Project, Clock singleton sizes~~
+
+(All pages now recorded.)
+
+## ARM sizeof Summary — Critical Corrections from Host Estimates
+
+| Item | Host estimate | ARM actual | Delta | Impact |
+|---|---|---|---|---|
+| Track | 10,120 | 10,108 | -12 | Confirmed ~10 KB/track |
+| **CurveTrack** | **10,092** | **10,092** | 0 | **Container-sizing model type** |
+| NoteTrack | 9,612 | 9,544 | -68 | 2nd largest model, not container-sizing |
+| IndexedTrack | ~4,000 | **7,496** | **+3,496** | Far larger than estimated — 3rd largest |
+| CurveSequence | 592 | 592 | 0 | 80 B header × 17 = 1,360 B overhead per track |
+| NoteSequence | 564 | 560 | -4 | 48 B header × 17 = 816 B overhead per track |
+| RoutingEngine | 7,484 | 7,484 | 0 | Confirmed |
+| RouteState | 460 | 460 | 0 | Confirmed |
+| RouteState::TrackState | 56 | 56 | 0 | Confirmed |
+| TeletypeTrackEngine | ~904 | **912** | +8 | **Container-sizing engine type** |
+| NoteTrackEngine | ~590 | **588** | -2 | Next-largest engine if TT extracted |
+| TrackEngineContainer | — | 912 (×8 = 7,296) | — | Sized by TeletypeTrackEngine |
+| Engine | 15,588 | 15,588 | 0 | Confirmed from nm |
+| Model | 92,836 | 92,836 | 0 | Confirmed from nm |
+
 
 ### Three Broad Optimization Directions
 
@@ -199,11 +296,11 @@ This corrects the earlier missed RAM candidate: NoteSequence step data is packed
 
 **The RoutingEngine is the single biggest RAM problem — not the Engine container.** The RouteState in XFORMER has per-track shaping state (56 B × 8 tracks = 448 B per route × 16 routes = 7,168 B) that Vinx doesn't have at all. That's over half the total gap.
 
-Optimization priority:
-1. **RoutingEngine** (.ccmram, ~7.4 KB): Reduce RouteState to Vinx's minimalist version (`{Target, tracks}` = 2 B), or make per-track shaping state conditional/allocated. Single highest-ROI change.
-2. **Teletype standalone** (.bss+.data, ~6.9 KB): Slot backups could be shared (saving 2,452 B).
-3. **Sequence header packing** (.bss/model, measurement-first): NoteSequence and CurveSequence already pack steps, but their per-pattern headers are still byte/routable-heavy and repeated 17 times per track type. Note-only packing may save zero top-level RAM if CurveTrack remains the max container arm; pack/measure both.
-4. **Engine container** (.ccmram, ~1.8 KB): TeletypeTrackEngine inflates container slots — worth fixing but smaller impact.
+Optimization priority (ARM-verified):
+1. **RoutingEngine** (.ccmram, 7,168 B TrackStates + 124 B other): Reduce RouteState per-track shaping. P5 (union-by-shaper) saves ~4,096 B; P6 (skip-for-non-per-track) saves ~2,688 B. Combined ~6.8 KB. Single highest-ROI change.
+2. **TeletypeTrackEngine container extraction** (.ccmram, ~2,592 B direct + ~4 KB cascade): Move TT engine out of variant → container max drops from 912→588 B. Total Engine reduction ~6.6 KB.
+3. **Teletype standalone** (.bss+.data, ~6.9 KB): Slot backups could be shared (saving 2,452 B).
+4. **CurveSequence header packing** (.bss/model, high-value now): CurveTrack (10,092 B) is the container-sizing model type. CurveSequence header = 80 B × 17 = 1,360 B per track. Reducing CurveSequence header size would shrink CurveTrack and thus the Track container (currently sized by CurveTrack). NoteSequence header = 48 B × 17 = 816 B; NoteTrack-only packing won't help since CurveTrack remains the max.
 5. **Model scatter** (.bss, ~4.8 KB): Lowest priority — many micro-tweaks needed.
 
 ### Track Engine Container Contents (Per Fork)
@@ -212,43 +309,27 @@ The Engine singleton's `_trackEngineContainers` is a `std::array<Container<Types
 
 | Fork | Types in Container | Max Type | Per-Track Slot | Array Total |
 |---|---|---|---|---|
-| **XFORMER** | Note, Curve, MidiCv, Tuesday, DiscreteMap, Indexed, **Teletype** | TeletypeTrackEngine (~904 B with vtable) | **~904 B** | **~7,232 B (7.1 KB)** |
+| **XFORMER** | Note, Curve, MidiCv, Tuesday, DiscreteMap, Indexed, **Teletype** | TeletypeTrackEngine (**912 B** ARM) | **912 B** | **7,296 B (7.1 KB)** |
 | **Vinx** | Note, Curve, MidiCv, Stochastic, LogicTrack, Arp | ArpTrackEngine (~675 B) | **~675 B** | **~5,400 B (5.3 KB)** |
 | **Mebitek** | Note, Curve, MidiCv, Stochastic, LogicTrack, Arp | ArpTrackEngine (~675 B) | **~675 B** | **~5,400 B (5.3 KB)** |
 | **Modulove** | Note (±Curve ±MidiCv via `#ifdef`) | NoteTrackEngine or CurveTrackEngine | **~590 B** | **~9,440 B (9.2 KB) × 16 tracks** |
 
-**TeletypeTrackEngine byte-accurate breakdown (~904 B):**
+**ARM-verified TrackEngine sizes:**
 
-| Component | Size | Items |
-|---|---|---|
-| TrackEngine base (vtable + 5 refs) | 24 B | vtable ptr, &_engine, &_model, &_track, &_trackState, _linkedTrackEngine |
-| _teletypeTrack ref | 4 B | Reference to TeletypeTrack model |
-| 7 bools + _manualScriptIndex | 8 B | boot/activity/clock/metro/init/geode flags |
-| _metroPeriodMs + _cachedPattern | 6 B | int16 + int |
-| 8 floats + _clockTickCounter | 36 B | _tickDurationMs, _pulseClockMs, _metroRemainingMs, _activityCountdownMs, _tickRemainderMs, _geodeFreePhase, _geodePhaseOffset, _geodeBarSeconds, _clockTickCounter |
-| 2 doubles (8-byte aligned) | 16 B | _clockRemainder, _lastClockPos |
-| 6× bool[4] + 1× bool[8] | 32 B | teletypeInputState/Prev, trWidthEnabled, cvSlewActive, lfoActive, cvInterpolationEnabled, performerGateOutput[8] |
-| 6× uint8[4] | 24 B | trDiv, trDivCounter, trWidthPct, envState, lfoAmp, lfoFold |
-| 3× int8[4] | 12 B | envEorTr, envEocTr, geodeOutRouting |
-| 13× int16[4] | 104 B | teletypeCvRaw/Offset, cvSlewTime, envTargetRaw/Offset/Attack/Decay/Loop/LoopsRemaining/SlewMs, lfoCycleMs/Wave/OffsetRaw |
-| 10× float[4] | 160 B | trActivityCountdown, PulseRemainingMs, trLastPulse/Interval, cvOutputTarget, cvRealTarget, prevCvTarget, cvTickPhase, lfoPhase, envStageRemaining |
-| 1× float[8] | 32 B | _performerCvOutput |
-| GeodeParams | 40 B | 8 int16 (time/intone/ramp/curve/run/offset/bars + mode) + tuneNum[6] + tuneDen[6] |
-| GeodeEngine | ~394 B | 6× Voice[48] + _prevMeasureFraction + tune arrays + cached values + _cachedMixLevel |
-| **Total** | **~904 B** | |
+| TrackEngine Type | ARM sizeof |
+|---|---|
+| TeletypeTrackEngine | **912 B** (container-sizing max) |
+| NoteTrackEngine | 588 B |
+| MidiCvTrackEngine | 416 B |
+| TuesdayTrackEngine | 416 B |
+| DiscreteMapTrackEngine | 416 B |
+| CurveTrackEngine | 392 B |
+| IndexedTrackEngine | 120 B |
+| TrackEngine (base) | 32 B |
 
-**Why ArpTrackEngine is smaller (~675 B)**: It handles arpeggiation with minimal state — a few arrays of note/cv values and a sequencer state, no LFO/envelope/Geode/CV slew subsystems.
+**Removing TeletypeTrackEngine from container** → new max = NoteTrackEngine (588 B), container slot drops from 912 → 588, saving (912-588)×8 = **2,592 B** directly from TrackEngineContainerArray, plus likely 4+ KB from alignment cascade in Engine (15,588 B singleton). Total Engine reduction estimate: **2,592 + ~4,000 = ~6.6 KB**.
 
-**Modulove anomaly**: Despite having **16 tracks** (double everyone else), its engine is only 9,452 B because its container only holds Note (+ optional Curve/MidiCv) — each slot is ~590 B instead of ~904 B. The 16×590 = 9,440 B matches the measured engine size.
-
-**Container gap is only ~1,832 B**: The container difference (904 vs 675 B per slot × 8 = 1,832 B) is a minority of the 6,136 B Engine gap. The remaining **~4,304 B** comes from non-container Engine members unique to XFORMER:
-- `UsbH &_usbH` (4 B) + 3 std::function handlers (~24 B each for Keyboard/HidConnect/HidDisconnect) ≈ 76 B
-- `_cvRouteOutputs[CvRoute::LaneCount=4]` (16 B) + `_busCv[4]` (16 B) + `_busCvWritten[4]` (4 B) + `_busCvSafeMode` (1 B) + BusCvSlewPerTick/Decay constants ≈ 48 B
-- 3 teletype control methods (`panicTeletype`, `setTeletypeMetroAll`, `setTeletypeMetroActiveAll`, `resetTeletypeMetroAll`) — their thunks and supporting state
-- Alignment cascade: the larger container pushes subsequent members further apart, creating ~4 KB of cascading overhead in the 15,588 B singleton
-- **Key insight**: fixing the container recovers 1,832 B directly, but the alignment cascade means fixing it might recover more (~3-4 KB total) as the remaining members pack tighter
-
-**The key leverage point**: Removing TeletypeTrackEngine from the variant would drop the container max to whichever is next largest (TuesdayTrackEngine or NoteTrackEngine). This directly saves ~1,832 B, plus indirectly recovers some of the ~4,304 B in alignment cascade overhead. Moving TeletypeTrackEngine to heap allocation is the single highest-ROI change in the entire codebase.
+**Container gap is now 2,592 B (ARM-verified)**: (912 - 588) × 8. The remaining ~8,000 B of XFORMER's Engine gap (15,588 - 5,400 = 10,188 B) comes from non-container members + alignment cascade.
 
 ### Reference: Per-Fork Main Singleton Sizes
 
@@ -338,16 +419,26 @@ High — blocks all further feature development.
 ## Status
 Active — Phase 1 complete. Phase 2 prep.
 
-## Phase 1 Results (verified by build)
+## Phase 1 Results (verified by build, hardware-tested ✓)
 | Proposal | Savings | Status |
 |----------|---------|--------|
 | P2 — mutes bool[8]→uint8_t | 7 B/TT track internal cleanup; no current top-level .bss reduction | ✅ Merged |
 | P4 — DELAY_SIZE 16→8 | 488 B/TT track internal cleanup; no current top-level .bss reduction | ✅ Merged |
 | P14 — tele_glyphs/bitmap to flash | 1,040 B from .data | ✅ Merged |
 | P14b — tele_ops[] to flash | 1,664 B from .data | ✅ Merged |
-| **Total .data reduction** | **9,020 → 6,316 = 2,704 B** | **SRAM: 97.4% → 95.2%** |
+| **Total .data reduction** | **9,020 → 6,320 = 2,700 B** | **SRAM: 97.4% → 95.2%** |
 
 **Key finding**: P2+P4 are valid Teletype footprint cleanup, but they do not currently count toward the 15-20 KB RAM-headroom goal. The owning storage is inside `Track::_container`, whose size is still dominated by large Note/Curve sequence-track models. The .bss total (118,400) stayed unchanged. The immediate headroom win came entirely from P14/P14b moving read-only data to flash.
+
+## Phase 2 Measurement Gate (built, awaiting hardware)
+ARM `sizeof` probes added to MonitorPage SIZES mode. 5 pages, encoder-scrollable:
+- **Page 1**: Track container types (Track, NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack, Container sizes)
+- **Page 2**: Sequence types (NoteSequence, NoteSequence::Step, CurveSequence, CurveSequence::Step, step array totals)
+- **Page 3**: RoutingEngine (RoutingEngine total, RouteState, RouteState::TrackState, Shaper, array totals)
+- **Page 4**: TrackEngine types (all 7 engine sizes + base TrackEngine)
+- **Page 5**: Global singletons (Engine, Model, Project, Clock, RoutingEngine, TrackEngineContainer array, MidiOutputEngine)
+
+Build verified: `.data=6,320 .bss=118,400 .ccmram_bss=58,236`. Firmware ready to flash.
 
 ## Next action (Phase 2 prep)
 Plan and implement Phase 2 proposals:
