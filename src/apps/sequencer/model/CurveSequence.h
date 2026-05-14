@@ -629,12 +629,12 @@ private:
     Routable<float> _djFilter;
     float _xFade;  // Non-routable, UI-only control
 
-    Routable<int> _chaosAmount;
+    Routable<int8_t> _chaosAmount;
     ChaosAlgorithm _chaosAlgo;
     ChaosRange _chaosRange;
-    Routable<int> _chaosRate;
-    Routable<int> _chaosParam1;
-    Routable<int> _chaosParam2;
+    Routable<int8_t> _chaosRate;
+    Routable<int8_t> _chaosParam1;
+    Routable<int8_t> _chaosParam2;
 
     StepArray _steps;
 

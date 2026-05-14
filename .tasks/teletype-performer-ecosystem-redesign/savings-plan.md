@@ -120,13 +120,13 @@ Each proposal: **Savings**, **Effort** (Low/Medium/High/Very High), **Risk** (No
 
 **What**: `FileManager.cpp:628-635` has 4 static `PatternSlot` globals. The two primaries (`ttSlot1` / `ttSlot2`) are accessed **concurrently** during file parsing — `#SLOT 1` / `#SLOT 2` directives can switch between them. The two backup slots (`ttSlot1Backup` / `ttSlot2Backup`) are used for atomic rollback on parse failure.
 
-Proposal: Replace the two backups with a single shared backup buffer. Before parsing, save to the shared backup one slot at a time. On failure, restore from shared backup (if only one slot was dirtied, the other's backup is stale — must only rollback the actively-parsed slot). If both slots are dirtied during the same file, the single backup covers the most recently dirtied slot.
+Status: **deferred research**. Do not treat this as a low-risk one-file cleanup. Current `readTeletypeTrack()` snapshots both slots before clearing and restores both slots on failure. Replacing the two backups with one shared buffer changes transaction semantics unless the read/apply flow is redesigned around a clear single-slot rollback contract.
 
 Simpler alternative: keep both backups but acknowledge this savings is currently unreachable.
 
 **Savings**: 1 × 1,226 B = **~1,226 B** (consolidate 2 backups → 1)  
-**Effort**: Low-Medium — modify `readTeletypeTrack()` backup/restore logic  
-**Risk**: Low — rollback becomes single-slot only; on multi-slot parse failure, only the last-dirtied slot is restorable  
+**Effort**: Medium — requires rollback semantics redesign, not just changing the globals  
+**Risk**: Medium — multi-slot parse failure can corrupt or partially restore state if the transaction boundary is wrong  
 
 **Files**: `src/apps/sequencer/model/FileManager.cpp`
 
@@ -296,21 +296,22 @@ Key corrections from adversarial review of v1:
 | Phase | Proposals | Verified Savings | Cumulative | Risk |
 |---|---|---|---|---|
 | **Phase 1 (Safe)** | P2/P4 internal Teletype cleanup + P14 (1,040 B) + P14b (1,664 B) | **2,704 B measured .data** | ~2.7 KB | None-Low |
-| **Phase 2 (Medium)** | P5 (4,096 B) + P6 (2,688 B) first, then P4b (1,226 B) and P15 measurement-first Note/Curve sequence header packing | **~8,010 B + measured P15 delta** | ~10.7 KB + P15 | Low-Medium |
+| **Phase 2 (Medium)** | P5 complete (4,096 B CCMRAM), then P15 CurveSequence-first header packing | **4,096 B measured + P15 delta** | ~6.8 KB + P15 | Low-Medium |
 | **Phase 3 (Risk)** | P5a (7,488 B, only if shapers unused) + P8 (544 B) + P13 (1,536 B, after measurement) | **~9,568 B** | ~26.0 KB | Medium-High |
 
 **Phase 1 alone**: 2,704 B recovers from .data → RAM ~124.7 KB (~95.2%).  
-**Phases 1+2**: ~10.7 KB → RAM ~116.7 KB before any later risk-tier work.  
+**P5 status**: complete, hardware-verified, saves 4,096 B CCMRAM.  
 **All phases**: ~26 KB → RAM ~101 KB (~79%). Comfortable headroom.
 
 Recommended order:
 1. **P14+P14b** (2.7 KB measured) plus P2/P4 internal cleanup — completed  
-2. **P5+P6** (6.8 KB, 2 files, ~1 week) — biggest single structural change  
-3. **P15** — ARM sizeof probe, then Note/Curve sequence-header packing only if `Track` / `_ZL5model` actually shrink  
-4. **P4b** (1.2 KB, 1 file, ~1 day) — Teletype file I/O cleanup  
-5. **P7** — future research only; useful only with a capped live Teletype engine pool  
-6. **P8** (0.5 KB, 2 files, ~2 days) — final pattern savings  
-7. **P13** (1.5 KB, after verification) — stack trim only if safe
+2. **P5** — completed and hardware-verified  
+3. **P15 CurveSequence-first** — ARM probes show CurveTrack is `Track::_container` max; target `.bss` / `_ZL5model` next  
+4. **P4b** — deferred research; rollback semantics are not simple  
+5. **P6** — deferred research; sparse/capped shaper state needs a separate design  
+6. **P7** — future research only; useful only with a capped live Teletype engine pool  
+7. **P8** (0.5 KB, 2 files, ~2 days) — final pattern savings  
+8. **P13** (1.5 KB, after verification) — stack trim only if safe
 
 ---
 

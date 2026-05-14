@@ -29,19 +29,20 @@ The active savings plan ranks the work as:
 
 | Phase | Proposals | Target savings | Risk |
 |---|---|---:|---|
-| 1 | P2/P4 internal cleanup + P14 + P14b | 2,704 B measured .data | none-low |
-| 2A | P4b | ~1,226 B | low-medium |
-| 2B | P5 + P6 | ~6,784 B | medium |
-| 2C | P15 | measurement-first Note/Curve sequence header packing; count only if `Track` / `_ZL5model` shrink | low-medium |
-| 2D | P7 | future research only; conditional on capped live Teletype engine pool | medium-high |
+| 1 | P2/P4 internal cleanup + P14 + P14b | 2,700 B measured .data | none-low |
+| 2B | P5 union-based TrackState compaction | 4,096 B measured .ccmram_bss | medium; complete |
+| 2C | P15 CurveSequence-first header packing | measurement-first; count only if `CurveSequence` shrinks `Track` / `_ZL5model` | low-medium |
+| 2R | P4b, P6, P7 | deferred research only | medium-high |
 | 3 | P8 + P13, maybe P5a only by explicit decision | ~2,080 B safe subset; +7,488 B risky | medium-high |
 
 Current implementation state:
 
-- Phase 1 code is present on `refactor/resouce-optimization` and build-size verified: `.data` 9,020→6,316 = 2,704 B saved.
-- Phase 1 hardware smoke proof is not recorded in this plan yet.
-- No Phase 2 code exists yet.
-- Do not start model-pool/container-pool architecture work under current "any track can be any type" semantics; `model-pool-decision-table.md` records this as no-go. Proceed with RoutingEngine state compaction and measurement-first sequence-header probes instead.
+- Phase 1 is hardware-verified: `.data` 9,020→6,320 = 2,700 B saved.
+- P5 is hardware-verified: `TrackStateUnion` reduced `.ccmram_bss` by 4,096 B.
+- creaseEnabled removal + serialization fix is hardware-verified: `.bss` reduced by 128 B and shaper save/load now works.
+- Current pressure is SRAM (`.data + .bss`), not CCMRAM; next active work is P15 CurveSequence-first header packing.
+- Do not start model-pool/container-pool architecture work under current "any track can be any type" semantics; `model-pool-decision-table.md` records this as no-go.
+- Defer Teletype backup consolidation. Current read failure rollback restores both PatternSlots, so one-buffer consolidation is research, not a simple Phase 2 cleanup.
 
 ## Measurement Protocol
 
@@ -136,14 +137,16 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 - Teletype delay behavior breaks under a normal small script.
 - Saving or loading a Teletype project corrupts slot data.
 
-## Phase 2A: Teletype File Backup Consolidation
+## Phase 2R: Deferred Research — Teletype File Backup Consolidation
 
 **Proposal:** P4b
 
 **Files:**
 - Modify: `src/apps/sequencer/model/FileManager.cpp`
 
-**Expected savings:** about 1,226 B from `.bss`.
+**Expected savings:** about 1,226 B from `.bss` only after rollback semantics are redesigned.
+
+**Status:** deferred. This is not the next implementation step. Current `readTeletypeTrack()` snapshots both PatternSlots before clearing and restores both on failure, so replacing two backups with one shared backup changes transaction semantics unless the load flow is redesigned.
 
 - [ ] Read the current `readTeletypeTrack()` slot parse flow and identify where `ttSlot1Backup` and `ttSlot2Backup` are copied/restored.
 - [ ] Replace the two backup globals with one shared backup buffer only if restore semantics stay single-slot and explicit.
@@ -162,26 +165,26 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 
 ## Phase 2B: RoutingEngine State Reduction
 
-**Proposals:** P5 and P6
+**Proposals:** P5 complete; P6 deferred
 
 **Files:**
 - Modify: `src/apps/sequencer/engine/RoutingEngine.h`
 - Modify: `src/apps/sequencer/engine/RoutingEngine.cpp`
 
-**Expected savings:** about 6,784 B from `.ccmram_bss`.
+**Measured savings:** P5 saved 4,096 B from `.ccmram_bss`. P6 is deferred because sparse/capped state allocation needs a separate design around stateful-shaper caps or sparse state lifetime.
 
-- [ ] Before editing, catalog every `TrackState` field use in `RoutingEngine.cpp` by shaper.
-- [ ] Add a focused test or debug-only size assertion for `sizeof(RoutingEngine::RouteState)` if the local test framework can cover this cheaply.
-- [ ] Convert `TrackState` to a per-track union/discriminant layout; do not use a per-route discriminant because tracks in one route can use different shapers.
-- [ ] Keep accumulated state for ProgressiveDivider, Location, Envelope, Activity, and FrequencyFollower.
+- [x] Before editing, catalog every `TrackState` field use in `RoutingEngine.cpp` by shaper.
+- [x] Add a focused test or debug-only size assertion for `sizeof(RoutingEngine::RouteState)` if the local test framework can cover this cheaply.
+- [x] Convert `TrackState` to a per-track union/discriminant layout; do not use a per-route discriminant because tracks in one route can use different shapers.
+- [x] Keep accumulated state for ProgressiveDivider, Location, Envelope, Activity, and FrequencyFollower.
 - [ ] Avoid P5a in this phase; do not strip state entirely.
-- [ ] Skip state storage for route targets where `Routing::isPerTrackTarget()` proves no per-track shaping can apply.
-- [ ] Build STM32 `sequencer`.
-- [ ] Run the measurement protocol and confirm `_ZL6engine` / routing-related CCMRAM drops by the expected range.
-- [ ] Flash hardware and run the hardware smoke checklist.
-- [ ] Routing hardware check: create or load routes using each stateful shaper and verify output changes over time, not just instantly.
-- [ ] Regression check: verify Tempo/Swing/Play/Record/Mute/Fill/Pattern routes still behave as non-per-track routes.
-- [ ] Commit only after hardware passes and routing semantics are proven.
+- [ ] Skip state storage for route targets where `Routing::isPerTrackTarget()` proves no per-track shaping can apply. Deferred as P6 research; runtime branching alone is not a RAM win.
+- [x] Build STM32 `sequencer`.
+- [x] Run the measurement protocol and confirm `_ZL6engine` / routing-related CCMRAM drops by the expected range.
+- [x] Flash hardware and run the hardware smoke checklist.
+- [x] Routing hardware check: create or load routes using each stateful shaper and verify output changes over time, not just instantly.
+- [x] Regression check: verify Tempo/Swing/Play/Record/Mute/Fill/Pattern routes still behave as non-per-track routes.
+- [x] Commit only after hardware passes and routing semantics are proven.
 
 **Stop conditions:**
 
@@ -189,22 +192,22 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 - Route target classification is unclear.
 - CCMRAM saving is much smaller than expected and cannot be explained.
 
-## Phase 2C: Measurement-First Note/Curve Sequence Header Packing
+## Phase 2C: P15 CurveSequence-First Header Packing
 
 **Proposal:** P15
 
 **Files:**
-- Modify after measurement: `src/apps/sequencer/model/NoteSequence.h`
-- Modify after measurement: `src/apps/sequencer/model/NoteSequence.cpp`
-- Modify after measurement: `src/apps/sequencer/model/CurveSequence.h`
-- Modify after measurement: `src/apps/sequencer/model/CurveSequence.cpp`
+- Modify: `src/apps/sequencer/model/CurveSequence.h`
+- Modify: `src/apps/sequencer/model/CurveSequence.cpp`
+- Read/follow-up only: `src/apps/sequencer/model/NoteSequence.h`
+- Read/follow-up only: `src/apps/sequencer/model/NoteSequence.cpp`
 - Read/measure: `src/apps/sequencer/model/Track.h`
 
-**Expected savings:** measurement-first. Host probe shows `NoteSequence=564 B` with a 512 B packed step array, `CurveSequence=592 B` with a 512 B packed step array, `NoteTrack=9,612 B`, `CurveTrack=10,092 B`, and `Track=10,120 B`. This means note-only packing may save no top-level RAM while CurveTrack remains the largest `Track::_container` arm. Count this phase only from ARM `sizeof(Track)`, `_ZL5model`, and `.bss` deltas.
+**Expected savings:** measurement-first. ARM probes show `CurveSequence=592 B`, `CurveTrack=10,092 B`, and `Track=10,108 B`. CurveTrack is the `Track::_container` sizing arm, so CurveSequence header packing is the correct first model/SRAM experiment. Count this phase only from ARM `sizeof(CurveSequence)`, `sizeof(CurveTrack)`, `sizeof(Track)`, `_ZL5model`, and `.bss` deltas.
 
-- [ ] Add temporary ARM build size probes for `sizeof(NoteSequence::Step)`, `sizeof(NoteSequence)`, `sizeof(CurveSequence::Step)`, `sizeof(CurveSequence)`, `sizeof(NoteTrack)`, `sizeof(CurveTrack)`, and `sizeof(Track)`.
-- [ ] Record whether NoteTrack or CurveTrack is the current `Track::_container` max on target.
-- [ ] If CurveTrack remains max, include CurveSequence header packing in the same phase; do not implement note-only packing as a claimed RAM win.
+- [x] Add temporary ARM build size probes for `sizeof(NoteSequence::Step)`, `sizeof(NoteSequence)`, `sizeof(CurveSequence::Step)`, `sizeof(CurveSequence)`, `sizeof(NoteTrack)`, `sizeof(CurveTrack)`, and `sizeof(Track)`.
+- [x] Record whether NoteTrack or CurveTrack is the current `Track::_container` max on target: CurveTrack is max.
+- [ ] Design a packed CurveSequence header behind current accessors.
 - [ ] Preserve the current public getters/setters and the current serialized `write()` / `read()` field order.
 - [ ] Preserve `Routable<T>` semantics for routed sequence params: base and routed values must remain independently representable.
 - [ ] Build STM32 `sequencer`.

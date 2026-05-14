@@ -369,6 +369,8 @@ void MonitorPage::drawSizes(Canvas &canvas) {
         drawRow(6, "IndexedTrack", sizeof(IndexedTrack));
         drawRow(7, "TeletypeTrack", sizeof(TeletypeTrack));
         drawRow2(8, "Container", sizeof(Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack>), sizeof(Engine::TrackEngineContainer));
+        drawRow(9, "NoteSeq", sizeof(NoteSequence));
+        drawRow(10, "CurveSeq", sizeof(CurveSequence));
         break;
     case 1: // Sequences
         drawRow(0, "NoteSeq", sizeof(NoteSequence));
