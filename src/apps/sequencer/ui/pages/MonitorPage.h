@@ -35,8 +35,6 @@ private:
     void drawScope(Canvas &canvas);
     void sampleScope();
     void resetScope();
-    int scopeTrackFromOption(int option) const;
-    int scopeOptionFromTrack(int trackIndex) const;
 
     enum class Mode : uint8_t {
         CvIn,
@@ -58,5 +56,6 @@ private:
     std::array<uint8_t, ScopeWidth> _scopeGate{};
     std::array<float, ScopeWidth> _scopeCvSecondary{};
     int _scopeWriteIndex = 0;
-    int8_t _scopeSecondaryTrack = -1;
+    int8_t _scopeChannel = 0;
+    int8_t _scopeSecondaryChannel = -1;
 };
