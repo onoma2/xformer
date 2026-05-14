@@ -159,13 +159,13 @@ void CurveSequence::writeRouted(Routing::Target target, int intValue, float floa
         setLastStep(intValue, true);
         break;
     case Routing::Target::WavefolderFold:
-        setWavefolderFold(floatValue / 100.0f, true);  // Convert 0-100 to 0.0-1.0
+        setWavefolderFold(int16_t(floatValue), true);  // Already 0-100 centi-units
         break;
     case Routing::Target::WavefolderGain:
-        setWavefolderGain(floatValue / 100.0f, true);  // Convert 0-200 to 0.0-2.0
+        setWavefolderGain(int16_t(floatValue), true);  // Already 0-200 centi-units
         break;
     case Routing::Target::DjFilter:
-        setDjFilter(floatValue / 100.0f, true);  // Convert -100 to 100 to -1.0 to 1.0
+        setDjFilter(int16_t(floatValue), true);  // Already -100 to 100 centi-units
         break;
     // XFade is non-routable (UI-only control)
     case Routing::Target::ChaosAmount:

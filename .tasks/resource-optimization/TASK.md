@@ -45,13 +45,14 @@ Do not start a model-pool/container-pool implementation under current semantics.
 
 ### Recovery Progress (current build vs original baseline)
 
-| Resource | Original (pre-P1) | After P1 | After P5 + creaseEnabled fix | Total Delta | % of 128 KB |
-|---|---|---|---|---|---|
-| **.data** | 9,020 | 6,320 | 6,320 | **-2,700** | 4.8% |
-| **.bss** | 118,400 | 118,400 | 118,272 | **-128** | 90.1% |
-| **Total SRAM** (.data+.bss) | 127,420 (97.4%) | 124,720 (95.2%) | 124,592 (94.9%) | **-2,828** | 94.9% |
-| **CCMRAM** (.ccmram_bss) | 58,236 | 58,236 | 54,132 | **-4,104** | 84.6% of 64 KB |
-| **Flash .text** | 760,732 | ~764,300 | 762,956 | +2,224 | 72.9% of 1 MB |
+| Resource | Original (pre-P1) | After P1 | After P5 + crease | **After P15a**
+|---|---|---|---|---|
+| **.data** | 9,020 | 6,320 | 6,320 | **6,320** |
+| **.bss** | 118,400 | 118,400 | 118,272 | **114,760** |
+| **Total SRAM** (.data+.bss) | 127,420 (97.4%) | 124,720 (95.2%) | 124,592 (94.9%) | **121,080 (92.4%)** |
+| **CCMRAM** (.ccmram_bss) | 58,236 | 58,236 | 54,132 | **54,108** |
+| **Flash .text** | 760,732 | ~764,300 | 762,956 | **762,636** |
+| **Binary** | 789,252 | — | 791,472 | **788,448** |
 
 > - **Vinx**: "closest fork" — shares Note, Curve, Arp, Stochastic, Logic tracks; adds Chaos/Entropy/Generator features. 86% RAM.
 > - **Mebitek**: adds Logic, Stochastic, Arp tracks plus UI shortcuts. 87% RAM, 615 KB flash.

@@ -390,9 +390,9 @@ public:
 
     // wavefolderFold
 
-    float wavefolderFold() const { return _wavefolderFold.get(isRouted(Routing::Target::WavefolderFold)); }
+    float wavefolderFold() const { return _wavefolderFold.get(isRouted(Routing::Target::WavefolderFold)) * 0.01f; }
     void setWavefolderFold(float value, bool routed = false) {
-        _wavefolderFold.set(clamp(value, 0.f, 1.f), routed);
+        _wavefolderFold.set(clamp(int16_t(std::round(value * 100.f)), int16_t(0), int16_t(100)), routed);
     }
     void editWavefolderFold(int value, bool shift) {
         if (!isRouted(Routing::Target::WavefolderFold)) {
@@ -406,9 +406,9 @@ public:
 
     // wavefolderGain
 
-    float wavefolderGain() const { return _wavefolderGain.get(isRouted(Routing::Target::WavefolderGain)); }
+    float wavefolderGain() const { return _wavefolderGain.get(isRouted(Routing::Target::WavefolderGain)) * 0.01f; }
     void setWavefolderGain(float value, bool routed = false) {
-        _wavefolderGain.set(clamp(value, 0.f, 2.f), routed);
+        _wavefolderGain.set(clamp(int16_t(std::round(value * 100.f)), int16_t(0), int16_t(200)), routed);
     }
     void editWavefolderGain(int value, bool shift) {
         if (!isRouted(Routing::Target::WavefolderGain)) {
@@ -422,9 +422,9 @@ public:
 
     // djFilter
 
-    float djFilter() const { return _djFilter.get(isRouted(Routing::Target::DjFilter)); }
+    float djFilter() const { return _djFilter.get(isRouted(Routing::Target::DjFilter)) * 0.01f; }
     void setDjFilter(float value, bool routed = false) {
-        _djFilter.set(clamp(value, -1.f, 1.f), routed);
+        _djFilter.set(clamp(int16_t(std::round(value * 100.f)), int16_t(-100), int16_t(100)), routed);
     }
     void editDjFilter(int value, bool shift) {
         if (!isRouted(Routing::Target::DjFilter)) {
@@ -624,9 +624,9 @@ private:
     Routable<uint8_t> _firstStep;
     Routable<uint8_t> _lastStep;
 
-    Routable<float> _wavefolderFold;
-    Routable<float> _wavefolderGain;
-    Routable<float> _djFilter;
+    Routable<int16_t> _wavefolderFold;
+    Routable<int16_t> _wavefolderGain;
+    Routable<int16_t> _djFilter;
     float _xFade;  // Non-routable, UI-only control
 
     Routable<int8_t> _chaosAmount;
