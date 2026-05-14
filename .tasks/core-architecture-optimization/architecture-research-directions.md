@@ -38,6 +38,8 @@ Size measurements are supporting evidence. They are not the first step of archit
 
 The first concrete output should be a short assumption/mismatch table, not a measurement patch.
 
+Before proposing a major architecture change from any mismatch, apply `architecture-change-decision-gates.md`. If the candidate fails the gates for clear replacement contract, migration path, or verification path, do documentation or measurement instead.
+
 ---
 
 ## Executive Summary
@@ -103,16 +105,16 @@ Use this table as the first interpretive layer for future passes. Container size
 - **Risk if changed:** Location, Envelope, FrequencyFollower, Activity, and ProgressiveDivider produce time-dependent output. Verify whether destroying state mid-operation causes audible artifacts. Any lifecycle change must preserve accumulated-state behavior.
 - **Research direction:** Routing needs conditional TrackState storage keyed by shaper type, with explicit create/destroy lifecycle. See Direction 3.
 
-### Mismatch 2: Model Container pays NoteTrack tax
+### Mismatch 2: Model Container pays CurveTrack tax
 
-- **Evidence:** `Track.h:273` — `Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack> _container`. `Container.h`: max-size union. NoteTrack ≈ 9,500 B (17 × NoteSequence).
-- **What changed:** Note/Curve genuinely need all 17 sequences. Tuesday, DiscreteMap, Indexed, and Teletype are much smaller but pay NoteTrack's size.
-- **Cost:** 8 tracks × ~9,500 B = ~76,000 B for model Track containers. Waste depends on how many tracks are non-Note/Curve.
+- **Evidence:** `Track.h:273` — `Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack> _container`. `Container.h`: max-size union. Current host probes show `CurveTrack≈10,092 B`, `NoteTrack≈9,612 B`, and `Track≈10,120 B`; ARM verification is still required.
+- **What changed:** Note/Curve genuinely need all 17 sequences. Tuesday, DiscreteMap, Indexed, Teletype, and MidiCv are much smaller but pay CurveTrack's size.
+- **Cost:** 8 tracks × ~10,120 B = ~80,960 B for model Track containers. Waste depends on how many tracks are non-Curve/Note and is absolute RAM pressure even when it is not a fork-vs-fork delta.
 - **User-visible quirks:** None — Container uses placement new, unused bytes are never touched.
 - **Maintenance/future-feature friction:** Adding a track type to the Container template inflates all slots if the new type is larger, or forces the new type to pay NoteTrack's tax if smaller.
 - **RAM/flash side effect:** Distributed waste — only measurable per active non-Note/Curve track.
 - **Risk if changed:** Pattern copy/clear/snapshot semantics rely on value-copy of the Container variant. Splitting model storage requires redesigning these operations.
-- **Research direction:** Investigate whether lazy sequence storage or type-pooled model storage is feasible without breaking value-copy semantics. See Direction 1.
+- **Research direction:** Do not pursue model-pool implementation under current "any track can be any type" semantics; see `model-pool-decision-table.md`. Local Note/Curve sequence-header packing remains a measurement-first RAM experiment because it attacks the dominant container arms directly.
 
 ### Mismatch 3: Engine Container pays TeletypeTrackEngine tax
 
@@ -160,20 +162,20 @@ Use this table as the first interpretive layer for future passes. Container size
 
 ### 1. Track Lifecycle And Residency
 
-**Why it matters:** Model Container and Engine Container both use max-size variants. Model pays NoteTrack's ~9,500 B tax (Note/Curve genuinely need it). Engine pays TeletypeTrackEngine's ~904 B tax (only Teletype needs it).
+**Why it matters:** Model Container and Engine Container both use max-size variants. Model currently pays CurveTrack's ~10,092 B tax (Note/Curve genuinely need the large sequence storage). Engine pays TeletypeTrackEngine's ~904 B tax (only Teletype needs it).
 
 **Evidence to gather:**
 - Measure actual per-track-type model sizes: `sizeof(NoteTrack)`, `sizeof(CurveTrack)`, `sizeof(TeletypeTrack)`, `sizeof(TuesdayTrack)`, etc. (Use a temporary `static_assert` in an existing build unit, not a standalone compile.)
-- Profile typical track configurations: how often do users have non-Note/Curve tracks active?
+- Confirm ARM target sizes and record whether CurveTrack still dominates `Track::_container`.
 - Check if NoteSequence storage can become lazy (active-pattern-only, loading others from flash/SD on demand).
 
 **What a good architecture would clarify:**
 - Whether track "type" should split into persistent project data (what gets saved) and runtime generator/service (what runs during playback).
-- Whether heavy track types (Teletype, future Fractal-style) should have caps, pools, or lazy engine allocation.
-- Whether model storage should be type-pooled rather than variant-containers.
+- Whether heavy runtime engines (Teletype, future Fractal-style) should have caps, pools, or lazy engine allocation.
+- Whether model storage should ever become type-pooled rather than variant-containers; current answer is no unless simultaneous type counts become an explicit product constraint.
 
 **What not to change yet:**
-- Do not split model Container without a clear plan for pattern copy/clear/snapshot semantics across different storage backends.
+- Do not split model Container under current "any track can be any type" semantics; see `model-pool-decision-table.md`.
 - Do not extract TeletypeTrackEngine from the engine Container unless you can answer: should any/all 8 tracks simultaneously be Teletype?
 
 ### 2. Pattern Storage Semantics
@@ -289,34 +291,38 @@ Use this table as the first interpretive layer for future passes. Container size
 
 ## Direction Ranking
 
-| Direction | Architectural Value | Quirk Reduction | Future Feature Leverage | RAM Side Benefit | Risk | Timing |
+This table ranks research value. It is not an execution order. If asked for the next step in this architecture document, use the Agent Entry Point and build the assumption/mismatch map first. Concrete RAM work belongs in `ram-recovery-experiments.md`.
+
+| Direction | Architectural Value | Musical / Workflow Mismatch | Quirk Reduction | Future Feature Leverage | RAM Side Benefit | Risk |
 |---|---|---|---|---|---|---|
-| 3. Routing as Modulation | High | Medium | High | High (baseline ~7.4 KB; recoverable depends on design) | Medium | Next (highest ROI) |
-| 1. Track Lifecycle | High | Low | High | Medium (~1.8 KB engine; more if model split viable) | Medium | After routing |
-| 2. Pattern Semantics | Medium | Low | Medium | Low (Teletype triple-store is designed) | Medium | Research when needed |
-| 4. Output Ownership | Medium | Medium | Medium | None | Low (documentation) | Parallel with routing |
-| 5. State Lifecycle | Medium | Low | Medium | Low (ttSlot ~1.2 KB) | Low | Parallel with lifecycle |
-| 6. Teletype Boundary | Low | Low | Low | Medium | Low | When needed |
-| 7. UI Capability Model | Low | None | Medium | None | Low | Only if types grow |
+| 3. Routing as Modulation | High | Medium — routing now behaves like modulation, not just plumbing | Medium | High | High baseline footprint; recoverable amount depends on design | Medium |
+| 1. Track Lifecycle | High | Medium — track-as-lane is stressed by VM/generator tracks | Low | High | Medium for engine; model split is speculative | Medium |
+| 2. Pattern Semantics | Medium | High — pattern no longer always means X0X grid | Low | Medium | Low; Teletype triple-store is designed | Medium |
+| 4. Output Ownership | Medium | High — voltage intent is no longer track-owned only | Medium | Medium | None | Low for documentation |
+| 5. State Lifecycle | Medium | High — runtime state may have musical time memory | Low | Medium | Low; may reveal transactional buffers | Low for classification |
+| 6. Teletype Boundary | Medium | High — imported VM workflow differs from Performer workflow | Low | Medium | Medium for specific buffers/tables | Low for audit |
+| 7. UI Capability Model | Low-Medium | Medium — type identity no longer captures capabilities | None | Medium | None | Low-Medium |
 
 ---
 
-## Keep / Change / Research Later
+## Keep / Candidate Changes / Research Later
 
 ### Keep
-- **Note/Curve model Container at NoteTrack size.** Both types genuinely need 17 full sequences.
+- **Note/Curve model Container at CurveTrack size.** Both types genuinely need 17 full sequences; current host probes show CurveTrack is the larger arm.
 - **Teletype dual-path output.** Verify whether it exists for latency reasons before changing.
 - **Teletype PatternSlot swap-buffer mechanism.** It serves atomic slot switching. Simplify backups, don't eliminate the mechanism.
 - **LITE mode configuration.** Correctly constrains scripts, delays, and grid.
 - **Route model per-track configuration (`biasPct`, `depthPct`, `creaseEnabled`, `shaper`).** These are user-facing parameters that correctly live in the persistent model.
 
-### Change
-- **RoutingEngine `TrackState[8]` storage layout should be conditional.** Routes targeting global targets don't need per-track state. Stateful shapers should only allocate TrackState entries when the shaper and target type require it. This is the highest-ROI architecture change. The `RouteState[16]` array must change its storage layout — runtime branching alone saves nothing. See `ram-recovery-experiments.md`.
-- **ttSlot backup buffers should be consolidated.** 2 backups into 1 shared backup saves ~1,226 B. See `ram-recovery-experiments.md`.
-- **`mutes[8]` should be `uint8_t` bits.** Saves 56 B per track, trivial change. Already merged.
+### Candidate Changes
+These are not the next step of architecture research. They are implementation candidates that should only be pulled from `ram-recovery-experiments.md` after the assumption/mismatch map and measurement gates are clear.
+
+- **RoutingEngine `TrackState[8]` storage layout should be conditional.** Routes targeting global targets don't need per-track state. Stateful shapers should only allocate TrackState entries when the shaper and target type require it. The `RouteState[16]` array must change its storage layout — runtime branching alone saves nothing. See `ram-recovery-experiments.md`.
+- **ttSlot backup buffers may be consolidated.** 2 backups into 1 shared backup saves ~1,226 B, but rollback semantics must be verified. See `ram-recovery-experiments.md`.
+- **`mutes[8]` as `uint8_t` bits.** Already merged as internal cleanup; it did not move top-level `.bss` because the container max did not change.
 
 ### Research Later
-- **Model Container split into type-pooled storage.** Requires redesigning Track copy/clear/snapshot and project serialization.
+- **Model Container split into type-pooled storage.** Current decision is no-go under "any track can be any type" semantics because realistic per-type caps are zero/negative RAM; reopen only if simultaneous track-type counts become an explicit product constraint.
 - **Engine Container extraction of TeletypeTrackEngine.** Only saves RAM if maximum live Teletype track count is capped. Research whether users actually use >2 Teletype tracks.
 - **Capability-matrix UI dispatch.** Only worth it if track type count grows significantly.
 - **Pattern diff/sparse storage for Note/Curve.** Requires complex serialization, breaks value-copy semantics. Research needed.
@@ -337,3 +343,5 @@ Use this table as the first interpretive layer for future passes. Container size
 - UI capability model (Direction 7) — maintenance only
 
 **Key distinction:** "Routing evolved from sidecar to modulation engine" is the architecture finding. "Conditional TrackState storage layout may recover CCMRAM" is the RAM experiment. They serve different purposes. The architecture finding explains why the current design is structurally wrong; the RAM experiment measures what a fix would save.
+
+For deciding whether any mismatch deserves a major refactor rather than documentation or local optimization, use `architecture-change-decision-gates.md`.

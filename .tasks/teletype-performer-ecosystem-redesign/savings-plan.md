@@ -47,6 +47,7 @@ The parallel resource-optimization task (`../../resource-optimization/TASK.md`) 
 | Model scatter = 4.8 KB gap (no single target) | line 120 | Not addressed here |
 | UI is **bigger** in Vinx (30,068 B) than XFORMER (27,244 B) | line 228 | P10/P11 are not XFORMER's bottleneck |
 | Top 3 directions: RoutingEngine > Teletype > Engine container | lines 171-175 | Priority order confirmed |
+| Model/container pool architecture | `.tasks/core-architecture-optimization/model-pool-decision-table.md` | No-go under current "any track can be any type" semantics; only re-open with explicit simultaneous type caps |
 
 ---
 
@@ -286,6 +287,8 @@ Key corrections from adversarial review of v1:
 
 6. **P13 TEMPERED (needs measurement)**: `ttSlot*` globals were moved OFF stack (into .bss) because large PatternSlot objects caused overflow. Stack reduction requires watermark measurement before attempting.
 
+7. **P15 ADDED (missed sequence-header candidate)**: NoteSequence and CurveSequence steps are already packed, but sequence-level parameters/header fields are still repeated across 17 patterns/snapshots. Host sizeof probe: `NoteSequence=564 B`, `CurveSequence=592 B`, `NoteTrack=9,612 B`, `CurveTrack=10,092 B`, `Track=10,120 B`. Because CurveTrack appears to size `Track::_container`, note-only packing may not reduce top-level RAM; measure ARM sizes first and pack Note/Curve headers together if pursuing this as RAM recovery.
+
 ---
 
 ## Recommended First Pass
@@ -293,7 +296,7 @@ Key corrections from adversarial review of v1:
 | Phase | Proposals | Verified Savings | Cumulative | Risk |
 |---|---|---|---|---|
 | **Phase 1 (Safe)** | P2/P4 internal Teletype cleanup + P14 (1,040 B) + P14b (1,664 B) | **2,704 B measured .data** | ~2.7 KB | None-Low |
-| **Phase 2 (Medium)** | P4b (1,226 B) + P5 (4,096 B) + P6 (2,688 B) | **~8,010 B** | ~10.7 KB | Low-Medium |
+| **Phase 2 (Medium)** | P5 (4,096 B) + P6 (2,688 B) first, then P4b (1,226 B) and P15 measurement-first Note/Curve sequence header packing | **~8,010 B + measured P15 delta** | ~10.7 KB + P15 | Low-Medium |
 | **Phase 3 (Risk)** | P5a (7,488 B, only if shapers unused) + P8 (544 B) + P13 (1,536 B, after measurement) | **~9,568 B** | ~26.0 KB | Medium-High |
 
 **Phase 1 alone**: 2,704 B recovers from .data → RAM ~124.7 KB (~95.2%).  
@@ -303,10 +306,11 @@ Key corrections from adversarial review of v1:
 Recommended order:
 1. **P14+P14b** (2.7 KB measured) plus P2/P4 internal cleanup — completed  
 2. **P5+P6** (6.8 KB, 2 files, ~1 week) — biggest single structural change  
-3. **P4b** (1.2 KB, 1 file, ~1 day) — Teletype file I/O cleanup  
-4. **P7** — future research only; useful only with a capped live Teletype engine pool  
-5. **P8** (0.5 KB, 2 files, ~2 days) — final pattern savings  
-6. **P13** (1.5 KB, after verification) — stack trim only if safe
+3. **P15** — ARM sizeof probe, then Note/Curve sequence-header packing only if `Track` / `_ZL5model` actually shrink  
+4. **P4b** (1.2 KB, 1 file, ~1 day) — Teletype file I/O cleanup  
+5. **P7** — future research only; useful only with a capped live Teletype engine pool  
+6. **P8** (0.5 KB, 2 files, ~2 days) — final pattern savings  
+7. **P13** (1.5 KB, after verification) — stack trim only if safe
 
 ---
 

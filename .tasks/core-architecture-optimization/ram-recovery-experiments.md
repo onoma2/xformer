@@ -4,6 +4,8 @@
 
 This document is for measured RAM/flash recovery only. It is **not** the full architecture research answer. For architecture findings, mismatches, and research directions, see `architecture-research-directions.md`.
 
+Current triage: RoutingEngine state compaction is the next implementable RAM experiment. Model/container pool architecture is not an active experiment under current "any track can be any type" semantics; see `model-pool-decision-table.md` for the no-go decision. Note/Curve sequence-header packing remains measurement-first because it can reduce the dominant container arms directly without changing project semantics.
+
 ## Baseline (post Phase 1, from `sequencer.size` + `nm`)
 
 | Metric | Value | Source |
@@ -28,7 +30,13 @@ This document is for measured RAM/flash recovery only. It is **not** the full ar
 | `TeletypeTrackEngine` | ~904 B | resource-optimization byte-accurate breakdown |
 | `PatternSlot` | 1,226 B | savings-plan, nm |
 | `tele_command_t` | 52 B | savings-plan |
-| `NoteTrack` (model) | ~9,500 B | resource-optimization estimate |
+| `NoteSequence::Step` | 8 B | host sizeof probe; ARM verification needed |
+| `NoteSequence` | 564 B | host sizeof probe; 512 B step array + ~52 B header/state |
+| `CurveSequence::Step` | 8 B | host sizeof probe; ARM verification needed |
+| `CurveSequence` | 592 B | host sizeof probe; 512 B step array + ~80 B header/state |
+| `NoteTrack` (model) | 9,612 B | host sizeof probe; ARM verification needed |
+| `CurveTrack` (model) | 10,092 B | host sizeof probe; ARM verification needed |
+| `Track` (model container) | 10,120 B | host sizeof probe; suggests CurveTrack currently sizes `Track::_container` |
 | Engine container direct gap | ~1,832 B (904−675)×8 | resource-optimization |
 
 ---
@@ -170,6 +178,49 @@ arm-none-eabi-nm --print-size --size-sort build/stm32/release/src/apps/sequencer
 **Exit criteria:** Exact sizeof() for all 7 model types and 7 engine types documented.
 
 **Rollback:** Remove temporary static_asserts.
+
+---
+
+### Experiment C2: Note/Curve Sequence Header Packing
+
+**Architecture finding it came from:** NoteSequence steps are already packed into two `uint32_t` words per step, but per-pattern sequence parameters remain byte/routable-heavy. This was missed by the earlier RAM plan because the audit did not multiply small repeated sequence headers by 17 patterns/snapshots, and did not verify the current `Track::_container` max before ranking model optimizations.
+
+**Hypothesis:** Packing sequence-level parameters behind existing accessors can shrink `NoteSequence` and `CurveSequence` without changing behavior or project-file compatibility. Top-level RAM savings only counts if the largest `Track::_container` arm shrinks; current host probes suggest CurveTrack, not NoteTrack, is the largest model arm.
+
+**Required measurement first:**
+```cpp
+static_assert(sizeof(NoteSequence::Step) == 8, "record NoteSequence::Step size");
+static_assert(sizeof(NoteSequence) == 564, "record NoteSequence size");
+static_assert(sizeof(CurveSequence::Step) == 8, "record CurveSequence::Step size");
+static_assert(sizeof(CurveSequence) == 592, "record CurveSequence size");
+static_assert(sizeof(NoteTrack) == 9612, "record NoteTrack size");
+static_assert(sizeof(CurveTrack) == 10092, "record CurveTrack size");
+static_assert(sizeof(Track) == 10120, "record Track size");
+```
+
+Use intentionally-wrong static assertions on the ARM build if needed to capture exact target sizes from compiler diagnostics. Host sizes above are evidence, not final ARM proof.
+
+**Files:**
+- `src/apps/sequencer/model/NoteSequence.h/.cpp` — pack sequence-level parameters; preserve public accessors
+- `src/apps/sequencer/model/CurveSequence.h/.cpp` — same treatment if CurveTrack remains the model-container max
+- `src/apps/sequencer/model/Routing.h` — reference only; routed params need base+routed semantics equivalent to `Routable<T>`
+- `src/apps/sequencer/model/Track.h` — measure container impact
+
+**Packing candidates:**
+- `NoteSequence`: `_scale`, `_rootNote`, `_divisor`, `_divisorY`, `_divisorYSource`, `_divisorYTrack`, `_clockMultiplier`, `_resetMeasure`, `_runMode`, `_mode`, `_firstStep`, `_lastStep`, `_noteFirstStep`, `_noteLastStep`, harmony byte fields, and unused `_edited`.
+- `CurveSequence`: same sequence-control family plus curve-specific sequence parameters; inspect live fields before editing.
+
+**Compatibility constraint:** Keep current `write()` / `read()` serialized field order and values. This experiment changes in-RAM representation only. Existing project files must load identically.
+
+**Expected RAM/flash delta:** Measurement-first. Local upper bound is tens of bytes per sequence × 17, but top-level `Model` saving is zero if only NoteSequence shrinks while CurveTrack remains the largest `Track::_container` arm. Count success only from `sequencer.size`, `sizeof(Track)`, and `_ZL5model` deltas.
+
+**Behavior risk:** Low-Medium. Runtime access goes through getters/setters, but routed parameters have two live values (`base` and `routed`) and must not collapse to one.
+
+**Hardware check:** Boot; edit Note and Curve sequence settings; route Scale/Root/Divisor/ClockMult/RunMode/FirstStep/LastStep; save/reload a project with differing pattern settings.
+
+**Exit criteria:** ARM `sizeof` and `_ZL5model` deltas recorded; Note and Curve patterns keep independent params across pattern switch, routing, save, reload, and reboot.
+
+**Rollback:** Revert NoteSequence/CurveSequence storage changes.
 
 ---
 

@@ -32,8 +32,16 @@ The active savings plan ranks the work as:
 | 1 | P2/P4 internal cleanup + P14 + P14b | 2,704 B measured .data | none-low |
 | 2A | P4b | ~1,226 B | low-medium |
 | 2B | P5 + P6 | ~6,784 B | medium |
-| 2C | P7 | future research only; conditional on capped live Teletype engine pool | medium-high |
+| 2C | P15 | measurement-first Note/Curve sequence header packing; count only if `Track` / `_ZL5model` shrink | low-medium |
+| 2D | P7 | future research only; conditional on capped live Teletype engine pool | medium-high |
 | 3 | P8 + P13, maybe P5a only by explicit decision | ~2,080 B safe subset; +7,488 B risky | medium-high |
+
+Current implementation state:
+
+- Phase 1 code is present on `refactor/resouce-optimization` and build-size verified: `.data` 9,020→6,316 = 2,704 B saved.
+- Phase 1 hardware smoke proof is not recorded in this plan yet.
+- No Phase 2 code exists yet.
+- Do not start model-pool/container-pool architecture work under current "any track can be any type" semantics; `model-pool-decision-table.md` records this as no-go. Proceed with RoutingEngine state compaction and measurement-first sequence-header probes instead.
 
 ## Measurement Protocol
 
@@ -110,14 +118,14 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 - Modify: `src/core/gfx/fonts/tele.h`
 - Modify: `teletype/src/ops/op.c`
 
-**Expected savings:** updated after Phase 1 measurement. P14/P14b recover 2,704 B from `.data`; P2/P4 are internal Teletype footprint cleanup and do not currently reduce top-level `.bss` because `Track::_container` remains sized by NoteTrack.
+**Expected savings:** updated after Phase 1 measurement. P14/P14b recover 2,704 B from `.data`; P2/P4 are internal Teletype footprint cleanup and do not currently reduce top-level `.bss` because `Track::_container` remains sized by large Note/Curve sequence-track models.
 
-- [ ] P2: pack `scene_state_t::mutes[8]` into one `uint8_t`; keep access through `ss_get_mute()` / `ss_set_mute()`.
-- [ ] P4: reduce `DELAY_SIZE` from 16 to 8 in the active Performer Teletype config only.
-- [ ] P14: add `const` to `tele_glyphs` and `tele_bitmap`; verify they leave `.data`.
-- [ ] P14b: make `tele_ops[]` flash-resident only if the table and pointed-to op records are genuinely immutable.
-- [ ] Build STM32 `sequencer`.
-- [ ] Run the measurement protocol and confirm expected symbol movement: `tele_glyphs`, `tele_bitmap`, and ideally `tele_ops` are no longer RAM residents.
+- [x] P2: pack `scene_state_t::mutes[8]` into one `uint8_t`; keep access through `ss_get_mute()` / `ss_set_mute()`.
+- [x] P4: reduce `DELAY_SIZE` from 16 to 8 in the active Performer Teletype config only.
+- [x] P14: add `const` to `tele_glyphs` and `tele_bitmap`; verify they leave `.data`.
+- [x] P14b: make `tele_ops[]` flash-resident only if the table and pointed-to op records are genuinely immutable.
+- [x] Build STM32 `sequencer`.
+- [x] Run the measurement protocol and confirm expected symbol movement: `tele_glyphs`, `tele_bitmap`, and ideally `tele_ops` are no longer RAM residents.
 - [ ] Flash hardware and run the hardware smoke checklist.
 - [ ] Teletype-specific check: run a script using `DEL` or queued delay behavior enough to prove delay queue still works at size 8.
 - [ ] Commit only after hardware passes and the RAM delta is recorded.
@@ -181,7 +189,39 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 - Route target classification is unclear.
 - CCMRAM saving is much smaller than expected and cannot be explained.
 
-## Phase 2C: Future Research: Extract TeletypeTrackEngine From Engine Container
+## Phase 2C: Measurement-First Note/Curve Sequence Header Packing
+
+**Proposal:** P15
+
+**Files:**
+- Modify after measurement: `src/apps/sequencer/model/NoteSequence.h`
+- Modify after measurement: `src/apps/sequencer/model/NoteSequence.cpp`
+- Modify after measurement: `src/apps/sequencer/model/CurveSequence.h`
+- Modify after measurement: `src/apps/sequencer/model/CurveSequence.cpp`
+- Read/measure: `src/apps/sequencer/model/Track.h`
+
+**Expected savings:** measurement-first. Host probe shows `NoteSequence=564 B` with a 512 B packed step array, `CurveSequence=592 B` with a 512 B packed step array, `NoteTrack=9,612 B`, `CurveTrack=10,092 B`, and `Track=10,120 B`. This means note-only packing may save no top-level RAM while CurveTrack remains the largest `Track::_container` arm. Count this phase only from ARM `sizeof(Track)`, `_ZL5model`, and `.bss` deltas.
+
+- [ ] Add temporary ARM build size probes for `sizeof(NoteSequence::Step)`, `sizeof(NoteSequence)`, `sizeof(CurveSequence::Step)`, `sizeof(CurveSequence)`, `sizeof(NoteTrack)`, `sizeof(CurveTrack)`, and `sizeof(Track)`.
+- [ ] Record whether NoteTrack or CurveTrack is the current `Track::_container` max on target.
+- [ ] If CurveTrack remains max, include CurveSequence header packing in the same phase; do not implement note-only packing as a claimed RAM win.
+- [ ] Preserve the current public getters/setters and the current serialized `write()` / `read()` field order.
+- [ ] Preserve `Routable<T>` semantics for routed sequence params: base and routed values must remain independently representable.
+- [ ] Build STM32 `sequencer`.
+- [ ] Run the measurement protocol and confirm `sizeof(Track)`, `_ZL5model`, and `.bss` drop; otherwise mark as local cleanup only, not RAM recovery.
+- [ ] Flash hardware and run the hardware smoke checklist.
+- [ ] Pattern independence check: create Note and Curve patterns with different divisor/run mode/first/last/scale/root-style settings, switch patterns, save, reboot, reload, and verify settings survive.
+- [ ] Routing check: route sequence params that support routing and verify routed values still override base values only while the route is active.
+- [ ] Commit only after hardware passes and the real RAM delta is recorded.
+
+**Stop conditions:**
+
+- ARM size probes show no plausible `Track` / `_ZL5model` reduction path.
+- Routed base/routed value ownership becomes ambiguous.
+- Serialization would require a project-version migration for this storage-only change.
+- Pattern-specific sequence params collapse into shared track-level behavior.
+
+## Phase 2D: Future Research: Extract TeletypeTrackEngine From Engine Container
 
 **Proposal:** P7
 

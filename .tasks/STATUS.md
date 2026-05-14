@@ -2,19 +2,20 @@
 _Updated: 2026-05-14_
 
 ## 🔴 resource-optimization — RAM & Flash budget recovery (includes teletype-performer-ecosystem-redesign analysis)
-**Status:** active — Phase 1 complete. Phase 2 prep.
-**Where I stopped:** Phase 1 implemented (P2+P4+P14+P14b). Measured .data reduction 9,020→6,316 = 2,704 B saved; P2/P4 are internal Teletype cleanup with no current .bss effect because Track container remains NoteTrack-sized.
-**Next action:** Plan Phase 2 around P5 (RoutingEngine TrackState union) and P6 (non-per-track routes); keep P7 as future research because it only saves RAM if live Teletype engine count is capped.
+**Status:** active — Phase 1 code present, build-size measured, hardware proof still not recorded.
+**Where I stopped:** Phase 1 implemented (P2+P4+P14+P14b) and measured .data reduction 9,020→6,316 = 2,704 B; no Phase 2 code exists yet.
+**Next action:** Start Phase 2 with ARM sizeof probes and RoutingEngine P5/P6 state compaction; keep P15 as measurement-first and keep model-pool architecture as no-go under current semantics.
 **Depends on:** nothing
-**Branch:** feat/resource-optimization
+**Branch:** refactor/resouce-optimization
 
 ---
 
 ## 🟡 core-architecture-optimization — Research XFORMER core mechanics after expansion beyond original Note/Curve Performer
-**Status:** research complete — restructured into two docs per user direction.
-**Where I stopped:** Restructured into `architecture-research-directions.md` (broad architecture: 7 mismatches, ranked directions, keep/change/research-later) and `ram-recovery-experiments.md` (narrow RAM experiments: 5 experiments with baselines, exit criteria, rollback). Key architectural finding: RoutingEngine evolved from sidecar to modulation engine (7,488 B unconditional state, no lifecycle). Key structural finding: model Container Note/Curve-driven (~9.5 KB each), engine Container Teletype-driven (~904 B). Next: run Experiment C/D (measurement-only) then Experiment A (RoutingEngine conditional state).
+**Status:** paused/reference — research and decision artifacts only, not an implementation queue.
+**Where I stopped:** Source probes and decision tables now say RoutingEngine compaction is the only current architecture-adjacent RAM implementation; model/container pool replacement is no-go unless product semantics change.
+**Next action:** Keep docs current while implementing `resource-optimization`; use `model-pool-decision-table.md` and `routingengine-refactor-phased-plan.md` as decision references.
 **Depends on:** resource-optimization (for baseline measurements)
-**Branch:** TBD
+**Branch:** refactor/resouce-optimization
 
 ---
 

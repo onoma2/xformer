@@ -6,6 +6,25 @@ XFORMER firmware is at 97% RAM capacity (127,420 bytes out of 128 KB) with only 
 
 **Goal:** Recover at least 15-20 KB of RAM to provide safe headroom for future features, and reduce flash usage where possible.
 
+## Current Implementation State (2026-05-14)
+
+- Active branch in this workspace: `refactor/resouce-optimization`.
+- Phase 1 code is present: Teletype mute bit-packing, `DELAY_SIZE=8`, Teletype font `const`, and `tele_ops` flash residency.
+- Current measured build artifact: `.data=6,316 B`, `.bss=118,400 B`, `.ccmram_bss=58,232 B`, total runtime RAM `.data + .bss = 124,716 B`.
+- Phase 1 measured saving: `.data` 9,020→6,316 = 2,704 B.
+- Hardware proof is not recorded here yet; treat Phase 1 as build-size verified, not fully hardware-accepted.
+- No Phase 2 code exists yet. RoutingEngine P5/P6, P4b backup consolidation, P15 sequence-header packing, stack watermark/trim, and container safety fixes are still analysis/plans only.
+
+## Restructured Implementation Queue
+
+1. **Phase 2 measurement gate:** add temporary ARM `sizeof` probes for Track, TrackEngine, NoteSequence, CurveSequence, and RoutingEngine state; remove probes after recording results.
+2. **Phase 2B first implementation:** RoutingEngine P5/P6 state compaction. This is the highest-value current implementation target because it attacks actual CCMRAM waste without product caps or save-format changes.
+3. **Phase 2A low-medium risk:** Teletype file backup consolidation (`ttSlot1Backup`/`ttSlot2Backup`) after rollback semantics are rechecked.
+4. **Phase 2C measurement-first:** Note/Curve sequence-header packing only if ARM probes show `Track`, `_ZL5model`, and `.bss` can shrink; note-only packing is not a claimed RAM win while CurveTrack remains the max container arm.
+5. **Phase 3B:** file task stack trim only after hardware watermark evidence.
+
+Do not start a model-pool/container-pool implementation under current semantics. `.tasks/core-architecture-optimization/model-pool-decision-table.md` records the decision: the current `Container<T...>` is the best static representation for "any track can be any type"; per-type pools save RAM only with explicit simultaneous track-type caps.
+
 ## Current Resource Budget
 
 ### Measured from `build/stm32/release` (fresh build)
@@ -122,33 +141,45 @@ These account for the unique subsystem cost:
 
 **Engine breakdown**: Vinx/Mebitek = 5,400 B, Modulove = 9,452 B, XFORMER = 15,588 B. Vinx has the same core track count minus the 4 XFORMER-unique tracks. The 10 KB gap (15,588 - 5,400 = 10,188 B) maps directly to Teletype + Tuesday + Discrete + Indexed engines.
 
-**Model breakdown**: XFORMER = 92,836 B, Vinx = 88,056 B, Mebitek = 88,052 B, Modulove = 87,204 B. The 4.8 KB XFORMER gap comes primarily from the **Track::_container** variant — another Container bottleneck parallel to the Engine one.
+**Model breakdown**: XFORMER = 92,836 B, Vinx = 88,056 B, Mebitek = 88,052 B, Modulove = 87,204 B. The 4.8 KB XFORMER gap is model scatter plus container-sized sequence tracks; exact attribution needs ARM `sizeof` probes before ranking model changes.
 
-### Track::_container — Not a Bottleneck (Correction)
+### Track::_container — Not a Bottleneck (Correction, With New Follow-Up)
 
-Earlier analysis incorrectly claimed the `Track::_container` variant was a ~12 KB gap. In reality, **both forks have NoteTrack as the largest Track type** (~9,500 B with 17 NoteSequence arrays × 64 steps × 8 B each).
+Earlier analysis incorrectly claimed the `Track::_container` variant was a ~12 KB fork gap. In reality, all forks are dominated by large step-sequence track models, so the container explains little of the XFORMER-vs-Vinx delta. A follow-up host size probe also corrected the local max-type assumption: current XFORMER appears CurveTrack-sized, not NoteTrack-sized.
 
 ```cpp
-// XFORMER Track::_container — max is NoteTrack (~9,500 B)
+// XFORMER Track::_container — host probe suggests max is CurveTrack (~10,092 B)
 Container<NoteTrack, CurveTrack, MidiCvTrack,
           TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack>
 
-// Vinx Track::_container — max is NoteTrack (~9,600 B, slightly larger
-// because Vinx NoteSequence has _name[18] per sequence)
+// Vinx Track::_container — large Note/Curve-style sequence tracks also dominate;
+// exact max requires fork-specific sizeof verification.
 Container<NoteTrack, CurveTrack, MidiCvTrack,
           StochasticTrack, LogicTrack, ArpTrack>
 ```
 
 | Track Type | Estimated Size | Why |
 |---|---|---|
-| **NoteTrack** (both forks) | **~9,500 B** | 17 NoteSequence = 17 × (Step[64]×8 B + ~30 B members) = 17 × 542 = 9,214 B + ~50 B NoteTrack members = ~9,264 B. XFORMER has Accumulator (20 B) + harmony state (6 B); Vinx has _name[18] per sequence. Net diff: ~8 B per sequence × 17 = ~136 B in XFORMER's favor. |
+| NoteTrack | 9,612 B host probe | 17 NoteSequence = 17 × (Step[64]×8 B + ~52 B header/state) + track-level members. ARM verification still required. |
 | TeletypeTrack | ~2,800 B | scene_state_t (1,226 B) + 2× PatternSlot (~1,500 B) + misc |
 | TuesdayTrack | ~500 B | 17 TuesdaySequence (params only, no step array) + playMode |
-| CurveTrack | ~9,500 B | 17 CurveSequence = same footprint as NoteSequence (Step[64] × 8 B) |
+| **CurveTrack** | **10,092 B host probe** | 17 CurveSequence = 17 × (Step[64]×8 B + ~80 B header/state) + track-level members. Current likely `Track::_container` max. |
 | DiscreteMapTrack | ~1,800 B | 32 stages × ~50 B + 17 sequence metadata |
 | IndexedTrack | ~4,000 B | 17 IndexedSequence × ~232 B each (Step[48] × 4 B + params) |
 
-Since both forks' containers are sized by NoteTrack (~9,500 B), the Track::_container produces **virtually zero gap** (actually XFORMER's is slightly smaller due to Vinx's _name[18] per sequence).
+Since both forks' containers are sized by large step-sequence tracks, the Track::_container produces **virtually zero fork gap**. Follow-up local size probes found that the current XFORMER model container is probably sized by CurveTrack, not NoteTrack:
+
+```text
+NoteSequence::Step = 8 B
+NoteSequence       = 564 B
+CurveSequence::Step = 8 B
+CurveSequence       = 592 B
+NoteTrack          = 9,612 B
+CurveTrack         = 10,092 B
+Track              = 10,120 B
+```
+
+This corrects the earlier missed RAM candidate: NoteSequence step data is packed, but the per-pattern NoteSequence header is still about 52 B beyond its 512 B step array. Packing that header is locally legitimate, but **note-only packing may not reduce top-level model RAM while CurveTrack remains the largest container arm**. The immediate experiment should therefore measure and, if worthwhile, pack NoteSequence and CurveSequence sequence-parameter/header storage together.
 
 ### Total Gap Accounting
 
@@ -171,8 +202,9 @@ Since both forks' containers are sized by NoteTrack (~9,500 B), the Track::_cont
 Optimization priority:
 1. **RoutingEngine** (.ccmram, ~7.4 KB): Reduce RouteState to Vinx's minimalist version (`{Target, tracks}` = 2 B), or make per-track shaping state conditional/allocated. Single highest-ROI change.
 2. **Teletype standalone** (.bss+.data, ~6.9 KB): Slot backups could be shared (saving 2,452 B).
-3. **Engine container** (.ccmram, ~1.8 KB): TeletypeTrackEngine inflates container slots — worth fixing but smaller impact.
-4. **Model scatter** (.bss, ~4.8 KB): Lowest priority — many micro-tweaks needed.
+3. **Sequence header packing** (.bss/model, measurement-first): NoteSequence and CurveSequence already pack steps, but their per-pattern headers are still byte/routable-heavy and repeated 17 times per track type. Note-only packing may save zero top-level RAM if CurveTrack remains the max container arm; pack/measure both.
+4. **Engine container** (.ccmram, ~1.8 KB): TeletypeTrackEngine inflates container slots — worth fixing but smaller impact.
+5. **Model scatter** (.bss, ~4.8 KB): Lowest priority — many micro-tweaks needed.
 
 ### Track Engine Container Contents (Per Fork)
 
@@ -254,6 +286,24 @@ TeletypeTrackEngine at ~904 B inflates all 8 container slots to 904 B vs Vinx's 
 ### Strategy D: Model singleton scatter (.bss, target: -2 KB)
 The 4.8 KB Model gap is distributed across HarmonyEngine, ClipBoard::_container (Pattern with Teletype::PatternSlot), UserSettings vector backing, and Tuesday/Discrete/Indexed sequence metadata. No single big target. Lowest priority.
 
+### Strategy D2: Note/Curve sequence header packing (.bss/model, measurement-first)
+NoteSequence and CurveSequence steps are already packed into 8 B per step, but sequence-level parameters are still stored as multiple `Routable<T>` and byte/enum fields across 17 patterns/snapshots.
+
+Measured host probe:
+- `NoteSequence::Step = 8 B`, `NoteSequence = 564 B`; step array is 512 B, leaving about 52 B of sequence header/state.
+- `CurveSequence::Step = 8 B`, `CurveSequence = 592 B`; step array is 512 B, leaving about 80 B of sequence header/state.
+- `NoteTrack = 9,612 B`, `CurveTrack = 10,092 B`, `Track = 10,120 B`.
+
+Implications:
+- Packing NoteSequence alone is a real local simplification but may not reduce top-level `Model` RAM while CurveTrack remains the largest `Track::_container` arm.
+- A useful RAM experiment should pack NoteSequence and CurveSequence sequence-parameter/header storage together, or first prove with ARM `sizeof` assertions that NoteTrack is currently the max on target.
+- Serialization must remain byte-compatible: keep the current `write()`/`read()` field order and only change in-RAM representation behind existing accessors.
+- Routed parameters still need base+routed slots, or an equivalent replacement, because `Routable<T>` carries live routed feedback separately from serialized base values.
+
+Estimated savings: measurement-first. Rough local upper bound is tens of bytes per sequence × 17 patterns; top-level savings only appears if the largest model container arm shrinks.
+
+Files: `src/apps/sequencer/model/NoteSequence.h/.cpp`, `src/apps/sequencer/model/CurveSequence.h/.cpp`, `src/apps/sequencer/model/Track.h`.
+
 ### Strategy E: Task stack trimming (.ccmram, target: -1 KB)
 Task stack sizes are mostly in line with other forks, but `_ZL6fsTask` (4,256 B vs Modulove's 2,208 B) and `_ZL10driverTask` (1,184 B vs Vinx's 1,148 B) are slightly larger.
 
@@ -297,15 +347,16 @@ Active — Phase 1 complete. Phase 2 prep.
 | P14b — tele_ops[] to flash | 1,664 B from .data | ✅ Merged |
 | **Total .data reduction** | **9,020 → 6,316 = 2,704 B** | **SRAM: 97.4% → 95.2%** |
 
-**Key finding**: P2+P4 are valid Teletype footprint cleanup, but they do not currently count toward the 15-20 KB RAM-headroom goal. The owning storage is inside `Track::_container`, whose size is still dominated by NoteTrack. The .bss total (118,400) stayed unchanged. The immediate headroom win came entirely from P14/P14b moving read-only data to flash.
+**Key finding**: P2+P4 are valid Teletype footprint cleanup, but they do not currently count toward the 15-20 KB RAM-headroom goal. The owning storage is inside `Track::_container`, whose size is still dominated by large Note/Curve sequence-track models. The .bss total (118,400) stayed unchanged. The immediate headroom win came entirely from P14/P14b moving read-only data to flash.
 
 ## Next action (Phase 2 prep)
 Plan and implement Phase 2 proposals:
 - P5 — Union-based TrackState by shaper type (~4,096 B CCMRAM)
 - P6 — Skip TrackState for non-per-track routes (~2,688 B CCMRAM)
+- P15 — Measurement-first Note/Curve sequence header packing: verify ARM `sizeof(NoteSequence)`, `sizeof(CurveSequence)`, `sizeof(NoteTrack)`, `sizeof(CurveTrack)`, and `sizeof(Track)` before ranking; do not count note-only packing as a RAM win unless the container max actually shrinks.
 
 ## Future research
 - P7 — Extract TeletypeTrackEngine from Container variant. Graphify/source review shows this only saves RAM if the firmware accepts a capped live Teletype engine pool. Preserving "any/all 8 tracks can be Teletype" requires separate storage for all 8 TeletypeTrackEngines and does not recover RAM.
 
 ## Branch
-feat/resource-optimization
+refactor/resouce-optimization

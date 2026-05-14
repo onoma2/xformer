@@ -12,13 +12,21 @@ This is a research task only. Do not implement code.
 
 ## Derived Documents
 
-This spec has produced two separate documents:
+This spec has produced the following derived documents:
 
 1. **`architecture-research-directions.md`** — Broad architecture research: original assumptions, mismatches, research directions, ranking. Not an implementation plan. Covers structural incoherence, lifecycle, pattern semantics, routing evolution, output ownership, state taxonomy, and UI friction.
 
-2. **`ram-recovery-experiments.md`** — Narrow RAM recovery experiments only. Baseline measurements, specific experiments with hypotheses, verification methods, exit criteria, and rollback plans. Does not pretend to be the architecture answer.
+2. **`architecture-change-decision-gates.md`** — Policy for deciding whether a mismatch justifies major architecture change. Use before proposing broad refactors.
 
-This spec serves as the agent handoff brief for future research passes. Read the two derived documents for findings.
+3. **`ram-recovery-experiments.md`** — Narrow RAM recovery experiments only. Baseline measurements, specific experiments with hypotheses, verification methods, exit criteria, and rollback plans. Does not pretend to be the architecture answer.
+
+4. **`source-probe-investigation.md`** — Source trace for allocation timing, realtime reference stability, project load suspend behavior, and container lifetime gaps.
+
+5. **`model-pool-decision-table.md`** — Go/no-go decision artifact for Track/Engine pool architecture. Current decision: no model-pool implementation under "any track can be any type" semantics.
+
+6. **`routingengine-refactor-phased-plan.md`** — Concrete plan for RoutingEngine state compaction. Implementation belongs under the active `resource-optimization` task.
+
+This spec serves as the agent handoff brief for future research passes. Read the derived documents for findings.
 
 ## Repository Context
 
@@ -49,12 +57,14 @@ Original Performer could afford always-resident variant containers because Note/
 
 Test whether heavy features should move toward explicit lifecycle, pools, caps, capability-based interfaces, or shared native services.
 
+Before recommending a major architectural change, apply `architecture-change-decision-gates.md`. Do not turn every mismatch into a rewrite.
+
 ## Key Findings Summary
 
 ### Architecture Problems (not just RAM)
 
 1. **Routing is now a modulation engine**, not a sidecar. It owns time-accumulated state for 5 shapers across 16 routes × 8 tracks, allocated unconditionally. It needs lifecycle semantics.
-2. **Model Container pays NoteTrack's ~9,500 B tax** because all track types share one max-sized variant. This is Note/Curve-driven, not Teletype-driven.
+2. **Model Container pays CurveTrack's ~10,092 B tax** because all track types share one max-sized variant. This is Note/Curve-driven, not Teletype-driven; host probes show CurveTrack is currently larger than NoteTrack, pending ARM verification.
 3. **Engine Container pays TeletypeTrackEngine's ~904 B tax** because all engine types share one max-sized variant. This IS Teletype-driven.
 4. **Pattern storage semantics diverged:** Note/Curve have 17 full sequences; Teletype has 2 swap-buffer slots; Tuesday/Indexed have param-only sequences. One model doesn't fit all.
 5. **Output ownership is deliberate dual-path** (track engines + Teletype bypass + routing + bus CV + rotation), but undocumented.
@@ -72,11 +82,24 @@ See `ram-recovery-experiments.md` for full details:
 5. **Experiment D:** Symbol and section measurement (info only)
 6. **Experiment E:** Task stack watermark measurement (~1,536 B CCMRAM potential)
 
-## Recommended Research Order
+## How To Answer "Next Step"
 
-1. Start with `architecture-research-directions.md` for the full mismatch analysis and direction ranking.
-2. Use `ram-recovery-experiments.md` for concrete, measurable RAM recovery experiments.
-3. Use this spec as the stable handoff point for future research agents.
+If asked for the next step of `architecture-research-directions.md`, stay in architecture scope:
+
+1. Build or refine the source-grounded Original Performer assumption/mismatch map.
+2. Include musical/workflow assumptions, not just storage/RAM assumptions.
+3. Separate each finding into architecture problem, user-visible quirk, future-feature friction, RAM side benefit, and verification needed.
+
+Do not answer with a RAM experiment unless the user explicitly asks to switch to `ram-recovery-experiments.md` or the active `resource-optimization` task.
+
+## Recommended Document Use
+
+1. Use `architecture-research-directions.md` for broad architecture research and assumption/mismatch mapping.
+2. Use `architecture-change-decision-gates.md` to decide whether a mismatch justifies a major refactor.
+3. Use `ram-recovery-experiments.md` only for concrete, measurable RAM recovery experiments.
+4. Use this spec as the stable handoff point for future research agents.
+
+Current restructuring decision: keep core architecture as research/reference, not an implementation queue. The next implementation work is resource optimization: ARM size probes, RoutingEngine state compaction, then lower-risk Teletype backup and sequence-header experiments.
 
 ## Evidence Requirements
 
