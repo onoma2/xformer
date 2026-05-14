@@ -497,9 +497,6 @@ void RoutingEngine::updateSinks() {
                 case Routing::Shaper::Last:
                     break;
                 }
-                if (route.creaseEnabled(kBusShaperTrack) && shaper != Routing::Shaper::Crease) {
-                    shaperOut = applyCreaseSource(shaperOut, biasNormalized);
-                }
                 float baseValue = route.min() + shaperOut * (route.max() - route.min());
                 float centivolts = Routing::denormalizeTargetValue(target, baseValue);
                 float volts = centivolts * 0.01f;  // Convert centivolts to volts
@@ -549,9 +546,6 @@ void RoutingEngine::updateSinks() {
                         }
                         case Routing::Shaper::Last:
                             break;
-                        }
-                        if (route.creaseEnabled(trackIndex) && shaper != Routing::Shaper::Crease) {
-                            shaperOut = applyCreaseSource(shaperOut, biasNormalized);
                         }
                         float routed = route.min() + shaperOut * routeSpan;
 

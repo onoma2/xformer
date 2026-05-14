@@ -77,7 +77,6 @@ void Routing::Route::clear() {
     _max = 1.f;
     _biasPct.fill(DefaultBiasPct);
     _depthPct.fill(DefaultDepthPct);
-    _creaseEnabled.fill(false);
     _shaper.fill(Shaper::None);
     _source = Source::None;
     _cvSource.clear();
@@ -94,7 +93,6 @@ void Routing::Route::write(VersionedSerializedWriter &writer) const {
     for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
         writer.write(_biasPct[i]);
         writer.write(_depthPct[i]);
-        writer.write(_creaseEnabled[i]);
         writer.write(_shaper[i]);
     }
     writer.write(_source);
@@ -115,13 +113,6 @@ void Routing::Route::read(VersionedSerializedReader &reader) {
     for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
         reader.read(_biasPct[i]);
         reader.read(_depthPct[i]);
-    }
-
-    for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
-        reader.read(_creaseEnabled[i]);
-    }
-
-    for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
         reader.read(_shaper[i]);
     }
     reader.read(_source);
@@ -148,7 +139,6 @@ bool Routing::Route::operator==(const Route &other) const {
         (!isMidiSource(_source) || _midiSource == other._midiSource) &&
         _biasPct == other._biasPct &&
         _depthPct == other._depthPct &&
-        _creaseEnabled == other._creaseEnabled &&
         _shaper == other._shaper
     );
 }
