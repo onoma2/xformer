@@ -4,6 +4,61 @@
 #include "MidiUtils.h"
 #include "core/math/Math.h"
 
+// Per-shaper state reset: zero-init then set non-zero initial values.
+// Must match the original TrackState() constructor defaults for each shaper.
+void RoutingEngine::resetState(RouteState::TrackStateUnion &st, Routing::Shaper shaper) {
+    // Zero-init the entire union (all bytes to 0)
+    st = RouteState::TrackStateUnion{};
+
+    // Set per-shaper non-zero initial values (these differ from zero-init)
+    switch (shaper) {
+    case Routing::Shaper::Location:
+        st.locationState.location = 0.5f;
+        break;
+    case Routing::Shaper::Activity:
+        st.activityState.activityPrev = 0.5f;
+        break;
+    case Routing::Shaper::ProgressiveDivider:
+        st.progDivState.progThreshold = 1.f;
+        break;
+    default:
+        // Envelope, FrequencyFollower: all fields correctly default from zero-init
+        break;
+    }
+}
+
+Routing::Shaper RoutingEngine::effectiveShaper(const Routing::Route &route, int trackIndex) {
+    auto target = route.target();
+    if (Routing::isBusTarget(target)) {
+        return route.shaper(0);
+    } else if (Routing::isPerTrackTarget(target)) {
+        return route.shaper(trackIndex);
+    } else {
+        return Routing::Shaper::None;
+    }
+}
+
+void RoutingEngine::resetRouteShaperState(RouteState &routeState, const Routing::Route &route) {
+    auto target = route.target();
+    if (Routing::isBusTarget(target)) {
+        // Bus targets use only track 0
+        resetState(routeState.shaperState[0], route.shaper(0));
+        // Tracks 1-7 get None (no state needed)
+        for (int i = 1; i < CONFIG_TRACK_COUNT; ++i) {
+            resetState(routeState.shaperState[i], Routing::Shaper::None);
+        }
+    } else if (Routing::isPerTrackTarget(target)) {
+        for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
+            resetState(routeState.shaperState[i], route.shaper(i));
+        }
+    } else {
+        // Engine/other targets: no shaper state needed
+        for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
+            resetState(routeState.shaperState[i], Routing::Shaper::None);
+        }
+    }
+}
+
 // Apply per-track bias/depth to the normalized source (0..1) before the route window is applied.
 static inline float applyBiasDepthToSource(float srcNormalized, const Routing::Route &route, int trackIndex) {
     float depth = route.depthPct(trackIndex) * 0.01f;
@@ -46,7 +101,7 @@ static inline float applyTriangleFold(float srcNormalized, float bias) {
     return clamp(0.5f + 0.5f * folded, 0.f, 1.f);
 }
 
-static inline float applyFrequencyFollower(float srcNormalized, RoutingEngine::RouteState::TrackState &st) {
+static inline float applyFrequencyFollower(float srcNormalized, RoutingEngine::RouteState::FreqFollowState &st) {
     bool signNow = srcNormalized > 0.5f;
     if (signNow != st.freqSign) {
         // Tuned for 1s LFO: reaches 1.0 in 14 crossings = 7s build time
@@ -73,7 +128,7 @@ static inline float applyFrequencyFollower(float srcNormalized, RoutingEngine::R
     return st.freqAcc;
 }
 
-static inline float applyActivity(float srcNormalized, RoutingEngine::RouteState::TrackState &st) {
+static inline float applyActivity(float srcNormalized, RoutingEngine::RouteState::ActivityState &st) {
     float delta = fabsf(srcNormalized - st.activityPrev);
     // decay with tau ~2s at 1 kHz: exp(-1/2000) ≈ 0.9995 (tuned for 1-3s LFOs)
     constexpr float decay = 0.9995f;
@@ -103,7 +158,7 @@ static inline float applyActivity(float srcNormalized, RoutingEngine::RouteState
     return clamp(st.activityLevel, 0.f, 1.f);
 }
 
-float RoutingEngine::applyProgressiveDivider(float srcNormalized, RouteState::TrackState &st) {
+float RoutingEngine::applyProgressiveDivider(float srcNormalized, RouteState::ProgDivState &st) {
     bool signNow = srcNormalized > 0.5f;
     if (signNow != st.progSign) {
         st.progCount += 1.f;
@@ -138,6 +193,42 @@ float RoutingEngine::applyProgressiveDivider(float srcNormalized, RouteState::Tr
     st.progOutSlewed += (st.progOut - st.progOutSlewed) * gateSlew;
 
     return st.progOutSlewed;
+}
+
+// Helper: apply a shaper to a TrackStateUnion, reading/writing the correct union member.
+static inline float applyShaper(Routing::Shaper shaper, float shapedSource, float biasNormalized,
+                                 RoutingEngine::RouteState::TrackStateUnion &st) {
+    switch (shaper) {
+    case Routing::Shaper::None:
+        break;
+    case Routing::Shaper::Crease:
+        shapedSource = applyCreaseSource(shapedSource, biasNormalized);
+        break;
+    case Routing::Shaper::Location:
+        shapedSource = applyLocation(shapedSource, st.locationState.location);
+        break;
+    case Routing::Shaper::Envelope:
+        shapedSource = applyEnvelope(shapedSource, st.envelopeState.envelope);
+        break;
+    case Routing::Shaper::TriangleFold:
+        shapedSource = applyTriangleFold(shapedSource, biasNormalized);
+        break;
+    case Routing::Shaper::FrequencyFollower:
+        shapedSource = applyFrequencyFollower(shapedSource, st.freqFollowState);
+        break;
+    case Routing::Shaper::Activity:
+        shapedSource = applyActivity(shapedSource, st.activityState);
+        break;
+    case Routing::Shaper::ProgressiveDivider:
+        shapedSource = RoutingEngine::applyProgressiveDivider(shapedSource, st.progDivState);
+        break;
+    case Routing::Shaper::VcaNext:
+        // VcaNext needs neighbor source value — handled in caller
+        break;
+    case Routing::Shaper::Last:
+        break;
+    }
+    return shapedSource;
 }
 
 // for allowing direct mapping
@@ -175,10 +266,10 @@ float RoutingEngine::cvRotateValue(int trackIndex) const {
 }
 
 void RoutingEngine::resetShaperState() {
-    for (auto &routeState : _routeStates) {
-        for (auto &st : routeState.shaperState) {
-            st = RouteState::TrackState();
-        }
+    for (int routeIndex = 0; routeIndex < CONFIG_ROUTE_COUNT; ++routeIndex) {
+        const auto &route = _routing.route(routeIndex);
+        auto &routeState = _routeStates[routeIndex];
+        resetRouteShaperState(routeState, route);
     }
 }
 
@@ -326,12 +417,19 @@ void RoutingEngine::updateSinks() {
         auto &routeState = _routeStates[routeIndex];
 
         bool routeChanged = route.target() != routeState.target || route.tracks() != routeState.tracks;
+        // Check for shaper changes on all relevant tracks
         if (!routeChanged && Routing::isPerTrackTarget(route.target())) {
             for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
                 if (route.shaper(i) != routeState.shaper[i]) {
                     routeChanged = true;
                     break;
                 }
+            }
+        }
+        // Bus targets also use shaper(0) — detect shaper changes there too
+        if (!routeChanged && Routing::isBusTarget(route.target())) {
+            if (route.shaper(0) != routeState.shaper[0]) {
+                routeChanged = true;
             }
         }
 
@@ -352,10 +450,8 @@ void RoutingEngine::updateSinks() {
                     }
                 }
             }
-            // reset shaper state
-            for (auto &st : routeState.shaperState) {
-                st = RouteState::TrackState();
-            }
+            // reset shaper state to correct initial values for the new route config
+            resetRouteShaperState(routeState, route);
         }
 
         if (route.active()) {
@@ -365,9 +461,9 @@ void RoutingEngine::updateSinks() {
                 constexpr int kBusShaperTrack = 0;
                 float shapedSource = applyBiasDepthToSource(_sourceValues[routeIndex], route, kBusShaperTrack);
                 float biasNormalized = route.biasPct(kBusShaperTrack) * 0.01f;
-                float shaperOut = shapedSource;
                 auto shaper = route.shaper(kBusShaperTrack);
                 auto &st = routeState.shaperState[kBusShaperTrack];
+                float shaperOut = shapedSource;
                 switch (shaper) {
                 case Routing::Shaper::None:
                     break;
@@ -375,22 +471,22 @@ void RoutingEngine::updateSinks() {
                     shaperOut = applyCreaseSource(shapedSource, biasNormalized);
                     break;
                 case Routing::Shaper::Location:
-                    shaperOut = applyLocation(shapedSource, st.location);
+                    shaperOut = applyLocation(shapedSource, st.locationState.location);
                     break;
                 case Routing::Shaper::Envelope:
-                    shaperOut = applyEnvelope(shapedSource, st.envelope);
+                    shaperOut = applyEnvelope(shapedSource, st.envelopeState.envelope);
                     break;
                 case Routing::Shaper::TriangleFold:
                     shaperOut = applyTriangleFold(shapedSource, biasNormalized);
                     break;
                 case Routing::Shaper::FrequencyFollower:
-                    shaperOut = applyFrequencyFollower(shapedSource, st);
+                    shaperOut = applyFrequencyFollower(shapedSource, st.freqFollowState);
                     break;
                 case Routing::Shaper::Activity:
-                    shaperOut = applyActivity(shapedSource, st);
+                    shaperOut = applyActivity(shapedSource, st.activityState);
                     break;
                 case Routing::Shaper::ProgressiveDivider:
-                    shaperOut = applyProgressiveDivider(shapedSource, st);
+                    shaperOut = applyProgressiveDivider(shapedSource, st.progDivState);
                     break;
                 case Routing::Shaper::VcaNext: {
                     int nextRouteIndex = (routeIndex + 1) % CONFIG_ROUTE_COUNT;
@@ -417,7 +513,6 @@ void RoutingEngine::updateSinks() {
                     if (tracks & (1 << trackIndex)) {
                         float shapedSource = applyBiasDepthToSource(_sourceValues[routeIndex], route, trackIndex);
                         float biasNormalized = route.biasPct(trackIndex) * 0.01f;
-                        // select shaper
                         float shaperOut = shapedSource;
                         auto shaper = route.shaper(trackIndex);
                         auto &st = routeState.shaperState[trackIndex];
@@ -428,22 +523,22 @@ void RoutingEngine::updateSinks() {
                             shaperOut = applyCreaseSource(shapedSource, biasNormalized);
                             break;
                         case Routing::Shaper::Location:
-                            shaperOut = applyLocation(shapedSource, st.location);
+                            shaperOut = applyLocation(shapedSource, st.locationState.location);
                             break;
                         case Routing::Shaper::Envelope:
-                            shaperOut = applyEnvelope(shapedSource, st.envelope);
+                            shaperOut = applyEnvelope(shapedSource, st.envelopeState.envelope);
                             break;
                         case Routing::Shaper::TriangleFold:
                             shaperOut = applyTriangleFold(shapedSource, biasNormalized);
                             break;
                         case Routing::Shaper::FrequencyFollower:
-                            shaperOut = applyFrequencyFollower(shapedSource, st);
+                            shaperOut = applyFrequencyFollower(shapedSource, st.freqFollowState);
                             break;
                         case Routing::Shaper::Activity:
-                            shaperOut = applyActivity(shapedSource, st);
+                            shaperOut = applyActivity(shapedSource, st.activityState);
                             break;
                         case Routing::Shaper::ProgressiveDivider:
-                            shaperOut = applyProgressiveDivider(shapedSource, st);
+                            shaperOut = applyProgressiveDivider(shapedSource, st.progDivState);
                             break;
                         case Routing::Shaper::VcaNext: {
                             int nextRouteIndex = (routeIndex + 1) % CONFIG_ROUTE_COUNT;
@@ -489,9 +584,9 @@ void RoutingEngine::updateSinks() {
                 _routing.writeTarget(target, route.tracks(), baseValue);
             }
         } else {
-            for (auto &st : routeState.shaperState) {
-                st = RouteState::TrackState();
-            }
+            // Inactive route: reset shaper state using the route's configured shapers
+            // so that re-activating starts from correct initial values
+            resetRouteShaperState(routeState, route);
         }
 
         if (routeChanged) {

@@ -139,6 +139,31 @@ Measured on ARM Cortex-M4F (STM32F405, `-O2`, hard float). Corrects host-x86_64 
 | RouteStates[] (×16) | 7,360 | 460 × 16 |
 | TrackStates[] (×16×8=128) | 7,168 | 56 × 128 — **the single largest waste target** |
 
+### P5 Results: Union-Based TrackState Compaction (hardware-verified)
+
+| Type | Before | After | Delta |
+|---|---|---|---|
+| RouteState::TrackStateUnion | 56 B (old TrackState) | **24 B** | **-32 B (-57%)** |
+| shaperState per route (×8) | 448 B | 192 B | -256 B |
+| TrackStateUnion total (×128) | 7,168 B | **3,072 B** | **-4,096 B** |
+| `.ccmram_bss` total | 58,236 B | **54,140 B** | **-4,096 B** |
+| `.text` | 760,732 B | 764,300 B | +3,568 B (new helpers) |
+| `.data` | 6,320 B | 6,320 B | 0 |
+| `.bss` | 118,400 B | 118,400 B | 0 |
+
+**Per-shaper state sizes (ARM-verified):**
+
+| Shaper state struct | Estimated | ARM actual |
+|---|---|---|
+| LocationState | 4 B | (awaiting hardware) |
+| EnvelopeState | 4 B | (awaiting hardware) |
+| FreqFollowState | ~8 B | (awaiting hardware) |
+| ActivityState | ~12 B | (awaiting hardware) |
+| ProgDivState | ~24 B | (awaiting hardware) |
+| **TrackStateUnion** (max variant) | ~24-28 B | **24 B** |
+
+**Total runtime RAM: .data + .bss = 124,720 B (95.2% → still 95.2%). CCMRAM: 54,140 B (84.6% of 64 KB, was 91.0%).**
+
 **Confirmed: RouteState::TrackState is exactly 56 B, and RouteState is 460 B.** The 7,168 B of TrackState storage across all 16 routes × 8 tracks is the primary compaction target for P5/P6.
 
 ### Page 4: TrackEngine types

@@ -2,9 +2,9 @@
 _Updated: 2026-05-14_
 
 ## 🔴 resource-optimization — RAM & Flash budget recovery (includes teletype-performer-ecosystem-redesign analysis)
-**Status:** active — Phase 2 measurement gate complete ✓. All ARM sizeof values recorded.
-**Where I stopped:** All 5 pages of ARM sizeof probes recorded. Key ARM-verified values: Track=10,108 B, NoteTrack=9,544 B, TeletypeTrackEngine=912 B (container-sizing), RoutingEngine=7,484 B, RouteState=460 B, TrackState=56 B. Container saving from TT extraction: 2,592 B direct + ~4 KB cascade.
-**Next action:** Implement P5/P6 RoutingEngine state compaction (highest ROI: ~6.8 KB CCMRAM). Then consider TeletypeTrackEngine container extraction (~6.6 KB).
+**Status:** active — P5 union-compaction implemented and CCMRAM savings verified (4,096 B). Awaiting hardware shaper-switching test.
+**Where I stopped:** P5 TrackState→TrackStateUnion implemented. ARM-verified: TrackStateUnion=24 B (was 56 B), CCMRAM 58,236→54,140 (-4,096 B). Bus-target shaper-change detection fixed. Reset semantics use effective shaper (not blanket None).
+**Next action:** Hardware-test all 5 stateful shapers + shaper switching. Then commit P5 and re-evaluate P6 from new baseline.
 **Depends on:** nothing
 **Branch:** refactor/resouce-optimization
 

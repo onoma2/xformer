@@ -31,25 +31,64 @@ public:
         Routing::Target target = Routing::Target::None;
         uint8_t tracks = 0;
         std::array<Routing::Shaper, CONFIG_TRACK_COUNT> shaper{};
-        struct TrackState {
-            float location = 0.5f;
-            float envelope = 0.f;
-            float freqAcc = 0.f;
-            bool freqSign = false;
-            float activityPrev = 0.5f;
-            float activityLevel = 0.f;
-            bool activitySign = false;
-            uint16_t ffHold = 0;
-            uint16_t actHold = 0;
-            float progCount = 0.f;
-            float progThreshold = 1.f;
-            bool progSign = false;
-            float progOut = 0.f;
-            float progOutSlewed = 0.f;
-            uint16_t progHold = 0;
+
+        // Per-shaper state structs — stored in a union per track slot.
+        // The active variant is determined by route.shaper(trackIndex) at access time.
+        // No default member initializers inside union — resetState() sets per-shaper defaults.
+
+        struct LocationState {
+            float location;
         };
-        std::array<TrackState, CONFIG_TRACK_COUNT> shaperState;
+
+        struct EnvelopeState {
+            float envelope;
+        };
+
+        struct FreqFollowState {
+            float freqAcc;
+            bool freqSign;
+            uint16_t ffHold;
+        };
+
+        struct ActivityState {
+            float activityPrev;
+            float activityLevel;
+            bool activitySign;
+            uint16_t actHold;
+        };
+
+        struct ProgDivState {
+            float progCount;
+            float progThreshold;
+            bool progSign;
+            float progOut;
+            float progOutSlewed;
+            uint16_t progHold;
+        };
+
+        union TrackStateUnion {
+            LocationState locationState;
+            EnvelopeState envelopeState;
+            FreqFollowState freqFollowState;
+            ActivityState activityState;
+            ProgDivState progDivState;
+        };
+
+        std::array<TrackStateUnion, CONFIG_TRACK_COUNT> shaperState;
     };
+
+    // Reset a single TrackStateUnion to the correct initial values for a given shaper.
+    static void resetState(RouteState::TrackStateUnion &st, Routing::Shaper shaper);
+
+    // Determine the effective shaper for a given route and track index.
+    // Bus targets use shaper(0), engine/other targets use None.
+    static Routing::Shaper effectiveShaper(const Routing::Route &route, int trackIndex);
+
+    // Reset all shaperState entries for a route using the route's current configuration.
+    static void resetRouteShaperState(RouteState &routeState, const Routing::Route &route);
+
+    // Apply progressive divider shaper (public for use by applyShaper helper)
+    static float applyProgressiveDivider(float srcNormalized, RouteState::ProgDivState &st);
 
 private:
     void updateSources();
@@ -69,6 +108,4 @@ private:
     uint8_t _lastPlayToggleActive = false;
     uint8_t _lastRecordToggleActive = false;
     std::array<uint8_t, CONFIG_TRACK_COUNT> _lastResetActive{};
-
-    static float applyProgressiveDivider(float srcNormalized, RouteState::TrackState &st);
 };
