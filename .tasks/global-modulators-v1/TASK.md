@@ -24,8 +24,9 @@ Active. V1 engine + Modulove-matching UI (minus ADSR/MIDI CC) implemented on `fe
 ## V2 scope (next)
 - ADSR shape (7th waveform with attack/decay/sustain/release/amplitude)
 - MIDI CC output routing (routing overlay, target selection, CC number)
-- Remove passive mode label, add Mode as editable F6 parameter
-- Port Shift+Page routing overlay for mode/gate/target editing
+- Port Shift+Page routing overlay from Modulove — this is how mode (Free/Sync/Retrigger), gate track, and target routing are edited. Without it, Mode is inaccessible in the UI.
+- Remove passive "FREE"/"SYNC"/"RETRIG" mode label (Modulove never shows mode in normal view — only in routing overlay via F1=MODE)
+- Port Modulove's routing overlay: F1=MODE, F2=GATE, F3=TARGET, F4=EVENT, F5=CC NUM (with CV mode dimming F4/F5)
 - No quick-map popup.
 - No full Modulove page clone before engine/model proof.
 - No interaction with Teletype CV source combiner. This is a global output layer; Teletype combiner is local Teletype source ownership.
