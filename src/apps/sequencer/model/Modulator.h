@@ -42,6 +42,7 @@ public:
     enum class Mode : uint8_t {
         Free,
         Sync,
+        Hold,
         Retrigger,
         Last
     };
@@ -50,6 +51,7 @@ public:
         switch (mode) {
         case Mode::Free:       return "Free";
         case Mode::Sync:       return "Sync";
+        case Mode::Hold:       return "Hold";
         case Mode::Retrigger:  return "Retrig";
         case Mode::Last:       break;
         }

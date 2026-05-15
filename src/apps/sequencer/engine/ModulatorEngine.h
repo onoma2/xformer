@@ -90,9 +90,15 @@ public:
         // Rate is in PPQN=96 ticks in reference; convert to our PPQN=192
         uint32_t rate = modulator.rate() * 2;
 
-        // Sync/Retrigger modes reset phase on gate edge but always keep running
+        // Sync/Retrigger/Hold modes
         if (modulator.mode() == Modulator::Mode::Sync) {
             // Hard sync: reset phase on gate rising edge
+            if (gate && !_lastGate[index]) {
+                _phaseAccumulator[index] = 0;
+            }
+            _lastGate[index] = gate;
+        } else if (modulator.mode() == Modulator::Mode::Hold) {
+            // Hold: reset phase on gate rising edge, only advance while gate is high
             if (gate && !_lastGate[index]) {
                 _phaseAccumulator[index] = 0;
             }
@@ -105,9 +111,18 @@ public:
             _lastGate[index] = gate;
         }
 
-        // Always advance phase (matching Modulove original behavior)
+        // Increment phase
         uint32_t phaseIncrement = 65536 / rate;
-        _phaseAccumulator[index] += phaseIncrement;
+
+        if (modulator.mode() == Modulator::Mode::Hold) {
+            // Hold: only advance phase while gate is high
+            if (gate) {
+                _phaseAccumulator[index] += phaseIncrement;
+            }
+        } else {
+            // Free/Sync/Retrigger: always advance
+            _phaseAccumulator[index] += phaseIncrement;
+        }
 
         uint32_t phase = _phaseAccumulator[index] + (static_cast<uint32_t>(modulator.phase()) * 65536 / 360);
 
