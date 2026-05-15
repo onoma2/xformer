@@ -217,10 +217,8 @@ bool Project::read(VersionedSerializedReader &reader) {
     readArray(reader, _cvOutputTracks);
     readArray(reader, _gateOutputTracks);
 
-    if (reader.dataVersion() >= ProjectVersion::Version35) {
-        readArray(reader, _modulators);
-        readArray(reader, _cvOutputModulators);
-    }
+    readArray(reader, _modulators);
+    readArray(reader, _cvOutputModulators);
 
     _song.read(reader);
     _playState.read(reader);
