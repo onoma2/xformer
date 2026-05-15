@@ -74,13 +74,32 @@ Active. V1 engine + full Modulove-matching UI implemented on `feat/modulators`. 
 
 ## RAM measurements (feat/modulators branch)
 - `.data` = 6,320 bytes (unchanged from baseline)
-- `.bss` = 112,248 bytes (was 113,640 baseline; branch includes other optimizations)
-- `.data + .bss` = 118,568 bytes (90.4% of 128 KB, within 120 KB hard warning)
-- `.ccmram_bss` = 54,332 bytes
-- `.text` = 790,244 bytes (flash has ample headroom)
-- Delta from this feature: ~364 bytes BSS (8 Modulators × ~15B model + 8B cvOutputModulator + ~192B ModulatorEngine + UI state)
-- Track container gate: NoteTrack=9544B unchanged. Modulator does not inflate Track::_container.
-- Engine container: TeletypeTrackEngine=912B unchanged. ModulatorEngine is separate from the engine container.
+- `.bss` = 112,248 bytes (was 113,640 on master; branch includes other optimizations)
+- `.data + .bss` = 118,568 bytes (90.5% of 128 KB, within 120 KB hard warning)
+- `.ccmram_bss` = 54,436 bytes (83.1% of 64 KB)
+- `.text` = 774,020 bytes (flash has ~250 KB headroom in 1 MB)
+- Feature BSS delta: ~328 bytes (model arrays + engine state, not in any container)
+- Feature CCMRAM delta: ~112 bytes (ModulatorPage waveform cache)
+- Feature flash delta: ~6 KB (ModulatorPage code + model code + WaveformGenerator inlines)
+- Track container gate: NoteTrack=9544B unchanged. Modulator is direct Project member, not in Track::_container.
+- Engine container: TeletypeTrackEngine=912B unchanged. ModulatorEngine is direct Engine member, not in TrackEngineContainer.
+
+### Detailed BSS breakdown (modulators only)
+| Member | Size | Location |
+|--------|------|----------|
+| Modulator × 8 (model array) | 8 × ~15B = ~120B | Project, .bss |
+| cvOutputModulator[8] | 8B | Project, .bss |
+| selectedModulatorIndex | 4B | Project, .bss |
+| ModulatorEngine state | ~184B | Engine, .bss |
+| ModulatorPage cache | 112B | Pages, .ccmram_bss |
+| **Total feature RAM** | **~428B** | |
+
+### Container gate verification
+- `Track::_container` max arm: `NoteTrack = 9544B` — **no inflation**
+- `Engine::TrackEngineContainer` max arm: `TeletypeTrackEngine = 912B` — **no inflation**
+- `ModulatorEngine` is a direct `Engine` member, **not** in any variant container
+- `Modulator[]` is a direct `Project` member, **not** in any variant container
+- Feature adds ~428B total across SRAM + CCMRAM, well within budget
 
 ## Notes
 - This is a feature task, not a RAM recovery task. It must still pass the current RAM budget gates.
