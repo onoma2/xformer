@@ -27,17 +27,21 @@ Current triage: RoutingEngine state compaction is the next implementable RAM exp
 | `RouteState::TrackState` | 56 B | savings-plan ARM struct analysis |
 | `RouteState` (full) | 468 B (ARM) / 460 B (standalone) | savings-plan; on-target verification needed |
 | `RouteState × 16` | 7,488 B (ARM) | 468 × 16 |
-| `TeletypeTrackEngine` | ~904 B | resource-optimization byte-accurate breakdown |
-| `PatternSlot` | 1,226 B | savings-plan, nm |
-| `tele_command_t` | 52 B | savings-plan |
+| `TeletypeTrack` | 7,104 B | MonitorPage SIZES page 6 |
+| `TeletypeTrackEngine` | 912 B | MonitorPage SIZES page 6 |
+| `Engine::TrackEngineContainer` | 912 B | MonitorPage SIZES page 6 |
+| `scene_state_t` | 4,640 B | MonitorPage SIZES page 6 |
+| `PatternSlot` | 1,226 B | MonitorPage SIZES page 6 |
+| `tele_command_t` | 52 B | MonitorPage SIZES page 6 |
+| `scene_pattern_t` | 138 B | MonitorPage SIZES page 6 |
 | `NoteSequence::Step` | 8 B | host sizeof probe; ARM verification needed |
 | `NoteSequence` | 564 B | host sizeof probe; 512 B step array + ~52 B header/state |
 | `CurveSequence::Step` | 8 B | host sizeof probe; ARM verification needed |
 | `CurveSequence` | 592 B | host sizeof probe; 512 B step array + ~80 B header/state |
-| `NoteTrack` (model) | 9,612 B | host sizeof probe; ARM verification needed |
-| `CurveTrack` (model) | 10,092 B | host sizeof probe; ARM verification needed |
-| `Track` (model container) | 10,120 B | host sizeof probe; suggests CurveTrack currently sizes `Track::_container` |
-| Engine container direct gap | ~1,832 B (904−675)×8 | resource-optimization |
+| `NoteTrack` (model) | 9,544 B | MonitorPage after P15 |
+| `CurveTrack` (model) | 9,480 B | MonitorPage after P15 |
+| `Track` (model container) | 9,560 B | MonitorPage after P15 |
+| Engine container direct gap | TBD | `TeletypeTrackEngine=912` is the gate; measure next-largest engine before estimating |
 
 ---
 

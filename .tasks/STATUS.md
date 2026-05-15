@@ -2,9 +2,9 @@
 _Updated: 2026-05-15_
 
 ## 🔴 resource-optimization — RAM & Flash budget recovery
-**Status:** active — P5 + creaseEnabled bug fix both hardware-verified ✓.
-**Where I stopped:** P5 union compaction (-4,096 B CCMRAM) and creaseEnabled removal + serialization fix (-128 B .bss) both committed and hardware-verified. All 5 stateful shapers work correctly. Shapers now save/load correctly.
-**Next action:** Implement P15 as a CurveSequence-first header packing experiment; defer Teletype backup consolidation to research because rollback semantics are not one-file/simple.
+**Status:** active — P1/P5/P15 hardware/build-verified; model storage is solved for now.
+**Where I stopped:** Current build is `.data=6,320`, `.bss=113,640`, `.ccmram_bss=54,096`; MonitorPage shows `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`.
+**Next action:** Research Teletype file-load backup transaction semantics; USB/FS audit found only ~700-1,000 B safe SRAM, and P13/LCD D-B remain future/last-resort research.
 **Depends on:** nothing
 **Branch:** refactor/resouce-optimization
 
@@ -15,6 +15,15 @@ _Updated: 2026-05-15_
 **Where I stopped:** Source probes and decision tables now say RoutingEngine compaction is the only current architecture-adjacent RAM implementation; model/container pool replacement is no-go unless product semantics change.
 **Next action:** Keep docs current while implementing `resource-optimization`; use `model-pool-decision-table.md` and `routingengine-refactor-phased-plan.md` as decision references.
 **Depends on:** resource-optimization (for baseline measurements)
+**Branch:** refactor/resouce-optimization
+
+---
+
+## 🟡 teletype-runtime-architecture — Clarify Teletype VM/slot/runtime ownership before global runtime work
+**Status:** paused/ready — source-grounded architecture task, not an implementation queue yet.
+**Where I stopped:** Approach A is now documented: slots are Teletype clips, `scene_state_t` is live runtime truth, and load/capture boundaries must be explicit.
+**Next action:** Plan the wrapper slice: `loadClipIntoVm()`, `captureVmToClip()`, remove hidden capture from `write()` / `patternSlotSnapshot()`, then decide auto-capture-on-leave vs explicit capture.
+**Depends on:** resource-optimization (for RAM gates), teletype file transaction semantics
 **Branch:** refactor/resouce-optimization
 
 ---

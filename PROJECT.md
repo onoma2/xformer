@@ -151,21 +151,80 @@ Three major improvement categories documented in `doc/improvements/`:
 2. **Shape improvements** (`shape-improvements.md`): Enhanced CV curve generation
 3. **MIDI improvements** (`midi-improvements.md`): Extended MIDI functionality
 
-## Resource Footprint (current release build)
-- Flash: `.text` ~413 KB (≈39% of 1 MB), ample headroom.
-- SRAM (128 KB): `.data` 6 KB + `.bss` ~110 KB → ~15 KB free. Largest blocks:
-  - `Model` ~93 KB: 8 tracks each with 17 `NoteSequence`s of 64 packed steps; includes project globals, settings, clipboard, harmony.
-  - LCD driver buffer 8 KB.
-- CCM RAM (64 KB): `.ccmram_bss` ~44.7 KB → ~21 KB free. Largest blocks:
-  - `Ui` ~22.9 KB: framebuffer 8 KB, page objects, MIDI ring buffer, key/LED state.
-  - FreeRTOS static stacks: UI/engine ~4 KB each; USBH/file/profiler ~2 KB; driver ~1 KB.
-  - `Engine` ~6.5 KB.
+## Resource Footprint and Budget
+
+RAM is the tight resource. A feature is acceptable only if it stays within the budget below or identifies the exact RAM tradeoff it consumes.
+
+**Budget targets:**
+- Main SRAM target: `.data + .bss` at or below roughly **111-113 KB**.
+- Hard warning zone: `.data + .bss` above **120 KB**. Feature work in this zone needs explicit symbol-level justification.
+- CCMRAM target: `.ccmram_bss` below roughly **56 KB** unless hardware testing proves safe margin.
+- Flash is secondary right now; still measure `.text`, but do not optimize flash before RAM unless flash is the stated task.
+
+**Current measured baseline. Refresh this block after resource-optimization work or before major feature work.**
+- Flash: `.text` ~763 KB, still with headroom in 1 MB flash.
+- SRAM (128 KB): current post-P15 build is `.data=6,320` + `.bss=113,640` = 119,960 B, about 91.4% used. Largest blocks:
+  - `Model` = 88,072 B.
+  - LCD driver DMA buffer = 8,192 B normal SRAM.
+  - Teletype file slot globals = 4 x 1,226 B.
+  - USB host / filesystem globals = about 6.2 KB total, mostly functional buffers.
+- CCM RAM (64 KB): current post-P15 `.ccmram_bss=54,096`, about 84.5% used. Largest blocks:
+  - `Ui`, including 16,384 B 8-bit Canvas framebuffer.
+  - `Engine` = 11,492 B.
+  - FreeRTOS static stacks.
 - FreeRTOS heap disabled (static allocation only).
 
 ## RAM-heavy structures
-- `Model`: per-track `NoteSequence` arrays (17 patterns/snapshots × 64 steps × 2x32-bit bitfields with pulse count, gate mode, accumulator, harmony overrides), plus routing/song/MIDI settings.
+- `Model`: top-level `Track::_container` is currently sized by `NoteTrack`, not `CurveTrack`. Current MonitorPage values: `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`.
+- `Engine`: top-level engine storage is sized by the largest track engine, currently TeletypeTrackEngine-class storage. Current MonitorPage `Engine=11492`.
 - `Ui`: framebuffer, `Pages` aggregate of all page instances and list/selection models, MIDI receive ring buffer.
-- Misc: FS pools, USB/MIDI state, idle/timer stacks are small compared to above.
+- Display buffers: UI has a 16,384 B 8-bit working framebuffer in CCMRAM; STM32 LCD driver has an 8,192 B packed DMA buffer in normal SRAM.
+- Misc: Teletype file PatternSlot globals, FS pools, USB/MIDI state, idle/timer stacks.
+
+**USB/FS note:**
+- USB/FS was audited as a possible hidden SRAM target. It is not one: realistic no-behavior-change recovery is only about 700-1,000 B.
+- Safe candidate: `DirBuf` (~608 B) appears dead when `FF_USE_LFN=0`; guard/remove it only after confirming the FatFs config path.
+- Reducing USB device counts or `BUFFER_ONE_BYTES` is a product/compatibility change, not a transparent optimization.
+
+**Display buffer note:**
+- Do not treat `Lcd::_frameBuffer` removal as a near-term easy SRAM win. The 8,192 B normal-SRAM buffer exists because STM32 DMA cannot read the UI framebuffer in CCMRAM.
+- CPU-SPI streaming or line-buffered DMA would save SRAM but sacrifice the current full-frame asynchronous DMA path and likely require a lower display FPS on complex pages.
+- Keep LCD low-RAM mode as last-resort research only. Packed Canvas rendering is a separate CCMRAM cleanup idea, not a main-SRAM recovery path.
+
+## RAM Gates for Feature Development
+
+Treat RAM as a gate only when a feature changes the relevant container maximum or adds direct RAM residents. Use ARM build/probes, not host estimates.
+
+**Container mental model:**
+- `Container<A, B, C>` is static variant storage implemented as an aligned byte buffer sized to `max(sizeof(A), sizeof(B), sizeof(C))`.
+- `_container.create<T>()` placement-news one active type into that storage; `_container.as<T>()` reinterprets the same storage as the active type.
+- Every owner pays for the largest possible type, not the currently selected type. Eight `Track` objects means eight max-sized `Track::_container` buffers even if some tracks are tiny modes.
+- Small track-type savings matter only when they reduce the current largest arm or a direct member outside the container.
+
+**Model/track-type gate:**
+- Current max: `NoteTrack=9544 B`; `Track=9560 B`.
+- A new or modified track model below 9544 B should not increase top-level `Model` RAM through the 8-track `Track::_container`.
+- If a track model exceeds 9544 B, the excess is multiplied by 8 in the `Model` singleton.
+- Since `CurveTrack=9480 B`, sequence-packing follow-ups have low current ROI: only 64 B per Track slot is available before CurveTrack becomes the max again.
+- `TeletypeTrack=7104 B` is below the model container gate. Teletype model cleanup is not a current top-level model RAM win unless the container architecture or gate changes.
+
+**Engine gate:**
+- Current measured max: `TeletypeTrackEngine=912 B`; `Engine::TrackEngineContainer=912 B`.
+- Next-largest measured engine: `NoteTrackEngine=588 B`; conditional direct gap is `(912 - 588) * 8 = 2592 B` CCMRAM.
+- A new or modified track engine below 912 B should not inflate the engine container.
+- If it exceeds the current largest engine, the excess is multiplied by 8 engine slots in CCMRAM.
+- Shrinking or extracting `TeletypeTrackEngine` can save CCMRAM across all 8 engine slots if the current "any/all 8 tracks can be Teletype" behavior is changed or if the engine itself shrinks below 588 B.
+
+**Direct RAM still matters:**
+- New globals, static buffers, queues, page members, lookup tables, file buffers, task stacks, and DMA buffers count directly even if container gates do not move.
+- Immutable tables should be `const`/flash-resident instead of `.data`.
+- DMA buffers must generally live in normal SRAM; CCMRAM is not DMA-accessible on STM32F4.
+
+**Feature RAM check:**
+- Build with `cd build/stm32/release && make sequencer`.
+- Check `.data`, `.bss`, `.ccmram_bss`, `Model`, `Engine`, `Track`, changed track type sizes, and changed engine type sizes.
+- If flash grows but RAM sections and container gates stay flat, RAM should not block the feature.
+- If RAM grows, identify the exact symbol or container cliff before proposing broader architecture changes.
 
 ## Build & test
 - **STM32 release build (REQUIRED for all compile checks):** `cd build/stm32/release && make sequencer`

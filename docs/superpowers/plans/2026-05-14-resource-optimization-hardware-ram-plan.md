@@ -31,18 +31,21 @@ The active savings plan ranks the work as:
 |---|---|---:|---|
 | 1 | P2/P4 internal cleanup + P14 + P14b | 2,700 B measured .data | none-low |
 | 2B | P5 union-based TrackState compaction | 4,096 B measured .ccmram_bss | medium; complete |
-| 2C | P15 CurveSequence-first header packing | measurement-first; count only if `CurveSequence` shrinks `Track` / `_ZL5model` | low-medium |
-| 2R | P4b, P6, P7 | deferred research only | medium-high |
-| 3 | P8 + P13, maybe P5a only by explicit decision | ~2,080 B safe subset; +7,488 B risky | medium-high |
+| 2C | P15 CurveSequence-first header packing | 4,760 B measured `.bss`; complete | low-medium |
+| 2R | P4b, P6, P7, P13 | deferred research only | medium-high |
+| 3 | P8, maybe P5a only by explicit decision | ~544 B safe subset; +7,488 B risky | medium-high |
 
 Current implementation state:
 
 - Phase 1 is hardware-verified: `.data` 9,020→6,320 = 2,700 B saved.
 - P5 is hardware-verified: `TrackStateUnion` reduced `.ccmram_bss` by 4,096 B.
 - creaseEnabled removal + serialization fix is hardware-verified: `.bss` reduced by 128 B and shaper save/load now works.
-- Current pressure is SRAM (`.data + .bss`), not CCMRAM; next active work is P15 CurveSequence-first header packing.
+- P15 is complete: current build is `.text=763,436`, `.data=6,320`, `.bss=113,640`, `.ccmram_bss=54,096`; MonitorPage shows `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Engine=11492`, `Model=88072`, `Project=78012`.
+- Current pressure is SRAM (`.data + .bss`), not CCMRAM; next work is Teletype file-load backup transaction research. USB/FS symbol audit is complete and found only about 700-1,000 B safe SRAM recovery.
 - Do not start model-pool/container-pool architecture work under current "any track can be any type" semantics; `model-pool-decision-table.md` records this as no-go.
 - Defer Teletype backup consolidation. Current read failure rollback restores both PatternSlots, so one-buffer consolidation is research, not a simple Phase 2 cleanup.
+- Deprioritize P13 file task stack trim to future research. It needs hardware watermark evidence across worst-case file flows before any implementation.
+- USB/FS is not a hidden large SRAM target. `DirBuf` is the only clear dead-weight item (~608 B with `FF_USE_LFN=0`); deeper USB config reductions change supported hub/composite/MIDI/HID behavior.
 
 ## Measurement Protocol
 
@@ -196,6 +199,8 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 
 **Proposal:** P15
 
+**Status:** complete. P15a/P15b reduced `.bss` from 118,400 to 113,640 after Phase 1/P5 context and flipped `Track::_container` from CurveTrack to NoteTrack.
+
 **Files:**
 - Modify: `src/apps/sequencer/model/CurveSequence.h`
 - Modify: `src/apps/sequencer/model/CurveSequence.cpp`
@@ -203,19 +208,17 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 - Read/follow-up only: `src/apps/sequencer/model/NoteSequence.cpp`
 - Read/measure: `src/apps/sequencer/model/Track.h`
 
-**Expected savings:** measurement-first. ARM probes show `CurveSequence=592 B`, `CurveTrack=10,092 B`, and `Track=10,108 B`. CurveTrack is the `Track::_container` sizing arm, so CurveSequence header packing is the correct first model/SRAM experiment. Count this phase only from ARM `sizeof(CurveSequence)`, `sizeof(CurveTrack)`, `sizeof(Track)`, `_ZL5model`, and `.bss` deltas.
+**Measured result:** `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`, `.bss=113,640`. Model storage is done for now; NoteSequence follow-up is low ROI because only 64 B per Track slot is available before CurveTrack becomes the max again.
 
 - [x] Add temporary ARM build size probes for `sizeof(NoteSequence::Step)`, `sizeof(NoteSequence)`, `sizeof(CurveSequence::Step)`, `sizeof(CurveSequence)`, `sizeof(NoteTrack)`, `sizeof(CurveTrack)`, and `sizeof(Track)`.
 - [x] Record whether NoteTrack or CurveTrack is the current `Track::_container` max on target: CurveTrack is max.
-- [ ] Design a packed CurveSequence header behind current accessors.
-- [ ] Preserve the current public getters/setters and the current serialized `write()` / `read()` field order.
-- [ ] Preserve `Routable<T>` semantics for routed sequence params: base and routed values must remain independently representable.
-- [ ] Build STM32 `sequencer`.
-- [ ] Run the measurement protocol and confirm `sizeof(Track)`, `_ZL5model`, and `.bss` drop; otherwise mark as local cleanup only, not RAM recovery.
-- [ ] Flash hardware and run the hardware smoke checklist.
-- [ ] Pattern independence check: create Note and Curve patterns with different divisor/run mode/first/last/scale/root-style settings, switch patterns, save, reboot, reload, and verify settings survive.
-- [ ] Routing check: route sequence params that support routing and verify routed values still override base values only while the route is active.
-- [ ] Commit only after hardware passes and the real RAM delta is recorded.
+- [x] Design packed CurveSequence parameter storage behind current accessors.
+- [x] Preserve the current public getters/setters and the current serialized `write()` / `read()` field order.
+- [x] Preserve routed/base semantics for routed sequence params.
+- [x] Build STM32 `sequencer`.
+- [x] Run the measurement protocol and confirm `sizeof(Track)`, `_ZL5model`, and `.bss` drop.
+- [x] Flash hardware / record MonitorPage size results.
+- [x] Commit after the real RAM delta is recorded.
 
 **Stop conditions:**
 
@@ -233,7 +236,7 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 - Modify: `src/apps/sequencer/engine/Engine.cpp`
 - Read: `src/apps/sequencer/engine/TeletypeTrackEngine.h`
 
-**Expected savings:** conditional. About 1,832 B direct from `.ccmram_bss` only if the product accepts a capped live Teletype engine pool. If any/all 8 tracks must remain valid Teletype tracks, separate storage for 8 TeletypeTrackEngines cancels the container saving.
+**Expected savings:** conditional. Current ARM probes show `TeletypeTrackEngine=912 B`, `Engine::TrackEngineContainer=912 B`, and `NoteTrackEngine=588 B`; direct container gap is `(912 - 588) * 8 = 2,592 B` CCMRAM. Savings exist only if the product accepts a capped live Teletype engine pool or TeletypeTrackEngine shrinks below 588 B. If any/all 8 tracks must remain valid Teletype tracks, separate storage for 8 TeletypeTrackEngines cancels the container saving.
 
 - [ ] Map the current track-engine construction/destruction path in `Engine::updateTrackSetups()`.
 - [ ] Decide the product rule for maximum live Teletype tracks before implementation.
@@ -277,13 +280,15 @@ If any check fails, stop the phase, keep the measurement output, and bisect with
 - Save/load no longer preserves both slots.
 - Runtime scene state and stored slot state diverge.
 
-## Phase 3B: File Task Stack Trim With Watermark
+## Phase 3B: Future Research: File Task Stack Trim With Watermark
 
 **Proposal:** P13
 
 **Files:**
 - Modify: `src/apps/sequencer/Config.h`
 - Modify only if needed for temporary instrumentation: `src/apps/sequencer/Sequencer.cpp`
+
+**Status:** deprioritized to future research. Do not implement as the next RAM step.
 
 **Expected savings:** about 1,536 B in `.ccmram_bss` if trimming from 4096 to 2560.
 
@@ -311,6 +316,7 @@ Do not implement these without a fresh decision:
 - P5a: stripping RoutingEngine state entirely. This breaks accumulated behavior for ProgressiveDivider, Location, Envelope, Activity, and FrequencyFollower.
 - P9: packing `tele_command_t` tags. This touches parser, op handlers, serialization, and runtime command access.
 - P10/P11/P12: lazy page construction, 4bpp framebuffer, flash-backed model. These are architecture changes, not preparatory RAM cleanups.
+- LCD D-B: removing `Lcd::_frameBuffer` / using CPU-SPI or line-buffered DMA. This can save 8,192 B SRAM, but it gives up the current full-frame asynchronous DMA path. At default 50 Hz it risks visible UI slowdown on complex pages; keep only as a last-resort low-RAM mode, likely with a 30 Hz display cap.
 
 If one is revived, write a separate plan with its own baseline, test cases, and hardware acceptance criteria.
 

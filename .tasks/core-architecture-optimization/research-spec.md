@@ -64,8 +64,8 @@ Before recommending a major architectural change, apply `architecture-change-dec
 ### Architecture Problems (not just RAM)
 
 1. **Routing is now a modulation engine**, not a sidecar. It owns time-accumulated state for 5 shapers across 16 routes × 8 tracks, allocated unconditionally. It needs lifecycle semantics.
-2. **Model Container pays CurveTrack's ~10,092 B tax** because all track types share one max-sized variant. This is Note/Curve-driven, not Teletype-driven; host probes show CurveTrack is currently larger than NoteTrack, pending ARM verification.
-3. **Engine Container pays TeletypeTrackEngine's ~904 B tax** because all engine types share one max-sized variant. This IS Teletype-driven.
+2. **Model Container pays NoteTrack's 9,544 B tax** because all track types share one max-sized variant. This is Note/Curve-driven, not Teletype-driven; post-P15 ARM probes show `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `TeletypeTrack=7104`.
+3. **Engine Container pays TeletypeTrackEngine's 912 B tax** because all engine types share one max-sized variant. This IS Teletype-driven.
 4. **Pattern storage semantics diverged:** Note/Curve have 17 full sequences; Teletype has 2 swap-buffer slots; Tuesday/Indexed have param-only sequences. One model doesn't fit all.
 5. **Output ownership is deliberate dual-path** (track engines + Teletype bypass + routing + bus CV + rotation), but undocumented.
 6. **State lifecycle is scattered**: persistent project state, runtime/rebuildable state, transaction/scratch state, compatibility state, and dual-path mirror state have no formal classification.

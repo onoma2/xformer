@@ -352,7 +352,7 @@ arm-none-eabi-nm build/stm32/release/src/apps/sequencer/sequencer.elf | grep -i 
 
 2. **`updateTrackSetups()` runs every main-loop iteration.** Even though it only does work on `trackMode` change, the comparison loop (8 iterations, pointer null check + enum comparison) runs ~1000x/sec. This is cheap but worth knowing.
 
-3. **`Container<7 Track types>` vs `Container<7 TrackEngine types>` sizes are different.** Need ARM `sizeof()` for both to determine exact waste. Host probes suggest the model Container is CurveTrack-dominated (~10,120 B per track) and the engine Container is TeletypeTrackEngine-dominated (~904 B per track).
+3. **`Container<7 Track types>` vs `Container<7 TrackEngine types>` sizes are different.** Current ARM MonitorPage probes show the model container gate is `NoteTrack=9544 B` (`Track=9560 B`, `CurveTrack=9480 B`, `TeletypeTrack=7104 B`). The engine container gate is `TeletypeTrackEngine=912 B` (`Engine::TrackEngineContainer=912 B`). Teletype model shrinkage is not a current top-level model RAM win, but Teletype engine compaction/extraction can save CCMRAM if the next-largest engine is smaller.
 
 4. **Destroy-before-create is missing in both model and engine containers.** `Track::setTrackMode()` calls `_container.create<NewType>()` without destroying the old type. `Engine::updateTrackSetups()` calls `trackContainer.create<XTrackEngine>(...)` without destroying the old engine. Both rely on old types having trivial destructors. If any Track or TrackEngine type acquires non-trivial destructors (e.g., owned heap memory), this becomes a real bug. A pool architecture must not carry this forward.
 

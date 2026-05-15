@@ -46,7 +46,7 @@ Derived from `assumption-matrix.md`. Classifies every major state owner by lifec
 
 | State Owner | Category | Safe to Compact | Needs Documentation | Load-Bearing | Notes |
 |---|---|---|---|---|---|
-| `Engine::_trackEngineContainers` | Runtime-rebuildable | No | No | Yes | Max-size union. `TeletypeTrackEngine` (~904 B) dominates. Only compactable if product caps simultaneous Teletype tracks. |
+| `Engine::_trackEngineContainers` | Runtime-rebuildable | No | No | Yes | Max-size union. `TeletypeTrackEngine=912 B` dominates. Only compactable if product caps simultaneous Teletype tracks or TeletypeTrackEngine shrinks below the next-largest engine. |
 | `Engine::_trackEngines` (pointers) | Runtime-rebuildable | Yes | No | No | Pointers into `_trackEngineContainers`. Rebuilt on init. |
 | `EngineState` | Runtime-rebuildable | Yes | No | No | Running/recording flags. Rebuilt from play state. **Rebuildable on init/load only; resetting mid-play stops transport.** |
 | `Clock` | Runtime-rebuildable | Yes | No | No | BPM, tick counter. Rebuilt from `ClockSetup`. **Rebuildable on init/load only; resetting mid-play breaks timing.** |
@@ -186,7 +186,7 @@ Write path:
 |---|---|---|---|
 | `RoutingEngine::_routeStates` (conditional layout) | ~7.4 KB | **High** | Allocate `TrackState` only for routes using per-track targets with stateful shapers. Global targets need no `TrackState`. |
 | `ttSlot1Backup` + `ttSlot2Backup` | ~2,452 B | **Medium** | Consolidate to 1 shared backup buffer if rollback semantics allow atomic dual-slot restore. |
-| `TeletypeTrackEngine` in engine Container | ~1,832 B gap | **Low-Medium** | Only if product caps simultaneous Teletype tracks below 8. Requires product decision. |
+| `TeletypeTrackEngine` in engine Container | 2,592 B conditional gap; 912 B current gate vs 588 B next-largest engine | **Low-Medium** | Only if product caps simultaneous Teletype tracks below 8, or TeletypeTrackEngine shrinks below 588 B. Requires product decision. |
 | `scene_grid_t` (LITE) | Variable | **Low** | Audit unused grid fields; stub if ops excluded. |
 
 ---

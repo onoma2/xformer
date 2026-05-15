@@ -105,22 +105,22 @@ Use this table as the first interpretive layer for future passes. Container size
 - **Risk if changed:** Location, Envelope, FrequencyFollower, Activity, and ProgressiveDivider produce time-dependent output. Verify whether destroying state mid-operation causes audible artifacts. Any lifecycle change must preserve accumulated-state behavior.
 - **Research direction:** Routing needs conditional TrackState storage keyed by shaper type, with explicit create/destroy lifecycle. See Direction 3.
 
-### Mismatch 2: Model Container pays CurveTrack tax
+### Mismatch 2: Model Container pays NoteTrack tax
 
-- **Evidence:** `Track.h:273` — `Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack> _container`. `Container.h`: max-size union. Current host probes show `CurveTrack≈10,092 B`, `NoteTrack≈9,612 B`, and `Track≈10,120 B`; ARM verification is still required.
-- **What changed:** Note/Curve genuinely need all 17 sequences. Tuesday, DiscreteMap, Indexed, Teletype, and MidiCv are much smaller but pay CurveTrack's size.
-- **Cost:** 8 tracks × ~10,120 B = ~80,960 B for model Track containers. Waste depends on how many tracks are non-Curve/Note and is absolute RAM pressure even when it is not a fork-vs-fork delta.
+- **Evidence:** `Track.h:273` — `Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack> _container`. `Container.h`: max-size union. Current post-P15 ARM probes show `Track=9560 B`, `NoteTrack=9544 B`, `CurveTrack=9480 B`, `IndexedTrack=7496 B`, and `TeletypeTrack=7104 B`.
+- **What changed:** Note/Curve genuinely need all 17 sequences. Tuesday, DiscreteMap, Indexed, Teletype, and MidiCv are much smaller but pay NoteTrack's size.
+- **Cost:** 8 tracks × 9,560 B = 76,480 B for model Track containers. Waste depends on how many tracks are non-Note/Curve and is absolute RAM pressure even when it is not a fork-vs-fork delta.
 - **User-visible quirks:** None — Container uses placement new, unused bytes are never touched.
 - **Maintenance/future-feature friction:** Adding a track type to the Container template inflates all slots if the new type is larger, or forces the new type to pay NoteTrack's tax if smaller.
 - **RAM/flash side effect:** Distributed waste — only measurable per active non-Note/Curve track.
 - **Risk if changed:** Pattern copy/clear/snapshot semantics rely on value-copy of the Container variant. Splitting model storage requires redesigning these operations.
-- **Research direction:** Do not pursue model-pool implementation under current "any track can be any type" semantics; see `model-pool-decision-table.md`. Local Note/Curve sequence-header packing remains a measurement-first RAM experiment because it attacks the dominant container arms directly.
+- **Research direction:** Do not pursue model-pool implementation under current "any track can be any type" semantics; see `model-pool-decision-table.md`. P15 already reduced CurveTrack below NoteTrack, so further sequence-header packing has low current ROI.
 
 ### Mismatch 3: Engine Container pays TeletypeTrackEngine tax
 
-- **Evidence:** `Engine.h:41` — `TrackEngineContainerArray` with TeletypeTrackEngine at ~904 B vs next largest at ~675 B. Direct gap: (904 - 675) × 8 = ~1,832 B CCMRAM.
+- **Evidence:** `Engine.h:41` — `TrackEngineContainerArray` with `TeletypeTrackEngine=912 B`, `Engine::TrackEngineContainer=912 B`, and next-largest `NoteTrackEngine=588 B`. TeletypeTrackEngine currently gates every engine slot.
 - **What changed:** TeletypeTrackEngine carries CV slew arrays, envelope state machines, LFO state, Geode voice allocation, trigger dividers, pulse timers, ADC input state, and output buffers for 8 CV + 8 gate channels. Other track engines are much simpler.
-- **Cost:** ~1,832 B direct CCMRAM. Potentially more if alignment cascade is verified.
+- **Cost:** `(912 - 588) × 8 = 2,592 B` CCMRAM, conditional on capped/separate Teletype engine residency or shrinking TeletypeTrackEngine below 588 B.
 - **User-visible quirks:** None — Container is placement-new'd.
 - **Risk if changed:** Only saves RAM if Teletype engine count can be capped below 8 or allocated separately. If 8-simultaneous-Teletype is a product requirement, a separate pool of 8 engines cancels the savings. Verify whether users actually use >2 Teletype tracks.
 - **Research direction:** See Direction 1.
@@ -162,11 +162,11 @@ Use this table as the first interpretive layer for future passes. Container size
 
 ### 1. Track Lifecycle And Residency
 
-**Why it matters:** Model Container and Engine Container both use max-size variants. Model currently pays CurveTrack's ~10,092 B tax (Note/Curve genuinely need the large sequence storage). Engine pays TeletypeTrackEngine's ~904 B tax (only Teletype needs it).
+**Why it matters:** Model Container and Engine Container both use max-size variants. Model currently pays NoteTrack's 9,544 B tax (Note/Curve genuinely need the large sequence storage). Engine pays TeletypeTrackEngine's 912 B tax (only Teletype needs it).
 
 **Evidence to gather:**
 - Measure actual per-track-type model sizes: `sizeof(NoteTrack)`, `sizeof(CurveTrack)`, `sizeof(TeletypeTrack)`, `sizeof(TuesdayTrack)`, etc. (Use a temporary `static_assert` in an existing build unit, not a standalone compile.)
-- Confirm ARM target sizes and record whether CurveTrack still dominates `Track::_container`.
+- Current ARM target sizes are recorded; NoteTrack now dominates `Track::_container` after P15.
 - Check if NoteSequence storage can become lazy (active-pattern-only, loading others from flash/SD on demand).
 
 **What a good architecture would clarify:**

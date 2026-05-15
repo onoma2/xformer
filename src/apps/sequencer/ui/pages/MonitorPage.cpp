@@ -413,6 +413,15 @@ void MonitorPage::drawSizes(Canvas &canvas) {
         drawRow(6, "TEArray", sizeof(Engine::TrackEngineArray));
         drawRow(7, "MidiOutEngine", sizeof(MidiOutputEngine));
         break;
+    case 5: // Teletype
+        drawRow(0, "TTTrack", sizeof(TeletypeTrack));
+        drawRow(1, "TTSlot", sizeof(TeletypeTrack::PatternSlot));
+        drawRow(2, "scene_state", sizeof(scene_state_t));
+        drawRow(3, "tele_cmd", sizeof(tele_command_t));
+        drawRow(4, "scene_pat", sizeof(scene_pattern_t));
+        drawRow(5, "TTTE", sizeof(TeletypeTrackEngine));
+        drawRow(6, "TECont", sizeof(Engine::TrackEngineContainer));
+        break;
     }
 
     // Page indicator

@@ -90,3 +90,53 @@ You are an elite STM32 coder with advanced musical acumen, aware of EURORACK CV 
   if user asks.
 - **Conventions**: Adhere strictly to existing project style and patterns
 - **Coworker Skills**: Use modular coworker skills for bounded tasks. Refer to `COWORK.md` for detailed rules and interface contracts.
+
+## RAM Budget and Feature Gates
+
+RAM is a release gate on this firmware. Use the STM32 release build and ARM `sizeof` probes as the source of truth; do not rely on host `sizeof` estimates for RAM decisions.
+
+Budget targets:
+- **Main SRAM target:** keep `.data + .bss` at or below roughly **111-113 KB**. This is the practical feature-development budget for a 128 KB SRAM part.
+- **Hard warning zone:** `.data + .bss` above **120 KB** leaves too little operational margin. Do not add feature RAM here without identifying the exact symbol and tradeoff.
+- **CCMRAM target:** keep `.ccmram_bss` below roughly **56 KB** unless there is measured boot/runtime margin.
+- **Flash:** currently secondary; check it, but RAM is the constraint.
+
+Current measured baseline. Refresh these numbers after resource work or before major feature work:
+- `.data = 6,320`
+- `.bss = 113,640`
+- `.data + .bss = 119,960` (~91.4% of 128 KB)
+- `.ccmram_bss = 54,096`
+- `Track = 9560`
+- `NoteTrack = 9544`
+- `CurveTrack = 9480`
+- `TeletypeTrack = 7104`
+- `NoteTrackEngine = 588`
+- `TeletypeTrackEngine = 912`
+- `Engine::TrackEngineContainer = 912`
+
+For model/track-type work:
+- If a new or changed track model stays below the current largest `Track::_container` arm (`NoteTrack`, currently 9544 B), it should not increase top-level `Model` RAM through the 8-track container.
+- If it exceeds the current max, every byte over the max is multiplied by 8 tracks in the top-level model container.
+- Sequence-packing follow-ups are low priority while `NoteTrack` is only 64 B larger than `CurveTrack`; the likely top-level container win is small.
+- `TeletypeTrack=7104 B` is below the current model gate. Teletype model cleanup can still improve local semantics, but it is not a top-level model RAM win unless the container architecture or model gate changes.
+
+Container mental model:
+- `Container<A, B, C>` is static variant storage implemented as an aligned byte buffer sized to `max(sizeof(A), sizeof(B), sizeof(C))`.
+- `_container.create<T>()` placement-news one active type into that storage; `_container.as<T>()` reinterprets the same storage as the active type.
+- Every owner pays for the largest possible type, not the currently selected type. Eight `Track` objects means eight max-sized `Track::_container` buffers even if some tracks are tiny modes.
+- Small track-type savings matter only when they reduce the current largest arm or a direct member outside the container.
+
+For engine work:
+- Apply the same rule to the track-engine container. A new or changed track engine below the current largest engine does not inflate the engine container; anything above the current max multiplies across 8 engine slots in CCMRAM.
+- `TeletypeTrackEngine=912 B` currently equals `Engine::TrackEngineContainer=912 B`, so it is the engine container gate. The next-largest measured engine is `NoteTrackEngine=588 B`, so engine extraction/compaction has a conditional direct gap of `(912 - 588) * 8 = 2592 B` CCMRAM.
+
+Always still check direct RAM additions:
+- New globals, static buffers, page members, queues, lookup tables, file buffers, DMA buffers, and task stacks count directly even when model/engine container sizes stay below their gates.
+- Tables that are immutable should live in flash/rodata, not `.data`.
+- DMA buffers generally must stay in normal SRAM; CCMRAM is not DMA-accessible on STM32F4.
+
+Feature branch RAM acceptance check:
+- Build STM32 release: `cd build/stm32/release && make sequencer`.
+- Check `.data`, `.bss`, `.ccmram_bss`, `Model`, `Engine`, `Track`, changed track type sizes, and changed engine type sizes.
+- If only flash grows and RAM sections/container gates are flat, RAM should not block the feature.
+- If RAM grows, identify the exact symbol or container cliff before proposing architecture changes.

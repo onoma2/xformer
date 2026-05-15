@@ -57,27 +57,27 @@ Claims from existing analysis documents that are superseded by newer probe data:
 
 ## 4. ARM Sizes — Consolidated from All Sources
 
-Sizes marked (host) are from `ram-recovery-experiments.md` host probe. Sizes marked (ARM/nm) are from `resource-optimization/TASK.md` nm analysis. All marked **(unverified)** need ARM `static_assert` confirmation.
+Current sizes are ARM MonitorPage values after P15 unless noted.
 
 ### Model Track Types
 
-| Type | Host Size | ARM Verified? | Notes |
+| Type | ARM Size | Notes |
 |---|---|---|---|
-| **CurveTrack** | ~10,092 B | **(unverified)** | Current max type. 17 × CurveSequence (steps + headers). Dominates `Track::_container`. |
-| **NoteTrack** | ~9,612 B | **(unverified)** | 17 × NoteSequence (steps + headers). ~480 B less than CurveTrack. |
-| **IndexedTrack** | ~4,000 B | **(unverified)** | 17 × IndexedSequence × ~232 B each |
-| **TeletypeTrack** | ~2,800 B | **(unverified)** | scene_state_t (1,226 B) + 2× PatternSlot + misc |
-| **DiscreteMapTrack** | ~1,800 B | **(unverified)** | 32 stages × ~50 B + 17 sequence metadata |
-| **TuesdayTrack** | ~500 B | **(unverified)** | 17 × TuesdaySequence (params only) |
-| **MidiCvTrack** | ~200 B | **(unverified)** | Minimal — config + CV routing |
+| **NoteTrack** | **9,544 B** | Current max type after P15; dominates `Track::_container`. |
+| **CurveTrack** | **9,480 B** | 64 B below NoteTrack after P15. |
+| **IndexedTrack** | **7,496 B** | Larger than early estimates, but below Note/Curve. |
+| **TeletypeTrack** | **7,104 B** | `scene_state_t` (4,640 B) + 2× PatternSlot (2,452 B) + small fields/padding. |
+| **DiscreteMapTrack** | **2,196 B** | 32 stages + 17 sequence metadata. |
+| **TuesdayTrack** | **718 B** | 17 TuesdaySequence parameter objects + track fields. |
+| **MidiCvTrack** | **24 B** | Minimal stub type. |
 
-**Container per track = maxsizeof(CurveTrack) ≈ 10,120 B (host). 8 tracks × 10,120 B ≈ 80,960 B in `.bss`.**
+**Container per track = Track=9,560 B. 8 tracks × 9,560 B = 76,480 B in `.bss`.**
 
 ### Engine Track Types
 
 | Type | ARM Size | Source | Notes |
 |---|---|---|---|
-| **TeletypeTrackEngine** | ~904 B | nm analysis (resource-optimization/TASK.md) | Current max type. GeodeEngine, LFO, envelope, CV slew, 8×CV+8×gate |
+| **TeletypeTrackEngine** | 912 B | MonitorPage SIZES page 6 | Current max type. GeodeEngine, LFO, envelope, CV slew, 8×CV+8×gate |
 | **NoteTrackEngine** | ~590 B | estimate (Modulove comparison) | |
 | **CurveTrackEngine** | ~590 B | estimate | |
 | **TuesdayTrackEngine** | ~500 B | estimate | |
@@ -85,16 +85,16 @@ Sizes marked (host) are from `ram-recovery-experiments.md` host probe. Sizes mar
 | **IndexedTrackEngine** | ~400 B | estimate | |
 | **MidiCvTrackEngine** | ~300 B | estimate | |
 
-**Container per track = maxsizeof(TeletypeTrackEngine) ≈ 904 B. 8 tracks × 904 B ≈ 7,232 B in `.ccmram`.**
+**Container per track = TrackEngineContainer=912 B. 8 tracks × 912 B = 7,296 B in `.ccmram`.**
 
 ### Key Derived Numbers
 
 | Quantity | Value | Location |
 |---|---|---|
-| Model Container total | ~80,960 B | `.bss` |
-| Engine Container total | ~7,232 B | `.ccmram` |
-| **Combined Container total** | **~88,192 B** | |
-| TeletypeTrackEngine direct gap | (904 - 590) × 8 = ~2,512 B | `.ccmram` |
+| Model Container total | 76,480 B | `.bss` |
+| Engine Container total | 7,296 B | `.ccmram` |
+| **Combined Container total** | **83,776 B** | |
+| TeletypeTrackEngine direct gap | (912 - 588) × 8 = 2,592 B conditional | `.ccmram` |
 | RoutingEngine TrackState total | 56 B × 8 × 16 = 7,168 B | `.ccmram` |
 
 ---
@@ -122,17 +122,17 @@ This is exactly the current `Container<T...>`. Already minimum static representa
 
 ### Option C: Hybrid — Extract Teletype from Both Containers
 
-Remove TeletypeTrack from model Container and TeletypeTrackEngine from engine Container. Container max shrinks to CurveTrack/NoteTrackEngine respectively.
+Remove TeletypeTrack from model Container and TeletypeTrackEngine from engine Container. Current measurements show model extraction is not useful because TeletypeTrack is already below NoteTrack; only engine extraction can reduce a container gate.
 
 | Component | Per-Track | ×8 Tracks | Extra Pool | Total | Location |
 |---|---|---|---|---|---|
-| Model Container (max = CurveTrack) | ~10,120 B | ~80,960 B | — | — | `.bss` |
-| TeletypeTrackPool[2] | — | — | 2 × ~2,800 = 5,600 B | — | `.bss` |
+| Model Container (max = NoteTrack) | 9,560 B | 76,480 B | — | — | `.bss` |
+| TeletypeTrackPool[2] | — | — | 2 × 7,104 = 14,208 B | — | `.bss` |
 | Engine Container (max = NoteTrackEngine) | ~590 B | ~4,720 B | — | — | `.ccmram` |
-| TeletypeTrackEnginePool[2] | — | — | 2 × ~904 = 1,808 B | — | `.ccmram` |
-| **Total hybrid** | | | | **~93,088 B** | |
+| TeletypeTrackEnginePool[2] | — | — | 2 × 912 = 1,824 B | — | `.ccmram` |
+| **Total hybrid** | | | | **worse for model RAM unless Teletype count is capped and model semantics change** | |
 
-**vs status quo 88,192 B: +4,896 B WORSE.** Extracting Teletype saves Container slots but the extracted pool adds back more than it saves because CurveTrack still dominates the model Container.
+Extracting TeletypeTrack from the model container saves nothing under current gates because `Track::_container` is sized by NoteTrack. Extracting TeletypeTrackEngine remains plausible only as a separate engine-side cap/lifecycle decision.
 
 ### Option D: Lazy Sequence Storage (Active Pattern Only)
 

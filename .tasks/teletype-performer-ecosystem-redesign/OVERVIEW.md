@@ -393,7 +393,7 @@ scene_state_t (one per TeletypeTrack)
 │   │   param_range, param_scale                ~20 B
 │   └─  (fader arrays excluded in LITE)
 │
-├── patterns[4] (scene_pattern_t)       4×136  = 544 B
+├── patterns[4] (scene_pattern_t)       4×138  = 552 B
 │   ├─  idx, len, wrap, start, end     5×int16  10 B
 │   └─  val[64]                        64×int16 128 B
 │
