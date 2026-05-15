@@ -4,20 +4,28 @@
 Port Modulove-style global LFO modulators into XFORMER as a standalone feature, starting with a smaller V1: project-level modulators that can offset physical CV outputs after track/routing selection. This fills a real gap between CurveTrack sequenced CV, Teletype script-local LFOs, and RoutingEngine shapers.
 
 ## Status
-Active. V1 engine + full Modulove-matching UI implemented on `feat/modulators`. Phase 6 (hardware verification) pending.
+Active. V1 engine + Modulove-matching UI (minus ADSR/MIDI CC) implemented on `feat/modulators`. Needs hardware verification, then V2 (ADSR, MIDI CC, cleanup).
 
 ## V1 scope
 - 8 global modulators (`CONFIG_MODULATOR_COUNT = 8`).
 - Waveforms: sine, triangle, saw up, saw down, square, random.
-- Modes: free-running and gate-sync/retrigger if cheap to preserve from Modulove.
+- Modes: free-running and gate-sync/retrigger (matching Modulove — phase always advances, gate resets on rising edge only).
 - Output target: physical CV outputs only.
 - Modulator value applied as post-track/post-routing CV offset in volts.
-- Basic model serialization for project save/load.
-- Basic UI page can come after model/engine/output integration is measured.
+- Project serialization (unguarded — reads unconditionally per project rule).
+- Full Modulove-matching UI: waveform viz with playhead, level bar, dynamic footer, track LED selection, context menu for CV routing.
 
 ## Explicit non-goals for V1
 - No MIDI CC output routing.
-- No ADSR until the core LFO/random path is working and measured.
+- No ADSR shape.
+- No full Modulove routing overlay (Shift+Page for mode/gate/target).
+- No quick-map popup beyond context menu Route toggle.
+
+## V2 scope (next)
+- ADSR shape (7th waveform with attack/decay/sustain/release/amplitude)
+- MIDI CC output routing (routing overlay, target selection, CC number)
+- Remove passive mode label, add Mode as editable F6 parameter
+- Port Shift+Page routing overlay for mode/gate/target editing
 - No quick-map popup.
 - No full Modulove page clone before engine/model proof.
 - No interaction with Teletype CV source combiner. This is a global output layer; Teletype combiner is local Teletype source ownership.
