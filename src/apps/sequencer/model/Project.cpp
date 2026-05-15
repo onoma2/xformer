@@ -166,6 +166,8 @@ void Project::write(VersionedSerializedWriter &writer) const {
     writeArray(writer, _modulators);
     writeArray(writer, _cvOutputModulators);
 
+    writer.write(_selectedModulatorIndex);
+
     _song.write(writer);
     _playState.write(writer);
     _routing.write(writer);
@@ -219,6 +221,8 @@ bool Project::read(VersionedSerializedReader &reader) {
 
     readArray(reader, _modulators);
     readArray(reader, _cvOutputModulators);
+
+    reader.read(_selectedModulatorIndex);
 
     _song.read(reader);
     _playState.read(reader);

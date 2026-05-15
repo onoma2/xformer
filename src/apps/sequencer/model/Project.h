@@ -397,6 +397,17 @@ public:
         setCvOutputModulator(index, cvOutputModulator(index) + value);
     }
 
+    // selectedModulatorIndex
+
+    int selectedModulatorIndex() const { return _selectedModulatorIndex; }
+    void setSelectedModulatorIndex(int index) {
+        _selectedModulatorIndex = clamp(index, 0, CONFIG_MODULATOR_COUNT - 1);
+    }
+
+    // modulator convenience
+    const Modulator &selectedModulator() const { return _modulators[_selectedModulatorIndex]; }
+          Modulator &selectedModulator()       { return _modulators[_selectedModulatorIndex]; }
+
     // song
 
     const Song &song() const { return _song; }
@@ -587,6 +598,7 @@ private:
     GateOutputArray _gateOutputTracks;
     ModulatorArray _modulators;
     CvOutputModulatorArray _cvOutputModulators{};
+    int _selectedModulatorIndex = 0;
     Song _song;
     PlayState _playState;
     Routing _routing;

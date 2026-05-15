@@ -4,7 +4,7 @@
 Port Modulove-style global LFO modulators into XFORMER as a standalone feature, starting with a smaller V1: project-level modulators that can offset physical CV outputs after track/routing selection. This fills a real gap between CurveTrack sequenced CV, Teletype script-local LFOs, and RoutingEngine shapers.
 
 ## Status
-Active. Phases 1-5 implemented on `feat/modulators`; model, engine, CV output integration, and basic UI page are wired up. Phase 6 (hardware verification) pending.
+Active. V1 engine + full Modulove-matching UI implemented on `feat/modulators`. Phase 6 (hardware verification) pending.
 
 ## V1 scope
 - 8 global modulators (`CONFIG_MODULATOR_COUNT = 8`).
@@ -63,6 +63,13 @@ Active. Phases 1-5 implemented on `feat/modulators`; model, engine, CV output in
 - [x] Phase 3: Modulator tick in Engine::update() tick loop, gate source from configured track.
 - [x] Phase 4: applyModulatorOffset() in Engine::updateTrackOutputs() for all three CV output paths (rotation, track-CV, route-lane). No modulation during override.
 - [x] Phase 5: ModulatorListModel + ModulatorPage (ListPage), TopPage Mode::Modulator navigation, Pages.h integration.
+- [x] Phase 5b: Full UI rewrite — ModulatorPage as BasePage with waveform viz, playhead, level bar, dynamic footer, track LED selection, context menu for CV routing. selectedModulatorIndex in Project. Removed ModulatorListModel.
+
+## Remaining gaps to full Modulove parity (not in V1 scope)
+- ADSR shape (7th waveform with attack/decay/sustain/release/amplitude)
+- MIDI CC output routing (routing overlay with target selection, CC number, Note vs CC)
+- Pagination (ADSR needs 2 pages — not needed without ADSR)
+- Waveform cache only invalidates on parameter change (could add engine tick invalidation)
 - [ ] Phase 6: Hardware verification and RAM gate check.
 
 ## RAM measurements (feat/modulators branch)
