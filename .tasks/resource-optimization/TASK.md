@@ -16,11 +16,11 @@ XFORMER firmware is at 97% RAM capacity (127,420 bytes out of 128 KB) with only 
 - **P5 complete and hardware-verified.** Union-based RoutingEngine TrackState compaction saved 4,096 B CCMRAM; creaseEnabled cleanup + serialization fix saved 128 B `.bss` and fixed shaper save/load.
 - **P15 complete.** CurveSequence parameter narrowing flipped the model container max from CurveTrack to NoteTrack and reduced `.bss` by 4,760 B total across P15a/P15b. Current MonitorPage values: `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Engine=11492`, `Model=88072`, `Project=78012`.
 - Current build after P15b: `.text=763,436`, `.data=6,320`, `.bss=113,640`, `.ccmram_bss=54,096`; total SRAM `.data + .bss = 119,960` (91.4%).
-- P6 sparse/capped shaper-state allocation is deferred; it needs a separate design around stateful-shaper caps or sparse allocation.
+- P6 sparse/capped shaper-state allocation is deferred. The only now-clear medium-size version is a product constraint: only the first N routing lanes have stateful shaper memory. Estimated savings after P5: first 4 lanes => ~2.3 KB CCMRAM, first 8 lanes => ~1.5 KB CCMRAM.
 - P15 follow-on NoteSequence packing is low ROI now: `NoteTrack=9544` and `CurveTrack=9480`, so only 64 B per Track slot is available before CurveTrack becomes the max again. Treat model/sequence packing as done for now.
 - P4b Teletype backup consolidation is deferred to research because read failure rollback currently restores both slots and is not a simple one-buffer cleanup.
 - P13 file task stack trimming is deprioritized to future research. It requires trustworthy watermark evidence and is not the next RAM recovery step.
-- **USB/FS symbol audit complete.** Combined USB+FS SRAM residents are about 6.2 KB, but nearly all are functional buffers. Realistic no-behavior-change win is only about 700-1,000 B, mainly `DirBuf` (~608 B, dead when `FF_USE_LFN=0`) plus minor struct padding cleanup.
+- **USB/FS symbol audit complete.** Combined USB+FS SRAM residents are about 6.2 KB, but nearly all are functional buffers. The original `DirBuf` headline win is already absent from the ELF (`FF_USE_LFN=0`); remaining safe cleanup is only minor struct packing, likely ~100-300 B after ARM verification.
 
 ## Restructured Implementation Queue
 
@@ -28,10 +28,11 @@ XFORMER firmware is at 97% RAM capacity (127,420 bytes out of 128 KB) with only 
 2. ~~**P5 RoutingEngine union compaction:**~~ complete, committed, and hardware-verified; `TrackStateUnion` reduced CCMRAM by 4,096 B.
 3. ~~**P15 CurveSequence-first header packing:**~~ complete; `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`.
 4. **Next active research/spec:** Teletype slot backup consolidation (`ttSlot1Backup`/`ttSlot2Backup`) needs a rollback transaction design before implementation.
-5. ~~**Post-P15 USB/FS symbol audit:**~~ complete; no hidden large SRAM target found. Only safe near-term cleanup is `DirBuf` + small packing (~700-1,000 B).
-6. **Deferred research:** TeletypeTrackEngine container extraction targets CCMRAM and needs live-Teletype-engine/product-cap decisions.
-7. **Future research:** P13 file task stack trim only after hardware watermark evidence; do not keep it in the active implementation queue.
-8. **Do not touch soon:** LCD packed DMA buffer removal / line-buffered DMA (`Lcd::_frameBuffer`, 8,192 B SRAM) is researched as conditional no-go for near-term work. It saves SRAM but trades away the current asynchronous full-frame DMA path and likely forces 30 Hz / worse UI timing on complex pages.
+5. ~~**Post-P15 USB/FS symbol audit:**~~ complete; `DirBuf` already not compiled (`FF_USE_LFN=0`), remaining safe win is ~100-300 B struct packing only (~700-1,000 B original estimate reduced after confirming DirBuf is dead code).
+6. **Maybe later:** P6 capped stateful RoutingEngine lanes. If the product accepts "only routing lanes 1-N have stateful shapers", a static `TrackStateUnion[N][8]` recovers ~2.3 KB CCMRAM for N=4 or ~1.5 KB for N=8.
+7. **Deferred research:** TeletypeTrackEngine container extraction targets CCMRAM and needs live-Teletype-engine/product-cap decisions.
+8. **Future research:** P13 file task stack trim only after hardware watermark evidence; do not keep it in the active implementation queue.
+9. **NO-GO:** LCD packed Canvas (D-A) — 16,384 B CCMRAM is the biggest real target but touches FrameBuffer/Canvas/blitting with visual regression risk; not casual. LCD D-B (`Lcd::_frameBuffer`, 8,192 B SRAM) remains conditional no-go: saves SRAM but trades away asynchronous full-frame DMA.
 
 Do not start a model-pool/container-pool implementation under current semantics. `.tasks/core-architecture-optimization/model-pool-decision-table.md` records the decision: the current `Container<T...>` is the best static representation for "any track can be any type"; per-type pools save RAM only with explicit simultaneous track-type caps.
 
@@ -453,21 +454,22 @@ USB/FS SRAM residents total about 6.2 KB, but most of that storage is functional
 
 Verdict:
 - No hidden 8 KB SRAM target exists in USB/FS.
-- The only guaranteed dead/near-dead target is `DirBuf` (~608 B) because `FF_USE_LFN=0`; wrap it in `#if FF_USE_LFN` or remove it only after confirming the local FatFs config path.
-- Minor struct packing (`usbh_device_t`, `channel_t`, `hid_device_t`) may recover another ~100-300 B, but must be verified on ARM and should not change USB behavior.
+- `DirBuf` (~608 B) is **already not compiled** — `FF_USE_LFN == 0` and `FF_FS_EXFAT == 0` cause the `#if FF_USE_LFN == 0` branch to be taken, which defines empty macros and never declares `DirBuf` or `LfnBuf`. Confirmed absent from ELF symbols via `nm`. The bootloader FatFs copy also has `FF_USE_LFN == 0`. No cleanup needed.
+- Current measured SRAM residents: `driver_data_fs` 2,800 B (.data), `filePool` 1,116 B (.bss), `hid_device` 560 B (.bss), `channels_fs` 288 B (.bss), `_ZL4usbh` 188 B (.bss), `FatFs` 4 B (.bss), `usbh_data` 16 B (.bss).
+- Minor struct packing (`usbh_device_t`, `channel_t`, `hid_device_t`) may recover ~100-300 B, but must be verified on ARM and should not change USB behavior.
 - Product-level config reductions can save more, but they change behavior: reducing `USBH_MAX_DEVICES`, HID/MIDI device counts, or `BUFFER_ONE_BYTES` may break hubs, multiple MIDI/HID devices, or composite descriptors.
 
-Realistic no-behavior-change SRAM win: about 700-1,000 B.
+Realistic no-behavior-change SRAM win: ~100-400 B (DirBuf is already gone; remaining wins are struct packing only).
 
-### Strategy E2: Display buffer architecture (researched; do not touch soon)
+### Strategy E2: Display buffer architecture (confirmed no-go)
 
 Current display memory:
 - `Ui::_frameBufferData[256*64]` = 16,384 B in CCMRAM. This is the 8-bit Canvas working buffer.
 - `Lcd::_frameBuffer[256*64/2]` = 8,192 B in normal SRAM. This is the packed 4-bit DMA buffer; DMA cannot read CCMRAM on STM32F4.
 
-Near-term verdict:
+Verdict:
+- **D-A / packed Canvas framebuffer: NO-GO.** The 16,384 B 8-bit UI buffer is the biggest CCMRAM target, but it touches FrameBuffer/Canvas/blitting and requires visual regression testing across every page. The savings are in CCMRAM (not main SRAM), and the risk of subtle rendering bugs is high. Marked as no-go for now.
 - **D-B / remove `Lcd::_frameBuffer`: conditional no-go.** CPU-SPI streaming or line-buffered DMA can recover 8,192 B SRAM, but it replaces the current asynchronous full-frame DMA transfer with blocking transfer/restart work. At default 50 Hz, complex pages can exceed the UI frame budget. Keep this only as a last-resort `CONFIG_LCD_LOW_RAM_MODE` idea, likely paired with a 30 Hz display cap and hardware validation.
-- **D-A / packed Canvas framebuffer:** possible CCMRAM cleanup, not main SRAM recovery. It may save the 16,384 B UI working buffer in CCMRAM, but it does not move `.data + .bss` toward the main SRAM target.
 
 Do not propose LCD buffer removal as an easy 8 KB win in the active RAM plan. Prefer USB/FS symbol audit and Teletype file transaction-buffer research first.
 
@@ -551,17 +553,31 @@ All five stateful shapers were checked on hardware. Shaper configuration now sav
 Do **not** go straight to NoteSequence or P13.
 
 1. Research/spec the Teletype file-load backup transaction before touching `ttSlot1Backup` / `ttSlot2Backup`: define what gets snapshotted, when clearing is allowed, and what must be restored after malformed multi-slot files.
-2. Optionally take the very small USB/FS safe cleanup (`DirBuf` guarded by `FF_USE_LFN`, plus measured struct padding) if a low-risk ~1 KB SRAM win is useful.
+2. Do not pursue USB/FS as active RAM recovery; `DirBuf` is already absent and remaining safe struct-packing cleanup is only ~100-300 B after ARM verification.
 3. Only then choose whether to pursue Teletype transaction-buffer changes or defer more RAM recovery.
 
 ## Future research
 - P4b — Teletype slot backup consolidation. Deferred because `readTeletypeTrack()` currently restores both PatternSlots on parse/read failure; one shared backup would change rollback semantics unless the load transaction is redesigned.
-- P6 — Sparse/capped RoutingEngine state allocation. Deferred until there is a design for stateful-shaper caps or sparse allocation.
+- P6 — Capped stateful RoutingEngine lanes. Maybe later, if the product accepts that only the first N routing lanes can use stateful shapers; stateless shapers still work on all 16 lanes. After P5, estimated savings are ~2.3 KB CCMRAM for N=4 or ~1.5 KB for N=8. This is the only remaining medium-level RAM option with a clear static layout.
 - P7 — Extract TeletypeTrackEngine from Container variant. Deferred because it targets CCMRAM and requires a capped live Teletype engine pool or equivalent lifecycle contract. Preserving "any/all 8 tracks can be Teletype" requires separate storage for all 8 TeletypeTrackEngines and does not recover RAM.
 - P13 — File task stack trim. Deprioritized to future research; requires reliable hardware watermark data across worst-case save/load/malformed-file flows before any stack size reduction.
 - NoteSequence header packing. Low ROI after P15 because the Track container max is now NoteTrack by only 64 B over CurveTrack.
-- LCD D-B — remove `Lcd::_frameBuffer` / line-buffered DMA. Deprioritized as near-term no-go because it saves 8 KB SRAM by sacrificing the current full-frame asynchronous DMA path and likely requires a display FPS cap on complex pages.
-- USB/FS config reductions — reducing USB device counts or `BUFFER_ONE_BYTES` is deferred because it changes supported hub/composite/MIDI/HID behavior. Safe cleanup is limited to `DirBuf` and small packing.
+- LCD D-A — packed Canvas framebuffer. Confirmed NO-GO. The 16,384 B 8-bit UI CCMRAM buffer is the biggest real memory target, but it touches FrameBuffer/Canvas/blitting and needs visual regression testing. Not casual; marked as no-go for now.
+- LCD D-B — remove `Lcd::_frameBuffer` / line-buffered DMA. Conditional no-go: saves 8 KB SRAM but sacrifices asynchronous full-frame DMA, likely requiring 30 Hz cap and hardware validation. Last-resort only.
+- USB/FS config reductions — reducing USB device counts or `BUFFER_ONE_BYTES` is deferred because it changes supported hub/composite/MIDI/HID behavior. Safe cleanup is limited to struct packing (~100-300 B after ARM verification). `DirBuf` is already not compiled (`FF_USE_LFN=0`).
+
+## Remaining medium-level RAM conclusion
+
+As of 2026-05-16, the medium-level no-drama RAM queue is effectively exhausted:
+
+- P5 and P15 are done.
+- Teletype Phase 4 is done and verified.
+- USB/FS has no hidden safe target; `DirBuf` is absent from the ELF.
+- P13 needs stack watermark proof.
+- LCD/display work is large-risk UI architecture.
+- Model/container pooling is no-go under current "any track can be any type" semantics.
+
+The only meaningful medium option left is the explicit P6 product constraint above: cap stateful shaper memory to the first N routing lanes. Everything else is either micro-cleanup, future research, or major architecture work.
 
 ## Branch
 refactor/resouce-optimization

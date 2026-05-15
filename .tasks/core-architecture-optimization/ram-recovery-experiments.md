@@ -306,4 +306,6 @@ These are architecture-level ideas that do not meet the criteria for RAM recover
 
 5. **Separate ModulationEngine subsystem** — Would give RoutingEngine modulation state an explicit lifecycle (create/destroy shaper state on configuration change). This is an architecture clarification, not a RAM experiment. The RAM savings come from Experiment A (conditional state), which can be done independently.
 
-6. **State lifecycle formalization** — Documenting which state is persistent, rebuildable, transactional, compatibility, and mirror. No direct RAM savings, but reduces conceptual debt. See `architecture-research-directions.md` Direction 5.
+6. **Capped stateful routing lanes** — Maybe-later P6 variant. Instead of dynamic sparse allocation, use a static state array only for the first N routing lanes, e.g. `TrackStateUnion statefulShaperState[4][8]`. Lanes above N still support stateless shapers but cannot use stateful shapers. After P5, expected savings are ~2,304 B CCMRAM for N=4 or ~1,536 B for N=8. This is a product constraint, not a transparent optimization.
+
+7. **State lifecycle formalization** — Documenting which state is persistent, rebuildable, transactional, compatibility, and mirror. No direct RAM savings, but reduces conceptual debt. See `architecture-research-directions.md` Direction 5.

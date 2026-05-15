@@ -187,13 +187,25 @@ Each variant ~16-24 B vs current ~56 B. Non-shaper tracks (None, Crease, Triangl
 
 **Files**: `src/apps/sequencer/engine/RoutingEngine.h`, `RoutingEngine.cpp`
 
-#### P6 — Skip TrackState for non-per-track routes
+#### P6 — Cap stateful RoutingEngine lanes (maybe later)
 
-**What**: Routes targeting global targets (Tempo, Swing, Play, Record, CvRouteScan, CvRouteRoute, Mute, Fill, Pattern) don't need per-track shaping. Identified by `Routing::isPerTrackTarget()`. Conditional allocation: only per-track routes carry TrackState[8].
+**What**: After P5, each shaper state slot is already a 24 B union. Bus routes use only slot 0, engine/project routes use no shaper state, and per-track routes can use up to all 8 slots. Because `RouteState[16]` is fixed-layout and routes can retarget at runtime, merely restricting shapers on bus/engine routes does not save RAM.
 
-**Savings**: ~56 B × 8 × 6 (non-per-track routes) = **~2,688 B**  
-**Effort**: Medium — conditional TrackState allocation in RouteState, branching in `updateSinks()`  
-**Risk**: Low — `isPerTrackTarget()` already classifies targets; routes are type-checked at model level
+The static RAM-saving variant is a product constraint: only the first N routing lanes have stateful shaper memory. Stateless shapers remain available on all 16 lanes.
+
+Example layout:
+
+```cpp
+RouteState routeStates[16];              // target/tracks/shaper cache only
+TrackStateUnion statefulShaperState[4][8]; // lanes 1-4 only
+```
+
+**Savings after P5**:
+- N=4: current `16 × 8 × 24 = 3,072 B` → `4 × 8 × 24 = 768 B`, save **~2,304 B CCMRAM**
+- N=8: save **~1,536 B CCMRAM**
+
+**Effort**: Medium — split state storage from `RouteState`, gate stateful shaper access by lane index, update reset/change logic  
+**Risk**: Medium — user-visible routing constraint; stateful shapers unavailable on lanes above N  
 
 **Files**: `src/apps/sequencer/engine/RoutingEngine.h`, `RoutingEngine.cpp`
 

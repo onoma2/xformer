@@ -4,7 +4,7 @@ _Updated: 2026-05-15_
 ## 🔴 resource-optimization — RAM & Flash budget recovery
 **Status:** active — P1/P5/P15 hardware/build-verified; model storage is solved for now.
 **Where I stopped:** Current build is `.data=6,320`, `.bss=113,640`, `.ccmram_bss=54,096`; MonitorPage shows `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`.
-**Next action:** Research Teletype file-load backup transaction semantics; USB/FS audit found only ~700-1,000 B safe SRAM, and P13/LCD D-B remain future/last-resort research.
+**Next action:** Research Teletype file-load backup transaction semantics; USB/FS DirBuf already dead (FF_USE_LFN=0), remaining safe win ~100-300 B struct packing only; LCD packed Canvas (D-A) confirmed no-go; P13/LCD D-B remain future/last-resort research.
 **Depends on:** nothing
 **Branch:** refactor/resouce-optimization
 
