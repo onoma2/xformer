@@ -626,17 +626,20 @@ static const char *rootNoteName(int8_t note, FixedStringBuilder<8> &buffer) {
 }
 
 namespace {
-    // Shared Teletype slot buffers to avoid large stack usage in file task.
-    TeletypeTrack::PatternSlot ttSlot1;
-    TeletypeTrack::PatternSlot ttSlot2;
-    TeletypeTrack::PatternSlot ttSlot1Backup;  // Rollback backup for readTeletypeTrack
-    TeletypeTrack::PatternSlot ttSlot2Backup;  // Rollback backup for readTeletypeTrack
+    // Shared Teletype clip buffers to avoid large stack usage in file task.
+    // Phase 4: active-only format. 2 buffers instead of 4.
+    TeletypeTrack::PatternSlot ttActiveClip;       // Parse target for read
+    TeletypeTrack::PatternSlot ttActiveClipBackup;  // Rollback backup for read
     char ttLineBuffer[256];
+
+    // Shared S1-S3 script backup for read transaction rollback.
+    struct {
+        uint8_t lengths[3];
+        std::array<tele_command_t, TeletypeTrack::ScriptLineCount> commands[3];
+    } ttSharedScriptsBackup;
 }
 
-static void writeSlotIo(fs::FileWriter &writer, int slotIndex, const TeletypeTrack::PatternSlot &slot) {
-    writeLine(writer, FixedStringBuilder<8>("SLOT %d", slotIndex + 1));
-
+static void writeSlotIo(fs::FileWriter &writer, const TeletypeTrack::PatternSlot &slot) {
     for (int i = 0; i < TeletypeTrack::TriggerInputCount; ++i) {
         const char *name = TeletypeTrack::triggerInputSourceName(slot.triggerInputSource[i]);
         writeLine(writer, FixedStringBuilder<32>("TI-TR%d %s", i + 1, name ? name : "None"));
@@ -683,10 +686,9 @@ static void writeSlotIo(fs::FileWriter &writer, int slotIndex, const TeletypeTra
     writeLine(writer, FixedStringBuilder<16>("RESET.METRO %d", slot.resetMetroOnLoad ? 1 : 0));
 }
 
-static void writePatterns(fs::FileWriter &writer, int slotIndex, const TeletypeTrack::PatternSlot &slot) {
-    writeLine(writer, FixedStringBuilder<8>("SLOT %d", slotIndex + 1));
+static void writePatterns(fs::FileWriter &writer, const scene_state_t &state) {
     for (int p = 0; p < PATTERN_COUNT; ++p) {
-        const auto &pat = slot.patterns[p];
+        const auto &pat = state.patterns[p];
         writeLine(writer, FixedStringBuilder<24>("P%d LEN %d", p + 1, pat.len));
         writeLine(writer, FixedStringBuilder<24>("P%d WRAP %d", p + 1, pat.wrap));
         writeLine(writer, FixedStringBuilder<24>("P%d START %d", p + 1, pat.start));
@@ -711,26 +713,26 @@ fs::Error FileManager::writeTeletypeTrack(const TeletypeTrack &track, const char
     const char *safeName = (name && name[0]) ? name : "TELETYPE";
     writeLine(fileWriter, FixedStringBuilder<64>("NAME %s", safeName));
 
-    // Avoid large PatternSlot copies on the file task stack.
-    ttSlot1 = track.clipSnapshot(0);
-    ttSlot2 = track.clipSnapshot(1);
+    // IO/config comes from stored clip config (routing, not script content).
+    // S4/M/PATS come from live VM state — text save exports what the Teletype
+    // is actually running, which may differ from last-captured clip if scripts
+    // mutate patterns at runtime.
+    const auto &activeClip = track.activeClipConfig();
+    const scene_state_t &state = track.state();
+    constexpr int SlotScriptIndex = TeletypeTrack::SlotScriptIndex;
 
     writeLine(fileWriter, "#IO");
-    writeSlotIo(fileWriter, 0, ttSlot1);
-    writeSlotIo(fileWriter, 1, ttSlot2);
+    writeSlotIo(fileWriter, activeClip);
 
-    writeScriptSection(fileWriter, "#S4P1", ttSlot1.slotScript, ttSlot1.slotScriptLength);
-    writeScriptSection(fileWriter, "#M1", ttSlot1.metro, ttSlot1.metroLength);
-    writeScriptSection(fileWriter, "#S4P2", ttSlot2.slotScript, ttSlot2.slotScriptLength);
-    writeScriptSection(fileWriter, "#M2", ttSlot2.metro, ttSlot2.metroLength);
-    const scene_state_t &state = track.state();
+    writeScriptSectionRaw(fileWriter, "#S4", state.scripts[SlotScriptIndex].c, state.scripts[SlotScriptIndex].l);
+    writeScriptSectionRaw(fileWriter, "#M", state.scripts[METRO_SCRIPT].c, state.scripts[METRO_SCRIPT].l);
+
     writeScriptSectionRaw(fileWriter, "#S1", state.scripts[0].c, state.scripts[0].l);
     writeScriptSectionRaw(fileWriter, "#S2", state.scripts[1].c, state.scripts[1].l);
     writeScriptSectionRaw(fileWriter, "#S3", state.scripts[2].c, state.scripts[2].l);
 
     writeLine(fileWriter, "#PATS");
-    writePatterns(fileWriter, 0, ttSlot1);
-    writePatterns(fileWriter, 1, ttSlot2);
+    writePatterns(fileWriter, state);
 
     return fileWriter.finish();
 }
@@ -751,46 +753,54 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
         return fileReader.error();
     }
 
-    // Snapshot current state for rollback before clearing
-    ttSlot1Backup = track.clipSnapshot(0);
-    ttSlot2Backup = track.clipSnapshot(1);
+    // Snapshot active clip and shared S1-S3 for rollback.
+    // Do NOT call track.clear() — we must preserve inactive clip and active clip index.
+    ttActiveClipBackup = track.activeClipConfig();
+    for (int i = 0; i < 3; ++i) {
+        ttSharedScriptsBackup.lengths[i] = track.state().scripts[i].l;
+        std::memcpy(ttSharedScriptsBackup.commands[i].data(), track.state().scripts[i].c, sizeof(track.state().scripts[i].c));
+    }
 
-    track.clear();
+    // Clear only the live VM S1-S3 scripts and the parse target clip,
+    // preserving inactive clip and active clip index.
     scene_state_t &state = track.state();
-    for (int script = 0; script < TeletypeTrack::EditableScriptCount; ++script) {
+    for (int script = 0; script < 3; ++script) {
         ss_clear_script(&state, script);
     }
+    // Also clear S4 and M scripts in VM (they come from active clip on load)
+    ss_clear_script(&state, TeletypeTrack::SlotScriptIndex);
+    ss_clear_script(&state, METRO_SCRIPT);
+
     bool success = true;
 
-    // Avoid large PatternSlot copies on the file task stack.
-    ttSlot1 = track.clipSnapshot(0);
-    ttSlot2 = track.clipSnapshot(1);
-    clearScriptBuffer(ttSlot1, false);
-    clearScriptBuffer(ttSlot1, true);
-    clearScriptBuffer(ttSlot2, false);
-    clearScriptBuffer(ttSlot2, true);
+    // Initialize parse target from defaults (cleared scripts/patterns)
+    ttActiveClip = track.activeClipConfig();
+    clearScriptBuffer(ttActiveClip, false);
+    clearScriptBuffer(ttActiveClip, true);
+    // Reset patterns to defaults (same as TeletypeTrack::clear)
+    for (int i = 0; i < PATTERN_COUNT; ++i) {
+        auto &pattern = ttActiveClip.patterns[i];
+        pattern.idx = 0;
+        pattern.len = 0;
+        pattern.wrap = 1;
+        pattern.start = 0;
+        pattern.end = PATTERN_LENGTH - 1;
+        std::memset(pattern.val, 0, sizeof(pattern.val));
+    }
 
     enum class Section {
         None,
         IO,
         Pats,
-        ScriptSlotP1,
-        ScriptSlotP2,
-        ScriptM1,
-        ScriptM2,
+        ScriptS4,
+        ScriptM,
         ScriptS1,
         ScriptS2,
         ScriptS3,
     };
 
     Section section = Section::None;
-    int currentSlot = 0;
-    int currentPatternSlot = 0;
-    int patternValueIndex[2][PATTERN_COUNT] = {};
-
-    auto parseSlot = [&] () -> TeletypeTrack::PatternSlot & {
-        return currentSlot == 0 ? ttSlot1 : ttSlot2;
-    };
+    int patternValueIndex[PATTERN_COUNT] = {};
 
     ttLineBuffer[0] = '\0';
     while (readLine(fileReader, ttLineBuffer, sizeof(ttLineBuffer))) {
@@ -805,14 +815,10 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 section = Section::IO;
             } else if (std::strcmp(line, "#PATS") == 0) {
                 section = Section::Pats;
-            } else if (std::strcmp(line, "#S4P1") == 0 || std::strcmp(line, "#S1P1") == 0) {
-                section = Section::ScriptSlotP1;
-            } else if (std::strcmp(line, "#S4P2") == 0 || std::strcmp(line, "#S1P2") == 0) {
-                section = Section::ScriptSlotP2;
-            } else if (std::strcmp(line, "#M1") == 0) {
-                section = Section::ScriptM1;
-            } else if (std::strcmp(line, "#M2") == 0) {
-                section = Section::ScriptM2;
+            } else if (std::strcmp(line, "#S4") == 0) {
+                section = Section::ScriptS4;
+            } else if (std::strcmp(line, "#M") == 0) {
+                section = Section::ScriptM;
             } else if (std::strcmp(line, "#S1") == 0) {
                 section = Section::ScriptS1;
             } else if (std::strcmp(line, "#S2") == 0) {
@@ -829,21 +835,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
             continue;
         }
 
-        if (section == Section::IO || section == Section::Pats) {
-            if (std::strncmp(line, "SLOT ", 5) == 0) {
-                int slotIndex = 0;
-                if (parseInt(line + 5, slotIndex)) {
-                    currentSlot = clamp(slotIndex - 1, 0, TeletypeTrack::PatternSlotCount - 1);
-                    if (section == Section::Pats) {
-                        currentPatternSlot = currentSlot;
-                    }
-                }
-                continue;
-            }
-        }
-
         if (section == Section::IO) {
-            auto &slot = parseSlot();
             const char *value = nullptr;
 
             if (std::strncmp(line, "TI-TR", 5) == 0 && std::isdigit(line[5])) {
@@ -852,7 +844,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 TeletypeTrack::TriggerInputSource source{};
                 if (idx >= 0 && idx < TeletypeTrack::TriggerInputCount &&
                     parseTriggerInputSource(value, source)) {
-                    slot.triggerInputSource[idx] = source;
+                    ttActiveClip.triggerInputSource[idx] = source;
                 }
                 continue;
             }
@@ -860,7 +852,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 value = skipSpace(line + 6);
                 TeletypeTrack::CvInputSource source{};
                 if (parseCvInputSource(value, source)) {
-                    slot.cvInSource = source;
+                    ttActiveClip.cvInSource = source;
                 }
                 continue;
             }
@@ -868,7 +860,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 value = skipSpace(line + 9);
                 TeletypeTrack::CvInputSource source{};
                 if (parseCvInputSource(value, source)) {
-                    slot.cvParamSource = source;
+                    ttActiveClip.cvParamSource = source;
                 }
                 continue;
             }
@@ -876,7 +868,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 value = skipSpace(line + 5);
                 TeletypeTrack::CvInputSource source{};
                 if (parseCvInputSource(value, source)) {
-                    slot.cvXSource = source;
+                    ttActiveClip.cvXSource = source;
                 }
                 continue;
             }
@@ -884,7 +876,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 value = skipSpace(line + 5);
                 TeletypeTrack::CvInputSource source{};
                 if (parseCvInputSource(value, source)) {
-                    slot.cvYSource = source;
+                    ttActiveClip.cvYSource = source;
                 }
                 continue;
             }
@@ -892,7 +884,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 value = skipSpace(line + 5);
                 TeletypeTrack::CvInputSource source{};
                 if (parseCvInputSource(value, source)) {
-                    slot.cvZSource = source;
+                    ttActiveClip.cvZSource = source;
                 }
                 continue;
             }
@@ -900,7 +892,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 value = skipSpace(line + 5);
                 TeletypeTrack::CvInputSource source{};
                 if (parseCvInputSource(value, source)) {
-                    slot.cvTSource = source;
+                    ttActiveClip.cvTSource = source;
                 }
                 continue;
             }
@@ -910,7 +902,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 TeletypeTrack::TriggerOutputDest dest{};
                 if (idx >= 0 && idx < TeletypeTrack::TriggerOutputCount &&
                     parseTriggerOutputDest(value, dest)) {
-                    slot.triggerOutputDest[idx] = dest;
+                    ttActiveClip.triggerOutputDest[idx] = dest;
                 }
                 continue;
             }
@@ -920,7 +912,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 TeletypeTrack::CvOutputDest dest{};
                 if (idx >= 0 && idx < TeletypeTrack::CvOutputCount &&
                     parseCvOutputDest(value, dest)) {
-                    slot.cvOutputDest[idx] = dest;
+                    ttActiveClip.cvOutputDest[idx] = dest;
                 }
                 continue;
             }
@@ -932,24 +924,24 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                         value = skipSpace(line + 8);
                         Types::VoltageRange range{};
                         if (parseVoltageRange(value, range)) {
-                            slot.cvOutputRange[idx] = range;
+                            ttActiveClip.cvOutputRange[idx] = range;
                         }
                     } else if (std::strncmp(line + 3, " OFF ", 5) == 0) {
                         int off = 0;
                         if (parseInt(line + 8, off)) {
-                            slot.cvOutputOffset[idx] = clamp<int16_t>(off, -500, 500);
+                            ttActiveClip.cvOutputOffset[idx] = clamp<int16_t>(off, -500, 500);
                         }
                     } else if (std::strncmp(line + 3, " Q ", 3) == 0) {
                         value = skipSpace(line + 6);
-                        int8_t q = slot.cvOutputQuantizeScale[idx];
+                        int8_t q = ttActiveClip.cvOutputQuantizeScale[idx];
                         if (parseQuantizeScale(value, q)) {
-                            slot.cvOutputQuantizeScale[idx] = q;
+                            ttActiveClip.cvOutputQuantizeScale[idx] = q;
                         }
                     } else if (std::strncmp(line + 3, " ROOT ", 6) == 0) {
                         value = skipSpace(line + 9);
-                        int8_t note = slot.cvOutputRootNote[idx];
+                        int8_t note = ttActiveClip.cvOutputRootNote[idx];
                         if (parseRootNote(value, note)) {
-                            slot.cvOutputRootNote[idx] = note;
+                            ttActiveClip.cvOutputRootNote[idx] = note;
                         }
                     }
                 }
@@ -960,18 +952,18 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 value = skipSpace(line + 10);
                 Types::MidiPort port{};
                 if (parseMidiPort(value, port)) {
-                    slot.midiSource.setPort(port);
+                    ttActiveClip.midiSource.setPort(port);
                 }
                 continue;
             }
             if (std::strncmp(line, "MIDI CH ", 8) == 0) {
                 value = skipSpace(line + 8);
                 if (std::strcmp(value, "Omni") == 0) {
-                    slot.midiSource.setChannel(-1);
+                    ttActiveClip.midiSource.setChannel(-1);
                 } else {
                     int ch = 0;
                     if (parseInt(value, ch)) {
-                        slot.midiSource.setChannel(ch - 1);
+                        ttActiveClip.midiSource.setChannel(ch - 1);
                     }
                 }
                 continue;
@@ -979,7 +971,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
             if (std::strncmp(line, "BOOT ", 5) == 0) {
                 int boot = 0;
                 if (parseInt(line + 5, boot)) {
-                    slot.bootScriptIndex = clamp<int8_t>(boot - 1, 0, TeletypeTrack::ScriptSlotCount - 1);
+                    ttActiveClip.bootScriptIndex = clamp<int8_t>(boot - 1, 0, TeletypeTrack::ScriptSlotCount - 1);
                 }
                 continue;
             }
@@ -987,40 +979,37 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 value = skipSpace(line + 9);
                 TeletypeTrack::TimeBase base{};
                 if (parseTimeBase(value, base)) {
-                    slot.timeBase = base;
+                    ttActiveClip.timeBase = base;
                 }
                 continue;
             }
             if (std::strncmp(line, "CLK.DIV ", 8) == 0) {
                 int div = 0;
                 if (parseInt(line + 8, div)) {
-                    slot.clockDivisor = ModelUtils::clampDivisor(div);
+                    ttActiveClip.clockDivisor = ModelUtils::clampDivisor(div);
                 }
                 continue;
             }
             if (std::strncmp(line, "CLK.MULT ", 9) == 0) {
                 int mult = 0;
                 if (parseInt(line + 9, mult)) {
-                    slot.clockMultiplier = clamp<int16_t>(mult, 50, 150);
+                    ttActiveClip.clockMultiplier = clamp<int16_t>(mult, 50, 150);
                 }
                 continue;
             }
             if (std::strncmp(line, "RESET.METRO ", 12) == 0) {
                 int value = 0;
                 if (parseInt(line + 12, value)) {
-                    slot.resetMetroOnLoad = value != 0;
+                    ttActiveClip.resetMetroOnLoad = value != 0;
                 }
                 continue;
             }
         }
 
-        if (section == Section::ScriptSlotP1 || section == Section::ScriptSlotP2 ||
-            section == Section::ScriptM1 || section == Section::ScriptM2) {
-            TeletypeTrack::PatternSlot &slot =
-                (section == Section::ScriptSlotP1 || section == Section::ScriptM1) ? ttSlot1 : ttSlot2;
-            bool metro = (section == Section::ScriptM1 || section == Section::ScriptM2);
-            auto &buffer = metro ? slot.metro : slot.slotScript;
-            uint8_t &length = metro ? slot.metroLength : slot.slotScriptLength;
+        if (section == Section::ScriptS4 || section == Section::ScriptM) {
+            bool metro = (section == Section::ScriptM);
+            auto &buffer = metro ? ttActiveClip.metro : ttActiveClip.slotScript;
+            uint8_t &length = metro ? ttActiveClip.metroLength : ttActiveClip.slotScriptLength;
             if (length >= TeletypeTrack::ScriptLineCount) {
                 continue;
             }
@@ -1070,8 +1059,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                 if (patternIndex < 0 || patternIndex >= PATTERN_COUNT) {
                     continue;
                 }
-                auto &slot = (currentPatternSlot == 0) ? ttSlot1 : ttSlot2;
-                auto &pat = slot.patterns[patternIndex];
+                auto &pat = ttActiveClip.patterns[patternIndex];
                 const char *rest = skipSpace(line + 2);
                 if (std::strncmp(rest, "LEN ", 4) == 0) {
                     int value = 0;
@@ -1095,7 +1083,7 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
                     }
                 } else if (std::strncmp(rest, "VALS", 4) == 0) {
                     const char *values = skipSpace(rest + 4);
-                    int &idx = patternValueIndex[currentPatternSlot][patternIndex];
+                    int &idx = patternValueIndex[patternIndex];
                     while (values && *values && idx < 64) {
                         char *end = nullptr;
                         long val = std::strtol(values, &end, 10);
@@ -1119,13 +1107,15 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     }
 
     if (error == fs::OK) {
-        track.setClipForPerformerPattern(0, ttSlot1);
-        track.setClipForPerformerPattern(1, ttSlot2);
+        track.setActiveClip(ttActiveClip);
         track.loadActiveClipIntoVm();
     } else {
-        // Restore from backup on failure
-        track.setClipForPerformerPattern(0, ttSlot1Backup);
-        track.setClipForPerformerPattern(1, ttSlot2Backup);
+        // Rollback: restore active clip and shared S1-S3 from backup
+        track.setActiveClip(ttActiveClipBackup);
+        for (int i = 0; i < 3; ++i) {
+            track.state().scripts[i].l = ttSharedScriptsBackup.lengths[i];
+            std::memcpy(track.state().scripts[i].c, ttSharedScriptsBackup.commands[i].data(), sizeof(track.state().scripts[i].c));
+        }
         track.loadActiveClipIntoVm();
     }
 

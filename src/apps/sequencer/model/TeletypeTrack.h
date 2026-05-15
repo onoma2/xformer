@@ -169,6 +169,12 @@ public:
     PatternSlot &activeSlot() { return _patternSlots[_activePatternSlot]; }
     const PatternSlot &activeSlot() const { return _patternSlots[_activePatternSlot]; }
 
+    // Active clip config for FileManager (const ref, no capture)
+    const PatternSlot &activeClipConfig() const { return _patternSlots[_activePatternSlot]; }
+    void setActiveClip(const PatternSlot &clip) {
+        _patternSlots[_activePatternSlot] = clip;
+    }
+
     // midiSource
     const MidiSourceConfig &midiSource() const { return activeSlot().midiSource; }
           MidiSourceConfig &midiSource()       { return activeSlot().midiSource; }

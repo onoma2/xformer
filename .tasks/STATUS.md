@@ -29,9 +29,9 @@ _Updated: 2026-05-15_
 ---
 
 ## 🟡 teletype-runtime-architecture — Clarify Teletype VM/slot/runtime ownership before global runtime work
-**Status:** active — Phase 0-3 hardware-verified and committed.
-**Where I stopped:** Phase 3 centralized Performer Pattern clip policy and fixed `clearClipForPerformerPattern()` to avoid a 4.6 KB `scene_state_t` UI-stack allocation during Pattern Init.
-**Next action:** Phase 4 — split project save/load from active-only Teletype text save/load and reduce text import/export buffers from 4 PatternSlots to 2.
+**Status:** active — Phase 0-3 hardware-verified and committed. Phase 4 code-complete, awaiting hardware verification.
+**Where I stopped:** Phase 4 code-complete: active-clip-only text save/load, S1-S3 rollback transaction, `.data+bss` reduced by 1,136 B. Text format changed: `#S4`/`#M` (no slot sub-headers), no `SLOT` markers.
+**Next action:** Phase 4 hardware verification: text save/load roundtrip, inactive clip untouched, project save/load, IO config, error rollback.
 **Depends on:** resource-optimization (for RAM gates), teletype file transaction semantics
 **Branch:** refactor/resouce-optimization
 

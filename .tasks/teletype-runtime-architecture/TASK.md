@@ -121,7 +121,7 @@ Execute phased plan per `tele-clip-plan.md`:
 - **Phase 1:** ✓ Complete. Hardware verified.
 - **Phase 2:** ✓ Complete. Hardware verified.
 - **Phase 3:** ✓ Complete. Hardware verified.
-- **Phase 4:** Two persistence contracts — text S/L as active-only, 4→2 file I/O buffers (1 file, ~2,452 B .bss savings, hardware build + file roundtrip + RAM check).
+- **Phase 4:** ✓ Code complete. STM32 build passes, .bss reduced by 1,136 B. Awaiting hardware behavioral checks.
 
 Record RAM baseline before Phase 0. Refresh after each phase.
 

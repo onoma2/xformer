@@ -341,7 +341,7 @@ Each refactored method uses `captureActiveClip()` + `loadClipIntoVm()` explicitl
 
 ---
 
-### Phase 4 — Two Persistence Contracts
+### Phase 4 — Two Persistence Contracts ✓
 
 **Goal:** Separate project save/load from Teletype text save/load. Text
 files operate on active clip + live VM only. 4 global `PatternSlot` buffers
@@ -471,43 +471,41 @@ from FileManager.
 #### Section header mapping
 
 ```text
-New format         Legacy format (detected)
-----------         -----------------------
-#IO                #IO + SLOT 1/SLOT 2 sub-headers
-#S4                #S4P1 or #S4P2
-#M                 #M1 or #M2
-#S1                #S1
-#S2                #S2
-#S3                #S3
-#PATS              #PATS + SLOT 1/SLOT 2 sub-headers
+New format (dev only, no legacy compat)
+----------
+
+#IO                No SLOT sub-headers, active clip only
+#S4                Slot script (was #S4P1/#S4P2)
+#M                 Metro script (was #M1/#M2)
+#S1                Shared scripts
+#S2
+#S3
+#PATS              Active clip patterns only, no SLOT sub-headers
 ```
 
-Legacy read: if `S4P1`/`S4P2`/`M1`/`M2`/`SLOT` sections detected, parse only
-the slot matching `track.activePatternSlot()`, ignore the other. `S1`/`S2`/`S3`
-always parsed into `scene_state_t`, covered by `sharedScriptsBackup` in the
-transaction struct.
+No legacy two-slot format parsing. Dev firmware only.
 
 **Files changed:**
 - `src/apps/sequencer/model/FileManager.cpp` — rewrite `writeTeletypeTrack()`
   for read-only live export; rewrite `readTeletypeTrack()` for active-clip-
-  only with full transaction (active clip + shared S1-S3 backup); add legacy
-  two-slot detection and selective parsing; replace 4 globals with
-  `TeletypeFileTransaction`; replace `writeSlotIo()` 2-slot call with
-  single-slot IO write; replace `writePatterns()` 2-slot call with
-  single-slot patterns write
+  only with full transaction (active clip + shared S1-S3 backup); replace 4
+  globals with 2 `PatternSlot` + `ttSharedScriptsBackup`; replace
+  `writeSlotIo()` 2-slot call with single-slot IO write; replace
+  `writePatterns()` 2-slot call with single-slot patterns write
 - `src/apps/sequencer/model/TeletypeTrack.h` — add `setActiveClip(const PatternSlot &)`
-  for FileManager to write active clip by index without Performer Pattern dependency
+  and `activeClipConfig()` for FileManager to write/read active clip by index
 
 **Hardware gate:**
-- [ ] STM32 release build
-- [ ] RAM: `.bss` reduced by ~2,452 B (4 → 2 `PatternSlot` globals in
+- [x] STM32 release build
+- [ ] RAM: `.bss` reduced by 1,136 B (4→2 PatternSlot globals + S1-S3 backup
+      struct; `.data+bss = 118,900`, down from 119,960; `.ccmram_bss` flat).
+      Savings less than projected 2,452 B because `ttSharedScriptsBackup` adds
+      940 B for S1-S3 rollback coverage.
       `FileManager`). Record exact `.data + .bss` and `.ccmram_bss`
 - [ ] New format roundtrip: text save → text load on hardware, verify active
       clip material preserved
 - [ ] Inactive clip untouched: note inactive clip state, text load, verify
       inactive clip unchanged
-- [ ] Legacy format: load an old two-slot .tt file, verify active slot
-      imported, other slot ignored
 - [ ] Project save/load: binary project save/reload still works for both clips
 - [ ] Text save does not mutate: after text save only (no text load), inspect
       active clip project state — unchanged. Then text load same file:
