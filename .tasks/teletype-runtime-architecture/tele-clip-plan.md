@@ -137,7 +137,7 @@ acceptable overhead.
 
 ---
 
-### Phase 1 — Naming Wrappers (No Behavior Change)
+### Phase 1 — Naming Wrappers (No Behavior Change) ✓
 
 **Goal:** Establish clip vocabulary so every caller declares intent.
 Zero runtime difference. Rename `PatternSlot` references to clip names.
@@ -161,7 +161,7 @@ compatibility wrappers.
 
 | Old call | New call | File:Line |
 |----------|----------|-----------|
-| `applyPatternSlot(slot)` | `loadClipIntoVm(slot)` | `TeletypeTrackEngine.cpp:92` |
+| `applyPatternSlot(slot)` | `loadClipForPerformerPattern(pattern)` | `TeletypeTrackEngine.cpp:92` |
 | `applyActivePatternSlot()` | `loadActiveClipIntoVm()` | `TeletypeTrackEngine.cpp:1417` (inside `loadScriptsFromModel()`) |
 
 `onPatternChanged()` calls (lines 382, 384) deferred to Phase 3 — they pair
@@ -173,12 +173,12 @@ capture+load and belong in the centralized policy.
 - `src/apps/sequencer/engine/TeletypeTrackEngine.cpp` — migrate 2 calls
 
 **Hardware gate:**
-- [ ] STM32 release build
-- [ ] RAM: flat (wrappers are inline or thin, no new data)
-- [ ] Existing projects load without migration loss
-- [ ] Performer Pattern switching: switch between patterns on a Teletype
+- [x] STM32 release build
+- [x] RAM: flat (wrappers are inline or thin, no new data)
+- [x] Existing projects load without migration loss
+- [x] Performer Pattern switching: switch between patterns on a Teletype
       track, verify scripts/patterns load correctly
-- [ ] Boot script: verify boot script runs on power-on / project load
+- [x] Boot script: verify boot script runs on power-on / project load
 
 ---
 

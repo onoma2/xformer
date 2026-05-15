@@ -417,3 +417,22 @@ void TeletypeTrack::syncToActiveSlot() {
     }
     patternSlot.resetMetroOnLoad = _resetMetroOnLoad;
 }
+
+// Clip vocabulary wrappers (Phase 1 - no behavior change)
+
+void TeletypeTrack::loadClipIntoVm(int clipIndex) {
+    applyPatternSlot(clipIndex);
+}
+
+void TeletypeTrack::loadActiveClipIntoVm() {
+    applyActivePatternSlot();
+}
+
+void TeletypeTrack::loadClipForPerformerPattern(int performerPatternIndex) {
+    const int clipIndex = patternSlotForPattern(performerPatternIndex);
+    applyPatternSlot(clipIndex);
+}
+
+void TeletypeTrack::captureActiveClip() {
+    syncToActiveSlot();
+}

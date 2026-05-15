@@ -20,9 +20,9 @@ _Updated: 2026-05-15_
 ---
 
 ## 🟡 teletype-runtime-architecture — Clarify Teletype VM/slot/runtime ownership before global runtime work
-**Status:** paused/ready — source-grounded architecture task, not an implementation queue yet.
-**Where I stopped:** Approach A is now documented: slots are Teletype clips, `scene_state_t` is live runtime truth, and load/capture boundaries must be explicit.
-**Next action:** Plan the wrapper slice: `loadClipIntoVm()`, `captureVmToClip()`, remove hidden capture from `write()` / `patternSlotSnapshot()`, then decide auto-capture-on-leave vs explicit capture.
+**Status:** active — Phase 0 (UI/engine race fix) hardware-verified and committed.
+**Where I stopped:** Phase 0 committed (`9bce3e11`). Phase 1 committed (naming wrappers). All Teletype VM mutations from UI now bracketed with `Engine::lock()/unlock()`. Clip vocabulary wrappers `loadClipIntoVm()`, `loadActiveClipIntoVm()`, `loadClipForPerformerPattern()`, `captureActiveClip()` added.
+**Next action:** Phase 2 — remove hidden capture from `write()`/`patternSlotSnapshot()`, rename all call sites, remove `const_cast`, add `clipSnapshot()`, `setTeletypePattern()`, engine lock on TeletypePatternViewPage.
 **Depends on:** resource-optimization (for RAM gates), teletype file transaction semantics
 **Branch:** refactor/resouce-optimization
 

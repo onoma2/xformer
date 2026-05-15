@@ -89,7 +89,7 @@ void TeletypeTrackEngine::reset() {
             state.scripts[script].c[line] = savedScripts[script][line];
         }
     }
-    _teletypeTrack.applyPatternSlot(_teletypeTrack.patternSlotForPattern(_trackState.pattern()));
+    _teletypeTrack.loadClipForPerformerPattern(_trackState.pattern());
     _bootScriptPending = false;
     _activity = false;
     _activityCountdownMs = 0.f;
@@ -1414,7 +1414,7 @@ bool TeletypeTrackEngine::applyScriptLine(scene_state_t &state, int scriptIndex,
 }
 
 void TeletypeTrackEngine::loadScriptsFromModel() {
-    _teletypeTrack.applyActivePatternSlot();
+    _teletypeTrack.loadActiveClipIntoVm();
 }
 
 void TeletypeTrackEngine::seedScriptsFromPresets() {

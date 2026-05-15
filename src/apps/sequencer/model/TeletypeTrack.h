@@ -656,6 +656,12 @@ public:
     void applyActivePatternSlot();
     void syncToActiveSlot();
 
+    // Clip vocabulary wrappers (Phase 1 - no behavior change)
+    void loadClipIntoVm(int clipIndex);                                    // wraps applyPatternSlot
+    void loadActiveClipIntoVm();                                          // wraps applyActivePatternSlot
+    void loadClipForPerformerPattern(int performerPatternIndex);           // mapping + load
+    void captureActiveClip();                                             // wraps syncToActiveSlot
+
     //----------------------------------------
     // Name printing helpers
     //----------------------------------------
