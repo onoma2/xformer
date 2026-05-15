@@ -23,6 +23,7 @@ public:
         SawDown,
         Square,
         Random,
+        ADSR,
         Last
     };
 
@@ -34,6 +35,7 @@ public:
         case Shape::SawDown:   return "Saw Down";
         case Shape::Square:    return "Square";
         case Shape::Random:    return "Random";
+        case Shape::ADSR:      return "ADSR";
         case Shape::Last:      break;
         }
         return nullptr;
@@ -210,6 +212,85 @@ public:
         str(modeName(mode()));
     }
 
+    // attack (0-2000ms, for ADSR)
+
+    int attack() const { return _attack; }
+    void setAttack(int attack) {
+        _attack = clamp(attack, 0, 2000);
+    }
+
+    void editAttack(int value, bool shift) {
+        setAttack(attack() + value * (shift ? 1 : 20));
+    }
+
+    void printAttack(StringBuilder &str) const {
+        str("%dms", attack());
+    }
+
+    // decay (0-2000ms, for ADSR)
+
+    int decay() const { return _decay; }
+    void setDecay(int decay) {
+        _decay = clamp(decay, 0, 2000);
+    }
+
+    void editDecay(int value, bool shift) {
+        setDecay(decay() + value * (shift ? 1 : 20));
+    }
+
+    void printDecay(StringBuilder &str) const {
+        str("%dms", decay());
+    }
+
+    // sustain (0-127, for ADSR)
+
+    int sustain() const { return _sustain; }
+    void setSustain(int sustain) {
+        _sustain = clamp(sustain, 0, 127);
+    }
+
+    void editSustain(int value, bool shift) {
+        int absValue = (value < 0) ? -value : value;
+        int multiplier = shift ? 4 : 1;
+        if (absValue >= 4) multiplier *= 4;
+        else if (absValue >= 2) multiplier *= 2;
+        setSustain(sustain() + value * multiplier);
+    }
+
+    void printSustain(StringBuilder &str) const {
+        str("%d", sustain());
+    }
+
+    // release (0-2000ms, for ADSR)
+
+    int release() const { return _release; }
+    void setRelease(int release) {
+        _release = clamp(release, 0, 2000);
+    }
+
+    void editRelease(int value, bool shift) {
+        setRelease(release() + value * (shift ? 1 : 20));
+    }
+
+    void printRelease(StringBuilder &str) const {
+        str("%dms", release());
+    }
+
+    // amplitude (0-127, for ADSR)
+
+    int amplitude() const { return _amplitude; }
+    void setAmplitude(int amplitude) {
+        _amplitude = clamp(amplitude, 0, 127);
+    }
+
+    void editAmplitude(int value, bool shift) {
+        setAmplitude(amplitude() + value * (shift ? 1 : 4));
+    }
+
+    void printAmplitude(StringBuilder &str) const {
+        str("%d", amplitude());
+    }
+
     //----------------------------------------
     // Methods
     //----------------------------------------
@@ -224,6 +305,11 @@ public:
         setGateTrack(0);
         setRandomMode(RandomMode::Clocked);
         setMode(Mode::Free);
+        setAttack(100);
+        setDecay(100);
+        setSustain(100);
+        setRelease(200);
+        setAmplitude(127);
     }
 
     void write(VersionedSerializedWriter &writer) const {
@@ -236,6 +322,11 @@ public:
         writer.write(_gateTrack);
         writer.write(_randomMode);
         writer.write(_mode);
+        writer.write(_attack);
+        writer.write(_decay);
+        writer.write(_sustain);
+        writer.write(_release);
+        writer.write(_amplitude);
     }
 
     void read(VersionedSerializedReader &reader) {
@@ -248,6 +339,11 @@ public:
         reader.read(_gateTrack);
         reader.read(_randomMode);
         reader.read(_mode);
+        reader.read(_attack);
+        reader.read(_decay);
+        reader.read(_sustain);
+        reader.read(_release);
+        reader.read(_amplitude, 127);
     }
 
 private:
@@ -260,4 +356,9 @@ private:
     uint8_t _gateTrack = 0;
     RandomMode _randomMode = RandomMode::Clocked;
     Mode _mode = Mode::Free;
+    uint16_t _attack = 100;
+    uint16_t _decay = 100;
+    uint8_t _sustain = 100;
+    uint16_t _release = 200;
+    uint8_t _amplitude = 127;
 };

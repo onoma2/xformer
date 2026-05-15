@@ -22,6 +22,7 @@ ModulatorPage::ModulatorPage(PageManager &manager, PageContext &context) :
 void ModulatorPage::enter() {
     _selectedModulator = _project.selectedModulatorIndex();
     _waveformCacheValid = false;
+    _currentPage = 0;
 }
 
 void ModulatorPage::exit() {
@@ -31,6 +32,17 @@ void ModulatorPage::draw(Canvas &canvas) {
     auto &modulator = _project.modulator(_selectedModulator);
     bool isRandom = (modulator.shape() == Modulator::Shape::Random);
     bool isTriggered = isRandom && (modulator.randomMode() == Modulator::RandomMode::Triggered);
+    bool isADSR = (modulator.shape() == Modulator::Shape::ADSR);
+
+    // Update total pages for ADSR
+    if (isADSR) {
+        _totalPages = 2;
+    } else {
+        _totalPages = 1;
+    }
+    if (_currentPage >= _totalPages) {
+        _currentPage = 0;
+    }
 
     WindowPainter::clear(canvas);
 
@@ -50,12 +62,37 @@ void ModulatorPage::draw(Canvas &canvas) {
     } else {
         WindowPainter::drawActiveFunction(canvas, "");
         const char *functionNames[5];
-        functionNames[0] = "SHAPE";
-        functionNames[1] = isRandom ? "R.MODE" : "RATE";
-        functionNames[2] = isTriggered ? "G.TRACK" : "DEPTH";
-        functionNames[3] = "OFFSET";
-        functionNames[4] = isRandom ? "SLEW" : "PHASE";
-        WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), int(_selectedFunction));
+        if (isADSR) {
+            if (_currentPage == 0) {
+                functionNames[0] = "SHAPE";
+                functionNames[1] = "ATTACK";
+                functionNames[2] = "DECAY";
+                functionNames[3] = "SUSTAIN";
+                functionNames[4] = "RELEASE";
+            } else {
+                functionNames[0] = "AMPLIT";
+                functionNames[1] = "DEPTH";
+                functionNames[2] = "OFFSET";
+                functionNames[3] = nullptr;
+                functionNames[4] = nullptr;
+            }
+        } else {
+            functionNames[0] = "SHAPE";
+            functionNames[1] = isRandom ? "R.MODE" : "RATE";
+            functionNames[2] = isTriggered ? "G.TRACK" : "DEPTH";
+            functionNames[3] = "OFFSET";
+            functionNames[4] = isRandom ? "SLEW" : "PHASE";
+        }
+        int highlight = isADSR ? int(_selectedFunction) : int(_selectedFunction);
+        WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), highlight);
+
+        // Pagination dots for ADSR
+        if (_totalPages > 1) {
+            canvas.setColor(Color::Low);
+            canvas.setFont(Font::Tiny);
+            FixedStringBuilder<8> page("Pg %d/%d", _currentPage + 1, _totalPages);
+            canvas.drawText(56, 12, page);
+        }
     }
 
     canvas.setBlendMode(BlendMode::Set);
@@ -89,6 +126,40 @@ void ModulatorPage::draw(Canvas &canvas) {
             if (first) paramValue("--");
             break;
         }
+        }
+    } else if (isADSR) {
+        if (_currentPage == 0) {
+            switch (_selectedFunction) {
+            case Function::Shape:
+                paramName("SHAPE");
+                paramValue("ADSR");
+                break;
+            case Function::Rate:
+                paramName("ATTACK");
+                modulator.printAttack(paramValue);
+                break;
+            case Function::Depth:
+                paramName("DECAY");
+                modulator.printDecay(paramValue);
+                break;
+            case Function::Offset:
+                paramName("SUSTAIN");
+                modulator.printSustain(paramValue);
+                break;
+            case Function::Phase:
+                paramName("RELEASE");
+                modulator.printRelease(paramValue);
+                break;
+            }
+        } else {
+            switch (_selectedFunction) {
+            case Function::Shape:
+                paramName("AMPLITUDE");
+                modulator.printAmplitude(paramValue);
+                break;
+            default:
+                break;
+            }
         }
     } else {
         switch (_selectedFunction) {
@@ -130,14 +201,13 @@ void ModulatorPage::draw(Canvas &canvas) {
         }
     }
 
-    // --- Draw waveform (left half) or CV output list (routing overlay) ---
+    // --- Left half: waveform or ADSR envelope ---
     const int waveformX = 4;
     const int waveformY = 15;
     const int waveformW = 116;
     const int waveformH = 34;
 
     if (_showRoutingOverlay) {
-        // Routing overlay: left half shows CV output assignments
         canvas.setColor(Color::Low);
         canvas.setFont(Font::Small);
         for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
@@ -147,6 +217,81 @@ void ModulatorPage::draw(Canvas &canvas) {
             FixedStringBuilder<16> label("CV%d", i + 1);
             canvas.drawText(6, y, label);
         }
+    } else if (isADSR) {
+        // ADSR envelope visualization
+        int attackMs = modulator.attack();
+        int decayMs = modulator.decay();
+        int sustainLevel = modulator.sustain();
+        int releaseMs = modulator.release();
+        int amplitude = modulator.amplitude();
+
+        int totalTime = attackMs + decayMs + 500 + releaseMs;
+        if (totalTime == 0) totalTime = 1;
+        int attackWidth = (attackMs * waveformW) / totalTime;
+        int decayWidth = (decayMs * waveformW) / totalTime;
+        int sustainWidth = (500 * waveformW) / totalTime;
+        int releaseWidth = (releaseMs * waveformW) / totalTime;
+
+        int x = waveformX;
+        int bottomY = waveformY + waveformH - 2;
+        int peakY = waveformY + 2;
+
+        // Scale by amplitude
+        int scaledPeakY = bottomY - ((bottomY - peakY) * amplitude) / 127;
+        int scaledSustainY = bottomY - ((bottomY - peakY) * sustainLevel * amplitude) / (127 * 127);
+
+        canvas.setColor(Color::Bright);
+        // Attack
+        canvas.line(x, bottomY, x + attackWidth, scaledPeakY);
+        x += attackWidth;
+        // Decay
+        canvas.line(x, scaledPeakY, x + decayWidth, scaledSustainY);
+        x += decayWidth;
+        // Sustain
+        if (sustainWidth > 0) {
+            canvas.hline(x, scaledSustainY, sustainWidth);
+        }
+        x += sustainWidth;
+        // Release
+        canvas.line(x, scaledSustainY, x + releaseWidth, bottomY);
+
+        // Draw playhead
+        auto state = _engine.modulatorEngine().adsrState(_selectedModulator);
+        uint32_t timer = _engine.modulatorEngine().adsrTimer(_selectedModulator);
+        int playheadX = waveformX;
+
+        switch (state) {
+        case ModulatorEngine::ADSRState::Idle:
+            playheadX = waveformX;
+            break;
+        case ModulatorEngine::ADSRState::Attack: {
+            int attackTicks = (attackMs * CONFIG_PPQN) / 2500;
+            if (attackTicks == 0) attackTicks = 1;
+            int progress = clamp(static_cast<int>((timer * attackWidth) / attackTicks), 0, attackWidth);
+            playheadX = waveformX + progress;
+            break;
+        }
+        case ModulatorEngine::ADSRState::Decay: {
+            int decayTicks = (decayMs * CONFIG_PPQN) / 2500;
+            if (decayTicks == 0) decayTicks = 1;
+            int progress = clamp(static_cast<int>((timer * decayWidth) / decayTicks), 0, decayWidth);
+            playheadX = waveformX + attackWidth + progress;
+            break;
+        }
+        case ModulatorEngine::ADSRState::Sustain:
+            playheadX = waveformX + attackWidth + decayWidth;
+            break;
+        case ModulatorEngine::ADSRState::Release: {
+            int releaseTicks = (releaseMs * CONFIG_PPQN) / 2500;
+            if (releaseTicks == 0) releaseTicks = 1;
+            int progress = clamp(static_cast<int>((timer * releaseWidth) / releaseTicks), 0, releaseWidth);
+            playheadX = waveformX + attackWidth + decayWidth + sustainWidth + progress;
+            break;
+        }
+        }
+
+        canvas.setColor(Color::Medium);
+        canvas.vline(playheadX, waveformY + 1, waveformH - 2);
     } else {
         // Waveform visualization
         canvas.setColor(Color::Bright);
@@ -201,7 +346,7 @@ void ModulatorPage::draw(Canvas &canvas) {
         canvas.hline(barX + 1, levelY + 1, barWidth - 2);
     }
 
-    // --- Draw parameter display (right half) ---
+    // --- Right half: parameter display ---
     const int paramX = 128;
 
     canvas.setFont(Font::Tiny);
@@ -212,7 +357,6 @@ void ModulatorPage::draw(Canvas &canvas) {
     canvas.setColor(Color::Bright);
     canvas.drawText(paramX, 30, paramValue);
 
-    // CV output assignment hint (normal mode only)
     if (!_showRoutingOverlay) {
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Low);
@@ -231,7 +375,6 @@ void ModulatorPage::draw(Canvas &canvas) {
             canvas.drawText(paramX, 44, label);
         }
     } else {
-        // Routing overlay hint
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Low);
         canvas.drawTextCentered(paramX, 44, 128, 8, FixedStringBuilder<32>("Shift+Page to exit"));
@@ -248,7 +391,7 @@ void ModulatorPage::updateLeds(Leds &leds) {
 void ModulatorPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
-    // Shift+Page toggles routing overlay (must be before pageModifier check)
+    // Shift+Page toggles routing overlay
     if (key.isPage() && key.shiftModifier()) {
         _showRoutingOverlay = !_showRoutingOverlay;
         if (_showRoutingOverlay) {
@@ -263,6 +406,27 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
 
     if (key.pageModifier()) {
         return;
+    }
+
+    // Pagination for ADSR (Left/Right without shift)
+    auto &modulator = _project.modulator(_selectedModulator);
+    if (modulator.shape() == Modulator::Shape::ADSR && _totalPages > 1 && !_showRoutingOverlay) {
+        if (key.is(Key::Left)) {
+            if (_currentPage > 0) {
+                _currentPage--;
+                _selectedFunction = Function::Shape;
+            }
+            event.consume();
+            return;
+        }
+        if (key.is(Key::Right)) {
+            if (_currentPage < _totalPages - 1) {
+                _currentPage++;
+                _selectedFunction = Function::Shape;
+            }
+            event.consume();
+            return;
+        }
     }
 
     // Context menu
@@ -289,14 +453,14 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
         } else {
             int func = key.function();
             if (func >= 0 && func < 5) {
-                _selectedFunction = Function(func);
+                setSelectedFunction(Function(func));
             }
         }
         event.consume();
         return;
     }
 
-    // Left/Right change modulator
+    // Left/Right change modulator (only when not in ADSR pagination)
     if (key.isLeft()) {
         setSelectedModulator(_selectedModulator - 1);
         event.consume();
@@ -322,7 +486,6 @@ void ModulatorPage::encoder(EncoderEvent &event) {
             modulator.editGateTrack(event.value(), pressed);
             break;
         case RoutingFunction::Target:
-            // Cycle CV output assignment
             _routingCvOutputIndex = (_routingCvOutputIndex + event.value() + CONFIG_CHANNEL_COUNT) % CONFIG_CHANNEL_COUNT;
             if (_project.cvOutputModulator(_routingCvOutputIndex) == _selectedModulator + 1) {
                 _project.setCvOutputModulator(_routingCvOutputIndex, 0);
@@ -330,6 +493,40 @@ void ModulatorPage::encoder(EncoderEvent &event) {
                 _project.setCvOutputModulator(_routingCvOutputIndex, _selectedModulator + 1);
             }
             break;
+        }
+    } else if (modulator.shape() == Modulator::Shape::ADSR) {
+        if (_currentPage == 0) {
+            switch (_selectedFunction) {
+            case Function::Shape:
+                modulator.editShape(event.value(), pressed);
+                break;
+            case Function::Rate:
+                modulator.editAttack(event.value(), pressed);
+                break;
+            case Function::Depth:
+                modulator.editDecay(event.value(), pressed);
+                break;
+            case Function::Offset:
+                modulator.editSustain(event.value(), pressed);
+                break;
+            case Function::Phase:
+                modulator.editRelease(event.value(), pressed);
+                break;
+            }
+        } else {
+            switch (_selectedFunction) {
+            case Function::Shape:
+                modulator.editAmplitude(event.value(), pressed);
+                break;
+            case Function::Depth:
+                modulator.editDepth(event.value(), pressed);
+                break;
+            case Function::Offset:
+                modulator.editOffset(event.value(), pressed);
+                break;
+            default:
+                break;
+            }
         }
     } else {
         bool isRandom = (modulator.shape() == Modulator::Shape::Random);
@@ -375,6 +572,7 @@ void ModulatorPage::setSelectedModulator(int index) {
     _selectedModulator = clamp(index, 0, CONFIG_MODULATOR_COUNT - 1);
     _project.setSelectedModulatorIndex(_selectedModulator);
     _waveformCacheValid = false;
+    _currentPage = 0;
 }
 
 void ModulatorPage::setSelectedFunction(Function function) {

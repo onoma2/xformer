@@ -47,6 +47,10 @@ private:
     int _selectedModulator = 0;
     Function _selectedFunction = Function::Shape;
 
+    // Pagination state (for ADSR 2-page support)
+    int _currentPage = 0;  // 0 or 1 for ADSR
+    int _totalPages = 1;   // 1 for LFO/Random, 2 for ADSR
+
     // Routing overlay state
     bool _showRoutingOverlay = false;
     RoutingFunction _selectedRoutingFunction = RoutingFunction::Mode;
