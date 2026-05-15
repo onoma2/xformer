@@ -5,6 +5,8 @@
 
 #include "core/math/Math.h"
 
+#include "model/Track.h"
+
 ListPage::ListPage(PageManager &manager, PageContext &context, ListModel &listModel) :
     BasePage(manager, context)
 {
@@ -58,7 +60,7 @@ void ListPage::keyPress(KeyPressEvent &event) {
 
     if (key.isLeft()) {
         if (_edit) {
-            _listModel->edit(_selectedRow, 1, -1, globalKeyState()[Key::Shift]);
+            editSelectedRow(-1, globalKeyState()[Key::Shift]);
         } else {
             setSelectedRow(selectedRow() - 1);
         }
@@ -66,7 +68,7 @@ void ListPage::keyPress(KeyPressEvent &event) {
     }
     else if (key.isRight()) {
         if (_edit) {
-            _listModel->edit(_selectedRow, 1, 1, globalKeyState()[Key::Shift]);
+            editSelectedRow(1, globalKeyState()[Key::Shift]);
         } else {
             setSelectedRow(selectedRow() + 1);
         }
@@ -79,7 +81,7 @@ void ListPage::keyPress(KeyPressEvent &event) {
 
 void ListPage::encoder(EncoderEvent &event) {
     if (_edit) {
-        _listModel->edit(_selectedRow, 1, event.value(), event.pressed() || globalKeyState()[Key::Shift]);
+        editSelectedRow(event.value(), event.pressed() || globalKeyState()[Key::Shift]);
     } else {
         setSelectedRow(selectedRow() + event.value());
     }
@@ -97,11 +99,11 @@ void ListPage::keyboard(KeyboardEvent &event) {
         event.consume();
         break;
     case KeyboardEvent::KeyLeft:
-        _listModel->edit(_selectedRow, 1, -1, event.shift());
+        editSelectedRow(-1, event.shift());
         event.consume();
         break;
     case KeyboardEvent::KeyRight:
-        _listModel->edit(_selectedRow, 1, 1, event.shift());
+        editSelectedRow(1, event.shift());
         event.consume();
         break;
     case KeyboardEvent::KeyEnter:
@@ -111,6 +113,17 @@ void ListPage::keyboard(KeyboardEvent &event) {
     default:
         BasePage::keyboard(event);
         break;
+    }
+}
+
+void ListPage::editSelectedRow(int value, bool shift) {
+    const bool isTeletype = _project.selectedTrack().trackMode() == Track::TrackMode::Teletype;
+    if (isTeletype) {
+        _engine.lock();
+    }
+    _listModel->edit(_selectedRow, 1, value, shift);
+    if (isTeletype) {
+        _engine.unlock();
     }
 }
 

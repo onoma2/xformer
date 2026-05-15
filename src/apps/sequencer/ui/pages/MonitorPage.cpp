@@ -5,19 +5,43 @@
 
 #include "engine/CvInput.h"
 #include "engine/CvOutput.h"
+#include "engine/Engine.h"
+#include "engine/RoutingEngine.h"
+#include "engine/NoteTrackEngine.h"
+#include "engine/CurveTrackEngine.h"
+#include "engine/MidiCvTrackEngine.h"
+#include "engine/TuesdayTrackEngine.h"
+#include "engine/DiscreteMapTrackEngine.h"
+#include "engine/IndexedTrackEngine.h"
+#include "engine/TeletypeTrackEngine.h"
+#include "engine/TrackEngine.h"
+#include "model/NoteSequence.h"
+#include "model/CurveSequence.h"
+#include "model/NoteTrack.h"
+#include "model/CurveTrack.h"
+#include "model/MidiCvTrack.h"
+#include "model/TuesdayTrack.h"
+#include "model/DiscreteMapTrack.h"
+#include "model/IndexedTrack.h"
+#include "model/TeletypeTrack.h"
+#include "model/Track.h"
+#include "model/Model.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
+
+// ARM sizeof probes — temporary, remove after recording phase 2 measurements
 
 enum class Function {
     CvIn    = 0,
     CvOut   = 1,
     Midi    = 2,
     Stats   = 3,
-    Version = 4,
+    Sizes   = 4,
+    Version = 5,
 };
 
-static const char *functionNames[] = { "CV IN", "CV OUT", "MIDI", "STATS", "Version", nullptr };
+static const char *functionNames[] = { "CV IN", "CV OUT", "MIDI", "STATS", "SIZES", "Ver", nullptr };
 
 static void formatMidiMessage(StringBuilder &eventStr, StringBuilder &dataStr, const MidiMessage &msg) {
     if (msg.isChannelMessage()) {
@@ -115,6 +139,9 @@ void MonitorPage::draw(Canvas &canvas) {
     case Mode::Stats:
         drawStats(canvas);
         break;
+    case Mode::Sizes:
+        drawSizes(canvas);
+        break;
     case Mode::Version:
         drawVersion(canvas);
         break;
@@ -145,6 +172,9 @@ void MonitorPage::keyPress(KeyPressEvent &event) {
         case Function::Stats:
             _mode = Mode::Stats;
             break;
+        case Function::Sizes:
+            _mode = Mode::Sizes;
+            break;
         case Function::Version:
             _mode = Mode::Version;
             break;
@@ -153,19 +183,36 @@ void MonitorPage::keyPress(KeyPressEvent &event) {
 }
 
 void MonitorPage::encoder(EncoderEvent &event) {
+    if (_mode == Mode::Sizes) {
+        int next = _sizePage + event.value();
+        _sizePage = clamp(next, 0, SizePageCount - 1);
+        return;
+    }
+
     if (!_scopeActive) {
         return;
     }
 
-    int optionCount = CONFIG_TRACK_COUNT;
-    int option = scopeOptionFromTrack(_scopeSecondaryTrack);
-    int next = option + event.value();
-    if (next >= optionCount) {
-        next %= optionCount;
-    } else if (next < 0) {
-        next = (next % optionCount + optionCount) % optionCount;
+    if (globalKeyState()[Key::Shift]) {
+        int next = _scopeSecondaryChannel + event.value();
+        if (next >= CvOutput::Channels) {
+            next %= CvOutput::Channels;
+        } else if (next < -1) {
+            next = (next % CvOutput::Channels + CvOutput::Channels) % CvOutput::Channels;
+            if (next == CvOutput::Channels - 1) {
+                next = -1;
+            }
+        }
+        _scopeSecondaryChannel = (int8_t)next;
+    } else {
+        int next = _scopeChannel + event.value();
+        if (next >= CvOutput::Channels) {
+            next %= CvOutput::Channels;
+        } else if (next < 0) {
+            next = (next % CvOutput::Channels + CvOutput::Channels) % CvOutput::Channels;
+        }
+        _scopeChannel = (int8_t)next;
     }
-    _scopeSecondaryTrack = scopeTrackFromOption(next);
 }
 
 void MonitorPage::midi(MidiEvent &event) {
@@ -276,16 +323,11 @@ void MonitorPage::drawVersion(Canvas &canvas) {
 }
 
 void MonitorPage::sampleScope() {
-    const auto &trackEngine = _engine.selectedTrackEngine();
-    _scopeCv[_scopeWriteIndex] = trackEngine.cvOutput(0);
-    _scopeGate[_scopeWriteIndex] = trackEngine.gateOutput(0) ? 1 : 0;
+    _scopeCv[_scopeWriteIndex] = _engine.cvOutput().channel(_scopeChannel);
+    _scopeGate[_scopeWriteIndex] = (_engine.gateOutput() >> _scopeChannel) & 1;
 
-    int selectedTrack = _project.selectedTrackIndex();
-    if (_scopeSecondaryTrack == selectedTrack) {
-        _scopeSecondaryTrack = -1;
-    }
-    if (_scopeSecondaryTrack >= 0) {
-        _scopeCvSecondary[_scopeWriteIndex] = _engine.trackEngine(_scopeSecondaryTrack).cvOutput(0);
+    if (_scopeSecondaryChannel >= 0) {
+        _scopeCvSecondary[_scopeWriteIndex] = _engine.cvOutput().channel(_scopeSecondaryChannel);
     } else {
         _scopeCvSecondary[_scopeWriteIndex] = 0.f;
     }
@@ -299,6 +341,95 @@ void MonitorPage::resetScope() {
     _scopeWriteIndex = 0;
 }
 
+void MonitorPage::drawSizes(Canvas &canvas) {
+    // ARM sizeof probe display — temporary measurement gate for Phase 2
+    canvas.setFont(Font::Tiny);
+    canvas.setColor(Color::Bright);
+
+    auto drawRow = [&](int row, const char *label, size_t size) {
+        int y = 12 + row * 8;
+        FixedStringBuilder<24> str("%s:%u", label, (unsigned)size);
+        canvas.drawText(2, y, str);
+    };
+
+    auto drawRow2 = [&](int row, const char *label, size_t size1, size_t size2) {
+        int y = 12 + row * 8;
+        FixedStringBuilder<24> str("%s:%u/%u", label, (unsigned)size1, (unsigned)size2);
+        canvas.drawText(2, y, str);
+    };
+
+    switch (_sizePage) {
+    case 0: // Track & container
+        drawRow(0, "Track", sizeof(Track));
+        drawRow(1, "NoteTrack", sizeof(NoteTrack));
+        drawRow(2, "CurveTrack", sizeof(CurveTrack));
+        drawRow(3, "MidiCvTrack", sizeof(MidiCvTrack));
+        drawRow(4, "TuesdayTrack", sizeof(TuesdayTrack));
+        drawRow(5, "DiscreteMapTrack", sizeof(DiscreteMapTrack));
+        drawRow(6, "IndexedTrack", sizeof(IndexedTrack));
+        drawRow(7, "TeletypeTrack", sizeof(TeletypeTrack));
+        drawRow2(8, "Container", sizeof(Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack>), sizeof(Engine::TrackEngineContainer));
+        drawRow(9, "NoteSeq", sizeof(NoteSequence));
+        drawRow(10, "CurveSeq", sizeof(CurveSequence));
+        break;
+    case 1: // Sequences
+        drawRow(0, "NoteSeq", sizeof(NoteSequence));
+        drawRow(1, "NoteSeq::Step", sizeof(NoteSequence::Step));
+        drawRow2(2, "NoteStep[]", sizeof(NoteSequence::Step) * CONFIG_STEP_COUNT, CONFIG_STEP_COUNT);
+        drawRow(3, "CurveSeq", sizeof(CurveSequence));
+        drawRow(4, "CurveSeq::Step", sizeof(CurveSequence::Step));
+        drawRow2(5, "CurveStep[]", sizeof(CurveSequence::Step) * CONFIG_STEP_COUNT, CONFIG_STEP_COUNT);
+        break;
+    case 2: // RoutingEngine
+        drawRow(0, "RoutingEngine", sizeof(RoutingEngine));
+        drawRow(1, "RouteState", sizeof(RoutingEngine::RouteState));
+        drawRow(2, "TSUnion", sizeof(RoutingEngine::RouteState::TrackStateUnion));
+        drawRow(3, "Shaper", sizeof(Routing::Shaper));
+        drawRow2(4, "RouteStates[]", sizeof(RoutingEngine::RouteState) * CONFIG_ROUTE_COUNT, CONFIG_ROUTE_COUNT);
+        drawRow2(5, "TSUnions[]", sizeof(RoutingEngine::RouteState::TrackStateUnion) * CONFIG_ROUTE_COUNT * CONFIG_TRACK_COUNT, CONFIG_ROUTE_COUNT * CONFIG_TRACK_COUNT);
+        drawRow(6, "LocationState", sizeof(RoutingEngine::RouteState::LocationState));
+        drawRow(7, "EnvelopeState", sizeof(RoutingEngine::RouteState::EnvelopeState));
+        drawRow(8, "FreqFollowState", sizeof(RoutingEngine::RouteState::FreqFollowState));
+        drawRow(9, "ActivityState", sizeof(RoutingEngine::RouteState::ActivityState));
+        drawRow(10, "ProgDivState", sizeof(RoutingEngine::RouteState::ProgDivState));
+        break;
+    case 3: // TrackEngine container sizes
+        drawRow(0, "NoteTrackEngine", sizeof(NoteTrackEngine));
+        drawRow(1, "CurveTrackEngine", sizeof(CurveTrackEngine));
+        drawRow(2, "MidiCvTrackEngine", sizeof(MidiCvTrackEngine));
+        drawRow(3, "TuesdayTrackEngine", sizeof(TuesdayTrackEngine));
+        drawRow(4, "DiscreteMapTE", sizeof(DiscreteMapTrackEngine));
+        drawRow(5, "IndexedTrackEngine", sizeof(IndexedTrackEngine));
+        drawRow(6, "TeletypeTE", sizeof(TeletypeTrackEngine));
+        drawRow(7, "TrackEngine", sizeof(TrackEngine));
+        break;
+    case 4: // Engine & Model & global
+        drawRow(0, "Engine", sizeof(Engine));
+        drawRow(1, "Model", sizeof(Model));
+        drawRow(2, "Project", sizeof(Project));
+        drawRow(3, "Clock", sizeof(Clock));
+        drawRow(4, "RoutingEngine", sizeof(RoutingEngine));
+        drawRow2(5, "TEContainer[]", sizeof(Engine::TrackEngineContainerArray), sizeof(Engine::TrackEngineContainer));
+        drawRow(6, "TEArray", sizeof(Engine::TrackEngineArray));
+        drawRow(7, "MidiOutEngine", sizeof(MidiOutputEngine));
+        break;
+    case 5: // Teletype
+        drawRow(0, "TTTrack", sizeof(TeletypeTrack));
+        drawRow(1, "TTSlot", sizeof(TeletypeTrack::PatternSlot));
+        drawRow(2, "scene_state", sizeof(scene_state_t));
+        drawRow(3, "tele_cmd", sizeof(tele_command_t));
+        drawRow(4, "scene_pat", sizeof(scene_pattern_t));
+        drawRow(5, "TTTE", sizeof(TeletypeTrackEngine));
+        drawRow(6, "TECont", sizeof(Engine::TrackEngineContainer));
+        break;
+    }
+
+    // Page indicator
+    FixedStringBuilder<8> pageStr("%d/%d", _sizePage + 1, SizePageCount);
+    canvas.setColor(Color::Low);
+    canvas.drawText(Width - canvas.textWidth(pageStr) - 2, 8, pageStr);
+}
+
 void MonitorPage::drawScope(Canvas &canvas) {
     WindowPainter::clear(canvas);
     sampleScope();
@@ -310,26 +441,8 @@ void MonitorPage::drawScope(Canvas &canvas) {
     const float cvScale = cvBottom / (2.f * 6.f);
 
     canvas.setBlendMode(BlendMode::Set);
-    canvas.setColor(Color::MediumBright);
 
-    int lastY = 0;
-    {
-        int idx = _scopeWriteIndex % ScopeWidth;
-        float cv = _scopeCv[idx];
-        lastY = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
-    }
-
-    for (int x = 1; x < ScopeWidth; ++x) {
-        int idx = (_scopeWriteIndex + x) % ScopeWidth;
-        float cv = _scopeCv[idx];
-        int y = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
-        int y0 = std::min(lastY, y);
-        int y1 = std::max(lastY, y);
-        canvas.vline(x, y0, y1 - y0 + 1);
-        lastY = y;
-    }
-
-    if (_scopeSecondaryTrack >= 0) {
+    if (_scopeSecondaryChannel >= 0) {
         canvas.setColor(Color::Low);
         int lastSecondaryY = 0;
         {
@@ -346,6 +459,24 @@ void MonitorPage::drawScope(Canvas &canvas) {
             canvas.vline(x, y0, y1 - y0 + 1);
             lastSecondaryY = y;
         }
+    }
+
+    canvas.setColor(Color::MediumBright);
+    int lastY = 0;
+    {
+        int idx = _scopeWriteIndex % ScopeWidth;
+        float cv = _scopeCv[idx];
+        lastY = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
+    }
+
+    for (int x = 1; x < ScopeWidth; ++x) {
+        int idx = (_scopeWriteIndex + x) % ScopeWidth;
+        float cv = _scopeCv[idx];
+        int y = clamp(int(cvCenter - cv * cvScale), 0, cvBottom);
+        int y0 = std::min(lastY, y);
+        int y1 = std::max(lastY, y);
+        canvas.vline(x, y0, y1 - y0 + 1);
+        lastY = y;
     }
 
     canvas.setColor(Color::Medium);
@@ -374,40 +505,18 @@ void MonitorPage::drawScope(Canvas &canvas) {
     int x = Width - 2 - canvas.textWidth(cvStr);
     canvas.drawText(x, 8, cvStr);
 
-    FixedStringBuilder<8> secondaryStr;
-    if (_scopeSecondaryTrack < 0) {
-        secondaryStr("OFF");
+    canvas.setColor(Color::MediumBright);
+    FixedStringBuilder<8> primaryStr("CH%d", _scopeChannel + 1);
+    canvas.drawText(2, 8, primaryStr);
+
+    int secondaryX = 2 + canvas.textWidth(primaryStr) + 4;
+    canvas.setColor(Color::Low);
+    if (_scopeSecondaryChannel < 0) {
+        canvas.drawText(secondaryX, 8, "OFF");
     } else {
-        secondaryStr("T%d", _scopeSecondaryTrack + 1);
+        FixedStringBuilder<8> secondaryStr("CH%d", _scopeSecondaryChannel + 1);
+        canvas.drawText(secondaryX, 8, secondaryStr);
     }
-    canvas.drawText(2, 8, secondaryStr);
-}
-
-int MonitorPage::scopeTrackFromOption(int option) const {
-    if (option <= 0) {
-        return -1;
-    }
-    int selected = _project.selectedTrackIndex();
-    int track = option - 1;
-    if (track >= selected) {
-        track += 1;
-    }
-    return track;
-}
-
-int MonitorPage::scopeOptionFromTrack(int trackIndex) const {
-    if (trackIndex < 0) {
-        return 0;
-    }
-    int selected = _project.selectedTrackIndex();
-    if (trackIndex == selected) {
-        return 0;
-    }
-    int option = trackIndex + 1;
-    if (trackIndex > selected) {
-        option -= 1;
-    }
-    return option;
 }
 
 void MonitorPage::keyboard(KeyboardEvent &event) {
@@ -417,6 +526,7 @@ void MonitorPage::keyboard(KeyboardEvent &event) {
     case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
     case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
     case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
+    case KeyboardEvent::KeyF6: pressFunctionButton(5, event.shift()); event.consume(); break;
     default: break;
     }
     BasePage::keyboard(event);

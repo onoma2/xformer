@@ -35,6 +35,7 @@ protected:
 
 private:
     void scrollTo(int row);
+    void editSelectedRow(int value, bool shift);
 
     static constexpr int LineHeight = 10;
     static constexpr int LineCount = 4;

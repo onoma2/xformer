@@ -13,18 +13,20 @@ XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific t
 - **T9Type Track** (a mildly stripped down version of [Monome Teletype](https://monome.org/past/teletype.html): Full TT VM running withing a track, yes you can have 8 T9types running. USB keyboard supported for script editing (see Keyboard Shortcuts in the manual). No I2C, No Grid.
 
 - **Note Circus Track Enhancements**:  **Accumulator** (inspired by [Intellijel Metropolix](https://intellijel.com/shop/eurorack/metropolix/)). **Harmony Engine** (inspired by [Instruo Harmonaig](https://www.instruomodular.com/product/harmonaig/)). Pulse Count,Modes, ReRene and Ikra playmodes
- 
+
 - **Curve Studio Track Enhancements**: Global Phase, Wavefolder, Chaos Engine, advanced playback features.
 
 - **Scope View**: Monitor page oscilloscope for track CV with optional second track overlay.
+  - Access: Monitor page (S8) → `Page+S8` toggles scope
+  - Navigate: Encoder cycles primary channel (CH1-CH8), Shift+Encoder cycles secondary channel (OFF/CH1-CH8)
 
 
 - **Routing**:
-	- additional BUS 1-4 routing Targets	
+	- additional BUS 1-4 routing Targets
 	- CV/Gate Output Rotation, Run, Reset.
 	- Advanced Bias/Depth/Shaper system.
 	- Independent interpolating CV Router (think [Vostok Trace](https://www.vostokinstruments.com/trace)
-	
+
 
 
 
@@ -39,7 +41,7 @@ XFORMER is a fork of the Phazerville PER|FORMER firmware with XFORMER-specific t
 - T9Type - [Full](./manuals/T9Type-manual.md), [Ops](./manuals/T9Type-ops.md), [Track](./manuals/T9Type-learn.md)
 
 
-- [Scala (.scl) to .SCA (performer SCA)](./scripts/SCL-TO-SCA/) - conversion script 
+- [Scala (.scl) to .SCA (performer SCA)](./scripts/SCL-TO-SCA/) - conversion script
 - [HTML Shapes Visualizer](./manuals/curve-and-route-shapers.html) - helper to
 visualize Curve Studio shapes and routing additions with a sound engine
 

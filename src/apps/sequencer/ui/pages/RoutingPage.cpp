@@ -246,7 +246,6 @@ void RoutingPage::exitBiasOverlay(bool commit) {
             _editRoute.setBiasPct(i, _biasStaging[i]);
             _editRoute.setDepthPct(i, _depthStaging[i]);
             _editRoute.setShaper(i, _shaperStaging[i]);
-            _editRoute.setCreaseEnabled(i, _shaperStaging[i] == Routing::Shaper::Crease);
         }
         showMessage("BIAS/DEPTH/SHAPER UPDATED");
     }
@@ -304,7 +303,6 @@ void RoutingPage::handleBiasOverlayKey(KeyPressEvent &event) {
                     _editRoute.setBiasPct(i, _biasStaging[i]);
                     _editRoute.setDepthPct(i, _depthStaging[i]);
                     _editRoute.setShaper(i, _shaperStaging[i]);
-                    _editRoute.setCreaseEnabled(i, _shaperStaging[i] == Routing::Shaper::Crease);
                 }
 
                 // Check conflict

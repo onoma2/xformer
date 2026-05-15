@@ -26,7 +26,7 @@ typedef struct {
     const uint8_t params;
 } tele_mod_t;
 
-extern const tele_op_t *tele_ops[E_OP__LENGTH];
+extern const tele_op_t *const tele_ops[E_OP__LENGTH];
 extern const tele_mod_t *tele_mods[E_MOD__LENGTH];
 
 // Get only ops

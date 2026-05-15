@@ -1,4 +1,5 @@
 # Engine Sub-Object Size Comparison
+> **SUPERSEDED** — This analysis is fully absorbed into `resource-optimization/TASK.md:80-168` (Symbol-Level RAM Analysis). Kept for git history only. Do not use for decision-making.
 
 ## CONFIG Values
 

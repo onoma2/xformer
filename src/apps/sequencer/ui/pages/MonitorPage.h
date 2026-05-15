@@ -32,17 +32,17 @@ private:
     void drawMidi(Canvas &canvas);
     void drawStats(Canvas &canvas);
     void drawVersion(Canvas &canvas);
+    void drawSizes(Canvas &canvas);
     void drawScope(Canvas &canvas);
     void sampleScope();
     void resetScope();
-    int scopeTrackFromOption(int option) const;
-    int scopeOptionFromTrack(int trackIndex) const;
 
     enum class Mode : uint8_t {
         CvIn,
         CvOut,
         Midi,
         Stats,
+        Sizes,
         Version,
     };
 
@@ -51,6 +51,8 @@ private:
     MidiMessage _lastMidiMessage;
     MidiPort _lastMidiMessagePort;
     uint32_t _lastMidiMessageTicks = -1;
+    int _sizePage = 0;
+    static constexpr int SizePageCount = 6;
 
     static constexpr int ScopeWidth = Width;
     static constexpr int ScopeHeight = Height;
@@ -58,5 +60,6 @@ private:
     std::array<uint8_t, ScopeWidth> _scopeGate{};
     std::array<float, ScopeWidth> _scopeCvSecondary{};
     int _scopeWriteIndex = 0;
-    int8_t _scopeSecondaryTrack = -1;
+    int8_t _scopeChannel = 0;
+    int8_t _scopeSecondaryChannel = -1;
 };

@@ -13,12 +13,15 @@ All measurements verified by `arm-none-eabi-nm` and manual struct analysis. Thes
 | `TrackState` | **56 bytes** (15 fields + padding) | `RoutingEngine.h:34-50` |
 | `RouteState` (full) | **468 bytes** (Target + tracks + shaper[8] + TrackState[8]) | `RoutingEngine.h:30-51` |
 | `tele_command_t` | **52 bytes** | `command.h:25-32` |
-| `scene_pattern_t` | **136 bytes** | `state.h:138-145` |
+| `scene_pattern_t` | **138 bytes** | MonitorPage SIZES page 6 |
 | `PatternSlot` | **1,226 bytes** | `TeletypeTrack.h:127-152` |
+| `scene_state_t` | **4,640 bytes** | MonitorPage SIZES page 6 |
+| `TeletypeTrack` | **7,104 bytes** | MonitorPage SIZES page 6 |
 | `tele_ops[]` | **1,664 bytes** (416 × 4 byte ptrs) | `op.c / op_enum.h` |
 | `ttSlot` globals (×4) | **4,904 bytes** (4 × 1,226) | `FileManager.cpp:628-635` |
-| `TeletypeTrackEngine` | **~904 B** | `TeletypeTrackEngine.h:167-269` |
-| Next largest engine | **~675 B** (ArpTrackEngine analog) | Estimated from Container sizing |
+| `TeletypeTrackEngine` | **912 B** | MonitorPage SIZES page 6 |
+| `Engine::TrackEngineContainer` | **912 B** | MonitorPage SIZES page 6 |
+| Next largest engine | **588 B** (`NoteTrackEngine`) | MonitorPage SIZES page 4 |
 
 ### Configuration Constants
 
@@ -40,13 +43,14 @@ The parallel resource-optimization task (`../../resource-optimization/TASK.md`) 
 |---|---|---|
 | RoutingEngine is **7.4 KB** gap — 90% of Engine singleton delta | lines 88, 233-241 | Confirms P5/P6 as #1 priority, adds aggressive P5a variant |
 | `ttSlot1-4` are **.bss globals** (4,904 B), not stack locals | lines 104-108, `FileManager.cpp:628-635` | Adds P4b (backup consolidation only) |
-| Engine container direct gap is **1,832 B** | lines 212-219 | P7 savings confirmed at 1,832 B direct. **No alignment cascade**: 904 is 8-byte aligned (904 % 8 = 0), cascade mechanism unverified |
+| Engine container gate is **TeletypeTrackEngine=912 B** | MonitorPage SIZES page 6 | P7 direct conditional gap is `(912 - 588) × 8 = 2,592 B` CCMRAM; only recoverable with capped/separate Teletype engine residency or TeletypeTrackEngine shrink |
 | `tele_ops` table in **.data** = 1,664 B | line 104 | Adds to P14 scope if const-able |
-| Stack: file task 4,096 B vs Modulove 2,208 B (~1,888 B gap) | line 258 | Adds P13 (requires stack watermark measurement) |
+| Stack: file task 4,096 B vs Modulove 2,208 B (~1,888 B gap) | line 258 | Tracks P13 as future research; requires stack watermark measurement before implementation |
 | `tele_glyphs/bitmap` in .data = 1,040 B | lines 109, 111 | Adds P14 |
 | Model scatter = 4.8 KB gap (no single target) | line 120 | Not addressed here |
 | UI is **bigger** in Vinx (30,068 B) than XFORMER (27,244 B) | line 228 | P10/P11 are not XFORMER's bottleneck |
-| Top 3 directions: RoutingEngine > Teletype > Engine container | lines 171-175 | Priority order confirmed |
+| Top 3 directions after P15/P5: Teletype engine container and transaction/slot semantics remain relevant; Teletype model shrink is not a current container win | current MonitorPage SIZES | `TeletypeTrack=7104` is below `NoteTrack=9544`; `TeletypeTrackEngine=912` equals engine container |
+| Model/container pool architecture | `.tasks/core-architecture-optimization/model-pool-decision-table.md` | No-go under current "any track can be any type" semantics; only re-open with explicit simultaneous type caps |
 
 ---
 
@@ -119,13 +123,13 @@ Each proposal: **Savings**, **Effort** (Low/Medium/High/Very High), **Risk** (No
 
 **What**: `FileManager.cpp:628-635` has 4 static `PatternSlot` globals. The two primaries (`ttSlot1` / `ttSlot2`) are accessed **concurrently** during file parsing — `#SLOT 1` / `#SLOT 2` directives can switch between them. The two backup slots (`ttSlot1Backup` / `ttSlot2Backup`) are used for atomic rollback on parse failure.
 
-Proposal: Replace the two backups with a single shared backup buffer. Before parsing, save to the shared backup one slot at a time. On failure, restore from shared backup (if only one slot was dirtied, the other's backup is stale — must only rollback the actively-parsed slot). If both slots are dirtied during the same file, the single backup covers the most recently dirtied slot.
+Status: **deferred research**. Do not treat this as a low-risk one-file cleanup. Current `readTeletypeTrack()` snapshots both slots before clearing and restores both slots on failure. Replacing the two backups with one shared buffer changes transaction semantics unless the read/apply flow is redesigned around a clear single-slot rollback contract.
 
 Simpler alternative: keep both backups but acknowledge this savings is currently unreachable.
 
 **Savings**: 1 × 1,226 B = **~1,226 B** (consolidate 2 backups → 1)  
-**Effort**: Low-Medium — modify `readTeletypeTrack()` backup/restore logic  
-**Risk**: Low — rollback becomes single-slot only; on multi-slot parse failure, only the last-dirtied slot is restorable  
+**Effort**: Medium — requires rollback semantics redesign, not just changing the globals  
+**Risk**: Medium — multi-slot parse failure can corrupt or partially restore state if the transaction boundary is wrong  
 
 **Files**: `src/apps/sequencer/model/FileManager.cpp`
 
@@ -183,24 +187,36 @@ Each variant ~16-24 B vs current ~56 B. Non-shaper tracks (None, Crease, Triangl
 
 **Files**: `src/apps/sequencer/engine/RoutingEngine.h`, `RoutingEngine.cpp`
 
-#### P6 — Skip TrackState for non-per-track routes
+#### P6 — Cap stateful RoutingEngine lanes (maybe later)
 
-**What**: Routes targeting global targets (Tempo, Swing, Play, Record, CvRouteScan, CvRouteRoute, Mute, Fill, Pattern) don't need per-track shaping. Identified by `Routing::isPerTrackTarget()`. Conditional allocation: only per-track routes carry TrackState[8].
+**What**: After P5, each shaper state slot is already a 24 B union. Bus routes use only slot 0, engine/project routes use no shaper state, and per-track routes can use up to all 8 slots. Because `RouteState[16]` is fixed-layout and routes can retarget at runtime, merely restricting shapers on bus/engine routes does not save RAM.
 
-**Savings**: ~56 B × 8 × 6 (non-per-track routes) = **~2,688 B**  
-**Effort**: Medium — conditional TrackState allocation in RouteState, branching in `updateSinks()`  
-**Risk**: Low — `isPerTrackTarget()` already classifies targets; routes are type-checked at model level
+The static RAM-saving variant is a product constraint: only the first N routing lanes have stateful shaper memory. Stateless shapers remain available on all 16 lanes.
+
+Example layout:
+
+```cpp
+RouteState routeStates[16];              // target/tracks/shaper cache only
+TrackStateUnion statefulShaperState[4][8]; // lanes 1-4 only
+```
+
+**Savings after P5**:
+- N=4: current `16 × 8 × 24 = 3,072 B` → `4 × 8 × 24 = 768 B`, save **~2,304 B CCMRAM**
+- N=8: save **~1,536 B CCMRAM**
+
+**Effort**: Medium — split state storage from `RouteState`, gate stateful shaper access by lane index, update reset/change logic  
+**Risk**: Medium — user-visible routing constraint; stateful shapers unavailable on lanes above N  
 
 **Files**: `src/apps/sequencer/engine/RoutingEngine.h`, `RoutingEngine.cpp`
 
 #### P7 — Extract TeletypeTrackEngine from Container variant
 
-**What**: TeletypeTrackEngine (~904 B) inflates all 8 container slots. Remove it from the `Container<...>` type — the container max drops from 904 B to the next largest (~675 B).
+**What**: TeletypeTrackEngine (912 B) inflates all 8 container slots. Remove it from the `Container<...>` type only if the next-largest engine is smaller and Teletype engine residency can be capped.
 
-**Savings**: (904 - 675) × 8 = **1,832 B direct** in CCMRAM  
-**Note**: Verified 904 is 8-byte aligned (904 % 8 = 0). No alignment cascade mechanism identified in Engine.h member ordering. The 4,304 B "cascade" figure from resource-optimization task requires further source validation.  
+**Savings**: Conditional. Current ARM probes show `TeletypeTrackEngine=912 B`, `Engine::TrackEngineContainer=912 B`, and `NoteTrackEngine=588 B`; direct container gap is `(912 - 588) × 8 = 2,592 B` CCMRAM. If Performer preserves the current behavior where any/all 8 tracks can be Teletype, separate storage for 8 TeletypeTrackEngines cancels the container saving.
+**Note**: No alignment cascade mechanism identified in Engine.h member ordering. The old 904-vs-675 estimate is superseded by the MonitorPage measurements.
 **Effort**: Medium — separate TTE storage array, update `updateTrackSetups()`  
-**Risk**: Medium — track mode switch lifecycle; ensure proper construct/destruct ordering
+**Risk**: Medium-High — track mode switch lifecycle plus product semantics around maximum live Teletype tracks. Future research only until the cap/semantics question is decided.
 
 **Files**: `src/apps/sequencer/engine/Engine.h`, `Engine.cpp`
 
@@ -214,11 +230,13 @@ Each variant ~16-24 B vs current ~56 B. Non-shaper tracks (None, Crease, Triangl
 
 **Files**: `src/apps/sequencer/model/TeletypeTrack.h`, `TeletypeTrack.cpp`
 
-#### P13 — Trim file task stack (requires measurement)
+#### P13 — Trim file task stack (future research)
 
 **What**: `CONFIG_FILE_TASK_STACK_SIZE` is 4,096 B. Modulove runs at 2,208 B with the same FatFs + SDIO driver.
 
 **Must verify**: The `ttSlot*` globals were **moved out of stack** into .bss at `FileManager.cpp:628-635` specifically because large PatternSlot objects caused stack overflow on the file task. This means stack was already tight before the move. Need stack watermark measurement in debug build before reducing.
+
+**Status**: deprioritized to future research. Do not keep this in the active resource-optimization implementation queue until hardware watermark data exists for worst-case save/load, Teletype file parse, malformed Teletype file, and relevant SD failure flows.
 
 **Savings**: 4,096 → 2,560 = **~1,536 B in CCMRAM** (conservative)  
 **Effort**: Low — one `#define` change  
@@ -286,27 +304,32 @@ Key corrections from adversarial review of v1:
 
 6. **P13 TEMPERED (needs measurement)**: `ttSlot*` globals were moved OFF stack (into .bss) because large PatternSlot objects caused overflow. Stack reduction requires watermark measurement before attempting.
 
+7. **P15 ADDED (missed sequence-header candidate)**: NoteSequence and CurveSequence steps are already packed, but sequence-level parameters/header fields are still repeated across 17 patterns/snapshots. Host sizeof probe: `NoteSequence=564 B`, `CurveSequence=592 B`, `NoteTrack=9,612 B`, `CurveTrack=10,092 B`, `Track=10,120 B`. Because CurveTrack appears to size `Track::_container`, note-only packing may not reduce top-level RAM; measure ARM sizes first and pack Note/Curve headers together if pursuing this as RAM recovery.
+
 ---
 
 ## Recommended First Pass
 
 | Phase | Proposals | Verified Savings | Cumulative | Risk |
 |---|---|---|---|---|
-| **Phase 1 (Safe)** | P2 (56 B) + P4 (3,904 B) + P14 (1,040 B) + P14b (1,664 B) | **~6,664 B** | ~6.5 KB | None-Low |
-| **Phase 2 (Medium)** | P4b (1,226 B) + P5 (4,096 B) + P6 (2,688 B) + P7 (1,832 B) | **~9,842 B** | ~16.5 KB | Low-Medium |
-| **Phase 3 (Risk)** | P5a (7,488 B, only if shapers unused) + P8 (544 B) + P13 (1,536 B, after measurement) | **~9,568 B** | ~26.0 KB | Medium-High |
+| **Phase 1 (Safe)** | P2/P4 internal Teletype cleanup + P14 (1,040 B) + P14b (1,664 B) | **2,704 B measured .data** | ~2.7 KB | None-Low |
+| **Phase 2 (Medium)** | P5 complete (4,096 B CCMRAM), P15 complete (4,760 B `.bss`) | **8,856 B measured across SRAM/CCMRAM** | ~11.6 KB total with Phase 1 | Low-Medium |
+| **Phase 3 (Risk)** | P5a (7,488 B, only by explicit decision) + P8 (544 B) | **~8,032 B** | conditional | Medium-High |
 
-**Phase 1 alone**: ~6.5 KB recovers → RAM ~121 KB (~94%). Enough to unblock minor feature work.  
-**Phases 1+2**: ~16.5 KB → RAM ~111 KB (~87%). Matches Vinx baseline.  
-**All phases**: ~26 KB → RAM ~101 KB (~79%). Comfortable headroom.
+**Phase 1 alone**: 2,704 B recovers from .data → RAM ~124.7 KB (~95.2%).  
+**P5 status**: complete, hardware-verified, saves 4,096 B CCMRAM.  
+**P15 status**: complete, saves 4,760 B `.bss`; post-P15 MonitorPage shows `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`. Model storage is done for now.
 
 Recommended order:
-1. **P2+P4+P14+P14b** (6.7 KB, 4 files, ~2 days) — safest quick wins  
-2. **P5+P6** (6.8 KB, 2 files, ~1 week) — biggest single structural change  
-3. **P4b** (1.2 KB, 1 file, ~1 day) — Teletype file I/O cleanup  
-4. **P7** (1.8 KB, 2 files, ~1 week) — invasive but high value  
-5. **P8** (0.5 KB, 2 files, ~2 days) — final pattern savings  
-6. **P13** (1.5 KB, after verification) — stack trim only if safe
+1. **P14+P14b** (2.7 KB measured) plus P2/P4 internal cleanup — completed  
+2. **P5** — completed and hardware-verified  
+3. **P15 CurveSequence-first** — completed; model container max is now NoteTrack
+4. **Post-P15 SRAM symbol audit** — required before choosing another implementation target
+5. **P4b** — research/spec next; rollback semantics are not simple
+6. **P6** — deferred research; sparse/capped shaper state needs a separate design
+7. **P7** — future research only; useful only with a capped live Teletype engine pool
+8. **P8** (0.5 KB, 2 files, ~2 days) — possible final pattern savings after transaction semantics are understood
+9. **P13** — future research only; requires hardware stack watermark evidence before implementation
 
 ---
 

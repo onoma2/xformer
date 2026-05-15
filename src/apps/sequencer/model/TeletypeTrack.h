@@ -169,6 +169,12 @@ public:
     PatternSlot &activeSlot() { return _patternSlots[_activePatternSlot]; }
     const PatternSlot &activeSlot() const { return _patternSlots[_activePatternSlot]; }
 
+    // Active clip config for FileManager (const ref, no capture)
+    const PatternSlot &activeClipConfig() const { return _patternSlots[_activePatternSlot]; }
+    void setActiveClip(const PatternSlot &clip) {
+        _patternSlots[_activePatternSlot] = clip;
+    }
+
     // midiSource
     const MidiSourceConfig &midiSource() const { return activeSlot().midiSource; }
           MidiSourceConfig &midiSource()       { return activeSlot().midiSource; }
@@ -621,11 +627,11 @@ public:
         int clamped = clamp(index, 0, PATTERN_COUNT - 1);
         return _state.patterns[clamped];
     }
-    void setPattern(int index, const scene_pattern_t &pattern) {
+    void setTeletypePattern(int index, const scene_pattern_t &pattern) {
         int clamped = clamp(index, 0, PATTERN_COUNT - 1);
         _state.patterns[clamped] = pattern;
-        syncToActiveSlot();
     }
+    void setPattern(int index, const scene_pattern_t &pattern) { setTeletypePattern(index, pattern); } // compatibility
 
     int bootScriptIndex() const { return activeSlot().bootScriptIndex; }
     void setBootScriptIndex(int index) {
@@ -644,17 +650,28 @@ public:
     }
 
     int activePatternSlot() const { return _activePatternSlot; }
-    int patternSlotForPattern(int patternIndex) const {
+    int clipIndexForPerformerPattern(int patternIndex) const {
         return clamp(patternIndex, 0, CONFIG_PATTERN_COUNT - 1) % PatternSlotCount;
     }
-    PatternSlot patternSlotSnapshot(int patternIndex) const;
-    void setPatternSlotForPattern(int patternIndex, const PatternSlot &slot);
-    void clearPatternSlot(int patternIndex);
-    void copyPatternSlot(int srcPatternIndex, int dstPatternIndex);
-    void onPatternChanged(int patternIndex);
+    PatternSlot clipSnapshot(int patternIndex) const;
+    PatternSlot patternSlotSnapshot(int patternIndex) const { return clipSnapshot(patternIndex); } // compatibility
+    void setClipForPerformerPattern(int patternIndex, const PatternSlot &slot);
+    void clearClipForPerformerPattern(int patternIndex);
+    void copyClipForPerformerPattern(int srcPatternIndex, int dstPatternIndex);
+    void switchClipForPerformerPattern(int performerPatternIndex);
+    void setPatternSlotForPattern(int patternIndex, const PatternSlot &slot) { setClipForPerformerPattern(patternIndex, slot); } // compatibility
+    void clearPatternSlot(int patternIndex) { clearClipForPerformerPattern(patternIndex); } // compatibility
+    void copyPatternSlot(int srcPatternIndex, int dstPatternIndex) { copyClipForPerformerPattern(srcPatternIndex, dstPatternIndex); } // compatibility
+    void onPatternChanged(int patternIndex) { switchClipForPerformerPattern(patternIndex); } // compatibility
     void applyPatternSlot(int slotIndex);
     void applyActivePatternSlot();
     void syncToActiveSlot();
+
+    // Clip vocabulary wrappers (Phase 1 - no behavior change)
+    void loadClipIntoVm(int clipIndex);                                    // wraps applyPatternSlot
+    void loadActiveClipIntoVm();                                          // wraps applyActivePatternSlot
+    void loadClipForPerformerPattern(int performerPatternIndex);           // mapping + load
+    void captureActiveClip();                                             // wraps syncToActiveSlot
 
     //----------------------------------------
     // Name printing helpers

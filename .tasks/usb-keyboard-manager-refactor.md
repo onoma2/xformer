@@ -1,4 +1,5 @@
 # usb-keyboard-manager-refactor
+> **SUPERSEDED** — Fully merged. See `STATUS.md` -> `usb-keyboard-system` (🟢 done) for consolidated keyboard epic. Kept for git history.
 
 ## Goal
 Refactor the USB HID Keyboard handling towards a `KeyboardManager` inspired by the existing `ControllerManager`. This achieves better separation of concerns by moving keycode translation (ASCII/Step) out of the main `Ui` class and provides a consistent interface for external controllers.

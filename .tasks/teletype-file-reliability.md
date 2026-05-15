@@ -1,4 +1,5 @@
 # teletype-file-reliability
+> **SUPERSEDED** — Canonical task file is `teletype-file-reliability/README.md`. This standalone copy kept for git history only.
 
 ## Goal
 Fix the three real bugs in TeletypeTrack file saving/loading: redundant legacy I/O in binary serialization, silent parse failures in the text track loader, and no rollback when a text load fails (wipes the working track).

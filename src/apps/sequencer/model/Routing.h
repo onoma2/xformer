@@ -722,18 +722,10 @@ public:
         bool hasNonDefaultShaping(int trackIndex) const {
             return _biasPct[trackIndex] != DefaultBiasPct ||
                    _depthPct[trackIndex] != DefaultDepthPct ||
-                   _creaseEnabled[trackIndex] != false ||
                    _shaper[trackIndex] != Shaper::None;
         }
 
-        // per-track crease
-
-        bool creaseEnabled(int trackIndex) const { return _creaseEnabled[trackIndex]; }
-        void setCreaseEnabled(int trackIndex, bool enabled) {
-            _creaseEnabled[trackIndex] = enabled;
-        }
-
-        // shaper (per track)
+        // shaper (per track) — crease is Shaper::Crease, no separate flag needed
 
         Shaper shaper(int trackIndex) const { return _shaper[trackIndex]; }
         void setShaper(int trackIndex, Shaper shaper) {
@@ -818,7 +810,6 @@ public:
         float _max;
         std::array<int8_t, CONFIG_TRACK_COUNT> _biasPct;
         std::array<int8_t, CONFIG_TRACK_COUNT> _depthPct;
-        std::array<bool, CONFIG_TRACK_COUNT> _creaseEnabled;
         std::array<Shaper, CONFIG_TRACK_COUNT> _shaper;
         Source _source;
         CvSource _cvSource;

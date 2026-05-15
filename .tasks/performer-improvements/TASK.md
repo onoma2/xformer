@@ -100,6 +100,9 @@ Launchpad-specific improvements (LP Style, Circuit Keyboard, Performer Mode, etc
 ### 1. 8 LFO Modulators
 **Source:** `temp-ref/modulove-performer/src/apps/sequencer/model/Modulator.h`
 
+**Status:** Extracted to dedicated task `.tasks/global-modulators-v1/`. Keep this
+section as reference only; implementation planning lives in the new task.
+
 | Requirement | Feasibility | Effort |
 |-------------|------------|--------|
 | New Modulator data model | High | 1 file |

@@ -33,7 +33,7 @@ void Track::clearPattern(int patternIndex) {
         _track.indexed->sequence(patternIndex).clear();
         break;
     case TrackMode::Teletype:
-        _track.teletype->clearPatternSlot(patternIndex);
+        _track.teletype->clearClipForPerformerPattern(patternIndex);
         break;
     case TrackMode::Last:
         break;
@@ -60,7 +60,7 @@ void Track::copyPattern(int src, int dst) {
         _track.indexed->sequence(dst) = _track.indexed->sequence(src);
         break;
     case TrackMode::Teletype:
-        _track.teletype->copyPatternSlot(src, dst);
+        _track.teletype->copyClipForPerformerPattern(src, dst);
         break;
     case TrackMode::Last:
         break;

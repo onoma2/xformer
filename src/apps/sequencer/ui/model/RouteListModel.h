@@ -255,7 +255,6 @@ private:
             if (next >= int(Routing::Shaper::Last)) next = 0;
             auto shaper = Routing::Shaper(next);
             _route.setShaper(0, shaper);
-            _route.setCreaseEnabled(0, shaper == Routing::Shaper::Crease);
             break;
         }
         case Last:

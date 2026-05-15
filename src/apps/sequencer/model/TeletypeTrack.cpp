@@ -179,9 +179,6 @@ const char *TeletypeTrack::cvOutputDestName(CvOutputDest dest) {
 }
 
 void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
-    auto *self = const_cast<TeletypeTrack *>(this);
-    self->syncToActiveSlot();
-
     scene_state_t &state = const_cast<scene_state_t &>(_state);
     for (int script = 0; script < EditableScriptCount; ++script) {
         writer.write(state.scripts[script].l);
@@ -327,61 +324,62 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
     applyPatternSlot(_activePatternSlot);
 }
 
-TeletypeTrack::PatternSlot TeletypeTrack::patternSlotSnapshot(int patternIndex) const {
-    auto *self = const_cast<TeletypeTrack *>(this);
-    self->syncToActiveSlot();
-    const int slot = patternSlotForPattern(patternIndex);
-    return self->_patternSlots[slot];
+TeletypeTrack::PatternSlot TeletypeTrack::clipSnapshot(int patternIndex) const {
+    const int slot = clipIndexForPerformerPattern(patternIndex);
+    return _patternSlots[slot];
 }
 
-void TeletypeTrack::setPatternSlotForPattern(int patternIndex, const PatternSlot &slot) {
-    syncToActiveSlot();
-    const int slotIndex = patternSlotForPattern(patternIndex);
-    _patternSlots[slotIndex] = slot;
-    if (slotIndex == _activePatternSlot) {
-        applyPatternSlot(slotIndex);
+void TeletypeTrack::setClipForPerformerPattern(int patternIndex, const PatternSlot &slot) {
+    captureActiveClip();
+    const int clipIndex = clipIndexForPerformerPattern(patternIndex);
+    _patternSlots[clipIndex] = slot;
+    if (clipIndex == _activePatternSlot) {
+        loadClipIntoVm(clipIndex);
     }
 }
 
-void TeletypeTrack::clearPatternSlot(int patternIndex) {
-    syncToActiveSlot();
-    const int slotIndex = patternSlotForPattern(patternIndex);
-    auto &slot = _patternSlots[slotIndex];
-    slot.slotScriptLength = 0;
-    slot.metroLength = 0;
-    std::memset(slot.slotScript.data(), 0, sizeof(slot.slotScript));
-    std::memset(slot.metro.data(), 0, sizeof(slot.metro));
-    scene_state_t defaults{};
-    ss_init(&defaults);
+void TeletypeTrack::clearClipForPerformerPattern(int patternIndex) {
+    captureActiveClip();
+    const int clipIndex = clipIndexForPerformerPattern(patternIndex);
+    auto &clip = _patternSlots[clipIndex];
+    clip.slotScriptLength = 0;
+    clip.metroLength = 0;
+    std::memset(clip.slotScript.data(), 0, sizeof(clip.slotScript));
+    std::memset(clip.metro.data(), 0, sizeof(clip.metro));
     for (int i = 0; i < PATTERN_COUNT; ++i) {
-        slot.patterns[i] = defaults.patterns[i];
+        auto &pattern = clip.patterns[i];
+        pattern.idx = 0;
+        pattern.len = 0;
+        pattern.wrap = 1;
+        pattern.start = 0;
+        pattern.end = PATTERN_LENGTH - 1;
+        std::memset(pattern.val, 0, sizeof(pattern.val));
     }
-    if (slotIndex == _activePatternSlot) {
-        applyPatternSlot(slotIndex);
-    }
-}
-
-void TeletypeTrack::copyPatternSlot(int srcPatternIndex, int dstPatternIndex) {
-    syncToActiveSlot();
-    const int srcSlot = patternSlotForPattern(srcPatternIndex);
-    const int dstSlot = patternSlotForPattern(dstPatternIndex);
-    if (srcSlot == dstSlot) {
-        return;
-    }
-    _patternSlots[dstSlot] = _patternSlots[srcSlot];
-    if (dstSlot == _activePatternSlot) {
-        applyPatternSlot(dstSlot);
+    if (clipIndex == _activePatternSlot) {
+        loadClipIntoVm(clipIndex);
     }
 }
 
-void TeletypeTrack::onPatternChanged(int patternIndex) {
-    const int slot = patternSlotForPattern(patternIndex);
-    if (slot == _activePatternSlot) {
+void TeletypeTrack::copyClipForPerformerPattern(int srcPatternIndex, int dstPatternIndex) {
+    captureActiveClip();
+    const int srcClip = clipIndexForPerformerPattern(srcPatternIndex);
+    const int dstClip = clipIndexForPerformerPattern(dstPatternIndex);
+    if (srcClip == dstClip) {
         return;
     }
-    syncToActiveSlot();
+    _patternSlots[dstClip] = _patternSlots[srcClip];
+    if (dstClip == _activePatternSlot) {
+        loadClipIntoVm(dstClip);
+    }
+}
 
-    applyPatternSlot(slot);
+void TeletypeTrack::switchClipForPerformerPattern(int performerPatternIndex) {
+    const int newClip = clipIndexForPerformerPattern(performerPatternIndex);
+    if (newClip == _activePatternSlot) {
+        return;
+    }
+    captureActiveClip();
+    loadClipIntoVm(newClip);
 }
 
 void TeletypeTrack::applyPatternSlot(int slotIndex) {
@@ -416,4 +414,23 @@ void TeletypeTrack::syncToActiveSlot() {
         patternSlot.patterns[i] = _state.patterns[i];
     }
     patternSlot.resetMetroOnLoad = _resetMetroOnLoad;
+}
+
+// Clip vocabulary wrappers (Phase 1 - no behavior change)
+
+void TeletypeTrack::loadClipIntoVm(int clipIndex) {
+    applyPatternSlot(clipIndex);
+}
+
+void TeletypeTrack::loadActiveClipIntoVm() {
+    applyActivePatternSlot();
+}
+
+void TeletypeTrack::loadClipForPerformerPattern(int performerPatternIndex) {
+    const int clipIndex = clipIndexForPerformerPattern(performerPatternIndex);
+    applyPatternSlot(clipIndex);
+}
+
+void TeletypeTrack::captureActiveClip() {
+    syncToActiveSlot();
 }
