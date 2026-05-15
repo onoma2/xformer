@@ -10,6 +10,15 @@ _Updated: 2026-05-15_
 
 ---
 
+## 🟡 sim-project-io — Desktop editor foundation: simulator load/save HW projects via FileManager
+**Status:** paused
+**Where I stopped:** Architecture mapped. Two I/O paths identified (direct std::fstream vs FileManager→FatFs→sdcard.iso). Full plan written at `.tasks/sim-project-io/PLAN.md`.
+**Next action:** Step 1 — generate `sdcard.iso` FAT disk image for the virtual SD card
+**Depends on:** nothing
+**Branch:** TBD
+
+---
+
 ## 🟡 core-architecture-optimization — Research XFORMER core mechanics after expansion beyond original Note/Curve Performer
 **Status:** paused/reference — research and decision artifacts only, not an implementation queue.
 **Where I stopped:** Source probes and decision tables now say RoutingEngine compaction is the only current architecture-adjacent RAM implementation; model/container pool replacement is no-go unless product semantics change.
@@ -20,9 +29,9 @@ _Updated: 2026-05-15_
 ---
 
 ## 🟡 teletype-runtime-architecture — Clarify Teletype VM/slot/runtime ownership before global runtime work
-**Status:** active — Phase 0 (UI/engine race fix) hardware-verified and committed.
-**Where I stopped:** Phase 2 code-complete, STM32 build passes, RAM flat. `write()` and `clipSnapshot()` are now `const` with no hidden mutation. Clip vocabulary established everywhere except `onPatternChanged`/`clearPatternSlot`/`copyPatternSlot`/`setPatternSlotForPattern` (deferred to Phase 3).
-**Next action:** Phase 3 — centralize pattern-change policy: `switchClipForPerformerPattern()`, `clearClipForPerformerPattern()`, `copyClipForPerformerPattern()`, `setClipForPerformerPattern()`.
+**Status:** active — Phase 0-3 hardware-verified and committed.
+**Where I stopped:** Phase 3 centralized Performer Pattern clip policy and fixed `clearClipForPerformerPattern()` to avoid a 4.6 KB `scene_state_t` UI-stack allocation during Pattern Init.
+**Next action:** Phase 4 — split project save/load from active-only Teletype text save/load and reduce text import/export buffers from 4 PatternSlots to 2.
 **Depends on:** resource-optimization (for RAM gates), teletype file transaction semantics
 **Branch:** refactor/resouce-optimization
 
@@ -85,3 +94,12 @@ _Updated: 2026-05-15_
 **Status:** done — all 3 phases complete, merged to master
 **Where I stopped:** Phases 0-2 merged. Follow-on on master: script files show project name in slot picker (`8a829819`), USB keyboard text input for NAME fields (`2f4f38dc`).
 **Branch:** fix/teletype-files (stale, can delete)
+
+---
+
+## 🟡 orca-mvp — Port Orca esolang to Performer as new track type
+**Status:** paused
+**Where I stopped:** Research phase complete. All reference codebases cloned to `temp-ref/` (C, Lua, Arduino C++). RAM container gates identified: `NoteTrack=9544 B`, `TeletypeTrackEngine=912 B`. Next step is designing fixed-grid `OrcaTrack` model that fits under the container gate.
+**Next action:** Prototype `OrcaTrack` model with fixed grid size (e.g., 16×16 or 32×16) and measure `sizeof(OrcaTrack)` in STM32 release build to verify it stays ≤ `NoteTrack`.
+**Depends on:** resource-optimization (needs RAM headroom), teletype-runtime-architecture (pattern slot pattern to follow)
+**Branch:** TBD

@@ -255,15 +255,15 @@ or remove if no remaining callers.
 - [x] STM32 release build
 - [x] RAM: flat (no new data; removed `const_cast` may enable minor optimizer wins)
 - [x] `const_cast` removed: `write()` is truly `const`, `clipSnapshot()` is pure stored-data read
-- [ ] Captured clip edit survives project save/load: edit S4, call
+- [x] Captured clip edit survives project save/load: edit S4, call
       `captureActiveClip()`, project save, project reload → S4 edit present
-- [ ] Uncaptured VM-only edit is not silently captured by project save:
+- [x] Uncaptured VM-only edit is not silently captured by project save:
       edit S4 without capture, project save, project reload → S4 edit absent
       (stored clip state takes precedence on reload)
-- [ ] Script persistence: edit S4 on hardware, switch Pattern away and back, verify S4 restored
-- [ ] Pattern persistence: edit TT pattern values on hardware, switch Pattern away and back, verify restored
-- [ ] Clipboard: copy/paste Teletype clip, verify correct data
-- [ ] File export: use TT text save on hardware, re-import, verify roundtrip
+- [x] Script persistence: edit S4 on hardware, switch Pattern away and back, verify S4 restored
+- [x] Pattern persistence: edit TT pattern values on hardware, switch Pattern away and back, verify restored
+- [x] Clipboard: copy/paste Teletype clip, verify correct data
+- [x] File export: use TT text save on hardware, re-import, verify roundtrip
 
 ---
 
@@ -318,18 +318,26 @@ Each refactored method uses `captureActiveClip()` + `loadClipIntoVm()` explicitl
 - `src/apps/sequencer/model/Track.cpp:36,63` — call renamed functions
 
 **Hardware gate:**
-- [ ] STM32 release build
-- [ ] RAM: flat
-- [ ] Pattern switching: switch between all 4 Performer Patterns on a TT
+- [x] STM32 release build
+- [x] RAM: flat
+- [x] Pattern switching: switch between all 4 Performer Patterns on a TT
       track, verify scripts/patterns/presets load for each clip
-- [ ] Auto-capture: edit S4 on Clip 0, switch to Clip 1, switch back to
+- [x] Auto-capture: edit S4 on Clip 0, switch to Clip 1, switch back to
       Clip 0, verify S4 edits preserved
-- [ ] Delay queue: schedule DEL commands, switch pattern during delay
+- [x] Delay queue: schedule DEL commands, switch pattern during delay
       execution, verify chosen policy behavior
-- [ ] Performer copy/paste/clear: copy clip, clear clip, paste clip on
+- [x] Performer copy/paste/clear: copy clip, clear clip, paste clip on
       hardware, verify correct behavior for each
-- [ ] Boot script: verify boot script index per-clip persists across
+- [x] Boot script: verify boot script index per-clip persists across
       project save/reload
+
+**Hardware regression found/fixed:**
+- Pattern Init initially rebooted on hardware because `clearClipForPerformerPattern()`
+  used a local `scene_state_t defaults{}` just to reset Teletype Pattern defaults.
+  `scene_state_t` is ~4.6 KB while the UI task stack is 4 KB, so this could overflow
+  the UI stack. The fix resets `scene_pattern_t` fields directly in the clip
+  (`idx=0`, `len=0`, `wrap=1`, `start=0`, `end=63`, values zero) with no full-scene
+  stack allocation.
 
 ---
 

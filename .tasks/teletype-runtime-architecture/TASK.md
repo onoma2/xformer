@@ -38,7 +38,8 @@ Clarify Teletype ownership before any global runtime or RAM-motivated engine ext
 - **`bootScriptIndex` is clip-scoped permanently.** Storage (`TeletypeTrack.h:630-633`) reads/writes through `activeSlot()`, file IO stores `BOOT` inside each `SLOT` block. Moving it top-level is a breaking file-format change with no current justification.
 - **Clip mapping is `% 2` — two clips, not per-Pattern.** `performerPatternIndex % PatternSlotCount` means Patterns 1 & 3 share Clip 0, Patterns 2 & 4 share Clip 1. Switching between patterns that share a clip is a no-op. Switching between different clips triggers capture + load.
 - **`captureActiveClip()` is the only VM-to-clip primitive.** `captureVmToClip(int clipIndex)` does not exist — the VM represents the active clip only. Copying live VM into an arbitrary clip index is semantically wrong and dangerous.
-- **UI/engine race on VM capture exists now.** `TeletypeScriptViewPage` (4 sites) and `TeletypePatternViewPage` (1 site) mutate VM/capture without `engine.suspend()`. This should be fixed as a standalone correctness bug before the clip refactoring.
+- **UI/engine race on VM capture is fixed.** `TeletypeScriptViewPage`, `TeletypePatternViewPage`, and Teletype list edits now lock/suspend the engine around live VM/config mutations before capture.
+- **Pattern Init stack hazard is fixed.** Phase 3 briefly exposed that `clearClipForPerformerPattern()` must not allocate a full `scene_state_t` on the UI stack; Pattern defaults are now reset directly inside the clip.
 - **Two persistence contracts are cleaner than one.** Project save/load = whole model. Teletype text save/load = active clip + live VM only. Text load must not touch the inactive clip. This reduces text I/O buffers from 4 → 2 PatternSlots (~2,452 B .bss saved) and eliminates the two-slot backup/rollback complexity.
 - **Approach A is now "slots are TeletypeTrack pattern clips."** Keep the feature, but stop treating slots as scenes or live VM mirrors. The live `scene_state_t` is runtime truth; a slot/clip is the TeletypeTrack pattern payload selected by Performer pattern state and explicitly loaded into/captured from the VM at defined boundaries.
 
@@ -108,6 +109,9 @@ This is the preferred slot/VM separation path to plan first.
 - [x] Slot/pattern/VM sync contract written in `docs/slots-teletype.md`.
 - [x] Working order selected: slot ownership, then transaction-local file import/export, then runtime extraction.
 - [x] Phase 0: UI/engine race fix — `Engine::lock()/unlock()` on all Teletype VM mutations from UI. Committed `9bce3e11`. Hardware verified.
+- [x] Phase 1: Clip vocabulary wrappers — no behavior change. Committed `1980de8a`. Hardware verified.
+- [x] Phase 2: Hidden capture removed from `write()`/`clipSnapshot()`; remaining call sites migrated to clip vocabulary. Committed `7cf6de4f`. Hardware verified.
+- [x] Phase 3: Performer Pattern clip policy centralized via `switch/set/clear/copyClipForPerformerPattern()`; Pattern Init reboot fixed by removing full-scene stack allocation. Hardware verified.
 
 ## Next action
 
@@ -115,9 +119,8 @@ Execute phased plan per `tele-clip-plan.md`:
 
 - **Phase 0:** ✓ Complete. Hardware verified.
 - **Phase 1:** ✓ Complete. Hardware verified.
-- **Phase 2:** ✓ Complete. Hardware build verified, RAM flat. Awaiting hardware behavioral checks.
-- **Phase 3:** Centralize pattern-change policy (switchClipForPerformerPattern, clip vocabulary for clear/copy/set).
-- **Phase 3:** Centralize pattern-change policy (4 files, needs product decisions on auto-capture and delay queue first, hardware build + pattern-switch test).
+- **Phase 2:** ✓ Complete. Hardware verified.
+- **Phase 3:** ✓ Complete. Hardware verified.
 - **Phase 4:** Two persistence contracts — text S/L as active-only, 4→2 file I/O buffers (1 file, ~2,452 B .bss savings, hardware build + file roundtrip + RAM check).
 
 Record RAM baseline before Phase 0. Refresh after each phase.

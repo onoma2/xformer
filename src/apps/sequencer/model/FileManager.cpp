@@ -1119,13 +1119,13 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     }
 
     if (error == fs::OK) {
-        track.setPatternSlotForPattern(0, ttSlot1);
-        track.setPatternSlotForPattern(1, ttSlot2);
+        track.setClipForPerformerPattern(0, ttSlot1);
+        track.setClipForPerformerPattern(1, ttSlot2);
         track.loadActiveClipIntoVm();
     } else {
         // Restore from backup on failure
-        track.setPatternSlotForPattern(0, ttSlot1Backup);
-        track.setPatternSlotForPattern(1, ttSlot2Backup);
+        track.setClipForPerformerPattern(0, ttSlot1Backup);
+        track.setClipForPerformerPattern(1, ttSlot2Backup);
         track.loadActiveClipIntoVm();
     }
 

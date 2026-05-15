@@ -204,7 +204,7 @@ void TeletypeTrackEngine::update(float dt) {
 
     const int currentPattern = pattern();
     if (currentPattern != _cachedPattern) {
-        _teletypeTrack.onPatternChanged(currentPattern);
+        _teletypeTrack.switchClipForPerformerPattern(currentPattern);
         _cachedPattern = currentPattern;
     }
 

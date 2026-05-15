@@ -247,7 +247,7 @@ void ClipBoard::pastePattern(int patternIndex) const {
                     track.indexedTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.indexed;
                     break;
                 case Track::TrackMode::Teletype:
-                    track.teletypeTrack().setPatternSlotForPattern(patternIndex, pattern.sequences[trackIndex].data.teletypeClip);
+                    track.teletypeTrack().setClipForPerformerPattern(patternIndex, pattern.sequences[trackIndex].data.teletypeClip);
                     break;
                 default:
                     break;

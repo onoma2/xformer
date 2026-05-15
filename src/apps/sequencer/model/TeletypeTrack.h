@@ -644,15 +644,19 @@ public:
     }
 
     int activePatternSlot() const { return _activePatternSlot; }
-    int patternSlotForPattern(int patternIndex) const {
+    int clipIndexForPerformerPattern(int patternIndex) const {
         return clamp(patternIndex, 0, CONFIG_PATTERN_COUNT - 1) % PatternSlotCount;
     }
     PatternSlot clipSnapshot(int patternIndex) const;
     PatternSlot patternSlotSnapshot(int patternIndex) const { return clipSnapshot(patternIndex); } // compatibility
-    void setPatternSlotForPattern(int patternIndex, const PatternSlot &slot);
-    void clearPatternSlot(int patternIndex);
-    void copyPatternSlot(int srcPatternIndex, int dstPatternIndex);
-    void onPatternChanged(int patternIndex);
+    void setClipForPerformerPattern(int patternIndex, const PatternSlot &slot);
+    void clearClipForPerformerPattern(int patternIndex);
+    void copyClipForPerformerPattern(int srcPatternIndex, int dstPatternIndex);
+    void switchClipForPerformerPattern(int performerPatternIndex);
+    void setPatternSlotForPattern(int patternIndex, const PatternSlot &slot) { setClipForPerformerPattern(patternIndex, slot); } // compatibility
+    void clearPatternSlot(int patternIndex) { clearClipForPerformerPattern(patternIndex); } // compatibility
+    void copyPatternSlot(int srcPatternIndex, int dstPatternIndex) { copyClipForPerformerPattern(srcPatternIndex, dstPatternIndex); } // compatibility
+    void onPatternChanged(int patternIndex) { switchClipForPerformerPattern(patternIndex); } // compatibility
     void applyPatternSlot(int slotIndex);
     void applyActivePatternSlot();
     void syncToActiveSlot();
