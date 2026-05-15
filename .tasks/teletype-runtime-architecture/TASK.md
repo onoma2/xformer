@@ -107,12 +107,13 @@ This is the preferred slot/VM separation path to plan first.
 - [x] Source-grounded global VM analysis written in `docs/global-teletype.md`.
 - [x] Slot/pattern/VM sync contract written in `docs/slots-teletype.md`.
 - [x] Working order selected: slot ownership, then transaction-local file import/export, then runtime extraction.
+- [x] Phase 0: UI/engine race fix — `Engine::lock()/unlock()` on all Teletype VM mutations from UI. Hardware verified.
 
 ## Next action
 
 Execute phased plan per `tele-clip-plan.md`:
 
-- **Phase 0:** Fix UI/engine race (standalone correctness bug, 3 files).
+- **Phase 0:** ✓ Complete.
 - **Phase 1:** Naming wrappers, no behavior change (3 files, hardware build check).
 - **Phase 2:** Remove hidden capture, rename all call sites, `const_cast` removal (~10 files, hardware build + behavioral check).
 - **Phase 3:** Centralize pattern-change policy (4 files, needs product decisions on auto-capture and delay queue first, hardware build + pattern-switch test).

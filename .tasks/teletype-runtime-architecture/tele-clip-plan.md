@@ -81,47 +81,59 @@ behavioral verification on hardware.
 
 ---
 
-### Phase 0 — UI/Engine Race Fix (Standalone Correctness)
+### Phase 0 — UI/Engine Race Fix (Standalone Correctness) ✓
 
 **Goal:** Fix the race that exists right now. Not part of the clip
 refactoring, but must land first because later phases depend on safe
 UI/engine access.
 
-**What:** Add `engine.suspend()` / `engine.resume()` around the 6 sites
-that mutate VM state or capture from the UI thread without locking.
+**Key insight:** `Engine::suspend()` stops the transport/clock (calls
+`_clock.masterStop()`). Short inline UI mutations must use
+`Engine::lock()`/`Engine::unlock()` instead, which skip engine updates
+without stopping playback. `suspend()`/`resume()` is only correct for
+long operations like file I/O (already used correctly for script/track
+save/load via `kSuspendEngineForScriptIO`).
+
+**What:** Add `engine.lock()` / `engine.unlock()` around all VM state
+mutations from UI, bracketing the full read-modify-write sequence (not
+just the final sync/capture).
 
 | File:Line | Mutation | Fix |
 |-----------|----------|-----|
-| `TeletypeScriptViewPage.cpp:830` | `track.syncToActiveSlot()` | wrap in `engine.suspend()`/`engine.resume()` |
-| `TeletypeScriptViewPage.cpp:867` | `track.syncToActiveSlot()` | same |
-| `TeletypeScriptViewPage.cpp:879` | `track.syncToActiveSlot()` | same |
-| `TeletypeScriptViewPage.cpp:898` | `track.syncToActiveSlot()` | same |
-| `TeletypePatternViewPage.cpp:627` | `track.setPattern()` + implied sync | wrap in `engine.suspend()`/`engine.resume()` |
-| `TeletypeTrackListModel.h:249` | `_track->syncToActiveSlot()` | move suspend to caller (see below) |
+| `TeletypeScriptViewPage.cpp:828` | `ss_overwrite_script_command()` + optional `syncToActiveSlot()` | wrap in `_engine.lock()`/`_engine.unlock()` |
+| `TeletypeScriptViewPage.cpp:863` | `ss_insert_script_command()` + optional `syncToActiveSlot()` | same |
+| `TeletypeScriptViewPage.cpp:881` | `ss_toggle_script_comment()` + optional `syncToActiveSlot()` | same |
+| `TeletypeScriptViewPage.cpp:901` | `ss_delete_script_command()` + optional `syncToActiveSlot()` | same |
+| `TeletypePatternViewPage.cpp` (10 sites) | `ss_set_pattern_*()` + `syncPattern()` | wrap in `_engine.lock()`/`_engine.unlock()`, reads inside lock for RMW patterns |
+| `TeletypePatternViewPage.cpp:621` | `toggleTurtle()` | wrap in `_engine.lock()`/`_engine.unlock()` |
+| `TeletypePatternViewPage.cpp:530` | `backspaceDigit()` read | wrap VM read in `_engine.lock()`/`_engine.unlock()` |
+| `TeletypePatternViewPage.cpp:612` | `negateValue()` read | wrap VM read in `_engine.lock()`/`_engine.unlock()` |
+| `ListPage.cpp:119` | all Teletype config edits via `_listModel->edit()` | `_engine.lock()`/`_engine.unlock()` when selected track is Teletype |
 
-Pattern: match existing usage in same file (`TeletypeScriptViewPage` already
-uses `engine.suspend()` at lines 945, 975, 1032, 1054 for file operations).
-
-**TeletypeTrackListModel does not own Engine.** It only has `TeletypeTrack`,
-`Project`, and track index — no `engine.suspend()` is directly callable. The
-suspend boundary must be at the page/caller level that invokes the model edit
-and already has Engine access, or `TeletypeTrackListModel` must gain an Engine
-reference. Preferred approach: move the suspend to the invoking page (who
-owns the Engine) and remove `syncToActiveSlot()` from the list model, making
-the model method a pure VM mutation that the page wraps with suspend +
-capture.
+**TeletypeTrackListModel does not own Engine.** `ListPage::editSelectedRow()`
+wraps `_listModel->edit()` with `lock()`/`unlock()` when the selected track
+is Teletype. This covers all Teletype config field mutations (TI/TO/CV/
+range/MIDI/BOOT/clock), not just the `MidiSource` case that calls
+`syncToActiveSlot()`. **Intentional broad guard:** locks for any
+list-model edit when the track is Teletype. Short synchronous operation,
+acceptable overhead.
 
 **Files changed:**
-- `src/apps/sequencer/ui/pages/TeletypeScriptViewPage.cpp`
-- `src/apps/sequencer/ui/pages/TeletypePatternViewPage.cpp`
-- `src/apps/sequencer/ui/model/TeletypeTrackListModel.h`
+- `src/apps/sequencer/ui/pages/TeletypeScriptViewPage.cpp` — 4 edit ops wrapped with lock/unlock
+- `src/apps/sequencer/ui/pages/TeletypePatternViewPage.cpp` — all pattern mutation+sync and VM reads wrapped with lock/unlock
+- `src/apps/sequencer/ui/pages/ListPage.cpp` — added `editSelectedRow()` helper with lock/unlock guard
+- `src/apps/sequencer/ui/pages/ListPage.h` — declared `editSelectedRow()`
 
 **Hardware gate:**
-- [ ] STM32 release build: `cd build/stm32/release && make sequencer`
-- [ ] RAM: `.data + .bss` flat or lower. `.ccmram_bss` flat.
-- [ ] Script editing: enter lines on hardware, verify no corruption or hang.
-- [ ] Pattern editing: edit TT pattern values, verify persistence.
-- [ ] Concurrent edit: edit script while metro is running, verify stability.
+- [x] STM32 release build: `cd build/stm32/release && make sequencer`
+- [x] RAM: `.data + .bss` = 119,960 (flat). `.ccmram_bss` = 54,096 (flat).
+- [x] Script editing: enter lines with metro running, verify sequencer continues
+- [x] Pattern editing: edit TT pattern values with metro running, verify stability
+- [x] Config editing: edit TI/TO/CV/MIDI settings from track page with metro running
+- [x] Transport continuity: verify play/stop state unchanged after edits
+- [x] Edge cases: metro S4/M edit, S1-S3 edit during trigger, pattern toggle
+      during script pattern read, delete line during metro, insert row during
+      metro, config edit during metro -- all pass, no crashes
 
 ---
 
@@ -544,9 +556,10 @@ Phase 4 depends on Phase 3's lifecycle being stable.
 
 | File | P0 | P1 | P2 | P3 | P4 |
 |------|----|----|----|----|-----|
-| `TeletypeScriptViewPage.cpp` | add suspend | — | rename 4 calls | — | — |
-| `TeletypePatternViewPage.cpp` | add suspend | — | add `captureActiveClip()` after `setTeletypePattern()` | — | — |
-| `TeletypeTrackListModel.h` | add suspend | — | rename 1 call | — | — |
+| `TeletypeScriptViewPage.cpp` | add lock/unlock ✓ | — | rename 4 calls | — | — |
+| `TeletypePatternViewPage.cpp` | add lock/unlock (10 sites) ✓ | — | add `captureActiveClip()` after `setTeletypePattern()` | — | — |
+| `ListPage.cpp` | add `editSelectedRow()` with lock ✓ | — | — | — | — |
+| `ListPage.h` | declare `editSelectedRow()` ✓ | — | — | — | — |
 | `TeletypeTrack.h` | — | +4 wrapper methods | rename, remove `const_cast`, add `clipSnapshot()` | +`switchClipForPerformerPattern()`, `clipIndexForPerformerPattern()` | +`setActiveClip()` |
 | `TeletypeTrack.cpp` | — | +wrapper bodies | remove sync from `write()`/`setTeletypePattern()`/`clipSnapshot()` | +`switchClipForPerformerPattern()` body | — |
 | `TeletypeTrackEngine.cpp` | — | migrate 2 calls | — | migrate `onPatternChanged()` call | — |

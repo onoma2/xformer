@@ -311,8 +311,10 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
             {
                 auto &track = _project.selectedTrack().teletypeTrack();
                 scene_state_t &state = track.state();
+                _engine.lock();
                 ss_set_pattern_val(&state, _patternIndex, _row, _valueCopyBuffer);
                 syncPattern();
+                _engine.unlock();
                 _editingNumber = false;
             }
             event.consume();
@@ -420,9 +422,11 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
     if (keycode == KeyboardEvent::KeySpace) {
         auto &track = _project.selectedTrack().teletypeTrack();
         scene_state_t &state = track.state();
+        _engine.lock();
         int16_t val = ss_get_pattern_val(&state, _patternIndex, _row);
         ss_set_pattern_val(&state, _patternIndex, _row, val ? 0 : 1);
         syncPattern();
+        _engine.unlock();
         _editingNumber = false;
         event.consume();
         return;
@@ -439,9 +443,11 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
     if (event.ch() == '[') {
         auto &track = _project.selectedTrack().teletypeTrack();
         scene_state_t &state = track.state();
+        _engine.lock();
         int16_t val = ss_get_pattern_val(&state, _patternIndex, _row);
         ss_set_pattern_val(&state, _patternIndex, _row, val == INT16_MIN ? INT16_MAX : val - 1);
         syncPattern();
+        _engine.unlock();
         _editingNumber = false;
         event.consume();
         return;
@@ -449,9 +455,11 @@ void TeletypePatternViewPage::keyboard(KeyboardEvent &event) {
     if (event.ch() == ']') {
         auto &track = _project.selectedTrack().teletypeTrack();
         scene_state_t &state = track.state();
+        _engine.lock();
         int16_t val = ss_get_pattern_val(&state, _patternIndex, _row);
         ss_set_pattern_val(&state, _patternIndex, _row, val == INT16_MAX ? INT16_MIN : val + 1);
         syncPattern();
+        _engine.unlock();
         _editingNumber = false;
         event.consume();
         return;
@@ -503,12 +511,14 @@ void TeletypePatternViewPage::commitEdit() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
     int16_t value = clamp<int32_t>(_editBuffer, INT16_MIN, INT16_MAX);
+    _engine.lock();
     ss_set_pattern_val(&state, _patternIndex, _row, value);
     uint16_t len = ss_get_pattern_len(&state, _patternIndex);
     if (_row >= len && len < PATTERN_LENGTH) {
         ss_set_pattern_len(&state, _patternIndex, _row + 1);
     }
     syncPattern();
+    _engine.unlock();
     _editingNumber = false;
 }
 
@@ -516,7 +526,9 @@ void TeletypePatternViewPage::backspaceDigit() {
     if (!_editingNumber) {
         auto &track = _project.selectedTrack().teletypeTrack();
         scene_state_t &state = track.state();
+        _engine.lock();
         _editBuffer = ss_get_pattern_val(&state, _patternIndex, _row);
+        _engine.unlock();
         _editingNumber = true;
     }
     _editBuffer /= 10;
@@ -536,8 +548,10 @@ void TeletypePatternViewPage::insertDigit(int digit) {
 void TeletypePatternViewPage::insertRow() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
-    const int16_t len = ss_get_pattern_len(&state, _patternIndex);
     const int16_t idx = _row;
+
+    _engine.lock();
+    const int16_t len = ss_get_pattern_len(&state, _patternIndex);
     const int16_t value = ss_get_pattern_val(&state, _patternIndex, idx);
     const int16_t maxIndex = std::min<int16_t>(len, PATTERN_LENGTH - 1);
 
@@ -555,17 +569,21 @@ void TeletypePatternViewPage::insertRow() {
 
     ss_set_pattern_val(&state, _patternIndex, idx, value);
     syncPattern();
+    _engine.unlock();
     _editingNumber = false;
 }
 
 void TeletypePatternViewPage::deleteRow() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
+    const int16_t idx = _row;
+
+    _engine.lock();
     const int16_t len = ss_get_pattern_len(&state, _patternIndex);
     if (len <= 0) {
+        _engine.unlock();
         return;
     }
-    const int16_t idx = _row;
     int16_t newLen = len;
     if (idx < len) {
         for (int16_t i = idx; i < len - 1; ++i) {
@@ -575,10 +593,11 @@ void TeletypePatternViewPage::deleteRow() {
         newLen = len - 1;
         ss_set_pattern_len(&state, _patternIndex, newLen);
     }
+    syncPattern();
+    _engine.unlock();
     int maxRow = std::max<int>(static_cast<int>(newLen) - 1, 0);
     _row = clamp(_row, 0, maxRow);
     ensureRowVisible();
-    syncPattern();
     _editingNumber = false;
 }
 
@@ -589,38 +608,48 @@ void TeletypePatternViewPage::negateValue() {
     }
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
+    _engine.lock();
     _editBuffer = -ss_get_pattern_val(&state, _patternIndex, _row);
+    _engine.unlock();
     _editingNumber = true;
 }
 
 void TeletypePatternViewPage::toggleTurtle() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
+    _engine.lock();
     scene_turtle_t *turtle = ss_turtle_get(&state);
     turtle_set_shown(turtle, !turtle_get_shown(turtle));
+    _engine.unlock();
 }
 
 void TeletypePatternViewPage::setLength() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
+    _engine.lock();
     ss_set_pattern_len(&state, _patternIndex, _row + 1);
     syncPattern();
+    _engine.unlock();
     _editingNumber = false;
 }
 
 void TeletypePatternViewPage::setStart() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
+    _engine.lock();
     ss_set_pattern_start(&state, _patternIndex, _row);
     syncPattern();
+    _engine.unlock();
     _editingNumber = false;
 }
 
 void TeletypePatternViewPage::setEnd() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
+    _engine.lock();
     ss_set_pattern_end(&state, _patternIndex, _row);
     syncPattern();
+    _engine.unlock();
     _editingNumber = false;
 }
 

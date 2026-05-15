@@ -825,10 +825,12 @@ void TeletypeScriptViewPage::commitLine() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
     const int scriptIndex = _scriptIndex;
+    _engine.lock();
     ss_overwrite_script_command(&state, scriptIndex, _selectedLine, &parsed);
     if (scriptIndex == TeletypeTrack::SlotScriptIndex || scriptIndex == METRO_SCRIPT) {
         track.syncToActiveSlot();
     }
+    _engine.unlock();
     // Commit succeeded; no UI message per current workflow.
 }
 
@@ -858,14 +860,16 @@ void TeletypeScriptViewPage::duplicateLine() {
     if (!cmd) {
         return;
     }
+    _engine.lock();
     ss_insert_script_command(&state, scriptIndex, _selectedLine + 1, cmd);
     if (_selectedLine < kLineCount - 1) {
         _selectedLine += 1;
     }
-    loadEditBuffer(_selectedLine);
     if (scriptIndex == TeletypeTrack::SlotScriptIndex || scriptIndex == METRO_SCRIPT) {
         track.syncToActiveSlot();
     }
+    _engine.unlock();
+    loadEditBuffer(_selectedLine);
 }
 
 void TeletypeScriptViewPage::commentLine() {
@@ -874,10 +878,12 @@ void TeletypeScriptViewPage::commentLine() {
     }
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
+    _engine.lock();
     ss_toggle_script_comment(&state, _scriptIndex, _selectedLine);
     if (_scriptIndex == TeletypeTrack::SlotScriptIndex || _scriptIndex == METRO_SCRIPT) {
         track.syncToActiveSlot();
     }
+    _engine.unlock();
 }
 
 void TeletypeScriptViewPage::deleteLine() {
@@ -892,11 +898,13 @@ void TeletypeScriptViewPage::deleteLine() {
         setEditBuffer(lineBuffer);
         copyLine();
     }
+    _engine.lock();
     ss_delete_script_command(&state, _scriptIndex, _selectedLine);
-    loadEditBuffer(_selectedLine);
     if (_scriptIndex == TeletypeTrack::SlotScriptIndex || _scriptIndex == METRO_SCRIPT) {
         track.syncToActiveSlot();
     }
+    _engine.unlock();
+    loadEditBuffer(_selectedLine);
     showMessage("Line deleted");
 }
 
