@@ -14,6 +14,7 @@
 #include "GeneratorSelectPage.h"
 #include "LayoutPage.h"
 #include "MidiOutputPage.h"
+#include "ModulatorPage.h"
 #include "MonitorPage.h"
 #include "NoteSequenceEditPage.h"
 #include "NoteSequencePage.h"
@@ -70,6 +71,7 @@ struct Pages {
     SongPage song;
     RoutingPage routing;
     MidiOutputPage midiOutput;
+    ModulatorPage modulator;
     CvRoutePage cvRoute;
     UserScalePage userScale;
     OverviewPage overview;
@@ -128,6 +130,7 @@ struct Pages {
         song(manager, context),
         routing(manager, context),
         midiOutput(manager, context),
+        modulator(manager, context),
         cvRoute(manager, context),
         userScale(manager, context),
         overview(manager, context),

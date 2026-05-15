@@ -16,6 +16,7 @@
 #include "CvOutput.h"
 #include "RoutingEngine.h"
 #include "MidiOutputEngine.h"
+#include "ModulatorEngine.h"
 #include "MidiPort.h"
 #include "MidiLearn.h"
 #include "CvGateToMidiConverter.h"
@@ -180,6 +181,9 @@ public:
     const RoutingEngine &routingEngine() const { return _routingEngine; }
           RoutingEngine &routingEngine()       { return _routingEngine; }
 
+    const ModulatorEngine &modulatorEngine() const { return _modulatorEngine; }
+          ModulatorEngine &modulatorEngine()       { return _modulatorEngine; }
+
     const MidiOutputEngine &midiOutputEngine() const { return _midiOutputEngine; }
           MidiOutputEngine &midiOutputEngine()       { return _midiOutputEngine; }
 
@@ -220,6 +224,8 @@ private:
     void updateCvRouteOutputs();
     void reset();
     void updatePlayState(bool ticked);
+
+    float applyModulatorOffset(int channel, float cvValue) const;
     void updateOverrides();
 
     void usbMidiConnect(uint16_t vendorId, uint16_t productId);
@@ -259,6 +265,7 @@ private:
     MidiOutputEngine _midiOutputEngine;
 
     RoutingEngine _routingEngine;
+    ModulatorEngine _modulatorEngine;
     MidiLearn _midiLearn;
     MidiReceiveHandler _midiReceiveHandler;
     UsbMidiConnectHandler _usbMidiConnectHandler;

@@ -104,6 +104,9 @@ enum ProjectVersion {
     // added Project::busSafety
     Version34 = 34,
 
+    // added Modulator array and cvOutputModulator array
+    Version35 = 35,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

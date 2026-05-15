@@ -84,11 +84,11 @@ _Updated: 2026-05-15_
 ---
 
 ## 🟡 global-modulators-v1 — Port reduced Modulove global LFO/random modulators
-**Status:** paused — extracted as dedicated feature candidate; no code started.
-**Where I stopped:** V1 scoped to 8 global modulators applied as physical CV output voltage offsets after track/routing selection.
-**Next action:** Start Phase 0 in `.tasks/global-modulators-v1/plan.md`: reference diff, adaptation notes, and pre-change STM32 size gate.
-**Depends on:** resource-optimization current RAM gates
-**Branch:** refactor/resouce-optimization
+**Status:** active — Phases 1-5 implemented on `feat/modulators` branch.
+**Where I stopped:** Model, engine, CV output integration, and basic UI page are wired up and compile. `.data+bss=118,568` (90.4% of 128KB, within budget). Modulator delta: ~364B BSS.
+**Next action:** Phase 6: Hardware verification — no-assignment regression, sine modulator on CV1, depth-zero null, different output assignment, CV route lane, override bypass.
+**Depends on:** none (RAM gate passed)
+**Branch:** feat/modulators
 
 ---
 

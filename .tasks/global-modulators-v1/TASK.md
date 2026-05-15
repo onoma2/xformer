@@ -4,7 +4,7 @@
 Port Modulove-style global LFO modulators into XFORMER as a standalone feature, starting with a smaller V1: project-level modulators that can offset physical CV outputs after track/routing selection. This fills a real gap between CurveTrack sequenced CV, Teletype script-local LFOs, and RoutingEngine shapers.
 
 ## Status
-Paused. Extracted from `.tasks/performer-improvements/TASK.md`; no code started.
+Active. Phases 1-5 implemented on `feat/modulators`; model, engine, CV output integration, and basic UI page are wired up. Phase 6 (hardware verification) pending.
 
 ## V1 scope
 - 8 global modulators (`CONFIG_MODULATOR_COUNT = 8`).
@@ -48,16 +48,32 @@ Paused. Extracted from `.tasks/performer-improvements/TASK.md`; no code started.
 - 2026-05-15: Modulator application law for V1: compute modulator output as a voltage offset and add it to the final physical CV value before DAC channel write, then clamp to DAC output range.
 
 ## Open questions
-- [ ] Should modulation be additive only in V1, or should there be bipolar attenuverter/depth per output assignment?
-- [ ] Should modulator routing attach to physical CV output channel or logical output before CV rotation?
-- [ ] Should CV route lanes be modulatable the same way as track CV outputs? V1 answer should probably be yes, because the target is physical CV channel.
-- [ ] How should modulation interact with `_cvOutputOverride`? V1 answer should probably be no modulation while override is active.
-- [ ] Should random smoothing be included in V1, or should random be stepped until the core path is stable?
+- [x] Should modulation be additive only in V1, or should there be bipolar attenuverter/depth per output assignment? → Additive offset only per V1 plan.
+- [x] Should modulator routing attach to physical CV output channel or logical output before CV rotation? → Physical CV output channel per V1 plan.
+- [x] Should CV route lanes be modulatable the same way as track CV outputs? → Yes per V1 plan; targets physical CV channel.
+- [x] How should modulation interact with `_cvOutputOverride`? → No modulation while override is active per V1 plan.
+- [x] Should random smoothing be included in V1, or should random be stepped until the core path is stable? → Include smooth/slew per V1 plan (matches Modulove reference).
 
 ## Completed steps
 - [x] Task wiki scan found existing Modulove LFO modulator analysis in `performer-improvements`.
 - [x] Reference files confirmed present in `temp-ref/modulove-performer`.
 - [x] Dedicated task folder and V1 plan created.
+- [x] Phase 1: Modulator model (Modulator.h/Modulator.cpp), CONFIG_MODULATOR_COUNT, Project serialization (Version 35), cvOutputModulator array.
+- [x] Phase 2: WaveformGenerator.h (header-only, 5 waveforms), ModulatorEngine.h (header-only, phase accumulator + random state).
+- [x] Phase 3: Modulator tick in Engine::update() tick loop, gate source from configured track.
+- [x] Phase 4: applyModulatorOffset() in Engine::updateTrackOutputs() for all three CV output paths (rotation, track-CV, route-lane). No modulation during override.
+- [x] Phase 5: ModulatorListModel + ModulatorPage (ListPage), TopPage Mode::Modulator navigation, Pages.h integration.
+- [ ] Phase 6: Hardware verification and RAM gate check.
+
+## RAM measurements (feat/modulators branch)
+- `.data` = 6,320 bytes (unchanged from baseline)
+- `.bss` = 112,248 bytes (was 113,640 baseline; branch includes other optimizations)
+- `.data + .bss` = 118,568 bytes (90.4% of 128 KB, within 120 KB hard warning)
+- `.ccmram_bss` = 54,332 bytes
+- `.text` = 790,244 bytes (flash has ample headroom)
+- Delta from this feature: ~364 bytes BSS (8 Modulators × ~15B model + 8B cvOutputModulator + ~192B ModulatorEngine + UI state)
+- Track container gate: NoteTrack=9544B unchanged. Modulator does not inflate Track::_container.
+- Engine container: TeletypeTrackEngine=912B unchanged. ModulatorEngine is separate from the engine container.
 
 ## Notes
 - This is a feature task, not a RAM recovery task. It must still pass the current RAM budget gates.

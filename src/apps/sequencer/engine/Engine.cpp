@@ -183,6 +183,15 @@ void Engine::update() {
         if (tick == 0) {
             _midiOutputEngine.update(true);
         }
+
+        // tick modulators
+        for (int modulatorIndex = 0; modulatorIndex < CONFIG_MODULATOR_COUNT; ++modulatorIndex) {
+            const auto &modulator = _project.modulator(modulatorIndex);
+            int gateTrack = modulator.gateTrack();
+            bool gate = (gateTrack >= 0 && gateTrack < CONFIG_TRACK_COUNT) ?
+                _trackEngines[gateTrack]->gateOutput(0) : false;
+            _modulatorEngine.tick(tick, modulator, modulatorIndex, gate);
+        }
     }
 
     for (auto trackEngine : _trackEngines) {
@@ -655,7 +664,7 @@ void Engine::updateTrackOutputs() {
                 float highValue = (highTrack >= 0 && highSlot >= 0) ? _trackEngines[highTrack]->cvOutput(highSlot) : 0.f;
                 float mixed = lowValue * (1.f - t) + highValue * t;
                 if (!_cvOutputOverride) {
-                    _cvOutput.setChannel(i, mixed);
+                    _cvOutput.setChannel(i, applyModulatorOffset(i, mixed));
                 }
                 continue;
             } else {
@@ -675,14 +684,25 @@ void Engine::updateTrackOutputs() {
         }
         if (cvOutputTrack < CONFIG_TRACK_COUNT) {
             int cvSlot = cvOutputTrackSlot[cvSourceOutputIndex];
-            _cvOutput.setChannel(i, _trackEngines[cvOutputTrack]->cvOutput(cvSlot));
+            _cvOutput.setChannel(i, applyModulatorOffset(i, _trackEngines[cvOutputTrack]->cvOutput(cvSlot)));
         } else if (cvOutputTrack == CONFIG_TRACK_COUNT) {
             int lane = cvOutputCvRouteLane[cvSourceOutputIndex];
             if (lane >= 0 && lane < int(_cvRouteOutputs.size())) {
-                _cvOutput.setChannel(i, _cvRouteOutputs[lane]);
+                _cvOutput.setChannel(i, applyModulatorOffset(i, _cvRouteOutputs[lane]));
             }
         }
     }
+}
+
+float Engine::applyModulatorOffset(int channel, float cvValue) const {
+    int modulatorIndex = _project.cvOutputModulator(channel);
+    if (modulatorIndex > 0 && modulatorIndex <= CONFIG_MODULATOR_COUNT) {
+        int modValue = _modulatorEngine.currentValue(modulatorIndex - 1);
+        float modOffset = (modValue - 64) / 64.f;
+        cvValue += modOffset;
+        cvValue = clamp(cvValue, -5.f, 5.f);
+    }
+    return cvValue;
 }
 
 void Engine::updateCvRouteOutputs() {
@@ -758,6 +778,7 @@ void Engine::reset() {
     }
 
     _midiOutputEngine.reset();
+    _modulatorEngine.reset();
 }
 
 void Engine::updatePlayState(bool ticked) {
