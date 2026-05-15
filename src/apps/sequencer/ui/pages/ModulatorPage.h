@@ -25,6 +25,13 @@ private:
         Phase = 4,
     };
 
+    // Routing overlay functions (Shift+Page to toggle)
+    enum class RoutingFunction : uint8_t {
+        Mode = 0,
+        Gate = 1,
+        Target = 2,
+    };
+
     enum class ContextAction : uint8_t {
         Route = 0,
         Last
@@ -32,15 +39,20 @@ private:
 
     void setSelectedModulator(int index);
     void setSelectedFunction(Function function);
+    void setSelectedRoutingFunction(RoutingFunction function);
     void updateWaveformCache();
     void contextShow();
     void contextAction(int index);
-    void quickMapToOutput(int outputIndex);
 
     int _selectedModulator = 0;
     Function _selectedFunction = Function::Shape;
 
-    // Waveform cache for performance
+    // Routing overlay state
+    bool _showRoutingOverlay = false;
+    RoutingFunction _selectedRoutingFunction = RoutingFunction::Mode;
+    int _routingCvOutputIndex = 0;  // CV output 0-7 being routed
+
+    // Waveform cache
     static constexpr int WaveformCacheSize = 112;
     int8_t _waveformCache[WaveformCacheSize];
     bool _waveformCacheValid = false;
