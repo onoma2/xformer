@@ -347,6 +347,10 @@ Each refactored method uses `captureActiveClip()` + `loadClipIntoVm()` explicitl
 files operate on active clip + live VM only. 4 global `PatternSlot` buffers
 reduce to 2.
 
+**Status:** Complete and hardware-verified. Verified coverage includes text
+save/load roundtrip, inactive clip preservation, project save/load, I/O config
+roundtrip, and error rollback. Measured `.data+bss` reduction: 1,136 B.
+
 #### Contracts
 
 ```text
@@ -585,12 +589,12 @@ Phase 4 depends on Phase 3's lifecycle being stable.
 2. **Auto-capture vs. explicit-capture (Phase 3):** Musical/product decision.
    Default: auto-capture (current behavior). Validate with user input.
 
-3. **`write()` redundancy cleanup (post-Phase 4):** `write()` serializes
+3. **`write()` redundancy cleanup (post-Phase 4 research):** `write()` serializes
    both `_state.patterns` and clip payload patterns. Decide later whether
    to stop serializing `_state.patterns`. Clip patterns take precedence on
    reload.
 
-4. **Transaction buffer further reduction (post-Phase 4):** 2→1 `PatternSlot`
+4. **Transaction buffer further reduction (post-Phase 4 research):** 2→1 `PatternSlot`
    buffer if parse errors tolerated as partial model mutations with rollback.
    `sharedScriptsBackup` could also be eliminated if scripts are parsed into
    temporary buffers first and only committed to `scene_state_t` on success,

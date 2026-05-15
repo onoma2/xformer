@@ -112,6 +112,7 @@ This is the preferred slot/VM separation path to plan first.
 - [x] Phase 1: Clip vocabulary wrappers — no behavior change. Committed `1980de8a`. Hardware verified.
 - [x] Phase 2: Hidden capture removed from `write()`/`clipSnapshot()`; remaining call sites migrated to clip vocabulary. Committed `7cf6de4f`. Hardware verified.
 - [x] Phase 3: Performer Pattern clip policy centralized via `switch/set/clear/copyClipForPerformerPattern()`; Pattern Init reboot fixed by removing full-scene stack allocation. Hardware verified.
+- [x] Phase 4: Two persistence contracts implemented and hardware-verified. Teletype text save/load now operates on active clip + live VM only; inactive clip is untouched; project save/load remains whole-model. `.data+bss` reduced by 1,136 B.
 
 ## Next action
 
@@ -121,9 +122,9 @@ Execute phased plan per `tele-clip-plan.md`:
 - **Phase 1:** ✓ Complete. Hardware verified.
 - **Phase 2:** ✓ Complete. Hardware verified.
 - **Phase 3:** ✓ Complete. Hardware verified.
-- **Phase 4:** ✓ Code complete. STM32 build passes, .bss reduced by 1,136 B. Awaiting hardware behavioral checks.
+- **Phase 4:** ✓ Complete. Hardware verified. STM32 build passes, `.data+bss` reduced by 1,136 B.
 
-Record RAM baseline before Phase 0. Refresh after each phase.
+Post-Phase-4 follow-up: decide whether further transaction-buffer reduction or `write()` redundancy cleanup is worth doing.
 
 ## Notes
 

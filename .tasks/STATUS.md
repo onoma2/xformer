@@ -29,10 +29,19 @@ _Updated: 2026-05-15_
 ---
 
 ## 🟡 teletype-runtime-architecture — Clarify Teletype VM/slot/runtime ownership before global runtime work
-**Status:** active — Phase 0-3 hardware-verified and committed. Phase 4 code-complete, awaiting hardware verification.
-**Where I stopped:** Phase 4 code-complete: active-clip-only text save/load, S1-S3 rollback transaction, `.data+bss` reduced by 1,136 B. Text format changed: `#S4`/`#M` (no slot sub-headers), no `SLOT` markers.
-**Next action:** Phase 4 hardware verification: text save/load roundtrip, inactive clip untouched, project save/load, IO config, error rollback.
+**Status:** active — Phase 0-4 hardware-verified; two persistence contracts are now implemented.
+**Where I stopped:** Phase 4 verified: active-clip-only text save/load, S1-S3 rollback transaction, inactive clip untouched, project save/load OK, `.data+bss` reduced by 1,136 B.
+**Next action:** Post-Phase-4 research: decide whether further transaction-buffer reduction or `write()` redundancy cleanup is worth doing.
 **Depends on:** resource-optimization (for RAM gates), teletype file transaction semantics
+**Branch:** refactor/resouce-optimization
+
+---
+
+## 🟡 teletype-cv-source-combiner — Explicit raw/value-domain CV source pipeline for Teletype outputs
+**Status:** paused — task and first implementation plan captured; no code started.
+**Where I stopped:** Rejected Telex VCA semantics; first implementation uses explicit raw source arbitration with V0 priority law `ENV > GEODE > LFO > CV`.
+**Next action:** If resumed, start Phase 1 in `.tasks/teletype-cv-source-combiner/plan.md`: add per-output source cache without behavior change.
+**Depends on:** none; Teletype runtime Phase 4 is hardware-verified
 **Branch:** refactor/resouce-optimization
 
 ---
@@ -68,9 +77,18 @@ _Updated: 2026-05-15_
 ## 🟡 performer-improvements — Non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
 **Status:** blocked
 **Where I stopped:** MenuWrapSetting wired (Settings::Version=2, dynamic_cast gate, default=on). Hardware crashes on boot — RAM at 97%, no headroom.
-**Next action:** Unblocked by resource-optimization
+**Next action:** Unblocked by resource-optimization; LFO modulators were extracted to `global-modulators-v1`.
 **Depends on:** resource-optimization (needs RAM headroom)
 **Branch:** TBD
+
+---
+
+## 🟡 global-modulators-v1 — Port reduced Modulove global LFO/random modulators
+**Status:** paused — extracted as dedicated feature candidate; no code started.
+**Where I stopped:** V1 scoped to 8 global modulators applied as physical CV output voltage offsets after track/routing selection.
+**Next action:** Start Phase 0 in `.tasks/global-modulators-v1/plan.md`: reference diff, adaptation notes, and pre-change STM32 size gate.
+**Depends on:** resource-optimization current RAM gates
+**Branch:** refactor/resouce-optimization
 
 ---
 
