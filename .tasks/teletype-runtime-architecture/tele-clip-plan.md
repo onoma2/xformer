@@ -182,7 +182,7 @@ capture+load and belong in the centralized policy.
 
 ---
 
-### Phase 2 — Remove Hidden Capture + Rename Call Sites
+### Phase 2 — Remove Hidden Capture + Rename Call Sites ✓
 
 **Goal:** No read-only or serialization path mutates clip storage.
 Every `syncToActiveSlot()` call site is migrated to `captureActiveClip()`.
@@ -252,9 +252,9 @@ or remove if no remaining callers.
 - `src/apps/sequencer/model/Track.h` — declare new Pattern methods
 
 **Hardware gate:**
-- [ ] STM32 release build
-- [ ] RAM: flat (no new data; removed `const_cast` may enable minor optimizer wins)
-- [ ] `const_cast` removed: verify `write()` is truly `const` (compile with warnings)
+- [x] STM32 release build
+- [x] RAM: flat (no new data; removed `const_cast` may enable minor optimizer wins)
+- [x] `const_cast` removed: `write()` is truly `const`, `clipSnapshot()` is pure stored-data read
 - [ ] Captured clip edit survives project save/load: edit S4, call
       `captureActiveClip()`, project save, project reload → S4 edit present
 - [ ] Uncaptured VM-only edit is not silently captured by project save:

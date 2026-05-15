@@ -99,7 +99,7 @@ private:
                 TuesdaySequence tuesday;
                 DiscreteMapSequence discreteMap;
                 IndexedSequence indexed;
-                TeletypeTrack::PatternSlot teletype;
+                TeletypeTrack::PatternSlot teletypeClip;
             } data;
         } sequences[CONFIG_TRACK_COUNT];
     };

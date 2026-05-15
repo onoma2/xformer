@@ -179,9 +179,6 @@ const char *TeletypeTrack::cvOutputDestName(CvOutputDest dest) {
 }
 
 void TeletypeTrack::write(VersionedSerializedWriter &writer) const {
-    auto *self = const_cast<TeletypeTrack *>(this);
-    self->syncToActiveSlot();
-
     scene_state_t &state = const_cast<scene_state_t &>(_state);
     for (int script = 0; script < EditableScriptCount; ++script) {
         writer.write(state.scripts[script].l);
@@ -327,11 +324,9 @@ void TeletypeTrack::read(VersionedSerializedReader &reader) {
     applyPatternSlot(_activePatternSlot);
 }
 
-TeletypeTrack::PatternSlot TeletypeTrack::patternSlotSnapshot(int patternIndex) const {
-    auto *self = const_cast<TeletypeTrack *>(this);
-    self->syncToActiveSlot();
+TeletypeTrack::PatternSlot TeletypeTrack::clipSnapshot(int patternIndex) const {
     const int slot = patternSlotForPattern(patternIndex);
-    return self->_patternSlots[slot];
+    return _patternSlots[slot];
 }
 
 void TeletypeTrack::setPatternSlotForPattern(int patternIndex, const PatternSlot &slot) {

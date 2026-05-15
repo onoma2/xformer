@@ -712,8 +712,8 @@ fs::Error FileManager::writeTeletypeTrack(const TeletypeTrack &track, const char
     writeLine(fileWriter, FixedStringBuilder<64>("NAME %s", safeName));
 
     // Avoid large PatternSlot copies on the file task stack.
-    ttSlot1 = track.patternSlotSnapshot(0);
-    ttSlot2 = track.patternSlotSnapshot(1);
+    ttSlot1 = track.clipSnapshot(0);
+    ttSlot2 = track.clipSnapshot(1);
 
     writeLine(fileWriter, "#IO");
     writeSlotIo(fileWriter, 0, ttSlot1);
@@ -752,8 +752,8 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     }
 
     // Snapshot current state for rollback before clearing
-    ttSlot1Backup = track.patternSlotSnapshot(0);
-    ttSlot2Backup = track.patternSlotSnapshot(1);
+    ttSlot1Backup = track.clipSnapshot(0);
+    ttSlot2Backup = track.clipSnapshot(1);
 
     track.clear();
     scene_state_t &state = track.state();
@@ -763,8 +763,8 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     bool success = true;
 
     // Avoid large PatternSlot copies on the file task stack.
-    ttSlot1 = track.patternSlotSnapshot(0);
-    ttSlot2 = track.patternSlotSnapshot(1);
+    ttSlot1 = track.clipSnapshot(0);
+    ttSlot2 = track.clipSnapshot(1);
     clearScriptBuffer(ttSlot1, false);
     clearScriptBuffer(ttSlot1, true);
     clearScriptBuffer(ttSlot2, false);
@@ -1121,12 +1121,12 @@ fs::Error FileManager::readTeletypeTrack(TeletypeTrack &track, const char *path)
     if (error == fs::OK) {
         track.setPatternSlotForPattern(0, ttSlot1);
         track.setPatternSlotForPattern(1, ttSlot2);
-        track.applyActivePatternSlot();
+        track.loadActiveClipIntoVm();
     } else {
         // Restore from backup on failure
         track.setPatternSlotForPattern(0, ttSlot1Backup);
         track.setPatternSlotForPattern(1, ttSlot2Backup);
-        track.applyActivePatternSlot();
+        track.loadActiveClipIntoVm();
     }
 
     return error;

@@ -621,11 +621,11 @@ public:
         int clamped = clamp(index, 0, PATTERN_COUNT - 1);
         return _state.patterns[clamped];
     }
-    void setPattern(int index, const scene_pattern_t &pattern) {
+    void setTeletypePattern(int index, const scene_pattern_t &pattern) {
         int clamped = clamp(index, 0, PATTERN_COUNT - 1);
         _state.patterns[clamped] = pattern;
-        syncToActiveSlot();
     }
+    void setPattern(int index, const scene_pattern_t &pattern) { setTeletypePattern(index, pattern); } // compatibility
 
     int bootScriptIndex() const { return activeSlot().bootScriptIndex; }
     void setBootScriptIndex(int index) {
@@ -647,7 +647,8 @@ public:
     int patternSlotForPattern(int patternIndex) const {
         return clamp(patternIndex, 0, CONFIG_PATTERN_COUNT - 1) % PatternSlotCount;
     }
-    PatternSlot patternSlotSnapshot(int patternIndex) const;
+    PatternSlot clipSnapshot(int patternIndex) const;
+    PatternSlot patternSlotSnapshot(int patternIndex) const { return clipSnapshot(patternIndex); } // compatibility
     void setPatternSlotForPattern(int patternIndex, const PatternSlot &slot);
     void clearPatternSlot(int patternIndex);
     void copyPatternSlot(int srcPatternIndex, int dstPatternIndex);

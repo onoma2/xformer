@@ -656,5 +656,6 @@ void TeletypePatternViewPage::setEnd() {
 void TeletypePatternViewPage::syncPattern() {
     auto &track = _project.selectedTrack().teletypeTrack();
     scene_state_t &state = track.state();
-    track.setPattern(_patternIndex, state.patterns[_patternIndex]);
+    track.setTeletypePattern(_patternIndex, state.patterns[_patternIndex]);
+    track.captureActiveClip();
 }

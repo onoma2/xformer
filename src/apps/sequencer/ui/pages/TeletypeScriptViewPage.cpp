@@ -828,7 +828,7 @@ void TeletypeScriptViewPage::commitLine() {
     _engine.lock();
     ss_overwrite_script_command(&state, scriptIndex, _selectedLine, &parsed);
     if (scriptIndex == TeletypeTrack::SlotScriptIndex || scriptIndex == METRO_SCRIPT) {
-        track.syncToActiveSlot();
+        track.captureActiveClip();
     }
     _engine.unlock();
     // Commit succeeded; no UI message per current workflow.
@@ -866,7 +866,7 @@ void TeletypeScriptViewPage::duplicateLine() {
         _selectedLine += 1;
     }
     if (scriptIndex == TeletypeTrack::SlotScriptIndex || scriptIndex == METRO_SCRIPT) {
-        track.syncToActiveSlot();
+        track.captureActiveClip();
     }
     _engine.unlock();
     loadEditBuffer(_selectedLine);
@@ -881,7 +881,7 @@ void TeletypeScriptViewPage::commentLine() {
     _engine.lock();
     ss_toggle_script_comment(&state, _scriptIndex, _selectedLine);
     if (_scriptIndex == TeletypeTrack::SlotScriptIndex || _scriptIndex == METRO_SCRIPT) {
-        track.syncToActiveSlot();
+        track.captureActiveClip();
     }
     _engine.unlock();
 }
@@ -901,7 +901,7 @@ void TeletypeScriptViewPage::deleteLine() {
     _engine.lock();
     ss_delete_script_command(&state, _scriptIndex, _selectedLine);
     if (_scriptIndex == TeletypeTrack::SlotScriptIndex || _scriptIndex == METRO_SCRIPT) {
-        track.syncToActiveSlot();
+        track.captureActiveClip();
     }
     _engine.unlock();
     loadEditBuffer(_selectedLine);

@@ -115,7 +115,8 @@ Execute phased plan per `tele-clip-plan.md`:
 
 - **Phase 0:** ✓ Complete. Hardware verified.
 - **Phase 1:** ✓ Complete. Hardware verified.
-- **Phase 2:** Remove hidden capture, rename all call sites, `const_cast` removal (~10 files, hardware build + behavioral check).
+- **Phase 2:** ✓ Complete. Hardware build verified, RAM flat. Awaiting hardware behavioral checks.
+- **Phase 3:** Centralize pattern-change policy (switchClipForPerformerPattern, clip vocabulary for clear/copy/set).
 - **Phase 3:** Centralize pattern-change policy (4 files, needs product decisions on auto-capture and delay queue first, hardware build + pattern-switch test).
 - **Phase 4:** Two persistence contracts — text S/L as active-only, 4→2 file I/O buffers (1 file, ~2,452 B .bss savings, hardware build + file roundtrip + RAM check).
 
