@@ -75,9 +75,9 @@ _Updated: 2026-05-16_
 ---
 
 ## 🟡 performer-improvements — Non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
-**Status:** paused — Phase 1 subset wired and hardware-verified; remaining items unblocked.
-**Where I stopped:** Phase 1 items completed: (1) Quick octave change Step+F1-F5, (2) Double-click Page opens context menus with 2s auto-close, (3) Short clock pulse prevention (1ms floor via tickPeriodUs), (4) PerformerPage mute LEDs wired + track labels dimmed when muted + pattern numbers replace T1-T8. MenuWrap already done earlier.
-**Next action:** Next unblocked Phase 1 items: Random generator preview/apply, Curve undo restoration. Then Phase 2: Generator preview/apply workflow, Screensaver refinement.
+**Status:** paused — Phase 1 wired and hardware-verified (6/8 items done); generator task extracted to separate task.
+**Where I stopped:** Phase 1 items completed: (1) Quick octave change Step+F1-F5, (2) Double-click Page context menus with 2s auto-close, (3) Short clock pulse 1ms floor, (4-6) PerformerPage mute LEDs + pattern labels + MenuWrap. Generator preview/apply extracted to `generator-preview-apply` task.
+**Next action:** Remaining Phase 1: Curve undo restoration. Then generator-preview-apply Phase A.
 **Depends on:** resource-optimization (RAM headroom available)
 **Branch:** TBD
 
@@ -129,4 +129,13 @@ _Updated: 2026-05-16_
 **Where I stopped:** Research phase complete. All reference codebases cloned to `temp-ref/` (C, Lua, Arduino C++). RAM container gates identified: `NoteTrack=9544 B`, `TeletypeTrackEngine=912 B`. Next step is designing fixed-grid `OrcaTrack` model that fits under the container gate.
 **Next action:** Prototype `OrcaTrack` model with fixed grid size (e.g., 16×16 or 32×16) and measure `sizeof(OrcaTrack)` in STM32 release build to verify it stays ≤ `NoteTrack`.
 **Depends on:** resource-optimization (needs RAM headroom), teletype-runtime-architecture (pattern slot pattern to follow)
+**Branch:** TBD
+
+---
+
+## ⚪ generator-preview-apply — Generator A/B preview, step selection, 64-step context
+**Status:** ready — research complete, plan written, not started
+**Where I stopped:** Research phase complete. Vinx fork fully analyzed. XFORMER delta documented. Phased implementation plan (A-E) written in TASK.md.
+**Next action:** Phase A — Add `_preview` copy + `apply()`/`showOriginal()`/`showPreview()`/`showingPreview()` to SequenceBuilder. Measure sizeof impact before proceeding.
+**Depends on:** resource-optimization (RAM headroom at 90.5%, need to verify _preview copy fits)
 **Branch:** TBD
