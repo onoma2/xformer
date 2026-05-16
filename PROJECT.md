@@ -10,6 +10,7 @@ The project is a dual-platform embedded system running on both STM32 hardware an
 
 ## Rules
 - Never make user-facing out-of-scope additions/changes without asking the user first.
+- **No ProjectVersion bumps during feature development.** The project is in active development on `feat/*` branches. Version bumps happen only when a release is prepared and all features for that release are complete. Adding enum values (e.g. `Routing::Source`, `Routing::Target`) without a version bump is acceptable — old projects will read unknown values as default/None, which is safe enough for dev firmware.
 
 ## Build System
 
