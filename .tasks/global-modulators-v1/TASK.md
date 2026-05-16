@@ -125,7 +125,8 @@ Port Modulove-style global LFO modulators into XFORMER as a standalone feature, 
 - [x] Phase 5i: Rate display fix — `hzTenths < 1000` shows decimal instead of dropping it at `< 100`.
 - [x] Phase 6: RAM gate check passed. Build clean.
 - [x] Hardware verified — user confirmed chaos shapes, slew, None target working.
-- [ ] Phase 7: RoutingEngine source — add `Mod1..Mod8` to `Routing::Source` enum, wire `RoutingEngine` to read `_currentValue[]` as 0..1 float sources.
+- [x] Phase 7: RoutingEngine source — add `Mod1..Mod8` to `Routing::Source` enum, wire `RoutingEngine` to read `_currentValue[]` as 0..1 float sources.
+- [x] Phase 8: Rate/depth defaults fixed — `clear()` matches member init: `rate=96` (1/4 note), `depth=25` (~±1V). LFO rate encoder inverted so right = faster.
 
 ## Notes
 - This is a feature task, not a RAM recovery task. It must still pass the current RAM budget gates.

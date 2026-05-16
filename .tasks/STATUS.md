@@ -84,9 +84,9 @@ _Updated: 2026-05-16_
 ---
 
 ## 🔴 global-modulators-v1 — Port Modulove-style global modulators with chaos shapes
-**Status:** active — core complete (LFO/Random/ADSR/Chaos, CV+MIDI output, routing overlay). Next step: RoutingEngine source integration.
-**Where I stopped:** V1 core shapes, output routing, and UI fully tested on hardware. `.data+bss` within budget. Chaos slew, None target, parabolic curves all functional.
-**Next action:** Add Mod1..Mod8 to `Routing::Source` enum. Wire `RoutingEngine` to read modulator current values as 0..1 float sources, feeding existing `Routing::Target` system.
+**Status:** active — Phases 1-8 complete. Core shapes, output routing, RoutingEngine source integration, defaults, rate consistency all done.
+**Where I stopped:** Phase 8 committed: LFO rate encoder inverted (right = faster), `clear()` rate=96/depth=25 defaults match member init.
+**Next action:** Hardware verification of latest changes, or merge `feat/modulators` to master.
 **Depends on:** none (RAM gate passed)
 **Branch:** feat/modulators
 
