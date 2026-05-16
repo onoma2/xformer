@@ -35,6 +35,7 @@ private:
     };
 
     enum class RoutingTargetType : uint8_t {
+        None,
         Midi,
         CV,
     };
@@ -63,7 +64,7 @@ private:
     // Routing overlay state
     bool _showRoutingOverlay = false;
     RoutingFunction _selectedRoutingFunction = RoutingFunction::Mode;
-    RoutingTargetType _routingTargetType = RoutingTargetType::Midi;
+    RoutingTargetType _routingTargetType = RoutingTargetType::None;
     int _routingTargetIndex = 0;     // 0-15 = MIDI output, 0-7 = CV output
     bool _routingEventIsCC = true;   // false = Note, true = CC (MIDI only)
     int _routingCCNum = 0;           // CC number 0-127 (MIDI CC only)

@@ -66,7 +66,7 @@ void Modulator::printRate(StringBuilder &str) const {
         int frac = hzTenths % 10;
         if (hzTenths < 10) {
             str("0.%dHz", frac);
-        } else if (hzTenths < 100) {
+        } else if (hzTenths < 1000) {
             str("%d.%dHz", whole, frac);
         } else {
             str("%dHz", whole);

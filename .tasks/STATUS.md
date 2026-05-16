@@ -1,8 +1,8 @@
 # Task Board
-_Updated: 2026-05-15_
+_Updated: 2026-05-16_
 
-## 🔴 resource-optimization — RAM & Flash budget recovery
-**Status:** active — P1/P5/P15 hardware/build-verified; model storage is solved for now.
+## 🟡 resource-optimization — RAM & Flash budget recovery
+**Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
 **Where I stopped:** Current build is `.data=6,320`, `.bss=113,640`, `.ccmram_bss=54,096`; MonitorPage shows `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`.
 **Next action:** Research Teletype file-load backup transaction semantics; USB/FS DirBuf already dead (FF_USE_LFN=0), remaining safe win ~100-300 B struct packing only; LCD packed Canvas (D-A) confirmed no-go; P13/LCD D-B remain future/last-resort research.
 **Depends on:** nothing
@@ -75,19 +75,28 @@ _Updated: 2026-05-15_
 ---
 
 ## 🟡 performer-improvements — Non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
-**Status:** blocked
-**Where I stopped:** MenuWrapSetting wired (Settings::Version=2, dynamic_cast gate, default=on). Hardware crashes on boot — RAM at 97%, no headroom.
-**Next action:** Unblocked by resource-optimization; LFO modulators were extracted to `global-modulators-v1`.
-**Depends on:** resource-optimization (needs RAM headroom)
+**Status:** paused — modulators extracted and completed in `global-modulators-v1`; RAM headroom now available.
+**Where I stopped:** MenuWrapSetting wired (Settings::Version=2, dynamic_cast gate, default=on). LFO modulators completed; next unblocked item is route-reordering.
+**Next action:** Resume after route-reordering.
+**Depends on:** resource-optimization (RAM headroom available)
 **Branch:** TBD
 
 ---
 
-## 🟡 global-modulators-v1 — Port reduced Modulove global LFO/random modulators
-**Status:** complete — All V1+V2 items ported (model, engine, CV output integration, waveform UI, ADSR, MIDI CC routing with Shift+Page overlay). STM32 release builds cleanly. RAM gate passed.
-**Where I stopped:** `.data+bss=118,568` (90.4% of 128KB). Modulator delta: ~428B. All original V1 non-goals (MIDI CC, ADSR, routing overlay) now resolved.
-**Next action:** Hardware verification or merge to master.
+## 🟢 global-modulators-v1 — Port Modulove-style global modulators with chaos shapes
+**Status:** complete — Chaos (Lorenz/Latoocarfian), None target, slew, parabolic parameter curves, live waveform, fixed rate display. Hardware-tested and building cleanly on `feat/modulators`.
+**Where I stopped:** V1 through chaos shapes fully tested. `.data+bss` within budget. All features functional; user says "next step is still routing".
+**Next action:** Merge `feat/modulators` to master or proceed with `route-reordering`.
 **Depends on:** none (RAM gate passed)
+**Branch:** feat/modulators
+
+---
+
+## 🔴 route-reordering — Rearranging Routing::Target enum into signal-flow ordering
+**Status:** active — Spec complete, ready to implement.
+**Where I stopped:** Spec written in `reorder-spec.md`. Target ordering by signal-flow (Transport → Project → Sequence → Pitch → Gate → Probability → Output → Module-specific → Infrastructure). `targetSerialize()` already decouples serialization from enum values.
+**Next action:** Update `Routing.h` enum, sentinel values, `isXxxTarget()` checks. Then `Routing.cpp` `targetInfos[]` designated initializers and `targetName()` order.
+**Depends on:** nothing (pure refactor, no behavior change)
 **Branch:** feat/modulators
 
 ---

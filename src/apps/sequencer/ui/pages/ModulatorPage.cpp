@@ -132,7 +132,9 @@ void ModulatorPage::draw(Canvas &canvas) {
             break;
         case RoutingFunction::Target: {
             paramName("TARGET");
-            if (_routingTargetType == RoutingTargetType::Midi) {
+            if (_routingTargetType == RoutingTargetType::None) {
+                paramValue("NONE");
+            } else if (_routingTargetType == RoutingTargetType::Midi) {
                 paramValue("MIDI %d", _routingTargetIndex + 1);
             } else {
                 paramValue("CV %d", _routingTargetIndex + 1);
@@ -275,7 +277,7 @@ void ModulatorPage::draw(Canvas &canvas) {
     const int waveformH = 34;
 
     if (isChaos) {
-        // Chaos waveform visualization
+        // Chaos: live output visualization (like Random — updates every frame)
         canvas.setColor(Color::Bright);
         canvas.drawRect(waveformX, waveformY, waveformW, waveformH);
 
@@ -288,22 +290,11 @@ void ModulatorPage::draw(Canvas &canvas) {
         canvas.hline(scopeX, scopeY, scopeWidth);
 
         canvas.setColor(Color::Bright);
-        if (!_waveformCacheValid ||
-            modulator.shape() != _lastShape ||
-            modulator.depth() != _lastDepth ||
-            modulator.offset() != _lastOffset ||
-            modulator.attack() != _lastAttack ||
-            modulator.decay() != _lastDecay) {
-            updateWaveformCache();
-        }
-        for (int x = 0; x < WaveformCacheSize - 1; ++x) {
-            int y1 = scopeY - (_waveformCache[x] * scopeHeight / 2) / 127;
-            int y2 = scopeY - (_waveformCache[x + 1] * scopeHeight / 2) / 127;
-            canvas.line(scopeX + x, y1, scopeX + x + 1, y2);
-        }
+        int currentValue = _engine.modulatorEngine().currentValue(_selectedModulator);
+        int y = scopeY - ((currentValue - 64) * scopeHeight / 2) / 127;
+        canvas.hline(scopeX, y, scopeWidth);
 
         // Level bar (same as all other shapes)
-        int currentValue = _engine.modulatorEngine().currentValue(_selectedModulator);
         const int barX = waveformX + waveformW + 4;
         const int barWidth = 4;
         canvas.setColor(Color::Medium);
@@ -589,17 +580,23 @@ void ModulatorPage::encoder(EncoderEvent &event) {
             modulator.editGateTrack(event.value(), pressed);
             break;
         case RoutingFunction::Target: {
-            int totalTargets = 16 + 8; // MIDI 1-16 + CV 1-8
-            int currentGlobal = (_routingTargetType == RoutingTargetType::Midi)
-                ? _routingTargetIndex
-                : (16 + _routingTargetIndex);
+            int totalTargets = 1 + 16 + 8; // None + MIDI 1-16 + CV 1-8
+            int currentGlobal;
+            switch (_routingTargetType) {
+                case RoutingTargetType::None: currentGlobal = 0; break;
+                case RoutingTargetType::Midi: currentGlobal = 1 + _routingTargetIndex; break;
+                case RoutingTargetType::CV: currentGlobal = 1 + 16 + _routingTargetIndex; break;
+            }
             currentGlobal = (currentGlobal + event.value() + totalTargets) % totalTargets;
-            if (currentGlobal < 16) {
+            if (currentGlobal == 0) {
+                _routingTargetType = RoutingTargetType::None;
+                _routingTargetIndex = 0;
+            } else if (currentGlobal <= 16) {
                 _routingTargetType = RoutingTargetType::Midi;
-                _routingTargetIndex = currentGlobal;
+                _routingTargetIndex = currentGlobal - 1;
             } else {
                 _routingTargetType = RoutingTargetType::CV;
-                _routingTargetIndex = currentGlobal - 16;
+                _routingTargetIndex = currentGlobal - 17;
             }
             break;
         }
@@ -742,8 +739,12 @@ void ModulatorPage::updateWaveformCache() {
         if (modulator.shape() == Modulator::Shape::ChaosLorenz) {
             Lorenz lorenz;
             lorenz.reset();
-            float rho = 10.0f + (modulator.attack() / 100.f) * 0.4f;
-            float beta = 0.5f + (modulator.decay() / 100.f) * 0.035f;
+            float p1n = modulator.attack() / 2000.f;
+            float p2n = modulator.decay() / 2000.f;
+            float p1c = p1n * (2.0f - p1n);
+            float p2c = p2n * (2.0f - p2n);
+            float rho  = 10.0f + p1c * 40.0f;
+            float beta = 0.5f + p2c * 3.5f;
             for (int i = 0; i < 100; ++i) {
                 lorenz.next(0.001f, rho, beta);
             }
@@ -757,12 +758,14 @@ void ModulatorPage::updateWaveformCache() {
         } else {
             Latoocarfian latoo;
             latoo.reset();
-            float a = 0.5f + (modulator.attack() / 100.f) * 0.025f;
-            float b = a;
-            float c = 0.5f + (modulator.decay() / 100.f) * 0.025f;
-            float d = c;
+            float p1n = modulator.attack() / 2000.f;
+            float p2n = modulator.decay() / 2000.f;
+            float p1c = p1n * (2.0f - p1n);
+            float p2c = p2n * (2.0f - p2n);
+            float ab = 0.5f + p1c * 2.5f;
+            float cd = 0.5f + p2c * 2.5f;
             for (int x = 0; x < WaveformCacheSize; ++x) {
-                float raw = latoo.next(a, b, c, d);
+                float raw = latoo.next(ab, ab, cd, cd);
                 int value = static_cast<int>(raw * 127.f);
                 value = (value * modulator.depth()) / 127;
                 value += modulator.offset();
@@ -854,16 +857,36 @@ void ModulatorPage::loadRoutingFromMidiOutput() {
         }
 
         if (!foundInCV) {
-            _routingTargetType = RoutingTargetType::Midi;
-            _routingTargetIndex = clamp(_selectedModulator, 0, CONFIG_MIDI_OUTPUT_COUNT - 1);
-            _routingCCNum = _selectedModulator;
+            _routingTargetType = RoutingTargetType::None;
+            _routingTargetIndex = 0;
+            _routingCCNum = 0;
             _routingEventIsCC = true;
         }
     }
 }
 
 void ModulatorPage::applyRoutingToMidiOutput() {
-    if (_routingTargetType == RoutingTargetType::Midi) {
+    // Clear any existing old assignments first (fixes Modulove's leak where
+    // switching MIDI->CV leaves the old MIDI assignment active)
+    int targetModSource = int(MidiOutput::Output::ControlSource::FirstModulator) + _selectedModulator;
+    for (int i = 0; i < CONFIG_MIDI_OUTPUT_COUNT; ++i) {
+        auto &output = _project.midiOutput().output(i);
+        if (output.event() == MidiOutput::Output::Event::ControlChange &&
+            int(output.controlSource()) == targetModSource) {
+            output.clear();
+            break;
+        }
+    }
+    for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+        if (_project.cvOutputModulator(i) == _selectedModulator + 1) {
+            _project.setCvOutputModulator(i, 0);
+            break;
+        }
+    }
+
+    if (_routingTargetType == RoutingTargetType::None) {
+        showMessage(FixedStringBuilder<32>("Mod %d unassigned", _selectedModulator + 1), 2000);
+    } else if (_routingTargetType == RoutingTargetType::Midi) {
         auto &output = _project.midiOutput().output(_routingTargetIndex);
         if (_routingEventIsCC) {
             output.setEvent(MidiOutput::Output::Event::ControlChange);

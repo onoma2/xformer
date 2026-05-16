@@ -178,29 +178,43 @@ public:
 
             float rawValue = 0.f;
             if (shouldAdvance) {
+                // Normalize P1/P2 to 0..1 (attack/decay are 0..2000)
+                float p1n = modulator.attack() / 2000.f;
+                float p2n = modulator.decay() / 2000.f;
+
+                // Parabolic curve: t*(2-t) expands the sweet spot into the
+                // upper-mid range while keeping low values stable.
+                float p1curve = p1n * (2.0f - p1n);
+                float p2curve = p2n * (2.0f - p2n);
+
                 if (modulator.shape() == Modulator::Shape::ChaosLorenz) {
                     // Sub-tick iterations to maintain stable dt
                     int subTicks = std::max(1, static_cast<int>(hz));
+                    float rho  = 10.0f + p1curve * 40.0f;     // P1: 10..50
+                    float beta = 0.5f + p2curve * 3.5f;        // P2: 0.5..4.0
                     for (int i = 0; i < subTicks; ++i) {
-                        float rho = 10.0f + (modulator.attack() / 100.f) * 0.4f;     // P1: 10..50
-                        float beta = 0.5f + (modulator.decay() / 100.f) * 0.035f;    // P2: 0.5..4.0
                         rawValue = _lorenz[index].next(dt, rho, beta);
                     }
                 } else {
                     // Latoocarfian: phase-based stepping
-                    _phaseAccumulator[index] += static_cast<uint32_t>(hz * 655.36f);  // rough
+                    _phaseAccumulator[index] += static_cast<uint32_t>(hz * 655.36f);
                     if ((_phaseAccumulator[index] & 0xFFFF) < _lastPhase[index]) {
-                        float a = 0.5f + (modulator.attack() / 100.f) * 0.025f;
-                        float b = 0.5f + (modulator.attack() / 100.f) * 0.025f;
-                        float c = 0.5f + (modulator.decay() / 100.f) * 0.025f;
-                        float d = 0.5f + (modulator.decay() / 100.f) * 0.025f;
-                        rawValue = _latoocarfian[index].next(a, b, c, d);
+                        float ab = 0.5f + p1curve * 2.5f;      // P1: 0.5..3.0
+                        float cd = 0.5f + p2curve * 2.5f;      // P2: 0.5..3.0
+                        rawValue = _latoocarfian[index].next(ab, ab, cd, cd);
                     }
                     _lastPhase[index] = _phaseAccumulator[index] & 0xFFFF;
                 }
             }
 
-            int value = static_cast<int>(rawValue * 127.f);  // -127..+127 scaled
+            int target = static_cast<int>(rawValue * 127.f);  // -127..+127
+            int smoothMs = modulator.smooth();
+            int slewRate = calculateSlewRate(smoothMs, 0);
+            int current = _lastRandomValue[index];
+            int diff = target - current;
+            current += diff / slewRate;
+            _lastRandomValue[index] = current;
+            int value = current;
             // Apply depth and offset
             value = (value * modulator.depth()) / 127;
             value += modulator.offset();
@@ -325,6 +339,7 @@ private:
         } else {
             _latoocarfian[index].reset();
         }
+        _lastRandomValue[index] = 0;
         _lastGate[index] = false;
     }
 

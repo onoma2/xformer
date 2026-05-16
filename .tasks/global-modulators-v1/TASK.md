@@ -58,6 +58,7 @@ Port Modulove-style global LFO modulators into XFORMER as a standalone feature, 
 - 2026-05-15: V1 target is physical CV output modulation only. This avoids track/container semantics and keeps the integration point after routing/rotation.
 - 2026-05-15: MIDI CC routing, ADSR, quick-map UI, and full Modulove page are deferred until model/engine/output integration is measured.
 - 2026-05-15: Modulator application law for V1: compute modulator output as a voltage offset and add it to the final physical CV value before DAC channel write, then clamp to DAC output range.
+- 2026-05-16: Chaos shapes (Lorenz/Latoocarfian) ported. Parabolic parameter curves (`p1curve = p1n*(2-p1n)`) expand sweet spot. Default `None` target in routing overlay. Slew (`smooth`) applied to chaos output via shared `_lastRandomValue` buffer. Rate display fixed (`<1000` cutoff).
 
 ## Open questions
 - [x] Should modulation be additive only in V1, or should there be bipolar attenuverter/depth per output assignment? → Additive offset only per V1 plan.
@@ -66,16 +67,7 @@ Port Modulove-style global LFO modulators into XFORMER as a standalone feature, 
 - [x] How should modulation interact with `_cvOutputOverride`? → No modulation while override is active per V1 plan.
 - [x] Should random smoothing be included in V1, or should random be stepped until the core path is stable? → Include smooth/slew per V1 plan (matches Modulove reference).
 
-## Completed steps
-- [x] Task wiki scan found existing Modulove LFO modulator analysis in `performer-improvements`.
-- [x] Reference files confirmed present in `temp-ref/modulove-performer`.
-- [x] Dedicated task folder and V1 plan created.
-- [x] Phase 1: Modulator model (Modulator.h/Modulator.cpp), CONFIG_MODULATOR_COUNT, Project serialization (Version 35), cvOutputModulator array.
-- [x] Phase 2: WaveformGenerator.h (header-only, 5 waveforms), ModulatorEngine.h (header-only, phase accumulator + random state).
-- [x] Phase 3: Modulator tick in Engine::update() tick loop, gate source from configured track.
-- [x] Phase 4: applyModulatorOffset() in Engine::updateTrackOutputs() for all three CV output paths (rotation, track-CV, route-lane). No modulation during override.
-- [x] Phase 5: ModulatorListModel + ModulatorPage (ListPage), TopPage Mode::Modulator navigation, Pages.h integration.
-- [x] Phase 5b: Full UI rewrite — ModulatorPage as BasePage with waveform viz, playhead, level bar, dynamic footer, track LED selection, context menu for CV routing. selectedModulatorIndex in Project. Removed ModulatorListModel.
+
 
 ## Remaining gaps to full Modulove parity (ALL RESOLVED)
 - ~~ADSR shape~~ — Done. Model + engine + pagination implemented.
@@ -113,6 +105,26 @@ Port Modulove-style global LFO modulators into XFORMER as a standalone feature, 
 - `ModulatorEngine` is a direct `Engine` member, **not** in any variant container
 - `Modulator[]` is a direct `Project` member, **not** in any variant container
 - Feature adds ~428B total across SRAM + CCMRAM, well within budget
+
+## Completed steps
+- [x] Task wiki scan found existing Modulove LFO modulator analysis in `performer-improvements`.
+- [x] Reference files confirmed present in `temp-ref/modulove-performer`.
+- [x] Dedicated task folder and V1 plan created.
+- [x] Phase 1: Modulator model (Modulator.h/Modulator.cpp), CONFIG_MODULATOR_COUNT, Project serialization (Version 35), cvOutputModulator array.
+- [x] Phase 2: WaveformGenerator.h (header-only, 5 waveforms), ModulatorEngine.h (header-only, phase accumulator + random state).
+- [x] Phase 3: Modulator tick in Engine::update() tick loop, gate source from configured track.
+- [x] Phase 4: applyModulatorOffset() in Engine::updateTrackOutputs() for all three CV output paths (rotation, track-CV, route-lane). No modulation during override.
+- [x] Phase 5: ModulatorListModel + ModulatorPage (ListPage), TopPage Mode::Modulator navigation, Pages.h integration.
+- [x] Phase 5b: Full UI rewrite — ModulatorPage as BasePage with waveform viz, playhead, level bar, dynamic footer, track LED selection, context menu for CV routing. selectedModulatorIndex in Project. Removed ModulatorListModel.
+- [x] Phase 5c: ADSR shape — model fields (`attack`/`decay`/`sustain`/`release`/`amplitude`), engine state machine (Idle→Attack→Decay→Sustain→Release), 2-page ModulatorPage UI.
+- [x] Phase 5d: MIDI CC routing — `ControlSource::FirstModulator..LastModulator`, `sendModulator()` in `OutputState`, `applyModulatorOffset()` in Engine::tick.
+- [x] Phase 5e: Routing overlay — Shift+Page toggle, 5 functions (MODE/GATE/TARGET/EVENT/CCNUM), TARGET cycles MIDI 1-16 + CV 1-8, default None target.
+- [x] Phase 5f: Chaos shapes (Lorenz/Latoocarfian) — added to Shape enum, `isChaosShape()` helper, Hz-mode rate editing, 2-page UI (Pg1: RATE/P1/P2/DEPTH, Pg2: SLEW/OFFSET), live horizontal-line waveform, parabolic parameter curves.
+- [x] Phase 5g: None target for routing overlay — default unassigned, clear-on-apply with deduplication, prevents Modulove leak of simultaneous MIDI+CV assignment.
+- [x] Phase 5h: Slew on chaos — `_lastRandomValue` reused as shared smoothed buffer (Random and Chaos mutually exclusive), cleared on retrigger.
+- [x] Phase 5i: Rate display fix — `hzTenths < 1000` shows decimal instead of dropping it at `< 100`.
+- [x] Phase 6: RAM gate check passed. Build clean.
+- [x] Hardware verified — user confirmed chaos shapes, slew, None target working.
 
 ## Notes
 - This is a feature task, not a RAM recovery task. It must still pass the current RAM budget gates.
