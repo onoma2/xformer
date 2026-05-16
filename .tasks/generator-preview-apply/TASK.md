@@ -169,6 +169,12 @@ This is safe: generators write through `_edit` → live sequence. `showOriginal(
 - [x] Research: Delta between Vinx and XFORMER documented
 - [x] Research: RAM footprint recorded (see RESEARCH.md)
 - [x] Audit: 7 issues identified in initial plan, all addressed in revision
+- [x] **Phase A: SequenceBuilder 3-copy state machine** — committed and hardware verified
+  - Virtual destructor, apply(), showOriginal(), showPreview(), showingPreview() added to base
+  - T* _preview (heap-allocated) + bool _showingPreview + destructor in SequenceBuilderImpl<T>
+  - Allocation failure handled gracefully (std::nothrow, stays in ORIGINAL)
+  - Generator base class: delegate methods added
+  - RAM: .data + .bss unchanged at 118,648 (90.5%)
 
 ## Notes
 

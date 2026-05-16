@@ -2,11 +2,11 @@
 _Updated: 2026-05-17_
 
 ## ⚪ generator-preview-apply — Generator A/B preview, step selection, 64-step context
-**Status:** ready — plan has inconsistencies, needs revision before implementation
-**Where I stopped:** Plan written but has 7 issues found in audit: (1) STATUS.md duplication, (2) _preview type inconsistency (optional vs raw pointer), (3) encoder mutation order breaks preview semantics, (4) new T alloc needs failure path, (5) StepSelection type underspecified, (6) Shift+Step conflicts with existing selection, (7) 64-step draw needs pixel-level strategy. Not implementation-ready.
-**Next action:** Revise TASK.md Phase A to fix all 7 issues. Use T* _preview with explicit lifecycle, define mutation ownership (generate into _preview before exposing), add allocation failure behavior, concrete StepSelection<CONFIG_STEP_COUNT>* type, resolve Shift+Step precedence, specify 64-step rendering strategy.
+**Status:** ready — Phase A committed and hardware verified. Phases B-E remaining.
+**Where I stopped:** Phase A complete. SequenceBuilder has 3-copy state machine (T* _preview heap-allocated, apply/showOriginal/showPreview). Generator has delegate methods. .data + .bss unchanged at 118,648 (90.5%).
+**Next action:** Phase B — Add Variation param, randomizeParams/displayValue to RandomGenerator, widen seed to uint32_t.
 **Depends on:** resource-optimization (RAM at 90.5%, ~2.3 KB headroom to 120 KB warning)
-**Branch:** TBD
+**Branch:** feat/generator
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
