@@ -304,8 +304,8 @@ public:
 
     void clear() {
         setShape(Shape::Sine);
-        setRate(15);    // 1.5 Hz for chaos, fast for LFO
-        setDepth(100);
+        setRate(96);    // 1/4 note for LFO
+        setDepth(25);  // ~±1V default
         setOffset(0);
         setPhase(0);
         setSmooth(100);
@@ -356,7 +356,7 @@ public:
 private:
     Shape _shape = Shape::Sine;
     uint16_t _rate = 96;
-    uint8_t _depth = 127;
+    uint8_t _depth = 25;
     int8_t _offset = 0;
     uint16_t _phase = 0;
     uint16_t _smooth = 100;

@@ -83,10 +83,10 @@ _Updated: 2026-05-16_
 
 ---
 
-## 🔴 global-modulators-v1 — Port Modulove-style global modulators with chaos shapes
-**Status:** active — Phases 1-8 complete. Core shapes, output routing, RoutingEngine source integration, defaults, rate consistency all done.
-**Where I stopped:** Phase 8 committed: LFO rate encoder inverted (right = faster), `clear()` rate=96/depth=25 defaults match member init.
-**Next action:** Hardware verification of latest changes, or merge `feat/modulators` to master.
+## 🟢 global-modulators-v1 — Port Modulove-style global modulators with chaos shapes
+**Status:** complete — Phases 1-9 done. Core shapes, output routing, RoutingEngine/CvRoute integration, defaults, rate consistency, documentation. Hardware verified.
+**Where I stopped:** Phase 9 (CvRoute modulator inputs) committed. manuals/Modulators.md written. Feature ready for merge to master.
+**Next action:** Merge `feat/modulators` to master when user confirms.
 **Depends on:** none (RAM gate passed)
 **Branch:** feat/modulators
 

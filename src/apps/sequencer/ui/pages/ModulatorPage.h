@@ -15,6 +15,7 @@ public:
 
     virtual void keyPress(KeyPressEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
 
 private:
     enum class Function : uint8_t {

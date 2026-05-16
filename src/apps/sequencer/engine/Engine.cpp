@@ -699,7 +699,7 @@ float Engine::applyModulatorOffset(int channel, float cvValue) const {
     int modulatorIndex = _project.cvOutputModulator(channel);
     if (modulatorIndex > 0 && modulatorIndex <= CONFIG_MODULATOR_COUNT) {
         int modValue = _modulatorEngine.currentValue(modulatorIndex - 1);
-        float modOffset = (modValue - 64) / 64.f;
+        float modOffset = (modValue - 64) / 12.8f;  // 0..127 → ±5.0V
         cvValue += modOffset;
         cvValue = clamp(cvValue, -5.f, 5.f);
     }
@@ -717,6 +717,30 @@ void Engine::updateCvRouteOutputs() {
             break;
         case CvRoute::InputSource::Bus:
             inputs[lane] = busCv(lane);
+            break;
+        case CvRoute::InputSource::Mod1:
+            inputs[lane] = (_modulatorEngine.currentValue(0) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod2:
+            inputs[lane] = (_modulatorEngine.currentValue(1) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod3:
+            inputs[lane] = (_modulatorEngine.currentValue(2) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod4:
+            inputs[lane] = (_modulatorEngine.currentValue(3) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod5:
+            inputs[lane] = (_modulatorEngine.currentValue(4) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod6:
+            inputs[lane] = (_modulatorEngine.currentValue(5) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod7:
+            inputs[lane] = (_modulatorEngine.currentValue(6) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod8:
+            inputs[lane] = (_modulatorEngine.currentValue(7) / 127.f) * 10.f - 5.f;
             break;
         case CvRoute::InputSource::Off:
             inputs[lane] = 0.f;

@@ -16,6 +16,14 @@ public:
         CvIn,
         Bus,
         Off,
+        Mod1,
+        Mod2,
+        Mod3,
+        Mod4,
+        Mod5,
+        Mod6,
+        Mod7,
+        Mod8,
         Last
     };
 
@@ -91,6 +99,14 @@ private:
         case InputSource::CvIn: return 0;
         case InputSource::Bus:  return 1;
         case InputSource::Off:  return 2;
+        case InputSource::Mod1: return 3;
+        case InputSource::Mod2: return 4;
+        case InputSource::Mod3: return 5;
+        case InputSource::Mod4: return 6;
+        case InputSource::Mod5: return 7;
+        case InputSource::Mod6: return 8;
+        case InputSource::Mod7: return 9;
+        case InputSource::Mod8: return 10;
         case InputSource::Last: break;
         }
         return 0;
