@@ -3,6 +3,8 @@
 #include "Pages.h"
 #include "Config.h"
 #include "engine/ModulatorEngine.h"
+#include "engine/generators/Lorenz.h"
+#include "engine/generators/Latoocarfian.h"
 
 #include "ui/LedPainter.h"
 #include "ui/painters/WindowPainter.h"
@@ -33,9 +35,10 @@ void ModulatorPage::draw(Canvas &canvas) {
     bool isRandom = (modulator.shape() == Modulator::Shape::Random);
     bool isTriggered = isRandom && (modulator.randomMode() == Modulator::RandomMode::Triggered);
     bool isADSR = (modulator.shape() == Modulator::Shape::ADSR);
+    bool isChaos = Modulator::isChaosShape(modulator.shape());
 
-    // Update total pages for ADSR
-    if (isADSR) {
+    // Update total pages for ADSR and chaos
+    if (isADSR || isChaos) {
         _totalPages = 2;
     } else {
         _totalPages = 1;
@@ -71,8 +74,22 @@ void ModulatorPage::draw(Canvas &canvas) {
                 functionNames[4] = "RELEASE";
             } else {
                 functionNames[0] = "AMPLIT";
-                functionNames[1] = "DEPTH";
-                functionNames[2] = "OFFSET";
+                functionNames[1] = nullptr;
+                functionNames[2] = nullptr;
+                functionNames[3] = nullptr;
+                functionNames[4] = nullptr;
+            }
+        } else if (isChaos) {
+            if (_currentPage == 0) {
+                functionNames[0] = "SHAPE";
+                functionNames[1] = "RATE";
+                functionNames[2] = "P1";
+                functionNames[3] = "P2";
+                functionNames[4] = "DEPTH";
+            } else {
+                functionNames[0] = "SLEW";
+                functionNames[1] = "OFFSET";
+                functionNames[2] = nullptr;
                 functionNames[3] = nullptr;
                 functionNames[4] = nullptr;
             }
@@ -173,6 +190,44 @@ void ModulatorPage::draw(Canvas &canvas) {
                 break;
             }
         }
+    } else if (isChaos) {
+        if (_currentPage == 0) {
+            switch (_selectedFunction) {
+            case Function::Shape:
+                paramName("SHAPE");
+                paramValue(Modulator::shapeName(modulator.shape()));
+                break;
+            case Function::Rate:
+                paramName("RATE");
+                modulator.printRate(paramValue);
+                break;
+            case Function::Depth:
+                paramName("P1");
+                paramValue("%d", modulator.attack() / 20);
+                break;
+            case Function::Offset:
+                paramName("P2");
+                paramValue("%d", modulator.decay() / 20);
+                break;
+            case Function::Phase:
+                paramName("DEPTH");
+                modulator.printDepth(paramValue);
+                break;
+            }
+        } else {
+            switch (_selectedFunction) {
+            case Function::Shape:
+                paramName("SLEW");
+                modulator.printSmooth(paramValue);
+                break;
+            case Function::Rate:
+                paramName("OFFSET");
+                modulator.printOffset(paramValue);
+                break;
+            default:
+                break;
+            }
+        }
     } else {
         switch (_selectedFunction) {
         case Function::Shape:
@@ -219,7 +274,34 @@ void ModulatorPage::draw(Canvas &canvas) {
     const int waveformW = 116;
     const int waveformH = 34;
 
-    if (isADSR) {
+    if (isChaos) {
+        // Chaos waveform visualization
+        canvas.setColor(Color::Bright);
+        canvas.drawRect(waveformX, waveformY, waveformW, waveformH);
+
+        const int scopeX = waveformX + 2;
+        const int scopeY = waveformY + (waveformH / 2);
+        const int scopeWidth = waveformW - 4;
+        const int scopeHeight = waveformH - 4;
+
+        canvas.setColor(Color::Low);
+        canvas.hline(scopeX, scopeY, scopeWidth);
+
+        canvas.setColor(Color::Bright);
+        if (!_waveformCacheValid ||
+            modulator.shape() != _lastShape ||
+            modulator.depth() != _lastDepth ||
+            modulator.offset() != _lastOffset ||
+            modulator.attack() != _lastAttack ||
+            modulator.decay() != _lastDecay) {
+            updateWaveformCache();
+        }
+        for (int x = 0; x < WaveformCacheSize - 1; ++x) {
+            int y1 = scopeY - (_waveformCache[x] * scopeHeight / 2) / 127;
+            int y2 = scopeY - (_waveformCache[x + 1] * scopeHeight / 2) / 127;
+            canvas.line(scopeX + x, y1, scopeX + x + 1, y2);
+        }
+    } else if (isADSR) {
         // ADSR envelope visualization
         int attackMs = modulator.attack();
         int decayMs = modulator.decay();
@@ -318,7 +400,9 @@ void ModulatorPage::draw(Canvas &canvas) {
                 modulator.shape() != _lastShape ||
                 modulator.depth() != _lastDepth ||
                 modulator.offset() != _lastOffset ||
-                modulator.phase() != _lastPhase) {
+                modulator.phase() != _lastPhase ||
+                modulator.attack() != _lastAttack ||
+                modulator.decay() != _lastDecay) {
                 updateWaveformCache();
             }
 
@@ -411,9 +495,10 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Pagination for ADSR (Left/Right without shift)
+    // Pagination for ADSR and chaos (Left/Right without shift)
     auto &modulator = _project.modulator(_selectedModulator);
-    if (modulator.shape() == Modulator::Shape::ADSR && _totalPages > 1 && !_showRoutingOverlay) {
+    if ((modulator.shape() == Modulator::Shape::ADSR || Modulator::isChaosShape(modulator.shape()))
+        && _totalPages > 1 && !_showRoutingOverlay) {
         if (key.is(Key::Left)) {
             if (_currentPage > 0) {
                 _currentPage--;
@@ -518,6 +603,37 @@ void ModulatorPage::encoder(EncoderEvent &event) {
             }
             break;
         }
+    } else if (Modulator::isChaosShape(modulator.shape())) {
+        if (_currentPage == 0) {
+            switch (_selectedFunction) {
+            case Function::Shape:
+                modulator.editShape(event.value(), pressed);
+                break;
+            case Function::Rate:
+                modulator.editRate(event.value(), pressed);
+                break;
+            case Function::Depth:
+                modulator.editAttack(event.value(), pressed);
+                break;
+            case Function::Offset:
+                modulator.editDecay(event.value(), pressed);
+                break;
+            case Function::Phase:
+                modulator.editDepth(event.value(), pressed);
+                break;
+            }
+        } else {
+            switch (_selectedFunction) {
+            case Function::Shape:
+                modulator.editSmooth(event.value(), pressed);
+                break;
+            case Function::Rate:
+                modulator.editOffset(event.value(), pressed);
+                break;
+            default:
+                break;
+            }
+        }
     } else if (modulator.shape() == Modulator::Shape::ADSR) {
         if (_currentPage == 0) {
             switch (_selectedFunction) {
@@ -538,18 +654,9 @@ void ModulatorPage::encoder(EncoderEvent &event) {
                 break;
             }
         } else {
-            switch (_selectedFunction) {
-            case Function::Shape:
+            // ADSR page 2: only amplitude is meaningful; depth/offset are unused
+            if (_selectedFunction == Function::Shape) {
                 modulator.editAmplitude(event.value(), pressed);
-                break;
-            case Function::Depth:
-                modulator.editDepth(event.value(), pressed);
-                break;
-            case Function::Offset:
-                modulator.editOffset(event.value(), pressed);
-                break;
-            default:
-                break;
             }
         }
     } else {
@@ -617,6 +724,43 @@ void ModulatorPage::updateWaveformCache() {
     _lastDepth = modulator.depth();
     _lastOffset = modulator.offset();
     _lastPhase = modulator.phase();
+    _lastAttack = modulator.attack();
+    _lastDecay = modulator.decay();
+
+    if (Modulator::isChaosShape(modulator.shape())) {
+        if (modulator.shape() == Modulator::Shape::ChaosLorenz) {
+            Lorenz lorenz;
+            lorenz.reset();
+            float rho = 10.0f + (modulator.attack() / 100.f) * 0.4f;
+            float beta = 0.5f + (modulator.decay() / 100.f) * 0.035f;
+            for (int i = 0; i < 100; ++i) {
+                lorenz.next(0.001f, rho, beta);
+            }
+            for (int x = 0; x < WaveformCacheSize; ++x) {
+                float raw = lorenz.next(0.001f, rho, beta);
+                int value = static_cast<int>(raw * 127.f);
+                value = (value * modulator.depth()) / 127;
+                value += modulator.offset();
+                _waveformCache[x] = static_cast<int8_t>(clamp(value, -127, 127));
+            }
+        } else {
+            Latoocarfian latoo;
+            latoo.reset();
+            float a = 0.5f + (modulator.attack() / 100.f) * 0.025f;
+            float b = a;
+            float c = 0.5f + (modulator.decay() / 100.f) * 0.025f;
+            float d = c;
+            for (int x = 0; x < WaveformCacheSize; ++x) {
+                float raw = latoo.next(a, b, c, d);
+                int value = static_cast<int>(raw * 127.f);
+                value = (value * modulator.depth()) / 127;
+                value += modulator.offset();
+                _waveformCache[x] = static_cast<int8_t>(clamp(value, -127, 127));
+            }
+        }
+        _waveformCacheValid = true;
+        return;
+    }
 
     for (int x = 0; x < WaveformCacheSize; ++x) {
         uint32_t phase = ((uint32_t)x * 65536) / WaveformCacheSize;

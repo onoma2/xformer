@@ -69,6 +69,7 @@ If any are unclear on non-trivial work → flag it explicitly and ask or defer.
 - Creating significant complexity debt
 - Unknown unknowns on non-trivial changes
 - **State-altering git operations: NEVER use git commit, add, checkout, restore, push, or pull without explicit user confirmation**
+- **Code changes are FORBIDDEN unless the user explicitly asks. Explanation, research, and reading are always allowed. Writing or editing code requires explicit user consent — no exceptions, not even for "obvious" fixes or trivial changes.**
 
 ## Execution
 

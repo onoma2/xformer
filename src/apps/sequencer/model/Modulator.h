@@ -24,6 +24,8 @@ public:
         Square,
         Random,
         ADSR,
+        ChaosLorenz,
+        ChaosLatoocarfian,
         Last
     };
 
@@ -36,6 +38,8 @@ public:
         case Shape::Square:    return "Square";
         case Shape::Random:    return "Random";
         case Shape::ADSR:      return "ADSR";
+        case Shape::ChaosLorenz:       return "ChaosL";
+        case Shape::ChaosLatoocarfian: return "ChaosLa";
         case Shape::Last:      break;
         }
         return nullptr;
@@ -90,6 +94,9 @@ public:
         setShape(ModelUtils::adjustedEnum(shape(), value));
     }
 
+    static bool isChaosShape(Shape shape) {
+        return shape == Shape::ChaosLorenz || shape == Shape::ChaosLatoocarfian;
+    }
     void printShape(StringBuilder &str) const {
         str(shapeName(shape()));
     }

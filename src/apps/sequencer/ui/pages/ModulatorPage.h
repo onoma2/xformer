@@ -76,4 +76,6 @@ private:
     int _lastDepth = 0;
     int _lastOffset = 0;
     int _lastPhase = 0;
+    int _lastAttack = 0;
+    int _lastDecay = 0;
 };

@@ -3,6 +3,8 @@
 #include "Config.h"
 #include "model/Modulator.h"
 #include "WaveformGenerator.h"
+#include "generators/Lorenz.h"
+#include "generators/Latoocarfian.h"
 #include "core/utils/Random.h"
 #include "core/math/Math.h"
 
@@ -32,6 +34,8 @@ public:
             _adsrState[i] = ADSRState::Idle;
             _adsrLevel[i] = 0;
             _adsrTimer[i] = 0;
+            _lorenz[i].reset();
+            _latoocarfian[i].reset();
         }
     }
 
@@ -148,6 +152,62 @@ public:
             return;
         }
 
+        // Chaos shapes (Lorenz, Latoocarfian)
+        if (modulator.shape() == Modulator::Shape::ChaosLorenz ||
+            modulator.shape() == Modulator::Shape::ChaosLatoocarfian) {
+            // Gate mode handling
+            if (modulator.mode() == Modulator::Mode::Sync || modulator.mode() == Modulator::Mode::Retrigger) {
+                if (gate && !_lastGate[index]) {
+                    resetChaos(index, modulator.shape(), modulator.phase());
+                }
+                _lastGate[index] = gate;
+            } else if (modulator.mode() == Modulator::Mode::Hold) {
+                if (gate && !_lastGate[index]) {
+                    resetChaos(index, modulator.shape(), modulator.phase());
+                }
+                _lastGate[index] = gate;
+            }
+
+            // Rate is Hz * 10
+            float hz = modulator.rate() / 10.f;
+            float dt = 0.001f;  // 1ms per sub-tick tick assumption
+            bool shouldAdvance = (modulator.mode() == Modulator::Mode::Free) ||
+                                (modulator.mode() == Modulator::Mode::Sync) ||
+                                (modulator.mode() == Modulator::Mode::Retrigger) ||
+                                (modulator.mode() == Modulator::Mode::Hold && gate);
+
+            float rawValue = 0.f;
+            if (shouldAdvance) {
+                if (modulator.shape() == Modulator::Shape::ChaosLorenz) {
+                    // Sub-tick iterations to maintain stable dt
+                    int subTicks = std::max(1, static_cast<int>(hz));
+                    for (int i = 0; i < subTicks; ++i) {
+                        float rho = 10.0f + (modulator.attack() / 100.f) * 0.4f;     // P1: 10..50
+                        float beta = 0.5f + (modulator.decay() / 100.f) * 0.035f;    // P2: 0.5..4.0
+                        rawValue = _lorenz[index].next(dt, rho, beta);
+                    }
+                } else {
+                    // Latoocarfian: phase-based stepping
+                    _phaseAccumulator[index] += static_cast<uint32_t>(hz * 655.36f);  // rough
+                    if ((_phaseAccumulator[index] & 0xFFFF) < _lastPhase[index]) {
+                        float a = 0.5f + (modulator.attack() / 100.f) * 0.025f;
+                        float b = 0.5f + (modulator.attack() / 100.f) * 0.025f;
+                        float c = 0.5f + (modulator.decay() / 100.f) * 0.025f;
+                        float d = 0.5f + (modulator.decay() / 100.f) * 0.025f;
+                        rawValue = _latoocarfian[index].next(a, b, c, d);
+                    }
+                    _lastPhase[index] = _phaseAccumulator[index] & 0xFFFF;
+                }
+            }
+
+            int value = static_cast<int>(rawValue * 127.f);  // -127..+127 scaled
+            // Apply depth and offset
+            value = (value * modulator.depth()) / 127;
+            value += modulator.offset();
+            _currentValue[index] = clamp(value + 64, 0, 127);
+            return;
+        }
+
         // Clocked Random mode
         if (modulator.shape() == Modulator::Shape::Random) {
             // Rate is in PPQN=96 ticks in reference; convert to our PPQN=192
@@ -259,6 +319,15 @@ public:
     }
 
 private:
+    void resetChaos(int index, Modulator::Shape shape, uint16_t phase) {
+        if (shape == Modulator::Shape::ChaosLorenz) {
+            _lorenz[index].reset();
+        } else {
+            _latoocarfian[index].reset();
+        }
+        _lastGate[index] = false;
+    }
+
     int calculateSlewRate(int smoothMs, uint32_t rate) {
         if (smoothMs == 0) {
             return 1;
@@ -279,4 +348,8 @@ private:
     ADSRState _adsrState[CONFIG_MODULATOR_COUNT] = {};
     int _adsrLevel[CONFIG_MODULATOR_COUNT] = {};
     uint32_t _adsrTimer[CONFIG_MODULATOR_COUNT] = {};
+
+    // Chaos generators
+    Lorenz _lorenz[CONFIG_MODULATOR_COUNT];
+    Latoocarfian _latoocarfian[CONFIG_MODULATOR_COUNT];
 };
