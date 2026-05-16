@@ -83,19 +83,19 @@ _Updated: 2026-05-16_
 
 ---
 
-## 🟢 global-modulators-v1 — Port Modulove-style global modulators with chaos shapes
-**Status:** complete — Chaos (Lorenz/Latoocarfian), None target, slew, parabolic parameter curves, live waveform, fixed rate display. Hardware-tested and building cleanly on `feat/modulators`.
-**Where I stopped:** V1 through chaos shapes fully tested. `.data+bss` within budget. All features functional; user says "next step is still routing".
-**Next action:** Merge `feat/modulators` to master or proceed with `route-reordering`.
+## 🔴 global-modulators-v1 — Port Modulove-style global modulators with chaos shapes
+**Status:** active — core complete (LFO/Random/ADSR/Chaos, CV+MIDI output, routing overlay). Next step: RoutingEngine source integration.
+**Where I stopped:** V1 core shapes, output routing, and UI fully tested on hardware. `.data+bss` within budget. Chaos slew, None target, parabolic curves all functional.
+**Next action:** Add Mod1..Mod8 to `Routing::Source` enum. Wire `RoutingEngine` to read modulator current values as 0..1 float sources, feeding existing `Routing::Target` system.
 **Depends on:** none (RAM gate passed)
 **Branch:** feat/modulators
 
 ---
 
-## 🔴 route-reordering — Rearranging Routing::Target enum into signal-flow ordering
-**Status:** active — Spec complete, ready to implement.
-**Where I stopped:** Spec written in `reorder-spec.md`. Target ordering by signal-flow (Transport → Project → Sequence → Pitch → Gate → Probability → Output → Module-specific → Infrastructure). `targetSerialize()` already decouples serialization from enum values.
-**Next action:** Update `Routing.h` enum, sentinel values, `isXxxTarget()` checks. Then `Routing.cpp` `targetInfos[]` designated initializers and `targetName()` order.
+## 🟡 route-reordering — Rearranging Routing::Target enum into signal-flow ordering
+**Status:** paused — Spec complete; no code started.
+**Where I stopped:** Spec written in `reorder-spec.md`. Target ordering by signal-flow agreed. `targetSerialize()` already decouples serialization from enum values.
+**Next action:** Update `Routing.h` enum, sentinel values, `isXxxTarget()` checks; then `Routing.cpp` `targetInfos[]` and `targetName()` order.
 **Depends on:** nothing (pure refactor, no behavior change)
 **Branch:** feat/modulators
 

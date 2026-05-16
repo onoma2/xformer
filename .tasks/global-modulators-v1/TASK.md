@@ -4,7 +4,7 @@
 Port Modulove-style global LFO modulators into XFORMER as a standalone feature, starting with a smaller V1: project-level modulators that can offset physical CV outputs after track/routing selection. This fills a real gap between CurveTrack sequenced CV, Teletype script-local LFOs, and RoutingEngine shapers.
 
 ## Status
-**Complete on `feat/modulators`.** V1 engine + full Modulove-matching UI (including ADSR shape and MIDI CC routing) implemented and building cleanly. All non-goals from original V1 plan have been resolved. Branch ready for hardware verification or merge.
+**Active on `feat/modulators`.** V1 engine + full Modulove-matching UI implemented. Core modulator shapes (LFO, Random, ADSR, Chaos), CV/MIDI output routing, and overlay all complete. Next step: routing system integration — making modulators available as `Routing::Source` targets.
 
 ## V1 scope
 - 8 global modulators (`CONFIG_MODULATOR_COUNT = 8`).
@@ -125,6 +125,7 @@ Port Modulove-style global LFO modulators into XFORMER as a standalone feature, 
 - [x] Phase 5i: Rate display fix — `hzTenths < 1000` shows decimal instead of dropping it at `< 100`.
 - [x] Phase 6: RAM gate check passed. Build clean.
 - [x] Hardware verified — user confirmed chaos shapes, slew, None target working.
+- [ ] Phase 7: RoutingEngine source — add `Mod1..Mod8` to `Routing::Source` enum, wire `RoutingEngine` to read `_currentValue[]` as 0..1 float sources.
 
 ## Notes
 - This is a feature task, not a RAM recovery task. It must still pass the current RAM budget gates.
