@@ -413,12 +413,22 @@ public:
         GateOut6,
         GateOut7,
         GateOut8,
+        Mod1,
+        Mod2,
+        Mod3,
+        Mod4,
+        Mod5,
+        Mod6,
+        Mod7,
+        Mod8,
         Last
     };
 
     static bool isCvSource(Source source) { return source >= Source::CvFirst && source <= Source::CvLast; }
     static bool isMidiSource(Source source) { return source == Source::Midi; }
     static bool isBusSource(Source source) { return source >= Source::BusCv1 && source <= Source::BusCv4; }
+    static bool isModulatorSource(Source source) { return source >= Source::Mod1 && source <= Source::Mod8; }
+    static int modulatorSourceIndex(Source source) { return isModulatorSource(source) ? int(source) - int(Source::Mod1) : -1; }
     static int busSourceIndex(Source source) {
         return isBusSource(source) ? int(source) - int(Source::BusCv1) : -1;
     }
@@ -469,6 +479,16 @@ public:
         case Source::GateOut7:
         case Source::GateOut8:
             str("Gate Out %d", int(source) - int(Source::GateOut1) + 1);
+            break;
+        case Source::Mod1:
+        case Source::Mod2:
+        case Source::Mod3:
+        case Source::Mod4:
+        case Source::Mod5:
+        case Source::Mod6:
+        case Source::Mod7:
+        case Source::Mod8:
+            str("Mod %d", int(source) - int(Source::Mod1) + 1);
             break;
         case Source::Last:
             break;
