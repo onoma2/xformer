@@ -12,8 +12,9 @@ using GeneratorPattern = std::array<uint8_t, CONFIG_STEP_COUNT>;
 
 class Generator {
 public:
-    enum class Mode {
+   enum class Mode {
         InitLayer,
+        InitSteps,
         Euclidean,
         Random,
         Last
@@ -22,6 +23,7 @@ public:
     static const char *modeName(Mode mode) {
         switch (mode) {
         case Mode::InitLayer:   return "Init Layer";
+        case Mode::InitSteps:   return "Init Steps";
         case Mode::Euclidean:   return "Euclidean";
         case Mode::Random:      return "Random";
         case Mode::Last:        break;
@@ -44,6 +46,7 @@ public:
     virtual void printParam(int index, StringBuilder &str) const = 0;
 
     virtual void init() {}
+    virtual void randomizeParams() {}
 
     virtual void revert() {
         _builder.revert();

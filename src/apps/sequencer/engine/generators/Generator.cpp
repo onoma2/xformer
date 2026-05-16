@@ -13,10 +13,17 @@ static void initLayer(SequenceBuilder &builder) {
     builder.clearLayer();
 }
 
+static void initSteps(SequenceBuilder &builder) {
+    builder.clearSteps();
+}
+
 Generator *Generator::execute(Generator::Mode mode, SequenceBuilder &builder) {
     switch (mode) {
     case Mode::InitLayer:
         initLayer(builder);
+        return nullptr;
+    case Mode::InitSteps:
+        initSteps(builder);
         return nullptr;
     case Mode::Euclidean:
         return generatorContainer.create<EuclideanGenerator>(builder, euclideanParams);
