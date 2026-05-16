@@ -200,17 +200,15 @@ section as reference only; implementation planning lives in the new task.
 4. **Menu wrap** — **DONE** (`10efe3c4`)
 5. **Enhanced Performer Page** — **DONE** — Mute LEDs wired from PlayState, track labels dimmed when muted, pattern numbers shown instead of T1-T8
 6. **Prevent short clock pulses** — **DONE** — 1ms floor via `tickPeriodUs()` minimum in `Clock.cpp`
-7. **Random generator preview/apply** — RandomizePage enhancements
+7. **Generator preview/apply + step selection + 64-step context** — Unified task: (a) SequenceBuilder 3-copy state machine (original/edit/preview) + commit/cancel flow, (b) GeneratorPage A/B workflow + StepSelection + section navigation + bank separators, (c) RandomGenerator wired through as first consumer. Subsumes former "Random generator preview/apply" (Phase 1 #7), "Generator preview/apply workflow" (Phase 2 #1), and "64-step context visualization" (Phase 3 item).
 8. **Curve undo restoration** — CurveTrackEngine undo state
 
 ### Phase 2: Medium Priority
-1. **Generator preview/apply workflow** — GeneratorPage refactor (core state machine; LP trigger in `launchpad-track-port`)
-2. **Screensaver/wake refinement** — Existing screensaver improvements
+1. **Screensaver/wake refinement** — Existing screensaver improvements
 
 ### Phase 3: Low Priority
-1. **Chaos generators (Vandalize + Wreck)** — Generator page refactor
-2. **LFO modulators** — New ModulatorEngine + ModulatorPage
-4. **64-step context visualization** — Step multiplex rendering
+1. **Chaos generators (Vandalize + Wreck)** — Second consumer of generator preview/apply infrastructure. Chaos (Note-only, 14-target blend) and Entropy (template-generic across NoteSequence/CurveSequence).
+2. **LFO modulators** — **DONE** (extracted to `global-modulators-v1`)
 
 ### Phase 4: Future
 1. **Arpeggiator track** — Evaluate vs Tuesday approach
@@ -294,23 +292,99 @@ section as reference only; implementation planning lives in the new task.
 
 ---
 
-### Random generator preview/apply
+### Generator preview/apply + step selection + 64-step context
 
-**Files:**
-- `src/apps/sequencer/engine/generators/SequenceBuilder.h` — add `_preview` copy + `_showingPreview` flag + `apply()`, `showOriginal()`, `showPreview()`, `showingPreview()` virtuals
-- `src/apps/sequencer/engine/generators/Generator.h` — delegate methods to builder, add `randomizeParams()`
-- `src/apps/sequencer/engine/generators/RandomGenerator.h` — add `Variation` param, `randomizeParams()`, `randomizeSeed()`, `randomizeContextParams()`, `displayValue()`
-- `src/apps/sequencer/ui/pages/GeneratorPage.h` — add `_previewArmed`, `_applied`, `_section` state + `togglePreview()`
-- `src/apps/sequencer/ui/pages/GeneratorPage.cpp` — rewrite `enter()`/`exit()`/`commit()`/`revert()`/`encoder()`/`draw()` for A/B workflow
+Unified task combining former "Random generator preview/apply" (Phase 1 #7), "Generator preview/apply workflow" (Phase 2 #1), and "64-step context visualization" (Phase 3).
 
-**Change:** Add three-copy sequence state machine (`_original` → `_edit` → `_preview`). Enter in ORIGINAL. Encoder re-roll generates preview. F0 toggles A/B. APPLY commits preview, CANCEL restores original. Context menu: NEW RAND / SMOOTH X / RESETGEN / CANCEL / APPLY.
+#### Vinx reference architecture
+
+The Vinx fork has a complete 3-copy state machine with A/B preview, step selection, bank navigation, and chaos/entropy generators. Key files:
+
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/SequenceBuilder.h` — Base class with `revert()`, `apply()`, `showOriginal()`, `showPreview()`, `showingPreview()` virtuals. `SequenceBuilderImpl<T>` has `_edit` (ref), `_original` (copy), `_preview` (copy), `_showingPreview` flag. `apply()` copies preview → edit → original. `showOriginal()` swaps edit ← original. `showPreview()` swaps edit ← preview. Also: `clearSteps(selected)` with selection mask, `clearLayer(selected)` with selection mask, `applyEntropy(seed, amount, selected, targetMask)` for entropy system. `AcidSequenceBuilder` — phrase/layer mode with `ApplyMode` enum, `displayValue()`, target step collection. `ChaosSequenceBuilder` — multi-track chaos with Scope (Sequence/Pattern), per-track backup vectors.
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/Generator.h` — `Mode` enum: `InitLayer, InitSteps, Euclidean, Random, Acid, Chaos, ChaosEntropy`. Delegate methods: `revert()`, `apply()`, `showOriginal()`, `showPreview()`, `showingPreview()`, `randomizeParams()`.
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/RandomGenerator.h` — `Param` enum: Seed, Smooth, Bias, Scale, **Variation**. `randomizeParams()`, `randomizeSeed()`, `randomizeContextParams()`. `displayValue(int index)` for graph drawing. 32-bit seed (vs XFORMER's 16-bit).
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/ChaosGenerator.h` — 14-target enum `Target`, `blendRandomValue()`, `blendRandomBool()`, `TargetScope` (Sequence/Pattern), per-target mask bitfield, seed parameter.
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/ChaosEntropyGenerator.h` — Thin wrapper delegating to `SequenceBuilder::applyEntropy()`. 14-target enum mapping to `EntropyTargets`.
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/EntropyTargets.h` — 14-target enum `EntropyTarget` with `DefaultEntropyTargetMask`. Template `entropy_detail::applyTarget<T>()` maps targets to sequence-specific layers. Specializations for `CurveSequence`, `StochasticSequence`, `LogicSequence`, `ArpSequence`. `entropy_detail::blendValue()` lerps original → random with amount%.
+- `temp-ref/vinx-performer/src/apps/sequencer/ui/pages/GeneratorPage.h` — `StepSelection<CONFIG_STEP_COUNT>* _stepSelection`, `_section = 0`, `_previewArmed`, `_applied`, `_boundTrackIndex`, `_boundTrackMode`. Methods: `togglePreview()`, `invalidateChaosPreview()`, `triggerChaosPreview()`, `launchpadRandomize()`, `showPreviewStateMessage()`, `boundTrackContextValid()`, `ensureBoundTrackContext()`.
+- `temp-ref/vinx-performer/src/apps/sequencer/ui/pages/GeneratorPage.cpp` (2093 lines) — Full A/B workflow: `enter()` starts in ORIGINAL state, `keyPress()` on step+Shift triggers reroll, F0 toggles A/B via `togglePreview()`, context menu has NEW RAND / SMOOTH / RESEED / CANCEL / APPLY. `commit()` calls `apply()`, `revert()` calls `revert()`. Bank separators drawn in `drawRandomGenerator()` via `drawBankSeparators()` and `drawBankFrame()`. Step highlight uses `_stepSelection` for LED and draw. `boundTrackContextValid()` guard cancels if track switches.
+
+#### XFORMER current state
+
+- `SequenceBuilder.h` — 2-copy model (`_edit` ref + `_original` copy). No `_preview`, no `apply()`, no `showOriginal()`/`showPreview()`, no `showingPreview()`. `clearSteps()` without selection mask. No `applyEntropy()`. Only `NoteSequenceBuilder` and `CurveSequenceBuilder`.
+- `Generator.h` — `Mode` enum: `InitLayer, Euclidean, Random, Last`. No `apply()`, `showOriginal()`, `showPreview()`, `showingPreview()`, `randomizeParams()`.
+- `RandomGenerator.h` — `Param` enum: Seed, Smooth, Bias, Scale. No Variation param, no `randomizeParams()`, no `randomizeSeed()`, no `randomizeContextParams()`, no `displayValue()`. 16-bit seed.
+- `GeneratorPage.h` — No `_stepSelection`, no `_section`, no `_previewArmed`, no `_applied`. No `togglePreview()`. Simple `enter()`/`exit()` with no state machine. Just `_valueRange` and `_generator`.
+- `GeneratorPage.cpp` (270 lines) — No A/B workflow. `commit()` just calls `close()`. `revert()` calls `_generator->revert()` then `close()`. No bank separators, no step selection, no section navigation.
+
+#### XFORMER sequence types for entropy (not in Vinx)
+
+- `NoteSequence` — has full `layerValue/setLayerValue/layerRange` API with 17+ layers. XFORMER-unique layers: AccumulatorTrigger, PulseCount, GateMode, HarmonyRoleOverride, InversionOverride, VoicingOverride.
+- `CurveSequence` — 7 layers: Shape, ShapeVariation, Min, Max, Gate, GateOffset, GateProbability (GateLength in XFORMER maps to EventLength).
+- `IndexedSequence` — No Layer enum. Needs custom `applyTarget<IndexedSequence>` for duration, swing, repeats, condition.
+- `TuesdaySequence` — No Layer enum. Uses `Routable<T>`. Significant abstraction needed.
+- `DiscreteMapSequence` — Stage-based, not step-based. Custom handler needed.
+
+#### Implementation plan (phased)
+
+**Phase A: SequenceBuilder 3-copy state machine** (model layer)
+
+1. Add `_preview` copy and `_showingPreview` bool to `SequenceBuilderImpl<T>`
+2. Add virtual methods to `SequenceBuilder` base: `apply()`, `showOriginal()`, `showPreview()`, `showingPreview()`
+3. Update `clearSteps()` and `clearLayer()` to accept `std::bitset<CONFIG_STEP_COUNT>` selection mask (XFORMER doesn't use selected-step clearing yet, but Vinx does)
+4. Add `applyEntropy()` virtual with default no-op for future entropy consumer
+5. Implementation: `apply()` = `_edit = _preview; _original = _preview; _showingPreview = true;`, `showOriginal()` = `_edit = _original; _showingPreview = false;`, `showPreview()` = `_edit = _preview; _showingPreview = true;`, `revert()` = `_edit = _original; _preview = _original; _showingPreview = false;`
+
+**Phase B: Generator base class** (engine layer)
+
+1. Add `Mode::InitSteps` (clear all steps, already hinted in Vinx)
+2. Add delegate methods: `apply()`, `showOriginal()`, `showPreview()`, `showingPreview()`, `randomizeParams()` (with default no-op)
+3. Add `RandomGenerator::Param::Variation` (0-100 blend amount)
+4. Add `RandomGenerator::randomizeParams()` (re-randomize seed + context params)
+5. Add `RandomGenerator::randomizeSeed()` (re-roll seed only)
+6. Add `RandomGenerator::displayValue(int index)` for graph drawing
+7. Widen seed to 32-bit (Vinx uses uint32_t)
+
+**Phase C: GeneratorPage A/B workflow + step selection** (UI layer)
+
+1. Add `_section` member with `stepOffset()` (already in Vinx: `_section * StepCount`)
+2. Add `_previewArmed` and `_applied` state flags
+3. Add `_stepSelection` pointer (already exists in edit pages, port to GeneratorPage)
+4. Add `togglePreview()`, `commit()`, `revert()` state machine:
+   - Enter: `_generator->revert(); _generator->showOriginal();` (start in ORIGINAL)
+   - Encoder re-roll: `_generator->showPreview()` (show generated content)
+   - F0 or `togglePreview()`: flip between A/B states
+   - APPLY context: `_generator->apply(); close();`
+   - CANCEL context: `_generator->revert(); close();`
+   - Exit without apply: `_generator->revert();`
+5. Add `boundTrackContextValid()` / `ensureBoundTrackContext()` guard (cancel if track switches)
+6. Add section navigation: Left/Right buttons cycle `_section` 0-3, `stepOffset() = _section * 16`
+
+**Phase D: 64-step visualization** (UI layer)
+
+1. Add `drawBankSeparators()` — vertical lines at 16-step boundaries, brighter for current bank
+2. Add `drawBankFrame()` — horizontal lines framing current bank section
+3. Port `stepInCurrentBank()` check for dimming non-active banks
+4. Port `drawRandomGenerator()` graph with bank-aware rendering (current bank bright, other banks dim)
+5. Step selection LED feedback: `LedPainter::drawSelectedSequenceSection(leds, _section)` for bank indicator
+
+**Phase E: Context menu expansion**
+
+1. Replace current 3-item menu (INIT / RANDOM / CLOSE) with Vinx-style 5-item menu: NEW RAND / SMOOTH X / RESETGEN / CANCEL / APPLY
+2. Double-click context menu already wired (from Phase 1 submenu shortcuts)
+3. Add `randomizeSeed()` context action for re-rolling seed without changing other params
+
+**Porting strategy:** Port Vinx code as directly as possible. The Vinx `SequenceBuilderImpl<T>` template is almost identical to XFORMER's — the delta is `_preview` copy + virtual methods. `Generator` base class just needs the delegate additions. `RandomGenerator` needs Variation param + `randomizeParams()` + `displayValue()`. `EntropyTargets.h` and `entropy_detail::applyTarget<T>()` templates port directly with XFORMER-specific layer mappings. `ChaosGenerator` and `ChaosEntropyGenerator` are Phase 3 consumers.
 
 **Reference files:**
-- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/SequenceBuilder.h:18-46` (interface), `:272-403` (impl with 3 copies)
-- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/Generator.h:56-76` (base class methods)
-- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/RandomGenerator.h:12-84` (full)
-- `temp-ref/vinx-performer/src/apps/sequencer/ui/pages/GeneratorPage.h:44-78` (state + methods)
-- `temp-ref/vinx-performer/src/apps/sequencer/ui/pages/GeneratorPage.cpp:276-1931` (full workflow)
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/SequenceBuilder.h` (full — 3-copy state machine, AcidSequenceBuilder, ChaosSequenceBuilder)
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/Generator.h` (delegates + mode enum)
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/RandomGenerator.h` (Variation param, randomizeParams, displayValue)
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/EntropyTargets.h` (target enum + blendValue)
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/ChaosGenerator.h` (14-target chaos — Phase 3 consumer)
+- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/ChaosEntropyGenerator.h` (thin entropy wrapper — Phase 3 consumer)
+- `temp-ref/vinx-performer/src/apps/sequencer/ui/pages/GeneratorPage.h` (state machine + step selection)
+- `temp-ref/vinx-performer/src/apps/sequencer/ui/pages/GeneratorPage.cpp` (full workflow 2093 lines)
 
 ---
 
@@ -355,13 +429,6 @@ section as reference only; implementation planning lives in the new task.
 ---
 
 ## Phase 2+ — Reference Files
-
-### Generator preview/apply workflow (Phase 2)
-
-**Reference files:**
-- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/SequenceBuilder.h:18-46` — interface with `apply()`, `showOriginal()`, `showPreview()`
-- `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/Generator.h:56-76` — base class delegate methods
-- `temp-ref/vinx-performer/src/apps/sequencer/ui/pages/GeneratorPage.cpp:276-1931` — full A/B preview workflow
 
 ### Screensaver/wake refinement (Phase 2)
 
@@ -460,12 +527,6 @@ section as reference only; implementation planning lives in the new task.
 | Engine call | Central loop driving all 8 per tick | Inline in track engine update cycle |
 
 **Key takeaway:** Complementary, not competing. CurveTrack is a sequence-driven CV track playing step sequences through curve shapes with chaos processing. ModulatorEngine is a free-running LFO/ADSR/random source routable anywhere. XFORMER has nothing like Modulove's free-running LFO system with ADSR and flexible routing.
-
-### 64-step context visualization (Phase 3)
-
-**Reference files:**
-- `temp-ref/vinx-performer/src/apps/sequencer/ui/pages/GeneratorPage.cpp:1092-1162` — richest bank viz: `drawBankSeparators()`, `drawBankFrame()`, bank dimming
-- Current codebase already has `_section` + `stepOffset() = _section * StepCount` pattern across NoteSequenceEditPage, IndexedSequenceEditPage, CurveSequenceEditPage
 
 ---
 
