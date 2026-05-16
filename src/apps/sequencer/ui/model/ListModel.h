@@ -11,6 +11,8 @@ public:
 
     virtual void edit(int row, int column, int value, bool shift) = 0;
 
+    virtual void setSelectedScale(int, bool) {}
+
     virtual int indexedCount(int row) const { return 0; }
     virtual int indexed(int row) const { return -1; }
     virtual void setIndexed(int row, int index) {}

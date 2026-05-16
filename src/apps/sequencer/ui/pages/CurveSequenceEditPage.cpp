@@ -1318,7 +1318,7 @@ void CurveSequenceEditPage::generateSequence() {
             auto builder = _builderContainer.create<CurveSequenceBuilder>(_project.selectedCurveSequence(), layer());
             auto generator = Generator::execute(mode, *builder);
             if (generator) {
-                _manager.pages().generator.show(generator);
+                _manager.pages().generator.show(generator, &_stepSelection);
             }
         }
     });

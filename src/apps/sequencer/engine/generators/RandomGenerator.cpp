@@ -39,8 +39,8 @@ void RandomGenerator::printParam(int index, StringBuilder &str) const {
     case Param::Seed:       str("%d", seed()); break;
     case Param::Smooth:     str("%d", smooth()); break;
     case Param::Bias:       str("%d", bias()); break;
-    case Param::Scale:      str("%d", scale()); break;
-    case Param::Variation:  str("%d", variation()); break;
+    case Param::Scale:      str("%d%%", scale()); break;
+    case Param::Variation:  str("%d%%", variation()); break;
     case Param::Last:       break;
     }
 }

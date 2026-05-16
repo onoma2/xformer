@@ -1,7 +1,6 @@
 #pragma once
 
 #include "BasePage.h"
-
 #include "ui/model/ListModel.h"
 
 class QuickEditPage : public BasePage {
