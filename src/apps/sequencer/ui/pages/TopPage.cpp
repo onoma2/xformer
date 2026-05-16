@@ -159,7 +159,14 @@ void TopPage::keyPress(KeyPressEvent &event) {
     }
 
     if (key.pageModifier() && PageKeyMap::isPageKey(key.code())) {
-        setMode(Mode(key.code()));
+        // Double-press on Routing key toggles to Modulator page
+        if (key.code() == PageKeyMap::Routing && _mode == Mode::Routing) {
+            setMode(Mode::Modulator);
+        } else if (key.code() == PageKeyMap::Routing && _mode == Mode::Modulator) {
+            setMode(Mode::Routing);
+        } else {
+            setMode(Mode(key.code()));
+        }
         event.consume();
     } else if (!key.pageModifier()) {
         if (key.isPattern() && _mode != Mode::Pattern) {
@@ -248,6 +255,7 @@ void TopPage::keyboard(KeyboardEvent &event) {
         case 'y': case 'Y': setMode(Mode::MidiOutput);      break;
         case 'u': case 'U': setMode(Mode::UserScale);       break;
         case 'i': case 'I': setMode(Mode::CvRoute);         break;
+        case 'm': case 'M': setMode(Mode::Modulator);       break;
         case 'o': case 'O': setMode(Mode::Overview);        break;
         case 's': case 'S': setMode(Mode::Monitor);          break;
         case 'c': case 'C': setMode(Mode::System);           break;
@@ -355,6 +363,9 @@ void TopPage::setMode(Mode mode) {
         break;
     case Mode::CvRoute:
         setMainPage(pages.cvRoute);
+        break;
+    case Mode::Modulator:
+        setMainPage(pages.modulator);
         break;
     case Mode::UserScale:
         setMainPage(pages.userScale);

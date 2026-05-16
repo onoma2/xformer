@@ -69,6 +69,8 @@ public:
         enum class ControlSource : uint8_t {
             FirstTrack,
             LastTrack = FirstTrack + 7,
+            FirstModulator,
+            LastModulator = FirstModulator + 7,
             Last,
         };
 
@@ -182,7 +184,12 @@ public:
         }
 
         void printControlSource(StringBuilder &str) const {
-            if (!printTrackSource(str, controlSource())) {
+            if (printTrackSource(str, controlSource())) {
+                return;
+            }
+            auto source = controlSource();
+            if (int(source) >= int(ControlSource::FirstModulator) && int(source) <= int(ControlSource::LastModulator)) {
+                str("Mod %d", int(source) - int(ControlSource::FirstModulator) + 1);
             }
         }
 
@@ -208,6 +215,10 @@ public:
 
         bool takesControlFromTrack(int trackIndex) const {
             return isControlChangeEvent() && int(controlSource()) == trackIndex;
+        }
+        bool takesControlFromModulator(int modulatorIndex) const {
+            return isControlChangeEvent() &&
+                   int(controlSource()) == int(ControlSource::FirstModulator) + modulatorIndex;
         }
 
 

@@ -39,6 +39,7 @@ set(sources
     model/Curve.cpp
     model/CurveSequence.cpp
     model/CurveTrack.cpp
+    model/Modulator.cpp
     model/FileManager.cpp
     model/MidiCvTrack.cpp
     model/MidiOutput.cpp
@@ -98,6 +99,7 @@ set(sources
     ui/pages/LayoutPage.cpp
     ui/pages/ListPage.cpp
     ui/pages/MidiOutputPage.cpp
+    ui/pages/ModulatorPage.cpp
     ui/pages/AccumulatorPage.cpp
     ui/pages/AccumulatorStepsPage.cpp
     ui/pages/HarmonyPage.cpp

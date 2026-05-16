@@ -68,6 +68,11 @@ void Project::clear() {
     _midiOutput.clear();
     _cvRoute.clear();
 
+    for (auto &modulator : _modulators) {
+        modulator.clear();
+    }
+    _cvOutputModulators.fill(0);
+
     for (auto &userScale : UserScale::userScales) {
         userScale.clear();
     }
@@ -158,6 +163,11 @@ void Project::write(VersionedSerializedWriter &writer) const {
     writeArray(writer, _cvOutputTracks);
     writeArray(writer, _gateOutputTracks);
 
+    writeArray(writer, _modulators);
+    writeArray(writer, _cvOutputModulators);
+
+    writer.write(_selectedModulatorIndex);
+
     _song.write(writer);
     _playState.write(writer);
     _routing.write(writer);
@@ -208,6 +218,11 @@ bool Project::read(VersionedSerializedReader &reader) {
     readArray(reader, _tracks);
     readArray(reader, _cvOutputTracks);
     readArray(reader, _gateOutputTracks);
+
+    readArray(reader, _modulators);
+    readArray(reader, _cvOutputModulators);
+
+    reader.read(_selectedModulatorIndex);
 
     _song.read(reader);
     _playState.read(reader);

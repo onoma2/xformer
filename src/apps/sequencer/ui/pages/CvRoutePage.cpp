@@ -196,6 +196,13 @@ void CvRoutePage::cycleInput(int lane, int delta) {
                 cvRoute.outputDest(lane) == CvRoute::OutputDest::Bus) {
                 continue;
             }
+            if (candidate >= CvRoute::InputSource::Mod1 && candidate <= CvRoute::InputSource::Mod8) {
+                int modIndex = int(candidate) - int(CvRoute::InputSource::Mod1);  // 0..7
+                int modLane = modIndex / 2;  // lane 0 gets Mod1-2, lane 1 gets Mod3-4, etc.
+                if (modLane != lane) {
+                    continue;
+                }
+            }
             cvRoute.setInputSource(lane, candidate);
             break;
         }
@@ -246,6 +253,14 @@ const char *CvRoutePage::inputLabel(int lane, int value) {
         }
     case CvRoute::InputSource::Off:
         return "0V";
+    case CvRoute::InputSource::Mod1:  return "M1";
+    case CvRoute::InputSource::Mod2:  return "M2";
+    case CvRoute::InputSource::Mod3:  return "M3";
+    case CvRoute::InputSource::Mod4:  return "M4";
+    case CvRoute::InputSource::Mod5:  return "M5";
+    case CvRoute::InputSource::Mod6:  return "M6";
+    case CvRoute::InputSource::Mod7:  return "M7";
+    case CvRoute::InputSource::Mod8:  return "M8";
     case CvRoute::InputSource::Last:
         break;
     }

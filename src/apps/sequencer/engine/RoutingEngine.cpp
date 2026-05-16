@@ -401,6 +401,18 @@ void RoutingEngine::updateSources() {
             case Routing::Source::Midi:
                 // handled in receiveMidi
                 break;
+            case Routing::Source::Mod1:
+            case Routing::Source::Mod2:
+            case Routing::Source::Mod3:
+            case Routing::Source::Mod4:
+            case Routing::Source::Mod5:
+            case Routing::Source::Mod6:
+            case Routing::Source::Mod7:
+            case Routing::Source::Mod8: {
+                int index = int(route.source()) - int(Routing::Source::Mod1);
+                sourceValue = _engine.modulatorEngine().currentValue(index) / 127.f;
+                break;
+            }
             case Routing::Source::Last:
                 break;
             }

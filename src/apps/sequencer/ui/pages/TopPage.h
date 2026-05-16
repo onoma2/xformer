@@ -47,9 +47,10 @@ private:
         System          = PageKeyMap::System,
 
         // accumulator modes
-        Accumulator     = PageKeyMap::UserScale + 1,  // Use next available code
-        AccumulatorSteps = PageKeyMap::UserScale + 2, // Use next available code
-
+        Accumulator     = 64,
+        AccumulatorSteps,
+        // modulator mode
+        Modulator,
         Last,
     };
 

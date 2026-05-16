@@ -183,6 +183,16 @@ void Engine::update() {
         if (tick == 0) {
             _midiOutputEngine.update(true);
         }
+
+        // tick modulators
+        for (int modulatorIndex = 0; modulatorIndex < CONFIG_MODULATOR_COUNT; ++modulatorIndex) {
+            const auto &modulator = _project.modulator(modulatorIndex);
+            int gateTrack = modulator.gateTrack();
+            bool gate = (gateTrack >= 0 && gateTrack < CONFIG_TRACK_COUNT) ?
+                _trackEngines[gateTrack]->gateOutput(0) : false;
+            _modulatorEngine.tick(tick, modulator, modulatorIndex, gate);
+            _midiOutputEngine.sendModulator(modulatorIndex, _modulatorEngine.currentValue(modulatorIndex));
+        }
     }
 
     for (auto trackEngine : _trackEngines) {
@@ -655,7 +665,7 @@ void Engine::updateTrackOutputs() {
                 float highValue = (highTrack >= 0 && highSlot >= 0) ? _trackEngines[highTrack]->cvOutput(highSlot) : 0.f;
                 float mixed = lowValue * (1.f - t) + highValue * t;
                 if (!_cvOutputOverride) {
-                    _cvOutput.setChannel(i, mixed);
+                    _cvOutput.setChannel(i, applyModulatorOffset(i, mixed));
                 }
                 continue;
             } else {
@@ -675,14 +685,25 @@ void Engine::updateTrackOutputs() {
         }
         if (cvOutputTrack < CONFIG_TRACK_COUNT) {
             int cvSlot = cvOutputTrackSlot[cvSourceOutputIndex];
-            _cvOutput.setChannel(i, _trackEngines[cvOutputTrack]->cvOutput(cvSlot));
+            _cvOutput.setChannel(i, applyModulatorOffset(i, _trackEngines[cvOutputTrack]->cvOutput(cvSlot)));
         } else if (cvOutputTrack == CONFIG_TRACK_COUNT) {
             int lane = cvOutputCvRouteLane[cvSourceOutputIndex];
             if (lane >= 0 && lane < int(_cvRouteOutputs.size())) {
-                _cvOutput.setChannel(i, _cvRouteOutputs[lane]);
+                _cvOutput.setChannel(i, applyModulatorOffset(i, _cvRouteOutputs[lane]));
             }
         }
     }
+}
+
+float Engine::applyModulatorOffset(int channel, float cvValue) const {
+    int modulatorIndex = _project.cvOutputModulator(channel);
+    if (modulatorIndex > 0 && modulatorIndex <= CONFIG_MODULATOR_COUNT) {
+        int modValue = _modulatorEngine.currentValue(modulatorIndex - 1);
+        float modOffset = (modValue - 64) / 12.8f;  // 0..127 → ±5.0V
+        cvValue += modOffset;
+        cvValue = clamp(cvValue, -5.f, 5.f);
+    }
+    return cvValue;
 }
 
 void Engine::updateCvRouteOutputs() {
@@ -696,6 +717,30 @@ void Engine::updateCvRouteOutputs() {
             break;
         case CvRoute::InputSource::Bus:
             inputs[lane] = busCv(lane);
+            break;
+        case CvRoute::InputSource::Mod1:
+            inputs[lane] = (_modulatorEngine.currentValue(0) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod2:
+            inputs[lane] = (_modulatorEngine.currentValue(1) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod3:
+            inputs[lane] = (_modulatorEngine.currentValue(2) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod4:
+            inputs[lane] = (_modulatorEngine.currentValue(3) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod5:
+            inputs[lane] = (_modulatorEngine.currentValue(4) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod6:
+            inputs[lane] = (_modulatorEngine.currentValue(5) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod7:
+            inputs[lane] = (_modulatorEngine.currentValue(6) / 127.f) * 10.f - 5.f;
+            break;
+        case CvRoute::InputSource::Mod8:
+            inputs[lane] = (_modulatorEngine.currentValue(7) / 127.f) * 10.f - 5.f;
             break;
         case CvRoute::InputSource::Off:
             inputs[lane] = 0.f;
@@ -758,6 +803,7 @@ void Engine::reset() {
     }
 
     _midiOutputEngine.reset();
+    _modulatorEngine.reset();
 }
 
 void Engine::updatePlayState(bool ticked) {

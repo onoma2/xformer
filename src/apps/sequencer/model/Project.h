@@ -12,6 +12,7 @@
 #include "Routing.h"
 #include "CvRoute.h"
 #include "MidiOutput.h"
+#include "Modulator.h"
 #include "Serialize.h"
 #include "FileDefs.h"
 #include "TuesdaySequence.h"
@@ -32,6 +33,8 @@ public:
     using TrackArray = std::array<Track, CONFIG_TRACK_COUNT>;
     using CvOutputTrackArray = std::array<uint8_t, CONFIG_CHANNEL_COUNT>;
     using GateOutputArray = std::array<uint8_t, CONFIG_CHANNEL_COUNT>;
+    using ModulatorArray = std::array<Modulator, CONFIG_MODULATOR_COUNT>;
+    using CvOutputModulatorArray = std::array<uint8_t, CONFIG_CHANNEL_COUNT>;
 
     Project();
 
@@ -372,6 +375,39 @@ public:
         setGateOutputTrack(index, gateOutputTrack(index) + value);
     }
 
+    // modulators
+
+    const ModulatorArray &modulators() const { return _modulators; }
+          ModulatorArray &modulators()       { return _modulators; }
+
+    const Modulator &modulator(int index) const { return _modulators[index]; }
+          Modulator &modulator(int index)       { return _modulators[index]; }
+
+    // cvOutputModulator - per physical CV output, 0 = none, 1..CONFIG_MODULATOR_COUNT = modulator index + 1
+
+    const CvOutputModulatorArray &cvOutputModulators() const { return _cvOutputModulators; }
+          CvOutputModulatorArray &cvOutputModulators()       { return _cvOutputModulators; }
+
+    int cvOutputModulator(int index) const { return _cvOutputModulators[index]; }
+    void setCvOutputModulator(int index, int modulatorIndex) {
+        _cvOutputModulators[index] = clamp(modulatorIndex, 0, CONFIG_MODULATOR_COUNT);
+    }
+
+    void editCvOutputModulator(int index, int value, bool shift) {
+        setCvOutputModulator(index, cvOutputModulator(index) + value);
+    }
+
+    // selectedModulatorIndex
+
+    int selectedModulatorIndex() const { return _selectedModulatorIndex; }
+    void setSelectedModulatorIndex(int index) {
+        _selectedModulatorIndex = clamp(index, 0, CONFIG_MODULATOR_COUNT - 1);
+    }
+
+    // modulator convenience
+    const Modulator &selectedModulator() const { return _modulators[_selectedModulatorIndex]; }
+          Modulator &selectedModulator()       { return _modulators[_selectedModulatorIndex]; }
+
     // song
 
     const Song &song() const { return _song; }
@@ -560,6 +596,9 @@ private:
     TrackArray _tracks;
     CvOutputTrackArray _cvOutputTracks;
     GateOutputArray _gateOutputTracks;
+    ModulatorArray _modulators;
+    CvOutputModulatorArray _cvOutputModulators{};
+    int _selectedModulatorIndex = 0;
     Song _song;
     PlayState _playState;
     Routing _routing;

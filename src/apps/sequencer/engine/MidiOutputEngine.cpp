@@ -148,6 +148,20 @@ void MidiOutputEngine::sendCv(int trackIndex, float cv) {
     }
 }
 
+void MidiOutputEngine::sendModulator(int modulatorIndex, int value) {
+    int clamped = clamp(value, 0, 127);
+    for (int outputIndex = 0; outputIndex < CONFIG_MIDI_OUTPUT_COUNT; ++outputIndex) {
+        const auto &output = _midiOutput.output(outputIndex);
+        auto &outputState = _outputStates[outputIndex];
+        if (output.takesControlFromModulator(modulatorIndex)) {
+            if (clamped != outputState.control) {
+                outputState.control = clamped;
+                outputState.setRequest(OutputState::ControlChange);
+            }
+        }
+    }
+}
+
 void MidiOutputEngine::sendProgramChange(int channel, int programNumber) {
     auto pgmChangeMessage = MidiMessage::makeProgramChange(channel, programNumber);
 
