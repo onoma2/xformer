@@ -301,6 +301,17 @@ void ModulatorPage::draw(Canvas &canvas) {
             int y2 = scopeY - (_waveformCache[x + 1] * scopeHeight / 2) / 127;
             canvas.line(scopeX + x, y1, scopeX + x + 1, y2);
         }
+
+        // Level bar (same as all other shapes)
+        int currentValue = _engine.modulatorEngine().currentValue(_selectedModulator);
+        const int barX = waveformX + waveformW + 4;
+        const int barWidth = 4;
+        canvas.setColor(Color::Medium);
+        canvas.drawRect(barX, waveformY, barWidth, waveformH);
+        canvas.setColor(Color::Bright);
+        int levelY = waveformY + waveformH - 2 - ((currentValue * (waveformH - 4)) / 127);
+        canvas.hline(barX + 1, levelY, barWidth - 2);
+        canvas.hline(barX + 1, levelY + 1, barWidth - 2);
     } else if (isADSR) {
         // ADSR envelope visualization
         int attackMs = modulator.attack();

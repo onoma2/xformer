@@ -38,8 +38,8 @@ public:
         case Shape::Square:    return "Square";
         case Shape::Random:    return "Random";
         case Shape::ADSR:      return "ADSR";
-        case Shape::ChaosLorenz:       return "ChaosL";
-        case Shape::ChaosLatoocarfian: return "ChaosLa";
+        case Shape::ChaosLorenz:       return "Lorenz";
+        case Shape::ChaosLatoocarfian: return "Latoocarfian";
         case Shape::Last:      break;
         }
         return nullptr;
@@ -304,16 +304,16 @@ public:
 
     void clear() {
         setShape(Shape::Sine);
-        setRate(96);
-        setDepth(127);
+        setRate(15);    // 1.5 Hz for chaos, fast for LFO
+        setDepth(100);
         setOffset(0);
         setPhase(0);
         setSmooth(100);
         setGateTrack(0);
         setRandomMode(RandomMode::Clocked);
         setMode(Mode::Free);
-        setAttack(100);
-        setDecay(100);
+        setAttack(900);   // P1 = 45 for chaos
+        setDecay(1240);  // P2 = 62 for chaos
         setSustain(100);
         setRelease(200);
         setAmplitude(127);
