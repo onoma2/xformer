@@ -131,22 +131,26 @@ Step selection:
 
 The `_preview` member in `SequenceBuilderImpl<T>` would be a full copy of the sequence type T.
 
-| Type | sizeof(T) | _preview as member cost |
-|------|-----------|------------------------|
+| Type | sizeof(T) | _preview as inline member cost |
+|------|-----------|----------------------------------|
 | NoteSequence | 9,544 B | +9.5 KB per instance in Container |
 | CurveSequence | ~4,800 B | +4.8 KB per instance in Container |
 
 **Problem:** `Container<NoteSequenceBuilder>` sits inside `NoteSequenceEditPage`, which is statically allocated in the `Pages` struct. Adding `_preview` as an inline member would increase `sizeof(NoteSequenceEditPage)` by ~9.5 KB, flowing directly into `.bss`.
 
-**Decision: Use `std::optional<T>` for `_preview`.**
+**Decision: Use raw `T* _preview = nullptr` with heap allocation.** Not `std::optional<T>` — on STM32, `std::optional` reserves inline storage for the contained value (engaged flag + aligned storage sized for T), so `std::optional<NoteSequence>` would inflate the builder by ~9.5 KB in the Pages struct. A raw `T*` is just 4 bytes + 1 byte bool.
 
 - `_edit` (reference) and `_original` (copy) remain as members — no size change from current code.
-- `_preview` is `std::optional<T>` — heap-allocated on `emplace()`, freed on `reset()`. Only exists while GeneratorPage is open.
-- `sizeof(SequenceBuilderImpl<T>)` increases by `sizeof(std::optional<T>)` = ~1 byte (just the engaged flag + vtable padding) since `<T>` is heap-allocated. The optional itself is a discriminant byte + aligned storage pointer, not the full T.
-- Actually, `std::optional<T>` contains the full T inline by default. We need to use `std::unique_ptr<T>` instead for heap allocation, or simply use a raw pointer `T* _preview = nullptr` with manual new/delete.
-- **Final choice:** `T* _preview = nullptr` with `new T(_original)` on `showPreview()` and `delete _preview` on `revert()`. Zero persistent RAM impact. `_preview` only lives while the generator page is open.
+- `_preview` is `T* _preview = nullptr` — heap-allocated on `showPreview()`, freed on `revert()` or destructor.
+- `_showingPreview` is `bool _showingPreview = false`.
+- Total persistent increase: ~8 bytes (pointer + bool + padding) per builder type.
+- Runtime heap allocation: ~9.5 KB per active generator instance (freed on exit/revert).
 
-**Estimated persistent RAM delta for Phase A: ~0 bytes** (only virtual method pointers increase vtable by a few bytes in `.rodata`, not `.bss`).
+**Allocation failure behavior:** If `new (std::nothrow) T(_original)` fails, `_preview` stays null, `_showingPreview` stays false. GeneratorPage checks `_preview != nullptr` and `showingPreview()` before allowing toggle. Generator stays in ORIGINAL state. Encoder changes still work but preview toggle is disabled.
+
+**Lifecycle ownership:** `SequenceBuilderImpl<T>` destructor calls `delete _preview`. `revert()` calls `delete _preview; _preview = nullptr`. `apply()` leaves `_preview` alive for future toggles. `showOriginal()` leaves `_preview` alive for toggle back.
+
+**Estimated persistent RAM delta for Phase A: ~8 bytes** (pointer + bool in Pages struct, not 9.5 KB — the preview copy is on the heap only while generator page is open).
 
 ### Phase B: Generator + RandomGenerator
 

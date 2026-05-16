@@ -1,14 +1,12 @@
 # Task Board
-_Updated: 2026-05-16_
+_Updated: 2026-05-17_
 
-## 🔴 generator-preview-apply — Generator A/B preview, step selection, 64-step context
-**Status:** active — research complete, phased plan written (A-E with hardware checks)
-**Where I stopped:** Plan written. Phase A designed: `std::optional` vs heap `T*` for `_preview` (chose heap pointer for zero persistent RAM). Next step is implementing Phase A.
-**Next action:** Phase A — Add `_preview` ptr + `apply()`/`showOriginal()`/`showPreview()`/`showingPreview()` to `SequenceBuilder`. Build and check RAM.
+## ⚪ generator-preview-apply — Generator A/B preview, step selection, 64-step context
+**Status:** ready — plan has inconsistencies, needs revision before implementation
+**Where I stopped:** Plan written but has 7 issues found in audit: (1) STATUS.md duplication, (2) _preview type inconsistency (optional vs raw pointer), (3) encoder mutation order breaks preview semantics, (4) new T alloc needs failure path, (5) StepSelection type underspecified, (6) Shift+Step conflicts with existing selection, (7) 64-step draw needs pixel-level strategy. Not implementation-ready.
+**Next action:** Revise TASK.md Phase A to fix all 7 issues. Use T* _preview with explicit lifecycle, define mutation ownership (generate into _preview before exposing), add allocation failure behavior, concrete StepSelection<CONFIG_STEP_COUNT>* type, resolve Shift+Step precedence, specify 64-step rendering strategy.
 **Depends on:** resource-optimization (RAM at 90.5%, ~2.3 KB headroom to 120 KB warning)
 **Branch:** TBD
-
----
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
@@ -38,7 +36,7 @@ _Updated: 2026-05-16_
 ---
 
 ## 🟡 teletype-runtime-architecture — Clarify Teletype VM/slot/runtime ownership before global runtime work
-**Status:** active — Phase 0-4 hardware-verified; two persistence contracts are now implemented.
+**Status:** paused — Phase 0-4 hardware-verified; two persistence contracts are now implemented.
 **Where I stopped:** Phase 4 verified: active-clip-only text save/load, S1-S3 rollback transaction, inactive clip untouched, project save/load OK, `.data+bss` reduced by 1,136 B.
 **Next action:** Post-Phase-4 research: decide whether further transaction-buffer reduction or `write()` redundancy cleanup is worth doing.
 **Depends on:** resource-optimization (for RAM gates), teletype file transaction semantics
@@ -138,13 +136,4 @@ _Updated: 2026-05-16_
 **Where I stopped:** Research phase complete. All reference codebases cloned to `temp-ref/` (C, Lua, Arduino C++). RAM container gates identified: `NoteTrack=9544 B`, `TeletypeTrackEngine=912 B`. Next step is designing fixed-grid `OrcaTrack` model that fits under the container gate.
 **Next action:** Prototype `OrcaTrack` model with fixed grid size (e.g., 16×16 or 32×16) and measure `sizeof(OrcaTrack)` in STM32 release build to verify it stays ≤ `NoteTrack`.
 **Depends on:** resource-optimization (needs RAM headroom), teletype-runtime-architecture (pattern slot pattern to follow)
-**Branch:** TBD
-
----
-
-## ⚪ generator-preview-apply — Generator A/B preview, step selection, 64-step context
-**Status:** ready — research complete, plan written, not started
-**Where I stopped:** Research phase complete. Vinx fork fully analyzed. XFORMER delta documented. Phased implementation plan (A-E) written in TASK.md.
-**Next action:** Phase A — Add `_preview` copy + `apply()`/`showOriginal()`/`showPreview()`/`showingPreview()` to SequenceBuilder. Measure sizeof impact before proceeding.
-**Depends on:** resource-optimization (RAM headroom at 90.5%, need to verify _preview copy fits)
 **Branch:** TBD
