@@ -123,6 +123,12 @@ void CurveSequencePage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier() && key.is(Key::Step5)) {
         lfoContextShow();
         event.consume();
@@ -150,12 +156,13 @@ void CurveSequencePage::keyPress(KeyPressEvent &event) {
     }
 }
 
-void CurveSequencePage::contextShow() {
+void CurveSequencePage::contextShow(bool doubleClick) {
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
     ));
 }
 

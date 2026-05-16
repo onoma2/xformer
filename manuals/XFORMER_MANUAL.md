@@ -52,6 +52,7 @@ Connect any USB HID keyboard to the USB Host port. Most keyboard shortcuts map d
 | Alt + A/S/D/F/G/H | Page navigation (Page+Step / Page+buttons) |
 | Tab | Context menu (Page+Shift) |
 | Shift + Alt | Open context menu (long-press) |
+| Double-press Page | Open context menu (auto-closes after 2s) |
 | Up/Down | Encoder rotate (value up/down) |
 
 ### On Edit Pages (Note, Curve, Indexed)
@@ -63,6 +64,7 @@ Connect any USB HID keyboard to the USB Host port. Most keyboard shortcuts map d
 | Shift + step key | Persistent selection (shift+step hold) |
 | Left/Right | Section navigation (Prev/Next page) |
 | Shift + Left/Right | Shift step data |
+| Hold step + F1-F5 | Set selected steps to octave 1-5 (Note Track only) |
 
 ### On List Pages (Tracks, Settings, etc.)
 
@@ -76,6 +78,33 @@ Connect any USB HID keyboard to the USB Host port. Most keyboard shortcuts map d
 ### On Teletype Pages
 
 See the Teletype manual (`T9type-learn.md`) for full Teletype keyboard shortcuts — Enter, Backspace, Home/End, Ctrl+C/V/X, F1-F5, Alt+F1-F5, and more. Teletype pages consume their keys first so global shortcuts don't conflict.
+
+## 1.5. Performer Page
+
+The Performer page provides a performance overview of all 8 tracks.
+
+### Display Layout
+
+Each track column shows (top to bottom):
+- **Pattern number** ("P1"–"P16") — dimmed when track is muted, bright when fill is active
+- **Activity rectangle** — bright when track is active, medium when idle; filled inner box when muted
+- **Sequence progress bar** — thin bar showing playback position
+- **Fill amount bar** — shows current fill level
+
+### Mute LEDs
+
+The step LEDs (1-8) show mute state:
+- **Green**: Track is currently muted
+- **Red**: Track has a pending mute change (synced or latched)
+- **Off**: Track is active (unmuted)
+
+### Context Menu
+
+Double-press the **Page** button on any page with a context menu to open it. The menu auto-closes after 2 seconds if no selection is made. This works on all pages that have a context menu (indicated by the "Page+Shift" shortcut).
+
+### Quick Octave Change (Note Track)
+
+On the Note Edit page, hold one or more step buttons and press **F1**–**F5** to set all selected steps to octave 1–5. The note value is set to `scale.notesPerOctave() × octave`, so the result respects the current scale (chromatic, major, etc.).
 
 ## 2. Algo Track
 

@@ -13,4 +13,5 @@ public:
 
     virtual const Item &item(int index) const = 0;
     virtual bool itemEnabled(int index) const = 0;
+    virtual bool doubleClick() const { return false; }
 };

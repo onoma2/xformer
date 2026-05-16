@@ -50,7 +50,7 @@ private:
     void setSelectedFunction(Function function);
     void setSelectedRoutingFunction(RoutingFunction function);
     void updateWaveformCache();
-    void contextShow();
+    void contextShow(bool doubleClick = false);
     void contextAction(int index);
     void loadRoutingFromMidiOutput();
     void applyRoutingToMidiOutput();

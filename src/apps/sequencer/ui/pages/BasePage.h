@@ -30,7 +30,7 @@ protected:
     void showMessage(const char *text, uint32_t duration = 1000);
     void showContextMenu(const ContextMenu &contextMenu);
 
-    virtual void contextShow() {}
+    virtual void contextShow(bool doubleClick = false) {}
 
     const KeyState &pageKeyState() const { return _context.pageKeyState; }
     const KeyState &globalKeyState() const { return _context.globalKeyState; }

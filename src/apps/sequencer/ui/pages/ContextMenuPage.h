@@ -27,4 +27,5 @@ protected:
 
     ContextMenuModel *_contextMenuModel;
     ResultCallback _callback;
+    uint32_t _showTicks = 0;
 };

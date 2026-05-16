@@ -574,6 +574,13 @@ void CurveSequenceEditPage::keyPress(KeyPressEvent &event) {
 
     // Check page modifier shortcuts BEFORE quick edit
     // (quick edit catches Page + Step 8-15, so we need to intercept first)
+
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier() && key.is(Key::Step5)) {
         lfoContextShow();
         event.consume();
@@ -1140,13 +1147,14 @@ void CurveSequenceEditPage::drawDetail(Canvas &canvas, const CurveSequence::Step
     }
 }
 
-void CurveSequenceEditPage::contextShow() {
+void CurveSequenceEditPage::contextShow(bool doubleClick) {
     if (_editMode == EditMode::Step || _editMode == EditMode::GlobalPhase) {
         showContextMenu(ContextMenu(
             contextMenuItems,
             int(ContextAction::Last),
             [&] (int index) { contextAction(index); },
-            [&] (int index) { return contextActionEnabled(index); }
+            [&] (int index) { return contextActionEnabled(index); },
+            doubleClick
         ));
     } else {
         settingsContextShow();

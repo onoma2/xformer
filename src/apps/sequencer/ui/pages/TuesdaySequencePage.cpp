@@ -51,6 +51,12 @@ void TuesdaySequencePage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier()) {
         return;
     }
@@ -60,12 +66,13 @@ void TuesdaySequencePage::keyPress(KeyPressEvent &event) {
     }
 }
 
-void TuesdaySequencePage::contextShow() {
+void TuesdaySequencePage::contextShow(bool doubleClick) {
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
     ));
 }
 

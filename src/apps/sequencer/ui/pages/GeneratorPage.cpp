@@ -131,6 +131,12 @@ void GeneratorPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     if (key.isGlobal()) {
         return;
     }
@@ -216,12 +222,13 @@ void GeneratorPage::drawRandomGenerator(Canvas &canvas, const RandomGenerator &g
     }
 }
 
-void GeneratorPage::contextShow() {
+void GeneratorPage::contextShow(bool doubleClick) {
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
     ));
 }
 

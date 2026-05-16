@@ -57,6 +57,12 @@ void ProjectPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier()) {
         // easter egg
         if (key.is(Key::Step15)) {
@@ -96,12 +102,13 @@ void ProjectPage::keyboard(KeyboardEvent &event) {
     ListPage::keyboard(event);
 }
 
-void ProjectPage::contextShow() {
+void ProjectPage::contextShow(bool doubleClick) {
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
     ));
 }
 

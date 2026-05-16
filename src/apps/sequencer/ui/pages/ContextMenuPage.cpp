@@ -4,6 +4,8 @@
 
 #include "core/math/Math.h"
 
+#include "os/os.h"
+
 ContextMenuPage::ContextMenuPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
 {}
@@ -11,10 +13,20 @@ ContextMenuPage::ContextMenuPage(PageManager &manager, PageContext &context) :
 void ContextMenuPage::show(ContextMenuModel &contextMenuModel, ResultCallback callback) {
     _contextMenuModel = &contextMenuModel;
     _callback = callback;
+    _showTicks = os::ticks();
     BasePage::show();
 }
 
 void ContextMenuPage::draw(Canvas &canvas) {
+    // Auto-close after 2 seconds for double-click opened context menus
+    if (_contextMenuModel->doubleClick()) {
+        uint32_t elapsed = os::ticks() - _showTicks;
+        if (elapsed > os::time::ms(2000)) {
+            close();
+            return;
+        }
+    }
+
     canvas.setFont(Font::Tiny);
     canvas.setBlendMode(BlendMode::Set);
 
@@ -52,6 +64,13 @@ void ContextMenuPage::draw(Canvas &canvas) {
 
 void ContextMenuPage::keyUp(KeyEvent &event) {
     const auto &key = event.key();
+
+    // Double-click context menus don't close on key release — user must
+    // select an action or wait for auto-close timeout.
+    if (_contextMenuModel->doubleClick()) {
+        event.consume();
+        return;
+    }
 
     if (!key.pageModifier() || !key.shiftModifier()) {
         close();

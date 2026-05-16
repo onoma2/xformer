@@ -17,7 +17,7 @@ public:
     virtual void keyPress(KeyPressEvent &event) override;
 
 private:
-    void contextShow();
+    void contextShow(bool doubleClick = false);
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
 

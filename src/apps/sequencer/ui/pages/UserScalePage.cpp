@@ -55,6 +55,12 @@ void UserScalePage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     if (key.isFunction()) {
         if (key.function() < CONFIG_USER_SCALE_COUNT) {
             setSelectedIndex(key.function());
@@ -98,12 +104,13 @@ void UserScalePage::setSelectedIndex(int index) {
     setEdit(false);
 }
 
-void UserScalePage::contextShow() {
+void UserScalePage::contextShow(bool doubleClick) {
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
     ));
 }
 

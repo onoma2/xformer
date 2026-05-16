@@ -75,9 +75,9 @@ _Updated: 2026-05-16_
 ---
 
 ## 🟡 performer-improvements — Non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
-**Status:** paused — modulators extracted and completed in `global-modulators-v1`; RAM headroom now available.
-**Where I stopped:** MenuWrapSetting wired (Settings::Version=2, dynamic_cast gate, default=on). LFO modulators completed; next unblocked item is route-reordering.
-**Next action:** Resume after route-reordering.
+**Status:** paused — Phase 1 subset wired and hardware-verified; remaining items unblocked.
+**Where I stopped:** Phase 1 items completed: (1) Quick octave change Step+F1-F5, (2) Double-click Page opens context menus with 2s auto-close, (3) Short clock pulse prevention (1ms floor via tickPeriodUs), (4) PerformerPage mute LEDs wired + track labels dimmed when muted + pattern numbers replace T1-T8. MenuWrap already done earlier.
+**Next action:** Next unblocked Phase 1 items: Random generator preview/apply, Curve undo restoration. Then Phase 2: Generator preview/apply workflow, Screensaver refinement.
 **Depends on:** resource-optimization (RAM headroom available)
 **Branch:** TBD
 

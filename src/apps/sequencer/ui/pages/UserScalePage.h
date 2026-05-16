@@ -21,7 +21,7 @@ public:
 private:
     void setSelectedIndex(int index);
 
-    void contextShow();
+    void contextShow(bool doubleClick = false);
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
 

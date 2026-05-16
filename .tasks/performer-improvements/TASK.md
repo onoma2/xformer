@@ -194,12 +194,12 @@ section as reference only; implementation planning lives in the new task.
 ## Implementation Plan (Prioritized)
 
 ### Phase 1: High Priority
-1. **Quick octave change** (Step+F1-F5) — Page shortcut handler
-2. **Submenu shortcuts** (double-click F1-F5) — Double-click detection
-3. **Context menu via double-click page** — Timer-based key event detection
+1. **Quick octave change** (Step+F1-F5) — **DONE** — Page shortcut handler
+2. **Submenu shortcuts** (double-click F1-F5) — **DONE** — Double-click Page opens context menu with 2s auto-close
+3. **Context menu via double-click page** — **DONE** (merged with #2)
 4. **Menu wrap** — **DONE** (`10efe3c4`)
-5. **Enhanced Performer Page** — LED color coding, muted display
-6. **Prevent short clock pulses** — Add min pulse width to ClockEngine
+5. **Enhanced Performer Page** — **DONE** — Mute LEDs wired from PlayState, track labels dimmed when muted, pattern numbers shown instead of T1-T8
+6. **Prevent short clock pulses** — **DONE** — 1ms floor via `tickPeriodUs()` minimum in `Clock.cpp`
 7. **Random generator preview/apply** — RandomizePage enhancements
 8. **Curve undo restoration** — CurveTrackEngine undo state
 
@@ -785,7 +785,7 @@ These were researched and documented but explicitly not implementing. Code refer
 ---
 
 ## Status
-Paused
+Active — Phase 1 items 1-3, 5-6 complete and hardware-verified.
 
 ## Priority
 High

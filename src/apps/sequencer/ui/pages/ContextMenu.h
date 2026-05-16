@@ -15,16 +15,20 @@ public:
         const Item items[],
         int itemCount,
         ActionCallback actionCallback,
-        ItemEnabledCallback itemEnabledCallback = [] (int) { return true; }
+        ItemEnabledCallback itemEnabledCallback = [] (int) { return true; },
+        bool doubleClick = false
     ) :
         _items(items),
         _itemCount(itemCount),
         _actionCallback(actionCallback),
-        _itemEnabledCallback(itemEnabledCallback)
+        _itemEnabledCallback(itemEnabledCallback),
+        _doubleClick(doubleClick)
     {
     }
 
     const ActionCallback &actionCallback() const { return _actionCallback; }
+
+    virtual bool doubleClick() const override { return _doubleClick; }
 
 private:
     virtual int itemCount() const override {
@@ -43,4 +47,5 @@ private:
     int _itemCount;
     ActionCallback _actionCallback;
     ItemEnabledCallback _itemEnabledCallback;
+    bool _doubleClick = false;
 };

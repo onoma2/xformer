@@ -39,7 +39,7 @@ private:
         static int stepIndex(int row) { return row / 3; }
     };
 
-    void contextShow();
+    void contextShow(bool doubleClick = false);
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
 

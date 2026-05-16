@@ -560,6 +560,12 @@ void DiscreteMapSequencePage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     // Shift + double-click on step button (top row only): select all stages with same value
     if (key.shiftModifier() && key.isStep() && key.step() < 8 && event.count() == 2 && _sequence) {
         int stepOffset = _section * 8;
@@ -1247,12 +1253,13 @@ const char *DiscreteMapSequencePage::getRangeMacroName(RangeMacro macro) const {
     return "RANGE";
 }
 
-void DiscreteMapSequencePage::contextShow() {
+void DiscreteMapSequencePage::contextShow(bool doubleClick) {
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
     ));
 }
 

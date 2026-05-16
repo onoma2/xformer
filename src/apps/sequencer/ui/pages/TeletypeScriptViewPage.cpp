@@ -400,6 +400,12 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier()) {
         if (key.isLeft()) {
             recallHistory(-1);
@@ -506,12 +512,13 @@ void TeletypeScriptViewPage::keyPress(KeyPressEvent &event) {
     }
 }
 
-void TeletypeScriptViewPage::contextShow() {
+void TeletypeScriptViewPage::contextShow(bool doubleClick) {
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
     ));
 }
 

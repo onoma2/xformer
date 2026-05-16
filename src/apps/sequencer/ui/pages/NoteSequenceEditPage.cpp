@@ -427,6 +427,12 @@ void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     if (key.isQuickEdit()) {
         quickEdit(key.quickEdit());
         event.consume();
@@ -462,6 +468,19 @@ void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
         default:
             break;
         }
+    }
+
+    // Quick octave change: Step held + F1-F5 sets note to octave 1-5
+    if (key.isFunction() && _stepSelection.any()) {
+        int octave = key.function() + 1; // F1=1, F2=2, ... F5=5
+        const auto &scale = sequence.selectedScale(_project.scale());
+        for (size_t i = 0; i < sequence.steps().size(); ++i) {
+            if (_stepSelection[i]) {
+                sequence.step(i).setNote(scale.notesPerOctave() * octave);
+            }
+        }
+        event.consume();
+        return;
     }
 
     if (key.isFunction()) {
@@ -1002,12 +1021,13 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
     }
 }
 
-void NoteSequenceEditPage::contextShow() {
+void NoteSequenceEditPage::contextShow(bool doubleClick) {
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
     ));
 }
 

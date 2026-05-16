@@ -226,6 +226,12 @@ void PatternPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier()) {
         return;
     }
@@ -302,12 +308,13 @@ void PatternPage::encoder(EncoderEvent &event) {
     _project.editSelectedPatternIndex(event.value(), event.pressed());
 }
 
-void PatternPage::contextShow() {
+void PatternPage::contextShow(bool doubleClick) {
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
-        [&] (int index) { return contextActionEnabled(index); }
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
     ));
 }
 

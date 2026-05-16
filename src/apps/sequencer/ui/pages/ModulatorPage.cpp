@@ -526,6 +526,12 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     // Track buttons select modulator
     if (key.isTrackSelect()) {
         setSelectedModulator(key.trackSelect());
@@ -791,12 +797,13 @@ void ModulatorPage::updateWaveformCache() {
     _waveformCacheValid = true;
 }
 
-void ModulatorPage::contextShow() {
+void ModulatorPage::contextShow(bool doubleClick) {
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
         [this] (int index) { contextAction(index); },
-        [this] (int index) { return true; }
+        [this] (int index) { return true; },
+        doubleClick
     ));
 }
 

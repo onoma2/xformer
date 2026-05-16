@@ -51,7 +51,7 @@ private:
 
     int stepOffset() const { return _section * StepCount; }
 
-    void contextShow();
+    void contextShow(bool doubleClick = false);
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
 

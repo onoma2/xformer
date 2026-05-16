@@ -30,7 +30,7 @@ private:
 
     uint8_t pressedTrackKeys() const;
 
-    void contextShow();
+    void contextShow(bool doubleClick = false);
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
 

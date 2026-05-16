@@ -532,6 +532,12 @@ void IndexedSequenceEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (key.pageModifier() && event.count() == 2) {
+        contextShow(true);
+        event.consume();
+        return;
+    }
+
     if (key.pageModifier() && key.is(Key::Step4)) {
         rhythmContextShow();
         event.consume();
@@ -1009,13 +1015,14 @@ void IndexedSequenceEditPage::updateMonitorStep() {
     }
 }
 
-void IndexedSequenceEditPage::contextShow() {
+void IndexedSequenceEditPage::contextShow(bool doubleClick) {
     if (_contextMode == ContextMode::Sequence) {
         showContextMenu(ContextMenu(
             seqContextMenuItems,
             4, // count
             [&] (int index) { contextAction(index); },
-            [&] (int index) { return contextActionEnabled(index); }
+            [&] (int index) { return contextActionEnabled(index); },
+            doubleClick
         ));
     } else {
         showContextMenu(ContextMenu(

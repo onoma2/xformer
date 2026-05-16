@@ -58,9 +58,10 @@ void PerformerPage::draw(Canvas &canvas) {
 
         x += 8;
 
-        // draw track number (highlight when fill is active)
-        canvas.setColor(trackState.fill() ? Color::Bright : Color::Medium);
-        canvas.drawTextCentered(x, y - 2, w, 8, FixedStringBuilder<8>("T%d", trackIndex + 1));
+        // draw pattern number (dimmed when muted, bright when fill is active)
+        bool muted = trackState.mute() || (trackState.hasMuteRequest() && trackState.requestedMute());
+        canvas.setColor(muted ? Color::Low : (trackState.fill() ? Color::Bright : Color::Medium));
+        canvas.drawTextCentered(x, y - 2, w, 8, FixedStringBuilder<8>("P%d", trackState.pattern() + 1));
 
         y += 8;
 
@@ -99,13 +100,21 @@ void PerformerPage::updateLeds(Leds &leds) {
 
     LedPainter::drawTrackGates(leds, _engine, _project.playState());
 
+    uint8_t activeMutes = 0;
+    uint8_t requestedMutes = 0;
     uint8_t activeFills = 0;
     for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
         const auto &trackState = playState.trackState(trackIndex);
-        activeFills |= trackState.fill() ? (1<<trackIndex) : 0;
+        if (trackState.mute()) {
+            activeMutes |= (1 << trackIndex);
+        }
+        if (trackState.hasMuteRequest() && trackState.requestedMute() != trackState.mute()) {
+            requestedMutes |= (1 << trackIndex);
+        }
+        activeFills |= trackState.fill() ? (1 << trackIndex) : 0;
     }
 
-    LedPainter::drawMutes(leds, 0, 0);
+    LedPainter::drawMutes(leds, activeMutes, requestedMutes);
     LedPainter::drawFills(leds, activeFills);
 }
 

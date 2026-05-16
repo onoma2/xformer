@@ -20,7 +20,7 @@ private:
     void handleStepKey(int step, bool shift);
     void loadEditBuffer(int line);
     void setScriptIndex(int scriptIndex);
-    void contextShow();
+    void contextShow(bool doubleClick = false);
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
     void insertText(const char *text, bool addSpace);
