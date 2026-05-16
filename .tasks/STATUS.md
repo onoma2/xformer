@@ -1,6 +1,15 @@
 # Task Board
 _Updated: 2026-05-16_
 
+## 🔴 generator-preview-apply — Generator A/B preview, step selection, 64-step context
+**Status:** active — research complete, phased plan written (A-E with hardware checks)
+**Where I stopped:** Plan written. Phase A designed: `std::optional` vs heap `T*` for `_preview` (chose heap pointer for zero persistent RAM). Next step is implementing Phase A.
+**Next action:** Phase A — Add `_preview` ptr + `apply()`/`showOriginal()`/`showPreview()`/`showingPreview()` to `SequenceBuilder`. Build and check RAM.
+**Depends on:** resource-optimization (RAM at 90.5%, ~2.3 KB headroom to 120 KB warning)
+**Branch:** TBD
+
+---
+
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
 **Where I stopped:** Current build is `.data=6,320`, `.bss=113,640`, `.ccmram_bss=54,096`; MonitorPage shows `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`.

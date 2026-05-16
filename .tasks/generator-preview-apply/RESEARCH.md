@@ -129,22 +129,44 @@ Step selection:
 
 ### Phase A: SequenceBuilder 3-copy
 
-The `_preview` member in `SequenceBuilderImpl<T>` is a full copy of the sequence type T.
+The `_preview` member in `SequenceBuilderImpl<T>` would be a full copy of the sequence type T.
 
-| Type | sizeof(T) | _preview copy cost |
-|------|-----------|-------------------|
-| NoteSequence | 9,544 B | +9.5 KB per instance on stack |
-| CurveSequence | ~4,800 B | +4.8 KB per instance on stack |
+| Type | sizeof(T) | _preview as member cost |
+|------|-----------|------------------------|
+| NoteSequence | 9,544 B | +9.5 KB per instance in Container |
+| CurveSequence | ~4,800 B | +4.8 KB per instance in Container |
 
-Current XFORMER has `Container<NoteSequenceBuilder>` in NoteSequenceEditPage (stack-allocated via placement new). The Container is sized to `max(sizeof(NoteSequenceBuilder), ...)` which is already 9,544 B. Adding `_preview` would roughly double this.
+**Problem:** `Container<NoteSequenceBuilder>` sits inside `NoteSequenceEditPage`, which is statically allocated in the `Pages` struct. Adding `_preview` as an inline member would increase `sizeof(NoteSequenceEditPage)` by ~9.5 KB, flowing directly into `.bss`.
 
-**Mitigation**: `_preview` is only needed while the GeneratorPage is open. It can be allocated on-demand rather than embedded in the builder. Alternatively, the existing Container size may not change if `_preview` is stored as a separate heap allocation.
+**Decision: Use `std::optional<T>` for `_preview`.**
 
-**Check required**: Measure `sizeof(NoteSequenceBuilder)` before and after adding `_preview`. If it exceeds the current `Container<NoteSequenceBuilder>` size, it impacts the `NoteSequenceEditPage` model RAM.
+- `_edit` (reference) and `_original` (copy) remain as members — no size change from current code.
+- `_preview` is `std::optional<T>` — heap-allocated on `emplace()`, freed on `reset()`. Only exists while GeneratorPage is open.
+- `sizeof(SequenceBuilderImpl<T>)` increases by `sizeof(std::optional<T>)` = ~1 byte (just the engaged flag + vtable padding) since `<T>` is heap-allocated. The optional itself is a discriminant byte + aligned storage pointer, not the full T.
+- Actually, `std::optional<T>` contains the full T inline by default. We need to use `std::unique_ptr<T>` instead for heap allocation, or simply use a raw pointer `T* _preview = nullptr` with manual new/delete.
+- **Final choice:** `T* _preview = nullptr` with `new T(_original)` on `showPreview()` and `delete _preview` on `revert()`. Zero persistent RAM impact. `_preview` only lives while the generator page is open.
 
-### Phase B-E: Generator + UI
+**Estimated persistent RAM delta for Phase A: ~0 bytes** (only virtual method pointers increase vtable by a few bytes in `.rodata`, not `.bss`).
 
-Generator/RandomGenerator changes add small amounts (a few bytes per instance). GeneratorPage state adds ~20 bytes. EntropyTargets.h adds ~0 bytes runtime (enum + inline template only).
+### Phase B: Generator + RandomGenerator
+
+Adding `Variation` param (1 byte), widening seed to `uint32_t` (+2 bytes from `uint16_t`), a few method pointers. Estimated: **~50 bytes** in `.bss` (from widened seed in `RandomGenerator::Params` and the `Variation` field).
+
+### Phase C: GeneratorPage state machine
+
+Adding `_previewArmed` (1B), `_applied` (1B), `_section` (4B), `_stepSelection` ptr (4B), `_boundTrackIndex` (4B), `_boundTrackMode` (1B). Total: **~15 bytes** in Pages struct.
+
+### Phase D: Bank visualization
+
+No persistent RAM — all rendering is stack-local.
+
+### Phase E: Context menu expansion
+
+No persistent RAM — context menu items are static const arrays.
+
+### Total estimated persistent RAM increase: ~65 bytes
+
+Well within the ~2.3 KB headroom before the 120 KB warning zone.
 
 ---
 
