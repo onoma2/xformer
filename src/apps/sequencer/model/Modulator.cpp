@@ -55,7 +55,7 @@ void Modulator::editRate(int value, bool shift) {
         }
     }
 
-    int newIndex = clamp(currentIndex + value, 0, numDivisions - 1);
+    int newIndex = clamp(currentIndex - value, 0, numDivisions - 1);
     _rate = divisions[newIndex];
 }
 
