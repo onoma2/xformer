@@ -55,9 +55,9 @@ void ModulatorPage::draw(Canvas &canvas) {
         const char *routingNames[5];
         routingNames[0] = "MODE";
         routingNames[1] = "GATE";
-        routingNames[2] = "CV OUT";
-        routingNames[3] = nullptr;
-        routingNames[4] = nullptr;
+        routingNames[2] = "TARGET";
+        routingNames[3] = "EVENT";
+        routingNames[4] = "CC NUM";
         WindowPainter::drawFooter(canvas, routingNames, pageKeyState(), int(_selectedRoutingFunction));
     } else {
         WindowPainter::drawActiveFunction(canvas, "");
@@ -114,18 +114,30 @@ void ModulatorPage::draw(Canvas &canvas) {
             modulator.printGateTrack(paramValue);
             break;
         case RoutingFunction::Target: {
-            paramName("CV OUT");
-            bool first = true;
-            for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
-                if (_project.cvOutputModulator(i) == _selectedModulator + 1) {
-                    if (!first) paramValue(",");
-                    paramValue("CV%d", i + 1);
-                    first = false;
-                }
+            paramName("TARGET");
+            if (_routingTargetType == RoutingTargetType::Midi) {
+                paramValue("MIDI %d", _routingTargetIndex + 1);
+            } else {
+                paramValue("CV %d", _routingTargetIndex + 1);
             }
-            if (first) paramValue("--");
             break;
         }
+        case RoutingFunction::Event:
+            paramName("EVENT");
+            if (_routingTargetType == RoutingTargetType::CV) {
+                paramValue("N/A");
+            } else {
+                paramValue(_routingEventIsCC ? "CC" : "Note");
+            }
+            break;
+        case RoutingFunction::CCNumber:
+            paramName("CC NUM");
+            if (_routingTargetType == RoutingTargetType::CV || !_routingEventIsCC) {
+                paramValue("N/A");
+            } else {
+                paramValue("CC %d", _routingCCNum);
+            }
+            break;
         }
     } else if (isADSR) {
         if (_currentPage == 0) {
@@ -207,17 +219,7 @@ void ModulatorPage::draw(Canvas &canvas) {
     const int waveformW = 116;
     const int waveformH = 34;
 
-    if (_showRoutingOverlay) {
-        canvas.setColor(Color::Low);
-        canvas.setFont(Font::Small);
-        for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
-            int y = 16 + i * 6;
-            bool assigned = (_project.cvOutputModulator(i) == _selectedModulator + 1);
-            canvas.setColor(assigned ? Color::Bright : Color::Low);
-            FixedStringBuilder<16> label("CV%d", i + 1);
-            canvas.drawText(6, y, label);
-        }
-    } else if (isADSR) {
+    if (isADSR) {
         // ADSR envelope visualization
         int attackMs = modulator.attack();
         int decayMs = modulator.decay();
@@ -396,9 +398,10 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
         _showRoutingOverlay = !_showRoutingOverlay;
         if (_showRoutingOverlay) {
             _selectedRoutingFunction = RoutingFunction::Mode;
-            _routingCvOutputIndex = 0;
+            loadRoutingFromMidiOutput();
         } else {
             _selectedFunction = Function::Shape;
+            applyRoutingToMidiOutput();
         }
         event.consume();
         return;
@@ -447,7 +450,11 @@ void ModulatorPage::keyPress(KeyPressEvent &event) {
     if (key.isFunction()) {
         if (_showRoutingOverlay) {
             int func = key.function();
-            if (func >= 0 && func < 3) {
+            if (func >= 0 && func < 5) {
+                // Skip EVENT and CC NUM if routing to CV (they're dimmed)
+                if (_routingTargetType == RoutingTargetType::CV && func >= 3) {
+                    return;
+                }
                 _selectedRoutingFunction = RoutingFunction(func);
             }
         } else {
@@ -485,12 +492,29 @@ void ModulatorPage::encoder(EncoderEvent &event) {
         case RoutingFunction::Gate:
             modulator.editGateTrack(event.value(), pressed);
             break;
-        case RoutingFunction::Target:
-            _routingCvOutputIndex = (_routingCvOutputIndex + event.value() + CONFIG_CHANNEL_COUNT) % CONFIG_CHANNEL_COUNT;
-            if (_project.cvOutputModulator(_routingCvOutputIndex) == _selectedModulator + 1) {
-                _project.setCvOutputModulator(_routingCvOutputIndex, 0);
+        case RoutingFunction::Target: {
+            int totalTargets = 16 + 8; // MIDI 1-16 + CV 1-8
+            int currentGlobal = (_routingTargetType == RoutingTargetType::Midi)
+                ? _routingTargetIndex
+                : (16 + _routingTargetIndex);
+            currentGlobal = (currentGlobal + event.value() + totalTargets) % totalTargets;
+            if (currentGlobal < 16) {
+                _routingTargetType = RoutingTargetType::Midi;
+                _routingTargetIndex = currentGlobal;
             } else {
-                _project.setCvOutputModulator(_routingCvOutputIndex, _selectedModulator + 1);
+                _routingTargetType = RoutingTargetType::CV;
+                _routingTargetIndex = currentGlobal - 16;
+            }
+            break;
+        }
+        case RoutingFunction::Event:
+            if (_routingTargetType == RoutingTargetType::Midi && event.value() != 0) {
+                _routingEventIsCC = !_routingEventIsCC;
+            }
+            break;
+        case RoutingFunction::CCNumber:
+            if (_routingTargetType == RoutingTargetType::Midi && _routingEventIsCC) {
+                _routingCCNum = clamp(_routingCCNum + event.value(), 0, 127);
             }
             break;
         }
@@ -573,6 +597,9 @@ void ModulatorPage::setSelectedModulator(int index) {
     _project.setSelectedModulatorIndex(_selectedModulator);
     _waveformCacheValid = false;
     _currentPage = 0;
+    if (_showRoutingOverlay) {
+        loadRoutingFromMidiOutput();
+    }
 }
 
 void ModulatorPage::setSelectedFunction(Function function) {
@@ -638,5 +665,64 @@ void ModulatorPage::contextAction(int index) {
     }
     case ContextAction::Last:
         break;
+    }
+}
+
+void ModulatorPage::loadRoutingFromMidiOutput() {
+    int targetModSource = int(MidiOutput::Output::ControlSource::FirstModulator) + _selectedModulator;
+
+    bool foundInMidi = false;
+    for (int i = 0; i < CONFIG_MIDI_OUTPUT_COUNT; ++i) {
+        auto &output = _project.midiOutput().output(i);
+        if (output.event() == MidiOutput::Output::Event::ControlChange &&
+            int(output.controlSource()) == targetModSource) {
+            _routingTargetType = RoutingTargetType::Midi;
+            _routingTargetIndex = i;
+            _routingCCNum = output.controlNumber();
+            _routingEventIsCC = true;
+            foundInMidi = true;
+            break;
+        }
+    }
+
+    if (!foundInMidi) {
+        bool foundInCV = false;
+        for (int i = 0; i < CONFIG_CHANNEL_COUNT; ++i) {
+            if (_project.cvOutputModulator(i) == _selectedModulator + 1) {
+                _routingTargetType = RoutingTargetType::CV;
+                _routingTargetIndex = i;
+                _routingCCNum = 0;
+                _routingEventIsCC = true;
+                foundInCV = true;
+                break;
+            }
+        }
+
+        if (!foundInCV) {
+            _routingTargetType = RoutingTargetType::Midi;
+            _routingTargetIndex = clamp(_selectedModulator, 0, CONFIG_MIDI_OUTPUT_COUNT - 1);
+            _routingCCNum = _selectedModulator;
+            _routingEventIsCC = true;
+        }
+    }
+}
+
+void ModulatorPage::applyRoutingToMidiOutput() {
+    if (_routingTargetType == RoutingTargetType::Midi) {
+        auto &output = _project.midiOutput().output(_routingTargetIndex);
+        if (_routingEventIsCC) {
+            output.setEvent(MidiOutput::Output::Event::ControlChange);
+            int modSource = int(MidiOutput::Output::ControlSource::FirstModulator) + _selectedModulator;
+            output.setControlSource(MidiOutput::Output::ControlSource(modSource));
+            output.setControlNumber(_routingCCNum);
+            int channel = output.target().channel();
+            const char *portName = (output.target().port() == Types::MidiPort::UsbMidi) ? "USB" : "MIDI";
+            showMessage(FixedStringBuilder<32>("Mod %d > Out %d %s Ch%d CC%d",
+                _selectedModulator + 1, _routingTargetIndex + 1, portName, channel + 1, _routingCCNum), 2000);
+        }
+    } else {
+        _project.setCvOutputModulator(_routingTargetIndex, _selectedModulator + 1);
+        showMessage(FixedStringBuilder<32>("Mod %d > CV %d",
+            _selectedModulator + 1, _routingTargetIndex + 1), 2000);
     }
 }

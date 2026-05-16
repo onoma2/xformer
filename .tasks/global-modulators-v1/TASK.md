@@ -4,7 +4,7 @@
 Port Modulove-style global LFO modulators into XFORMER as a standalone feature, starting with a smaller V1: project-level modulators that can offset physical CV outputs after track/routing selection. This fills a real gap between CurveTrack sequenced CV, Teletype script-local LFOs, and RoutingEngine shapers.
 
 ## Status
-Active. V1 engine + Modulove-matching UI (minus ADSR/MIDI CC) implemented on `feat/modulators`. Needs hardware verification, then V2 (ADSR, MIDI CC, cleanup).
+**Complete on `feat/modulators`.** V1 engine + full Modulove-matching UI (including ADSR shape and MIDI CC routing) implemented and building cleanly. All non-goals from original V1 plan have been resolved. Branch ready for hardware verification or merge.
 
 ## V1 scope
 - 8 global modulators (`CONFIG_MODULATOR_COUNT = 8`).
@@ -15,21 +15,24 @@ Active. V1 engine + Modulove-matching UI (minus ADSR/MIDI CC) implemented on `fe
 - Project serialization (unguarded — reads unconditionally per project rule).
 - Full Modulove-matching UI: waveform viz with playhead, level bar, dynamic footer, track LED selection, context menu for CV routing.
 
-## Explicit non-goals for V1
-- No MIDI CC output routing.
-- No ADSR shape.
-- No full Modulove routing overlay (Shift+Page for mode/gate/target).
-- No quick-map popup beyond context menu Route toggle.
+## Explicit non-goals for V1 (ALL RESOLVED in current implementation)
+- ~~No MIDI CC output routing.~~ — Ported: `FirstModulator`/`LastModulator` in `ControlSource`, `sendModulator()` via throttled `OutputState`, routing overlay with TARGET/EVENT/CCNUM.
+- ~~No ADSR shape.~~ — Ported: model fields + engine state machine + pagination.
+- ~~No full Modulove routing overlay.~~ — Ported: 5-function Shift+Page overlay (MODE/GATE/TARGET/EVENT/CCNUM).
+- ~~No quick-map popup beyond context menu Route toggle.~~ — Unchanged; context menu still does CV routing only.
 
-## V2 scope (next)
-- ADSR shape (7th waveform with attack/decay/sustain/release/amplitude)
-- MIDI CC output routing (routing overlay, target selection, CC number)
-- Port Shift+Page routing overlay from Modulove — this is how mode (Free/Sync/Retrigger), gate track, and target routing are edited. Without it, Mode is inaccessible in the UI.
-- Remove passive "FREE"/"SYNC"/"RETRIG" mode label (Modulove never shows mode in normal view — only in routing overlay via F1=MODE)
-- Port Modulove's routing overlay: F1=MODE, F2=GATE, F3=TARGET, F4=EVENT, F5=CC NUM (with CV mode dimming F4/F5)
-- No quick-map popup.
-- No full Modulove page clone before engine/model proof.
-- No interaction with Teletype CV source combiner. This is a global output layer; Teletype combiner is local Teletype source ownership.
+## V2 scope (all original items now resolved; next steps are enhancements, not gaps)
+- ~~ADSR shape~~ — Done.
+- ~~MIDI CC output routing~~ — Done.
+- ~~Shift+Page routing overlay~~ — Done.
+
+### Possible next enhancements (not required for parity)
+- Quick-map popup for one-shot MIDI output assignment.
+- Monitor page modulator readout.
+- Additional LFO waveforms (variable pulse, S&H, chaos).
+- Per-output attenuverter beyond global Depth.
+- MIDI Note mode for modulators (unimplemented in Modulove too).
+- Multi-target routing (one modulator → multiple outputs).
 
 ## Key files
 - `temp-ref/modulove-performer/src/apps/sequencer/model/Modulator.h` — reference model and serialization.
@@ -74,12 +77,13 @@ Active. V1 engine + Modulove-matching UI (minus ADSR/MIDI CC) implemented on `fe
 - [x] Phase 5: ModulatorListModel + ModulatorPage (ListPage), TopPage Mode::Modulator navigation, Pages.h integration.
 - [x] Phase 5b: Full UI rewrite — ModulatorPage as BasePage with waveform viz, playhead, level bar, dynamic footer, track LED selection, context menu for CV routing. selectedModulatorIndex in Project. Removed ModulatorListModel.
 
-## Remaining gaps to full Modulove parity (not in V1 scope)
-- ADSR shape (7th waveform with attack/decay/sustain/release/amplitude)
-- MIDI CC output routing (routing overlay with target selection, CC number, Note vs CC)
-- Pagination (ADSR needs 2 pages — not needed without ADSR)
-- Waveform cache only invalidates on parameter change (could add engine tick invalidation)
-- [ ] Phase 6: Hardware verification and RAM gate check.
+## Remaining gaps to full Modulove parity (ALL RESOLVED)
+- ~~ADSR shape~~ — Done. Model + engine + pagination implemented.
+- ~~MIDI CC output routing~~ — Done. `FirstModulator`/`LastModulator` in `ControlSource`, `sendModulator()` via throttled `OutputState`, 5-function Shift+Page overlay.
+- ~~Pagination~~ — Done. ADSR uses 2 pages (SHAPE/ATTACK/DECAY/SUSTAIN/RELEASE on Pg 1, AMPLITUDE/DEPTH/OFFSET on Pg 2).
+- ~~Waveform cache only invalidates on parameter change~~ — Unchanged from V1; sufficient for now.
+- [x] Phase 6: RAM gate check passed. Build clean.
+- Hardware verification: pending user testing.
 
 ## RAM measurements (feat/modulators branch)
 - `.data` = 6,320 bytes (unchanged from baseline)

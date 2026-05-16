@@ -30,6 +30,13 @@ private:
         Mode = 0,
         Gate = 1,
         Target = 2,
+        Event = 3,
+        CCNumber = 4,
+    };
+
+    enum class RoutingTargetType : uint8_t {
+        Midi,
+        CV,
     };
 
     enum class ContextAction : uint8_t {
@@ -43,6 +50,8 @@ private:
     void updateWaveformCache();
     void contextShow();
     void contextAction(int index);
+    void loadRoutingFromMidiOutput();
+    void applyRoutingToMidiOutput();
 
     int _selectedModulator = 0;
     Function _selectedFunction = Function::Shape;
@@ -54,7 +63,10 @@ private:
     // Routing overlay state
     bool _showRoutingOverlay = false;
     RoutingFunction _selectedRoutingFunction = RoutingFunction::Mode;
-    int _routingCvOutputIndex = 0;  // CV output 0-7 being routed
+    RoutingTargetType _routingTargetType = RoutingTargetType::Midi;
+    int _routingTargetIndex = 0;     // 0-15 = MIDI output, 0-7 = CV output
+    bool _routingEventIsCC = true;   // false = Note, true = CC (MIDI only)
+    int _routingCCNum = 0;           // CC number 0-127 (MIDI CC only)
 
     // Waveform cache
     static constexpr int WaveformCacheSize = 112;
