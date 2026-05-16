@@ -5,7 +5,13 @@
 
 class SequenceBuilder {
 public:
+    virtual ~SequenceBuilder() = default;
+
     virtual void revert() = 0;
+    virtual void apply() = 0;
+    virtual void showOriginal() = 0;
+    virtual void showPreview() = 0;
+    virtual bool showingPreview() const = 0;
 
     // original sequence
 
@@ -32,13 +38,53 @@ public:
     SequenceBuilderImpl(T &sequence, typename T::Layer layer) :
         _edit(sequence),
         _original(sequence),
+        _preview(nullptr),
         _layer(layer),
         _range(T::layerRange(layer)),
-        _default(T::layerDefaultValue(layer))
+        _default(T::layerDefaultValue(layer)),
+        _showingPreview(false)
     {}
+
+    ~SequenceBuilderImpl() override {
+        delete _preview;
+    }
 
     void revert() override {
         _edit = _original;
+        delete _preview;
+        _preview = nullptr;
+        _showingPreview = false;
+    }
+
+    void apply() override {
+        if (_preview) {
+            _edit = *_preview;
+            _original = *_preview;
+            _showingPreview = true;
+        }
+    }
+
+    void showOriginal() override {
+        _edit = _original;
+        _showingPreview = false;
+    }
+
+    void showPreview() override {
+        if (!_preview) {
+            _preview = new (std::nothrow) T(_original);
+            if (!_preview) {
+                _showingPreview = false;
+                return;
+            }
+            // Copy current _edit (which has generator mutations) into _preview
+            *_preview = _edit;
+        }
+        _edit = *_preview;
+        _showingPreview = true;
+    }
+
+    bool showingPreview() const override {
+        return _showingPreview;
     }
 
     int originalLength() const override {
@@ -86,9 +132,11 @@ public:
 private:
     T &_edit;
     T _original;
+    T *_preview;
     typename T::Layer _layer;
     Types::LayerRange _range;
-    int _default;;
+    int _default;
+    bool _showingPreview;
 };
 
 using NoteSequenceBuilder = SequenceBuilderImpl<NoteSequence>;

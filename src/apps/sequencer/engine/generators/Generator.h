@@ -49,6 +49,22 @@ public:
         _builder.revert();
     }
 
+    virtual void apply() {
+        _builder.apply();
+    }
+
+    virtual void showOriginal() {
+        _builder.showOriginal();
+    }
+
+    virtual void showPreview() {
+        _builder.showPreview();
+    }
+
+    bool showingPreview() const {
+        return _builder.showingPreview();
+    }
+
     virtual void update() = 0;
 
     static Generator *execute(Generator::Mode mode, SequenceBuilder &builder);
