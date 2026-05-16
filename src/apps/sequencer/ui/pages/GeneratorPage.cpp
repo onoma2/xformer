@@ -9,9 +9,50 @@
 #include "engine/generators/RandomGenerator.h"
 
 #include "engine/Engine.h"
+#include "engine/NoteTrackEngine.h"
+#include "engine/CurveTrackEngine.h"
 #include "core/math/Math.h"
 
 #include <cstddef>
+#include <algorithm>
+#include <cmath>
+
+namespace {
+namespace PlotArea {
+constexpr int Top = 15;
+constexpr int Bottom = 35;
+constexpr int Height = Bottom - Top + 1;
+constexpr int BankTop = 38;
+}
+
+int stepX(int step, int steps) {
+    return (CONFIG_LCD_WIDTH * step) / steps;
+}
+
+int stepWidth(int step, int steps) {
+    return std::max(1, stepX(step + 1, steps) - stepX(step, steps));
+}
+
+int stepCenterX(int step, int steps) {
+    return stepX(step, steps) + stepWidth(step, steps) / 2;
+}
+
+int noteY(int note, int minNote, int maxNote, int top, int height) {
+    if (maxNote <= minNote) {
+        return top + height / 2;
+    }
+    int span = maxNote - minNote;
+    int innerHeight = std::max(1, height - 1);
+    int value = top + innerHeight - ((note - minNote) * innerHeight) / span;
+    return clamp(value, top, top + innerHeight);
+}
+
+void drawStairStep(Canvas &canvas, int x0, int x1, int y, Color color) {
+    canvas.setColor(color);
+    canvas.hline(x0 + 1, y, std::max(1, x1 - x0 - 1));
+}
+
+} // namespace
 
 void GeneratorContextQuickEditModel::configure(Generator *generator, int paramIndex, const char *label, const std::function<void()> &onEdited) {
     _generator = generator;
@@ -119,6 +160,27 @@ bool GeneratorPage::ensureBoundTrackContext() {
     revert();
     showMessage("GEN CANCELED");
     return false;
+}
+
+int GeneratorPage::currentStep() const {
+    switch (_project.selectedTrack().trackMode()) {
+    case Track::TrackMode::Note: {
+        const auto &trackEngine = _engine.selectedTrackEngine().as<NoteTrackEngine>();
+        const auto &sequence = _project.selectedNoteSequence();
+        return trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
+    }
+    case Track::TrackMode::Curve: {
+        const auto &trackEngine = _engine.selectedTrackEngine().as<CurveTrackEngine>();
+        const auto &sequence = _project.selectedCurveSequence();
+        return trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
+    }
+    default:
+        return -1;
+    }
+}
+
+bool GeneratorPage::stepInCurrentBank(int step) const {
+    return step / StepCount == _section;
 }
 
 void GeneratorPage::enter() {
@@ -248,24 +310,34 @@ void GeneratorPage::updateLeds(Leds &leds) {
         return;
     }
 
-    // value range
-    for (int i = 0; i < 8; ++i) {
-        bool inRange = (i >= _valueRange.first && i <= _valueRange.second) || (i >= _valueRange.second && i <= _valueRange.first);
-        bool inverted = _valueRange.first > _valueRange.second;
-        leds.set(MatrixMap::toStep(i), inRange && inverted, inRange && !inverted);
-    }
-    for (int i = 0; i < 7; ++i) {
-        leds.set(MatrixMap::toStep(8 + i), false, false);
-    }
-
-    if (_stepSelection) {
-        // Highlight selected steps in the current bank
-        for (int i = 0; i < StepCount; ++i) {
-            int stepIndex = stepOffset() + i;
-            if (stepIndex < CONFIG_STEP_COUNT && _stepSelection->selected()[stepIndex]) {
-                leds.set(MatrixMap::toStep(i), true, true);
+    int currentStep;
+    switch (_project.selectedTrack().trackMode()) {
+    case Track::TrackMode::Note: {
+            const auto &trackEngine = _engine.selectedTrackEngine().as<NoteTrackEngine>();
+            const auto &sequence = _project.selectedNoteSequence();
+            currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
+            for (int i = 0; i < 16; ++i) {
+                int stepIndex = stepOffset() + i;
+                bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected()[stepIndex]);
+                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected()[stepIndex]));
+                leds.set(MatrixMap::fromStep(i), red, green);
             }
         }
+        break;
+    case Track::TrackMode::Curve: {
+            const auto &trackEngine = _engine.selectedTrackEngine().as<CurveTrackEngine>();
+            const auto &sequence = _project.selectedCurveSequence();
+            currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
+            for (int i = 0; i < 16; ++i) {
+                int stepIndex = stepOffset() + i;
+                bool red = (stepIndex == currentStep) || (_stepSelection && _stepSelection->selected()[stepIndex]);
+                bool green = (stepIndex != currentStep) && (sequence.step(stepIndex).gate() || (_stepSelection && _stepSelection->selected()[stepIndex]));
+                leds.set(MatrixMap::fromStep(i), red, green);
+            }
+        }
+        break;
+    default:
+        return;
     }
 
     LedPainter::drawSelectedSequenceSection(leds, _section);
@@ -336,6 +408,7 @@ void GeneratorPage::keyPress(KeyPressEvent &event) {
             _generator->update();
         }
         if (abPreviewGenerator(_generator->mode())) {
+            _generator->updatePreview();
             _generator->showPreview();
         }
         event.consume();
@@ -368,6 +441,7 @@ void GeneratorPage::keyPress(KeyPressEvent &event) {
             _generator->update();
         }
         if (abPreviewGenerator(_generator->mode())) {
+            _generator->updatePreview();
             _generator->showPreview();
         }
         event.consume();
@@ -434,7 +508,15 @@ void GeneratorPage::encoder(EncoderEvent &event) {
     }
 
     bool changed = false;
-    bool rerollTriggered = false;
+    bool functionKeyHeld = false;
+
+    for (int functionIndex = 0; functionIndex < 5; ++functionIndex) {
+        int paramIndex = paramIndexForFunction(_generator->mode(), functionIndex);
+        if (paramIndex >= 0 && pageKeyState()[Key::F0 + functionIndex]) {
+            functionKeyHeld = true;
+            break;
+        }
+    }
 
     for (int functionIndex = 0; functionIndex < 5; ++functionIndex) {
         int paramIndex = paramIndexForFunction(_generator->mode(), functionIndex);
@@ -444,21 +526,23 @@ void GeneratorPage::encoder(EncoderEvent &event) {
         }
     }
 
-    if (_generator->mode() == Generator::Mode::Random && !pageKeyState()[Key::F0] && !pageKeyState()[Key::F1] && !pageKeyState()[Key::F2] && !pageKeyState()[Key::F3] && !pageKeyState()[Key::F4] && event.pressed()) {
-        auto *random = static_cast<RandomGenerator *>(_generator);
-        random->randomizeParams();
+    if (_generator->mode() == Generator::Mode::Random && !functionKeyHeld && event.value() != 0) {
+        static_cast<RandomGenerator *>(_generator)->randomizeSeed();
         changed = true;
-        rerollTriggered = true;
+    }
+
+    if (_generator->mode() == Generator::Mode::Euclidean && !functionKeyHeld && event.value() != 0) {
+        _generator->randomizeParams();
+        changed = true;
     }
 
     if (changed) {
-        if (rerollTriggered && abPreviewGenerator(_generator->mode())) {
+        if (abPreviewGenerator(_generator->mode())) {
             _previewArmed = true;
         }
         _generator->update();
-        if (rerollTriggered && abPreviewGenerator(_generator->mode())) {
-            _generator->showPreview();
-        } else if (!abPreviewGenerator(_generator->mode()) || _generator->showingPreview()) {
+        if (abPreviewGenerator(_generator->mode())) {
+            _generator->updatePreview();
             _generator->showPreview();
         }
     }
@@ -487,22 +571,271 @@ void GeneratorPage::drawEuclideanGenerator(Canvas &canvas, const EuclideanGenera
 void GeneratorPage::drawRandomGenerator(Canvas &canvas, const RandomGenerator &generator) const {
     const auto &pattern = generator.pattern();
     int steps = pattern.size();
+    const int baselineY = PlotArea::Top + PlotArea::Height / 2;
+    const int amplitude = PlotArea::Height / 2;
 
-    int stepWidth = Width / steps;
-    int stepHeight = 16;
-    int x = (Width - steps * stepWidth) / 2;
-    int y = 16;
+    auto drawBankSeparators = [&] () {
+        for (int bank = 0; bank <= steps / StepCount; ++bank) {
+            const int separatorX = stepX(bank * StepCount, steps);
+            canvas.setColor(bank == _section || bank == _section + 1 ? Color::Medium : Color::MediumLow);
+            canvas.vline(separatorX, PlotArea::Top, PlotArea::BankTop - PlotArea::Top + 1);
+        }
+    };
 
-    for (int i = 0; i < steps; ++i) {
-        int h = stepHeight - 2;
-        int h2 = (h * pattern[i]) / 255;
-        canvas.setColor(Color::Low);
-        canvas.drawRect(x + 1, y + 1, stepWidth - 2, h);
-        canvas.setColor(Color::Bright);
-        canvas.hline(x + 1, y + 1 + h - h2, stepWidth - 2);
-        // canvas.fillRect(x + 1, y + 1 + h - h2 , stepWidth - 2, h2);
-        x += stepWidth;
+    auto drawBankFrame = [&] () {
+        if (steps <= StepCount) {
+            return;
+        }
+        const int x0 = stepX(_section * StepCount, steps);
+        const int x1 = stepX((_section + 1) * StepCount, steps);
+        canvas.setColor(Color::Medium);
+        canvas.hline(x0 + 1, PlotArea::Top, std::max(1, x1 - x0 - 1));
+        canvas.hline(x0 + 1, PlotArea::BankTop, std::max(1, x1 - x0 - 1));
+    };
+
+    auto drawPlayhead = [&] () {
+        const int playheadStep = currentStep();
+        if (playheadStep >= 0 && playheadStep < steps) {
+            const int playX = stepCenterX(playheadStep, steps);
+            canvas.setColor(Color::MediumBright);
+            canvas.vline(playX, PlotArea::Top, PlotArea::BankTop - PlotArea::Top + 1);
+        }
+    };
+
+    auto drawProfile = [&] (bool centered, bool highlightMarkers) {
+        if (centered) {
+            canvas.setColor(Color::MediumLow);
+            canvas.hline(0, baselineY, Width);
+        }
+
+        drawBankSeparators();
+
+        int previousX = -1;
+        int previousY = baselineY;
+        for (int i = 0; i < steps; ++i) {
+            const int centerX = stepCenterX(i, steps);
+            const int rawValue = generator.displayValue(i);
+            const int y = centered ?
+                baselineY - ((rawValue - 127) * amplitude) / 127 :
+                PlotArea::Bottom - (rawValue * (PlotArea::Height - 2)) / 255;
+            const bool activeBank = steps <= StepCount || stepInCurrentBank(i);
+
+            if (previousX >= 0) {
+                canvas.setColor((activeBank || (steps <= StepCount || stepInCurrentBank(i - 1))) ? Color::Medium : Color::MediumLow);
+                canvas.line(previousX, previousY, centerX, y);
+            } else {
+                canvas.setColor(activeBank ? Color::Bright : Color::Medium);
+                canvas.fillRect(centerX, y, 1, 1);
+            }
+
+            if (highlightMarkers && activeBank) {
+                canvas.setColor(Color::Bright);
+                canvas.fillRect(std::max(0, centerX - 1), std::max(PlotArea::Top, y - 1), 3, 3);
+            } else if (highlightMarkers) {
+                canvas.setColor(Color::Medium);
+                canvas.fillRect(centerX, y, 1, 1);
+            }
+
+            previousX = centerX;
+            previousY = y;
+        }
+    };
+
+    auto drawGateBlocks = [&] () {
+        constexpr int gateTop = PlotArea::Top + 3;
+        constexpr int gateHeight = 12;
+
+        drawBankSeparators();
+        for (int i = 0; i < steps; ++i) {
+            const bool activeBank = steps <= StepCount || stepInCurrentBank(i);
+            const int x0 = stepX(i, steps);
+            const int width = std::max(1, stepWidth(i, steps) - 1);
+
+            canvas.setColor(activeBank ? Color::Medium : Color::MediumLow);
+            canvas.drawRect(x0 + 1, gateTop, width, gateHeight);
+            if (generator.displayValue(i) >= 128) {
+                canvas.setColor(activeBank ? Color::Bright : Color::Medium);
+                canvas.fillRect(x0 + 1, gateTop + 1, width, gateHeight - 1);
+            }
+        }
+    };
+
+    auto drawNoteContour = [&] () {
+        int minValue = 255;
+        int maxValue = 0;
+        for (int i = 0; i < steps; ++i) {
+            const int value = generator.displayValue(i);
+            minValue = std::min(minValue, value);
+            maxValue = std::max(maxValue, value);
+        }
+        if (minValue == maxValue) {
+            minValue = std::max(0, minValue - 1);
+            maxValue = std::min(255, maxValue + 1);
+        }
+
+        int previousStep = -1;
+        int previousY = 0;
+        drawBankSeparators();
+
+        for (int i = 0; i < steps; ++i) {
+            const bool activeBank = steps <= StepCount || stepInCurrentBank(i);
+            const int x0 = stepX(i, steps);
+            const int x1 = stepX(i + 1, steps);
+            const int y = noteY(generator.displayValue(i), minValue, maxValue, PlotArea::Top + 2, PlotArea::Height - 5);
+            drawStairStep(canvas, x0, x1, y, activeBank ? Color::Bright : Color::Medium);
+
+            if (previousStep >= 0) {
+                canvas.setColor((activeBank || stepInCurrentBank(previousStep)) ? Color::Medium : Color::MediumLow);
+                canvas.vline(x0, std::min(previousY, y), std::abs(y - previousY) + 1);
+            }
+
+            previousStep = i;
+            previousY = y;
+        }
+    };
+
+    auto drawSlideMarkers = [&] () {
+        drawBankSeparators();
+        for (int i = 0; i < steps; ++i) {
+            if (generator.displayValue(i) < 128) {
+                continue;
+            }
+            const bool activeBank = steps <= StepCount || stepInCurrentBank(i);
+            const int x0 = stepX(i, steps);
+            const int x1 = stepX(i + 1, steps);
+            canvas.setColor(activeBank ? Color::Bright : Color::Medium);
+            canvas.fillRect(x0 + 1, PlotArea::Bottom - 4, std::max(1, x1 - x0 - 2), 3);
+        }
+    };
+
+    auto drawBooleanMarkers = [&] () {
+        constexpr int markerY = PlotArea::Top + PlotArea::Height / 2 - 1;
+
+        drawBankSeparators();
+        for (int i = 0; i < steps; ++i) {
+            if (generator.displayValue(i) < 128) {
+                continue;
+            }
+            const bool activeBank = steps <= StepCount || stepInCurrentBank(i);
+            const int centerX = stepCenterX(i, steps);
+            canvas.setColor(activeBank ? Color::Bright : Color::Medium);
+            canvas.fillRect(std::max(0, centerX - 1), markerY - 1, 3, 3);
+        }
+    };
+
+    auto drawLengthBars = [&] () {
+        constexpr int barTop = PlotArea::Top + 6;
+        constexpr int barHeight = 8;
+
+        drawBankSeparators();
+        for (int i = 0; i < steps; ++i) {
+            const bool activeBank = steps <= StepCount || stepInCurrentBank(i);
+            const int x0 = stepX(i, steps);
+            const int cellWidth = std::max(2, stepWidth(i, steps) - 1);
+            const int barWidth = std::max(1, (cellWidth * generator.displayValue(i)) / 255);
+            canvas.setColor(activeBank ? Color::Medium : Color::MediumLow);
+            canvas.drawRect(x0 + 1, barTop, cellWidth, barHeight);
+            canvas.setColor(activeBank ? Color::Bright : Color::Medium);
+            canvas.fillRect(x0 + 1, barTop + 1, barWidth, barHeight - 1);
+        }
+    };
+
+    auto drawRepeatStripes = [&] () {
+        constexpr int stripeTop = PlotArea::Top + 4;
+        constexpr int stripeHeight = 12;
+
+        drawBankSeparators();
+        for (int i = 0; i < steps; ++i) {
+            const bool activeBank = steps <= StepCount || stepInCurrentBank(i);
+            const int x0 = stepX(i, steps);
+            const int width = std::max(2, stepWidth(i, steps) - 2);
+            const int stripes = std::max(0, (generator.displayValue(i) * 4 + 127) / 255);
+
+            canvas.setColor(activeBank ? Color::Medium : Color::MediumLow);
+            canvas.drawRect(x0 + 1, stripeTop, width, stripeHeight);
+            canvas.setColor(activeBank ? Color::Bright : Color::Medium);
+            for (int stripe = 0; stripe < stripes; ++stripe) {
+                const int stripeX = x0 + 2 + (stripe * width) / std::max(1, stripes);
+                canvas.vline(stripeX, stripeTop + 1, stripeHeight - 1);
+            }
+        }
+    };
+
+    bool drewSpecialized = false;
+    if (_project.selectedTrack().trackMode() == Track::TrackMode::Note) {
+        switch (_project.selectedNoteSequenceLayer()) {
+        case NoteSequence::Layer::Gate:
+            drawGateBlocks();
+            drewSpecialized = true;
+            break;
+        case NoteSequence::Layer::Note:
+            drawNoteContour();
+            drewSpecialized = true;
+            break;
+        case NoteSequence::Layer::Slide:
+            drawSlideMarkers();
+            drewSpecialized = true;
+            break;
+        case NoteSequence::Layer::Length:
+            drawLengthBars();
+            drewSpecialized = true;
+            break;
+        case NoteSequence::Layer::Retrigger:
+        case NoteSequence::Layer::PulseCount:
+            drawRepeatStripes();
+            drewSpecialized = true;
+            break;
+        case NoteSequence::Layer::GateOffset:
+            drawProfile(true, true);
+            drewSpecialized = true;
+            break;
+        case NoteSequence::Layer::AccumulatorTrigger:
+            drawBooleanMarkers();
+            drewSpecialized = true;
+            break;
+        case NoteSequence::Layer::Condition:
+        case NoteSequence::Layer::GateProbability:
+        case NoteSequence::Layer::RetriggerProbability:
+        case NoteSequence::Layer::LengthVariationRange:
+        case NoteSequence::Layer::LengthVariationProbability:
+        case NoteSequence::Layer::NoteVariationRange:
+        case NoteSequence::Layer::NoteVariationProbability:
+        case NoteSequence::Layer::GateMode:
+        case NoteSequence::Layer::HarmonyRoleOverride:
+        case NoteSequence::Layer::InversionOverride:
+        case NoteSequence::Layer::VoicingOverride:
+            drawProfile(false, true);
+            drewSpecialized = true;
+            break;
+        default:
+            break;
+        }
+    } else if (_project.selectedTrack().trackMode() == Track::TrackMode::Curve) {
+        switch (_project.selectedCurveSequenceLayer()) {
+        case CurveSequence::Layer::Gate:
+            drawGateBlocks();
+            drewSpecialized = true;
+            break;
+        case CurveSequence::Layer::Min:
+        case CurveSequence::Layer::Max:
+        case CurveSequence::Layer::Shape:
+        case CurveSequence::Layer::ShapeVariation:
+        case CurveSequence::Layer::ShapeVariationProbability:
+        case CurveSequence::Layer::GateProbability:
+            drawProfile(false, true);
+            drewSpecialized = true;
+            break;
+        default:
+            break;
+        }
     }
+
+    if (!drewSpecialized) {
+        drawProfile(false, true);
+    }
+
+    drawBankFrame();
+    drawPlayhead();
 }
 
 void GeneratorPage::contextShow(bool doubleClick) {
@@ -541,9 +874,7 @@ void GeneratorPage::contextAction(int index) {
         case 1:
             gGeneratorContextQuickEditModel.configure(_generator, int(RandomGenerator::Param::Smooth), "SMOOTH", [&] {
                 _generator->update();
-                if (abPreviewGenerator(_generator->mode()) && _generator->showingPreview()) {
-                    _generator->showPreview();
-                }
+                _generator->updatePreview();
             });
             _manager.pages().quickEdit.show(gGeneratorContextQuickEditModel, 0);
             return;
@@ -571,6 +902,7 @@ void GeneratorPage::contextAction(int index) {
             random->update();
             if (abPreviewGenerator(_generator->mode())) {
                 _previewArmed = true;
+                _generator->updatePreview();
                 _generator->showPreview();
             }
         }
@@ -582,6 +914,7 @@ void GeneratorPage::contextAction(int index) {
             random->update();
             if (abPreviewGenerator(_generator->mode())) {
                 _previewArmed = true;
+                _generator->updatePreview();
                 _generator->showPreview();
             }
         }

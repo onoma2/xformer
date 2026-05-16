@@ -62,6 +62,8 @@ public:
 private:
     bool boundTrackContextValid() const;
     bool ensureBoundTrackContext();
+    int currentStep() const;
+    bool stepInCurrentBank(int step) const;
 
     void drawEuclideanGenerator(Canvas &canvas, const EuclideanGenerator &generator) const;
     void drawRandomGenerator(Canvas &canvas, const RandomGenerator &generator) const;

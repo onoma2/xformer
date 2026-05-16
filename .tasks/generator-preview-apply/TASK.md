@@ -161,6 +161,7 @@ This is safe: generators write through `_edit` → live sequence. `showOriginal(
 
 - [ ] Should `EntropyTargets.h` be ported in Phase A or deferred to Phase 3 chaos/entropy task? Decision: defer. Phase A only adds the state machine shell.
 - [ ] XFORMER-specific entropy layers (AccumulatorTrigger, PulseCount, GateMode, HarmonyRoleOverride, etc.) — how to map EntropyTarget to these? Needs custom `applyTarget<NoteSequence>` specialization. Deferred to chaos/entropy consumer task.
+- [ ] **SequenceBuilder expansion for Tuesday/Indexed/Discrete** — current `SequenceBuilderImpl<T>` assumes `T::Layer` enum, `layerValue()/setLayerValue()`, `firstStep()/lastStep()` step range, and fixed-step iteration. Tuesday (no steps, algorithmic params), Indexed (bitpacked step, dynamic length 1-48), and Discrete (32 stages with threshold/direction/note, no Layer enum) each need hand-rolled SequenceBuilder subclasses before any generator/entropy system can apply. Deferred to post-Phase-E expansion task — the current preview/apply workflow targets NoteSequence and CurveSequence only.
 
 ## Completed Steps
 
@@ -174,7 +175,31 @@ This is safe: generators write through `_edit` → live sequence. `showOriginal(
   - T* _preview (heap-allocated) + bool _showingPreview + destructor in SequenceBuilderImpl<T>
   - Allocation failure handled gracefully (std::nothrow, stays in ORIGINAL)
   - Generator base class: delegate methods added
+  - updatePreview() base virtual + SequenceBuilderImpl implementation
   - RAM: .data + .bss unchanged at 118,648 (90.5%)
+- [x] **Phase B: RandomGenerator enhancements** — committed and hardware verified
+  - Variation param, randomizeParams, randomizeSeed, randomizeContextParams, displayValue
+  - displayValue() is preview-aware (shows preview values when showing preview, original when showing original)
+  - 32-bit seed
+- [x] **Phase C: GeneratorPage A/B workflow** — committed and hardware verified
+  - enter() in ORIGINAL state, encoder reroll creates preview, F0 toggles A/B
+  - _previewArmed/_applied state machine with bound track validation
+  - Step+Shift rerolls, F4 NEW RAND, encoder rerolls with function-key-aware detection
+  - Fixed: updatePreview() now called on all param changes (even in ORIGINAL state), fixing stale-preview bug on A/B toggle
+  - Fixed: updatePreview() now called before showPreview() in all reroll paths (F4, Shift+Step, RESEED)
+  - SMOOTH context menu quick-edit calls updatePreview() after edit
+- [x] **Phase D: 64-step visualization** — committed and hardware verified
+  - Layer-specific draw routines: drawGateBlocks, drawNoteContour, drawSlideMarkers, drawBooleanMarkers, drawLengthBars, drawRepeatStripes, drawProfile (centered/offset)
+  - Bank separators at 16-step boundaries with active-bank highlighting
+  - Bank frame around current section
+  - Playhead cursor (NoteTrackEngine/CurveTrackEngine)
+  - Left/Right navigation for section 0-3
+  - stepInCurrentBank for dimming non-active banks
+  - LED feedback: current step + step selection + gate highlight
+- [x] **Phase E: Context menu expansion** — committed and hardware verified
+  - Random: empty slot / SMOOTH (quick-edit) / REGEN / CANCEL / COMMIT
+  - Euclidean/others: NEW RAND / RESEED / REVERT / COMMIT
+  - RESEED action calls randomizeSeed() + update() + updatePreview() + showPreview()
 
 ## Notes
 

@@ -321,9 +321,9 @@ The Vinx fork has a complete 3-copy state machine with A/B preview, step selecti
 
 - `NoteSequence` — has full `layerValue/setLayerValue/layerRange` API with 17+ layers. XFORMER-unique layers: AccumulatorTrigger, PulseCount, GateMode, HarmonyRoleOverride, InversionOverride, VoicingOverride.
 - `CurveSequence` — 7 layers: Shape, ShapeVariation, Min, Max, Gate, GateOffset, GateProbability (GateLength in XFORMER maps to EventLength).
-- `IndexedSequence` — No Layer enum. Needs custom `applyTarget<IndexedSequence>` for duration, swing, repeats, condition.
-- `TuesdaySequence` — No Layer enum. Uses `Routable<T>`. Significant abstraction needed.
-- `DiscreteMapSequence` — Stage-based, not step-based. Custom handler needed.
+- `IndexedSequence` — No Layer enum, bitpacked 32-bit step (no `layerValue()`/`setLayerValue()`), dynamic skip via 0-duration steps. Needs hand-rolled `SequenceBuilder` + custom `applyTarget<IndexedSequence>` before entropy can apply.
+- `TuesdaySequence` — No Layer enum, no Step at all, algorithmic params via `Routable<T>`. Needs hand-rolled `SequenceBuilder` that models params as edit surface. Entropy means scrambling algorithm/flow/mask/glide/etc, not per-step layer blending.
+- `DiscreteMapSequence` — Stage-based (not step-based), threshold/direction/note per stage, no Layer enum. Needs hand-rolled `SequenceBuilder` + custom entropy path. Already has type-specific `randomizeThresholds()`/`randomizeNotes()`/`randomizeDirections()` — a more honest entry point.
 
 #### Implementation plan (phased)
 

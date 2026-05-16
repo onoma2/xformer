@@ -104,3 +104,8 @@ void RandomGenerator::update() {
         _builder.setValue(i, _pattern[i] * (1.f / 255.f));
     }
 }
+
+int RandomGenerator::displayValue(int index) const {
+    float value = showingPreview() ? _builder.value(index) : _builder.originalValue(index);
+    return clamp(int(value * 255.f + 0.5f), 0, 255);
+}

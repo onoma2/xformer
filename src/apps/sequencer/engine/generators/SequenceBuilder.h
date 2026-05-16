@@ -12,6 +12,7 @@ public:
     virtual void showOriginal() = 0;
     virtual void showPreview() = 0;
     virtual bool showingPreview() const = 0;
+    virtual void updatePreview() = 0;
 
     // original sequence
 
@@ -76,11 +77,20 @@ public:
                 _showingPreview = false;
                 return;
             }
-            // Copy current _edit (which has generator mutations) into _preview
             *_preview = _edit;
         }
         _edit = *_preview;
         _showingPreview = true;
+    }
+
+    void updatePreview() {
+        if (!_preview) {
+            _preview = new (std::nothrow) T(_original);
+            if (!_preview) {
+                return;
+            }
+        }
+        *_preview = _edit;
     }
 
     bool showingPreview() const override {

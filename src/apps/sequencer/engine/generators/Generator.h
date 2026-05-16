@@ -64,6 +64,10 @@ public:
         _builder.showPreview();
     }
 
+    void updatePreview() {
+        _builder.updatePreview();
+    }
+
     bool showingPreview() const {
         return _builder.showingPreview();
     }
