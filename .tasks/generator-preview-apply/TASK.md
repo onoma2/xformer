@@ -157,6 +157,12 @@ This is safe: generators write through `_edit` → live sequence. `showOriginal(
 - 2026-05-17: **Resolved Shift+Step conflict**: GeneratorPage consumes Shift+Step for re-roll ONLY when generator is active. Precedence: if `_generator != nullptr && key.isStep() && key.shiftModifier()`, handle as reroll and consume event. StepSelection's shift-persist is a different gesture in edit pages.
 - 2026-05-17: **Added 64-step rendering strategy**: At >16 steps, switch from filled rectangles to line/point rendering. Bank separators at 16-step boundaries. Active bank framed with horizontal lines. Non-active banks dimmed. Without this, 64 steps on 128px produces zero-width bars.
 
+## Next Phase
+
+### → [Phase F: Tuesday AlgoGenerator](PHASE_F_ALGO_GENERATOR.md)
+
+Run Tuesday's 15 algorithmic composition engines as a generator for NoteSequence tracks. Drives existing TuesdayTrackEngine via save/override/restore session — no code duplication.
+
 ## Open Questions
 
 - [ ] Should `EntropyTargets.h` be ported in Phase A or deferred to Phase 3 chaos/entropy task? Decision: defer. Phase A only adds the state machine shell.
