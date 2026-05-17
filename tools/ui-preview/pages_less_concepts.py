@@ -48,15 +48,17 @@ def render_stochastic_pitch_less_concepts(canvas: Canvas, sequence, track_engine
     canvas.draw_text(180, 20, f"min:{sequence.min_degree()}")
     canvas.draw_text(180, 28, f"max:{sequence.max_degree()}")
     canvas.draw_text(180, 36, f"root:{sequence.scale_root()}")
+    # Preset grid moved up from y=53-59 (footer collision) to y=40-47 (safe area)
+    grid_y0 = 40
     for i in range(2):
         for j in range(8):
             idx = j + i * 8
             active = idx < scale_size and tickets[idx] >= 0
             canvas.set_color(Color.Medium if active else Color.Low)
-            canvas.fill_rect(j * 5, 54 + i * 5, 4, 4)
+            canvas.fill_rect(j * 5, grid_y0 + i * 5, 4, 4)
             if idx == selected_degree:
                 canvas.set_color(Color.Bright)
-                canvas.draw_rect(j * 5 - 1, 53 + i * 5, 6, 6)
+                canvas.draw_rect(j * 5 - 1, grid_y0 - 1 + i * 5, 6, 6)
 
 
 

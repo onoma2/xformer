@@ -27,8 +27,8 @@ def render_stochastic_steps_skylines(canvas: Canvas, sequence, track_engine, sec
     current_step = track_engine.current_step()
     # From skylines.lua: move(3,58) then line_rel(5,0), then per step: line_rel(0,-5*reps), line_rel(4,0), line_rel(0,5*reps), line_rel(4,0)
     # Bar width = 4px, gap = 4px, base_y = 58 (bg) / 60 (fg), scale = 5px per rep
-    base_y_bg = 58
-    base_y_fg = 60
+    base_y_bg = 50
+    base_y_fg = 52
     bar_w = 4
     bar_gap = 4
     scale = 5

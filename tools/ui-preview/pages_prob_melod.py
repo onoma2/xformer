@@ -57,39 +57,42 @@ def render_stochastic_pitch_prob_melod(canvas: Canvas, sequence, track_engine, w
             canvas.set_color(Color.Low)
             canvas.draw_text(x_off - 2, y_off + 4, "X")
     # --- Keyboard (DrawKeyboard, lines 342-362) ---
-    # Keyboard frame: gfxFrame(0, 27, 63, 32)
+    # Scaled to fit safe area: original gfxFrame(0, 27, 63, 32) reaches y=59 (into footer)
+    # Compressed vertically: frame at y=22, h=26, key lines end at y=48
+    kb_y = 22
+    kb_h = 26
     canvas.set_color(Color.Medium)
-    canvas.draw_rect(0, 27, 63, 32)
-    # White-key vertical lines
+    canvas.draw_rect(0, kb_y, 63, kb_h)
+    # White-key vertical lines (compressed from 32px to 26px height)
     for x in range(8):
         if x == 3 or x == 7:
-            # Full-height line: gfxLine(x*8, 27, x*8, 58)
-            canvas.vline(x * 8, 27, 32)
+            # Full-height line
+            canvas.vline(x * 8, kb_y, kb_h)
         else:
-            # Lower line: gfxLine(x*8, 43, x*8, 58)
-            canvas.vline(x * 8, 43, 16)
-    # Black keys: gfxInvert((i*8)+6, 28, 5, 15) for i in [0,1,3,4,5] (skip i=2)
+            # Lower line (starts mid-height)
+            canvas.vline(x * 8, kb_y + kb_h // 2, kb_h // 2)
+    # Black keys: gfxInvert((i*8)+6, 28, 5, 15) compressed to fit
     black_key_indices = [0, 1, 3, 4, 5]
     for i in black_key_indices:
         bx = (i * 8) + 6
         canvas.set_color(Color.Bright)
-        canvas.fill_rect(bx, 28, 5, 15)
+        canvas.fill_rect(bx, kb_y + 1, 5, 12)
     # --- Active note triangles (lines 385-389) ---
     note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
     canvas.set_color(Color.Bright)
     # Draw note letter above keyboard for active note
     nx = semitone_x[active_note] + (1 if is_black[active_note] else 2) - 3
-    canvas.draw_text(nx, 59, note_names[active_note])
+    canvas.draw_text(nx, kb_y + kb_h + 2, note_names[active_note])
     # Octave indicator at right
-    canvas.draw_text(56, 59, f"O{active_octave}")
+    canvas.draw_text(56, kb_y + kb_h + 2, f"O{active_octave}")
     # --- Range fences (parameter area, approximated) ---
     canvas.set_color(Color.Bright)
     if 0 <= sequence.min_degree() < 12:
         fx = semitone_x[sequence.min_degree()] + (1 if is_black[sequence.min_degree()] else 2)
-        canvas.vline(fx, 20, 30)
+        canvas.vline(fx, 14, kb_y + kb_h - 14)
     if 0 <= sequence.max_degree() < 12:
         fx = semitone_x[sequence.max_degree()] + (1 if is_black[sequence.max_degree()] else 2)
-        canvas.vline(fx, 20, 30)
+        canvas.vline(fx, 14, kb_y + kb_h - 14)
 
 
 

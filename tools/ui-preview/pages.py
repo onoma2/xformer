@@ -16,6 +16,28 @@ from tracks import (
     StochasticSequence, StochasticTrackEngine,
     _ALGO_NAMES,
 )
+from pages_core import (
+    render_note_sequence_edit_page,
+    render_discrete_map_sequence_page,
+    render_tuesday_edit_page,
+    render_stochastic_edit_page,
+    render_stochastic_steps,
+    render_stochastic_dice,
+    render_stochastic_pitch,
+    render_stochastic_marbles,
+    render_stochastic_lock,
+    render_stochastic_track,
+)
+
+from pages_reference import (
+    render_ref_prob_melod,
+    render_ref_shredder,
+    render_ref_euclid,
+    render_ref_delinquencer,
+    render_ref_skylines,
+    render_ref_prob_div,
+)
+
 from pages_bline import (
     render_stochastic_marbles_bline,
     render_stochastic_pitch_bline,
