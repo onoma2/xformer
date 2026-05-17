@@ -509,21 +509,337 @@ pattern cycle
 
 **Goal:** Implement the dictionary as a new internal core while preserving the existing Stochastic track shell.
 
-**Model direction:**
-- Replace per-step stochastic probability as the primary model with a compact generated parent-event buffer.
-- Keep the current mode integration and storage wrappers, but treat the existing Vinx-like sequence fields as migration/scaffolding unless explicitly retained.
-- Add compact parent-event and child-hit storage that can be locked/replayed without tick-path allocation.
-- Preserve Performer scale/root/transpose/static octave behavior and user-scale support up to `CONFIG_USER_SCALE_SIZE`.
+**Implementation plan:**
 
-**Engine rules:**
-1. Generation creates parent events from track-owned controls.
-2. Pitch selection uses active scale degree count, signed tickets, excluded mask entries, range, Spread/Bias shaping, Complexity, Linearity, and Contour.
-3. `Rate` and `Variation` create parent-event durations.
-4. `Rest` decides whether a generated parent event is silent.
-5. `Burst` creates child hits inside a parent event; child hits may inherit or re-evaluate pitch according to `Burst Pitch`.
-6. `Density` is deterministic thinning over parent events using the pattern's stable rest order and must not consume RNG while being changed.
-7. `Mutate`, `Patience`, `Sleep`, and `Jump` operate at pattern-cycle boundaries while unlocked.
-8. `Lock` replays captured evaluated parent events and child hits; later edits must not alter locked output.
+Phase 7b is a ground-up core rebuild inside the existing `TrackMode::Stochastic` shell. Do not start from UI. Start from storage and deterministic engine behavior, then keep the current list/stub pages only as temporary hardware access.
+
+##### 7b.0 Baseline and Guard Rails
+
+**Files to read before editing:**
+- `PROJECT.md` — version bump policy and RAM gates.
+- `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md` — required vocabulary and ownership contract.
+- `src/apps/sequencer/model/StochasticTrack.h`
+- `src/apps/sequencer/model/StochasticSequence.h`
+- `src/apps/sequencer/engine/StochasticTrackEngine.h`
+- `src/apps/sequencer/engine/StochasticTrackEngine.cpp`
+- `src/apps/sequencer/model/Routing.h`
+- `src/apps/sequencer/model/Routing.cpp`
+- `src/apps/sequencer/ui/model/StochasticTrackListModel.h`
+- `src/apps/sequencer/ui/model/StochasticSequenceListModel.h`
+
+**Before code changes:**
+1. Capture current STM32 release size numbers with `cd build/stm32/release && make sequencer`.
+2. Capture `sizeof(StochasticTrack)`, `sizeof(StochasticSequence)`, `sizeof(StochasticTrackEngine)`, and `sizeof(Engine::TrackEngineContainer)` via the existing MonitorPage/size-probe workflow.
+3. Confirm the current `tools/ui-preview` deletions are unrelated and do not include them in Phase 7b commits.
+
+**Hard constraints:**
+- No STL containers in the tick path.
+- No tick-path heap allocation.
+- No large inline engine buffers that exceed the engine container gate.
+- No `Run` parameter.
+- No raw user-facing `0..15` probability values.
+- No final UI work in Phase 7b.
+
+##### 7b.1 Add the Core Event Types
+
+**Files:**
+- Create: `src/apps/sequencer/model/StochasticTypes.h`
+- Modify: `src/apps/sequencer/model/StochasticSequence.h`
+- Modify: `src/apps/sequencer/model/StochasticTrack.h`
+
+**New file responsibility:** `StochasticTypes.h` owns the compact vocabulary-level storage types shared by model and engine. Keep this separate so `StochasticSequence.h` does not keep growing around old Vinx bitfields.
+
+**Types to add:**
+- `enum class StochasticMode : uint8_t { Dice, Realtime, Last };`
+- `enum class StochasticBurstPitch : uint8_t { Parent, Generate, Last };`
+- `struct StochasticChildHit`
+  - `int16_t degree;`
+  - `int8_t octave;`
+  - `uint8_t offset;` normalized 0..255 inside parent duration.
+  - `uint8_t length;` normalized 0..255 inside parent duration.
+  - `bool gate;`
+  - `bool slide;`
+  - `bool accent;`
+- `struct StochasticParentEvent`
+  - `int16_t degree;`
+  - `int8_t octave;`
+  - `uint8_t rate;` encoded duration index, not raw ticks.
+  - `uint8_t length;` normalized gate length.
+  - `uint8_t childFirst;`
+  - `uint8_t childCount;`
+  - `uint8_t densityRank;`
+  - bit flags for `rest`, `legato`, `slide`, `accent`, `valid`.
+
+**Storage rule:** Parent events are pattern-buffer data. Child hits are burst-buffer data. Neither should live only in the engine if the user expects Dice/Lock/project recall to reconstruct the pattern.
+
+**How to integrate:**
+- Add `#include "StochasticTypes.h"` to `StochasticSequence.h` and `StochasticTrack.h`.
+- Leave the old `StochasticSequence::Step` type in place for migration and current stub UI access, but mark in comments that it is Phase 6 scaffolding.
+- Add a compact event buffer to `StochasticSequence`:
+  - `std::array<StochasticParentEvent, CONFIG_STEP_COUNT> _events;`
+  - `std::array<StochasticChildHit, CONFIG_STEP_COUNT * 4> _children;`
+  - `uint8_t _size;`
+  - `uint8_t _first;`
+  - `uint8_t _last;`
+  - `bool _patternValid;`
+- Use a fixed child capacity of `CONFIG_STEP_COUNT * 4` for Phase 7b. Four child hits per parent is enough to verify Tuesday-style burst without introducing unbounded queue pressure.
+
+**Expected RAM impact:** This will add direct model storage. Probe before continuing. If `sizeof(StochasticTrack)` crosses `sizeof(NoteTrack)`, reduce child capacity or pack flags before touching engine behavior.
+
+##### 7b.2 Move Stochastic Pattern Controls Into the Model
+
+**Files:**
+- Modify: `src/apps/sequencer/model/StochasticSequence.h`
+- Modify: `src/apps/sequencer/model/StochasticTrack.h`
+- Modify: `src/apps/sequencer/model/StochasticTrack.cpp`
+- Modify: `src/apps/sequencer/model/ClipBoard.h`
+- Modify: `src/apps/sequencer/model/ClipBoard.cpp`
+
+**StochasticSequence additions:**
+- `size()` / `setSize(int)` / `printSize()` / `editSize()`
+- `first()` / `setFirst(int)` / `printFirst()` / `editFirst()`
+- `last()` / `setLast(int)` / `printLast()` / `editLast()`
+- `patternValid()` / `setPatternValid(bool)`
+- `event(int)` accessors
+- `child(int)` accessors
+- `clearEvents()` clearing `_events`, `_children`, `_size`, `_first`, `_last`, `_patternValid`
+
+**Bounds:**
+- `Size`: clamp `2..CONFIG_STEP_COUNT`.
+- `First`: clamp `0..size - 1`.
+- `Last`: clamp `first..size - 1`.
+- Default: `size = 16`, `first = 0`, `last = 15`.
+
+**StochasticTrack additions:**
+- Pitch/control fields:
+  - `StochasticMode _mode;`
+  - `uint8_t _complexity;`
+  - `int8_t _contour;` range `-100..100`
+  - `uint8_t _rate;`
+  - `int8_t _variation;` range `-100..100`
+  - `uint8_t _rest;`
+  - `uint8_t _slide;`
+  - `uint8_t _burstRate;`
+  - `uint8_t _burstCount;`
+  - `StochasticBurstPitch _burstPitch;`
+  - `uint8_t _sleep;`
+  - `uint8_t _patience;`
+  - `uint8_t _mutate;`
+  - `uint8_t _jump;`
+- Existing fields to keep but reinterpret:
+  - `_degreeTickets` = `Tickets`.
+  - `_marblesSpread` = `Spread`; consider renaming later only if serialization can stay safe.
+  - `_marblesBias` = `Bias`.
+  - `_linearity` = `Linearity`.
+  - `_density` = deterministic pattern thinning.
+  - `_tilt` = rest-order generation bias.
+  - `_octave` = static Performer track octave.
+  - `_transpose` = Performer transpose.
+- Existing fields to demote/scaffold:
+  - `_jitter`, `_rotate`, `_gateBias`, `_retriggerBias`, `_lengthBias`, `_noteBias`, old `loopFirst/loopLast` should not drive Phase 7b core output unless explicitly bridged.
+
+**Serialization:**
+- Append new fields at the end of `StochasticTrack::write()` and `read()` in exactly the same order.
+- Add event/child arrays to `StochasticSequence::write()` and `read()` after existing old step data to avoid another `end_of_file` regression.
+- No version bump unless the user explicitly approves; dev projects may break, but read/write symmetry must be exact.
+- After read, clamp enum values with `ModelUtils::clampedEnum()` or explicit range checks.
+
+**Clipboard:**
+- Update `ClipBoard.h` stochastic union arm if `StochasticSequence` size changes.
+- Update `ClipBoard.cpp` copy/paste only if existing full-sequence copy no longer includes new event buffers automatically.
+
+##### 7b.3 Add Deterministic Generation Helpers
+
+**Files:**
+- Create: `src/apps/sequencer/engine/StochasticGenerator.h`
+- Create: `src/apps/sequencer/engine/StochasticGenerator.cpp`
+- Modify: `src/apps/sequencer/engine/StochasticTrackEngine.cpp`
+
+**Responsibility:** `StochasticGenerator` creates and mutates `StochasticSequence` event buffers from `StochasticTrack` controls. It should be deterministic, small, and testable without the full track engine.
+
+**Public API:**
+- `static void generatePattern(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, uint32_t seed);`
+- `static void mutateOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng);`
+- `static StochasticParentEvent generateParentEvent(...);`
+- `static int generateDegree(...);`
+- `static void generateDensityRanks(StochasticSequence &sequence, const StochasticTrack &track, uint32_t seed);`
+- `static int generateJumpOctave(const StochasticTrack &track, int currentJump, Random &rng);`
+
+**Pitch generation rules:**
+1. Build a local allowed degree list of at most `CONFIG_USER_SCALE_SIZE` active degrees from `scale.notesPerOctave()`.
+2. Exclude tickets `< 0`.
+3. Exclude degrees outside `Range`.
+4. Compute final weight as:
+   - `ticket_weight`
+   - multiplied by Spread/Bias window weight
+   - multiplied by Linearity distance weight
+   - multiplied by Contour direction weight
+   - constrained by Complexity.
+5. If all final weights are zero, fall back to the first non-excluded degree in range.
+6. Complexity behavior:
+   - `0..32`: choose a tiny anchor subset from the ticket pool and strongly prefer repeats.
+   - `33..66`: prefer repeat, `last - 1`, `last`, and `last + 1`.
+   - `67..100`: use full weighted pool with wider jumps.
+
+**Spread/Bias rule:**
+- Treat Bias as a center index across the allowed degree list.
+- Treat Spread as bandwidth:
+  - low Spread = narrow window around Bias,
+  - mid Spread = soft Gaussian-ish window,
+  - high Spread = flat enough that tickets dominate.
+- Spread/Bias must never wake an excluded or zero-ticket degree.
+
+**Density ranks:**
+- Generate one stable `densityRank` per parent event when a new pattern is created.
+- Rank is unique from `0..size-1`.
+- Tilt biases rank generation before deterministic shuffle:
+  - negative preserves earlier positions longer,
+  - positive preserves later positions longer.
+- Density playback uses rank threshold only; changing Density must not consume RNG.
+
+##### 7b.4 Rebuild Engine Playback Around Parent Events
+
+**Files:**
+- Modify: `src/apps/sequencer/engine/StochasticTrackEngine.h`
+- Modify: `src/apps/sequencer/engine/StochasticTrackEngine.cpp`
+- Add include: `src/apps/sequencer/engine/StochasticGenerator.h`
+
+**Engine state changes:**
+- Replace `_currentStep` semantics with parent-event index semantics. Keep method name if required by UI, but document it as current parent event.
+- Add:
+  - `uint8_t _patternIndex;`
+  - `uint8_t _sleepRemaining;`
+  - `uint16_t _boredomCounter;`
+  - `int8_t _jumpOctave;`
+  - `bool _patternCycleEnded;`
+- Replace `LockedStep` with evaluated event lock data:
+  - `LockedParentEvent`: final CV, duration ticks, gate/rest, legato, slide, accent, first child, child count, valid.
+  - `LockedChildHit`: final CV, offset ticks, length ticks, gate, slide, accent.
+- Keep locked buffers heap-allocated, not inline. Allocate parent buffer capacity `CONFIG_STEP_COUNT`, child capacity `CONFIG_STEP_COUNT * 4`.
+
+**Tick advancement:**
+1. Do not use `sequence.runMode()` for Phase 7b stochastic playback.
+2. Parent events advance forward through `sequence.first()..sequence.last()`.
+3. Parent event duration comes from the generated event's `rate` and `length`, not from old per-step length probability.
+4. `Realtime` mode generates the next parent event on demand and does not reuse the stored pattern, except for monitoring/debug if needed.
+5. `Dice` mode generates the pattern when invalid, then reuses it until `New`, `Mutate`, or `Patience` changes it.
+
+**Pattern-cycle boundary:**
+- When index passes `last`, wrap to `first` and evaluate:
+  - `Sleep`: insert wait cycles/ticks before next parent event.
+  - `Patience`: if not 100, increase boredom and maybe call `generatePattern()`.
+  - `Mutate`: maybe call `mutateOne()`.
+  - `Jump`: maybe update `_jumpOctave` within bounded pitch behavior.
+- If `lock()` is true, skip all mutation/new/jump changes to evaluated playback.
+
+**Output scheduling:**
+- Parent event schedules its CV/gate first.
+- Burst child hits are scheduled relative to the parent event start and duration.
+- Child hits do not advance `_patternIndex`.
+- If `Burst Pitch == Parent`, child CV equals parent CV.
+- If `Burst Pitch == Generate`, child CV is generated and captured independently.
+- A parent hidden by Density schedules a gate-off and no child hits.
+- `cvUpdateMode == Always` may still update CV on rests; `Gate` holds pitch until gate.
+
+**Old logic to bypass or remove from main path:**
+- `evalStepGate()`
+- `evalStepLength()`
+- `evalStepRetrigger()`
+- old `evalStepNote()` fallback-to-step-note behavior
+- `SequenceUtils::rotateStep()`
+- `sequence.runMode()`
+- `loopFirst/loopLast` as active stochastic playback source
+
+Keep these only if needed for migration/debug until Phase 8 removes old UI assumptions.
+
+##### 7b.5 Routing and Temporary Hardware Access
+
+**Files:**
+- Modify: `src/apps/sequencer/model/Routing.h`
+- Modify: `src/apps/sequencer/model/Routing.cpp`
+- Modify: `src/apps/sequencer/model/StochasticTrack.cpp`
+- Modify: `src/apps/sequencer/ui/model/StochasticTrackListModel.h`
+- Modify: `src/apps/sequencer/ui/model/StochasticSequenceListModel.h`
+- Modify only if required: `src/apps/sequencer/ui/pages/StochasticConfigPage.h/.cpp`
+- Modify only if required: `src/apps/sequencer/ui/pages/StochasticSequenceEditPage.h/.cpp`
+
+**Routing targets:**
+- Add only high-value performance routables in Phase 7b:
+  - `StochasticComplexity`
+  - `StochasticRest`
+  - `StochasticBurst`
+  - `StochasticDensity`
+  - `StochasticPatience`
+  - `StochasticMutate`
+- Do not add routable targets for every dictionary term yet. UI comes in Phase 8.
+- Use `targetSerialize()` stable IDs; do not reorder existing IDs.
+
+**Temporary list access:**
+- `StochasticTrackListModel.h` should expose enough to hardware-test Phase 7b:
+  - Mode, New, Complexity
+  - Scale, Root, Transpose, Octave
+  - Range, Tickets access path or at least a selected-ticket editor
+  - Spread, Bias
+  - Rate, Variation, Rest, Legato, Slide
+  - Burst, Burst Rate, Burst Count, Burst Pitch
+  - Size, First, Last, Lock
+  - Density, Tilt, Sleep, Patience, Mutate, Jump
+- Labels must be user-facing dictionary names, not internal names.
+- `StochasticSequenceListModel.h` may expose event-buffer inspection only; it should not imply old step probabilities are the main model.
+
+##### 7b.6 Project Save/Load and Backward Safety
+
+**Files:**
+- Modify: `src/apps/sequencer/model/StochasticTrack.h`
+- Modify: `src/apps/sequencer/model/StochasticSequence.h`
+- Review: `src/apps/sequencer/model/Track.cpp`
+- Review: `src/apps/sequencer/model/ClipBoard.cpp`
+
+**Checklist:**
+1. Write/read order is byte-for-byte symmetric.
+2. No conditional reads based on runtime state.
+3. All enum reads are clamped.
+4. `clear()` initializes every new field and every event/child valid flag.
+5. Saved project with Stochastic track loads without `end_of_file`.
+6. Clipboard copy/paste preserves generated pattern buffers.
+
+##### 7b.7 Verification Plan
+
+**Build/size checks:**
+- `cd build/stm32/release && make sequencer`
+- Record:
+  - `.data`
+  - `.bss`
+  - `.ccmram_bss`
+  - `sizeof(StochasticTrack)`
+  - `sizeof(StochasticSequence)`
+  - `sizeof(StochasticTrackEngine)`
+  - `sizeof(Engine::TrackEngineContainer)`
+
+**Hardware checks before Phase 8 UI:**
+1. Create Stochastic track and confirm no boot/load crash.
+2. Generate `New` pattern in Dice mode; confirm repeatable playback.
+3. Switch to Realtime; confirm event stream changes continuously.
+4. Set active scale/root/transpose/static octave; confirm output follows Performer pitch behavior.
+5. Use user scale with more than 12 degrees; confirm tickets/range do not assume chromatic 12.
+6. Set Complexity low; confirm small pitch vocabulary/repetition even with many tickets.
+7. Set Complexity mid; confirm adjacent runs appear.
+8. Set Complexity high; confirm wider pool use.
+9. Sweep Density down/up; confirm the same parent events disappear/reappear.
+10. Change Tilt, regenerate, and confirm early/late density survival changes.
+11. Enable Burst with `Burst Pitch = Parent`; confirm child hits keep parent pitch.
+12. Enable Burst with `Burst Pitch = Generate`; confirm child hits can change pitch and lock captures them.
+13. Enable Lock, edit generator controls, and confirm evaluated parent/child output does not change.
+14. Unlock, trigger New/Mutate/Patience behavior, and confirm output updates.
+15. Save/load the project and confirm no `end_of_file`, same generated Dice pattern, and same locked replay.
+
+**Commit slicing:**
+1. Commit dictionary-linked model storage only.
+2. Commit generator helpers and deterministic generation.
+3. Commit engine playback rewrite.
+4. Commit routing/list hardware access.
+5. Commit serialization/clipboard/save-load fixes.
+6. Commit verification notes and task status update.
 
 **Non-goals:**
 - Do not preserve `Run` as a Phase 7 control.
