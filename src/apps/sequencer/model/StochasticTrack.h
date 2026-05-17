@@ -152,6 +152,12 @@ public:
         _transpose.set(clamp(transpose, -100, 100), routed);
     }
 
+    // rotate
+    int rotate() const { return _rotate.get(isRouted(Routing::Target::Rotate)); }
+    void setRotate(int rotate, bool routed = false) {
+        _rotate.set(clamp(rotate, -CONFIG_STEP_COUNT, CONFIG_STEP_COUNT), routed);
+    }
+
     // fillMode
     FillMode fillMode() const { return _fillMode; }
     void setFillMode(FillMode fillMode) {
@@ -227,6 +233,7 @@ public:
         _slideTime.setBase(0);
         _octave.setBase(0);
         _transpose.setBase(0);
+        _rotate.setBase(0);
         _fillMode = FillMode::None;
         _cvUpdateMode = CvUpdateMode::Gate;
         _gateBias.setBase(0);
@@ -259,6 +266,7 @@ public:
         _slideTime.write(writer);
         _octave.write(writer);
         _transpose.write(writer);
+        _rotate.write(writer);
         writer.write(static_cast<uint8_t>(_fillMode));
         writer.write(static_cast<uint8_t>(_cvUpdateMode));
         _gateBias.write(writer);
@@ -293,9 +301,11 @@ public:
         _slideTime.read(reader);
         _octave.read(reader);
         _transpose.read(reader);
-        uint8_t fillMode, cvUpdateMode;
+        _rotate.read(reader);
+        uint8_t fillMode;
         reader.read(fillMode);
         _fillMode = static_cast<FillMode>(fillMode);
+        uint8_t cvUpdateMode;
         reader.read(cvUpdateMode);
         _cvUpdateMode = static_cast<CvUpdateMode>(cvUpdateMode);
         _gateBias.read(reader);
@@ -338,6 +348,7 @@ private:
     Routable<uint8_t> _slideTime;
     Routable<int8_t> _octave;
     Routable<int8_t> _transpose;
+    Routable<int8_t> _rotate;
     FillMode _fillMode;
     CvUpdateMode _cvUpdateMode;
     Routable<int8_t> _gateBias;

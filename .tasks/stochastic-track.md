@@ -11,6 +11,8 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - `src/apps/sequencer/ui/pages/StochasticConfigPage.h` — Global settings UI
 
 ## Decisions log
+- 2026-05-17: Phase 5 complete. Implemented Accent and Legato probabilities. Accent is mapped to a secondary gate output (index 1), and Legato ties the gate to the next note while triggering a slide. Both are captured in the lock buffer.
+- 2026-05-17: Phase 4 complete. Implemented track-level Loop Windowing (loopFirst/loopLast) and Sequence Rotation. Fixed the lock invariant by capturing gateOffset and slide state.
 - 2026-05-17: Initializing task wiki. Consolidated "Enhanced" design with Vinx port plan.
 - 2026-05-17: Decision: Use heap-allocated lock buffer to save CCMRAM (nongotiable for RAM acceptance).
 - 2026-05-17: Decision: Implement Marbles control law (Spread/Bias/Steps) for pitch shaping as an optional mode.
@@ -48,12 +50,12 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 
 ### Phase 4: Loop Controls
 - [x] Implement Captured Event Lock logic (freeze evaluated results).
-- [ ] Implement Loop Windowing (First/Last) and Rotation.
-- [ ] **Validation:** Verify locked-loop invariant (source edits don't change lock).
+- [x] Implement Loop Windowing (First/Last) and Rotation.
+- [x] **Validation:** Verify locked-loop invariant (source edits don't change lock).
 
 ### Phase 5: Dynamics
-- [ ] Implement Accent Probability.
-- [ ] Implement Legato/Slew Probability.
+- [x] Implement Accent Probability.
+- [x] Implement Legato/Slew Probability.
 
 ### Phase 6: UI Development
 - [ ] Implement `StochasticSequenceEditPage` (Grid + Layer switching).

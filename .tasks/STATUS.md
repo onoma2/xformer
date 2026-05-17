@@ -12,8 +12,8 @@ _Updated: 2026-05-17_
 
 ## 🟡 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Phase 4 part A complete: Captured-event lock buffer implemented with compact 704 B footprint. Phase 3 refinements (ProbMeloD rotation, deterministic RNG) verified.
-**Next action:** Phase 4 part B: Implement Loop Windowing (First/Last) and sequence rotation for the stochastic engine.
+**Where I stopped:** Phase 5 complete: implemented Accent and Legato probabilities with full lock invariant capture. Track-level loop windowing and sequence rotation are functional.
+**Next action:** Phase 6 UI Development: start implementing `StochasticConfigPage` to expose the new global stochastic parameters.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic

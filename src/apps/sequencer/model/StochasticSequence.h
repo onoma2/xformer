@@ -306,9 +306,6 @@ public:
         reader.read(_divisor);
         reader.read(_resetMeasure);
 
-        setScale(_scale);
-        setRootNote(_rootNote);
-
         for (auto &step : _steps) {
             step.read(reader);
         }

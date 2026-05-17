@@ -231,6 +231,7 @@ void StochasticTrackEngine::reset() {
     _prevCondition = false;
     _activity = false;
     _gateOutput = false;
+    _accentOutput = false;
     _slideActive = false;
     _cvOutput = 0.f;
     _cvOutputTarget = 0.f;
@@ -273,10 +274,13 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
         }
 
         // advance sequence
+        uint32_t firstStep = _stochasticTrack.loopFirst();
+        uint32_t lastStep = _stochasticTrack.loopLast();
+
         switch (sequence.playMode()) {
         case Types::PlayMode::Aligned: {
             if (relativeTick % divisor == 0) {
-                _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), _rng);
+                _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), firstStep, lastStep, _rng);
                 triggerStep(tick, divisor);
             }
         }
@@ -288,7 +292,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
             uint32_t currentRelativeTick = static_cast<uint32_t>(baseTick);
             
             if (currentRelativeTick % divisor == 0 && currentRelativeTick != _freeRelativeTick) {
-                _sequenceState.advanceAligned(currentRelativeTick / divisor, sequence.runMode(), sequence.firstStep(), sequence.lastStep(), _rng);
+                _sequenceState.advanceAligned(currentRelativeTick / divisor, sequence.runMode(), firstStep, lastStep, _rng);
                 triggerStep(tick, divisor);
                 _freeRelativeTick = currentRelativeTick;
             }
@@ -311,6 +315,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
             result |= TickResult::GateUpdate;
             _activity = _gateQueue.front().gate;
             _gateOutput = (!mute() || fill()) && _activity;
+            _accentOutput = _gateQueue.front().accent && _gateOutput;
             midiOutputEngine.sendGate(_track.trackIndex(), _gateOutput);
         }
         _gateQueue.pop();
@@ -406,7 +411,7 @@ void StochasticTrackEngine::setMonitorStep(int index) {
 
 void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool forNextStep) {
     auto &sequence = *_sequence;
-    _index = _sequenceState.step();
+    _index = SequenceUtils::rotateStep(_sequenceState.step(), _stochasticTrack.loopFirst(), _stochasticTrack.loopLast(), _stochasticTrack.rotate());
     _currentStep = _index;
 
     auto step = sequence.step(_index);
@@ -417,6 +422,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
     uint8_t stepRetrigger = 1;
     bool stepGate = false;
     bool slide = false;
+    bool accent = false;
+    bool legato = false;
 
     bool locked = _stochasticTrack.lock() && _lockedSteps && _lockedSteps[_index].valid;
 
@@ -427,6 +434,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
         stepRetrigger = _lockedSteps[_index].retrigger;
         stepGate = _lockedSteps[_index].gate;
         slide = _lockedSteps[_index].slide;
+        accent = _lockedSteps[_index].accent;
+        legato = _lockedSteps[_index].legato;
     } else {
         stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _rng);
 
@@ -443,13 +452,19 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
             gateOffset = step.gateOffset();
             stepRetrigger = (uint8_t) evalStepRetrigger(step, _stochasticTrack.retriggerBias(), _rng);
             slide = step.slide();
+            accent = (int(_rng.nextRange(100)) < _stochasticTrack.accentProb());
+            legato = (int(_rng.nextRange(100)) < _stochasticTrack.legatoProb());
+
+            if (legato) {
+                stepLength = divisor;
+            }
         }
 
         if (_lockedSteps) {
             if (!_lockedSteps[_index].valid) {
                 _lockedStepCount++;
             }
-            _lockedSteps[_index] = { noteValue, stepLength, gateOffset, stepRetrigger, stepGate, slide, true };
+            _lockedSteps[_index] = { noteValue, stepLength, gateOffset, stepRetrigger, stepGate, slide, accent, legato, true };
         }
     }
 
@@ -461,16 +476,18 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
             uint32_t retriggerLength = divisor / stepRetrigger;
             uint32_t retriggerOffset = 0;
             while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
-                _gateQueue.pushReplace({ Groove::applySwing(stepTick + retriggerOffset, swing()), true });
-                _gateQueue.pushReplace({ Groove::applySwing(stepTick + retriggerOffset + retriggerLength / 2, swing()), false });
+                _gateQueue.pushReplace({ Groove::applySwing(stepTick + retriggerOffset, swing()), true, accent });
+                _gateQueue.pushReplace({ Groove::applySwing(stepTick + retriggerOffset + retriggerLength / 2, swing()), false, accent });
                 retriggerOffset += retriggerLength;
             }
         } else {
-            _gateQueue.pushReplace({ Groove::applySwing(stepTick, swing()), true });
-            _gateQueue.pushReplace({ Groove::applySwing(stepTick + stepLength, swing()), false });
+            _gateQueue.pushReplace({ Groove::applySwing(stepTick, swing()), true, accent });
+            if (!legato) {
+                _gateQueue.pushReplace({ Groove::applySwing(stepTick + stepLength, swing()), false, accent });
+            }
         }
 
-        _cvQueue.push({ Groove::applySwing(stepTick, swing()), noteValue, slide });
+        _cvQueue.push({ Groove::applySwing(stepTick, swing()), noteValue, slide || legato });
     }
 }
 

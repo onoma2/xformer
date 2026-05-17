@@ -28,8 +28,12 @@ public:
     virtual const TrackLinkData *linkData() const override { return &_linkData; }
 
     virtual bool activity() const override { return _activity; }
-    virtual bool gateOutput(int index) const override { return _gateOutput; }
-    virtual float cvOutput(int index) const override { return _cvOutput; }
+    virtual bool gateOutput(int index) const override {
+        return index == 0 ? _gateOutput : (index == 1 ? _accentOutput : false);
+    }
+    virtual float cvOutput(int index) const override {
+        return index == 0 ? _cvOutput : 0.f;
+    }
     virtual float sequenceProgress() const override;
 
     const StochasticSequence &sequence() const { return *_sequence; }
@@ -47,6 +51,8 @@ public:
         uint8_t retrigger;
         bool gate;
         bool slide;
+        bool accent;
+        bool legato;
         bool valid;
     };
 
@@ -87,6 +93,7 @@ private:
 
     bool _activity;
     bool _gateOutput;
+    bool _accentOutput;
     float _cvOutput;
     float _cvOutputTarget;
     bool _slideActive;
@@ -103,6 +110,7 @@ private:
     struct Gate {
         uint32_t tick;
         bool gate;
+        bool accent;
     };
 
     struct GateCompare {
