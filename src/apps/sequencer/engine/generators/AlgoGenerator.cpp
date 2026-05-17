@@ -127,7 +127,7 @@ void AlgoGenerator::update() {
     algoParams.algorithm = _params.algorithm;
     algoParams.flow = _params.flow;
     algoParams.ornament = _params.ornament;
-    algoParams.glide = 0;          // no glide from generator
+    algoParams.glide = _params.variation / 2;
     algoParams.power = _params.power;
     algoParams.stepTrill = 0;
     algoParams.gateLength = 50;
