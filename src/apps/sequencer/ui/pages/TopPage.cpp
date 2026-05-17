@@ -493,7 +493,7 @@ void TopPage::setSequenceView(SequenceView view) {
         setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Stochastic:
-        setMainPage(pages.track); // Fallback to track page for now
+        setMainPage(pages.stochasticSequenceEdit);
         break;
     case Track::TrackMode::Last:
         break;
@@ -584,7 +584,7 @@ void TopPage::setSequenceEditPage() {
         setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Stochastic:
-        setMainPage(pages.track); // Fallback to track page for now
+        setMainPage(pages.stochasticSequenceEdit);
         break;
     case Track::TrackMode::Last:
         break;

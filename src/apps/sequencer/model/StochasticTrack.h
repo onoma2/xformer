@@ -215,6 +215,61 @@ public:
         _noteBias.set(clamp(noteBias, -100, 100), routed);
     }
 
+    // UI methods
+    void printDensity(StringBuilder &str) const { str("%d%%", density()); }
+    void editDensity(int value, bool shift) { setDensity(ModelUtils::adjustedByStep(density(), value, 1, !shift)); }
+
+    void printTilt(StringBuilder &str) const { str("%+d%%", tilt()); }
+    void editTilt(int value, bool shift) { setTilt(ModelUtils::adjustedByStep(tilt(), value, 1, !shift)); }
+
+    void printJitter(StringBuilder &str) const { str("%d%%", jitter()); }
+    void editJitter(int value, bool shift) { setJitter(ModelUtils::adjustedByStep(jitter(), value, 1, !shift)); }
+
+    void printBurst(StringBuilder &str) const { str("%d%%", burst()); }
+    void editBurst(int value, bool shift) { setBurst(ModelUtils::adjustedByStep(burst(), value, 1, !shift)); }
+
+    void printRotate(StringBuilder &str) const { str("%d", rotate()); }
+    void editRotate(int value, bool shift) { setRotate(ModelUtils::adjustedByStep(rotate(), value, 1, !shift)); }
+
+    void printLock(StringBuilder &str) const { str(lock() ? "On" : "Off"); }
+    void editLock(int value, bool shift) { setLock(value > 0); }
+
+    void printLoopFirst(StringBuilder &str) const { str("%d", loopFirst() + 1); }
+    void editLoopFirst(int value, bool shift) { setLoopFirst(loopFirst() + value); }
+
+    void printLoopLast(StringBuilder &str) const { str("%d", loopLast() + 1); }
+    void editLoopLast(int value, bool shift) { setLoopLast(loopLast() + value); }
+
+    void printCvUpdateMode(StringBuilder &str) const {
+        switch (cvUpdateMode()) {
+        case CvUpdateMode::Gate:   str("Gate"); break;
+        case CvUpdateMode::Always: str("Always"); break;
+        case CvUpdateMode::Last:   break;
+        }
+    }
+    void editCvUpdateMode(int value, bool shift) { setCvUpdateMode(ModelUtils::adjustedEnum(cvUpdateMode(), value)); }
+
+    void printSlideTime(StringBuilder &str) const { str("%d", slideTime()); }
+    void editSlideTime(int value, bool shift) { setSlideTime(ModelUtils::adjustedByStep(slideTime(), value, 1, !shift)); }
+
+    void printOctave(StringBuilder &str) const { str("%+d", octave()); }
+    void editOctave(int value, bool shift) { setOctave(octave() + value); }
+
+    void printTranspose(StringBuilder &str) const { str("%+d", transpose()); }
+    void editTranspose(int value, bool shift) { setTranspose(transpose() + value); }
+
+    void printScale(StringBuilder &str, int defaultScale) const { str("Default"); }
+    void editScale(int value, bool shift) { }
+
+    void printRootNote(StringBuilder &str, int defaultRootNote) const { str("Default"); }
+    void editRootNote(int value, bool shift) { }
+
+    void printDivisor(StringBuilder &str) const { str("N/A"); }
+    void editDivisor(int value, bool shift) { }
+
+    void printRunMode(StringBuilder &str) const { str("N/A"); }
+    void editRunMode(int value, bool shift) { }
+
     // sequences
     const StochasticSequenceArray &sequences() const { return _sequences; }
           StochasticSequenceArray &sequences()       { return _sequences; }

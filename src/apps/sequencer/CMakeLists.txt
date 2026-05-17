@@ -129,6 +129,8 @@ set(sources
     ui/pages/SongPage.cpp
     ui/pages/StartupPage.cpp
     ui/pages/SystemPage.cpp
+    ui/pages/StochasticConfigPage.cpp
+    ui/pages/StochasticSequenceEditPage.cpp
     ui/pages/TempoPage.cpp
     ui/pages/TextInputPage.cpp
     ui/pages/TopPage.cpp

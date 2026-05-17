@@ -31,7 +31,7 @@ public:
     using RetriggerProbability = UnsignedValue<4>;
     using GateOffset = SignedValue<4>;
     using Condition = UnsignedValue<7>;
-    using StageRepeats = UnsignedValue<3>;
+    using StageRepeats = UnsignedValue<2>;
     using StageRepeatMode = UnsignedValue<3>;
 
     enum class Layer {
@@ -61,7 +61,7 @@ public:
         void clear() {
             _data0.raw = 0;
             _data1.raw = 0;
-            setLength(Length::Max / 2); // Default to some length
+            setLength(Length::Max / 2);
         }
 
         bool gate() const { return _data0.gate ? true : false; }
@@ -69,6 +69,12 @@ public:
 
         bool slide() const { return _data0.slide ? true : false; }
         void setSlide(bool slide) { _data0.slide = slide; }
+
+        bool accent() const { return _data0.accent ? true : false; }
+        void setAccent(bool accent) { _data0.accent = accent; }
+
+        bool legato() const { return _data0.legato ? true : false; }
+        void setLegato(bool legato) { _data0.legato = legato; }
 
         int length() const { return _data0.length; }
         void setLength(int length) { _data0.length = Length::clamp(length); }
@@ -84,9 +90,6 @@ public:
 
         int noteOctave() const { return NoteOctave::Min + _data0.noteOctave; }
         void setNoteOctave(int noteOctave) { _data0.noteOctave = NoteOctave::clamp(noteOctave) - NoteOctave::Min; }
-
-        int noteVariationProbability() const { return _data0.noteVariationProbability; }
-        void setNoteVariationProbability(int noteVariationProbability) { _data0.noteVariationProbability = NoteVariationProbability::clamp(noteVariationProbability); }
 
         int noteOctaveProbability() const { return _data0.noteOctaveProbability; }
         void setNoteOctaveProbability(int noteOctaveProbability) { _data0.noteOctaveProbability = NoteOctaveProbability::clamp(noteOctaveProbability); }
@@ -109,11 +112,16 @@ public:
         Types::Condition condition() const { return Types::Condition(int(_data1.condition)); }
         void setCondition(Types::Condition condition) { _data1.condition = int(ModelUtils::clampedEnum(condition)); }
 
+        int noteVariationProbability() const { return _data1.noteVariationProbability; }
+        void setNoteVariationProbability(int noteVariationProbability) { _data1.noteVariationProbability = NoteVariationProbability::clamp(noteVariationProbability); }
+
         int stageRepeats() const { return _data1.stageRepeats; }
         void setStageRepeats(int stageRepeats) { _data1.stageRepeats = StageRepeats::clamp(stageRepeats); }
 
         int stageRepeatMode() const { return _data1.stageRepeatMode; }
         void setStageRepeatMode(int stageRepeatMode) { _data1.stageRepeatMode = StageRepeatMode::clamp(stageRepeatMode); }
+
+        void toggleGate() { setGate(!gate()); }
 
         void write(VersionedSerializedWriter &writer) const {
             writer.write(_data0.raw);
@@ -138,13 +146,14 @@ public:
             uint32_t raw;
             BitField<uint32_t, 0, 1> gate;
             BitField<uint32_t, 1, 1> slide;
-            BitField<uint32_t, 2, Length::Bits> length;
-            BitField<uint32_t, 6, LengthVariationRange::Bits> lengthVariationRange;
-            BitField<uint32_t, 10, LengthVariationProbability::Bits> lengthVariationProbability;
-            BitField<uint32_t, 14, Note::Bits> note;
-            BitField<uint32_t, 21, NoteOctave::Bits> noteOctave;
-            BitField<uint32_t, 24, NoteVariationProbability::Bits> noteVariationProbability;
-            BitField<uint32_t, 28, NoteOctaveProbability::Bits> noteOctaveProbability;
+            BitField<uint32_t, 2, 1> accent;
+            BitField<uint32_t, 3, 1> legato;
+            BitField<uint32_t, 4, Length::Bits> length;
+            BitField<uint32_t, 8, LengthVariationRange::Bits> lengthVariationRange;
+            BitField<uint32_t, 12, LengthVariationProbability::Bits> lengthVariationProbability;
+            BitField<uint32_t, 16, Note::Bits> note;
+            BitField<uint32_t, 23, NoteOctave::Bits> noteOctave;
+            BitField<uint32_t, 26, NoteOctaveProbability::Bits> noteOctaveProbability;
         } _data0;
 
         union {
@@ -155,8 +164,9 @@ public:
             BitField<uint32_t, 8, RetriggerProbability::Bits> retriggerProbability;
             BitField<uint32_t, 12, GateOffset::Bits> gateOffset;
             BitField<uint32_t, 16, Condition::Bits> condition;
-            BitField<uint32_t, 23, StageRepeats::Bits> stageRepeats;
-            BitField<uint32_t, 26, StageRepeatMode::Bits> stageRepeatMode;
+            BitField<uint32_t, 23, NoteVariationProbability::Bits> noteVariationProbability;
+            BitField<uint32_t, 27, 2> stageRepeats;
+            BitField<uint32_t, 29, StageRepeatMode::Bits> stageRepeatMode;
         } _data1;
     };
 
@@ -262,6 +272,12 @@ public:
 
     const Step &step(int index) const { return _steps[index]; }
           Step &step(int index)       { return _steps[index]; }
+
+    void printNote(StringBuilder &str, int note, int defaultRootNote, int defaultScale) const {
+        int rootNote = selectedRootNote(defaultRootNote);
+        const auto &scale = selectedScale(defaultScale);
+        scale.noteName(str, note, rootNote, Scale::Short1);
+    }
 
     void clear() {
         setScale(-1);
