@@ -196,9 +196,9 @@ public:
         case Target::StepTrill:                 return "StepTrill";
         case Target::GateOffset:                return "Gate Offset";
         case Target::GateLength:                return "Gate Length";
-        case Target::StochasticDensity:         return "Stoch Density";
-        case Target::StochasticTilt:            return "Stoch Tilt";
-        case Target::StochasticJitter:          return "Stoch Jitter";
+        case Target::StochasticDensity:         return "Density";
+        case Target::StochasticTilt:            return "Tilt";
+        case Target::StochasticJitter:          return "Jitter";
         
         
 

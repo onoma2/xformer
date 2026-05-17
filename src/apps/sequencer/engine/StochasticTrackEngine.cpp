@@ -17,33 +17,51 @@
 #include <new>
 
 // Stable priority for deterministic density masking
-static uint8_t stepPriority(int trackIndex, int patternIndex, int stepIndex) {
+static uint32_t stepScore(int trackIndex, int patternIndex, int stepIndex) {
     uint32_t h = (uint32_t(trackIndex) * 1664525u) + (uint32_t(patternIndex) * 1013904223u) + (uint32_t(stepIndex) * 31u);
     h ^= h >> 16;
     h *= 0x85ebca6bu;
     h ^= h >> 13;
     h *= 0xc2b2ae35u;
     h ^= h >> 16;
-    return h % 101; // 0..100
+    return h;
+}
+
+static int32_t stepTiltScore(int trackIndex, int patternIndex, int stepIndex, int loopFirst, int loopLast, int tilt) {
+    int32_t score = int32_t(stepScore(trackIndex, patternIndex, stepIndex) & 0x3FFFFFFF);
+    
+    if (tilt != 0 && loopLast > loopFirst) {
+        int32_t relPos = ((stepIndex - loopFirst) << 10) / (loopLast - loopFirst); // 0..1024
+        if (tilt < 0) {
+            score += ((-tilt) * relPos) << 10;
+        } else {
+            score += (tilt * (1024 - relPos)) << 10;
+        }
+    }
+    return score;
 }
 
 static bool evalDensityMask(int trackIndex, int patternIndex, int stepIndex, int loopFirst, int loopLast, int density, int tilt) {
-    if (density >= 100 && tilt == 0) return true;
+    if (density >= 100) return true;
     if (density <= 0) return false;
 
-    int priority = stepPriority(trackIndex, patternIndex, stepIndex);
+    int loopSize = loopLast - loopFirst + 1;
+    if (loopSize <= 1) return true;
+
+    int32_t myScore = stepTiltScore(trackIndex, patternIndex, stepIndex, loopFirst, loopLast, tilt);
     
-    // Apply tilt bias to priority
-    // Negative tilt: preserves earlier steps (lowers their priority value)
-    // Positive tilt: preserves later steps
-    if (tilt != 0 && loopLast > loopFirst) {
-        float relPos = float(stepIndex - loopFirst) / (loopLast - loopFirst);
-        // map relPos 0..1 to -0.5..0.5
-        float tiltBias = (tilt / 100.0f) * (relPos - 0.5f) * 100.0f;
-        priority = clamp(int(priority - tiltBias), 0, 100);
+    int rank = 0;
+    for (int i = loopFirst; i <= loopLast; ++i) {
+        if (i == stepIndex) continue;
+        int32_t otherScore = stepTiltScore(trackIndex, patternIndex, i, loopFirst, loopLast, tilt);
+        if (otherScore < myScore) {
+            rank++;
+        } else if (otherScore == myScore && i < stepIndex) {
+            rank++;
+        }
     }
 
-    return priority < density;
+    return (rank * 100) < (density * loopSize);
 }
 
 // evaluate if step gate is active (per-step probability roll)
@@ -52,7 +70,6 @@ static bool evalStepGate(const StochasticSequence::Step &step, int probabilityBi
     if (probability <= 0) {
         return false;
     }
-    // nextRange(15) is 0..14. We want 15/15 to be 100%
     return step.gate() && int(rng.nextRange(StochasticSequence::GateProbability::Range)) < probability;
 }
 
