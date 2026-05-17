@@ -496,12 +496,18 @@ Run the primary build from the repo root with:
 cd build/stm32/release && make sequencer
 ```
 
-#### F1: Core Extraction Build Gate
+#### F1: Core Extraction Build Gate (PASSED)
 
 - Build STM32 release after adding `TuesdayAlgoCore`.
 - Capture `.data`, `.bss`, `.data + .bss`, `.ccmram_bss`, and flash text size.
+  - `.data = 6,320`
+  - `.bss = 112,368`
+  - `.data + .bss = 118,688`
+  - `.ccmram_bss = 54,804`
+  - `.text = 795,412`
 - Run ARM `sizeof` probes for `TuesdayAlgoCore`, current `TuesdayTrackEngine`, and current `Engine::TrackEngineContainer`.
 - Acceptance: no `.data + .bss` growth beyond direct new symbols needed for the core files; `TuesdayAlgoCore` size matches the estimate closely enough to keep the engine container below its current gate.
+- **Result**: PASSED. TuesdayAlgoCore adds ~14 KB flash (.text), zero RAM (.data/.bss/.ccmram_bss unchanged). No instances created yet (engine refactor in Step 2).
 
 #### F2: TuesdayTrackEngine Behavior Gate
 

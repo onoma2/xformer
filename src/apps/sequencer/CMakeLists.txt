@@ -27,6 +27,7 @@ set(sources
     engine/generators/Generator.cpp
     engine/generators/RandomGenerator.cpp
     engine/generators/Rhythm.cpp
+    engine/generators/TuesdayAlgoCore.cpp
     # intro
     intro/Intro.cpp
     # model
