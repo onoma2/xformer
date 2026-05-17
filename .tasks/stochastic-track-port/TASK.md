@@ -190,9 +190,11 @@ These must be added to XFORMER's `Routing::Target` enum and `targetInfos[]`.
 
 ---
 
-### Phase 2: Engine Compaction (RAM-critical)
+### Phase 2: Engine Rewrite + Compaction (RAM-critical)
 
-**Goal:** Port StochasticEngine with heap-allocated `_lockedSteps` and all std::vector/std::rand replacements.
+**Goal:** Implement StochasticEngine as an XFORMER-native engine that preserves Vinx locked-loop semantics without porting Vinx's vector/sort/slicing implementation.
+
+**Locked-loop semantic target:** A locked loop is a captured playback result. Once a step has been evaluated into the lock buffer, later edits to the source sequence step must not change that locked event's gate result, CV, length, retrigger, slide, or gate offset. Current sequence loop-window controls (`bufferLoopLength`, `sequenceFirstStep`, `sequenceLastStep`, `sequenceLength`) may still affect which cached events are replayed, matching Vinx's current behavior.
 
 **Files:**
 - `src/apps/sequencer/engine/StochasticEngine.h`
@@ -200,18 +202,35 @@ These must be added to XFORMER's `Routing::Target` enum and `targetInfos[]`.
 - `src/apps/sequencer/engine/Engine.cpp` — add to track factory
 
 **Changes:**
-1. Replace `_lockedSteps` std::vector with heap-allocated `StochasticLoopStep*`
-2. Replace local std::vector probability arrays with fixed arrays on stack
-3. Replace `std::mt19937` + `std::normal_distribution` with `Random` + Box-Muller approx
-4. Replace `std::rand()` / `time(NULL)` with `Random`
-5. Replace `std::sort(std::begin, std::end)` with `std::sort(arr, arr+count)`
+1. Replace `_lockedSteps` `std::vector<StochasticLoopStep>` with a compact heap/pool allocated fixed-capacity replay buffer.
+2. Store evaluated replay events, not mutable model pointers. The cached event should contain only replay data such as source step index/rest marker, gate flag, slide flag, gate offset, evaluated CV, evaluated length ticks, and evaluated retrigger count.
+3. Do not copy full vectors or subarrays during playback. Replace Vinx `slicing()` behavior with direct index arithmetic over the cached buffer and current loop-window settings.
+4. Replace rest and pitch probability vectors with direct weighted sampling over the small fixed domains (4 rest weights, up to 12 pitch slots). No `std::vector`, no `std::sort`.
+5. Replace `std::mt19937` + `std::normal_distribution` with `Random` and a cheap bounded approximation for the length modifier.
+6. Replace `std::rand()` / `time(NULL)` with per-engine `Random` seeded from deterministic track/sequence state or an existing XFORMER timing seed.
+7. Keep gate/CV scheduling behavior aligned with NoteTrackEngine: fixed `SortedQueue`s, no runtime allocation in the tick hot path except lock-buffer creation/clear at explicit loop-cache boundaries.
+
+**Implementation shape:**
+
+```cpp
+struct LockedStep {
+    int8_t sourceStep;      // -1 = rest
+    uint8_t gateOffset;
+    uint8_t retrigger;
+    uint8_t flags;          // gate, slide
+    uint16_t lengthTicks;
+    float cv;
+};
+```
+
+This preserves Vinx's captured-performance behavior while avoiding the 28 B `StochasticLoopStep`, full `Step` copy, vector metadata, vector copies by value, and per-step slicing allocations.
 
 **RAM check:** Build STM32 release. Run ARM `sizeof` probe:
-- `sizeof(StochasticEngine)` — target < 1,000 B (under current 912 B gate would be ideal; under 1,200 B acceptable)
+- `sizeof(StochasticEngine)` — target under current 912 B engine gate; anything above the gate must identify exact members and CCMRAM delta
 - `sizeof(Engine::TrackEngineContainer)` — must not exceed current gate significantly
 - `.ccmram_bss` — must stay under 60 KB (hard limit 64 KB)
 
-**Acceptance:** If `sizeof(StochasticEngine)` > 1,200 B, iterate on compaction. If CCMRAM > 60 KB, stop and redesign.
+**Acceptance:** If `sizeof(StochasticEngine)` exceeds the current engine gate, iterate on compaction before UI/generator work. If CCMRAM > 60 KB, stop and redesign.
 
 ---
 
@@ -298,6 +317,46 @@ These must be added to XFORMER's `Routing::Target` enum and `targetInfos[]`.
 - `.ccmram_bss = 54,804` (53.4% of 64 KB) — comfortable if engine stays under gate
 - If engine compaction succeeds, Stochastic track is **RAM-viable**
 - If engine stays inline, Stochastic track is **RAM-blocked**
+
+---
+
+## Why `_lockedSteps` Is Unpacked (and Why Bit-Packing Is Not the Fix)
+
+### Model Step vs Engine Cache Step
+
+| | Model Step | Engine Cache Step |
+|---|---|---|
+| **NoteSequence::Step** | 8 B (2×uint32_t bitfields) | — |
+| **StochasticSequence::Step** | 8 B (2×uint32_t bitfields) | — |
+| **StochasticLoopStep** | — | **28 B** (unpacked evaluated results) |
+
+The model step stores *probability settings* (e.g., `gateProbability = 12`, `lengthVariationRange = 3`). The engine cache stores *evaluated results* after rolling dice:
+- `float _noteValue` — computed CV voltage after scale lookup (4 B)
+- `uint32_t _stepLength` — computed duration in ticks after probability roll (4 B)
+- `int _stepRetrigger` — evaluated retrigger count after probability roll (4 B)
+- `bool _gate` — final gate on/off after probability + condition evaluation (1 B + padding)
+- `StochasticStepRaw _step` — full copy of the source step for gate offset, slide, etc. (8 B)
+- `int _index` — which model step was selected (4 B)
+
+### Bit-Packing Marginal Gains
+
+Could we pack it tighter?
+- `_index` (0-63) → `uint8_t` saves **3 B**
+- `_stepRetrigger` (1-4) → fits in 2 bits, but in practice needs its own byte
+- `_stepLength` is duration in ticks → could be `uint16_t` if max < 65K
+- `_noteValue` is a float → **needs 4 B** for CV precision
+
+Best-case aggressive packing: ~16-20 B per step. With 64 steps that's still **1,024-1,280 B** — still exceeds the 912 B engine gate.
+
+### Why Heap Allocation Is the Right Fix
+
+Bit-packing would add complexity for marginal gain. Heap allocation is:
+- **Simpler** — one `new`/`delete[]` pair, same pattern as `SequenceBuilder::_preview`
+- **Complete** — drops engine from 2,228 B to **440 B**, well under the gate
+- **Safe** — buffer only exists while track is playing; `new` failure falls back to live evaluation
+- **Proven** — `SequenceBuilder::_preview` (9.5 KB heap allocation) already works in XFORMER
+
+**Conclusion:** Do not bit-pack `_lockedSteps`. Heap-allocate it in Phase 2.
 
 ---
 
