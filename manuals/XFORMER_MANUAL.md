@@ -23,6 +23,7 @@ This manual covers the XFORMER-specific features:
    	- Harmony Engine (Inspired by Instruo Harmonaig)
 	- Accumulator (Inspired by Intellijel Metropolix)
 	- Pulse Count and Gate Modes
+   - **Generator System**: A/B preview workflow for algorithmic sequence generation on Note and Curve tracks. See [GENERATOR.md](GENERATOR.md) for full documentation.
    - **Curve Track Enhancements**:
 		- Global Phase
 		- Wavefolder
