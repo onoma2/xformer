@@ -9,6 +9,7 @@ Port the Vinx fork's Stochastic track type to XFORMER, then extend the MVP with 
 **References:**
 - `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md` — controlling MVP spec.
 - `.tasks/stochastic-track-port/UI-DESIGN.md` — XFORMER-native UI design plan.
+- `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md` — immutable Phase 7 vocabulary and ownership contract.
 - `temp-ref/vinx-performer/src/apps/sequencer/{model,engine,ui}/Stochastic*` — Vinx Stochastic source.
 - `../others/mutable/marbles/random/output_channel.cc`
 - `../others/mutable/marbles/random/distributions.h`
@@ -413,78 +414,135 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 
 ---
 
-### Phase 7: Proteus-Inspired Buffer Evolution
+### Phase 7: Reimagined Stochastic Core Retopology
 
-**Goal:** Add a loop-bound melody-buffer evolution layer inspired by the Proteus reverse-engineered spec. This is not a replacement for stochastic step evaluation; it is a higher-level buffer lifecycle that can generate, thin, mutate, and occasionally refresh melodic material at loop boundaries.
+**Goal:** Stop extending the current Vinx-shaped step-probability engine and rebuild the stochastic core as a Performer-native probability instrument: generator controls create parent events, pattern controls capture and window those events, burst creates child hits inside parent events, and evolution controls mutate the generated buffer. Keep the existing `TrackMode::Stochastic` shell, save/load integration, routing entry points, project scale/root conventions, and hardware-tested page access plumbing.
 
-**Source reference:**
-- User-provided Proteus reverse-engineered functional spec: stochastic buffer-based CV/Gate sequencer with complexity, patience/boredom, deterministic rest-priority thinning, per-loop mutation, and constrained octave shifting.
+**Source references:**
+- MeloDICER user-guide excerpts provided by the user: rhythm `NOTE VALUE` / `VARIATION` / `LEGATO` / `REST`, melody faders, separate dice/realtime behavior, pattern length, lock.
+- Stochastic Instruments SIG user-guide excerpts provided by the user: note/octave/duration probability, captured loops, repeat, linearity, contour, portamento, ratchet, force barline.
+- Proteus reverse-engineered functional spec and user excerpts: `New`, complexity, deterministic density/rest-order thinning, sleep, patience/boredom, mutate, octave transposition.
+- Tuesday track behavior: burst should mean child events inside a parent event when musically useful, not just same-pitch retrigger count.
+- Marbles references: spread/bias as a bandwidth window over selectable pitch mass.
+- Performer-native requirements: user scales up to 32 degrees, normal root/scale/transpose/static octave semantics, and STM32 RAM gates. Tickets, Spread, Bias, and Jump are stochastic controls constrained by that pitch contract, not Performer-native controls.
 
-**Model additions:**
-- `complexity`: `uint8_t` 0-100. Controls how new buffer degrees are generated.
-- `patience`: `uint8_t` 0-100. `100` means infinite/no boredom reset.
-- Mutation probability: `uint8_t` 0-100. Per-loop probability to reroll one buffer index.
-- Octave probability: `uint8_t` 0-100. Per-loop probability to shift the buffer octave by -1, 0, or +1 within bounds.
-- Buffer mode: compact enum if needed: off, generate, evolve. Default should preserve current Stochastic behavior.
+#### Phase 7a: Immutable Dictionary of Truth
 
-**Engine state:**
-- `melody_buffer[CONFIG_STEP_COUNT]`: generated scale-degree values or compact signed degree offsets.
-- `rest_priority[CONFIG_STEP_COUNT]`: deterministic priority order used by density.
-- `buffer_valid`: whether the melody buffer has been generated for the current pattern/settings.
-- `boredom_counter`: loop count since last full buffer refresh.
-- `buffer_octave_offset`: constrained to `-1..+1`.
+**Goal:** Add a durable dictionary document before touching code. This dictionary is the contract for user-facing names, internal ownership, event timing, and what each external reference contributes. It should live next to this task, for example `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`, and be referenced from this file and the enhanced spec.
 
-**Generation rules:**
-1. Buffer generation happens at explicit generate/clear points or loop boundaries, never as hidden per-clock random voltage generation.
-2. Complexity chooses the degree-transition law:
-   - Low complexity: choose 1-2 anchor degrees and repeat them rhythmically.
-   - Mid complexity: bias toward `last - 1`, `last`, and `last + 1` for scale runs.
-   - High complexity: use the full allowed degree pool with wider weighted jumps.
-3. The allowed degree pool still comes from existing Stochastic pitch logic: active scale degree count, signed degree tickets, excluded mask entries, range, degree/mask rotation, and optional Marbles shaping.
-4. Buffer generation must be deterministic from pattern state, track index, and seed inputs so project recall is stable.
+**Dictionary rules:**
+- Do not use module names as user-facing mode names. Use them only as provenance in the docs.
+- User-facing labels should be short, preferably one word.
+- Internal code names should follow existing codebase style, not underscore-heavy UI names.
+- `Run` is excluded from Phase 7. Pattern playback is forward through the active stochastic window; reverse/pendulum/random order is not core because it makes "order of random" unclear.
+- `First` and `Last` are stochastic pattern-buffer indices, not Performer step-loop controls.
+- Burst child hits do not advance the pattern position and do not count toward `Size`.
+- `Lock` is a hard evaluated-event freeze. `Patience == 100` only means never auto-new; it is not lock.
 
-**Patience / boredom rules:**
-1. Only evaluate boredom at the active loop boundary.
-2. `patience == 100` disables full buffer refresh.
-3. Otherwise, `boredom_counter` increases each completed loop and maps to `p_new`.
-4. Use a simple linear ramp for MVP: `p_new = boredom_counter * (100 - patience) / k`, clamped to 100. Choose `k` so mid patience evolves over several loops, not every loop.
-5. On boredom reset, regenerate the full melody buffer, rest priority, and octave offset, then clear `boredom_counter`.
+**Dictionary terms:**
 
-**Rest-priority refresh rules:**
-1. Generate `rest_priority[]` whenever a new melody buffer is created.
-2. Phase 6 `density` uses this priority order when buffer mode is active. It must not introduce a second density control.
-3. Priority generation should preserve musical anchors first: keep loop start and beat-like positions later in the mute order, then shuffle the remaining steps deterministically.
-4. The evaluated gate/rest decision produced by this density layer must be captured into lock.
+Pitch:
+- `Scale`: Performer scale selection, including user scales up to 32 degrees.
+- `Root`: Performer root note for scale-degree conversion.
+- `Transpose`: normal Performer pitch offset applied after generation.
+- `Octave`: normal static full-track octave offset, like Note track.
+- `Range`: pre-selection generated pitch span, possibly across multiple scale octaves.
+- `Tickets`: per-degree pitch weights where excluded degrees cannot be selected.
+- `Spread`: Marbles-style bandwidth window over selectable ticket mass, from tight to broad/flat.
+- `Bias`: center position of the Marbles-style window over selectable ticket mass.
+- `Jump`: bounded probabilistic octave displacement in the generated pitch domain, separate from static track `Octave`.
 
-**Mutation and octave rules:**
-1. Mutation is evaluated once per loop while unlocked.
-2. If mutation fires, reroll one buffer index using current Complexity and the existing allowed degree pool.
-3. Octave shift is evaluated once per loop while unlocked.
-4. Octave offset is constrained to `-1..+1` relative to the current base octave; it is a buffer-evolution macro, not a replacement for existing octave/transpose controls.
+Generator:
+- `New`: manually, externally, or automatically creates a fresh generated pattern.
+- `Mode`: `Dice` repeats a generated pattern; `Realtime` continuously generates events without reusing the pattern.
+- `Complexity`: controls how much of the ticket pool and movement space the melody may explore, from simple repetition to richer melodic/rhythmic structure.
+- `Linearity`: advanced bias toward pitches near the previous parent event.
+- `Contour`: advanced bias toward ascending or descending motion.
 
-**Lock invariant:**
-- Captured lock wins. While locked, buffer evolution must not silently alter replayed events.
-- Unlocking may resume evolution from the stored buffer state.
-- Explicit regenerate/recapture actions may refresh the buffer and then capture the new evaluated output.
+Pattern:
+- `Size`: number of generated parent events in the pattern buffer.
+- `First`: first parent event included in stochastic playback.
+- `Last`: last parent event included in stochastic playback.
+- `Lock`: freezes evaluated parent events and burst child hits.
+
+Rhythm:
+- `Rate`: base duration of generated parent events.
+- `Variation`: bipolar bias toward durations longer or shorter than `Rate`.
+- `Rest`: stochastic chance that a generated parent event is silent.
+- `Legato`: stochastic chance that a parent event continues the previous gate instead of firing a new one.
+- `Slide`: chance or amount of pitch glide into the parent event.
+
+Burst:
+- `Burst`: probability that a parent event contains child hits.
+- `Rate`: subdivision spacing for child hits inside one parent event.
+- `Count`: amount or probability of child hits produced inside one parent event.
+- `Pitch`: whether child hits inherit the parent pitch or re-evaluate pitch.
+
+Evolution:
+- `Density`: deterministic parent-event thinning using the generated pattern's stable rest order.
+- `Tilt`: early/late bias used when generating the density rest order.
+- `Sleep`: wait time inserted between completed pattern cycles.
+- `Patience`: rate at which automatic `New` becomes likely; maximum means never auto-new.
+- `Mutate`: probability that existing parent events are regenerated per cycle.
+
+**Ownership invariants:**
+- Track owns generator controls, pitch controls, rhythm controls, burst controls, and evolution controls.
+- Pattern buffer owns generated parent events, density ranks, and captured burst child hits.
+- Step/grid UI, if present, edits generated/captured parent events; it is not the primary stochastic programming model.
+- `Tickets` define selectable pitch material. `Spread` and `Bias` reshape that ticket mass; they do not form a second undisclosed pitch-weight system.
+- `Complexity` gates pitch behavior and explored vocabulary, not event audibility. `Density` and `Rest` control audibility.
+
+**Timing invariant:**
+
+```text
+pattern cycle
+  parent event
+    burst child hit
+```
+
+- Parent events advance the pattern position.
+- Burst child hits are scheduled inside the parent event duration.
+- Density hides/shows parent events; hidden parent events also hide their child hits.
+- Lock captures the evaluated parent event plus all evaluated child hits.
+
+#### Phase 7b: Core Model + Engine Rebuild
+
+**Goal:** Implement the dictionary as a new internal core while preserving the existing Stochastic track shell.
+
+**Model direction:**
+- Replace per-step stochastic probability as the primary model with a compact generated parent-event buffer.
+- Keep the current mode integration and storage wrappers, but treat the existing Vinx-like sequence fields as migration/scaffolding unless explicitly retained.
+- Add compact parent-event and child-hit storage that can be locked/replayed without tick-path allocation.
+- Preserve Performer scale/root/transpose/static octave behavior and user-scale support up to `CONFIG_USER_SCALE_SIZE`.
+
+**Engine rules:**
+1. Generation creates parent events from track-owned controls.
+2. Pitch selection uses active scale degree count, signed tickets, excluded mask entries, range, Spread/Bias shaping, Complexity, Linearity, and Contour.
+3. `Rate` and `Variation` create parent-event durations.
+4. `Rest` decides whether a generated parent event is silent.
+5. `Burst` creates child hits inside a parent event; child hits may inherit or re-evaluate pitch according to `Burst Pitch`.
+6. `Density` is deterministic thinning over parent events using the pattern's stable rest order and must not consume RNG while being changed.
+7. `Mutate`, `Patience`, `Sleep`, and `Jump` operate at pattern-cycle boundaries while unlocked.
+8. `Lock` replays captured evaluated parent events and child hits; later edits must not alter locked output.
 
 **Non-goals:**
+- Do not preserve `Run` as a Phase 7 control.
+- Do not keep `Burst` as merely same-pitch retrigger if the user-facing term remains Burst; same-pitch repeats should be called ratchets if retained.
+- Do not expose raw 0..15 probability values as the final user-facing model.
 - Do not adopt Proteus CV summing, knob-lock, DAC range, C3 root, flash persistence, or 16-slot scale assumptions.
-- Do not replace Performer user scales; active scales may have up to 32 degrees.
-- Do not add gate passthrough in this phase.
-- Do not add another density control here. Phase 6 owns density; Phase 7 owns complexity, patience, mutation, and buffer evolution.
-- Internal code names should follow existing codebase style. User-facing labels should be short, preferably one word.
+- Do not clone MeloDICER, SIG, Proteus, Tuesday, or Marbles UI vocabulary wholesale.
 
 **Acceptance:**
-- Buffer mode Off preserves current Stochastic behavior.
-- Buffer generation, boredom reset, rest-priority refresh, mutation, and octave shift are deterministic under project recall.
-- Lock replay remains a freeze of evaluated gate, CV, length, retrigger, slide, gate offset, and burst events.
-- No large inline engine buffers that exceed the engine container gate.
+- Phase 7a dictionary exists and is referenced by this task before Phase 7b implementation starts.
+- The new engine can produce deterministic generated patterns, realtime generation, lock replay, density thinning, and burst child hits.
+- STM32 release RAM remains under track and engine container gates, or exact deltas are documented before continuation.
+- Hardware can verify the core without final visual UI; any temporary list/stub controls are explicitly throwaway.
 
 ---
 
 ### Phase 8: UI Layer
 
-**Goal:** Implement the XFORMER-native Stochastic UI from `.tasks/stochastic-track-port/UI-DESIGN.md`: core step grid, visual pitch/distribution pages, captured lock page, and compact track console. Do not clone Vinx's list-heavy UI directly.
+**Goal:** Implement the XFORMER-native Stochastic UI from `.tasks/stochastic-track-port/UI-DESIGN.md` only after the Phase 7 dictionary and core retopology are stable. The UI must expose the reimagined event-generator model, not the current Vinx-shaped step-probability internals.
 
 **Files:**
 - `src/apps/sequencer/ui/pages/StochasticSequenceEditPage.h/.cpp`
@@ -496,13 +554,15 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 
 **Enhanced UI requirements:**
 - Preserve Performer header/footer conventions from Note, Curve, Indexed, DiscreteMap, and Tuesday pages.
-- Prefer custom visual pages over list models for degree tickets, Marbles, lock buffer, and probability overview.
+- Prefer custom visual pages over list models for degree tickets, generated pattern, burst child hits, lock buffer, and probability overview.
 - Degree-ticket visual editor sized by the active scale's `notesPerOctave()`.
-- Linearity, Min/Max degree range.
-- Marbles Mode, Spread, Bias, Steps.
-- Phase 6 user-facing controls: Density, Tilt, Jitter, Burst, CV, Rotate.
-- Phase 7 user-facing controls: Complexity, Patience, Mutation, Octave, Buffer.
-- Lock, loop first/last, and rotation controls via context menu + encoder where possible.
+- Pitch pages must use the Phase 7 dictionary: Scale, Root, Transpose, Octave, Range, Tickets, Spread, Bias, Jump.
+- Generator pages must expose New, Mode, Complexity, Linearity, and Contour without leaking raw storage values.
+- Pattern pages must expose Size, First, Last, and Lock as stochastic pattern-buffer controls, not Performer step-loop controls.
+- Rhythm pages must expose Rate, Variation, Rest, Legato, and Slide.
+- Burst pages must make parent events vs child hits visually clear.
+- Evolution pages must expose Density, Tilt, Sleep, Patience, and Mutate with deterministic density behavior.
+- Existing Phase 6 UI stubs are acceptable only as hardware access scaffolding; final Phase 8 UI should not be a list-only workflow.
 - `StochasticTrackListModel` may exist as a fallback/settings bridge, but normal performance editing should live on visual pages.
 
 **RAM check:** UI pages are in `.bss` (Pages struct). Estimate: StochasticSequenceEditPage ≈ NoteSequenceEditPage + list model overhead ≈ similar size. Should be under existing page gate.
@@ -637,14 +697,15 @@ Bit-packing the Vinx object adds complexity for marginal gain. Compact heap/pool
 | Phase 4: Loop Controls | ~2h |
 | Phase 5: Dynamics + Routing Targets | complete, reported |
 | Phase 6: Stochastic Performance Mechanics | ~3-4h |
-| Phase 7: Proteus-Inspired Buffer Evolution | ~4-5h |
+| Phase 7a: Immutable Dictionary of Truth | complete, documented |
+| Phase 7b: Reimagined Core Retopology | ~6-8h |
 | Phase 8: UI Layer | ~6h |
 | Phase 9: Validation | ~3h |
-| **Remaining** | **~16-18h** |
+| **Remaining** | **~18-21h** |
 
 ## Next Action
 
-**Phase 1 prep:** Verify enhanced `sizeof(StochasticTrack)` under the NoteTrack gate by creating a temporary STM32 release sizeof probe. Include signed degree tickets, sequence scale/root fields, degree/mask rotation, Linearity, range, Marbles fields, lock/window fields, and optional accent/legato fields in the probe.
+**Phase 7b prep:** Design the compact parent-event and burst-child storage against `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`, then probe STM32 release sizes before replacing the current Vinx-shaped step-probability core.
 
 ## Depends On
 

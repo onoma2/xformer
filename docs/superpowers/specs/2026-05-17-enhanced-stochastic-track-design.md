@@ -157,13 +157,15 @@ Avoid making the primary workflow a `StochasticTrackListModel`. List models may 
     - Rotate: bounded address transform over `loopFirst..loopLast`.
     - Naming: internal code names should follow existing codebase style; user-facing labels should be short, preferably one word.
     - Deferred: true Tuesday `pressure` / cooldown. Do not implement it in this phase.
-7.  **Phase 7: Proteus-Inspired Buffer Evolution.** Add loop-bound melody-buffer lifecycle controls after the Tuesday mechanics and before final UI:
-    - Complexity-governed buffer generation: low repeats anchors, mid prefers adjacent scale-degree runs, high allows wider weighted jumps.
-    - Patience / boredom reset at loop boundaries, with infinite patience disabling full refresh.
-    - Per-loop Mutation that rerolls one buffer index through the current stochastic pitch pool.
-    - Per-loop octave-shift probability constrained to `-1..+1` octave from the base buffer.
-    - Lock-safe behavior: captured lock replay is never silently mutated by buffer evolution.
-    - Deferred here: no additional density control. Phase 6 owns density.
-8.  **Phase 8: UI Development.** XFORMER-native visual pages from `.tasks/stochastic-track-port/UI-DESIGN.md`, including Phase 6 and Phase 7 mechanics in the track console, probability overview, buffer page, lock page, and loop controls.
+7.  **Phase 7: Reimagined Stochastic Core Retopology.** Rebuild the stochastic core as a Performer-native probability instrument before final UI work:
+    - Phase 7a: add `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md` as the immutable vocabulary and ownership contract.
+    - Preserve the existing Stochastic track shell, but replace the Vinx-shaped step-probability core with generated parent events, burst child hits, and pattern evolution.
+    - Pitch output remains Performer-native: Scale, Root, Transpose, static Octave, and user scales up to 32 degrees follow existing Performer contracts.
+    - Stochastic pitch controls sit on top of that contract: Range, Tickets, Spread, Bias, and Jump.
+    - Pattern controls are Size, First, Last, and Lock; First/Last are stochastic pattern-buffer indices, not Performer step-loop controls.
+    - Exclude Run from Phase 7; playback is forward through the active stochastic pattern window.
+    - Proteus-style Density, Tilt, Sleep, Patience, and Mutate operate on the generated pattern/evolution layer.
+    - Tuesday-style Burst means child hits inside a parent event, not merely same-pitch retrigger count.
+8.  **Phase 8: UI Development.** XFORMER-native visual pages from `.tasks/stochastic-track-port/UI-DESIGN.md`, updated to expose the Phase 7 dictionary model rather than the current list-only step-probability scaffolding.
 9.  **Phase 9: Validation.** STM32 release size probes and hardware verify.
 10. **Post-MVP Gates.** Split locks, drift, reverse playback, ghost voices.

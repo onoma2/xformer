@@ -1,5 +1,5 @@
 # Task Board
-_Updated: 2026-05-17_
+_Updated: 2026-05-18_
 
 ## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
 **Status:** done — Phases A-F complete and hardware verified.
@@ -12,8 +12,8 @@ _Updated: 2026-05-17_
 
 ## 🟡 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Phase 8 UI Stubs complete. List-based editors implemented for global track and per-step sequence settings. All engine mechanics (Density, Tilt, Jitter, Burst, probabilities) are now controllable on hardware. Refined Phase 6 repair complete with true ranked rest-priority and fixed execution order.
-**Next action:** Phase 7: Implement melody-lifecycle buffer evolution (generation, boredom reset, loop mutation).
+**Where I stopped:** Phase 6 hardware controls work, but the current Vinx-shaped step-probability model is now treated as scaffolding; Phase 7 retopology and the immutable dictionary have been documented.
+**Next action:** Phase 7b: rebuild the stochastic core around generated parent events, burst child hits, pattern evolution, and Performer-native pitch controls; defer final UI to Phase 8.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic
