@@ -43,8 +43,10 @@ public:
     struct LockedStep {
         float noteValue;
         uint32_t stepLength;
+        int8_t gateOffset;
         uint8_t retrigger;
         bool gate;
+        bool slide;
         bool valid;
     };
 

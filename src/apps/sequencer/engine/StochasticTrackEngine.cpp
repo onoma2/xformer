@@ -14,6 +14,7 @@
 #include "model/Scale.h"
 
 #include <cmath>
+#include <new>
 
 // evaluate if step gate is active
 static bool evalStepGate(const StochasticSequence::Step &step, int probabilityBias, Random &rng) {
@@ -113,7 +114,7 @@ static float evalStepNote(const StochasticSequence::Step &step, const Stochastic
         }
     }
 
-    if (allowedCount == 0 || int(rng.nextRange(StochasticSequence::NoteVariationProbability::Range)) >= noteVarProb) {
+    if (allowedCount == 0 || int(rng.nextRange(StochasticSequence::NoteVariationProbability::Max)) >= noteVarProb) {
         // Fallback to step note if pool is empty or variation roll fails (0% = deterministic)
         degree = step.note();
     } else {
@@ -413,16 +414,20 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
 
     float noteValue = 0.f;
     uint32_t stepLength = 0;
+    int8_t gateOffset = 0;
     uint8_t stepRetrigger = 1;
     bool stepGate = false;
+    bool slide = false;
 
     bool locked = _stochasticTrack.lock() && _lockedSteps && _lockedSteps[_index].valid;
 
     if (locked) {
         noteValue = _lockedSteps[_index].noteValue;
         stepLength = _lockedSteps[_index].stepLength;
+        gateOffset = _lockedSteps[_index].gateOffset;
         stepRetrigger = _lockedSteps[_index].retrigger;
         stepGate = _lockedSteps[_index].gate;
+        slide = _lockedSteps[_index].slide;
     } else {
         stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _rng);
 
@@ -436,17 +441,22 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
             
             noteValue = evalStepNote(step, _stochasticTrack, scale, rootNote, _stochasticTrack.octave(), _stochasticTrack.transpose(), _lastDegree, _rng);
             stepLength = (divisor * evalStepLength(step, _stochasticTrack.lengthBias(), _rng)) / StochasticSequence::Length::Range;
+            gateOffset = step.gateOffset();
             stepRetrigger = (uint8_t) evalStepRetrigger(step, _stochasticTrack.retriggerBias(), _rng);
+            slide = step.slide();
         }
 
         if (_lockedSteps) {
-            _lockedSteps[_index] = { noteValue, stepLength, stepRetrigger, stepGate, true };
+            if (!_lockedSteps[_index].valid) {
+                _lockedStepCount++;
+            }
+            _lockedSteps[_index] = { noteValue, stepLength, gateOffset, stepRetrigger, stepGate, slide, true };
         }
     }
 
     if (stepGate) {
-        int gateOffset = ((int) divisor * step.gateOffset()) / (StochasticSequence::GateOffset::Max + 1);
-        uint32_t stepTick = tick + gateOffset;
+        int offsetTick = ((int) divisor * gateOffset) / (StochasticSequence::GateOffset::Max + 1);
+        uint32_t stepTick = tick + offsetTick;
         
         if (stepRetrigger > 1) {
             uint32_t retriggerLength = divisor / stepRetrigger;
@@ -461,7 +471,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
             _gateQueue.pushReplace({ Groove::applySwing(stepTick + stepLength, swing()), false });
         }
 
-        _cvQueue.push({ Groove::applySwing(stepTick, swing()), noteValue, step.slide() });
+        _cvQueue.push({ Groove::applySwing(stepTick, swing()), noteValue, slide });
     }
 }
 
