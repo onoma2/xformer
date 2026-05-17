@@ -59,9 +59,7 @@ void MidiOutputPage::keyPress(KeyPressEvent &event) {
             setEdit(false);
             break;
         case Function::Commit:
-            *_output = _editOutput;
-            setEdit(false);
-            showMessage("OUTPUT CHANGED");
+            commitOutput();
             break;
         }
         event.consume();
@@ -87,6 +85,29 @@ void MidiOutputPage::showOutput(int outputIndex) {
 
     setSelectedRow(0);
     setEdit(false);
+}
+
+void MidiOutputPage::commitOutput() {
+    *_output = _editOutput;
+    setEdit(false);
+    showMessage("OUTPUT CHANGED");
+}
+
+void MidiOutputPage::keyboard(KeyboardEvent &event) {
+    if (event.isPressed()) {
+        if (event.keycode() == KeyboardEvent::KeyEnter) {
+            commitOutput();
+            event.consume();
+            return;
+        }
+        if (event.keycode() == KeyboardEvent::KeyEscape) {
+            _manager.pop();
+            event.consume();
+            return;
+        }
+    }
+    if (handleFunctionKeys(event)) return;
+    ListPage::keyboard(event);
 }
 
 void MidiOutputPage::selectOutput(int outputIndex) {

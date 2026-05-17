@@ -68,6 +68,7 @@ private:
     bool matchesGroup(const IndexedSequence::Step &step, uint8_t targetGroups, int stepIndex) const;
     bool configChanged() const;
     void resetConfigs();
+    void applyMathConfig();
 
     int valueMin(const MathConfig &cfg) const;
     int valueMax(const MathConfig &cfg) const;

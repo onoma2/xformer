@@ -2002,13 +2002,6 @@ void DiscreteMapSequencePage::transformContextAction(int index) {
 }
 
 void DiscreteMapSequencePage::keyboard(KeyboardEvent &event) {
-    switch (event.keycode()) {
-    case KeyboardEvent::KeyF1: pressFunctionButton(0, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF2: pressFunctionButton(1, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default: break;
-    }
+    if (handleFunctionKeys(event)) return;
     BasePage::keyboard(event);
 }

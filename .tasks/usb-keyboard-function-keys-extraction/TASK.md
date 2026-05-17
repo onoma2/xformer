@@ -28,7 +28,9 @@ Eliminate the duplicated F1-F5 `pressFunctionButton` dispatch switch block that 
 - `src/apps/sequencer/ui/pages/TextInputPage.cpp:154` — custom text editor keyboard
 
 ## Decisions log
-- *(empty until session starts)*
+- 2026-05-17: GeneratorPage added to extraction list (Pattern A with Enter/Escape inside `if(event.isPressed())`).
+- 2026-05-17: Pattern C (PerformerPage, PatternPage) refactored by placing `handleFunctionKeys()` in `default` case rather than at top, avoiding incorrect interception of custom F4 on PerformerPage.
+- 2026-05-17: Build verified — `.data=6,332`, `.bss=112,552`, `.ccmram_bss=54,804` (structural refactor, no new state).
 
 ## Open questions
 - [ ] Pattern C (PatternPage, PerformerPage) — can the custom F1/F2/F4 cases share structure with `handleFunctionKeys()` via callback or are they too unique?
@@ -38,7 +40,13 @@ Eliminate the duplicated F1-F5 `pressFunctionButton` dispatch switch block that 
 - [ ] RAM impact: ~0 B (no new state), but verify with STM32 release build
 
 ## Completed steps
-- *(none yet)*
+- [x] Phase 1: Add `handleFunctionKeys(KeyboardEvent &event) -> bool` to BasePage.h + BasePage.cpp
+- [x] Phase 2: Pattern A pages (11 files): CurveSequenceEditPage, NoteSequenceEditPage, IndexedSequenceEditPage, DiscreteMapSequencePage, SongPage, IndexedRouteConfigPage, IndexedMathPage, TuesdayEditPage, ModulatorPage, MonitorPage, GeneratorPage
+- [x] Phase 3: Pattern B pages (5 files): TrackPage, SystemPage, RoutingPage, LayoutPage
+- [x] Phase 4: Pattern C pages (2 files): PatternPage, PerformerPage
+- [x] Phase 5: STM32 release build clean, RAM flat (no new state)
+- [x] Phase 6: Enter→Commit + Escape→Cancel on commit pages: RoutingPage, MidiOutputPage, IndexedRouteConfigPage, IndexedMathPage, LayoutPage
+- [x] Phase 7: Enter→OK + Escape→Cancel on dialog pages: GeneratorSelectPage (FileSelectPage, ConfirmationPage, TextInputPage already had it)
 
 ## Notes
 Research session identified the pattern in AGENTS.md session on 2026-05-17. The 17 files with the F1-F5 dispatch block break into:

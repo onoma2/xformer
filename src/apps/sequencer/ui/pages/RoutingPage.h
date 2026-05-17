@@ -43,6 +43,7 @@ private:
 
     void selectRoute(int routeIndex);
     void assignMidiLearn(const MidiLearn::Result &result);
+    void commitRoute();
 
     RouteListModel _routeListModel;
     Routing::Route *_route;

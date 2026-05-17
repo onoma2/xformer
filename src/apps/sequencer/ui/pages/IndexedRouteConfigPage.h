@@ -41,6 +41,7 @@ private:
     IndexedSequence::RouteConfig& activeRouteConfig();
     const IndexedSequence::RouteConfig& activeRouteConfig() const;
     bool stagedChanged() const;
+    void commitRouteConfig();
 
     void drawRouteConfig(Canvas &canvas, const IndexedSequence::RouteConfig &cfg, int y, bool active, const char *label);
     void drawMixConfig(Canvas &canvas, IndexedSequence::RouteCombineMode mode, int y, bool active);

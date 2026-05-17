@@ -511,28 +511,9 @@ void GeneratorPage::keyPress(KeyPressEvent &event) {
 }
 
 void GeneratorPage::keyboard(KeyboardEvent &event) {
+    if (handleFunctionKeys(event)) return;
     if (event.isPressed()) {
         switch (event.keycode()) {
-        case KeyboardEvent::KeyF1:
-            pressFunctionButton(0, event.shift());
-            event.consume();
-            return;
-        case KeyboardEvent::KeyF2:
-            pressFunctionButton(1, event.shift());
-            event.consume();
-            return;
-        case KeyboardEvent::KeyF3:
-            pressFunctionButton(2, event.shift());
-            event.consume();
-            return;
-        case KeyboardEvent::KeyF4:
-            pressFunctionButton(3, event.shift());
-            event.consume();
-            return;
-        case KeyboardEvent::KeyF5:
-            pressFunctionButton(4, event.shift());
-            event.consume();
-            return;
         case KeyboardEvent::KeyEnter:
             commit();
             event.consume();

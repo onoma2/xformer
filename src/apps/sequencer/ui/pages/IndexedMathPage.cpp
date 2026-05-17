@@ -103,13 +103,8 @@ void IndexedMathPage::keyPress(KeyPressEvent &event) {
         if (fn == 4) {
             if (key.shiftModifier()) {
                 _manager.pop();
-            } else if (configChanged()) {
-                applyMath(_opA);
-                applyMath(_opB);
-                resetConfigs();
-                showMessage("MATH APPLIED");
             } else {
-                _manager.pop();
+                applyMathConfig();
             }
             event.consume();
             return;
@@ -554,14 +549,30 @@ const char *IndexedMathPage::opName(MathOp op) {
     return "?";
 }
 
-void IndexedMathPage::keyboard(KeyboardEvent &event) {
-    switch (event.keycode()) {
-    case KeyboardEvent::KeyF1: pressFunctionButton(0, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF2: pressFunctionButton(1, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default: break;
+void IndexedMathPage::applyMathConfig() {
+    if (configChanged()) {
+        applyMath(_opA);
+        applyMath(_opB);
+        resetConfigs();
+        showMessage("MATH APPLIED");
+    } else {
+        _manager.pop();
     }
+}
+
+void IndexedMathPage::keyboard(KeyboardEvent &event) {
+    if (event.isPressed()) {
+        if (event.keycode() == KeyboardEvent::KeyEnter) {
+            applyMathConfig();
+            event.consume();
+            return;
+        }
+        if (event.keycode() == KeyboardEvent::KeyEscape) {
+            _manager.pop();
+            event.consume();
+            return;
+        }
+    }
+    if (handleFunctionKeys(event)) return;
     BasePage::keyboard(event);
 }

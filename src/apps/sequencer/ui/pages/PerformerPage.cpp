@@ -263,13 +263,14 @@ void PerformerPage::keyboard(KeyboardEvent &event) {
         _syncing = !_syncing;
         event.consume();
         break;
-    case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
     case KeyboardEvent::KeyF4:
         _project.playState().commitLatchedRequests();
         updateFills();
         event.consume();
         break;
-    case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default: BasePage::keyboard(event); break;
+    default:
+        if (handleFunctionKeys(event)) break;
+        BasePage::keyboard(event);
+        break;
     }
 }

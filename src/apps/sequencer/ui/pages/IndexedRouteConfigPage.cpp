@@ -213,14 +213,8 @@ void IndexedRouteConfigPage::keyPress(KeyPressEvent &event) {
         if (fn == 4) {
             if (key.shiftModifier()) {
                 _manager.pop();
-            } else if (stagedChanged()) {
-                auto &sequence = _project.selectedIndexedSequence();
-                sequence.setRouteA(_routeAStaged);
-                sequence.setRouteB(_routeBStaged);
-                sequence.setRouteCombineMode(_combineModeStaged);
-                showMessage("ROUTE UPDATED");
             } else {
-                _manager.pop();
+                commitRouteConfig();
             }
         }
 
@@ -348,14 +342,31 @@ bool IndexedRouteConfigPage::stagedChanged() const {
         _combineModeStaged != sequence.routeCombineMode();
 }
 
-void IndexedRouteConfigPage::keyboard(KeyboardEvent &event) {
-    switch (event.keycode()) {
-    case KeyboardEvent::KeyF1: pressFunctionButton(0, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF2: pressFunctionButton(1, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default: break;
+void IndexedRouteConfigPage::commitRouteConfig() {
+    if (stagedChanged()) {
+        auto &sequence = _project.selectedIndexedSequence();
+        sequence.setRouteA(_routeAStaged);
+        sequence.setRouteB(_routeBStaged);
+        sequence.setRouteCombineMode(_combineModeStaged);
+        showMessage("ROUTE UPDATED");
+    } else {
+        _manager.pop();
     }
+}
+
+void IndexedRouteConfigPage::keyboard(KeyboardEvent &event) {
+    if (event.isPressed()) {
+        if (event.keycode() == KeyboardEvent::KeyEnter) {
+            commitRouteConfig();
+            event.consume();
+            return;
+        }
+        if (event.keycode() == KeyboardEvent::KeyEscape) {
+            _manager.pop();
+            event.consume();
+            return;
+        }
+    }
+    if (handleFunctionKeys(event)) return;
     BasePage::keyboard(event);
 }

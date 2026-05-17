@@ -105,16 +105,7 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
             }
             break;
         case Function::Commit:
-            _engine.midiLearn().stop();
-            int conflict = _project.routing().checkRouteConflict(_editRoute, *_route);
-            if (conflict >= 0) {
-                showMessage(FixedStringBuilder<64>("ROUTE SETTINGS CONFLICT WITH ROUTE %d", conflict + 1));
-            } else {
-                bool busFeedback = Routing::isBusSource(_editRoute.source()) && Routing::isBusTarget(_editRoute.target());
-                *_route = _editRoute;
-                setEdit(false);
-                showMessage(busFeedback ? "ROUTE CHG FB" : "ROUTE CHANGED");
-            }
+            commitRoute();
             break;
         }
         event.consume();
@@ -571,15 +562,33 @@ void RoutingPage::drawBiasOverlay(Canvas &canvas) {
     }
 }
 
+void RoutingPage::commitRoute() {
+    _engine.midiLearn().stop();
+    int conflict = _project.routing().checkRouteConflict(_editRoute, *_route);
+    if (conflict >= 0) {
+        showMessage(FixedStringBuilder<64>("ROUTE SETTINGS CONFLICT WITH ROUTE %d", conflict + 1));
+    } else {
+        bool busFeedback = Routing::isBusSource(_editRoute.source()) && Routing::isBusTarget(_editRoute.target());
+        *_route = _editRoute;
+        setEdit(false);
+        showMessage(busFeedback ? "ROUTE CHG FB" : "ROUTE CHANGED");
+    }
+}
+
 void RoutingPage::keyboard(KeyboardEvent &event) {
-    switch (event.keycode()) {
-    case KeyboardEvent::KeyF1: pressFunctionButton(0, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF2: pressFunctionButton(1, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default:
+    if (event.isPressed()) {
+        if (event.keycode() == KeyboardEvent::KeyEnter) {
+            commitRoute();
+            event.consume();
+            return;
+        }
+        if (event.keycode() == KeyboardEvent::KeyEscape) {
+            _manager.pop();
+            event.consume();
+            return;
+        }
+    }
+    if (!handleFunctionKeys(event)) {
         ListPage::keyboard(event);
-        break;
     }
 }

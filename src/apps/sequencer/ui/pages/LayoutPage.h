@@ -44,6 +44,7 @@ private:
     void startTeletypeOutputAssignments(const std::array<int, CONFIG_TRACK_COUNT> &tracks, int count);
     void promptNextTeletypeOutputAssignment();
     void assignOutputsForTeletypeTrack(int trackIndex);
+    void commitLayout();
 
     Mode _mode = Mode::TrackMode;
     TrackModeListModel _trackModeListModel;

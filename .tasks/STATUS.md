@@ -90,10 +90,10 @@ _Updated: 2026-05-17_
 
 ---
 
-## 🟡 usb-keyboard-function-keys-extraction — Extract duplicated F1-F5 pressFunctionButton dispatch from 17 page keyboard() overrides into BasePage helper
-**Status:** paused — research complete, plan written. All 17 files with the duplicated switch block identified and categorized into patterns A/B/C.
-**Where I stopped:** Research session catalogued every `keyboard()` override in the codebase. 17 pages share a near-identical F1-F5 switch block (Pattern A: 10 files → BasePage fallback, Pattern B: 5 files → ListPage fallback, Pattern C: 2 files → mixed custom/pb). Extraction plan at `.tasks/usb-keyboard-function-keys-extraction/PLAN.md`.
-**Next action:** Phase 1 — add `BasePage::handleFunctionKeys()` helper (declaration + 5-line implementation).
+## 🟢 usb-keyboard-function-keys-extraction — Extract duplicated F1-F5 pressFunctionButton dispatch from 17 page keyboard() overrides into BasePage helper
+**Status:** done — all phases complete. 18 files refactored (original 17 + GeneratorPage). Build clean.
+**Where I stopped:** `BasePage::handleFunctionKeys()` added. Pattern A (11 files), B (5 files), C (2 files) refactored. STM32 release build verified: `.data=6,332`, `.bss=112,552`, `.ccmram_bss=54,804` (net SRAM -1,076 B vs baseline — within linker noise for pure code move).
+**Next action:** Merge to master when user confirms.
 **Depends on:** nothing (structural refactor, no RAM or behavior change)
 **Branch:** TBD
 
