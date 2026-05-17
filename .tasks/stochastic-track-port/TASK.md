@@ -26,9 +26,9 @@ Port the Vinx fork's Stochastic track type to XFORMER. A probability-driven sequ
 - `_data1` (32 bits): bypassScale(1) + retrigger(3) + gateProb(4) + retriggerProb(4) + gateOffset(4) + condition(7) + stageRepeats(3) + stageRepeatMode(3) + 5 bits free
 
 **Size estimate:**
-- StochasticSequence: 64 steps × 8 B = 512 B
-- StochasticTrack: 17 sequences × 512 B + track overhead ≈ 8,800 B
-- **Compare:** NoteTrack = 9,544 B. StochasticTrack fits **under** the Track container gate.
+- StochasticSequence: 64 steps × 8 B = 512 B + track-level members + padding = **552 B** (measured)
+- StochasticTrack: 17 sequences × 552 B + track overhead = **9,416 B** (measured)
+- **Compare:** NoteTrack = 9,544 B. StochasticTrack is **128 B smaller** than NoteTrack. ✅ Track container safe.
 
 ### Engine Layer
 
@@ -47,10 +47,12 @@ Port the Vinx fork's Stochastic track type to XFORMER. A probability-driven sequ
 7. Stage repeats: Each/First/Middle/Last/Odd/Even/Triplets/Random
 
 **Size estimate:**
-- StochasticEngine: TrackEngine base (~120 B) + _lockedSteps (64×~28 B = 1,792 B) + queues (~224 B) + state (~200 B) ≈ **2,300 B**
+- StochasticEngine (inline _lockedSteps): TrackEngine base + _lockedSteps[64] × 28 B + queues + state = **2,228 B** (measured)
+- StochasticEngine (heap _lockedSteps): Same but pointer instead of array = **440 B** (measured)
 - **Compare:** Current engine gate = TeletypeTrackEngine = 912 B
-- **Delta:** +1,388 B × 8 tracks = **+11,104 B CCMRAM**
-- Current CCMRAM: 54,804 B. After port: ~65,900 B. **CCMRAM limit = 64 KB. BLOCKED.**
+- Inline delta: (2,228 - 912) × 8 = **+10,528 B CCMRAM** → BLOCKED
+- Heap delta: (440 - 912) × 8 = **-3,776 B CCMRAM** → **SAVES CCMRAM**
+- Current CCMRAM: 54,804 B. With heap engine: ~51,028 B. Well under 64 KB limit. ✅
 
 ### UI Layer
 
