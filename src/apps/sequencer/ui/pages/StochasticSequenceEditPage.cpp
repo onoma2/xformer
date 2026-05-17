@@ -39,20 +39,22 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
 
 void StochasticSequenceEditPage::keyDown(KeyEvent &event) {
     const auto &key = event.key();
-    if (key.isStep()) {
+    if (key.isStep() && !key.pageModifier()) {
         _stepIndex = key.step();
         _listModel.setStepIndex(_stepIndex);
         event.consume();
+        return;
     }
     ListPage::keyDown(event);
 }
 
 void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
-    if (key.isStep()) {
+    if (key.isStep() && !key.pageModifier()) {
         _stepIndex = key.step();
         _listModel.setStepIndex(_stepIndex);
         event.consume();
+        return;
     }
     ListPage::keyPress(event);
 }

@@ -12,7 +12,7 @@ _Updated: 2026-05-17_
 
 ## 🟡 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Phase 8 UI Stubs complete. List-based editors implemented for global track and per-step sequence settings. All engine mechanics (Density, Tilt, Jitter, Burst, probabilities) are now controllable on hardware.
+**Where I stopped:** Phase 8 UI Stubs complete. List-based editors implemented for global track and per-step sequence settings. All engine mechanics (Density, Tilt, Jitter, Burst, probabilities) are now controllable on hardware. Refined Phase 6 repair complete with true ranked rest-priority and fixed execution order.
 **Next action:** Phase 7: Implement melody-lifecycle buffer evolution (generation, boredom reset, loop mutation).
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
