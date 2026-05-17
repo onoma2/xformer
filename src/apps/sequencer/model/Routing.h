@@ -95,13 +95,6 @@ public:
         GateLength, // Added
         TuesdayLast = GateLength,
 
-        // Stochastic Track Targets
-        StochasticFirst,
-        StochasticDensity = StochasticFirst,
-        StochasticTilt,
-        StochasticJitter,
-        StochasticLast = StochasticJitter,
-
         // Chaos Targets
         ChaosFirst,
         ChaosAmount = ChaosFirst,
@@ -133,6 +126,8 @@ public:
         IndexedB,
         IndexedLast = IndexedB,
 
+
+
         // Bus Targets
         BusFirst,
         BusCv1 = BusFirst,
@@ -140,6 +135,14 @@ public:
         BusCv3,
         BusCv4,
         BusLast = BusCv4,
+
+        // Stochastic Track Targets
+        StochasticFirst,
+        StochasticDensity = StochasticFirst,
+        StochasticTilt,
+        StochasticJitter,
+        StochasticBurst,
+        StochasticLast = StochasticBurst,
 
         Last,
     };
@@ -199,6 +202,7 @@ public:
         case Target::StochasticDensity:         return "Density";
         case Target::StochasticTilt:            return "Tilt";
         case Target::StochasticJitter:          return "Jitter";
+        case Target::StochasticBurst:           return "Burst";
         
         
 
@@ -285,6 +289,7 @@ public:
         case Target::StochasticDensity:         return 65;
         case Target::StochasticTilt:            return 66;
         case Target::StochasticJitter:          return 67;
+        case Target::StochasticBurst:           return 68;
         
 
         // Chaos Targets (39-42)
@@ -385,6 +390,14 @@ public:
         Activity,
         ProgressiveDivider,
         VcaNext,
+        // Stochastic Track Targets
+        StochasticFirst,
+        StochasticDensity = StochasticFirst,
+        StochasticTilt,
+        StochasticJitter,
+        StochasticBurst,
+        StochasticLast = StochasticBurst,
+
         Last,
     };
 
@@ -554,7 +567,15 @@ public:
             NoteToggle,
             NoteVelocity,
             NoteRange,
-            Last,
+            // Stochastic Track Targets
+        StochasticFirst,
+        StochasticDensity = StochasticFirst,
+        StochasticTilt,
+        StochasticJitter,
+        StochasticBurst,
+        StochasticLast = StochasticBurst,
+
+        Last,
         };
 
         static const char *eventName(Event event) {

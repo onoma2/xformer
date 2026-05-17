@@ -140,6 +140,12 @@ public:
         _jitter.set(clamp(jitter, 0, 100), routed);
     }
 
+    // burst
+    int burst() const { return _burst.get(isRouted(Routing::Target::StochasticBurst)); }
+    void setBurst(int burst, bool routed = false) {
+        _burst.set(clamp(burst, 0, 100), routed);
+    }
+
     // minDegree
     int minDegree() const { return _minDegree; }
     void setMinDegree(int degree) {
@@ -249,6 +255,7 @@ public:
         _density.setBase(100);
         _tilt.setBase(0);
         _jitter.setBase(0);
+        _burst.setBase(0);
         _minDegree = 0;
         _maxDegree = 127;
         _slideTime.setBase(0);
@@ -285,6 +292,7 @@ public:
         _density.write(writer);
         _tilt.write(writer);
         _jitter.write(writer);
+        _burst.write(writer);
         writer.write(_minDegree);
         writer.write(_maxDegree);
         _slideTime.write(writer);
@@ -323,6 +331,7 @@ public:
         _density.read(reader);
         _tilt.read(reader);
         _jitter.read(reader);
+        _burst.read(reader);
         reader.read(_minDegree);
         reader.read(_maxDegree);
         _slideTime.read(reader);
@@ -373,6 +382,7 @@ private:
     Routable<uint8_t> _density;
     Routable<int8_t> _tilt;
     Routable<uint8_t> _jitter;
+    Routable<uint8_t> _burst;
 
     uint8_t _minDegree;
     uint8_t _maxDegree;

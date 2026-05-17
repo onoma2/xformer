@@ -35,6 +35,9 @@ void StochasticTrack::writeRouted(Routing::Target target, int intValue, float fl
     case Routing::Target::StochasticJitter:
         setJitter(intValue, true);
         break;
+    case Routing::Target::StochasticBurst:
+        setBurst(intValue, true);
+        break;
     default:
         break;
     }

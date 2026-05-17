@@ -396,9 +396,6 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::StepTrill)]                       = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::GateOffset)]                      = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::GateLength)]                      = { 0,      100,    0,      100,    10      },
-    [int(Routing::Target::StochasticDensity)]               = { 0,      100,    0,      100,    10      },
-    [int(Routing::Target::StochasticTilt)]                  = { -100,   100,    0,      100,    10      },
-    [int(Routing::Target::StochasticJitter)]                = { 0,      100,    0,      100,    10      },
     // Chaos targets
     [int(Routing::Target::ChaosAmount)]                     = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::ChaosRate)]                       = { 0,      127,    0,      127,    10      },
@@ -423,6 +420,10 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::BusCv2)]                          = { -500,   500,    -500,   500,    10      },
     [int(Routing::Target::BusCv3)]                          = { -500,   500,    -500,   500,    10      },
     [int(Routing::Target::BusCv4)]                          = { -500,   500,    -500,   500,    10      },
+    [int(Routing::Target::StochasticDensity)]               = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticTilt)]                  = { -100,   100,    0,      100,    10      },
+    [int(Routing::Target::StochasticJitter)]                = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticBurst)]                 = { 0,      100,    0,      100,    10      },
 };
 
 float Routing::normalizeTargetValue(Routing::Target target, float value) {

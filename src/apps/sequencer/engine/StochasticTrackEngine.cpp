@@ -506,6 +506,14 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
             stepLength = (divisor * evalStepLength(step, _stochasticTrack.lengthBias(), _rng)) / StochasticSequence::Length::Range;
             gateOffset = step.gateOffset();
             stepRetrigger = (uint8_t) evalStepRetrigger(step, _stochasticTrack.retriggerBias(), _rng);
+            
+            // Tuesday-style Burst (override/augment retrigger if step retrigger is 1)
+            if (stepRetrigger == 1 && _stochasticTrack.burst() > 0) {
+                if (int(_rng.nextRange(100)) < _stochasticTrack.burst()) {
+                    stepRetrigger = 2 + _rng.nextRange(3); // 2, 3, 4
+                }
+            }
+
             slide = step.slide();
             accent = (int(_rng.nextRange(100)) < _stochasticTrack.accentProb());
             legato = (int(_rng.nextRange(100)) < _stochasticTrack.legatoProb());
