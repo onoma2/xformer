@@ -39,32 +39,47 @@ from pages_reference import (
     render_ref_prob_div,
 )
 
-from pages_hybrid import (
+from pages_steps import (
     render_stochastic_steps_skylines,
     render_stochastic_steps_delinquencer,
     render_stochastic_steps_euclid,
-    render_stochastic_pitch_prob_melod,
-    render_stochastic_pitch_circle,
-    render_stochastic_pitch_less_concepts,
-    render_stochastic_dice_shredder,
-    render_stochastic_dice_register,
-    render_stochastic_marbles_rndwalk,
-    render_stochastic_marbles_constellations,
-    render_stochastic_lock_skylines,
-    render_stochastic_lock_qfwfq,
-    render_stochastic_track_rndwalk,
-    render_stochastic_track_sequencex,
     render_stochastic_steps_bline,
     render_stochastic_steps_hiswing,
     render_stochastic_steps_meadowphysics,
+)
+
+from pages_pitch import (
+    render_stochastic_pitch_prob_melod,
+    render_stochastic_pitch_circle,
+    render_stochastic_pitch_less_concepts,
     render_stochastic_pitch_kreislauf,
     render_stochastic_pitch_bline,
+)
+
+from pages_dice import (
+    render_stochastic_dice_shredder,
+    render_stochastic_dice_register,
     render_stochastic_dice_grd,
     render_stochastic_dice_kreislauf,
+)
+
+from pages_marbles import (
+    render_stochastic_marbles_rndwalk,
+    render_stochastic_marbles_constellations,
     render_stochastic_marbles_pit_orchisstra,
     render_stochastic_marbles_bline,
+)
+
+from pages_lock import (
+    render_stochastic_lock_skylines,
+    render_stochastic_lock_qfwfq,
     render_stochastic_lock_meadowphysics,
     render_stochastic_lock_pit_orchisstra,
+)
+
+from pages_track import (
+    render_stochastic_track_rndwalk,
+    render_stochastic_track_sequencex,
     render_stochastic_track_bline,
     render_stochastic_track_pitter_patter,
 )
