@@ -487,38 +487,38 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
         accent = _lockedSteps[_index].accent;
         legato = _lockedSteps[_index].legato;
     } else {
-        // Deterministic Density Masking
-        bool densityGated = evalDensityMask(_track.trackIndex(), pattern(), _index, _stochasticTrack.loopFirst(), _stochasticTrack.loopLast(), _stochasticTrack.density(), _stochasticTrack.tilt());
-        
-        if (densityGated) {
-            stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _rng);
+        stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _rng);
 
-            if (stepGate) {
-                stepGate = evalStepCondition(step, _sequenceState.iteration(), fill(), _prevCondition);
+        if (stepGate) {
+            stepGate = evalStepCondition(step, _sequenceState.iteration(), fill(), _prevCondition);
+        }
+
+        if (stepGate) {
+            // Apply deterministic Density Masking after gate/condition rolls
+            stepGate = evalDensityMask(_track.trackIndex(), pattern(), _index, _stochasticTrack.loopFirst(), _stochasticTrack.loopLast(), _stochasticTrack.density(), _stochasticTrack.tilt());
+        }
+
+        if (stepGate) {
+            const auto &scale = sequence.selectedScale(_model.project().scale());
+            int rootNote = sequence.selectedRootNote(_model.project().rootNote());
+            
+            noteValue = evalStepNote(step, _stochasticTrack, scale, rootNote, _stochasticTrack.octave(), _stochasticTrack.transpose(), _lastDegree, _rng);
+            stepLength = (divisor * evalStepLength(step, _stochasticTrack.lengthBias(), _rng)) / StochasticSequence::Length::Range;
+            gateOffset = step.gateOffset();
+            stepRetrigger = (uint8_t) evalStepRetrigger(step, _stochasticTrack.retriggerBias(), _rng);
+            slide = step.slide();
+            accent = (int(_rng.nextRange(100)) < _stochasticTrack.accentProb());
+            legato = (int(_rng.nextRange(100)) < _stochasticTrack.legatoProb());
+
+            if (legato) {
+                stepLength = divisor;
             }
 
-            if (stepGate) {
-                const auto &scale = sequence.selectedScale(_model.project().scale());
-                int rootNote = sequence.selectedRootNote(_model.project().rootNote());
-                
-                noteValue = evalStepNote(step, _stochasticTrack, scale, rootNote, _stochasticTrack.octave(), _stochasticTrack.transpose(), _lastDegree, _rng);
-                stepLength = (divisor * evalStepLength(step, _stochasticTrack.lengthBias(), _rng)) / StochasticSequence::Length::Range;
-                gateOffset = step.gateOffset();
-                stepRetrigger = (uint8_t) evalStepRetrigger(step, _stochasticTrack.retriggerBias(), _rng);
-                slide = step.slide();
-                accent = (int(_rng.nextRange(100)) < _stochasticTrack.accentProb());
-                legato = (int(_rng.nextRange(100)) < _stochasticTrack.legatoProb());
-
-                if (legato) {
-                    stepLength = divisor;
-                }
-
-                // Small jitter Timing Humanize
-                if (_stochasticTrack.jitter() > 0) {
-                    int maxJitter = (divisor * _stochasticTrack.jitter()) / 200; // +-50% of jitter percentage
-                    if (maxJitter > 0) {
-                        jitterTick = int16_t(_rng.nextRange(maxJitter * 2 + 1)) - maxJitter;
-                    }
+            // Small jitter Timing Humanize
+            if (_stochasticTrack.jitter() > 0) {
+                int maxJitter = (divisor * _stochasticTrack.jitter()) / 200; // +-50% of jitter percentage
+                if (maxJitter > 0) {
+                    jitterTick = int16_t(_rng.nextRange(maxJitter * 2 + 1)) - maxJitter;
                 }
             }
         }

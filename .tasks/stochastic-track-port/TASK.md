@@ -376,31 +376,39 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 
 ---
 
-### Phase 6: Tuesday-Derived Stochastic Mechanics
+### Phase 6: Stochastic Performance Mechanics
 
-**Goal:** Add the small, reusable Tuesday control laws that strengthen Stochastic without turning it into a second Tuesday algorithm track.
+**Goal:** Keep the live stochastic layer small and semantically tight. Do not mix Proteus density, Tuesday pressure, and Proteus patience into one control set.
 
 **Source references:**
 - `src/apps/sequencer/model/TuesdaySequence.h`
 - `src/apps/sequencer/engine/TuesdayTrackEngine.h`
 - `src/apps/sequencer/engine/TuesdayTrackEngine.cpp`
+- User-provided Proteus reverse-engineered functional spec: deterministic density muting by rest priority.
 
 **Additions:**
-1. **Power / cooldown density governor:** Add a global density pressure layer after per-step gate probability. Low power increases spacing; accents can punch through; evaluated gate results must be captured by lock.
-2. **Loop skew:** Add a bipolar loop-position density bias so probability can rise or fall across the active loop window without rewriting step data.
-3. **Micro-gate / step burst layer:** Extend stochastic retrigger into a Tuesday-style micro-gate scheduler that can emit several gates inside one step with optional scale-degree offsets. Keep queue size bounded and lock the evaluated burst events.
-4. **Timing looseness / gate-offset scaler:** Interpret global gate-offset control as a scaler over evaluated timing looseness: `0%` strict, `50%` generated timing, `100%` exaggerated timing.
-5. **CV update mode polish:** Verify and expose the existing `Gate/Always` CV update mode as a clear musical choice: hold pitch until a gate vs evaluate pitch every step.
-6. **Finite loop + rotate ergonomics:** Keep Stochastic's existing loop-first/loop-last model, but borrow Tuesday's bounded rotate behavior and compact finite-loop UX so rotation stays musical inside the active loop.
+1. **Density:** Proteus-style deterministic rest-priority thinning over `loopFirst..loopLast`. This is not another random gate roll. Turning density down mutes the same ordered steps; turning it back up restores the same rhythm skeleton.
+2. **Tilt:** Optional bias used when generating the rest-priority order. Positive values preserve later-loop positions longer; negative values preserve earlier-loop positions longer. It is not a second density probability.
+3. **Jitter:** Optional small timing humanize. It is evaluated once per accepted event and stored in the lock buffer. Locked replay must not reroll timing.
+4. **Burst:** Optional bounded micro-gate layer based on the existing retrigger model. It may borrow Tuesday's queue discipline, but it must not introduce a hidden Tuesday algorithm or cooldown engine.
+5. **CV:** Verify and expose the existing `gate/always` update choice: hold pitch until a gate vs evaluate pitch every step.
+6. **Rotate:** Bounded address transform over `loopFirst..loopLast`.
 
 **Non-goals:**
 - Do not port Tuesday algorithms (`Autechre`, `Ganz`, `Blake`, `Window`, `ChipArp`, etc.).
 - Do not add a hidden `Algorithm` selector to Stochastic.
 - Do not add large algorithm state unions to `StochasticTrackEngine`.
+- Do not implement Tuesday `power` / cooldown pressure in this phase.
+- Do not add `patience` here; patience belongs only to Phase 7 buffer evolution.
+- Do not expose compound underscore names such as `timing_jitter` or `density_tilt` to the user.
+- Internal code names should follow existing codebase style. For example, prefer local C++ style such as `timingJitter()` / `_timingJitter` if that is the surrounding pattern.
+- User-facing labels should be short, preferably one word: `Density`, `Tilt`, `Jitter`, `Burst`, `CV`, `Rotate`.
 
 **Acceptance:**
 - All six additions remain compatible with captured-event lock semantics.
 - No unbounded queue growth, STL containers, or tick-path allocation.
+- Default settings preserve current stochastic behavior: density 100, tilt 0, jitter 0.
+- Step gate probability remains the only per-step random gate probability. Density is deterministic masking after a step wants to fire.
 - STM32 release build remains within current SRAM/CCMRAM gates.
 
 ---
@@ -410,22 +418,21 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 **Goal:** Add a loop-bound melody-buffer evolution layer inspired by the Proteus reverse-engineered spec. This is not a replacement for stochastic step evaluation; it is a higher-level buffer lifecycle that can generate, thin, mutate, and occasionally refresh melodic material at loop boundaries.
 
 **Source reference:**
-- User-provided Proteus reverse-engineered functional spec: stochastic buffer-based CV/Gate sequencer with Complexity, Patience/boredom, deterministic Density muting, per-loop Mutation, and constrained octave shifting.
+- User-provided Proteus reverse-engineered functional spec: stochastic buffer-based CV/Gate sequencer with complexity, patience/boredom, deterministic rest-priority thinning, per-loop mutation, and constrained octave shifting.
 
 **Model additions:**
 - `complexity`: `uint8_t` 0-100. Controls how new buffer degrees are generated.
 - `patience`: `uint8_t` 0-100. `100` means infinite/no boredom reset.
-- `bufferDensity`: `uint8_t` 0-100. Applies deterministic rest priority over the generated buffer.
-- `mutationProb`: `uint8_t` 0-100. Per-loop probability to reroll one buffer index.
-- `octaveShiftProb`: `uint8_t` 0-100. Per-loop probability to shift the buffer octave by -1, 0, or +1 within bounds.
-- `bufferMode`: compact enum if needed: Off, Generate, Evolve. Default should preserve current Stochastic behavior.
+- Mutation probability: `uint8_t` 0-100. Per-loop probability to reroll one buffer index.
+- Octave probability: `uint8_t` 0-100. Per-loop probability to shift the buffer octave by -1, 0, or +1 within bounds.
+- Buffer mode: compact enum if needed: off, generate, evolve. Default should preserve current Stochastic behavior.
 
 **Engine state:**
-- `melodyBuffer[CONFIG_STEP_COUNT]`: generated scale-degree values or compact signed degree offsets.
-- `restPriority[CONFIG_STEP_COUNT]`: deterministic priority order used by Density.
-- `bufferValid`: whether the melody buffer has been generated for the current pattern/settings.
-- `boredomCounter`: loop count since last full buffer refresh.
-- `bufferOctaveOffset`: constrained to `-1..+1`.
+- `melody_buffer[CONFIG_STEP_COUNT]`: generated scale-degree values or compact signed degree offsets.
+- `rest_priority[CONFIG_STEP_COUNT]`: deterministic priority order used by density.
+- `buffer_valid`: whether the melody buffer has been generated for the current pattern/settings.
+- `boredom_counter`: loop count since last full buffer refresh.
+- `buffer_octave_offset`: constrained to `-1..+1`.
 
 **Generation rules:**
 1. Buffer generation happens at explicit generate/clear points or loop boundaries, never as hidden per-clock random voltage generation.
@@ -439,13 +446,13 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 **Patience / boredom rules:**
 1. Only evaluate boredom at the active loop boundary.
 2. `patience == 100` disables full buffer refresh.
-3. Otherwise, `boredomCounter` increases each completed loop and maps to `P_new`.
-4. Use a simple linear ramp for MVP: `P_new = boredomCounter * (100 - patience) / K`, clamped to 100. Choose `K` so mid patience evolves over several loops, not every loop.
-5. On boredom reset, regenerate the full melody buffer, rest priority, and octave offset, then clear `boredomCounter`.
+3. Otherwise, `boredom_counter` increases each completed loop and maps to `p_new`.
+4. Use a simple linear ramp for MVP: `p_new = boredom_counter * (100 - patience) / k`, clamped to 100. Choose `k` so mid patience evolves over several loops, not every loop.
+5. On boredom reset, regenerate the full melody buffer, rest priority, and octave offset, then clear `boredom_counter`.
 
-**Density / rest-priority rules:**
-1. Generate `restPriority[]` whenever a new melody buffer is created.
-2. Density does not reroll gates randomly. It mutes the same ordered steps as Density decreases, so turning the control back up restores the same rhythm skeleton.
+**Rest-priority refresh rules:**
+1. Generate `rest_priority[]` whenever a new melody buffer is created.
+2. Phase 6 `density` uses this priority order when buffer mode is active. It must not introduce a second density control.
 3. Priority generation should preserve musical anchors first: keep loop start and beat-like positions later in the mute order, then shuffle the remaining steps deterministically.
 4. The evaluated gate/rest decision produced by this density layer must be captured into lock.
 
@@ -464,10 +471,12 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 - Do not adopt Proteus CV summing, knob-lock, DAC range, C3 root, flash persistence, or 16-slot scale assumptions.
 - Do not replace Performer user scales; active scales may have up to 32 degrees.
 - Do not add gate passthrough in this phase.
+- Do not add another density control here. Phase 6 owns density; Phase 7 owns complexity, patience, mutation, and buffer evolution.
+- Internal code names should follow existing codebase style. User-facing labels should be short, preferably one word.
 
 **Acceptance:**
 - Buffer mode Off preserves current Stochastic behavior.
-- Buffer generation, boredom reset, density muting, mutation, and octave shift are deterministic under project recall.
+- Buffer generation, boredom reset, rest-priority refresh, mutation, and octave shift are deterministic under project recall.
 - Lock replay remains a freeze of evaluated gate, CV, length, retrigger, slide, gate offset, and burst events.
 - No large inline engine buffers that exceed the engine container gate.
 
@@ -491,8 +500,8 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 - Degree-ticket visual editor sized by the active scale's `notesPerOctave()`.
 - Linearity, Min/Max degree range.
 - Marbles Mode, Spread, Bias, Steps.
-- Power/cooldown density, loop skew, burst depth, timing looseness, CV update mode, and bounded loop rotation from Phase 6.
-- Proteus-inspired buffer controls from Phase 7: Complexity, Patience, buffer Density, Mutation, octave-shift probability, and buffer mode.
+- Phase 6 user-facing controls: Density, Tilt, Jitter, Burst, CV, Rotate.
+- Phase 7 user-facing controls: Complexity, Patience, Mutation, Octave, Buffer.
 - Lock, loop first/last, and rotation controls via context menu + encoder where possible.
 - `StochasticTrackListModel` may exist as a fallback/settings bridge, but normal performance editing should live on visual pages.
 
@@ -524,8 +533,8 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 11. Test fill modes (Gates, NextPattern, Condition).
 12. Test routing targets.
 13. Test project save/load with Stochastic tracks.
-14. Test Tuesday-derived mechanics: power/cooldown density, loop skew, micro-gate bursts, timing looseness, CV update mode, and bounded loop rotate ergonomics.
-15. Test Proteus-inspired buffer evolution: Complexity generation, Patience reset, deterministic Density muting, per-loop Mutation, octave-shift bounds, and locked replay.
+14. Test Phase 6 mechanics: deterministic density, tilt priority generation, jitter lock capture, burst queue bounds, CV update behavior, and bounded rotate ergonomics.
+15. Test Phase 7 buffer evolution: complexity generation, patience reset, per-loop mutation, octave-shift bounds, and locked replay.
 16. Regression test: Note/Curve/Tuesday/Teletype tracks still work.
 
 ---
@@ -627,7 +636,7 @@ Bit-packing the Vinx object adds complexity for marginal gain. Compact heap/pool
 | Phase 3: Global Pitch Logic | ~3h |
 | Phase 4: Loop Controls | ~2h |
 | Phase 5: Dynamics + Routing Targets | complete, reported |
-| Phase 6: Tuesday-Derived Stochastic Mechanics | ~3-4h |
+| Phase 6: Stochastic Performance Mechanics | ~3-4h |
 | Phase 7: Proteus-Inspired Buffer Evolution | ~4-5h |
 | Phase 8: UI Layer | ~6h |
 | Phase 9: Validation | ~3h |
