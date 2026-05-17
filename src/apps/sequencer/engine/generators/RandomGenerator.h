@@ -13,14 +13,16 @@ public:
         Smooth,
         Bias,
         Scale,
+        Variation,
         Last
     };
 
     struct Params {
-        uint16_t seed = 0;
+        uint32_t seed = 0;
         uint8_t smooth = 0;
         int8_t bias = 0;
         uint8_t scale = 10;
+        uint8_t variation = 100;
     };
 
     RandomGenerator(SequenceBuilder &builder, Params &params);
@@ -35,10 +37,14 @@ public:
     void init() override;
     void update() override;
 
+    void randomizeParams() override;
+    void randomizeSeed();
+    void randomizeContextParams();
+
     // seed
 
     int seed() const { return _params.seed; }
-    void setSeed(int seed) { _params.seed = clamp(seed, 0, 1000); }
+    void setSeed(int seed) { _params.seed = clamp(seed, 0, 1000000); }
 
     // smooth
 
@@ -54,6 +60,11 @@ public:
 
     int scale() const { return _params.scale; }
     void setScale(int scale) { _params.scale = clamp(scale, 0, 100); }
+
+    int variation() const { return _params.variation; }
+    void setVariation(int variation) { _params.variation = clamp(variation, 0, 100); }
+
+    int displayValue(int index) const override;
 
     // pattern
 

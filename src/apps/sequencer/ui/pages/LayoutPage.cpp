@@ -37,34 +37,8 @@ void LayoutPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
     if (key.isFunction()) {
-        if (key.function() == 4 && _mode == Mode::TrackMode && !_trackModeListModel.sameAsProject(_project)) {
-            _manager.pages().confirmation.show("ARE YOU SURE?", [this] (bool result) {
-                if (result) {
-                    setEdit(false);
-                    // we are about to change track engines -> lock the engine to avoid inconsistent state
-                    _engine.lock();
-                    Track::TrackMode oldModes[CONFIG_TRACK_COUNT];
-                    std::array<int, CONFIG_TRACK_COUNT> teletypeTracks{};
-                    int teletypeCount = 0;
-                    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-                        oldModes[trackIndex] = _project.track(trackIndex).trackMode();
-                    }
-                    _trackModeListModel.toProject(_project);
-                    for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-                        Track::TrackMode newMode = _project.track(trackIndex).trackMode();
-                        if (oldModes[trackIndex] != newMode && newMode == Track::TrackMode::Teletype) {
-                            _project.track(trackIndex).teletypeTrack().requestBootScriptRun();
-                            teletypeTracks[teletypeCount++] = trackIndex;
-                        }
-                    }
-                    _engine.unlock();
-                    if (teletypeCount > 0) {
-                        startTeletypeOutputAssignments(teletypeTracks, teletypeCount);
-                    } else {
-                        showMessage("LAYOUT CHANGED");
-                    }
-                }
-            });
+        if (key.function() == 4) {
+            commitLayout();
         }
         setMode(Mode(key.function()));
         event.consume();
@@ -131,15 +105,56 @@ void LayoutPage::assignOutputsForTeletypeTrack(int trackIndex) {
     }
 }
 
+void LayoutPage::commitLayout() {
+    if (_mode == Mode::TrackMode && !_trackModeListModel.sameAsProject(_project)) {
+        _manager.pages().confirmation.show("ARE YOU SURE?", [this] (bool result) {
+            if (result) {
+                setEdit(false);
+                // we are about to change track engines -> lock the engine to avoid inconsistent state
+                _engine.lock();
+                Track::TrackMode oldModes[CONFIG_TRACK_COUNT];
+                std::array<int, CONFIG_TRACK_COUNT> teletypeTracks{};
+                int teletypeCount = 0;
+                for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+                    oldModes[trackIndex] = _project.track(trackIndex).trackMode();
+                }
+                _trackModeListModel.toProject(_project);
+                for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
+                    Track::TrackMode newMode = _project.track(trackIndex).trackMode();
+                    if (oldModes[trackIndex] != newMode && newMode == Track::TrackMode::Teletype) {
+                        _project.track(trackIndex).teletypeTrack().requestBootScriptRun();
+                        teletypeTracks[teletypeCount++] = trackIndex;
+                    }
+                }
+                _engine.unlock();
+                if (teletypeCount > 0) {
+                    startTeletypeOutputAssignments(teletypeTracks, teletypeCount);
+                } else {
+                    showMessage("LAYOUT CHANGED");
+                }
+            }
+        });
+    }
+}
+
 void LayoutPage::keyboard(KeyboardEvent &event) {
-    switch (event.keycode()) {
-    case KeyboardEvent::KeyF1: pressFunctionButton(0, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF2: pressFunctionButton(1, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default:
+    if (event.isPressed()) {
+        if (event.keycode() == KeyboardEvent::KeyEnter) {
+            if (_mode == Mode::TrackMode && !_trackModeListModel.sameAsProject(_project)) {
+                commitLayout();
+            } else {
+                _manager.pop();
+            }
+            event.consume();
+            return;
+        }
+        if (event.keycode() == KeyboardEvent::KeyEscape) {
+            _manager.pop();
+            event.consume();
+            return;
+        }
+    }
+    if (!handleFunctionKeys(event)) {
         ListPage::keyboard(event);
-        break;
     }
 }

@@ -23,10 +23,12 @@ set(sources
     engine/RoutingEngine.cpp
     engine/SequenceState.cpp
     # engine/generators
+    engine/generators/AlgoGenerator.cpp
     engine/generators/EuclideanGenerator.cpp
     engine/generators/Generator.cpp
     engine/generators/RandomGenerator.cpp
     engine/generators/Rhythm.cpp
+    engine/generators/TuesdayAlgoCore.cpp
     # intro
     intro/Intro.cpp
     # model

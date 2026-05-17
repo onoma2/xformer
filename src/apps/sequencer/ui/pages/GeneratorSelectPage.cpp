@@ -58,6 +58,22 @@ void GeneratorSelectPage::keyPress(KeyPressEvent &event) {
     ListPage::keyPress(event);
 }
 
+void GeneratorSelectPage::keyboard(KeyboardEvent &event) {
+    if (event.isPressed()) {
+        switch (event.keycode()) {
+        case KeyboardEvent::KeyEnter:
+            closeWithResult(true);
+            event.consume();
+            break;
+        case KeyboardEvent::KeyEscape:
+            closeWithResult(false);
+            event.consume();
+            break;
+        }
+    }
+    ListPage::keyboard(event);
+}
+
 void GeneratorSelectPage::closeWithResult(bool result) {
     Page::close();
     if (_callback) {

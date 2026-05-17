@@ -227,6 +227,65 @@ Treat RAM as a gate only when a feature changes the relevant container maximum o
 - If flash grows but RAM sections and container gates stay flat, RAM should not block the feature.
 - If RAM grows, identify the exact symbol or container cliff before proposing broader architecture changes.
 
+## Simulator Workflow (Reference Forks)
+
+The project maintains reference forks in `temp-ref/` for comparing features (vinx-performer, mebitek-performer). Each can be built and launched via a shared macOS `.app` bundle.
+
+### Building a Simulator
+
+```bash
+cd temp-ref/vinx-performer && mkdir -p build/sim/debug
+cd build/sim/debug && cmake -DPLATFORM=sim ../../.. && make -j$(nproc)
+```
+
+### macOS App Bundle (Keyboard Focus Fix)
+
+Running the simulator binary directly from the terminal causes macOS to route keyboard events to Terminal.app instead of the SDL window. The fix is a `.app` bundle wrapper:
+
+```
+build/sim/Performer.app/
+  Contents/Info.plist
+  Contents/MacOS/performer    ← shell script wrapper (resolves build dir + assets)
+  Contents/MacOS/sequencer    ← symlink → actual binary
+```
+
+The wrapper (`performer`) `cd`s to the binary's build directory (where the `assets/` symlink lives), then runs the binary with `| tee /tmp/performer-sim.log` for diagnostics.
+
+**To switch to a different fork/build:** repoint the symlink:
+
+```bash
+# Vinx
+ln -sf ../../../../../temp-ref/vinx-performer/build/sim/debug/src/apps/sequencer/sequencer \
+       build/sim/Performer.app/Contents/MacOS/sequencer
+
+# Xformer
+ln -sf ../../../../../build/sim/debug/src/apps/sequencer/sequencer \
+       build/sim/Performer.app/Contents/MacOS/sequencer
+```
+
+**Launch:**
+
+```bash
+open build/sim/Performer.app          # non-blocking (bg process)
+open -W build/sim/Performer.app       # blocks until exit
+```
+
+(`open -W` may fail with PID errors on macOS 15.x — use `open` without `-W` and check `/tmp/performer-sim.log` for output.)
+
+### Simulator Keyboard Mapping
+
+| Physical Button  | Keyboard Key |
+|------------------|--------------|
+| Step 1-8         | `Z X C V B N M ,` |
+| Step 9-16        | `A S D F G H J K` |
+| Track 1-8        | `Q W E R T Y U I` |
+| 4 round buttons  | `1 2 3 4` |
+| Left / Right     | `← →` |
+| Shift            | Left Shift |
+| Page             | Left Alt |
+| Encoder push     | Space |
+| Encoder rotate   | Drag mouse on encoder widget |
+
 ## Build & test
 - **STM32 release build (REQUIRED for all compile checks):** `cd build/stm32/release && make sequencer`
 - Simulator build: `cd build/sim/debug && make sequencer` — **DO ONLY IF USER EXPLICITLY ASKS.**

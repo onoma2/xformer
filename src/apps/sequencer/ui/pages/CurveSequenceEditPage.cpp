@@ -1318,7 +1318,7 @@ void CurveSequenceEditPage::generateSequence() {
             auto builder = _builderContainer.create<CurveSequenceBuilder>(_project.selectedCurveSequence(), layer());
             auto generator = Generator::execute(mode, *builder);
             if (generator) {
-                _manager.pages().generator.show(generator);
+                _manager.pages().generator.show(generator, &_stepSelection);
             }
         }
     });
@@ -1561,13 +1561,6 @@ void CurveSequenceEditPage::gatePresetsContextAction(int index) {
 }
 
 void CurveSequenceEditPage::keyboard(KeyboardEvent &event) {
-    switch (event.keycode()) {
-    case KeyboardEvent::KeyF1: pressFunctionButton(0, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF2: pressFunctionButton(1, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default: break;
-    }
+    if (handleFunctionKeys(event)) return;
     BasePage::keyboard(event);
 }

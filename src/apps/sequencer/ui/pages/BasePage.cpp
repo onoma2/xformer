@@ -36,6 +36,15 @@ void BasePage::pressFunctionButton(int functionIndex, bool shift) {
     keyUp(upEvent);
 }
 
+bool BasePage::handleFunctionKeys(KeyboardEvent &event) {
+    if (event.keycode() >= KeyboardEvent::KeyF1 && event.keycode() <= KeyboardEvent::KeyF5) {
+        pressFunctionButton(event.keycode() - KeyboardEvent::KeyF1, event.shift());
+        event.consume();
+        return true;
+    }
+    return false;
+}
+
 void BasePage::keyboard(KeyboardEvent &event) {
     if (event.isPressed()) {
         if (event.keycode() == KeyboardEvent::KeyTab) {

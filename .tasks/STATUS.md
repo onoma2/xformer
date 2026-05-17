@@ -1,5 +1,23 @@
 # Task Board
-_Updated: 2026-05-16_
+_Updated: 2026-05-17_
+
+## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
+**Status:** done — Phases A-F complete and hardware verified.
+**Where I stopped:** All phases committed. SequenceBuilder 3-copy state machine, RandomGenerator enhancements, GeneratorPage A/B workflow, 64-step bank visualization, context menu expansion, and Tuesday AlgoGenerator (15 algorithms via TuesdayAlgoCore). RAM: `.data + .bss = 118,884` (92.9%).
+**Next action:** Merge `feat/generator` to master when user confirms.
+**Depends on:** nothing
+**Branch:** feat/generator
+
+---
+
+## 🔵 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
+**Status:** research complete — task documented, RAM assessment done. BLOCKED on engine compaction (CCMRAM).
+**Where I stopped:** Full architecture researched. StochasticTrack model (~8,800 B) fits under NoteTrack gate. StochasticEngine (~2,300 B inline) would blow CCMRAM by +11 KB. Engine must heap-allocate `_lockedSteps` to fit under 912 B gate. Three std::vector uses, std::mt19937/std::normal_distribution, and std::rand() need replacement.
+**Next action:** Run ARM sizeof probe on temporary StochasticTrack to verify model gate, then decide whether to proceed with Phase 1 or block behind resource-optimization.
+**Depends on:** resource-optimization (RAM headroom), generator-preview-apply (SequenceBuilder 3-copy — done)
+**Blocks:** nothing
+**Branch:** TBD
+**Reference:** `.tasks/stochastic-track-port/TASK.md`
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
@@ -29,7 +47,7 @@ _Updated: 2026-05-16_
 ---
 
 ## 🟡 teletype-runtime-architecture — Clarify Teletype VM/slot/runtime ownership before global runtime work
-**Status:** active — Phase 0-4 hardware-verified; two persistence contracts are now implemented.
+**Status:** paused — Phase 0-4 hardware-verified; two persistence contracts are now implemented.
 **Where I stopped:** Phase 4 verified: active-clip-only text save/load, S1-S3 rollback transaction, inactive clip untouched, project save/load OK, `.data+bss` reduced by 1,136 B.
 **Next action:** Post-Phase-4 research: decide whether further transaction-buffer reduction or `write()` redundancy cleanup is worth doing.
 **Depends on:** resource-optimization (for RAM gates), teletype file transaction semantics
@@ -83,6 +101,15 @@ _Updated: 2026-05-16_
 
 ---
 
+## 🟢 usb-keyboard-function-keys-extraction — Extract duplicated F1-F5 pressFunctionButton dispatch from 17 page keyboard() overrides into BasePage helper
+**Status:** done — all phases complete. 18 files refactored (original 17 + GeneratorPage). Build clean.
+**Where I stopped:** `BasePage::handleFunctionKeys()` added. Pattern A (11 files), B (5 files), C (2 files) refactored. STM32 release build verified: `.data=6,332`, `.bss=112,552`, `.ccmram_bss=54,804` (net SRAM -1,076 B vs baseline — within linker noise for pure code move).
+**Next action:** Merge to master when user confirms.
+**Depends on:** nothing (structural refactor, no RAM or behavior change)
+**Branch:** TBD
+
+---
+
 ## 🟢 global-modulators-v1 — Port Modulove-style global modulators with chaos shapes
 **Status:** complete — Phases 1-9 done. Core shapes, output routing, RoutingEngine/CvRoute integration, defaults, rate consistency, documentation. Hardware verified.
 **Where I stopped:** Phase 9 (CvRoute modulator inputs) committed. manuals/Modulators.md written. Feature ready for merge to master.
@@ -129,13 +156,4 @@ _Updated: 2026-05-16_
 **Where I stopped:** Research phase complete. All reference codebases cloned to `temp-ref/` (C, Lua, Arduino C++). RAM container gates identified: `NoteTrack=9544 B`, `TeletypeTrackEngine=912 B`. Next step is designing fixed-grid `OrcaTrack` model that fits under the container gate.
 **Next action:** Prototype `OrcaTrack` model with fixed grid size (e.g., 16×16 or 32×16) and measure `sizeof(OrcaTrack)` in STM32 release build to verify it stays ≤ `NoteTrack`.
 **Depends on:** resource-optimization (needs RAM headroom), teletype-runtime-architecture (pattern slot pattern to follow)
-**Branch:** TBD
-
----
-
-## ⚪ generator-preview-apply — Generator A/B preview, step selection, 64-step context
-**Status:** ready — research complete, plan written, not started
-**Where I stopped:** Research phase complete. Vinx fork fully analyzed. XFORMER delta documented. Phased implementation plan (A-E) written in TASK.md.
-**Next action:** Phase A — Add `_preview` copy + `apply()`/`showOriginal()`/`showPreview()`/`showingPreview()` to SequenceBuilder. Measure sizeof impact before proceeding.
-**Depends on:** resource-optimization (RAM headroom at 90.5%, need to verify _preview copy fits)
 **Branch:** TBD

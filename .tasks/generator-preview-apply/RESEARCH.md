@@ -129,22 +129,48 @@ Step selection:
 
 ### Phase A: SequenceBuilder 3-copy
 
-The `_preview` member in `SequenceBuilderImpl<T>` is a full copy of the sequence type T.
+The `_preview` member in `SequenceBuilderImpl<T>` would be a full copy of the sequence type T.
 
-| Type | sizeof(T) | _preview copy cost |
-|------|-----------|-------------------|
-| NoteSequence | 9,544 B | +9.5 KB per instance on stack |
-| CurveSequence | ~4,800 B | +4.8 KB per instance on stack |
+| Type | sizeof(T) | _preview as inline member cost |
+|------|-----------|----------------------------------|
+| NoteSequence | 9,544 B | +9.5 KB per instance in Container |
+| CurveSequence | ~4,800 B | +4.8 KB per instance in Container |
 
-Current XFORMER has `Container<NoteSequenceBuilder>` in NoteSequenceEditPage (stack-allocated via placement new). The Container is sized to `max(sizeof(NoteSequenceBuilder), ...)` which is already 9,544 B. Adding `_preview` would roughly double this.
+**Problem:** `Container<NoteSequenceBuilder>` sits inside `NoteSequenceEditPage`, which is statically allocated in the `Pages` struct. Adding `_preview` as an inline member would increase `sizeof(NoteSequenceEditPage)` by ~9.5 KB, flowing directly into `.bss`.
 
-**Mitigation**: `_preview` is only needed while the GeneratorPage is open. It can be allocated on-demand rather than embedded in the builder. Alternatively, the existing Container size may not change if `_preview` is stored as a separate heap allocation.
+**Decision: Use raw `T* _preview = nullptr` with heap allocation.** Not `std::optional<T>` — on STM32, `std::optional` reserves inline storage for the contained value (engaged flag + aligned storage sized for T), so `std::optional<NoteSequence>` would inflate the builder by ~9.5 KB in the Pages struct. A raw `T*` is just 4 bytes + 1 byte bool.
 
-**Check required**: Measure `sizeof(NoteSequenceBuilder)` before and after adding `_preview`. If it exceeds the current `Container<NoteSequenceBuilder>` size, it impacts the `NoteSequenceEditPage` model RAM.
+- `_edit` (reference) and `_original` (copy) remain as members — no size change from current code.
+- `_preview` is `T* _preview = nullptr` — heap-allocated on `showPreview()`, freed on `revert()` or destructor.
+- `_showingPreview` is `bool _showingPreview = false`.
+- Total persistent increase: ~8 bytes (pointer + bool + padding) per builder type.
+- Runtime heap allocation: ~9.5 KB per active generator instance (freed on exit/revert).
 
-### Phase B-E: Generator + UI
+**Allocation failure behavior:** If `new (std::nothrow) T(_original)` fails, `_preview` stays null, `_showingPreview` stays false. GeneratorPage checks `_preview != nullptr` and `showingPreview()` before allowing toggle. Generator stays in ORIGINAL state. Encoder changes still work but preview toggle is disabled.
 
-Generator/RandomGenerator changes add small amounts (a few bytes per instance). GeneratorPage state adds ~20 bytes. EntropyTargets.h adds ~0 bytes runtime (enum + inline template only).
+**Lifecycle ownership:** `SequenceBuilderImpl<T>` destructor calls `delete _preview`. `revert()` calls `delete _preview; _preview = nullptr`. `apply()` leaves `_preview` alive for future toggles. `showOriginal()` leaves `_preview` alive for toggle back.
+
+**Estimated persistent RAM delta for Phase A: ~8 bytes** (pointer + bool in Pages struct, not 9.5 KB — the preview copy is on the heap only while generator page is open).
+
+### Phase B: Generator + RandomGenerator
+
+Adding `Variation` param (1 byte), widening seed to `uint32_t` (+2 bytes from `uint16_t`), a few method pointers. Estimated: **~50 bytes** in `.bss` (from widened seed in `RandomGenerator::Params` and the `Variation` field).
+
+### Phase C: GeneratorPage state machine
+
+Adding `_previewArmed` (1B), `_applied` (1B), `_section` (4B), `_stepSelection` ptr (4B), `_boundTrackIndex` (4B), `_boundTrackMode` (1B). Total: **~15 bytes** in Pages struct.
+
+### Phase D: Bank visualization
+
+No persistent RAM — all rendering is stack-local.
+
+### Phase E: Context menu expansion
+
+No persistent RAM — context menu items are static const arrays.
+
+### Total estimated persistent RAM increase: ~65 bytes
+
+Well within the ~2.3 KB headroom before the 120 KB warning zone.
 
 ---
 

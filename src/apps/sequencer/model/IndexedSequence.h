@@ -153,6 +153,15 @@ public:
             _groupMask = 0;
         }
 
+        void swap(Step &other) {
+            uint32_t tempPacked = _packed;
+            uint8_t tempGroupMask = _groupMask;
+            _packed = other._packed;
+            _groupMask = other._groupMask;
+            other._packed = tempPacked;
+            other._groupMask = tempGroupMask;
+        }
+
         void write(VersionedSerializedWriter &writer) const {
             writer.write(_packed);
             writer.write(_groupMask);
@@ -521,6 +530,24 @@ public:
         std::rotate(_steps.begin(), _steps.begin() + newFirstIndex, _steps.begin() + _activeLength);
         setFirstStep(0);  // Reset rotation offset to 0
     }
+
+    //----------------------------------------
+    // Macro methods
+    //----------------------------------------
+
+    void populateWithMacroRhythm(int firstStep, int lastStep, const int *groups, int groupCount);
+    void populateWithMacroTriangle(int firstStep, int lastStep, int cycles);
+    void populateWithMacroSawtooth(int firstStep, int lastStep, int cycles);
+    void populateWithMacroScale(int firstStep, int lastStep, bool ascending);
+    void populateWithMacroArpeggio(int firstStep, int lastStep, int patternIndex);
+    void populateWithMacroChord(int firstStep, int lastStep, int progressionIndex);
+    void populateWithMacroModal(int firstStep, int lastStep, int modeIndex);
+    void populateWithMacroRandomMelody(int firstStep, int lastStep);
+    void transformDurationLog(int firstStep, int lastStep);
+    void transformDurationExp(int firstStep, int lastStep);
+    void transformQuantizeMeasure(int firstStep, int lastStep);
+    void transformReverse(int firstStep, int lastStep);
+    void transformMirror(int firstStep, int lastStep);
 
     void clear() {
         _divisor = 1;   // 1 tick per stored tick

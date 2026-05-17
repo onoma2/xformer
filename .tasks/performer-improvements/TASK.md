@@ -321,9 +321,9 @@ The Vinx fork has a complete 3-copy state machine with A/B preview, step selecti
 
 - `NoteSequence` — has full `layerValue/setLayerValue/layerRange` API with 17+ layers. XFORMER-unique layers: AccumulatorTrigger, PulseCount, GateMode, HarmonyRoleOverride, InversionOverride, VoicingOverride.
 - `CurveSequence` — 7 layers: Shape, ShapeVariation, Min, Max, Gate, GateOffset, GateProbability (GateLength in XFORMER maps to EventLength).
-- `IndexedSequence` — No Layer enum. Needs custom `applyTarget<IndexedSequence>` for duration, swing, repeats, condition.
-- `TuesdaySequence` — No Layer enum. Uses `Routable<T>`. Significant abstraction needed.
-- `DiscreteMapSequence` — Stage-based, not step-based. Custom handler needed.
+- `IndexedSequence` — No Layer enum, bitpacked 32-bit step (no `layerValue()`/`setLayerValue()`), dynamic skip via 0-duration steps. Needs hand-rolled `SequenceBuilder` + custom `applyTarget<IndexedSequence>` before entropy can apply.
+- `TuesdaySequence` — No Layer enum, no Step at all, algorithmic params via `Routable<T>`. Needs hand-rolled `SequenceBuilder` that models params as edit surface. Entropy means scrambling algorithm/flow/mask/glide/etc, not per-step layer blending.
+- `DiscreteMapSequence` — Stage-based (not step-based), threshold/direction/note per stage, no Layer enum. Needs hand-rolled `SequenceBuilder` + custom entropy path. Already has type-specific `randomizeThresholds()`/`randomizeNotes()`/`randomizeDirections()` — a more honest entry point.
 
 #### Implementation plan (phased)
 
@@ -870,6 +870,100 @@ High
 - `src/apps/sequencer/engine/ClockEngine.h` — clock/reset/stop logic
 - `src/apps/sequencer/ui/page/PerformerPage.h` — performer page
 - `src/apps/sequencer/ui/page/GeneratorPage.h` — generator page base
+
+---
+
+## Context Menu + QuickEdit Integration Pattern
+
+### Discovery
+
+The Vinx GeneratorPage implements an elegant hybrid UI pattern: context menu items can trigger QuickEdit dialogs for complex parameter editing. This provides:
+- **Context menu organization**: Group related actions in a clean menu hierarchy
+- **QuickEdit integration**: Open an encoder-driven parameter editor for menu-selected params
+- **Dynamic menu labels**: Show current param value in the menu item label (e.g., "SMOOTH 5")
+
+### Implementation Pattern
+
+**Files:**
+- `src/apps/sequencer/ui/pages/GeneratorPage.h` — `GeneratorContextQuickEditModel` class (ListModel wrapper)
+- `src/apps/sequencer/ui/pages/GeneratorPage.cpp` — `contextAction()` handles QuickEdit launch via `_manager.pages().quickEdit.show()`
+- `src/apps/sequencer/ui/pages/QuickEditPage.h/.cpp` — Existing QuickEdit page (2-column compact layout)
+- `src/apps/sequencer/ui/model/ListModel.h` — Added `setSelectedScale()` interface
+
+**Random generator context menu (Vinx pattern):**
+```
+(blank)           → unused slot
+SMOOTH %d         → QuickEdit opens for param 1 (Smooth)
+RESETGEN          → init() - re-roll seed + all params
+CANCEL            → revert() - clear step selection, exit without apply
+APPLY             → commit() - apply preview, clear step selection, exit
+VAR %d%%          → informational label at bottom
+```
+
+**Code flow:**
+1. `contextShow()` builds menu with dynamic labels (`snprintf(_contextMenuAuxLabel, "SMOOTH %d", smooth())`)
+2. User selects "SMOOTH 5" → `contextAction(index=1)` called
+3. `contextAction()` configures `GeneratorContextQuickEditModel` (wrapper around Generator param editing)
+4. `_manager.pages().quickEdit.show(gGeneratorContextQuickEditModel, 0)` opens QuickEdit page
+5. QuickEdit page provides encoder-based editing (2 columns: "SMOOTH" label + value)
+6. `onEdited` callback triggers `_generator->update()` + preview refresh
+
+**GeneratorContextQuickEditModel:**
+```cpp
+class GeneratorContextQuickEditModel : public ListModel {
+public:
+    void configure(Generator *generator, int paramIndex, const char *label, const std::function<void()> &onEdited);
+    int rows() const override { return 1; }
+    int columns() const override { return 2; }
+    void cell(int row, int column, StringBuilder &str) const override;
+    void edit(int row, int column, int value, bool shift) override;
+    void setSelectedScale(int, bool) override {}
+private:
+    Generator *_generator;
+    int _paramIndex;
+    const char *_label;
+    std::function<void()> _onEdited;
+};
+```
+
+**Key design choices:**
+- **Static instance**: `gGeneratorContextQuickEditModel` to avoid allocation overhead (SRAM-sensitive firmware)
+- **Lambda callback**: `onEdited` called after each param edit to trigger downstream effects (preview update)
+- **Column mapping**: Column 0 = param label, Column 1 = param value (2-column QuickEdit layout)
+- **Forward declarations**: `class Generator` in header to avoid circular includes
+
+### Other Pages Using This Pattern
+
+**Potential candidates for QuickEdit + context menu integration:**
+
+1. **NoteSequenceEditPage** — Step values could trigger QuickEdit for complex step parameters (note, slide, gate probability)
+2. **CurveSequenceEditPage** — Curve parameters (min/max, shape variation) could have QuickEdit via context menu
+3. **TrackPage** — Per-track settings (divisor, clock multiplier, route targets) could use QuickEdit
+4. **ProjectPage** — Tempo, swing, project-wide settings
+5. **ModulatorPage** (when added) — Already uses QuickEdit for waveform preview + param editing
+
+**Benefits of applying this pattern elsewhere:**
+- **Consistent UX**: Users learn one interaction model (context menu → QuickEdit)
+- **Encoder accessibility**: All params accessible via encoder, not just direct button mapping
+- **Dynamic feedback**: Menu labels show current values; QuickEdit shows live updates
+- **Menu cleanliness**: Hide rarely-used or complex params behind context menu, expose via QuickEdit
+
+### Follow-Up Task
+
+**Task:** Apply context menu + QuickEdit integration pattern to other pages
+
+**Scope:**
+1. Identify pages with complex parameter sets (>4 parameters) that could benefit from context menu organization
+2. Add per-page QuickEdit wrapper classes (like `GeneratorContextQuickEditModel`)
+3. Reorganize context menus to open QuickEdit for complex params
+4. Ensure dynamic menu labels show current param values
+
+**Reference implementation:**
+- `src/apps/sequencer/ui/pages/GeneratorPage.cpp` — Complete working example
+- `src/apps/sequencer/ui/pages/GeneratorPage.h` — `GeneratorContextQuickEditModel` class pattern
+- `src/apps/sequencer/ui/pages/QuickEditPage.cpp` — QuickEdit page (2-column compact)
+
+**Priority:** Medium — Quality-of-life improvement, not blocking current features
 
 ---
 

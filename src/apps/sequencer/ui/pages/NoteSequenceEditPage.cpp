@@ -471,16 +471,17 @@ void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
     }
 
     // Quick octave change: Step held + F1-F5 sets note to octave 1-5
-    if (key.isFunction() && _stepSelection.any()) {
-        int octave = key.function() + 1; // F1=1, F2=2, ... F5=5
-        const auto &scale = sequence.selectedScale(_project.scale());
-        for (size_t i = 0; i < sequence.steps().size(); ++i) {
-            if (_stepSelection[i]) {
-                sequence.step(i).setNote(scale.notesPerOctave() * octave);
+    if (key.isFunction()) {
+        for (int i = 0; i < StepCount; ++i) {
+            if (key.state(MatrixMap::fromStep(i))) {
+                int octave = key.function() + 1;
+                const auto &scale = sequence.selectedScale(_project.scale());
+                int stepIndex = stepOffset() + i;
+                sequence.step(stepIndex).setNote(scale.notesPerOctave() * octave);
+                event.consume();
+                return;
             }
         }
-        event.consume();
-        return;
     }
 
     if (key.isFunction()) {
@@ -1088,7 +1089,7 @@ void NoteSequenceEditPage::generateSequence() {
             auto builder = _builderContainer.create<NoteSequenceBuilder>(_project.selectedNoteSequence(), layer());
             auto generator = Generator::execute(mode, *builder);
             if (generator) {
-                _manager.pages().generator.show(generator);
+                _manager.pages().generator.show(generator, &_stepSelection);
             }
         }
     });
@@ -1126,13 +1127,6 @@ void NoteSequenceEditPage::setSelectedStepsGate(bool gate) {
 }
 
 void NoteSequenceEditPage::keyboard(KeyboardEvent &event) {
-    switch (event.keycode()) {
-    case KeyboardEvent::KeyF1: pressFunctionButton(0, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF2: pressFunctionButton(1, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF3: pressFunctionButton(2, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF4: pressFunctionButton(3, event.shift()); event.consume(); break;
-    case KeyboardEvent::KeyF5: pressFunctionButton(4, event.shift()); event.consume(); break;
-    default: break;
-    }
+    if (handleFunctionKeys(event)) return;
     BasePage::keyboard(event);
 }

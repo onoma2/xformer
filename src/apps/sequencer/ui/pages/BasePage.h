@@ -39,6 +39,11 @@ protected:
     // Used by keyboard() to map USB F-keys to hardware button actions.
     void pressFunctionButton(int functionIndex, bool shift = false);
 
+    // Returns true if event was a handled function key (F1-F5 → pressFunctionButton).
+    // Pages that want custom F-key handling can call this and fall through for other keys.
+    // Pages that just need F1-F5 + BasePage fallback don't need to override keyboard() at all.
+    bool handleFunctionKeys(KeyboardEvent &event);
+
     virtual void keyboard(KeyboardEvent &event) override;
 
     PageContext &_context;
