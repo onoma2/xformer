@@ -11,6 +11,44 @@ All images are 256×64 pixel OLED frames rendered at 4× scale. The font is the 
 
 ---
 
+## Canvas Geometry
+
+The Performer OLED is **256×64 px**. The `WindowPainter` reserves fixed bands at the top and bottom, leaving a safe content area in the middle.
+
+### Header (y = 0 … 10)
+| Element | Position | Size |
+|---------|----------|------|
+| Clock text | x=2, y=6 | Tiny font, ~5 px tall |
+| Track / pattern badges | x=40, y=6 | Inverted text, 7 px tall box |
+| Mode label | right-aligned, y=6 | Tiny font |
+| Active function | x=100, y=6 | Tiny font |
+| Accumulator | x=176, y=6 | Tiny font (optional) |
+| **Separator line** | y = 10 | 1 px horizontal rule across 256 px |
+
+**Header occupies 11 px** (y = 0 … 10 inclusive).
+
+### Footer (y = 53 … 63)
+| Element | Position | Size |
+|---------|----------|------|
+| **Separator line** | y = 53 | 1 px horizontal rule across 256 px |
+| Function-key dividers | x = 51, 102, 153, 204 | 1 px vertical rules, 10 px tall |
+| Function-key labels | y = 61 | Tiny font, centered in each 51 px column |
+
+**Footer occupies 12 px** (y = 53 … 64 inclusive).
+
+### Safe Content Area
+```
+y = 11  ← first usable pixel row
+    …
+y = 52  ← last usable pixel row
+```
+**Height = 42 px** (rows 11–52 inclusive).
+**Width = 256 px** (full canvas width).
+
+When designing new UI elements, draw only inside this 256×42 rectangle. Anything touching y ≤ 10 or y ≥ 53 will collide with the header/footer chrome.
+
+---
+
 ## Baseline / Existing Pages
 
 ### `note-edit`
