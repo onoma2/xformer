@@ -8,6 +8,17 @@ _Updated: 2026-05-17_
 **Depends on:** nothing
 **Branch:** feat/generator
 
+---
+
+## 🔵 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
+**Status:** research complete — task documented, RAM assessment done. BLOCKED on engine compaction (CCMRAM).
+**Where I stopped:** Full architecture researched. StochasticTrack model (~8,800 B) fits under NoteTrack gate. StochasticEngine (~2,300 B inline) would blow CCMRAM by +11 KB. Engine must heap-allocate `_lockedSteps` to fit under 912 B gate. Three std::vector uses, std::mt19937/std::normal_distribution, and std::rand() need replacement.
+**Next action:** Run ARM sizeof probe on temporary StochasticTrack to verify model gate, then decide whether to proceed with Phase 1 or block behind resource-optimization.
+**Depends on:** resource-optimization (RAM headroom), generator-preview-apply (SequenceBuilder 3-copy — done)
+**Blocks:** nothing
+**Branch:** TBD
+**Reference:** `.tasks/stochastic-track-port/TASK.md`
+
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
 **Where I stopped:** Current build is `.data=6,320`, `.bss=113,640`, `.ccmram_bss=54,096`; MonitorPage shows `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`.
