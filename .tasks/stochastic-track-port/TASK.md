@@ -2,7 +2,7 @@
 
 ## Goal
 
-Port the Vinx fork's Stochastic track type to XFORMER, then extend the MVP with global musical constraints from `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md`: signed Pitch Ticket Table, scale-mask exclusion, Semi/Mask rotation, Linearity, Min/Max note range, Marbles-style spread/bias/steps pitch shaping, and a compact captured-event lock buffer.
+Port the Vinx fork's Stochastic track type to XFORMER, then extend the MVP with global musical constraints from `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md`: signed Degree Ticket Table, scale-mask exclusion, degree/mask rotation, Linearity, Min/Max degree range, Marbles-style spread/bias/steps pitch shaping, and a compact captured-event lock buffer.
 
 **Why this matters:** Stochastic is one of Vinx's flagship track types alongside Logic and Arp. The enhanced MVP gives XFORMER a mono generative sequencer with step probability, global pitch shaping, and lockable captured performances without taking on polyphony or drift scope yet.
 
@@ -22,10 +22,10 @@ Port the Vinx fork's Stochastic track type to XFORMER, then extend the MVP with 
 Included:
 - Vinx Stochastic model, engine, and core grid UI.
 - Compact captured-event lock buffer.
-- Signed Pitch Ticket Table (12 semitone tickets; `-1` excluded, `0` included with zero tickets).
-- Semi/Mask rotation for key and chord movement.
+- Signed Degree Ticket Table (`CONFIG_USER_SCALE_SIZE` tickets; engine uses the active scale's `notesPerOctave()` prefix; `-1` excluded, `0` included with zero tickets).
+- Degree/Mask rotation for scale-aware transposition and chord movement.
 - Linearity / melodic smoothing.
-- Min/Max note range.
+- Min/Max degree range.
 - Marbles spread/bias/steps pitch shaping.
 - Accent and slew/legato probability only if they stay RAM/queue-cheap.
 
@@ -59,17 +59,17 @@ Deferred post-MVP gates:
 - **Compare:** NoteTrack = 9,544 B. StochasticTrack is **128 B smaller** than NoteTrack. ✅ Track container safe.
 
 **Enhanced MVP model additions:**
-- `pitchWeights[12]`: `int8_t`
+- `degreeTickets[CONFIG_USER_SCALE_SIZE]`: `int8_t`
 - `linearity`: `uint8_t`
-- `semiRotation`, `maskRotation`: `int8_t`
+- `degreeRotation`, `maskRotation`: `int8_t`
 - `lock`: `bool`
 - `loopFirst`, `loopLast`: `uint8_t`
 - `marblesMode`: `uint8_t` or compact enum
 - `marblesSpread`, `marblesBias`, `marblesSteps`: `uint8_t`
-- `minNote`, `maxNote`: `uint8_t`
+- `minDegree`, `maxDegree`: `uint8_t`
 - `accentProb`, `legatoProb`: `uint8_t` only if accepted after size probe
 
-**PWT semantic correction:** Use `int8_t pitchWeights[12]`, not `uint8_t[12]`. `-1` means excluded from the scale mask, `0` means included but no raffle tickets, and positive values are ticket counts. This is byte-neutral versus `uint8_t[12]` and enables ProbMeloD-style mask rotation.
+**PWT semantic correction:** Use `int8_t degreeTickets[CONFIG_USER_SCALE_SIZE]`, not `uint8_t[12]`. `-1` means excluded from the active scale-degree mask, `0` means included but no raffle tickets, and positive values are ticket counts. The first implementation reads only `scale.notesPerOctave()` entries, so user scales up to 32 degrees are first-class. ProbMeloD's 12-slot table is the chromatic/semitone case, not the Performer model limit.
 
 **Model acceptance:** The Vinx baseline is under the current `NoteTrack` gate, but the enhanced settings require an STM32 release `sizeof` probe. Do not assume the final model is accepted until `StochasticTrack <= NoteTrack` is measured on ARM.
 
@@ -82,7 +82,7 @@ Deferred post-MVP gates:
 
 **Engine behavior:**
 1. On each tick, evaluates step probabilities to select a pitch slot from active gates
-2. Applies enhanced global constraints: signed PWT, scale mask, Semi/Mask rotation, Linearity, Min/Max range, optional Marbles spread/bias/steps shaping
+2. Applies enhanced global constraints: signed degree tickets, scale mask, degree/mask rotation, Linearity, Min/Max degree range, optional Marbles spread/bias/steps shaping
 3. Evaluates gate probability + bias, condition (Fill/NotFill/Pre/NotPre/First/Loop), length variation
 4. Schedules gate/CV events into fixed `SortedQueue<Gate, 16>` and `SortedQueue<Cv, 16>`
 5. Caches evaluated events into a compact lock buffer for deterministic replay
@@ -113,7 +113,7 @@ Deferred post-MVP gates:
 - 64-step grid with 4 banks (sections) of 16 steps
 - Layer editing: Gate, GateProbability, GateOffset, Length, LengthVariation, NoteVariation, Octave, etc.
 - Step selection with shift-persist
-- Enhanced config controls: PWT, Linearity, range, Marbles mode/spread/bias/steps, lock/window controls
+- Enhanced config controls: degree tickets, scale/root, Linearity, degree range, Marbles mode/spread/bias/steps, lock/window controls
 - Launchpad generator overlay support
 - Context menus: Init, Copy, Paste, Duplicate, Tie, Generate
 
@@ -130,11 +130,11 @@ Vinx's `SequenceBuilder.h` includes `StochasticSequenceBuilder` alongside `NoteS
 The old task plan was a Vinx-only port. The controlling spec is now the enhanced mono MVP:
 - Vinx foundation
 - compact captured-event lock buffer
-- PWT
+- Degree Ticket Table
 - Scale-mask exclusion with `-1` ticket values
-- Semi/Mask rotation
+- Degree/Mask rotation
 - Linearity
-- Min/Max range
+- Min/Max degree range
 - Marbles spread/bias/steps
 - optional cheap accent/legato
 
@@ -195,18 +195,18 @@ rnd = std::round(normal_dist(e2));
 Marbles spread/bias/steps must be added as a pitch-selection shape, not as a full Marbles subsystem:
 - Use Marbles source as a control-law reference only.
 - Do not import Marbles `OutputChannel`, quantizer, lag processor, register mode, or lookup-table stack unless a later proof shows the cheap approximation is musically wrong.
-- Marbles shaping runs after allowed pitch slots are established by step gates, note probabilities, PWT, and range.
+- Marbles shaping runs after allowed pitch slots are established by step gates, note probabilities, degree tickets, active scale, and range.
 - The evaluated CV produced by Marbles shaping is stored in the captured-event cache.
 
 ### 6. ProbMeloD Pitch Semantics — MVP Requirement
 
-ProbMeloD contributes the cleanest pitch-table mechanics:
-- `int8_t weights[12]` where `-1` is excluded from the scale mask and non-negative values remain in the mask.
+ProbMeloD contributes the cleanest pitch-table mechanics, but Performer generalizes them through its scale system:
+- `int8_t weights[12]` maps to `int8_t degreeTickets[CONFIG_USER_SCALE_SIZE]`; the engine uses the active scale's `notesPerOctave()` entries.
 - `0` is not played by direct weighting, but it rotates with the included scale degrees.
-- Semi rotation shifts all 12 ticket slots for key changes.
+- Degree rotation shifts all active degree ticket slots.
 - Mask rotation rotates only included scale degrees while excluded notes remain fixed, enabling chord movement inside a key mask.
 - Range is a pre-selection filter: out-of-range notes never enter the raffle pool.
-- Raffle-ticket UI language should be used for PWT: positive value equals number of tickets in the draw.
+- Raffle-ticket UI language should be used for degree tickets: positive value equals number of tickets in the draw.
 
 Reference implementation:
 - `ProbabilityMelody.h:170-173` — edit range `-1..MAX`.
@@ -331,7 +331,7 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 
 ### Phase 3: Global Pitch Logic
 
-**Goal:** Implement enhanced MVP pitch selection: signed PWT tickets, scale-mask exclusion, Semi/Mask rotation, Linearity, Min/Max range, and Marbles spread/bias/steps shaping.
+**Goal:** Implement enhanced MVP pitch selection: signed degree tickets, scale-mask exclusion, degree/mask rotation, Linearity, Min/Max degree range, and Marbles spread/bias/steps shaping.
 
 **Files:**
 - `src/apps/sequencer/engine/StochasticEngine.cpp`
@@ -339,12 +339,12 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 - `src/apps/sequencer/model/StochasticSequence.h/.cpp` if sequence-level accessors are needed
 
 **Rules:**
-1. PWT uses `int8_t[12]`: `-1` excluded, `0` included with zero tickets, positive values are raffle tickets.
-2. Normal weighted mode uses step gates/probabilities plus PWT, Semi/Mask rotation, Linearity, and Min/Max range.
+1. Degree tickets use `int8_t[CONFIG_USER_SCALE_SIZE]`: `-1` excluded, `0` included with zero tickets, positive values are raffle tickets.
+2. Normal weighted mode uses step gates/probabilities plus degree tickets, active scale/root, degree/mask rotation, Linearity, and Min/Max degree range.
 3. Range filters the raffle pool before selection; do not clamp selected output notes after the draw.
-4. Marbles mode replaces the final pitch-slot choice after allowed slots are known.
+4. Marbles mode replaces the final degree choice after allowed slots are known.
 5. Marbles mode uses cheap local shaping based on `spread`, `bias`, and `steps`.
-6. Captured events store the evaluated CV, so locked loops are independent of later source edits.
+6. Engine selects a scale degree, converts with `Scale::noteToVolts(degree)`, applies root according to existing scale semantics, then stores the evaluated CV so locked loops are independent of later source edits.
 
 ---
 
@@ -388,9 +388,9 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 
 **Enhanced UI requirements:**
 - Preserve Performer header/footer conventions from Note, Curve, Indexed, DiscreteMap, and Tuesday pages.
-- Prefer custom visual pages over list models for PWT, Marbles, lock buffer, and probability overview.
-- PWT visual editor.
-- Linearity, Min/Max range.
+- Prefer custom visual pages over list models for degree tickets, Marbles, lock buffer, and probability overview.
+- Degree-ticket visual editor sized by the active scale's `notesPerOctave()`.
+- Linearity, Min/Max degree range.
 - Marbles Mode, Spread, Bias, Steps.
 - Lock, loop first/last, and rotation controls via context menu + encoder where possible.
 - `StochasticTrackListModel` may exist as a fallback/settings bridge, but normal performance editing should live on visual pages.
@@ -412,10 +412,10 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 **Hardware checks:**
 1. Create Stochastic track, verify step grid editing.
 2. Set gate/note probabilities, verify weighted selection.
-3. Verify PWT, Linearity, Min/Max range.
+3. Verify degree tickets, scale/root selection, Linearity, and Min/Max degree range.
 4. Verify `-1` excluded notes stay fixed under Mask rotation and never enter the draw.
 5. Verify `0` included notes rotate with the mask but do not play without tickets.
-6. Verify Semi rotation changes key and Mask rotation changes chord shape within the included mask.
+6. Verify Degree rotation moves the active degree table and Mask rotation changes chord shape within the included mask.
 7. Verify Marbles Spread/Bias/Steps are musically distinct and captured into locked loops.
 8. Test stage repeats (Each/First/Last/Odd/Even/Triplets/Random).
 9. Test rest probabilities (1/2/4/8 step).
@@ -530,7 +530,7 @@ Bit-packing the Vinx object adds complexity for marginal gain. Compact heap/pool
 
 ## Next Action
 
-**Phase 1 prep:** Verify enhanced `sizeof(StochasticTrack)` under the NoteTrack gate by creating a temporary STM32 release sizeof probe. Include signed PWT tickets, Semi/Mask rotation, Linearity, range, Marbles fields, lock/window fields, and optional accent/legato fields in the probe.
+**Phase 1 prep:** Verify enhanced `sizeof(StochasticTrack)` under the NoteTrack gate by creating a temporary STM32 release sizeof probe. Include signed degree tickets, sequence scale/root fields, degree/mask rotation, Linearity, range, Marbles fields, lock/window fields, and optional accent/legato fields in the probe.
 
 ## Depends On
 

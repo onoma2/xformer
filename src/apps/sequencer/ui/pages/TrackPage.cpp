@@ -181,6 +181,10 @@ void TrackPage::setTrack(Track &track) {
         _teletypeTrackListModel.setTrack(track.teletypeTrack(), _project, track.trackIndex());
         newListModel = &_teletypeTrackListModel;
         break;
+    case Track::TrackMode::Stochastic:
+        _stochasticTrackListModel.setTrack(track.stochasticTrack());
+        newListModel = &_stochasticTrackListModel;
+        break;
     case Track::TrackMode::Last:
         ASSERT(false, "invalid track mode");
         break;

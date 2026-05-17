@@ -226,7 +226,7 @@ Why this page exists:
 
 ### 3. `StochasticPitchPage` — Pitch Tickets
 
-Global pitch constraint page for signed PWT tickets, scale-mask exclusion, Semi/Mask rotation, Linearity, range, and scale relationship.
+Global pitch constraint page for signed degree tickets, scale-mask exclusion, degree/mask rotation, Linearity, degree range, and scale relationship.
 
 Reference:
 - `temp-ref/o_c/O_C-Phazerville/software/src/applets/ProbabilityMelody.h`
@@ -236,7 +236,7 @@ Header:
 - `STOCH PITCH`
 
 Active function:
-- `TICKETS`, `SEMI`, `MASK`, `LINEAR`, `RANGE`, or `ROOT/SCALE` depending on selected slot.
+- `TICKETS`, `DEG`, `MASK`, `LINEAR`, `RANGE`, or `ROOT/SCALE` depending on selected slot.
 
 Footer:
 - `TIX`
@@ -256,38 +256,38 @@ Ticket semantics:
 - Use "tickets" in UI messages instead of "weight" where space allows.
 
 Rotation semantics:
-- **Semi** rotates all 12 ticket slots and represents key movement.
+- **Degree** rotates the active scale-degree ticket slots and represents scale-aware movement.
 - **Mask** rotates only included scale degrees while excluded `-1` notes stay fixed.
 - Manual context actions may destructively rotate stored tickets.
-- Live/routed rotation should use non-destructive `semiRotation` and `maskRotation` offsets.
+- Live/routed rotation should use non-destructive `degreeRotation` and `maskRotation` offsets.
 
 Footer bank A:
 - `TIX`
-- `SEMI`
+- `DEG`
 - `MASK`
 - `LIN`
 - `NEXT`
 
 Main drawing:
-- 12 vertical bars for pitch tickets, arranged like a compact keyboard/chromatic histogram.
-- Excluded notes draw as `X` or blank masked keys.
-- Included zero-ticket notes draw as hollow keys/bars.
-- Current generated pitch cursor above the active semitone.
-- Min/Max note range fences across the pitch field.
-- Root/scale markers shown as small ticks or brighter pitch labels.
+- One vertical bar per active scale degree, up to `CONFIG_USER_SCALE_SIZE`; chromatic scales look like the 12-slot ProbMeloD keyboard case.
+- Excluded degrees draw as `X` or blank masked keys.
+- Included zero-ticket degrees draw as hollow keys/bars.
+- Current generated pitch cursor above the active scale degree.
+- Min/Max degree range fences across the pitch field.
+- Root/scale markers shown as small ticks or brighter degree labels.
 - Linearity shown as a center-pull arc or distance falloff bar from the last note.
-- Semi/Mask rotation offsets shown as small signed values near the footer/page indicator.
+- Degree/Mask rotation offsets shown as small signed values near the footer/page indicator.
 
 Interaction:
-- F1 `TIX`: Step keys 1-12 select semitone bars; encoder edits `-1..max`.
-- F2 `SEMI`: encoder edits non-destructive semitone rotation; context menu can bake rotation into stored tickets.
+- F1 `TIX`: Step keys select visible degree bars; encoder edits `-1..max`.
+- F2 `DEG`: encoder edits non-destructive degree rotation; context menu can bake rotation into stored tickets.
 - F3 `MASK`: encoder edits non-destructive masked scale-degree rotation.
 - F4 `LIN`: encoder edits linearity; view shows tighter/wider distance curve.
 - F5 `NEXT`: jump to Marbles page.
-- Context menu: `EVEN`, `MAJ`, `MIN`, `PENTA`, `CLEAR`, `RAND`, `BAKE`, `SEMI+`, `MASK+`.
+- Context menu: `EVEN`, `MAJ`, `MIN`, `PENTA`, `CLEAR`, `RAND`, `BAKE`, `DEG+`, `MASK+`.
 
 Why this page exists:
-- PWT should feel like a playable ticket/mask field, not twelve list entries.
+- Degree tickets should feel like a playable ticket/mask field, not a fixed twelve-entry list.
 - It borrows DiscreteMap's range/fence display and Tuesday's focused parameter slots.
 - It borrows ProbMeloD's important distinction between excluded notes and zero-ticket included notes.
 
@@ -309,7 +309,7 @@ Footer:
 - `PITCH`
 
 Main drawing:
-- Left side: distribution preview curve or 12-bin histogram of the shaped pitch-choice result.
+- Left side: distribution preview curve or histogram with one bin per active scale degree.
 - Center: bias marker and spread envelope.
 - Right side: compact live status box with last chosen slot, note name, CV, and lock state, following the Tuesday status-box idiom.
 - Steps value shown as bucket divisions over the distribution, not just a number.
@@ -414,7 +414,7 @@ Do not make users traverse a long `StochasticTrackListModel` for normal performa
 MVP pages:
 - `StochasticSequencePage` — pattern/snapshot list, minimal.
 - `StochasticSequenceEditPage` — step grid.
-- `StochasticPitchPage` — PWT, Linearity, Range.
+- `StochasticPitchPage` — degree tickets, scale/root, Linearity, Range.
 - `StochasticMarblesPage` — Spread/Bias/Steps.
 - `StochasticLockPage` — captured loop.
 - `StochasticTrackPage` — compact track console.
@@ -488,17 +488,17 @@ Replace the linear step grid with concentric circular rings divided into radial 
 **Mapping to pages:**
 - `StochasticSequenceEditPage` (Alt): 4 concentric rings → GATE/NOTE/LEN/RTRG. Edit prob by selecting wedge with encoder + step key. Selected wedge inverts.
 - `StochasticDicePage` (Alt): Single wide ring. 64 segments in one ring (very thin but readable by brightness only).
-- `PitchPage` (Alt): 12-segment pitch ring — semitones as wedges, weight = brightness. Active note as bright radial cursor.
+- `PitchPage` (Alt): degree-count ring — active scale degrees as wedges, ticket count = brightness. Active note as bright radial cursor.
 
 ---
 
-### Alternative C: Piano + Weight Bars (ProbMeloD-derived)
+### Alternative C: Piano + Weight Bars (ProbMeloD-derived, Chromatic View)
 
-Full pitch-probability keyboard for the Pitch Page, drawn directly from ProbabilityMelody.
+Full pitch-probability keyboard for the Pitch Page, drawn directly from ProbabilityMelody. This is a useful chromatic view, not the default model for arbitrary Performer scales.
 
 **Visual system:**
 - 8 white key outlines + 6 black key inverted rects — `DrawKeyboard()` at `temp-ref/o_c/O_C-Phazerville/software/src/applets/ProbabilityMelody.h:342-362`.
-- 12 vertical dotted lines above the keyboard keys, one per semitone — lines 372-384.
+- 12 vertical dotted lines above the keyboard keys, one per semitone — lines 372-384. In Performer this applies only when the active scale has 12 chromatic degrees; otherwise use the scale-degree bar field.
 - Horizontal tick at top of each dotted line: y-position = weight value (0-10px). Short horizontal line at `gfxLine(x-1, y+10-w, x+1, y+10-w)` — line 383.
 - Negative weight shown as "X" marker instead of tick — line 450.
 - Active note shown as left/right triangles from `UP_TRI_L_HALF` / `UP_TRI_R_HALF` icons at y=59 — line 388.
@@ -516,12 +516,14 @@ Full pitch-probability keyboard for the Pitch Page, drawn directly from Probabil
 **When this fails:**
 - 8 white keys (7 octaves) in 64px width means very thin keys (8px per white key).
 - No room for Marbles controls on the same page.
+- It misrepresents non-12-degree scales, TET scales, and 32-degree user scales if used as the primary view.
 - 0-10 weight range is small; 128x64 can show 0-63 with finer bars.
 - Keyboard takes ~32px of vertical space, leaving only ~32px for parameter rows.
 
 **Mapping to pages:**
-- `StochasticPitchPage`: Full ProbMeloD keyboard + weight bars. F1=PWT (weight editing), F2=ROTATE (scale mask rotation), F3=RANGE, F4=CV mode. Remove two-channel complexity; mono mode simplifies to one triangle and octave rect.
-- Add Linearity as a horizontal slider bar below the keyboard (space permitting), or via F2 slot.
+- `StochasticPitchPage` secondary view only: Full ProbMeloD keyboard + weight bars when the selected scale is chromatic/12-degree. F1=TIX (ticket editing), F2=ROTATE (mask rotation), F3=RANGE, F4=SCALE/ROOT. Remove two-channel complexity; mono mode simplifies to one triangle and octave rect.
+- Primary view remains one bar per active scale degree, up to `CONFIG_USER_SCALE_SIZE`.
+- Add Linearity as a horizontal slider bar below the keyboard/bar field (space permitting), or via F2 slot.
 
 **Source file reference:**
 - Full drawing pipeline: `ProbabilityMelody.h` lines 342-468.
@@ -656,7 +658,7 @@ Replace the pitch field/integer weights with a circular pitch-class visualizatio
 
 **Visual system:**
 - Circle (radius 28) at center of display area — `visualize_pitch_classes()` at `temp-ref/o_c/O_C-Phazerville/software/src/OC_menus.cpp:65-81`.
-- 12 pitch class positions plotted on the circle as filled 8x8 bitmap dots — uses `circle_pos_lut` for precomputed coordinates.
+- Active scale degrees plotted on the circle as filled dots. The O_C 12-position `circle_pos_lut` is only directly usable for 12-degree/chromatic scales; arbitrary scale sizes need generated positions or a small generic polar helper.
 - Weight shown by dot radius: small dot = low weight, large dot = high weight, no dot = excluded.
 - Connecting lines form a polygon between the 3 highest-weighted pitches (the "chord").
 - Bias point shown as a bright ring on the circle perimeter.
@@ -676,7 +678,7 @@ Replace the pitch field/integer weights with a circular pitch-class visualizatio
 - Multiple channels require separate circles or overlay.
 
 **Mapping to pages:**
-- `StochasticPitchPage` (Alt): Pitch class circle dominates display. PWT editing = tap step key for semitone, encoder for weight. Circle updates in real time. Active note dot + chord polygon. Octave shown as bar below circle. Linearity shown as arc contraction.
+- `StochasticPitchPage` (Alt): Scale-degree circle dominates display. Ticket editing = select visible degree, encoder for tickets. Circle updates in real time. Active note dot + chord polygon. Octave shown as bar below circle. Linearity shown as arc contraction.
 - `StochasticMarblesPage` (Alt): Same circle, but bias = arc rotation, spread = arc width, steps = how many dots visible.
 
 ---
@@ -807,9 +809,9 @@ The primary approach (Note/Curve grid + dedicated pages) is the safest MVP — i
 
 2. **`StochasticDicePage` (post-MVP)** — Use **Alternative K (Squares-and-Circles Euclidean Ring)** as the primary Dice visualization. A single 16-step ring per probability axis. Square dots = locked/active steps. Circle dots = probabilistic/pending. The ring makes the dice-throw metaphor literal: you see which steps are "loaded" (square) and which are "still rolling" (circle).
 
-3. **`StochasticPitchPage`** — Adopt **Alternative C (Piano + Weight Bars)** fully. Replace the abstract vertical bars with a ProbMeloD-derived keyboard layout. Add **Alternative H pitch class circle** as a secondary view switchable via context menu ("VIEW CIRCLE").
+3. **`StochasticPitchPage`** — Use a scale-degree bar field as the primary view: one bar per active degree from `scale.notesPerOctave()`, up to 32. Keep **Alternative C (Piano + Weight Bars)** only as a chromatic/12-degree secondary view. Add **Alternative H scale-degree circle** as a secondary view switchable via context menu ("VIEW CIRCLE").
 
-4. **`StochasticMarblesPage`** — Adopt **Alternative I (Bar Meter)** for Spread/Bias/Steps controls (horizontal inverted bars with live animation). Add **Alternative K's Euclidean ring** for the 12-semitone distribution preview: spread = arc width, bias = ring rotation, steps = dot count.
+4. **`StochasticMarblesPage`** — Adopt **Alternative I (Bar Meter)** for Spread/Bias/Steps controls (horizontal inverted bars with live animation). Add **Alternative K's Euclidean ring** for the active-degree distribution preview: spread = arc width, bias = ring rotation, steps = dot count.
 
 5. **`StochasticLockPage`** — Keep primary 4x16 event strip. Use **Alternative K squares-and-circles semantics**: locked event squares are solid-filled, pending/unlocked events are circles. This makes the locked/unlocked invariant visible at a glance without color.
 
@@ -817,7 +819,7 @@ The primary approach (Note/Curve grid + dedicated pages) is the safest MVP — i
 
 1. **`StochasticSequenceEditPage`** — Keep primary Note/Curve grid. Add **Alternative D register bars** at the bottom of the screen (in the footer/status area) showing all 64 gate states as 1px bars for playback overview. Add **Alternative A's crosshair** as a playhead indicator on the grid.
 
-2. **`StochasticPitchPage`** — Adopt **Alternative C (Piano + Weight Bars)** fully. Replace the abstract vertical bars with a ProbMeloD-derived keyboard layout. Add **Alternative H pitch class circle** as a secondary view switchable via context menu ("VIEW CIRCLE").
+2. **`StochasticPitchPage`** — Use the scale-degree bar field as the primary layout. Keep the ProbMeloD-derived keyboard as a chromatic view only. Add **Alternative H pitch class / scale-degree circle** as a secondary view switchable via context menu ("VIEW CIRCLE").
 
 3. **`StochasticMarblesPage`** — Adopt **Alternative I (Bar Meter)** for Spread/Bias/Steps controls (horizontal inverted bars with live animation). Add **Alternative H pitch class circle** for distribution preview showing which pitch classes are active and how spread/bias shape the field.
 
@@ -831,7 +833,7 @@ The primary approach (Note/Curve grid + dedicated pages) is the safest MVP — i
 
 ## Implementation Notes
 
-- Prefer custom pages over list models for PWT, Marbles, lock buffer, and probability overview.
+- Prefer custom pages over list models for degree tickets, Marbles, lock buffer, and probability overview.
 - Reuse `WindowPainter`, `SequencePainter`, and existing bar/marker drawing idioms.
 - Reuse Tuesday's four-column parameter console for compact track settings.
 - Reuse DiscreteMap's range/fence visual language for pitch range and distribution markers.
@@ -847,7 +849,7 @@ The primary approach (Note/Curve grid + dedicated pages) is the safest MVP — i
 - Whether `Pitch` and `Marbles` should be separate pages or merged if `.bss` pressure is too high.
 - Whether accent/legato deserve track-console slots only, or visual markers in `StochasticSequenceEditPage`.
 - Whether lock clear should be immediate F5 action or confirmation modal.
-- **NEW:** Which alternative visual approach to adopt for the Pitch Page — Piano keyboard (Alt C) or Pitch Class Circle (Alt H) or both with context-menu toggle.
+- **NEW:** Which secondary visual approach to adopt for the Pitch Page — chromatic Piano keyboard (Alt C), generic Scale-Degree Circle (Alt H), or both with context-menu toggle. The primary view remains degree-count aware.
 - **NEW:** Whether the Register Bar overview (Alt D) should be a permanent fixture in the SequenceEditPage footer or a toggleable layer.
 - **NEW:** Whether the Marbles Page distribution preview should use a histogram bar chart (primary), a pitch class circle (Alt H), or a squares-and-circles Euclidean ring (Alt K).
 - **NEW:** Whether the squares-and-circles square/circle binary (Alt K) should be adopted as the universal visual language for the entire track (locked = rect, probabilistic = circle) or used only on specific pages.

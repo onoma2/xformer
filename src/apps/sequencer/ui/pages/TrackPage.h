@@ -12,6 +12,7 @@
 #include "ui/model/IndexedSequenceListModel.h"
 #include "ui/model/IndexedTrackListModel.h"
 #include "ui/model/TeletypeTrackListModel.h"
+#include "ui/model/StochasticTrackListModel.h"
 
 #include <array>
 
@@ -53,5 +54,6 @@ private:
     IndexedSequenceListModel _indexedSequenceListModel;
     IndexedTrackListModel _indexedTrackListModel;
     TeletypeTrackListModel _teletypeTrackListModel;
+    StochasticTrackListModel _stochasticTrackListModel;
     std::array<int, CONFIG_TRACK_COUNT> _teletypeTriggerPresetIndex{};
 };

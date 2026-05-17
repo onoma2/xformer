@@ -543,6 +543,9 @@ void Engine::updateTrackSetups() {
             case Track::TrackMode::Teletype:
                 trackEngine = trackContainer.create<TeletypeTrackEngine>(*this, _model, track, linkedTrackEngine);
                 break;
+            case Track::TrackMode::Stochastic:
+                trackEngine = trackContainer.create<StochasticTrackEngine>(*this, _model, track, linkedTrackEngine);
+                break;
             case Track::TrackMode::Last:
                 break;
             }

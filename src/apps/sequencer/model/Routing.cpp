@@ -283,6 +283,8 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                     break;
                 case Track::TrackMode::Teletype:
                     break;
+                case Track::TrackMode::Stochastic:
+                    break;
                 case Track::TrackMode::Last:
                     break;
                 }

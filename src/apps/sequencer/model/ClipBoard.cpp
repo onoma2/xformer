@@ -249,6 +249,9 @@ void ClipBoard::pastePattern(int patternIndex) const {
                 case Track::TrackMode::Teletype:
                     track.teletypeTrack().setClipForPerformerPattern(patternIndex, pattern.sequences[trackIndex].data.teletypeClip);
                     break;
+                case Track::TrackMode::Stochastic:
+                    track.stochasticTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.stochastic;
+                    break;
                 default:
                     break;
                 }

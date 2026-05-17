@@ -12,6 +12,7 @@
 #include "DiscreteMapTrackEngine.h"
 #include "IndexedTrackEngine.h"
 #include "TeletypeTrackEngine.h"
+#include "StochasticTrackEngine.h"
 #include "CvInput.h"
 #include "CvOutput.h"
 #include "RoutingEngine.h"
@@ -39,7 +40,7 @@
 
 class Engine : private Clock::Listener {
 public:
-    using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine, TeletypeTrackEngine>;
+    using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine, TeletypeTrackEngine, StochasticTrackEngine>;
     using TrackEngineContainerArray = std::array<TrackEngineContainer, CONFIG_TRACK_COUNT>;
     using TrackEngineArray = std::array<TrackEngine *, CONFIG_TRACK_COUNT>;
     using TrackUpdateReducerArray = std::array<UpdateReducer<os::time::ms(25)>, CONFIG_TRACK_COUNT>;

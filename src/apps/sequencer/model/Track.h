@@ -8,6 +8,7 @@
 #include "ModelUtils.h"
 #include "NoteTrack.h"
 #include "Serialize.h"
+#include "StochasticTrack.h"
 #include "TeletypeTrack.h"
 #include "TuesdayTrack.h"
 #include "Types.h"
@@ -45,6 +46,7 @@ public:
     DiscreteMap,
     Indexed,
     Teletype,
+    Stochastic,
     Last,
     Default = Note
   };
@@ -65,6 +67,8 @@ public:
       return "Indexed";
     case TrackMode::Teletype:
       return "T9type";
+    case TrackMode::Stochastic:
+      return "Stochastic";
     case TrackMode::Last:
       break;
     }
@@ -87,6 +91,8 @@ public:
       return 5;
     case TrackMode::Teletype:
       return 6;
+    case TrackMode::Stochastic:
+      return 7;
     case TrackMode::Last:
       break;
     }
@@ -260,6 +266,17 @@ public:
     return _container.as<TeletypeTrack>();
   }
 
+  // stochasticTrack
+
+  const StochasticTrack &stochasticTrack() const {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::Stochastic);
+    return _container.as<StochasticTrack>();
+  }
+  StochasticTrack &stochasticTrack() {
+    SANITIZE_TRACK_MODE(_trackMode, TrackMode::Stochastic);
+    return _container.as<StochasticTrack>();
+  }
+
   //----------------------------------------
   // Methods
   //----------------------------------------
@@ -311,6 +328,9 @@ private:
     case TrackMode::Teletype:
       _container.as<TeletypeTrack>().setTrackIndex(trackIndex);
       break;
+    case TrackMode::Stochastic:
+      _container.as<StochasticTrack>().setTrackIndex(trackIndex);
+      break;
     case TrackMode::Last:
       break;
     }
@@ -353,6 +373,10 @@ private:
       _track.teletype = _container.create<TeletypeTrack>();
       _track.teletype->setTrackIndex(_trackIndex); // Set track index here
       break;
+    case TrackMode::Stochastic:
+      _track.stochastic = _container.create<StochasticTrack>();
+      _track.stochastic->setTrackIndex(_trackIndex); // Set track index here
+      break;
     case TrackMode::Last:
       break;
     }
@@ -365,7 +389,7 @@ private:
   Routable<int8_t> _cvOutputRotate;
   Routable<int8_t> _gateOutputRotate;
 
-  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack> _container;
+  Container<NoteTrack, CurveTrack, MidiCvTrack, TuesdayTrack, DiscreteMapTrack, IndexedTrack, TeletypeTrack, StochasticTrack> _container;
   union {
     NoteTrack *note;
     CurveTrack *curve;
@@ -374,6 +398,7 @@ private:
     DiscreteMapTrack *discreteMap;
     IndexedTrack *indexed;
     TeletypeTrack *teletype;
+    StochasticTrack *stochastic;
   } _track;
 
   friend class Project;

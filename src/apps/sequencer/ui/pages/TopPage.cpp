@@ -492,6 +492,9 @@ void TopPage::setSequenceView(SequenceView view) {
     case Track::TrackMode::Teletype:
         setMainPage(pages.teletypeScriptView);
         break;
+    case Track::TrackMode::Stochastic:
+        setMainPage(pages.track); // Fallback to track page for now
+        break;
     case Track::TrackMode::Last:
         break;
     }
@@ -539,6 +542,7 @@ void TopPage::setTrackView(TrackView view) {
     case Track::TrackMode::MidiCv:
     case Track::TrackMode::Tuesday:
     case Track::TrackMode::Teletype:
+    case Track::TrackMode::Stochastic:
         // For non-note tracks, always show track page
         setMainPage(pages.track);
         break;
@@ -578,6 +582,9 @@ void TopPage::setSequenceEditPage() {
         break;
     case Track::TrackMode::Teletype:
         setMainPage(pages.teletypeScriptView);
+        break;
+    case Track::TrackMode::Stochastic:
+        setMainPage(pages.track); // Fallback to track page for now
         break;
     case Track::TrackMode::Last:
         break;

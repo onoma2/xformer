@@ -100,6 +100,7 @@ private:
                 DiscreteMapSequence discreteMap;
                 IndexedSequence indexed;
                 TeletypeTrack::PatternSlot teletypeClip;
+                StochasticSequence stochastic;
             } data;
         } sequences[CONFIG_TRACK_COUNT];
     };

@@ -12,8 +12,8 @@ _Updated: 2026-05-17_
 
 ## 🟡 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Phase 1 complete. `StochasticSequence` and `StochasticTrack` implemented and integrated. Sizeof probe confirmed at 8,804 bytes (well within 9,544 B budget).
-**Next action:** Phase 2 Engine Foundations: Port `StochasticEngine` skeleton and implement heap-allocated `_lockedSteps` cache.
+**Where I stopped:** Phase 1 model updated for Performer scale awareness: `StochasticSequence` owns scale/root defaults, and `StochasticTrack` uses `degreeTickets[CONFIG_USER_SCALE_SIZE]`, degree/mask rotation, and Min/Max degree range instead of a fixed 12-semitone PWT. STM32 release `make sequencer` passes; section sizes: `.data=6332`, `.bss=112552`, `.ccmram_bss=54812`.
+**Next action:** Phase 2 Engine Foundations: implement scale-degree selection with `Scale::noteToVolts()`, root handling consistent with existing scale semantics, and compact captured-event cache.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** TBD

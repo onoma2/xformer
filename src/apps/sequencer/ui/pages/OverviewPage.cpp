@@ -389,6 +389,10 @@ void OverviewPage::draw(Canvas &canvas) {
         case Track::TrackMode::Teletype:
             drawTeletypeTrack(canvas, trackIndex, trackEngine.as<TeletypeTrackEngine>(), track.teletypeTrack());
             break;
+        case Track::TrackMode::Stochastic:
+            canvas.setColor(Color::Medium);
+            canvas.drawText(36, y, "Stochastic");
+            break;
         case Track::TrackMode::Last:
             break;
         }
