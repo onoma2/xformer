@@ -350,7 +350,7 @@ public:
         reader.read(_decay);
         reader.read(_sustain);
         reader.read(_release);
-        reader.read(_amplitude, 127);
+        reader.read(_amplitude);
     }
 
 private:
