@@ -875,8 +875,15 @@ void GeneratorPage::contextShow(bool doubleClick) {
         _contextMenuItems[2] = { "REGEN" };
         _contextMenuItems[3] = { "CANCEL" };
         _contextMenuItems[4] = { "COMMIT" };
+    } else if (_generator->mode() == Generator::Mode::Algo) {
+        snprintf(_contextMenuAuxLabel, sizeof(_contextMenuAuxLabel), "VAR %d", static_cast<const AlgoGenerator *>(_generator)->variation());
+        _contextMenuItems[0] = { "" };
+        _contextMenuItems[1] = { _contextMenuAuxLabel };
+        _contextMenuItems[2] = { "REGEN" };
+        _contextMenuItems[3] = { "CANCEL" };
+        _contextMenuItems[4] = { "COMMIT" };
     } else {
-        _contextMenuItems[0] = { _generator->mode() == Generator::Mode::Algo ? "NEW ALGO" : "NEW RAND" };
+        _contextMenuItems[0] = { "NEW RAND" };
         _contextMenuItems[1] = { "RESEED" };
         _contextMenuItems[2] = { "REVERT" };
         _contextMenuItems[3] = { "COMMIT" };
@@ -901,6 +908,30 @@ void GeneratorPage::contextAction(int index) {
         switch (index) {
         case 1:
             gGeneratorContextQuickEditModel.configure(_generator, int(RandomGenerator::Param::Smooth), "SMOOTH", [&] {
+                _generator->update();
+                _generator->updatePreview();
+            });
+            _manager.pages().quickEdit.show(gGeneratorContextQuickEditModel, 0);
+            return;
+        case 2:
+            init();
+            break;
+        case 3:
+            revert();
+            break;
+        case 4:
+            commit();
+            break;
+        default:
+            break;
+        }
+        return;
+    }
+
+    if (_generator->mode() == Generator::Mode::Algo) {
+        switch (index) {
+        case 1:
+            gGeneratorContextQuickEditModel.configure(_generator, int(AlgoGenerator::Param::Variation), "VAR", [&] {
                 _generator->update();
                 _generator->updatePreview();
             });
@@ -982,7 +1013,10 @@ bool GeneratorPage::contextActionEnabled(int index) const {
     }
 
     if (_generator->mode() == Generator::Mode::Random) {
-        // Empty slot at index 0, SMOOTH at 1, RESETGEN at 2, CANCEL at 3, COMMIT at 4
+        return index >= 1 && index <= 4;
+    }
+
+    if (_generator->mode() == Generator::Mode::Algo) {
         return index >= 1 && index <= 4;
     }
 

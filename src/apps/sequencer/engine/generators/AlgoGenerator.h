@@ -13,6 +13,7 @@ public:
         Flow,
         Ornament,
         Power,
+        Variation,
         Last
     };
 
