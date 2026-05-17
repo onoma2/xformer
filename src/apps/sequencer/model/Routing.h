@@ -93,7 +93,9 @@ public:
         StepTrill,
         GateOffset,
         GateLength, // Added
-        TuesdayLast = GateLength,
+        Skew,
+        Looseness,
+        TuesdayLast = Looseness,
 
         // Chaos Targets
         ChaosFirst,
@@ -189,6 +191,8 @@ public:
         case Target::StepTrill:                 return "StepTrill";
         case Target::GateOffset:                return "Gate Offset";
         case Target::GateLength:                return "Gate Length";
+        case Target::Skew:                      return "Skew";
+        case Target::Looseness:                  return "Looseness";
 
         case Target::ChaosAmount:               return "Chaos Amount";
         case Target::ChaosRate:                 return "Chaos Rate";
@@ -270,6 +274,8 @@ public:
         case Target::StepTrill:                 return 36;
         case Target::GateOffset:                return 37;
         case Target::GateLength:                return 38;
+        case Target::Skew:                      return 63;
+        case Target::Looseness:                  return 64;
 
         // Chaos Targets (39-42)
         case Target::ChaosAmount:               return 39;

@@ -17,12 +17,28 @@
 #include <new>
 
 // evaluate if step gate is active
-static bool evalStepGate(const StochasticSequence::Step &step, int probabilityBias, Random &rng) {
+static bool evalStepGate(const StochasticSequence::Step &step, int probabilityBias, int power, int skew, int stepIndex, int firstStep, int lastStep, Random &rng) {
     int probability = clamp(step.gateProbability() + probabilityBias, -1, StochasticSequence::GateProbability::Max);
     if (probability == 0) {
         return false;
     }
-    return step.gate() && int(rng.nextRange(StochasticSequence::GateProbability::Range)) <= probability;
+
+    bool gated = step.gate() && int(rng.nextRange(StochasticSequence::GateProbability::Range)) <= probability;
+    if (!gated) {
+        return false;
+    }
+
+    // Apply Power (Density) and Skew
+    int density = power;
+    if (skew != 0 && lastStep > firstStep) {
+        float relativePos = float(stepIndex - firstStep) / (lastStep - firstStep);
+        // skew > 0 -> more density at end
+        // skew < 0 -> more density at start
+        float skewBias = skew / 100.0f;
+        density = clamp(int(density + skewBias * (relativePos - 0.5f) * 100.0f), 0, 100);
+    }
+
+    return int(rng.nextRange(100)) < density;
 }
 
 // evaluate step condition
@@ -437,7 +453,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
         accent = _lockedSteps[_index].accent;
         legato = _lockedSteps[_index].legato;
     } else {
-        stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _rng);
+        stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _stochasticTrack.power(), _stochasticTrack.skew(), _index, _stochasticTrack.loopFirst(), _stochasticTrack.loopLast(), _rng);
 
         if (stepGate) {
             stepGate = evalStepCondition(step, _sequenceState.iteration(), fill(), _prevCondition);
@@ -469,7 +485,14 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
     }
 
     if (stepGate) {
-        int offsetTick = ((int) divisor * gateOffset) / (StochasticSequence::GateOffset::Max + 1);
+        // Apply Looseness to gate offset
+        int jitter = 0;
+        if (_stochasticTrack.looseness() > 0) {
+            int maxJitter = (divisor * _stochasticTrack.looseness()) / 200; // ±1/2 of looseness percentage
+            jitter = _rng.nextRange(maxJitter * 2) - maxJitter;
+        }
+
+        int offsetTick = ((int) divisor * gateOffset) / (StochasticSequence::GateOffset::Max + 1) + jitter;
         uint32_t stepTick = tick + offsetTick;
         
         if (stepRetrigger > 1) {
@@ -488,6 +511,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
         }
 
         _cvQueue.push({ Groove::applySwing(stepTick, swing()), noteValue, slide || legato });
+    } else {
+        // Schedule a gate-off at the beginning of the step to clear previous legato if any
+        _gateQueue.pushReplace({ tick, false, false });
     }
 }
 
