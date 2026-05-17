@@ -46,6 +46,7 @@ public:
     virtual void keyUp(KeyEvent &event) override;
     virtual void keyPress(KeyPressEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
+    virtual void keyboard(KeyboardEvent &event) override;
 
     void contextShow(bool doubleClick = false);
     void contextAction(int index);
