@@ -47,7 +47,7 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - [x] Implement Marbles-style pitch distribution (Spread/Bias/Steps).
 
 ### Phase 4: Loop Controls
-- [ ] Implement Captured Event Lock logic (freeze evaluated results).
+- [x] Implement Captured Event Lock logic (freeze evaluated results).
 - [ ] Implement Loop Windowing (First/Last) and Rotation.
 - [ ] **Validation:** Verify locked-loop invariant (source edits don't change lock).
 

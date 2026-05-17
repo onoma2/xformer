@@ -92,7 +92,7 @@ static float betaDistributionSample(float x, float spread) {
 }
 
 static float evalStepNote(const StochasticSequence::Step &step, const StochasticTrack &track, const Scale &scale, int rootNote, int octave, int transpose, int &lastDegree, Random &rng) {
-    int activeNotes = scale.notesPerOctave();
+    int activeNotes = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
     int noteVarProb = clamp(step.noteVariationProbability() + track.noteBias(), -1, StochasticSequence::NoteVariationProbability::Max);
     
     int degree = 0;
@@ -104,21 +104,20 @@ static float evalStepNote(const StochasticSequence::Step &step, const Stochastic
     
     for (int i = 0; i < activeNotes; ++i) {
         if (i >= track.minDegree() && i <= track.maxDegree()) {
-            if (track.degreeTicket(i) >= 0) {
+            int ticket = track.degreeTicket(i);
+            if (ticket >= 0) {
                 allowedDegrees[allowedCount] = i;
-                weights[allowedCount] = track.degreeTicket(i);
+                weights[allowedCount] = ticket;
                 allowedCount++;
             }
         }
     }
 
-    if (allowedCount == 0 || (noteVarProb > 0 && int(rng.nextRange(StochasticSequence::NoteVariationProbability::Range)) > noteVarProb)) {
-        // Fallback to step note if pool is empty or variation roll fails
+    if (allowedCount == 0 || int(rng.nextRange(StochasticSequence::NoteVariationProbability::Range)) >= noteVarProb) {
+        // Fallback to step note if pool is empty or variation roll fails (0% = deterministic)
         degree = step.note();
     } else {
-        // Apply mask rotation to the weights within the allowed pool
-        // Excluded degrees stay excluded (they aren't in the pool), 
-        // and we rotate the weights of the included degrees through their positions.
+        // ProbMeloD style mask rotation: exclusions stay fixed, weights rotate through included degrees
         if (track.maskRotation() != 0) {
             int originalWeights[CONFIG_USER_SCALE_SIZE];
             for (int i = 0; i < allowedCount; ++i) originalWeights[i] = weights[i];
@@ -139,6 +138,7 @@ static float evalStepNote(const StochasticSequence::Step &step, const Stochastic
         } else {
             // PWT raffling with Linearity
             int totalTickets = 0;
+            int penalizedWeights[CONFIG_USER_SCALE_SIZE];
             for (int i = 0; i < allowedCount; ++i) {
                 int w = weights[i];
                 if (track.linearity() > 0 && lastDegree >= 0) {
@@ -146,7 +146,7 @@ static float evalStepNote(const StochasticSequence::Step &step, const Stochastic
                     float penalty = 1.0f - (dist / float(activeNotes)) * (track.linearity() / 100.0f);
                     w = int(w * std::max(0.1f, penalty));
                 }
-                weights[i] = w;
+                penalizedWeights[i] = w;
                 totalTickets += w;
             }
 
@@ -154,7 +154,7 @@ static float evalStepNote(const StochasticSequence::Step &step, const Stochastic
                 int roll = rng.nextRange(totalTickets);
                 int sum = 0;
                 for (int i = 0; i < allowedCount; ++i) {
-                    sum += weights[i];
+                    sum += penalizedWeights[i];
                     if (roll < sum) {
                         degree = allowedDegrees[i];
                         break;
@@ -165,7 +165,7 @@ static float evalStepNote(const StochasticSequence::Step &step, const Stochastic
             }
         }
 
-        // Apply degree rotation within the pool
+        // Apply degree rotation within the allowed pool
         if (track.degreeRotation() != 0) {
             int currentIdx = 0;
             for (int i = 0; i < allowedCount; ++i) {
@@ -208,7 +208,10 @@ StochasticTrackEngine::~StochasticTrackEngine() {
 
 void StochasticTrackEngine::initLockedSteps() {
     if (!_lockedSteps) {
-        _lockedSteps = new LockedStep[CONFIG_STEP_COUNT];
+        _lockedSteps = new (std::nothrow) LockedStep[CONFIG_STEP_COUNT];
+        if (_lockedSteps) {
+            for (int i = 0; i < CONFIG_STEP_COUNT; ++i) _lockedSteps[i].valid = false;
+        }
     }
 }
 
@@ -407,24 +410,41 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
     _currentStep = _index;
 
     auto step = sequence.step(_index);
-    bool stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _rng);
-
-    if (stepGate) {
-        stepGate = evalStepCondition(step, _sequenceState.iteration(), fill(), _prevCondition);
-    }
 
     float noteValue = 0.f;
     uint32_t stepLength = 0;
-    int stepRetrigger = 1;
+    uint8_t stepRetrigger = 1;
+    bool stepGate = false;
+
+    bool locked = _stochasticTrack.lock() && _lockedSteps && _lockedSteps[_index].valid;
+
+    if (locked) {
+        noteValue = _lockedSteps[_index].noteValue;
+        stepLength = _lockedSteps[_index].stepLength;
+        stepRetrigger = _lockedSteps[_index].retrigger;
+        stepGate = _lockedSteps[_index].gate;
+    } else {
+        stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _rng);
+
+        if (stepGate) {
+            stepGate = evalStepCondition(step, _sequenceState.iteration(), fill(), _prevCondition);
+        }
+
+        if (stepGate) {
+            const auto &scale = sequence.selectedScale(_model.project().scale());
+            int rootNote = sequence.selectedRootNote(_model.project().rootNote());
+            
+            noteValue = evalStepNote(step, _stochasticTrack, scale, rootNote, _stochasticTrack.octave(), _stochasticTrack.transpose(), _lastDegree, _rng);
+            stepLength = (divisor * evalStepLength(step, _stochasticTrack.lengthBias(), _rng)) / StochasticSequence::Length::Range;
+            stepRetrigger = (uint8_t) evalStepRetrigger(step, _stochasticTrack.retriggerBias(), _rng);
+        }
+
+        if (_lockedSteps) {
+            _lockedSteps[_index] = { noteValue, stepLength, stepRetrigger, stepGate, true };
+        }
+    }
 
     if (stepGate) {
-        const auto &scale = sequence.selectedScale(_model.project().scale());
-        int rootNote = sequence.selectedRootNote(_model.project().rootNote());
-        
-        noteValue = evalStepNote(step, _stochasticTrack, scale, rootNote, _stochasticTrack.octave(), _stochasticTrack.transpose(), _lastDegree, _rng);
-        stepLength = (divisor * evalStepLength(step, _stochasticTrack.lengthBias(), _rng)) / StochasticSequence::Length::Range;
-        stepRetrigger = evalStepRetrigger(step, _stochasticTrack.retriggerBias(), _rng);
-
         int gateOffset = ((int) divisor * step.gateOffset()) / (StochasticSequence::GateOffset::Max + 1);
         uint32_t stepTick = tick + gateOffset;
         

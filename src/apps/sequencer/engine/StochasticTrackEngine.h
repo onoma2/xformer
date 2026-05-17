@@ -41,12 +41,11 @@ public:
     void setMonitorStep(int index);
 
     struct LockedStep {
-        int index = -1;
-        bool gate = false;
-        StochasticSequence::Step step;
-        float noteValue = 0.f;
-        uint32_t stepLength = 0;
-        int stepRetrigger = 0;
+        float noteValue;
+        uint32_t stepLength;
+        uint8_t retrigger;
+        bool gate;
+        bool valid;
     };
 
     const LockedStep* lockedSteps() const { return _lockedSteps; }
