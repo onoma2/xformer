@@ -237,10 +237,9 @@ void StochasticTrackEngine::reset() {
     _gateQueue.clear();
     _cvQueue.clear();
     _recordHistory.clear();
-    _lockedStepCount = 0;
     _skips = 0;
     _lastDegree = -1;
-    _rng = Random(0x12345678 + _track.trackIndex()); // Re-seed for determinism
+    _rng = Random(0x12345678 + _track.trackIndex()); // Re-seed for transport start determinism
     changePattern();
 }
 
@@ -248,7 +247,7 @@ void StochasticTrackEngine::restart() {
     _freeRelativeTick = 0xFFFFFFFF;
     _sequenceState.reset();
     _currentStep = -1;
-    _rng = Random(0x12345678 + _track.trackIndex()); // Re-seed for determinism
+    _rng = Random(0x12345678 + _track.trackIndex()); // Re-seed for transport start determinism
 }
 
 TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
