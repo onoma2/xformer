@@ -36,10 +36,10 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - [x] **Validation:** `sizeof(StochasticTrack)` probe and Project save/load.
 
 ### Phase 2: Engine Foundations
-- [ ] Port `StochasticEngine` skeleton.
-- [ ] Replace `std::vector` and `std::sort` with fixed arrays/logic.
-- [ ] Implement heap-allocated `_lockedSteps` cache.
-- [ ] **Validation:** Engine CCMRAM gate check (< 912 B).
+- [x] Port `StochasticEngine` skeleton.
+- [x] Replace `std::vector` and `std::sort` with fixed arrays/logic.
+- [x] Implement heap-allocated `_lockedSteps` cache.
+- [x] **Validation:** Engine CCMRAM gate check (< 912 B).
 
 ### Phase 3: Global Logic
 - [ ] Implement Pitch Weight Table (PWT) weighted selection.
