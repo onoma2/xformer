@@ -93,9 +93,14 @@ public:
         StepTrill,
         GateOffset,
         GateLength, // Added
-        Skew,
-        Looseness,
-        TuesdayLast = Looseness,
+        TuesdayLast = GateLength,
+
+        // Stochastic Track Targets
+        StochasticFirst,
+        StochasticDensity = StochasticFirst,
+        StochasticTilt,
+        StochasticJitter,
+        StochasticLast = StochasticJitter,
 
         // Chaos Targets
         ChaosFirst,
@@ -191,8 +196,11 @@ public:
         case Target::StepTrill:                 return "StepTrill";
         case Target::GateOffset:                return "Gate Offset";
         case Target::GateLength:                return "Gate Length";
-        case Target::Skew:                      return "Skew";
-        case Target::Looseness:                  return "Looseness";
+        case Target::StochasticDensity:         return "Stoch Density";
+        case Target::StochasticTilt:            return "Stoch Tilt";
+        case Target::StochasticJitter:          return "Stoch Jitter";
+        
+        
 
         case Target::ChaosAmount:               return "Chaos Amount";
         case Target::ChaosRate:                 return "Chaos Rate";
@@ -274,8 +282,10 @@ public:
         case Target::StepTrill:                 return 36;
         case Target::GateOffset:                return 37;
         case Target::GateLength:                return 38;
-        case Target::Skew:                      return 63;
-        case Target::Looseness:                  return 64;
+        case Target::StochasticDensity:         return 65;
+        case Target::StochasticTilt:            return 66;
+        case Target::StochasticJitter:          return 67;
+        
 
         // Chaos Targets (39-42)
         case Target::ChaosAmount:               return 39;
@@ -336,6 +346,10 @@ public:
         return target >= Target::TuesdayFirst && target <= Target::TuesdayLast;
     }
 
+    static bool isStochasticTarget(Target target) {
+        return target >= Target::StochasticFirst && target <= Target::StochasticLast;
+    }
+
     static bool isChaosTarget(Target target) {
         return target >= Target::ChaosFirst && target <= Target::ChaosLast;
     }
@@ -357,7 +371,7 @@ public:
 
     static bool isPerTrackTarget(Target target) {
         return isPlayStateTarget(target) || isTrackTarget(target) || isSequenceTarget(target) ||
-               isTuesdayTarget(target) || isChaosTarget(target) || isWavefolderTarget(target) ||
+               isTuesdayTarget(target) || isStochasticTarget(target) || isChaosTarget(target) || isWavefolderTarget(target) ||
                isDiscreteMapTarget(target) || isIndexedTarget(target);
     }
 

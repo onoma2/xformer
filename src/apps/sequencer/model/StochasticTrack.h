@@ -122,22 +122,22 @@ public:
         _marblesSteps = clamp(steps, 0, 100);
     }
 
-    // power
-    int power() const { return _power.get(isRouted(Routing::Target::Power)); }
-    void setPower(int power, bool routed = false) {
-        _power.set(clamp(power, 0, 100), routed);
+    // density
+    int density() const { return _density.get(isRouted(Routing::Target::StochasticDensity)); }
+    void setDensity(int density, bool routed = false) {
+        _density.set(clamp(density, 0, 100), routed);
     }
 
-    // skew
-    int skew() const { return _skew.get(isRouted(Routing::Target::Skew)); }
-    void setSkew(int skew, bool routed = false) {
-        _skew.set(clamp(skew, -100, 100), routed);
+    // tilt
+    int tilt() const { return _tilt.get(isRouted(Routing::Target::StochasticTilt)); }
+    void setTilt(int tilt, bool routed = false) {
+        _tilt.set(clamp(tilt, -100, 100), routed);
     }
 
-    // looseness
-    int looseness() const { return _looseness.get(isRouted(Routing::Target::Looseness)); }
-    void setLooseness(int looseness, bool routed = false) {
-        _looseness.set(clamp(looseness, 0, 100), routed);
+    // jitter
+    int jitter() const { return _jitter.get(isRouted(Routing::Target::StochasticJitter)); }
+    void setJitter(int jitter, bool routed = false) {
+        _jitter.set(clamp(jitter, 0, 100), routed);
     }
 
     // minDegree
@@ -246,9 +246,9 @@ public:
         _marblesSpread = 50;
         _marblesBias = 50;
         _marblesSteps = 100;
-        _power.setBase(100);
-        _skew.setBase(0);
-        _looseness.setBase(0);
+        _density.setBase(100);
+        _tilt.setBase(0);
+        _jitter.setBase(0);
         _minDegree = 0;
         _maxDegree = 127;
         _slideTime.setBase(0);
@@ -282,9 +282,9 @@ public:
         writer.write(_marblesSpread);
         writer.write(_marblesBias);
         writer.write(_marblesSteps);
-        _power.write(writer);
-        _skew.write(writer);
-        _looseness.write(writer);
+        _density.write(writer);
+        _tilt.write(writer);
+        _jitter.write(writer);
         writer.write(_minDegree);
         writer.write(_maxDegree);
         _slideTime.write(writer);
@@ -320,9 +320,9 @@ public:
         reader.read(_marblesSpread);
         reader.read(_marblesBias);
         reader.read(_marblesSteps);
-        _power.read(reader);
-        _skew.read(reader);
-        _looseness.read(reader);
+        _density.read(reader);
+        _tilt.read(reader);
+        _jitter.read(reader);
         reader.read(_minDegree);
         reader.read(_maxDegree);
         _slideTime.read(reader);
@@ -370,9 +370,9 @@ private:
     uint8_t _marblesBias;
     uint8_t _marblesSteps;
     
-    Routable<uint8_t> _power;
-    Routable<int8_t> _skew;
-    Routable<uint8_t> _looseness;
+    Routable<uint8_t> _density;
+    Routable<int8_t> _tilt;
+    Routable<uint8_t> _jitter;
 
     uint8_t _minDegree;
     uint8_t _maxDegree;

@@ -26,14 +26,14 @@ void StochasticTrack::writeRouted(Routing::Target target, int intValue, float fl
     case Routing::Target::NoteProbabilityBias:
         setNoteBias(intValue, true);
         break;
-    case Routing::Target::Power:
-        setPower(intValue, true);
+    case Routing::Target::StochasticDensity:
+        setDensity(intValue, true);
         break;
-    case Routing::Target::Skew:
-        setSkew(intValue, true);
+    case Routing::Target::StochasticTilt:
+        setTilt(intValue, true);
         break;
-    case Routing::Target::Looseness:
-        setLooseness(intValue, true);
+    case Routing::Target::StochasticJitter:
+        setJitter(intValue, true);
         break;
     default:
         break;

@@ -16,29 +16,44 @@
 #include <cmath>
 #include <new>
 
-// evaluate if step gate is active
-static bool evalStepGate(const StochasticSequence::Step &step, int probabilityBias, int power, int skew, int stepIndex, int firstStep, int lastStep, Random &rng) {
+// Stable priority for deterministic density masking
+static uint8_t stepPriority(int trackIndex, int patternIndex, int stepIndex) {
+    uint32_t h = (uint32_t(trackIndex) * 1664525u) + (uint32_t(patternIndex) * 1013904223u) + (uint32_t(stepIndex) * 31u);
+    h ^= h >> 16;
+    h *= 0x85ebca6bu;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35u;
+    h ^= h >> 16;
+    return h % 101; // 0..100
+}
+
+static bool evalDensityMask(int trackIndex, int patternIndex, int stepIndex, int loopFirst, int loopLast, int density, int tilt) {
+    if (density >= 100 && tilt == 0) return true;
+    if (density <= 0) return false;
+
+    int priority = stepPriority(trackIndex, patternIndex, stepIndex);
+    
+    // Apply tilt bias to priority
+    // Negative tilt: preserves earlier steps (lowers their priority value)
+    // Positive tilt: preserves later steps
+    if (tilt != 0 && loopLast > loopFirst) {
+        float relPos = float(stepIndex - loopFirst) / (loopLast - loopFirst);
+        // map relPos 0..1 to -0.5..0.5
+        float tiltBias = (tilt / 100.0f) * (relPos - 0.5f) * 100.0f;
+        priority = clamp(int(priority - tiltBias), 0, 100);
+    }
+
+    return priority < density;
+}
+
+// evaluate if step gate is active (per-step probability roll)
+static bool evalStepGate(const StochasticSequence::Step &step, int probabilityBias, Random &rng) {
     int probability = clamp(step.gateProbability() + probabilityBias, -1, StochasticSequence::GateProbability::Max);
-    if (probability == 0) {
+    if (probability <= 0) {
         return false;
     }
-
-    bool gated = step.gate() && int(rng.nextRange(StochasticSequence::GateProbability::Range)) <= probability;
-    if (!gated) {
-        return false;
-    }
-
-    // Apply Power (Density) and Skew
-    int density = power;
-    if (skew != 0 && lastStep > firstStep) {
-        float relativePos = float(stepIndex - firstStep) / (lastStep - firstStep);
-        // skew > 0 -> more density at end
-        // skew < 0 -> more density at start
-        float skewBias = skew / 100.0f;
-        density = clamp(int(density + skewBias * (relativePos - 0.5f) * 100.0f), 0, 100);
-    }
-
-    return int(rng.nextRange(100)) < density;
+    // nextRange(15) is 0..14. We want 15/15 to be 100%
+    return step.gate() && int(rng.nextRange(StochasticSequence::GateProbability::Range)) < probability;
 }
 
 // evaluate step condition
@@ -67,14 +82,14 @@ static bool evalStepCondition(const StochasticSequence::Step &step, int iteratio
 // evaluate step retrigger count
 static int evalStepRetrigger(const StochasticSequence::Step &step, int probabilityBias, Random &rng) {
     int probability = clamp(step.retriggerProbability() + probabilityBias, -1, StochasticSequence::RetriggerProbability::Max);
-    return int(rng.nextRange(StochasticSequence::RetriggerProbability::Range)) <= probability ? step.retrigger() + 1 : 1;
+    return int(rng.nextRange(StochasticSequence::RetriggerProbability::Range)) < probability ? step.retrigger() + 1 : 1;
 }
 
 // evaluate step length
 static int evalStepLength(const StochasticSequence::Step &step, int lengthBias, Random &rng) {
     int length = StochasticSequence::Length::clamp(step.length() + lengthBias) + 1;
     int probability = step.lengthVariationProbability();
-    if (int(rng.nextRange(StochasticSequence::LengthVariationProbability::Range)) <= probability) {
+    if (int(rng.nextRange(StochasticSequence::LengthVariationProbability::Range)) < probability) {
         int offset = step.lengthVariationRange() == 0 ? 0 : rng.nextRange(std::abs(step.lengthVariationRange()) + 1);
         if (step.lengthVariationRange() < 0) {
             offset = -offset;
@@ -130,7 +145,7 @@ static float evalStepNote(const StochasticSequence::Step &step, const Stochastic
         }
     }
 
-    if (allowedCount == 0 || int(rng.nextRange(StochasticSequence::NoteVariationProbability::Max)) >= noteVarProb) {
+    if (allowedCount == 0 || int(rng.nextRange(StochasticSequence::NoteVariationProbability::Range)) >= noteVarProb) {
         // Fallback to step note if pool is empty or variation roll fails (0% = deterministic)
         degree = step.note();
     } else {
@@ -202,7 +217,7 @@ static float evalStepNote(const StochasticSequence::Step &step, const Stochastic
     // Apply octave jump
     int octProb = clamp(step.noteOctaveProbability(), -1, StochasticSequence::NoteOctaveProbability::Max);
     int selectedOctave = octave;
-    if (octProb > 0 && int(rng.nextRange(StochasticSequence::NoteOctaveProbability::Range)) <= octProb) {
+    if (octProb > 0 && int(rng.nextRange(StochasticSequence::NoteOctaveProbability::Range)) < octProb) {
         selectedOctave += step.noteOctave();
     }
 
@@ -434,6 +449,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
 
     float noteValue = 0.f;
     uint32_t stepLength = 0;
+    int16_t jitterTick = 0;
     int8_t gateOffset = 0;
     uint8_t stepRetrigger = 1;
     bool stepGate = false;
@@ -446,6 +462,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
     if (locked) {
         noteValue = _lockedSteps[_index].noteValue;
         stepLength = _lockedSteps[_index].stepLength;
+        jitterTick = _lockedSteps[_index].jitterTick;
         gateOffset = _lockedSteps[_index].gateOffset;
         stepRetrigger = _lockedSteps[_index].retrigger;
         stepGate = _lockedSteps[_index].gate;
@@ -453,26 +470,39 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
         accent = _lockedSteps[_index].accent;
         legato = _lockedSteps[_index].legato;
     } else {
-        stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _stochasticTrack.power(), _stochasticTrack.skew(), _index, _stochasticTrack.loopFirst(), _stochasticTrack.loopLast(), _rng);
+        // Deterministic Density Masking
+        bool densityGated = evalDensityMask(_track.trackIndex(), pattern(), _index, _stochasticTrack.loopFirst(), _stochasticTrack.loopLast(), _stochasticTrack.density(), _stochasticTrack.tilt());
+        
+        if (densityGated) {
+            stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _rng);
 
-        if (stepGate) {
-            stepGate = evalStepCondition(step, _sequenceState.iteration(), fill(), _prevCondition);
-        }
+            if (stepGate) {
+                stepGate = evalStepCondition(step, _sequenceState.iteration(), fill(), _prevCondition);
+            }
 
-        if (stepGate) {
-            const auto &scale = sequence.selectedScale(_model.project().scale());
-            int rootNote = sequence.selectedRootNote(_model.project().rootNote());
-            
-            noteValue = evalStepNote(step, _stochasticTrack, scale, rootNote, _stochasticTrack.octave(), _stochasticTrack.transpose(), _lastDegree, _rng);
-            stepLength = (divisor * evalStepLength(step, _stochasticTrack.lengthBias(), _rng)) / StochasticSequence::Length::Range;
-            gateOffset = step.gateOffset();
-            stepRetrigger = (uint8_t) evalStepRetrigger(step, _stochasticTrack.retriggerBias(), _rng);
-            slide = step.slide();
-            accent = (int(_rng.nextRange(100)) < _stochasticTrack.accentProb());
-            legato = (int(_rng.nextRange(100)) < _stochasticTrack.legatoProb());
+            if (stepGate) {
+                const auto &scale = sequence.selectedScale(_model.project().scale());
+                int rootNote = sequence.selectedRootNote(_model.project().rootNote());
+                
+                noteValue = evalStepNote(step, _stochasticTrack, scale, rootNote, _stochasticTrack.octave(), _stochasticTrack.transpose(), _lastDegree, _rng);
+                stepLength = (divisor * evalStepLength(step, _stochasticTrack.lengthBias(), _rng)) / StochasticSequence::Length::Range;
+                gateOffset = step.gateOffset();
+                stepRetrigger = (uint8_t) evalStepRetrigger(step, _stochasticTrack.retriggerBias(), _rng);
+                slide = step.slide();
+                accent = (int(_rng.nextRange(100)) < _stochasticTrack.accentProb());
+                legato = (int(_rng.nextRange(100)) < _stochasticTrack.legatoProb());
 
-            if (legato) {
-                stepLength = divisor;
+                if (legato) {
+                    stepLength = divisor;
+                }
+
+                // Small jitter Timing Humanize
+                if (_stochasticTrack.jitter() > 0) {
+                    int maxJitter = (divisor * _stochasticTrack.jitter()) / 200; // +-50% of jitter percentage
+                    if (maxJitter > 0) {
+                        jitterTick = int16_t(_rng.nextRange(maxJitter * 2 + 1)) - maxJitter;
+                    }
+                }
             }
         }
 
@@ -480,20 +510,13 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool fo
             if (!_lockedSteps[_index].valid) {
                 _lockedStepCount++;
             }
-            _lockedSteps[_index] = { noteValue, stepLength, gateOffset, stepRetrigger, stepGate, slide, accent, legato, true };
+            _lockedSteps[_index] = { noteValue, stepLength, jitterTick, gateOffset, stepRetrigger, stepGate, slide, accent, legato, true };
         }
     }
 
     if (stepGate) {
-        // Apply Looseness to gate offset
-        int jitter = 0;
-        if (_stochasticTrack.looseness() > 0) {
-            int maxJitter = (divisor * _stochasticTrack.looseness()) / 200; // ±1/2 of looseness percentage
-            jitter = _rng.nextRange(maxJitter * 2) - maxJitter;
-        }
-
-        int offsetTick = ((int) divisor * gateOffset) / (StochasticSequence::GateOffset::Max + 1) + jitter;
-        uint32_t stepTick = tick + offsetTick;
+        int offsetTick = ((int) divisor * gateOffset) / (StochasticSequence::GateOffset::Max + 1) + jitterTick;
+        uint32_t stepTick = tick + std::max(0, offsetTick); // Ensure no underflow
         
         if (stepRetrigger > 1) {
             uint32_t retriggerLength = divisor / stepRetrigger;
