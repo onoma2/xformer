@@ -1,6 +1,6 @@
 # Status
 
-**Planning complete, reviewed** — Full implementation plan written and independently reviewed for feasibility. Implementation not started.
+**Planning complete, reviewed** — Full implementation plan written and independently reviewed for feasibility. Phased plan (`PHASEDPLAN.md`) is the authoritative reference. Implementation not started.
 
 ## What was done
 
@@ -10,50 +10,38 @@
 - Deep-dived into DiscreteMapSequence, IndexedSequence, TuesdaySequence APIs
 - Checked model drift since last Launchpad commit (`888f183c`)
 - Examined `temp-ref/mebitek-performer/` reference implementation (3240-line .cpp)
-- **Re-examined mebitek with fresh context** — extracted LayerMapItem pattern, Performer mode, circuit keyboard
-- **Merged vinx-modulove Launchpad improvements** — LP Style/Note Style, circuit keyboard, generators mode, undo/redo, performer mode, enhanced button events, visual feedback
-- **Performed feasibility/priority/risk review** — found Indexed macros don't exist in model, several method name errors, file size risk
-- **Removed MidiCvTrack** — no sequence data, arpeggiator only; lowest value for Launchpad grid
-- **Created corrected implementation plan** with 5 track types, reordered phases, deferred items
-- **Discarded TeletypeTrack** — VM text-input integration is 2–3× underscoped; no Launchpad grid value
+- Re-examined mebitek with fresh context — extracted LayerMapItem pattern, Performer mode, circuit keyboard
+- Merged vinx-modulove Launchpad improvements — LP Style/Note Style, circuit keyboard, generators mode, undo/redo, performer mode, enhanced button events, visual feedback
+- Performed feasibility/priority/risk review — found Indexed macros don't exist in model, several method name errors, file size risk
+- Removed MidiCvTrack — no sequence data, arpeggiator only; lowest value for Launchpad grid
+- Created corrected implementation plan with 5 track types, reordered phases, deferred items
+- Discarded TeletypeTrack — VM text-input integration is 2–3× underscoped; no Launchpad grid value
+- Created PHASEDPLAN.md — organized into Essential → Baseline → User Decisions → Extra tiers based on Mini MK1 testing constraint
+- Reviewed external grid patterns (GRID-APPROACHES-REVIEW.md) and UI optimizations (UI-OPTIMIZATION-REVIEW.md)
+- Folded optimization pre-flight items into PHASEDPLAN E0 (grew from 4 to 13 items)
 
-## Plan Summary (Corrected)
+## Hardware Constraint
 
-### Track Port Phases
+**Only Launchpad Mini MK1 available for hardware testing.** This device uses the base `LaunchpadDevice` protocol with red/green/amber colors only (no RGB, no SysEx init). All plan phases prioritize MK1-verifiable work. MK2+/Pro/X-specific features (blue color styles, RGB remapping) are flagged and deferred to Extra tier.
 
-| Phase | Track | Effort | Description | Status |
-|-------|-------|--------|-------------|--------|
-| 1 | Note | ~1.5h | Fix 6 missing layers, step highlighting, add Mode selector | Must-do |
-| 2 | Tuesday | ~2.5h | **2×8 step-key grid** — 1:1 HW parity + parameter editor | Must-do |
-| 3 | DiscreteMap | ~3h | 32-stage editor: threshold/direction/note/params + 16 macros | Must-do |
-| 4 | Indexed | ~3.5h | 48-step grid editor (Pitch/Duration/GateSlide/Route). **No macros yet** | Must-do |
-| 5 | Curve chaos | — | **DEFERRED** — low value, revisit later | Deferred |
-| 6 | Macro Grid v2 | ~3h | Curve (12) + DiscreteMap (16). **Indexed macros blocked by `indexed-sequence-macro-refactor`** | Phase 2.5 → v2 |
+## Plan Summary
 
-**Track port subtotal: ~10–13h**
+See `PHASEDPLAN.md` for full details, acceptance criteria, and dependency graph.
 
-### VinxScorza / Modulove Launchpad Improvements (Merged)
+| Tier | Effort | Cumulative | Description |
+|------|--------|------------|-------------|
+| **Essential** | ~18h | ~18h | Pre-flight optimization (13 items) + NoteTrack fixes + Tuesday + DiscreteMap + Indexed + Performer |
+| **Baseline** | ~10.5h | ~28.5h | Circuit keyboard, LP styles, visual feedback, button events, long-press, range fills |
+| **User Decisions** | ~10.5h | ~39h | Generators, macros, undo, follow, locking, prob overlay, loop mod — each needs explicit approval |
+| **Extra** | ~13h | ~52h | Chaos params, RGB remapping, global config, other controllers |
 
-| Segment | Effort | Description | Source |
-|---------|--------|-------------|--------|
-| A | **LP Style / LP Note Style settings** | ~1.5h | `classic`/`blue` color schemes + `classic`/`circuit` note entry | Vinx |
-| B | **Circuit Keyboard** | ~2h | Circuit-style keyboard overlay for Note track | Vinx |
-| C | **Generators Mode** | ~4h | Split architecture + preview/apply workflow with A/B | Vinx |
-| D | **1-Level Undo/Redo** | ~1h | `Shift + Play` shortcut | Vinx |
-| E | **Track Selection Locking** | ~1.5h | Modal/UI-kind/top-page locking | Vinx |
-| F | **Performer Mode** | ~3h | Scene mute/solo/fill, follow mode | Vinx/Modulove |
-| G | **Enhanced Button Events** | ~1.5h | Double-tap, long-press | Modulove |
-| H | **Visual Feedback** | ~2h | Octave lines, pattern viz, mute status LEDs | Modulove |
-| I | **Interaction Improvements** | ~1h | Fill, range editing, run mode enhancements | Modulove |
-| J | **Layer Selection Optimization** | ~1h | Better layer mapping visualization | Modulove |
+**Recommended ship target:** Essential + Baseline (~28.5h).
+**Absolute MVP:** Essential only (~18h).
 
-**Vinx/Modulove subtotal: ~18.5h**
+## Removed from Plan
 
-**Combined total: ~26.5h** (with ~2h overlap between track port and vinx/modulove foundation work)
-
-## Removed: MidiCvTrack
-
-MidiCvTrack has no step sequence, no per-step data, and no `isActiveSequence()`. The only thing to show on a Launchpad grid would be the Arpeggiator parameters (enabled, hold, mode, divisor, gateLength, octaves) and voice activity (8 voices, gate on/off). This is low-value compared to the effort — an arpeggiator has 5-6 parameters that are already editable via the device's LCD UI. **Removed from plan entirely.**
+- **MidiCvTrack** — no sequence data, arpeggiator only. Lowest value for Launchpad grid.
+- **TeletypeTrack** — VM text-input integration; not a grid-editable track type.
 
 ## Key Review Findings
 
@@ -67,93 +55,46 @@ MidiCvTrack has no step sequence, no per-step data, and no `isActiveSequence()`.
 | Flash impact: +30–50 KB | 🟢 Low | Reaches ~460 KB / 1 MB. Safe. |
 | RAM impact: ~16 bytes | 🟢 Low | Negligible. |
 
-## Key design decisions
+## Key Design Decisions
 
 - **Layer button** stays consistent: LayerMapItem[] arrays for all track types, even those without native Layer enums
 - **FirstStep/LastStep** available only on tracks that have those concepts
-- **No model changes needed** — *except* `isEdited()` for 3 sequence types (~45 min total)
+- **No model changes needed** — except `isEdited()` for 3 sequence types (~45 min total)
 - **Split `LaunchpadController.cpp`** into per-track files before implementing
 - **Indexed macros deferred** — extracted to separate task `indexed-sequence-macro-refactor` (~4.5h). Must complete before Macro Grid v2
 - **MidiCvTrack removed** — no sequence data, lowest value for grid
 - **TeletypeTrack discarded** — complex VM text-input integration; not a grid-editable track type
-- **Vinx/Modulove LP improvements merged** — style settings, circuit keyboard, generators, undo/redo, performer mode, button events, visual feedback all in scope
+- **Vinx/Modulove LP improvements triaged** — style settings, circuit keyboard, performer mode, button events, visual feedback → Baseline tier; generators, undo/redo, track locking → User Decisions tier
+- **Optimization pre-flight folded into E0** — LedSemantic, buffer-then-blast syncLeds, dirty-row mask, VirtualGrid, Modifier bitmask, DeviceCapabilities, TX scratch buffer, mapColor dedup, std::function→fn ptr
 
-## Pre-implementation checklist
+## Pre-implementation Checklist
 
-- [ ] Add `isEdited()` to DiscreteMapSequence, IndexedSequence, TuesdaySequence
-- [ ] Fix method names in plan (`transformSmoothWalk`, not `transformSmooth`/`transformWalk`)
-- [ ] Split `LaunchpadController.cpp` into per-track files
-- [ ] Verify all `Project.h` accessors compile
-- [ ] Add `selectedLayer` to `_sequence` state struct
+From PHASEDPLAN E0 (13 items):
 
-## TDD Infrastructure (2026-05-04)
+- [ ] E0.1: Add `isEdited()` to `DiscreteMapSequence`, `IndexedSequence`, `TuesdaySequence`
+- [ ] E0.2: Split `LaunchpadController.cpp` into per-track files
+- [ ] E0.3: Verify all `Project.h` accessors compile
+- [ ] E0.4: Add `selectedLayer` to `_sequence` state struct
+- [ ] E0.5: Add `LedSemantic` enum + `semanticColor()` helper
+- [ ] E0.6: Refactor `syncLeds()` to buffer-then-blast MIDI (depends on E0.11)
+- [ ] E0.7: Add `_dirtyRows` row-dirty mask to `LaunchpadDevice`
+- [ ] E0.8: Extract `VirtualGrid` pagination helper
+- [ ] E0.9: Add `Modifier` bitmask enum + `_modifierMask` byte
+- [ ] E0.10: Add `DeviceCapabilities` struct to device classes
+- [ ] E0.11: Add shared TX scratch buffer to `LaunchpadDevice`
+- [ ] E0.12: Hoist `mapColor` table to base class + deduplicate
+- [ ] E0.13: Replace `std::function` handlers with function pointers
 
-### Existing Test Framework
+## Dependencies
 
-**C++ unit tests** (custom framework, `src/test/UnitTest.h`):
-- 43+ active test files in `src/tests/unit/sequencer/` and `src/tests/unit/core/`
-- `UNIT_TEST(name) { CASE("desc") { expect(...); } }` pattern with `setjmp/longjmp` per-case isolation
-- Built via CMake, registered with CTest via `register_sequencer_test()` — CI runs `make test`
-- Tests link against `core` + `sequencer_shared` (full model+engine static lib)
-- Pattern: stack-construct `Model`/`Project`/`Engine`, configure, call methods, `expectEqual()`
+| Task | Relationship | Notes |
+|------|-------------|-------|
+| `feat/stochastic` | **Will be ready** before launchpad work starts | Stochastic track in development; X6 rest-probability editing may become viable |
+| `indexed-sequence-macro-refactor` | **Blocks** D2 Macro Grid for IndexedTrack | ~4.5h separate task; can run in parallel with E0–E5 |
+| `performer-improvements` | **Blocks** D1 Generators (A/B state machine), D3 Undo (undo stack) | External dependency |
+| `teletype-file-reliability` | Independent | No overlap |
+| `vinx-modulove-improvements` | LP items merged here | Non-LP items remain separate |
 
-**Python UI tests** (pybind11 + SDL simulator):
-- `src/apps/sequencer/tests/testframework/` — `UiTest` base class + `Controller` fluent API
-- `Controller`: button press/release, encoder, ADC, MIDI input, screenshots — all via `Simulator` pybind11 bindings
-- Full model access: `env.sequencer.model.project.track(i).noteTrack.sequence(j).step(k).gate`
-- **CRITICAL GAP**: `TargetState` (LEDs, gates, DAC, LCD) is NOT Python-bound — cannot verify hardware output from Python tests
+## Next Action
 
-**Integration tests** (`src/tests/integration/drivers/`):
-- 11 driver tests using `IntegrationTest` base + `Simulator` + SDL frontend
-- Only built as standalone executables, NOT registered with CTest
-- Run on-device via STM32 `IntegrationTestRunner`
-
-### Launchpad Testability Assessment
-
-**LaunchpadController is NOT directly unit-testable** because:
-1. Constructor needs `ControllerManager`, `Model`, `Engine`, `ControllerInfo` — solvable (same as engine tests)
-2. Device selection (Mk2/Mk3/Pro) sends MIDI SysEx on `initialize()` — needs real or mock device
-3. `sendMidi()` routes through `ControllerManager` to `MidiPort` — needs full MIDI stack
-4. `LaunchpadDevice` has no virtual interface — cannot inject a mock
-5. Button state read via `_device->buttonState(row, col)` — needs device
-6. LED writes go to `_device->setLed()` → `_ledState[]` → `syncLeds()` sends MIDI — same dependency
-
-### Recommended TDD Approach
-
-**Option C (Pragmatic): Test pure logic separately, then integration-test through simulator.**
-
-1. **Extract pure-logic helpers** into `LaunchpadLogic.h/.cpp`:
-   - `Button` struct methods (`isGrid()`, `isFunction()`, `isScene()`, `gridIndex()`)
-   - `Navigation` calculations
-   - `RangeMap::map()`/`unmap()`
-   - `stepColor()` and LED-value computation
-   - These are pure functions needing no device — immediately unit-testable
-
-2. **Add TargetState Python bindings** (P0 blocker for verification):
-   - Bind `LedState`, `GateOutputState`, `DacState`, `TargetState` to pybind11
-   - Enables: simulate Launchpad MIDI input → verify LED output from Python
-   - ~1-2h effort, high leverage
-
-3. **Add MIDI output capture** (P0 for Launchpad-specific testing):
-   - Ring buffer of recent `MidiEvent` outputs accessible from Python
-   - Enables: verify Launchpad LED feedback MIDI messages are correct
-
-4. **Write C++ model/engine unit tests** for each phase:
-   - Phase 1 (Note): Test `NoteSequence` layer selection, step highlighting math, `noteFirstStep`/`noteLastStep` in Ikra mode
-   - Phase 3 (DiscreteMap): Test `DiscreteMapSequence` stage navigation, `isEdited()` (add it first)
-   - Phase 4 (Indexed): Test `IndexedSequence` step access, `isEdited()` (add it first)
-
-5. **Write Python integration tests** for each phase after TargetState bindings:
-   - Simulate Launchpad MIDI note-ons → verify correct LED MIDI note-offs
-   - Simulate encoder rotations → verify model state changes
-   - Verify layer navigation → verify LED row changes
-
-### Pre-implementation TDD Checklist (adds ~2-3h)
-
-| Task | Effort | Blocks |
-|------|--------|--------|
-| Add `TargetState` Python bindings (LedState, GateOutputState, DacState) | ~1.5h | All Python verification tests |
-| Add MIDI output capture to Python bindings | ~0.5h | Launchpad LED feedback tests |
-| Extract pure-logic helpers from `LaunchpadController.cpp` | ~1h | C++ unit tests for Button/Navigation/stepColor |
-| Add `isEdited()` to 3 sequence types | ~0.75h | DiscreteMap/Indexed/Tuesday pattern page tests |
-| Add C++ unit test for `NoteSequence` layer/step math | ~0.5h | Phase 1 verification |
+Begin E0 pre-flight tasks. Start with E0.11 (TX scratch buffer), then E0.2 (file split), then E0.1 / E0.3 / E0.4 (model accessors). Remaining E0.5–E0.13 can proceed in any order after E0.11 is done.

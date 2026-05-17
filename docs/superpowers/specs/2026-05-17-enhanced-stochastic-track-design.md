@@ -147,7 +147,21 @@ Avoid making the primary workflow a `StochasticTrackListModel`. List models may 
 2.  **Phase 2: Engine Foundations.** Heap buffers, Random integration.
 3.  **Phase 3: Global Logic.** Signed degree tickets, scale/root, scale mask, degree/mask rotation, Linearity, Range, Marbles spread/bias/steps pitch shaping.
 4.  **Phase 4: Loop Controls.** Captured-event lock buffer, windowing, rotation.
-5.  **Phase 5: Dynamics.** Accent/Legato rolls if RAM and queue behavior remain flat.
-6.  **Phase 6: UI Development.** XFORMER-native visual pages from `.tasks/stochastic-track-port/UI-DESIGN.md`.
-7.  **Phase 7: Validation.** STM32 release size probes and hardware verify.
-8.  **Post-MVP Gates.** Split locks, drift, reverse playback, ghost voices.
+5.  **Phase 5: Dynamics.** Accent/Legato rolls if RAM and queue behavior remain flat. **Reported complete.**
+6.  **Phase 6: Tuesday-Derived Stochastic Mechanics.** Add only the reusable Tuesday control laws that fit the stochastic identity before final UI work:
+    - Power / cooldown density governor after per-step gate probability.
+    - Loop skew as a bipolar density bias across the active loop.
+    - Micro-gate / step burst scheduler with bounded queues and captured lock replay.
+    - Timing looseness / gate-offset scaler: `0%` strict, `50%` generated timing, `100%` exaggerated timing.
+    - CV update mode polish for `Gate` vs `Always` pitch updates.
+    - Finite loop + bounded rotate ergonomics borrowed from Tuesday, without replacing Stochastic's loop-first/loop-last model.
+7.  **Phase 7: Proteus-Inspired Buffer Evolution.** Add loop-bound melody-buffer lifecycle controls after the Tuesday mechanics and before final UI:
+    - Complexity-governed buffer generation: low repeats anchors, mid prefers adjacent scale-degree runs, high allows wider weighted jumps.
+    - Patience / boredom reset at loop boundaries, with infinite patience disabling full refresh.
+    - Deterministic Density muting from a seeded rest-priority order so density changes recall the same rhythm skeleton.
+    - Per-loop Mutation that rerolls one buffer index through the current stochastic pitch pool.
+    - Per-loop octave-shift probability constrained to `-1..+1` octave from the base buffer.
+    - Lock-safe behavior: captured lock replay is never silently mutated by buffer evolution.
+8.  **Phase 8: UI Development.** XFORMER-native visual pages from `.tasks/stochastic-track-port/UI-DESIGN.md`, including Phase 6 and Phase 7 mechanics in the track console, probability overview, buffer page, lock page, and loop controls.
+9.  **Phase 9: Validation.** STM32 release size probes and hardware verify.
+10. **Post-MVP Gates.** Split locks, drift, reverse playback, ghost voices.
