@@ -64,7 +64,7 @@ public:
     int variation() const { return _params.variation; }
     void setVariation(int variation) { _params.variation = clamp(variation, 0, 100); }
 
-    int displayValue(int index) const;
+    int displayValue(int index) const override;
 
     // pattern
 

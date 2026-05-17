@@ -75,6 +75,7 @@ public:
     }
 
     virtual void update() = 0;
+    virtual int displayValue(int index) const { (void)index; return 0; }
 
     static Generator *execute(Generator::Mode mode, SequenceBuilder &builder);
 

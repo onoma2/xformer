@@ -322,7 +322,7 @@ void GeneratorPage::draw(Canvas &canvas) {
         break;
     case Generator::Mode::Random:
     case Generator::Mode::Algo:
-        drawRandomGenerator(canvas, *static_cast<const RandomGenerator *>(_generator));
+        drawValueGenerator(canvas, *_generator);
         break;
     case Generator::Mode::Last:
         break;
@@ -451,8 +451,8 @@ void GeneratorPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // F4 triggers re-roll (NEW RAND)
-    if (key.isFunction() && key.function() == 4) {
+    // F4 triggers re-roll only when the footer labels it as NEW RAND/NEW EUCL.
+    if (key.isFunction() && key.function() == 4 && _generator->mode() != Generator::Mode::Algo) {
         if (abPreviewGenerator(_generator->mode())) {
             _previewArmed = true;
         }
@@ -597,9 +597,8 @@ void GeneratorPage::drawEuclideanGenerator(Canvas &canvas, const EuclideanGenera
     }
 }
 
-void GeneratorPage::drawRandomGenerator(Canvas &canvas, const RandomGenerator &generator) const {
-    const auto &pattern = generator.pattern();
-    int steps = pattern.size();
+void GeneratorPage::drawValueGenerator(Canvas &canvas, const Generator &generator) const {
+    const int steps = CONFIG_STEP_COUNT;
     const int baselineY = PlotArea::Top + PlotArea::Height / 2;
     const int amplitude = PlotArea::Height / 2;
 
@@ -877,7 +876,7 @@ void GeneratorPage::contextShow(bool doubleClick) {
         _contextMenuItems[3] = { "CANCEL" };
         _contextMenuItems[4] = { "COMMIT" };
     } else {
-        _contextMenuItems[0] = { "NEW RAND" };
+        _contextMenuItems[0] = { _generator->mode() == Generator::Mode::Algo ? "NEW ALGO" : "NEW RAND" };
         _contextMenuItems[1] = { "RESEED" };
         _contextMenuItems[2] = { "REVERT" };
         _contextMenuItems[3] = { "COMMIT" };

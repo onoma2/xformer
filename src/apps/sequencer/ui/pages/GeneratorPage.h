@@ -66,7 +66,7 @@ private:
     bool stepInCurrentBank(int step) const;
 
     void drawEuclideanGenerator(Canvas &canvas, const EuclideanGenerator &generator) const;
-    void drawRandomGenerator(Canvas &canvas, const RandomGenerator &generator) const;
+    void drawValueGenerator(Canvas &canvas, const Generator &generator) const;
 
     Generator *_generator;
     StepSelection<CONFIG_STEP_COUNT> *_stepSelection;

@@ -123,11 +123,6 @@ int AlgoGenerator::ornamentToSubdivisions(int ornament) const {
 }
 
 void AlgoGenerator::update() {
-    // Only regenerate on explicit action (not during draw)
-    if (!_builder.showingPreview()) {
-        return;
-    }
-
     AlgoParams algoParams;
     algoParams.algorithm = _params.algorithm;
     algoParams.flow = _params.flow;
@@ -218,5 +213,8 @@ void AlgoGenerator::update() {
 }
 
 int AlgoGenerator::displayValue(int index) const {
+    if (!showingPreview()) {
+        return clamp(int(_builder.originalValue(index) * 255.f + 0.5f), 0, 255);
+    }
     return _pattern[index];
 }

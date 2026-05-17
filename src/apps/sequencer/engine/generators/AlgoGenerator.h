@@ -40,7 +40,7 @@ public:
 
     void randomizeSeed();
 
-    int displayValue(int index) const;
+    int displayValue(int index) const override;
 
     int algorithm() const { return _params.algorithm; }
     void setAlgorithm(int algorithm) { _params.algorithm = clamp(algorithm, 0, 14); }
