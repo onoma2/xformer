@@ -167,18 +167,20 @@ void AlgoGenerator::update() {
         bool useGateOffset = int(blendRng.nextRange(100)) < _params.variation;
         bool useLength = int(blendRng.nextRange(100)) < _params.variation;
         bool useRetrigger = int(blendRng.nextRange(100)) < _params.variation;
+        bool useGateProb = int(blendRng.nextRange(100)) < _params.variation;
 
-        // Gate decision: velocity > 0 && gateRatio > 0 && cooldown allows
+        // Gate decision: velocity > 0 && gateRatio > 0
+        // Accent overrides cooldown — always fires
         bool shouldGate = result.velocity > 0 && result.gateRatio > 0;
-        if (shouldGate && coolDownMax > 0) {
+        if (shouldGate && result.accent) {
+            shouldGate = true;  // accent always fires
+        } else if (shouldGate && coolDownMax > 0) {
             shouldGate = (--coolDown <= 0);
             if (shouldGate) {
                 coolDown = std::max(1, int(blendRng.nextRange(coolDownMax + 1)));
             }
-        } else if (shouldGate && coolDownMax == 0) {
-            // power=16: all gates pass
-        } else {
-            shouldGate = false;
+        } else if (!shouldGate) {
+            // velocity == 0 is an explicit rest
         }
 
         if (useGate) {
@@ -202,8 +204,20 @@ void AlgoGenerator::update() {
         }
         if (useRetrigger) {
             const auto &range = NoteSequence::layerRange(NoteSequence::Layer::Retrigger);
+            // polyCount is a fancy retrigger: when set (>1), use it instead of trillCount
+            int retriggerValue = (result.polyCount > 1)
+                ? result.polyCount - 1
+                : result.trillCount - 1;
             step.setLayerValue(NoteSequence::Layer::Retrigger,
-                range.min + (result.trillCount - 1) * (range.max - range.min) / 3);
+                range.min + retriggerValue * (range.max - range.min) / 3);
+        }
+        if (useGateProb) {
+            // GateProbability from velocity: accent = 100%, else proportional
+            if (result.accent) {
+                step.setGateProbability(7);
+            } else {
+                step.setGateProbability(result.velocity * 7 / 255);
+            }
         }
 
         // Cache display value
