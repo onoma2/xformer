@@ -95,6 +95,7 @@ private:
     void melodicContextAction(int index);
     void durationTransformContextShow();
     void durationTransformContextAction(int index);
+    void getMacroRange(int &firstStep, int &lastStep) const;
 
     int _section = 0;
     EditMode _editMode = EditMode::Note;

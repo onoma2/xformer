@@ -15,9 +15,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <vector>
 
-static Random rng;
 
 static void formatGateValue(StringBuilder &str, uint16_t gateValue, uint16_t durationTicks) {
     if (IndexedSequence::gateIsOff(gateValue)) {
@@ -1680,6 +1678,16 @@ static const ContextMenuModel::Item durationTransformContextMenuItems[] = {
     { "MIRR" },
 };
 
+void IndexedSequenceEditPage::getMacroRange(int &firstStep, int &lastStep) const {
+    auto &sequence = _project.selectedIndexedSequence();
+    firstStep = 0;
+    lastStep = sequence.activeLength() - 1;
+    if (_stepSelection.any()) {
+        firstStep = _stepSelection.firstSetIndex();
+        lastStep = _stepSelection.lastSetIndex();
+    }
+}
+
 void IndexedSequenceEditPage::rhythmContextShow() {
     showContextMenu(ContextMenu(
         rhythmContextMenuItems,
@@ -1691,140 +1699,73 @@ void IndexedSequenceEditPage::rhythmContextShow() {
 
 void IndexedSequenceEditPage::rhythmContextAction(int index) {
     auto &sequence = _project.selectedIndexedSequence();
-
-    auto applyGroups = [&](const int *groups, int groupCount, const char *message) {
-        if (groupCount <= 0) {
-            return;
-        }
-        int totalSteps = 0;
-        for (int i = 0; i < groupCount; ++i) {
-            totalSteps += groups[i];
-        }
-        if (totalSteps <= 0) {
-            return;
-        }
-
-        std::vector<int> targetSteps;
-        bool hasSelection = _stepSelection.any();
-        if (hasSelection) {
-            targetSteps.reserve(IndexedSequence::MaxSteps);
-            for (int i = 0; i < IndexedSequence::MaxSteps; ++i) {
-                if (_stepSelection[i]) {
-                    targetSteps.push_back(i);
-                }
-            }
-            if (targetSteps.empty()) {
-                hasSelection = false;
-            }
-        }
-
-        if (!hasSelection) {
-            sequence.setActiveLength(totalSteps);
-            targetSteps.clear();
-            targetSteps.reserve(totalSteps);
-            for (int i = 0; i < totalSteps; ++i) {
-                targetSteps.push_back(i);
-            }
-        } else {
-            int lastIndex = targetSteps.back();
-            if (lastIndex + 1 > sequence.activeLength()) {
-                sequence.setActiveLength(lastIndex + 1);
-            }
-        }
-
-        if (targetSteps.empty()) {
-            showMessage("NO STEP");
-            return;
-        }
-
-        const int totalTicks = 768;
-        const int baseGroupTicks = totalTicks / groupCount;
-        const int groupRemainder = totalTicks % groupCount;
-
-        std::vector<uint16_t> pattern;
-        pattern.reserve(totalSteps);
-        for (int g = 0; g < groupCount; ++g) {
-            int groupSteps = groups[g];
-            if (groupSteps <= 0) {
-                continue;
-            }
-            int groupTicks = baseGroupTicks + (g < groupRemainder ? 1 : 0);
-            int baseStepTicks = groupTicks / groupSteps;
-            int stepRemainder = groupTicks % groupSteps;
-
-            for (int i = 0; i < groupSteps; ++i) {
-                int dur = baseStepTicks + (i < stepRemainder ? 1 : 0);
-                pattern.push_back(uint16_t(dur));
-            }
-        }
-
-        if (pattern.empty()) {
-            return;
-        }
-
-        const int patternCount = int(pattern.size());
-        for (size_t i = 0; i < targetSteps.size(); ++i) {
-            int patternIndex = int(i % patternCount);
-            auto &step = sequence.step(targetSteps[i]);
-            step.setDuration(pattern[patternIndex]);
-        }
-
-        showMessage(message);
-    };
+    int firstStep, lastStep;
+    getMacroRange(firstStep, lastStep);
+    if (firstStep > lastStep) {
+        showMessage("NO STEP");
+        return;
+    }
 
     switch (RhythmContextAction(index)) {
     case RhythmContextAction::Euclidean: {
         static bool longCycle = false;
-        const int steps = longCycle ? 9 : 3;
-        const int groups[] = { steps };
-        applyGroups(groups, 1, longCycle ? "3/9 9" : "3/9 3");
+        int steps = longCycle ? 9 : 3;
+        sequence.populateWithMacroRhythm(firstStep, lastStep, &steps, 1);
+        showMessage(longCycle ? "3/9 9" : "3/9 3");
         longCycle = !longCycle;
         break;
     }
     case RhythmContextAction::Clave: {
         static bool longCycle = false;
-        const int steps = longCycle ? 20 : 5;
-        const int groups[] = { steps };
-        applyGroups(groups, 1, longCycle ? "5/20 20" : "5/20 5");
+        int steps = longCycle ? 20 : 5;
+        sequence.populateWithMacroRhythm(firstStep, lastStep, &steps, 1);
+        showMessage(longCycle ? "5/20 20" : "5/20 5");
         longCycle = !longCycle;
         break;
     }
     case RhythmContextAction::Tuplet: {
         static bool longCycle = false;
-        const int steps = longCycle ? 28 : 7;
-        const int groups[] = { steps };
-        applyGroups(groups, 1, longCycle ? "7/28 28" : "7/28 7");
+        int steps = longCycle ? 28 : 7;
+        sequence.populateWithMacroRhythm(firstStep, lastStep, &steps, 1);
+        showMessage(longCycle ? "7/28 28" : "7/28 7");
         longCycle = !longCycle;
         break;
     }
     case RhythmContextAction::Poly: {
         static bool longCycle = false;
         if (longCycle) {
-            const int groups[] = { 5, 7 };
-            applyGroups(groups, 2, "5-7");
+            int groups[] = {5, 7};
+            sequence.populateWithMacroRhythm(firstStep, lastStep, groups, 2);
+            showMessage("5-7");
         } else {
-            const int groups[] = { 3, 5 };
-            applyGroups(groups, 2, "3-5");
+            int groups[] = {3, 5};
+            sequence.populateWithMacroRhythm(firstStep, lastStep, groups, 2);
+            showMessage("3-5");
         }
         longCycle = !longCycle;
         break;
     }
     case RhythmContextAction::RandomRhythm: {
         static int patternIndex = 0;
-        const int khand[] = { 5, 7 };
-        const int tihai[] = { 2, 1, 2, 2, 1, 2, 2, 1, 2 };
-        const int dhamar[] = { 5, 2, 3, 4 };
-
         switch (patternIndex) {
-        case 0:
-            applyGroups(khand, int(sizeof(khand) / sizeof(khand[0])), "M-KHAND");
+        case 0: {
+            int groups[] = {5, 7};
+            sequence.populateWithMacroRhythm(firstStep, lastStep, groups, 2);
+            showMessage("M-KHAND");
             break;
-        case 1:
-            applyGroups(tihai, int(sizeof(tihai) / sizeof(tihai[0])), "M-TIHAI");
+        }
+        case 1: {
+            int groups[] = {2, 1, 2, 2, 1, 2, 2, 1, 2};
+            sequence.populateWithMacroRhythm(firstStep, lastStep, groups, 9);
+            showMessage("M-TIHAI");
             break;
-        case 2:
-            applyGroups(dhamar, int(sizeof(dhamar) / sizeof(dhamar[0])), "M-DHAMAR");
+        }
+        case 2: {
+            int groups[] = {5, 2, 3, 4};
+            sequence.populateWithMacroRhythm(firstStep, lastStep, groups, 4);
+            showMessage("M-DHAMAR");
             break;
+        }
         }
         patternIndex = (patternIndex + 1) % 3;
         break;
@@ -1845,150 +1786,34 @@ void IndexedSequenceEditPage::waveformContextShow() {
 
 void IndexedSequenceEditPage::waveformContextAction(int index) {
     auto &sequence = _project.selectedIndexedSequence();
-
-    // Determine range: use selected steps if any, otherwise full active length
     int firstStep, lastStep;
-
-    if (_stepSelection.any()) {
-        firstStep = _stepSelection.firstSetIndex();
-        lastStep = _stepSelection.lastSetIndex();
-    } else {
-        firstStep = 0;
-        lastStep = sequence.activeLength() - 1;
+    getMacroRange(firstStep, lastStep);
+    if (firstStep > lastStep) {
+        showMessage("NO STEP");
+        return;
     }
-
-    int stepCount = lastStep - firstStep + 1;
-    if (stepCount <= 0) return;
-
-    const uint16_t minDur = 8;
-    const uint16_t maxDur = 192;
-    const int quantum = 96;
-
-    auto adjustDurationsToQuantum = [&](std::vector<uint16_t> &durations) {
-        if (durations.empty()) {
-            return;
-        }
-        int sum = 0;
-        int slackDown = 0;
-        int slackUp = 0;
-        for (uint16_t dur : durations) {
-            sum += dur;
-            slackDown += int(dur) - int(minDur);
-            slackUp += int(maxDur) - int(dur);
-        }
-        int remainder = sum % quantum;
-        if (remainder == 0) {
-            return;
-        }
-        int down = remainder;
-        int up = quantum - remainder;
-        bool canDown = slackDown >= down;
-        bool canUp = slackUp >= up;
-        int delta = 0;
-        if (canDown && canUp) {
-            delta = (down <= up) ? -down : up;
-        } else if (canDown) {
-            delta = -down;
-        } else if (canUp) {
-            delta = up;
-        }
-
-        int remaining = std::abs(delta);
-        if (remaining == 0) {
-            return;
-        }
-        if (delta > 0) {
-            while (remaining > 0) {
-                bool changed = false;
-                for (int i = 0; i < stepCount && remaining > 0; ++i) {
-                    if (durations[i] < maxDur) {
-                        durations[i]++;
-                        remaining--;
-                        changed = true;
-                    }
-                }
-                if (!changed) {
-                    break;
-                }
-            }
-        } else {
-            while (remaining > 0) {
-                bool changed = false;
-                for (int i = 0; i < stepCount && remaining > 0; ++i) {
-                    if (durations[i] > minDur) {
-                        durations[i]--;
-                        remaining--;
-                        changed = true;
-                    }
-                }
-                if (!changed) {
-                    break;
-                }
-            }
-        }
-    };
-
-    auto applyDurations = [&](const std::vector<uint16_t> &durations, const char *label) {
-        for (int i = 0; i < stepCount; ++i) {
-            sequence.step(firstStep + i).setDuration(durations[i]);
-        }
-        FixedStringBuilder<16> msg("WAVEFORM: ");
-        msg(label);
-        showMessage(msg);
-    };
-
-    auto applyTriangle = [&](int bumps, const char *label) {
-        std::vector<uint16_t> durations;
-        durations.reserve(stepCount);
-        for (int i = 0; i < stepCount; ++i) {
-            float t = (stepCount > 1) ? float(i) / float(stepCount - 1) : 0.f;
-            float phase = t * float(bumps);
-            float frac = phase - std::floor(phase);
-            float tri = 1.f - std::abs(2.f * frac - 1.f); // 0 at edges, 1 at mid
-            float normalized = 1.f - tri; // shorter in the middle
-            uint16_t dur = uint16_t(std::round(minDur + normalized * (maxDur - minDur)));
-            durations.push_back(clamp<uint16_t>(dur, minDur, maxDur));
-        }
-        adjustDurationsToQuantum(durations);
-        applyDurations(durations, label);
-    };
-
-    auto applySaw = [&](int bumps, const char *label) {
-        std::vector<uint16_t> durations;
-        durations.reserve(stepCount);
-        for (int i = 0; i < stepCount; ++i) {
-            float t = (stepCount > 1) ? float(i) / float(stepCount - 1) : 0.f;
-            float phase = t * float(bumps);
-            float frac = phase - std::floor(phase);
-            float normalized = frac; // shorter at the start of each segment
-            uint16_t dur = uint16_t(std::round(minDur + normalized * (maxDur - minDur)));
-            durations.push_back(clamp<uint16_t>(dur, minDur, maxDur));
-        }
-        adjustDurationsToQuantum(durations);
-        applyDurations(durations, label);
-    };
 
     switch (WaveformContextAction(index)) {
-    case WaveformContextAction::Triangle: {
-        applyTriangle(1, "TRI");
+    case WaveformContextAction::Triangle:
+        sequence.populateWithMacroTriangle(firstStep, lastStep, 1);
+        showMessage("WAVEFORM: TRI");
         break;
-    }
-    case WaveformContextAction::Triangle2: {
-        applyTriangle(2, "2TRI");
+    case WaveformContextAction::Triangle2:
+        sequence.populateWithMacroTriangle(firstStep, lastStep, 2);
+        showMessage("WAVEFORM: 2TRI");
         break;
-    }
-    case WaveformContextAction::Triangle3: {
-        applyTriangle(3, "3TRI");
+    case WaveformContextAction::Triangle3:
+        sequence.populateWithMacroTriangle(firstStep, lastStep, 3);
+        showMessage("WAVEFORM: 3TRI");
         break;
-    }
-    case WaveformContextAction::Saw2: {
-        applySaw(2, "2SAW");
+    case WaveformContextAction::Saw2:
+        sequence.populateWithMacroSawtooth(firstStep, lastStep, 2);
+        showMessage("WAVEFORM: 2SAW");
         break;
-    }
-    case WaveformContextAction::Saw3: {
-        applySaw(3, "3SAW");
+    case WaveformContextAction::Saw3:
+        sequence.populateWithMacroSawtooth(firstStep, lastStep, 3);
+        showMessage("WAVEFORM: 3SAW");
         break;
-    }
     case WaveformContextAction::Last:
         break;
     }
@@ -2005,149 +1830,55 @@ void IndexedSequenceEditPage::melodicContextShow() {
 
 void IndexedSequenceEditPage::melodicContextAction(int index) {
     auto &sequence = _project.selectedIndexedSequence();
-
-    // Determine range: use selected steps if any, otherwise full active length
     int firstStep, lastStep;
-
-    if (_stepSelection.any()) {
-        firstStep = _stepSelection.firstSetIndex();
-        lastStep = _stepSelection.lastSetIndex();
-    } else {
-        firstStep = 0;
-        lastStep = sequence.activeLength() - 1;
+    getMacroRange(firstStep, lastStep);
+    if (firstStep > lastStep) {
+        showMessage("NO STEP");
+        return;
     }
-
-    int stepCount = lastStep - firstStep + 1;
-    if (stepCount <= 0) return;
 
     switch (MelodicContextAction(index)) {
     case MelodicContextAction::Scale: {
-        // Scale fill: ascending or descending scale
         static bool ascending = true;
-
-        // Use major scale intervals: 0, 2, 4, 5, 7, 9, 11, 12
-        static const int8_t scaleIntervals[] = {0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24};
-        static const int scaleLength = sizeof(scaleIntervals) / sizeof(scaleIntervals[0]);
-
-        for (int i = 0; i < stepCount; ++i) {
-            int idx = ascending ? i : (stepCount - 1 - i);
-            int8_t note = scaleIntervals[idx % scaleLength];
-            if (idx >= scaleLength) {
-                note += 12 * (idx / scaleLength);  // Extend to higher octaves
-            }
-            sequence.step(firstStep + i).setNoteIndex(note);
-        }
-
-        ascending = !ascending;
+        sequence.populateWithMacroScale(firstStep, lastStep, ascending);
         showMessage(ascending ? "SCALE: DESC" : "SCALE: ASC");
+        ascending = !ascending;
         break;
     }
     case MelodicContextAction::Arpeggio: {
-        // Arpeggio patterns: up, down, up-down, random
-        static const struct {
-            const char *name;
-            int8_t pattern[8];
-            int length;
-        } arpeggios[] = {
-            {"UP",      {0, 4, 7, 12, 16, 19, 24, 28},    8},
-            {"DOWN",    {24, 19, 16, 12, 7, 4, 0, -5},    8},
-            {"UP-DN",   {0, 4, 7, 12, 7, 4, 0, -5},       8},
-            {"TRIAD",   {0, 4, 7, 0, 4, 7, 12, 7},        8},
-        };
-        static int arpIndex = 0;
-
-        const auto &arp = arpeggios[arpIndex];
-        arpIndex = (arpIndex + 1) % 4;
-
-        for (int i = 0; i < stepCount; ++i) {
-            int8_t note = arp.pattern[i % arp.length];
-            sequence.step(firstStep + i).setNoteIndex(note);
-        }
-
-        FixedStringBuilder<16> msg;
-        msg("ARP: ");
-        msg(arp.name);
+        static int patternIndex = 0;
+        sequence.populateWithMacroArpeggio(firstStep, lastStep, patternIndex);
+        const char *names[] = {"UP", "DOWN", "UP-DN", "TRIAD"};
+        FixedStringBuilder<16> msg("ARP: ");
+        msg(names[patternIndex]);
         showMessage(msg);
+        patternIndex = (patternIndex + 1) % 4;
         break;
     }
     case MelodicContextAction::Chord: {
-        // Chord progressions: I-IV-V-I, I-V-vi-IV, ii-V-I
-        static const struct {
-            const char *name;
-            int8_t roots[4];
-        } progressions[] = {
-            {"I-IV-V",  {0, 5, 7, 0}},      // Classic I-IV-V-I
-            {"I-V-vi",  {0, 7, 9, 5}},      // Pop progression
-            {"ii-V-I",  {2, 7, 0, 2}},      // Jazz turnaround
-        };
-        static int progIndex = 0;
-
-        const auto &prog = progressions[progIndex];
-        progIndex = (progIndex + 1) % 3;
-
-        // Chord intervals (major triad)
-        static const int8_t triad[] = {0, 4, 7};
-
-        for (int i = 0; i < stepCount; ++i) {
-            int chordIdx = (i / 3) % 4;           // Change chord every 3 steps
-            int noteIdx = i % 3;                   // Cycle through triad
-            int8_t note = prog.roots[chordIdx] + triad[noteIdx];
-            sequence.step(firstStep + i).setNoteIndex(note);
-        }
-
-        FixedStringBuilder<16> msg;
-        msg("CHORD: ");
-        msg(prog.name);
+        static int progressionIndex = 0;
+        sequence.populateWithMacroChord(firstStep, lastStep, progressionIndex);
+        const char *names[] = {"I-IV-V", "I-V-vi", "ii-V-I"};
+        FixedStringBuilder<16> msg("CHORD: ");
+        msg(names[progressionIndex]);
         showMessage(msg);
+        progressionIndex = (progressionIndex + 1) % 3;
         break;
     }
     case MelodicContextAction::Modal: {
-        // Modal melodies: Dorian, Phrygian, Lydian, Mixolydian
-        static const struct {
-            const char *name;
-            int8_t intervals[7];
-        } modes[] = {
-            {"DORIAN",     {0, 2, 3, 5, 7, 9, 10}},
-            {"PHRYGIAN",   {0, 1, 3, 5, 7, 8, 10}},
-            {"LYDIAN",     {0, 2, 4, 6, 7, 9, 11}},
-            {"MIXOLYDIAN", {0, 2, 4, 5, 7, 9, 10}},
-        };
         static int modeIndex = 0;
-
-        const auto &mode = modes[modeIndex];
-        modeIndex = (modeIndex + 1) % 4;
-
-        for (int i = 0; i < stepCount; ++i) {
-            int octave = i / 7;
-            int degree = i % 7;
-            int8_t note = mode.intervals[degree] + (octave * 12);
-            sequence.step(firstStep + i).setNoteIndex(note);
-        }
-
-        FixedStringBuilder<16> msg;
-        msg("MODAL: ");
-        msg(mode.name);
+        sequence.populateWithMacroModal(firstStep, lastStep, modeIndex);
+        const char *names[] = {"DORIAN", "PHRYGIAN", "LYDIAN", "MIXOLYDIAN"};
+        FixedStringBuilder<16> msg("MODAL: ");
+        msg(names[modeIndex]);
         showMessage(msg);
+        modeIndex = (modeIndex + 1) % 4;
         break;
     }
-    case MelodicContextAction::RandomMelody: {
-        // Random melody: pentatonic scale for musicality
-        static const int8_t pentatonic[] = {0, 2, 4, 7, 9, 12, 14, 16, 19, 21};
-        static const int pentaLength = sizeof(pentatonic) / sizeof(pentatonic[0]);
-
-        for (int i = 0; i < stepCount; ++i) {
-            int idx = rng.nextRange(pentaLength);
-            int8_t note = pentatonic[idx];
-
-            // Random octave shift (-12 to +12)
-            int octaveShift = (rng.nextRange(3) - 1) * 12;
-            note += octaveShift;
-
-            sequence.step(firstStep + i).setNoteIndex(note);
-        }
+    case MelodicContextAction::RandomMelody:
+        sequence.populateWithMacroRandomMelody(firstStep, lastStep);
         showMessage("RANDOM MELODY");
         break;
-    }
     case MelodicContextAction::Last:
         break;
     }
@@ -2164,147 +1895,42 @@ void IndexedSequenceEditPage::durationTransformContextShow() {
 
 void IndexedSequenceEditPage::durationTransformContextAction(int index) {
     auto &sequence = _project.selectedIndexedSequence();
-
-    // Determine range: use selected steps if any, otherwise full active length
     int firstStep, lastStep;
-
-    if (_stepSelection.any()) {
-        firstStep = _stepSelection.firstSetIndex();
-        lastStep = _stepSelection.lastSetIndex();
-    } else {
-        firstStep = 0;
-        lastStep = sequence.activeLength() - 1;
+    getMacroRange(firstStep, lastStep);
+    if (firstStep > lastStep) {
+        showMessage("NO STEP");
+        return;
     }
-
-    int stepCount = lastStep - firstStep + 1;
-    if (stepCount <= 0) return;
 
     switch (DurationTransformContextAction(index)) {
-    case DurationTransformContextAction::DurationLog: {
-        // Logarithmic curve: slow start, fast end
-        uint16_t minDur = 48;   // 32nd note minimum
-        uint16_t maxDur = 768;  // Whole note maximum
-        for (int i = 0; i < stepCount; ++i) {
-            float t = float(i) / float(stepCount - 1);
-            float curved = std::log(1.0f + t * 9.0f) / std::log(10.0f); // log10(1 + 9t)
-            uint16_t dur = uint16_t(minDur + curved * (maxDur - minDur));
-            sequence.step(firstStep + i).setDuration(dur);
-        }
+    case DurationTransformContextAction::DurationLog:
+        sequence.transformDurationLog(firstStep, lastStep);
         showMessage("DURATION LOG");
         break;
-    }
-    case DurationTransformContextAction::DurationExp: {
-        // Exponential curve: fast start, slow end
-        uint16_t minDur = 48;
-        uint16_t maxDur = 768;
-        for (int i = 0; i < stepCount; ++i) {
-            float t = float(i) / float(stepCount - 1);
-            float curved = (std::exp(t * 2.0f) - 1.0f) / (std::exp(2.0f) - 1.0f);
-            uint16_t dur = uint16_t(minDur + curved * (maxDur - minDur));
-            sequence.step(firstStep + i).setDuration(dur);
-        }
+    case DurationTransformContextAction::DurationExp:
+        sequence.transformDurationExp(firstStep, lastStep);
         showMessage("DURATION EXP");
         break;
-    }
     case DurationTransformContextAction::QuantizeMeasure: {
-        // Calculate current total duration
+        sequence.transformQuantizeMeasure(firstStep, lastStep);
         uint32_t totalDuration = 0;
         for (int i = firstStep; i <= lastStep; ++i) {
             totalDuration += sequence.step(i).duration();
         }
-
-        if (totalDuration == 0) {
-            showMessage("Q-MEAS: EMPTY");
-            break;
-        }
-
-        // Find nearest measure (multiples of 768 = 4 beats)
-        const uint32_t barTicks = 768;   // 4 beats = 1 bar at 192 PPQN
-
-        // Round to nearest bar
-        uint32_t targetDuration = ((totalDuration + barTicks / 2) / barTicks) * barTicks;
-
-        // Ensure at least 1 bar
-        if (targetDuration == 0) {
-            targetDuration = barTicks;
-        }
-
-        // Calculate scaling factor
-        float scalingFactor = float(targetDuration) / float(totalDuration);
-
-        // Apply scaling with rounding error distribution
-        uint32_t scaledTotal = 0;
-        for (int i = firstStep; i <= lastStep; ++i) {
-            uint16_t originalDur = sequence.step(i).duration();
-            uint16_t scaledDur = uint16_t(std::round(originalDur * scalingFactor));
-
-            // Clamp to valid range
-            scaledDur = clamp<uint16_t>(scaledDur, 1, IndexedSequence::MaxDuration);
-
-            sequence.step(i).setDuration(scaledDur);
-            scaledTotal += scaledDur;
-        }
-
-        // Distribute rounding error on last step
-        if (scaledTotal != targetDuration) {
-            int diff = int(targetDuration) - int(scaledTotal);
-            uint16_t lastDur = sequence.step(lastStep).duration();
-            uint16_t adjustedDur = clamp<uint16_t>(
-                int(lastDur) + diff,
-                1,
-                IndexedSequence::MaxDuration
-            );
-            sequence.step(lastStep).setDuration(adjustedDur);
-        }
-
-        // Show result
-        int bars = targetDuration / barTicks;
+        const uint32_t barTicks = 768;
+        int bars = int(totalDuration / barTicks);
         FixedStringBuilder<32> msg("Q-MEAS: %d BAR%s", bars, bars == 1 ? "" : "S");
         showMessage(msg);
         break;
     }
-    case DurationTransformContextAction::Reverse: {
-        // Reverse step order
-        for (int i = 0; i < stepCount / 2; ++i) {
-            int a = firstStep + i;
-            int b = lastStep - i;
-            auto tempNote = sequence.step(a).noteIndex();
-            auto tempDur = sequence.step(a).duration();
-            auto tempGate = sequence.step(a).gateLength();
-            auto tempSlide = sequence.step(a).slide();
-            auto tempGroup = sequence.step(a).groupMask();
-
-            sequence.step(a).setNoteIndex(sequence.step(b).noteIndex());
-            sequence.step(a).setDuration(sequence.step(b).duration());
-            sequence.step(a).setGateLength(sequence.step(b).gateLength());
-            sequence.step(a).setSlide(sequence.step(b).slide());
-            sequence.step(a).setGroupMask(sequence.step(b).groupMask());
-
-            sequence.step(b).setNoteIndex(tempNote);
-            sequence.step(b).setDuration(tempDur);
-            sequence.step(b).setGateLength(tempGate);
-            sequence.step(b).setSlide(tempSlide);
-            sequence.step(b).setGroupMask(tempGroup);
-        }
+    case DurationTransformContextAction::Reverse:
+        sequence.transformReverse(firstStep, lastStep);
         showMessage("REVERSED");
         break;
-    }
-    case DurationTransformContextAction::Mirror: {
-        // Mirror around midpoint
-        int midpoint = firstStep + stepCount / 2;
-        for (int i = midpoint; i <= lastStep; ++i) {
-            int mirror = firstStep + (midpoint - i);
-            if (mirror >= firstStep && mirror < midpoint) {
-                sequence.step(i).setNoteIndex(sequence.step(mirror).noteIndex());
-                sequence.step(i).setDuration(sequence.step(mirror).duration());
-                sequence.step(i).setGateLength(sequence.step(mirror).gateLength());
-                sequence.step(i).setSlide(sequence.step(mirror).slide());
-                sequence.step(i).setGroupMask(sequence.step(mirror).groupMask());
-            }
-        }
+    case DurationTransformContextAction::Mirror:
+        sequence.transformMirror(firstStep, lastStep);
         showMessage("MIRRORED");
         break;
-    }
     case DurationTransformContextAction::Last:
         break;
     }
