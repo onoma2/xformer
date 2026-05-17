@@ -20,6 +20,20 @@ public:
         Last
     };
 
+    enum class FillMode : uint8_t {
+        None,
+        Gates,
+        NextPattern,
+        Condition,
+        Last
+    };
+
+    enum class CvUpdateMode : uint8_t {
+        Gate,
+        Always,
+        Last
+    };
+
     //----------------------------------------
     // Properties
     //----------------------------------------
@@ -52,6 +66,12 @@ public:
     bool lock() const { return _lock; }
     void setLock(bool lock) {
         _lock = lock;
+    }
+
+    // fillMuted
+    bool fillMuted() const { return _fillMuted; }
+    void setFillMuted(bool fillMuted) {
+        _fillMuted = fillMuted;
     }
 
     // loopFirst
@@ -114,25 +134,55 @@ public:
         _maxDegree = clamp(degree, minDegree(), 127);
     }
 
+    // slideTime
+    int slideTime() const { return _slideTime.get(isRouted(Routing::Target::SlideTime)); }
+    void setSlideTime(int slideTime, bool routed = false) {
+        _slideTime.set(clamp(slideTime, 0, 100), routed);
+    }
+
+    // octave
+    int octave() const { return _octave.get(isRouted(Routing::Target::Octave)); }
+    void setOctave(int octave, bool routed = false) {
+        _octave.set(clamp(octave, -10, 10), routed);
+    }
+
+    // transpose
+    int transpose() const { return _transpose.get(isRouted(Routing::Target::Transpose)); }
+    void setTranspose(int transpose, bool routed = false) {
+        _transpose.set(clamp(transpose, -100, 100), routed);
+    }
+
+    // fillMode
+    FillMode fillMode() const { return _fillMode; }
+    void setFillMode(FillMode fillMode) {
+        _fillMode = ModelUtils::clampedEnum(fillMode);
+    }
+
+    // cvUpdateMode
+    CvUpdateMode cvUpdateMode() const { return _cvUpdateMode; }
+    void setCvUpdateMode(CvUpdateMode cvUpdateMode) {
+        _cvUpdateMode = ModelUtils::clampedEnum(cvUpdateMode);
+    }
+
     // Biases
-    int gateBias() const { return _gateBias; }
-    void setGateBias(int gateBias) {
-        _gateBias = clamp(gateBias, -100, 100);
+    int gateBias() const { return _gateBias.get(isRouted(Routing::Target::GateProbabilityBias)); }
+    void setGateBias(int gateBias, bool routed = false) {
+        _gateBias.set(clamp(gateBias, -100, 100), routed);
     }
 
-    int retriggerBias() const { return _retriggerBias; }
-    void setRetriggerBias(int retriggerBias) {
-        _retriggerBias = clamp(retriggerBias, -100, 100);
+    int retriggerBias() const { return _retriggerBias.get(isRouted(Routing::Target::RetriggerProbabilityBias)); }
+    void setRetriggerBias(int retriggerBias, bool routed = false) {
+        _retriggerBias.set(clamp(retriggerBias, -100, 100), routed);
     }
 
-    int lengthBias() const { return _lengthBias; }
-    void setLengthBias(int lengthBias) {
-        _lengthBias = clamp(lengthBias, -100, 100);
+    int lengthBias() const { return _lengthBias.get(isRouted(Routing::Target::LengthBias)); }
+    void setLengthBias(int lengthBias, bool routed = false) {
+        _lengthBias.set(clamp(lengthBias, -100, 100), routed);
     }
 
-    int noteBias() const { return _noteBias; }
-    void setNoteBias(int noteBias) {
-        _noteBias = clamp(noteBias, -100, 100);
+    int noteBias() const { return _noteBias.get(isRouted(Routing::Target::NoteProbabilityBias)); }
+    void setNoteBias(int noteBias, bool routed = false) {
+        _noteBias.set(clamp(noteBias, -100, 100), routed);
     }
 
     // sequences
@@ -143,6 +193,13 @@ public:
           StochasticSequence &sequence(int index)       { return _sequences[index]; }
 
     //----------------------------------------
+    // Routing
+    //----------------------------------------
+
+    inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
+    void writeRouted(Routing::Target target, int intValue, float floatValue);
+
+    //----------------------------------------
     // Methods
     //----------------------------------------
 
@@ -150,12 +207,13 @@ public:
 
     void clear() {
         for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
-            _degreeTickets[i] = 10; // Default ticket count for active scale degrees.
+            _degreeTickets[i] = 10;
         }
         _linearity = 0;
         _degreeRotation = 0;
         _maskRotation = 0;
         _lock = false;
+        _fillMuted = true;
         _loopFirst = 0;
         _loopLast = CONFIG_STEP_COUNT - 1;
         _accentProb = 0;
@@ -166,10 +224,15 @@ public:
         _marblesSteps = 100;
         _minDegree = 0;
         _maxDegree = 127;
-        _gateBias = 0;
-        _retriggerBias = 0;
-        _lengthBias = 0;
-        _noteBias = 0;
+        _slideTime.setBase(0);
+        _octave.setBase(0);
+        _transpose.setBase(0);
+        _fillMode = FillMode::None;
+        _cvUpdateMode = CvUpdateMode::Gate;
+        _gateBias.setBase(0);
+        _retriggerBias.setBase(0);
+        _lengthBias.setBase(0);
+        _noteBias.setBase(0);
 
         for (auto &sequence : _sequences) {
             sequence.clear();
@@ -182,6 +245,7 @@ public:
         writer.write(_degreeRotation);
         writer.write(_maskRotation);
         writer.write(_lock);
+        writer.write(_fillMuted);
         writer.write(_loopFirst);
         writer.write(_loopLast);
         writer.write(_accentProb);
@@ -192,10 +256,15 @@ public:
         writer.write(_marblesSteps);
         writer.write(_minDegree);
         writer.write(_maxDegree);
-        writer.write(_gateBias);
-        writer.write(_retriggerBias);
-        writer.write(_lengthBias);
-        writer.write(_noteBias);
+        _slideTime.write(writer);
+        _octave.write(writer);
+        _transpose.write(writer);
+        writer.write(static_cast<uint8_t>(_fillMode));
+        writer.write(static_cast<uint8_t>(_cvUpdateMode));
+        _gateBias.write(writer);
+        _retriggerBias.write(writer);
+        _lengthBias.write(writer);
+        _noteBias.write(writer);
 
         for (const auto &sequence : _sequences) {
             sequence.write(writer);
@@ -208,6 +277,7 @@ public:
         reader.read(_degreeRotation);
         reader.read(_maskRotation);
         reader.read(_lock);
+        reader.read(_fillMuted);
         reader.read(_loopFirst);
         reader.read(_loopLast);
         reader.read(_accentProb);
@@ -220,10 +290,18 @@ public:
         reader.read(_marblesSteps);
         reader.read(_minDegree);
         reader.read(_maxDegree);
-        reader.read(_gateBias);
-        reader.read(_retriggerBias);
-        reader.read(_lengthBias);
-        reader.read(_noteBias);
+        _slideTime.read(reader);
+        _octave.read(reader);
+        _transpose.read(reader);
+        uint8_t fillMode, cvUpdateMode;
+        reader.read(fillMode);
+        _fillMode = static_cast<FillMode>(fillMode);
+        reader.read(cvUpdateMode);
+        _cvUpdateMode = static_cast<CvUpdateMode>(cvUpdateMode);
+        _gateBias.read(reader);
+        _retriggerBias.read(reader);
+        _lengthBias.read(reader);
+        _noteBias.read(reader);
 
         for (auto &sequence : _sequences) {
             sequence.read(reader);
@@ -245,6 +323,7 @@ private:
     int8_t _degreeRotation;
     int8_t _maskRotation;
     bool _lock;
+    bool _fillMuted;
     uint8_t _loopFirst;
     uint8_t _loopLast;
     uint8_t _accentProb;
@@ -255,10 +334,16 @@ private:
     uint8_t _marblesSteps;
     uint8_t _minDegree;
     uint8_t _maxDegree;
-    int8_t _gateBias;
-    int8_t _retriggerBias;
-    int8_t _lengthBias;
-    int8_t _noteBias;
+    
+    Routable<uint8_t> _slideTime;
+    Routable<int8_t> _octave;
+    Routable<int8_t> _transpose;
+    FillMode _fillMode;
+    CvUpdateMode _cvUpdateMode;
+    Routable<int8_t> _gateBias;
+    Routable<int8_t> _retriggerBias;
+    Routable<int8_t> _lengthBias;
+    Routable<int8_t> _noteBias;
 
     StochasticSequenceArray _sequences;
 

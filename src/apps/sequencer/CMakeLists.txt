@@ -19,6 +19,7 @@ set(sources
     engine/NoteTrackEngine.cpp
     engine/TeletypeBridge.cpp
     engine/TeletypeTrackEngine.cpp
+    engine/StochasticTrackEngine.cpp
     engine/TuesdayTrackEngine.cpp
     engine/RoutingEngine.cpp
     engine/SequenceState.cpp
@@ -49,6 +50,7 @@ set(sources
     model/ModelUtils.cpp
     model/NoteSequence.cpp
     model/NoteTrack.cpp
+    model/StochasticTrack.cpp
     model/DiscreteMapSequence.cpp
     model/DiscreteMapTrack.cpp
     model/IndexedSequence.cpp

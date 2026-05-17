@@ -198,8 +198,63 @@ public:
             Types::printNote(str, rootNote());
         }
     }
+    // selectedRootNote
     int selectedRootNote(int defaultRootNote) const {
         return rootNote() < 0 ? defaultRootNote : rootNote();
+    }
+
+    // playMode
+    Types::PlayMode playMode() const { return _playMode; }
+    void setPlayMode(Types::PlayMode playMode) {
+        _playMode = ModelUtils::clampedEnum(playMode);
+    }
+    void editPlayMode(int value, bool shift) {
+        setPlayMode(ModelUtils::adjustedEnum(_playMode, value));
+    }
+    void printPlayMode(StringBuilder &str) const {
+        str(Types::playModeName(_playMode));
+    }
+
+    // runMode
+    Types::RunMode runMode() const { return _runMode; }
+    void setRunMode(Types::RunMode runMode) {
+        _runMode = ModelUtils::clampedEnum(runMode);
+    }
+    void editRunMode(int value, bool shift) {
+        setRunMode(ModelUtils::adjustedEnum(_runMode, value));
+    }
+    void printRunMode(StringBuilder &str) const {
+        str(Types::runModeName(_runMode));
+    }
+
+    // firstStep
+    int firstStep() const { return _firstStep; }
+    void setFirstStep(int firstStep) {
+        _firstStep = clamp(firstStep, 0, CONFIG_STEP_COUNT - 1);
+    }
+
+    // lastStep
+    int lastStep() const { return _lastStep; }
+    void setLastStep(int lastStep) {
+        _lastStep = clamp(lastStep, 0, CONFIG_STEP_COUNT - 1);
+    }
+
+    // divisor
+    int divisor() const { return _divisor; }
+    void setDivisor(int divisor) {
+        _divisor = clamp(divisor, 1, 255);
+    }
+    void editDivisor(int value, bool shift) {
+        setDivisor(ModelUtils::adjustedByStep(divisor(), value, 1, !shift));
+    }
+    void printDivisor(StringBuilder &str) const {
+        str("%d", divisor());
+    }
+
+    // resetMeasure
+    int resetMeasure() const { return _resetMeasure; }
+    void setResetMeasure(int resetMeasure) {
+        _resetMeasure = clamp(resetMeasure, 0, 127);
     }
 
     const StepArray &steps() const { return _steps; }
@@ -211,6 +266,12 @@ public:
     void clear() {
         setScale(-1);
         setRootNote(-1);
+        setPlayMode(Types::PlayMode::Aligned);
+        setRunMode(Types::RunMode::Forward);
+        setFirstStep(0);
+        setLastStep(CONFIG_STEP_COUNT - 1);
+        setDivisor(12);
+        setResetMeasure(0);
 
         for (auto &step : _steps) {
             step.clear();
@@ -220,6 +281,12 @@ public:
     void write(VersionedSerializedWriter &writer) const {
         writer.write(_scale);
         writer.write(_rootNote);
+        writer.write(static_cast<uint8_t>(_playMode));
+        writer.write(static_cast<uint8_t>(_runMode));
+        writer.write(_firstStep);
+        writer.write(_lastStep);
+        writer.write(_divisor);
+        writer.write(_resetMeasure);
 
         for (const auto &step : _steps) {
             step.write(writer);
@@ -229,6 +296,16 @@ public:
     void read(VersionedSerializedReader &reader) {
         reader.read(_scale);
         reader.read(_rootNote);
+        uint8_t playMode, runMode;
+        reader.read(playMode);
+        reader.read(runMode);
+        _playMode = static_cast<Types::PlayMode>(playMode);
+        _runMode = static_cast<Types::RunMode>(runMode);
+        reader.read(_firstStep);
+        reader.read(_lastStep);
+        reader.read(_divisor);
+        reader.read(_resetMeasure);
+
         setScale(_scale);
         setRootNote(_rootNote);
 
@@ -241,6 +318,12 @@ private:
     int8_t _trackIndex = -1;
     int8_t _scale = -1;
     int8_t _rootNote = -1;
+    Types::PlayMode _playMode = Types::PlayMode::Aligned;
+    Types::RunMode _runMode = Types::RunMode::Forward;
+    uint8_t _firstStep = 0;
+    uint8_t _lastStep = CONFIG_STEP_COUNT - 1;
+    uint8_t _divisor = 12;
+    uint8_t _resetMeasure = 0;
     StepArray _steps;
 
     friend class StochasticTrack;
