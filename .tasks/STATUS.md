@@ -12,8 +12,8 @@ _Updated: 2026-05-17_
 
 ## 🟡 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Phase 2 Engine Foundations complete: ported `StochasticTrackEngine` skeleton without STL bloat, and `_lockedSteps` cache successfully heap-allocated. `.ccmram_bss` is stable at 54,812 bytes.
-**Next action:** Phase 3 Global Logic: Implement PWT selection, Linearity bias, and Marbles-style shaping within the engine's `update()` or `tick()` loop.
+**Where I stopped:** Phase 3 Global Logic complete. PWT weighted selection, Linearity bias, and Marbles-style pitch shaping are now fully integrated into the `StochasticTrackEngine` tick evaluation.
+**Next action:** Phase 4 Loop Controls: implement the captured-event lock buffer logic so that generated sequences can be looped deterministically.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic

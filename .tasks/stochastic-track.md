@@ -42,9 +42,9 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - [x] **Validation:** Engine CCMRAM gate check (< 912 B).
 
 ### Phase 3: Global Logic
-- [ ] Implement Pitch Weight Table (PWT) weighted selection.
-- [ ] Implement Linearity (melodic smoothing).
-- [ ] Implement Marbles-style pitch distribution (Spread/Bias/Steps).
+- [x] Implement Pitch Weight Table (PWT) weighted selection.
+- [x] Implement Linearity (melodic smoothing).
+- [x] Implement Marbles-style pitch distribution (Spread/Bias/Steps).
 
 ### Phase 4: Loop Controls
 - [ ] Implement Captured Event Lock logic (freeze evaluated results).
