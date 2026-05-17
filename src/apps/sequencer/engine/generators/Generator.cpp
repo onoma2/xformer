@@ -2,12 +2,14 @@
 
 #include "EuclideanGenerator.h"
 #include "RandomGenerator.h"
+#include "AlgoGenerator.h"
 
 #include "core/utils/Container.h"
 
-static Container<EuclideanGenerator, RandomGenerator> generatorContainer;
+static Container<EuclideanGenerator, RandomGenerator, AlgoGenerator> generatorContainer;
 static EuclideanGenerator::Params euclideanParams;
 static RandomGenerator::Params randomParams;
+static AlgoGenerator::Params algoParams;
 
 static void initLayer(SequenceBuilder &builder) {
     builder.clearLayer();
@@ -29,6 +31,14 @@ Generator *Generator::execute(Generator::Mode mode, SequenceBuilder &builder) {
         return generatorContainer.create<EuclideanGenerator>(builder, euclideanParams);
     case Mode::Random:
         return generatorContainer.create<RandomGenerator>(builder, randomParams);
+    case Mode::Algo: {
+        // Guard: Algo mode only works with NoteSequenceBuilder
+        auto *noteBuilder = dynamic_cast<SequenceBuilderImpl<NoteSequence> *>(&builder);
+        if (!noteBuilder) {
+            return nullptr;
+        }
+        return generatorContainer.create<AlgoGenerator>(builder, algoParams);
+    }
     case Mode::Last:
         break;
     }

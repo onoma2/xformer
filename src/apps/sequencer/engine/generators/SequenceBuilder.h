@@ -139,6 +139,10 @@ public:
         }
     }
 
+public:
+    T &editSequence() { return _edit; }
+    const T &originalSequence() const { return _original; }
+
 private:
     T &_edit;
     T _original;

@@ -7,6 +7,7 @@
 #include "engine/generators/Generator.h"
 #include "engine/generators/EuclideanGenerator.h"
 #include "engine/generators/RandomGenerator.h"
+#include "engine/generators/AlgoGenerator.h"
 
 #include "engine/Engine.h"
 #include "engine/NoteTrackEngine.h"
@@ -104,7 +105,7 @@ enum class ContextAction {
 };
 
 static bool seedDrivenGenerator(Generator::Mode mode) {
-    return mode == Generator::Mode::Random;
+    return mode == Generator::Mode::Random || mode == Generator::Mode::Algo;
 }
 
 static bool abPreviewGenerator(Generator::Mode mode) {
@@ -126,6 +127,16 @@ static int paramIndexForFunction(Generator::Mode mode, int functionIndex) {
         case 1: return int(EuclideanGenerator::Param::Offset);
         case 2: return int(EuclideanGenerator::Param::Steps);
         case 3: return int(EuclideanGenerator::Param::Beats);
+        default: return -1;
+        }
+    }
+
+    if (mode == Generator::Mode::Algo) {
+        switch (functionIndex) {
+        case 1: return int(AlgoGenerator::Param::Algorithm);
+        case 2: return int(AlgoGenerator::Param::Flow);
+        case 3: return int(AlgoGenerator::Param::Ornament);
+        case 4: return int(AlgoGenerator::Param::Power);
         default: return -1;
         }
     }
@@ -223,6 +234,12 @@ void GeneratorPage::draw(Canvas &canvas) {
         functionNames[2] = "STEPS";
         functionNames[3] = "BEATS";
         functionNames[4] = "NEW EUCL";
+    } else if (_generator->mode() == Generator::Mode::Algo) {
+        functionNames[0] = "A/B";
+        functionNames[1] = "ALGO";
+        functionNames[2] = "FLOW";
+        functionNames[3] = "ORNMT";
+        functionNames[4] = "POWER";
     } else {
         for (int i = 0; i < 5; ++i) {
             functionNames[i] = i < _generator->paramCount() ? _generator->paramName(i) : nullptr;
@@ -283,6 +300,12 @@ void GeneratorPage::draw(Canvas &canvas) {
         drawParamValue(1, int(EuclideanGenerator::Param::Offset));
         drawParamValue(2, int(EuclideanGenerator::Param::Steps));
         drawParamValue(3, int(EuclideanGenerator::Param::Beats));
+    } else if (_generator->mode() == Generator::Mode::Algo) {
+        drawValue(0, _generator->showingPreview() ? "CURRENT" : "ORIGINAL", true);
+        drawParamValue(1, int(AlgoGenerator::Param::Algorithm));
+        drawParamValue(2, int(AlgoGenerator::Param::Flow));
+        drawParamValue(3, int(AlgoGenerator::Param::Ornament));
+        drawParamValue(4, int(AlgoGenerator::Param::Power));
     } else {
         for (int i = 0; i < _generator->paramCount(); ++i) {
             drawParamValue(i, i);
@@ -298,6 +321,7 @@ void GeneratorPage::draw(Canvas &canvas) {
         drawEuclideanGenerator(canvas, *static_cast<const EuclideanGenerator *>(_generator));
         break;
     case Generator::Mode::Random:
+    case Generator::Mode::Algo:
         drawRandomGenerator(canvas, *static_cast<const RandomGenerator *>(_generator));
         break;
     case Generator::Mode::Last:
@@ -533,6 +557,11 @@ void GeneratorPage::encoder(EncoderEvent &event) {
 
     if (_generator->mode() == Generator::Mode::Euclidean && !functionKeyHeld && event.value() != 0) {
         _generator->randomizeParams();
+        changed = true;
+    }
+
+    if (_generator->mode() == Generator::Mode::Algo && !functionKeyHeld && event.value() != 0) {
+        static_cast<AlgoGenerator *>(_generator)->randomizeSeed();
         changed = true;
     }
 
@@ -905,6 +934,15 @@ void GeneratorPage::contextAction(int index) {
                 _generator->updatePreview();
                 _generator->showPreview();
             }
+        } else if (_generator->mode() == Generator::Mode::Algo) {
+            auto *algo = static_cast<AlgoGenerator *>(_generator);
+            algo->randomizeParams();
+            algo->update();
+            if (abPreviewGenerator(_generator->mode())) {
+                _previewArmed = true;
+                _generator->updatePreview();
+                _generator->showPreview();
+            }
         }
         break;
     case 1: // RESEED
@@ -912,6 +950,15 @@ void GeneratorPage::contextAction(int index) {
             auto *random = static_cast<RandomGenerator *>(_generator);
             random->randomizeSeed();
             random->update();
+            if (abPreviewGenerator(_generator->mode())) {
+                _previewArmed = true;
+                _generator->updatePreview();
+                _generator->showPreview();
+            }
+        } else if (_generator->mode() == Generator::Mode::Algo) {
+            auto *algo = static_cast<AlgoGenerator *>(_generator);
+            algo->randomizeSeed();
+            algo->update();
             if (abPreviewGenerator(_generator->mode())) {
                 _previewArmed = true;
                 _generator->updatePreview();

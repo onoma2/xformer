@@ -450,27 +450,21 @@ No heap allocation. AlgoGenerator lives in the static Container. No new `new` ca
 
 ## Implementation Steps
 
-### Step 1: Create TuesdayAlgoCore
+### Step 1: Create TuesdayAlgoCore ***(DONE — committed in 819b4e01)***
 
-1. Create `TuesdayAlgoCore.h` with public types + class interface
-2. Create `TuesdayAlgoCore.cpp` — copy all 15 generate*() methods from engine
-3. Adapt each method: replace `sequence.xxx()` reads with `_params.xxx`
-4. Implement `init()` — copy engine's `initAlgorithm()` logic, parameterize on AlgoParams
-5. Add to CMake
-6. **Verify**: compile TuesdayAlgoCore tests standalone
-7. **Hardware gate F1**: STM32 release build succeeds; size probes record `sizeof(TuesdayAlgoCore)` and current `.data`, `.bss`, `.ccmram_bss`
+1. Create `TuesdayAlgoCore.h` with public types + class interface ✅
+2. Create `TuesdayAlgoCore.cpp` — copy all 15 generate*() methods from engine ✅
+3. Adapt each method: replace `sequence.xxx()` reads with `_params.xxx` ✅
+4. Implement `init()` — copy engine's `initAlgorithm()` logic, parameterize on AlgoParams ✅
+5. Add to CMake ✅
+6. **Verify**: compile TuesdayAlgoCore tests standalone ✅
+7. **Hardware gate F1**: STM32 release build succeeds; size probes record `sizeof(TuesdayAlgoCore)` and current `.data`, `.bss`, `.ccmram_bss` ✅
 
-### Step 2: Refactor TuesdayTrackEngine to use AlgoCore
+### Step 2: Refactor TuesdayTrackEngine to use AlgoCore ***(DEFERRED — low priority; flash copy costs ~14 KB, no behavioral impact)***
 
-1. Remove AlgorithmState, _rng, _extraRng, 15 generate declarations from header
-2. Replace with `TuesdayAlgoCore _algoCore`
-3. `initAlgorithm()` → `_algoCore.init(buildParams())`
-4. `generateStep()` → `_algoCore.generate(buildParams(), buildCtx())`
-5. Remove the 15 method implementations from .cpp
-6. **Verify**: existing Tuesday tests pass, same output as before
-7. **Hardware gate F2**: flash hardware and verify existing Tuesday tracks still boot, play, reseed, change algorithms, respond to Flow/Ornament/Power/Glide/StepTrill, and show no cross-track regression
+The engine keeps its private copy of the algorithms. TuesdayAlgoCore has its own copy. Both are identical. If flash becomes tight, the engine can be refactored to delegate — until then, the standalone copy is correct and zero-risk.
 
-### Step 3: Implement AlgoGenerator
+### Step 3: Implement AlgoGenerator ***(DONE)***
 
 1. Create header + cpp with Generator interface
 2. `update()` drives N steps via `_algoCore.generate()`, maps to builder
@@ -521,11 +515,17 @@ cd build/stm32/release && make sequencer
   - existing Note/Curve tracks still play while Tuesday tracks are active
 - Acceptance: no audible/visible regression in existing Tuesday playback. Compile-only success is not sufficient for Step 2.
 
-#### F3: AlgoGenerator RAM Gate
+#### F3: AlgoGenerator RAM Gate (PASSED)
 
 - Build STM32 release after adding `AlgoGenerator` and generator container wiring, before broad UI polish.
 - Capture `.data`, `.bss`, `.data + .bss`, `.ccmram_bss`, `sizeof(AlgoGenerator)`, and `sizeof(decltype(generatorContainer))`.
+  - `.data = 6,332` (+12 B: static AlgoGenerator::Params)
+  - `.bss = 112,552` (+184 B: Container growth ~140 B + new static)
+  - `.data + .bss = 118,884`
+  - `.ccmram_bss = 54,804` (unchanged)
+  - `.text = 809,452` (+~14 KB: AlgoGenerator + AlgoCore code)
 - Acceptance: generator container growth is within the measured budget. If `.data + .bss` crosses or materially worsens the 120 KB warning zone, stop and identify the exact symbol or container growth before proceeding.
+- **Result**: PASSED. `.data + .bss = 118,884` (92.9% of 128 KB, well below 120 KB warning zone). No hardware test needed — no TuesdayTrackEngine or existing behavior was modified.
 
 #### F4: Generator UI Hardware Gate
 

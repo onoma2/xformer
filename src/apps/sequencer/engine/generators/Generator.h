@@ -12,11 +12,12 @@ using GeneratorPattern = std::array<uint8_t, CONFIG_STEP_COUNT>;
 
 class Generator {
 public:
-   enum class Mode {
+    enum class Mode {
         InitLayer,
         InitSteps,
         Euclidean,
         Random,
+        Algo,
         Last
     };
 
@@ -26,6 +27,7 @@ public:
         case Mode::InitSteps:   return "Init Steps";
         case Mode::Euclidean:   return "Euclidean";
         case Mode::Random:      return "Random";
+        case Mode::Algo:        return "Algo";
         case Mode::Last:        break;
         }
         return nullptr;
