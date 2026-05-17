@@ -1,11 +1,11 @@
 # Task Board
 _Updated: 2026-05-17_
 
-## ⚪ generator-preview-apply — Generator A/B preview, step selection, 64-step context
-**Status:** ready — Phase A committed and hardware verified. Phases B-E remaining.
-**Where I stopped:** Phase A complete. SequenceBuilder has 3-copy state machine (T* _preview heap-allocated, apply/showOriginal/showPreview). Generator has delegate methods. .data + .bss unchanged at 118,648 (90.5%).
-**Next action:** Phase B — Add Variation param, randomizeParams/displayValue to RandomGenerator, widen seed to uint32_t.
-**Depends on:** resource-optimization (RAM at 90.5%, ~2.3 KB headroom to 120 KB warning)
+## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
+**Status:** done — Phases A-F complete and hardware verified.
+**Where I stopped:** All phases committed. SequenceBuilder 3-copy state machine, RandomGenerator enhancements, GeneratorPage A/B workflow, 64-step bank visualization, context menu expansion, and Tuesday AlgoGenerator (15 algorithms via TuesdayAlgoCore). RAM: `.data + .bss = 118,884` (92.9%).
+**Next action:** Merge `feat/generator` to master when user confirms.
+**Depends on:** nothing
 **Branch:** feat/generator
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
