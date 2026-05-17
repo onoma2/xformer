@@ -1,5 +1,5 @@
 """
-Individual edit page renderers.
+Hybrid stochastic page renderers.
 """
 
 import sys
@@ -16,71 +16,87 @@ from tracks import (
     StochasticSequence, StochasticTrackEngine,
     _ALGO_NAMES,
 )
-
-from pages_core import (
-    render_note_sequence_edit_page,
-    render_discrete_map_sequence_page,
-    render_tuesday_edit_page,
-    render_stochastic_edit_page,
-    render_stochastic_steps,
-    render_stochastic_dice,
-    render_stochastic_pitch,
-    render_stochastic_marbles,
-    render_stochastic_lock,
-    render_stochastic_track,
-)
-
-from pages_reference import (
-    render_ref_prob_melod,
-    render_ref_shredder,
-    render_ref_euclid,
-    render_ref_delinquencer,
-    render_ref_skylines,
-    render_ref_prob_div,
-)
-
-from pages_steps import (
-    render_stochastic_steps_skylines,
-    render_stochastic_steps_delinquencer,
-    render_stochastic_steps_euclid,
+from pages_bline import (
+    render_stochastic_marbles_bline,
+    render_stochastic_pitch_bline,
     render_stochastic_steps_bline,
+    render_stochastic_track_bline,
+)
+
+from pages_circle import (
+    render_stochastic_pitch_circle,
+)
+
+from pages_constellations import (
+    render_stochastic_marbles_constellations,
+)
+
+from pages_delinquencer import (
+    render_stochastic_steps_delinquencer,
+)
+
+from pages_euclid import (
+    render_stochastic_steps_euclid,
+)
+
+from pages_grd import (
+    render_stochastic_dice_grd,
+)
+
+from pages_hiswing import (
     render_stochastic_steps_hiswing,
+)
+
+from pages_kreislauf import (
+    render_stochastic_dice_kreislauf,
+    render_stochastic_pitch_kreislauf,
+)
+
+from pages_less_concepts import (
+    render_stochastic_pitch_less_concepts,
+)
+
+from pages_meadowphysics import (
+    render_stochastic_lock_meadowphysics,
     render_stochastic_steps_meadowphysics,
 )
 
-from pages_pitch import (
-    render_stochastic_pitch_prob_melod,
-    render_stochastic_pitch_circle,
-    render_stochastic_pitch_less_concepts,
-    render_stochastic_pitch_kreislauf,
-    render_stochastic_pitch_bline,
-)
-
-from pages_dice import (
-    render_stochastic_dice_shredder,
-    render_stochastic_dice_register,
-    render_stochastic_dice_grd,
-    render_stochastic_dice_kreislauf,
-)
-
-from pages_marbles import (
-    render_stochastic_marbles_rndwalk,
-    render_stochastic_marbles_constellations,
-    render_stochastic_marbles_pit_orchisstra,
-    render_stochastic_marbles_bline,
-)
-
-from pages_lock import (
-    render_stochastic_lock_skylines,
-    render_stochastic_lock_qfwfq,
-    render_stochastic_lock_meadowphysics,
+from pages_pit_orchisstra import (
     render_stochastic_lock_pit_orchisstra,
+    render_stochastic_marbles_pit_orchisstra,
 )
 
-from pages_track import (
-    render_stochastic_track_rndwalk,
-    render_stochastic_track_sequencex,
-    render_stochastic_track_bline,
+from pages_pitter_patter import (
     render_stochastic_track_pitter_patter,
+)
+
+from pages_prob_melod import (
+    render_stochastic_pitch_prob_melod,
+)
+
+from pages_qfwfq import (
+    render_stochastic_lock_qfwfq,
+)
+
+from pages_register import (
+    render_stochastic_dice_register,
+)
+
+from pages_rndwalk import (
+    render_stochastic_marbles_rndwalk,
+    render_stochastic_track_rndwalk,
+)
+
+from pages_sequencex import (
+    render_stochastic_track_sequencex,
+)
+
+from pages_shredder import (
+    render_stochastic_dice_shredder,
+)
+
+from pages_skylines import (
+    render_stochastic_lock_skylines,
+    render_stochastic_steps_skylines,
 )
 
