@@ -97,75 +97,90 @@ static float evalStepNote(const StochasticSequence::Step &step, const Stochastic
     
     int degree = 0;
 
-    if (noteVarProb == 0 || int(rng.nextRange(StochasticSequence::NoteVariationProbability::Range)) > noteVarProb) {
-        // Use step note
-        degree = step.note();
-    } else {
-        // 1. Build candidate pool from active scale degrees
-        int allowedDegrees[CONFIG_USER_SCALE_SIZE];
-        int weights[CONFIG_USER_SCALE_SIZE];
-        int allowedCount = 0;
-        
-        for (int i = 0; i < activeNotes; ++i) {
-            // Apply maskRotation to ticket lookup
-            int ticketIdx = (i + track.maskRotation()) % activeNotes;
-            if (ticketIdx < 0) ticketIdx += activeNotes;
-            
-            int ticket = track.degreeTicket(ticketIdx);
-            if (ticket >= 0) {
+    // 1. Build candidate pool from active scale degrees within range
+    int allowedDegrees[CONFIG_USER_SCALE_SIZE];
+    int weights[CONFIG_USER_SCALE_SIZE];
+    int allowedCount = 0;
+    
+    for (int i = 0; i < activeNotes; ++i) {
+        if (i >= track.minDegree() && i <= track.maxDegree()) {
+            if (track.degreeTicket(i) >= 0) {
                 allowedDegrees[allowedCount] = i;
-                weights[allowedCount] = ticket;
+                weights[allowedCount] = track.degreeTicket(i);
                 allowedCount++;
-            }
-        }
-
-        if (allowedCount == 0) {
-            degree = step.note();
-        } else {
-            if (track.marblesMode() == StochasticTrack::MarblesMode::On) {
-                // Marbles shaping
-                float u = rng.nextFloat();
-                float shaped = betaDistributionSample(u, track.marblesSpread() / 100.0f);
-                float biased = shaped + (track.marblesBias() / 100.0f - 0.5f);
-                int bucket = clamp(int(clamp(biased, 0.0f, 1.0f) * allowedCount), 0, allowedCount - 1);
-                degree = allowedDegrees[bucket];
-            } else {
-                // PWT raffling with Linearity
-                int totalTickets = 0;
-                for (int i = 0; i < allowedCount; ++i) {
-                    int w = weights[i];
-                    if (track.linearity() > 0 && lastDegree >= 0) {
-                        int dist = std::abs(allowedDegrees[i] - lastDegree);
-                        float penalty = 1.0f - (dist / float(activeNotes)) * (track.linearity() / 100.0f);
-                        w = int(w * std::max(0.1f, penalty));
-                    }
-                    weights[i] = w;
-                    totalTickets += w;
-                }
-
-                if (totalTickets > 0) {
-                    int roll = rng.nextRange(totalTickets);
-                    int sum = 0;
-                    for (int i = 0; i < allowedCount; ++i) {
-                        sum += weights[i];
-                        if (roll < sum) {
-                            degree = allowedDegrees[i];
-                            break;
-                        }
-                    }
-                } else {
-                    degree = allowedDegrees[rng.nextRange(allowedCount)];
-                }
             }
         }
     }
 
-    lastDegree = degree;
+    if (allowedCount == 0 || (noteVarProb > 0 && int(rng.nextRange(StochasticSequence::NoteVariationProbability::Range)) > noteVarProb)) {
+        // Fallback to step note if pool is empty or variation roll fails
+        degree = step.note();
+    } else {
+        // Apply mask rotation to the weights within the allowed pool
+        // Excluded degrees stay excluded (they aren't in the pool), 
+        // and we rotate the weights of the included degrees through their positions.
+        if (track.maskRotation() != 0) {
+            int originalWeights[CONFIG_USER_SCALE_SIZE];
+            for (int i = 0; i < allowedCount; ++i) originalWeights[i] = weights[i];
+            for (int i = 0; i < allowedCount; ++i) {
+                int srcIdx = (i - track.maskRotation()) % allowedCount;
+                if (srcIdx < 0) srcIdx += allowedCount;
+                weights[i] = originalWeights[srcIdx];
+            }
+        }
 
-    // Apply degreeRotation
-    degree += track.degreeRotation();
-    // Clamp to min/max
-    degree = clamp(degree, int(track.minDegree()), int(track.maxDegree()));
+        if (track.marblesMode() == StochasticTrack::MarblesMode::On) {
+            // Marbles shaping
+            float u = rng.nextFloat();
+            float shaped = betaDistributionSample(u, track.marblesSpread() / 100.0f);
+            float biased = shaped + (track.marblesBias() / 100.0f - 0.5f);
+            int bucket = clamp(int(clamp(biased, 0.0f, 1.0f) * allowedCount), 0, allowedCount - 1);
+            degree = allowedDegrees[bucket];
+        } else {
+            // PWT raffling with Linearity
+            int totalTickets = 0;
+            for (int i = 0; i < allowedCount; ++i) {
+                int w = weights[i];
+                if (track.linearity() > 0 && lastDegree >= 0) {
+                    int dist = std::abs(allowedDegrees[i] - lastDegree);
+                    float penalty = 1.0f - (dist / float(activeNotes)) * (track.linearity() / 100.0f);
+                    w = int(w * std::max(0.1f, penalty));
+                }
+                weights[i] = w;
+                totalTickets += w;
+            }
+
+            if (totalTickets > 0) {
+                int roll = rng.nextRange(totalTickets);
+                int sum = 0;
+                for (int i = 0; i < allowedCount; ++i) {
+                    sum += weights[i];
+                    if (roll < sum) {
+                        degree = allowedDegrees[i];
+                        break;
+                    }
+                }
+            } else {
+                degree = allowedDegrees[rng.nextRange(allowedCount)];
+            }
+        }
+
+        // Apply degree rotation within the pool
+        if (track.degreeRotation() != 0) {
+            int currentIdx = 0;
+            for (int i = 0; i < allowedCount; ++i) {
+                if (allowedDegrees[i] == degree) {
+                    currentIdx = i;
+                    break;
+                }
+            }
+            int rotatedIdx = (currentIdx + track.degreeRotation()) % allowedCount;
+            if (rotatedIdx < 0) rotatedIdx += allowedCount;
+            degree = allowedDegrees[rotatedIdx];
+        }
+    }
+
+    lastDegree = degree;
     
     // Apply octave jump
     int octProb = clamp(step.noteOctaveProbability(), -1, StochasticSequence::NoteOctaveProbability::Max);
@@ -205,7 +220,7 @@ void StochasticTrackEngine::freeLockedSteps() {
 }
 
 void StochasticTrackEngine::reset() {
-    _freeRelativeTick = 0;
+    _freeRelativeTick = 0xFFFFFFFF;
     _sequenceState.reset();
     _currentStep = -1;
     _index = -1;
@@ -221,13 +236,15 @@ void StochasticTrackEngine::reset() {
     _lockedStepCount = 0;
     _skips = 0;
     _lastDegree = -1;
+    _rng = Random(0x12345678 + _track.trackIndex()); // Re-seed for determinism
     changePattern();
 }
 
 void StochasticTrackEngine::restart() {
-    _freeRelativeTick = 0;
+    _freeRelativeTick = 0xFFFFFFFF;
     _sequenceState.reset();
     _currentStep = -1;
+    _rng = Random(0x12345678 + _track.trackIndex()); // Re-seed for determinism
 }
 
 TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
