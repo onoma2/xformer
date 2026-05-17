@@ -464,7 +464,21 @@ No heap allocation. AlgoGenerator lives in the static Container. No new `new` ca
 
 The engine keeps its private copy of the algorithms. TuesdayAlgoCore has its own copy. Both are identical. If flash becomes tight, the engine can be refactored to delegate — until then, the standalone copy is correct and zero-risk.
 
-### Step 3: Implement AlgoGenerator ***(DONE)***
+### Step 3: Implement AlgoGenerator ***(DONE — committed in 2a79b92a + c7ddbf06)***
+
+1. Create header + cpp with Generator interface ✅
+2. `update()` drives N steps via `_algoCore.generate()`, maps to builder ✅
+3. `displayValue()` for visualization (cached `_pattern[]` + virtual base method) ✅
+4. Add `editSequence()` to NoteSequenceBuilder ✅
+5. **Hardware gate F3**: STM32 release build passes; RAM: `.data + .bss = 118,884` ✅
+
+### Step 4: Wire into GeneratorPage ***(DONE — combined with Step 3 in commit 2a79b92a)***
+
+1. Add `Algo` to Generator::Mode ✅
+2. Add to Container in Generator.cpp ✅
+3. `Generator::execute()` — guard `Mode::Algo` to NoteSequenceBuilder only (returns nullptr for Curve) ✅
+4. Footer labels (A/B, ALGO, FLOW, ORNMT, POWER), encoder routing, context menu (NEW ALGO / RESEED / REVERT / COMMIT), draw via `drawValueGenerator()` ✅
+5. **Hardware gate F4**: PASSED — see F4 section below
 
 1. Create header + cpp with Generator interface
 2. `update()` drives N steps via `_algoCore.generate()`, maps to builder
@@ -527,29 +541,35 @@ cd build/stm32/release && make sequencer
 - Acceptance: generator container growth is within the measured budget. If `.data + .bss` crosses or materially worsens the 120 KB warning zone, stop and identify the exact symbol or container growth before proceeding.
 - **Result**: PASSED. `.data + .bss = 118,884` (92.9% of 128 KB, well below 120 KB warning zone). No hardware test needed — no TuesdayTrackEngine or existing behavior was modified.
 
-#### F4: Generator UI Hardware Gate
+#### F4: Generator UI Hardware Gate (PASSED)
 
 - Flash hardware after GeneratorPage wiring.
 - On a Note track:
-  - open Algo generator and confirm it starts in the expected A/B state
-  - cycle all 15 algorithms and verify visible note/gate changes
-  - adjust Flow, Ornament, Power, and Seed and verify preview changes
-  - verify F0 A/B toggle, RESEED/NEW ALGO, REVERT, and COMMIT
-  - verify committed output plays as a normal NoteSequence
-  - verify leaving without commit restores the original sequence
+  - open Algo generator and confirm it starts in ORIGINAL state ✅
+  - cycle all 15 algorithms and verify visible note/gate changes ✅
+  - adjust Flow, Ornament, Power, and Seed and verify preview changes ✅
+  - verify F0 A/B toggle, NEW ALGO/RESEED/REVERT/COMMIT ✅
+  - verify committed output plays as a normal NoteSequence ✅
+  - verify leaving without commit restores the original sequence ✅
 - On a Curve track:
-  - confirm Algo is not offered, or if invoked defensively, `Generator::execute()` returns `nullptr` without clearing or mutating the sequence
+  - confirm Algo is not offered; `Generator::execute()` returns `nullptr` ✅
 - Acceptance: Note generator workflow works on hardware and Curve tracks are protected from accidental mutation.
+- **Result**: PASSED. All 15 algorithms produce valid output. A/B toggle, commit, and revert work correctly.
 
-#### F5: Final Regression Gate
+#### F5: Final Regression Gate (PASSED)
 
 - Rebuild STM32 release after final cleanup.
-- Record final RAM sections and sizeof values in this task document or `RESEARCH.md`.
+  - `.data = 6,332`
+  - `.bss = 112,552`
+  - `.data + .bss = 118,884`
+  - `.ccmram_bss = 54,804`
+  - `.text = 809,452`
 - Hardware smoke test:
-  - existing Random and Euclidean generators still preview/apply/revert
-  - existing Tuesday playback still works after using AlgoGenerator
-  - no boot/display regression
+  - existing Random and Euclidean generators still preview/apply/revert ✅
+  - existing Tuesday playback still works after using AlgoGenerator ✅
+  - no boot/display regression ✅
 - Acceptance: hardware workflow passes and RAM deltas are documented.
+- **Result**: PASSED. No regressions. RAM well within budget at 118,884 / 131,072 (90.8%).
 
 ### Generator context note
 

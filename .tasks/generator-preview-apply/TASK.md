@@ -157,11 +157,16 @@ This is safe: generators write through `_edit` → live sequence. `showOriginal(
 - 2026-05-17: **Resolved Shift+Step conflict**: GeneratorPage consumes Shift+Step for re-roll ONLY when generator is active. Precedence: if `_generator != nullptr && key.isStep() && key.shiftModifier()`, handle as reroll and consume event. StepSelection's shift-persist is a different gesture in edit pages.
 - 2026-05-17: **Added 64-step rendering strategy**: At >16 steps, switch from filled rectangles to line/point rendering. Bank separators at 16-step boundaries. Active bank framed with horizontal lines. Non-active banks dimmed. Without this, 64 steps on 128px produces zero-width bars.
 
-## Next Phase
+## Completed Phases
 
-### → [Phase F: Tuesday AlgoGenerator](PHASE_F_ALGO_GENERATOR.md)
+### → [Phase F: Tuesday AlgoGenerator](PHASE_F_ALGO_GENERATOR.md) ***(DONE — hardware tested)***
 
-Run Tuesday's 15 algorithmic composition engines as a generator for NoteSequence tracks. Drives existing TuesdayTrackEngine via save/override/restore session — no code duplication.
+Run Tuesday's 15 algorithmic composition engines as a generator for NoteSequence tracks. Drives TuesdayAlgoCore via save/override/restore session — no code duplication.
+
+- F1: Core extraction build gate ✅
+- F3: AlgoGenerator RAM gate ✅ (`.data + .bss = 118,884`)
+- F4: Generator UI hardware gate ✅
+- F5: Final regression gate ✅
 
 ## Open Questions
 
