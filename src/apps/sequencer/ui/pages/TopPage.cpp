@@ -542,9 +542,10 @@ void TopPage::setTrackView(TrackView view) {
     case Track::TrackMode::MidiCv:
     case Track::TrackMode::Tuesday:
     case Track::TrackMode::Teletype:
-    case Track::TrackMode::Stochastic:
-        // For non-note tracks, always show track page
         setMainPage(pages.track);
+        break;
+    case Track::TrackMode::Stochastic:
+        setMainPage(pages.stochasticConfig);
         break;
     case Track::TrackMode::DiscreteMap:
         setMainPage(pages.track);
