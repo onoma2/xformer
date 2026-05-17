@@ -10,14 +10,14 @@ _Updated: 2026-05-17_
 
 ---
 
-## 🔵 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
-**Status:** research complete — task documented, RAM assessment done. BLOCKED on engine compaction (CCMRAM).
-**Where I stopped:** Full architecture researched. StochasticTrack model (~8,800 B) fits under NoteTrack gate. StochasticEngine (~2,300 B inline) would blow CCMRAM by +11 KB. Engine must heap-allocate `_lockedSteps` to fit under 912 B gate. Three std::vector uses, std::mt19937/std::normal_distribution, and std::rand() need replacement.
-**Next action:** Run ARM sizeof probe on temporary StochasticTrack to verify model gate, then decide whether to proceed with Phase 1 or block behind resource-optimization.
-**Depends on:** resource-optimization (RAM headroom), generator-preview-apply (SequenceBuilder 3-copy — done)
+## 🟡 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
+**Status:** active
+**Where I stopped:** Phase 1 complete. `StochasticSequence` and `StochasticTrack` implemented and integrated. Sizeof probe confirmed at 8,804 bytes (well within 9,544 B budget).
+**Next action:** Phase 2 Engine Foundations: Port `StochasticEngine` skeleton and implement heap-allocated `_lockedSteps` cache.
+**Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** TBD
-**Reference:** `.tasks/stochastic-track-port/TASK.md`
+**Reference:** `.tasks/stochastic-track-port/TASK.md`, `.tasks/stochastic-track-port/UI-DESIGN.md`, `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md`
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
