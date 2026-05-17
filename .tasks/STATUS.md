@@ -12,8 +12,8 @@ _Updated: 2026-05-17_
 
 ## 🟡 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Phase 5 complete: implemented Accent and Legato probabilities with full lock invariant capture. Phase 6 has been corrected to a small stochastic performance layer: Density, Tilt, Jitter, optional Burst, CV update, and bounded Rotate.
-**Next action:** Repair current Phase 6 code so it does not mix Tuesday pressure, Proteus density, and Proteus patience: replace `power`/`skew`/`looseness` semantics with deterministic density, density tilt, and lock-captured jitter. Phase 7 then adds Proteus-inspired buffer evolution without another density control; Phase 8 builds the XFORMER-native visual pages. Internal code names should follow existing codebase style; user-facing labels should be one word where possible.
+**Where I stopped:** Phase 8 UI Stubs complete. List-based editors implemented for global track and per-step sequence settings. All engine mechanics (Density, Tilt, Jitter, Burst, probabilities) are now controllable on hardware.
+**Next action:** Phase 7: Implement melody-lifecycle buffer evolution (generation, boredom reset, loop mutation).
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic

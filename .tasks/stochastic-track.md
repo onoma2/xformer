@@ -11,6 +11,8 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - `src/apps/sequencer/ui/pages/StochasticConfigPage.h` — Global settings UI
 
 ## Decisions log
+- 2026-05-17: Phase 8 UI Stubs complete. Implemented list-based editors for both global Track parameters and per-step Sequence probabilities. Users can now edit all stochastic metrics on hardware.
+- 2026-05-17: Phase 6 repair complete. Retopologized performance layer to Density/Tilt/Jitter. Implemented true ranked rest-priority for density thinning and stable timing jitter. Verified lock invariant.
 - 2026-05-17: Phase 5 complete. Implemented Accent and Legato probabilities. Accent is mapped to a secondary gate output (index 1), and Legato ties the gate to the next note while triggering a slide. Both are captured in the lock buffer.
 - 2026-05-17: Phase 4 complete. Implemented track-level Loop Windowing (loopFirst/loopLast) and Sequence Rotation. Fixed the lock invariant by capturing gateOffset and slide state.
 - 2026-05-17: Initializing task wiki. Consolidated "Enhanced" design with Vinx port plan.
@@ -57,12 +59,23 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - [x] Implement Accent Probability.
 - [x] Implement Legato/Slew Probability.
 
-### Phase 6: UI Development
-- [ ] Implement `StochasticSequenceEditPage` (Grid + Layer switching).
-- [ ] Implement `StochasticConfigPage` (List settings + PWT visualization).
-- [ ] Implement `StochasticSequencePage` (Pattern list).
+### Phase 6: Tuesday-Derived Stochastic Mechanics
+- [x] Implement Power (Density) and Skew (Tilt) deterministic logic.
+- [x] Implement Micro-gate / Step Burst Scheduler.
+- [x] Implement Timing Looseness (Jitter).
+- [x] **Validation:** Confirm deterministic thinning and jitter lock.
 
-### Phase 7: Validation & Optimization
+### Phase 7: Proteus-Inspired Buffer Evolution
+- [ ] Implement melody-lifecycle generation logic.
+- [ ] Implement Patience / Boredom reset.
+- [ ] Implement per-loop mutation and octave shifts.
+
+### Phase 8: UI Development
+- [x] Implement `StochasticSequenceEditPage` stub (Boring List).
+- [x] Implement `StochasticConfigPage` stub (Boring List).
+- [ ] Implement final visual UI (Grid + Layer switching + PWT visualization).
+
+### Phase 9: Validation & Optimization
 - [ ] Final hardware verification (STM32 release).
 - [ ] Generator system integration (`StochasticSequenceBuilder`).
 
