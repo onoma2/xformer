@@ -223,6 +223,7 @@ public:
         case Target::StochasticPatience:        return "Patience";
         case Target::StochasticMutate:          return "Mutate";
         case Target::StochasticJump:            return "Jump";
+        case Target::StochasticReserved:        return "";
         
         
 
@@ -380,9 +381,10 @@ public:
     static bool isTuesdayTarget(Target target) {
         return target >= Target::TuesdayFirst && target <= Target::TuesdayLast;
     }
-
     static bool isStochasticTarget(Target target) {
-        return target >= Target::StochasticFirst && target <= Target::StochasticLast;
+        return target >= Target::StochasticFirst &&
+               target <= Target::StochasticLast &&
+               target != Target::StochasticReserved;
     }
 
     static bool isChaosTarget(Target target) {

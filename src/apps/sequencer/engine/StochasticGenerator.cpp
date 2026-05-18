@@ -112,12 +112,6 @@ StochasticParentEvent StochasticGenerator::generateParentEvent(const StochasticT
     int activeNotes = scale.notesPerOctave();
     event.d0.degree = absoluteDegree % activeNotes;
     event.d0.octave = absoluteDegree / activeNotes;
-
-    // Jump: probability of octave register jump inside generated pitch behavior
-    if (track.jump() > 0 && int(rng.nextRange(100)) < track.jump()) {
-        int jumpOffset = rng.nextRange(2) == 0 ? -1 : 1;
-        event.d0.octave = clamp(int(event.d0.octave) + jumpOffset, -4, 3);
-    }
     
     // Rhythm
     event.d0.rate = track.rate();

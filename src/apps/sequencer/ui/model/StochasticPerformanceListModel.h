@@ -173,7 +173,6 @@ public:
         case Density:       return Routing::Target::StochasticDensity;
         case Tilt:          return Routing::Target::StochasticTilt;
         case Burst:         return Routing::Target::StochasticBurst;
-        case Complexity:    return Routing::Target::StochasticComplexity;
         case Contour:       return Routing::Target::StochasticContour;
         case Rate:          return Routing::Target::StochasticRate;
         case Variation:     return Routing::Target::StochasticVariation;
