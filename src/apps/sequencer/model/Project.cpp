@@ -1,5 +1,6 @@
 #include "Project.h"
 #include "ProjectVersion.h"
+#include "StochasticTypes.h"
 
 Project::Project() :
     _playState(*this),
@@ -106,14 +107,24 @@ void Project::clear() {
     noteSequence(5, 0).setLastStep(15);
     noteSequence(5, 0).setGates({ 0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0 });
 
-    // Track 8: Indexed
-    track(7).setTrackMode(Track::TrackMode::Indexed);
-    auto &indexed = indexedSequence(7, 0);
+    // Track 7: Indexed
+    track(6).setTrackMode(Track::TrackMode::Indexed);
+    auto &indexed = indexedSequence(6, 0);
     indexed.setActiveLength(5);
     for (int i = 0; i < 5; ++i) {
         indexed.step(i).setNoteIndex(i * 2);
         indexed.step(i).setGateLength(IndexedSequence::gateEncodeTicks(4));
     }
+
+    // Track 8: Stochastic (Live Rhythm + Live Melody, should produce gates)
+    track(7).setTrackMode(Track::TrackMode::Stochastic);
+    auto &stoTrack = track(7).stochasticTrack();
+    stoTrack.setRhythmMode(StochasticSourceMode::Live);
+    stoTrack.setMelodyMode(StochasticSourceMode::Live);
+    stoTrack.setDensity(100);
+    stoTrack.setRest(0);
+    stoTrack.setCvUpdateMode(StochasticTrack::CvUpdateMode::Always);
+    stoTrack.setLock(false);
 
     setTempo(80.f);
     setScale(2); // 2 corresponds to Minor scale
