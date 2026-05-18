@@ -10,6 +10,7 @@ Port the Vinx fork's Stochastic track type to XFORMER, then extend the MVP with 
 - `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md` — controlling MVP spec.
 - `.tasks/stochastic-track-port/UI-DESIGN.md` — XFORMER-native UI design plan.
 - `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md` — immutable Phase 7 vocabulary and ownership contract.
+- `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md` — controlling Phase 8 V3 rebuild plan: split Rhythm/Melody `Loop`/`Live` source modes, no `New`, `Patience` as loop refresh, `Mutate` as loop-only edit, runtime Lock A/B, UI deferred to Phase 9.
 - `temp-ref/vinx-performer/src/apps/sequencer/{model,engine,ui}/Stochastic*` — Vinx Stochastic source.
 - `../others/mutable/marbles/random/output_channel.cc`
 - `../others/mutable/marbles/random/distributions.h`
@@ -856,9 +857,55 @@ Keep these only if needed for migration/debug until Phase 8 removes old UI assum
 
 ---
 
-### Phase 8: UI Layer
+### Phase 8: V3 Generator + Looper Core Rebuild
 
-**Goal:** Implement the XFORMER-native Stochastic UI from `.tasks/stochastic-track-port/UI-DESIGN.md` only after the Phase 7 dictionary and core retopology are stable. The UI must expose the reimagined event-generator model, not the current Vinx-shaped step-probability internals.
+**Goal:** Replace the current single global Dice/Realtime stochastic core with the V3 two-layer architecture documented in `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`.
+
+**Controlling plan:** `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`
+
+**Core topology:**
+- Rhythm and Melody each have independent source modes: `Loop` or `Live`.
+- No user-facing `Dice`, `Realtime`, or `New`.
+- `Patience` controls automatic refresh of Loop domains only: `0` refreshes constantly, `100` never refreshes.
+- `Mutate` edits Loop source material only. Live domains are already fresh and must not be mutated.
+- `Rest` creates rhythm-generator silence.
+- `Density` deterministically thins rhythm playback by stable priority/rank.
+- Runtime `Lock A/B` replays final evaluated output above generator, loop, patience, mutation, density, and source edits.
+
+**Primary files:**
+- `src/apps/sequencer/model/StochasticTypes.h`
+- `src/apps/sequencer/model/StochasticSequence.h`
+- `src/apps/sequencer/model/StochasticTrack.h`
+- `src/apps/sequencer/model/StochasticTrack.cpp`
+- `src/apps/sequencer/engine/StochasticGenerator.h`
+- `src/apps/sequencer/engine/StochasticGenerator.cpp`
+- `src/apps/sequencer/engine/StochasticTrackEngine.h`
+- `src/apps/sequencer/engine/StochasticTrackEngine.cpp`
+- `src/apps/sequencer/model/Routing.h`
+- `src/apps/sequencer/model/Routing.cpp`
+- `src/apps/sequencer/ui/model/StochasticPerformanceListModel.h` — temporary hardware access only
+- `src/apps/sequencer/ui/model/StochasticConfigListModel.h` — temporary hardware access only
+
+**Acceptance:**
+- `Rhythm Loop + Melody Loop`: full phrase repeats.
+- `Rhythm Loop + Melody Live`: rhythm repeats while pitch changes.
+- `Rhythm Live + Melody Loop`: rhythm changes while pitch repeats.
+- `Rhythm Live + Melody Live`: fully fresh generation.
+- `Patience` and `Mutate` affect only Loop domains.
+- `Lock A/B` captures and replays evaluated parent events plus burst child hits, without project persistence in Phase 8.
+- STM32 RAM gates remain documented after implementation.
+
+**Non-goals:**
+- No final visual UI.
+- No persistent evaluated lock banks.
+- No separate exposed rhythm/melody sizes yet.
+- No hidden mutation of Live material.
+
+---
+
+### Phase 9: UI Layer
+
+**Goal:** Implement the XFORMER-native Stochastic UI from `.tasks/stochastic-track-port/UI-DESIGN.md` only after the Phase 8 V3 generator/looper core is hardware-verified. The UI must expose the reimagined `Rhythm/Melody` `Loop/Live` source model, not the current Vinx-shaped step-probability internals.
 
 **Files:**
 - `src/apps/sequencer/ui/pages/StochasticSequenceEditPage.h/.cpp`
@@ -873,19 +920,19 @@ Keep these only if needed for migration/debug until Phase 8 removes old UI assum
 - Prefer custom visual pages over list models for degree tickets, generated pattern, burst child hits, lock buffer, and probability overview.
 - Degree-ticket visual editor sized by the active scale's `notesPerOctave()`.
 - Pitch pages must use the Phase 7 dictionary: Scale, Root, Transpose, Octave, Range, Tickets, Spread, Bias, Jump.
-- Generator pages must expose New, Mode, Complexity, Linearity, and Contour without leaking raw storage values.
+- Generator pages must expose Rhythm source, Melody source, Patience, Mutate, Complexity, Linearity, and Contour without leaking raw storage values.
 - Pattern pages must expose Size, First, Last, and Lock as stochastic pattern-buffer controls, not Performer step-loop controls.
 - Rhythm pages must expose Rate, Variation, Rest, Legato, and Slide.
 - Burst pages must make parent events vs child hits visually clear.
 - Evolution pages must expose Density, Tilt, Sleep, Patience, and Mutate with deterministic density behavior.
-- Existing Phase 6 UI stubs are acceptable only as hardware access scaffolding; final Phase 8 UI should not be a list-only workflow.
+- Existing Phase 6/8 UI stubs are acceptable only as hardware access scaffolding; final Phase 9 UI should not be a list-only workflow.
 - `StochasticTrackListModel` may exist as a fallback/settings bridge, but normal performance editing should live on visual pages.
 
 **RAM check:** UI pages are in `.bss` (Pages struct). Estimate: StochasticSequenceEditPage ≈ NoteSequenceEditPage + list model overhead ≈ similar size. Should be under existing page gate.
 
 ---
 
-### Phase 9: Validation
+### Phase 10: Validation
 
 **Goal:** Full STM32 size and hardware verification.
 
@@ -1015,13 +1062,14 @@ Bit-packing the Vinx object adds complexity for marginal gain. Compact heap/pool
 | Phase 6: Stochastic Performance Mechanics | ~3-4h |
 | Phase 7a: Immutable Dictionary of Truth | complete, documented |
 | Phase 7b: Reimagined Core Retopology | ~6-8h |
-| Phase 8: UI Layer | ~6h |
-| Phase 9: Validation | ~3h |
-| **Remaining** | **~18-21h** |
+| Phase 8: V3 Generator + Looper Core Rebuild | ~6-8h |
+| Phase 9: UI Layer | ~6h |
+| Phase 10: Validation | ~3h |
+| **Remaining** | **~15-19h** |
 
 ## Next Action
 
-**Phase 7b prep:** Design the compact parent-event and burst-child storage against `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`, then probe STM32 release sizes before replacing the current Vinx-shaped step-probability core.
+**Phase 8 prep:** Implement `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`: split Rhythm/Melody `Loop`/`Live` source modes, split source buffers, make `Patience` and `Mutate` Loop-domain-only, and add runtime Lock A/B. Defer final visual UI to Phase 9.
 
 ## Depends On
 

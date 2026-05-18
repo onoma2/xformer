@@ -32,6 +32,7 @@ public:
     void copyIndexedSequenceSteps(const IndexedSequence &sequence, const SelectedSteps &selectedSteps);
     void copyDiscreteMapSequence(const DiscreteMapSequence &sequence);
     void copyTuesdaySequence(const TuesdaySequence &sequence);
+    void copyStochasticSequence(const StochasticSequence &sequence);
     void copyPattern(int patternIndex);
     void copyUserScale(const UserScale &userScale);
 
@@ -44,6 +45,7 @@ public:
     void pasteIndexedSequenceSteps(IndexedSequence &sequence, const SelectedSteps &selectedSteps) const;
     void pasteDiscreteMapSequence(DiscreteMapSequence &sequence) const;
     void pasteTuesdaySequence(TuesdaySequence &sequence) const;
+    void pasteStochasticSequence(StochasticSequence &sequence) const;
     void pastePattern(int patternIndex) const;
     void pasteUserScale(UserScale &userScale) const;
 
@@ -56,6 +58,7 @@ public:
     bool canPasteIndexedSequenceSteps() const;
     bool canPasteDiscreteMapSequence() const;
     bool canPasteTuesdaySequence() const;
+    bool canPasteStochasticSequence() const;
     bool canPastePattern() const;
     bool canPasteUserScale() const;
 
@@ -71,6 +74,7 @@ private:
         IndexedSequenceSteps,
         DiscreteMapSequence,
         TuesdaySequence,
+        StochasticSequence,
         Pattern,
         UserScale,
     };

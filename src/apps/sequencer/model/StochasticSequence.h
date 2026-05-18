@@ -11,59 +11,76 @@
 
 #include "StochasticTypes.h"
 
-#include <array>
-#include <cstdint>
-
 class StochasticSequence {
 public:
-    StochasticSequence() { clear(); }
-    StochasticSequence(int trackIndex) : _trackIndex(trackIndex) { clear(); }
+    //----------------------------------------
+    // Properties
+    //----------------------------------------
 
+    // trackIndex
     int trackIndex() const { return _trackIndex; }
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
 
     // scale
     int scale() const { return _scale; }
     void setScale(int scale) { _scale = clamp(scale, -1, Scale::Count - 1); }
-    const Scale &selectedScale(int defaultScale) const { return Scale::get(scale() < 0 ? defaultScale : scale()); }
-    void editScale(int value, bool shift) { setScale(scale() + value); }
-    void printScale(StringBuilder &str) const { str(scale() < 0 ? "Default" : Scale::name(scale())); }
+    const Scale &selectedScale(int defaultScale) const {
+        return Scale::get(_scale != -1 ? _scale : defaultScale);
+    }
 
     // rootNote
     int rootNote() const { return _rootNote; }
     void setRootNote(int rootNote) { _rootNote = clamp(rootNote, -1, 11); }
-    int selectedRootNote(int defaultRootNote) const { return rootNote() < 0 ? defaultRootNote : rootNote(); }
-    void editRootNote(int value, bool shift) { setRootNote(rootNote() + value); }
+    int selectedRootNote(int defaultRootNote) const {
+        return _rootNote != -1 ? _rootNote : defaultRootNote;
+    }
+
+    // divisor
+    int divisor() const { return _divisor; }
+    void setDivisor(int divisor) { _divisor = ModelUtils::clampDivisor(divisor); }
+
+    // resetMeasure
+    int resetMeasure() const { return _resetMeasure; }
+    void setResetMeasure(int resetMeasure) { _resetMeasure = clamp(resetMeasure, 0, 128); }
+
+    void printDivisor(StringBuilder &str) const {
+        ModelUtils::printDivisor(str, _divisor);
+    }
+
+    void editDivisor(int value, bool shift) {
+        setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
+    }
+
+    void printResetMeasure(StringBuilder &str) const {
+        if (_resetMeasure == 0) {
+            str("Off");
+        } else {
+            str("%d", _resetMeasure);
+        }
+    }
+
+    void editResetMeasure(int value, bool shift) {
+        setResetMeasure(resetMeasure() + value);
+    }
+
+    void printScale(StringBuilder &str) const {
+        str(Scale::name(scale()));
+    }
+
+    void editScale(int value, bool shift) {
+        setScale(scale() + value);
+    }
+
     void printRootNote(StringBuilder &str) const {
-        if (rootNote() < 0) {
+        if (rootNote() == -1) {
             str("Default");
         } else {
             Types::printNote(str, rootNote());
         }
     }
 
-    // divisor
-    int divisor() const { return _divisor; }
-    void setDivisor(int divisor) { _divisor = ModelUtils::clampDivisor(divisor); }
-    void editDivisor(int value, bool shift) {
-        setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
-    }
-    void printDivisor(StringBuilder &str) const {
-        ModelUtils::printDivisor(str, divisor());
-    }
-
-    // resetMeasure
-    int resetMeasure() const { return _resetMeasure; }
-    void setResetMeasure(int resetMeasure) { _resetMeasure = clamp(resetMeasure, 0, 127); }
-    void editResetMeasure(int value, bool shift) {
-        setResetMeasure(ModelUtils::adjustedByPowerOfTwo(resetMeasure(), value, shift));
-    }
-    void printResetMeasure(StringBuilder &str) const {
-        if (resetMeasure() == 0) {
-            str("Off");
-        } else {
-            str("%d", resetMeasure());
-        }
+    void editRootNote(int value, bool shift) {
+        setRootNote(rootNote() + value);
     }
 
     // Phase 7 Pattern controls (Per-pattern metadata)
@@ -73,14 +90,14 @@ public:
     int first() const { return _first; }
     void setFirst(int first) { _first = clamp(first, 0, int(_size) - 1); }
 
-    int last() const { return _last; }
-    void setLast(int last) { _last = clamp(last, int(_first), int(_size) - 1); }
+    int last() const { return std::max(first(), int(_last)); }
+    void setLast(int last) { _last = clamp(last, first(), int(_size) - 1); }
 
-    bool patternValid() const { return _patternValid; }
-    void setPatternValid(bool valid) { _patternValid = valid; }
+    bool patternValid() const { return rhythmValid() && melodyValid(); }
+    void setPatternValid(bool valid) { setRhythmValid(valid); setMelodyValid(valid); }
 
-    uint32_t seed() const { return _seed; }
-    void setSeed(uint32_t seed) { _seed = seed; }
+    uint32_t seed() const { return rhythmSeed(); }
+    void setSeed(uint32_t seed) { setRhythmSeed(seed); }
 
     void printNote(StringBuilder &str, int note, int defaultRootNote, int defaultScale) const {
         int rootNote = selectedRootNote(defaultRootNote);
@@ -125,56 +142,86 @@ public:
     const StepStub step(int index) const { return StepStub(); }
           StepStub step(int index)       { return StepStub(); }
 
+    // Phase 8.2 Split Source Buffers
+    const std::array<StochasticSourceEvent, CONFIG_STEP_COUNT> &events() const { return _events; }
+          std::array<StochasticSourceEvent, CONFIG_STEP_COUNT> &events()       { return _events; }
+
+    bool rhythmValid() const { return _rhythmValid; }
+    void setRhythmValid(bool valid) { _rhythmValid = valid; }
+
+    bool melodyValid() const { return _melodyValid; }
+    void setMelodyValid(bool valid) { _melodyValid = valid; }
+
+    uint32_t rhythmSeed() const { return _rhythmSeed; }
+    void setRhythmSeed(uint32_t seed) { _rhythmSeed = seed; }
+
+    uint32_t melodySeed() const { return _melodySeed; }
+    void setMelodySeed(uint32_t seed) { _melodySeed = seed; }
+
     void clear() {
         _scale = -1;
         _rootNote = -1;
-        _reserved[0] = 0; // was playMode
-        _reserved[1] = 0; // was runMode
         _divisor = 12;
         _resetMeasure = 0;
         
         _size = 16;
         _first = 0;
         _last = 15;
-        _patternValid = false;
-        _seed = 0;
+
+        _rhythmValid = false;
+        _melodyValid = false;
+        _rhythmSeed = 0;
+        _melodySeed = 0;
+
+        for (auto &event : _events) event.clear();
     }
 
     void write(VersionedSerializedWriter &writer) const {
         writer.write(_scale);
         writer.write(_rootNote);
-        writer.write(_reserved[0]);
-        writer.write(_reserved[1]);
         writer.write(_divisor);
         writer.write(_resetMeasure);
 
         writer.write(_size);
         writer.write(_first);
         writer.write(_last);
-        writer.write(_patternValid);
-        writer.write(_seed);
+
+        writer.write(_rhythmValid);
+        writer.write(_melodyValid);
+        writer.write(_rhythmSeed);
+        writer.write(_melodySeed);
+
+        for (const auto &event : _events) {
+            writer.write(event.d0.raw);
+            writer.write(event.d1.raw);
+        }
     }
 
     void read(VersionedSerializedReader &reader) {
         reader.read(_scale);
         reader.read(_rootNote);
-        reader.read(_reserved[0]);
-        reader.read(_reserved[1]);
         reader.read(_divisor);
         reader.read(_resetMeasure);
 
         reader.read(_size);
         reader.read(_first);
         reader.read(_last);
-        reader.read(_patternValid);
-        reader.read(_seed);
+
+        reader.read(_rhythmValid);
+        reader.read(_melodyValid);
+        reader.read(_rhythmSeed);
+        reader.read(_melodySeed);
+
+        for (auto &event : _events) {
+            reader.read(event.d0.raw);
+            reader.read(event.d1.raw);
+        }
     }
 
 private:
     int8_t _trackIndex = -1;
     int8_t _scale = -1;
     int8_t _rootNote = -1;
-    uint8_t _reserved[2]; // was playMode, runMode
     uint8_t _divisor = 12;
     uint8_t _resetMeasure = 0;
 
@@ -182,8 +229,15 @@ private:
     uint8_t _size;
     uint8_t _first;
     uint8_t _last;
-    bool _patternValid;
-    uint32_t _seed;
+
+    // Phase 8.2 Split Source Buffers
+    std::array<StochasticSourceEvent, CONFIG_STEP_COUNT> _events;
+    bool _rhythmValid;
+    bool _melodyValid;
+    uint32_t _rhythmSeed;
+    uint32_t _melodySeed;
 
     friend class StochasticTrack;
 };
+
+static_assert(sizeof(StochasticSequence) <= 544, "StochasticSequence too large");

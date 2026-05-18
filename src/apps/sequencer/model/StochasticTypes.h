@@ -6,7 +6,37 @@
 
 enum class StochasticMode : uint8_t { Dice, Realtime, Last };
 
+enum class StochasticSourceMode : uint8_t {
+    Loop,
+    Live,
+    Last
+};
+
 enum class StochasticBurstPitch : uint8_t { Parent, Generate, Last };
+
+struct StochasticSourceEvent {
+    union {
+        uint32_t raw;
+        BitField<uint32_t, 0, 8> rate;
+        BitField<uint32_t, 8, 8> length;
+        BitField<uint32_t, 16, 8> densityRank;
+        BitField<uint32_t, 24, 8> childFirst;
+    } d0;
+    union {
+        uint32_t raw;
+        BitField<uint32_t, 0, 8> childCount;
+        BitField<uint32_t, 8, 1> rest;
+        BitField<uint32_t, 9, 1> legato;
+        BitField<uint32_t, 10, 1> slide;
+        BitField<uint32_t, 11, 1> accent;
+        BitField<uint32_t, 12, 1> rhythmValid;
+        BitField<uint32_t, 13, 7> degree;
+        BitField<uint32_t, 20, 5> octave;
+        BitField<uint32_t, 25, 1> melodyValid;
+    } d1;
+
+    void clear() { d0.raw = 0; d1.raw = 0; }
+};
 
 struct StochasticChildHit {
     // 32 bits (4 bytes)

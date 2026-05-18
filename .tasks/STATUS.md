@@ -10,14 +10,14 @@ _Updated: 2026-05-18_
 
 ---
 
-## 🟡 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
+## 🔴 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Phase 7b complete. Core architecture rebuilt around Track-owned generator and shared pattern buffer. Implemented MeloDICER-style duration variation and dynamic Burst logic. RAM budget restored (free SRAM margin ~11.8 KB).
-**Next action:** Phase 7c: Implement melody-lifecycle refinements (Complexity/Contour evolution).
+**Where I stopped:** Completed Phase 8.1 (Source Mode Topology) and 8.2 (Split Source Buffers). 17 patterns of 8-byte packed source material fit within 9.5KB RAM budget. Generator/Engine refactored to use split source modes.
+**Next action:** Implement Phase 8.3 (Generator Rebuild) and 8.4 (Engine Rebuild) to support separate rhythm/melody evolution and Patience/Mutate logic.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic
-**Reference:** `.tasks/stochastic-track-port/TASK.md`, `.tasks/stochastic-track-port/UI-DESIGN.md`, `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md`
+**Reference:** `.tasks/stochastic-track-port/TASK.md`, `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`, `.tasks/stochastic-track-port/UI-DESIGN.md`, `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md`
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.

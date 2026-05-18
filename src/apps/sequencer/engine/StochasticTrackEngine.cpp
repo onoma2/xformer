@@ -14,7 +14,6 @@
 #include <algorithm>
 
 static uint32_t getDurationMultiplier(int rate) {
-    // Maps 0..100 to discrete multipliers (1 bar down to 1/128th)
     if (rate < 10) return 192 * 4;  // 1 Bar
     if (rate < 20) return 192 * 2;  // 1/2
     if (rate < 30) return 192;      // 1/4
@@ -108,7 +107,6 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
         }
     }
 
-    // Process Queues
     while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
         _gateOutput = _gateQueue.front().gate;
         _gateQueue.pop();
@@ -134,7 +132,6 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     const auto &scale = sequence.selectedScale(_model.project().scale());
     int rootNote = sequence.selectedRootNote(_model.project().rootNote());
 
-    // 1. Read Index (Rotate) - Must be computed before Lock check
     int readIndex = _patternIndex;
     if (track.rotate() != 0) {
         int windowSize = sequence.last() - sequence.first() + 1;
@@ -143,8 +140,6 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         readIndex = sequence.first() + offset;
     }
 
-    // 2. Evaluated Lock check (Primary Control Flow)
-    // Replay immediately without consuming RNG or generating source if locked and valid for the rotated slot.
     bool locked = track.lock() && _lockedParents[readIndex].valid;
     
     float finalCv = 0.f;
@@ -162,7 +157,6 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         isSlide = _lockedParents[readIndex].slide;
         isAccent = _lockedParents[readIndex].accent;
 
-        // Schedule Replay (Parent)
         if (!isRest) {
             _cvQueue.push({ tick, finalCv, isSlide });
             
@@ -171,7 +165,6 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
             uint32_t gateLen = (durationTicks * 50) / 100;
             if (hasChildren) {
-                // Shorten parent gate to ensure child retriggers are audible
                 gateLen = std::min(gateLen, uint32_t(10));
             }
 
@@ -184,12 +177,10 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _activity = false;
         }
 
-        // Replay Children
         for (int i = 0; i < 4; ++i) {
             auto &child = _lockedParents[readIndex].children[i];
             if (child.valid) {
                 uint32_t childTick = tick + child.tickOffset;
-                // Force a brief low before each child high to ensure audibility, safe from underflow
                 uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
                 _gateQueue.push({ lowTick, false });
                 _cvQueue.push({ childTick, child.cv, child.slide });
@@ -198,55 +189,49 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             }
         }
     } else {
-        // 3. Dice Mode: Generate/Verify shared buffer (Only if not locked)
-        int patternIndex = _model.project().selectedPatternIndex();
-        if (track.mode() == StochasticMode::Dice) {
-            if (!sequence.patternValid() || track.activePatternIndex() != patternIndex || track.activeSeed() != sequence.seed()) {
-                StochasticGenerator::generatePattern(sequence, track, scale, rootNote, sequence.seed());
-                track.setActivePatternIndex(patternIndex);
-                track.setActiveSeed(sequence.seed());
-            }
+        if (track.rhythmMode() == StochasticSourceMode::Loop && !sequence.rhythmValid()) {
+            StochasticGenerator::generateRhythm(sequence, track, _rng.next());
+        }
+        if (track.melodyMode() == StochasticSourceMode::Loop && !sequence.melodyValid()) {
+            StochasticGenerator::generateMelody(sequence, track, scale, rootNote, _rng.next());
         }
 
-        // 4. Fetch Event
-        StochasticParentEvent event;
+        const auto &event = sequence.events()[readIndex];
 
-        StochasticChildHit evaluationChildren[4];
-        bool useSharedChildren = true;
-
-        if (track.mode() == StochasticMode::Realtime) {
-            int lastDegree = -1; 
-            event = StochasticGenerator::generateParentEvent(track, scale, rootNote, lastDegree, _rng);
-            
-            useSharedChildren = false;
-            int count = event.d1.childCount;
-            int childLast = event.d0.degree;
-            int burstRate = track.burstRate();
-            for (int c = 0; c < count; ++c) {
-                auto &child = evaluationChildren[c];
-                child.clear();
-                if (track.burstPitch() == StochasticBurstPitch::Parent) {
-                    child.degree = event.d0.degree;
-                    child.octave = event.d0.octave;
-                } else {
-                    int absoluteDegree = StochasticGenerator::generateDegree(track, scale, childLast, _rng);
-                    int activeNotes = scale.notesPerOctave();
-                    child.degree = absoluteDegree % activeNotes;
-                    child.octave = absoluteDegree / activeNotes;
-                }
-                int spacing = 255 / (count + 1);
-                if (burstRate > 0) spacing = std::max(8, spacing - (spacing * burstRate) / 100);
-                child.offset = (c + 1) * spacing;
-                child.length = 128;
-                child.gate = true;
-            }
+        StochasticSourceEvent evaluationEvent;
+        if (track.rhythmMode() == StochasticSourceMode::Live) {
+            auto rhythm = StochasticGenerator::generateRhythmEvent(track, _rng);
+            evaluationEvent.d0 = rhythm.d0;
+            evaluationEvent.d1.childCount = rhythm.d1.childCount;
+            evaluationEvent.d1.rest = rhythm.d1.rest;
+            evaluationEvent.d1.legato = rhythm.d1.legato;
+            evaluationEvent.d1.slide = rhythm.d1.slide;
+            evaluationEvent.d1.accent = rhythm.d1.accent;
+            evaluationEvent.d1.rhythmValid = rhythm.d1.rhythmValid;
         } else {
-            event = track.events()[readIndex];
+            evaluationEvent.d0 = event.d0;
+            evaluationEvent.d1.childCount = event.d1.childCount;
+            evaluationEvent.d1.rest = event.d1.rest;
+            evaluationEvent.d1.legato = event.d1.legato;
+            evaluationEvent.d1.slide = event.d1.slide;
+            evaluationEvent.d1.accent = event.d1.accent;
+            evaluationEvent.d1.rhythmValid = event.d1.rhythmValid;
+        }
+
+        if (track.melodyMode() == StochasticSourceMode::Live) {
+            int lastDegree = -1;
+            auto melody = StochasticGenerator::generateMelodyEvent(track, scale, rootNote, lastDegree, _rng);
+            evaluationEvent.d1.degree = melody.d1.degree;
+            evaluationEvent.d1.octave = melody.d1.octave;
+            evaluationEvent.d1.melodyValid = melody.d1.melodyValid;
+        } else {
+            evaluationEvent.d1.degree = event.d1.degree;
+            evaluationEvent.d1.octave = event.d1.octave;
+            evaluationEvent.d1.melodyValid = event.d1.melodyValid;
         }
 
         int activeNotes = scale.notesPerOctave();
         
-        // Rhythm: Rate / Variation
         uint32_t mult = getDurationMultiplier(track.rate());
         if (track.variation() != 0) {
             int variationRoll = _rng.nextRange(100);
@@ -260,20 +245,19 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
         durationTicks = mult;
 
-        // Evaluate Jump: probability of octave register jump inside generated pitch behavior
         int jumpOffset = 0;
         if (track.jump() > 0 && int(_rng.nextRange(100)) < track.jump()) {
             jumpOffset = _rng.nextRange(2) == 0 ? -1 : 1;
         }
 
-        int note = int(event.d0.degree) + (int(event.d0.octave) + jumpOffset + track.octave()) * activeNotes + track.transpose();
+        int note = int(evaluationEvent.d1.degree) + (int(evaluationEvent.d1.octave) + jumpOffset + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
         
-        bool densityPass = (uint32_t(event.d1.densityRank) * 100) < (uint32_t(track.density()) * sequence.size());
-        isRest = bool(event.d1.rest) || !densityPass || !event.d1.valid;
-        isLegato = bool(event.d1.legato);
-        isSlide = bool(event.d1.slide);
-        isAccent = bool(event.d1.accent);
+        bool densityPass = (uint32_t(evaluationEvent.d0.densityRank) * 100) < (uint32_t(track.density()) * sequence.size());
+        isRest = bool(evaluationEvent.d1.rest) || !densityPass || !evaluationEvent.d1.rhythmValid || !evaluationEvent.d1.melodyValid;
+        isLegato = bool(evaluationEvent.d1.legato);
+        isSlide = bool(evaluationEvent.d1.slide);
+        isAccent = bool(evaluationEvent.d1.accent);
 
         if (_lockedParents) {
             _lockedParents[readIndex].valid = true; 
@@ -290,41 +274,13 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _cvQueue.push({ tick, finalCv, isSlide });
             
             uint32_t gateLen = (durationTicks * 50) / 100;
-            if (event.d1.childCount > 0) {
+            if (evaluationEvent.d1.childCount > 0) {
                 gateLen = std::min(gateLen, uint32_t(10));
             }
 
             _gateQueue.push({ tick, true });
             if (!isLegato) _gateQueue.push({ tick + gateLen, false });
             _activity = true;
-
-            // Schedule & Lock Children
-            for (int c = 0; c < int(event.d1.childCount); ++c) {
-                const auto &child = useSharedChildren ? track.children()[event.d1.childFirst + c] : evaluationChildren[c];
-                uint32_t childOffset = (durationTicks * child.offset) / 256;
-                uint32_t childTick = tick + childOffset;
-                uint32_t childGateTicks = (durationTicks * child.length) / (256 * (int(event.d1.childCount) + 1));
-                
-                int childNote = int(child.degree) + (int(child.octave) + track.octave()) * activeNotes + track.transpose();
-                float childCv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
-
-                // Child CV update is unconditional on gated hits
-                uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
-                _gateQueue.push({ lowTick, false }); // Force low
-                _cvQueue.push({ childTick, childCv, bool(child.slide) });
-                _gateQueue.push({ childTick, true });
-                _gateQueue.push({ childTick + childGateTicks, false });
-
-                if (_lockedParents) {
-                    auto &lc = _lockedParents[readIndex].children[c];
-                    lc.valid = true;
-                    lc.cv = childCv;
-                    lc.tickOffset = childOffset;
-                    lc.gateTicks = childGateTicks;
-                    lc.slide = bool(child.slide);
-                    lc.accent = bool(child.accent);
-                }
-            }
         } else {
             _gateQueue.push({ tick, false });
             if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
@@ -332,7 +288,6 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
     }
 
-    // 5. Pattern Advancement
     _patternIndex++;
     if (_patternIndex > sequence.last()) {
         _patternIndex = sequence.first();
@@ -344,17 +299,14 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             if (track.mutate() > 0 && int(_rng.nextRange(100)) < track.mutate()) {
                 StochasticGenerator::mutateOne(sequence, track, scale, rootNote, _rng);
             }
-            // Patience / Boredom
             if (track.patience() < 100) {
                 _boredomCounter++;
-                uint32_t threshold = uint32_t(track.patience()) * 20; // Range ~0..2000 loops
-
+                uint32_t threshold = uint32_t(track.patience()) * 20;
                 if (_boredomCounter > threshold) {
-                    // Full re-roll
-                    sequence.setPatternValid(false);
+                    sequence.setRhythmValid(false);
+                    sequence.setMelodyValid(false);
                     _boredomCounter = 0;
                 } else if (_boredomCounter > (threshold * 3) / 4) {
-                    // Warning phase: high mutation rate
                     if (int(_rng.nextRange(100)) < 25) {
                         StochasticGenerator::mutateOne(sequence, track, scale, rootNote, _rng);
                     }

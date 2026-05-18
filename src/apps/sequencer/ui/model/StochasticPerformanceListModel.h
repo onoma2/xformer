@@ -8,7 +8,8 @@
 class StochasticPerformanceListModel : public RoutableListModel {
 public:
     enum Item {
-        Mode,
+        RhythmMode,
+        MelodyMode,
         Complexity,
         Contour,
         Linearity,
@@ -60,7 +61,8 @@ public:
         auto &sequence = _track->sequence(_project->selectedPatternIndex());
         if (column == 0) {
             switch (Item(row)) {
-            case Mode:          str("Mode"); break;
+            case RhythmMode:    str("Rhythm"); break;
+            case MelodyMode:    str("Melody"); break;
             case Complexity:    str("Complexity"); break;
             case Contour:       str("Contour"); break;
             case Linearity:     str("Linearity"); break;
@@ -94,7 +96,8 @@ public:
             }
         } else if (column == 1) {
             switch (Item(row)) {
-            case Mode:          str(_track->mode() == StochasticMode::Dice ? "Dice" : "Realtime"); break;
+            case RhythmMode:    str(_track->rhythmMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
+            case MelodyMode:    str(_track->melodyMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
             case Complexity:    str("%d%%", _track->complexity()); break;
             case Contour:       str("%+d%%", _track->contour()); break;
             case Linearity:     _track->printLinearity(str); break;
@@ -133,7 +136,8 @@ public:
         if (column == 1) {
             auto &sequence = _track->sequence(_project->selectedPatternIndex());
             switch (Item(row)) {
-            case Mode:          _track->setMode(ModelUtils::adjustedEnum(_track->mode(), value)); break;
+            case RhythmMode:    _track->setRhythmMode(ModelUtils::adjustedEnum(_track->rhythmMode(), value)); break;
+            case MelodyMode:    _track->setMelodyMode(ModelUtils::adjustedEnum(_track->melodyMode(), value)); break;
             case Complexity:    _track->setComplexity(_track->complexity() + value); break;
             case Contour:       _track->setContour(_track->contour() + value); break;
             case Linearity:     _track->editLinearity(value, shift); break;

@@ -14,11 +14,7 @@ public:
 
     using StochasticSequenceArray = std::array<StochasticSequence, CONFIG_PATTERN_COUNT + CONFIG_SNAPSHOT_COUNT>;
 
-    enum class MarblesMode : uint8_t {
-        Off,
-        On,
-        Last
-    };
+    // FillMode
 
     enum class FillMode : uint8_t {
         None,
@@ -28,9 +24,38 @@ public:
         Last
     };
 
+    static const char *fillModeName(FillMode fillMode) {
+        switch (fillMode) {
+        case FillMode::None:        return "None";
+        case FillMode::Gates:       return "Gates";
+        case FillMode::NextPattern: return "Next Pattern";
+        case FillMode::Condition:   return "Condition";
+        case FillMode::Last:        break;
+        }
+        return nullptr;
+    }
+
+    // CvUpdateMode
+
     enum class CvUpdateMode : uint8_t {
         Gate,
         Always,
+        Last
+    };
+
+    static const char *cvUpdateModeName(CvUpdateMode mode) {
+        switch (mode) {
+        case CvUpdateMode::Gate:    return "Gate";
+        case CvUpdateMode::Always:  return "Always";
+        case CvUpdateMode::Last:    break;
+        }
+        return nullptr;
+    }
+
+    // MarblesMode
+    enum class MarblesMode : uint8_t {
+        Off,
+        On,
         Last
     };
 
@@ -38,210 +63,37 @@ public:
     // Properties
     //----------------------------------------
 
-    // degreeTickets
-    int degreeTicket(int index) const { return _degreeTickets[index]; }
-    void setDegreeTicket(int index, int tickets) {
-        _degreeTickets[index] = clamp(tickets, -1, 127);
-    }
+    // Phase 8.1 Source Modes
+    StochasticSourceMode rhythmMode() const { return _rhythmMode; }
+    void setRhythmMode(StochasticSourceMode mode) { _rhythmMode = ModelUtils::clampedEnum(mode); }
 
-    // linearity
-    int linearity() const { return _linearity; }
-    void setLinearity(int linearity) {
-        _linearity = clamp(linearity, 0, 100);
-    }
-
-    // degreeRotation
-    int degreeRotation() const { return _degreeRotation; }
-    void setDegreeRotation(int rotation) {
-        _degreeRotation = clamp(rotation, -CONFIG_USER_SCALE_SIZE, CONFIG_USER_SCALE_SIZE);
-    }
-
-    // maskRotation
-    int maskRotation() const { return _maskRotation; }
-    void setMaskRotation(int rotation) {
-        _maskRotation = clamp(rotation, -CONFIG_USER_SCALE_SIZE, CONFIG_USER_SCALE_SIZE);
-    }
-
-    // lock
-    bool lock() const { return _lock; }
-    void setLock(bool lock) {
-        _lock = lock;
-    }
-
-    // fillMuted
-    bool fillMuted() const { return _fillMuted; }
-    void setFillMuted(bool fillMuted) {
-        _fillMuted = fillMuted;
-    }
-
-    // loopFirst
-    int loopFirst() const { return _loopFirst; }
-    void setLoopFirst(int loopFirst) {
-        _loopFirst = clamp(loopFirst, 0, CONFIG_STEP_COUNT - 1);
-    }
-
-    // loopLast
-    int loopLast() const { return std::max(loopFirst(), int(_loopLast)); }
-    void setLoopLast(int loopLast) {
-        _loopLast = clamp(loopLast, loopFirst(), CONFIG_STEP_COUNT - 1);
-    }
-
-    // accentProb
-    int accentProb() const { return _accentProb; }
-    void setAccentProb(int accentProb) {
-        _accentProb = clamp(accentProb, 0, 100);
-    }
-
-    // legatoProb
-    int legatoProb() const { return _legatoProb; }
-    void setLegatoProb(int legatoProb) {
-        _legatoProb = clamp(legatoProb, 0, 100);
-    }
-
-    // marblesMode
-    MarblesMode marblesMode() const { return _marblesMode; }
-    void setMarblesMode(MarblesMode mode) {
-        _marblesMode = ModelUtils::clampedEnum(mode);
-    }
-
-    // marblesSpread
-    int marblesSpread() const { return _marblesSpread; }
-    void setMarblesSpread(int spread) {
-        _marblesSpread = clamp(spread, 0, 100);
-    }
-
-    // marblesBias
-    int marblesBias() const { return _marblesBias; }
-    void setMarblesBias(int bias) {
-        _marblesBias = clamp(bias, 0, 100);
-    }
-
-    // marblesSteps
-    int marblesSteps() const { return _marblesSteps; }
-    void setMarblesSteps(int steps) {
-        _marblesSteps = clamp(steps, 0, 100);
-    }
-
-    // density
-    int density() const { return _density.get(isRouted(Routing::Target::StochasticDensity)); }
-    void setDensity(int density, bool routed = false) {
-        _density.set(clamp(density, 0, 100), routed);
-    }
-
-    // tilt
-    int tilt() const { return _tilt.get(isRouted(Routing::Target::StochasticTilt)); }
-    void setTilt(int tilt, bool routed = false) {
-        _tilt.set(clamp(tilt, -100, 100), routed);
-    }
-
-    // burst
-    int burst() const { return _burst.get(isRouted(Routing::Target::StochasticBurst)); }
-    void setBurst(int burst, bool routed = false) {
-        _burst.set(clamp(burst, 0, 100), routed);
-    }
-
-    // minDegree
-    int minDegree() const { return _minDegree; }
-    void setMinDegree(int degree) {
-        _minDegree = clamp(degree, 0, 127);
-    }
-
-    // maxDegree
-    int maxDegree() const { return std::max(minDegree(), int(_maxDegree)); }
-    void setMaxDegree(int degree) {
-        _maxDegree = clamp(degree, minDegree(), 127);
-    }
-
-    // slideTime
-    int slideTime() const { return _slideTime.get(isRouted(Routing::Target::SlideTime)); }
-    void setSlideTime(int slideTime, bool routed = false) {
-        _slideTime.set(clamp(slideTime, 0, 100), routed);
-    }
-
-    // octave
-    int octave() const { return _octave.get(isRouted(Routing::Target::Octave)); }
-    void setOctave(int octave, bool routed = false) {
-        _octave.set(clamp(octave, -10, 10), routed);
-    }
-
-    // transpose
-    int transpose() const { return _transpose.get(isRouted(Routing::Target::Transpose)); }
-    void setTranspose(int transpose, bool routed = false) {
-        _transpose.set(clamp(transpose, -100, 100), routed);
-    }
-
-    // rotate
-    int rotate() const { return _rotate.get(isRouted(Routing::Target::Rotate)); }
-    void setRotate(int rotate, bool routed = false) {
-        _rotate.set(clamp(rotate, -CONFIG_STEP_COUNT, CONFIG_STEP_COUNT), routed);
-    }
-
-    // fillMode
-    FillMode fillMode() const { return _fillMode; }
-    void setFillMode(FillMode fillMode) {
-        _fillMode = ModelUtils::clampedEnum(fillMode);
-    }
-
-    // cvUpdateMode
-    CvUpdateMode cvUpdateMode() const { return _cvUpdateMode; }
-    void setCvUpdateMode(CvUpdateMode cvUpdateMode) {
-        _cvUpdateMode = ModelUtils::clampedEnum(cvUpdateMode);
-    }
-
-    // Biases
-    int gateBias() const { return _gateBias.get(isRouted(Routing::Target::GateProbabilityBias)); }
-    void setGateBias(int gateBias, bool routed = false) {
-        _gateBias.set(clamp(gateBias, -100, 100), routed);
-    }
-
-    int retriggerBias() const { return _retriggerBias.get(isRouted(Routing::Target::RetriggerProbabilityBias)); }
-    void setRetriggerBias(int retriggerBias, bool routed = false) {
-        _retriggerBias.set(clamp(retriggerBias, -100, 100), routed);
-    }
-
-    int lengthBias() const { return _lengthBias.get(isRouted(Routing::Target::LengthBias)); }
-    void setLengthBias(int lengthBias, bool routed = false) {
-        _lengthBias.set(clamp(lengthBias, -100, 100), routed);
-    }
-
-    int noteBias() const { return _noteBias.get(isRouted(Routing::Target::NoteProbabilityBias)); }
-    void setNoteBias(int noteBias, bool routed = false) {
-        _noteBias.set(clamp(noteBias, -100, 100), routed);
-    }
+    StochasticSourceMode melodyMode() const { return _melodyMode; }
+    void setMelodyMode(StochasticSourceMode mode) { _melodyMode = ModelUtils::clampedEnum(mode); }
 
     // Phase 7b Generator controls
     StochasticMode mode() const { return _mode; }
     void setMode(StochasticMode mode) { _mode = ModelUtils::clampedEnum(mode); }
 
     int complexity() const { return _complexity.get(isRouted(Routing::Target::StochasticComplexity)); }
-    void setComplexity(int complexity, bool routed = false) {
-        _complexity.set(clamp(complexity, 0, 100), routed);
-    }
+    void setComplexity(int complexity, bool routed = false) { _complexity.set(clamp(complexity, 0, 100), routed); }
 
     int contour() const { return _contour.get(isRouted(Routing::Target::StochasticContour)); }
-    void setContour(int contour, bool routed = false) {
-        _contour.set(clamp(contour, -100, 100), routed);
-    }
+    void setContour(int contour, bool routed = false) { _contour.set(clamp(contour, -100, 100), routed); }
+
+    int linearity() const { return _linearity; }
+    void setLinearity(int linearity) { _linearity = clamp(linearity, 0, 100); }
 
     int rate() const { return _rate.get(isRouted(Routing::Target::StochasticRate)); }
-    void setRate(int rate, bool routed = false) {
-        _rate.set(clamp(rate, 0, 100), routed);
-    }
+    void setRate(int rate, bool routed = false) { _rate.set(clamp(rate, 1, 400), routed); }
 
     int variation() const { return _variation.get(isRouted(Routing::Target::StochasticVariation)); }
-    void setVariation(int variation, bool routed = false) {
-        _variation.set(clamp(variation, -100, 100), routed);
-    }
+    void setVariation(int variation, bool routed = false) { _variation.set(clamp(variation, -100, 100), routed); }
 
     int rest() const { return _rest.get(isRouted(Routing::Target::StochasticRest)); }
-    void setRest(int rest, bool routed = false) {
-        _rest.set(clamp(rest, 0, 100), routed);
-    }
+    void setRest(int rest, bool routed = false) { _rest.set(clamp(rest, 0, 100), routed); }
 
     int slide() const { return _slide.get(isRouted(Routing::Target::StochasticSlide)); }
-    void setSlide(int slide, bool routed = false) {
-        _slide.set(clamp(slide, 0, 100), routed);
-    }
+    void setSlide(int slide, bool routed = false) { _slide.set(clamp(slide, 0, 100), routed); }
 
     int burstRate() const { return _burstRate; }
     void setBurstRate(int rate) { _burstRate = clamp(rate, 0, 100); }
@@ -253,92 +105,166 @@ public:
     void setBurstPitch(StochasticBurstPitch pitch) { _burstPitch = ModelUtils::clampedEnum(pitch); }
 
     int sleep() const { return _sleep.get(isRouted(Routing::Target::StochasticSleep)); }
-    void setSleep(int sleep, bool routed = false) {
-        _sleep.set(clamp(sleep, 0, 100), routed);
-    }
+    void setSleep(int sleep, bool routed = false) { _sleep.set(clamp(sleep, 0, 100), routed); }
 
     int patience() const { return _patience.get(isRouted(Routing::Target::StochasticPatience)); }
-    void setPatience(int patience, bool routed = false) {
-        _patience.set(clamp(patience, 0, 100), routed);
-    }
+    void setPatience(int patience, bool routed = false) { _patience.set(clamp(patience, 0, 100), routed); }
 
     int mutate() const { return _mutate.get(isRouted(Routing::Target::StochasticMutate)); }
-    void setMutate(int mutate, bool routed = false) {
-        _mutate.set(clamp(mutate, 0, 100), routed);
-    }
+    void setMutate(int mutate, bool routed = false) { _mutate.set(clamp(mutate, 0, 100), routed); }
 
     int jump() const { return _jump.get(isRouted(Routing::Target::StochasticJump)); }
-    void setJump(int jump, bool routed = false) {
-        _jump.set(clamp(jump, 0, 100), routed);
-    }
+    void setJump(int jump, bool routed = false) { _jump.set(clamp(jump, 0, 100), routed); }
 
     int range() const { return _range; }
     void setRange(int range) { _range = clamp(range, 1, 4); }
 
-    // UI methods
-    void printDensity(StringBuilder &str) const { str("%d%%", density()); }
-    void editDensity(int value, bool shift) { setDensity(ModelUtils::adjustedByStep(density(), value, 1, !shift)); }
+    // degreeTickets
+    int degreeTicket(int degree) const { return _degreeTickets[degree]; }
+    void setDegreeTicket(int degree, int tickets) { _degreeTickets[degree] = clamp(tickets, 0, 100); }
 
-    void printTilt(StringBuilder &str) const { str("%+d%%", tilt()); }
-    void editTilt(int value, bool shift) { setTilt(ModelUtils::adjustedByStep(tilt(), value, 1, !shift)); }
+    // degreeRotation
+    int degreeRotation() const { return _degreeRotation; }
+    void setDegreeRotation(int rotation) { _degreeRotation = clamp(rotation, -12, 12); }
 
-    void printBurst(StringBuilder &str) const { str("%d%%", burst()); }
-    void editBurst(int value, bool shift) { setBurst(ModelUtils::adjustedByStep(burst(), value, 1, !shift)); }
+    // maskRotation
+    int maskRotation() const { return _maskRotation; }
+    void setMaskRotation(int rotation) { _maskRotation = clamp(rotation, -12, 12); }
 
-    void printRotate(StringBuilder &str) const { str("%d", rotate()); }
-    void editRotate(int value, bool shift) { setRotate(ModelUtils::adjustedByStep(rotate(), value, 1, !shift)); }
+    // lock
+    bool lock() const { return _lock; }
+    void setLock(bool lock) { _lock = lock; }
 
-    void printLock(StringBuilder &str) const { str(lock() ? "On" : "Off"); }
-    void editLock(int value, bool shift) { setLock(value > 0); }
+    // fillMuted
+    bool fillMuted() const { return _fillMuted; }
+    void setFillMuted(bool fillMuted) { _fillMuted = fillMuted; }
 
-    void printLoopFirst(StringBuilder &str) const { str("%d", loopFirst() + 1); }
-    void editLoopFirst(int value, bool shift) { setLoopFirst(loopFirst() + value); }
+    // loopFirst
+    int loopFirst() const { return _loopFirst; }
+    void setLoopFirst(int first) { _loopFirst = clamp(first, 0, CONFIG_STEP_COUNT - 1); }
 
-    void printLoopLast(StringBuilder &str) const { str("%d", loopLast() + 1); }
-    void editLoopLast(int value, bool shift) { setLoopLast(loopLast() + value); }
+    // loopLast
+    int loopLast() const { return _loopLast; }
+    void setLoopLast(int last) { _loopLast = clamp(last, 0, CONFIG_STEP_COUNT - 1); }
 
-    void printCvUpdateMode(StringBuilder &str) const {
-        switch (cvUpdateMode()) {
-        case CvUpdateMode::Gate:   str("Gate"); break;
-        case CvUpdateMode::Always: str("Always"); break;
-        case CvUpdateMode::Last:   break;
-        }
-    }
-    void editCvUpdateMode(int value, bool shift) { setCvUpdateMode(ModelUtils::adjustedEnum(cvUpdateMode(), value)); }
+    // accentProb
+    int accentProb() const { return _accentProb; }
+    void setAccentProb(int prob) { _accentProb = clamp(prob, 0, 100); }
 
-    void printSlideTime(StringBuilder &str) const { str("%d", slideTime()); }
-    void editSlideTime(int value, bool shift) { setSlideTime(ModelUtils::adjustedByStep(slideTime(), value, 1, !shift)); }
+    // legatoProb
+    int legatoProb() const { return _legatoProb; }
+    void setLegatoProb(int prob) { _legatoProb = clamp(prob, 0, 100); }
 
-    void printOctave(StringBuilder &str) const { str("%+d", octave()); }
-    void editOctave(int value, bool shift) { setOctave(octave() + value); }
+    // marblesMode
+    MarblesMode marblesMode() const { return _marblesMode; }
+    void setMarblesMode(MarblesMode mode) { _marblesMode = ModelUtils::clampedEnum(mode); }
 
-    void printTranspose(StringBuilder &str) const { str("%+d", transpose()); }
-    void editTranspose(int value, bool shift) { setTranspose(transpose() + value); }
+    // marblesSpread
+    int marblesSpread() const { return _marblesSpread; }
+    void setMarblesSpread(int spread) { _marblesSpread = clamp(spread, 0, 100); }
 
-    void printScale(StringBuilder &str, int defaultScale) const { str("Default"); }
-    void editScale(int value, bool shift) { }
+    // marblesBias
+    int marblesBias() const { return _marblesBias; }
+    void setMarblesBias(int bias) { _marblesBias = clamp(bias, 0, 100); }
 
-    void printRootNote(StringBuilder &str, int defaultRootNote) const { str("Default"); }
-    void editRootNote(int value, bool shift) { }
+    // marblesSteps
+    int marblesSteps() const { return _marblesSteps; }
+    void setMarblesSteps(int steps) { _marblesSteps = clamp(steps, 1, 100); }
 
-    void printDivisor(StringBuilder &str) const { str("N/A"); }
-    void editDivisor(int value, bool shift) { }
+    // density
+    int density() const { return _density.get(isRouted(Routing::Target::StochasticDensity)); }
+    void setDensity(int density, bool routed = false) { _density.set(clamp(density, 0, 100), routed); }
 
-    void printRunMode(StringBuilder &str) const { str("N/A"); }
-    void editRunMode(int value, bool shift) { }
+    // tilt
+    int tilt() const { return _tilt.get(isRouted(Routing::Target::StochasticTilt)); }
+    void setTilt(int tilt, bool routed = false) { _tilt.set(clamp(tilt, -100, 100), routed); }
 
+    // reservedJitter
+    int reservedJitter() const { return _reservedJitter.get(isRouted(Routing::Target::StochasticReserved)); }
+    void setReservedJitter(int jitter, bool routed = false) { _reservedJitter.set(clamp(jitter, 0, 100), routed); }
 
+    // burst
+    int burst() const { return _burst.get(isRouted(Routing::Target::StochasticBurst)); }
+    void setBurst(int burst, bool routed = false) { _burst.set(clamp(burst, 0, 100), routed); }
+
+    // minDegree
+    int minDegree() const { return _minDegree; }
+    void setMinDegree(int degree) { _minDegree = clamp(degree, 0, 127); }
+
+    // maxDegree
+    int maxDegree() const { return _maxDegree; }
+    void setMaxDegree(int degree) { _maxDegree = clamp(degree, 0, 127); }
+
+    // slideTime
+    int slideTime() const { return _slideTime.get(isRouted(Routing::Target::SlideTime)); }
+    void setSlideTime(int slideTime, bool routed = false) { _slideTime.set(clamp(slideTime, 0, 100), routed); }
+
+    // octave
+    int octave() const { return _octave.get(isRouted(Routing::Target::Octave)); }
+    void setOctave(int octave, bool routed = false) { _octave.set(clamp(octave, -10, 10), routed); }
+
+    // transpose
+    int transpose() const { return _transpose.get(isRouted(Routing::Target::Transpose)); }
+    void setTranspose(int transpose, bool routed = false) { _transpose.set(clamp(transpose, -100, 100), routed); }
+
+    // rotate
+    int rotate() const { return _rotate.get(isRouted(Routing::Target::Rotate)); }
+    void setRotate(int rotate, bool routed = false) { _rotate.set(clamp(rotate, -64, 64), routed); }
+
+    // fillMode
+    FillMode fillMode() const { return _fillMode; }
+    void setFillMode(FillMode mode) { _fillMode = ModelUtils::clampedEnum(mode); }
+
+    // cvUpdateMode
+    CvUpdateMode cvUpdateMode() const { return _cvUpdateMode; }
+    void setCvUpdateMode(CvUpdateMode mode) { _cvUpdateMode = ModelUtils::clampedEnum(mode); }
+
+    // gateBias
+    int gateBias() const { return _gateBias.get(isRouted(Routing::Target::GateProbabilityBias)); }
+    void setGateBias(int bias, bool routed = false) { _gateBias.set(clamp(bias, -8, 8), routed); }
+
+    // retriggerBias
+    int retriggerBias() const { return _retriggerBias.get(isRouted(Routing::Target::RetriggerProbabilityBias)); }
+    void setRetriggerBias(int bias, bool routed = false) { _retriggerBias.set(clamp(bias, -8, 8), routed); }
+
+    // lengthBias
+    int lengthBias() const { return _lengthBias.get(isRouted(Routing::Target::LengthBias)); }
+    void setLengthBias(int bias, bool routed = false) { _lengthBias.set(clamp(bias, -8, 8), routed); }
+
+    // noteBias
+    int noteBias() const { return _noteBias.get(isRouted(Routing::Target::NoteProbabilityBias)); }
+    void setNoteBias(int bias, bool routed = false) { _noteBias.set(clamp(bias, -8, 8), routed); }
+
+    // UI Helpers
     void printLinearity(StringBuilder &str) const { str("%d%%", linearity()); }
-    void editLinearity(int value, bool shift) { setLinearity(ModelUtils::adjustedByStep(linearity(), value, 1, !shift)); }
+    void editLinearity(int value, bool shift) { setLinearity(linearity() + value); }
 
     void printMarblesMode(StringBuilder &str) const { str(marblesMode() == MarblesMode::Off ? "Off" : "On"); }
     void editMarblesMode(int value, bool shift) { setMarblesMode(ModelUtils::adjustedEnum(marblesMode(), value)); }
 
     void printMarblesSpread(StringBuilder &str) const { str("%d%%", marblesSpread()); }
-    void editMarblesSpread(int value, bool shift) { setMarblesSpread(ModelUtils::adjustedByStep(marblesSpread(), value, 1, !shift)); }
+    void editMarblesSpread(int value, bool shift) { setMarblesSpread(marblesSpread() + value); }
 
     void printMarblesBias(StringBuilder &str) const { str("%d%%", marblesBias()); }
-    void editMarblesBias(int value, bool shift) { setMarblesBias(ModelUtils::adjustedByStep(marblesBias(), value, 1, !shift)); }
+    void editMarblesBias(int value, bool shift) { setMarblesBias(marblesBias() + value); }
+
+    void printMarblesSteps(StringBuilder &str) const { str("%d", marblesSteps()); }
+    void editMarblesSteps(int value, bool shift) { setMarblesSteps(marblesSteps() + value); }
+
+    void printDensity(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticDensity); str("%d%%", density()); }
+    void editDensity(int value, bool shift) { if (!isRouted(Routing::Target::StochasticDensity)) setDensity(density() + value); }
+
+    void printTilt(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticTilt); str("%+d%%", tilt()); }
+    void editTilt(int value, bool shift) { if (!isRouted(Routing::Target::StochasticTilt)) setTilt(tilt() + value); }
+
+    void printBurst(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticBurst); str("%d%%", burst()); }
+    void editBurst(int value, bool shift) { if (!isRouted(Routing::Target::StochasticBurst)) setBurst(burst() + value); }
+
+    void printRotate(StringBuilder &str) const { printRouted(str, Routing::Target::Rotate); str("%+d", rotate()); }
+    void editRotate(int value, bool shift) { if (!isRouted(Routing::Target::Rotate)) setRotate(rotate() + value); }
+
+    void printLock(StringBuilder &str) const { ModelUtils::printYesNo(str, lock()); }
+    void editLock(int value, bool shift) { setLock(value > 0); }
 
     void printMinDegree(StringBuilder &str) const { str("%d", minDegree()); }
     void editMinDegree(int value, bool shift) { setMinDegree(minDegree() + value); }
@@ -352,27 +278,23 @@ public:
     void printLegatoProb(StringBuilder &str) const { str("%d%%", legatoProb()); }
     void editLegatoProb(int value, bool shift) { setLegatoProb(ModelUtils::adjustedByStep(legatoProb(), value, 1, !shift)); }
 
+    void printOctave(StringBuilder &str) const { printRouted(str, Routing::Target::Octave); str("%+d", octave()); }
+    void editOctave(int value, bool shift) { if (!isRouted(Routing::Target::Octave)) setOctave(octave() + value); }
 
+    void printTranspose(StringBuilder &str) const { printRouted(str, Routing::Target::Transpose); str("%+d", transpose()); }
+    void editTranspose(int value, bool shift) { if (!isRouted(Routing::Target::Transpose)) setTranspose(transpose() + value); }
 
+    void printCvUpdateMode(StringBuilder &str) const { str(cvUpdateModeName(cvUpdateMode())); }
+    void editCvUpdateMode(int value, bool shift) { setCvUpdateMode(ModelUtils::adjustedEnum(cvUpdateMode(), value)); }
 
+    void printSlideTime(StringBuilder &str) const { printRouted(str, Routing::Target::SlideTime); str("%d%%", slideTime()); }
+    void editSlideTime(int value, bool shift) { if (!isRouted(Routing::Target::SlideTime)) setSlideTime(ModelUtils::adjustedByStep(slideTime(), value, 5, !shift)); }
 
+    int8_t activePatternIndex() const { return -1; }
+    void setActivePatternIndex(int index) {}
 
-
-
-
-
-    // Active Pattern Buffer (Shared across track patterns)
-    const std::array<StochasticParentEvent, CONFIG_STEP_COUNT> &events() const { return _events; }
-          std::array<StochasticParentEvent, CONFIG_STEP_COUNT> &events()       { return _events; }
-    
-    const std::array<StochasticChildHit, CONFIG_STEP_COUNT * 4> &children() const { return _children; }
-          std::array<StochasticChildHit, CONFIG_STEP_COUNT * 4> &children()       { return _children; }
-
-    int activePatternIndex() const { return _activePatternIndex; }
-    void setActivePatternIndex(int index) { _activePatternIndex = index; }
-
-    uint32_t activeSeed() const { return _activeSeed; }
-    void setActiveSeed(uint32_t seed) { _activeSeed = seed; }
+    uint32_t activeSeed() const { return 0; }
+    void setActiveSeed(uint32_t seed) {}
 
     // sequences
     const StochasticSequenceArray &sequences() const { return _sequences; }
@@ -386,6 +308,7 @@ public:
     //----------------------------------------
 
     inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
+    inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
     void writeRouted(Routing::Target target, int intValue, float floatValue);
 
     //----------------------------------------
@@ -444,11 +367,8 @@ public:
         _jump.setBase(0);
         _range = 1;
 
-        _activePatternIndex = -1;
-        _activeSeed = 0;
-
-        for (auto &event : _events) event.clear();
-        for (auto &child : _children) child.clear();
+        _rhythmMode = StochasticSourceMode::Loop;
+        _melodyMode = StochasticSourceMode::Loop;
 
         for (auto &sequence : _sequences) {
             sequence.clear();
@@ -503,6 +423,9 @@ public:
         _mutate.write(writer);
         _jump.write(writer);
         writer.write(_range);
+
+        writer.write(static_cast<uint8_t>(_rhythmMode));
+        writer.write(static_cast<uint8_t>(_melodyMode));
 
         for (const auto &sequence : _sequences) {
             sequence.write(writer);
@@ -565,7 +488,9 @@ public:
         _jump.read(reader);
         reader.read(_range);
 
-        _activePatternIndex = -1; // Force regeneration on read
+        uint8_t rhythmMode, melodyMode;
+        reader.read(rhythmMode); _rhythmMode = static_cast<StochasticSourceMode>(rhythmMode);
+        reader.read(melodyMode); _melodyMode = static_cast<StochasticSourceMode>(melodyMode);
 
         for (auto &sequence : _sequences) {
             sequence.read(reader);
@@ -633,22 +558,12 @@ private:
     Routable<uint8_t> _jump;
     uint8_t _range;
 
-
-
-
-
-
-
-
-
-
-    // Active Pattern Buffer (Shared across track patterns)
-    std::array<StochasticParentEvent, CONFIG_STEP_COUNT> _events;
-    std::array<StochasticChildHit, CONFIG_STEP_COUNT * 4> _children;
-    int8_t _activePatternIndex;
-    uint32_t _activeSeed;
+    StochasticSourceMode _rhythmMode;
+    StochasticSourceMode _melodyMode;
 
     StochasticSequenceArray _sequences;
 
     friend class Track;
 };
+
+static_assert(sizeof(StochasticTrack) <= 9544, "StochasticTrack too large");

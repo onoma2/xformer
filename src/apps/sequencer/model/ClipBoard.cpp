@@ -65,6 +65,11 @@ void ClipBoard::copyTuesdaySequence(const TuesdaySequence &sequence) {
     _container.as<TuesdaySequence>() = sequence;
 }
 
+void ClipBoard::copyStochasticSequence(const StochasticSequence &sequence) {
+    _type = Type::StochasticSequence;
+    _container.as<StochasticSequence>() = sequence;
+}
+
 void ClipBoard::copyPattern(int patternIndex) {
     _type = Type::Pattern;
     auto &pattern = _container.as<Pattern>();
@@ -89,6 +94,9 @@ void ClipBoard::copyPattern(int patternIndex) {
             break;
         case Track::TrackMode::Teletype:
             pattern.sequences[trackIndex].data.teletypeClip = track.teletypeTrack().clipSnapshot(patternIndex);
+            break;
+        case Track::TrackMode::Stochastic:
+            pattern.sequences[trackIndex].data.stochastic = track.stochasticTrack().sequence(patternIndex);
             break;
         default:
             break;
@@ -223,6 +231,13 @@ void ClipBoard::pasteTuesdaySequence(TuesdaySequence &sequence) const {
     }
 }
 
+void ClipBoard::pasteStochasticSequence(StochasticSequence &sequence) const {
+    if (canPasteStochasticSequence()) {
+        Model::WriteLock lock;
+        sequence = _container.as<StochasticSequence>();
+    }
+}
+
 void ClipBoard::pastePattern(int patternIndex) const {
     if (canPastePattern()) {
         Model::WriteLock lock;
@@ -300,6 +315,10 @@ bool ClipBoard::canPasteDiscreteMapSequence() const {
 
 bool ClipBoard::canPasteTuesdaySequence() const {
     return _type == Type::TuesdaySequence;
+}
+
+bool ClipBoard::canPasteStochasticSequence() const {
+    return _type == Type::StochasticSequence;
 }
 
 bool ClipBoard::canPastePattern() const {
