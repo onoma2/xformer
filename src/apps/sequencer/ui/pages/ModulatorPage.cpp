@@ -116,50 +116,28 @@ void ModulatorPage::draw(Canvas &canvas) {
     canvas.setColor(Color::Bright);
     canvas.setFont(Font::Small);
 
-    // Build parameter name/value strings (routing overlay uses single value)
-    FixedStringBuilder<16> paramName;
-    FixedStringBuilder<32> paramValue;
-
     // Build all 5 parameter values for the grid display
     FixedStringBuilder<32> values[5];
 
     if (_showRoutingOverlay) {
-        switch (_selectedRoutingFunction) {
-        case RoutingFunction::Mode:
-            paramName("MODE");
-            modulator.printMode(paramValue);
-            break;
-        case RoutingFunction::Gate:
-            paramName("GATE");
-            modulator.printGateTrack(paramValue);
-            break;
-        case RoutingFunction::Target: {
-            paramName("TARGET");
-            if (_routingTargetType == RoutingTargetType::None) {
-                paramValue("NONE");
-            } else if (_routingTargetType == RoutingTargetType::Midi) {
-                paramValue("MIDI %d", _routingTargetIndex + 1);
-            } else {
-                paramValue("CV %d", _routingTargetIndex + 1);
-            }
-            break;
+        modulator.printMode(values[0]);
+        modulator.printGateTrack(values[1]);
+        if (_routingTargetType == RoutingTargetType::None) {
+            values[2]("NONE");
+        } else if (_routingTargetType == RoutingTargetType::Midi) {
+            values[2]("MIDI %d", _routingTargetIndex + 1);
+        } else {
+            values[2]("CV %d", _routingTargetIndex + 1);
         }
-        case RoutingFunction::Event:
-            paramName("EVENT");
-            if (_routingTargetType == RoutingTargetType::CV) {
-                paramValue("N/A");
-            } else {
-                paramValue(_routingEventIsCC ? "CC" : "Note");
-            }
-            break;
-        case RoutingFunction::CCNumber:
-            paramName("CC NUM");
-            if (_routingTargetType == RoutingTargetType::CV || !_routingEventIsCC) {
-                paramValue("N/A");
-            } else {
-                paramValue("CC %d", _routingCCNum);
-            }
-            break;
+        if (_routingTargetType == RoutingTargetType::CV) {
+            values[3]("N/A");
+        } else {
+            values[3](_routingEventIsCC ? "CC" : "Note");
+        }
+        if (_routingTargetType == RoutingTargetType::CV || !_routingEventIsCC) {
+            values[4]("N/A");
+        } else {
+            values[4]("CC %d", _routingCCNum);
         }
     } else if (isADSR) {
         if (_currentPage == 0) {
@@ -371,51 +349,40 @@ void ModulatorPage::draw(Canvas &canvas) {
     const int colM = 190;
     const int colR = 256;
 
-    if (_showRoutingOverlay) {
-        // Routing overlay: keep single-value display
-        canvas.setFont(Font::Tiny);
-        canvas.setColor(Color::Medium);
-        canvas.drawText(colL, 18, paramName);
+    // Unified grid layout: all parameter values visible, no labels
+    canvas.setBlendMode(BlendMode::Set);
+    canvas.setFont(Font::Small);
 
-        canvas.setFont(Font::Small);
-        canvas.setColor(Color::Bright);
-        canvas.drawText(colL, 30, paramValue);
+    int selectedIdx = _showRoutingOverlay ? int(_selectedRoutingFunction) : int(_selectedFunction);
 
-        canvas.setFont(Font::Tiny);
-        canvas.setColor(Color::Low);
-        canvas.drawTextCentered(colL, 44, 128, 8, FixedStringBuilder<32>("Shift+Page to exit"));
-    } else {
-        // Grid layout: all parameter values visible, no labels
-        canvas.setBlendMode(BlendMode::Set);
-        canvas.setFont(Font::Small);
-
-        // Row 1 (y=22): param 0 (left) + param 1 (right)
-        for (int i = 0; i < 2; ++i) {
-            if (values[i][0] == '\0') continue;
-            canvas.setColor(i == int(_selectedFunction) ? Color::Bright : Color::Medium);
-            if (i == 0) {
-                canvas.drawText(colL, 22, values[0]);
-            } else {
-                int tw = canvas.textWidth(values[1]);
-                canvas.drawText(colR - tw, 22, values[1]);
-            }
+    // Row 1 (y=22): param 0 (left) + param 1 (right)
+    for (int i = 0; i < 2; ++i) {
+        if (values[i][0] == '\0') continue;
+        canvas.setColor(i == selectedIdx ? Color::Bright : Color::Medium);
+        if (i == 0) {
+            canvas.drawText(colL, 22, values[0]);
+        } else {
+            int tw = canvas.textWidth(values[1]);
+            canvas.drawText(colR - tw, 22, values[1]);
         }
+    }
 
-        // Row 2 (y=42): param 2 + param 3 + param 4
-        for (int i = 2; i < 5; ++i) {
-            if (values[i][0] == '\0') continue;
-            canvas.setColor(i == int(_selectedFunction) ? Color::Bright : Color::Medium);
-            if (i == 2) {
-                canvas.drawText(colL, 42, values[2]);
-            } else if (i == 3) {
-                canvas.drawText(colM, 42, values[3]);
-            } else {
-                int tw = canvas.textWidth(values[4]);
-                canvas.drawText(colR - tw, 42, values[4]);
-            }
+    // Row 2 (y=42): param 2 + param 3 + param 4
+    for (int i = 2; i < 5; ++i) {
+        if (values[i][0] == '\0') continue;
+        canvas.setColor(i == selectedIdx ? Color::Bright : Color::Medium);
+        if (i == 2) {
+            canvas.drawText(colL, 42, values[2]);
+        } else if (i == 3) {
+            canvas.drawText(colM, 42, values[3]);
+        } else {
+            int tw = canvas.textWidth(values[4]);
+            canvas.drawText(colR - tw, 42, values[4]);
         }
+    }
 
-        // CV routing info
+    // CV routing info (only when NOT in routing overlay)
+    if (!_showRoutingOverlay) {
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Low);
         FixedStringBuilder<32> cvOut;
