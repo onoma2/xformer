@@ -12,8 +12,8 @@ _Updated: 2026-05-18_
 
 ## 🟡 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Phase 6 hardware controls work, but the current Vinx-shaped step-probability model is now treated as scaffolding; Phase 7 retopology and the immutable dictionary have been documented.
-**Next action:** Phase 7b: rebuild the stochastic core around generated parent events, burst child hits, pattern evolution, and Performer-native pitch controls; defer final UI to Phase 8.
+**Where I stopped:** Phase 7b complete. Core architecture rebuilt around Track-owned generator and shared pattern buffer. Implemented MeloDICER-style duration variation and dynamic Burst logic. RAM budget restored (free SRAM margin ~11.8 KB).
+**Next action:** Phase 7c: Implement melody-lifecycle refinements (Complexity/Contour evolution).
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic

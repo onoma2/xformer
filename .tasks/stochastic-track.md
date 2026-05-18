@@ -11,6 +11,7 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - `src/apps/sequencer/ui/pages/StochasticConfigPage.h` — Global settings UI
 
 ## Decisions log
+- 2026-05-18: Phase 7b complete. Re-topologized model for RAM safety (Sequence size: 16B, Track buffer: 2KB). Implemented MeloDICER-style duration variation and dynamic Burst Count/Rate semantics. Verified full evaluated lock and project load stability.
 - 2026-05-17: Phase 8 UI Stubs complete. Implemented list-based editors for both global Track parameters and per-step Sequence probabilities. Users can now edit all stochastic metrics on hardware.
 - 2026-05-17: Phase 6 repair complete. Retopologized performance layer to Density/Tilt/Jitter. Implemented true ranked rest-priority for density thinning and stable timing jitter. Verified lock invariant.
 - 2026-05-17: Phase 5 complete. Implemented Accent and Legato probabilities. Accent is mapped to a secondary gate output (index 1), and Legato ties the gate to the next note while triggering a slide. Both are captured in the lock buffer.
@@ -66,7 +67,8 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - [x] **Validation:** Confirm deterministic thinning and jitter lock.
 
 ### Phase 7: Proteus-Inspired Buffer Evolution
-- [ ] Implement melody-lifecycle generation logic.
+- [x] Implement Phase 7b: Rebuild core for Track-owned generator and pattern buffer.
+- [ ] Implement melody-lifecycle generation logic (Complexity/Contour).
 - [ ] Implement Patience / Boredom reset.
 - [ ] Implement per-loop mutation and octave shifts.
 
