@@ -174,6 +174,7 @@ public:
         case Jump:          return Routing::Target::StochasticJump;
         case Rotate:        return Routing::Target::Rotate;
         case Divisor:       return Routing::Target::Divisor;
+        case ResetMeasure:  return Routing::Target::None;
         case Scale:         return Routing::Target::Scale;
         case RootNote:      return Routing::Target::RootNote;
         default:            return Routing::Target::None;

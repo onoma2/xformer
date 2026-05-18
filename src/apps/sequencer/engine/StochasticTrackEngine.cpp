@@ -14,12 +14,16 @@
 #include <algorithm>
 
 static uint32_t getDurationMultiplier(int rate) {
-    if (rate < 10) return 16;
-    if (rate < 20) return 8;
-    if (rate < 30) return 4;
-    if (rate < 40) return 2;
-    if (rate < 60) return 1;
-    return 1; // Default
+    // Maps 0..100 to discrete multipliers (1 bar down to 1/128th)
+    if (rate < 10) return 192 * 4;  // 1 Bar
+    if (rate < 20) return 192 * 2;  // 1/2
+    if (rate < 30) return 192;      // 1/4
+    if (rate < 40) return 96;       // 1/8
+    if (rate < 50) return 48;       // 1/16
+    if (rate < 60) return 24;       // 1/32
+    if (rate < 70) return 12;       // 1/64
+    if (rate < 80) return 6;        // 1/128
+    return 6; // Default to 1/128
 }
 
 StochasticTrackEngine::StochasticTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
@@ -215,7 +219,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 uint32_t childTick = tick + child.tickOffset;
                 _cvQueue.push({ childTick, child.cv, child.slide });
                 _gateQueue.push({ childTick, true });
-                _gateQueue.push({ childTick + 10, false }); 
+                _gateQueue.push({ childTick + child.gateTicks, false }); 
             }
         }
     } else {
@@ -223,11 +227,17 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         
         // Rhythm: Rate / Variation
         uint32_t mult = getDurationMultiplier(track.rate());
-        if (track.variation() > 0 && int(_rng.nextRange(100)) < track.variation()) {
-             // Pick neighbor multiplier
-             mult = (_rng.nextRange(2) == 0) ? mult * 2 : std::max(uint32_t(1), uint32_t(mult / 2));
+        if (track.variation() != 0) {
+            int variationRoll = _rng.nextRange(100);
+            if (variationRoll < std::abs(track.variation())) {
+                 if (track.variation() > 0) {
+                     mult *= 2; // Slower
+                 } else {
+                     mult = std::max(uint32_t(6), mult / 2); // Faster
+                 }
+            }
         }
-        durationTicks = divisor * mult;
+        durationTicks = mult;
 
         int note = int(event.d0.degree) + (int(event.d0.octave) + track.octave() + _jumpOctave) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
@@ -261,19 +271,21 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 const auto &child = useSharedChildren ? track.children()[event.d1.childFirst + c] : evaluationChildren[c];
                 uint32_t childOffset = (durationTicks * child.offset) / 256;
                 uint32_t childTick = tick + childOffset;
+                uint32_t childGateTicks = (durationTicks * child.length) / (256 * (int(event.d1.childCount) + 1));
                 
                 int childNote = int(child.degree) + (int(child.octave) + track.octave() + _jumpOctave) * activeNotes + track.transpose();
                 float childCv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
 
                 _cvQueue.push({ childTick, childCv, bool(child.slide) });
                 _gateQueue.push({ childTick, true });
-                _gateQueue.push({ childTick + 10, false });
+                _gateQueue.push({ childTick + childGateTicks, false });
 
                 if (_lockedParents) {
                     auto &lc = _lockedParents[_patternIndex].children[c];
                     lc.valid = true;
                     lc.cv = childCv;
                     lc.tickOffset = childOffset;
+                    lc.gateTicks = childGateTicks;
                     lc.slide = bool(child.slide);
                     lc.accent = bool(child.accent);
                 }

@@ -104,6 +104,7 @@ private:
         struct LockedChild {
             float cv;
             uint32_t tickOffset;
+            uint32_t gateTicks;
             bool slide;
             bool accent;
             bool valid;
