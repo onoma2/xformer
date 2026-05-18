@@ -104,11 +104,11 @@ def _parse_font_header(filepath: str, font_name: str) -> BitmapFont:
 
 def _load_fonts() -> dict:
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(script_dir, '../..'))
+    project_root = os.path.abspath(os.path.join(script_dir, '..'))
     fonts_dir = os.path.join(project_root, 'src/core/gfx/fonts')
 
     fonts = {}
-    for font_enum, font_name in [(Font.Tiny, 'tiny5x5')]:
+    for font_enum, font_name in [(Font.Tiny, 'tiny5x5'), (Font.Small, 'ati8x8')]:
         path = os.path.join(fonts_dir, f'{font_name}.h')
         fonts[font_enum] = _parse_font_header(path, font_name)
     return fonts
@@ -201,6 +201,24 @@ class Canvas:
             y1 = self._bottom
         for yi in range(y0, y1 + 1):
             self._blit(x, yi, self._color)
+
+    def line(self, x0: int, y0: int, x1: int, y1: int):
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+        sx = 1 if x0 < x1 else -1
+        sy = 1 if y0 < y1 else -1
+        err = dx - dy
+        while True:
+            self._blit(x0, y0, self._color)
+            if x0 == x1 and y0 == y1:
+                break
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                x0 += sx
+            if e2 < dx:
+                err += dx
+                y0 += sy
 
     def draw_rect(self, x: int, y: int, w: int, h: int):
         self.hline(x, y, w)

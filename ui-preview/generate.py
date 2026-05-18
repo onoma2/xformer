@@ -84,6 +84,18 @@ from pages import (
     render_ref_skylines,
     render_ref_prob_div,
 )
+from pages_modulator import (
+    render_modulator_current_sine,
+    render_modulator_current_adsr,
+    render_modulator_current_random,
+    render_modulator_current_chaos,
+    render_modulator_proposed_sine,
+    render_modulator_proposed_adsr,
+    render_modulator_proposed_random,
+    render_modulator_proposed_chaos,
+    render_modulator_proposed_adsr_page2,
+    render_modulator_proposed_chaos_page2,
+)
 from tracks import (
     DiscreteMapSequence, DiscreteMapTrackEngine,
     NoteSequence, NoteSequenceStep, NoteTrackEngine,
@@ -326,6 +338,27 @@ def render_page(page: str, scale: int = 4):
         render_ref_skylines(canvas)
     elif page == "ref-prob-div":
         render_ref_prob_div(canvas)
+    # Modulator page — current vs proposed design
+    elif page == "modulator-current-sine":
+        render_modulator_current_sine(canvas)
+    elif page == "modulator-current-adsr":
+        render_modulator_current_adsr(canvas)
+    elif page == "modulator-current-random":
+        render_modulator_current_random(canvas)
+    elif page == "modulator-current-chaos":
+        render_modulator_current_chaos(canvas)
+    elif page == "modulator-proposed-sine":
+        render_modulator_proposed_sine(canvas)
+    elif page == "modulator-proposed-adsr":
+        render_modulator_proposed_adsr(canvas)
+    elif page == "modulator-proposed-random":
+        render_modulator_proposed_random(canvas)
+    elif page == "modulator-proposed-chaos":
+        render_modulator_proposed_chaos(canvas)
+    elif page == "modulator-proposed-adsr-page2":
+        render_modulator_proposed_adsr_page2(canvas)
+    elif page == "modulator-proposed-chaos-page2":
+        render_modulator_proposed_chaos_page2(canvas)
     else:
         raise ValueError(f"Unknown page: {page}")
 
@@ -360,7 +393,13 @@ def main():
                                  'stochastic-track-bline', 'stochastic-track-pitter-patter',
                                  # Pure reference screens
                                  'ref-prob-melod', 'ref-shredder', 'ref-euclid',
-                                 'ref-delinquencer', 'ref-skylines', 'ref-prob-div'],
+                                 'ref-delinquencer', 'ref-skylines', 'ref-prob-div',
+                                 # Modulator page designs
+                                 'modulator-current-sine', 'modulator-current-adsr',
+                                 'modulator-current-random', 'modulator-current-chaos',
+                                 'modulator-proposed-sine', 'modulator-proposed-adsr',
+                                 'modulator-proposed-random', 'modulator-proposed-chaos',
+                                 'modulator-proposed-adsr-page2', 'modulator-proposed-chaos-page2'],
                         help='Which edit page or reference screen to render')
     args = parser.parse_args()
 
