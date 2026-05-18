@@ -116,9 +116,12 @@ void ModulatorPage::draw(Canvas &canvas) {
     canvas.setColor(Color::Bright);
     canvas.setFont(Font::Small);
 
-    // Build parameter name/value strings
+    // Build parameter name/value strings (routing overlay uses single value)
     FixedStringBuilder<16> paramName;
     FixedStringBuilder<32> paramValue;
+
+    // Build all 5 parameter values for the grid display
+    FixedStringBuilder<32> values[5];
 
     if (_showRoutingOverlay) {
         switch (_selectedRoutingFunction) {
@@ -160,113 +163,42 @@ void ModulatorPage::draw(Canvas &canvas) {
         }
     } else if (isADSR) {
         if (_currentPage == 0) {
-            switch (_selectedFunction) {
-            case Function::Shape:
-                paramName("SHAPE");
-                paramValue("ADSR");
-                break;
-            case Function::Rate:
-                paramName("ATTACK");
-                modulator.printAttack(paramValue);
-                break;
-            case Function::Depth:
-                paramName("DECAY");
-                modulator.printDecay(paramValue);
-                break;
-            case Function::Offset:
-                paramName("SUSTAIN");
-                modulator.printSustain(paramValue);
-                break;
-            case Function::Phase:
-                paramName("RELEASE");
-                modulator.printRelease(paramValue);
-                break;
-            }
+            values[0]("ADSR");
+            modulator.printAttack(values[1]);
+            modulator.printDecay(values[2]);
+            modulator.printSustain(values[3]);
+            modulator.printRelease(values[4]);
         } else {
-            switch (_selectedFunction) {
-            case Function::Shape:
-                paramName("AMPLITUDE");
-                modulator.printAmplitude(paramValue);
-                break;
-            default:
-                break;
-            }
+            modulator.printAmplitude(values[0]);
         }
     } else if (isChaos) {
         if (_currentPage == 0) {
-            switch (_selectedFunction) {
-            case Function::Shape:
-                paramName("SHAPE");
-                paramValue(Modulator::shapeName(modulator.shape()));
-                break;
-            case Function::Rate:
-                paramName("RATE");
-                modulator.printRate(paramValue);
-                break;
-            case Function::Depth:
-                paramName("P1");
-                paramValue("%d", modulator.attack() / 20);
-                break;
-            case Function::Offset:
-                paramName("P2");
-                paramValue("%d", modulator.decay() / 20);
-                break;
-            case Function::Phase:
-                paramName("DEPTH");
-                modulator.printDepth(paramValue);
-                break;
-            }
+            values[0](Modulator::shapeName(modulator.shape()));
+            modulator.printRate(values[1]);
+            values[2]("%d", modulator.attack() / 20);
+            values[3]("%d", modulator.decay() / 20);
+            modulator.printDepth(values[4]);
         } else {
-            switch (_selectedFunction) {
-            case Function::Shape:
-                paramName("SLEW");
-                modulator.printSmooth(paramValue);
-                break;
-            case Function::Rate:
-                paramName("OFFSET");
-                modulator.printOffset(paramValue);
-                break;
-            default:
-                break;
-            }
+            modulator.printSmooth(values[0]);
+            modulator.printOffset(values[1]);
         }
     } else {
-        switch (_selectedFunction) {
-        case Function::Shape:
-            paramName("SHAPE");
-            paramValue(Modulator::shapeName(modulator.shape()));
-            break;
-        case Function::Rate:
-            if (isRandom) {
-                paramName("R.MODE");
-                paramValue(Modulator::randomModeName(modulator.randomMode()));
-            } else {
-                paramName("RATE");
-                modulator.printRate(paramValue);
-            }
-            break;
-        case Function::Depth:
-            if (isTriggered) {
-                paramName("G.TRACK");
-                modulator.printGateTrack(paramValue);
-            } else {
-                paramName("DEPTH");
-                modulator.printDepth(paramValue);
-            }
-            break;
-        case Function::Offset:
-            paramName("OFFSET");
-            modulator.printOffset(paramValue);
-            break;
-        case Function::Phase:
-            if (isRandom) {
-                paramName("SLEW");
-                modulator.printSmooth(paramValue);
-            } else {
-                paramName("PHASE");
-                modulator.printPhase(paramValue);
-            }
-            break;
+        values[0](Modulator::shapeName(modulator.shape()));
+        if (isRandom) {
+            values[1](Modulator::randomModeName(modulator.randomMode()));
+        } else {
+            modulator.printRate(values[1]);
+        }
+        if (isTriggered) {
+            modulator.printGateTrack(values[2]);
+        } else {
+            modulator.printDepth(values[2]);
+        }
+        modulator.printOffset(values[3]);
+        if (isRandom) {
+            modulator.printSmooth(values[4]);
+        } else {
+            modulator.printPhase(values[4]);
         }
     }
 
@@ -295,7 +227,7 @@ void ModulatorPage::draw(Canvas &canvas) {
         canvas.hline(scopeX, y, scopeWidth);
 
         // Level bar (same as all other shapes)
-        const int barX = waveformX + waveformW + 4;
+        const int barX = waveformX + waveformW + 2;
         const int barWidth = 4;
         canvas.setColor(Color::Medium);
         canvas.drawRect(barX, waveformY, barWidth, waveformH);
@@ -422,7 +354,7 @@ void ModulatorPage::draw(Canvas &canvas) {
 
         // Level bar
         int currentValue = _engine.modulatorEngine().currentValue(_selectedModulator);
-        const int barX = waveformX + waveformW + 4;
+        const int barX = waveformX + waveformW + 2;
         const int barWidth = 4;
 
         canvas.setColor(Color::Medium);
@@ -435,17 +367,55 @@ void ModulatorPage::draw(Canvas &canvas) {
     }
 
     // --- Right half: parameter display ---
-    const int paramX = 128;
+    const int colL = 128;
+    const int colM = 190;
+    const int colR = 256;
 
-    canvas.setFont(Font::Tiny);
-    canvas.setColor(Color::Medium);
-    canvas.drawText(paramX, 18, paramName);
+    if (_showRoutingOverlay) {
+        // Routing overlay: keep single-value display
+        canvas.setFont(Font::Tiny);
+        canvas.setColor(Color::Medium);
+        canvas.drawText(colL, 18, paramName);
 
-    canvas.setFont(Font::Small);
-    canvas.setColor(Color::Bright);
-    canvas.drawText(paramX, 30, paramValue);
+        canvas.setFont(Font::Small);
+        canvas.setColor(Color::Bright);
+        canvas.drawText(colL, 30, paramValue);
 
-    if (!_showRoutingOverlay) {
+        canvas.setFont(Font::Tiny);
+        canvas.setColor(Color::Low);
+        canvas.drawTextCentered(colL, 44, 128, 8, FixedStringBuilder<32>("Shift+Page to exit"));
+    } else {
+        // Grid layout: all parameter values visible, no labels
+        canvas.setBlendMode(BlendMode::Set);
+        canvas.setFont(Font::Small);
+
+        // Row 1 (y=22): param 0 (left) + param 1 (right)
+        for (int i = 0; i < 2; ++i) {
+            if (values[i][0] == '\0') continue;
+            canvas.setColor(i == int(_selectedFunction) ? Color::Bright : Color::Medium);
+            if (i == 0) {
+                canvas.drawText(colL, 22, values[0]);
+            } else {
+                int tw = canvas.textWidth(values[1]);
+                canvas.drawText(colR - tw, 22, values[1]);
+            }
+        }
+
+        // Row 2 (y=42): param 2 + param 3 + param 4
+        for (int i = 2; i < 5; ++i) {
+            if (values[i][0] == '\0') continue;
+            canvas.setColor(i == int(_selectedFunction) ? Color::Bright : Color::Medium);
+            if (i == 2) {
+                canvas.drawText(colL, 42, values[2]);
+            } else if (i == 3) {
+                canvas.drawText(colM, 42, values[3]);
+            } else {
+                int tw = canvas.textWidth(values[4]);
+                canvas.drawText(colR - tw, 42, values[4]);
+            }
+        }
+
+        // CV routing info
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Low);
         FixedStringBuilder<32> cvOut;
@@ -460,12 +430,8 @@ void ModulatorPage::draw(Canvas &canvas) {
         if (!first) {
             FixedStringBuilder<32> label;
             label("-> %s", (const char *)cvOut);
-            canvas.drawText(paramX, 44, label);
+            canvas.drawText(colL, 54, label);
         }
-    } else {
-        canvas.setFont(Font::Tiny);
-        canvas.setColor(Color::Low);
-        canvas.drawTextCentered(paramX, 44, 128, 8, FixedStringBuilder<32>("Shift+Page to exit"));
     }
 }
 
