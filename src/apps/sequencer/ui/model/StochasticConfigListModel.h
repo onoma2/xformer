@@ -82,9 +82,6 @@ public:
 
     virtual Routing::Target routingTarget(int row) const override {
         switch (Item(row)) {
-        case Divisor:       return Routing::Target::Divisor;
-        case Scale:         return Routing::Target::Scale;
-        case RootNote:      return Routing::Target::RootNote;
         case Octave:        return Routing::Target::Octave;
         case Transpose:     return Routing::Target::Transpose;
         case SlideTime:     return Routing::Target::SlideTime;

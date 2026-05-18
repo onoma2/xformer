@@ -67,6 +67,7 @@ private:
     struct Gate {
         uint32_t tick;
         bool gate;
+        bool accent;
     };
 
     struct GateCompare {

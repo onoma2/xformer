@@ -9,9 +9,18 @@ class StochasticGenerator {
 public:
     static void generateRhythm(StochasticSequence &sequence, const StochasticTrack &track, uint32_t seed);
     static void generateMelody(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, uint32_t seed);
-    static void mutateOne(StochasticSequence &sequence, StochasticTrack &track, const Scale &scale, int rootNote, Random &rng);
-    static void generateDensityRanks(StochasticSequence &sequence, int size, uint32_t seed);
-    static void generateChildren(StochasticSequence &sequence, int eventIndex, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng);
+    static void mutateRhythmOne(StochasticSequence &sequence, const StochasticTrack &track, Random &rng);
+    static void mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng);
+    static void generateDensityRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed);
+    
+    struct EvaluatedChild {
+        uint32_t tickOffset;
+        uint32_t gateTicks;
+        int note;
+        bool valid;
+    };
+
+    static void evaluateChildren(EvaluatedChild *children, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng);
 
     static StochasticSourceEvent generateRhythmEvent(const StochasticTrack &track, Random &rng);
     static StochasticSourceEvent generateMelodyEvent(const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng);

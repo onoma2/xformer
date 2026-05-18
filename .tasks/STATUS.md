@@ -12,8 +12,8 @@ _Updated: 2026-05-18_
 
 ## 🔴 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Completed Phase 8.1 (Source Mode Topology) and 8.2 (Split Source Buffers). 17 patterns of 8-byte packed source material fit within 9.5KB RAM budget. Generator/Engine refactored to use split source modes.
-**Next action:** Implement Phase 8.3 (Generator Rebuild) and 8.4 (Engine Rebuild) to support separate rhythm/melody evolution and Patience/Mutate logic.
+**Where I stopped:** Repaired Phase 8.1/8.2: Serialization is symmetric, source domains are cleanly split in 8-byte packed events, bursts/children are audible and lockable, and Patience/Mutate are domain-aware. STM32 RAM usage verified (StochasticTrack: 9148B).
+**Next action:** Implement Phase 8.5 (Evaluation) and Phase 8.6 (Lock A/B Evolution) according to PHASE8-V3-PLAN.md.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic
@@ -134,7 +134,7 @@ _Updated: 2026-05-18_
 **Next action:** Phase 1: model layer (`FractalSequence.h` + `FractalTrack.h`) + Track integration
 **Depends on:** resource-optimization (needs RAM headroom), stochastic-track-port (higher priority, will consume first available RAM)
 **Branch:** TBD
-**Reference:** `.tasks/fractal-track-implementation/TASK.md`, `.tasks/fractal-track-implementation/PHASEDPLAN.md`, `doc/fractal-track-research.md`
+**Reference:** `.tasks/fractal-track-implementation/TASK.md`, `docs/superpowers/specs/2026-05-17-fractal-track-design.md`, `docs/superpowers/specs/2026-05-17-fractal-advanced-research.md`
 
 ---
 

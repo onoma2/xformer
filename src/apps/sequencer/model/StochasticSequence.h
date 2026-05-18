@@ -64,7 +64,11 @@ public:
     }
 
     void printScale(StringBuilder &str) const {
-        str(Scale::name(scale()));
+        if (scale() == -1) {
+            str("Default");
+        } else {
+            str(Scale::name(scale()));
+        }
     }
 
     void editScale(int value, bool shift) {

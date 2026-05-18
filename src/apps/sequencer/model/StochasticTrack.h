@@ -70,9 +70,9 @@ public:
     StochasticSourceMode melodyMode() const { return _melodyMode; }
     void setMelodyMode(StochasticSourceMode mode) { _melodyMode = ModelUtils::clampedEnum(mode); }
 
-    // Phase 7b Generator controls
-    StochasticMode mode() const { return _mode; }
-    void setMode(StochasticMode mode) { _mode = ModelUtils::clampedEnum(mode); }
+    // Internal layout padding / legacy
+    StochasticModeInternal modeInternal() const { return _modeInternal; }
+    void setModeInternal(StochasticModeInternal mode) { _modeInternal = ModelUtils::clampedEnum(mode); }
 
     int complexity() const { return _complexity.get(isRouted(Routing::Target::StochasticComplexity)); }
     void setComplexity(int complexity, bool routed = false) { _complexity.set(clamp(complexity, 0, 100), routed); }
@@ -121,15 +121,15 @@ public:
 
     // degreeTickets
     int degreeTicket(int degree) const { return _degreeTickets[degree]; }
-    void setDegreeTicket(int degree, int tickets) { _degreeTickets[degree] = clamp(tickets, 0, 100); }
+    void setDegreeTicket(int degree, int tickets) { _degreeTickets[degree] = clamp(tickets, -1, 100); }
 
     // degreeRotation
     int degreeRotation() const { return _degreeRotation; }
-    void setDegreeRotation(int rotation) { _degreeRotation = clamp(rotation, -12, 12); }
+    void setDegreeRotation(int rotation) { _degreeRotation = clamp(rotation, -32, 32); }
 
     // maskRotation
     int maskRotation() const { return _maskRotation; }
-    void setMaskRotation(int rotation) { _maskRotation = clamp(rotation, -12, 12); }
+    void setMaskRotation(int rotation) { _maskRotation = clamp(rotation, -32, 32); }
 
     // lock
     bool lock() const { return _lock; }
@@ -290,6 +290,39 @@ public:
     void printSlideTime(StringBuilder &str) const { printRouted(str, Routing::Target::SlideTime); str("%d%%", slideTime()); }
     void editSlideTime(int value, bool shift) { if (!isRouted(Routing::Target::SlideTime)) setSlideTime(ModelUtils::adjustedByStep(slideTime(), value, 5, !shift)); }
 
+    void printComplexity(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticComplexity); str("%d%%", complexity()); }
+    void editComplexity(int value, bool shift) { if (!isRouted(Routing::Target::StochasticComplexity)) setComplexity(complexity() + value); }
+
+    void printContour(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticContour); str("%+d%%", contour()); }
+    void editContour(int value, bool shift) { if (!isRouted(Routing::Target::StochasticContour)) setContour(contour() + value); }
+
+    void printRate(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticRate); str("%d%%", rate()); }
+    void editRate(int value, bool shift) { if (!isRouted(Routing::Target::StochasticRate)) setRate(rate() + value); }
+
+    void printVariation(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticVariation); str("%+d%%", variation()); }
+    void editVariation(int value, bool shift) { if (!isRouted(Routing::Target::StochasticVariation)) setVariation(variation() + value); }
+
+    void printRest(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticRest); str("%d%%", rest()); }
+    void editRest(int value, bool shift) { if (!isRouted(Routing::Target::StochasticRest)) setRest(rest() + value); }
+
+    void printSlide(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticSlide); str("%d%%", slide()); }
+    void editSlide(int value, bool shift) { if (!isRouted(Routing::Target::StochasticSlide)) setSlide(slide() + value); }
+
+    void printSleep(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticSleep); str("%d%%", sleep()); }
+    void editSleep(int value, bool shift) { if (!isRouted(Routing::Target::StochasticSleep)) setSleep(sleep() + value); }
+
+    void printPatience(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticPatience); str("%d%%", patience()); }
+    void editPatience(int value, bool shift) { if (!isRouted(Routing::Target::StochasticPatience)) setPatience(patience() + value); }
+
+    void printMutate(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMutate); str("%d%%", mutate()); }
+    void editMutate(int value, bool shift) { if (!isRouted(Routing::Target::StochasticMutate)) setMutate(mutate() + value); }
+
+    void printJump(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticJump); str("%d%%", jump()); }
+    void editJump(int value, bool shift) { if (!isRouted(Routing::Target::StochasticJump)) setJump(jump() + value); }
+
+    void printBurstPitch(StringBuilder &str) const { str(burstPitch() == StochasticBurstPitch::Parent ? "Parent" : "Gen"); }
+    void editBurstPitch(int value, bool shift) { setBurstPitch(ModelUtils::adjustedEnum(burstPitch(), value)); }
+
     int8_t activePatternIndex() const { return -1; }
     void setActivePatternIndex(int index) {}
 
@@ -351,7 +384,7 @@ public:
         _lengthBias.setBase(0);
         _noteBias.setBase(0);
 
-        _mode = StochasticMode::Dice;
+        _modeInternal = StochasticModeInternal::Dice;
         _complexity.setBase(50);
         _contour.setBase(0);
         _rate.setBase(50);
@@ -408,7 +441,7 @@ public:
         _noteBias.write(writer);
 
         // Phase 7b additions
-        writer.write(static_cast<uint8_t>(_mode));
+        writer.write(static_cast<uint8_t>(_modeInternal));
         _complexity.write(writer);
         _contour.write(writer);
         _rate.write(writer);
@@ -471,8 +504,8 @@ public:
         _noteBias.read(reader);
 
         // Phase 7b additions
-        uint8_t mode, burstPitch;
-        reader.read(mode); _mode = static_cast<StochasticMode>(mode);
+        uint8_t modeInternal, burstPitch;
+        reader.read(modeInternal); _modeInternal = static_cast<StochasticModeInternal>(modeInternal);
         _complexity.read(reader);
         _contour.read(reader);
         _rate.read(reader);
@@ -542,7 +575,7 @@ private:
     Routable<int8_t> _noteBias;
 
     // Phase 7b Generator controls
-    StochasticMode _mode;
+    StochasticModeInternal _modeInternal;
     Routable<uint8_t> _complexity;
     Routable<int8_t> _contour;
     Routable<uint8_t> _rate;

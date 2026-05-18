@@ -109,6 +109,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
 
     while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
         _gateOutput = _gateQueue.front().gate;
+        _accentOutput = _gateQueue.front().accent;
         _gateQueue.pop();
     }
 
@@ -135,9 +136,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     int readIndex = _patternIndex;
     if (track.rotate() != 0) {
         int windowSize = sequence.last() - sequence.first() + 1;
-        int offset = (_patternIndex - sequence.first() + track.rotate()) % windowSize;
-        if (offset < 0) offset += windowSize;
-        readIndex = sequence.first() + offset;
+        if (windowSize > 0) {
+            int offset = (_patternIndex - sequence.first() + track.rotate()) % windowSize;
+            if (offset < 0) offset += windowSize;
+            readIndex = sequence.first() + offset;
+        }
     }
 
     bool locked = track.lock() && _lockedParents[readIndex].valid;
@@ -159,6 +162,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
         if (!isRest) {
             _cvQueue.push({ tick, finalCv, isSlide });
+            _gateQueue.push({ tick, true, isAccent });
             
             bool hasChildren = false;
             for (int i = 0; i < 4; ++i) if (_lockedParents[readIndex].children[i].valid) hasChildren = true;
@@ -168,11 +172,10 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 gateLen = std::min(gateLen, uint32_t(10));
             }
 
-            _gateQueue.push({ tick, true });
-            if (!isLegato) _gateQueue.push({ tick + gateLen, false });
+            if (!isLegato) _gateQueue.push({ tick + gateLen, false, false });
             _activity = true;
         } else {
-            _gateQueue.push({ tick, false });
+            _gateQueue.push({ tick, false, false });
             if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
             _activity = false;
         }
@@ -182,13 +185,14 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             if (child.valid) {
                 uint32_t childTick = tick + child.tickOffset;
                 uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
-                _gateQueue.push({ lowTick, false });
+                _gateQueue.push({ lowTick, false, false });
                 _cvQueue.push({ childTick, child.cv, child.slide });
-                _gateQueue.push({ childTick, true });
-                _gateQueue.push({ childTick + child.gateTicks, false }); 
+                _gateQueue.push({ childTick, true, child.accent });
+                _gateQueue.push({ childTick + child.gateTicks, false, false }); 
             }
         }
     } else {
+        // Source Evaluation
         if (track.rhythmMode() == StochasticSourceMode::Loop && !sequence.rhythmValid()) {
             StochasticGenerator::generateRhythm(sequence, track, _rng.next());
         }
@@ -197,42 +201,43 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
 
         const auto &event = sequence.events()[readIndex];
+        StochasticSourceEvent eval;
+        eval.clear();
 
-        StochasticSourceEvent evaluationEvent;
         if (track.rhythmMode() == StochasticSourceMode::Live) {
             auto rhythm = StochasticGenerator::generateRhythmEvent(track, _rng);
-            evaluationEvent.d0 = rhythm.d0;
-            evaluationEvent.d1.childCount = rhythm.d1.childCount;
-            evaluationEvent.d1.rest = rhythm.d1.rest;
-            evaluationEvent.d1.legato = rhythm.d1.legato;
-            evaluationEvent.d1.slide = rhythm.d1.slide;
-            evaluationEvent.d1.accent = rhythm.d1.accent;
-            evaluationEvent.d1.rhythmValid = rhythm.d1.rhythmValid;
+            eval.d0 = rhythm.d0;
+            eval.d1.rest = rhythm.d1.rest;
+            eval.d1.legato = rhythm.d1.legato;
+            eval.d1.slide = rhythm.d1.slide;
+            eval.d1.accent = rhythm.d1.accent;
+            eval.d1.rhythmValid = 1;
+            eval.d1.burstRate = rhythm.d1.burstRate;
         } else {
-            evaluationEvent.d0 = event.d0;
-            evaluationEvent.d1.childCount = event.d1.childCount;
-            evaluationEvent.d1.rest = event.d1.rest;
-            evaluationEvent.d1.legato = event.d1.legato;
-            evaluationEvent.d1.slide = event.d1.slide;
-            evaluationEvent.d1.accent = event.d1.accent;
-            evaluationEvent.d1.rhythmValid = event.d1.rhythmValid;
+            eval.d0 = event.d0;
+            eval.d1.rest = event.d1.rest;
+            eval.d1.legato = event.d1.legato;
+            eval.d1.slide = event.d1.slide;
+            eval.d1.accent = event.d1.accent;
+            eval.d1.rhythmValid = event.d1.rhythmValid;
+            eval.d1.burstRate = event.d1.burstRate;
         }
 
         if (track.melodyMode() == StochasticSourceMode::Live) {
             int lastDegree = -1;
             auto melody = StochasticGenerator::generateMelodyEvent(track, scale, rootNote, lastDegree, _rng);
-            evaluationEvent.d1.degree = melody.d1.degree;
-            evaluationEvent.d1.octave = melody.d1.octave;
-            evaluationEvent.d1.melodyValid = melody.d1.melodyValid;
+            eval.d1.degree = melody.d1.degree;
+            eval.d1.octave = melody.d1.octave;
+            eval.d1.melodyValid = 1;
         } else {
-            evaluationEvent.d1.degree = event.d1.degree;
-            evaluationEvent.d1.octave = event.d1.octave;
-            evaluationEvent.d1.melodyValid = event.d1.melodyValid;
+            eval.d1.degree = event.d1.degree;
+            eval.d1.octave = event.d1.octave;
+            eval.d1.melodyValid = event.d1.melodyValid;
         }
 
         int activeNotes = scale.notesPerOctave();
         
-        uint32_t mult = getDurationMultiplier(track.rate());
+        uint32_t mult = getDurationMultiplier(eval.d0.rate);
         if (track.variation() != 0) {
             int variationRoll = _rng.nextRange(100);
             if (variationRoll < std::abs(track.variation())) {
@@ -250,14 +255,18 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             jumpOffset = _rng.nextRange(2) == 0 ? -1 : 1;
         }
 
-        int note = int(evaluationEvent.d1.degree) + (int(evaluationEvent.d1.octave) + jumpOffset + track.octave()) * activeNotes + track.transpose();
+        int note = int(eval.d1.degree) + (int(eval.d1.octave) + jumpOffset + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
         
-        bool densityPass = (uint32_t(evaluationEvent.d0.densityRank) * 100) < (uint32_t(track.density()) * sequence.size());
-        isRest = bool(evaluationEvent.d1.rest) || !densityPass || !evaluationEvent.d1.rhythmValid || !evaluationEvent.d1.melodyValid;
-        isLegato = bool(evaluationEvent.d1.legato);
-        isSlide = bool(evaluationEvent.d1.slide);
-        isAccent = bool(evaluationEvent.d1.accent);
+        bool densityPass = (uint32_t(eval.d0.densityRank) * 100) < (uint32_t(track.density()) * sequence.size());
+        isRest = bool(eval.d1.rest) || !densityPass || !eval.d1.rhythmValid || !eval.d1.melodyValid;
+        isLegato = bool(eval.d1.legato);
+        isSlide = bool(eval.d1.slide);
+        isAccent = bool(eval.d1.accent);
+
+        // Evaluate Children
+        StochasticGenerator::EvaluatedChild evalChildren[4];
+        StochasticGenerator::evaluateChildren(evalChildren, eval, track, scale, rootNote, note, durationTicks, _rng);
 
         if (_lockedParents) {
             _lockedParents[readIndex].valid = true; 
@@ -267,22 +276,49 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _lockedParents[readIndex].legato = isLegato;
             _lockedParents[readIndex].slide = isSlide;
             _lockedParents[readIndex].accent = isAccent;
-            for (int i = 0; i < 4; ++i) _lockedParents[readIndex].children[i].valid = false;
+            for (int i = 0; i < 4; ++i) {
+                if (evalChildren[i].valid) {
+                    _lockedParents[readIndex].children[i].valid = true;
+                    _lockedParents[readIndex].children[i].cv = scale.noteToVolts(evalChildren[i].note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
+                    _lockedParents[readIndex].children[i].tickOffset = evalChildren[i].tickOffset;
+                    _lockedParents[readIndex].children[i].gateTicks = evalChildren[i].gateTicks;
+                    _lockedParents[readIndex].children[i].slide = isSlide;
+                    _lockedParents[readIndex].children[i].accent = isAccent;
+                } else {
+                    _lockedParents[readIndex].children[i].valid = false;
+                }
+            }
         }
 
         if (!isRest) {
             _cvQueue.push({ tick, finalCv, isSlide });
+            _gateQueue.push({ tick, true, isAccent });
             
+            bool hasChildren = false;
+            for (int i = 0; i < 4; ++i) if (evalChildren[i].valid) hasChildren = true;
+
             uint32_t gateLen = (durationTicks * 50) / 100;
-            if (evaluationEvent.d1.childCount > 0) {
+            if (hasChildren) {
                 gateLen = std::min(gateLen, uint32_t(10));
             }
 
-            _gateQueue.push({ tick, true });
-            if (!isLegato) _gateQueue.push({ tick + gateLen, false });
+            if (!isLegato) _gateQueue.push({ tick + gateLen, false, false });
             _activity = true;
+
+            for (int i = 0; i < 4; ++i) {
+                if (evalChildren[i].valid) {
+                    uint32_t childTick = tick + evalChildren[i].tickOffset;
+                    uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
+                    float childCv = scale.noteToVolts(evalChildren[i].note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
+                    
+                    _gateQueue.push({ lowTick, false, false });
+                    _cvQueue.push({ childTick, childCv, isSlide });
+                    _gateQueue.push({ childTick, true, isAccent }); // Children inherit accent for now
+                    _gateQueue.push({ childTick + evalChildren[i].gateTicks, false, false });
+                }
+            }
         } else {
-            _gateQueue.push({ tick, false });
+            _gateQueue.push({ tick, false, false });
             if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
             _activity = false;
         }
@@ -296,19 +332,38 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         if (!track.lock()) {
             if (track.sleep() > 0) _sleepRemaining = (track.sleep() * 4) / 10; 
             
+            // Domain-aware mutation
             if (track.mutate() > 0 && int(_rng.nextRange(100)) < track.mutate()) {
-                StochasticGenerator::mutateOne(sequence, track, scale, rootNote, _rng);
+                if (track.rhythmMode() == StochasticSourceMode::Loop && track.melodyMode() == StochasticSourceMode::Loop) {
+                    if (_rng.nextRange(2) == 0) StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
+                    else StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
+                } else if (track.rhythmMode() == StochasticSourceMode::Loop) {
+                    StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
+                } else if (track.melodyMode() == StochasticSourceMode::Loop) {
+                    StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
+                }
             }
+
+            // Domain-aware patience
             if (track.patience() < 100) {
                 _boredomCounter++;
                 uint32_t threshold = uint32_t(track.patience()) * 20;
-                if (_boredomCounter > threshold) {
-                    sequence.setRhythmValid(false);
-                    sequence.setMelodyValid(false);
+                if (track.patience() == 0) threshold = 1;
+
+                if (_boredomCounter >= threshold) {
+                    if (track.rhythmMode() == StochasticSourceMode::Loop) sequence.setRhythmValid(false);
+                    if (track.melodyMode() == StochasticSourceMode::Loop) sequence.setMelodyValid(false);
                     _boredomCounter = 0;
                 } else if (_boredomCounter > (threshold * 3) / 4) {
                     if (int(_rng.nextRange(100)) < 25) {
-                        StochasticGenerator::mutateOne(sequence, track, scale, rootNote, _rng);
+                        if (track.rhythmMode() == StochasticSourceMode::Loop && track.melodyMode() == StochasticSourceMode::Loop) {
+                            if (_rng.nextRange(2) == 0) StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
+                            else StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
+                        } else if (track.rhythmMode() == StochasticSourceMode::Loop) {
+                            StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
+                        } else if (track.melodyMode() == StochasticSourceMode::Loop) {
+                            StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
+                        }
                     }
                 }
             }
