@@ -215,6 +215,72 @@ public:
         _noteBias.set(clamp(noteBias, -100, 100), routed);
     }
 
+    // Phase 7b Generator controls
+    StochasticMode mode() const { return _mode; }
+    void setMode(StochasticMode mode) { _mode = ModelUtils::clampedEnum(mode); }
+
+    int complexity() const { return _complexity.get(isRouted(Routing::Target::StochasticComplexity)); }
+    void setComplexity(int complexity, bool routed = false) {
+        _complexity.set(clamp(complexity, 0, 100), routed);
+    }
+
+    int contour() const { return _contour.get(isRouted(Routing::Target::StochasticContour)); }
+    void setContour(int contour, bool routed = false) {
+        _contour.set(clamp(contour, -100, 100), routed);
+    }
+
+    int rate() const { return _rate.get(isRouted(Routing::Target::StochasticRate)); }
+    void setRate(int rate, bool routed = false) {
+        _rate.set(clamp(rate, 0, 100), routed);
+    }
+
+    int variation() const { return _variation.get(isRouted(Routing::Target::StochasticVariation)); }
+    void setVariation(int variation, bool routed = false) {
+        _variation.set(clamp(variation, -100, 100), routed);
+    }
+
+    int rest() const { return _rest.get(isRouted(Routing::Target::StochasticRest)); }
+    void setRest(int rest, bool routed = false) {
+        _rest.set(clamp(rest, 0, 100), routed);
+    }
+
+    int slide() const { return _slide.get(isRouted(Routing::Target::StochasticSlide)); }
+    void setSlide(int slide, bool routed = false) {
+        _slide.set(clamp(slide, 0, 100), routed);
+    }
+
+    int burstRate() const { return _burstRate; }
+    void setBurstRate(int rate) { _burstRate = clamp(rate, 0, 100); }
+
+    int burstCount() const { return _burstCount; }
+    void setBurstCount(int count) { _burstCount = clamp(count, 0, 100); }
+
+    StochasticBurstPitch burstPitch() const { return _burstPitch; }
+    void setBurstPitch(StochasticBurstPitch pitch) { _burstPitch = ModelUtils::clampedEnum(pitch); }
+
+    int sleep() const { return _sleep.get(isRouted(Routing::Target::StochasticSleep)); }
+    void setSleep(int sleep, bool routed = false) {
+        _sleep.set(clamp(sleep, 0, 100), routed);
+    }
+
+    int patience() const { return _patience.get(isRouted(Routing::Target::StochasticPatience)); }
+    void setPatience(int patience, bool routed = false) {
+        _patience.set(clamp(patience, 0, 100), routed);
+    }
+
+    int mutate() const { return _mutate.get(isRouted(Routing::Target::StochasticMutate)); }
+    void setMutate(int mutate, bool routed = false) {
+        _mutate.set(clamp(mutate, 0, 100), routed);
+    }
+
+    int jump() const { return _jump.get(isRouted(Routing::Target::StochasticJump)); }
+    void setJump(int jump, bool routed = false) {
+        _jump.set(clamp(jump, 0, 100), routed);
+    }
+
+    int range() const { return _range; }
+    void setRange(int range) { _range = clamp(range, 1, 4); }
+
     // UI methods
     void printDensity(StringBuilder &str) const { str("%d%%", density()); }
     void editDensity(int value, bool shift) { setDensity(ModelUtils::adjustedByStep(density(), value, 1, !shift)); }
@@ -270,6 +336,19 @@ public:
     void printRunMode(StringBuilder &str) const { str("N/A"); }
     void editRunMode(int value, bool shift) { }
 
+    // Active Pattern Buffer (Shared across track patterns)
+    const std::array<StochasticParentEvent, CONFIG_STEP_COUNT> &events() const { return _events; }
+          std::array<StochasticParentEvent, CONFIG_STEP_COUNT> &events()       { return _events; }
+    
+    const std::array<StochasticChildHit, CONFIG_STEP_COUNT * 4> &children() const { return _children; }
+          std::array<StochasticChildHit, CONFIG_STEP_COUNT * 4> &children()       { return _children; }
+
+    int activePatternIndex() const { return _activePatternIndex; }
+    void setActivePatternIndex(int index) { _activePatternIndex = index; }
+
+    uint32_t activeSeed() const { return _activeSeed; }
+    void setActiveSeed(uint32_t seed) { _activeSeed = seed; }
+
     // sequences
     const StochasticSequenceArray &sequences() const { return _sequences; }
           StochasticSequenceArray &sequences()       { return _sequences; }
@@ -324,6 +403,28 @@ public:
         _lengthBias.setBase(0);
         _noteBias.setBase(0);
 
+        _mode = StochasticMode::Dice;
+        _complexity.setBase(50);
+        _contour.setBase(0);
+        _rate.setBase(50);
+        _variation.setBase(0);
+        _rest.setBase(0);
+        _slide.setBase(0);
+        _burstRate = 50;
+        _burstCount = 0;
+        _burstPitch = StochasticBurstPitch::Parent;
+        _sleep.setBase(0);
+        _patience.setBase(100);
+        _mutate.setBase(0);
+        _jump.setBase(0);
+        _range = 1;
+
+        _activePatternIndex = -1;
+        _activeSeed = 0;
+
+        for (auto &event : _events) event.clear();
+        for (auto &child : _children) child.clear();
+
         for (auto &sequence : _sequences) {
             sequence.clear();
         }
@@ -360,6 +461,23 @@ public:
         _retriggerBias.write(writer);
         _lengthBias.write(writer);
         _noteBias.write(writer);
+
+        // Phase 7b additions
+        writer.write(static_cast<uint8_t>(_mode));
+        _complexity.write(writer);
+        _contour.write(writer);
+        _rate.write(writer);
+        _variation.write(writer);
+        _rest.write(writer);
+        _slide.write(writer);
+        writer.write(_burstRate);
+        writer.write(_burstCount);
+        writer.write(static_cast<uint8_t>(_burstPitch));
+        _sleep.write(writer);
+        _patience.write(writer);
+        _mutate.write(writer);
+        _jump.write(writer);
+        writer.write(_range);
 
         for (const auto &sequence : _sequences) {
             sequence.write(writer);
@@ -403,6 +521,26 @@ public:
         _retriggerBias.read(reader);
         _lengthBias.read(reader);
         _noteBias.read(reader);
+
+        // Phase 7b additions
+        uint8_t mode, burstPitch;
+        reader.read(mode); _mode = static_cast<StochasticMode>(mode);
+        _complexity.read(reader);
+        _contour.read(reader);
+        _rate.read(reader);
+        _variation.read(reader);
+        _rest.read(reader);
+        _slide.read(reader);
+        reader.read(_burstRate);
+        reader.read(_burstCount);
+        reader.read(burstPitch); _burstPitch = static_cast<StochasticBurstPitch>(burstPitch);
+        _sleep.read(reader);
+        _patience.read(reader);
+        _mutate.read(reader);
+        _jump.read(reader);
+        reader.read(_range);
+
+        _activePatternIndex = -1; // Force regeneration on read
 
         for (auto &sequence : _sequences) {
             sequence.read(reader);
@@ -452,6 +590,29 @@ private:
     Routable<int8_t> _retriggerBias;
     Routable<int8_t> _lengthBias;
     Routable<int8_t> _noteBias;
+
+    // Phase 7b Generator controls
+    StochasticMode _mode;
+    Routable<uint8_t> _complexity;
+    Routable<int8_t> _contour;
+    Routable<uint8_t> _rate;
+    Routable<int8_t> _variation;
+    Routable<uint8_t> _rest;
+    Routable<uint8_t> _slide;
+    uint8_t _burstRate;
+    uint8_t _burstCount;
+    StochasticBurstPitch _burstPitch;
+    Routable<uint8_t> _sleep;
+    Routable<uint8_t> _patience;
+    Routable<uint8_t> _mutate;
+    Routable<uint8_t> _jump;
+    uint8_t _range;
+
+    // Active Pattern Buffer (Shared across track patterns)
+    std::array<StochasticParentEvent, CONFIG_STEP_COUNT> _events;
+    std::array<StochasticChildHit, CONFIG_STEP_COUNT * 4> _children;
+    int8_t _activePatternIndex;
+    uint32_t _activeSeed;
 
     StochasticSequenceArray _sequences;
 
