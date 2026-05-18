@@ -284,9 +284,17 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                 case Track::TrackMode::Teletype:
                     break;
                 case Track::TrackMode::Stochastic:
+                    if (target == Routing::Target::Divisor) {
+                        track.stochasticTrack().sequence(_project.selectedPatternIndex()).setDivisor(intValue);
+                    } else if (target == Routing::Target::Scale) {
+                        track.stochasticTrack().sequence(_project.selectedPatternIndex()).setScale(intValue);
+                    } else if (target == Routing::Target::RootNote) {
+                        track.stochasticTrack().sequence(_project.selectedPatternIndex()).setRootNote(intValue);
+                    } else {
+                        track.stochasticTrack().writeRouted(target, intValue, floatValue);
+                    }
                     break;
-                case Track::TrackMode::Last:
-                    break;
+                case Track::TrackMode::Last:                    break;
                 }
             }
         }
@@ -424,6 +432,16 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::StochasticTilt)]                  = { -100,   100,    0,      100,    10      },
     [int(Routing::Target::StochasticJitter)]                = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::StochasticBurst)]                 = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticComplexity)]            = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticContour)]               = { -100,   100,    0,      100,    10      },
+    [int(Routing::Target::StochasticRate)]                  = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticVariation)]             = { -100,   100,    0,      100,    10      },
+    [int(Routing::Target::StochasticRest)]                  = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticSlide)]                 = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticSleep)]                 = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticPatience)]              = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticMutate)]                = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticJump)]                  = { 0,      100,    0,      100,    10      },
 };
 
 float Routing::normalizeTargetValue(Routing::Target target, float value) {

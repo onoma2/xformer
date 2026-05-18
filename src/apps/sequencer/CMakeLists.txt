@@ -20,6 +20,7 @@ set(sources
     engine/TeletypeBridge.cpp
     engine/TeletypeTrackEngine.cpp
     engine/StochasticTrackEngine.cpp
+    engine/StochasticGenerator.cpp
     engine/TuesdayTrackEngine.cpp
     engine/RoutingEngine.cpp
     engine/SequenceState.cpp

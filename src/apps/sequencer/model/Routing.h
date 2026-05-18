@@ -142,7 +142,17 @@ public:
         StochasticTilt,
         StochasticJitter,
         StochasticBurst,
-        StochasticLast = StochasticBurst,
+        StochasticComplexity,
+        StochasticContour,
+        StochasticRate,
+        StochasticVariation,
+        StochasticRest,
+        StochasticSlide,
+        StochasticSleep,
+        StochasticPatience,
+        StochasticMutate,
+        StochasticJump,
+        StochasticLast = StochasticJump,
 
         Last,
     };
@@ -203,6 +213,16 @@ public:
         case Target::StochasticTilt:            return "Tilt";
         case Target::StochasticJitter:          return "Jitter";
         case Target::StochasticBurst:           return "Burst";
+        case Target::StochasticComplexity:      return "Complexity";
+        case Target::StochasticContour:         return "Contour";
+        case Target::StochasticRate:            return "Rate";
+        case Target::StochasticVariation:       return "Variation";
+        case Target::StochasticRest:            return "Rest";
+        case Target::StochasticSlide:           return "Slide";
+        case Target::StochasticSleep:           return "Sleep";
+        case Target::StochasticPatience:        return "Patience";
+        case Target::StochasticMutate:          return "Mutate";
+        case Target::StochasticJump:            return "Jump";
         
         
 
@@ -290,6 +310,16 @@ public:
         case Target::StochasticTilt:            return 66;
         case Target::StochasticJitter:          return 67;
         case Target::StochasticBurst:           return 68;
+        case Target::StochasticComplexity:      return 69;
+        case Target::StochasticContour:         return 70;
+        case Target::StochasticRate:            return 71;
+        case Target::StochasticVariation:       return 72;
+        case Target::StochasticRest:            return 73;
+        case Target::StochasticSlide:           return 74;
+        case Target::StochasticSleep:           return 75;
+        case Target::StochasticPatience:        return 76;
+        case Target::StochasticMutate:          return 77;
+        case Target::StochasticJump:            return 78;
         
 
         // Chaos Targets (39-42)
@@ -396,7 +426,17 @@ public:
         StochasticTilt,
         StochasticJitter,
         StochasticBurst,
-        StochasticLast = StochasticBurst,
+        StochasticComplexity,
+        StochasticContour,
+        StochasticRate,
+        StochasticVariation,
+        StochasticRest,
+        StochasticSlide,
+        StochasticSleep,
+        StochasticPatience,
+        StochasticMutate,
+        StochasticJump,
+        StochasticLast = StochasticJump,
 
         Last,
     };
@@ -573,7 +613,17 @@ public:
         StochasticTilt,
         StochasticJitter,
         StochasticBurst,
-        StochasticLast = StochasticBurst,
+        StochasticComplexity,
+        StochasticContour,
+        StochasticRate,
+        StochasticVariation,
+        StochasticRest,
+        StochasticSlide,
+        StochasticSleep,
+        StochasticPatience,
+        StochasticMutate,
+        StochasticJump,
+        StochasticLast = StochasticJump,
 
         Last,
         };
