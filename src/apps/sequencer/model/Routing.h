@@ -92,7 +92,7 @@ public:
         Trill,
         StepTrill,
         GateOffset,
-        GateLength, // Added
+        GateLength,
         TuesdayLast = GateLength,
 
         // Chaos Targets
@@ -125,8 +125,6 @@ public:
         IndexedA = IndexedFirst,
         IndexedB,
         IndexedLast = IndexedB,
-
-
 
         // Bus Targets
         BusFirst,
@@ -209,9 +207,10 @@ public:
         case Target::StepTrill:                 return "StepTrill";
         case Target::GateOffset:                return "Gate Offset";
         case Target::GateLength:                return "Gate Length";
+
         case Target::StochasticDensity:         return "Density";
         case Target::StochasticTilt:            return "Tilt";
-
+        case Target::StochasticReserved:        return "";
         case Target::StochasticBurst:           return "Burst";
         case Target::StochasticComplexity:      return "Complexity";
         case Target::StochasticContour:         return "Contour";
@@ -223,9 +222,6 @@ public:
         case Target::StochasticPatience:        return "Patience";
         case Target::StochasticMutate:          return "Mutate";
         case Target::StochasticJump:            return "Jump";
-        case Target::StochasticReserved:        return "";
-        
-        
 
         case Target::ChaosAmount:               return "Chaos Amount";
         case Target::ChaosRate:                 return "Chaos Rate";
@@ -266,7 +262,7 @@ public:
         case Target::CvRouteRoute:              return 62;
         case Target::SlideTime:                 return 5;
         case Target::Octave:                    return 6;
-        case Target::Transpose:                    return 7;
+        case Target::Transpose:                 return 7;
         case Target::Rotate:                    return 8;
         case Target::GateProbabilityBias:       return 9;
         case Target::RetriggerProbabilityBias:  return 10;
@@ -276,7 +272,7 @@ public:
         case Target::RunMode:                   return 14;
         case Target::FirstStep:                 return 15;
         case Target::LastStep:                  return 16;
-        case Target::ClockMult:                return 56;
+        case Target::ClockMult:                 return 56;
 
         case Target::Mute:                      return 17;
         case Target::Fill:                      return 18;
@@ -307,6 +303,7 @@ public:
         case Target::StepTrill:                 return 36;
         case Target::GateOffset:                return 37;
         case Target::GateLength:                return 38;
+
         case Target::StochasticDensity:         return 65;
         case Target::StochasticTilt:            return 66;
         case Target::StochasticReserved:        return 67;
@@ -321,7 +318,6 @@ public:
         case Target::StochasticPatience:        return 76;
         case Target::StochasticMutate:          return 77;
         case Target::StochasticJump:            return 78;
-        
 
         // Chaos Targets (39-42)
         case Target::ChaosAmount:               return 39;
@@ -381,6 +377,7 @@ public:
     static bool isTuesdayTarget(Target target) {
         return target >= Target::TuesdayFirst && target <= Target::TuesdayLast;
     }
+
     static bool isStochasticTarget(Target target) {
         return target >= Target::StochasticFirst &&
                target <= Target::StochasticLast &&
@@ -454,7 +451,7 @@ public:
         case Shaper::Activity:           return 6;
         case Shaper::ProgressiveDivider: return 7;
         case Shaper::VcaNext:            return 8;
-        case Shaper::Last:               break;
+        default:                         break;
         }
         return 0;
     }
@@ -572,28 +569,20 @@ public:
 
     class CvSource {
     public:
-        // range
-
         Types::VoltageRange range() const { return _range; }
         void setRange(Types::VoltageRange range) {
             _range = ModelUtils::clampedEnum(range);
         }
-
         void editRange(int value, bool shift) {
             setRange(ModelUtils::adjustedEnum(range(), value));
         }
-
         void printRange(StringBuilder &str) const {
             str(Types::voltageRangeName(range()));
         }
-
         void clear();
-
         void write(VersionedSerializedWriter &writer) const;
         void read(VersionedSerializedReader &reader);
-
         bool operator==(const CvSource &other) const;
-
     private:
         Types::VoltageRange _range;
     };
@@ -609,25 +598,23 @@ public:
             NoteToggle,
             NoteVelocity,
             NoteRange,
-            // Stochastic Track Targets
-        StochasticFirst,
-        StochasticDensity = StochasticFirst,
-        StochasticTilt,
-        StochasticReserved,
-        StochasticBurst,
-        StochasticComplexity,
-        StochasticContour,
-        StochasticRate,
-        StochasticVariation,
-        StochasticRest,
-        StochasticSlide,
-        StochasticSleep,
-        StochasticPatience,
-        StochasticMutate,
-        StochasticJump,
-        StochasticLast = StochasticJump,
-
-        Last,
+            StochasticFirst,
+            StochasticDensity = StochasticFirst,
+            StochasticTilt,
+            StochasticReserved,
+            StochasticBurst,
+            StochasticComplexity,
+            StochasticContour,
+            StochasticRate,
+            StochasticVariation,
+            StochasticRest,
+            StochasticSlide,
+            StochasticSleep,
+            StochasticPatience,
+            StochasticMutate,
+            StochasticJump,
+            StochasticLast = StochasticJump,
+            Last,
         };
 
         static const char *eventName(Event event) {
@@ -639,87 +626,61 @@ public:
             case Event::NoteToggle:     return "Note Toggle";
             case Event::NoteVelocity:   return "Note Velocity";
             case Event::NoteRange:      return "Note Range";
-            case Event::Last:           break;
+            default:                    break;
             }
             return nullptr;
         }
 
-        // source
-
         const MidiSourceConfig &source() const { return _source; }
               MidiSourceConfig &source()       { return _source; }
-
-        // event
 
         Event event() const { return _event; }
         void setEvent(Event event) {
             _event = ModelUtils::clampedEnum(event);
         }
-
         void editEvent(int value, bool shift) {
             setEvent(ModelUtils::adjustedEnum(event(), value));
         }
-
         void printEvent(StringBuilder &str) const {
             str(eventName(event()));
         }
-
         bool isControlEvent() const {
             return int(_event) <= int(Event::LastControlEvent);
         }
-
-        // controlNumber
-
         int controlNumber() const { return _controlNumberOrNote; }
         void setControlNumber(int controlNumber) {
             _controlNumberOrNote = clamp(controlNumber, 0, 127);
         }
-
         void editControlNumber(int value, bool shift) {
             setControlNumber(controlNumber() + value);
         }
-
         void printControlNumber(StringBuilder &str) const {
             str("%d", note());
         }
-
-        // note
-
         int note() const { return _controlNumberOrNote; }
         void setNote(int note) {
             _controlNumberOrNote = clamp(note, 0, 127);
         }
-
         void editNote(int value, bool shift) {
             setNote(note() + value);
         }
-
         void printNote(StringBuilder &str) const {
             Types::printMidiNote(str, note());
         }
-
-        // noteRange
-
         int noteRange() const { return _noteRange; }
         void setNoteRange(int noteRange) {
             _noteRange = clamp(noteRange, 2, 64);
         }
-
         void editNoteRange(int value, bool shift) {
             setNoteRange(noteRange() + value);
         }
-
         void printNoteRange(StringBuilder &str) const {
             str("%d", noteRange());
         }
-
         void clear();
-
         void write(VersionedSerializedWriter &writer) const;
         void read(VersionedSerializedReader &reader);
-
         bool operator==(const MidiSource &other) const;
-
     private:
         MidiSourceConfig _source;
         Event _event;
@@ -731,9 +692,6 @@ public:
     public:
         static constexpr int8_t DefaultBiasPct = 0;
         static constexpr int8_t DefaultDepthPct = 100;
-
-        // target
-
         Target target() const { return _target; }
         void setTarget(Target target) {
             target = ModelUtils::clampedEnum(target);
@@ -745,24 +703,18 @@ public:
                 _source = Source::None;
             }
         }
-
         void editTarget(int value, bool shift) {
             setTarget(ModelUtils::adjustedEnum(target(), value));
         }
-
         void printTarget(StringBuilder &str) const {
             str(targetName(target()));
         }
-
-        // tracks
-
         uint8_t tracks() const { return isPerTrackTarget(_target) ? _tracks : 0; }
         void setTracks(uint8_t tracks) {
             if (isPerTrackTarget(_target)) {
                 _tracks = tracks;
             }
         }
-
         void toggleTrack(int trackIndex) {
             uint8_t trackBit = (1<<trackIndex);
             if (tracks() & trackBit) {
@@ -771,7 +723,6 @@ public:
                 setTracks(tracks() | trackBit);
             }
         }
-
         void printTracks(StringBuilder &str) const {
             if (isPerTrackTarget(_target)) {
                 for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
@@ -781,9 +732,6 @@ public:
                 str("n/a");
             }
         }
-
-        // min
-
         float min() const { return _min; }
         void setMin(float min) {
             _min = clamp(min, 0.f, 1.f);
@@ -791,17 +739,12 @@ public:
                 setMax(_min);
             }
         }
-
         void editMin(int value, bool shift) {
             setMin(min() + value * targetValueStep(_target, shift));
         }
-
         void printMin(StringBuilder &str) const {
             Routing::printTargetValue(_target, _min, str);
         }
-
-        // max
-
         float max() const { return _max; }
         void setMax(float max) {
             _max = clamp(max, 0.f, 1.f);
@@ -809,44 +752,29 @@ public:
                 setMin(_max);
             }
         }
-
         void editMax(int value, bool shift) {
             setMax(max() + value * targetValueStep(_target, shift));
         }
-
         void printMax(StringBuilder &str) const {
             Routing::printTargetValue(_target, _max, str);
         }
-
-        // per-track bias
-
         int biasPct(int trackIndex) const { return _biasPct[trackIndex]; }
         void setBiasPct(int trackIndex, int bias) {
             _biasPct[trackIndex] = clamp(bias, -75, 75);
         }
-
-        // per-track depth
-
         int depthPct(int trackIndex) const { return _depthPct[trackIndex]; }
         void setDepthPct(int trackIndex, int depth) {
             _depthPct[trackIndex] = clamp(depth, -100, 100);
         }
-
         bool hasNonDefaultShaping(int trackIndex) const {
             return _biasPct[trackIndex] != DefaultBiasPct ||
                    _depthPct[trackIndex] != DefaultDepthPct ||
                    _shaper[trackIndex] != Shaper::None;
         }
-
-        // shaper (per track) — crease is Shaper::Crease, no separate flag needed
-
         Shaper shaper(int trackIndex) const { return _shaper[trackIndex]; }
         void setShaper(int trackIndex, Shaper shaper) {
             _shaper[trackIndex] = ModelUtils::clampedEnum(shaper);
         }
-
-        // source
-
         Source source() const { return _source; }
         void setSource(Source source) {
             source = ModelUtils::clampedEnum(source);
@@ -856,7 +784,6 @@ public:
                 _source = source;
             }
         }
-
         void editSource(int value, bool shift) {
             if (value == 0) {
                 return;
@@ -882,44 +809,28 @@ public:
                 }
             }
         }
-
         void printSource(StringBuilder &str) const {
             Routing::printSource(source(), str);
         }
-
-        // cvSource
-
         const CvSource &cvSource() const { return _cvSource; }
               CvSource &cvSource()       { return _cvSource; }
-
-        // midiSource
-
         const MidiSource &midiSource() const { return _midiSource; }
               MidiSource &midiSource()       { return _midiSource; }
-
-        // cvRotateInterpolate (CV Out Rot only)
-
         bool cvRotateInterpolate() const { return _cvRotateInterpolate; }
         void setCvRotateInterpolate(bool enabled) { _cvRotateInterpolate = enabled; }
-
         Route();
-
         void clear();
-
         bool active() const { return _target != Target::None; }
-
         void write(VersionedSerializedWriter &writer) const;
         void read(VersionedSerializedReader &reader);
-
         bool operator==(const Route &other) const;
         bool operator!=(const Route &other) const {
             return !(*this == other);
         }
-
     private:
         Target _target;
         int8_t _tracks;
-        float _min; // TODO make these int16_t
+        float _min;
         float _max;
         std::array<int8_t, CONFIG_TRACK_COUNT> _biasPct;
         std::array<int8_t, CONFIG_TRACK_COUNT> _depthPct;
@@ -928,65 +839,40 @@ public:
         CvSource _cvSource;
         MidiSource _midiSource;
         bool _cvRotateInterpolate = false;
-
         friend class Routing;
     };
 
     using RouteArray = std::array<Route, CONFIG_ROUTE_COUNT>;
-
-    //----------------------------------------
-    // Properties
-    //----------------------------------------
-
-    // routes
-
     const RouteArray &routes() const { return _routes; }
           RouteArray &routes()       { return _routes; }
-
     const Route &route(int index) const { return _routes[index]; }
           Route &route(int index)       { return _routes[index]; }
 
-    //----------------------------------------
-    // Methods
-    //----------------------------------------
-
     Routing(Project &project);
-
     void clear();
-
     int findEmptyRoute() const;
     int findRoute(Target target, int trackIndex) const;
     int checkRouteConflict(const Route &editedRoute, const Route &existingRoute) const;
-
     void writeTarget(Target target, uint8_t tracks, float normalized);
-
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);
-
     bool isDirty() const { return _dirty; }
     void clearDirty() { _dirty = false; }
-
-    // Target value helpers (exposed for routing/shaping)
     static float normalizeTargetValue(Target target, float value);
     static float denormalizeTargetValue(Target target, float normalized);
     static std::pair<float, float> targetValueRange(Target target);
-
-    // global state for keeping active set of routed targets
     static bool isRouted(Target target, int trackIndex = -1);
     static void setRouted(Target target, uint8_t tracks, bool routed);
     static void printRouted(StringBuilder &str, Target target, int trackIndex = -1);
-
 private:
     static std::pair<float, float> normalizedDefaultRange(Target target);
     static float targetValueStep(Target target, bool shift);
     static void printTargetValue(Target target, float normalized, StringBuilder &str);
-
     Project &_project;
     RouteArray _routes;
     bool _dirty;
 };
 
-// Routable parameters store both a base and routed value.
 template<typename T>
 struct Routable {
     union {
@@ -996,25 +882,21 @@ struct Routable {
         };
         T values[2];
     };
-
     inline void set(T value, bool selectRouted) {
         values[selectRouted] = value;
         if (!selectRouted) {
-            values[1] = value;  // Also initialize routed when setting base
+            values[1] = value;
         }
     }
     inline T get(bool selectRouted) const { return values[selectRouted]; }
-
     inline void clear() { base = T{}; routed = T{}; }
-    inline void setBase(T value) { base = value; routed = value; }  // Initialize routed to same value
-    inline void write(int value) { routed = value; } // For Routing::writeTarget (writes to routed slot)
-
+    inline void setBase(T value) { base = value; routed = value; }
+    inline void write(int value) { routed = value; }
     inline void write(VersionedSerializedWriter &writer) const {
         writer.write(base);
     }
-
     inline void read(VersionedSerializedReader &reader) {
         reader.read(base);
-        routed = base; // Initialize routed to base value on read
+        routed = base;
     }
 };

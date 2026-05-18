@@ -344,12 +344,20 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             if (track.mutate() > 0 && int(_rng.nextRange(100)) < track.mutate()) {
                 StochasticGenerator::mutateOne(sequence, track, scale, rootNote, _rng);
             }
-            
+            // Patience / Boredom
             if (track.patience() < 100) {
                 _boredomCounter++;
-                if (_boredomCounter > (uint32_t(track.patience()) * 10)) {
+                uint32_t threshold = uint32_t(track.patience()) * 20; // Range ~0..2000 loops
+
+                if (_boredomCounter > threshold) {
+                    // Full re-roll
                     sequence.setPatternValid(false);
                     _boredomCounter = 0;
+                } else if (_boredomCounter > (threshold * 3) / 4) {
+                    // Warning phase: high mutation rate
+                    if (int(_rng.nextRange(100)) < 25) {
+                        StochasticGenerator::mutateOne(sequence, track, scale, rootNote, _rng);
+                    }
                 }
             }
         }

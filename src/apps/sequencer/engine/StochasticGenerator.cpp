@@ -170,17 +170,40 @@ int StochasticGenerator::generateDegree(const StochasticTrack &track, const Scal
         degree = allowedDegrees[targetIdx];
     } else {
         int complexity = track.complexity();
-        if (complexity < 33 && lastDegree != -1) {
-            if (int(rng.nextRange(100)) < (100 - complexity)) {
-                return lastDegree;
-            }
-        }
+        int contour = track.contour();
+        int linearity = track.linearity();
 
-        if (track.linearity() > 0 && lastDegree != -1) {
+        // 2. Apply Complexity constraints to the raffle pool
+        if (complexity < 50 && lastDegree != -1) {
+            // Low complexity: strong preference for small intervals and repeats
             totalTickets = 0;
             for (int i = 0; i < allowedCount; ++i) {
                 int dist = std::abs(allowedDegrees[i] - lastDegree);
-                int penalty = (dist * track.linearity()) / 10;
+                if (dist > (1 + complexity / 10)) {
+                    penalizedWeights[i] /= 4; // Heavily penalize large leaps
+                }
+                totalTickets += penalizedWeights[i];
+            }
+        }
+
+        // 3. Apply Contour bias
+        if (contour != 0) {
+            totalTickets = 0;
+            for (int i = 0; i < allowedCount; ++i) {
+                // Normalize position in allowed pool to -1.0 .. 1.0
+                float pos = (2.0f * i / (allowedCount - 1)) - 1.0f;
+                float bias = 1.0f + (pos * contour / 100.0f);
+                penalizedWeights[i] = std::max(0, int(penalizedWeights[i] * bias));
+                totalTickets += penalizedWeights[i];
+            }
+        }
+
+        // 4. Apply Linearity bias (melodic smoothing)
+        if (linearity > 0 && lastDegree != -1) {
+            totalTickets = 0;
+            for (int i = 0; i < allowedCount; ++i) {
+                int dist = std::abs(allowedDegrees[i] - lastDegree);
+                int penalty = (dist * linearity) / 10;
                 penalizedWeights[i] = std::max(0, penalizedWeights[i] - penalty);
                 totalTickets += penalizedWeights[i];
             }
