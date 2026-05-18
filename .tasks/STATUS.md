@@ -130,10 +130,11 @@ _Updated: 2026-05-18_
 
 ## 🔵 fractal-track-implementation — Smart Mutation Engine track type (FractalTrack)
 **Status:** blocked
-**Where I stopped:** Full design doc read. Architecture defined as new TrackMode following TuesdayTrack pattern.
+**Where I stopped:** Updated phased plan written to `.tasks/fractal-track-implementation/PHASEDPLAN.md`. Reduced initial scope to MVP: NoteTrack parent only, scale-constrained mutation only, no extended rules, no Bloom features. RAM assessment: estimated to fit under existing container gates (~880 B model, ~416 B engine), but needs ARM sizeof probe confirmation on hardware.
 **Next action:** Phase 1: model layer (`FractalSequence.h` + `FractalTrack.h`) + Track integration
-**Depends on:** resource-optimization (needs RAM headroom)
+**Depends on:** resource-optimization (needs RAM headroom), stochastic-track-port (higher priority, will consume first available RAM)
 **Branch:** TBD
+**Reference:** `.tasks/fractal-track-implementation/TASK.md`, `.tasks/fractal-track-implementation/PHASEDPLAN.md`, `doc/fractal-track-research.md`
 
 ---
 
