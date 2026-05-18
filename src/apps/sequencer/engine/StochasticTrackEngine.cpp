@@ -1,245 +1,25 @@
 #include "StochasticTrackEngine.h"
-
+#include "StochasticGenerator.h"
 #include "Engine.h"
-#include "Groove.h"
-#include "SequenceState.h"
-#include "Slide.h"
-#include "SequenceUtils.h"
 
-#include "core/Debug.h"
+#include "model/StochasticSequence.h"
+#include "model/StochasticTrack.h"
+#include "model/Model.h"
+#include "model/Scale.h"
+
 #include "core/utils/Random.h"
 #include "core/math/Math.h"
 
-#include "model/StochasticSequence.h"
-#include "model/Scale.h"
-
 #include <cmath>
-#include <new>
+#include <algorithm>
 
-// Stable priority for deterministic density masking
-static uint32_t stepScore(int trackIndex, int patternIndex, int stepIndex) {
-    uint32_t h = (uint32_t(trackIndex) * 1664525u) + (uint32_t(patternIndex) * 1013904223u) + (uint32_t(stepIndex) * 31u);
-    h ^= h >> 16;
-    h *= 0x85ebca6bu;
-    h ^= h >> 13;
-    h *= 0xc2b2ae35u;
-    h ^= h >> 16;
-    return h;
-}
-
-static int32_t stepTiltScore(int trackIndex, int patternIndex, int stepIndex, int loopFirst, int loopLast, int tilt) {
-    int32_t score = int32_t(stepScore(trackIndex, patternIndex, stepIndex) & 0x3FFFFFFF);
-    
-    if (tilt != 0 && loopLast > loopFirst) {
-        int32_t relPos = ((stepIndex - loopFirst) << 10) / (loopLast - loopFirst); // 0..1024
-        if (tilt < 0) {
-            score += ((-tilt) * relPos) << 10;
-        } else {
-            score += (tilt * (1024 - relPos)) << 10;
-        }
-    }
-    return score;
-}
-
-static bool evalDensityMask(int trackIndex, int patternIndex, int stepIndex, int loopFirst, int loopLast, int density, int tilt) {
-    if (density >= 100) return true;
-    if (density <= 0) return false;
-
-    int loopSize = loopLast - loopFirst + 1;
-    if (loopSize <= 1) return true;
-
-    int32_t myScore = stepTiltScore(trackIndex, patternIndex, stepIndex, loopFirst, loopLast, tilt);
-    
-    int rank = 0;
-    for (int i = loopFirst; i <= loopLast; ++i) {
-        if (i == stepIndex) continue;
-        int32_t otherScore = stepTiltScore(trackIndex, patternIndex, i, loopFirst, loopLast, tilt);
-        if (otherScore < myScore) {
-            rank++;
-        } else if (otherScore == myScore && i < stepIndex) {
-            rank++;
-        }
-    }
-
-    return (rank * 100) < (density * loopSize);
-}
-
-// evaluate if step gate is active (per-step probability roll)
-static bool evalStepGate(const StochasticSequence::Step &step, int probabilityBias, Random &rng) {
-    int probability = clamp(step.gateProbability() + probabilityBias, -1, StochasticSequence::GateProbability::Max);
-    if (probability <= 0) {
-        return false;
-    }
-    return step.gate() && int(rng.nextRange(StochasticSequence::GateProbability::Range)) < probability;
-}
-
-// evaluate step condition
-static bool evalStepCondition(const StochasticSequence::Step &step, int iteration, bool fill, bool &prevCondition) {
-    auto condition = step.condition();
-    switch (condition) {
-    case Types::Condition::Off:                                         return true;
-    case Types::Condition::Fill:        prevCondition = fill;           return prevCondition;
-    case Types::Condition::NotFill:     prevCondition = !fill;          return prevCondition;
-    case Types::Condition::Pre:                                         return prevCondition;
-    case Types::Condition::NotPre:                                      return !prevCondition;
-    case Types::Condition::First:       prevCondition = iteration == 0; return prevCondition;
-    case Types::Condition::NotFirst:    prevCondition = iteration != 0; return prevCondition;
-    default:
-        int index = int(condition);
-        if (index >= int(Types::Condition::Loop) && index < int(Types::Condition::Last)) {
-            auto loop = Types::conditionLoop(condition);
-            prevCondition = iteration % loop.base == loop.offset;
-            if (loop.invert) prevCondition = !prevCondition;
-            return prevCondition;
-        }
-    }
-    return true;
-}
-
-// evaluate step retrigger count
-static int evalStepRetrigger(const StochasticSequence::Step &step, int probabilityBias, Random &rng) {
-    int probability = clamp(step.retriggerProbability() + probabilityBias, -1, StochasticSequence::RetriggerProbability::Max);
-    return int(rng.nextRange(StochasticSequence::RetriggerProbability::Range)) < probability ? step.retrigger() + 1 : 1;
-}
-
-// evaluate step length
-static int evalStepLength(const StochasticSequence::Step &step, int lengthBias, Random &rng) {
-    int length = StochasticSequence::Length::clamp(step.length() + lengthBias) + 1;
-    int probability = step.lengthVariationProbability();
-    if (int(rng.nextRange(StochasticSequence::LengthVariationProbability::Range)) < probability) {
-        int offset = step.lengthVariationRange() == 0 ? 0 : rng.nextRange(std::abs(step.lengthVariationRange()) + 1);
-        if (step.lengthVariationRange() < 0) {
-            offset = -offset;
-        }
-        length = clamp(length + offset, 0, StochasticSequence::Length::Range);
-    }
-    return length;
-}
-
-// Beta distribution approximation for Marbles shaping
-static float betaDistributionSample(float x, float spread) {
-    float normalizedSpread = clamp(spread, 0.0f, 1.0f);
-    if (normalizedSpread == 0.5f) return x;
-    
-    if (normalizedSpread < 0.5f) {
-        // Concentrate towards center
-        float p = 1.0f + (0.5f - normalizedSpread) * 4.0f;
-        if (x < 0.5f) {
-            return 0.5f * std::pow(2.0f * x, p);
-        } else {
-            return 1.0f - 0.5f * std::pow(2.0f * (1.0f - x), p);
-        }
-    } else {
-        // Push to edges
-        float p = 1.0f + (normalizedSpread - 0.5f) * 4.0f;
-        if (x < 0.5f) {
-            return 0.5f * (1.0f - std::pow(1.0f - 2.0f * x, p));
-        } else {
-            return 0.5f + 0.5f * std::pow(2.0f * x - 1.0f, p);
-        }
-    }
-}
-
-static float evalStepNote(const StochasticSequence::Step &step, const StochasticTrack &track, const Scale &scale, int rootNote, int octave, int transpose, int &lastDegree, Random &rng) {
-    int activeNotes = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
-    int noteVarProb = clamp(step.noteVariationProbability() + track.noteBias(), -1, StochasticSequence::NoteVariationProbability::Max);
-    
-    int degree = 0;
-
-    // 1. Build candidate pool from active scale degrees within range
-    int allowedDegrees[CONFIG_USER_SCALE_SIZE];
-    int weights[CONFIG_USER_SCALE_SIZE];
-    int allowedCount = 0;
-    
-    for (int i = 0; i < activeNotes; ++i) {
-        if (i >= track.minDegree() && i <= track.maxDegree()) {
-            int ticket = track.degreeTicket(i);
-            if (ticket >= 0) {
-                allowedDegrees[allowedCount] = i;
-                weights[allowedCount] = ticket;
-                allowedCount++;
-            }
-        }
-    }
-
-    if (allowedCount == 0 || int(rng.nextRange(StochasticSequence::NoteVariationProbability::Range)) >= noteVarProb) {
-        // Fallback to step note if pool is empty or variation roll fails (0% = deterministic)
-        degree = step.note();
-    } else {
-        // ProbMeloD style mask rotation: exclusions stay fixed, weights rotate through included degrees
-        if (track.maskRotation() != 0) {
-            int originalWeights[CONFIG_USER_SCALE_SIZE];
-            for (int i = 0; i < allowedCount; ++i) originalWeights[i] = weights[i];
-            for (int i = 0; i < allowedCount; ++i) {
-                int srcIdx = (i - track.maskRotation()) % allowedCount;
-                if (srcIdx < 0) srcIdx += allowedCount;
-                weights[i] = originalWeights[srcIdx];
-            }
-        }
-
-        if (track.marblesMode() == StochasticTrack::MarblesMode::On) {
-            // Marbles shaping
-            float u = rng.nextFloat();
-            float shaped = betaDistributionSample(u, track.marblesSpread() / 100.0f);
-            float biased = shaped + (track.marblesBias() / 100.0f - 0.5f);
-            int bucket = clamp(int(clamp(biased, 0.0f, 1.0f) * allowedCount), 0, allowedCount - 1);
-            degree = allowedDegrees[bucket];
-        } else {
-            // PWT raffling with Linearity
-            int totalTickets = 0;
-            int penalizedWeights[CONFIG_USER_SCALE_SIZE];
-            for (int i = 0; i < allowedCount; ++i) {
-                int w = weights[i];
-                if (track.linearity() > 0 && lastDegree >= 0) {
-                    int dist = std::abs(allowedDegrees[i] - lastDegree);
-                    float penalty = 1.0f - (dist / float(activeNotes)) * (track.linearity() / 100.0f);
-                    w = int(w * std::max(0.1f, penalty));
-                }
-                penalizedWeights[i] = w;
-                totalTickets += w;
-            }
-
-            if (totalTickets > 0) {
-                int roll = rng.nextRange(totalTickets);
-                int sum = 0;
-                for (int i = 0; i < allowedCount; ++i) {
-                    sum += penalizedWeights[i];
-                    if (roll < sum) {
-                        degree = allowedDegrees[i];
-                        break;
-                    }
-                }
-            } else {
-                degree = allowedDegrees[rng.nextRange(allowedCount)];
-            }
-        }
-
-        // Apply degree rotation within the allowed pool
-        if (track.degreeRotation() != 0) {
-            int currentIdx = 0;
-            for (int i = 0; i < allowedCount; ++i) {
-                if (allowedDegrees[i] == degree) {
-                    currentIdx = i;
-                    break;
-                }
-            }
-            int rotatedIdx = (currentIdx + track.degreeRotation()) % allowedCount;
-            if (rotatedIdx < 0) rotatedIdx += allowedCount;
-            degree = allowedDegrees[rotatedIdx];
-        }
-    }
-
-    lastDegree = degree;
-    
-    // Apply octave jump
-    int octProb = clamp(step.noteOctaveProbability(), -1, StochasticSequence::NoteOctaveProbability::Max);
-    int selectedOctave = octave;
-    if (octProb > 0 && int(rng.nextRange(StochasticSequence::NoteOctaveProbability::Range)) < octProb) {
-        selectedOctave += step.noteOctave();
-    }
-
-    int finalNote = degree + selectedOctave * activeNotes + transpose;
-    return scale.noteToVolts(finalNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
+static uint32_t getDurationMultiplier(int rate) {
+    if (rate < 10) return 16;
+    if (rate < 20) return 8;
+    if (rate < 30) return 4;
+    if (rate < 40) return 2;
+    if (rate < 60) return 1;
+    return 1; // Default
 }
 
 StochasticTrackEngine::StochasticTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
@@ -256,26 +36,32 @@ StochasticTrackEngine::~StochasticTrackEngine() {
 }
 
 void StochasticTrackEngine::initLockedSteps() {
-    if (!_lockedSteps) {
-        _lockedSteps = new (std::nothrow) LockedStep[CONFIG_STEP_COUNT];
-        if (_lockedSteps) {
-            for (int i = 0; i < CONFIG_STEP_COUNT; ++i) _lockedSteps[i].valid = false;
+    if (!_lockedParents) {
+        _lockedParents = new (std::nothrow) LockedParentEvent[CONFIG_STEP_COUNT];
+        if (_lockedParents) {
+            for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
+                _lockedParents[i].valid = false;
+                for (int j = 0; j < 4; ++j) _lockedParents[i].children[j].valid = false;
+            }
         }
     }
 }
 
 void StochasticTrackEngine::freeLockedSteps() {
-    if (_lockedSteps) {
-        delete[] _lockedSteps;
-        _lockedSteps = nullptr;
+    if (_lockedParents) {
+        delete[] _lockedParents;
+        _lockedParents = nullptr;
     }
 }
 
 void StochasticTrackEngine::reset() {
-    _freeRelativeTick = 0xFFFFFFFF;
     _sequenceState.reset();
-    _currentStep = -1;
-    _index = -1;
+    _patternIndex = _stochasticTrack.sequence(_model.project().selectedPatternIndex()).first();
+    _relativeTick = 0;
+    _sleepRemaining = 0;
+    _boredomCounter = 0;
+    _jumpOctave = 0;
+    _patternCycleEnded = false;
     _prevCondition = false;
     _activity = false;
     _gateOutput = false;
@@ -285,307 +71,250 @@ void StochasticTrackEngine::reset() {
     _cvOutputTarget = 0.f;
     _gateQueue.clear();
     _cvQueue.clear();
-    _recordHistory.clear();
-    _skips = 0;
-    _lastDegree = -1;
-    _rng = Random(0x12345678 + _track.trackIndex()); // Re-seed for transport start determinism
+    _rng = Random(0x12345678 + _track.trackIndex());
     changePattern();
 }
 
 void StochasticTrackEngine::restart() {
-    _freeRelativeTick = 0xFFFFFFFF;
     _sequenceState.reset();
-    _currentStep = -1;
-    _rng = Random(0x12345678 + _track.trackIndex()); // Re-seed for transport start determinism
+    _patternIndex = _stochasticTrack.sequence(_model.project().selectedPatternIndex()).first();
+    _relativeTick = 0;
+    _rng = Random(0x12345678 + _track.trackIndex());
 }
 
 TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
     ASSERT(_sequence != nullptr, "invalid sequence");
     const auto &sequence = *_sequence;
-    const auto *linkData = _linkedTrackEngine ? _linkedTrackEngine->linkData() : nullptr;
 
-    if (linkData) {
-        _linkData = *linkData;
-        _sequenceState = *linkData->sequenceState;
-
-        if (linkData->relativeTick % linkData->divisor == 0) {
-            recordStep(tick, linkData->divisor);
-            triggerStep(tick, linkData->divisor);
-        }
-    } else {
-        uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-        uint32_t resetDivisor = sequence.resetMeasure() * _engine.measureDivisor();
-        uint32_t relativeTick = resetDivisor == 0 ? tick : tick % resetDivisor;
-
+    uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+    uint32_t resetMeasure = sequence.resetMeasure();
+    if (resetMeasure > 0) {
+        uint32_t resetDivisor = resetMeasure * _engine.measureDivisor();
+        uint32_t relativeTick = tick % resetDivisor;
         if (relativeTick == 0) {
             reset();
         }
-
-        // advance sequence
-        uint32_t firstStep = _stochasticTrack.loopFirst();
-        uint32_t lastStep = _stochasticTrack.loopLast();
-
-        switch (sequence.playMode()) {
-        case Types::PlayMode::Aligned: {
-            if (relativeTick % divisor == 0) {
-                _sequenceState.advanceAligned(relativeTick / divisor, sequence.runMode(), firstStep, lastStep, _rng);
-                triggerStep(tick, divisor);
-            }
-        }
-            break;
-        case Types::PlayMode::Free: {
-            double tickPos = _engine.clock().tickPosition();
-            double baseTick = resetDivisor == 0 ? tickPos : std::fmod(tickPos, double(resetDivisor));
-            if (baseTick < 0.0) baseTick = 0.0;
-            uint32_t currentRelativeTick = static_cast<uint32_t>(baseTick);
-            
-            if (currentRelativeTick % divisor == 0 && currentRelativeTick != _freeRelativeTick) {
-                _sequenceState.advanceAligned(currentRelativeTick / divisor, sequence.runMode(), firstStep, lastStep, _rng);
-                triggerStep(tick, divisor);
-                _freeRelativeTick = currentRelativeTick;
-            }
-        }
-            break;
-        case Types::PlayMode::Last:
-            break;
-        }
-
-        _linkData.divisor = divisor;
-        _linkData.relativeTick = relativeTick;
-        _linkData.sequenceState = &_sequenceState;
+        _relativeTick = relativeTick % divisor;
     }
 
-    auto &midiOutputEngine = _engine.midiOutputEngine();
-    TickResult result = TickResult::NoUpdate;
-
-    while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
-        if (!_monitorOverrideActive) {
-            result |= TickResult::GateUpdate;
-            _activity = _gateQueue.front().gate;
-            _gateOutput = (!mute() || fill()) && _activity;
-            _accentOutput = _gateQueue.front().accent && _gateOutput;
-            midiOutputEngine.sendGate(_track.trackIndex(), _gateOutput);
+    if (_relativeTick == 0) {
+        if (_sleepRemaining > 0) {
+            _sleepRemaining--;
+        } else {
+            triggerStep(tick, divisor);
         }
+    }
+
+    // Process Queues
+    while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
+        _gateOutput = _gateQueue.front().gate;
         _gateQueue.pop();
     }
 
     while (!_cvQueue.empty() && tick >= _cvQueue.front().tick) {
-        if (!mute() || _stochasticTrack.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) {
-            if (!_monitorOverrideActive) {
-                result |= TickResult::CvUpdate;
-                _cvOutputTarget = _cvQueue.front().cv;
-                _slideActive = _cvQueue.front().slide;
-                midiOutputEngine.sendCv(_track.trackIndex(), _cvOutputTarget);
-                midiOutputEngine.sendSlide(_track.trackIndex(), _slideActive);
-            }
-        }
+        _cvOutputTarget = _cvQueue.front().cv;
+        _slideActive = _cvQueue.front().slide;
         _cvQueue.pop();
     }
 
-    return result;
-}
-
-void StochasticTrackEngine::update(float dt) {
-    bool running = _engine.state().running();
-    const auto &sequence = *_sequence;
-    const auto &scale = sequence.selectedScale(_model.project().scale());
-    int rootNote = sequence.selectedRootNote(_model.project().rootNote());
-
-    auto sendToMidiOutputEngine = [this] (bool gate, float cv = 0.f) {
-        auto &midiOutputEngine = _engine.midiOutputEngine();
-        midiOutputEngine.sendGate(_track.trackIndex(), gate);
-        if (gate) {
-            midiOutputEngine.sendCv(_track.trackIndex(), cv);
-            midiOutputEngine.sendSlide(_track.trackIndex(), false);
-        }
-    };
-
-    auto setOverride = [&] (float cv) {
-        _cvOutputTarget = cv;
-        _activity = _gateOutput = true;
-        _monitorOverrideActive = true;
-        sendToMidiOutputEngine(true, cv);
-    };
-
-    auto clearOverride = [&] () {
-        if (_monitorOverrideActive) {
-            _activity = _gateOutput = false;
-            _monitorOverrideActive = false;
-            sendToMidiOutputEngine(false);
-        }
-    };
-
-    bool stepMonitoring = (!running && _monitorStepIndex >= 0);
-
-    auto monitorMode = _model.project().monitorMode();
-    bool liveMonitoring =
-        (monitorMode == Types::MonitorMode::Always) ||
-        (monitorMode == Types::MonitorMode::Stopped && !running);
-
-    if (stepMonitoring) {
-        const auto &step = sequence.step(_monitorStepIndex);
-        int lastDegreeStub = -1;
-        setOverride(evalStepNote(step, _stochasticTrack, scale, rootNote, _stochasticTrack.octave(), _stochasticTrack.transpose(), lastDegreeStub, _rng));
-    } else if (liveMonitoring && _recordHistory.isNoteActive()) {
-        int note = noteFromMidiNote(_recordHistory.activeNote()) + _stochasticTrack.octave() * scale.notesPerOctave() + _stochasticTrack.transpose();
-        setOverride(scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f));
-    } else {
-        clearOverride();
+    if (resetMeasure == 0) {
+        _relativeTick = (_relativeTick + 1) % divisor;
     }
-
-    if (_slideActive && _stochasticTrack.slideTime() > 0) {
-        _cvOutput = Slide::applySlide(_cvOutput, _cvOutputTarget, _stochasticTrack.slideTime(), dt);
-    } else {
-        _cvOutput = _cvOutputTarget;
-    }
-}
-
-void StochasticTrackEngine::changePattern() {
-    _sequence = &_stochasticTrack.sequence(pattern());
-    _fillSequence = &_stochasticTrack.sequence(std::min(pattern() + 1, CONFIG_PATTERN_COUNT - 1));
-}
-
-void StochasticTrackEngine::monitorMidi(uint32_t tick, const MidiMessage &message) {
-    _recordHistory.write(tick, message);
-}
-
-void StochasticTrackEngine::clearMidiMonitoring() {
-    _recordHistory.clear();
-}
-
-void StochasticTrackEngine::setMonitorStep(int index) {
-    _monitorStepIndex = (index >= 0 && index < CONFIG_STEP_COUNT) ? index : -1;
-}
-
-void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor, bool forNextStep) {
-    auto &sequence = *_sequence;
-    _index = SequenceUtils::rotateStep(_sequenceState.step(), _stochasticTrack.loopFirst(), _stochasticTrack.loopLast(), _stochasticTrack.rotate());
-    _currentStep = _index;
-
-    auto step = sequence.step(_index);
-
-    float noteValue = 0.f;
-    uint32_t stepLength = 0;
-    int16_t jitterTick = 0;
-    int8_t gateOffset = 0;
-    uint8_t stepRetrigger = 1;
-    bool stepGate = false;
-    bool slide = false;
-    bool accent = false;
-    bool legato = false;
-
-    bool locked = _stochasticTrack.lock() && _lockedSteps && _lockedSteps[_index].valid;
-
-    if (locked) {
-        noteValue = _lockedSteps[_index].noteValue;
-        stepLength = _lockedSteps[_index].stepLength;
-        jitterTick = _lockedSteps[_index].jitterTick;
-        gateOffset = _lockedSteps[_index].gateOffset;
-        stepRetrigger = _lockedSteps[_index].retrigger;
-        stepGate = _lockedSteps[_index].gate;
-        slide = _lockedSteps[_index].slide;
-        accent = _lockedSteps[_index].accent;
-        legato = _lockedSteps[_index].legato;
-    } else {
-        stepGate = evalStepGate(step, _stochasticTrack.gateBias(), _rng);
-
-        if (stepGate) {
-            stepGate = evalStepCondition(step, _sequenceState.iteration(), fill(), _prevCondition);
-        }
-
-        if (stepGate) {
-            // Apply deterministic Density Masking after gate/condition rolls
-            stepGate = evalDensityMask(_track.trackIndex(), pattern(), _index, _stochasticTrack.loopFirst(), _stochasticTrack.loopLast(), _stochasticTrack.density(), _stochasticTrack.tilt());
-        }
-
-        if (stepGate) {
-            const auto &scale = sequence.selectedScale(_model.project().scale());
-            int rootNote = sequence.selectedRootNote(_model.project().rootNote());
-            
-            noteValue = evalStepNote(step, _stochasticTrack, scale, rootNote, _stochasticTrack.octave(), _stochasticTrack.transpose(), _lastDegree, _rng);
-            stepLength = (divisor * evalStepLength(step, _stochasticTrack.lengthBias(), _rng)) / StochasticSequence::Length::Range;
-            gateOffset = step.gateOffset();
-            stepRetrigger = (uint8_t) evalStepRetrigger(step, _stochasticTrack.retriggerBias(), _rng);
-            
-            // Tuesday-style Burst (override/augment retrigger if step retrigger is 1)
-            if (stepRetrigger == 1 && _stochasticTrack.burst() > 0) {
-                if (int(_rng.nextRange(100)) < _stochasticTrack.burst()) {
-                    stepRetrigger = 2 + _rng.nextRange(3); // 2, 3, 4
-                }
-            }
-
-            slide = step.slide();
-            accent = (int(_rng.nextRange(100)) < _stochasticTrack.accentProb());
-            legato = (int(_rng.nextRange(100)) < _stochasticTrack.legatoProb());
-
-            if (legato) {
-                stepLength = divisor;
-            }
-
-            // Small jitter Timing Humanize
-            if (_stochasticTrack.jitter() > 0) {
-                int maxJitter = (divisor * _stochasticTrack.jitter()) / 200; // +-50% of jitter percentage
-                if (maxJitter > 0) {
-                    jitterTick = int16_t(_rng.nextRange(maxJitter * 2 + 1)) - maxJitter;
-                }
-            }
-        }
-
-        if (_lockedSteps) {
-            if (!_lockedSteps[_index].valid) {
-                _lockedStepCount++;
-            }
-            _lockedSteps[_index] = { noteValue, stepLength, jitterTick, gateOffset, stepRetrigger, stepGate, slide, accent, legato, true };
-        }
-    }
-
-    if (stepGate) {
-        int offsetTick = ((int) divisor * gateOffset) / (StochasticSequence::GateOffset::Max + 1) + jitterTick;
-        uint32_t stepTick = tick + std::max(0, offsetTick); // Ensure no underflow
-        
-        if (stepRetrigger > 1) {
-            uint32_t retriggerLength = divisor / stepRetrigger;
-            uint32_t retriggerOffset = 0;
-            while (stepRetrigger-- > 0 && retriggerOffset <= stepLength) {
-                _gateQueue.pushReplace({ Groove::applySwing(stepTick + retriggerOffset, swing()), true, accent });
-                _gateQueue.pushReplace({ Groove::applySwing(stepTick + retriggerOffset + retriggerLength / 2, swing()), false, accent });
-                retriggerOffset += retriggerLength;
-            }
-        } else {
-            _gateQueue.pushReplace({ Groove::applySwing(stepTick, swing()), true, accent });
-            if (!legato) {
-                _gateQueue.pushReplace({ Groove::applySwing(stepTick + stepLength, swing()), false, accent });
-            }
-        }
-
-        _cvQueue.push({ Groove::applySwing(stepTick, swing()), noteValue, slide || legato });
-    } else {
-        // Schedule a gate-off at the beginning of the step to clear previous legato if any
-        _gateQueue.pushReplace({ tick, false, false });
-    }
+    
+    return (CvUpdate | GateUpdate);
 }
 
 void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
-    triggerStep(tick, divisor, false);
-}
+    auto &sequence = const_cast<StochasticSequence&>(*_sequence);
+    auto &track = const_cast<StochasticTrack&>(_stochasticTrack);
 
-void StochasticTrackEngine::recordStep(uint32_t tick, uint32_t divisor) {
-}
-
-int StochasticTrackEngine::noteFromMidiNote(uint8_t midiNote) const {
-    const auto &scale = _sequence->selectedScale(_model.project().scale());
-    int rootNote = _sequence->selectedRootNote(_model.project().rootNote());
-    float octaveVolts = scale.noteToVolts(scale.notesPerOctave()) - scale.noteToVolts(0);
-    float semitoneVolts = octaveVolts * (1.f / 12.f);
-    float volts = (int(midiNote) - 60) * semitoneVolts;
-
-    if (scale.isChromatic()) {
-        volts -= rootNote * semitoneVolts;
+    // 1. Consistency check: rebuild shared buffer if it doesn't match current pattern context
+    int patternIndex = _model.project().selectedPatternIndex();
+    if (track.mode() == StochasticMode::Dice) {
+        if (!sequence.patternValid() || track.activePatternIndex() != patternIndex || track.activeSeed() != sequence.seed()) {
+            StochasticGenerator::generatePattern(sequence, track, sequence.selectedScale(_model.project().scale()), sequence.selectedRootNote(_model.project().rootNote()), sequence.seed());
+            track.setActivePatternIndex(patternIndex);
+            track.setActiveSeed(sequence.seed());
+        }
     }
 
-    return scale.noteFromVolts(volts);
+    // 2. Fetch Event
+    StochasticParentEvent event;
+    const auto &scale = sequence.selectedScale(_model.project().scale());
+    int rootNote = sequence.selectedRootNote(_model.project().rootNote());
+
+    StochasticChildHit evaluationChildren[4];
+    bool useSharedChildren = true;
+
+    if (track.mode() == StochasticMode::Realtime) {
+        int lastDegree = -1; 
+        event = StochasticGenerator::generateParentEvent(track, scale, rootNote, lastDegree, _rng);
+        
+        // Isolate realtime children
+        useSharedChildren = false;
+        int count = event.d1.childCount;
+        int childLast = event.d0.degree;
+        int burstRate = track.burstRate();
+        for (int c = 0; c < count; ++c) {
+            auto &child = evaluationChildren[c];
+            child.clear();
+            if (track.burstPitch() == StochasticBurstPitch::Parent) {
+                child.degree = event.d0.degree;
+                child.octave = event.d0.octave;
+            } else {
+                int absoluteDegree = StochasticGenerator::generateDegree(track, scale, childLast, _rng);
+                int activeNotes = scale.notesPerOctave();
+                child.degree = absoluteDegree % activeNotes;
+                child.octave = absoluteDegree / activeNotes;
+            }
+            int spacing = 255 / (count + 1);
+            if (burstRate > 0) spacing = std::max(8, spacing - (spacing * burstRate) / 100);
+            child.offset = (c + 1) * spacing;
+            child.length = 128;
+            child.gate = true;
+        }
+    } else {
+        event = track.events()[_patternIndex];
+    }
+
+    // 3. Evaluated Lock check
+    bool locked = track.lock() && _lockedParents[_patternIndex].valid;
+    
+    float finalCv = 0.f;
+    uint32_t durationTicks = divisor;
+    bool isRest = false;
+    bool isLegato = false;
+    bool isSlide = false;
+    bool isAccent = false;
+
+    if (locked) {
+        finalCv = _lockedParents[_patternIndex].cv;
+        durationTicks = _lockedParents[_patternIndex].durationTicks;
+        isRest = _lockedParents[_patternIndex].rest;
+        isLegato = _lockedParents[_patternIndex].legato;
+        isSlide = _lockedParents[_patternIndex].slide;
+        isAccent = _lockedParents[_patternIndex].accent;
+
+        // Schedule Replay (Parent)
+        if (!isRest) {
+            _cvQueue.push({ tick, finalCv, isSlide });
+            uint32_t gateLen = (durationTicks * 50) / 100;
+            _gateQueue.push({ tick, true });
+            if (!isLegato) _gateQueue.push({ tick + gateLen, false });
+            _activity = true;
+        } else {
+            _gateQueue.push({ tick, false });
+            if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
+            _activity = false;
+        }
+
+        // Replay Children
+        for (int i = 0; i < 4; ++i) {
+            auto &child = _lockedParents[_patternIndex].children[i];
+            if (child.valid) {
+                uint32_t childTick = tick + child.tickOffset;
+                _cvQueue.push({ childTick, child.cv, child.slide });
+                _gateQueue.push({ childTick, true });
+                _gateQueue.push({ childTick + 10, false }); 
+            }
+        }
+    } else {
+        int activeNotes = scale.notesPerOctave();
+        
+        // Rhythm: Rate / Variation
+        uint32_t mult = getDurationMultiplier(track.rate());
+        if (track.variation() > 0 && int(_rng.nextRange(100)) < track.variation()) {
+             // Pick neighbor multiplier
+             mult = (_rng.nextRange(2) == 0) ? mult * 2 : std::max(uint32_t(1), uint32_t(mult / 2));
+        }
+        durationTicks = divisor * mult;
+
+        int note = int(event.d0.degree) + (int(event.d0.octave) + track.octave() + _jumpOctave) * activeNotes + track.transpose();
+        finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
+        
+        bool densityPass = (uint32_t(event.d1.densityRank) * 100) < (uint32_t(track.density()) * sequence.size());
+        isRest = bool(event.d1.rest) || !densityPass || !event.d1.valid;
+        isLegato = bool(event.d1.legato);
+        isSlide = bool(event.d1.slide);
+        isAccent = bool(event.d1.accent);
+
+        if (_lockedParents) {
+            _lockedParents[_patternIndex].valid = true;
+            _lockedParents[_patternIndex].cv = finalCv;
+            _lockedParents[_patternIndex].durationTicks = durationTicks;
+            _lockedParents[_patternIndex].rest = isRest;
+            _lockedParents[_patternIndex].legato = isLegato;
+            _lockedParents[_patternIndex].slide = isSlide;
+            _lockedParents[_patternIndex].accent = isAccent;
+            for (int i = 0; i < 4; ++i) _lockedParents[_patternIndex].children[i].valid = false;
+        }
+
+        if (!isRest) {
+            _cvQueue.push({ tick, finalCv, isSlide });
+            uint32_t gateLen = (durationTicks * 50) / 100;
+            _gateQueue.push({ tick, true });
+            if (!isLegato) _gateQueue.push({ tick + gateLen, false });
+            _activity = true;
+
+            // Schedule & Lock Children
+            for (int c = 0; c < int(event.d1.childCount); ++c) {
+                const auto &child = useSharedChildren ? track.children()[event.d1.childFirst + c] : evaluationChildren[c];
+                uint32_t childOffset = (durationTicks * child.offset) / 256;
+                uint32_t childTick = tick + childOffset;
+                
+                int childNote = int(child.degree) + (int(child.octave) + track.octave() + _jumpOctave) * activeNotes + track.transpose();
+                float childCv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
+
+                _cvQueue.push({ childTick, childCv, bool(child.slide) });
+                _gateQueue.push({ childTick, true });
+                _gateQueue.push({ childTick + 10, false });
+
+                if (_lockedParents) {
+                    auto &lc = _lockedParents[_patternIndex].children[c];
+                    lc.valid = true;
+                    lc.cv = childCv;
+                    lc.tickOffset = childOffset;
+                    lc.slide = bool(child.slide);
+                    lc.accent = bool(child.accent);
+                }
+            }
+        } else {
+            _gateQueue.push({ tick, false });
+            if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
+            _activity = false;
+        }
+    }
+
+    // Pattern Advancement
+    _patternIndex++;
+    if (_patternIndex > sequence.last()) {
+        _patternIndex = sequence.first();
+        _patternCycleEnded = true;
+        
+        if (!track.lock()) {
+            if (track.sleep() > 0) _sleepRemaining = (track.sleep() * 4) / 10; 
+            
+            if (track.mutate() > 0 && int(_rng.nextRange(100)) < track.mutate()) {
+                StochasticGenerator::mutateOne(sequence, track, scale, rootNote, _rng);
+            }
+            
+            if (track.patience() < 100) {
+                _boredomCounter++;
+                if (_boredomCounter > (uint32_t(track.patience()) * 10)) {
+                    sequence.setPatternValid(false);
+                    _boredomCounter = 0;
+                }
+            }
+            _jumpOctave = StochasticGenerator::generateJumpOctave(track, _jumpOctave, _rng);
+        }
+    }
 }
 
-float StochasticTrackEngine::sequenceProgress() const {
-    return _currentStep < 0 ? 0.f : float(_currentStep - _sequence->firstStep()) / std::max(1, _sequence->lastStep() - _sequence->firstStep());
+void StochasticTrackEngine::update(float dt) {
+    if (_slideActive && _stochasticTrack.slideTime() > 0) {
+        float slideDt = dt * 1000.f / (float(_stochasticTrack.slideTime()) + 1.f);
+        _cvOutput += (_cvOutputTarget - _cvOutput) * std::min(1.f, slideDt);
+    } else {
+        _cvOutput = _cvOutputTarget;
+    }
 }

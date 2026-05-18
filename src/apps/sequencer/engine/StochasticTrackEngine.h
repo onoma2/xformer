@@ -13,105 +13,60 @@ public:
     StochasticTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine);
     ~StochasticTrackEngine();
 
-    virtual Track::TrackMode trackMode() const override { return Track::TrackMode::Stochastic; }
-
     virtual void reset() override;
     virtual void restart() override;
     virtual TickResult tick(uint32_t tick) override;
     virtual void update(float dt) override;
 
-    virtual void changePattern() override;
+    virtual Track::TrackMode trackMode() const override { return Track::TrackMode::Stochastic; }
 
-    virtual void monitorMidi(uint32_t tick, const MidiMessage &message) override;
-    virtual void clearMidiMonitoring() override;
-
-    virtual const TrackLinkData *linkData() const override { return &_linkData; }
-
-    virtual bool activity() const override { return _activity; }
     virtual bool gateOutput(int index) const override {
-        return index == 0 ? _gateOutput : (index == 1 ? _accentOutput : false);
+        return index == 0 ? _gateOutput : _accentOutput;
     }
+
     virtual float cvOutput(int index) const override {
-        return index == 0 ? _cvOutput : 0.f;
+        return _cvOutput;
     }
-    virtual float sequenceProgress() const override;
 
-    const StochasticSequence &sequence() const { return *_sequence; }
-    bool isActiveSequence(const StochasticSequence &sequence) const { return &sequence == _sequence; }
+    virtual void changePattern() override {
+        _sequence = &(_stochasticTrack.sequence(_model.project().selectedPatternIndex()));
+    }
 
-    int currentStep() const { return _currentStep; }
-    int currentRecordStep() const { return _stepRecorder.stepIndex(); }
-
-    void setMonitorStep(int index);
-
-    struct LockedStep {
-        float noteValue;
-        uint32_t stepLength;
-        int16_t jitterTick;
-        int8_t gateOffset;
-        uint8_t retrigger;
-        bool gate;
-        bool slide;
-        bool accent;
-        bool legato;
-        bool valid;
-    };
-
-    const LockedStep* lockedSteps() const { return _lockedSteps; }
-    int lockedStepCount() const { return _lockedStepCount; }
+    int currentStep() const { return _patternIndex; }
+    bool activity() const { return _activity; }
 
 private:
-    void triggerStep(uint32_t tick, uint32_t divisor, bool forNextStep);
-    void triggerStep(uint32_t tick, uint32_t divisor);
-    void recordStep(uint32_t tick, uint32_t divisor);
-    int noteFromMidiNote(uint8_t midiNote) const;
-
-    bool fill() const {
-        return (_stochasticTrack.fillMuted() || !TrackEngine::mute()) ? TrackEngine::fill() : false;
-    }
-
     void initLockedSteps();
     void freeLockedSteps();
 
-    StochasticTrack &_stochasticTrack;
+    void triggerStep(uint32_t tick, uint32_t divisor);
 
-    TrackLinkData _linkData;
-
-    StochasticSequence *_sequence;
-    const StochasticSequence *_fillSequence;
-
-    uint32_t _freeRelativeTick;
-    SequenceState _sequenceState;
-    int _currentStep;
-    int _index;
-    bool _prevCondition;
-
-    int _monitorStepIndex = -1;
-
-    RecordHistory _recordHistory;
-    bool _monitorOverrideActive = false;
-    StepRecorder _stepRecorder;
-
-    bool _activity;
-    bool _gateOutput;
-    bool _accentOutput;
-    float _cvOutput;
-    float _cvOutputTarget;
-    bool _slideActive;
-    unsigned int _currentStageRepeat;
-
-    int _skips;
-    int _lastDegree = -1;
+    const StochasticTrack &_stochasticTrack;
+    const StochasticSequence *_sequence = nullptr;
     Random _rng;
 
-    // Heap-allocated cache for locked steps
-    LockedStep *_lockedSteps = nullptr;
-    int _lockedStepCount = 0;
+    // Engine state
+    uint8_t _patternIndex = 0;
+    uint32_t _relativeTick = 0;
+    uint8_t _sleepRemaining = 0;
+    uint16_t _boredomCounter = 0;
+    int8_t _jumpOctave = 0;
+    bool _patternCycleEnded = false;
+
+    SequenceState _sequenceState;
+    SequenceState _linkData;
+
+    bool _prevCondition = false;
+    bool _activity = false;
+    bool _gateOutput = false;
+    bool _accentOutput = false;
+    bool _slideActive = false;
+    float _cvOutput = 0.f;
+    float _cvOutputTarget = 0.f;
 
     struct Gate {
         uint32_t tick;
         bool gate;
-        bool accent;
     };
 
     struct GateCompare {
@@ -135,4 +90,25 @@ private:
     };
 
     SortedQueue<Cv, 16, CvCompare> _cvQueue;
+
+    // Evaluated Event Lock data
+    struct LockedParentEvent {
+        float cv;
+        uint32_t durationTicks;
+        bool rest;
+        bool legato;
+        bool slide;
+        bool accent;
+        bool valid;
+
+        struct LockedChild {
+            float cv;
+            uint32_t tickOffset;
+            bool slide;
+            bool accent;
+            bool valid;
+        } children[4];
+    };
+
+    LockedParentEvent *_lockedParents = nullptr;
 };

@@ -90,7 +90,7 @@ public:
 
     virtual void edit(int row, int column, int value, bool shift) override {
         if (column == 1) {
-            auto &step = _sequence->step(_stepIndex);
+            auto step = _sequence->step(_stepIndex);
             switch (Item(row)) {
             case Gate:                          step.setGate(value > 0); break;
             case GateProbability:               step.setGateProbability(step.gateProbability() + value); break;
