@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-enum class StochasticModeInternal : uint8_t { Dice, Realtime, Last };
+enum class StochasticModeInternal : uint8_t { Loop, Live, Last };
 
 enum class StochasticSourceMode : uint8_t {
     Loop,

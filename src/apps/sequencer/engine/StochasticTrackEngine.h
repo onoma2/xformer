@@ -50,7 +50,8 @@ private:
     uint32_t _relativeTick = 0;
     uint8_t _sleepRemaining = 0;
     uint16_t _boredomCounter = 0;
-    int8_t _jumpOctave = 0;
+    int _lastDegree = -1;
+    int _jumpRegister = 0;
     bool _patternCycleEnded = false;
 
     SequenceState _sequenceState;
@@ -114,3 +115,5 @@ private:
 
     LockedParentEvent *_lockedParents = nullptr;
 };
+
+static_assert(sizeof(StochasticTrackEngine) <= 512, "StochasticTrackEngine too large");

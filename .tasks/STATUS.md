@@ -12,8 +12,15 @@ _Updated: 2026-05-18_
 
 ## 🔴 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Repaired Phase 8.1/8.2: Serialization is symmetric, source domains are cleanly split in 8-byte packed events, bursts/children are audible and lockable, and Patience/Mutate are domain-aware. STM32 RAM usage verified (StochasticTrack: 9148B).
-**Next action:** Implement Phase 8.5 (Evaluation) and Phase 8.6 (Lock A/B Evolution) according to PHASE8-V3-PLAN.md.
+**Where I stopped:** Repaired Phase 8: 
+- Fixed burst leakage: child hits are now strictly suppressed and cleared for rest/thinned steps in both locked and unlocked paths.
+- Fixed burst spacing: child hits are guaranteed to fit within parent duration with a min 2-tick low gap between hits.
+- Guarded lock buffer: added null checks for `_lockedParents` to prevent crashes on allocation failure.
+- Redefined Jump: now a loop-cycle "register shift" (-1, 0, +1) evaluated only at loop wrap, preserving Proteus-style pitch stability.
+- Frozen Capture: locked path now captures final evaluated CV, making it immune to runtime jump/octave changes.
+- Nomenclature: fully aligned to Loop/Live; Dice/Realtime removed from code and UI.
+- STM32 RAM: StochasticTrack 9148B, StochasticSequence 532B, StochasticTrackEngine 424B.
+**Next action:** Implement Phase 8.3/8.4 semantics, then replace semantic lock structs with a single runtime Hold buffer of compact scheduled output hits that clears on pattern switch; no Lock A/B banks.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic
@@ -130,11 +137,11 @@ _Updated: 2026-05-18_
 
 ## 🔵 fractal-track-implementation — Smart Mutation Engine track type (FractalTrack)
 **Status:** blocked
-**Where I stopped:** Updated phased plan written to `.tasks/fractal-track-implementation/PHASEDPLAN.md`. Reduced initial scope to MVP: NoteTrack parent only, scale-constrained mutation only, no extended rules, no Bloom features. RAM assessment: estimated to fit under existing container gates (~880 B model, ~416 B engine), but needs ARM sizeof probe confirmation on hardware.
+**Where I stopped:** Controlling spec amended with evolution system (KD-6: MutationHistory + SelectionPressure + EvolutionDepth), Bloom branches (KD-12: trunk+math transforms, zero storage), ornamentation (KD-13: per-step flourishes). DICTIONARY.md created with vocabulary/ownership. TASK.md rewritten for 3-layer architecture (trunk -> branches -> ornamentation). PHASEDPLAN.md deleted (superseded by controlling spec phases).
 **Next action:** Phase 1: model layer (`FractalSequence.h` + `FractalTrack.h`) + Track integration
 **Depends on:** resource-optimization (needs RAM headroom), stochastic-track-port (higher priority, will consume first available RAM)
 **Branch:** TBD
-**Reference:** `.tasks/fractal-track-implementation/TASK.md`, `docs/superpowers/specs/2026-05-17-fractal-track-design.md`, `docs/superpowers/specs/2026-05-17-fractal-advanced-research.md`
+**Reference:** `.tasks/fractal-track-implementation/TASK.md`, `.tasks/fractal-track-implementation/DICTIONARY.md`, `docs/superpowers/specs/2026-05-17-fractal-track-design.md`, `docs/superpowers/specs/2026-05-17-fractal-advanced-research.md`
 
 ---
 

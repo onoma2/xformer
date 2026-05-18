@@ -54,6 +54,7 @@ void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const St
     if (size <= 0) return;
     int i = rng.nextRange(size);
     
+    uint8_t oldRank = sequence.events()[i].d0.densityRank;
     auto rhythm = generateRhythmEvent(track, rng);
     sequence.events()[i].d0 = rhythm.d0;
     sequence.events()[i].d1.rest = rhythm.d1.rest;
@@ -63,9 +64,7 @@ void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const St
     sequence.events()[i].d1.rhythmValid = 1;
     sequence.events()[i].d1.burstRate = rhythm.d1.burstRate;
 
-    // Ranks might need partial refresh? For now just one is fine.
-    // Assigning a random rank for the single mutated step.
-    sequence.events()[i].d0.densityRank = rng.nextRange(size);
+    sequence.events()[i].d0.densityRank = oldRank;
 }
 
 void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng) {
@@ -112,12 +111,30 @@ void StochasticGenerator::evaluateChildren(EvaluatedChild *children, const Stoch
     int count = event.d0.childCount;
     uint32_t burstRate = event.d1.burstRate;
     
+    // Minimum audible gap (low pulse duration)
+    const uint32_t minGap = 2;
+
     for (int i = 0; i < 4; ++i) {
         children[i].valid = false;
         if (i < count) {
             float spacing = (durationTicks / float(count + 1)) * (burstRate / 100.f);
-            children[i].tickOffset = uint32_t((i + 1) * spacing);
-            children[i].gateTicks = std::max(uint32_t(1), uint32_t(spacing * 0.5f));
+            spacing = std::max(float(minGap + 1), spacing); 
+
+            uint32_t offset = uint32_t((i + 1) * spacing);
+            uint32_t gate = std::max(uint32_t(1), uint32_t(spacing * 0.5f));
+
+            // Bounds check: must fit inside durationTicks
+            if (offset + gate >= durationTicks) {
+                // If it doesn't fit, try to reduce gate or skip
+                if (offset + 1 < durationTicks) {
+                    gate = durationTicks - offset - 1;
+                } else {
+                    break; // Doesn't fit at all
+                }
+            }
+
+            children[i].tickOffset = offset;
+            children[i].gateTicks = gate;
             
             if (track.burstPitch() == StochasticBurstPitch::Generate) {
                 int lastDegree = -1;
@@ -217,7 +234,7 @@ int StochasticGenerator::generateDegree(const StochasticTrack &track, const Scal
             }
         }
 
-        if (contour != 0) {
+        if (contour != 0 && allowedCount > 1) {
             totalTickets = 0;
             for (int i = 0; i < allowedCount; ++i) {
                 float pos = (2.0f * i / (allowedCount - 1)) - 1.0f;

@@ -7,6 +7,7 @@ downloads/
 tools/
 compile_commands.json
 .cache/
+.compound-engineering/*.local.yaml
 # Prerequisites
 *.d
 

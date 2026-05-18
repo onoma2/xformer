@@ -26,21 +26,21 @@ Phase 8 is engine/model/internal-access work. Final visual UI is Phase 9.
 - `Mutate` edits Loop source material only. It does not affect Live domains.
 - `Rest` creates generator-level rhythm silence.
 - `Density` deterministically thins loop playback using stable priority/rank.
-- `Lock` is evaluated-output replay above generator, loop, patience, mutation, density, and source edits.
-- Add runtime-only `Lock A/B`; do not persist evaluated lock buffers in Phase 8.
+- `Hold`/`Lock` is a single runtime evaluated-output freeze above generator, loop, patience, mutation, density, and source edits.
+- Do not add `Lock A/B` in Phase 8. Performer’s 16 patterns are the saved snapshot system; evaluated-output hold is temporary runtime state.
 
 ## Mental Model
 
 User-facing explanation:
 
-> Rhythm and Melody can each be Live or Loop. Patience refreshes Loops. Mutate edits Loops. Rest creates rhythm silence. Density thins rhythm playback. Lock A/B captures exactly what came out.
+> Rhythm and Melody can each be Live or Loop. Patience refreshes Loops. Mutate edits Loops. Rest creates rhythm silence. Density thins rhythm playback. Hold freezes exactly what came out.
 
 Internal ownership:
 
 - Generator owns how new rhythm and melody material is invented.
 - Loop source owns repeatable rhythm/melody material and playback windowing.
 - Evolution owns source refresh, source mutation, and density thinning.
-- Lock owns final evaluated event replay.
+- Hold/Lock owns final evaluated event replay for the current runtime performance state.
 
 ## Key Files
 
@@ -387,49 +387,66 @@ Acceptance matrix:
 | Live | Loop | changing rhythm, repeating pitch cycle |
 | Live | Live | fully fresh generation |
 
-## Phase 8.5 Lock A/B
+## Phase 8.5 Runtime Hold
 
 ### Files
 
-- Modify `src/apps/sequencer/model/StochasticTypes.h`
 - Modify `src/apps/sequencer/model/StochasticTrack.h`
 - Modify `src/apps/sequencer/model/StochasticTrack.cpp`
 - Modify `src/apps/sequencer/engine/StochasticTrackEngine.h`
 - Modify `src/apps/sequencer/engine/StochasticTrackEngine.cpp`
 - Modify `src/apps/sequencer/ui/model/StochasticPerformanceListModel.h`
 
-### Required Types
+Engine storage:
+
+- One runtime evaluated hold buffer for the currently active performance state.
+- The buffer stores compact final scheduled/evaluated output hits, not stochastic source events and not parent/child semantic structures.
+- Keep the buffer runtime-only in Phase 8.
+- Do not store `LockedParentEvent` / `LockedChild` style semantic structs. Hold should not remember "parent", "child", "legato", "rest", "duration", or "burst"; it should remember only the hits needed to reproduce CV and gate output.
+- Prefer compact integer CV representation if the existing output scale permits it without adding conversion ambiguity. If conversion risk is high, keep float CV for Phase 8 and leave integer CV compaction as a measured follow-up.
+
+Required type shape:
 
 ```cpp
-enum class StochasticLockMode : uint8_t {
-    Off,
-    A,
-    B,
-    Last
+struct HeldHit {
+    uint16_t onTick;   // tick offset from the parent step tick
+    uint16_t offTick;  // tick offset from the parent step tick
+    float cv;          // exact evaluated CV for Phase 8; int16_t only if conversion is already canonical
+    uint8_t flags;     // valid, gate, accent, slide, forceCv
+};
+
+struct HeldStep {
+    uint8_t count;
+    uint8_t flags;     // valid, forceGateOffAtStart
+    HeldHit hits[5];   // parent + up to four burst children
 };
 ```
 
-Track storage:
+Function wording:
 
-```cpp
-StochasticLockMode _lockMode;
-```
+- `initHoldBuffer()` allocates and invalidates the runtime `HeldStep[CONFIG_STEP_COUNT]` buffer.
+- `freeHoldBuffer()` releases the runtime hold buffer.
+- `clearHoldBuffer()` invalidates every held step and is called from `reset()`, `restart()` when needed, and `changePattern()`.
+- `replayHeldStep(uint8_t readIndex, uint32_t tick)` returns `true` only when Hold is on and the held step is valid; it schedules the stored hits directly into `_cvQueue` and `_gateQueue`, then bypasses all generator/source/evolution logic.
+- `beginHoldCapture(uint8_t readIndex)` clears one held step before normal evaluation writes the current output.
+- `captureHeldHit(uint8_t readIndex, uint32_t onOffset, uint32_t offOffset, float cv, bool accent, bool slide, bool forceCv)` appends one evaluated audible hit to the current held step.
+- `finishHoldCapture(uint8_t readIndex)` marks the held step valid after all parent/burst hits have been captured.
 
-Engine storage:
+English contract:
 
-- Two runtime evaluated lock buffers:
-  - `LockSlot A`
-  - `LockSlot B`
-- Each slot stores evaluated parent events and evaluated child hits.
-- Keep buffers runtime-only in Phase 8.
+- Capture what the output scheduler is about to do, not why it decided to do it.
+- A held hit means: set CV at this offset, raise gate at this offset, lower gate at this offset, with these accent/slide flags.
+- Parent and burst children are just hits in the held step. Their origin must not matter during replay.
+- If a generated event is a rest or is hidden by density, capture a valid held step with zero hits plus any required gate-off flag; do not replay stale hits from an older pass.
+- Replay should be no smarter than the queues: push CV events and gate events from the held hit list.
 
 Behavior:
 
-- `Lock Off`: evaluate normally and allow capture/update policy.
-- `Lock A`: replay slot A if valid.
-- `Lock B`: replay slot B if valid.
-- If selected lock slot has no valid captured event for the read index, evaluate normally and capture that event into the selected slot, or explicitly show/use empty behavior. Prefer current lock behavior if already established on hardware.
-- Lock replay bypasses:
+- `Hold Off`: evaluate normally and keep/update the runtime capture buffer according to the current capture policy.
+- `Hold On`: replay the captured evaluated output if valid.
+- If the hold buffer has no valid captured event for the read index, evaluate normally and capture that event into the hold buffer, matching the current single-lock behavior.
+- Pattern switching must not silently mask the new pattern with old locked output. On selected-pattern change, clear the hold buffer and turn hold off unless a later hardware-tested policy explicitly replaces this.
+- Hold replay bypasses:
   - source buffer reads
   - Live generation
   - Patience
@@ -439,20 +456,21 @@ Behavior:
 
 User-facing labels:
 
-- `Lock: Off`
-- `Lock: A`
-- `Lock: B`
+- Prefer `Hold: Off/On` for new UI text.
+- `Lock: Off/On` is acceptable as temporary list-model wording if already wired.
 
 Non-goal:
 
-- Do not persist Lock A/B buffers in project files.
-- Do not call Lock A/B "Pattern Banks".
+- Do not persist evaluated hold buffers in project files.
+- Do not implement evaluated-output snapshot banks.
+- Do not call Hold a pattern bank or snapshot. The saved snapshot mechanism is the existing Performer pattern system plus pattern-owned Loop source material.
 
 Acceptance:
 
-- User can capture/replay two evaluated phrases during one runtime session.
-- Switching A/B does not alter source material.
-- Project save/load does not attempt to serialize lock buffers.
+- User can freeze and replay one evaluated phrase during the current runtime session.
+- Hold does not alter source material.
+- Pattern switch reveals the newly selected pattern by clearing/disabling Hold.
+- Project save/load does not attempt to serialize the hold buffer.
 
 ## Phase 8.6 Temporary Hardware Access
 
@@ -480,7 +498,7 @@ Performance list should expose:
 - `Count`
 - `Rate` for burst if label context is clear; otherwise `B Rate`
 - `Pitch` for burst if label context is clear; otherwise `B Pitch`
-- `Lock`: `Off` / `A` / `B`
+- `Hold`: `Off` / `On` (or temporary `Lock`: `Off` / `On`)
 - `Size`
 - `First`
 - `Last`
@@ -497,7 +515,7 @@ Config list should keep Performer infrastructure:
 - `CV`
 - `Slide Time`
 
-Do not implement final graphics, grids, visual lock-bank pages, or custom ticket pages in Phase 8. That is Phase 9.
+Do not implement final graphics, grids, visual hold pages, or custom ticket pages in Phase 8. That is Phase 9.
 
 ## Phase 8.7 Verification
 
@@ -529,11 +547,11 @@ Hardware smoke tests:
 7. `Patience = 0`: confirm Loop material refreshes at maximum cadence.
 8. `Mutate > 0`: confirm only Loop domains mutate.
 9. `Density` down/up: confirm same rhythm skeleton disappears/reappears.
-10. `Lock A`: capture and replay final evaluated output.
-11. `Lock B`: capture a different output and switch A/B.
-12. While locked, edit tickets, density, patience, mutate, burst, and source modes; output should not change.
+10. `Hold On`: capture and replay final evaluated output.
+11. While held, edit tickets, density, patience, mutate, burst, and source modes; output should not change.
+12. Switch pattern while held; confirm Hold clears/disables and the newly selected pattern is heard.
 13. Save/load project; confirm no `end_of_file`.
-14. Confirm lock buffers are not expected to persist after load.
+14. Confirm hold buffer is not expected to persist after load.
 
 ## Commit Slices
 
@@ -541,7 +559,7 @@ Hardware smoke tests:
 2. Split source buffers and serialization.
 3. Generator split.
 4. Engine source-resolution and loop/evolution semantics.
-5. Lock A/B runtime buffers.
+5. Runtime Hold buffer.
 6. Temporary list access and routing cleanup.
 7. Verification notes and task status update.
 
@@ -553,7 +571,7 @@ Phase 9 should build the real UI around the stable Phase 8 model:
 - ticket editor sized by active scale degrees
 - rhythm density/rest-order view
 - generated source loop view
-- Lock A/B capture/replay view
+- Hold capture/replay indication
 - burst child-hit visualization
 
 Do not start Phase 9 until Phase 8 hardware semantics are verified.

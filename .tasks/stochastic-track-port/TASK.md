@@ -10,7 +10,7 @@ Port the Vinx fork's Stochastic track type to XFORMER, then extend the MVP with 
 - `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md` — controlling MVP spec.
 - `.tasks/stochastic-track-port/UI-DESIGN.md` — XFORMER-native UI design plan.
 - `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md` — immutable Phase 7 vocabulary and ownership contract.
-- `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md` — controlling Phase 8 V3 rebuild plan: split Rhythm/Melody `Loop`/`Live` source modes, no `New`, `Patience` as loop refresh, `Mutate` as loop-only edit, runtime Lock A/B, UI deferred to Phase 9.
+- `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md` — controlling Phase 8 V3 rebuild plan: split Rhythm/Melody `Loop`/`Live` source modes, no `New`, `Patience` as loop refresh, `Mutate` as loop-only edit, single runtime Hold/Lock freeze, UI deferred to Phase 9.
 - `temp-ref/vinx-performer/src/apps/sequencer/{model,engine,ui}/Stochastic*` — Vinx Stochastic source.
 - `../others/mutable/marbles/random/output_channel.cc`
 - `../others/mutable/marbles/random/distributions.h`
@@ -713,10 +713,10 @@ Phase 7b is a ground-up core rebuild inside the existing `TrackMode::Stochastic`
   - `uint16_t _boredomCounter;`
   - `int8_t _jumpOctave;`
   - `bool _patternCycleEnded;`
-- Replace `LockedStep` with evaluated event lock data:
+- Historical Phase 7b note, superseded by Phase 8 Runtime Hold. Do not implement this semantic lock shape in new work:
   - `LockedParentEvent`: final CV, duration ticks, gate/rest, legato, slide, accent, first child, child count, valid.
   - `LockedChildHit`: final CV, offset ticks, length ticks, gate, slide, accent.
-- Keep locked buffers heap-allocated, not inline. Allocate parent buffer capacity `CONFIG_STEP_COUNT`, child capacity `CONFIG_STEP_COUNT * 4`.
+- Historical buffer note also superseded: Phase 8 uses one runtime `HeldStep[CONFIG_STEP_COUNT]` scheduled-output buffer, not separate semantic parent/child lock buffers.
 
 **Tick advancement:**
 1. Do not use `sequence.runMode()` for Phase 7b stochastic playback.
@@ -870,7 +870,9 @@ Keep these only if needed for migration/debug until Phase 8 removes old UI assum
 - `Mutate` edits Loop source material only. Live domains are already fresh and must not be mutated.
 - `Rest` creates rhythm-generator silence.
 - `Density` deterministically thins rhythm playback by stable priority/rank.
-- Runtime `Lock A/B` replays final evaluated output above generator, loop, patience, mutation, density, and source edits.
+- Runtime Hold/Lock replays final evaluated output above generator, loop, patience, mutation, density, and source edits.
+- Runtime Hold/Lock stores compact scheduled output hits, not parent/child semantic source data. Required engine helper wording: `initHoldBuffer()`, `freeHoldBuffer()`, `clearHoldBuffer()`, `replayHeldStep(readIndex, tick)`, `beginHoldCapture(readIndex)`, `captureHeldHit(readIndex, onOffset, offOffset, cv, accent, slide, forceCv)`, and `finishHoldCapture(readIndex)`.
+- Do not add Lock A/B banks. Performer’s 16 patterns plus pattern-owned Loop source material are the saved snapshot system.
 
 **Primary files:**
 - `src/apps/sequencer/model/StochasticTypes.h`
@@ -892,12 +894,14 @@ Keep these only if needed for migration/debug until Phase 8 removes old UI assum
 - `Rhythm Live + Melody Loop`: rhythm changes while pitch repeats.
 - `Rhythm Live + Melody Live`: fully fresh generation.
 - `Patience` and `Mutate` affect only Loop domains.
-- `Lock A/B` captures and replays evaluated parent events plus burst child hits, without project persistence in Phase 8.
+- Hold/Lock captures and replays one evaluated parent/child output buffer during the runtime session, without project persistence in Phase 8.
+- Hold replay schedules stored CV/gate hits directly and does not remember why a hit existed.
 - STM32 RAM gates remain documented after implementation.
 
 **Non-goals:**
 - No final visual UI.
-- No persistent evaluated lock banks.
+- No evaluated-output A/B banks.
+- No persistent evaluated lock buffers.
 - No separate exposed rhythm/melody sizes yet.
 - No hidden mutation of Live material.
 

@@ -384,7 +384,7 @@ public:
         _lengthBias.setBase(0);
         _noteBias.setBase(0);
 
-        _modeInternal = StochasticModeInternal::Dice;
+        _modeInternal = StochasticModeInternal::Loop;
         _complexity.setBase(50);
         _contour.setBase(0);
         _rate.setBase(50);

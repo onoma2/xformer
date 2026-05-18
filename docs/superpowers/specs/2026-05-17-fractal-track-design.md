@@ -73,14 +73,31 @@ Configurable length: 16/32/64/128/256 steps. Default 64.
 
 ### KD-3: Loop Lifecycle Model — Proteus-Inspired Boredom/Mutation
 
-**Decision:** Adopt the Proteus spec's loop-boundary lifecycle:
+**Decision:** Adopt the Proteus spec's loop-boundary lifecycle, augmented with a per-loop-cycle evolution system (KD-6) and a trunk/branch cycle (KD-12):
 
-1. **Complexity** parameter controls how aggressively **mutation pitch selection** works. It affects mutation only — recording and recapture always come from source track outputs directly.
-2. **Patience** parameter ramps a boredom probability at each loop boundary. At max patience, the loop never resets.
-3. **Mutation** probability re-rolls one buffer index per loop pass.
-4. **Octave Shift** probability offsets the entire buffer ±12 semitones, constrained to ±1 octave from base.
+1. **Boredom/Patience**: resets the loop via auto-capture at loop boundaries.
+2. **Mutation via Evolution**: selects a step index in the mutation zone, influenced by Evolution mode/depth/history (KD-6), and re-generates its CV.
+3. **Octave Shift**: offsets CV values in the mutation zone by ±12 semitones.
+4. **Trunk/Branch cycle management**: track trunk/branch phase counters and switch layers at boundaries (KD-12).
 
-**Rationale:** These are the Proteus §3.2–3.4 mechanics, adapted from "melody buffer reset" to "captured-loop mutation." They map cleanly to the Stochastic track's existing Phase 7 plan.
+**Loop-boundary execution order (during trunk phase):**
+```
+1. Boredom reset (patience): may set _autoCapturePending
+2. Select mutation target via evolution mode + depth + history
+3. Mutate selected step's CV via complexity + scale
+4. Record mutation to history: {stepIndex, oldCV, newCV, loopCount}
+5. Octave shift
+6. Decrement trunk cycle counter; if zero, switch to branch phase
+```
+
+**Loop-boundary execution order (during branch phase):**
+```
+1. Advance to next branch in path
+2. Decrement branch cycle counter; if zero, switch to trunk phase
+3. No buffer mutation during branch phase — branches are non-destructive transforms
+```
+
+**Rationale:** These are the Proteus §3.2–3.4 mechanics, adapted from "melody buffer reset" to "captured-loop mutation." The evolution system (KD-6) adds per-loop-cycle memory; the trunk/branch cycle (KD-12) adds Bloom-style generative navigation.
 
 ### KD-4: Two-Master Input Mixing
 
@@ -111,17 +128,57 @@ Configurable length: 16/32/64/128/256 steps. Default 64.
 
 **Compose/decompose semantics (post-MVP):** The compose/decompose *rates* from Palimpsest can be repurposed to control the `blendAmount` parameter (compose = high blend toward new, decompose = low blend, keep old). But they must never add/subtract raw V/Oct voltages.
 
-### KD-6: Mutation Engine — Persistent Engine RNG (MVP)
+### KD-6: Per-Loop-Cycle Evolution System
 
-**Decision:** MVP mutations use a **persistent engine RNG** (same `Random` class as StochasticTrackEngine). The RNG is a single `uint32_t` seed that advances normally with each roll:
-- Engine holds `_rng` as a member. Reseeded on transport reset from track index + pattern.
-- At each loop boundary, consume RNG rolls for each mutation type (mutation, octave shift, boredom reset).
-- Each loop boundary produces different results because the RNG state advances naturally.
-- No mutation history array, no Turing register — "stateless" means no saved mutation log, not that the RNG is re-seeded identically each loop.
+**Decision:** Loop-boundary mutation step selection is biased by a **per-loop-cycle evolution system** — MutationHistory, SelectionPressure, and EvolutionDepth — rather than purely random RNG picks.
 
-**Why NOT Turing DNA for MVP:** A shift register makes mutation stateful — the engine must store the register, its length, and its probability parameter. This adds engine RAM beyond the single `uint32_t` RNG seed. Turing DNA is a strong post-MVP candidate (see Reference Porting B) but the MVP should prove the loop recorder first, then layer in correlated mutation patterns.
+**Components:**
 
-**Post-MVP upgrade path:** Replace the per-loop random index with a Turing shift register (`util_turing.h`) where set bits select mutation targets. This adds ~12 B to the engine (uint64_t register + uint8_t length + uint8_t probability) and creates correlated, drifting mutations.
+```
+MutationHistory: circular buffer of 16 records
+  struct MutationRecord {
+      int8_t  stepIndex;       // which step (0-255)
+      float   oldCV;           // CV before mutation
+      float   newCV;           // CV after mutation
+      uint16_t loopCount;      // when it happened (for age/decay)
+  };
+  Records: 16 x ~16 B = ~256 B inline in engine
+
+SelectionPressure: mode-selectable bias function over history
+  Three user-selectable modes:
+    1. Even-Spread (Explore):
+       Bias toward steps least-recently-touched. Feels like a cursor
+       systematically scanning through the mutation zone.
+    2. Hot-Spot (Cluster):
+       Bias toward recently-mutated steps + their neighbors. Creates
+       clusters of related mutations in one region before drifting.
+    3. Pattern-Follow (Mimic):
+       Bias toward steps whose current CV matches historical mutation
+       source values. If step 2 went C->E last cycle, and step 8 is
+       currently at C, bias toward picking step 8.
+  Each mode is a pure bias function over the history buffer — no
+  state beyond the mode enum (2 bits on model).
+
+EvolutionDepth: single uint8_t (0-100%) on model
+  0% = purely random step selection (ignore history)
+  100% = full bias toward history-selected step
+```
+
+**How it works at loop boundaries:**
+```
+On trunk-phase loop boundary:
+  1. Roll evolution RNG (persistent _rng reseeded on transport reset)
+  2. If mutationProb triggers:
+     a. SelectionPressure biases which step index in mutateFirst..mutateLast
+     b. EvolutionDepth controls bias vs random: depth=0 -> pure random,
+        depth=100 -> full pressure weighting
+     c. Mutate selected step's CV via complexity + scale
+  3. Record mutation to history: {stepIndex, oldCV, newCV, loopCount}
+```
+
+**Success scoring deferred:** History records mutations but cannot "learn" until a success mechanism exists. Pressure biases toward exploration/recency/pattern, not "better" outcomes. When success scoring is added (post-MVP), it will update per-type weights in the bias function.
+
+**Persistent RNG preserved for underlying randomness:** The engine still holds `_rng` (uint32_t, reseeded on transport reset). The evolution system biases RNG rolls, it doesn't replace them. Turing DNA remains a post-MVP upgrade (see Reference Porting B).
 
 ### KD-7: Record Trigger — Fractal-Local Record Arm
 
@@ -151,10 +208,11 @@ Configurable length: 16/32/64/128/256 steps. Default 64.
 **Engine members estimate:**
 - TrackEngine base (~100 B)
 - SequenceState, linkData, queues (~200 B)
-- RNG, loop counters, boredom counter (~30 B)
-- No mutation history or Turing register — single persistent RNG seed, no mutation log
+- RNG, loop counters, boredom counter, trunk/branch counters (~50 B)
+- MutationHistory: 16 records x ~16 B = ~256 B inline
+- SelectionPressure mode + EvolutionDepth (2 B on model, 0 B in engine)
 - No lockedSteps — the main buffer IS the loop (heap-allocated)
-- **Target: ~400–600 B** — well under the 912 B gate.
+- **Target: ~600–700 B** — under the 912 B gate. The history system adds ~256 B but stays inline and does not inflate the container.
 
 ### KD-10: Mutation Zone — Scoped Transform Range
 
@@ -196,6 +254,68 @@ Configurable length: 16/32/64/128/256 steps. Default 64.
 
 ---
 
+### KD-12: Branches — Non-Destructive Playback Transforms (Post-Trunk)
+
+**Decision:** Branches are **"trunk + math transform" at playback time** — no separate buffers. The trunk is the single ground truth recording. Each branch reads the trunk buffer and applies one of the following transforms during playback:
+
+- **Reverse**: play trunk steps backwards
+- **Inverse**: mirror pitch around a center note (`center - (cv - center)`)
+- **Transpose**: offset all CV values by fixed semitones
+- **Mutate**: per-step probability of re-rolling CV via current complexity/scale
+- **Randomize**: each step gets a random CV from the active scale
+
+**Lifecycle: trunk cycles, then branches, then back to trunk:**
+
+```
+trunk(N) -> branches(M) -> trunk(N) -> branches(M) -> ...
+```
+
+Where N = trunkCycles (how many loop repetitions of trunk before switching to branches) and M = branchCount (how many branches to generate before switching back). The trunk may evolve at its loop boundaries (via KD-3/KD-6); branches do NOT mutate the buffer.
+
+**Path:** a curated set of navigation patterns defining which branch plays in which order. Implemented as a small editable LUT (6-8 entries in rodata/flash, ~64 B). Options include:
+
+1. Forward Ladder: T -> B1 -> B2 -> ... -> BN
+2. Reverse Ladder: T -> BN -> BN-1 -> ... -> B1
+3. Ping-Pong: T -> B1 -> B2 -> B3 -> B2 -> B1 -> T
+4. Trunk Return: T -> B1 -> T -> B2 -> T -> B3 -> ...
+5. Deep Dive: T -> B1 -> B2 -> ... -> BN (stay at BN for N reps)
+6. Converge: B1 -> B2 -> ... -> T (inward)
+7. Diverge: T -> B3 -> B2 -> B1 (outward)
+8. Random Walk: randomly pick between T and any branch each loop
+
+**Order (from Bloom):** playback direction for trunk — Forward, Reverse, Pendulum, Random, Converge, Diverge, Page Jump.
+
+**RAM impact:** Zero. Branches have no buffer storage — transforms are applied at playback time reading from the single trunk buffer. Only model params: trunkCycles (uint8_t), branchCount (uint8_t, 0-7), pathType (uint8_t, 0-7), orderMode (uint8_t, 0-6), branchTransformFlags (uint8_t bitmask).
+
+### KD-13: Ornamentation — Per-Step Classical Flourishes (Post-Trunk/Branch)
+
+**Decision:** Ornamentation applies per-step classical flourishes during playback, on top of whatever layer (trunk or branch) is playing. No storage — evaluated in the tick path.
+
+**Two-step ornaments (anticipation, suspension, syncopation, octave/fifth up, half-turn toward/away):**
+- Anticipation: play next step's note one eighth early
+- Suspension: hold previous step's note for one eighth before current step's note
+- Syncopation: rest for one eighth, then play current step's note
+- Octave Up: play the octave above one eighth later
+- Fifth Up: play the fifth above one eighth later
+- Half Turn Toward: one eighth that goes one scale degree beyond the next note toward it
+- Half Turn Away: one eighth that goes one scale degree away from the next note
+
+**Four-step ornaments (run toward/away, turn, arp toward/away, mordent up/down):**
+- Run Toward: four notes moving toward the next step's pitch
+- Run Away: four notes moving away from the next step's pitch
+- Turn: current note, one up, one down, then current again
+- Arp Toward: arpeggiated chord toward the next step
+- Arp Away: arpeggiated chord away from the next step
+- Mordent Up/Down: rapidly alternate between current note and neighbor
+
+**Max ornaments:** Full 8-step trills.
+
+**User control:** Ornamentation probability per step (like Bloom's Performance Mode Mutate knob). Implemented as `ornamentProb` (uint8_t, 0-100%) + `ornamentMode` (uint8_t selecting 2-step / 4-step / max / off).
+
+**RAM impact:** Negligible. Evaluated in tick path, no per-step storage. ~2 B model params.
+
+---
+
 ## Phased Implementation Plan
 
 ### Phase 1: Model & Serialization
@@ -204,7 +324,7 @@ Configurable length: 16/32/64/128/256 steps. Default 64.
 
 **Files:**
 - NEW `model/FractalSequence.h` — minimal sequence: divisor, scale, root, runMode, firstStep, lastStep, playMode, resetMeasure (~20 B).
-- NEW `model/FractalTrack.h` — 17 sequences + track params: complexity, patience, mutationProb, octaveShiftProb, density, tilt, inputTrack1, inputTrack2, slideTime, octave, transpose, rotate, fillMode, gateLogic, cvLogic, bufferLength, recordArmed, mutateFirst, mutateLast. (cvUpdateMode deferred — see Phase 5. overdubMode deferred to post-MVP blend phase.)
+- NEW `model/FractalTrack.h` — 17 sequences + track params: complexity, patience, mutationProb, octaveShiftProb, density, tilt, inputTrack1, inputTrack2, slideTime, octave, transpose, rotate, fillMode, gateLogic, cvLogic, bufferLength, recordArmed, mutateFirst, mutateLast, evolutionDepth, pressureMode, trunkCycles, branchCount, pathType, orderMode, branchTransformFlags. (cvUpdateMode deferred. overdubMode deferred to post-MVP blend phase.)
 - EDIT `model/Track.h` — add `Fractal` to TrackMode enum, Container, union, accessors, initContainer.
 - EDIT `model/Routing.h` — add `FractalFirst..FractalLast` routing targets.
 - EDIT `engine/Engine.h` — add `FractalTrackEngine` to TrackEngineContainer typedef.
@@ -280,24 +400,35 @@ Configurable length: 16/32/64/128/256 steps. Default 64.
 
 **Verification:** Set moderate patience + mutation, observe buffer evolving over multiple loops. Confirm lock prevents mutation.
 
-### Phase 5: Density & Performance Mechanics
+### Phase 5: Branches + Ornamentation + Density
 
-**Goal:** Deterministic density masking and basic performance controls.
+**Goal:** Branch transforms (trunk+math at playback), ornamentation (per-step flourishes), and deterministic density masking.
 
-**Reused from Stochastic Phase 6:**
-- `density` (0–100): deterministic ranked rest-priority thinning over the loop. **Density is non-destructive:** it reads `_gateBitmap` but writes to a per-tick replay mask. `_gateBitmap` is never modified by density — only mutation and recording change the bitmap.
-- `tilt` (-100 to +100): bias rest-priority toward front or back of loop.
-- **Replay gate-off:** When density mask or invalid buffer mutes a step, the engine schedules gate-off at step start (clears any prior gate). No gate hang — muted steps always produce a clean gate-off.
-- Record arm/disarm via UI (Fractal-local, not global `_engine.recording()`).
+**Branches (KD-12):**
+- `branchCount` (0-7): how many branch transforms to cycle through
+- `branchTransformFlags` (uint8_t bitmask): enable transforms per-branch
+- `trunkCycles` (1-16): how many loop reps of trunk before switching to branches
+- `pathType` (0-7): navigation path from curated LUT
+- `orderMode` (0-6): Bloom playback order (Forward, Reverse, Pendulum, etc.)
+- Engine playback: during trunk phase → read trunk buffer; during branch phase → read trunk buffer + apply current branch's transform
+- No buffer mutation during branch phase — transforms are render-time only
 
-**Deferred from MVP:**
-- Overdub/blend mode: post-MVP weighted lerp (see KD-5).
+**Ornamentation (KD-13):**
+- `ornamentProb` (0-100%): per-step ornamentation likelihood
+- `ornamentMode`: 2-step / 4-step / max (trills) / off
+- Tick-path evaluation: after trunk or branch resolves CV+gate, ornamentation may override CV or advance playback by 1-8 micro-steps
+- Reuses existing gate queue (same as ratchet/trill scheduling)
 
-**Deferred from MVP:**
-- Jitter: the buffer stores step-aligned CV/gate snapshots with no intra-step timing. Jitter would require a `_jitterTicks[]` buffer or live timing perturbation — too much for MVP.
-- cvUpdateMode: a step-sampled buffer replaying stored CV does not need gate/always update semantics. Remove until continuous source-following is a feature.
+**Density (moved from old Phase 5, unchanged):**
+- `density` (0-100), `tilt` (-100 to +100): deterministic rest-priority thinning
+- Non-destructive: reads `_gateBitmap`, writes to per-tick replay mask
+- Replay gate-off on muted steps
 
-**Verification:** Sweep density from 100→0, confirm steps drop out in stable priority order. Test overdub: record second pass over existing loop.
+**Deferred:**
+- Micro Mutate Mode (per-step ratchet/slew/mod probability mutation) — Phase 6
+- Performance Mode (non-destructive per-step ratchet/slew/ornamentation effects) — Phase 6
+
+**Verification:** Sweep density 100→0, confirm step drop. Set branchCount=3, cycle through trunk+3 branches. Enable ornamentation, confirm flourishes on active steps.
 
 ### Phase 6: Minimal List UI (Before Hardware Validation)
 
@@ -313,8 +444,12 @@ Configurable length: 16/32/64/128/256 steps. Default 64.
 - Lock (Yes/No)
 - Density, Tilt
 - Complexity, Patience, Mutation Prob, Octave Shift Prob
+- Evolution Depth (0-100%), Pressure Mode (Even/Hot/Pattern)
 - Loop First, Loop Last, Rotate
 - Mutate First, Mutate Last (mutation zone — KD-10)
+- Trunk Cycles (1-16), Branch Count (0-7)
+- Path Type (0-7 from curated LUT), Order Mode (Forward/Reverse/Pendulum/etc.)
+- Ornament Prob (0-100%), Ornament Mode (Off/2-Step/4-Step/Max)
 - SlideTime, Octave, Transpose
 
 **Integration:** `TrackPage.cpp` routes to `FractalTrackListModel` when track mode is Fractal.
@@ -405,10 +540,12 @@ Sources audited: `temp-ref/o_c/O_C-Phazerville/` (applets, enigma, util), `temp-
 |-------|---------------|--------|--------|
 | **Phase 2** | 2-input gate/CV mixing | Vinx LogicTrackEngine | Low — adapt existing gate/note logic to output-reading |
 | **Phase 3** | Loop freeze/rotate (bool flag) | Fractal-specific | Trivial — lock flag + existing rotation |
-| **Phase 4** | Per-loop mutation via persistent RNG | Stochastic RNG pattern | Low — one Random roll per mutation type per loop boundary |
-| **Phase 4** | Complexity → mutation weights | Proteus §3.1 | Low — 3-tier weight table |
-| **Phase 4** | Patience boredom ramp | Proteus §3.2 | Low — linear ramp formula |
-| **Phase 5** | Deterministic density masking | StochasticTrackEngine (already in codebase) | Low — copy evalDensityMask |
+| **Phase 4** | Per-loop mutation bias via SelectionPressure + EvolutionDepth | Evolution system (KD-6) | Low — history 16 x 16 B inline, bias function per mode |
+| **Phase 4** | Complexity -> mutation weights | Proteus Sec3.1 | Low — 3-tier weight table |
+| **Phase 4** | Patience boredom ramp | Proteus Sec3.2 | Low — linear ramp formula |
+| **Phase 5** | Branch transforms + Path LUT | Bloom v2 (KD-12) | Low — playback-time math on trunk, zero buffer storage |
+| **Phase 5** | Ornamentation per-step | Bloom v2 (KD-13) | Low — tick-path eval, ~2 B model params |
+| **Phase 5** | Deterministic density masking | StochasticTrackEngine | Low — copy evalDensityMask |
 | **Phase 5+** | Blend overdub (weighted lerp) | o_c Palimpsest compose/decompose rates | Low — lerp with blend weight param |
 | **Phase 5+** | Turing shift register mutation | o_c ShiftReg / util_turing.h | Medium — 12 B added to engine |
 | **Phase 5+** | RunglBook freeze behavior | o_c RunglBook | Low — deterministic rotation when locked |
@@ -425,16 +562,19 @@ Sources audited: `temp-ref/o_c/O_C-Phazerville/` (applets, enigma, util), `temp-
 3. **Scale awareness:** Should mutation snap to the project scale, or the parent track's scale? **Recommendation: FractalSequence has its own scale/root (like Stochastic), defaulting to project scale.**
 4. **Buffer clear trigger:** Only via explicit user action, or also on pattern change? **Resolved:** Buffer is volatile engine state. Clear on: track mode change, buffer length change, explicit clear, power cycle. Survives transport reset and pattern change.
 5. **Overdub semantics:** **Resolved:** MVP is overwrite only (KD-5). Post-MVP blend mode uses weighted lerp (NOT additive CV accumulation, which breaks V/Oct pitch). Palimpsest-style compose/decompose rates control blend weight.
-6. **Turing DNA timing:** **Resolved:** MVP uses persistent engine RNG (KD-6). Turing shift register deferred to post-MVP (~12 B added to engine when adopted).
+6. **Turing DNA timing:** **Resolved:** KD-6 uses evolution system (history + pressure + depth) for mutation step selection, not purely random RNG. Turing shift register deferred to post-MVP (~12 B added to engine when adopted) for correlated drift patterns only.
 7. **UI before hardware:** Phase 6 (minimal list UI) must come before Phase 8 (hardware validation). Lesson from Stochastic: no manual testing without at least a list model.
 8. **Buffer persistence:** **Deferred to post-MVP.** MVP uses volatile engine buffer (not serialized). Options for persistence (per-pattern, per-track, external import) will be decided after the volatile engine proves the concept. Affects project file format, flash wear, and RAM budget.
+9. **Branches vs Post-MVP:** **Resolved:** Branches (KD-12) are Phase 5, not post-MVP. Trunk+math transforms at playback time with zero buffer storage.
+10. **Ornamentation vs Post-MVP:** **Resolved:** Ornamentation (KD-13) is Phase 5, not post-MVP. Per-step flourishes evaluated in tick path, ~2 B model params.
+11. **Evolution system vs Persistent RNG:** **Resolved:** KD-6 replaces old "persistent RNG only" with MutationHistory + SelectionPressure + EvolutionDepth. Persistent RNG is preserved for underlying rolls but step selection is biased by history.
 
-## Resolved Decisions (Audit Round 4)
+## Resolved Decisions (Audit Rounds 4-5)
 
 | # | Issue | Resolution |
 |---|-------|-----------|
 | 1 | Buffer ownership/persistence | Volatile engine state, not model state. Not serialized. Clear on mode/length/explicit/power change. |
-| 2 | Mutation RNG contradiction | Persistent engine RNG (`_rng`), reseeded on transport reset. Not re-seeded per loop. "Stateless" means no mutation history, not no RNG state. |
+| 2 | Mutation RNG contradiction | Evolution system (KD-6) replaces purely random step selection. Persistent RNG preserved for underlying rolls. |
 | 3 | Boredom mutating user recordArmed | Internal `_autoCapturePending` flag. User `recordArmed` is never touched by boredom. |
 | 4 | 17 patterns × buffer explosion | One volatile buffer per engine, not per pattern. Pattern change = config only. |
 | 5 | Reference table contradicted MVP | Palimpsest, Turing, RunglBook moved to Section B (post-MVP). Porting priority table updated. |
@@ -444,3 +584,6 @@ Sources audited: `temp-ref/o_c/O_C-Phazerville/` (applets, enigma, util), `temp-
 | 9 | Density destructiveness | Density reads `_gateBitmap`, writes to per-tick replay mask. Bitmap never modified by density. |
 | 10 | Complexity scope | Complexity controls mutation pitch selection only. Recording/recapture always from source outputs. |
 | 11 | overdubMode in Phase 1 | Removed from model. Added when blend mode is implemented (post-MVP). |
+| 12 | Branches storage | Branches are trunk+math at playback time. No separate buffers. Zero branch buffer RAM. |
+| 13 | Ornamentation storage | Ornamentation is tick-path evaluation. No per-step storage, ~2 B model params. |
+| 14 | Evolution system RAM | MutationHistory 256 B inline in engine, SelectionPressure mode 2 bits on model, EvolutionDepth 1 byte on model. |
