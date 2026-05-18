@@ -467,37 +467,50 @@ public:
 
     void read(VersionedSerializedReader &reader) {
         for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) reader.read(_degreeTickets[i]);
+        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) _degreeTickets[i] = clamp(int(_degreeTickets[i]), -1, 100);
         reader.read(_linearity);
+        _linearity = clamp(int(_linearity), 0, 100);
         reader.read(_degreeRotation);
+        _degreeRotation = clamp(int(_degreeRotation), -32, 32);
         reader.read(_maskRotation);
+        _maskRotation = clamp(int(_maskRotation), -32, 32);
         reader.read(_lock);
         reader.read(_fillMuted);
         reader.read(_loopFirst);
+        _loopFirst = clamp(int(_loopFirst), 0, CONFIG_STEP_COUNT - 1);
         reader.read(_loopLast);
+        _loopLast = clamp(int(_loopLast), 0, CONFIG_STEP_COUNT - 1);
         reader.read(_accentProb);
+        _accentProb = clamp(int(_accentProb), 0, 100);
         reader.read(_legatoProb);
+        _legatoProb = clamp(int(_legatoProb), 0, 100);
         uint8_t marblesMode;
         reader.read(marblesMode);
-        _marblesMode = static_cast<MarblesMode>(marblesMode);
+        _marblesMode = marblesMode < uint8_t(MarblesMode::Last) ? static_cast<MarblesMode>(marblesMode) : MarblesMode::Off;
         reader.read(_marblesSpread);
+        _marblesSpread = clamp(int(_marblesSpread), 0, 100);
         reader.read(_marblesBias);
+        _marblesBias = clamp(int(_marblesBias), 0, 100);
         reader.read(_marblesSteps);
+        _marblesSteps = clamp(int(_marblesSteps), 1, 100);
         _density.read(reader);
         _tilt.read(reader);
         _reservedJitter.read(reader);
         _burst.read(reader);
         reader.read(_minDegree);
+        _minDegree = clamp(int(_minDegree), 0, 127);
         reader.read(_maxDegree);
+        _maxDegree = clamp(int(_maxDegree), 0, 127);
         _slideTime.read(reader);
         _octave.read(reader);
         _transpose.read(reader);
         _rotate.read(reader);
         uint8_t fillMode;
         reader.read(fillMode);
-        _fillMode = static_cast<FillMode>(fillMode);
+        _fillMode = fillMode < uint8_t(FillMode::Last) ? static_cast<FillMode>(fillMode) : FillMode::None;
         uint8_t cvUpdateMode;
         reader.read(cvUpdateMode);
-        _cvUpdateMode = static_cast<CvUpdateMode>(cvUpdateMode);
+        _cvUpdateMode = cvUpdateMode < uint8_t(CvUpdateMode::Last) ? static_cast<CvUpdateMode>(cvUpdateMode) : CvUpdateMode::Gate;
         _gateBias.read(reader);
         _retriggerBias.read(reader);
         _lengthBias.read(reader);
@@ -505,7 +518,8 @@ public:
 
         // Phase 7b additions
         uint8_t modeInternal, burstPitch;
-        reader.read(modeInternal); _modeInternal = static_cast<StochasticModeInternal>(modeInternal);
+        reader.read(modeInternal);
+        _modeInternal = modeInternal < uint8_t(StochasticModeInternal::Last) ? static_cast<StochasticModeInternal>(modeInternal) : StochasticModeInternal::Loop;
         _complexity.read(reader);
         _contour.read(reader);
         _rate.read(reader);
@@ -513,17 +527,23 @@ public:
         _rest.read(reader);
         _slide.read(reader);
         reader.read(_burstRate);
+        _burstRate = clamp(int(_burstRate), 0, 100);
         reader.read(_burstCount);
-        reader.read(burstPitch); _burstPitch = static_cast<StochasticBurstPitch>(burstPitch);
+        _burstCount = clamp(int(_burstCount), 0, 100);
+        reader.read(burstPitch);
+        _burstPitch = burstPitch < uint8_t(StochasticBurstPitch::Last) ? static_cast<StochasticBurstPitch>(burstPitch) : StochasticBurstPitch::Parent;
         _sleep.read(reader);
         _patience.read(reader);
         _mutate.read(reader);
         _jump.read(reader);
         reader.read(_range);
+        _range = clamp(int(_range), 1, 4);
 
         uint8_t rhythmMode, melodyMode;
-        reader.read(rhythmMode); _rhythmMode = static_cast<StochasticSourceMode>(rhythmMode);
-        reader.read(melodyMode); _melodyMode = static_cast<StochasticSourceMode>(melodyMode);
+        reader.read(rhythmMode);
+        _rhythmMode = rhythmMode < uint8_t(StochasticSourceMode::Last) ? static_cast<StochasticSourceMode>(rhythmMode) : StochasticSourceMode::Loop;
+        reader.read(melodyMode);
+        _melodyMode = melodyMode < uint8_t(StochasticSourceMode::Last) ? static_cast<StochasticSourceMode>(melodyMode) : StochasticSourceMode::Loop;
 
         for (auto &sequence : _sequences) {
             sequence.read(reader);

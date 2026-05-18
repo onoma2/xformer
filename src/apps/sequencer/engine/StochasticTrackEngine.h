@@ -29,7 +29,7 @@ public:
     }
 
     virtual void changePattern() override {
-        _sequence = &(_stochasticTrack.sequence(_model.project().selectedPatternIndex()));
+        _sequence = &(_stochasticTrack.sequence(pattern()));
     }
 
     int currentStep() const { return _patternIndex; }

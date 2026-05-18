@@ -14,6 +14,7 @@ The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples
 | Core loop | Generate → evaluate → lock | Record → loop → mutate/evolve |
 | Mutation trigger | Per-step probability rolls | Loop-boundary lifecycle events |
 | Buffer semantics | Capture evaluated events into lock buffer | Step-sample gate+CV, loop, mutate |
+| Record modes | Binary capture (Hold lock) | Replace vs Latch, PunchIn/Immediate, Loop/Once, record quantize |
 | Relationship | Stand-alone sequencer | Post-processing child of other tracks |
 
 ---
@@ -35,33 +36,53 @@ The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples
 - No cross-track feedback is possible by construction. This matches the existing Performer convention where linked tracks must be earlier in the track array.
 - Alternative (rejected for MVP): read from previous tick's latched output. This would allow any source index but requires a per-engine output latch — too much architectural change for MVP.
 
-### KD-2: Buffer Format — Split Arrays, Configurable Length
+### KD-2: Buffer Format — Bitpacked Single Array (IndexedSequence Pattern)
 
-**Decision:** Heap-allocate **three separate arrays** (not a struct-per-step):
+**Decision:** Heap-allocate a single array of `uint32_t`, one per step, bitpacked following the IndexedSequence::Step pattern:
+
 ```cpp
-float *_cvBuffer;       // cvBuffer[step] = V/Oct voltage at that step
-uint8_t *_gateBitmap;   // bit i = gate state for step i
-uint8_t *_validBitmap;  // bit i = 1 if step has been recorded
+uint32_t *_stepBuffer;  // One uint32_t per step, bitpacked:
+
+// bits 0-15:  CV (16-bit fixed-point, signed int16 centered at 0V = 0,
+//             resolution ~0.15 mV over 10V range)
+// bit 16:     gate (1 bit)
+// bit 17:     valid (1 bit, set when step has been recorded)
+// bit 18:     slide/slew (1 bit, smooth transition from previous step)
+// bits 19-31: reserved (13 bits)
 ```
+
 Configurable length: 16/32/64/128/256 steps. Default 64.
 
-**Why split arrays, not struct-per-step:** A `{float cv; bool gate;}` struct pads to 8 bytes due to alignment. Split arrays avoid padding waste and let the gate bitmap double as the density masking input directly.
+**Why bitpacking instead of split arrays:**
+- IndexedSequence already proves this pattern works: 32-bit step words with getters/setters using shift+mask, serialized directly by `VersionedSerializedWriter`. No alignment padding waste. Single heap allocation instead of three.
+- 16-bit CV resolution (~0.15 mV per LSB) exceeds the ~1 mV resolution of a 16-bit DAC and the ~3 mV noise floor of Eurorack. Float is overkill for V/Oct recording: 7 octaves at 1V/oct = 7V range, 16-bit gives 0.15 mV resolution = ~0.0015 semitones. More than adequate.
+- The 13 unused bits provide headroom for future per-step flags (retrigger, accent, legato, gate mode, ornament override) without ever needing a second word.
 
 **RAM budget at max length (256 steps):**
-- CV array: 256 × 4 B = 1024 B
-- Gate bitmap: 256 / 8 = 32 B
-- Valid bitmap: 256 / 8 = 32 B
-- **Total: 1088 B heap** — comparable to Stochastic's 768 B.
+- Step buffer: 256 × 4 B = 1024 B
+- **Total: 1024 B heap** — a 6% savings over split arrays (1088 B), and a single allocation.
 
 **RAM budget at default length (64 steps):**
-- CV array: 64 × 4 B = 256 B
-- Gate bitmap: 8 B
-- Valid bitmap: 8 B
-- **Total: 272 B heap** — very light.
+- Step buffer: 64 × 4 B = 256 B
+- **Total: 256 B heap** — same as split arrays' CV alone, with gate/valid/slide included for free.
 
-**Rationale:** Unlike Stochastic which stores per-step probability grids (512 B per pattern), Fractal stores only the step-sampled result — gate on/off and final CV voltage. Step-aligned timing keeps the buffer naturally synchronized with the Performer's divisor system.
+**CV encoding:**
+```cpp
+// Encode float CV to 16-bit fixed-point
+int16_t encodeCv(float cv) {
+    // Clamp to ~±8V range (safe for Eurorack)
+    cv = clamp(cv, -8.0f, 8.0f);
+    return static_cast<int16_t>(std::round(cv * 4096.0f));  // 1V = 4096
+}
 
-**Deferred:** Per-step slide/legato/length capture. Each step captures one instantaneous gate+CV snapshot. Replayed gate length is one divisor division unless legato is added later.
+// Decode 16-bit fixed-point to float CV
+float decodeCv(int16_t encoded) {
+    return static_cast<float>(encoded) / 4096.0f;
+}
+```
+Resolution: 1/4096 V ≈ 0.244 mV. Over 7 octaves (7V) that's 28,672 steps — ~2.4 cents per step at 12-EDO.
+
+**Rationale:** Per-step gate length, note index, and independent duration are NOT stored because FractalTrack records step-sampled snapshots on a uniform divisor grid. Each step is exactly one divisor tick. Per-step duration would imply variable-length steps, which contradicts the recording model. If per-step gate length or variable timing is needed later, there are 13 reserved bits in the current layout; adding micro-timing would require a second word.
 
 **Buffer persistence (MVP):** The recorded buffer is **volatile engine state**, not model state. One buffer per active FractalTrackEngine, heap-allocated, not serialized. Project save stores configuration only (model params, no buffer data). The buffer survives transport reset and pattern change (config-only changes). The buffer is cleared on: track mode change, buffer length change, explicit user clear action, or power cycle.
 
@@ -201,9 +222,16 @@ On trunk-phase loop boundary:
 - 17 sequences × ~20 B = 340 B + ~200 B overhead = ~540 B total.
 - Well under the gate. No container inflation risk.
 
-### KD-9: Engine Container Impact
+### KD-9: Engine Container Impact + RAM Allocation Policy
 
 **Decision:** FractalTrackEngine must stay at or below the current engine container gate (912 B = TeletypeTrackEngine).
+
+**RAM allocation policy:**
+1. **Buffer length cap:** Default 64 steps (272 B heap). Maximum 256 steps (1,088 B heap per active engine). This caps worst-case per-engine heap at ~1 KB.
+2. **Active Fractal engine limit:** At most 4 FractalTrack engines can allocate buffers simultaneously. This limits worst-case heap for Fractal buffers to ~4 KB (at 256 steps each).
+3. **Allocation failure:** If `new` returns nullptr (OOM), the engine enters idle mode — gate=false, cv=0 — and sets an internal OOM flag. The list UI can surface this as a "Buffer OOM" warning. Fractal does NOT crash or assert on heap exhaustion. This matches the existing codebase pattern where Stochastic's `initLockedSteps` allocates with `std::nothrow`.
+4. **ARM sizeof probe required before Phase 4-5:** A skeleton FractalTrackEngine must be built on STM32 and `sizeof` reported before adding MutationHistory (256 B), branch counters, or ornamentation state. This validates the ~600 B estimate before committing to the 912 B gate. If the estimate is wrong, these features must be re-budgeted or cut.
+5. **No heap per-pattern buffers:** One heap buffer per engine instance, period. Pattern switching does not swap or reallocate buffers. This avoids 17x heap amplification.
 
 **Engine members estimate:**
 - TrackEngine base (~100 B)
@@ -246,7 +274,7 @@ On trunk-phase loop boundary:
 - 16-step loop with steps [0..3] as a fixed melodic motif, [4..15] evolving each loop
 - 64-step loop with first 8 steps as a rhythmic anchor, rest mutating pitch
 - Split loop: first half anchors, second half evolves — the anchor half provides harmonic context for the evolving half
-- All-steps-anchor: zone = empty (mutateFirst > mutateLast) effectively freezes the whole buffer without using lock — lock blocks recording too, but an empty zone only blocks mutation
+- All-steps-anchor: set `mutateFirst = mutateLast` (single-step zone) and `mutationProb = 0` to freeze all step content without using lock. Unlike lock, this still allows recording. However, the idiomatic "freeze everything" approach is `lock = true`, not an empty zone.
 
 **Relationship to Proteus anchors:** The Proteus spec describes "anchor notes" that survive regeneration (complexity low = repeat 1-2 anchors). The mutation zone IS the Proteus anchor mechanism made explicit: steps outside the zone are anchors that never change, steps inside evolve. The Proteus complexity knob then controls *how aggressively the mutable zone evolves*, while the zone itself controls *what is mutable*.
 
@@ -314,7 +342,216 @@ Where N = trunkCycles (how many loop repetitions of trunk before switching to br
 
 **RAM impact:** Negligible. Evaluated in tick path, no per-step storage. ~2 B model params.
 
----
+### KD-14: Recording Features — Replace vs Latch, Punch-In, Loop Mode, Record Quantize
+
+**Decision:** Four recording-focused features modeled after common Eurorack CV recorder patterns (Hermod Hard Rec/Rec Wait, Flame Quad's loop modes, o_C Hemisphere's quantized capture).
+
+**Components:**
+
+```
+RecordMode: enum (2 bits on model)
+  - Replace (0, default): every tick while armed, overwrite buffer[stepIndex] with source gate+CV.
+  - Latch (1): only write to buffer when source gate=1. Silent steps keep previous content.
+    Enables surgical per-step overdub without clearing the rest of the loop.
+
+PunchMode: enum (1 bit on model)
+  - Immediate (0, default): recording begins on first tick after recordArmed transitions false->true.
+  - PunchIn (1): after arming, the engine enters a wait state (_punchWait=true) and continues
+    playback. Recording releases on the first tick where resolved source gate=1. Matches Hermod
+    "Rec Wait" behavior -- you arm, the loop keeps playing, and recording kicks in when the
+    source fires a gate.
+
+LoopMode: enum (2 bits on model)
+  - Loop (0, default): at loopLast, wrap to loopFirst and continue playback.
+  - Once (1): after reaching loopLast once, set _onceDone=true. Gates go off, step advancement
+    stops. Transport restart or re-arming record resets _onceDone. Enables capture-one-loop workflow.
+
+RecordQuantize: bool (1 bit on model)
+  - Off (0, default): source CV written to buffer as-is (int16_t fixed-point).
+  - On (1): source CV is quantized to the active FractalSequence scale before writing.
+    Uses selectedScale().noteToVolts() or equivalent. Gate is unchanged. Ensures microtonal
+    source CV (from TuesdayTrack, Teletype, LFOs) snaps to scale-degree grid on capture.
+```
+
+**Total model cost:** 6 bits (fits in 1 uint8_t). Two engine bools: `_punchWait`, `_onceDone`.
+
+**Why these belong in Phase 2, not deferred:**
+- RecordMode (Replace vs Latch) is a fundamental recording paradigm choice. Without it, every record pass clears the loop entirely. Latch makes the recorder usable for live performance where you want to replace specific steps.
+- PunchIn makes recording interactive -- you can start a loop, hear it cycle, then trigger capture at the right moment.
+- LoopMode=Once is essential for "capture one loop and hold" -- the most common recorder workflow. Without it, the buffer keeps repeating and you can't inspect a single captured pass.
+- RecordQuantize ensures the captured loop is musical even when the source produces non-scale CV. This is especially important for Teletype and TuesdayTrack parents.
+
+**Deferred:** Blend/overdub (weighted lerp, post-MVP). RecordQuantize-on-playback (post-MVP).
+
+**Recording state machine (Phase 2):**
+```
+On tick() when recordArmed=true and not locked:
+  if punchMode==PunchIn && _punchWait:
+    // Keep replaying buffer, wait for source gate
+    replay buffer[stepIndex] normally
+    if resolvedSourceGate == true:
+      _punchWait = false
+      // Do NOT capture this tick -- let next tick capture
+    advance stepIndex normally
+  else:
+    Read resolved source gate + CV
+    if recordQuantize==On: snap CV to selectedScale
+    if recordMode==Replace || (recordMode==Latch && sourceGate==true):
+      Write gate + (quantized)CV to buffer[stepIndex]
+      Set valid bit, clear slide bit
+    advance stepIndex
+```
+
+**Playback after boundary (Phase 2):**
+```
+On loopLast -> loopFirst boundary:
+  if loopMode==Once && _onceDone==false:
+    set _onceDone=true   // gates off, stop advance
+  if loopMode==Loop:
+    wrap to loopFirst normally
+```
+
+### KD-15: Timing Alignment — Bar-Quantized Loop Length, Beat Offset, Track Delay
+
+**Decision:** Add timing alignment features for locking loop length to bars, shifting loop position relative to the master transport, and microtiming nudging.
+
+**Components:**
+
+```
+loopBars (uint8_t, 0-16, default 0):
+  0 = manual mode -- loopLast is a direct model param editable by the user.
+  Non-zero: auto-compute loop window length in bar units.
+    loopLast = loopFirst + (loopBars * engine.measureDivisor() / divisor()) - 1
+    Clamped to [loopFirst, bufferLength-1].
+  Changing divisor or bufferLength auto-recomputes. User edits to loopLast
+  are ignored while loopBars > 0 (the list model hides loopLast and shows
+  loopBars instead).
+
+beatOffset (int8_t, -16 to +16 beats, default 0):
+  Shift the derived loop window by N beats relative to bar lines.
+  Applied as: beatOffset * (measureDivisor() / 4) ticks added to loopFirst
+  (and correspondingly to loopLast since the bar-derived length is constant).
+  Positive shift = later in the measure (loop starts on later beats).
+  Does NOT change loop length -- only slides the window position within the
+  bar grid. Useful when recording from a parent track on a different beat
+  alignment.
+
+loopPhase (float, 0.0 to 1.0, default 0.0):
+  Free rotation of playback start within the loop, as a fraction of loop
+  length. Applied like CurveTrack `globalPhase`:
+    float stepFraction = (stepIndex - loopFirst) / (float)(loopLast - loopFirst + 1);
+    float phasedPos = fmodf(stepFraction + loopPhase, 1.0f);
+    readStep = loopFirst + (int)(phasedPos * (loopLast - loopFirst + 1));
+  At 0.0 = normal start. At 0.5 = start halfway through the loop. Wraps
+  naturally. This rotates loop content, not output timing. Combined with
+  `rotate` (integer step offset via SequenceUtils::rotateStep), gives
+  full free-form rotation of the playback head. Matches CurveTrack's
+  `globalPhase` pattern exactly.
+```
+
+**Rationale:** Eurorack CV recorders commonly offer bar-quantized loop lengths (Flame "record mode" ties to gate length) and beat-aligned start points. Phase rotation lets the user freely adjust where the loop starts in the cycle. CurveTrack already proves this pattern with `globalPhase`; FractalTrack adopts it directly. `rotate` handles coarse integer-step shifts, `loopPhase` handles continuous fractional rotation. Together they replace the need for a fixed tick delay.
+
+**Model cost:** loopBars (1 B), beatOffset (1 B), loopPhase (4 B) = 6 B total. No engine state beyond reading them. Negligible.
+
+**Timing computation flow (Phase 2):**
+```
+On tick() at step boundary:
+  1. Resolve effective loop window:
+     if loopBars > 0:
+       effectiveLen = (loopBars * engine.measureDivisor()) / divisor
+       winFirst = loopFirst + (beatOffset * measureDivisor / 4)
+       winLast  = winFirst + effectiveLen - 1
+       clamp winFirst/winLast to [0, bufferLength-1]
+     else:
+       winFirst = loopFirst, winLast = loopLast (direct from model)
+
+  2. Apply phase rotation to step index lookup:
+     float stepFraction = (stepIndex - winFirst) / (float)(winLast - winFirst + 1);
+     float phasedPos = fmodf(stepFraction + loopPhase, 1.0f);
+     int readStep = winFirst + (int)(phasedPos * (winLast - winFirst + 1));
+
+  3. Process readStep within [winFirst..winLast]:
+     recording or replay per existing Phase 2 logic
+     (phase rotation applies to playback reads; on record, write to
+      stepIndex normally, but readStep determines which step is heard)
+
+  4. Schedule output normally:
+     gateQueue.push({tick, gateState})
+     cvQueue.push({tick, cvValue})
+```
+
+**Interaction with existing features:**
+- rotate is applied on top of the bar-derived window: beatOffset shifts the window, rotate + loopPhase shifts the playback start within it. rotate provides integer-step rotation, loopPhase provides continuous fractional rotation. Both can be active simultaneously.
+- loopMode=Once works normally: after one pass of the derived window, _onceDone fires.
+- PunchIn is unaffected: punch still fires on first source gate after arming, regardless of where the bar-aligned window starts.
+- resetMeasure (from FractalSequence) is unrelated: it resets the sequence on bar-boundary transport.
+
+### KD-16: Separate Recording Extent from Loop Window
+
+**Decision:** Add `recordFirst`/`recordLast` as the recording target window, distinct from `loopFirst`/`loopLast` (playback window). Based on the Compass norns looper pattern where `sPoint`/`ePoint` define the recording extent and `loopStart`/`loopEnd` define the active loop subset.
+
+**Components:**
+```
+recordFirst (uint16_t, default 0): first step of the recording extent.
+recordLast (uint16_t, default bufferLength-1): last step of the recording extent.
+```
+
+**Behavior:**
+- Recording engine writes to `recordFirst..recordLast` and wraps from `recordLast` back to `recordFirst`.
+- Playback reads from `loopFirst..loopLast` (existing param, subset of record extent).
+- Clear buffer clears `recordFirst..recordLast` only, not the full buffer.
+- `loopBars` mode derives loop window relative to `recordFirst`.
+- Loop window cannot extend outside the record extent.
+
+**Invariants:**
+- `recordFirst <= loopFirst <= loopLast <= recordLast <= bufferLength-1` (enforced by list model).
+- Steps outside the loop window within the record extent are stored but muted during playback.
+- Recording always targets `recordFirst..recordLast` — you cannot record outside the extent.
+
+**Model cost:** recordFirst (uint16_t), recordLast (uint16_t) = 4 B.
+
+**Rationale:** Without this, the user records into the full buffer and can only loop the whole thing. Separating recording extent from loop window lets you record a long 256-step passage and loop only bars 1-4, or record 8 bars and loop a specific 2-bar section. Compass proves this pattern works well with its `sPoint`/`ePoint` vs `loopStart`/`loopEnd` distinction.
+
+**Phase:** Phase 3 (Loop Controls — windowing). Phase 2 uses `recordFirst=0, recordLast=bufferLength-1` (legacy default). Phase 3 adds the params and the extent-constrained loop window.
+
+### KD-17: ClockSource — CV-Driven Playback Step (DiscreteMap Pattern)
+
+**Decision:** Add a `ClockSource` enum to `FractalSequence` (Internal/External), matching DiscreteMapSequence's pattern. When External, a routed CV directly determines the playback step position within the loop window — no clock advancement, no divisor, no PlayMode.
+
+**Components:**
+```
+FractalSequence::_clockSource (uint8_t):
+  Internal (default): step advancement via clock ticks. PlayMode (Aligned/Free) applies normally.
+  External: step position = floor(routedScan). PlayMode and divisor are ignored.
+
+FractalTrack::_routedScan (Routable<float>): CV source for External mode.
+```
+
+**Engine behavior (Phase 2):**
+```
+if clockSource == External:
+  float scanCv = track.routedScan()
+  int step = winFirst + int(clamp(scanCv, 0.f, float(winLast - winFirst)))
+  // Edge detection: DiscreteMap scanner pattern
+  if step != _lastScanStep:
+    _lastScanStep = step
+    triggerStep(tick, step)
+else:
+  // existing clock-based step advancement (Aligned/Free)
+```
+
+**Invariants:**
+- External mode bypasses ALL clock-based step machinery: no divisor, no phase accumulator, no bar alignment, no PlayMode.
+- External mode uses the DiscreteMap floor-truncation pattern: `int(cv)` maps the continuous CV range to discrete steps. Edge detection fires triggerStep once per crossing.
+- Recording still uses clock-relative step position in both modes. External mode affects playback only.
+- `routedScan` is an independent routing target, not sharing infrastructure with sourceA/sourceB.
+- When External is active, the list UI hides divisor, gateLength, and PlayMode (they have no effect).
+
+**Model cost:** clockSource (1 B, within existing FractalSequence budget), Routable<float> on FractalTrack (~12 B routing infrastructure). Engine state: _lastScanStep (int8_t, 1 B). Negligible.
+
+**Rationale:** DiscreteMapTrack already proves this pattern — its `clockSource == External` branch reads `getRoutedInput()` and maps to stage position directly, ignoring PlayMode entirely. For FractalTrack, External mode turns the loop buffer into a CV-indexed wavetable: any CV source (LFO, envelope, sequencer, modulation track) directly selects the playback step. This enables tape-head-style scanning, LFO-driven wobbly loops, or step selection from a master track's CV output.
+
+**Phase:** Phase 1 (model: clockSource enum, routedScan routing target) + Phase 2 (engine: External branch in tick()).
 
 ## Phased Implementation Plan
 
@@ -323,8 +560,8 @@ Where N = trunkCycles (how many loop repetitions of trunk before switching to br
 **Goal:** `FractalTrack` and `FractalSequence` in the Track container, serializable.
 
 **Files:**
-- NEW `model/FractalSequence.h` — minimal sequence: divisor, scale, root, runMode, firstStep, lastStep, playMode, resetMeasure (~20 B).
-- NEW `model/FractalTrack.h` — 17 sequences + track params: complexity, patience, mutationProb, octaveShiftProb, density, tilt, inputTrack1, inputTrack2, slideTime, octave, transpose, rotate, fillMode, gateLogic, cvLogic, bufferLength, recordArmed, mutateFirst, mutateLast, evolutionDepth, pressureMode, trunkCycles, branchCount, pathType, orderMode, branchTransformFlags. (cvUpdateMode deferred. overdubMode deferred to post-MVP blend phase.)
+- NEW `model/FractalSequence.h` — minimal sequence: divisor, scale, root, runMode, firstStep, lastStep, playMode, clockSource, resetMeasure (~22 B).
+- NEW `model/FractalTrack.h` — 17 sequences + track params (MVP core only): sourceA, sourceB, gateLogic, cvLogic, bufferLength, recordArmed, recordMode, punchMode, loopMode, recordQuantize, lock, loopFirst, loopLast, loopBars, beatOffset, loopPhase, rotate, complexity, patience, mutationProb, octaveShiftProb, density, tilt, slideTime, octave, transpose, routedScan. (mutateFirst, mutateLast deferred to Phase 3. evolutionDepth, pressureMode deferred to Phase 4. trunkCycles, branchCount, pathType, orderMode, branchTransformFlags deferred to Phase 5. ornamentProb, ornamentMode deferred to Phase 5.)
 - EDIT `model/Track.h` — add `Fractal` to TrackMode enum, Container, union, accessors, initContainer.
 - EDIT `model/Routing.h` — add `FractalFirst..FractalLast` routing targets.
 - EDIT `engine/Engine.h` — add `FractalTrackEngine` to TrackEngineContainer typedef.
@@ -332,19 +569,24 @@ Where N = trunkCycles (how many loop repetitions of trunk before switching to br
 
 **Verification:** STM32 build compiles, `sizeof(FractalTrack)` probe.
 
-### Phase 2: Engine Foundation — Record & Loop
+### Phase 2: Engine Foundation — Record & Loop + Minimal List UI (Before Hardware)
 
-**Goal:** Record CV/Gate from 1–2 master tracks into a heap-allocated loop buffer, play it back on loop.
+**Goal:** Record CV/Gate from 1-2 parent tracks into a heap-allocated loop buffer, play it back on loop. **All engine features immediately accessible from existing TrackPage list view.**
 
 **Files:**
 - NEW `engine/FractalTrackEngine.h`
 - NEW `engine/FractalTrackEngine.cpp`
 
 **Core behavior:**
-- `tick()`: resolve parent engine pointers (LogicTrack pattern), read `gateOutput(0)` and `cvOutput(0)`.
-- When recording: write source gate into `_gateBitmap`, source CV into `_cvBuffer`, set bit in `_validBitmap` at current step index.
-- When playing: replay buffer in sequence order within `loopFirst..loopLast`.
-- Sequence advancement follows existing aligned/free playMode pattern (StochasticTrackEngine pattern).
+- `tick()`: resolve parent engine pointers, read `gateOutput(0)` and `cvOutput(0)`.
+- **Clock source check (new):** If `clockSource == External`, read `_fractalTrack.routedScan()`, map to step via `winFirst + int(clamp(scanCv, 0, winLen-1))`. Edge detection fires triggerStep on step change. Bypass all clock-based advancement, divisor, and PlayMode.
+- **Timing computation (new):** If `clockSource == Internal` and `loopBars > 0`, derive effective loop window: `winLast = loopFirst + (loopBars * engine.measureDivisor() / divisor) - 1`, apply `beatOffset` shift to both winFirst and winLast, clamp to buffer bounds. Otherwise use `loopFirst`/`loopLast` directly. Apply `loopPhase` for fractional rotation of the playback read position: `phasedPos = fmodf(stepFraction + loopPhase, 1.0f)` maps to a readStep within the window. Record writes go to stepIndex normally; readStep determines what is heard on output.
+- When recording (recordArmed=true, not locked):
+  - PunchIn wait: if punchMode=PunchIn and `_punchWait` is set, replay buffer normally and don't record until source gate fires.
+  - Otherwise: write source gate+CV into `_stepBuffer[stepIndex]`. If recordQuantize=On, snap CV to sequence scale first. If recordMode=Latch, only write when source gate=1.
+- When playing: read and decode `_stepBuffer[stepIndex]` — extract CV, gate, valid, slide via shift+mask.
+- Playback boundary: if loopMode=Loop, wrap derived loopLast to derived loopFirst. If loopMode=Once, set `_onceDone`, gates off, stop advance.
+- Sequence advancement: when clockSource==Internal, follows aligned/free playMode pattern (StochasticTrackEngine pattern). When External, no advancement — step position comes from routedScan CV.
 - Gate/CV queue system (same as all engines).
 
 **Key functions:**
@@ -354,6 +596,8 @@ Where N = trunkCycles (how many loop repetitions of trunk before switching to br
 
 **Cycle safety:** Engine checks source track indices < Fractal track index at creation time. Warns and treats invalid sources as idle.
 
+**List UI integration (Phase 2, not deferred):** `FractalTrackListModel` with MVP core params immediately: Clock Source (Internal/External), PlayMode, Divisor, Scale, Root, Source A/B, Gate/CV Logic, BufferLength, Record Arm, Clear Buffer (action), Record Mode (Replace/Latch), Punch Mode (Immediate/PunchIn), Loop Mode (Loop/Once), Rec Quantize (Off/On), Lock, Density, Tilt, Loop First/Last, Loop Bars, Beat Offset, Loop Phase, Rotate, SlideTime, Octave, Transpose. When ClockSource=External, divisor, PlayMode, and gateLength are hidden (they have no effect). When LoopBars > 0, Loop Last is derived and hidden from the list UI (LoopBars displayed instead). This list lives in TrackPage.cpp's existing list routing — no new page type needed. Mutation/evolution params (Complexity, Patience, MutationProb, OctaveShiftProb) are also included from Phase 1 since they're model fields.
+
 **Verification:** STM32 build, manual test via list UI: assign NoteTrack as parent, record one loop, hear it repeat.
 
 ### Phase 3: Loop Controls — Windowing, Rotation, Lock, Mutation Zone
@@ -362,16 +606,19 @@ Where N = trunkCycles (how many loop repetitions of trunk before switching to br
 
 **Model additions:**
 - `loopFirst`, `loopLast` on FractalTrack (already planned).
+- `recordFirst`, `recordLast` — recording extent (KD-16). Default `recordFirst=0`, `recordLast=bufferLength-1`. Recording wraps within extent, not full buffer.
 - `lock` bool — when true, buffer is read-only; mutations and recording are blocked.
 - `rotate` — address rotation over `loopFirst..loopLast`.
-- `mutateFirst`, `mutateLast` — mutation zone boundaries (KD-10). Default to `loopFirst`/`loopLast`. Invariant: `loopFirst ≤ mutateFirst ≤ mutateLast ≤ loopLast`.
+- `mutateFirst`, `mutateLast` — mutation zone boundaries (KD-10). Default to `loopFirst`/`loopLast`. Extent invariant: `recordFirst <= loopFirst <= mutateFirst <= mutateLast <= loopLast <= recordLast <= bufferLength-1`.
 
 **Engine changes:**
+- Recording targets `recordFirst..recordLast`. Record position wraps from `recordLast` to `recordFirst`.
 - `triggerStep()` respects lock — if locked, replay only, no writes.
 - Rotation applied via `SequenceUtils::rotateStep()` (existing).
 - Mutation zone boundaries stored on model, read by mutation logic in Phase 4.
+- Clear buffer clears `recordFirst..recordLast` only, not the full buffer.
 
-**Verification:** Rotate loop window, lock/unlock, confirm playback matches. Set mutation zone narrower than loop window, confirm anchor steps survive mutation.
+**Verification:** Record into long buffer, narrow loop window to subset, confirm playback is constrained. Extend loop window across record extent boundary — confirm list model enforces constraint.
 
 ### Phase 4: Proteus Mutation — Loop-Boundary Lifecycle
 
@@ -425,46 +672,19 @@ Where N = trunkCycles (how many loop repetitions of trunk before switching to br
 - Replay gate-off on muted steps
 
 **Deferred:**
-- Micro Mutate Mode (per-step ratchet/slew/mod probability mutation) — Phase 6
-- Performance Mode (non-destructive per-step ratchet/slew/ornamentation effects) — Phase 6
+- Micro Mutate Mode (per-step ratchet/slew/mod probability mutation) — post-core
+- Performance Mode (non-destructive per-step ratchet/slew/ornamentation effects) — post-core
 
 **Verification:** Sweep density 100→0, confirm step drop. Set branchCount=3, cycle through trunk+3 branches. Enable ornamentation, confirm flourishes on active steps.
 
-### Phase 6: Minimal List UI (Before Hardware Validation)
-
-**Goal:** Enough UI to test all engine features on hardware without needing visual pages.
-
-**`FractalTrackListModel` items (follows existing ListModel pattern):**
-- PlayMode, Divisor, ResetMeasure, Scale, Root
-- Source A (track 1–8), Source B (track 1–8, or Off)
-- Gate Logic (A/B/AND/OR/XOR/NAND/Random)
-- CV Logic (A/B/Sum/Avg/Min/Max/Random)
-- Buffer Length (16/32/64/128/256)
-- Record Arm (Yes/No), Clear Buffer (action)
-- Lock (Yes/No)
-- Density, Tilt
-- Complexity, Patience, Mutation Prob, Octave Shift Prob
-- Evolution Depth (0-100%), Pressure Mode (Even/Hot/Pattern)
-- Loop First, Loop Last, Rotate
-- Mutate First, Mutate Last (mutation zone — KD-10)
-- Trunk Cycles (1-16), Branch Count (0-7)
-- Path Type (0-7 from curated LUT), Order Mode (Forward/Reverse/Pendulum/etc.)
-- Ornament Prob (0-100%), Ornament Mode (Off/2-Step/4-Step/Max)
-- SlideTime, Octave, Transpose
-
-**Integration:** `TrackPage.cpp` routes to `FractalTrackListModel` when track mode is Fractal.
-
-**Verification:** All parameters accessible and editable from existing TrackPage list view. No custom pages needed for hardware validation.
-
-**Post-MVP:** Visual pages (buffer waveform, mutation visualization) as Phase 8+.
-
-### Phase 7: Visual UI Pages (Post-Hardware Validation)
+### Phase 6: Visual UI Pages (Post-Hardware Validation)
 
 **Goal:** Visual pages for Fractal Track in the Performer UI.
 
 **Pages (following existing patterns):**
 - `FractalTrackListModel` — track setup: playMode, input tracks, divisor, scale, root, loop window.
 - `FractalBufferPage` — visual display of captured CV/Gate buffer, loop window, lock state.
+  - **Compass loop bar:** 128px horizontal bar representing `loopFirst..loopLast`. Start/end markers as bright vertical ticks. Current playhead position as a tall tick. Density-affected steps dimmed (non-destructive replay mask visible). Lock indicator and record arm indicator in the same view. Loop window markers at loopFirst/loopLast; record extent shown as secondary brackets.
 - `FractalMutationPage` — complexity, patience, mutation, octave shift controls.
 - `FractalPerformancePage` — density, tilt, overdub toggle, record arm.
 
@@ -482,7 +702,7 @@ Where N = trunkCycles (how many loop repetitions of trunk before switching to br
 **Checks:**
 - `sizeof(FractalTrack)` under 9544 B.
 - `sizeof(FractalTrackEngine)` under 912 B.
-- Heap-allocated buffer: 64 steps × (4 B CV + 1/8 B gate + 1/8 B valid) ≈ 272 B.
+- Heap-allocated buffer: 64 steps × 4 B = 256 B.
 - Full `.data + .bss` stays under 120 KB.
 - Config serialization round-trip (model params only — buffer is volatile).
 - Routing CV modulation of mutation/density/patience.
@@ -555,6 +775,18 @@ Sources audited: `temp-ref/o_c/O_C-Phazerville/` (applets, enigma, util), `temp-
 
 ---
 
+## Future Research (Compass Norns)
+
+The following Compass-derived features are noted for future consideration, not in any phased plan:
+
+**Command palette for mutation dispatch (Phase 5+):** Compass's 18-command palette with enable/disable per step suggests a similar approach for ornamentation. Instead of a global `ornamentProb`, each FractalTrack step could index into a palette of ornament types (anticipation, suspension, mordent, run, etc.), with each ornament type having an enable flag. The per-step palette index is set during recording or editing. This would make ornamentation step-accurate rather than probabilistic. **Model cost:** 4 bits per step for palette index (16 entries) — fits in the 13 reserved bits of the `_stepBuffer` word. No extra RAM.
+
+**Discrete rate table (Phase 5+):** Compass uses 6 discrete rates {-2, -1, -0.5, 0.5, 1, 2} with slew smoothing. FractalTrack could support a playback speed multiplier, enabling half-speed (2 octaves down), double-speed (1 octave up), or reverse-speed loop playback. **Model cost:** uint8_t rate index (1 B). **Engine cost:** float accumulator per engine (4 B). **Trade-off:** Speed modulation changes the step-time relationship — the FractalTrack tick fires at the master clock rate, so speed would skip or repeat buffer reads, not change the recording. This is a fundamentally different timing model than the current step-aligned approach.
+
+**Grid gesture recording (Phase 6+):** Compass records grid touches (x,y positions) into 8 pattern slots and replays them. The grid's row 4-5 touches correspond to buffer position, while row 7 touches advance the command sequencer step. FractalTrack has no grid hardware, but the *concept* of recording gestural inputs as a pattern layer applies: a Performer encoder gesture (knob turn direction, speed, duration) could be recorded as a modulation track over the FractalTrack buffer. This is architecturally closer to the existing accumulator system than to FractalTrack.
+
+---
+
 ## Open Questions (Decide Before Phase 4)
 
 1. **Patience ramp function:** Linear or exponential? Linear is simpler and predictable. Exponential creates longer "plateaus" before sudden change. **Recommendation: Linear for MVP.**
@@ -587,3 +819,6 @@ Sources audited: `temp-ref/o_c/O_C-Phazerville/` (applets, enigma, util), `temp-
 | 12 | Branches storage | Branches are trunk+math at playback time. No separate buffers. Zero branch buffer RAM. |
 | 13 | Ornamentation storage | Ornamentation is tick-path evaluation. No per-step storage, ~2 B model params. |
 | 14 | Evolution system RAM | MutationHistory 256 B inline in engine, SelectionPressure mode 2 bits on model, EvolutionDepth 1 byte on model. |
+| 15 | Timing features | KD-15: bar-quantized loop length (loopBars), beat offset (beatOffset), free phase rotation (loopPhase). 6 B model. Phase 2. |
+| 16 | Recording extent vs loop window | KD-16: recordFirst/recordLast separate from loopFirst/loopLast. 4 B model (uint16_t+uint16_t). Phase 3. |
+| 17 | CV-driven playback | KD-17: clockSource (Internal/External) on FractalSequence. External = routedScan CV direct-maps to step position via int(cv) floor-truncation + edge detection. Bypasses divisor, PlayMode, all clock machinery. DiscreteMap pattern. Phase 1 (model) + Phase 2 (engine). |

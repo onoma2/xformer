@@ -94,6 +94,13 @@ void TopPage::keyPress(KeyPressEvent &event) {
                               currentPage == &pages.accumulator ||
                               currentPage == &pages.stochasticPerformance ||
                               currentPage == &pages.stochasticConfig);
+        bool onSequenceEditView = (currentPage == &pages.noteSequenceEdit ||
+                                   currentPage == &pages.curveSequenceEdit ||
+                                   currentPage == &pages.tuesdayEdit ||
+                                   currentPage == &pages.discreteMapSequence ||
+                                   currentPage == &pages.indexedSequenceEdit ||
+                                   (currentPage == &pages.teletypeScriptView && _mode == Mode::SequenceEdit) ||
+                                   currentPage == &pages.stochasticSequenceEdit);
         bool onTrackView = (currentPage == &pages.track ||
                            currentPage == &pages.harmony);
 
@@ -118,6 +125,8 @@ void TopPage::keyPress(KeyPressEvent &event) {
         // Navigate to same view for new track
         if (onSequenceView) {
             setSequenceView(_sequenceView);
+        } else if (onSequenceEditView) {
+            setSequenceEditPage();
         } else if (onTrackView) {
             setTrackView(_trackView);
         }

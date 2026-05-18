@@ -21,12 +21,12 @@ Do not expose module names as final user-facing modes. The track should feel Per
 - Playback order is forward through the active loop window unless overridden by Order mode.
 - Ornamentation is applied AFTER trunk or branch CV+gate is resolved.
 - Phase 4 evolution (trunk mutation) and Phase 5 branches are independent - branches read whatever trunk exists, evolved or not.
-- Lock blocks ALL buffer mutation: evolution, recording, boredom recapture.
-- No Teletype parent. Teletype output is script-defined and too variable for predictable fractaling.
+- Lock blocks trunk buffer mutation only: evolution, recording, and boredom recapture. Branch transforms and ornamentation continue while locked.
+- All lower-index engine types supported as parent sources. Fractal reads `gateOutput(0)` and `cvOutput(0)` from any engine, including Teletype.
 
 ## Parent
 
-- `Source A`, `Source B`: track indices (1-8) whose gate+CV output is recorded. Any engine type.
+- `Source A`, `Source B`: track indices (1-8) whose gate+CV output is recorded. Any engine type is supported as parent, including Teletype, NoteTrack, Stochastic, Tuesday, etc.
 - Cycle safety: source tracks must have lower indices than the FractalTrack index (enforced by list model clamping).
 - Gate Logic (8 modes): A, B, AND, OR, XOR, NAND, Random.
 - CV Logic (8 modes): A, B, Sum, Avg, Min, Max, Random.
@@ -38,31 +38,78 @@ Parent invariants:
 - Parent changes propagate immediately on next tick. FractalTrack does not cache parent state.
 - No parent link loops (A links fractal to B, B links fractal to A).
 
+## Record
+
+- `recordMode`: Replace (default) or Latch.
+  - **Replace**: every tick while armed, overwrite buffer[stepIndex] with source gate+CV.
+  - **Latch**: only write to buffer when source gate=1. Silent steps keep their previous content. Enables surgical per-step overdubbing of specific beats without clearing the rest of the loop.
+- `punchMode`: Immediate (default) or PunchIn.
+  - **Immediate**: recording begins on first tick after `recordArmed` transitions false->true.
+  - **PunchIn**: after arming, the engine enters a wait state and continues playback. Recording starts on the first tick where the resolved source gate=1. Matches Hermod "Rec Wait" behavior.
+- `loopMode`: Loop (default) or Once.
+  - **Loop**: at `loopLast`, wrap to `loopFirst` and continue.
+  - **Once**: after reaching `loopLast`, gates go off and step advancement stops. Transport restart or re-arming record resets.
+- `recordQuantize`: Off (default) or On.
+  - **Off**: source CV written to buffer as-is.
+  - **On**: source CV is quantized to the active FractalSequence scale before writing. Gate is unchanged. Ensures microtonal source CV snaps to scale-degree grid.
+
+Record invariants:
+- PunchIn respects source gate from the *resolved* parent (after Gate/CV Logic mixing). If combined gate=0, punch never fires.
+- Latch mode: a muted step stays muted if the source gate is off at that step position. Only explicitly gated source steps trigger writes.
+- RecordMode and PunchMode are orthogonal: Replace+PunchIn = punch in and overwrite; Latch+PunchIn = punch in and latch; Latch+Immediate = every step in the loop gets a chance to latch if gate fires.
+- recording is always overwrite of the 32-bit step word. There is no blend/lerp (deferred to post-MVP).
+- LoopMode=Once is a playback mode -- it does not affect recording. You can record a loop in Once mode (record fills the buffer, playback stops after one pass).
+- RecordQuantize applies on capture only. Playback is always raw buffer value. Quantization-on-playback is deferred.
+
+## Record Extent
+
+- `recordFirst`, `recordLast`: the recording target window within the buffer. Default `recordFirst=0`, `recordLast=bufferLength-1`.
+- When recording, the engine writes to `recordFirst..recordLast` and wraps from `recordLast` back to `recordFirst`, looping within the extent.
+- The loop window `loopFirst..loopLast` is a subset of the record extent. The user records into the full extent, then chooses a narrower loop window for playback.
+- Clear buffer only clears the extent `recordFirst..recordLast`, not the full buffer length.
+- `loopBars` bar-quantized mode derives the loop window relative to `recordFirst`.
+
+Record extent invariants:
+- `recordFirst <= loopFirst <= loopLast <= recordLast <= bufferLength-1` (enforced by list model).
+- Recording targets `recordFirst..recordLast`. The record position wraps from `recordLast` to `recordFirst`, not from `bufferLength-1` to 0.
+- Steps outside the loop window within the record extent are stored but muted during playback.
+- Record extent is model state (serialized). Buffer content within the extent is volatile engine state (not serialized).
+
 ## Buffer
 
-- `_cvBuffer[]`: heap-allocated float array storing V/Oct voltages per step.
-- `_gateBitmap[]`: heap-allocated bitmask (1 bit per step) storing gate state.
-- `_validBitmap[]`: heap-allocated bitmask (1 bit per step) storing whether step has been recorded.
+- `_stepBuffer[]`: heap-allocated array of uint32_t, one per step. Each word is bitpacked:
+  - bits 0-15: CV (16-bit fixed-point, resolution ~0.15 mV over 10V range, encoded as int16_t centered at 0V = 0)
+  - bit 16: gate (1 bit)
+  - bit 17: valid (1 bit, set when step has been recorded)
+  - bit 18: slide/slew (1 bit, smooth transition from previous step)
+  - bits 19-31: reserved for future use (13 bits)
 - Configurable length: 16/32/64/128/256 steps. Default 64.
-- One buffer per FractalTrackEngine instance (not per pattern).
+- One buffer per FractalTrackEngine instance (not per pattern). Single heap allocation, not split arrays.
 - Buffer is volatile engine state -- not serialized in project files.
 
 Buffer invariants:
+- Buffer is ONE per engine, NOT one per pattern. Pattern switching is a config-only operation (changes divisor, scale, mutation params, etc.) over the same live buffer.
+- Buffer is NOT swapped or cleared on pattern change. This matches the existing codebase pattern: other tracks' `changePattern()` swaps the sequence pointer; Fractal does the same for per-pattern config but the buffer survives.
 - Buffer cleared on: track mode change, buffer length change, explicit user clear, power cycle.
 - Buffer survives transport reset and pattern change.
 - Buffer length change clears buffer entirely -- no step preservation.
-- Recording is overwrite-only in MVP (blend/overdub is post-MVP via weighted lerp).
 - Recording arming is Fractal-local (`_recordArmed` flag), not coupled to global `_engine.recording()`.
 
 ## Loop
 
-- `loopFirst`, `loopLast`: playback window boundaries within the buffer.
-- `rotate`: circular shift of playback start within loopFirst..loopLast.
-- `lock`: when true, buffer is read-only. Mutations, recording, and boredom recapture are blocked.
+- `loopFirst`, `loopLast`: playback window boundaries within the buffer. When `loopBars` is non-zero, `loopLast` is derived from bar count (see loopBars below).
+- `loopBars` (0-16): bar-quantized loop length. 0 = manual mode (use `loopLast` directly). When >0, auto-compute `loopLast = loopFirst + (loopBars * measureDivisor() / divisor()) - 1`, clamped to `[loopFirst, bufferLength-1]`.
+- `beatOffset` (-16 to +16 beats, default 0): shift the loop window by N beats relative to measure bar lines. Applied by adding `beatOffset * (measureDivisor() / 4)` ticks to loopFirst. Positive = later in measure, negative = earlier. Does not change loop length.
+- `loopPhase` (float, 0.0 to 1.0, default 0.0): free rotation of playback start within the loop window, as a fraction of loop length. Applied like CurveTrack `globalPhase`: `phasedPos = fmodf(stepFraction + loopPhase, 1.0f)` maps to `loopFirst + int(phasedPos * (loopLast - loopFirst + 1))`. At 0.0 = normal start. At 0.5 = start halfway through the loop. Wraps naturally.
+- `rotate`: circular shift of playback start within loopFirst..loopLast by integer steps.
+- `lock`: when true, trunk buffer mutations are blocked (evolution, recording, boredom recapture). Branch transforms and ornamentation continue to operate normally while locked. This is NOT an output freeze -- it protects the recorded trunk content from further change while generative playback variations still run.
 - `mutateFirst`, `mutateLast`: mutation zone -- subset of loop window where transforms may operate.
 
 Loop invariants:
-- `loopFirst <= mutateFirst <= mutateLast <= loopLast` (enforced by list model).
+- `recordFirst <= loopFirst <= mutateFirst <= mutateLast <= loopLast <= recordLast <= bufferLength-1` (full extent invariant chain, enforced by list model).
+- When `loopBars > 0`, changes to `divisor` or `measureDivisor` (tempo/PPQN) auto-recompute `loopLast`. User edits to `loopLast` are ignored while `loopBars > 0`.
+- `beatOffset` is applied before `rotate` and `loopPhase`. Window shifts first, then playback start rotates within the shifted window via step offset (rotate) or fractional position (loopPhase).
+- `loopPhase` wraps naturally -- applying 0.5 to a 64-step loop places the start at step 32 on the first pass, step 0 wraps around to the end.
 - Steps OUTSIDE the mutation zone are anchors -- they replay recorded values unchanged.
 - Mutation zone scopes evolution, octave shift, and boredom recapture. Does NOT scope recording, playback, density, or lock.
 - Density operates on full loopFirst..loopLast (non-destructive replay mask).
@@ -144,6 +191,19 @@ Density invariants:
 - Changing density up and down produces the same steps disappearing/reappearing (stable priority order).
 - Muted steps schedule gate-off at step start. No gate hang.
 - Density operates on full loop window, not mutation zone.
+
+## Clock Source
+
+- `clockSource` (Internal/External): controls how the playback step position is determined.
+  - **Internal** (default): step advancement driven by clock ticks per the standard divisor system. PlayMode (Aligned/Free) applies normally.
+  - **External**: step position is directly mapped from a routed CV (`routedScan` on FractalTrack). PlayMode and divisor are ignored. The CV value is floor-truncated to an integer step index within the loop window. Edge detection (step change) triggers output.
+- `routedScan` (Routable<float> on FractalTrack): the CV source for External clock mode. A 0.0-to-1.0 CV maps to `loopFirst..loopLast`.
+
+Clock Source invariants:
+- External mode bypasses all clock-based step advancement. No divisor, no phase accumulation, no bar alignment.
+- External mode ignores PlayMode entirely — it's not Free-mode-with-CV, it's CV-as-position.
+- Edge detection uses the DiscreteMap scanner pattern: `int(cv)` truncates to discrete step, `step != _lastStep` fires once per crossing.
+- Recording still uses clock-relative step position in both modes. External mode only affects playback.
 
 ## Timing Model
 

@@ -54,25 +54,44 @@ NoteSequenceEditPage::NoteSequenceEditPage(PageManager &manager, PageContext &co
     BasePage(manager, context)
 {
     _stepSelection.setStepCompare([this] (int a, int b) {
+        if (!isActiveForSelectedTrack()) {
+            return false;
+        }
         auto layer = _project.selectedNoteSequenceLayer();
         const auto &sequence = _project.selectedNoteSequence();
         return sequence.step(a).layerValue(layer) == sequence.step(b).layerValue(layer);
     });
 }
 
+bool NoteSequenceEditPage::isActiveForSelectedTrack() const {
+    return _project.selectedTrack().trackMode() == Track::TrackMode::Note &&
+        _engine.selectedTrackEngine().trackMode() == Track::TrackMode::Note;
+}
+
 void NoteSequenceEditPage::enter() {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     updateMonitorStep();
 
     _showDetail = false;
 }
 
 void NoteSequenceEditPage::exit() {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     _engine.selectedTrackEngine().as<NoteTrackEngine>().setMonitorStep(-1);
 }
 
 void NoteSequenceEditPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "STEPS");
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
     WindowPainter::drawActiveFunction(canvas, NoteSequence::layerName(layer()));
 
     const auto &trackEngine = _engine.selectedTrackEngine().as<NoteTrackEngine>();
@@ -362,6 +381,10 @@ void NoteSequenceEditPage::draw(Canvas &canvas) {
 }
 
 void NoteSequenceEditPage::updateLeds(Leds &leds) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     const auto &trackEngine = _engine.selectedTrackEngine().as<NoteTrackEngine>();
     const auto &sequence = _project.selectedNoteSequence();
     int currentStep = trackEngine.isActiveSequence(sequence) ? trackEngine.currentStep() : -1;
@@ -408,16 +431,28 @@ void NoteSequenceEditPage::updateLeds(Leds &leds) {
 }
 
 void NoteSequenceEditPage::keyDown(KeyEvent &event) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     _stepSelection.keyDown(event, stepOffset());
     updateMonitorStep();
 }
 
 void NoteSequenceEditPage::keyUp(KeyEvent &event) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     _stepSelection.keyUp(event, stepOffset());
     updateMonitorStep();
 }
 
 void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     const auto &key = event.key();
     auto &sequence = _project.selectedNoteSequence();
 
@@ -516,6 +551,10 @@ void NoteSequenceEditPage::keyPress(KeyPressEvent &event) {
 }
 
 void NoteSequenceEditPage::encoder(EncoderEvent &event) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     auto &sequence = _project.selectedNoteSequence();
     const auto &scale = sequence.selectedScale(_project.scale());
 
@@ -600,6 +639,10 @@ void NoteSequenceEditPage::encoder(EncoderEvent &event) {
 }
 
 void NoteSequenceEditPage::midi(MidiEvent &event) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     if (!_engine.recording() && layer() == Layer::Note && _stepSelection.any()) {
         auto &trackEngine = _engine.selectedTrackEngine().as<NoteTrackEngine>();
         auto &sequence = _project.selectedNoteSequence();
@@ -625,6 +668,10 @@ void NoteSequenceEditPage::midi(MidiEvent &event) {
 }
 
 void NoteSequenceEditPage::switchLayer(int functionKey, bool shift) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     if (shift) {
         switch (Function(functionKey)) {
         case Function::Gate:
@@ -789,6 +836,10 @@ int NoteSequenceEditPage::activeFunctionKey() {
 }
 
 void NoteSequenceEditPage::updateMonitorStep() {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     auto &trackEngine = _engine.selectedTrackEngine().as<NoteTrackEngine>();
 
     // Only monitor note layer, not accumulator triggers
@@ -800,6 +851,9 @@ void NoteSequenceEditPage::updateMonitorStep() {
 }
 
 void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &step) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
 
     const auto &sequence = _project.selectedNoteSequence();
     const auto &scale = sequence.selectedScale(_project.scale());
@@ -1023,6 +1077,10 @@ void NoteSequenceEditPage::drawDetail(Canvas &canvas, const NoteSequence::Step &
 }
 
 void NoteSequenceEditPage::contextShow(bool doubleClick) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     showContextMenu(ContextMenu(
         contextMenuItems,
         int(ContextAction::Last),
@@ -1033,6 +1091,10 @@ void NoteSequenceEditPage::contextShow(bool doubleClick) {
 }
 
 void NoteSequenceEditPage::contextAction(int index) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     switch (ContextAction(index)) {
     case ContextAction::Init:
         initSequence();
@@ -1055,6 +1117,10 @@ void NoteSequenceEditPage::contextAction(int index) {
 }
 
 bool NoteSequenceEditPage::contextActionEnabled(int index) const {
+    if (!isActiveForSelectedTrack()) {
+        return false;
+    }
+
     switch (ContextAction(index)) {
     case ContextAction::Paste:
         return _model.clipBoard().canPasteNoteSequenceSteps();
@@ -1064,28 +1130,48 @@ bool NoteSequenceEditPage::contextActionEnabled(int index) const {
 }
 
 void NoteSequenceEditPage::initSequence() {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     _project.selectedNoteSequence().clearSteps();
     showMessage("STEPS INITIALIZED");
 }
 
 void NoteSequenceEditPage::copySequence() {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     _model.clipBoard().copyNoteSequenceSteps(_project.selectedNoteSequence(), _stepSelection.selected());
     showMessage("STEPS COPIED");
 }
 
 void NoteSequenceEditPage::pasteSequence() {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     _model.clipBoard().pasteNoteSequenceSteps(_project.selectedNoteSequence(), _stepSelection.selected());
     showMessage("STEPS PASTED");
 }
 
 void NoteSequenceEditPage::duplicateSequence() {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     _project.selectedNoteSequence().duplicateSteps();
     showMessage("STEPS DUPLICATED");
 }
 
 void NoteSequenceEditPage::generateSequence() {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     _manager.pages().generatorSelect.show([this] (bool success, Generator::Mode mode) {
-        if (success) {
+        if (success && isActiveForSelectedTrack()) {
             auto builder = _builderContainer.create<NoteSequenceBuilder>(_project.selectedNoteSequence(), layer());
             auto generator = Generator::execute(mode, *builder);
             if (generator) {
@@ -1096,6 +1182,10 @@ void NoteSequenceEditPage::generateSequence() {
 }
 
 void NoteSequenceEditPage::quickEdit(int index) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     _listModel.setSequence(&_project.selectedNoteSequence());
     if (quickEditItems[index] == NoteSequenceListModel::Item::Last) {
         return;
@@ -1108,6 +1198,10 @@ void NoteSequenceEditPage::quickEdit(int index) {
 }
 
 bool NoteSequenceEditPage::allSelectedStepsActive() const {
+    if (!isActiveForSelectedTrack()) {
+        return false;
+    }
+
     const auto &sequence = _project.selectedNoteSequence();
     for (size_t stepIndex = 0; stepIndex < _stepSelection.size(); ++stepIndex) {
         if (_stepSelection[stepIndex] && !sequence.step(stepIndex).gate()) {
@@ -1118,6 +1212,10 @@ bool NoteSequenceEditPage::allSelectedStepsActive() const {
 }
 
 void NoteSequenceEditPage::setSelectedStepsGate(bool gate) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     auto &sequence = _project.selectedNoteSequence();
     for (size_t stepIndex = 0; stepIndex < _stepSelection.size(); ++stepIndex) {
         if (_stepSelection[stepIndex]) {
@@ -1127,6 +1225,10 @@ void NoteSequenceEditPage::setSelectedStepsGate(bool gate) {
 }
 
 void NoteSequenceEditPage::keyboard(KeyboardEvent &event) {
+    if (!isActiveForSelectedTrack()) {
+        return;
+    }
+
     if (handleFunctionKeys(event)) return;
     BasePage::keyboard(event);
 }

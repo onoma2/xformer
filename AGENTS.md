@@ -69,6 +69,7 @@ If any are unclear on non-trivial work → flag it explicitly and ask or defer.
 - Creating significant complexity debt
 - Unknown unknowns on non-trivial changes
 - **No project version bumps during dev-stage feature work. Do not bump `ProjectVersion`, add release-migration ceremony, or preserve every transient dev-branch file layout unless the user explicitly asks or release prep has started. Dev projects may be disposable.**
+- **UI track-type page safety is a hard rule. Any page that calls type-specific accessors (`selectedNoteSequence()`, `selectedCurveSequence()`, `Track::noteTrack()`, `Track::curveTrack()`, `selectedTrackEngine().as<T>()`, etc.) must guard draw/LED/input/context callbacks against selected-track mode changes, or the navigation layer must replace that page immediately after track selection changes. In `TopPage`, track-select handling must remap sequence/edit pages after `_project.setSelectedTrackIndex(...)`; stale pages must never be allowed to run type-specific accessors.**
 - **State-altering git operations: NEVER use git commit, add, checkout, restore, push, or pull without explicit user confirmation**
 - **Code changes are FORBIDDEN unless the user explicitly asks. Explanation, research, and reading are always allowed. Writing or editing code requires explicit user consent — no exceptions, not even for "obvious" fixes or trivial changes.**
 

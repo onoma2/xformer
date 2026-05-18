@@ -12,15 +12,14 @@ _Updated: 2026-05-18_
 
 ## 🔴 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Repaired Phase 8: 
-- Fixed burst leakage: child hits are now strictly suppressed and cleared for rest/thinned steps in both locked and unlocked paths.
-- Fixed burst spacing: child hits are guaranteed to fit within parent duration with a min 2-tick low gap between hits.
-- Guarded lock buffer: added null checks for `_lockedParents` to prevent crashes on allocation failure.
-- Redefined Jump: now a loop-cycle "register shift" (-1, 0, +1) evaluated only at loop wrap, preserving Proteus-style pitch stability.
-- Frozen Capture: locked path now captures final evaluated CV, making it immune to runtime jump/octave changes.
-- Nomenclature: fully aligned to Loop/Live; Dice/Realtime removed from code and UI.
-- STM32 RAM: StochasticTrack 9148B, StochasticSequence 532B, StochasticTrackEngine 424B.
-**Next action:** Implement Phase 8.3/8.4 semantics, then replace semantic lock structs with a single runtime Hold buffer of compact scheduled output hits that clears on pattern switch; no Lock A/B banks.
+**Where I stopped:** Finalized Phase 8 repairs: 
+- Fixed locked rest + burst leakage: children are strictly suppressed for silent steps and cleared during capture.
+- Fixed burst spacing: child hits now strictly bound within parent duration; spacing truncated if necessary.
+- Guarded lock buffer: implemented `lockActive` helper for consistent allocation-failure fallback to "unlocked" mode.
+- Jump Register: implemented loop-level register shift (-1, 0, +1) evaluated only at loop wrap; bypasses RNG during lock.
+- Frozen Capture: locked path uses captured evaluated CV, immune to runtime jump/octave shifts.
+- STM32 RAM (Aggregate BSS confirmed): StochasticTrack 9148B, StochasticSequence 532B, StochasticTrackEngine 424B.
+**Next action:** Implement Phase 8.3/8.4 semantics: Runtime Hold buffer and dual A/B comparison.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic
@@ -137,7 +136,7 @@ _Updated: 2026-05-18_
 
 ## 🔵 fractal-track-implementation — Smart Mutation Engine track type (FractalTrack)
 **Status:** blocked
-**Where I stopped:** Controlling spec amended with evolution system (KD-6: MutationHistory + SelectionPressure + EvolutionDepth), Bloom branches (KD-12: trunk+math transforms, zero storage), ornamentation (KD-13: per-step flourishes). DICTIONARY.md created with vocabulary/ownership. TASK.md rewritten for 3-layer architecture (trunk -> branches -> ornamentation). PHASEDPLAN.md deleted (superseded by controlling spec phases).
+**Where I stopped:** Buffer format switched to bitpacked uint32_t per step. All 9 review findings applied. Four recording features added (KD-14: Replace/Latch, PunchIn/Immediate, Loop/Once, record quantize). Timing features (KD-15): loopBars bar-quantized length, beatOffset, loopPhase free phase rotation. Compass norns research applied: KD-16 (recordFirst/recordLast separate recording extent from loop window), Compass loop bar visual for FractalBufferPage (Phase 6), Future Research appendix. DiscreteMap scan pattern applied as KD-17 (clockSource Internal/External on FractalSequence, routedScan CV-driven step selection via DiscreteMap int-truncation + edge detection). DICTIONARY.md has new Clock Source section. Controlling spec updated with KD-17, Phase 1-2 params/engine/UI. TASK.md Phase 1-2 updated.
 **Next action:** Phase 1: model layer (`FractalSequence.h` + `FractalTrack.h`) + Track integration
 **Depends on:** resource-optimization (needs RAM headroom), stochastic-track-port (higher priority, will consume first available RAM)
 **Branch:** TBD

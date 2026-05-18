@@ -89,12 +89,16 @@ public:
 
     // Phase 7 Pattern controls (Per-pattern metadata)
     int size() const { return _size; }
-    void setSize(int size) { _size = clamp(size, 2, CONFIG_STEP_COUNT); }
+    void setSize(int size) {
+        _size = clamp(size, 2, CONFIG_STEP_COUNT);
+        _first = clamp(int(_first), 0, int(_size) - 1);
+        _last = clamp(int(_last), int(_first), int(_size) - 1);
+    }
 
     int first() const { return _first; }
     void setFirst(int first) { _first = clamp(first, 0, int(_size) - 1); }
 
-    int last() const { return std::max(first(), int(_last)); }
+    int last() const { return clamp(int(_last), first(), int(_size) - 1); }
     void setLast(int last) { _last = clamp(last, first(), int(_size) - 1); }
 
     bool patternValid() const { return rhythmValid() && melodyValid(); }
@@ -220,9 +224,39 @@ public:
             reader.read(event.d0.raw);
             reader.read(event.d1.raw);
         }
+
+        sanitizeAfterRead();
     }
 
 private:
+    void sanitizeAfterRead() {
+        _scale = clamp(int(_scale), -1, Scale::Count - 1);
+        _rootNote = clamp(int(_rootNote), -1, 11);
+        _divisor = ModelUtils::clampDivisor(_divisor);
+        _resetMeasure = clamp(int(_resetMeasure), 0, 128);
+
+        if (_size < 2 || _size > CONFIG_STEP_COUNT) {
+            _size = 16;
+            _first = 0;
+            _last = 15;
+            _rhythmValid = false;
+            _melodyValid = false;
+            _rhythmSeed = 0;
+            _melodySeed = 0;
+            for (auto &event : _events) event.clear();
+            return;
+        }
+
+        _first = clamp(int(_first), 0, int(_size) - 1);
+        _last = clamp(int(_last), int(_first), int(_size) - 1);
+        _rhythmValid = _rhythmValid ? true : false;
+        _melodyValid = _melodyValid ? true : false;
+
+        for (int i = _size; i < CONFIG_STEP_COUNT; ++i) {
+            _events[i].clear();
+        }
+    }
+
     int8_t _trackIndex = -1;
     int8_t _scale = -1;
     int8_t _rootNote = -1;

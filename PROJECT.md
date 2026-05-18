@@ -40,6 +40,7 @@ This project uses CMake with platform-specific toolchains. Build directories are
 - Use simulator screenshot feature to document UI changes
 
 **Hardware-confirmed UI lessons:**
+- **Track-type page safety is mandatory.** A page that calls type-specific accessors such as `selectedNoteSequence()`, `selectedCurveSequence()`, `Track::noteTrack()`, `Track::curveTrack()`, or `selectedTrackEngine().as<T>()` must prove the selected track is still that type before every draw/LED/input/context callback, or the navigation layer must replace the page immediately when selected track changes. Track-select handling in `TopPage` must remap stale sequence/edit pages through the appropriate `set*Page()` function after `_project.setSelectedTrackIndex(...)`. Never rely on "this page should only be reachable for this mode"; page-stack callbacks can run after the selected track changes and will hit `SANITIZE_TRACK_MODE`.
 - Keep simple UI behavior local unless persistence is truly required. Menu list wrapping is hardware-confirmed when implemented only in `ListPage::setSelectedRow()`.
 - Do not add a persisted `MenuWrapSetting` or bump `Settings::Version` just to port Vinx menu wrapping. That path black-screened hardware during this workstream and should be treated as known-bad for this feature.
 - `ListPage::setListModel()` must not call `setSelectedRow()`. Some derived pages pass member list models during construction, before those members are fully safe to query. Reset `_selectedRow` and `_displayRow` directly there.

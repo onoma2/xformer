@@ -33,6 +33,8 @@ private:
 
     int stepOffset() const { return _section * StepCount; }
 
+    bool isActiveForSelectedTrack() const;
+
     void switchLayer(int functionKey, bool shift);
     int activeFunctionKey();
 

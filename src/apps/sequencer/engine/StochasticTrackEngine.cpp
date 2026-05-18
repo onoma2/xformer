@@ -59,7 +59,7 @@ void StochasticTrackEngine::freeLockedSteps() {
 
 void StochasticTrackEngine::reset() {
     _sequenceState.reset();
-    _patternIndex = _stochasticTrack.sequence(_model.project().selectedPatternIndex()).first();
+    _patternIndex = _stochasticTrack.sequence(pattern()).first();
     _relativeTick = 0;
     _sleepRemaining = 0;
     _boredomCounter = 0;
@@ -81,7 +81,7 @@ void StochasticTrackEngine::reset() {
 
 void StochasticTrackEngine::restart() {
     _sequenceState.reset();
-    _patternIndex = _stochasticTrack.sequence(_model.project().selectedPatternIndex()).first();
+    _patternIndex = _stochasticTrack.sequence(pattern()).first();
     _relativeTick = 0;
     _lastDegree = -1;
     _rng = Random(0x12345678 + _track.trackIndex());
@@ -146,7 +146,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
     }
 
-    bool locked = track.lock() && _lockedParents && _lockedParents[readIndex].valid;
+    const bool lockActive = track.lock() && _lockedParents != nullptr;
+    bool locked = lockActive && _lockedParents[readIndex].valid;
     
     float finalCv = 0.f;
     uint32_t durationTicks = divisor;
@@ -257,7 +258,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         int note = int(eval.d1.degree) + (int(eval.d1.octave) + _jumpRegister + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
         
-        bool densityPass = (uint32_t(eval.d0.densityRank) * 100) < (uint32_t(track.density()) * sequence.size());
+        uint32_t densitySize = std::max(1, sequence.size());
+        bool densityPass = track.density() >= 100 ||
+            ((uint32_t(eval.d0.densityRank) * 100) < (uint32_t(track.density()) * densitySize));
         isRest = bool(eval.d1.rest) || !densityPass || !eval.d1.rhythmValid || !eval.d1.melodyValid;
         isLegato = bool(eval.d1.legato);
         isSlide = bool(eval.d1.slide);
@@ -344,16 +347,16 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         _patternIndex = sequence.first();
         _patternCycleEnded = true;
 
-        // Evaluate Loop-level Jump Register
-        if (track.jump() > 0 && int(_rng.nextRange(100)) < track.jump()) {
-            if (_jumpRegister == 0) {
-                _jumpRegister = _rng.nextRange(2) == 0 ? -1 : 1;
-            } else {
-                _jumpRegister = 0; // Return to 0
+        if (!lockActive) {
+            // Evaluate Loop-level Jump Register
+            if (track.jump() > 0 && int(_rng.nextRange(100)) < track.jump()) {
+                if (_jumpRegister == 0) {
+                    _jumpRegister = _rng.nextRange(2) == 0 ? -1 : 1;
+                } else {
+                    _jumpRegister = 0; // Return to 0
+                }
             }
-        }
-        
-        if (!track.lock()) {
+            
             if (track.sleep() > 0) _sleepRemaining = (track.sleep() * 4) / 10; 
             
             // Domain-aware mutation
