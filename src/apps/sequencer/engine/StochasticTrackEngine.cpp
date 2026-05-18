@@ -14,7 +14,6 @@
 #include <algorithm>
 
 static uint32_t getDurationMultiplier(int rate) {
-    // Maps 0..100 to discrete multipliers (1 bar down to 1/128th)
     if (rate < 10) return 192 * 4;  // 1 Bar
     if (rate < 20) return 192 * 2;  // 1/2
     if (rate < 30) return 192;      // 1/4
@@ -23,7 +22,7 @@ static uint32_t getDurationMultiplier(int rate) {
     if (rate < 60) return 24;       // 1/32
     if (rate < 70) return 12;       // 1/64
     if (rate < 80) return 6;        // 1/128
-    return 6; // Default to 1/128
+    return 6;
 }
 
 StochasticTrackEngine::StochasticTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
@@ -64,7 +63,6 @@ void StochasticTrackEngine::reset() {
     _relativeTick = 0;
     _sleepRemaining = 0;
     _boredomCounter = 0;
-    _jumpOctave = 0;
     _patternCycleEnded = false;
     _prevCondition = false;
     _activity = false;
@@ -132,7 +130,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     auto &sequence = const_cast<StochasticSequence&>(*_sequence);
     auto &track = const_cast<StochasticTrack&>(_stochasticTrack);
 
-    // 1. Consistency check: rebuild shared buffer if it doesn't match current pattern context
+    // 1. Dice Mode: Generate/Verify shared buffer
     int patternIndex = _model.project().selectedPatternIndex();
     if (track.mode() == StochasticMode::Dice) {
         if (!sequence.patternValid() || track.activePatternIndex() != patternIndex || track.activeSeed() != sequence.seed()) {
@@ -142,7 +140,16 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
     }
 
-    // 2. Fetch Event
+    // 2. Read Index (Rotate)
+    int readIndex = _patternIndex;
+    if (track.rotate() != 0) {
+        int windowSize = sequence.last() - sequence.first() + 1;
+        int offset = (_patternIndex - sequence.first() + track.rotate()) % windowSize;
+        if (offset < 0) offset += windowSize;
+        readIndex = sequence.first() + offset;
+    }
+
+    // 3. Fetch Event
     StochasticParentEvent event;
     const auto &scale = sequence.selectedScale(_model.project().scale());
     int rootNote = sequence.selectedRootNote(_model.project().rootNote());
@@ -154,7 +161,6 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         int lastDegree = -1; 
         event = StochasticGenerator::generateParentEvent(track, scale, rootNote, lastDegree, _rng);
         
-        // Isolate realtime children
         useSharedChildren = false;
         int count = event.d1.childCount;
         int childLast = event.d0.degree;
@@ -178,11 +184,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             child.gate = true;
         }
     } else {
-        event = track.events()[_patternIndex];
+        event = track.events()[readIndex];
     }
 
-    // 3. Evaluated Lock check
-    bool locked = track.lock() && _lockedParents[_patternIndex].valid;
+    // 4. Evaluated Lock check
+    bool locked = track.lock() && _lockedParents[readIndex].valid;
     
     float finalCv = 0.f;
     uint32_t durationTicks = divisor;
@@ -192,14 +198,13 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     bool isAccent = false;
 
     if (locked) {
-        finalCv = _lockedParents[_patternIndex].cv;
-        durationTicks = _lockedParents[_patternIndex].durationTicks;
-        isRest = _lockedParents[_patternIndex].rest;
-        isLegato = _lockedParents[_patternIndex].legato;
-        isSlide = _lockedParents[_patternIndex].slide;
-        isAccent = _lockedParents[_patternIndex].accent;
+        finalCv = _lockedParents[readIndex].cv;
+        durationTicks = _lockedParents[readIndex].durationTicks;
+        isRest = _lockedParents[readIndex].rest;
+        isLegato = _lockedParents[readIndex].legato;
+        isSlide = _lockedParents[readIndex].slide;
+        isAccent = _lockedParents[readIndex].accent;
 
-        // Schedule Replay (Parent)
         if (!isRest) {
             _cvQueue.push({ tick, finalCv, isSlide });
             uint32_t gateLen = (durationTicks * 50) / 100;
@@ -214,7 +219,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
         // Replay Children
         for (int i = 0; i < 4; ++i) {
-            auto &child = _lockedParents[_patternIndex].children[i];
+            auto &child = _lockedParents[readIndex].children[i];
             if (child.valid) {
                 uint32_t childTick = tick + child.tickOffset;
                 _cvQueue.push({ childTick, child.cv, child.slide });
@@ -231,15 +236,15 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             int variationRoll = _rng.nextRange(100);
             if (variationRoll < std::abs(track.variation())) {
                  if (track.variation() > 0) {
-                     mult *= 2; // Slower
+                     mult *= 2; 
                  } else {
-                     mult = std::max(uint32_t(6), mult / 2); // Faster
+                     mult = std::max(uint32_t(6), mult / 2);
                  }
             }
         }
         durationTicks = mult;
 
-        int note = int(event.d0.degree) + (int(event.d0.octave) + track.octave() + _jumpOctave) * activeNotes + track.transpose();
+        int note = int(event.d0.degree) + (int(event.d0.octave) + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
         
         bool densityPass = (uint32_t(event.d1.densityRank) * 100) < (uint32_t(track.density()) * sequence.size());
@@ -249,14 +254,14 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         isAccent = bool(event.d1.accent);
 
         if (_lockedParents) {
-            _lockedParents[_patternIndex].valid = true;
-            _lockedParents[_patternIndex].cv = finalCv;
-            _lockedParents[_patternIndex].durationTicks = durationTicks;
-            _lockedParents[_patternIndex].rest = isRest;
-            _lockedParents[_patternIndex].legato = isLegato;
-            _lockedParents[_patternIndex].slide = isSlide;
-            _lockedParents[_patternIndex].accent = isAccent;
-            for (int i = 0; i < 4; ++i) _lockedParents[_patternIndex].children[i].valid = false;
+            _lockedParents[readIndex].valid = true;
+            _lockedParents[readIndex].cv = finalCv;
+            _lockedParents[readIndex].durationTicks = durationTicks;
+            _lockedParents[readIndex].rest = isRest;
+            _lockedParents[readIndex].legato = isLegato;
+            _lockedParents[readIndex].slide = isSlide;
+            _lockedParents[readIndex].accent = isAccent;
+            for (int i = 0; i < 4; ++i) _lockedParents[readIndex].children[i].valid = false;
         }
 
         if (!isRest) {
@@ -273,15 +278,16 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 uint32_t childTick = tick + childOffset;
                 uint32_t childGateTicks = (durationTicks * child.length) / (256 * (int(event.d1.childCount) + 1));
                 
-                int childNote = int(child.degree) + (int(child.octave) + track.octave() + _jumpOctave) * activeNotes + track.transpose();
+                int childNote = int(child.degree) + (int(child.octave) + track.octave()) * activeNotes + track.transpose();
                 float childCv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
 
+                // Child CV update is unconditional on gated hits
                 _cvQueue.push({ childTick, childCv, bool(child.slide) });
                 _gateQueue.push({ childTick, true });
                 _gateQueue.push({ childTick + childGateTicks, false });
 
                 if (_lockedParents) {
-                    auto &lc = _lockedParents[_patternIndex].children[c];
+                    auto &lc = _lockedParents[readIndex].children[c];
                     lc.valid = true;
                     lc.cv = childCv;
                     lc.tickOffset = childOffset;
@@ -297,7 +303,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
     }
 
-    // Pattern Advancement
+    // 5. Pattern Advancement
     _patternIndex++;
     if (_patternIndex > sequence.last()) {
         _patternIndex = sequence.first();
@@ -317,7 +323,6 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     _boredomCounter = 0;
                 }
             }
-            _jumpOctave = StochasticGenerator::generateJumpOctave(track, _jumpOctave, _rng);
         }
     }
 }

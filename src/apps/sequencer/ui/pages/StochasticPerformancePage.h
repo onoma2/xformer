@@ -1,11 +1,11 @@
 #pragma once
 
 #include "ListPage.h"
-#include "ui/model/StochasticConfigListModel.h"
+#include "ui/model/StochasticPerformanceListModel.h"
 
-class StochasticConfigPage : public ListPage {
+class StochasticPerformancePage : public ListPage {
 public:
-    StochasticConfigPage(PageManager &manager, PageContext &context);
+    StochasticPerformancePage(PageManager &manager, PageContext &context);
 
     virtual void enter() override;
     virtual void exit() override;
@@ -14,5 +14,5 @@ public:
     virtual void updateLeds(Leds &leds) override;
 
 private:
-    StochasticConfigListModel _listModel;
+    StochasticPerformanceListModel _listModel;
 };

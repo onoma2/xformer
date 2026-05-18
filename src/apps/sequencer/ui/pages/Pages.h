@@ -49,6 +49,7 @@
 #include "TeletypePatternViewPage.h"
 #include "TeletypeScriptViewPage.h"
 #include "StochasticConfigPage.h"
+#include "StochasticPerformancePage.h"
 #include "StochasticSequenceEditPage.h"
 
 #ifdef CONFIG_ENABLE_INTRO
@@ -94,6 +95,7 @@ struct Pages {
     TeletypePatternViewPage teletypePatternView;
     TeletypeScriptViewPage teletypeScriptView;
     StochasticConfigPage stochasticConfig;
+    StochasticPerformancePage stochasticPerformance;
     StochasticSequenceEditPage stochasticSequenceEdit;
     SystemPage system;
     // modal pages
@@ -155,6 +157,7 @@ struct Pages {
         teletypePatternView(manager, context),
         teletypeScriptView(manager, context),
         stochasticConfig(manager, context),
+        stochasticPerformance(manager, context),
         stochasticSequenceEdit(manager, context),
         system(manager, context),
         // modal pages

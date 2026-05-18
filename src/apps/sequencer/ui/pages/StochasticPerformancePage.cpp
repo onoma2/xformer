@@ -1,12 +1,12 @@
-#include "StochasticConfigPage.h"
+#include "StochasticPerformancePage.h"
 
 #include "ui/painters/WindowPainter.h"
 
-StochasticConfigPage::StochasticConfigPage(PageManager &manager, PageContext &context) :
+StochasticPerformancePage::StochasticPerformancePage(PageManager &manager, PageContext &context) :
     ListPage(manager, context, _listModel)
 {}
 
-void StochasticConfigPage::enter() {
+void StochasticPerformancePage::enter() {
     auto &track = _project.selectedTrack();
     if (track.trackMode() == Track::TrackMode::Stochastic) {
         _listModel.setTrack(track.stochasticTrack(), _project);
@@ -14,16 +14,16 @@ void StochasticConfigPage::enter() {
     ListPage::enter();
 }
 
-void StochasticConfigPage::exit() {
+void StochasticPerformancePage::exit() {
     ListPage::exit();
 }
 
-void StochasticConfigPage::draw(Canvas &canvas) {
+void StochasticPerformancePage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "STOCH CFG");
+    WindowPainter::drawHeader(canvas, _model, _engine, "STOCH");
     ListPage::draw(canvas);
 }
 
-void StochasticConfigPage::updateLeds(Leds &leds) {
+void StochasticPerformancePage::updateLeds(Leds &leds) {
     ListPage::updateLeds(leds);
 }

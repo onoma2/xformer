@@ -134,12 +134,6 @@ public:
         _tilt.set(clamp(tilt, -100, 100), routed);
     }
 
-    // jitter
-    int jitter() const { return _jitter.get(isRouted(Routing::Target::StochasticJitter)); }
-    void setJitter(int jitter, bool routed = false) {
-        _jitter.set(clamp(jitter, 0, 100), routed);
-    }
-
     // burst
     int burst() const { return _burst.get(isRouted(Routing::Target::StochasticBurst)); }
     void setBurst(int burst, bool routed = false) {
@@ -288,9 +282,6 @@ public:
     void printTilt(StringBuilder &str) const { str("%+d%%", tilt()); }
     void editTilt(int value, bool shift) { setTilt(ModelUtils::adjustedByStep(tilt(), value, 1, !shift)); }
 
-    void printJitter(StringBuilder &str) const { str("%d%%", jitter()); }
-    void editJitter(int value, bool shift) { setJitter(ModelUtils::adjustedByStep(jitter(), value, 1, !shift)); }
-
     void printBurst(StringBuilder &str) const { str("%d%%", burst()); }
     void editBurst(int value, bool shift) { setBurst(ModelUtils::adjustedByStep(burst(), value, 1, !shift)); }
 
@@ -335,6 +326,40 @@ public:
 
     void printRunMode(StringBuilder &str) const { str("N/A"); }
     void editRunMode(int value, bool shift) { }
+
+
+    void printLinearity(StringBuilder &str) const { str("%d%%", linearity()); }
+    void editLinearity(int value, bool shift) { setLinearity(ModelUtils::adjustedByStep(linearity(), value, 1, !shift)); }
+
+    void printMarblesMode(StringBuilder &str) const { str(marblesMode() == MarblesMode::Off ? "Off" : "On"); }
+    void editMarblesMode(int value, bool shift) { setMarblesMode(ModelUtils::adjustedEnum(marblesMode(), value)); }
+
+    void printMarblesSpread(StringBuilder &str) const { str("%d%%", marblesSpread()); }
+    void editMarblesSpread(int value, bool shift) { setMarblesSpread(ModelUtils::adjustedByStep(marblesSpread(), value, 1, !shift)); }
+
+    void printMarblesBias(StringBuilder &str) const { str("%d%%", marblesBias()); }
+    void editMarblesBias(int value, bool shift) { setMarblesBias(ModelUtils::adjustedByStep(marblesBias(), value, 1, !shift)); }
+
+    void printMinDegree(StringBuilder &str) const { str("%d", minDegree()); }
+    void editMinDegree(int value, bool shift) { setMinDegree(minDegree() + value); }
+
+    void printMaxDegree(StringBuilder &str) const { str("%d", maxDegree()); }
+    void editMaxDegree(int value, bool shift) { setMaxDegree(maxDegree() + value); }
+
+    void printAccentProb(StringBuilder &str) const { str("%d%%", accentProb()); }
+    void editAccentProb(int value, bool shift) { setAccentProb(ModelUtils::adjustedByStep(accentProb(), value, 1, !shift)); }
+
+    void printLegatoProb(StringBuilder &str) const { str("%d%%", legatoProb()); }
+    void editLegatoProb(int value, bool shift) { setLegatoProb(ModelUtils::adjustedByStep(legatoProb(), value, 1, !shift)); }
+
+
+
+
+
+
+
+
+
 
     // Active Pattern Buffer (Shared across track patterns)
     const std::array<StochasticParentEvent, CONFIG_STEP_COUNT> &events() const { return _events; }
@@ -388,7 +413,7 @@ public:
         _marblesSteps = 100;
         _density.setBase(100);
         _tilt.setBase(0);
-        _jitter.setBase(0);
+        _reservedJitter.setBase(0);
         _burst.setBase(0);
         _minDegree = 0;
         _maxDegree = 127;
@@ -447,7 +472,7 @@ public:
         writer.write(_marblesSteps);
         _density.write(writer);
         _tilt.write(writer);
-        _jitter.write(writer);
+        _reservedJitter.write(writer);
         _burst.write(writer);
         writer.write(_minDegree);
         writer.write(_maxDegree);
@@ -503,7 +528,7 @@ public:
         reader.read(_marblesSteps);
         _density.read(reader);
         _tilt.read(reader);
-        _jitter.read(reader);
+        _reservedJitter.read(reader);
         _burst.read(reader);
         reader.read(_minDegree);
         reader.read(_maxDegree);
@@ -574,7 +599,7 @@ private:
     
     Routable<uint8_t> _density;
     Routable<int8_t> _tilt;
-    Routable<uint8_t> _jitter;
+    Routable<uint8_t> _reservedJitter;
     Routable<uint8_t> _burst;
 
     uint8_t _minDegree;
@@ -607,6 +632,15 @@ private:
     Routable<uint8_t> _mutate;
     Routable<uint8_t> _jump;
     uint8_t _range;
+
+
+
+
+
+
+
+
+
 
     // Active Pattern Buffer (Shared across track patterns)
     std::array<StochasticParentEvent, CONFIG_STEP_COUNT> _events;

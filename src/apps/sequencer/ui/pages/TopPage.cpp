@@ -1,52 +1,34 @@
 #include "TopPage.h"
-
 #include "Pages.h"
+
+#include "model/NoteSequence.h"
+#include "ui/LedPainter.h"
 #include "ui/PageKeyMap.h"
 
-#include "engine/TeletypeTrackEngine.h"
+#include "core/utils/StringBuilder.h"
 
-#include "ui/model/NoteSequenceListModel.h"
-#include "ui/model/CurveSequenceListModel.h"
-
-#include "ui/LedPainter.h"
-#include "model/Track.h"
-
-#include <cstdio>
+#include <algorithm>
 
 TopPage::TopPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
-{
-}
+{}
 
 void TopPage::init() {
-    setMode(Mode::Project);
-
-    _context.model.project().watch([this] (Project::Event event) {
-        auto &pages = _manager.pages();
-        switch (event) {
-        case Project::Event::ProjectCleared:
-        case Project::Event::ProjectRead:
-            // reset local state in pages
-            pages.routing.reset();
-            pages.midiOutput.reset();
-            pages.song.reset();
-            setMode(_mode);
-            if (event == Project::Event::ProjectRead) {
-                for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-                    if (_project.track(trackIndex).trackMode() == Track::TrackMode::Teletype) {
-                        _project.track(trackIndex).teletypeTrack().requestBootScriptRun();
-                    }
-                }
-            }
-            break;
-        case Project::Event::TrackModeChanged:
-        case Project::Event::SelectedTrackIndexChanged:
-        case Project::Event::SelectedPatternIndexChanged:
-            setMode(_mode);
-            break;
-        }
-    });
+    _mode = Mode::Project;
+    setMainPage(_manager.pages().project);
 }
+
+void TopPage::updateLeds(Leds &leds) {
+    auto &pages = _manager.pages();
+    Page *top = _manager.top();
+
+    if (top == &pages.pattern || top == &pages.performer) {
+        top->updateLeds(leds);
+    } else {
+        LedPainter::drawTrackGatesAndSelectedTrack(leds, _engine, _project.playState(), _project.selectedTrackIndex());
+    }
+}
+
 
 void TopPage::editRoute(Routing::Target target, int trackIndex) {
     auto &routing = _project.routing();
@@ -59,46 +41,30 @@ void TopPage::editRoute(Routing::Target target, int trackIndex) {
     if (routeIndex >= 0) {
         setMode(Mode::Routing);
         _manager.pages().routing.showRoute(routeIndex);
-        return;
-    }
-
-    routeIndex = routing.findEmptyRoute();
-    if (routeIndex >= 0) {
-        routing.route(routeIndex).clear();
-        Routing::Route initRoute;
-        initRoute.setTarget(target);
-        initRoute.setTracks(1<<trackIndex);
-        setMode(Mode::Routing);
-        _manager.pages().routing.showRoute(routeIndex, &initRoute);
     } else {
-        showMessage("All routes are used!");
+        routeIndex = routing.findEmptyRoute();
+        if (routeIndex >= 0) {
+            auto &route = routing.route(routeIndex);
+            route.clear();
+            route.setTarget(target);
+            route.setTracks(1 << trackIndex);
+            setMode(Mode::Routing);
+            _manager.pages().routing.showRoute(routeIndex, &route);
+        } else {
+            showMessage("NO EMPTY ROUTES");
+        }
     }
 }
 
+
 void TopPage::editIndexedRouteConfig() {
     auto &pages = _manager.pages();
-    _manager.push(&pages.indexedRouteConfig);
+    setMainPage(pages.indexedRouteConfig);
 }
 
 void TopPage::editIndexedMath() {
     auto &pages = _manager.pages();
-    _manager.push(&pages.indexedMath);
-}
-
-void TopPage::updateLeds(Leds &leds) {
-    bool clockTick = _engine.clockRunning() && _engine.tick() % CONFIG_PPQN < (CONFIG_PPQN / 8);
-
-    leds.set(
-        Key::Play,
-        _engine.recording() && !clockTick,
-        clockTick
-    );
-
-    if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
-        LedPainter::drawSelectedPage(leds, _mode);
-    } else {
-        LedPainter::drawTrackGatesAndSelectedTrack(leds, _engine, _project.playState(), _project.selectedTrackIndex());
-    }
+    setMainPage(pages.indexedMath);
 }
 
 void TopPage::keyDown(KeyEvent &event) {
@@ -125,7 +91,9 @@ void TopPage::keyPress(KeyPressEvent &event) {
         // Store which page we're on BEFORE changing track
         Page* currentPage = _manager.top();
         bool onSequenceView = (currentPage == &pages.noteSequence ||
-                              currentPage == &pages.accumulator);
+                              currentPage == &pages.accumulator ||
+                              currentPage == &pages.stochasticPerformance ||
+                              currentPage == &pages.stochasticConfig);
         bool onTrackView = (currentPage == &pages.track ||
                            currentPage == &pages.harmony);
 
@@ -133,6 +101,10 @@ void TopPage::keyPress(KeyPressEvent &event) {
         if (currentPage == &pages.noteSequence) {
             _sequenceView = SequenceView::NoteSequence;
         } else if (currentPage == &pages.accumulator) {
+            _sequenceView = SequenceView::Accumulator;
+        } else if (currentPage == &pages.stochasticPerformance) {
+            _sequenceView = SequenceView::NoteSequence;
+        } else if (currentPage == &pages.stochasticConfig) {
             _sequenceView = SequenceView::Accumulator;
         } else if (currentPage == &pages.track) {
             _trackView = TrackView::Track;
@@ -159,6 +131,23 @@ void TopPage::keyPress(KeyPressEvent &event) {
     }
 
     if (key.pageModifier() && PageKeyMap::isPageKey(key.code())) {
+        if (_project.selectedTrack().trackMode() == Track::TrackMode::Stochastic) {
+            if (key.code() == PageKeyMap::SequenceEdit) { // PAGE+S1
+                _sequenceView = SequenceView::NoteSequence;
+                setSequenceView(_sequenceView);
+                _mode = Mode::SequenceEdit;
+                event.consume();
+                return;
+            }
+            if (key.code() == PageKeyMap::Sequence) { // PAGE+S2
+                _sequenceView = SequenceView::Accumulator;
+                setSequenceView(_sequenceView);
+                _mode = Mode::Sequence;
+                event.consume();
+                return;
+            }
+        }
+
         // Double-press on Routing key toggles to Modulator page
         if (key.code() == PageKeyMap::Routing && _mode == Mode::Routing) {
             setMode(Mode::Modulator);
@@ -212,9 +201,7 @@ void TopPage::encoder(EncoderEvent &event) {
 
 void TopPage::keyboard(KeyboardEvent &event) {
     // TopPage is at stack position 0 — it only sees events
-    // that no higher page consumed. This makes it the ideal
-    // global shortcut handler: Teletype pages consume their
-    // keys first (F1-F5, letters, Escape), so no conflicts.
+    // that no higher page consumed.
 
     // Escape: pop page / go back
     if (event.keycode() == KeyboardEvent::KeyEscape) {
@@ -231,84 +218,179 @@ void TopPage::keyboard(KeyboardEvent &event) {
         event.consume();
         return;
     }
-
-    // Alt + key combos: page navigation & track select
-    if (event.alt()) {
-        bool handled = true;
-        switch (event.chRaw()) {
-        case '1': selectTrackWithViewSync(0); break;
-        case '2': selectTrackWithViewSync(1); break;
-        case '3': selectTrackWithViewSync(2); break;
-        case '4': selectTrackWithViewSync(3); break;
-        case '5': selectTrackWithViewSync(4); break;
-        case '6': selectTrackWithViewSync(5); break;
-        case '7': selectTrackWithViewSync(6); break;
-        case '8': selectTrackWithViewSync(7); break;
-        // Alt + letter: page navigation (mirrors hardware Page+Key)
-        case 'a': case 'A': setMode(Mode::Project);       break;
-        case 'l': case 'L': setMode(Mode::Layout);         break;
-        case 'q': case 'Q': setMode(Mode::SequenceEdit);  break;
-        case 'w': case 'W': setMode(Mode::Sequence);       break;
-        case 'e': case 'E': setMode(Mode::Song);           break;
-        case 'r': case 'R': setMode(Mode::Routing);         break;
-        case 't': case 'T': setMode(Mode::Clock);           break;
-        case 'y': case 'Y': setMode(Mode::MidiOutput);      break;
-        case 'u': case 'U': setMode(Mode::UserScale);       break;
-        case 'i': case 'I': setMode(Mode::CvRoute);         break;
-        case 'm': case 'M': setMode(Mode::Modulator);       break;
-        case 'o': case 'O': setMode(Mode::Overview);        break;
-        case 's': case 'S': setMode(Mode::Monitor);          break;
-        case 'c': case 'C': setMode(Mode::System);           break;
-        case 'p': case 'P': setMode(Mode::Pattern);          break;
-        case 'g': case 'G': setMode(Mode::Performer);        break;
-        case 'd': case 'D': setMode(Mode::Overview);         break;
-        case 'h': case 'H': setMode(Mode::Track);            break;
-        default: handled = false; break;
-        }
-        if (handled) {
-            event.consume();
-        }
-        return;
-    }
-
-    // Digits 1-8 without modifier: track select
-    if (!event.alt() && !event.ctrl() && !event.shift()) {
-        if (event.ch() >= '1' && event.ch() <= '8') {
-            selectTrackWithViewSync(event.ch() - '1');
-            event.consume();
-            return;
-        }
-    }
-
-    BasePage::keyboard(event);
 }
 
-void TopPage::selectTrackWithViewSync(int trackIndex) {
+void TopPage::setTrackPage() {
+    Page* currentPage = _manager.top();
     auto &pages = _manager.pages();
-    Page *currentPage = _manager.top();
-    bool onSequenceView = (currentPage == &pages.noteSequence ||
-                          currentPage == &pages.accumulator);
-    bool onTrackView = (currentPage == &pages.track ||
-                       currentPage == &pages.harmony);
+    bool fromTrackView = (currentPage == &pages.track ||
+                         currentPage == &pages.harmony);
 
-    // Sync view states with current page before track change
-    if (currentPage == &pages.noteSequence) {
-        _sequenceView = SequenceView::NoteSequence;
-    } else if (currentPage == &pages.accumulator) {
-        _sequenceView = SequenceView::Accumulator;
-    } else if (currentPage == &pages.track) {
-        _trackView = TrackView::Track;
-    } else if (currentPage == &pages.harmony) {
-        _trackView = TrackView::Harmony;
+    if (fromTrackView) {
+        switch (_trackView) {
+        case TrackView::Track:
+            _trackView = TrackView::Harmony;
+            break;
+        case TrackView::Harmony:
+            _trackView = TrackView::Track;
+            break;
+        }
+    } else {
+        _trackView = TrackView::Track; 
     }
 
-    _project.setSelectedTrackIndex(trackIndex);
+    setTrackView(_trackView);
+}
 
-    // Navigate to same view for new track
-    if (onSequenceView) {
-        setSequenceView(_sequenceView);
-    } else if (onTrackView) {
-        setTrackView(_trackView);
+void TopPage::setTrackView(TrackView view) {
+    auto &pages = _manager.pages();
+
+    switch (_project.selectedTrack().trackMode()) {
+    case Track::TrackMode::Note:
+        switch (view) {
+        case TrackView::Track:
+            setMainPage(pages.track);
+            break;
+        case TrackView::Harmony:
+            setMainPage(pages.harmony);
+            break;
+        }
+        break;
+    case Track::TrackMode::Curve:
+    case Track::TrackMode::MidiCv:
+    case Track::TrackMode::Tuesday:
+    case Track::TrackMode::Teletype:
+        setMainPage(pages.track);
+        break;
+    case Track::TrackMode::Stochastic:
+        setMainPage(pages.stochasticPerformance);
+        break;
+    case Track::TrackMode::DiscreteMap:
+        setMainPage(pages.track);
+        break;
+    case Track::TrackMode::Indexed:
+        setMainPage(pages.track);
+        break;
+    case Track::TrackMode::Last:
+        break;
+    }
+}
+
+void TopPage::setSequencePage() {
+    Page* currentPage = _manager.top();
+    auto &pages = _manager.pages();
+    bool fromSequenceView = (currentPage == &pages.noteSequence ||
+                            currentPage == &pages.accumulator ||
+                            currentPage == &pages.stochasticPerformance ||
+                            currentPage == &pages.stochasticConfig);
+
+    if (fromSequenceView) {
+        switch (_sequenceView) {
+        case SequenceView::NoteSequence:
+            _sequenceView = SequenceView::Accumulator;
+            break;
+        case SequenceView::Accumulator:
+            _sequenceView = SequenceView::NoteSequence;
+            break;
+        }
+    } else {
+        _sequenceView = SequenceView::NoteSequence; 
+    }
+
+    setSequenceView(_sequenceView);
+}
+
+void TopPage::setSequenceView(SequenceView view) {
+    auto &pages = _manager.pages();
+
+    switch (_project.selectedTrack().trackMode()) {
+    case Track::TrackMode::Note:
+        switch (view) {
+        case SequenceView::NoteSequence:
+            setMainPage(pages.noteSequence);
+            break;
+        case SequenceView::Accumulator:
+            setMainPage(pages.accumulator);
+            break;
+        }
+        break;
+    case Track::TrackMode::Curve:
+        setMainPage(pages.curveSequence);
+        break;
+    case Track::TrackMode::MidiCv:
+        setMainPage(pages.track);
+        break;
+    case Track::TrackMode::Tuesday:
+        setMainPage(pages.tuesdaySequence);
+        break;
+    case Track::TrackMode::DiscreteMap:
+        switch (view) {
+        case SequenceView::NoteSequence:
+            setMainPage(pages.discreteMapStages);
+            break;
+        case SequenceView::Accumulator:
+            setMainPage(pages.discreteMapSequenceList);
+            break;
+        }
+        break;
+    case Track::TrackMode::Indexed:
+        switch (view) {
+        case SequenceView::NoteSequence:
+            setMainPage(pages.indexedSequence);
+            break;
+        case SequenceView::Accumulator:
+            setMainPage(pages.indexedSteps);
+            break;
+        }
+        break;
+    case Track::TrackMode::Teletype:
+        setMainPage(pages.teletypeScriptView);
+        break;
+    case Track::TrackMode::Stochastic:
+        switch (view) {
+        case SequenceView::NoteSequence:
+            setMainPage(pages.stochasticPerformance);
+            break;
+        case SequenceView::Accumulator:
+            setMainPage(pages.stochasticConfig);
+            break;
+        }
+        break;
+    case Track::TrackMode::Last:
+        break;
+    }
+}
+
+void TopPage::setSequenceEditPage() {
+    auto &pages = _manager.pages();
+
+    switch (_project.selectedTrack().trackMode()) {
+    case Track::TrackMode::Note:
+        setMainPage(pages.noteSequenceEdit);
+        break;
+    case Track::TrackMode::Curve:
+        setMainPage(pages.curveSequenceEdit);
+        break;
+    case Track::TrackMode::MidiCv:
+        setMainPage(pages.track);
+        break;
+    case Track::TrackMode::Tuesday:
+        setMainPage(pages.tuesdayEdit);
+        break;
+    case Track::TrackMode::DiscreteMap:
+        setMainPage(pages.discreteMapSequence);
+        break;
+    case Track::TrackMode::Indexed:
+        setMainPage(pages.indexedSequenceEdit);
+        break;
+    case Track::TrackMode::Teletype:
+        setMainPage(pages.teletypeScriptView);
+        break;
+    case Track::TrackMode::Stochastic:
+        setMainPage(pages.stochasticSequenceEdit);
+        break;
+    case Track::TrackMode::Last:
+        break;
     }
 }
 
@@ -335,9 +417,6 @@ void TopPage::setMode(Mode mode) {
         break;
     case Mode::Pattern:
         pages.pattern.setModal(false);
-        // do not re-enter pattern page when its already the selected page
-        // the reason for this is that when changing a pattern in latched mode, we don't want to loose the latch
-        // state on the page
         if (_manager.top() != &pages.pattern) {
             setMainPage(pages.pattern);
         }
@@ -398,196 +477,6 @@ void TopPage::setMainPage(Page &page) {
     if (_manager.stackSize() < 2) {
         _manager.push(&page);
     } else {
-        _manager.replace(1, &page);
-    }
-}
-
-void TopPage::setSequencePage() {
-    // Determine if we're cycling within sequence views (pressing Sequence key while already viewing sequence)
-    Page* currentPage = _manager.top();
-    auto &pages = _manager.pages();
-    bool fromSequenceView = (currentPage == &pages.noteSequence ||
-                            currentPage == &pages.accumulator ||
-                            currentPage == &pages.tuesdaySequence ||
-                            currentPage == &pages.discreteMapSequenceList ||
-                            currentPage == &pages.discreteMapSequence ||
-                            currentPage == &pages.discreteMapStages ||
-                            currentPage == &pages.indexedSequence ||
-                            currentPage == &pages.indexedSteps);
-
-    // Cycle to next view only if we're currently on a sequence view
-    if (fromSequenceView) {
-        if (currentPage == &pages.noteSequence || currentPage == &pages.indexedSequence) {
-            _sequenceView = SequenceView::NoteSequence;
-        } else if (currentPage == &pages.accumulator || currentPage == &pages.indexedSteps) {
-            _sequenceView = SequenceView::Accumulator;
-        } else if (currentPage == &pages.discreteMapStages) {
-            _sequenceView = SequenceView::NoteSequence;
-        } else if (currentPage == &pages.discreteMapSequenceList) {
-            _sequenceView = SequenceView::Accumulator;
-        } else {
-            _sequenceView = SequenceView::NoteSequence;
-        }
-
-        switch (_sequenceView) {
-        case SequenceView::NoteSequence:
-            _sequenceView = SequenceView::Accumulator;
-            break;
-        case SequenceView::Accumulator:
-            _sequenceView = SequenceView::NoteSequence;
-            break;
-        }
-    } else {
-        _sequenceView = SequenceView::NoteSequence; // Default to note sequence for first visit
-    }
-
-    setSequenceView(_sequenceView);
-}
-
-void TopPage::setSequenceView(SequenceView view) {
-    auto &pages = _manager.pages();
-
-    switch (_project.selectedTrack().trackMode()) {
-    case Track::TrackMode::Note:
-        switch (view) {
-        case SequenceView::NoteSequence:
-            setMainPage(pages.noteSequence);
-            break;
-        case SequenceView::Accumulator:
-            setMainPage(pages.accumulator);
-            break;
-        }
-        break;
-    case Track::TrackMode::Curve:
-        // For curve tracks, just show the curve sequence page
-        setMainPage(pages.curveSequence);
-        break;
-    case Track::TrackMode::MidiCv:
-        setMainPage(pages.track);
-        break;
-    case Track::TrackMode::Tuesday:
-        // Tuesday tracks use TuesdaySequencePage for sequence parameters
-        setMainPage(pages.tuesdaySequence);
-        break;
-    case Track::TrackMode::DiscreteMap:
-        switch (view) {
-        case SequenceView::NoteSequence:
-            setMainPage(pages.discreteMapStages);
-            break;
-        case SequenceView::Accumulator:
-            setMainPage(pages.discreteMapSequenceList);
-            break;
-        }
-        break;
-    case Track::TrackMode::Indexed:
-        switch (view) {
-        case SequenceView::NoteSequence:
-            setMainPage(pages.indexedSequence);
-            break;
-        case SequenceView::Accumulator:
-            setMainPage(pages.indexedSteps);
-            break;
-        }
-        break;
-    case Track::TrackMode::Teletype:
-        setMainPage(pages.teletypeScriptView);
-        break;
-    case Track::TrackMode::Stochastic:
-        setMainPage(pages.stochasticSequenceEdit);
-        break;
-    case Track::TrackMode::Last:
-        break;
-    }
-}
-
-void TopPage::setTrackPage() {
-    // Determine if we're cycling within track views (pressing Track key while already viewing track)
-    Page* currentPage = _manager.top();
-    auto &pages = _manager.pages();
-    bool fromTrackView = (currentPage == &pages.track ||
-                         currentPage == &pages.harmony);
-
-    // Cycle to next view only if we're currently on a track view
-    if (fromTrackView) {
-        switch (_trackView) {
-        case TrackView::Track:
-            _trackView = TrackView::Harmony;
-            break;
-        case TrackView::Harmony:
-            _trackView = TrackView::Track;
-            break;
-        }
-    } else {
-        _trackView = TrackView::Track; // Default to track page for first visit
-    }
-
-    setTrackView(_trackView);
-}
-
-void TopPage::setTrackView(TrackView view) {
-    auto &pages = _manager.pages();
-
-    switch (_project.selectedTrack().trackMode()) {
-    case Track::TrackMode::Note:
-        switch (view) {
-        case TrackView::Track:
-            setMainPage(pages.track);
-            break;
-        case TrackView::Harmony:
-            setMainPage(pages.harmony);
-            break;
-        }
-        break;
-    case Track::TrackMode::Curve:
-    case Track::TrackMode::MidiCv:
-    case Track::TrackMode::Tuesday:
-    case Track::TrackMode::Teletype:
-        setMainPage(pages.track);
-        break;
-    case Track::TrackMode::Stochastic:
-        setMainPage(pages.stochasticConfig);
-        break;
-    case Track::TrackMode::DiscreteMap:
-        setMainPage(pages.track);
-        break;
-    case Track::TrackMode::Indexed:
-        setMainPage(pages.track);
-        break;
-    case Track::TrackMode::Last:
-        break;
-    }
-}
-
-void TopPage::setSequenceEditPage() {
-    auto &pages = _manager.pages();
-
-    switch (_project.selectedTrack().trackMode()) {
-    case Track::TrackMode::Note:
-        setMainPage(pages.noteSequenceEdit);
-        break;
-    case Track::TrackMode::Curve:
-        setMainPage(pages.curveSequenceEdit);
-        break;
-    case Track::TrackMode::MidiCv:
-        setMainPage(pages.track);
-        break;
-    case Track::TrackMode::Tuesday:
-        // Tuesday tracks use TuesdayEditPage for main parameter editing
-        setMainPage(pages.tuesdayEdit);
-        break;
-    case Track::TrackMode::DiscreteMap:
-        setMainPage(pages.discreteMapSequence);
-        break;
-    case Track::TrackMode::Indexed:
-        setMainPage(pages.indexedSequenceEdit);
-        break;
-    case Track::TrackMode::Teletype:
-        setMainPage(pages.teletypeScriptView);
-        break;
-    case Track::TrackMode::Stochastic:
-        setMainPage(pages.stochasticSequenceEdit);
-        break;
-    case Track::TrackMode::Last:
-        break;
+        _manager.replace(_manager.stackSize() - 1, &page);
     }
 }

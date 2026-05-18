@@ -72,7 +72,6 @@ void StochasticGenerator::generateChildren(StochasticTrack &track, int eventInde
     int count = event.d1.childCount;
     if (count <= 0) return;
 
-    // Burst Rate defines spacing. 0 = spread across parent, 100 = fast burst at start.
     int burstRate = track.burstRate();
     
     for (int c = 0; c < count; ++c) {
@@ -92,9 +91,7 @@ void StochasticGenerator::generateChildren(StochasticTrack &track, int eventInde
         }
 
         // Timing
-        // burstRate 0: offsets are [1/4, 2/4, 3/4] etc.
-        // burstRate 100: offsets are very close [10, 20, 30]
-        int spacing = 255 / (count + 1); // evenly spread base
+        int spacing = 255 / (count + 1); 
         if (burstRate > 0) {
             int compression = (spacing * burstRate) / 100;
             spacing = std::max(8, spacing - compression);
@@ -115,6 +112,12 @@ StochasticParentEvent StochasticGenerator::generateParentEvent(const StochasticT
     int activeNotes = scale.notesPerOctave();
     event.d0.degree = absoluteDegree % activeNotes;
     event.d0.octave = absoluteDegree / activeNotes;
+
+    // Jump: probability of octave register jump inside generated pitch behavior
+    if (track.jump() > 0 && int(rng.nextRange(100)) < track.jump()) {
+        int jumpOffset = rng.nextRange(2) == 0 ? -1 : 1;
+        event.d0.octave = clamp(int(event.d0.octave) + jumpOffset, -4, 3);
+    }
     
     // Rhythm
     event.d0.rate = track.rate();
@@ -130,7 +133,6 @@ StochasticParentEvent StochasticGenerator::generateParentEvent(const StochasticT
     // Children
     event.d1.childCount = 0;
     if (int(rng.nextRange(100)) < track.burst()) {
-        // burstCount maps to 1..4 hits
         event.d1.childCount = 1 + (uint32_t(track.burstCount()) * 3) / 100; 
     }
 
@@ -210,11 +212,8 @@ int StochasticGenerator::generateDegree(const StochasticTrack &track, const Scal
 }
 
 int StochasticGenerator::generateJumpOctave(const StochasticTrack &track, int currentJump, Random &rng) {
-    if (track.jump() == 0) return 0;
-    if (int(rng.nextRange(100)) < track.jump()) {
-        return rng.nextRange(3) - 1; 
-    }
-    return currentJump;
+    // Legacy - no longer used by engine for per-loop transposition
+    return 0;
 }
 
 float StochasticGenerator::betaDistributionSample(float x, float spread) {

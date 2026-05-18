@@ -131,6 +131,7 @@ set(sources
     ui/pages/StartupPage.cpp
     ui/pages/SystemPage.cpp
     ui/pages/StochasticConfigPage.cpp
+    ui/pages/StochasticPerformancePage.cpp
     ui/pages/StochasticSequenceEditPage.cpp
     ui/pages/TempoPage.cpp
     ui/pages/TextInputPage.cpp

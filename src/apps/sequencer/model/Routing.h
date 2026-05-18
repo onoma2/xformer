@@ -140,7 +140,7 @@ public:
         StochasticFirst,
         StochasticDensity = StochasticFirst,
         StochasticTilt,
-        StochasticJitter,
+        StochasticReserved,
         StochasticBurst,
         StochasticComplexity,
         StochasticContour,
@@ -211,7 +211,7 @@ public:
         case Target::GateLength:                return "Gate Length";
         case Target::StochasticDensity:         return "Density";
         case Target::StochasticTilt:            return "Tilt";
-        case Target::StochasticJitter:          return "Jitter";
+
         case Target::StochasticBurst:           return "Burst";
         case Target::StochasticComplexity:      return "Complexity";
         case Target::StochasticContour:         return "Contour";
@@ -308,7 +308,7 @@ public:
         case Target::GateLength:                return 38;
         case Target::StochasticDensity:         return 65;
         case Target::StochasticTilt:            return 66;
-        case Target::StochasticJitter:          return 67;
+        case Target::StochasticReserved:        return 67;
         case Target::StochasticBurst:           return 68;
         case Target::StochasticComplexity:      return 69;
         case Target::StochasticContour:         return 70;
@@ -424,7 +424,7 @@ public:
         StochasticFirst,
         StochasticDensity = StochasticFirst,
         StochasticTilt,
-        StochasticJitter,
+        StochasticReserved,
         StochasticBurst,
         StochasticComplexity,
         StochasticContour,
@@ -611,7 +611,7 @@ public:
         StochasticFirst,
         StochasticDensity = StochasticFirst,
         StochasticTilt,
-        StochasticJitter,
+        StochasticReserved,
         StochasticBurst,
         StochasticComplexity,
         StochasticContour,
