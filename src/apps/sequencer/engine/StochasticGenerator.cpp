@@ -10,17 +10,11 @@ void StochasticGenerator::generateRhythm(StochasticSequence &sequence, const Sto
     for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
         if (i < size) {
             auto rhythm = generateRhythmEvent(track, rng);
-            sequence.events()[i].d0 = rhythm.d0;
-            sequence.events()[i].d1.rest = rhythm.d1.rest;
-            sequence.events()[i].d1.legato = rhythm.d1.legato;
-            sequence.events()[i].d1.slide = rhythm.d1.slide;
-            sequence.events()[i].d1.accent = rhythm.d1.accent;
-            sequence.events()[i].d1.rhythmValid = 1;
-            sequence.events()[i].d1.burstRate = rhythm.d1.burstRate;
+            sequence.events()[i].mergeRhythmFrom(rhythm);
         } else {
             // Do not clear the whole event, only rhythm part
             sequence.events()[i].d0.raw = 0;
-            sequence.events()[i].d1.rhythmValid = 0;
+            sequence.events()[i].setRhythmValid(false);
         }
     }
 
@@ -37,11 +31,9 @@ void StochasticGenerator::generateMelody(StochasticSequence &sequence, const Sto
     for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
         if (i < size) {
             auto melody = generateMelodyEvent(track, scale, rootNote, lastDegree, rng);
-            sequence.events()[i].d1.degree = melody.d1.degree;
-            sequence.events()[i].d1.octave = melody.d1.octave;
-            sequence.events()[i].d1.melodyValid = 1;
+            sequence.events()[i].mergeMelodyFrom(melody);
         } else {
-            sequence.events()[i].d1.melodyValid = 0;
+            sequence.events()[i].setMelodyValid(false);
         }
     }
 
@@ -56,15 +48,8 @@ void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const St
     
     uint8_t oldRank = sequence.events()[i].d0.densityRank;
     auto rhythm = generateRhythmEvent(track, rng);
-    sequence.events()[i].d0 = rhythm.d0;
-    sequence.events()[i].d1.rest = rhythm.d1.rest;
-    sequence.events()[i].d1.legato = rhythm.d1.legato;
-    sequence.events()[i].d1.slide = rhythm.d1.slide;
-    sequence.events()[i].d1.accent = rhythm.d1.accent;
-    sequence.events()[i].d1.rhythmValid = 1;
-    sequence.events()[i].d1.burstRate = rhythm.d1.burstRate;
-
-    sequence.events()[i].d0.densityRank = oldRank;
+    sequence.events()[i].mergeRhythmFrom(rhythm);
+    sequence.events()[i].setDensityRank(oldRank);
 }
 
 void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng) {
@@ -74,9 +59,7 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
 
     int lastDegree = (i > 0) ? int(sequence.events()[i-1].d1.degree) : -1;
     auto melody = generateMelodyEvent(track, scale, rootNote, lastDegree, rng);
-    sequence.events()[i].d1.degree = melody.d1.degree;
-    sequence.events()[i].d1.octave = melody.d1.octave;
-    sequence.events()[i].d1.melodyValid = 1;
+    sequence.events()[i].mergeMelodyFrom(melody);
 }
 
 void StochasticGenerator::generateDensityRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed) {
@@ -100,10 +83,10 @@ void StochasticGenerator::generateDensityRanks(StochasticSequence &sequence, int
         return a.weight < b.weight;
     });
 
-    for (int i = 0; i < CONFIG_STEP_COUNT; ++i) sequence.events()[i].d0.densityRank = 255;
+    for (int i = 0; i < CONFIG_STEP_COUNT; ++i) sequence.events()[i].setDensityRank(255);
 
     for (int i = 0; i < size; ++i) {
-        sequence.events()[weightedIndices[i].index].d0.densityRank = i;
+        sequence.events()[weightedIndices[i].index].setDensityRank(i);
     }
 }
 
@@ -151,20 +134,20 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticT
     StochasticSourceEvent event;
     event.clear();
 
-    event.d0.rate = track.rate();
-    event.d0.length = 128; 
-    event.d0.densityRank = 0; // Bypass density for Live/Single events
+    event.setRate(track.rate());
+    event.setLength(128);
+    event.setDensityRank(0); // Bypass density for Live/Single events
     
-    event.d1.rest = (int(rng.nextRange(100)) < track.rest());
-    event.d1.legato = (int(rng.nextRange(100)) < track.legatoProb());
-    event.d1.slide = (int(rng.nextRange(100)) < track.slide());
-    event.d1.accent = (int(rng.nextRange(100)) < track.accentProb());
-    event.d1.rhythmValid = 1;
-    event.d1.burstRate = track.burstRate();
+    event.setRest(int(rng.nextRange(100)) < track.rest());
+    event.setLegato(int(rng.nextRange(100)) < track.legatoProb());
+    event.setSlide(int(rng.nextRange(100)) < track.slide());
+    event.setAccent(int(rng.nextRange(100)) < track.accentProb());
+    event.setRhythmValid(true);
+    event.setBurstRate(track.burstRate());
 
-    event.d0.childCount = 0;
+    event.setChildCount(0);
     if (int(rng.nextRange(100)) < track.burst()) {
-        event.d0.childCount = 1 + (uint32_t(track.burstCount()) * 3) / 100; 
+        event.setChildCount(1 + (uint32_t(track.burstCount()) * 3) / 100);
     }
 
     return event;
@@ -176,9 +159,9 @@ StochasticSourceEvent StochasticGenerator::generateMelodyEvent(const StochasticT
 
     int absoluteDegree = generateDegree(track, scale, lastDegree, rng);
     int activeNotes = scale.notesPerOctave();
-    event.d1.degree = absoluteDegree % activeNotes;
-    event.d1.octave = absoluteDegree / activeNotes;
-    event.d1.melodyValid = 1;
+    event.setDegree(absoluteDegree % activeNotes);
+    event.setOctave(absoluteDegree / activeNotes);
+    event.setMelodyValid(true);
 
     return event;
 }

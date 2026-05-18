@@ -19,6 +19,14 @@ enum class StochasticBurstPitch : uint8_t { Parent, Generate, Last };
  * This 8-byte record allows storing 17 patterns within the Performer track budget.
  */
 struct StochasticSourceEvent {
+    static constexpr uint32_t D0RateMask = 0xffu << 0;
+    static constexpr uint32_t D0LengthMask = 0xffu << 8;
+    static constexpr uint32_t D0DensityRankMask = 0xffu << 16;
+    static constexpr uint32_t D0ChildCountMask = 0xffu << 24;
+
+    static constexpr uint32_t D1RhythmMask = (1u << 13) - 1u;
+    static constexpr uint32_t D1MelodyMask = ((1u << 13) - 1u) << 13;
+
     union {
         uint32_t raw;
         // Rhythm Domain (32 bits)
@@ -46,6 +54,67 @@ struct StochasticSourceEvent {
     } d1;
 
     void clear() { d0.raw = 0; d1.raw = 0; }
+
+    void setRate(int value) {
+        d0.raw = (d0.raw & ~D0RateMask) | ((uint32_t(value) & 0xffu) << 0);
+    }
+
+    void setLength(int value) {
+        d0.raw = (d0.raw & ~D0LengthMask) | ((uint32_t(value) & 0xffu) << 8);
+    }
+
+    void setDensityRank(int value) {
+        d0.raw = (d0.raw & ~D0DensityRankMask) | ((uint32_t(value) & 0xffu) << 16);
+    }
+
+    void setChildCount(int value) {
+        d0.raw = (d0.raw & ~D0ChildCountMask) | ((uint32_t(value) & 0xffu) << 24);
+    }
+
+    void setRest(bool value) {
+        d1.raw = (d1.raw & ~(1u << 0)) | (uint32_t(value) << 0);
+    }
+
+    void setLegato(bool value) {
+        d1.raw = (d1.raw & ~(1u << 1)) | (uint32_t(value) << 1);
+    }
+
+    void setSlide(bool value) {
+        d1.raw = (d1.raw & ~(1u << 2)) | (uint32_t(value) << 2);
+    }
+
+    void setAccent(bool value) {
+        d1.raw = (d1.raw & ~(1u << 3)) | (uint32_t(value) << 3);
+    }
+
+    void setRhythmValid(bool value) {
+        d1.raw = (d1.raw & ~(1u << 4)) | (uint32_t(value) << 4);
+    }
+
+    void setBurstRate(int value) {
+        d1.raw = (d1.raw & ~(0xffu << 5)) | ((uint32_t(value) & 0xffu) << 5);
+    }
+
+    void setDegree(int value) {
+        d1.raw = (d1.raw & ~(0x7fu << 13)) | ((uint32_t(value) & 0x7fu) << 13);
+    }
+
+    void setOctave(int value) {
+        d1.raw = (d1.raw & ~(0x1fu << 20)) | ((uint32_t(value) & 0x1fu) << 20);
+    }
+
+    void setMelodyValid(bool value) {
+        d1.raw = (d1.raw & ~(1u << 25)) | (uint32_t(value) << 25);
+    }
+
+    void mergeRhythmFrom(const StochasticSourceEvent &event) {
+        d0.raw = event.d0.raw;
+        d1.raw = (d1.raw & ~D1RhythmMask) | (event.d1.raw & D1RhythmMask);
+    }
+
+    void mergeMelodyFrom(const StochasticSourceEvent &event) {
+        d1.raw = (d1.raw & ~D1MelodyMask) | (event.d1.raw & D1MelodyMask);
+    }
 };
 
 struct StochasticChildHit {

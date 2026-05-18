@@ -125,7 +125,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
     if (resetMeasure == 0) {
         _relativeTick = (_relativeTick + 1) % divisor;
     }
-    
+
     return (CvUpdate | GateUpdate);
 }
 
@@ -176,7 +176,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 gateLen = std::min(gateLen, uint32_t(10));
             }
 
-            if (!isLegato) _gateQueue.push({ tick + gateLen, false, false });
+            if (!isLegato) {
+                _gateQueue.push({ tick + gateLen, false, false });
+            }
             _activity = true;
 
             for (int i = 0; i < 4; ++i) {
@@ -210,33 +212,17 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
         if (track.rhythmMode() == StochasticSourceMode::Live) {
             auto rhythm = StochasticGenerator::generateRhythmEvent(track, _rng);
-            eval.d0 = rhythm.d0;
-            eval.d1.rest = rhythm.d1.rest;
-            eval.d1.legato = rhythm.d1.legato;
-            eval.d1.slide = rhythm.d1.slide;
-            eval.d1.accent = rhythm.d1.accent;
-            eval.d1.rhythmValid = 1;
-            eval.d1.burstRate = rhythm.d1.burstRate;
+            eval.mergeRhythmFrom(rhythm);
         } else {
-            eval.d0 = event.d0;
-            eval.d1.rest = event.d1.rest;
-            eval.d1.legato = event.d1.legato;
-            eval.d1.slide = event.d1.slide;
-            eval.d1.accent = event.d1.accent;
-            eval.d1.rhythmValid = event.d1.rhythmValid;
-            eval.d1.burstRate = event.d1.burstRate;
+            eval.mergeRhythmFrom(event);
         }
 
         if (track.melodyMode() == StochasticSourceMode::Live) {
             auto melody = StochasticGenerator::generateMelodyEvent(track, scale, rootNote, _lastDegree, _rng);
-            eval.d1.degree = melody.d1.degree;
-            eval.d1.octave = melody.d1.octave;
-            eval.d1.melodyValid = 1;
+            eval.mergeMelodyFrom(melody);
             _lastDegree = int(eval.d1.degree) + int(eval.d1.octave) * scale.notesPerOctave();
         } else {
-            eval.d1.degree = event.d1.degree;
-            eval.d1.octave = event.d1.octave;
-            eval.d1.melodyValid = event.d1.melodyValid;
+            eval.mergeMelodyFrom(event);
             _lastDegree = int(eval.d1.degree) + int(eval.d1.octave) * scale.notesPerOctave();
         }
 
@@ -315,7 +301,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 gateLen = std::min(gateLen, uint32_t(10));
             }
 
-            if (!isLegato) _gateQueue.push({ tick + gateLen, false, false });
+            if (!isLegato) {
+                _gateQueue.push({ tick + gateLen, false, false });
+            }
             _activity = true;
 
             for (int i = 0; i < 4; ++i) {
