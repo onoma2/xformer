@@ -11,6 +11,7 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - `src/apps/sequencer/ui/pages/StochasticConfigPage.h` — Global settings UI
 
 ## Decisions log
+- 2026-05-19: Decision: V4 Ownership Correction Plan created. We will pack events to 48 bits (6 bytes) to save 4KB of Track RAM, enabling us to safely move 29 pattern-defining fields (like generator params and pitch tickets) to Sequence ownership.
 - 2026-05-18: Phase 7b complete. Re-topologized model for RAM safety (Sequence size: 16B, Track buffer: 2KB). Implemented MeloDICER-style duration variation and dynamic Burst Count/Rate semantics. Verified full evaluated lock and project load stability.
 - 2026-05-17: Phase 8 UI Stubs complete. Implemented list-based editors for both global Track parameters and per-step Sequence probabilities. Users can now edit all stochastic metrics on hardware.
 - 2026-05-17: Phase 6 repair complete. Retopologized performance layer to Density/Tilt/Jitter. Implemented true ranked rest-priority for density thinning and stable timing jitter. Verified lock invariant.

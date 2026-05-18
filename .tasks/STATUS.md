@@ -12,18 +12,12 @@ _Updated: 2026-05-18_
 
 ## 🔴 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Finalized Phase 8 repairs: 
-- Fixed locked rest + burst leakage: children are strictly suppressed for silent steps and cleared during capture.
-- Fixed burst spacing: child hits now strictly bound within parent duration; spacing truncated if necessary.
-- Guarded lock buffer: implemented `lockActive` helper for consistent allocation-failure fallback to "unlocked" mode.
-- Jump Register: implemented loop-level register shift (-1, 0, +1) evaluated only at loop wrap; bypasses RNG during lock.
-- Frozen Capture: locked path uses captured evaluated CV, immune to runtime jump/octave shifts.
-- STM32 RAM (Aggregate BSS confirmed): StochasticTrack 9148B, StochasticSequence 532B, StochasticTrackEngine 424B.
-**Next action:** Implement Phase 8.3/8.4 semantics: Runtime Hold buffer and dual A/B comparison.
+**Where I stopped:** V4 Ownership Correction Plan created (`PHASE9-V4-OWNERSHIP.md`). Redefined event storage to 48-bit compact structure, saving ~4KB track RAM and allowing 29 generator fields to safely move to Sequence ownership.
+**Next action:** Evaluate the Phase 9 V4 Ownership Plan.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic
-**Reference:** `.tasks/stochastic-track-port/TASK.md`, `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`, `.tasks/stochastic-track-port/UI-DESIGN.md`, `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md`
+**Reference:** `.tasks/stochastic-track-port/TASK.md`, `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`, `.tasks/stochastic-track-port/PHASE9-V4-OWNERSHIP.md`, `.tasks/stochastic-track-port/UI-DESIGN.md`, `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md`
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
