@@ -170,86 +170,254 @@
         </p>
 
         <div class="fig">
-            <svg viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg">
+            <svg viewBox="0 0 900 680" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                    <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#888"/></marker>
-                    <marker id="arrowhead-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#0a7c42"/></marker>
-                    <marker id="arrowhead-warm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#b45309"/></marker>
-                    <marker id="arrowhead-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#1d4ed8"/></marker>
-                    <marker id="arrowhead-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#b91c1c"/></marker>
-                    <marker id="arrowhead-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#7c3aed"/></marker>
+                    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#888"/></marker>
+                    <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#0a7c42"/></marker>
+                    <marker id="ar-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#b45309"/></marker>
+                    <marker id="ar-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#1d4ed8"/></marker>
+                    <marker id="ar-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#b91c1c"/></marker>
+                    <marker id="ar-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#7c3aed"/></marker>
+
+                    <filter id="shadow"><feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.12"/></filter>
                 </defs>
 
-                <!-- Title -->
-                <text x="350" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Stochastic Track &mdash; High-Level Architecture</text>
+                <text x="450" y="24" text-anchor="middle" font-family="Inter" font-size="15" font-weight="700" fill="#1a1a18">Full Generative Pipeline &mdash; All Parameters Fighting for Each Note</text>
 
-                <!-- Domains: Rhythm (left), Melody (right) -->
-                <rect class="sch-block" x="40" y="50" width="260" height="190" />
-                <text x="170" y="74" text-anchor="middle" class="sch-text-accent">Rhythm Domain</text>
-                <text x="170" y="90" text-anchor="middle" class="sch-text-small">"When"</text>
+                <!-- ============================================================ -->
+                <!-- SOURCE LAYER -->
+                <!-- ============================================================ -->
+                <rect x="30" y="44" width="840" height="68" rx="8" fill="#f3f7ff" stroke="#1d4ed8" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.7"/>
+                <text x="450" y="62" text-anchor="middle" font-family="Inter" font-size="10" fill="#1d4ed8" font-weight="600">LAYER 0 &mdash; SOURCE MODE (independent per domain)</text>
 
-                <rect class="sch-block-blue" x="400" y="50" width="260" height="190" />
-                <text x="530" y="74" text-anchor="middle" font-family="Inter" font-size="11" fill="#1d4ed8" font-weight="600">Melody Domain</text>
-                <text x="530" y="90" text-anchor="middle" class="sch-text-small">"What pitch"</text>
+                <rect x="80" y="74" width="160" height="26" rx="13" fill="var(--bg-card)" stroke="var(--border)" stroke-width="1" filter="url(#shadow)"/>
+                <text x="160" y="91" text-anchor="middle" class="sch-text-label" font-size="10">Rhythm: Loop / Live</text>
+                <path class="sch-dash" d="M240,87 L320,87"/>
 
-                <!-- Rhythm internals -->
-                <rect class="sch-fill-dim" x="70" y="110" width="100" height="30" />
-                <text x="120" y="129" text-anchor="middle" class="sch-text">Duration</text>
-                <rect class="sch-fill-dim" x="70" y="150" width="100" height="30" />
-                <text x="120" y="169" text-anchor="middle" class="sch-text">Density Gate</text>
-                <rect class="sch-fill-dim" x="70" y="190" width="100" height="30" />
-                <text x="120" y="209" text-anchor="middle" class="sch-text">Rest / Accent</text>
+                <rect x="320" y="74" width="220" height="26" rx="13" fill="var(--bg-card)" stroke="var(--accent)" stroke-width="1.5" filter="url(#shadow)"/>
+                <text x="430" y="91" text-anchor="middle" class="sch-text-label" font-size="10">Dual domain dice roll each step</text>
 
-                <rect class="sch-fill-dim" x="200" y="110" width="80" height="30" />
-                <text x="240" y="129" text-anchor="middle" class="sch-text">Burst</text>
-                <rect class="sch-fill-dim" x="200" y="150" width="80" height="30" />
-                <text x="240" y="169" text-anchor="middle" class="sch-text">Children</text>
-                <rect class="sch-fill-dim" x="200" y="190" width="80" height="30" />
-                <text x="240" y="209" text-anchor="middle" class="sch-text">Gate Out</text>
+                <path class="sch-dash" d="M540,87 L620,87"/>
+                <rect x="620" y="74" width="160" height="26" rx="13" fill="var(--bg-card)" stroke="var(--border)" stroke-width="1" filter="url(#shadow)"/>
+                <text x="700" y="91" text-anchor="middle" class="sch-text-label" font-size="10">Melody: Loop / Live</text>
 
-                <path class="sch-arrow" d="M170,140 L200,125" />
-                <path class="sch-arrow" d="M170,180 L200,165" />
-                <path class="sch-arrow" d="M120,110 L120,150" />
-                <path class="sch-arrow" d="M120,180 L120,190" />
-                <path class="sch-arrow" d="M240,140 L240,150" />
-                <path class="sch-arrow" d="M240,180 L240,190" />
+                <!-- Down arrow to Layer 1 -->
+                <path class="sch-arrow" d="M450,112 L450,130"/>
 
-                <!-- Melody internals -->
-                <rect class="sch-fill-dim" x="430" y="110" width="100" height="30" />
-                <text x="480" y="129" text-anchor="middle" class="sch-text">Tickets</text>
-                <rect class="sch-fill-dim" x="430" y="150" width="100" height="30" />
-                <text x="480" y="169" text-anchor="middle" class="sch-text">Marbles</text>
-                <rect class="sch-fill-dim" x="430" y="190" width="100" height="30" />
-                <text x="480" y="209" text-anchor="middle" class="sch-text">CV Out</text>
+                <!-- ============================================================ -->
+                <!-- LAYER 1: RHYTHM -->
+                <!-- ============================================================ -->
+                <rect x="30" y="132" width="420" height="200" rx="8" fill="var(--bg-card)" stroke="#d4d3d0" stroke-width="1.5" filter="url(#shadow)"/>
+                <text x="240" y="152" text-anchor="middle" class="sch-text-accent" font-size="12">RHYTHM GENERATORS (competing dice rolls)</text>
 
-                <rect class="sch-fill-dim" x="560" y="110" width="80" height="70" />
-                <text x="600" y="138" text-anchor="middle" class="sch-text">Cpx / Cntr</text>
-                <text x="600" y="155" text-anchor="middle" class="sch-text">/ Linear</text>
-                <text x="600" y="172" text-anchor="middle" class="sch-text">Modifiers</text>
+                <!-- Duration -->
+                <rect x="52" y="164" width="120" height="44" rx="6" fill="#f0efed" stroke="#b45309" stroke-width="1.2"/>
+                <text x="112" y="182" text-anchor="middle" class="sch-text-label" font-size="9">Rate</text>
+                <text x="112" y="196" text-anchor="middle" class="sch-text-small" fill="var(--accent-warm)">maps to 8 durations</text>
+                <text x="112" y="206" class="sch-text-small" fill="#b45309" text-anchor="middle">Variation &times;2 / &divide;2</text>
 
-                <path class="sch-arrow" d="M480,140 L560,145" />
-                <path class="sch-arrow" d="M530,140 L560,145" />
-                <path class="sch-arrow" d="M480,110 L480,150" />
-                <path class="sch-arrow" d="M480,180 L480,190" />
+                <path class="sch-arrow" d="M172,186 L200,186"/>
 
-                <!-- Shared evolution -->
-                <rect class="sch-block-warm" x="140" y="38" width="380" height="0" /> <!-- invisible, just for grouping -->
+                <!-- Density Gate -->
+                <rect x="202" y="164" width="110" height="44" rx="6" fill="#f0efed" stroke="#b91c1c" stroke-width="1.2"/>
+                <text x="257" y="182" text-anchor="middle" class="sch-text-label" font-size="9">Density</text>
+                <text x="257" y="196" text-anchor="middle" class="sch-text-small" fill="var(--accent-red)">threshold gate</text>
+                <text x="257" y="206" class="sch-text-small" fill="#b91c1c" text-anchor="middle">Tilt bias</text>
 
-                <path class="sch-arrow-accent" d="M380,115 L430,115" />
-                <path class="sch-arrow-accent" d="M380,165 L430,165" />
+                <path class="sch-arrow" d="M312,186 L340,186"/>
 
-                <!-- Bottom: source modes label -->
-                <rect class="sch-block" x="200" y="248" width="260" height="28" rx="14" ry="14" />
-                <text x="330" y="266" text-anchor="middle" class="sch-text">Source Mode: Loop / Live (independent per domain)</text>
+                <!-- Rest -->
+                <rect x="340" y="164" width="90" height="44" rx="6" fill="#f0efed" stroke="#7c3aed" stroke-width="1.2"/>
+                <text x="385" y="182" text-anchor="middle" class="sch-text-label" font-size="9">Rest %</text>
+                <text x="385" y="196" text-anchor="middle" class="sch-text-small" fill="var(--accent-purple)">silence</text>
 
-                <path class="sch-arrow" d="M170,240 L240,258" />
-                <path class="sch-arrow" d="M530,240 L420,258" />
+                <!-- Second row: expression -->
+                <rect x="52" y="218" width="90" height="36" rx="6" fill="#f0efed" stroke="var(--border)" stroke-width="1"/>
+                <text x="97" y="232" text-anchor="middle" class="sch-text-label" font-size="9">Accent %</text>
+                <text x="97" y="246" text-anchor="middle" class="sch-text-small">gate accent</text>
 
-                <!-- Legend -->
-                <rect class="sch-block" x="40" y="248" width="130" height="28" rx="4" ry="4" fill="var(--bg-card)" />
-                <text x="105" y="266" text-anchor="middle" class="sch-text-small">Cycle-end: Mutate / Patience</text>
+                <rect x="152" y="218" width="90" height="36" rx="6" fill="#f0efed" stroke="var(--border)" stroke-width="1"/>
+                <text x="197" y="232" text-anchor="middle" class="sch-text-label" font-size="9">Legato %</text>
+                <text x="197" y="246" text-anchor="middle" class="sch-text-small">tie gates</text>
+
+                <rect x="252" y="218" width="90" height="36" rx="6" fill="#f0efed" stroke="var(--border)" stroke-width="1"/>
+                <text x="297" y="232" text-anchor="middle" class="sch-text-label" font-size="9">Slide %</text>
+                <text x="297" y="246" text-anchor="middle" class="sch-text-small">portamento</text>
+
+                <rect x="352" y="218" width="80" height="36" rx="6" fill="#f0efed" stroke="var(--border)" stroke-width="1"/>
+                <text x="392" y="232" text-anchor="middle" class="sch-text-label" font-size="9">Burst %</text>
+                <text x="392" y="246" text-anchor="middle" class="sch-text-small">children</text>
+
+                <!-- Layer 1 right: Rhythm output -->
+                <rect x="340" y="270" width="90" height="28" rx="6" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+                <text x="385" y="288" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent)" font-weight="600">GATE OUT</text>
+
+                <path class="sch-arrow" d="M385,254 L385,270"/>
+                <path class="sch-arrow" d="M385,204 L385,218"/>
+                <path class="sch-arrow" d="M257,208 L257,218"/>
+
+                <!-- ============================================================ -->
+                <!-- LAYER 1: MELODY -->
+                <!-- ============================================================ -->
+                <rect x="460" y="132" width="420" height="200" rx="8" fill="var(--bg-card)" stroke="#1d4ed8" stroke-width="1.5" filter="url(#shadow)"/>
+                <text x="670" y="152" text-anchor="middle" font-family="Inter" font-size="12" fill="#1d4ed8" font-weight="600">MELODY GENERATORS (competing weights &amp; modifiers)</text>
+
+                <!-- Tickets -->
+                <rect x="482" y="164" width="110" height="52" rx="6" fill="#f0efed" stroke="#0a7c42" stroke-width="1.2"/>
+                <text x="537" y="180" text-anchor="middle" class="sch-text-label" font-size="9">Degree Tickets</text>
+                <text x="537" y="194" text-anchor="middle" class="sch-text-small" fill="var(--accent)">0-100 per degree</text>
+                <text x="537" y="208" text-anchor="middle" class="sch-text-small">exclude (-1)</text>
+
+                <path class="sch-arrow" d="M592,190 L620,190"/>
+
+                <!-- Complexity -->
+                <rect x="620" y="164" width="110" height="36" rx="6" fill="#f0efed" stroke="#b91c1c" stroke-width="1.2"/>
+                <text x="675" y="178" text-anchor="middle" class="sch-text-label" font-size="9">Complexity</text>
+                <text x="675" y="192" text-anchor="middle" class="sch-text-small" fill="var(--accent-red)">far notes &times; &frac14;</text>
+
+                <!-- Contour -->
+                <rect x="740" y="164" width="120" height="36" rx="6" fill="#f0efed" stroke="#b45309" stroke-width="1.2"/>
+                <text x="800" y="178" text-anchor="middle" class="sch-text-label" font-size="9">Contour</text>
+                <text x="800" y="192" text-anchor="middle" class="sch-text-small" fill="var(--accent-warm)">ramp up/down</text>
+
+                <path class="sch-arrow" d="M730,182 L740,182"/>
+
+                <!-- Marbles -->
+                <rect x="482" y="226" width="110" height="36" rx="6" fill="#f0efed" stroke="#7c3aed" stroke-width="1.2"/>
+                <text x="537" y="240" text-anchor="middle" class="sch-text-label" font-size="9">Marbles</text>
+                <text x="537" y="254" text-anchor="middle" class="sch-text-small" fill="var(--accent-purple)">beta dist (when On)</text>
+
+                <!-- Linearity -->
+                <rect x="610" y="226" width="120" height="36" rx="6" fill="#f0efed" stroke="#1d4ed8" stroke-width="1.2"/>
+                <text x="670" y="240" text-anchor="middle" class="sch-text-label" font-size="9">Linearity</text>
+                <text x="670" y="254" text-anchor="middle" class="sch-text-small" fill="var(--accent-blue)">distance penalty</text>
+
+                <!-- Range -->
+                <rect x="750" y="226" width="110" height="36" rx="6" fill="#f0efed" stroke="var(--border)" stroke-width="1"/>
+                <text x="805" y="240" text-anchor="middle" class="sch-text-label" font-size="9">Range / MinMax</text>
+                <text x="805" y="254" text-anchor="middle" class="sch-text-small">octave clamp</text>
+
+                <path class="sch-arrow" d="M602,182 L620,182"/>
+                <path class="sch-arrow" d="M675,200 L675,226"/>
+
+                <!-- CV Output -->
+                <rect x="650" y="270" width="90" height="28" rx="6" fill="#e8effc" stroke="#1d4ed8" stroke-width="1.5"/>
+                <text x="695" y="288" text-anchor="middle" class="sch-text-label" font-size="10" fill="#1d4ed8" font-weight="600">CV OUT</text>
+
+                <!-- Connection: rhythm + melody combine -->
+                <path d="M385,298 L385,320 L450,320 L450,340" class="sch-arrow" fill="none"/>
+                <path d="M695,298 L695,320 L450,320 L450,340" class="sch-arrow" fill="none"/>
+
+                <!-- Arrow from source layer into generators -->
+                <path d="M450,130 L240,130 L240,164" class="sch-arrow" fill="none"/>
+                <path d="M450,130 L670,130 L670,164" class="sch-arrow" fill="none"/>
+
+                <!-- ============================================================ -->
+                <!-- LAYER 2: PATTERN / LOOP -->
+                <!-- ============================================================ -->
+                <rect x="30" y="342" width="840" height="130" rx="8" fill="var(--bg-card)" stroke="#b45309" stroke-width="1.5" filter="url(#shadow)"/>
+                <text x="450" y="362" text-anchor="middle" class="sch-text" font-size="12" fill="var(--accent-warm)" font-weight="600">PATTERN BUFFER &amp; LOOP PERMUTATIONS</text>
+
+                <!-- Buffer visualization -->
+                <g transform="translate(80, 376)">
+                    <rect x="0" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <text x="18" y="17" text-anchor="middle" class="sch-text-small" fill="white">1</text>
+                    <rect x="40" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.6"/>
+                    <text x="58" y="17" text-anchor="middle" class="sch-text-small" fill="white">2</text>
+                    <rect x="80" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.5"/>
+                    <text x="98" y="17" text-anchor="middle" class="sch-text-small" fill="white">3</text>
+                    <rect x="120" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.8"/>
+                    <text x="138" y="17" text-anchor="middle" class="sch-text-small" fill="white">4</text>
+                    <rect x="160" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.4"/>
+                    <text x="178" y="17" text-anchor="middle" class="sch-text-small" fill="white">5</text>
+                    <rect x="200" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.6"/>
+                    <text x="218" y="17" text-anchor="middle" class="sch-text-small" fill="white">6</text>
+                    <rect x="240" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.9"/>
+                    <text x="258" y="17" text-anchor="middle" class="sch-text-small" fill="white">7</text>
+                    <rect x="280" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.5"/>
+                    <text x="298" y="17" text-anchor="middle" class="sch-text-small" fill="white">8</text>
+                    <rect x="320" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.3"/>
+                    <text x="338" y="17" text-anchor="middle" class="sch-text-small" fill="white">9</text>
+                    <rect x="360" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <text x="378" y="17" text-anchor="middle" class="sch-text-small" fill="white">10</text>
+                    <rect x="400" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.4"/>
+                    <text x="418" y="17" text-anchor="middle" class="sch-text-small" fill="white">11</text>
+                    <rect x="440" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.6"/>
+                    <text x="458" y="17" text-anchor="middle" class="sch-text-small" fill="white">12</text>
+                    <rect x="480" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.8"/>
+                    <text x="498" y="17" text-anchor="middle" class="sch-text-small" fill="white">13</text>
+                    <rect x="520" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.5"/>
+                    <text x="538" y="17" text-anchor="middle" class="sch-text-small" fill="white">14</text>
+                    <rect x="560" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <text x="578" y="17" text-anchor="middle" class="sch-text-small" fill="white">15</text>
+                    <rect x="600" y="0" width="36" height="26" rx="3" fill="var(--accent)" opacity="0.6"/>
+                    <text x="618" y="17" text-anchor="middle" class="sch-text-small" fill="white">16</text>
+                </g>
+
+                <text x="450" y="418" text-anchor="middle" class="sch-text-label" font-size="10">16-step pattern (Size=16). First/Last define loop window. Rotate shifts read head.</text>
+
+                <!-- Lock state -->
+                <rect x="80" y="432" width="180" height="28" rx="6" fill="var(--bg-card)" stroke="#7c3aed" stroke-width="1.2"/>
+                <text x="170" y="450" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent-purple)">Lock = freeze buffer</text>
+
+                <!-- Sleep -->
+                <rect x="290" y="432" width="140" height="28" rx="6" fill="var(--bg-card)" stroke="var(--border)" stroke-width="1"/>
+                <text x="360" y="450" text-anchor="middle" class="sch-text-label" font-size="10">Sleep = pause N cycles</text>
+
+                <path class="sch-arrow" d="M450,402 L450,432"/>
+
+                <!-- ============================================================ -->
+                <!-- LAYER 3: EVOLUTION -->
+                <!-- ============================================================ -->
+                <rect x="30" y="490" width="840" height="100" rx="8" fill="var(--bg-card)" stroke="#b91c1c" stroke-width="1.5" stroke-dasharray="8 3" filter="url(#shadow)"/>
+                <text x="450" y="510" text-anchor="middle" class="sch-text" font-size="12" fill="var(--accent-red)" font-weight="600">CYCLE-END: EVOLUTION &amp; MUTATION (per loop permutation)</text>
+
+                <!-- Mutate -->
+                <rect x="60" y="524" width="160" height="28" rx="6" fill="var(--accent-red-bg)" stroke="var(--accent-red)" stroke-width="1.2"/>
+                <text x="140" y="542" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent-red)">Mutate % &rarr; replace 1 step</text>
+
+                <!-- Patience / Boredom -->
+                <rect x="250" y="524" width="200" height="28" rx="6" fill="var(--accent-warm-bg)" stroke="var(--accent-warm)" stroke-width="1.2"/>
+                <text x="350" y="542" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent-warm)">Patience &rarr; boredom &rarr; full reset</text>
+
+                <!-- Jump -->
+                <rect x="480" y="524" width="160" height="28" rx="6" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.2"/>
+                <text x="560" y="542" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent)">Jump % &rarr; octave toggle</text>
+
+                <!-- CV Routing -->
+                <rect x="670" y="524" width="180" height="28" rx="6" fill="#e8effc" stroke="#1d4ed8" stroke-width="1.2"/>
+                <text x="760" y="542" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent-blue)">CV route &rarr; mod any param</text>
+
+                <!-- ============================================================ -->
+                <!-- FEEDBACK LOOPS -->
+                <!-- ============================================================ -->
+                <!-- Major loop: evolution back to buffer -->
+                <path class="sch-arrow-r" d="M300,520 L300,404 L360,404" stroke-dasharray="6 3" fill="none" stroke-width="2"/>
+                <path class="sch-arrow-r" d="M600,520 L600,404 L540,404" stroke-dasharray="6 3" fill="none" stroke-width="2"/>
+                <text x="370" y="470" class="sch-text-small" fill="var(--accent-red)" font-size="9">Mutate/Patience modify buffer &rarr; next permutation different</text>
+
+                <!-- Source mode loop: when Live -->
+                <path d="M430,530 L430,555 L80,555 L80,100 L160,100" class="sch-arrow" fill="none" stroke-dasharray="3 2" stroke-width="1.5" stroke="#1d4ed8"/>
+                <text x="160" y="572" class="sch-text-small" fill="var(--accent-blue)" font-size="9">Live mode: bypasses buffer entirely, every step fresh</text>
+
+                <!-- Loop path -->
+                <path d="M720,528 L720,570 L880,570 L880,80 L700,80 L700,100" class="sch-arrow" fill="none" stroke-dasharray="3 2" stroke-width="1.5" stroke="#b45309"/>
+                <text x="790" y="586" class="sch-text-small" fill="var(--accent-warm)" font-size="9">Loop mode: cycles through buffer, mutation changes it gradually</text>
+
+                <!-- ============================================================ -->
+                <!-- LEGEND -->
+                <!-- ============================================================ -->
+                <g transform="translate(30, 610)">
+                    <rect x="0" y="0" width="840" height="52" rx="6" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1"/>
+                    <text x="420" y="18" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--text-muted)">Every step: random dice rolls against each probability parameter. Parameters compete &mdash; Rest can silence a step that passed Density, Burst can override gate length, etc.</text>
+
+                    <!-- dice icons -->
+                    <text x="60" y="36" font-family="JetBrains Mono" font-size="16">&#x2680; &#x2681; &#x2682; &#x2683; &#x2684; &#x2685;</text>
+                    <text x="140" y="40" class="sch-text-small" fill="var(--text-muted)">Each % parameter rolls independent dice every step</text>
+                    <text x="560" y="40" class="sch-text-small" fill="var(--text-muted)">Loop count = permutations before evolution triggers change</text>
+                </g>
             </svg>
-            <div class="fig-caption">Figure 1: Dual-domain architecture of the Stochastic track</div>
+            <div class="fig-caption">Figure 1: Full generative pipeline &mdash; every parameter rolls dice per step, competing to shape the output. Loop permutations accumulate until evolution (mutate/patience) alters the buffer.</div>
         </div>
 
         <p>
@@ -459,38 +627,164 @@
         <h3>3.3 &middot; Complexity, Contour &amp; Linearity</h3>
 
         <div class="fig">
-            <svg viewBox="0 0 680 180" xmlns="http://www.w3.org/2000/svg">
-                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Melody Modifiers</text>
+            <svg viewBox="0 0 710 470" xmlns="http://www.w3.org/2000/svg">
+                <text x="355" y="22" text-anchor="middle" font-family="Inter" font-size="14" font-weight="700" fill="#1a1a18">Pitch Modifiers &mdash; Visual Behavior</text>
 
-                <!-- Complexity -->
-                <rect class="sch-block" x="20" y="50" width="200" height="110" />
-                <text x="120" y="72" text-anchor="middle" class="sch-text">Complexity (0&ndash;100)</text>
-                <text x="120" y="92" text-anchor="middle" class="sch-text-label">Below 50: penalizes large</text>
-                <text x="120" y="106" text-anchor="middle" class="sch-text-label">interval jumps</text>
-                <rect x="40" y="118" width="160" height="16" rx="8" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1" />
-                <rect x="40" y="118" width="80" height="16" rx="8" fill="var(--accent)" opacity="0.6" />
-                <text x="120" y="130" text-anchor="middle" class="sch-text-small">Cplx: 40</text>
+                <!-- ============================================================ -->
+                <!-- COMPLEXITY -->
+                <!-- ============================================================ -->
+                <rect class="sch-block" x="12" y="46" width="686" height="126" />
+                <text x="48" y="68" class="sch-text-accent" font-size="13">Complexity (active when &lt; 50)</text>
+                <text x="220" y="68" class="sch-text-label" font-size="11">Reduces probability of notes far from the last played note</text>
 
-                <!-- Contour -->
-                <rect class="sch-block" x="240" y="50" width="200" height="110" />
-                <text x="340" y="72" text-anchor="middle" class="sch-text">Contour (-100&ndash;+100)</text>
-                <text x="340" y="92" text-anchor="middle" class="sch-text-label">Negative = low bias</text>
-                <text x="340" y="106" text-anchor="middle" class="sch-text-label">Positive = high bias</text>
-                <rect x="260" y="118" width="160" height="16" rx="8" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1" />
-                <rect x="260" y="118" width="80" height="16" rx="8" fill="var(--accent-warm)" opacity="0.6" />
-                <line x1="340" y1="118" x2="340" y2="134" stroke="var(--accent-warm)" stroke-width="2" />
-                <text x="380" y="130" text-anchor="middle" class="sch-text-small">Cntr: -30</text>
+                <!-- Before - after bars -->
+                <text x="30" y="94" class="sch-text-label" font-size="11" fill="var(--text-muted)">Before:</text>
+                <g transform="translate(30, 100)">
+                    <rect x="0" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="24" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="48" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="72" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="96" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.8"/>
+                    <rect x="120" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="144" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="168" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="192" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <text x="0" y="54" class="sch-text-small">deg 0</text>
+                    <text x="24" y="54" class="sch-text-small">1</text>
+                    <text x="48" y="54" class="sch-text-small">2</text>
+                    <text x="96" y="54" class="sch-text-small">4</text>
+                    <text x="168" y="54" class="sch-text-small">8</text>
+                    <text x="192" y="54" class="sch-text-small">9</text>
+                </g>
+                <!-- Arrow -->
+                <path d="M260,120 L300,120" stroke="var(--accent-red)" stroke-width="2" marker-end="url(#arrowhead-red)" fill="none"/>
+                <!-- Last note label -->
+                <text x="280" y="96" text-anchor="middle" class="sch-text-label" fill="var(--accent-red)">last=4</text>
 
-                <!-- Linearity -->
-                <rect class="sch-block" x="460" y="50" width="200" height="110" />
-                <text x="560" y="72" text-anchor="middle" class="sch-text">Linearity (0&ndash;100)</text>
-                <text x="560" y="92" text-anchor="middle" class="sch-text-label">Penalizes repeated notes</text>
-                <text x="560" y="106" text-anchor="middle" class="sch-text-label">Higher = more linear</text>
-                <rect x="480" y="118" width="160" height="16" rx="8" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1" />
-                <rect x="480" y="118" width="48" height="16" rx="8" fill="var(--accent-blue)" opacity="0.6" />
-                <text x="560" y="130" text-anchor="middle" class="sch-text-small">Lin: 30</text>
+                <!-- After -->
+                <text x="315" y="94" class="sch-text-label" font-size="11" fill="var(--text-muted)">After (cplx=20, threshold=1+2=3):</text>
+                <g transform="translate(315, 100)">
+                    <!-- Far degrees slashed -->
+                    <rect x="0" y="0" width="20" height="10" rx="3" fill="var(--accent-red)" opacity="0.5"/>
+                    <rect x="24" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="48" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="72" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="96" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.8"/>
+                    <rect x="120" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="144" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="168" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
+                    <rect x="192" y="0" width="20" height="10" rx="3" fill="var(--accent-red)" opacity="0.5"/>
+                    <!-- x marks over slashed -->
+                    <text x="6" y="22" font-family="JetBrains Mono" font-size="14" fill="var(--accent-red)" font-weight="700">x</text>
+                    <text x="198" y="22" font-family="JetBrains Mono" font-size="14" fill="var(--accent-red)" font-weight="700">x</text>
+                </g>
+                <text x="600" y="130" class="sch-text-small" fill="var(--text-muted)">Degrees beyond threshold are unlikely</text>
+
+                <!-- Complexity slider indicator -->
+                <g transform="translate(30, 156)">
+                    <rect x="0" y="0" width="200" height="8" rx="4" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1"/>
+                    <rect x="0" y="0" width="40" height="8" rx="4" fill="var(--accent)" opacity="0.7"/>
+                    <text x="8" y="20" class="sch-text-small" fill="var(--accent)">Low</text>
+                    <text x="80" y="20" class="sch-text-small" fill="var(--text-muted)">tight melodic focus</text>
+                    <text x="178" y="20" class="sch-text-small">50+</text>
+                </g>
+                <text x="30" y="24" class="sch-text-small">0</text>
+                <text x="170" y="24" class="sch-text-small">50</text>
+
+                <!-- ============================================================ -->
+                <!-- CONTOUR -->
+                <!-- ============================================================ -->
+                <rect class="sch-block" x="12" y="190" width="686" height="126" />
+                <text x="48" y="212" class="sch-text-accent" font-size="13">Contour</text>
+                <text x="130" y="212" class="sch-text-label" font-size="11">Slopes the probability ramp: negative = low notes favored, positive = high notes favored</text>
+
+                <!-- Negative contour -->
+                <g transform="translate(30, 226)">
+                    <text x="0" y="0" class="sch-text-label">Contour = -80 (strong low bias):</text>
+                    <rect x="0" y="10" width="200" height="24" rx="4" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1"/>
+                    <rect x="0" y="10" width="200" height="24" rx="4" fill="var(--accent-warm)" opacity="0.5"/>
+                    <text x="10" y="26" class="sch-text-small" fill="var(--accent-warm)">high weight</text>
+                    <text x="150" y="26" class="sch-text-small" fill="var(--accent-warm)">low weight</text>
+                    <!-- triangle arrow -->
+                    <polygon points="100,42 85,50 115,50" fill="var(--accent-warm)" opacity="0.6"/>
+                    <text x="100" y="64" text-anchor="middle" class="sch-text-small" fill="var(--accent-warm)">bias downward</text>
+                </g>
+
+                <!-- Positive contour -->
+                <g transform="translate(370, 226)">
+                    <text x="0" y="0" class="sch-text-label">Contour = +60 (moderate high bias):</text>
+                    <rect x="0" y="10" width="200" height="24" rx="4" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1"/>
+                    <rect x="110" y="10" width="90" height="24" rx="4" fill="var(--accent)" opacity="0.5"/>
+                    <text x="10" y="26" class="sch-text-small" fill="var(--text-muted)">low weight</text>
+                    <text x="150" y="26" class="sch-text-small" fill="var(--accent)">high weight</text>
+                    <polygon points="100,42 85,50 115,50" fill="var(--accent)" opacity="0.6"/>
+                    <text x="100" y="64" text-anchor="middle" class="sch-text-small" fill="var(--accent)">bias upward</text>
+                </g>
+
+                <text x="355" y="306" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">The ramp is linear: each degree position is multiplied by (1 + pos &times; contour / 100)</text>
+
+                <!-- ============================================================ -->
+                <!-- LINEARITY -->
+                <!-- ============================================================ -->
+                <rect class="sch-block" x="12" y="334" width="686" height="126" />
+                <text x="48" y="356" class="sch-text-accent" font-size="13">Linearity</text>
+                <text x="128" y="356" class="sch-text-label" font-size="11">Penalty cone radiating from the last note &mdash; farther notes lose more weight</text>
+
+                <!-- Visual cone diagram -->
+                <g transform="translate(30, 368)">
+                    <!-- Degree positions -->
+                    <line x1="0" y1="40" x2="620" y2="40" stroke="var(--border)" stroke-width="1.5"/>
+
+                    <!-- Tick marks for degrees 0-8 -->
+                    <text x="0" y="30" class="sch-text-small">0</text>
+                    <text x="35" y="30" class="sch-text-small">1</text>
+                    <text x="70" y="30" class="sch-text-small">2</text>
+                    <text x="105" y="30" class="sch-text-small">3</text>
+                    <text x="150" y="30" class="sch-text-small" fill="var(--accent)" font-weight="700">4</text>
+                    <text x="185" y="30" class="sch-text-small">5</text>
+                    <text x="220" y="30" class="sch-text-small">6</text>
+                    <text x="255" y="30" class="sch-text-small">7</text>
+                    <text x="290" y="30" class="sch-text-small">8</text>
+
+                    <line x1="0" y1="36" x2="0" y2="44" stroke="var(--border)" stroke-width="1"/>
+                    <line x1="35" y1="36" x2="35" y2="44" stroke="var(--border)" stroke-width="1"/>
+                    <line x1="70" y1="36" x2="70" y2="44" stroke="var(--border)" stroke-width="1"/>
+                    <line x1="105" y1="36" x2="105" y2="44" stroke="var(--border)" stroke-width="1"/>
+                    <line x1="150" y1="30" x2="150" y2="44" stroke="var(--accent)" stroke-width="2"/>
+                    <line x1="185" y1="36" x2="185" y2="44" stroke="var(--border)" stroke-width="1"/>
+                    <line x1="220" y1="36" x2="220" y2="44" stroke="var(--border)" stroke-width="1"/>
+                    <line x1="255" y1="36" x2="255" y2="44" stroke="var(--border)" stroke-width="1"/>
+                    <line x1="290" y1="36" x2="290" y2="44" stroke="var(--border)" stroke-width="1"/>
+
+                    <!-- Last degree highlight -->
+                    <text x="150" y="54" text-anchor="middle" class="sch-text-small" fill="var(--accent)">last degree</text>
+                    <line x1="150" y1="50" x2="150" y2="56" stroke="var(--accent)" stroke-width="2"/>
+
+                    <!-- Penalty cone: triangle radiating from center -->
+                    <polygon points="150,0 0,85 290,85" fill="var(--accent-red)" opacity="0.08"/>
+                    <line x1="150" y1="10" x2="0" y2="80" stroke="var(--accent-red)" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.5"/>
+                    <line x1="150" y1="10" x2="290" y2="80" stroke="var(--accent-red)" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.5"/>
+
+                    <!-- Weight bars showing decay -->
+                    <rect x="4" y="65" width="20" height="15" rx="3" fill="var(--accent-red)" opacity="0.3"/>
+                    <rect x="39" y="55" width="20" height="25" rx="3" fill="var(--accent-red)" opacity="0.35"/>
+                    <rect x="74" y="45" width="20" height="35" rx="3" fill="var(--accent-red)" opacity="0.4"/>
+                    <rect x="109" y="35" width="20" height="45" rx="3" fill="var(--accent-red)" opacity="0.45"/>
+                    <rect x="144" y="62" width="20" height="5" rx="3" fill="var(--accent)" opacity="0.8"/>
+                    <rect x="179" y="35" width="20" height="45" rx="3" fill="var(--accent-red)" opacity="0.45"/>
+                    <rect x="214" y="45" width="20" height="35" rx="3" fill="var(--accent-red)" opacity="0.4"/>
+                    <rect x="249" y="55" width="20" height="25" rx="3" fill="var(--accent-red)" opacity="0.35"/>
+                    <rect x="284" y="65" width="20" height="15" rx="3" fill="var(--accent-red)" opacity="0.3"/>
+
+                    <text x="0" y="96" class="sch-text-small" fill="var(--accent-red)">&larr; penalty increases with distance &rarr;</text>
+                </g>
+
+                <!-- Order note -->
+                <text x="355" y="456" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">
+                    Application order: Complexity &rarr; Contour &rarr; Linearity. Final weighted random roll picks the degree.
+                </text>
             </svg>
-            <div class="fig-caption">Figure 5: Three pitch-shaping modifiers and their ranges</div>
+            <div class="fig-caption">Figure 5: Visual behavior of the three pitch modifiers &mdash; how they reshape weight distributions</div>
         </div>
 
         <h3>3.4 &middot; Mutation &amp; Patience (Evolution System)</h3>
@@ -1137,6 +1431,669 @@
         <p style="text-align:center; margin-top:40px; color:var(--text-muted); font-size:12px;">
             Stochastic Track Manual &middot; Performer Phazer
         </p>
+
+        <!-- ================================================================ -->
+        <!-- INTERACTIVE SCHEME -->
+        <!-- ================================================================ -->
+        <h2 id="interactive" style="margin-top:80px;">Interactive Simulator</h2>
+        <p style="margin-bottom:20px;">
+            Tweak parameters on the left (generator) and right (looper), press play, and watch
+            the engine math unfold in real time. Each step is computed with the same algorithms
+            as the firmware &mdash; tickets, complexity, contour, linearity, density tilt, mutation, boredom.
+        </p>
+
+        <div id="sim-root" style="background:#fff; border:2px solid #d4d3d0; border-radius:12px; padding:20px; font-family:Inter,system-ui,sans-serif; font-size:13px; color:#1a1a18; box-shadow:0 4px 16px rgba(0,0,0,0.12); margin-bottom:32px;">
+
+            <!-- Toolbar -->
+            <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #e8e7e4;">
+                <button id="sim-play-btn" style="padding:8px 28px; border-radius:8px; border:none; font-family:Inter,sans-serif; font-size:15px; font-weight:600; cursor:pointer; background:#0a7c42; color:#fff; transition:background 0.15s;">Play</button>
+                <span style="color:#555450; font-size:13px;">Loop:</span>
+                <span id="sim-loop-count" style="font-weight:700; font-size:16px; color:#0a7c42; min-width:40px;">0</span>
+                <span style="color:#555450; font-size:13px;">Step:</span>
+                <span id="sim-step-count" style="font-weight:700; font-size:16px; color:#1d4ed8; min-width:40px;">0</span>
+                <span style="color:#555450; font-size:13px;">Speed:</span>
+                <input type="range" id="sim-speed" min="50" max="800" value="300" style="width:100px; accent-color:#0a7c42;">
+                <span id="sim-speed-label" style="color:#555450; font-size:12px; min-width:50px;">300ms</span>
+                <span style="color:#555450; font-size:13px; margin-left:auto;">Seed:</span>
+                <input type="number" id="sim-seed" value="42" style="width:60px; padding:4px 8px; border-radius:6px; border:1px solid #d4d3d0; font-family:JetBrains Mono,monospace; font-size:12px;">
+                <button id="sim-reset-btn" style="padding:6px 16px; border-radius:6px; border:1px solid #d4d3d0; font-family:Inter,sans-serif; font-size:12px; cursor:pointer; background:#f0efed; color:#555450;">Reset</button>
+            </div>
+
+            <!-- Main grid -->
+            <div style="display:grid; grid-template-columns:240px 1fr 1fr 240px; gap:16px;">
+
+                <!-- ==================== LEFT CONTROLS: GENERATOR ==================== -->
+                <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px; font-size:12px;">
+                    <div style="font-weight:600; color:#0a7c42; margin-bottom:8px; font-size:13px;">Generator Parameters</div>
+
+                    <div style="margin-bottom:8px;">
+                        <div style="font-size:10px; color:#8b8a86; margin-bottom:2px;">Degree Tickets</div>
+                        <div style="display:flex; gap:2px;" id="sim-ticket-controls">
+                            <script>
+                                (function(){
+                                    const root = document.getElementById('sim-root');
+                                    if (!root) return;
+                                    const tc = document.getElementById('sim-ticket-controls');
+                                    if (!tc) return;
+                                    const colors = ['#0a7c42','#1d4ed8','#b45309','#7c3aed','#b91c1c','#c0266d','#0d7a7a'];
+                                    for (let i=0; i<7; i++) {
+                                        const wrapper = document.createElement('div');
+                                        wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
+                                        const label = document.createElement('span');
+                                        label.textContent = i+1;
+                                        label.style.cssText = 'font-size:9px;color:#8b8a86;';
+                                        const inp = document.createElement('input');
+                                        inp.type = 'number';
+                                        inp.id = 'sim-ticket-'+i;
+                                        inp.value = [100,10,70,10,100,20,-1][i];
+                                        inp.min = -1; inp.max = 100;
+                                        inp.style.cssText = 'width:28px;padding:1px 2px;border-radius:4px;border:1px solid #d4d3d0;font-size:10px;text-align:center;font-family:JetBrains Mono,monospace;';
+                                        if (inp.value == -1) inp.style.color = '#b91c1c';
+                                        inp.addEventListener('input', function(){ this.style.color = parseInt(this.value) < 0 ? '#b91c1c' : '#1a1a18'; });
+                                        wrapper.appendChild(label);
+                                        wrapper.appendChild(inp);
+                                        tc.appendChild(wrapper);
+                                    }
+                                })();
+                            </script>
+                        </div>
+                    </div>
+
+                    <div class="sim-slider"><label class="sim-lbl">Complexity</label><input type="range" id="sim-cplx" min="0" max="100" value="40"/><span class="sim-val" id="sim-cplx-v">40</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Contour</label><input type="range" id="sim-cntr" min="-100" max="100" value="0"/><span class="sim-val" id="sim-cntr-v">0</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Linearity</label><input type="range" id="sim-lin" min="0" max="100" value="0"/><span class="sim-val" id="sim-lin-v">0</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Marbles</label>
+                        <select id="sim-marbles" style="flex:1;padding:2px 4px;border-radius:4px;border:1px solid #d4d3d0;font-size:11px;">
+                            <option value="off">Off</option><option value="on">On</option>
+                        </select>
+                    </div>
+                    <div class="sim-slider"><label class="sim-lbl">Spread</label><input type="range" id="sim-spread" min="0" max="100" value="50"/><span class="sim-val" id="sim-spread-v">50</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Bias</label><input type="range" id="sim-mbias" min="0" max="100" value="50"/><span class="sim-val" id="sim-mbias-v">50</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Rate</label><input type="range" id="sim-rate" min="1" max="400" value="50"/><span class="sim-val" id="sim-rate-v">50</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Variation</label><input type="range" id="sim-var" min="-100" max="100" value="0"/><span class="sim-val" id="sim-var-v">0</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Rest %</label><input type="range" id="sim-rest" min="0" max="100" value="10"/><span class="sim-val" id="sim-rest-v">10</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Slide %</label><input type="range" id="sim-slide" min="0" max="100" value="0"/><span class="sim-val" id="sim-slide-v">0</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Legato %</label><input type="range" id="sim-leg" min="0" max="100" value="0"/><span class="sim-val" id="sim-leg-v">0</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Accent %</label><input type="range" id="sim-acc" min="0" max="100" value="0"/><span class="sim-val" id="sim-acc-v">0</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Burst %</label><input type="range" id="sim-burst" min="0" max="100" value="0"/><span class="sim-val" id="sim-burst-v">0</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Burst Cnt</label><input type="range" id="sim-bcnt" min="0" max="100" value="0"/><span class="sim-val" id="sim-bcnt-v">0</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Burst Rate</label><input type="range" id="sim-brate" min="0" max="100" value="50"/><span class="sim-val" id="sim-brate-v">50</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Burst Pitch</label>
+                        <select id="sim-bpitch" style="flex:1;padding:2px 4px;border-radius:4px;border:1px solid #d4d3d0;font-size:11px;">
+                            <option value="parent">Parent</option><option value="gen">Gen</option>
+                        </select>
+                    </div>
+                    <div style="margin-top:8px; padding-top:6px; border-top:1px solid #e8e7e4;">
+                        <div class="sim-slider"><label class="sim-lbl">Density</label><input type="range" id="sim-dens" min="0" max="100" value="80"/><span class="sim-val" id="sim-dens-v">80</span></div>
+                        <div class="sim-slider"><label class="sim-lbl">Tilt</label><input type="range" id="sim-tilt" min="-100" max="100" value="0"/><span class="sim-val" id="sim-tilt-v">0</span></div>
+                    </div>
+                </div>
+
+                <!-- ==================== LEFT WINDOW: LIVE GENERATION ==================== -->
+                <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px;">
+                    <div style="font-weight:600; color:#0a7c42; margin-bottom:8px; font-size:13px;">Live Generation (8 steps)</div>
+                    <div id="sim-live-steps" style="display:flex; gap:4px; height:200px; align-items:flex-end;"></div>
+                    <div id="sim-live-labels" style="display:flex; gap:4px; margin-top:4px;"></div>
+                    <div id="sim-live-gate" style="display:flex; gap:4px; margin-top:2px; height:8px;"></div>
+                </div>
+
+                <!-- ==================== RIGHT WINDOW: LOOPED ==================== -->
+                <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px;">
+                    <div style="font-weight:600; color:#1d4ed8; margin-bottom:8px; font-size:13px;">Loop Buffer (8 steps)</div>
+                    <div id="sim-loop-steps" style="display:flex; gap:4px; height:200px; align-items:flex-end;"></div>
+                    <div id="sim-loop-labels" style="display:flex; gap:4px; margin-top:4px;"></div>
+                    <div id="sim-loop-gate" style="display:flex; gap:4px; margin-top:2px; height:8px;"></div>
+                </div>
+
+                <!-- ==================== RIGHT CONTROLS: LOOPER ==================== -->
+                <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px; font-size:12px;">
+                    <div style="font-weight:600; color:#1d4ed8; margin-bottom:8px; font-size:13px;">Looper / Evolution</div>
+
+                    <div class="sim-slider"><label class="sim-lbl">Mutate %</label><input type="range" id="sim-mut" min="0" max="100" value="8"/><span class="sim-val" id="sim-mut-v">8</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Patience</label><input type="range" id="sim-pat" min="0" max="100" value="60"/><span class="sim-val" id="sim-pat-v">60</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Jump %</label><input type="range" id="sim-jump" min="0" max="100" value="5"/><span class="sim-val" id="sim-jump-v">5</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Sleep %</label><input type="range" id="sim-sleep" min="0" max="100" value="0"/><span class="sim-val" id="sim-sleep-v">0</span></div>
+                    <div class="sim-slider"><label class="sim-lbl">Rotate</label><input type="range" id="sim-rot" min="-8" max="8" value="0"/><span class="sim-val" id="sim-rot-v">0</span></div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                        <span style="min-width:80px;font-size:11px;color:#555450;">Lock</span>
+                        <label style="display:flex;align-items:center;gap:4px;font-size:11px;"><input type="checkbox" id="sim-lock"/> Freeze buffer</label>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                        <span style="min-width:80px;font-size:11px;color:#555450;">First / Last</span>
+                        <input type="number" id="sim-first" value="0" min="0" max="7" style="width:36px;padding:1px 4px;border-radius:4px;border:1px solid #d4d3d0;font-size:11px;text-align:center;">
+                        <span style="font-size:11px;color:#8b8a86;">to</span>
+                        <input type="number" id="sim-last" value="7" min="0" max="7" style="width:36px;padding:1px 4px;border-radius:4px;border:1px solid #d4d3d0;font-size:11px;text-align:center;">
+                    </div>
+
+                    <div style="margin-top:10px; padding-top:8px; border-top:1px solid #e8e7e4; font-size:11px; color:#8b8a86;">
+                        <div>Boredom: <span id="sim-boredom-bar" style="display:inline-block; width:60px; height:10px; background:#e8e7e4; border-radius:5px; vertical-align:middle; overflow:hidden;"><span id="sim-boredom-fill" style="display:block; height:100%; width:0%; background:#b45309; border-radius:5px; transition:width 0.1s;"></span></span></div>
+                        <div style="margin-top:4px;">Jump oct: <span id="sim-jump-oct" style="font-weight:600; color:#b91c1c;">0</span></div>
+                        <div style="margin-top:4px;">State: <span id="sim-state" style="font-weight:600; color:#0a7c42;">waiting</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <style>
+            .sim-slider { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+            .sim-slider label.sim-lbl { min-width:80px; font-size:11px; color:#555450; }
+            .sim-slider input[type=range] { flex:1; height:4px; accent-color:#0a7c42; }
+            .sim-slider .sim-val { min-width:28px; font-size:10px; color:#8b8a86; text-align:right; font-family:JetBrains Mono,monospace; }
+            .sim-step-bar { border-radius:4px 4px 0 0; transition:height 0.08s, background 0.08s; position:relative; cursor:pointer; min-height:2px; }
+            .sim-step-bar:hover { opacity:0.8; }
+            .sim-step-bar.active { box-shadow:0 0 0 2px #f59e0b; }
+            .sim-step-bar.rest { opacity:0.3; }
+            .sim-gate-dot { border-radius:2px; transition:background 0.08s; }
+            .sim-step-label { font-size:9px; text-align:center; color:#8b8a86; flex:1; font-family:JetBrains Mono,monospace; }
+        </style>
+
+        <script>
+        (function(){
+            const root = document.getElementById('sim-root');
+            if (!root) return;
+
+            // === ENGINE STATE ===
+            let state = { running: false, timer: null };
+            let livePattern = [];     // rolling buffer, last 8 generated steps
+            let loopPattern = [];     // 8 steps, buffer
+            let loopCounter = 0;
+            let stepIndex = 0;
+            let boredom = 0;
+            let jreg = 0;            // jump register
+            let lastCplxDegree = -1;  // last degree for live complexity calc
+            let lastLoopDegree = -1;
+            let rngState = 42;
+            let sleepRemaining = 0;
+
+            // === SEEDED RNG (Park-Miller) ===
+            function rng() {
+                rngState = (rngState * 16807) % 2147483647;
+                return (rngState - 1) / 2147483646;
+            }
+            function rngRange(max) { return Math.floor(rng() * (max + 1)); }
+            function rngInt(min, max) { return min + Math.floor(rng() * (max - min + 1)); }
+            function setSeed(s) { rngState = s >>> 0; if (rngState === 0) rngState = 1; }
+
+            // === READ PARAMS ===
+            function getParams() {
+                const g = (id) => parseInt(document.getElementById(id).value) || 0;
+                const f = (id) => parseFloat(document.getElementById(id).value) || 0;
+                const s = (id) => document.getElementById(id).value;
+                const ck = (id) => document.getElementById(id).checked;
+
+                const tickets = [];
+                for (let i=0; i<7; i++) tickets.push(g('sim-ticket-'+i));
+
+                return {
+                    tickets, cplx: g('sim-cplx'), cntr: g('sim-cntr'), lin: g('sim-lin'),
+                    marbles: s('sim-marbles'), spread: g('sim-spread'), mbias: g('sim-mbias'),
+                    rate: g('sim-rate'), vari: g('sim-var'),
+                    rest: g('sim-rest'), slide: g('sim-slide'), leg: g('sim-leg'), acc: g('sim-acc'),
+                    burst: g('sim-burst'), bcnt: g('sim-bcnt'), brate: g('sim-brate'), bpitch: s('sim-bpitch'),
+                    dens: g('sim-dens'), tilt: g('sim-tilt'),
+                    mut: g('sim-mut'), pat: g('sim-pat'), jump: g('sim-jump'), sleep: g('sim-sleep'),
+                    rot: g('sim-rot'), lock: ck('sim-lock'),
+                    first: g('sim-first'), last: g('sim-last')
+                };
+            }
+
+            function updateLabels() {
+                const ids = ['sim-cplx','sim-cntr','sim-lin','sim-spread','sim-mbias','sim-rate','sim-var',
+                            'sim-rest','sim-slide','sim-leg','sim-acc','sim-burst','sim-bcnt','sim-brate',
+                            'sim-dens','sim-tilt','sim-mut','sim-pat','sim-jump','sim-sleep','sim-rot'];
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    const v = document.getElementById(id+'-v');
+                    if (el && v) v.textContent = el.value;
+                });
+            }
+            document.querySelectorAll('.sim-slider input[type=range]').forEach(el => {
+                el.addEventListener('input', function(){ const v = document.getElementById(this.id+'-v'); if(v) v.textContent=this.value; });
+            });
+
+            // === DURATION MAPPING (exact code match) ===
+            function getDurationIndex(rate) {
+                const r = Math.max(1, Math.min(400, rate));
+                return Math.floor((r - 1) * 8 / 400);
+            }
+
+            // === BETA DISTRIBUTION (exact code match) ===
+            function betaSample(x, spread) {
+                const ns = Math.max(0, Math.min(1, spread));
+                if (ns === 0.5) return x;
+                if (ns < 0.5) {
+                    const p = 1 + (0.5 - ns) * 4;
+                    if (x < 0.5) return 0.5 * Math.pow(2 * x, p);
+                    else return 1 - 0.5 * Math.pow(2 * (1 - x), p);
+                } else {
+                    const p = 1 + (ns - 0.5) * 4;
+                    if (x < 0.5) return 0.5 * (1 - Math.pow(1 - 2 * x, p));
+                    else return 0.5 + 0.5 * Math.pow(2 * x - 1, p);
+                }
+            }
+
+            // === DURATION (exact code) ===
+            function getDurationMultiplier(index) {
+                const mults = [192*4, 192*2, 192, 96, 48, 24, 12, 6];
+                return mults[Math.min(index, 7)];
+            }
+
+            function computeDuration(params) {
+                const index = getDurationIndex(params.rate);
+                let mult = getDurationMultiplier(index);
+                if (params.vari !== 0) {
+                    if (rngRange(99) < Math.abs(params.vari)) {
+                        if (params.vari > 0) {
+                            mult *= 2;
+                        } else {
+                            mult = Math.max(6, Math.floor(mult / 2));
+                        }
+                    }
+                }
+                return mult;
+            }
+
+            // === GENERATE ONE STEP ===
+            function generateStep(params, lastDeg) {
+                const tix = params.tickets;
+                const activeDegs = [];
+                const weights = [];
+                for (let i=0; i<7; i++) {
+                    if (tix[i] >= 0) { activeDegs.push(i); weights.push(tix[i]); }
+                }
+                if (activeDegs.length === 0) {
+                    return { degree: 0, gate: true, rest: false, accent: false, slide: false, burst: false, childCount: 0, duration: 192 };
+                }
+
+                const duration = computeDuration(params);
+
+                // Normalize active degrees to 0..n-1
+                const n = activeDegs.length;
+                let w = weights.slice();
+
+                // If marbles ON
+                if (params.marbles === 'on') {
+                    const x = rng();
+                    const sx = betaSample(x, params.spread / 100);
+                    const bias = params.mbias / 100;
+                    const idx = Math.max(0, Math.min(n-1, Math.floor((sx - 0.5) * n + bias * n)));
+                    const deg = activeDegs[idx];
+                    // Still roll expression
+                    const isRest = rngRange(99) < params.rest;
+                    const isAccent = rngRange(99) < params.acc;
+                    const isSlide = rngRange(99) < params.slide;
+                    const isLegato = rngRange(99) < params.leg;
+                    const burstRoll = rngRange(99) < params.burst;
+                    const childCount = burstRoll ? 1 + Math.floor(params.bcnt * 3 / 100) : 0;
+                    return { degree: deg, gate: !isRest, rest: isRest, accent: isAccent, slide: isSlide, legato: isLegato, burst: burstRoll, childCount, duration: duration };
+                }
+
+                // Apply COMPLEXITY (exact: if cplx < 50 and lastDeg exists)
+                if (params.cplx < 50 && lastDeg >= 0) {
+                    const threshold = 1 + Math.floor(params.cplx / 10);
+                    let total = 0;
+                    for (let i=0; i<n; i++) {
+                        const dist = Math.abs(activeDegs[i] - lastDeg);
+                        if (dist > threshold) w[i] = Math.floor(w[i] / 4);
+                        total += w[i];
+                    }
+                }
+
+                // Apply CONTOUR (exact code)
+                if (params.cntr !== 0 && n > 1) {
+                    let total = 0;
+                    for (let i=0; i<n; i++) {
+                        const pos = (2.0 * i / (n - 1)) - 1.0;
+                        const bias = 1.0 + (pos * params.cntr / 100.0);
+                        w[i] = Math.max(0, Math.round(w[i] * bias));
+                        total += w[i];
+                    }
+                }
+
+                // Apply LINEARITY (exact)
+                if (params.lin > 0 && lastDeg >= 0) {
+                    let total = 0;
+                    for (let i=0; i<n; i++) {
+                        const dist = Math.abs(activeDegs[i] - lastDeg);
+                        const penalty = Math.floor(dist * params.lin / 10);
+                        w[i] = Math.max(0, w[i] - penalty);
+                        total += w[i];
+                    }
+                }
+
+                // Weighted random selection
+                let totalW = 0;
+                for (let i=0; i<n; i++) totalW += w[i];
+                let deg;
+                if (totalW > 0) {
+                    const roll = rng() * totalW;
+                    let sum = 0;
+                    for (let i=0; i<n; i++) {
+                        sum += w[i];
+                        if (roll < sum) { deg = activeDegs[i]; break; }
+                    }
+                } else {
+                    deg = activeDegs[rngInt(0, n-1)];
+                }
+                if (deg === undefined) deg = activeDegs[0];
+
+                // Expression rolls
+                const isRest = rngRange(99) < params.rest;
+                const isAccent = rngRange(99) < params.acc;
+                const isSlide = rngRange(99) < params.slide;
+                const isLegato = rngRange(99) < params.leg;
+                const burstRoll = rngRange(99) < params.burst;
+                const childCount = burstRoll ? 1 + Math.floor(params.bcnt * 3 / 100) : 0;
+
+                return { degree: deg, gate: !isRest, rest: isRest, accent: isAccent, slide: isSlide, legato: isLegato, burst: burstRoll, childCount, duration: duration };
+            }
+
+            // === DENSITY RANKING WITH TILT (exact code logic) ===
+            function assignDensityRanks(size, tilt, seed) {
+                const saveState = rngState;
+                rngState = seed >>> 0; if (rngState === 0) rngState = 1;
+                const items = [];
+                for (let i=0; i<size; i++) {
+                    const progress = i / Math.max(1, size - 1);
+                    const bias = (tilt / 100) * (progress - 0.5);
+                    const weight = bias + (rngRange(1000) / 1000) * 0.2;
+                    items.push({ index: i, weight: weight });
+                }
+                items.sort((a,b) => a.weight - b.weight);
+                const ranks = new Array(size);
+                for (let i=0; i<size; i++) ranks[items[i].index] = i; // rank 0 = lowest density, rank N-1 = highest
+                rngState = saveState;
+                return ranks;
+            }
+
+            // === GENERATE PATTERN (8 steps) ===
+            function generatePattern(params) {
+                const p = [];
+                let lastDeg = -1;
+                for (let i=0; i<8; i++) {
+                    const step = generateStep(params, lastDeg);
+                    if (!step.rest) lastDeg = step.degree;
+                    p.push(step);
+                }
+                // Assign density ranks
+                const seed = Math.floor(rng() * 0xFFFFFFFF);
+                const ranks = assignDensityRanks(8, params.tilt, seed ^ 0xdeadbeef);
+                for (let i=0; i<8; i++) {
+                    // Density gate: compare rank vs threshold
+                    const densityThreshold = params.dens;
+                    const maxRank = 7;
+                    const passes = (ranks[i] / maxRank) * 100 < densityThreshold;
+                    if (!passes && !p[i].rest) {
+                        p[i].gate = false;
+                        p[i].rest = true;
+                    }
+                }
+                return p;
+            }
+
+            // === MUTATE ONE STEP ===
+            function mutateOneStep(pattern, params) {
+                const i = rngInt(0, 7);
+                const old = pattern[i];
+                // Keep the lastDegree context from adjacent steps
+                let ctx = -1;
+                if (i > 0 && !pattern[i-1].rest) ctx = pattern[i-1].degree;
+                const step = generateStep(params, ctx);
+                if (!step.rest && i > 0) ctx = step.degree;
+                pattern[i] = step;
+                return pattern;
+            }
+
+            // === RENDER STEPS ===
+            function renderSteps(containerId, labelsId, gatesId, pattern, activeStep, isLoop) {
+                const container = document.getElementById(containerId);
+                const labels = document.getElementById(labelsId);
+                const gates = document.getElementById(gatesId);
+                if (!container || !labels || !gates) return;
+
+                container.innerHTML = '';
+                labels.innerHTML = '';
+                gates.innerHTML = '';
+
+                const first = isLoop ? parseInt(document.getElementById('sim-first').value) || 0 : 0;
+                const last = isLoop ? parseInt(document.getElementById('sim-last').value) || 7 : 7;
+                const rotate = isLoop ? parseInt(document.getElementById('sim-rot').value) || 0 : 0;
+
+                for (let i=0; i<8; i++) {
+                    // Read index with rotation
+                    const windowSize = last - first + 1;
+                    let readIdx = i;
+                    if (isLoop && windowSize > 0) {
+                        let offset = (i - first + rotate) % windowSize;
+                        if (offset < 0) offset += windowSize;
+                        readIdx = first + offset;
+                    }
+
+                    const step = pattern[i] || { degree: 0, gate: false, rest: true, accent: false, slide: false, burst: false, childCount: 0, duration: 192 };
+                    const isActive = (i === activeStep);
+                    const inLoop = isLoop ? (i >= first && i <= last) : true;
+
+                    // Duration-driven width: longer notes get wider bars
+                    const dur = step.duration || 192;
+                    const minW = 12, maxW = 60;
+                    const barW = Math.round(minW + (dur / 768) * (maxW - minW));
+
+                    // Bar
+                    const bar = document.createElement('div');
+                    bar.className = 'sim-step-bar' + (isActive ? ' active' : '') + (step.rest ? ' rest' : '');
+                    const maxH = 180;
+                    const h = step.rest ? 4 : Math.max(4, Math.round((step.degree + 1) / 7 * maxH));
+                    bar.style.cssText = `flex:none;width:${barW}px;height:${h}px;background:${step.rest ? '#e8e7e4' : (step.accent ? '#b45309' : (step.burst ? '#7c3aed' : (isLoop ? '#1d4ed8' : '#0a7c42')))};opacity:${inLoop ? 1 : 0.25};border-radius:4px 4px 0 0;transition:width 0.08s,height 0.08s;`;
+                    if (!step.rest && step.burst) {
+                        bar.style.background = 'repeating-linear-gradient(135deg, #7c3aed 0px, #7c3aed 3px, #a855f7 3px, #a855f7 6px)';
+                    }
+                    bar.title = `deg ${step.degree} dur ${dur}${step.rest?' (rest)':''}${step.accent?' accent':''}${step.burst?' burst['+step.childCount+']':''}${step.slide?' slide':''}`;
+                    container.appendChild(bar);
+
+                    // Label
+                    const lbl = document.createElement('div');
+                    lbl.className = 'sim-step-label';
+                    lbl.style.cssText = `width:${barW}px;text-align:center;font-size:9px;color:${isActive ? '#f59e0b' : (step.rest ? '#bbb' : (isLoop ? '#1d4ed8' : '#0a7c42'))};font-weight:${isActive ? '700' : '400'};`;
+                    lbl.textContent = step.rest ? '-' : (step.degree + 1);
+                    labels.appendChild(lbl);
+
+                    // Gate dot
+                    const dot = document.createElement('div');
+                    dot.className = 'sim-gate-dot';
+                    dot.style.cssText = `width:${barW}px;height:8px;background:${step.gate ? (step.accent ? '#b45309' : '#0a7c42') : '#e8e7e4'};opacity:${inLoop ? 1 : 0.25};border-radius:2px;`;
+                    gates.appendChild(dot);
+                }
+            }
+
+            // === TICK FUNCTION ===
+            function tick() {
+                if (!state.running) return;
+                const params = getParams();
+
+                // Check sleep
+                if (sleepRemaining > 0) {
+                    sleepRemaining--;
+                    stepIndex = (stepIndex + 1) % 8;
+                    if (stepIndex === 0) loopCounter++;
+                    renderSteps('sim-live-steps','sim-live-labels','sim-live-gate', livePattern, stepIndex, false);
+                    renderSteps('sim-loop-steps','sim-loop-labels','sim-loop-gate', loopPattern, stepIndex, true);
+                    document.getElementById('sim-loop-count').textContent = loopCounter;
+                    document.getElementById('sim-step-count').textContent = stepIndex;
+                    state.timer = setTimeout(tick, parseInt(document.getElementById('sim-speed').value));
+                    return;
+                }
+
+                // Check lock
+                const locked = params.lock;
+
+                // LIVE: generate ONE step fresh every tick (independent)
+                const liveStep = generateStep(params, lastCplxDegree);
+                if (!liveStep.rest) lastCplxDegree = liveStep.degree;
+                // Apply density to live step (compute ranks for just this step?)
+                // In C++ live mode density is still applied via densityRank bypass - the density gate
+                // is checked per-step: densityRank(0) is used, so just check density% directly
+                const livePasses = rngRange(99) < params.dens;
+                if (!livePasses && !liveStep.rest) {
+                    liveStep.gate = false;
+                    liveStep.rest = true;
+                }
+                // Push into rolling buffer (last 8)
+                livePattern.push(liveStep);
+                if (livePattern.length > 8) livePattern.shift();
+                // Pad if less than 8
+                while (livePattern.length < 8) {
+                    livePattern.unshift({ degree: 0, gate: false, rest: true, accent: false, slide: false, burst: false, childCount: 0, duration: 192 });
+                }
+
+                // For loop: generate on first cycle or if bored
+                if (loopCounter === 0 && stepIndex === 0 && !locked) {
+                    const s = Math.floor(rng() * 0xFFFFFFFF);
+                    const save = rngState;
+                    rngState = s; if (rngState === 0) rngState = 1;
+                    loopPattern = generatePattern(params);
+                    rngState = save;
+                    lastLoopDegree = -1;
+                }
+
+                // Show state
+                document.getElementById('sim-state').textContent = locked ? 'locked' : (sleepRemaining > 0 ? 'sleeping' : 'running');
+
+                // Render
+                renderSteps('sim-live-steps','sim-live-labels','sim-live-gate', livePattern, stepIndex, false);
+                renderSteps('sim-loop-steps','sim-loop-labels','sim-loop-gate', loopPattern, stepIndex, true);
+                document.getElementById('sim-loop-count').textContent = loopCounter;
+                document.getElementById('sim-step-count').textContent = stepIndex;
+
+                // Advance step
+                stepIndex++;
+                if (stepIndex >= 8) {
+                    stepIndex = 0;
+                    loopCounter++;
+
+                    // CYCLE-END EVOLUTION
+                    if (!locked) {
+                        // Sleep
+                        if (params.sleep > 0) {
+                            sleepRemaining = Math.floor(params.sleep * 8 / 100);
+                        }
+
+                        // Jump
+                        if (params.jump > 0 && rngRange(99) < params.jump) {
+                            if (jreg === 0) jreg = rngRange(1) === 0 ? -1 : 1;
+                            else jreg = 0;
+                        }
+                        document.getElementById('sim-jump-oct').textContent = (jreg > 0 ? '+' : '') + jreg;
+
+                        // Patience / Boredom
+                        let threshold = params.pat * 2;
+                        if (params.pat === 0) threshold = 1;
+                        else if (threshold < 1) threshold = 1;
+
+                        boredom++;
+                        let resetBuffer = false;
+
+                        if (boredom >= threshold) {
+                            resetBuffer = true;
+                            boredom = 0;
+                        } else if (boredom > Math.floor(threshold * 3 / 4)) {
+                            // Restlessness: 25% chance of single mutation
+                            if (rngRange(99) < 25) {
+                                loopPattern = mutateOneStep(loopPattern, params);
+                            }
+                        }
+
+                        // Mutate (independent)
+                        if (params.mut > 0 && rngRange(99) < params.mut) {
+                            loopPattern = mutateOneStep(loopPattern, params);
+                        }
+
+                        if (resetBuffer) {
+                            const s = Math.floor(rng() * 0xFFFFFFFF);
+                            const save = rngState;
+                            rngState = s; if (rngState === 0) rngState = 1;
+                            loopPattern = generatePattern(params);
+                            rngState = save;
+                            document.getElementById('sim-state').textContent = 'regenerated';
+                        }
+                    }
+
+                    // Update boredom bar
+                    const bThreshold = Math.max(1, params.pat * 2);
+                    const pct = Math.min(100, Math.round((boredom / bThreshold) * 100));
+                    document.getElementById('sim-boredom-fill').style.width = pct + '%';
+                }
+
+                const speed = parseInt(document.getElementById('sim-speed').value);
+                state.timer = setTimeout(tick, speed);
+            }
+
+            // === PLAY / STOP ===
+            function togglePlay() {
+                const btn = document.getElementById('sim-play-btn');
+                if (state.running) {
+                    state.running = false;
+                    clearTimeout(state.timer);
+                    btn.textContent = 'Play';
+                    btn.style.background = '#0a7c42';
+                    document.getElementById('sim-state').textContent = 'paused';
+                } else {
+                    state.running = true;
+                    btn.textContent = 'Stop';
+                    btn.style.background = '#b91c1c';
+                    document.getElementById('sim-state').textContent = 'running';
+                    tick();
+                }
+            }
+
+            // === RESET ===
+            function resetSim() {
+                state.running = false;
+                clearTimeout(state.timer);
+                const btn = document.getElementById('sim-play-btn');
+                btn.textContent = 'Play';
+                btn.style.background = '#0a7c42';
+                loopCounter = 0;
+                stepIndex = 0;
+                boredom = 0;
+                jreg = 0;
+                sleepRemaining = 0;
+                lastCplxDegree = -1;
+                lastLoopDegree = -1;
+                document.getElementById('sim-loop-count').textContent = '0';
+                document.getElementById('sim-step-count').textContent = '0';
+                document.getElementById('sim-jump-oct').textContent = '0';
+                document.getElementById('sim-boredom-fill').style.width = '0%';
+                document.getElementById('sim-state').textContent = 'reset';
+
+                setSeed(parseInt(document.getElementById('sim-seed').value) || 42);
+                // Live starts empty -- each step generated fresh at tick time
+                livePattern = [];
+                // Loop generates initial buffer
+                const params = getParams();
+                const s = Math.floor(rng() * 0xFFFFFFFF);
+                const save = rngState;
+                rngState = s; if (rngState === 0) rngState = 1;
+                loopPattern = generatePattern(params);
+                rngState = save;
+
+                renderSteps('sim-live-steps','sim-live-labels','sim-live-gate', livePattern, -1, false);
+                renderSteps('sim-loop-steps','sim-loop-labels','sim-loop-gate', loopPattern, -1, true);
+            }
+
+            // === INIT ===
+            document.getElementById('sim-play-btn').addEventListener('click', togglePlay);
+            document.getElementById('sim-reset-btn').addEventListener('click', resetSim);
+            document.getElementById('sim-speed').addEventListener('input', function(){
+                document.getElementById('sim-speed-label').textContent = this.value + 'ms';
+            });
+            // Also reset on seed change
+            document.getElementById('sim-seed').addEventListener('change', resetSim);
+
+            // Initial render
+            updateLabels();
+            resetSim();
+        })();
+        </script>
 
     </div>
 </body>
