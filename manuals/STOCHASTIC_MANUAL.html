@@ -42,7 +42,7 @@
             font-size: 15px;
         }
 
-        .container { max-width: 900px; margin: 0 auto; padding: 48px 24px 96px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 48px 24px 96px; }
 
         /* --- Typography --- */
         h1 { font-size: 32px; font-weight: 700; color: var(--accent); margin-bottom: 4px; letter-spacing: -0.5px; }
@@ -1460,7 +1460,7 @@
             </div>
 
             <!-- Main grid - two rows -->
-            <div style="display:grid; grid-template-columns:240px 1fr; gap:16px;">
+            <div style="display:grid; grid-template-columns:360px 1fr; gap:16px;">
 
                 <!-- ==================== ROW 1: GENERATOR CONTROLS ==================== -->
                 <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px; font-size:12px;">
@@ -1478,16 +1478,16 @@
                                     const colors = ['#0a7c42','#1d4ed8','#b45309','#7c3aed','#b91c1c','#c0266d','#0d7a7a'];
                                     for (let i=0; i<7; i++) {
                                         const wrapper = document.createElement('div');
-                                        wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
+                                        wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;flex:1;';
                                         const label = document.createElement('span');
                                         label.textContent = i+1;
-                                        label.style.cssText = 'font-size:9px;color:#8b8a86;';
+                                        label.style.cssText = 'font-size:9px;color:#8b8a86;margin-bottom:1px;';
                                         const inp = document.createElement('input');
                                         inp.type = 'number';
                                         inp.id = 'sim-ticket-'+i;
                                         inp.value = [100,10,70,10,100,20,-1][i];
                                         inp.min = -1; inp.max = 100;
-                                        inp.style.cssText = 'width:28px;padding:1px 2px;border-radius:4px;border:1px solid #d4d3d0;font-size:10px;text-align:center;font-family:JetBrains Mono,monospace;';
+                                        inp.style.cssText = 'width:100%;padding:3px 2px;border-radius:4px;border:1px solid #d4d3d0;font-size:11px;text-align:center;font-family:JetBrains Mono,monospace;';
                                         if (inp.value == -1) inp.style.color = '#b91c1c';
                                         inp.addEventListener('input', function(){ this.style.color = parseInt(this.value) < 0 ? '#b91c1c' : '#1a1a18'; });
                                         wrapper.appendChild(label);
@@ -1564,12 +1564,24 @@
                     </div>
                 </div>
 
-                <!-- ==================== ROW 2: LOOP WINDOW ==================== -->
-                <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px;">
-                    <div style="font-weight:600; color:#1d4ed8; margin-bottom:8px; font-size:13px;">Loop Buffer (8 steps)</div>
-                    <div id="sim-loop-steps" style="display:flex; gap:4px; height:180px; align-items:flex-end;"></div>
-                    <div id="sim-loop-labels" style="display:flex; gap:4px; margin-top:4px;"></div>
-                    <div id="sim-loop-gate" style="display:flex; gap:4px; margin-top:2px; height:8px;"></div>
+                <!-- ==================== ROW 2: THREE LOOP PLOTS ==================== -->
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:8px 12px;">
+                        <div style="font-weight:600; color:#7c3aed; margin-bottom:4px; font-size:12px;">Melody Only (Loop mode)</div>
+                        <div id="sim-loop-melody-steps" style="display:flex; gap:4px; height:100px; align-items:flex-end;"></div>
+                        <div id="sim-loop-melody-labels" style="display:flex; gap:4px; margin-top:2px;"></div>
+                    </div>
+                    <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:8px 12px;">
+                        <div style="font-weight:600; color:#b45309; margin-bottom:4px; font-size:12px;">Rhythm Only (Loop mode)</div>
+                        <div id="sim-loop-rhythm-steps" style="display:flex; gap:4px; height:100px; align-items:flex-end;"></div>
+                        <div id="sim-loop-rhythm-labels" style="display:flex; gap:4px; margin-top:2px;"></div>
+                    </div>
+                    <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:8px 12px;">
+                        <div style="font-weight:600; color:#1d4ed8; margin-bottom:4px; font-size:12px;">Both (Loop mode)</div>
+                        <div id="sim-loop-both-steps" style="display:flex; gap:4px; height:100px; align-items:flex-end;"></div>
+                        <div id="sim-loop-both-labels" style="display:flex; gap:4px; margin-top:2px;"></div>
+                        <div id="sim-loop-both-gate" style="display:flex; gap:4px; margin-top:2px; height:6px;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1595,7 +1607,9 @@
             // === ENGINE STATE ===
             let state = { running: false, timer: null };
             let livePattern = [];     // rolling buffer, last 8 generated steps
-            let loopPattern = [];     // 8 steps, buffer
+            let loopPattern = [];     // 8 steps, combined buffer
+            let loopMelodyOnly = [];  // 8 steps, melody only (dummy pitch, no expr)
+            let loopRhythmOnly = [];  // 8 steps, rhythm only (fixed pitch, all expr)
             let loopCounter = 0;
             let stepIndex = 0;
             let boredom = 0;
@@ -1844,23 +1858,24 @@
                 return pattern;
             }
 
+            function cloneParams(p) { return JSON.parse(JSON.stringify(p)); }
+
             // === RENDER STEPS ===
-            function renderSteps(containerId, labelsId, gatesId, pattern, activeStep, isLoop) {
+            function renderSteps(containerId, labelsId, gatesId, pattern, activeStep, isLoop, mode) {
                 const container = document.getElementById(containerId);
                 const labels = document.getElementById(labelsId);
                 const gates = document.getElementById(gatesId);
-                if (!container || !labels || !gates) return;
+                if (!container) return;
 
                 container.innerHTML = '';
-                labels.innerHTML = '';
-                gates.innerHTML = '';
+                if (labels) labels.innerHTML = '';
+                if (gates) gates.innerHTML = '';
 
                 const first = isLoop ? parseInt(document.getElementById('sim-first').value) || 0 : 0;
                 const last = isLoop ? parseInt(document.getElementById('sim-last').value) || 7 : 7;
                 const rotate = isLoop ? parseInt(document.getElementById('sim-rot').value) || 0 : 0;
 
                 for (let i=0; i<8; i++) {
-                    // Read index with rotation
                     const windowSize = last - first + 1;
                     let readIdx = i;
                     if (isLoop && windowSize > 0) {
@@ -1873,35 +1888,47 @@
                     const isActive = (i === activeStep);
                     const inLoop = isLoop ? (i >= first && i <= last) : true;
 
-                    // Duration-driven width: longer notes get wider bars
                     const dur = step.duration || 192;
                     const minW = 12, maxW = 60;
                     const barW = Math.round(minW + (dur / 768) * (maxW - minW));
 
-                    // Bar
+                    let barColor, barH, showGate = true;
+                    if (mode === 'melody') {
+                        barColor = step.rest ? '#e0e0e0' : '#7c3aed';
+                        barH = step.rest ? 4 : Math.max(4, Math.round((step.degree + 1) / 7 * 90));
+                        showGate = false;
+                    } else if (mode === 'rhythm') {
+                        barH = step.rest ? 4 : 50;
+                        barColor = step.rest ? '#e8e7e4' : (step.gate ? '#b45309' : '#e8e7e4');
+                        showGate = false;
+                    } else {
+                        barH = step.rest ? 4 : Math.max(4, Math.round((step.degree + 1) / 7 * 90));
+                        barColor = step.rest ? '#e8e7e4' : (step.accent ? '#b45309' : (step.burst ? '#7c3aed' : '#1d4ed8'));
+                        if (!step.rest && step.burst) {
+                            barColor = 'repeating-linear-gradient(135deg, #7c3aed 0px, #7c3aed 3px, #a855f7 3px, #a855f7 6px)';
+                        }
+                    }
+
                     const bar = document.createElement('div');
                     bar.className = 'sim-step-bar' + (isActive ? ' active' : '') + (step.rest ? ' rest' : '');
-                    const maxH = 180;
-                    const h = step.rest ? 4 : Math.max(4, Math.round((step.degree + 1) / 7 * maxH));
-                    bar.style.cssText = `flex:none;width:${barW}px;height:${h}px;background:${step.rest ? '#e8e7e4' : (step.accent ? '#b45309' : (step.burst ? '#7c3aed' : (isLoop ? '#1d4ed8' : '#0a7c42')))};opacity:${inLoop ? 1 : 0.25};border-radius:4px 4px 0 0;transition:width 0.08s,height 0.08s;`;
-                    if (!step.rest && step.burst) {
-                        bar.style.background = 'repeating-linear-gradient(135deg, #7c3aed 0px, #7c3aed 3px, #a855f7 3px, #a855f7 6px)';
-                    }
+                    bar.style.cssText = `flex:none;width:${barW}px;height:${barH}px;background:${barColor};opacity:${inLoop ? 1 : 0.25};border-radius:4px 4px 0 0;transition:width 0.08s,height 0.08s;`;
                     bar.title = `deg ${step.degree} dur ${dur}${step.rest?' (rest)':''}${step.accent?' accent':''}${step.burst?' burst['+step.childCount+']':''}${step.slide?' slide':''}`;
                     container.appendChild(bar);
 
-                    // Label
-                    const lbl = document.createElement('div');
-                    lbl.className = 'sim-step-label';
-                    lbl.style.cssText = `width:${barW}px;text-align:center;font-size:9px;color:${isActive ? '#f59e0b' : (step.rest ? '#bbb' : (isLoop ? '#1d4ed8' : '#0a7c42'))};font-weight:${isActive ? '700' : '400'};`;
-                    lbl.textContent = step.rest ? '-' : (step.degree + 1);
-                    labels.appendChild(lbl);
+                    if (labels) {
+                        const lbl = document.createElement('div');
+                        lbl.className = 'sim-step-label';
+                        lbl.style.cssText = `width:${barW}px;text-align:center;font-size:9px;color:${isActive ? '#f59e0b' : (step.rest ? '#bbb' : '#555450')};font-weight:${isActive ? '700' : '400'};font-family:JetBrains Mono,monospace;`;
+                        lbl.textContent = mode === 'rhythm' ? (step.rest ? '-' : (step.accent ? 'A' : 'G')) : (step.rest ? '-' : (step.degree + 1));
+                        labels.appendChild(lbl);
+                    }
 
-                    // Gate dot
-                    const dot = document.createElement('div');
-                    dot.className = 'sim-gate-dot';
-                    dot.style.cssText = `width:${barW}px;height:8px;background:${step.gate ? (step.accent ? '#b45309' : '#0a7c42') : '#e8e7e4'};opacity:${inLoop ? 1 : 0.25};border-radius:2px;`;
-                    gates.appendChild(dot);
+                    if (gates && showGate) {
+                        const dot = document.createElement('div');
+                        dot.className = 'sim-gate-dot';
+                        dot.style.cssText = `width:${barW}px;height:6px;background:${step.gate ? (step.accent ? '#b45309' : '#1d4ed8') : '#e8e7e4'};opacity:${inLoop ? 1 : 0.25};border-radius:2px;`;
+                        gates.appendChild(dot);
+                    }
                 }
             }
 
@@ -1916,7 +1943,9 @@
                     stepIndex = (stepIndex + 1) % 8;
                     if (stepIndex === 0) loopCounter++;
                     renderSteps('sim-live-steps','sim-live-labels','sim-live-gate', livePattern, stepIndex, false);
-                    renderSteps('sim-loop-steps','sim-loop-labels','sim-loop-gate', loopPattern, stepIndex, true);
+                    renderSteps('sim-loop-melody-steps','sim-loop-melody-labels',null, loopMelodyOnly, stepIndex, true, 'melody');
+                    renderSteps('sim-loop-rhythm-steps','sim-loop-rhythm-labels',null, loopRhythmOnly, stepIndex, true, 'rhythm');
+                    renderSteps('sim-loop-both-steps','sim-loop-both-labels','sim-loop-both-gate', loopPattern, stepIndex, true, 'both');
                     document.getElementById('sim-loop-count').textContent = loopCounter;
                     document.getElementById('sim-step-count').textContent = stepIndex;
                     state.timer = setTimeout(tick, parseInt(document.getElementById('sim-speed').value));
@@ -1929,18 +1958,13 @@
                 // LIVE: generate ONE step fresh every tick (independent)
                 const liveStep = generateStep(params, lastCplxDegree);
                 if (!liveStep.rest) lastCplxDegree = liveStep.degree;
-                // Apply density to live step (compute ranks for just this step?)
-                // In C++ live mode density is still applied via densityRank bypass - the density gate
-                // is checked per-step: densityRank(0) is used, so just check density% directly
                 const livePasses = rngRange(99) < params.dens;
                 if (!livePasses && !liveStep.rest) {
                     liveStep.gate = false;
                     liveStep.rest = true;
                 }
-                // Push into rolling buffer (last 8)
                 livePattern.push(liveStep);
                 if (livePattern.length > 8) livePattern.shift();
-                // Pad if less than 8
                 while (livePattern.length < 8) {
                     livePattern.unshift({ degree: 0, gate: false, rest: true, accent: false, slide: false, burst: false, childCount: 0, duration: 192 });
                 }
@@ -1951,6 +1975,18 @@
                     const save = rngState;
                     rngState = s; if (rngState === 0) rngState = 1;
                     loopPattern = generatePattern(params);
+                    // Melody-only: same pattern, but force gate/rest from melody perspective
+                    loopMelodyOnly = [];
+                    for (let i=0; i<8; i++) {
+                        const st = { ...loopPattern[i] };
+                        loopMelodyOnly.push(st);
+                    }
+                    // Rhythm-only: fixed degree, keep expression
+                    loopRhythmOnly = [];
+                    for (let i=0; i<8; i++) {
+                        const r = generateStep({ ...params, cplx: 0, cntr: 0, lin: 0, marbles: 'off' }, i > 0 ? 0 : -1);
+                        loopRhythmOnly.push({ degree: 0, gate: r.gate, rest: r.rest, accent: r.accent, slide: r.slide, legato: r.legato, burst: r.burst, childCount: r.childCount, duration: r.duration });
+                    }
                     rngState = save;
                     lastLoopDegree = -1;
                 }
@@ -1960,7 +1996,9 @@
 
                 // Render
                 renderSteps('sim-live-steps','sim-live-labels','sim-live-gate', livePattern, stepIndex, false);
-                renderSteps('sim-loop-steps','sim-loop-labels','sim-loop-gate', loopPattern, stepIndex, true);
+                renderSteps('sim-loop-melody-steps','sim-loop-melody-labels',null, loopMelodyOnly, stepIndex, true, 'melody');
+                renderSteps('sim-loop-rhythm-steps','sim-loop-rhythm-labels',null, loopRhythmOnly, stepIndex, true, 'rhythm');
+                renderSteps('sim-loop-both-steps','sim-loop-both-labels','sim-loop-both-gate', loopPattern, stepIndex, true, 'both');
                 document.getElementById('sim-loop-count').textContent = loopCounter;
                 document.getElementById('sim-step-count').textContent = stepIndex;
 
@@ -1999,12 +2037,29 @@
                             // Restlessness: 25% chance of single mutation
                             if (rngRange(99) < 25) {
                                 loopPattern = mutateOneStep(loopPattern, params);
+                                // Keep melody/rhythm derived buffers in sync
+                                loopMelodyOnly = loopPattern.map(s => ({ ...s }));
+                                const rp = cloneParams(params);
+                                rp.cplx = 0; rp.cntr = 0; rp.lin = 0; rp.marbles = 'off';
+                                loopRhythmOnly = [];
+                                for (let j=0; j<8; j++) {
+                                    const r = generateStep(rp, j > 0 ? 0 : -1);
+                                    loopRhythmOnly.push({ degree: 0, gate: r.gate, rest: r.rest, accent: r.accent, slide: r.slide, legato: r.legato, burst: r.burst, childCount: r.childCount, duration: r.duration });
+                                }
                             }
                         }
 
                         // Mutate (independent)
                         if (params.mut > 0 && rngRange(99) < params.mut) {
                             loopPattern = mutateOneStep(loopPattern, params);
+                            loopMelodyOnly = loopPattern.map(s => ({ ...s }));
+                            const rp = cloneParams(params);
+                            rp.cplx = 0; rp.cntr = 0; rp.lin = 0; rp.marbles = 'off';
+                            loopRhythmOnly = [];
+                            for (let j=0; j<8; j++) {
+                                const r = generateStep(rp, j > 0 ? 0 : -1);
+                                loopRhythmOnly.push({ degree: 0, gate: r.gate, rest: r.rest, accent: r.accent, slide: r.slide, legato: r.legato, burst: r.burst, childCount: r.childCount, duration: r.duration });
+                            }
                         }
 
                         if (resetBuffer) {
@@ -2012,6 +2067,15 @@
                             const save = rngState;
                             rngState = s; if (rngState === 0) rngState = 1;
                             loopPattern = generatePattern(params);
+                            loopMelodyOnly = [];
+                            for (let j=0; j<8; j++) loopMelodyOnly.push({ ...loopPattern[j] });
+                            loopRhythmOnly = [];
+                            const rp = cloneParams(params);
+                            rp.cplx = 0; rp.cntr = 0; rp.lin = 0; rp.marbles = 'off';
+                            for (let j=0; j<8; j++) {
+                                const r = generateStep(rp, j > 0 ? 0 : -1);
+                                loopRhythmOnly.push({ degree: 0, gate: r.gate, rest: r.rest, accent: r.accent, slide: r.slide, legato: r.legato, burst: r.burst, childCount: r.childCount, duration: r.duration });
+                            }
                             rngState = save;
                             document.getElementById('sim-state').textContent = 'regenerated';
                         }
@@ -2074,10 +2138,21 @@
                 const save = rngState;
                 rngState = s; if (rngState === 0) rngState = 1;
                 loopPattern = generatePattern(params);
+                loopMelodyOnly = [];
+                for (let i=0; i<8; i++) loopMelodyOnly.push({ ...loopPattern[i] });
+                loopRhythmOnly = [];
+                const rp = cloneParams(params);
+                rp.cplx = 0; rp.cntr = 0; rp.lin = 0; rp.marbles = 'off';
+                for (let i=0; i<8; i++) {
+                    const r = generateStep(rp, i > 0 ? 0 : -1);
+                    loopRhythmOnly.push({ degree: 0, gate: r.gate, rest: r.rest, accent: r.accent, slide: r.slide, legato: r.legato, burst: r.burst, childCount: r.childCount, duration: r.duration });
+                }
                 rngState = save;
 
                 renderSteps('sim-live-steps','sim-live-labels','sim-live-gate', livePattern, -1, false);
-                renderSteps('sim-loop-steps','sim-loop-labels','sim-loop-gate', loopPattern, -1, true);
+                renderSteps('sim-loop-melody-steps','sim-loop-melody-labels',null, loopMelodyOnly, -1, true, 'melody');
+                renderSteps('sim-loop-rhythm-steps','sim-loop-rhythm-labels',null, loopRhythmOnly, -1, true, 'rhythm');
+                renderSteps('sim-loop-both-steps','sim-loop-both-labels','sim-loop-both-gate', loopPattern, -1, true, 'both');
             }
 
             // === INIT ===

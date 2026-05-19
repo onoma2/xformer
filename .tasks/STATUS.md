@@ -1,5 +1,5 @@
 # Task Board
-_Updated: 2026-05-18_
+_Updated: 2026-05-19_
 
 ## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
 **Status:** done — Phases A-F complete and hardware verified.
@@ -12,12 +12,12 @@ _Updated: 2026-05-18_
 
 ## 🔴 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** Phase 9 (V4 Ownership) and Phase 9.1 (UI Unstubbing) complete. Pattern-defining parameters moved to Sequence; 6-byte Event packing verified (sizeof(Seq)=484, sizeof(Trk)=8252); Ticket Page (S3) implemented with 16-bar banks, Left/Right navigation, and QuickEdit shortcuts.
-**Next action:** Perform final hardware verification of S3 ticket interaction and pattern switching consistency.
+**Where I stopped:** V5 control-granularity spec and dictionary rewrite captured: Density is generator sound/rest, deterministic thinning is Mask/Tilt, full Burst and Marbles Shape/Spread/Bias/Steps are Level 1, split Rhythm/Melody starts Level 2, and Duration Tickets use `1/2, 1/4, 1/8, 1/16, 3/16, 5/16, 7/16, 1/8T`.
+**Next action:** Implement `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`: rename loop thinning to Mask, add generator Density semantics, add 8-slot Duration Tickets, and reorganize the UI/control surface by Generator/Looper levels.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic
-**Reference:** `.tasks/stochastic-track.md`, `.tasks/stochastic-track-port/PHASE9-V4-OWNERSHIP.md`
+**Reference:** `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`, `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`, `.tasks/stochastic-track-port/PHASE9-V4-OWNERSHIP.md`
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.

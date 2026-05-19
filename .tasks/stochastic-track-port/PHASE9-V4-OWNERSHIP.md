@@ -1,5 +1,10 @@
 # Phase 9: V4 Ownership Correction Plan
 
+> Historical note: V4 ownership is still relevant, but V5 supersedes V4 naming
+> where terms conflict. In particular, V4 `Density/Tilt` deterministic thinning
+> should now be implemented and shown as `Mask/Tilt`; V5 `Density` is
+> generator-level sound/rest amount.
+
 ## Why V4 is Required
 
 Current UI testing and architecture review reveals a critical mismatch in the Stochastic track: almost all generative controls—most notably the degree tickets, rhythms, and structural modes—are **Track-owned** rather than **Sequence-owned**. 

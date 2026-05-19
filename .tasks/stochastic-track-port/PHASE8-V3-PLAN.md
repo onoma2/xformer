@@ -1,5 +1,12 @@
 # Phase 8 V3 Stochastic Core Rebuild Plan
 
+> Historical note: this V3 plan is superseded by the V5 control-granularity spec
+> where the terms conflict. Use
+> `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md` and
+> `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md` as the current contract.
+> In particular, V3 `Density` as deterministic loop thinning is now `Mask`;
+> V5 `Density` is generator-level sound/rest amount.
+
 ## Purpose
 
 Phase 8 replaces the current single-mode stochastic core with a clearer two-layer design:
@@ -8,7 +15,7 @@ Phase 8 replaces the current single-mode stochastic core with a clearer two-laye
 generator domains -> loop source playback/evolution -> evaluated lock replay
 ```
 
-This document is the controlling implementation plan for Phase 8. Where this plan conflicts with the older Phase 7 dictionary, this plan wins for Phase 8. Do not rewrite the Phase 7 dictionary during implementation unless the user explicitly asks for a dictionary topology amendment.
+This document was the controlling implementation plan for Phase 8. Where this plan conflicts with V5, V5 wins.
 
 Phase 8 is engine/model/internal-access work. Final visual UI is Phase 9.
 

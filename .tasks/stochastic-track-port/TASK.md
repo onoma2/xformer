@@ -9,8 +9,9 @@ Port the Vinx fork's Stochastic track type to XFORMER, then extend the MVP with 
 **References:**
 - `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md` — controlling MVP spec.
 - `.tasks/stochastic-track-port/UI-DESIGN.md` — XFORMER-native UI design plan.
-- `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md` — immutable Phase 7 vocabulary and ownership contract.
+- `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md` — current V5 vocabulary, ownership, and behavior contract.
 - `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md` — controlling Phase 8 V3 rebuild plan: split Rhythm/Melody `Loop`/`Live` source modes, no `New`, `Patience` as loop refresh, `Mutate` as loop-only edit, single runtime Hold/Lock freeze, UI deferred to Phase 9.
+- `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md` — controlling V5 control-granularity spec: Level 1 Core, Level 2 Direct, Level 3 Weights/Advanced, generator/looper segmentation, `Density` vs `Mask`, and duration tickets.
 - `temp-ref/vinx-performer/src/apps/sequencer/{model,engine,ui}/Stochastic*` — Vinx Stochastic source.
 - `../others/mutable/marbles/random/output_channel.cc`
 - `../others/mutable/marbles/random/distributions.h`
@@ -429,82 +430,20 @@ This preserves Vinx's captured-performance behavior while avoiding the 28 B `Sto
 
 #### Phase 7a: Immutable Dictionary of Truth
 
-**Goal:** Add a durable dictionary document before touching code. This dictionary is the contract for user-facing names, internal ownership, event timing, and what each external reference contributes. It should live next to this task, for example `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`, and be referenced from this file and the enhanced spec.
+**Status:** Superseded by the V5 rewrite in `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`.
 
-**Dictionary rules:**
-- Do not use module names as user-facing mode names. Use them only as provenance in the docs.
-- User-facing labels should be short, preferably one word.
-- Internal code names should follow existing codebase style, not underscore-heavy UI names.
-- `Run` is excluded from Phase 7. Pattern playback is forward through the active stochastic window; reverse/pendulum/random order is not core because it makes "order of random" unclear.
-- `First` and `Last` are stochastic pattern-buffer indices, not Performer step-loop controls.
-- Burst child hits do not advance the pattern position and do not count toward `Size`.
-- `Lock` is a hard evaluated-event freeze. `Patience == 100` only means never auto-new; it is not lock.
+**Current dictionary summary:**
+- One generator + looper model under multiple control-granularity levels.
+- `Density` now means generator-level sound/rest amount.
+- Deterministic loop thinning is `Mask`; `Tilt` belongs to `Mask`.
+- `Shape`, `Spread`, `Bias`, and `Steps` are Level 1 macro distribution controls.
+- `Burst`, `Burst Count`, `Burst Rate`, and `Burst Pitch` are visible from Level 1.
+- Split `Rhythm` and `Melody` `Live`/`Loop` source modes appear starting at Level 2.
+- `Degree Rotate` and `Ticket Rotate` are Level 3 advanced pitch-ticket controls.
+- `Duration Tickets` are Level 3 parent-duration weights using exactly:
+  `1/2`, `1/4`, `1/8`, `1/16`, `3/16`, `5/16`, `7/16`, `1/8T`.
 
-**Dictionary terms:**
-
-Pitch:
-- `Scale`: Performer scale selection, including user scales up to 32 degrees.
-- `Root`: Performer root note for scale-degree conversion.
-- `Transpose`: normal Performer pitch offset applied after generation.
-- `Octave`: normal static full-track octave offset, like Note track.
-- `Range`: pre-selection generated pitch span, possibly across multiple scale octaves.
-- `Tickets`: per-degree pitch weights where excluded degrees cannot be selected.
-- `Spread`: Marbles-style bandwidth window over selectable ticket mass, from tight to broad/flat.
-- `Bias`: center position of the Marbles-style window over selectable ticket mass.
-- `Jump`: bounded probabilistic octave displacement in the generated pitch domain, separate from static track `Octave`.
-
-Generator:
-- `New`: manually, externally, or automatically creates a fresh generated pattern.
-- `Mode`: `Dice` repeats a generated pattern; `Realtime` continuously generates events without reusing the pattern.
-- `Complexity`: controls how much of the ticket pool and movement space the melody may explore, from simple repetition to richer melodic/rhythmic structure.
-- `Linearity`: advanced bias toward pitches near the previous parent event.
-- `Contour`: advanced bias toward ascending or descending motion.
-
-Pattern:
-- `Size`: number of generated parent events in the pattern buffer.
-- `First`: first parent event included in stochastic playback.
-- `Last`: last parent event included in stochastic playback.
-- `Lock`: freezes evaluated parent events and burst child hits.
-
-Rhythm:
-- `Rate`: base duration of generated parent events.
-- `Variation`: bipolar bias toward durations longer or shorter than `Rate`.
-- `Rest`: stochastic chance that a generated parent event is silent.
-- `Legato`: stochastic chance that a parent event continues the previous gate instead of firing a new one.
-- `Slide`: chance or amount of pitch glide into the parent event.
-
-Burst:
-- `Burst`: probability that a parent event contains child hits.
-- `Rate`: subdivision spacing for child hits inside one parent event.
-- `Count`: amount or probability of child hits produced inside one parent event.
-- `Pitch`: whether child hits inherit the parent pitch or re-evaluate pitch.
-
-Evolution:
-- `Density`: deterministic parent-event thinning using the generated pattern's stable rest order.
-- `Tilt`: early/late bias used when generating the density rest order.
-- `Sleep`: wait time inserted between completed pattern cycles.
-- `Patience`: rate at which automatic `New` becomes likely; maximum means never auto-new.
-- `Mutate`: probability that existing parent events are regenerated per cycle.
-
-**Ownership invariants:**
-- Track owns generator controls, pitch controls, rhythm controls, burst controls, and evolution controls.
-- Pattern buffer owns generated parent events, density ranks, and captured burst child hits.
-- Step/grid UI, if present, edits generated/captured parent events; it is not the primary stochastic programming model.
-- `Tickets` define selectable pitch material. `Spread` and `Bias` reshape that ticket mass; they do not form a second undisclosed pitch-weight system.
-- `Complexity` gates pitch behavior and explored vocabulary, not event audibility. `Density` and `Rest` control audibility.
-
-**Timing invariant:**
-
-```text
-pattern cycle
-  parent event
-    burst child hit
-```
-
-- Parent events advance the pattern position.
-- Burst child hits are scheduled inside the parent event duration.
-- Density hides/shows parent events; hidden parent events also hide their child hits.
-- Lock captures the evaluated parent event plus all evaluated child hits.
+Do not use the older inline Phase 7 terms from git history as implementation truth.
 
 #### Phase 7b: Core Model + Engine Rebuild
 
@@ -861,7 +800,9 @@ Keep these only if needed for migration/debug until Phase 8 removes old UI assum
 
 **Goal:** Replace the current single global Dice/Realtime stochastic core with the V3 two-layer architecture documented in `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`.
 
-**Controlling plan:** `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`
+**Historical plan:** `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`
+
+**Superseded by V5 where it conflicts:** `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`. In particular, old V3 wording that says `Density` is deterministic loop thinning must now be read as `Mask`; V5 `Density` is generator-level sound/rest amount.
 
 **Core topology:**
 - Rhythm and Melody each have independent source modes: `Loop` or `Live`.
@@ -909,7 +850,7 @@ Keep these only if needed for migration/debug until Phase 8 removes old UI assum
 
 ### Phase 9: UI Layer
 
-**Goal:** Implement the XFORMER-native Stochastic UI from `.tasks/stochastic-track-port/UI-DESIGN.md` only after the Phase 8 V3 generator/looper core is hardware-verified. The UI must expose the reimagined `Rhythm/Melody` `Loop/Live` source model, not the current Vinx-shaped step-probability internals.
+**Goal:** Implement the XFORMER-native Stochastic UI from `.tasks/stochastic-track-port/UI-DESIGN.md` and the V5 control-granularity spec only after the generator/looper core is hardware-verified. The UI must expose the reimagined `Rhythm/Melody` `Loop/Live` source model, not the current Vinx-shaped step-probability internals.
 
 **Files:**
 - `src/apps/sequencer/ui/pages/StochasticSequenceEditPage.h/.cpp`
@@ -923,12 +864,14 @@ Keep these only if needed for migration/debug until Phase 8 removes old UI assum
 - Preserve Performer header/footer conventions from Note, Curve, Indexed, DiscreteMap, and Tuesday pages.
 - Prefer custom visual pages over list models for degree tickets, generated pattern, burst child hits, lock buffer, and probability overview.
 - Degree-ticket visual editor sized by the active scale's `notesPerOctave()`.
-- Pitch pages must use the Phase 7 dictionary: Scale, Root, Transpose, Octave, Range, Tickets, Spread, Bias, Jump.
-- Generator pages must expose Rhythm source, Melody source, Patience, Mutate, Complexity, Linearity, and Contour without leaking raw storage values.
-- Pattern pages must expose Size, First, Last, and Lock as stochastic pattern-buffer controls, not Performer step-loop controls.
-- Rhythm pages must expose Rate, Variation, Rest, Legato, and Slide.
-- Burst pages must make parent events vs child hits visually clear.
-- Evolution pages must expose Density, Tilt, Sleep, Patience, and Mutate with deterministic density behavior.
+- UI must be segmented by `Generator` and `Looper`, not one long mixed list.
+- Level 1 Core must expose `Complexity`, `Density`, `Shape`, `Spread`, `Bias`, `Steps`, `Burst`, `Burst Count`, `Burst Rate`, `Burst Pitch`, `Mode`, `Size`, `First`, `Last`, `Rotate`, and `Patience`.
+- Level 2 Direct must expose split `Rhythm` and `Melody` source modes, `Rate`, `Variation`, `Rest`, `Legato`, `Slide`, `Accent`, `Range`, `Low Degree`, `High Degree`, and `Pitch Tickets`.
+- Level 3 Weights/Advanced must expose `Duration Tickets`, optional `Rest Tickets`, `Degree Rotate`, `Ticket Rotate`, `Linearity`, `Contour`, `Mask`, `Tilt`, `Mutate`, `Jump`, and `Lock`.
+- Pitch pages must use the current V5 dictionary: Scale, Root, Transpose, Octave, Range, Low/High Degree, Pitch Tickets, Degree Rotate, and Ticket Rotate.
+- Rhythm pages must expose Rate, Variation, Rest, Legato, Slide, Accent, and Duration Tickets.
+- Burst pages must make parent events vs child hits visually clear and must not hide Burst until advanced pages.
+- Evolution/loop pages must distinguish `Density` from `Mask`: Density is generator sound/rest amount; Mask is deterministic playback thinning.
 - Existing Phase 6/8 UI stubs are acceptable only as hardware access scaffolding; final Phase 9 UI should not be a list-only workflow.
 - `StochasticTrackListModel` may exist as a fallback/settings bridge, but normal performance editing should live on visual pages.
 
@@ -936,7 +879,56 @@ Keep these only if needed for migration/debug until Phase 8 removes old UI assum
 
 ---
 
-### Phase 10: Validation
+### Phase 10: V5 Control Granularity Retopology
+
+**Goal:** Implement the V5 control model documented in `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`.
+
+**Controlling plan:** `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`
+
+**Required semantic changes:**
+- Implement from model truth upward: persistent Level 3 tables/transforms first, then Level 2 direct controls, then Level 1 macro control laws.
+- Preserve V4 ownership: new stochastic entities are sequence-owned by default; do not move pattern-defining controls back to `StochasticTrack`.
+- Rename deterministic loop thinning from `Density` to `Mask` in user-facing UI.
+- Keep `Tilt` as the priority bias for `Mask`.
+- Reintroduce `Density` as generator-level sound/rest amount.
+- Keep Marbles-style `Shape`, `Spread`, `Bias`, and `Steps` together as Level 1 macro generator controls.
+- Keep `Range` available across all levels as generator register/octave spread; it is not a Shape sub-control.
+- Expose full burst controls from Level 1: `Burst`, `Burst Count`, `Burst Rate`, and `Burst Pitch`.
+- Add Level 3 `Duration Tickets` with the approved parent-duration set:
+  `1/2`, `1/4`, `1/8`, `1/16`, `3/16`, `5/16`, `7/16`, `1/8T`.
+- Do not add `1 bar`, `1/64`, `1/128`, or quintuplet parent durations.
+- Starting at Level 2, expose separate `Rhythm` and `Melody` `Live`/`Loop` source modes.
+- Keep Level 1 `Mode` as a UI macro over both source modes, not a third stored source mode.
+- Keep `Degree Rotate` and `Ticket Rotate` as Level 3 advanced pitch-ticket controls.
+- Add a manual `Refresh` action that repopulates Loop source domains immediately, like momentary `Patience=0`, without changing stored Patience.
+- Implement the new Patience rule: `0` refreshes every loop, `100` never auto-refreshes, and `1..99` maps exponentially to loop counts.
+
+**Files likely involved:**
+- `src/apps/sequencer/model/StochasticSequence.h`
+- `src/apps/sequencer/model/StochasticTypes.h`
+- `src/apps/sequencer/engine/StochasticGenerator.h`
+- `src/apps/sequencer/engine/StochasticGenerator.cpp`
+- `src/apps/sequencer/engine/StochasticTrackEngine.cpp`
+- `src/apps/sequencer/ui/model/StochasticPerformanceListModel.h`
+- `src/apps/sequencer/ui/model/StochasticConfigListModel.h`
+- `src/apps/sequencer/ui/pages/StochasticSequenceEditPage.h/.cpp`
+- future custom visual pages for V5 levels
+
+**Acceptance:**
+- Default Level 1 produces audible output.
+- Density changes generator sound/rest amount.
+- Mask down/up restores the same stored loop skeleton.
+- Range affects register/octave spread consistently at all levels.
+- Full Burst controls are accessible without entering Level 3.
+- Duration Tickets select only approved parent durations and Burst remains responsible for faster child hits.
+- Split Rhythm/Melody source modes work at Level 2.
+- Existing `StochasticSequenceEditPage` ticket page is retained for pitch-ticket editing during Phase 10; final UI can wrap or rename it later, but it must not be removed as part of the model/engine rewrite.
+- Refresh command repopulates Loop source material and is ignored by locked replay.
+- STM32 RAM and container gates remain documented.
+
+---
+
+### Phase 11: Validation
 
 **Goal:** Full STM32 size and hardware verification.
 
@@ -1068,12 +1060,13 @@ Bit-packing the Vinx object adds complexity for marginal gain. Compact heap/pool
 | Phase 7b: Reimagined Core Retopology | ~6-8h |
 | Phase 8: V3 Generator + Looper Core Rebuild | ~6-8h |
 | Phase 9: UI Layer | ~6h |
-| Phase 10: Validation | ~3h |
-| **Remaining** | **~15-19h** |
+| Phase 10: V5 Control Granularity Retopology | ~5-8h |
+| Phase 11: Validation | ~3h |
+| **Remaining** | **~8-11h before UI polish; ~14-19h including final UI** |
 
 ## Next Action
 
-**Phase 8 prep:** Implement `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`: split Rhythm/Melody `Loop`/`Live` source modes, split source buffers, make `Patience` and `Mutate` Loop-domain-only, and add runtime Lock A/B. Defer final visual UI to Phase 9.
+**Phase 10 prep:** Implement `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`: rename deterministic thinning to `Mask`, make `Density` generator sound/rest amount, expose full Burst at Level 1, keep Marbles `Shape/Spread/Bias/Steps` together at Level 1, add the approved 8-slot Duration Tickets, and keep split Rhythm/Melody source modes starting at Level 2.
 
 ## Depends On
 
