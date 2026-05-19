@@ -8,6 +8,7 @@
 class StochasticConfigListModel : public RoutableListModel {
 public:
     enum Item {
+        Lock,
         Divisor,
         ResetMeasure,
         Scale,
@@ -16,6 +17,8 @@ public:
         Transpose,
         CvUpdateMode,
         SlideTime,
+        FillMode,
+        FillMuted,
         LastItem
     };
 
@@ -38,6 +41,7 @@ public:
         auto &sequence = _track->sequence(_project->selectedPatternIndex());
         if (column == 0) {
             switch (Item(row)) {
+            case Lock:          str("Lock"); break;
             case Divisor:       str("Clock/Div"); break;
             case ResetMeasure:  str("Reset Measure"); break;
             case Scale:         str("Scale"); break;
@@ -46,10 +50,13 @@ public:
             case Transpose:     str("Transpose"); break;
             case CvUpdateMode:  str("CV Update"); break;
             case SlideTime:     str("Slide Time"); break;
+            case FillMode:      str("Fill Mode"); break;
+            case FillMuted:     str("Fill Muted"); break;
             case LastItem:      break;
             }
         } else if (column == 1) {
             switch (Item(row)) {
+            case Lock:          _track->printLock(str); break;
             case Divisor:       sequence.printDivisor(str); break;
             case ResetMeasure:  sequence.printResetMeasure(str); break;
             case Scale:         sequence.printScale(str); break;
@@ -58,6 +65,8 @@ public:
             case Transpose:     _track->printTranspose(str); break;
             case CvUpdateMode:  _track->printCvUpdateMode(str); break;
             case SlideTime:     _track->printSlideTime(str); break;
+            case FillMode:      str(StochasticTrack::fillModeName(_track->fillMode())); break;
+            case FillMuted:     ModelUtils::printYesNo(str, _track->fillMuted()); break;
             case LastItem:      break;
             }
         }
@@ -67,6 +76,7 @@ public:
         if (column == 1) {
             auto &sequence = _track->sequence(_project->selectedPatternIndex());
             switch (Item(row)) {
+            case Lock:          _track->editLock(value, shift); break;
             case Divisor:       sequence.editDivisor(value, shift); break;
             case ResetMeasure:  sequence.editResetMeasure(value, shift); break;
             case Scale:         sequence.editScale(value, shift); break;
@@ -75,6 +85,8 @@ public:
             case Transpose:     _track->editTranspose(value, shift); break;
             case CvUpdateMode:  _track->editCvUpdateMode(value, shift); break;
             case SlideTime:     _track->editSlideTime(value, shift); break;
+            case FillMode:      _track->setFillMode(ModelUtils::adjustedEnum(_track->fillMode(), value)); break;
+            case FillMuted:     _track->setFillMuted(value > 0); break;
             case LastItem:      break;
             }
         }

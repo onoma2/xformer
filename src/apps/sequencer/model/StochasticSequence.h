@@ -326,43 +326,6 @@ public:
         scale.noteName(str, note, rootNote, Scale::Short1);
     }
 
-    // Phase 6 scaffolding stubs for UI list (to keep current pages building)
-    struct StepStub {
-        int note() const { return 0; }
-        bool gate() const { return false; }
-        int gateProbability() const { return 0; }
-        int noteVariationProbability() const { return 0; }
-        int noteOctaveProbability() const { return 0; }
-        int length() const { return 0; }
-        int lengthVariationRange() const { return 0; }
-        int lengthVariationProbability() const { return 0; }
-        int retrigger() const { return 0; }
-        int retriggerProbability() const { return 0; }
-        Types::Condition condition() const { return Types::Condition::Off; }
-        int gateOffset() const { return 0; }
-        bool slide() const { return false; }
-        bool accent() const { return false; }
-        bool legato() const { return false; }
-        void setGate(bool) {}
-        void setGateProbability(int) {}
-        void setNote(int) {}
-        void setNoteVariationProbability(int) {}
-        void setNoteOctaveProbability(int) {}
-        void setLength(int) {}
-        void setLengthVariationRange(int) {}
-        void setLengthVariationProbability(int) {}
-        void setRetrigger(int) {}
-        void setRetriggerProbability(int) {}
-        void setCondition(Types::Condition) {}
-        void setGateOffset(int) {}
-        void setSlide(bool) {}
-        void setAccent(bool) {}
-        void setLegato(bool) {}
-    };
-
-    const StepStub step(int index) const { return StepStub(); }
-          StepStub step(int index)       { return StepStub(); }
-
     // Phase 8.2 Split Source Buffers
     const std::array<StochasticSourceEvent, CONFIG_STEP_COUNT> &events() const { return _events; }
           std::array<StochasticSourceEvent, CONFIG_STEP_COUNT> &events()       { return _events; }

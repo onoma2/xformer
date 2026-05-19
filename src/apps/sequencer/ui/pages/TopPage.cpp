@@ -140,23 +140,6 @@ void TopPage::keyPress(KeyPressEvent &event) {
     }
 
     if (key.pageModifier() && PageKeyMap::isPageKey(key.code())) {
-        if (_project.selectedTrack().trackMode() == Track::TrackMode::Stochastic) {
-            if (key.code() == PageKeyMap::SequenceEdit) { // PAGE+S1
-                _sequenceView = SequenceView::NoteSequence;
-                setSequenceView(_sequenceView);
-                _mode = Mode::SequenceEdit;
-                event.consume();
-                return;
-            }
-            if (key.code() == PageKeyMap::Sequence) { // PAGE+S2
-                _sequenceView = SequenceView::Accumulator;
-                setSequenceView(_sequenceView);
-                _mode = Mode::Sequence;
-                event.consume();
-                return;
-            }
-        }
-
         // Double-press on Routing key toggles to Modulator page
         if (key.code() == PageKeyMap::Routing && _mode == Mode::Routing) {
             setMode(Mode::Modulator);
@@ -272,7 +255,7 @@ void TopPage::setTrackView(TrackView view) {
         setMainPage(pages.track);
         break;
     case Track::TrackMode::Stochastic:
-        setMainPage(pages.stochasticPerformance);
+        setMainPage(pages.stochasticSequenceEdit);
         break;
     case Track::TrackMode::DiscreteMap:
         setMainPage(pages.track);
@@ -356,14 +339,7 @@ void TopPage::setSequenceView(SequenceView view) {
         setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Stochastic:
-        switch (view) {
-        case SequenceView::NoteSequence:
-            setMainPage(pages.stochasticPerformance);
-            break;
-        case SequenceView::Accumulator:
-            setMainPage(pages.stochasticConfig);
-            break;
-        }
+        setMainPage(pages.stochasticConfig);
         break;
     case Track::TrackMode::Last:
         break;
@@ -396,7 +372,7 @@ void TopPage::setSequenceEditPage() {
         setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Stochastic:
-        setMainPage(pages.stochasticSequenceEdit);
+        setMainPage(pages.stochasticPerformance);
         break;
     case Track::TrackMode::Last:
         break;

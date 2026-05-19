@@ -16,11 +16,13 @@ public:
         Shape,
         Spread,
         Bias,
+        Steps,
         Rate,
         Variation,
         Rest,
         SlideProb,
-        Legato,
+        LegatoProb,
+        AccentProb,
         Burst,
         BurstCount,
         BurstRate,
@@ -35,7 +37,6 @@ public:
         First,
         Last,
         Rotate,
-        Lock,
         Range,
         MinDegree,
         MaxDegree,
@@ -69,11 +70,13 @@ public:
             case Shape:         str("Shape"); break;
             case Spread:        str("Spread"); break;
             case Bias:          str("Bias"); break;
+            case Steps:         str("Steps"); break;
             case Rate:          str("Rate"); break;
             case Variation:     str("Variation"); break;
             case Rest:          str("Rest"); break;
             case SlideProb:     str("Slide Prob"); break;
-            case Legato:        str("Legato"); break;
+            case LegatoProb:    str("Legato"); break;
+            case AccentProb:    str("Accent"); break;
             case Burst:         str("Burst"); break;
             case BurstCount:    str("Burst Count"); break;
             case BurstRate:     str("Burst Rate"); break;
@@ -88,7 +91,6 @@ public:
             case First:         str("First"); break;
             case Last:          str("Last"); break;
             case Rotate:        str("Rotate"); break;
-            case Lock:          str("Lock"); break;
             case Range:         str("Range"); break;
             case MinDegree:     str("Low Degree"); break;
             case MaxDegree:     str("High Degree"); break;
@@ -104,11 +106,13 @@ public:
             case Shape:         sequence.printMarblesMode(str); break;
             case Spread:        sequence.printMarblesSpread(str); break;
             case Bias:          sequence.printMarblesBias(str); break;
+            case Steps:         sequence.printMarblesSteps(str); break;
             case Rate:          sequence.printRate(str); break;
             case Variation:     sequence.printVariation(str); break;
             case Rest:          sequence.printRest(str); break;
             case SlideProb:     sequence.printSlide(str); break;
-            case Legato:        sequence.printLegatoProb(str); break;
+            case LegatoProb:    sequence.printLegatoProb(str); break;
+            case AccentProb:    sequence.printAccentProb(str); break;
             case Burst:         sequence.printBurst(str); break;
             case BurstCount:    str("%d", sequence.burstCount()); break;
             case BurstRate:     str("%d%%", sequence.burstRate()); break;
@@ -123,7 +127,6 @@ public:
             case First:         str("%d", sequence.first() + 1); break;
             case Last:          str("%d", sequence.last() + 1); break;
             case Rotate:        sequence.printRotate(str); break;
-            case Lock:          _track->printLock(str); break;
             case Range:         str("%d Oct", sequence.range()); break;
             case MinDegree:     sequence.printMinDegree(str); break;
             case MaxDegree:     sequence.printMaxDegree(str); break;
@@ -144,11 +147,13 @@ public:
             case Shape:         sequence.editMarblesMode(value, shift); break;
             case Spread:        sequence.editMarblesSpread(value, shift); break;
             case Bias:          sequence.editMarblesBias(value, shift); break;
+            case Steps:         sequence.editMarblesSteps(value, shift); break;
             case Rate:          sequence.editRate(value, shift); break;
             case Variation:     sequence.editVariation(value, shift); break;
             case Rest:          sequence.editRest(value, shift); break;
             case SlideProb:     sequence.editSlide(value, shift); break;
-            case Legato:        sequence.editLegatoProb(value, shift); break;
+            case LegatoProb:    sequence.editLegatoProb(value, shift); break;
+            case AccentProb:    sequence.editAccentProb(value, shift); break;
             case Burst:         sequence.editBurst(value, shift); break;
             case BurstCount:    sequence.setBurstCount(sequence.burstCount() + value); break;
             case BurstRate:     sequence.setBurstRate(sequence.burstRate() + value); break;
@@ -163,7 +168,6 @@ public:
             case First:         sequence.setFirst(sequence.first() + value); break;
             case Last:          sequence.setLast(sequence.last() + value); break;
             case Rotate:        sequence.editRotate(value, shift); break;
-            case Lock:          _track->editLock(value, shift); break;
             case Range:         sequence.setRange(sequence.range() + value); break;
             case MinDegree:     sequence.editMinDegree(value, shift); break;
             case MaxDegree:     sequence.editMaxDegree(value, shift); break;
