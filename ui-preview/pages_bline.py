@@ -70,46 +70,75 @@ def render_stochastic_steps_bline(canvas: Canvas, sequence, track_engine, sectio
 def render_stochastic_pitch_bline(canvas: Canvas, sequence, track_engine, selected_degree: int = 2):
     """
     bline-derived pattern bars for pitch degrees.
-    3px wide vertical bars, height = tickets. Current degree = bright top.
+    Improved version matching C++ implementation.
     """
     WindowPainter.clear(canvas)
     WindowPainter.draw_header(canvas, mode="STOCH")
-    WindowPainter.draw_active_function(canvas, "PITCH BLN")
-    WindowPainter.draw_footer(canvas, ["TIX", "DEG", "RANGE", "LIN", "NEXT"])
+    WindowPainter.draw_active_function(canvas, "STOCHASTIC TICKETS")
+    WindowPainter.draw_footer(canvas, ["TIX", "DROT", "MROT", "", "NEXT"])
 
     tickets = sequence.degree_tickets()
     scale_size = sequence.scale_size()
-    bar_w = 3
-    bar_gap = 1
-    base_y = 48
-    bar_max_h = 30
+    
+    # Simple bank logic for preview (show bank 1)
+    bank = 0
+    bank_size = min(16, scale_size - bank * 16)
+    
+    base_y = 46
+    bar_max_h = 26
+    bar_w = 5
+    gap = 2
+    
+    total_w = bank_size * (bar_w + gap) - gap
+    x_offset = max(8, (256 - total_w) // 2)
+
+    if total_w > 256 - 16:
+        bar_w = 3
+        gap = 1
+        total_w = bank_size * (bar_w + gap) - gap
+        x_offset = max(8, (256 - total_w) // 2)
 
     canvas.set_blend_mode(BlendMode.Set)
-    for i in range(scale_size):
-        t = tickets[i] if i < len(tickets) else 0
-        x = 8 + i * (bar_w + bar_gap)
-        selected = (i == selected_degree)
+    for i in range(bank_size):
+        degree_index = bank * 16 + i
+        t = tickets[degree_index] if degree_index < len(tickets) else 0
+        x = x_offset + i * (bar_w + gap)
+        selected = (degree_index == selected_degree)
 
         if t < 0:
-            canvas.set_color(Color.Low)
-            canvas.draw_text(x - 1, base_y - 6, "X")
+            # Excluded
+            canvas.set_color(Color.Medium)
+            canvas.line(x, base_y - 5, x + bar_w - 1, base_y)
+            canvas.line(x, base_y, x + bar_w - 1, base_y - 5)
         elif t == 0:
-            h = 2
-            canvas.set_color(Color.Medium if selected else Color.Low)
-            canvas.vline(x, base_y - h, h)
+            # Included but 0 tickets
+            canvas.set_color(Color.Low)
+            canvas.draw_rect(x, base_y - 2, bar_w - 1, 2)
         else:
-            h = min(bar_max_h, t * 3)
-            is_current = selected
-            # Bar body
-            canvas.set_color(Color.MediumBright if is_current else Color.Medium)
-            canvas.vline(x, base_y - h, h)
-            # Bar top
-            canvas.set_color(Color.Bright if is_current else Color.MediumBright)
-            canvas.point(x, base_y - h - 1)
+            # Bar
+            h = (t * bar_max_h) // 100
+            h = max(1, h)
+            canvas.set_color(Color.Bright if selected else Color.Medium)
+            canvas.fill_rect(x, base_y - h, bar_w, h)
 
-        # Degree number
-        canvas.set_color(Color.Bright if selected else Color.Medium)
-        canvas.draw_text(x - 1, base_y + 2, f"{i+1}")
+        if selected:
+            canvas.set_color(Color.Bright)
+            canvas.hline(x - 1, base_y + 2, bar_w + 2)
+
+    # Info text
+    canvas.set_color(Color.Bright)
+    t_val = tickets[selected_degree] if selected_degree < len(tickets) else 0
+    canvas.draw_text(8, 18, f"DEG {selected_degree + 1}: {t_val if t_val >= 0 else 'EXCL'}")
+    
+    # Page indicator if paged
+    if scale_size > 16:
+        canvas.set_color(Color.Low)
+        canvas.draw_text(8, 28, f"P{bank + 1}/{(scale_size + 15) // 16}")
+
+    canvas.set_color(Color.Medium)
+    rot_str = f"DROT:{sequence.degree_rotation():+d} MROT:{sequence.mask_rotation():+d}"
+    canvas.set_font(Font.Tiny)
+    canvas.draw_text(256 - canvas.text_width(rot_str) - 12, 18, rot_str)
 
 # ---------------------------------------------------------------------------
 # Dice variants

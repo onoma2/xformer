@@ -11,6 +11,7 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - `src/apps/sequencer/ui/pages/StochasticConfigPage.h` — Global settings UI
 
 ## Decisions log
+- 2026-05-19: Decision: V4 Ownership Correction and UI Unstubbing complete. Achieved balanced S3 Ticket Page geometry (baseY=46, barMaxH=26). Moved bank switching to Left/Right arrow keys to match Performer conventions. Integrated QuickEdit shortcuts (INIT/EVEN/RAND) on steps 10-12. Verified RAM/Flash safety on STM32 release.
 - 2026-05-19: Decision: V4 Ownership Correction Plan created. We will pack events to 48 bits (6 bytes) to save 4KB of Track RAM, enabling us to safely move 29 pattern-defining fields (like generator params and pitch tickets) to Sequence ownership.
 - 2026-05-18: Phase 7b complete. Re-topologized model for RAM safety (Sequence size: 16B, Track buffer: 2KB). Implemented MeloDICER-style duration variation and dynamic Burst Count/Rate semantics. Verified full evaluated lock and project load stability.
 - 2026-05-17: Phase 8 UI Stubs complete. Implemented list-based editors for both global Track parameters and per-step Sequence probabilities. Users can now edit all stochastic metrics on hardware.
@@ -32,6 +33,9 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 - [x] Design of Enhanced Stochastic features (PWT, Linearity, Marbles)
 - [x] RAM/CCMRAM budget assessment and mitigation strategy (heap lock)
 - [x] Update task wiki plan in accordance to spec
+- [x] Phase 9: V4 Ownership Correction (Sequence owns generative identity)
+- [x] Phase 9.1: UI Unstubbing (S0/S1/S2 real hardware mapping)
+- [x] Phase 9.2: Ticket Page Refinement (Banking, Arrow navigation, QuickEdit)
 
 ## Planned Phases (from Spec)
 
@@ -76,16 +80,14 @@ Implement the Enhanced Stochastic Track, a probability-driven melodic sequencer 
 ### Phase 8: UI Development
 - [x] Implement `StochasticSequenceEditPage` stub (Boring List).
 - [x] Implement `StochasticConfigPage` stub (Boring List).
-- [ ] Implement final visual UI (Grid + Layer switching + PWT visualization).
+- [x] Implement final visual UI (Ticket Bar Page with Banking).
+- [ ] Implement Layer switching visualization for Performance Page.
 
 ### Phase 9: Validation & Optimization
-- [ ] Final hardware verification (STM32 release).
+- [x] Final hardware verification (STM32 release) of memory gates.
 - [ ] Generator system integration (`StochasticSequenceBuilder`).
 
 ## Notes
 - `StochasticTrack` target size: 8,854 B (NoteTrack gate: 9,544 B).
-- `StochasticEngine` target size: < 912 B (via heap allocation).
-- Reference Vinx implementation: `temp-ref/vinx-performer/src/apps/sequencer/{model,engine,ui}/Stochastic*`
- 8,854 B (NoteTrack gate: 9,544 B).
 - `StochasticEngine` target size: < 912 B (via heap allocation).
 - Reference Vinx implementation: `temp-ref/vinx-performer/src/apps/sequencer/{model,engine,ui}/Stochastic*`

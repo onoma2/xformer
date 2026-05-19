@@ -1,9 +1,8 @@
 #pragma once
 
-#include "ListPage.h"
-#include "ui/model/StochasticSequenceListModel.h"
+#include "BasePage.h"
 
-class StochasticSequenceEditPage : public ListPage {
+class StochasticSequenceEditPage : public BasePage {
 public:
     StochasticSequenceEditPage(PageManager &manager, PageContext &context);
 
@@ -15,8 +14,27 @@ public:
 
     virtual void keyDown(KeyEvent &event) override;
     virtual void keyPress(KeyPressEvent &event) override;
+    virtual void encoder(EncoderEvent &event) override;
 
 private:
-    StochasticSequenceListModel _listModel;
-    int _stepIndex = 0;
+    enum class EditFocus {
+        Ticket,
+        DegreeRotation,
+        MaskRotation,
+        Last
+    };
+
+    enum class ContextAction {
+        Init,
+        Even,
+        Random,
+        Last
+    };
+
+    void contextShow(bool doubleClick = false);
+    void contextAction(int index);
+
+    int _selectedDegree = 0;
+    int _bank = 0;
+    EditFocus _editFocus = EditFocus::Ticket;
 };

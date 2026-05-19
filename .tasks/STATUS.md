@@ -12,12 +12,12 @@ _Updated: 2026-05-18_
 
 ## 🔴 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
 **Status:** active
-**Where I stopped:** V4 Ownership Correction Plan evaluated and mathematically proven (`PHASE9-V4-OWNERSHIP.md`). Ready to execute.
-**Next action:** Implement Phase 1: Event Re-packing (48-bit compact structure).
+**Where I stopped:** Phase 9 (V4 Ownership) and Phase 9.1 (UI Unstubbing) complete. Pattern-defining parameters moved to Sequence; 6-byte Event packing verified (sizeof(Seq)=484, sizeof(Trk)=8252); Ticket Page (S3) implemented with 16-bar banks, Left/Right navigation, and QuickEdit shortcuts.
+**Next action:** Perform final hardware verification of S3 ticket interaction and pattern switching consistency.
 **Depends on:** resource-optimization (RAM headroom)
 **Blocks:** nothing
 **Branch:** feat/stochastic
-**Reference:** `.tasks/stochastic-track-port/TASK.md`, `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md`, `.tasks/stochastic-track-port/PHASE9-V4-OWNERSHIP.md`, `.tasks/stochastic-track-port/UI-DESIGN.md`, `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md`
+**Reference:** `.tasks/stochastic-track.md`, `.tasks/stochastic-track-port/PHASE9-V4-OWNERSHIP.md`
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
