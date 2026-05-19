@@ -9,7 +9,9 @@ class StochasticConfigListModel : public RoutableListModel {
 public:
     enum Item {
         Lock,
+        PlayMode,
         Divisor,
+        ClockMult,
         ResetMeasure,
         Scale,
         RootNote,
@@ -42,7 +44,9 @@ public:
         if (column == 0) {
             switch (Item(row)) {
             case Lock:          str("Lock"); break;
+            case PlayMode:      str("Play Mode"); break;
             case Divisor:       str("Clock/Div"); break;
+            case ClockMult:     str("Clock Mult"); break;
             case ResetMeasure:  str("Reset Measure"); break;
             case Scale:         str("Scale"); break;
             case RootNote:      str("Root Note"); break;
@@ -57,7 +61,9 @@ public:
         } else if (column == 1) {
             switch (Item(row)) {
             case Lock:          _track->printLock(str); break;
+            case PlayMode:      _track->printPlayMode(str); break;
             case Divisor:       sequence.printDivisor(str); break;
+            case ClockMult:     sequence.printClockMultiplier(str); break;
             case ResetMeasure:  sequence.printResetMeasure(str); break;
             case Scale:         sequence.printScale(str); break;
             case RootNote:      sequence.printRootNote(str); break;
@@ -77,7 +83,9 @@ public:
             auto &sequence = _track->sequence(_project->selectedPatternIndex());
             switch (Item(row)) {
             case Lock:          _track->editLock(value, shift); break;
+            case PlayMode:      _track->editPlayMode(value, shift); break;
             case Divisor:       sequence.editDivisor(value, shift); break;
+            case ClockMult:     sequence.editClockMultiplier(value, shift); break;
             case ResetMeasure:  sequence.editResetMeasure(value, shift); break;
             case Scale:         sequence.editScale(value, shift); break;
             case RootNote:      sequence.editRootNote(value, shift); break;
@@ -97,6 +105,9 @@ public:
         case Octave:        return Routing::Target::Octave;
         case Transpose:     return Routing::Target::Transpose;
         case SlideTime:     return Routing::Target::SlideTime;
+        case ClockMult:     return Routing::Target::ClockMult;
+        case Scale:         return Routing::Target::Scale;
+        case RootNote:      return Routing::Target::RootNote;
         default:            return Routing::Target::None;
         }
     }

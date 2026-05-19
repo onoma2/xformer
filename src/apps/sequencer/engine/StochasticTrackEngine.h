@@ -15,6 +15,7 @@ public:
 
     virtual void reset() override;
     virtual void restart() override;
+    virtual void stop() override;
     virtual TickResult tick(uint32_t tick) override;
     virtual void update(float dt) override;
 
@@ -53,12 +54,9 @@ private:
     uint16_t _loopCycleCount = 0;
     int _lastDegree = -1;
     int _jumpRegister = 0;
+    int _lastFreeStepIndex = -1;
     bool _patternCycleEnded = false;
 
-    SequenceState _sequenceState;
-    SequenceState _linkData;
-
-    bool _prevCondition = false;
     bool _activity = false;
     bool _gateOutput = false;
     bool _accentOutput = false;

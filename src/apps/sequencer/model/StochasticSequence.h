@@ -40,6 +40,21 @@ public:
     int divisor() const { return _divisor; }
     void setDivisor(int divisor) { _divisor = ModelUtils::clampDivisor(divisor); }
 
+    // clockMultiplier
+    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    void setClockMultiplier(int clockMultiplier, bool routed = false) {
+        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    }
+    void editClockMultiplier(int value, bool shift) {
+        if (!isRouted(Routing::Target::ClockMult)) {
+            setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
+        }
+    }
+    void printClockMultiplier(StringBuilder &str) const {
+        printRouted(str, Routing::Target::ClockMult);
+        str("%.2fx", clockMultiplier() * 0.01f);
+    }
+
     // resetMeasure
     int resetMeasure() const { return _resetMeasure; }
     void setResetMeasure(int resetMeasure) { _resetMeasure = clamp(resetMeasure, 0, 128); }
@@ -97,6 +112,7 @@ public:
         case Routing::Target::StochasticMutate: setMutate(intValue, true); break;
         case Routing::Target::StochasticJump: setJump(intValue, true); break;
         case Routing::Target::Rotate: setRotate(intValue, true); break;
+        case Routing::Target::ClockMult: setClockMultiplier(intValue, true); break;
         default: break;
         }
     }
@@ -394,6 +410,7 @@ public:
         _rootNote = -1;
         _divisor = 12;
         _resetMeasure = 0;
+        _clockMultiplier.setBase(100);
 
         _size = 16;
         _first = 0;
@@ -452,6 +469,7 @@ public:
         writer.write(_rootNote);
         writer.write(_divisor);
         writer.write(_resetMeasure);
+        _clockMultiplier.write(writer);
 
         writer.write(_size);
         writer.write(_first);
@@ -508,89 +526,10 @@ public:
         reader.read(_scale);
         reader.read(_rootNote);
         reader.read(_divisor);
-        reader.read(_resetMeasure);
-
-        reader.read(_size);
-        reader.read(_first);
-        reader.read(_last);
-
-        reader.read(_rhythmValid);
-        reader.read(_melodyValid);
-        reader.read(_rhythmSeed);
-        reader.read(_melodySeed);
-
-        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) reader.read(_degreeTickets[i]);
-        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) _degreeTickets[i] = clamp(int(_degreeTickets[i]), -1, 100);
-        reader.read(_linearity);
-        _linearity = clamp(int(_linearity), 0, 100);
-        reader.read(_degreeRotation);
-        _degreeRotation = clamp(int(_degreeRotation), -32, 32);
-        reader.read(_maskRotation);
-        _maskRotation = clamp(int(_maskRotation), -32, 32);
-        reader.read(_accentProb);
-        _accentProb = clamp(int(_accentProb), 0, 100);
-        reader.read(_legatoProb);
-        _legatoProb = clamp(int(_legatoProb), 0, 100);
-        uint8_t marblesMode;
-        reader.read(marblesMode);
-        _marblesMode = marblesMode < uint8_t(MarblesMode::Last) ? static_cast<MarblesMode>(marblesMode) : MarblesMode::Off;
-        reader.read(_marblesSpread);
-        _marblesSpread = clamp(int(_marblesSpread), 0, 100);
-        reader.read(_marblesBias);
-        _marblesBias = clamp(int(_marblesBias), 0, 100);
-        reader.read(_marblesSteps);
-        _marblesSteps = clamp(int(_marblesSteps), 1, 100);
-        _mask.read(reader);
-        _tilt.read(reader);
-        _reservedJitter.read(reader);
-        _burst.read(reader);
-        reader.read(_minDegree);
-        _minDegree = clamp(int(_minDegree), 0, 127);
-        reader.read(_maxDegree);
-        _maxDegree = clamp(int(_maxDegree), 0, 127);
-        _rotate.read(reader);
-        _complexity.read(reader);
-        _contour.read(reader);
-        _rate.read(reader);
-        _variation.read(reader);
-        _rest.read(reader);
-        _slide.read(reader);
-        reader.read(_burstRate);
-        _burstRate = clamp(int(_burstRate), 0, 100);
-        reader.read(_burstCount);
-        _burstCount = clamp(int(_burstCount), 0, 100);
-        uint8_t burstPitch;
-        reader.read(burstPitch);
-        _burstPitch = burstPitch < uint8_t(StochasticBurstPitch::Last) ? static_cast<StochasticBurstPitch>(burstPitch) : StochasticBurstPitch::Parent;
-        _sleep.read(reader);
-        _patience.read(reader);
-        _mutate.read(reader);
-        _jump.read(reader);
-        reader.read(_range);
-        _range = clamp(int(_range), 1, 4);
-
-        uint8_t rhythmMode, melodyMode;
-        reader.read(rhythmMode);
-        _rhythmMode = rhythmMode < uint8_t(StochasticSourceMode::Last) ? static_cast<StochasticSourceMode>(rhythmMode) : StochasticSourceMode::Loop;
-        reader.read(melodyMode);
-        _melodyMode = melodyMode < uint8_t(StochasticSourceMode::Last) ? static_cast<StochasticSourceMode>(melodyMode) : StochasticSourceMode::Loop;
-
-
-        for (auto &event : _events) {
-            for (int i = 0; i < 6; ++i) {
-                reader.read(event.bytes[i]);
-            }
-        }
-
-        sanitizeAfterRead();
-    }
-
-private:
-    void sanitizeAfterRead() {
-        _scale = clamp(int(_scale), -1, Scale::Count - 1);
-        _rootNote = clamp(int(_rootNote), -1, 11);
         _divisor = ModelUtils::clampDivisor(_divisor);
+        reader.read(_resetMeasure);
         _resetMeasure = clamp(int(_resetMeasure), 0, 128);
+        _clockMultiplier.read(reader);
 
         if (_size < 2 || _size > CONFIG_STEP_COUNT) {
             _size = 16;
@@ -660,6 +599,7 @@ private:
     int8_t _rootNote = -1;
     uint8_t _divisor = 12;
     uint8_t _resetMeasure = 0;
+    Routable<uint8_t> _clockMultiplier;
 
     // Phase 7 Generation Parameters
     uint8_t _size;

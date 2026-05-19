@@ -97,6 +97,12 @@ public:
     CvUpdateMode cvUpdateMode() const { return _cvUpdateMode; }
     void setCvUpdateMode(CvUpdateMode mode) { _cvUpdateMode = ModelUtils::clampedEnum(mode); }
 
+    // playMode
+    Types::PlayMode playMode() const { return _playMode; }
+    void setPlayMode(Types::PlayMode playMode) { _playMode = ModelUtils::clampedEnum(playMode); }
+    void editPlayMode(int value, bool shift) { setPlayMode(ModelUtils::adjustedEnum(playMode(), value)); }
+    void printPlayMode(StringBuilder &str) const { str(Types::playModeName(playMode())); }
+
     // gateBias
     int gateBias() const { return _gateBias.get(isRouted(Routing::Target::GateProbabilityBias)); }
     void setGateBias(int bias, bool routed = false) { _gateBias.set(clamp(bias, -8, 8), routed); }
@@ -166,6 +172,7 @@ public:
         _transpose.setBase(0);
         _fillMode = FillMode::None;
         _cvUpdateMode = CvUpdateMode::Gate;
+        _playMode = Types::PlayMode::Aligned;
         _gateBias.setBase(0);
         _retriggerBias.setBase(0);
         _lengthBias.setBase(0);
@@ -188,6 +195,7 @@ public:
         _transpose.write(writer);
         writer.write(static_cast<uint8_t>(_fillMode));
         writer.write(static_cast<uint8_t>(_cvUpdateMode));
+        writer.write(static_cast<uint8_t>(_playMode));
         _gateBias.write(writer);
         _retriggerBias.write(writer);
         _lengthBias.write(writer);
@@ -217,6 +225,9 @@ public:
         uint8_t cvUpdateMode;
         reader.read(cvUpdateMode);
         _cvUpdateMode = cvUpdateMode < uint8_t(CvUpdateMode::Last) ? static_cast<CvUpdateMode>(cvUpdateMode) : CvUpdateMode::Gate;
+        uint8_t playMode;
+        reader.read(playMode);
+        _playMode = playMode < uint8_t(Types::PlayMode::Last) ? static_cast<Types::PlayMode>(playMode) : Types::PlayMode::Free;
         _gateBias.read(reader);
         _retriggerBias.read(reader);
         _lengthBias.read(reader);
@@ -251,6 +262,7 @@ private:
     Routable<int8_t> _transpose;
     FillMode _fillMode;
     CvUpdateMode _cvUpdateMode;
+    Types::PlayMode _playMode;
     Routable<int8_t> _gateBias;
     Routable<int8_t> _retriggerBias;
     Routable<int8_t> _lengthBias;

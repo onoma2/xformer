@@ -61,15 +61,14 @@ void StochasticTrackEngine::freeLockedSteps() {
 }
 
 void StochasticTrackEngine::reset() {
-    _sequenceState.reset();
     _patternIndex = _stochasticTrack.sequence(pattern()).first();
     _relativeTick = 0;
     _sleepRemaining = 0;
     _loopCycleCount = 0;
     _lastDegree = -1;
     _jumpRegister = 0;
+    _lastFreeStepIndex = -1;
     _patternCycleEnded = false;
-    _prevCondition = false;
     _activity = false;
     _gateOutput = false;
     _accentOutput = false;
@@ -83,10 +82,10 @@ void StochasticTrackEngine::reset() {
 }
 
 void StochasticTrackEngine::restart() {
-    _sequenceState.reset();
     _patternIndex = _stochasticTrack.sequence(pattern()).first();
     _relativeTick = 0;
     _lastDegree = -1;
+    _lastFreeStepIndex = -1;
     _rng = Random(0x12345678 + _track.trackIndex());
 }
 
@@ -94,42 +93,76 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
     ASSERT(_sequence != nullptr, "invalid sequence");
     const auto &sequence = *_sequence;
 
+    // Divisor with clock multiplier
+    float clockMult = sequence.clockMultiplier() * 0.01f;
     uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-    uint32_t resetMeasure = sequence.resetMeasure();
-    if (resetMeasure > 0) {
-        uint32_t resetDivisor = resetMeasure * _engine.measureDivisor();
-        uint32_t relativeTick = tick % resetDivisor;
-        if (relativeTick == 0) {
-            reset();
-        }
-        _relativeTick = relativeTick % divisor;
+    divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
+
+    // Reset measure
+    uint32_t resetDivisor = sequence.resetMeasure() * _engine.measureDivisor();
+    uint32_t relativeTick = resetDivisor == 0 ? tick : tick % resetDivisor;
+    if (resetDivisor > 0 && relativeTick == 0) {
+        reset();
     }
 
-    if (_relativeTick == 0) {
-        if (_sleepRemaining > 0) {
-            _sleepRemaining--;
-        } else {
-            triggerStep(tick, divisor);
+    // Dispatch by play mode
+    switch (_stochasticTrack.playMode()) {
+    case Types::PlayMode::Free: {
+        double tickPos = _engine.clock().tickPosition();
+        double baseTick = resetDivisor == 0 ? tickPos : std::fmod(tickPos, double(resetDivisor));
+        if (baseTick < 0.0) baseTick = 0.0;
+        int stepIndex = int(std::floor(baseTick / divisor));
+        if (stepIndex != _lastFreeStepIndex) {
+            _lastFreeStepIndex = stepIndex;
+            if (_sleepRemaining > 0) {
+                _sleepRemaining--;
+            } else {
+                triggerStep(tick, divisor);
+            }
         }
+        break;
+    }
+    case Types::PlayMode::Aligned:
+    default:
+        _relativeTick = resetDivisor == 0 ? tick % divisor : relativeTick % divisor;
+        if (_relativeTick == 0) {
+            if (_sleepRemaining > 0) {
+                _sleepRemaining--;
+            } else {
+                triggerStep(tick, divisor);
+            }
+        }
+        break;
     }
 
+    // Process gate queue
+    TickResult result = TickResult::NoUpdate;
     while (!_gateQueue.empty() && tick >= _gateQueue.front().tick) {
-        _gateOutput = _gateQueue.front().gate;
-        _accentOutput = _gateQueue.front().accent;
+        auto &ev = _gateQueue.front();
+        _gateOutput = ev.gate;
+        _accentOutput = ev.accent;
         _gateQueue.pop();
+        result |= TickResult::GateUpdate;
     }
 
+    // Process CV queue
     while (!_cvQueue.empty() && tick >= _cvQueue.front().tick) {
-        _cvOutputTarget = _cvQueue.front().cv;
-        _slideActive = _cvQueue.front().slide;
+        auto &ev = _cvQueue.front();
+        _cvOutputTarget = ev.cv;
+        _slideActive = ev.slide;
         _cvQueue.pop();
+        result |= TickResult::CvUpdate;
     }
 
-    if (resetMeasure == 0) {
-        _relativeTick = (_relativeTick + 1) % divisor;
-    }
+    return result;
+}
 
-    return (CvUpdate | GateUpdate);
+void StochasticTrackEngine::stop() {
+    _gateQueue.clear();
+    _cvQueue.clear();
+    _gateOutput = false;
+    _accentOutput = false;
+    _activity = false;
 }
 
 void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
