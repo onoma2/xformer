@@ -303,6 +303,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         int activeNotes = scale.notesPerOctave();
 
         uint32_t mult = getDurationMultiplier(eval.durationIndex());
+        _lastDurationIndex = eval.durationIndex();
         if (sequence.variation() != 0) {
             int variationRoll = _rng.nextRange(100);
             if (variationRoll < std::abs(sequence.variation())) {

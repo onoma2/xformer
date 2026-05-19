@@ -12,7 +12,7 @@ _Updated: 2026-05-19_
 
 ## 🟢 stochastic-track-port — V5 Control Granularity: model/engine/UI wired
 **Status:** done — Phase 10 V5 beta implemented and build verified.
-**Where I stopped:** V5 model/engine/UI complete. Character macro, step-relative Rate, L1/L2/L3 level-gated lists, dual-view ticket editor, Duration Ticket event timing. Save/load fixed. Reset measure now soft-realigns (snaps patternIndex to first, no queue clear/RNG reseed). Density=75, Rate=75, divisor=48, size=4, Gate CV mode defaults produce clean 1/4 note articulation.
+**Where I stopped:** V5 model/engine/UI complete. Multi-select ticket editor (hold=latch, shift=persist, encoder edits all selected). Active step highlighting (Bright=currently playing, MediumBright=selected). Duration Ticket event timing. Character macro, step-relative Rate, soft reset measure. Density=75, Rate=75, divisor=48, size=4, Gate CV defaults.
 **Next action:** Hardware verification: Density vs Mask distinction, Burst audibility, Duration Ticket selection, Patience 0/mid/100, Refresh command, split Rhythm/Melody Loop/Live, Lock stability.
 **Branch:** feat/stochastic
 **Reference:** `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`, `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`

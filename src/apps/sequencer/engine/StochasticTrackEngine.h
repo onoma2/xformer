@@ -35,6 +35,8 @@ public:
 
     int currentStep() const { return _patternIndex; }
     bool activity() const { return _activity; }
+    int lastDegree() const { return _lastDegree; }
+    int lastDurationIndex() const { return _lastDurationIndex; }
 
 private:
     void initLockedSteps();
@@ -54,6 +56,7 @@ private:
     uint8_t _sleepRemaining = 0;
     uint16_t _loopCycleCount = 0;
     int _lastDegree = -1;
+    int _lastDurationIndex = 0;
     int _jumpRegister = 0;
     int _lastFreeStepIndex = -1;
     bool _patternCycleEnded = false;

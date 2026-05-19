@@ -5,6 +5,8 @@
 #include "model/StochasticTrack.h"
 #include "core/utils/Random.h"
 
+#include "engine/StochasticTrackEngine.h"
+
 static const ContextMenuModel::Item contextMenuItems[] = {
     { "INIT" },
     { "EVEN" },
@@ -82,25 +84,39 @@ void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
         int x = xOffset + i * (barW + gap);
         int tickets = sequence.degreeTicket(degreeIndex);
 
+        bool active = false;
+        int activeDegree = -1;
+        if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+            auto &stoEng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
+            activeDegree = stoEng.lastDegree() % scaleSize;
+            active = (degreeIndex == activeDegree);
+        }
+        bool selected = (_pitchSelectionMask & (1U << degreeIndex)) != 0;
+
         if (tickets < 0) {
             canvas.setBlendMode(BlendMode::Set);
-            canvas.setColor(Color::Medium);
+            canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
             canvas.line(x, baseY - 5, x + barW - 1, baseY);
             canvas.line(x, baseY, x + barW - 1, baseY - 5);
         } else if (tickets == 0) {
             canvas.setBlendMode(BlendMode::Set);
-            canvas.setColor(Color::Low);
+            canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
             canvas.drawRect(x, baseY - 2, barW - 1, 2);
         } else {
             int h = (tickets * barMaxH) / 100;
             h = std::max(1, h);
             canvas.setBlendMode(BlendMode::Set);
-            canvas.setColor(degreeIndex == _selectedDegree ? Color::Bright : Color::Medium);
+            if (active) canvas.setColor(Color::Bright);
+            else if (selected) canvas.setColor(Color::MediumBright);
+            else canvas.setColor(Color::Medium);
             canvas.fillRect(x, baseY - h, barW, h);
         }
 
-        if (degreeIndex == _selectedDegree) {
+        if (active) {
             canvas.setColor(Color::Bright);
+            canvas.hline(x - 1, baseY + 2, barW + 2);
+        } else if (degreeIndex == _selectedDegree) {
+            canvas.setColor(Color::MediumBright);
             canvas.hline(x - 1, baseY + 2, barW + 2);
         }
     }
@@ -161,20 +177,33 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
         int x = xOffset + i * (barW + gap);
         int weight = sequence.durationTicket(i);
 
+        int activeIdx = -1;
+        if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+            auto &stoEng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
+            activeIdx = stoEng.lastDurationIndex();
+        }
+        bool active = (i == activeIdx);
+        bool selected = (_durSelectionMask & (1U << i)) != 0;
+
         if (weight == 0) {
             canvas.setBlendMode(BlendMode::Set);
-            canvas.setColor(Color::Low);
+            canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
             canvas.drawRect(x, baseY - 2, barW - 1, 2);
         } else {
             int h = (weight * barMaxH) / 100;
             h = std::max(1, h);
             canvas.setBlendMode(BlendMode::Set);
-            canvas.setColor(i == _selectedDurSlot ? Color::Bright : Color::Medium);
+            if (active) canvas.setColor(Color::Bright);
+            else if (selected) canvas.setColor(Color::MediumBright);
+            else canvas.setColor(Color::Medium);
             canvas.fillRect(x, baseY - h, barW, h);
         }
 
-        if (i == _selectedDurSlot) {
+        if (active) {
             canvas.setColor(Color::Bright);
+            canvas.hline(x - 1, baseY + 2, barW + 2);
+        } else if (i == _selectedDurSlot) {
+            canvas.setColor(Color::MediumBright);
             canvas.hline(x - 1, baseY + 2, barW + 2);
         }
 
@@ -222,10 +251,18 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
         auto &scale = sequence.selectedScale(_project.scale());
         int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
 
+        int activeDegree = -1;
+        if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+            auto &stoEng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
+            activeDegree = stoEng.lastDegree() % scaleSize;
+        }
+
         for (int i = 0; i < 16; ++i) {
             int degreeIndex = _bank * 16 + i;
             bool bit = (degreeIndex < scaleSize);
-            leds.set(MatrixMap::fromStep(i), bit && (degreeIndex == _selectedDegree), bit);
+            bool selected = (_pitchSelectionMask & (1U << degreeIndex)) != 0;
+            bool active = (degreeIndex == activeDegree);
+            leds.set(MatrixMap::fromStep(i), active || (bit && selected), bit);
         }
 
         if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
@@ -239,8 +276,15 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
         break;
     }
     case Page::Duration: {
+        int activeIdx = -1;
+        if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+            auto &stoEng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
+            activeIdx = stoEng.lastDurationIndex();
+        }
         for (int i = 0; i < 8; ++i) {
-            leds.set(MatrixMap::fromStep(i), i == _selectedDurSlot, true);
+            bool active = (i == activeIdx);
+            bool selected = (_durSelectionMask & (1U << i)) != 0;
+            leds.set(MatrixMap::fromStep(i), active || (i == _selectedDurSlot), true);
         }
         break;
     }
@@ -271,7 +315,19 @@ void StochasticSequenceEditPage::handlePitchKeyDown(KeyEvent &event) {
         int degreeIndex = _bank * 16 + key.step();
         if (degreeIndex < scaleSize) {
             _selectedDegree = degreeIndex;
+            if (_persistMode) {
+                _pitchSelectionMask ^= (1U << degreeIndex);
+            } else {
+                _pitchSelectionMask |= (1U << degreeIndex);
+            }
         }
+        event.consume();
+        return;
+    }
+
+    if (key.isShift()) {
+        _persistMode = !_persistMode;
+        if (!_persistMode) _pitchSelectionMask = 0;
         event.consume();
         return;
     }
@@ -291,7 +347,19 @@ void StochasticSequenceEditPage::handleDurationKeyDown(KeyEvent &event) {
         int step = key.step();
         if (step >= 0 && step < 8) {
             _selectedDurSlot = step;
+            if (_persistMode) {
+                _durSelectionMask ^= (1U << step);
+            } else {
+                _durSelectionMask |= (1U << step);
+            }
         }
+        event.consume();
+        return;
+    }
+
+    if (key.isShift()) {
+        _persistMode = !_persistMode;
+        if (!_persistMode) _durSelectionMask = 0;
         event.consume();
         return;
     }
@@ -303,6 +371,30 @@ void StochasticSequenceEditPage::handleDurationKeyDown(KeyEvent &event) {
     }
 
     BasePage::keyDown(event);
+}
+
+void StochasticSequenceEditPage::keyUp(KeyEvent &event) {
+    const auto &key = event.key();
+    if (key.isStep() && !_persistMode) {
+        if (_currentPage == Page::Pitch) {
+            int degreeIndex = _bank * 16 + key.step();
+            _pitchSelectionMask &= ~(1U << degreeIndex);
+        } else if (_currentPage == Page::Duration) {
+            int step = key.step();
+            if (step >= 0 && step < 8) {
+                _durSelectionMask &= ~(1U << step);
+            }
+        }
+        event.consume();
+        return;
+    }
+
+    if (key.isShift()) {
+        event.consume();
+        return;
+    }
+
+    BasePage::keyUp(event);
 }
 
 void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
@@ -412,11 +504,20 @@ void StochasticSequenceEditPage::encoder(EncoderEvent &event) {
 void StochasticSequenceEditPage::handlePitchEncoder(EncoderEvent &event) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &sequence = track.sequence(_project.selectedPatternIndex());
+    auto &scale = sequence.selectedScale(_project.scale());
+    int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
 
     switch (_editFocus) {
-    case EditFocus::Ticket:
-        sequence.setDegreeTicket(_selectedDegree, sequence.degreeTicket(_selectedDegree) + event.value());
+    case EditFocus::Ticket: {
+        uint32_t mask = _pitchSelectionMask;
+        if (_pitchSelectionMask == 0) mask = (1U << _selectedDegree);
+        for (int i = 0; i < scaleSize; ++i) {
+            if (mask & (1U << i)) {
+                sequence.setDegreeTicket(i, sequence.degreeTicket(i) + event.value());
+            }
+        }
         break;
+    }
     case EditFocus::DegreeRotation:
         sequence.setDegreeRotation(sequence.degreeRotation() + event.value());
         break;
@@ -435,9 +536,16 @@ void StochasticSequenceEditPage::handleDurationEncoder(EncoderEvent &event) {
     auto &sequence = track.sequence(_project.selectedPatternIndex());
 
     switch (_durFocus) {
-    case DurFocus::DurTicket:
-        sequence.setDurationTicket(_selectedDurSlot, sequence.durationTicket(_selectedDurSlot) + event.value());
+    case DurFocus::DurTicket: {
+        uint32_t mask = _durSelectionMask;
+        if (_durSelectionMask == 0) mask = (1U << _selectedDurSlot);
+        for (int i = 0; i < 8; ++i) {
+            if (mask & (1U << i)) {
+                sequence.setDurationTicket(i, sequence.durationTicket(i) + event.value());
+            }
+        }
         break;
+    }
     case DurFocus::Rest:
         sequence.setRest(sequence.rest() + event.value());
         break;

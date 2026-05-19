@@ -13,6 +13,7 @@ public:
     virtual void updateLeds(Leds &leds) override;
 
     virtual void keyDown(KeyEvent &event) override;
+    virtual void keyUp(KeyEvent &event) override;
     virtual void keyPress(KeyPressEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
 
@@ -59,6 +60,9 @@ private:
     int _selectedDegree = 0;
     int _bank = 0;
     EditFocus _editFocus = EditFocus::Ticket;
+    uint32_t _pitchSelectionMask = 0;
+    uint32_t _durSelectionMask = 0;
+    bool _persistMode = false;
 
     Page _currentPage = Page::Pitch;
     int _selectedDurSlot = 0;
