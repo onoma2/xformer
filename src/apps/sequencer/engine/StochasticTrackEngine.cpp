@@ -69,6 +69,12 @@ void StochasticTrackEngine::freeLockedSteps() {
     }
 }
 
+void StochasticTrackEngine::resetMeasure() {
+    _patternIndex = _stochasticTrack.sequence(pattern()).first();
+    _relativeTick = 0;
+    _eventElapsed = 0;
+}
+
 void StochasticTrackEngine::reset() {
     _patternIndex = _stochasticTrack.sequence(pattern()).first();
     _relativeTick = 0;
@@ -78,6 +84,8 @@ void StochasticTrackEngine::reset() {
     _jumpRegister = 0;
     _lastFreeStepIndex = -1;
     _patternCycleEnded = false;
+    _eventElapsed = 0;
+    _eventDuration = 0;
     _eventElapsed = 0;
     _eventDuration = 0;
     _activity = false;
@@ -113,7 +121,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
     uint32_t resetDivisor = sequence.resetMeasure() * _engine.measureDivisor();
     uint32_t relativeTick = resetDivisor == 0 ? tick : tick % resetDivisor;
     if (resetDivisor > 0 && relativeTick == 0) {
-        reset();
+        resetMeasure();
     }
 
     // Dispatch by play mode or Duration Tickets event timing

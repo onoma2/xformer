@@ -41,6 +41,7 @@ private:
     void freeLockedSteps();
 
     void triggerStep(uint32_t tick, uint32_t divisor);
+    void resetMeasure();
     void refreshLoopSources();
 
     const StochasticTrack &_stochasticTrack;
