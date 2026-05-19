@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stochastic Track - User Manual</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+        :root {
+            --bg: #f8f8f6;
+            --bg-card: #ffffff;
+            --bg-secondary: #f0efed;
+            --bg-tertiary: #e8e7e4;
+            --border: #d4d3d0;
+            --text-primary: #1a1a18;
+            --text-secondary: #555450;
+            --text-muted: #8b8a86;
+            --accent: #0a7c42;
+            --accent-bg: #e6f5ed;
+            --accent-warm: #b45309;
+            --accent-warm-bg: #fef3e7;
+            --accent-blue: #1d4ed8;
+            --accent-blue-bg: #e8effc;
+            --accent-red: #b91c1c;
+            --accent-red-bg: #fde8e8;
+            --accent-purple: #7c3aed;
+            --accent-purple-bg: #f0eaff;
+            --accent-pink: #c0266d;
+            --accent-teal: #0d7a7a;
+            --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            line-height: 1.7;
+            font-size: 15px;
+        }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 48px 24px 96px; }
+
+        /* --- Typography --- */
+        h1 { font-size: 32px; font-weight: 700; color: var(--accent); margin-bottom: 4px; letter-spacing: -0.5px; }
+        .subtitle { color: var(--text-secondary); font-size: 15px; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 2px solid var(--border); }
+        h2 { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-top: 52px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+        h3 { font-size: 17px; font-weight: 600; color: var(--accent); margin-top: 28px; margin-bottom: 10px; }
+        h4 { font-size: 15px; font-weight: 600; color: var(--text-secondary); margin-top: 20px; margin-bottom: 8px; }
+        p { margin-bottom: 12px; color: var(--text-secondary); }
+        strong { color: var(--text-primary); font-weight: 600; }
+
+        /* --- ToC --- */
+        .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px; margin-bottom: 36px; box-shadow: var(--shadow); }
+        .toc h3 { margin: 0 0 14px 0; color: var(--text-primary); font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; }
+        .toc ul { list-style: none; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+        .toc ul li { margin: 0; }
+        .toc ul li a { color: var(--text-secondary); text-decoration: none; font-size: 13px; transition: color 0.15s; padding: 3px 0; display: inline-block; }
+        .toc ul li a:hover { color: var(--accent); text-decoration: underline; }
+
+        /* --- Callout --- */
+        .callout { background: var(--bg-card); border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px 18px; margin: 18px 0; font-size: 14px; box-shadow: var(--shadow); }
+        .callout.warm { border-left-color: var(--accent-warm); }
+        .callout.blue { border-left-color: var(--accent-blue); }
+        .callout.red { border-left-color: var(--accent-red); }
+        .callout.purple { border-left-color: var(--accent-purple); }
+        .callout.pink { border-left-color: var(--accent-pink); }
+        .callout strong { color: var(--text-primary); }
+
+        /* --- Tables --- */
+        .param-table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 13px; border-radius: 8px; overflow: hidden; box-shadow: var(--shadow); }
+        .param-table th { text-align: left; padding: 10px 14px; background: var(--bg-secondary); color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+        .param-table td { padding: 9px 14px; border-bottom: 1px solid var(--bg-tertiary); color: var(--text-secondary); vertical-align: top; background: var(--bg-card); }
+        .param-table tr:last-child td { border-bottom: none; }
+        .param-table td:first-child { color: var(--accent); font-weight: 600; white-space: nowrap; width: 150px; }
+        .param-table tr:hover td { background: var(--accent-bg); }
+        .param-table .routable { display: inline-block; font-size: 10px; background: var(--accent-bg); color: var(--accent); padding: 0 7px; border-radius: 4px; margin-left: 4px; font-weight: 700; letter-spacing: 0.5px; }
+
+        /* --- kbd / code --- */
+        kbd { background: var(--bg-card); border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; font-size: 12px; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; box-shadow: var(--shadow); }
+        code { background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+
+        hr { border: none; border-top: 2px solid var(--border); margin: 40px 0; }
+        ul, ol { color: var(--text-secondary); margin: 8px 0 16px 22px; }
+        ul li, ol li { margin: 5px 0; }
+
+        .page-header { display: inline-block; background: var(--accent-bg); color: var(--accent); font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 5px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+        /* ============================================
+           SVG / Schematic Styles
+           ============================================ */
+        .fig { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin: 20px 0; box-shadow: var(--shadow-md); overflow-x: auto; }
+        .fig svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+        .fig-caption { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 10px; font-weight: 500; letter-spacing: 0.3px; }
+
+        /* --- Legend bar --- */
+        .legend { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin: 12px 0 6px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+        .legend-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); }
+
+        /* --- Schematic node style --- */
+        .sch-block { fill: #ffffff; stroke: #d4d3d0; stroke-width: 1.5; rx: 6; ry: 6; }
+        .sch-block-accent { fill: var(--accent-bg); stroke: var(--accent); stroke-width: 1.5; rx: 6; ry: 6; }
+        .sch-block-warm { fill: var(--accent-warm-bg); stroke: var(--accent-warm); stroke-width: 1.5; rx: 6; ry: 6; }
+        .sch-block-blue { fill: var(--accent-blue-bg); stroke: var(--accent-blue); stroke-width: 1.5; rx: 6; ry: 6; }
+        .sch-block-purple { fill: var(--accent-purple-bg); stroke: var(--accent-purple); stroke-width: 1.5; rx: 6; ry: 6; }
+        .sch-arrow { stroke: #888; stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }
+        .sch-arrow-accent { stroke: var(--accent); stroke-width: 2; fill: none; marker-end: url(#arrowhead-accent); }
+        .sch-arrow-warm { stroke: var(--accent-warm); stroke-width: 2; fill: none; marker-end: url(#arrowhead-warm); }
+        .sch-arrow-blue { stroke: var(--accent-blue); stroke-width: 2; fill: none; marker-end: url(#arrowhead-blue); }
+        .sch-arrow-red { stroke: var(--accent-red); stroke-width: 2; fill: none; marker-end: url(#arrowhead-red); }
+        .sch-text { font-family: 'Inter', sans-serif; font-size: 11px; fill: var(--text-primary); font-weight: 500; }
+        .sch-text-label { font-family: 'Inter', sans-serif; font-size: 10px; fill: var(--text-muted); }
+        .sch-text-accent { font-family: 'Inter', sans-serif; font-size: 11px; fill: var(--accent); font-weight: 600; }
+        .sch-text-small { font-family: 'Inter', sans-serif; font-size: 9px; fill: var(--text-muted); }
+        .sch-dash { stroke: #aaa; stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
+        .sch-fill-dim { fill: var(--bg-secondary); stroke: var(--border); stroke-width: 1; rx: 4; ry: 4; }
+
+        /* --- Bar chart / ticket viz --- */
+        .bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 120px; padding: 10px 0; margin: 10px 0; }
+        .bar { flex: 1; min-width: 8px; background: var(--accent); border-radius: 3px 3px 0 0; position: relative; transition: height 0.2s; }
+        .bar.excluded { background: repeating-linear-gradient(135deg, var(--accent-red) 0, var(--accent-red) 2px, transparent 2px, transparent 4px); }
+        .bar-label { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--text-muted); white-space: nowrap; }
+        .bar-value { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--accent); font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- ============================================ -->
+        <!-- HEADER -->
+        <!-- ============================================ -->
+        <h1>Stochastic Track</h1>
+        <p class="subtitle">
+            Algorithmic generative sequencer &mdash; probabilistic rhythm, melody, and real-time mutation
+        </p>
+
+        <!-- ============================================ -->
+        <!-- TABLE OF CONTENTS -->
+        <!-- ============================================ -->
+        <div class="toc">
+            <h3>Contents</h3>
+            <ul>
+                <li><a href="#overview">1 &middot; Overview</a></li>
+                <li><a href="#architecture">2 &middot; Architecture</a></li>
+                <li><a href="#key-concepts">3 &middot; Key Concepts</a></li>
+                <li><a href="#navigation">4 &middot; Page Navigation</a></li>
+                <li><a href="#stoch-page">5 &middot; Performance Page (STOCH)</a></li>
+                <li><a href="#config-page">6 &middot; Config Page (STOCH CFG)</a></li>
+                <li><a href="#tickets-page">7 &middot; Degree Ticket Editor</a></li>
+                <li><a href="#generator">8 &middot; Generator Engine</a></li>
+                <li><a href="#workflow">9 &middot; Workflow Guide</a></li>
+                <li><a href="#reference">10 &middot; Parameter Reference</a></li>
+            </ul>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- 1. OVERVIEW -->
+        <!-- ================================================================ -->
+        <h2 id="overview">1 &middot; Overview</h2>
+
+        <p>
+            The <strong>Stochastic track</strong> is a probability-driven generative sequencer.
+            Instead of programming every note, you define a <em>probability space</em> and the
+            sequencer explores it &mdash; generating rhythm and melody from high-level parameters
+            in real time.
+        </p>
+
+        <div class="fig">
+            <svg viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#888"/></marker>
+                    <marker id="arrowhead-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#0a7c42"/></marker>
+                    <marker id="arrowhead-warm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#b45309"/></marker>
+                    <marker id="arrowhead-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#1d4ed8"/></marker>
+                    <marker id="arrowhead-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#b91c1c"/></marker>
+                    <marker id="arrowhead-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><polygon points="0 0, 10 5, 0 10" fill="#7c3aed"/></marker>
+                </defs>
+
+                <!-- Title -->
+                <text x="350" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Stochastic Track &mdash; High-Level Architecture</text>
+
+                <!-- Domains: Rhythm (left), Melody (right) -->
+                <rect class="sch-block" x="40" y="50" width="260" height="190" />
+                <text x="170" y="74" text-anchor="middle" class="sch-text-accent">Rhythm Domain</text>
+                <text x="170" y="90" text-anchor="middle" class="sch-text-small">"When"</text>
+
+                <rect class="sch-block-blue" x="400" y="50" width="260" height="190" />
+                <text x="530" y="74" text-anchor="middle" font-family="Inter" font-size="11" fill="#1d4ed8" font-weight="600">Melody Domain</text>
+                <text x="530" y="90" text-anchor="middle" class="sch-text-small">"What pitch"</text>
+
+                <!-- Rhythm internals -->
+                <rect class="sch-fill-dim" x="70" y="110" width="100" height="30" />
+                <text x="120" y="129" text-anchor="middle" class="sch-text">Duration</text>
+                <rect class="sch-fill-dim" x="70" y="150" width="100" height="30" />
+                <text x="120" y="169" text-anchor="middle" class="sch-text">Density Gate</text>
+                <rect class="sch-fill-dim" x="70" y="190" width="100" height="30" />
+                <text x="120" y="209" text-anchor="middle" class="sch-text">Rest / Accent</text>
+
+                <rect class="sch-fill-dim" x="200" y="110" width="80" height="30" />
+                <text x="240" y="129" text-anchor="middle" class="sch-text">Burst</text>
+                <rect class="sch-fill-dim" x="200" y="150" width="80" height="30" />
+                <text x="240" y="169" text-anchor="middle" class="sch-text">Children</text>
+                <rect class="sch-fill-dim" x="200" y="190" width="80" height="30" />
+                <text x="240" y="209" text-anchor="middle" class="sch-text">Gate Out</text>
+
+                <path class="sch-arrow" d="M170,140 L200,125" />
+                <path class="sch-arrow" d="M170,180 L200,165" />
+                <path class="sch-arrow" d="M120,110 L120,150" />
+                <path class="sch-arrow" d="M120,180 L120,190" />
+                <path class="sch-arrow" d="M240,140 L240,150" />
+                <path class="sch-arrow" d="M240,180 L240,190" />
+
+                <!-- Melody internals -->
+                <rect class="sch-fill-dim" x="430" y="110" width="100" height="30" />
+                <text x="480" y="129" text-anchor="middle" class="sch-text">Tickets</text>
+                <rect class="sch-fill-dim" x="430" y="150" width="100" height="30" />
+                <text x="480" y="169" text-anchor="middle" class="sch-text">Marbles</text>
+                <rect class="sch-fill-dim" x="430" y="190" width="100" height="30" />
+                <text x="480" y="209" text-anchor="middle" class="sch-text">CV Out</text>
+
+                <rect class="sch-fill-dim" x="560" y="110" width="80" height="70" />
+                <text x="600" y="138" text-anchor="middle" class="sch-text">Cpx / Cntr</text>
+                <text x="600" y="155" text-anchor="middle" class="sch-text">/ Linear</text>
+                <text x="600" y="172" text-anchor="middle" class="sch-text">Modifiers</text>
+
+                <path class="sch-arrow" d="M480,140 L560,145" />
+                <path class="sch-arrow" d="M530,140 L560,145" />
+                <path class="sch-arrow" d="M480,110 L480,150" />
+                <path class="sch-arrow" d="M480,180 L480,190" />
+
+                <!-- Shared evolution -->
+                <rect class="sch-block-warm" x="140" y="38" width="380" height="0" /> <!-- invisible, just for grouping -->
+
+                <path class="sch-arrow-accent" d="M380,115 L430,115" />
+                <path class="sch-arrow-accent" d="M380,165 L430,165" />
+
+                <!-- Bottom: source modes label -->
+                <rect class="sch-block" x="200" y="248" width="260" height="28" rx="14" ry="14" />
+                <text x="330" y="266" text-anchor="middle" class="sch-text">Source Mode: Loop / Live (independent per domain)</text>
+
+                <path class="sch-arrow" d="M170,240 L240,258" />
+                <path class="sch-arrow" d="M530,240 L420,258" />
+
+                <!-- Legend -->
+                <rect class="sch-block" x="40" y="248" width="130" height="28" rx="4" ry="4" fill="var(--bg-card)" />
+                <text x="105" y="266" text-anchor="middle" class="sch-text-small">Cycle-end: Mutate / Patience</text>
+            </svg>
+            <div class="fig-caption">Figure 1: Dual-domain architecture of the Stochastic track</div>
+        </div>
+
+        <p>
+            The track operates on <strong>two independent generative domains</strong> &mdash; rhythm
+            (when events fire) and melody (what pitches they play). Each domain has its own source mode,
+            seed, buffer, and mutation system. The two outputs combine at the gate and CV jacks.
+        </p>
+
+        <div class="callout blue">
+            <strong>Tip:</strong> The Stochastic track excels at generative ambient, aleatoric percussion,
+            evolving basslines, and any situation where you want musical variation without step-by-step programming.
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- 2. ARCHITECTURE -->
+        <!-- ================================================================ -->
+        <h2 id="architecture">2 &middot; Architecture</h2>
+
+        <div class="fig">
+            <svg viewBox="0 0 740 340" xmlns="http://www.w3.org/2000/svg">
+                <!-- Title -->
+                <text x="370" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Step Evaluation Pipeline</text>
+
+                <!-- Row of blocks -->
+                <rect class="sch-block-purple" x="20" y="60" width="90" height="40" />
+                <text x="65" y="84" text-anchor="middle" class="sch-text">1. Lock Check</text>
+
+                <path class="sch-arrow" d="M110,80 L150,80" />
+
+                <rect class="sch-block" x="150" y="60" width="90" height="40" />
+                <text x="195" y="84" text-anchor="middle" class="sch-text">2. Source Fetch</text>
+
+                <path class="sch-arrow" d="M240,80 L280,80" />
+
+                <rect class="sch-block-warm" x="280" y="60" width="90" height="40" />
+                <text x="325" y="84" text-anchor="middle" class="sch-text">3. Duration</text>
+
+                <path class="sch-arrow" d="M370,80 L410,80" />
+
+                <rect class="sch-block" x="410" y="60" width="90" height="40" />
+                <text x="455" y="84" text-anchor="middle" class="sch-text">4. Density Gate</text>
+
+                <path class="sch-arrow" d="M500,80 L540,80" />
+
+                <rect class="sch-block-blue" x="540" y="60" width="90" height="40" />
+                <text x="585" y="84" text-anchor="middle" class="sch-text">5. Pitch Select</text>
+
+                <path class="sch-arrow" d="M630,80 L670,80" />
+
+                <rect class="sch-block-accent" x="670" y="60" width="60" height="40" />
+                <text x="700" y="84" text-anchor="middle" class="sch-text">Out</text>
+
+                <!-- Branch lines -->
+                <!-- Rest/Legato/Slide/Accent branch -->
+                <path class="sch-dash" d="M325,100 L325,130 L240,130" />
+                <rect class="sch-fill-dim" x="140" y="118" width="100" height="28" />
+                <text x="190" y="136" text-anchor="middle" class="sch-text-label">Rest / Legato / Slide / Accent</text>
+
+                <!-- Children branch -->
+                <path class="sch-dash" d="M455,100 L455,170 L195,170" />
+                <rect class="sch-fill-dim" x="140" y="158" width="110" height="28" />
+                <text x="195" y="176" text-anchor="middle" class="sch-text-label">Burst Children (1&ndash;4)</text>
+
+                <!-- Cycle end section -->
+                <path class="sch-dash" d="M700,100 L700,210 L130,210" />
+                <rect class="sch-block-warm" x="18" y="198" width="110" height="28" />
+                <text x="73" y="216" text-anchor="middle" class="sch-text-label" fill="var(--accent-warm)">Cycle End</text>
+
+                <rect class="sch-fill-dim" x="18" y="240" width="250" height="60" />
+                <text x="143" y="260" text-anchor="middle" class="sch-text">Sleep / Boredom / Mutate / Jump</text>
+                <text x="143" y="278" text-anchor="middle" class="sch-text-label">evaluated at end of each pattern cycle</text>
+
+                <path class="sch-arrow" d="M195,226 L195,240" />
+                <path class="sch-arrow-red" d="M240,270 L300,270 L300,80 L280,80" stroke-dasharray="5 3" />
+
+                <text x="360" y="278" text-anchor="middle" class="sch-text-small" fill="var(--accent-red)">mutate/patience can invalidate buffer &rarr; regenerate</text>
+
+                <!-- Legend -->
+                <rect x="20" y="310" width="700" height="24" fill="none" />
+                <text x="60" y="322" font-family="Inter" font-size="10" fill="var(--text-muted)">Locked</text>
+                <line x1="28" y1="308" x2="48" y2="308" stroke="#7c3aed" stroke-width="2" />
+                <text x="150" y="322" font-family="Inter" font-size="10" fill="var(--text-muted)">Rhythm</text>
+                <line x1="120" y1="308" x2="140" y2="308" stroke="#555450" stroke-width="2" />
+                <text x="250" y="322" font-family="Inter" font-size="10" fill="var(--text-muted)">Timing</text>
+                <line x1="220" y1="308" x2="240" y2="308" stroke="#b45309" stroke-width="2" />
+                <text x="355" y="322" font-family="Inter" font-size="10" fill="var(--text-muted)">Melody/Pitch</text>
+                <line x1="300" y1="308" x2="340" y2="308" stroke="#1d4ed8" stroke-width="2" />
+                <text x="470" y="322" font-family="Inter" font-size="10" fill="var(--text-muted)">Output</text>
+                <line x1="440" y1="308" x2="460" y2="308" stroke="#0a7c42" stroke-width="2" />
+                <text x="560" y="322" font-family="Inter" font-size="10" fill="var(--text-muted)">Evolution trigger</text>
+                <line x1="530" y1="308" x2="550" y2="308" stroke="#b91c1c" stroke-width="2" />
+            </svg>
+            <div class="fig-caption">Figure 2: Step evaluation flow through the Stochastic engine</div>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- 3. KEY CONCEPTS -->
+        <!-- ================================================================ -->
+        <h2 id="key-concepts">3 &middot; Key Concepts</h2>
+
+        <h3>3.1 &middot; Loop vs Live Source Modes</h3>
+
+        <div class="fig">
+            <svg viewBox="0 0 680 200" xmlns="http://www.w3.org/2000/svg">
+                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Source Modes</text>
+
+                <!-- Loop -->
+                <rect class="sch-block" x="30" y="50" width="290" height="130" />
+                <text x="175" y="72" text-anchor="middle" class="sch-text-accent">Loop Mode</text>
+
+                <rect class="sch-fill-dim" x="55" y="90" width="110" height="30" />
+                <text x="110" y="109" text-anchor="middle" class="sch-text">Generate Buffer</text>
+                <path class="sch-arrow" d="M165,105 L200,105" />
+                <rect class="sch-fill-dim" x="200" y="90" width="95" height="30" />
+                <text x="247" y="109" text-anchor="middle" class="sch-text">Play Loop</text>
+
+                <path class="sch-arrow-warm" d="M247,120 L247,140 L110,140 L110,120" stroke-dasharray="5 3" />
+                <text x="175" y="162" text-anchor="middle" class="sch-text-small" fill="var(--accent-warm)">Mutate / Patience alters buffer per cycle</text>
+
+                <!-- Live -->
+                <rect class="sch-block-blue" x="360" y="50" width="290" height="130" />
+                <text x="505" y="72" text-anchor="middle" font-family="Inter" font-size="11" fill="#1d4ed8" font-weight="600">Live Mode</text>
+
+                <rect class="sch-fill-dim" x="390" y="90" width="110" height="30" />
+                <text x="445" y="109" text-anchor="middle" class="sch-text">Generate Step</text>
+                <path class="sch-arrow" d="M500,105 L535,105" />
+                <rect class="sch-fill-dim" x="535" y="90" width="90" height="30" />
+                <text x="580" y="109" text-anchor="middle" class="sch-text">Play Step</text>
+
+                <path class="sch-arrow-blue" d="M580,120 L580,145 L445,145 L445,120" />
+                <text x="505" y="162" text-anchor="middle" class="sch-text-small" fill="#1d4ed8">Every step generated fresh</text>
+            </svg>
+            <div class="fig-caption">Figure 3: Loop mode generates a buffer then mutates it; Live mode generates each step fresh</div>
+        </div>
+
+        <p>
+            Each domain (rhythm, melody) has an independent source mode. <strong>Loop</strong> fills a pattern
+            buffer on first play and can evolve via <code>Mutate</code>/<code>Patience</code>.
+            <strong>Live</strong> generates every step fresh &mdash; maximum unpredictability.
+        </p>
+
+        <h3>3.2 &middot; Degree Tickets &amp; Weighted Pitch Selection</h3>
+
+        <div class="fig">
+            <svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg">
+                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Ticket System &mdash; Weighted Pitch Selection</text>
+
+                <!-- Example: C major scale degrees -->
+                <text x="20" y="50" class="sch-text-label">C major scale: C  D  E  F  G  A  B</text>
+                <text x="20" y="64" class="sch-text-label">Degree:  1  2  3  4  5  6  7</text>
+
+                <!-- Bar chart -->
+                <g transform="translate(20, 80)">
+                    <rect x="0" y="0" width="40" height="100" rx="4" ry="4" fill="var(--accent)" opacity="0.85" />
+                    <text x="20" y="-6" text-anchor="middle" class="sch-text" fill="var(--accent)">100</text>
+                    <text x="20" y="118" text-anchor="middle" class="sch-text-label">1 (C)</text>
+
+                    <rect x="50" y="60" width="40" height="40" rx="4" ry="4" fill="var(--accent)" opacity="0.55" />
+                    <text x="70" y="54" text-anchor="middle" class="sch-text" fill="var(--accent)">40</text>
+                    <text x="70" y="118" text-anchor="middle" class="sch-text-label">2 (D)</text>
+
+                    <rect x="100" y="30" width="40" height="70" rx="4" ry="4" fill="var(--accent)" opacity="0.70" />
+                    <text x="120" y="24" text-anchor="middle" class="sch-text" fill="var(--accent)">70</text>
+                    <text x="120" y="118" text-anchor="middle" class="sch-text-label">3 (E)</text>
+
+                    <rect x="150" y="80" width="40" height="20" rx="4" ry="4" fill="var(--accent)" opacity="0.30" />
+                    <text x="170" y="74" text-anchor="middle" class="sch-text" fill="var(--accent)">20</text>
+                    <text x="170" y="118" text-anchor="middle" class="sch-text-label">4 (F)</text>
+
+                    <rect x="200" y="0" width="40" height="100" rx="4" ry="4" fill="var(--accent)" opacity="0.85" />
+                    <text x="220" y="-6" text-anchor="middle" class="sch-text" fill="var(--accent)">100</text>
+                    <text x="220" y="118" text-anchor="middle" class="sch-text-label">5 (G)</text>
+
+                    <rect x="250" y="80" width="40" height="20" rx="4" ry="4" fill="var(--accent)" opacity="0.30" />
+                    <text x="270" y="74" text-anchor="middle" class="sch-text" fill="var(--accent)">20</text>
+                    <text x="270" y="118" text-anchor="middle" class="sch-text-label">6 (A)</text>
+
+                    <rect x="300" y="90" width="40" height="10" rx="4" ry="4" fill="var(--accent-red)" opacity="0.5" />
+                    <text x="320" y="84" text-anchor="middle" class="sch-text" fill="var(--accent-red)">-1</text>
+                    <text x="320" y="118" text-anchor="middle" class="sch-text-label">7 (B)</text>
+                    <line x1="300" y1="95" x2="340" y2="95" stroke="var(--accent-red)" stroke-width="2" />
+                </g>
+
+                <!-- Probability wheel -->
+                <g transform="translate(460, 60)">
+                    <circle cx="80" cy="80" r="70" fill="none" stroke="var(--border)" stroke-width="2" />
+                    <!-- Arc segments approx -->
+                    <path d="M80,10 A70,70 0 0,1 160,57 L80,80 Z" fill="var(--accent)" opacity="0.4" />
+                    <path d="M80,10 A70,70 0 0,0 12,42 L80,80 Z" fill="var(--accent)" opacity="0.15" />
+                    <path d="M160,57 A70,70 0 0,1 133,147 L80,80 Z" fill="var(--accent)" opacity="0.3" />
+                    <path d="M133,147 A70,70 0 0,1 12,42 L80,80 Z" fill="var(--accent)" opacity="0.2" />
+                    <text x="80" y="80" text-anchor="middle" class="sch-text-label" font-size="9">C: 36%</text>
+                    <text x="130" y="42" class="sch-text-small">G: 36%</text>
+                    <text x="148" y="118" class="sch-text-small">E: 25%</text>
+                </g>
+
+                <text x="340" y="210" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">Degrees with more tickets have higher probability of being chosen. -1 = excluded.</text>
+            </svg>
+            <div class="fig-caption">Figure 4: Ticket weights determine pitch probability. Higher bars = more likely to be selected.</div>
+        </div>
+
+        <p>
+            Each degree of the current scale gets a ticket count (0&ndash;100). More tickets = higher
+            probability. A value of <code>-1</code> excludes that degree entirely.
+        </p>
+
+        <h3>3.3 &middot; Complexity, Contour &amp; Linearity</h3>
+
+        <div class="fig">
+            <svg viewBox="0 0 680 180" xmlns="http://www.w3.org/2000/svg">
+                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Melody Modifiers</text>
+
+                <!-- Complexity -->
+                <rect class="sch-block" x="20" y="50" width="200" height="110" />
+                <text x="120" y="72" text-anchor="middle" class="sch-text">Complexity (0&ndash;100)</text>
+                <text x="120" y="92" text-anchor="middle" class="sch-text-label">Below 50: penalizes large</text>
+                <text x="120" y="106" text-anchor="middle" class="sch-text-label">interval jumps</text>
+                <rect x="40" y="118" width="160" height="16" rx="8" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1" />
+                <rect x="40" y="118" width="80" height="16" rx="8" fill="var(--accent)" opacity="0.6" />
+                <text x="120" y="130" text-anchor="middle" class="sch-text-small">Cplx: 40</text>
+
+                <!-- Contour -->
+                <rect class="sch-block" x="240" y="50" width="200" height="110" />
+                <text x="340" y="72" text-anchor="middle" class="sch-text">Contour (-100&ndash;+100)</text>
+                <text x="340" y="92" text-anchor="middle" class="sch-text-label">Negative = low bias</text>
+                <text x="340" y="106" text-anchor="middle" class="sch-text-label">Positive = high bias</text>
+                <rect x="260" y="118" width="160" height="16" rx="8" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1" />
+                <rect x="260" y="118" width="80" height="16" rx="8" fill="var(--accent-warm)" opacity="0.6" />
+                <line x1="340" y1="118" x2="340" y2="134" stroke="var(--accent-warm)" stroke-width="2" />
+                <text x="380" y="130" text-anchor="middle" class="sch-text-small">Cntr: -30</text>
+
+                <!-- Linearity -->
+                <rect class="sch-block" x="460" y="50" width="200" height="110" />
+                <text x="560" y="72" text-anchor="middle" class="sch-text">Linearity (0&ndash;100)</text>
+                <text x="560" y="92" text-anchor="middle" class="sch-text-label">Penalizes repeated notes</text>
+                <text x="560" y="106" text-anchor="middle" class="sch-text-label">Higher = more linear</text>
+                <rect x="480" y="118" width="160" height="16" rx="8" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1" />
+                <rect x="480" y="118" width="48" height="16" rx="8" fill="var(--accent-blue)" opacity="0.6" />
+                <text x="560" y="130" text-anchor="middle" class="sch-text-small">Lin: 30</text>
+            </svg>
+            <div class="fig-caption">Figure 5: Three pitch-shaping modifiers and their ranges</div>
+        </div>
+
+        <h3>3.4 &middot; Mutation &amp; Patience (Evolution System)</h3>
+
+        <div class="fig">
+            <svg viewBox="0 0 680 220" xmlns="http://www.w3.org/2000/svg">
+                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Pattern Evolution Timeline</text>
+
+                <!-- Timeline -->
+                <line x1="30" y1="70" x2="650" y2="70" stroke="var(--border)" stroke-width="2" />
+                <text x="30" y="60" class="sch-text-small">Cycle 1</text>
+                <text x="200" y="60" class="sch-text-small">Cycle 5</text>
+                <text x="430" y="60" class="sch-text-small">Cycle 15</text>
+                <text x="620" y="60" class="sch-text-small">Cycle 25</text>
+
+                <!-- Tick marks -->
+                <line x1="80" y1="65" x2="80" y2="75" stroke="var(--border)" stroke-width="1.5" />
+                <line x1="200" y1="65" x2="200" y2="75" stroke="var(--border)" stroke-width="1.5" />
+                <line x1="430" y1="65" x2="430" y2="75" stroke="var(--border)" stroke-width="1.5" />
+                <line x1="550" y1="65" x2="550" y2="75" stroke="var(--border)" stroke-width="1.5" />
+                <line x1="620" y1="65" x2="620" y2="75" stroke="var(--border)" stroke-width="1.5" />
+
+                <!-- Original pattern area -->
+                <rect class="sch-block" x="30" y="90" width="140" height="50" />
+                <text x="100" y="120" text-anchor="middle" class="sch-text">Original Pattern</text>
+
+                <!-- Mutate arrows -->
+                <path class="sch-arrow-warm" d="M170,115 L200,115" />
+                <rect class="sch-block-warm" x="200" y="90" width="200" height="50" />
+                <text x="300" y="112" text-anchor="middle" class="sch-text" fill="var(--accent-warm)">Single-step mutation</text>
+                <text x="300" y="128" text-anchor="middle" class="sch-text-label" fill="var(--accent-warm)">(one event replaced per cycle)</text>
+
+                <!-- Boredom buildup -->
+                <path class="sch-arrow" d="M400,115 L450,115" />
+                <rect class="sch-block-blue" x="450" y="90" width="90" height="50" />
+                <text x="495" y="112" text-anchor="middle" class="sch-text" fill="var(--accent-blue)">Boredom</text>
+                <text x="495" y="128" text-anchor="middle" class="sch-text-label" fill="var(--accent-blue)">buildup</text>
+
+                <!-- Full regeneration -->
+                <path class="sch-arrow-red" d="M540,115 L590,115" />
+                <rect class="sch-block" x="590" y="90" width="60" height="50" fill="var(--accent-red-bg)" stroke="var(--accent-red)" />
+                <text x="620" y="112" text-anchor="middle" class="sch-text" fill="var(--accent-red)">Full</text>
+                <text x="620" y="128" text-anchor="middle" class="sch-text" fill="var(--accent-red)">Reset</text>
+
+                <!-- Patience scale -->
+                <rect x="30" y="170" width="620" height="20" rx="10" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1" />
+                <rect x="30" y="170" width="155" height="20" rx="10" fill="var(--accent)" opacity="0.7" />
+                <text x="340" y="184" text-anchor="middle" class="sch-text-small">Patience: 25 / 100 (buffer regenerates every ~5 cycles at 0)</text>
+            </svg>
+            <div class="fig-caption">Figure 6: Evolution timeline &mdash; mutation makes single-step changes, patience triggers full resets</div>
+        </div>
+
+        <p>
+            <strong>Mutate</strong> replaces one step per cycle. <strong>Patience</strong> controls
+            how many cycles before boredom triggers a full buffer regeneration. When patience is low,
+            patterns reset frequently. When high, patterns persist with only gradual mutation.
+        </p>
+
+        <h3>3.5 &middot; Burst System</h3>
+
+        <div class="fig">
+            <svg viewBox="0 0 680 180" xmlns="http://www.w3.org/2000/svg">
+                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Burst Children</text>
+
+                <!-- Timeline row -->
+                <line x1="50" y1="80" x2="630" y2="80" stroke="var(--border)" stroke-width="2" />
+                <text x="50" y="72" class="sch-text-small">Step N</text>
+                <text x="620" y="72" class="sch-text-small">N + duration</text>
+
+                <!-- Parent note -->
+                <rect x="100" y="100" width="160" height="30" rx="6" fill="var(--accent)" opacity="0.7" />
+                <text x="180" y="120" text-anchor="middle" class="sch-text" fill="white">Parent Note (gate)</text>
+
+                <!-- Child notes -->
+                <rect x="290" y="100" width="50" height="30" rx="6" fill="var(--accent-warm)" opacity="0.8" />
+                <text x="315" y="120" text-anchor="middle" class="sch-text" fill="white">C1</text>
+                <rect x="360" y="100" width="50" height="30" rx="6" fill="var(--accent-warm)" opacity="0.8" />
+                <text x="385" y="120" text-anchor="middle" class="sch-text" fill="white">C2</text>
+                <rect x="430" y="100" width="50" height="30" rx="6" fill="var(--accent-warm)" opacity="0.8" />
+                <text x="455" y="120" text-anchor="middle" class="sch-text" fill="white">C3</text>
+
+                <!-- Spacing bracket -->
+                <line x1="290" y1="90" x2="480" y2="90" stroke="var(--accent-warm)" stroke-width="1.5" />
+                <text x="385" y="88" text-anchor="middle" class="sch-text-small" fill="var(--accent-warm)">Burst Rate controls spacing</text>
+
+                <text x="180" y="158" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">Burst Pitch: Parent = all same pitch / Gen = each child gets independent pitch</text>
+            </svg>
+            <div class="fig-caption">Figure 7: A parent note generates 1&ndash;4 child sub-notes within its duration</div>
+        </div>
+
+        <p>
+            Any step may generate <strong>children</strong> &mdash; sub-notes that fire inside the parent
+            duration. <code>Burst Count</code> controls how many children, <code>Burst Rate</code> controls
+            their spacing. <code>Burst Pitch</code> chooses whether children inherit the parent pitch or
+            generate their own.
+        </p>
+
+        <h3>3.6 &middot; Density Ranking &amp; Tilt</h3>
+
+        <div class="fig">
+            <svg viewBox="0 0 680 200" xmlns="http://www.w3.org/2000/svg">
+                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Density Gate with Negative Tilt</text>
+
+                <!-- Pattern steps -->
+                <line x1="40" y1="60" x2="640" y2="60" stroke="var(--border)" stroke-width="1.5" />
+                <line x1="40" y1="150" x2="640" y2="150" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 4" />
+                <text x="30" y="154" text-anchor="end" class="sch-text-small">Threshold (Density=60)</text>
+
+                <!-- Steps -->
+                <rect x="50" y="30" width="30" height="30" rx="4" fill="var(--accent)" opacity="0.8" />
+                <text x="65" y="48" text-anchor="middle" class="sch-text" fill="white">1</text>
+                <rect x="50" y="140" width="30" height="10" rx="2" fill="var(--accent-red)" opacity="0.5" />
+                <text x="65" y="175" class="sch-text-small" fill="var(--accent-red)">rest</text>
+
+                <rect x="100" y="40" width="30" height="20" rx="4" fill="var(--accent)" opacity="0.6" />
+                <text x="115" y="53" text-anchor="middle" class="sch-text" fill="white">2</text>
+                <rect x="100" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
+                <text x="115" y="175" class="sch-text-small" fill="var(--accent-red)">rest</text>
+
+                <rect x="150" y="20" width="30" height="40" rx="4" fill="var(--accent)" opacity="0.9" />
+                <text x="165" y="43" text-anchor="middle" class="sch-text" fill="white">3</text>
+                <rect x="150" y="130" width="30" height="20" rx="2" fill="var(--accent)" opacity="0.5" />
+
+                <rect x="200" y="45" width="30" height="15" rx="4" fill="var(--accent)" opacity="0.5" />
+                <text x="215" y="55" text-anchor="middle" class="sch-text" fill="white">4</text>
+                <rect x="200" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
+
+                <rect x="250" y="30" width="30" height="30" rx="4" fill="var(--accent)" opacity="0.8" />
+                <text x="265" y="48" text-anchor="middle" class="sch-text" fill="white">5</text>
+                <rect x="250" y="130" width="30" height="20" rx="2" fill="var(--accent)" opacity="0.5" />
+
+                <rect x="300" y="35" width="30" height="25" rx="4" fill="var(--accent)" opacity="0.7" />
+                <text x="315" y="51" text-anchor="middle" class="sch-text" fill="white">6</text>
+                <rect x="300" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
+
+                <rect x="350" y="45" width="30" height="15" rx="4" fill="var(--accent)" opacity="0.5" />
+                <text x="365" y="55" text-anchor="middle" class="sch-text" fill="white">7</text>
+                <rect x="350" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
+
+                <rect x="400" y="25" width="30" height="35" rx="4" fill="var(--accent)" opacity="0.85" />
+                <text x="415" y="46" text-anchor="middle" class="sch-text" fill="white">8</text>
+                <rect x="400" y="130" width="30" height="20" rx="2" fill="var(--accent)" opacity="0.5" />
+
+                <rect x="450" y="40" width="30" height="20" rx="4" fill="var(--accent)" opacity="0.6" />
+                <text x="465" y="53" text-anchor="middle" class="sch-text" fill="white">9</text>
+                <rect x="450" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
+
+                <rect x="500" y="50" width="30" height="10" rx="4" fill="var(--accent-red)" opacity="0.4" />
+                <text x="515" y="58" text-anchor="middle" class="sch-text" fill="white">10</text>
+                <rect x="500" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
+
+                <text x="340" y="192" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">Negative tilt = earlier steps denser (more likely to pass). Positive = later steps denser.</text>
+            </svg>
+            <div class="fig-caption">Figure 8: Density gate with Tilt biasing rhythm toward early steps</div>
+        </div>
+
+        <h3>3.7 &middot; Jump Register &amp; Lock</h3>
+
+        <p>
+            <strong>Jump</strong> probability fires at cycle end, toggling an octave register between
+            -1, 0, and +1 &mdash; creating sudden transposition shifts. <strong>Lock</strong> freezes
+            the entire evaluated pattern (all pitches, gates, children) so it plays back identically
+            every cycle.
+        </p>
+
+        <!-- ================================================================ -->
+        <!-- 4. PAGE NAVIGATION -->
+        <!-- ================================================================ -->
+        <h2 id="navigation">4 &middot; Page Navigation</h2>
+
+        <div class="fig">
+            <svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg">
+                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Page Hierarchy</text>
+
+                <!-- Top: Track Select -->
+                <rect class="sch-block" x="220" y="50" width="240" height="36" rx="18" ry="18" />
+                <text x="340" y="72" text-anchor="middle" class="sch-text" font-size="12">Select Stochastic Track</text>
+
+                <!-- Arrows down -->
+                <path class="sch-arrow" d="M300,86 L300,110" />
+                <path class="sch-arrow" d="M340,86 L340,110" />
+                <path class="sch-arrow" d="M380,86 L380,110" />
+
+                <!-- Three pages -->
+                <rect class="sch-block-accent" x="140" y="110" width="180" height="50" />
+                <text x="230" y="132" text-anchor="middle" class="sch-text-accent">STOCH</text>
+                <text x="230" y="148" text-anchor="middle" class="sch-text-label">Performance Page</text>
+
+                <rect class="sch-block" x="340" y="110" width="180" height="50" />
+                <text x="430" y="132" text-anchor="middle" class="sch-text">STOCH CFG</text>
+                <text x="430" y="148" text-anchor="middle" class="sch-text-label">Config Page [CONFIG]</text>
+
+                <rect class="sch-block-warm" x="480" y="110" width="160" height="50" />
+                <text x="560" y="132" text-anchor="middle" class="sch-text" fill="var(--accent-warm)">TICKETS</text>
+                <text x="560" y="148" text-anchor="middle" class="sch-text-label">Edit Page [EDIT]</text>
+
+                <!-- Bottom shared pages -->
+                <path class="sch-dash" d="M230,160 L230,190 L120,190" />
+                <path class="sch-dash" d="M430,160 L430,190 L340,190" />
+                <path class="sch-dash" d="M560,160 L560,190 L400,190" />
+
+                <rect class="sch-block-blue" x="80" y="190" width="160" height="36" rx="6" ry="6" />
+                <text x="160" y="213" text-anchor="middle" class="sch-text" fill="var(--accent-blue)">Routing</text>
+
+                <rect class="sch-block" x="280" y="190" width="140" height="36" rx="6" ry="6" />
+                <text x="350" y="213" text-anchor="middle" class="sch-text">Pattern Select</text>
+
+                <rect class="sch-block-blue" x="460" y="190" width="160" height="36" rx="6" ry="6" />
+                <text x="540" y="213" text-anchor="middle" class="sch-text" fill="var(--accent-blue)">Track Page (all tracks)</text>
+
+                <text x="340" y="252" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">Many parameters on the STOCH page accept CV routing (<span class="routable" style="font-size:9px">R</span>)</text>
+            </svg>
+            <div class="fig-caption">Figure 9: Page navigation map for the Stochastic track</div>
+        </div>
+
+        <p>The Stochastic track has three dedicated pages:</p>
+        <table class="param-table">
+            <tr><th>Page</th><th>Header</th><th>Access</th><th>Purpose</th></tr>
+            <tr><td>Performance</td><td><kbd>STOCH</kbd></td><td>Select Stochastic track</td><td>All generative parameters, source modes, pattern controls</td></tr>
+            <tr><td>Config</td><td><kbd>STOCH CFG</kbd></td><td><kbd>CONFIG</kbd></td><td>Track settings: lock, clock, scale, octave, fill</td></tr>
+            <tr><td>Tickets</td><td><kbd>STOCHASTIC TICKETS</kbd></td><td><kbd>EDIT</kbd></td><td>Per-degree weighting, rotation</td></tr>
+            <tr><td>Routing</td><td>&mdash;</td><td><kbd>ROUTES</kbd></td><td>CV modulation for routable parameters</td></tr>
+            <tr><td>Pattern</td><td>&mdash;</td><td><kbd>PATTERN</kbd></td><td>Active pattern selection</td></tr>
+        </table>
+
+
+        <!-- ================================================================ -->
+        <!-- 5. STOCH PAGE -->
+        <!-- ================================================================ -->
+        <h2 id="stoch-page">5 &middot; STOCH &mdash; Performance Page</h2>
+
+        <p>
+            The <kbd>STOCH</kbd> page is a list-based interface exposing all generative parameters
+            for the current pattern. Navigate rows with the encoder, edit values by turning.
+        </p>
+
+        <h3>5.1 &middot; Source Mode</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Description</th></tr>
+            <tr><td>Rhythm</td><td>Loop / Live</td><td>Source mode for rhythm domain</td></tr>
+            <tr><td>Melody</td><td>Loop / Live</td><td>Source mode for melody domain</td></tr>
+        </table>
+
+        <div class="callout blue"><strong>Pro tip:</strong> Loop rhythm + Live melody = stable rhythm with ever-changing melody.</div>
+
+        <h3>5.2 &middot; Melody Shaping</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
+            <tr><td>Complexity</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Interval jump penalty (below 50 limits large jumps)</td></tr>
+            <tr><td>Contour</td><td>-100&ndash;+100</td><td><span class="routable">R</span></td><td>Pitch bias: negative=low, positive=high</td></tr>
+            <tr><td>Linearity</td><td>0&ndash;100</td><td>&mdash;</td><td>Penalizes repeating the same note</td></tr>
+            <tr><td>Range</td><td>1&ndash;4 Oct</td><td>&mdash;</td><td>Number of octaves melody spans</td></tr>
+            <tr><td>Low Degree</td><td>0&ndash;127</td><td>&mdash;</td><td>Minimum absolute degree</td></tr>
+            <tr><td>High Degree</td><td>0&ndash;127</td><td>&mdash;</td><td>Maximum absolute degree</td></tr>
+        </table>
+
+        <h3>5.3 &middot; Marbles Distribution</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Description</th></tr>
+            <tr><td>Shape</td><td>Off / On</td><td>Toggle beta distribution for pitch selection</td></tr>
+            <tr><td>Spread</td><td>0&ndash;100</td><td>0 = tight/repetitive, 100 = wide/varied</td></tr>
+            <tr><td>Bias</td><td>0&ndash;100</td><td>Distribution center offset</td></tr>
+            <tr><td>Steps</td><td>1&ndash;100</td><td>Discrete positions in distribution</td></tr>
+        </table>
+
+        <h3>5.4 &middot; Rhythm &amp; Timing</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
+            <tr><td>Rate</td><td>1&ndash;400</td><td><span class="routable">R</span></td><td>Base note duration (higher = shorter)</td></tr>
+            <tr><td>Variation</td><td>-100&ndash;+100</td><td><span class="routable">R</span></td><td>Doubles (+) or halves (-) duration</td></tr>
+            <tr><td>Rest</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Rest probability per step</td></tr>
+            <tr><td>Density</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Gate density threshold</td></tr>
+            <tr><td>Tilt</td><td>-100&ndash;+100</td><td><span class="routable">R</span></td><td>Density gradient across pattern</td></tr>
+            <tr><td>Slide Prob</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Portamento probability</td></tr>
+            <tr><td>Legato</td><td>0&ndash;100</td><td>&mdash;</td><td>Gate tie probability</td></tr>
+            <tr><td>Accent</td><td>0&ndash;100</td><td>&mdash;</td><td>Accent output probability</td></tr>
+        </table>
+
+        <h3>5.5 &middot; Burst</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
+            <tr><td>Burst</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Burst probability per step</td></tr>
+            <tr><td>Burst Count</td><td>0&ndash;100</td><td>&mdash;</td><td>Number of children (scaled 1&ndash;4)</td></tr>
+            <tr><td>Burst Rate</td><td>0&ndash;100</td><td>&mdash;</td><td>Spacing within parent duration</td></tr>
+            <tr><td>Burst Pitch</td><td>Parent / Gen</td><td>&mdash;</td><td>Parent = inherit / Gen = independent</td></tr>
+        </table>
+
+        <h3>5.6 &middot; Evolution</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
+            <tr><td>Sleep</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Cycles to pause after each full cycle</td></tr>
+            <tr><td>Patience</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Cycles before boredom reset (100=never)</td></tr>
+            <tr><td>Mutate</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Single-step replacement probability</td></tr>
+            <tr><td>Jump</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Octave transposition toggle probability</td></tr>
+        </table>
+
+        <h3>5.7 &middot; Pattern Controls</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
+            <tr><td>Size</td><td>2&ndash;64</td><td>&mdash;</td><td>Active steps in pattern buffer (default 16)</td></tr>
+            <tr><td>First / Last</td><td>1&ndash;Size</td><td>&mdash;</td><td>Loop boundaries within the pattern</td></tr>
+            <tr><td>Rotate</td><td>-64&ndash;+64</td><td><span class="routable">R</span></td><td>Read offset for polyrhythmic phasing</td></tr>
+        </table>
+
+
+        <!-- ================================================================ -->
+        <!-- 6. STOCH CFG PAGE -->
+        <!-- ================================================================ -->
+        <h2 id="config-page">6 &middot; STOCH CFG &mdash; Config Page</h2>
+
+        <p>
+            The <kbd>STOCH CFG</kbd> page exposes track-level and structural parameters accessed via <kbd>CONFIG</kbd>:
+        </p>
+
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
+            <tr><td>Lock</td><td>On / Off</td><td>&mdash;</td><td>Freeze evaluated pattern</td></tr>
+            <tr><td>Clock/Div</td><td>Divisor values</td><td>&mdash;</td><td>Pattern clock division</td></tr>
+            <tr><td>Reset Measure</td><td>Off, 1&ndash;128</td><td>&mdash;</td><td>Auto-reset interval in measures</td></tr>
+            <tr><td>Scale</td><td>Default &middot; all scales</td><td>&mdash;</td><td>Pattern scale (default = project)</td></tr>
+            <tr><td>Root Note</td><td>Default, C&ndash;B</td><td>&mdash;</td><td>Scale root note</td></tr>
+            <tr><td>Octave</td><td>-10&ndash;+10</td><td><span class="routable">R</span></td><td>Global octave transposition</td></tr>
+            <tr><td>Transpose</td><td>-100&ndash;+100</td><td><span class="routable">R</span></td><td>Semitone offset</td></tr>
+            <tr><td>CV Update</td><td>Gate / Always</td><td>&mdash;</td><td>When to update CV (rests too?)</td></tr>
+            <tr><td>Slide Time</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Portamento glide time</td></tr>
+            <tr><td>Fill Mode</td><td>None / Gates / Next Pattern / Condition</td><td>&mdash;</td><td>Fill behavior</td></tr>
+            <tr><td>Fill Muted</td><td>Yes / No</td><td>&mdash;</td><td>Play fills when muted?</td></tr>
+        </table>
+
+        <!-- ================================================================ -->
+        <!-- 7. TICKETS PAGE -->
+        <!-- ================================================================ -->
+        <h2 id="tickets-page">7 &middot; Degree Ticket Editor</h2>
+
+        <p>
+            The <kbd>STOCHASTIC TICKETS</kbd> page shows a bar-graph of degree weights for the
+            current scale. Press <kbd>EDIT</kbd> from the tracks page to open it.
+        </p>
+
+        <div class="fig">
+            <svg viewBox="0 0 680 220" xmlns="http://www.w3.org/2000/svg">
+                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Tickets Page &mdash; Bar Graph Visualization</text>
+
+                <!-- Simulated 16-degree bar chart -->
+                <g transform="translate(30, 50)">
+                    <rect x="0" y="0" width="30" height="90" rx="3" fill="var(--accent)" opacity="0.85" />
+                    <text x="15" y="-4" text-anchor="middle" class="sch-text" fill="var(--accent)">90</text>
+                    <text x="15" y="108" text-anchor="middle" class="sch-text-small">1</text>
+
+                    <rect x="35" y="50" width="28" height="40" rx="3" fill="var(--accent)" opacity="0.6" />
+                    <text x="49" y="46" text-anchor="middle" class="sch-text-label">40</text>
+                    <text x="49" y="108" text-anchor="middle" class="sch-text-small">2</text>
+
+                    <rect x="68" y="20" width="28" height="70" rx="3" fill="var(--accent)" opacity="0.75" />
+                    <text x="82" y="16" text-anchor="middle" class="sch-text" fill="var(--accent)">70</text>
+                    <text x="82" y="108" text-anchor="middle" class="sch-text-small">3</text>
+
+                    <rect x="101" y="70" width="28" height="20" rx="3" fill="var(--accent)" opacity="0.4" />
+                    <text x="115" y="66" text-anchor="middle" class="sch-text-label">20</text>
+                    <text x="115" y="108" text-anchor="middle" class="sch-text-small">4</text>
+
+                    <rect x="134" y="0" width="28" height="90" rx="3" fill="var(--accent)" opacity="0.85" />
+                    <text x="148" y="-4" text-anchor="middle" class="sch-text" fill="var(--accent)">90</text>
+                    <text x="148" y="108" text-anchor="middle" class="sch-text-small">5</text>
+
+                    <rect x="167" y="60" width="28" height="30" rx="3" fill="var(--accent)" opacity="0.45" />
+                    <text x="181" y="56" text-anchor="middle" class="sch-text-label">30</text>
+                    <text x="181" y="108" text-anchor="middle" class="sch-text-small">6</text>
+
+                    <rect x="200" y="75" width="28" height="15" rx="3" fill="var(--accent)" opacity="0.3" />
+                    <text x="214" y="71" text-anchor="middle" class="sch-text-label">15</text>
+                    <text x="214" y="108" text-anchor="middle" class="sch-text-small">7</text>
+
+                    <rect x="233" y="40" width="28" height="50" rx="3" fill="var(--accent)" opacity="0.65" />
+                    <text x="247" y="36" text-anchor="middle" class="sch-text-label">50</text>
+                    <text x="247" y="108" text-anchor="middle" class="sch-text-small">8</text>
+
+                    <rect x="266" y="60" width="28" height="30" rx="3" fill="var(--accent)" opacity="0.45" />
+                    <text x="280" y="56" text-anchor="middle" class="sch-text-label">30</text>
+                    <text x="280" y="108" text-anchor="middle" class="sch-text-small">9</text>
+
+                    <rect x="299" y="30" width="28" height="60" rx="3" fill="var(--accent)" opacity="0.7" />
+                    <text x="313" y="26" text-anchor="middle" class="sch-text" fill="var(--accent)">60</text>
+                    <text x="313" y="108" text-anchor="middle" class="sch-text-small">10</text>
+
+                    <rect x="332" y="85" width="28" height="5" rx="3" fill="var(--accent-red)" opacity="0.4" />
+                    <text x="346" y="82" text-anchor="middle" class="sch-text-label" fill="var(--accent-red)">-1</text>
+                    <line x1="332" y1="88" x2="360" y2="88" stroke="var(--accent-red)" stroke-width="1.5" />
+                    <text x="346" y="108" text-anchor="middle" class="sch-text-small">11</text>
+
+                    <rect x="365" y="55" width="28" height="35" rx="3" fill="var(--accent)" opacity="0.55" />
+                    <text x="379" y="51" text-anchor="middle" class="sch-text-label">35</text>
+                    <text x="379" y="108" text-anchor="middle" class="sch-text-small">12</text>
+
+                    <rect x="398" y="20" width="28" height="70" rx="3" fill="var(--accent)" opacity="0.75" />
+                    <text x="412" y="16" text-anchor="middle" class="sch-text" fill="var(--accent)">70</text>
+                    <text x="412" y="108" text-anchor="middle" class="sch-text-small">13</text>
+
+                    <rect x="431" y="60" width="28" height="30" rx="3" fill="var(--accent)" opacity="0.45" />
+                    <text x="445" y="56" text-anchor="middle" class="sch-text-label">30</text>
+                    <text x="445" y="108" text-anchor="middle" class="sch-text-small">14</text>
+
+                    <rect x="464" y="55" width="28" height="35" rx="3" fill="var(--accent)" opacity="0.55" />
+                    <text x="478" y="51" text-anchor="middle" class="sch-text-label">35</text>
+                    <text x="478" y="108" text-anchor="middle" class="sch-text-small">15</text>
+
+                    <rect x="497" y="70" width="28" height="20" rx="3" fill="var(--accent)" opacity="0.4" />
+                    <text x="511" y="66" text-anchor="middle" class="sch-text-label">20</text>
+                    <text x="511" y="108" text-anchor="middle" class="sch-text-small">16</text>
+                </g>
+
+                <!-- Footer controls -->
+                <rect x="30" y="145" width="620" height="50" rx="8" fill="var(--bg-card)" stroke="var(--border)" stroke-width="1" />
+                <text x="340" y="164" text-anchor="middle" class="sch-text">Footer: TIX (tickets) | DROT (degree rotation) | MROT (mask rotation)</text>
+                <text x="340" y="183" text-anchor="middle" class="sch-text-small">Context menu: INIT | EVEN (copy current to all) | RAND (randomize)</text>
+            </svg>
+            <div class="fig-caption">Figure 10: Tickets page showing degree weights. Highlighted bar = selected degree with underline.</div>
+        </div>
+
+        <h3>7.1 &middot; Edit Modes</h3>
+        <table class="param-table">
+            <tr><th>Mode</th><th>Description</th></tr>
+            <tr><td>TIX</td><td>Adjust selected degree's ticket count (0&ndash;100, -1 = exclude)</td></tr>
+            <tr><td>DROT</td><td>Rotate ticket assignments across degree indices</td></tr>
+            <tr><td>MROT</td><td>Rotate exclusion mask independently of tickets</td></tr>
+        </table>
+
+        <h3>7.2 &middot; Context Menu Actions</h3>
+        <table class="param-table">
+            <tr><th>Action</th><th>Effect</th></tr>
+            <tr><td>INIT</td><td>Reset all tickets to 100, rotations to 0</td></tr>
+            <tr><td>EVEN</td><td>Copy current degree's value to all degrees</td></tr>
+            <tr><td>RAND</td><td>Assign random ticket values (0&ndash;100)</td></tr>
+        </table>
+
+
+        <!-- ================================================================ -->
+        <!-- 8. GENERATOR ENGINE -->
+        <!-- ================================================================ -->
+        <h2 id="generator">8 &middot; Generator Engine Deep Dive</h2>
+
+        <h3>8.1 &middot; Duration Mapping</h3>
+
+        <div class="fig">
+            <svg viewBox="0 0 680 140" xmlns="http://www.w3.org/2000/svg">
+                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Rate-to-Duration Mapping</text>
+
+                <!-- 8-duration slots -->
+                <g transform="translate(30, 50)">
+                    <rect x="0" y="0" width="70" height="40" rx="4" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1" />
+                    <text x="35" y="16" text-anchor="middle" class="sch-text-small">Idx 0</text>
+                    <text x="35" y="30" text-anchor="middle" class="sch-text-label">1 Bar</text>
+
+                    <rect x="78" y="0" width="70" height="40" rx="4" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1" />
+                    <text x="113" y="16" text-anchor="middle" class="sch-text-small">Idx 1</text>
+                    <text x="113" y="30" text-anchor="middle" class="sch-text-label">1/2</text>
+
+                    <rect x="156" y="0" width="70" height="40" rx="4" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1" />
+                    <text x="191" y="16" text-anchor="middle" class="sch-text-small">Idx 2</text>
+                    <text x="191" y="30" text-anchor="middle" class="sch-text-label">1/4</text>
+
+                    <rect x="234" y="15" width="70" height="25" rx="4" fill="var(--accent-warm-bg)" stroke="var(--accent-warm)" stroke-width="1.5" />
+                    <text x="269" y="30" text-anchor="middle" class="sch-text-small" fill="var(--accent-warm)">Idx 3</text>
+                    <text x="269" y="30" text-anchor="middle" class="sch-text-label" fill="var(--accent-warm)" y="40">1/8</text>
+
+                    <rect x="312" y="0" width="70" height="40" rx="4" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1" />
+                    <text x="347" y="16" text-anchor="middle" class="sch-text-small">Idx 4</text>
+                    <text x="347" y="30" text-anchor="middle" class="sch-text-label">1/16</text>
+
+                    <rect x="390" y="0" width="70" height="40" rx="4" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1" />
+                    <text x="425" y="16" text-anchor="middle" class="sch-text-small">Idx 5</text>
+                    <text x="425" y="30" text-anchor="middle" class="sch-text-label">1/32</text>
+
+                    <rect x="468" y="0" width="70" height="40" rx="4" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1" />
+                    <text x="503" y="16" text-anchor="middle" class="sch-text-small">Idx 6</text>
+                    <text x="503" y="30" text-anchor="middle" class="sch-text-label">1/64</text>
+
+                    <rect x="546" y="0" width="70" height="40" rx="4" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1" />
+                    <text x="581" y="16" text-anchor="middle" class="sch-text-small">Idx 7</text>
+                    <text x="581" y="30" text-anchor="middle" class="sch-text-label">1/128</text>
+
+                    <!-- Arrow from Rate -->
+                    <text x="30" y="70" class="sch-text-small">Rate: 1 (longest) &larr;&rarr; 400 (shortest)</text>
+                    <text x="30" y="85" class="sch-text-small">Variation +: doubles duration (creates syncopation)</text>
+                    <text x="30" y="100" class="sch-text-small">Variation -: halves duration</text>
+                </g>
+            </svg>
+            <div class="fig-caption">Figure 11: Rate maps to 8 duration slots. Variation can double or halve the effective duration.</div>
+        </div>
+
+        <h3>8.2 &middot; Domain Independence</h3>
+
+        <div class="fig">
+            <svg viewBox="0 0 680 180" xmlns="http://www.w3.org/2000/svg">
+                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Dual-Domain Generator</text>
+
+                <!-- Rhythm generator -->
+                <rect class="sch-block" x="30" y="50" width="290" height="110" />
+                <text x="175" y="72" text-anchor="middle" class="sch-text-accent">Rhythm Generator</text>
+                <rect class="sch-fill-dim" x="55" y="88" width="80" height="26" />
+                <text x="95" y="105" text-anchor="middle" class="sch-text-label">generateRhythm()</text>
+                <rect class="sch-fill-dim" x="145" y="88" width="80" height="26" />
+                <text x="185" y="105" text-anchor="middle" class="sch-text-label">mutateRhythm()</text>
+                <rect class="sch-fill-dim" x="235" y="88" width="60" height="26" />
+                <text x="265" y="105" text-anchor="middle" class="sch-text-label">Seed 1</text>
+                <text x="175" y="145" text-anchor="middle" class="sch-text-small">Source events: duration, density rank, rest, legato, accent, burst</text>
+
+                <!-- Melody generator -->
+                <rect class="sch-block-blue" x="360" y="50" width="290" height="110" />
+                <text x="505" y="72" text-anchor="middle" font-family="Inter" font-size="11" fill="#1d4ed8" font-weight="600">Melody Generator</text>
+                <rect class="sch-fill-dim" x="385" y="88" width="80" height="26" />
+                <text x="425" y="105" text-anchor="middle" class="sch-text-label">generateMelody()</text>
+                <rect class="sch-fill-dim" x="475" y="88" width="80" height="26" />
+                <text x="515" y="105" text-anchor="middle" class="sch-text-label">mutateMelody()</text>
+                <rect class="sch-fill-dim" x="565" y="88" width="60" height="26" />
+                <text x="595" y="105" text-anchor="middle" class="sch-text-label">Seed 2</text>
+                <text x="505" y="145" text-anchor="middle" class="sch-text-small">Source events: degree, octave (note number)</text>
+
+                <!-- Independence note -->
+                <text x="340" y="172" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">Separate seeds, buffers, source modes, and mutation triggers. Fully independent.</text>
+            </svg>
+            <div class="fig-caption">Figure 12: Rhythm and melody are completely independent generators with separate state</div>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- 9. WORKFLOW GUIDE -->
+        <!-- ================================================================ -->
+        <h2 id="workflow">9 &middot; Workflow Guide</h2>
+
+        <h3>9.1 &middot; Quick Start</h3>
+        <ol>
+            <li>Create a track, set mode to <strong>Stochastic</strong>.</li>
+            <li>Open <kbd>STOCH</kbd>. Set Rhythm + Melody to <code>Loop</code>.</li>
+            <li>Set <code>Density</code> to 80, <code>Rest</code> to 10.</li>
+            <li>Set <code>Complexity</code> to 40.</li>
+            <li>Open Tickets, give root + fifth high weights, others low.</li>
+            <li>Press play. The pattern repeats with subtle variation.</li>
+        </ol>
+
+        <h3>9.2 &middot; Slow Mutation</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Value</th><th>Effect</th></tr>
+            <tr><td>Mutate</td><td>5&ndash;10</td><td>One step changes every 10&ndash;20 cycles</td></tr>
+            <tr><td>Patience</td><td>80&ndash;90</td><td>Buffer regenerates only after prolonged boredom</td></tr>
+            <tr><td>Jump</td><td>5&ndash;10</td><td>Occasional octave leaps for drama</td></tr>
+        </table>
+
+        <h3>9.3 &middot; Chaotic / Live Generation</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Value</th><th>Effect</th></tr>
+            <tr><td>Rhythm/Melody</td><td>Live</td><td>Every step is fresh</td></tr>
+            <tr><td>Density</td><td>60&ndash;70</td><td>Moderate gate density</td></tr>
+            <tr><td>Rest</td><td>20&ndash;30</td><td>Good chance of silence</td></tr>
+            <tr><td>Complexity</td><td>70&ndash;100</td><td>Allow large jumps</td></tr>
+        </table>
+
+        <h3>9.4 &middot; Percussion Focus</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Value</th><th>Effect</th></tr>
+            <tr><td>Melody</td><td>Fix pitch or 1-note scale</td><td>Pitch is irrelevant</td></tr>
+            <tr><td>Rate</td><td>200+</td><td>Short percussive notes</td></tr>
+            <tr><td>Burst</td><td>30&ndash;50</td><td>Flam-like double hits</td></tr>
+            <tr><td>Accent</td><td>20&ndash;30</td><td>Dynamic accents</td></tr>
+        </table>
+
+        <h3>9.5 &middot; Lock a Happy Accident</h3>
+        <p>
+            When a pattern sounds great: open <kbd>STOCH CFG</kbd> and set <code>Lock</code> to <code>On</code>.
+            Every pitch, gate, burst, and slide freezes exactly as-is. Unlock to resume evolution.
+        </p>
+
+        <h3>9.6 &middot; Polyrhythmic Phasing</h3>
+        <p>
+            Create two Stochastic tracks with similar settings. On the second, set <code>Rotate</code> to +3.
+            The second track reads its buffer shifted by 3 steps, creating polyrhythmic interplay.
+        </p>
+
+        <h3>9.7 &middot; External CV Routing</h3>
+        <ul>
+            <li>Route an LFO to <code>Density</code> for pulsing intensity.</li>
+            <li>Route a sequencer lane to <code>Contour</code> for melodic arcs.</li>
+            <li>Route random voltage to <code>Mutate</code> for evolution bursts.</li>
+            <li>Route an envelope to <code>Slide Prob</code> for portamento swells.</li>
+        </ul>
+
+        <!-- ================================================================ -->
+        <!-- 10. PARAMETER REFERENCE -->
+        <!-- ================================================================ -->
+        <h2 id="reference">10 &middot; Full Parameter Reference</h2>
+
+        <h3>Performance Page (STOCH)</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Default</th><th>Routable</th></tr>
+            <tr><td>Rhythm Mode</td><td>Loop / Live</td><td>Loop</td><td>&mdash;</td></tr>
+            <tr><td>Melody Mode</td><td>Loop / Live</td><td>Loop</td><td>&mdash;</td></tr>
+            <tr><td>Complexity</td><td>0&ndash;100</td><td>50</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Contour</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Linearity</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td></tr>
+            <tr><td>Shape (Marbles)</td><td>Off / On</td><td>Off</td><td>&mdash;</td></tr>
+            <tr><td>Spread</td><td>0&ndash;100</td><td>50</td><td>&mdash;</td></tr>
+            <tr><td>Bias</td><td>0&ndash;100</td><td>50</td><td>&mdash;</td></tr>
+            <tr><td>Steps</td><td>1&ndash;100</td><td>100</td><td>&mdash;</td></tr>
+            <tr><td>Rate</td><td>1&ndash;400</td><td>50</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Variation</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Rest</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Density</td><td>0&ndash;100</td><td>100</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Tilt</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Slide Prob</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Legato</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td></tr>
+            <tr><td>Accent</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td></tr>
+            <tr><td>Burst</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Burst Count</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td></tr>
+            <tr><td>Burst Rate</td><td>0&ndash;100</td><td>50</td><td>&mdash;</td></tr>
+            <tr><td>Burst Pitch</td><td>Parent / Gen</td><td>Parent</td><td>&mdash;</td></tr>
+            <tr><td>Sleep</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Patience</td><td>0&ndash;100</td><td>100</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Mutate</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Jump</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Size</td><td>2&ndash;64</td><td>16</td><td>&mdash;</td></tr>
+            <tr><td>First</td><td>1&ndash;Size</td><td>1</td><td>&mdash;</td></tr>
+            <tr><td>Last</td><td>1&ndash;Size</td><td>Size</td><td>&mdash;</td></tr>
+            <tr><td>Rotate</td><td>-64&ndash;+64</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Range</td><td>1&ndash;4 Oct</td><td>1</td><td>&mdash;</td></tr>
+            <tr><td>Low Degree</td><td>0&ndash;127</td><td>0</td><td>&mdash;</td></tr>
+            <tr><td>High Degree</td><td>0&ndash;127</td><td>127</td><td>&mdash;</td></tr>
+        </table>
+
+        <h3>Config Page (STOCH CFG)</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Default</th><th>Routable</th></tr>
+            <tr><td>Lock</td><td>On / Off</td><td>Off</td><td>&mdash;</td></tr>
+            <tr><td>Clock/Div</td><td>Divisor values</td><td>1/4</td><td>&mdash;</td></tr>
+            <tr><td>Reset Measure</td><td>Off, 1&ndash;128</td><td>Off</td><td>&mdash;</td></tr>
+            <tr><td>Scale</td><td>Default &middot; all scales</td><td>Default</td><td>&mdash;</td></tr>
+            <tr><td>Root Note</td><td>Default, C&ndash;B</td><td>Default</td><td>&mdash;</td></tr>
+            <tr><td>Octave</td><td>-10&ndash;+10</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Transpose</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>CV Update</td><td>Gate / Always</td><td>Gate</td><td>&mdash;</td></tr>
+            <tr><td>Slide Time</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Fill Mode</td><td>None / Gates / Next Pattern / Condition</td><td>None</td><td>&mdash;</td></tr>
+            <tr><td>Fill Muted</td><td>Yes / No</td><td>Yes</td><td>&mdash;</td></tr>
+        </table>
+
+        <p style="text-align:center; margin-top:40px; color:var(--text-muted); font-size:12px;">
+            Stochastic Track Manual &middot; Performer Phazer
+        </p>
+
+    </div>
+</body>
+</html>
