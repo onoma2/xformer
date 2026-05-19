@@ -122,7 +122,7 @@ void Project::clear() {
     auto &stoSeq = stoTrack.sequence(0);
     stoSeq.setRhythmMode(StochasticSourceMode::Live);
     stoSeq.setMelodyMode(StochasticSourceMode::Live);
-    stoSeq.setDensity(100);
+    stoSeq.setMask(100);
     stoSeq.setRest(0);
     stoTrack.setCvUpdateMode(StochasticTrack::CvUpdateMode::Always);
     stoTrack.setLock(false);

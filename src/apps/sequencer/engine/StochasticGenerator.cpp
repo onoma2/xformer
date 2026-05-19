@@ -17,7 +17,7 @@ void StochasticGenerator::generateRhythm(StochasticSequence &sequence, const Sto
         }
     }
 
-    generateDensityRanks(sequence, size, sequence.tilt(), seed ^ 0xdeadbeef);
+    generateMaskRanks(sequence, size, sequence.tilt(), seed ^ 0xdeadbeef);
     sequence.setRhythmValid(true);
     sequence.setRhythmSeed(seed);
 }
@@ -61,7 +61,7 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
     sequence.events()[i].mergeMelodyFrom(melody);
 }
 
-void StochasticGenerator::generateDensityRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed) {
+void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed) {
     Random rng(seed);
     if (size <= 0) return;
     
@@ -131,13 +131,23 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
     StochasticSourceEvent event;
     event.clear();
 
-    int r = std::max(1, std::min(400, int(sequence.rate())));
-    int durationIndex = ((r - 1) * 8) / 400;
+    // V5 Duration: use duration tickets if enabled, else Rate+Variation
+    int durationIndex;
+    if (sequence.durationTicketsEnabled()) {
+        durationIndex = selectDurationTicket(sequence, rng);
+    } else {
+        int r = std::max(1, std::min(400, int(sequence.rate())));
+        durationIndex = ((r - 1) * 8) / 400;
+    }
 
     event.setDurationIndex(durationIndex);
-    event.setDensityRank(0); // Bypass density for Live/Single events
-    
-    event.setRest(int(rng.nextRange(100)) < sequence.rest());
+    event.setDensityRank(0); // Live events have no mask rank
+
+    // Generator Density: sound/rest amount at generation time
+    bool densityGate = (rng.nextRange(100) < sequence.generatorDensity());
+    // Direct Rest probability
+    bool restGate = (rng.nextRange(100) < sequence.rest());
+    event.setRest(!densityGate || restGate);
     event.setLegato(int(rng.nextRange(100)) < sequence.legatoProb());
     event.setSlide(int(rng.nextRange(100)) < sequence.slide());
     event.setAccent(int(rng.nextRange(100)) < sequence.accentProb());
@@ -257,6 +267,26 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
 
 int StochasticGenerator::generateJumpOctave(const StochasticSequence &sequence, const StochasticTrack &track, int currentJump, Random &rng) {
     return 0;
+}
+
+int StochasticGenerator::selectDurationTicket(const StochasticSequence &sequence, Random &rng) {
+    int totalWeight = 0;
+    for (int i = 0; i < 8; ++i) {
+        totalWeight += sequence.durationTicket(i);
+    }
+    if (totalWeight <= 0) {
+        for (int i = 0; i < 8; ++i) totalWeight += 10;
+        totalWeight = 80;
+    }
+    int roll = rng.nextRange(totalWeight);
+    int sum = 0;
+    for (int i = 0; i < 8; ++i) {
+        int w = sequence.durationTicket(i);
+        if (w <= 0 && totalWeight <= 0) w = 10;
+        sum += w;
+        if (roll < sum) return i;
+    }
+    return 3; // default 1/16
 }
 
 float StochasticGenerator::betaDistributionSample(float x, float spread) {

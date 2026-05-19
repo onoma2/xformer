@@ -11,6 +11,12 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "RAND" },
 };
 
+static const ContextMenuModel::Item durContextMenuItems[] = {
+    { "INIT" },
+    { "EVEN" },
+    { "RAND" },
+};
+
 StochasticSequenceEditPage::StochasticSequenceEditPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
 {}
@@ -21,7 +27,23 @@ void StochasticSequenceEditPage::enter() {
 void StochasticSequenceEditPage::exit() {
 }
 
+void StochasticSequenceEditPage::nextPage() {
+    _currentPage = Page((int(_currentPage) + 1) % int(Page::Count));
+}
+
+//----------
+// Draw
+//----------
+
 void StochasticSequenceEditPage::draw(Canvas &canvas) {
+    switch (_currentPage) {
+    case Page::Pitch:   drawPitchPage(canvas); break;
+    case Page::Duration: drawDurationPage(canvas); break;
+    case Page::Count:   break;
+    }
+}
+
+void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &sequence = track.sequence(_project.selectedPatternIndex());
     auto &scale = sequence.selectedScale(_project.scale());
@@ -38,7 +60,7 @@ void StochasticSequenceEditPage::draw(Canvas &canvas) {
     int barMaxH = 26;
     int barW = 5;
     int gap = 2;
-    
+
     int bankSize = std::min(16, scaleSize - _bank * 16);
     if (bankSize < 0) {
         _bank = 0;
@@ -54,25 +76,22 @@ void StochasticSequenceEditPage::draw(Canvas &canvas) {
         totalW = bankSize * (barW + gap) - gap;
         xOffset = std::max(8, (Width - totalW) / 2);
     }
-    
+
     for (int i = 0; i < bankSize; ++i) {
         int degreeIndex = _bank * 16 + i;
         int x = xOffset + i * (barW + gap);
         int tickets = sequence.degreeTicket(degreeIndex);
 
         if (tickets < 0) {
-            // Excluded
             canvas.setBlendMode(BlendMode::Set);
             canvas.setColor(Color::Medium);
             canvas.line(x, baseY - 5, x + barW - 1, baseY);
             canvas.line(x, baseY, x + barW - 1, baseY - 5);
         } else if (tickets == 0) {
-            // Included but 0 tickets
             canvas.setBlendMode(BlendMode::Set);
             canvas.setColor(Color::Low);
             canvas.drawRect(x, baseY - 2, barW - 1, 2);
         } else {
-            // Bar
             int h = (tickets * barMaxH) / 100;
             h = std::max(1, h);
             canvas.setBlendMode(BlendMode::Set);
@@ -86,7 +105,6 @@ void StochasticSequenceEditPage::draw(Canvas &canvas) {
         }
     }
 
-    // Selected degree info
     FixedStringBuilder<32> str;
     str("DEG %d: ", _selectedDegree + 1);
     int t = sequence.degreeTicket(_selectedDegree);
@@ -96,7 +114,6 @@ void StochasticSequenceEditPage::draw(Canvas &canvas) {
     canvas.setColor(Color::Bright);
     canvas.drawText(8, 18, str);
 
-    // Page indicator
     if (scaleSize > 16) {
         str.reset();
         str("P%d/%d", _bank + 1, (scaleSize + 15) / 16);
@@ -104,41 +121,137 @@ void StochasticSequenceEditPage::draw(Canvas &canvas) {
         canvas.drawText(8, 28, str);
     }
 
-    // Rotation info
     str.reset();
     str("DROT:%+d MROT:%+d", sequence.degreeRotation(), sequence.maskRotation());
     canvas.setFont(Font::Tiny);
     canvas.setColor(Color::Medium);
     canvas.drawText(Width - canvas.textWidth(str) - 12, 18, str);
 
-    // Footer
-    const char *footer[] = { "TIX", "DROT", "MROT", nullptr, nullptr };
-    WindowPainter::drawFooter(canvas, footer, int(_editFocus));
+    const char *footer[] = { "TIX", "DROT", "MROT", nullptr, "NEXT" };
+    WindowPainter::drawFooter(canvas, footer, pageKeyState(), int(_editFocus));
 }
+
+void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
+    auto &track = _project.selectedTrack().stochasticTrack();
+    auto &sequence = track.sequence(_project.selectedPatternIndex());
+
+    WindowPainter::clear(canvas);
+    WindowPainter::drawHeader(canvas, _model, _engine, "DURATION TICKETS");
+
+    const int numSlots = 8;
+    const int baseY = 46;
+    const int barMaxH = 26;
+    const int barW = 12;
+    const int gap = barW;
+
+    int totalW = numSlots * (barW + gap) - gap;
+    int xOffset = std::max(8, (Width - totalW) / 2);
+
+    for (int i = 0; i < numSlots; ++i) {
+        int x = xOffset + i * (barW + gap);
+        int weight = sequence.durationTicket(i);
+
+        if (weight == 0) {
+            canvas.setBlendMode(BlendMode::Set);
+            canvas.setColor(Color::Low);
+            canvas.drawRect(x, baseY - 2, barW - 1, 2);
+        } else {
+            int h = (weight * barMaxH) / 100;
+            h = std::max(1, h);
+            canvas.setBlendMode(BlendMode::Set);
+            canvas.setColor(i == _selectedDurSlot ? Color::Bright : Color::Medium);
+            canvas.fillRect(x, baseY - h, barW, h);
+        }
+
+        if (i == _selectedDurSlot) {
+            canvas.setColor(Color::Bright);
+            canvas.hline(x - 1, baseY + 2, barW + 2);
+        }
+
+        canvas.setFont(Font::Tiny);
+        canvas.setColor(Color::Low);
+        int labelW = canvas.textWidth(durationTicketLabels[i]);
+        canvas.drawText(x + (barW - labelW) / 2, baseY + 6, durationTicketLabels[i]);
+    }
+
+    // Left info text
+    FixedStringBuilder<32> str;
+    if (_durFocus == DurFocus::Rest) {
+        str("REST: %d%%", sequence.rest());
+        canvas.setFont(Font::Small);
+        canvas.setColor(Color::Bright);
+        canvas.drawText(8, 18, str);
+    } else {
+        str("%s: %d", durationTicketLabels[_selectedDurSlot], sequence.durationTicket(_selectedDurSlot));
+        canvas.setFont(Font::Small);
+        canvas.setColor(Color::Bright);
+        canvas.drawText(8, 18, str);
+    }
+
+    // Duration tickets on/off
+    str.reset();
+    str(sequence.durationTicketsEnabled() ? "ON" : "OFF");
+    canvas.setFont(Font::Small);
+    canvas.setColor(sequence.durationTicketsEnabled() ? Color::Bright : Color::Medium);
+    canvas.drawText(Width - canvas.textWidth(str) - 8, 18, str);
+
+    const char *footer[] = { "DUR", "RST", nullptr, nullptr, "NEXT" };
+    WindowPainter::drawFooter(canvas, footer, pageKeyState(), _durFocus == DurFocus::DurTicket ? 0 : (_durFocus == DurFocus::Rest ? 1 : -1));
+}
+
+//----------
+// LEDs
+//----------
 
 void StochasticSequenceEditPage::updateLeds(Leds &leds) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &sequence = track.sequence(_project.selectedPatternIndex());
-    auto &scale = sequence.selectedScale(_project.scale());
-    int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
 
-    for (int i = 0; i < 16; ++i) {
-        int degreeIndex = _bank * 16 + i;
-        bool bit = (degreeIndex < scaleSize);
-        leds.set(MatrixMap::fromStep(i), bit && (degreeIndex == _selectedDegree), bit);
-    }
+    switch (_currentPage) {
+    case Page::Pitch: {
+        auto &scale = sequence.selectedScale(_project.scale());
+        int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
 
-    if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
-        for (int i = 8; i < 11; ++i) {
-            int index = MatrixMap::fromStep(i + 1);
-            leds.unmask(index);
-            leds.set(index, false, true);
-            leds.mask(index);
+        for (int i = 0; i < 16; ++i) {
+            int degreeIndex = _bank * 16 + i;
+            bool bit = (degreeIndex < scaleSize);
+            leds.set(MatrixMap::fromStep(i), bit && (degreeIndex == _selectedDegree), bit);
         }
+
+        if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
+            for (int i = 8; i < 11; ++i) {
+                int index = MatrixMap::fromStep(i + 1);
+                leds.unmask(index);
+                leds.set(index, false, true);
+                leds.mask(index);
+            }
+        }
+        break;
+    }
+    case Page::Duration: {
+        for (int i = 0; i < 8; ++i) {
+            leds.set(MatrixMap::fromStep(i), i == _selectedDurSlot, true);
+        }
+        break;
+    }
+    case Page::Count:
+        break;
     }
 }
 
+//----------
+// Key Input
+//----------
+
 void StochasticSequenceEditPage::keyDown(KeyEvent &event) {
+    switch (_currentPage) {
+    case Page::Pitch:   handlePitchKeyDown(event); break;
+    case Page::Duration: handleDurationKeyDown(event); break;
+    case Page::Count:   break;
+    }
+}
+
+void StochasticSequenceEditPage::handlePitchKeyDown(KeyEvent &event) {
     const auto &key = event.key();
     if (key.isStep() && !key.pageModifier()) {
         auto &track = _project.selectedTrack().stochasticTrack();
@@ -162,25 +275,46 @@ void StochasticSequenceEditPage::keyDown(KeyEvent &event) {
     BasePage::keyDown(event);
 }
 
-void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
+void StochasticSequenceEditPage::handleDurationKeyDown(KeyEvent &event) {
     const auto &key = event.key();
     if (key.isStep() && !key.pageModifier()) {
-        // Handled in keyDown
+        int step = key.step();
+        if (step >= 0 && step < 8) {
+            _selectedDurSlot = step;
+        }
+        event.consume();
+        return;
+    }
+
+    if (key.isContextMenu()) {
+        contextShow();
+        event.consume();
+        return;
+    }
+
+    BasePage::keyDown(event);
+}
+
+void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
+    switch (_currentPage) {
+    case Page::Pitch:   handlePitchKeyPress(event); break;
+    case Page::Duration: handleDurationKeyPress(event); break;
+    case Page::Count:   break;
+    }
+}
+
+void StochasticSequenceEditPage::handlePitchKeyPress(KeyPressEvent &event) {
+    const auto &key = event.key();
+    if (key.isStep() && !key.pageModifier()) {
         event.consume();
         return;
     }
 
     if (key.isQuickEdit() && !key.shiftModifier()) {
         switch (key.quickEdit()) {
-        case 1: // Step 10: INIT
-            contextAction(int(ContextAction::Init));
-            break;
-        case 2: // Step 11: EVEN
-            contextAction(int(ContextAction::Even));
-            break;
-        case 3: // Step 12: RAND
-            contextAction(int(ContextAction::Random));
-            break;
+        case 1: contextAction(int(ContextAction::Init)); break;
+        case 2: contextAction(int(ContextAction::Even)); break;
+        case 3: contextAction(int(ContextAction::Random)); break;
         }
         event.consume();
         return;
@@ -191,6 +325,10 @@ void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
         case 0: _editFocus = EditFocus::Ticket; break;
         case 1: _editFocus = EditFocus::DegreeRotation; break;
         case 2: _editFocus = EditFocus::MaskRotation; break;
+        case 4: // F5 = NEXT
+            nextPage();
+            event.consume();
+            return;
         }
         event.consume();
         return;
@@ -220,7 +358,49 @@ void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
     BasePage::keyPress(event);
 }
 
+void StochasticSequenceEditPage::handleDurationKeyPress(KeyPressEvent &event) {
+    const auto &key = event.key();
+    if (key.isStep() && !key.pageModifier()) {
+        event.consume();
+        return;
+    }
+
+    if (key.isQuickEdit() && !key.shiftModifier()) {
+        switch (key.quickEdit()) {
+        case 1: contextAction(int(ContextAction::Init)); break;
+        case 2: contextAction(int(ContextAction::Even)); break;
+        case 3: contextAction(int(ContextAction::Random)); break;
+        }
+        event.consume();
+        return;
+    }
+
+    if (key.isFunction()) {
+        switch (key.function()) {
+        case 0: _durFocus = DurFocus::DurTicket; break;
+        case 1: _durFocus = DurFocus::Rest; break;
+        case 4:
+            if (key.shiftModifier()) {
+                nextPage();
+            }
+            break;
+        }
+        event.consume();
+        return;
+    }
+
+    BasePage::keyPress(event);
+}
+
 void StochasticSequenceEditPage::encoder(EncoderEvent &event) {
+    switch (_currentPage) {
+    case Page::Pitch:   handlePitchEncoder(event); break;
+    case Page::Duration: handleDurationEncoder(event); break;
+    case Page::Count:   break;
+    }
+}
+
+void StochasticSequenceEditPage::handlePitchEncoder(EncoderEvent &event) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &sequence = track.sequence(_project.selectedPatternIndex());
 
@@ -233,6 +413,24 @@ void StochasticSequenceEditPage::encoder(EncoderEvent &event) {
         break;
     case EditFocus::MaskRotation:
         sequence.setMaskRotation(sequence.maskRotation() + event.value());
+        break;
+    default:
+        break;
+    }
+
+    event.consume();
+}
+
+void StochasticSequenceEditPage::handleDurationEncoder(EncoderEvent &event) {
+    auto &track = _project.selectedTrack().stochasticTrack();
+    auto &sequence = track.sequence(_project.selectedPatternIndex());
+
+    switch (_durFocus) {
+    case DurFocus::DurTicket:
+        sequence.setDurationTicket(_selectedDurSlot, sequence.durationTicket(_selectedDurSlot) + event.value());
+        break;
+    case DurFocus::Rest:
+        sequence.setRest(sequence.rest() + event.value());
         break;
     default:
         break;
@@ -255,34 +453,69 @@ void StochasticSequenceEditPage::contextAction(int index) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &sequence = track.sequence(_project.selectedPatternIndex());
 
-    switch (ContextAction(index)) {
-    case ContextAction::Init:
-        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
-            sequence.setDegreeTicket(i, 100);
+    switch (_currentPage) {
+    case Page::Pitch: {
+        switch (ContextAction(index)) {
+        case ContextAction::Init:
+            for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
+                sequence.setDegreeTicket(i, 100);
+            }
+            sequence.setDegreeRotation(0);
+            sequence.setMaskRotation(0);
+            showMessage("INIT TICKETS");
+            break;
+        case ContextAction::Even: {
+            int val = sequence.degreeTicket(_selectedDegree);
+            if (val < 0) val = 50;
+            for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
+                sequence.setDegreeTicket(i, val);
+            }
+            showMessage("EVEN TICKETS");
+            break;
         }
-        sequence.setDegreeRotation(0);
-        sequence.setMaskRotation(0);
-        showMessage("INIT TICKETS");
-        break;
-    case ContextAction::Even: {
-        int val = sequence.degreeTicket(_selectedDegree);
-        if (val < 0) val = 50;
-        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
-            sequence.setDegreeTicket(i, val);
+        case ContextAction::Random: {
+            static Random rng;
+            for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
+                sequence.setDegreeTicket(i, rng.nextRange(101));
+            }
+            showMessage("RANDOM TICKETS");
+            break;
         }
-        showMessage("EVEN TICKETS");
+        case ContextAction::Last:
+            break;
+        }
         break;
     }
-    case ContextAction::Random: {
-        static Random rng;
-        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
-            sequence.setDegreeTicket(i, rng.nextRange(101));
+    case Page::Duration: {
+        switch (ContextAction(index)) {
+        case ContextAction::Init:
+            for (int i = 0; i < 8; ++i) {
+                sequence.setDurationTicket(i, 50);
+            }
+            sequence.setRest(0);
+            showMessage("INIT DUR");
+            break;
+        case ContextAction::Even:
+            for (int i = 0; i < 8; ++i) {
+                sequence.setDurationTicket(i, 50);
+            }
+            sequence.setRest(0);
+            showMessage("EVEN DUR");
+            break;
+        case ContextAction::Random: {
+            static Random rng;
+            for (int i = 0; i < 8; ++i) {
+                sequence.setDurationTicket(i, rng.nextRange(101));
+            }
+            showMessage("RAND DUR");
+            break;
         }
-        showMessage("RANDOM TICKETS");
+        case ContextAction::Last:
+            break;
+        }
         break;
     }
-    case ContextAction::Last:
+    case Page::Count:
         break;
     }
 }
-

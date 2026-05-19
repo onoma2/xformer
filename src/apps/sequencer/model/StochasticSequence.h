@@ -82,7 +82,8 @@ public:
 
     void writeRouted(Routing::Target target, int intValue, float floatValue) {
         switch (target) {
-        case Routing::Target::StochasticDensity: setDensity(intValue, true); break;
+        case Routing::Target::StochasticDensity: setMask(intValue, true); break;
+        case Routing::Target::StochasticGeneratorDensity: setGeneratorDensity(intValue, true); break;
         case Routing::Target::StochasticTilt: setTilt(intValue, true); break;
         case Routing::Target::StochasticBurst: setBurst(intValue, true); break;
         case Routing::Target::StochasticComplexity: setComplexity(intValue, true); break;
@@ -106,6 +107,24 @@ public:
 
     StochasticSourceMode melodyMode() const { return _melodyMode; }
     void setMelodyMode(StochasticSourceMode mode) { _melodyMode = ModelUtils::clampedEnum(mode); }
+
+    void printCoupledMode(StringBuilder &str) const {
+        if (rhythmMode() == melodyMode()) {
+            str(rhythmMode() == StochasticSourceMode::Loop ? "Loop" : "Live");
+        } else {
+            str("Split");
+        }
+    }
+    void editCoupledMode(int value, bool shift) {
+        StochasticSourceMode mode = ModelUtils::adjustedEnum(rhythmMode(), value);
+        setRhythmMode(mode);
+        setMelodyMode(mode);
+    }
+
+    void refresh() {
+        if (_rhythmMode == StochasticSourceMode::Loop) _rhythmValid = false;
+        if (_melodyMode == StochasticSourceMode::Loop) _melodyValid = false;
+    }
 
     int complexity() const { return _complexity.get(isRouted(Routing::Target::StochasticComplexity)); }
     void setComplexity(int complexity, bool routed = false) { _complexity.set(clamp(complexity, 0, 100), routed); }
@@ -188,11 +207,15 @@ public:
     int marblesSteps() const { return _marblesSteps; }
     void setMarblesSteps(int steps) { _marblesSteps = clamp(steps, 1, 100); }
 
-    // density
-    int density() const { return _density.get(isRouted(Routing::Target::StochasticDensity)); }
-    void setDensity(int density, bool routed = false) { _density.set(clamp(density, 0, 100), routed); }
+    // mask (deterministic loop playback thinning, V5 rename from density)
+    int mask() const { return _mask.get(isRouted(Routing::Target::StochasticDensity)); }
+    void setMask(int mask, bool routed = false) { _mask.set(clamp(mask, 0, 100), routed); }
 
-    // til
+    // generatorDensity (generator-level sound/rest amount)
+    int generatorDensity() const { return _generatorDensity.get(isRouted(Routing::Target::StochasticGeneratorDensity)); }
+    void setGeneratorDensity(int density, bool routed = false) { _generatorDensity.set(clamp(density, 0, 100), routed); }
+
+    // tilt (attached to mask)
     int tilt() const { return _tilt.get(isRouted(Routing::Target::StochasticTilt)); }
     void setTilt(int tilt, bool routed = false) { _tilt.set(clamp(tilt, -100, 100), routed); }
 
@@ -216,6 +239,27 @@ public:
     int rotate() const { return _rotate.get(isRouted(Routing::Target::Rotate)); }
     void setRotate(int rotate, bool routed = false) { _rotate.set(clamp(rotate, -64, 64), routed); }
 
+    // durationTickets (Level 3 parent-duration weights)
+    int durationTicket(int index) const { return _durationTickets[index]; }
+    void setDurationTicket(int index, int value) { _durationTickets[index] = clamp(value, 0, 100); }
+    bool durationTicketsEnabled() const { return _durationTicketsEnabled; }
+    void setDurationTicketsEnabled(bool enabled) { _durationTicketsEnabled = enabled; }
+    void toggleDurationTickets() { _durationTicketsEnabled = !_durationTicketsEnabled; }
+
+    // Level (UI presentation, not engine)
+    StochasticLevel level() const { return _level; }
+    void setLevel(StochasticLevel level) { _level = ModelUtils::clampedEnum(level); }
+
+    void printLevel(StringBuilder &str) const {
+        switch (_level) {
+        case StochasticLevel::Core:       str("Core"); break;
+        case StochasticLevel::Direct:     str("Direct"); break;
+        case StochasticLevel::Weights:    str("Weights"); break;
+        case StochasticLevel::Last:       break;
+        }
+    }
+    void editLevel(int value, bool shift) { setLevel(ModelUtils::adjustedEnum(level(), value)); }
+
     void printLinearity(StringBuilder &str) const { str("%d%%", linearity()); }
     void editLinearity(int value, bool shift) { setLinearity(linearity() + value); }
 
@@ -231,8 +275,11 @@ public:
     void printMarblesSteps(StringBuilder &str) const { str("%d", marblesSteps()); }
     void editMarblesSteps(int value, bool shift) { setMarblesSteps(marblesSteps() + value); }
 
-    void printDensity(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticDensity); str("%d%%", density()); }
-    void editDensity(int value, bool shift) { if (!isRouted(Routing::Target::StochasticDensity)) setDensity(density() + value); }
+    void printMask(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticDensity); str("%d%%", mask()); }
+    void editMask(int value, bool shift) { if (!isRouted(Routing::Target::StochasticDensity)) setMask(mask() + value); }
+
+    void printGeneratorDensity(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticGeneratorDensity); str("%d%%", generatorDensity()); }
+    void editGeneratorDensity(int value, bool shift) { if (!isRouted(Routing::Target::StochasticGeneratorDensity)) setGeneratorDensity(generatorDensity() + value); }
 
     void printTilt(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticTilt); str("%+d%%", tilt()); }
     void editTilt(int value, bool shift) { if (!isRouted(Routing::Target::StochasticTilt)) setTilt(tilt() + value); }
@@ -369,7 +416,8 @@ public:
         _marblesSpread = 50;
         _marblesBias = 50;
         _marblesSteps = 100;
-        _density.setBase(100);
+        _mask.setBase(100);
+        _generatorDensity.setBase(100);
         _tilt.setBase(0);
         _reservedJitter.setBase(0);
         _burst.setBase(0);
@@ -393,6 +441,8 @@ public:
         _rhythmMode = StochasticSourceMode::Loop;
         _melodyMode = StochasticSourceMode::Loop;
 
+        for (int i = 0; i < 8; ++i) _durationTickets[i] = 50;
+        _durationTicketsEnabled = false;
 
         for (auto &event : _events) event.clear();
     }
@@ -422,7 +472,7 @@ public:
         writer.write(_marblesSpread);
         writer.write(_marblesBias);
         writer.write(_marblesSteps);
-        _density.write(writer);
+        _mask.write(writer);
         _tilt.write(writer);
         _reservedJitter.write(writer);
         _burst.write(writer);
@@ -490,7 +540,7 @@ public:
         _marblesBias = clamp(int(_marblesBias), 0, 100);
         reader.read(_marblesSteps);
         _marblesSteps = clamp(int(_marblesSteps), 1, 100);
-        _density.read(reader);
+        _mask.read(reader);
         _tilt.read(reader);
         _reservedJitter.read(reader);
         _burst.read(reader);
@@ -563,8 +613,12 @@ private:
         _marblesSpread = 50;
         _marblesBias = 50;
         _marblesSteps = 100;
-        _density.setBase(100);
+        _mask.setBase(100);
+
+        _generatorDensity.setBase(100);
+
         _tilt.setBase(0);
+
         _reservedJitter.setBase(0);
         _burst.setBase(0);
         _minDegree = 0;
@@ -630,7 +684,8 @@ private:
     uint8_t _marblesBias;
     uint8_t _marblesSteps;
 
-    Routable<uint8_t> _density;
+    Routable<uint8_t> _mask;
+    Routable<uint8_t> _generatorDensity;
     Routable<int8_t> _tilt;
     Routable<uint8_t> _reservedJitter;
     Routable<uint8_t> _burst;
@@ -654,6 +709,11 @@ private:
     Routable<uint8_t> _jump;
     uint8_t _range;
 
+    uint8_t _durationTickets[8];
+    bool _durationTicketsEnabled = false;
+
+    StochasticLevel _level = StochasticLevel::Core;
+
     StochasticSourceMode _rhythmMode;
     StochasticSourceMode _melodyMode;
 
@@ -661,4 +721,4 @@ private:
     friend class StochasticTrack;
 };
 
-static_assert(sizeof(StochasticSequence) <= 544, "StochasticSequence too large");
+static_assert(sizeof(StochasticSequence) <= 560, "StochasticSequence too large");

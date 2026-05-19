@@ -10,14 +10,12 @@ _Updated: 2026-05-19_
 
 ---
 
-## 🔴 stochastic-track-port — Port Vinx Stochastic track type to XFORMER
-**Status:** active
-**Where I stopped:** V5 control-granularity spec and dictionary rewrite captured: Density is generator sound/rest, deterministic thinning is Mask/Tilt, full Burst and Marbles Shape/Spread/Bias/Steps are Level 1, split Rhythm/Melody starts Level 2, and Duration Tickets use `1/2, 1/4, 1/8, 1/16, 3/16, 5/16, 7/16, 1/8T`.
-**Next action:** Implement `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`: rename loop thinning to Mask, add generator Density semantics, add 8-slot Duration Tickets, and reorganize the UI/control surface by Generator/Looper levels.
-**Depends on:** resource-optimization (RAM headroom)
-**Blocks:** nothing
+## 🟢 stochastic-track-port — V5 Control Granularity: model/engine/UI wired
+**Status:** done — Phase 10 V5 beta implemented and build verified.
+**Where I stopped:** All 4 commit slices complete: model/storage (Mask rename, generator Density, Duration Tickets, StochasticLevel), generator semantics (density gating, duration ticket selection, maskRanks), engine playback (V5 patience formula, Refresh, split source modes, single V5 duration table), temporary UI (3-item-array level-gated list model, dual-view Ticket page with Pitch/Duration+RST). RAM flat: `.data=6,412`, `.bss=112,576`, `.ccmram_bss=54,956`. StochasticTrack ≤ NoteTrack gate. No project version bump. Existing ticket page preserved and enhanced with NEXT-page Duration view.
+**Next action:** Hardware verification: Density vs Mask distinction, Burst audibility, Duration Ticket selection, Patience 0/mid/100, Refresh command, split Rhythm/Melody Loop/Live, Lock stability.
 **Branch:** feat/stochastic
-**Reference:** `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`, `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`, `.tasks/stochastic-track-port/PHASE9-V4-OWNERSHIP.md`
+**Reference:** `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`, `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.

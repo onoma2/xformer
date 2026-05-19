@@ -137,6 +137,7 @@ public:
         // Stochastic Track Targets
         StochasticFirst,
         StochasticDensity = StochasticFirst,
+        StochasticGeneratorDensity,
         StochasticTilt,
         StochasticReserved,
         StochasticBurst,
@@ -208,7 +209,8 @@ public:
         case Target::GateOffset:                return "Gate Offset";
         case Target::GateLength:                return "Gate Length";
 
-        case Target::StochasticDensity:         return "Density";
+        case Target::StochasticDensity:         return "Mask";
+        case Target::StochasticGeneratorDensity: return "Gen Density";
         case Target::StochasticTilt:            return "Tilt";
         case Target::StochasticReserved:        return "";
         case Target::StochasticBurst:           return "Burst";
@@ -305,6 +307,7 @@ public:
         case Target::GateLength:                return 38;
 
         case Target::StochasticDensity:         return 65;
+        case Target::StochasticGeneratorDensity: return 79;
         case Target::StochasticTilt:            return 66;
         case Target::StochasticReserved:        return 67;
         case Target::StochasticBurst:           return 68;

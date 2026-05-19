@@ -24,6 +24,12 @@ private:
         Last
     };
 
+    enum class DurFocus {
+        DurTicket,
+        Rest,
+        Last
+    };
+
     enum class ContextAction {
         Init,
         Even,
@@ -31,10 +37,34 @@ private:
         Last
     };
 
+    enum class Page {
+        Pitch,
+        Duration,
+        Count
+    };
+
     void contextShow(bool doubleClick = false);
     void contextAction(int index);
+    void nextPage();
+
+    void drawPitchPage(Canvas &canvas);
+    void drawDurationPage(Canvas &canvas);
+    void handlePitchEncoder(EncoderEvent &event);
+    void handleDurationEncoder(EncoderEvent &event);
+    void handlePitchKeyDown(KeyEvent &event);
+    void handleDurationKeyDown(KeyEvent &event);
+    void handlePitchKeyPress(KeyPressEvent &event);
+    void handleDurationKeyPress(KeyPressEvent &event);
 
     int _selectedDegree = 0;
     int _bank = 0;
     EditFocus _editFocus = EditFocus::Ticket;
+
+    Page _currentPage = Page::Pitch;
+    int _selectedDurSlot = 0;
+    DurFocus _durFocus = DurFocus::DurTicket;
+};
+
+static const char *durationTicketLabels[] = {
+    "1/2", "1/4", "1/8", "1/16", "3/16", "5/16", "7/16", "1/8T"
 };

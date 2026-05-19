@@ -11,7 +11,8 @@ public:
     static void generateMelody(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, uint32_t seed);
     static void mutateRhythmOne(StochasticSequence &sequence, const StochasticTrack &track, Random &rng);
     static void mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng);
-    static void generateDensityRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed);
+    static void generateMaskRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed);
+    static int selectDurationTicket(const StochasticSequence &sequence, Random &rng);
     
     struct EvaluatedChild {
         uint32_t tickOffset;

@@ -40,6 +40,7 @@ private:
     void freeLockedSteps();
 
     void triggerStep(uint32_t tick, uint32_t divisor);
+    void refreshLoopSources();
 
     const StochasticTrack &_stochasticTrack;
     const StochasticSequence *_sequence = nullptr;
@@ -49,7 +50,7 @@ private:
     uint8_t _patternIndex = 0;
     uint32_t _relativeTick = 0;
     uint8_t _sleepRemaining = 0;
-    uint16_t _boredomCounter = 0;
+    uint16_t _loopCycleCount = 0;
     int _lastDegree = -1;
     int _jumpRegister = 0;
     bool _patternCycleEnded = false;

@@ -14,6 +14,13 @@ enum class StochasticSourceMode : uint8_t {
 
 enum class StochasticBurstPitch : uint8_t { Parent, Generate, Last };
 
+enum class StochasticLevel : uint8_t {
+    Core,     // Level 1
+    Direct,   // Level 2
+    Weights,  // Level 3
+    Last
+};
+
 // MarblesMode
 enum class MarblesMode : uint8_t {
     Off,

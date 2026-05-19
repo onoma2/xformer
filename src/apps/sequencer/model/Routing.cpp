@@ -439,6 +439,7 @@ static const TargetInfo targetInfos[int(Routing::Target::Last)] = {
     [int(Routing::Target::BusCv3)]                          = { -500,   500,    -500,   500,    10      },
     [int(Routing::Target::BusCv4)]                          = { -500,   500,    -500,   500,    10      },
     [int(Routing::Target::StochasticDensity)]               = { 0,      100,    0,      100,    10      },
+    [int(Routing::Target::StochasticGeneratorDensity)]      = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::StochasticTilt)]                  = { -100,   100,    0,      100,    10      },
     [int(Routing::Target::StochasticReserved)]                = { 0,      100,    0,      100,    10      },
     [int(Routing::Target::StochasticBurst)]                 = { 0,      100,    0,      100,    10      },

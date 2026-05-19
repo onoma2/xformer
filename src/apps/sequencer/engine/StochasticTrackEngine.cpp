@@ -13,18 +13,19 @@
 #include <cmath>
 #include <algorithm>
 
-static uint32_t getDurationMultiplierByIndex(int index) {
+// V5 duration multiplier: 1/2, 1/4, 1/8, 1/16, 3/16, 5/16, 7/16, 1/8T
+static uint32_t getDurationMultiplier(int index) {
     switch (index) {
-    case 0: return 192 * 4;  // 1 Bar
-    case 1: return 192 * 2;  // 1/2
-    case 2: return 192;      // 1/4
-    case 3: return 96;       // 1/8
-    case 4: return 48;       // 1/16
-    case 5: return 24;       // 1/32
-    case 6: return 12;       // 1/64
-    case 7: return 6;        // 1/128
+    case 0: return 192 * 2;       // 1/2
+    case 1: return 192;           // 1/4
+    case 2: return 96;            // 1/8
+    case 3: return 48;            // 1/16
+    case 4: return (48 * 3);      // 3/16
+    case 5: return (48 * 5);      // 5/16
+    case 6: return (48 * 7);      // 7/16
+    case 7: return 64;            // 1/8T = PPQN/3 = 64
     }
-    return 6;
+    return 48;
 }
 
 StochasticTrackEngine::StochasticTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
@@ -64,7 +65,7 @@ void StochasticTrackEngine::reset() {
     _patternIndex = _stochasticTrack.sequence(pattern()).first();
     _relativeTick = 0;
     _sleepRemaining = 0;
-    _boredomCounter = 0;
+    _loopCycleCount = 0;
     _lastDegree = -1;
     _jumpRegister = 0;
     _patternCycleEnded = false;
@@ -232,7 +233,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
         int activeNotes = scale.notesPerOctave();
 
-        uint32_t mult = getDurationMultiplierByIndex(eval.durationIndex());
+        uint32_t mult = getDurationMultiplier(eval.durationIndex());
         if (sequence.variation() != 0) {
             int variationRoll = _rng.nextRange(100);
             if (variationRoll < std::abs(sequence.variation())) {
@@ -248,10 +249,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         int note = int(eval.degree()) + (int(eval.octave()) + _jumpRegister + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
 
-        uint32_t densitySize = std::max(1, sequence.size());
-        bool densityPass = sequence.density() >= 100 ||
-            ((uint32_t(eval.densityRank()) * 100) < (uint32_t(sequence.density()) * densitySize));
-        isRest = bool(eval.rest()) || !densityPass || !eval.rhythmValid() || !eval.melodyValid();
+        // V5 Mask: deterministic playback thinning after source read/evaluation
+        uint32_t maskSize = std::max(1, sequence.size());
+        bool maskPass = sequence.mask() >= 100 ||
+            ((uint32_t(eval.densityRank()) * 100) < (uint32_t(sequence.mask()) * maskSize));
+        isRest = bool(eval.rest()) || !maskPass || !eval.rhythmValid() || !eval.melodyValid();
         isLegato = bool(eval.legato());
         isSlide = bool(eval.slide());
         isAccent = bool(eval.accent());
@@ -363,31 +365,39 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 }
             }
 
-            // Domain-aware patience
+            // V5 Patience: exponential loop-count mapping
             if (sequence.patience() < 100) {
-                _boredomCounter++;
-                uint32_t threshold = uint32_t(sequence.patience()) * 20;
-                if (sequence.patience() == 0) threshold = 1;
-
-                if (_boredomCounter >= threshold) {
+                _loopCycleCount++;
+                uint32_t loopsBeforeRefresh;
+                if (sequence.patience() == 0) {
+                    loopsBeforeRefresh = 1;
+                } else {
+                    int bucket = clamp(sequence.patience() / 14, 0, 7);
+                    loopsBeforeRefresh = uint32_t(1) << bucket;
+                }
+                if (_loopCycleCount >= loopsBeforeRefresh) {
                     if (sequence.rhythmMode() == StochasticSourceMode::Loop) sequence.setRhythmValid(false);
                     if (sequence.melodyMode() == StochasticSourceMode::Loop) sequence.setMelodyValid(false);
-                    _boredomCounter = 0;
-                } else if (_boredomCounter > (threshold * 3) / 4) {
-                    if (int(_rng.nextRange(100)) < 25) {
-                        if (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.melodyMode() == StochasticSourceMode::Loop) {
-                            if (_rng.nextRange(2) == 0) StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
-                            else StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
-                        } else if (sequence.rhythmMode() == StochasticSourceMode::Loop) {
-                            StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
-                        } else if (sequence.melodyMode() == StochasticSourceMode::Loop) {
-                            StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
-                        }
-                    }
+                    _loopCycleCount = 0;
                 }
             }
         }
     }
+}
+
+void StochasticTrackEngine::refreshLoopSources() {
+    auto &sequence = const_cast<StochasticSequence&>(*_sequence);
+    auto &track = const_cast<StochasticTrack&>(_stochasticTrack);
+    const auto &scale = sequence.selectedScale(_model.project().scale());
+    int rootNote = sequence.selectedRootNote(_model.project().rootNote());
+
+    if (sequence.rhythmMode() == StochasticSourceMode::Loop) {
+        sequence.setRhythmValid(false);
+    }
+    if (sequence.melodyMode() == StochasticSourceMode::Loop) {
+        sequence.setMelodyValid(false);
+    }
+    _loopCycleCount = 0;
 }
 
 void StochasticTrackEngine::update(float dt) {

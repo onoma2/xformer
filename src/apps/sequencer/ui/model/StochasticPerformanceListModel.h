@@ -8,11 +8,14 @@
 class StochasticPerformanceListModel : public RoutableListModel {
 public:
     enum Item {
-        RhythmMode,
-        MelodyMode,
+        Level,
+        Mode,
+        Rhythm,
+        Melody,
         Complexity,
         Contour,
         Linearity,
+        GenDensity,
         Shape,
         Spread,
         Bias,
@@ -27,7 +30,7 @@ public:
         BurstCount,
         BurstRate,
         BurstPitch,
-        Density,
+        Mask,
         Tilt,
         Sleep,
         Patience,
@@ -40,6 +43,8 @@ public:
         Range,
         MinDegree,
         MaxDegree,
+        Refresh,
+        DurationTickets,
         LastItem
     };
 
@@ -51,7 +56,7 @@ public:
     }
 
     virtual int rows() const override {
-        return LastItem;
+        return _track ? itemCount() : 0;
     }
 
     virtual int columns() const override {
@@ -60,125 +65,25 @@ public:
 
     virtual void cell(int row, int column, StringBuilder &str) const override {
         auto &sequence = _track->sequence(_project->selectedPatternIndex());
+        auto item = itemForRow(row);
         if (column == 0) {
-            switch (Item(row)) {
-            case RhythmMode:    str("Rhythm"); break;
-            case MelodyMode:    str("Melody"); break;
-            case Complexity:    str("Complexity"); break;
-            case Contour:       str("Contour"); break;
-            case Linearity:     str("Linearity"); break;
-            case Shape:         str("Shape"); break;
-            case Spread:        str("Spread"); break;
-            case Bias:          str("Bias"); break;
-            case Steps:         str("Steps"); break;
-            case Rate:          str("Rate"); break;
-            case Variation:     str("Variation"); break;
-            case Rest:          str("Rest"); break;
-            case SlideProb:     str("Slide Prob"); break;
-            case LegatoProb:    str("Legato"); break;
-            case AccentProb:    str("Accent"); break;
-            case Burst:         str("Burst"); break;
-            case BurstCount:    str("Burst Count"); break;
-            case BurstRate:     str("Burst Rate"); break;
-            case BurstPitch:    str("Burst Pitch"); break;
-            case Density:       str("Density"); break;
-            case Tilt:          str("Tilt"); break;
-            case Sleep:         str("Sleep"); break;
-            case Patience:      str("Patience"); break;
-            case Mutate:        str("Mutate"); break;
-            case Jump:          str("Jump"); break;
-            case Size:          str("Size"); break;
-            case First:         str("First"); break;
-            case Last:          str("Last"); break;
-            case Rotate:        str("Rotate"); break;
-            case Range:         str("Range"); break;
-            case MinDegree:     str("Low Degree"); break;
-            case MaxDegree:     str("High Degree"); break;
-            case LastItem:      break;
-            }
+            formatName(item, str);
         } else if (column == 1) {
-            switch (Item(row)) {
-            case RhythmMode:    str(sequence.rhythmMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
-            case MelodyMode:    str(sequence.melodyMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
-            case Complexity:    sequence.printComplexity(str); break;
-            case Contour:       sequence.printContour(str); break;
-            case Linearity:     sequence.printLinearity(str); break;
-            case Shape:         sequence.printMarblesMode(str); break;
-            case Spread:        sequence.printMarblesSpread(str); break;
-            case Bias:          sequence.printMarblesBias(str); break;
-            case Steps:         sequence.printMarblesSteps(str); break;
-            case Rate:          sequence.printRate(str); break;
-            case Variation:     sequence.printVariation(str); break;
-            case Rest:          sequence.printRest(str); break;
-            case SlideProb:     sequence.printSlide(str); break;
-            case LegatoProb:    sequence.printLegatoProb(str); break;
-            case AccentProb:    sequence.printAccentProb(str); break;
-            case Burst:         sequence.printBurst(str); break;
-            case BurstCount:    str("%d", sequence.burstCount()); break;
-            case BurstRate:     str("%d%%", sequence.burstRate()); break;
-            case BurstPitch:    sequence.printBurstPitch(str); break;
-            case Density:       sequence.printDensity(str); break;
-            case Tilt:          sequence.printTilt(str); break;
-            case Sleep:         sequence.printSleep(str); break;
-            case Patience:      sequence.printPatience(str); break;
-            case Mutate:        sequence.printMutate(str); break;
-            case Jump:          sequence.printJump(str); break;
-            case Size:          str("%d", sequence.size()); break;
-            case First:         str("%d", sequence.first() + 1); break;
-            case Last:          str("%d", sequence.last() + 1); break;
-            case Rotate:        sequence.printRotate(str); break;
-            case Range:         str("%d Oct", sequence.range()); break;
-            case MinDegree:     sequence.printMinDegree(str); break;
-            case MaxDegree:     sequence.printMaxDegree(str); break;
-            case LastItem:      break;
-            }
+            formatValue(item, sequence, str);
         }
     }
 
     virtual void edit(int row, int column, int value, bool shift) override {
         if (column == 1) {
             auto &sequence = _track->sequence(_project->selectedPatternIndex());
-            switch (Item(row)) {
-            case RhythmMode:    sequence.setRhythmMode(ModelUtils::adjustedEnum(sequence.rhythmMode(), value)); break;
-            case MelodyMode:    sequence.setMelodyMode(ModelUtils::adjustedEnum(sequence.melodyMode(), value)); break;
-            case Complexity:    sequence.editComplexity(value, shift); break;
-            case Contour:       sequence.editContour(value, shift); break;
-            case Linearity:     sequence.editLinearity(value, shift); break;
-            case Shape:         sequence.editMarblesMode(value, shift); break;
-            case Spread:        sequence.editMarblesSpread(value, shift); break;
-            case Bias:          sequence.editMarblesBias(value, shift); break;
-            case Steps:         sequence.editMarblesSteps(value, shift); break;
-            case Rate:          sequence.editRate(value, shift); break;
-            case Variation:     sequence.editVariation(value, shift); break;
-            case Rest:          sequence.editRest(value, shift); break;
-            case SlideProb:     sequence.editSlide(value, shift); break;
-            case LegatoProb:    sequence.editLegatoProb(value, shift); break;
-            case AccentProb:    sequence.editAccentProb(value, shift); break;
-            case Burst:         sequence.editBurst(value, shift); break;
-            case BurstCount:    sequence.setBurstCount(sequence.burstCount() + value); break;
-            case BurstRate:     sequence.setBurstRate(sequence.burstRate() + value); break;
-            case BurstPitch:    sequence.editBurstPitch(value, shift); break;
-            case Density:       sequence.editDensity(value, shift); break;
-            case Tilt:          sequence.editTilt(value, shift); break;
-            case Sleep:         sequence.editSleep(value, shift); break;
-            case Patience:      sequence.editPatience(value, shift); break;
-            case Mutate:        sequence.editMutate(value, shift); break;
-            case Jump:          sequence.editJump(value, shift); break;
-            case Size:          sequence.setSize(sequence.size() + value); break;
-            case First:         sequence.setFirst(sequence.first() + value); break;
-            case Last:          sequence.setLast(sequence.last() + value); break;
-            case Rotate:        sequence.editRotate(value, shift); break;
-            case Range:         sequence.setRange(sequence.range() + value); break;
-            case MinDegree:     sequence.editMinDegree(value, shift); break;
-            case MaxDegree:     sequence.editMaxDegree(value, shift); break;
-            case LastItem:      break;
-            }
+            editValue(itemForRow(row), sequence, value, shift);
         }
     }
 
     virtual Routing::Target routingTarget(int row) const override {
-        switch (Item(row)) {
-        case Density:       return Routing::Target::StochasticDensity;
+        switch (itemForRow(row)) {
+        case Mask:          return Routing::Target::StochasticDensity;
+        case GenDensity:    return Routing::Target::StochasticGeneratorDensity;
         case Tilt:          return Routing::Target::StochasticTilt;
         case Burst:         return Routing::Target::StochasticBurst;
         case Contour:       return Routing::Target::StochasticContour;
@@ -197,6 +102,265 @@ public:
     }
 
 private:
+    static const Item coreItems[];
+    static const Item directItems[];
+    static const Item weightsItems[];
+
+    const Item *activeItems() const {
+        auto &sequence = _track->sequence(_project->selectedPatternIndex());
+        switch (sequence.level()) {
+        case StochasticLevel::Direct:  return directItems;
+        case StochasticLevel::Weights: return weightsItems;
+        default:                       return coreItems;
+        }
+    }
+
+    int itemCount() const {
+        int count = 0;
+        const Item *items = activeItems();
+        while (items[count] != LastItem) ++count;
+        return count;
+    }
+
+    Item itemForRow(int row) const {
+        const Item *items = activeItems();
+        int count = itemCount();
+        if (row < 0 || row >= count) return items[0];
+        return items[row];
+    }
+
+    const char *itemName(Item item) const {
+        switch (item) {
+        case Level:         return "Level";
+        case Mode:          return "Mode";
+        case Rhythm:        return "Rhythm";
+        case Melody:        return "Melody";
+        case Complexity:    return "Complexity";
+        case Contour:       return "Contour";
+        case Linearity:     return "Linearity";
+        case GenDensity:    return "Gen Density";
+        case Shape:         return "Shape";
+        case Spread:        return "Spread";
+        case Bias:          return "Bias";
+        case Steps:         return "Steps";
+        case Rate:          return "Rate";
+        case Variation:     return "Variation";
+        case Rest:          return "Rest";
+        case SlideProb:     return "Slide Prob";
+        case LegatoProb:    return "Legato";
+        case AccentProb:    return "Accent";
+        case Burst:         return "Burst";
+        case BurstCount:    return "Burst Count";
+        case BurstRate:     return "Burst Rate";
+        case BurstPitch:    return "Burst Pitch";
+        case Mask:          return "Mask";
+        case Tilt:          return "Tilt";
+        case Sleep:         return "Sleep";
+        case Patience:      return "Patience";
+        case Mutate:        return "Mutate";
+        case Jump:          return "Jump";
+        case Size:          return "Size";
+        case First:         return "First";
+        case Last:          return "Last";
+        case Rotate:        return "Rotate";
+        case Range:         return "Range";
+        case MinDegree:     return "Low Degree";
+        case MaxDegree:     return "High Degree";
+        case Refresh:       return "Refresh";
+        case DurationTickets: return "Dur Tickets";
+        case LastItem:      break;
+        }
+        return nullptr;
+    }
+
+    void formatName(Item item, StringBuilder &str) const {
+        str(itemName(item));
+    }
+
+    void formatValue(Item item, const StochasticSequence &sequence, StringBuilder &str) const {
+        switch (item) {
+        case Level:         sequence.printLevel(str); break;
+        case Mode:          sequence.printCoupledMode(str); break;
+        case Rhythm:        str(sequence.rhythmMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
+        case Melody:        str(sequence.melodyMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
+        case Complexity:    sequence.printComplexity(str); break;
+        case Contour:       sequence.printContour(str); break;
+        case Linearity:     sequence.printLinearity(str); break;
+        case GenDensity:    sequence.printGeneratorDensity(str); break;
+        case Shape:         sequence.printMarblesMode(str); break;
+        case Spread:        sequence.printMarblesSpread(str); break;
+        case Bias:          sequence.printMarblesBias(str); break;
+        case Steps:         sequence.printMarblesSteps(str); break;
+        case Rate:          sequence.printRate(str); break;
+        case Variation:     sequence.printVariation(str); break;
+        case Rest:          sequence.printRest(str); break;
+        case SlideProb:     sequence.printSlide(str); break;
+        case LegatoProb:    sequence.printLegatoProb(str); break;
+        case AccentProb:    sequence.printAccentProb(str); break;
+        case Burst:         sequence.printBurst(str); break;
+        case BurstCount:    str("%d", sequence.burstCount()); break;
+        case BurstRate:     str("%d%%", sequence.burstRate()); break;
+        case BurstPitch:    sequence.printBurstPitch(str); break;
+        case Mask:          sequence.printMask(str); break;
+        case Tilt:          sequence.printTilt(str); break;
+        case Sleep:         sequence.printSleep(str); break;
+        case Patience:      sequence.printPatience(str); break;
+        case Mutate:        sequence.printMutate(str); break;
+        case Jump:          sequence.printJump(str); break;
+        case Size:          str("%d", sequence.size()); break;
+        case First:         str("%d", sequence.first() + 1); break;
+        case Last:          str("%d", sequence.last() + 1); break;
+        case Rotate:        sequence.printRotate(str); break;
+        case Range:         str("%d Oct", sequence.range()); break;
+        case MinDegree:     sequence.printMinDegree(str); break;
+        case MaxDegree:     sequence.printMaxDegree(str); break;
+        case Refresh:       str("Exec"); break;
+        case DurationTickets: str(sequence.durationTicketsEnabled() ? "On" : "Off"); break;
+        case LastItem:      break;
+        }
+    }
+
+    void editValue(Item item, StochasticSequence &sequence, int value, bool shift) {
+        switch (item) {
+        case Level:         sequence.editLevel(value, shift); break;
+        case Mode:          sequence.editCoupledMode(value, shift); break;
+        case Rhythm:        sequence.setRhythmMode(ModelUtils::adjustedEnum(sequence.rhythmMode(), value)); break;
+        case Melody:        sequence.setMelodyMode(ModelUtils::adjustedEnum(sequence.melodyMode(), value)); break;
+        case Complexity:    sequence.editComplexity(value, shift); break;
+        case Contour:       sequence.editContour(value, shift); break;
+        case Linearity:     sequence.editLinearity(value, shift); break;
+        case GenDensity:    sequence.editGeneratorDensity(value, shift); break;
+        case Shape:         sequence.editMarblesMode(value, shift); break;
+        case Spread:        sequence.editMarblesSpread(value, shift); break;
+        case Bias:          sequence.editMarblesBias(value, shift); break;
+        case Steps:         sequence.editMarblesSteps(value, shift); break;
+        case Rate:          sequence.editRate(value, shift); break;
+        case Variation:     sequence.editVariation(value, shift); break;
+        case Rest:          sequence.editRest(value, shift); break;
+        case SlideProb:     sequence.editSlide(value, shift); break;
+        case LegatoProb:    sequence.editLegatoProb(value, shift); break;
+        case AccentProb:    sequence.editAccentProb(value, shift); break;
+        case Burst:         sequence.editBurst(value, shift); break;
+        case BurstCount:    sequence.setBurstCount(sequence.burstCount() + value); break;
+        case BurstRate:     sequence.setBurstRate(sequence.burstRate() + value); break;
+        case BurstPitch:    sequence.editBurstPitch(value, shift); break;
+        case Mask:          sequence.editMask(value, shift); break;
+        case Tilt:          sequence.editTilt(value, shift); break;
+        case Sleep:         sequence.editSleep(value, shift); break;
+        case Patience:      sequence.editPatience(value, shift); break;
+        case Mutate:        sequence.editMutate(value, shift); break;
+        case Jump:          sequence.editJump(value, shift); break;
+        case Size:          sequence.setSize(sequence.size() + value); break;
+        case First:         sequence.setFirst(sequence.first() + value); break;
+        case Last:          sequence.setLast(sequence.last() + value); break;
+        case Rotate:        sequence.editRotate(value, shift); break;
+        case Range:         sequence.setRange(sequence.range() + value); break;
+        case MinDegree:     sequence.editMinDegree(value, shift); break;
+        case MaxDegree:     sequence.editMaxDegree(value, shift); break;
+        case Refresh:       sequence.refresh(); break;
+        case DurationTickets: sequence.toggleDurationTickets(); break;
+        case LastItem:      break;
+        }
+    }
+
     StochasticTrack *_track = nullptr;
     Project *_project = nullptr;
+};
+
+// Level 1: Core — immediate generative music
+inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel::coreItems[] = {
+    Level,
+    Mode,
+    Complexity,
+    GenDensity,
+    Shape,
+    Spread,
+    Bias,
+    Steps,
+    Range,
+    Burst,
+    BurstCount,
+    BurstRate,
+    BurstPitch,
+    Refresh,
+    Size,
+    First,
+    Last,
+    Rotate,
+    Patience,
+    LastItem
+};
+
+// Level 2: Direct — split source modes, explicit rhythm/pitch controls
+inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel::directItems[] = {
+    Level,
+    Rhythm,
+    Melody,
+    Complexity,
+    Rate,
+    Variation,
+    Rest,
+    GenDensity,
+    SlideProb,
+    LegatoProb,
+    AccentProb,
+    Range,
+    MinDegree,
+    MaxDegree,
+    Shape,
+    Spread,
+    Bias,
+    Steps,
+    Burst,
+    BurstCount,
+    BurstRate,
+    BurstPitch,
+    Refresh,
+    Size,
+    First,
+    Last,
+    Rotate,
+    Patience,
+    LastItem
+};
+
+// Level 3: Weights — explicit probability programming
+inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel::weightsItems[] = {
+    Level,
+    Rhythm,
+    Melody,
+    Complexity,
+    Contour,
+    Linearity,
+    Rate,
+    Variation,
+    Rest,
+    DurationTickets,
+    SlideProb,
+    LegatoProb,
+    AccentProb,
+    GenDensity,
+    Shape,
+    Spread,
+    Bias,
+    Steps,
+    Range,
+    MinDegree,
+    MaxDegree,
+    Burst,
+    BurstCount,
+    BurstRate,
+    BurstPitch,
+    Mask,
+    Tilt,
+    Sleep,
+    Patience,
+    Mutate,
+    Jump,
+    Refresh,
+    Size,
+    First,
+    Last,
+    Rotate,
+    LastItem
 };
