@@ -14,8 +14,8 @@
 #include <algorithm>
 #include <cstdio>
 
-// Uncomment for gate scheduling trace
-// #define DBG_STO_ENABLE
+// Gate scheduling trace — enabled for simulator debugging
+#define DBG_STO_ENABLE
 #ifdef DBG_STO_ENABLE
 #define DBG_STO(fmt, ...) printf("[STO] " fmt "\n", ##__VA_ARGS__)
 #else
@@ -160,6 +160,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
     // Process CV queue
     while (!_cvQueue.empty() && tick >= _cvQueue.front().tick) {
         auto &ev = _cvQueue.front();
+        DBG_STO("%u CVpop cv=%.3f", tick, ev.cv);
         _cvOutputTarget = ev.cv;
         _slideActive = ev.slide;
         _cvQueue.pop();
@@ -345,7 +346,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
 
         if (!isRest) {
-            DBG_STO("%u GATEpush LIVE ON p=%d", tick, _patternIndex);
+            DBG_STO("%u CVpush ON p=%d cv=%.3f", tick, _patternIndex, finalCv);
             _cvQueue.push({ tick, finalCv, isSlide });
             _gateQueue.push({ tick, true, isAccent });
 
@@ -382,7 +383,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 }
             }
         } else {
-            DBG_STO("%u GATEpush LIVE REST p=%d", tick, _patternIndex);
+            DBG_STO("%u CVpush REST p=%d cv=%.3f mode=%s", tick, _patternIndex, finalCv,
+                track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always ? "Always" : "Gate");
             _gateQueue.push({ tick, false, false });
             if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
             _activity = false;

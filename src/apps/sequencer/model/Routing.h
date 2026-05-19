@@ -210,7 +210,7 @@ public:
         case Target::GateLength:                return "Gate Length";
 
         case Target::StochasticDensity:         return "Mask";
-        case Target::StochasticGeneratorDensity: return "Gen Density";
+        case Target::StochasticGeneratorDensity: return "Density";
         case Target::StochasticTilt:            return "Tilt";
         case Target::StochasticReserved:        return "";
         case Target::StochasticBurst:           return "Burst";

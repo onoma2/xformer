@@ -98,7 +98,7 @@ public:
     void writeRouted(Routing::Target target, int intValue, float floatValue) {
         switch (target) {
         case Routing::Target::StochasticDensity: setMask(intValue, true); break;
-        case Routing::Target::StochasticGeneratorDensity: setGeneratorDensity(intValue, true); break;
+        case Routing::Target::StochasticGeneratorDensity: setDensity(intValue, true); break;
         case Routing::Target::StochasticTilt: setTilt(intValue, true); break;
         case Routing::Target::StochasticBurst: setBurst(intValue, true); break;
         case Routing::Target::StochasticComplexity: setComplexity(intValue, true); break;
@@ -227,9 +227,9 @@ public:
     int mask() const { return _mask.get(isRouted(Routing::Target::StochasticDensity)); }
     void setMask(int mask, bool routed = false) { _mask.set(clamp(mask, 0, 100), routed); }
 
-    // generatorDensity (generator-level sound/rest amount)
-    int generatorDensity() const { return _generatorDensity.get(isRouted(Routing::Target::StochasticGeneratorDensity)); }
-    void setGeneratorDensity(int density, bool routed = false) { _generatorDensity.set(clamp(density, 0, 100), routed); }
+    // density (generator-level sound/rest amount)
+    int density() const { return _density.get(isRouted(Routing::Target::StochasticGeneratorDensity)); }
+    void setDensity(int density, bool routed = false) { _density.set(clamp(density, 0, 100), routed); }
 
     // tilt (attached to mask)
     int tilt() const { return _tilt.get(isRouted(Routing::Target::StochasticTilt)); }
@@ -294,8 +294,14 @@ public:
     void printMask(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticDensity); str("%d%%", mask()); }
     void editMask(int value, bool shift) { if (!isRouted(Routing::Target::StochasticDensity)) setMask(mask() + value); }
 
-    void printGeneratorDensity(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticGeneratorDensity); str("%d%%", generatorDensity()); }
-    void editGeneratorDensity(int value, bool shift) { if (!isRouted(Routing::Target::StochasticGeneratorDensity)) setGeneratorDensity(generatorDensity() + value); }
+    // Level 1 Density macro: drives both density and rest
+    void editDensityMacro(int value, bool shift) {
+        if (!isRouted(Routing::Target::StochasticGeneratorDensity)) {
+            int newVal = clamp(density() + value, 0, 100);
+            setDensity(newVal);
+            setRest(100 - newVal);
+        }
+    }
 
     void printTilt(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticTilt); str("%+d%%", tilt()); }
     void editTilt(int value, bool shift) { if (!isRouted(Routing::Target::StochasticTilt)) setTilt(tilt() + value); }
@@ -434,7 +440,7 @@ public:
         _marblesBias = 50;
         _marblesSteps = 100;
         _mask.setBase(100);
-        _generatorDensity.setBase(100);
+        _density.setBase(100);
         _tilt.setBase(0);
         _reservedJitter.setBase(0);
         _burst.setBase(0);
@@ -554,7 +560,7 @@ public:
         _marblesSteps = 100;
         _mask.setBase(100);
 
-        _generatorDensity.setBase(100);
+        _density.setBase(100);
 
         _tilt.setBase(0);
 
@@ -625,7 +631,7 @@ public:
     uint8_t _marblesSteps;
 
     Routable<uint8_t> _mask;
-    Routable<uint8_t> _generatorDensity;
+    Routable<uint8_t> _density;
     Routable<int8_t> _tilt;
     Routable<uint8_t> _reservedJitter;
     Routable<uint8_t> _burst;

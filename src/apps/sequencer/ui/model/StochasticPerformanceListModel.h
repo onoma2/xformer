@@ -10,12 +10,12 @@ public:
     enum Item {
         Level,
         Mode,
+        Density,
         Rhythm,
         Melody,
         Complexity,
         Contour,
         Linearity,
-        GenDensity,
         Shape,
         Spread,
         Bias,
@@ -83,7 +83,7 @@ public:
     virtual Routing::Target routingTarget(int row) const override {
         switch (itemForRow(row)) {
         case Mask:          return Routing::Target::StochasticDensity;
-        case GenDensity:    return Routing::Target::StochasticGeneratorDensity;
+        case Density:       return Routing::Target::StochasticGeneratorDensity;
         case Tilt:          return Routing::Target::StochasticTilt;
         case Burst:         return Routing::Target::StochasticBurst;
         case Contour:       return Routing::Target::StochasticContour;
@@ -133,12 +133,12 @@ private:
         switch (item) {
         case Level:         return "Level";
         case Mode:          return "Mode";
+        case Density:       return "Density";
         case Rhythm:        return "Rhythm";
         case Melody:        return "Melody";
         case Complexity:    return "Complexity";
         case Contour:       return "Contour";
         case Linearity:     return "Linearity";
-        case GenDensity:    return "Gen Density";
         case Shape:         return "Shape";
         case Spread:        return "Spread";
         case Bias:          return "Bias";
@@ -181,12 +181,16 @@ private:
         switch (item) {
         case Level:         sequence.printLevel(str); break;
         case Mode:          sequence.printCoupledMode(str); break;
+        case Density: {
+            sequence.printRouted(str, Routing::Target::StochasticGeneratorDensity);
+            str("%d%%", sequence.density());
+            break;
+        }
         case Rhythm:        str(sequence.rhythmMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
         case Melody:        str(sequence.melodyMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
         case Complexity:    sequence.printComplexity(str); break;
         case Contour:       sequence.printContour(str); break;
         case Linearity:     sequence.printLinearity(str); break;
-        case GenDensity:    sequence.printGeneratorDensity(str); break;
         case Shape:         sequence.printMarblesMode(str); break;
         case Spread:        sequence.printMarblesSpread(str); break;
         case Bias:          sequence.printMarblesBias(str); break;
@@ -224,12 +228,12 @@ private:
         switch (item) {
         case Level:         sequence.editLevel(value, shift); break;
         case Mode:          sequence.editCoupledMode(value, shift); break;
+        case Density:       sequence.editDensityMacro(value, shift); break;
         case Rhythm:        sequence.setRhythmMode(ModelUtils::adjustedEnum(sequence.rhythmMode(), value)); break;
         case Melody:        sequence.setMelodyMode(ModelUtils::adjustedEnum(sequence.melodyMode(), value)); break;
         case Complexity:    sequence.editComplexity(value, shift); break;
         case Contour:       sequence.editContour(value, shift); break;
         case Linearity:     sequence.editLinearity(value, shift); break;
-        case GenDensity:    sequence.editGeneratorDensity(value, shift); break;
         case Shape:         sequence.editMarblesMode(value, shift); break;
         case Spread:        sequence.editMarblesSpread(value, shift); break;
         case Bias:          sequence.editMarblesBias(value, shift); break;
@@ -272,7 +276,7 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     Level,
     Mode,
     Complexity,
-    GenDensity,
+    Density,
     Shape,
     Spread,
     Bias,
@@ -300,7 +304,6 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     Rate,
     Variation,
     Rest,
-    GenDensity,
     SlideProb,
     LegatoProb,
     AccentProb,
@@ -339,7 +342,6 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     SlideProb,
     LegatoProb,
     AccentProb,
-    GenDensity,
     Shape,
     Spread,
     Bias,

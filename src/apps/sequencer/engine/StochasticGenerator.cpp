@@ -144,7 +144,7 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
     event.setDensityRank(0); // Live events have no mask rank
 
     // Generator Density: sound/rest amount at generation time
-    bool densityGate = (rng.nextRange(100) < sequence.generatorDensity());
+    bool densityGate = (rng.nextRange(100) < sequence.density());
     // Direct Rest probability
     bool restGate = (rng.nextRange(100) < sequence.rest());
     event.setRest(!densityGate || restGate);
