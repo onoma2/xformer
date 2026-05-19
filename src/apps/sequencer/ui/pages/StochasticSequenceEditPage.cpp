@@ -123,9 +123,19 @@ void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
 
     str.reset();
     str("DROT:%+d MROT:%+d", sequence.degreeRotation(), sequence.maskRotation());
+    int rw = canvas.textWidth(str);
+
+    // Ticket active badge
     canvas.setFont(Font::Tiny);
+    canvas.setColor(sequence.pitchTicketsActive() ? Color::Bright : Color::Medium);
+    FixedStringBuilder<8> badge;
+    badge(sequence.pitchTicketsActive() ? "ON" : "OFF");
+    int bw = canvas.textWidth(badge);
+    canvas.drawText(Width - rw - bw - 16, 18, badge);
+
+    // Rotation info
     canvas.setColor(Color::Medium);
-    canvas.drawText(Width - canvas.textWidth(str) - 12, 18, str);
+    canvas.drawText(Width - rw - 12, 18, str);
 
     const char *footer[] = { "TIX", "DROT", "MROT", nullptr, "NEXT" };
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), int(_editFocus));
@@ -190,9 +200,9 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
 
     // Duration tickets on/off
     str.reset();
-    str(sequence.durationTicketsEnabled() ? "ON" : "OFF");
+    str(sequence.durationTicketsActive() ? "ON" : "OFF");
     canvas.setFont(Font::Small);
-    canvas.setColor(sequence.durationTicketsEnabled() ? Color::Bright : Color::Medium);
+    canvas.setColor(sequence.durationTicketsActive() ? Color::Bright : Color::Medium);
     canvas.drawText(Width - canvas.textWidth(str) - 8, 18, str);
 
     const char *footer[] = { "DUR", "RST", nullptr, nullptr, "NEXT" };
@@ -380,10 +390,9 @@ void StochasticSequenceEditPage::handleDurationKeyPress(KeyPressEvent &event) {
         case 0: _durFocus = DurFocus::DurTicket; break;
         case 1: _durFocus = DurFocus::Rest; break;
         case 4:
-            if (key.shiftModifier()) {
-                nextPage();
-            }
-            break;
+            nextPage();
+            event.consume();
+            return;
         }
         event.consume();
         return;

@@ -12,7 +12,7 @@ _Updated: 2026-05-19_
 
 ## 🟢 stochastic-track-port — V5 Control Granularity: model/engine/UI wired
 **Status:** done — Phase 10 V5 beta implemented and build verified.
-**Where I stopped:** All 4 commit slices complete: model/storage (Mask rename, generator Density, Duration Tickets, StochasticLevel), generator semantics (density gating, duration ticket selection, maskRanks), engine playback (V5 patience formula, Refresh, split source modes, single V5 duration table), temporary UI (3-item-array level-gated list model, dual-view Ticket page with Pitch/Duration+RST). RAM flat: `.data=6,412`, `.bss=112,576`, `.ccmram_bss=54,956`. StochasticTrack ≤ NoteTrack gate. No project version bump. Existing ticket page preserved and enhanced with NEXT-page Duration view.
+**Where I stopped:** V5 model/engine/UI complete. Character macro (Complexity→Character at L1, drives Complexity+Contour+Linearity), step-relative Rate (divisor×Rate/100), L1/L2/L3 level-gated list arrays, dual-view ticket editor (Pitch/Duration+RST, ON/OFF badges). Duration/rest tickets init to 0, activate when weight>0. Serialization fixed: `_density` not serialized (defaults 100). Gate CV mode defaults with Density=75, Rate=75, divisor=48, size=4. No `GenDensity` anywhere.
 **Next action:** Hardware verification: Density vs Mask distinction, Burst audibility, Duration Ticket selection, Patience 0/mid/100, Refresh command, split Rhythm/Melody Loop/Live, Lock stability.
 **Branch:** feat/stochastic
 **Reference:** `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`, `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`

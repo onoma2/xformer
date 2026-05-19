@@ -78,6 +78,8 @@ void StochasticTrackEngine::reset() {
     _jumpRegister = 0;
     _lastFreeStepIndex = -1;
     _patternCycleEnded = false;
+    _eventElapsed = 0;
+    _eventDuration = 0;
     _activity = false;
     _gateOutput = false;
     _accentOutput = false;
@@ -114,9 +116,17 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
         reset();
     }
 
-    // Dispatch by play mode
-    switch (_stochasticTrack.playMode()) {
-    case Types::PlayMode::Free: {
+    // Dispatch by play mode or Duration Tickets event timing
+    if (sequence.durationTicketsActive()) {
+        _eventElapsed++;
+        if (_eventDuration == 0 || _eventElapsed >= _eventDuration) {
+            _eventElapsed = 0;
+            DBG_STO("%u TRIG(T) p=%d", tick, _patternIndex);
+            triggerStep(tick, divisor);
+        }
+    } else {
+        switch (_stochasticTrack.playMode()) {
+        case Types::PlayMode::Free: {
         double tickPos = _engine.clock().tickPosition();
         double baseTick = resetDivisor == 0 ? tickPos : std::fmod(tickPos, double(resetDivisor));
         if (baseTick < 0.0) baseTick = 0.0;
@@ -144,6 +154,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
             }
         }
         break;
+    }
     }
 
     // Process gate queue
@@ -295,6 +306,12 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             }
         }
         durationTicks = mult;
+
+        if (!sequence.durationTicketsActive()) {
+            durationTicks = (divisor * sequence.rate()) / 100;
+            if (durationTicks < 1) durationTicks = 1;
+        }
+        _eventDuration = durationTicks;
 
         int note = int(eval.degree()) + (int(eval.octave()) + _jumpRegister + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);

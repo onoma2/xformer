@@ -258,9 +258,14 @@ public:
     // durationTickets (Level 3 parent-duration weights)
     int durationTicket(int index) const { return _durationTickets[index]; }
     void setDurationTicket(int index, int value) { _durationTickets[index] = clamp(value, 0, 100); }
-    bool durationTicketsEnabled() const { return _durationTicketsEnabled; }
-    void setDurationTicketsEnabled(bool enabled) { _durationTicketsEnabled = enabled; }
-    void toggleDurationTickets() { _durationTicketsEnabled = !_durationTicketsEnabled; }
+    bool durationTicketsActive() const {
+        for (int i = 0; i < 8; ++i) if (_durationTickets[i] > 0) return true;
+        return false;
+    }
+    bool pitchTicketsActive() const {
+        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) if (_degreeTickets[i] > 0) return true;
+        return false;
+    }
 
     // Level (UI presentation, not engine)
     StochasticLevel level() const { return _level; }
@@ -300,6 +305,15 @@ public:
             int newVal = clamp(density() + value, 0, 100);
             setDensity(newVal);
             setRest(100 - newVal);
+        }
+    }
+
+    void editCharacterMacro(int value, bool shift) {
+        if (!isRouted(Routing::Target::StochasticComplexity)) {
+            int c = clamp(complexity() + value, 0, 100);
+            setComplexity(c);
+            setContour((c - 50) * 2);
+            setLinearity(100 - c);
         }
     }
 
@@ -427,8 +441,8 @@ public:
         _rhythmSeed = 0;
         _melodySeed = 0;
 
-        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
-            _degreeTickets[i] = 10;
+for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
+            _degreeTickets[i] = 0;
         }
         _linearity = 0;
         _degreeRotation = 0;
@@ -464,8 +478,7 @@ public:
         _rhythmMode = StochasticSourceMode::Loop;
         _melodyMode = StochasticSourceMode::Loop;
 
-        for (int i = 0; i < 8; ++i) _durationTickets[i] = 50;
-        _durationTicketsEnabled = false;
+        for (int i = 0; i < 8; ++i) _durationTickets[i] = 0;
 
         for (auto &event : _events) event.clear();
     }
@@ -537,6 +550,88 @@ public:
         _resetMeasure = clamp(int(_resetMeasure), 0, 128);
         _clockMultiplier.read(reader);
 
+        reader.read(_size);
+        reader.read(_first);
+        reader.read(_last);
+
+        reader.read(_rhythmValid);
+        reader.read(_melodyValid);
+        reader.read(_rhythmSeed);
+        reader.read(_melodySeed);
+
+        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) reader.read(_degreeTickets[i]);
+        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) _degreeTickets[i] = clamp(int(_degreeTickets[i]), -1, 100);
+        reader.read(_linearity);
+        _linearity = clamp(int(_linearity), 0, 100);
+        reader.read(_degreeRotation);
+        _degreeRotation = clamp(int(_degreeRotation), -32, 32);
+        reader.read(_maskRotation);
+        _maskRotation = clamp(int(_maskRotation), -32, 32);
+        reader.read(_accentProb);
+        _accentProb = clamp(int(_accentProb), 0, 100);
+        reader.read(_legatoProb);
+        _legatoProb = clamp(int(_legatoProb), 0, 100);
+        uint8_t marblesMode;
+        reader.read(marblesMode);
+        _marblesMode = marblesMode < uint8_t(MarblesMode::Last) ? static_cast<MarblesMode>(marblesMode) : MarblesMode::Off;
+        reader.read(_marblesSpread);
+        _marblesSpread = clamp(int(_marblesSpread), 0, 100);
+        reader.read(_marblesBias);
+        _marblesBias = clamp(int(_marblesBias), 0, 100);
+        reader.read(_marblesSteps);
+        _marblesSteps = clamp(int(_marblesSteps), 1, 100);
+        _mask.read(reader);
+        _tilt.read(reader);
+        _reservedJitter.read(reader);
+        _burst.read(reader);
+        reader.read(_minDegree);
+        _minDegree = clamp(int(_minDegree), 0, 127);
+        reader.read(_maxDegree);
+        _maxDegree = clamp(int(_maxDegree), 0, 127);
+        _rotate.read(reader);
+        _complexity.read(reader);
+        _contour.read(reader);
+        _rate.read(reader);
+        _variation.read(reader);
+        _rest.read(reader);
+        _slide.read(reader);
+        reader.read(_burstRate);
+        _burstRate = clamp(int(_burstRate), 0, 100);
+        reader.read(_burstCount);
+        _burstCount = clamp(int(_burstCount), 0, 100);
+        uint8_t burstPitch;
+        reader.read(burstPitch);
+        _burstPitch = burstPitch < uint8_t(StochasticBurstPitch::Last) ? static_cast<StochasticBurstPitch>(burstPitch) : StochasticBurstPitch::Parent;
+        _sleep.read(reader);
+        _patience.read(reader);
+        _mutate.read(reader);
+        _jump.read(reader);
+        reader.read(_range);
+        _range = clamp(int(_range), 1, 4);
+
+        uint8_t rhythmMode, melodyMode;
+        reader.read(rhythmMode);
+        _rhythmMode = rhythmMode < uint8_t(StochasticSourceMode::Last) ? static_cast<StochasticSourceMode>(rhythmMode) : StochasticSourceMode::Loop;
+        reader.read(melodyMode);
+        _melodyMode = melodyMode < uint8_t(StochasticSourceMode::Last) ? static_cast<StochasticSourceMode>(melodyMode) : StochasticSourceMode::Loop;
+
+
+        for (auto &event : _events) {
+            for (int i = 0; i < 6; ++i) {
+                reader.read(event.bytes[i]);
+            }
+        }
+
+        sanitizeAfterRead();
+    }
+
+private:
+    void sanitizeAfterRead() {
+        _scale = clamp(int(_scale), -1, Scale::Count - 1);
+        _rootNote = clamp(int(_rootNote), -1, 11);
+        _divisor = ModelUtils::clampDivisor(_divisor);
+        _resetMeasure = clamp(int(_resetMeasure), 0, 128);
+
         if (_size < 2 || _size > CONFIG_STEP_COUNT) {
             _size = 16;
             _first = 0;
@@ -546,45 +641,44 @@ public:
             _rhythmSeed = 0;
             _melodySeed = 0;
 
-        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
-            _degreeTickets[i] = 10;
-        }
-        _linearity = 0;
-        _degreeRotation = 0;
-        _maskRotation = 0;
-        _accentProb = 0;
-        _legatoProb = 0;
-        _marblesMode = MarblesMode::Off;
-        _marblesSpread = 50;
-        _marblesBias = 50;
-        _marblesSteps = 100;
-        _mask.setBase(100);
+            for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
+                _degreeTickets[i] = 0;
+            }
+            _linearity = 0;
+            _degreeRotation = 0;
+            _maskRotation = 0;
+            _accentProb = 0;
+            _legatoProb = 0;
+            _marblesMode = MarblesMode::Off;
+            _marblesSpread = 50;
+            _marblesBias = 50;
+            _marblesSteps = 100;
+            _mask.setBase(100);
+            _density.setBase(100);
+            _tilt.setBase(0);
+            _reservedJitter.setBase(0);
+            _burst.setBase(0);
+            _minDegree = 0;
+            _maxDegree = 127;
+            _rotate.setBase(0);
+            _complexity.setBase(50);
+            _contour.setBase(0);
+            _rate.setBase(50);
+            _variation.setBase(0);
+            _rest.setBase(0);
+            _slide.setBase(0);
+            _burstRate = 50;
+            _burstCount = 0;
+            _burstPitch = StochasticBurstPitch::Parent;
+            _sleep.setBase(0);
+            _patience.setBase(100);
+            _mutate.setBase(0);
+            _jump.setBase(0);
+            _range = 1;
+            _rhythmMode = StochasticSourceMode::Loop;
+            _melodyMode = StochasticSourceMode::Loop;
 
-        _density.setBase(100);
-
-        _tilt.setBase(0);
-
-        _reservedJitter.setBase(0);
-        _burst.setBase(0);
-        _minDegree = 0;
-        _maxDegree = 127;
-        _rotate.setBase(0);
-        _complexity.setBase(50);
-        _contour.setBase(0);
-        _rate.setBase(50);
-        _variation.setBase(0);
-        _rest.setBase(0);
-        _slide.setBase(0);
-        _burstRate = 50;
-        _burstCount = 0;
-        _burstPitch = StochasticBurstPitch::Parent;
-        _sleep.setBase(0);
-        _patience.setBase(100);
-        _mutate.setBase(0);
-        _jump.setBase(0);
-        _range = 1;
-        _rhythmMode = StochasticSourceMode::Loop;
-        _melodyMode = StochasticSourceMode::Loop;
+            for (int i = 0; i < 8; ++i) _durationTickets[i] = 0;
 
             for (auto &event : _events) event.clear();
             return;
@@ -656,7 +750,6 @@ public:
     uint8_t _range;
 
     uint8_t _durationTickets[8];
-    bool _durationTicketsEnabled = false;
 
     StochasticLevel _level = StochasticLevel::Core;
 

@@ -56,6 +56,8 @@ private:
     int _jumpRegister = 0;
     int _lastFreeStepIndex = -1;
     bool _patternCycleEnded = false;
+    uint32_t _eventElapsed = 0;
+    uint32_t _eventDuration = 0;
 
     bool _activity = false;
     bool _gateOutput = false;

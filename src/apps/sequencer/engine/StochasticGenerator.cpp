@@ -133,7 +133,7 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
 
     // V5 Duration: use duration tickets if enabled, else Rate+Variation
     int durationIndex;
-    if (sequence.durationTicketsEnabled()) {
+    if (sequence.durationTicketsActive()) {
         durationIndex = selectDurationTicket(sequence, rng);
     } else {
         int r = std::max(1, std::min(400, int(sequence.rate())));

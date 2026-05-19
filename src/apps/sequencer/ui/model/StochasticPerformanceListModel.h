@@ -11,6 +11,7 @@ public:
         Level,
         Mode,
         Density,
+        Character,
         Rhythm,
         Melody,
         Complexity,
@@ -44,7 +45,6 @@ public:
         MinDegree,
         MaxDegree,
         Refresh,
-        DurationTickets,
         LastItem
     };
 
@@ -134,6 +134,7 @@ private:
         case Level:         return "Level";
         case Mode:          return "Mode";
         case Density:       return "Density";
+        case Character:     return "Character";
         case Rhythm:        return "Rhythm";
         case Melody:        return "Melody";
         case Complexity:    return "Complexity";
@@ -167,7 +168,6 @@ private:
         case MinDegree:     return "Low Degree";
         case MaxDegree:     return "High Degree";
         case Refresh:       return "Refresh";
-        case DurationTickets: return "Dur Tickets";
         case LastItem:      break;
         }
         return nullptr;
@@ -186,6 +186,7 @@ private:
             str("%d%%", sequence.density());
             break;
         }
+        case Character:     sequence.printComplexity(str); break;
         case Rhythm:        str(sequence.rhythmMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
         case Melody:        str(sequence.melodyMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
         case Complexity:    sequence.printComplexity(str); break;
@@ -219,7 +220,6 @@ private:
         case MinDegree:     sequence.printMinDegree(str); break;
         case MaxDegree:     sequence.printMaxDegree(str); break;
         case Refresh:       str("Exec"); break;
-        case DurationTickets: str(sequence.durationTicketsEnabled() ? "On" : "Off"); break;
         case LastItem:      break;
         }
     }
@@ -229,6 +229,7 @@ private:
         case Level:         sequence.editLevel(value, shift); break;
         case Mode:          sequence.editCoupledMode(value, shift); break;
         case Density:       sequence.editDensityMacro(value, shift); break;
+        case Character:     sequence.editCharacterMacro(value, shift); break;
         case Rhythm:        sequence.setRhythmMode(ModelUtils::adjustedEnum(sequence.rhythmMode(), value)); break;
         case Melody:        sequence.setMelodyMode(ModelUtils::adjustedEnum(sequence.melodyMode(), value)); break;
         case Complexity:    sequence.editComplexity(value, shift); break;
@@ -262,7 +263,6 @@ private:
         case MinDegree:     sequence.editMinDegree(value, shift); break;
         case MaxDegree:     sequence.editMaxDegree(value, shift); break;
         case Refresh:       sequence.refresh(); break;
-        case DurationTickets: sequence.toggleDurationTickets(); break;
         case LastItem:      break;
         }
     }
@@ -275,7 +275,7 @@ private:
 inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel::coreItems[] = {
     Level,
     Mode,
-    Complexity,
+    Character,
     Density,
     Shape,
     Spread,
@@ -301,6 +301,8 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     Rhythm,
     Melody,
     Complexity,
+    Contour,
+    Linearity,
     Rate,
     Variation,
     Rest,
@@ -338,7 +340,6 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     Rate,
     Variation,
     Rest,
-    DurationTickets,
     SlideProb,
     LegatoProb,
     AccentProb,
