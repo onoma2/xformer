@@ -1459,10 +1459,10 @@
                 <button id="sim-reset-btn" style="padding:6px 16px; border-radius:6px; border:1px solid #d4d3d0; font-family:Inter,sans-serif; font-size:12px; cursor:pointer; background:#f0efed; color:#555450;">Reset</button>
             </div>
 
-            <!-- Main grid -->
-            <div style="display:grid; grid-template-columns:240px 1fr 1fr 240px; gap:16px;">
+            <!-- Main grid - two rows -->
+            <div style="display:grid; grid-template-columns:240px 1fr; gap:16px;">
 
-                <!-- ==================== LEFT CONTROLS: GENERATOR ==================== -->
+                <!-- ==================== ROW 1: GENERATOR CONTROLS ==================== -->
                 <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px; font-size:12px;">
                     <div style="font-weight:600; color:#0a7c42; margin-bottom:8px; font-size:13px;">Generator Parameters</div>
 
@@ -1529,23 +1529,15 @@
                     </div>
                 </div>
 
-                <!-- ==================== LEFT WINDOW: LIVE GENERATION ==================== -->
+                <!-- ==================== ROW 1: LIVE WINDOW ==================== -->
                 <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px;">
                     <div style="font-weight:600; color:#0a7c42; margin-bottom:8px; font-size:13px;">Live Generation (8 steps)</div>
-                    <div id="sim-live-steps" style="display:flex; gap:4px; height:200px; align-items:flex-end;"></div>
+                    <div id="sim-live-steps" style="display:flex; gap:4px; height:180px; align-items:flex-end;"></div>
                     <div id="sim-live-labels" style="display:flex; gap:4px; margin-top:4px;"></div>
                     <div id="sim-live-gate" style="display:flex; gap:4px; margin-top:2px; height:8px;"></div>
                 </div>
 
-                <!-- ==================== RIGHT WINDOW: LOOPED ==================== -->
-                <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px;">
-                    <div style="font-weight:600; color:#1d4ed8; margin-bottom:8px; font-size:13px;">Loop Buffer (8 steps)</div>
-                    <div id="sim-loop-steps" style="display:flex; gap:4px; height:200px; align-items:flex-end;"></div>
-                    <div id="sim-loop-labels" style="display:flex; gap:4px; margin-top:4px;"></div>
-                    <div id="sim-loop-gate" style="display:flex; gap:4px; margin-top:2px; height:8px;"></div>
-                </div>
-
-                <!-- ==================== RIGHT CONTROLS: LOOPER ==================== -->
+                <!-- ==================== ROW 2: LOOPER CONTROLS ==================== -->
                 <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px; font-size:12px;">
                     <div style="font-weight:600; color:#1d4ed8; margin-bottom:8px; font-size:13px;">Looper / Evolution</div>
 
@@ -1570,6 +1562,14 @@
                         <div style="margin-top:4px;">Jump oct: <span id="sim-jump-oct" style="font-weight:600; color:#b91c1c;">0</span></div>
                         <div style="margin-top:4px;">State: <span id="sim-state" style="font-weight:600; color:#0a7c42;">waiting</span></div>
                     </div>
+                </div>
+
+                <!-- ==================== ROW 2: LOOP WINDOW ==================== -->
+                <div style="background:#f8f8f6; border:1px solid #e8e7e4; border-radius:8px; padding:12px;">
+                    <div style="font-weight:600; color:#1d4ed8; margin-bottom:8px; font-size:13px;">Loop Buffer (8 steps)</div>
+                    <div id="sim-loop-steps" style="display:flex; gap:4px; height:180px; align-items:flex-end;"></div>
+                    <div id="sim-loop-labels" style="display:flex; gap:4px; margin-top:4px;"></div>
+                    <div id="sim-loop-gate" style="display:flex; gap:4px; margin-top:2px; height:8px;"></div>
                 </div>
             </div>
         </div>
