@@ -9,16 +9,15 @@ void StochasticGenerator::generateRhythm(StochasticSequence &sequence, const Sto
     
     for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
         if (i < size) {
-            auto rhythm = generateRhythmEvent(track, rng);
+            auto rhythm = generateRhythmEvent(sequence, track, rng);
             sequence.events()[i].mergeRhythmFrom(rhythm);
         } else {
             // Do not clear the whole event, only rhythm part
-            sequence.events()[i].d0.raw = 0;
-            sequence.events()[i].setRhythmValid(false);
+            sequence.events()[i].clearRhythm();
         }
     }
 
-    generateDensityRanks(sequence, size, track.tilt(), seed ^ 0xdeadbeef);
+    generateDensityRanks(sequence, size, sequence.tilt(), seed ^ 0xdeadbeef);
     sequence.setRhythmValid(true);
     sequence.setRhythmSeed(seed);
 }
@@ -30,7 +29,7 @@ void StochasticGenerator::generateMelody(StochasticSequence &sequence, const Sto
     
     for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
         if (i < size) {
-            auto melody = generateMelodyEvent(track, scale, rootNote, lastDegree, rng);
+            auto melody = generateMelodyEvent(sequence, track, scale, rootNote, lastDegree, rng);
             sequence.events()[i].mergeMelodyFrom(melody);
         } else {
             sequence.events()[i].setMelodyValid(false);
@@ -46,8 +45,8 @@ void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const St
     if (size <= 0) return;
     int i = rng.nextRange(size);
     
-    uint8_t oldRank = sequence.events()[i].d0.densityRank;
-    auto rhythm = generateRhythmEvent(track, rng);
+    uint8_t oldRank = sequence.events()[i].densityRank();
+    auto rhythm = generateRhythmEvent(sequence, track, rng);
     sequence.events()[i].mergeRhythmFrom(rhythm);
     sequence.events()[i].setDensityRank(oldRank);
 }
@@ -57,8 +56,8 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
     if (size <= 0) return;
     int i = rng.nextRange(size);
 
-    int lastDegree = (i > 0) ? int(sequence.events()[i-1].d1.degree) : -1;
-    auto melody = generateMelodyEvent(track, scale, rootNote, lastDegree, rng);
+    int lastDegree = (i > 0) ? int(sequence.events()[i-1].degree()) : -1;
+    auto melody = generateMelodyEvent(sequence, track, scale, rootNote, lastDegree, rng);
     sequence.events()[i].mergeMelodyFrom(melody);
 }
 
@@ -83,16 +82,14 @@ void StochasticGenerator::generateDensityRanks(StochasticSequence &sequence, int
         return a.weight < b.weight;
     });
 
-    for (int i = 0; i < CONFIG_STEP_COUNT; ++i) sequence.events()[i].setDensityRank(255);
-
     for (int i = 0; i < size; ++i) {
         sequence.events()[weightedIndices[i].index].setDensityRank(i);
     }
 }
 
-void StochasticGenerator::evaluateChildren(EvaluatedChild *children, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng) {
-    int count = event.d0.childCount;
-    uint32_t burstRate = event.d1.burstRate;
+void StochasticGenerator::evaluateChildren(EvaluatedChild *children, const StochasticSequence &sequence, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng) {
+    int count = event.childCount();
+    uint32_t burstRate = event.burstRate();
     
     // Minimum audible gap (low pulse duration)
     const uint32_t minGap = 2;
@@ -119,9 +116,9 @@ void StochasticGenerator::evaluateChildren(EvaluatedChild *children, const Stoch
             children[i].tickOffset = offset;
             children[i].gateTicks = gate;
             
-            if (track.burstPitch() == StochasticBurstPitch::Generate) {
+            if (sequence.burstPitch() == StochasticBurstPitch::Generate) {
                 int lastDegree = -1;
-                children[i].note = generateDegree(track, scale, lastDegree, rng);
+                children[i].note = generateDegree(sequence, track, scale, lastDegree, rng);
             } else {
                 children[i].note = parentNote;
             }
@@ -130,34 +127,36 @@ void StochasticGenerator::evaluateChildren(EvaluatedChild *children, const Stoch
     }
 }
 
-StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticTrack &track, Random &rng) {
+StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticSequence &sequence, const StochasticTrack &track, Random &rng) {
     StochasticSourceEvent event;
     event.clear();
 
-    event.setRate(track.rate());
-    event.setLength(128);
+    int r = std::max(1, std::min(400, int(sequence.rate())));
+    int durationIndex = ((r - 1) * 8) / 400;
+
+    event.setDurationIndex(durationIndex);
     event.setDensityRank(0); // Bypass density for Live/Single events
     
-    event.setRest(int(rng.nextRange(100)) < track.rest());
-    event.setLegato(int(rng.nextRange(100)) < track.legatoProb());
-    event.setSlide(int(rng.nextRange(100)) < track.slide());
-    event.setAccent(int(rng.nextRange(100)) < track.accentProb());
+    event.setRest(int(rng.nextRange(100)) < sequence.rest());
+    event.setLegato(int(rng.nextRange(100)) < sequence.legatoProb());
+    event.setSlide(int(rng.nextRange(100)) < sequence.slide());
+    event.setAccent(int(rng.nextRange(100)) < sequence.accentProb());
     event.setRhythmValid(true);
-    event.setBurstRate(track.burstRate());
+    event.setBurstRate(sequence.burstRate());
 
     event.setChildCount(0);
-    if (int(rng.nextRange(100)) < track.burst()) {
-        event.setChildCount(1 + (uint32_t(track.burstCount()) * 3) / 100);
+    if (int(rng.nextRange(100)) < sequence.burst()) {
+        event.setChildCount(1 + (uint32_t(sequence.burstCount()) * 3) / 100);
     }
 
     return event;
 }
 
-StochasticSourceEvent StochasticGenerator::generateMelodyEvent(const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng) {
+StochasticSourceEvent StochasticGenerator::generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng) {
     StochasticSourceEvent event;
     event.clear();
 
-    int absoluteDegree = generateDegree(track, scale, lastDegree, rng);
+    int absoluteDegree = generateDegree(sequence, track, scale, lastDegree, rng);
     int activeNotes = scale.notesPerOctave();
     event.setDegree(absoluteDegree % activeNotes);
     event.setOctave(absoluteDegree / activeNotes);
@@ -166,9 +165,9 @@ StochasticSourceEvent StochasticGenerator::generateMelodyEvent(const StochasticT
     return event;
 }
 
-int StochasticGenerator::generateDegree(const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng) {
+int StochasticGenerator::generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng) {
     int activeNotes = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
-    int range = track.range();
+    int range = sequence.range();
     
     int allowedDegrees[CONFIG_USER_SCALE_SIZE * 4];
     int penalizedWeights[CONFIG_USER_SCALE_SIZE * 4];
@@ -177,10 +176,10 @@ int StochasticGenerator::generateDegree(const StochasticTrack &track, const Scal
 
     for (int oct = 0; oct < range; ++oct) {
         for (int i = 0; i < activeNotes; ++i) {
-            int tickets = track.degreeTicket(i);
+            int tickets = sequence.degreeTicket(i);
             if (tickets >= 0) { // -1 is excluded
                 int deg = oct * activeNotes + i;
-                if (deg >= track.minDegree() && deg <= track.maxDegree()) {
+                if (deg >= sequence.minDegree() && deg <= sequence.maxDegree()) {
                     allowedDegrees[allowedCount] = deg;
                     penalizedWeights[allowedCount] = tickets;
                     totalTickets += tickets;
@@ -194,17 +193,17 @@ int StochasticGenerator::generateDegree(const StochasticTrack &track, const Scal
 
     int degree = allowedDegrees[0];
 
-    if (track.marblesMode() == StochasticTrack::MarblesMode::On) {
+    if (sequence.marblesMode() == MarblesMode::On) {
         float x = rng.nextRange(1000) / 1000.f;
-        float shapedX = betaDistributionSample(x, track.marblesSpread() / 100.f);
-        float bias = track.marblesBias() / 100.f;
+        float shapedX = betaDistributionSample(x, sequence.marblesSpread() / 100.f);
+        float bias = sequence.marblesBias() / 100.f;
         float targetIdxFloat = (shapedX - 0.5f) * (allowedCount) + (bias * allowedCount);
         int targetIdx = clamp(int(targetIdxFloat), 0, allowedCount - 1);
         degree = allowedDegrees[targetIdx];
     } else {
-        int complexity = track.complexity();
-        int contour = track.contour();
-        int linearity = track.linearity();
+        int complexity = sequence.complexity();
+        int contour = sequence.contour();
+        int linearity = sequence.linearity();
 
         if (complexity < 50 && lastDegree != -1) {
             totalTickets = 0;
@@ -256,7 +255,7 @@ int StochasticGenerator::generateDegree(const StochasticTrack &track, const Scal
     return degree;
 }
 
-int StochasticGenerator::generateJumpOctave(const StochasticTrack &track, int currentJump, Random &rng) {
+int StochasticGenerator::generateJumpOctave(const StochasticSequence &sequence, const StochasticTrack &track, int currentJump, Random &rng) {
     return 0;
 }
 

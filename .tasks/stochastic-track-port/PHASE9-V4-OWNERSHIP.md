@@ -210,3 +210,4 @@ Implementation rule:
 5. Use exact member lists and STM32 `sizeof` probes instead of estimated field counts.
 6. Define `densityRank` validity via flags and sequence size; do not rely on a `255` sentinel after packing to 6 bits.
 7. Define routing overlay semantics before embedding `Routable<>` in every pattern, because per-sequence `Routable<>` can erase the RAM win.
+8. Preserve the packed-event write invariant from commit `88e28621`: rhythm and melody domains must be written through raw-preserving setters/merge helpers only. Do not assign packed bitfield members directly. The Phase 8 silent-gate regression happened because melody writes into `d1.raw` cleared `rhythmValid`, so every generated event evaluated as a rest. Current engine reference: `StochasticTrackEngine::triggerStep()` must combine domains with `StochasticSourceEvent::mergeRhythmFrom()` and `mergeMelodyFrom()`.

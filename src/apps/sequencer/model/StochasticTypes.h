@@ -14,108 +14,92 @@ enum class StochasticSourceMode : uint8_t {
 
 enum class StochasticBurstPitch : uint8_t { Parent, Generate, Last };
 
+// MarblesMode
+enum class MarblesMode : uint8_t {
+    Off,
+    On,
+    Last
+};
+
 /**
  * RAM-packed pair of rhythm and melody source material.
- * This 8-byte record allows storing 17 patterns within the Performer track budget.
+ * This 6-byte record allows storing 17 patterns within the Performer track budget.
  */
 struct StochasticSourceEvent {
-    static constexpr uint32_t D0RateMask = 0xffu << 0;
-    static constexpr uint32_t D0LengthMask = 0xffu << 8;
-    static constexpr uint32_t D0DensityRankMask = 0xffu << 16;
-    static constexpr uint32_t D0ChildCountMask = 0xffu << 24;
+    uint8_t bytes[6];
 
-    static constexpr uint32_t D1RhythmMask = (1u << 13) - 1u;
-    static constexpr uint32_t D1MelodyMask = ((1u << 13) - 1u) << 13;
-
-    union {
-        uint32_t raw;
-        // Rhythm Domain (32 bits)
-        BitField<uint32_t, 0, 8> rate;
-        BitField<uint32_t, 8, 8> length;
-        BitField<uint32_t, 16, 8> densityRank;
-        BitField<uint32_t, 24, 8> childCount;
-    } d0;
-    union {
-        uint32_t raw;
-        // Rhythm Domain flags
-        BitField<uint32_t, 0, 1> rest;
-        BitField<uint32_t, 1, 1> legato;
-        BitField<uint32_t, 2, 1> slide;
-        BitField<uint32_t, 3, 1> accent;
-        BitField<uint32_t, 4, 1> rhythmValid;
-        BitField<uint32_t, 5, 8> burstRate;
-        
-        // Melody Domain (13 bits)
-        BitField<uint32_t, 13, 7> degree;
-        BitField<uint32_t, 20, 5> octave;
-        BitField<uint32_t, 25, 1> melodyValid;
-
-        // Reserved (6 bits)
-    } d1;
-
-    void clear() { d0.raw = 0; d1.raw = 0; }
-
-    void setRate(int value) {
-        d0.raw = (d0.raw & ~D0RateMask) | ((uint32_t(value) & 0xffu) << 0);
+    void clear() {
+        for (int i = 0; i < 6; ++i) bytes[i] = 0;
     }
 
-    void setLength(int value) {
-        d0.raw = (d0.raw & ~D0LengthMask) | ((uint32_t(value) & 0xffu) << 8);
+    void clearRhythm() {
+        bytes[0] = 0;
+        bytes[1] = 0;
+        bytes[2] = 0;
+        bytes[3] = 0;
     }
 
+    // --- Rhythm Domain (bytes 0..3) ---
+    int durationIndex() const { return bytes[0] & 0x0F; }
+    void setDurationIndex(int value) { bytes[0] = (bytes[0] & 0xF0) | (value & 0x0F); }
+
+    int densityRank() const { return ((bytes[0] >> 4) & 0x0F) | ((bytes[1] & 0x03) << 4); }
     void setDensityRank(int value) {
-        d0.raw = (d0.raw & ~D0DensityRankMask) | ((uint32_t(value) & 0xffu) << 16);
+        bytes[0] = (bytes[0] & 0x0F) | ((value & 0x0F) << 4);
+        bytes[1] = (bytes[1] & 0xFC) | ((value >> 4) & 0x03);
     }
 
-    void setChildCount(int value) {
-        d0.raw = (d0.raw & ~D0ChildCountMask) | ((uint32_t(value) & 0xffu) << 24);
-    }
+    int childCount() const { return (bytes[1] >> 2) & 0x07; }
+    void setChildCount(int value) { bytes[1] = (bytes[1] & 0xE3) | ((value & 0x07) << 2); }
 
-    void setRest(bool value) {
-        d1.raw = (d1.raw & ~(1u << 0)) | (uint32_t(value) << 0);
-    }
-
-    void setLegato(bool value) {
-        d1.raw = (d1.raw & ~(1u << 1)) | (uint32_t(value) << 1);
-    }
-
-    void setSlide(bool value) {
-        d1.raw = (d1.raw & ~(1u << 2)) | (uint32_t(value) << 2);
-    }
-
-    void setAccent(bool value) {
-        d1.raw = (d1.raw & ~(1u << 3)) | (uint32_t(value) << 3);
-    }
-
-    void setRhythmValid(bool value) {
-        d1.raw = (d1.raw & ~(1u << 4)) | (uint32_t(value) << 4);
-    }
-
+    int burstRate() const { return ((bytes[1] >> 5) & 0x07) | ((bytes[2] & 0x0F) << 3); }
     void setBurstRate(int value) {
-        d1.raw = (d1.raw & ~(0xffu << 5)) | ((uint32_t(value) & 0xffu) << 5);
+        bytes[1] = (bytes[1] & 0x1F) | ((value & 0x07) << 5);
+        bytes[2] = (bytes[2] & 0xF0) | ((value >> 3) & 0x0F);
     }
 
-    void setDegree(int value) {
-        d1.raw = (d1.raw & ~(0x7fu << 13)) | ((uint32_t(value) & 0x7fu) << 13);
-    }
+    bool rest() const { return (bytes[2] >> 4) & 0x01; }
+    void setRest(bool value) { bytes[2] = (bytes[2] & ~(1 << 4)) | ((value ? 1 : 0) << 4); }
 
+    bool legato() const { return (bytes[2] >> 5) & 0x01; }
+    void setLegato(bool value) { bytes[2] = (bytes[2] & ~(1 << 5)) | ((value ? 1 : 0) << 5); }
+
+    bool slide() const { return (bytes[2] >> 6) & 0x01; }
+    void setSlide(bool value) { bytes[2] = (bytes[2] & ~(1 << 6)) | ((value ? 1 : 0) << 6); }
+
+    bool accent() const { return (bytes[2] >> 7) & 0x01; }
+    void setAccent(bool value) { bytes[2] = (bytes[2] & ~(1 << 7)) | ((value ? 1 : 0) << 7); }
+
+    bool rhythmValid() const { return bytes[3] & 0x01; }
+    void setRhythmValid(bool value) { bytes[3] = (bytes[3] & ~0x01) | (value ? 1 : 0); }
+
+    // --- Melody Domain (bytes 4..5) ---
+    int degree() const { return bytes[4] & 0x7F; }
+    void setDegree(int value) { bytes[4] = (bytes[4] & 0x80) | (value & 0x7F); }
+
+    int octave() const { return ((bytes[4] >> 7) & 0x01) | ((bytes[5] & 0x0F) << 1); }
     void setOctave(int value) {
-        d1.raw = (d1.raw & ~(0x1fu << 20)) | ((uint32_t(value) & 0x1fu) << 20);
+        bytes[4] = (bytes[4] & 0x7F) | ((value & 0x01) << 7);
+        bytes[5] = (bytes[5] & 0xF0) | ((value >> 1) & 0x0F);
     }
 
-    void setMelodyValid(bool value) {
-        d1.raw = (d1.raw & ~(1u << 25)) | (uint32_t(value) << 25);
-    }
+    bool melodyValid() const { return (bytes[5] >> 4) & 0x01; }
+    void setMelodyValid(bool value) { bytes[5] = (bytes[5] & ~(1 << 4)) | ((value ? 1 : 0) << 4); }
 
     void mergeRhythmFrom(const StochasticSourceEvent &event) {
-        d0.raw = event.d0.raw;
-        d1.raw = (d1.raw & ~D1RhythmMask) | (event.d1.raw & D1RhythmMask);
+        bytes[0] = event.bytes[0];
+        bytes[1] = event.bytes[1];
+        bytes[2] = event.bytes[2];
+        bytes[3] = event.bytes[3];
     }
 
     void mergeMelodyFrom(const StochasticSourceEvent &event) {
-        d1.raw = (d1.raw & ~D1MelodyMask) | (event.d1.raw & D1MelodyMask);
+        bytes[4] = event.bytes[4];
+        bytes[5] = event.bytes[5];
     }
 };
+
+static_assert(sizeof(StochasticSourceEvent) == 6, "Event must be exactly 6 bytes");
 
 struct StochasticChildHit {
     // 32 bits (4 bytes)

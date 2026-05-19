@@ -119,10 +119,11 @@ void Project::clear() {
     // Track 8: Stochastic (Live Rhythm + Live Melody, should produce gates)
     track(7).setTrackMode(Track::TrackMode::Stochastic);
     auto &stoTrack = track(7).stochasticTrack();
-    stoTrack.setRhythmMode(StochasticSourceMode::Live);
-    stoTrack.setMelodyMode(StochasticSourceMode::Live);
-    stoTrack.setDensity(100);
-    stoTrack.setRest(0);
+    auto &stoSeq = stoTrack.sequence(0);
+    stoSeq.setRhythmMode(StochasticSourceMode::Live);
+    stoSeq.setMelodyMode(StochasticSourceMode::Live);
+    stoSeq.setDensity(100);
+    stoSeq.setRest(0);
     stoTrack.setCvUpdateMode(StochasticTrack::CvUpdateMode::Always);
     stoTrack.setLock(false);
 

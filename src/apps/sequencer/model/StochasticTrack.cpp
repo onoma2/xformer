@@ -11,48 +11,6 @@ void StochasticTrack::writeRouted(Routing::Target target, int intValue, float fl
     case Routing::Target::Transpose:
         setTranspose(intValue, true);
         break;
-    case Routing::Target::Rotate:
-        setRotate(intValue, true);
-        break;
-    case Routing::Target::StochasticDensity:
-        setDensity(intValue, true);
-        break;
-    case Routing::Target::StochasticTilt:
-        setTilt(intValue, true);
-        break;
-    case Routing::Target::StochasticBurst:
-        setBurst(intValue, true);
-        break;
-    case Routing::Target::StochasticComplexity:
-        setComplexity(intValue, true);
-        break;
-    case Routing::Target::StochasticContour:
-        setContour(intValue, true);
-        break;
-    case Routing::Target::StochasticRate:
-        setRate(intValue, true);
-        break;
-    case Routing::Target::StochasticVariation:
-        setVariation(intValue, true);
-        break;
-    case Routing::Target::StochasticRest:
-        setRest(intValue, true);
-        break;
-    case Routing::Target::StochasticSlide:
-        setSlide(intValue, true);
-        break;
-    case Routing::Target::StochasticSleep:
-        setSleep(intValue, true);
-        break;
-    case Routing::Target::StochasticPatience:
-        setPatience(intValue, true);
-        break;
-    case Routing::Target::StochasticMutate:
-        setMutate(intValue, true);
-        break;
-    case Routing::Target::StochasticJump:
-        setJump(intValue, true);
-        break;
     default:
         break;
     }

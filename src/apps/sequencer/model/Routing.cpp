@@ -285,13 +285,23 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                     break;
                 case Track::TrackMode::Stochastic:
                     if (target == Routing::Target::Divisor) {
-                        track.stochasticTrack().sequence(_project.selectedPatternIndex()).setDivisor(intValue);
+                        for (int patternIndex = 0; patternIndex < CONFIG_PATTERN_COUNT; ++patternIndex) {
+                            track.stochasticTrack().sequence(patternIndex).setDivisor(intValue);
+                        }
                     } else if (target == Routing::Target::Scale) {
-                        track.stochasticTrack().sequence(_project.selectedPatternIndex()).setScale(intValue);
+                        for (int patternIndex = 0; patternIndex < CONFIG_PATTERN_COUNT; ++patternIndex) {
+                            track.stochasticTrack().sequence(patternIndex).setScale(intValue);
+                        }
                     } else if (target == Routing::Target::RootNote) {
-                        track.stochasticTrack().sequence(_project.selectedPatternIndex()).setRootNote(intValue);
-                    } else {
+                        for (int patternIndex = 0; patternIndex < CONFIG_PATTERN_COUNT; ++patternIndex) {
+                            track.stochasticTrack().sequence(patternIndex).setRootNote(intValue);
+                        }
+                    } else if (isTrackTarget(target)) {
                         track.stochasticTrack().writeRouted(target, intValue, floatValue);
+                    } else if (isSequenceTarget(target) || isStochasticTarget(target)) {
+                        for (int patternIndex = 0; patternIndex < CONFIG_PATTERN_COUNT; ++patternIndex) {
+                            track.stochasticTrack().sequence(patternIndex).writeRouted(target, intValue, floatValue);
+                        }
                     }
                     break;
                 case Track::TrackMode::Last:                    break;

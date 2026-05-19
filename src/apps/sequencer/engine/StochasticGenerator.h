@@ -20,12 +20,12 @@ public:
         bool valid;
     };
 
-    static void evaluateChildren(EvaluatedChild *children, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng);
+    static void evaluateChildren(EvaluatedChild *children, const StochasticSequence &sequence, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng);
 
-    static StochasticSourceEvent generateRhythmEvent(const StochasticTrack &track, Random &rng);
-    static StochasticSourceEvent generateMelodyEvent(const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng);
-    static int generateDegree(const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng);
-    static int generateJumpOctave(const StochasticTrack &track, int currentJump, Random &rng);
+    static StochasticSourceEvent generateRhythmEvent(const StochasticSequence &sequence, const StochasticTrack &track, Random &rng);
+    static StochasticSourceEvent generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng);
+    static int generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng);
+    static int generateJumpOctave(const StochasticSequence &sequence, const StochasticTrack &track, int currentJump, Random &rng);
 
 private:
     static float betaDistributionSample(float x, float spread);
