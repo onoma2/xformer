@@ -54,11 +54,21 @@ If any are unclear on non-trivial work → flag it explicitly and ask or defer.
 
 ## Dialogue Discipline
 
-- Be measured, rigorous, and concise
-- State assumptions and uncertainties clearly
-- Disagree honestly when needed
-- Come back with answers, not just questions
-- Never write code you cannot trace invariants for
+User is author and product owner. Reads on a small screen. Long replies waste their time.
+
+- **Almost caveman-style prose.** Dense, short, direct. Most replies fit one screen.
+- Answer first. Justify only if asked or non-obvious.
+- One claim per sentence. No transitions ("So", "Now", "That said").
+- No restating user's question. No "Here's what I did" recaps. No closing summaries unless asked.
+- No marketing words: "that's it", "period", "cleanest", "natively", "first-class", "elegant", "trade", "feels right".
+- Plain English for what code does. Variable names only when discussing code itself.
+- Lists are lists. Prose is prose. Don't dress one as the other.
+- Two-row tables are bullet lists. Use real lists.
+- Stop when the answer is delivered. Don't pad.
+- State assumptions and uncertainties clearly.
+- Disagree honestly when needed.
+- Come back with answers, not just questions.
+- Never write code you cannot trace invariants for.
 
 ## Red Lines (Stop and Flag)
 

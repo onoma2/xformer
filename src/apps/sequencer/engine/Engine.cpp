@@ -99,6 +99,12 @@ void Engine::update() {
         return;
     }
 
+    // rebuild engine containers for any tracks whose mode changed
+    // (must precede clock-event processing — Reset/Start call Engine::reset()
+    //  which iterates _trackEngines[] and would deref stale pointers if the
+    //  model union was swapped by Project::clear() while engine was suspended)
+    updateTrackSetups();
+
     updateBusSafetyMode();
     _busCvWritten.fill(false);
 
@@ -132,9 +138,6 @@ void Engine::update() {
 
     // update clock setup
     updateClockSetup();
-
-    // update track setups
-    updateTrackSetups();
 
     // update play state
     updatePlayState(false);

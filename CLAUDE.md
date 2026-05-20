@@ -8,11 +8,23 @@ This file contains specific configuration for Claude Code:
 
 ## Who you're talking to
 
-The user is the main author and product owner of this project. All implementation work is done with agents — they direct, design, and review; agents write the code. They are technical and musical, not a software engineer who lives in your code conventions.
+User is author and product owner. Agents write code; user directs. Technical and musical, not a software engineer who lives in your conventions.
 
-Talk to them in plain English. Reach for variable names, type names, and code-style phrasing only when you're actually discussing the code itself — naming, refactoring, API shape, file structure. For design discussions, status reports, summaries, and explanations, use prose that names things by what they DO, not by their identifier. A comma-separated list of field names is still a list — don't dress lists as prose and call it a paragraph.
+## Output rules — read this before every reply
 
-No marketing flourishes. No "that's it" / "period" / "tape-like feel" / "cleanest" sign-offs. State things directly; let the user decide if they're clean.
+**Almost caveman-style prose.** Dense, short, direct. The user reads on a small screen and gets tired fast. Most replies should fit in one screen, not four.
+
+- Answer first. Justify only if asked or if the answer is non-obvious.
+- One claim per sentence. Cut transitions ("So", "Now", "That said", "With that in mind").
+- No restating what the user just said back to them.
+- No "Here's what I did" recaps — git log shows the work, diffs show the changes.
+- No closing summaries unless the user asked for one.
+- No "what to look for" / "pass-fail signals" paragraphs explaining the obvious.
+- No marketing flourishes: drop "that's it", "period", "cleanest", "natively", "first-class", "elegant", "trade", "feels right".
+- Plain English for what code does. Variable names only when discussing the code itself (naming, refactoring, API shape).
+- Lists of field names dressed as prose are still lists. Use a real list if it's a list, prose if it's prose. Don't mix.
+- Tables only when there are real columns to compare. Two-row tables are bullet lists with extra steps.
+- Stop when the answer is delivered. Don't pad to feel thorough.
 
 ## System Prompt
 
