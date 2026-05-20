@@ -203,6 +203,21 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
 
     int degree = allowedDegrees[0];
 
+    if (sequence.pitchTicketsActive()) {
+        if (totalTickets > 0) {
+            int roll = rng.nextRange(totalTickets);
+            int sum = 0;
+            for (int i = 0; i < allowedCount; ++i) {
+                sum += penalizedWeights[i];
+                if (roll < sum) { degree = allowedDegrees[i]; break; }
+            }
+        } else {
+            degree = allowedDegrees[rng.nextRange(allowedCount)];
+        }
+        lastDegree = degree;
+        return degree;
+    }
+
     if (sequence.marblesMode() == MarblesMode::On) {
         float x = rng.nextRange(1000) / 1000.f;
         float shapedX = betaDistributionSample(x, sequence.marblesSpread() / 100.f);
