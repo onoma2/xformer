@@ -58,6 +58,7 @@ void StochasticTrackEngine::resetMeasure() {
     _patternIndex = _stochasticTrack.sequence(pattern()).first();
     _relativeTick = 0;
     _eventElapsed = 0;
+    _eventDuration = 0;
 }
 
 void StochasticTrackEngine::reset() {
@@ -88,6 +89,8 @@ void StochasticTrackEngine::restart() {
     _relativeTick = 0;
     _lastDegree = -1;
     _lastFreeStepIndex = -1;
+    _eventElapsed = 0;
+    _eventDuration = 0;
     _rng = Random(0x12345678 + _track.trackIndex());
 }
 
@@ -210,6 +213,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     if (locked) {
         finalCv = _lockedParents[readIndex].cv;
         durationTicks = _lockedParents[readIndex].durationTicks;
+        _eventDuration = durationTicks;
         isRest = _lockedParents[readIndex].rest;
         isLegato = _lockedParents[readIndex].legato;
         isSlide = _lockedParents[readIndex].slide;
@@ -287,7 +291,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
         uint32_t mult = getDurationMultiplier(eval.durationIndex());
         _lastDurationIndex = eval.durationIndex();
-        if (sequence.variation() != 0) {
+        if (!sequence.durationTicketsActive() && sequence.variation() != 0) {
             int variationRoll = _rng.nextRange(100);
             if (variationRoll < std::abs(sequence.variation())) {
                  if (sequence.variation() > 0) {
