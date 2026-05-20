@@ -1,5 +1,5 @@
 # Task Board
-_Updated: 2026-05-20 (grilling session; usb-mouse-to-route added)_
+_Updated: 2026-05-20 (grilling session; usb-mouse-to-route added; fractal substrate decided; stochastic Phase 2 landed)_
 
 ## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
 **Status:** done — Phases A-F complete and hardware verified.
@@ -10,10 +10,10 @@ _Updated: 2026-05-20 (grilling session; usb-mouse-to-route added)_
 
 ---
 
-## 🟡 stochastic-track-port — V5 Phase 10 shipped; L1 redesign + bug catalog ready; Phase 2 not started
-**Status:** paused — Phase 10 V5 beta shipped; Phase 1 debugging found 12 bugs (3 clusters); Phase 10.7 L1/L2/L3 redesign synthesized from grilling session.
-**Where I stopped:** Two design docs ready: `PHASE10.6-BUG-CATALOG.md` (Clusters A/B/C, design decisions) and `PHASE10.7-L1-REDESIGN.md` (Proteus-style single-knob macros, 3-way ticket exclusivity, bipolar Mutate, scale-aware Marbles, engine-clever derivation). Confirmed: L1 = Density + Complexity (renamed from Character) + Shape (mutually exclusive with Complexity); macros write one field each; L2 sub-controls override macro derivation when set; Burst at L2 only; Looper universal; drop _accent + dead Track residue.
-**Next action:** Phase 2 implementation. Order: Cluster A (serialization) → Cluster B (ticket-mode state) → L1 redesign steps 3–8 per PHASE10.7 → list model re-curation. TDD entry: serialization round-trip test for `StochasticSequence` (Density=33, three duration ticket weights, Level=Direct).
+## 🟡 stochastic-track-port — Phase 2 deterministic clusters landed; hardware verification next
+**Status:** paused — Phase 2 deterministic-cluster work complete (7 commits, all 13 catalogued bugs fixed). Hardware-tuning steps (scale-aware Marbles, bipolar Mutate, engine-clever derivation) explicitly deferred per plan.
+**Where I stopped:** Seven cluster commits between `01752a25` (plan) and `ef0ab4cb` (last cluster D): Cluster A serialization (`_density`/`_durationTickets`/`_level` added to stream, `_lock` dropped per PHASE9-V4), Duration dictionary (1/4..1/64 + triplets + 3/16), L1 fan-out drops (editDensityMacro / editComplexityMacro single-field), 3-way pitch exclusivity (tickets > Marbles > Complexity), Cleanup (8 dead Track fields + `_reservedJitter` + debug printf + duplicate reset zeros), Cluster B (resetMeasure/restart counter clears + variation gating + lock-branch _eventDuration write), Cluster D (parent gate-OFF gated on `!hasChildren` in both locked and live branches + 6-tick child gate floor). Four new unit tests added, all passing in sim. Pre-existing Tuesday/Curve test failures unrelated.
+**Next action:** Hardware verification on STM32. Confirm: burst children audible (Cluster D + 6-tick floor), lock+ticket no machine-gun (C5), variation only in rate mode (H1), project save/load round-trips Density/DurationTickets/Level (A), lock not persisted (H2). Then resume into hardware-tuning steps (Marbles scale-aware Steps law, bipolar Mutate semantics, Density/Complexity derivation curves) and list model re-curation (UX: dual Character/Complexity entries need a call).
 **Branch:** feat/stochastic
 **Reference:** `.tasks/stochastic-track-port/PHASE10.7-L1-REDESIGN.md`, `.tasks/stochastic-track-port/PHASE10.6-BUG-CATALOG.md`, `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`, `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`, `.tasks/stochastic-track-port/PHASE9-V4-OWNERSHIP.md`
 
@@ -136,13 +136,13 @@ _Updated: 2026-05-20 (grilling session; usb-mouse-to-route added)_
 
 ---
 
-## 🔵 fractal-track-implementation — Smart Mutation Engine track type (FractalTrack)
-**Status:** blocked
-**Where I stopped:** Buffer format switched to bitpacked uint32_t per step. All 9 review findings applied. Four recording features added (KD-14: Replace/Latch, PunchIn/Immediate, Loop/Once, record quantize). Timing features (KD-15): loopBars bar-quantized length, beatOffset, loopPhase free phase rotation. Compass norns research applied: KD-16 (recordFirst/recordLast separate recording extent from loop window), Compass loop bar visual for FractalBufferPage (Phase 6), Future Research appendix. DiscreteMap scan pattern applied as KD-17 (clockSource Internal/External on FractalSequence, routedScan CV-driven step selection via DiscreteMap int-truncation + edge detection). DICTIONARY.md has new Clock Source section. Controlling spec updated with KD-17, Phase 1-2 params/engine/UI. TASK.md Phase 1-2 updated.
-**Next action:** Phase 1: model layer (`FractalSequence.h` + `FractalTrack.h`) + Track integration
+## 🔵 fractal-track-implementation — Mirror-with-step-grid child track (FractalTrack)
+**Status:** blocked — design re-anchored 2026-05-20 to mirror identity; awaits stochastic completion and RAM budget.
+**Where I stopped:** Substrate chosen via options comparison: Mirror with small bounded step grid (~128 B inline, no heap). End-product-aware MVP path designed — capture+loop+lock+pattern-lens working from day one, all known future fields (mutation, branches, ornament, density, Sleep, recordMode trinary, recordTrigger, etc.) reserved in serialization at MVP. Identity: child track, no reseed — content originates from source or defaults to project root note; mutations/branches evolve from there. Three-layer pipeline trunk → branches → ornamentation locked in via function boundaries even where MVP behavior is pass-through.
+**Next action:** Phase 1 (model with full serialization): create `FractalSequence.h` + `FractalTrack.h` with active + reserved fields per the comparison HTML. STM32 sizeof probe.
 **Depends on:** resource-optimization (needs RAM headroom), stochastic-track-port (higher priority, will consume first available RAM)
 **Branch:** TBD
-**Reference:** `.tasks/fractal-track-implementation/TASK.md`, `.tasks/fractal-track-implementation/DICTIONARY.md`, `docs/superpowers/specs/2026-05-17-fractal-track-design.md`, `docs/superpowers/specs/2026-05-17-fractal-advanced-research.md`
+**Reference:** `docs/fractal-track-options-comparison.html` (canonical architectural ref), `.tasks/fractal-track-implementation/TASK.md`, `.tasks/fractal-track-implementation/DICTIONARY.md`, `docs/superpowers/specs/2026-05-17-fractal-track-design.md` (historical spec; superseded by HTML for MVP shape), `docs/superpowers/specs/2026-05-17-fractal-advanced-research.md`
 
 ---
 
