@@ -6,6 +6,12 @@ Make a USB mouse usable as a CV source inside the routing engine. Mouse X / Y / 
 ## Status
 Paused. No code started. Design context captured from a session that walked the USB-keyboard git history to understand which diagnostic surfaces survived hardware testing.
 
+## Worktree
+- Path: `.worktrees/usb-mouse-to-route/`
+- Branch: `feat/usb-mouse-to-route`
+- Base: `master` @ `11b5dae0 Merge branch 'feat/generator'`
+- Build directories are per-worktree (in `build/` which is gitignored); cmake bootstrap required before first `make sequencer`.
+
 ## Gate (must clear before any feature work)
 The libusbhost driver currently rejects every mouse in `analyze_descriptor` (commit `0d2b0015 Reject USB mice at HID driver level to prevent host stack crash`). The commit message: *"Mice corrupt the USB host state machine during enumeration, causing permanent failure for all subsequent USB devices (keyboard, Launchpad) until power cycle."* Re-enabling mice without fixing the underlying enumeration bug reintroduces a known hardware regression. Investigation of the root cause is step 1 of this task and must succeed before anything else.
 

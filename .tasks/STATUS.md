@@ -127,11 +127,11 @@ _Updated: 2026-05-20 (grilling session; usb-mouse-to-route added; fractal substr
 ---
 
 ## 🟡 usb-mouse-to-route — USB mouse axes/buttons as Routing::Source CV inputs
-**Status:** paused — design captured; no code started. Gate identified before any feature work.
+**Status:** paused — design captured; no code started. Gate identified before any feature work. Worktree at `.worktrees/usb-mouse-to-route/`.
 **Where I stopped:** Walked the USB-keyboard git history (`6b0e407e` driver lift → `41ade375`/`80dd6d9c`/`b32cf6cb` failed-then-reverted in-driver OLED diagnostics → `82e64080` Engine pump → KeyboardManager extraction → `0d2b0015` mouse rejection). Established the OLED diagnostic rule: nothing inside `usbh_driver_hid.c` hooks or `hid_in_message_handler` may take a FreeRTOS mutex; only `UsbH::process()` post-poll may touch OLED. Mapped source-enum / RoutingEngine plug-in points.
 **Next action:** Step 1 in TASK.md — reproduce the mouse-rejection crash on hardware with the rejection at `usbh_driver_hid.c:218-224` removed, observe whether keyboard/Launchpad survive, to establish the failure boundary before designing a fix.
 **Depends on:** none (gated on libusbhost mouse-enumeration root cause investigation, which is step 1 of this task itself)
-**Branch:** TBD
+**Branch:** feat/usb-mouse-to-route (from master @ 11b5dae0)
 **Reference:** `.tasks/usb-mouse-to-route/TASK.md`
 
 ---
