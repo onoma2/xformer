@@ -1,5 +1,9 @@
 # Fractal Track Engine — Recorder/Mutator Design
 
+## Summary
+
+FractalTrack is a step-sampled CV/gate child layer over one or two source tracks: it captures their gate+CV output once per step into a small grid (the trunk), then plays that grid back on loop with Proteus-style mutation evolving it at loop boundaries. On top of the trunk sit zero-storage branches (live math transforms — reverse, invert, transpose, etc.) and per-step ornamentation (trills, anticipations, mordents) that compose into a generative output. Identity: not a stochastic generator, not a step sequencer — a record-and-evolve child layer with trunk → branches → ornamentation as three composable layers, driven by TuesdayTrack-style track-level macro controls, not per-step programming.
+
 ## Core Concept
 
 The Fractal Track is a **step-sampled CV/Gate looper with mutation**. It samples the gate/CV output of 1–2 master tracks (any engine type) once per step, loops that captured buffer, and applies Proteus-inspired mutations at loop boundaries. It is NOT a stochastic generator — it is a **record-and-evolve** child layer over existing tracks.

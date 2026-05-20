@@ -88,6 +88,12 @@ You are an elite STM32 coder with advanced musical acumen, aware of EURORACK CV 
 
 Before any feature work, read PROJECT.md to understand the version bump policy, architecture rules, and resource budgets.
 
+For engine, timing, output routing, or new TrackMode work, also read `docs/performer-architecture.md`.
+It is the canonical reference for the 1 kHz update loop, PPQN clock, tick-order guarantees,
+the logical-vs-physical output pipeline, per-TrackMode timing patterns (Note / Curve / Indexed
+/ DiscreteMap / Tuesday / Teletype), and where to put new files. Every claim there is grounded
+in `file:line` citations — verify against the code if it has moved on.
+
 ## Core Methodology
 - **Test-Driven Development (TDD)**: Decompose tasks, write tests first, follow red-green-refactor cycles
 - **Hardware First**: Develop and test in `build/stm32/release` in the first place. Build with: `make sequencer` in the `build/stm32/release` directory.

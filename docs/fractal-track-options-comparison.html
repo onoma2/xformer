@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FractalTrack — Implementation Options Comparison</title>
+<style>
+  :root {
+    --bg: #f7f5f1;
+    --fg: #1d1d1f;
+    --muted: #6b6b6f;
+    --rule: #d8d4cc;
+    --card: #fff;
+    --accent: #2c5f8d;
+    --ok: #2b7a3d;
+    --part: #b6841c;
+    --no: #a93232;
+    --na: #888;
+    --code-bg: #ece8df;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.55;
+    font-size: 15px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 36px 28px 80px; }
+  h1 { font-size: 28px; margin: 0 0 4px; font-weight: 600; }
+  h2 { font-size: 20px; margin: 36px 0 14px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); font-weight: 600; }
+  h3 { font-size: 17px; margin: 24px 0 6px; font-weight: 600; }
+  h4 { font-size: 14px; margin: 14px 0 4px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+  p { margin: 8px 0; }
+  .subhead { color: var(--muted); margin-top: 0; }
+  code { background: var(--code-bg); padding: 1px 4px; border-radius: 3px; font-size: 0.92em; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  ol.necessities { margin: 0; padding-left: 22px; }
+  ol.necessities li { margin: 4px 0; }
+  .nec-label { font-weight: 600; }
+
+  table.matrix {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 24px;
+    font-size: 13.5px;
+    background: var(--card);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  table.matrix th, table.matrix td {
+    border: 1px solid var(--rule);
+    padding: 8px 10px;
+    text-align: center;
+    vertical-align: top;
+  }
+  table.matrix th { background: #efeae0; font-weight: 600; }
+  table.matrix th.opt, table.matrix td.opt { text-align: left; min-width: 170px; }
+  table.matrix td.ok { color: var(--ok); font-weight: 700; }
+  table.matrix td.part { color: var(--part); font-weight: 700; }
+  table.matrix td.no { color: var(--no); font-weight: 700; }
+  table.matrix td.na { color: var(--na); }
+  .legend { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+  .legend span { margin-right: 14px; }
+  .legend .ok { color: var(--ok); font-weight: 700; }
+  .legend .part { color: var(--part); font-weight: 700; }
+  .legend .no { color: var(--no); font-weight: 700; }
+
+  section.opt {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 18px 22px;
+    margin: 16px 0;
+  }
+  section.opt h3 .verdict { float: right; font-size: 12px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  section.opt h3 .verdict.good { background: #d6ecd8; color: var(--ok); }
+  section.opt h3 .verdict.fair { background: #f1e3c0; color: var(--part); }
+  section.opt h3 .verdict.bad { background: #f3d1d1; color: var(--no); }
+  section.opt h3 .verdict.miss { background: #e5e5e5; color: var(--na); }
+  .checkrow { display: grid; grid-template-columns: 24px 1fr; gap: 8px; margin: 2px 0; align-items: baseline; font-size: 13.5px; }
+  .checkrow .mark.ok { color: var(--ok); font-weight: 700; }
+  .checkrow .mark.part { color: var(--part); font-weight: 700; }
+  .checkrow .mark.no { color: var(--no); font-weight: 700; }
+  .checkrow .mark.na { color: var(--na); }
+  .nec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
+  @media (max-width: 700px) {
+    .nec-grid { grid-template-columns: 1fr; }
+  }
+  .meta {
+    background: #efeae0;
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin: 10px 0;
+    font-size: 13.5px;
+  }
+  .meta dt { font-weight: 600; color: var(--muted); float: left; width: 110px; }
+  .meta dd { margin: 0 0 4px 110px; }
+  .recommend { background: #eef4f9; border-left: 3px solid var(--accent); padding: 14px 18px; border-radius: 4px; margin-top: 24px; }
+  .footer { color: var(--muted); font-size: 12px; margin-top: 36px; text-align: center; }
+  .mvp { background: #fff8e6; border: 1px solid #e6d49a; border-radius: 6px; padding: 18px 22px; margin: 8px 0 32px; }
+  .mvp h2 { border: 0; margin-top: 0; }
+  .mvp h3 { margin-top: 18px; }
+  .mvp h4 { color: #6b5a25; }
+  pre.code {
+    background: #2a2620;
+    color: #efeae0;
+    padding: 14px 16px;
+    border-radius: 4px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    overflow-x: auto;
+    line-height: 1.45;
+  }
+  pre.code .c { color: #9a957f; font-style: italic; }
+  table.fields {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 13.5px;
+  }
+  table.fields th, table.fields td {
+    border: 1px solid var(--rule);
+    padding: 6px 9px;
+    text-align: left;
+    vertical-align: top;
+  }
+  table.fields th { background: #efeae0; }
+  table.fields td.active { background: #eaf2ec; }
+  table.fields td.reserved { background: #fdf5d8; }
+  table.fields td.future { background: #f3eaea; color: #7a3535; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>FractalTrack — Implementation Options Comparison</h1>
+  <p class="subhead">Seven mechanisms evaluated against the spec's seven architectural necessities, with RAM/CPU notes and behavioral peculiarities. Scope is the full identity: two inputs, mutation, branches, ornamentation, looper behavior.</p>
+
+  <div class="mvp">
+    <h2>End-product-aware MVP path (Mirror with step grid)</h2>
+    <p>The comparison below lands on Mirror with step grid as the substrate. This box is the actionable plan: an MVP that ships the smallest useful tape (capture, loop, lock, pattern-lens) while pre-wiring the structural hooks every later feature will need. Cost of pre-wiring is small (a few extra model fields, a few function boundaries in the engine); cost of <em>not</em> pre-wiring is rewriting the tick loop and the model layout when each later feature lands.</p>
+
+    <h3>Principle</h3>
+    <p>Structure for the full end product; implement only the MVP behavior. Every later feature has a known landing site at MVP — an empty function, a reserved field, a stub branch in a dispatch. The MVP runs the same engine the final product runs, just with most of the dispatch points being no-ops.</p>
+    <p><strong>Serialization is done in full at MVP.</strong> Every known future field is declared in the model, initialized in <code>clear()</code>, written by <code>write()</code>, read by <code>read()</code> with sanitize/clamp, and sanitized in the bad-size branch — from day one. Inert fields hold defaults; UI doesn't expose them yet. This makes the MVP serialization layout the layout we live with through the whole feature buildout. No layout churn, no per-feature read/write additions, no "dev save files broke again." The MVP KPI is core functionality working and architecture sound; carrying a few hundred bytes of declared-but-unused fields is the right trade.</p>
+
+    <h3>Model fields — what to reserve at MVP</h3>
+    <p>Reserve cheaply now to avoid serialization layout churn later. Reserved fields hold sensible defaults and are inert; UI doesn't expose them yet. The ~1 KB cost across 8 tracks at worst case is far less than the cost of changing serialization layout multiple times during feature additions.</p>
+
+    <h4>FractalSequence (per pattern × 17)</h4>
+    <table class="fields">
+      <thead><tr><th>Field</th><th>Status at MVP</th><th>Why reserve / role</th></tr></thead>
+      <tbody>
+        <tr><td><code>divisor</code></td><td class="active">active</td><td>Step rate (Performer-native)</td></tr>
+        <tr><td><code>clockMultiplier</code></td><td class="active">active</td><td>Per-sequence clock rate (Performer-native)</td></tr>
+        <tr><td><code>scale</code>, <code>rootNote</code></td><td class="reserved">reserved (display only at MVP)</td><td>Pure mirror plays raw captured CV — scale doesn't gate anything at MVP. Lands as the basis for branch transforms (transpose-by-degree, invert-around-root), ornamentation (next/prev scale note), and mutation pitch selection. Also used for note-name display in UI.</td></tr>
+        <tr><td><code>runMode</code></td><td class="reserved">reserved (Forward only)</td><td>MVP plays forward. Reverse / Ping-Pong / Random / Page-Jump land as the playback-order dispatch in <code>nextStepIndex()</code> when path modes are added.</td></tr>
+        <tr><td><code>playMode</code></td><td class="active">active</td><td>Aligned/Free, standard</td></tr>
+        <tr><td><code>firstStep</code>, <code>lastStep</code></td><td class="active">active</td><td>Sequence range, standard</td></tr>
+        <tr><td><code>resetMeasure</code></td><td class="active">active</td><td>Bar-boundary restart</td></tr>
+        <tr><td><code>loopFirst</code>, <code>loopLast</code></td><td class="active">active</td><td>Loop window in grid cells</td></tr>
+        <tr><td><code>rotate</code></td><td class="active">active</td><td>Integer step offset</td></tr>
+        <tr><td><code>loopMode</code></td><td class="active">active</td><td>Loop / Once</td></tr>
+        <tr><td><code>clockSource</code></td><td class="reserved">reserved (Internal only)</td><td>Enum exists, only Internal works at MVP. CV-scan playback lands as the External branch later, no field change needed.</td></tr>
+        <tr><td><code>loopPhase</code></td><td class="reserved">reserved (defaults to 0)</td><td>Field exists, ignored at MVP. Phase offset lands as a small read-position math change in <code>mapLogicalToRead()</code> later.</td></tr>
+        <tr><td><code>loopBars</code></td><td class="reserved">reserved (0 = manual)</td><td>Field exists, ignored at MVP. Bar-quantized loop lands as a derived <code>loopLast</code> computation later.</td></tr>
+        <tr><td><code>sleep</code></td><td class="reserved">reserved (0 = no sleep)</td><td>Per-pattern step count of silence between loop iterations. Borrowed from StochasticTrack. Different from loopMode=Once+resetMeasure because it's step-counted, not bar-locked — enables polymetric silence. Lands in <code>onLoopBoundary()</code> alongside mutation.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>FractalTrack (track-wide)</h4>
+    <table class="fields">
+      <thead><tr><th>Field</th><th>Status at MVP</th><th>Why reserve / role</th></tr></thead>
+      <tbody>
+        <tr><td><code>sourceA</code></td><td class="active">active</td><td>The source whose gate+CV gets captured</td></tr>
+        <tr><td><code>sourceB</code></td><td class="reserved">reserved (-1 = unused)</td><td>Two-source mixing lands by switching capture path from <code>readSourceA()</code> to <code>readMixedSource()</code>; no model change.</td></tr>
+        <tr><td><code>gateLogic</code>, <code>cvLogic</code></td><td class="reserved">reserved (mode A)</td><td>Enum slots exist for the eight Vinx logic modes; default returns sourceA's gate/CV unchanged.</td></tr>
+        <tr><td><code>bufferLength</code></td><td class="active">active</td><td>Grid size selector (16/32/64). Fixed inline allocation = max size; smaller settings just use a sub-range.</td></tr>
+        <tr><td><code>lock</code></td><td class="active">active</td><td>Stops capture, preserves grid</td></tr>
+        <tr><td><code>recordMode</code></td><td class="reserved">reserved (Replace)</td><td>Enum: Replace / Latch / Once. MVP behavior = Replace. Latch only writes when source gate fires (surgical overdub). Once writes one loop pass then auto-locks (explicit tape feel). All three land as branches in <code>capture()</code>; no separate field.</td></tr>
+        <tr><td><code>punchMode</code></td><td class="reserved">reserved (Immediate)</td><td>PunchIn lands as a wait-for-source-gate state in <code>capture()</code>.</td></tr>
+        <tr><td><code>recordTrigger</code> (<code>Routable&lt;bool&gt;</code>)</td><td class="reserved">reserved</td><td>External arm. When routed, capture only fires while this CV is high. Lets you gate capture from another track's gate or a CV input. Composable with recordMode/punchMode (e.g. PunchIn + recordTrigger = wait for both external arm AND source gate).</td></tr>
+        <tr><td><code>octave</code>, <code>transpose</code>, <code>slideTime</code>, <code>cvUpdateMode</code></td><td class="active">active</td><td>Standard Performer track infrastructure</td></tr>
+        <tr><td><code>routedScan</code> (<code>Routable&lt;float&gt;</code>)</td><td class="reserved">reserved</td><td>Routing target exists, ignored at MVP. When clockSource=External lands, this is the CV source.</td></tr>
+        <tr><td><code>complexity</code>, <code>patience</code>, <code>mutationProb</code>, <code>octaveShiftProb</code></td><td class="reserved">reserved (all 0)</td><td>Mutation macros (Proteus). Inert at MVP because <code>onLoopBoundary()</code> is empty; serialized so when mutation lands, no layout change.</td></tr>
+        <tr><td><code>density</code>, <code>tilt</code></td><td class="reserved">reserved (density=100, tilt=0)</td><td>Density mask + priority bias. Density=100 means all cells play. Lands as a mask applied in <code>play()</code>.</td></tr>
+        <tr><td><code>branchCount</code>, <code>trunkCycles</code>, <code>pathType</code>, <code>orderMode</code>, <code>branchTransformFlags</code></td><td class="reserved">reserved (branchCount=0)</td><td>Branch system. branchCount=0 = trunk only. When branches land, dispatch in <code>play()</code> wraps trunk reads with transforms.</td></tr>
+        <tr><td><code>ornamentProb</code>, <code>ornamentMode</code></td><td class="reserved">reserved (prob=0, mode=Off)</td><td>Ornamentation probability and style. prob=0 = no ornaments. Lands in <code>applyOrnamentation()</code> stub.</td></tr>
+      </tbody>
+    </table>
+    <p><strong>No reseed.</strong> FractalTrack is a child track — content originates from source, never from internal RNG. If the trunk is empty (never captured, or cleared), uncaptured cells default to the project root note (gate held off until capture or transforms touch them). Mutations and branches can then evolve that root-seeded baseline into something. This keeps the child-track identity pure: every cell's content has a parent justification, never a "fresh random fill."</p>
+    <p><strong>Snapshot bank explicitly NOT reserved:</strong> the storage isn't a few bytes — it's another grid per snapshot. Reserving would force a worst-case allocation of N × grid-bytes inline now. Leave it as the one explicitly deferred feature; if added later, plan separately.</p>
+
+    <h3>Engine structure — function boundaries to lock in at MVP</h3>
+    <p>The MVP tick loop is structured so every late-stage feature has a named function or dispatch point to slot into. None of the structure is expensive; it just means writing helpers instead of inlining code.</p>
+
+    <pre class="code">tick(uint32_t tick) {
+    <span class="c">// 1. Standard NoteTrack-style divisor + relativeTick math</span>
+    compute divisor, relativeTick;
+    if (resetMeasure && relativeTick == 0) reset();
+
+    <span class="c">// 2. Decide WHETHER to advance step. MVP: clockSource is always Internal.</span>
+    <span class="c">//    Future: when clockSource == External, read routedScan and dispatch differently.</span>
+    if (shouldAdvanceStep(tick)) {
+        int newIndex = nextStepIndex(_stepIndex);
+
+        <span class="c">// 3. Detect loop boundary. MVP: hook is empty. Future: mutation, patience, etc.</span>
+        if (crossedLoopBoundary(_stepIndex, newIndex)) {
+            onLoopBoundary();
+        }
+
+        _stepIndex = newIndex;
+        stepBoundary(tick, _stepIndex);
+    }
+
+    drainQueues(tick);
+}
+
+stepBoundary(uint32_t tick, int stepIndex) {
+    if (!_lock) capture(stepIndex);
+    play(tick, stepIndex);
+}
+
+<span class="c">// All read-position math collected into one place. Future: phase offset, branches.</span>
+int mapLogicalToRead(int logicalStep) {
+    int windowSize = effectiveLoopLast() - loopFirst() + 1;
+    int rotated = (logicalStep - loopFirst() + rotate()) % windowSize;
+    <span class="c">// Future: add loopPhase fractional rotation here.</span>
+    <span class="c">// Future: branches apply by replacing this mapping with a transform.</span>
+    return loopFirst() + (rotated + windowSize) % windowSize;
+}
+
+<span class="c">// Source read isolated so two-source mixing can replace it without touching tick().</span>
+GateCV readResolvedSource() {
+    return readSourceA();
+    <span class="c">// Future: if (sourceB != -1) return mix(readSourceA(), readSourceB(), gateLogic, cvLogic);</span>
+}
+
+capture(int writeIndex) {
+    GateCV s = readResolvedSource();
+    _trunk[writeIndex] = encode(s);
+}
+
+play(uint32_t tick, int logicalStep) {
+    int readIdx = mapLogicalToRead(logicalStep);
+    StepWord value = _trunk[readIdx];
+    <span class="c">// Future: value = applyBranchTransform(value, currentBranchPhase, readIdx);</span>
+    <span class="c">// Future: applyOrnamentation(value, logicalStep, tick);  // schedules extra events</span>
+    scheduleOutput(value, tick);
+}
+
+onLoopBoundary() {
+    <span class="c">// Empty at MVP. Future hooks land here:</span>
+    <span class="c">//   - Proteus mutation roll (mutationProb, complexity)</span>
+    <span class="c">//   - Patience countdown / reseed trigger</span>
+    <span class="c">//   - Branch phase advance / trunk cycle counter</span>
+    <span class="c">//   - Octave shift mutation</span>
+}
+
+<span class="c">// Future: int effectiveLoopLast() handles loopBars=0 (manual) vs loopBars>0 (derived from bars).</span>
+int effectiveLoopLast() { return loopLast(); }
+
+<span class="c">// Future: nextStepIndex(curr) consults runMode for path-order (forward/reverse/pingpong/random).</span>
+int nextStepIndex(int curr) { return (curr + 1) % bufferLength; }
+
+<span class="c">// Future: bool shouldAdvanceStep() returns false in External mode, true on edge-detected scan.</span>
+bool shouldAdvanceStep(uint32_t tick) { return relativeTick % stepDivisor == 0; }</pre>
+
+    <h3>What the MVP actually does (and only that)</h3>
+    <ul>
+      <li>Pick a source track (any lower-index TrackEngine). On every step boundary while not locked, the engine reads <code>cvOutput(0)</code> and <code>gateOutput(0)</code> from that engine, encodes them as a 16-bit word, writes the word to the current grid cell.</li>
+      <li>Plays back from the current grid cell at each step boundary: pushes a gate event and a CV event into the standard sorted queues at the current tick. Slide interpolation handled by <code>update(float dt)</code> via <code>slideTime</code>.</li>
+      <li>Loop window (<code>loopFirst</code>, <code>loopLast</code>) and rotate (<code>rotate</code>) constrain playback. Wrap at <code>loopLast</code> back to <code>loopFirst</code>. LoopMode=Once stops advancing after one pass; LoopMode=Loop continues.</li>
+      <li>Lock = stop capturing, keep playing. Unlocking resumes capture from whatever step is current.</li>
+      <li>Pattern switching changes loop window / rotate / loopMode / scale / root / divisor / etc. The grid itself survives across pattern changes (engine state, not model).</li>
+      <li>List UI exposes only the active fields. Reserved fields exist in the model and serialize but have no UI surface yet.</li>
+    </ul>
+
+    <h3>What's pre-wired but inert at MVP</h3>
+    <ul>
+      <li><strong>Two-source mixing:</strong> <code>sourceB</code> + <code>gateLogic</code> + <code>cvLogic</code> reserved on track; <code>readResolvedSource()</code> is the swap site. Lands as a function-body change with no tick-loop edits.</li>
+      <li><strong>CV-scan playback:</strong> <code>clockSource</code> reserved on sequence; <code>shouldAdvanceStep()</code> and <code>nextStepIndex()</code> are the dispatch sites. External mode is a new branch in those two helpers plus a <code>routedScan</code> read; no engine state-machine change.</li>
+      <li><strong>Phase offset:</strong> <code>loopPhase</code> reserved on sequence; <code>mapLogicalToRead()</code> is the math site. One extra fmod operation.</li>
+      <li><strong>Bar-quantized loop length:</strong> <code>loopBars</code> reserved on sequence; <code>effectiveLoopLast()</code> helper is the derivation site.</li>
+      <li><strong>Path / playback order modes:</strong> <code>runMode</code> reserved (already standard Performer); <code>nextStepIndex()</code> is the dispatch site. Adds forward/reverse/pingpong/random branches.</li>
+      <li><strong>Recording variants (Latch / PunchIn):</strong> <code>recordMode</code>, <code>punchMode</code> reserved on track; <code>capture()</code> is the dispatch site. Adds two state branches.</li>
+      <li><strong>Proteus mutation:</strong> <code>onLoopBoundary()</code> stub exists; engine has <code>_rng</code> field reserved (engine-state, zero RAM cost to add). Mutation params land on track when implemented.</li>
+      <li><strong>Branches:</strong> <code>play()</code> calls a single-line trunk read at MVP; the line becomes a wrapped function call with branch-transform math later. Trunk phase counter + branch phase counter are reserved engine fields.</li>
+      <li><strong>Ornamentation:</strong> <code>play()</code> calls an <code>applyOrnamentation()</code> stub at MVP; the stub pushes nothing extra. Late expansion adds anticipation/mordent/run events to the sorted queues — the queue infrastructure already exists.</li>
+      <li><strong>Density / Tilt:</strong> No structural pre-wiring needed. Lands as a deterministic mask applied at <code>play()</code> before scheduling. Operates on cell ranking, doesn't touch capture or storage.</li>
+      <li><strong>Snapshot capture (manual one-cell sample-and-hold):</strong> UI action calls a new <code>snapshotCell(stepIndex)</code> on engine; engine reads source immediately (not at next step boundary) and writes to the given cell. No model field needed.</li>
+      <li><strong>Snapshot bank:</strong> The only feature with no clean pre-wired landing. Adding multiple buffers per engine requires either heap (each snapshot allocated on demand) or an extra inline buffer slot. Genuinely needs new structure later. Worth knowing.</li>
+    </ul>
+
+    <h3>Implementation phases</h3>
+    <ol>
+      <li><strong>Phase 1 — Model (with reserved fields).</strong> Create <code>FractalSequence.h</code> and <code>FractalTrack.h</code> with the full field set above. All write/read serialization slots present from day one. Track container entry, Routing target additions (including <code>FractalRoutedScan</code> for the future External clock source). STM32 sizeof probe.</li>
+      <li><strong>Phase 2 — Engine (with hooks but minimal behavior).</strong> <code>FractalTrackEngine.h/.cpp</code> with the function structure above. Inline step grid buffer sized at max <code>bufferLength</code>. Tick loop dispatches through the helpers; future-feature helpers return MVP defaults (no scan, no phase, no branches, no ornament, no mutation). Capture writes sourceA only. Lock works.</li>
+      <li><strong>Phase 3 — List UI.</strong> <code>FractalTrackListModel.h</code> exposes only the active params. Reserved params have no UI items. Source A clamp (must be lower-index track).</li>
+      <li><strong>Hardware verification gate.</strong> Assign a NoteTrack to sourceA, observe the FractalTrack output mirroring it at its own step rate. Toggle lock, observe playback freezes on the current snapshot. Switch patterns, observe the same grid sliced with different loop windows. Verify slide on playback, verify resetMeasure restart, verify pattern recall.</li>
+    </ol>
+    <p>After this point, every late-stage feature is an independent landing inside an existing function boundary or reserved field — no structural rewrites, no tick-loop reshaping.</p>
+
+    <h3>Order to add late features (suggested)</h3>
+    <p>From cheapest to land to most behaviorally-rich:</p>
+    <ol>
+      <li><strong>Phase offset</strong> — one line in <code>mapLogicalToRead</code>. Smallest, no semantic risk.</li>
+      <li><strong>Path / playback order modes</strong> — extends <code>nextStepIndex</code>. Uses <code>runMode</code> field already standard in Performer.</li>
+      <li><strong>Two-source mixing</strong> — swap <code>readResolvedSource</code>. Adds the Vinx logic enum behavior.</li>
+      <li><strong>CV-scan playback (External clock source)</strong> — extends <code>shouldAdvanceStep</code> + <code>nextStepIndex</code>. Operational regime change; document that generative lifecycle pauses while scanning.</li>
+      <li><strong>Bar-quantized loop length</strong> — extends <code>effectiveLoopLast</code>.</li>
+      <li><strong>Recording variants (Latch, Once, PunchIn, recordTrigger)</strong> — extends <code>capture</code>.</li>
+      <li><strong>Snapshot capture action</strong> — engine entry point + UI action item. No model change.</li>
+      <li><strong>Sleep (between-loop silence)</strong> — first occupant of <code>onLoopBoundary</code>. Step-count silence after each loop pass.</li>
+      <li><strong>Density / Tilt</strong> — new mask in <code>play</code>.</li>
+      <li><strong>Proteus mutation + patience</strong> — also lives in <code>onLoopBoundary</code> alongside Sleep. Big behavioral feature, small code addition.</li>
+      <li><strong>Branches</strong> — wrap the trunk-read in <code>play</code> with a transform function. Add trunk/branch phase counters (already reserved engine state). When trunk cell is uncaptured, branches operate on project-root-note baseline.</li>
+      <li><strong>Ornamentation</strong> — fill the <code>applyOrnamentation</code> stub with anticipation/mordent/run scheduling.</li>
+      <li><strong>Snapshot bank</strong> — requires new structure. Plan separately.</li>
+      <li><strong>Visual page</strong> — buffer waveform, loop window markers, lock indicator.</li>
+    </ol>
+  </div>
+
+  <h2>The seven necessities</h2>
+  <ol class="necessities">
+    <li><span class="nec-label">N1 — Source reads with tick-order guarantee.</span> Read another track's logical gate+CV on the current tick; relies on lower-index ordering.</li>
+    <li><span class="nec-label">N2 — Small bounded trunk in engine state.</span> Stored substrate that branches transform and mutation mutates; volatile, fixed-size.</li>
+    <li><span class="nec-label">N3 — Step-boundary capture timing.</span> Capture occurs at this track's step boundaries, not at tick rate and not at source events.</li>
+    <li><span class="nec-label">N4 — Three-layer pipeline.</span> Output = ornament(branch(trunk-step)). Strict ordering at output time.</li>
+    <li><span class="nec-label">N5 — Loop-boundary lifecycle event.</span> A single named point in tick loop where mutation, patience, branch advance, octave shift fire.</li>
+    <li><span class="nec-label">N6 — Track-level macro controls only.</span> All behavior params are track-wide knobs, no per-step UI editing.</li>
+    <li><span class="nec-label">N7 — Per-pattern lens, single-buffer body.</span> Patterns provide different playback configs over the same captured trunk; no 17× buffer amplification.</li>
+  </ol>
+
+  <h2>Matrix</h2>
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th class="opt">Option</th>
+        <th>N1</th>
+        <th>N2</th>
+        <th>N3</th>
+        <th>N4</th>
+        <th>N5</th>
+        <th>N6</th>
+        <th>N7</th>
+        <th>RAM (per track)</th>
+        <th>CPU/tick</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="opt">1 — Tape (per-tick continuous)</td>
+        <td class="ok">●</td><td class="no">✗</td><td class="no">✗</td><td class="part">◐</td><td class="part">◐</td><td class="ok">●</td><td class="part">◐</td>
+        <td>several KB heap</td><td>low capture, heavy on branches/mutation walk</td>
+      </tr>
+      <tr>
+        <td class="opt">2 — Mirror with step grid</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td>
+        <td>~150 B inline</td><td>very low</td>
+      </tr>
+      <tr>
+        <td class="opt">3 — Logic-track style live mix</td>
+        <td class="ok">●</td><td class="no">✗</td><td class="na">n/a</td><td class="no">✗</td><td class="no">✗</td><td class="ok">●</td><td class="no">✗</td>
+        <td>~30 B state</td><td>trivial</td>
+      </tr>
+      <tr>
+        <td class="opt">4 — Performer-style CV recorder (steps in model)</td>
+        <td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="part">◐</td><td class="part">◐</td><td class="no">✗</td><td class="no">✗</td>
+        <td>17× per-pattern step data (large)</td><td>low</td>
+      </tr>
+      <tr>
+        <td class="opt">5 — Sample &amp; Hold (event-triggered capture)</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="part">◐</td><td class="part">◐</td><td class="part">◐</td><td class="ok">●</td><td class="ok">●</td>
+        <td>~100–200 B inline</td><td>low</td>
+      </tr>
+      <tr>
+        <td class="opt">6 — Turing / shift register</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="part">◐</td><td class="part">◐</td><td class="part">◐</td><td class="ok">●</td><td class="part">◐</td>
+        <td>~32–128 B inline</td><td>trivial</td>
+      </tr>
+      <tr>
+        <td class="opt">7 — Granular scatter (positions + ring)</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="part">◐</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td><td class="part">◐</td>
+        <td>~400 B inline (ring + positions)</td><td>low–moderate</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="legend">
+    <span class="ok">● fit</span>
+    <span class="part">◐ partial / awkward</span>
+    <span class="no">✗ broken / missing</span>
+    <span style="color: var(--na); font-weight: 700;">n/a</span> not applicable
+  </p>
+
+  <h2>Per-option detail</h2>
+
+  <section class="opt">
+    <h3>1. Tape — per-tick continuous recording <span class="verdict bad">Wrong scale</span></h3>
+    <p>Capture source A's gate and CV every tick (192 PPQN or 1 kHz update) into a long buffer; play back per tick. Faithful reproduction at full source resolution.</p>
+    <h4>Architectural alignment</h4>
+    <div class="nec-grid">
+      <div class="checkrow"><span class="mark ok">●</span>N1 reads source per tick</div>
+      <div class="checkrow"><span class="mark no">✗</span>N2 buffer is large, needs heap</div>
+      <div class="checkrow"><span class="mark no">✗</span>N3 captures per tick, not per step</div>
+      <div class="checkrow"><span class="mark part">◐</span>N4 pipeline works but on dense data</div>
+      <div class="checkrow"><span class="mark part">◐</span>N5 loop wrap at tick granularity</div>
+      <div class="checkrow"><span class="mark ok">●</span>N6 macros possible</div>
+      <div class="checkrow"><span class="mark part">◐</span>N7 buffer survives pattern change but is huge</div>
+    </div>
+    <dl class="meta">
+      <dt>RAM</dt><dd>3 KB/bar at 120 BPM, 6 KB/2 bars. Heap mandatory at any reasonable loop length. Active-engine cap needed.</dd>
+      <dt>CPU</dt><dd>Capture itself is trivial. Branches at playback have to walk per-tick samples — a "reverse" branch reads a long buffer. Mutation picks a tick index among thousands.</dd>
+      <dt>Behavior</dt><dd>Captures source slides, micro-events, Teletype tick-level scripts, Tuesday micro-queues faithfully. Branches become coarse on dense data (transpose on every tick = a tone-shifted version of source). Ornamentation has no obvious step rate to attach to.</dd>
+    </dl>
+    <p><strong>Why it loses fit:</strong> the trunk stops being a small fractal substrate. Branches and ornamentation lose their identity-defining "operate on N discrete steps" framing.</p>
+  </section>
+
+  <section class="opt">
+    <h3>2. Mirror with step grid <span class="verdict good">Reference fit</span></h3>
+    <p>The track defines its own step rate via divisor. At each step boundary, sample source A (and optionally B mixed) and store one cell into a small fixed grid in engine state. Playback walks the grid.</p>
+    <h4>Architectural alignment</h4>
+    <div class="nec-grid">
+      <div class="checkrow"><span class="mark ok">●</span>N1 reads source at step boundaries (still tick-order safe)</div>
+      <div class="checkrow"><span class="mark ok">●</span>N2 ~128 B grid inline</div>
+      <div class="checkrow"><span class="mark ok">●</span>N3 step-boundary capture is its core mechanic</div>
+      <div class="checkrow"><span class="mark ok">●</span>N4 step values feed branch math feed ornament</div>
+      <div class="checkrow"><span class="mark ok">●</span>N5 grid wrap = loop boundary, single point</div>
+      <div class="checkrow"><span class="mark ok">●</span>N6 every behavior knob is track-wide</div>
+      <div class="checkrow"><span class="mark ok">●</span>N7 grid survives pattern change; pattern carries loop window + divisor</div>
+    </div>
+    <dl class="meta">
+      <dt>RAM</dt><dd>64 steps × 16 bits = 128 B inline buffer. Engine container under 500 B total.</dd>
+      <dt>CPU</dt><dd>One sample read + one encode per step. Branches apply a math transform to one cell per output. Ornamentation evaluated per tick around active step.</dd>
+      <dt>Behavior</dt><dd>Source is aliased to the track's step grid — fast Teletype events or sub-step Tuesday micro-queues collapse to one captured value per step. This is the intentional design: the grid is the analytical unit. Locking freezes the grid; unlocking resumes capture. Pattern slots slice the same grid with different loop windows.</dd>
+    </dl>
+    <p><strong>Why it fits:</strong> built for the spec. All seven necessities map onto its native mechanics. Smallest implementation, smallest RAM, simplest engine.</p>
+  </section>
+
+  <section class="opt">
+    <h3>3. Logic-track style live mix (Vinx/Mebitek) <span class="verdict miss">Identity-incompatible</span></h3>
+    <p>Each tick, read source A and source B, combine via gate logic (AND/OR/XOR/etc.) and CV logic (sum/avg/min/max/etc.), pass result to output. No storage, no looping.</p>
+    <h4>Architectural alignment</h4>
+    <div class="nec-grid">
+      <div class="checkrow"><span class="mark ok">●</span>N1 reads sources every tick</div>
+      <div class="checkrow"><span class="mark no">✗</span>N2 no buffer — nothing to transform or mutate</div>
+      <div class="checkrow"><span class="mark na">n/a</span>N3 no captured grid</div>
+      <div class="checkrow"><span class="mark no">✗</span>N4 pipeline collapses — branches have nothing to act on</div>
+      <div class="checkrow"><span class="mark no">✗</span>N5 no loop boundary; output reacts continuously</div>
+      <div class="checkrow"><span class="mark ok">●</span>N6 gate-logic + CV-logic are track-wide macros</div>
+      <div class="checkrow"><span class="mark no">✗</span>N7 nothing to lens</div>
+    </div>
+    <dl class="meta">
+      <dt>RAM</dt><dd>Engine state only, no buffer. ~30 B.</dd>
+      <dt>CPU</dt><dd>Two reads + one mix per tick. Trivial.</dd>
+      <dt>Behavior</dt><dd>Pure live combination of two sources. Output reacts instantly to source changes. No memory, no transformation over time. Stops the moment sources stop.</dd>
+    </dl>
+    <p><strong>Why it loses fit:</strong> this is what LogicTrack would be (LogicTrack doesn't currently exist in the codebase but the pattern does in vinx-performer). Without storage the mutation/branches/ornament identity collapses. Useful as a separate track type but not as FractalTrack.</p>
+  </section>
+
+  <section class="opt">
+    <h3>4. Performer-style CV recorder — steps live in model <span class="verdict bad">N6 + N7 violation</span></h3>
+    <p>Arm record, then on each step the source's gate+CV gets written into the active sequence's step data (like NoteTrack's CV-record mode). Buffer == per-pattern sequence steps, persistent across save.</p>
+    <h4>Architectural alignment</h4>
+    <div class="nec-grid">
+      <div class="checkrow"><span class="mark ok">●</span>N1 source reads work</div>
+      <div class="checkrow"><span class="mark no">✗</span>N2 buffer in model, not engine</div>
+      <div class="checkrow"><span class="mark ok">●</span>N3 step-boundary capture is native</div>
+      <div class="checkrow"><span class="mark part">◐</span>N4 pipeline works but trunk is sequence data</div>
+      <div class="checkrow"><span class="mark part">◐</span>N5 loop boundary works</div>
+      <div class="checkrow"><span class="mark no">✗</span>N6 per-step model state surfaces UI editing of captured steps — drifts toward step sequencer</div>
+      <div class="checkrow"><span class="mark no">✗</span>N7 buffer × 17 patterns = massive RAM growth, each pattern recall swaps content</div>
+    </div>
+    <dl class="meta">
+      <dt>RAM</dt><dd>Per-pattern step data × 17 patterns. At 64 steps × 4 B × 17 = ~4.4 KB SRAM per track in model. Multiplies with track count.</dd>
+      <dt>CPU</dt><dd>Low. Same as NoteTrack-style record path.</dd>
+      <dt>Behavior</dt><dd>Each pattern slot is an independent recording. Switching patterns recalls different captured material entirely. Users can edit captured steps later. Save/load preserves the recordings. Feels like a NoteTrack with rec-input.</dd>
+    </dl>
+    <p><strong>Why it loses fit:</strong> the spec commits to volatile single-buffer per engine (N7) and to no per-step UI (N6). This option breaks both. Worth considering as a separate track type for users who want persistent recordings, but it's not FractalTrack.</p>
+  </section>
+
+  <section class="opt">
+    <h3>5. Sample &amp; Hold — event-triggered capture <span class="verdict fair">Close cousin to mirror</span></h3>
+    <p>Watch source A for gate rising edges. On each rising edge, sample source CV and write the (gate, cv, duration-since-last-event) triple into the next trunk slot. Capture rate follows source's event density.</p>
+    <h4>Architectural alignment</h4>
+    <div class="nec-grid">
+      <div class="checkrow"><span class="mark ok">●</span>N1 source reads per tick (edge detection)</div>
+      <div class="checkrow"><span class="mark ok">●</span>N2 small event buffer in engine</div>
+      <div class="checkrow"><span class="mark part">◐</span>N3 capture timing is source-event-driven, not step-boundary — alignment to track divisor is approximate</div>
+      <div class="checkrow"><span class="mark part">◐</span>N4 pipeline works on events but "branches" on event lists behave differently than on a grid</div>
+      <div class="checkrow"><span class="mark part">◐</span>N5 loop wraps when event buffer fills — irregular cadence</div>
+      <div class="checkrow"><span class="mark ok">●</span>N6 macros possible</div>
+      <div class="checkrow"><span class="mark ok">●</span>N7 buffer is engine-side, pattern provides lens</div>
+    </div>
+    <dl class="meta">
+      <dt>RAM</dt><dd>64 events × ~3 B each = ~200 B inline.</dd>
+      <dt>CPU</dt><dd>Trivial capture (edge detection). Playback walks events with elapsed-ticks counter, IndexedTrack-style.</dd>
+      <dt>Behavior</dt><dd>Captures source's note events faithfully — gate timing preserved. Sub-event source motion (CV slide between gates) is sampled once at gate-on. If source produces no gates, the buffer stays empty and the track outputs silence. Playback unit is "events" not "steps" — loop length is in event count, not bars. The musical feel is "loop the last N notes source played."</dd>
+    </dl>
+    <p><strong>Why it almost fits:</strong> it preserves rhythmic identity of source better than step-aliased mirror. But N3 is the awkward one — capture is source-driven, so the track loses its own step rate as a concept. Branches and ornament still work but operate over events instead of steps, which changes their feel. Strong candidate if rhythmic fidelity matters more than analytical regularity.</p>
+  </section>
+
+  <section class="opt">
+    <h3>6. Turing / shift register <span class="verdict fair">Wrong identity</span></h3>
+    <p>Maintain a small fixed-length register (e.g. 32 cells). Every tick (or step), push source A's current gate+CV into one end; the cell falling off the other end is what plays now. Mutation = probability of bit-flip or new-roll during shift.</p>
+    <h4>Architectural alignment</h4>
+    <div class="nec-grid">
+      <div class="checkrow"><span class="mark ok">●</span>N1 reads source per shift</div>
+      <div class="checkrow"><span class="mark ok">●</span>N2 register is the buffer</div>
+      <div class="checkrow"><span class="mark part">◐</span>N3 shift happens at track-defined rate, but it's a sliding window not a step grid</div>
+      <div class="checkrow"><span class="mark part">◐</span>N4 branches over a constantly-shifting buffer are conceptually awkward — what does "reverse" mean on a sliding register?</div>
+      <div class="checkrow"><span class="mark part">◐</span>N5 loop boundary becomes "register wraps" — continuous not discrete</div>
+      <div class="checkrow"><span class="mark ok">●</span>N6 mutation prob and shift behavior are macros</div>
+      <div class="checkrow"><span class="mark part">◐</span>N7 register state survives pattern change, but "loop window" doesn't apply naturally</div>
+    </div>
+    <dl class="meta">
+      <dt>RAM</dt><dd>32-cell register × 16 bits = 64 B inline. Among the smallest options.</dd>
+      <dt>CPU</dt><dd>One shift + one optional RNG roll per tick. Trivial.</dd>
+      <dt>Behavior</dt><dd>Output is a delayed echo of source with stochastic decay. Slow drift through the register creates loop-like repetition without a discrete loop. Mutation produces gradual divergence. Feels like Marbles Y/Z or Music Thing Turing — source-fed feedback delay with corruption. Not a "looper" in the traditional sense.</dd>
+    </dl>
+    <p><strong>Why it loses fit:</strong> the spec's branches/ornamentation model assumes a discrete N-cell substrate with a clean wrap point. A shift register doesn't have either. Mutation is natural, but the rest of the identity (loop boundary, branches as transforms) doesn't map cleanly. Better as its own track type.</p>
+  </section>
+
+  <section class="opt">
+    <h3>7. Granular scatter — positions over a ring <span class="verdict fair">Novel, partial fit</span></h3>
+    <p>Maintain two storages. Storage A: small ring buffer of recent source ticks (a few hundred bytes, sliding window of last 1–2 seconds). Storage B: the trunk, which is a list of <em>read positions</em> into ring A — not actual sample values. At each step boundary, output reads ring A at the current trunk position. Branches reorder or transform the position list. Mutation moves positions.</p>
+    <h4>Architectural alignment</h4>
+    <div class="nec-grid">
+      <div class="checkrow"><span class="mark ok">●</span>N1 source reads per tick into ring</div>
+      <div class="checkrow"><span class="mark ok">●</span>N2 trunk is the position list, small</div>
+      <div class="checkrow"><span class="mark part">◐</span>N3 step boundary triggers position reads, but ring captures per-tick</div>
+      <div class="checkrow"><span class="mark ok">●</span>N4 branches transform position list, ornament decorates</div>
+      <div class="checkrow"><span class="mark ok">●</span>N5 trunk position list wraps = loop boundary</div>
+      <div class="checkrow"><span class="mark ok">●</span>N6 all behavior is track-wide</div>
+      <div class="checkrow"><span class="mark part">◐</span>N7 ring is per-engine fine, but the position list per pattern would multiply</div>
+    </div>
+    <dl class="meta">
+      <dt>RAM</dt><dd>Ring buffer ~256 B (recent source) + position trunk ~64 B (64 positions × 8 bits each) = ~320 B inline.</dd>
+      <dt>CPU</dt><dd>Per-tick ring write is trivial. Position-list reads are simple. Branches that reorder positions are cheap (no value math). Mutation perturbs positions, also cheap.</dd>
+      <dt>Behavior</dt><dd>Output is recombinant collage of recent source — snippets of past source material played back in scrambled order. Source phrases become fragmented and rearranged. Mutation gradually drifts the position list. Branches like "reverse" reorder positions; "transpose" can still apply by shifting CV values at read time. Feels closer to Mutable Beads or a CV-domain Morphagene.</dd>
+    </dl>
+    <p><strong>Why it almost fits:</strong> structurally clean — trunk is small, branches are zero-storage transforms over positions, ornament decorates output. The musical identity diverges from "child layer that loops source" toward "scatterer that collages source." More novel, less aligned with the spec's stated mental model. Possible later evolution if mirror-with-steps proves musically limited.</p>
+  </section>
+
+  <h2>Late-stage feature compatibility</h2>
+  <p>The architectural matrix above scores against the spec's seven necessities. This section asks a different question: as features get added past MVP, which options keep working and which break? Frame: "if you want X (and Y), Z doesn't work."</p>
+
+  <h3>Feature support matrix</h3>
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th class="opt">Feature</th>
+        <th>Tape</th>
+        <th>Mirror</th>
+        <th>Logic</th>
+        <th>CV-rec</th>
+        <th>S&amp;H</th>
+        <th>Turing</th>
+        <th>Granular</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="opt">Proteus loop-boundary mutation</td>
+        <td class="part">◐</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Branches (reverse, invert, transpose, math)</td>
+        <td class="part">◐</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="part">◐</td><td class="no">✗</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Ornamentation (per-step trills, mordents, anticipations)</td>
+        <td class="no">✗</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="part">◐</td><td class="no">✗</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Density / Tilt deterministic thinning</td>
+        <td class="part">◐</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Path / playback order modes (fwd, rev, ping-pong, random)</td>
+        <td class="part">◐</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Loop window + rotate</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Lock (freeze captured content)</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="ok">●</td><td class="part">◐</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Two-source mixing (A+B gate/CV logic)</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Per-pattern lens, single-buffer body (N7)</td>
+        <td class="part">◐</td><td class="ok">●</td><td class="no">✗</td><td class="no">✗</td><td class="ok">●</td><td class="no">✗</td><td class="part">◐</td></tr>
+      <tr><td class="opt">CV-driven scan playback (DiscreteMap-style)</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="part">◐</td><td class="no">✗</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Phase offset / loop phase rotation (CurveTrack-style)</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="part">◐</td><td class="no">✗</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Variable playback speed / direction</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="ok">●</td><td class="part">◐</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Snapshot bank (multiple captured trunks per track)</td>
+        <td class="part">◐</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Recording variants (Replace, Latch, PunchIn, Once)</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="part">◐</td></tr>
+      <tr><td class="opt">Bar-quantized loop length / beat offset</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="no">✗</td><td class="no">✗</td><td class="ok">●</td></tr>
+      <tr><td class="opt">Reseed (generate fresh trunk content)</td>
+        <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td></tr>
+    </tbody>
+  </table>
+  <p class="legend">
+    <span class="ok">● clean fit</span>
+    <span class="part">◐ works but awkward / needs adapter logic</span>
+    <span class="no">✗ broken — not possible without changing the substrate</span>
+  </p>
+
+  <h3>Decision rules</h3>
+  <p>Read each rule as: this combination of wants forces or eliminates options.</p>
+
+  <section class="opt">
+    <h4>If you want Proteus mutation + branches + ornamentation (the full identity)</h4>
+    <p>Tape doesn't work — mutation on per-tick cells is musically inaudible (one tick is sub-millisecond); branches operating on thousands of ticks are wasteful; ornamentation has no step boundary to attach to. Logic doesn't work at all (no buffer). Turing doesn't work — math transforms on a constantly-shifting register are conceptually broken. <strong>Mirror, CV-recorder, S&amp;H, and Granular survive.</strong> CV-recorder will break N7 next.</p>
+  </section>
+
+  <section class="opt">
+    <h4>If you also want per-pattern lens (N7 — patterns slice the same captured material)</h4>
+    <p>CV-recorder is out — its buffer is per-pattern model state, so each pattern holds an independent recording, not a lens over shared material. <strong>Mirror, S&amp;H, Granular remain.</strong></p>
+  </section>
+
+  <section class="opt">
+    <h4>If you also want bar-quantized loop length / beat offset (loopBars, beatOffset from KD-15)</h4>
+    <p>S&amp;H is out — its trunk units are events (source gate fires), not steps, so "4 bars" doesn't map to event count. The musical loop length floats with source activity. <strong>Mirror and Granular remain.</strong> Mirror's bar-alignment is straightforward (steps × divisor = ticks); Granular requires an extra layer to align position-list traversal to bar timing.</p>
+  </section>
+
+  <section class="opt">
+    <h4>If you also want predictable per-step ornamentation (mordents at step N-1, runs into step N)</h4>
+    <p>Granular's positions don't have stable per-step musical identity — the cell at position 5 was sampled from a random ring offset, so "the note before this" varies across loops. Ornamentation that needs to anticipate "the next note" gets noisy. <strong>Only Mirror survives the full feature stack cleanly.</strong></p>
+  </section>
+
+  <section class="opt">
+    <h4>If you want only two-source mixing + path modes (mixer with sequence)</h4>
+    <p>Logic gives you the mix but breaks on the loop, mutation, branches, ornament. Mirror gives you mix-at-capture + the rest. <strong>Mirror is the only path that lands both.</strong></p>
+  </section>
+
+  <section class="opt">
+    <h4>If you want collage / recombinant aesthetics (Morphagene / Beads feel)</h4>
+    <p>Mirror produces faithful step-sampled playback — not collage. <strong>Granular is the natural fit</strong> because its trunk is positions over a ring, so "what plays at step 5" can be a snippet from anywhere in the recent source. But you give up bar-quantized loop, predictable ornamentation, and some recording-variant clarity. Different product.</p>
+  </section>
+
+  <section class="opt">
+    <h4>If you want stochastic feedback / Turing-machine feel</h4>
+    <p><strong>Turing is the natural fit</strong> and nothing else in this list captures the same musical character (slow drift through a register with bit-flip corruption). But you give up branches, ornamentation, density, path modes, per-pattern lens — most of the FractalTrack identity. This is a separate track type, not a variation of FractalTrack.</p>
+  </section>
+
+  <section class="opt">
+    <h4>If you want persistent recordings across save/load (each pattern = its own captured loop)</h4>
+    <p><strong>CV-recorder is the natural fit</strong> because its buffer lives in model state and is serialized with the project. Mirror and S&amp;H lose their captures on power cycle. But CV-recorder gives up the per-pattern lens (N7) — each pattern is independent, not a slice of shared material. Different product again — closer to "NoteTrack with CV-input record mode" than to FractalTrack.</p>
+  </section>
+
+  <section class="opt">
+    <h4>If you ever want tick-rate playback fidelity (capture every source gate, no aliasing)</h4>
+    <p><strong>Only Tape</strong> gives you this, and you pay for it with several KB heap per track, awkward mutation semantics, and ornamentation that has nowhere to attach. The spec's identity explicitly accepts step-rate aliasing — adding tick-rate fidelity later would force a rewrite of the trunk model and almost certainly a heap allocator path.</p>
+  </section>
+
+  <h3>Cross-cutting note: scan playback and phase offset</h3>
+  <p>These two features behave differently from the others. They aren't behaviors added to the trunk — they're alternative ways to compute the <em>read position</em> into the trunk. So their compatibility hinges on whether an option's trunk has a clean integer read index.</p>
+
+  <section class="opt">
+    <h4>What scan mode actually does</h4>
+    <p>Scan mode (KD-17) bypasses clock-based step advancement entirely. A routed CV maps directly to a step index in the trunk via floor-truncation, with edge detection firing output on step crossings. Same pattern DiscreteMap uses for External clock source. The clock-driven sequence loop is silent in this mode; the CV is the playhead. Useful for LFO-driven wobble, envelope-shaped phrase navigation, or sequencing the FractalTrack with another track's CV output.</p>
+  </section>
+
+  <section class="opt">
+    <h4>What phase offset actually does</h4>
+    <p>Phase offset (KD-15, loopPhase) is a continuous fractional rotation of the playback head within the loop window. CurveTrack's <code>globalPhase</code> is the reference: <code>phasedPos = fmod(stepFraction + phase, 1.0)</code>, then back to a step index. It composes with rotate (integer step shift) — rotate moves the head by whole steps, phase moves it by fractions of a step. Adds a knob; doesn't change any state machine.</p>
+  </section>
+
+  <section class="opt">
+    <h4>Per option — both at once</h4>
+    <ul>
+      <li><strong>Tape:</strong> both work cleanly. CV maps to tick offset, phase math operates on tick offsets. Tape's natural unit is the tick, so neither feature feels forced.</li>
+      <li><strong>Mirror with step grid:</strong> both work cleanly. CV → integer step index for scan. Phase math is exactly CurveTrack's pattern, in step units. The grid is the natural addressable structure.</li>
+      <li><strong>Logic:</strong> neither works. No playhead, no trunk to scan.</li>
+      <li><strong>CV-recorder:</strong> both work the same way as Mirror — same step-grid abstraction, just persisted in model.</li>
+      <li><strong>S&amp;H:</strong> both <em>partial</em>. The trunk holds events with non-uniform durations, so CV-to-event-index is technically possible but musically uneven (scrubbing produces unequal time jumps). Phase offset has the same problem — fractional phase as a fraction of total loop time doesn't map evenly onto event indices.</li>
+      <li><strong>Turing:</strong> neither works. There's no stable read index to address — the register shifts continuously, and "freezing" it to scan or phase-offset fights the Turing identity.</li>
+      <li><strong>Granular:</strong> both work cleanly, possibly better than Mirror. The trunk is a position list, so scan maps CV onto a position (or directly onto a ring offset, skipping the list entirely). Phase offset rotates the position list. Granular was already a position-oriented model; these features fit natively.</li>
+    </ul>
+  </section>
+
+  <section class="opt">
+    <h4>Structural side effect of scan mode (applies to all options that support it)</h4>
+    <p>Scan mode disables clock-driven advancement. That means features whose semantics depend on a natural loop-end event lose their scheduling moment:</p>
+    <ul>
+      <li><strong>Proteus mutation</strong> needs a "loop just wrapped" boundary to fire. In scan mode there's no wrap — the CV can sweep back and forth without ever crossing the conventional loop end. Mutation either has to fire on a different trigger (timer? trigger input?) or be disabled while scan is active.</li>
+      <li><strong>Patience countdown</strong> measures elapsed loops. With no loop wraps, it stalls.</li>
+      <li><strong>Predictive ornamentation</strong> (anticipations, runs <em>toward</em> the next note, mordents that reach for step N+1) can't predict what comes next when "next" depends on the user's CV. Two-step and four-step ornaments degrade to in-place behavior.</li>
+      <li><strong>Branch phase counters</strong> (trunk for N loops → branches for M loops) lose meaning. Branches still apply their transform to whatever step the scan selects, but the trunk/branch cycle has no progression.</li>
+    </ul>
+    <p>This isn't a per-option problem — it's a property of scan mode itself, and the same things would break in any substrate. The implication is that scan mode should advertise itself as a different operational regime: when scan is on, the generative lifecycle pauses and the track behaves as a pure CV-addressed wavetable readout. When scan is off, the full generative system resumes.</p>
+    <p>Phase offset has no such side effect — it's a pure read-position transform that composes cleanly with everything else.</p>
+  </section>
+
+  <section class="opt">
+    <h4>Implication for the substrate choice</h4>
+    <p>Mirror, Tape, CV-recorder, and Granular all support both features cleanly. Granular is interesting here because its native data shape (positions over a ring) is actually the natural representation of "CV-as-read-index" — scan mode is essentially what Granular does at all times. If scan playback is a centerpiece feature (not just a side mode), Granular has the structural advantage. If scan is one capability among many and Mirror's analytical grid suits the rest of the feature stack better, Mirror still wins on aggregate.</p>
+    <p>S&amp;H's awkward marks on both features are worth weighing — it scored well on most other features but loses fit specifically on read-position-as-CV semantics. If scan is a must-have, S&amp;H drops below Mirror.</p>
+  </section>
+
+  <h3>Which option survives the longest "yes" chain</h3>
+  <p>Walk the sixteen-feature list top to bottom, saying yes to each. Mirror is the only option that says yes to all sixteen without an awkward marker. Granular collects two awkward markers (per-pattern lens, recording variants), and that's it. S&amp;H collects four awkward markers (branches feel different on events; scan playback is uneven; phase offset is uneven; bar-quantized loop is broken outright). CV-recorder collects one full break (N7). Tape collects three breaks (mutation, ornament, branches on dense data). Logic and Turing fall out within the first three features and never recover.</p>
+  <p>This is the structural argument for Mirror being the substrate even if some later feature seems initially better served by another option — every "later feature" that looks like a candidate for switching mechanisms ends up losing more than it gains because the other mechanisms break something earlier in the chain.</p>
+
+  <h2>Recommendation</h2>
+  <div class="recommend">
+    <p><strong>Mirror with step grid (option 2)</strong> is the only option that satisfies all seven necessities natively. Every other option breaks at least one architectural foundation — either by lacking the bounded trunk (logic), by storing too much (tape, CV-recorder), by capturing on the wrong axis (S&amp;H, Turing), or by reframing the trunk into a non-grid structure (Granular) that strains the branch/ornament model.</p>
+    <p>Mirror is also the cheapest in RAM and CPU, and it inherits NoteTrack's proven timing pattern (divisor, relativeTick modulo, SortedQueue, slide-in-update, resetMeasure-on-bar) — no new engine timing model needs to be invented.</p>
+    <p>The runner-up by structural cleanliness is <strong>Sample &amp; Hold (option 5)</strong> if rhythmic fidelity to source events outweighs analytical regularity of a fixed step grid. The runner-up by novelty is <strong>Granular scatter (option 7)</strong> if collage aesthetics are wanted later. Both could be considered as post-MVP track types or alternate modes within FractalTrack.</p>
+    <p>The remaining four options describe genuinely different products: a tape recorder (1), a live mixer (3), a persistent step recorder (4), a stochastic-feedback delay (6). They're worth knowing but they're not FractalTrack.</p>
+  </div>
+
+  <div class="footer">docs/fractal-track-options-comparison.html — drafted 2026-05-20 against the spec at <code>docs/superpowers/specs/2026-05-17-fractal-track-design.md</code></div>
+</div>
+</body>
+</html>

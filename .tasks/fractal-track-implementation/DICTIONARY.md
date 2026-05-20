@@ -2,6 +2,13 @@
 
 This document is the immutable vocabulary and ownership contract for the FractalTrack track mode. Update it only when the model topology changes intentionally.
 
+**Identity (2026-05-20 revision):** FractalTrack is a step-sampled CV/gate **child layer**
+over one or two source tracks. It captures source gate+CV into a small bounded step grid
+(the trunk), plays the grid back on loop, evolves it via mutation at loop boundaries, and
+exposes branches and ornamentation as zero-storage transforms on top. Driven by
+TuesdayTrack-style track-level macros, not per-step programming. Substrate: Mirror with
+step grid. Canonical architectural reference: `docs/fractal-track-options-comparison.html`.
+
 ## Provenance
 
 - **Proteus spec** contributes loop-boundary lifecycle (complexity, patience, mutation, octave shift), deterministic density/rest-order thinning, sleep/boredom, and mutation zone anchors.
@@ -18,11 +25,19 @@ Do not expose module names as final user-facing modes. The track should feel Per
 - Internal names should follow existing codebase style.
 - The trunk is the single ground truth buffer. Branches are playback transforms over trunk, not separate buffers.
 - Branches do NOT mutate the buffer. Only the evolution system (during trunk phase) mutates the buffer.
-- Playback order is forward through the active loop window unless overridden by Order mode.
+- Playback order is forward through the active loop window unless overridden by `runMode`.
 - Ornamentation is applied AFTER trunk or branch CV+gate is resolved.
-- Phase 4 evolution (trunk mutation) and Phase 5 branches are independent - branches read whatever trunk exists, evolved or not.
-- Lock blocks trunk buffer mutation only: evolution, recording, and boredom recapture. Branch transforms and ornamentation continue while locked.
+- Phase 4 evolution (trunk mutation) and Phase 5 branches are independent — branches read whatever trunk exists, evolved or not.
+- Lock blocks trunk buffer mutation only: evolution, recording, and Sleep-bounded recapture. Branch transforms and ornamentation continue while locked.
 - All lower-index engine types supported as parent sources. Fractal reads `gateOutput(0)` and `cvOutput(0)` from any engine, including Teletype.
+- **Child track invariant.** Content originates from source captures or defaults to the
+  project root note. There is no internal RNG-driven content generation. No reseed
+  feature. Mutations and branches evolve from a source-captured or root-defaulted
+  baseline.
+- **Trunk is inline, not heap.** Engine-state buffer at 128 cells × 2 bytes max = 256 B.
+  Single buffer per engine, never per pattern.
+- **MVP serialization is complete.** All known future fields are declared and serialized
+  from day one. Inert fields hold sensible defaults; UI exposes only active fields.
 
 ## Parent
 
@@ -40,18 +55,23 @@ Parent invariants:
 
 ## Record
 
-- `recordMode`: Replace (default) or Latch.
-  - **Replace**: every tick while armed, overwrite buffer[stepIndex] with source gate+CV.
-  - **Latch**: only write to buffer when source gate=1. Silent steps keep their previous content. Enables surgical per-step overdubbing of specific beats without clearing the rest of the loop.
+- `recordMode`: Replace (default) / Latch / Once.
+  - **Replace**: every step boundary while not locked, overwrite buffer[stepIndex] with source gate+CV.
+  - **Latch**: only write to buffer when source gate=1. Silent steps keep their previous content. Enables surgical per-step overdubbing.
+  - **Once**: capture one loop pass starting from current step, then auto-lock. The explicit "tape feel" — press record, hear one loop captured, recorder stops. Lock can be released to record again.
 - `punchMode`: Immediate (default) or PunchIn.
-  - **Immediate**: recording begins on first tick after `recordArmed` transitions false->true.
-  - **PunchIn**: after arming, the engine enters a wait state and continues playback. Recording starts on the first tick where the resolved source gate=1. Matches Hermod "Rec Wait" behavior.
+  - **Immediate**: recording begins on first step boundary after unlock.
+  - **PunchIn**: after unlock, engine enters a wait state and continues playback. Recording starts on the first step boundary where resolved source gate=1.
+- `recordTrigger` (`Routable<bool>`): external arm. When routed, capture only fires while
+  this CV is high. Composable with recordMode and punchMode — e.g. recordMode=Latch +
+  recordTrigger gates surgical overdub by an external CV.
 - `loopMode`: Loop (default) or Once.
   - **Loop**: at `loopLast`, wrap to `loopFirst` and continue.
-  - **Once**: after reaching `loopLast`, gates go off and step advancement stops. Transport restart or re-arming record resets.
+  - **Once**: after reaching `loopLast`, gates go off and step advancement stops. Transport restart or pattern recall resets.
 - `recordQuantize`: Off (default) or On.
   - **Off**: source CV written to buffer as-is.
-  - **On**: source CV is quantized to the active FractalSequence scale before writing. Gate is unchanged. Ensures microtonal source CV snaps to scale-degree grid.
+  - **On**: source CV is quantized to the active FractalSequence scale before writing. Gate is unchanged. Requires `scale` to be active (scale becomes active when transforms or quantize-on-record land — see Scale Activation).
+- `snapshotCell(stepIndex)`: engine API that captures source immediately (not at next step boundary) and writes to the given cell. UI action item, no model field. Like sample-and-hold on demand.
 
 Record invariants:
 - PunchIn respects source gate from the *resolved* parent (after Gate/CV Logic mixing). If combined gate=0, punch never fires.
@@ -77,23 +97,56 @@ Record extent invariants:
 
 ## Buffer
 
-- `_stepBuffer[]`: heap-allocated array of uint32_t, one per step. Each word is bitpacked:
-  - bits 0-15: CV (16-bit fixed-point, resolution ~0.15 mV over 10V range, encoded as int16_t centered at 0V = 0)
-  - bit 16: gate (1 bit)
-  - bit 17: valid (1 bit, set when step has been recorded)
-  - bit 18: slide/slew (1 bit, smooth transition from previous step)
-  - bits 19-31: reserved for future use (13 bits)
-- Configurable length: 16/32/64/128/256 steps. Default 64.
-- One buffer per FractalTrackEngine instance (not per pattern). Single heap allocation, not split arrays.
-- Buffer is volatile engine state -- not serialized in project files.
+- `_trunk[]`: **inline** array of `uint16_t`, one per step (NOT heap, NOT per-pattern).
+  Each word is bitpacked:
+  - bits 0-13: CV (14-bit fixed-point, ~6 cents per LSB across 10 V range)
+  - bit 14: gate (1 bit)
+  - bit 15: valid (1 bit, set when step has been captured)
+- Configurable length: 16/32/64/128 steps. Default 64. Max 128 = 256 B inline.
+- One buffer per FractalTrackEngine instance (not per pattern). Lives in engine state, not model.
+- Buffer is volatile engine state — not serialized in project files.
 
 Buffer invariants:
-- Buffer is ONE per engine, NOT one per pattern. Pattern switching is a config-only operation (changes divisor, scale, mutation params, etc.) over the same live buffer.
-- Buffer is NOT swapped or cleared on pattern change. This matches the existing codebase pattern: other tracks' `changePattern()` swaps the sequence pointer; Fractal does the same for per-pattern config but the buffer survives.
+- Buffer is ONE per engine, NOT one per pattern. Pattern switching is a config-only operation (changes divisor, scale, loop window, mutation params, etc.) over the same live buffer.
+- Buffer is NOT swapped or cleared on pattern change. Matches the existing codebase pattern: other tracks' `changePattern()` swaps the sequence pointer; Fractal does the same for per-pattern config but the buffer survives.
 - Buffer cleared on: track mode change, buffer length change, explicit user clear, power cycle.
 - Buffer survives transport reset and pattern change.
-- Buffer length change clears buffer entirely -- no step preservation.
-- Recording arming is Fractal-local (`_recordArmed` flag), not coupled to global `_engine.recording()`.
+- Buffer length change clears buffer entirely — no step preservation.
+- No `_recordArmed` flag. Capture is the default state when not locked.
+- **Invalid (uncaptured) cells**: playback outputs project root note CV with gate=off. This is the child-track fallback when no source content has reached the cell.
+
+## Scale Activation
+
+`scale` and `rootNote` are FractalSequence fields, declared and serialized at MVP, but
+**inert** until scale-aware behaviors land. Pure mirror plays raw captured CV — scale
+doesn't gate anything.
+
+Scale activates when any of these are enabled:
+- `recordQuantize=On` — captured CV snapped to scale before storage
+- Branch transforms that need scale degrees (transpose-by-degree, invert-around-root)
+- Scale-aware ornamentation (next/prev scale note for runs, mordents, anticipations)
+- Mutation pitch selection biased toward scale neighbors
+- UI display of note names
+
+When scale is inactive: source CV passes through verbatim, root note serves only as the
+fallback CV for invalid (uncaptured) cells.
+
+## Sleep
+
+- `sleep` (0..100, per-pattern, default 0): step count of silence after each loop pass.
+  Borrowed from StochasticTrack. After playhead wraps from `loopLast` to `loopFirst`,
+  engine inserts `_sleepRemaining = sleepScaled` ticks of silence before the next loop
+  pass begins. Sleep is step-counted, not bar-locked.
+
+Sleep invariants:
+- Sleep fires at the loop boundary, inside `onLoopBoundary()` alongside mutation.
+- During sleep, both capture and playback pause; gate stays low, CV held at last value.
+- Per-pattern Sleep enables pattern slots to switch between continuous and sparse playback
+  (pattern 1 = sleep 0, pattern 2 = sleep 12). Switching at bar boundaries via song mode
+  alternates dense and sparse sections.
+- Sleep is distinct from loopMode=Once (which stops permanently after one pass) and from
+  density (which masks individual cells inside the loop).
+- Sleep does not interact with the trunk content; the same content plays after the silence.
 
 ## Loop
 

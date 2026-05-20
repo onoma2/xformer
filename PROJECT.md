@@ -2,6 +2,11 @@
 
 This file contains all project-specific information, architecture details, build instructions, and coding conventions.
 
+**Engine/timing/IO architecture lives in `docs/performer-architecture.md`** — read that for the
+1 kHz update loop, PPQN clock, tick-order guarantees, logical-vs-physical output pipeline,
+and per-TrackMode timing patterns (Note / Curve / Indexed / DiscreteMap / Tuesday / Teletype).
+This file (`PROJECT.md`) covers the higher-level architecture, build, and conventions.
+
 ## Project Overview
 
 **PEW|FORMER** is a fork of the original PER|FORMER eurorack sequencer firmware. This fork maintains the known-good master branch while carefully integrating improvements from other forks, notably jackpf's noise reduction, shape improvements, and MIDI improvements. The firmware has been updated to gcc 14.2 and libopencm3 (October 2024).
@@ -60,6 +65,10 @@ python runner.py
 ```
 
 ## Architecture
+
+> The engine, timing, and I/O internals (1 kHz update loop, PPQN clock, TrackEngine virtuals,
+> cross-track reads, DAC/GateOutput drivers, per-TrackMode timing patterns) are documented in
+> `docs/performer-architecture.md`. This section covers higher-level project structure.
 
 ### Multi-Platform Design
 
