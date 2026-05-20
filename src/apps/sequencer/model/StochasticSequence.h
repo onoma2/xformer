@@ -235,7 +235,7 @@ public:
     int accentProb() const { return _accentProb; }
     void setAccentProb(int prob) { _accentProb = clamp(prob, 0, 100); }
 
-    // legatoProb
+    // degreeRotation
     int legatoProb() const { return _legatoProb; }
     void setLegatoProb(int prob) { _legatoProb = clamp(prob, 0, 100); }
 
@@ -266,10 +266,6 @@ public:
     // tilt (attached to mask)
     int tilt() const { return _tilt.get(isRouted(Routing::Target::StochasticTilt)); }
     void setTilt(int tilt, bool routed = false) { _tilt.set(clamp(tilt, -100, 100), routed); }
-
-    // reservedJitter
-    int reservedJitter() const { return _reservedJitter.get(isRouted(Routing::Target::StochasticReserved)); }
-    void setReservedJitter(int jitter, bool routed = false) { _reservedJitter.set(clamp(jitter, 0, 100), routed); }
 
     // burs
     int burst() const { return _burst.get(isRouted(Routing::Target::StochasticBurst)); }
@@ -485,7 +481,6 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _mask.setBase(100);
         _density.setBase(100);
         _tilt.setBase(0);
-        _reservedJitter.setBase(0);
         _burst.setBase(0);
         _minDegree = 0;
         _maxDegree = 127;
@@ -540,7 +535,6 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         writer.write(_marblesSteps);
         _mask.write(writer);
         _tilt.write(writer);
-        _reservedJitter.write(writer);
         _burst.write(writer);
         writer.write(_minDegree);
         writer.write(_maxDegree);
@@ -614,7 +608,6 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _marblesSteps = clamp(int(_marblesSteps), 1, 100);
         _mask.read(reader);
         _tilt.read(reader);
-        _reservedJitter.read(reader);
         _burst.read(reader);
         reader.read(_minDegree);
         _minDegree = clamp(int(_minDegree), 0, 127);
@@ -697,7 +690,6 @@ private:
             _mask.setBase(100);
             _density.setBase(100);
             _tilt.setBase(0);
-            _reservedJitter.setBase(0);
             _burst.setBase(0);
             _minDegree = 0;
             _maxDegree = 127;
@@ -768,7 +760,6 @@ private:
     Routable<uint8_t> _mask;
     Routable<uint8_t> _density;
     Routable<int8_t> _tilt;
-    Routable<uint8_t> _reservedJitter;
     Routable<uint8_t> _burst;
 
     uint8_t _minDegree;

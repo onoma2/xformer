@@ -14,8 +14,8 @@
 #include <algorithm>
 #include <cstdio>
 
-// Gate scheduling trace — enabled for simulator debugging
-#define DBG_STO_ENABLE
+// Gate scheduling trace — disabled for release
+//#define DBG_STO_ENABLE
 #ifdef DBG_STO_ENABLE
 #define DBG_STO(fmt, ...) printf("[STO] " fmt "\n", ##__VA_ARGS__)
 #else
@@ -69,8 +69,6 @@ void StochasticTrackEngine::reset() {
     _jumpRegister = 0;
     _lastFreeStepIndex = -1;
     _patternCycleEnded = false;
-    _eventElapsed = 0;
-    _eventDuration = 0;
     _eventElapsed = 0;
     _eventDuration = 0;
     _activity = false;

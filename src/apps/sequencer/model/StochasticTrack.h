@@ -58,24 +58,10 @@ public:
     //----------------------------------------
 
     // Internal layout padding / legacy
-    StochasticModeInternal modeInternal() const { return _modeInternal; }
-    void setModeInternal(StochasticModeInternal mode) { _modeInternal = ModelUtils::clampedEnum(mode); }
 
     // lock
     bool lock() const { return _lock; }
     void setLock(bool lock) { _lock = lock; }
-
-    // fillMuted
-    bool fillMuted() const { return _fillMuted; }
-    void setFillMuted(bool fillMuted) { _fillMuted = fillMuted; }
-
-    // loopFirst
-    int loopFirst() const { return _loopFirst; }
-    void setLoopFirst(int first) { _loopFirst = clamp(first, 0, CONFIG_STEP_COUNT - 1); }
-
-    // loopLast
-    int loopLast() const { return _loopLast; }
-    void setLoopLast(int last) { _loopLast = clamp(last, 0, CONFIG_STEP_COUNT - 1); }
 
     // slideTime
     int slideTime() const { return _slideTime.get(isRouted(Routing::Target::SlideTime)); }
@@ -102,22 +88,6 @@ public:
     void setPlayMode(Types::PlayMode playMode) { _playMode = ModelUtils::clampedEnum(playMode); }
     void editPlayMode(int value, bool shift) { setPlayMode(ModelUtils::adjustedEnum(playMode(), value)); }
     void printPlayMode(StringBuilder &str) const { str(Types::playModeName(playMode())); }
-
-    // gateBias
-    int gateBias() const { return _gateBias.get(isRouted(Routing::Target::GateProbabilityBias)); }
-    void setGateBias(int bias, bool routed = false) { _gateBias.set(clamp(bias, -8, 8), routed); }
-
-    // retriggerBias
-    int retriggerBias() const { return _retriggerBias.get(isRouted(Routing::Target::RetriggerProbabilityBias)); }
-    void setRetriggerBias(int bias, bool routed = false) { _retriggerBias.set(clamp(bias, -8, 8), routed); }
-
-    // lengthBias
-    int lengthBias() const { return _lengthBias.get(isRouted(Routing::Target::LengthBias)); }
-    void setLengthBias(int bias, bool routed = false) { _lengthBias.set(clamp(bias, -8, 8), routed); }
-
-    // noteBias
-    int noteBias() const { return _noteBias.get(isRouted(Routing::Target::NoteProbabilityBias)); }
-    void setNoteBias(int bias, bool routed = false) { _noteBias.set(clamp(bias, -8, 8), routed); }
 
     // UI Helpers
     void printLock(StringBuilder &str) const { ModelUtils::printYesNo(str, lock()); }
@@ -164,21 +134,12 @@ public:
 
     void clear() {
         _lock = false;
-        _fillMuted = true;
-        _loopFirst = 0;
-        _loopLast = CONFIG_STEP_COUNT - 1;
         _slideTime.setBase(0);
         _octave.setBase(0);
         _transpose.setBase(0);
         _fillMode = FillMode::None;
         _cvUpdateMode = CvUpdateMode::Gate;
         _playMode = Types::PlayMode::Aligned;
-        _gateBias.setBase(0);
-        _retriggerBias.setBase(0);
-        _lengthBias.setBase(0);
-        _noteBias.setBase(0);
-
-        _modeInternal = StochasticModeInternal::Loop;
 
         for (auto &sequence : _sequences) {
             sequence.clear();
@@ -186,22 +147,12 @@ public:
     }
 
     void write(VersionedSerializedWriter &writer) const {
-        writer.write(_fillMuted);
-        writer.write(_loopFirst);
-        writer.write(_loopLast);
         _slideTime.write(writer);
         _octave.write(writer);
         _transpose.write(writer);
         writer.write(static_cast<uint8_t>(_fillMode));
         writer.write(static_cast<uint8_t>(_cvUpdateMode));
         writer.write(static_cast<uint8_t>(_playMode));
-        _gateBias.write(writer);
-        _retriggerBias.write(writer);
-        _lengthBias.write(writer);
-        _noteBias.write(writer);
-
-        // Phase 7b additions
-        writer.write(static_cast<uint8_t>(_modeInternal));
 
         for (const auto &sequence : _sequences) {
             sequence.write(writer);
@@ -209,11 +160,6 @@ public:
     }
 
     void read(VersionedSerializedReader &reader) {
-        reader.read(_fillMuted);
-        reader.read(_loopFirst);
-        _loopFirst = clamp(int(_loopFirst), 0, CONFIG_STEP_COUNT - 1);
-        reader.read(_loopLast);
-        _loopLast = clamp(int(_loopLast), 0, CONFIG_STEP_COUNT - 1);
         _slideTime.read(reader);
         _octave.read(reader);
         _transpose.read(reader);
@@ -226,15 +172,6 @@ public:
         uint8_t playMode;
         reader.read(playMode);
         _playMode = playMode < uint8_t(Types::PlayMode::Last) ? static_cast<Types::PlayMode>(playMode) : Types::PlayMode::Free;
-        _gateBias.read(reader);
-        _retriggerBias.read(reader);
-        _lengthBias.read(reader);
-        _noteBias.read(reader);
-
-        // Phase 7b additions
-        uint8_t modeInternal;
-        reader.read(modeInternal);
-        _modeInternal = modeInternal < uint8_t(StochasticModeInternal::Last) ? static_cast<StochasticModeInternal>(modeInternal) : StochasticModeInternal::Loop;
 
         for (auto &sequence : _sequences) {
             sequence.read(reader);
@@ -252,22 +189,12 @@ private:
     int8_t _trackIndex = -1;
 
     bool _lock;
-    bool _fillMuted;
-    uint8_t _loopFirst;
-    uint8_t _loopLast;
     Routable<uint8_t> _slideTime;
     Routable<int8_t> _octave;
     Routable<int8_t> _transpose;
     FillMode _fillMode;
     CvUpdateMode _cvUpdateMode;
     Types::PlayMode _playMode;
-    Routable<int8_t> _gateBias;
-    Routable<int8_t> _retriggerBias;
-    Routable<int8_t> _lengthBias;
-    Routable<int8_t> _noteBias;
-
-    // Phase 7b Generator controls
-    StochasticModeInternal _modeInternal;
 
     StochasticSequenceArray _sequences;
 

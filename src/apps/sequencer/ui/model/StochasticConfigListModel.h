@@ -20,7 +20,6 @@ public:
         CvUpdateMode,
         SlideTime,
         FillMode,
-        FillMuted,
         LastItem
     };
 
@@ -55,7 +54,6 @@ public:
             case CvUpdateMode:  str("CV Update"); break;
             case SlideTime:     str("Slide Time"); break;
             case FillMode:      str("Fill Mode"); break;
-            case FillMuted:     str("Fill Muted"); break;
             case LastItem:      break;
             }
         } else if (column == 1) {
@@ -72,7 +70,6 @@ public:
             case CvUpdateMode:  _track->printCvUpdateMode(str); break;
             case SlideTime:     _track->printSlideTime(str); break;
             case FillMode:      str(StochasticTrack::fillModeName(_track->fillMode())); break;
-            case FillMuted:     ModelUtils::printYesNo(str, _track->fillMuted()); break;
             case LastItem:      break;
             }
         }
@@ -94,7 +91,6 @@ public:
             case CvUpdateMode:  _track->editCvUpdateMode(value, shift); break;
             case SlideTime:     _track->editSlideTime(value, shift); break;
             case FillMode:      _track->setFillMode(ModelUtils::adjustedEnum(_track->fillMode(), value)); break;
-            case FillMuted:     _track->setFillMuted(value > 0); break;
             case LastItem:      break;
             }
         }
