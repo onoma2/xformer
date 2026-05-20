@@ -12,6 +12,7 @@ Port the Vinx fork's Stochastic track type to XFORMER, then extend the MVP with 
 - `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md` — current V5 vocabulary, ownership, and behavior contract.
 - `.tasks/stochastic-track-port/PHASE8-V3-PLAN.md` — controlling Phase 8 V3 rebuild plan: split Rhythm/Melody `Loop`/`Live` source modes, no `New`, `Patience` as loop refresh, `Mutate` as loop-only edit, single runtime Hold/Lock freeze, UI deferred to Phase 9.
 - `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md` — controlling V5 control-granularity spec: Level 1 Core, Level 2 Direct, Level 3 Weights/Advanced, generator/looper segmentation, `Density` vs `Mask`, and duration tickets.
+- `.tasks/stochastic-track-port/PHASE10.6-BUG-CATALOG.md` — Phase 1 systematic-debugging findings from 2026-05-20: 12 confirmed bugs across 3 clusters (serialization symmetry, ticket-mode state machine, macro contract) plus design decisions confirmed (divisor/clockMultiplier ignored in ticket mode; `_level` sequence-owned).
 - `temp-ref/vinx-performer/src/apps/sequencer/{model,engine,ui}/Stochastic*` — Vinx Stochastic source.
 - `../others/mutable/marbles/random/output_channel.cc`
 - `../others/mutable/marbles/random/distributions.h`
@@ -1066,7 +1067,9 @@ Bit-packing the Vinx object adds complexity for marginal gain. Compact heap/pool
 
 ## Next Action
 
-**Phase 10 prep:** Implement `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`: rename deterministic thinning to `Mask`, make `Density` generator sound/rest amount, expose full Burst at Level 1, keep Marbles `Shape/Spread/Bias/Steps` together at Level 1, add the approved 8-slot Duration Tickets, and keep split Rhythm/Melody source modes starting at Level 2.
+**Phase 10.6 (current):** Implement bug fixes from `.tasks/stochastic-track-port/PHASE10.6-BUG-CATALOG.md`. Start with Cluster A (serialization symmetry — add `_density`/`_durationTickets[8]`/`_level` to Sequence write/read; remove `_lock` from Track write/read) under TDD. Then Cluster B (ticket-mode state machine — fix lock+ticket re-trigger, resetMeasure/restart counter reset, variation gating). Cluster C (macro contract) needs a design call first.
+
+**Phase 10 prep (done):** Implement `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`: rename deterministic thinning to `Mask`, make `Density` generator sound/rest amount, expose full Burst at Level 1, keep Marbles `Shape/Spread/Bias/Steps` together at Level 1, add the approved 8-slot Duration Tickets, and keep split Rhythm/Melody source modes starting at Level 2.
 
 ## Depends On
 

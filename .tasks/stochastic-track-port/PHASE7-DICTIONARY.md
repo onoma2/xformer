@@ -207,27 +207,33 @@ Duration tickets are Level 3 generator controls. They define weighted selection
 of parent-event durations. They do not define gate probability, loop masking, or
 burst child timing.
 
-Approved duration set:
+Approved duration set (revised 2026-05-20, was previously 1/2, 1/4, 1/8, 1/16, 3/16,
+5/16, 7/16, 1/8T — felt too slow in hardware testing):
 
 ```text
-1/2
 1/4
 1/8
 1/16
-3/16
-5/16
-7/16
+1/32
+1/64
 1/8T
+1/16T
+3/16
 ```
 
 Duration-ticket invariants:
-- No `1 bar`: use the sequence clock divisor to make the whole track slower.
-- No `1/64` or `1/128`: fast sub-events belong to Burst.
-- `1/8T` is the fastest approved parent-triplet duration for now.
+- The dictionary is now shift-down focused: faster straight durations plus two triplets
+  and one dotted, dropping the slow 1/2 and the irregular 5/16, 7/16.
+- `1/64` is approved (previous spec forbade it; revised here).
+- `1/16T` is the fastest approved parent-triplet duration.
 - Quintuplets are deferred until there is a clear UI and clocking contract.
+- `_divisor` and `_clockMultiplier` are intentionally ignored in duration-ticket mode
+  (tickets express absolute musical duration; divisor sets the rate-mode grid).
+  To slow a ticket-mode track, pick longer ticket slots (1/4 is the slowest).
 - When duration tickets are inactive, use `Rate + Variation`.
 - When duration tickets are active, they replace `Rate + Variation` for parent
-  duration selection.
+  duration selection. Variation does NOT apply in ticket mode (engine code must gate
+  the variation block on `!durationTicketsActive()` — see PHASE10.6 bug H1).
 - A selected parent duration is the time container for any burst child hits.
 
 ## Burst

@@ -1,5 +1,5 @@
 # Task Board
-_Updated: 2026-05-19_
+_Updated: 2026-05-20 (grilling session)_
 
 ## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
 **Status:** done — Phases A-F complete and hardware verified.
@@ -10,12 +10,12 @@ _Updated: 2026-05-19_
 
 ---
 
-## 🟢 stochastic-track-port — V5 Control Granularity: model/engine/UI wired
-**Status:** done — Phase 10 V5 beta implemented and build verified.
-**Where I stopped:** V5 model/engine/UI complete. Multi-select ticket editor (hold=latch, shift=persist, encoder edits all selected). Active step highlighting (Bright=currently playing, MediumBright=selected). Duration Ticket event timing. Character macro, step-relative Rate, soft reset measure. Density=75, Rate=75, divisor=48, size=4, Gate CV defaults.
-**Next action:** Hardware verification: Density vs Mask distinction, Burst audibility, Duration Ticket selection, Patience 0/mid/100, Refresh command, split Rhythm/Melody Loop/Live, Lock stability.
+## 🟡 stochastic-track-port — V5 Phase 10 shipped; L1 redesign + bug catalog ready; Phase 2 not started
+**Status:** paused — Phase 10 V5 beta shipped; Phase 1 debugging found 12 bugs (3 clusters); Phase 10.7 L1/L2/L3 redesign synthesized from grilling session.
+**Where I stopped:** Two design docs ready: `PHASE10.6-BUG-CATALOG.md` (Clusters A/B/C, design decisions) and `PHASE10.7-L1-REDESIGN.md` (Proteus-style single-knob macros, 3-way ticket exclusivity, bipolar Mutate, scale-aware Marbles, engine-clever derivation). Confirmed: L1 = Density + Complexity (renamed from Character) + Shape (mutually exclusive with Complexity); macros write one field each; L2 sub-controls override macro derivation when set; Burst at L2 only; Looper universal; drop _accent + dead Track residue.
+**Next action:** Phase 2 implementation. Order: Cluster A (serialization) → Cluster B (ticket-mode state) → L1 redesign steps 3–8 per PHASE10.7 → list model re-curation. TDD entry: serialization round-trip test for `StochasticSequence` (Density=33, three duration ticket weights, Level=Direct).
 **Branch:** feat/stochastic
-**Reference:** `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`, `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`
+**Reference:** `.tasks/stochastic-track-port/PHASE10.7-L1-REDESIGN.md`, `.tasks/stochastic-track-port/PHASE10.6-BUG-CATALOG.md`, `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`, `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`, `.tasks/stochastic-track-port/PHASE9-V4-OWNERSHIP.md`
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
