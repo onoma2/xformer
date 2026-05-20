@@ -21,6 +21,7 @@ register_sequencer_test(TestScale TestScale.cpp)
 register_sequencer_test(TestAccumulator TestAccumulator.cpp)
 register_sequencer_test(TestAccumulatorSerialization TestAccumulatorSerialization.cpp)
 register_sequencer_test(TestStochasticSequenceSerialization TestStochasticSequenceSerialization.cpp)
+register_sequencer_test(TestStochasticDurationDictionary TestStochasticDurationDictionary.cpp)
 register_sequencer_test(TestNoteSequence TestNoteSequence.cpp)
 register_sequencer_test(TestDiscreteMapSequence TestDiscreteMapSequence.cpp)
 # Disabled: requires complex mock dependencies for hardware drivers

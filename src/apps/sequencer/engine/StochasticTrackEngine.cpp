@@ -22,21 +22,6 @@
 #define DBG_STO(fmt, ...)
 #endif
 
-// V5 duration multiplier: 1/2, 1/4, 1/8, 1/16, 3/16, 5/16, 7/16, 1/8T
-static uint32_t getDurationMultiplier(int index) {
-    switch (index) {
-    case 0: return 192 * 2;       // 1/2
-    case 1: return 192;           // 1/4
-    case 2: return 96;            // 1/8
-    case 3: return 48;            // 1/16
-    case 4: return (48 * 3);      // 3/16
-    case 5: return (48 * 5);      // 5/16
-    case 6: return (48 * 7);      // 7/16
-    case 7: return 64;            // 1/8T = PPQN/3 = 64
-    }
-    return 48;
-}
-
 StochasticTrackEngine::StochasticTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
     TrackEngine(engine, model, track, linkedTrackEngine),
     _stochasticTrack(track.stochasticTrack()),
