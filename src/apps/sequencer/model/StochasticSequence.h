@@ -564,6 +564,9 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         writer.write(_range);
         writer.write(static_cast<uint8_t>(_rhythmMode));
         writer.write(static_cast<uint8_t>(_melodyMode));
+        _density.write(writer);
+        for (int i = 0; i < 8; ++i) writer.write(_durationTickets[i]);
+        writer.write(static_cast<uint8_t>(_level));
 
 
         for (const auto &event : _events) {
@@ -646,6 +649,15 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _rhythmMode = rhythmMode < uint8_t(StochasticSourceMode::Last) ? static_cast<StochasticSourceMode>(rhythmMode) : StochasticSourceMode::Loop;
         reader.read(melodyMode);
         _melodyMode = melodyMode < uint8_t(StochasticSourceMode::Last) ? static_cast<StochasticSourceMode>(melodyMode) : StochasticSourceMode::Loop;
+
+        _density.read(reader);
+        for (int i = 0; i < 8; ++i) {
+            reader.read(_durationTickets[i]);
+            _durationTickets[i] = clamp(int(_durationTickets[i]), 0, 100);
+        }
+        uint8_t level;
+        reader.read(level);
+        _level = level < uint8_t(StochasticLevel::Last) ? static_cast<StochasticLevel>(level) : StochasticLevel::Core;
 
 
         for (auto &event : _events) {

@@ -186,7 +186,6 @@ public:
     }
 
     void write(VersionedSerializedWriter &writer) const {
-        writer.write(_lock);
         writer.write(_fillMuted);
         writer.write(_loopFirst);
         writer.write(_loopLast);
@@ -210,7 +209,6 @@ public:
     }
 
     void read(VersionedSerializedReader &reader) {
-        reader.read(_lock);
         reader.read(_fillMuted);
         reader.read(_loopFirst);
         _loopFirst = clamp(int(_loopFirst), 0, CONFIG_STEP_COUNT - 1);
