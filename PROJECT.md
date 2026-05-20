@@ -301,6 +301,38 @@ open -W build/sim/Performer.app       # blocks until exit
 - Simulator build: `cd build/sim/debug && make sequencer` — **DO ONLY IF USER EXPLICITLY ASKS.**
 - **Always use the STM32 release build to verify compilation.** The sim build uses a different toolchain (host clang vs arm-none-eabi-gcc) and can mask STM32-specific issues. Only the STM32 build catches cross-compilation errors.
 
+## Fresh-worktree bootstrap
+
+`git worktree add` only checks out tracked files. `build/`, the libopencm3 submodule, and ragel-generated teletype sources do not come along. Bootstrap a new worktree with:
+
+```bash
+# 1. Create worktree (branch from master or wherever)
+git worktree add .worktrees/<slug> -b feat/<slug> master
+
+# 2. Init the STM32 submodule (skip the sim-only ones unless needed)
+git -C .worktrees/<slug> submodule update --init --recursive \
+    src/platform/stm32/libs/libopencm3
+
+# 3. Generate ragel sources (gitignored in teletype/.gitignore)
+( cd .worktrees/<slug>/teletype/src \
+  && ragel -C -G2 match_token.rl -o match_token.c \
+  && ragel -C -G2 scanner.rl -o scanner.c )
+
+# 4. Configure cmake (absolute paths — relative breaks if cwd drifts)
+cmake -S "$PWD/.worktrees/<slug>" \
+      -B "$PWD/.worktrees/<slug>/build/stm32/release" \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_TOOLCHAIN_FILE="$PWD/.worktrees/<slug>/cmake/arm.cmake" \
+      -DPLATFORM=stm32
+
+# 5. Build
+cd .worktrees/<slug>/build/stm32/release && make sequencer -j8
+```
+
+Requirements: `ragel` on PATH (`brew install ragel`), `arm-none-eabi-gcc` toolchain installed at the path referenced by `cmake/arm.cmake`. Do not share `build/` between worktrees — cmake caches absolute source paths and branch contents diverge.
+
+`.worktrees/` is gitignored at repo root.
+
 ## Considerations
 - RAM is the tight constraint; flash has plenty of margin.
 - To free RAM: shrink note-step fields/pattern count/snapshots, reduce UI/page caches, or trim task stack sizes; prefer moving non-DMA data to CCM if SRAM pressure rises.
