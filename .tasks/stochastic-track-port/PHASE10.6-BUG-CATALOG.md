@@ -87,6 +87,38 @@ User-reported symptom: "most of burst gates don't reach output."
   Recommended: (a) for cleanest semantics. Parent gate spans the whole parent duration
   (the burst envelope); children retrigger via their own low→on→off cycles inside it.
 
+## Cluster F — Burst at Short Parent Durations (musical issue, deferred)
+
+Surfaced 2026-05-21 during hardware feature verification. Phase 2 Cluster D fixed the
+parent-gate-masking bug and added a 6-tick child gate floor. Both correct individually.
+But the underlying burst math doesn't scale gracefully to short parent durations.
+
+- [~] **F1** Burst at parent durations ≤1/16 produces sub-audible mush. With divisor at
+  1/16 (48 ticks per step) and BurstCount near max (3 children), child spacing is ~12
+  ticks (~60 ms at 120 BPM). At divisor 1/32 (24 ticks), children pack to ~6 ticks and
+  the floor either drops them or merges them with the parent. Perceptually the burst
+  becomes a thickened click, not distinct hits.
+
+  Possible resolution paths (pick one or combine when implementing):
+  - **Hard duration gate.** No burst evaluation when `durationTicks < threshold`
+    (e.g. <96 ticks = below 1/8). Simplest; surfaces as "burst silently disabled at fast
+    parent durations" which is musically fine but needs UI signal so users don't think
+    burst is broken.
+  - **Count-shrinking law.** Child count caps based on durationTicks: full count only
+    above 1/4, halved at 1/8, single child at 1/16, zero below. Smooth degradation,
+    no UI surprise.
+  - **Burst probability gate.** Multiply BurstProbability by a duration-scaling factor:
+    full at long parents, ramped down to zero below a threshold. User-facing behavior is
+    "fewer bursts on fast parents," which is musical.
+  - **Different burst model.** Replace child-events-with-own-CV with ratchet-over-parent
+    (repeated gates at the parent's CV, no separate scheduling). Simpler at fast
+    durations but loses BurstPitch=Generate variation.
+
+  Recommended: count-shrinking law (graceful degradation) + a UI hint when the effective
+  count falls below the configured count.
+
+  Out of Phase 2 scope. Implementation gated on user confirmation of approach.
+
 ## Cluster E — Performer-Native Controls (preservation, not bug)
 
 Add to L1 redesign acceptance: do NOT remove or hide these Performer-native sequence

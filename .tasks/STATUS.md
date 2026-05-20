@@ -1,5 +1,5 @@
 # Task Board
-_Updated: 2026-05-21 (engine-rebuild-order + Container destructor-skip crash fixes)_
+_Updated: 2026-05-21 (stochastic hardware-stable; Burst math flagged for rework)_
 
 ## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
 **Status:** done — Phases A-F complete and hardware verified.
@@ -10,10 +10,10 @@ _Updated: 2026-05-21 (engine-rebuild-order + Container destructor-skip crash fix
 
 ---
 
-## 🟡 stochastic-track-port — Phase 2 + two crash fixes landed; hardware verification next
-**Status:** paused — Phase 2 deterministic-cluster work complete (7 commits, all 13 catalogued bugs fixed). Two hardware crashes uncovered and fixed during verification: (1) engine-rebuild-order on init project, (2) Container destructor-skip on every track-mode swap.
-**Where I stopped:** Seven cluster commits between `01752a25` (plan) and `ef0ab4cb` (last cluster D) per PHASE10.6 + PHASE10.7. Plus two follow-up fixes: (1) Engine.cpp moved `updateTrackSetups()` to the top of `update()` (before clock-event processing) so engine containers always match model trackMode when any engine code runs — fixed the init-project hard fault. (2) Container.h `create<U>()` now destructs the prior occupant before placement-new of the new type via a type-erased destructor pointer — fixed the second-layout-commit hard fault caused by `_lockedParents` heap leaks on every Stochastic→other engine swap. Both fixes hardware-confirmed. Four unit tests still passing in sim.
-**Next action:** Hardware verification of the actual Phase 2 features now that the engine lifecycle is stable. Confirm: burst children audible (Cluster D + 6-tick floor), lock+ticket no machine-gun (C5), variation only in rate mode (H1), project save/load round-trips Density/DurationTickets/Level (A), lock not persisted (H2), 3-way pitch exclusivity behaves (tickets win over Marbles and Complexity), L1 macros write single fields, full duration dictionary span (1/4 to 1/64 + triplets + 3/16). Then resume into hardware-tuning steps (Marbles scale-aware Steps law, bipolar Mutate semantics, Density/Complexity derivation curves) and list model re-curation (UX: dual Character/Complexity entries need a call).
+## 🟡 stochastic-track-port — Phase 2 hardware-stable; Burst math rework deferred
+**Status:** paused — Phase 2 complete, two crash fixes landed, hardware stable across save/load/init-project/layout-commit cycles. Persistent loops survive reload. Audible feature verification mostly clean; one design issue surfaced: Burst at short durations (1/16, 1/32, 1/64) produces mush.
+**Where I stopped:** Phase 2 done. Two follow-up fixes: (1) Engine.cpp moved `updateTrackSetups()` to top of `update()` — fixed init-project hard fault. (2) Container.h `create<U>()` destructs prior occupant before placement-new via type-erased destructor pointer — fixed second-layout-commit hard fault from `_lockedParents` heap leak. Both hardware-confirmed. Hardware audit confirmed: project save/load preserves all serialized fields including loops; no crashes on any combination of init project / layout commit / project reload.
+**Next action:** Burst math rework — Burst should be disabled or restricted at short parent durations (1/16 and shorter). Current behavior with the 6-tick child gate floor produces unmusical mush. Need either a hard duration gate, a scaling law that picks fewer/longer children at short durations, or a different burst model. Flagged for future work; see PHASE10.6-BUG-CATALOG.md Cluster F. Then resume into hardware-tuning steps (Marbles scale-aware Steps law, bipolar Mutate semantics, Density/Complexity derivation curves) and list model re-curation (UX: dual Character/Complexity entries need a call).
 **Branch:** feat/stochastic
 **Reference:** `.tasks/stochastic-track-port/PHASE10.7-L1-REDESIGN.md`, `.tasks/stochastic-track-port/PHASE10.6-BUG-CATALOG.md`, `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`, `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md`, `.tasks/stochastic-track-port/PHASE9-V4-OWNERSHIP.md`
 
