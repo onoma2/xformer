@@ -148,12 +148,13 @@
                 <li><a href="#architecture">2 &middot; Architecture</a></li>
                 <li><a href="#key-concepts">3 &middot; Key Concepts</a></li>
                 <li><a href="#navigation">4 &middot; Page Navigation</a></li>
-                <li><a href="#stoch-page">5 &middot; Performance Page (STOCH)</a></li>
-                <li><a href="#config-page">6 &middot; Config Page (STOCH CFG)</a></li>
-                <li><a href="#tickets-page">7 &middot; Degree Ticket Editor</a></li>
-                <li><a href="#generator">8 &middot; Generator Engine</a></li>
-                <li><a href="#workflow">9 &middot; Workflow Guide</a></li>
-                <li><a href="#reference">10 &middot; Parameter Reference</a></li>
+                <li><a href="#ui-levels">5 &middot; UI Levels (Core/Direct/Weights)</a></li>
+                <li><a href="#stoch-page">6 &middot; Performance Page (STOCH)</a></li>
+                <li><a href="#config-page">7 &middot; Config Page (STOCH CFG)</a></li>
+                <li><a href="#tickets-page">8 &middot; Degree Ticket Editor</a></li>
+                <li><a href="#generator">9 &middot; Generator Engine</a></li>
+                <li><a href="#workflow">10 &middot; Workflow Guide</a></li>
+                <li><a href="#reference">11 &middot; Parameter Reference</a></li>
             </ul>
         </div>
 
@@ -168,6 +169,19 @@
             sequencer explores it &mdash; generating rhythm and melody from high-level parameters
             in real time.
         </p>
+
+        <p>
+            The track operates on <strong>two independent generative domains</strong> &mdash; rhythm
+            (when events fire) and melody (what pitches they play). Each domain has its own source mode,
+            seed, buffer, and mutation system. The two outputs combine at the gate and CV jacks.
+        </p>
+
+        <div class="callout purple">
+            <strong>Sequence Ownership:</strong> All generative parameters, pattern sizes, and even
+            scales/root notes are now owned by the <strong>Sequence</strong> (Pattern). This means every
+            pattern in a Stochastic track can have completely different probability weights, complexity settings,
+            and rhythmic rates.
+        </div>
 
         <div class="fig">
             <svg viewBox="0 0 900 680" xmlns="http://www.w3.org/2000/svg">
@@ -1012,9 +1026,41 @@
 
 
         <!-- ================================================================ -->
-        <!-- 5. STOCH PAGE -->
+        <!-- 5. UI LEVELS -->
         <!-- ================================================================ -->
-        <h2 id="stoch-page">5 &middot; STOCH &mdash; Performance Page</h2>
+        <h2 id="ui-levels">5 &middot; UI Levels (Core/Direct/Weights)</h2>
+
+        <p>
+            The <kbd>Level</kbd> parameter at the top of the <kbd>STOCH</kbd> page toggles between three
+            tiers of complexity, hiding or revealing parameters based on your workflow.
+        </p>
+
+        <h3>5.1 &middot; Level: Core</h3>
+        <p>
+            Focused on immediate generative music. Parameters are "macro" oriented, combining multiple
+            internal controls (e.g., <code>Character</code> affects complexity, contour, and linearity).
+            Source modes for rhythm and melody are coupled into a single <code>Mode</code> parameter.
+        </p>
+
+        <h3>5.2 &middot; Level: Direct</h3>
+        <p>
+            Uncouples the rhythm and melody source modes. Reveals individual shaping controls like
+            <code>Complexity</code> and <code>Contour</code>. Adds direct probability controls for
+            <code>Slide</code>, <code>Legato</code>, and <code>Accent</code>.
+        </p>
+
+        <h3>5.3 &middot; Level: Weights</h3>
+        <p>
+            Reveals the full deterministic evolution engine. Adds <code>Mask</code> (ranked thinning),
+            <code>Tilt</code>, <code>Sleep</code>, <code>Mutate</code>, and <code>Jump</code>.
+            Ideal for precise algorithmic programming.
+        </p>
+
+
+        <!-- ================================================================ -->
+        <!-- 6. STOCH PAGE -->
+        <!-- ================================================================ -->
+        <h2 id="stoch-page">6 &middot; STOCH &mdash; Performance Page</h2>
 
         <p>
             The <kbd>STOCH</kbd> page is a list-based interface exposing all generative parameters

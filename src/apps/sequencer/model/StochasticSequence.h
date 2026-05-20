@@ -191,6 +191,38 @@ public:
     int degreeTicket(int degree) const { return _degreeTickets[degree]; }
     void setDegreeTicket(int degree, int tickets) { _degreeTickets[degree] = clamp(tickets, -1, 100); }
 
+    // Effective ticket after degree + mask rotation (same logic as generator)
+    int effectiveDegreeTicket(int degree, int activeNotes) const {
+        int dRot = (degreeRotation() % activeNotes + activeNotes) % activeNotes;
+        int srcIdx = (degree - dRot + activeNotes * 2) % activeNotes;
+        int ticket = _degreeTickets[srcIdx];
+        if (ticket < 0) return -1;
+        // Count non-excluded and apply mask rotation
+        int nonNegCount = 0;
+        int nonNegWeight[CONFIG_USER_SCALE_SIZE];
+        int8_t effTickets[CONFIG_USER_SCALE_SIZE];
+        for (int i = 0; i < activeNotes; ++i) {
+            int idx = (i - dRot + activeNotes * 2) % activeNotes;
+            effTickets[i] = _degreeTickets[idx];
+            if (effTickets[i] >= 0) {
+                nonNegWeight[nonNegCount++] = effTickets[i];
+            }
+        }
+        int mRot = maskRotation();
+        if (nonNegCount > 1 && mRot != 0) {
+            int rotSteps = (mRot % nonNegCount + nonNegCount) % nonNegCount;
+            int pos = 0;
+            for (int i = 0; i < activeNotes; ++i) {
+                if (effTickets[i] >= 0) {
+                    int srcPos = (pos - rotSteps + nonNegCount) % nonNegCount;
+                    effTickets[i] = nonNegWeight[srcPos];
+                    pos++;
+                }
+            }
+        }
+        return effTickets[degree];
+    }
+
     // degreeRotation
     int degreeRotation() const { return _degreeRotation; }
     void setDegreeRotation(int rotation) { _degreeRotation = clamp(rotation, -32, 32); }

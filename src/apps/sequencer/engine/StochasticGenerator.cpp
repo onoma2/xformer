@@ -186,7 +186,7 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
 
     for (int oct = 0; oct < range; ++oct) {
         for (int i = 0; i < activeNotes; ++i) {
-            int tickets = sequence.degreeTicket(i);
+            int tickets = sequence.effectiveDegreeTicket(i, activeNotes);
             if (tickets >= 0) { // -1 is excluded
                 int deg = oct * activeNotes + i;
                 if (deg >= sequence.minDegree() && deg <= sequence.maxDegree()) {

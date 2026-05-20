@@ -56,33 +56,21 @@ void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
     }
 
     WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "STOCHASTIC TICKETS");
+    WindowPainter::drawHeader(canvas, _model, _engine, "SCALE TICKETS");
 
     int baseY = 46;
     int barMaxH = 26;
-    int barW = 5;
+    int barW = std::max(3, (Width - 16) / scaleSize - 2);
     int gap = 2;
+    if (scaleSize > 20) { gap = 1; barW = std::max(2, (Width - 16) / scaleSize - 1); }
 
-    int bankSize = std::min(16, scaleSize - _bank * 16);
-    if (bankSize < 0) {
-        _bank = 0;
-        bankSize = std::min(16, scaleSize);
-    }
-
-    int totalW = bankSize * (barW + gap) - gap;
+    int totalW = scaleSize * (barW + gap) - gap;
     int xOffset = std::max(8, (Width - totalW) / 2);
 
-    if (totalW > Width - 16) {
-        barW = 3;
-        gap = 1;
-        totalW = bankSize * (barW + gap) - gap;
-        xOffset = std::max(8, (Width - totalW) / 2);
-    }
-
-    for (int i = 0; i < bankSize; ++i) {
-        int degreeIndex = _bank * 16 + i;
+    for (int i = 0; i < scaleSize; ++i) {
+        int degreeIndex = i;
         int x = xOffset + i * (barW + gap);
-        int tickets = sequence.degreeTicket(degreeIndex);
+        int tickets = sequence.effectiveDegreeTicket(degreeIndex, scaleSize);
 
         bool active = false;
         int activeDegree = -1;
@@ -132,7 +120,8 @@ void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
 
     if (scaleSize > 16) {
         str.reset();
-        str("P%d/%d", _bank + 1, (scaleSize + 15) / 16);
+        str("%d total  [%d-%d]", scaleSize, _bank * 16 + 1, std::min((_bank + 1) * 16, scaleSize));
+        canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Low);
         canvas.drawText(8, 28, str);
     }
@@ -330,6 +319,24 @@ void StochasticSequenceEditPage::handlePitchKeyDown(KeyEvent &event) {
         if (!_persistMode) _pitchSelectionMask = 0;
         event.consume();
         return;
+    }
+
+    {
+        auto &track = _project.selectedTrack().stochasticTrack();
+        auto &sequence = track.sequence(_project.selectedPatternIndex());
+        auto &scale = sequence.selectedScale(_project.scale());
+        int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
+        if (key.isLeft() && scaleSize > 16) {
+            _bank = std::max(0, _bank - 1);
+            event.consume();
+            return;
+        }
+        if (key.isRight() && scaleSize > 16) {
+            int maxBank = (scaleSize - 1) / 16;
+            _bank = std::min(maxBank, _bank + 1);
+            event.consume();
+            return;
+        }
     }
 
     if (key.isContextMenu()) {
