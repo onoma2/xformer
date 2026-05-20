@@ -227,12 +227,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             bool hasChildren = false;
             for (int i = 0; i < 4; ++i) if (_lockedParents[readIndex].children[i].valid) hasChildren = true;
 
-            uint32_t gateLen = (durationTicks * 50) / 100;
-            if (hasChildren) {
-                gateLen = std::min(gateLen, uint32_t(10));
-            }
-
-            if (!isLegato) {
+            if (!isLegato && !hasChildren) {
+                uint32_t gateLen = (durationTicks * 50) / 100;
                 DBG_STO("%u GATEpush LOCKED OFF p=%d", tick + gateLen, _patternIndex);
                 _gateQueue.push({ tick + gateLen, false, false });
             }
@@ -366,12 +362,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             bool hasChildren = false;
             for (int i = 0; i < 4; ++i) if (evalChildren[i].valid) hasChildren = true;
 
-            uint32_t gateLen = (durationTicks * 50) / 100;
-            if (hasChildren) {
-                gateLen = std::min(gateLen, uint32_t(10));
-            }
-
-            if (!isLegato) {
+            if (!isLegato && !hasChildren) {
+                uint32_t gateLen = (durationTicks * 50) / 100;
                 DBG_STO("%u GATEpush LIVE OFF p=%d", tick + gateLen, _patternIndex);
                 _gateQueue.push({ tick + gateLen, false, false });
             }

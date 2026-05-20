@@ -91,25 +91,24 @@ void StochasticGenerator::evaluateChildren(EvaluatedChild *children, const Stoch
     int count = event.childCount();
     uint32_t burstRate = event.burstRate();
     
-    // Minimum audible gap (low pulse duration)
-    const uint32_t minGap = 2;
+    // Minimum audible child gate: 6 ticks ≈ 30ms at 120 BPM (PPQN=192)
+    const uint32_t minChildGate = 6;
 
     for (int i = 0; i < 4; ++i) {
         children[i].valid = false;
         if (i < count) {
             float spacing = (durationTicks / float(count + 1)) * (burstRate / 100.f);
-            spacing = std::max(float(minGap + 1), spacing); 
+            spacing = std::max(float(minChildGate + 1), spacing); 
 
             uint32_t offset = uint32_t((i + 1) * spacing);
-            uint32_t gate = std::max(uint32_t(1), uint32_t(spacing * 0.5f));
+            uint32_t gate = std::max(minChildGate, uint32_t(spacing * 0.5f));
 
-            // Bounds check: must fit inside durationTicks
             if (offset + gate >= durationTicks) {
-                // If it doesn't fit, try to reduce gate or skip
-                if (offset + 1 < durationTicks) {
+                if (offset + minChildGate < durationTicks) {
                     gate = durationTicks - offset - 1;
+                    if (gate < minChildGate) break;
                 } else {
-                    break; // Doesn't fit at all
+                    break;
                 }
             }
 
