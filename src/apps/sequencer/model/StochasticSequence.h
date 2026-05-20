@@ -331,21 +331,18 @@ public:
     void printMask(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticDensity); str("%d%%", mask()); }
     void editMask(int value, bool shift) { if (!isRouted(Routing::Target::StochasticDensity)) setMask(mask() + value); }
 
-    // Level 1 Density macro: drives both density and rest
+    // Level 1 Density macro: writes density only (no fan-out to rest)
     void editDensityMacro(int value, bool shift) {
         if (!isRouted(Routing::Target::StochasticGeneratorDensity)) {
             int newVal = clamp(density() + value, 0, 100);
             setDensity(newVal);
-            setRest(100 - newVal);
         }
     }
 
-    void editCharacterMacro(int value, bool shift) {
+    void editComplexityMacro(int value, bool shift) {
         if (!isRouted(Routing::Target::StochasticComplexity)) {
             int c = clamp(complexity() + value, 0, 100);
             setComplexity(c);
-            setContour((c - 50) * 2);
-            setLinearity(100 - c);
         }
     }
 

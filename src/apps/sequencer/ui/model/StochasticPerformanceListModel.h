@@ -134,7 +134,7 @@ private:
         case Level:         return "Level";
         case Mode:          return "Mode";
         case Density:       return "Density";
-        case Character:     return "Character";
+        case Character:     return "Complexity";
         case Rhythm:        return "Rhythm";
         case Melody:        return "Melody";
         case Complexity:    return "Complexity";
@@ -229,7 +229,7 @@ private:
         case Level:         sequence.editLevel(value, shift); break;
         case Mode:          sequence.editCoupledMode(value, shift); break;
         case Density:       sequence.editDensityMacro(value, shift); break;
-        case Character:     sequence.editCharacterMacro(value, shift); break;
+        case Character:     sequence.editComplexityMacro(value, shift); break;
         case Rhythm:        sequence.setRhythmMode(ModelUtils::adjustedEnum(sequence.rhythmMode(), value)); break;
         case Melody:        sequence.setMelodyMode(ModelUtils::adjustedEnum(sequence.melodyMode(), value)); break;
         case Complexity:    sequence.editComplexity(value, shift); break;
