@@ -1,5 +1,5 @@
 # Task Board
-_Updated: 2026-05-20 (grilling session)_
+_Updated: 2026-05-20 (grilling session; usb-mouse-to-route added)_
 
 ## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
 **Status:** done — Phases A-F complete and hardware verified.
@@ -123,6 +123,16 @@ _Updated: 2026-05-20 (grilling session)_
 **Next action:** Update `Routing.h` enum, sentinel values, `isXxxTarget()` checks; then `Routing.cpp` `targetInfos[]` and `targetName()` order.
 **Depends on:** nothing (pure refactor, no behavior change)
 **Branch:** feat/modulators
+
+---
+
+## 🟡 usb-mouse-to-route — USB mouse axes/buttons as Routing::Source CV inputs
+**Status:** paused — design captured; no code started. Gate identified before any feature work.
+**Where I stopped:** Walked the USB-keyboard git history (`6b0e407e` driver lift → `41ade375`/`80dd6d9c`/`b32cf6cb` failed-then-reverted in-driver OLED diagnostics → `82e64080` Engine pump → KeyboardManager extraction → `0d2b0015` mouse rejection). Established the OLED diagnostic rule: nothing inside `usbh_driver_hid.c` hooks or `hid_in_message_handler` may take a FreeRTOS mutex; only `UsbH::process()` post-poll may touch OLED. Mapped source-enum / RoutingEngine plug-in points.
+**Next action:** Step 1 in TASK.md — reproduce the mouse-rejection crash on hardware with the rejection at `usbh_driver_hid.c:218-224` removed, observe whether keyboard/Launchpad survive, to establish the failure boundary before designing a fix.
+**Depends on:** none (gated on libusbhost mouse-enumeration root cause investigation, which is step 1 of this task itself)
+**Branch:** TBD
+**Reference:** `.tasks/usb-mouse-to-route/TASK.md`
 
 ---
 
