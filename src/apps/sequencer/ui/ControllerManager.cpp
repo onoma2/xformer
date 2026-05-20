@@ -42,7 +42,7 @@ void ControllerManager::connect(uint16_t vendorId, uint16_t productId) {
 
 void ControllerManager::disconnect() {
     if (_controller) {
-        _controllerContainer.destroy(_controller);
+        _controllerContainer.destroy();
         _controller = nullptr;
     }
 }

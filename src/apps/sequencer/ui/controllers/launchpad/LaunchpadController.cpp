@@ -135,7 +135,7 @@ LaunchpadController::LaunchpadController(ControllerManager &manager, Model &mode
 }
 
 LaunchpadController::~LaunchpadController() {
-    _deviceContainer.destroy(_device);
+    _deviceContainer.destroy();
 }
 
 void LaunchpadController::update() {

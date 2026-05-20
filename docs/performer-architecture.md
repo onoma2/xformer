@@ -4,7 +4,7 @@ Reference for agents working on engine code, track types, or new TrackModes.
 Read this before designing any feature that touches timing, output, or cross-track behavior.
 
 Every claim here is grounded in a specific file and line number — verify against the code
-if the codebase has moved on. Last reconciled: 2026-05-20.
+if the codebase has moved on. Last reconciled: 2026-05-21.
 
 ---
 
@@ -481,6 +481,70 @@ Returns ticks-per-bar at the current tempo and time signature. Used by:
 - resetMeasure math (`resetDivisor = resetMeasure * measureDivisor()`).
 - Bar-quantized loop length calculations.
 - Any feature that needs to align to musical bars rather than absolute tick counts.
+
+### 8.7 Engine lifecycle invariants (XFORMER additions)
+
+Two safety properties that aren't in upstream Performer. Both fix hard-fault classes that
+surfaced once XFORMER added track types with non-trivial engine destruction (specifically
+StochasticTrackEngine, which allocates `_lockedParents` on the heap and frees it in
+`~StochasticTrackEngine`).
+
+#### 8.7.1 `updateTrackSetups()` runs before clock events in `Engine::update()`
+
+Engine containers must match model `trackMode` before any engine code reads
+`_trackEngines[i]`. Upstream Performer ran `updateTrackSetups()` later in `Engine::update()`
+(after `updateBusSafetyMode` and the clock-event loop). That order is unsafe when the model
+union is swapped while the engine is suspended or locked: `_engine.suspend()` internally
+calls `_clock.masterStop()` which queues a `Clock::Stop` and possibly `Clock::Reset` event;
+on resume, those events fire BEFORE the engine container rebuild, and `Engine::reset()`
+iterates `_trackEngines[]` calling `trackEngine->reset()` on the stale type whose underlying
+union memory has just been overwritten by `Track::clear() → initContainer()`. ARM hard fault.
+
+XFORMER moves `updateTrackSetups()` to the top of `Engine::update()` (immediately after the
+suspend-handling block), so engine containers are reconciled to model state before any code
+touches `_trackEngines[]`. The relevant invariant: **inside `Engine::update()` after line
+~106, `_trackEngines[i]->trackMode() == _project.track(i).trackMode()` for every `i`.**
+
+Files: `src/apps/sequencer/engine/Engine.cpp` `Engine::update()`.
+
+#### 8.7.2 `Container::create<U>()` destructs the prior occupant
+
+Upstream `Container::create<U>()` did `return new(_data) U(args...)` — placement-new with
+no destruction of whatever was there before. Callers were expected to remember to call
+`destroy()` first, but no caller did, and the original tracks (NoteTrack, CurveTrack, etc.)
+were trivially destructible so the omission was harmless.
+
+StochasticTrackEngine breaks that assumption: `~StochasticTrackEngine` calls
+`freeLockedSteps()` which `delete[] _lockedParents`. Skipping the destructor leaks ~1.8 KB
+of heap (`64 × sizeof(LockedParentEvent)`) on every Stochastic→other engine swap. On
+sim the leak is invisible (huge heap). On STM32 with newlib `sbrk`-managed heap, two or
+three cycles exhaust the heap; the next `new` either returns nullptr (silently broken) or
+corrupts heap state (hard fault).
+
+XFORMER's `Container::create<U>()` stores a type-erased destructor pointer
+(`destructorThunk<U>`) on each construction and invokes it on the next `create()` or on
+Container destruction. Side effect: the typed-pointer `destroy(U *object)` overload was
+replaced with no-arg `destroy()` (the destructor pointer is stored internally; the caller
+doesn't need to pass it). Container also gains its own destructor, so scope-exit cleanup
+is automatic.
+
+```cpp
+// src/core/utils/Container.h
+template<typename U, typename... Args>
+U *create(Args&&... args) {
+    if (_destructor) { _destructor(_data); _destructor = nullptr; }
+    U *obj = new(_data) U(std::forward<Args>(args)...);
+    _destructor = &destructorThunk<U>;
+    return obj;
+}
+```
+
+This is a generic fix that protects any future track-engine type with non-trivial
+destruction, not just Stochastic. New engines that allocate on the heap (or hold any
+resource that needs cleanup) get correct destructor invocation on type swap automatically.
+
+Files: `src/core/utils/Container.h`. Call-site changes: `LaunchpadController.cpp` and
+`ControllerManager.cpp` use the no-arg `destroy()` form.
 
 ---
 
