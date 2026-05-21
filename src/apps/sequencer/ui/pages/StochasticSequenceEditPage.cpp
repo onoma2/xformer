@@ -934,7 +934,7 @@ void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
             event.consume();
             return;
         }
-        event.consume();
+        // Let unmatched events (Play, Stop, Tempo, Pattern, Performer, etc.) reach TopPage.
         return;
     }
     switch (_currentPage) {
