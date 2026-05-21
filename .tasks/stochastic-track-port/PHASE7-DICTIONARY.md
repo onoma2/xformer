@@ -44,6 +44,56 @@ Duration ticket bar labels are now divisor-aware at draw time via
 `StochasticSequence::printSlotDuration()` — they track clock-divisor changes
 instead of lying with hardcoded 1/16-centered strings.
 
+## Phase 12 — Reserved-slot repurposes + performance pair (2026-05-21)
+
+Reserved slots from Phase 11 reclaimed into new musical controls. Authoritative
+spec is the "Phase 12 follow-ups" section in `PHASE11-SIMPLIFY.md`.
+
+**Reserved-slot status table:**
+
+| Slot | Engine reads | UI shows as | Purpose |
+|---|---|---|---|
+| `_density` | yes | "Gate Length" | Per-event gate length spread around hardcoded 50% center. 0=exact, 100=full triangular 10..100%. Floored at 10% of duration AND 6 ticks (audible minimum). Replaces hardcoded `(durationTicks × 50) / 100`. |
+| `_contour` | yes | "Contour" (Drift) | Directional bias in Complexity kernel. `kernel += (contour × signedDist) / 20`. Positive contour boosts ascending picks. |
+| `_linearity` | yes | "Repeat" | Per-event Bernoulli at triggerStep. On hit, reuses cached `_lastEvent` verbatim (note, octave, duration, articulation). Works Live + Loop. |
+| `_marblesMode` | no | hidden | Reserved flag (serialization stays). Engine always runs Marbles distribution. |
+| `_level` | no | hidden | Reserved enum. UI no longer gates by level. |
+| `_minDegree` | no | hidden | Reserved. Range + tickets cover its role. |
+| `_maxDegree` | no | hidden | Reserved. Range + tickets cover its role. |
+| `_accentProb` | yes | "Patience M" | Per-domain patience (melody). Independent Poisson counter, own λ. Default 100 (off sentinel). No routing target. |
+| `_marblesSteps` | yes | "Steps" | Pitch sieve cutoff. Universal LUT rank-based. 0..100, high=open. |
+| `_variation` sign | no | display abs() | Storage signed for forward compat; reads always positive. |
+
+**Patience split — two domains, two counters:**
+- `patienceRhythm()` (= `_patience`, routing target `StochasticPatience` preserved) drives rhythm regen via own counter `_loopCycleCount`. λ ∈ [1, 50].
+- `patienceMelody()` (= `_accentProb`) drives melody regen via own counter `_loopCycleCountMelody`. λ ∈ [1, 50]. No routing.
+- Each fires independently. On regen, only its own domain's `setRhythmValid(false)` / `setMelodyValid(false)` and own counter reset.
+
+**Mask + Tilt — Loop-mode filter+resonance performance pair:**
+- **Mask** (0..100, default 100) = cutoff. `maskPass = rank × 100 < mask × size`. Instant at trigger time.
+- **Tilt** (-100..+100, default 0) = duration-aware rank skew. Phase 12: position-bias semantics dropped. Now `weight = (tilt/100) × ((durSlot - 3.5) / 3.5) + noise`. Long-duration slot (durSlot=0) gets `axis = -1`, short (durSlot=7) gets `axis = +1`. Positive tilt → long notes get rank 0 (top priority, survive Mask cuts). Negative tilt → short notes survive.
+- **Instant on knob edit:** engine caches `_lastAppliedTilt` and `_lastAppliedSize`. At pattern-cycle boundary, if either changed, `generateMaskRanks` runs on existing event buffer. Content untouched. Tilt and Size knobs become real-time performance controls on captured loops.
+- **Live mode unchanged:** Mask + Tilt apply only when content is in Loop mode. Live events get `densityRank=0` always; Mask filter passes any non-zero cutoff. Live = "raw stochastic stream" by design.
+
+**Boredom indicator math:**
+- Engine roll uses `patienceProbability(loops, patience)` = Poisson CDF. Unchanged.
+- UI bar uses `patienceMeter(loops, patience)` = `min(1, loops / λ)` — linear "tension building" meter scaled to expected regen point. Bar reaches 100% at typical regen point (λ), then sits there until Poisson roll fires. Visibly fills before regen.
+- Bar split per domain: left half = rhythm progress, right half = melody progress. Both grow rightward from their respective left edge. 2px gap between halves.
+
+**Loop hero step button layout:**
+- Top row (red LEDs): 0=Patience R, 1=Patience M, 2=Mutate, 3=Jump, 4=Sleep.
+- Bottom row left (green LEDs): 8=First, 9=Last, 10=Size, 11=Rotate.
+- Bottom row right (green LEDs): 14=Mask, 15=Tilt.
+- Held step inverts colour. Held-step OLED label: short form (e.g. `MASK 100`, `TILT +0`).
+- Macro readout row (no step held): tiny font `PR# PM# M# J# S#` top, `MK#` / `TL+#` below the boredom bars.
+
+**Double-click guard on NewR / NewM:**
+- F3 / F4 Fn buttons on Loop page require `event.count() == 2` (kernel double-click) to actually fire `renewRhythm()` / `renewMelody()`.
+- Single press shows OLED message `Press again - renew R` / `Press again - renew M`. No engine action.
+- F1 / F2 mode toggles (LoopR / LoopM) stay single-press (reversible, not destructive).
+
+**Accent gate output dropped silently.** No second physical gate jack on the device. `_accentOutput` engine state removed; `Gate` struct `accent` field removed; `LockedParentEvent`/`LockedChild` `accent` fields removed; `gateOutput(int)` returns `_gateOutput` for any index. Model `_accentProb` field stays (now serves as `patienceMelody`). `event.setAccent(...)` still written by generator as a harmless dead write for event-shape stability.
+
 ## Provenance
 
 - MeloDICER contributes direct rhythm controls, direct pitch probability controls,
