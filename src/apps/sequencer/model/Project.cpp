@@ -122,7 +122,7 @@ void Project::clear() {
     auto &stoSeq = stoTrack.sequence(0);
     stoSeq.setRhythmMode(StochasticSourceMode::Live);
     stoSeq.setMelodyMode(StochasticSourceMode::Live);
-    stoSeq.setDivisor(48);
+    stoSeq.setDivisor(12);   // 1/16 — better default than 1/4 for stochastic content
     stoSeq.setSize(4);
     stoSeq.setRate(75);
     stoSeq.setMask(100);

@@ -255,7 +255,8 @@ void TopPage::setTrackView(TrackView view) {
         setMainPage(pages.track);
         break;
     case Track::TrackMode::Stochastic:
-        setMainPage(pages.stochasticSequenceEdit);
+        // Page+S2 (Track) — Stochastic's analog of the generic track list-model.
+        setMainPage(pages.stochasticConfig);
         break;
     case Track::TrackMode::DiscreteMap:
         setMainPage(pages.track);
@@ -339,7 +340,8 @@ void TopPage::setSequenceView(SequenceView view) {
         setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Stochastic:
-        setMainPage(pages.stochasticConfig);
+        // Page+S1 (Sequence) — Stochastic's performance list-model.
+        setMainPage(pages.stochasticPerformance);
         break;
     case Track::TrackMode::Last:
         break;
@@ -372,7 +374,8 @@ void TopPage::setSequenceEditPage() {
         setMainPage(pages.teletypeScriptView);
         break;
     case Track::TrackMode::Stochastic:
-        setMainPage(pages.stochasticPerformance);
+        // Page+S0 (SequenceEdit) — main hero edit pages (was stochasticPerformance).
+        setMainPage(pages.stochasticSequenceEdit);
         break;
     case Track::TrackMode::Last:
         break;

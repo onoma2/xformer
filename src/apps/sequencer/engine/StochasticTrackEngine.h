@@ -42,17 +42,18 @@ public:
     uint8_t sleepRemaining() const { return _sleepRemaining; }
     void renewLoopSources() { refreshLoopSources(); }
 
-    // V5 duration multiplier dictionary: 1/4, 1/8, 1/16, 1/32, 1/64, 1/8T, 1/16T, 3/16
+    // V5 duration multiplier dictionary, sorted descending by ticks at PPQN=192.
+    // 1/2, 1/4, 3/16, 1/8, 1/8T, 1/16, 1/16T, 1/32.
     static uint32_t getDurationMultiplier(int index) {
         switch (index) {
-        case 0: return 192;           // 1/4
-        case 1: return 96;            // 1/8
-        case 2: return 48;            // 1/16
-        case 3: return 24;            // 1/32
-        case 4: return 12;            // 1/64
-        case 5: return 64;            // 1/8T
+        case 0: return 384;           // 1/2
+        case 1: return 192;           // 1/4
+        case 2: return 144;           // 3/16
+        case 3: return 96;            // 1/8
+        case 4: return 64;            // 1/8T
+        case 5: return 48;            // 1/16
         case 6: return 32;            // 1/16T
-        case 7: return 144;           // 3/16
+        case 7: return 24;            // 1/32
         }
         return 48;
     }
