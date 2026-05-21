@@ -37,6 +37,10 @@ public:
     bool activity() const { return _activity; }
     int lastDegree() const { return _lastDegree; }
     int lastDurationIndex() const { return _lastDurationIndex; }
+    uint16_t loopCycleCount() const { return _loopCycleCount; }
+    int jumpRegister() const { return _jumpRegister; }
+    uint8_t sleepRemaining() const { return _sleepRemaining; }
+    void renewLoopSources() { refreshLoopSources(); }
 
     // V5 duration multiplier dictionary: 1/4, 1/8, 1/16, 1/32, 1/64, 1/8T, 1/16T, 3/16
     static uint32_t getDurationMultiplier(int index) {

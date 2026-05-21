@@ -3,9 +3,13 @@
 #include "ui/painters/WindowPainter.h"
 #include "ui/MatrixMap.h"
 #include "model/StochasticTrack.h"
+#include "model/StochasticTypes.h"
 #include "core/utils/Random.h"
 
 #include "engine/StochasticTrackEngine.h"
+
+#include <cmath>
+#include <cstdint>
 
 static const ContextMenuModel::Item contextMenuItems[] = {
     { "INIT" },
@@ -30,7 +34,14 @@ void StochasticSequenceEditPage::exit() {
 }
 
 void StochasticSequenceEditPage::nextPage() {
-    _currentPage = Page((int(_currentPage) + 1) % int(Page::Count));
+    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
+    int next = (int(_currentPage) + 1) % int(Page::Count);
+    // Skip Marbles page entirely when marblesMode is Off.
+    if (Page(next) == Page::Marbles && seq.marblesMode() == MarblesMode::Off) {
+        next = (next + 1) % int(Page::Count);
+    }
+    _currentPage = Page(next);
+    _heroHeldStep = -1;
 }
 
 //----------
@@ -39,10 +50,398 @@ void StochasticSequenceEditPage::nextPage() {
 
 void StochasticSequenceEditPage::draw(Canvas &canvas) {
     switch (_currentPage) {
-    case Page::Pitch:   drawPitchPage(canvas); break;
+    case Page::Core:     drawCorePage(canvas); break;
+    case Page::Marbles:  drawMarblesPage(canvas); break;
+    case Page::Direct:   drawDirectPage(canvas); break;
+    case Page::Loop:     drawLoopPage(canvas); break;
+    case Page::Pitch:    drawPitchPage(canvas); break;
     case Page::Duration: drawDurationPage(canvas); break;
-    case Page::Count:   break;
+    case Page::Count:    break;
     }
+}
+
+//----------
+// Hero page draws
+//----------
+
+void StochasticSequenceEditPage::drawCorePage(Canvas &canvas) {
+    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
+
+    WindowPainter::clear(canvas);
+    WindowPainter::drawHeader(canvas, _model, _engine, "CORE");
+
+    int density = seq.density();
+    int complexity = seq.complexity();
+    bool marblesOn = (seq.marblesMode() == MarblesMode::On);
+
+    int dropCount = 12 + (density * 88) / 100;          // ~12..100
+    int jitter = 2 + (complexity * 14) / 100;           // 2..16
+    int wind = marblesOn ? 2 : 0;
+
+    Random rng(11);
+    canvas.setBlendMode(BlendMode::Set);
+    for (int i = 0; i < dropCount; ++i) {
+        int x = 2 + int(rng.nextRange(Width - 4));
+        int y = 13 + int(rng.nextRange(36));
+        int dropLen = 2 + int(rng.nextRange(uint32_t(jitter / 2 + 1)));
+        int b = int(rng.nextRange(15));
+        Color col = (b >= 12) ? Color::Bright :
+                    (b >= 8)  ? Color::MediumBright :
+                    (b >= 4)  ? Color::Medium :
+                                Color::Low;
+        canvas.setColor(col);
+        for (int j = 0; j < dropLen; ++j) {
+            int px = x + (wind * j) / std::max(1, dropLen);
+            int py = y + j;
+            if (py >= 12 && py <= 51) canvas.point(px, py);
+        }
+    }
+
+    FixedStringBuilder<32> str;
+    if (_heroHeldStep == 0) str("DENS %d", density);
+    else if (_heroHeldStep == 1) str("CMPX %d", complexity);
+    else str("D%d  C%d", density, complexity);
+    canvas.setFont(Font::Small);
+    canvas.setColor(Color::Bright);
+    canvas.drawText(8, 18, str);
+
+    canvas.setColor(marblesOn ? Color::Bright : Color::Medium);
+    const char *shapeLabel = marblesOn ? "SHAPE ON" : "SHAPE OFF";
+    canvas.drawText(Width - canvas.textWidth(shapeLabel) - 8, 18, shapeLabel);
+
+    const char *footer[] = { "SHAPE", "MODE", "RENEW", "LOCK", "NEXT" };
+    WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
+}
+
+void StochasticSequenceEditPage::drawMarblesPage(Canvas &canvas) {
+    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
+
+    WindowPainter::clear(canvas);
+    WindowPainter::drawHeader(canvas, _model, _engine, "MARBLES");
+
+    int bias = seq.marblesBias();       // 0..100, 50=center
+    int spreadVal = seq.marblesSpread(); // 0..100
+    int stepsVal = seq.marblesSteps();   // 1..100
+    bool on = (seq.marblesMode() == MarblesMode::On);
+
+    int biasOffset = ((bias - 50) * 4) / 5;            // -40..+40
+    int cx = Width / 2 + biasOffset;
+    int spread = std::max(8, (spreadVal * 4) / 5);
+    int stepsCount = std::max(2, stepsVal);
+    int baseline = 50;
+    int peakY = 14;
+
+    canvas.setBlendMode(BlendMode::Set);
+    if (!on) {
+        canvas.setColor(Color::Low);
+        canvas.hline(8, baseline, Width - 16);
+    } else {
+        // Quantization ticks
+        canvas.setColor(Color::Low);
+        int bandW = std::max(2, (spread * 4) / stepsCount);
+        for (int k = -stepsCount; k <= stepsCount; ++k) {
+            int x = cx + k * bandW;
+            if (x >= 0 && x < Width) canvas.vline(x, baseline - 1, 3);
+        }
+        // Bell curve fill — gaussian-ish, gradient brighter toward peak
+        for (int x = 0; x < Width; ++x) {
+            float d = float(x - cx) / float(spread);
+            float env = expf(-d * d * 1.4f);
+            int h = int(env * (baseline - peakY));
+            if (h <= 0) continue;
+            int top = baseline - h;
+            for (int y = top; y <= baseline; ++y) {
+                int v = ((baseline - y) * 85) / std::max(1, h * 100 / 100);
+                v = (baseline - y) * 100 / std::max(1, h);
+                Color col = (v >= 85) ? Color::Bright :
+                            (v >= 60) ? Color::MediumBright :
+                            (v >= 35) ? Color::Medium :
+                            (v >= 12) ? Color::MediumLow :
+                                        Color::Low;
+                canvas.setColor(col);
+                canvas.point(x, y);
+            }
+        }
+        // Peak marker
+        canvas.setColor(Color::Bright);
+        canvas.point(cx, peakY - 1);
+        canvas.point(cx - 1, peakY);
+        canvas.point(cx + 1, peakY);
+    }
+
+    FixedStringBuilder<32> str;
+    if (_heroHeldStep == 0) str("BIAS %d", bias);
+    else if (_heroHeldStep == 1) str("SPRD %d", spreadVal);
+    else if (_heroHeldStep == 2) str("STEP %d", stepsVal);
+    else str("B%d  S%d  N%d", bias, spreadVal, stepsVal);
+    canvas.setFont(Font::Small);
+    canvas.setColor(Color::Bright);
+    canvas.drawText(8, 18, str);
+
+    const char *footer[] = { "SHAPE", nullptr, nullptr, nullptr, "NEXT" };
+    WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
+}
+
+void StochasticSequenceEditPage::drawDirectPage(Canvas &canvas) {
+    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
+
+    WindowPainter::clear(canvas);
+    WindowPainter::drawHeader(canvas, _model, _engine, "DIRECT");
+
+    // Live CV / gate from engine
+    float liveCv = 0.f;
+    bool liveGate = false;
+    if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+        auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
+        liveCv = eng.cvOutput(0);
+        liveGate = eng.gateOutput(0);
+    }
+
+    canvas.setBlendMode(BlendMode::Set);
+
+    // Pond floor — dim dotted line at y=31
+    canvas.setColor(Color::Low);
+    for (int x = 0; x < Width; x += 4) canvas.point(x, 31);
+
+    // Live point at right side, y by CV
+    int px = (Width * 72) / 100;
+    int py = 31 - int(liveCv * 16.f);
+    py = clamp(py, 13, 49);
+    Color ringCols[] = { Color::Bright, Color::MediumBright, Color::Medium, Color::Low };
+    int ringRs[] = { 2, 5, 9, 14 };
+    for (int i = 0; i < 4; ++i) {
+        canvas.setColor(ringCols[i]);
+        int r = ringRs[i];
+        // Sample 32 points around circle
+        for (int k = 0; k < 32; ++k) {
+            float a = float(k) * 6.2832f / 32.f;
+            int x = px + int(r * cosf(a));
+            int y = py + int(r * sinf(a));
+            if (x >= 0 && x < Width && y >= 12 && y <= 51) canvas.point(x, y);
+        }
+    }
+    if (liveGate) {
+        canvas.setColor(Color::Bright);
+        canvas.fillRect(px - 1, py - 1, 3, 3);
+    }
+
+    // Param labels
+    const char *names[] = { "VAR", "TILT", "CONT", "RATE", "LIN", "REST", "SLIDE", "JUMP" };
+    int values[] = {
+        seq.variation(), seq.tilt(), seq.contour(), seq.rate(),
+        seq.linearity(), seq.rest(), seq.slide(), seq.jump()
+    };
+    FixedStringBuilder<32> str;
+    if (_heroHeldStep >= 0 && _heroHeldStep < 8) {
+        str("%s %d", names[_heroHeldStep], values[_heroHeldStep]);
+    } else {
+        str("DIRECT");
+    }
+    canvas.setFont(Font::Small);
+    canvas.setColor(Color::Bright);
+    canvas.drawText(8, 18, str);
+
+    const char *footer[] = { nullptr, nullptr, nullptr, nullptr, "NEXT" };
+    WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
+}
+
+void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
+    auto &track = _project.selectedTrack().stochasticTrack();
+    auto &seq = track.sequence(_project.selectedPatternIndex());
+
+    WindowPainter::clear(canvas);
+    WindowPainter::drawHeader(canvas, _model, _engine, "LOOP");
+
+    int margin = 10;
+    int tapeTop = 22;
+    int tapeBot = 40;
+    int availW = Width - 2 * margin;
+
+    canvas.setBlendMode(BlendMode::Set);
+
+    // Tape body
+    canvas.setColor(Color::MediumLow);
+    canvas.fillRect(margin, tapeTop, Width - 2 * margin, tapeBot - tapeTop + 1);
+
+    // Mutation scratches
+    int mutateVal = seq.mutate();
+    int nScratches = (mutateVal * 10) / 100;
+    Random rng(7);
+    for (int i = 0; i < nScratches; ++i) {
+        int sx = margin + 2 + int(rng.nextRange(uint32_t(Width - 2 * margin - 4)));
+        int sy = tapeTop + 1 + int(rng.nextRange(uint32_t(tapeBot - tapeTop - 1)));
+        canvas.setColor(Color::None);
+        canvas.fillRect(sx, sy, 2, 2);
+    }
+
+    // Loop window brackets (from sequence.first()/last() relative to size())
+    int seqSize = std::max(1, seq.size());
+    int lf = seq.first();
+    int ll = seq.last();
+    int bxFirst = margin + (lf * availW) / seqSize;
+    int bxLast = margin + ((ll + 1) * availW) / seqSize - 1;
+    canvas.setColor(Color::Bright);
+    canvas.vline(bxFirst - 1, tapeTop - 3, tapeBot - tapeTop + 7);
+    canvas.hline(bxFirst - 1, tapeTop - 3, 4);
+    canvas.hline(bxFirst - 1, tapeBot + 3, 4);
+    canvas.vline(bxLast + 1, tapeTop - 3, tapeBot - tapeTop + 7);
+    canvas.hline(bxLast - 2, tapeTop - 3, 4);
+    canvas.hline(bxLast - 2, tapeBot + 3, 4);
+
+    // Boredom counter bar — engine internal _loopCycleCount progress to patience threshold.
+    // Read from engine if available.
+    int boredomFill = 0;
+    int patience = seq.patience();
+    if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+        auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
+        int loops = eng.loopCycleCount();
+        // patience 0..100 → bucket 0..7, loopsBeforeRefresh = 1<<bucket
+        int bucket = clamp(patience / 14, 0, 7);
+        uint32_t threshold = (patience == 100) ? UINT32_MAX : (uint32_t(1) << bucket);
+        if (threshold > 0) {
+            boredomFill = int((uint64_t(loops) * 100) / std::max(uint32_t(1), threshold));
+            boredomFill = clamp(boredomFill, 0, 100);
+        }
+    }
+    canvas.setColor(Color::Low);
+    canvas.drawRect(margin, tapeBot + 7, availW, 3);
+    canvas.setColor(Color::MediumBright);
+    canvas.fillRect(margin, tapeBot + 7, (boredomFill * availW) / 100, 3);
+
+    // Param labels
+    FixedStringBuilder<32> str;
+    if (_heroHeldStep == 0)      str("MUT %d", seq.mutate());
+    else if (_heroHeldStep == 1) str("PAT %d", patience);
+    else if (_heroHeldStep == 2) str("SLP %d", seq.sleep());
+    else if (_heroHeldStep == 3) str("FRST %d", seq.first());
+    else if (_heroHeldStep == 4) str("LAST %d", seq.last());
+    else if (_heroHeldStep == 5) str("ROT %+d", seq.rotate());
+    else                          str("LOOP");
+    canvas.setFont(Font::Small);
+    canvas.setColor(Color::Bright);
+    canvas.drawText(8, 18, str);
+
+    canvas.setColor(track.lock() ? Color::Bright : Color::Medium);
+    const char *lockLabel = track.lock() ? "LOCKED" : "LIVE";
+    canvas.drawText(Width - canvas.textWidth(lockLabel) - 8, 18, lockLabel);
+
+    const char *footer[] = { "MODE", "RENEW", "LOCK", nullptr, "NEXT" };
+    WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
+}
+
+//----------
+// Hero step edits — encoder writes the held step's param
+//----------
+
+void StochasticSequenceEditPage::editCoreStep(int step, int value, bool shift) {
+    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
+    int v = shift ? value * 10 : value;
+    switch (step) {
+    case 0: seq.setDensity(seq.density() + v); break;
+    case 1: seq.setComplexity(seq.complexity() + v); break;
+    }
+}
+
+void StochasticSequenceEditPage::editMarblesStep(int step, int value, bool shift) {
+    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
+    int v = shift ? value * 10 : value;
+    switch (step) {
+    case 0: seq.setMarblesBias(seq.marblesBias() + v); break;
+    case 1: seq.setMarblesSpread(seq.marblesSpread() + v); break;
+    case 2: seq.setMarblesSteps(seq.marblesSteps() + v); break;
+    }
+}
+
+void StochasticSequenceEditPage::editDirectStep(int step, int value, bool shift) {
+    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
+    int v = shift ? value * 10 : value;
+    switch (step) {
+    case 0: seq.setVariation(seq.variation() + v); break;
+    case 1: seq.setTilt(seq.tilt() + v); break;
+    case 2: seq.setContour(seq.contour() + v); break;
+    case 3: seq.setRate(seq.rate() + v); break;
+    case 4: seq.setLinearity(seq.linearity() + v); break;
+    case 5: seq.setRest(seq.rest() + v); break;
+    case 6: seq.setSlide(seq.slide() + v); break;
+    case 7: seq.setJump(seq.jump() + v); break;
+    }
+}
+
+void StochasticSequenceEditPage::editLoopStep(int step, int value, bool shift) {
+    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
+    int v = shift ? value * 10 : value;
+    switch (step) {
+    case 0: seq.setMutate(seq.mutate() + v); break;
+    case 1: seq.setPatience(seq.patience() + v); break;
+    case 2: seq.setSleep(seq.sleep() + v); break;
+    case 3: seq.setFirst(seq.first() + value); break;
+    case 4: seq.setLast(seq.last() + value); break;
+    case 5: seq.setRotate(seq.rotate() + v); break;
+    }
+}
+
+//----------
+// Hero Fn handlers
+//----------
+
+bool StochasticSequenceEditPage::handleCoreFunction(int fn, bool shift) {
+    auto &track = _project.selectedTrack().stochasticTrack();
+    auto &seq = track.sequence(_project.selectedPatternIndex());
+    switch (fn) {
+    case 0: // SHAPE — toggle marblesMode
+        seq.setMarblesMode(seq.marblesMode() == MarblesMode::Off ? MarblesMode::On : MarblesMode::Off);
+        return true;
+    case 1: // MODE — cycle coupled rhythm/melody Loop/Live
+        seq.editCoupledMode(1, false);
+        return true;
+    case 2: // RENEW — refresh loop sources
+        if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+            auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
+            eng.renewLoopSources();
+            showMessage("RENEW");
+        }
+        return true;
+    case 3: // LOCK toggle
+        track.setLock(!track.lock());
+        return true;
+    }
+    return false;
+}
+
+bool StochasticSequenceEditPage::handleMarblesFunction(int fn, bool shift) {
+    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
+    switch (fn) {
+    case 0: // SHAPE — back to Core (marbles off)
+        seq.setMarblesMode(MarblesMode::Off);
+        _currentPage = Page::Core;
+        return true;
+    }
+    return false;
+}
+
+bool StochasticSequenceEditPage::handleDirectFunction(int /*fn*/, bool /*shift*/) {
+    return false;
+}
+
+bool StochasticSequenceEditPage::handleLoopFunction(int fn, bool shift) {
+    auto &track = _project.selectedTrack().stochasticTrack();
+    auto &seq = track.sequence(_project.selectedPatternIndex());
+    switch (fn) {
+    case 0: // MODE
+        seq.editCoupledMode(1, false);
+        return true;
+    case 1: // RENEW
+        if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+            auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
+            eng.renewLoopSources();
+            showMessage("RENEW");
+        }
+        return true;
+    case 2: // LOCK toggle
+        track.setLock(!track.lock());
+        return true;
+    }
+    return false;
 }
 
 void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
@@ -274,7 +673,27 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &sequence = track.sequence(_project.selectedPatternIndex());
 
+    auto heroLeds = [&] (int paramCount, bool useGreen, bool useRed) {
+        for (int i = 0; i < paramCount; ++i) {
+            bool held = (i == _heroHeldStep);
+            leds.set(MatrixMap::fromStep(i), useRed && held, useGreen);
+        }
+    };
+
     switch (_currentPage) {
+    case Page::Core:
+        // Orange = green + red. Active param brighter.
+        heroLeds(2, /*green*/true, /*red*/true);
+        break;
+    case Page::Marbles:
+        heroLeds(3, /*green*/true, /*red*/false);
+        break;
+    case Page::Direct:
+        heroLeds(8, /*green*/true, /*red*/false);
+        break;
+    case Page::Loop:
+        heroLeds(6, /*green*/false, /*red*/true);
+        break;
     case Page::Pitch: {
         auto &scale = sequence.selectedScale(_project.scale());
         int scaleSize = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
@@ -326,10 +745,21 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
 //----------
 
 void StochasticSequenceEditPage::keyDown(KeyEvent &event) {
+    const auto &key = event.key();
+    bool isHero = (_currentPage == Page::Core || _currentPage == Page::Marbles ||
+                   _currentPage == Page::Direct || _currentPage == Page::Loop);
+    if (isHero) {
+        if (key.isStep() && !key.pageModifier()) {
+            _heroHeldStep = key.step();
+            event.consume();
+            return;
+        }
+        return;
+    }
     switch (_currentPage) {
-    case Page::Pitch:   handlePitchKeyDown(event); break;
+    case Page::Pitch:    handlePitchKeyDown(event); break;
     case Page::Duration: handleDurationKeyDown(event); break;
-    case Page::Count:   break;
+    default: break;
     }
 }
 
@@ -421,6 +851,17 @@ void StochasticSequenceEditPage::handleDurationKeyDown(KeyEvent &event) {
 
 void StochasticSequenceEditPage::keyUp(KeyEvent &event) {
     const auto &key = event.key();
+    bool isHero = (_currentPage == Page::Core || _currentPage == Page::Marbles ||
+                   _currentPage == Page::Direct || _currentPage == Page::Loop);
+    if (isHero) {
+        if (key.isStep() && _heroHeldStep >= 0 && key.step() == _heroHeldStep) {
+            _heroHeldStep = -1;
+            event.consume();
+            return;
+        }
+        return;
+    }
+
     if (key.isStep() && !_persistMode) {
         if (_currentPage == Page::Pitch) {
             int degreeIndex = _bank * 16 + key.step();
@@ -444,10 +885,42 @@ void StochasticSequenceEditPage::keyUp(KeyEvent &event) {
 }
 
 void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
+    const auto &key = event.key();
+    bool isHero = (_currentPage == Page::Core || _currentPage == Page::Marbles ||
+                   _currentPage == Page::Direct || _currentPage == Page::Loop);
+    if (isHero) {
+        // F5 NEXT first (universal).
+        if (key.isFunction() && key.function() == 4) {
+            nextPage();
+            event.consume();
+            return;
+        }
+        // Per-page Fn dispatch.
+        if (key.isFunction()) {
+            int fn = key.function();
+            bool shift = key.shiftModifier();
+            switch (_currentPage) {
+            case Page::Core:    handleCoreFunction(fn, shift); break;
+            case Page::Marbles: handleMarblesFunction(fn, shift); break;
+            case Page::Direct:  handleDirectFunction(fn, shift); break;
+            case Page::Loop:    handleLoopFunction(fn, shift); break;
+            default: break;
+            }
+            event.consume();
+            return;
+        }
+        if (key.isContextMenu()) {
+            contextShow();
+            event.consume();
+            return;
+        }
+        event.consume();
+        return;
+    }
     switch (_currentPage) {
-    case Page::Pitch:   handlePitchKeyPress(event); break;
+    case Page::Pitch:    handlePitchKeyPress(event); break;
     case Page::Duration: handleDurationKeyPress(event); break;
-    case Page::Count:   break;
+    default: break;
     }
 }
 
@@ -540,10 +1013,16 @@ void StochasticSequenceEditPage::handleDurationKeyPress(KeyPressEvent &event) {
 }
 
 void StochasticSequenceEditPage::encoder(EncoderEvent &event) {
+    int step = _heroHeldStep >= 0 ? _heroHeldStep : 0;
+    bool shift = event.pressed();
     switch (_currentPage) {
-    case Page::Pitch:   handlePitchEncoder(event); break;
+    case Page::Core:    editCoreStep(step, event.value(), shift); event.consume(); return;
+    case Page::Marbles: editMarblesStep(step, event.value(), shift); event.consume(); return;
+    case Page::Direct:  editDirectStep(step, event.value(), shift); event.consume(); return;
+    case Page::Loop:    editLoopStep(step, event.value(), shift); event.consume(); return;
+    case Page::Pitch:    handlePitchEncoder(event); break;
     case Page::Duration: handleDurationEncoder(event); break;
-    case Page::Count:   break;
+    default: break;
     }
 }
 
@@ -617,6 +1096,12 @@ void StochasticSequenceEditPage::contextAction(int index) {
     auto &sequence = track.sequence(_project.selectedPatternIndex());
 
     switch (_currentPage) {
+    case Page::Core:
+    case Page::Marbles:
+    case Page::Direct:
+    case Page::Loop:
+        // Hero pages don't yet have INIT/EVEN/RAND semantics — no-op for now.
+        break;
     case Page::Pitch: {
         switch (ContextAction(index)) {
         case ContextAction::Init:

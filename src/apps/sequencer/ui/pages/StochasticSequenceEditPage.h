@@ -39,6 +39,10 @@ private:
     };
 
     enum class Page {
+        Core,
+        Marbles,
+        Direct,
+        Loop,
         Pitch,
         Duration,
         Count
@@ -48,8 +52,27 @@ private:
     void contextAction(int index);
     void nextPage();
 
+    // Hero page draws (parameterized — respond to current sequence values).
+    void drawCorePage(Canvas &canvas);
+    void drawMarblesPage(Canvas &canvas);
+    void drawDirectPage(Canvas &canvas);
+    void drawLoopPage(Canvas &canvas);
     void drawPitchPage(Canvas &canvas);
     void drawDurationPage(Canvas &canvas);
+
+    // Hero param edits (held-step + encoder turn).
+    void editCoreStep(int step, int value, bool shift);
+    void editMarblesStep(int step, int value, bool shift);
+    void editDirectStep(int step, int value, bool shift);
+    void editLoopStep(int step, int value, bool shift);
+
+    // Per-page Fn handlers.
+    bool handleCoreFunction(int fn, bool shift);
+    bool handleMarblesFunction(int fn, bool shift);
+    bool handleDirectFunction(int fn, bool shift);
+    bool handleLoopFunction(int fn, bool shift);
+
+    // Legacy ticket pages (existing).
     void handlePitchEncoder(EncoderEvent &event);
     void handleDurationEncoder(EncoderEvent &event);
     void handlePitchKeyDown(KeyEvent &event);
@@ -64,9 +87,13 @@ private:
     uint32_t _durSelectionMask = 0;
     bool _persistMode = false;
 
-    Page _currentPage = Page::Pitch;
+    Page _currentPage = Page::Core;
     int _selectedDurSlot = 0;
     DurFocus _durFocus = DurFocus::DurTicket;
+
+    // Hero pages: which step is currently held (encoder writes that step's param).
+    // -1 = no step held; encoder writes the page-default param (step 0 of the page).
+    int _heroHeldStep = -1;
 };
 
 static const char *durationTicketLabels[] = {
