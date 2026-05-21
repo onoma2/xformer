@@ -388,8 +388,12 @@ bool StochasticSequenceEditPage::handleCoreFunction(int fn, bool shift) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &seq = track.sequence(_project.selectedPatternIndex());
     switch (fn) {
-    case 0: // SHAPE — toggle marblesMode
+    case 0: // SHAPE — toggle marblesMode and jump to Marbles page when turning On
         seq.setMarblesMode(seq.marblesMode() == MarblesMode::Off ? MarblesMode::On : MarblesMode::Off);
+        if (seq.marblesMode() == MarblesMode::On) {
+            _currentPage = Page::Marbles;
+            _heroHeldStep = -1;
+        }
         return true;
     case 1: // MODE — cycle coupled rhythm/melody Loop/Live
         seq.editCoupledMode(1, false);
