@@ -67,6 +67,27 @@ void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
     int totalW = scaleSize * (barW + gap) - gap;
     int xOffset = std::max(8, (Width - totalW) / 2);
 
+    int maxTicket = 0, totalTickets = 0, activeSlotCount = 0;
+    for (int i = 0; i < scaleSize; ++i) {
+        int t = sequence.effectiveDegreeTicket(i, scaleSize);
+        if (t >= 0) {
+            if (t > maxTicket) maxTicket = t;
+            totalTickets += t;
+            ++activeSlotCount;
+        }
+    }
+    bool uniformFallback = (totalTickets == 0 && activeSlotCount > 0);
+    int denom = std::max(1, maxTicket);
+
+    if (totalTickets > 0 && activeSlotCount > 0) {
+        int avgH = (totalTickets * barMaxH) / (activeSlotCount * denom);
+        if (avgH > 0 && avgH < barMaxH) {
+            canvas.setBlendMode(BlendMode::Set);
+            canvas.setColor(Color::Low);
+            canvas.hline(xOffset - 2, baseY - avgH, totalW + 4);
+        }
+    }
+
     for (int i = 0; i < scaleSize; ++i) {
         int degreeIndex = i;
         int x = xOffset + i * (barW + gap);
@@ -86,17 +107,17 @@ void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
             canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
             canvas.line(x, baseY - 5, x + barW - 1, baseY);
             canvas.line(x, baseY, x + barW - 1, baseY - 5);
-        } else if (tickets == 0) {
+        } else if (tickets == 0 && !uniformFallback) {
             canvas.setBlendMode(BlendMode::Set);
             canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
             canvas.drawRect(x, baseY - 2, barW - 1, 2);
         } else {
-            int h = (tickets * barMaxH) / 100;
+            int h = uniformFallback ? barMaxH : (tickets * barMaxH) / denom;
             h = std::max(1, h);
             canvas.setBlendMode(BlendMode::Set);
             if (active) canvas.setColor(Color::Bright);
             else if (selected) canvas.setColor(Color::MediumBright);
-            else canvas.setColor(Color::Medium);
+            else canvas.setColor(uniformFallback ? Color::Low : Color::Medium);
             canvas.fillRect(x, baseY - h, barW, h);
         }
 
@@ -154,13 +175,31 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
     WindowPainter::drawHeader(canvas, _model, _engine, "DURATION TICKETS");
 
     const int numSlots = 8;
-    const int baseY = 46;
+    const int baseY = 42;
     const int barMaxH = 26;
     const int barW = 12;
     const int gap = barW;
 
     int totalW = numSlots * (barW + gap) - gap;
     int xOffset = std::max(8, (Width - totalW) / 2);
+
+    int maxWeight = 0, totalWeight = 0;
+    for (int i = 0; i < numSlots; ++i) {
+        int w = sequence.durationTicket(i);
+        if (w > maxWeight) maxWeight = w;
+        totalWeight += w;
+    }
+    bool uniformFallback = (totalWeight == 0);
+    int denom = std::max(1, maxWeight);
+
+    if (totalWeight > 0) {
+        int avgH = (totalWeight * barMaxH) / (numSlots * denom);
+        if (avgH > 0 && avgH < barMaxH) {
+            canvas.setBlendMode(BlendMode::Set);
+            canvas.setColor(Color::Low);
+            canvas.hline(xOffset - 2, baseY - avgH, totalW + 4);
+        }
+    }
 
     for (int i = 0; i < numSlots; ++i) {
         int x = xOffset + i * (barW + gap);
@@ -174,17 +213,17 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
         bool active = (i == activeIdx);
         bool selected = (_durSelectionMask & (1U << i)) != 0;
 
-        if (weight == 0) {
+        if (weight == 0 && !uniformFallback) {
             canvas.setBlendMode(BlendMode::Set);
             canvas.setColor(active ? Color::Bright : (selected ? Color::Medium : Color::Low));
             canvas.drawRect(x, baseY - 2, barW - 1, 2);
         } else {
-            int h = (weight * barMaxH) / 100;
+            int h = uniformFallback ? barMaxH : (weight * barMaxH) / denom;
             h = std::max(1, h);
             canvas.setBlendMode(BlendMode::Set);
             if (active) canvas.setColor(Color::Bright);
             else if (selected) canvas.setColor(Color::MediumBright);
-            else canvas.setColor(Color::Medium);
+            else canvas.setColor(uniformFallback ? Color::Low : Color::Medium);
             canvas.fillRect(x, baseY - h, barW, h);
         }
 
@@ -199,7 +238,7 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Low);
         int labelW = canvas.textWidth(durationTicketLabels[i]);
-        canvas.drawText(x + (barW - labelW) / 2, baseY + 6, durationTicketLabels[i]);
+        canvas.drawText(x + (barW - labelW) / 2, baseY + 8, durationTicketLabels[i]);
     }
 
     // Left info text
