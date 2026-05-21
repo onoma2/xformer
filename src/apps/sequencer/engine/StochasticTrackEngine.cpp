@@ -370,13 +370,16 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         _patternCycleEnded = true;
 
         if (!lockActive) {
-            // Evaluate Loop-level Jump Register
+            // Proteus-style octave walk — random ±1 each fire, reflected at the
+            // ±kJumpMaxRange bounds. Non-destructive: _jumpRegister is applied
+            // as a playback offset only; stored events are never modified, so
+            // turning jump off snaps the sequence back to its captured pitches.
             if (sequence.jump() > 0 && int(_rng.nextRange(100)) < sequence.jump()) {
-                if (_jumpRegister == 0) {
-                    _jumpRegister = _rng.nextRange(2) == 0 ? -1 : 1;
-                } else {
-                    _jumpRegister = 0; // Return to 0
-                }
+                static const int kJumpMaxRange = 2;   // ±2 octaves
+                int direction = (_rng.nextRange(2) == 0) ? -1 : +1;
+                if (_jumpRegister + direction > kJumpMaxRange) direction = -1;
+                else if (_jumpRegister + direction < -kJumpMaxRange) direction = +1;
+                _jumpRegister += direction;
             }
 
             if (sequence.sleep() > 0) _sleepRemaining = (sequence.sleep() * 4) / 10;
@@ -391,11 +394,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             if (mutateMag > 0 && int(_rng.nextRange(100)) < mutateMag) {
                 bool destructive = (mutateAmount < 0);
                 auto applyRhythm = [&] {
-                    if (destructive) StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
+                    if (destructive) StochasticGenerator::mutateRhythmOne(sequence, track, _rng, mutateMag);
                     else             StochasticGenerator::permuteRhythmOne(sequence, _rng);
                 };
                 auto applyMelody = [&] {
-                    if (destructive) StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
+                    if (destructive) StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng, mutateMag);
                     else             StochasticGenerator::permuteMelodyOne(sequence, _rng);
                 };
                 if (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.melodyMode() == StochasticSourceMode::Loop) {

@@ -9,9 +9,13 @@ class StochasticGenerator {
 public:
     static void generateRhythm(StochasticSequence &sequence, const StochasticTrack &track, uint32_t seed);
     static void generateMelody(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, uint32_t seed);
-    // Proteus-style: regenerate a single event with a fresh random roll (replaces content).
-    static void mutateRhythmOne(StochasticSequence &sequence, const StochasticTrack &track, Random &rng);
-    static void mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng);
+    // Proteus-style: regenerate a single event with a fresh random roll.
+    // mutateMagnitude (0..100) drives the bias strength of the replacement pick:
+    //   low magnitude → strong anchor bias (close to base / tonal)
+    //   high magnitude → uniform random across LUT (chaotic)
+    // bias_strength = 100 - magnitude (inverse coupling).
+    static void mutateRhythmOne(StochasticSequence &sequence, const StochasticTrack &track, Random &rng, int mutateMagnitude);
+    static void mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng, int mutateMagnitude);
     // Marbles-style: swap two existing events (reorders, preserves content).
     static void permuteRhythmOne(StochasticSequence &sequence, Random &rng);
     static void permuteMelodyOne(StochasticSequence &sequence, Random &rng);

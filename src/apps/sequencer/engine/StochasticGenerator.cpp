@@ -99,24 +99,129 @@ void StochasticGenerator::generateMelody(StochasticSequence &sequence, const Sto
     sequence.setMelodySeed(seed);
 }
 
-void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const StochasticTrack &track, Random &rng) {
+// Universal scale-degree weight from position alone. Works for any scale size
+// (5, 7, 12, 24, 43, microtonal). Anchors at simple integer fractions of N:
+// root (0), half (N/2), thirds (N/3, 2N/3), quarters (N/4, 3N/4). Triangular
+// kernel around each anchor falls off across N/6 slots.
+static int universalDegreeBoost(int degInOct, int N) {
+    if (N <= 1) return 0;
+    int halfWidth = N / 6;
+    if (halfWidth < 1) halfWidth = 1;
+    auto kernel = [&](int target, int weight) {
+        int dist = std::abs(degInOct - target);
+        // Wrap-around (octave equivalence at N)
+        int wrap = N - dist;
+        if (wrap < dist) dist = wrap;
+        int w = (halfWidth - dist) * weight / halfWidth;
+        return w > 0 ? w : 0;
+    };
+    int boost = 0;
+    boost += kernel(0,             30);                  // root anchor
+    if (N >= 2) boost += kernel(N / 2,         20);      // half
+    if (N >= 3) boost += kernel(N / 3,         10);      // third
+    if (N >= 3) boost += kernel((2 * N) / 3,   10);
+    if (N >= 4) boost += kernel(N / 4,          5);      // quarter
+    if (N >= 4) boost += kernel((3 * N) / 4,    5);
+    return boost;
+}
+
+void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const StochasticTrack &track, Random &rng, int mutateMagnitude) {
     int size = sequence.size();
     if (size <= 0) return;
     int i = rng.nextRange(size);
-    
+
     uint8_t oldRank = sequence.events()[i].densityRank();
+
+    // Run the regular rhythm generator first — gets fresh rolls for density,
+    // rest, legato, slide, accent, burst, plus an initial variation-biased
+    // duration pick.
     auto rhythm = generateRhythmEvent(sequence, track, rng);
+
+    // Override the duration with mutate-anchored bias: triangular kernel around
+    // the current noteDuration slot. bias_strength = 100 - mutateMagnitude:
+    //   low magnitude → strong anchor (stays near base)
+    //   high magnitude → uniform across the 8 LUT slots
+    int baseDur = std::max(0, std::min(7, int(sequence.noteDuration())));
+    int biasStrength = 100 - std::max(0, std::min(100, mutateMagnitude));
+    int variation = sequence.variation();
+    int varSign = (variation > 0) ? +1 : (variation < 0 ? -1 : 0);
+    int varMag = std::abs(variation);
+
+    int weights[8]; int total = 0;
+    for (int s = 0; s < 8; ++s) {
+        int dist = std::abs(s - baseDur);
+        int anchorKernel = std::max(0, 7 - dist);           // 7 at base, 0 at far end
+        int dirDist = (s - baseDur) * varSign;              // signed distance in variation direction
+        int dirBoost = (dirDist > 0) ? varMag * dirDist : 0;
+        int w = 100 + biasStrength * anchorKernel + dirBoost;
+        weights[s] = w;
+        total += w;
+    }
+    int durIdx = baseDur;
+    if (total > 0) {
+        int roll = int(rng.nextRange(uint32_t(total)));
+        int sum = 0;
+        for (int s = 0; s < 8; ++s) {
+            sum += weights[s];
+            if (roll < sum) { durIdx = s; break; }
+        }
+    }
+    rhythm.setDurationIndex(durIdx);
+
     sequence.events()[i].mergeRhythmFrom(rhythm);
     sequence.events()[i].setDensityRank(oldRank);
 }
 
-void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng) {
+void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng, int mutateMagnitude) {
     int size = sequence.size();
     if (size <= 0) return;
     int i = rng.nextRange(size);
 
-    int lastDegree = (i > 0) ? int(sequence.events()[i-1].degree()) : -1;
-    auto melody = generateMelodyEvent(sequence, track, scale, rootNote, lastDegree, rng);
+    // Build a weighted candidate list combining: degree tickets (user-curated),
+    // universal degree LUT (geometric anchors), and bias_strength inverse to
+    // mutate magnitude. Low magnitude = strong anchor pull (tonal); high = uniform.
+    int activeNotes = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
+    int range = sequence.range();
+    int biasStrength = 100 - std::max(0, std::min(100, mutateMagnitude));
+
+    int allowedDegrees[CONFIG_USER_SCALE_SIZE * 4];
+    int weights[CONFIG_USER_SCALE_SIZE * 4];
+    int allowedCount = 0;
+    int totalWeight = 0;
+
+    for (int oct = 0; oct < range; ++oct) {
+        for (int idx = 0; idx < activeNotes; ++idx) {
+            int tickets = sequence.effectiveDegreeTicket(idx, activeNotes);
+            if (tickets < 0) continue;                       // excluded
+            int deg = oct * activeNotes + idx;
+            if (deg < sequence.minDegree() || deg > sequence.maxDegree()) continue;
+
+            int boost = universalDegreeBoost(idx, activeNotes);
+            int ticketWeight = (tickets > 0) ? tickets : 1;
+            int w = ticketWeight * (100 + (biasStrength * boost) / 100);
+            allowedDegrees[allowedCount] = deg;
+            weights[allowedCount] = w;
+            totalWeight += w;
+            ++allowedCount;
+        }
+    }
+    if (allowedCount == 0) return;
+
+    int absDegree = allowedDegrees[0];
+    if (totalWeight > 0) {
+        int roll = int(rng.nextRange(uint32_t(totalWeight)));
+        int sum = 0;
+        for (int k = 0; k < allowedCount; ++k) {
+            sum += weights[k];
+            if (roll < sum) { absDegree = allowedDegrees[k]; break; }
+        }
+    }
+
+    StochasticSourceEvent melody;
+    melody.clear();
+    melody.setDegree(absDegree % activeNotes);
+    melody.setOctave(absDegree / activeNotes);
+    melody.setMelodyValid(true);
     sequence.events()[i].mergeMelodyFrom(melody);
 }
 
