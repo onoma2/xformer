@@ -623,7 +623,91 @@ differently than `arm-none-eabi-gcc`.
 
 ---
 
-## 12. Reading order for a new agent
+## 12. UI control vocabulary
+
+The hardware has 16 step buttons, 5 function keys (F0–F4), Page, Shift, Left, Right, Track 0–7, Play, Tempo, Pattern, Performer, and a clickable encoder. Edit pages combine these primitives via a small set of recurring patterns. New pages should reuse these patterns instead of inventing new combos.
+
+### 12.1 Input primitives
+
+All defined in `src/apps/sequencer/ui/Key.h`:
+
+| Primitive | Detect | Notes |
+|---|---|---|
+| Step (0–15) | `key.isStep() && !key.pageModifier()` | `key.step()` returns 0–15 |
+| Function (F0–F4) | `key.isFunction()` | `key.function()` returns 0–4; footer renders as F1–F5 |
+| Shift held | `key.shiftModifier()` | modifier flag on any key |
+| Page held | `key.pageModifier()` | modifier flag on any key |
+| Page + Step (8–15) | `key.isQuickEdit()`, `key.quickEdit()` returns 0–7 | 8-slot quick-edit bank |
+| Page + Step (0–7) / Page + Track | `key.isPageSelect()` | navigation to other pages |
+| Page + Step (specific) | `key.pageModifier() && key.is(Key::StepN)` | sub-context shortcuts (Indexed/DiscreteMap use Step4/5/6/14) |
+| Page + Shift | `key.isContextMenu()` | universal context menu trigger |
+| Left / Right | `key.isLeft()`, `key.isRight()` | section nav, bank scroll |
+| Encoder turn | `EncoderEvent::value()` | continuous edit |
+| Encoder pressed (while turning) | `EncoderEvent::pressed()` | usually passed as `shift` flag → coarse step |
+
+KeyPressEvent additionally carries `event.count()` — `count() == 2` is a double-press of the same key.
+
+### 12.2 Common page patterns
+
+Patterns recur across the codebase. Pick the closest match and follow its convention rather than inventing a new one.
+
+#### Pattern A — Params console (list of slots × pages)
+
+Used by `TuesdayEditPage.cpp:64-106` and `IndexedSequenceEditPage`. Four parameter columns (51 px each) under F1–F4, value + bar per slot, F5 cycles pages. Status box at the right edge. Encoder edits whichever slot is selected by the last F-key press. Shift + F5 commonly does a related secondary action (Tuesday: reseed; Indexed: navigate to route config — `TuesdayEditPage.cpp:267-276`, `IndexedSequenceEditPage.cpp:631-642`).
+
+Step buttons are repurposed for *track-global* params (octave/transpose/root/divisor) split into top-row +1 / bottom-row −1 nudges — see `TuesdayEditPage.cpp:704-790`.
+
+#### Pattern B — Step-tab + sub-page edit
+
+Used by the legacy `StochasticSequenceEditPage.cpp`. Step buttons select a per-step target; F-keys pick a sub-axis (TIX / DROT / MROT for pitch, DUR / RST for duration); encoder edits the selected axis on the selected step(s); F5 NEXT cycles between sub-pages. Selection mask is a `uint32_t` set/cleared by step press, persistent in a Shift-toggled persist mode. Context menu provides INIT / EVEN / RAND.
+
+#### Pattern C — Multi-select with shift-double = "match all"
+
+Used by `DiscreteMapSequencePage.cpp:570-600`. Holding a step adds to a selection mask. Double-pressing a step does a per-page-specific quick action (auto-place threshold midpoint — `DiscreteMapSequencePage.cpp:603-640`; toggle gate min — `IndexedSequenceEditPage.cpp:582-603`). Shift + double-press selects all entries matching the source's value field — useful for editing groups of identical thresholds at once.
+
+Page + Step (specific positions) opens sub-context menus for advanced operations (distribute / cluster / transform): `DiscreteMapSequencePage.cpp:642-664`.
+
+#### Pattern D — Generator / preview workflow
+
+`GeneratorPage.cpp:370-511`. F0 toggles A/B preview; F4 triggers re-roll; Shift + Step randomizes generator params; pressing two step buttons in steps 0–7 sets a value-range (`GeneratorPage.cpp:476-496`). Page + double-press opens the context menu in "double-click" alt mode — used by the page to surface a commit-on-doubleclick variant. Context menu items can launch a `QuickEdit` modal sub-editor for a single param: `_manager.pages().quickEdit.show(model, slot)` (`GeneratorPage.cpp:927-931`).
+
+#### Pattern E — Teletype-style "view-only" with external editor
+
+`TeletypeEditPage.cpp` is intentionally empty (one stub `keyPress` that swallows pageModifier). Teletype scripts are too large for hardware editing so the page delegates to `TeletypeScriptViewPage` / `TeletypePatternViewPage`. Use this pattern when the data shape doesn't fit a 16-step grid; provide a viewer with cursor nav and route real editing to an external host.
+
+#### Pattern F — Live status box
+
+Reusable component (not a class — copy the draw pattern). 48 × 30 px box at `x=204`, drawn by `TuesdayEditPage.cpp:570-630`. Shows live engine state (current note name, gate indicator square, CV voltage, step counter). Used to give the page a "what's playing right now" readout without consuming step or F-key bandwidth.
+
+### 12.3 LED conventions
+
+Step LEDs are bi-color (top = green, bottom = red, each independent on/off — 4 states per LED via `leds.set(index, redOn, greenOn)`).
+
+- Top color (green) = positive direction / up / active / selected.
+- Bottom color (red) = negative direction / down / disabled.
+- Both = orange (high attention).
+- Off = inactive.
+
+Page modifier held → page may *temporarily override* LED state by `leds.unmask(index) ; leds.set(...) ; leds.mask(index)`. Pattern used in `TuesdayEditPage.cpp:158-185` to show QuickEdit slot availability while Page is held. This is the right way to surface "secondary mode" LED hints without polluting normal LED state.
+
+### 12.4 Reusable widgets
+
+- **`showContextMenu(ContextMenu(items, count, onSelect, isEnabled, doubleClick=false))`** — universal modal. Items are `ContextMenuModel::Item[]`. `doubleClick=true` flags an alt variant (typically COMMIT-on-doubleclick). Trigger via `isContextMenu()` or `pageModifier() && count()==2`.
+- **`StepSelection<N>`** — multi-select helper. Steps keypress goes through `_stepSelection.keyDown/keyPress(event, stepOffset())`. Selection persists; query via `_stepSelection.selected(i)` / `count()`.
+- **`_manager.pages().quickEdit.show(model, slot)`** — single-param modal sub-editor. Bind a model that exposes one editable cell and a label; useful for "deep" sub-params that don't deserve a full page.
+- **`showMessage("TEXT")`** — toast banner across the bottom for action confirmations.
+
+### 12.5 What not to invent
+
+- **No new modifier keys.** Use Shift, Page, Page+Shift, Page+Step. Anything else fights muscle memory.
+- **No step-button "group ranges"** (e.g. "steps 1–5 = density"). One param per step button is the established idiom — color/brightness encodes domain.
+- **No new "tab" UI** — F-keys are the tab mechanism. If you need more tabs than F1–F4, use F5 NEXT to cycle sub-pages.
+- **No persistent step assignments without an LED tell.** If pressing step N edits param X, step N's LED must light when that page is active so the user can see the map.
+- **No silently-magic step double-press.** If `count()==2` does something distinct from `count()==1`, the action must be confirmable (toast or visible state change) so users learn the binding.
+
+---
+
+## 13. Reading order for a new agent
 
 If you're new to this codebase and about to design a new TrackMode:
 

@@ -115,7 +115,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
         _eventElapsed++;
         if (_eventDuration == 0 || _eventElapsed >= _eventDuration) {
             _eventElapsed = 0;
-            DBG_STO("%u TRIG(T) p=%d", tick, _patternIndex);
+            // DBG_STO("%u TRIG(T) p=%d", tick, _patternIndex);
             triggerStep(tick, divisor);
         }
     } else {
@@ -130,7 +130,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
             if (_sleepRemaining > 0) {
                 _sleepRemaining--;
             } else {
-                DBG_STO("%u TRIG(F) p=%d", tick, _patternIndex);
+                // DBG_STO("%u TRIG(F) p=%d", tick, _patternIndex);
                 triggerStep(tick, divisor);
             }
         }
@@ -143,7 +143,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
             if (_sleepRemaining > 0) {
                 _sleepRemaining--;
             } else {
-                DBG_STO("%u TRIG(A) p=%d", tick, _patternIndex);
+                // DBG_STO("%u TRIG(A) p=%d", tick, _patternIndex);
                 triggerStep(tick, divisor);
             }
         }
@@ -158,14 +158,14 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
         _gateOutput = ev.gate;
         _accentOutput = ev.accent;
         _gateQueue.pop();
-        DBG_STO("%u GATE pop gate=%d", tick, _gateOutput);
+        // DBG_STO("%u GATE pop gate=%d", tick, _gateOutput);
         result |= TickResult::GateUpdate;
     }
 
     // Process CV queue
     while (!_cvQueue.empty() && tick >= _cvQueue.front().tick) {
         auto &ev = _cvQueue.front();
-        DBG_STO("%u CVpop cv=%.3f", tick, ev.cv);
+        // DBG_STO("%u CVpop cv=%.3f", tick, ev.cv);
         _cvOutputTarget = ev.cv;
         _slideActive = ev.slide;
         _cvQueue.pop();
@@ -220,7 +220,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         isAccent = _lockedParents[readIndex].accent;
 
         if (!isRest) {
-            DBG_STO("%u GATEpush LOCKED ON p=%d", tick, _patternIndex);
+            // DBG_STO("%u GATEpush LOCKED ON p=%d", tick, _patternIndex);
             _cvQueue.push({ tick, finalCv, isSlide });
             _gateQueue.push({ tick, true, isAccent });
 
@@ -229,7 +229,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
             if (!isLegato && !hasChildren) {
                 uint32_t gateLen = (durationTicks * 50) / 100;
-                DBG_STO("%u GATEpush LOCKED OFF p=%d", tick + gateLen, _patternIndex);
+                // DBG_STO("%u GATEpush LOCKED OFF p=%d", tick + gateLen, _patternIndex);
                 _gateQueue.push({ tick + gateLen, false, false });
             }
             _activity = true;
@@ -243,11 +243,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     _cvQueue.push({ childTick, child.cv, child.slide });
                     _gateQueue.push({ childTick, true, child.accent });
                     _gateQueue.push({ childTick + child.gateTicks, false, false });
-                    DBG_STO("%u GATEpush LOCKED child on=%u off=%u", tick, childTick, childTick + child.gateTicks);
+                    // DBG_STO("%u GATEpush LOCKED child on=%u off=%u", tick, childTick, childTick + child.gateTicks);
                 }
             }
         } else {
-            DBG_STO("%u GATEpush LOCKED REST p=%d", tick, _patternIndex);
+            // DBG_STO("%u GATEpush LOCKED REST p=%d", tick, _patternIndex);
             _gateQueue.push({ tick, false, false });
             if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
             _activity = false;
@@ -355,7 +355,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
 
         if (!isRest) {
-            DBG_STO("%u CVpush ON p=%d cv=%.3f", tick, _patternIndex, finalCv);
+            // DBG_STO("%u CVpush ON p=%d cv=%.3f", tick, _patternIndex, finalCv);
             _cvQueue.push({ tick, finalCv, isSlide });
             _gateQueue.push({ tick, true, isAccent });
 
@@ -364,7 +364,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
             if (!isLegato && !hasChildren) {
                 uint32_t gateLen = (durationTicks * 50) / 100;
-                DBG_STO("%u GATEpush LIVE OFF p=%d", tick + gateLen, _patternIndex);
+                // DBG_STO("%u GATEpush LIVE OFF p=%d", tick + gateLen, _patternIndex);
                 _gateQueue.push({ tick + gateLen, false, false });
             }
             _activity = true;
@@ -384,12 +384,12 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     _cvQueue.push({ childTick, childCv, isSlide });
                     _gateQueue.push({ childTick, true, isAccent });
                     _gateQueue.push({ childTick + evalChildren[i].gateTicks, false, false });
-                    DBG_STO("%u GATEpush LIVE child on=%u off=%u", tick, childTick, childTick + evalChildren[i].gateTicks);
+                    // DBG_STO("%u GATEpush LIVE child on=%u off=%u", tick, childTick, childTick + evalChildren[i].gateTicks);
                 }
             }
         } else {
-            DBG_STO("%u CVpush REST p=%d cv=%.3f mode=%s", tick, _patternIndex, finalCv,
-                track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always ? "Always" : "Gate");
+            // DBG_STO("%u CVpush REST p=%d cv=%.3f mode=%s", tick, _patternIndex, finalCv,
+            //     track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always ? "Always" : "Gate");
             _gateQueue.push({ tick, false, false });
             if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
             _activity = false;

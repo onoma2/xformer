@@ -6,9 +6,11 @@ XFORMER firmware is at 97% RAM capacity (127,420 bytes out of 128 KB) with only 
 
 **Goal:** Recover at least 15-20 KB of RAM to provide safe headroom for future features, and reduce flash usage where possible.
 
-## Current Implementation State (2026-05-15)
+## Current Implementation State (2026-05-21)
 
-- Active branch in this workspace: `refactor/resouce-optimization`.
+- Active branch in this workspace: `refactor/resouce-optimization` (resource-optimization is paused; current work happens on `feat/stochastic`).
+- **2026-05-21 measurement on `feat/stochastic` post-bar-normalize build:** `.text=848,412`, `.data=6,332`, `.bss=112,616`, `.ccmram_bss=55,028`. Total SRAM `.data + .bss = 118,948 (90.7%)`. CCMRAM `55,028 (84.0%)`. UPDATE.DAT binary `875,076 B`. Compared to the post-P15b baseline (`.text=763,436`, SRAM=119,960 / 91.4%, CCMRAM=54,096 / 84.5%) — `.text` grew **+84,976 B (+11%)** from Phase 2 stochastic engine work (StochasticTrackEngine + StochasticGenerator new logic, `LockedParentEvent` buffer plumbing, Container destructor-pointer infra in `src/core/utils/Container.h`, `Engine::update()` reorder, bar rendering polish in `StochasticSequenceEditPage.cpp`). SRAM is actually **-1,012 B better** than P15b baseline; CCMRAM **+932 B worse**. Net headroom: SRAM ~12 KB, CCMRAM ~10 KB, Flash ~199 KB. Today's bar-normalize commit alone: `.text` +1,104 B, no RAM cost. Build verified rebuild picked up `StochasticSequenceEditPage.cpp.obj` and `StochasticTrackEngine.cpp.obj` at 2026-05-21 09:22.
+- Hero-page UI draft (CORE-RAIN / MARBLES-BELL / DIRECT-POND / LOOP-TAPE) in `.tasks/stochastic-track-port/UI-CONTROL-DRAFT.md` — estimated cost ~10-15 KB flash, 0 B SRAM, 0 B CCMRAM. Framebuffer is reused (16,384 B CCMRAM + 8,192 B SRAM already allocated). Safe to land without touching this resource-optimization queue.
 - **Phase 1 complete and hardware-verified.** Teletype mute bit-packing, `DELAY_SIZE=8`, Teletype font `const`, and `tele_ops` flash residency all confirmed working on hardware.
 - Phase 1 measured saving: `.data` 9,020→6,320 = 2,700 B. Runtime SRAM: 124,720 B (95.2% of 128 KB).
 - Current build after P5 + creaseEnabled fix: `.data=6,320`, `.bss=118,272`, `.ccmram_bss=54,132`; total SRAM `.data + .bss = 124,592` (94.9%).
@@ -52,16 +54,16 @@ Do not start a model-pool/container-pool implementation under current semantics.
 
 ### Recovery Progress (current build vs original baseline)
 
-| Resource | Original (pre-P1) | After P1 | After P5 + crease | After P15a | **After P15b** | Total saved | % of limit |
-|---|---|---|---|---|---|---|---|
-| **.data** | 9,020 | 6,320 | 6,320 | 6,320 | **6,320** | **-2,700** | 4.8% |
-| **.bss** | 118,400 | 118,400 | 118,272 | 114,760 | **113,640** | **-4,760** | 86.3% |
-| **Total SRAM** (.data+.bss) | 127,420 **(97.4%)** | 124,720 (95.2%) | 124,592 (94.9%) | 121,080 (92.4%) | **119,960 (91.4%)** | **-7,460** | 91.4% |
-| **CCMRAM** (.ccmram_bss) | 58,236 | 58,236 | 54,132 | 54,108 | **54,096** | **-4,140** | 84.5% |
-| **Flash .text** | 760,732 | ~764,300 | 762,956 | 762,636 | **763,436** | +2,704 | 74.6% |
-| **Binary** | 789,252 | — | 791,472 | 788,448 | **789,260** | +8 | — |
+| Resource | Original (pre-P1) | After P1 | After P5 + crease | After P15a | After P15b | **2026-05-21 (feat/stochastic post-Phase 2)** | Total Δ from origin | % of limit |
+|---|---|---|---|---|---|---|---|---|
+| **.data** | 9,020 | 6,320 | 6,320 | 6,320 | 6,320 | **6,332** | -2,688 | 4.8% |
+| **.bss** | 118,400 | 118,400 | 118,272 | 114,760 | 113,640 | **112,616** | **-5,784** | 85.9% |
+| **Total SRAM** (.data+.bss) | 127,420 **(97.4%)** | 124,720 (95.2%) | 124,592 (94.9%) | 121,080 (92.4%) | 119,960 (91.4%) | **118,948 (90.7%)** | **-8,472** | 90.7% |
+| **CCMRAM** (.ccmram_bss) | 58,236 | 58,236 | 54,132 | 54,108 | 54,096 | **55,028** | -3,208 | 84.0% |
+| **Flash .text** | 760,732 | ~764,300 | 762,956 | 762,636 | 763,436 | **848,412** | **+87,680** | 80.9% |
+| **Binary (UPDATE.DAT)** | 789,252 | — | 791,472 | 788,448 | 789,260 | **875,076** | **+85,824** | — |
 
-> **91.4% SRAM utilization — target of 85% requires ~8 KB more.** Current SRAM recovery: 7,460 B. Current CCMRAM recovery: 4,140 B.
+> **90.7% SRAM utilization — target of 85% requires ~7.5 KB more.** Current SRAM recovery: 8,472 B. Current CCMRAM recovery: 3,208 B. Flash grew +85 KB since P15b baseline from Phase 2 Stochastic engine work + Container destructor infra + UI bar-render polish — flash is well under the 1 MB limit (~199 KB headroom) so this is acceptable.
 
 > - **Vinx**: "closest fork" — shares Note, Curve, Arp, Stochastic, Logic tracks; adds Chaos/Entropy/Generator features. 86% RAM.
 > - **Mebitek**: adds Logic, Stochastic, Arp tracks plus UI shortcuts. 87% RAM, 615 KB flash.
