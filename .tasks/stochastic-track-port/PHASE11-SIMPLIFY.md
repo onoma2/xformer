@@ -318,3 +318,47 @@ center lead vs the leakage floor. Same fix applied to:
 - [ ] Final UI label for repurposed Steps knob: "Steps" / "Tones" / "Sieve" / "Anchors".
 - [ ] Whether to also rename `Note Duration` → "Duration" and `Variation` → "Duration Spread" in the UI now that they have parallel roles. Probably no — current names are recognizable, the conceptual rename is internal.
 - [ ] Whether to add hero page numerics overlay showing the live Steps cutoff (e.g. "5/12 degrees" when knob = 40% on a 12-tone scale).
+
+## Phase 13 — DIRECT hero page redesign (2026-05-22)
+
+**Goal:** Turn the DIRECT page from a single jumping figure into a full pitch+rhythm performance surface. Every audible per-event parameter on one screen, with a live event-driven visualization.
+
+### Step button mapping (16 slots, 4 LED groups)
+- **Top row red** (rhythm + range): `0=DURA` `1=VARI` `2=REST` `3=RANG`
+- **Top row orange** (burst sub-set): `4=BURS` `5=BCNT` `6=BRAT` `7=BPIT`
+- **Bottom row green** (pitch shape): `8=CMPX` `9=CONT` `10=BIAS` `11=SPRE` `12=REPT`
+- **Bottom row red** (per-event gate behavior): `13=GATE` `14=SLID` `15=LEGA`
+
+The 4 newly-added params (`range`, `gateLength`, `slide`, `legatoProb`) were previously consulted by the engine but unreachable from any hero page. All 16 slots now used.
+
+### Walker visualization
+- **Event-driven ring buffer** (12 slots) on the page state. Header adds:
+  `kDirectTrailMax`, `DirectParticle { yOffset, flags, children }`, `_directTrail[]`,
+  `_directTrailFilled`, `_directLastGate`.
+- On every gate rising edge from `eng.gateOutput(0)`: ring shifts left, new
+  particle inserted at slot 0 with `yOffset = -liveCv × 4` (vertical = pitch).
+- **Horizontal motion** = rhythm (events arriving from the engine).
+  **Vertical motion** = pitch (live CV mapped to viewport coords).
+- **Centered span**: midpoint between walker head (slot 0) and oldest tail
+  particle (slot N-1) anchored at viewport mid-X via
+  `walkerX = vpCx + ((filled-1) × baseStride) / 2`.
+- **Brighter trail**: fade floor raised from 0 to 30; color tiers bumped
+  (`Bright`/`MediumBright`/`Medium`/`MediumLow`) so all 12 slots visible.
+- "Now" cross marker tracks the walker head + live CV, not screen right edge.
+- Rest events render as `Medium` (was `Low`) center dash.
+
+### Footer
+Mirrors LOOP page Fn pattern: `Loop/Live R` `Loop/Live M` `NewR` `NewM` `NEXT`.
+Same double-click guard on NewR/NewM (first press warns, second fires).
+
+### Variation default (newR-at-defaults fix)
+Investigation: user reported "newR does nothing at defaults". Root cause was
+rhythm-side defaults all deterministic — `variation=0` collapses `pickDuration`
+to a single slot (kernel width=1, leakage=0), and `rest/burst/legato/slide/accent`
+all default to 0 (Bernoullis return false). So `generateRhythmEvent` produces a
+bit-identical event every call; `renewRhythm` overwrites the buffer with
+identical content; user hears nothing change because nothing did.
+
+Fix: `_variation` default 0 → 16 in both `clear()` and `sanitizeAfterRead()`.
+Just enough leakage that new patterns get audible duration drift out of the box.
+Size + first + last untouched (already 16/0/15 = full 16 active steps).

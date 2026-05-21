@@ -548,7 +548,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _complexity.setBase(50);
         _contour.setBase(0);
         _noteDuration.setBase(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
-        _variation.setBase(0);
+        _variation.setBase(16);   // ~1-slot leakage so newR produces audible variation out of the box
         _rest.setBase(0);
         _slide.setBase(0);
         _burstRate = 50;
@@ -757,7 +757,7 @@ private:
             _complexity.setBase(50);
             _contour.setBase(0);
             _noteDuration.setBase(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
-            _variation.setBase(0);
+            _variation.setBase(16);   // ~1-slot leakage so newR produces audible variation out of the box
             _rest.setBase(0);
             _slide.setBase(0);
             _burstRate = 50;

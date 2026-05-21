@@ -69,7 +69,7 @@ private:
     // Per-page Fn handlers.
     bool handleCoreFunction(int fn, bool shift);
     bool handleMarblesFunction(int fn, bool shift);
-    bool handleDirectFunction(int fn, bool shift);
+    bool handleDirectFunction(int fn, bool shift, int pressCount);
     bool handleLoopFunction(int fn, bool shift, int pressCount);
 
     // Legacy ticket pages (existing).
@@ -94,6 +94,20 @@ private:
     // Hero pages: which step is currently held (encoder writes that step's param).
     // -1 = no step held; encoder writes the page-default param (step 0 of the page).
     int _heroHeldStep = -1;
+
+    // DIRECT walker animation phase: advances per draw, wraps when it exceeds
+    // one stride so the trail slides smoothly left between content refreshes.
+    uint16_t _directWalkerTick = 0;
+
+    // Event-driven walker trail. Ring of particles; each gate rising edge
+    // shifts the ring left (older particles age, oldest falls off) and writes
+    // a new particle at slot 0 with the live CV-derived pitch.
+    static constexpr int kDirectTrailMax = 12;
+    struct DirectParticle { int16_t yOffset; uint8_t flags; uint8_t children; };
+    DirectParticle _directTrail[kDirectTrailMax] = {};
+    uint8_t _directTrailFilled = 0;            // how many slots are valid (0..max)
+    bool _directLastGate = false;
+    uint32_t _directLastEventEpoch = 0;        // tick count of last event for sub-tick smoothing
 };
 
 // Duration ticket labels are now generated at runtime via
