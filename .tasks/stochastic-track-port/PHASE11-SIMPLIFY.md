@@ -165,6 +165,79 @@ Each commit independently sim-builds + STM32-builds + passes the 4 stochastic te
   all kept as reserved slots. Pitch tickets at 0 cover per-degree exclusion;
   Range covers octave coverage; Spread + Bias cover soft windowing.
 
+## Phase 12 follow-ups (2026-05-21, this session)
+
+### Density slot → Gate Length spread
+- `_density` field repurposed via `gateLength()` / `setGateLength()` accessor pair.
+- New `pickGateLength(durationTicks, spread, rng)` static helper in engine.
+- Math: triangular distribution around hardcoded 50% center. spread=0 → exact 50%, spread=100 → 10..100% triangular.
+- Floored at 10% of duration AND at `kMinAudibleGateTicks = 6` (≈16 ms @ 192 PPQN, 120 BPM).
+- Replaces two hardcoded `(durationTicks * 50) / 100` sites (Live + Locked playback).
+- Default 0 → matches prior hardcoded 50/50 behavior. Routing target `StochasticGeneratorDensity` kept for save compat.
+
+### Drift restored — `_contour` re-enabled
+- Reverted Phase 11 drop. Contour back in the pitch picker via Complexity kernel.
+- `int drift = (contour × signedDist) / 20` added to per-degree kernel weight.
+- Positive contour boosts ascending picks; negative, descending. Symmetric around lastIdx.
+- UI: `Contour` re-added to flat items[] in the pitch block. Routing target `StochasticContour` preserved.
+
+### Repeat probability — `_linearity` slot
+- `_linearity` field aliased as `repeatProb()` / `setRepeatProb()`.
+- Engine caches last-emitted event in `StochasticSourceEvent _lastEvent` + `bool _lastEventValid`.
+- At triggerStep, Bernoulli `rng < repeatProb` bypasses generation and reuses cached event (note, octave, duration, articulation). Works in both Live and Loop modes — freezes / clusters at playback layer.
+- `_lastEventValid` cleared on `reset()` / `restart()`.
+- No routing target.
+
+### Patience split — rhythm vs melody
+- `_patience` (existing, routing target `StochasticPatience` preserved) → `patienceRhythm()`.
+- `_accentProb` slot repurposed → `patienceMelody()`. Default 100 (off).
+- Engine: split `_loopCycleCount` and `_loopCycleCountMelody`. Each rolls its own Poisson CDF, invalidates its own domain.
+- Resets independently on its own `setXxxValid(false)` fire, on `renewRhythm()` / `renewMelody()`, on `refreshLoopSources()`, on engine reset/restart.
+- No routing for `patienceMelody` (matches Repeat treatment).
+
+### Accent gate output dropped silently
+- No second physical gate jack on this device. `_accentOutput` member removed, `accent` field stripped from `Gate` struct and `LockedParentEvent`/`LockedChild`. `gateOutput(int)` returns `_gateOutput` for any index.
+- Model field `_accentProb` kept (now serves as `patienceMelody`). UI list row dropped.
+- `event.setAccent(...)` still written by generator — harmless dead write preserved for event-shape stability.
+
+### Mask + Tilt redefined as performance pair (Loop-only filter + resonance)
+- **Mask** = cutoff knob 0..100, default 100 (open). Already instant.
+- **Tilt** = duration-based bipolar bias.
+  - `weight = (tilt/100) × ((durSlot - 3.5) / 3.5) + noise`
+  - tilt=+100 → long-duration events get top priority (rank 0), survive Mask cuts
+  - tilt=-100 → short-duration events survive
+  - tilt=0 → noise only, random rank
+- Engine caches `_lastAppliedTilt` and `_lastAppliedSize`. At pattern-cycle boundary, if either changed, `generateMaskRanks` runs on existing event buffer (content untouched). Makes Tilt a real-time performance knob.
+- `mutateRhythmOne` drops `oldRank` preservation; calls `generateMaskRanks` after writing the new event so duration-driven ranks stay current.
+- Re-rank only in Loop mode. Live mode events still get rank=0 (Mask/Tilt do nothing in Live, matches intentional asymmetry — Live is the "raw stochastic stream").
+
+### Loop page UI wiring
+- Step buttons:
+  - Top row (red LEDs): 0=Patience R, 1=Patience M, 2=Mutate, 3=Jump, 4=Sleep.
+  - Bottom row left (green LEDs): 8=First, 9=Last, 10=Size, 11=Rotate.
+  - Bottom row right (green LEDs): 14=Mask, 15=Tilt.
+  - Held-step inverts colour.
+- Held labels truncated: `PR %d`, `PM %d`, `M %+d`, `J %d`, `S %d`, `FRST %d`, `LAST %d`, `SIZE %d`, `ROT %+d`, `MASK %d`, `TILT %+d`.
+- Macro readout row (no held step): `PR# PM# M# J# S#` tiny font at top.
+- Tiny truncated labels `MK#` / `TL+#` under the boredom bars.
+- **Boredom bars split** — left half = rhythm patience, right half = melody patience, 2px center gap, both grow rightward from their respective left edge.
+- **Bar math** uses `patienceMeter(loops, patience)` = `min(1, loops / λ)` — linear "tension building" meter scaled to expected regen point (λ). Engine roll still uses `patienceProbability` (Poisson CDF) — independent. Bar visibly fills before regen fires now.
+- **Double-click guard** on F3 NewR / F4 NewM. Single press shows `Press again - renew R` (or `M`); confirmed double-press fires the renew. Uses kernel `event.count() == 2` mechanism. F1/F2 (mode toggles) stay single-press.
+
+### Final Phase 12 reserved-slot table
+
+| Slot | Engine reads? | UI shows? | Repurpose status |
+|---|---|---|---|
+| `_density` | yes | yes (as "Gate Length") | repurposed — gate length spread |
+| `_contour` | yes | yes (as "Contour") | reused — Drift directional bias |
+| `_linearity` | yes | yes (as "Repeat") | repurposed — repeat probability |
+| `_marblesMode` | no | no | reserved — flag stays in save |
+| `_level` | no | no | reserved — enum stays in save |
+| `_minDegree` / `_maxDegree` | no | no | reserved — slots only |
+| `_accentProb` | yes | yes (as "Patience M") | repurposed — melody patience |
+| `_marblesSteps` | yes | yes (as "Steps") | repurposed — pitch sieve cutoff |
+| `_variation` sign | no | no (display abs) | storage signed for forward compat, abs() at getter |
+
 ## Open questions
 
 - [ ] Final UI label for repurposed Steps knob: "Steps" / "Tones" / "Sieve" / "Anchors".

@@ -130,7 +130,8 @@ void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const St
     if (size <= 0) return;
     int i = rng.nextRange(size);
 
-    uint8_t oldRank = sequence.events()[i].densityRank();
+    // Phase 12: Mutate changes this event's durationIndex; tilt-driven ranks
+    // depend on duration, so re-rank the whole buffer after the mutate.
 
     // Run the regular rhythm generator first — gets fresh rolls for density,
     // rest, legato, slide, accent, burst, plus an initial variation-biased
@@ -168,7 +169,8 @@ void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const St
     rhythm.setDurationIndex(durIdx);
 
     sequence.events()[i].mergeRhythmFrom(rhythm);
-    sequence.events()[i].setDensityRank(oldRank);
+    // Duration-aware ranks need refresh after this event's durationIndex changed.
+    generateMaskRanks(sequence, size, sequence.tilt(), sequence.rhythmSeed() ^ 0xdeadbeef);
 }
 
 void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng, int mutateMagnitude) {
@@ -282,10 +284,16 @@ void StochasticGenerator::permuteMelodyOne(StochasticSequence &sequence, Random 
     ev[j].mergeMelodyFrom(tmp);
 }
 
+// Phase 12: duration-aware rank assignment. Tilt is bipolar — positive favors
+// long-note survival under Mask cuts; negative favors short notes. Tilt=0 →
+// pure noise (random rank). Reads each event's durationIndex (0..7, where 0 is
+// the longest LUT slot, 7 the shortest). Mapping: longShortAxis = (slot-3.5)/3.5
+// so slot 0 → -1 (long), slot 7 → +1 (short). Rank weight = tilt × axis + noise.
+// Sort ascending → rank 0 = top priority (survives Mask), rank size-1 = first cut.
 void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed) {
     Random rng(seed);
     if (size <= 0) return;
-    
+
     struct WeightedIndex {
         uint8_t index;
         float weight;
@@ -294,9 +302,10 @@ void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int si
 
     for (int i = 0; i < size; ++i) {
         weightedIndices[i].index = i;
-        float progress = i / float(size - 1 == 0 ? 1 : size - 1);
-        float bias = (tilt / 100.f) * (progress - 0.5f); 
-        weightedIndices[i].weight = bias + (rng.nextRange(1000) / 1000.f) * 0.2f; 
+        int durSlot = clamp(int(sequence.events()[i].durationIndex()), 0, 7);
+        float longShortAxis = (durSlot - 3.5f) / 3.5f;          // -1..+1
+        float bias = (tilt / 100.f) * longShortAxis;
+        weightedIndices[i].weight = bias + (rng.nextRange(1000) / 1000.f) * 0.2f;
     }
 
     std::sort(weightedIndices.begin(), weightedIndices.begin() + size, [](const WeightedIndex &a, const WeightedIndex &b) {
@@ -499,6 +508,7 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
     int complexity = clamp(int(sequence.complexity()), 0, 100);
     int kernelWidth = 1 + (complexity * N) / 50;     // ~1 .. ~2N
     int kernelLeak = complexity / 10;                // 0..10
+    int contour = clamp(int(sequence.contour()), -100, 100); // Drift: directional bias from lastIdx
 
     int marblesBias = clamp(int(sequence.marblesBias()), 0, 100);     // 0..100
     int marblesSpread = clamp(int(sequence.marblesSpread()), 0, 100); // 0..100
@@ -528,7 +538,13 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
         } else {
             int d = i > lastIdx ? i - lastIdx : lastIdx - i;
             int tri = kernelWidth > d ? kernelWidth - d : 0;
-            kernel = tri + kernelLeak;
+            // Drift: signed-distance × contour scales the kernel in the chosen
+            // direction. Positive contour boosts ascending picks; negative,
+            // descending. Scale tuned so |contour|=100 makes ±1-step asymmetric.
+            int signedDist = i - lastIdx;
+            int drift = (contour * signedDist) / 20;
+            kernel = tri + kernelLeak + drift;
+            if (kernel < 0) kernel = 0;
         }
 
         int dm = i > biasPos ? i - biasPos : biasPos - i;

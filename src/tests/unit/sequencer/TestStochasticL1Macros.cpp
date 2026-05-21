@@ -5,19 +5,19 @@
 
 UNIT_TEST("StochasticL1Macros") {
 
-CASE("density_macro_only_writes_density") {
+CASE("gate_length_edit_writes_only_gate_length") {
     StochasticSequence seq;
     seq.clear();
     seq.setRest(20);
-    seq.setDensity(0);
+    seq.setGateLength(0);
 
-    expectEqual(seq.density(), 0, "density starts at 0");
+    expectEqual(seq.gateLength(), 0, "gate length starts at 0");
     expectEqual(seq.rest(), 20, "rest starts at 20");
 
-    seq.editDensityMacro(30, false);
+    seq.editGateLength(30, false);
 
-    expectEqual(seq.density(), 30, "density should be 30 after +30 macro");
-    expectEqual(seq.rest(), 20, "rest should remain 20 (unchanged by macro)");
+    expectEqual(seq.gateLength(), 30, "gate length should be 30 after +30 edit");
+    expectEqual(seq.rest(), 20, "rest should remain 20 (unchanged)");
 }
 
 CASE("complexity_macro_only_writes_complexity") {

@@ -447,33 +447,58 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     canvas.hline(bxLast - 2, tapeTop - 3, 4);
     canvas.hline(bxLast - 2, tapeBot + 3, 4);
 
-    // Boredom counter bar — Poisson CDF probability of regen at current loop
-    // count and patience knob. Matches the engine's actual roll math (Phase 11).
-    // Patience = 100 (off sentinel) → 0% always.
-    int boredomFill = 0;
-    int patience = seq.patience();
+    // Boredom counter bar — Phase 12 split. Left half = rhythm progress
+    // (fills from the centre outward leftward). Right half = melody progress
+    // (fills from the centre outward rightward). 2px gap between halves.
+    int fillR = 0, fillM = 0;
     if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
         auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
-        float p = StochasticTrackEngine::patienceProbability(eng.loopCycleCount(), patience);
-        boredomFill = clamp(int(p * 100.0f), 0, 100);
+        // Linear meter scaled to expected loops (λ) — bar reaches 100% at the
+        // typical regen point, then sits at 100% until the Poisson roll fires.
+        // Replaces CDF math which mathematically rises but rarely hits high
+        // values before a regen resets the counter.
+        float pR = StochasticTrackEngine::patienceMeter(eng.loopCycleCount(),       seq.patienceRhythm());
+        float pM = StochasticTrackEngine::patienceMeter(eng.loopCycleCountMelody(), seq.patienceMelody());
+        fillR = clamp(int(pR * 100.0f), 0, 100);
+        fillM = clamp(int(pM * 100.0f), 0, 100);
     }
+    const int gap = 2;
+    const int halfW = (availW - gap) / 2;
+    const int leftX  = margin;
+    const int rightX = margin + halfW + gap;
     canvas.setColor(Color::Low);
-    canvas.drawRect(margin, tapeBot + 7, availW, 3);
+    canvas.drawRect(leftX,  tapeBot + 7, halfW, 3);
+    canvas.drawRect(rightX, tapeBot + 7, halfW, 3);
     canvas.setColor(Color::MediumBright);
-    canvas.fillRect(margin, tapeBot + 7, (boredomFill * availW) / 100, 3);
+    // Both halves fill rightward from their respective left edge.
+    canvas.fillRect(leftX,  tapeBot + 7, (fillR * halfW) / 100, 3);
+    canvas.fillRect(rightX, tapeBot + 7, (fillM * halfW) / 100, 3);
+
+    // Truncated bottom-row state — Mask + Tilt under the bars, tiny font.
+    canvas.setFont(Font::Tiny);
+    canvas.setColor(Color::Medium);
+    FixedStringBuilder<16> mt;
+    mt("MK%d", seq.mask());
+    canvas.drawText(margin, tapeBot + 14, mt);
+    mt.reset();
+    mt("TL%+d", seq.tilt());
+    canvas.drawText(margin + availW - canvas.textWidth(mt), tapeBot + 14, mt);
 
     // Top-area readout. When a step is held, show that step's value in Small
     // font. Otherwise show all four destructive macros at once in Tiny font.
     if (_heroHeldStep >= 0) {
         FixedStringBuilder<32> str;
-        if (_heroHeldStep == 0)       str("PAT %d", patience);
-        else if (_heroHeldStep == 1)  str("MUT %+d", seq.mutate());
-        else if (_heroHeldStep == 2)  str("JMP %d", seq.jump());
-        else if (_heroHeldStep == 3)  str("SLP %d", seq.sleep());
+        if (_heroHeldStep == 0)       str("PR %d", seq.patienceRhythm());
+        else if (_heroHeldStep == 1)  str("PM %d", seq.patienceMelody());
+        else if (_heroHeldStep == 2)  str("M %+d", seq.mutate());
+        else if (_heroHeldStep == 3)  str("J %d", seq.jump());
+        else if (_heroHeldStep == 4)  str("S %d", seq.sleep());
         else if (_heroHeldStep == 8)  str("FRST %d", seq.first());
         else if (_heroHeldStep == 9)  str("LAST %d", seq.last());
         else if (_heroHeldStep == 10) str("SIZE %d", seq.size());
         else if (_heroHeldStep == 11) str("ROT %+d", seq.rotate());
+        else if (_heroHeldStep == 14) str("MASK %d", seq.mask());
+        else if (_heroHeldStep == 15) str("TILT %+d", seq.tilt());
         canvas.setFont(Font::Small);
         canvas.setColor(Color::Bright);
         canvas.drawText(8, 18, str);
@@ -481,10 +506,11 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Medium);
         FixedStringBuilder<16> s;
-        s("P%d", patience);     canvas.drawText(8,   16, s);
-        s.reset(); s("M%+d", seq.mutate()); canvas.drawText(44,  16, s);
-        s.reset(); s("J%d", seq.jump());    canvas.drawText(80,  16, s);
-        s.reset(); s("S%d", seq.sleep());   canvas.drawText(116, 16, s);
+        s("PR%d",  seq.patienceRhythm()); canvas.drawText(4,   16, s);
+        s.reset(); s("PM%d",  seq.patienceMelody()); canvas.drawText(34,  16, s);
+        s.reset(); s("M%+d", seq.mutate());          canvas.drawText(66,  16, s);
+        s.reset(); s("J%d",  seq.jump());            canvas.drawText(94,  16, s);
+        s.reset(); s("S%d",  seq.sleep());           canvas.drawText(120, 16, s);
     }
 
     const char *fnR = (seq.rhythmMode() == StochasticSourceMode::Loop) ? "LoopR" : "LiveR";
@@ -535,16 +561,20 @@ void StochasticSequenceEditPage::editLoopStep(int step, int value, bool shift) {
     auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
     int v = shift ? value * 10 : value;
     switch (step) {
-    // Top row — destructive / timing params (red LEDs)
-    case 0: seq.setPatience(seq.patience() + v); break;
-    case 1: seq.setMutate(seq.mutate() + v); break;
-    case 2: seq.setJump(seq.jump() + v); break;
-    case 3: seq.setSleep(seq.sleep() + v); break;
+    // Top row — patience (split per domain), mutation, walk, sleep
+    case 0: seq.setPatienceRhythm(seq.patienceRhythm() + v); break;
+    case 1: seq.setPatienceMelody(seq.patienceMelody() + v); break;
+    case 2: seq.setMutate(seq.mutate() + v); break;
+    case 3: seq.setJump(seq.jump() + v); break;
+    case 4: seq.setSleep(seq.sleep() + v); break;
     // Bottom row — loop window / shape params (green LEDs)
     case 8:  seq.setFirst(seq.first() + value); break;
     case 9:  seq.setLast(seq.last() + value); break;
     case 10: seq.setSize(seq.size() + value); break;
     case 11: seq.setRotate(seq.rotate() + value); break;
+    // Last two — Mask + Tilt performance pair (filter + duration-tilt resonance)
+    case 14: seq.setMask(seq.mask() + v); break;
+    case 15: seq.setTilt(seq.tilt() + v); break;
     }
 }
 
@@ -599,7 +629,7 @@ bool StochasticSequenceEditPage::handleDirectFunction(int /*fn*/, bool /*shift*/
     return false;
 }
 
-bool StochasticSequenceEditPage::handleLoopFunction(int fn, bool shift) {
+bool StochasticSequenceEditPage::handleLoopFunction(int fn, bool shift, int pressCount) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &seq = track.sequence(_project.selectedPatternIndex());
     auto stoEng = [&] () -> StochasticTrackEngine* {
@@ -621,11 +651,19 @@ bool StochasticSequenceEditPage::handleLoopFunction(int fn, bool shift) {
         seq.setMelodyMode(newMode);
         return true;
     }
-    case 2: // NewR — refresh rhythm buffer only
-        if (auto *eng = stoEng()) { eng->renewRhythm(); showMessage("NEW R"); }
+    case 2: // NewR — double-click guard. First press warns, second fires.
+        if (pressCount == 2) {
+            if (auto *eng = stoEng()) { eng->renewRhythm(); showMessage("NEW R"); }
+        } else {
+            showMessage("Press again - renew R");
+        }
         return true;
-    case 3: // NewM — refresh melody buffer only
-        if (auto *eng = stoEng()) { eng->renewMelody(); showMessage("NEW M"); }
+    case 3: // NewM — double-click guard.
+        if (pressCount == 2) {
+            if (auto *eng = stoEng()) { eng->renewMelody(); showMessage("NEW M"); }
+        } else {
+            showMessage("Press again - renew M");
+        }
         return true;
     }
     return false;
@@ -883,13 +921,18 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
         heroLeds(8, /*green*/true, /*red*/false);
         break;
     case Page::Loop:
-        // Top row (0..3): red — destructive / timing params (patience, mutate, jump, sleep)
-        for (int i = 0; i < 4; ++i) {
+        // Top row (0..4): red — patience R, patience M, mutate, jump, sleep
+        for (int i = 0; i <= 4; ++i) {
             bool held = (i == _heroHeldStep);
             leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/held);
         }
-        // Bottom row (8..11): green — loop window / shape params (first, last, size, rotate)
+        // Bottom row left (8..11): green — loop window (first, last, size, rotate)
         for (int i = 8; i <= 11; ++i) {
+            bool held = (i == _heroHeldStep);
+            leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
+        }
+        // Bottom row right (14..15): green — Mask + Tilt performance pair
+        for (int i = 14; i <= 15; ++i) {
             bool held = (i == _heroHeldStep);
             leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
         }
@@ -1103,7 +1146,7 @@ void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
             case Page::Core:    handleCoreFunction(fn, shift); break;
             case Page::Marbles: handleMarblesFunction(fn, shift); break;
             case Page::Direct:  handleDirectFunction(fn, shift); break;
-            case Page::Loop:    handleLoopFunction(fn, shift); break;
+            case Page::Loop:    handleLoopFunction(fn, shift, event.count()); break;
             default: break;
             }
             event.consume();

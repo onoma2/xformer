@@ -70,7 +70,7 @@ private:
     bool handleCoreFunction(int fn, bool shift);
     bool handleMarblesFunction(int fn, bool shift);
     bool handleDirectFunction(int fn, bool shift);
-    bool handleLoopFunction(int fn, bool shift);
+    bool handleLoopFunction(int fn, bool shift, int pressCount);
 
     // Legacy ticket pages (existing).
     void handlePitchEncoder(EncoderEvent &event);

@@ -98,7 +98,7 @@ public:
     void writeRouted(Routing::Target target, int intValue, float floatValue) {
         switch (target) {
         case Routing::Target::StochasticDensity: setMask(intValue, true); break;
-        case Routing::Target::StochasticGeneratorDensity: setDensity(intValue, true); break;
+        case Routing::Target::StochasticGeneratorDensity: setGateLength(intValue, true); break;
         case Routing::Target::StochasticTilt: setTilt(intValue, true); break;
         case Routing::Target::StochasticBurst: setBurst(intValue, true); break;
         case Routing::Target::StochasticComplexity: setComplexity(intValue, true); break;
@@ -148,8 +148,14 @@ public:
     int contour() const { return _contour.get(isRouted(Routing::Target::StochasticContour)); }
     void setContour(int contour, bool routed = false) { _contour.set(clamp(contour, -100, 100), routed); }
 
+    // Phase 12: _linearity slot repurposed as Repeat probability. Per-event
+    // chance to reuse the previously-generated event verbatim (note, octave,
+    // duration, articulation). 100% freezes on the last event. Mid values
+    // cluster durations like a human player.
     int linearity() const { return _linearity; }
     void setLinearity(int linearity) { _linearity = clamp(linearity, 0, 100); }
+    int repeatProb() const { return _linearity; }
+    void setRepeatProb(int value) { _linearity = clamp(value, 0, 100); }
 
     // Live-mode duration LUT slot index 0..7. Divisor-relative: see
     // StochasticTrackEngine::getDurationFraction() for the multiplier table.
@@ -242,6 +248,13 @@ public:
     // accentProb
     int accentProb() const { return _accentProb; }
     void setAccentProb(int prob) { _accentProb = clamp(prob, 0, 100); }
+    // Phase 12: _accentProb slot repurposed as melody patience (independent of
+    // rhythm patience). Same Poisson-CDF behavior. Knob 0..99 → λ ∈ [1, 50];
+    // knob 100 = off sentinel. No routing target (matches Repeat treatment).
+    int patienceMelody() const { return _accentProb; }
+    void setPatienceMelody(int value) { _accentProb = clamp(value, 0, 100); }
+    int patienceRhythm() const { return patience(); }
+    void setPatienceRhythm(int value, bool routed = false) { setPatience(value, routed); }
 
     // degreeRotation
     int legatoProb() const { return _legatoProb; }
@@ -267,13 +280,15 @@ public:
     int mask() const { return _mask.get(isRouted(Routing::Target::StochasticDensity)); }
     void setMask(int mask, bool routed = false) { _mask.set(clamp(mask, 0, 100), routed); }
 
-    // density — RESERVED SLOT (engine-unused since 2026-05-21). Field, getter,
-    // setter, serialization, and routing target are kept intact to avoid breaking
-    // saved projects. Likely future use: Proteus-style rank-cutoff density on
-    // top of the Mask rank infrastructure. Until then, edits to this field have
-    // no audible effect; the actual rest gate is driven by `rest()` alone.
-    int density() const { return _density.get(isRouted(Routing::Target::StochasticGeneratorDensity)); }
-    void setDensity(int density, bool routed = false) { _density.set(clamp(density, 0, 100), routed); }
+    // gateLength — repurposed from the Phase 11 `_density` reserved slot. Knob
+    // 0..100 controls the spread of per-event gate length around a hardcoded
+    // 50% center. 0 = exact 50% every event; 100 = triangular distribution
+    // 10..100% peaked at 50%. Floored at 10% of duration AND at an absolute
+    // audible-tick minimum so very short events still produce a real trigger.
+    // Routing target keeps the legacy `StochasticGeneratorDensity` enum name
+    // for save-file compatibility; UI label changes to "Gate Length".
+    int gateLength() const { return _density.get(isRouted(Routing::Target::StochasticGeneratorDensity)); }
+    void setGateLength(int value, bool routed = false) { _density.set(clamp(value, 0, 100), routed); }
 
     // tilt (attached to mask)
     int tilt() const { return _tilt.get(isRouted(Routing::Target::StochasticTilt)); }
@@ -323,6 +338,8 @@ public:
 
     void printLinearity(StringBuilder &str) const { str("%d%%", linearity()); }
     void editLinearity(int value, bool shift) { setLinearity(linearity() + value); }
+    void printRepeatProb(StringBuilder &str) const { str("%d%%", repeatProb()); }
+    void editRepeatProb(int value, bool shift) { setRepeatProb(repeatProb() + value); }
 
     void printMarblesMode(StringBuilder &str) const { str(marblesMode() == MarblesMode::Off ? "Off" : "On"); }
     void editMarblesMode(int value, bool shift) { setMarblesMode(ModelUtils::adjustedEnum(marblesMode(), value)); }
@@ -340,10 +357,10 @@ public:
     void editMask(int value, bool shift) { if (!isRouted(Routing::Target::StochasticDensity)) setMask(mask() + value); }
 
     // Level 1 Density macro: writes density only (no fan-out to rest)
-    void editDensityMacro(int value, bool shift) {
+    void printGateLength(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticGeneratorDensity); str("%d%%", gateLength()); }
+    void editGateLength(int value, bool shift) {
         if (!isRouted(Routing::Target::StochasticGeneratorDensity)) {
-            int newVal = clamp(density() + value, 0, 100);
-            setDensity(newVal);
+            setGateLength(gateLength() + value);
         }
     }
 
@@ -368,6 +385,8 @@ public:
 
     void printAccentProb(StringBuilder &str) const { str("%d%%", accentProb()); }
     void editAccentProb(int value, bool shift) { setAccentProb(ModelUtils::adjustedByStep(accentProb(), value, 1, !shift)); }
+    void printPatienceMelody(StringBuilder &str) const { str("%d%%", patienceMelody()); }
+    void editPatienceMelody(int value, bool shift) { setPatienceMelody(patienceMelody() + value); }
 
     void printLegatoProb(StringBuilder &str) const { str("%d%%", legatoProb()); }
     void editLegatoProb(int value, bool shift) { setLegatoProb(ModelUtils::adjustedByStep(legatoProb(), value, 1, !shift)); }
@@ -499,14 +518,14 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _linearity = 0;
         _degreeRotation = 0;
         _maskRotation = 0;
-        _accentProb = 0;
+        _accentProb = 100;   // patienceMelody default (off sentinel)
         _legatoProb = 0;
         _marblesMode = MarblesMode::Off;
         _marblesSpread = 50;
         _marblesBias = 50;
         _marblesSteps = 100;
         _mask.setBase(100);
-        _density.setBase(100);
+        _density.setBase(0);   // gate length spread default — 0 = exact 50% center
         _tilt.setBase(0);
         _burst.setBase(0);
         _minDegree = 0;
@@ -708,14 +727,14 @@ private:
             _linearity = 0;
             _degreeRotation = 0;
             _maskRotation = 0;
-            _accentProb = 0;
+            _accentProb = 100;   // patienceMelody default (off sentinel)
             _legatoProb = 0;
             _marblesMode = MarblesMode::Off;
             _marblesSpread = 50;
             _marblesBias = 50;
             _marblesSteps = 100;
             _mask.setBase(100);
-            _density.setBase(100);
+            _density.setBase(0);   // gate length spread default — 0 = exact 50% center
             _tilt.setBase(0);
             _burst.setBase(0);
             _minDegree = 0;

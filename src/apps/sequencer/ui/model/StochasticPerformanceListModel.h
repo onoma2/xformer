@@ -10,13 +10,14 @@ public:
     enum Item {
         Level,
         Mode,
-        Density,
+        GateLength,
         Character,
         Rhythm,
         Melody,
         Complexity,
         Contour,
         Linearity,
+        Repeat,
         Shape,
         Spread,
         Bias,
@@ -35,6 +36,7 @@ public:
         Tilt,
         Sleep,
         Patience,
+        PatienceMelody,
         Mutate,
         Jump,
         Size,
@@ -83,7 +85,7 @@ public:
     virtual Routing::Target routingTarget(int row) const override {
         switch (itemForRow(row)) {
         case Mask:          return Routing::Target::StochasticDensity;
-        case Density:       return Routing::Target::StochasticGeneratorDensity;
+        case GateLength:    return Routing::Target::StochasticGeneratorDensity;
         case Tilt:          return Routing::Target::StochasticTilt;
         case Burst:         return Routing::Target::StochasticBurst;
         case Contour:       return Routing::Target::StochasticContour;
@@ -126,13 +128,14 @@ private:
         switch (item) {
         case Level:         return "Level";
         case Mode:          return "Mode";
-        case Density:       return "Density";
+        case GateLength:    return "Gate Length";
         case Character:     return "Complexity";
         case Rhythm:        return "Rhythm";
         case Melody:        return "Melody";
         case Complexity:    return "Complexity";
         case Contour:       return "Contour";
         case Linearity:     return "Linearity";
+        case Repeat:        return "Repeat";
         case Shape:         return "Shape";
         case Spread:        return "Spread";
         case Bias:          return "Bias";
@@ -150,7 +153,8 @@ private:
         case Mask:          return "Mask";
         case Tilt:          return "Tilt";
         case Sleep:         return "Sleep";
-        case Patience:      return "Patience";
+        case Patience:      return "Patience R";
+        case PatienceMelody:return "Patience M";
         case Mutate:        return "Mutate";
         case Jump:          return "Jump";
         case Size:          return "Size";
@@ -174,17 +178,14 @@ private:
         switch (item) {
         case Level:         sequence.printLevel(str); break;
         case Mode:          sequence.printCoupledMode(str); break;
-        case Density: {
-            sequence.printRouted(str, Routing::Target::StochasticGeneratorDensity);
-            str("%d%%", sequence.density());
-            break;
-        }
+        case GateLength:    sequence.printGateLength(str); break;
         case Character:     sequence.printComplexity(str); break;
         case Rhythm:        str(sequence.rhythmMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
         case Melody:        str(sequence.melodyMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
         case Complexity:    sequence.printComplexity(str); break;
         case Contour:       sequence.printContour(str); break;
         case Linearity:     sequence.printLinearity(str); break;
+        case Repeat:        sequence.printRepeatProb(str); break;
         case Shape:         sequence.printMarblesMode(str); break;
         case Spread:        sequence.printMarblesSpread(str); break;
         case Bias:          sequence.printMarblesBias(str); break;
@@ -203,6 +204,7 @@ private:
         case Tilt:          sequence.printTilt(str); break;
         case Sleep:         sequence.printSleep(str); break;
         case Patience:      sequence.printPatience(str); break;
+        case PatienceMelody:sequence.printPatienceMelody(str); break;
         case Mutate:        sequence.printMutate(str); break;
         case Jump:          sequence.printJump(str); break;
         case Size:          str("%d", sequence.size()); break;
@@ -221,13 +223,14 @@ private:
         switch (item) {
         case Level:         sequence.editLevel(value, shift); break;
         case Mode:          sequence.editCoupledMode(value, shift); break;
-        case Density:       sequence.editDensityMacro(value, shift); break;
+        case GateLength:    sequence.editGateLength(value, shift); break;
         case Character:     sequence.editComplexityMacro(value, shift); break;
         case Rhythm:        sequence.setRhythmMode(ModelUtils::adjustedEnum(sequence.rhythmMode(), value)); break;
         case Melody:        sequence.setMelodyMode(ModelUtils::adjustedEnum(sequence.melodyMode(), value)); break;
         case Complexity:    sequence.editComplexity(value, shift); break;
         case Contour:       sequence.editContour(value, shift); break;
         case Linearity:     sequence.editLinearity(value, shift); break;
+        case Repeat:        sequence.editRepeatProb(value, shift); break;
         case Shape:         sequence.editMarblesMode(value, shift); break;
         case Spread:        sequence.editMarblesSpread(value, shift); break;
         case Bias:          sequence.editMarblesBias(value, shift); break;
@@ -246,6 +249,7 @@ private:
         case Tilt:          sequence.editTilt(value, shift); break;
         case Sleep:         sequence.editSleep(value, shift); break;
         case Patience:      sequence.editPatience(value, shift); break;
+        case PatienceMelody:sequence.editPatienceMelody(value, shift); break;
         case Mutate:        sequence.editMutate(value, shift); break;
         case Jump:          sequence.editJump(value, shift); break;
         case Size:          sequence.setSize(sequence.size() + value); break;
@@ -270,8 +274,9 @@ private:
 //   Mode     — coupled Loop/Live (use split Rhythm + Melody instead)
 //   Character — duplicate of Complexity (same field)
 //   Shape    — Marbles toggle (engine always runs the distribution now)
-//   Contour, Linearity — folded into Complexity kernel
-//   Density  — folded into Rest
+//   Linearity — folded into Complexity kernel (slot repurposed as Repeat probability)
+//   Contour    — restored Phase 12 as directional Drift bias relative to lastDegree
+//   Density  — slot repurposed as Gate Length (visible row)
 // Sections (top to bottom):
 //   1. Playback   — Rhythm, Melody, Refresh
 //   2. Pitch      — Complexity, Bias, Spread, Steps + Range/MinDegree/MaxDegree
@@ -287,6 +292,8 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     Refresh,
     // Pitch
     Complexity,
+    Contour,
+    Repeat,
     Bias,
     Spread,
     Steps,
@@ -295,9 +302,9 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     NoteDuration,
     Variation,
     Rest,
+    GateLength,
     SlideProb,
     LegatoProb,
-    AccentProb,
     // Burst
     Burst,
     BurstCount,
@@ -314,6 +321,7 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     // State evolution
     Sleep,
     Patience,
+    PatienceMelody,
     Mutate,
     Jump,
     LastItem

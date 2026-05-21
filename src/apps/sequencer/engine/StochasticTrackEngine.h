@@ -22,7 +22,8 @@ public:
     virtual Track::TrackMode trackMode() const override { return Track::TrackMode::Stochastic; }
 
     virtual bool gateOutput(int index) const override {
-        return index == 0 ? _gateOutput : _accentOutput;
+        // No second gate jack on this device; index ignored.
+        return _gateOutput;
     }
 
     virtual float cvOutput(int index) const override {
@@ -38,6 +39,7 @@ public:
     int lastDegree() const { return _lastDegree; }
     int lastDurationIndex() const { return _lastDurationIndex; }
     uint16_t loopCycleCount() const { return _loopCycleCount; }
+    uint16_t loopCycleCountMelody() const { return _loopCycleCountMelody; }
     int jumpRegister() const { return _jumpRegister; }
     uint8_t sleepRemaining() const { return _sleepRemaining; }
     void renewLoopSources() { refreshLoopSources(); }
@@ -51,6 +53,11 @@ public:
     // given loop count and patience knob (0..100). Returns 0.0 when knob = 100
     // (off sentinel — patience disabled, never regenerates).
     static float patienceProbability(uint32_t loops, int patience);
+
+    // Linear "tension building" meter scaled to expected loops (λ). Reaches
+    // 1.0 at the typical regen point so the on-screen bar visibly fills before
+    // the Poisson roll fires. Returns 0.0 when patience knob = 100 (off).
+    static float patienceMeter(uint32_t loops, int patience);
 
     // V5 duration LUT as multipliers of the sequence divisor, sorted descending.
     // ticks = (divisor * num) / den. Labels assume divisor = 1/16:
@@ -97,7 +104,12 @@ private:
     uint8_t _patternIndex = 0;
     uint32_t _relativeTick = 0;
     uint8_t _sleepRemaining = 0;
-    uint16_t _loopCycleCount = 0;
+    uint16_t _loopCycleCount = 0;          // legacy alias kept for indicator path (== rhythm count)
+    uint16_t _loopCycleCountMelody = 0;
+    // Phase 12 Mask/Tilt instant re-rank cache. Engine re-runs generateMaskRanks
+    // when either tilt or size changes (or on Mutate fire).
+    int8_t _lastAppliedTilt = 0;
+    uint8_t _lastAppliedSize = 0;
     int _lastDegree = -1;
     int _lastDurationIndex = 0;
     int _jumpRegister = 0;
@@ -108,15 +120,17 @@ private:
 
     bool _activity = false;
     bool _gateOutput = false;
-    bool _accentOutput = false;
     bool _slideActive = false;
     float _cvOutput = 0.f;
     float _cvOutputTarget = 0.f;
 
+    // Repeat cache — Phase 12 reuse of last-emitted event on Bernoulli hit.
+    StochasticSourceEvent _lastEvent;
+    bool _lastEventValid = false;
+
     struct Gate {
         uint32_t tick;
         bool gate;
-        bool accent;
     };
 
     struct GateCompare {
@@ -148,7 +162,6 @@ private:
         bool rest;
         bool legato;
         bool slide;
-        bool accent;
         bool valid;
 
         struct LockedChild {
@@ -156,7 +169,6 @@ private:
             uint32_t tickOffset;
             uint32_t gateTicks;
             bool slide;
-            bool accent;
             bool valid;
         } children[kMaxChildren];
     };

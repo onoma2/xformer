@@ -37,7 +37,7 @@ CASE("default_round_trip") {
     restored.clear();
     readSequence(restored, buf, sizeof(buf));
 
-    expectEqual(restored.density(), seq.density(), "density default");
+    expectEqual(restored.gateLength(), seq.gateLength(), "gate length default");
     expectEqual(restored.level() == StochasticLevel::Core, true, "level default Core");
     for (int i = 0; i < 8; ++i) {
         expectEqual(restored.durationTicket(i), seq.durationTicket(i), "duration ticket default");
@@ -45,10 +45,10 @@ CASE("default_round_trip") {
     expectEqual(static_cast<int>(restored.marblesMode()), static_cast<int>(seq.marblesMode()), "marblesMode default");
 }
 
-CASE("density_persists") {
+CASE("gate_length_persists") {
     StochasticSequence seq;
     seq.clear();
-    seq.setDensity(33);
+    seq.setGateLength(33);
 
     uint8_t buf[2048];
     std::memset(buf, 0, sizeof(buf));
@@ -58,7 +58,7 @@ CASE("density_persists") {
     restored.clear();
     readSequence(restored, buf, sizeof(buf));
 
-    expectEqual(restored.density(), 33, "density should be 33 after round trip");
+    expectEqual(restored.gateLength(), 33, "gate length should be 33 after round trip");
 }
 
 CASE("duration_tickets_persist") {

@@ -127,9 +127,8 @@ void Project::clear() {
     stoSeq.setNoteDuration(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
     stoSeq.setMask(100);
     stoSeq.setRest(0);
-    stoSeq.setDensity(75);
     stoSeq.setBurst(0);
-    stoSeq.setDensity(100);
+    stoSeq.setGateLength(0);
     stoTrack.setCvUpdateMode(StochasticTrack::CvUpdateMode::Gate);
     stoTrack.setLock(false);
 
