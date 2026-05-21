@@ -29,6 +29,9 @@ int adjustedByDivisor(int value, int offset, bool shift);
 
 void printYesNo(StringBuilder &str, bool value);
 void printDivisor(StringBuilder &str, int value);
+// Same fraction lookup as printDivisor but without the leading raw tick value.
+// Outputs just "x/y" or "x/yT" (or "x" / "xT" when denominator is 1).
+void printDivisorShort(StringBuilder &str, int value);
 
 int divisorToIndex(int divisor);
 int indexToDivisor(int index);

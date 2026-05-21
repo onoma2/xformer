@@ -96,6 +96,6 @@ private:
     int _heroHeldStep = -1;
 };
 
-static const char *durationTicketLabels[] = {
-    "1/2", "1/4", "3/16", "1/8", "1/8T", "1/16", "1/16T", "1/32"
-};
+// Duration ticket labels are now generated at runtime via
+// StochasticSequence::printSlotDuration() so they track the active clock divisor.
+// The old hardcoded table assumed divisor = 1/16 and lied at any other divisor.

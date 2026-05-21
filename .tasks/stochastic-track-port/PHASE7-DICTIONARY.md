@@ -8,6 +8,42 @@ Update this file only when the model topology changes intentionally. Do not let
 implementation convenience, temporary UI pages, or reference-module vocabulary
 silently redefine these terms.
 
+## Phase 11 — Simplification Update (2026-05-21)
+
+The pitch and duration pickers were unified. **Level branches and mode toggles
+no longer gate engine math.** The authoritative spec is
+`PHASE11-SIMPLIFY.md`; sections below describing per-Level visibility or
+"alternative-mode" engine branches are historical context, not current contract.
+
+**Engine now:**
+- One pitch picker. Tickets × Complexity kernel × Marbles distro × Steps sieve.
+  Always multiplicative. Steps is the **pitch-side sieve** parallel to Mask
+  (rank-based universal-LUT cutoff, 0..100, high = open).
+- One duration picker. Duration tickets × noteDuration kernel × variation spread.
+  Always combine. `durationTicketsActive` no longer branches engine.
+- Marbles toggle, Contour, Linearity, Density, variation sign — all dropped from
+  engine math. Model fields kept as reserved slots for serialization stability.
+
+**Reserved slots** (field/getter/setter/storage intact, engine ignores, UI hidden):
+`_density`, `_contour`, `_linearity`, `_marblesMode` (flag), `_level` (enum),
+plus `_variation` sign bit (storage signed; getter returns `abs()`).
+
+**Repurposed:** `_marblesSteps` (was Marbles permutation reseed interval, never
+read by engine) → pitch Steps sieve cutoff. Clamp relaxed to 0..100, default 100.
+
+**UI surface (single flat list, semantically grouped):**
+- Playback: Rhythm, Melody, Refresh
+- Pitch: Complexity, Bias, Spread, Steps, Range, MinDegree, MaxDegree
+- Rhythm: NoteDuration, Variation, Rest, Slide, Legato, Accent
+- Burst: Burst, BurstCount, BurstRate, BurstPitch
+- Pattern: Mask, Tilt
+- Window: Size, First, Last, Rotate
+- Evolution: Sleep, Patience, Mutate, Jump
+
+Duration ticket bar labels are now divisor-aware at draw time via
+`StochasticSequence::printSlotDuration()` — they track clock-divisor changes
+instead of lying with hardcoded 1/16-centered strings.
+
 ## Provenance
 
 - MeloDICER contributes direct rhythm controls, direct pitch probability controls,
@@ -85,7 +121,11 @@ Looper controls:
 - `First`: first parent event included in playback.
 - `Last`: last parent event included in playback.
 - `Rotate`: non-destructive loop read offset.
-- `Patience`: loop regeneration interval; 100 means never auto-regenerate.
+- `Patience`: Proteus-style Poisson CDF regeneration. Knob 0..99 → λ ∈ [1, 50]
+  linear; each loop boundary rolls `F(k; λ) = Σᵢ e^(-λ) λⁱ / i!` against
+  uniform 0..1, fires regen when it crosses. Shared counter across rhythm and
+  melody Loop domains. Knob 100 = off sentinel. Stochastic "tension builds,
+  then breaks" feel — replaces the V5 deterministic `2^bucket` countdown.
 
 ### Level 2: Direct
 
@@ -300,7 +340,11 @@ Burst invariants:
 - `First`: first parent event included in playback.
 - `Last`: last parent event included in playback.
 - `Rotate`: non-destructive loop read offset.
-- `Patience`: loop regeneration interval; maximum means never auto-regenerate.
+- `Patience`: Poisson CDF regeneration timer. Knob 0..99 → λ ∈ [1, 50]; CDF
+  rolled at each loop boundary against shared `_loopCycleCount`. P(regen)
+  rises monotonically with each survived loop, resets to 0 on fire. Fires
+  invalidate whichever domains are currently in Loop mode. Knob 100 = off
+  (no auto-regen). Avg loops before regen: knob 0 ≈ 1.3, 50 ≈ 21, 99 ≈ 43.
 - `Mutate`: bipolar -100..+100 loop-source mutation per loop end.
   - Sign selects algorithm: positive = Marbles-style permutation (swap two
     events), negative = Proteus-style destructive regen (replace one event).

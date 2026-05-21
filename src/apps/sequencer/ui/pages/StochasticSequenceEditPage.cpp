@@ -70,11 +70,14 @@ void StochasticSequenceEditPage::drawCorePage(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "CORE");
 
-    int density = seq.density();
+    int rest = seq.rest();
+    int burst = seq.burst();
     int complexity = seq.complexity();
     bool marblesOn = (seq.marblesMode() == MarblesMode::On);
 
-    int dropCount = 12 + (density * 88) / 100;          // ~12..100
+    // dropCount = mood proxy: rest sparsens, burst + complexity busy it up.
+    // Range ~12..100. Density slot is engine-reserved and not visualized.
+    int dropCount = 12 + ((100 - rest) * 40) / 100 + (burst * 30) / 100 + (complexity * 18) / 100;
     int jitter = 2 + (complexity * 14) / 100;           // 2..16
     int wind = marblesOn ? 2 : 0;
 
@@ -98,9 +101,9 @@ void StochasticSequenceEditPage::drawCorePage(Canvas &canvas) {
     }
 
     FixedStringBuilder<32> str;
-    if (_heroHeldStep == 0) str("DENS %d", density);
+    if (_heroHeldStep == 0) str("REST %d", rest);
     else if (_heroHeldStep == 1) str("CMPX %d", complexity);
-    else str("D%d  C%d", density, complexity);
+    else str("R%d  C%d", rest, complexity);
     canvas.setFont(Font::Small);
     canvas.setColor(Color::Bright);
     canvas.drawText(8, 18, str);
@@ -444,20 +447,15 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     canvas.hline(bxLast - 2, tapeTop - 3, 4);
     canvas.hline(bxLast - 2, tapeBot + 3, 4);
 
-    // Boredom counter bar — engine internal _loopCycleCount progress to patience threshold.
-    // Read from engine if available.
+    // Boredom counter bar — Poisson CDF probability of regen at current loop
+    // count and patience knob. Matches the engine's actual roll math (Phase 11).
+    // Patience = 100 (off sentinel) → 0% always.
     int boredomFill = 0;
     int patience = seq.patience();
     if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
         auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
-        int loops = eng.loopCycleCount();
-        // patience 0..100 → bucket 0..7, loopsBeforeRefresh = 1<<bucket
-        int bucket = clamp(patience / 14, 0, 7);
-        uint32_t threshold = (patience == 100) ? UINT32_MAX : (uint32_t(1) << bucket);
-        if (threshold > 0) {
-            boredomFill = int((uint64_t(loops) * 100) / std::max(uint32_t(1), threshold));
-            boredomFill = clamp(boredomFill, 0, 100);
-        }
+        float p = StochasticTrackEngine::patienceProbability(eng.loopCycleCount(), patience);
+        boredomFill = clamp(int(p * 100.0f), 0, 100);
     }
     canvas.setColor(Color::Low);
     canvas.drawRect(margin, tapeBot + 7, availW, 3);
@@ -503,7 +501,7 @@ void StochasticSequenceEditPage::editCoreStep(int step, int value, bool shift) {
     auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
     int v = shift ? value * 10 : value;
     switch (step) {
-    case 0: seq.setDensity(seq.density() + v); break;
+    case 0: seq.setRest(seq.rest() + v); break;     // S0 now drives the live rest gate
     case 1: seq.setComplexity(seq.complexity() + v); break;
     }
 }
@@ -825,8 +823,10 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
 
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Low);
-        int labelW = canvas.textWidth(durationTicketLabels[i]);
-        canvas.drawText(x + (barW - labelW) / 2, baseY + 8, durationTicketLabels[i]);
+        FixedStringBuilder<8> slotLabel;
+        sequence.printSlotDuration(slotLabel, i);
+        int labelW = canvas.textWidth(slotLabel);
+        canvas.drawText(x + (barW - labelW) / 2, baseY + 8, slotLabel);
     }
 
     // Left info text
@@ -837,7 +837,9 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
         canvas.setColor(Color::Bright);
         canvas.drawText(8, 18, str);
     } else {
-        str("%s: %d", durationTicketLabels[_selectedDurSlot], sequence.durationTicket(_selectedDurSlot));
+        FixedStringBuilder<8> slotLabel;
+        sequence.printSlotDuration(slotLabel, _selectedDurSlot);
+        str("%s: %d", (const char *)slotLabel, sequence.durationTicket(_selectedDurSlot));
         canvas.setFont(Font::Small);
         canvas.setColor(Color::Bright);
         canvas.drawText(8, 18, str);

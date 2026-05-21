@@ -156,8 +156,11 @@ public:
     int noteDuration() const { return _noteDuration.get(isRouted(Routing::Target::StochasticNoteDuration)); }
     void setNoteDuration(int v, bool routed = false) { _noteDuration.set(clamp(v, 0, 7), routed); }
 
-    int variation() const { return _variation.get(isRouted(Routing::Target::StochasticVariation)); }
-    void setVariation(int variation, bool routed = false) { _variation.set(clamp(variation, -100, 100), routed); }
+    // Phase 11: storage may be signed (legacy patches); read always returns |v|.
+    int variation() const { int v = _variation.get(isRouted(Routing::Target::StochasticVariation)); return v < 0 ? -v : v; }
+    // Phase 11: variation is symmetric (sign meaningless). New writes clamp to
+    // [0, 100]. Legacy patches with negative storage get abs()'d at getter.
+    void setVariation(int variation, bool routed = false) { _variation.set(clamp(variation, 0, 100), routed); }
 
     int rest() const { return _rest.get(isRouted(Routing::Target::StochasticRest)); }
     void setRest(int rest, bool routed = false) { _rest.set(clamp(rest, 0, 100), routed); }
@@ -256,15 +259,19 @@ public:
     int marblesBias() const { return _marblesBias; }
     void setMarblesBias(int bias) { _marblesBias = clamp(bias, 0, 100); }
 
-    // marblesSteps
+    // marblesSteps — repurposed as pitch sieve cutoff (Phase 11). 0..100, 100=open.
     int marblesSteps() const { return _marblesSteps; }
-    void setMarblesSteps(int steps) { _marblesSteps = clamp(steps, 1, 100); }
+    void setMarblesSteps(int steps) { _marblesSteps = clamp(steps, 0, 100); }
 
     // mask (deterministic loop playback thinning, V5 rename from density)
     int mask() const { return _mask.get(isRouted(Routing::Target::StochasticDensity)); }
     void setMask(int mask, bool routed = false) { _mask.set(clamp(mask, 0, 100), routed); }
 
-    // density (generator-level sound/rest amount)
+    // density — RESERVED SLOT (engine-unused since 2026-05-21). Field, getter,
+    // setter, serialization, and routing target are kept intact to avoid breaking
+    // saved projects. Likely future use: Proteus-style rank-cutoff density on
+    // top of the Mask rank infrastructure. Until then, edits to this field have
+    // no audible effect; the actual rest gate is driven by `rest()` alone.
     int density() const { return _density.get(isRouted(Routing::Target::StochasticGeneratorDensity)); }
     void setDensity(int density, bool routed = false) { _density.set(clamp(density, 0, 100), routed); }
 
@@ -373,17 +380,23 @@ public:
 
     void printNoteDuration(StringBuilder &str) const {
         printRouted(str, Routing::Target::StochasticNoteDuration);
-        // Compute the effective note from divisor × LUT multiplier so the label
-        // tracks clock-divisor changes. LUT mirrors getDurationFraction().
+        printSlotDuration(str, noteDuration());
+    }
+    // Phase 11: divisor-aware label for any LUT slot. Used by both noteDuration
+    // print and the duration ticket bars (so labels track clock-divisor changes
+    // instead of lying with hardcoded 1/16-centered strings). Short form
+    // ("x/y" / "x/yT") — no leading raw-tick value.
+    void printSlotDuration(StringBuilder &str, int slot) const {
+        // LUT mirrors StochasticTrackEngine::getDurationFraction().
         static const int lutNum[] = { 8, 4, 3, 2, 4, 1, 2, 1 };
         static const int lutDen[] = { 1, 1, 1, 1, 3, 1, 3, 2 };
-        int idx = clamp(noteDuration(), 0, 7);
+        int idx = clamp(slot, 0, 7);
         int effectiveDivisor = (int(divisor()) * lutNum[idx]) / lutDen[idx];
-        ModelUtils::printDivisor(str, effectiveDivisor);
+        ModelUtils::printDivisorShort(str, effectiveDivisor);
     }
     void editNoteDuration(int value, bool shift) { if (!isRouted(Routing::Target::StochasticNoteDuration)) setNoteDuration(noteDuration() + value); }
 
-    void printVariation(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticVariation); str("%+d%%", variation()); }
+    void printVariation(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticVariation); str("%d%%", variation()); }
     void editVariation(int value, bool shift) { if (!isRouted(Routing::Target::StochasticVariation)) setVariation(variation() + value); }
 
     void printRest(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticRest); str("%d%%", rest()); }

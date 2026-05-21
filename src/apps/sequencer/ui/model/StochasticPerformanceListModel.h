@@ -102,18 +102,11 @@ public:
     }
 
 private:
-    static const Item coreItems[];
-    static const Item directItems[];
-    static const Item weightsItems[];
+    // Phase 11: single flat list. Level enum kept in model for serialization but
+    // no longer gates visibility — all sequence-level controls are visible.
+    static const Item items[];
 
-    const Item *activeItems() const {
-        auto &sequence = _track->sequence(_project->selectedPatternIndex());
-        switch (sequence.level()) {
-        case StochasticLevel::Direct:  return directItems;
-        case StochasticLevel::Weights: return weightsItems;
-        default:                       return coreItems;
-        }
-    }
+    const Item *activeItems() const { return items; }
 
     int itemCount() const {
         int count = 0;
@@ -271,99 +264,57 @@ private:
     Project *_project = nullptr;
 };
 
-// Level 1: Core — immediate generative music
-inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel::coreItems[] = {
-    Level,
-    Mode,
-    Character,
-    Density,
-    Shape,
-    Spread,
-    Bias,
-    Steps,
-    Range,
-    Burst,
-    BurstCount,
-    BurstRate,
-    BurstPitch,
-    Refresh,
-    Size,
-    First,
-    Last,
-    Rotate,
-    Patience,
-    LastItem
-};
-
-// Level 2: Direct — split source modes, explicit rhythm/pitch controls
-inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel::directItems[] = {
-    Level,
+// Phase 11 — single flat list, grouped semantically.
+// Dropped from visibility (model fields/enum members kept as reserved slots):
+//   Level    — UI no longer gates by level
+//   Mode     — coupled Loop/Live (use split Rhythm + Melody instead)
+//   Character — duplicate of Complexity (same field)
+//   Shape    — Marbles toggle (engine always runs the distribution now)
+//   Contour, Linearity — folded into Complexity kernel
+//   Density  — folded into Rest
+// Sections (top to bottom):
+//   1. Playback   — Rhythm, Melody, Refresh
+//   2. Pitch      — Complexity, Bias, Spread, Steps + Range/MinDegree/MaxDegree
+//   3. Rhythm     — NoteDuration, Variation, Rest, articulation probs
+//   4. Burst      — Burst + Count/Rate/Pitch
+//   5. Pattern    — Mask, Tilt
+//   6. Window     — Size, First, Last, Rotate
+//   7. Evolution  — Sleep, Patience, Mutate, Jump
+inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel::items[] = {
+    // Playback
     Rhythm,
     Melody,
+    Refresh,
+    // Pitch
     Complexity,
-    Contour,
-    Linearity,
+    Bias,
+    Spread,
+    Steps,
+    Range,
+    // Rhythm
     NoteDuration,
     Variation,
     Rest,
     SlideProb,
     LegatoProb,
     AccentProb,
-    Range,
-    MinDegree,
-    MaxDegree,
-    Shape,
-    Spread,
-    Bias,
-    Steps,
+    // Burst
     Burst,
     BurstCount,
     BurstRate,
     BurstPitch,
-    Refresh,
-    Size,
-    First,
-    Last,
-    Rotate,
-    Patience,
-    LastItem
-};
-
-// Level 3: Weights — explicit probability programming
-inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel::weightsItems[] = {
-    Level,
-    Rhythm,
-    Melody,
-    Complexity,
-    Contour,
-    Linearity,
-    NoteDuration,
-    Variation,
-    Rest,
-    SlideProb,
-    LegatoProb,
-    AccentProb,
-    Shape,
-    Spread,
-    Bias,
-    Steps,
-    Range,
-    MinDegree,
-    MaxDegree,
-    Burst,
-    BurstCount,
-    BurstRate,
-    BurstPitch,
+    // Pattern sieve
     Mask,
     Tilt,
+    // Sequence window
+    Size,
+    First,
+    Last,
+    Rotate,
+    // State evolution
     Sleep,
     Patience,
     Mutate,
     Jump,
-    Refresh,
-    Size,
-    First,
-    Last,
-    Rotate,
     LastItem
 };

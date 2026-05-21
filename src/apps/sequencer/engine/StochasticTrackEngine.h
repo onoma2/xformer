@@ -47,6 +47,11 @@ public:
     // Max children per parent burst — matches burstCount LUT {2, 3, 4, 5}.
     static constexpr int kMaxChildren = 5;
 
+    // Patience boredom indicator: Poisson CDF probability of regen at the
+    // given loop count and patience knob (0..100). Returns 0.0 when knob = 100
+    // (off sentinel — patience disabled, never regenerates).
+    static float patienceProbability(uint32_t loops, int patience);
+
     // V5 duration LUT as multipliers of the sequence divisor, sorted descending.
     // ticks = (divisor * num) / den. Labels assume divisor = 1/16:
     //   slot 0: ×8     → 1/2

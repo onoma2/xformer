@@ -22,6 +22,30 @@
 #define DBG_STO(fmt, ...)
 #endif
 
+// Forward decl for use by patienceProbability below.
+static float poissonCdf(int k, float lambda);
+
+float StochasticTrackEngine::patienceProbability(uint32_t loops, int patience) {
+    if (patience >= 100) return 0.0f;  // off sentinel
+    float lambda = 1.0f + (patience * 49.0f) / 99.0f;
+    return poissonCdf(int(loops), lambda);
+}
+
+// Poisson CDF F(k; λ) = Σᵢ₌₀ᵏ e^(-λ) λⁱ / i!. Iterative, one exp() + k mults.
+// Used by patience: probability of "time to regenerate" given k loops survived.
+static float poissonCdf(int k, float lambda) {
+    if (k < 0) return 0.0f;
+    if (lambda <= 0.0f) return 1.0f;
+    if (k > 200) k = 200;  // guard against runaway loops
+    float term = std::exp(-lambda);
+    float sum = term;
+    for (int i = 1; i <= k; ++i) {
+        term *= lambda / float(i);
+        sum += term;
+    }
+    return sum > 1.0f ? 1.0f : sum;
+}
+
 StochasticTrackEngine::StochasticTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
     TrackEngine(engine, model, track, linkedTrackEngine),
     _stochasticTrack(track.stochasticTrack()),
@@ -117,7 +141,8 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
     _eventElapsed++;
     if (_eventDuration == 0 || _eventElapsed >= _eventDuration) {
         _eventElapsed = 0;
-        if (!sequence.durationTicketsActive() && _sleepRemaining > 0) {
+        // Phase 11: tickets always combine — sleep gate no longer mode-dependent.
+        if (_sleepRemaining > 0) {
             _sleepRemaining--;
         } else {
             triggerStep(tick, divisor);
@@ -411,17 +436,16 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 }
             }
 
-            // V5 Patience: exponential loop-count mapping
+            // Proteus-style patience: Poisson CDF roll at each loop boundary.
+            // _loopCycleCount = Proteus's repetitionCount (loops survived since regen).
+            // Knob 0..99 → λ ∈ [1, 50] linear. Knob 100 = off sentinel.
+            // F(k; λ) rises monotonically: probability of regen builds with each
+            // survived loop, then resets to 0 on fire. Fuzzy "tension → break" feel.
             if (sequence.patience() < 100) {
                 _loopCycleCount++;
-                uint32_t loopsBeforeRefresh;
-                if (sequence.patience() == 0) {
-                    loopsBeforeRefresh = 1;
-                } else {
-                    int bucket = clamp(sequence.patience() / 14, 0, 7);
-                    loopsBeforeRefresh = uint32_t(1) << bucket;
-                }
-                if (_loopCycleCount >= loopsBeforeRefresh) {
+                float lambda = 1.0f + (sequence.patience() * 49.0f) / 99.0f;
+                float p = poissonCdf(_loopCycleCount, lambda);
+                if (_rng.nextRange(10000) < uint32_t(p * 10000.0f)) {
                     if (sequence.rhythmMode() == StochasticSourceMode::Loop) sequence.setRhythmValid(false);
                     if (sequence.melodyMode() == StochasticSourceMode::Loop) sequence.setMelodyValid(false);
                     _loopCycleCount = 0;

@@ -141,19 +141,18 @@ void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const St
     // the current noteDuration slot. bias_strength = 100 - mutateMagnitude:
     //   low magnitude → strong anchor (stays near base)
     //   high magnitude → uniform across the 8 LUT slots
+    // Phase 11: variation is symmetric (sign dropped). Spread term widens the
+    // kernel symmetrically; direction comes from noteDuration (Bias) alone.
     int baseDur = std::max(0, std::min(7, int(sequence.noteDuration())));
     int biasStrength = 100 - std::max(0, std::min(100, mutateMagnitude));
-    int variation = sequence.variation();
-    int varSign = (variation > 0) ? +1 : (variation < 0 ? -1 : 0);
-    int varMag = std::abs(variation);
+    int varMag = clamp(int(sequence.variation()), 0, 100);   // abs via getter
 
     int weights[8]; int total = 0;
     for (int s = 0; s < 8; ++s) {
         int dist = std::abs(s - baseDur);
-        int anchorKernel = std::max(0, 7 - dist);           // 7 at base, 0 at far end
-        int dirDist = (s - baseDur) * varSign;              // signed distance in variation direction
-        int dirBoost = (dirDist > 0) ? varMag * dirDist : 0;
-        int w = 100 + biasStrength * anchorKernel + dirBoost;
+        int anchorKernel = std::max(0, 7 - dist);
+        int spreadBoost = varMag * std::max(0, 4 - dist);    // symmetric spread bonus
+        int w = 100 + biasStrength * anchorKernel + spreadBoost;
         weights[s] = w;
         total += w;
     }
@@ -194,7 +193,7 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
             int tickets = sequence.effectiveDegreeTicket(idx, activeNotes);
             if (tickets < 0) continue;                       // excluded
             int deg = oct * activeNotes + idx;
-            if (deg < sequence.minDegree() || deg > sequence.maxDegree()) continue;
+            // Phase 12: min/max degree clamps dropped — pool gated by range + tickets only.
 
             int boost = universalDegreeBoost(idx, activeNotes);
             int ticketWeight = (tickets > 0) ? tickets : 1;
@@ -239,35 +238,34 @@ void StochasticGenerator::permuteRhythmOne(StochasticSequence &sequence, Random 
     ev[j].mergeRhythmFrom(tmp);
 }
 
-int StochasticGenerator::applyVariation(int baseIdx, int variation, Random &rng) {
-    if (variation == 0) return baseIdx;
-    int absVar = variation < 0 ? -variation : variation;
-    if (int(rng.nextRange(100)) >= absVar) return baseIdx;
+// Phase 11 unified duration picker. Always combines duration tickets (base weight
+// LUT, defaults flat) with noteDuration (kernel center / Bias) and variation
+// (kernel width / Spread, symmetric — sign ignored). Returns LUT slot 0..7.
+static int pickDuration(const StochasticSequence &sequence, Random &rng) {
+    const int slots = 8;
+    int center = clamp(int(sequence.noteDuration()), 0, slots - 1);
+    int spread = clamp(int(sequence.variation()), 0, 100);  // abs via variation() getter
+    int width = 1 + (spread * 4) / 100;                      // 1..5 slots wide
+    int leakage = spread / 10;                               // 0..10 flat term
 
-    int sign = variation > 0 ? +1 : -1;
-    int maxJump = 1 + (absVar * 3) / 100;     // 1..4 slots
-    if (maxJump < 1) maxJump = 1;
-    if (maxJump > 4) maxJump = 4;
-
-    int weights[4];
+    int weights[slots];
     int total = 0;
-    for (int d = 1; d <= maxJump; ++d) {
-        int w = maxJump - d + 1;              // triangular: adjacent heaviest
-        weights[d - 1] = w;
-        total += w;
+    for (int i = 0; i < slots; ++i) {
+        int base = sequence.durationTicket(i);
+        if (base <= 0) base = 10;                            // flat default
+        int dist = i > center ? i - center : center - i;
+        int kernel = (width > dist ? width - dist : 0) + leakage;
+        weights[i] = base * kernel;
+        total += weights[i];
     }
+    if (total <= 0) return center;
     int roll = int(rng.nextRange(uint32_t(total)));
     int sum = 0;
-    int jump = 1;
-    for (int d = 1; d <= maxJump; ++d) {
-        sum += weights[d - 1];
-        if (roll < sum) { jump = d; break; }
+    for (int i = 0; i < slots; ++i) {
+        sum += weights[i];
+        if (roll < sum) return i;
     }
-
-    int target = baseIdx + sign * jump;
-    if (target < 0) target = 0;
-    if (target > 7) target = 7;
-    return target;
+    return center;
 }
 
 // Marbles-style permutation: swap melody content between two random positions.
@@ -371,22 +369,18 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
     // generation time so each event gets its own randomized durationIndex
     // baked into the stored pattern — Loop-mode playback then repeats the same
     // varied content until RENEW, and the loop tape display sees the variation.
-    int durationIndex;
-    if (sequence.durationTicketsActive()) {
-        durationIndex = selectDurationTicket(sequence, rng);
-    } else {
-        int baseDur = std::max(0, std::min(7, int(sequence.noteDuration())));
-        durationIndex = applyVariation(baseDur, sequence.variation(), rng);
-    }
+    // Phase 11: single path — duration tickets always multiply into the
+    // noteDuration (Bias) + variation (Spread) kernel.
+    int durationIndex = pickDuration(sequence, rng);
 
     event.setDurationIndex(durationIndex);
     event.setDensityRank(0); // Live events have no mask rank
 
-    // Generator Density: sound/rest amount at generation time
-    bool densityGate = (rng.nextRange(100) < sequence.density());
-    // Direct Rest probability
+    // Rest probability: single Bernoulli gate. `sequence.density()` is a reserved
+    // model slot (engine-unused — kept for serialization stability and future
+    // repurpose, likely as Proteus-style rank-cutoff density).
     bool restGate = (rng.nextRange(100) < sequence.rest());
-    event.setRest(!densityGate || restGate);
+    event.setRest(restGate);
     event.setLegato(int(rng.nextRange(100)) < sequence.legatoProb());
     event.setSlide(int(rng.nextRange(100)) < sequence.slide());
     event.setAccent(int(rng.nextRange(100)) < sequence.accentProb());
@@ -433,133 +427,139 @@ StochasticSourceEvent StochasticGenerator::generateMelodyEvent(const StochasticS
     return event;
 }
 
+// Phase 11 unified pitch picker. Single path. All shaping multiplies:
+//   1. Build allowed degrees from range × scale tones, gated by ticket≥0
+//      (Phase 12: min/max degree clamps dropped — redundant with range + pitch
+//      tickets at 0; reserved as model slots only.)
+//   2. Steps sieve — universalDegreeBoost rank cutoff. Knob 0..100, 100=open.
+//      Top-K most-fundamental degrees survive. Mirrors Mask on rhythm side.
+//   3. Per-survivor weight = ticket × complexityKernel × marblesKernel
+//      - complexityKernel: triangular around lastDegree, width grows with complexity
+//        plus a leakage term so high complexity allows leaps (linearity baked in)
+//      - marblesKernel: triangular around bias position, width grows with spread,
+//        always running with transparent defaults (bias=50, spread=100 → wide)
+//   4. Weighted random pick over survivors
 int StochasticGenerator::generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng) {
     int activeNotes = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
     int range = sequence.range();
-    
-    int allowedDegrees[CONFIG_USER_SCALE_SIZE * 4];
-    int penalizedWeights[CONFIG_USER_SCALE_SIZE * 4];
+    int N = activeNotes;
+
+    // 1. Build allowed degrees + ticket weights
+    constexpr int kMaxSlots = CONFIG_USER_SCALE_SIZE * 4;
+    int allowedDegrees[kMaxSlots];
+    int ticketWeights[kMaxSlots];
     int allowedCount = 0;
-    int totalTickets = 0;
 
     for (int oct = 0; oct < range; ++oct) {
         for (int i = 0; i < activeNotes; ++i) {
             int tickets = sequence.effectiveDegreeTicket(i, activeNotes);
-            if (tickets >= 0) { // -1 is excluded
-                int deg = oct * activeNotes + i;
-                if (deg >= sequence.minDegree() && deg <= sequence.maxDegree()) {
-                    allowedDegrees[allowedCount] = deg;
-                    penalizedWeights[allowedCount] = tickets;
-                    totalTickets += tickets;
-                    allowedCount++;
-                }
+            if (tickets >= 0) {
+                allowedDegrees[allowedCount] = oct * activeNotes + i;
+                ticketWeights[allowedCount] = tickets;
+                allowedCount++;
             }
         }
     }
-
     if (allowedCount == 0) return 0;
 
-    int degree = allowedDegrees[0];
+    // 2. Steps sieve — keep top-K by universalDegreeBoost rank
+    int steps = clamp(int(sequence.marblesSteps()), 0, 100);
+    int K = (allowedCount * steps + 99) / 100;
+    if (K < 1) K = 1;
+    if (K > allowedCount) K = allowedCount;
 
-    if (sequence.pitchTicketsActive()) {
-        if (totalTickets > 0) {
-            int roll = rng.nextRange(totalTickets);
-            int sum = 0;
-            for (int i = 0; i < allowedCount; ++i) {
-                sum += penalizedWeights[i];
-                if (roll < sum) { degree = allowedDegrees[i]; break; }
-            }
-        } else {
-            degree = allowedDegrees[rng.nextRange(allowedCount)];
-        }
-        lastDegree = degree;
-        return degree;
+    int sieveRank[kMaxSlots];
+    for (int i = 0; i < allowedCount; ++i) {
+        int degInOct = ((allowedDegrees[i] % N) + N) % N;
+        sieveRank[i] = universalDegreeBoost(degInOct, N);
     }
-
-    if (sequence.marblesMode() == MarblesMode::On) {
-        float x = rng.nextRange(1000) / 1000.f;
-        float shapedX = betaDistributionSample(x, sequence.marblesSpread() / 100.f);
-        float bias = sequence.marblesBias() / 100.f;
-        float targetIdxFloat = (shapedX - 0.5f) * (allowedCount) + (bias * allowedCount);
-        int targetIdx = clamp(int(targetIdxFloat), 0, allowedCount - 1);
-        degree = allowedDegrees[targetIdx];
+    bool keep[kMaxSlots] = {};
+    if (K >= allowedCount) {
+        for (int i = 0; i < allowedCount; ++i) keep[i] = true;
     } else {
-        int complexity = sequence.complexity();
-        int contour = sequence.contour();
-        int linearity = sequence.linearity();
-
-        if (complexity < 50 && lastDegree != -1) {
-            totalTickets = 0;
+        for (int k = 0; k < K; ++k) {
+            int bestIdx = -1; int bestRank = -1;
             for (int i = 0; i < allowedCount; ++i) {
-                int dist = std::abs(allowedDegrees[i] - lastDegree);
-                if (dist > (1 + complexity / 10)) {
-                    penalizedWeights[i] /= 4;
-                }
-                totalTickets += penalizedWeights[i];
+                if (keep[i]) continue;
+                if (sieveRank[i] > bestRank) { bestRank = sieveRank[i]; bestIdx = i; }
             }
-        }
-
-        if (contour != 0 && allowedCount > 1) {
-            totalTickets = 0;
-            for (int i = 0; i < allowedCount; ++i) {
-                float pos = (2.0f * i / (allowedCount - 1)) - 1.0f;
-                float bias = 1.0f + (pos * contour / 100.0f);
-                penalizedWeights[i] = std::max(0, int(penalizedWeights[i] * bias));
-                totalTickets += penalizedWeights[i];
-            }
-        }
-
-        if (linearity > 0 && lastDegree != -1) {
-            totalTickets = 0;
-            for (int i = 0; i < allowedCount; ++i) {
-                int dist = std::abs(allowedDegrees[i] - lastDegree);
-                int penalty = (dist * linearity) / 10;
-                penalizedWeights[i] = std::max(0, penalizedWeights[i] - penalty);
-                totalTickets += penalizedWeights[i];
-            }
-        }
-
-        if (totalTickets > 0) {
-            int roll = rng.nextRange(totalTickets);
-            int sum = 0;
-            for (int i = 0; i < allowedCount; ++i) {
-                sum += penalizedWeights[i];
-                if (roll < sum) {
-                    degree = allowedDegrees[i];
-                    break;
-                }
-            }
-        } else {
-            degree = allowedDegrees[rng.nextRange(allowedCount)];
+            if (bestIdx >= 0) keep[bestIdx] = true;
+            else break;
         }
     }
 
+    // 3. Locate lastDegree's slot in allowedDegrees for complexity kernel
+    int lastIdx = -1;
+    if (lastDegree != -1) {
+        for (int i = 0; i < allowedCount; ++i) {
+            if (allowedDegrees[i] == lastDegree) { lastIdx = i; break; }
+        }
+    }
+
+    int complexity = clamp(int(sequence.complexity()), 0, 100);
+    int kernelWidth = 1 + (complexity * N) / 50;     // ~1 .. ~2N
+    int kernelLeak = complexity / 10;                // 0..10
+
+    int marblesBias = clamp(int(sequence.marblesBias()), 0, 100);     // 0..100
+    int marblesSpread = clamp(int(sequence.marblesSpread()), 0, 100); // 0..100
+
+    int biasPos = (allowedCount > 1) ? (marblesBias * (allowedCount - 1) + 50) / 100 : 0;
+    int marblesWidth = 1 + (marblesSpread * allowedCount) / 100;
+    int marblesLeak = 1 + marblesSpread / 10;
+
+    // Global ticket-active check: if any ticket > 0, zero tickets mean "excluded"
+    // (filter). If ALL tickets are 0, use flat=10 fallback for all (no filter).
+    bool anyTicket = false;
+    for (int i = 0; i < allowedCount; ++i) {
+        if (ticketWeights[i] > 0) { anyTicket = true; break; }
+    }
+
+    int weights[kMaxSlots];
+    int totalWeight = 0;
+    for (int i = 0; i < allowedCount; ++i) {
+        if (!keep[i]) { weights[i] = 0; continue; }
+
+        int base = anyTicket ? ticketWeights[i] : 10;
+        if (base < 0) base = 0;
+
+        int kernel;
+        if (lastIdx < 0) {
+            kernel = 10;
+        } else {
+            int d = i > lastIdx ? i - lastIdx : lastIdx - i;
+            int tri = kernelWidth > d ? kernelWidth - d : 0;
+            kernel = tri + kernelLeak;
+        }
+
+        int dm = i > biasPos ? i - biasPos : biasPos - i;
+        int mtri = marblesWidth > dm ? marblesWidth - dm : 0;
+        int marbles = mtri + marblesLeak;
+
+        weights[i] = base * kernel * marbles;
+        totalWeight += weights[i];
+    }
+
+    // 4. Weighted random pick
+    int degree = allowedDegrees[0];
+    if (totalWeight > 0) {
+        int roll = int(rng.nextRange(uint32_t(totalWeight)));
+        int sum = 0;
+        for (int i = 0; i < allowedCount; ++i) {
+            sum += weights[i];
+            if (roll < sum) { degree = allowedDegrees[i]; break; }
+        }
+    } else {
+        // All weights zero (shouldn't happen with leakage floor); pick any survivor
+        for (int i = 0; i < allowedCount; ++i) {
+            if (keep[i]) { degree = allowedDegrees[i]; break; }
+        }
+    }
     lastDegree = degree;
     return degree;
 }
 
 int StochasticGenerator::generateJumpOctave(const StochasticSequence &sequence, const StochasticTrack &track, int currentJump, Random &rng) {
     return 0;
-}
-
-int StochasticGenerator::selectDurationTicket(const StochasticSequence &sequence, Random &rng) {
-    int totalWeight = 0;
-    for (int i = 0; i < 8; ++i) {
-        totalWeight += sequence.durationTicket(i);
-    }
-    if (totalWeight <= 0) {
-        for (int i = 0; i < 8; ++i) totalWeight += 10;
-        totalWeight = 80;
-    }
-    int roll = rng.nextRange(totalWeight);
-    int sum = 0;
-    for (int i = 0; i < 8; ++i) {
-        int w = sequence.durationTicket(i);
-        if (w <= 0 && totalWeight <= 0) w = 10;
-        sum += w;
-        if (roll < sum) return i;
-    }
-    return 3; // default 1/16
 }
 
 float StochasticGenerator::betaDistributionSample(float x, float spread) {

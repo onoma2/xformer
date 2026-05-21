@@ -20,14 +20,7 @@ public:
     static void permuteRhythmOne(StochasticSequence &sequence, Random &rng);
     static void permuteMelodyOne(StochasticSequence &sequence, Random &rng);
 
-    // Bipolar variation pick over the duration LUT. variation: -100..+100.
-    //   variation > 0 → bias toward shorter (higher LUT slot index)
-    //   variation < 0 → bias toward longer  (lower LUT slot index)
-    // |variation|/100 = probability + max-jump scaling. Returns the (possibly
-    // substituted) LUT slot index, clamped to [0, 7].
-    static int applyVariation(int baseIdx, int variation, Random &rng);
     static void generateMaskRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed);
-    static int selectDurationTicket(const StochasticSequence &sequence, Random &rng);
     
     struct EvaluatedChild {
         uint32_t tickOffset;
