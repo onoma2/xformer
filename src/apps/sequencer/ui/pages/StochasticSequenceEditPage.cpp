@@ -109,7 +109,16 @@ void StochasticSequenceEditPage::drawCorePage(Canvas &canvas) {
     const char *shapeLabel = marblesOn ? "SHAPE ON" : "SHAPE OFF";
     canvas.drawText(Width - canvas.textWidth(shapeLabel) - 8, 18, shapeLabel);
 
-    const char *footer[] = { "SHAPE", "MODE", "RENEW", "LOCK", "NEXT" };
+    // Dynamic footer labels — show actual current state per DiscreteMap convention.
+    auto &track = _project.selectedTrack().stochasticTrack();
+    const char *modeLabel = "LIVE";
+    if (seq.rhythmMode() == seq.melodyMode()) {
+        modeLabel = (seq.rhythmMode() == StochasticSourceMode::Loop) ? "LOOP" : "LIVE";
+    } else {
+        modeLabel = "SPLIT";
+    }
+    const char *lockLabel = track.lock() ? "LOCKED" : "FREE";
+    const char *footer[] = { marblesOn ? "MARBLE" : "SHAPE", modeLabel, "RENEW", lockLabel, "NEXT" };
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
 }
 
@@ -322,10 +331,17 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     canvas.drawText(8, 18, str);
 
     canvas.setColor(track.lock() ? Color::Bright : Color::Medium);
-    const char *lockLabel = track.lock() ? "LOCKED" : "LIVE";
-    canvas.drawText(Width - canvas.textWidth(lockLabel) - 8, 18, lockLabel);
+    const char *lockState = track.lock() ? "LOCKED" : "LIVE";
+    canvas.drawText(Width - canvas.textWidth(lockState) - 8, 18, lockState);
 
-    const char *footer[] = { "MODE", "RENEW", "LOCK", nullptr, "NEXT" };
+    const char *modeLabel = "LIVE";
+    if (seq.rhythmMode() == seq.melodyMode()) {
+        modeLabel = (seq.rhythmMode() == StochasticSourceMode::Loop) ? "LOOP" : "LIVE";
+    } else {
+        modeLabel = "SPLIT";
+    }
+    const char *lockFooter = track.lock() ? "LOCKED" : "FREE";
+    const char *footer[] = { modeLabel, "RENEW", lockFooter, nullptr, "NEXT" };
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
 }
 
