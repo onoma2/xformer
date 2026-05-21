@@ -25,15 +25,20 @@
 // Forward decl for use by patienceProbability below.
 static float poissonCdf(int k, float lambda);
 
+// Phase 12 musicality fix: dropped the knob-100 off-sentinel discontinuity.
+// Knob 0..100 → λ ∈ [1, 80] linear; 100 is "very patient" (~80 loops avg) but
+// still finite. For "never regenerate", use the track Lock control instead.
+static inline float patienceLambda(int patience) {
+    int p = patience < 0 ? 0 : (patience > 100 ? 100 : patience);
+    return 1.0f + (p * 79.0f) / 100.0f;
+}
+
 float StochasticTrackEngine::patienceProbability(uint32_t loops, int patience) {
-    if (patience >= 100) return 0.0f;  // off sentinel
-    float lambda = 1.0f + (patience * 49.0f) / 99.0f;
-    return poissonCdf(int(loops), lambda);
+    return poissonCdf(int(loops), patienceLambda(patience));
 }
 
 float StochasticTrackEngine::patienceMeter(uint32_t loops, int patience) {
-    if (patience >= 100) return 0.0f;
-    float lambda = 1.0f + (patience * 49.0f) / 99.0f;
+    float lambda = patienceLambda(patience);
     float meter = float(loops) / lambda;
     if (meter > 1.0f) meter = 1.0f;
     return meter;
@@ -110,10 +115,22 @@ void StochasticTrackEngine::freeLockedSteps() {
 }
 
 void StochasticTrackEngine::resetMeasure() {
-    _patternIndex = _stochasticTrack.sequence(pattern()).first();
+    auto &seq = _stochasticTrack.sequence(pattern());
+    // Phase 12: count the reset-measure boundary toward patience ONLY when it
+    // preempts a natural wrap that hasn't already fired. Natural wraps run
+    // before reset boundaries in normal playback (often one tick apart), so
+    // unconditional roll here would double-count and accelerate patience.
+    // If `_patternIndex` is already `first()`, the natural wrap just ran and
+    // already rolled — skip. If it's mid-cycle, reset is truncating an unfired
+    // cycle — count it.
+    bool preempted = (_patternIndex != seq.first());
+    _patternIndex = seq.first();
     _relativeTick = 0;
     _eventElapsed = 0;
     _eventDuration = 0;
+    if (preempted) {
+        rollPatience();
+    }
 }
 
 void StochasticTrackEngine::reset() {
@@ -124,6 +141,8 @@ void StochasticTrackEngine::reset() {
     _loopCycleCountMelody = 0;
     _lastAppliedTilt = 0;
     _lastAppliedSize = 0;
+    _lastAppliedFirst = 0;
+    _lastAppliedLast = 0;
     _lastDegree = -1;
     _jumpRegister = 0;
     _lastFreeStepIndex = -1;
@@ -221,6 +240,13 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     const auto &scale = sequence.selectedScale(_model.project().scale());
     int rootNote = sequence.selectedRootNote(_model.project().rootNote());
 
+    // Phase 12 fix: snap _patternIndex into the active window before reading.
+    // If the user shrinks Last or raises First while playback is past the new
+    // window, the engine would otherwise play one stale off-window event with
+    // stale rank/mutation state. Snap to first() so window edits feel immediate.
+    if (_patternIndex < sequence.first() || _patternIndex > sequence.last()) {
+        _patternIndex = sequence.first();
+    }
     int readIndex = _patternIndex;
     if (sequence.rotate() != 0) {
         int windowSize = sequence.last() - sequence.first() + 1;
@@ -346,10 +372,13 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         int note = int(eval.degree()) + (int(eval.octave()) + _jumpRegister + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
 
-        // V5 Mask: deterministic playback thinning after source read/evaluation
-        uint32_t maskSize = std::max(1, sequence.size());
+        // V5 Mask: deterministic playback thinning after source read/evaluation.
+        // Phase 12: ranks are assigned over the active window [first..last]
+        // (0..windowSize-1), so the mask threshold must use windowSize, not
+        // sequence.size(), to keep "% audible plays" semantics correct.
+        uint32_t windowSize = std::max(1, int(sequence.last()) - int(sequence.first()) + 1);
         bool maskPass = sequence.mask() >= 100 ||
-            ((uint32_t(eval.densityRank()) * 100) < (uint32_t(sequence.mask()) * maskSize));
+            ((uint32_t(eval.densityRank()) * 100) < (uint32_t(sequence.mask()) * windowSize));
         isRest = bool(eval.rest()) || !maskPass || !eval.rhythmValid() || !eval.melodyValid();
         isLegato = bool(eval.legato());
         isSlide = bool(eval.slide());
@@ -449,17 +478,32 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 _jumpRegister += direction;
             }
 
-            if (sequence.sleep() > 0) _sleepRemaining = (sequence.sleep() * 4) / 10;
+            // Phase 12 musicality fix: round (+5) instead of floor so knob=2
+            // already produces 1 sleep event instead of the dead 0..2 zone.
+            if (sequence.sleep() > 0) _sleepRemaining = (sequence.sleep() * 4 + 5) / 10;
+
+            // Phase 12 fix: roll patience BEFORE mutation. If patience invalidates
+            // a Loop domain, the next triggerStep will regenerate the whole event
+            // buffer for that domain — overwriting any mutation we'd just write.
+            // Doing patience first lets the mutation skip a domain that's about
+            // to be regenerated, avoiding wasted writes that audio never observes.
+            // Also now counts the reset-measure boundary (see resetMeasure()) toward
+            // the same per-domain counters.
+            rollPatience();
 
             // Domain-aware bipolar mutation. Sign selects algorithm:
             //   mutate > 0 → Marbles permutation (swap two existing events)
             //   mutate < 0 → Proteus destructive (regenerate one event)
             //   mutate = 0 → lock (no mutation)
             // Magnitude is the per-loop probability.
+            // Phase 12: only apply to domains that are still valid after the
+            // patience roll above; an invalidated domain is about to be wiped.
             int mutateAmount = sequence.mutate();
             int mutateMag = mutateAmount < 0 ? -mutateAmount : mutateAmount;
             if (mutateMag > 0 && int(_rng.nextRange(100)) < mutateMag) {
                 bool destructive = (mutateAmount < 0);
+                bool rhythmEligible = (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.rhythmValid());
+                bool melodyEligible = (sequence.melodyMode() == StochasticSourceMode::Loop && sequence.melodyValid());
                 auto applyRhythm = [&] {
                     if (destructive) StochasticGenerator::mutateRhythmOne(sequence, track, _rng, mutateMag);
                     else             StochasticGenerator::permuteRhythmOne(sequence, _rng);
@@ -468,52 +512,56 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     if (destructive) StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng, mutateMag);
                     else             StochasticGenerator::permuteMelodyOne(sequence, _rng);
                 };
-                if (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.melodyMode() == StochasticSourceMode::Loop) {
+                if (rhythmEligible && melodyEligible) {
                     if (_rng.nextRange(2) == 0) applyRhythm();
                     else                         applyMelody();
-                } else if (sequence.rhythmMode() == StochasticSourceMode::Loop) {
+                } else if (rhythmEligible) {
                     applyRhythm();
-                } else if (sequence.melodyMode() == StochasticSourceMode::Loop) {
+                } else if (melodyEligible) {
                     applyMelody();
                 }
             }
 
-            // Phase 12 Mask+Tilt: re-rank on Tilt or Size change. Cheap O(N log N)
-            // pass over the existing event buffer; content untouched. Makes Tilt
-            // a real-time performance knob like Mask without forcing a full
-            // content renew.
+            // Phase 12 Mask+Tilt: re-rank on Tilt / Size / First / Last change.
+            // Ranks are now window-local, so any change to the active playback
+            // window invalidates them. Content untouched.
             if (int8_t(sequence.tilt()) != _lastAppliedTilt ||
-                uint8_t(sequence.size()) != _lastAppliedSize) {
+                uint8_t(sequence.size()) != _lastAppliedSize ||
+                uint8_t(sequence.first()) != _lastAppliedFirst ||
+                uint8_t(sequence.last())  != _lastAppliedLast) {
                 if (sequence.rhythmMode() == StochasticSourceMode::Loop) {
                     StochasticGenerator::generateMaskRanks(sequence, sequence.size(),
                         sequence.tilt(), sequence.rhythmSeed() ^ 0xdeadbeef);
                 }
-                _lastAppliedTilt = int8_t(sequence.tilt());
-                _lastAppliedSize = uint8_t(sequence.size());
+                _lastAppliedTilt  = int8_t(sequence.tilt());
+                _lastAppliedSize  = uint8_t(sequence.size());
+                _lastAppliedFirst = uint8_t(sequence.first());
+                _lastAppliedLast  = uint8_t(sequence.last());
             }
+        }
+    }
+}
 
-            // Proteus-style patience — split per domain (Phase 12). Each domain
-            // has its own knob, its own loop counter, and its own Poisson CDF roll.
-            // Rhythm patience invalidates only the rhythm loop source; melody
-            // patience only the melody. Knob 100 = off sentinel for each.
-            int patR = int(sequence.patienceRhythm());
-            if (patR < 100 && sequence.rhythmMode() == StochasticSourceMode::Loop) {
-                _loopCycleCount++;
-                float pR = StochasticTrackEngine::patienceProbability(_loopCycleCount, patR);
-                if (_rng.nextRange(10000) < uint32_t(pR * 10000.0f)) {
-                    sequence.setRhythmValid(false);
-                    _loopCycleCount = 0;
-                }
-            }
-            int patM = int(sequence.patienceMelody());
-            if (patM < 100 && sequence.melodyMode() == StochasticSourceMode::Loop) {
-                _loopCycleCountMelody++;
-                float pM = StochasticTrackEngine::patienceProbability(_loopCycleCountMelody, patM);
-                if (_rng.nextRange(10000) < uint32_t(pM * 10000.0f)) {
-                    sequence.setMelodyValid(false);
-                    _loopCycleCountMelody = 0;
-                }
-            }
+void StochasticTrackEngine::rollPatience() {
+    auto &sequence = const_cast<StochasticSequence&>(*_sequence);
+    // Phase 12 musicality fix: no off-sentinel; patience always rolls when in
+    // Loop mode. For "never regenerate", the user uses the track Lock control.
+    int patR = int(sequence.patienceRhythm());
+    if (sequence.rhythmMode() == StochasticSourceMode::Loop) {
+        _loopCycleCount++;
+        float pR = StochasticTrackEngine::patienceProbability(_loopCycleCount, patR);
+        if (_rng.nextRange(10000) < uint32_t(pR * 10000.0f)) {
+            sequence.setRhythmValid(false);
+            _loopCycleCount = 0;
+        }
+    }
+    int patM = int(sequence.patienceMelody());
+    if (sequence.melodyMode() == StochasticSourceMode::Loop) {
+        _loopCycleCountMelody++;
+        float pM = StochasticTrackEngine::patienceProbability(_loopCycleCountMelody, patM);
+        if (_rng.nextRange(10000) < uint32_t(pM * 10000.0f)) {
+            sequence.setMelodyValid(false);
+            _loopCycleCountMelody = 0;
         }
     }
 }

@@ -95,6 +95,10 @@ private:
     void triggerStep(uint32_t tick, uint32_t divisor);
     void resetMeasure();
     void refreshLoopSources();
+    // Phase 12: per-domain Poisson patience roll. Fired from pattern-cycle wrap
+    // AND from forced reset-measure boundary so both count toward the patience
+    // counters. Each domain rolls independently against its own counter.
+    void rollPatience();
 
     const StochasticTrack &_stochasticTrack;
     const StochasticSequence *_sequence = nullptr;
@@ -107,9 +111,12 @@ private:
     uint16_t _loopCycleCount = 0;          // legacy alias kept for indicator path (== rhythm count)
     uint16_t _loopCycleCountMelody = 0;
     // Phase 12 Mask/Tilt instant re-rank cache. Engine re-runs generateMaskRanks
-    // when either tilt or size changes (or on Mutate fire).
+    // when tilt, size, or the playback window (first/last) changes — or on
+    // Mutate fire. Ranks are window-local so first/last shifts reshape ranks.
     int8_t _lastAppliedTilt = 0;
     uint8_t _lastAppliedSize = 0;
+    uint8_t _lastAppliedFirst = 0;
+    uint8_t _lastAppliedLast = 0;
     int _lastDegree = -1;
     int _lastDurationIndex = 0;
     int _jumpRegister = 0;

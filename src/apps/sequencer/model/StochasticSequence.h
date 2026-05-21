@@ -374,7 +374,21 @@ public:
     void printTilt(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticTilt); str("%+d%%", tilt()); }
     void editTilt(int value, bool shift) { if (!isRouted(Routing::Target::StochasticTilt)) setTilt(tilt() + value); }
 
-    void printBurst(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticBurst); str("%d%%", burst()); }
+    // Phase 12: append "*" when current noteDuration + divisor combo can't
+    // produce audible burst (parentTicks < 96). Engine still gates Burst
+    // probability via Cluster F; this just tells the user why the knob is
+    // inert at short durations so Burst/Count/Rate aren't silently dead.
+    void printBurst(StringBuilder &str) const {
+        printRouted(str, Routing::Target::StochasticBurst);
+        static const int lutNum[] = { 8, 4, 3, 2, 4, 1, 2, 1 };
+        static const int lutDen[] = { 1, 1, 1, 1, 3, 1, 3, 2 };
+        int idx = clamp(int(noteDuration()), 0, 7);
+        // parentTicks = divisor * (CONFIG_PPQN/CONFIG_SEQUENCE_PPQN=4) * num / den.
+        int parentTicks = (int(divisor()) * 4 * lutNum[idx]) / lutDen[idx];
+        const int kMinBurstParentTicks = 96;
+        if (parentTicks < kMinBurstParentTicks) str("%d%% *", burst());
+        else str("%d%%", burst());
+    }
     void editBurst(int value, bool shift) { if (!isRouted(Routing::Target::StochasticBurst)) setBurst(burst() + value); }
 
     void printMinDegree(StringBuilder &str) const { str("%d", minDegree()); }
@@ -651,7 +665,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         reader.read(_marblesBias);
         _marblesBias = clamp(int(_marblesBias), 0, 100);
         reader.read(_marblesSteps);
-        _marblesSteps = clamp(int(_marblesSteps), 1, 100);
+        _marblesSteps = clamp(int(_marblesSteps), 0, 100);
         _mask.read(reader);
         _tilt.read(reader);
         _burst.read(reader);

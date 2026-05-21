@@ -34,12 +34,9 @@ void StochasticSequenceEditPage::exit() {
 }
 
 void StochasticSequenceEditPage::nextPage() {
-    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
     int next = (int(_currentPage) + 1) % int(Page::Count);
-    // Skip Marbles page entirely when marblesMode is Off.
-    if (Page(next) == Page::Marbles && seq.marblesMode() == MarblesMode::Off) {
-        next = (next + 1) % int(Page::Count);
-    }
+    // Phase 12: marblesMode toggle is dead (always-on transparent defaults).
+    // Marbles page is always visible in the cycle.
     _currentPage = Page(next);
     _heroHeldStep = -1;
 }
@@ -73,13 +70,14 @@ void StochasticSequenceEditPage::drawCorePage(Canvas &canvas) {
     int rest = seq.rest();
     int burst = seq.burst();
     int complexity = seq.complexity();
-    bool marblesOn = (seq.marblesMode() == MarblesMode::On);
 
     // dropCount = mood proxy: rest sparsens, burst + complexity busy it up.
     // Range ~12..100. Density slot is engine-reserved and not visualized.
     int dropCount = 12 + ((100 - rest) * 40) / 100 + (burst * 30) / 100 + (complexity * 18) / 100;
     int jitter = 2 + (complexity * 14) / 100;           // 2..16
-    int wind = marblesOn ? 2 : 0;
+    // Phase 12: marblesMode toggle is dead — pitch shape always applies.
+    // Wind is purely cosmetic, driven by complexity instead.
+    int wind = 1 + complexity / 50;
 
     Random rng(11);
     canvas.setBlendMode(BlendMode::Set);
@@ -108,9 +106,8 @@ void StochasticSequenceEditPage::drawCorePage(Canvas &canvas) {
     canvas.setColor(Color::Bright);
     canvas.drawText(8, 18, str);
 
-    canvas.setColor(marblesOn ? Color::Bright : Color::Medium);
-    const char *shapeLabel = marblesOn ? "SHAPE ON" : "SHAPE OFF";
-    canvas.drawText(Width - canvas.textWidth(shapeLabel) - 8, 18, shapeLabel);
+    // Phase 12: removed the SHAPE ON/OFF on-screen affordance — engine no
+    // longer honors `marblesMode`, so the label was a lie.
 
     // Dynamic footer labels — show actual current state per DiscreteMap convention.
     auto &track = _project.selectedTrack().stochasticTrack();
@@ -121,7 +118,8 @@ void StochasticSequenceEditPage::drawCorePage(Canvas &canvas) {
         modeLabel = "SPLIT";
     }
     const char *lockLabel = track.lock() ? "LOCKED" : "FREE";
-    const char *footer[] = { marblesOn ? "MARBLE" : "SHAPE", modeLabel, "RENEW", lockLabel, "NEXT" };
+    // F1 slot used to toggle marblesMode; that's dead now, so the slot is empty.
+    const char *footer[] = { nullptr, modeLabel, "RENEW", lockLabel, "NEXT" };
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
 }
 
@@ -133,8 +131,15 @@ void StochasticSequenceEditPage::drawMarblesPage(Canvas &canvas) {
 
     int bias = seq.marblesBias();       // 0..100, 50=center
     int spreadVal = seq.marblesSpread(); // 0..100
-    int stepsVal = seq.marblesSteps();   // 1..100
-    bool on = (seq.marblesMode() == MarblesMode::On);
+    int stepsVal = seq.marblesSteps();   // 0..100 (sieve cutoff)
+    // Phase 12 musicality fix: Steps is a coarse rank cutoff (K = ceil(N×%/100)).
+    // Show K/N alongside the raw % so the user sees the actual sieve count and
+    // understands the staircase, not a smooth continuous knob.
+    auto &scaleForSteps = seq.selectedScale(_project.scale());
+    int scaleSizeForSteps = clamp(scaleForSteps.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
+    int stepsK = (scaleSizeForSteps * stepsVal + 99) / 100;
+    if (stepsK < 1) stepsK = 1;
+    if (stepsK > scaleSizeForSteps) stepsK = scaleSizeForSteps;
 
     int biasOffset = ((bias - 50) * 4) / 5;            // -40..+40
     int cx = Width / 2 + biasOffset;
@@ -144,10 +149,8 @@ void StochasticSequenceEditPage::drawMarblesPage(Canvas &canvas) {
     int peakY = 14;
 
     canvas.setBlendMode(BlendMode::Set);
-    if (!on) {
-        canvas.setColor(Color::Low);
-        canvas.hline(8, baseline, Width - 16);
-    } else {
+    // Phase 12: pitch shape is always live — no "off" branch. Always draw bell.
+    {
         // Quantization ticks
         canvas.setColor(Color::Low);
         int bandW = std::max(2, (spread * 4) / stepsCount);
@@ -184,13 +187,15 @@ void StochasticSequenceEditPage::drawMarblesPage(Canvas &canvas) {
     FixedStringBuilder<32> str;
     if (_heroHeldStep == 0) str("BIAS %d", bias);
     else if (_heroHeldStep == 1) str("SPRD %d", spreadVal);
-    else if (_heroHeldStep == 2) str("STEP %d", stepsVal);
-    else str("B%d  S%d  N%d", bias, spreadVal, stepsVal);
+    else if (_heroHeldStep == 2) str("STEP %d  (%d/%d)", stepsVal, stepsK, scaleSizeForSteps);
+    else str("B%d  S%d  N%d/%d", bias, spreadVal, stepsK, scaleSizeForSteps);
     canvas.setFont(Font::Small);
     canvas.setColor(Color::Bright);
     canvas.drawText(8, 18, str);
 
-    const char *footer[] = { "SHAPE", nullptr, nullptr, nullptr, "NEXT" };
+    // Phase 12: F1 SHAPE toggle removed (was a lie — engine always honors
+    // Bias/Spread/Steps regardless of marblesMode).
+    const char *footer[] = { nullptr, nullptr, nullptr, nullptr, "NEXT" };
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
 }
 
@@ -586,13 +591,9 @@ bool StochasticSequenceEditPage::handleCoreFunction(int fn, bool shift) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &seq = track.sequence(_project.selectedPatternIndex());
     switch (fn) {
-    case 0: // SHAPE — toggle marblesMode and jump to Marbles page when turning On
-        seq.setMarblesMode(seq.marblesMode() == MarblesMode::Off ? MarblesMode::On : MarblesMode::Off);
-        if (seq.marblesMode() == MarblesMode::On) {
-            _currentPage = Page::Marbles;
-            _heroHeldStep = -1;
-        }
-        return true;
+    case 0: // F1 unused — was SHAPE toggle, dead since Phase 12 (engine always
+            // honors Bias/Spread/Steps regardless of marblesMode).
+        return false;
     case 1: { // MODE — toggle coupled rhythm/melody between Loop and Live
         auto newMode = (seq.rhythmMode() == StochasticSourceMode::Loop)
             ? StochasticSourceMode::Live : StochasticSourceMode::Loop;
