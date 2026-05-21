@@ -4,36 +4,76 @@
 
 UNIT_TEST("StochasticDurationDictionary") {
 
-CASE("slot_0_is_quarter") {
-    expectEqual(StochasticTrackEngine::getDurationMultiplier(0), uint32_t(192), "slot 0 = 192 (1/4)");
+// V5 LUT — divisor-relative multipliers, sorted descending by duration.
+// Slot ordering: ×8, ×4, ×3, ×2, ×4/3, ×1, ×2/3, ×1/2.
+// Labels assume divisor = 1/16 (12 ticks at PPQN=48 → 48 at PPQN=192).
+// getDurationMultiplier() returns absolute ticks at PPQN=192 assuming
+// divisor=1/16 (legacy helper for tests + back-compat).
+
+CASE("slot_0_is_half") {
+    auto f = StochasticTrackEngine::getDurationFraction(0);
+    expectEqual(int(f.num), 8, "slot 0 num=8");
+    expectEqual(int(f.den), 1, "slot 0 den=1");
+    expectEqual(StochasticTrackEngine::getDurationMultiplier(0), uint32_t(384), "slot 0 = 384 ticks (1/2 @ divisor=1/16)");
 }
 
-CASE("slot_1_is_eighth") {
-    expectEqual(StochasticTrackEngine::getDurationMultiplier(1), uint32_t(96), "slot 1 = 96 (1/8)");
+CASE("slot_1_is_quarter") {
+    auto f = StochasticTrackEngine::getDurationFraction(1);
+    expectEqual(int(f.num), 4, "slot 1 num=4");
+    expectEqual(int(f.den), 1, "slot 1 den=1");
+    expectEqual(StochasticTrackEngine::getDurationMultiplier(1), uint32_t(192), "slot 1 = 192 ticks (1/4 @ divisor=1/16)");
 }
 
-CASE("slot_2_is_sixteenth") {
-    expectEqual(StochasticTrackEngine::getDurationMultiplier(2), uint32_t(48), "slot 2 = 48 (1/16)");
+CASE("slot_2_is_dotted_eighth") {
+    auto f = StochasticTrackEngine::getDurationFraction(2);
+    expectEqual(int(f.num), 3, "slot 2 num=3");
+    expectEqual(int(f.den), 1, "slot 2 den=1");
+    expectEqual(StochasticTrackEngine::getDurationMultiplier(2), uint32_t(144), "slot 2 = 144 ticks (3/16 @ divisor=1/16)");
 }
 
-CASE("slot_3_is_thirtysecond") {
-    expectEqual(StochasticTrackEngine::getDurationMultiplier(3), uint32_t(24), "slot 3 = 24 (1/32)");
+CASE("slot_3_is_eighth") {
+    auto f = StochasticTrackEngine::getDurationFraction(3);
+    expectEqual(int(f.num), 2, "slot 3 num=2");
+    expectEqual(int(f.den), 1, "slot 3 den=1");
+    expectEqual(StochasticTrackEngine::getDurationMultiplier(3), uint32_t(96), "slot 3 = 96 ticks (1/8 @ divisor=1/16)");
 }
 
-CASE("slot_4_is_sixtyfourth") {
-    expectEqual(StochasticTrackEngine::getDurationMultiplier(4), uint32_t(12), "slot 4 = 12 (1/64)");
+CASE("slot_4_is_eighth_triplet") {
+    auto f = StochasticTrackEngine::getDurationFraction(4);
+    expectEqual(int(f.num), 4, "slot 4 num=4");
+    expectEqual(int(f.den), 3, "slot 4 den=3");
+    expectEqual(StochasticTrackEngine::getDurationMultiplier(4), uint32_t(64), "slot 4 = 64 ticks (1/8T @ divisor=1/16)");
 }
 
-CASE("slot_5_is_eighth_triplet") {
-    expectEqual(StochasticTrackEngine::getDurationMultiplier(5), uint32_t(64), "slot 5 = 64 (1/8T)");
+CASE("slot_5_is_sixteenth_base") {
+    auto f = StochasticTrackEngine::getDurationFraction(5);
+    expectEqual(int(f.num), 1, "slot 5 num=1");
+    expectEqual(int(f.den), 1, "slot 5 den=1 (= divisor)");
+    expectEqual(StochasticTrackEngine::getDurationMultiplier(5), uint32_t(48), "slot 5 = 48 ticks (1/16 @ divisor=1/16)");
 }
 
 CASE("slot_6_is_sixteenth_triplet") {
-    expectEqual(StochasticTrackEngine::getDurationMultiplier(6), uint32_t(32), "slot 6 = 32 (1/16T)");
+    auto f = StochasticTrackEngine::getDurationFraction(6);
+    expectEqual(int(f.num), 2, "slot 6 num=2");
+    expectEqual(int(f.den), 3, "slot 6 den=3");
+    expectEqual(StochasticTrackEngine::getDurationMultiplier(6), uint32_t(32), "slot 6 = 32 ticks (1/16T @ divisor=1/16)");
 }
 
-CASE("slot_7_is_dotted_eighth") {
-    expectEqual(StochasticTrackEngine::getDurationMultiplier(7), uint32_t(144), "slot 7 = 144 (3/16)");
+CASE("slot_7_is_thirtysecond") {
+    auto f = StochasticTrackEngine::getDurationFraction(7);
+    expectEqual(int(f.num), 1, "slot 7 num=1");
+    expectEqual(int(f.den), 2, "slot 7 den=2");
+    expectEqual(StochasticTrackEngine::getDurationMultiplier(7), uint32_t(24), "slot 7 = 24 ticks (1/32 @ divisor=1/16)");
+}
+
+CASE("lut_is_descending") {
+    // Each slot strictly shorter than the previous.
+    auto prev = StochasticTrackEngine::getDurationMultiplier(0);
+    for (int i = 1; i < 8; ++i) {
+        auto cur = StochasticTrackEngine::getDurationMultiplier(i);
+        expect(cur < prev, "LUT must descend by ticks");
+        prev = cur;
+    }
 }
 
 } // UNIT_TEST("StochasticDurationDictionary")

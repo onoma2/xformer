@@ -143,7 +143,7 @@ public:
         StochasticBurst,
         StochasticComplexity,
         StochasticContour,
-        StochasticRate,
+        StochasticNoteDuration,
         StochasticVariation,
         StochasticRest,
         StochasticSlide,
@@ -216,7 +216,7 @@ public:
         case Target::StochasticBurst:           return "Burst";
         case Target::StochasticComplexity:      return "Complexity";
         case Target::StochasticContour:         return "Contour";
-        case Target::StochasticRate:            return "Rate";
+        case Target::StochasticNoteDuration:            return "Note Duration";
         case Target::StochasticVariation:       return "Variation";
         case Target::StochasticRest:            return "Rest";
         case Target::StochasticSlide:           return "Slide";
@@ -313,7 +313,7 @@ public:
         case Target::StochasticBurst:           return 68;
         case Target::StochasticComplexity:      return 69;
         case Target::StochasticContour:         return 70;
-        case Target::StochasticRate:            return 71;
+        case Target::StochasticNoteDuration:            return 71;
         case Target::StochasticVariation:       return 72;
         case Target::StochasticRest:            return 73;
         case Target::StochasticSlide:           return 74;

@@ -1,7 +1,66 @@
 #include "StochasticGenerator.h"
+#include "StochasticTrackEngine.h"   // for getDurationMultiplier + kMaxChildren
 
 #include <cmath>
 #include <algorithm>
+
+// Burst count LUT — knob picks weighted-random over {2,3,4,5}.
+// 1 child is meaningless; max 5 matches kMaxChildren in StochasticTrackEngine.h.
+// burstCount is a MAX intent: actual count clips to whatever the picked
+// spacing slot can hold inside the parent duration (Option C).
+static const int kBurstCountLut[] = { 2, 3, 4, 5 };
+static const int kBurstCountLutSize = 4;
+
+// Burst spacing LUT — knob picks weighted-random denominator from {2,3,4,5,6}.
+// Spacing = parentDurationTicks / denominator.
+//   /2 = half-parent (echo / slap-back; few children fit)
+//   /3 = sextuplet feel
+//   /4 = 1/32 fill (3 children fit on 1/8 parent)
+//   /5 = quintuplet
+//   /6 = 1/48 sextuplet flurry (5 children fit on 1/8 parent)
+// At Cluster F gate (parent >= 1/8 = 96 ticks), /6 = 16 ticks ≥ minChildGate+1.
+static const int kBurstSpacingLut[] = { 2, 3, 4, 5, 6 };
+static const int kBurstSpacingLutSize = 5;
+
+// Minimum parent duration (ticks) for burst to fire at all. 96 ticks = 1/8 at
+// PPQN=48. Below this the children either fall under minChildGate or pack into
+// inaudible mush. Cluster F gate.
+static const uint32_t kMinBurstParentTicks = 96;
+
+// Triangular-kernel weighted pick over a LUT.
+// knob = 0   → ~always lut[0]
+// knob = 100 → ~always lut[last]
+// midpoints  → smooth distribution over neighbors (50-tick tent half-width).
+static int pickFromLutTriangular(const int *lut, int lutSize, int knob, Random &rng) {
+    int weights[8];  // enough for any reasonable LUT
+    int total = 0;
+    for (int i = 0; i < lutSize; ++i) {
+        int center = (i * 100) / (lutSize - 1);
+        int dist = knob > center ? knob - center : center - knob;
+        int w = 50 - dist;
+        if (w < 0) w = 0;
+        weights[i] = w;
+        total += w;
+    }
+    if (total <= 0) {
+        return lut[rng.nextRange(uint32_t(lutSize))];
+    }
+    int roll = int(rng.nextRange(uint32_t(total)));
+    int sum = 0;
+    for (int i = 0; i < lutSize; ++i) {
+        sum += weights[i];
+        if (roll < sum) return lut[i];
+    }
+    return lut[lutSize - 1];
+}
+
+static int pickBurstCountFromLut(int knob, Random &rng) {
+    return pickFromLutTriangular(kBurstCountLut, kBurstCountLutSize, knob, rng);
+}
+
+static int pickBurstSpacingFromLut(int knob, Random &rng) {
+    return pickFromLutTriangular(kBurstSpacingLut, kBurstSpacingLutSize, knob, rng);
+}
 
 void StochasticGenerator::generateRhythm(StochasticSequence &sequence, const StochasticTrack &track, uint32_t seed) {
     Random rng(seed);
@@ -61,6 +120,65 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
     sequence.events()[i].mergeMelodyFrom(melody);
 }
 
+// Marbles-style permutation: swap rhythm content between two random positions.
+void StochasticGenerator::permuteRhythmOne(StochasticSequence &sequence, Random &rng) {
+    int size = sequence.size();
+    if (size < 2) return;
+    int i = rng.nextRange(size);
+    int j = rng.nextRange(size - 1);
+    if (j >= i) ++j;  // ensure j != i
+    auto &ev = sequence.events();
+    StochasticSourceEvent tmp;
+    tmp.mergeRhythmFrom(ev[i]);
+    ev[i].mergeRhythmFrom(ev[j]);
+    ev[j].mergeRhythmFrom(tmp);
+}
+
+int StochasticGenerator::applyVariation(int baseIdx, int variation, Random &rng) {
+    if (variation == 0) return baseIdx;
+    int absVar = variation < 0 ? -variation : variation;
+    if (int(rng.nextRange(100)) >= absVar) return baseIdx;
+
+    int sign = variation > 0 ? +1 : -1;
+    int maxJump = 1 + (absVar * 3) / 100;     // 1..4 slots
+    if (maxJump < 1) maxJump = 1;
+    if (maxJump > 4) maxJump = 4;
+
+    int weights[4];
+    int total = 0;
+    for (int d = 1; d <= maxJump; ++d) {
+        int w = maxJump - d + 1;              // triangular: adjacent heaviest
+        weights[d - 1] = w;
+        total += w;
+    }
+    int roll = int(rng.nextRange(uint32_t(total)));
+    int sum = 0;
+    int jump = 1;
+    for (int d = 1; d <= maxJump; ++d) {
+        sum += weights[d - 1];
+        if (roll < sum) { jump = d; break; }
+    }
+
+    int target = baseIdx + sign * jump;
+    if (target < 0) target = 0;
+    if (target > 7) target = 7;
+    return target;
+}
+
+// Marbles-style permutation: swap melody content between two random positions.
+void StochasticGenerator::permuteMelodyOne(StochasticSequence &sequence, Random &rng) {
+    int size = sequence.size();
+    if (size < 2) return;
+    int i = rng.nextRange(size);
+    int j = rng.nextRange(size - 1);
+    if (j >= i) ++j;
+    auto &ev = sequence.events();
+    StochasticSourceEvent tmp;
+    tmp.mergeMelodyFrom(ev[i]);
+    ev[i].mergeMelodyFrom(ev[j]);
+    ev[j].mergeMelodyFrom(tmp);
+}
+
 void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed) {
     Random rng(seed);
     if (size <= 0) return;
@@ -89,17 +207,30 @@ void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int si
 
 void StochasticGenerator::evaluateChildren(EvaluatedChild *children, const StochasticSequence &sequence, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng) {
     int count = event.childCount();
-    uint32_t burstRate = event.burstRate();
-    
+
+    // Cluster F eval-time safety net: regardless of what childCount the event
+    // stores (possibly generated at a longer duration), suppress burst if the
+    // current effective parent is too short.
+    if (durationTicks < kMinBurstParentTicks) {
+        count = 0;
+    }
+
+    // Spacing comes from the LUT slot baked into event.burstRate(). Option C:
+    // the picked denominator determines child spacing INDEPENDENTLY of count;
+    // count auto-clips via the break-out logic below when children no longer fit.
+    int spacingSlot = int(event.burstRate());
+    if (spacingSlot < 0) spacingSlot = 0;
+    if (spacingSlot >= kBurstSpacingLutSize) spacingSlot = kBurstSpacingLutSize - 1;
+    int spacingDenom = kBurstSpacingLut[spacingSlot];
+    float spacing = float(durationTicks) / float(spacingDenom);
+
     // Minimum audible child gate: 6 ticks ≈ 30ms at 120 BPM (PPQN=192)
     const uint32_t minChildGate = 6;
+    spacing = std::max(float(minChildGate + 1), spacing);
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < StochasticTrackEngine::kMaxChildren; ++i) {
         children[i].valid = false;
         if (i < count) {
-            float spacing = (durationTicks / float(count + 1)) * (burstRate / 100.f);
-            spacing = std::max(float(minChildGate + 1), spacing); 
-
             uint32_t offset = uint32_t((i + 1) * spacing);
             uint32_t gate = std::max(minChildGate, uint32_t(spacing * 0.5f));
 
@@ -130,13 +261,17 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
     StochasticSourceEvent event;
     event.clear();
 
-    // V5 Duration: use duration tickets if enabled, else Rate+Variation
+    // V5 Duration: use weighted duration tickets if any are active, else
+    // single-slot pick via the noteDuration LUT macro. Variation is applied at
+    // generation time so each event gets its own randomized durationIndex
+    // baked into the stored pattern — Loop-mode playback then repeats the same
+    // varied content until RENEW, and the loop tape display sees the variation.
     int durationIndex;
     if (sequence.durationTicketsActive()) {
         durationIndex = selectDurationTicket(sequence, rng);
     } else {
-        int r = std::max(1, std::min(400, int(sequence.rate())));
-        durationIndex = ((r - 1) * 8) / 400;
+        int baseDur = std::max(0, std::min(7, int(sequence.noteDuration())));
+        durationIndex = applyVariation(baseDur, sequence.variation(), rng);
     }
 
     event.setDurationIndex(durationIndex);
@@ -151,11 +286,30 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
     event.setSlide(int(rng.nextRange(100)) < sequence.slide());
     event.setAccent(int(rng.nextRange(100)) < sequence.accentProb());
     event.setRhythmValid(true);
-    event.setBurstRate(sequence.burstRate());
 
     event.setChildCount(0);
-    if (int(rng.nextRange(100)) < sequence.burst()) {
-        event.setChildCount(1 + (uint32_t(sequence.burstCount()) * 3) / 100);
+    event.setBurstRate(0);
+    // Cluster F duration gate: skip burst entirely if the parent is shorter than
+    // 1/8 (96 ticks). Below that, children pack into mush even with the 6-tick
+    // gate floor. Combined with the LUT picks below, this guarantees children
+    // are always audible.
+    uint32_t parentTicks = StochasticTrackEngine::getDurationMultiplier(durationIndex);
+    if (parentTicks >= kMinBurstParentTicks && int(rng.nextRange(100)) < sequence.burst()) {
+        // burstCount macro biases the LUT pick for max child count (Option C —
+        // actual count is auto-shrunk by the eval-time fit loop if the picked
+        // spacing can't hold all children).
+        event.setChildCount(pickBurstCountFromLut(sequence.burstCount(), rng));
+        // burstRate macro biases the spacing LUT pick. The picked denominator
+        // is baked into the event (stored in the burstRate field, reinterpreted
+        // as the LUT slot index 0..kBurstSpacingLutSize-1) so Loop-mode playback
+        // is consistent across iterations.
+        int spacingSlot = -1;
+        const int picked = pickBurstSpacingFromLut(sequence.burstRate(), rng);
+        for (int i = 0; i < kBurstSpacingLutSize; ++i) {
+            if (kBurstSpacingLut[i] == picked) { spacingSlot = i; break; }
+        }
+        if (spacingSlot < 0) spacingSlot = 0;
+        event.setBurstRate(uint32_t(spacingSlot));
     }
 
     return event;

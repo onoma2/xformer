@@ -110,45 +110,18 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
         resetMeasure();
     }
 
-    // Dispatch by play mode or Duration Tickets event timing
-    if (sequence.durationTicketsActive()) {
-        _eventElapsed++;
-        if (_eventDuration == 0 || _eventElapsed >= _eventDuration) {
-            _eventElapsed = 0;
-            // DBG_STO("%u TRIG(T) p=%d", tick, _patternIndex);
+    // Event-driven step advancement. The current event's durationTicks (set in
+    // triggerStep, from the LUT slot × divisor) controls when the NEXT event
+    // fires. Same path for Duration-Tickets mode and Live/Loop mode — only the
+    // duration source differs (weighted ticket pick vs noteDuration+variation).
+    _eventElapsed++;
+    if (_eventDuration == 0 || _eventElapsed >= _eventDuration) {
+        _eventElapsed = 0;
+        if (!sequence.durationTicketsActive() && _sleepRemaining > 0) {
+            _sleepRemaining--;
+        } else {
             triggerStep(tick, divisor);
         }
-    } else {
-        switch (_stochasticTrack.playMode()) {
-        case Types::PlayMode::Free: {
-        double tickPos = _engine.clock().tickPosition();
-        double baseTick = resetDivisor == 0 ? tickPos : std::fmod(tickPos, double(resetDivisor));
-        if (baseTick < 0.0) baseTick = 0.0;
-        int stepIndex = int(std::floor(baseTick / divisor));
-        if (stepIndex != _lastFreeStepIndex) {
-            _lastFreeStepIndex = stepIndex;
-            if (_sleepRemaining > 0) {
-                _sleepRemaining--;
-            } else {
-                // DBG_STO("%u TRIG(F) p=%d", tick, _patternIndex);
-                triggerStep(tick, divisor);
-            }
-        }
-        break;
-    }
-    case Types::PlayMode::Aligned:
-    default:
-        _relativeTick = resetDivisor == 0 ? tick % divisor : relativeTick % divisor;
-        if (_relativeTick == 0) {
-            if (_sleepRemaining > 0) {
-                _sleepRemaining--;
-            } else {
-                // DBG_STO("%u TRIG(A) p=%d", tick, _patternIndex);
-                triggerStep(tick, divisor);
-            }
-        }
-        break;
-    }
     }
 
     // Process gate queue
@@ -225,7 +198,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _gateQueue.push({ tick, true, isAccent });
 
             bool hasChildren = false;
-            for (int i = 0; i < 4; ++i) if (_lockedParents[readIndex].children[i].valid) hasChildren = true;
+            for (int i = 0; i < kMaxChildren; ++i) if (_lockedParents[readIndex].children[i].valid) hasChildren = true;
 
             if (!isLegato && !hasChildren) {
                 uint32_t gateLen = (durationTicks * 50) / 100;
@@ -234,7 +207,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             }
             _activity = true;
 
-            for (int i = 0; i < 4; ++i) {
+            for (int i = 0; i < kMaxChildren; ++i) {
                 auto &child = _lockedParents[readIndex].children[i];
                 if (child.valid) {
                     uint32_t childTick = tick + child.tickOffset;
@@ -270,6 +243,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         if (sequence.rhythmMode() == StochasticSourceMode::Live) {
             auto rhythm = StochasticGenerator::generateRhythmEvent(sequence, track, _rng);
             eval.mergeRhythmFrom(rhythm);
+            // Write back so the loop-tape display sees the just-played event.
+            sequence.events()[readIndex].mergeRhythmFrom(rhythm);
         } else {
             eval.mergeRhythmFrom(event);
         }
@@ -278,6 +253,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             auto melody = StochasticGenerator::generateMelodyEvent(sequence, track, scale, rootNote, _lastDegree, _rng);
             eval.mergeMelodyFrom(melody);
             _lastDegree = int(eval.degree()) + int(eval.octave()) * scale.notesPerOctave();
+            sequence.events()[readIndex].mergeMelodyFrom(melody);
         } else {
             eval.mergeMelodyFrom(event);
             _lastDegree = int(eval.degree()) + int(eval.octave()) * scale.notesPerOctave();
@@ -285,24 +261,16 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
         int activeNotes = scale.notesPerOctave();
 
-        uint32_t mult = getDurationMultiplier(eval.durationIndex());
-        _lastDurationIndex = eval.durationIndex();
-        if (!sequence.durationTicketsActive() && sequence.variation() != 0) {
-            int variationRoll = _rng.nextRange(100);
-            if (variationRoll < std::abs(sequence.variation())) {
-                 if (sequence.variation() > 0) {
-                     mult *= 2;
-                 } else {
-                     mult = std::max(uint32_t(6), mult / 2);
-                 }
-            }
-        }
+        // Duration LUT is divisor-relative: ticks = (divisor * num) / den.
+        // Variation is applied at generation time in generateRhythmEvent — each
+        // event's durationIndex is already varied when stored, so eval just
+        // reads it directly.
+        int durIdx = eval.durationIndex();
+        auto frac = getDurationFraction(durIdx);
+        uint32_t mult = (uint64_t(divisor) * frac.num) / frac.den;
+        if (mult < 1) mult = 1;
+        _lastDurationIndex = durIdx;
         durationTicks = mult;
-
-        if (!sequence.durationTicketsActive()) {
-            durationTicks = (divisor * sequence.rate()) / 100;
-            if (durationTicks < 1) durationTicks = 1;
-        }
         _eventDuration = durationTicks;
 
         int note = int(eval.degree()) + (int(eval.octave()) + _jumpRegister + track.octave()) * activeNotes + track.transpose();
@@ -318,11 +286,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         isAccent = bool(eval.accent());
 
         // Evaluate Children
-        StochasticGenerator::EvaluatedChild evalChildren[4];
+        StochasticGenerator::EvaluatedChild evalChildren[kMaxChildren];
         if (!isRest) {
             StochasticGenerator::evaluateChildren(evalChildren, sequence, eval, track, scale, rootNote, note, durationTicks, _rng);
         } else {
-            for (int i = 0; i < 4; ++i) evalChildren[i].valid = false;
+            for (int i = 0; i < kMaxChildren; ++i) evalChildren[i].valid = false;
         }
 
         if (_lockedParents) {
@@ -333,7 +301,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _lockedParents[readIndex].legato = isLegato;
             _lockedParents[readIndex].slide = isSlide;
             _lockedParents[readIndex].accent = isAccent;
-            for (int i = 0; i < 4; ++i) {
+            for (int i = 0; i < kMaxChildren; ++i) {
                 if (evalChildren[i].valid) {
                     _lockedParents[readIndex].children[i].valid = true;
 
@@ -360,7 +328,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _gateQueue.push({ tick, true, isAccent });
 
             bool hasChildren = false;
-            for (int i = 0; i < 4; ++i) if (evalChildren[i].valid) hasChildren = true;
+            for (int i = 0; i < kMaxChildren; ++i) if (evalChildren[i].valid) hasChildren = true;
 
             if (!isLegato && !hasChildren) {
                 uint32_t gateLen = (durationTicks * 50) / 100;
@@ -369,7 +337,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             }
             _activity = true;
 
-            for (int i = 0; i < 4; ++i) {
+            for (int i = 0; i < kMaxChildren; ++i) {
                 if (evalChildren[i].valid) {
                     uint32_t childTick = tick + evalChildren[i].tickOffset;
                     uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
@@ -413,15 +381,30 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
             if (sequence.sleep() > 0) _sleepRemaining = (sequence.sleep() * 4) / 10;
 
-            // Domain-aware mutation
-            if (sequence.mutate() > 0 && int(_rng.nextRange(100)) < sequence.mutate()) {
+            // Domain-aware bipolar mutation. Sign selects algorithm:
+            //   mutate > 0 → Marbles permutation (swap two existing events)
+            //   mutate < 0 → Proteus destructive (regenerate one event)
+            //   mutate = 0 → lock (no mutation)
+            // Magnitude is the per-loop probability.
+            int mutateAmount = sequence.mutate();
+            int mutateMag = mutateAmount < 0 ? -mutateAmount : mutateAmount;
+            if (mutateMag > 0 && int(_rng.nextRange(100)) < mutateMag) {
+                bool destructive = (mutateAmount < 0);
+                auto applyRhythm = [&] {
+                    if (destructive) StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
+                    else             StochasticGenerator::permuteRhythmOne(sequence, _rng);
+                };
+                auto applyMelody = [&] {
+                    if (destructive) StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
+                    else             StochasticGenerator::permuteMelodyOne(sequence, _rng);
+                };
                 if (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.melodyMode() == StochasticSourceMode::Loop) {
-                    if (_rng.nextRange(2) == 0) StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
-                    else StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
+                    if (_rng.nextRange(2) == 0) applyRhythm();
+                    else                         applyMelody();
                 } else if (sequence.rhythmMode() == StochasticSourceMode::Loop) {
-                    StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
+                    applyRhythm();
                 } else if (sequence.melodyMode() == StochasticSourceMode::Loop) {
-                    StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
+                    applyMelody();
                 }
             }
 
@@ -445,18 +428,39 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     }
 }
 
+void StochasticTrackEngine::renewRhythm() {
+    auto &sequence = const_cast<StochasticSequence&>(*_sequence);
+    auto &track = const_cast<StochasticTrack&>(_stochasticTrack);
+    StochasticGenerator::generateRhythm(sequence, track, _rng.next());
+    sequence.setRhythmValid(true);
+    _loopCycleCount = 0;
+}
+
+void StochasticTrackEngine::renewMelody() {
+    auto &sequence = const_cast<StochasticSequence&>(*_sequence);
+    auto &track = const_cast<StochasticTrack&>(_stochasticTrack);
+    const auto &scale = sequence.selectedScale(_model.project().scale());
+    int rootNote = sequence.selectedRootNote(_model.project().rootNote());
+    StochasticGenerator::generateMelody(sequence, track, scale, rootNote, _rng.next());
+    sequence.setMelodyValid(true);
+    _loopCycleCount = 0;
+}
+
 void StochasticTrackEngine::refreshLoopSources() {
     auto &sequence = const_cast<StochasticSequence&>(*_sequence);
     auto &track = const_cast<StochasticTrack&>(_stochasticTrack);
     const auto &scale = sequence.selectedScale(_model.project().scale());
     int rootNote = sequence.selectedRootNote(_model.project().rootNote());
 
-    if (sequence.rhythmMode() == StochasticSourceMode::Loop) {
-        sequence.setRhythmValid(false);
-    }
-    if (sequence.melodyMode() == StochasticSourceMode::Loop) {
-        sequence.setMelodyValid(false);
-    }
+    // Always regenerate the stored event buffer, regardless of source mode.
+    // Loop mode will play the new pattern. Live mode keeps generating per-tick
+    // but the loop tape display now reflects the fresh content too. Setting
+    // valid=true prevents the engine's own re-roll path from firing on the
+    // very next tick.
+    StochasticGenerator::generateRhythm(sequence, track, _rng.next());
+    StochasticGenerator::generateMelody(sequence, track, scale, rootNote, _rng.next());
+    sequence.setRhythmValid(true);
+    sequence.setMelodyValid(true);
     _loopCycleCount = 0;
 }
 

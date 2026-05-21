@@ -103,7 +103,7 @@ public:
         case Routing::Target::StochasticBurst: setBurst(intValue, true); break;
         case Routing::Target::StochasticComplexity: setComplexity(intValue, true); break;
         case Routing::Target::StochasticContour: setContour(intValue, true); break;
-        case Routing::Target::StochasticRate: setRate(intValue, true); break;
+        case Routing::Target::StochasticNoteDuration: setNoteDuration(intValue, true); break;
         case Routing::Target::StochasticVariation: setVariation(intValue, true); break;
         case Routing::Target::StochasticRest: setRest(intValue, true); break;
         case Routing::Target::StochasticSlide: setSlide(intValue, true); break;
@@ -151,8 +151,10 @@ public:
     int linearity() const { return _linearity; }
     void setLinearity(int linearity) { _linearity = clamp(linearity, 0, 100); }
 
-    int rate() const { return _rate.get(isRouted(Routing::Target::StochasticRate)); }
-    void setRate(int rate, bool routed = false) { _rate.set(clamp(rate, 1, 400), routed); }
+    // Live-mode duration LUT slot index 0..7. Divisor-relative: see
+    // StochasticTrackEngine::getDurationFraction() for the multiplier table.
+    int noteDuration() const { return _noteDuration.get(isRouted(Routing::Target::StochasticNoteDuration)); }
+    void setNoteDuration(int v, bool routed = false) { _noteDuration.set(clamp(v, 0, 7), routed); }
 
     int variation() const { return _variation.get(isRouted(Routing::Target::StochasticVariation)); }
     void setVariation(int variation, bool routed = false) { _variation.set(clamp(variation, -100, 100), routed); }
@@ -179,7 +181,10 @@ public:
     void setPatience(int patience, bool routed = false) { _patience.set(clamp(patience, 0, 100), routed); }
 
     int mutate() const { return _mutate.get(isRouted(Routing::Target::StochasticMutate)); }
-    void setMutate(int mutate, bool routed = false) { _mutate.set(clamp(mutate, 0, 100), routed); }
+    // Bipolar: -100..0 = Proteus destructive (regenerate one event), 0 = lock,
+    // 0..+100 = Marbles permutation (swap two existing events). Magnitude is
+    // probability per loop iteration.
+    void setMutate(int mutate, bool routed = false) { _mutate.set(clamp(mutate, -100, 100), routed); }
 
     int jump() const { return _jump.get(isRouted(Routing::Target::StochasticJump)); }
     void setJump(int jump, bool routed = false) { _jump.set(clamp(jump, 0, 100), routed); }
@@ -366,8 +371,17 @@ public:
     void printContour(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticContour); str("%+d%%", contour()); }
     void editContour(int value, bool shift) { if (!isRouted(Routing::Target::StochasticContour)) setContour(contour() + value); }
 
-    void printRate(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticRate); str("%d%%", rate()); }
-    void editRate(int value, bool shift) { if (!isRouted(Routing::Target::StochasticRate)) setRate(rate() + value); }
+    void printNoteDuration(StringBuilder &str) const {
+        printRouted(str, Routing::Target::StochasticNoteDuration);
+        // Compute the effective note from divisor × LUT multiplier so the label
+        // tracks clock-divisor changes. LUT mirrors getDurationFraction().
+        static const int lutNum[] = { 8, 4, 3, 2, 4, 1, 2, 1 };
+        static const int lutDen[] = { 1, 1, 1, 1, 3, 1, 3, 2 };
+        int idx = clamp(noteDuration(), 0, 7);
+        int effectiveDivisor = (int(divisor()) * lutNum[idx]) / lutDen[idx];
+        ModelUtils::printDivisor(str, effectiveDivisor);
+    }
+    void editNoteDuration(int value, bool shift) { if (!isRouted(Routing::Target::StochasticNoteDuration)) setNoteDuration(noteDuration() + value); }
 
     void printVariation(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticVariation); str("%+d%%", variation()); }
     void editVariation(int value, bool shift) { if (!isRouted(Routing::Target::StochasticVariation)) setVariation(variation() + value); }
@@ -384,7 +398,7 @@ public:
     void printPatience(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticPatience); str("%d%%", patience()); }
     void editPatience(int value, bool shift) { if (!isRouted(Routing::Target::StochasticPatience)) setPatience(patience() + value); }
 
-    void printMutate(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMutate); str("%d%%", mutate()); }
+    void printMutate(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMutate); str("%+d%%", mutate()); }
     void editMutate(int value, bool shift) { if (!isRouted(Routing::Target::StochasticMutate)) setMutate(mutate() + value); }
 
     void printJump(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticJump); str("%d%%", jump()); }
@@ -487,7 +501,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _rotate.setBase(0);
         _complexity.setBase(50);
         _contour.setBase(0);
-        _rate.setBase(50);
+        _noteDuration.setBase(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
         _variation.setBase(0);
         _rest.setBase(0);
         _slide.setBase(0);
@@ -541,7 +555,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _rotate.write(writer);
         _complexity.write(writer);
         _contour.write(writer);
-        _rate.write(writer);
+        _noteDuration.write(writer);
         _variation.write(writer);
         _rest.write(writer);
         _slide.write(writer);
@@ -616,7 +630,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _rotate.read(reader);
         _complexity.read(reader);
         _contour.read(reader);
-        _rate.read(reader);
+        _noteDuration.read(reader);
         _variation.read(reader);
         _rest.read(reader);
         _slide.read(reader);
@@ -696,7 +710,7 @@ private:
             _rotate.setBase(0);
             _complexity.setBase(50);
             _contour.setBase(0);
-            _rate.setBase(50);
+            _noteDuration.setBase(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
             _variation.setBase(0);
             _rest.setBase(0);
             _slide.setBase(0);
@@ -768,7 +782,7 @@ private:
     Routable<int8_t> _rotate;
     Routable<uint8_t> _complexity;
     Routable<int8_t> _contour;
-    Routable<uint8_t> _rate;
+    Routable<uint8_t> _noteDuration;
     Routable<int8_t> _variation;
     Routable<uint8_t> _rest;
     Routable<uint8_t> _slide;
@@ -777,7 +791,7 @@ private:
     StochasticBurstPitch _burstPitch;
     Routable<uint8_t> _sleep;
     Routable<uint8_t> _patience;
-    Routable<uint8_t> _mutate;
+    Routable<int8_t> _mutate;
     Routable<uint8_t> _jump;
     uint8_t _range;
 

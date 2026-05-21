@@ -235,9 +235,9 @@ void StochasticSequenceEditPage::drawDirectPage(Canvas &canvas) {
     }
 
     // Param labels
-    const char *names[] = { "VAR", "TILT", "CONT", "RATE", "LIN", "REST", "SLIDE", "JUMP" };
+    const char *names[] = { "VAR", "TILT", "CONT", "DUR", "LIN", "REST", "SLIDE", "JUMP" };
     int values[] = {
-        seq.variation(), seq.tilt(), seq.contour(), seq.rate(),
+        seq.variation(), seq.tilt(), seq.contour(), seq.noteDuration(),
         seq.linearity(), seq.rest(), seq.slide(), seq.jump()
     };
     FixedStringBuilder<32> str;
@@ -280,7 +280,13 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     int currentStep = -1;
     if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
         auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
-        currentStep = eng.currentStep();
+        // currentStep() returns _patternIndex, which is the NEXT step to fire
+        // (engine increments inside triggerStep after reading the index).
+        // Step back one with wrap so the highlight tracks what's audible right
+        // now, not what's about to play.
+        int next = eng.currentStep();
+        int sz = std::max(1, seq.size());
+        currentStep = ((next - 1) % sz + sz) % sz;
     }
 
     // Adaptive event timeline: ALL steps 0..size-1 always visible. Brackets
@@ -298,49 +304,78 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         return displayIdx;
     };
 
-    // Total ticks + pitch range across all slots (adaptive per-frame normalization).
-    int totalTicks = 0;
-    int activeCount = 0;
+    // The engine writes back live-generated events to sequence.events()[] each
+    // tick (Live mode), so the stored buffer is always the most recently-played
+    // content. Tape reads stored data uniformly — Loop mode is a snapshot, Live
+    // mode updates progressively as each step plays.
+    auto durIndexForSlot = [&] (const StochasticSourceEvent &ev) {
+        return int(ev.durationIndex());
+    };
+
+    // Divisor-aware-and-adjusted width:
+    //   rawFill   = actual loop ticks / max possible (size × largest LUT × divisor)
+    //   adjFill   = max(0.4, rawFill)  — short loops still get usable tape
+    //   totalDraw = adjFill × availW  — how many pixels the loop occupies
+    // Each event's slot is then a proportional slice of totalDraw, so per-event
+    // variation stays visible even at dense settings, and longer-duration loops
+    // visibly fill more of the tape (up to 100%).
+    auto ticksForSlot = [&] (int durIdx) {
+        auto f = StochasticTrackEngine::getDurationFraction(durIdx);
+        return (int(seq.divisor()) * f.num) / f.den;
+    };
+
+    int referenceTotal = int(seq.divisor()) * 8 * seqSize;
+    if (referenceTotal <= 0) referenceTotal = 1;
+
+    int totalEventTicks = 0;
     int pitchMin = INT32_MAX;
     int pitchMax = INT32_MIN;
     for (int i = 0; i < seqSize; ++i) {
         int eIdx = resolveEventIdx(i);
         const auto &ev = seq.events()[eIdx];
-        int durIdx = ev.durationIndex();
-        int ticks = int(StochasticTrackEngine::getDurationMultiplier(durIdx));
-        totalTicks += ticks;
-        if (ticks > 0) activeCount++;
+        totalEventTicks += ticksForSlot(durIndexForSlot(ev));
         if (!ev.rest()) {
             int pitch = int(ev.degree()) + int(ev.octave()) * 12;
             if (pitch < pitchMin) pitchMin = pitch;
             if (pitch > pitchMax) pitchMax = pitch;
         }
     }
-    if (totalTicks <= 0) totalTicks = 1;
-    if (activeCount <= 0) activeCount = 1;
+    if (totalEventTicks <= 0) totalEventTicks = 1;
     int pitchRange = std::max(1, pitchMax - pitchMin);
-    if (pitchMin > pitchMax) { pitchMin = 0; pitchMax = 0; }  // no gates → no range
+    if (pitchMin > pitchMax) { pitchMin = 0; pitchMax = 0; }
 
-    int extraPixels = availW - minStepW * activeCount;
-    if (extraPixels < 0) extraPixels = 0;
-    int error = 0;
-    int currentX = margin;
-    int bxFirst = margin;        // pixel x of left bracket
-    int bxLast = margin + availW; // pixel x of right bracket
+    // rawFill ∈ [0..1], adjusted to keep at least 40% tape for very short loops.
+    int rawFillNum = totalEventTicks;
+    int rawFillDen = referenceTotal;
+    if (rawFillNum > rawFillDen) rawFillNum = rawFillDen;   // cap at 100%
+    int totalDrawW = (rawFillNum * availW) / rawFillDen;
+    int minDrawW = (availW * 40) / 100;
+    if (totalDrawW < minDrawW) totalDrawW = minDrawW;
+
+    // Empty-tape outline so unused span is visible.
+    canvas.setColor(Color::Low);
+    canvas.drawRect(margin, tapeTop, availW, tapeRowH);
+
+    // Center the loop horizontally inside the tape — small loops sit in the
+    // middle, large loops fill it. Brackets/slots all start from this offset.
+    int loopOriginX = margin + (availW - totalDrawW) / 2;
+    int ticksAccum = 0;
+    int currentX = loopOriginX;
+    int bxFirst = loopOriginX;
+    int bxLast = loopOriginX + totalDrawW;
 
     for (int i = 0; i < seqSize; ++i) {
         int eIdx = resolveEventIdx(i);
         const auto &ev = seq.events()[eIdx];
-        int durIdx = ev.durationIndex();
-        int ticks = int(StochasticTrackEngine::getDurationMultiplier(durIdx));
-        int stepW = 0;
-        if (ticks > 0) {
-            int scaled = extraPixels * ticks + error;
-            int extraW = scaled / totalTicks;
-            error = scaled % totalTicks;
-            stepW = minStepW + extraW;
+        int durIdx = durIndexForSlot(ev);
+        int eventTicks = ticksForSlot(durIdx);
+        ticksAccum += eventTicks;
+        int xEnd = loopOriginX + (ticksAccum * totalDrawW) / totalEventTicks;
+        int stepW = xEnd - currentX;
+        if (stepW < 1) stepW = 1;
+        if (currentX + stepW > loopOriginX + totalDrawW) {
+            stepW = std::max(1, loopOriginX + totalDrawW - currentX);
         }
-        if (stepW <= 0) stepW = 1;
 
         // Snap bracket positions to slot boundaries.
         if (i == lf) bxFirst = currentX;
@@ -365,12 +400,14 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
 
             // Pitch-mapped fill bar: bar climbs from slot bottom; bar height encodes
             // (degree + octave*12) normalized to the loop's observed pitch range.
+            // In Live-melody mode the stored pitches are stale, so use a neutral
+            // midline height for all slots instead.
             if (!isRest && stepW > 2) {
                 int innerW = stepW - 2;
                 int innerH = tapeRowH - 2;
-                int pitch = int(ev.degree()) + int(ev.octave()) * 12;
                 int barH;
                 if (pitchRange > 0) {
+                    int pitch = int(ev.degree()) + int(ev.octave()) * 12;
                     int norm = clamp(pitch - pitchMin, 0, pitchRange);
                     barH = 1 + (norm * (innerH - 1)) / pitchRange;
                 } else {
@@ -427,33 +464,34 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     canvas.setColor(Color::MediumBright);
     canvas.fillRect(margin, tapeBot + 7, (boredomFill * availW) / 100, 3);
 
-    // Param labels
-    FixedStringBuilder<32> str;
-    if (_heroHeldStep == 0)       str("PAT %d", patience);
-    else if (_heroHeldStep == 1)  str("MUT %d", seq.mutate());
-    else if (_heroHeldStep == 2)  str("JMP %d", seq.jump());
-    else if (_heroHeldStep == 3)  str("SLP %d", seq.sleep());
-    else if (_heroHeldStep == 8)  str("FRST %d", seq.first());
-    else if (_heroHeldStep == 9)  str("LAST %d", seq.last());
-    else if (_heroHeldStep == 10) str("SIZE %d", seq.size());
-    else if (_heroHeldStep == 11) str("ROT %+d", seq.rotate());
-    else                           str("LOOP");
-    canvas.setFont(Font::Small);
-    canvas.setColor(Color::Bright);
-    canvas.drawText(8, 18, str);
-
-    canvas.setColor(track.lock() ? Color::Bright : Color::Medium);
-    const char *lockState = track.lock() ? "LOCKED" : "LIVE";
-    canvas.drawText(Width - canvas.textWidth(lockState) - 8, 18, lockState);
-
-    const char *modeLabel = "LIVE";
-    if (seq.rhythmMode() == seq.melodyMode()) {
-        modeLabel = (seq.rhythmMode() == StochasticSourceMode::Loop) ? "LOOP" : "LIVE";
+    // Top-area readout. When a step is held, show that step's value in Small
+    // font. Otherwise show all four destructive macros at once in Tiny font.
+    if (_heroHeldStep >= 0) {
+        FixedStringBuilder<32> str;
+        if (_heroHeldStep == 0)       str("PAT %d", patience);
+        else if (_heroHeldStep == 1)  str("MUT %+d", seq.mutate());
+        else if (_heroHeldStep == 2)  str("JMP %d", seq.jump());
+        else if (_heroHeldStep == 3)  str("SLP %d", seq.sleep());
+        else if (_heroHeldStep == 8)  str("FRST %d", seq.first());
+        else if (_heroHeldStep == 9)  str("LAST %d", seq.last());
+        else if (_heroHeldStep == 10) str("SIZE %d", seq.size());
+        else if (_heroHeldStep == 11) str("ROT %+d", seq.rotate());
+        canvas.setFont(Font::Small);
+        canvas.setColor(Color::Bright);
+        canvas.drawText(8, 18, str);
     } else {
-        modeLabel = "SPLIT";
+        canvas.setFont(Font::Tiny);
+        canvas.setColor(Color::Medium);
+        FixedStringBuilder<16> s;
+        s("P%d", patience);     canvas.drawText(8,   16, s);
+        s.reset(); s("M%+d", seq.mutate()); canvas.drawText(44,  16, s);
+        s.reset(); s("J%d", seq.jump());    canvas.drawText(80,  16, s);
+        s.reset(); s("S%d", seq.sleep());   canvas.drawText(116, 16, s);
     }
-    const char *lockFooter = track.lock() ? "LOCKED" : "FREE";
-    const char *footer[] = { modeLabel, "RENEW", lockFooter, nullptr, "NEXT" };
+
+    const char *fnR = (seq.rhythmMode() == StochasticSourceMode::Loop) ? "LoopR" : "LiveR";
+    const char *fnM = (seq.melodyMode() == StochasticSourceMode::Loop) ? "LoopM" : "LiveM";
+    const char *footer[] = { fnR, fnM, "NewR", "NewM", "NEXT" };
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
 }
 
@@ -487,7 +525,7 @@ void StochasticSequenceEditPage::editDirectStep(int step, int value, bool shift)
     case 0: seq.setVariation(seq.variation() + v); break;
     case 1: seq.setTilt(seq.tilt() + v); break;
     case 2: seq.setContour(seq.contour() + v); break;
-    case 3: seq.setRate(seq.rate() + v); break;
+    case 3: seq.setNoteDuration(seq.noteDuration() + value); break;
     case 4: seq.setLinearity(seq.linearity() + v); break;
     case 5: seq.setRest(seq.rest() + v); break;
     case 6: seq.setSlide(seq.slide() + v); break;
@@ -566,23 +604,30 @@ bool StochasticSequenceEditPage::handleDirectFunction(int /*fn*/, bool /*shift*/
 bool StochasticSequenceEditPage::handleLoopFunction(int fn, bool shift) {
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &seq = track.sequence(_project.selectedPatternIndex());
+    auto stoEng = [&] () -> StochasticTrackEngine* {
+        if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+            return &_engine.selectedTrackEngine().as<StochasticTrackEngine>();
+        }
+        return nullptr;
+    };
     switch (fn) {
-    case 0: { // MODE — toggle coupled rhythm/melody Loop/Live
+    case 0: { // LoopR / LiveR — toggle rhythm source mode
         auto newMode = (seq.rhythmMode() == StochasticSourceMode::Loop)
             ? StochasticSourceMode::Live : StochasticSourceMode::Loop;
         seq.setRhythmMode(newMode);
+        return true;
+    }
+    case 1: { // LoopM / LiveM — toggle melody source mode
+        auto newMode = (seq.melodyMode() == StochasticSourceMode::Loop)
+            ? StochasticSourceMode::Live : StochasticSourceMode::Loop;
         seq.setMelodyMode(newMode);
         return true;
     }
-    case 1: // RENEW
-        if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
-            auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
-            eng.renewLoopSources();
-            showMessage("RENEW");
-        }
+    case 2: // NewR — refresh rhythm buffer only
+        if (auto *eng = stoEng()) { eng->renewRhythm(); showMessage("NEW R"); }
         return true;
-    case 2: // LOCK toggle
-        track.setLock(!track.lock());
+    case 3: // NewM — refresh melody buffer only
+        if (auto *eng = stoEng()) { eng->renewMelody(); showMessage("NEW M"); }
         return true;
     }
     return false;

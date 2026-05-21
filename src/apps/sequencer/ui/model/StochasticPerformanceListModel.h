@@ -21,7 +21,7 @@ public:
         Spread,
         Bias,
         Steps,
-        Rate,
+        NoteDuration,
         Variation,
         Rest,
         SlideProb,
@@ -87,7 +87,7 @@ public:
         case Tilt:          return Routing::Target::StochasticTilt;
         case Burst:         return Routing::Target::StochasticBurst;
         case Contour:       return Routing::Target::StochasticContour;
-        case Rate:          return Routing::Target::StochasticRate;
+        case NoteDuration:  return Routing::Target::StochasticNoteDuration;
         case Variation:     return Routing::Target::StochasticVariation;
         case Rest:          return Routing::Target::StochasticRest;
         case SlideProb:     return Routing::Target::StochasticSlide;
@@ -144,7 +144,7 @@ private:
         case Spread:        return "Spread";
         case Bias:          return "Bias";
         case Steps:         return "Steps";
-        case Rate:          return "Rate";
+        case NoteDuration:  return "Note Duration";
         case Variation:     return "Variation";
         case Rest:          return "Rest";
         case SlideProb:     return "Slide Prob";
@@ -196,14 +196,14 @@ private:
         case Spread:        sequence.printMarblesSpread(str); break;
         case Bias:          sequence.printMarblesBias(str); break;
         case Steps:         sequence.printMarblesSteps(str); break;
-        case Rate:          sequence.printRate(str); break;
+        case NoteDuration:  sequence.printNoteDuration(str); break;
         case Variation:     sequence.printVariation(str); break;
         case Rest:          sequence.printRest(str); break;
         case SlideProb:     sequence.printSlide(str); break;
         case LegatoProb:    sequence.printLegatoProb(str); break;
         case AccentProb:    sequence.printAccentProb(str); break;
         case Burst:         sequence.printBurst(str); break;
-        case BurstCount:    str("%d", sequence.burstCount()); break;
+        case BurstCount:    str("%d%%", sequence.burstCount()); break;
         case BurstRate:     str("%d%%", sequence.burstRate()); break;
         case BurstPitch:    sequence.printBurstPitch(str); break;
         case Mask:          sequence.printMask(str); break;
@@ -239,7 +239,7 @@ private:
         case Spread:        sequence.editMarblesSpread(value, shift); break;
         case Bias:          sequence.editMarblesBias(value, shift); break;
         case Steps:         sequence.editMarblesSteps(value, shift); break;
-        case Rate:          sequence.editRate(value, shift); break;
+        case NoteDuration:  sequence.editNoteDuration(value, shift); break;
         case Variation:     sequence.editVariation(value, shift); break;
         case Rest:          sequence.editRest(value, shift); break;
         case SlideProb:     sequence.editSlide(value, shift); break;
@@ -303,7 +303,7 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     Complexity,
     Contour,
     Linearity,
-    Rate,
+    NoteDuration,
     Variation,
     Rest,
     SlideProb,
@@ -337,7 +337,7 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     Complexity,
     Contour,
     Linearity,
-    Rate,
+    NoteDuration,
     Variation,
     Rest,
     SlideProb,

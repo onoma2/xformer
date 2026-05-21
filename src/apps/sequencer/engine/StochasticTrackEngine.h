@@ -41,21 +41,39 @@ public:
     int jumpRegister() const { return _jumpRegister; }
     uint8_t sleepRemaining() const { return _sleepRemaining; }
     void renewLoopSources() { refreshLoopSources(); }
+    void renewRhythm();
+    void renewMelody();
 
-    // V5 duration multiplier dictionary, sorted descending by ticks at PPQN=192.
-    // 1/2, 1/4, 3/16, 1/8, 1/8T, 1/16, 1/16T, 1/32.
+    // Max children per parent burst — matches burstCount LUT {2, 3, 4, 5}.
+    static constexpr int kMaxChildren = 5;
+
+    // V5 duration LUT as multipliers of the sequence divisor, sorted descending.
+    // ticks = (divisor * num) / den. Labels assume divisor = 1/16:
+    //   slot 0: ×8     → 1/2
+    //   slot 1: ×4     → 1/4
+    //   slot 2: ×3     → 3/16
+    //   slot 3: ×2     → 1/8
+    //   slot 4: ×4/3   → 1/8T
+    //   slot 5: ×1     → 1/16 (= divisor)
+    //   slot 6: ×2/3   → 1/16T
+    //   slot 7: ×1/2   → 1/32
+    // Whole table scales with the sequence's clock divisor.
+    struct DurationFraction { uint16_t num; uint16_t den; };
+    static DurationFraction getDurationFraction(int index) {
+        static const DurationFraction lut[] = {
+            { 8, 1 }, { 4, 1 }, { 3, 1 }, { 2, 1 },
+            { 4, 3 }, { 1, 1 }, { 2, 3 }, { 1, 2 },
+        };
+        if (index < 0) index = 0;
+        if (index > 7) index = 7;
+        return lut[index];
+    }
+
+    // Backward-compatibility helper for any call site that still wants ticks
+    // at PPQN=192 assuming divisor = 1/16 (legacy reference).
     static uint32_t getDurationMultiplier(int index) {
-        switch (index) {
-        case 0: return 384;           // 1/2
-        case 1: return 192;           // 1/4
-        case 2: return 144;           // 3/16
-        case 3: return 96;            // 1/8
-        case 4: return 64;            // 1/8T
-        case 5: return 48;            // 1/16
-        case 6: return 32;            // 1/16T
-        case 7: return 24;            // 1/32
-        }
-        return 48;
+        auto f = getDurationFraction(index);
+        return (48u * f.num) / f.den;
     }
 
 private:
@@ -135,7 +153,7 @@ private:
             bool slide;
             bool accent;
             bool valid;
-        } children[4];
+        } children[kMaxChildren];
     };
 
     LockedParentEvent *_lockedParents = nullptr;
