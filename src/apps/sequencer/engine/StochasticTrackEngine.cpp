@@ -11,8 +11,6 @@
 #include "core/utils/Random.h"
 #include "core/math/Math.h"
 
-#include "Platform.h"
-
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -36,10 +34,12 @@ int directHistoryTrackIndex(const Track &track) {
     return index;
 }
 
-// Phase 14B Patch B: per-track engine cache. CCMRAM-resident (cells, aux,
-// parent-cache-idx — ~448 B per track × 8 = ~3.6 KB total). Engine-owned,
-// never serialized, rehydrates from events[] after any generator write.
-CCMRAM_BSS stochastic_cache::Cache gStochasticCaches[CONFIG_TRACK_COUNT] = {};
+// Phase 14B engine cache lives inside StochasticTrackEngine as a member
+// (`_cache`). The previous file-scope `gStochasticCaches[8]` was 3.6 KB of
+// CCMRAM that paid 8× the per-track cost regardless of which tracks were
+// stochastic. Folding it into the engine costs only the per-slot growth on
+// the Container<...> slot size (~56 B × 8 = 448 B) since the container is
+// already sized to its largest member (per PROJECT.md "Engine gate").
 }
 
 // Gate scheduling trace — disabled for release
@@ -378,12 +378,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // generator write so this lookup stays in sync with the audible content.
         // parentCacheIdx maps event-slot index -> cache cell index in O(1).
         uint32_t windowSize = std::max(1, int(sequence.last()) - int(sequence.first()) + 1);
-        const auto &cache = gStochasticCaches[directHistoryTrackIndex(_track)];
         uint8_t cacheIdx = (readIndex >= 0 && readIndex < int(stochastic_cache::kMaxEventSlots))
-                         ? cache.parentCacheIdx[readIndex]
+                         ? _cache.parentCacheIdx[readIndex]
                          : uint8_t(0xff);
         uint32_t cacheRank = (cacheIdx < stochastic_cache::kCellCap)
-                           ? uint32_t(cache.aux[cacheIdx].rank)
+                           ? uint32_t(_cache.aux[cacheIdx].rank)
                            : uint32_t(eval.densityRank());   // fallback (e.g. cache not yet primed)
         bool maskPass = sequence.mask() >= 100 ||
             ((cacheRank * 100) < (uint32_t(sequence.mask()) * windowSize));
@@ -646,7 +645,6 @@ void StochasticTrackEngine::writeLiveMelodyShadow(int readIndex, const Stochasti
 }
 
 void StochasticTrackEngine::refreshCache() {
-    int trackIndex = directHistoryTrackIndex(_track);
     auto &seq = sequence();
     // Match the divisor computation in tick(): base divisor scaled by the
     // sequence's clockMultiplier and PPQN conversion. clockMultiplier is in
@@ -656,12 +654,10 @@ void StochasticTrackEngine::refreshCache() {
     uint32_t divisor = uint32_t(seq.divisor()) * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
     divisor = std::max<uint32_t>(1u, uint32_t(std::lround(divisor / clockMult)));
     // rhythmSeed drives deterministic rank salt — same seed → same rank order.
-    stochastic_cache::regenerateCacheFromEvents(
-        gStochasticCaches[trackIndex], seq, divisor, seq.rhythmSeed());
+    stochastic_cache::regenerateCacheFromEvents(_cache, seq, divisor, seq.rhythmSeed());
     // tilt feeds rank weights; recomputeCacheRanks already ran inside
     // regenerateCacheFromEvents with tilt=0, so re-run with live tilt.
-    stochastic_cache::recomputeCacheRanks(
-        gStochasticCaches[trackIndex], seq.rhythmSeed(), int(seq.tilt()));
+    stochastic_cache::recomputeCacheRanks(_cache, seq.rhythmSeed(), int(seq.tilt()));
 }
 
 // captureLockedParent removed 2026-05-22 — see header comment near the

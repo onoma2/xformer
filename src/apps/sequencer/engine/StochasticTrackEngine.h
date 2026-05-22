@@ -5,6 +5,7 @@
 #include "SortedQueue.h"
 #include "RecordHistory.h"
 #include "StepRecorder.h"
+#include "StochasticCache.h"
 #include "model/StochasticSequence.h"
 #include "model/StochasticTrack.h"
 
@@ -234,6 +235,22 @@ private:
     };
 
     SortedQueue<Cv, 16, CvCompare> _cvQueue;
+
+    // Phase 14B engine cache — playback-ready CV/gate cells materialized from
+    // the event tape on every event write. Mask filter reads deterministic
+    // rank from here instead of event.densityRank() (which had random noise).
+    //
+    // Lives inside the engine (not as a file-scope CCMRAM global like the old
+    // gStochasticCaches[]) because the Container<...> for track engines is
+    // already sized to its largest variant — paying the cache's ~448 B as part
+    // of StochasticTrackEngine costs ~56 B per slot (912 → 968) instead of an
+    // extra 3.6 KB CCMRAM global. See PROJECT.md "Engine gate" section.
+    stochastic_cache::Cache _cache{};
 };
 
-static_assert(sizeof(StochasticTrackEngine) <= 512, "StochasticTrackEngine too large");
+// Bumped from 512 in Phase 14B to absorb the engine cache (CachedCell[64] +
+// CellAux[64] + parentCacheIdx[64] + housekeeping ≈ 456 B). The new ceiling
+// keeps Stochastic at or below the previous container-sizing engine
+// (TeletypeTrackEngine = 912 B per PROJECT.md), so the container slot growth
+// is at most ~56 B × 8 tracks ≈ 448 B in CCMRAM.
+static_assert(sizeof(StochasticTrackEngine) <= 1024, "StochasticTrackEngine too large");

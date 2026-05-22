@@ -240,6 +240,21 @@ Treat RAM as a gate only when a feature changes the relevant container maximum o
 - Every owner pays for the largest possible type, not the currently selected type. Eight `Track` objects means eight max-sized `Track::_container` buffers even if some tracks are tiny modes.
 - Small track-type savings matter only when they reduce the current largest arm or a direct member outside the container.
 
+**Container gate formula (both Model and Engine):**
+
+Both the model-side `Track::_container` and the engine-side `Engine::TrackEngineContainer` are `Container<...>` variants instantiated **8 times** (`CONFIG_TRACK_COUNT = 8`). The RAM cost is:
+
+```
+container_array_total = 8 × max(sizeof(variant_types))
+```
+
+- For the **model**: `8 × max(NoteTrack, CurveTrack, MidiCvTrack, …)` lives in normal SRAM as part of `Model`.
+- For the **engine**: `8 × max(NoteTrackEngine, CurveTrackEngine, …, StochasticTrackEngine)` lives in CCMRAM as part of `Engine`.
+
+Since the container is always sized to its largest variant, **adding fields to a non-largest variant is free until that variant exceeds the current max** — the wasted bytes in non-largest variant slots already exist. Conversely, growing the largest variant by N bytes costs `8 × N` across the container array.
+
+This is why fold-into-engine often wins over file-scope CCMRAM allocations: existing slot-size waste absorbs the new fields, while a separate global pays the full size × 8.
+
 **Model/track-type gate:**
 - Current max: `NoteTrack=9544 B`; `Track=9560 B`.
 - A new or modified track model below 9544 B should not increase top-level `Model` RAM through the 8-track `Track::_container`.
@@ -248,11 +263,12 @@ Treat RAM as a gate only when a feature changes the relevant container maximum o
 - `TeletypeTrack=7104 B` is below the model container gate. Teletype model cleanup is not a current top-level model RAM win unless the container architecture or gate changes.
 
 **Engine gate:**
-- Current measured max: `TeletypeTrackEngine=912 B`; `Engine::TrackEngineContainer=912 B`.
+- Current measured max on `feat/stochastic-seed-log` (Phase 14B Patch B follow-on, 2026-05-22): `TeletypeTrackEngine=912 B`; `Engine::TrackEngineContainer=912 B`. STM32 release: `.text=889,236`, `.data=6,416`, `.bss=167,996`, `.ccmram_bss=55,084 B`, **CCMRAM free ≈ 10.2 KB**.
 - Next-largest measured engine: `NoteTrackEngine=588 B`; conditional direct gap is `(912 - 588) * 8 = 2592 B` CCMRAM.
 - A new or modified track engine below 912 B should not inflate the engine container.
 - If it exceeds the current largest engine, the excess is multiplied by 8 engine slots in CCMRAM.
 - Shrinking or extracting `TeletypeTrackEngine` can save CCMRAM across all 8 engine slots if the current "any/all 8 tracks can be Teletype" behavior is changed or if the engine itself shrinks below 588 B.
+- **Worked example (Phase 14B engine cache).** A ~448 B per-track cache was first allocated as a file-scope `CCMRAM_BSS gStochasticCaches[8]` (3,616 B total). Moving the cache into `StochasticTrackEngine` as a member reclaimed the full 3,616 B with no container-array growth, because `StochasticTrackEngine + cache` still fit under the `TeletypeTrackEngine=912 B` slot ceiling. **Pattern:** when adding runtime state for a non-largest engine variant, prefer engine-member placement over file-scope CCMRAM globals — the container's existing slot waste absorbs it.
 
 **Direct RAM still matters:**
 - New globals, static buffers, queues, page members, lookup tables, file buffers, task stacks, and DMA buffers count directly even if container gates do not move.
