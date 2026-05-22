@@ -50,6 +50,15 @@ public:
 
     int currentStep() const { return _patternIndex; }
     bool activity() const { return _activity; }
+
+    // Phase 14B follow-on (2026-05-22): immediate transport sync after a
+    // model-level window edit (setFirst / setLast / setSize). Without this,
+    // engine state — _patternIndex, queued gate/CV events, cached ranks —
+    // can still reflect the old window until the next event-boundary trigger,
+    // so a Last shrink "feels like it still honors slot 31." Callers from
+    // edit paths must invoke this when the active stochastic track's window
+    // changes. See engine/StochasticTrackEngine.cpp:syncWindowEdit body.
+    void syncWindowEdit();
     int lastDegree() const { return _lastDegree; }
     int lastDurationIndex() const { return _lastDurationIndex; }
     uint16_t loopCycleCount() const { return _loopCycleCount; }

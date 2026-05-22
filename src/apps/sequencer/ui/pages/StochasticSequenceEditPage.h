@@ -67,6 +67,14 @@ private:
     void editLiveStep(int step, int value, bool shift);
     void editLoopStep(int step, int value, bool shift);
 
+    // Phase 14B follow-on: window-edit (first/last/size) requires immediate
+    // engine sync — model-only edits leave _patternIndex / queues / cache
+    // pointing at the old window until the next event-boundary trigger.
+    // Call this AFTER setFirst/setLast/setSize on the selected stochastic
+    // sequence. No-op if the selected track isn't currently a Stochastic
+    // engine.
+    void notifyStochasticWindowEdit();
+
     // Per-page Fn handlers.
     bool handleLiveFunction(int fn, bool shift, int pressCount);
     bool handleLoopFunction(int fn, bool shift, int pressCount);

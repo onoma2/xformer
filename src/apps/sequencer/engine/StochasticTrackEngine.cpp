@@ -659,6 +659,43 @@ void StochasticTrackEngine::writeLiveMelodyShadow(int readIndex, const Stochasti
     refreshCache();
 }
 
+void StochasticTrackEngine::syncWindowEdit() {
+    // Called from UI edit paths after setFirst / setLast / setSize on this
+    // track's sequence. Brings engine playback state in line with the new
+    // window NOW — without waiting for the next event-boundary trigger.
+    //
+    // Without this, queued gate/CV events (with absolute ticks for slots that
+    // may be outside the new window) and an in-flight _eventDuration (set
+    // when the old window was active) keep playback honoring the old
+    // boundaries until the current event finishes.
+    auto &seq = sequence();
+    int first = seq.first();
+    int last  = seq.last();
+    if (last < first) last = first;
+
+    // Snap _patternIndex into the new window if it's now outside.
+    if (_patternIndex < first || _patternIndex > last) {
+        _patternIndex = first;
+        // Force the next tick to trigger a step (don't wait for the now-stale
+        // _eventDuration to elapse — its remaining ticks belonged to the old
+        // window's event).
+        _eventElapsed = _eventDuration;
+    }
+
+    // Queued events were scheduled at absolute ticks for slots that may not
+    // exist in the new window. Drop them all; force gate off so the user
+    // doesn't hear a stuck gate from the old window.
+    _gateQueue.clear();
+    _cvQueue.clear();
+    _gateOutput = false;
+    _activity = false;
+
+    // Cache rank ordering was built for the old window — windowSize feeds the
+    // mask threshold and the rank distribution was assigned over the old
+    // window's slot set. Rebuild for the new window.
+    refreshCache();
+}
+
 void StochasticTrackEngine::refreshCache() {
     auto &seq = sequence();
     // Match the divisor computation in tick(): base divisor scaled by the

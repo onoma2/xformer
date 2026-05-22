@@ -696,6 +696,22 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     }
 }
 
+void StochasticSequenceEditPage::notifyStochasticWindowEdit() {
+    // Resolve the selected track's engine and ask it to sync. Three guards:
+    //   1. Selected track must currently be running as Stochastic.
+    //   2. The just-edited pattern must be the one the engine is currently
+    //      playing — editing pattern 3 while engine plays pattern 0 is a
+    //      model-only change that doesn't need engine sync (and calling sync
+    //      would clear pattern 0's audio queues for no reason).
+    //   3. The engine-array index matches the project's track index;
+    //      engine/model are kept consistent via Engine::updateTrackSetups.
+    int trackIdx = _project.selectedTrackIndex();
+    auto &engine = _engine.trackEngine(trackIdx);
+    if (engine.trackMode() != Track::TrackMode::Stochastic) return;
+    if (engine.pattern() != _project.selectedPatternIndex()) return;
+    static_cast<StochasticTrackEngine &>(engine).syncWindowEdit();
+}
+
 void StochasticSequenceEditPage::editLoopStep(int step, int value, bool shift) {
     auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
     int v = shift ? value * 10 : value;
@@ -707,10 +723,10 @@ void StochasticSequenceEditPage::editLoopStep(int step, int value, bool shift) {
     case 3: seq.setJump(seq.jump() + v); break;
     case 4: seq.setSleep(seq.sleep() + v); break;
     // Bottom row — loop window / shape params (green LEDs)
-    case 8:  seq.setFirst(seq.first() + value); break;
-    case 9:  seq.setLast(seq.last() + value); break;
-    case 10: seq.setSize(seq.size() + value); break;
-    case 11: seq.setRotate(seq.rotate() + value); break;
+    case 8:  seq.setFirst(seq.first() + value);   notifyStochasticWindowEdit(); break;
+    case 9:  seq.setLast(seq.last() + value);     notifyStochasticWindowEdit(); break;
+    case 10: seq.setSize(seq.size() + value);     notifyStochasticWindowEdit(); break;
+    case 11: seq.setRotate(seq.rotate() + value); break;   // rotation doesn't move window bounds
     // Last two — Mask + Tilt performance pair (filter + duration-tilt resonance)
     case 14: seq.setMask(seq.mask() + v); break;
     case 15: seq.setTilt(seq.tilt() + v); break;
@@ -1609,10 +1625,12 @@ void StochasticSequenceEditPage::contextAction(int index) {
         if (wants(2))  sequence.setMutate(0);
         if (wants(3))  sequence.setJump(0);
         if (wants(4))  sequence.setSleep(0);
-        if (wants(8))  sequence.setFirst(0);
-        if (wants(9))  sequence.setLast(15);
-        if (wants(10)) sequence.setSize(16);
-        if (wants(11)) sequence.setRotate(0);
+        bool windowEdited = false;
+        if (wants(8))  { sequence.setFirst(0);  windowEdited = true; }
+        if (wants(9))  { sequence.setLast(15);  windowEdited = true; }
+        if (wants(10)) { sequence.setSize(16);  windowEdited = true; }
+        if (wants(11)) sequence.setRotate(0);   // rotation doesn't move bounds
+        if (windowEdited) notifyStochasticWindowEdit();
         if (wants(14)) sequence.setMask(100);
         if (wants(15)) sequence.setTilt(0);
         showMessage(_heroSelectionMask ? "INIT SELECTED" : "INIT LOOP");
