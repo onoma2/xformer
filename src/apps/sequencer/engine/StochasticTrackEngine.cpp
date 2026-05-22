@@ -356,43 +356,51 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
         int activeNotes = scale.notesPerOctave();
 
-        // Duration LUT is divisor-relative: ticks = (divisor * num) / den.
-        // Variation is applied at generation time in generateRhythmEvent — each
-        // event's durationIndex is already varied when stored, so eval just
-        // reads it directly.
-        int durIdx = eval.durationIndex();
-        auto frac = getDurationFraction(durIdx);
-        uint32_t mult = (uint64_t(divisor) * frac.num) / frac.den;
-        if (mult < 1) mult = 1;
-        _lastDurationIndex = durIdx;
-        durationTicks = mult;
-        _eventDuration = durationTicks;
-
-        // Phase 14B Patch C step 1 (2026-05-22): pitch lookup source for the
-        // non-Repeat parent path moves to the engine cache. Cache cell stores
-        // degree + signed octave (event-domain values, no track offsets
-        // baked in), so the trigger-time scale lookup is identical math to
-        // the legacy `eval.degree()/.octave()` path — just sourced from the
-        // deterministic cache cell instead of the noisy event tape.
-        //
-        // Repeat path stays on `eval.degree()/.octave()` (i.e. from
-        // _lastEvent's stored fields) — same logic as the cache-rank fix:
-        // the audible material is the repeated event, not the cell at
-        // readIndex.
-        int pitchDegree = int(eval.degree());
-        int pitchOctave = int(eval.octave());
+        // Phase 14B Patch C step 2 (2026-05-22): parent-cell playback fields
+        // (durationIndex, degree, octave, rest, slide, legato) sourced from
+        // the engine cache when not under Repeat. The cache is built from the
+        // event tape and tracked across all event-writes (refreshCache), so
+        // these reads are byte-equivalent to the legacy eval-tape reads —
+        // just routed through the deterministic cache. Repeat path stays on
+        // eval (i.e. _lastEvent) because the audible material is the
+        // repeated event, not the cell at readIndex (same discipline as the
+        // mask-rank fix).
+        int  pDurIdx = eval.durationIndex();
+        int  pDegree = int(eval.degree());
+        int  pOctave = int(eval.octave());
+        bool pRest   = bool(eval.rest());
+        bool pSlide  = bool(eval.slide());
+        bool pLegato = bool(eval.legato());
         if (!useRepeat) {
             uint8_t cIdx = (readIndex >= 0 && readIndex < int(stochastic_cache::kMaxEventSlots))
                          ? _cache.parentCacheIdx[readIndex]
                          : uint8_t(0xff);
             if (cIdx < stochastic_cache::kCellCap) {
-                pitchDegree = int(_cache.cells[cIdx].degree());
-                pitchOctave = int(_cache.cells[cIdx].octave());
+                const auto &cell = _cache.cells[cIdx];
+                const auto &aux  = _cache.aux[cIdx];
+                pDurIdx = int(cell.gateLen());  // cell.gateLen field holds durSlot (encodeGateLenAsDurSlot)
+                pDegree = int(cell.degree());
+                pOctave = int(cell.octave());
+                pRest   = !aux.audible();
+                pSlide  = cell.slide();
+                pLegato = cell.legato();
             }
             // else: cache unprimed (engine reset, no refresh yet) — fall back
-            // to event tape values already loaded above.
+            // to event-tape values already loaded above.
         }
-        int note = pitchDegree + (pitchOctave + _jumpRegister + track.octave()) * activeNotes + track.transpose();
+
+        // Duration LUT is divisor-relative: ticks = (divisor * num) / den.
+        // Variation is applied at generation time in generateRhythmEvent — each
+        // event's durationIndex is already varied when stored, so we just
+        // read the (possibly cache-sourced) durationIndex directly.
+        auto frac = getDurationFraction(pDurIdx);
+        uint32_t mult = (uint64_t(divisor) * frac.num) / frac.den;
+        if (mult < 1) mult = 1;
+        _lastDurationIndex = pDurIdx;
+        durationTicks = mult;
+        _eventDuration = durationTicks;
+
+        int note = pDegree + (pOctave + _jumpRegister + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
 
         // V5 Mask: deterministic playback thinning after source read/evaluation.
@@ -418,9 +426,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             useRepeat, eval.densityRank(), readIndex, _cache);
         bool maskPass = sequence.mask() >= 100 ||
             ((cacheRank * 100) < (uint32_t(sequence.mask()) * windowSize));
-        isRest = bool(eval.rest()) || !maskPass || !eval.rhythmValid() || !eval.melodyValid();
-        isLegato = bool(eval.legato());
-        isSlide = bool(eval.slide());
+        isRest = pRest || !maskPass || !eval.rhythmValid() || !eval.melodyValid();
+        isLegato = pLegato;
+        isSlide = pSlide;
 
         // Evaluate Children
         StochasticGenerator::EvaluatedChild evalChildren[kMaxChildren];
