@@ -53,19 +53,23 @@ int directHistoryTrackIndex(const Track &track) {
 // Forward decl for use by patienceProbability below.
 static float poissonCdf(int k, float lambda);
 
-// Phase 12 musicality fix: dropped the knob-100 off-sentinel discontinuity.
-// Knob 0..100 → λ ∈ [1, 80] linear; 100 is "very patient" (~80 loops avg) but
-// still finite. For "never regenerate", use the track Lock control instead.
+// Knob 0..99 → λ ∈ [1, ~79] linear; knob 100 is the off-sentinel ("never
+// regenerate"). Phase 12 had dropped this sentinel in favor of routing the
+// "never" case through the deferred Lock feature, but Lock hasn't shipped
+// yet, so without the sentinel users had no way to disable patience-driven
+// regen. Restored 2026-05-22 (hardware feedback on feat/stochastic-seed-log).
 static inline float patienceLambda(int patience) {
     int p = patience < 0 ? 0 : (patience > 100 ? 100 : patience);
     return 1.0f + (p * 79.0f) / 100.0f;
 }
 
 float StochasticTrackEngine::patienceProbability(uint32_t loops, int patience) {
+    if (patience >= 100) return 0.f;   // off sentinel — never regenerate
     return poissonCdf(int(loops), patienceLambda(patience));
 }
 
 float StochasticTrackEngine::patienceMeter(uint32_t loops, int patience) {
+    if (patience >= 100) return 0.f;   // off sentinel — UI shows no boredom progress
     float lambda = patienceLambda(patience);
     float meter = float(loops) / lambda;
     if (meter > 1.0f) meter = 1.0f;
@@ -541,25 +545,32 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
 void StochasticTrackEngine::rollPatience() {
     auto &sequence = this->sequence();
-    // Phase 12 musicality fix: no off-sentinel; patience always rolls when in
-    // Loop mode. For "never regenerate", the user uses the track Lock control.
+    // Knob 100 is the off-sentinel: don't advance the counter and don't roll.
+    // Counter stays at 0 so the UI tension meter sits at empty; flipping the
+    // knob below 100 starts fresh (counter from 0) rather than picking up
+    // accumulated time. Restored 2026-05-22 — Lock feature hasn't shipped to
+    // own the "never regenerate" semantics.
     int patR = int(sequence.patienceRhythm());
-    if (sequence.rhythmMode() == StochasticSourceMode::Loop) {
+    if (sequence.rhythmMode() == StochasticSourceMode::Loop && patR < 100) {
         _loopCycleCount++;
         float pR = StochasticTrackEngine::patienceProbability(_loopCycleCount, patR);
         if (_rng.nextRange(10000) < uint32_t(pR * 10000.0f)) {
             sequence.setRhythmValid(false);
             _loopCycleCount = 0;
         }
+    } else if (patR >= 100) {
+        _loopCycleCount = 0;
     }
     int patM = int(sequence.patienceMelody());
-    if (sequence.melodyMode() == StochasticSourceMode::Loop) {
+    if (sequence.melodyMode() == StochasticSourceMode::Loop && patM < 100) {
         _loopCycleCountMelody++;
         float pM = StochasticTrackEngine::patienceProbability(_loopCycleCountMelody, patM);
         if (_rng.nextRange(10000) < uint32_t(pM * 10000.0f)) {
             sequence.setMelodyValid(false);
             _loopCycleCountMelody = 0;
         }
+    } else if (patM >= 100) {
+        _loopCycleCountMelody = 0;
     }
 }
 
