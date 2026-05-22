@@ -21,6 +21,7 @@ set(sources
     engine/TeletypeTrackEngine.cpp
     engine/StochasticTrackEngine.cpp
     engine/StochasticGenerator.cpp
+    engine/StochasticCache.cpp
     engine/TuesdayTrackEngine.cpp
     engine/RoutingEngine.cpp
     engine/SequenceState.cpp

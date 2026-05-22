@@ -25,6 +25,7 @@ register_sequencer_test(TestStochasticDurationDictionary TestStochasticDurationD
 register_sequencer_test(TestStochasticL1Macros TestStochasticL1Macros.cpp)
 register_sequencer_test(TestStochasticGenerator TestStochasticGenerator.cpp)
 register_sequencer_test(TestStochasticKeyedRng TestStochasticKeyedRng.cpp)
+register_sequencer_test(TestStochasticCacheParity TestStochasticCacheParity.cpp)
 register_sequencer_test(TestNoteSequence TestNoteSequence.cpp)
 register_sequencer_test(TestDiscreteMapSequence TestDiscreteMapSequence.cpp)
 # Disabled: requires complex mock dependencies for hardware drivers

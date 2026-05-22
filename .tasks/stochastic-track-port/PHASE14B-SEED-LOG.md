@@ -58,21 +58,51 @@ Per pattern size: **~115 B** (vs ~400 B today). Big RAM win.
 
 ## Engine cache
 
-Output lives in a transient per-track cache, engine-owned, CCMRAM-resident, **never serialized**:
+Output lives in a transient per-track cache, engine-owned, CCMRAM-resident, **never serialized**. Bit-packed to 4 B per cell after a footprint review (see "Footprint" below):
 
 ```
 struct CachedCell {
-    uint16_t relTick;
-    int16_t  cv;
-    uint16_t gateLen;
-    uint8_t  flags;     // slide, legato, audible, burst-child, rank
+    uint32_t packed;
+    //   bits  0..11  relTick   (0..4095 ticks ≈ 5 bars at PPQN=192)
+    //   bits 12..23  cv        (12-bit signed, ~2.4mV step over ±5V; DAC-limited)
+    //   bits 24..29  gateLen   (6-bit gateLen-as-fraction or LUT slot)
+    //   bit  30      slide
+    //   bit  31      legato
+    //   audible + burst-child packed alongside in flags helper byte (see code)
 };
-CachedCell _cache[96];
+CachedCell _cache[64];          // 256 B per track
+uint8_t    _cacheRank[64];      //  64 B per track — aux rank, deterministic from keyed hash
 uint8_t    _cacheCount;
 uint16_t   _cycleTicks;
 ```
 
-8 B × 96 × 8 tracks = 6 KB CCMRAM. Same footprint as the trunk model's per-track-active strategy, but here the cache is *always transient* — nothing persists between power cycles.
+Stored separately from the engine struct (file-scope `.ccmram_bss` globals, same pattern as `gDirectHistory`) to keep `sizeof(StochasticTrackEngine) <= 512` intact.
+
+### Deterministic rank (Mask filter)
+
+Today's `generateMaskRanks` uses random noise to scatter ties — that fights seed-lock (noise re-rolls under patience-driven regen even when durations didn't change). Phase 14B drives the tie-break from keyed RNG instead:
+
+```
+rankWeight = tilt × longShortAxis(durationIndex)
+           + (keyed_rng::cellSeed(rhythmSeed, cellIdx) >> 24) × 0.001
+// tilt magnitude:  -100..+100
+// longShortAxis:   (durSlot - 3.5) / 3.5  ∈ -1..+1
+// hash salt:       0..0.255  (loses to any non-zero tilt; provides ordering at tilt=0)
+sort ascending by rankWeight; rank = sort-index
+```
+
+Properties (Mask filter cuts cells with **high** rank — survival means **low** rank):
+- Tilt > 0: long-duration cells get low rank → survive Mask cuts. Short cells get cut first.
+- Tilt < 0: short-duration cells get low rank → survive. Long cells get cut first.
+- Tilt = 0: rank determined entirely by keyed hash — quasi-random ordering, but reproducible from `(rhythmSeed, cellIdx)`.
+- Patience reseed → rank ordering shifts deterministically, no rogue noise drift.
+
+### Footprint
+
+- 4 B `CachedCell` × 64 = 256 B per track.
+- 1 B `_cacheRank` × 64 = 64 B per track.
+- **Total: 320 B per active track.** ~35% of `TeletypeTrackEngine` (~912 B), ~3.3% of total `Track` (~9560 B).
+- 8 tracks × 320 B = **2.5 KB** worst case if all tracks stochastic and active. Well inside CCMRAM headroom.
 
 ## Generation contract
 
@@ -137,23 +167,29 @@ Content lock means: freeze the engine cache itself, regardless of knob movement.
 
 Not in Phase 14B scope. Revisit after seed+log is shipped and we know what users actually want from a Bloom-shape lock.
 
-## Engine playback
+## Engine playback — two modes preserved
+
+Decision 2026-05-22: Live and Loop modes keep their distinct regen cadences. Loop = cycle-wrap regen. Live = per-event regen.
 
 ```
 triggerStep(stepIndex):
-    if cycle just wrapped:
-        if !seedLocked OR !cacheValid:
-            regenerateRhythm(sequence, _cache, _rng)
-            regenerateMelody(sequence, _cache, ...)
-        else:
-            // seed-locked: regenerate cache from frozen seeds + current knobs
-            regenerateRhythm(sequence, _cache, _rng)
-            regenerateMelody(sequence, _cache, ...)
-    cell = _cache[stepIndex]
-    push to _gateQueue / _cvQueue
+    if mode == Loop (seedLocked):
+        if cycle just wrapped:
+            regenerateCacheFromKeyedSeeds(sequence, _cache, cycleCounter=0)
+        cell = _cache[stepIndex]
+    else:  // mode == Live
+        cell = regenerateOneCellFromKeyedSeed(sequence, stepIndex, cycleCounter)
+        _cache[stepIndex] = cell  // write-through so UI / lookback can read
+
+    push cell -> _gateQueue / _cvQueue
 ```
 
-Note: under seed-lock, the cache still regenerates each cycle — the seeds are frozen but knob inputs are live. Content lock (deferred) would skip regen entirely. Today's `_gateQueue` / `_cvQueue` drain path is unchanged.
+- **Loop mode**: cache is built once per cycle. Within one cycle, cells are bit-identical across iterations (frozen seed). Knob edits take effect at the next cycle wrap.
+- **Live mode**: cells regenerate as the playhead advances. Cycle counter advances each cycle wrap so cycle N+1 is keyed differently from cycle N — gives today's "fresh per cycle" feel without losing per-cell determinism. Mid-cycle knob changes affect cells that haven't played yet.
+
+The keyed RNG invariant still holds in Live mode: cell N's output is a pure function of `(rhythmSeed, stepIndex=N, cycleCounter, knobs)`. The cycleCounter is folded into the key so each cycle's content differs while remaining reproducible.
+
+Today's `_gateQueue` / `_cvQueue` drain path is unchanged. Content lock (deferred) would skip both regen paths.
 
 ## Operations
 
