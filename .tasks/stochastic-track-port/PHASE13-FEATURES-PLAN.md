@@ -55,6 +55,38 @@ Spec written 2026-05-22 ahead of Patch 1.
 
 ---
 
+## Alias + routing cleanup (landed 2026-05-22)
+
+Cosmetic + bug-fix pass that finally separates accent semantics from patience M storage and aligns identifiers with their actual roles.
+
+**Accent semantic deleted.** `event.setAccent(...)` write removed from `generateRhythmEvent`. `accent()` / `setAccent` removed from `StochasticSourceEvent`. Bit 7 of byte 2 reserved for future use. The accent flag was never consumed by the audio path AND its storage byte `_accentProb` was aliased with the patience-melody value — so setting patience M to 50 silently set 50% of events as accented (which then went nowhere because nothing read the bit), and setting patience M to 100 (off sentinel) silently set every event to "accent". Two semantics on one byte. Killed.
+
+**Field renames** (no on-disk format change — `writer.write(_field)` is positional):
+- `_accentProb` → `_patienceMelody`
+- `_linearity` → `_repeatProb`
+- `_patience` → `_patienceRhythm`
+- `_marblesSteps` → `_stepsSieve`
+- `_density` → `_gateLength`
+
+**Dead accessor removal.** `accentProb()/setAccentProb/printAccentProb/editAccentProb`, `linearity()/setLinearity/printLinearity/editLinearity`, `marblesSteps()/setMarblesSteps/printMarblesSteps/editMarblesSteps`, `patience()/setPatience/printPatience/editPatience` all deleted. New canonical accessors: `repeatProb` / `patienceRhythm` / `patienceMelody` / `stepsSieve` / `gateLength` with their print/edit siblings.
+
+**Routing enum + label cleanup** (numeric IDs unchanged → saves load fine):
+- `Routing::Target::StochasticDensity` → `StochasticMask` (ID 65, label stays "Mask")
+- `Routing::Target::StochasticGeneratorDensity` → `StochasticGateLength` (ID 79, label "Density" → "Gate Length")
+- `Routing::Target::StochasticPatience` → `StochasticPatienceRhythm` (ID 76, label "Patience" → "Patience R")
+- `Routing.cpp` ParameterRange table updated.
+- `StochasticPerformanceListModel.h` `Linearity` enum → `RepeatProb`, label "Linearity" → "Repeat". `AccentProb` enum entry + label + print/edit cases removed entirely.
+
+**Test updates.** `TestStochasticL1Macros` uses `setRepeatProb`/`repeatProb`. `TestStochasticGenerator` uses `setStepsSieve`.
+
+**Plus snap-flush fix.** `triggerStep`'s window snap clause now also flushes `_gateQueue` / `_cvQueue` and forces gate low when it engages. Fixes a bug where shrinking `last` mid-cycle still played stale slots from the old window because queued events were drained by absolute tick regardless of `_patternIndex` position.
+
+**Still reserved as a routing slot:** `StochasticReserved` (ID 67). Natural fit for `StochasticPatienceMelody` once patience M becomes routable. Deferred — would require bumping the field to `Routable<uint8_t>` and a one-time on-disk migration.
+
+**Build:** STM32 `.text=885,972`. Sim + four stochastic test suites pass.
+
+---
+
 ## Phase 13 gate — repair product truth first
 
 Do these before new feature work. They come from `docs/stoch-review.md` and from rereading the live model/engine/UI source.

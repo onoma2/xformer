@@ -261,12 +261,24 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     // Same seeds, same order, same valid semantics as the inlined block was.
     ensureLoopSources(scale, rootNote);
 
-    // Phase 12 fix: snap _patternIndex into the active window before reading.
-    // If the user shrinks Last or raises First while playback is past the new
-    // window, the engine would otherwise play one stale off-window event with
-    // stale rank/mutation state. Snap to first() so window edits feel immediate.
+    // Phase 12 fix + 2026-05-22 follow-up: snap _patternIndex into the active
+    // window before reading. If the user shrinks Last or raises First while
+    // playback is past the new window, the engine would otherwise play one
+    // stale off-window event with stale rank/mutation state.
+    //
+    // The snap also has to flush the gate/CV queues. Previous triggerSteps
+    // pushed events with absolute ticks for indices that are now outside the
+    // window (e.g. user shrinks last from 31 → 10 mid-cycle with queued events
+    // for slot 25, 31). `tick()` drains those by absolute tick regardless of
+    // _patternIndex, so without flushing the user would still hear slot 31's
+    // gate/CV fire after the snap repositioned playback to slot 0. Same
+    // discipline as changePattern() — clear queues, force gate low.
     if (_patternIndex < sequence.first() || _patternIndex > sequence.last()) {
         _patternIndex = sequence.first();
+        _gateQueue.clear();
+        _cvQueue.clear();
+        _gateOutput = false;
+        _activity = false;
     }
     int readIndex = _patternIndex;
     if (sequence.rotate() != 0) {

@@ -74,8 +74,12 @@ struct StochasticSourceEvent {
     bool slide() const { return (bytes[2] >> 6) & 0x01; }
     void setSlide(bool value) { bytes[2] = (bytes[2] & ~(1 << 6)) | ((value ? 1 : 0) << 6); }
 
-    bool accent() const { return (bytes[2] >> 7) & 0x01; }
-    void setAccent(bool value) { bytes[2] = (bytes[2] & ~(1 << 7)) | ((value ? 1 : 0) << 7); }
+    // bit 7 of byte 2 — reserved. Was the accent flag (Bernoulli set in
+    // generateRhythmEvent vs accentProb). Removed 2026-05-22 because (a) the
+    // accent semantic was never read by the audio path, and (b) accentProb's
+    // storage was aliased with patienceMelody, so the same knob was driving
+    // two independent engine behaviors. Free to repurpose in a later
+    // event-struct extension.
 
     bool rhythmValid() const { return bytes[3] & 0x01; }
     void setRhythmValid(bool value) { bytes[3] = (bytes[3] & ~0x01) | (value ? 1 : 0); }

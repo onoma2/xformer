@@ -97,8 +97,8 @@ public:
 
     void writeRouted(Routing::Target target, int intValue, float floatValue) {
         switch (target) {
-        case Routing::Target::StochasticDensity: setMask(intValue, true); break;
-        case Routing::Target::StochasticGeneratorDensity: setGateLength(intValue, true); break;
+        case Routing::Target::StochasticMask: setMask(intValue, true); break;
+        case Routing::Target::StochasticGateLength: setGateLength(intValue, true); break;
         case Routing::Target::StochasticTilt: setTilt(intValue, true); break;
         case Routing::Target::StochasticBurst: setBurst(intValue, true); break;
         case Routing::Target::StochasticComplexity: setComplexity(intValue, true); break;
@@ -108,7 +108,7 @@ public:
         case Routing::Target::StochasticRest: setRest(intValue, true); break;
         case Routing::Target::StochasticSlide: setSlide(intValue, true); break;
         case Routing::Target::StochasticSleep: setSleep(intValue, true); break;
-        case Routing::Target::StochasticPatience: setPatience(intValue, true); break;
+        case Routing::Target::StochasticPatienceRhythm: setPatienceRhythm(intValue, true); break;
         case Routing::Target::StochasticMutate: setMutate(intValue, true); break;
         case Routing::Target::StochasticJump: setJump(intValue, true); break;
         case Routing::Target::Rotate: setRotate(intValue, true); break;
@@ -148,14 +148,12 @@ public:
     int contour() const { return _contour.get(isRouted(Routing::Target::StochasticContour)); }
     void setContour(int contour, bool routed = false) { _contour.set(clamp(contour, -100, 100), routed); }
 
-    // Phase 12: _linearity slot repurposed as Repeat probability. Per-event
+    // Phase 12: _repeatProb slot repurposed as Repeat probability. Per-event
     // chance to reuse the previously-generated event verbatim (note, octave,
     // duration, articulation). 100% freezes on the last event. Mid values
     // cluster durations like a human player.
-    int linearity() const { return _linearity; }
-    void setLinearity(int linearity) { _linearity = clamp(linearity, 0, 100); }
-    int repeatProb() const { return _linearity; }
-    void setRepeatProb(int value) { _linearity = clamp(value, 0, 100); }
+    int repeatProb() const { return _repeatProb; }
+    void setRepeatProb(int value) { _repeatProb = clamp(value, 0, 100); }
 
     // Live-mode duration LUT slot index 0..7. Divisor-relative: see
     // StochasticTrackEngine::getDurationFraction() for the multiplier table.
@@ -186,8 +184,6 @@ public:
     int sleep() const { return _sleep.get(isRouted(Routing::Target::StochasticSleep)); }
     void setSleep(int sleep, bool routed = false) { _sleep.set(clamp(sleep, 0, 100), routed); }
 
-    int patience() const { return _patience.get(isRouted(Routing::Target::StochasticPatience)); }
-    void setPatience(int patience, bool routed = false) { _patience.set(clamp(patience, 0, 100), routed); }
 
     int mutate() const { return _mutate.get(isRouted(Routing::Target::StochasticMutate)); }
     // Bipolar: -100..0 = Proteus destructive (regenerate one event), 0 = lock,
@@ -246,15 +242,13 @@ public:
     void setMaskRotation(int rotation) { _maskRotation = clamp(rotation, -32, 32); }
 
     // accentProb
-    int accentProb() const { return _accentProb; }
-    void setAccentProb(int prob) { _accentProb = clamp(prob, 0, 100); }
-    // Phase 12: _accentProb slot repurposed as melody patience (independent of
+    // Phase 12: _patienceMelody slot repurposed as melody patience (independent of
     // rhythm patience). Same Poisson-CDF behavior. Knob 0..99 → λ ∈ [1, 50];
     // knob 100 = off sentinel. No routing target (matches Repeat treatment).
-    int patienceMelody() const { return _accentProb; }
-    void setPatienceMelody(int value) { _accentProb = clamp(value, 0, 100); }
-    int patienceRhythm() const { return patience(); }
-    void setPatienceRhythm(int value, bool routed = false) { setPatience(value, routed); }
+    int patienceMelody() const { return _patienceMelody; }
+    void setPatienceMelody(int value) { _patienceMelody = clamp(value, 0, 100); }
+    int patienceRhythm() const { return _patienceRhythm.get(isRouted(Routing::Target::StochasticPatienceRhythm)); }
+    void setPatienceRhythm(int value, bool routed = false) { _patienceRhythm.set(clamp(value, 0, 100), routed); }
 
     // degreeRotation
     int legatoProb() const { return _legatoProb; }
@@ -272,23 +266,23 @@ public:
     int marblesBias() const { return _marblesBias; }
     void setMarblesBias(int bias) { _marblesBias = clamp(bias, 0, 100); }
 
-    // marblesSteps — repurposed as pitch sieve cutoff (Phase 11). 0..100, 100=open.
-    int marblesSteps() const { return _marblesSteps; }
-    void setMarblesSteps(int steps) { _marblesSteps = clamp(steps, 0, 100); }
+    // stepsSieve — pitch sieve cutoff (Phase 11). 0..100, 100=open.
+    int stepsSieve() const { return _stepsSieve; }
+    void setStepsSieve(int value) { _stepsSieve = clamp(value, 0, 100); }
 
     // mask (deterministic loop playback thinning, V5 rename from density)
-    int mask() const { return _mask.get(isRouted(Routing::Target::StochasticDensity)); }
+    int mask() const { return _mask.get(isRouted(Routing::Target::StochasticMask)); }
     void setMask(int mask, bool routed = false) { _mask.set(clamp(mask, 0, 100), routed); }
 
-    // gateLength — repurposed from the Phase 11 `_density` reserved slot. Knob
+    // gateLength — repurposed from the Phase 11 `_gateLength` reserved slot. Knob
     // 0..100 controls the spread of per-event gate length around a hardcoded
     // 50% center. 0 = exact 50% every event; 100 = triangular distribution
     // 10..100% peaked at 50%. Floored at 10% of duration AND at an absolute
     // audible-tick minimum so very short events still produce a real trigger.
     // Routing target keeps the legacy `StochasticGeneratorDensity` enum name
     // for save-file compatibility; UI label changes to "Gate Length".
-    int gateLength() const { return _density.get(isRouted(Routing::Target::StochasticGeneratorDensity)); }
-    void setGateLength(int value, bool routed = false) { _density.set(clamp(value, 0, 100), routed); }
+    int gateLength() const { return _gateLength.get(isRouted(Routing::Target::StochasticGateLength)); }
+    void setGateLength(int value, bool routed = false) { _gateLength.set(clamp(value, 0, 100), routed); }
 
     // tilt (attached to mask)
     int tilt() const { return _tilt.get(isRouted(Routing::Target::StochasticTilt)); }
@@ -336,10 +330,11 @@ public:
     }
     void editLevel(int value, bool shift) { setLevel(ModelUtils::adjustedEnum(level(), value)); }
 
-    void printLinearity(StringBuilder &str) const { str("%d%%", linearity()); }
-    void editLinearity(int value, bool shift) { setLinearity(linearity() + value); }
     void printRepeatProb(StringBuilder &str) const { str("%d%%", repeatProb()); }
     void editRepeatProb(int value, bool shift) { setRepeatProb(repeatProb() + value); }
+
+    void printStepsSieve(StringBuilder &str) const { str("%d", stepsSieve()); }
+    void editStepsSieve(int value, bool shift) { setStepsSieve(stepsSieve() + value); }
 
     void printMarblesMode(StringBuilder &str) const { str(marblesMode() == MarblesMode::Off ? "Off" : "On"); }
     void editMarblesMode(int value, bool shift) { setMarblesMode(ModelUtils::adjustedEnum(marblesMode(), value)); }
@@ -350,16 +345,14 @@ public:
     void printMarblesBias(StringBuilder &str) const { str("%d%%", marblesBias()); }
     void editMarblesBias(int value, bool shift) { setMarblesBias(marblesBias() + value); }
 
-    void printMarblesSteps(StringBuilder &str) const { str("%d", marblesSteps()); }
-    void editMarblesSteps(int value, bool shift) { setMarblesSteps(marblesSteps() + value); }
 
-    void printMask(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticDensity); str("%d%%", mask()); }
-    void editMask(int value, bool shift) { if (!isRouted(Routing::Target::StochasticDensity)) setMask(mask() + value); }
+    void printMask(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMask); str("%d%%", mask()); }
+    void editMask(int value, bool shift) { if (!isRouted(Routing::Target::StochasticMask)) setMask(mask() + value); }
 
     // Level 1 Density macro: writes density only (no fan-out to rest)
-    void printGateLength(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticGeneratorDensity); str("%d%%", gateLength()); }
+    void printGateLength(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticGateLength); str("%d%%", gateLength()); }
     void editGateLength(int value, bool shift) {
-        if (!isRouted(Routing::Target::StochasticGeneratorDensity)) {
+        if (!isRouted(Routing::Target::StochasticGateLength)) {
             setGateLength(gateLength() + value);
         }
     }
@@ -397,10 +390,11 @@ public:
     void printMaxDegree(StringBuilder &str) const { str("%d", maxDegree()); }
     void editMaxDegree(int value, bool shift) { setMaxDegree(maxDegree() + value); }
 
-    void printAccentProb(StringBuilder &str) const { str("%d%%", accentProb()); }
-    void editAccentProb(int value, bool shift) { setAccentProb(ModelUtils::adjustedByStep(accentProb(), value, 1, !shift)); }
     void printPatienceMelody(StringBuilder &str) const { str("%d%%", patienceMelody()); }
     void editPatienceMelody(int value, bool shift) { setPatienceMelody(patienceMelody() + value); }
+
+    void printPatienceRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticPatienceRhythm); str("%d%%", patienceRhythm()); }
+    void editPatienceRhythm(int value, bool shift) { if (!isRouted(Routing::Target::StochasticPatienceRhythm)) setPatienceRhythm(patienceRhythm() + value); }
 
     void printLegatoProb(StringBuilder &str) const { str("%d%%", legatoProb()); }
     void editLegatoProb(int value, bool shift) { setLegatoProb(ModelUtils::adjustedByStep(legatoProb(), value, 1, !shift)); }
@@ -441,8 +435,6 @@ public:
     void printSleep(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticSleep); str("%d%%", sleep()); }
     void editSleep(int value, bool shift) { if (!isRouted(Routing::Target::StochasticSleep)) setSleep(sleep() + value); }
 
-    void printPatience(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticPatience); str("%d%%", patience()); }
-    void editPatience(int value, bool shift) { if (!isRouted(Routing::Target::StochasticPatience)) setPatience(patience() + value); }
 
     void printMutate(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMutate); str("%+d%%", mutate()); }
     void editMutate(int value, bool shift) { if (!isRouted(Routing::Target::StochasticMutate)) setMutate(mutate() + value); }
@@ -529,17 +521,17 @@ public:
 for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
             _degreeTickets[i] = 0;
         }
-        _linearity = 0;
+        _repeatProb = 0;
         _degreeRotation = 0;
         _maskRotation = 0;
-        _accentProb = 100;   // patienceMelody default (off sentinel)
+        _patienceMelody = 100;   // patienceMelody default (off sentinel)
         _legatoProb = 0;
         _marblesMode = MarblesMode::Off;
         _marblesSpread = 50;
         _marblesBias = 50;
-        _marblesSteps = 100;
+        _stepsSieve = 100;
         _mask.setBase(100);
-        _density.setBase(0);   // gate length spread default — 0 = exact 50% center
+        _gateLength.setBase(0);   // gate length spread default — 0 = exact 50% center
         _tilt.setBase(0);
         _burst.setBase(0);
         _minDegree = 0;
@@ -555,7 +547,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _burstCount = 0;
         _burstPitch = StochasticBurstPitch::Parent;
         _sleep.setBase(0);
-        _patience.setBase(100);
+        _patienceRhythm.setBase(100);
         _mutate.setBase(0);
         _jump.setBase(0);
         _range = 1;
@@ -584,15 +576,15 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         writer.write(_melodySeed);
 
         for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) writer.write(_degreeTickets[i]);
-        writer.write(_linearity);
+        writer.write(_repeatProb);
         writer.write(_degreeRotation);
         writer.write(_maskRotation);
-        writer.write(_accentProb);
+        writer.write(_patienceMelody);
         writer.write(_legatoProb);
         writer.write(static_cast<uint8_t>(_marblesMode));
         writer.write(_marblesSpread);
         writer.write(_marblesBias);
-        writer.write(_marblesSteps);
+        writer.write(_stepsSieve);
         _mask.write(writer);
         _tilt.write(writer);
         _burst.write(writer);
@@ -609,13 +601,13 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         writer.write(_burstCount);
         writer.write(static_cast<uint8_t>(_burstPitch));
         _sleep.write(writer);
-        _patience.write(writer);
+        _patienceRhythm.write(writer);
         _mutate.write(writer);
         _jump.write(writer);
         writer.write(_range);
         writer.write(static_cast<uint8_t>(_rhythmMode));
         writer.write(static_cast<uint8_t>(_melodyMode));
-        _density.write(writer);
+        _gateLength.write(writer);
         for (int i = 0; i < 8; ++i) writer.write(_durationTickets[i]);
         writer.write(static_cast<uint8_t>(_level));
 
@@ -647,14 +639,14 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
 
         for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) reader.read(_degreeTickets[i]);
         for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) _degreeTickets[i] = clamp(int(_degreeTickets[i]), -1, 100);
-        reader.read(_linearity);
-        _linearity = clamp(int(_linearity), 0, 100);
+        reader.read(_repeatProb);
+        _repeatProb = clamp(int(_repeatProb), 0, 100);
         reader.read(_degreeRotation);
         _degreeRotation = clamp(int(_degreeRotation), -32, 32);
         reader.read(_maskRotation);
         _maskRotation = clamp(int(_maskRotation), -32, 32);
-        reader.read(_accentProb);
-        _accentProb = clamp(int(_accentProb), 0, 100);
+        reader.read(_patienceMelody);
+        _patienceMelody = clamp(int(_patienceMelody), 0, 100);
         reader.read(_legatoProb);
         _legatoProb = clamp(int(_legatoProb), 0, 100);
         uint8_t marblesMode;
@@ -664,8 +656,8 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _marblesSpread = clamp(int(_marblesSpread), 0, 100);
         reader.read(_marblesBias);
         _marblesBias = clamp(int(_marblesBias), 0, 100);
-        reader.read(_marblesSteps);
-        _marblesSteps = clamp(int(_marblesSteps), 0, 100);
+        reader.read(_stepsSieve);
+        _stepsSieve = clamp(int(_stepsSieve), 0, 100);
         _mask.read(reader);
         _tilt.read(reader);
         _burst.read(reader);
@@ -688,7 +680,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         reader.read(burstPitch);
         _burstPitch = burstPitch < uint8_t(StochasticBurstPitch::Last) ? static_cast<StochasticBurstPitch>(burstPitch) : StochasticBurstPitch::Parent;
         _sleep.read(reader);
-        _patience.read(reader);
+        _patienceRhythm.read(reader);
         _mutate.read(reader);
         _jump.read(reader);
         reader.read(_range);
@@ -700,7 +692,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         reader.read(melodyMode);
         _melodyMode = melodyMode < uint8_t(StochasticSourceMode::Last) ? static_cast<StochasticSourceMode>(melodyMode) : StochasticSourceMode::Loop;
 
-        _density.read(reader);
+        _gateLength.read(reader);
         for (int i = 0; i < 8; ++i) {
             reader.read(_durationTickets[i]);
             _durationTickets[i] = clamp(int(_durationTickets[i]), 0, 100);
@@ -738,17 +730,17 @@ private:
             for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
                 _degreeTickets[i] = 0;
             }
-            _linearity = 0;
+            _repeatProb = 0;
             _degreeRotation = 0;
             _maskRotation = 0;
-            _accentProb = 100;   // patienceMelody default (off sentinel)
+            _patienceMelody = 100;   // patienceMelody default (off sentinel)
             _legatoProb = 0;
             _marblesMode = MarblesMode::Off;
             _marblesSpread = 50;
             _marblesBias = 50;
-            _marblesSteps = 100;
+            _stepsSieve = 100;
             _mask.setBase(100);
-            _density.setBase(0);   // gate length spread default — 0 = exact 50% center
+            _gateLength.setBase(0);   // gate length spread default — 0 = exact 50% center
             _tilt.setBase(0);
             _burst.setBase(0);
             _minDegree = 0;
@@ -764,7 +756,7 @@ private:
             _burstCount = 0;
             _burstPitch = StochasticBurstPitch::Parent;
             _sleep.setBase(0);
-            _patience.setBase(100);
+            _patienceRhythm.setBase(100);
             _mutate.setBase(0);
             _jump.setBase(0);
             _range = 1;
@@ -807,18 +799,18 @@ private:
     uint32_t _melodySeed;
 
     int8_t _degreeTickets[CONFIG_USER_SCALE_SIZE];
-    uint8_t _linearity;
+    uint8_t _repeatProb;
     int8_t _degreeRotation;
     int8_t _maskRotation;
-    uint8_t _accentProb;
+    uint8_t _patienceMelody;
     uint8_t _legatoProb;
     MarblesMode _marblesMode;
     uint8_t _marblesSpread;
     uint8_t _marblesBias;
-    uint8_t _marblesSteps;
+    uint8_t _stepsSieve;
 
     Routable<uint8_t> _mask;
-    Routable<uint8_t> _density;
+    Routable<uint8_t> _gateLength;
     Routable<int8_t> _tilt;
     Routable<uint8_t> _burst;
 
@@ -836,7 +828,7 @@ private:
     uint8_t _burstCount;
     StochasticBurstPitch _burstPitch;
     Routable<uint8_t> _sleep;
-    Routable<uint8_t> _patience;
+    Routable<uint8_t> _patienceRhythm;
     Routable<int8_t> _mutate;
     Routable<uint8_t> _jump;
     uint8_t _range;

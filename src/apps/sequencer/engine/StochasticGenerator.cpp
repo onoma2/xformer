@@ -428,7 +428,10 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
     event.setRest(restGate);
     event.setLegato(int(rng.nextRange(100)) < sequence.legatoProb());
     event.setSlide(int(rng.nextRange(100)) < sequence.slide());
-    event.setAccent(int(rng.nextRange(100)) < sequence.accentProb());
+    // Accent write removed 2026-05-22 — the accent bit was never consumed by
+    // the audio path, and its storage (`_accentProb`) was aliased with
+    // patienceMelody, so writing it here meant the patience M knob silently
+    // drove a per-event Bernoulli too. Bit 7 of byte 2 is now reserved.
     event.setRhythmValid(true);
 
     event.setChildCount(0);
@@ -511,7 +514,7 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
     if (allowedCount == 0) return 0;
 
     // 2. Steps sieve — keep top-K by universalDegreeBoost rank
-    int steps = clamp(int(sequence.marblesSteps()), 0, 100);
+    int steps = clamp(int(sequence.stepsSieve()), 0, 100);
     int K = (allowedCount * steps + 99) / 100;
     if (K < 1) K = 1;
     if (K > allowedCount) K = allowedCount;

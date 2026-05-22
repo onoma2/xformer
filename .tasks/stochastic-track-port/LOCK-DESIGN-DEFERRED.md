@@ -72,6 +72,79 @@ struct LockedTick {
 - "Patterns with more queue events than 128 per cycle truncate; the truncated portion plays as silence under Lock."
 - "Lock is per-track. Switching patterns auto-recaptures on the next cycle of the new pattern."
 
+## Alternative: engine-flag Lock (RNG-state freeze) — likely simpler than the tape
+
+After the tape design was drafted, a simpler option emerged: don't capture output at all, just freeze the engine state that drives the random rolls. Restore the snapshot at every cycle wrap. The engine re-evaluates each cycle from the same starting state → bit-identical audio without any tape.
+
+**The codebase already proves this works.** `TuesdayTrackEngine::tick` lines 1870–1883:
+
+```cpp
+int loopLength = sequence.actualLoopLength();
+uint32_t resetDivisor = (loopLength > 0) ? (loopLength * divisor) : 0;
+uint32_t relativeTick = (resetDivisor == 0) ? tick : tick % resetDivisor;
+if (resetDivisor > 0 && relativeTick == 0) {
+    initAlgorithm();    // re-seeds _rng and _extraRng to loop-start state
+    _stepIndex = ...;
+}
+```
+
+Tuesday's entire loop mechanism is "re-seed the RNG on cycle wrap, advance steps deterministically from there." `generateStep()` is stateless w.r.t. the loop — purely a function of `_stepIndex` + current RNG state + sequence params. No `events()[]` buffer, no tape. The loop is bit-identical because the RNG is reset to a known state each cycle, and all 15 Tuesday algorithms (Test, Tritrance, Stomper, Aphex, Autechre, Stepwave, Markov, ChipArp1, ChipArp2, Wobble, Scalewalker, Window, Minimal, Blake, Ganz) read this contract.
+
+**Same pattern applied to stochastic Lock:**
+
+- On `ArmPending → Capturing` (at next `first()` visit), snapshot the engine state that drives randomness:
+  ```cpp
+  _snapshotRng           = _rng;
+  _snapshotJumpRegister  = _jumpRegister;
+  _snapshotLastDegree    = _lastDegree;
+  _snapshotLastEvent     = _lastEvent;
+  _snapshotLastEventValid = _lastEventValid;
+  ```
+- Cycle N plays from this state. Patience/Mutate/Live-writeback to `events()[]` are blocked while `Locked`.
+- On every subsequent cycle wrap (`_patternIndex == first()`):
+  ```cpp
+  _rng           = _snapshotRng;
+  _jumpRegister  = _snapshotJumpRegister;
+  _lastDegree    = _snapshotLastDegree;
+  _lastEvent     = _snapshotLastEvent;
+  _lastEventValid = _snapshotLastEventValid;
+  ```
+- `triggerStep` runs normally inside the cycle. Within-cycle randomness (gate length, burst children, Repeat roll, Live regen) reads `_rng` — same state every cycle, so same rolls, same audio.
+- Lock toggle off: just stop restoring on wrap. Natural evolution resumes from wherever the engine state happened to be at that moment.
+
+**Per-track footprint (engine struct, no heap, no CCMRAM pool):**
+- `Random _snapshotRng` — 4 B
+- `int _snapshotJumpRegister` — 4 B
+- `int _snapshotLastDegree` — 4 B
+- `StochasticSourceEvent _snapshotLastEvent` — 6 B
+- `bool _snapshotLastEventValid` — 1 B (padded)
+- ≈ **20 B per track in the engine struct.** 8 tracks → 160 B. Fits under the existing 512 B engine size assert with comfortable headroom.
+
+**No tape capacity limit.** Works on any pattern size — 16 steps, 64 steps, all-burst, doesn't matter. The lock doesn't store output, it stores the input conditions that produce the same output.
+
+**Differences vs Tuesday:**
+
+- Tuesday re-seeds from sequence params each cycle (`initAlgorithm()` derives the seed from `flow` and `ornament`). Always-deterministic by design — there's no "unlock" because there's no captured state to evolve from.
+- Stochastic Lock would snapshot `_rng` at the moment of arm (not re-derive from params), then restore that snapshot at every cycle wrap until the user releases Lock. Releasing Lock just stops the restore — the engine continues with whatever state was there at that moment and natural evolution (patience, mutate, jump consuming `_rng` freely) resumes.
+
+**Caveat that comes with the territory:** if the user turns a knob while Lock is on, the audio changes — the RNG state is frozen but the parameter inputs differ. That's arguably a feature ("perform on top of the locked pattern" — Repeat, Range, Variation knobs become mod controls over the frozen loop). For strict "Lock means everything is frozen" semantics you'd also snapshot model values, but that's an extension, not the base design.
+
+**Engine determinism prerequisite (already true today):**
+- `_rng` is a single `uint32_t` state. Deterministic LCG.
+- All per-step rolls (`evaluateChildren`, `pickGateLength`, Repeat probability, Live-mode regen) consume `_rng.nextRange(N)` — integer math.
+- CV pipeline uses `scale.noteToVolts(note)` — fixed-point lookup, deterministic on STM32.
+- No floats from the audio API, no clock jitter affecting the audio path, no threading races in `triggerStep` (engine task only).
+
+**Why this is probably the answer:**
+
+- Lighter than the tape (20 B/track vs 768 B/track CCMRAM).
+- No capacity cliff (no 128-event cap).
+- Pattern of "snapshot + restore on cycle wrap" already shipping in Tuesday — same engine, same task, same audio path. Validated architecture.
+- Sequence-owned 1-bit flag persists across save/load. Auto-arms on project load (1-cycle recapture delay).
+- Park "tape" design as a fallback if engine determinism turns out to have hidden non-determinism we missed.
+
+This is now the preferred implementation when the Lock work resumes. The tape design above is kept as a fallback.
+
 ## Open question: outsource to fractal
 
 The fractal-track design (see `.tasks/fractal-track-implementation/DICTIONARY.md`) has a "trunk" — an inline `uint16_t[]` buffer per step (11-bit CV + 4-bit gate length + 1 flag). Lock semantics in fractal: trunk content is captured during recording, and Lock blocks further trunk writes. Branches and ornamentation continue while locked.
@@ -97,4 +170,5 @@ When the redesign comes back, the flag is already wired and persistable; the eng
 
 ## Cleanup history
 
-- 2026-05-22 — removed heap-allocated `_lockedParents` cache, the `if (locked)` replay branch in `triggerStep`, `captureLockedParent`, `lockAvailable`, init/free helpers, destructor. Sim + STM32 release builds clean. `.text` shrunk by ~2.5 KB. Four stochastic test suites pass. PROJECT.md heap section updated.
+- 2026-05-22 — removed heap-allocated `_lockedParents` cache, the `if (locked)` replay branch in `triggerStep`, `captureLockedParent`, `lockAvailable`, init/free helpers, destructor. Sim + STM32 release builds clean. `.text` shrunk by ~2.5 KB. Four stochastic test suites pass. PROJECT.md heap section updated. **Hardware-verified with 8 stochastic tracks — no crash.**
+- 2026-05-22 — added the engine-flag (RNG-state freeze) alternative section, pointing at `TuesdayTrackEngine::tick:1870-1883` as the working precedent. This is now the preferred implementation when Lock work resumes; the flat-tape design is kept as a fallback.

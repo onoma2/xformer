@@ -27,7 +27,7 @@ CASE("tickets_steer_the_distribution") {
     seq.setComplexity(50);
     seq.setMarblesBias(50);
     seq.setMarblesSpread(100);
-    seq.setMarblesSteps(100); // sieve fully open
+    seq.setStepsSieve(100); // sieve fully open
 
     StochasticTrack track;
     track.clear();
@@ -57,7 +57,7 @@ CASE("steps_sieve_restricts_to_fundamental_degrees") {
     for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
 
     // Tight sieve — only the root anchor should survive.
-    seq.setMarblesSteps(5);
+    seq.setStepsSieve(5);
     seq.setComplexity(50);
     seq.setMarblesBias(50);
     seq.setMarblesSpread(100);
@@ -89,7 +89,7 @@ CASE("marbles_distribution_always_runs_with_transparent_defaults") {
     // Transparent defaults — bias center, spread wide, steps open.
     seq.setMarblesBias(50);
     seq.setMarblesSpread(100);
-    seq.setMarblesSteps(100);
+    seq.setStepsSieve(100);
     seq.setComplexity(50);
 
     StochasticTrack track;
@@ -121,7 +121,7 @@ CASE("complexity_kernel_narrows_movement_at_low_values") {
 
     seq.setMarblesBias(50);
     seq.setMarblesSpread(100);
-    seq.setMarblesSteps(100);
+    seq.setStepsSieve(100);
     // Low complexity — kernel tight, picks should cluster near lastDegree
     seq.setComplexity(0);
 

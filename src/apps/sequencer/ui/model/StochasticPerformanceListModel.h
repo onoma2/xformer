@@ -16,7 +16,7 @@ public:
         Melody,
         Complexity,
         Contour,
-        Linearity,
+        RepeatProb,
         Repeat,
         Shape,
         Spread,
@@ -27,7 +27,6 @@ public:
         Rest,
         SlideProb,
         LegatoProb,
-        AccentProb,
         Burst,
         BurstCount,
         BurstRate,
@@ -84,8 +83,8 @@ public:
 
     virtual Routing::Target routingTarget(int row) const override {
         switch (itemForRow(row)) {
-        case Mask:          return Routing::Target::StochasticDensity;
-        case GateLength:    return Routing::Target::StochasticGeneratorDensity;
+        case Mask:          return Routing::Target::StochasticMask;
+        case GateLength:    return Routing::Target::StochasticGateLength;
         case Tilt:          return Routing::Target::StochasticTilt;
         case Burst:         return Routing::Target::StochasticBurst;
         case Contour:       return Routing::Target::StochasticContour;
@@ -94,7 +93,7 @@ public:
         case Rest:          return Routing::Target::StochasticRest;
         case SlideProb:     return Routing::Target::StochasticSlide;
         case Sleep:         return Routing::Target::StochasticSleep;
-        case Patience:      return Routing::Target::StochasticPatience;
+        case Patience:      return Routing::Target::StochasticPatienceRhythm;
         case Mutate:        return Routing::Target::StochasticMutate;
         case Jump:          return Routing::Target::StochasticJump;
         case Rotate:        return Routing::Target::Rotate;
@@ -134,7 +133,7 @@ private:
         case Melody:        return "Melody";
         case Complexity:    return "Complexity";
         case Contour:       return "Contour";
-        case Linearity:     return "Linearity";
+        case RepeatProb:     return "RepeatProb";
         case Repeat:        return "Repeat";
         case Shape:         return "Shape";
         case Spread:        return "Spread";
@@ -145,7 +144,6 @@ private:
         case Rest:          return "Rest";
         case SlideProb:     return "Slide Prob";
         case LegatoProb:    return "Legato";
-        case AccentProb:    return "Accent";
         case Burst:         return "Burst";
         case BurstCount:    return "Burst Count";
         case BurstRate:     return "Burst Rate";
@@ -184,18 +182,17 @@ private:
         case Melody:        str(sequence.melodyMode() == StochasticSourceMode::Loop ? "Loop" : "Live"); break;
         case Complexity:    sequence.printComplexity(str); break;
         case Contour:       sequence.printContour(str); break;
-        case Linearity:     sequence.printLinearity(str); break;
+        case RepeatProb:     sequence.printRepeatProb(str); break;
         case Repeat:        sequence.printRepeatProb(str); break;
         case Shape:         sequence.printMarblesMode(str); break;
         case Spread:        sequence.printMarblesSpread(str); break;
         case Bias:          sequence.printMarblesBias(str); break;
-        case Steps:         sequence.printMarblesSteps(str); break;
+        case Steps:         sequence.printStepsSieve(str); break;
         case NoteDuration:  sequence.printNoteDuration(str); break;
         case Variation:     sequence.printVariation(str); break;
         case Rest:          sequence.printRest(str); break;
         case SlideProb:     sequence.printSlide(str); break;
         case LegatoProb:    sequence.printLegatoProb(str); break;
-        case AccentProb:    sequence.printAccentProb(str); break;
         case Burst:         sequence.printBurst(str); break;
         case BurstCount:    str("%d%%", sequence.burstCount()); break;
         case BurstRate:     str("%d%%", sequence.burstRate()); break;
@@ -203,7 +200,7 @@ private:
         case Mask:          sequence.printMask(str); break;
         case Tilt:          sequence.printTilt(str); break;
         case Sleep:         sequence.printSleep(str); break;
-        case Patience:      sequence.printPatience(str); break;
+        case Patience:      sequence.printPatienceRhythm(str); break;
         case PatienceMelody:sequence.printPatienceMelody(str); break;
         case Mutate:        sequence.printMutate(str); break;
         case Jump:          sequence.printJump(str); break;
@@ -229,18 +226,17 @@ private:
         case Melody:        sequence.setMelodyMode(ModelUtils::adjustedEnum(sequence.melodyMode(), value)); break;
         case Complexity:    sequence.editComplexity(value, shift); break;
         case Contour:       sequence.editContour(value, shift); break;
-        case Linearity:     sequence.editLinearity(value, shift); break;
+        case RepeatProb:     sequence.editRepeatProb(value, shift); break;
         case Repeat:        sequence.editRepeatProb(value, shift); break;
         case Shape:         sequence.editMarblesMode(value, shift); break;
         case Spread:        sequence.editMarblesSpread(value, shift); break;
         case Bias:          sequence.editMarblesBias(value, shift); break;
-        case Steps:         sequence.editMarblesSteps(value, shift); break;
+        case Steps:         sequence.editStepsSieve(value, shift); break;
         case NoteDuration:  sequence.editNoteDuration(value, shift); break;
         case Variation:     sequence.editVariation(value, shift); break;
         case Rest:          sequence.editRest(value, shift); break;
         case SlideProb:     sequence.editSlide(value, shift); break;
         case LegatoProb:    sequence.editLegatoProb(value, shift); break;
-        case AccentProb:    sequence.editAccentProb(value, shift); break;
         case Burst:         sequence.editBurst(value, shift); break;
         case BurstCount:    sequence.setBurstCount(sequence.burstCount() + value); break;
         case BurstRate:     sequence.setBurstRate(sequence.burstRate() + value); break;
@@ -248,7 +244,7 @@ private:
         case Mask:          sequence.editMask(value, shift); break;
         case Tilt:          sequence.editTilt(value, shift); break;
         case Sleep:         sequence.editSleep(value, shift); break;
-        case Patience:      sequence.editPatience(value, shift); break;
+        case Patience:      sequence.editPatienceRhythm(value, shift); break;
         case PatienceMelody:sequence.editPatienceMelody(value, shift); break;
         case Mutate:        sequence.editMutate(value, shift); break;
         case Jump:          sequence.editJump(value, shift); break;
@@ -274,7 +270,7 @@ private:
 //   Mode     — coupled Loop/Live (use split Rhythm + Melody instead)
 //   Character — duplicate of Complexity (same field)
 //   Shape    — Marbles toggle (engine always runs the distribution now)
-//   Linearity — folded into Complexity kernel (slot repurposed as Repeat probability)
+//   RepeatProb — folded into Complexity kernel (slot repurposed as Repeat probability)
 //   Contour    — restored Phase 12 as directional Drift bias relative to lastDegree
 //   Density  — slot repurposed as Gate Length (visible row)
 // Sections (top to bottom):

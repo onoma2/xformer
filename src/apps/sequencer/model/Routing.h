@@ -136,8 +136,8 @@ public:
 
         // Stochastic Track Targets
         StochasticFirst,
-        StochasticDensity = StochasticFirst,
-        StochasticGeneratorDensity,
+        StochasticMask = StochasticFirst,
+        StochasticGateLength,
         StochasticTilt,
         StochasticReserved,
         StochasticBurst,
@@ -148,7 +148,7 @@ public:
         StochasticRest,
         StochasticSlide,
         StochasticSleep,
-        StochasticPatience,
+        StochasticPatienceRhythm,
         StochasticMutate,
         StochasticJump,
         StochasticLast = StochasticJump,
@@ -209,8 +209,8 @@ public:
         case Target::GateOffset:                return "Gate Offset";
         case Target::GateLength:                return "Gate Length";
 
-        case Target::StochasticDensity:         return "Mask";
-        case Target::StochasticGeneratorDensity: return "Density";
+        case Target::StochasticMask:            return "Mask";
+        case Target::StochasticGateLength:      return "Gate Length";
         case Target::StochasticTilt:            return "Tilt";
         case Target::StochasticReserved:        return "";
         case Target::StochasticBurst:           return "Burst";
@@ -221,7 +221,7 @@ public:
         case Target::StochasticRest:            return "Rest";
         case Target::StochasticSlide:           return "Slide";
         case Target::StochasticSleep:           return "Sleep";
-        case Target::StochasticPatience:        return "Patience";
+        case Target::StochasticPatienceRhythm:  return "Patience R";
         case Target::StochasticMutate:          return "Mutate";
         case Target::StochasticJump:            return "Jump";
 
@@ -306,8 +306,8 @@ public:
         case Target::GateOffset:                return 37;
         case Target::GateLength:                return 38;
 
-        case Target::StochasticDensity:         return 65;
-        case Target::StochasticGeneratorDensity: return 79;
+        case Target::StochasticMask:         return 65;
+        case Target::StochasticGateLength: return 79;
         case Target::StochasticTilt:            return 66;
         case Target::StochasticReserved:        return 67;
         case Target::StochasticBurst:           return 68;
@@ -318,7 +318,7 @@ public:
         case Target::StochasticRest:            return 73;
         case Target::StochasticSlide:           return 74;
         case Target::StochasticSleep:           return 75;
-        case Target::StochasticPatience:        return 76;
+        case Target::StochasticPatienceRhythm:        return 76;
         case Target::StochasticMutate:          return 77;
         case Target::StochasticJump:            return 78;
 
