@@ -239,6 +239,66 @@ CASE("burst_children_match_reference_math") {
     expectEqual(int(cache.cells[3].relTick()), int(refOffsets[2]));
 }
 
+CASE("burst_child_gate_fraction_survives_long_parents") {
+    // Codex review 2026-05-22 finding 3: legacy evaluateChildren used the full
+    // computed gateTicks. Previous cache encoding clamped to 63 raw ticks,
+    // shortening child gates at long parent durations and skewing audible
+    // behavior vs the Repeat-legacy path. Fix: cache stores child gate as
+    // 64ths-of-parent fraction; engine decodes back to ticks at trigger time.
+    //
+    // This test exercises the fraction roundtrip directly: emit a parent
+    // long enough that the raw childGate exceeds 63 ticks, then verify the
+    // engine-side decode reconstructs the original tick count within rounding.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setFirst(0);
+    seq.setLast(0);
+    seq.setBurstPitch(StochasticBurstPitch::Parent);
+
+    auto &ev = seq.events()[0];
+    ev.setDurationIndex(0);   // longest: ×8 (largest LUT slot)
+    ev.setRest(false);
+    ev.setRhythmValid(true);
+    ev.setChildCount(2);
+    ev.setBurstRate(0);       // spacingSlot 0 → denom 2; childGate = parentTicks/4
+
+    // Use a divisor large enough that parentTicks * 8 overshoots the legacy
+    // 63-tick clamp by a large margin. divisor=96 → parentTicks = 96 * 8 = 768.
+    // spacing = 768 / 2 = 384. childGate (legacy) = 384 * 0.5 = 192. Far above 63.
+    const uint32_t kDivisor = 96;
+    Cache cache{};
+    regenerateCacheFromEvents(cache, seq, kDivisor, 0xfeed);
+
+    // Parent at index 0; child at index 1 (we requested 2 children but only
+    // the first fits before parentTicks runs out at spacingDenom=2).
+    expectTrue(cache.count >= 2, "at least one child must be cached");
+    expectFalse(cache.aux[0].burstChild());
+    expectTrue(cache.aux[1].burstChild());
+
+    // Compute parentTicks the same way the engine does at trigger time.
+    auto frac = StochasticTrackEngine::getDurationFraction(int(ev.durationIndex()));
+    uint32_t parentTicks = (uint64_t(kDivisor) * frac.num) / frac.den;
+    expectEqual(int(parentTicks), 768);
+
+    // Decode the child's gate from the cell's 64ths fraction.
+    uint32_t childGateField = cache.cells[1].gateLen();
+    expectTrue(childGateField > 0 && childGateField <= 63,
+               "fraction must encode in 6-bit range");
+    uint32_t decodedGate = (childGateField * parentTicks) / 64u;
+
+    // Expected legacy gate = parentTicks / 4 = 192. Allow rounding within
+    // one quantization step (parentTicks/64 = 12 ticks per fractional unit).
+    const uint32_t kExpectedLegacyGate = 192;
+    uint32_t tolerance = parentTicks / 64u;   // one fractional-step worth
+    uint32_t delta = decodedGate > kExpectedLegacyGate
+                   ? decodedGate - kExpectedLegacyGate
+                   : kExpectedLegacyGate - decodedGate;
+    expectTrue(delta <= tolerance,
+               "decoded child gate must match legacy gate within fractional tolerance — "
+               "previous raw 63-tick clamp would fail this test by ~129 ticks");
+}
+
 CASE("burst_suppressed_when_parent_too_short") {
     StochasticSequence seq;
     seq.clear();

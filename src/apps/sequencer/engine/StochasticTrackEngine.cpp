@@ -499,6 +499,10 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 uint8_t parentIdx = _cache.parentCacheIdx[readIndex];
                 if (parentIdx < stochastic_cache::kCellCap) {
                     uint32_t parentRel = _cache.cells[parentIdx].relTick();
+                    // parentTicks for this slot — we already computed it above
+                    // as `durationTicks`. Children's gate length encodes as
+                    // 64ths of parentTicks; decode below.
+                    uint32_t parentTicks = durationTicks;
                     for (uint8_t ci = parentIdx + 1; ci < _cache.count; ++ci) {
                         if (!_cache.aux[ci].burstChild()) break;
                         const auto &cCell = _cache.cells[ci];
@@ -512,11 +516,14 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                         float childCv = scale.noteToVolts(childNote)
                                       + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
 
-                        // For children, the cache's gateLen field holds raw
-                        // ticks (not durSlot). See encode path in
-                        // StochasticCache.cpp: `childGateField = min(kMaxGateLen, childGate)`.
-                        uint32_t childGateTicks = uint32_t(cCell.gateLen());
-                        if (childGateTicks < 1) childGateTicks = 1;
+                        // Decode child gate from 6-bit fraction (Codex finding 3
+                        // fix, 2026-05-22). Cell.gateLen() holds (childGate*64)
+                        // / parentTicks. Inverse: childGateTicks = (frac *
+                        // parentTicks) / 64. kMinChildGate floor matches the
+                        // legacy evaluateChildren contract.
+                        constexpr uint32_t kMinChildGate = 6;
+                        uint32_t childGateTicks = (uint32_t(cCell.gateLen()) * parentTicks) / 64u;
+                        if (childGateTicks < kMinChildGate) childGateTicks = kMinChildGate;
 
                         _gateQueue.push({ lowTick, false });
                         _cvQueue.push({ childTick, childCv, isSlide });

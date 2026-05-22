@@ -9,7 +9,7 @@ StochasticPerformancePage::StochasticPerformancePage(PageManager &manager, PageC
 void StochasticPerformancePage::enter() {
     auto &track = _project.selectedTrack();
     if (track.trackMode() == Track::TrackMode::Stochastic) {
-        _listModel.setTrack(track.stochasticTrack(), _project);
+        _listModel.setTrack(track.stochasticTrack(), _project, &_engine);
     }
     ListPage::enter();
 }

@@ -59,6 +59,14 @@ public:
     // edit paths must invoke this when the active stochastic track's window
     // changes. See engine/StochasticTrackEngine.cpp:syncWindowEdit body.
     void syncWindowEdit();
+
+    // Phase 14B Codex finding 2 follow-on (2026-05-22): rebuild the engine
+    // cache from current sequence content. Lighter than syncWindowEdit — no
+    // _patternIndex snap, no queue flush. Call from edit paths that change
+    // cache-baked fields (Burst, BurstCount, BurstRate, BurstPitch — and
+    // future cache-affecting knobs) so non-Repeat playback picks up the new
+    // shape on the next trigger instead of waiting for the next cycle wrap.
+    void refreshCacheNow() { refreshCache(); }
     int lastDegree() const { return _lastDegree; }
     int lastDurationIndex() const { return _lastDurationIndex; }
     uint16_t loopCycleCount() const { return _loopCycleCount; }

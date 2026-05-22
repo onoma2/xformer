@@ -75,6 +75,13 @@ private:
     // engine.
     void notifyStochasticWindowEdit();
 
+    // Codex review 2026-05-22 finding 2: edits to burst-shaping knobs (Burst,
+    // BurstCount, BurstRate, BurstPitch) and other cache-baked fields must
+    // invalidate the engine cache; otherwise non-Repeat playback keeps using
+    // pre-edit baked child cells. Lighter than syncWindowEdit (no queue
+    // flush, no _patternIndex snap) — just refreshCache.
+    void notifyStochasticShapingEdit();
+
     // Per-page Fn handlers.
     bool handleLiveFunction(int fn, bool shift, int pressCount);
     bool handleLoopFunction(int fn, bool shift, int pressCount);

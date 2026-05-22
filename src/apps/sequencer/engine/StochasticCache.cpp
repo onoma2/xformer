@@ -115,7 +115,21 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
                 uint32_t childAbsTick = cycleTicks + childOffset;
                 if (childAbsTick > kMaxRelTick) childAbsTick = kMaxRelTick;
 
-                uint8_t childGateField = uint8_t(std::min(uint32_t(kMaxGateLen), childGate));
+                // Encode child gate as fraction of parent duration in 64ths
+                // (6-bit slot, 0..63). Avoids the original 63-tick raw clamp
+                // (Codex finding 3, 2026-05-22) which truncated long-parent
+                // burst gates and skewed audible behavior vs the legacy
+                // evaluateChildren path. At trigger time the engine decodes
+                // back to ticks via the current parent's durationTicks:
+                //   childGateTicks = (cell.gateLen() * parentTicks) / 64
+                // Since childGate = parentTicks / (2 * spacingDenom), the
+                // fraction is always 1/(2 * spacingDenom) — fits in 6 bits
+                // for all spacingDenom ∈ {2..6}. Add 1 to round-half-up so
+                // tiny child gates don't decode to zero.
+                uint32_t childGateField32 = (childGate * 64u + parentTicks / 2u) / parentTicks;
+                if (childGateField32 < 1u) childGateField32 = 1u;
+                if (childGateField32 > kMaxGateLen) childGateField32 = kMaxGateLen;
+                uint8_t childGateField = uint8_t(childGateField32);
 
                 // Burst child melody fields baked at cache-build (Patch C-1b,
                 // 2026-05-22). Parent mode: copy parent's degree+octave.

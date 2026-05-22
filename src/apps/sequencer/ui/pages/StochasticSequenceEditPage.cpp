@@ -680,11 +680,12 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     case 1:  seq.setVariation(seq.variation() + v); break;
     case 2:  seq.setRest(seq.rest() + v); break;
     case 3:  seq.setRange(seq.range() + value); break;
-    case 4:  seq.setBurst(seq.burst() + v); break;
-    case 5:  seq.setBurstCount(seq.burstCount() + v); break;
-    case 6:  seq.setBurstRate(seq.burstRate() + v); break;
+    case 4:  seq.setBurst(seq.burst() + v);                          notifyStochasticShapingEdit(); break;
+    case 5:  seq.setBurstCount(seq.burstCount() + v);                notifyStochasticShapingEdit(); break;
+    case 6:  seq.setBurstRate(seq.burstRate() + v);                  notifyStochasticShapingEdit(); break;
     case 7:  seq.setBurstPitch(StochasticBurstPitch(
-                ((int(seq.burstPitch()) + (value > 0 ? 1 : value < 0 ? -1 : 0)) % 2 + 2) % 2)); break;
+                ((int(seq.burstPitch()) + (value > 0 ? 1 : value < 0 ? -1 : 0)) % 2 + 2) % 2));
+             notifyStochasticShapingEdit(); break;
     case 8:  seq.setComplexity(seq.complexity() + v); break;
     case 9:  seq.setContour(seq.contour() + v); break;
     case 10: seq.setMarblesBias(seq.marblesBias() + v); break;
@@ -694,6 +695,14 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     case 14: seq.setSlide(seq.slide() + v); break;
     case 15: seq.setLegatoProb(seq.legatoProb() + v); break;
     }
+}
+
+void StochasticSequenceEditPage::notifyStochasticShapingEdit() {
+    int trackIdx = _project.selectedTrackIndex();
+    auto &engine = _engine.trackEngine(trackIdx);
+    if (engine.trackMode() != Track::TrackMode::Stochastic) return;
+    if (engine.pattern() != _project.selectedPatternIndex()) return;
+    static_cast<StochasticTrackEngine &>(engine).refreshCacheNow();
 }
 
 void StochasticSequenceEditPage::notifyStochasticWindowEdit() {
@@ -1609,6 +1618,8 @@ void StochasticSequenceEditPage::contextAction(int index) {
         if (wants(13)) sequence.setGateLength(0);
         if (wants(14)) sequence.setSlide(0);
         if (wants(15)) sequence.setLegatoProb(0);
+        // INIT touches many cache-affecting knobs; always refresh.
+        notifyStochasticShapingEdit();
         showMessage(_heroSelectionMask ? "INIT SELECTED" : "INIT LIVE");
         break;
     }

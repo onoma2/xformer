@@ -4,6 +4,8 @@
 #include "RoutableListModel.h"
 #include "model/StochasticTrack.h"
 #include "model/Project.h"
+#include "engine/Engine.h"
+#include "engine/StochasticTrackEngine.h"
 
 class StochasticPerformanceListModel : public RoutableListModel {
 public:
@@ -51,9 +53,10 @@ public:
 
     StochasticPerformanceListModel() {}
 
-    void setTrack(StochasticTrack &track, Project &project) {
+    void setTrack(StochasticTrack &track, Project &project, Engine *engine = nullptr) {
         _track = &track;
         _project = &project;
+        _engine = engine;
     }
 
     virtual int rows() const override {
@@ -237,10 +240,10 @@ private:
         case Rest:          sequence.editRest(value, shift); break;
         case SlideProb:     sequence.editSlide(value, shift); break;
         case LegatoProb:    sequence.editLegatoProb(value, shift); break;
-        case Burst:         sequence.editBurst(value, shift); break;
-        case BurstCount:    sequence.setBurstCount(sequence.burstCount() + value); break;
-        case BurstRate:     sequence.setBurstRate(sequence.burstRate() + value); break;
-        case BurstPitch:    sequence.editBurstPitch(value, shift); break;
+        case Burst:         sequence.editBurst(value, shift);                            notifyShapingEdit(); break;
+        case BurstCount:    sequence.setBurstCount(sequence.burstCount() + value);       notifyShapingEdit(); break;
+        case BurstRate:     sequence.setBurstRate(sequence.burstRate() + value);         notifyShapingEdit(); break;
+        case BurstPitch:    sequence.editBurstPitch(value, shift);                       notifyShapingEdit(); break;
         case Mask:          sequence.editMask(value, shift); break;
         case Tilt:          sequence.editTilt(value, shift); break;
         case Sleep:         sequence.editSleep(value, shift); break;
@@ -248,9 +251,9 @@ private:
         case PatienceMelody:sequence.editPatienceMelody(value, shift); break;
         case Mutate:        sequence.editMutate(value, shift); break;
         case Jump:          sequence.editJump(value, shift); break;
-        case Size:          sequence.setSize(sequence.size() + value); break;
-        case First:         sequence.setFirst(sequence.first() + value); break;
-        case Last:          sequence.setLast(sequence.last() + value); break;
+        case Size:          sequence.setSize(sequence.size() + value);    notifyWindowEdit(); break;
+        case First:         sequence.setFirst(sequence.first() + value);  notifyWindowEdit(); break;
+        case Last:          sequence.setLast(sequence.last() + value);    notifyWindowEdit(); break;
         case Rotate:        sequence.editRotate(value, shift); break;
         case Range:         sequence.setRange(sequence.range() + value); break;
         case MinDegree:     sequence.editMinDegree(value, shift); break;
@@ -260,8 +263,35 @@ private:
         }
     }
 
+    // Engine notify helpers (Codex review 2026-05-22 finding 1+2). Mirror
+    // the StochasticSequenceEditPage::notifyStochastic* pair: refresh cache
+    // on cache-baked-field edits (Burst*), and snap+flush+refresh on window
+    // edits (Size/First/Last). No-op when no engine reference was bound at
+    // setTrack time, or when the selected track isn't currently running as
+    // Stochastic, or when the engine's playing pattern isn't this edit's
+    // target pattern.
+    bool shouldNotifyEngine() const {
+        if (!_engine || !_track || !_project) return false;
+        int idx = _project->selectedTrackIndex();
+        auto &eng = _engine->trackEngine(idx);
+        if (eng.trackMode() != Track::TrackMode::Stochastic) return false;
+        if (eng.pattern() != _project->selectedPatternIndex()) return false;
+        return true;
+    }
+    void notifyWindowEdit() {
+        if (!shouldNotifyEngine()) return;
+        int idx = _project->selectedTrackIndex();
+        static_cast<StochasticTrackEngine &>(_engine->trackEngine(idx)).syncWindowEdit();
+    }
+    void notifyShapingEdit() {
+        if (!shouldNotifyEngine()) return;
+        int idx = _project->selectedTrackIndex();
+        static_cast<StochasticTrackEngine &>(_engine->trackEngine(idx)).refreshCacheNow();
+    }
+
     StochasticTrack *_track = nullptr;
     Project *_project = nullptr;
+    Engine *_engine = nullptr;   // optional — only callers that have engine access pass it
 };
 
 // Phase 11 — single flat list, grouped semantically.
