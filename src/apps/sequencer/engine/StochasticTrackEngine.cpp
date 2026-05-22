@@ -115,7 +115,7 @@ void StochasticTrackEngine::freeLockedSteps() {
 }
 
 void StochasticTrackEngine::resetMeasure() {
-    auto &seq = _stochasticTrack.sequence(pattern());
+    auto &seq = stochasticTrack().sequence(pattern());
     // Phase 12: count the reset-measure boundary toward patience ONLY when it
     // preempts a natural wrap that hasn't already fired. Natural wraps run
     // before reset boundaries in normal playback (often one tick apart), so
@@ -134,7 +134,7 @@ void StochasticTrackEngine::resetMeasure() {
 }
 
 void StochasticTrackEngine::reset() {
-    _patternIndex = _stochasticTrack.sequence(pattern()).first();
+    _patternIndex = stochasticTrack().sequence(pattern()).first();
     _relativeTick = 0;
     _sleepRemaining = 0;
     _loopCycleCount = 0;
@@ -162,7 +162,7 @@ void StochasticTrackEngine::reset() {
 }
 
 void StochasticTrackEngine::restart() {
-    _patternIndex = _stochasticTrack.sequence(pattern()).first();
+    _patternIndex = stochasticTrack().sequence(pattern()).first();
     _relativeTick = 0;
     _lastDegree = -1;
     _lastFreeStepIndex = -1;
@@ -174,7 +174,7 @@ void StochasticTrackEngine::restart() {
 
 TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
     ASSERT(_sequence != nullptr, "invalid sequence");
-    const auto &sequence = *_sequence;
+    const auto &sequence = this->sequence();
 
     // Divisor with clock multiplier
     float clockMult = sequence.clockMultiplier() * 0.01f;
@@ -234,11 +234,15 @@ void StochasticTrackEngine::stop() {
 }
 
 void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
-    auto &sequence = const_cast<StochasticSequence&>(*_sequence);
-    auto &track = const_cast<StochasticTrack&>(_stochasticTrack);
+    auto &sequence = this->sequence();
+    auto &track = stochasticTrack();
 
     const auto &scale = sequence.selectedScale(_model.project().scale());
     int rootNote = sequence.selectedRootNote(_model.project().rootNote());
+
+    // Patch 2: Loop source-tape regen if either domain is marked invalid.
+    // Same seeds, same order, same valid semantics as the inlined block was.
+    ensureLoopSources(scale, rootNote);
 
     // Phase 12 fix: snap _patternIndex into the active window before reading.
     // If the user shrinks Last or raises First while playback is past the new
@@ -308,14 +312,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _activity = false;
         }
     } else {
-        // Source Evaluation
-        if (sequence.rhythmMode() == StochasticSourceMode::Loop && !sequence.rhythmValid()) {
-            StochasticGenerator::generateRhythm(sequence, track, _rng.next());
-        }
-        if (sequence.melodyMode() == StochasticSourceMode::Loop && !sequence.melodyValid()) {
-            StochasticGenerator::generateMelody(sequence, track, scale, rootNote, _rng.next());
-        }
-
+        // Source loop tape is guaranteed fresh at this point — ensureLoopSources
+        // at the top of triggerStep handled any invalid Loop domain regen.
         const auto &event = sequence.events()[readIndex];
         StochasticSourceEvent eval;
         eval.clear();
@@ -335,8 +333,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             if (sequence.rhythmMode() == StochasticSourceMode::Live) {
                 auto rhythm = StochasticGenerator::generateRhythmEvent(sequence, track, _rng);
                 eval.mergeRhythmFrom(rhythm);
-                // Write back so the loop-tape display sees the just-played event.
-                sequence.events()[readIndex].mergeRhythmFrom(rhythm);
+                writeLiveRhythmShadow(readIndex, rhythm);
             } else {
                 eval.mergeRhythmFrom(event);
             }
@@ -345,7 +342,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 auto melody = StochasticGenerator::generateMelodyEvent(sequence, track, scale, rootNote, _lastDegree, _rng);
                 eval.mergeMelodyFrom(melody);
                 _lastDegree = int(eval.degree()) + int(eval.octave()) * scale.notesPerOctave();
-                sequence.events()[readIndex].mergeMelodyFrom(melody);
+                writeLiveMelodyShadow(readIndex, melody);
             } else {
                 eval.mergeMelodyFrom(event);
                 _lastDegree = int(eval.degree()) + int(eval.octave()) * scale.notesPerOctave();
@@ -391,32 +388,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             for (int i = 0; i < kMaxChildren; ++i) evalChildren[i].valid = false;
         }
 
-        if (_lockedParents) {
-            _lockedParents[readIndex].valid = true;
-            _lockedParents[readIndex].cv = finalCv;
-            _lockedParents[readIndex].durationTicks = durationTicks;
-            _lockedParents[readIndex].rest = isRest;
-            _lockedParents[readIndex].legato = isLegato;
-            _lockedParents[readIndex].slide = isSlide;
-            for (int i = 0; i < kMaxChildren; ++i) {
-                if (evalChildren[i].valid) {
-                    _lockedParents[readIndex].children[i].valid = true;
-
-                    int childNote = evalChildren[i].note;
-                    if (sequence.burstPitch() == StochasticBurstPitch::Generate) {
-                        // Apply pitch transforms to generated burst pitch
-                        childNote += (_jumpRegister + track.octave()) * activeNotes + track.transpose();
-                    }
-
-                    _lockedParents[readIndex].children[i].cv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
-                    _lockedParents[readIndex].children[i].tickOffset = evalChildren[i].tickOffset;
-                    _lockedParents[readIndex].children[i].gateTicks = evalChildren[i].gateTicks;
-                    _lockedParents[readIndex].children[i].slide = isSlide;
-                } else {
-                    _lockedParents[readIndex].children[i].valid = false;
-                }
-            }
-        }
+        captureLockedParent(readIndex, finalCv, durationTicks, isRest, isLegato, isSlide,
+                            evalChildren, activeNotes, scale, rootNote);
 
         if (!isRest) {
             // DBG_STO("%u CVpush ON p=%d cv=%.3f", tick, _patternIndex, finalCv);
@@ -543,7 +516,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 }
 
 void StochasticTrackEngine::rollPatience() {
-    auto &sequence = const_cast<StochasticSequence&>(*_sequence);
+    auto &sequence = this->sequence();
     // Phase 12 musicality fix: no off-sentinel; patience always rolls when in
     // Loop mode. For "never regenerate", the user uses the track Lock control.
     int patR = int(sequence.patienceRhythm());
@@ -567,47 +540,109 @@ void StochasticTrackEngine::rollPatience() {
 }
 
 void StochasticTrackEngine::renewRhythm() {
-    auto &sequence = const_cast<StochasticSequence&>(*_sequence);
-    auto &track = const_cast<StochasticTrack&>(_stochasticTrack);
-    StochasticGenerator::generateRhythm(sequence, track, _rng.next());
-    sequence.setRhythmValid(true);
+    auto &seq = sequence();
+    auto &trk = stochasticTrack();
+    StochasticGenerator::generateRhythm(seq, trk, _rng.next());
+    seq.setRhythmValid(true);
     _loopCycleCount = 0;
 }
 
 void StochasticTrackEngine::renewMelody() {
-    auto &sequence = const_cast<StochasticSequence&>(*_sequence);
-    auto &track = const_cast<StochasticTrack&>(_stochasticTrack);
-    const auto &scale = sequence.selectedScale(_model.project().scale());
-    int rootNote = sequence.selectedRootNote(_model.project().rootNote());
-    StochasticGenerator::generateMelody(sequence, track, scale, rootNote, _rng.next());
-    sequence.setMelodyValid(true);
+    auto &seq = sequence();
+    auto &trk = stochasticTrack();
+    const auto &scale = seq.selectedScale(_model.project().scale());
+    int rootNote = seq.selectedRootNote(_model.project().rootNote());
+    StochasticGenerator::generateMelody(seq, trk, scale, rootNote, _rng.next());
+    seq.setMelodyValid(true);
     _loopCycleCountMelody = 0;
 }
 
 void StochasticTrackEngine::refreshLoopSources() {
-    auto &sequence = const_cast<StochasticSequence&>(*_sequence);
-    auto &track = const_cast<StochasticTrack&>(_stochasticTrack);
-    const auto &scale = sequence.selectedScale(_model.project().scale());
-    int rootNote = sequence.selectedRootNote(_model.project().rootNote());
+    auto &seq = sequence();
+    auto &trk = stochasticTrack();
+    const auto &scale = seq.selectedScale(_model.project().scale());
+    int rootNote = seq.selectedRootNote(_model.project().rootNote());
 
     // Always regenerate the stored event buffer, regardless of source mode.
     // Loop mode will play the new pattern. Live mode keeps generating per-tick
     // but the loop tape display now reflects the fresh content too. Setting
     // valid=true prevents the engine's own re-roll path from firing on the
     // very next tick.
-    StochasticGenerator::generateRhythm(sequence, track, _rng.next());
-    StochasticGenerator::generateMelody(sequence, track, scale, rootNote, _rng.next());
-    sequence.setRhythmValid(true);
-    sequence.setMelodyValid(true);
+    StochasticGenerator::generateRhythm(seq, trk, _rng.next());
+    StochasticGenerator::generateMelody(seq, trk, scale, rootNote, _rng.next());
+    seq.setRhythmValid(true);
+    seq.setMelodyValid(true);
     _loopCycleCount = 0;
     _loopCycleCountMelody = 0;
 }
 
 void StochasticTrackEngine::update(float dt) {
-    if (_slideActive && _stochasticTrack.slideTime() > 0) {
-        float slideDt = dt * 1000.f / (float(_stochasticTrack.slideTime()) + 1.f);
+    const auto &trk = stochasticTrack();
+    if (_slideActive && trk.slideTime() > 0) {
+        float slideDt = dt * 1000.f / (float(trk.slideTime()) + 1.f);
         _cvOutput += (_cvOutputTarget - _cvOutput) * std::min(1.f, slideDt);
     } else {
         _cvOutput = _cvOutputTarget;
+    }
+}
+
+// ============================================================================
+// Patch 2 — Helper bodies. No behavior change vs the inlined originals.
+// ============================================================================
+
+void StochasticTrackEngine::ensureLoopSources(const Scale &scale, int rootNote) {
+    auto &seq = sequence();
+    auto &trk = stochasticTrack();
+    // Same seeds, same order, same valid semantics as the previously-inlined
+    // block at the top of triggerStep's non-locked branch.
+    if (seq.rhythmMode() == StochasticSourceMode::Loop && !seq.rhythmValid()) {
+        StochasticGenerator::generateRhythm(seq, trk, _rng.next());
+    }
+    if (seq.melodyMode() == StochasticSourceMode::Loop && !seq.melodyValid()) {
+        StochasticGenerator::generateMelody(seq, trk, scale, rootNote, _rng.next());
+    }
+}
+
+void StochasticTrackEngine::writeLiveRhythmShadow(int readIndex, const StochasticSourceEvent &rhythm) {
+    // Live-mode writeback into the source loop tape so the loop-tape UI
+    // visualizes recent activity. Mid-audio write — see docs/stoch-review.md
+    // finding #1; Patch 3 may relocate to engine-owned shadow if needed.
+    sequence().events()[readIndex].mergeRhythmFrom(rhythm);
+}
+
+void StochasticTrackEngine::writeLiveMelodyShadow(int readIndex, const StochasticSourceEvent &melody) {
+    sequence().events()[readIndex].mergeMelodyFrom(melody);
+}
+
+void StochasticTrackEngine::captureLockedParent(int readIndex, float finalCv, uint32_t durationTicks,
+                                                bool isRest, bool isLegato, bool isSlide,
+                                                const StochasticGenerator::EvaluatedChild *evalChildren,
+                                                int activeNotes, const Scale &scale, int rootNote) {
+    if (!_lockedParents) return;
+    const auto &seq = sequence();
+    const auto &trk = stochasticTrack();
+    _lockedParents[readIndex].valid = true;
+    _lockedParents[readIndex].cv = finalCv;
+    _lockedParents[readIndex].durationTicks = durationTicks;
+    _lockedParents[readIndex].rest = isRest;
+    _lockedParents[readIndex].legato = isLegato;
+    _lockedParents[readIndex].slide = isSlide;
+    for (int i = 0; i < kMaxChildren; ++i) {
+        if (evalChildren[i].valid) {
+            _lockedParents[readIndex].children[i].valid = true;
+
+            int childNote = evalChildren[i].note;
+            if (seq.burstPitch() == StochasticBurstPitch::Generate) {
+                // Apply pitch transforms to generated burst pitch
+                childNote += (_jumpRegister + trk.octave()) * activeNotes + trk.transpose();
+            }
+
+            _lockedParents[readIndex].children[i].cv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
+            _lockedParents[readIndex].children[i].tickOffset = evalChildren[i].tickOffset;
+            _lockedParents[readIndex].children[i].gateTicks = evalChildren[i].gateTicks;
+            _lockedParents[readIndex].children[i].slide = isSlide;
+        } else {
+            _lockedParents[readIndex].children[i].valid = false;
+        }
     }
 }

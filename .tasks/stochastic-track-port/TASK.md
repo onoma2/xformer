@@ -7,6 +7,7 @@ Port the Vinx fork's Stochastic track type to XFORMER, then extend the MVP with 
 **Why this matters:** Stochastic is one of Vinx's flagship track types alongside Logic and Arp. The enhanced MVP gives XFORMER a mono generative sequencer with step probability, global pitch shaping, and lockable captured performances without taking on polyphony or drift scope yet.
 
 **References:**
+- `docs/stoch-review.md` — 2026-05-22 adversarial review; current next-step source for implemented model/engine/UI risks.
 - `docs/superpowers/specs/2026-05-17-enhanced-stochastic-track-design.md` — controlling MVP spec.
 - `.tasks/stochastic-track-port/UI-DESIGN.md` — XFORMER-native UI design plan.
 - `.tasks/stochastic-track-port/PHASE7-DICTIONARY.md` — current V5 vocabulary, ownership, and behavior contract.
@@ -1040,6 +1041,9 @@ Bit-packing the Vinx object adds complexity for marginal gain. Compact heap/pool
 
 ## Open Questions
 
+- [ ] Is generated loop tape persistent model state or engine runtime state? `docs/stoch-review.md` flags current engine-task model writes as the top ownership risk.
+- [ ] Should stochastic Lock remain runtime-only, or should it be serialized as project state?
+- [ ] Should stochastic `PlayMode` be implemented with real Aligned/Free semantics, or hidden until it has distinct timing behavior?
 - [ ] Does Vinx's `std::normal_distribution` length modifier produce audible differences vs a simpler random offset? Can we approximate with `Random::nextRange()` + clamp?
 - [ ] Should Stochastic track use the same 64-step bank visualization as GeneratorPage (Phase D), or keep Vinx's simpler grid?
 - [ ] Does Stochastic track need Launchpad controller support in Phase 1, or defer to `launchpad-track-port`?
@@ -1067,7 +1071,9 @@ Bit-packing the Vinx object adds complexity for marginal gain. Compact heap/pool
 
 ## Next Action
 
-**Phase 10.6 (current):** Implement bug fixes from `.tasks/stochastic-track-port/PHASE10.6-BUG-CATALOG.md`. Start with Cluster A (serialization symmetry — add `_density`/`_durationTickets[8]`/`_level` to Sequence write/read; remove `_lock` from Track write/read) under TDD. Then Cluster B (ticket-mode state machine — fix lock+ticket re-trigger, resetMeasure/restart counter reset, variation gating). Cluster C (macro contract) needs a design call first.
+**Review remediation (current, 2026-05-22):** Address `docs/stoch-review.md` before more UI polish or hardware retest. Work in this order: (1) decide and implement ownership for generated loop tape so the engine does not race the UI on persistent model records, (2) make lock replay pattern-scoped or clear/reset it on pattern change, (3) add local stochastic UI type guards or a stronger selected-track page replacement guarantee, (4) implement or hide stochastic `PlayMode`, (5) add user-visible feedback for lock-buffer allocation failure, (6) decide Lock persistence and align invalid PlayMode fallback with `clear()`.
+
+**Phase 10.6 (superseded as immediate next step):** Implement bug fixes from `.tasks/stochastic-track-port/PHASE10.6-BUG-CATALOG.md`. Start with Cluster A (serialization symmetry — add `_density`/`_durationTickets[8]`/`_level` to Sequence write/read; remove `_lock` from Track write/read) under TDD. Then Cluster B (ticket-mode state machine — fix lock+ticket re-trigger, resetMeasure/restart counter reset, variation gating). Cluster C (macro contract) needs a design call first.
 
 **Phase 10 prep (done):** Implement `.tasks/stochastic-track-port/PHASE10-V5-CONTROL-GRANULARITY.md`: rename deterministic thinning to `Mask`, make `Density` generator sound/rest amount, expose full Burst at Level 1, keep Marbles `Shape/Spread/Bias/Steps` together at Level 1, add the approved 8-slot Duration Tickets, and keep split Rhythm/Melody source modes starting at Level 2.
 

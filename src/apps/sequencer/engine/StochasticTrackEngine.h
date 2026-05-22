@@ -5,6 +5,7 @@
 #include "SortedQueue.h"
 #include "RecordHistory.h"
 #include "StepRecorder.h"
+#include "StochasticGenerator.h"
 #include "model/StochasticSequence.h"
 #include "model/StochasticTrack.h"
 
@@ -31,6 +32,9 @@ public:
     }
 
     virtual void changePattern() override {
+        // Engine owns the right to write to the sequence (Loop tape regeneration,
+        // mutation/permutation, validity flags). See ownership contract in
+        // .tasks/stochastic-track-port/PHASE13-FEATURES-PLAN.md.
         _sequence = &(_stochasticTrack.sequence(pattern()));
     }
 
@@ -89,6 +93,17 @@ public:
     }
 
 private:
+    // ---- Patch 2 helpers (Phase 13 Batch 0) -----------------------------------
+    // Local mutable / const accessors for the owned sequence and track. These
+    // make the ownership contract visible at call sites and give one place to
+    // assert pointer validity. Mutable overloads are used by engine writes
+    // (Loop tape regen, mutation, validity flag writes); const overloads for
+    // read paths.
+    StochasticSequence &sequence()             { return *_sequence; }
+    const StochasticSequence &sequence() const { return *_sequence; }
+    StochasticTrack &stochasticTrack()             { return _stochasticTrack; }
+    const StochasticTrack &stochasticTrack() const { return _stochasticTrack; }
+
     void initLockedSteps();
     void freeLockedSteps();
 
@@ -100,8 +115,41 @@ private:
     // counters. Each domain rolls independently against its own counter.
     void rollPatience();
 
-    const StochasticTrack &_stochasticTrack;
-    const StochasticSequence *_sequence = nullptr;
+    // ---- Patch 2 intent-named helpers ----------------------------------------
+    // ensureLoopSources: if Loop domain is marked invalid, regenerate the
+    // source loop tape. No-op for Live domains. Called from triggerStep.
+    void ensureLoopSources(const Scale &scale, int rootNote);
+    // writeLiveRhythmShadow / writeLiveMelodyShadow: Live mode writes the
+    // just-generated event back into source tape so the loop-tape UI
+    // visualizes recent activity. This is the mid-audio writeback flagged in
+    // docs/stoch-review.md finding #1 — kept for behavior parity in Patch 2;
+    // may relocate to engine-owned shadow in Patch 3.
+    void writeLiveRhythmShadow(int readIndex, const StochasticSourceEvent &rhythm);
+    void writeLiveMelodyShadow(int readIndex, const StochasticSourceEvent &melody);
+    // captureLockedParent: stash evaluated parent + children into the
+    // _lockedParents cache at readIndex. Runtime-only state; not persisted.
+    void captureLockedParent(int readIndex, float finalCv, uint32_t durationTicks,
+                             bool isRest, bool isLegato, bool isSlide,
+                             const StochasticGenerator::EvaluatedChild *evalChildren,
+                             int activeNotes, const Scale &scale, int rootNote);
+
+    // Ownership contract (Patch 1 / Phase 13 Batch 0):
+    //   StochasticSequence    — owns pattern material (source loop tape, ticket
+    //                           weights, masks, rotations, validity flags).
+    //   StochasticTrack       — owns track-global controls (Lock toggle, divisor,
+    //                           clock multiplier, scale, octave, transpose, slide
+    //                           time, fill mode).
+    //   StochasticTrackEngine — owns runtime playback state (queues, locked
+    //                           evaluated history, repeat cache, patience counters,
+    //                           jump register, sleep counter).
+    //
+    // The engine has the right to mutate sequence material (Loop tape regeneration,
+    // mutation, permutation, validity flags) and track state where applicable.
+    // Storing these as non-const references makes that ownership explicit and
+    // removes the const_cast trick that previously hid the write boundary.
+    // See `.tasks/stochastic-track-port/PHASE13-FEATURES-PLAN.md`.
+    StochasticTrack &_stochasticTrack;
+    StochasticSequence *_sequence = nullptr;
     Random _rng;
 
     // Engine state
