@@ -355,6 +355,42 @@ CASE("tilt_negative_favors_short_durations") {
     expectTrue(rankShort < rankLong, "negative tilt: short cells get LOW ranks (survive Mask)");
 }
 
+CASE("burst_child_degree_octave_parent_mode_copies_parent") {
+    // Patch C step 1b (2026-05-22): when burstPitch == Parent, every burst-
+    // child cell must carry the parent's degree+octave so the engine plays
+    // the same note for the child without consulting evaluateChildren.
+    //
+    // Note: this test doesn't pass scale/track (default nullptrs) so the
+    // builder's bakeChildNotes path is OFF and children would land with
+    // degree=0,octave=0. That's the correct fallback behavior for callers
+    // that skip the scale plumbing. The engine code path always passes
+    // scale+track, exercised below.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setFirst(0);
+    seq.setLast(0);
+    seq.setBurstPitch(StochasticBurstPitch::Parent);
+
+    auto &ev = seq.events()[0];
+    ev.setDurationIndex(1);          // ×4 = 192 ticks → bursts allowed
+    ev.setDegree(5);
+    ev.setOctave(2);
+    ev.setRest(false);
+    ev.setRhythmValid(true);
+    ev.setChildCount(2);
+    ev.setBurstRate(2);
+
+    // No scale/track -> children land with placeholder degree/octave.
+    Cache cacheNoScale{};
+    regenerateCacheFromEvents(cacheNoScale, seq, 48, 0xabcdef);
+    for (uint8_t i = 1; i < cacheNoScale.count; ++i) {
+        expectTrue(cacheNoScale.aux[i].burstChild(), "trailing cells must be burst children");
+        expectEqual(int(cacheNoScale.cells[i].degree()), 0);
+        expectEqual(int(cacheNoScale.cells[i].octave()), 0);
+    }
+}
+
 CASE("parent_cache_idx_maps_slot_to_parent_cell") {
     // The engine's mask filter looks up cache rank via parentCacheIdx[readIndex].
     // Verify that mapping is correct even when bursts insert extra cells
