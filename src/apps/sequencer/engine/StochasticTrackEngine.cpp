@@ -107,12 +107,7 @@ StochasticTrackEngine::StochasticTrackEngine(Engine &engine, const Model &model,
     _stochasticTrack(track.stochasticTrack()),
     _rng(0x12345678 + track.trackIndex())
 {
-    initLockedSteps();
     reset();
-}
-
-StochasticTrackEngine::~StochasticTrackEngine() {
-    freeLockedSteps();
 }
 
 uint8_t StochasticTrackEngine::directHistoryCount() const {
@@ -133,24 +128,6 @@ StochasticTrackEngine::DirectHistoryEvent StochasticTrackEngine::directHistoryEv
     return event;
 }
 
-void StochasticTrackEngine::initLockedSteps() {
-    if (!_lockedParents) {
-        _lockedParents = new (std::nothrow) LockedParentEvent[CONFIG_STEP_COUNT];
-        if (_lockedParents) {
-            for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
-                _lockedParents[i].valid = false;
-                for (int j = 0; j < 4; ++j) _lockedParents[i].children[j].valid = false;
-            }
-        }
-    }
-}
-
-void StochasticTrackEngine::freeLockedSteps() {
-    if (_lockedParents) {
-        delete[] _lockedParents;
-        _lockedParents = nullptr;
-    }
-}
 
 void StochasticTrackEngine::resetMeasure() {
     auto &seq = stochasticTrack().sequence(pattern());
@@ -301,59 +278,18 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
     }
 
-    const bool lockActive = track.lock() && _lockedParents != nullptr;
-    bool locked = lockActive && _lockedParents[readIndex].valid;
-
+    // Lock evaluated-cache replay path removed 2026-05-22 (crash on 2+ tracks
+    // due to heap-stack collision; see PROJECT.md heap section and
+    // .tasks/stochastic-track-port/LOCK-DESIGN-DEFERRED.md). The model-side
+    // `track.lock()` flag is intentionally not consulted here — Lock is a UI
+    // placeholder until the new design lands.
     float finalCv = 0.f;
     uint32_t durationTicks = divisor;
     bool isRest = false;
     bool isLegato = false;
     bool isSlide = false;
 
-    if (locked) {
-        finalCv = _lockedParents[readIndex].cv;
-        durationTicks = _lockedParents[readIndex].durationTicks;
-        _eventDuration = durationTicks;
-        isRest = _lockedParents[readIndex].rest;
-        isLegato = _lockedParents[readIndex].legato;
-        isSlide = _lockedParents[readIndex].slide;
-
-        if (!isRest) {
-            // DBG_STO("%u GATEpush LOCKED ON p=%d", tick, _patternIndex);
-            _cvQueue.push({ tick, finalCv, isSlide });
-            _gateQueue.push({ tick, true });
-
-            uint8_t childCount = 0;
-            for (int i = 0; i < kMaxChildren; ++i) if (_lockedParents[readIndex].children[i].valid) childCount++;
-            recordDirectHistory(finalCv, false, true, childCount);
-
-            if (!isLegato && childCount == 0) {
-                uint32_t gateLen = pickGateLength(durationTicks, sequence.gateLength(), _rng);
-                // DBG_STO("%u GATEpush LOCKED OFF p=%d", tick + gateLen, _patternIndex);
-                _gateQueue.push({ tick + gateLen, false });
-            }
-            _activity = true;
-
-            for (int i = 0; i < kMaxChildren; ++i) {
-                auto &child = _lockedParents[readIndex].children[i];
-                if (child.valid) {
-                    uint32_t childTick = tick + child.tickOffset;
-                    uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
-                    _gateQueue.push({ lowTick, false });
-                    _cvQueue.push({ childTick, child.cv, child.slide });
-                    _gateQueue.push({ childTick, true });
-                    _gateQueue.push({ childTick + child.gateTicks, false });
-                    // DBG_STO("%u GATEpush LOCKED child on=%u off=%u", tick, childTick, childTick + child.gateTicks);
-                }
-            }
-        } else {
-            // DBG_STO("%u GATEpush LOCKED REST p=%d", tick, _patternIndex);
-            _gateQueue.push({ tick, false });
-            if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
-            recordDirectHistory(finalCv, true, false, 0);
-            _activity = false;
-        }
-    } else {
+    {
         // Source loop tape is guaranteed fresh at this point — ensureLoopSources
         // at the top of triggerStep handled any invalid Loop domain regen.
         const auto &event = sequence.events()[readIndex];
@@ -430,9 +366,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             for (int i = 0; i < kMaxChildren; ++i) evalChildren[i].valid = false;
         }
 
-        captureLockedParent(readIndex, finalCv, durationTicks, isRest, isLegato, isSlide,
-                            evalChildren, activeNotes, scale, rootNote);
-
+        // captureLockedParent removed 2026-05-22 — lock cache deferred.
         uint8_t childCount = 0;
         for (int i = 0; i < kMaxChildren; ++i) if (evalChildren[i].valid) childCount++;
         recordDirectHistory(finalCv, isRest, !isRest, childCount);
@@ -481,7 +415,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         _patternIndex = sequence.first();
         _patternCycleEnded = true;
 
-        if (!lockActive) {
+        {
+            // Lock cache removed 2026-05-22 — `lockActive` gate dropped; the
+            // jump/sleep/patience/mutate cycle-end hooks always run.
             // Proteus-style octave walk — random ±1 each fire, reflected at the
             // ±kJumpMaxRange bounds. Non-destructive: _jumpRegister is applied
             // as a playback offset only; stored events are never modified, so
@@ -657,38 +593,8 @@ void StochasticTrackEngine::writeLiveMelodyShadow(int readIndex, const Stochasti
     sequence().events()[readIndex].mergeMelodyFrom(melody);
 }
 
-void StochasticTrackEngine::captureLockedParent(int readIndex, float finalCv, uint32_t durationTicks,
-                                                bool isRest, bool isLegato, bool isSlide,
-                                                const StochasticGenerator::EvaluatedChild *evalChildren,
-                                                int activeNotes, const Scale &scale, int rootNote) {
-    if (!_lockedParents) return;
-    const auto &seq = sequence();
-    const auto &trk = stochasticTrack();
-    _lockedParents[readIndex].valid = true;
-    _lockedParents[readIndex].cv = finalCv;
-    _lockedParents[readIndex].durationTicks = durationTicks;
-    _lockedParents[readIndex].rest = isRest;
-    _lockedParents[readIndex].legato = isLegato;
-    _lockedParents[readIndex].slide = isSlide;
-    for (int i = 0; i < kMaxChildren; ++i) {
-        if (evalChildren[i].valid) {
-            _lockedParents[readIndex].children[i].valid = true;
-
-            int childNote = evalChildren[i].note;
-            if (seq.burstPitch() == StochasticBurstPitch::Generate) {
-                // Apply pitch transforms to generated burst pitch
-                childNote += (_jumpRegister + trk.octave()) * activeNotes + trk.transpose();
-            }
-
-            _lockedParents[readIndex].children[i].cv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
-            _lockedParents[readIndex].children[i].tickOffset = evalChildren[i].tickOffset;
-            _lockedParents[readIndex].children[i].gateTicks = evalChildren[i].gateTicks;
-            _lockedParents[readIndex].children[i].slide = isSlide;
-        } else {
-            _lockedParents[readIndex].children[i].valid = false;
-        }
-    }
-}
+// captureLockedParent removed 2026-05-22 — see header comment near the
+// triggerStep declaration and `.tasks/stochastic-track-port/LOCK-DESIGN-DEFERRED.md`.
 
 void StochasticTrackEngine::clearDirectHistory() {
     int trackIndex = directHistoryTrackIndex(_track);

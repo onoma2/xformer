@@ -62,8 +62,8 @@ Do these before new feature work. They come from `docs/stoch-review.md` and from
 1. **Resolve model-vs-engine ownership for generated loop tape.** _(Patch 1: const ownership landed 2026-05-22; Patches 2/3 pending.)_
    `StochasticTrackEngine::triggerStep()` previously cast away constness and wrote generated Live/Loop material into `StochasticSequence::events()` during playback. Patch 1 made the ownership explicit by storing the track/sequence as non-const references on the engine — no `const_cast` remains. Patches 2 and 3 will pull the writeback paths into intent-named helpers and optionally relocate the Live writeback to an engine-owned shadow.
 
-2. **Make Lock pattern-safe and explicit.** _(Engine portion landed 2026-05-22.)_
-   Lock cache + gate/CV queues now cleared on `changePattern()` so a pattern switch with Lock active no longer replays cached events from the previous pattern at the same indices. Lock persistence decision (runtime-only vs serialized) still pending — defaults to runtime-only behavior in code; UI labeling pass deferred.
+2. **Make Lock pattern-safe and explicit.** _(Superseded 2026-05-22 — Lock engine path deleted; redesign deferred.)_
+   The lock-cache code was crashing on ≥2 stochastic tracks because the per-track heap allocation overlapped the call stack on STM32. Rather than ship a packed or capped version that just delays the same failure, the entire lock-cache machinery was removed: heap alloc, `LockedParentEvent`/`LockedChild`, `if (locked)` replay branch in `triggerStep`, `captureLockedParent`, `lockAvailable()`, destructor, init/free helpers. `_lock` flag on `StochasticTrack` remains as a UI placeholder; engine ignores it. Redesign captured in `.tasks/stochastic-track-port/LOCK-DESIGN-DEFERRED.md` — flat tick-event tape (768 B/track in CCMRAM), with an open question about absorbing Lock into the fractal-track trunk substrate after fractal lands.
 
 3. **Add stochastic page type guards.**
    `StochasticSequenceEditPage` directly calls `selectedTrack().stochasticTrack()` in draw/input/LED paths. TopPage remapping covers the normal path, but the page should locally guard type-specific accessors or the navigation layer must guarantee replacement for every selected-track/mode mutation path.
@@ -74,8 +74,7 @@ Do these before new feature work. They come from `docs/stoch-review.md` and from
 5. **Audit exposed-but-unused track controls.**
    `FillMode` exists on `StochasticTrack` and is shown by config plumbing, but the stochastic engine does not appear to consume it. Treat it like PlayMode: implement it, hide it, or mark it explicitly as reserved.
 
-6. **Add lock allocation feedback.** _(Engine accessor landed 2026-05-22.)_
-   `StochasticTrackEngine::lockAvailable()` now reports whether the heap allocation succeeded so the UI can grey-out the Lock toggle or show a status message. Actual UI gating still to do.
+6. **Add lock allocation feedback.** _(Obsoleted 2026-05-22 — no heap allocation to fail since lock cache was deleted; see #2.)_
 
 7. **Invalid serialized PlayMode default.** _(Landed 2026-05-22.)_
    `StochasticTrack::read()` now falls back to `PlayMode::Aligned` on out-of-range serialized values, matching `clear()`'s default. Corrupted loads no longer behave differently from fresh tracks.

@@ -5,14 +5,12 @@
 #include "SortedQueue.h"
 #include "RecordHistory.h"
 #include "StepRecorder.h"
-#include "StochasticGenerator.h"
 #include "model/StochasticSequence.h"
 #include "model/StochasticTrack.h"
 
 class StochasticTrackEngine : public TrackEngine {
 public:
     StochasticTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine);
-    ~StochasticTrackEngine();
 
     virtual void reset() override;
     virtual void restart() override;
@@ -37,22 +35,10 @@ public:
         // .tasks/stochastic-track-port/PHASE13-FEATURES-PLAN.md.
         _sequence = &(_stochasticTrack.sequence(pattern()));
 
-        // Batch 0 / docs/stoch-review.md finding #2 — Lock cache and queues are
-        // pattern-scoped runtime state. They reference the previous pattern's
-        // evaluated content keyed by raw event index. Without clearing them,
-        // a pattern change with Lock active would replay cached events from
-        // the old pattern at the same indices. Same goes for in-flight gate/CV
-        // queue entries — they targeted the previous sequence's timing/CV.
+        // In-flight queue entries targeted the previous sequence's timing/CV;
+        // discard them on pattern switch.
         _gateQueue.clear();
         _cvQueue.clear();
-        if (_lockedParents) {
-            for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
-                _lockedParents[i].valid = false;
-                for (int j = 0; j < kMaxChildren; ++j) {
-                    _lockedParents[i].children[j].valid = false;
-                }
-            }
-        }
         _patternCycleEnded = false;
         _lastEventValid = false;
         clearDirectHistory();
@@ -60,11 +46,6 @@ public:
 
     int currentStep() const { return _patternIndex; }
     bool activity() const { return _activity; }
-    // Batch 0 / docs/stoch-review.md finding #5 — exposed so the UI can grey-out
-    // the Lock control (or show a status message) when allocation failed. With
-    // allocation failure, the Lock toggle currently behaves like unlocked
-    // playback with no diagnostic. UI gating is a follow-up task.
-    bool lockAvailable() const { return _lockedParents != nullptr; }
     int lastDegree() const { return _lastDegree; }
     int lastDurationIndex() const { return _lastDurationIndex; }
     uint16_t loopCycleCount() const { return _loopCycleCount; }
@@ -141,9 +122,6 @@ private:
     StochasticTrack &stochasticTrack()             { return _stochasticTrack; }
     const StochasticTrack &stochasticTrack() const { return _stochasticTrack; }
 
-    void initLockedSteps();
-    void freeLockedSteps();
-
     void triggerStep(uint32_t tick, uint32_t divisor);
     void resetMeasure();
     void refreshLoopSources();
@@ -163,12 +141,12 @@ private:
     // may relocate to engine-owned shadow in Patch 3.
     void writeLiveRhythmShadow(int readIndex, const StochasticSourceEvent &rhythm);
     void writeLiveMelodyShadow(int readIndex, const StochasticSourceEvent &melody);
-    // captureLockedParent: stash evaluated parent + children into the
-    // _lockedParents cache at readIndex. Runtime-only state; not persisted.
-    void captureLockedParent(int readIndex, float finalCv, uint32_t durationTicks,
-                             bool isRest, bool isLegato, bool isSlide,
-                             const StochasticGenerator::EvaluatedChild *evalChildren,
-                             int activeNotes, const Scale &scale, int rootNote);
+    // Lock cache removed 2026-05-22. The heap-allocated LockedParentEvent[]
+    // colliding with the stack caused crashes at ≥2 stochastic tracks. The
+    // engine no longer captures evaluated output; the `_lock` flag on
+    // StochasticTrack remains as a UI placeholder and is ignored here. See
+    // `.tasks/stochastic-track-port/LOCK-DESIGN-DEFERRED.md` for the deferred
+    // redesign — possibly absorbed by the fractal-track trunk substrate.
     void clearDirectHistory();
     void recordDirectHistory(float cv, bool rest, bool gate, uint8_t children);
 
@@ -248,26 +226,6 @@ private:
     };
 
     SortedQueue<Cv, 16, CvCompare> _cvQueue;
-
-    // Evaluated Event Lock data
-    struct LockedParentEvent {
-        float cv;
-        uint32_t durationTicks;
-        bool rest;
-        bool legato;
-        bool slide;
-        bool valid;
-
-        struct LockedChild {
-            float cv;
-            uint32_t tickOffset;
-            uint32_t gateTicks;
-            bool slide;
-            bool valid;
-        } children[kMaxChildren];
-    };
-
-    LockedParentEvent *_lockedParents = nullptr;
 };
 
 static_assert(sizeof(StochasticTrackEngine) <= 512, "StochasticTrackEngine too large");

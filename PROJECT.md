@@ -185,6 +185,34 @@ RAM is the tight resource. A feature is acceptable only if it stays within the b
   - FreeRTOS static stacks.
 - FreeRTOS heap disabled (static allocation only).
 
+## C++ Heap (`new` / `malloc`)
+
+**There is no dedicated heap.** The linker reserves only `.data` + `.bss` in main SRAM and leaves the gap between `end-of-.bss` and `top-of-stack` available for both libc heap and the call stack. The stack pointer starts at `_stack = ORIGIN(RAM) + LENGTH(RAM)` and grows down. The libc `_sbrk` walks `end` upward and **does not check against the stack pointer**, so a successful `new` can return memory that overlaps the live stack region. The fault manifests later as a hardfault when the stack scribbles into the "heap" allocation (or vice versa).
+
+**Numbers, current build:**
+- RAM = 128 KB = 131,072 B.
+- `.data` + `.bss` (main SRAM portion only — `.ccmram_bss` lives separately) ≈ 119 KB.
+- Free space for heap + stack combined ≈ **12 KB**.
+- Practical stack ceiling is ~4 KB (worst-case ISR + audio path + UI draw). That leaves ~**8 KB** that any `new`/`malloc` can safely consume — across **all** allocators, for **all** tracks, **for the lifetime of the process**.
+
+**Recorded incident (2026-05-22):** `StochasticTrackEngine::initLockedSteps()` was allocating `new LockedParentEvent[CONFIG_STEP_COUNT]` = 5,888 B per stochastic track at engine construction. Two stochastic tracks → 11,776 B → wiped out the entire 12 KB heap+stack window, leaving 52 B for stack → hardfault on the next deep call after project load. One stochastic track worked because 5,940 B was enough stack headroom; two didn't. The heap-allocated lock cache was in the design from the very first stochastic commit, so this risk was latent since stochastic shipped.
+
+**Resolution (2026-05-22):** The lock-cache heap allocation, the `LockedParentEvent`/`LockedChild` structs, the lock-replay branch in `triggerStep`, the `captureLockedParent` helper, the `lockAvailable()` accessor, and the engine destructor were all deleted in the same commit. `.text` shrunk by ~2,548 B. The user-facing Lock toggle on `StochasticTrack` remains as a UI placeholder; the engine no longer reads it. Redesign deferred — see `.tasks/stochastic-track-port/LOCK-DESIGN-DEFERRED.md` for the converged flat-tape spec and the open question about absorbing Lock into the fractal-track trunk substrate.
+
+**Rules for new heap users:**
+1. **Default to no heap.** Every track-mode struct, every engine subobject, every UI page should live in `.bss` (or in a container with statically-sized variants). Heap is for genuinely dynamic content with no static upper bound.
+2. **If you genuinely need dynamic allocation, audit the budget first.** Sum the worst case across all 8 tracks, all UI pages, all generator previews, all transient buffers. Don't reason from "I'll probably only use it once" — products run in arbitrary order.
+3. **`new (std::nothrow)` + a nullptr check is not safety.** `_sbrk` may succeed and return stack-overlapping memory. The null check fires only on systems where `_sbrk` enforces a ceiling, which this one doesn't.
+4. **When in doubt, use a file-scope BSS pool indexed by track index** (pattern: `gDirectHistory[CONFIG_TRACK_COUNT][N]` in `StochasticTrackEngine.cpp`). Predictable at link time, the size-assert and `.bss` totals catch overflow at build time, and there's no per-track allocation race.
+5. **Existing heap users (audit list, refresh when changed):**
+   - `SequenceBuilder<T>::_preview` — generator A/B preview clone. Allocated when entering the Generator page, freed on exit. Worst case ~9.5 KB (size of `NoteTrack`). Currently the only runtime heap user in the engine path.
+   - Static `std::string` / `std::vector` in `UserSettings` and `TeletypeTrack::getAvailable*` — initialized at static-init time, so charged to "heap usage already in steady state" rather than runtime allocation. Still counts against the 12 KB window.
+
+**Removed heap users (kept for the audit trail):**
+- `StochasticTrackEngine::_lockedParents` — `LockedParentEvent[64]` per track, 5,888 B per track. Removed 2026-05-22 after the heap–stack collision was diagnosed. Lock semantics are deferred (see `.tasks/stochastic-track-port/LOCK-DESIGN-DEFERRED.md`). The model-side `_lock` flag remains as a UI placeholder; engine ignores it until the new implementation lands, possibly via the fractal-track trunk substrate.
+
+**Practical heap budget:** Treat heap as ~**6 KB usable** after accounting for stack headroom and the SequenceBuilder preview slot. Any new heap allocator must fit within that or replace an existing user.
+
 ## RAM-heavy structures
 - `Model`: top-level `Track::_container` is currently sized by `NoteTrack`, not `CurveTrack`. Current MonitorPage values: `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`.
 - `Engine`: top-level engine storage is sized by the largest track engine, currently TeletypeTrackEngine-class storage. Current MonitorPage `Engine=11492`.
