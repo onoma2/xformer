@@ -292,6 +292,13 @@ public:
     int burst() const { return _burst.get(isRouted(Routing::Target::StochasticBurst)); }
     void setBurst(int burst, bool routed = false) { _burst.set(clamp(burst, 0, 100), routed); }
 
+    // feel (Phase 16 P4, 2026-05-23) — knob 0..100, default 50. Detent
+    // [45..55] = off (no scaling). knob < 45 lerps toward 3 beats per
+    // cycle, knob > 55 lerps toward 5 beats per cycle. Generator reads
+    // this in the post-walk scaling pass; inert until P5 wires it.
+    int feel() const { return _feel.get(isRouted(Routing::Target::StochasticFeel)); }
+    void setFeel(int feel, bool routed = false) { _feel.set(clamp(feel, 0, 100), routed); }
+
     // minDegree
     int minDegree() const { return _minDegree; }
     void setMinDegree(int degree) { _minDegree = clamp(degree, 0, 127); }
@@ -534,6 +541,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _gateLength.setBase(0);   // gate length spread default — 0 = exact 50% center
         _tilt.setBase(0);
         _burst.setBase(0);
+        _feel.setBase(50);    // detent default — Feel inactive
         _minDegree = 0;
         _maxDegree = 127;
         _rotate.setBase(0);
@@ -588,6 +596,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _mask.write(writer);
         _tilt.write(writer);
         _burst.write(writer);
+        _feel.write(writer);
         writer.write(_minDegree);
         writer.write(_maxDegree);
         _rotate.write(writer);
@@ -661,6 +670,7 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _mask.read(reader);
         _tilt.read(reader);
         _burst.read(reader);
+        _feel.read(reader);
         reader.read(_minDegree);
         _minDegree = clamp(int(_minDegree), 0, 127);
         reader.read(_maxDegree);
@@ -813,6 +823,7 @@ private:
     Routable<uint8_t> _gateLength;
     Routable<int8_t> _tilt;
     Routable<uint8_t> _burst;
+    Routable<uint8_t> _feel;
 
     uint8_t _minDegree;
     uint8_t _maxDegree;

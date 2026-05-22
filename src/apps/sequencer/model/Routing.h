@@ -139,7 +139,9 @@ public:
         StochasticMask = StochasticFirst,
         StochasticGateLength,
         StochasticTilt,
-        StochasticReserved,
+        StochasticFeel,        // Phase 16 P4 (2026-05-23): repurposed from StochasticReserved (ID 67).
+                              //   Stays at the same enum position so existing project files remain readable.
+                              //   Old "" display name → "Feel".
         StochasticBurst,
         StochasticComplexity,
         StochasticContour,
@@ -212,7 +214,7 @@ public:
         case Target::StochasticMask:            return "Mask";
         case Target::StochasticGateLength:      return "Gate Length";
         case Target::StochasticTilt:            return "Tilt";
-        case Target::StochasticReserved:        return "";
+        case Target::StochasticFeel:            return "Feel";
         case Target::StochasticBurst:           return "Burst";
         case Target::StochasticComplexity:      return "Complexity";
         case Target::StochasticContour:         return "Contour";
@@ -309,7 +311,7 @@ public:
         case Target::StochasticMask:         return 65;
         case Target::StochasticGateLength: return 79;
         case Target::StochasticTilt:            return 66;
-        case Target::StochasticReserved:        return 67;
+        case Target::StochasticFeel:            return 67;
         case Target::StochasticBurst:           return 68;
         case Target::StochasticComplexity:      return 69;
         case Target::StochasticContour:         return 70;
@@ -383,8 +385,7 @@ public:
 
     static bool isStochasticTarget(Target target) {
         return target >= Target::StochasticFirst &&
-               target <= Target::StochasticLast &&
-               target != Target::StochasticReserved;
+               target <= Target::StochasticLast;
     }
 
     static bool isChaosTarget(Target target) {
