@@ -1,6 +1,8 @@
 # Phase 13 — Stochastic feature plan
 
-_Drafted 2026-05-22. Updated 2026-05-22 after source/product review. Status: parked behind adversarial-review remediation._
+_Drafted 2026-05-22. Updated 2026-05-22 after source/product review and again after the Phase 14 trunk-model design landed. Status: cleanup pass shipped; feature work parked; storage redesign captured separately in `PHASE14-TRUNK-MODEL.md`._
+
+> **See also: [`PHASE14-TRUNK-MODEL.md`](PHASE14-TRUNK-MODEL.md).** The Phase 14 design replaces the "what gets stored in `events()[]` and what re-rolls per trigger" question with a baked CV/gate cell array (the trunk). Most of the per-event flag discussion below becomes obsolete once Phase 14 lands — the trunk cell is the loop's truth, the per-event recipe struct goes away. Features still apply (Wobble, Strum, RunMode, glide shape) but their integration points shift.
 
 Survey of candidate features (from `vcv-sequencers.md` + gap audit vs Note/Curve/Indexed tracks), with feasibility notes against the existing stochastic engine, CV pipeline, and UI scaffolding.
 

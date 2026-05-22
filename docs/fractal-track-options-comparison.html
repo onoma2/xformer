@@ -159,7 +159,8 @@
         <tr><td><code>rotate</code></td><td class="active">active</td><td>Integer step offset</td></tr>
         <tr><td><code>loopMode</code></td><td class="active">active</td><td>Loop / Once</td></tr>
         <tr><td><code>clockSource</code></td><td class="reserved">reserved (Internal only)</td><td>Enum exists, only Internal works at MVP. CV-scan playback lands as the External branch later, no field change needed.</td></tr>
-        <tr><td><code>loopPhase</code></td><td class="reserved">reserved (defaults to 0)</td><td>Field exists, ignored at MVP. Phase offset lands as a small read-position math change in <code>mapLogicalToRead()</code> later.</td></tr>
+        <tr><td><code>loopPhase</code></td><td class="active">active (neutral by default)</td><td>Global fractional rotation in <code>mapLogicalToRead()</code>. Neutral value is identity.</td></tr>
+        <tr><td><code>sectionPhase[4]</code></td><td class="active">active (neutral by default)</td><td>Fixed four-section playback lens. No enable flag; neutral section values are identity. Section boundaries derive from the effective loop window, with remainder cells distributed front-to-back.</td></tr>
         <tr><td><code>loopBars</code></td><td class="reserved">reserved (0 = manual)</td><td>Field exists, ignored at MVP. Bar-quantized loop lands as a derived <code>loopLast</code> computation later.</td></tr>
         <tr><td><code>sleep</code></td><td class="reserved">reserved (0 = no sleep)</td><td>Per-pattern step count of silence between loop iterations. Borrowed from StochasticTrack. Different from loopMode=Once+resetMeasure because it's step-counted, not bar-locked — enables polymetric silence. Lands in <code>onLoopBoundary()</code> alongside mutation.</td></tr>
       </tbody>
@@ -172,7 +173,7 @@
         <tr><td><code>sourceA</code></td><td class="active">active</td><td>The source whose gate+CV gets captured</td></tr>
         <tr><td><code>sourceB</code></td><td class="reserved">reserved (-1 = unused)</td><td>Two-source mixing lands by switching capture path from <code>readSourceA()</code> to <code>readMixedSource()</code>; no model change.</td></tr>
         <tr><td><code>gateLogic</code>, <code>cvLogic</code></td><td class="reserved">reserved (mode A)</td><td>Enum slots exist for the eight Vinx logic modes; default returns sourceA's gate/CV unchanged.</td></tr>
-        <tr><td><code>bufferLength</code></td><td class="active">active</td><td>Grid size selector (16/32/64). Fixed inline allocation = max size; smaller settings just use a sub-range.</td></tr>
+        <tr><td><code>bufferLength</code></td><td class="active">active</td><td>Grid size selector (16/32/64/128). Fixed inline allocation = max size; smaller settings just use a sub-range.</td></tr>
         <tr><td><code>lock</code></td><td class="active">active</td><td>Stops capture, preserves grid</td></tr>
         <tr><td><code>recordMode</code></td><td class="reserved">reserved (Replace)</td><td>Enum: Replace / Latch / Once. MVP behavior = Replace. Latch only writes when source gate fires (surgical overdub). Once writes one loop pass then auto-locks (explicit tape feel). All three land as branches in <code>capture()</code>; no separate field.</td></tr>
         <tr><td><code>punchMode</code></td><td class="reserved">reserved (Immediate)</td><td>PunchIn lands as a wait-for-source-gate state in <code>capture()</code>.</td></tr>
@@ -218,11 +219,11 @@ stepBoundary(uint32_t tick, int stepIndex) {
     play(tick, stepIndex);
 }
 
-<span class="c">// All read-position math collected into one place. Future: phase offset, branches.</span>
+<span class="c">// All read-position math collected into one place: rotate, loopPhase, fixed section phase.</span>
 int mapLogicalToRead(int logicalStep) {
     int windowSize = effectiveLoopLast() - loopFirst() + 1;
     int rotated = (logicalStep - loopFirst() + rotate()) % windowSize;
-    <span class="c">// Future: add loopPhase fractional rotation here.</span>
+    <span class="c">// Apply loopPhase and the fixed 4-section phase lens here.</span>
     <span class="c">// Future: branches apply by replacing this mapping with a transform.</span>
     return loopFirst() + (rotated + windowSize) % windowSize;
 }
@@ -235,7 +236,8 @@ GateCV readResolvedSource() {
 
 capture(int writeIndex) {
     GateCV s = readResolvedSource();
-    _trunk[writeIndex] = encode(s);
+    _trunk[writeIndex] = encodeCvAndGateLen(s);
+    <span class="c">// If source gate is high, later falling edge before the next step updates gateLen.</span>
 }
 
 play(uint32_t tick, int logicalStep) {
@@ -265,9 +267,9 @@ bool shouldAdvanceStep(uint32_t tick) { return relativeTick % stepDivisor == 0; 
 
     <h3>What the MVP actually does (and only that)</h3>
     <ul>
-      <li>Pick a source track (any lower-index TrackEngine). On every step boundary while not locked, the engine reads <code>cvOutput(0)</code> and <code>gateOutput(0)</code> from that engine, encodes them as a 16-bit word, writes the word to the current grid cell.</li>
+      <li>Pick a source track (any lower-index TrackEngine). On every step boundary while not locked, the engine reads <code>cvOutput(0)</code> and <code>gateOutput(0)</code> from that engine, encodes CV plus gate length as a 16-bit word, writes the word to the current grid cell.</li>
       <li>Plays back from the current grid cell at each step boundary: pushes a gate event and a CV event into the standard sorted queues at the current tick. Slide interpolation handled by <code>update(float dt)</code> via <code>slideTime</code>.</li>
-      <li>Loop window (<code>loopFirst</code>, <code>loopLast</code>) and rotate (<code>rotate</code>) constrain playback. Wrap at <code>loopLast</code> back to <code>loopFirst</code>. LoopMode=Once stops advancing after one pass; LoopMode=Loop continues.</li>
+      <li>Loop window (<code>loopFirst</code>, <code>loopLast</code>), rotate (<code>rotate</code>), global phase (<code>loopPhase</code>), and fixed four-section phase constrain playback. Wrap at <code>loopLast</code> back to <code>loopFirst</code>. LoopMode=Once stops advancing after one pass; LoopMode=Loop continues.</li>
       <li>Lock = stop capturing, keep playing. Unlocking resumes capture from whatever step is current.</li>
       <li>Pattern switching changes loop window / rotate / loopMode / scale / root / divisor / etc. The grid itself survives across pattern changes (engine state, not model).</li>
       <li>List UI exposes only the active fields. Reserved fields exist in the model and serialize but have no UI surface yet.</li>
@@ -277,7 +279,7 @@ bool shouldAdvanceStep(uint32_t tick) { return relativeTick % stepDivisor == 0; 
     <ul>
       <li><strong>Two-source mixing:</strong> <code>sourceB</code> + <code>gateLogic</code> + <code>cvLogic</code> reserved on track; <code>readResolvedSource()</code> is the swap site. Lands as a function-body change with no tick-loop edits.</li>
       <li><strong>CV-scan playback:</strong> <code>clockSource</code> reserved on sequence; <code>shouldAdvanceStep()</code> and <code>nextStepIndex()</code> are the dispatch sites. External mode is a new branch in those two helpers plus a <code>routedScan</code> read; no engine state-machine change.</li>
-      <li><strong>Phase offset:</strong> <code>loopPhase</code> reserved on sequence; <code>mapLogicalToRead()</code> is the math site. One extra fmod operation.</li>
+      <li><strong>Global and section phase:</strong> <code>loopPhase</code> and fixed <code>sectionPhase[4]</code> live on the sequence; <code>mapLogicalToRead()</code> is the math site. They are always part of the architecture, with neutral defaults and no user enable flag.</li>
       <li><strong>Bar-quantized loop length:</strong> <code>loopBars</code> reserved on sequence; <code>effectiveLoopLast()</code> helper is the derivation site.</li>
       <li><strong>Path / playback order modes:</strong> <code>runMode</code> reserved (already standard Performer); <code>nextStepIndex()</code> is the dispatch site. Adds forward/reverse/pingpong/random branches.</li>
       <li><strong>Recording variants (Latch / PunchIn):</strong> <code>recordMode</code>, <code>punchMode</code> reserved on track; <code>capture()</code> is the dispatch site. Adds two state branches.</li>
@@ -301,7 +303,6 @@ bool shouldAdvanceStep(uint32_t tick) { return relativeTick % stepDivisor == 0; 
     <h3>Order to add late features (suggested)</h3>
     <p>From cheapest to land to most behaviorally-rich:</p>
     <ol>
-      <li><strong>Phase offset</strong> — one line in <code>mapLogicalToRead</code>. Smallest, no semantic risk.</li>
       <li><strong>Path / playback order modes</strong> — extends <code>nextStepIndex</code>. Uses <code>runMode</code> field already standard in Performer.</li>
       <li><strong>Two-source mixing</strong> — swap <code>readResolvedSource</code>. Adds the Vinx logic enum behavior.</li>
       <li><strong>CV-scan playback (External clock source)</strong> — extends <code>shouldAdvanceStep</code> + <code>nextStepIndex</code>. Operational regime change; document that generative lifecycle pauses while scanning.</li>
@@ -323,7 +324,7 @@ bool shouldAdvanceStep(uint32_t tick) { return relativeTick % stepDivisor == 0; 
     <li><span class="nec-label">N1 — Source reads with tick-order guarantee.</span> Read another track's logical gate+CV on the current tick; relies on lower-index ordering.</li>
     <li><span class="nec-label">N2 — Small bounded trunk in engine state.</span> Stored substrate that branches transform and mutation mutates; volatile, fixed-size.</li>
     <li><span class="nec-label">N3 — Step-boundary capture timing.</span> Capture occurs at this track's step boundaries, not at tick rate and not at source events.</li>
-    <li><span class="nec-label">N4 — Three-layer pipeline.</span> Output = ornament(branch(trunk-step)). Strict ordering at output time.</li>
+    <li><span class="nec-label">N4 — Four-stage playback pipeline.</span> Output = ornament(branch(sectionPhase(trunk-step))). Strict ordering at output time.</li>
     <li><span class="nec-label">N5 — Loop-boundary lifecycle event.</span> A single named point in tick loop where mutation, patience, branch advance, octave shift fire.</li>
     <li><span class="nec-label">N6 — Track-level macro controls only.</span> All behavior params are track-wide knobs, no per-step UI editing.</li>
     <li><span class="nec-label">N7 — Per-pattern lens, single-buffer body.</span> Patterns provide different playback configs over the same captured trunk; no 17× buffer amplification.</li>
@@ -427,9 +428,9 @@ bool shouldAdvanceStep(uint32_t tick) { return relativeTick % stepDivisor == 0; 
       <div class="checkrow"><span class="mark ok">●</span>N7 grid survives pattern change; pattern carries loop window + divisor</div>
     </div>
     <dl class="meta">
-      <dt>RAM</dt><dd>64 steps × 16 bits = 128 B inline buffer. Engine container under 500 B total.</dd>
+      <dt>RAM</dt><dd>64 steps × 16 bits = 128 B inline buffer. Each cell stores 11-bit CV, 4-bit gate length, and valid. Engine container under 500 B total.</dd>
       <dt>CPU</dt><dd>One sample read + one encode per step. Branches apply a math transform to one cell per output. Ornamentation evaluated per tick around active step.</dd>
-      <dt>Behavior</dt><dd>Source is aliased to the track's step grid — fast Teletype events or sub-step Tuesday micro-queues collapse to one captured value per step. This is the intentional design: the grid is the analytical unit. Locking freezes the grid; unlocking resumes capture. Pattern slots slice the same grid with different loop windows.</dd>
+      <dt>Behavior</dt><dd>Source is aliased to the track's step grid — fast Teletype events or sub-step Tuesday micro-queues collapse to one captured CV plus one gate length per step. This is the intentional design: the grid is the analytical unit. Locking freezes the grid; unlocking resumes capture. Pattern slots slice the same grid with different loop windows and section phase.</dd>
     </dl>
     <p><strong>Why it fits:</strong> built for the spec. All seven necessities map onto its native mechanics. Smallest implementation, smallest RAM, simplest engine.</p>
   </section>
@@ -577,7 +578,7 @@ bool shouldAdvanceStep(uint32_t tick) { return relativeTick % stepDivisor == 0; 
         <td class="part">◐</td><td class="ok">●</td><td class="no">✗</td><td class="no">✗</td><td class="ok">●</td><td class="no">✗</td><td class="part">◐</td></tr>
       <tr><td class="opt">CV-driven scan playback (DiscreteMap-style)</td>
         <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="part">◐</td><td class="no">✗</td><td class="ok">●</td></tr>
-      <tr><td class="opt">Phase offset / loop phase rotation (CurveTrack-style)</td>
+      <tr><td class="opt">Global + fixed section phase read lens</td>
         <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="part">◐</td><td class="no">✗</td><td class="ok">●</td></tr>
       <tr><td class="opt">Variable playback speed / direction</td>
         <td class="ok">●</td><td class="ok">●</td><td class="no">✗</td><td class="ok">●</td><td class="ok">●</td><td class="part">◐</td><td class="ok">●</td></tr>
@@ -645,7 +646,7 @@ bool shouldAdvanceStep(uint32_t tick) { return relativeTick % stepDivisor == 0; 
     <p><strong>Only Tape</strong> gives you this, and you pay for it with several KB heap per track, awkward mutation semantics, and ornamentation that has nowhere to attach. The spec's identity explicitly accepts step-rate aliasing — adding tick-rate fidelity later would force a rewrite of the trunk model and almost certainly a heap allocator path.</p>
   </section>
 
-  <h3>Cross-cutting note: scan playback and phase offset</h3>
+  <h3>Cross-cutting note: scan playback and phase</h3>
   <p>These two features behave differently from the others. They aren't behaviors added to the trunk — they're alternative ways to compute the <em>read position</em> into the trunk. So their compatibility hinges on whether an option's trunk has a clean integer read index.</p>
 
   <section class="opt">
@@ -654,8 +655,8 @@ bool shouldAdvanceStep(uint32_t tick) { return relativeTick % stepDivisor == 0; 
   </section>
 
   <section class="opt">
-    <h4>What phase offset actually does</h4>
-    <p>Phase offset (KD-15, loopPhase) is a continuous fractional rotation of the playback head within the loop window. CurveTrack's <code>globalPhase</code> is the reference: <code>phasedPos = fmod(stepFraction + phase, 1.0)</code>, then back to a step index. It composes with rotate (integer step shift) — rotate moves the head by whole steps, phase moves it by fractions of a step. Adds a knob; doesn't change any state machine.</p>
+    <h4>What phase actually does</h4>
+    <p>Phase is a read-position transform, not capture fidelity. Global phase (<code>loopPhase</code>) is a continuous fractional rotation of the playback head within the loop window. Fixed section phase splits the effective loop into four derived sections and bends read position inside each section. There is no user-facing enable flag: neutral values are identity, and an engine may fast-path neutral phase internally. Remainder cells are distributed front-to-back across the four sections.</p>
   </section>
 
   <section class="opt">
@@ -681,7 +682,7 @@ bool shouldAdvanceStep(uint32_t tick) { return relativeTick % stepDivisor == 0; 
       <li><strong>Branch phase counters</strong> (trunk for N loops → branches for M loops) lose meaning. Branches still apply their transform to whatever step the scan selects, but the trunk/branch cycle has no progression.</li>
     </ul>
     <p>This isn't a per-option problem — it's a property of scan mode itself, and the same things would break in any substrate. The implication is that scan mode should advertise itself as a different operational regime: when scan is on, the generative lifecycle pauses and the track behaves as a pure CV-addressed wavetable readout. When scan is off, the full generative system resumes.</p>
-    <p>Phase offset has no such side effect — it's a pure read-position transform that composes cleanly with everything else.</p>
+    <p>Phase has no such side effect — it's a pure read-position transform that composes cleanly with everything else.</p>
   </section>
 
   <section class="opt">

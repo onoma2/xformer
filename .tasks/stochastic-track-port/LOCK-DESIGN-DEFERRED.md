@@ -1,6 +1,8 @@
 # Stochastic Lock — Design Deferred
 
-_Drafted 2026-05-22. Status: engine implementation removed; redesign deferred until fractal-track work lands and a substrate decision is possible._
+_Drafted 2026-05-22. **Superseded by `PHASE14-TRUNK-MODEL.md` (also drafted 2026-05-22).** Under the trunk model, Lock collapses to a single bit on the sequence (or track) that refuses generator writes — no tape, no engine-state snapshot, no fractal substrate needed. The trunk IS the locked content. The flat-tape design and engine-flag (RNG-snapshot) alternative described below remain valid contingency designs in case the trunk model gets revised, but neither needs to be implemented if Phase 14 lands._
+
+_Original status: engine implementation removed; redesign deferred until fractal-track work lands and a substrate decision is possible._
 
 ## Why this doc exists
 
