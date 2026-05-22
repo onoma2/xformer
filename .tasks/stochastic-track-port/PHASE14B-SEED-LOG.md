@@ -48,13 +48,13 @@ struct StochasticSequence {
     MutationOp mutationLog[16];
     uint8_t    mutationLogCount;
 
-    // NEW — locks (see "Locking" section)
-    bool seedLock;       // freeze seeds + log (the "recipe lock")
-    bool contentLock;    // freeze the evaluated cache (the "output lock")
+    // NO new lock fields. Seed lock is a derived state:
+    //   seedLocked = (rhythmValid && melodyValid && !live)
+    // i.e. Loop mode with both domains generated. Content lock is deferred.
 }
 ```
 
-Per pattern size: **~120 B** (vs ~400 B today). Big RAM win.
+Per pattern size: **~115 B** (vs ~400 B today). Big RAM win.
 
 ## Engine cache
 
@@ -109,50 +109,63 @@ The melody-needs-lastDegree dependency is real (`StochasticGenerator.cpp:85`). T
 
 **Per-cell keyed RNG is mandatory.** Without it, REGEN_CELL forces a full stream replay every time the log changes, and mutation cost scales with cell index. This is in the acceptance bar.
 
-## Locking — the central problem and proposed split
+## Locking — seed lock now, content lock deferred
 
-The current shipped UX has one notion: Loop/Live mode toggle. The deferred lock design was a second notion: content freeze. The user's observation: **these are actually two locks at different layers.**
+Phase 14B ships **one lock concept: seed lock.** Content lock is documented but pushed to future work.
 
-- **Seed lock** (= today's Loop mode evolved) — freeze `rhythmSeed`, `melodySeed`, `mutationLog`. Patience can't re-roll. NewR/NewM refuse. Cache regenerates every cycle from these frozen recipe inputs PLUS current knobs. Knob edits still take effect immediately. The "recipe" is locked; the *interpretation* of the recipe responds to live knob changes.
-
-- **Content lock** (= deferred Lock under the trunk doc, equivalent here) — freeze the cache itself. Cache regen is suppressed entirely while content-locked. Knob edits and dictionary edits don't reach the output. The evaluated material is frozen.
-
-Two flags, two semantics:
-
+**Seed lock = derived state, no new field.** Decision 2026-05-22:
 ```
-sequence.seedLock     → block NewR, NewM, Patience writes
-sequence.contentLock  → block cache regeneration; output is the snapshot taken at lock-press
+seedLocked = (rhythmValid && melodyValid && !live)
 ```
+This is what today's Loop mode already evaluates to. Reusing the existing flags keeps the model surface stable and makes Phase 14B's lock semantics identical to today's Loop UX.
 
-Today's Loop mode maps cleanly onto seed lock. The deferred Lock feature ships as content lock. Both are 1 bit each. They compose: you can have seed-locked + content-unlocked (loop a recipe, knobs still shape it) or seed-unlocked + content-locked (knob explorations don't disturb the captured output, but NewR can reset everything by reseeding then re-locking).
+**While seed-locked:**
+- `rhythmSeed`, `melodySeed`, `mutationLog` are frozen. NewR/NewM/Patience refuse.
+- Cache regenerates every cycle from frozen recipe + **current knobs**.
+- Knob edits, dictionary edits, mask, tilt, rotation: all take effect at the next cycle wrap.
 
-The trunk model only needs content lock (its "Lock collapses to 1 bit"). The seed+log model needs *both* to match shipped UX.
+**Behavior shift from today:** Today's Loop mode plays back stored `_events[]`. Knob edits to mask/tilt/gateLength take effect at trigger time, but rest/duration/burst etc. do not — those decisions are baked into the event tape. Under seed+log, Loop mode regenerates every cycle from current knobs, so **all knobs affect locked output at cycle wrap.**
+
+This is the user-visible change. Explicitly accepted per the design decision of 2026-05-22 alongside the seed-lock simplification. Bloom-shape "lock freezes the actual output bytes" is the future content lock feature.
+
+### Content lock — deferred to future work
+
+Content lock means: freeze the engine cache itself, regardless of knob movement. Implementation sketch for the future:
+- Add a `bool contentLock` field, persisted.
+- While content-locked, suppress cache regeneration at cycle wrap. Engine plays the snapshot indefinitely.
+- Save/load problem: cache is engine-owned CCMRAM and not normally serialized. If we want content lock to survive save/load, the cache must serialize while locked (~768 B per locked pattern). Alternative: document that content-lock state is volatile across save/load.
+
+Not in Phase 14B scope. Revisit after seed+log is shipped and we know what users actually want from a Bloom-shape lock.
 
 ## Engine playback
 
 ```
 triggerStep(stepIndex):
-    if cycle just wrapped AND !contentLock:
-        regenerateRhythm(sequence, _cache, _rng)
-        if !sequence.melodyValid: regenerateMelody(sequence, _cache, ...)
-    if cycle just wrapped AND contentLock:
-        // do nothing — _cache is the snapshot
+    if cycle just wrapped:
+        if !seedLocked OR !cacheValid:
+            regenerateRhythm(sequence, _cache, _rng)
+            regenerateMelody(sequence, _cache, ...)
+        else:
+            // seed-locked: regenerate cache from frozen seeds + current knobs
+            regenerateRhythm(sequence, _cache, _rng)
+            regenerateMelody(sequence, _cache, ...)
     cell = _cache[stepIndex]
     push to _gateQueue / _cvQueue
 ```
 
-Same queue drain path as today. Same `_gateQueue` / `_cvQueue` shape.
+Note: under seed-lock, the cache still regenerates each cycle — the seeds are frozen but knob inputs are live. Content lock (deferred) would skip regen entirely. Today's `_gateQueue` / `_cvQueue` drain path is unchanged.
 
 ## Operations
 
-- **NewR** → `rhythmSeed = rngPick(); clear rhythm entries in log;` refuse if seedLocked or contentLocked.
-- **NewM** → `melodySeed = rngPick(); clear melody entries in log;` same refusal.
-- **Patience** → on Poisson hit, replace seed; refuse if seedLocked or contentLocked.
-- **Mutate (permute)** → append `{SWAP_CELLS, a, b, domain}` to log; log entries apply after the generator's base pass. Refuse if locked.
-- **Mutate (regen one cell)** → append `{REGEN_CELL, idx, _, domain}` to log; generator re-hashes that cell's RNG (cheap via per-cell keys) and re-rolls. Refuse if locked.
-- **Mask** → generator computes per-cell rank during pass; engine filters at trigger time vs knob value. Knob-responsive even when seedLocked.
+- **NewR** → `rhythmSeed = rngPick(); clear rhythm entries in log;` refuse if seedLocked.
+- **NewM** → `melodySeed = rngPick(); clear melody entries in log;` refuse if seedLocked.
+- **Patience** → on Poisson hit, replace seed; refuse if seedLocked.
+- **Mutate (permute)** → append `{SWAP_CELLS, a, b, domain}` to log; log entries apply after the generator's base pass. Refuse if seedLocked.
+- **Mutate (regen one cell)** → append `{REGEN_CELL, idx, _, domain}` to log; generator re-hashes that cell's RNG (cheap via per-cell keys) and re-rolls. Refuse if seedLocked.
+- **Mask** → generator computes per-cell rank during pass; engine filters at trigger time vs knob value. Knob is live (acts on next cycle regen even when seedLocked).
 - **Tilt** → input to rank assignment; same as Mask.
-- **Repeat** → **baked into generator**, deterministic from seed. On Bernoulli hit during generation, generator marks cell as repeat-of-previous. Loop is bit-identical between iterations. *This is a feel change from today's per-trigger Bernoulli — explicit acceptance required.*
+- **Seed lock** → derived state `rhythmValid && melodyValid && !live`. No new field. While seedLocked: NewR/NewM/Patience/Mutate no-op. Cache still regenerates each cycle from frozen seeds + current knobs.
+- **Repeat** → **baked into generator**, deterministic from seed. On Bernoulli hit during generation, generator marks cell as repeat-of-previous. Loop is bit-identical between iterations. *Feel change from today's per-trigger Bernoulli — explicit acceptance required.*
 - **Jump / Sleep / Variation** → unchanged.
 - **Burst** → decided during generation, expressed as multiple cells in cache. Same as Phase 14 trunk model.
 - **Polyrhythm** → generator places cells at non-grid `relTick` values. Free.
@@ -191,7 +204,7 @@ Nothing musical. No knob removed. No dictionary removed.
 
 Per the review of 2026-05-22:
 
-1. **Lock freezes output across knob edits.** Implemented via the seed-lock + content-lock split documented above. Content lock is mandatory; seed lock alone is insufficient.
+1. **Lock semantics defined.** Decision 2026-05-22: ship seed lock only; content lock deferred to future work. Seed lock is derived from existing state (`rhythmValid && melodyValid && !live`), no new field. Knob edits affect locked output at the next cycle regen — explicitly accepted as the Phase 14B behavior; Bloom-shape output freeze is future.
 
 2. **Per-cell regen is deterministic without full RNG stream replay.** Implemented via per-cell keyed RNG: `rngState = hash(seed, cellIdx)`. Required before accepting REGEN_CELL semantics. Melody dependency on `lastDegree` either refactored away or accepted as "replay [N..end] for melody on REGEN_CELL," with replay cost proven cheap.
 
@@ -207,6 +220,60 @@ Per the review of 2026-05-22:
 
 All seven items must be designed and signed-off before any patch lands.
 
+## Serialization
+
+Decided before Patch C lands; deferred for Patches A and B (no on-disk changes until C).
+
+### What changes in `StochasticSequence::write` / `read`
+
+**v1 (today):** seeds + knobs + dictionaries + 64×6 B `_events[]` tape.
+
+**v2 (Phase 14B post-C):** seeds + knobs + dictionaries + 16×4 B `mutationLog[]` + `mutationLogCount`. No `_events[]`.
+
+Loader logic:
+```
+if (storedVersion <= v1) {
+    read seeds + knobs + dictionaries as today
+    skip 384 bytes (legacy _events tape)
+    mutationLog = empty
+    mutationLogCount = 0
+    // seedLock is derived; rhythmValid/melodyValid loaded from existing fields
+} else {  // v2+
+    read seeds + knobs + dictionaries
+    read mutationLog[16], mutationLogCount
+}
+```
+
+Cache is **not** serialized — engine regenerates from seeds at first trigger after load. One-cycle hydration delay on pattern switch is accepted.
+
+### Decisions
+
+1. **NewR clears rhythm-domain log entries.** NewR is a fresh-recipe reset; prior mutations don't survive a new seed. Same for NewM clearing melody-domain entries.
+2. **No new lock fields persisted.** Seed lock is derived from `rhythmValid && melodyValid && !live` — those flags already serialize today, no change.
+3. **Content lock deferred** — no related serialization work in Phase 14B.
+
+### Migration loss
+
+v1 projects lose their `_events[]` content. Saved seeds + knobs + dictionaries hydrate a new cache on first cycle wrap; old happy-accident content can't be reconstructed. Documented in the acceptance bar (item 5). Mitigation: ship Phase 14B with a project version bump prompt explaining the one-time content shift.
+
+### Routing IDs
+
+No new routable parameters. Existing `StochasticReserved` slot (routing ID 67) remains available for future use; not consumed by Phase 14B.
+
+## Parameter coverage test (planned, Patch B → C boundary)
+
+Risk: a knob that's silently disconnected from the generator (accent-alias regression) goes unnoticed after Patch C rewires generator output to the cache. Hedge with a coverage test that exercises every knob in `StochasticSequence`:
+
+```
+TestStochasticKnobCoverage:
+  for each knob in StochasticSequence:
+    set knob = MIN;  generate; fingerprint cache
+    set knob = MAX;  generate; fingerprint again
+    expect divergence above threshold (or expected stationarity)
+```
+
+About 30 cases, one per knob. Runs as part of CI on any commit touching the generator. **Not required before Patch A.** Land it as part of Patch B prep — same time as switching playback to the cache, where wire breakage would actually surface.
+
 ## Comparison vs trunk
 
 |                          | Trunk (Phase 14)                   | Seed+Log (Phase 14B)              |
@@ -215,8 +282,8 @@ All seven items must be designed and signed-off before any patch lands.
 | Output persists           | Yes — trunk IS the output          | No — cache regenerates per cycle |
 | Project save preserves accidents | Yes (trunk serialized)        | No (seeds regenerate, knobs shape) |
 | Migration                | Read old events, synthesize trunk | Drop old events, regenerate       |
-| Lock                     | 1 bit (content lock)               | 2 bits (seed lock + content lock) |
-| Knob edits affect locked output | No                          | Only if content-locked, not just seed-locked |
+| Lock (Phase 14B scope)   | 1 bit (content lock)               | Seed lock only (derived; content lock deferred) |
+| Knob edits affect locked output | No                          | Yes (next cycle regen) — content freeze is future work |
 | Per-cell editing surface | Possible via trunk cell edits      | Not present (matches today)       |
 | RAM win                  | Modest (768 B per active track)    | Large (~120 B per pattern)        |
 | Identity model           | Output = identity (Bloom-shape)    | Recipe = identity (Tuesday-shape) |
