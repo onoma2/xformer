@@ -357,6 +357,51 @@ Three options, in order of preference:
 
 Option 1 is the working plan. Cost is bounded and known; we just run melody pass twice for a cell when it's regenerated. Property tests can pin it.
 
+## Pitch math — carrying forward unchanged
+
+The current `generateDegree` formulas have known weirdness at default knob values. Phase 14B does **not** change them — it preserves audible behavior so the architecture change can be validated against existing user expectations. The musicality review lives in [`PHASE15-PITCH-MATH-REVIEW.md`](PHASE15-PITCH-MATH-REVIEW.md).
+
+What Phase 14B carries forward verbatim:
+
+- **One RNG draw per cell** — `rng.nextRange(totalWeight)`. Everything else (sieve, kernel, drift, marbles bell) is deterministic from `(lastDegree, knobs)`.
+- **Cell weight = base × kernel × marbles.** Three terms multiply.
+- **Cross-cell dependency on `lastDegree`** — kernel triangle re-centers on the prior cell's degree.
+
+### Trace at defaults (start from C, chromatic scale, range=1)
+
+Defaults: complexity=50, contour=0, stepsSieve=100, marblesBias=50, marblesSpread=50, all tickets=0.
+→ kernelWidth=13, kernelLeak=5, biasPos=6, marblesWidth=7, marblesLeak=6, base=10 flat.
+
+Cell 1 with `lastDegree = 0` (C):
+
+| slot | note | kernel | marbles | weight |
+|---|---|---|---|---|
+| 0  | C   | 135 | 16 | 21,600  |
+| 1  | C#  | 125 | 26 | 32,500  |
+| 2  | D   | 115 | 36 | 41,400  |
+| 3  | D#  | 105 | 46 | 48,300  |
+| 4  | E   |  95 | 56 | 53,200  |
+| 5  | F   |  85 | 66 | 56,100  |
+| 6  | F#  |  75 | 76 | **57,000** |
+| 7  | G   |  65 | 66 | 42,900  |
+| 8  | G#  |  55 | 56 | 30,800  |
+| 9  | A   |  45 | 46 | 20,700  |
+| 10 | A#  |  35 | 36 | 12,600  |
+| 11 | B   |  25 | 26 |  6,500  |
+
+Peak at F# (slot 6), not at C — even though we just played C. The marbles bell wins at defaults because its leak floor + triangle product overpowers the kernel re-centering.
+
+### Known weirdness (NOT fixed in Phase 14B — see Phase 15)
+
+1. **Marbles bell dominates kernel at default spread.** Default `marblesSpread=50` produces a 5× peak-to-edge ratio; the bell's gravity overrides where `lastDegree` says the kernel should center.
+2. **No octave equivalence in kernel.** lastDegree=0 (C oct 1) treats slot 12 (C oct 2 if range=2) as "far away" — the natural "same note, different octave" move gets the worst kernel score.
+3. **Sieve cuts before kernel applies.** stepsSieve excludes slots that the kernel could otherwise pull toward — the two knobs fight in an undocumented way.
+4. **Contour drift swamps kernel at high knob values.** At contour=100 and `i - lastIdx = 11`, drift = 550 vs max tri = 130 — kernelWidth/kernelLeak become irrelevant.
+5. **kernelLeak (= complexity/10) is too small to matter.** Max 10 against tri max 130. A low-complexity walk can never escape its triangle.
+6. **base flat-10 vs ticket crossover.** Setting any single ticket > 0 silently flips unset slots from "weight 10" to "weight 0 = excluded." The crossover isn't communicated.
+
+These are kept *as-is* in Phase 14B so the seed+log refactor doesn't double up on architectural and behavioral changes. Patch C ships with bit-identical audible behavior to today's `generateMelody`. Phase 15 is the cleanup pass.
+
 ## Go / no-go
 
 **Go.** The keyed-RNG approach is mechanically sound; all three load-bearing properties (determinism, order independence, mutation isolation) hold under a generator that mirrors the real picker shape. The one cross-cell dependency — `lastDegree` in melody generation — has three viable mitigations, with melody-pass replay being the natural default.
