@@ -67,22 +67,24 @@ CASE("cell_pack_roundtrip") {
     // useful value range. This is the load-bearing invariant of the 4-byte
     // pack — if it fails, nothing else in this test means anything.
     //
-    // Patch C step 1 (2026-05-22): cv field replaced with degree (7-bit
-    // unsigned) + octave (5-bit unsigned), matching StochasticSourceEvent's
-    // storage range.
+    // Phase 16 P2 (2026-05-23): octave narrowed 5→4 bits (max 15) to free a
+    // bit for `audible` packed into the cell. Test exercises the new layout.
     for (uint32_t r : { 0u, 1u, 96u, 768u, 2047u, 4095u }) {
         for (uint8_t deg : { uint8_t(0), uint8_t(1), uint8_t(63), uint8_t(127) }) {
-            for (uint8_t oct : { uint8_t(0), uint8_t(1), uint8_t(15), uint8_t(31) }) {
+            for (uint8_t oct : { uint8_t(0), uint8_t(1), uint8_t(7), uint8_t(15) }) {
                 for (uint8_t g : { uint8_t(0), uint8_t(31), uint8_t(63) }) {
                     for (bool slide : { false, true }) {
                         for (bool legato : { false, true }) {
-                            auto c = CachedCell::make(r, deg, oct, g, slide, legato);
-                            expectEqual(uint32_t(c.relTick()), r);
-                            expectEqual(int(c.degree()), int(deg));
-                            expectEqual(int(c.octave()), int(oct));
-                            expectEqual(int(c.gateLen()), int(g));
-                            expectEqual(c.slide(), slide);
-                            expectEqual(c.legato(), legato);
+                            for (bool audible : { false, true }) {
+                                auto c = CachedCell::make(r, deg, oct, g, slide, legato, audible);
+                                expectEqual(uint32_t(c.relTick()), r);
+                                expectEqual(int(c.degree()), int(deg));
+                                expectEqual(int(c.octave()), int(oct));
+                                expectEqual(int(c.gateLen()), int(g));
+                                expectEqual(c.slide(), slide);
+                                expectEqual(c.legato(), legato);
+                                expectEqual(c.audible(), audible);
+                            }
                         }
                     }
                 }
@@ -106,7 +108,7 @@ CASE("empty_sequence_yields_empty_cache") {
     int n = regenerateCacheFromEvents(cache, seq, /*divisor*/ 48, /*seed*/ 0xdeadbeef);
     expectEqual(n, 1);
     expectEqual(int(cache.count), 1);
-    expectTrue(cache.aux[0].audible(), "default cleared event has rest=false → audible");
+    expectTrue(cache.cells[0].audible(), "default cleared event has rest=false → audible");
 }
 
 CASE("cache_stores_event_degree_and_octave") {
@@ -161,7 +163,7 @@ CASE("single_parent_event_relTick_and_gateLen") {
     expectEqual(int(cache.cells[0].gateLen()), 5);
     expectTrue(cache.cells[0].slide(), "slide flag must propagate");
     expectFalse(cache.cells[0].legato(), "legato flag must propagate (false case)");
-    expectTrue(cache.aux[0].audible(), "non-rest event is audible");
+    expectTrue(cache.cells[0].audible(), "non-rest event is audible");
     expectFalse(cache.aux[0].burstChild(), "parent is not a burst child");
     expectEqual(int(cache.cycleTicks), 48);  // divisor × (1/1) = 48
 }
@@ -181,7 +183,7 @@ CASE("rest_event_audible_false") {
     Cache cache{};
     regenerateCacheFromEvents(cache, seq, 48, 0);
     expectEqual(int(cache.count), 1);
-    expectFalse(cache.aux[0].audible(), "rest event must be marked non-audible");
+    expectFalse(cache.cells[0].audible(), "rest event must be marked non-audible");
 }
 
 CASE("window_first_last_respected") {
@@ -337,7 +339,7 @@ CASE("rank_is_deterministic_per_seed") {
     regenerateCacheFromEvents(cacheB, seq, 48, /*seed*/ 0xaabbccdd);
 
     for (int i = 0; i < int(cacheA.count); ++i) {
-        expectEqual(int(cacheA.aux[i].rank), int(cacheB.aux[i].rank), "same seed → same rank");
+        expectEqual(int(cacheA.aux[i].rank()), int(cacheB.aux[i].rank()), "same seed → same rank");
     }
 }
 
@@ -361,7 +363,7 @@ CASE("rank_changes_when_seed_changes") {
 
     int divergent = 0;
     for (int i = 0; i < int(cacheA.count); ++i) {
-        if (cacheA.aux[i].rank != cacheB.aux[i].rank) ++divergent;
+        if (cacheA.aux[i].rank() != cacheB.aux[i].rank()) ++divergent;
     }
     expectTrue(divergent >= int(cacheA.count) / 2, "seed change should reshuffle most ranks");
 }
@@ -387,8 +389,8 @@ CASE("tilt_positive_favors_long_durations") {
     // Mask filter cuts HIGH ranks. "Survive Mask" means LOW rank. So at
     // positive tilt, long cells must get LOW ranks (they survive). Cell 0
     // has durationIndex=0 (longest), cell 7 has durationIndex=7 (shortest).
-    int rankLong  = cache.aux[0].rank;  // slot 0 = longest
-    int rankShort = cache.aux[7].rank;  // slot 7 = shortest
+    int rankLong  = cache.aux[0].rank();  // slot 0 = longest
+    int rankShort = cache.aux[7].rank();  // slot 7 = shortest
     expectTrue(rankLong < rankShort, "positive tilt: long cells get LOW ranks (survive Mask)");
 }
 
@@ -410,8 +412,8 @@ CASE("tilt_negative_favors_short_durations") {
     regenerateCacheFromEvents(cache, seq, 48, /*seed*/ 0xaabbccdd);
     recomputeCacheRanks(cache, 0xaabbccdd, /*tilt*/ -100);
 
-    int rankLong  = cache.aux[0].rank;
-    int rankShort = cache.aux[7].rank;
+    int rankLong  = cache.aux[0].rank();
+    int rankShort = cache.aux[7].rank();
     expectTrue(rankShort < rankLong, "negative tilt: short cells get LOW ranks (survive Mask)");
 }
 
@@ -597,7 +599,7 @@ CASE("repeat_path_uses_event_rank_not_cache_rank") {
     // disagree. We forge a densityRank on a synthetic repeated event that
     // differs from whatever rank the cache assigned to slot 3.
     const int testSlot = 3;
-    const uint8_t cacheRankAtSlot = cache.aux[cache.parentCacheIdx[testSlot]].rank;
+    const uint8_t cacheRankAtSlot = cache.aux[cache.parentCacheIdx[testSlot]].rank();
 
     // Pick a forged event rank guaranteed to differ from the cache rank.
     const uint8_t forgedRepeatedRank = uint8_t((cacheRankAtSlot + 5) & 0x3f);
@@ -653,13 +655,13 @@ CASE("rank_recomputes_when_tilt_changes_via_caller") {
     regenerateCacheFromEvents(cache, seq, 48, /*seed*/ 0xfeedface);
     // Default build leaves tilt=0; capture the baseline ordering.
     uint8_t ranksTilt0[kCellCap];
-    for (int i = 0; i < int(cache.count); ++i) ranksTilt0[i] = cache.aux[i].rank;
+    for (int i = 0; i < int(cache.count); ++i) ranksTilt0[i] = cache.aux[i].rank();
 
     // Caller flips tilt without rebuilding the cache — must change ranks.
     recomputeCacheRanks(cache, /*seed*/ 0xfeedface, /*tilt*/ 100);
     int changed = 0;
     for (int i = 0; i < int(cache.count); ++i) {
-        if (cache.aux[i].rank != ranksTilt0[i]) ++changed;
+        if (cache.aux[i].rank() != ranksTilt0[i]) ++changed;
     }
     expectTrue(changed > 0, "tilt change must reshuffle at least some ranks");
 }

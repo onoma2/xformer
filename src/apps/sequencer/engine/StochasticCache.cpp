@@ -72,12 +72,12 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
                 int8_t(ev.octave()),
                 gateLen,
                 ev.slide(),
-                ev.legato());
+                ev.legato(),
+                /*audible*/ !ev.rest());
 
             cache.aux[cache.count] = CellAux::make(
-                /*audible*/   !ev.rest(),
                 /*burstChild*/ false,
-                /*rank*/      0);
+                /*rank*/       0);
 
             ++cache.count;
         }
@@ -167,10 +167,10 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
                     childOctave,
                     childGateField,
                     /*slide*/   false,
-                    /*legato*/  false);
+                    /*legato*/  false,
+                    /*audible*/ !ev.rest());
 
                 cache.aux[cache.count] = CellAux::make(
-                    /*audible*/    !ev.rest(),
                     /*burstChild*/ true,
                     /*rank*/       0);
 
@@ -219,7 +219,7 @@ void recomputeCacheRanks(Cache &cache, uint32_t seed, int tilt) {
     });
 
     for (uint8_t k = 0; k < cache.count; ++k) {
-        cache.aux[weighted[k].idx].rank = k;
+        cache.aux[weighted[k].idx].setRank(k);
     }
 }
 

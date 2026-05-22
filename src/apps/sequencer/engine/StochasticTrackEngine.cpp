@@ -377,11 +377,10 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                          : uint8_t(0xff);
             if (cIdx < stochastic_cache::kCellCap) {
                 const auto &cell = _cache.cells[cIdx];
-                const auto &aux  = _cache.aux[cIdx];
                 pDurIdx = int(cell.gateLen());  // cell.gateLen field holds durSlot (encodeGateLenAsDurSlot)
                 pDegree = int(cell.degree());
                 pOctave = int(cell.octave());
-                pRest   = !aux.audible();
+                pRest   = !cell.audible();      // audible packed into cell in Phase 16 P2
                 pSlide  = cell.slide();
                 pLegato = cell.legato();
             }
