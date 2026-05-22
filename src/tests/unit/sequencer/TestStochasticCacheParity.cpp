@@ -621,6 +621,68 @@ CASE("repeat_path_uses_event_rank_not_cache_rank") {
                "the bug is that repeat path used cache rank — these MUST differ");
 }
 
+CASE("feel_scale_in_detent_is_unity") {
+    // Phase 16 P5 (2026-05-23): Feel knob in detent [45..55] = no scaling.
+    // computeFeelScaleQ16 should return 0x10000 (1.0 in Q16.16) for any
+    // input in that range, regardless of naturalSum.
+    for (int feel = 45; feel <= 55; ++feel) {
+        uint32_t scale = computeFeelScaleQ16(feel, /*naturalSum*/ 768, /*beatTicks*/ 192);
+        expectEqual(int(scale), 0x10000, "detent must be unity scale");
+    }
+}
+
+CASE("feel_scale_endpoints_target_3_and_5_beats") {
+    // Feel=0 should target 3 beats (3/4 feel). Feel=100 should target 5 beats.
+    // Verify with naturalSum = 4 beats (default at Size=16 × ×1 LUT × divisor).
+    // With CONFIG_PPQN as beat ticks:
+    //   feel=0   → target 3 → scale = 3*PPQN / (4*PPQN) = 0.75 = 0xC000 in Q16.16
+    //   feel=100 → target 5 → scale = 5*PPQN / (4*PPQN) = 1.25 = 0x14000 in Q16.16
+    uint32_t naturalSum_4beats = 4 * 192;   // assume PPQN=192
+    uint32_t scaleLow  = computeFeelScaleQ16(/*feel*/ 0,   naturalSum_4beats, /*beatTicks*/ 192);
+    uint32_t scaleHigh = computeFeelScaleQ16(/*feel*/ 100, naturalSum_4beats, /*beatTicks*/ 192);
+
+    // Allow small rounding tolerance.
+    int expectedLow  = int(0.75f * 65536.f + 0.5f);   // = 49152
+    int expectedHigh = int(1.25f * 65536.f + 0.5f);   // = 81920
+    int deltaLow  = int(scaleLow)  > expectedLow  ? int(scaleLow)  - expectedLow  : expectedLow  - int(scaleLow);
+    int deltaHigh = int(scaleHigh) > expectedHigh ? int(scaleHigh) - expectedHigh : expectedHigh - int(scaleHigh);
+    expectTrue(deltaLow  < 16, "Feel=0 → scale ≈ 0.75");
+    expectTrue(deltaHigh < 16, "Feel=100 → scale ≈ 1.25");
+}
+
+CASE("feel_scale_clamped_at_extreme_naturalSum") {
+    // If naturalSum is wildly larger than target, scale would compress
+    // catastrophically. computeFeelScaleQ16 clamps to [0.25, 4.0].
+    // naturalSum = 100 beats; feel=0 wants 3 beats → 0.03 raw → clamped to 0.25.
+    uint32_t huge = 100 * 192;
+    uint32_t scale = computeFeelScaleQ16(/*feel*/ 0, huge, /*beatTicks*/ 192);
+    int expectedClamp = int(0.25f * 65536.f);
+    int delta = int(scale) > expectedClamp ? int(scale) - expectedClamp : expectedClamp - int(scale);
+    expectTrue(delta < 32, "extreme compression clamped at 0.25 scale");
+}
+
+CASE("feel_scale_div_by_zero_safe") {
+    // Empty cycle → naturalSum=0 should not div-by-zero. Return unity.
+    uint32_t scale = computeFeelScaleQ16(/*feel*/ 0, /*naturalSum*/ 0, /*beatTicks*/ 192);
+    expectEqual(int(scale), 0x10000);
+}
+
+CASE("applyFeelScale_unity_is_identity") {
+    // Applying scale=1.0 (0x10000) must not change tick values (within
+    // integer rounding from the >>16 shift).
+    expectEqual(int(applyFeelScale(0,    0x10000)), 0);
+    expectEqual(int(applyFeelScale(48,   0x10000)), 48);
+    expectEqual(int(applyFeelScale(768,  0x10000)), 768);
+    expectEqual(int(applyFeelScale(4095, 0x10000)), 4095);
+}
+
+CASE("applyFeelScale_quarter_compresses") {
+    // Scale=0.25 (the clamp floor): 96-tick parent becomes 24-tick.
+    uint32_t quarter = uint32_t(0.25f * 65536.f);
+    expectEqual(int(applyFeelScale(96, quarter)), 24);
+    expectEqual(int(applyFeelScale(768, quarter)), 192);
+}
+
 CASE("fallback_when_cache_unprimed") {
     // Engine reset, no refresh yet — parentCacheIdx is zero-init = 0, but
     // cacheIdx 0 with count=0 means cells/aux are also zeroed. The mask

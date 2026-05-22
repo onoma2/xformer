@@ -2,6 +2,7 @@
 #include "StochasticTrackEngine.h"   // for getDurationFraction
 #include "StochasticGenerator.h"     // for generateDegree (burst-child notes)
 #include "KeyedRng.h"
+#include "Config.h"                  // CONFIG_PPQN for Feel beat-ticks
 
 #include "model/StochasticSequence.h"
 #include "model/StochasticTrack.h"
@@ -28,11 +29,43 @@ static uint8_t encodeGateLenAsDurSlot(uint8_t durationIndex) {
     return durationIndex & 0x3fu;
 }
 
+uint32_t computeFeelScaleQ16(int feel, uint32_t naturalSum, uint32_t beatTicks) {
+    constexpr uint32_t kOneQ16 = 0x10000;
+    // Detent: [45..55] → no scaling.
+    if (feel >= 45 && feel <= 55) return kOneQ16;
+    if (naturalSum == 0) return kOneQ16;
+    if (beatTicks == 0)  return kOneQ16;
+
+    // Target beats per cycle: linear from 3 (feel=0) to 5 (feel=100) outside
+    // detent. Within detent ([45..55]) this branch isn't taken.
+    //   feel < 45:  targetBeats = lerp(4, 3, (45-feel)/45)
+    //   feel > 55:  targetBeats = lerp(4, 5, (feel-55)/45)
+    // Both branches converge to 4.0 at the detent edges.
+    float targetBeats;
+    if (feel < 45) {
+        targetBeats = 4.f - float(45 - feel) / 45.f;          // → 3 at feel=0
+    } else {
+        targetBeats = 4.f + float(feel - 55) / 45.f;          // → 5 at feel=100
+    }
+
+    float targetTicks = targetBeats * float(beatTicks);
+    float scale = targetTicks / float(naturalSum);
+
+    // Clamp to a reasonable range (1/4 .. 4×). Prevents catastrophic
+    // compression when naturalSum is wildly off target (e.g. NoteDuration
+    // pushed to extremes).
+    if (scale < 0.25f) scale = 0.25f;
+    if (scale > 4.0f)  scale = 4.0f;
+
+    return uint32_t(scale * float(kOneQ16) + 0.5f);
+}
+
 int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
                               const Scale *scale, const StochasticTrack *track, int rootNote) {
     (void)rootNote; // unused — generateDegree consumes scale + track only, root is applied at trigger time
     cache.count = 0;
     cache.cycleTicks = 0;
+    cache.feelScaleQ16 = 0x10000;   // default: no scaling, set properly at end
     for (int i = 0; i < kMaxEventSlots; ++i) cache.parentCacheIdx[i] = 0xff;
 
     const bool bakeChildNotes = (scale != nullptr) && (track != nullptr);
@@ -183,6 +216,12 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
     }
 
     cache.cycleTicks = uint16_t(std::min(cycleTicks, uint32_t(UINT16_MAX)));
+
+    // Phase 16 P5 (2026-05-23): compute Feel scaling from sequence.feel().
+    // CONFIG_PPQN = ticks per quarter note = beat ticks at the master clock.
+    // Engine applies scale at trigger time when reading parent duration +
+    // burst-child offsets, stretching the cycle uniformly toward target meter.
+    cache.feelScaleQ16 = computeFeelScaleQ16(int(seq.feel()), cycleTicks, uint32_t(CONFIG_PPQN));
 
     recomputeCacheRanks(cache, seed, /*tilt*/ 0);
     return cache.count;

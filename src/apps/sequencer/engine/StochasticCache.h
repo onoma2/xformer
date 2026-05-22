@@ -111,6 +111,18 @@ struct Cache {
 
     uint8_t    count;
     uint16_t   cycleTicks;
+
+    // Feel scaling (Phase 16 P5, 2026-05-23). Computed at cache build from
+    // sequence.feel() and the natural cycleTicks. Engine multiplies parent
+    // durations and burst-child offsets by this factor at trigger time so
+    // the audible cycle stretches/compresses toward 3/4/5/4 meters.
+    //
+    // Stored as Q16.16 fixed-point: 1.0 = (1 << 16). At Feel detent (45..55),
+    // value = 0x10000 (no scaling). Outside detent: scale = target_beats ×
+    // PPQN / naturalSum, clamped to a reasonable range.
+    //
+    // Engine: scaledTicks = (rawTicks * feelScaleQ16) >> 16.
+    uint32_t feelScaleQ16;
 };
 
 // Populate cache by walking an existing StochasticSequence's `_events[]` tape.
@@ -133,6 +145,21 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 // cache; durationIndex is recovered from gateLen via the duration LUT.
 // `tilt` is -100..+100.
 void recomputeCacheRanks(Cache &cache, uint32_t seed, int tilt);
+
+// Phase 16 P5 (2026-05-23): compute the Feel scaling factor as Q16.16
+// fixed-point. Inputs:
+//   feel        — sequence.feel() knob value, 0..100.
+//   naturalSum  — sum of natural cell durations in ticks (cache.cycleTicks).
+//   beatTicks   — ticks per beat (CONFIG_PPQN typically).
+// Detent [45..55] → returns 0x10000 (1.0, no scaling). Outside detent:
+// scale = (targetBeats × beatTicks) / naturalSum, clamped to a reasonable
+// range. Returns 0x10000 (no-op) if naturalSum is 0 to avoid div-by-zero.
+uint32_t computeFeelScaleQ16(int feel, uint32_t naturalSum, uint32_t beatTicks);
+
+// Convenience: multiply a tick value by a Q16.16 scale factor.
+inline uint32_t applyFeelScale(uint32_t ticks, uint32_t scaleQ16) {
+    return uint32_t((uint64_t(ticks) * scaleQ16) >> 16);
+}
 
 // Select the rank a mask filter should use for the event currently being
 // played.

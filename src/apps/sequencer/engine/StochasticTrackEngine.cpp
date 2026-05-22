@@ -395,6 +395,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         auto frac = getDurationFraction(pDurIdx);
         uint32_t mult = (uint64_t(divisor) * frac.num) / frac.den;
         if (mult < 1) mult = 1;
+        // Phase 16 P5 (2026-05-23): apply Feel scaling. Cache.feelScaleQ16 was
+        // computed at refresh time from the sequence's natural cycle length
+        // and the Feel knob. Default (knob in detent) = 0x10000 = no scaling.
+        mult = stochastic_cache::applyFeelScale(mult, _cache.feelScaleQ16);
+        if (mult < 1) mult = 1;
         _lastDurationIndex = pDurIdx;
         durationTicks = mult;
         _eventDuration = durationTicks;
@@ -506,7 +511,13 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                         if (!_cache.aux[ci].burstChild()) break;
                         const auto &cCell = _cache.cells[ci];
                         uint32_t childRel = cCell.relTick();
-                        uint32_t childTick = tick + (childRel - parentRel);
+                        // Phase 16 P5: scale burst-child offset by Feel.
+                        // Cell relTicks stored unscaled at cache build; engine
+                        // applies the cycle-stretch at trigger so the burst
+                        // shape stays proportional to the stretched parent.
+                        uint32_t childOffset = stochastic_cache::applyFeelScale(
+                            childRel - parentRel, _cache.feelScaleQ16);
+                        uint32_t childTick = tick + childOffset;
                         uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
 
                         int childNote = int(cCell.degree())
@@ -517,9 +528,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
                         // Decode child gate from 6-bit fraction (Codex finding 3
                         // fix, 2026-05-22). Cell.gateLen() holds (childGate*64)
-                        // / parentTicks. Inverse: childGateTicks = (frac *
-                        // parentTicks) / 64. kMinChildGate floor matches the
-                        // legacy evaluateChildren contract.
+                        // / parentTicks_natural. Inverse: childGateTicks =
+                        // (frac * parentTicks) / 64 where parentTicks is the
+                        // FEEL-SCALED parent duration. Gate scales with parent.
                         constexpr uint32_t kMinChildGate = 6;
                         uint32_t childGateTicks = (uint32_t(cCell.gateLen()) * parentTicks) / 64u;
                         if (childGateTicks < kMinChildGate) childGateTicks = kMinChildGate;
