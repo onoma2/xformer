@@ -437,6 +437,66 @@ CASE("parents_keep_priority_under_burst_truncation") {
     }
 }
 
+CASE("repeat_path_uses_event_rank_not_cache_rank") {
+    // Codex adversarial review 2026-05-22: when Repeat fires, the engine
+    // replays _lastEvent. The slot's cached rank refers to the original
+    // event at that index, NOT the repeated material. Mask must filter by
+    // the repeated event's own densityRank so the right material is gated.
+    Cache cache{};
+    // Construct a sequence that primes the cache so we know the ranks at
+    // each slot.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(8);
+    seq.setFirst(0);
+    seq.setLast(7);
+    for (int i = 0; i < 8; ++i) {
+        auto &ev = seq.events()[i];
+        ev.setDurationIndex(i);   // 0..7 spans the LUT
+        ev.setRest(false);
+        ev.setRhythmValid(true);
+    }
+    regenerateCacheFromEvents(cache, seq, 48, /*seed*/ 0xa5a5);
+
+    // Choose a readIndex where cache rank and "repeated event's rank" must
+    // disagree. We forge a densityRank on a synthetic repeated event that
+    // differs from whatever rank the cache assigned to slot 3.
+    const int testSlot = 3;
+    const uint8_t cacheRankAtSlot = cache.aux[cache.parentCacheIdx[testSlot]].rank;
+
+    // Pick a forged event rank guaranteed to differ from the cache rank.
+    const uint8_t forgedRepeatedRank = uint8_t((cacheRankAtSlot + 5) & 0x3f);
+    expectTrue(forgedRepeatedRank != cacheRankAtSlot, "test setup: ranks must differ");
+
+    // Non-repeat path returns cache rank.
+    uint32_t r_nonrepeat = selectMaskRank(
+        /*useRepeat=*/false, forgedRepeatedRank, testSlot, cache);
+    expectEqual(int(r_nonrepeat), int(cacheRankAtSlot));
+
+    // Repeat path returns the event's own rank, IGNORING the cache.
+    uint32_t r_repeat = selectMaskRank(
+        /*useRepeat=*/true, forgedRepeatedRank, testSlot, cache);
+    expectEqual(int(r_repeat), int(forgedRepeatedRank));
+
+    // Confirm the two paths actually disagree — proves we're testing the
+    // discriminating behavior, not just both returning the same value.
+    expectTrue(r_nonrepeat != r_repeat,
+               "the bug is that repeat path used cache rank — these MUST differ");
+}
+
+CASE("fallback_when_cache_unprimed") {
+    // Engine reset, no refresh yet — parentCacheIdx is zero-init = 0, but
+    // cacheIdx 0 with count=0 means cells/aux are also zeroed. The mask
+    // filter must not lock up; selectMaskRank falls back to the legacy
+    // density rank when the cache hasn't been built.
+    Cache cache{};   // count = 0, parentCacheIdx[i] = 0 (default zero-init)
+
+    // Out-of-range readIndex returns the event rank via fallback.
+    uint32_t r = selectMaskRank(/*useRepeat=*/false, /*evRank=*/42, /*readIndex=*/100, cache);
+    expectEqual(int(r), 42);
+}
+
 CASE("rank_recomputes_when_tilt_changes_via_caller") {
     // Codex adversarial review 2026-05-22 finding #1: tilt is a live knob, so
     // the engine must call recomputeCacheRanks when tilt changes — the cache

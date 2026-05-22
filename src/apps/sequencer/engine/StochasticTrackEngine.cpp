@@ -377,13 +377,17 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // derived from keyed RNG salt + tilt. The cache is rebuilt after every
         // generator write so this lookup stays in sync with the audible content.
         // parentCacheIdx maps event-slot index -> cache cell index in O(1).
+        //
+        // Codex review 2026-05-22 finding: Repeat replays _lastEvent, so the
+        // audible material is no longer the event at readIndex. The cache
+        // rank for readIndex would filter unrelated content. _lastEvent
+        // carries its own densityRank (copied at capture time), so when
+        // useRepeat is true the legacy rank field is the right source — it
+        // travels with the repeated event. This is the one place where the
+        // cache-as-rank-source path has to defer to the event's own rank.
         uint32_t windowSize = std::max(1, int(sequence.last()) - int(sequence.first()) + 1);
-        uint8_t cacheIdx = (readIndex >= 0 && readIndex < int(stochastic_cache::kMaxEventSlots))
-                         ? _cache.parentCacheIdx[readIndex]
-                         : uint8_t(0xff);
-        uint32_t cacheRank = (cacheIdx < stochastic_cache::kCellCap)
-                           ? uint32_t(_cache.aux[cacheIdx].rank)
-                           : uint32_t(eval.densityRank());   // fallback (e.g. cache not yet primed)
+        uint32_t cacheRank = stochastic_cache::selectMaskRank(
+            useRepeat, eval.densityRank(), readIndex, _cache);
         bool maskPass = sequence.mask() >= 100 ||
             ((cacheRank * 100) < (uint32_t(sequence.mask()) * windowSize));
         isRest = bool(eval.rest()) || !maskPass || !eval.rhythmValid() || !eval.melodyValid();

@@ -107,4 +107,40 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 // `tilt` is -100..+100.
 void recomputeCacheRanks(Cache &cache, uint32_t seed, int tilt);
 
+// Select the rank a mask filter should use for the event currently being
+// played.
+//
+// Codex adversarial review 2026-05-22: when Repeat fires, the engine replays
+// `_lastEvent` instead of the slot's stored event. The cache's per-slot rank
+// then refers to the *wrong* material — the current readIndex's event, not
+// the repeated event. `_lastEvent` carries its own `densityRank` (legacy
+// rank field, copied at capture time), so the right rank source for a
+// repeated event is `eval.densityRank()`, not `cache.aux[parentCacheIdx]`.
+//
+// Inputs:
+//   useRepeat        — true if engine is about to play a Repeat replay.
+//   eventDensityRank — eval.densityRank() of the (possibly repeated) event.
+//   readIndex        — current sequence slot, 0..kMaxEventSlots-1.
+//   cache            — engine's per-track cache.
+//
+// Returns the rank value that should be compared against the mask threshold.
+inline uint32_t selectMaskRank(bool useRepeat,
+                               uint8_t eventDensityRank,
+                               int readIndex,
+                               const Cache &cache) {
+    if (useRepeat) {
+        // The audible material is _lastEvent, whose densityRank travels with
+        // it. Slot-keyed cache rank would filter unrelated content.
+        return uint32_t(eventDensityRank);
+    }
+    uint8_t cacheIdx = (readIndex >= 0 && readIndex < int(kMaxEventSlots))
+                     ? cache.parentCacheIdx[readIndex]
+                     : uint8_t(0xff);
+    if (cacheIdx < kCellCap) {
+        return uint32_t(cache.aux[cacheIdx].rank);
+    }
+    // Fallback for unprimed cache (engine reset, no refresh has run yet).
+    return uint32_t(eventDensityRank);
+}
+
 } // namespace stochastic_cache
