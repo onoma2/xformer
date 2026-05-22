@@ -19,11 +19,19 @@ void StochasticConfigPage::exit() {
 }
 
 void StochasticConfigPage::draw(Canvas &canvas) {
+    // Batch 0 / docs/stoch-review.md finding #3 — if the selected track is no
+    // longer Stochastic, the list model still holds a raw pointer to the
+    // previously-selected track. Bail before ListPage dereferences it.
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::Stochastic) {
+        WindowPainter::clear(canvas);
+        return;
+    }
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "STOCH CFG");
     ListPage::draw(canvas);
 }
 
 void StochasticConfigPage::updateLeds(Leds &leds) {
+    if (_project.selectedTrack().trackMode() != Track::TrackMode::Stochastic) return;
     ListPage::updateLeds(leds);
 }

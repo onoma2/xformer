@@ -1,6 +1,7 @@
 #include "UnitTest.h"
 
 #include "apps/sequencer/engine/StochasticTrackEngine.h"
+#include <cstddef>
 
 UNIT_TEST("StochasticDurationDictionary") {
 
@@ -74,6 +75,21 @@ CASE("lut_is_descending") {
         expect(cur < prev, "LUT must descend by ticks");
         prev = cur;
     }
+}
+
+CASE("direct_history_event_is_compact_ui_truth") {
+    StochasticTrackEngine::DirectHistoryEvent event;
+    event.cv = 1.25f;
+    event.children = 3;
+    event.rest = false;
+    event.gate = true;
+
+    expectTrue(sizeof(StochasticTrackEngine::DirectHistoryEvent) <= 8,
+               "Direct history event should stay compact");
+    expectEqual(int(StochasticTrackEngine::kDirectHistoryMax), 12,
+                "Direct history should match the hero trail length");
+    expectEqual(event.children, uint8_t(3), "children count should be stored");
+    expectTrue(event.gate, "gate truth should be stored");
 }
 
 } // UNIT_TEST("StochasticDurationDictionary")

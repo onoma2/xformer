@@ -38,18 +38,36 @@ void StochasticSequenceEditPage::nextPage() {
     // Phase 12: marblesMode toggle is dead (always-on transparent defaults).
     // Marbles page is always visible in the cycle.
     _currentPage = Page(next);
-    _heroHeldStep = -1;
+    _heroSelectionMask = 0;
+}
+
+// Lowest-bit-set helper: returns step index 0..15 of the only/first held step,
+// or -1 if no step is held. Used by single-step overlay paths.
+static int heroFirstHeld(uint32_t mask) {
+    if (mask == 0) return -1;
+    for (int i = 0; i < 16; ++i) if (mask & (1U << i)) return i;
+    return -1;
+}
+
+static int heroPopcount(uint32_t mask) {
+    int n = 0;
+    for (int i = 0; i < 16; ++i) if (mask & (1U << i)) ++n;
+    return n;
 }
 
 //----------
 // Draw
 //----------
 
+bool StochasticSequenceEditPage::isActiveForSelectedTrack() const {
+    return _project.selectedTrack().trackMode() == Track::TrackMode::Stochastic &&
+        _engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic;
+}
+
 void StochasticSequenceEditPage::draw(Canvas &canvas) {
+    if (!isActiveForSelectedTrack()) return;
     switch (_currentPage) {
-    case Page::Core:     drawCorePage(canvas); break;
-    case Page::Marbles:  drawMarblesPage(canvas); break;
-    case Page::Direct:   drawDirectPage(canvas); break;
+    case Page::Live:     drawLivePage(canvas); break;
     case Page::Loop:     drawLoopPage(canvas); break;
     case Page::Pitch:    drawPitchPage(canvas); break;
     case Page::Duration: drawDurationPage(canvas); break;
@@ -61,149 +79,11 @@ void StochasticSequenceEditPage::draw(Canvas &canvas) {
 // Hero page draws
 //----------
 
-void StochasticSequenceEditPage::drawCorePage(Canvas &canvas) {
+void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
     auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
 
     WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "CORE");
-
-    int rest = seq.rest();
-    int burst = seq.burst();
-    int complexity = seq.complexity();
-
-    // dropCount = mood proxy: rest sparsens, burst + complexity busy it up.
-    // Range ~12..100. Density slot is engine-reserved and not visualized.
-    int dropCount = 12 + ((100 - rest) * 40) / 100 + (burst * 30) / 100 + (complexity * 18) / 100;
-    int jitter = 2 + (complexity * 14) / 100;           // 2..16
-    // Phase 12: marblesMode toggle is dead — pitch shape always applies.
-    // Wind is purely cosmetic, driven by complexity instead.
-    int wind = 1 + complexity / 50;
-
-    Random rng(11);
-    canvas.setBlendMode(BlendMode::Set);
-    for (int i = 0; i < dropCount; ++i) {
-        int x = 2 + int(rng.nextRange(Width - 4));
-        int y = 13 + int(rng.nextRange(36));
-        int dropLen = 2 + int(rng.nextRange(uint32_t(jitter / 2 + 1)));
-        int b = int(rng.nextRange(15));
-        Color col = (b >= 12) ? Color::Bright :
-                    (b >= 8)  ? Color::MediumBright :
-                    (b >= 4)  ? Color::Medium :
-                                Color::Low;
-        canvas.setColor(col);
-        for (int j = 0; j < dropLen; ++j) {
-            int px = x + (wind * j) / std::max(1, dropLen);
-            int py = y + j;
-            if (py >= 12 && py <= 51) canvas.point(px, py);
-        }
-    }
-
-    FixedStringBuilder<32> str;
-    if (_heroHeldStep == 0) str("REST %d", rest);
-    else if (_heroHeldStep == 1) str("CMPX %d", complexity);
-    else str("R%d  C%d", rest, complexity);
-    canvas.setFont(Font::Small);
-    canvas.setColor(Color::Bright);
-    canvas.drawText(8, 18, str);
-
-    // Phase 12: removed the SHAPE ON/OFF on-screen affordance — engine no
-    // longer honors `marblesMode`, so the label was a lie.
-
-    // Dynamic footer labels — show actual current state per DiscreteMap convention.
-    auto &track = _project.selectedTrack().stochasticTrack();
-    const char *modeLabel = "LIVE";
-    if (seq.rhythmMode() == seq.melodyMode()) {
-        modeLabel = (seq.rhythmMode() == StochasticSourceMode::Loop) ? "LOOP" : "LIVE";
-    } else {
-        modeLabel = "SPLIT";
-    }
-    const char *lockLabel = track.lock() ? "LOCKED" : "FREE";
-    // F1 slot used to toggle marblesMode; that's dead now, so the slot is empty.
-    const char *footer[] = { nullptr, modeLabel, "RENEW", lockLabel, "NEXT" };
-    WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
-}
-
-void StochasticSequenceEditPage::drawMarblesPage(Canvas &canvas) {
-    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
-
-    WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "MARBLES");
-
-    int bias = seq.marblesBias();       // 0..100, 50=center
-    int spreadVal = seq.marblesSpread(); // 0..100
-    int stepsVal = seq.marblesSteps();   // 0..100 (sieve cutoff)
-    // Phase 12 musicality fix: Steps is a coarse rank cutoff (K = ceil(N×%/100)).
-    // Show K/N alongside the raw % so the user sees the actual sieve count and
-    // understands the staircase, not a smooth continuous knob.
-    auto &scaleForSteps = seq.selectedScale(_project.scale());
-    int scaleSizeForSteps = clamp(scaleForSteps.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
-    int stepsK = (scaleSizeForSteps * stepsVal + 99) / 100;
-    if (stepsK < 1) stepsK = 1;
-    if (stepsK > scaleSizeForSteps) stepsK = scaleSizeForSteps;
-
-    int biasOffset = ((bias - 50) * 4) / 5;            // -40..+40
-    int cx = Width / 2 + biasOffset;
-    int spread = std::max(8, (spreadVal * 4) / 5);
-    int stepsCount = std::max(2, stepsVal);
-    int baseline = 50;
-    int peakY = 14;
-
-    canvas.setBlendMode(BlendMode::Set);
-    // Phase 12: pitch shape is always live — no "off" branch. Always draw bell.
-    {
-        // Quantization ticks
-        canvas.setColor(Color::Low);
-        int bandW = std::max(2, (spread * 4) / stepsCount);
-        for (int k = -stepsCount; k <= stepsCount; ++k) {
-            int x = cx + k * bandW;
-            if (x >= 0 && x < Width) canvas.vline(x, baseline - 1, 3);
-        }
-        // Bell curve fill — gaussian-ish, gradient brighter toward peak
-        for (int x = 0; x < Width; ++x) {
-            float d = float(x - cx) / float(spread);
-            float env = expf(-d * d * 1.4f);
-            int h = int(env * (baseline - peakY));
-            if (h <= 0) continue;
-            int top = baseline - h;
-            for (int y = top; y <= baseline; ++y) {
-                int v = ((baseline - y) * 85) / std::max(1, h * 100 / 100);
-                v = (baseline - y) * 100 / std::max(1, h);
-                Color col = (v >= 85) ? Color::Bright :
-                            (v >= 60) ? Color::MediumBright :
-                            (v >= 35) ? Color::Medium :
-                            (v >= 12) ? Color::MediumLow :
-                                        Color::Low;
-                canvas.setColor(col);
-                canvas.point(x, y);
-            }
-        }
-        // Peak marker
-        canvas.setColor(Color::Bright);
-        canvas.point(cx, peakY - 1);
-        canvas.point(cx - 1, peakY);
-        canvas.point(cx + 1, peakY);
-    }
-
-    FixedStringBuilder<32> str;
-    if (_heroHeldStep == 0) str("BIAS %d", bias);
-    else if (_heroHeldStep == 1) str("SPRD %d", spreadVal);
-    else if (_heroHeldStep == 2) str("STEP %d  (%d/%d)", stepsVal, stepsK, scaleSizeForSteps);
-    else str("B%d  S%d  N%d/%d", bias, spreadVal, stepsK, scaleSizeForSteps);
-    canvas.setFont(Font::Small);
-    canvas.setColor(Color::Bright);
-    canvas.drawText(8, 18, str);
-
-    // Phase 12: F1 SHAPE toggle removed (was a lie — engine always honors
-    // Bias/Spread/Steps regardless of marblesMode).
-    const char *footer[] = { nullptr, nullptr, nullptr, nullptr, "NEXT" };
-    WindowPainter::drawFooter(canvas, footer, pageKeyState(), -1);
-}
-
-void StochasticSequenceEditPage::drawDirectPage(Canvas &canvas) {
-    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
-
-    WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "DIRECT");
+    WindowPainter::drawHeader(canvas, _model, _engine, "LIVE");
 
     canvas.setBlendMode(BlendMode::Set);
 
@@ -216,6 +96,13 @@ void StochasticSequenceEditPage::drawDirectPage(Canvas &canvas) {
     int bias       = seq.marblesBias();
     int spread     = seq.marblesSpread();
     int repeats    = seq.repeatProb();
+    int range      = seq.range();
+    int burst      = seq.burst();
+    int burstCount = seq.burstCount();
+    int burstRate  = seq.burstRate();
+    int gateLength = seq.gateLength();
+    int slide      = seq.slide();
+    int legato     = seq.legatoProb();
 
     // Viewport — leaves room for the two info rows at top and footer at bottom.
     const int vpLeft = 8;
@@ -233,14 +120,17 @@ void StochasticSequenceEditPage::drawDirectPage(Canvas &canvas) {
         int dy = y - biasY;
         // Gaussian-ish envelope: env ≈ exp(-(dy/spreadY)² × 1.4). Approximated
         // with fixed-point math: scale = max(0, 256 - (dy*dy*180)/(spreadY*spreadY))
-        int dist2 = (dy * dy * 180) / (spreadY * spreadY);
+        int dist2 = (dy * dy * 160) / (spreadY * spreadY);
         int env = 256 - dist2;
-        if (env < 64) continue;       // skip dim tails
-        Color col = (env >= 218) ? Color::MediumLow : Color::Low;
+        if (env < 48) continue;       // skip dim tails
+        Color col = (env >= 210) ? Color::MediumLow : Color::Low;
         canvas.setColor(col);
-        int step = (env >= 154) ? 2 : 3;
-        int offset = (y * 7) % step;
-        for (int x = vpLeft + offset; x < vpRight; x += step) canvas.point(x, y);
+        int step = (env >= 170) ? 3 : (env >= 96 ? 4 : 5);
+        int offset = (y * 5 + spread) % step;
+        for (int x = vpLeft + offset; x < vpRight; x += step) {
+            if (((x + y * 3) % 11) < 2) continue;
+            canvas.point(x, y);
+        }
     }
 
     // --- Event-driven walker ----------------------------------------------
@@ -251,62 +141,116 @@ void StochasticSequenceEditPage::drawDirectPage(Canvas &canvas) {
     // (events arriving), vertical = pitch.
     _directWalkerTick++;
 
-    float liveCv = 0.f;
-    bool liveGate = false;
+    const StochasticTrackEngine *stoEng = nullptr;
     if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
         auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
-        liveCv = eng.cvOutput(0);
-        liveGate = eng.gateOutput(0);
+        stoEng = &eng;
     }
 
     // Map liveCv (≈ -5..+5 V typical) to a vertical offset around biasY.
-    // The bias-anchored mapping keeps the trail centered when CV is near 0.
-    int cvOffset = -int(liveCv * 4.f);   // 1V ≈ 4 px
-    int cvOffsetMax = vpH / 2 - 2;
-    if (cvOffset > cvOffsetMax) cvOffset = cvOffsetMax;
-    else if (cvOffset < -cvOffsetMax) cvOffset = -cvOffsetMax;
+    // Range opens the vertical travel, while Bias/Spread stay the visible pitch
+    // field. This keeps Bias/Spread semantics intact and makes Range legible.
+    auto cvToOffset = [&] (float cv) {
+        int offset = -int(cv * (2.f + float(range)));   // 1V ≈ 3..6 px
+        int cvOffsetMax = 4 + range * 3;
+        int hardMax = vpH / 2 - 2;
+        if (cvOffsetMax > hardMax) cvOffsetMax = hardMax;
+        if (offset > cvOffsetMax) offset = cvOffsetMax;
+        else if (offset < -cvOffsetMax) offset = -cvOffsetMax;
+        return offset;
+    };
 
-    // Rising edge → shift ring + insert.
-    if (liveGate && !_directLastGate) {
-        for (int i = kDirectTrailMax - 1; i > 0; --i) {
-            _directTrail[i] = _directTrail[i - 1];
+    // Runtime history supplies event truth: recent CV positions, actual rests,
+    // and actual child count when the engine produced a parent burst. Knobs
+    // still shape the metaphor below.
+    if (stoEng && stoEng->directHistoryCount() > 0) {
+        int count = std::min<int>(kDirectTrailMax, stoEng->directHistoryCount());
+        for (int i = 0; i < count; ++i) {
+            const auto &ev = stoEng->directHistoryEvent(i);
+            uint8_t flags = (ev.rest ? 1 : 0) | (ev.children > 0 ? 2 : 0);
+            _directTrail[i] = { int16_t(cvToOffset(ev.cv)), flags, ev.children };
         }
-        bool isRest = (rest > 0) && (int((_directWalkerTick * 1103515245u) % 100u) < rest);
-        bool isBurst = !isRest && (seq.burst() > 0)
-            && (int((_directWalkerTick * 22695477u) % 100u) < seq.burst());
-        uint8_t flags = (isRest ? 1 : 0) | (isBurst ? 2 : 0);
-        uint8_t children = isBurst ? uint8_t(2 + std::min(3, (seq.burstCount() * 4) / 100)) : 0;
-        _directTrail[0] = { int16_t(cvOffset), flags, children };
-        if (_directTrailFilled < kDirectTrailMax) _directTrailFilled++;
-        _directLastEventEpoch = _directWalkerTick;
+        _directTrailFilled = uint8_t(count);
+    } else {
+        _directTrailFilled = 0;
     }
-    _directLastGate = liveGate;
 
-    // Horizontal stride per slot, modulated by DUR so the trail visibly tightens
-    // at short durations and spreads at long ones.
-    int baseStride = 6 + (7 - duration) * 5;
-    if (baseStride < 4) baseStride = 4;
-
-    // Center the (walker ↔ oldest particle) midpoint on the viewport center.
-    // Walker = slot 0, oldest = slot (filled-1). With stride S and N filled
-    // slots: span = (N-1)*S; anchor walker at vpCx + span/2 so midpoint = vpCx.
+    // Horizontal stride per slot. DURA controls the base footstep distance;
+    // VARI perturbs each older particle deterministically. The whole walker set
+    // is midpoint-anchored: it grows from center and collapses back to center,
+    // never from the right wall. Clamp the visible span so it neither hits the
+    // walls nor squeezes below a readable 60 px footprint.
+    int baseStride = 7 + (7 - duration) * 4;
+    if (baseStride < 5) baseStride = 5;
     int vpCx = (vpLeft + vpRight) / 2;
     int filled = _directTrailFilled > 0 ? _directTrailFilled : 1;
-    int span = (filled - 1) * baseStride;
+    const int kMinDirectSpan = 60;
+    int maxSpan = (vpRight - vpLeft) - 18;
+    int rawSpan = (filled - 1) * baseStride;
+    int span = rawSpan;
+    if (filled > 1 && span < kMinDirectSpan) span = kMinDirectSpan;
+    if (span > maxSpan) span = maxSpan;
     int walkerX = vpCx + span / 2;
-    if (walkerX > vpRight - 2) walkerX = vpRight - 2;
+    int oldestX = vpCx - span / 2;
+    int effectiveStride = filled > 1 ? span / (filled - 1) : 0;
 
-    // Particle slope encodes CONT direction (positive = up-right tilt).
+    // Pitch guide rails: RANGE opens the vertical travel without disturbing the
+    // Bias/Spread haze. Low contrast so it reads as motion affordance, not grid.
+    canvas.setColor(Color::Low);
+    int rails = 1 + range * 2;
+    for (int r = 0; r < rails; ++r) {
+        int y = vpCy;
+        if (rails > 1) y = vpCy - ((rails - 1) * 3) / 2 + r * 3;
+        if (y >= vpTop + 1 && y <= vpBot - 1) canvas.hline(oldestX, y, span + 1);
+    }
+
+    // Particle slope encodes CONT direction (positive = up-right tilt). Contour
+    // also adds an age-based vertical drift so the whole phrase visibly leans.
     int slopeDy = -(contour * 3) / 200;             // -1..+1 typically
-    int burstSpacing = 2 + (seq.burstRate() * 6) / 100;
+    int contourStep = (contour * 4) / 100;          // -4..+4 px over age
+    int burstSpacing = 7 - (burstRate * 5) / 100;   // high rate = tighter child pips
+    if (burstSpacing < 2) burstSpacing = 2;
     bool burstPitchScatter = (seq.burstPitch() == StochasticBurstPitch::Generate);
+
+    // Slide and Legato turn the point cloud into a connected phrase. Slide draws
+    // a pitch ribbon; Legato draws a low gate-continuity rail between events.
+    if (_directTrailFilled > 1 && (slide > 0 || legato > 0)) {
+        int prevX = -1;
+        int prevY = -1;
+        for (int i = _directTrailFilled - 1; i >= 0; --i) {
+            const DirectParticle &p = _directTrail[i];
+            bool isRest = (p.flags & 1) != 0;
+            int jitter = (variation * int((uint32_t(_directWalkerTick + i * 29) % 9u) - 4)) / 120;
+            int px = walkerX - i * effectiveStride + jitter;
+            int py = biasY + p.yOffset + contourStep * i;
+            if (py < vpTop + 2) py = vpTop + 2;
+            if (py > vpBot - 2) py = vpBot - 2;
+            if (!isRest && prevX >= 0) {
+                if (slide > 0) {
+                    canvas.setColor(slide > 65 ? Color::Medium : Color::MediumLow);
+                    canvas.line(prevX, prevY, px, py);
+                }
+                if (legato > 45) {
+                    canvas.setColor(Color::Low);
+                    int railY = (prevY > py ? prevY : py) + 2;
+                    if (railY <= vpBot - 1) canvas.hline(prevX, railY, px - prevX + 1);
+                }
+            }
+            if (!isRest) {
+                prevX = px;
+                prevY = py;
+            }
+        }
+    }
 
     // Draw oldest → newest so newer events overdraw older fade.
     for (int i = _directTrailFilled - 1; i >= 0; --i) {
         const DirectParticle &p = _directTrail[i];
-        int px = walkerX - i * baseStride;
+        int jitter = (variation * int((uint32_t(_directWalkerTick + i * 29) % 9u) - 4)) / 120;
+        int px = walkerX - i * effectiveStride + jitter;
         if (px < vpLeft) break;
-        int py = biasY + p.yOffset;
+        if (px > vpRight) continue;
+        int py = biasY + p.yOffset + contourStep * i;
         if (py < vpTop + 2) py = vpTop + 2;
         if (py > vpBot - 2) py = vpBot - 2;
 
@@ -329,11 +273,25 @@ void StochasticSequenceEditPage::drawDirectPage(Canvas &canvas) {
                    : (trailStrength >= 30) ? Color::Medium
                                            : Color::MediumLow;
         canvas.setColor(col);
+        int radius = gateLength >= 75 ? 2 : (gateLength >= 35 ? 1 : 0);
         if (i == 0) {
-            canvas.fillRect(px - 1, py - 1, 3, 3);
+            int pulseRadius = radius + 1;
+            canvas.hline(px - pulseRadius, py, pulseRadius * 2 + 1);
+            for (int yy = 1; yy <= pulseRadius; ++yy) {
+                int w = pulseRadius * 2 + 1 - yy * 2;
+                if (w < 1) w = 1;
+                canvas.hline(px - w / 2, py - yy, w);
+                canvas.hline(px - w / 2, py + yy, w);
+            }
+            canvas.setColor(Color::MediumBright);
+            canvas.point(px - pulseRadius - 2, py);
+            canvas.point(px + pulseRadius + 2, py);
+            canvas.point(px, py - pulseRadius - 2);
+            canvas.point(px, py + pulseRadius + 2);
         } else {
             canvas.line(px - 1, py + slopeDy, px + 1, py - slopeDy);
             canvas.point(px, py);
+            if (radius > 1) canvas.point(px, py - 1);
         }
         // Burst children — small dots offset rightward from the parent slot.
         if (isBurst && p.children > 0) {
@@ -342,73 +300,92 @@ void StochasticSequenceEditPage::drawDirectPage(Canvas &canvas) {
                 if (cxp >= vpRight - 1) break;
                 int cy = py;
                 if (burstPitchScatter) {
-                    cy += int((_directWalkerTick + i * 17 + c * 5) % 5) - 2;
+                    int scatter = 1 + spread / 35;
+                    cy += (int((_directWalkerTick + i * 17 + c * 5) % uint32_t(scatter * 2 + 1)) - scatter);
                 }
                 if (cy < vpTop + 1) cy = vpTop + 1;
                 if (cy > vpBot - 1) cy = vpBot - 1;
+                canvas.setColor(Color::MediumBright);
                 canvas.point(cxp, cy);
+                canvas.point(cxp, cy + 1 <= vpBot ? cy + 1 : cy);
             }
         }
     }
 
-    // "Now" cross marker — sits at the walker head (centered span).
-    int nowX = walkerX;
-    int nowY = biasY + cvOffset;
-    if (nowY < vpTop + 2) nowY = vpTop + 2;
-    if (nowY > vpBot - 2) nowY = vpBot - 2;
-    canvas.setColor(Color::Bright);
-    canvas.fillRect(nowX - 2, nowY - 2, 5, 5);
-    canvas.setColor(Color::MediumBright);
-    canvas.point(nowX + 3, nowY);
-    canvas.point(nowX - 3, nowY);
-    canvas.point(nowX, nowY + 3);
-    canvas.point(nowX, nowY - 3);
-
     // --- Info rows ---------------------------------------------------------
-    canvas.setFont(Font::Small);
-    canvas.setColor(Color::Bright);
+    // Tiny readout: per-slot 1-letter label + value, two rows of 8 columns
+    // aligned to a 32-px grid. Small overlay: full param name + value when a
+    // step is held.
+
+    // Helper: Duration step shows the actual fraction (e.g. "1/16", "1/8T")
+    // from the divisor-aware printSlotDuration table — not the raw slot index.
+    auto durationLabel = [&](FixedStringBuilder<16> &s) {
+        s.reset();
+        seq.printSlotDuration(s, duration);
+    };
+    auto burstPitchLabel = [&]() {
+        return seq.burstPitch() == StochasticBurstPitch::Parent ? "P" : "G";
+    };
+
     FixedStringBuilder<32> str;
     bool labeled = true;
-    switch (_heroHeldStep) {
-    case 0:  str("DURA %d", duration); break;
-    case 1:  str("VARI %d", variation); break;
+    canvas.setFont(Font::Small);
+    canvas.setColor(Color::Bright);
+    int heldCount = heroPopcount(_heroSelectionMask);
+    int heldStep  = (heldCount == 1) ? heroFirstHeld(_heroSelectionMask) : -1;
+    if (heldCount > 1) {
+        str("MANY SELECTED");
+    } else switch (heldStep) {
+    case 0:  { FixedStringBuilder<16> d; durationLabel(d); str("DURATION %s", static_cast<const char*>(d)); break; }
+    case 1:  str("VARIATION %d", variation); break;
     case 2:  str("REST %d", rest); break;
-    case 3:  str("RANG %d oct", seq.range()); break;
-    case 4:  str("BURS %d", seq.burst()); break;
-    case 5:  str("BCNT %d", seq.burstCount()); break;
-    case 6:  str("BRAT %d", seq.burstRate()); break;
-    case 7:  str("BPIT %s", seq.burstPitch() == StochasticBurstPitch::Parent ? "PAR" : "GEN"); break;
-    case 8:  str("CMPX %d", complexity); break;
-    case 9:  str("CONT %+d", contour); break;
+    case 3:  str("RANGE %d oct", seq.range()); break;
+    case 4:  str("BURST %d", burst); break;
+    case 5:  str("BURST COUNT %d", burstCount); break;
+    case 6:  str("BURST RATE %d", burstRate); break;
+    case 7:  str("BURST PITCH %s", seq.burstPitch() == StochasticBurstPitch::Parent ? "PARENT" : "GENERATE"); break;
+    case 8:  str("COMPLEXITY %d", complexity); break;
+    case 9:  str("CONTOUR %+d", contour); break;
     case 10: str("BIAS %d", bias); break;
-    case 11: str("SPRE %d", spread); break;
-    case 12: str("REPT %d", repeats); break;
-    case 13: str("GATE %d", seq.gateLength()); break;
-    case 14: str("SLID %d", seq.slide()); break;
-    case 15: str("LEGA %d", seq.legatoProb()); break;
+    case 11: str("SPREAD %d", spread); break;
+    case 12: str("REPEAT %d", repeats); break;
+    case 13: str("GATE LENGTH %d", gateLength); break;
+    case 14: str("SLIDE %d", slide); break;
+    case 15: str("LEGATO %d", legato); break;
     default: labeled = false; break;
     }
-    if (labeled) {
+    if (labeled || heldCount > 1) {
         canvas.drawText(8, 19, str);
     } else {
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Medium);
         FixedStringBuilder<16> s;
-        // Top row: rhythm + burst sub-set
-        s.reset(); s("DUR%d", duration);          canvas.drawText(8,   18, s);
-        s.reset(); s("VAR%d", variation);         canvas.drawText(40,  18, s);
-        s.reset(); s("RES%d", rest);              canvas.drawText(72,  18, s);
-        s.reset(); s("BUR%d", seq.burst());       canvas.drawText(104, 18, s);
-        s.reset(); s("BCN%d", seq.burstCount());  canvas.drawText(136, 18, s);
-        s.reset(); s("BRT%d", seq.burstRate());   canvas.drawText(168, 18, s);
-        s.reset(); s("BPI%s", seq.burstPitch() == StochasticBurstPitch::Parent ? "P" : "G");
-                                                  canvas.drawText(200, 18, s);
-        // Bottom row: pitch shaping
-        s.reset(); s("CMP%d",  complexity);   canvas.drawText(8,   24, s);
-        s.reset(); s("CON%+d", contour);      canvas.drawText(56,  24, s);
-        s.reset(); s("BIA%d",  bias);         canvas.drawText(104, 24, s);
-        s.reset(); s("SPR%d",  spread);       canvas.drawText(152, 24, s);
-        s.reset(); s("REP%d",  repeats);      canvas.drawText(200, 24, s);
+        // 8-column grid, 32 px per column, starting at x=8.
+        const int col0 = 8;
+        const int colStep = 32;
+        const int yTop = 18;
+        const int yBot = 24;
+
+        // Top row (slots 0..7): rhythm + burst sub-set.
+        FixedStringBuilder<16> durStr; durationLabel(durStr);
+        s.reset(); s("D %s",  static_cast<const char*>(durStr)); canvas.drawText(col0 + 0 * colStep, yTop, s);
+        s.reset(); s("V %d",  variation);   canvas.drawText(col0 + 1 * colStep, yTop, s);
+        s.reset(); s("R %d",  rest);        canvas.drawText(col0 + 2 * colStep, yTop, s);
+        s.reset(); s("N %d",  seq.range()); canvas.drawText(col0 + 3 * colStep, yTop, s);
+        s.reset(); s("B %d",  burst);       canvas.drawText(col0 + 4 * colStep, yTop, s);
+        s.reset(); s("C %d",  burstCount);  canvas.drawText(col0 + 5 * colStep, yTop, s);
+        s.reset(); s("T %d",  burstRate);   canvas.drawText(col0 + 6 * colStep, yTop, s);
+        s.reset(); s("P %s",  burstPitchLabel()); canvas.drawText(col0 + 7 * colStep, yTop, s);
+
+        // Bottom row (slots 8..15): pitch shape + per-event gate behavior.
+        s.reset(); s("X %d",  complexity);  canvas.drawText(col0 + 0 * colStep, yBot, s);
+        s.reset(); s("O %+d", contour);     canvas.drawText(col0 + 1 * colStep, yBot, s);
+        s.reset(); s("I %d",  bias);        canvas.drawText(col0 + 2 * colStep, yBot, s);
+        s.reset(); s("S %d",  spread);      canvas.drawText(col0 + 3 * colStep, yBot, s);
+        s.reset(); s("E %d",  repeats);     canvas.drawText(col0 + 4 * colStep, yBot, s);
+        s.reset(); s("G %d",  gateLength);  canvas.drawText(col0 + 5 * colStep, yBot, s);
+        s.reset(); s("L %d",  slide);       canvas.drawText(col0 + 6 * colStep, yBot, s);
+        s.reset(); s("A %d",  legato);      canvas.drawText(col0 + 7 * colStep, yBot, s);
     }
 
     // Footer mirrors LOOP page.
@@ -645,21 +622,27 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     mt("TL%+d", seq.tilt());
     canvas.drawText(margin + availW - canvas.textWidth(mt), tapeBot + 14, mt);
 
-    // Top-area readout. When a step is held, show that step's value in Small
-    // font. Otherwise show all four destructive macros at once in Tiny font.
-    if (_heroHeldStep >= 0) {
+    // Top-area readout. Multi-select aware: popcount>1 → "MANY SELECTED",
+    // popcount==1 → that step's value in Small font, popcount==0 → tiny macros.
+    int heldCount = heroPopcount(_heroSelectionMask);
+    int heldStep  = (heldCount == 1) ? heroFirstHeld(_heroSelectionMask) : -1;
+    if (heldCount > 1) {
+        canvas.setFont(Font::Small);
+        canvas.setColor(Color::Bright);
+        canvas.drawText(8, 18, "MANY SELECTED");
+    } else if (heldStep >= 0) {
         FixedStringBuilder<32> str;
-        if (_heroHeldStep == 0)       str("PR %d", seq.patienceRhythm());
-        else if (_heroHeldStep == 1)  str("PM %d", seq.patienceMelody());
-        else if (_heroHeldStep == 2)  str("M %+d", seq.mutate());
-        else if (_heroHeldStep == 3)  str("J %d", seq.jump());
-        else if (_heroHeldStep == 4)  str("S %d", seq.sleep());
-        else if (_heroHeldStep == 8)  str("FRST %d", seq.first());
-        else if (_heroHeldStep == 9)  str("LAST %d", seq.last());
-        else if (_heroHeldStep == 10) str("SIZE %d", seq.size());
-        else if (_heroHeldStep == 11) str("ROT %+d", seq.rotate());
-        else if (_heroHeldStep == 14) str("MASK %d", seq.mask());
-        else if (_heroHeldStep == 15) str("TILT %+d", seq.tilt());
+        if (heldStep == 0)       str("PATIENCE R %d", seq.patienceRhythm());
+        else if (heldStep == 1)  str("PATIENCE M %d", seq.patienceMelody());
+        else if (heldStep == 2)  str("MUTATE %+d", seq.mutate());
+        else if (heldStep == 3)  str("JUMP %d", seq.jump());
+        else if (heldStep == 4)  str("SLEEP %d", seq.sleep());
+        else if (heldStep == 8)  str("FIRST %d", seq.first());
+        else if (heldStep == 9)  str("LAST %d", seq.last());
+        else if (heldStep == 10) str("SIZE %d", seq.size());
+        else if (heldStep == 11) str("ROTATE %+d", seq.rotate());
+        else if (heldStep == 14) str("MASK %d", seq.mask());
+        else if (heldStep == 15) str("TILT %+d", seq.tilt());
         canvas.setFont(Font::Small);
         canvas.setColor(Color::Bright);
         canvas.drawText(8, 18, str);
@@ -684,26 +667,7 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
 // Hero step edits — encoder writes the held step's param
 //----------
 
-void StochasticSequenceEditPage::editCoreStep(int step, int value, bool shift) {
-    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
-    int v = shift ? value * 10 : value;
-    switch (step) {
-    case 0: seq.setRest(seq.rest() + v); break;     // S0 now drives the live rest gate
-    case 1: seq.setComplexity(seq.complexity() + v); break;
-    }
-}
-
-void StochasticSequenceEditPage::editMarblesStep(int step, int value, bool shift) {
-    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
-    int v = shift ? value * 10 : value;
-    switch (step) {
-    case 0: seq.setMarblesBias(seq.marblesBias() + v); break;
-    case 1: seq.setMarblesSpread(seq.marblesSpread() + v); break;
-    case 2: seq.setMarblesSteps(seq.marblesSteps() + v); break;
-    }
-}
-
-void StochasticSequenceEditPage::editDirectStep(int step, int value, bool shift) {
+void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
     int v = shift ? value * 10 : value;
     // DIRECT layout:
@@ -757,46 +721,7 @@ void StochasticSequenceEditPage::editLoopStep(int step, int value, bool shift) {
 // Hero Fn handlers
 //----------
 
-bool StochasticSequenceEditPage::handleCoreFunction(int fn, bool shift) {
-    auto &track = _project.selectedTrack().stochasticTrack();
-    auto &seq = track.sequence(_project.selectedPatternIndex());
-    switch (fn) {
-    case 0: // F1 unused — was SHAPE toggle, dead since Phase 12 (engine always
-            // honors Bias/Spread/Steps regardless of marblesMode).
-        return false;
-    case 1: { // MODE — toggle coupled rhythm/melody between Loop and Live
-        auto newMode = (seq.rhythmMode() == StochasticSourceMode::Loop)
-            ? StochasticSourceMode::Live : StochasticSourceMode::Loop;
-        seq.setRhythmMode(newMode);
-        seq.setMelodyMode(newMode);
-        return true;
-    }
-    case 2: // RENEW — refresh loop sources
-        if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
-            auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
-            eng.renewLoopSources();
-            showMessage("RENEW");
-        }
-        return true;
-    case 3: // LOCK toggle
-        track.setLock(!track.lock());
-        return true;
-    }
-    return false;
-}
-
-bool StochasticSequenceEditPage::handleMarblesFunction(int fn, bool shift) {
-    auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
-    switch (fn) {
-    case 0: // SHAPE — back to Core (marbles off)
-        seq.setMarblesMode(MarblesMode::Off);
-        _currentPage = Page::Core;
-        return true;
-    }
-    return false;
-}
-
-bool StochasticSequenceEditPage::handleDirectFunction(int fn, bool shift, int pressCount) {
+bool StochasticSequenceEditPage::handleLiveFunction(int fn, bool shift, int pressCount) {
     // DIRECT page Fn keys mirror the LOOP page: toggle source modes per domain
     // and renew loop content (double-click guarded for the destructive renews).
     auto &track = _project.selectedTrack().stochasticTrack();
@@ -822,16 +747,16 @@ bool StochasticSequenceEditPage::handleDirectFunction(int fn, bool shift, int pr
     }
     case 2:
         if (pressCount == 2) {
-            if (auto *eng = stoEng()) { eng->renewRhythm(); showMessage("NEW R"); }
+            if (auto *eng = stoEng()) { eng->renewRhythm(); showMessage("Rhythm renewed"); }
         } else {
-            showMessage("Press again - renew R");
+            showMessage("Press again to renew rhythm");
         }
         return true;
     case 3:
         if (pressCount == 2) {
-            if (auto *eng = stoEng()) { eng->renewMelody(); showMessage("NEW M"); }
+            if (auto *eng = stoEng()) { eng->renewMelody(); showMessage("Melody renewed"); }
         } else {
-            showMessage("Press again - renew M");
+            showMessage("Press again to renew melody");
         }
         return true;
     }
@@ -862,16 +787,16 @@ bool StochasticSequenceEditPage::handleLoopFunction(int fn, bool shift, int pres
     }
     case 2: // NewR — double-click guard. First press warns, second fires.
         if (pressCount == 2) {
-            if (auto *eng = stoEng()) { eng->renewRhythm(); showMessage("NEW R"); }
+            if (auto *eng = stoEng()) { eng->renewRhythm(); showMessage("Rhythm renewed"); }
         } else {
-            showMessage("Press again - renew R");
+            showMessage("Press again to renew rhythm");
         }
         return true;
     case 3: // NewM — double-click guard.
         if (pressCount == 2) {
-            if (auto *eng = stoEng()) { eng->renewMelody(); showMessage("NEW M"); }
+            if (auto *eng = stoEng()) { eng->renewMelody(); showMessage("Melody renewed"); }
         } else {
-            showMessage("Press again - renew M");
+            showMessage("Press again to renew melody");
         }
         return true;
     }
@@ -891,8 +816,11 @@ void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "SCALE TICKETS");
 
-    int baseY = 46;
-    int barMaxH = 26;
+    // Bar geometry: top at y = baseY - barMaxH = 50 - 22 = 28. Small-font readout
+    // at y=18 (glyphs span ~y=12..19) leaves ~9 px clearance below to the bar
+    // tops at y=28 — no overlap with the topmost ticket values.
+    int baseY = 50;
+    int barMaxH = 22;
     int barW = std::max(3, (Width - 16) / scaleSize - 2);
     int gap = 2;
     if (scaleSize > 20) { gap = 1; barW = std::max(2, (Width - 16) / scaleSize - 1); }
@@ -983,21 +911,19 @@ void StochasticSequenceEditPage::drawPitchPage(Canvas &canvas) {
     str.reset();
     str("DROT:%+d MROT:%+d", sequence.degreeRotation(), sequence.maskRotation());
     int rw = canvas.textWidth(str);
-
-    // Ticket active badge
     canvas.setFont(Font::Tiny);
-    canvas.setColor(sequence.pitchTicketsActive() ? Color::Bright : Color::Medium);
-    FixedStringBuilder<8> badge;
-    badge(sequence.pitchTicketsActive() ? "ON" : "OFF");
-    int bw = canvas.textWidth(badge);
-    canvas.drawText(Width - rw - bw - 16, 18, badge);
-
-    // Rotation info
     canvas.setColor(Color::Medium);
-    canvas.drawText(Width - rw - 12, 18, str);
+    canvas.drawText(Width - rw - 8, 18, str);
 
-    const char *footer[] = { "TIX", "DROT", "MROT", nullptr, "NEXT" };
-    WindowPainter::drawFooter(canvas, footer, pageKeyState(), int(_editFocus));
+    // Footer: F1 LoopM/LiveM, F2 NewM, F3 DROT, F4 MROT, F5 NEXT.
+    // EditFocus::Ticket is the implicit default — encoder edits the held
+    // degree's ticket value when neither DROT nor MROT is active.
+    const char *fnM = (sequence.melodyMode() == StochasticSourceMode::Loop) ? "LoopM" : "LiveM";
+    const char *footer[] = { fnM, "NewM", "DROT", "MROT", "NEXT" };
+    int activeFn = -1;
+    if (_editFocus == EditFocus::DegreeRotation) activeFn = 2;
+    else if (_editFocus == EditFocus::MaskRotation) activeFn = 3;
+    WindowPainter::drawFooter(canvas, footer, pageKeyState(), activeFn);
 }
 
 void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
@@ -1008,8 +934,11 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
     WindowPainter::drawHeader(canvas, _model, _engine, "DURATION TICKETS");
 
     const int numSlots = 8;
-    const int baseY = 42;
-    const int barMaxH = 26;
+    // Bar geometry: baseY=46 with barMaxH=22 puts bar tops at y=24, leaving
+    // ~5 px clearance below the Small-font readout at y=18 (glyphs y=12..19).
+    // Slot label text at baseY+8=54 stays well above the footer band (~y=58+).
+    const int baseY = 46;
+    const int barMaxH = 22;
     const int barW = 12;
     const int gap = barW;
 
@@ -1076,31 +1005,35 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
         canvas.drawText(x + (barW - labelW) / 2, baseY + 8, slotLabel);
     }
 
-    // Left info text
+    // Left info: Small font primary value depending on focus.
     FixedStringBuilder<32> str;
     if (_durFocus == DurFocus::Rest) {
-        str("REST: %d%%", sequence.rest());
-        canvas.setFont(Font::Small);
-        canvas.setColor(Color::Bright);
-        canvas.drawText(8, 18, str);
+        str("REST %d%%", sequence.rest());
     } else {
         FixedStringBuilder<8> slotLabel;
         sequence.printSlotDuration(slotLabel, _selectedDurSlot);
         str("%s: %d", (const char *)slotLabel, sequence.durationTicket(_selectedDurSlot));
-        canvas.setFont(Font::Small);
-        canvas.setColor(Color::Bright);
-        canvas.drawText(8, 18, str);
     }
-
-    // Duration tickets on/off
-    str.reset();
-    str(sequence.durationTicketsActive() ? "ON" : "OFF");
     canvas.setFont(Font::Small);
-    canvas.setColor(sequence.durationTicketsActive() ? Color::Bright : Color::Medium);
-    canvas.drawText(Width - canvas.textWidth(str) - 8, 18, str);
+    canvas.setColor(Color::Bright);
+    canvas.drawText(8, 18, str);
 
-    const char *footer[] = { "DUR", "RST", nullptr, nullptr, "NEXT" };
-    WindowPainter::drawFooter(canvas, footer, pageKeyState(), _durFocus == DurFocus::DurTicket ? 0 : (_durFocus == DurFocus::Rest ? 1 : -1));
+    // Tiny rest readout always visible (top-right). When focus is on Rest, the
+    // big Small-font version on the left takes the spotlight; this tiny line
+    // is a constant reminder of the current value either way.
+    FixedStringBuilder<16> restTiny;
+    restTiny("REST %d%%", sequence.rest());
+    canvas.setFont(Font::Tiny);
+    canvas.setColor(_durFocus == DurFocus::Rest ? Color::Medium : Color::Bright);
+    canvas.drawText(Width - canvas.textWidth(restTiny) - 8, 18, restTiny);
+
+    // Footer: F1 LoopR/LiveR, F2 NewR, F3 RST, F4 unused, F5 NEXT.
+    // DurFocus::DurTicket is the implicit default (encoder edits held slot's
+    // ticket weight).
+    const char *fnR = (sequence.rhythmMode() == StochasticSourceMode::Loop) ? "LoopR" : "LiveR";
+    const char *footer[] = { fnR, "NewR", "RST", nullptr, "NEXT" };
+    int activeFn = (_durFocus == DurFocus::Rest) ? 2 : -1;
+    WindowPainter::drawFooter(canvas, footer, pageKeyState(), activeFn);
 }
 
 //----------
@@ -1108,33 +1041,22 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
 //----------
 
 void StochasticSequenceEditPage::updateLeds(Leds &leds) {
+    if (!isActiveForSelectedTrack()) return;
     auto &track = _project.selectedTrack().stochasticTrack();
     auto &sequence = track.sequence(_project.selectedPatternIndex());
 
-    auto heroLeds = [&] (int paramCount, bool useGreen, bool useRed) {
-        for (int i = 0; i < paramCount; ++i) {
-            bool held = (i == _heroHeldStep);
-            leds.set(MatrixMap::fromStep(i), useRed && held, useGreen);
-        }
-    };
+    auto heldStep = [&] (int i) { return (_heroSelectionMask & (1U << i)) != 0; };
 
     switch (_currentPage) {
-    case Page::Core:
-        // Orange = green + red. Active param brighter.
-        heroLeds(2, /*green*/true, /*red*/true);
-        break;
-    case Page::Marbles:
-        heroLeds(3, /*green*/true, /*red*/false);
-        break;
-    case Page::Direct: {
+    case Page::Live: {
         // Top row 0..3 red — DURA/VARI/REST/RANG.
         for (int i = 0; i <= 3; ++i) {
-            bool held = (i == _heroHeldStep);
+            bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/held);
         }
         // Top row 4..7 orange (red+green) — burst sub-set (BURS/BCNT/BRAT/BPIT).
         for (int i = 4; i <= 7; ++i) {
-            bool held = (i == _heroHeldStep);
+            bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/!held, /*green*/!held ? true : true);
             if (held) {
                 leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/false);
@@ -1142,12 +1064,12 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
         }
         // Bottom row 8..12 green — pitch shape (CMPX/CONT/BIAS/SPRE/REPT).
         for (int i = 8; i <= 12; ++i) {
-            bool held = (i == _heroHeldStep);
+            bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
         }
         // Bottom row 13..15 red — per-event gate behavior (GATE/SLID/LEGA).
         for (int i = 13; i <= 15; ++i) {
-            bool held = (i == _heroHeldStep);
+            bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/held);
         }
         break;
@@ -1155,17 +1077,17 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
     case Page::Loop:
         // Top row (0..4): red — patience R, patience M, mutate, jump, sleep
         for (int i = 0; i <= 4; ++i) {
-            bool held = (i == _heroHeldStep);
+            bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/held);
         }
         // Bottom row left (8..11): green — loop window (first, last, size, rotate)
         for (int i = 8; i <= 11; ++i) {
-            bool held = (i == _heroHeldStep);
+            bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
         }
         // Bottom row right (14..15): green — Mask + Tilt performance pair
         for (int i = 14; i <= 15; ++i) {
-            bool held = (i == _heroHeldStep);
+            bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
         }
         break;
@@ -1220,12 +1142,25 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
 //----------
 
 void StochasticSequenceEditPage::keyDown(KeyEvent &event) {
+    if (!isActiveForSelectedTrack()) return;
     const auto &key = event.key();
-    bool isHero = (_currentPage == Page::Core || _currentPage == Page::Marbles ||
-                   _currentPage == Page::Direct || _currentPage == Page::Loop);
+    bool isHero = (_currentPage == Page::Live || _currentPage == Page::Loop);
     if (isHero) {
         if (key.isStep() && !key.pageModifier()) {
-            _heroHeldStep = key.step();
+            int step = key.step();
+            if (step >= 0 && step < 16) {
+                if (_persistMode) _heroSelectionMask ^= (1U << step);
+                else              _heroSelectionMask |= (1U << step);
+            }
+            event.consume();
+            return;
+        }
+        if (key.isShift()) {
+            // Toggle persist mode. Mirrors the ticket-page shift latch — when
+            // turning persist off, clear the mask so the next step press starts
+            // fresh.
+            _persistMode = !_persistMode;
+            if (!_persistMode) _heroSelectionMask = 0;
             event.consume();
             return;
         }
@@ -1325,12 +1260,15 @@ void StochasticSequenceEditPage::handleDurationKeyDown(KeyEvent &event) {
 }
 
 void StochasticSequenceEditPage::keyUp(KeyEvent &event) {
+    if (!isActiveForSelectedTrack()) return;
     const auto &key = event.key();
-    bool isHero = (_currentPage == Page::Core || _currentPage == Page::Marbles ||
-                   _currentPage == Page::Direct || _currentPage == Page::Loop);
+    bool isHero = (_currentPage == Page::Live || _currentPage == Page::Loop);
     if (isHero) {
-        if (key.isStep() && _heroHeldStep >= 0 && key.step() == _heroHeldStep) {
-            _heroHeldStep = -1;
+        if (key.isStep() && !_persistMode) {
+            int step = key.step();
+            if (step >= 0 && step < 16) {
+                _heroSelectionMask &= ~(1U << step);
+            }
             event.consume();
             return;
         }
@@ -1360,9 +1298,9 @@ void StochasticSequenceEditPage::keyUp(KeyEvent &event) {
 }
 
 void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
+    if (!isActiveForSelectedTrack()) return;
     const auto &key = event.key();
-    bool isHero = (_currentPage == Page::Core || _currentPage == Page::Marbles ||
-                   _currentPage == Page::Direct || _currentPage == Page::Loop);
+    bool isHero = (_currentPage == Page::Live || _currentPage == Page::Loop);
     if (isHero) {
         // F5 NEXT first (universal).
         if (key.isFunction() && key.function() == 4) {
@@ -1375,9 +1313,7 @@ void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
             int fn = key.function();
             bool shift = key.shiftModifier();
             switch (_currentPage) {
-            case Page::Core:    handleCoreFunction(fn, shift); break;
-            case Page::Marbles: handleMarblesFunction(fn, shift); break;
-            case Page::Direct:  handleDirectFunction(fn, shift, event.count()); break;
+            case Page::Live:  handleLiveFunction(fn, shift, event.count()); break;
             case Page::Loop:    handleLoopFunction(fn, shift, event.count()); break;
             default: break;
             }
@@ -1417,11 +1353,35 @@ void StochasticSequenceEditPage::handlePitchKeyPress(KeyPressEvent &event) {
     }
 
     if (key.isFunction()) {
+        auto &track = _project.selectedTrack().stochasticTrack();
+        auto &sequence = track.sequence(_project.selectedPatternIndex());
+        auto stoEng = [&] () -> StochasticTrackEngine* {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+                return &_engine.selectedTrackEngine().as<StochasticTrackEngine>();
+            }
+            return nullptr;
+        };
         switch (key.function()) {
-        case 0: _editFocus = EditFocus::Ticket; break;
-        case 1: _editFocus = EditFocus::DegreeRotation; break;
-        case 2: _editFocus = EditFocus::MaskRotation; break;
-        case 4: // F5 = NEXT
+        case 0: { // F1: LoopM / LiveM — instant toggle.
+            auto newMode = (sequence.melodyMode() == StochasticSourceMode::Loop)
+                ? StochasticSourceMode::Live : StochasticSourceMode::Loop;
+            sequence.setMelodyMode(newMode);
+            break;
+        }
+        case 1: // F2: NewM — double-click guard.
+            if (event.count() == 2) {
+                if (auto *eng = stoEng()) { eng->renewMelody(); showMessage("Melody renewed"); }
+            } else {
+                showMessage("Press again to renew melody");
+            }
+            break;
+        case 2: // F3: DROT toggle (Ticket ↔ DegreeRotation).
+            _editFocus = (_editFocus == EditFocus::DegreeRotation) ? EditFocus::Ticket : EditFocus::DegreeRotation;
+            break;
+        case 3: // F4: MROT toggle (Ticket ↔ MaskRotation).
+            _editFocus = (_editFocus == EditFocus::MaskRotation) ? EditFocus::Ticket : EditFocus::MaskRotation;
+            break;
+        case 4: // F5: NEXT.
             nextPage();
             event.consume();
             return;
@@ -1472,10 +1432,32 @@ void StochasticSequenceEditPage::handleDurationKeyPress(KeyPressEvent &event) {
     }
 
     if (key.isFunction()) {
+        auto &track = _project.selectedTrack().stochasticTrack();
+        auto &sequence = track.sequence(_project.selectedPatternIndex());
+        auto stoEng = [&] () -> StochasticTrackEngine* {
+            if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
+                return &_engine.selectedTrackEngine().as<StochasticTrackEngine>();
+            }
+            return nullptr;
+        };
         switch (key.function()) {
-        case 0: _durFocus = DurFocus::DurTicket; break;
-        case 1: _durFocus = DurFocus::Rest; break;
-        case 4:
+        case 0: { // F1: LoopR / LiveR — instant toggle.
+            auto newMode = (sequence.rhythmMode() == StochasticSourceMode::Loop)
+                ? StochasticSourceMode::Live : StochasticSourceMode::Loop;
+            sequence.setRhythmMode(newMode);
+            break;
+        }
+        case 1: // F2: NewR — double-click guard.
+            if (event.count() == 2) {
+                if (auto *eng = stoEng()) { eng->renewRhythm(); showMessage("Rhythm renewed"); }
+            } else {
+                showMessage("Press again to renew rhythm");
+            }
+            break;
+        case 2: // F3: RST toggle (DurTicket ↔ Rest).
+            _durFocus = (_durFocus == DurFocus::Rest) ? DurFocus::DurTicket : DurFocus::Rest;
+            break;
+        case 4: // F5: NEXT.
             nextPage();
             event.consume();
             return;
@@ -1488,13 +1470,23 @@ void StochasticSequenceEditPage::handleDurationKeyPress(KeyPressEvent &event) {
 }
 
 void StochasticSequenceEditPage::encoder(EncoderEvent &event) {
-    int step = _heroHeldStep >= 0 ? _heroHeldStep : 0;
+    if (!isActiveForSelectedTrack()) return;
     bool shift = event.pressed();
+    if (_currentPage == Page::Live || _currentPage == Page::Loop) {
+        // Multi-select: apply the encoder delta to every step set in the mask.
+        // Fallback (mask == 0) keeps the page-default behavior of writing to
+        // step 0 so a bare encoder turn still touches something.
+        uint32_t mask = _heroSelectionMask;
+        if (mask == 0) mask = 1U;   // implicit step 0
+        for (int i = 0; i < 16; ++i) {
+            if (!(mask & (1U << i))) continue;
+            if (_currentPage == Page::Live) editLiveStep(i, event.value(), shift);
+            else                            editLoopStep(i, event.value(), shift);
+        }
+        event.consume();
+        return;
+    }
     switch (_currentPage) {
-    case Page::Core:    editCoreStep(step, event.value(), shift); event.consume(); return;
-    case Page::Marbles: editMarblesStep(step, event.value(), shift); event.consume(); return;
-    case Page::Direct:  editDirectStep(step, event.value(), shift); event.consume(); return;
-    case Page::Loop:    editLoopStep(step, event.value(), shift); event.consume(); return;
     case Page::Pitch:    handlePitchEncoder(event); break;
     case Page::Duration: handleDurationEncoder(event); break;
     default: break;
@@ -1571,12 +1563,61 @@ void StochasticSequenceEditPage::contextAction(int index) {
     auto &sequence = track.sequence(_project.selectedPatternIndex());
 
     switch (_currentPage) {
-    case Page::Core:
-    case Page::Marbles:
-    case Page::Direct:
-    case Page::Loop:
-        // Hero pages don't yet have INIT/EVEN/RAND semantics — no-op for now.
+    case Page::Live: {
+        // INIT resets the LIVE-page params bound to step buttons back to their
+        // model defaults (matches `StochasticSequence::clear()`). When the
+        // selection mask is non-empty, only the held steps' params are reset
+        // so the user can scope the init to a subset (mirrors ticket-page
+        // selection-aware INIT). EVEN/RAND are not meaningful for these
+        // mixed-type slots — surface a short reminder instead.
+        if (ContextAction(index) != ContextAction::Init) {
+            showMessage("INIT ONLY ON LIVE");
+            break;
+        }
+        uint32_t mask = _heroSelectionMask;
+        if (mask == 0) mask = 0xFFFFu;  // no selection → init all 16 slots
+        auto wants = [&](int i) { return (mask & (1U << i)) != 0; };
+        if (wants(0))  sequence.setNoteDuration(5);
+        if (wants(1))  sequence.setVariation(16);
+        if (wants(2))  sequence.setRest(0);
+        if (wants(3))  sequence.setRange(1);
+        if (wants(4))  sequence.setBurst(0);
+        if (wants(5))  sequence.setBurstCount(0);
+        if (wants(6))  sequence.setBurstRate(50);
+        if (wants(7))  sequence.setBurstPitch(StochasticBurstPitch::Parent);
+        if (wants(8))  sequence.setComplexity(50);
+        if (wants(9))  sequence.setContour(0);
+        if (wants(10)) sequence.setMarblesBias(50);
+        if (wants(11)) sequence.setMarblesSpread(50);
+        if (wants(12)) sequence.setRepeatProb(0);
+        if (wants(13)) sequence.setGateLength(0);
+        if (wants(14)) sequence.setSlide(0);
+        if (wants(15)) sequence.setLegatoProb(0);
+        showMessage(_heroSelectionMask ? "INIT SELECTED" : "INIT LIVE");
         break;
+    }
+    case Page::Loop: {
+        if (ContextAction(index) != ContextAction::Init) {
+            showMessage("INIT ONLY ON LOOP");
+            break;
+        }
+        uint32_t mask = _heroSelectionMask;
+        if (mask == 0) mask = 0xC30Fu;  // bits 0-3, 4, 8-11, 14-15 (the bound LOOP slots)
+        auto wants = [&](int i) { return (mask & (1U << i)) != 0; };
+        if (wants(0))  sequence.setPatienceRhythm(100);
+        if (wants(1))  sequence.setPatienceMelody(100);
+        if (wants(2))  sequence.setMutate(0);
+        if (wants(3))  sequence.setJump(0);
+        if (wants(4))  sequence.setSleep(0);
+        if (wants(8))  sequence.setFirst(0);
+        if (wants(9))  sequence.setLast(15);
+        if (wants(10)) sequence.setSize(16);
+        if (wants(11)) sequence.setRotate(0);
+        if (wants(14)) sequence.setMask(100);
+        if (wants(15)) sequence.setTilt(0);
+        showMessage(_heroSelectionMask ? "INIT SELECTED" : "INIT LOOP");
+        break;
+    }
     case Page::Pitch: {
         switch (ContextAction(index)) {
         case ContextAction::Init:

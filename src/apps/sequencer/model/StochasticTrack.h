@@ -171,7 +171,9 @@ public:
         _cvUpdateMode = cvUpdateMode < uint8_t(CvUpdateMode::Last) ? static_cast<CvUpdateMode>(cvUpdateMode) : CvUpdateMode::Gate;
         uint8_t playMode;
         reader.read(playMode);
-        _playMode = playMode < uint8_t(Types::PlayMode::Last) ? static_cast<Types::PlayMode>(playMode) : Types::PlayMode::Free;
+        // Batch 0 / docs/stoch-review.md finding #7 — fall back to Aligned on
+        // invalid serialized value so a corrupted load matches a fresh clear().
+        _playMode = playMode < uint8_t(Types::PlayMode::Last) ? static_cast<Types::PlayMode>(playMode) : Types::PlayMode::Aligned;
 
         for (auto &sequence : _sequences) {
             sequence.read(reader);

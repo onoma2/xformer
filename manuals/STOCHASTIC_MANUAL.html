@@ -148,13 +148,12 @@
                 <li><a href="#architecture">2 &middot; Architecture</a></li>
                 <li><a href="#key-concepts">3 &middot; Key Concepts</a></li>
                 <li><a href="#navigation">4 &middot; Page Navigation</a></li>
-                <li><a href="#ui-levels">5 &middot; UI Levels (Core/Direct/Weights)</a></li>
-                <li><a href="#stoch-page">6 &middot; Performance Page (STOCH)</a></li>
-                <li><a href="#config-page">7 &middot; Config Page (STOCH CFG)</a></li>
-                <li><a href="#tickets-page">8 &middot; Degree Ticket Editor</a></li>
-                <li><a href="#generator">9 &middot; Generator Engine</a></li>
-                <li><a href="#workflow">10 &middot; Workflow Guide</a></li>
-                <li><a href="#reference">11 &middot; Parameter Reference</a></li>
+                <li><a href="#hero-pages">5 &middot; Hero Pages (Live / Loop)</a></li>
+                <li><a href="#ticket-pages">6 &middot; Ticket Pages (Pitch / Duration)</a></li>
+                <li><a href="#config-page">7 &middot; Config Page</a></li>
+                <li><a href="#generator">8 &middot; Generator Engine</a></li>
+                <li><a href="#workflow">9 &middot; Workflow Guide</a></li>
+                <li><a href="#reference">10 &middot; Parameter Reference</a></li>
             </ul>
         </div>
 
@@ -177,10 +176,12 @@
         </p>
 
         <div class="callout purple">
-            <strong>Sequence Ownership:</strong> All generative parameters, pattern sizes, and even
-            scales/root notes are now owned by the <strong>Sequence</strong> (Pattern). This means every
-            pattern in a Stochastic track can have completely different probability weights, complexity settings,
-            and rhythmic rates.
+            <strong>Sequence Ownership:</strong> Generative parameters (all per-event knobs, ticket
+            weights, Loop window, mutation rates) live on the <strong>Sequence</strong>
+            (Pattern), so every pattern in a Stochastic track can carry its own probability
+            shape and evolution rate. Track-level settings (Lock, Divisor, ClockMult, Scale,
+            RootNote, Octave, Transpose, SlideTime, FillMode) live on the <strong>Track</strong>
+            and survive pattern switches.
         </div>
 
         <div class="fig">
@@ -226,17 +227,17 @@
 
                 <!-- Duration -->
                 <rect x="52" y="164" width="120" height="44" rx="6" fill="#f0efed" stroke="#b45309" stroke-width="1.2"/>
-                <text x="112" y="182" text-anchor="middle" class="sch-text-label" font-size="9">Rate</text>
-                <text x="112" y="196" text-anchor="middle" class="sch-text-small" fill="var(--accent-warm)">maps to 8 durations</text>
-                <text x="112" y="206" class="sch-text-small" fill="#b45309" text-anchor="middle">Variation &times;2 / &divide;2</text>
+                <text x="112" y="182" text-anchor="middle" class="sch-text-label" font-size="9">Duration</text>
+                <text x="112" y="196" text-anchor="middle" class="sch-text-small" fill="var(--accent-warm)">8-slot LUT pick</text>
+                <text x="112" y="206" class="sch-text-small" fill="#b45309" text-anchor="middle">Variation kernel</text>
 
                 <path class="sch-arrow" d="M172,186 L200,186"/>
 
-                <!-- Density Gate -->
+                <!-- Mask Sieve -->
                 <rect x="202" y="164" width="110" height="44" rx="6" fill="#f0efed" stroke="#b91c1c" stroke-width="1.2"/>
-                <text x="257" y="182" text-anchor="middle" class="sch-text-label" font-size="9">Density</text>
-                <text x="257" y="196" text-anchor="middle" class="sch-text-small" fill="var(--accent-red)">threshold gate</text>
-                <text x="257" y="206" class="sch-text-small" fill="#b91c1c" text-anchor="middle">Tilt bias</text>
+                <text x="257" y="182" text-anchor="middle" class="sch-text-label" font-size="9">Mask</text>
+                <text x="257" y="196" text-anchor="middle" class="sch-text-small" fill="var(--accent-red)">ranked thinning</text>
+                <text x="257" y="206" class="sch-text-small" fill="#b91c1c" text-anchor="middle">Tilt duration-rank</text>
 
                 <path class="sch-arrow" d="M312,186 L340,186"/>
 
@@ -296,15 +297,15 @@
 
                 <path class="sch-arrow" d="M730,182 L740,182"/>
 
-                <!-- Marbles -->
+                <!-- Marbles bell -->
                 <rect x="482" y="226" width="110" height="36" rx="6" fill="#f0efed" stroke="#7c3aed" stroke-width="1.2"/>
-                <text x="537" y="240" text-anchor="middle" class="sch-text-label" font-size="9">Marbles</text>
-                <text x="537" y="254" text-anchor="middle" class="sch-text-small" fill="var(--accent-purple)">beta dist (when On)</text>
+                <text x="537" y="240" text-anchor="middle" class="sch-text-label" font-size="9">Marbles bell</text>
+                <text x="537" y="254" text-anchor="middle" class="sch-text-small" fill="var(--accent-purple)">Bias / Spread</text>
 
-                <!-- Linearity -->
+                <!-- Steps sieve -->
                 <rect x="610" y="226" width="120" height="36" rx="6" fill="#f0efed" stroke="#1d4ed8" stroke-width="1.2"/>
-                <text x="670" y="240" text-anchor="middle" class="sch-text-label" font-size="9">Linearity</text>
-                <text x="670" y="254" text-anchor="middle" class="sch-text-small" fill="var(--accent-blue)">distance penalty</text>
+                <text x="670" y="240" text-anchor="middle" class="sch-text-label" font-size="9">Steps</text>
+                <text x="670" y="254" text-anchor="middle" class="sch-text-small" fill="var(--accent-blue)">top K of N sieve</text>
 
                 <!-- Range -->
                 <rect x="750" y="226" width="110" height="36" rx="6" fill="#f0efed" stroke="var(--border)" stroke-width="1"/>
@@ -388,15 +389,15 @@
 
                 <!-- Mutate -->
                 <rect x="60" y="524" width="160" height="28" rx="6" fill="var(--accent-red-bg)" stroke="var(--accent-red)" stroke-width="1.2"/>
-                <text x="140" y="542" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent-red)">Mutate % &rarr; replace 1 step</text>
+                <text x="140" y="542" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent-red)">Mutate &plusmn; &rarr; permute/regen 1 event</text>
 
-                <!-- Patience / Boredom -->
+                <!-- Patience R/M -->
                 <rect x="250" y="524" width="200" height="28" rx="6" fill="var(--accent-warm-bg)" stroke="var(--accent-warm)" stroke-width="1.2"/>
-                <text x="350" y="542" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent-warm)">Patience &rarr; boredom &rarr; full reset</text>
+                <text x="350" y="542" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent-warm)">Patience R/M &rarr; per-domain Poisson regen</text>
 
                 <!-- Jump -->
                 <rect x="480" y="524" width="160" height="28" rx="6" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.2"/>
-                <text x="560" y="542" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent)">Jump % &rarr; octave toggle</text>
+                <text x="560" y="542" text-anchor="middle" class="sch-text-label" font-size="10" fill="var(--accent)">Jump % &rarr; &plusmn;octave walk</text>
 
                 <!-- CV Routing -->
                 <rect x="670" y="524" width="180" height="28" rx="6" fill="#e8effc" stroke="#1d4ed8" stroke-width="1.2"/>
@@ -472,7 +473,7 @@
                 <path class="sch-arrow" d="M370,80 L410,80" />
 
                 <rect class="sch-block" x="410" y="60" width="90" height="40" />
-                <text x="455" y="84" text-anchor="middle" class="sch-text">4. Density Gate</text>
+                <text x="455" y="84" text-anchor="middle" class="sch-text">4. Mask + Steps</text>
 
                 <path class="sch-arrow" d="M500,80 L540,80" />
 
@@ -638,168 +639,31 @@
             probability. A value of <code>-1</code> excludes that degree entirely.
         </p>
 
-        <h3>3.3 &middot; Complexity, Contour &amp; Linearity</h3>
+        <h3>3.3 &middot; Complexity, Contour &amp; Repeat</h3>
 
-        <div class="fig">
-            <svg viewBox="0 0 710 470" xmlns="http://www.w3.org/2000/svg">
-                <text x="355" y="22" text-anchor="middle" font-family="Inter" font-size="14" font-weight="700" fill="#1a1a18">Pitch Modifiers &mdash; Visual Behavior</text>
+        <p>
+            Three knobs reshape the per-step pitch probability after the degree tickets are weighed:
+        </p>
+        <ul>
+            <li><strong>Complexity</strong> &mdash; triangle kernel around the last played degree.
+                Low values keep the next pick close to where you just were (tight melodic focus);
+                high values let it leap freely across the scale. Width is symmetric around the last
+                degree and the kernel is multiplied 10&times; against the leakage floor so the
+                center always wins at small knob values (no integer-truncation cliff).</li>
+            <li><strong>Contour</strong> (-100&ndash;+100) &mdash; <em>directional drift</em>. Each
+                fired step nudges the kernel's center by a small offset along the contour direction;
+                positive Contour walks upward, negative walks downward. Drift is capped to the
+                kernel width so it cannot run away in large scales.</li>
+            <li><strong>Repeat</strong> (0&ndash;100) &mdash; Bernoulli per-event chance to <em>bypass
+                generation entirely</em> and replay the last emitted event verbatim. Works in both
+                Loop and Live mode. Freezes/clusters at the playback layer. Lives in the
+                <code>_linearity</code> model slot for serialization stability.</li>
+        </ul>
 
-                <!-- ============================================================ -->
-                <!-- COMPLEXITY -->
-                <!-- ============================================================ -->
-                <rect class="sch-block" x="12" y="46" width="686" height="126" />
-                <text x="48" y="68" class="sch-text-accent" font-size="13">Complexity (active when &lt; 50)</text>
-                <text x="220" y="68" class="sch-text-label" font-size="11">Reduces probability of notes far from the last played note</text>
-
-                <!-- Before - after bars -->
-                <text x="30" y="94" class="sch-text-label" font-size="11" fill="var(--text-muted)">Before:</text>
-                <g transform="translate(30, 100)">
-                    <rect x="0" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="24" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="48" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="72" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="96" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.8"/>
-                    <rect x="120" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="144" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="168" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="192" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <text x="0" y="54" class="sch-text-small">deg 0</text>
-                    <text x="24" y="54" class="sch-text-small">1</text>
-                    <text x="48" y="54" class="sch-text-small">2</text>
-                    <text x="96" y="54" class="sch-text-small">4</text>
-                    <text x="168" y="54" class="sch-text-small">8</text>
-                    <text x="192" y="54" class="sch-text-small">9</text>
-                </g>
-                <!-- Arrow -->
-                <path d="M260,120 L300,120" stroke="var(--accent-red)" stroke-width="2" marker-end="url(#arrowhead-red)" fill="none"/>
-                <!-- Last note label -->
-                <text x="280" y="96" text-anchor="middle" class="sch-text-label" fill="var(--accent-red)">last=4</text>
-
-                <!-- After -->
-                <text x="315" y="94" class="sch-text-label" font-size="11" fill="var(--text-muted)">After (cplx=20, threshold=1+2=3):</text>
-                <g transform="translate(315, 100)">
-                    <!-- Far degrees slashed -->
-                    <rect x="0" y="0" width="20" height="10" rx="3" fill="var(--accent-red)" opacity="0.5"/>
-                    <rect x="24" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="48" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="72" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="96" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.8"/>
-                    <rect x="120" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="144" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="168" y="0" width="20" height="40" rx="3" fill="var(--accent)" opacity="0.7"/>
-                    <rect x="192" y="0" width="20" height="10" rx="3" fill="var(--accent-red)" opacity="0.5"/>
-                    <!-- x marks over slashed -->
-                    <text x="6" y="22" font-family="JetBrains Mono" font-size="14" fill="var(--accent-red)" font-weight="700">x</text>
-                    <text x="198" y="22" font-family="JetBrains Mono" font-size="14" fill="var(--accent-red)" font-weight="700">x</text>
-                </g>
-                <text x="600" y="130" class="sch-text-small" fill="var(--text-muted)">Degrees beyond threshold are unlikely</text>
-
-                <!-- Complexity slider indicator -->
-                <g transform="translate(30, 156)">
-                    <rect x="0" y="0" width="200" height="8" rx="4" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1"/>
-                    <rect x="0" y="0" width="40" height="8" rx="4" fill="var(--accent)" opacity="0.7"/>
-                    <text x="8" y="20" class="sch-text-small" fill="var(--accent)">Low</text>
-                    <text x="80" y="20" class="sch-text-small" fill="var(--text-muted)">tight melodic focus</text>
-                    <text x="178" y="20" class="sch-text-small">50+</text>
-                </g>
-                <text x="30" y="24" class="sch-text-small">0</text>
-                <text x="170" y="24" class="sch-text-small">50</text>
-
-                <!-- ============================================================ -->
-                <!-- CONTOUR -->
-                <!-- ============================================================ -->
-                <rect class="sch-block" x="12" y="190" width="686" height="126" />
-                <text x="48" y="212" class="sch-text-accent" font-size="13">Contour</text>
-                <text x="130" y="212" class="sch-text-label" font-size="11">Slopes the probability ramp: negative = low notes favored, positive = high notes favored</text>
-
-                <!-- Negative contour -->
-                <g transform="translate(30, 226)">
-                    <text x="0" y="0" class="sch-text-label">Contour = -80 (strong low bias):</text>
-                    <rect x="0" y="10" width="200" height="24" rx="4" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1"/>
-                    <rect x="0" y="10" width="200" height="24" rx="4" fill="var(--accent-warm)" opacity="0.5"/>
-                    <text x="10" y="26" class="sch-text-small" fill="var(--accent-warm)">high weight</text>
-                    <text x="150" y="26" class="sch-text-small" fill="var(--accent-warm)">low weight</text>
-                    <!-- triangle arrow -->
-                    <polygon points="100,42 85,50 115,50" fill="var(--accent-warm)" opacity="0.6"/>
-                    <text x="100" y="64" text-anchor="middle" class="sch-text-small" fill="var(--accent-warm)">bias downward</text>
-                </g>
-
-                <!-- Positive contour -->
-                <g transform="translate(370, 226)">
-                    <text x="0" y="0" class="sch-text-label">Contour = +60 (moderate high bias):</text>
-                    <rect x="0" y="10" width="200" height="24" rx="4" fill="var(--bg-secondary)" stroke="var(--border)" stroke-width="1"/>
-                    <rect x="110" y="10" width="90" height="24" rx="4" fill="var(--accent)" opacity="0.5"/>
-                    <text x="10" y="26" class="sch-text-small" fill="var(--text-muted)">low weight</text>
-                    <text x="150" y="26" class="sch-text-small" fill="var(--accent)">high weight</text>
-                    <polygon points="100,42 85,50 115,50" fill="var(--accent)" opacity="0.6"/>
-                    <text x="100" y="64" text-anchor="middle" class="sch-text-small" fill="var(--accent)">bias upward</text>
-                </g>
-
-                <text x="355" y="306" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">The ramp is linear: each degree position is multiplied by (1 + pos &times; contour / 100)</text>
-
-                <!-- ============================================================ -->
-                <!-- LINEARITY -->
-                <!-- ============================================================ -->
-                <rect class="sch-block" x="12" y="334" width="686" height="126" />
-                <text x="48" y="356" class="sch-text-accent" font-size="13">Linearity</text>
-                <text x="128" y="356" class="sch-text-label" font-size="11">Penalty cone radiating from the last note &mdash; farther notes lose more weight</text>
-
-                <!-- Visual cone diagram -->
-                <g transform="translate(30, 368)">
-                    <!-- Degree positions -->
-                    <line x1="0" y1="40" x2="620" y2="40" stroke="var(--border)" stroke-width="1.5"/>
-
-                    <!-- Tick marks for degrees 0-8 -->
-                    <text x="0" y="30" class="sch-text-small">0</text>
-                    <text x="35" y="30" class="sch-text-small">1</text>
-                    <text x="70" y="30" class="sch-text-small">2</text>
-                    <text x="105" y="30" class="sch-text-small">3</text>
-                    <text x="150" y="30" class="sch-text-small" fill="var(--accent)" font-weight="700">4</text>
-                    <text x="185" y="30" class="sch-text-small">5</text>
-                    <text x="220" y="30" class="sch-text-small">6</text>
-                    <text x="255" y="30" class="sch-text-small">7</text>
-                    <text x="290" y="30" class="sch-text-small">8</text>
-
-                    <line x1="0" y1="36" x2="0" y2="44" stroke="var(--border)" stroke-width="1"/>
-                    <line x1="35" y1="36" x2="35" y2="44" stroke="var(--border)" stroke-width="1"/>
-                    <line x1="70" y1="36" x2="70" y2="44" stroke="var(--border)" stroke-width="1"/>
-                    <line x1="105" y1="36" x2="105" y2="44" stroke="var(--border)" stroke-width="1"/>
-                    <line x1="150" y1="30" x2="150" y2="44" stroke="var(--accent)" stroke-width="2"/>
-                    <line x1="185" y1="36" x2="185" y2="44" stroke="var(--border)" stroke-width="1"/>
-                    <line x1="220" y1="36" x2="220" y2="44" stroke="var(--border)" stroke-width="1"/>
-                    <line x1="255" y1="36" x2="255" y2="44" stroke="var(--border)" stroke-width="1"/>
-                    <line x1="290" y1="36" x2="290" y2="44" stroke="var(--border)" stroke-width="1"/>
-
-                    <!-- Last degree highlight -->
-                    <text x="150" y="54" text-anchor="middle" class="sch-text-small" fill="var(--accent)">last degree</text>
-                    <line x1="150" y1="50" x2="150" y2="56" stroke="var(--accent)" stroke-width="2"/>
-
-                    <!-- Penalty cone: triangle radiating from center -->
-                    <polygon points="150,0 0,85 290,85" fill="var(--accent-red)" opacity="0.08"/>
-                    <line x1="150" y1="10" x2="0" y2="80" stroke="var(--accent-red)" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.5"/>
-                    <line x1="150" y1="10" x2="290" y2="80" stroke="var(--accent-red)" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.5"/>
-
-                    <!-- Weight bars showing decay -->
-                    <rect x="4" y="65" width="20" height="15" rx="3" fill="var(--accent-red)" opacity="0.3"/>
-                    <rect x="39" y="55" width="20" height="25" rx="3" fill="var(--accent-red)" opacity="0.35"/>
-                    <rect x="74" y="45" width="20" height="35" rx="3" fill="var(--accent-red)" opacity="0.4"/>
-                    <rect x="109" y="35" width="20" height="45" rx="3" fill="var(--accent-red)" opacity="0.45"/>
-                    <rect x="144" y="62" width="20" height="5" rx="3" fill="var(--accent)" opacity="0.8"/>
-                    <rect x="179" y="35" width="20" height="45" rx="3" fill="var(--accent-red)" opacity="0.45"/>
-                    <rect x="214" y="45" width="20" height="35" rx="3" fill="var(--accent-red)" opacity="0.4"/>
-                    <rect x="249" y="55" width="20" height="25" rx="3" fill="var(--accent-red)" opacity="0.35"/>
-                    <rect x="284" y="65" width="20" height="15" rx="3" fill="var(--accent-red)" opacity="0.3"/>
-
-                    <text x="0" y="96" class="sch-text-small" fill="var(--accent-red)">&larr; penalty increases with distance &rarr;</text>
-                </g>
-
-                <!-- Order note -->
-                <text x="355" y="456" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">
-                    Application order: Complexity &rarr; Contour &rarr; Linearity. Final weighted random roll picks the degree.
-                </text>
-            </svg>
-            <div class="fig-caption">Figure 5: Visual behavior of the three pitch modifiers &mdash; how they reshape weight distributions</div>
-        </div>
+        <p class="sch-text-small" style="text-align:center; color:var(--text-muted); margin: 8px 0 20px;">
+            Application order: <strong>tickets &times; Complexity kernel &times; Marbles bell &times; Steps sieve</strong>;
+            Contour drifts the kernel's center between picks; Repeat is a separate bypass.
+        </p>
 
         <h3>3.4 &middot; Mutation &amp; Patience (Evolution System)</h3>
 
@@ -852,9 +716,24 @@
         </div>
 
         <p>
-            <strong>Mutate</strong> replaces one step per cycle. <strong>Patience</strong> controls
-            how many cycles before boredom triggers a full buffer regeneration. When patience is low,
-            patterns reset frequently. When high, patterns persist with only gradual mutation.
+            <strong>Mutate</strong> is bipolar. Positive values <em>permute</em> one event per
+            cycle within the active <code>[first, last]</code> window (Marbles-style swap). Negative
+            values <em>destructively regenerate</em> one event per cycle, treating the existing Loop
+            material as raw clay. Zero holds the buffer.
+        </p>
+
+        <p>
+            <strong>Patience is split per domain</strong>: <code>Patience R</code> independently
+            counts loop cycles for the rhythm domain, <code>Patience M</code> for melody. Each rolls
+            a Poisson-CDF probability per cycle; on success, that domain's loop tape is invalidated
+            and regenerated on the next trigger. Knob 0&ndash;100 maps to &lambda; &isin; [1, 80]
+            linear &mdash; no off sentinel. Track <code>Lock</code> is the proper "freeze" gesture.
+        </p>
+
+        <p>
+            <strong>Ordering matters</strong>: at cycle end, Patience rolls <em>before</em> Mutate.
+            If Patience invalidates a domain, Mutate skips that domain (no wasted writes that audio
+            never observes).
         </p>
 
         <h3>3.5 &middot; Burst System</h3>
@@ -896,380 +775,273 @@
             generate their own.
         </p>
 
-        <h3>3.6 &middot; Density Ranking &amp; Tilt</h3>
+        <h3>3.6 &middot; Mask, Tilt &amp; Steps Sieve</h3>
 
-        <div class="fig">
-            <svg viewBox="0 0 680 200" xmlns="http://www.w3.org/2000/svg">
-                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Density Gate with Negative Tilt</text>
+        <p>
+            Three deterministic filters thin or shape the Loop tape after generation. All three
+            operate on the active playback window <code>[first, last]</code> only &mdash; off-window
+            events are never read by playback, so they don't get "top priority" slots in the rank.
+        </p>
 
-                <!-- Pattern steps -->
-                <line x1="40" y1="60" x2="640" y2="60" stroke="var(--border)" stroke-width="1.5" />
-                <line x1="40" y1="150" x2="640" y2="150" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 4" />
-                <text x="30" y="154" text-anchor="end" class="sch-text-small">Threshold (Density=60)</text>
+        <ul>
+            <li><strong>Mask</strong> (0&ndash;100) &mdash; ranked thinning. Each event in the window
+                receives a rank 0..windowSize-1. The mask passes events whose rank &times; 100 &lt;
+                mask &times; windowSize. Knob 100 = everything plays; knob 0 = nothing plays.</li>
+            <li><strong>Tilt</strong> (-100&ndash;+100) &mdash; <em>duration-aware</em> rank order.
+                Positive Tilt favors long notes (long durations get low ranks &rarr; survive Mask
+                cuts). Negative Tilt favors short notes. Zero is random rank.</li>
+            <li><strong>Steps</strong> (0&ndash;100) &mdash; pitch sieve cutoff. Acts on the
+                degree picker upstream: only the top K of N degrees (ranked by ticket weight) are
+                eligible. Steps = 100 means all degrees survive (no sieve); Steps = 0 collapses to
+                a single degree (the highest-ranked one).</li>
+        </ul>
 
-                <!-- Steps -->
-                <rect x="50" y="30" width="30" height="30" rx="4" fill="var(--accent)" opacity="0.8" />
-                <text x="65" y="48" text-anchor="middle" class="sch-text" fill="white">1</text>
-                <rect x="50" y="140" width="30" height="10" rx="2" fill="var(--accent-red)" opacity="0.5" />
-                <text x="65" y="175" class="sch-text-small" fill="var(--accent-red)">rest</text>
-
-                <rect x="100" y="40" width="30" height="20" rx="4" fill="var(--accent)" opacity="0.6" />
-                <text x="115" y="53" text-anchor="middle" class="sch-text" fill="white">2</text>
-                <rect x="100" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
-                <text x="115" y="175" class="sch-text-small" fill="var(--accent-red)">rest</text>
-
-                <rect x="150" y="20" width="30" height="40" rx="4" fill="var(--accent)" opacity="0.9" />
-                <text x="165" y="43" text-anchor="middle" class="sch-text" fill="white">3</text>
-                <rect x="150" y="130" width="30" height="20" rx="2" fill="var(--accent)" opacity="0.5" />
-
-                <rect x="200" y="45" width="30" height="15" rx="4" fill="var(--accent)" opacity="0.5" />
-                <text x="215" y="55" text-anchor="middle" class="sch-text" fill="white">4</text>
-                <rect x="200" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
-
-                <rect x="250" y="30" width="30" height="30" rx="4" fill="var(--accent)" opacity="0.8" />
-                <text x="265" y="48" text-anchor="middle" class="sch-text" fill="white">5</text>
-                <rect x="250" y="130" width="30" height="20" rx="2" fill="var(--accent)" opacity="0.5" />
-
-                <rect x="300" y="35" width="30" height="25" rx="4" fill="var(--accent)" opacity="0.7" />
-                <text x="315" y="51" text-anchor="middle" class="sch-text" fill="white">6</text>
-                <rect x="300" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
-
-                <rect x="350" y="45" width="30" height="15" rx="4" fill="var(--accent)" opacity="0.5" />
-                <text x="365" y="55" text-anchor="middle" class="sch-text" fill="white">7</text>
-                <rect x="350" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
-
-                <rect x="400" y="25" width="30" height="35" rx="4" fill="var(--accent)" opacity="0.85" />
-                <text x="415" y="46" text-anchor="middle" class="sch-text" fill="white">8</text>
-                <rect x="400" y="130" width="30" height="20" rx="2" fill="var(--accent)" opacity="0.5" />
-
-                <rect x="450" y="40" width="30" height="20" rx="4" fill="var(--accent)" opacity="0.6" />
-                <text x="465" y="53" text-anchor="middle" class="sch-text" fill="white">9</text>
-                <rect x="450" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
-
-                <rect x="500" y="50" width="30" height="10" rx="4" fill="var(--accent-red)" opacity="0.4" />
-                <text x="515" y="58" text-anchor="middle" class="sch-text" fill="white">10</text>
-                <rect x="500" y="145" width="30" height="5" rx="2" fill="var(--accent-red)" opacity="0.5" />
-
-                <text x="340" y="192" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">Negative tilt = earlier steps denser (more likely to pass). Positive = later steps denser.</text>
-            </svg>
-            <div class="fig-caption">Figure 8: Density gate with Tilt biasing rhythm toward early steps</div>
-        </div>
+        <p class="sch-text-small" style="color:var(--text-muted);">
+            Note: the legacy <code>Density</code> knob has been repurposed as
+            <strong>Gate Length</strong> spread (see 3.9). The current sieve role lives on
+            <strong>Steps</strong>; the current rank-thinner role lives on <strong>Mask</strong>.
+        </p>
 
         <h3>3.7 &middot; Jump Register &amp; Lock</h3>
 
         <p>
-            <strong>Jump</strong> probability fires at cycle end, toggling an octave register between
-            -1, 0, and +1 &mdash; creating sudden transposition shifts. <strong>Lock</strong> freezes
-            the entire evaluated pattern (all pitches, gates, children) so it plays back identically
-            every cycle.
+            <strong>Jump</strong> probability fires at the end of each pattern cycle (Bernoulli
+            against the knob). On success, an internal <em>jump register</em> walks &plusmn;1
+            octave (Proteus-style), reflected at &plusmn;2 octaves. The register is applied as a
+            playback transposition only &mdash; stored events are never modified, so turning Jump
+            off snaps the sequence back to its captured pitches.
         </p>
 
-        <!-- ================================================================ -->
-        <!-- 4. PAGE NAVIGATION -->
-        <!-- ================================================================ -->
+        <p>
+            <strong>Lock</strong> freezes the evaluated pattern (all pitches, gates, children, slide
+            flags) so it plays back identically every cycle. Useful for capturing a "happy accident".
+            Lock is a track-level setting on the Config page.
+        </p>
+
+        <h3>3.8 &middot; Marbles Bell &amp; Steps Sieve (Pitch Picker)</h3>
+
+        <p>
+            The pitch picker is a four-stage product applied per non-rest event:
+        </p>
+        <ol>
+            <li><strong>Degree tickets</strong> &mdash; per-degree base weight (0&ndash;100), edited
+                on the Pitch page.</li>
+            <li><strong>Complexity kernel</strong> &mdash; triangle around the last picked degree,
+                width modulated by knob.</li>
+            <li><strong>Marbles bell</strong> &mdash; gaussian envelope across scale degrees centered
+                on Bias (0&ndash;100 = low-to-high) with width Spread (0&ndash;100). Tight Spread =
+                fixed register; wide Spread = full scale.</li>
+            <li><strong>Steps sieve</strong> &mdash; rank cutoff that keeps only the top K of N
+                degrees by post-product weight. K = ceil(N &times; steps / 100).</li>
+        </ol>
+        <p>
+            Whichever degree survives all four stages is emitted; if Steps collapses to a single
+            degree, the picker becomes deterministic for that pool.
+        </p>
+
+        <h3>3.9 &middot; Gate Length Spread</h3>
+
+        <p>
+            <strong>Gate Length</strong> (0&ndash;100, formerly the <code>Density</code> slot) is a
+            triangle distribution width for per-event gate length. Knob 0 = exactly 50% of the
+            duration. Higher values spread the picked gate length symmetrically around 50%
+            (still floored to a minimum audible width). Each event picks its own gate length at
+            trigger time. Lives on the LIVE page at step 13.
+        </p>
+
         <h2 id="navigation">4 &middot; Page Navigation</h2>
 
-        <div class="fig">
-            <svg viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg">
-                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Page Hierarchy</text>
+        <p>
+            Stochastic editing is split between <strong>hero pages</strong> (live performance
+            surfaces driven by step buttons + encoder + footer Fn keys) and <strong>ticket pages</strong>
+            (per-degree / per-duration weight editors). All pages share the same Track / Pattern /
+            Routing infrastructure as other track types.
+        </p>
 
-                <!-- Top: Track Select -->
-                <rect class="sch-block" x="220" y="50" width="240" height="36" rx="18" ry="18" />
-                <text x="340" y="72" text-anchor="middle" class="sch-text" font-size="12">Select Stochastic Track</text>
+        <table class="param-table">
+            <tr><th>Page</th><th>Access</th><th>Purpose</th></tr>
+            <tr><td>LIVE</td><td>Default for Stochastic tracks</td><td>16-button performance grid for every per-event control, with a centered walker visualization driven by real engine events.</td></tr>
+            <tr><td>LOOP</td><td>NEXT (F5) from LIVE</td><td>Loop window + evolution: Patience R/M, Mutate, Jump, Sleep, First/Last/Size/Rotate, Mask + Tilt.</td></tr>
+            <tr><td>PITCH</td><td>NEXT (F5) from LOOP, or <kbd>EDIT</kbd></td><td>Per-degree ticket bar editor (DROT, MROT rotations) with LoopM/LiveM + NewM in the footer.</td></tr>
+            <tr><td>DURATION</td><td>NEXT (F5) from PITCH</td><td>Per-slot duration ticket editor (8 LUT slots) with always-visible Rest readout and LoopR/LiveR + NewR in the footer.</td></tr>
+            <tr><td>STOCH CFG</td><td><kbd>CONFIG</kbd></td><td>Track-level: Lock, Divisor, ClockMult, Scale, RootNote, Octave, Transpose, SlideTime, FillMode.</td></tr>
+            <tr><td>Routing</td><td><kbd>ROUTES</kbd></td><td>CV modulation for routable knobs.</td></tr>
+            <tr><td>Pattern</td><td><kbd>PATTERN</kbd></td><td>Active pattern selection.</td></tr>
+        </table>
 
-                <!-- Arrows down -->
-                <path class="sch-arrow" d="M300,86 L300,110" />
-                <path class="sch-arrow" d="M340,86 L340,110" />
-                <path class="sch-arrow" d="M380,86 L380,110" />
+        <p>
+            F5 NEXT cycles Live &rarr; Loop &rarr; Pitch &rarr; Duration &rarr; Live. The legacy
+            CORE and MARBLES summary pages were retired &mdash; their parameters live on LIVE
+            (Rest, Complexity) and the Marbles bell (Bias/Spread/Steps) is now reached from LIVE
+            step buttons 10/11 and the PITCH ticket editor's Steps overlay.
+        </p>
 
-                <!-- Three pages -->
-                <rect class="sch-block-accent" x="140" y="110" width="180" height="50" />
-                <text x="230" y="132" text-anchor="middle" class="sch-text-accent">STOCH</text>
-                <text x="230" y="148" text-anchor="middle" class="sch-text-label">Performance Page</text>
-
-                <rect class="sch-block" x="340" y="110" width="180" height="50" />
-                <text x="430" y="132" text-anchor="middle" class="sch-text">STOCH CFG</text>
-                <text x="430" y="148" text-anchor="middle" class="sch-text-label">Config Page [CONFIG]</text>
-
-                <rect class="sch-block-warm" x="480" y="110" width="160" height="50" />
-                <text x="560" y="132" text-anchor="middle" class="sch-text" fill="var(--accent-warm)">TICKETS</text>
-                <text x="560" y="148" text-anchor="middle" class="sch-text-label">Edit Page [EDIT]</text>
-
-                <!-- Bottom shared pages -->
-                <path class="sch-dash" d="M230,160 L230,190 L120,190" />
-                <path class="sch-dash" d="M430,160 L430,190 L340,190" />
-                <path class="sch-dash" d="M560,160 L560,190 L400,190" />
-
-                <rect class="sch-block-blue" x="80" y="190" width="160" height="36" rx="6" ry="6" />
-                <text x="160" y="213" text-anchor="middle" class="sch-text" fill="var(--accent-blue)">Routing</text>
-
-                <rect class="sch-block" x="280" y="190" width="140" height="36" rx="6" ry="6" />
-                <text x="350" y="213" text-anchor="middle" class="sch-text">Pattern Select</text>
-
-                <rect class="sch-block-blue" x="460" y="190" width="160" height="36" rx="6" ry="6" />
-                <text x="540" y="213" text-anchor="middle" class="sch-text" fill="var(--accent-blue)">Track Page (all tracks)</text>
-
-                <text x="340" y="252" text-anchor="middle" class="sch-text-small" fill="var(--text-muted)">Many parameters on the STOCH page accept CV routing (<span class="routable" style="font-size:9px">R</span>)</text>
-            </svg>
-            <div class="fig-caption">Figure 9: Page navigation map for the Stochastic track</div>
+        <div class="callout">
+            <strong>Hero page convention.</strong> Press one or more step buttons to focus those
+            parameters &mdash; the top-row Small-font overlay shows the held parameter and its
+            value. Hold multiple steps at once and the overlay reads <code>MANY SELECTED</code>;
+            the encoder edit then applies to every held step.
+            Hold <kbd>Shift</kbd> to latch the selection (persist mode); turn <kbd>Shift</kbd> off
+            to clear it.
+            Hold <kbd>Shift</kbd> while turning the encoder for &times;10 step.
+            Footer Fn row on LIVE / LOOP: <code>Loop/Live R</code>, <code>Loop/Live M</code>,
+            <code>NewR</code>, <code>NewM</code>, <code>NEXT</code>. NewR/NewM are guarded by a
+            double-click confirm. Context menu <code>INIT</code> resets the held steps' params
+            (or all bound slots when nothing is held).
         </div>
 
-        <p>The Stochastic track has three dedicated pages:</p>
+        <!-- ================================================================ -->
+        <!-- 5. HERO PAGES -->
+        <!-- ================================================================ -->
+        <h2 id="hero-pages">5 &middot; Hero Pages</h2>
+
+        <h3>5.1 &middot; LIVE</h3>
+        <p>
+            The default hero page for Stochastic tracks. All 16 step buttons are bound, and a
+            centered <em>walker</em> visualization animates from real engine gate rising edges
+            (horizontal motion = rhythm, vertical motion = pitch from live CV).
+        </p>
+
+        <p>
+            Above the walker, an always-on tiny readout shows every bound parameter in a
+            2-row 8-column grid &mdash; one-letter label + value (<code>D&nbsp;5</code>,
+            <code>V&nbsp;16</code>, <code>R&nbsp;0</code>, etc.). Step 0 (<code>D</code>) shows the
+            actual duration fraction (e.g. <code>1/16</code>, <code>1/8T</code>) from the
+            divisor-aware LUT, not the raw slot index. When a step is held, the row swaps to a
+            Small-font overlay with the full parameter name (<code>DURATION&nbsp;1/16</code>,
+            <code>BURST&nbsp;RATE&nbsp;50</code>, <code>GATE&nbsp;LENGTH&nbsp;0</code>); when more
+            than one step is held the overlay reads <code>MANY&nbsp;SELECTED</code>.
+        </p>
+
         <table class="param-table">
-            <tr><th>Page</th><th>Header</th><th>Access</th><th>Purpose</th></tr>
-            <tr><td>Performance</td><td><kbd>STOCH</kbd></td><td>Select Stochastic track</td><td>All generative parameters, source modes, pattern controls</td></tr>
-            <tr><td>Config</td><td><kbd>STOCH CFG</kbd></td><td><kbd>CONFIG</kbd></td><td>Track settings: lock, clock, scale, octave, fill</td></tr>
-            <tr><td>Tickets</td><td><kbd>STOCHASTIC TICKETS</kbd></td><td><kbd>EDIT</kbd></td><td>Per-degree weighting, rotation</td></tr>
-            <tr><td>Routing</td><td>&mdash;</td><td><kbd>ROUTES</kbd></td><td>CV modulation for routable parameters</td></tr>
-            <tr><td>Pattern</td><td>&mdash;</td><td><kbd>PATTERN</kbd></td><td>Active pattern selection</td></tr>
+            <tr><th>Step</th><th>Tiny label</th><th>Param</th><th>Range</th><th>LED</th><th>Description</th></tr>
+            <tr><td>0</td><td>D</td><td>Duration</td><td>0&ndash;7 LUT slot (1/2 &hellip; 1/32)</td><td>red</td><td>Base note duration. Slot 5 = &times;1 (= divisor). Display uses <code>printSlotDuration()</code>.</td></tr>
+            <tr><td>1</td><td>V</td><td>Variation</td><td>0&ndash;100</td><td>red</td><td>Triangle-kernel spread around the Duration slot.</td></tr>
+            <tr><td>2</td><td>R</td><td>Rest</td><td>0&ndash;100</td><td>red</td><td>Per-event rest Bernoulli.</td></tr>
+            <tr><td>3</td><td>N</td><td>Range</td><td>1&ndash;4 oct</td><td>red</td><td>Pitch range in octaves.</td></tr>
+            <tr><td>4</td><td>B</td><td>Burst</td><td>0&ndash;100</td><td>orange</td><td>Per-event burst probability.</td></tr>
+            <tr><td>5</td><td>C</td><td>Burst Count</td><td>0&ndash;100</td><td>orange</td><td>Max children per burst (LUT bias).</td></tr>
+            <tr><td>6</td><td>T</td><td>Burst Rate</td><td>0&ndash;100</td><td>orange</td><td>Child spacing within the parent.</td></tr>
+            <tr><td>7</td><td>P</td><td>Burst Pitch</td><td>Parent / Gen</td><td>orange</td><td>Inherit parent pitch, or generate per child.</td></tr>
+            <tr><td>8</td><td>X</td><td>Complexity</td><td>0&ndash;100</td><td>green</td><td>Pitch kernel width.</td></tr>
+            <tr><td>9</td><td>O</td><td>Contour</td><td>-100&ndash;+100</td><td>green</td><td>Directional drift of the kernel center.</td></tr>
+            <tr><td>10</td><td>I</td><td>Bias</td><td>0&ndash;100</td><td>green</td><td>Marbles bell center across the scale.</td></tr>
+            <tr><td>11</td><td>S</td><td>Spread</td><td>0&ndash;100</td><td>green</td><td>Marbles bell width.</td></tr>
+            <tr><td>12</td><td>E</td><td>Repeat</td><td>0&ndash;100</td><td>green</td><td>Per-event chance to replay the last event verbatim.</td></tr>
+            <tr><td>13</td><td>G</td><td>Gate Length</td><td>0&ndash;100</td><td>red</td><td>Per-event gate length triangle spread (around 50% of duration).</td></tr>
+            <tr><td>14</td><td>L</td><td>Slide</td><td>0&ndash;100</td><td>red</td><td>Per-event slide (portamento) probability.</td></tr>
+            <tr><td>15</td><td>A</td><td>Legato</td><td>0&ndash;100</td><td>red</td><td>Per-event legato (gate tie) probability.</td></tr>
+        </table>
+
+        <h3>5.2 &middot; LOOP</h3>
+        <p>
+            Loop window + evolution controls. The Loop page is where you decide how a Loop-mode
+            buffer evolves over time and how the active playback window is shaped.
+        </p>
+        <table class="param-table">
+            <tr><th>Step</th><th>Param</th><th>Range</th><th>LED</th><th>Description</th></tr>
+            <tr><td>0</td><td>Patience R</td><td>0&ndash;100</td><td>red</td><td>Rhythm-domain Poisson regenerate probability per cycle.</td></tr>
+            <tr><td>1</td><td>Patience M</td><td>0&ndash;100</td><td>red</td><td>Melody-domain Poisson regenerate probability per cycle.</td></tr>
+            <tr><td>2</td><td>Mutate</td><td>-100&ndash;+100</td><td>red</td><td>Bipolar. Positive = permute one event (Marbles-style swap). Negative = destructively regenerate one event.</td></tr>
+            <tr><td>3</td><td>Jump</td><td>0&ndash;100</td><td>red</td><td>End-of-cycle octave-walk probability.</td></tr>
+            <tr><td>4</td><td>Sleep</td><td>0&ndash;100</td><td>red</td><td>Skip N cycles after each full loop (knob &times; 4 / 10, rounded).</td></tr>
+            <tr><td>8</td><td>First</td><td>0&ndash;Size-1</td><td>green</td><td>Active window start.</td></tr>
+            <tr><td>9</td><td>Last</td><td>First&ndash;Size-1</td><td>green</td><td>Active window end.</td></tr>
+            <tr><td>10</td><td>Size</td><td>2&ndash;64</td><td>green</td><td>Total pattern buffer size.</td></tr>
+            <tr><td>11</td><td>Rotate</td><td>-Size&ndash;+Size</td><td>green</td><td>Read offset for polyrhythmic phasing.</td></tr>
+            <tr><td>14</td><td>Mask</td><td>0&ndash;100</td><td>green</td><td>Window-local ranked thinning (% of audible events).</td></tr>
+            <tr><td>15</td><td>Tilt</td><td>-100&ndash;+100</td><td>green</td><td>Duration-aware rank: positive = long notes survive, negative = short notes survive.</td></tr>
+        </table>
+
+        <!-- ================================================================ -->
+        <!-- 6. TICKET PAGES -->
+        <!-- ================================================================ -->
+        <h2 id="ticket-pages">6 &middot; Ticket Pages</h2>
+
+        <p>
+            Two ticket editors live under <kbd>EDIT</kbd>, paged via F5 NEXT: the
+            <strong>Pitch</strong> ticket page (per-degree weights for the current scale) and the
+            <strong>Duration</strong> ticket page (per-slot weights for the 8-slot duration LUT).
+        </p>
+
+        <h3>6.1 &middot; Pitch Tickets</h3>
+        <p>
+            Bar graph of per-degree weights for the current scale (up to 16 degrees per bank;
+            larger scales use left/right banks). The selected degree is highlighted with an
+            underline; the held / focused degree value reads out top-left in Small font.
+            DROT/MROT rotation values display top-right in Tiny font.
+        </p>
+        <table class="param-table">
+            <tr><th>Footer Fn</th><th>Action</th></tr>
+            <tr><td>F1 &mdash; LoopM / LiveM</td><td>Toggle the melody source mode (instant).</td></tr>
+            <tr><td>F2 &mdash; NewM</td><td>Regenerate the melody loop tape. Double-click guarded &mdash; first press shows <em>"Press again to renew melody"</em>; second press fires and toasts <em>"Melody renewed"</em>.</td></tr>
+            <tr><td>F3 &mdash; DROT</td><td>Encoder edits degree rotation. Toggle off (back to Ticket mode) by pressing again.</td></tr>
+            <tr><td>F4 &mdash; MROT</td><td>Encoder edits the exclusion-mask rotation independently of tickets.</td></tr>
+            <tr><td>F5 &mdash; NEXT</td><td>Cycle to DURATION.</td></tr>
+        </table>
+        <p>
+            The default encoder edit (no DROT or MROT focus) is the held degree's ticket count
+            (0&ndash;100, or -1 to exclude that degree entirely).
+        </p>
+
+        <p>Quick-edit (Page + step on ticket pages):</p>
+        <ul>
+            <li><kbd>Page + step 1</kbd> &mdash; INIT (all tickets = 100, rotations = 0)</li>
+            <li><kbd>Page + step 2</kbd> &mdash; EVEN (copy current degree's value to all)</li>
+            <li><kbd>Page + step 3</kbd> &mdash; RAND (random tickets 0&ndash;100)</li>
+        </ul>
+
+        <h3>6.2 &middot; Duration Tickets</h3>
+        <p>
+            8-slot duration weight editor. Slot index corresponds to the LUT entry that drives
+            <code>noteDuration</code> picks (slot 0 = longest, slot 7 = shortest, slot 5 = &times;1 =
+            divisor). Each slot's ticket weight multiplies into the Variation kernel at
+            generation time, so duration tickets are the "tonal" equivalent of pitch tickets for
+            rhythm. Slot labels are generated at runtime from the active divisor (e.g. "1/8" at
+            divisor=1/8).
+        </p>
+        <p>
+            The top-right corner of the page shows the current <strong>Rest %</strong> in Tiny
+            font, always on (the live rest probability never disappears, even when focus is on a
+            duration slot). When focus is switched to Rest via F3, the same value also appears
+            top-left in Small font as the primary readout.
+        </p>
+        <table class="param-table">
+            <tr><th>Footer Fn</th><th>Action</th></tr>
+            <tr><td>F1 &mdash; LoopR / LiveR</td><td>Toggle the rhythm source mode (instant).</td></tr>
+            <tr><td>F2 &mdash; NewR</td><td>Regenerate the rhythm loop tape. Double-click guarded &mdash; first press shows <em>"Press again to renew rhythm"</em>; second press fires and toasts <em>"Rhythm renewed"</em>.</td></tr>
+            <tr><td>F3 &mdash; RST</td><td>Switch encoder focus to Rest probability. Toggle off (back to duration ticket) by pressing again.</td></tr>
+            <tr><td>F5 &mdash; NEXT</td><td>Cycle back to LIVE.</td></tr>
         </table>
 
 
         <!-- ================================================================ -->
-        <!-- 5. UI LEVELS -->
+        <!-- 7. CONFIG PAGE -->
         <!-- ================================================================ -->
-        <h2 id="ui-levels">5 &middot; UI Levels (Core/Direct/Weights)</h2>
+        <h2 id="config-page">7 &middot; STOCH CFG &mdash; Config Page</h2>
 
         <p>
-            The <kbd>Level</kbd> parameter at the top of the <kbd>STOCH</kbd> page toggles between three
-            tiers of complexity, hiding or revealing parameters based on your workflow.
+            The <kbd>STOCH CFG</kbd> page exposes track-level parameters accessed via <kbd>CONFIG</kbd>.
+            These belong to the track (not the pattern), so they survive pattern switches.
         </p>
 
-        <h3>5.1 &middot; Level: Core</h3>
-        <p>
-            Focused on immediate generative music. Parameters are "macro" oriented, combining multiple
-            internal controls (e.g., <code>Character</code> affects complexity, contour, and linearity).
-            Source modes for rhythm and melody are coupled into a single <code>Mode</code> parameter.
-        </p>
-
-        <h3>5.2 &middot; Level: Direct</h3>
-        <p>
-            Uncouples the rhythm and melody source modes. Reveals individual shaping controls like
-            <code>Complexity</code> and <code>Contour</code>. Adds direct probability controls for
-            <code>Slide</code>, <code>Legato</code>, and <code>Accent</code>.
-        </p>
-
-        <h3>5.3 &middot; Level: Weights</h3>
-        <p>
-            Reveals the full deterministic evolution engine. Adds <code>Mask</code> (ranked thinning),
-            <code>Tilt</code>, <code>Sleep</code>, <code>Mutate</code>, and <code>Jump</code>.
-            Ideal for precise algorithmic programming.
-        </p>
-
-
-        <!-- ================================================================ -->
-        <!-- 6. STOCH PAGE -->
-        <!-- ================================================================ -->
-        <h2 id="stoch-page">6 &middot; STOCH &mdash; Performance Page</h2>
-
-        <p>
-            The <kbd>STOCH</kbd> page is a list-based interface exposing all generative parameters
-            for the current pattern. Navigate rows with the encoder, edit values by turning.
-        </p>
-
-        <h3>5.1 &middot; Source Mode</h3>
-        <table class="param-table">
-            <tr><th>Parameter</th><th>Range</th><th>Description</th></tr>
-            <tr><td>Rhythm</td><td>Loop / Live</td><td>Source mode for rhythm domain</td></tr>
-            <tr><td>Melody</td><td>Loop / Live</td><td>Source mode for melody domain</td></tr>
-        </table>
-
-        <div class="callout blue"><strong>Pro tip:</strong> Loop rhythm + Live melody = stable rhythm with ever-changing melody.</div>
-
-        <h3>5.2 &middot; Melody Shaping</h3>
         <table class="param-table">
             <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
-            <tr><td>Complexity</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Interval jump penalty (below 50 limits large jumps)</td></tr>
-            <tr><td>Contour</td><td>-100&ndash;+100</td><td><span class="routable">R</span></td><td>Pitch bias: negative=low, positive=high</td></tr>
-            <tr><td>Linearity</td><td>0&ndash;100</td><td>&mdash;</td><td>Penalizes repeating the same note</td></tr>
-            <tr><td>Range</td><td>1&ndash;4 Oct</td><td>&mdash;</td><td>Number of octaves melody spans</td></tr>
-            <tr><td>Low Degree</td><td>0&ndash;127</td><td>&mdash;</td><td>Minimum absolute degree</td></tr>
-            <tr><td>High Degree</td><td>0&ndash;127</td><td>&mdash;</td><td>Maximum absolute degree</td></tr>
+            <tr><td>Lock</td><td>On / Off</td><td>&mdash;</td><td>Freeze the evaluated pattern (all pitches, gates, children).</td></tr>
+            <tr><td>Play Mode</td><td>Aligned / Free</td><td>&mdash;</td><td>Clock alignment mode (currently runtime exposes the field but timing is fixed to Aligned semantics &mdash; under review).</td></tr>
+            <tr><td>Divisor</td><td>Divisor values</td><td>&mdash;</td><td>Pattern clock division.</td></tr>
+            <tr><td>Clock Mult</td><td>Multiplier</td><td><span class="routable">R</span></td><td>Per-track clock multiplier.</td></tr>
+            <tr><td>Reset Measure</td><td>0&ndash;128</td><td>&mdash;</td><td>Auto-reset interval in measures (0 = off).</td></tr>
+            <tr><td>Scale</td><td>Default &middot; all scales</td><td>&mdash;</td><td>Pattern scale (Default = project scale).</td></tr>
+            <tr><td>Root Note</td><td>Default, C&ndash;B</td><td>&mdash;</td><td>Scale root.</td></tr>
+            <tr><td>Octave</td><td>-10&ndash;+10</td><td><span class="routable">R</span></td><td>Global octave transposition.</td></tr>
+            <tr><td>Transpose</td><td>-100&ndash;+100</td><td><span class="routable">R</span></td><td>Semitone offset.</td></tr>
+            <tr><td>CV Update</td><td>Gate / Always</td><td>&mdash;</td><td>Update CV on rests too, or only when a gate fires.</td></tr>
+            <tr><td>Slide Time</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Portamento glide time.</td></tr>
+            <tr><td>Fill Mode</td><td>None / Gates / Next Pattern / Condition</td><td>&mdash;</td><td>Fill behavior (currently exposed but engine usage is under review).</td></tr>
+            <tr><td>Fill Muted</td><td>Yes / No</td><td>&mdash;</td><td>Play fills when muted.</td></tr>
         </table>
 
-        <h3>5.3 &middot; Marbles Distribution</h3>
-        <table class="param-table">
-            <tr><th>Parameter</th><th>Range</th><th>Description</th></tr>
-            <tr><td>Shape</td><td>Off / On</td><td>Toggle beta distribution for pitch selection</td></tr>
-            <tr><td>Spread</td><td>0&ndash;100</td><td>0 = tight/repetitive, 100 = wide/varied</td></tr>
-            <tr><td>Bias</td><td>0&ndash;100</td><td>Distribution center offset</td></tr>
-            <tr><td>Steps</td><td>1&ndash;100</td><td>Discrete positions in distribution</td></tr>
-        </table>
-
-        <h3>5.4 &middot; Rhythm &amp; Timing</h3>
-        <table class="param-table">
-            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
-            <tr><td>Rate</td><td>1&ndash;400</td><td><span class="routable">R</span></td><td>Base note duration (higher = shorter)</td></tr>
-            <tr><td>Variation</td><td>-100&ndash;+100</td><td><span class="routable">R</span></td><td>Doubles (+) or halves (-) duration</td></tr>
-            <tr><td>Rest</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Rest probability per step</td></tr>
-            <tr><td>Density</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Gate density threshold</td></tr>
-            <tr><td>Tilt</td><td>-100&ndash;+100</td><td><span class="routable">R</span></td><td>Density gradient across pattern</td></tr>
-            <tr><td>Slide Prob</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Portamento probability</td></tr>
-            <tr><td>Legato</td><td>0&ndash;100</td><td>&mdash;</td><td>Gate tie probability</td></tr>
-            <tr><td>Accent</td><td>0&ndash;100</td><td>&mdash;</td><td>Accent output probability</td></tr>
-        </table>
-
-        <h3>5.5 &middot; Burst</h3>
-        <table class="param-table">
-            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
-            <tr><td>Burst</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Burst probability per step</td></tr>
-            <tr><td>Burst Count</td><td>0&ndash;100</td><td>&mdash;</td><td>Number of children (scaled 1&ndash;4)</td></tr>
-            <tr><td>Burst Rate</td><td>0&ndash;100</td><td>&mdash;</td><td>Spacing within parent duration</td></tr>
-            <tr><td>Burst Pitch</td><td>Parent / Gen</td><td>&mdash;</td><td>Parent = inherit / Gen = independent</td></tr>
-        </table>
-
-        <h3>5.6 &middot; Evolution</h3>
-        <table class="param-table">
-            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
-            <tr><td>Sleep</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Cycles to pause after each full cycle</td></tr>
-            <tr><td>Patience</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Cycles before boredom reset (100=never)</td></tr>
-            <tr><td>Mutate</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Single-step replacement probability</td></tr>
-            <tr><td>Jump</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Octave transposition toggle probability</td></tr>
-        </table>
-
-        <h3>5.7 &middot; Pattern Controls</h3>
-        <table class="param-table">
-            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
-            <tr><td>Size</td><td>2&ndash;64</td><td>&mdash;</td><td>Active steps in pattern buffer (default 16)</td></tr>
-            <tr><td>First / Last</td><td>1&ndash;Size</td><td>&mdash;</td><td>Loop boundaries within the pattern</td></tr>
-            <tr><td>Rotate</td><td>-64&ndash;+64</td><td><span class="routable">R</span></td><td>Read offset for polyrhythmic phasing</td></tr>
-        </table>
-
-
-        <!-- ================================================================ -->
-        <!-- 6. STOCH CFG PAGE -->
-        <!-- ================================================================ -->
-        <h2 id="config-page">6 &middot; STOCH CFG &mdash; Config Page</h2>
-
-        <p>
-            The <kbd>STOCH CFG</kbd> page exposes track-level and structural parameters accessed via <kbd>CONFIG</kbd>:
-        </p>
-
-        <table class="param-table">
-            <tr><th>Parameter</th><th>Range</th><th>Routable</th><th>Description</th></tr>
-            <tr><td>Lock</td><td>On / Off</td><td>&mdash;</td><td>Freeze evaluated pattern</td></tr>
-            <tr><td>Clock/Div</td><td>Divisor values</td><td>&mdash;</td><td>Pattern clock division</td></tr>
-            <tr><td>Reset Measure</td><td>Off, 1&ndash;128</td><td>&mdash;</td><td>Auto-reset interval in measures</td></tr>
-            <tr><td>Scale</td><td>Default &middot; all scales</td><td>&mdash;</td><td>Pattern scale (default = project)</td></tr>
-            <tr><td>Root Note</td><td>Default, C&ndash;B</td><td>&mdash;</td><td>Scale root note</td></tr>
-            <tr><td>Octave</td><td>-10&ndash;+10</td><td><span class="routable">R</span></td><td>Global octave transposition</td></tr>
-            <tr><td>Transpose</td><td>-100&ndash;+100</td><td><span class="routable">R</span></td><td>Semitone offset</td></tr>
-            <tr><td>CV Update</td><td>Gate / Always</td><td>&mdash;</td><td>When to update CV (rests too?)</td></tr>
-            <tr><td>Slide Time</td><td>0&ndash;100</td><td><span class="routable">R</span></td><td>Portamento glide time</td></tr>
-            <tr><td>Fill Mode</td><td>None / Gates / Next Pattern / Condition</td><td>&mdash;</td><td>Fill behavior</td></tr>
-            <tr><td>Fill Muted</td><td>Yes / No</td><td>&mdash;</td><td>Play fills when muted?</td></tr>
-        </table>
-
-        <!-- ================================================================ -->
-        <!-- 7. TICKETS PAGE -->
-        <!-- ================================================================ -->
-        <h2 id="tickets-page">7 &middot; Degree Ticket Editor</h2>
-
-        <p>
-            The <kbd>STOCHASTIC TICKETS</kbd> page shows a bar-graph of degree weights for the
-            current scale. Press <kbd>EDIT</kbd> from the tracks page to open it.
-        </p>
-
-        <div class="fig">
-            <svg viewBox="0 0 680 220" xmlns="http://www.w3.org/2000/svg">
-                <text x="340" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1a1a18">Tickets Page &mdash; Bar Graph Visualization</text>
-
-                <!-- Simulated 16-degree bar chart -->
-                <g transform="translate(30, 50)">
-                    <rect x="0" y="0" width="30" height="90" rx="3" fill="var(--accent)" opacity="0.85" />
-                    <text x="15" y="-4" text-anchor="middle" class="sch-text" fill="var(--accent)">90</text>
-                    <text x="15" y="108" text-anchor="middle" class="sch-text-small">1</text>
-
-                    <rect x="35" y="50" width="28" height="40" rx="3" fill="var(--accent)" opacity="0.6" />
-                    <text x="49" y="46" text-anchor="middle" class="sch-text-label">40</text>
-                    <text x="49" y="108" text-anchor="middle" class="sch-text-small">2</text>
-
-                    <rect x="68" y="20" width="28" height="70" rx="3" fill="var(--accent)" opacity="0.75" />
-                    <text x="82" y="16" text-anchor="middle" class="sch-text" fill="var(--accent)">70</text>
-                    <text x="82" y="108" text-anchor="middle" class="sch-text-small">3</text>
-
-                    <rect x="101" y="70" width="28" height="20" rx="3" fill="var(--accent)" opacity="0.4" />
-                    <text x="115" y="66" text-anchor="middle" class="sch-text-label">20</text>
-                    <text x="115" y="108" text-anchor="middle" class="sch-text-small">4</text>
-
-                    <rect x="134" y="0" width="28" height="90" rx="3" fill="var(--accent)" opacity="0.85" />
-                    <text x="148" y="-4" text-anchor="middle" class="sch-text" fill="var(--accent)">90</text>
-                    <text x="148" y="108" text-anchor="middle" class="sch-text-small">5</text>
-
-                    <rect x="167" y="60" width="28" height="30" rx="3" fill="var(--accent)" opacity="0.45" />
-                    <text x="181" y="56" text-anchor="middle" class="sch-text-label">30</text>
-                    <text x="181" y="108" text-anchor="middle" class="sch-text-small">6</text>
-
-                    <rect x="200" y="75" width="28" height="15" rx="3" fill="var(--accent)" opacity="0.3" />
-                    <text x="214" y="71" text-anchor="middle" class="sch-text-label">15</text>
-                    <text x="214" y="108" text-anchor="middle" class="sch-text-small">7</text>
-
-                    <rect x="233" y="40" width="28" height="50" rx="3" fill="var(--accent)" opacity="0.65" />
-                    <text x="247" y="36" text-anchor="middle" class="sch-text-label">50</text>
-                    <text x="247" y="108" text-anchor="middle" class="sch-text-small">8</text>
-
-                    <rect x="266" y="60" width="28" height="30" rx="3" fill="var(--accent)" opacity="0.45" />
-                    <text x="280" y="56" text-anchor="middle" class="sch-text-label">30</text>
-                    <text x="280" y="108" text-anchor="middle" class="sch-text-small">9</text>
-
-                    <rect x="299" y="30" width="28" height="60" rx="3" fill="var(--accent)" opacity="0.7" />
-                    <text x="313" y="26" text-anchor="middle" class="sch-text" fill="var(--accent)">60</text>
-                    <text x="313" y="108" text-anchor="middle" class="sch-text-small">10</text>
-
-                    <rect x="332" y="85" width="28" height="5" rx="3" fill="var(--accent-red)" opacity="0.4" />
-                    <text x="346" y="82" text-anchor="middle" class="sch-text-label" fill="var(--accent-red)">-1</text>
-                    <line x1="332" y1="88" x2="360" y2="88" stroke="var(--accent-red)" stroke-width="1.5" />
-                    <text x="346" y="108" text-anchor="middle" class="sch-text-small">11</text>
-
-                    <rect x="365" y="55" width="28" height="35" rx="3" fill="var(--accent)" opacity="0.55" />
-                    <text x="379" y="51" text-anchor="middle" class="sch-text-label">35</text>
-                    <text x="379" y="108" text-anchor="middle" class="sch-text-small">12</text>
-
-                    <rect x="398" y="20" width="28" height="70" rx="3" fill="var(--accent)" opacity="0.75" />
-                    <text x="412" y="16" text-anchor="middle" class="sch-text" fill="var(--accent)">70</text>
-                    <text x="412" y="108" text-anchor="middle" class="sch-text-small">13</text>
-
-                    <rect x="431" y="60" width="28" height="30" rx="3" fill="var(--accent)" opacity="0.45" />
-                    <text x="445" y="56" text-anchor="middle" class="sch-text-label">30</text>
-                    <text x="445" y="108" text-anchor="middle" class="sch-text-small">14</text>
-
-                    <rect x="464" y="55" width="28" height="35" rx="3" fill="var(--accent)" opacity="0.55" />
-                    <text x="478" y="51" text-anchor="middle" class="sch-text-label">35</text>
-                    <text x="478" y="108" text-anchor="middle" class="sch-text-small">15</text>
-
-                    <rect x="497" y="70" width="28" height="20" rx="3" fill="var(--accent)" opacity="0.4" />
-                    <text x="511" y="66" text-anchor="middle" class="sch-text-label">20</text>
-                    <text x="511" y="108" text-anchor="middle" class="sch-text-small">16</text>
-                </g>
-
-                <!-- Footer controls -->
-                <rect x="30" y="145" width="620" height="50" rx="8" fill="var(--bg-card)" stroke="var(--border)" stroke-width="1" />
-                <text x="340" y="164" text-anchor="middle" class="sch-text">Footer: TIX (tickets) | DROT (degree rotation) | MROT (mask rotation)</text>
-                <text x="340" y="183" text-anchor="middle" class="sch-text-small">Context menu: INIT | EVEN (copy current to all) | RAND (randomize)</text>
-            </svg>
-            <div class="fig-caption">Figure 10: Tickets page showing degree weights. Highlighted bar = selected degree with underline.</div>
-        </div>
-
-        <h3>7.1 &middot; Edit Modes</h3>
-        <table class="param-table">
-            <tr><th>Mode</th><th>Description</th></tr>
-            <tr><td>TIX</td><td>Adjust selected degree's ticket count (0&ndash;100, -1 = exclude)</td></tr>
-            <tr><td>DROT</td><td>Rotate ticket assignments across degree indices</td></tr>
-            <tr><td>MROT</td><td>Rotate exclusion mask independently of tickets</td></tr>
-        </table>
-
-        <h3>7.2 &middot; Context Menu Actions</h3>
-        <table class="param-table">
-            <tr><th>Action</th><th>Effect</th></tr>
-            <tr><td>INIT</td><td>Reset all tickets to 100, rotations to 0</td></tr>
-            <tr><td>EVEN</td><td>Copy current degree's value to all degrees</td></tr>
-            <tr><td>RAND</td><td>Assign random ticket values (0&ndash;100)</td></tr>
-        </table>
-
-
-        <!-- ================================================================ -->
-        <!-- 8. GENERATOR ENGINE -->
-        <!-- ================================================================ -->
         <h2 id="generator">8 &middot; Generator Engine Deep Dive</h2>
 
         <h3>8.1 &middot; Duration Mapping</h3>
@@ -1312,14 +1084,22 @@
                     <text x="581" y="16" text-anchor="middle" class="sch-text-small">Idx 7</text>
                     <text x="581" y="30" text-anchor="middle" class="sch-text-label">1/128</text>
 
-                    <!-- Arrow from Rate -->
-                    <text x="30" y="70" class="sch-text-small">Rate: 1 (longest) &larr;&rarr; 400 (shortest)</text>
-                    <text x="30" y="85" class="sch-text-small">Variation +: doubles duration (creates syncopation)</text>
-                    <text x="30" y="100" class="sch-text-small">Variation -: halves duration</text>
+                    <text x="30" y="70" class="sch-text-small">Duration knob picks one of 8 LUT slots (slot 5 = &times;1 = divisor).</text>
+                    <text x="30" y="85" class="sch-text-small">Variation widens a triangle kernel around the picked slot (0&ndash;100).</text>
+                    <text x="30" y="100" class="sch-text-small">Variation default 16; at 0 every event picks the same slot (deterministic).</text>
                 </g>
             </svg>
-            <div class="fig-caption">Figure 11: Rate maps to 8 duration slots. Variation can double or halve the effective duration.</div>
+            <div class="fig-caption">Figure 11: Duration LUT picker. Variation spreads a triangle kernel around the Bias slot.</div>
         </div>
+
+        <p>
+            Each LUT slot is a duration <em>fraction</em> of the active clock divisor &mdash; not a
+            fixed musical value. The slot labels you see in the Duration ticket editor
+            (e.g. "1/8") are computed at runtime from the active divisor, so changing the
+            divisor automatically retunes the LUT. Per-slot ticket weights (Duration page)
+            multiply into the Variation kernel: a slot with weight 100 is fully eligible; weight
+            0 is muted from the pick.
+        </p>
 
         <h3>8.2 &middot; Domain Independence</h3>
 
@@ -1336,7 +1116,7 @@
                 <text x="185" y="105" text-anchor="middle" class="sch-text-label">mutateRhythm()</text>
                 <rect class="sch-fill-dim" x="235" y="88" width="60" height="26" />
                 <text x="265" y="105" text-anchor="middle" class="sch-text-label">Seed 1</text>
-                <text x="175" y="145" text-anchor="middle" class="sch-text-small">Source events: duration, density rank, rest, legato, accent, burst</text>
+                <text x="175" y="145" text-anchor="middle" class="sch-text-small">Source events: durationIndex, rank (mask/tilt), rest, legato, slide, accent, burst</text>
 
                 <!-- Melody generator -->
                 <rect class="sch-block-blue" x="360" y="50" width="290" height="110" />
@@ -1363,108 +1143,121 @@
         <h3>9.1 &middot; Quick Start</h3>
         <ol>
             <li>Create a track, set mode to <strong>Stochastic</strong>.</li>
-            <li>Open <kbd>STOCH</kbd>. Set Rhythm + Melody to <code>Loop</code>.</li>
-            <li>Set <code>Density</code> to 80, <code>Rest</code> to 10.</li>
-            <li>Set <code>Complexity</code> to 40.</li>
-            <li>Open Tickets, give root + fifth high weights, others low.</li>
-            <li>Press play. The pattern repeats with subtle variation.</li>
+            <li>You start on the LIVE page (default for Stochastic tracks).</li>
+            <li>The footer Fn keys F1/F2 toggle <code>Loop/Live</code> per domain. Leave both on Loop for now.</li>
+            <li>On LIVE, hold step 2 (R = Rest) and turn the encoder to a small value (10&ndash;20). Multi-hold several step buttons to edit them at once; the overlay reads <code>MANY SELECTED</code>.</li>
+            <li>Press F5 to NEXT through to PITCH. Press EDIT to enter ticket editing if you want to weight specific scale degrees.</li>
+            <li>Hit play. The Loop tape generates on the first cycle; subsequent cycles replay it with whatever Patience / Mutate / Sleep evolution you've set.</li>
         </ol>
 
         <h3>9.2 &middot; Slow Mutation</h3>
         <table class="param-table">
             <tr><th>Parameter</th><th>Value</th><th>Effect</th></tr>
-            <tr><td>Mutate</td><td>5&ndash;10</td><td>One step changes every 10&ndash;20 cycles</td></tr>
-            <tr><td>Patience</td><td>80&ndash;90</td><td>Buffer regenerates only after prolonged boredom</td></tr>
-            <tr><td>Jump</td><td>5&ndash;10</td><td>Occasional octave leaps for drama</td></tr>
+            <tr><td>Mutate</td><td>+5 to +15</td><td>One event permuted within the window every few cycles (positive = swap, non-destructive).</td></tr>
+            <tr><td>Patience R / M</td><td>10&ndash;30</td><td>Slow Poisson regeneration per domain; each rolls independently.</td></tr>
+            <tr><td>Jump</td><td>5&ndash;10</td><td>Occasional &plusmn;1-octave walks at cycle end.</td></tr>
         </table>
 
         <h3>9.3 &middot; Chaotic / Live Generation</h3>
         <table class="param-table">
             <tr><th>Parameter</th><th>Value</th><th>Effect</th></tr>
-            <tr><td>Rhythm/Melody</td><td>Live</td><td>Every step is fresh</td></tr>
-            <tr><td>Density</td><td>60&ndash;70</td><td>Moderate gate density</td></tr>
-            <tr><td>Rest</td><td>20&ndash;30</td><td>Good chance of silence</td></tr>
-            <tr><td>Complexity</td><td>70&ndash;100</td><td>Allow large jumps</td></tr>
+            <tr><td>Rhythm / Melody source (F1 / F2)</td><td>Live</td><td>Every event generated fresh at trigger time.</td></tr>
+            <tr><td>Rest</td><td>20&ndash;30</td><td>Sparse output.</td></tr>
+            <tr><td>Complexity</td><td>70&ndash;100</td><td>Wide kernel &mdash; large pitch jumps allowed.</td></tr>
+            <tr><td>Mask</td><td>50&ndash;80</td><td>Window-local thinning to break up the density.</td></tr>
         </table>
 
         <h3>9.4 &middot; Percussion Focus</h3>
         <table class="param-table">
             <tr><th>Parameter</th><th>Value</th><th>Effect</th></tr>
-            <tr><td>Melody</td><td>Fix pitch or 1-note scale</td><td>Pitch is irrelevant</td></tr>
-            <tr><td>Rate</td><td>200+</td><td>Short percussive notes</td></tr>
-            <tr><td>Burst</td><td>30&ndash;50</td><td>Flam-like double hits</td></tr>
-            <tr><td>Accent</td><td>20&ndash;30</td><td>Dynamic accents</td></tr>
+            <tr><td>Melody (F2)</td><td>Lock single degree (set degree tickets to one position)</td><td>Pitch is irrelevant.</td></tr>
+            <tr><td>Duration</td><td>Slot 6 or 7 (1/32 or 1/64)</td><td>Short percussive notes.</td></tr>
+            <tr><td>Burst</td><td>30&ndash;50</td><td>Flam-like double hits.</td></tr>
+            <tr><td>Gate Length</td><td>30+</td><td>Variable gate width for groove.</td></tr>
         </table>
 
         <h3>9.5 &middot; Lock a Happy Accident</h3>
         <p>
-            When a pattern sounds great: open <kbd>STOCH CFG</kbd> and set <code>Lock</code> to <code>On</code>.
-            Every pitch, gate, burst, and slide freezes exactly as-is. Unlock to resume evolution.
+            When the pattern lands somewhere good: <kbd>CONFIG</kbd> &rarr; set <code>Lock</code> to
+            <code>On</code>. Every pitch, gate, slide, and burst child freezes &mdash; further Patience /
+            Mutate rolls are still evaluated but the engine plays the cached evaluated buffer
+            instead. Unlock to resume evolution. (Note: Lock is currently a runtime cache; its
+            persistence is under review &mdash; see <code>docs/stoch-review.md</code>.)
         </p>
 
         <h3>9.6 &middot; Polyrhythmic Phasing</h3>
         <p>
-            Create two Stochastic tracks with similar settings. On the second, set <code>Rotate</code> to +3.
-            The second track reads its buffer shifted by 3 steps, creating polyrhythmic interplay.
+            Create two Stochastic tracks with similar settings. On the second, set
+            <code>Rotate</code> to +3 on the LOOP page. The second track reads its buffer shifted
+            by 3 steps within the active <code>[first, last]</code> window, creating
+            polyrhythmic interplay.
         </p>
 
         <h3>9.7 &middot; External CV Routing</h3>
         <ul>
-            <li>Route an LFO to <code>Density</code> for pulsing intensity.</li>
+            <li>Route an LFO to <code>Mask</code> for pulsing density.</li>
             <li>Route a sequencer lane to <code>Contour</code> for melodic arcs.</li>
             <li>Route random voltage to <code>Mutate</code> for evolution bursts.</li>
-            <li>Route an envelope to <code>Slide Prob</code> for portamento swells.</li>
+            <li>Route an envelope to <code>Slide</code> for portamento swells.</li>
+            <li>Route a slow LFO to <code>Bias</code> for register sweeps under the Marbles bell.</li>
         </ul>
 
-        <!-- ================================================================ -->
-        <!-- 10. PARAMETER REFERENCE -->
-        <!-- ================================================================ -->
         <h2 id="reference">10 &middot; Full Parameter Reference</h2>
 
-        <h3>Performance Page (STOCH)</h3>
+        <h3>Per-sequence (hero pages)</h3>
         <table class="param-table">
-            <tr><th>Parameter</th><th>Range</th><th>Default</th><th>Routable</th></tr>
-            <tr><td>Rhythm Mode</td><td>Loop / Live</td><td>Loop</td><td>&mdash;</td></tr>
-            <tr><td>Melody Mode</td><td>Loop / Live</td><td>Loop</td><td>&mdash;</td></tr>
-            <tr><td>Complexity</td><td>0&ndash;100</td><td>50</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Contour</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Linearity</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td></tr>
-            <tr><td>Shape (Marbles)</td><td>Off / On</td><td>Off</td><td>&mdash;</td></tr>
-            <tr><td>Spread</td><td>0&ndash;100</td><td>50</td><td>&mdash;</td></tr>
-            <tr><td>Bias</td><td>0&ndash;100</td><td>50</td><td>&mdash;</td></tr>
-            <tr><td>Steps</td><td>1&ndash;100</td><td>100</td><td>&mdash;</td></tr>
-            <tr><td>Rate</td><td>1&ndash;400</td><td>50</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Variation</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Rest</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Density</td><td>0&ndash;100</td><td>100</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Tilt</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Slide Prob</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Legato</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td></tr>
-            <tr><td>Accent</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td></tr>
-            <tr><td>Burst</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Burst Count</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td></tr>
-            <tr><td>Burst Rate</td><td>0&ndash;100</td><td>50</td><td>&mdash;</td></tr>
-            <tr><td>Burst Pitch</td><td>Parent / Gen</td><td>Parent</td><td>&mdash;</td></tr>
-            <tr><td>Sleep</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Patience</td><td>0&ndash;100</td><td>100</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Mutate</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Jump</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Size</td><td>2&ndash;64</td><td>16</td><td>&mdash;</td></tr>
-            <tr><td>First</td><td>1&ndash;Size</td><td>1</td><td>&mdash;</td></tr>
-            <tr><td>Last</td><td>1&ndash;Size</td><td>Size</td><td>&mdash;</td></tr>
-            <tr><td>Rotate</td><td>-64&ndash;+64</td><td>0</td><td><span class="routable">R</span></td></tr>
-            <tr><td>Range</td><td>1&ndash;4 Oct</td><td>1</td><td>&mdash;</td></tr>
-            <tr><td>Low Degree</td><td>0&ndash;127</td><td>0</td><td>&mdash;</td></tr>
-            <tr><td>High Degree</td><td>0&ndash;127</td><td>127</td><td>&mdash;</td></tr>
+            <tr><th>Parameter</th><th>Range</th><th>Default</th><th>Routable</th><th>Page</th></tr>
+            <tr><td>Rhythm Mode</td><td>Loop / Live</td><td>Loop</td><td>&mdash;</td><td>footer Fn</td></tr>
+            <tr><td>Melody Mode</td><td>Loop / Live</td><td>Loop</td><td>&mdash;</td><td>footer Fn</td></tr>
+            <tr><td>Duration</td><td>0&ndash;7 LUT slot</td><td>5 (&times;1)</td><td><span class="routable">R</span></td><td>LIVE</td></tr>
+            <tr><td>Variation</td><td>0&ndash;100</td><td>16</td><td><span class="routable">R</span></td><td>LIVE</td></tr>
+            <tr><td>Rest</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td><td>LIVE</td></tr>
+            <tr><td>Range</td><td>1&ndash;4 oct</td><td>1</td><td>&mdash;</td><td>LIVE</td></tr>
+            <tr><td>Burst</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td><td>LIVE</td></tr>
+            <tr><td>Burst Count</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td><td>LIVE</td></tr>
+            <tr><td>Burst Rate</td><td>0&ndash;100</td><td>50</td><td>&mdash;</td><td>LIVE</td></tr>
+            <tr><td>Burst Pitch</td><td>Parent / Gen</td><td>Parent</td><td>&mdash;</td><td>LIVE</td></tr>
+            <tr><td>Complexity</td><td>0&ndash;100</td><td>50</td><td><span class="routable">R</span></td><td>LIVE</td></tr>
+            <tr><td>Contour</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td><td>LIVE</td></tr>
+            <tr><td>Bias (Marbles)</td><td>0&ndash;100</td><td>50</td><td>&mdash;</td><td>LIVE</td></tr>
+            <tr><td>Spread (Marbles)</td><td>0&ndash;100</td><td>50</td><td>&mdash;</td><td>LIVE</td></tr>
+            <tr><td>Steps (sieve)</td><td>0&ndash;100</td><td>100</td><td>&mdash;</td><td>LIVE</td></tr>
+            <tr><td>Repeat</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td><td>LIVE</td></tr>
+            <tr><td>Gate Length</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td><td>LIVE</td></tr>
+            <tr><td>Slide</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td><td>LIVE</td></tr>
+            <tr><td>Legato</td><td>0&ndash;100</td><td>0</td><td>&mdash;</td><td>LIVE</td></tr>
+            <tr><td>Accent</td><td>0&ndash;100</td><td>100</td><td>&mdash;</td><td>engine-only (Patience M alias)</td></tr>
+            <tr><td>Patience R</td><td>0&ndash;100</td><td>100</td><td><span class="routable">R</span></td><td>LOOP</td></tr>
+            <tr><td>Patience M</td><td>0&ndash;100</td><td>100</td><td>&mdash;</td><td>LOOP</td></tr>
+            <tr><td>Mutate</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td><td>LOOP</td></tr>
+            <tr><td>Jump</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td><td>LOOP</td></tr>
+            <tr><td>Sleep</td><td>0&ndash;100</td><td>0</td><td><span class="routable">R</span></td><td>LOOP</td></tr>
+            <tr><td>First</td><td>0&ndash;Size-1</td><td>0</td><td>&mdash;</td><td>LOOP</td></tr>
+            <tr><td>Last</td><td>First&ndash;Size-1</td><td>15</td><td>&mdash;</td><td>LOOP</td></tr>
+            <tr><td>Size</td><td>2&ndash;64</td><td>16</td><td>&mdash;</td><td>LOOP</td></tr>
+            <tr><td>Rotate</td><td>-Size&ndash;+Size</td><td>0</td><td><span class="routable">R</span></td><td>LOOP</td></tr>
+            <tr><td>Mask</td><td>0&ndash;100</td><td>100</td><td><span class="routable">R</span></td><td>LOOP</td></tr>
+            <tr><td>Tilt</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td><td>LOOP</td></tr>
         </table>
 
-        <h3>Config Page (STOCH CFG)</h3>
+        <h3>Per-degree / per-slot weights</h3>
+        <table class="param-table">
+            <tr><th>Parameter</th><th>Range</th><th>Default</th><th>Page</th></tr>
+            <tr><td>Degree Ticket [0..N-1]</td><td>-1, 0&ndash;100</td><td>0</td><td>PITCH</td></tr>
+            <tr><td>Degree Rotation</td><td>integer</td><td>0</td><td>PITCH</td></tr>
+            <tr><td>Mask Rotation</td><td>integer</td><td>0</td><td>PITCH</td></tr>
+            <tr><td>Duration Ticket [0..7]</td><td>0&ndash;100</td><td>0</td><td>DURATION</td></tr>
+        </table>
+
+        <h3>Track-level (CONFIG)</h3>
         <table class="param-table">
             <tr><th>Parameter</th><th>Range</th><th>Default</th><th>Routable</th></tr>
             <tr><td>Lock</td><td>On / Off</td><td>Off</td><td>&mdash;</td></tr>
-            <tr><td>Clock/Div</td><td>Divisor values</td><td>1/4</td><td>&mdash;</td></tr>
-            <tr><td>Reset Measure</td><td>Off, 1&ndash;128</td><td>Off</td><td>&mdash;</td></tr>
-            <tr><td>Scale</td><td>Default &middot; all scales</td><td>Default</td><td>&mdash;</td></tr>
+            <tr><td>Play Mode</td><td>Aligned / Free</td><td>Aligned</td><td>&mdash;</td></tr>
+            <tr><td>Divisor</td><td>Divisor values</td><td>1/16</td><td>&mdash;</td></tr>
+            <tr><td>Clock Mult</td><td>Multiplier</td><td>1.00</td><td><span class="routable">R</span></td></tr>
+            <tr><td>Reset Measure</td><td>0&ndash;128</td><td>0 (off)</td><td>&mdash;</td></tr>
+            <tr><td>Scale</td><td>Default / all scales</td><td>Default</td><td>&mdash;</td></tr>
             <tr><td>Root Note</td><td>Default, C&ndash;B</td><td>Default</td><td>&mdash;</td></tr>
             <tr><td>Octave</td><td>-10&ndash;+10</td><td>0</td><td><span class="routable">R</span></td></tr>
             <tr><td>Transpose</td><td>-100&ndash;+100</td><td>0</td><td><span class="routable">R</span></td></tr>
@@ -1478,14 +1271,22 @@
             Stochastic Track Manual &middot; Performer Phazer
         </p>
 
-        <!-- ================================================================ -->
         <!-- INTERACTIVE SCHEME -->
         <!-- ================================================================ -->
         <h2 id="interactive" style="margin-top:80px;">Interactive Simulator</h2>
+
+        <div class="callout warm">
+            <strong>Heads up.</strong> The simulator below was built against an earlier surface
+            (Phase 10 / V4) and exposes some knobs that no longer exist on hardware: a free
+            <code>Rate</code> knob (now an 8-slot Duration LUT), a Marbles <code>On/Off</code>
+            toggle (now always-on with Bias/Spread/Steps), and <code>Linearity</code> (now
+            <em>Repeat</em>, a different mechanic). Use it as a flavor preview of the algorithms;
+            the live firmware behavior is described in &sect;3 and &sect;5 above.
+        </div>
+
         <p style="margin-bottom:20px;">
             Tweak parameters on the left (generator) and right (looper), press play, and watch
-            the engine math unfold in real time. Each step is computed with the same algorithms
-            as the firmware &mdash; tickets, complexity, contour, linearity, density tilt, mutation, boredom.
+            the engine math unfold in real time.
         </p>
 
         <div id="sim-root" style="background:#fff; border:2px solid #d4d3d0; border-radius:12px; padding:20px; font-family:Inter,system-ui,sans-serif; font-size:13px; color:#1a1a18; box-shadow:0 4px 16px rgba(0,0,0,0.12); margin-bottom:32px;">

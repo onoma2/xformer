@@ -39,37 +39,36 @@ private:
     };
 
     enum class Page {
-        Core,
-        Marbles,
-        Direct,
+        Live,
         Loop,
         Pitch,
         Duration,
         Count
     };
 
+    // Batch 0 / docs/stoch-review.md finding #3 — guard every type-specific
+    // callback against being invoked when the selected track is no longer
+    // Stochastic. TopPage remapping covers the normal path, but project
+    // load + future selected-track mutation paths may not. Mirrors the
+    // pattern used by NoteSequenceEditPage::isActiveForSelectedTrack().
+    bool isActiveForSelectedTrack() const;
+
     void contextShow(bool doubleClick = false);
     void contextAction(int index);
     void nextPage();
 
     // Hero page draws (parameterized — respond to current sequence values).
-    void drawCorePage(Canvas &canvas);
-    void drawMarblesPage(Canvas &canvas);
-    void drawDirectPage(Canvas &canvas);
+    void drawLivePage(Canvas &canvas);
     void drawLoopPage(Canvas &canvas);
     void drawPitchPage(Canvas &canvas);
     void drawDurationPage(Canvas &canvas);
 
     // Hero param edits (held-step + encoder turn).
-    void editCoreStep(int step, int value, bool shift);
-    void editMarblesStep(int step, int value, bool shift);
-    void editDirectStep(int step, int value, bool shift);
+    void editLiveStep(int step, int value, bool shift);
     void editLoopStep(int step, int value, bool shift);
 
     // Per-page Fn handlers.
-    bool handleCoreFunction(int fn, bool shift);
-    bool handleMarblesFunction(int fn, bool shift);
-    bool handleDirectFunction(int fn, bool shift, int pressCount);
+    bool handleLiveFunction(int fn, bool shift, int pressCount);
     bool handleLoopFunction(int fn, bool shift, int pressCount);
 
     // Legacy ticket pages (existing).
@@ -87,27 +86,26 @@ private:
     uint32_t _durSelectionMask = 0;
     bool _persistMode = false;
 
-    Page _currentPage = Page::Core;
+    Page _currentPage = Page::Live;
     int _selectedDurSlot = 0;
     DurFocus _durFocus = DurFocus::DurTicket;
 
-    // Hero pages: which step is currently held (encoder writes that step's param).
-    // -1 = no step held; encoder writes the page-default param (step 0 of the page).
-    int _heroHeldStep = -1;
+    // Hero pages (Live/Loop): bitmask of currently held step buttons. Multiple
+    // bits = multi-select; encoder turn applies the edit to every set bit.
+    // Mirrors the ticket-page selection mask pattern (`_pitchSelectionMask`,
+    // `_durSelectionMask`). Cleared on keyUp unless `_persistMode` is active.
+    uint32_t _heroSelectionMask = 0;
 
     // DIRECT walker animation phase: advances per draw, wraps when it exceeds
     // one stride so the trail slides smoothly left between content refreshes.
     uint16_t _directWalkerTick = 0;
 
-    // Event-driven walker trail. Ring of particles; each gate rising edge
-    // shifts the ring left (older particles age, oldest falls off) and writes
-    // a new particle at slot 0 with the live CV-derived pitch.
+    // Event-driven walker trail, copied from the engine's recent Direct history
+    // and transformed into viewport-relative coordinates.
     static constexpr int kDirectTrailMax = 12;
     struct DirectParticle { int16_t yOffset; uint8_t flags; uint8_t children; };
     DirectParticle _directTrail[kDirectTrailMax] = {};
     uint8_t _directTrailFilled = 0;            // how many slots are valid (0..max)
-    bool _directLastGate = false;
-    uint32_t _directLastEventEpoch = 0;        // tick count of last event for sub-tick smoothing
 };
 
 // Duration ticket labels are now generated at runtime via

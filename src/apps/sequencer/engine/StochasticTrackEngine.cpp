@@ -14,6 +14,26 @@
 #include <algorithm>
 #include <cstdio>
 
+namespace {
+struct PackedDirectHistoryEvent {
+    int8_t cvSixteenths = 0;
+    uint8_t children = 0;
+    uint8_t flags = 0; // bit0 rest, bit1 gate
+};
+static_assert(sizeof(PackedDirectHistoryEvent::cvSixteenths) == 1, "Direct history CV must stay 8-bit");
+static_assert(sizeof(PackedDirectHistoryEvent) <= 4, "Direct history event must stay UI-sized");
+
+PackedDirectHistoryEvent gDirectHistory[CONFIG_TRACK_COUNT][StochasticTrackEngine::kDirectHistoryMax] = {};
+uint8_t gDirectHistoryCount[CONFIG_TRACK_COUNT] = {};
+
+int directHistoryTrackIndex(const Track &track) {
+    int index = track.trackIndex();
+    if (index < 0) index = 0;
+    if (index >= CONFIG_TRACK_COUNT) index = CONFIG_TRACK_COUNT - 1;
+    return index;
+}
+}
+
 // Gate scheduling trace — disabled for release
 //#define DBG_STO_ENABLE
 #ifdef DBG_STO_ENABLE
@@ -95,6 +115,24 @@ StochasticTrackEngine::~StochasticTrackEngine() {
     freeLockedSteps();
 }
 
+uint8_t StochasticTrackEngine::directHistoryCount() const {
+    return gDirectHistoryCount[directHistoryTrackIndex(_track)];
+}
+
+StochasticTrackEngine::DirectHistoryEvent StochasticTrackEngine::directHistoryEvent(int age) const {
+    int trackIndex = directHistoryTrackIndex(_track);
+    uint8_t count = gDirectHistoryCount[trackIndex];
+    if (age < 0) age = 0;
+    if (age >= count) age = count > 0 ? count - 1 : 0;
+    const auto &packed = gDirectHistory[trackIndex][age];
+    DirectHistoryEvent event;
+    event.cv = float(packed.cvSixteenths) * 0.0625f;
+    event.children = packed.children;
+    event.rest = (packed.flags & 1) != 0;
+    event.gate = (packed.flags & 2) != 0;
+    return event;
+}
+
 void StochasticTrackEngine::initLockedSteps() {
     if (!_lockedParents) {
         _lockedParents = new (std::nothrow) LockedParentEvent[CONFIG_STEP_COUNT];
@@ -155,6 +193,7 @@ void StochasticTrackEngine::reset() {
     _cvOutput = 0.f;
     _cvOutputTarget = 0.f;
     _lastEventValid = false;
+    clearDirectHistory();
     _gateQueue.clear();
     _cvQueue.clear();
     _rng = Random(0x12345678 + _track.trackIndex());
@@ -169,6 +208,7 @@ void StochasticTrackEngine::restart() {
     _eventElapsed = 0;
     _eventDuration = 0;
     _lastEventValid = false;
+    clearDirectHistory();
     _rng = Random(0x12345678 + _track.trackIndex());
 }
 
@@ -283,10 +323,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _cvQueue.push({ tick, finalCv, isSlide });
             _gateQueue.push({ tick, true });
 
-            bool hasChildren = false;
-            for (int i = 0; i < kMaxChildren; ++i) if (_lockedParents[readIndex].children[i].valid) hasChildren = true;
+            uint8_t childCount = 0;
+            for (int i = 0; i < kMaxChildren; ++i) if (_lockedParents[readIndex].children[i].valid) childCount++;
+            recordDirectHistory(finalCv, false, true, childCount);
 
-            if (!isLegato && !hasChildren) {
+            if (!isLegato && childCount == 0) {
                 uint32_t gateLen = pickGateLength(durationTicks, sequence.gateLength(), _rng);
                 // DBG_STO("%u GATEpush LOCKED OFF p=%d", tick + gateLen, _patternIndex);
                 _gateQueue.push({ tick + gateLen, false });
@@ -309,6 +350,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             // DBG_STO("%u GATEpush LOCKED REST p=%d", tick, _patternIndex);
             _gateQueue.push({ tick, false });
             if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
+            recordDirectHistory(finalCv, true, false, 0);
             _activity = false;
         }
     } else {
@@ -391,15 +433,16 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         captureLockedParent(readIndex, finalCv, durationTicks, isRest, isLegato, isSlide,
                             evalChildren, activeNotes, scale, rootNote);
 
+        uint8_t childCount = 0;
+        for (int i = 0; i < kMaxChildren; ++i) if (evalChildren[i].valid) childCount++;
+        recordDirectHistory(finalCv, isRest, !isRest, childCount);
+
         if (!isRest) {
             // DBG_STO("%u CVpush ON p=%d cv=%.3f", tick, _patternIndex, finalCv);
             _cvQueue.push({ tick, finalCv, isSlide });
             _gateQueue.push({ tick, true });
 
-            bool hasChildren = false;
-            for (int i = 0; i < kMaxChildren; ++i) if (evalChildren[i].valid) hasChildren = true;
-
-            if (!isLegato && !hasChildren) {
+            if (!isLegato && childCount == 0) {
                 uint32_t gateLen = pickGateLength(durationTicks, sequence.gateLength(), _rng);
                 // DBG_STO("%u GATEpush LIVE OFF p=%d", tick + gateLen, _patternIndex);
                 _gateQueue.push({ tick + gateLen, false });
@@ -645,4 +688,27 @@ void StochasticTrackEngine::captureLockedParent(int readIndex, float finalCv, ui
             _lockedParents[readIndex].children[i].valid = false;
         }
     }
+}
+
+void StochasticTrackEngine::clearDirectHistory() {
+    int trackIndex = directHistoryTrackIndex(_track);
+    gDirectHistoryCount[trackIndex] = 0;
+    for (int i = 0; i < kDirectHistoryMax; ++i) {
+        gDirectHistory[trackIndex][i] = {};
+    }
+}
+
+void StochasticTrackEngine::recordDirectHistory(float cv, bool rest, bool gate, uint8_t children) {
+    int trackIndex = directHistoryTrackIndex(_track);
+    for (int i = kDirectHistoryMax - 1; i > 0; --i) {
+        gDirectHistory[trackIndex][i] = gDirectHistory[trackIndex][i - 1];
+    }
+    if (children > kMaxChildren) children = kMaxChildren;
+    int cvSixteenths = int(cv * 16.f);
+    if (cvSixteenths < -128) cvSixteenths = -128;
+    if (cvSixteenths > 127) cvSixteenths = 127;
+    gDirectHistory[trackIndex][0].cvSixteenths = int8_t(cvSixteenths);
+    gDirectHistory[trackIndex][0].children = children;
+    gDirectHistory[trackIndex][0].flags = (rest ? 1 : 0) | (gate ? 2 : 0);
+    if (gDirectHistoryCount[trackIndex] < kDirectHistoryMax) gDirectHistoryCount[trackIndex]++;
 }

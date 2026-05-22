@@ -36,10 +36,35 @@ public:
         // mutation/permutation, validity flags). See ownership contract in
         // .tasks/stochastic-track-port/PHASE13-FEATURES-PLAN.md.
         _sequence = &(_stochasticTrack.sequence(pattern()));
+
+        // Batch 0 / docs/stoch-review.md finding #2 — Lock cache and queues are
+        // pattern-scoped runtime state. They reference the previous pattern's
+        // evaluated content keyed by raw event index. Without clearing them,
+        // a pattern change with Lock active would replay cached events from
+        // the old pattern at the same indices. Same goes for in-flight gate/CV
+        // queue entries — they targeted the previous sequence's timing/CV.
+        _gateQueue.clear();
+        _cvQueue.clear();
+        if (_lockedParents) {
+            for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
+                _lockedParents[i].valid = false;
+                for (int j = 0; j < kMaxChildren; ++j) {
+                    _lockedParents[i].children[j].valid = false;
+                }
+            }
+        }
+        _patternCycleEnded = false;
+        _lastEventValid = false;
+        clearDirectHistory();
     }
 
     int currentStep() const { return _patternIndex; }
     bool activity() const { return _activity; }
+    // Batch 0 / docs/stoch-review.md finding #5 — exposed so the UI can grey-out
+    // the Lock control (or show a status message) when allocation failed. With
+    // allocation failure, the Lock toggle currently behaves like unlocked
+    // playback with no diagnostic. UI gating is a follow-up task.
+    bool lockAvailable() const { return _lockedParents != nullptr; }
     int lastDegree() const { return _lastDegree; }
     int lastDurationIndex() const { return _lastDurationIndex; }
     uint16_t loopCycleCount() const { return _loopCycleCount; }
@@ -52,6 +77,18 @@ public:
 
     // Max children per parent burst — matches burstCount LUT {2, 3, 4, 5}.
     static constexpr int kMaxChildren = 5;
+
+    // Recent evaluated parent events for Direct hero drawing. This is UI truth,
+    // not source material: only what just reached the scheduler is recorded.
+    static constexpr int kDirectHistoryMax = 12;
+    struct DirectHistoryEvent {
+        float cv = 0.f;
+        uint8_t children = 0;
+        bool rest = false;
+        bool gate = false;
+    };
+    uint8_t directHistoryCount() const;
+    DirectHistoryEvent directHistoryEvent(int age) const;
 
     // Patience boredom indicator: Poisson CDF probability of regen at the
     // given loop count and patience knob (0..100). Returns 0.0 when knob = 100
@@ -132,6 +169,8 @@ private:
                              bool isRest, bool isLegato, bool isSlide,
                              const StochasticGenerator::EvaluatedChild *evalChildren,
                              int activeNotes, const Scale &scale, int rootNote);
+    void clearDirectHistory();
+    void recordDirectHistory(float cv, bool rest, bool gate, uint8_t children);
 
     // Ownership contract (Patch 1 / Phase 13 Batch 0):
     //   StochasticSequence    — owns pattern material (source loop tape, ticket
