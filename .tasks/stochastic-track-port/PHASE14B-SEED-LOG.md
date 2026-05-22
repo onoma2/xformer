@@ -232,6 +232,76 @@ Trunk's "output is the identity" pitch is musically tidy but the cost is real:
 
 The legitimate trunk wins remaining: project save preserves bit-exact happy accidents, and 1-bit lock semantics. Both are real, but neither outweighs the RAM win + architectural alignment with the rest of the codebase.
 
+## Foundational invariant — validated 2026-05-22
+
+Per-cell keyed RNG is the precondition for everything else in this design. Validated on `feat/stochastic-seed-log`:
+
+- **Header:** `src/apps/sequencer/engine/KeyedRng.h` — 32-bit murmur3-style mixer over `(baseSeed XOR cellIdx * goldenRatio)`. Branch-free, ~6 multiplies + shifts. `cellSeed(seed, idx)` for fresh cells, `cellSeedAfterRegen(seed, idx, mutationGen)` for REGEN_CELL.
+- **Test:** `src/tests/unit/sequencer/TestStochasticKeyedRng.cpp` — 8 cases, all green:
+  - Hash determinism.
+  - Adjacent cells get >8-bit-different seeds (mixer not weak).
+  - Same `(seed, idx, knobs)` → identical output (property 1).
+  - Forward / reverse / shuffled generation orders all match (property 2).
+  - REGEN_CELL on cell N changes that cell and leaves every other untouched (property 3).
+  - Successive regens keep producing distinct outputs (no modular collision).
+  - Seed change propagates to >2/3 of cells (mixer not idx-dominated).
+  - Knob change at fixed seed diverges >2/3 of cells (generator actually reads knobs).
+
+The three load-bearing properties hold. REGEN_CELL is mechanically free — no stream replay needed.
+
+## Picker inventory
+
+Cataloging every RNG draw in `src/apps/sequencer/engine/StochasticGenerator.cpp` against the keyed-RNG model. **Pure per-cell** means the picker reads only `(rng, knobs)` and can be migrated by swapping its `Random` for `keyed_rng::forCell(seed, idx)`. **Cross-cell dependency** means the picker reads state from prior cells and needs refactor.
+
+### Rhythm path
+
+| Picker | Location | Draws | Per-cell pure? | Notes |
+|---|---|---|---|---|
+| `pickDuration` | `StochasticGenerator.cpp:262` | 1 draw over weighted LUT | **Yes** | Reads only knobs + dictionaries. Migrate trivially. |
+| Rest Bernoulli | `:427` | 1 | **Yes** | `rng.nextRange(100) < sequence.rest()`. |
+| Legato Bernoulli | `:429` | 1 | **Yes** | Same shape. |
+| Slide Bernoulli | `:430` | 1 | **Yes** | Same shape. |
+| Burst-gate Bernoulli | `:447` | 1 | **Yes** | Conditional draw — only fires when parentTicks ≥ 96. |
+| `pickBurstCountFromLut` | `:451` | up to 2 | **Yes** | Reads `burstCount` knob. Conditional on burst-gate. |
+| `pickBurstSpacingFromLut` | `:457` | up to 2 | **Yes** | Reads `burstRate` knob. Conditional on burst-gate. |
+| `generateMaskRanks` weight | `:344` | 1 per cell | **Yes** | Reads `tilt` + `durationIndex` from the just-generated event. Cross-cell only in the sort — the random weight per cell is pure. Migrate: weight each cell with its own keyed RNG, then sort. |
+
+**All rhythm draws are pure per-cell.** The current sequential RNG is an artifact, not a dependency.
+
+### Melody path
+
+| Picker | Location | Draws | Per-cell pure? | Notes |
+|---|---|---|---|---|
+| `generateDegree` (Mutate path) | `:184-238` | variable | **Yes** | Reads `mutateMagnitude`, scale, `range`, dictionaries — no `lastDegree`. |
+| `generateDegree` (NewM path) | `:493` | variable | **No — depends on `lastDegree`** | Complexity kernel narrows around the previous cell's degree. Cross-cell state. |
+| Burst child `generateDegree` | `:399` | variable | **Yes** | Locally sets `lastDegree = -1` before calling, so no cross-cell coupling. |
+
+### The `lastDegree` problem
+
+`generateDegree` in the NewM path uses `lastDegree` to bias the next pitch toward melodic continuity (the complexity kernel narrows around the previous degree). This is the only cross-cell dependency in the entire generator.
+
+Three options, in order of preference:
+
+1. **Replay melody pass for `[N..end]` after REGEN_CELL at N.** Melody pass is fast and writes only the CV field. For typical 16-32 cell patterns this is <10 µs on STM32. The amortized cost across a session is negligible compared to the RAM and architectural win. **Recommended.**
+
+2. **Refactor `generateDegree` to use a stable "anchor" derived from cell index instead of prior cell's degree.** e.g. `anchorDegree = keyedRng(seed ^ MELODY_ANCHOR_TAG, idx)` produces a per-cell anchor; complexity kernel narrows around that. Loses literal melodic continuity in favor of statistical continuity. Different musical feel — would need user A/B before committing.
+
+3. **Cache `lastDegree` per cell as part of the cell output.** Cell N stores its own `lastDegree` so cell N+1 can read it. Brings cross-cell state back in a localized way but defeats some of the keyed-RNG win.
+
+Option 1 is the working plan. Cost is bounded and known; we just run melody pass twice for a cell when it's regenerated. Property tests can pin it.
+
+## Go / no-go
+
+**Go.** The keyed-RNG approach is mechanically sound; all three load-bearing properties (determinism, order independence, mutation isolation) hold under a generator that mirrors the real picker shape. The one cross-cell dependency — `lastDegree` in melody generation — has three viable mitigations, with melody-pass replay being the natural default.
+
+Patch A scope can proceed: engine-side cache structure + plumbing alongside existing event tape, no behavior change, no model changes yet.
+
 ## Next step
 
-Validate per-cell keyed RNG before any other work: small test proving cell N's output depends only on `(seed, N, knobs)` and not on stream consumption order. Foundational invariant for REGEN_CELL and the mutation log to work without full RNG replay. After that invariant holds, plan Patch A — engine-cache plumbing alongside existing event tape, no behavior change.
+Write Patch A:
+- `CachedCell` struct in `StochasticTrackEngine` — engine-owned CCMRAM, 8 B per cell × 96 cells per active track.
+- Helper `engine->regenerateCacheFromSeeds()` that calls existing `StochasticGenerator::generateRhythm` / `generateMelody` and copies the result into the cache. Engine still plays from `_events[]`; cache is shadow-only.
+- Sim build asserts cache matches the event tape's playback semantics (every cell's `(relTick, cv, gateLen, flags)` derives the same gate/CV stream).
+- No UI changes. No model changes. No behavior changes.
+
+Patch A unblocks Patches B (switch playback to cache) and C (delete `_events[]`, mutation log lands, generator writes cache directly).
