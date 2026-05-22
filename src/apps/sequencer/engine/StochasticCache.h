@@ -33,7 +33,12 @@ constexpr uint8_t kMaxGateLen = 63;
 // move into cell saves a byte per aux entry (CellAux shrinks to 1 byte).
 constexpr uint8_t kMaxOctave = 15;
 
-constexpr int kCellCap = 64;
+// Phase 16 P3 (2026-05-23): bumped 64 → 80 to give burst patterns more
+// headroom before the cap truncates. Under the parent/child model this
+// reduces burst-truncation in dense patterns. Once Phase 16 P5 lands
+// (flat cell model where bursts no longer spawn separate cells), the
+// optimal cap may drop back to 64 — revisit after P5.
+constexpr int kCellCap = 80;
 
 struct CachedCell {
     uint32_t packed;
