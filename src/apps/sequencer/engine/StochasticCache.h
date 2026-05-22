@@ -75,9 +75,20 @@ static_assert(sizeof(CellAux) == 2, "CellAux must be 2 bytes");
 // (CellAux grew to 2 B because we store rank alongside flags. Aux remains
 //  outside the cell to keep the cell at exactly 4 B for future ABI work.)
 
+// Max event slots in a sequence — matches CONFIG_STEP_COUNT but the header
+// avoids pulling that in (Cache is consumed by tests too).
+constexpr int kMaxEventSlots = 64;
+
 struct Cache {
     CachedCell cells[kCellCap];
     CellAux    aux[kCellCap];
+
+    // Map from event-slot index (0..kMaxEventSlots-1) to its parent cell index
+    // in `cells[]`. Lets the engine look up "for sequence slot K, what's the
+    // parent cell's rank?" without scanning the cache at trigger time.
+    // 0xff = unmapped (slot outside the active window).
+    uint8_t    parentCacheIdx[kMaxEventSlots];
+
     uint8_t    count;
     uint16_t   cycleTicks;
 };

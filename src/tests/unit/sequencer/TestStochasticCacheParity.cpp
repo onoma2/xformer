@@ -317,6 +317,62 @@ CASE("tilt_negative_favors_short_durations") {
     expectTrue(rankShort < rankLong, "negative tilt: short cells get LOW ranks (survive Mask)");
 }
 
+CASE("parent_cache_idx_maps_slot_to_parent_cell") {
+    // The engine's mask filter looks up cache rank via parentCacheIdx[readIndex].
+    // Verify that mapping is correct even when bursts insert extra cells
+    // between parents.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setFirst(0);
+    seq.setLast(3);
+
+    // slot 0: short, no burst (durationIndex=7 → 24 ticks @ divisor=48, below kMinBurstParentTicks=96)
+    seq.events()[0].setDurationIndex(7);
+    seq.events()[0].setRest(false);
+    seq.events()[0].setRhythmValid(true);
+    // slot 1: long, burst with 2 children
+    seq.events()[1].setDurationIndex(1);  // ×4 = 192 ticks
+    seq.events()[1].setRest(false);
+    seq.events()[1].setRhythmValid(true);
+    seq.events()[1].setChildCount(2);
+    seq.events()[1].setBurstRate(2);
+    // slot 2: short, no burst
+    seq.events()[2].setDurationIndex(6);
+    seq.events()[2].setRest(false);
+    seq.events()[2].setRhythmValid(true);
+    // slot 3: long, burst with 3 children
+    seq.events()[3].setDurationIndex(1);
+    seq.events()[3].setRest(false);
+    seq.events()[3].setRhythmValid(true);
+    seq.events()[3].setChildCount(3);
+    seq.events()[3].setBurstRate(2);
+
+    Cache cache{};
+    regenerateCacheFromEvents(cache, seq, 48, 0xa5a5);
+
+    // Expected cache layout (parent + children interleaved):
+    //   idx 0: parent slot 0 (no children)
+    //   idx 1: parent slot 1
+    //   idx 2,3: slot 1's burst children
+    //   idx 4: parent slot 2
+    //   idx 5: parent slot 3
+    //   idx 6,7,8: slot 3's burst children
+    expectEqual(int(cache.parentCacheIdx[0]), 0);
+    expectEqual(int(cache.parentCacheIdx[1]), 1);
+    expectEqual(int(cache.parentCacheIdx[2]), 4);
+    expectEqual(int(cache.parentCacheIdx[3]), 5);
+
+    // Slot outside the window is unmapped.
+    expectEqual(int(cache.parentCacheIdx[10]), 0xff);
+
+    // The cells at the mapped indices must NOT be burst children.
+    for (int slot = 0; slot <= 3; ++slot) {
+        uint8_t cidx = cache.parentCacheIdx[slot];
+        expectFalse(cache.aux[cidx].burstChild(), "parentCacheIdx must point at a parent cell");
+    }
+}
+
 CASE("cache_cap_truncates_silently") {
     // Worst-case: every parent has 5 children, 64-cell cap stops cleanly.
     // Use 16 parents × 5 children each = 80 attempted cells; cap at 64.

@@ -26,6 +26,7 @@ static uint8_t encodeGateLenAsDurSlot(uint8_t durationIndex) {
 int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed) {
     cache.count = 0;
     cache.cycleTicks = 0;
+    for (int i = 0; i < kMaxEventSlots; ++i) cache.parentCacheIdx[i] = 0xff;
 
     const int first = std::max(0, std::min(int(seq.first()), int(seq.size()) - 1));
     const int last  = std::max(first, std::min(int(seq.last()),  int(seq.size()) - 1));
@@ -35,6 +36,12 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 
     for (int i = first; i <= last; ++i) {
         const StochasticSourceEvent &ev = seq.events()[i];
+
+        // Record this slot's parent cell index for O(1) rank lookup at trigger
+        // time. Captured before the parent cell is emitted so we know its idx.
+        if (cache.count < kCellCap && i < kMaxEventSlots) {
+            cache.parentCacheIdx[i] = cache.count;
+        }
 
         auto frac = StochasticTrackEngine::getDurationFraction(int(ev.durationIndex()));
         uint32_t parentTicks = (uint64_t(divisor) * frac.num) / frac.den;

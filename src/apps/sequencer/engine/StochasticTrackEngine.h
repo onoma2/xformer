@@ -42,6 +42,9 @@ public:
         _patternCycleEnded = false;
         _lastEventValid = false;
         clearDirectHistory();
+        // Phase 14B Patch B: cache is per-track, so a pattern switch leaves
+        // stale rank data behind. Rebuild from the new pattern's events.
+        refreshCache();
     }
 
     int currentStep() const { return _patternIndex; }
@@ -141,6 +144,11 @@ private:
     // may relocate to engine-owned shadow in Patch 3.
     void writeLiveRhythmShadow(int readIndex, const StochasticSourceEvent &rhythm);
     void writeLiveMelodyShadow(int readIndex, const StochasticSourceEvent &melody);
+    // Phase 14B Patch B: rebuild the engine-side cache (gStochasticCaches[idx])
+    // from the current event tape. Called after every event-write path so the
+    // cache rank is always in sync with the audible content. Pure shadow until
+    // Patch C — only the mask filter reads from it.
+    void refreshCache();
     // Lock cache removed 2026-05-22. The heap-allocated LockedParentEvent[]
     // colliding with the stack caused crashes at ≥2 stochastic tracks. The
     // engine no longer captures evaluated output; the `_lock` flag on
