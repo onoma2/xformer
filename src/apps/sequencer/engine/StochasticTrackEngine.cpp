@@ -368,7 +368,31 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         durationTicks = mult;
         _eventDuration = durationTicks;
 
-        int note = int(eval.degree()) + (int(eval.octave()) + _jumpRegister + track.octave()) * activeNotes + track.transpose();
+        // Phase 14B Patch C step 1 (2026-05-22): pitch lookup source for the
+        // non-Repeat parent path moves to the engine cache. Cache cell stores
+        // degree + signed octave (event-domain values, no track offsets
+        // baked in), so the trigger-time scale lookup is identical math to
+        // the legacy `eval.degree()/.octave()` path — just sourced from the
+        // deterministic cache cell instead of the noisy event tape.
+        //
+        // Repeat path stays on `eval.degree()/.octave()` (i.e. from
+        // _lastEvent's stored fields) — same logic as the cache-rank fix:
+        // the audible material is the repeated event, not the cell at
+        // readIndex.
+        int pitchDegree = int(eval.degree());
+        int pitchOctave = int(eval.octave());
+        if (!useRepeat) {
+            uint8_t cIdx = (readIndex >= 0 && readIndex < int(stochastic_cache::kMaxEventSlots))
+                         ? _cache.parentCacheIdx[readIndex]
+                         : uint8_t(0xff);
+            if (cIdx < stochastic_cache::kCellCap) {
+                pitchDegree = int(_cache.cells[cIdx].degree());
+                pitchOctave = int(_cache.cells[cIdx].octave());
+            }
+            // else: cache unprimed (engine reset, no refresh yet) — fall back
+            // to event tape values already loaded above.
+        }
+        int note = pitchDegree + (pitchOctave + _jumpRegister + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
 
         // V5 Mask: deterministic playback thinning after source read/evaluation.

@@ -66,17 +66,24 @@ CASE("cell_pack_roundtrip") {
     // Verify the bit-packed cell encoding survives a roundtrip for the full
     // useful value range. This is the load-bearing invariant of the 4-byte
     // pack — if it fails, nothing else in this test means anything.
+    //
+    // Patch C step 1 (2026-05-22): cv field replaced with degree (7-bit
+    // unsigned) + octave (5-bit unsigned), matching StochasticSourceEvent's
+    // storage range.
     for (uint32_t r : { 0u, 1u, 96u, 768u, 2047u, 4095u }) {
-        for (int cv : { -2048, -100, 0, 100, 2047 }) {
-            for (uint8_t g : { uint8_t(0), uint8_t(31), uint8_t(63) }) {
-                for (bool slide : { false, true }) {
-                    for (bool legato : { false, true }) {
-                        auto c = CachedCell::make(r, cv, g, slide, legato);
-                        expectEqual(uint32_t(c.relTick()), r);
-                        expectEqual(c.cv(), cv);
-                        expectEqual(int(c.gateLen()), int(g));
-                        expectEqual(c.slide(), slide);
-                        expectEqual(c.legato(), legato);
+        for (uint8_t deg : { uint8_t(0), uint8_t(1), uint8_t(63), uint8_t(127) }) {
+            for (uint8_t oct : { uint8_t(0), uint8_t(1), uint8_t(15), uint8_t(31) }) {
+                for (uint8_t g : { uint8_t(0), uint8_t(31), uint8_t(63) }) {
+                    for (bool slide : { false, true }) {
+                        for (bool legato : { false, true }) {
+                            auto c = CachedCell::make(r, deg, oct, g, slide, legato);
+                            expectEqual(uint32_t(c.relTick()), r);
+                            expectEqual(int(c.degree()), int(deg));
+                            expectEqual(int(c.octave()), int(oct));
+                            expectEqual(int(c.gateLen()), int(g));
+                            expectEqual(c.slide(), slide);
+                            expectEqual(c.legato(), legato);
+                        }
                     }
                 }
             }
@@ -100,6 +107,37 @@ CASE("empty_sequence_yields_empty_cache") {
     expectEqual(n, 1);
     expectEqual(int(cache.count), 1);
     expectTrue(cache.aux[0].audible(), "default cleared event has rest=false → audible");
+}
+
+CASE("cache_stores_event_degree_and_octave") {
+    // Patch C step 1 (2026-05-22): the cell's pitch fields must match the
+    // source event's degree/octave so the engine's scale lookup at trigger
+    // time produces the same audible CV whether reading the cache or the
+    // legacy event tape.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setFirst(0);
+    seq.setLast(3);
+
+    // StochasticSourceEvent stores octave as 5-bit unsigned (0..31); the
+    // engine layers _jumpRegister + track.octave() at trigger time for the
+    // signed offset case. Match that range here.
+    seq.events()[0].setDegree(0);  seq.events()[0].setOctave(0);  seq.events()[0].setRhythmValid(true); seq.events()[0].setRest(false);
+    seq.events()[1].setDegree(7);  seq.events()[1].setOctave(1);  seq.events()[1].setRhythmValid(true); seq.events()[1].setRest(false);
+    seq.events()[2].setDegree(11); seq.events()[2].setOctave(2);  seq.events()[2].setRhythmValid(true); seq.events()[2].setRest(false);
+    seq.events()[3].setDegree(64); seq.events()[3].setOctave(3);  seq.events()[3].setRhythmValid(true); seq.events()[3].setRest(false);
+
+    Cache cache{};
+    regenerateCacheFromEvents(cache, seq, 48, 0xfeed);
+
+    for (int slot = 0; slot < 4; ++slot) {
+        uint8_t cIdx = cache.parentCacheIdx[slot];
+        expectEqual(int(cache.cells[cIdx].degree()), int(seq.events()[slot].degree()),
+                    "cache cell must store same degree as source event");
+        expectEqual(int(cache.cells[cIdx].octave()), int(seq.events()[slot].octave()),
+                    "cache cell must store same octave as source event");
+    }
 }
 
 CASE("single_parent_event_relTick_and_gateLen") {

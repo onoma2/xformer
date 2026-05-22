@@ -17,14 +17,18 @@ namespace stochastic_cache {
 // ~5 bars at PPQN=192 (4096 ticks). Reasonable upper bound for one cycle.
 constexpr uint32_t kMaxRelTick = 4095;
 
-// 12-bit signed CV over ±5V → ~2.4mV/step. STM32 DAC is 12-bit so we lose
-// nothing real. Stored as offset (0..4095) with midpoint 2048 = 0V.
-constexpr int16_t kCvMidpoint = 2048;
-constexpr int16_t kCvMin = 0;
-constexpr int16_t kCvMax = 4095;
-
 // 6-bit gate length encoded as LUT slot or fractional ticks (0..63).
 constexpr uint8_t kMaxGateLen = 63;
+
+// Melody fields (Phase 14B Patch C step 1, 2026-05-22):
+// Cells store scale-domain `degree` and `octave` rather than resolved voltage.
+// Trigger-time scale + track-offset lookup matches today's engine, keeping
+// the cache invariant to scale/rootNote/track.octave/track.transpose changes
+// (no rebuild needed when those move). Range matches StochasticSourceEvent:
+//   degree: 0..127  (7-bit unsigned)
+//   octave: 0..31   (5-bit unsigned — engine adds _jumpRegister + track.octave()
+//                   at trigger time for the signed offset case).
+constexpr uint8_t kMaxOctave = 31;
 
 constexpr int kCellCap = 64;
 
@@ -32,16 +36,19 @@ struct CachedCell {
     uint32_t packed;
 
     uint32_t relTick()       const { return  packed        & 0xfffu; }
-    int      cv()            const { return int((packed >> 12) & 0xfffu) - kCvMidpoint; }
+    uint8_t  degree()        const { return (packed >> 12) & 0x7fu; }
+    uint8_t  octave()        const { return (packed >> 19) & 0x1fu; }
     uint8_t  gateLen()       const { return (packed >> 24) & 0x3fu; }
     bool     slide()         const { return (packed >> 30) & 1u; }
     bool     legato()        const { return (packed >> 31) & 1u; }
 
-    static CachedCell make(uint32_t relTick, int cv, uint8_t gateLen, bool slide, bool legato) {
-        uint32_t cvField = uint32_t(cv + kCvMidpoint) & 0xfffu;
+    static CachedCell make(uint32_t relTick, uint8_t degree, uint8_t octave,
+                           uint8_t gateLen, bool slide, bool legato) {
+        if (octave > kMaxOctave) octave = kMaxOctave;
         uint32_t r =  (relTick                 & 0xfffu)
-                   | ((cvField                 & 0xfffu) << 12)
-                   | ((uint32_t(gateLen)       & 0x3fu)  << 24)
+                   | ((uint32_t(degree)       & 0x7fu)  << 12)
+                   | ((uint32_t(octave)       & 0x1fu)  << 19)
+                   | ((uint32_t(gateLen)       & 0x3fu) << 24)
                    | ((slide  ? 1u : 0u)               << 30)
                    | ((legato ? 1u : 0u)               << 31);
         return CachedCell{r};

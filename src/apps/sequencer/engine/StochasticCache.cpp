@@ -54,12 +54,12 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             }
 
             uint32_t relTick = cycleTicks > kMaxRelTick ? kMaxRelTick : cycleTicks;
-            int cv = 0;  // Patch A: CV resolution deferred to engine wiring (Patch B).
             uint8_t gateLen = encodeGateLenAsDurSlot(ev.durationIndex());
 
             cache.cells[cache.count] = CachedCell::make(
                 relTick,
-                cv,
+                uint8_t(ev.degree()),
+                int8_t(ev.octave()),
                 gateLen,
                 ev.slide(),
                 ev.legato());
@@ -107,9 +107,14 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 
                 uint8_t childGateField = uint8_t(std::min(uint32_t(kMaxGateLen), childGate));
 
+                // Burst child melody fields still deferred to trigger time
+                // (evaluateChildren picks per-child notes per StochasticBurstPitch
+                // mode — Parent or Generate). Cache stores zeros until a future
+                // patch bakes the child notes at cache-build.
                 cache.cells[cache.count] = CachedCell::make(
                     childAbsTick,
-                    /*cv*/      0,    // Patch A: deferred.
+                    /*degree*/  0,
+                    /*octave*/  0,
                     childGateField,
                     /*slide*/   false,
                     /*legato*/  false);
