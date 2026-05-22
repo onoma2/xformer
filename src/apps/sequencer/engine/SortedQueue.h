@@ -30,6 +30,16 @@ public:
     }
 
     void push(const T &value) {
+        // Drop-oldest overflow contract (Phase 16 P1, 2026-05-23). The ring
+        // buffer reserves one slot for empty/full discrimination, so the
+        // effective capacity is `Capacity - 1`. Pushing into a full queue
+        // would otherwise wrap _write to meet _read and silently drop every
+        // pending element. Instead: drop the oldest unread element first,
+        // then insert. Caller never sees a failed push; the most recent
+        // (Capacity-1) elements always survive.
+        if (size() + 1 >= Capacity) {
+            _read = increase(_read);
+        }
         insert(value);
     }
 
