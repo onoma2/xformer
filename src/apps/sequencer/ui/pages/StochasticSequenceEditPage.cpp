@@ -423,11 +423,23 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
         // currentStep() returns _patternIndex, which is the NEXT step to fire
         // (engine increments inside triggerStep after reading the index).
-        // Step back one with wrap so the highlight tracks what's audible right
-        // now, not what's about to play.
+        // Step back one with wrap to track what's audible right now.
+        //
+        // Bug fix 2026-05-22: previous math wrapped across the full sequence
+        // size, not the playback window. At the cycle boundary (engine
+        // wraps from `last` to `first`), `_patternIndex` becomes `first` and
+        // the just-played audible slot is `last`. Old math gave `first - 1`
+        // (sometimes outside the window). Walk the window, not the sequence.
         int next = eng.currentStep();
-        int sz = std::max(1, seq.size());
-        currentStep = ((next - 1) % sz + sz) % sz;
+        int winFirst = std::max(0, std::min(lf, seqSize - 1));
+        int winLast  = std::max(winFirst, std::min(ll, seqSize - 1));
+        int winSize  = winLast - winFirst + 1;
+        if (winSize <= 0) winSize = 1;
+        // Clamp next into the window before stepping back (defensive: snap
+        // clause may have repositioned _patternIndex on a window edit).
+        int relNext = ((next - winFirst) % winSize + winSize) % winSize;
+        int relAudible = (relNext - 1 + winSize) % winSize;
+        currentStep = winFirst + relAudible;
     }
 
     // Adaptive event timeline: ALL steps 0..size-1 always visible. Brackets
