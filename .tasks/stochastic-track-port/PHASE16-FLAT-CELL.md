@@ -14,25 +14,36 @@ One uniform cell concept. Burst is a duration-bias on the picker, not a parent/c
 
 ## One new knob: Feel
 
-`Routable<uint8_t>` 0..100. Controls how strictly cell durations are normalized to the `resetMeasure` bar boundary.
+`Routable<uint8_t>` 0..100. Default **50** (center, in detent → no effect, identical to today). Locks the cycle to a target beat count; off in the detent zone.
 
 ```
-if (feel > 0 && resetMeasure > 0):
-    barLen = resetMeasure × measureDivisor
-    sumLen = sum of all cell durations
-    scale = barLen / sumLen
-    for each cell:
-        adjustedDur = lerp(dur, dur × scale, feel / 100)
-    recompute relTicks from adjustedDurs
-else:
-    leave durations as-picked (interval walk)
+naturalSum = sum of picked cell durations (LUT picks + cluster denom math)
+
+if feel in [45..55]:
+    // Detent: Feel off. Use natural sum, cycle length floats with picks.
+
+elif feel < 45:
+    targetBeats = 4 - (45 - feel) / 45.0      // knob 0 → 3 beats
+    scale = (targetBeats × CONFIG_PPQN) / naturalSum
+    for each cell: cell.duration = picked × scale
+    recompute relTicks from scaled durations
+
+elif feel > 55:
+    targetBeats = 4 + (feel - 55) / 45.0      // knob 100 → 5 beats
+    scale = (targetBeats × CONFIG_PPQN) / naturalSum
+    for each cell: cell.duration = picked × scale
+    recompute relTicks from scaled durations
 ```
 
-- Feel = 0: pure interval walk. Cycle length = sum of natural durations.
-- Feel = 100: cycle exactly fills the bar. Odd `Size` + bar = odd-time intrinsic (e.g. Size=5 in 4/4 → quintuplet feel).
-- Feel = 50: blend. Cycle drifts halfway toward bar boundary.
+- Feel = 0: cycle = 3 beats (3/4 feel against master clock).
+- Feel = 45..55: detent zone — Feel inactive. Cycle length floats with LUT picks. Default 50 sits here = identical to today's behavior.
+- Feel = 100: cycle = 5 beats (5/4 feel).
 
-Semantic shift to acknowledge: at Feel > 0, NoteDuration becomes a *relative weight*, not an absolute duration. NoteDuration shape (long-vs-short) preserved; absolute lengths fall out of the bar fit.
+Detent gives the user a safe "Feel off" zone in the middle of the knob range. Transitions outside detent (knob = 44 or 56) engage the metric lock. There IS a discontinuity at detent edges — at default knobs (natural cycle ≈ 4 beats) it's inaudible; at extreme knob settings the jump is larger but it's the user's deliberate "engage Feel" action.
+
+Semantic shift to acknowledge: when Feel is active, `NoteDuration` becomes a *relative weight* (cell-shape bias) rather than an absolute length. `Variation` still drives shape spread. `Size` still controls cell count per phrase. Cycle length is what Feel locks; internal shape is what NoteDuration + Variation determine.
+
+Routing target: reuse `Routing::Target::StochasticReserved` (ID 67, currently unused) renamed to `StochasticFeel`.
 
 ## Rhythm laws
 
@@ -115,7 +126,7 @@ Per cell:
 4. Update `prevDur` to this cell's duration.
 5. Roll rest, slide, legato. Pick degree/octave (per current generateDegree logic).
 
-After the walk: apply Feel scaling pass (`adjustedDur = lerp(dur, dur × barLen/sumLen, feel/100)`); recompute relTicks from adjustedDurs.
+After the walk: apply Feel scaling pass per the "One new knob: Feel" section above. If knob is in detent [45..55], leave durations as-picked. Else compute `scale = targetBeats × CONFIG_PPQN / naturalSum` (targetBeats derived from knob position) and multiply each cell's duration by scale. Recompute relTicks from the result.
 
 Cache holds cells uniformly. Engine `triggerStep` simplifies — drop `evaluateChildren` and `EvaluatedChild`, drop burst-walking loop, drop the parent/child path entirely.
 
@@ -171,11 +182,21 @@ Per AGENTS.md line 81: **no project version bumps during dev-stage feature work.
 - **Repeat decisions become part of stored cycle identity** (baked, not per-trigger random).
 - **Burst-children-as-decoration → cluster-cells-as-events.** Mute one, the others continue.
 
-## Open items
+## Locked decisions (2026-05-23)
 
-- Which LIVE-page slot for Feel (P4)?
-- Default `_size` value after density shift (P5) — 32 or higher?
-- Should Mask treat consecutive cluster cells cohesively, or strictly per-cell? Strict-per-cell is the default; revisit if hardware feedback says glitchy.
+- **Queue overflow**: drop oldest + debug log.
+- **BurstPitch fate**: keep both modes, rename UI to **Hold** (cluster cells share prior pitch — ratcheting) and **Roll** (cluster cells each pick own pitch). Demote toggle to context menu. Model field stays.
+- **Repeat baked**: content + duration (full cell copy; downstream relTicks shift).
+- **Mask + cluster**: strict per-cell.
+- **Feel**: detent [45..55] = off; endpoints 0 → 3 beats, 100 → 5 beats; default 50.
+- **Default `_size` after P5**: 32 (doubles default density to compensate for cluster-cells-eat-budget shift).
+- **LIVE page slot 7** = Feel (replaces BurstPitch).
+- **Routing target**: reuse `StochasticReserved` (ID 67) renamed `StochasticFeel`.
+
+## Open items (post-implementation)
+
+- Hardware feedback on Mask + cluster cohesion behavior — revisit only if "cluster started but stopped mid-way" sounds glitchy in practice.
+- Whether the detent discontinuity is perceptually acceptable across extreme NoteDuration settings.
 
 ## Out of scope
 
