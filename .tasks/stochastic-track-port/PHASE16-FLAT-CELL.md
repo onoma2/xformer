@@ -36,37 +36,51 @@ Semantic shift to acknowledge: at Feel > 0, NoteDuration becomes a *relative wei
 
 ## Rhythm laws
 
-1. **Cells are flat.** One uniform cell type: `relTick + duration + degree + octave + gateLen + flags`. No parent reference.
-2. **Generator places cells sequentially.** Each cell consumes its own duration. `relTick(N) = sum(durations 0..N-1)`. Cumulative.
-3. **Duration is the rhythm knob.** `NoteDuration` = center of LUT pick. `Variation` = spread. Same LUT (×8, ×4, ×3, ×2, ×4/3, ×1, ×2/3, ×1/2).
-4. **Clusters reinterpret burst knobs.** No new knobs.
+1. **Cells are flat.** One uniform cell type. Cache stores per cell: `relTick + gateLen + degree + octave + flags (slide, legato, audible)`. **Duration is implicit** — `dur(N) = relTick(N+1) - relTick(N)`. No parent reference, no separate child cells.
+2. **Generator places cells sequentially.** Each cell consumes a picked duration; the generator accumulates ticks and writes the next cell's relTick. Cell durations are arbitrary tick counts, not constrained to any fixed LUT.
+3. **Duration is the rhythm knob.**
+   - Ordinary cells: pick from the duration LUT (×8, ×4, ×3, ×2, ×4/3, ×1, ×2/3, ×1/2) weighted by `NoteDuration` (center) and `Variation` (spread).
+   - Cluster cells (Burst path): see law 4.
+4. **Bursts reinterpret existing knobs as relative-to-context cluster math.** No new knobs.
    - `Burst` (probability) = chance this cell starts a cluster.
-   - `BurstCount` = how many consecutive cells in the cluster.
-   - `BurstRate` = which short-LUT slot the cluster cells use.
-   - `BurstPitch::Parent` = cluster cells inherit start cell's degree+octave.
-   - `BurstPitch::Generate` = each cluster cell rolls its own pitch.
-   - Cluster cells advance the playhead. They eat slot budget.
-5. **Cycle wrap is structural.** Cycle ends when generator emits cell `last`, regardless of musical time. Phrase identity = N events; musical length follows from durations + Feel.
-6. **Mask / Tilt / Mutate / Repeat all per-cell.** No special burst-child rules. Cluster cells participate in ranking, can be muted, mutated. Loses "mute parent → children silent" — accept it.
-7. **Rest = silent cell.** Cell exists, has full duration, gate stays off. Cycle length unchanged.
+   - `BurstCount` = how many consecutive cells the cluster spans.
+   - `BurstRate` = **denominator applied to the previous cell's duration**. cluster_cell_duration = `prev_cell_duration / BurstRate_denom`. denom ∈ {2,3,4,5,6} — the same set today's burst spacing uses. Cluster cell durations are arbitrary ticks; they do NOT have to land on a LUT slot, which is what produces genuine polyrhythmic placement (e.g. prev=×1 at 48 ticks, denom=3 → cluster cells at 16 ticks = triplet-of-1/16 spacing, unreachable from the LUT alone).
+   - All `BurstCount` cluster cells emit at the same cluster_cell_duration. Generator returns to LUT picking after the cluster ends.
+   - `BurstPitch::Parent` = cluster cells inherit the cluster-starting cell's degree+octave.
+   - `BurstPitch::Generate` = each cluster cell rolls its own pitch via the keyed-RNG → generateDegree path.
+   - **Cluster cells advance the playhead.** They consume slot budget. Cycle's audible event count = N cells, including cluster cells.
+5. **`gateLen` is fraction-of-cell-duration.** 6-bit field stores `(actualGateTicks * 64) / cellDur`. Engine decodes at trigger: `gateTicks = (cell.gateLen * cellDur) / 64`. Uniform encoding for ordinary cells AND cluster cells — same shape as the existing fix for burst-child gates. No special clamps, no special cases.
+6. **Cycle wrap is structural.** Cycle ends when generator emits the cell at `last`, regardless of musical time. Phrase identity = N events; musical length follows from sum of durations + Feel scaling.
+7. **Mask / Tilt / Mutate / Repeat all per-cell.** Cluster cells participate in ranking, can be muted, mutated, repeated. Today's "mute parent → children silent" goes away — under flat, cluster cells are independently maskable. Accept the trade.
+8. **Rest = silent cell.** Cell exists, has its full duration, gate stays off. Cycle length unchanged. Cell still counts toward slot budget.
 
 ## Cache + RAM footprint
 
-Aggressive packing under flat:
-- 4 B `CachedCell`: steal 1 bit from `octave` (5→4 bits) to pack `audible` into the cell.
-- 1 B `CellAux`: rank only. Drop `burstChild` flag.
-- Drop `parentCacheIdx[]` (64 B): under flat, `K - first` is trivial inline math.
+Cell layout under flat (32 bits exact):
+- 12 bits `relTick` (when this cell starts, 0..4095 ticks from cycle start)
+- 7 bits `degree` (0..127)
+- 4 bits `octave` (0..15 — narrowed from 5 bits to make room for audible)
+- 6 bits `gateLen` (fraction-of-cell-duration in 64ths)
+- 1 bit `slide`
+- 1 bit `legato`
+- 1 bit `audible` (inverse of rest)
 
-Per-cell cost: 5 B (was 7).
+**Duration is implicit.** `cellDur(N) = relTick(N+1) - relTick(N)`. Engine derives duration at trigger. Cluster cells with non-LUT durations (arbitrary tick counts from `prev_dur / BurstRate_denom`) cost nothing extra to store — relTicks just land where they land.
+
+CellAux: 1 byte holding `rank` only. No `burstChild` flag (no children exist).
+
+`parentCacheIdx[]` (64 B in today's cache): dropped. Under flat, slot-to-cell-index is `K - first` if K is in window, else 0xff. Compute inline.
+
+Per-cell cost: 4 (cell) + 1 (aux) = **5 B**.
 
 | cap | per-track | Δ from today's CCMRAM |
 |---|---|---|
-| 64  | 320 B | −1,008 B |
-| **80**  | **400 B** | **−368 B** |
-| 96  | 480 B | +272 B (Stoch becomes Container max) |
-| 128 | 640 B | +1,552 B |
+| 64  | 320 B + ~3 B housekeeping | −1,008 B |
+| **80**  | **400 B + housekeeping** | **−368 B** |
+| 96  | 480 B + housekeeping | +272 B (Stoch becomes Container max) |
+| 128 | 640 B + housekeeping | +1,552 B |
 
-**Land at cap = 80.** 25% density headroom over today's effective max, slightly cheaper than today's CCMRAM footprint.
+**Land at cap = 80.** 25% density headroom over today's effective max (which was capped at 64 by the existing cell array). Slightly cheaper than today's CCMRAM footprint.
 
 ## Patch sequencing
 
@@ -89,7 +103,25 @@ Single constant after P2 lands. Verify STM32 CCMRAM accounting.
 Add `_feel`, `Routing::Target::StochasticFeel`. Wire to LIVE page (slot TBD at UI pass). Stored, inert.
 
 **P5 — Flat generator (the big one).**
-Rewrite `generateRhythm` as interval walk. Burst becomes duration-bias state (`clusterRemaining`, `clusterLutSlot`). Apply Feel scaling after the walk. Cache holds cells uniformly. Engine `triggerStep` simplifies — drop `evaluateChildren`, drop burst-walking loop. Tests updated for flat layout. Default `_size` re-defaulted (probably 32) to preserve perceived density.
+Rewrite `generateRhythm` as interval walk. Generator state during the walk:
+- `prevDur`: ticks of the most recently emitted cell (or first cell's LUT pick for the start of cycle).
+- `clusterRemaining`: 0 = normal; > 0 = inside a cluster.
+- `clusterDur`: cluster_cell_duration set when cluster starts, = `prevDur / BurstRate_denom`. Used for every cluster cell.
+
+Per cell:
+1. If `clusterRemaining > 0`: emit cell with duration = `clusterDur`. Decrement.
+2. Else: roll cluster start (`Bernoulli(Burst)`). If hit: set `clusterRemaining = BurstCount`, `clusterDur = prevDur / pickBurstRateDenom()`. Emit one cluster cell.
+3. Else: pick duration from LUT (NoteDuration + Variation kernel). Emit ordinary cell.
+4. Update `prevDur` to this cell's duration.
+5. Roll rest, slide, legato. Pick degree/octave (per current generateDegree logic).
+
+After the walk: apply Feel scaling pass (`adjustedDur = lerp(dur, dur × barLen/sumLen, feel/100)`); recompute relTicks from adjustedDurs.
+
+Cache holds cells uniformly. Engine `triggerStep` simplifies — drop `evaluateChildren` and `EvaluatedChild`, drop burst-walking loop, drop the parent/child path entirely.
+
+Tests updated for flat layout: add a denom-based duration check (BurstRate=3 with prev=48 → cluster cells at 16 ticks each, regardless of LUT slot values). Add a cluster-eats-budget test (Size=16 with Burst=100, BurstCount=4 → cycle covers fewer beats than Size=16 without bursts).
+
+Default `_size` re-defaulted (probably 32) to preserve perceived density across the slot-budget shift.
 
 ### Identity work (Phase 14B's deferred completion)
 
@@ -115,18 +147,21 @@ Per AGENTS.md line 81: **no project version bumps during dev-stage feature work.
 - Engine `useRepeat` / `_lastEvent` capture path.
 - `StochasticSourceEvent::childCount` / `burstRate` per-event fields (P5).
 - `StochasticSourceEvent` struct entirely (P8).
+- "Duration LUT slot" stored on a cell — replaced by implicit duration from relTick deltas. Cluster cells take arbitrary tick counts derived from `prev_dur / BurstRate_denom`.
 - Parent/child concept everywhere — code, comments, UI.
 
 ## What survives
 
 - `kCellCap` (resized to 80).
-- 4 B `CachedCell` shape (repacked).
+- 4 B `CachedCell` shape (repacked — fields reshuffled).
+- The duration LUT itself: still used by NoteDuration + Variation to pick *ordinary* cell durations. Cluster cells bypass it via the BurstRate denom path.
+- The BurstRate denom set {2, 3, 4, 5, 6}: same as today's burst spacing denominators. Knob behavior identical to the user's ear; the math just runs at generation time per cluster instead of at trigger time per child.
 - Mask filter math (rank-based).
 - Tilt deterministic salt.
 - Cache lifecycle (`refreshCache`, `syncWindowEdit`).
 - Direct-history walker.
 - Ticket dictionaries, scale, jump, sleep.
-- All existing knobs (with reinterpreted semantics for Burst).
+- All existing knobs (with reinterpreted semantics for Burst — see Rhythm laws).
 
 ## Acknowledged feel changes
 
