@@ -397,4 +397,77 @@ CASE("cache_cap_truncates_silently") {
     expectEqual(n, int(cache.count));
 }
 
+CASE("parents_keep_priority_under_burst_truncation") {
+    // Codex adversarial review 2026-05-22 finding #2: cell-cap truncation can
+    // leave late parent slots unmapped, mixing deterministic-cache ranks for
+    // early parents with legacy noisy ranks for late ones. Fix: parents have
+    // priority; bursts only consume capacity that doesn't starve later parents.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(32);   // must precede setLast — setLast clamps to size-1.
+    seq.setFirst(0);
+    seq.setLast(31);  // 32 parents — well within cap
+
+    // Every event requests 5 burst children: 32 × (1 + 5) = 192 cells if all
+    // fit, but cap is 64. Without parent priority, the first ~10 slots would
+    // consume the entire cap and slots 11..31 would be unmapped.
+    for (int i = 0; i < 32; ++i) {
+        auto &ev = seq.events()[i];
+        ev.setDurationIndex(1);  // ×4 = 192 ticks, allows bursts
+        ev.setRest(false);
+        ev.setRhythmValid(true);
+        ev.setChildCount(5);
+        ev.setBurstRate(0);
+    }
+
+    Cache cache{};
+    int n = regenerateCacheFromEvents(cache, seq, 48, 0xabcdef);
+    expectTrue(n <= kCellCap, "cap respected");
+
+    // Every parent slot in the active window MUST map to a parent cell —
+    // never 0xff. This is the property that prevents mixed rank semantics.
+    for (int slot = 0; slot <= 31; ++slot) {
+        expectTrue(cache.parentCacheIdx[slot] != 0xff,
+                   "every window slot must map to a parent cell");
+        expectTrue(cache.parentCacheIdx[slot] < kCellCap,
+                   "mapped index must point inside the cache");
+        expectFalse(cache.aux[cache.parentCacheIdx[slot]].burstChild(),
+                    "mapping must point at a parent, not a burst child");
+    }
+}
+
+CASE("rank_recomputes_when_tilt_changes_via_caller") {
+    // Codex adversarial review 2026-05-22 finding #1: tilt is a live knob, so
+    // the engine must call recomputeCacheRanks when tilt changes — the cache
+    // build itself only knows about the seed. This test exercises the helper
+    // directly to confirm tilt-only changes produce different rank orderings.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setFirst(0);
+    seq.setLast(7);
+
+    for (int i = 0; i < 8; ++i) {
+        auto &ev = seq.events()[i];
+        ev.setDurationIndex(i);
+        ev.setRest(false);
+        ev.setRhythmValid(true);
+    }
+
+    Cache cache{};
+    regenerateCacheFromEvents(cache, seq, 48, /*seed*/ 0xfeedface);
+    // Default build leaves tilt=0; capture the baseline ordering.
+    uint8_t ranksTilt0[kCellCap];
+    for (int i = 0; i < int(cache.count); ++i) ranksTilt0[i] = cache.aux[i].rank;
+
+    // Caller flips tilt without rebuilding the cache — must change ranks.
+    recomputeCacheRanks(cache, /*seed*/ 0xfeedface, /*tilt*/ 100);
+    int changed = 0;
+    for (int i = 0; i < int(cache.count); ++i) {
+        if (cache.aux[i].rank != ranksTilt0[i]) ++changed;
+    }
+    expectTrue(changed > 0, "tilt change must reshuffle at least some ranks");
+}
+
 } // UNIT_TEST("StochasticCacheParity")

@@ -37,18 +37,22 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
     for (int i = first; i <= last; ++i) {
         const StochasticSourceEvent &ev = seq.events()[i];
 
-        // Record this slot's parent cell index for O(1) rank lookup at trigger
-        // time. Captured before the parent cell is emitted so we know its idx.
-        if (cache.count < kCellCap && i < kMaxEventSlots) {
-            cache.parentCacheIdx[i] = cache.count;
-        }
-
         auto frac = StochasticTrackEngine::getDurationFraction(int(ev.durationIndex()));
         uint32_t parentTicks = (uint64_t(divisor) * frac.num) / frac.den;
         if (parentTicks == 0) parentTicks = 1;
 
-        // Build parent cell.
+        // Build parent cell. Parents have priority over burst children — the
+        // mask filter looks up rank by parentCacheIdx[slot] and falls back to
+        // legacy noisy ranks when a slot is unmapped, so silently dropping
+        // late parents would mix rank semantics inside one pattern (Codex
+        // adversarial review finding #2, 2026-05-22). Even under maximum-
+        // burst-density worst cases (16 parents × 5 children = 80 cells), the
+        // 64-cell cap is filled parents-first: bursts truncate, parents map.
         if (cache.count < kCellCap) {
+            if (i < kMaxEventSlots) {
+                cache.parentCacheIdx[i] = cache.count;
+            }
+
             uint32_t relTick = cycleTicks > kMaxRelTick ? kMaxRelTick : cycleTicks;
             int cv = 0;  // Patch A: CV resolution deferred to engine wiring (Patch B).
             uint8_t gateLen = encodeGateLenAsDurSlot(ev.durationIndex());
@@ -68,10 +72,15 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             ++cache.count;
         }
 
-        // Burst children — mirror evaluateChildren's spacing math.
+        // Burst children — mirror evaluateChildren's spacing math. Reserve
+        // capacity for every remaining parent in the window before adding
+        // children, so we never starve a later slot of its parent cell.
         int childCount = int(ev.childCount());
         if (parentTicks < kMinBurstParentTicks) childCount = 0;
-        if (childCount > 0) {
+        const int remainingParents = last - i;   // not counting current parent
+        int childCapacity = kCellCap - int(cache.count) - remainingParents;
+        if (childCapacity < 0) childCapacity = 0;
+        if (childCount > 0 && childCapacity > 0) {
             int spacingSlot = int(ev.burstRate());
             if (spacingSlot < 0) spacingSlot = 0;
             if (spacingSlot >= kBurstSpacingLutSize) spacingSlot = kBurstSpacingLutSize - 1;
@@ -80,6 +89,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             if (spacing < float(kMinChildGate + 1)) spacing = float(kMinChildGate + 1);
 
             for (int c = 0; c < childCount && c < StochasticTrackEngine::kMaxChildren; ++c) {
+                if (childCapacity <= 0) break;
                 if (cache.count >= kCellCap) break;
                 uint32_t childOffset = uint32_t((c + 1) * spacing);
                 uint32_t childGate = std::max(kMinChildGate, uint32_t(spacing * 0.5f));
@@ -110,6 +120,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
                     /*rank*/       0);
 
                 ++cache.count;
+                --childCapacity;
             }
         }
 

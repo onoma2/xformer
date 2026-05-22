@@ -505,6 +505,10 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 } else if (melodyEligible) {
                     applyMelody();
                 }
+                // Mutation just wrote into events; sync cache so the next
+                // cycle's mask filter sees the new content (Codex adversarial
+                // review finding #1, 2026-05-22).
+                refreshCache();
             }
 
             // Phase 12 Mask+Tilt: re-rank on Tilt / Size / First / Last change.
@@ -518,6 +522,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                     StochasticGenerator::generateMaskRanks(sequence, sequence.size(),
                         sequence.tilt(), sequence.rhythmSeed() ^ 0xdeadbeef);
                 }
+                // Cache rank also depends on tilt + window; the legacy refresh
+                // above only updates event.densityRank() (used as fallback).
+                // refreshCache() rebuilds cells from the (possibly resized)
+                // window and re-applies the live tilt to per-cell ranks.
+                refreshCache();
                 _lastAppliedTilt  = int8_t(sequence.tilt());
                 _lastAppliedSize  = uint8_t(sequence.size());
                 _lastAppliedFirst = uint8_t(sequence.first());
