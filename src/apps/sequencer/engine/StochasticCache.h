@@ -11,6 +11,8 @@
 #include <cstddef>
 
 class StochasticSequence;
+class StochasticTrack;
+class Scale;
 
 namespace stochastic_cache {
 
@@ -105,9 +107,16 @@ struct Cache {
 // the parity test can match cache content against today's behavior.
 //
 // `divisor` is the sequence divisor in ticks (engine reads this from track).
-// `seed` is the rhythmSeed used for deterministic rank assignment.
+// `seed` is the rhythmSeed used for deterministic rank assignment AND for
+//        burst-child Generate-mode pitch picking (keyed per cell index).
+// `scale` / `track` / `rootNote` are passed for burst-child Generate-mode
+//        scale-aware degree picking via StochasticGenerator::generateDegree.
+//        Optional — pass nullptr `scale` / `track` to skip burst-child note
+//        baking (children land with degree=0 placeholders for callers that
+//        only need timing).
 // Returns number of cells written.
-int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed);
+int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
+                              const Scale *scale = nullptr, const StochasticTrack *track = nullptr, int rootNote = 0);
 
 // Recompute ranks from keyed-hash salt + tilt. Cells must already be in
 // cache; durationIndex is recovered from gateLen via the duration LUT.

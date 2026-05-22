@@ -430,17 +430,33 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         isLegato = pLegato;
         isSlide = pSlide;
 
-        // Evaluate Children
+        // Phase 14B Patch C step 1b (2026-05-22): burst-child notes baked at
+        // cache-build. For the non-Repeat parent path, the engine walks the
+        // cache cells immediately after the parent — every burst-child cell
+        // is consecutive in cache layout, terminated by the next parent cell
+        // (or end of cache). Repeat path still uses evaluateChildren since
+        // _lastEvent's bursts don't live in the cache at readIndex's slot.
         StochasticGenerator::EvaluatedChild evalChildren[kMaxChildren];
-        if (!isRest) {
+        for (int i = 0; i < kMaxChildren; ++i) evalChildren[i].valid = false;
+        uint8_t childCount = 0;
+
+        if (useRepeat && !isRest) {
+            // Repeat path: bursts come from _lastEvent's stored fields.
             StochasticGenerator::evaluateChildren(evalChildren, sequence, eval, track, scale, rootNote, note, durationTicks, _rng);
-        } else {
-            for (int i = 0; i < kMaxChildren; ++i) evalChildren[i].valid = false;
+            for (int i = 0; i < kMaxChildren; ++i) if (evalChildren[i].valid) childCount++;
+        } else if (!useRepeat && !isRest) {
+            // Cache path: count bursts by walking the cache after the parent.
+            uint8_t parentIdx = (readIndex >= 0 && readIndex < int(stochastic_cache::kMaxEventSlots))
+                              ? _cache.parentCacheIdx[readIndex] : uint8_t(0xff);
+            if (parentIdx < stochastic_cache::kCellCap) {
+                for (uint8_t ci = parentIdx + 1; ci < _cache.count; ++ci) {
+                    if (!_cache.aux[ci].burstChild()) break;
+                    ++childCount;
+                    if (childCount >= kMaxChildren) break;
+                }
+            }
         }
 
-        // captureLockedParent removed 2026-05-22 — lock cache deferred.
-        uint8_t childCount = 0;
-        for (int i = 0; i < kMaxChildren; ++i) if (evalChildren[i].valid) childCount++;
         recordDirectHistory(finalCv, isRest, !isRest, childCount);
 
         if (!isRest) {
@@ -455,22 +471,58 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             }
             _activity = true;
 
-            for (int i = 0; i < kMaxChildren; ++i) {
-                if (evalChildren[i].valid) {
-                    uint32_t childTick = tick + evalChildren[i].tickOffset;
-                    uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
+            if (useRepeat) {
+                // Legacy burst playback for Repeat (kept until Repeat is baked).
+                for (int i = 0; i < kMaxChildren; ++i) {
+                    if (evalChildren[i].valid) {
+                        uint32_t childTick = tick + evalChildren[i].tickOffset;
+                        uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
 
-                    int childNote = evalChildren[i].note;
-                    if (sequence.burstPitch() == StochasticBurstPitch::Generate) {
-                        childNote += (_jumpRegister + track.octave()) * activeNotes + track.transpose();
+                        int childNote = evalChildren[i].note;
+                        if (sequence.burstPitch() == StochasticBurstPitch::Generate) {
+                            childNote += (_jumpRegister + track.octave()) * activeNotes + track.transpose();
+                        }
+                        float childCv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
+
+                        _gateQueue.push({ lowTick, false });
+                        _cvQueue.push({ childTick, childCv, isSlide });
+                        _gateQueue.push({ childTick, true });
+                        _gateQueue.push({ childTick + evalChildren[i].gateTicks, false });
                     }
-                    float childCv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
+                }
+            } else {
+                // Cache-driven burst playback. Each child cell carries its
+                // own degree/octave/gateLen and absolute relTick within the
+                // cycle. The parent cell's relTick tells us where in the
+                // cycle the parent slot starts; child absolute trigger tick
+                // = current parent trigger tick + (child.relTick - parent.relTick).
+                uint8_t parentIdx = _cache.parentCacheIdx[readIndex];
+                if (parentIdx < stochastic_cache::kCellCap) {
+                    uint32_t parentRel = _cache.cells[parentIdx].relTick();
+                    for (uint8_t ci = parentIdx + 1; ci < _cache.count; ++ci) {
+                        if (!_cache.aux[ci].burstChild()) break;
+                        const auto &cCell = _cache.cells[ci];
+                        uint32_t childRel = cCell.relTick();
+                        uint32_t childTick = tick + (childRel - parentRel);
+                        uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
 
-                    _gateQueue.push({ lowTick, false });
-                    _cvQueue.push({ childTick, childCv, isSlide });
-                    _gateQueue.push({ childTick, true });
-                    _gateQueue.push({ childTick + evalChildren[i].gateTicks, false });
-                    // DBG_STO("%u GATEpush LIVE child on=%u off=%u", tick, childTick, childTick + evalChildren[i].gateTicks);
+                        int childNote = int(cCell.degree())
+                                      + (int(cCell.octave()) + _jumpRegister + track.octave()) * activeNotes
+                                      + track.transpose();
+                        float childCv = scale.noteToVolts(childNote)
+                                      + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
+
+                        // For children, the cache's gateLen field holds raw
+                        // ticks (not durSlot). See encode path in
+                        // StochasticCache.cpp: `childGateField = min(kMaxGateLen, childGate)`.
+                        uint32_t childGateTicks = uint32_t(cCell.gateLen());
+                        if (childGateTicks < 1) childGateTicks = 1;
+
+                        _gateQueue.push({ lowTick, false });
+                        _cvQueue.push({ childTick, childCv, isSlide });
+                        _gateQueue.push({ childTick, true });
+                        _gateQueue.push({ childTick + childGateTicks, false });
+                    }
                 }
             }
         } else {
@@ -730,6 +782,7 @@ void StochasticTrackEngine::syncWindowEdit() {
 
 void StochasticTrackEngine::refreshCache() {
     auto &seq = sequence();
+    auto &trk = stochasticTrack();
     // Match the divisor computation in tick(): base divisor scaled by the
     // sequence's clockMultiplier and PPQN conversion. clockMultiplier is in
     // hundredths of one (so 100 == 1.0×).
@@ -737,8 +790,14 @@ void StochasticTrackEngine::refreshCache() {
     if (clockMult <= 0.f) clockMult = 1.f;
     uint32_t divisor = uint32_t(seq.divisor()) * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
     divisor = std::max<uint32_t>(1u, uint32_t(std::lround(divisor / clockMult)));
-    // rhythmSeed drives deterministic rank salt — same seed → same rank order.
-    stochastic_cache::regenerateCacheFromEvents(_cache, seq, divisor, seq.rhythmSeed());
+    // Scale + rootNote are needed to bake burst-child notes in Generate mode
+    // (Patch C-1b). rhythmSeed drives both deterministic rank salt and the
+    // per-cell keyed RNG for burst-child degree picks — same seed → same
+    // rank order AND same burst child pitches.
+    const auto &scale = seq.selectedScale(_model.project().scale());
+    int rootNote = seq.selectedRootNote(_model.project().rootNote());
+    stochastic_cache::regenerateCacheFromEvents(
+        _cache, seq, divisor, seq.rhythmSeed(), &scale, &trk, rootNote);
     // tilt feeds rank weights; recomputeCacheRanks already ran inside
     // regenerateCacheFromEvents with tilt=0, so re-run with live tilt.
     stochastic_cache::recomputeCacheRanks(_cache, seq.rhythmSeed(), int(seq.tilt()));

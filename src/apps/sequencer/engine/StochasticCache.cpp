@@ -1,9 +1,14 @@
 #include "StochasticCache.h"
 #include "StochasticTrackEngine.h"   // for getDurationFraction
+#include "StochasticGenerator.h"     // for generateDegree (burst-child notes)
 #include "KeyedRng.h"
 
 #include "model/StochasticSequence.h"
+#include "model/StochasticTrack.h"
 #include "model/StochasticTypes.h"
+#include "model/Scale.h"
+
+#include "core/utils/Random.h"
 
 #include <algorithm>
 
@@ -23,10 +28,15 @@ static uint8_t encodeGateLenAsDurSlot(uint8_t durationIndex) {
     return durationIndex & 0x3fu;
 }
 
-int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed) {
+int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
+                              const Scale *scale, const StochasticTrack *track, int rootNote) {
+    (void)rootNote; // unused — generateDegree consumes scale + track only, root is applied at trigger time
     cache.count = 0;
     cache.cycleTicks = 0;
     for (int i = 0; i < kMaxEventSlots; ++i) cache.parentCacheIdx[i] = 0xff;
+
+    const bool bakeChildNotes = (scale != nullptr) && (track != nullptr);
+    const int activeNotes = bakeChildNotes ? std::max(1, scale->notesPerOctave()) : 1;
 
     const int first = std::max(0, std::min(int(seq.first()), int(seq.size()) - 1));
     const int last  = std::max(first, std::min(int(seq.last()),  int(seq.size()) - 1));
@@ -107,14 +117,40 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 
                 uint8_t childGateField = uint8_t(std::min(uint32_t(kMaxGateLen), childGate));
 
-                // Burst child melody fields still deferred to trigger time
-                // (evaluateChildren picks per-child notes per StochasticBurstPitch
-                // mode — Parent or Generate). Cache stores zeros until a future
-                // patch bakes the child notes at cache-build.
+                // Burst child melody fields baked at cache-build (Patch C-1b,
+                // 2026-05-22). Parent mode: copy parent's degree+octave.
+                // Generate mode: per-cell keyed RNG → generateDegree (scale-
+                // aware), then split into degree-within-octave + octave.
+                // Without scale/track (cache-build called from a test path),
+                // children fall back to degree=0,octave=0.
+                uint8_t childDegree = 0;
+                uint8_t childOctave = 0;
+                if (bakeChildNotes) {
+                    if (seq.burstPitch() == StochasticBurstPitch::Generate) {
+                        // Use the child's own cell index as the RNG key — child
+                        // notes are independent per cell, reproducible from seed.
+                        // Cell index for this child is `cache.count` (before push).
+                        Random localRng(keyed_rng::cellSeed(seed, uint32_t(cache.count)));
+                        int lastDegree = -1;
+                        int absDeg = StochasticGenerator::generateDegree(seq, *track, *scale, lastDegree, localRng);
+                        if (absDeg < 0) absDeg = 0;
+                        childDegree = uint8_t(absDeg % activeNotes);
+                        int oct = absDeg / activeNotes;
+                        if (oct < 0) oct = 0;
+                        if (oct > kMaxOctave) oct = kMaxOctave;
+                        childOctave = uint8_t(oct);
+                    } else {
+                        // Parent mode: child plays parent's note. (Parent's
+                        // octave was already clamped 0..31 by event encoding.)
+                        childDegree = uint8_t(ev.degree());
+                        childOctave = uint8_t(ev.octave());
+                    }
+                }
+
                 cache.cells[cache.count] = CachedCell::make(
                     childAbsTick,
-                    /*degree*/  0,
-                    /*octave*/  0,
+                    childDegree,
+                    childOctave,
                     childGateField,
                     /*slide*/   false,
                     /*legato*/  false);
