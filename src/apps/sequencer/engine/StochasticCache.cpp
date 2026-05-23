@@ -110,17 +110,23 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
     int clusterRemaining = 0;
     uint32_t clusterDur = 0;
 
-    // Loop-mode melody pick state (2026-05-23): in Loop mode the cache walk
-    // picks each anchor cell's pitch via generateDegree using its own RNG
-    // seeded by melodySeed. Pitch-shaping knobs reshape the cache
-    // deterministically without rewriting the event tape — same parity as
-    // the rhythm path. In Live mode the engine writes fresh per-event pitches
-    // into the tape via writeLiveMelodyShadow, so the cache reads them
-    // verbatim and we stay out of the way. The mutate path's per-slot tape
-    // writes do not reach Loop playback under this contract — that's the
-    // next thing to address.
+    // Mode-gated pick paths (2026-05-23). Symmetric across pitch and rhythm:
+    //
+    //   Loop → cache walks pick per cell via keyed RNG seeded by the
+    //          domain's seed. Knob movement reshapes the cache
+    //          deterministically; the events array is left untouched.
+    //
+    //   Live → engine writes fresh content into events[readIndex] every
+    //          trigger via writeLive{Rhythm,Melody}Shadow. Cache reads
+    //          events verbatim — that's the actual freshness path. Pickers
+    //          stay out of the way.
+    //
+    // The mutate path's per-slot writes do not reach Loop playback under
+    // this contract — addressed next.
     const bool pickMelodyInCache =
         bakeChildNotes && seq.melodyMode() == StochasticSourceMode::Loop;
+    const bool pickRhythmInCache =
+        seq.rhythmMode() == StochasticSourceMode::Loop;
     Random meldRng(seq.melodySeed());
     int meldLastDeg = -1;
     uint8_t anchorDegree = 0;
@@ -142,7 +148,10 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             cellDur = clusterDur;
             --clusterRemaining;
             isClusterTail = true;
-        } else {
+        } else if (pickRhythmInCache) {
+            // Loop: pick fresh per cell via keyed RNG so NoteDuration /
+            // Variation / Burst / BurstCount / BurstRate (ui) knobs reshape
+            // the loop deterministically.
             const int picked = StochasticGenerator::pickDurationSlot(seq, cellRng);
             cellDur = lutTicks(uint8_t(picked));
 
@@ -161,9 +170,32 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
                 if (candidate >= kMinChildGate) {
                     clusterDur = candidate;
                     cellDur = clusterDur;
-                    // BurstCount picker returns the cluster count beyond the
-                    // starter cell, matching the old per-event semantics.
                     int count = StochasticGenerator::pickBurstCount(int(seq.burstCount()), cellRng);
+                    if (count > StochasticTrackEngine::kMaxChildren) {
+                        count = StochasticTrackEngine::kMaxChildren;
+                    }
+                    clusterRemaining = count;
+                }
+            }
+        } else {
+            // Live: engine wrote fresh content into events[i] this trigger.
+            // Read its durationIndex / childCount / burstRate so every event
+            // is genuinely fresh (not seed-locked to the previous cycle).
+            cellDur = lutTicks(uint8_t(ev.durationIndex()));
+            if (cache.count == 0) prevDur = cellDur;
+
+            if (int(ev.childCount()) > 0) {
+                int spacingSlot = int(ev.burstRate());
+                if (spacingSlot < 0) spacingSlot = 0;
+                if (spacingSlot >= int(sizeof(kBurstSpacingLut)/sizeof(kBurstSpacingLut[0]))) {
+                    spacingSlot = int(sizeof(kBurstSpacingLut)/sizeof(kBurstSpacingLut[0])) - 1;
+                }
+                const int denom = kBurstSpacingLut[spacingSlot];
+                const uint32_t candidate = prevDur / uint32_t(denom);
+                if (candidate >= kMinChildGate) {
+                    clusterDur = candidate;
+                    cellDur = clusterDur;
+                    int count = int(ev.childCount());
                     if (count > StochasticTrackEngine::kMaxChildren) {
                         count = StochasticTrackEngine::kMaxChildren;
                     }

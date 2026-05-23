@@ -206,9 +206,9 @@ CASE("window_first_last_respected") {
     clearAllEvents(seq);
     seq.setFirst(2);
     seq.setLast(4);
-    // Phase 16 P7 (2026-05-23): cache picks duration from sequence.noteDuration
-    // + variation. Lock variation to 0 so the test sees deterministic cell
-    // durations driven by the noteDuration knob alone.
+    // Loop rhythm mode so cache picks duration from the noteDuration /
+    // variation knobs deterministically (Live mode would read event fields).
+    seq.setRhythmMode(StochasticSourceMode::Loop);
     seq.setNoteDuration(5);
     seq.setVariation(0);
     seq.setBurst(0);
@@ -240,6 +240,7 @@ CASE("burst_knob_at_100_produces_cluster_cells") {
     seq.setSize(8);
     seq.setFirst(0);
     seq.setLast(7);
+    seq.setRhythmMode(StochasticSourceMode::Loop);   // exercise the cache-pick path
     seq.setNoteDuration(1);    // ×4 = 192 ticks at divisor=48
     seq.setVariation(0);
     seq.setBurst(100);
@@ -278,6 +279,7 @@ CASE("burst_knob_at_zero_produces_no_cluster_cells") {
     seq.setSize(8);
     seq.setFirst(0);
     seq.setLast(7);
+    seq.setRhythmMode(StochasticSourceMode::Loop);
     seq.setNoteDuration(3);    // ×2 = 96 ticks at divisor=48
     seq.setVariation(0);
     seq.setBurst(0);
@@ -306,6 +308,7 @@ CASE("cluster_cell_duration_never_below_minimum") {
     seq.setSize(8);
     seq.setFirst(0);
     seq.setLast(7);
+    seq.setRhythmMode(StochasticSourceMode::Loop);
     seq.setNoteDuration(7);    // ×1/2 = shortest natural slot, ~24 ticks at divisor=48
     seq.setVariation(0);
     seq.setBurst(100);
@@ -517,6 +520,7 @@ CASE("burst_pitch_roll_rerolls_cluster_tail_pitch") {
     seq.setSize(8);
     seq.setFirst(0);
     seq.setLast(7);
+    seq.setRhythmMode(StochasticSourceMode::Loop);   // cluster cells form via cache
     seq.setNoteDuration(1);
     seq.setVariation(0);
     seq.setBurst(100);
@@ -798,6 +802,7 @@ CASE("cycle_longer_than_4095_ticks_preserves_per_cell_durations") {
     seq.setSize(32);
     seq.setFirst(0);
     seq.setLast(31);
+    seq.setRhythmMode(StochasticSourceMode::Loop);
     seq.setNoteDuration(1);   // LUT slot 1 = ×4
     seq.setVariation(0);       // tight kernel → always picks the center slot
     seq.setBurst(0);           // no clusters
@@ -828,13 +833,14 @@ CASE("cache_walk_picks_duration_from_noteDuration_knob") {
     seq.setSize(4);
     seq.setFirst(0);
     seq.setLast(3);
+    seq.setRhythmMode(StochasticSourceMode::Loop);
     seq.setVariation(0);
     seq.setBurst(0);
     for (int i = 0; i < 4; ++i) {
         seq.events()[i].setRhythmValid(true);
         seq.events()[i].setRest(false);
         // Event-stored durationIndex deliberately a random slot — should be
-        // ignored by cache.
+        // ignored by cache in Loop mode.
         seq.events()[i].setDurationIndex(7);
     }
 
@@ -867,6 +873,7 @@ CASE("burst_fires_at_factory_defaults") {
     // Mirror the cleared default: size=32, noteDuration=5 (×1), variation=16,
     // divisor=12 (1/16 at PPQN=192 = 48 ticks per cell). Knob defaults except
     // burst itself — bring it up so the per-cell roll lands frequently.
+    seq.setRhythmMode(StochasticSourceMode::Loop);
     seq.setBurst(100);          // every roll lands → every cell tries to start a cluster
     seq.setBurstCount(50);      // medium count from the LUT
     seq.setBurstRate(50);       // medium denom from the LUT
@@ -920,6 +927,49 @@ CASE("cache_rebuild_is_deterministic_at_fixed_seed") {
                     int(cacheB.cells[i].durationTicks()),
                     "same seed must produce same per-cell durations");
     }
+}
+
+CASE("live_rhythm_reads_event_durationIndex_and_burst_fields") {
+    // Live (ui) rhythm contract: every trigger the engine writes fresh
+    // content into the events array via writeLiveRhythmShadow. The cache
+    // must read those event fields verbatim — not pick via keyed RNG —
+    // so each event is genuinely fresh, not seed-locked across cycles.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setRhythmMode(StochasticSourceMode::Live);
+    seq.setSize(4);
+    seq.setFirst(0);
+    seq.setLast(3);
+
+    // Sequence-level knobs deliberately different from what events store —
+    // the test proves cache ignores them in Live and uses event fields.
+    seq.setNoteDuration(0);    // would map to LUT slot 0 = ×8 if used
+    seq.setVariation(0);
+    seq.setBurst(0);
+
+    for (int i = 0; i < 4; ++i) {
+        auto &ev = seq.events()[i];
+        ev.setRhythmValid(true);
+        ev.setRest(false);
+        ev.setDurationIndex(5);   // ×1 = 48 ticks at divisor=48
+    }
+    // Slot 1 carries a burst spec — cluster of 2 cells with denom 3.
+    seq.events()[1].setChildCount(1);
+    seq.events()[1].setBurstRate(1);     // index 1 → kBurstSpacingLut[1] = 3
+
+    Cache cache{};
+    regenerateCacheFromEvents(cache, seq, /*divisor*/ 48, /*seed*/ 0xfeed);
+    expectEqual(int(cache.count), 4);
+
+    // Slot 0: ev.durationIndex=5 → 48 ticks (not slot 0 = ×8 which knob would give).
+    expectEqual(int(cache.cells[0].durationTicks()), 48);
+    // Slot 1: cluster anchor. cluster_dur = prev(48) / 3 = 16 ticks.
+    expectEqual(int(cache.cells[1].durationTicks()), 16);
+    // Slot 2: cluster tail, same cluster duration.
+    expectEqual(int(cache.cells[2].durationTicks()), 16);
+    // Slot 3: cluster ended (childCount=1 = anchor + 1 tail). Natural pick again.
+    expectEqual(int(cache.cells[3].durationTicks()), 48);
 }
 
 CASE("rank_recomputes_when_tilt_changes_via_caller") {
