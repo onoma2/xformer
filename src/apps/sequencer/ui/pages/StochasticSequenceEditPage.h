@@ -35,6 +35,7 @@ private:
         Init,
         Even,
         Random,
+        BurstPitch,   // Phase 16 (2026-05-23): toggle Hold/Roll burst-pitch mode (demoted from LIVE slot 7)
         Last
     };
 

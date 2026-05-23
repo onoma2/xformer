@@ -516,9 +516,9 @@ public:
         _resetMeasure = 0;
         _clockMultiplier.setBase(100);
 
-        _size = 16;
+        _size = 32;       // Phase 16 (2026-05-23): density restoration after flat bake-children-into-slots
         _first = 0;
-        _last = 15;
+        _last = 31;
 
         _rhythmValid = false;
         _melodyValid = false;
@@ -559,8 +559,8 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
         _mutate.setBase(0);
         _jump.setBase(0);
         _range = 1;
-        _rhythmMode = StochasticSourceMode::Loop;
-        _melodyMode = StochasticSourceMode::Loop;
+        _rhythmMode = StochasticSourceMode::Live;   // Phase 16 (2026-05-23): default playback = Live (was Loop)
+        _melodyMode = StochasticSourceMode::Live;
 
         for (int i = 0; i < 8; ++i) _durationTickets[i] = 0;
 

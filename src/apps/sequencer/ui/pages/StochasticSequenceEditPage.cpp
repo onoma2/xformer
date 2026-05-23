@@ -15,6 +15,7 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "INIT" },
     { "EVEN" },
     { "RAND" },
+    { "BPITCH" },   // Phase 16 (2026-05-23): toggle BurstPitch Hold/Roll (slot 7 → Feel)
 };
 
 static const ContextMenuModel::Item durContextMenuItems[] = {
@@ -695,9 +696,10 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     case 4:  seq.setBurst(seq.burst() + v);                          notifyStochasticShapingEdit(); break;
     case 5:  seq.setBurstCount(seq.burstCount() + v);                notifyStochasticShapingEdit(); break;
     case 6:  seq.setBurstRate(seq.burstRate() + v);                  notifyStochasticShapingEdit(); break;
-    case 7:  seq.setBurstPitch(StochasticBurstPitch(
-                ((int(seq.burstPitch()) + (value > 0 ? 1 : value < 0 ? -1 : 0)) % 2 + 2) % 2));
-             notifyStochasticShapingEdit(); break;
+    // Phase 16 (2026-05-23): slot 7 = Feel (replaces BurstPitch which moved to
+    // the LIVE context menu). Feel knob 0..100 with detent [45..55] = off;
+    // outside detent scales the cycle toward 3/4 (low) or 5/4 (high).
+    case 7:  seq.setFeel(seq.feel() + v); notifyStochasticShapingEdit(); break;
     case 8:  seq.setComplexity(seq.complexity() + v); break;
     case 9:  seq.setContour(seq.contour() + v); break;
     case 10: seq.setMarblesBias(seq.marblesBias() + v); break;
@@ -1599,6 +1601,20 @@ void StochasticSequenceEditPage::contextAction(int index) {
 
     switch (_currentPage) {
     case Page::Live: {
+        // BurstPitch toggle (Phase 16, 2026-05-23) — demoted from slot 7
+        // because Feel took its place. Hold = cluster cells share previous
+        // pitch (ratchet); Roll = cluster cells each pick own pitch.
+        if (ContextAction(index) == ContextAction::BurstPitch) {
+            auto cur = sequence.burstPitch();
+            sequence.setBurstPitch(cur == StochasticBurstPitch::Parent
+                                  ? StochasticBurstPitch::Generate
+                                  : StochasticBurstPitch::Parent);
+            notifyStochasticShapingEdit();
+            showMessage(sequence.burstPitch() == StochasticBurstPitch::Parent
+                        ? "BURST HOLD"
+                        : "BURST ROLL");
+            break;
+        }
         // INIT resets the LIVE-page params bound to step buttons back to their
         // model defaults (matches `StochasticSequence::clear()`). When the
         // selection mask is non-empty, only the held steps' params are reset
@@ -1619,7 +1635,7 @@ void StochasticSequenceEditPage::contextAction(int index) {
         if (wants(4))  sequence.setBurst(0);
         if (wants(5))  sequence.setBurstCount(0);
         if (wants(6))  sequence.setBurstRate(50);
-        if (wants(7))  sequence.setBurstPitch(StochasticBurstPitch::Parent);
+        if (wants(7))  sequence.setFeel(50);   // Phase 16: slot 7 is Feel (was BurstPitch)
         if (wants(8))  sequence.setComplexity(50);
         if (wants(9))  sequence.setContour(0);
         if (wants(10)) sequence.setMarblesBias(50);

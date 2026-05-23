@@ -450,31 +450,19 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         isLegato = pLegato;
         isSlide = pSlide;
 
-        // Phase 14B Patch C step 1b (2026-05-22): burst-child notes baked at
-        // cache-build. For the non-Repeat parent path, the engine walks the
-        // cache cells immediately after the parent — every burst-child cell
-        // is consecutive in cache layout, terminated by the next parent cell
-        // (or end of cache). Repeat path still uses evaluateChildren since
-        // _lastEvent's bursts don't live in the cache at readIndex's slot.
+        // Phase 16 (2026-05-23): under flat cell model, the non-Repeat path
+        // expresses bursts as consecutive cluster cells with their own
+        // duration (prev_dur/denom). Each cluster cell is its own event
+        // slot, so the engine plays them via the normal triggerStep loop —
+        // there are no aux.burstChild() cells to walk. Only Repeat still
+        // needs the legacy child-array path (bursts come from _lastEvent).
         StochasticGenerator::EvaluatedChild evalChildren[kMaxChildren];
         for (int i = 0; i < kMaxChildren; ++i) evalChildren[i].valid = false;
         uint8_t childCount = 0;
 
         if (useRepeat && !isRest) {
-            // Repeat path: bursts come from _lastEvent's stored fields.
             StochasticGenerator::evaluateChildren(evalChildren, sequence, eval, track, scale, rootNote, note, durationTicks, _rng);
             for (int i = 0; i < kMaxChildren; ++i) if (evalChildren[i].valid) childCount++;
-        } else if (!useRepeat && !isRest) {
-            // Cache path: count bursts by walking the cache after the parent.
-            uint8_t parentIdx = (readIndex >= 0 && readIndex < int(stochastic_cache::kMaxEventSlots))
-                              ? _cache.parentCacheIdx[readIndex] : uint8_t(0xff);
-            if (parentIdx < stochastic_cache::kCellCap) {
-                for (uint8_t ci = parentIdx + 1; ci < _cache.count; ++ci) {
-                    if (!_cache.aux[ci].burstChild()) break;
-                    ++childCount;
-                    if (childCount >= kMaxChildren) break;
-                }
-            }
         }
 
         recordDirectHistory(finalCv, isRest, !isRest, childCount);
@@ -492,7 +480,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _activity = true;
 
             if (useRepeat) {
-                // Legacy burst playback for Repeat (kept until Repeat is baked).
+                // Legacy burst playback for Repeat — bursts come from
+                // _lastEvent (Repeat replays the captured event, not the
+                // window). The flat-cell cache path doesn't apply here.
                 for (int i = 0; i < kMaxChildren; ++i) {
                     if (evalChildren[i].valid) {
                         uint32_t childTick = tick + evalChildren[i].tickOffset;
@@ -510,54 +500,10 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                         _gateQueue.push({ childTick + evalChildren[i].gateTicks, false });
                     }
                 }
-            } else {
-                // Cache-driven burst playback. Each child cell carries its
-                // own degree/octave/gateLen and absolute relTick within the
-                // cycle. The parent cell's relTick tells us where in the
-                // cycle the parent slot starts; child absolute trigger tick
-                // = current parent trigger tick + (child.relTick - parent.relTick).
-                uint8_t parentIdx = _cache.parentCacheIdx[readIndex];
-                if (parentIdx < stochastic_cache::kCellCap) {
-                    uint32_t parentRel = _cache.cells[parentIdx].relTick();
-                    // parentTicks for this slot — we already computed it above
-                    // as `durationTicks`. Children's gate length encodes as
-                    // 64ths of parentTicks; decode below.
-                    uint32_t parentTicks = durationTicks;
-                    for (uint8_t ci = parentIdx + 1; ci < _cache.count; ++ci) {
-                        if (!_cache.aux[ci].burstChild()) break;
-                        const auto &cCell = _cache.cells[ci];
-                        uint32_t childRel = cCell.relTick();
-                        // Phase 16 P5: scale burst-child offset by Feel.
-                        // Cell relTicks stored unscaled at cache build; engine
-                        // applies the cycle-stretch at trigger so the burst
-                        // shape stays proportional to the stretched parent.
-                        uint32_t childOffset = stochastic_cache::applyFeelScale(
-                            childRel - parentRel, _cache.feelScaleQ16);
-                        uint32_t childTick = tick + childOffset;
-                        uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
-
-                        int childNote = int(cCell.degree())
-                                      + (int(cCell.octave()) + _jumpRegister + track.octave()) * activeNotes
-                                      + track.transpose();
-                        float childCv = scale.noteToVolts(childNote)
-                                      + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
-
-                        // Decode child gate from 6-bit fraction (Codex finding 3
-                        // fix, 2026-05-22). Cell.gateLen() holds (childGate*64)
-                        // / parentTicks_natural. Inverse: childGateTicks =
-                        // (frac * parentTicks) / 64 where parentTicks is the
-                        // FEEL-SCALED parent duration. Gate scales with parent.
-                        constexpr uint32_t kMinChildGate = 6;
-                        uint32_t childGateTicks = (uint32_t(cCell.gateLen()) * parentTicks) / 64u;
-                        if (childGateTicks < kMinChildGate) childGateTicks = kMinChildGate;
-
-                        _gateQueue.push({ lowTick, false });
-                        _cvQueue.push({ childTick, childCv, isSlide });
-                        _gateQueue.push({ childTick, true });
-                        _gateQueue.push({ childTick + childGateTicks, false });
-                    }
-                }
             }
+            // Phase 16 (2026-05-23): non-Repeat burst playback is implicit —
+            // cluster cells are normal event slots with their own duration;
+            // each gets a triggerStep call. No cache-walk needed here.
         } else {
             // DBG_STO("%u CVpush REST p=%d cv=%.3f mode=%s", tick, _patternIndex, finalCv,
             //     track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always ? "Always" : "Gate");
