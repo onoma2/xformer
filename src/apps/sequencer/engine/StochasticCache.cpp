@@ -63,6 +63,7 @@ uint32_t computeFeelScaleQ16(int feel, uint32_t naturalSum, uint32_t beatTicks) 
 int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
                               const Scale *scale, const StochasticTrack *track, int rootNote) {
     (void)rootNote; // unused — generateDegree consumes scale + track only, root is applied at trigger time
+    (void)seed;     // unused under flat — no per-cell keyed RNG needed (clusters use deterministic prev-dur math)
     cache.count = 0;
     cache.cycleTicks = 0;
     cache.feelScaleQ16 = 0x10000;   // default: no scaling, set properly at end
@@ -70,149 +71,118 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 
     const bool bakeChildNotes = (scale != nullptr) && (track != nullptr);
     const int activeNotes = bakeChildNotes ? std::max(1, scale->notesPerOctave()) : 1;
+    (void)activeNotes; // currently unused under flat — Roll mode generated pitch lands here in P7 when wired
 
     const int first = std::max(0, std::min(int(seq.first()), int(seq.size()) - 1));
     const int last  = std::max(first, std::min(int(seq.last()),  int(seq.size()) - 1));
     if (last < first) return 0;
 
+    // Phase 16 flat-cell generator (2026-05-23).
+    //
+    // One cache cell per event slot. No parent/child distinction. Bursts
+    // become a duration-bias state running across consecutive cells: when
+    // an event starts a cluster, the next K cells take a duration derived
+    // from the previous cell's duration ÷ a burst-rate denominator.
+    //
+    // State carried across the walk:
+    //   prevDur:           ticks the previous cell occupied (or its LUT pick
+    //                      if cluster forced a different value). Used to
+    //                      derive cluster duration via the denom math.
+    //   clusterRemaining:  cells left in the current cluster (including the
+    //                      current one — decremented after each emit).
+    //   clusterDur:        the duration cluster cells take while the
+    //                      cluster is active.
+    //
+    // Cycle length = sum of every cell's duration. No "burst inside parent"
+    // anymore; clusters consume slot budget.
+
+    auto lutTicks = [&](uint8_t durationIndex) -> uint32_t {
+        auto frac = StochasticTrackEngine::getDurationFraction(int(durationIndex));
+        uint32_t t = (uint64_t(divisor) * frac.num) / frac.den;
+        return t > 0 ? t : 1;
+    };
+
     uint32_t cycleTicks = 0;
+    uint32_t prevDur = lutTicks(seq.events()[first].durationIndex());  // bootstrap
+    int clusterRemaining = 0;
+    uint32_t clusterDur = 0;
 
     for (int i = first; i <= last; ++i) {
+        if (cache.count >= kCellCap) break;  // hard cap; remaining slots dropped silently
+
         const StochasticSourceEvent &ev = seq.events()[i];
 
-        auto frac = StochasticTrackEngine::getDurationFraction(int(ev.durationIndex()));
-        uint32_t parentTicks = (uint64_t(divisor) * frac.num) / frac.den;
-        if (parentTicks == 0) parentTicks = 1;
+        // Decide this cell's duration. Cluster overrides the natural LUT pick.
+        uint32_t cellDur;
+        if (clusterRemaining > 0) {
+            cellDur = clusterDur;
+            --clusterRemaining;
+        } else {
+            cellDur = lutTicks(ev.durationIndex());
 
-        // Build parent cell. Parents have priority over burst children — the
-        // mask filter looks up rank by parentCacheIdx[slot] and falls back to
-        // legacy noisy ranks when a slot is unmapped, so silently dropping
-        // late parents would mix rank semantics inside one pattern (Codex
-        // adversarial review finding #2, 2026-05-22). Even under maximum-
-        // burst-density worst cases (16 parents × 5 children = 80 cells), the
-        // 64-cell cap is filled parents-first: bursts truncate, parents map.
-        if (cache.count < kCellCap) {
-            if (i < kMaxEventSlots) {
-                cache.parentCacheIdx[i] = cache.count;
-            }
+            // If this event starts a cluster, derive cluster duration from
+            // the PREVIOUS cell's emitted duration (relative-to-context
+            // semantics). The cluster's first cell IS this one.
+            int childCount = int(ev.childCount());
+            if (childCount > 0) {
+                int spacingSlot = int(ev.burstRate());
+                if (spacingSlot < 0) spacingSlot = 0;
+                if (spacingSlot >= kBurstSpacingLutSize) spacingSlot = kBurstSpacingLutSize - 1;
+                int denom = kBurstSpacingLut[spacingSlot];
+                clusterDur = prevDur / uint32_t(denom);
+                if (clusterDur < kMinChildGate) clusterDur = kMinChildGate;
 
-            uint32_t relTick = cycleTicks > kMaxRelTick ? kMaxRelTick : cycleTicks;
-            uint8_t gateLen = encodeGateLenAsDurSlot(ev.durationIndex());
-
-            cache.cells[cache.count] = CachedCell::make(
-                relTick,
-                uint8_t(ev.degree()),
-                int8_t(ev.octave()),
-                gateLen,
-                ev.slide(),
-                ev.legato(),
-                /*audible*/ !ev.rest());
-
-            cache.aux[cache.count] = CellAux::make(
-                /*burstChild*/ false,
-                /*rank*/       0);
-
-            ++cache.count;
-        }
-
-        // Burst children — mirror evaluateChildren's spacing math. Reserve
-        // capacity for every remaining parent in the window before adding
-        // children, so we never starve a later slot of its parent cell.
-        int childCount = int(ev.childCount());
-        if (parentTicks < kMinBurstParentTicks) childCount = 0;
-        const int remainingParents = last - i;   // not counting current parent
-        int childCapacity = kCellCap - int(cache.count) - remainingParents;
-        if (childCapacity < 0) childCapacity = 0;
-        if (childCount > 0 && childCapacity > 0) {
-            int spacingSlot = int(ev.burstRate());
-            if (spacingSlot < 0) spacingSlot = 0;
-            if (spacingSlot >= kBurstSpacingLutSize) spacingSlot = kBurstSpacingLutSize - 1;
-            int spacingDenom = kBurstSpacingLut[spacingSlot];
-            float spacing = float(parentTicks) / float(spacingDenom);
-            if (spacing < float(kMinChildGate + 1)) spacing = float(kMinChildGate + 1);
-
-            for (int c = 0; c < childCount && c < StochasticTrackEngine::kMaxChildren; ++c) {
-                if (childCapacity <= 0) break;
-                if (cache.count >= kCellCap) break;
-                uint32_t childOffset = uint32_t((c + 1) * spacing);
-                uint32_t childGate = std::max(kMinChildGate, uint32_t(spacing * 0.5f));
-                if (childOffset + childGate >= parentTicks) {
-                    if (childOffset + kMinChildGate < parentTicks) {
-                        childGate = parentTicks - childOffset - 1;
-                        if (childGate < kMinChildGate) break;
-                    } else {
-                        break;
-                    }
+                cellDur = clusterDur;
+                // BurstCount in today's events means "number of children" =
+                // additional cells beyond the cluster-starting one. Under
+                // flat we count this cell as the cluster start, so K more
+                // follow. Total cluster span = childCount + 1 cells.
+                clusterRemaining = childCount;
+                // childCount semantics: capped at kMaxChildren today; keep
+                // the same bound so flat behaves like burst.
+                if (clusterRemaining > StochasticTrackEngine::kMaxChildren) {
+                    clusterRemaining = StochasticTrackEngine::kMaxChildren;
                 }
-
-                uint32_t childAbsTick = cycleTicks + childOffset;
-                if (childAbsTick > kMaxRelTick) childAbsTick = kMaxRelTick;
-
-                // Encode child gate as fraction of parent duration in 64ths
-                // (6-bit slot, 0..63). Avoids the original 63-tick raw clamp
-                // (Codex finding 3, 2026-05-22) which truncated long-parent
-                // burst gates and skewed audible behavior vs the legacy
-                // evaluateChildren path. At trigger time the engine decodes
-                // back to ticks via the current parent's durationTicks:
-                //   childGateTicks = (cell.gateLen() * parentTicks) / 64
-                // Since childGate = parentTicks / (2 * spacingDenom), the
-                // fraction is always 1/(2 * spacingDenom) — fits in 6 bits
-                // for all spacingDenom ∈ {2..6}. Add 1 to round-half-up so
-                // tiny child gates don't decode to zero.
-                uint32_t childGateField32 = (childGate * 64u + parentTicks / 2u) / parentTicks;
-                if (childGateField32 < 1u) childGateField32 = 1u;
-                if (childGateField32 > kMaxGateLen) childGateField32 = kMaxGateLen;
-                uint8_t childGateField = uint8_t(childGateField32);
-
-                // Burst child melody fields baked at cache-build (Patch C-1b,
-                // 2026-05-22). Parent mode: copy parent's degree+octave.
-                // Generate mode: per-cell keyed RNG → generateDegree (scale-
-                // aware), then split into degree-within-octave + octave.
-                // Without scale/track (cache-build called from a test path),
-                // children fall back to degree=0,octave=0.
-                uint8_t childDegree = 0;
-                uint8_t childOctave = 0;
-                if (bakeChildNotes) {
-                    if (seq.burstPitch() == StochasticBurstPitch::Generate) {
-                        // Use the child's own cell index as the RNG key — child
-                        // notes are independent per cell, reproducible from seed.
-                        // Cell index for this child is `cache.count` (before push).
-                        Random localRng(keyed_rng::cellSeed(seed, uint32_t(cache.count)));
-                        int lastDegree = -1;
-                        int absDeg = StochasticGenerator::generateDegree(seq, *track, *scale, lastDegree, localRng);
-                        if (absDeg < 0) absDeg = 0;
-                        childDegree = uint8_t(absDeg % activeNotes);
-                        int oct = absDeg / activeNotes;
-                        if (oct < 0) oct = 0;
-                        if (oct > kMaxOctave) oct = kMaxOctave;
-                        childOctave = uint8_t(oct);
-                    } else {
-                        // Parent mode: child plays parent's note. (Parent's
-                        // octave was already clamped 0..31 by event encoding.)
-                        childDegree = uint8_t(ev.degree());
-                        childOctave = uint8_t(ev.octave());
-                    }
-                }
-
-                cache.cells[cache.count] = CachedCell::make(
-                    childAbsTick,
-                    childDegree,
-                    childOctave,
-                    childGateField,
-                    /*slide*/   false,
-                    /*legato*/  false,
-                    /*audible*/ !ev.rest());
-
-                cache.aux[cache.count] = CellAux::make(
-                    /*burstChild*/ true,
-                    /*rank*/       0);
-
-                ++cache.count;
-                --childCapacity;
             }
         }
 
-        cycleTicks += parentTicks;
+        // Pitch resolution per cell. For Roll mode in clusters, we'd reroll
+        // here using keyed RNG — but for now keep simple: every cell uses
+        // its own event.degree()/.octave(). The cluster Hold vs Roll
+        // distinction lands when generator gains keyed-RNG melody (next
+        // session). For Hold semantics today: events written by mutate keep
+        // their degree even inside clusters, which behaves like Hold.
+        uint8_t cellDegree = uint8_t(ev.degree());
+        uint8_t cellOctave = uint8_t(ev.octave());
+
+        // Gate length: 64ths-of-cell-duration. Default 32 (50%) for now;
+        // user gateLength knob modulation lands as a refinement after the
+        // flat model is verified.
+        constexpr uint8_t kDefaultGateFraction = 32;
+
+        uint32_t relTick = cycleTicks > kMaxRelTick ? kMaxRelTick : cycleTicks;
+
+        cache.cells[cache.count] = CachedCell::make(
+            relTick,
+            cellDegree,
+            cellOctave,
+            kDefaultGateFraction,
+            ev.slide(),
+            ev.legato(),
+            /*audible*/ !ev.rest());
+
+        cache.aux[cache.count] = CellAux::make(
+            /*burstChild*/ false,   // no children under flat — flag retained for binary compat
+            /*rank*/       0);
+
+        // 1:1 mapping: event slot K maps to cache cell (K - first).
+        if (i < kMaxEventSlots) {
+            cache.parentCacheIdx[i] = cache.count;
+        }
+
+        ++cache.count;
+        cycleTicks += cellDur;
+        prevDur = cellDur;
     }
 
     cache.cycleTicks = uint16_t(std::min(cycleTicks, uint32_t(UINT16_MAX)));
@@ -227,9 +197,14 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
     return cache.count;
 }
 
-// Compute deterministic ranks. Parent cells get duration-aware tilt bias;
-// burst-child cells inherit their parent's rank concept by being weighted
-// the same as their parent's durationIndex (the gateLen field holds it).
+// Compute deterministic ranks. Tilt biases cells along a long/short
+// duration axis; keyed hash provides a tie-break salt smaller than any
+// non-zero tilt step.
+//
+// Phase 16 flat rewrite (2026-05-23): duration is no longer encoded in
+// cell.gateLen (which now holds 64ths-of-cell-duration). Compute each
+// cell's actual duration from the relTick delta to the next cell. Last
+// cell uses cycleTicks as the implicit "next."
 void recomputeCacheRanks(Cache &cache, uint32_t seed, int tilt) {
     if (cache.count == 0) return;
 
@@ -238,11 +213,42 @@ void recomputeCacheRanks(Cache &cache, uint32_t seed, int tilt) {
 
     const int tiltClamped = std::max(-100, std::min(100, tilt));
 
+    // Derive each cell's duration from relTick deltas. Center the
+    // long-short axis on the median cell duration so ranks order purely
+    // on relative cell length, not absolute ticks. Computed once outside
+    // the per-cell loop for efficiency.
+    uint32_t durations[kCellCap];
+    uint32_t maxDur = 1;
     for (uint8_t i = 0; i < cache.count; ++i) {
-        const uint8_t durSlot = std::min(uint8_t(7), cache.cells[i].gateLen());
-        // longShortAxis in fixed-point: (durSlot - 3.5) ∈ -3.5 .. +3.5
-        // Multiply by 2 to get integer values -7..+7.
-        const int32_t longShortFP14 = int32_t(durSlot) * 2 - 7;
+        uint32_t thisTick = cache.cells[i].relTick();
+        uint32_t nextTick = (i + 1 < cache.count)
+                          ? cache.cells[i + 1].relTick()
+                          : uint32_t(cache.cycleTicks);
+        durations[i] = nextTick > thisTick ? (nextTick - thisTick) : 1;
+        if (durations[i] > maxDur) maxDur = durations[i];
+    }
+
+    for (uint8_t i = 0; i < cache.count; ++i) {
+        // longShortAxis: normalize duration to ±7 range centered on midpoint.
+        //   shortest cell → -7, longest cell → +7.
+        // Tilt > 0 + long cell → high bias → high rank → gets Mask-cut first.
+        // Mask cuts HIGH ranks, so for "long survives Mask" we need long → LOW
+        // rank. Today's contract: bias = tilt × (longShortAxis). Tilt > 0 and
+        // long cell → positive bias → high rank → cut. So semantically
+        // tilt > 0 cuts LONG cells first; "survive Mask" = low rank = short
+        // cells under +tilt. Reverse for -tilt. Same shape as legacy
+        // generateMaskRanks weighting.
+        int32_t longShortFP14;
+        if (maxDur <= 1) {
+            longShortFP14 = 0;
+        } else {
+            // Map duration ∈ [1, maxDur] → [+7, -7] linear (long → low/
+            // negative, short → high/positive). This sign matches the
+            // legacy parent/child code path: under tilt > 0, long cells
+            // get NEGATIVE bias → LOW rank → SURVIVE Mask (Mask cuts
+            // high ranks). Short cells get HIGH rank → cut first.
+            longShortFP14 = 7 - int32_t((int64_t(durations[i]) * 14) / maxDur);
+        }
         const int32_t biasTerm = int32_t(tiltClamped) * longShortFP14 * 100;
 
         // Hash salt: top byte of keyed seed × small constant. Always positive,

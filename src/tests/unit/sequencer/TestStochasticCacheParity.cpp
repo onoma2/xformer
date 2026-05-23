@@ -160,12 +160,15 @@ CASE("single_parent_event_relTick_and_gateLen") {
     int n = regenerateCacheFromEvents(cache, seq, /*divisor*/ 48, /*seed*/ 0x1234);
     expectEqual(n, 1);
     expectEqual(int(cache.cells[0].relTick()), 0);
-    expectEqual(int(cache.cells[0].gateLen()), 5);
+    // Phase 16 flat (2026-05-23): gateLen is 64ths-of-cell-duration, not a
+    // LUT slot. Default = 32 (50%).
+    expectEqual(int(cache.cells[0].gateLen()), 32);
     expectTrue(cache.cells[0].slide(), "slide flag must propagate");
     expectFalse(cache.cells[0].legato(), "legato flag must propagate (false case)");
     expectTrue(cache.cells[0].audible(), "non-rest event is audible");
-    expectFalse(cache.aux[0].burstChild(), "parent is not a burst child");
-    expectEqual(int(cache.cycleTicks), 48);  // divisor × (1/1) = 48
+    expectFalse(cache.aux[0].burstChild(), "no burst children under flat — flag always false");
+    // Cycle = single cell's duration. durationIndex=5 → LUT ×1 → 48 ticks.
+    expectEqual(int(cache.cycleTicks), 48);
 }
 
 CASE("rest_event_audible_false") {
@@ -210,95 +213,98 @@ CASE("window_first_last_respected") {
     expectEqual(int(cache.cycleTicks), 144);
 }
 
-CASE("burst_children_match_reference_math") {
+CASE("burst_starts_cluster_with_denom_duration") {
+    // Phase 16 flat (2026-05-23): burst no longer spawns separate child cells.
+    // It biases the next K cells (BurstCount) to take `prev_dur / denom` as
+    // their duration. Cluster cells advance the playhead like any other cell.
+    //
+    // Setup: 4 events. Slot 0 = normal long. Slot 1 starts a 3-cell cluster
+    // with denom=4 (BurstRate=2 → kBurstSpacingLut[2]=4). Cluster spans
+    // slots 1,2,3.
     StochasticSequence seq;
     seq.clear();
     clearAllEvents(seq);
+    seq.setSize(4);
     seq.setFirst(0);
-    seq.setLast(0);
+    seq.setLast(3);
 
-    auto &ev = seq.events()[0];
-    ev.setDurationIndex(1);  // ×4 of divisor — 4 × 48 = 192 ticks, above kMinBurstParentTicks
-    ev.setRest(false);
-    ev.setRhythmValid(true);
-    ev.setChildCount(3);
-    ev.setBurstRate(2);  // spacingSlot=2 → denom=4
-    // parentTicks = 192. spacing = 192/4 = 48. 3 children at offsets 48, 96, 144.
+    for (int i = 0; i < 4; ++i) {
+        auto &ev = seq.events()[i];
+        ev.setDurationIndex(1);     // ×4 LUT slot → 192 ticks at divisor=48
+        ev.setRest(false);
+        ev.setRhythmValid(true);
+    }
+    // Cluster start on slot 1: childCount=2 means 2 ADDITIONAL cells beyond
+    // the starter (cluster spans slots 1, 2, 3). burstRate=2 → denom=4.
+    seq.events()[1].setChildCount(2);
+    seq.events()[1].setBurstRate(2);
 
     Cache cache{};
     int n = regenerateCacheFromEvents(cache, seq, 48, 0);
-    expectEqual(n, 4);  // parent + 3 children
-    expectFalse(cache.aux[0].burstChild(), "first cell is parent");
-    expectTrue(cache.aux[1].burstChild(), "cells 1-3 are burst children");
-    expectTrue(cache.aux[2].burstChild());
-    expectTrue(cache.aux[3].burstChild());
+    // Flat layout: cell count = window size (4 events → 4 cells).
+    expectEqual(n, 4);
 
-    uint32_t refOffsets[5];
-    int refCount = expectedChildOffsets(/*parentTicks*/ 192, /*childCount*/ 3, /*spacingSlot*/ 2, refOffsets);
-    expectEqual(refCount, 3);
-    expectEqual(int(cache.cells[1].relTick()), int(refOffsets[0]));
-    expectEqual(int(cache.cells[2].relTick()), int(refOffsets[1]));
-    expectEqual(int(cache.cells[3].relTick()), int(refOffsets[2]));
+    // All cells are "parents" — no burstChild flag set under flat.
+    for (int i = 0; i < 4; ++i) {
+        expectFalse(cache.aux[i].burstChild(), "no burst-child flag under flat");
+    }
+
+    // Slot 0 = LUT ×4 = 192 ticks. Slots 1,2,3 = cluster cells at prev/denom.
+    // prev_dur entering cluster = 192. denom=4 → cluster_dur = 192/4 = 48.
+    expectEqual(int(cache.cells[0].relTick()),   0);
+    expectEqual(int(cache.cells[1].relTick()), 192);
+    expectEqual(int(cache.cells[2].relTick()), 192 + 48);
+    expectEqual(int(cache.cells[3].relTick()), 192 + 48 + 48);
+    // Cycle = 192 + 48 + 48 + 48 = 336.
+    expectEqual(int(cache.cycleTicks), 336);
 }
 
-CASE("burst_child_gate_fraction_survives_long_parents") {
-    // Codex review 2026-05-22 finding 3: legacy evaluateChildren used the full
-    // computed gateTicks. Previous cache encoding clamped to 63 raw ticks,
-    // shortening child gates at long parent durations and skewing audible
-    // behavior vs the Repeat-legacy path. Fix: cache stores child gate as
-    // 64ths-of-parent fraction; engine decodes back to ticks at trigger time.
-    //
-    // This test exercises the fraction roundtrip directly: emit a parent
-    // long enough that the raw childGate exceeds 63 ticks, then verify the
-    // engine-side decode reconstructs the original tick count within rounding.
+CASE("cluster_duration_unbounded_at_long_parents") {
+    // Phase 16 flat (2026-05-23): cluster cells take prev_dur / denom as
+    // their actual duration. At long prev_dur values the resulting tick
+    // count can be hundreds — that's fine under flat because cell durations
+    // are implicit from relTick deltas, not clamped to a 6-bit field.
+    // Verify a long-parent + small-denom cluster produces correctly large
+    // cluster cell durations.
     StochasticSequence seq;
     seq.clear();
     clearAllEvents(seq);
+    seq.setSize(3);
     seq.setFirst(0);
-    seq.setLast(0);
-    seq.setBurstPitch(StochasticBurstPitch::Parent);
+    seq.setLast(2);
 
-    auto &ev = seq.events()[0];
-    ev.setDurationIndex(0);   // longest: ×8 (largest LUT slot)
-    ev.setRest(false);
-    ev.setRhythmValid(true);
-    ev.setChildCount(2);
-    ev.setBurstRate(0);       // spacingSlot 0 → denom 2; childGate = parentTicks/4
+    seq.events()[0].setDurationIndex(0);   // ×8 LUT slot, long ordinary cell
+    seq.events()[0].setRest(false);
+    seq.events()[0].setRhythmValid(true);
 
-    // Use a divisor large enough that parentTicks * 8 overshoots the legacy
-    // 63-tick clamp by a large margin. divisor=96 → parentTicks = 96 * 8 = 768.
-    // spacing = 768 / 2 = 384. childGate (legacy) = 384 * 0.5 = 192. Far above 63.
+    seq.events()[1].setDurationIndex(0);   // overridden by cluster
+    seq.events()[1].setRest(false);
+    seq.events()[1].setRhythmValid(true);
+    seq.events()[1].setChildCount(1);      // cluster: slot 1 + 1 more = 2 cells
+    seq.events()[1].setBurstRate(0);       // denom 2
+
+    seq.events()[2].setDurationIndex(0);   // still inside cluster
+    seq.events()[2].setRest(false);
+    seq.events()[2].setRhythmValid(true);
+
     const uint32_t kDivisor = 96;
     Cache cache{};
     regenerateCacheFromEvents(cache, seq, kDivisor, 0xfeed);
 
-    // Parent at index 0; child at index 1 (we requested 2 children but only
-    // the first fits before parentTicks runs out at spacingDenom=2).
-    expectTrue(cache.count >= 2, "at least one child must be cached");
-    expectFalse(cache.aux[0].burstChild());
-    expectTrue(cache.aux[1].burstChild());
+    expectEqual(int(cache.count), 3);
+    // Slot 0 = 8 × 96 = 768 ticks ordinary.
+    // Slot 1 = cluster_dur = prev(768) / 2 = 384 ticks.
+    // Slot 2 = cluster continues (childCount=1 means 1 more after starter) =
+    //          384 ticks (same cluster_dur).
+    // Cycle = 768 + 384 + 384 = 1536.
+    expectEqual(int(cache.cells[0].relTick()),    0);
+    expectEqual(int(cache.cells[1].relTick()),  768);
+    expectEqual(int(cache.cells[2].relTick()), 1152);
+    expectEqual(int(cache.cycleTicks), 1536);
 
-    // Compute parentTicks the same way the engine does at trigger time.
-    auto frac = StochasticTrackEngine::getDurationFraction(int(ev.durationIndex()));
-    uint32_t parentTicks = (uint64_t(kDivisor) * frac.num) / frac.den;
-    expectEqual(int(parentTicks), 768);
-
-    // Decode the child's gate from the cell's 64ths fraction.
-    uint32_t childGateField = cache.cells[1].gateLen();
-    expectTrue(childGateField > 0 && childGateField <= 63,
-               "fraction must encode in 6-bit range");
-    uint32_t decodedGate = (childGateField * parentTicks) / 64u;
-
-    // Expected legacy gate = parentTicks / 4 = 192. Allow rounding within
-    // one quantization step (parentTicks/64 = 12 ticks per fractional unit).
-    const uint32_t kExpectedLegacyGate = 192;
-    uint32_t tolerance = parentTicks / 64u;   // one fractional-step worth
-    uint32_t delta = decodedGate > kExpectedLegacyGate
-                   ? decodedGate - kExpectedLegacyGate
-                   : kExpectedLegacyGate - decodedGate;
-    expectTrue(delta <= tolerance,
-               "decoded child gate must match legacy gate within fractional tolerance — "
-               "previous raw 63-tick clamp would fail this test by ~129 ticks");
+    // Confirm cluster cell duration is 384 (unbounded, no 6-bit clamp).
+    uint32_t cell1Dur = cache.cells[2].relTick() - cache.cells[1].relTick();
+    expectEqual(int(cell1Dur), 384);
 }
 
 CASE("burst_suppressed_when_parent_too_short") {
@@ -487,17 +493,13 @@ CASE("parent_cache_idx_maps_slot_to_parent_cell") {
     Cache cache{};
     regenerateCacheFromEvents(cache, seq, 48, 0xa5a5);
 
-    // Expected cache layout (parent + children interleaved):
-    //   idx 0: parent slot 0 (no children)
-    //   idx 1: parent slot 1
-    //   idx 2,3: slot 1's burst children
-    //   idx 4: parent slot 2
-    //   idx 5: parent slot 3
-    //   idx 6,7,8: slot 3's burst children
+    // Phase 16 flat (2026-05-23): cells are 1:1 with event slots. No
+    // separate burst-child cells. parentCacheIdx[K] = K - first for K in
+    // [first..last]. Outside the window, 0xff.
     expectEqual(int(cache.parentCacheIdx[0]), 0);
     expectEqual(int(cache.parentCacheIdx[1]), 1);
-    expectEqual(int(cache.parentCacheIdx[2]), 4);
-    expectEqual(int(cache.parentCacheIdx[3]), 5);
+    expectEqual(int(cache.parentCacheIdx[2]), 2);
+    expectEqual(int(cache.parentCacheIdx[3]), 3);
 
     // Slot outside the window is unmapped.
     expectEqual(int(cache.parentCacheIdx[10]), 0xff);

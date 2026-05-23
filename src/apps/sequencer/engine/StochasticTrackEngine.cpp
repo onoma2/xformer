@@ -365,39 +365,55 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // eval (i.e. _lastEvent) because the audible material is the
         // repeated event, not the cell at readIndex (same discipline as the
         // mask-rank fix).
-        int  pDurIdx = eval.durationIndex();
+        // Phase 16 flat playback (2026-05-23): cells are 1:1 with event
+        // slots. Cell duration is implicit from relTick deltas (next cell
+        // or cycleTicks for the last cell). cell.gateLen() now holds
+        // 64ths-of-cell-duration (the gate fraction), not a duration LUT
+        // slot. Engine derives both duration and gate from these.
+        int  pDurIdx = eval.durationIndex();  // legacy fallback / repeat path
         int  pDegree = int(eval.degree());
         int  pOctave = int(eval.octave());
         bool pRest   = bool(eval.rest());
         bool pSlide  = bool(eval.slide());
         bool pLegato = bool(eval.legato());
+        uint32_t cellDurFromCache = 0;       // 0 → use legacy durationIndex path
+        uint8_t  cellGateFrac     = 32;      // default 50% if no cache
         if (!useRepeat) {
             uint8_t cIdx = (readIndex >= 0 && readIndex < int(stochastic_cache::kMaxEventSlots))
                          ? _cache.parentCacheIdx[readIndex]
                          : uint8_t(0xff);
-            if (cIdx < stochastic_cache::kCellCap) {
+            if (cIdx < stochastic_cache::kCellCap && cIdx < _cache.count) {
                 const auto &cell = _cache.cells[cIdx];
-                pDurIdx = int(cell.gateLen());  // cell.gateLen field holds durSlot (encodeGateLenAsDurSlot)
+                // Duration derived from relTick delta to next cell (or
+                // cycleTicks for the last cell in the cycle).
+                uint32_t thisRel = cell.relTick();
+                uint32_t nextRel = (cIdx + 1 < _cache.count)
+                                 ? _cache.cells[cIdx + 1].relTick()
+                                 : uint32_t(_cache.cycleTicks);
+                cellDurFromCache = (nextRel > thisRel) ? (nextRel - thisRel) : 1;
+                cellGateFrac = cell.gateLen();
                 pDegree = int(cell.degree());
                 pOctave = int(cell.octave());
-                pRest   = !cell.audible();      // audible packed into cell in Phase 16 P2
+                pRest   = !cell.audible();
                 pSlide  = cell.slide();
                 pLegato = cell.legato();
             }
-            // else: cache unprimed (engine reset, no refresh yet) — fall back
-            // to event-tape values already loaded above.
+            // else: cache unprimed → fall back to event-tape values + LUT.
         }
 
-        // Duration LUT is divisor-relative: ticks = (divisor * num) / den.
-        // Variation is applied at generation time in generateRhythmEvent — each
-        // event's durationIndex is already varied when stored, so we just
-        // read the (possibly cache-sourced) durationIndex directly.
-        auto frac = getDurationFraction(pDurIdx);
-        uint32_t mult = (uint64_t(divisor) * frac.num) / frac.den;
-        if (mult < 1) mult = 1;
-        // Phase 16 P5 (2026-05-23): apply Feel scaling. Cache.feelScaleQ16 was
-        // computed at refresh time from the sequence's natural cycle length
-        // and the Feel knob. Default (knob in detent) = 0x10000 = no scaling.
+        // Compute durationTicks:
+        //   Non-Repeat with primed cache → use cache-derived duration.
+        //   Otherwise → LUT-pick from eval.durationIndex(), legacy path.
+        uint32_t mult;
+        if (cellDurFromCache > 0) {
+            mult = cellDurFromCache;
+        } else {
+            auto frac = getDurationFraction(pDurIdx);
+            mult = (uint64_t(divisor) * frac.num) / frac.den;
+            if (mult < 1) mult = 1;
+        }
+        // Feel scaling: cache.feelScaleQ16 is computed at refresh from the
+        // natural cycleTicks and seq.feel(). Default detent = no scaling.
         mult = stochastic_cache::applyFeelScale(mult, _cache.feelScaleQ16);
         if (mult < 1) mult = 1;
         _lastDurationIndex = pDurIdx;
