@@ -1184,20 +1184,18 @@ void StochasticSequenceEditPage::keyDown(KeyEvent &event) {
     bool isHero = (_currentPage == Page::Live || _currentPage == Page::Loop);
     if (isHero) {
         if (key.isStep() && !key.pageModifier()) {
+            if (!_persistMode && key.shiftModifier()) {
+                _heroSelectionMask = 0;
+                _persistMode = true;
+            }
+            if (_persistMode && !key.shiftModifier()) {
+                _heroSelectionMask = 0;
+                _persistMode = false;
+            }
             int step = key.step();
             if (step >= 0 && step < 16) {
-                if (_persistMode) _heroSelectionMask ^= (1U << step);
-                else              _heroSelectionMask |= (1U << step);
+                _heroSelectionMask ^= (1U << step);
             }
-            event.consume();
-            return;
-        }
-        if (key.isShift()) {
-            // Toggle persist mode. Mirrors the ticket-page shift latch — when
-            // turning persist off, clear the mask so the next step press starts
-            // fresh.
-            _persistMode = !_persistMode;
-            if (!_persistMode) _heroSelectionMask = 0;
             event.consume();
             return;
         }
