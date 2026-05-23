@@ -67,17 +67,17 @@ CASE("cell_pack_roundtrip") {
     // useful value range. This is the load-bearing invariant of the 4-byte
     // pack — if it fails, nothing else in this test means anything.
     //
-    // Phase 16 P2 (2026-05-23): octave narrowed 5→4 bits (max 15) to free a
-    // bit for `audible` packed into the cell. Test exercises the new layout.
-    for (uint32_t r : { 0u, 1u, 96u, 768u, 2047u, 4095u }) {
+    // Phase 16 P6 (2026-05-23): the 12-bit slot now stores per-cell duration
+    // (was absolute cycle position). Same bit width, new semantics.
+    for (uint32_t dur : { 1u, 48u, 96u, 768u, 2047u, 4095u }) {
         for (uint8_t deg : { uint8_t(0), uint8_t(1), uint8_t(63), uint8_t(127) }) {
             for (uint8_t oct : { uint8_t(0), uint8_t(1), uint8_t(7), uint8_t(15) }) {
                 for (uint8_t g : { uint8_t(0), uint8_t(31), uint8_t(63) }) {
                     for (bool slide : { false, true }) {
                         for (bool legato : { false, true }) {
                             for (bool audible : { false, true }) {
-                                auto c = CachedCell::make(r, deg, oct, g, slide, legato, audible);
-                                expectEqual(uint32_t(c.relTick()), r);
+                                auto c = CachedCell::make(dur, deg, oct, g, slide, legato, audible);
+                                expectEqual(uint32_t(c.durationTicks()), dur);
                                 expectEqual(int(c.degree()), int(deg));
                                 expectEqual(int(c.octave()), int(oct));
                                 expectEqual(int(c.gateLen()), int(g));
@@ -91,6 +91,13 @@ CASE("cell_pack_roundtrip") {
             }
         }
     }
+}
+
+CASE("cell_duration_clamps_at_kMaxCellDuration") {
+    // Phase 16 P6 (2026-05-23): individual cell duration is capped by the
+    // 12-bit field width. CachedCell::make must clamp gracefully, not wrap.
+    auto c = CachedCell::make(8000, 0, 0, 32, false, false, true);
+    expectEqual(int(c.durationTicks()), int(kMaxCellDuration));
 }
 
 CASE("empty_sequence_yields_empty_cache") {
@@ -159,7 +166,9 @@ CASE("single_parent_event_relTick_and_gateLen") {
     Cache cache{};
     int n = regenerateCacheFromEvents(cache, seq, /*divisor*/ 48, /*seed*/ 0x1234);
     expectEqual(n, 1);
-    expectEqual(int(cache.cells[0].relTick()), 0);
+    // Phase 16 P6 (2026-05-23): cell holds its own duration. durationIndex=5
+    // → LUT ×1 → 48 ticks at divisor=48.
+    expectEqual(int(cache.cells[0].durationTicks()), 48);
     // Phase 16 flat (2026-05-23): gateLen is 64ths-of-cell-duration, not a
     // LUT slot. Default = 32 (50%).
     expectEqual(int(cache.cells[0].gateLen()), 32);
@@ -206,10 +215,11 @@ CASE("window_first_last_respected") {
     Cache cache{};
     int n = regenerateCacheFromEvents(cache, seq, 48, 0);
     expectEqual(n, 3);  // slots 2, 3, 4 only
-    // First cell's relTick must be 0 — window starts at first(), not slot 0.
-    expectEqual(int(cache.cells[0].relTick()), 0);
-    expectEqual(int(cache.cells[1].relTick()), 48);
-    expectEqual(int(cache.cells[2].relTick()), 96);
+    // Phase 16 P6 (2026-05-23): each cell carries its own duration.
+    // Three slots × LUT ×1 (slot 5) × divisor 48 = three 48-tick cells.
+    expectEqual(int(cache.cells[0].durationTicks()), 48);
+    expectEqual(int(cache.cells[1].durationTicks()), 48);
+    expectEqual(int(cache.cells[2].durationTicks()), 48);
     expectEqual(int(cache.cycleTicks), 144);
 }
 
@@ -251,10 +261,11 @@ CASE("burst_starts_cluster_with_denom_duration") {
 
     // Slot 0 = LUT ×4 = 192 ticks. Slots 1,2,3 = cluster cells at prev/denom.
     // prev_dur entering cluster = 192. denom=4 → cluster_dur = 192/4 = 48.
-    expectEqual(int(cache.cells[0].relTick()),   0);
-    expectEqual(int(cache.cells[1].relTick()), 192);
-    expectEqual(int(cache.cells[2].relTick()), 192 + 48);
-    expectEqual(int(cache.cells[3].relTick()), 192 + 48 + 48);
+    // Phase 16 P6 (2026-05-23): per-cell durations, not cumulative positions.
+    expectEqual(int(cache.cells[0].durationTicks()), 192);
+    expectEqual(int(cache.cells[1].durationTicks()),  48);
+    expectEqual(int(cache.cells[2].durationTicks()),  48);
+    expectEqual(int(cache.cells[3].durationTicks()),  48);
     // Cycle = 192 + 48 + 48 + 48 = 336.
     expectEqual(int(cache.cycleTicks), 336);
 }
@@ -297,14 +308,11 @@ CASE("cluster_duration_unbounded_at_long_parents") {
     // Slot 2 = cluster continues (childCount=1 means 1 more after starter) =
     //          384 ticks (same cluster_dur).
     // Cycle = 768 + 384 + 384 = 1536.
-    expectEqual(int(cache.cells[0].relTick()),    0);
-    expectEqual(int(cache.cells[1].relTick()),  768);
-    expectEqual(int(cache.cells[2].relTick()), 1152);
+    // Phase 16 P6 (2026-05-23): per-cell durations.
+    expectEqual(int(cache.cells[0].durationTicks()), 768);
+    expectEqual(int(cache.cells[1].durationTicks()), 384);
+    expectEqual(int(cache.cells[2].durationTicks()), 384);
     expectEqual(int(cache.cycleTicks), 1536);
-
-    // Confirm cluster cell duration is 384 (unbounded, no 6-bit clamp).
-    uint32_t cell1Dur = cache.cells[2].relTick() - cache.cells[1].relTick();
-    expectEqual(int(cell1Dur), 384);
 }
 
 CASE("burst_suppressed_when_parent_too_short") {
@@ -695,6 +703,38 @@ CASE("fallback_when_cache_unprimed") {
     // Out-of-range readIndex returns the event rank via fallback.
     uint32_t r = selectMaskRank(/*useRepeat=*/false, /*evRank=*/42, /*readIndex=*/100, cache);
     expectEqual(int(r), 42);
+}
+
+CASE("cycle_longer_than_4095_ticks_preserves_per_cell_durations") {
+    // Phase 16 P6 (2026-05-23): regression for Codex audit #6. The old
+    // 12-bit relTick field stored absolute cycle position and clamped at
+    // 4095 — cells past that mark collapsed to identical positions and
+    // their playback duration (derived from next-this delta) decayed to 1.
+    // With per-cell durations, total cycle length is unbounded; each cell
+    // stores its own duration up to kMaxCellDuration.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(32);
+    seq.setFirst(0);
+    seq.setLast(31);
+    for (int i = 0; i < 32; ++i) {
+        auto &ev = seq.events()[i];
+        ev.setDurationIndex(1);     // LUT ×4 = 768 ticks at divisor=192
+        ev.setRest(false);
+        ev.setRhythmValid(true);
+    }
+    Cache cache{};
+    int n = regenerateCacheFromEvents(cache, seq, /*divisor*/ 192, /*seed*/ 0xfeedf00d);
+    expectEqual(n, 32);
+
+    // Every cell holds its own 768-tick duration. Pre-fix, cells past
+    // index 5 (4095/768) would clamp to relTick=4095 and the playback
+    // engine would compute durations of 1 for every subsequent cell.
+    for (int i = 0; i < 32; ++i) {
+        expectEqual(int(cache.cells[i].durationTicks()), 768,
+                    "every cell must keep its full duration past the 4095-tick mark");
+    }
 }
 
 CASE("rank_recomputes_when_tilt_changes_via_caller") {

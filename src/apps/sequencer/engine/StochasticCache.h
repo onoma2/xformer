@@ -16,8 +16,11 @@ class Scale;
 
 namespace stochastic_cache {
 
-// ~5 bars at PPQN=192 (4096 ticks). Reasonable upper bound for one cycle.
-constexpr uint32_t kMaxRelTick = 4095;
+// Per-cell duration cap (12-bit field). ~21 quarter-notes at PPQN=192. A
+// cell whose natural duration exceeds this is clamped at build time —
+// the cycle is the sum of all cells' durations, so unlike the old
+// absolute-position scheme this cannot silently corrupt the playhead.
+constexpr uint32_t kMaxCellDuration = 4095;
 
 // 6-bit gate length encoded as LUT slot or fractional ticks (0..63).
 constexpr uint8_t kMaxGateLen = 63;
@@ -44,10 +47,15 @@ constexpr uint8_t kMaxOctave = 15;
 // bits (one spare bit in CellAux today) before raising the cap.
 constexpr int kCellCap = 64;
 
+// Phase 16 P6 (2026-05-23): cell stores its own duration (per-cell), not
+// the absolute cycle position. Removes the silent 4095-tick overflow that
+// corrupted long-cycle playback when cells were spaced past the 12-bit
+// relTick cap — each cell's duration is independent and naturally bounded
+// by what a single cell can hold (kMaxCellDuration = 4095 ticks).
 struct CachedCell {
     uint32_t packed;
 
-    uint32_t relTick()       const { return  packed        & 0xfffu; }
+    uint32_t durationTicks() const { return  packed        & 0xfffu; }
     uint8_t  degree()        const { return (packed >> 12) & 0x7fu; }
     uint8_t  octave()        const { return (packed >> 19) & 0xfu;  }   // 4 bits
     uint8_t  gateLen()       const { return (packed >> 23) & 0x3fu; }
@@ -55,10 +63,11 @@ struct CachedCell {
     bool     slide()         const { return (packed >> 30) & 1u; }
     bool     legato()        const { return (packed >> 31) & 1u; }
 
-    static CachedCell make(uint32_t relTick, uint8_t degree, uint8_t octave,
+    static CachedCell make(uint32_t durationTicks, uint8_t degree, uint8_t octave,
                            uint8_t gateLen, bool slide, bool legato, bool audible = true) {
         if (octave > kMaxOctave) octave = kMaxOctave;
-        uint32_t r =  (relTick                 & 0xfffu)
+        if (durationTicks > kMaxCellDuration) durationTicks = kMaxCellDuration;
+        uint32_t r =  (durationTicks           & 0xfffu)
                    | ((uint32_t(degree)       & 0x7fu)  << 12)
                    | ((uint32_t(octave)       & 0xfu)   << 19)
                    | ((uint32_t(gateLen)       & 0x3fu) << 23)
@@ -116,17 +125,10 @@ struct Cache {
     uint8_t    count;
     uint16_t   cycleTicks;
 
-    // Feel scaling (Phase 16 P5, 2026-05-23). Computed at cache build from
-    // sequence.feel() and the natural cycleTicks. Engine multiplies parent
-    // durations and burst-child offsets by this factor at trigger time so
-    // the audible cycle stretches/compresses toward 3/4/5/4 meters.
-    //
-    // Stored as Q16.16 fixed-point: 1.0 = (1 << 16). At Feel detent (45..55),
-    // value = 0x10000 (no scaling). Outside detent: scale = target_beats ×
-    // PPQN / naturalSum, clamped to a reasonable range.
-    //
-    // Engine: scaledTicks = (rawTicks * feelScaleQ16) >> 16.
-    uint32_t feelScaleQ16;
+    // Phase 16 P6 (2026-05-23): Feel scaling moved out of cache state.
+    // Engine computes the Q16.16 scale on the fly each trigger from
+    // sequence.feel() + cycleTicks + CONFIG_PPQN via computeFeelScaleQ16.
+    // This makes routed Feel CV take effect without a cache refresh.
 };
 
 // Populate cache by walking an existing StochasticSequence's `_events[]` tape.

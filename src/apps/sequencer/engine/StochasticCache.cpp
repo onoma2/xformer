@@ -66,7 +66,6 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
     (void)seed;     // unused under flat — no per-cell keyed RNG needed (clusters use deterministic prev-dur math)
     cache.count = 0;
     cache.cycleTicks = 0;
-    cache.feelScaleQ16 = 0x10000;   // default: no scaling, set properly at end
     for (int i = 0; i < kMaxEventSlots; ++i) cache.parentCacheIdx[i] = 0xff;
 
     const bool bakeChildNotes = (scale != nullptr) && (track != nullptr);
@@ -160,10 +159,10 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
         // flat model is verified.
         constexpr uint8_t kDefaultGateFraction = 32;
 
-        uint32_t relTick = cycleTicks > kMaxRelTick ? kMaxRelTick : cycleTicks;
-
+        // Phase 16 P6 (2026-05-23): store per-cell duration, not the
+        // absolute cycle position. CachedCell::make clamps at kMaxCellDuration.
         cache.cells[cache.count] = CachedCell::make(
-            relTick,
+            cellDur,
             cellDegree,
             cellOctave,
             kDefaultGateFraction,
@@ -187,11 +186,9 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 
     cache.cycleTicks = uint16_t(std::min(cycleTicks, uint32_t(UINT16_MAX)));
 
-    // Phase 16 P5 (2026-05-23): compute Feel scaling from sequence.feel().
-    // CONFIG_PPQN = ticks per quarter note = beat ticks at the master clock.
-    // Engine applies scale at trigger time when reading parent duration +
-    // burst-child offsets, stretching the cycle uniformly toward target meter.
-    cache.feelScaleQ16 = computeFeelScaleQ16(int(seq.feel()), cycleTicks, uint32_t(CONFIG_PPQN));
+    // Phase 16 P6 (2026-05-23): Feel scaling is no longer baked at cache
+    // build — engine computes it per trigger from sequence.feel(), so a
+    // routed CV change takes effect without a cache refresh.
 
     recomputeCacheRanks(cache, seed, /*tilt*/ 0);
     return cache.count;
@@ -201,10 +198,8 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 // duration axis; keyed hash provides a tie-break salt smaller than any
 // non-zero tilt step.
 //
-// Phase 16 flat rewrite (2026-05-23): duration is no longer encoded in
-// cell.gateLen (which now holds 64ths-of-cell-duration). Compute each
-// cell's actual duration from the relTick delta to the next cell. Last
-// cell uses cycleTicks as the implicit "next."
+// Phase 16 P6 (2026-05-23): cell holds its own duration directly, so
+// rank weighting reads it without the old relTick-delta dance.
 void recomputeCacheRanks(Cache &cache, uint32_t seed, int tilt) {
     if (cache.count == 0) return;
 
@@ -213,19 +208,10 @@ void recomputeCacheRanks(Cache &cache, uint32_t seed, int tilt) {
 
     const int tiltClamped = std::max(-100, std::min(100, tilt));
 
-    // Derive each cell's duration from relTick deltas. Center the
-    // long-short axis on the median cell duration so ranks order purely
-    // on relative cell length, not absolute ticks. Computed once outside
-    // the per-cell loop for efficiency.
-    uint32_t durations[kCellCap];
     uint32_t maxDur = 1;
     for (uint8_t i = 0; i < cache.count; ++i) {
-        uint32_t thisTick = cache.cells[i].relTick();
-        uint32_t nextTick = (i + 1 < cache.count)
-                          ? cache.cells[i + 1].relTick()
-                          : uint32_t(cache.cycleTicks);
-        durations[i] = nextTick > thisTick ? (nextTick - thisTick) : 1;
-        if (durations[i] > maxDur) maxDur = durations[i];
+        uint32_t d = cache.cells[i].durationTicks();
+        if (d > maxDur) maxDur = d;
     }
 
     for (uint8_t i = 0; i < cache.count; ++i) {
@@ -247,7 +233,7 @@ void recomputeCacheRanks(Cache &cache, uint32_t seed, int tilt) {
             // legacy parent/child code path: under tilt > 0, long cells
             // get NEGATIVE bias → LOW rank → SURVIVE Mask (Mask cuts
             // high ranks). Short cells get HIGH rank → cut first.
-            longShortFP14 = 7 - int32_t((int64_t(durations[i]) * 14) / maxDur);
+            longShortFP14 = 7 - int32_t((int64_t(cache.cells[i].durationTicks()) * 14) / maxDur);
         }
         const int32_t biasTerm = int32_t(tiltClamped) * longShortFP14 * 100;
 

@@ -384,13 +384,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                          : uint8_t(0xff);
             if (cIdx < stochastic_cache::kCellCap && cIdx < _cache.count) {
                 const auto &cell = _cache.cells[cIdx];
-                // Duration derived from relTick delta to next cell (or
-                // cycleTicks for the last cell in the cycle).
-                uint32_t thisRel = cell.relTick();
-                uint32_t nextRel = (cIdx + 1 < _cache.count)
-                                 ? _cache.cells[cIdx + 1].relTick()
-                                 : uint32_t(_cache.cycleTicks);
-                cellDurFromCache = (nextRel > thisRel) ? (nextRel - thisRel) : 1;
+                // Phase 16 P6 (2026-05-23): cells store their own duration.
+                cellDurFromCache = cell.durationTicks();
+                if (cellDurFromCache == 0) cellDurFromCache = 1;
                 cellGateFrac = cell.gateLen();
                 pDegree = int(cell.degree());
                 pOctave = int(cell.octave());
@@ -412,9 +408,12 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             mult = (uint64_t(divisor) * frac.num) / frac.den;
             if (mult < 1) mult = 1;
         }
-        // Feel scaling: cache.feelScaleQ16 is computed at refresh from the
-        // natural cycleTicks and seq.feel(). Default detent = no scaling.
-        mult = stochastic_cache::applyFeelScale(mult, _cache.feelScaleQ16);
+        // Phase 16 P6 (2026-05-23): Feel scale computed per trigger from the
+        // current sequence.feel(). Lifting this out of cache state means a
+        // routed Feel CV takes effect immediately, without a cache refresh.
+        uint32_t feelScaleQ16 = stochastic_cache::computeFeelScaleQ16(
+            int(sequence.feel()), uint32_t(_cache.cycleTicks), uint32_t(CONFIG_PPQN));
+        mult = stochastic_cache::applyFeelScale(mult, feelScaleQ16);
         if (mult < 1) mult = 1;
         _lastDurationIndex = pDurIdx;
         durationTicks = mult;
