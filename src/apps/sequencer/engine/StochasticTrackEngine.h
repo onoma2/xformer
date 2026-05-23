@@ -216,6 +216,14 @@ private:
     uint32_t _eventElapsed = 0;
     uint32_t _eventDuration = 0;
 
+    // Phase 16 P9 (2026-05-23): Codex audit #7. Live rhythm/melody writes
+    // both used to call refreshCache() directly, so a single trigger that
+    // wrote to both domains paid for two full cache rebuilds back-to-back.
+    // They now set this flag; triggerStep processes it once at the top of
+    // the next call before any cache read. UI-initiated edits stay direct
+    // (refreshCacheNow) so they take effect immediately.
+    bool _cacheRefreshPending = false;
+
     bool _activity = false;
     bool _gateOutput = false;
     bool _slideActive = false;

@@ -266,6 +266,14 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     auto &sequence = this->sequence();
     auto &track = stochasticTrack();
 
+    // Phase 16 P9 (2026-05-23): coalesce cache refreshes — Live rhythm +
+    // melody writes from the PREVIOUS trigger may have flagged this. Pay
+    // at most one rebuild per trigger, before any cache read downstream.
+    if (_cacheRefreshPending) {
+        refreshCache();
+        _cacheRefreshPending = false;
+    }
+
     const auto &scale = sequence.selectedScale(_model.project().scale());
     int rootNote = sequence.selectedRootNote(_model.project().rootNote());
 
@@ -723,13 +731,15 @@ void StochasticTrackEngine::writeLiveRhythmShadow(int readIndex, const Stochasti
     // visualizes recent activity. Mid-audio write — see docs/stoch-review.md
     // finding #1; Patch 3 may relocate to engine-owned shadow if needed.
     sequence().events()[readIndex].mergeRhythmFrom(rhythm);
-    // Cache stays in sync with the tape so the mask filter sees the live event.
-    refreshCache();
+    // Phase 16 P9 (2026-05-23): coalesce refresh — if rhythm + melody both
+    // write in the same trigger, we used to rebuild the cache twice.
+    // Flag instead; consumed at the top of the next triggerStep.
+    _cacheRefreshPending = true;
 }
 
 void StochasticTrackEngine::writeLiveMelodyShadow(int readIndex, const StochasticSourceEvent &melody) {
     sequence().events()[readIndex].mergeMelodyFrom(melody);
-    refreshCache();
+    _cacheRefreshPending = true;
 }
 
 void StochasticTrackEngine::syncWindowEdit() {
