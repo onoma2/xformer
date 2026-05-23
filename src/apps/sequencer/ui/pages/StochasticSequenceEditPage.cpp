@@ -104,6 +104,7 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
     int gateLength = seq.gateLength();
     int slide      = seq.slide();
     int legato     = seq.legatoProb();
+    int feel       = seq.feel();
 
     // Viewport — leaves room for the two info rows at top and footer at bottom.
     const int vpLeft = 8;
@@ -324,10 +325,6 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
         s.reset();
         seq.printSlotDuration(s, duration);
     };
-    auto burstPitchLabel = [&]() {
-        return seq.burstPitch() == StochasticBurstPitch::Parent ? "P" : "G";
-    };
-
     FixedStringBuilder<32> str;
     bool labeled = true;
     canvas.setFont(Font::Small);
@@ -344,7 +341,7 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
     case 4:  str("BURST %d", burst); break;
     case 5:  str("BURST COUNT %d", burstCount); break;
     case 6:  str("BURST RATE %d", burstRate); break;
-    case 7:  str("BURST PITCH %s", seq.burstPitch() == StochasticBurstPitch::Parent ? "PARENT" : "GENERATE"); break;
+    case 7:  str("FEEL %d", feel); break;
     case 8:  str("COMPLEXITY %d", complexity); break;
     case 9:  str("CONTOUR %+d", contour); break;
     case 10: str("BIAS %d", bias); break;
@@ -376,7 +373,7 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
         s.reset(); s("B %d",  burst);       canvas.drawText(col0 + 4 * colStep, yTop, s);
         s.reset(); s("C %d",  burstCount);  canvas.drawText(col0 + 5 * colStep, yTop, s);
         s.reset(); s("T %d",  burstRate);   canvas.drawText(col0 + 6 * colStep, yTop, s);
-        s.reset(); s("P %s",  burstPitchLabel()); canvas.drawText(col0 + 7 * colStep, yTop, s);
+        s.reset(); s("F %d",  feel);        canvas.drawText(col0 + 7 * colStep, yTop, s);
 
         // Bottom row (slots 8..15): pitch shape + per-event gate behavior.
         s.reset(); s("X %d",  complexity);  canvas.drawText(col0 + 0 * colStep, yBot, s);
