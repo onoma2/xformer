@@ -204,10 +204,15 @@ CASE("window_first_last_respected") {
     clearAllEvents(seq);
     seq.setFirst(2);
     seq.setLast(4);
+    // Phase 16 P7 (2026-05-23): cache picks duration from sequence.noteDuration
+    // + variation. Lock variation to 0 so the test sees deterministic cell
+    // durations driven by the noteDuration knob alone.
+    seq.setNoteDuration(5);
+    seq.setVariation(0);
+    seq.setBurst(0);
 
     for (int i = 0; i < int(seq.events().size()); ++i) {
         auto &ev = seq.events()[i];
-        ev.setDurationIndex(5);
         ev.setRest(false);
         ev.setRhythmValid(true);
     }
@@ -215,123 +220,107 @@ CASE("window_first_last_respected") {
     Cache cache{};
     int n = regenerateCacheFromEvents(cache, seq, 48, 0);
     expectEqual(n, 3);  // slots 2, 3, 4 only
-    // Phase 16 P6 (2026-05-23): each cell carries its own duration.
-    // Three slots × LUT ×1 (slot 5) × divisor 48 = three 48-tick cells.
     expectEqual(int(cache.cells[0].durationTicks()), 48);
     expectEqual(int(cache.cells[1].durationTicks()), 48);
     expectEqual(int(cache.cells[2].durationTicks()), 48);
     expectEqual(int(cache.cycleTicks), 144);
 }
 
-CASE("burst_starts_cluster_with_denom_duration") {
-    // Phase 16 flat (2026-05-23): burst no longer spawns separate child cells.
-    // It biases the next K cells (BurstCount) to take `prev_dur / denom` as
-    // their duration. Cluster cells advance the playhead like any other cell.
-    //
-    // Setup: 4 events. Slot 0 = normal long. Slot 1 starts a 3-cell cluster
-    // with denom=4 (BurstRate=2 → kBurstSpacingLut[2]=4). Cluster spans
-    // slots 1,2,3.
+CASE("burst_knob_at_100_produces_cluster_cells") {
+    // Phase 16 P7 (2026-05-23): cluster cells are driven by sequence.burst()
+    // rolling per-cell at cache build, not by event.childCount written at
+    // mutate time. With burst=100, every cell tries to start a cluster.
+    // Variation locked to 0 so durations are deterministic ×1 LUT slots,
+    // making the cluster cells (shorter than the LUT pick) easy to identify.
     StochasticSequence seq;
     seq.clear();
     clearAllEvents(seq);
-    seq.setSize(4);
+    seq.setSize(8);
     seq.setFirst(0);
-    seq.setLast(3);
+    seq.setLast(7);
+    seq.setNoteDuration(1);    // ×4 = 192 ticks at divisor=48
+    seq.setVariation(0);
+    seq.setBurst(100);
+    seq.setBurstCount(20);     // bias the LUT pick low (count=2 region)
+    seq.setBurstRate(60);      // mid-range denom
 
-    for (int i = 0; i < 4; ++i) {
-        auto &ev = seq.events()[i];
-        ev.setDurationIndex(1);     // ×4 LUT slot → 192 ticks at divisor=48
-        ev.setRest(false);
-        ev.setRhythmValid(true);
-    }
-    // Cluster start on slot 1: childCount=2 means 2 ADDITIONAL cells beyond
-    // the starter (cluster spans slots 1, 2, 3). burstRate=2 → denom=4.
-    seq.events()[1].setChildCount(2);
-    seq.events()[1].setBurstRate(2);
-
-    Cache cache{};
-    int n = regenerateCacheFromEvents(cache, seq, 48, 0);
-    // Flat layout: cell count = window size (4 events → 4 cells).
-    expectEqual(n, 4);
-
-    // All cells are "parents" — no burstChild flag set under flat.
-    for (int i = 0; i < 4; ++i) {
-        expectFalse(cache.aux[i].burstChild(), "no burst-child flag under flat");
+    for (int i = 0; i < 8; ++i) {
+        seq.events()[i].setRhythmValid(true);
+        seq.events()[i].setRest(false);
     }
 
-    // Slot 0 = LUT ×4 = 192 ticks. Slots 1,2,3 = cluster cells at prev/denom.
-    // prev_dur entering cluster = 192. denom=4 → cluster_dur = 192/4 = 48.
-    // Phase 16 P6 (2026-05-23): per-cell durations, not cumulative positions.
-    expectEqual(int(cache.cells[0].durationTicks()), 192);
-    expectEqual(int(cache.cells[1].durationTicks()),  48);
-    expectEqual(int(cache.cells[2].durationTicks()),  48);
-    expectEqual(int(cache.cells[3].durationTicks()),  48);
-    // Cycle = 192 + 48 + 48 + 48 = 336.
-    expectEqual(int(cache.cycleTicks), 336);
+    Cache cache{};
+    int n = regenerateCacheFromEvents(cache, seq, 48, /*seed*/ 0xdead);
+    expectEqual(n, 8);
+
+    // First cell sets the baseline duration. At least one of the remaining
+    // cells must be shorter — that's the cluster signature.
+    const uint32_t baselineDur = cache.cells[0].durationTicks();
+    bool sawShorterCell = false;
+    for (int i = 1; i < int(cache.count); ++i) {
+        if (cache.cells[i].durationTicks() < baselineDur) {
+            sawShorterCell = true;
+            break;
+        }
+    }
+    expectTrue(sawShorterCell,
+               "burst=100 must produce at least one shorter cluster cell");
 }
 
-CASE("cluster_duration_unbounded_at_long_parents") {
-    // Phase 16 flat (2026-05-23): cluster cells take prev_dur / denom as
-    // their actual duration. At long prev_dur values the resulting tick
-    // count can be hundreds — that's fine under flat because cell durations
-    // are implicit from relTick deltas, not clamped to a 6-bit field.
-    // Verify a long-parent + small-denom cluster produces correctly large
-    // cluster cell durations.
+CASE("burst_knob_at_zero_produces_no_cluster_cells") {
+    // burst=0 means the per-cell roll never lands → no cluster cells.
+    // Every cell must equal the noteDuration pick (variation=0 locks it).
     StochasticSequence seq;
     seq.clear();
     clearAllEvents(seq);
-    seq.setSize(3);
+    seq.setSize(8);
     seq.setFirst(0);
-    seq.setLast(2);
+    seq.setLast(7);
+    seq.setNoteDuration(3);    // ×2 = 96 ticks at divisor=48
+    seq.setVariation(0);
+    seq.setBurst(0);
 
-    seq.events()[0].setDurationIndex(0);   // ×8 LUT slot, long ordinary cell
-    seq.events()[0].setRest(false);
-    seq.events()[0].setRhythmValid(true);
+    for (int i = 0; i < 8; ++i) {
+        seq.events()[i].setRhythmValid(true);
+        seq.events()[i].setRest(false);
+    }
 
-    seq.events()[1].setDurationIndex(0);   // overridden by cluster
-    seq.events()[1].setRest(false);
-    seq.events()[1].setRhythmValid(true);
-    seq.events()[1].setChildCount(1);      // cluster: slot 1 + 1 more = 2 cells
-    seq.events()[1].setBurstRate(0);       // denom 2
-
-    seq.events()[2].setDurationIndex(0);   // still inside cluster
-    seq.events()[2].setRest(false);
-    seq.events()[2].setRhythmValid(true);
-
-    const uint32_t kDivisor = 96;
     Cache cache{};
-    regenerateCacheFromEvents(cache, seq, kDivisor, 0xfeed);
-
-    expectEqual(int(cache.count), 3);
-    // Slot 0 = 8 × 96 = 768 ticks ordinary.
-    // Slot 1 = cluster_dur = prev(768) / 2 = 384 ticks.
-    // Slot 2 = cluster continues (childCount=1 means 1 more after starter) =
-    //          384 ticks (same cluster_dur).
-    // Cycle = 768 + 384 + 384 = 1536.
-    // Phase 16 P6 (2026-05-23): per-cell durations.
-    expectEqual(int(cache.cells[0].durationTicks()), 768);
-    expectEqual(int(cache.cells[1].durationTicks()), 384);
-    expectEqual(int(cache.cells[2].durationTicks()), 384);
-    expectEqual(int(cache.cycleTicks), 1536);
+    regenerateCacheFromEvents(cache, seq, 48, 0xfeed);
+    for (int i = 0; i < int(cache.count); ++i) {
+        expectEqual(int(cache.cells[i].durationTicks()), 96,
+                    "burst=0 → every cell at noteDuration's natural LUT pick");
+    }
 }
 
-CASE("burst_suppressed_when_parent_too_short") {
+CASE("cluster_cell_duration_never_below_minimum") {
+    // The cluster eligibility check (prev_dur / denom >= kMinChildGate)
+    // suppresses clusters that would produce sub-audible cells. Drive a
+    // short noteDuration + high burst rate denominator and confirm no
+    // cluster cell falls below the minimum floor.
     StochasticSequence seq;
     seq.clear();
     clearAllEvents(seq);
+    seq.setSize(8);
     seq.setFirst(0);
-    seq.setLast(0);
+    seq.setLast(7);
+    seq.setNoteDuration(7);    // ×1/2 = shortest natural slot, ~24 ticks at divisor=48
+    seq.setVariation(0);
+    seq.setBurst(100);
+    seq.setBurstRate(100);     // bias toward largest denominator (denser → shorter cluster cells)
 
-    auto &ev = seq.events()[0];
-    ev.setDurationIndex(7);  // ×1/2 — 24 ticks at divisor=48, below kMinBurstParentTicks=96
-    ev.setRest(false);
-    ev.setRhythmValid(true);
-    ev.setChildCount(4);
-    ev.setBurstRate(2);
+    for (int i = 0; i < 8; ++i) {
+        seq.events()[i].setRhythmValid(true);
+        seq.events()[i].setRest(false);
+    }
 
     Cache cache{};
-    int n = regenerateCacheFromEvents(cache, seq, 48, 0);
-    expectEqual(n, 1);  // parent only, no children
+    regenerateCacheFromEvents(cache, seq, 48, 0xbaadf00d);
+    constexpr uint32_t kMinCellTicks = 6;
+    for (int i = 0; i < int(cache.count); ++i) {
+        expectTrue(cache.cells[i].durationTicks() >= kMinCellTicks,
+                   "no cell may fall below the audible floor");
+    }
 }
 
 CASE("rank_is_deterministic_per_seed") {
@@ -383,48 +372,41 @@ CASE("rank_changes_when_seed_changes") {
 }
 
 CASE("tilt_positive_favors_long_durations") {
-    StochasticSequence seq;
-    seq.clear();
-    clearAllEvents(seq);
-    seq.setFirst(0);
-    seq.setLast(7);
-
-    for (int i = 0; i < 8; ++i) {
-        auto &ev = seq.events()[i];
-        ev.setDurationIndex(i);
-        ev.setRest(false);
-        ev.setRhythmValid(true);
-    }
-
+    // Phase 16 P7 (2026-05-23): tilt tests build the cache directly so the
+    // duration distribution is controlled, independent of the cache walk's
+    // randomized duration picker. We need varied per-cell durations to have
+    // a long/short axis for tilt to bias on.
     Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, /*seed*/ 0xaabbccdd);
-    recomputeCacheRanks(cache, 0xaabbccdd, /*tilt*/ 100);
+    cache.count = 8;
+    // Cells in descending duration order: cell 0 = longest, cell 7 = shortest.
+    const uint32_t durLut[8] = { 768, 384, 288, 192, 128, 96, 64, 48 };
+    for (uint8_t i = 0; i < 8; ++i) {
+        cache.cells[i] = CachedCell::make(durLut[i], 0, 0, 32, false, false, true);
+        cache.aux[i]   = CellAux::make(false, 0);
+    }
+    cache.cycleTicks = 0;
+    for (int i = 0; i < 8; ++i) cache.cycleTicks += durLut[i];
 
-    // Mask filter cuts HIGH ranks. "Survive Mask" means LOW rank. So at
-    // positive tilt, long cells must get LOW ranks (they survive). Cell 0
-    // has durationIndex=0 (longest), cell 7 has durationIndex=7 (shortest).
-    int rankLong  = cache.aux[0].rank();  // slot 0 = longest
-    int rankShort = cache.aux[7].rank();  // slot 7 = shortest
+    recomputeCacheRanks(cache, /*seed*/ 0xaabbccdd, /*tilt*/ 100);
+
+    // Mask filter cuts HIGH ranks. Long cells must get LOW ranks under +tilt.
+    int rankLong  = cache.aux[0].rank();   // longest
+    int rankShort = cache.aux[7].rank();   // shortest
     expectTrue(rankLong < rankShort, "positive tilt: long cells get LOW ranks (survive Mask)");
 }
 
 CASE("tilt_negative_favors_short_durations") {
-    StochasticSequence seq;
-    seq.clear();
-    clearAllEvents(seq);
-    seq.setFirst(0);
-    seq.setLast(7);
-
-    for (int i = 0; i < 8; ++i) {
-        auto &ev = seq.events()[i];
-        ev.setDurationIndex(i);
-        ev.setRest(false);
-        ev.setRhythmValid(true);
-    }
-
     Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, /*seed*/ 0xaabbccdd);
-    recomputeCacheRanks(cache, 0xaabbccdd, /*tilt*/ -100);
+    cache.count = 8;
+    const uint32_t durLut[8] = { 768, 384, 288, 192, 128, 96, 64, 48 };
+    for (uint8_t i = 0; i < 8; ++i) {
+        cache.cells[i] = CachedCell::make(durLut[i], 0, 0, 32, false, false, true);
+        cache.aux[i]   = CellAux::make(false, 0);
+    }
+    cache.cycleTicks = 0;
+    for (int i = 0; i < 8; ++i) cache.cycleTicks += durLut[i];
+
+    recomputeCacheRanks(cache, /*seed*/ 0xaabbccdd, /*tilt*/ -100);
 
     int rankLong  = cache.aux[0].rank();
     int rankShort = cache.aux[7].rank();
@@ -712,28 +694,137 @@ CASE("cycle_longer_than_4095_ticks_preserves_per_cell_durations") {
     // their playback duration (derived from next-this delta) decayed to 1.
     // With per-cell durations, total cycle length is unbounded; each cell
     // stores its own duration up to kMaxCellDuration.
+    //
+    // Phase 16 P7 (2026-05-23): cache picks duration from sequence.noteDuration
+    // + variation knobs, not from event.durationIndex. Set the knob, lock
+    // variation to 0 so every cell picks the same LUT slot.
     StochasticSequence seq;
     seq.clear();
     clearAllEvents(seq);
     seq.setSize(32);
     seq.setFirst(0);
     seq.setLast(31);
+    seq.setNoteDuration(1);   // LUT slot 1 = ×4
+    seq.setVariation(0);       // tight kernel → always picks the center slot
+    seq.setBurst(0);           // no clusters
     for (int i = 0; i < 32; ++i) {
         auto &ev = seq.events()[i];
-        ev.setDurationIndex(1);     // LUT ×4 = 768 ticks at divisor=192
-        ev.setRest(false);
         ev.setRhythmValid(true);
+        ev.setRest(false);
     }
     Cache cache{};
     int n = regenerateCacheFromEvents(cache, seq, /*divisor*/ 192, /*seed*/ 0xfeedf00d);
     expectEqual(n, 32);
 
-    // Every cell holds its own 768-tick duration. Pre-fix, cells past
-    // index 5 (4095/768) would clamp to relTick=4095 and the playback
-    // engine would compute durations of 1 for every subsequent cell.
+    // Every cell holds its own 768-tick duration (×4 × 192 = 768). Pre-fix,
+    // cells past index 5 (4095 / 768) would clamp to relTick=4095 and the
+    // engine's delta math would return duration=1 for every later cell.
     for (int i = 0; i < 32; ++i) {
         expectEqual(int(cache.cells[i].durationTicks()), 768,
                     "every cell must keep its full duration past the 4095-tick mark");
+    }
+}
+
+CASE("cache_walk_picks_duration_from_noteDuration_knob") {
+    // Phase 16 P7 (2026-05-23): cache reads sequence.noteDuration + variation,
+    // NOT event.durationIndex. Confirm a knob change reshapes the next cache.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(4);
+    seq.setFirst(0);
+    seq.setLast(3);
+    seq.setVariation(0);
+    seq.setBurst(0);
+    for (int i = 0; i < 4; ++i) {
+        seq.events()[i].setRhythmValid(true);
+        seq.events()[i].setRest(false);
+        // Event-stored durationIndex deliberately a random slot — should be
+        // ignored by cache.
+        seq.events()[i].setDurationIndex(7);
+    }
+
+    seq.setNoteDuration(5);     // ×1 = 48 at divisor 48
+    Cache cacheA{};
+    regenerateCacheFromEvents(cacheA, seq, /*divisor*/ 48, /*seed*/ 0xabc);
+    for (int i = 0; i < 4; ++i) {
+        expectEqual(int(cacheA.cells[i].durationTicks()), 48,
+                    "knob=5 (×1) should produce 48-tick cells");
+    }
+
+    seq.setNoteDuration(3);     // ×2 = 96 at divisor 48
+    Cache cacheB{};
+    regenerateCacheFromEvents(cacheB, seq, /*divisor*/ 48, /*seed*/ 0xabc);
+    for (int i = 0; i < 4; ++i) {
+        expectEqual(int(cacheB.cells[i].durationTicks()), 96,
+                    "knob=3 (×2) should produce 96-tick cells");
+    }
+}
+
+CASE("burst_fires_at_factory_defaults") {
+    // Codex audit finding #1+#2: pre-P7 the generator gated burst on the
+    // event's own duration ≥ 96 ticks, and bursts were baked at mutate time
+    // so the Burst knob did nothing until a regeneration cycle ran. With B3
+    // landed, raising the Burst knob and calling refreshCache produces
+    // visible cluster cells immediately, at factory-default divisor/duration.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    // Mirror the cleared default: size=32, noteDuration=5 (×1), variation=16,
+    // divisor=12 (1/16 at PPQN=192 = 48 ticks per cell). Knob defaults except
+    // burst itself — bring it up so the per-cell roll lands frequently.
+    seq.setBurst(100);          // every roll lands → every cell tries to start a cluster
+    seq.setBurstCount(50);      // medium count from the LUT
+    seq.setBurstRate(50);       // medium denom from the LUT
+    for (int i = 0; i < 32; ++i) {
+        seq.events()[i].setRhythmValid(true);
+        seq.events()[i].setRest(false);
+    }
+
+    Cache cache{};
+    regenerateCacheFromEvents(cache, seq, /*divisor*/ 48, /*seed*/ 0x515ce11);
+    expectEqual(int(cache.count), 32);
+
+    // At default 1/16 = 48 ticks per cell. Cluster cells = 48 / denom where
+    // denom ∈ {2,3,4,5,6}, so cluster cells fall in [8, 24] ticks. Any cell
+    // with durationTicks < 48 must be a cluster cell. Pre-fix this count was
+    // 0 because the generator gate suppressed every burst.
+    int clusterCells = 0;
+    for (int i = 0; i < int(cache.count); ++i) {
+        if (cache.cells[i].durationTicks() < 48) ++clusterCells;
+    }
+    expectTrue(clusterCells > 0,
+               "factory-default burst must produce at least one cluster cell");
+}
+
+CASE("cache_rebuild_is_deterministic_at_fixed_seed") {
+    // Phase 16 P7 (2026-05-23): cache shaping decisions now consume keyed
+    // RNG, so two rebuilds at the same seed must produce identical cells.
+    // This is what keeps Loop replay stable when knob edits trigger a
+    // refreshCache.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(16);
+    seq.setFirst(0);
+    seq.setLast(15);
+    seq.setBurst(80);
+    seq.setVariation(50);
+    for (int i = 0; i < 16; ++i) {
+        seq.events()[i].setRhythmValid(true);
+        seq.events()[i].setRest(false);
+    }
+
+    Cache cacheA{};
+    Cache cacheB{};
+    regenerateCacheFromEvents(cacheA, seq, 48, /*seed*/ 0xc0ffee);
+    regenerateCacheFromEvents(cacheB, seq, 48, /*seed*/ 0xc0ffee);
+
+    expectEqual(int(cacheA.count), int(cacheB.count));
+    for (int i = 0; i < int(cacheA.count); ++i) {
+        expectEqual(int(cacheA.cells[i].durationTicks()),
+                    int(cacheB.cells[i].durationTicks()),
+                    "same seed must produce same per-cell durations");
     }
 }
 

@@ -15,11 +15,15 @@
 
 namespace stochastic_cache {
 
-// Match StochasticGenerator.cpp burst LUTs. Kept in sync by hand for Patch A;
-// shared header refactor is out of scope for this patch.
+// Burst spacing denominators — kept in sync by hand with the matching LUT in
+// StochasticGenerator.cpp. The shared header refactor was out of scope when
+// the cache was added; both call sites must move together if either changes.
 static const int kBurstSpacingLut[] = { 2, 3, 4, 5, 6 };
-static const int kBurstSpacingLutSize = 5;
-static constexpr uint32_t kMinBurstParentTicks = 96;
+// kBurstSpacingLutSize no longer needed in cache (picker exposed via
+// StochasticGenerator::pickBurstSpacingSlot returns a clamped slot index).
+// kMinBurstParentTicks was the old generator-side gate that silently killed
+// burst at factory defaults — removed in Phase 16 P7. Cache uses the
+// playable-cluster-cell floor (kMinChildGate) instead.
 static constexpr uint32_t kMinChildGate = 6;
 
 // Encode a duration LUT slot into the 6-bit cell field. Patch A uses the slot
@@ -70,30 +74,26 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 
     const bool bakeChildNotes = (scale != nullptr) && (track != nullptr);
     const int activeNotes = bakeChildNotes ? std::max(1, scale->notesPerOctave()) : 1;
-    (void)activeNotes; // currently unused under flat — Roll mode generated pitch lands here in P7 when wired
+    (void)activeNotes; // BurstPitch Roll lands in Phase 16 P8 (B5); reroll degree for cluster cells using keyed RNG.
 
     const int first = std::max(0, std::min(int(seq.first()), int(seq.size()) - 1));
     const int last  = std::max(first, std::min(int(seq.last()),  int(seq.size()) - 1));
     if (last < first) return 0;
 
-    // Phase 16 flat-cell generator (2026-05-23).
+    // Phase 16 P7 (2026-05-23): flat-cell generator with shaping in cache.
     //
-    // One cache cell per event slot. No parent/child distinction. Bursts
-    // become a duration-bias state running across consecutive cells: when
-    // an event starts a cluster, the next K cells take a duration derived
-    // from the previous cell's duration ÷ a burst-rate denominator.
+    // Per-cell duration is picked here via StochasticGenerator::pickDurationSlot
+    // — NoteDuration + Variation knobs reshape playback on refreshCache without
+    // a full mutate pass. event.durationIndex is no longer read; the generator
+    // still writes it for the Repeat replay path (_lastEvent), but the
+    // non-Repeat playback path is fully cache-driven.
     //
-    // State carried across the walk:
-    //   prevDur:           ticks the previous cell occupied (or its LUT pick
-    //                      if cluster forced a different value). Used to
-    //                      derive cluster duration via the denom math.
-    //   clusterRemaining:  cells left in the current cluster (including the
-    //                      current one — decremented after each emit).
-    //   clusterDur:        the duration cluster cells take while the
-    //                      cluster is active.
-    //
-    // Cycle length = sum of every cell's duration. No "burst inside parent"
-    // anymore; clusters consume slot budget.
+    // Per-cell burst roll: rolls sequence.burst() probability via keyed RNG.
+    // On hit, picks BurstCount and BurstRate from their LUT pickers and starts
+    // a cluster of `count + 1` cells with duration prev_dur / denom. Eligibility
+    // check is "prev_dur / denom >= kMinChildGate" — judged on the actual
+    // previous cell, not the event's would-be LUT slot. This is the law the
+    // user expects: short cells can't sustain bursts; long cells can.
 
     auto lutTicks = [&](uint8_t durationIndex) -> uint32_t {
         auto frac = StochasticTrackEngine::getDurationFraction(int(durationIndex));
@@ -102,7 +102,11 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
     };
 
     uint32_t cycleTicks = 0;
-    uint32_t prevDur = lutTicks(seq.events()[first].durationIndex());  // bootstrap
+    // Bootstrap prevDur with the first cell's natural pick. Cluster math at
+    // slot 0 still has *something* to divide; if the first cell itself starts
+    // a cluster, the cell's own LUT pick is used as prevDur. Subsequent cells
+    // see the actual emitted prevDur from the cycle.
+    uint32_t prevDur = 0;
     int clusterRemaining = 0;
     uint32_t clusterDur = 0;
 
@@ -111,36 +115,41 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 
         const StochasticSourceEvent &ev = seq.events()[i];
 
-        // Decide this cell's duration. Cluster overrides the natural LUT pick.
+        // Per-cell keyed RNG so cache rebuilds are deterministic at fixed
+        // seed (Loop replay stable) while keeping each cell's roll independent.
+        Random cellRng(keyed_rng::cellSeed(seed, uint32_t(cache.count)));
+
+        // Decide this cell's duration. Cluster overrides the per-cell pick.
         uint32_t cellDur;
         if (clusterRemaining > 0) {
             cellDur = clusterDur;
             --clusterRemaining;
         } else {
-            cellDur = lutTicks(ev.durationIndex());
+            const int picked = StochasticGenerator::pickDurationSlot(seq, cellRng);
+            cellDur = lutTicks(uint8_t(picked));
 
-            // If this event starts a cluster, derive cluster duration from
-            // the PREVIOUS cell's emitted duration (relative-to-context
-            // semantics). The cluster's first cell IS this one.
-            int childCount = int(ev.childCount());
-            if (childCount > 0) {
-                int spacingSlot = int(ev.burstRate());
-                if (spacingSlot < 0) spacingSlot = 0;
-                if (spacingSlot >= kBurstSpacingLutSize) spacingSlot = kBurstSpacingLutSize - 1;
-                int denom = kBurstSpacingLut[spacingSlot];
-                clusterDur = prevDur / uint32_t(denom);
-                if (clusterDur < kMinChildGate) clusterDur = kMinChildGate;
+            // Bootstrap prevDur with this cell's natural pick if we're at slot 0
+            // (no prior cell to inherit from). Cluster math will divide it below.
+            if (cache.count == 0) prevDur = cellDur;
 
-                cellDur = clusterDur;
-                // BurstCount in today's events means "number of children" =
-                // additional cells beyond the cluster-starting one. Under
-                // flat we count this cell as the cluster start, so K more
-                // follow. Total cluster span = childCount + 1 cells.
-                clusterRemaining = childCount;
-                // childCount semantics: capped at kMaxChildren today; keep
-                // the same bound so flat behaves like burst.
-                if (clusterRemaining > StochasticTrackEngine::kMaxChildren) {
-                    clusterRemaining = StochasticTrackEngine::kMaxChildren;
+            // Burst roll: probability gated by sequence.burst(). Eligibility =
+            // resulting cluster cell duration ≥ kMinChildGate so we never
+            // schedule sub-audible clusters.
+            if (int(cellRng.nextRange(100)) < int(seq.burst())) {
+                const int spacingSlot = StochasticGenerator::pickBurstSpacingSlot(
+                    int(seq.burstRate()), cellRng);
+                const int denom = kBurstSpacingLut[spacingSlot];
+                const uint32_t candidate = prevDur / uint32_t(denom);
+                if (candidate >= kMinChildGate) {
+                    clusterDur = candidate;
+                    cellDur = clusterDur;
+                    // BurstCount picker returns the cluster count beyond the
+                    // starter cell, matching the old per-event semantics.
+                    int count = StochasticGenerator::pickBurstCount(int(seq.burstCount()), cellRng);
+                    if (count > StochasticTrackEngine::kMaxChildren) {
+                        count = StochasticTrackEngine::kMaxChildren;
+                    }
+                    clusterRemaining = count;
                 }
             }
         }

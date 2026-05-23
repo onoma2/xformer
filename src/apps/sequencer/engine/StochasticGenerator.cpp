@@ -63,6 +63,25 @@ static int pickBurstSpacingFromLut(int knob, Random &rng) {
     return pickFromLutTriangular(kBurstSpacingLut, kBurstSpacingLutSize, knob, rng);
 }
 
+// Phase 16 P7 (2026-05-23): public wrappers for cache walk consumption.
+// Cache builds shape decisions per-cell, not per-event-mutation. Both call
+// sites share the same triangular LUT pickers and same RNG semantics —
+// just sourced from different RNG instances (mutate uses Loop seed,
+// cache uses keyed per-cell seed).
+int StochasticGenerator::pickBurstCount(int knob, Random &rng) {
+    return pickBurstCountFromLut(knob, rng);
+}
+
+// Returns LUT slot index 0..kBurstSpacingLutSize-1 (not the denominator).
+// Caller looks up the denominator in its own copy of kBurstSpacingLut.
+int StochasticGenerator::pickBurstSpacingSlot(int knob, Random &rng) {
+    const int picked = pickBurstSpacingFromLut(knob, rng);
+    for (int i = 0; i < kBurstSpacingLutSize; ++i) {
+        if (kBurstSpacingLut[i] == picked) return i;
+    }
+    return 0;
+}
+
 void StochasticGenerator::generateRhythm(StochasticSequence &sequence, const StochasticTrack &track, uint32_t seed) {
     Random rng(seed);
     int size = sequence.size();
@@ -292,6 +311,11 @@ static int pickDuration(const StochasticSequence &sequence, Random &rng) {
     return center;
 }
 
+// Phase 16 P7 (2026-05-23): public entry point for cache walk.
+int StochasticGenerator::pickDurationSlot(const StochasticSequence &sequence, Random &rng) {
+    return pickDuration(sequence, rng);
+}
+
 // Marbles-style permutation: swap melody content between two random positions
 // in the active playback window [first..last].
 void StochasticGenerator::permuteMelodyOne(StochasticSequence &sequence, Random &rng) {
@@ -436,23 +460,17 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
 
     event.setChildCount(0);
     event.setBurstRate(0);
-    // Cluster F duration gate: skip burst entirely if the parent is shorter than
-    // 1/8 (96 ticks). Phase 12 fix: parent ticks must use the ACTUAL sequence
-    // divisor, not the legacy 1/16 reference, otherwise burst is silently
-    // suppressed at slower divisors where the parent is plenty long enough.
-    auto burstFrac = StochasticTrackEngine::getDurationFraction(durationIndex);
-    uint32_t parentTicks = (uint64_t(sequence.divisor())
-                            * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN)
-                            * burstFrac.num) / burstFrac.den;
-    if (parentTicks >= kMinBurstParentTicks && int(rng.nextRange(100)) < sequence.burst()) {
-        // burstCount macro biases the LUT pick for max child count (Option C —
-        // actual count is auto-shrunk by the eval-time fit loop if the picked
-        // spacing can't hold all children).
+    // Phase 16 P7 (2026-05-23): the old kMinBurstParentTicks gate was the
+    // silent-burst killer at factory defaults — generator suppressed burst
+    // unless the event's own LUT-derived duration was already ≥ 96 ticks.
+    // Under the flat cell model burst eligibility is "prev_dur / denom is
+    // playable," judged per-cell by the cache walk. The generator no longer
+    // gates burst at write time; it just stores the chosen count/spacing so
+    // Repeat playback (which replays _lastEvent and uses evaluateChildren)
+    // still has something to evaluate. evaluateChildren keeps its own
+    // duration check on the Repeat path so short repeats still play clean.
+    if (int(rng.nextRange(100)) < sequence.burst()) {
         event.setChildCount(pickBurstCountFromLut(sequence.burstCount(), rng));
-        // burstRate macro biases the spacing LUT pick. The picked denominator
-        // is baked into the event (stored in the burstRate field, reinterpreted
-        // as the LUT slot index 0..kBurstSpacingLutSize-1) so Loop-mode playback
-        // is consistent across iterations.
         int spacingSlot = -1;
         const int picked = pickBurstSpacingFromLut(sequence.burstRate(), rng);
         for (int i = 0; i < kBurstSpacingLutSize; ++i) {
