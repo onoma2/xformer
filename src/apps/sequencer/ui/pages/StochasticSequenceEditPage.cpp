@@ -686,23 +686,25 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     //   Bottom row 8=CMPX  9=CONT  10=BIAS 11=SPRE 12=REPT  (green — pitch shape)
     //              13=GATE 14=SLID 15=LEGA              (red — per-event gate behavior)
     switch (step) {
-    case 0:  seq.setNoteDuration(seq.noteDuration() + value); break;
-    case 1:  seq.setVariation(seq.variation() + v); break;
+    // Phase 16 P10 (2026-05-23): every knob whose value is now consumed by the
+    // cache walk (regenerateCacheFromEvents) must invalidate the cache on
+    // edit. Knobs that only roll at trigger time (Rest, Repeat, Legato, Slide
+    // probability) stay no-op refresh-wise. Feel is read per-trigger by the
+    // engine so notify is redundant for it — kept for consistency.
+    case 0:  seq.setNoteDuration(seq.noteDuration() + value);        notifyStochasticShapingEdit(); break;
+    case 1:  seq.setVariation(seq.variation() + v);                  notifyStochasticShapingEdit(); break;
     case 2:  seq.setRest(seq.rest() + v); break;
     case 3:  seq.setRange(seq.range() + value);                      notifyStochasticShapingEdit(); break;
     case 4:  seq.setBurst(seq.burst() + v);                          notifyStochasticShapingEdit(); break;
     case 5:  seq.setBurstCount(seq.burstCount() + v);                notifyStochasticShapingEdit(); break;
     case 6:  seq.setBurstRate(seq.burstRate() + v);                  notifyStochasticShapingEdit(); break;
-    // Phase 16 (2026-05-23): slot 7 = Feel (replaces BurstPitch which moved to
-    // the LIVE context menu). Feel knob 0..100 with detent [45..55] = off;
-    // outside detent scales the cycle toward 3/4 (low) or 5/4 (high).
-    case 7:  seq.setFeel(seq.feel() + v); notifyStochasticShapingEdit(); break;
-    case 8:  seq.setComplexity(seq.complexity() + v); break;
-    case 9:  seq.setContour(seq.contour() + v); break;
-    case 10: seq.setMarblesBias(seq.marblesBias() + v); break;
-    case 11: seq.setMarblesSpread(seq.marblesSpread() + v); break;
+    case 7:  seq.setFeel(seq.feel() + v);                            notifyStochasticShapingEdit(); break;
+    case 8:  seq.setComplexity(seq.complexity() + v);                notifyStochasticShapingEdit(); break;
+    case 9:  seq.setContour(seq.contour() + v);                      notifyStochasticShapingEdit(); break;
+    case 10: seq.setMarblesBias(seq.marblesBias() + v);              notifyStochasticShapingEdit(); break;
+    case 11: seq.setMarblesSpread(seq.marblesSpread() + v);          notifyStochasticShapingEdit(); break;
     case 12: seq.setRepeatProb(seq.repeatProb() + v); break;
-    case 13: seq.setGateLength(seq.gateLength() + v); break;
+    case 13: seq.setGateLength(seq.gateLength() + v);                notifyStochasticShapingEdit(); break;
     case 14: seq.setSlide(seq.slide() + v); break;
     case 15: seq.setLegatoProb(seq.legatoProb() + v); break;
     }

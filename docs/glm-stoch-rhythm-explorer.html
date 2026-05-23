@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stochastic Rhythm — Live Explorer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f5f5fa;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #333;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  h1 { text-align: center; color: #1a1a2e; font-size: 24px; margin: 8px 0 2px; letter-spacing: 2px; }
+  .sub { text-align: center; color: #8888aa; font-size: 12px; letter-spacing: 3px; margin-bottom: 16px; }
+  .main { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+  .controls {
+    background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 16px;
+  }
+  .controls h2 { color: #888; font-size: 11px; letter-spacing: 2px; margin-bottom: 12px; text-transform: uppercase; }
+  .param { margin-bottom: 8px; }
+  .param-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+  .param-name { color: #444; font-size: 12px; font-weight: 600; }
+  .param-val { color: #1a7abf; font-size: 11px; font-family: 'SF Mono','Consolas',monospace; }
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px;
+    background: #ddd; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: #0d9488; cursor: pointer; border: 2px solid #fff;
+  }
+  .section-label {
+    color: #999; font-size: 10px; letter-spacing: 2px; margin-top: 12px; margin-bottom: 6px;
+    border-top: 1px solid #e0e0e8; padding-top: 8px;
+  }
+  .btn-row { display: flex; gap: 6px; margin-top: 12px; }
+  .btn {
+    flex: 1; padding: 8px 0; border: 1px solid #ccc; border-radius: 6px;
+    background: #f8f8fc; color: #555; font-size: 11px; cursor: pointer;
+    text-align: center; letter-spacing: 1px;
+  }
+  .btn:hover { background: #eef; color: #333; border-color: #0d9488; }
+  .dur-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: 4px;
+  }
+  .dur-cell {
+    text-align: center; font-size: 9px; padding: 4px 2px; border-radius: 4px;
+    background: #f8f8fc; border: 1px solid #ddd; cursor: default; user-select: none;
+  }
+  .dur-cell .lbl { font-weight: 600; color: #555; font-size: 10px; }
+  .dur-cell .val { color: #0d9488; font-size: 8px; margin-top: 1px; }
+  .viz {
+    background: #fff; border: 1px solid #ddd; border-radius: 12px;
+    padding: 16px; position: relative;
+  }
+  #seqCanvas { width: 100%; display: block; }
+  .stats { display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap; }
+  .stat { font-size: 11px; color: #888; }
+  .stat span { color: #555; }
+  #tooltip {
+    position: absolute; background: #fff; border: 1px solid #ccc;
+    border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #333;
+    pointer-events: none; display: none; z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  }
+</style>
+</head>
+<body>
+
+<h1>STOCHASTIC RHYTHM EXPLORER</h1>
+<p class="sub">64 STEPS · NOTE DURATION, GATE, REST, BURST, MASK &amp; TILT</p>
+
+<div class="main">
+  <div class="controls">
+    <h2>Rhythm Parameters</h2>
+
+    <div class="section-label">DURATION</div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Note Duration</span><span class="param-val" id="vDur">5 (1/16)</span></div>
+      <input type="range" id="sDur" min="0" max="7" value="5" step="1">
+    </div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Variation</span><span class="param-val" id="vVar">30</span></div>
+      <input type="range" id="sVar" min="0" max="100" value="30" step="1">
+    </div>
+
+    <div class="section-label">DURATION WEIGHTS</div>
+    <div class="dur-grid" id="durGrid"></div>
+
+    <div class="section-label">GATE &amp; REST</div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Rest</span><span class="param-val" id="vRest">15</span></div>
+      <input type="range" id="sRest" min="0" max="100" value="15" step="1">
+    </div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Gate Length</span><span class="param-val" id="vGate">50</span></div>
+      <input type="range" id="sGate" min="0" max="100" value="50" step="1">
+    </div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Legato</span><span class="param-val" id="vLegato">10</span></div>
+      <input type="range" id="sLegato" min="0" max="100" value="10" step="1">
+    </div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Slide</span><span class="param-val" id="vSlide">0</span></div>
+      <input type="range" id="sSlide" min="0" max="100" value="0" step="1">
+    </div>
+
+    <div class="section-label">BURST (MULTI-HIT)</div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Burst</span><span class="param-val" id="vBurst">0</span></div>
+      <input type="range" id="sBurst" min="0" max="100" value="0" step="1">
+    </div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Burst Count</span><span class="param-val" id="vBurstCount">50</span></div>
+      <input type="range" id="sBurstCount" min="0" max="100" value="50" step="1">
+    </div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Burst Rate</span><span class="param-val" id="vBurstRate">50</span></div>
+      <input type="range" id="sBurstRate" min="0" max="100" value="50" step="1">
+    </div>
+
+    <div class="section-label">MASK &amp; TILT</div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Mask</span><span class="param-val" id="vMask">100%</span></div>
+      <input type="range" id="sMask" min="0" max="100" value="100" step="1">
+    </div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Tilt</span><span class="param-val" id="vTilt">+0</span></div>
+      <input type="range" id="sTilt" min="-100" max="100" value="0" step="1">
+    </div>
+
+    <div class="section-label">EVOLUTION</div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Repeat</span><span class="param-val" id="vRepeat">0</span></div>
+      <input type="range" id="sRepeat" min="0" max="100" value="0" step="1">
+    </div>
+    <div class="param">
+      <div class="param-header"><span class="param-name">Sleep</span><span class="param-val" id="vSleep">0</span></div>
+      <input type="range" id="sSleep" min="0" max="100" value="0" step="1">
+    </div>
+
+    <div class="btn-row">
+      <div class="btn" id="btnReroll">🎲 REROLL</div>
+      <div class="btn" id="btnReset">RESET</div>
+    </div>
+  </div>
+
+  <div class="viz">
+    <canvas id="seqCanvas" height="520"></canvas>
+    <div id="tooltip"></div>
+    <div class="stats" id="stats"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Rhythm Engine — JS port
+// ═══════════════════════════════════════════════════════════════
+
+const DUR_NAMES  = ['×8','×4','×3','×2','×4/3','×1','×2/3','×1/2'];
+const DUR_LABELS = ['1/2','1/4','3/16','1/8','1/8T','1/16','1/16T','1/32'];
+const DUR_FRACS  = [[8,1],[4,1],[3,1],[2,1],[4,3],[1,1],[2,3],[1,2]];
+const DUR_COLORS = [
+  '#7c3aed','#6d28d9','#5b21b6','#4c1d95',
+  '#2563eb','#1d4ed8','#1e40af','#1e3a8a'
+];
+
+const BURST_COUNT_LUT = [2, 3, 4, 5];
+const BURST_SPACING_LUT = [2, 3, 4, 5, 6];
+
+function makeRng(seed) {
+  let s = seed | 0;
+  return () => { s = (s + 0x6D2B79F5)|0; let t = Math.imul(s^(s>>>15),1|s); t = (t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; };
+}
+function rngRange(rng, n) { return Math.floor(rng() * n); }
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function pickFromLutTriangular(lut, knob, rng) {
+  const weights = [];
+  let total = 0;
+  for (let i = 0; i < lut.length; i++) {
+    const center = i * 100 / (lut.length - 1);
+    const w = Math.max(0, 50 - Math.abs(knob - center));
+    weights.push(w);
+    total += w;
+  }
+  if (total === 0) return lut[Math.floor(rng() * lut.length)];
+  let roll = rngRange(rng, total);
+  let sum = 0;
+  for (let i = 0; i < lut.length; i++) {
+    sum += weights[i];
+    if (roll < sum) return lut[i];
+  }
+  return lut[lut.length - 1];
+}
+
+function pickDuration(noteDuration, variation, durTickets, rng) {
+  const center = clamp(noteDuration, 0, 7);
+  const spread = clamp(Math.abs(variation), 0, 100);
+  const width = 1 + Math.floor(spread * 4 / 100);
+
+  const anyTicket = durTickets.some(t => t > 0);
+  let total = 0;
+  const weights = [];
+
+  for (let i = 0; i < 8; i++) {
+    let base = durTickets[i];
+    if (base <= 0) base = 10;
+    else if (!anyTicket) base = 10;
+    const dist = Math.abs(i - center);
+    const tri = Math.max(width - dist, 0) * 10;
+    const kernel = tri + Math.floor(spread / 10);
+    weights.push(base * kernel);
+    total += base * kernel;
+  }
+
+  if (total === 0) return center;
+  let roll = rngRange(rng, total);
+  let sum = 0;
+  for (let i = 0; i < 8; i++) {
+    sum += weights[i];
+    if (roll < sum) return i;
+  }
+  return 7;
+}
+
+function generateRhythmEvent(params, rng, prevEvent) {
+  // Repeat check
+  if (prevEvent && rngRange(rng, 100) < params.repeat) {
+    return { ...prevEvent, repeated: true };
+  }
+
+  // Duration
+  const durIdx = pickDuration(params.noteDuration, params.variation, params.durTickets, rng);
+  const frac = DUR_FRACS[durIdx];
+  const durTicks = Math.max(1, Math.round(24 * frac[0] / frac[1])); // 24 PPQN base
+
+  // Rest
+  const isRest = rngRange(rng, 100) < params.rest;
+
+  // Legato
+  const legato = !isRest && rngRange(rng, 100) < params.legato;
+
+  // Slide
+  const slide = !isRest && rngRange(rng, 100) < params.slide;
+
+  // Gate length (triangular distribution around 50%)
+  let gatePct = 50;
+  if (params.gateLength > 0) {
+    const r1 = rngRange(rng, 101);
+    const r2 = rngRange(rng, 101);
+    const tri = (r1 + r2) / 2;
+    gatePct = 50 + Math.floor((tri - 50) * params.gateLength / 100);
+    gatePct = clamp(gatePct, 10, 100);
+  }
+  let gateTicks = Math.max(6, Math.round(durTicks * gatePct / 100));
+  if (legato) gateTicks = durTicks;
+
+  // Burst
+  let burstHits = [];
+  const clusterGate = durTicks >= 96;
+  if (!isRest && clusterGate && rngRange(rng, 100) < params.burst) {
+    const childCount = pickFromLutTriangular(BURST_COUNT_LUT, params.burstCount, rng);
+    const spacingDenom = pickFromLutTriangular(BURST_SPACING_LUT, params.burstRate, rng);
+    const spacing = Math.max(7, Math.round(durTicks / spacingDenom));
+    const childGate = Math.max(6, Math.round(spacing * 0.5));
+    for (let c = 0; c < childCount; c++) {
+      const offset = (c + 1) * spacing;
+      if (offset + childGate >= durTicks) break;
+      burstHits.push({ offset, gate: childGate });
+    }
+    if (burstHits.length > 0) gateTicks = durTicks; // hold gate for burst
+  }
+
+  return {
+    durIdx, durTicks, isRest, legato, slide, gateTicks, gatePct,
+    burstHits, repeated: false
+  };
+}
+
+function generateMaskRanks(events, tilt, seed) {
+  const windowSize = events.length;
+  if (windowSize === 0) return [];
+
+  const rng = makeRng(seed);
+  const items = [];
+
+  for (let k = 0; k < windowSize; k++) {
+    const durSlot = events[k].durIdx;
+    const longShortAxis = (durSlot - 3.5) / 3.5; // -1..+1
+    const bias = (tilt / 100.0) * longShortAxis;
+    const noise = rng() * 0.2;
+    const weight = bias + noise;
+    items.push({ idx: k, weight });
+  }
+
+  items.sort((a, b) => a.weight - b.weight);
+  const ranks = new Array(windowSize);
+  for (let r = 0; r < windowSize; r++) {
+    ranks[items[r].idx] = r;
+  }
+  return ranks;
+}
+
+function generateSequence(params) {
+  const rng = makeRng(params.seed);
+  const rawEvents = [];
+  let prev = null;
+
+  for (let i = 0; i < 64; i++) {
+    // Sleep: skip N events at start of each 64-step cycle
+    const ev = generateRhythmEvent(params, rng, prev);
+    prev = ev;
+    rawEvents.push(ev);
+  }
+
+  // Mask ranking
+  const ranks = generateMaskRanks(rawEvents, params.tilt, params.seed ^ 0xdeadbeef);
+  const windowSize = 64;
+
+  // Apply mask
+  const result = [];
+  for (let i = 0; i < 64; i++) {
+    const ev = rawEvents[i];
+    const rank = ranks[i];
+    const maskPass = (params.mask >= 100) || ((rank * 100) < (params.mask * windowSize));
+    const silenced = ev.isRest || !maskPass;
+
+    result.push({
+      step: i,
+      durIdx: ev.durIdx,
+      durTicks: ev.durTicks,
+      gateTicks: ev.gateTicks,
+      gatePct: ev.gatePct,
+      isRest: ev.isRest,
+      silenced,
+      legato: ev.legato,
+      slide: ev.slide,
+      burstHits: ev.burstHits,
+      repeated: ev.repeated,
+      rank,
+      maskPass
+    });
+  }
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════
+
+const state = {
+  noteDuration: 5, variation: 30, durTickets: [0,0,0,0,0,0,0,0],
+  rest: 15, gateLength: 50, legato: 10, slide: 0,
+  burst: 0, burstCount: 50, burstRate: 50,
+  mask: 100, tilt: 0, repeat: 0, sleep: 0,
+  seed: 42
+};
+
+let sequence = [];
+let hoverStep = -1;
+
+// ═══════════════════════════════════════════════════════════════
+// Canvas rendering
+// ═══════════════════════════════════════════════════════════════
+
+const canvas = document.getElementById('seqCanvas');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = rect.width - 32;
+  canvas.style.width = w + 'px';
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = 520 * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function render() {
+  const W = canvas.width / (window.devicePixelRatio || 1);
+  const H = canvas.height / (window.devicePixelRatio || 1);
+  ctx.clearRect(0, 0, W, H);
+  if (!sequence.length) return;
+
+  const ml = 36, mr = 10, mt = 16, mb = 70;
+  const pw = W - ml - mr;
+  const ph = H - mt - mb;
+  const stepW = pw / 64;
+  const maxTicks = 24 * 8; // ×8 duration = 192 ticks
+  const tickH = ph / maxTicks;
+
+  // Y-axis labels
+  ctx.font = '8px system-ui';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+
+  // Duration gridlines
+  for (let d = 0; d < 8; d++) {
+    const ticks = Math.round(24 * DUR_FRACS[d][0] / DUR_FRACS[d][1]);
+    const y = mt + ph - ticks * tickH;
+    ctx.strokeStyle = '#e8e8f0';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(W - mr, y); ctx.stroke();
+    ctx.fillStyle = '#bbb';
+    ctx.fillText(DUR_LABELS[d], ml - 3, y);
+  }
+
+  // Draw events
+  for (let i = 0; i < 64; i++) {
+    const ev = sequence[i];
+    const x = ml + i * stepW;
+    const barW = stepW - 2;
+    const isHover = i === hoverStep;
+    const isSilent = ev.silenced;
+
+    // Duration bar (total event length)
+    const durY = mt + ph - ev.durTicks * tickH;
+    const durH = ev.durTicks * tickH;
+
+    if (isSilent) {
+      // Rest or masked — dim bar
+      ctx.fillStyle = isHover ? '#e0e0e8' : '#f0f0f5';
+      ctx.fillRect(x + 1, durY, barW, durH);
+      // Rest marker
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = 1;
+      const midY = durY + durH / 2;
+      ctx.beginPath(); ctx.moveTo(x + 4, midY); ctx.lineTo(x + barW - 2, midY); ctx.stroke();
+    } else {
+      // Active event
+      const color = DUR_COLORS[ev.durIdx];
+      ctx.fillStyle = isHover ? color : color + 'cc';
+      ctx.fillRect(x + 1, durY, barW, durH);
+
+      // Gate portion (brighter)
+      const gateY = mt + ph - ev.gateTicks * tickH;
+      const gateH = ev.gateTicks * tickH;
+      ctx.fillStyle = isHover ? color : color;
+      ctx.fillRect(x + 1, gateY, barW, gateH);
+
+      // Burst hits
+      if (ev.burstHits && ev.burstHits.length > 0) {
+        for (const hit of ev.burstHits) {
+          const hitY = mt + ph - (hit.offset + hit.gate) * tickH;
+          const hitH = hit.gate * tickH;
+          ctx.fillStyle = isHover ? '#dc2626' : '#ef4444aa';
+          ctx.fillRect(x + 1, hitY, barW, hitH);
+        }
+      }
+
+      // Slide indicator
+      if (ev.slide) {
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(x + 1, durY, barW, 2);
+      }
+
+      // Legato indicator
+      if (ev.legato) {
+        ctx.fillStyle = '#a78bfa';
+        ctx.fillRect(x + 1, durY, barW, 2);
+      }
+
+      // Mask rank (small number)
+      if (state.mask < 100) {
+        ctx.fillStyle = '#bbb';
+        ctx.font = '7px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(ev.rank, x + barW / 2 + 1, mt + ph + 2);
+      }
+
+      if (isHover) {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 6;
+        ctx.fillRect(x + 1, gateY, barW, gateH);
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    // Step number every 8
+    if (i % 8 === 0) {
+      ctx.fillStyle = '#bbb';
+      ctx.font = '9px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(i + 1, x + barW / 2, mt + ph + (state.mask < 100 ? 14 : 4));
+    }
+
+    // Bottom labels every 4
+    if (i % 4 === 0) {
+      ctx.fillStyle = isHover ? '#111' : '#999';
+      ctx.font = isHover ? 'bold 9px system-ui' : '8px system-ui';
+      ctx.textAlign = 'center';
+      const lbl = ev.silenced ? '—' : DUR_LABELS[ev.durIdx];
+      ctx.fillText(lbl, x + barW / 2, mt + ph + (state.mask < 100 ? 26 : 18));
+    }
+  }
+
+  // Legend at bottom
+  const legY = mt + ph + (state.mask < 100 ? 40 : 32);
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'left';
+
+  // Duration color swatches
+  const usedSlots = new Set(sequence.filter(e => !e.silenced).map(e => e.durIdx));
+  let lx = ml;
+  for (const s of [...usedSlots].sort()) {
+    ctx.fillStyle = DUR_COLORS[s];
+    ctx.fillRect(lx, legY, 10, 10);
+    ctx.fillStyle = '#666';
+    ctx.fillText(DUR_LABELS[s], lx + 14, legY + 9);
+    lx += 52;
+  }
+
+  // Rest symbol
+  ctx.fillStyle = '#ccc';
+  ctx.fillRect(lx, legY, 10, 10);
+  ctx.fillStyle = '#999';
+  ctx.fillText('rest/masked', lx + 14, legY + 9);
+  lx += 82;
+
+  // Burst
+  if (sequence.some(e => e.burstHits && e.burstHits.length > 0)) {
+    ctx.fillStyle = '#ef4444aa';
+    ctx.fillRect(lx, legY, 10, 10);
+    ctx.fillStyle = '#999';
+    ctx.fillText('burst hit', lx + 14, legY + 9);
+    lx += 65;
+  }
+
+  // Slide
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillRect(lx, legY, 10, 2);
+  ctx.fillStyle = '#999';
+  ctx.fillText('slide', lx + 14, legY + 9);
+  lx += 45;
+
+  // Legato
+  ctx.fillStyle = '#a78bfa';
+  ctx.fillRect(lx, legY, 10, 2);
+  ctx.fillStyle = '#999';
+  ctx.fillText('legato', lx + 14, legY + 9);
+
+  // Stats
+  const audible = sequence.filter(e => !e.silenced).length;
+  const rests = sequence.filter(e => e.isRest && !e.maskPass === false).length;
+  const masked = sequence.filter(e => !e.isRest && e.silenced).length;
+  const avgDur = audible > 0 ? (sequence.filter(e => !e.silenced).reduce((s, e) => s + e.durTicks, 0) / audible).toFixed(0) : 0;
+  const avgGate = audible > 0 ? (sequence.filter(e => !e.silenced).reduce((s, e) => s + e.gateTicks, 0) / audible).toFixed(0) : 0;
+  const bursts = sequence.filter(e => e.burstHits && e.burstHits.length > 0 && !e.silenced).length;
+  const repeats = sequence.filter(e => e.repeated).length;
+  const durDist = new Array(8).fill(0);
+  sequence.filter(e => !e.silenced).forEach(e => durDist[e.durIdx]++);
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat">Audible: <span>${audible}/64</span></div>
+    <div class="stat">Rests: <span>${rests}</span></div>
+    <div class="stat">Masked: <span>${masked}</span></div>
+    <div class="stat">Avg dur: <span>${avgDur} ticks</span></div>
+    <div class="stat">Avg gate: <span>${avgGate} ticks</span></div>
+    <div class="stat">Bursts: <span>${bursts}</span></div>
+    <div class="stat">Repeats: <span>${repeats}</span></div>
+    <div class="stat">Duration mix: <span>${durDist.map((c, i) => c > 0 ? DUR_LABELS[i] + '×' + c : '').filter(Boolean).join(' ')}</span></div>
+    <div class="stat">Seed: <span>${state.seed}</span></div>
+  `;
+}
+
+function regenerate() {
+  sequence = generateSequence(state);
+  resizeCanvas();
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Controls
+// ═══════════════════════════════════════════════════════════════
+
+function wireSlider(id, key, fmt) {
+  const el = document.getElementById('s' + id);
+  const val = document.getElementById('v' + id);
+  el.addEventListener('input', () => {
+    state[key] = parseInt(el.value);
+    val.textContent = fmt(state[key]);
+    regenerate();
+  });
+}
+
+wireSlider('Dur', 'noteDuration', v => v + ' (' + DUR_LABELS[v] + ')');
+wireSlider('Var', 'variation', v => v);
+wireSlider('Rest', 'rest', v => v);
+wireSlider('Gate', 'gateLength', v => v);
+wireSlider('Legato', 'legato', v => v);
+wireSlider('Slide', 'slide', v => v);
+wireSlider('Burst', 'burst', v => v);
+wireSlider('BurstCount', 'burstCount', v => v);
+wireSlider('BurstRate', 'burstRate', v => v);
+wireSlider('Mask', 'mask', v => v + '%');
+wireSlider('Tilt', 'tilt', v => (v >= 0 ? '+' : '') + v);
+wireSlider('Repeat', 'repeat', v => v);
+wireSlider('Sleep', 'sleep', v => v);
+
+// Duration ticket grid
+function buildDurGrid() {
+  const grid = document.getElementById('durGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'dur-cell';
+    const t = state.durTickets[i];
+    cell.innerHTML = `<div class="lbl">${DUR_LABELS[i]}</div><div class="val">${t > 0 ? 'wt ' + t : 'flat'}</div>`;
+    // Click to cycle: 0 → 20 → 50 → 100 → 0
+    cell.style.cursor = 'pointer';
+    cell.addEventListener('click', () => {
+      const vals = [0, 20, 50, 100];
+      const cur = vals.indexOf(state.durTickets[i]);
+      state.durTickets[i] = vals[(cur + 1) % vals.length];
+      buildDurGrid();
+      regenerate();
+    });
+    cell.style.borderColor = state.durTickets[i] > 0 ? '#0d9488' : '#ddd';
+    grid.appendChild(cell);
+  }
+}
+
+// Buttons
+document.getElementById('btnReroll').addEventListener('click', () => {
+  state.seed = Math.floor(Math.random() * 100000);
+  regenerate();
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  Object.assign(state, {
+    noteDuration:5, variation:30, durTickets:[0,0,0,0,0,0,0,0],
+    rest:15, gateLength:50, legato:10, slide:0,
+    burst:0, burstCount:50, burstRate:50,
+    mask:100, tilt:0, repeat:0, sleep:0, seed:42
+  });
+  document.getElementById('sDur').value=5; document.getElementById('vDur').textContent='5 (1/16)';
+  document.getElementById('sVar').value=30; document.getElementById('vVar').textContent='30';
+  document.getElementById('sRest').value=15; document.getElementById('vRest').textContent='15';
+  document.getElementById('sGate').value=50; document.getElementById('vGate').textContent='50';
+  document.getElementById('sLegato').value=10; document.getElementById('vLegato').textContent='10';
+  document.getElementById('sSlide').value=0; document.getElementById('vSlide').textContent='0';
+  document.getElementById('sBurst').value=0; document.getElementById('vBurst').textContent='0';
+  document.getElementById('sBurstCount').value=50; document.getElementById('vBurstCount').textContent='50';
+  document.getElementById('sBurstRate').value=50; document.getElementById('vBurstRate').textContent='50';
+  document.getElementById('sMask').value=100; document.getElementById('vMask').textContent='100%';
+  document.getElementById('sTilt').value=0; document.getElementById('vTilt').textContent='+0';
+  document.getElementById('sRepeat').value=0; document.getElementById('vRepeat').textContent='0';
+  document.getElementById('sSleep').value=0; document.getElementById('vSleep').textContent='0';
+  buildDurGrid();
+  regenerate();
+});
+
+// Canvas hover
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const W = rect.width;
+  const ml = 36, mr = 10, pw = W - ml - mr;
+  const stepW = pw / 64;
+  const step = Math.floor((x - ml) / stepW);
+
+  if (step >= 0 && step < 64 && sequence[step]) {
+    hoverStep = step;
+    const ev = sequence[step];
+    const vizRect = canvas.parentElement.getBoundingClientRect();
+    tooltip.style.display = 'block';
+    tooltip.style.left = Math.min(e.clientX - vizRect.left + 12, vizRect.width - 200) + 'px';
+    tooltip.style.top = (e.clientY - vizRect.top - 40) + 'px';
+
+    let html = `<b style="color:${DUR_COLORS[ev.durIdx]}">${DUR_LABELS[ev.durIdx]}</b> step ${step+1}`;
+    html += `<br><span style="color:#666">dur ${ev.durTicks} ticks · gate ${ev.gateTicks} ticks (${ev.gatePct}%)</span>`;
+    if (ev.isRest) html += `<br><span style="color:#dc2626">REST</span>`;
+    if (!ev.maskPass && !ev.isRest) html += `<br><span style="color:#d97706">MASKED (rank ${ev.rank})</span>`;
+    if (ev.legato) html += `<br><span style="color:#7c3aed">legato</span>`;
+    if (ev.slide) html += `<br><span style="color:#d97706">slide</span>`;
+    if (ev.burstHits && ev.burstHits.length > 0) html += `<br><span style="color:#dc2626">${ev.burstHits.length} burst hits</span>`;
+    if (ev.repeated) html += `<br><span style="color:#888">repeated</span>`;
+    tooltip.innerHTML = html;
+  } else {
+    hoverStep = -1;
+    tooltip.style.display = 'none';
+  }
+  render();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoverStep = -1; tooltip.style.display = 'none'; render();
+});
+
+window.addEventListener('resize', () => { resizeCanvas(); render(); });
+
+buildDurGrid();
+regenerate();
+</script>
+</body>
+</html>

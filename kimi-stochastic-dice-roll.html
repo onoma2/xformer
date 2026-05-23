@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stochastic Pitch Explorer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #f8f7f4;
+    font-family: 'Space Grotesk', sans-serif;
+    color: #1e293b;
+    padding: 24px 16px;
+    line-height: 1.5;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+h1 {
+    font-size: 1.7rem;
+    font-weight: 700;
+    text-align: center;
+    color: #0f172a;
+    margin-bottom: 2px;
+}
+
+.subtitle {
+    text-align: center;
+    color: #64748b;
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+}
+
+/* ---------- Layout ---------- */
+.app {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+@media (max-width: 860px) {
+    .app { flex-direction: column; }
+}
+
+/* ---------- Controls ---------- */
+.controls {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 20px 22px;
+    width: 300px;
+    flex-shrink: 0;
+}
+
+.controls h2 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #94a3b8;
+    margin-bottom: 14px;
+}
+
+.slider-group {
+    margin-bottom: 14px;
+}
+
+.slider-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 4px;
+}
+
+.slider-val {
+    color: #0ea5e9;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #e2e8f0;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0ea5e9;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0ea5e9;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    cursor: pointer;
+}
+
+.ticket-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.ticket-col {
+    text-align: center;
+}
+
+.ticket-col label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 2px;
+}
+
+.ticket-col input[type="range"] {
+    writing-mode: bt-lr; /* IE */
+    -webkit-appearance: slider-vertical;
+    appearance: slider-vertical;
+    width: 8px;
+    height: 60px;
+    margin: 0 auto;
+    display: block;
+}
+
+/* For modern browsers without slider-vertical support */
+@supports not (-webkit-appearance: slider-vertical) {
+    .ticket-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+    }
+    .ticket-col input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 6px;
+        transform: none;
+    }
+}
+
+.ticket-val {
+    font-size: 0.65rem;
+    color: #0ea5e9;
+    font-weight: 700;
+}
+
+.divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 14px 0;
+}
+
+.btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    background: #0f172a;
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+.btn:active { transform: scale(0.98); }
+
+.presets {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.preset-btn {
+    flex: 1;
+    padding: 6px 4px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+}
+.preset-btn:hover { background: #f1f5f9; }
+
+/* ---------- Visualization ---------- */
+.vis {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 20px 22px;
+    min-width: 0;
+}
+
+.vis-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.vis-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #94a3b8;
+}
+
+.vis-legend {
+    display: flex;
+    gap: 12px;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+.leg-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.leg-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+
+/* The sequencer grid */
+.seq-wrap {
+    display: flex;
+    gap: 2px;
+    height: 280px;
+    align-items: flex-end;
+    padding-bottom: 24px;
+    position: relative;
+    overflow-x: auto;
+}
+
+.step-col {
+    flex: 1;
+    min-width: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    position: relative;
+}
+
+.step-bar {
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    opacity: 0.9;
+    transition: height 0.2s ease, background 0.2s ease;
+    position: relative;
+}
+
+.step-bar:hover {
+    opacity: 1;
+    filter: brightness(1.1);
+}
+
+.step-label {
+    position: absolute;
+    bottom: -20px;
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-align: center;
+    width: 20px;
+    white-space: nowrap;
+    transform: rotate(-45deg);
+    transform-origin: top left;
+    pointer-events: none;
+}
+
+/* Show fewer labels to avoid clutter */
+.step-col:nth-child(4n+1) .step-label { opacity: 1; }
+.step-col:nth-child(4n+2) .step-label,
+.step-col:nth-child(4n+3) .step-label,
+.step-col:nth-child(4n+4) .step-label { opacity: 0; }
+
+.octave-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px dashed #e2e8f0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.tooltip {
+    position: absolute;
+    background: #0f172a;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 10;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.tooltip.show { opacity: 1; }
+
+/* Mobile */
+@media (max-width: 860px) {
+    .controls { width: 100%; }
+    .seq-wrap { height: 220px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Stochastic Pitch Explorer</h1>
+    <p class="subtitle">Move sliders. Watch 64 steps reshape in C Major.</p>
+
+    <div class="app">
+        <!-- CONTROLS -->
+        <div class="controls">
+            <h2>Presets</h2>
+            <div class="presets">
+                <button class="preset-btn" onclick="loadPreset('waltz')">Waltz</button>
+                <button class="preset-btn" onclick="loadPreset('ladder')">Ladder</button>
+                <button class="preset-btn" onclick="loadPreset('drift')">Drift</button>
+            </div>
+
+            <h2>Shape</h2>
+            <div class="slider-group">
+                <div class="slider-label">Range <span class="slider-val" id="val-range">2</span></div>
+                <input type="range" id="range" min="1" max="4" value="2" oninput="update()">
+            </div>
+            <div class="slider-group">
+                <div class="slider-label">Steps <span class="slider-val" id="val-steps">100</span></div>
+                <input type="range" id="steps" min="0" max="100" value="100" oninput="update()">
+            </div>
+            <div class="slider-group">
+                <div class="slider-label">Bias <span class="slider-val" id="val-bias">50</span></div>
+                <input type="range" id="bias" min="0" max="100" value="50" oninput="update()">
+            </div>
+            <div class="slider-group">
+                <div class="slider-label">Spread <span class="slider-val" id="val-spread">50</span></div>
+                <input type="range" id="spread" min="0" max="100" value="50" oninput="update()">
+            </div>
+            <div class="slider-group">
+                <div class="slider-label">Complexity <span class="slider-val" id="val-complexity">50</span></div>
+                <input type="range" id="complexity" min="0" max="100" value="50" oninput="update()">
+            </div>
+            <div class="slider-group">
+                <div class="slider-label">Contour <span class="slider-val" id="val-contour">0</span></div>
+                <input type="range" id="contour" min="-100" max="100" value="0" oninput="update()">
+            </div>
+
+            <div class="divider"></div>
+
+            <h2>Pitch Tickets</h2>
+            <div class="ticket-grid">
+                <div class="ticket-col">
+                    <label>C</label>
+                    <input type="range" id="t0" min="0" max="10" value="8" oninput="update()">
+                    <div class="ticket-val" id="val-t0">8</div>
+                </div>
+                <div class="ticket-col">
+                    <label>D</label>
+                    <input type="range" id="t1" min="0" max="10" value="5" oninput="update()">
+                    <div class="ticket-val" id="val-t1">5</div>
+                </div>
+                <div class="ticket-col">
+                    <label>E</label>
+                    <input type="range" id="t2" min="0" max="10" value="5" oninput="update()">
+                    <div class="ticket-val" id="val-t2">5</div>
+                </div>
+                <div class="ticket-col">
+                    <label>F</label>
+                    <input type="range" id="t3" min="0" max="10" value="2" oninput="update()">
+                    <div class="ticket-val" id="val-t3">2</div>
+                </div>
+                <div class="ticket-col">
+                    <label>G</label>
+                    <input type="range" id="t4" min="0" max="10" value="8" oninput="update()">
+                    <div class="ticket-val" id="val-t4">8</div>
+                </div>
+                <div class="ticket-col">
+                    <label>A</label>
+                    <input type="range" id="t5" min="0" max="10" value="4" oninput="update()">
+                    <div class="ticket-val" id="val-t5">4</div>
+                </div>
+                <div class="ticket-col">
+                    <label>B</label>
+                    <input type="range" id="t6" min="0" max="10" value="2" oninput="update()">
+                    <div class="ticket-val" id="val-t6">2</div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+            <button class="btn" onclick="randomize()">Randomize</button>
+        </div>
+
+        <!-- VISUALIZATION -->
+        <div class="vis">
+            <div class="vis-header">
+                <div class="vis-title">64-Step Sequence</div>
+                <div class="vis-legend">
+                    <div class="leg-item"><div class="leg-dot" style="background:#0ea5e9"></div>Oct 1</div>
+                    <div class="leg-item"><div class="leg-dot" style="background:#8b5cf6"></div>Oct 2</div>
+                    <div class="leg-item"><div class="leg-dot" style="background:#ec4899"></div>Oct 3</div>
+                    <div class="leg-item"><div class="leg-dot" style="background:#f59e0b"></div>Oct 4</div>
+                </div>
+            </div>
+            <div class="seq-wrap" id="seqWrap">
+                <!-- Bars generated by JS -->
+            </div>
+            <div class="tooltip" id="tooltip"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const NOTE_NAMES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+const OCT_COLORS = ['#0ea5e9', '#8b5cf6', '#ec4899', '#f59e0b'];
+const FUND_RANK = [10, 5, 8, 4, 9, 6, 3]; // C, D, E, F, G, A, B
+const NUM_STEPS = 64;
+
+let rngSeed = 12345;
+function seededRandom() {
+    rngSeed = (rngSeed * 16807 + 0) % 2147483647;
+    return (rngSeed - 1) / 2147483646;
+}
+
+function getParams() {
+    return {
+        range: +document.getElementById('range').value,
+        steps: +document.getElementById('steps').value,
+        bias: +document.getElementById('bias').value,
+        spread: +document.getElementById('spread').value,
+        complexity: +document.getElementById('complexity').value,
+        contour: +document.getElementById('contour').value,
+        tickets: [
+            +document.getElementById('t0').value,
+            +document.getElementById('t1').value,
+            +document.getElementById('t2').value,
+            +document.getElementById('t3').value,
+            +document.getElementById('t4').value,
+            +document.getElementById('t5').value,
+            +document.getElementById('t6').value,
+        ]
+    };
+}
+
+function generateSequence(params) {
+    const activeNotes = 7;
+    const notes = [];
+    let lastDegree = -1;
+
+    for (let step = 0; step < NUM_STEPS; step++) {
+        // Build pool
+        let allowed = [];
+        for (let oct = 0; oct < params.range; oct++) {
+            for (let deg = 0; deg < activeNotes; deg++) {
+                allowed.push({
+                    absDeg: oct * activeNotes + deg,
+                    deg,
+                    oct,
+                    name: NOTE_NAMES[deg],
+                    ticket: params.tickets[deg]
+                });
+            }
+        }
+
+        // Steps sieve
+        allowed.sort((a, b) => FUND_RANK[b.deg] - FUND_RANK[a.deg]);
+        const K = Math.max(1, Math.floor(allowed.length * params.steps / 100));
+        const survivors = allowed.slice(0, K);
+        survivors.sort((a, b) => a.absDeg - b.absDeg);
+
+        const N = survivors.length;
+        const biasPos = N <= 1 ? 0 : Math.floor((params.bias * (N - 1) + 50) / 100);
+        const marblesWidth = 1 + Math.floor(params.spread * N / 100);
+        const marblesLeak = 1 + Math.floor(params.spread / 10);
+
+        const kernelWidth = 1 + Math.floor(params.complexity * activeNotes / 50);
+        const kernelLeak = Math.floor(params.complexity / 10);
+
+        // Find lastIdx
+        let lastIdx = -1;
+        if (lastDegree >= 0) {
+            for (let i = 0; i < N; i++) {
+                if (survivors[i].absDeg === lastDegree) { lastIdx = i; break; }
+            }
+        }
+
+        const anyTicket = survivors.some(s => s.ticket > 0);
+        let weights = [];
+        let totalWeight = 0;
+
+        for (let i = 0; i < N; i++) {
+            let base = anyTicket ? survivors[i].ticket : 10;
+            if (base < 0) base = 0;
+
+            // Complexity kernel
+            let kernel;
+            if (lastIdx < 0) {
+                kernel = 100;
+            } else {
+                const dist = Math.abs(i - lastIdx);
+                const tri = Math.max(0, kernelWidth - dist) * 10;
+                const signedDist = i - lastIdx;
+                let drift = Math.floor((params.contour * signedDist) / 2);
+                const maxDrift = Math.max(kernelWidth, 2) * 10;
+                drift = Math.max(-maxDrift, Math.min(maxDrift, drift));
+                kernel = tri + kernelLeak + drift;
+                kernel = Math.max(0, kernel);
+            }
+
+            // Marbles kernel
+            const dm = Math.abs(i - biasPos);
+            const mtri = Math.max(0, marblesWidth - dm) * 10;
+            const marbles = mtri + marblesLeak;
+
+            const w = base * kernel * marbles;
+            weights.push(w);
+            totalWeight += w;
+        }
+
+        // Weighted pick
+        let pickIdx = 0;
+        if (totalWeight > 0) {
+            const roll = seededRandom() * totalWeight;
+            let sum = 0;
+            for (let i = 0; i < N; i++) {
+                sum += weights[i];
+                if (roll < sum) { pickIdx = i; break; }
+            }
+        } else {
+            pickIdx = Math.floor(seededRandom() * N);
+        }
+
+        const picked = survivors[pickIdx];
+        lastDegree = picked.absDeg;
+        notes.push(picked);
+    }
+
+    return notes;
+}
+
+function update() {
+    const params = getParams();
+
+    // Update value labels
+    document.getElementById('val-range').textContent = params.range;
+    document.getElementById('val-steps').textContent = params.steps;
+    document.getElementById('val-bias').textContent = params.bias;
+    document.getElementById('val-spread').textContent = params.spread;
+    document.getElementById('val-complexity').textContent = params.complexity;
+    document.getElementById('val-contour').textContent = (params.contour > 0 ? '+' : '') + params.contour;
+    for (let i = 0; i < 7; i++) {
+        document.getElementById('val-t' + i).textContent = params.tickets[i];
+    }
+
+    // Regenerate
+    rngSeed = 12345; // deterministic seed so slider changes are comparable
+    const notes = generateSequence(params);
+    const maxAbs = Math.max(1, (params.range * 7) - 1);
+
+    // Render
+    const wrap = document.getElementById('seqWrap');
+    wrap.innerHTML = '';
+
+    // Octave guide lines
+    for (let oct = 1; oct <= params.range; oct++) {
+        const line = document.createElement('div');
+        line.className = 'octave-line';
+        line.style.bottom = ((oct * 7 - 1) / maxAbs * 100) + '%';
+        wrap.appendChild(line);
+    }
+
+    const tooltip = document.getElementById('tooltip');
+
+    notes.forEach((note, idx) => {
+        const col = document.createElement('div');
+        col.className = 'step-col';
+
+        const bar = document.createElement('div');
+        bar.className = 'step-bar';
+        const h = (note.absDeg / maxAbs) * 100;
+        bar.style.height = Math.max(4, h) + '%';
+        bar.style.background = OCT_COLORS[note.oct % OCT_COLORS.length];
+
+        const label = document.createElement('div');
+        label.className = 'step-label';
+        label.textContent = note.name;
+
+        col.appendChild(bar);
+        col.appendChild(label);
+
+        // Tooltip
+        col.addEventListener('mouseenter', (e) => {
+            tooltip.textContent = `Step ${idx + 1}: ${note.name}${note.oct + 3} (deg ${note.absDeg})`;
+            tooltip.classList.add('show');
+        });
+        col.addEventListener('mousemove', (e) => {
+            const rect = wrap.getBoundingClientRect();
+            tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
+            tooltip.style.top = (e.clientY - rect.top - 30) + 'px';
+        });
+        col.addEventListener('mouseleave', () => {
+            tooltip.classList.remove('show');
+        });
+
+        wrap.appendChild(col);
+    });
+}
+
+function randomize() {
+    document.getElementById('range').value = 1 + Math.floor(Math.random() * 4);
+    document.getElementById('steps').value = 20 + Math.floor(Math.random() * 81);
+    document.getElementById('bias').value = Math.floor(Math.random() * 101);
+    document.getElementById('spread').value = Math.floor(Math.random() * 101);
+    document.getElementById('complexity').value = Math.floor(Math.random() * 101);
+    document.getElementById('contour').value = -100 + Math.floor(Math.random() * 201);
+    for (let i = 0; i < 7; i++) {
+        document.getElementById('t' + i).value = Math.floor(Math.random() * 11);
+    }
+    update();
+}
+
+const PRESETS = {
+    waltz: { range: 1, steps: 80, bias: 50, spread: 20, complexity: 70, contour: 0, tickets: [10, 4, 6, 0, 10, 4, 0] },
+    ladder: { range: 2, steps: 100, bias: 70, spread: 80, complexity: 30, contour: 60, tickets: [5, 5, 5, 5, 5, 5, 5] },
+    drift: { range: 3, steps: 60, bias: 20, spread: 60, complexity: 50, contour: -40, tickets: [10, 6, 8, 4, 10, 4, 2] },
+};
+
+function loadPreset(name) {
+    const p = PRESETS[name];
+    if (!p) return;
+    document.getElementById('range').value = p.range;
+    document.getElementById('steps').value = p.steps;
+    document.getElementById('bias').value = p.bias;
+    document.getElementById('spread').value = p.spread;
+    document.getElementById('complexity').value = p.complexity;
+    document.getElementById('contour').value = p.contour;
+    for (let i = 0; i < 7; i++) {
+        document.getElementById('t' + i).value = p.tickets[i];
+    }
+    update();
+}
+
+// Init
+update();
+</script>
+</body>
+</html>

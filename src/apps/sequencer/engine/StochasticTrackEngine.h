@@ -224,6 +224,26 @@ private:
     // (refreshCacheNow) so they take effect immediately.
     bool _cacheRefreshPending = false;
 
+    // Phase 16 P10 (2026-05-23): Codex audit follow-up. Knobs consumed inside
+    // regenerateCacheFromEvents are cache-baked state — when a routing target
+    // writes them mid-cycle (no UI involvement, no shaping-edit notify), the
+    // cache must rebuild before the next event read. triggerStep snapshots
+    // the current shaping-knob set at the top and flags refresh on any drift.
+    // Last-applied tilt/window already tracked via the existing fields above.
+    uint8_t _lastShapingNoteDuration = 0xff;
+    uint8_t _lastShapingVariation = 0xff;
+    uint8_t _lastShapingBurst = 0xff;
+    uint8_t _lastShapingGateLength = 0xff;
+    uint8_t _lastShapingComplexity = 0xff;
+    int8_t  _lastShapingContour = 0;
+    uint8_t _lastShapingMarblesBias = 0xff;
+    uint8_t _lastShapingMarblesSpread = 0xff;
+    uint8_t _lastShapingBurstCount = 0xff;
+    uint8_t _lastShapingBurstRate = 0xff;
+    uint8_t _lastShapingBurstPitch = 0xff;
+    uint8_t _lastShapingRange = 0xff;
+    bool    _shapingSnapshotValid = false;
+
     bool _activity = false;
     bool _gateOutput = false;
     bool _slideActive = false;

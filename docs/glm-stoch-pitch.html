@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stochastic Pitch — How One Note Is Born</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #060610;
+    display: flex; justify-content: center; align-items: flex-start;
+    min-height: 100vh; padding: 24px;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  .wrap { width: 100%; max-width: 1100px; }
+  svg { width: 100%; height: auto; display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<svg viewBox="0 0 1100 3400" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#08081a"/><stop offset="100%" stop-color="#060612"/>
+  </linearGradient>
+  <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#1e1545"/><stop offset="100%" stop-color="#2a1868"/>
+  </linearGradient>
+  <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#122040"/><stop offset="100%" stop-color="#163060"/>
+  </linearGradient>
+  <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#0f2520"/><stop offset="100%" stop-color="#14403a"/>
+  </linearGradient>
+  <linearGradient id="g4" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#252010"/><stop offset="100%" stop-color="#403518"/>
+  </linearGradient>
+  <linearGradient id="g5" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#301520"/><stop offset="100%" stop-color="#502038"/>
+  </linearGradient>
+  <linearGradient id="spine" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#7c6aef"/><stop offset="30%" stop-color="#4ea8de"/>
+    <stop offset="55%" stop-color="#4ecdc4"/><stop offset="80%" stop-color="#fbbf24"/>
+    <stop offset="100%" stop-color="#f472b6"/>
+  </linearGradient>
+
+  <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="sh"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#000" flood-opacity="0.45"/></filter>
+
+  <!-- Knob -->
+  <symbol id="k" viewBox="0 0 40 40">
+    <circle cx="20" cy="20" r="18" fill="#14142a" stroke="#2a2a50" stroke-width="1.5"/>
+    <circle cx="20" cy="20" r="13" fill="#1c1c3a"/>
+    <line x1="20" y1="7" x2="20" y2="16" stroke="#999" stroke-width="2.2" stroke-linecap="round"/>
+  </symbol>
+  <!-- Small knob -->
+  <symbol id="ks" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="14" fill="#14142a" stroke="#2a2a50" stroke-width="1.2"/>
+    <circle cx="16" cy="16" r="10" fill="#1c1c3a"/>
+    <line x1="16" y1="6" x2="16" y2="13" stroke="#888" stroke-width="1.8" stroke-linecap="round"/>
+  </symbol>
+  <!-- CV jack -->
+  <symbol id="cv" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10" fill="#0a0a18" stroke="#444" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="5" fill="#1a1a30" stroke="#555" stroke-width="1"/>
+    <circle cx="12" cy="12" r="2" fill="#333"/>
+  </symbol>
+</defs>
+
+<!-- BG -->
+<rect width="1100" height="3400" fill="url(#bg)" rx="16"/>
+
+<!-- ═══ TITLE ═══ -->
+<text x="550" y="60" text-anchor="middle" fill="#e0e0f0" font-size="32" font-weight="700" letter-spacing="3">HOW ONE NOTE IS BORN</text>
+<text x="550" y="88" text-anchor="middle" fill="#6a6a90" font-size="14" letter-spacing="5" font-weight="300">STOCHASTIC TRACK · FROM KNOB TO PITCH</text>
+<line x1="350" y1="108" x2="750" y2="108" stroke="url(#spine)" stroke-width="1.5" opacity="0.35"/>
+
+<!-- Spine -->
+<line x1="550" y1="130" x2="550" y2="3220" stroke="url(#spine)" stroke-width="2" opacity="0.12" stroke-dasharray="6,6"/>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 1: THE MUSICAL ALPHABET                                    -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<g transform="translate(0,130)">
+  <circle cx="550" cy="28" r="20" fill="#7c6aef" filter="url(#glow)"/>
+  <text x="550" y="34" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">1</text>
+
+  <rect x="70" y="55" width="960" height="220" rx="16" fill="url(#g1)" opacity="0.55" filter="url(#sh)"/>
+  <rect x="70" y="55" width="960" height="220" rx="16" fill="none" stroke="#7c6aef" stroke-width="1" opacity="0.25"/>
+
+  <text x="130" y="92" fill="#c4b5fd" font-size="20" font-weight="600">THE MUSICAL ALPHABET</text>
+  <text x="130" y="112" fill="#7a7aaa" font-size="12" font-style="italic">Config page — set once, affects every note</text>
+
+  <!-- Scale knob -->
+  <g transform="translate(160,170)">
+    <use href="#k" width="52" height="52" x="-26" y="-26"/>
+    <text x="0" y="38" text-anchor="middle" fill="#ddd" font-size="14" font-weight="600">Scale</text>
+    <text x="0" y="54" text-anchor="middle" fill="#777" font-size="10">Major · Minor · Dorian…</text>
+  </g>
+
+  <text x="250" y="175" fill="#7c6aef" font-size="20" opacity="0.5">→</text>
+
+  <!-- Root Note knob -->
+  <g transform="translate(360,170)">
+    <use href="#k" width="52" height="52" x="-26" y="-26"/>
+    <text x="0" y="38" text-anchor="middle" fill="#ddd" font-size="14" font-weight="600">Root Note</text>
+    <text x="0" y="54" text-anchor="middle" fill="#777" font-size="10">C · C♯ · D · D♯ · E…</text>
+  </g>
+
+  <!-- Explanation -->
+  <g transform="translate(530,130)">
+    <rect x="0" y="0" width="460" height="110" rx="10" fill="#08081a" opacity="0.55"/>
+    <text x="16" y="22" fill="#bbb" font-size="13">
+      <tspan fill="#c4b5fd" font-weight="600">Scale</tspan> chooses the intervals between notes.
+    </text>
+    <text x="16" y="44" fill="#bbb" font-size="13">
+      <tspan fill="#c4b5fd" font-weight="600">Root Note</tspan> sets where "home" is — the tuning anchor.
+    </text>
+    <text x="16" y="66" fill="#bbb" font-size="13">
+      Together they define the <tspan fill="#e0d0ff" font-weight="600">letters</tspan> every note is spelled from.
+    </text>
+    <text x="16" y="88" fill="#666" font-size="11" font-style="italic">Per-pattern setting. Falls back to project default.</text>
+  </g>
+</g>
+
+<!-- Arrow 1→2 -->
+<g opacity="0.6">
+  <line x1="550" y1="375" x2="550" y2="410" stroke="#4ea8de" stroke-width="2"/>
+  <polygon points="544,406 550,418 556,406" fill="#4ea8de"/>
+</g>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 2: BUILD THE NOTE POOL                                     -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<g transform="translate(0,420)">
+  <circle cx="550" cy="28" r="20" fill="#4ea8de" filter="url(#glow)"/>
+  <text x="550" y="34" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">2</text>
+
+  <rect x="50" y="55" width="1000" height="390" rx="16" fill="url(#g2)" opacity="0.55" filter="url(#sh)"/>
+  <rect x="50" y="55" width="1000" height="390" rx="16" fill="none" stroke="#4ea8de" stroke-width="1" opacity="0.25"/>
+
+  <text x="110" y="92" fill="#7dd3fc" font-size="20" font-weight="600">BUILD THE NOTE POOL</text>
+  <text x="110" y="112" fill="#5a88aa" font-size="12" font-style="italic">Pitch page + Scale Tickets — which notes can even be picked?</text>
+
+  <!-- Row of knobs -->
+  <!-- Range -->
+  <g transform="translate(140,178)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <text x="0" y="36" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Range</text>
+    <text x="0" y="51" text-anchor="middle" fill="#777" font-size="10">1–4 octaves</text>
+  </g>
+
+  <!-- Scale Tickets -->
+  <g transform="translate(350,178)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <text x="0" y="36" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Scale Tickets</text>
+    <text x="0" y="51" text-anchor="middle" fill="#777" font-size="10">Per-degree weight or EXCL</text>
+  </g>
+
+  <!-- Steps -->
+  <g transform="translate(560,178)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <text x="0" y="36" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Steps</text>
+    <text x="0" y="51" text-anchor="middle" fill="#777" font-size="10">How many notes survive</text>
+  </g>
+
+  <!-- DROT -->
+  <g transform="translate(770,178)">
+    <use href="#ks" width="40" height="40" x="-20" y="-20"/>
+    <text x="0" y="32" text-anchor="middle" fill="#ddd" font-size="12" font-weight="600">DROT</text>
+    <text x="0" y="46" text-anchor="middle" fill="#777" font-size="10">Rotate ticket slots</text>
+  </g>
+
+  <!-- MROT -->
+  <g transform="translate(940,178)">
+    <use href="#ks" width="40" height="40" x="-20" y="-20"/>
+    <text x="0" y="32" text-anchor="middle" fill="#ddd" font-size="12" font-weight="600">MROT</text>
+    <text x="0" y="46" text-anchor="middle" fill="#777" font-size="10">Rotate emphasis</text>
+  </g>
+
+  <!-- Visual: Pool building -->
+  <g transform="translate(90,250)">
+    <rect x="0" y="0" width="920" height="170" rx="10" fill="#08081a" opacity="0.5"/>
+
+    <!-- Row 1: Scale gives notes -->
+    <text x="20" y="25" fill="#7dd3fc" font-size="13" font-weight="600">Scale gives the note names:</text>
+    <g transform="translate(230,12)">
+      <rect x="0" y="0" width="30" height="22" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="15" y="16" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="600">C</text>
+      <rect x="36" y="0" width="30" height="22" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="51" y="16" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="600">D</text>
+      <rect x="72" y="0" width="30" height="22" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="87" y="16" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="600">E</text>
+      <rect x="108" y="0" width="30" height="22" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="123" y="16" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="600">F</text>
+      <rect x="144" y="0" width="30" height="22" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="159" y="16" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="600">G</text>
+      <rect x="180" y="0" width="30" height="22" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="195" y="16" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="600">A</text>
+      <rect x="216" y="0" width="30" height="22" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="231" y="16" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="600">B</text>
+    </g>
+
+    <!-- Row 2: Range expands across octaves -->
+    <text x="20" y="62" fill="#7dd3fc" font-size="13" font-weight="600">Range stacks octaves:</text>
+    <g transform="translate(230,48)">
+      <rect x="0" y="0" width="276" height="22" rx="4" fill="#0d1a30" stroke="#3a5a80" stroke-width="0.6"/>
+      <text x="138" y="15" text-anchor="middle" fill="#5a8ab0" font-size="10">C D E F G A B</text>
+      <rect x="280" y="0" width="276" height="22" rx="4" fill="#0d1a30" stroke="#3a5a80" stroke-width="0.6"/>
+      <text x="418" y="15" text-anchor="middle" fill="#5a8ab0" font-size="10">C D E F G A B</text>
+      <text x="138" y="-4" text-anchor="middle" fill="#445" font-size="9">oct 1</text>
+      <text x="418" y="-4" text-anchor="middle" fill="#445" font-size="9">oct 2</text>
+    </g>
+
+    <!-- Row 3: Tickets exclude / boost -->
+    <text x="20" y="98" fill="#7dd3fc" font-size="13" font-weight="600">Scale Tickets boost or ban:</text>
+    <g transform="translate(230,85)">
+      <rect x="0" y="0" width="30" height="22" rx="4" fill="#1a4030" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="15" y="15" text-anchor="middle" fill="#4ecdc4" font-size="10">C</text>
+      <rect x="36" y="0" width="30" height="22" rx="4" fill="#401a1a" stroke="#ef4444" stroke-width="0.8" opacity="0.6"/>
+      <text x="51" y="15" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="700">✕</text>
+      <rect x="72" y="0" width="30" height="22" rx="4" fill="#1a4030" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="87" y="15" text-anchor="middle" fill="#4ecdc4" font-size="10">E</text>
+      <rect x="108" y="0" width="30" height="22" rx="4" fill="#1a4030" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="123" y="15" text-anchor="middle" fill="#4ecdc4" font-size="10">F</text>
+      <rect x="144" y="0" width="30" height="22" rx="4" fill="#401a1a" stroke="#ef4444" stroke-width="0.8" opacity="0.6"/>
+      <text x="159" y="15" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="700">✕</text>
+      <rect x="180" y="0" width="30" height="22" rx="4" fill="#1a4030" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="195" y="15" text-anchor="middle" fill="#4ecdc4" font-size="10">A</text>
+      <rect x="216" y="0" width="30" height="22" rx="4" fill="#1a4030" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="231" y="15" text-anchor="middle" fill="#4ecdc4" font-size="10">B</text>
+    </g>
+
+    <!-- Row 4: Steps sieve -->
+    <text x="20" y="135" fill="#7dd3fc" font-size="13" font-weight="600">Steps keeps only the strongest:</text>
+    <g transform="translate(230,122)">
+      <rect x="0" y="0" width="30" height="22" rx="4" fill="#1a4030" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="15" y="15" text-anchor="middle" fill="#4ecdc4" font-size="10" font-weight="600">C</text>
+      <rect x="72" y="0" width="30" height="22" rx="4" fill="#1a4030" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="87" y="15" text-anchor="middle" fill="#4ecdc4" font-size="10" font-weight="600">E</text>
+      <rect x="108" y="0" width="30" height="22" rx="4" fill="#1a4030" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="123" y="15" text-anchor="middle" fill="#4ecdc4" font-size="10" font-weight="600">F</text>
+      <rect x="180" y="0" width="30" height="22" rx="4" fill="#1a4030" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="195" y="15" text-anchor="middle" fill="#4ecdc4" font-size="10" font-weight="600">A</text>
+      <rect x="216" y="0" width="30" height="22" rx="4" fill="#1a4030" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="231" y="15" text-anchor="middle" fill="#4ecdc4" font-size="10" font-weight="600">B</text>
+      <text x="280" y="15" fill="#555" font-size="11">← the pool is ready</text>
+    </g>
+
+    <text x="16" y="160" fill="#555" font-size="11" font-style="italic">DROT / MROT shift which notes carry the emphasis — same scale, different flavor.</text>
+  </g>
+</g>
+
+<!-- Arrow 2→3 -->
+<g opacity="0.6">
+  <line x1="550" y1="865" x2="550" y2="900" stroke="#4ecdc4" stroke-width="2"/>
+  <polygon points="544,896 550,908 556,896" fill="#4ecdc4"/>
+</g>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 3: SHAPE THE PROBABILITIES                                 -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<g transform="translate(0,910)">
+  <circle cx="550" cy="28" r="20" fill="#4ecdc4" filter="url(#glow)"/>
+  <text x="550" y="34" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">3</text>
+
+  <rect x="50" y="55" width="1000" height="520" rx="16" fill="url(#g3)" opacity="0.55" filter="url(#sh)"/>
+  <rect x="50" y="55" width="1000" height="520" rx="16" fill="none" stroke="#4ecdc4" stroke-width="1" opacity="0.25"/>
+
+  <text x="110" y="92" fill="#86efac" font-size="20" font-weight="600">SHAPE THE PROBABILITIES</text>
+  <text x="110" y="112" fill="#5a9977" font-size="12" font-style="italic">Three forces pull on the pool — they multiply together</text>
+
+  <!-- Force A: Complexity -->
+  <g transform="translate(90,140)">
+    <rect x="0" y="0" width="290" height="200" rx="12" fill="#08081a" opacity="0.5"/>
+    <text x="145" y="24" text-anchor="middle" fill="#86efac" font-size="13" font-weight="600" letter-spacing="1">HOW FAR?</text>
+
+    <g transform="translate(145,62)">
+      <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    </g>
+    <text x="145" y="98" text-anchor="middle" fill="#ddd" font-size="14" font-weight="600">Complexity</text>
+    <text x="145" y="115" text-anchor="middle" fill="#777" font-size="10">Live page · step encoder 8</text>
+
+    <!-- Mini graph: triangular hill -->
+    <g transform="translate(30,130)">
+      <line x1="0" y1="50" x2="230" y2="50" stroke="#333" stroke-width="0.5"/>
+      <!-- Low complexity: narrow hill -->
+      <polyline points="80,50 95,10 110,50" fill="none" stroke="#4ecdc4" stroke-width="1.5" opacity="0.8"/>
+      <text x="95" y="62" text-anchor="middle" fill="#555" font-size="9">last note</text>
+      <text x="40" y="30" fill="#555" font-size="9">Low</text>
+      <text x="40" y="42" fill="#555" font-size="9">= steps</text>
+
+      <!-- High complexity: wide hill -->
+      <polyline points="30,50 95,20 160,50" fill="none" stroke="#86efac" stroke-width="1.5" opacity="0.5" stroke-dasharray="4,3"/>
+      <text x="190" y="30" fill="#555" font-size="9">High</text>
+      <text x="190" y="42" fill="#555" font-size="9">= leaps</text>
+    </g>
+  </g>
+
+  <!-- Force B: Contour -->
+  <g transform="translate(405,140)">
+    <rect x="0" y="0" width="290" height="200" rx="12" fill="#08081a" opacity="0.5"/>
+    <text x="145" y="24" text-anchor="middle" fill="#86efac" font-size="13" font-weight="600" letter-spacing="1">WHICH WAY?</text>
+
+    <g transform="translate(145,62)">
+      <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    </g>
+    <text x="145" y="98" text-anchor="middle" fill="#ddd" font-size="14" font-weight="600">Contour</text>
+    <text x="145" y="115" text-anchor="middle" fill="#777" font-size="10">Live page · step encoder 9</text>
+
+    <!-- Mini graph: direction bias -->
+    <g transform="translate(30,130)">
+      <line x1="0" y1="50" x2="230" y2="50" stroke="#333" stroke-width="0.5"/>
+      <!-- Upward bias -->
+      <polyline points="60,50 80,35 120,15 160,8 200,5" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0.7"/>
+      <text x="60" y="62" fill="#555" font-size="9">last</text>
+      <text x="20" y="30" fill="#fbbf24" font-size="9">+ = climb</text>
+      <!-- Downward bias -->
+      <polyline points="30,5 70,8 110,15 150,35 170,50" fill="none" stroke="#7c6aef" stroke-width="1.5" opacity="0.5" stroke-dasharray="4,3"/>
+      <text x="175" y="30" fill="#7c6aef" font-size="9">− = fall</text>
+    </g>
+  </g>
+
+  <!-- Force C: Bias / Spread (Marbles) -->
+  <g transform="translate(720,140)">
+    <rect x="0" y="0" width="290" height="200" rx="12" fill="#08081a" opacity="0.5"/>
+    <text x="145" y="24" text-anchor="middle" fill="#86efac" font-size="13" font-weight="600" letter-spacing="1">WHERE TO LAND?</text>
+
+    <g transform="translate(80,62)">
+      <use href="#k" width="42" height="42" x="-21" y="-21"/>
+    </g>
+    <text x="80" y="92" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Bias</text>
+
+    <g transform="translate(210,62)">
+      <use href="#k" width="42" height="42" x="-21" y="-21"/>
+    </g>
+    <text x="210" y="92" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Spread</text>
+
+    <text x="145" y="112" text-anchor="middle" fill="#777" font-size="10">Live page · step 10 &amp; 11</text>
+
+    <!-- Mini graph: bell curve -->
+    <g transform="translate(30,125)">
+      <line x1="0" y1="55" x2="230" y2="55" stroke="#333" stroke-width="0.5"/>
+      <text x="20" y="50" fill="#555" font-size="8">low</text>
+      <text x="200" y="50" fill="#555" font-size="8">high</text>
+      <!-- Narrow bell -->
+      <path d="M70,55 Q90,5 110,55" fill="none" stroke="#4ecdc4" stroke-width="1.5" opacity="0.8"/>
+      <!-- Wide bell -->
+      <path d="M20,55 Q110,15 200,55" fill="none" stroke="#86efac" stroke-width="1.5" opacity="0.4" stroke-dasharray="4,3"/>
+      <text x="115" y="68" text-anchor="middle" fill="#555" font-size="9">← Bias moves the peak →</text>
+    </g>
+  </g>
+
+  <!-- Summary formula -->
+  <g transform="translate(90,360)">
+    <rect x="0" y="0" width="920" height="55" rx="10" fill="#0a1a15" stroke="#4ecdc4" stroke-width="0.8" opacity="0.3"/>
+    <text x="460" y="22" text-anchor="middle" fill="#86efac" font-size="14" font-weight="500">
+      final weight  =  Scale Tickets  ×  Complexity kernel  ×  Bias/Spread bell
+    </text>
+    <text x="460" y="42" text-anchor="middle" fill="#666" font-size="12">
+      A note with weight zero in any factor simply <tspan fill="#ef4444">cannot be picked</tspan>.
+    </text>
+  </g>
+
+  <!-- Weighted pick visual -->
+  <g transform="translate(90,435)">
+    <text x="0" y="14" fill="#86efac" font-size="13" font-weight="600">Then one weighted dice roll picks the note:</text>
+    <g transform="translate(0,25)">
+      <rect x="0" y="0" width="160" height="28" rx="5" fill="#14403a" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="80" y="19" text-anchor="middle" fill="#4ecdc4" font-size="12" font-weight="600">C  ·· weight 8</text>
+      <rect x="170" y="0" width="220" height="28" rx="5" fill="#1a5545" stroke="#4ecdc4" stroke-width="1.2"/>
+      <text x="280" y="19" text-anchor="middle" fill="#86efac" font-size="12" font-weight="700">E  ·· weight 22</text>
+      <rect x="400" y="0" width="130" height="28" rx="5" fill="#14403a" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="465" y="19" text-anchor="middle" fill="#4ecdc4" font-size="12" font-weight="600">F  ·· weight 5</text>
+      <rect x="540" y="0" width="100" height="28" rx="5" fill="#14403a" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="590" y="19" text-anchor="middle" fill="#4ecdc4" font-size="12" font-weight="600">A  ·· 4</text>
+      <rect x="650" y="0" width="100" height="28" rx="5" fill="#14403a" stroke="#4ecdc4" stroke-width="0.8"/>
+      <text x="700" y="19" text-anchor="middle" fill="#4ecdc4" font-size="12" font-weight="600">B  ·· 3</text>
+    </g>
+    <text x="810" y="44" fill="#86efac" font-size="22">🎲</text>
+    <text x="840" y="44" fill="#86efac" font-size="14" font-weight="600">→ E wins</text>
+    <text x="0" y="74" fill="#555" font-size="11" font-style="italic">The picked note becomes the "last note" anchor for the next pick — melody remembers where it's been.</text>
+  </g>
+</g>
+
+<!-- Arrow 3→4 -->
+<g opacity="0.6">
+  <line x1="550" y1="1490" x2="550" y2="1525" stroke="#fbbf24" stroke-width="2"/>
+  <polygon points="544,1521 550,1533 556,1521" fill="#fbbf24"/>
+</g>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 4: PLACE IT ON THE KEYBOARD                                -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<g transform="translate(0,1535)">
+  <circle cx="550" cy="28" r="20" fill="#fbbf24" filter="url(#glow)"/>
+  <text x="550" y="34" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">4</text>
+
+  <rect x="70" y="55" width="960" height="310" rx="16" fill="url(#g4)" opacity="0.55" filter="url(#sh)"/>
+  <rect x="70" y="55" width="960" height="310" rx="16" fill="none" stroke="#fbbf24" stroke-width="1" opacity="0.25"/>
+
+  <text x="130" y="92" fill="#fde68a" font-size="20" font-weight="600">PLACE IT ON THE KEYBOARD</text>
+  <text x="130" y="112" fill="#998855" font-size="12" font-style="italic">Config + Loop page — shift the chosen note to its final register</text>
+
+  <!-- Octave -->
+  <g transform="translate(160,185)">
+    <use href="#k" width="52" height="52" x="-26" y="-26"/>
+    <g transform="translate(30,-20)"><use href="#cv" width="22" height="22"/></g>
+    <text x="0" y="40" text-anchor="middle" fill="#ddd" font-size="14" font-weight="600">Octave</text>
+    <text x="0" y="57" text-anchor="middle" fill="#777" font-size="10">Config page · ±10 oct</text>
+    <text x="0" y="72" text-anchor="middle" fill="#fbbf24" font-size="9" opacity="0.6">CV-controllable</text>
+  </g>
+
+  <!-- Jump -->
+  <g transform="translate(390,185)">
+    <use href="#k" width="52" height="52" x="-26" y="-26"/>
+    <g transform="translate(30,-20)"><use href="#cv" width="22" height="22"/></g>
+    <text x="0" y="40" text-anchor="middle" fill="#ddd" font-size="14" font-weight="600">Jump</text>
+    <text x="0" y="57" text-anchor="middle" fill="#777" font-size="10">Loop page · 0–100</text>
+    <text x="0" y="72" text-anchor="middle" fill="#fbbf24" font-size="9" opacity="0.6">CV-controllable</text>
+  </g>
+
+  <!-- Transpose -->
+  <g transform="translate(620,185)">
+    <use href="#k" width="52" height="52" x="-26" y="-26"/>
+    <g transform="translate(30,-20)"><use href="#cv" width="22" height="22"/></g>
+    <text x="0" y="40" text-anchor="middle" fill="#ddd" font-size="14" font-weight="600">Transpose</text>
+    <text x="0" y="57" text-anchor="middle" fill="#777" font-size="10">Config page · ±100 semi</text>
+    <text x="0" y="72" text-anchor="middle" fill="#fbbf24" font-size="9" opacity="0.6">CV-controllable</text>
+  </g>
+
+  <!-- Visual -->
+  <g transform="translate(790,145)">
+    <rect x="0" y="0" width="210" height="180" rx="10" fill="#08081a" opacity="0.5"/>
+
+    <!-- Piano keys mini -->
+    <g transform="translate(15,15)">
+      <rect x="0" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="13" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="26" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="39" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="52" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="65" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="78" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="91" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="104" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="117" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="130" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="143" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+      <rect x="156" y="0" width="12" height="40" rx="1" fill="#ddd" stroke="#888" stroke-width="0.5"/>
+
+      <!-- Highlighted key -->
+      <rect x="26" y="0" width="12" height="40" rx="1" fill="#fbbf24" stroke="#fbbf24" stroke-width="0.5" opacity="0.8"/>
+
+      <!-- Arrow up -->
+      <line x1="32" y1="-5" x2="32" y2="-20" stroke="#fbbf24" stroke-width="1.5"/>
+      <polygon points="28,-18 32,-25 36,-18" fill="#fbbf24"/>
+      <text x="32" y="-30" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="600">Octave shifts here</text>
+
+      <!-- Arrow right -->
+      <line x1="170" y1="20" x2="185" y2="20" stroke="#fde68a" stroke-width="1.5"/>
+      <polygon points="183,16 190,20 183,24" fill="#fde68a"/>
+      <text x="180" y="35" text-anchor="middle" fill="#fde68a" font-size="8">Transpose</text>
+    </g>
+
+    <text x="105" y="80" text-anchor="middle" fill="#bbb" font-size="11">
+      <tspan fill="#fde68a" font-weight="600">Octave</tspan> moves whole melody up/down
+    </text>
+    <text x="105" y="96" text-anchor="middle" fill="#bbb" font-size="11">
+      <tspan fill="#fde68a" font-weight="600">Jump</tspan> rolls random ±1 octave per loop
+    </text>
+    <text x="105" y="112" text-anchor="middle" fill="#bbb" font-size="11">
+      <tspan fill="#fde68a" font-weight="600">Transpose</tspan> shifts by semitones
+    </text>
+    <text x="105" y="132" text-anchor="middle" fill="#555" font-size="10" font-style="italic">Jump is non-destructive — turning it off</text>
+    <text x="105" y="146" text-anchor="middle" fill="#555" font-size="10" font-style="italic">restores the original octave.</text>
+  </g>
+</g>
+
+<!-- Arrow 4→5 -->
+<g opacity="0.6">
+  <line x1="550" y1="1900" x2="550" y2="1935" stroke="#f472b6" stroke-width="2"/>
+  <polygon points="544,1931 550,1943 556,1931" fill="#f472b6"/>
+</g>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 5: OVER TIME — HOW THE MELODY LIVES                        -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<g transform="translate(0,1945)">
+  <circle cx="550" cy="28" r="20" fill="#f472b6" filter="url(#glow)"/>
+  <text x="550" y="34" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">5</text>
+
+  <rect x="50" y="55" width="1000" height="430" rx="16" fill="url(#g5)" opacity="0.55" filter="url(#sh)"/>
+  <rect x="50" y="55" width="1000" height="430" rx="16" fill="none" stroke="#f472b6" stroke-width="1" opacity="0.25"/>
+
+  <text x="110" y="92" fill="#f9a8d4" font-size="20" font-weight="600">HOW THE MELODY LIVES &amp; EVOLVES</text>
+  <text x="110" y="112" fill="#996688" font-size="12" font-style="italic">Loop + Evolution page — what happens across repeated loops</text>
+
+  <!-- Row of knobs -->
+  <!-- Rotate -->
+  <g transform="translate(140,180)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <g transform="translate(28,-18)"><use href="#cv" width="22" height="22"/></g>
+    <text x="0" y="38" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Rotate</text>
+    <text x="0" y="53" text-anchor="middle" fill="#777" font-size="10">Loop page · ±64</text>
+  </g>
+
+  <!-- Repeat -->
+  <g transform="translate(340,180)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <text x="0" y="38" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Repeat</text>
+    <text x="0" y="53" text-anchor="middle" fill="#777" font-size="10">Live page · step 12</text>
+  </g>
+
+  <!-- Mutate -->
+  <g transform="translate(540,180)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <g transform="translate(28,-18)"><use href="#cv" width="22" height="22"/></g>
+    <text x="0" y="38" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Mutate</text>
+    <text x="0" y="53" text-anchor="middle" fill="#777" font-size="10">Loop page · ±100</text>
+  </g>
+
+  <!-- Patience M -->
+  <g transform="translate(740,180)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <text x="0" y="38" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Patience M</text>
+    <text x="0" y="53" text-anchor="middle" fill="#777" font-size="10">Loop page · 0–100</text>
+  </g>
+
+  <!-- Burst Pitch -->
+  <g transform="translate(940,180)">
+    <use href="#ks" width="42" height="42" x="-21" y="-21"/>
+    <text x="0" y="33" text-anchor="middle" fill="#ddd" font-size="12" font-weight="600">Burst Pitch</text>
+    <text x="0" y="48" text-anchor="middle" fill="#777" font-size="10">Live · step 7</text>
+  </g>
+
+  <!-- Timeline visual -->
+  <g transform="translate(90,260)">
+    <rect x="0" y="0" width="920" height="190" rx="10" fill="#08081a" opacity="0.5"/>
+
+    <text x="16" y="22" fill="#f9a8d4" font-size="12" font-weight="600">Loop cycle timeline:</text>
+
+    <!-- Loop 1 -->
+    <text x="16" y="50" fill="#777" font-size="11" font-weight="500">Loop 1</text>
+    <g transform="translate(80,38)">
+      <rect x="0" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="30" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">C</text>
+      <rect x="66" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="96" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">E</text>
+      <rect x="132" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="162" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">G</text>
+      <rect x="198" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="228" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">A</text>
+      <rect x="264" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="294" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">E</text>
+      <rect x="330" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="360" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">F</text>
+      <rect x="396" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="426" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">D</text>
+      <rect x="462" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="492" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">C</text>
+    </g>
+
+    <!-- Arrow down -->
+    <text x="460" y="74" text-anchor="middle" fill="#555" font-size="16">↓</text>
+    <text x="560" y="74" fill="#f9a8d4" font-size="10">Repeat = high → same note replays</text>
+    <text x="560" y="88" fill="#f9a8d4" font-size="10">Rotate = +2 → pattern shifts right</text>
+
+    <!-- Loop 2 (mutated) -->
+    <text x="16" y="100" fill="#777" font-size="11" font-weight="500">Loop 2</text>
+    <g transform="translate(80,88)">
+      <rect x="0" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="30" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">C</text>
+      <rect x="66" y="0" width="60" height="20" rx="3" fill="#301828" stroke="#f472b6" stroke-width="0.7"/>
+      <text x="96" y="14" text-anchor="middle" fill="#f9a8d4" font-size="9" font-weight="600">B</text>
+      <rect x="132" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="162" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">G</text>
+      <rect x="198" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="228" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">A</text>
+      <rect x="264" y="0" width="60" height="20" rx="3" fill="#301828" stroke="#f472b6" stroke-width="0.7"/>
+      <text x="294" y="14" text-anchor="middle" fill="#f9a8d4" font-size="9" font-weight="600">D</text>
+      <rect x="330" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="360" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">F</text>
+      <rect x="396" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="426" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">D</text>
+      <rect x="462" y="0" width="60" height="20" rx="3" fill="#1a1040" stroke="#7c6aef" stroke-width="0.7"/>
+      <text x="492" y="14" text-anchor="middle" fill="#9a8adf" font-size="9">C</text>
+    </g>
+    <text x="560" y="100" fill="#f9a8d4" font-size="10">Mutate > 0 → some notes change</text>
+
+    <!-- Loop 3 (regenerated) -->
+    <text x="16" y="150" fill="#777" font-size="11" font-weight="500">Loop 3</text>
+    <g transform="translate(80,138)">
+      <rect x="0" y="0" width="60" height="20" rx="3" fill="#301828" stroke="#f472b6" stroke-width="0.7"/>
+      <text x="30" y="14" text-anchor="middle" fill="#f9a8d4" font-size="9" font-weight="600">A</text>
+      <rect x="66" y="0" width="60" height="20" rx="3" fill="#301828" stroke="#f472b6" stroke-width="0.7"/>
+      <text x="96" y="14" text-anchor="middle" fill="#f9a8d4" font-size="9" font-weight="600">F</text>
+      <rect x="132" y="0" width="60" height="20" rx="3" fill="#301828" stroke="#f472b6" stroke-width="0.7"/>
+      <text x="162" y="14" text-anchor="middle" fill="#f9a8d4" font-size="9" font-weight="600">E</text>
+      <rect x="198" y="0" width="60" height="20" rx="3" fill="#301828" stroke="#f472b6" stroke-width="0.7"/>
+      <text x="228" y="14" text-anchor="middle" fill="#f9a8d4" font-size="9" font-weight="600">C</text>
+      <rect x="264" y="0" width="60" height="20" rx="3" fill="#301828" stroke="#f472b6" stroke-width="0.7"/>
+      <text x="294" y="14" text-anchor="middle" fill="#f9a8d4" font-size="9" font-weight="600">G</text>
+      <rect x="330" y="0" width="60" height="20" rx="3" fill="#301828" stroke="#f472b6" stroke-width="0.7"/>
+      <text x="360" y="14" text-anchor="middle" fill="#f9a8d4" font-size="9" font-weight="600">B</text>
+      <rect x="396" y="0" width="60" height="20" rx="3" fill="#301828" stroke="#f472b6" stroke-width="0.7"/>
+      <text x="426" y="14" text-anchor="middle" fill="#f9a8d4" font-size="9" font-weight="600">D</text>
+      <rect x="462" y="0" width="60" height="20" rx="3" fill="#301828" stroke="#f472b6" stroke-width="0.7"/>
+      <text x="492" y="14" text-anchor="middle" fill="#f9a8d4" font-size="9" font-weight="600">A</text>
+    </g>
+    <text x="560" y="150" fill="#f9a8d4" font-size="10">Patience M < 100 → whole tape refreshed</text>
+    <text x="560" y="164" fill="#f9a8d4" font-size="10">Patience M = 100 → never refreshes</text>
+  </g>
+</g>
+
+<!-- Arrow 5→6 -->
+<g opacity="0.6">
+  <line x1="550" y1="2430" x2="550" y2="2465" stroke="#ef4444" stroke-width="2"/>
+  <polygon points="544,2461 550,2473 556,2461" fill="#ef4444"/>
+</g>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- SECTION 6: DOES THIS NOTE ACTUALLY PLAY?                           -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<g transform="translate(0,2475)">
+  <circle cx="550" cy="28" r="20" fill="#ef4444" filter="url(#glow)"/>
+  <text x="550" y="34" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">6</text>
+
+  <rect x="70" y="55" width="960" height="200" rx="16" fill="#1a0a0a" opacity="0.55" filter="url(#sh)"/>
+  <rect x="70" y="55" width="960" height="200" rx="16" fill="none" stroke="#ef4444" stroke-width="1" opacity="0.25"/>
+
+  <text x="130" y="92" fill="#fca5a5" font-size="20" font-weight="600">DOES THIS NOTE ACTUALLY PLAY?</text>
+  <text x="130" y="112" fill="#995555" font-size="12" font-style="italic">Loop page — gatekeepers that can silence a note after it's been picked</text>
+
+  <!-- Mask -->
+  <g transform="translate(180,175)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <text x="0" y="38" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Mask</text>
+    <text x="0" y="53" text-anchor="middle" fill="#777" font-size="10">Loop page · 0–100%</text>
+  </g>
+
+  <!-- Tilt -->
+  <g transform="translate(380,175)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <text x="0" y="38" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Tilt</text>
+    <text x="0" y="53" text-anchor="middle" fill="#777" font-size="10">Loop page · ±100</text>
+  </g>
+
+  <!-- Sleep -->
+  <g transform="translate(580,175)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <text x="0" y="38" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Sleep</text>
+    <text x="0" y="53" text-anchor="middle" fill="#777" font-size="10">Loop page · 0–100</text>
+  </g>
+
+  <!-- Rest (rhythm param but affects pitch output) -->
+  <g transform="translate(780,175)">
+    <use href="#k" width="48" height="48" x="-24" y="-24"/>
+    <text x="0" y="38" text-anchor="middle" fill="#ddd" font-size="13" font-weight="600">Rest</text>
+    <text x="0" y="53" text-anchor="middle" fill="#777" font-size="10">Live page · step 2</text>
+  </g>
+
+  <!-- Explanation -->
+  <g transform="translate(90,220)">
+    <text x="0" y="14" fill="#bbb" font-size="12">
+      <tspan fill="#fca5a5" font-weight="600">Mask</tspan> thins out notes — 100% = all play, 0% = silence.
+    </text>
+    <text x="460" y="14" fill="#bbb" font-size="12">
+      <tspan fill="#fca5a5" font-weight="600">Tilt</tspan> biases which notes survive.
+    </text>
+    <text x="0" y="32" fill="#bbb" font-size="12">
+      <tspan fill="#fca5a5" font-weight="600">Sleep</tspan> skips N events at loop start. <tspan fill="#fca5a5" font-weight="600">Rest</tspan> is per-event probability of silence.
+    </text>
+  </g>
+</g>
+
+<!-- Arrow 6→output -->
+<g opacity="0.6">
+  <line x1="550" y1="2730" x2="550" y2="2765" stroke="#fff" stroke-width="2"/>
+  <polygon points="544,2761 550,2773 556,2761" fill="#fff"/>
+</g>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- OUTPUT: THE FINAL NOTE                                              -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<g transform="translate(0,2775)">
+  <rect x="120" y="0" width="860" height="120" rx="16" fill="#0a0a15" filter="url(#sh)"/>
+  <rect x="120" y="0" width="860" height="120" rx="16" fill="none" stroke="#fff" stroke-width="1" opacity="0.15"/>
+
+  <text x="550" y="30" text-anchor="middle" fill="#666" font-size="12" letter-spacing="4" font-weight="300">OUTPUT</text>
+
+  <text x="550" y="60" text-anchor="middle" fill="#e8e8f0" font-size="16" font-weight="500">
+    Chosen Note  +  Octave  +  Jump  +  Octave Knob  +  Transpose
+  </text>
+  <text x="550" y="84" text-anchor="middle" fill="#888" font-size="13">
+    → mapped through the Scale → Root Note offset → pitch voltage out
+  </text>
+  <text x="550" y="108" text-anchor="middle" fill="#555" font-size="11" font-style="italic">1V/oct CV sent to your oscillator. The note is alive.</text>
+</g>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- FOOTER                                                              -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<g transform="translate(0,2940)">
+  <line x1="200" y1="0" x2="900" y2="0" stroke="#222" stroke-width="0.5"/>
+
+  <!-- Legend -->
+  <g transform="translate(160,30)">
+    <circle cx="0" cy="0" r="6" fill="#7c6aef"/>
+    <text x="14" y="4" fill="#666" font-size="12">Alphabet</text>
+    <circle cx="120" cy="0" r="6" fill="#4ea8de"/>
+    <text x="134" y="4" fill="#666" font-size="12">Pool</text>
+    <circle cx="200" cy="0" r="6" fill="#4ecdc4"/>
+    <text x="214" y="4" fill="#666" font-size="12">Shape</text>
+    <circle cx="290" cy="0" r="6" fill="#fbbf24"/>
+    <text x="304" y="4" fill="#666" font-size="12">Place</text>
+    <circle cx="380" cy="0" r="6" fill="#f472b6"/>
+    <text x="394" y="4" fill="#666" font-size="12">Evolve</text>
+    <circle cx="480" cy="0" r="6" fill="#ef4444"/>
+    <text x="494" y="4" fill="#666" font-size="12">Gatekeepers</text>
+  </g>
+
+  <!-- CV legend -->
+  <g transform="translate(160,60)">
+    <use href="#cv" width="18" height="18" x="-9" y="-9"/>
+    <text x="16" y="4" fill="#666" font-size="12">= CV-controllable knob (external modulation input)</text>
+  </g>
+
+  <!-- Page references -->
+  <text x="550" y="100" text-anchor="middle" fill="#444" font-size="11">Config page: Scale · Root Note · Octave · Transpose</text>
+  <text x="550" y="118" text-anchor="middle" fill="#444" font-size="11">Pitch page: Scale Tickets · DROT · MROT</text>
+  <text x="550" y="136" text-anchor="middle" fill="#444" font-size="11">Live page: Range · Complexity · Contour · Bias · Spread · Repeat · Rest · Burst Pitch</text>
+  <text x="550" y="154" text-anchor="middle" fill="#444" font-size="11">Loop page: Rotate · Mutate · Patience M · Jump · Sleep · Mask · Tilt · Steps</text>
+</g>
+
+</svg>
+</div>
+</body>
+</html>

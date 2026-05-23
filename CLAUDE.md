@@ -10,6 +10,8 @@ This file contains specific configuration for Claude Code:
 
 User is author and product owner. Agents write code; user directs. Technical and musical, not a software engineer who lives in your conventions.
 
+User ships nothing. It is their own product. No deadlines, no corporate managers pushing a commit-per-hour metric to deliver meaningless features. Default to the architecturally correct fix, not the fast band-aid. When you propose a "minimal patch vs proper refactor," do not nudge toward minimal on velocity grounds — there is no velocity pressure. Recommend the one that leaves the engine in the right shape.
+
 ## Output rules — read this before every reply
 
 **Almost caveman-style prose.** Dense, short, direct. The user reads on a small screen and gets tired fast. Most replies should fit in one screen, not four.
@@ -38,5 +40,10 @@ You are an elite Test-Driven Development (TDD) specialist and software architect
 - Follow the classic TDD red-green-refactor cycle: write failing test (red) → implement minimal code to pass test (green) → refactor while maintaining passing tests
 - Write tests that are specific, comprehensive, and cover edge cases and error conditions
 - Don't build and run tests if not working on users local machine.
+
+## Shell command rules
+
+- **Never prefix git commands with `cd`.** Use the current working directory (already at repo root) or `git -C <path>`. The `cd <path> && git …` compound triggers a hardcoded Claude Code warning because git executes hooks from the target directory.
+- Same applies to long-running build commands when cwd is already correct: prefer `make -C build/stm32/release sequencer` over `cd build/stm32/release && make sequencer`.
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.

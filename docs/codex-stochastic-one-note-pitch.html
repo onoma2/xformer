@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stochastic Track: Pitch Of One Note</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1f2522;
+      --muted: #59645e;
+      --paper: #f7f8f4;
+      --panel: #ffffff;
+      --line: #d4d9d0;
+      --green: #4f8a62;
+      --blue: #426f9e;
+      --gold: #b5812d;
+      --red: #b85d54;
+      --teal: #3f8d88;
+      --violet: #6f628f;
+      --shadow: 0 18px 48px rgba(40, 48, 42, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(247, 248, 244, 0.92)),
+        repeating-linear-gradient(0deg, transparent 0, transparent 31px, rgba(79, 138, 98, 0.08) 32px),
+        var(--paper);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    main {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 54px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 720px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: clamp(15px, 1.8vw, 19px);
+    }
+
+    .badge {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.86);
+      padding: 9px 14px;
+      font-weight: 750;
+      color: var(--green);
+      white-space: nowrap;
+    }
+
+    .sheet {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .section-title {
+      font-size: 25px;
+      font-weight: 850;
+      fill: var(--ink);
+    }
+
+    .section-note {
+      font-size: 16px;
+      fill: var(--muted);
+    }
+
+    .chip {
+      font-size: 15px;
+      font-weight: 760;
+      fill: var(--ink);
+    }
+
+    .small {
+      font-size: 13px;
+      fill: var(--muted);
+    }
+
+    .micro {
+      font-size: 11px;
+      font-weight: 760;
+      letter-spacing: 0;
+      fill: #ffffff;
+    }
+
+    .note-name {
+      font-size: 44px;
+      font-weight: 900;
+      fill: var(--ink);
+    }
+
+    .note-sub {
+      font-size: 18px;
+      fill: var(--muted);
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 16px;
+      border-top: 1px solid var(--line);
+      background: rgba(247, 248, 244, 0.72);
+    }
+
+    .legend div {
+      min-height: 90px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 12px 13px;
+    }
+
+    .legend h2 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      line-height: 1.2;
+    }
+
+    .legend p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 820px) {
+      header {
+        grid-template-columns: 1fr;
+      }
+
+      .badge {
+        width: fit-content;
+      }
+
+      .legend {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Pitch Of One Stochastic Note</h1>
+      <p class="subtitle">The note you hear is not white noise. One pitch is shaped by a remembered melody, a tonal home, a note palette, melodic pull, and final height controls.</p>
+    </div>
+    <div class="badge">Stochastic Track</div>
+  </header>
+
+  <section class="sheet" aria-label="Infographic showing which Stochastic Track controls determine the pitch of one note">
+    <svg viewBox="0 0 1180 760" role="img" aria-labelledby="title desc">
+      <title id="title">Pitch of one stochastic note</title>
+      <desc id="desc">A light infographic showing the user-facing Stochastic Track controls that determine one note pitch.</desc>
+
+      <defs>
+        <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#1f2522" flood-opacity="0.12"/>
+        </filter>
+        <marker id="arrowGreen" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto">
+          <path d="M1,1 L11,6 L1,11 Z" fill="#4f8a62"/>
+        </marker>
+        <marker id="arrowBlue" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto">
+          <path d="M1,1 L11,6 L1,11 Z" fill="#426f9e"/>
+        </marker>
+        <marker id="arrowGold" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto">
+          <path d="M1,1 L11,6 L1,11 Z" fill="#b5812d"/>
+        </marker>
+        <marker id="arrowRed" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto">
+          <path d="M1,1 L11,6 L1,11 Z" fill="#b85d54"/>
+        </marker>
+        <marker id="arrowTeal" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto">
+          <path d="M1,1 L11,6 L1,11 Z" fill="#3f8d88"/>
+        </marker>
+      </defs>
+
+      <rect x="0" y="0" width="1180" height="760" fill="#fbfcf8"/>
+      <g opacity="0.55">
+        <path d="M0 650 H1180 M0 618 H1180 M0 586 H1180 M0 554 H1180 M0 522 H1180" stroke="#d4d9d0" stroke-width="1"/>
+        <circle cx="1050" cy="590" r="7" fill="#4f8a62"/>
+        <circle cx="1090" cy="554" r="7" fill="#426f9e"/>
+        <circle cx="1130" cy="618" r="7" fill="#b5812d"/>
+      </g>
+
+      <g filter="url(#softShadow)">
+        <rect x="420" y="226" width="340" height="218" rx="8" fill="#ffffff" stroke="#cbd2c8"/>
+        <circle cx="590" cy="315" r="58" fill="#f4f7f0" stroke="#4f8a62" stroke-width="3"/>
+        <path d="M573 336 C573 350 594 351 603 340 C613 328 604 312 584 317 L584 264 L637 252 L637 276 L594 285 L594 320 C589 317 583 316 578 318 C570 321 566 328 573 336Z" fill="#4f8a62"/>
+        <text x="590" y="394" text-anchor="middle" class="note-name">ONE NOTE</text>
+        <text x="590" y="423" text-anchor="middle" class="note-sub">final pitch sent to CV</text>
+      </g>
+
+      <g>
+        <rect x="42" y="58" width="284" height="165" rx="8" fill="#ffffff" stroke="#cbd2c8"/>
+        <rect x="42" y="58" width="284" height="8" rx="4" fill="#4f8a62"/>
+        <text x="66" y="101" class="section-title">Remember or choose</text>
+        <text x="66" y="127" class="section-note">Does this pitch come back,</text>
+        <text x="66" y="150" class="section-note">or does the melody move?</text>
+        <g>
+          <rect x="66" y="169" width="63" height="28" rx="14" fill="#eef4ec" stroke="#bcc9b8"/>
+          <text x="97.5" y="188" text-anchor="middle" class="chip">Melody</text>
+          <rect x="138" y="169" width="58" height="28" rx="14" fill="#eef4ec" stroke="#bcc9b8"/>
+          <text x="167" y="188" text-anchor="middle" class="chip">Repeat</text>
+          <rect x="205" y="169" width="54" height="28" rx="14" fill="#eef4ec" stroke="#bcc9b8"/>
+          <text x="232" y="188" text-anchor="middle" class="chip">NewM</text>
+        </g>
+      </g>
+
+      <g>
+        <rect x="42" y="276" width="284" height="154" rx="8" fill="#ffffff" stroke="#cbd2c8"/>
+        <rect x="42" y="276" width="284" height="8" rx="4" fill="#426f9e"/>
+        <text x="66" y="319" class="section-title">Tonal home</text>
+        <text x="66" y="345" class="section-note">The family of notes and</text>
+        <text x="66" y="368" class="section-note">the home note.</text>
+        <rect x="66" y="389" width="56" height="28" rx="14" fill="#edf3f9" stroke="#b9c8d8"/>
+        <text x="94" y="408" text-anchor="middle" class="chip">Scale</text>
+        <rect x="132" y="389" width="84" height="28" rx="14" fill="#edf3f9" stroke="#b9c8d8"/>
+        <text x="174" y="408" text-anchor="middle" class="chip">Root Note</text>
+      </g>
+
+      <g>
+        <rect x="42" y="486" width="312" height="177" rx="8" fill="#ffffff" stroke="#cbd2c8"/>
+        <rect x="42" y="486" width="312" height="8" rx="4" fill="#b5812d"/>
+        <text x="66" y="529" class="section-title">Note palette</text>
+        <text x="66" y="555" class="section-note">Which scale notes are</text>
+        <text x="66" y="578" class="section-note">available for this note.</text>
+        <rect x="66" y="600" width="96" height="28" rx="14" fill="#fbf1df" stroke="#dac9a8"/>
+        <text x="114" y="619" text-anchor="middle" class="chip">Pitch Tickets</text>
+        <rect x="172" y="600" width="58" height="28" rx="14" fill="#fbf1df" stroke="#dac9a8"/>
+        <text x="201" y="619" text-anchor="middle" class="chip">Range</text>
+        <rect x="240" y="600" width="46" height="28" rx="14" fill="#fbf1df" stroke="#dac9a8"/>
+        <text x="263" y="619" text-anchor="middle" class="chip">Steps</text>
+        <rect x="66" y="635" width="86" height="28" rx="14" fill="#fbf1df" stroke="#dac9a8"/>
+        <text x="109" y="654" text-anchor="middle" class="chip">Low Degree</text>
+        <rect x="162" y="635" width="92" height="28" rx="14" fill="#fbf1df" stroke="#dac9a8"/>
+        <text x="208" y="654" text-anchor="middle" class="chip">High Degree</text>
+      </g>
+
+      <g>
+        <rect x="834" y="58" width="304" height="183" rx="8" fill="#ffffff" stroke="#cbd2c8"/>
+        <rect x="834" y="58" width="304" height="8" rx="4" fill="#b85d54"/>
+        <text x="858" y="101" class="section-title">Melodic pull</text>
+        <text x="858" y="127" class="section-note">How strongly the melody</text>
+        <text x="858" y="150" class="section-note">leans, steps, or leaps.</text>
+        <rect x="858" y="172" width="94" height="28" rx="14" fill="#fbefed" stroke="#d7bbb7"/>
+        <text x="905" y="191" text-anchor="middle" class="chip">Complexity</text>
+        <rect x="962" y="172" width="68" height="28" rx="14" fill="#fbefed" stroke="#d7bbb7"/>
+        <text x="996" y="191" text-anchor="middle" class="chip">Contour</text>
+        <rect x="1040" y="172" width="44" height="28" rx="14" fill="#fbefed" stroke="#d7bbb7"/>
+        <text x="1062" y="191" text-anchor="middle" class="chip">Bias</text>
+        <rect x="858" y="207" width="62" height="28" rx="14" fill="#fbefed" stroke="#d7bbb7"/>
+        <text x="889" y="226" text-anchor="middle" class="chip">Spread</text>
+      </g>
+
+      <g>
+        <rect x="834" y="298" width="304" height="162" rx="8" fill="#ffffff" stroke="#cbd2c8"/>
+        <rect x="834" y="298" width="304" height="8" rx="4" fill="#3f8d88"/>
+        <text x="858" y="341" class="section-title">Final height</text>
+        <text x="858" y="367" class="section-note">The chosen note moves</text>
+        <text x="858" y="390" class="section-note">to its played register.</text>
+        <rect x="858" y="412" width="62" height="28" rx="14" fill="#eaf6f4" stroke="#b7d2cf"/>
+        <text x="889" y="431" text-anchor="middle" class="chip">Octave</text>
+        <rect x="930" y="412" width="86" height="28" rx="14" fill="#eaf6f4" stroke="#b7d2cf"/>
+        <text x="973" y="431" text-anchor="middle" class="chip">Transpose</text>
+        <rect x="1026" y="412" width="50" height="28" rx="14" fill="#eaf6f4" stroke="#b7d2cf"/>
+        <text x="1051" y="431" text-anchor="middle" class="chip">Jump</text>
+      </g>
+
+      <g>
+        <rect x="826" y="536" width="312" height="128" rx="8" fill="#ffffff" stroke="#cbd2c8"/>
+        <rect x="826" y="536" width="312" height="8" rx="4" fill="#6f628f"/>
+        <text x="850" y="579" class="section-title">Longer melody change</text>
+        <text x="850" y="605" class="section-note">These do not name a note;</text>
+        <text x="850" y="628" class="section-note">they change which notes return.</text>
+        <rect x="850" y="644" width="86" height="28" rx="14" fill="#f1eff7" stroke="#c8c1d5"/>
+        <text x="893" y="663" text-anchor="middle" class="chip">Patience M</text>
+        <rect x="946" y="644" width="62" height="28" rx="14" fill="#f1eff7" stroke="#c8c1d5"/>
+        <text x="977" y="663" text-anchor="middle" class="chip">Mutate</text>
+      </g>
+
+      <g fill="none" stroke-linecap="round" stroke-width="4">
+        <path d="M326 141 C384 156 400 223 435 264" stroke="#4f8a62" marker-end="url(#arrowGreen)"/>
+        <path d="M326 354 C380 354 393 343 420 334" stroke="#426f9e" marker-end="url(#arrowBlue)"/>
+        <path d="M354 574 C403 539 424 485 472 432" stroke="#b5812d" marker-end="url(#arrowGold)"/>
+        <path d="M834 150 C790 176 765 226 737 270" stroke="#b85d54" marker-end="url(#arrowRed)"/>
+        <path d="M834 382 C795 371 782 362 760 348" stroke="#3f8d88" marker-end="url(#arrowTeal)"/>
+        <path d="M826 597 C772 563 738 509 695 440" stroke="#6f628f" marker-end="url(#arrowBlue)"/>
+      </g>
+
+      <g>
+        <path d="M443 520 C494 548 690 548 740 520" fill="none" stroke="#cbd2c8" stroke-width="2"/>
+        <circle cx="452" cy="522" r="6" fill="#4f8a62"/>
+        <circle cx="510" cy="543" r="6" fill="#426f9e"/>
+        <circle cx="590" cy="550" r="6" fill="#b5812d"/>
+        <circle cx="670" cy="543" r="6" fill="#b85d54"/>
+        <circle cx="732" cy="522" r="6" fill="#3f8d88"/>
+        <text x="590" y="593" text-anchor="middle" class="section-title">heard pitch</text>
+        <text x="590" y="621" text-anchor="middle" class="section-note">a scale note, in a register, sent as pitch CV</text>
+      </g>
+
+      <g>
+        <rect x="426" y="62" width="328" height="108" rx="8" fill="#f7f8f4" stroke="#cbd2c8"/>
+        <text x="590" y="98" text-anchor="middle" class="section-title">Single-note order</text>
+        <text x="590" y="127" text-anchor="middle" class="section-note">remembered melody first, then tonal color,</text>
+        <text x="590" y="150" text-anchor="middle" class="section-note">then register and performance movement</text>
+      </g>
+
+      <g>
+        <rect x="445" y="674" width="290" height="42" rx="21" fill="#1f2522"/>
+        <text x="590" y="701" text-anchor="middle" class="micro">SAME KNOBS, ONE PITCH DECISION</text>
+      </g>
+    </svg>
+
+    <div class="legend">
+      <div>
+        <h2>Remembered melody</h2>
+        <p><strong>Melody</strong>, <strong>Repeat</strong>, <strong>NewM</strong>, <strong>Patience M</strong>, and <strong>Mutate</strong> decide whether this note comes from the current phrase or a changed phrase.</p>
+      </div>
+      <div>
+        <h2>Available notes</h2>
+        <p><strong>Scale</strong>, <strong>Root Note</strong>, <strong>Pitch Tickets</strong>, <strong>Range</strong>, <strong>Low Degree</strong>, <strong>High Degree</strong>, and <strong>Steps</strong> set the note palette.</p>
+      </div>
+      <div>
+        <h2>Musical pull</h2>
+        <p><strong>Complexity</strong>, <strong>Contour</strong>, <strong>Bias</strong>, and <strong>Spread</strong> shape which available note feels more likely.</p>
+      </div>
+      <div>
+        <h2>Played height</h2>
+        <p><strong>Octave</strong>, <strong>Transpose</strong>, and <strong>Jump</strong> move the chosen note to the pitch CV the oscillator receives.</p>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stochastic Pitch Infographic</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            min-height: 100vh;
+            padding: 30px 20px;
+        }
+        h1 { color: #e94560; font-size: 2rem; font-weight: 700; text-align: center; margin-bottom: 8px; }
+        .subtitle { color: #8892b0; font-size: 1.1rem; text-align: center; margin-bottom: 30px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .svg-wrapper { background: rgba(255,255,255,0.02); border-radius: 20px; padding: 20px; border: 1px solid rgba(255,255,255,0.08); }
+        svg { width: 100%; height: auto; }
+        .footer { color: #5a6a8a; font-size: 0.8rem; text-align: center; margin-top: 25px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>STOCHASTIC TRACK</h1>
+        <p class="subtitle">What determines the PITCH of each note?</p>
+        <div class="svg-wrapper">
+<svg viewBox="0 0 900 650" xmlns="http://www.w3.org/2000/svg">
+<defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#1a1a2e"/>
+        <stop offset="100%" stop-color="#0f0f23"/>
+    </linearGradient>
+    <filter id="shadow">
+        <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+</defs>
+
+<rect width="900" height="650" fill="url(#bg)" rx="14"/>
+
+<text x="450" y="35" fill="#e94560" font-size="16" font-weight="700" text-anchor="middle">WHAT DETERMINES THE NOTE YOU HEAR?</text>
+<text x="450" y="55" fill="#8892b0" font-size="11" text-anchor="middle" opacity="0.7">Read columns left to right: from ingredients to final output</text>
+
+<!-- COLUMN 1: RANDOMNESS -->
+<g transform="translate(30, 75)">
+    <rect x="0" y="0" width="135" height="530" rx="10" fill="rgba(233,69,96,0.04)" stroke="rgba(233,69,96,0.25)" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="67" y="22" fill="#e94560" font-size="11" font-weight="600" text-anchor="middle">RANDOMNESS</text>
+
+    <rect x="12" y="55" width="110" height="58" rx="6" fill="rgba(233,69,96,0.12)" stroke="#e94560" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="67" y="80" fill="#ff8fa3" font-size="11" font-weight="600" text-anchor="middle">Melody Seed</text>
+    <text x="67" y="98" fill="#e94560" font-size="8" text-anchor="middle" opacity="0.7">Same seed = same melody</text>
+
+    <rect x="12" y="130" width="110" height="48" rx="6" fill="rgba(168,85,247,0.12)" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="67" y="152" fill="#e9d5ff" font-size="10" font-weight="600" text-anchor="middle">Variation</text>
+    <text x="67" y="167" fill="#a855f7" font-size="8" text-anchor="middle" opacity="0.7">Randomizes on loop</text>
+
+    <rect x="12" y="193" width="110" height="48" rx="6" fill="rgba(168,85,247,0.12)" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="67" y="215" fill="#e9d5ff" font-size="10" font-weight="600" text-anchor="middle">Mutate</text>
+    <text x="67" y="230" fill="#a855f7" font-size="8" text-anchor="middle" opacity="0.7">Evolves over time</text>
+
+    <rect x="12" y="256" width="110" height="48" rx="6" fill="rgba(245,158,11,0.12)" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="67" y="278" fill="#fcd34d" font-size="10" font-weight="600" text-anchor="middle">Repeat</text>
+    <text x="67" y="293" fill="#f59e0b" font-size="8" text-anchor="middle" opacity="0.7">Note glue / freeze</text>
+</g>
+
+<!-- COLUMN 2: THE PALETTE -->
+<g transform="translate(190, 75)">
+    <rect x="0" y="0" width="165" height="530" rx="10" fill="rgba(78,205,196,0.04)" stroke="rgba(78,205,196,0.25)" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="82" y="22" fill="#4ecdc4" font-size="11" font-weight="600" text-anchor="middle">THE PALETTE</text>
+
+    <rect x="15" y="55" width="135" height="62" rx="6" fill="rgba(78,205,196,0.12)" stroke="#4ecdc4" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="82" y="80" fill="#99f6e4" font-size="12" font-weight="600" text-anchor="middle">SCALE</text>
+    <text x="82" y="98" fill="#5eead4" font-size="9" text-anchor="middle">Major / Minor</text>
+    <text x="82" y="110" fill="#4ecdc4" font-size="8" text-anchor="middle" opacity="0.6">Dorian / Phrygian</text>
+
+    <rect x="15" y="133" width="135" height="55" rx="6" fill="rgba(78,205,196,0.12)" stroke="#4ecdc4" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="82" y="156" fill="#99f6e4" font-size="12" font-weight="600" text-anchor="middle">ROOT NOTE</text>
+    <text x="82" y="175" fill="#4ecdc4" font-size="9" text-anchor="middle" opacity="0.7">Key: C / D / F#</text>
+
+    <rect x="15" y="202" width="135" height="50" rx="6" fill="rgba(78,205,196,0.12)" stroke="#4ecdc4" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="82" y="224" fill="#99f6e4" font-size="11" font-weight="600" text-anchor="middle">RANGE</text>
+    <text x="82" y="242" fill="#4ecdc4" font-size="9" text-anchor="middle" opacity="0.7">1 to 4 octaves</text>
+
+    <text x="82" y="278" fill="#8892b0" font-size="9" text-anchor="middle">Creates your:</text>
+    <rect x="15" y="290" width="135" height="75" rx="6" fill="rgba(78,205,196,0.06)" stroke="rgba(78,205,196,0.4)" stroke-width="1"/>
+    <text x="30" y="318" fill="#99f6e4" font-size="14" font-weight="700">C</text>
+    <text x="55" y="318" fill="#99f6e4" font-size="14" font-weight="700">D</text>
+    <text x="80" y="318" fill="#99f6e4" font-size="14" font-weight="700">E</text>
+    <text x="105" y="318" fill="#99f6e4" font-size="14" font-weight="700">F</text>
+    <text x="40" y="338" fill="#99f6e4" font-size="14" font-weight="700">G</text>
+    <text x="65" y="338" fill="#99f6e4" font-size="14" font-weight="700">A</text>
+    <text x="90" y="338" fill="#99f6e4" font-size="14" font-weight="700">B</text>
+    <text x="82" y="358" fill="#4ecdc4" font-size="8" text-anchor="middle" opacity="0.6">(C Major example)</text>
+</g>
+
+<!-- COLUMN 3: PREFERENCE -->
+<g transform="translate(375, 75)">
+    <rect x="0" y="0" width="160" height="530" rx="10" fill="rgba(168,85,247,0.04)" stroke="rgba(168,85,247,0.25)" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="80" y="22" fill="#a855f7" font-size="11" font-weight="600" text-anchor="middle">PREFERENCE</text>
+
+    <rect x="12" y="55" width="135" height="68" rx="6" fill="rgba(168,85,247,0.12)" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="80" y="78" fill="#e9d5ff" font-size="11" font-weight="600" text-anchor="middle">DEGREE</text>
+    <text x="80" y="93" fill="#e9d5ff" font-size="11" font-weight="600" text-anchor="middle">WEIGHTS</text>
+    <text x="80" y="110" fill="#c084fc" font-size="9" text-anchor="middle">Favor specific notes</text>
+    <text x="80" y="122" fill="#a855f7" font-size="8" text-anchor="middle" opacity="0.6">-1 = exclude entirely</text>
+
+    <rect x="12" y="138" width="135" height="50" rx="6" fill="rgba(168,85,247,0.12)" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="80" y="160" fill="#e9d5ff" font-size="10" font-weight="600" text-anchor="middle">STEPS SIEVE</text>
+    <text x="80" y="177" fill="#a855f7" font-size="8" text-anchor="middle" opacity="0.7">Keep only fundamentals</text>
+
+    <rect x="12" y="203" width="135" height="45" rx="6" fill="rgba(59,130,246,0.10)" stroke="rgba(59,130,246,0.5)" stroke-width="1"/>
+    <text x="80" y="222" fill="#93c5fd" font-size="10" font-weight="500" text-anchor="middle">Deg Rotation</text>
+    <text x="80" y="238" fill="#3b82f6" font-size="7" text-anchor="middle" opacity="0.7">Shifts note mappings</text>
+
+    <rect x="12" y="263" width="135" height="35" rx="6" fill="rgba(59,130,246,0.10)" stroke="rgba(59,130,246,0.5)" stroke-width="1"/>
+    <text x="80" y="284" fill="#93c5fd" font-size="9" font-weight="500" text-anchor="middle">Mask Rotation</text>
+</g>
+
+<!-- COLUMN 4: SHAPING -->
+<g transform="translate(555, 75)">
+    <rect x="0" y="0" width="155" height="530" rx="10" fill="rgba(59,130,246,0.04)" stroke="rgba(59,130,246,0.25)" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="77" y="22" fill="#3b82f6" font-size="11" font-weight="600" text-anchor="middle">SHAPING</text>
+
+    <rect x="10" y="55" width="135" height="65" rx="6" fill="rgba(59,130,246,0.12)" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="77" y="78" fill="#93c5fd" font-size="12" font-weight="600" text-anchor="middle">COMPLEXITY</text>
+    <text x="77" y="96" fill="#60a5fa" font-size="9" text-anchor="middle">Step size control</text>
+    <text x="77" y="112" fill="#3b82f6" font-size="8" text-anchor="middle" opacity="0.6">Low=steps, High=leaps</text>
+
+    <rect x="10" y="136" width="135" height="55" rx="6" fill="rgba(59,130,246,0.12)" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="77" y="159" fill="#93c5fd" font-size="11" font-weight="600" text-anchor="middle">CONTOUR</text>
+    <text x="77" y="177" fill="#3b82f6" font-size="9" text-anchor="middle" opacity="0.7">Upward/downward drift</text>
+
+    <rect x="10" y="208" width="135" height="50" rx="6" fill="rgba(59,130,246,0.10)" stroke="rgba(59,130,246,0.5)" stroke-width="1"/>
+    <text x="77" y="228" fill="#93c5fd" font-size="10" font-weight="500" text-anchor="middle">Marbles Bias</text>
+    <text x="77" y="245" fill="#3b82f6" font-size="8" text-anchor="middle" opacity="0.7">Low/high center</text>
+
+    <rect x="10" y="273" width="135" height="40" rx="6" fill="rgba(59,130,246,0.10)" stroke="rgba(59,130,246,0.5)" stroke-width="1"/>
+    <text x="77" y="296" fill="#93c5fd" font-size="9" font-weight="500" text-anchor="middle">Spread</text>
+</g>
+
+<!-- COLUMN 5: GLOBAL -->
+<g transform="translate(730, 75)">
+    <rect x="0" y="0" width="140" height="530" rx="10" fill="rgba(249,115,22,0.04)" stroke="rgba(249,115,22,0.25)" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="70" y="22" fill="#f97316" font-size="11" font-weight="600" text-anchor="middle">GLOBAL</text>
+
+    <rect x="8" y="55" width="125" height="50" rx="6" fill="rgba(249,115,22,0.12)" stroke="#f97316" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="70" y="78" fill="#fed7aa" font-size="11" font-weight="600" text-anchor="middle">OCTAVE</text>
+    <text x="70" y="95" fill="#f97316" font-size="8" text-anchor="middle" opacity="0.7">Global shift</text>
+
+    <rect x="8" y="120" width="125" height="50" rx="6" fill="rgba(249,115,22,0.12)" stroke="#f97316" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="70" y="143" fill="#fed7aa" font-size="11" font-weight="600" text-anchor="middle">TRANSPOSE</text>
+    <text x="70" y="160" fill="#f97316" font-size="8" text-anchor="middle" opacity="0.7">Semitone shift</text>
+</g>
+
+<!-- ARROWS / FLOW INDICATORS -->
+<g stroke="#8892b0" stroke-width="1" opacity="0.3" fill="none">
+    <path d="M165 320 L180 320"/>
+    <path d="M355 320 L370 320"/>
+    <path d="M535 320 L550 320"/>
+    <path d="M710 320 L725 320"/>
+</g>
+
+<!-- THE FINAL OUTPUT -->
+<g transform="translate(350, 555)">
+    <rect x="0" y="0" width="200" height="45" rx="10" fill="rgba(233,69,96,0.15)" stroke="#e94560" stroke-width="2" filter="url(#shadow)"/>
+    <text x="100" y="22" fill="#ff8fa3" font-size="11" font-weight="500" text-anchor="middle">All multiply together</text>
+    <text x="100" y="38" fill="#e94560" font-size="10" text-anchor="middle" opacity="0.8">= Weighted random pick</text>
+</g>
+
+<g transform="translate(350, 610)">
+    <rect x="0" y="0" width="200" height="35" rx="10" fill="rgba(233,69,96,0.2)" stroke="#e94560" stroke-width="2.5" filter="url(#shadow)"/>
+    <text x="100" y="23" fill="#ff8fa3" font-size="13" font-weight="700" text-anchor="middle">FINAL NOTE = D4 (for example)</text>
+</g>
+
+</svg>
+</div>
+<div class="footer">
+    <strong>How it works for musicians:</strong><br>
+    The Scale + Root define your key (like C Major). Range sets how many octaves. Degree Weights make certain notes more likely.<br>
+    Complexity = step size (low = neighbor notes, high = big jumps). Contour = melodic shape bias (upwards, downwards, or static).
+</div>
+</div>
+</body>
+</html>

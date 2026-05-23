@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stochastic Pitch Infographic</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0f1115;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .infographic-container {
+            width: 100%;
+            max-width: 900px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        svg {
+            width: 100%;
+            height: auto;
+            filter: drop-shadow(0 0 30px rgba(0,0,0,0.5));
+        }
+    </style>
+</head>
+<body>
+
+<div class="infographic-container">
+    <svg viewBox="0 0 800 1100" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <!-- Gradients for connections -->
+            <linearGradient id="wire-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#3a404d" />
+                <stop offset="50%" stop-color="#00E5FF" />
+                <stop offset="100%" stop-color="#FF3366" />
+            </linearGradient>
+            
+            <linearGradient id="glow-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00E5FF" />
+                <stop offset="100%" stop-color="#0088ff" />
+            </linearGradient>
+
+            <linearGradient id="glow-magenta" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FF3366" />
+                <stop offset="100%" stop-color="#cc0044" />
+            </linearGradient>
+
+            <linearGradient id="glow-yellow" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FFD500" />
+                <stop offset="100%" stop-color="#ff8800" />
+            </linearGradient>
+
+            <!-- Glow Filters -->
+            <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="8" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            
+            <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+                <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.6"/>
+            </filter>
+        </defs>
+
+        <!-- Background Panel -->
+        <rect x="0" y="0" width="800" height="1100" rx="20" fill="#15181e" stroke="#2a303c" stroke-width="2" />
+
+        <!-- Title -->
+        <text x="400" y="70" font-size="32" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="1">ANATOMY OF A STOCHASTIC MELODY</text>
+        <text x="400" y="100" font-size="16" font-weight="400" fill="#8892b0" text-anchor="middle">How musical knobs shape random chaos into beautiful pitch CV</text>
+
+        <!-- Central Spine / Signal Flow -->
+        <path d="M 400 130 L 400 950" stroke="url(#wire-gradient)" stroke-width="6" stroke-linecap="round" stroke-dasharray="1 12" fill="none" />
+
+        <!-- ========================================== -->
+        <!-- MODULE 1: THE PALETTE (Scale & Root) -->
+        <!-- ========================================== -->
+        <g transform="translate(50, 160)" filter="url(#shadow)">
+            <rect x="0" y="0" width="310" height="160" rx="12" fill="#1c2128" stroke="#FF3366" stroke-width="2" />
+            <rect x="0" y="0" width="8" height="160" rx="4" fill="url(#glow-magenta)" />
+            
+            <text x="30" y="35" font-size="18" font-weight="700" fill="#FF3366">1. THE PALETTE</text>
+            <text x="30" y="60" font-size="14" font-weight="600" fill="#ffffff">Scale & Root Note</text>
+            <text x="30" y="80" font-size="12" fill="#8892b0" width="250">Sets the musical key (e.g., C Minor).</text>
+            <text x="30" y="98" font-size="12" fill="#8892b0" width="250">This builds the master pool of legal</text>
+            <text x="30" y="116" font-size="12" fill="#8892b0" width="250">notes before any randomness occurs.</text>
+
+            <!-- Mini visual: Piano keys -->
+            <rect x="230" y="20" width="50" height="40" rx="2" fill="#fff" />
+            <rect x="235" y="20" width="10" height="25" fill="#000" />
+            <rect x="250" y="20" width="10" height="25" fill="#000" />
+            <rect x="265" y="20" width="10" height="25" fill="#000" />
+        </g>
+
+        <!-- Connection -->
+        <path d="M 360 240 C 380 240, 380 240, 400 240" stroke="#FF3366" stroke-width="3" fill="none" />
+        <circle cx="400" cy="240" r="8" fill="#FF3366" filter="url(#neon-glow)" />
+
+        <!-- ========================================== -->
+        <!-- MODULE 2: THE FENCES (Masking) -->
+        <!-- ========================================== -->
+        <g transform="translate(440, 240)" filter="url(#shadow)">
+            <rect x="0" y="0" width="310" height="140" rx="12" fill="#1c2128" stroke="#FF3366" stroke-width="2" />
+            <rect x="302" y="0" width="8" height="140" rx="4" fill="url(#glow-magenta)" />
+            
+            <text x="20" y="35" font-size="18" font-weight="700" fill="#FF3366">2. THE FENCES</text>
+            <text x="20" y="60" font-size="14" font-weight="600" fill="#ffffff">Degree Masking</text>
+            <text x="20" y="80" font-size="12" fill="#8892b0">Mutes specific notes in the scale.</text>
+            <text x="20" y="98" font-size="12" fill="#8892b0">Turn a 7-note Dorian scale into a</text>
+            <text x="20" y="116" font-size="12" fill="#8892b0">5-note pentatonic by disabling degrees.</text>
+            
+            <!-- Mini visual: checkboxes -->
+            <circle cx="270" cy="80" r="6" fill="#FF3366" />
+            <circle cx="270" cy="100" r="6" fill="#3a404d" />
+            <circle cx="270" cy="120" r="6" fill="#FF3366" />
+        </g>
+
+        <!-- Connection -->
+        <path d="M 440 310 C 420 310, 420 310, 400 310" stroke="#FF3366" stroke-width="3" fill="none" />
+        <circle cx="400" cy="310" r="8" fill="#FF3366" filter="url(#neon-glow)" />
+
+        <!-- ========================================== -->
+        <!-- MODULE 3: THE SHAPE (Spread & Bias) -->
+        <!-- ========================================== -->
+        <g transform="translate(50, 390)" filter="url(#shadow)">
+            <rect x="0" y="0" width="310" height="180" rx="12" fill="#1c2128" stroke="#00E5FF" stroke-width="2" />
+            <rect x="0" y="0" width="8" height="180" rx="4" fill="url(#glow-cyan)" />
+            
+            <text x="30" y="35" font-size="18" font-weight="700" fill="#00E5FF">3. THE CONTOURS</text>
+            <text x="30" y="60" font-size="14" font-weight="600" fill="#ffffff">Pitch Spread & Bias</text>
+            <text x="30" y="80" font-size="12" fill="#8892b0">SPREAD: Spans from a tight 1-octave</text>
+            <text x="30" y="98" font-size="12" fill="#8892b0">cluster to wild 5-octave leaps.</text>
+            <text x="30" y="125" font-size="12" fill="#8892b0">BIAS: Pulls the melody gravity toward</text>
+            <text x="30" y="143" font-size="12" fill="#8892b0">the root note, or pushes it to the edges.</text>
+
+            <!-- Mini visual: Bell curve -->
+            <path d="M 220 140 Q 250 140, 260 90 T 290 140" stroke="#00E5FF" stroke-width="3" fill="none" />
+        </g>
+
+        <!-- Connection -->
+        <path d="M 360 480 C 380 480, 380 480, 400 480" stroke="#00E5FF" stroke-width="3" fill="none" />
+        <circle cx="400" cy="480" r="8" fill="#00E5FF" filter="url(#neon-glow)" />
+
+        <!-- ========================================== -->
+        <!-- MODULE 4: THE BEHAVIOR (Smoothness) -->
+        <!-- ========================================== -->
+        <g transform="translate(440, 470)" filter="url(#shadow)">
+            <rect x="0" y="0" width="310" height="140" rx="12" fill="#1c2128" stroke="#00E5FF" stroke-width="2" />
+            <rect x="302" y="0" width="8" height="140" rx="4" fill="url(#glow-cyan)" />
+            
+            <text x="20" y="35" font-size="18" font-weight="700" fill="#00E5FF">4. THE GRAVITY</text>
+            <text x="20" y="60" font-size="14" font-weight="600" fill="#ffffff">Interval Restraint</text>
+            <text x="20" y="80" font-size="12" fill="#8892b0">Forces the melody to step gently.</text>
+            <text x="20" y="98" font-size="12" fill="#8892b0">Weights the dice so the next note</text>
+            <text x="20" y="116" font-size="12" fill="#8892b0">is mathematically closer to the last note.</text>
+
+            <!-- Mini visual: Steps -->
+            <path d="M 230 110 L 250 110 L 250 90 L 270 90 L 270 70 L 290 70" stroke="#00E5FF" stroke-width="3" fill="none" />
+        </g>
+
+        <!-- Connection -->
+        <path d="M 440 540 C 420 540, 420 540, 400 540" stroke="#00E5FF" stroke-width="3" fill="none" />
+        <circle cx="400" cy="540" r="8" fill="#00E5FF" filter="url(#neon-glow)" />
+
+        <!-- ========================================== -->
+        <!-- MODULE 5: THE ENGINE (Chaos & Loop) -->
+        <!-- ========================================== -->
+        <g transform="translate(50, 620)" filter="url(#shadow)">
+            <rect x="0" y="0" width="310" height="160" rx="12" fill="#1c2128" stroke="#FFD500" stroke-width="2" />
+            <rect x="0" y="0" width="8" height="160" rx="4" fill="url(#glow-yellow)" />
+            
+            <text x="30" y="35" font-size="18" font-weight="700" fill="#FFD500">5. THE MEMORY</text>
+            <text x="30" y="60" font-size="14" font-weight="600" fill="#ffffff">Chaos (Lock / Dejavu)</text>
+            <text x="30" y="80" font-size="12" fill="#8892b0">0% Chaos = Plays the locked 16-step loop.</text>
+            <text x="30" y="98" font-size="12" fill="#8892b0">100% Chaos = Ignores the loop, rolls</text>
+            <text x="30" y="116" font-size="12" fill="#8892b0">a completely new note every step.</text>
+            <text x="30" y="134" font-size="12" fill="#8892b0">50% = Slowly mutating melody over time.</text>
+
+            <!-- Mini visual: Infinity loop -->
+            <path d="M 240 50 C 220 50, 220 80, 240 80 C 260 80, 260 50, 280 50 C 300 50, 300 80, 280 80 C 260 80, 260 50, 240 50" stroke="#FFD500" stroke-width="3" fill="none" />
+        </g>
+
+        <!-- Connection -->
+        <path d="M 360 700 C 380 700, 380 700, 400 700" stroke="#FFD500" stroke-width="3" fill="none" />
+        <circle cx="400" cy="700" r="8" fill="#FFD500" filter="url(#neon-glow)" />
+
+        <!-- ========================================== -->
+        <!-- MODULE 6: THE PERFORMANCE (Transpose) -->
+        <!-- ========================================== -->
+        <g transform="translate(440, 750)" filter="url(#shadow)">
+            <rect x="0" y="0" width="310" height="140" rx="12" fill="#1c2128" stroke="#B066FE" stroke-width="2" />
+            <rect x="302" y="0" width="8" height="140" rx="4" fill="#B066FE" />
+            
+            <text x="20" y="35" font-size="18" font-weight="700" fill="#B066FE">6. THE PERFORMANCE</text>
+            <text x="20" y="60" font-size="14" font-weight="600" fill="#ffffff">Octave Walk & Transpose</text>
+            <text x="20" y="80" font-size="12" fill="#8892b0">WALK: Randomly shifts the resulting note</text>
+            <text x="20" y="98" font-size="12" fill="#8892b0">up or down an entire octave.</text>
+            <text x="20" y="116" font-size="12" fill="#8892b0">TRANSPOSE: Absolute semitone shift.</text>
+
+            <!-- Mini visual: Arrow up/down -->
+            <path d="M 260 70 L 260 110 M 250 80 L 260 70 L 270 80 M 250 100 L 260 110 L 270 100" stroke="#B066FE" stroke-width="3" fill="none" />
+        </g>
+
+        <!-- Connection -->
+        <path d="M 440 820 C 420 820, 420 820, 400 820" stroke="#B066FE" stroke-width="3" fill="none" />
+        <circle cx="400" cy="820" r="8" fill="#B066FE" filter="url(#neon-glow)" />
+
+        <!-- ========================================== -->
+        <!-- FINAL OUTPUT: PITCH CV -->
+        <!-- ========================================== -->
+        <g transform="translate(250, 950)">
+            <rect x="0" y="0" width="300" height="80" rx="40" fill="#1c2128" stroke="#ffffff" stroke-width="3" filter="url(#shadow)" />
+            <circle cx="50" cy="40" r="25" fill="#15181e" stroke="#444" stroke-width="4" />
+            <circle cx="50" cy="40" r="10" fill="#000" />
+            
+            <text x="100" y="35" font-size="16" font-weight="700" fill="#ffffff" letter-spacing="2">OUTPUT CV OUT</text>
+            <text x="100" y="55" font-size="12" font-weight="600" fill="#00E5FF">1V / OCTAVE PITCH</text>
+        </g>
+        
+    </svg>
+</div>
+
+</body>
+</html>

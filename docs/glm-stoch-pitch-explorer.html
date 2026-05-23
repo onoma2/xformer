@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stochastic Pitch — Live Explorer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f5f5fa;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #333;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  h1 { text-align: center; color: #1a1a2e; font-size: 24px; margin: 8px 0 2px; letter-spacing: 2px; }
+  .sub { text-align: center; color: #8888aa; font-size: 12px; letter-spacing: 3px; margin-bottom: 16px; }
+
+  .main { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+
+  /* Controls panel */
+  .controls {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .controls h2 { color: #888; font-size: 11px; letter-spacing: 2px; margin-bottom: 12px; text-transform: uppercase; }
+
+  .param {
+    margin-bottom: 10px;
+  }
+  .param-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 3px;
+  }
+  .param-name {
+    color: #444; font-size: 12px; font-weight: 600;
+  }
+  .param-val {
+    color: #1a7abf; font-size: 11px; font-family: 'SF Mono', 'Consolas', monospace;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px;
+    background: #ddd; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: #0d9488; cursor: pointer; border: 2px solid #fff;
+  }
+
+  .section-label {
+    color: #999; font-size: 10px; letter-spacing: 2px; margin-top: 14px; margin-bottom: 6px;
+    border-top: 1px solid #e0e0e8; padding-top: 8px;
+  }
+
+  .btn-row { display: flex; gap: 6px; margin-top: 12px; }
+  .btn {
+    flex: 1; padding: 8px 0; border: 1px solid #ccc; border-radius: 6px;
+    background: #f8f8fc; color: #555; font-size: 11px; cursor: pointer;
+    text-align: center; letter-spacing: 1px;
+  }
+  .btn:hover { background: #eef; color: #333; border-color: #0d9488; }
+  .btn.active { background: #e0f5f3; color: #0d9488; border-color: #0d9488; }
+
+  /* Tickets grid */
+  .tickets-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 4px;
+  }
+  .ticket-cell {
+    text-align: center; font-size: 10px; padding: 3px 2px; border-radius: 4px;
+    background: #f8f8fc; border: 1px solid #ddd; cursor: pointer; user-select: none;
+    transition: all 0.15s;
+  }
+  .ticket-cell.excl { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+  .ticket-cell.incl { background: #f0fdfa; color: #0d9488; border-color: #99e5dd; }
+  .ticket-cell .deg { font-size: 11px; font-weight: 600; }
+  .ticket-cell .wt { font-size: 8px; color: #aaa; margin-top: 1px; }
+  .ticket-cell.excl .wt { color: #dc2626; }
+
+  /* Canvas area */
+  .viz {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 16px;
+    min-height: 500px;
+    position: relative;
+  }
+  #seqCanvas { width: 100%; display: block; }
+
+  /* Stats bar */
+  .stats {
+    display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap;
+  }
+  .stat { font-size: 11px; color: #888; }
+  .stat span { color: #555; }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute; background: #fff; border: 1px solid #ccc;
+    border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #333;
+    pointer-events: none; display: none; z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  }
+</style>
+</head>
+<body>
+
+<h1>STOCHASTIC PITCH EXPLORER</h1>
+<p class="sub">64 STEPS IN C MAJOR — MOVE THE KNOBS, HEAR THE ALGORITHM</p>
+
+<div class="main">
+  <div class="controls">
+    <h2>Parameters</h2>
+
+    <!-- Pool section -->
+    <div class="section-label">POOL SETUP</div>
+
+    <div class="param">
+      <div class="param-header"><span class="param-name">Range</span><span class="param-val" id="vRange">2 oct</span></div>
+      <input type="range" id="sRange" min="1" max="4" value="2" step="1">
+    </div>
+
+    <div class="param">
+      <div class="param-header"><span class="param-name">Steps</span><span class="param-val" id="vSteps">100</span></div>
+      <input type="range" id="sSteps" min="0" max="100" value="100" step="1">
+    </div>
+
+    <div class="section-label">SCALE TICKETS (click to exclude)</div>
+    <div class="tickets-grid" id="ticketsGrid"></div>
+
+    <!-- Per-note section -->
+    <div class="section-label">PER-NOTE SHAPING</div>
+
+    <div class="param">
+      <div class="param-header"><span class="param-name">Complexity</span><span class="param-val" id="vComplexity">50</span></div>
+      <input type="range" id="sComplexity" min="0" max="100" value="50" step="1">
+    </div>
+
+    <div class="param">
+      <div class="param-header"><span class="param-name">Contour</span><span class="param-val" id="vContour">+0</span></div>
+      <input type="range" id="sContour" min="-100" max="100" value="0" step="1">
+    </div>
+
+    <div class="param">
+      <div class="param-header"><span class="param-name">Bias</span><span class="param-val" id="vBias">50</span></div>
+      <input type="range" id="sBias" min="0" max="100" value="50" step="1">
+    </div>
+
+    <div class="param">
+      <div class="param-header"><span class="param-name">Spread</span><span class="param-val" id="vSpread">50</span></div>
+      <input type="range" id="sSpread" min="0" max="100" value="50" step="1">
+    </div>
+
+    <div class="btn-row">
+      <div class="btn" id="btnReroll">🎲 REROLL</div>
+      <div class="btn" id="btnReset">RESET</div>
+    </div>
+  </div>
+
+  <div class="viz">
+    <canvas id="seqCanvas" height="500"></canvas>
+    <div id="tooltip"></div>
+    <div class="stats" id="stats"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Stochastic Pitch Generator — JavaScript port of the engine
+// ═══════════════════════════════════════════════════════════════
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const C_MAJOR = [0,2,4,5,7,9,11]; // semitone offsets for C Major
+const SCALE_DEGREE_NAMES = ['C','D','E','F','G','A','B'];
+
+// PRNG — xoshiro32**
+function makeRng(seed) {
+  let s = seed | 0;
+  return function() {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function rngNextRange(rng, n) {
+  return Math.floor(rng() * n);
+}
+
+// universalDegreeBoost — exact port from StochasticGenerator.cpp
+function universalDegreeBoost(degInOct, N) {
+  const halfWidth = Math.max(Math.floor(N / 6), 1);
+  function kernel(target, weight) {
+    let dist = Math.abs(degInOct - target);
+    dist = Math.min(dist, N - dist);
+    return Math.max(Math.floor((halfWidth - dist) * weight / halfWidth), 0);
+  }
+  let boost = kernel(0, 30);
+  if (N >= 2) boost += kernel(Math.floor(N/2), 20);
+  if (N >= 3) boost += kernel(Math.floor(N/3), 10);
+  if (N >= 3) boost += kernel(Math.floor(2*N/3), 10);
+  if (N >= 4) boost += kernel(Math.floor(N/4), 5);
+  if (N >= 4) boost += kernel(Math.floor(3*N/4), 5);
+  return boost;
+}
+
+// Generate a 64-step sequence
+function generateSequence(params) {
+  const {
+    range, steps, tickets, complexity, contour, bias, spread, seed
+  } = params;
+
+  const N = 7; // C Major
+  const rng = makeRng(seed);
+
+  // Step 1: Enumerate candidates from Scale × Range
+  // Each candidate is an absolute degree index
+  let candidates = [];
+  for (let oct = 0; oct < range; oct++) {
+    for (let i = 0; i < N; i++) {
+      const ticketVal = tickets[i]; // per-degree ticket
+      if (ticketVal < 0) continue; // excluded
+      candidates.push({
+        absDeg: oct * N + i,
+        degInOct: i,
+        oct: oct,
+        ticket: ticketVal
+      });
+    }
+  }
+
+  if (candidates.length === 0) return [];
+
+  // Step 3: Steps sieve
+  const K = Math.max(1, Math.ceil(candidates.length * steps / 100));
+  if (K < candidates.length) {
+    // Rank by universalDegreeBoost
+    const ranked = candidates.map((c, idx) => ({
+      idx,
+      boost: universalDegreeBoost(c.degInOct, N)
+    }));
+    ranked.sort((a, b) => b.boost - a.boost);
+    const keep = new Set(ranked.slice(0, K).map(r => r.idx));
+    candidates = candidates.filter((_, i) => keep.has(i));
+  }
+
+  if (candidates.length === 0) return [];
+
+  const allowedCount = candidates.length;
+  const anyTicket = candidates.some(c => c.ticket > 0);
+
+  // Pre-compute marbles (same every note)
+  const biasPos = allowedCount > 1 ? Math.floor((bias * (allowedCount - 1) + 50) / 100) : 0;
+  const marblesWidth = 1 + Math.floor(spread * allowedCount / 100);
+  const marblesLeak = 1 + Math.floor(spread / 10);
+
+  // Generate 64 notes
+  let lastDeg = -1;
+  const sequence = [];
+
+  for (let step = 0; step < 64; step++) {
+    // Compute weights
+    const kernelWidth = 1 + Math.floor(complexity * allowedCount / 50);
+    const kernelLeak = Math.floor(complexity / 10);
+
+    let totalWeight = 0;
+    const weights = new Array(allowedCount);
+
+    for (let i = 0; i < allowedCount; i++) {
+      // Base (ticket weight)
+      const base = anyTicket ? Math.max(candidates[i].ticket, 0) : 10;
+      const fallbackBase = (candidates[i].ticket === 0 && !anyTicket) ? 10 : (candidates[i].ticket > 0 ? candidates[i].ticket : 10);
+
+      // Complexity kernel
+      let kernel;
+      if (lastDeg < 0) {
+        kernel = 100; // no last note, flat
+      } else {
+        const d = Math.abs(i - lastDeg);
+        const tri = Math.max(kernelWidth - d, 0) * 10;
+        const signedDist = i - lastDeg;
+        let drift = Math.floor(contour * signedDist / 2);
+        const maxDrift = Math.max(kernelWidth > 2 ? kernelWidth : 2, 2) * 10;
+        drift = Math.max(-maxDrift, Math.min(maxDrift, drift));
+        kernel = tri + kernelLeak + drift;
+        if (kernel < 0) kernel = 0;
+      }
+
+      // Marbles bell
+      const dm = Math.abs(i - biasPos);
+      const mtri = Math.max(marblesWidth - dm, 0) * 10;
+      const marbles = mtri + marblesLeak;
+
+      // Final weight
+      weights[i] = fallbackBase * kernel * marbles;
+      totalWeight += weights[i];
+    }
+
+    if (totalWeight === 0) {
+      sequence.push({ step, note: null, name: '—', absDeg: -1 });
+      continue;
+    }
+
+    // Weighted pick
+    let roll = rngNextRange(rng, totalWeight);
+    let sum = 0;
+    let pick = 0;
+    for (let i = 0; i < allowedCount; i++) {
+      sum += weights[i];
+      if (roll < sum) { pick = i; break; }
+    }
+
+    const chosen = candidates[pick];
+    lastDeg = pick;
+
+    // Convert to note info
+    const semitone = C_MAJOR[chosen.degInOct];
+    const octNum = chosen.oct + 3; // start from octave 3
+    const midiNote = (octNum + 1) * 12 + semitone;
+    const noteName = NOTE_NAMES[semitone] + octNum;
+
+    sequence.push({
+      step,
+      note: noteName,
+      absDeg: chosen.absDeg,
+      degInOct: chosen.degInOct,
+      oct: chosen.oct,
+      midiNote,
+      weight: weights[pick],
+      totalWeight,
+      pct: ((weights[pick] / totalWeight) * 100).toFixed(1)
+    });
+  }
+
+  return sequence;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI State
+// ═══════════════════════════════════════════════════════════════
+
+const state = {
+  range: 2,
+  steps: 100,
+  tickets: [0, 0, 0, 0, 0, 0, 0], // 0 = included neutral, -1 = excluded
+  complexity: 50,
+  contour: 0,
+  bias: 50,
+  spread: 50,
+  seed: 12345
+};
+
+let sequence = [];
+let hoverStep = -1;
+
+// ═══════════════════════════════════════════════════════════════
+// Rendering
+// ═══════════════════════════════════════════════════════════════
+
+const canvas = document.getElementById('seqCanvas');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+
+// Note colors by octave
+const OCT_COLORS = [
+  '#6d5ce8', // oct 0 (C3)
+  '#2e86c1', // oct 1 (C4)
+  '#0d9488', // oct 2 (C5)
+  '#d97706', // oct 3 (C6)
+];
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = rect.width - 32;
+  canvas.style.width = w + 'px';
+  canvas.width = w * (window.devicePixelRatio || 1);
+  canvas.height = 500 * (window.devicePixelRatio || 1);
+  ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+}
+
+function render() {
+  const W = canvas.width / (window.devicePixelRatio || 1);
+  const H = canvas.height / (window.devicePixelRatio || 1);
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (sequence.length === 0) return;
+
+  const maxAbsDeg = state.range * 7;
+  const marginLeft = 40;
+  const marginRight = 10;
+  const marginTop = 20;
+  const marginBottom = 50;
+  const plotW = W - marginLeft - marginRight;
+  const plotH = H - marginTop - marginBottom;
+
+  // Note rows (y axis) — each absolute degree gets a row
+  const rowH = plotH / maxAbsDeg;
+
+  // Draw grid lines and note labels
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+
+  for (let d = 0; d < maxAbsDeg; d++) {
+    const y = marginTop + plotH - (d + 0.5) * rowH;
+    const degInOct = d % 7;
+    const oct = Math.floor(d / 7) + 3;
+    const name = SCALE_DEGREE_NAMES[degInOct] + oct;
+
+    // Check if excluded
+    const excluded = state.tickets[degInOct] < 0;
+
+    // Grid line
+    ctx.strokeStyle = excluded ? '#fef2f2' : '#eef0f5';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(marginLeft, y);
+    ctx.lineTo(W - marginRight, y);
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle = excluded ? '#fca5a5' : (degInOct === 0 ? '#555' : '#aaa');
+    ctx.fillText(name, marginLeft - 4, y);
+  }
+
+  // Step columns
+  const stepW = plotW / 64;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+
+  // Draw bars
+  for (let i = 0; i < 64; i++) {
+    const ev = sequence[i];
+    if (!ev || ev.absDeg < 0) continue;
+
+    const x = marginLeft + i * stepW;
+    const barW = stepW - 2;
+
+    // Bar from bottom to note height
+    const noteY = marginTop + plotH - (ev.absDeg + 1) * rowH;
+    const barH = (ev.absDeg + 1) * rowH;
+    const drawY = noteY;
+    const drawH = rowH;
+
+    const oct = ev.oct || 0;
+    const color = OCT_COLORS[oct % OCT_COLORS.length];
+
+    // Highlight if hovered
+    const isHover = i === hoverStep;
+
+    // Draw the note bar
+    ctx.fillStyle = isHover ? color : color + 'bb';
+    ctx.fillRect(x + 1, drawY, barW, drawH - 1);
+
+    // Glow on hover
+    if (isHover) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 8;
+      ctx.fillRect(x + 1, drawY, barW, drawH - 1);
+      ctx.shadowBlur = 0;
+    }
+
+    // Step number labels (every 4th)
+    if (i % 4 === 0) {
+      ctx.fillStyle = '#bbb';
+      ctx.font = '8px system-ui';
+      ctx.fillText(i + 1, x + barW / 2, marginTop + plotH + 4);
+    }
+
+    // Note name labels at bottom (every 4th)
+    if (i % 4 === 0 || isHover) {
+      ctx.fillStyle = isHover ? '#111' : '#888';
+      ctx.font = isHover ? 'bold 10px system-ui' : '8px system-ui';
+      ctx.fillText(ev.note, x + barW / 2, marginTop + plotH + 16);
+    }
+  }
+
+  // Connecting line
+  ctx.strokeStyle = '#00000018';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < 64; i++) {
+    const ev = sequence[i];
+    if (!ev || ev.absDeg < 0) continue;
+    const x = marginLeft + (i + 0.5) * stepW;
+    const y = marginTop + plotH - (ev.absDeg + 0.5) * rowH;
+    if (!started) { ctx.moveTo(x, y); started = true; }
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Step numbers at bottom
+  ctx.fillStyle = '#bbb';
+  ctx.font = '8px system-ui';
+  for (let i = 0; i < 64; i += 8) {
+    const x = marginLeft + (i + 0.5) * stepW;
+    ctx.fillText(i + 1, x, marginTop + plotH + 30);
+  }
+
+  // Stats
+  const notes = sequence.filter(e => e && e.absDeg >= 0);
+  const uniqueNotes = new Set(notes.map(e => e.note));
+  const octaves = new Set(notes.map(e => Math.floor(e.absDeg / 7)));
+  const avgDeg = notes.length > 0 ? (notes.reduce((s, e) => s + e.absDeg, 0) / notes.length) : 0;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat">Steps: <span>64</span></div>
+    <div class="stat">Audible: <span>${notes.length}/64</span></div>
+    <div class="stat">Unique notes: <span>${uniqueNotes.size}</span></div>
+    <div class="stat">Octaves used: <span>${octaves.size}</span></div>
+    <div class="stat">Avg height: <span>${avgDeg.toFixed(1)}</span></div>
+    <div class="stat">Seed: <span>${state.seed}</span></div>
+  `;
+}
+
+function regenerate() {
+  sequence = generateSequence(state);
+  resizeCanvas();
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Controls wiring
+// ═══════════════════════════════════════════════════════════════
+
+// Slider helper
+function wireSlider(id, key, fmt) {
+  const el = document.getElementById('s' + id);
+  const val = document.getElementById('v' + id);
+  el.addEventListener('input', () => {
+    state[key] = parseInt(el.value);
+    val.textContent = fmt(state[key]);
+    regenerate();
+  });
+}
+
+wireSlider('Range', 'range', v => v + ' oct');
+wireSlider('Steps', 'steps', v => v);
+wireSlider('Complexity', 'complexity', v => v);
+wireSlider('Contour', 'contour', v => (v >= 0 ? '+' : '') + v);
+wireSlider('Bias', 'bias', v => v);
+wireSlider('Spread', 'spread', v => v);
+
+// Tickets grid
+function buildTickets() {
+  const grid = document.getElementById('ticketsGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'ticket-cell ' + (state.tickets[i] < 0 ? 'excl' : 'incl');
+    cell.innerHTML = `<div class="deg">${SCALE_DEGREE_NAMES[i]}</div><div class="wt">${state.tickets[i] < 0 ? 'EXCL' : 'INCL'}</div>`;
+    cell.addEventListener('click', () => {
+      state.tickets[i] = state.tickets[i] < 0 ? 0 : -1;
+      buildTickets();
+      regenerate();
+    });
+    grid.appendChild(cell);
+  }
+}
+
+// Buttons
+document.getElementById('btnReroll').addEventListener('click', () => {
+  state.seed = Math.floor(Math.random() * 100000);
+  regenerate();
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.range = 2; state.steps = 100; state.tickets = [0,0,0,0,0,0,0];
+  state.complexity = 50; state.contour = 0; state.bias = 50; state.spread = 50;
+  state.seed = 12345;
+
+  document.getElementById('sRange').value = 2; document.getElementById('vRange').textContent = '2 oct';
+  document.getElementById('sSteps').value = 100; document.getElementById('vSteps').textContent = '100';
+  document.getElementById('sComplexity').value = 50; document.getElementById('vComplexity').textContent = '50';
+  document.getElementById('sContour').value = 0; document.getElementById('vContour').textContent = '+0';
+  document.getElementById('sBias').value = 50; document.getElementById('vBias').textContent = '50';
+  document.getElementById('sSpread').value = 50; document.getElementById('vSpread').textContent = '50';
+
+  buildTickets();
+  regenerate();
+});
+
+// Canvas hover
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const W = rect.width;
+  const marginLeft = 40;
+  const plotW = W - marginLeft - 10;
+  const stepW = plotW / 64;
+
+  const step = Math.floor((x - marginLeft) / stepW);
+  if (step >= 0 && step < 64 && sequence[step] && sequence[step].absDeg >= 0) {
+    hoverStep = step;
+    const ev = sequence[step];
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX - canvas.parentElement.getBoundingClientRect().left + 12) + 'px';
+    tooltip.style.top = (e.clientY - canvas.parentElement.getBoundingClientRect().top - 30) + 'px';
+    tooltip.innerHTML = `<b style="color:#d97706">${ev.note}</b> step ${step + 1}<br>` +
+      `<span style="color:#888">weight ${ev.weight} / ${ev.totalWeight} (${ev.pct}%)</span>`;
+  } else {
+    hoverStep = -1;
+    tooltip.style.display = 'none';
+  }
+  render();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoverStep = -1;
+  tooltip.style.display = 'none';
+  render();
+});
+
+// Resize
+window.addEventListener('resize', () => { resizeCanvas(); render(); });
+
+// Init
+buildTickets();
+regenerate();
+</script>
+</body>
+</html>

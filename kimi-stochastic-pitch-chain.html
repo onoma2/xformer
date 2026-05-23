@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stochastic Track — Pitch of One Note</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #06060a;
+            font-family: 'Space Grotesk', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 30px 15px;
+            color: #e2e8f0;
+        }
+        
+        .container {
+            max-width: 720px;
+            width: 100%;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 1.9rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            font-size: 0.95rem;
+            color: #475569;
+            margin-bottom: 36px;
+            font-weight: 300;
+        }
+        
+        svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .stage-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            fill: #94a3b8;
+        }
+        
+        .knob-name {
+            font-size: 13px;
+            font-weight: 600;
+            fill: #f8fafc;
+        }
+        
+        .knob-desc {
+            font-size: 10px;
+            font-weight: 300;
+            fill: #64748b;
+        }
+        
+        .flow-line {
+            fill: none;
+            stroke: url(#flowGrad);
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            opacity: 0.7;
+        }
+        
+        .flow-glow {
+            fill: none;
+            stroke: #38bdf8;
+            stroke-width: 6;
+            stroke-linecap: round;
+            opacity: 0.1;
+            filter: blur(3px);
+        }
+        
+        .note-icon { fill: #fbbf24; }
+        
+        .output-label {
+            font-size: 16px;
+            font-weight: 700;
+            fill: #fbbf24;
+            letter-spacing: 1.5px;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 32px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 12px;
+            color: #475569;
+            font-weight: 400;
+        }
+        
+        .legend-swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Pitch of One Note</h1>
+        <p class="subtitle">Every knob that shapes pitch in the Stochastic track</p>
+        
+        <svg viewBox="0 0 680 1340" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+                    <feGaussianBlur stdDeviation="4" result="blur"/>
+                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+                
+                <filter id="bigGlow" x="-30%" y="-30%" width="160%" height="160%">
+                    <feGaussianBlur stdDeviation="10" result="blur"/>
+                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+                
+                <!-- Stage fills -->
+                <linearGradient id="gFoundation" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#0ea5e9;stop-opacity:0.22"/>
+                    <stop offset="100%" style="stop-color:#0284c7;stop-opacity:0.08"/>
+                </linearGradient>
+                <linearGradient id="gPool" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.22"/>
+                    <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0.08"/>
+                </linearGradient>
+                <linearGradient id="gShape" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#ec4899;stop-opacity:0.22"/>
+                    <stop offset="100%" style="stop-color:#db2777;stop-opacity:0.08"/>
+                </linearGradient>
+                <linearGradient id="gPick" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:0.25"/>
+                    <stop offset="100%" style="stop-color:#d97706;stop-opacity:0.1"/>
+                </linearGradient>
+                <linearGradient id="gOutput" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.22"/>
+                    <stop offset="100%" style="stop-color:#059669;stop-opacity:0.08"/>
+                </linearGradient>
+                <linearGradient id="gFinal" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:0.35"/>
+                    <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:0.15"/>
+                </linearGradient>
+                
+                <linearGradient id="flowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:0.9"/>
+                    <stop offset="50%" style="stop-color:#a78bfa;stop-opacity:0.9"/>
+                    <stop offset="100%" style="stop-color:#fbbf24;stop-opacity:0.9"/>
+                </linearGradient>
+                
+                <radialGradient id="knobGrad" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" style="stop-color:#1e293b"/>
+                    <stop offset="100%" style="stop-color:#0f172a"/>
+                </radialGradient>
+                
+                <marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#38bdf8" opacity="0.7"/>
+                </marker>
+            </defs>
+            
+            <!-- Background dots -->
+            <pattern id="dots" width="32" height="32" patternUnits="userSpaceOnUse">
+                <circle cx="16" cy="16" r="0.6" fill="#1e293b" opacity="0.6"/>
+            </pattern>
+            <rect width="680" height="1340" fill="url(#dots)"/>
+            
+            <!-- ============================================== -->
+            <!-- 1. FOUNDATION                                  -->
+            <!-- ============================================== -->
+            <g transform="translate(80, 30)">
+                <rect x="0" y="0" width="520" height="130" rx="16" fill="url(#gFoundation)" stroke="#0ea5e9" stroke-width="1.5" opacity="0.9"/>
+                <text x="260" y="24" text-anchor="middle" class="stage-title" fill="#38bdf8">Foundation</text>
+                
+                <!-- Scale -->
+                <circle cx="90" cy="68" r="28" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="90" y="74" text-anchor="middle" class="knob-name" style="font-size:11px;fill:#38bdf8;">SCALE</text>
+                <text x="90" y="116" text-anchor="middle" class="knob-name">Scale</text>
+                <text x="90" y="130" text-anchor="middle" class="knob-desc">The note collection</text>
+                
+                <!-- Root Note -->
+                <circle cx="260" cy="68" r="28" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="260" y="74" text-anchor="middle" class="knob-name" style="font-size:11px;fill:#38bdf8;">ROOT</text>
+                <text x="260" y="116" text-anchor="middle" class="knob-name">Root Note</text>
+                <text x="260" y="130" text-anchor="middle" class="knob-desc">Tonal center</text>
+                
+                <!-- Range -->
+                <circle cx="430" cy="68" r="28" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="430" y="74" text-anchor="middle" class="knob-name" style="font-size:12px;fill:#38bdf8;">1–4</text>
+                <text x="430" y="116" text-anchor="middle" class="knob-name">Range</text>
+                <text x="430" y="130" text-anchor="middle" class="knob-desc">How many octaves</text>
+            </g>
+            
+            <!-- ============================================== -->
+            <!-- 2. NOTE POOL                                   -->
+            <!-- ============================================== -->
+            <g transform="translate(80, 190)">
+                <rect x="0" y="0" width="520" height="200" rx="16" fill="url(#gPool)" stroke="#8b5cf6" stroke-width="1.5" opacity="0.9"/>
+                <text x="260" y="24" text-anchor="middle" class="stage-title" fill="#a78bfa">Note Pool</text>
+                <text x="260" y="42" text-anchor="middle" class="knob-desc">Which degrees are allowed & how much they "weigh"</text>
+                
+                <!-- Scale Tickets bars visualization -->
+                <rect x="40" y="58" width="440" height="50" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+                <!-- Fake ticket bars -->
+                <rect x="48" y="82" width="22" height="18" rx="2" fill="#a78bfa" opacity="0.9"/>
+                <rect x="76" y="70" width="22" height="30" rx="2" fill="#a78bfa" opacity="0.7"/>
+                <rect x="104" y="88" width="22" height="12" rx="2" fill="#a78bfa" opacity="0.4"/>
+                <rect x="132" y="66" width="22" height="34" rx="2" fill="#a78bfa" opacity="0.85"/>
+                <rect x="160" y="90" width="22" height="10" rx="2" fill="#475569" opacity="0.5"/>
+                <rect x="188" y="74" width="22" height="26" rx="2" fill="#a78bfa" opacity="0.6"/>
+                <rect x="216" y="86" width="22" height="14" rx="2" fill="#a78bfa" opacity="0.5"/>
+                <text x="260" y="106" text-anchor="middle" class="knob-desc" style="font-size:9px;fill:#475569;">SCALE TICKETS  (per-degree weights)</text>
+                
+                <!-- DROT -->
+                <circle cx="120" cy="158" r="22" fill="url(#knobGrad)" stroke="#334155" stroke-width="1.5"/>
+                <text x="120" y="163" text-anchor="middle" class="knob-name" style="font-size:10px;fill:#c084fc;">DROT</text>
+                <text x="120" y="196" text-anchor="middle" class="knob-name">Degree Rotation</text>
+                
+                <!-- MROT -->
+                <circle cx="260" cy="158" r="22" fill="url(#knobGrad)" stroke="#334155" stroke-width="1.5"/>
+                <text x="260" y="163" text-anchor="middle" class="knob-name" style="font-size:10px;fill:#c084fc;">MROT</text>
+                <text x="260" y="196" text-anchor="middle" class="knob-name">Mask Rotation</text>
+                
+                <!-- Low / High Degree -->
+                <circle cx="400" cy="158" r="22" fill="url(#knobGrad)" stroke="#334155" stroke-width="1.5"/>
+                <text x="400" y="163" text-anchor="middle" class="knob-name" style="font-size:10px;fill:#c084fc;">L–H</text>
+                <text x="400" y="196" text-anchor="middle" class="knob-name">Low / High Degree</text>
+            </g>
+            
+            <!-- ============================================== -->
+            <!-- 3. DISTRIBUTION SHAPE                          -->
+            <!-- ============================================== -->
+            <g transform="translate(80, 420)">
+                <rect x="0" y="0" width="520" height="240" rx="16" fill="url(#gShape)" stroke="#ec4899" stroke-width="1.5" opacity="0.9"/>
+                <text x="260" y="24" text-anchor="middle" class="stage-title" fill="#f472b6">Distribution Shape</text>
+                <text x="260" y="42" text-anchor="middle" class="knob-desc">How probability is spread across the pool</text>
+                
+                <!-- Bell curve visual -->
+                <path d="M60,180 Q160,80 260,130 Q360,180 460,80" fill="none" stroke="#f472b6" stroke-width="2.5" opacity="0.5" stroke-linecap="round"/>
+                <path d="M60,180 Q160,80 260,130 Q360,180 460,80" fill="none" stroke="#f472b6" stroke-width="8" opacity="0.08" stroke-linecap="round" filter="blur(4px)"/>
+                
+                <!-- Bias -->
+                <circle cx="120" cy="98" r="26" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="120" y="104" text-anchor="middle" class="knob-name" style="font-size:12px;fill:#f472b6;">BIAS</text>
+                <text x="120" y="142" text-anchor="middle" class="knob-name">Bias</text>
+                <text x="120" y="156" text-anchor="middle" class="knob-desc">Center of the bell</text>
+                
+                <!-- Spread -->
+                <circle cx="260" cy="98" r="26" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="260" y="104" text-anchor="middle" class="knob-name" style="font-size:11px;fill:#f472b6;">SPRE</text>
+                <text x="260" y="142" text-anchor="middle" class="knob-name">Spread</text>
+                <text x="260" y="156" text-anchor="middle" class="knob-desc">Width of the bell</text>
+                
+                <!-- Steps -->
+                <circle cx="400" cy="98" r="26" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="400" y="104" text-anchor="middle" class="knob-name" style="font-size:11px;fill:#f472b6;">STEP</text>
+                <text x="400" y="142" text-anchor="middle" class="knob-name">Steps</text>
+                <text x="400" y="156" text-anchor="middle" class="knob-desc">Sieve — keep top degrees</text>
+                
+                <!-- Complexity -->
+                <circle cx="190" cy="198" r="26" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="190" y="204" text-anchor="middle" class="knob-name" style="font-size:10px;fill:#f472b6;">CMPX</text>
+                <text x="190" y="242" text-anchor="middle" class="knob-name">Complexity</text>
+                <text x="190" y="256" text-anchor="middle" class="knob-desc">How close to last note</text>
+                
+                <!-- Contour -->
+                <circle cx="330" cy="198" r="26" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="330" y="204" text-anchor="middle" class="knob-name" style="font-size:10px;fill:#f472b6;">CONT</text>
+                <text x="330" y="242" text-anchor="middle" class="knob-name">Contour</text>
+                <text x="330" y="256" text-anchor="middle" class="knob-desc">Up / down drift</text>
+            </g>
+            
+            <!-- ============================================== -->
+            <!-- 4. THE PICK                                    -->
+            <!-- ============================================== -->
+            <g transform="translate(80, 690)">
+                <rect x="0" y="0" width="520" height="150" rx="16" fill="url(#gPick)" stroke="#f59e0b" stroke-width="1.5" opacity="0.9"/>
+                <text x="260" y="24" text-anchor="middle" class="stage-title" fill="#fbbf24">The Pick</text>
+                
+                <!-- Repeat -->
+                <circle cx="130" cy="78" r="28" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="130" y="84" text-anchor="middle" class="knob-name" style="font-size:11px;fill:#fbbf24;">REPT</text>
+                <text x="130" y="122" text-anchor="middle" class="knob-name">Repeat</text>
+                <text x="130" y="136" text-anchor="middle" class="knob-desc">Chance to replay last note</text>
+                
+                <!-- Dice -->
+                <rect x="290" y="50" width="56" height="56" rx="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+                <circle cx="305" cy="65" r="4.5" class="note-icon"/>
+                <circle cx="331" cy="65" r="4.5" class="note-icon"/>
+                <circle cx="305" cy="91" r="4.5" class="note-icon"/>
+                <circle cx="331" cy="91" r="4.5" class="note-icon"/>
+                <circle cx="318" cy="78" r="4.5" class="note-icon"/>
+                <text x="318" y="128" text-anchor="middle" class="knob-name">Weighted Roll</text>
+            </g>
+            
+            <!-- ============================================== -->
+            <!-- 5. REGISTER & OFFSET                           -->
+            <!-- ============================================== -->
+            <g transform="translate(80, 870)">
+                <rect x="0" y="0" width="520" height="150" rx="16" fill="url(#gOutput)" stroke="#10b981" stroke-width="1.5" opacity="0.9"/>
+                <text x="260" y="24" text-anchor="middle" class="stage-title" fill="#34d399">Register & Offset</text>
+                
+                <!-- Jump -->
+                <circle cx="100" cy="78" r="26" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="100" y="84" text-anchor="middle" class="knob-name" style="font-size:11px;fill:#34d399;">JUMP</text>
+                <text x="100" y="122" text-anchor="middle" class="knob-name">Jump</text>
+                <text x="100" y="136" text-anchor="middle" class="knob-desc">Random octave walk</text>
+                
+                <!-- Octave -->
+                <circle cx="220" cy="78" r="26" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="220" y="84" text-anchor="middle" class="knob-name" style="font-size:12px;fill:#34d399;">8va</text>
+                <text x="220" y="122" text-anchor="middle" class="knob-name">Octave</text>
+                <text x="220" y="136" text-anchor="middle" class="knob-desc">Track octave shift</text>
+                
+                <!-- Transpose -->
+                <circle cx="340" cy="78" r="26" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="340" y="84" text-anchor="middle" class="knob-name" style="font-size:12px;fill:#34d399;">±12</text>
+                <text x="340" y="122" text-anchor="middle" class="knob-name">Transpose</text>
+                <text x="340" y="136" text-anchor="middle" class="knob-desc">Semitone nudge</text>
+                
+                <!-- Burst Pitch -->
+                <circle cx="460" cy="78" r="26" fill="url(#knobGrad)" stroke="#334155" stroke-width="2"/>
+                <text x="460" y="84" text-anchor="middle" class="knob-name" style="font-size:10px;fill:#34d399;">BPIT</text>
+                <text x="460" y="122" text-anchor="middle" class="knob-name">Burst Pitch</text>
+                <text x="460" y="136" text-anchor="middle" class="knob-desc">Parent or Generate</text>
+            </g>
+            
+            <!-- ============================================== -->
+            <!-- OUTPUT                                         -->
+            <!-- ============================================== -->
+            <g transform="translate(80, 1060)">
+                <!-- Glow -->
+                <circle cx="260" cy="90" r="100" fill="url(#gFinal)" filter="url(#bigGlow)" opacity="0.5"/>
+                <circle cx="260" cy="90" r="80" fill="#0f172a" stroke="#fbbf24" stroke-width="3" filter="url(#glow)"/>
+                <circle cx="260" cy="90" r="74" fill="none" stroke="#f59e0b" stroke-width="1" opacity="0.3"/>
+                
+                <!-- Note glyph -->
+                <g transform="translate(260, 85)">
+                    <ellipse cx="-10" cy="8" rx="9" ry="7" class="note-icon"/>
+                    <line x1="-1" y1="8" x2="-1" y2="-26" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M-1,-26 Q12,-22 12,-10" stroke="#fbbf24" stroke-width="3" fill="none" stroke-linecap="round"/>
+                </g>
+                
+                <text x="260" y="150" text-anchor="middle" class="output-label">THE NOTE</text>
+                <text x="260" y="168" text-anchor="middle" class="knob-desc" style="font-size:11px;">CV sent to the oscillator</text>
+            </g>
+            
+            <!-- ============================================== -->
+            <!-- FLOW LINES                                     -->
+            <!-- ============================================== -->
+            <!-- Foundation -> Pool -->
+            <line x1="340" y1="160" x2="340" y2="190" class="flow-glow"/>
+            <line x1="340" y1="160" x2="340" y2="190" class="flow-line" marker-end="url(#arr)"/>
+            
+            <!-- Pool -> Shape -->
+            <line x1="340" y1="390" x2="340" y2="420" class="flow-glow"/>
+            <line x1="340" y1="390" x2="340" y2="420" class="flow-line" marker-end="url(#arr)"/>
+            
+            <!-- Shape -> Pick -->
+            <line x1="340" y1="660" x2="340" y2="690" class="flow-glow"/>
+            <line x1="340" y1="660" x2="340" y2="690" class="flow-line" marker-end="url(#arr)"/>
+            
+            <!-- Pick -> Register -->
+            <line x1="340" y1="840" x2="340" y2="870" class="flow-glow"/>
+            <line x1="340" y1="840" x2="340" y2="870" class="flow-line" marker-end="url(#arr)"/>
+            
+            <!-- Register -> Output -->
+            <line x1="340" y1="1020" x2="340" y2="1060" class="flow-glow"/>
+            <line x1="340" y1="1020" x2="340" y2="1060" class="flow-line" marker-end="url(#arr)"/>
+            
+            <!-- Feedback: Output -> Pick (Repeat memory) -->
+            <path d="M600,1125 C640,1125 640,765 600,765" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0.2" stroke-dasharray="5,5" marker-end="url(#arr)"/>
+            <text x="625" y="945" text-anchor="middle" class="knob-desc" style="font-size:9px;fill:#475569;" transform="rotate(90, 625, 945)">last note memory</text>
+            
+            <!-- ============================================== -->
+            <!-- FOOTER LEGEND                                  -->
+            <!-- ============================================== -->
+            <g transform="translate(80, 1190)">
+                <rect x="0" y="0" width="520" height="110" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+                <text x="260" y="22" text-anchor="middle" class="stage-title" style="font-size:10px;fill:#475569;">Quick Guide</text>
+                
+                <text x="20" y="48" class="knob-name" style="font-size:10px;fill:#38bdf8;">Foundation</text>
+                <text x="20" y="64" class="knob-desc">Scale + Root define the palette. Range sets octave span.</text>
+                
+                <text x="20" y="84" class="knob-name" style="font-size:10px;fill:#a78bfa;">Note Pool</text>
+                <text x="20" y="100" class="knob-desc">Tickets favor degrees. DROT/MROT shift the weights.</text>
+                
+                <text x="280" y="48" class="knob-name" style="font-size:10px;fill:#f472b6;">Distribution</text>
+                <text x="280" y="64" class="knob-desc">Bias/Spread shape the bell. Complexity = voice leading.</text>
+                
+                <text x="280" y="84" class="knob-name" style="font-size:10px;fill:#34d399;">Register</text>
+                <text x="280" y="100" class="knob-desc">Jump walks octaves. Octave/Transpose shift everything.</text>
+            </g>
+        </svg>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-swatch" style="background:#0ea5e9;"></div>
+                <span>Foundation</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-swatch" style="background:#8b5cf6;"></div>
+                <span>Note Pool</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-swatch" style="background:#ec4899;"></div>
+                <span>Distribution</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-swatch" style="background:#f59e0b;"></div>
+                <span>The Pick</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-swatch" style="background:#10b981;"></div>
+                <span>Register</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

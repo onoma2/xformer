@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pitch Dice — Step by Step</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #060610;
+    display: flex; justify-content: center; align-items: flex-start;
+    min-height: 100vh; padding: 20px;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  .wrap { width: 100%; max-width: 1100px; }
+  svg { width: 100%; height: auto; display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<svg viewBox="0 0 1100 6400" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#08081a"/><stop offset="100%" stop-color="#060612"/>
+  </linearGradient>
+  <linearGradient id="gA" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#1a1a3e"/><stop offset="100%" stop-color="#2d1b55"/>
+  </linearGradient>
+  <linearGradient id="gB" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#122a3e"/><stop offset="100%" stop-color="#1b4060"/>
+  </linearGradient>
+  <linearGradient id="gC" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#10302a"/><stop offset="100%" stop-color="#185545"/>
+  </linearGradient>
+  <linearGradient id="gD" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#2a2010"/><stop offset="100%" stop-color="#453515"/>
+  </linearGradient>
+  <linearGradient id="gF" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#2a1520"/><stop offset="100%" stop-color="#452038"/>
+  </linearGradient>
+  <linearGradient id="spine" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#7c6aef"/><stop offset="25%" stop-color="#4ea8de"/>
+    <stop offset="50%" stop-color="#4ecdc4"/><stop offset="75%" stop-color="#fbbf24"/>
+    <stop offset="100%" stop-color="#f472b6"/>
+  </linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="sh"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.5"/></filter>
+  <symbol id="k" viewBox="0 0 40 40">
+    <circle cx="20" cy="20" r="18" fill="#14142a" stroke="#2a2a50" stroke-width="1.5"/>
+    <circle cx="20" cy="20" r="13" fill="#1c1c3a"/>
+    <line x1="20" y1="7" x2="20" y2="16" stroke="#999" stroke-width="2.2" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="ks" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="14" fill="#14142a" stroke="#2a2a50" stroke-width="1.2"/>
+    <circle cx="16" cy="16" r="10" fill="#1c1c3a"/>
+    <line x1="16" y1="6" x2="16" y2="13" stroke="#888" stroke-width="1.8" stroke-linecap="round"/>
+  </symbol>
+</defs>
+
+<rect width="1100" height="6400" fill="url(#bg)" rx="16"/>
+
+<!-- ═══ TITLE ═══ -->
+<text x="550" y="55" text-anchor="middle" fill="#e0e0f0" font-size="30" font-weight="700" letter-spacing="3">HOW THE DICE ROLL</text>
+<text x="550" y="80" text-anchor="middle" fill="#6a6a90" font-size="14" letter-spacing="4" font-weight="300">PICKING 4 NOTES IN C MAJOR — STEP BY STEP</text>
+<line x1="350" y1="96" x2="750" y2="96" stroke="url(#spine)" stroke-width="1.5" opacity="0.3"/>
+<line x1="550" y1="116" x2="550" y2="6250" stroke="url(#spine)" stroke-width="2" opacity="0.1" stroke-dasharray="6,6"/>
+
+
+<!-- ═══ SETUP ═══ -->
+<g transform="translate(0,116)">
+  <rect x="80" y="0" width="940" height="130" rx="14" fill="#0a0a1a" filter="url(#sh)"/>
+  <rect x="80" y="0" width="940" height="130" rx="14" fill="none" stroke="#444" stroke-width="0.5" opacity="0.3"/>
+  <text x="550" y="28" text-anchor="middle" fill="#888" font-size="12" letter-spacing="3">EXAMPLE SETUP</text>
+  <text x="130" y="55" fill="#c4b5fd" font-size="15" font-weight="600">Scale:</text>
+  <text x="200" y="55" fill="#ddd" font-size="15">C Major (C D E F G A B = 7 notes/octave)</text>
+  <text x="130" y="78" fill="#7dd3fc" font-size="15" font-weight="600">Range:</text>
+  <text x="200" y="78" fill="#ddd" font-size="15">2 octaves → 14 candidates total</text>
+  <text x="130" y="101" fill="#86efac" font-size="15" font-weight="600">Goal:</text>
+  <text x="200" y="101" fill="#ddd" font-size="15">Generate 4 notes for a short melody</text>
+  <text x="130" y="122" fill="#fca5a5" font-size="11" font-style="italic">Low Degree / High Degree knobs exist in the UI but do NOT affect pitch generation.</text>
+</g>
+
+<g opacity="0.5"><line x1="550" y1="260" x2="550" y2="285" stroke="#7c6aef" stroke-width="2"/>
+  <polygon points="544,282 550,293 556,282" fill="#7c6aef"/></g>
+
+
+<!-- ═══ STEP 1: ENUMERATE ═══ -->
+<g transform="translate(0,296)">
+  <circle cx="550" cy="24" r="18" fill="#7c6aef" filter="url(#glow)"/>
+  <text x="550" y="30" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">1</text>
+
+  <rect x="60" y="50" width="980" height="195" rx="14" fill="url(#gA)" opacity="0.5" filter="url(#sh)"/>
+  <rect x="60" y="50" width="980" height="195" rx="14" fill="none" stroke="#7c6aef" stroke-width="0.8" opacity="0.25"/>
+
+  <text x="120" y="82" fill="#c4b5fd" font-size="18" font-weight="600">ENUMERATE</text>
+  <text x="310" y="82" fill="#777" font-size="13">— list every note from Scale × Range</text>
+
+  <g transform="translate(160,130)">
+    <use href="#k" width="40" height="40" x="-20" y="-20"/>
+    <text x="0" y="32" text-anchor="middle" fill="#ddd" font-size="12" font-weight="600">Scale</text>
+  </g>
+  <text x="210" y="133" fill="#7c6aef" font-size="16" opacity="0.5">×</text>
+  <g transform="translate(270,130)">
+    <use href="#k" width="40" height="40" x="-20" y="-20"/>
+    <text x="0" y="32" text-anchor="middle" fill="#ddd" font-size="12" font-weight="600">Range</text>
+  </g>
+  <text x="370" y="120" fill="#888" font-size="12">C Major = 7 notes/oct</text>
+  <text x="370" y="138" fill="#888" font-size="12">Range = 2 oct</text>
+  <text x="370" y="156" fill="#c4b5fd" font-size="13" font-weight="600">= 14 candidates</text>
+
+  <g transform="translate(120,175)">
+    <rect x="0" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="26" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">C3</text>
+    <rect x="58" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="84" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">D3</text>
+    <rect x="116" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="142" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">E3</text>
+    <rect x="174" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="200" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">F3</text>
+    <rect x="232" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="258" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">G3</text>
+    <rect x="290" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="316" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">A3</text>
+    <rect x="348" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="374" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">B3</text>
+    <rect x="420" y="0" width="52" height="26" rx="4" fill="#221a4a" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="446" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">C4</text>
+    <rect x="478" y="0" width="52" height="26" rx="4" fill="#221a4a" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="504" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">D4</text>
+    <rect x="536" y="0" width="52" height="26" rx="4" fill="#221a4a" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="562" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">E4</text>
+    <rect x="594" y="0" width="52" height="26" rx="4" fill="#221a4a" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="620" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">F4</text>
+    <rect x="652" y="0" width="52" height="26" rx="4" fill="#221a4a" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="678" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">G4</text>
+    <rect x="710" y="0" width="52" height="26" rx="4" fill="#221a4a" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="736" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">A4</text>
+    <rect x="768" y="0" width="52" height="26" rx="4" fill="#221a4a" stroke="#5a4aaf" stroke-width="0.7"/>
+    <text x="794" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">B4</text>
+    <text x="860" y="18" fill="#555" font-size="11">← flat list, indices 0–13</text>
+  </g>
+</g>
+
+<g opacity="0.5"><line x1="550" y1="510" x2="550" y2="535" stroke="#7c6aef" stroke-width="2"/>
+  <polygon points="544,532 550,543 556,532" fill="#4ea8de"/></g>
+
+
+<!-- ═══ STEP 2: SCALE TICKETS GATE ═══ -->
+<g transform="translate(0,546)">
+  <circle cx="550" cy="24" r="18" fill="#4ea8de" filter="url(#glow)"/>
+  <text x="550" y="30" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">2</text>
+
+  <rect x="60" y="50" width="980" height="230" rx="14" fill="url(#gB)" opacity="0.5" filter="url(#sh)"/>
+  <rect x="60" y="50" width="980" height="230" rx="14" fill="none" stroke="#4ea8de" stroke-width="0.8" opacity="0.25"/>
+
+  <text x="120" y="82" fill="#7dd3fc" font-size="18" font-weight="600">SCALE TICKETS GATE</text>
+  <text x="370" y="82" fill="#777" font-size="13">— exclude degrees, apply weights</text>
+
+  <g transform="translate(160,130)">
+    <use href="#k" width="44" height="44" x="-22" y="-22"/>
+    <text x="0" y="34" text-anchor="middle" fill="#ddd" font-size="12" font-weight="600">Scale Tickets</text>
+  </g>
+
+  <text x="260" y="110" fill="#888" font-size="12">Ticket = −1 → degree is <tspan fill="#ef4444">excluded</tspan> (removed from pool)</text>
+  <text x="260" y="128" fill="#888" font-size="12">Ticket = 0 → included, neutral weight (falls back to 10)</text>
+  <text x="260" y="146" fill="#888" font-size="12">Ticket = 1–100 → weight multiplier for later dice roll</text>
+
+  <g transform="translate(120,170)">
+    <text x="0" y="14" fill="#7dd3fc" font-size="12" font-weight="600">Example: D and A tickets set to EXCL →</text>
+    <g transform="translate(0,24)">
+      <rect x="0" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+      <text x="26" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">C3</text>
+      <rect x="58" y="0" width="52" height="26" rx="4" fill="#401515" stroke="#ef4444" stroke-width="0.8" opacity="0.7"/>
+      <text x="84" y="18" text-anchor="middle" fill="#ef4444" font-size="9" font-weight="700">✕D3</text>
+      <rect x="116" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+      <text x="142" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">E3</text>
+      <rect x="174" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+      <text x="200" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">F3</text>
+      <rect x="232" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+      <text x="258" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">G3</text>
+      <rect x="290" y="0" width="52" height="26" rx="4" fill="#401515" stroke="#ef4444" stroke-width="0.8" opacity="0.7"/>
+      <text x="316" y="18" text-anchor="middle" fill="#ef4444" font-size="9" font-weight="700">✕A3</text>
+      <rect x="348" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+      <text x="374" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">B3</text>
+      <rect x="420" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+      <text x="446" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">C4</text>
+      <rect x="478" y="0" width="52" height="26" rx="4" fill="#401515" stroke="#ef4444" stroke-width="0.8" opacity="0.7"/>
+      <text x="504" y="18" text-anchor="middle" fill="#ef4444" font-size="9" font-weight="700">✕D4</text>
+      <rect x="536" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+      <text x="562" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">E4</text>
+      <rect x="594" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+      <text x="620" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">F4</text>
+      <rect x="652" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+      <text x="678" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">G4</text>
+      <rect x="710" y="0" width="52" height="26" rx="4" fill="#401515" stroke="#ef4444" stroke-width="0.8" opacity="0.7"/>
+      <text x="736" y="18" text-anchor="middle" fill="#ef4444" font-size="9" font-weight="700">✕A4</text>
+      <rect x="768" y="0" width="52" height="26" rx="4" fill="#1a2a55" stroke="#5a4aaf" stroke-width="0.7"/>
+      <text x="794" y="18" text-anchor="middle" fill="#a8a0df" font-size="10">B4</text>
+    </g>
+    <text x="860" y="42" fill="#4ea8de" font-size="12" font-weight="600">10 survive</text>
+  </g>
+
+  <g transform="translate(120,228)">
+    <use href="#ks" width="30" height="30" x="-15" y="-10"/>
+    <text x="22" y="0" fill="#777" font-size="11">DROT rotates which ticket maps to which degree. MROT cycles ticket values among included degrees.</text>
+  </g>
+</g>
+
+<g opacity="0.5"><line x1="550" y1="800" x2="550" y2="825" stroke="#4ea8de" stroke-width="2"/>
+  <polygon points="544,822 550,833 556,822" fill="#4ea8de"/></g>
+
+
+<!-- ═══ STEP 3: STEPS SIEVE ═══ -->
+<g transform="translate(0,836)">
+  <circle cx="550" cy="24" r="18" fill="#4ea8de" filter="url(#glow)"/>
+  <text x="550" y="30" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">3</text>
+
+  <rect x="60" y="50" width="980" height="250" rx="14" fill="url(#gB)" opacity="0.5" filter="url(#sh)"/>
+  <rect x="60" y="50" width="980" height="250" rx="14" fill="none" stroke="#4ea8de" stroke-width="0.8" opacity="0.25"/>
+
+  <text x="120" y="82" fill="#7dd3fc" font-size="18" font-weight="600">STEPS SIEVE</text>
+  <text x="280" y="82" fill="#777" font-size="13">— rank by harmonic strength, keep top K</text>
+
+  <g transform="translate(160,118)">
+    <use href="#k" width="44" height="44" x="-22" y="-22"/>
+    <text x="0" y="34" text-anchor="middle" fill="#ddd" font-size="12" font-weight="600">Steps</text>
+  </g>
+  <text x="240" y="100" fill="#888" font-size="12">Steps = 0 → only the strongest note survives</text>
+  <text x="240" y="116" fill="#888" font-size="12">Steps = 100 → sieve is fully open, all notes survive</text>
+
+  <text x="120" y="145" fill="#7dd3fc" font-size="12" font-weight="600">Harmonic ranking (C Major):</text>
+  <g transform="translate(120,155)">
+    <rect x="0" y="0" width="860" height="22" rx="3" fill="#0a0a1a" opacity="0.6"/>
+    <text x="30" y="15" text-anchor="middle" fill="#7dd3fc" font-size="11" font-weight="700">C</text>
+    <text x="90" y="15" text-anchor="middle" fill="#555" font-size="11">D</text>
+    <text x="150" y="15" text-anchor="middle" fill="#7dd3fc" font-size="11">E</text>
+    <text x="210" y="15" text-anchor="middle" fill="#7dd3fc" font-size="11">F</text>
+    <text x="270" y="15" text-anchor="middle" fill="#7dd3fc" font-size="11">G</text>
+    <text x="330" y="15" text-anchor="middle" fill="#555" font-size="11">A</text>
+    <text x="390" y="15" text-anchor="middle" fill="#555" font-size="11">B</text>
+    <text x="470" y="15" fill="#555" font-size="11">→ applied per octave</text>
+  </g>
+  <g transform="translate(120,180)">
+    <text x="30" y="12" text-anchor="middle" fill="#aaa" font-size="10">rank 30</text>
+    <text x="90" y="12" text-anchor="middle" fill="#444" font-size="10">rank 5</text>
+    <text x="150" y="12" text-anchor="middle" fill="#aaa" font-size="10">rank 10</text>
+    <text x="210" y="12" text-anchor="middle" fill="#aaa" font-size="10">rank 20</text>
+    <text x="270" y="12" text-anchor="middle" fill="#aaa" font-size="10">rank 10</text>
+    <text x="330" y="12" text-anchor="middle" fill="#444" font-size="10">rank 5</text>
+    <text x="390" y="12" text-anchor="middle" fill="#444" font-size="10">rank 0</text>
+    <text x="470" y="12" fill="#7dd3fc" font-size="11" font-weight="600">Root strongest, B weakest</text>
+  </g>
+
+  <g transform="translate(120,205)">
+    <text x="0" y="14" fill="#7dd3fc" font-size="12" font-weight="600">Steps = 60 → K = ceil(10 × 60/100) = 6 survivors:</text>
+    <g transform="translate(0,24)">
+      <rect x="0" y="0" width="52" height="24" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="26" y="16" text-anchor="middle" fill="#7dd3fc" font-size="10">C3</text>
+      <rect x="58" y="0" width="52" height="24" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="84" y="16" text-anchor="middle" fill="#7dd3fc" font-size="10">E3</text>
+      <rect x="116" y="0" width="52" height="24" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="142" y="16" text-anchor="middle" fill="#7dd3fc" font-size="10">F3</text>
+      <rect x="174" y="0" width="52" height="24" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="200" y="16" text-anchor="middle" fill="#7dd3fc" font-size="10">G3</text>
+      <rect x="232" y="0" width="52" height="24" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="258" y="16" text-anchor="middle" fill="#7dd3fc" font-size="10">C4</text>
+      <rect x="290" y="0" width="52" height="24" rx="4" fill="#1a3060" stroke="#4ea8de" stroke-width="0.8"/>
+      <text x="316" y="16" text-anchor="middle" fill="#7dd3fc" font-size="10">F4</text>
+      <text x="370" y="16" fill="#4ea8de" font-size="12" font-weight="600">Pool is locked.</text>
+    </g>
+  </g>
+
+  <text x="120" y="278" fill="#555" font-size="11" font-style="italic">This pool is reused for all 4 notes. Only the dice change per note.</text>
+</g>
+
+<g opacity="0.5"><line x1="550" y1="1115" x2="550" y2="1140" stroke="#4ecdc4" stroke-width="2"/>
+  <polygon points="544,1137 550,1148 556,1137" fill="#4ecdc4"/></g>
+
+
+<!-- ═══ STEP 4: SHAPE THE WEIGHTS — the formula ═══ -->
+<g transform="translate(0,1150)">
+  <circle cx="550" cy="24" r="18" fill="#4ecdc4" filter="url(#glow)"/>
+  <text x="550" y="30" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">4</text>
+
+  <rect x="40" y="50" width="1020" height="230" rx="14" fill="url(#gC)" opacity="0.5" filter="url(#sh)"/>
+  <rect x="40" y="50" width="1020" height="230" rx="14" fill="none" stroke="#4ecdc4" stroke-width="0.8" opacity="0.25"/>
+
+  <text x="100" y="82" fill="#86efac" font-size="18" font-weight="600">SHAPE THE WEIGHTS</text>
+  <text x="340" y="82" fill="#777" font-size="13">— three forces multiply to set each note's chance</text>
+
+  <!-- The formula -->
+  <g transform="translate(80,100)">
+    <rect x="0" y="0" width="940" height="40" rx="8" fill="#0a1a15" stroke="#4ecdc4" stroke-width="0.8" opacity="0.4"/>
+    <text x="470" y="26" text-anchor="middle" fill="#86efac" font-size="16" font-weight="600">
+      final weight  =  Tickets  ×  Complexity kernel  ×  Bias/Spread bell
+    </text>
+  </g>
+
+  <!-- Three forces explained -->
+  <g transform="translate(80,155)">
+    <rect x="0" y="0" width="300" height="100" rx="8" fill="#060f0c" opacity="0.5"/>
+    <text x="150" y="20" text-anchor="middle" fill="#7dd3fc" font-size="12" font-weight="700">TICKETS (base)</text>
+    <text x="12" y="40" fill="#888" font-size="11">From Scale Tickets page. Per-degree weight.</text>
+    <text x="12" y="58" fill="#888" font-size="11">All-zero → falls back to flat 10.</text>
+    <text x="12" y="76" fill="#888" font-size="11">Already baked in from step 2.</text>
+
+    <rect x="320" y="0" width="300" height="100" rx="8" fill="#060f0c" opacity="0.5"/>
+    <text x="470" y="20" text-anchor="middle" fill="#4ecdc4" font-size="12" font-weight="700">COMPLEXITY + CONTOUR</text>
+    <text x="332" y="40" fill="#888" font-size="11">Triangular hill centered on "last note".</text>
+    <text x="332" y="58" fill="#888" font-size="11">Complexity = width. Contour = tilt.</text>
+    <text x="332" y="76" fill="#888" font-size="11">Changes every pick (last note moves).</text>
+
+    <rect x="640" y="0" width="300" height="100" rx="8" fill="#060f0c" opacity="0.5"/>
+    <text x="790" y="20" text-anchor="middle" fill="#f9a8d4" font-size="12" font-weight="700">BIAS + SPREAD</text>
+    <text x="652" y="40" fill="#888" font-size="11">Bell curve over the pool.</text>
+    <text x="652" y="58" fill="#888" font-size="11">Bias = peak position. Spread = width.</text>
+    <text x="652" y="76" fill="#888" font-size="11">Same shape every pick (pool is fixed).</text>
+  </g>
+</g>
+
+<g opacity="0.5"><line x1="550" y1="1410" x2="550" y2="1435" stroke="#4ecdc4" stroke-width="2"/>
+  <polygon points="544,1432 550,1443 556,1432" fill="#fbbf24"/></g>
+
+
+<!-- ═══ STEP 5: THE FOUR DICE ROLLS ═══ -->
+<g transform="translate(0,1448)">
+  <circle cx="550" cy="24" r="18" fill="#fbbf24" filter="url(#glow)"/>
+  <text x="550" y="30" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">5</text>
+
+  <rect x="40" y="50" width="1020" height="2120" rx="14" fill="url(#gD)" opacity="0.5" filter="url(#sh)"/>
+  <rect x="40" y="50" width="1020" height="2120" rx="14" fill="none" stroke="#fbbf24" stroke-width="0.8" opacity="0.25"/>
+
+  <text x="100" y="82" fill="#fde68a" font-size="18" font-weight="600">THE FOUR DICE ROLLS</text>
+  <text x="370" y="82" fill="#777" font-size="13">— same pool, same Bias/Spread, but Complexity hill follows the last pick</text>
+
+  <text x="100" y="108" fill="#888" font-size="12">Settings: Complexity=40 · Contour=+50 · Bias=60 · Spread=40</text>
+  <text x="100" y="126" fill="#888" font-size="12">Pool: C3(0) E3(1) F3(2) G3(3) C4(4) F4(5) — 6 candidates, N=6</text>
+
+  <!--
+    Actual code math for these settings:
+    kernelWidth = 1 + (40*6)/50 = 5
+    kernelLeak = 40/10 = 4
+    biasPos = (60*5 + 50)/100 = 3
+    marblesWidth = 1 + (40*6)/100 = 3
+    marblesLeak = 1 + 40/10 = 5
+
+    Marbles per index (same every note):
+      i=0: dm=3, mtri=max(3-3,0)*10=0,  marbles=0+5=5
+      i=1: dm=2, mtri=max(3-2,0)*10=10, marbles=10+5=15
+      i=2: dm=1, mtri=max(3-1,0)*10=20, marbles=20+5=25
+      i=3: dm=0, mtri=max(3-0,0)*10=30, marbles=30+5=35
+      i=4: dm=1, mtri=max(3-1,0)*10=20, marbles=20+5=25
+      i=5: dm=2, mtri=max(3-2,0)*10=10, marbles=10+5=15
+  -->
+
+  <!-- ══════ NOTE 1 ══════ -->
+  <g transform="translate(80,145)">
+    <rect x="0" y="0" width="940" height="340" rx="10" fill="#0a0a0a" opacity="0.4"/>
+    <text x="16" y="22" fill="#fde68a" font-size="14" font-weight="700">NOTE 1 of 4</text>
+    <text x="200" y="22" fill="#777" font-size="11">Last note = none → Complexity kernel is flat 100 everywhere</text>
+
+    <!-- Weight table -->
+    <g transform="translate(16,38)">
+      <!-- Header -->
+      <rect x="0" y="0" width="780" height="20" rx="3" fill="#1a1510" opacity="0.6"/>
+      <text x="40" y="14" text-anchor="middle" fill="#666" font-size="9" font-weight="600">FACTOR</text>
+      <text x="160" y="14" text-anchor="middle" fill="#666" font-size="9">C3 [0]</text>
+      <text x="260" y="14" text-anchor="middle" fill="#666" font-size="9">E3 [1]</text>
+      <text x="360" y="14" text-anchor="middle" fill="#666" font-size="9">F3 [2]</text>
+      <text x="460" y="14" text-anchor="middle" fill="#666" font-size="9">G3 [3]</text>
+      <text x="560" y="14" text-anchor="middle" fill="#666" font-size="9">C4 [4]</text>
+      <text x="660" y="14" text-anchor="middle" fill="#666" font-size="9">F4 [5]</text>
+
+      <!-- Tickets (all 0, fallback 10) -->
+      <text x="40" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">Tickets</text>
+      <text x="160" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="260" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="360" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="460" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="560" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="660" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+
+      <!-- Complexity (no last note = flat 100) -->
+      <text x="40" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">Complex</text>
+      <text x="160" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">100</text>
+      <text x="260" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">100</text>
+      <text x="360" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">100</text>
+      <text x="460" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">100</text>
+      <text x="560" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">100</text>
+      <text x="660" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">100</text>
+
+      <!-- Bias/Spread: biasPos=3, width=3, leak=5 -->
+      <text x="40" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">Bias/Sp</text>
+      <text x="160" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">5</text>
+      <text x="260" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">15</text>
+      <text x="360" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">25</text>
+      <text x="460" y="78" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">35</text>
+      <text x="560" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">25</text>
+      <text x="660" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">15</text>
+
+      <line x1="80" y1="88" x2="720" y2="88" stroke="#333" stroke-width="0.5"/>
+
+      <!-- Final weight = tickets × complexity × bias/spread -->
+      <text x="40" y="106" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700">WEIGHT</text>
+      <text x="160" y="106" text-anchor="middle" fill="#86efac" font-size="10">5,000</text>
+      <text x="260" y="106" text-anchor="middle" fill="#86efac" font-size="10">15,000</text>
+      <text x="360" y="106" text-anchor="middle" fill="#86efac" font-size="10">25,000</text>
+      <text x="460" y="106" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">35,000</text>
+      <text x="560" y="106" text-anchor="middle" fill="#86efac" font-size="10">25,000</text>
+      <text x="660" y="106" text-anchor="middle" fill="#86efac" font-size="10">15,000</text>
+
+      <text x="750" y="106" fill="#555" font-size="9">Total: 120K</text>
+    </g>
+
+    <!-- Bar chart -->
+    <g transform="translate(790,38)">
+      <text x="60" y="0" text-anchor="middle" fill="#555" font-size="9">Weight</text>
+      <rect x="0" y="10" width="18" height="14" rx="2" fill="#4ecdc4" opacity="0.3"/>
+      <rect x="25" y="10" width="18" height="43" rx="2" fill="#4ecdc4" opacity="0.4"/>
+      <rect x="50" y="10" width="18" height="72" rx="2" fill="#4ecdc4" opacity="0.5"/>
+      <rect x="75" y="10" width="22" height="100" rx="2" fill="#fbbf24" opacity="0.7"/>
+      <rect x="103" y="10" width="18" height="72" rx="2" fill="#4ecdc4" opacity="0.5"/>
+      <rect x="128" y="10" width="18" height="43" rx="2" fill="#4ecdc4" opacity="0.4"/>
+      <text x="9" y="130" text-anchor="middle" fill="#444" font-size="7">C3</text>
+      <text x="34" y="130" text-anchor="middle" fill="#444" font-size="7">E3</text>
+      <text x="59" y="130" text-anchor="middle" fill="#444" font-size="7">F3</text>
+      <text x="86" y="130" text-anchor="middle" fill="#fbbf24" font-size="7" font-weight="700">G3</text>
+      <text x="112" y="130" text-anchor="middle" fill="#444" font-size="7">C4</text>
+      <text x="137" y="130" text-anchor="middle" fill="#444" font-size="7">F4</text>
+    </g>
+
+    <!-- Dice result -->
+    <g transform="translate(16,155)">
+      <rect x="0" y="0" width="900" height="28" rx="6" fill="#0a1510" stroke="#4ecdc4" stroke-width="0.5" opacity="0.4"/>
+      <text x="10" y="19" fill="#86efac" font-size="12">🎲 Roll = 90,000 → running sum: 5K…20K…45K…<tspan fill="#fbbf24" font-weight="700">80K&lt;90K → G3 wins!</tspan></text>
+    </g>
+    <text x="16" y="200" fill="#777" font-size="11">G3 is now "last note". The Complexity hill for Note 2 will be centered on G3 (index 3).</text>
+    <text x="16" y="218" fill="#555" font-size="10" font-style="italic">Bias peaked at index 3 (G3). No Complexity tilt yet. G3 was the most likely and won.</text>
+
+    <!-- Hill diagram -->
+    <g transform="translate(16,230)">
+      <line x1="0" y1="70" x2="700" y2="70" stroke="#333" stroke-width="0.5"/>
+      <text x="0" y="68" fill="#444" font-size="8">0</text>
+      <text x="130" y="68" fill="#444" font-size="8">1</text>
+      <text x="260" y="68" fill="#444" font-size="8">2</text>
+      <text x="390" y="68" fill="#444" font-size="8">3</text>
+      <text x="520" y="68" fill="#444" font-size="8">4</text>
+      <text x="650" y="68" fill="#444" font-size="8">5</text>
+      <!-- Bias bell (dashed) -->
+      <path d="M0,70 L0,65 L130,55 L260,40 L390,10 L520,40 L650,55 L700,65 L700,70" fill="#f9a8d4" opacity="0.06" stroke="#f9a8d4" stroke-width="1" stroke-dasharray="4,3"/>
+      <!-- Complexity (flat) -->
+      <line x1="0" y1="50" x2="700" y2="50" stroke="#4ecdc4" stroke-width="1.5" opacity="0.3"/>
+      <text x="710" y="54" fill="#4ecdc4" font-size="8">Complexity (flat)</text>
+      <!-- Combined (product shape = bias bell × flat = bias bell) -->
+      <path d="M0,70 L0,65 L130,55 L260,40 L390,10 L520,40 L650,55 L700,65 L700,70" fill="#86efac" opacity="0.1" stroke="#86efac" stroke-width="1.5"/>
+      <text x="710" y="15" fill="#86efac" font-size="8">Combined</text>
+    </g>
+  </g>
+
+  <!-- ══════ NOTE 2 ══════ -->
+  <!--
+    Last = G3 (index 3). kernelWidth=5, leak=4, contour=+50
+    Complexity kernel per candidate:
+      d = abs(i - 3), signedDist = i - 3, maxDrift = 5*10 = 50
+      i=0: d=3, tri=max(5-3,0)*10=20, dist=-3, drift=(50*-3)/2=-75→clamp(-50,50)=-50, kernel=20+4-50=-26→0
+      i=1: d=2, tri=max(5-2,0)*10=30, dist=-2, drift=(50*-2)/2=-50→clamp=-50, kernel=30+4-50=-16→0
+      i=2: d=1, tri=max(5-1,0)*10=40, dist=-1, drift=(50*-1)/2=-25, kernel=40+4-25=19
+      i=3: d=0, tri=max(5-0,0)*10=50, dist=0, drift=0, kernel=50+4+0=54
+      i=4: d=1, tri=max(5-1,0)*10=40, dist=+1, drift=(50*1)/2=25, kernel=40+4+25=69
+      i=5: d=2, tri=max(5-2,0)*10=30, dist=+2, drift=(50*2)/2=50, kernel=30+4+50=84
+
+    Weights = 10 × kernel × marbles:
+      i=0: 10 × 0 × 5 = 0
+      i=1: 10 × 0 × 15 = 0
+      i=2: 10 × 19 × 25 = 4,750
+      i=3: 10 × 54 × 35 = 18,900
+      i=4: 10 × 69 × 25 = 17,250
+      i=5: 10 × 84 × 15 = 12,600
+      Total = 53,500
+  -->
+  <g transform="translate(80,520)">
+    <rect x="0" y="0" width="940" height="340" rx="10" fill="#0a0a0a" opacity="0.4"/>
+    <text x="16" y="22" fill="#fde68a" font-size="14" font-weight="700">NOTE 2 of 4</text>
+    <text x="200" y="22" fill="#777" font-size="11">Last note = G3 [3] → Complexity hill centered on index 3, Contour +50 tilts it right</text>
+
+    <g transform="translate(16,38)">
+      <rect x="0" y="0" width="780" height="20" rx="3" fill="#1a1510" opacity="0.6"/>
+      <text x="40" y="14" text-anchor="middle" fill="#666" font-size="9" font-weight="600">FACTOR</text>
+      <text x="160" y="14" text-anchor="middle" fill="#666" font-size="9">C3 [0]</text>
+      <text x="260" y="14" text-anchor="middle" fill="#666" font-size="9">E3 [1]</text>
+      <text x="360" y="14" text-anchor="middle" fill="#666" font-size="9">F3 [2]</text>
+      <text x="460" y="14" text-anchor="middle" fill="#666" font-size="9">G3 [3]</text>
+      <text x="560" y="14" text-anchor="middle" fill="#666" font-size="9">C4 [4]</text>
+      <text x="660" y="14" text-anchor="middle" fill="#666" font-size="9">F4 [5]</text>
+
+      <text x="40" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">Tickets</text>
+      <text x="160" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="260" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="360" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="460" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="560" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="660" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+
+      <!-- Complexity kernel: hill on 3, tilted right by contour +50 -->
+      <text x="40" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">Complex</text>
+      <text x="160" y="58" text-anchor="middle" fill="#333" font-size="10">0</text>
+      <text x="260" y="58" text-anchor="middle" fill="#333" font-size="10">0</text>
+      <text x="360" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">19</text>
+      <text x="460" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">54</text>
+      <text x="560" y="58" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">69</text>
+      <text x="660" y="58" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">84</text>
+
+      <text x="40" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">Bias/Sp</text>
+      <text x="160" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">5</text>
+      <text x="260" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">15</text>
+      <text x="360" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">25</text>
+      <text x="460" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">35</text>
+      <text x="560" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">25</text>
+      <text x="660" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">15</text>
+
+      <line x1="80" y1="88" x2="720" y2="88" stroke="#333" stroke-width="0.5"/>
+
+      <text x="40" y="106" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700">WEIGHT</text>
+      <text x="160" y="106" text-anchor="middle" fill="#333" font-size="10">0</text>
+      <text x="260" y="106" text-anchor="middle" fill="#333" font-size="10">0</text>
+      <text x="360" y="106" text-anchor="middle" fill="#86efac" font-size="10">4,750</text>
+      <text x="460" y="106" text-anchor="middle" fill="#86efac" font-size="10">18,900</text>
+      <text x="560" y="106" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">17,250</text>
+      <text x="660" y="106" text-anchor="middle" fill="#86efac" font-size="10">12,600</text>
+      <text x="750" y="106" fill="#555" font-size="9">Total: 53.5K</text>
+    </g>
+
+    <!-- Bar chart -->
+    <g transform="translate(790,38)">
+      <text x="60" y="0" text-anchor="middle" fill="#555" font-size="9">Weight</text>
+      <rect x="0" y="10" width="18" height="2" rx="2" fill="#333"/>
+      <rect x="25" y="10" width="18" height="2" rx="2" fill="#333"/>
+      <rect x="50" y="10" width="18" height="28" rx="2" fill="#4ecdc4" opacity="0.5"/>
+      <rect x="75" y="10" width="22" height="100" rx="2" fill="#4ecdc4" opacity="0.6"/>
+      <rect x="103" y="10" width="18" height="90" rx="2" fill="#fbbf24" opacity="0.7"/>
+      <rect x="128" y="10" width="18" height="66" rx="2" fill="#4ecdc4" opacity="0.5"/>
+      <text x="9" y="130" text-anchor="middle" fill="#333" font-size="7">C3</text>
+      <text x="34" y="130" text-anchor="middle" fill="#333" font-size="7">E3</text>
+      <text x="59" y="130" text-anchor="middle" fill="#444" font-size="7">F3</text>
+      <text x="86" y="130" text-anchor="middle" fill="#4ecdc4" font-size="7">G3</text>
+      <text x="112" y="130" text-anchor="middle" fill="#fbbf24" font-size="7" font-weight="700">C4</text>
+      <text x="137" y="130" text-anchor="middle" fill="#444" font-size="7">F4</text>
+    </g>
+
+    <g transform="translate(16,155)">
+      <rect x="0" y="0" width="900" height="28" rx="6" fill="#0a1510" stroke="#4ecdc4" stroke-width="0.5" opacity="0.4"/>
+      <text x="10" y="19" fill="#86efac" font-size="12">🎲 Roll = 40,000 → running sum: 0…0…4,750…<tspan fill="#fbbf24" font-weight="700">23,650 > 40K? No… 40,900 > 40K → F3 wins!</tspan></text>
+    </g>
+    <text x="16" y="200" fill="#777" font-size="11">F3 (index 2) is now "last note". Contour tilted the hill right, but Bias bell peaked left of center.</text>
+    <text x="16" y="218" fill="#555" font-size="10" font-style="italic">C3 and E3 got zero weight — too far below last note with this Complexity + Contour.</text>
+
+    <!-- Hill diagram -->
+    <g transform="translate(16,230)">
+      <line x1="0" y1="70" x2="700" y2="70" stroke="#333" stroke-width="0.5"/>
+      <text x="0" y="68" fill="#444" font-size="8">0</text>
+      <text x="130" y="68" fill="#444" font-size="8">1</text>
+      <text x="260" y="68" fill="#444" font-size="8">2</text>
+      <text x="390" y="68" fill="#444" font-size="8">3</text>
+      <text x="520" y="68" fill="#444" font-size="8">4</text>
+      <text x="650" y="68" fill="#444" font-size="8">5</text>
+      <!-- Bias bell (dashed) -->
+      <path d="M0,70 L0,65 L130,55 L260,40 L390,10 L520,40 L650,55 L700,65 L700,70" fill="#f9a8d4" opacity="0.06" stroke="#f9a8d4" stroke-width="1" stroke-dasharray="4,3"/>
+      <!-- Complexity hill (tilted right by +Contour) -->
+      <path d="M0,70 L0,70 L130,70 L260,40 L390,30 L520,15 L650,5 L700,20 L700,70" fill="#4ecdc4" opacity="0.08" stroke="#4ecdc4" stroke-width="1.5"/>
+      <text x="710" y="10" fill="#4ecdc4" font-size="8">Complexity</text>
+      <text x="710" y="20" fill="#4ecdc4" font-size="7">(+Contour tilt)</text>
+      <!-- Combined -->
+      <path d="M0,70 L0,70 L130,70 L260,40 L390,20 L520,30 L650,25 L700,40 L700,70" fill="#86efac" opacity="0.1" stroke="#86efac" stroke-width="1.5"/>
+      <text x="710" y="35" fill="#86efac" font-size="8">Combined</text>
+    </g>
+  </g>
+
+  <!-- ══════ NOTE 3 ══════ -->
+  <!--
+    Last = F3 (index 2). kernelWidth=5, leak=4, contour=+50
+    Complexity kernel:
+      i=0: d=2, tri=30, dist=-2, drift=-50→-50, kernel=30+4-50=-16→0
+      i=1: d=1, tri=40, dist=-1, drift=-25, kernel=40+4-25=19
+      i=2: d=0, tri=50, dist=0, drift=0, kernel=50+4=54
+      i=3: d=1, tri=40, dist=+1, drift=25, kernel=40+4+25=69
+      i=4: d=2, tri=30, dist=+2, drift=50, kernel=30+4+50=84
+      i=5: d=3, tri=20, dist=+3, drift=75→50, kernel=20+4+50=74
+
+    Weights:
+      i=0: 10 × 0 × 5 = 0
+      i=1: 10 × 19 × 15 = 2,850
+      i=2: 10 × 54 × 25 = 13,500
+      i=3: 10 × 69 × 35 = 24,150
+      i=4: 10 × 84 × 25 = 21,000
+      i=5: 10 × 74 × 15 = 11,100
+      Total = 72,600
+  -->
+  <g transform="translate(80,895)">
+    <rect x="0" y="0" width="940" height="340" rx="10" fill="#0a0a0a" opacity="0.4"/>
+    <text x="16" y="22" fill="#fde68a" font-size="14" font-weight="700">NOTE 3 of 4</text>
+    <text x="200" y="22" fill="#777" font-size="11">Last note = F3 [2] → Hill shifted left, Contour still pushes right</text>
+
+    <g transform="translate(16,38)">
+      <rect x="0" y="0" width="780" height="20" rx="3" fill="#1a1510" opacity="0.6"/>
+      <text x="40" y="14" text-anchor="middle" fill="#666" font-size="9" font-weight="600">FACTOR</text>
+      <text x="160" y="14" text-anchor="middle" fill="#666" font-size="9">C3 [0]</text>
+      <text x="260" y="14" text-anchor="middle" fill="#666" font-size="9">E3 [1]</text>
+      <text x="360" y="14" text-anchor="middle" fill="#666" font-size="9">F3 [2]</text>
+      <text x="460" y="14" text-anchor="middle" fill="#666" font-size="9">G3 [3]</text>
+      <text x="560" y="14" text-anchor="middle" fill="#666" font-size="9">C4 [4]</text>
+      <text x="660" y="14" text-anchor="middle" fill="#666" font-size="9">F4 [5]</text>
+
+      <text x="40" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">Tickets</text>
+      <text x="160" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="260" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="360" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="460" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="560" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+      <text x="660" y="38" text-anchor="middle" fill="#7dd3fc" font-size="10">10</text>
+
+      <text x="40" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">Complex</text>
+      <text x="160" y="58" text-anchor="middle" fill="#333" font-size="10">0</text>
+      <text x="260" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">19</text>
+      <text x="360" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">54</text>
+      <text x="460" y="58" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">69</text>
+      <text x="560" y="58" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">84</text>
+      <text x="660" y="58" text-anchor="middle" fill="#4ecdc4" font-size="10">74</text>
+
+      <text x="40" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">Bias/Sp</text>
+      <text x="160" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">5</text>
+      <text x="260" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">15</text>
+      <text x="360" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">25</text>
+      <text x="460" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">35</text>
+      <text x="560" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">25</text>
+      <text x="660" y="78" text-anchor="middle" fill="#f9a8d4" font-size="10">15</text>
+
+      <line x1="80" y1="88" x2="720" y2="88" stroke="#333" stroke-width="0.5"/>
+
+      <text x="40" y="106" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700">WEIGHT</text>
+      <text x="160" y="106" text-anchor="middle" fill="#333" font-size="10">0</text>
+      <text x="260" y="106" text-anchor="middle" fill="#86efac" font-size="10">2,850</text>
+      <text x="360" y="106" text-anchor="middle" fill="#86efac" font-size="10">13,500</text>
+      <text x="460" y="106" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700">24,150</text>
+      <text x="560" y="106" text-anchor="middle" fill="#86efac" font-size="10">21,000</text>
+      <text x="660" y="106" text-anchor="middle" fill="#86efac" font-size="10">11,100</text>
+      <text x="750" y="106" fill="#555" font-size="9">Total: 72.6K</text>
+    </g>
+
+    <g transform="translate(790,38)">
+      <text x="60" y="0" text-anchor="middle" fill="#555" font-size="9">Weight</text>
+      <rect x="0" y="10" width="18" height="2" rx="2" fill="#333"/>
+      <rect x="25" y="10" width="18" height="12" rx="2" fill="#4ecdc4" opacity="0.3"/>
+      <rect x="50" y="10" width="18" height="56" rx="2" fill="#4ecdc4" opacity="0.5"/>
+      <rect x="75" y="10" width="22" height="100" rx="2" fill="#fbbf24" opacity="0.7"/>
+      <rect x="103" y="10" width="18" height="87" rx="2" fill="#4ecdc4" opacity="0.6"/>
+      <rect x="128" y="10" width="18" height="46" rx="2" fill="#4ecdc4" opacity="0.4"/>
+      <text x="9" y="130" text-anchor="middle" fill="#333" font-size="7">C3</text>
+      <text x="34" y="130" text-anchor="middle" fill="#444" font-size="7">E3</text>
+      <text x="59" y="130" text-anchor="middle" fill="#444" font-size="7">F3</text>
+      <text x="86" y="130" text-anchor="middle" fill="#fbbf24" font-size="7" font-weight="700">G3</text>
+      <text x="112" y="130" text-anchor="middle" fill="#444" font-size="7">C4</text>
+      <text x="137" y="130" text-anchor="middle" fill="#444" font-size="7">F4</text>
+    </g>
+
+    <g transform="translate(16,155)">
+      <rect x="0" y="0" width="900" height="28" rx="6" fill="#0a1510" stroke="#4ecdc4" stroke-width="0.5" opacity="0.4"/>
+      <text x="10" y="19" fill="#86efac" font-size="12">🎲 Roll = 55,000 → running sum: 0…2,850…16,350…<tspan fill="#fbbf24" font-weight="700">40,500 > 55K? No… 61,500 > 55K → G3 wins!</tspan></text>
+    </g>
+    <text x="16" y="200" fill="#777" font-size="11">G3 (index 3) is "last note" again. Bias peak + high Complexity score combined to favor it.</text>
+    <text x="16" y="218" fill="#555" font-size="10" font-style="italic">Notice: C4 had the highest Complexity (84) but lower Bias (25) — the two forces compete.</text>
+
+    <g transform="translate(16,230)">
+      <line x1="0" y1="70" x2="700" y2="70" stroke="#333" stroke-width="0.5"/>
+      <text x="0" y="68" fill="#444" font-size="8">0</text>
+      <text x="130" y="68" fill="#444" font-size="8">1</text>
+      <text x="260" y="68" fill="#444" font-size="8">2</text>
+      <text x="390" y="68" fill="#444" font-size="8">3</text>
+      <text x="520" y="68" fill="#444" font-size="8">4</text>
+      <text x="650" y="68" fill="#444" font-size="8">5</text>
+      <path d="M0,70 L0,65 L130,55 L260,40 L390,10 L520,40 L650,55 L700,65 L700,70" fill="#f9a8d4" opacity="0.06" stroke="#f9a8d4" stroke-width="1" stroke-dasharray="4,3"/>
+      <path d="M0,70 L0,70 L130,50 L260,15 L390,20 L520,5 L650,15 L700,40 L700,70" fill="#4ecdc4" opacity="0.08" stroke="#4ecdc4" stroke-width="1.5"/>
+      <path d="M0,70 L0,70 L130,50 L260,25 L390,10 L520,20 L650,25 L700,50 L700,70" fill="#86efac" opacity="0.1" stroke="#86efac" stroke-width="1.5"/>
+      <text x="710" y="15" fill="#4ecdc4" font-size="8">Complexity</text>
+      <text x="710" y="30" fill="#86efac" font-size="8">Combined</text>
+    </g>
+  </g>
+
+  <!-- ══════ NOTE 4 ══════ -->
+  <!-- Same as Note 2 math (last=G3 index 3) but different dice roll -->
+  <g transform="translate(80,1270)">
+    <rect x="0" y="0" width="940" height="200" rx="10" fill="#0a0a0a" opacity="0.4"/>
+    <text x="16" y="22" fill="#fde68a" font-size="14" font-weight="700">NOTE 4 of 4</text>
+    <text x="200" y="22" fill="#777" font-size="11">Last note = G3 [3] → same weight table as Note 2, different dice roll</text>
+
+    <g transform="translate(16,40)">
+      <rect x="0" y="0" width="780" height="20" rx="3" fill="#1a1510" opacity="0.6"/>
+      <text x="40" y="14" text-anchor="middle" fill="#666" font-size="9" font-weight="600">WEIGHT</text>
+      <text x="160" y="14" text-anchor="middle" fill="#666" font-size="9">C3 [0]</text>
+      <text x="260" y="14" text-anchor="middle" fill="#666" font-size="9">E3 [1]</text>
+      <text x="360" y="14" text-anchor="middle" fill="#666" font-size="9">F3 [2]</text>
+      <text x="460" y="14" text-anchor="middle" fill="#666" font-size="9">G3 [3]</text>
+      <text x="560" y="14" text-anchor="middle" fill="#666" font-size="9">C4 [4]</text>
+      <text x="660" y="14" text-anchor="middle" fill="#666" font-size="9">F4 [5]</text>
+
+      <text x="160" y="38" text-anchor="middle" fill="#333" font-size="10">0</text>
+      <text x="260" y="38" text-anchor="middle" fill="#333" font-size="10">0</text>
+      <text x="360" y="38" text-anchor="middle" fill="#86efac" font-size="10">4,750</text>
+      <text x="460" y="38" text-anchor="middle" fill="#86efac" font-size="10">18,900</text>
+      <text x="560" y="38" text-anchor="middle" fill="#86efac" font-size="10">17,250</text>
+      <text x="660" y="38" text-anchor="middle" fill="#86efac" font-size="10">12,600</text>
+    </g>
+
+    <g transform="translate(16,85)">
+      <rect x="0" y="0" width="900" height="28" rx="6" fill="#0a1510" stroke="#4ecdc4" stroke-width="0.5" opacity="0.4"/>
+      <text x="10" y="19" fill="#86efac" font-size="12">🎲 Roll = 48,000 → 4,750…23,650…<tspan fill="#fbbf24" font-weight="700">40,900 > 48K? No… 53,500 > 48K → C4 wins!</tspan></text>
+    </g>
+    <text x="16" y="130" fill="#777" font-size="11">C4 wins! Contour pushed the melody up over 4 notes. Same weights as Note 2, different luck.</text>
+    <text x="16" y="150" fill="#555" font-size="10" font-style="italic">G3 was most likely (18.9K) but the dice landed in C4's zone (17.3K–53.5K). Weighted, not deterministic.</text>
+  </g>
+
+  <!-- RESULT -->
+  <g transform="translate(80,1500)">
+    <rect x="0" y="0" width="940" height="70" rx="10" fill="#1a1a0a" stroke="#fbbf24" stroke-width="1.5" opacity="0.4"/>
+    <text x="470" y="22" text-anchor="middle" fill="#888" font-size="11" letter-spacing="3">THE 4-NOTE SEQUENCE</text>
+    <g transform="translate(200,32)">
+      <rect x="0" y="0" width="70" height="28" rx="6" fill="#2a2010" stroke="#fbbf24" stroke-width="1.2"/>
+      <text x="35" y="20" text-anchor="middle" fill="#fde68a" font-size="15" font-weight="700">G3</text>
+      <rect x="85" y="0" width="70" height="28" rx="6" fill="#2a2010" stroke="#fbbf24" stroke-width="1.2"/>
+      <text x="120" y="20" text-anchor="middle" fill="#fde68a" font-size="15" font-weight="700">F3</text>
+      <rect x="170" y="0" width="70" height="28" rx="6" fill="#2a2010" stroke="#fbbf24" stroke-width="1.2"/>
+      <text x="205" y="20" text-anchor="middle" fill="#fde68a" font-size="15" font-weight="700">G3</text>
+      <rect x="255" y="0" width="70" height="28" rx="6" fill="#2a2010" stroke="#fbbf24" stroke-width="1.2"/>
+      <text x="290" y="20" text-anchor="middle" fill="#fde68a" font-size="15" font-weight="700">C4</text>
+    </g>
+    <text x="620" y="52" fill="#777" font-size="11">Contour +50 pushed it upward over time.</text>
+  </g>
+
+  <!-- Observation -->
+  <g transform="translate(80,1590)">
+    <rect x="0" y="0" width="940" height="90" rx="8" fill="#0a0a15" opacity="0.5"/>
+    <text x="16" y="20" fill="#86efac" font-size="12" font-weight="600">WHAT TO OBSERVE:</text>
+    <text x="16" y="40" fill="#bbb" font-size="11">• Bias peaked at G3 every roll — it's a gravity well. But it didn't always win.</text>
+    <text x="16" y="56" fill="#bbb" font-size="11">• Contour +50 made notes above "last" more likely each roll → melody drifted upward.</text>
+    <text x="16" y="72" fill="#bbb" font-size="11">• C3 and E3 disappeared after Note 1 — too far from the walking anchor + Contour pushes away.</text>
+    <text x="16" y="88" fill="#bbb" font-size="11">• Same weights on Notes 2 and 4 (both had last=G3) but different dice → different results. Weighted = not deterministic.</text>
+  </g>
+</g>
+
+<g opacity="0.5"><line x1="550" y1="3680" x2="550" y2="3705" stroke="#f472b6" stroke-width="2"/>
+  <polygon points="544,3702 550,3713 556,3702" fill="#f472b6"/></g>
+
+
+<!-- ═══ STEP 6: ORDER OF OPS SUMMARY ═══ -->
+<g transform="translate(0,3720)">
+  <circle cx="550" cy="24" r="18" fill="#f472b6" filter="url(#glow)"/>
+  <text x="550" y="30" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">6</text>
+
+  <rect x="60" y="50" width="980" height="470" rx="14" fill="url(#gF)" opacity="0.5" filter="url(#sh)"/>
+  <rect x="60" y="50" width="980" height="470" rx="14" fill="none" stroke="#f472b6" stroke-width="0.8" opacity="0.25"/>
+
+  <text x="120" y="82" fill="#f9a8d4" font-size="18" font-weight="600">ORDER OF OPERATIONS</text>
+
+  <!-- Once -->
+  <g transform="translate(100,105)">
+    <rect x="0" y="0" width="420" height="310" rx="10" fill="#0a0a15" opacity="0.5"/>
+    <text x="210" y="24" text-anchor="middle" fill="#7dd3fc" font-size="14" font-weight="700" letter-spacing="1">RUNS ONCE (pool setup)</text>
+    <g transform="translate(20,40)">
+      <rect x="0" y="0" width="380" height="50" rx="6" fill="#122040" opacity="0.6"/>
+      <circle cx="25" cy="25" r="14" fill="#7c6aef" opacity="0.8"/>
+      <text x="25" y="30" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">A</text>
+      <text x="52" y="20" fill="#ddd" font-size="12" font-weight="600">Scale × Range → enumerate candidates</text>
+      <text x="52" y="36" fill="#777" font-size="10">Scale + Range knobs</text>
+
+      <rect x="0" y="58" width="380" height="50" rx="6" fill="#122040" opacity="0.6"/>
+      <circle cx="25" cy="83" r="14" fill="#4ea8de" opacity="0.8"/>
+      <text x="25" y="88" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">B</text>
+      <text x="52" y="78" fill="#ddd" font-size="12" font-weight="600">Scale Tickets → exclude / weight</text>
+      <text x="52" y="94" fill="#777" font-size="10">Scale Tickets + DROT + MROT</text>
+
+      <rect x="0" y="116" width="380" height="50" rx="6" fill="#122040" opacity="0.6"/>
+      <circle cx="25" cy="141" r="14" fill="#4ea8de" opacity="0.8"/>
+      <text x="25" y="146" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">C</text>
+      <text x="52" y="136" fill="#ddd" font-size="12" font-weight="600">Steps Sieve → keep top K</text>
+      <text x="52" y="152" fill="#777" font-size="10">Steps knob (harmonic ranking)</text>
+
+      <rect x="0" y="174" width="380" height="50" rx="6" fill="#10302a" opacity="0.6"/>
+      <circle cx="25" cy="199" r="14" fill="#f9a8d4" opacity="0.8"/>
+      <text x="25" y="204" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">D</text>
+      <text x="52" y="194" fill="#ddd" font-size="12" font-weight="600">Bias/Spread bell → fixed per pool</text>
+      <text x="52" y="210" fill="#777" font-size="10">Bias + Spread knobs</text>
+    </g>
+    <text x="210" y="280" text-anchor="middle" fill="#555" font-size="11" font-style="italic">Pool is locked. Same for all notes.</text>
+  </g>
+
+  <!-- Per Note -->
+  <g transform="translate(560,105)">
+    <rect x="0" y="0" width="440" height="310" rx="10" fill="#0a0a15" opacity="0.5"/>
+    <text x="220" y="24" text-anchor="middle" fill="#86efac" font-size="14" font-weight="700" letter-spacing="1">RUNS PER NOTE (the dice)</text>
+    <g transform="translate(20,40)">
+      <rect x="0" y="0" width="400" height="50" rx="6" fill="#10302a" opacity="0.6"/>
+      <circle cx="25" cy="25" r="14" fill="#4ecdc4" opacity="0.8"/>
+      <text x="25" y="30" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">E</text>
+      <text x="52" y="20" fill="#ddd" font-size="12" font-weight="600">Complexity → hill around last note</text>
+      <text x="52" y="36" fill="#777" font-size="10">Complexity knob</text>
+
+      <rect x="0" y="58" width="400" height="50" rx="6" fill="#10302a" opacity="0.6"/>
+      <circle cx="25" cy="83" r="14" fill="#4ecdc4" opacity="0.8"/>
+      <text x="25" y="88" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">F</text>
+      <text x="52" y="78" fill="#ddd" font-size="12" font-weight="600">Contour → tilt the hill up/down</text>
+      <text x="52" y="94" fill="#777" font-size="10">Contour knob</text>
+
+      <rect x="0" y="116" width="400" height="50" rx="6" fill="#2a1510" opacity="0.6" stroke="#fbbf24" stroke-width="0.5"/>
+      <circle cx="25" cy="141" r="14" fill="#fbbf24" opacity="0.8"/>
+      <text x="25" y="146" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">G</text>
+      <text x="52" y="136" fill="#fde68a" font-size="12" font-weight="600">Multiply: Ticket × Complex × Bias</text>
+      <text x="52" y="152" fill="#777" font-size="10">Final weight per candidate</text>
+
+      <rect x="0" y="174" width="400" height="50" rx="6" fill="#2a1510" opacity="0.6" stroke="#ef4444" stroke-width="0.5"/>
+      <circle cx="25" cy="199" r="14" fill="#ef4444" opacity="0.8"/>
+      <text x="25" y="204" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">H</text>
+      <text x="52" y="194" fill="#fca5a5" font-size="12" font-weight="600">🎲 Weighted random pick</text>
+      <text x="52" y="210" fill="#777" font-size="10">One roll → cumulative scan → winner</text>
+    </g>
+    <text x="220" y="280" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600">Winner becomes "last note" → loop back to E</text>
+  </g>
+
+  <!-- Low/High Degree callout -->
+  <g transform="translate(100,430)">
+    <rect x="0" y="0" width="900" height="30" rx="6" fill="#1a0a0a" stroke="#ef4444" stroke-width="0.5" opacity="0.3"/>
+    <text x="450" y="20" text-anchor="middle" fill="#fca5a5" font-size="11">⚠ Low Degree / High Degree knobs exist in the UI but are NOT used in pitch generation. Use Scale Tickets (set to EXCL) instead.</text>
+  </g>
+</g>
+
+<g opacity="0.5"><line x1="550" y1="4250" x2="550" y2="4275" stroke="#fff" stroke-width="2"/>
+  <polygon points="544,4272 550,4283 556,4272" fill="#fff"/></g>
+
+
+<!-- ═══ PARAMETER CHEAT SHEET ═══ -->
+<g transform="translate(0,4290)">
+  <rect x="60" y="0" width="980" height="480" rx="14" fill="#0a0a15" filter="url(#sh)"/>
+  <rect x="60" y="0" width="980" height="480" rx="14" fill="none" stroke="#555" stroke-width="0.5" opacity="0.2"/>
+  <text x="550" y="28" text-anchor="middle" fill="#888" font-size="12" letter-spacing="3">PARAMETER → ROLE CHEAT SHEET</text>
+
+  <g transform="translate(90,45)">
+    <rect x="0" y="0" width="920" height="24" rx="4" fill="#151525"/>
+    <text x="30" y="16" fill="#888" font-size="10" font-weight="600">KNOB</text>
+    <text x="180" y="16" fill="#888" font-size="10" font-weight="600">PAGE</text>
+    <text x="300" y="16" fill="#888" font-size="10" font-weight="600">WHEN</text>
+    <text x="420" y="16" fill="#888" font-size="10" font-weight="600">WHAT IT DOES</text>
+  </g>
+
+  <g transform="translate(90,80)" fill="#bbb" font-size="11">
+    <rect x="0" y="0" width="920" height="28" rx="3" fill="#0d0d1a" opacity="0.4"/>
+    <text x="30" y="18" fill="#c4b5fd" font-weight="600">Scale</text>
+    <text x="180" y="18">Config</text>
+    <text x="300" y="18" fill="#7dd3fc">Once</text>
+    <text x="420" y="18">Note names and intervals per octave</text>
+
+    <rect x="0" y="32" width="920" height="28" rx="3" fill="#0d0d1a" opacity="0.3"/>
+    <text x="30" y="50" fill="#c4b5fd" font-weight="600">Root Note</text>
+    <text x="180" y="50">Config</text>
+    <text x="300" y="50" fill="#7dd3fc">Once</text>
+    <text x="420" y="50">Tuning anchor — where "home" is</text>
+
+    <rect x="0" y="64" width="920" height="28" rx="3" fill="#0d0d1a" opacity="0.4"/>
+    <text x="30" y="82" fill="#7dd3fc" font-weight="600">Range</text>
+    <text x="180" y="82">Live · step 3</text>
+    <text x="300" y="82" fill="#7dd3fc">Once</text>
+    <text x="420" y="82">Octaves in the pool (1–4)</text>
+
+    <rect x="0" y="96" width="920" height="28" rx="3" fill="#0d0d1a" opacity="0.3"/>
+    <text x="30" y="114" fill="#7dd3fc" font-weight="600">Scale Tickets</text>
+    <text x="180" y="114">Pitch page</text>
+    <text x="300" y="114" fill="#7dd3fc">Once</text>
+    <text x="420" y="114">Per-degree weight or EXCL. Becomes "base" in formula.</text>
+
+    <rect x="0" y="128" width="920" height="28" rx="3" fill="#0d0d1a" opacity="0.4"/>
+    <text x="30" y="146" fill="#7dd3fc" font-weight="600">DROT / MROT</text>
+    <text x="180" y="146">Pitch page</text>
+    <text x="300" y="146" fill="#7dd3fc">Once</text>
+    <text x="420" y="146">Rotate ticket assignments and weights</text>
+
+    <rect x="0" y="160" width="920" height="28" rx="3" fill="#0d0d1a" opacity="0.3"/>
+    <text x="30" y="178" fill="#7dd3fc" font-weight="600">Steps</text>
+    <text x="180" y="178">Loop page</text>
+    <text x="300" y="178" fill="#7dd3fc">Once</text>
+    <text x="420" y="178">Top-K sieve by harmonic strength (root > fifth > third…)</text>
+
+    <rect x="0" y="192" width="920" height="28" rx="3" fill="#1a1510" opacity="0.4"/>
+    <text x="30" y="210" fill="#86efac" font-weight="600">Complexity</text>
+    <text x="180" y="210">Live · step 8</text>
+    <text x="300" y="210" fill="#86efac">Per note</text>
+    <text x="420" y="210">Hill width around last note. Low = steps, high = leaps.</text>
+
+    <rect x="0" y="224" width="920" height="28" rx="3" fill="#1a1510" opacity="0.3"/>
+    <text x="30" y="242" fill="#86efac" font-weight="600">Contour</text>
+    <text x="180" y="242">Live · step 9</text>
+    <text x="300" y="242" fill="#86efac">Per note</text>
+    <text x="420" y="242">Tilts the hill. + = climb, − = descend, 0 = wander.</text>
+
+    <rect x="0" y="256" width="920" height="28" rx="3" fill="#1a1510" opacity="0.4"/>
+    <text x="30" y="274" fill="#f9a8d4" font-weight="600">Bias</text>
+    <text x="180" y="274">Live · step 10</text>
+    <text x="300" y="274" fill="#f9a8d4">Per note</text>
+    <text x="420" y="274">Where the bell curve peaks — low vs high register.</text>
+
+    <rect x="0" y="288" width="920" height="28" rx="3" fill="#1a1510" opacity="0.3"/>
+    <text x="30" y="306" fill="#f9a8d4" font-weight="600">Spread</text>
+    <text x="180" y="306">Live · step 11</text>
+    <text x="300" y="306" fill="#f9a8d4">Per note</text>
+    <text x="420" y="306">Bell curve width. Narrow = clustered, wide = scattered.</text>
+
+    <rect x="0" y="320" width="920" height="28" rx="3" fill="#1a0a0a" opacity="0.4"/>
+    <text x="30" y="338" fill="#ef4444" font-weight="600">Low Degree / High Degree</text>
+    <text x="180" y="338" fill="#555">—</text>
+    <text x="300" y="338" fill="#ef4444">—</text>
+    <text x="420" y="338" fill="#ef4444">Not used. Use Scale Tickets EXCL instead.</text>
+  </g>
+</g>
+
+<!-- Footer -->
+<g transform="translate(0,4820)">
+  <line x1="200" y1="0" x2="900" y2="0" stroke="#222" stroke-width="0.5"/>
+  <text x="550" y="25" text-anchor="middle" fill="#444" font-size="11">Each note is a weighted dice roll. The weights are set by your knobs. The dice provide the surprise.</text>
+  <text x="550" y="45" text-anchor="middle" fill="#333" font-size="10">Octave · Jump · Transpose · Rotate · Repeat · Mutate · Patience M are applied AFTER this pipeline.</text>
+</g>
+
+</svg>
+</div>
+</body>
+</html>

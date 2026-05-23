@@ -266,6 +266,55 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     auto &sequence = this->sequence();
     auto &track = stochasticTrack();
 
+    // Phase 16 P10 (2026-05-23): detect routed-CV changes to cache-baked
+    // knobs. Routing writes go directly into the sequence each tick without
+    // any UI notify, so the cache can hold stale values. Snapshot the
+    // shaping set on first run; on each subsequent trigger, compare and
+    // flag refresh if any field moved. The cost is one int compare per
+    // tracked field per event — far cheaper than rebuilding every tick.
+    {
+        const uint8_t curNoteDuration = uint8_t(sequence.noteDuration());
+        const uint8_t curVariation    = uint8_t(sequence.variation());
+        const uint8_t curBurst        = uint8_t(sequence.burst());
+        const uint8_t curGateLength   = uint8_t(sequence.gateLength());
+        const uint8_t curComplexity   = uint8_t(sequence.complexity());
+        const int8_t  curContour      = int8_t(sequence.contour());
+        const uint8_t curBias         = uint8_t(sequence.marblesBias());
+        const uint8_t curSpread       = uint8_t(sequence.marblesSpread());
+        const uint8_t curBurstCount   = uint8_t(sequence.burstCount());
+        const uint8_t curBurstRate    = uint8_t(sequence.burstRate());
+        const uint8_t curBurstPitch   = uint8_t(sequence.burstPitch());
+        const uint8_t curRange        = uint8_t(sequence.range());
+        if (!_shapingSnapshotValid
+            || curNoteDuration != _lastShapingNoteDuration
+            || curVariation    != _lastShapingVariation
+            || curBurst        != _lastShapingBurst
+            || curGateLength   != _lastShapingGateLength
+            || curComplexity   != _lastShapingComplexity
+            || curContour      != _lastShapingContour
+            || curBias         != _lastShapingMarblesBias
+            || curSpread       != _lastShapingMarblesSpread
+            || curBurstCount   != _lastShapingBurstCount
+            || curBurstRate    != _lastShapingBurstRate
+            || curBurstPitch   != _lastShapingBurstPitch
+            || curRange        != _lastShapingRange) {
+            _cacheRefreshPending = true;
+            _lastShapingNoteDuration = curNoteDuration;
+            _lastShapingVariation    = curVariation;
+            _lastShapingBurst        = curBurst;
+            _lastShapingGateLength   = curGateLength;
+            _lastShapingComplexity   = curComplexity;
+            _lastShapingContour      = curContour;
+            _lastShapingMarblesBias  = curBias;
+            _lastShapingMarblesSpread = curSpread;
+            _lastShapingBurstCount   = curBurstCount;
+            _lastShapingBurstRate    = curBurstRate;
+            _lastShapingBurstPitch   = curBurstPitch;
+            _lastShapingRange        = curRange;
+            _shapingSnapshotValid    = true;
+        }
+    }
+
     // Phase 16 P9 (2026-05-23): coalesce cache refreshes — Live rhythm +
     // melody writes from the PREVIOUS trigger may have flagged this. Pay
     // at most one rebuild per trigger, before any cache read downstream.

@@ -1,0 +1,1131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stochastic Track Atoms Inside the Performer Molecule</title>
+<style>
+  :root {
+    --bg: #f8f7f3;
+    --paper: #ffffff;
+    --ink: #202124;
+    --muted: #5f6368;
+    --line: #d8d4c8;
+    --soft: #f0ede5;
+    --blue: #2f5d7c;
+    --green: #386b4f;
+    --amber: #8a641f;
+    --red: #9a3d32;
+    --code: #ebe7dd;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  main {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 34px 24px 72px;
+  }
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: 30px;
+    line-height: 1.15;
+    font-weight: 650;
+  }
+
+  h2 {
+    margin: 34px 0 12px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--line);
+    font-size: 21px;
+    line-height: 1.25;
+    font-weight: 650;
+  }
+
+  h3 {
+    margin: 21px 0 7px;
+    font-size: 16px;
+    line-height: 1.25;
+    font-weight: 650;
+  }
+
+  p { margin: 8px 0; }
+
+  ul, ol {
+    margin: 8px 0 12px;
+    padding-left: 22px;
+  }
+
+  li { margin: 4px 0; }
+
+  code {
+    background: var(--code);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.92em;
+  }
+
+  .subhead {
+    margin: 0 0 18px;
+    color: var(--muted);
+    font-size: 16px;
+  }
+
+  .note {
+    background: #eef4f7;
+    border-left: 4px solid var(--blue);
+    border-radius: 5px;
+    padding: 13px 16px;
+    margin: 16px 0;
+  }
+
+  .warning {
+    background: #fff4df;
+    border-left: 4px solid var(--amber);
+    border-radius: 5px;
+    padding: 13px 16px;
+    margin: 16px 0;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 14px 0;
+  }
+
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 15px;
+  }
+
+  .card h3 { margin-top: 0; }
+
+  .decision-map {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin: 16px 0 24px;
+  }
+
+  .decision-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 1fr 1fr;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .stage {
+    background: var(--soft);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px;
+    font-weight: 650;
+    color: var(--blue);
+  }
+
+  .decision-cell {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 11px;
+  }
+
+  .decision-cell strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .coin {
+    color: var(--amber);
+    font-weight: 650;
+  }
+
+  .state {
+    color: var(--green);
+    font-weight: 650;
+  }
+
+  .overlap {
+    color: var(--red);
+    font-weight: 650;
+  }
+
+  .mini {
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+
+  .tag {
+    display: inline-block;
+    margin: 0 5px 5px 0;
+    padding: 2px 7px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--soft);
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .flow {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    margin: 16px 0;
+  }
+
+  .flow .box {
+    min-height: 88px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--blue);
+    border-radius: 6px;
+    padding: 10px 11px;
+  }
+
+  .flow .box strong {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 24px;
+    background: var(--paper);
+    font-size: 13.5px;
+  }
+
+  th, td {
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: var(--soft);
+    font-weight: 650;
+  }
+
+  .yes { color: var(--green); font-weight: 650; }
+  .risk { color: var(--amber); font-weight: 650; }
+  .no { color: var(--red); font-weight: 650; }
+
+  .fig {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0 28px;
+    overflow-x: auto;
+  }
+
+  .fig svg {
+    display: block;
+    width: 100%;
+    min-width: 900px;
+    height: auto;
+  }
+
+  .fig-caption {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .sch-block {
+    fill: #ffffff;
+    stroke: var(--line);
+    stroke-width: 1.4;
+  }
+
+  .sch-accent {
+    fill: #eef7f1;
+    stroke: var(--green);
+    stroke-width: 1.5;
+  }
+
+  .sch-warm {
+    fill: #fff4df;
+    stroke: var(--amber);
+    stroke-width: 1.5;
+  }
+
+  .sch-blue {
+    fill: #eef4f7;
+    stroke: var(--blue);
+    stroke-width: 1.5;
+  }
+
+  .sch-red {
+    fill: #fff0ed;
+    stroke: var(--red);
+    stroke-width: 1.5;
+  }
+
+  .sch-muted {
+    fill: var(--soft);
+    stroke: var(--line);
+    stroke-width: 1.2;
+  }
+
+  .sch-arrow {
+    stroke: #888;
+    stroke-width: 1.4;
+    fill: none;
+    marker-end: url(#arrowhead);
+  }
+
+  .sch-arrow-blue {
+    stroke: var(--blue);
+    stroke-width: 1.8;
+    fill: none;
+    marker-end: url(#arrowhead-blue);
+  }
+
+  .sch-arrow-warm {
+    stroke: var(--amber);
+    stroke-width: 1.8;
+    fill: none;
+    marker-end: url(#arrowhead-warm);
+  }
+
+  .sch-arrow-red {
+    stroke: var(--red);
+    stroke-width: 1.8;
+    fill: none;
+    marker-end: url(#arrowhead-red);
+  }
+
+  .sch-dash {
+    stroke: #aaa;
+    stroke-width: 1.2;
+    fill: none;
+    stroke-dasharray: 5 4;
+  }
+
+  .sch-text {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    font-size: 12px;
+    fill: var(--ink);
+    font-weight: 600;
+  }
+
+  .sch-small {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5px;
+    fill: var(--muted);
+  }
+
+  .sequence {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 15px 17px;
+    margin: 12px 0;
+  }
+
+  .sequence ol {
+    margin-bottom: 0;
+  }
+
+  .footer {
+    margin-top: 36px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: 1fr; }
+    .flow { grid-template-columns: 1fr; }
+    .decision-row { grid-template-columns: 1fr; }
+    main { padding: 24px 16px 54px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Stochastic Track Atoms Inside the Performer Molecule</h1>
+  <p class="subhead">A plain-language decomposition of current stochastic features, plus the Westlicht Performer plumbing that makes them a real track instead of a standalone generator.</p>
+
+  <section class="note">
+    <p><strong>Core framing:</strong> stochastic features should be small internal atoms. The track is the molecule. A feature atom is only useful when it connects cleanly to Performer timing, patterns, routing, UI, storage, and hardware output.</p>
+  </section>
+
+  <h2>Why This Exists</h2>
+  <p>The current stochastic track has many user-facing controls. Complexity grows when each control brings its own timing path, storage path, UI truth, and playback branch.</p>
+  <p>The goal is not to invent new product vocabulary. The goal is to reduce the implementation to a few repeatable internal atoms, then connect those atoms through Performer track plumbing.</p>
+
+  <h2>Decision Schematic: From Current C To The Next Sound</h2>
+  <p>This is not sampled white noise at a random time. A C in the first octave is sounding because several decisions have already resolved: clock position, current loop slot, selected rhythm material, selected melody material, scale/root/octave/transpose, gate state, and output routing. The next sound is chosen by walking the same decision chain again.</p>
+
+  <div class="decision-map">
+    <div class="decision-row">
+      <div class="stage">0. Current state</div>
+      <div class="decision-cell">
+        <strong>What exists now</strong>
+        <span class="state">C first octave is already on the output.</span> The oscillator hears CV. The envelope/VCA hear gate.
+      </div>
+      <div class="decision-cell">
+        <strong>Hidden state</strong>
+        Current slot, elapsed ticks, current event duration, previous event cache, queue contents, RNG state, patience counters, jump offset.
+      </div>
+      <div class="decision-cell">
+        <strong>User-facing context</strong>
+        Pattern, track mode, source modes, First/Last/Size/Rotate, Divisor, Clock Mult, Scale, Root, Octave, Transpose.
+      </div>
+    </div>
+
+    <div class="decision-row">
+      <div class="stage">1. Clock gate</div>
+      <div class="decision-cell">
+        <strong>Question</strong>
+        Is it time for the next stochastic event yet?
+      </div>
+      <div class="decision-cell">
+        <strong>Decision inputs</strong>
+        Divisor, Clock Mult, current event duration, Sleep, Reset Measure.
+      </div>
+      <div class="decision-cell">
+        <strong>Result</strong>
+        If not enough ticks elapsed, C keeps sounding or releases by queued gate-off. If enough ticks elapsed, the next event is evaluated.
+      </div>
+    </div>
+
+    <div class="decision-row">
+      <div class="stage">2. Frame</div>
+      <div class="decision-cell">
+        <strong>Question</strong>
+        Which loop slot is being read?
+      </div>
+      <div class="decision-cell">
+        <strong>Decision inputs</strong>
+        First, Last, Size, Rotate, current slot.
+      </div>
+      <div class="decision-cell">
+        <strong>Result</strong>
+        The next slot is picked inside the active loop window. Rotate can read a different stored slot than the playhead position.
+      </div>
+    </div>
+
+    <div class="decision-row">
+      <div class="stage">3. Source split</div>
+      <div class="decision-cell">
+        <strong>Rhythm source</strong>
+        Rhythm Loop reads stored rhythm material. Rhythm Live rolls fresh rhythm now.
+      </div>
+      <div class="decision-cell">
+        <strong>Melody source</strong>
+        Melody Loop reads stored pitch material. Melody Live rolls fresh pitch now.
+      </div>
+      <div class="decision-cell">
+        <strong>Overlap</strong>
+        <span class="overlap">Loop/Live is not one switch.</span> Rhythm and melody can disagree, so timing can repeat while pitch changes, or pitch can repeat while timing changes.
+      </div>
+    </div>
+
+    <div class="decision-row">
+      <div class="stage">4. Rhythm choice</div>
+      <div class="decision-cell">
+        <strong>When is the next event?</strong>
+        Note Duration, Variation, and Duration Tickets choose a duration slot.
+      </div>
+      <div class="decision-cell">
+        <strong>Is it silent?</strong>
+        <span class="coin">Rest is a coin toss when rhythm is generated.</span> In Loop mode the result is already stored until renewed or mutated.
+      </div>
+      <div class="decision-cell">
+        <strong>How does it open?</strong>
+        Slide and Legato are generated articulation decisions. Gate Length later turns duration into gate-off timing.
+      </div>
+    </div>
+
+    <div class="decision-row">
+      <div class="stage">5. Melody choice</div>
+      <div class="decision-cell">
+        <strong>What pitch family?</strong>
+        Pitch tickets, Range, Complexity, Bias, Spread, and Steps define the candidate pool and weights.
+      </div>
+      <div class="decision-cell">
+        <strong>Which exact degree?</strong>
+        <span class="coin">A weighted draw picks degree/octave when melody is generated.</span> Loop mode stores the draw. Live mode draws now.
+      </div>
+      <div class="decision-cell">
+        <strong>What final CV?</strong>
+        Scale, Root, Octave, Transpose, and Jump turn degree/octave into the output CV heard by the oscillator.
+      </div>
+    </div>
+
+    <div class="decision-row">
+      <div class="stage">6. Repeat override</div>
+      <div class="decision-cell">
+        <strong>Question</strong>
+        Should the next event reuse the previous emitted event?
+      </div>
+      <div class="decision-cell">
+        <strong>Decision input</strong>
+        <span class="coin">Repeat is a playback-time coin toss.</span>
+      </div>
+      <div class="decision-cell">
+        <strong>Result</strong>
+        If Repeat fires, the current slot's freshly chosen material can be bypassed by the previous event.
+      </div>
+    </div>
+
+    <div class="decision-row">
+      <div class="stage">7. Filter</div>
+      <div class="decision-cell">
+        <strong>Question</strong>
+        Does this event pass the loop thinning filter?
+      </div>
+      <div class="decision-cell">
+        <strong>Decision inputs</strong>
+        Mask sets how much survives. Tilt biases which duration ranks survive.
+      </div>
+      <div class="decision-cell">
+        <strong>Result</strong>
+        Failed Rest or Mask gives silence/gate-off. Passed material schedules CV and gate.
+      </div>
+    </div>
+
+    <div class="decision-row">
+      <div class="stage">8. Hit count</div>
+      <div class="decision-cell">
+        <strong>Question</strong>
+        How many hits does this one loop slot return?
+      </div>
+      <div class="decision-cell">
+        <strong>Decision inputs</strong>
+        <span class="coin">Burst is chosen during rhythm generation.</span> Burst Count and Burst Rate decide whether the result is zero, one, or several ordered hits.
+      </div>
+      <div class="decision-cell">
+        <strong>Pitch rule</strong>
+        Burst Pitch decides whether repeated hits reuse the first hit's pitch or ask melody generation for more pitches.
+      </div>
+    </div>
+
+    <div class="decision-row">
+      <div class="stage">9. Schedule</div>
+      <div class="decision-cell">
+        <strong>CV queue</strong>
+        The selected pitch becomes a CV event at an absolute tick.
+      </div>
+      <div class="decision-cell">
+        <strong>Gate queue</strong>
+        Gate-on and gate-off are queued from the evaluated hit list, Rest, Gate Length, and Legato.
+      </div>
+      <div class="decision-cell">
+        <strong>Hardware</strong>
+        The next audible note appears when queued CV/gate events reach the output tick.
+      </div>
+    </div>
+
+    <div class="decision-row">
+      <div class="stage">10. Cycle end</div>
+      <div class="decision-cell">
+        <strong>When it wraps</strong>
+        After Last, playback returns to First.
+      </div>
+      <div class="decision-cell">
+        <strong>Evolution decisions</strong>
+        <span class="coin">Patience R/M can invalidate loop material. Mutate can permute or regenerate loop material. Jump can change octave offset. Sleep can delay later events.</span>
+      </div>
+      <div class="decision-cell">
+        <strong>Next cycle</strong>
+        The next C might stay C, repeat, become another pitch, become silence, or be followed by more hits in the same evaluated step.
+      </div>
+    </div>
+  </div>
+
+  <section class="note">
+    <p><strong>What this reveals:</strong> most user controls are not atoms by themselves. They are inputs to a few ordered decisions. The important simplification target is to make each decision produce one clear intermediate result, then feed the next decision.</p>
+  </section>
+
+  <h2>Under The Hood: Engine Checklist</h2>
+  <p>This is the same path from the engine's point of view. It starts with "C is currently sounding" and asks what data must be read, what formula or branch runs, and what gets written before the next audible output exists.</p>
+
+  <div class="sequence">
+    <ol>
+      <li><strong>Where am I?</strong> Current time, phase, input position, or linked position.</li>
+      <li><strong>Did a boundary happen?</strong> Whether playback crossed a line that requires a state transition.</li>
+      <li><strong>What is active now?</strong> The current piece of material after boundary handling.</li>
+      <li><strong>What does active material become?</strong> The evaluated runtime result after parameters, modulation, rules, and constraints.</li>
+      <li><strong>What output actions are required?</strong> The immediate or scheduled changes requested by the evaluated result.</li>
+      <li><strong>What output state is visible now?</strong> The current gate, CV, activity, and progress exposed to the rest of Performer.</li>
+      <li><strong>What must be remembered?</strong> Runtime state needed to answer the next tick correctly.</li>
+    </ol>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Segment</th>
+        <th>Engine Question</th>
+        <th>Data To Gather</th>
+        <th>Formula Or Branch</th>
+        <th>Writes / Output</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1. Where am I?</td>
+        <td>What tick is being processed?</td>
+        <td>Performer transport tick, track engine runtime state.</td>
+        <td>The engine runs once per clock tick. Queues are checked against absolute tick values.</td>
+        <td>Any due gate/CV queue events are applied to physical outputs.</td>
+      </tr>
+      <tr>
+        <td>1. Where am I?</td>
+        <td>How long is the current stochastic timing unit?</td>
+        <td>Divisor, Clock Multiplier, global PPQN ratio.</td>
+        <td><code>baseTicks = divisor * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN)</code>. Then divide by clock multiplier and round. Clamp to at least 1 tick.</td>
+        <td>Runtime divisor used for duration and step timing.</td>
+      </tr>
+      <tr>
+        <td>2. Did a boundary happen?</td>
+        <td>Has the current event duration ended?</td>
+        <td>Current event duration, elapsed ticks since event start.</td>
+        <td>If <code>elapsed &lt; eventDuration</code>, do not choose a new event yet.</td>
+        <td>C continues, or its queued gate-off may already have released the envelope.</td>
+      </tr>
+      <tr>
+        <td>2. Did a boundary happen?</td>
+        <td>Is playback blocked before the next event?</td>
+        <td>Sleep counter from previous cycle end.</td>
+        <td>If sleep remaining is positive, decrement it instead of triggering a new step.</td>
+        <td>No new material chosen. Existing output/queued releases continue.</td>
+      </tr>
+      <tr>
+        <td>2. Did a boundary happen?</td>
+        <td>Did the active loop window change while playing?</td>
+        <td>Fresh First/Last/Size, current pattern index, queued events.</td>
+        <td>If active playhead is outside the new window, snap it to First. Clear stale gate/CV queues and force gate low.</td>
+        <td>Playback stops referencing slots from the old loop length.</td>
+      </tr>
+      <tr>
+        <td>3. What is active now?</td>
+        <td>Which loop slot is active?</td>
+        <td>Current pattern index, First, Last, Size, Rotate.</td>
+        <td>Clamp playhead into First..Last. Read index is optionally rotated inside that window.</td>
+        <td>One read slot is selected. Playhead truth and read-slot truth can differ because of Rotate.</td>
+      </tr>
+      <tr>
+        <td>3. What is active now?</td>
+        <td>Which source owns the active material?</td>
+        <td>Rhythm mode, Melody mode, rhythm valid flag, melody valid flag, scale, root.</td>
+        <td>Loop mode reads stored/generated material. If invalid, regenerate that domain before reading it. Live mode generates at trigger time.</td>
+        <td>Valid rhythm and melody material are available for the selected slot.</td>
+      </tr>
+      <tr>
+        <td>3. What is active now?</td>
+        <td>Does Repeat replace active material?</td>
+        <td>Repeat probability, last emitted event, RNG.</td>
+        <td>If last event is valid and random 0..99 is below Repeat, reuse the last emitted event.</td>
+        <td>Either an override event is selected, or the engine continues evaluating the current slot.</td>
+      </tr>
+      <tr>
+        <td>4. What does active material become?</td>
+        <td>What duration does active rhythm produce?</td>
+        <td>Note Duration, Variation, Duration Tickets, RNG.</td>
+        <td>Build weights around the Note Duration center. Variation widens the kernel. Duration Tickets multiply bucket weights. Weighted random draw picks one duration index.</td>
+        <td>Duration index for this event.</td>
+      </tr>
+      <tr>
+        <td>4. What does active material become?</td>
+        <td>How many ticks until the next event boundary?</td>
+        <td>Duration index, runtime divisor.</td>
+        <td>Look up the duration fraction. <code>eventDuration = max(1, divisorTicks * numerator / denominator)</code>.</td>
+        <td>New event duration is stored in engine runtime state.</td>
+      </tr>
+      <tr>
+        <td>4. What does active material become?</td>
+        <td>Does rhythm request silence?</td>
+        <td>Rest, RNG, rhythm validity.</td>
+        <td>When rhythm is generated, Rest is a Bernoulli draw. In Loop mode the stored rest bit is read.</td>
+        <td>Pre-filter rest state.</td>
+      </tr>
+      <tr>
+        <td>4. What does active material become?</td>
+        <td>What gate behavior is attached to the material?</td>
+        <td>Gate Length, Legato, Slide, RNG, event duration.</td>
+        <td>Legato suppresses normal gate-off. Slide marks CV transition. Gate Length maps duration to a percent, with spread if the routed value is above zero, then floors to the audible minimum.</td>
+        <td>Gate-off tick and slide flag are known if the event passes filters.</td>
+      </tr>
+      <tr>
+        <td>4. What does active material become?</td>
+        <td>What pitch choices are legal?</td>
+        <td>Scale, Range, Pitch Tickets, Min Degree, Max Degree, Steps.</td>
+        <td>Enumerate legal scale degrees across the allowed range. Remove impossible or disabled ticket entries. Steps keeps only the strongest part of the pool.</td>
+        <td>Candidate degree/octave list.</td>
+      </tr>
+      <tr>
+        <td>4. What does active material become?</td>
+        <td>Which pitch is selected?</td>
+        <td>Candidate pool, Complexity, Contour, Marbles Bias, Marbles Spread, previous degree, Pitch Tickets, RNG.</td>
+        <td>Each candidate gets a weight from ticket strength, distance from previous degree, contour direction, and marbles bias/spread. Weighted random draw picks absolute degree.</td>
+        <td>Event degree and octave. Previous-degree memory is updated.</td>
+      </tr>
+      <tr>
+        <td>4. What does active material become?</td>
+        <td>What voltage target follows from selected pitch?</td>
+        <td>Degree, octave, Scale, Root, track Octave, Transpose, Jump register.</td>
+        <td><code>note = degree + (octave + trackOctave + jump) * notesPerOctave + transpose</code>. Then scale maps note to volts. Chromatic root adds semitone voltage.</td>
+        <td>Final CV target.</td>
+      </tr>
+      <tr>
+        <td>4. What does active material become?</td>
+        <td>Does filtering silence the evaluated result?</td>
+        <td>Mask, Tilt-derived rank, window size, rhythm/melody validity.</td>
+        <td>If Mask is 100, pass. Otherwise pass when <code>rank * 100 &lt; mask * windowSize</code>. Failed validity also silences.</td>
+        <td>Final rest/pass decision.</td>
+      </tr>
+      <tr>
+        <td>4. What does active material become?</td>
+        <td>How many hits does this evaluated step return?</td>
+        <td>Burst, Burst Count, Burst Rate, Burst Pitch, duration ticks, RNG, candidate pitch machinery.</td>
+        <td>If Rest/Mask fails, return zero hits. If Burst does not fire, return one hit. If Burst fires, return an ordered list of hits with offsets inside the evaluated step. The scheduler only needs the ordered list.</td>
+        <td><code>hitList[]</code>: each hit has tick offset, CV target, gate length, slide/legato flags, and optional UI/debug provenance.</td>
+      </tr>
+      <tr>
+        <td>5. What output actions are required?</td>
+        <td>What if the hit list is empty?</td>
+        <td>CV Update mode, final CV target, current tick.</td>
+        <td>Empty list means no audible hit. Force gate low. Only queue CV if CV Update mode says rests should update pitch.</td>
+        <td>Next output is <code>Gate = low</code>. CV either stays where it was or moves to the evaluated rest pitch.</td>
+      </tr>
+      <tr>
+        <td>5. What output actions are required?</td>
+        <td>How is a hit converted to queue events?</td>
+        <td>One hit from <code>hitList[]</code>, current tick, step start tick.</td>
+        <td><code>hitTick = stepStartTick + hit.offset</code>. Queue CV at <code>hitTick</code>. Queue gate high at <code>hitTick</code>. If not legato, queue gate low at <code>hitTick + hit.gateLength</code>.</td>
+        <td>Absolute CV and gate queue entries exist for this hit.</td>
+      </tr>
+      <tr>
+        <td>5. What output actions are required?</td>
+        <td>How are several hits handled?</td>
+        <td>Ordered <code>hitList[]</code>.</td>
+        <td>Loop through hits in time order and apply the same queue formula to each one. Later hits are just more hits with later ticks.</td>
+        <td>Queues contain one ordered hardware schedule for the evaluated step.</td>
+      </tr>
+      <tr>
+        <td>6. What output state is visible now?</td>
+        <td>So what is the next gate/CV output?</td>
+        <td>Earliest due CV queue entry, earliest due gate queue entry, current tick.</td>
+        <td>When <code>currentTick &gt;= queued.tick</code>, drain the queue entry. CV queue sets output voltage. Gate queue sets high or low.</td>
+        <td><strong>Concrete result:</strong> <code>CV = X volts at tick T</code>, <code>Gate = high at tick T</code>, then usually <code>Gate = low at tick T + gateLength</code>.</td>
+      </tr>
+      <tr>
+        <td>7. What must be remembered?</td>
+        <td>Where does the playhead go next?</td>
+        <td>Pattern index, First, Last.</td>
+        <td>Increment pattern index. If it passes Last, wrap to First and mark cycle end.</td>
+        <td>Next playhead position, cycle-ended flag.</td>
+      </tr>
+      <tr>
+        <td>7. What must be remembered?</td>
+        <td>What history should UI and Repeat see?</td>
+        <td>Evaluated hit list, rest/pass result, read index, final emitted CV/gate facts.</td>
+        <td>Record recent output after evaluation, not before source choice. Repeat stores the emitted result, not merely the source slot.</td>
+        <td>Recent-output history and last-emitted cache.</td>
+      </tr>
+      <tr>
+        <td>7. What must be remembered?</td>
+        <td>At cycle end, does the future change?</td>
+        <td>Patience R/M, Mutate, Jump, Sleep, Lock policy, RNG, source modes.</td>
+        <td>Patience may invalidate loop domains. Mutate may permute or regenerate stored material. Jump may change octave register. Sleep may set a skip counter.</td>
+        <td>Next cycle's source material or runtime modifiers may differ.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="fig">
+    <svg viewBox="0 0 980 660" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stochastic engine boundary map">
+      <defs>
+        <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <polygon points="0 0, 10 5, 0 10" fill="#888" />
+        </marker>
+        <marker id="arrowhead-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <polygon points="0 0, 10 5, 0 10" fill="#2f5d7c" />
+        </marker>
+        <marker id="arrowhead-warm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <polygon points="0 0, 10 5, 0 10" fill="#8a641f" />
+        </marker>
+        <marker id="arrowhead-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <polygon points="0 0, 10 5, 0 10" fill="#9a3d32" />
+        </marker>
+      </defs>
+
+      <text x="490" y="24" text-anchor="middle" class="sch-text">Stochastic Engine Boundary Map</text>
+      <text x="490" y="42" text-anchor="middle" class="sch-small">Outer loop runs every tick. Nested hit boundaries only exist after evaluation returns a hit list.</text>
+
+      <!-- Every tick lane -->
+      <rect x="28" y="64" width="924" height="118" rx="8" class="sch-blue" opacity="0.45" />
+      <text x="44" y="84" class="sch-small">EVERY ENGINE TICK</text>
+
+      <rect x="54" y="104" width="130" height="48" rx="6" class="sch-block" />
+      <text x="119" y="124" text-anchor="middle" class="sch-text">Input</text>
+      <text x="119" y="140" text-anchor="middle" class="sch-small">tick + runtime</text>
+
+      <path class="sch-arrow" d="M184,128 L228,128" />
+      <rect x="228" y="98" width="150" height="60" rx="6" class="sch-warm" />
+      <text x="303" y="119" text-anchor="middle" class="sch-text">Boundary</text>
+      <text x="303" y="136" text-anchor="middle" class="sch-small">queued tick due?</text>
+      <text x="303" y="150" text-anchor="middle" class="sch-small">CV / gate queue</text>
+
+      <path class="sch-arrow-blue" d="M378,128 L424,128" />
+      <rect x="424" y="98" width="140" height="60" rx="6" class="sch-accent" />
+      <text x="494" y="119" text-anchor="middle" class="sch-text">Output</text>
+      <text x="494" y="136" text-anchor="middle" class="sch-small">visible CV/gate</text>
+      <text x="494" y="150" text-anchor="middle" class="sch-small">activity state</text>
+
+      <path class="sch-arrow" d="M564,128 L610,128" />
+      <rect x="610" y="98" width="150" height="60" rx="6" class="sch-warm" />
+      <text x="685" y="119" text-anchor="middle" class="sch-text">Boundary</text>
+      <text x="685" y="136" text-anchor="middle" class="sch-small">event duration</text>
+      <text x="685" y="150" text-anchor="middle" class="sch-small">elapsed enough?</text>
+
+      <path class="sch-arrow" d="M760,128 L806,128" />
+      <rect x="806" y="98" width="116" height="60" rx="6" class="sch-muted" />
+      <text x="864" y="119" text-anchor="middle" class="sch-text">No boundary</text>
+      <text x="864" y="136" text-anchor="middle" class="sch-small">remember</text>
+      <text x="864" y="150" text-anchor="middle" class="sch-small">elapsed tick</text>
+
+      <!-- Evaluation lane -->
+      <rect x="28" y="210" width="924" height="198" rx="8" class="sch-accent" opacity="0.35" />
+      <text x="44" y="230" class="sch-small">EVENT BOUNDARY REACHED</text>
+
+      <path class="sch-arrow-warm" d="M685,158 L685,190 L90,190 L90,250" />
+      <rect x="52" y="250" width="130" height="56" rx="6" class="sch-red" />
+      <text x="117" y="270" text-anchor="middle" class="sch-text">Boundary</text>
+      <text x="117" y="287" text-anchor="middle" class="sch-small">sleep active?</text>
+      <text x="117" y="301" text-anchor="middle" class="sch-small">skip event</text>
+
+      <path class="sch-arrow" d="M182,278 L222,278" />
+      <rect x="222" y="250" width="132" height="56" rx="6" class="sch-warm" />
+      <text x="288" y="270" text-anchor="middle" class="sch-text">Boundary</text>
+      <text x="288" y="287" text-anchor="middle" class="sch-small">window valid?</text>
+      <text x="288" y="301" text-anchor="middle" class="sch-small">First..Last</text>
+
+      <path class="sch-arrow" d="M354,278 L394,278" />
+      <rect x="394" y="250" width="134" height="56" rx="6" class="sch-blue" />
+      <text x="461" y="270" text-anchor="middle" class="sch-text">Active</text>
+      <text x="461" y="287" text-anchor="middle" class="sch-small">read slot</text>
+      <text x="461" y="301" text-anchor="middle" class="sch-small">source mode</text>
+
+      <path class="sch-arrow" d="M528,278 L568,278" />
+      <rect x="568" y="250" width="140" height="56" rx="6" class="sch-warm" />
+      <text x="638" y="270" text-anchor="middle" class="sch-text">Boundary</text>
+      <text x="638" y="287" text-anchor="middle" class="sch-small">source valid?</text>
+      <text x="638" y="301" text-anchor="middle" class="sch-small">Loop / Live</text>
+
+      <path class="sch-arrow" d="M708,278 L748,278" />
+      <rect x="748" y="250" width="148" height="56" rx="6" class="sch-warm" />
+      <text x="822" y="270" text-anchor="middle" class="sch-text">Boundary</text>
+      <text x="822" y="287" text-anchor="middle" class="sch-small">Repeat wins?</text>
+      <text x="822" y="301" text-anchor="middle" class="sch-small">use last emitted</text>
+
+      <rect x="222" y="330" width="168" height="52" rx="6" class="sch-blue" />
+      <text x="306" y="350" text-anchor="middle" class="sch-text">Inputs</text>
+      <text x="306" y="367" text-anchor="middle" class="sch-small">knobs + tickets + RNG</text>
+
+      <path class="sch-arrow-blue" d="M390,356 L436,356" />
+      <rect x="436" y="330" width="168" height="52" rx="6" class="sch-accent" />
+      <text x="520" y="350" text-anchor="middle" class="sch-text">Evaluate material</text>
+      <text x="520" y="367" text-anchor="middle" class="sch-small">time + pitch + gate</text>
+
+      <path class="sch-arrow-warm" d="M604,356 L650,356" />
+      <rect x="650" y="330" width="168" height="52" rx="6" class="sch-warm" />
+      <text x="734" y="350" text-anchor="middle" class="sch-text">Boundary</text>
+      <text x="734" y="367" text-anchor="middle" class="sch-small">rest / mask pass?</text>
+
+      <path class="sch-arrow-blue" d="M818,356 L880,356 L880,430" />
+
+      <!-- Nested hit lane -->
+      <rect x="28" y="436" width="924" height="126" rx="8" class="sch-warm" opacity="0.32" />
+      <text x="44" y="456" class="sch-small">NESTED HIT-LIST BOUNDARIES</text>
+
+      <rect x="70" y="480" width="138" height="52" rx="6" class="sch-accent" />
+      <text x="139" y="500" text-anchor="middle" class="sch-text">hitList[]</text>
+      <text x="139" y="517" text-anchor="middle" class="sch-small">0, 1, or N hits</text>
+
+      <path class="sch-arrow" d="M208,506 L250,506" />
+      <rect x="250" y="480" width="150" height="52" rx="6" class="sch-warm" />
+      <text x="325" y="500" text-anchor="middle" class="sch-text">Boundary</text>
+      <text x="325" y="517" text-anchor="middle" class="sch-small">hit offset due?</text>
+
+      <path class="sch-arrow-blue" d="M400,506 L442,506" />
+      <rect x="442" y="480" width="154" height="52" rx="6" class="sch-blue" />
+      <text x="519" y="500" text-anchor="middle" class="sch-text">Output action</text>
+      <text x="519" y="517" text-anchor="middle" class="sch-small">CV + gate high</text>
+
+      <path class="sch-arrow" d="M596,506 L638,506" />
+      <rect x="638" y="480" width="154" height="52" rx="6" class="sch-warm" />
+      <text x="715" y="500" text-anchor="middle" class="sch-text">Boundary</text>
+      <text x="715" y="517" text-anchor="middle" class="sch-small">gate length due?</text>
+
+      <path class="sch-arrow-blue" d="M792,506 L834,506" />
+      <rect x="834" y="480" width="86" height="52" rx="6" class="sch-blue" />
+      <text x="877" y="500" text-anchor="middle" class="sch-text">Action</text>
+      <text x="877" y="517" text-anchor="middle" class="sch-small">gate low</text>
+
+      <path class="sch-dash" d="M877,480 L877,430 L880,430" />
+      <path class="sch-arrow-blue" d="M880,430 L880,408" />
+
+      <!-- Cycle/state lane -->
+      <rect x="28" y="590" width="924" height="52" rx="8" class="sch-muted" />
+      <text x="44" y="611" class="sch-small">STATE REMEMBERED FOR NEXT TICK</text>
+      <text x="260" y="611" class="sch-small">playhead / elapsed / queues / last emitted / RNG / valid flags</text>
+      <rect x="710" y="602" width="196" height="28" rx="6" class="sch-warm" />
+      <text x="808" y="621" text-anchor="middle" class="sch-small">cycle wrap: patience, mutate, jump, sleep</text>
+
+      <path class="sch-arrow" d="M734,382 L734,590" />
+      <path class="sch-arrow-warm" d="M808,602 L808,562" />
+
+      <!-- Side boundary inputs -->
+      <rect x="46" y="344" width="126" height="38" rx="6" class="sch-red" />
+      <text x="109" y="360" text-anchor="middle" class="sch-small">async input</text>
+      <text x="109" y="374" text-anchor="middle" class="sch-small">window edit</text>
+      <path class="sch-arrow-red" d="M172,363 L222,300" stroke-dasharray="5 4" />
+    </svg>
+    <div class="fig-caption">Explicit boundaries are checked by the outer engine tick. Nested boundaries appear after the evaluated material returns a hit list and are flattened into normal CV/gate queue actions.</div>
+  </div>
+
+  <h2>The Performer Molecule</h2>
+  <p>A stochastic track is not an isolated algorithm. It is one track mode inside Performer. That adds plumbing which is not optional.</p>
+
+  <div class="flow">
+    <div class="box">
+      <strong>Project/Pattern</strong>
+      Pattern selection chooses which stochastic sequence is active. Copy/paste and save/load must preserve the model shape.
+    </div>
+    <div class="box">
+      <strong>Clock</strong>
+      Performer clock produces ticks. Divisor and clock multiplier turn user timing into tick intervals.
+    </div>
+    <div class="box">
+      <strong>Track Engine</strong>
+      Runtime state owns queues, current position, recent output, RNG state, patience counters, and gate/CV scheduling.
+    </div>
+    <div class="box">
+      <strong>Routing</strong>
+      Routable controls can be overridden by CV or internal modulation. The atom must read the routed value, not only the knob base.
+    </div>
+    <div class="box">
+      <strong>Hardware Output</strong>
+      Final CV and gate are consumed by oscillator, envelope, VCA, MIDI, or other downstream hardware.
+    </div>
+  </div>
+
+  <h2>What Each Atom Must Connect To</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Performer Layer</th>
+        <th>Question It Answers</th>
+        <th>Why It Matters</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Model ownership</td>
+        <td>Is this pattern material, track-global control, or runtime state?</td>
+        <td>Wrong ownership causes save/load lies, pattern switching bugs, and UI reading the wrong truth.</td>
+      </tr>
+      <tr>
+        <td>Clock order</td>
+        <td>Does this happen on every tick, on event trigger, or at cycle wrap?</td>
+        <td>Timing decisions cannot be scattered. They decide when the next note appears.</td>
+      </tr>
+      <tr>
+        <td>Routing</td>
+        <td>Can this value be modulated?</td>
+        <td>Routable controls need one read path so CV and base values do not diverge.</td>
+      </tr>
+      <tr>
+        <td>UI truth</td>
+        <td>Does the page draw the stored material, generated output, or recent hardware output?</td>
+        <td>Direct, Loop, Pitch, and Duration pages must not imply different realities.</td>
+      </tr>
+      <tr>
+        <td>Queue ownership</td>
+        <td>Does this atom schedule gate/CV, or only produce material for the scheduler?</td>
+        <td>Atoms that directly push queues multiply playback branches.</td>
+      </tr>
+      <tr>
+        <td>Resource budget</td>
+        <td>Does this add bytes per pattern, per track, per engine, or globally?</td>
+        <td>Per-pattern model bytes multiply fast. Engine bytes can affect all eight track engines through container size.</td>
+      </tr>
+      <tr>
+        <td>Track-mode integration</td>
+        <td>Does this obey Performer reset, stop, pattern change, selected track changes, and output rotation?</td>
+        <td>The stochastic track must behave like a Performer track, not a special side app.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Current Entanglement Smells</h2>
+  <p>These are signs that a user feature is not a clean atom yet.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>Current Smell</th>
+        <th>Cleaner Direction</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Repeat</td>
+        <td class="risk">It reuses previous material at playback time, so it interacts with RNG, mask rank, previous event cache, and burst playback.</td>
+        <td>Make it either a generation-time decision or a clearly isolated playback transform.</td>
+      </tr>
+      <tr>
+        <td>Burst</td>
+        <td class="risk">It is part stored recipe, part cache expansion, part playback branch.</td>
+        <td>Treat it as one expansion atom that produces scheduled hits before the engine pump.</td>
+      </tr>
+      <tr>
+        <td>Live source</td>
+        <td class="risk">It generates fresh material but also writes back into loop material for UI visibility.</td>
+        <td>Separate live output history from loop storage.</td>
+      </tr>
+      <tr>
+        <td>Mask/Tilt</td>
+        <td class="risk">Rank can live in stored event bytes, cache metadata, or recomputed runtime state.</td>
+        <td>Pick one rank truth and make UI/engine read that.</td>
+      </tr>
+      <tr>
+        <td>First/Last edits</td>
+        <td class="risk">The model changes immediately, but engine queues and current position may still point at old timing.</td>
+        <td>Window edits must notify engine state immediately when the active track is playing.</td>
+      </tr>
+      <tr>
+        <td>Lock</td>
+        <td class="risk">The UI has a toggle, but the engine currently ignores it after heap-cache removal.</td>
+        <td>Lock should freeze one clear output truth, not a recipe plus runtime leftovers.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Recommended Internal Rule</h2>
+  <section class="warning">
+    <p><strong>Rule:</strong> a user feature should operate at one layer. If a feature touches model storage, cache building, queue scheduling, UI history, and cycle-end mutation at the same time, it is not an atom. It is a source of future bugs.</p>
+  </section>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Layer</th>
+        <th>Allowed Job</th>
+        <th>Should Not Do</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Generator</td>
+        <td>Turn user controls and RNG into musical material.</td>
+        <td>Drain hardware queues or depend on UI state.</td>
+      </tr>
+      <tr>
+        <td>Material representation</td>
+        <td>Hold the generated loop truth in one format.</td>
+        <td>Mirror another representation indefinitely.</td>
+      </tr>
+      <tr>
+        <td>Engine pump</td>
+        <td>Schedule final CV and gate at ticks.</td>
+        <td>Know why a hit exists unless necessary for timing.</td>
+      </tr>
+      <tr>
+        <td>Evolution</td>
+        <td>Change material at cycle boundaries or explicit user actions.</td>
+        <td>Patch already-scheduled hardware events invisibly.</td>
+      </tr>
+      <tr>
+        <td>UI</td>
+        <td>Display stored material, generated output, or recent hardware output with clear intent.</td>
+        <td>Use a source-tape view as a proxy for evaluated output without saying so.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Human-Time Playback Walkthrough</h2>
+  <div class="sequence">
+    <ol>
+      <li>User presses play. Performer clock starts producing ticks.</li>
+      <li>The stochastic track reads pattern and track state: divisor, clock multiplier, source modes, first, last, size, rotate.</li>
+      <li>The source atom decides whether rhythm and melody come from stored loop material or fresh generation.</li>
+      <li>The time atom decides the event duration. That duration decides when the next main event can appear.</li>
+      <li>The pitch atom chooses degree/octave. Performer scale, root, octave, transpose, and jump convert that into final CV.</li>
+      <li>The articulation atom decides rest, slide, legato, and gate length.</li>
+      <li>The hit-count decision returns zero, one, or several ordered hits for the evaluated step.</li>
+      <li>The filter atom may silence material according to mask and tilt.</li>
+      <li>The engine pump schedules CV and gate events at absolute ticks.</li>
+      <li>At cycle wrap, evolution atoms may change the next cycle: patience, mutate, jump, sleep, NewR, NewM.</li>
+    </ol>
+  </div>
+
+  <h2>Useful Decision</h2>
+  <p>The useful top-level decision is whether stochastic keeps one truth for evaluated musical material before it becomes gate/CV queue events.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Design Direction</th>
+        <th>Effect</th>
+        <th>Verdict</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Keep source events plus cache plus playback fallbacks</td>
+        <td>Preserves current behavior but keeps multiplying branches.</td>
+        <td class="no">Bad long-term</td>
+      </tr>
+      <tr>
+        <td>Delete source events but replace them with seed-only recipes</td>
+        <td>Saves model RAM but weakens exact loop identity and lock semantics.</td>
+        <td class="risk">Useful only if that product behavior is intended</td>
+      </tr>
+      <tr>
+        <td>Use one generated material format and make engine pump it</td>
+        <td>Generator, engine, UI, and lock converge on one truth.</td>
+        <td class="yes">Best architecture</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Plain Test For Future Features</h2>
+  <p>Before adding or changing a stochastic feature, answer these in order:</p>
+  <ol>
+    <li>Which atom does this belong to?</li>
+    <li>Which Performer layer owns its state?</li>
+    <li>When does it run: generation, trigger, tick, or cycle wrap?</li>
+    <li>Does it affect stored material or only the next output?</li>
+    <li>What does the UI draw: parameter, generated material, or recent output?</li>
+    <li>What is the per-pattern, per-track, or per-engine RAM cost?</li>
+    <li>What breaks if the feature is deleted?</li>
+  </ol>
+
+  <p class="footer">Drafted as a stochastic architecture reference for Performer track integration. Light-background document by request.</p>
+</main>
+</body>
+</html>

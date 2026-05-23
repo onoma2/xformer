@@ -1,5 +1,20 @@
 # Fractal Track Engine — Recorder/Mutator Design
 
+> Current status, 2026-05-22: historical spec. The current best contract is in
+> `.tasks/fractal-track-implementation/TASK.md`,
+> `.tasks/fractal-track-implementation/DICTIONARY.md`, and
+> `docs/fractal-track-options-comparison.html`.
+>
+> Current topology: FractalTrack is a parent-dependent command/rule sequencer over
+> sampled melodic CV/gate material. Parent tracks provide the motif; the engine keeps a
+> small volatile trunk of 16-bit pitch/gate-length sections; the model owns capture/read rules
+> such as record extent, Replace/Latch/Once, PunchIn, lock, and loop lens. Fractal is a
+> melodic material mirror, not a high-fidelity CV recorder. It should not aim to capture
+> every CV movement inside a section. Fractal does not know why the parent output changed:
+> parent sequencing state, mutes, routing, resetMeasure, held notes, curves, and scripts are all opaque.
+> Older sections below that mention heap buffers, `_recordArmed`, 32-bit step words,
+> no gate length, tick-rate fidelity, or a separate manual recorder phase are superseded.
+
 ## Summary
 
 FractalTrack is a step-sampled CV/gate child layer over one or two source tracks: it captures their gate+CV output once per step into a small grid (the trunk), then plays that grid back on loop with Proteus-style mutation evolving it at loop boundaries. On top of the trunk sit zero-storage branches (live math transforms — reverse, invert, transpose, etc.) and per-step ornamentation (trills, anticipations, mordents) that compose into a generative output. Identity: not a stochastic generator, not a step sequencer — a record-and-evolve child layer with trunk → branches → ornamentation as three composable layers, driven by TuesdayTrack-style track-level macro controls, not per-step programming.

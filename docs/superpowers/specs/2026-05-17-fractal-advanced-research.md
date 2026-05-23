@@ -1,5 +1,15 @@
 # Fractal Track — Advanced Features Research
 
+> Current status, 2026-05-22: post-MVP research only. The current Fractal contract is
+> parent melodic material -> volatile engine trunk -> model-owned command/rule sequence
+> -> output. Capture policy is a model rule, not a separate `_recordArmed` recorder phase.
+> Fractal is not a high-fidelity CV recorder; ideas below that imply capturing every CV
+> movement inside a section are out of scope unless explicitly promoted as a separate mode.
+> The captured unit is a Fractal section, not a parent event. Parent sequencing state,
+> mutes, routing causes, resetMeasure events, held notes, curves, and scripts are opaque.
+> Treat older "record arm" language below as "capture rule / external write arm" unless a
+> future implementation explicitly restores a manual arm flag.
+
 Four research areas for post-MVP Fractal Track features. Each section covers what exists in the codebase, what can be reused, and what needs new code.
 
 ---
@@ -16,7 +26,8 @@ The Performer has three recording trigger mechanisms, all operating on the globa
 | Gate sync | `RoutingEngine.cpp:632` | `Routing::Target::Record` — gate high = record ON, low = OFF |
 | Gate toggle | `RoutingEngine.cpp:637` | `Routing::Target::RecordToggle` — rising edge toggles |
 
-The Fractal MVP already defines Fractal-local `_recordArmed` (KD-7), decoupled from global recording. This is the right foundation.
+The current Fractal contract defines model-owned capture rules, decoupled from global
+recording. This is the right foundation.
 
 ### Proposed Trigger Variants for Fractal
 
@@ -37,16 +48,16 @@ All variants would be implemented as a `RecordTrigger` enum on `FractalTrack`:
 The engine's `tick()` already knows when it crosses a loop boundary (step wraps from `loopLast` to `loopFirst`). Adding a trigger evaluation at that point is trivial:
 
 ```cpp
-// In triggerStep(), before recording logic:
+// In triggerStep(), before capture-rule execution:
 switch (_fractalTrack.recordTrigger()) {
 case RecordTrigger::LoopBoundary:
-    if (_loopBoundaryFlag && !_recordArmed) {
-        _recordArmed = true;
-        _recordStopAtLoopEnd = true; // auto-disarm after one pass
+    if (_loopBoundaryFlag && !captureRuleActive()) {
+        armCaptureRule();
+        setCaptureOnce(); // auto-disable writes after one pass
     }
     break;
 case RecordTrigger::SourceGate:
-    _recordArmed = sourceGateA || sourceGateB;
+    setCaptureRuleActive(sourceGateA || sourceGateB);
     break;
 // ... etc
 }
@@ -54,7 +65,7 @@ case RecordTrigger::SourceGate:
 
 ### Key Decision
 
-Should Fractal-local record triggers reuse the existing Routing infrastructure (so any CV input can trigger via `Routing::Target::FractalRecord`), or should they be internal-only? Recommendation: add `FractalRecord` and `FractalRecordToggle` to `Routing::Target` so external CV/gate can trigger Fractal recording independently of the global record state. This gives maximum flexibility without architectural changes.
+Should Fractal-local capture triggers reuse the existing Routing infrastructure (so any CV input can arm writes via `Routing::Target::FractalRecord`), or should they be internal-only? Recommendation: add `FractalRecord` and `FractalRecordToggle` to `Routing::Target` so external CV/gate can arm Fractal capture independently of the global record state. This gives maximum flexibility without architectural changes.
 
 ---
 
