@@ -38,7 +38,11 @@ constexpr uint8_t kMaxOctave = 15;
 // reduces burst-truncation in dense patterns. Once Phase 16 P5 lands
 // (flat cell model where bursts no longer spawn separate cells), the
 // optimal cap may drop back to 64 — revisit after P5.
-constexpr int kCellCap = 80;
+// Pinned at 64 (Codex H1, 2026-05-23): CellAux::rank is 6 bits (0..63).
+// Raising kCellCap past 64 wraps cells 64+ ranks via the 0x3f mask in
+// setRank(), corrupting Mask/Tilt ordering. Widen the rank field to 7
+// bits (one spare bit in CellAux today) before raising the cap.
+constexpr int kCellCap = 64;
 
 struct CachedCell {
     uint32_t packed;
