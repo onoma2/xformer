@@ -285,7 +285,14 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         const uint8_t curBurstRate    = uint8_t(sequence.burstRate());
         const uint8_t curBurstPitch   = uint8_t(sequence.burstPitch());
         const uint8_t curRange        = uint8_t(sequence.range());
-        if (!_shapingSnapshotValid
+        const bool firstRun = !_shapingSnapshotValid;
+        const bool pitchKnobMoved = !firstRun && (
+               curComplexity != _lastShapingComplexity
+            || curContour    != _lastShapingContour
+            || curBias       != _lastShapingMarblesBias
+            || curSpread     != _lastShapingMarblesSpread
+            || curRange      != _lastShapingRange);
+        const bool anyKnobMoved = firstRun
             || curNoteDuration != _lastShapingNoteDuration
             || curVariation    != _lastShapingVariation
             || curBurst        != _lastShapingBurst
@@ -297,7 +304,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             || curBurstCount   != _lastShapingBurstCount
             || curBurstRate    != _lastShapingBurstRate
             || curBurstPitch   != _lastShapingBurstPitch
-            || curRange        != _lastShapingRange) {
+            || curRange        != _lastShapingRange;
+
+        if (anyKnobMoved) {
             _cacheRefreshPending = true;
             _lastShapingNoteDuration = curNoteDuration;
             _lastShapingVariation    = curVariation;
@@ -312,6 +321,21 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _lastShapingBurstPitch   = curBurstPitch;
             _lastShapingRange        = curRange;
             _shapingSnapshotValid    = true;
+        }
+
+        // Phase 16 P11 (2026-05-23): pitch-shaping knobs (Complexity, Contour,
+        // Bias, Spread, Range) are consumed by generateMelody — not by the
+        // cache walk directly (except for Roll-mode cluster tails). To make
+        // these knobs scrubbable in Loop mode, regenerate the melody tape
+        // using the CURRENT melodySeed whenever any pitch knob moves. Same
+        // seed + new knobs = deterministic new pitch pattern; turn the knob
+        // back and the prior pattern returns. Skip on first run to respect
+        // a freshly-loaded project's saved tape.
+        if (pitchKnobMoved) {
+            const auto &scale_p11 = sequence.selectedScale(_model.project().scale());
+            int rootNote_p11 = sequence.selectedRootNote(_model.project().rootNote());
+            StochasticGenerator::generateMelody(
+                sequence, track, scale_p11, rootNote_p11, sequence.melodySeed());
         }
     }
 
