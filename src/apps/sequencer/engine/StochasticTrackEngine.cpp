@@ -331,7 +331,14 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // seed + new knobs = deterministic new pitch pattern; turn the knob
         // back and the prior pattern returns. Skip on first run to respect
         // a freshly-loaded project's saved tape.
-        if (pitchKnobMoved) {
+        //
+        // Phase 16 P11 fix (2026-05-23): Live mode keeps its own per-event
+        // generation via _rng and accumulates the tape as a history shadow.
+        // generateMelody here would wipe that history with seed-derived
+        // pitches every time a pitch knob moved — destroying Live's identity.
+        // Skip the regen unless melodyMode is Loop; in Live, knob changes
+        // already reach future events via the next generateMelodyEvent call.
+        if (pitchKnobMoved && sequence.melodyMode() == StochasticSourceMode::Loop) {
             const auto &scale_p11 = sequence.selectedScale(_model.project().scale());
             int rootNote_p11 = sequence.selectedRootNote(_model.project().rootNote());
             StochasticGenerator::generateMelody(
