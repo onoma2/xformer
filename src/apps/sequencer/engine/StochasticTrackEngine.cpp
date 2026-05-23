@@ -472,8 +472,19 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _gateQueue.push({ tick, true });
 
             if (!isLegato && childCount == 0) {
-                uint32_t gateLen = pickGateLength(durationTicks, sequence.gateLength(), _rng);
-                // DBG_STO("%u GATEpush LIVE OFF p=%d", tick + gateLen, _patternIndex);
+                // Phase 16 P8 (2026-05-23): non-Repeat reads the cell's baked
+                // gate fraction (sequence.gateLength() spread already rolled
+                // at cache build, with cell-keyed RNG → reproducible per cell).
+                // Repeat path uses runtime pickGateLength because _lastEvent
+                // doesn't carry a cache-baked gate fraction.
+                uint32_t gateLen;
+                if (useRepeat) {
+                    gateLen = pickGateLength(durationTicks, sequence.gateLength(), _rng);
+                } else {
+                    gateLen = (durationTicks * uint32_t(cellGateFrac)) / 64u;
+                    if (gateLen < kMinAudibleGateTicks) gateLen = kMinAudibleGateTicks;
+                    if (gateLen > durationTicks) gateLen = durationTicks;
+                }
                 _gateQueue.push({ tick + gateLen, false });
             }
             _activity = true;

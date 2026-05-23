@@ -121,9 +121,11 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 
         // Decide this cell's duration. Cluster overrides the per-cell pick.
         uint32_t cellDur;
+        bool isClusterTail = false;   // continuation cell of an in-flight cluster
         if (clusterRemaining > 0) {
             cellDur = clusterDur;
             --clusterRemaining;
+            isClusterTail = true;
         } else {
             const int picked = StochasticGenerator::pickDurationSlot(seq, cellRng);
             cellDur = lutTicks(uint8_t(picked));
@@ -154,27 +156,56 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             }
         }
 
-        // Pitch resolution per cell. For Roll mode in clusters, we'd reroll
-        // here using keyed RNG — but for now keep simple: every cell uses
-        // its own event.degree()/.octave(). The cluster Hold vs Roll
-        // distinction lands when generator gains keyed-RNG melody (next
-        // session). For Hold semantics today: events written by mutate keep
-        // their degree even inside clusters, which behaves like Hold.
+        // Pitch resolution per cell. Hold (default) copies event.degree/octave
+        // into cluster cells too. Roll (sequence.burstPitch() == Generate)
+        // rerolls the cluster continuation cells via generateDegree using
+        // the per-cell keyed RNG. The cluster STARTER (clusterRemaining was
+        // 0 entering the branch above) keeps its own event pitch — Roll only
+        // affects the trailing cells inside a burst.
         uint8_t cellDegree = uint8_t(ev.degree());
         uint8_t cellOctave = uint8_t(ev.octave());
+        if (isClusterTail
+            && bakeChildNotes
+            && seq.burstPitch() == StochasticBurstPitch::Generate) {
+            int lastDeg = -1;
+            const int degAbs = StochasticGenerator::generateDegree(
+                seq, *track, *scale, lastDeg, cellRng);
+            const int notes = std::max(1, scale->notesPerOctave());
+            cellDegree = uint8_t(degAbs % notes);
+            cellOctave = uint8_t(std::min(int(kMaxOctave), degAbs / notes));
+        }
 
-        // Gate length: 64ths-of-cell-duration. Default 32 (50%) for now;
-        // user gateLength knob modulation lands as a refinement after the
-        // flat model is verified.
-        constexpr uint8_t kDefaultGateFraction = 32;
+        // Gate length per cell. Triangular distribution centered at 50% of
+        // cell duration, widened by sequence.gateLength() (the same kernel
+        // the engine used to apply at trigger time via pickGateLength). Now
+        // baked at cache build so each cell owns its gate fraction.
+        // gateFrac stored as 64ths-of-cell-duration → engine multiplies at
+        // trigger: gateTicks = (durationTicks * gateFrac) / 64.
+        uint8_t cellGateFrac;
+        {
+            int pct = 50;
+            const int spread = std::max(0, std::min(100, int(seq.gateLength())));
+            if (spread > 0) {
+                int r1 = int(cellRng.nextRange(101));
+                int r2 = int(cellRng.nextRange(101));
+                int tri = (r1 + r2) / 2;
+                pct = 50 + ((tri - 50) * spread) / 100;
+            }
+            if (pct < 10) pct = 10;
+            if (pct > 100) pct = 100;
+            int frac = (pct * 64) / 100;
+            if (frac > int(kMaxGateLen)) frac = int(kMaxGateLen);
+            cellGateFrac = uint8_t(frac);
+        }
 
         // Phase 16 P6 (2026-05-23): store per-cell duration, not the
         // absolute cycle position. CachedCell::make clamps at kMaxCellDuration.
+        // Phase 16 P8 (2026-05-23): cellGateFrac stored per cell, picked above.
         cache.cells[cache.count] = CachedCell::make(
             cellDur,
             cellDegree,
             cellOctave,
-            kDefaultGateFraction,
+            cellGateFrac,
             ev.slide(),
             ev.legato(),
             /*audible*/ !ev.rest());

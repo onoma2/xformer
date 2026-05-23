@@ -11,7 +11,9 @@
 #include "apps/sequencer/engine/StochasticCache.h"
 #include "apps/sequencer/engine/StochasticTrackEngine.h"
 #include "apps/sequencer/model/StochasticSequence.h"
+#include "apps/sequencer/model/StochasticTrack.h"
 #include "apps/sequencer/model/StochasticTypes.h"
+#include "apps/sequencer/model/Scale.h"
 
 #include <cstdint>
 
@@ -413,40 +415,132 @@ CASE("tilt_negative_favors_short_durations") {
     expectTrue(rankShort < rankLong, "negative tilt: short cells get LOW ranks (survive Mask)");
 }
 
-CASE("burst_child_degree_octave_parent_mode_copies_parent") {
-    // Patch C step 1b (2026-05-22): when burstPitch == Parent, every burst-
-    // child cell must carry the parent's degree+octave so the engine plays
-    // the same note for the child without consulting evaluateChildren.
-    //
-    // Note: this test doesn't pass scale/track (default nullptrs) so the
-    // builder's bakeChildNotes path is OFF and children would land with
-    // degree=0,octave=0. That's the correct fallback behavior for callers
-    // that skip the scale plumbing. The engine code path always passes
-    // scale+track, exercised below.
+CASE("gate_length_zero_locks_gate_at_50_percent") {
+    // Phase 16 P8 (2026-05-23): cache bakes per-cell gateFrac from
+    // sequence.gateLength() via keyed RNG. gateLength=0 → pct = 50 exactly
+    // → gateFrac = 32 (50% of cell duration in 64ths) on every cell.
     StochasticSequence seq;
     seq.clear();
     clearAllEvents(seq);
+    seq.setSize(8);
     seq.setFirst(0);
-    seq.setLast(0);
-    seq.setBurstPitch(StochasticBurstPitch::Parent);
-
-    auto &ev = seq.events()[0];
-    ev.setDurationIndex(1);          // ×4 = 192 ticks → bursts allowed
-    ev.setDegree(5);
-    ev.setOctave(2);
-    ev.setRest(false);
-    ev.setRhythmValid(true);
-    ev.setChildCount(2);
-    ev.setBurstRate(2);
-
-    // No scale/track -> children land with placeholder degree/octave.
-    Cache cacheNoScale{};
-    regenerateCacheFromEvents(cacheNoScale, seq, 48, 0xabcdef);
-    for (uint8_t i = 1; i < cacheNoScale.count; ++i) {
-        expectTrue(cacheNoScale.aux[i].burstChild(), "trailing cells must be burst children");
-        expectEqual(int(cacheNoScale.cells[i].degree()), 0);
-        expectEqual(int(cacheNoScale.cells[i].octave()), 0);
+    seq.setLast(7);
+    seq.setNoteDuration(5);
+    seq.setVariation(0);
+    seq.setBurst(0);
+    seq.setGateLength(0);   // tight gate kernel
+    for (int i = 0; i < 8; ++i) {
+        seq.events()[i].setRhythmValid(true);
+        seq.events()[i].setRest(false);
     }
+    Cache cache{};
+    regenerateCacheFromEvents(cache, seq, 48, 0xfeed);
+    for (int i = 0; i < int(cache.count); ++i) {
+        expectEqual(int(cache.cells[i].gateLen()), 32,
+                    "gateLength=0 locks every cell to 50% gate fraction (32/64)");
+    }
+}
+
+CASE("gate_length_high_varies_gate_per_cell") {
+    // gateLength=100 widens the triangular kernel to its full 10..100% range.
+    // Two cells with different keyed RNG must produce visibly different
+    // gate fractions (occasionally the picker hits the same value, but a
+    // batch of 16 cells must not all coincide).
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(16);
+    seq.setFirst(0);
+    seq.setLast(15);
+    seq.setNoteDuration(5);
+    seq.setVariation(0);
+    seq.setBurst(0);
+    seq.setGateLength(100);
+    for (int i = 0; i < 16; ++i) {
+        seq.events()[i].setRhythmValid(true);
+        seq.events()[i].setRest(false);
+    }
+    Cache cache{};
+    regenerateCacheFromEvents(cache, seq, 48, 0xaaaa);
+    int distinctValues = 0;
+    uint8_t seen[64] = { 0 };
+    for (int i = 0; i < int(cache.count); ++i) {
+        const uint8_t g = cache.cells[i].gateLen();
+        if (g < 64 && !seen[g]) { seen[g] = 1; ++distinctValues; }
+    }
+    expectTrue(distinctValues >= 3,
+               "gateLength=100 must produce at least 3 distinct gate fractions across 16 cells");
+}
+
+CASE("burst_pitch_hold_keeps_parent_pitch_in_cluster_tail") {
+    // BurstPitch == Parent: cluster tail cells carry the same degree/octave
+    // as the cluster starter (which itself uses the source event's pitch).
+    const Scale &scale = Scale::get(0);
+    StochasticTrack track;
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(4);
+    seq.setFirst(0);
+    seq.setLast(3);
+    seq.setNoteDuration(1);    // ×4
+    seq.setVariation(0);
+    seq.setBurst(100);          // every cell tries to start a cluster
+    seq.setBurstCount(50);
+    seq.setBurstRate(50);
+    seq.setBurstPitch(StochasticBurstPitch::Parent);
+    for (int i = 0; i < 4; ++i) {
+        seq.events()[i].setRhythmValid(true);
+        seq.events()[i].setRest(false);
+        seq.events()[i].setDegree(3);
+        seq.events()[i].setOctave(1);
+    }
+    Cache cache{};
+    regenerateCacheFromEvents(cache, seq, 48, 0xbeef, &scale, &track);
+    for (int i = 0; i < int(cache.count); ++i) {
+        expectEqual(int(cache.cells[i].degree()), 3,
+                    "Hold mode: every cell keeps source-event degree");
+        expectEqual(int(cache.cells[i].octave()), 1,
+                    "Hold mode: every cell keeps source-event octave");
+    }
+}
+
+CASE("burst_pitch_roll_rerolls_cluster_tail_pitch") {
+    // BurstPitch == Generate: cluster tail cells reroll degree via
+    // generateDegree. With deterministic keyed RNG, at least one tail cell
+    // must differ from the starter's degree (otherwise the reroll is a noop).
+    const Scale &scale = Scale::get(0);
+    StochasticTrack track;
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(8);
+    seq.setFirst(0);
+    seq.setLast(7);
+    seq.setNoteDuration(1);
+    seq.setVariation(0);
+    seq.setBurst(100);
+    seq.setBurstCount(100);    // bias toward longer clusters → more tail cells
+    seq.setBurstRate(50);
+    seq.setBurstPitch(StochasticBurstPitch::Generate);
+    seq.setRange(3);           // wider candidate pool so reroll has room to differ
+    for (int i = 0; i < 8; ++i) {
+        seq.events()[i].setRhythmValid(true);
+        seq.events()[i].setRest(false);
+        seq.events()[i].setDegree(0);
+        seq.events()[i].setOctave(0);
+    }
+    Cache cache{};
+    regenerateCacheFromEvents(cache, seq, 48, 0xcafe, &scale, &track);
+    bool sawNonZero = false;
+    for (int i = 0; i < int(cache.count); ++i) {
+        if (cache.cells[i].degree() != 0 || cache.cells[i].octave() != 0) {
+            sawNonZero = true;
+            break;
+        }
+    }
+    expectTrue(sawNonZero,
+               "Roll mode: at least one cluster tail cell must reroll to a different degree");
 }
 
 CASE("parent_cache_idx_maps_slot_to_parent_cell") {
