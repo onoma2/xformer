@@ -110,6 +110,22 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
     int clusterRemaining = 0;
     uint32_t clusterDur = 0;
 
+    // Loop-mode melody pick state (2026-05-23): in Loop mode the cache walk
+    // picks each anchor cell's pitch via generateDegree using its own RNG
+    // seeded by melodySeed. Pitch-shaping knobs reshape the cache
+    // deterministically without rewriting the event tape — same parity as
+    // the rhythm path. In Live mode the engine writes fresh per-event pitches
+    // into the tape via writeLiveMelodyShadow, so the cache reads them
+    // verbatim and we stay out of the way. The mutate path's per-slot tape
+    // writes do not reach Loop playback under this contract — that's the
+    // next thing to address.
+    const bool pickMelodyInCache =
+        bakeChildNotes && seq.melodyMode() == StochasticSourceMode::Loop;
+    Random meldRng(seq.melodySeed());
+    int meldLastDeg = -1;
+    uint8_t anchorDegree = 0;
+    uint8_t anchorOctave = 0;
+
     for (int i = first; i <= last; ++i) {
         if (cache.count >= kCellCap) break;  // hard cap; remaining slots dropped silently
 
@@ -156,23 +172,45 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             }
         }
 
-        // Pitch resolution per cell. Hold (default) copies event.degree/octave
-        // into cluster cells too. Roll (sequence.burstPitch() == Generate)
-        // rerolls the cluster continuation cells via generateDegree using
-        // the per-cell keyed RNG. The cluster STARTER (clusterRemaining was
-        // 0 entering the branch above) keeps its own event pitch — Roll only
-        // affects the trailing cells inside a burst.
-        uint8_t cellDegree = uint8_t(ev.degree());
-        uint8_t cellOctave = uint8_t(ev.octave());
-        if (isClusterTail
-            && bakeChildNotes
-            && seq.burstPitch() == StochasticBurstPitch::Generate) {
-            int lastDeg = -1;
+        // Pitch resolution per cell.
+        //
+        // - Cluster tail cell + Roll mode → fresh pick via per-cell keyed RNG.
+        // - Cluster tail cell + Hold mode → copy anchor's chosen pitch
+        //   (matches the "Burst Hold = all same pitch" contract).
+        // - Anchor / non-cluster cell + Loop mode + scale available →
+        //   pick via generateDegree using meldRng (seeded by melodySeed).
+        //   This makes pitch-shaping knobs reshape the loop without
+        //   rewriting the tape.
+        // - Anchor / non-cluster + Live mode (or no scale provided) →
+        //   read the tape. In Live the engine has just written fresh content
+        //   to this slot via writeLiveMelodyShadow.
+        uint8_t cellDegree;
+        uint8_t cellOctave;
+        if (isClusterTail) {
+            if (bakeChildNotes && seq.burstPitch() == StochasticBurstPitch::Generate) {
+                int lastDeg = -1;
+                const int degAbs = StochasticGenerator::generateDegree(
+                    seq, *track, *scale, lastDeg, cellRng);
+                const int notes = std::max(1, scale->notesPerOctave());
+                cellDegree = uint8_t(degAbs % notes);
+                cellOctave = uint8_t(std::min(int(kMaxOctave), degAbs / notes));
+            } else {
+                cellDegree = anchorDegree;
+                cellOctave = anchorOctave;
+            }
+        } else if (pickMelodyInCache) {
             const int degAbs = StochasticGenerator::generateDegree(
-                seq, *track, *scale, lastDeg, cellRng);
+                seq, *track, *scale, meldLastDeg, meldRng);
             const int notes = std::max(1, scale->notesPerOctave());
             cellDegree = uint8_t(degAbs % notes);
             cellOctave = uint8_t(std::min(int(kMaxOctave), degAbs / notes));
+            anchorDegree = cellDegree;
+            anchorOctave = cellOctave;
+        } else {
+            cellDegree = uint8_t(ev.degree());
+            cellOctave = uint8_t(ev.octave());
+            anchorDegree = cellDegree;
+            anchorOctave = cellOctave;
         }
 
         // Gate length per cell. Triangular distribution centered at 50% of
