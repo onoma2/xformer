@@ -689,7 +689,7 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     case 0:  seq.setNoteDuration(seq.noteDuration() + value); break;
     case 1:  seq.setVariation(seq.variation() + v); break;
     case 2:  seq.setRest(seq.rest() + v); break;
-    case 3:  seq.setRange(seq.range() + value); break;
+    case 3:  seq.setRange(seq.range() + value);                      notifyStochasticShapingEdit(); break;
     case 4:  seq.setBurst(seq.burst() + v);                          notifyStochasticShapingEdit(); break;
     case 5:  seq.setBurstCount(seq.burstCount() + v);                notifyStochasticShapingEdit(); break;
     case 6:  seq.setBurstRate(seq.burstRate() + v);                  notifyStochasticShapingEdit(); break;
