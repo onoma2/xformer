@@ -113,4 +113,75 @@ CASE("lock_does_not_persist") {
     expectEqual(restored.lock(), false, "lock should NOT persist through serialization");
 }
 
+CASE("content_snapshot_roundtrip") {
+    // Tier 4 snapshot: capture/restore preserves all content fields except
+    // _steps[], which are intentionally NOT touched (caller regenerates from
+    // seeds via generateRhythm / generateMelody).
+    StochasticSequence src;
+    src.clear();
+    src.setRhythmSeed(0xCAFEF00Du);
+    src.setMelodySeed(0xDEADBEEFu);
+    src.setMaskMelody(73);
+    src.setTiltMelody(42);
+    src.setMaskRhythm(88);
+    src.setTiltRhythm(55);
+    src.setComplexity(33);
+    src.setContour(-44);
+    src.setBurst(77);
+    src.setBurstCount(60);
+    src.setBurstRate(80);
+    src.setRange(35);
+    src.setRest(22);
+    src.setSize(24);
+    src.setFirst(5);
+    src.setDegreeTicket(0, 90);
+    src.setDegreeTicket(5, -1);
+    src.setDegreeTicket(7, 33);
+    src.setDurationTicket(2, 50);
+    src.setDurationTicket(4, -1);
+    src.setRhythmMode(StochasticSourceMode::Loop);
+    src.setBurstHold(StochasticBurstHold::RollFit);
+    // Touch a stored step so we can verify steps[] is preserved (not wiped
+    // by the snapshot restore).
+    src.steps()[3].setDegree(11);
+    src.steps()[3].setOctave(2);
+    src.steps()[3].setMelodyValid(true);
+
+    StochasticSequence::ContentSnapshot snap;
+    src.captureContentTo(snap);
+
+    StochasticSequence dst;
+    dst.clear();
+    // Pre-populate dst's steps[3] with different content — the restore must
+    // leave it alone (Tier 4 contract: events come from a separate regen pass).
+    dst.steps()[3].setDegree(99);
+    dst.steps()[3].setOctave(0);
+    dst.restoreContentFrom(snap);
+
+    expectEqual(int(dst.rhythmSeed()), int(0xCAFEF00Du));
+    expectEqual(int(dst.melodySeed()), int(0xDEADBEEFu));
+    expectEqual(dst.maskMelody(), 73);
+    expectEqual(dst.tiltMelody(), 42);
+    expectEqual(dst.maskRhythm(), 88);
+    expectEqual(dst.tiltRhythm(), 55);
+    expectEqual(dst.complexity(), 33);
+    expectEqual(dst.contour(), -44);
+    expectEqual(dst.burst(), 77);
+    expectEqual(int(dst.burstCount()), 60);
+    expectEqual(int(dst.burstRate()), 80);
+    expectEqual(dst.range(), 35);
+    expectEqual(dst.rest(), 22);
+    expectEqual(int(dst.size()), 24);
+    expectEqual(int(dst.first()), 5);
+    expectEqual(dst.degreeTicket(0), 90);
+    expectEqual(dst.degreeTicket(5), -1);
+    expectEqual(dst.degreeTicket(7), 33);
+    expectEqual(dst.durationTicket(2), 50);
+    expectEqual(dst.durationTicket(4), -1);
+    expectTrue(dst.rhythmMode() == StochasticSourceMode::Loop, "rhythmMode roundtrip");
+    expectTrue(dst.burstHold() == StochasticBurstHold::RollFit, "burstHold roundtrip");
+    // steps[3] is the dst original (99/0) — proves snapshot did not overwrite events.
+    expectEqual(int(dst.steps()[3].degree()), 99, "snapshot must not overwrite stored events");
+}
+
 } // UNIT_TEST("StochasticSequenceSerialization")

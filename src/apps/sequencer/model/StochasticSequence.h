@@ -658,6 +658,159 @@ public:
         sanitizeAfterRead();
     }
 
+    // ContentSnapshot — Tier 4 seed-based snapshot for the A/B preview /
+    // Lock mechanic. Captures every content-shaping field EXCEPT _steps[],
+    // since events are deterministic outputs of the generator over
+    // (seeds × knobs × tickets) in Loop mode. Restore writes fields back;
+    // caller is responsible for re-running generateRhythm / generateMelody
+    // to repopulate _steps[]. Roughly ~92 bytes (vs. ~560 for full sequence).
+    struct ContentSnapshot {
+        uint32_t rhythmSeed = 0;
+        uint32_t melodySeed = 0;
+        int8_t   scale = -1;
+        int8_t   rootNote = -1;
+        uint8_t  divisor = 12;
+        uint8_t  resetMeasure = 0;
+        uint8_t  clockMultiplier = 100;
+        uint8_t  size = 32;
+        uint8_t  first = 0;
+        bool     rhythmValid = false;
+        bool     melodyValid = false;
+        int8_t   degreeTickets[CONFIG_USER_SCALE_SIZE] = {};
+        uint8_t  repeatProb = 0;
+        int8_t   degreeRotation = 0;
+        int8_t   maskRotation = 0;
+        uint8_t  patienceMelody = 100;
+        uint8_t  legatoProb = 0;
+        uint8_t  marblesMode = uint8_t(MarblesMode::Off);
+        uint8_t  marblesSpread = 50;
+        uint8_t  marblesBias = 50;
+        uint8_t  maskMelody = 100;
+        uint8_t  tiltMelody = 0;
+        uint8_t  maskRhythm = 100;
+        uint8_t  gateLength = 0;
+        uint8_t  tiltRhythm = 50;
+        uint8_t  burst = 0;
+        uint8_t  feel = 50;
+        int8_t   rotate = 0;
+        uint8_t  complexity = 50;
+        int8_t   contour = 0;
+        uint8_t  noteDuration = 5;
+        int8_t   variation = 16;
+        uint8_t  rest = 0;
+        uint8_t  slide = 0;
+        uint8_t  burstRate = 50;
+        uint8_t  burstCount = 0;
+        uint8_t  burstHold = uint8_t(StochasticBurstHold::HoldOver);
+        uint8_t  sleep = 0;
+        uint8_t  patienceRhythm = 100;
+        int8_t   mutate = 0;
+        uint8_t  jump = 0;
+        uint8_t  range = 50;
+        uint8_t  rhythmMode = uint8_t(StochasticSourceMode::Live);
+        uint8_t  melodyMode = uint8_t(StochasticSourceMode::Live);
+        int8_t   durationTickets[8] = {};
+    };
+
+    void captureContentTo(ContentSnapshot &snap) const {
+        snap.rhythmSeed = _rhythmSeed;
+        snap.melodySeed = _melodySeed;
+        snap.scale = _scale;
+        snap.rootNote = _rootNote;
+        snap.divisor = _divisor;
+        snap.resetMeasure = _resetMeasure;
+        snap.clockMultiplier = _clockMultiplier.base;
+        snap.size = _size;
+        snap.first = _first;
+        snap.rhythmValid = _rhythmValid;
+        snap.melodyValid = _melodyValid;
+        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) snap.degreeTickets[i] = _degreeTickets[i];
+        snap.repeatProb = _repeatProb;
+        snap.degreeRotation = _degreeRotation;
+        snap.maskRotation = _maskRotation;
+        snap.patienceMelody = _patienceMelody;
+        snap.legatoProb = _legatoProb;
+        snap.marblesMode = uint8_t(_marblesMode);
+        snap.marblesSpread = _marblesSpread;
+        snap.marblesBias = _marblesBias;
+        snap.maskMelody = _maskMelody;
+        snap.tiltMelody = _tiltMelody;
+        snap.maskRhythm = _maskRhythm.base;
+        snap.gateLength = _gateLength.base;
+        snap.tiltRhythm = _tiltRhythm.base;
+        snap.burst = _burst.base;
+        snap.feel = _feel.base;
+        snap.rotate = _rotate.base;
+        snap.complexity = _complexity.base;
+        snap.contour = _contour.base;
+        snap.noteDuration = _noteDuration.base;
+        snap.variation = _variation.base;
+        snap.rest = _rest.base;
+        snap.slide = _slide.base;
+        snap.burstRate = _burstRate;
+        snap.burstCount = _burstCount;
+        snap.burstHold = uint8_t(_burstHold);
+        snap.sleep = _sleep.base;
+        snap.patienceRhythm = _patienceRhythm.base;
+        snap.mutate = _mutate.base;
+        snap.jump = _jump.base;
+        snap.range = _range;
+        snap.rhythmMode = uint8_t(_rhythmMode);
+        snap.melodyMode = uint8_t(_melodyMode);
+        for (int i = 0; i < 8; ++i) snap.durationTickets[i] = _durationTickets[i];
+    }
+
+    void restoreContentFrom(const ContentSnapshot &snap) {
+        _rhythmSeed = snap.rhythmSeed;
+        _melodySeed = snap.melodySeed;
+        _scale = snap.scale;
+        _rootNote = snap.rootNote;
+        _divisor = snap.divisor;
+        _resetMeasure = snap.resetMeasure;
+        _clockMultiplier.setBase(snap.clockMultiplier);
+        _size = snap.size;
+        _first = snap.first;
+        _rhythmValid = snap.rhythmValid;
+        _melodyValid = snap.melodyValid;
+        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) _degreeTickets[i] = snap.degreeTickets[i];
+        _repeatProb = snap.repeatProb;
+        _degreeRotation = snap.degreeRotation;
+        _maskRotation = snap.maskRotation;
+        _patienceMelody = snap.patienceMelody;
+        _legatoProb = snap.legatoProb;
+        _marblesMode = MarblesMode(snap.marblesMode < uint8_t(MarblesMode::Last) ? snap.marblesMode : 0);
+        _marblesSpread = snap.marblesSpread;
+        _marblesBias = snap.marblesBias;
+        _maskMelody = snap.maskMelody;
+        _tiltMelody = snap.tiltMelody;
+        _maskRhythm.setBase(snap.maskRhythm);
+        _gateLength.setBase(snap.gateLength);
+        _tiltRhythm.setBase(snap.tiltRhythm);
+        _burst.setBase(snap.burst);
+        _feel.setBase(snap.feel);
+        _rotate.setBase(snap.rotate);
+        _complexity.setBase(snap.complexity);
+        _contour.setBase(snap.contour);
+        _noteDuration.setBase(snap.noteDuration);
+        _variation.setBase(snap.variation);
+        _rest.setBase(snap.rest);
+        _slide.setBase(snap.slide);
+        _burstRate = snap.burstRate;
+        _burstCount = snap.burstCount;
+        _burstHold = StochasticBurstHold(snap.burstHold < uint8_t(StochasticBurstHold::Last) ? snap.burstHold : 0);
+        _sleep.setBase(snap.sleep);
+        _patienceRhythm.setBase(snap.patienceRhythm);
+        _mutate.setBase(snap.mutate);
+        _jump.setBase(snap.jump);
+        _range = snap.range;
+        _rhythmMode = StochasticSourceMode(snap.rhythmMode < uint8_t(StochasticSourceMode::Last) ? snap.rhythmMode : 0);
+        _melodyMode = StochasticSourceMode(snap.melodyMode < uint8_t(StochasticSourceMode::Last) ? snap.melodyMode : 0);
+        for (int i = 0; i < 8; ++i) _durationTickets[i] = snap.durationTickets[i];
+        // _steps[] intentionally not touched — caller regenerates via
+        // generateRhythm / generateMelody to repopulate the deterministic
+        // events from the restored seeds + knobs.
+    }
+
 private:
     // Shared defaults for clear() and the invalid-size recovery path in
     // sanitizeAfterRead(). Touches all model fields except _steps (callers
