@@ -10,6 +10,27 @@ enum class StochasticSourceMode : uint8_t {
     Last
 };
 
+// Duration LUT shared by engine, cache, and UI. ticks = (divisor * num) / den.
+// Labels at divisor = 1/16:
+//   0: ×8     → 1/2     5: ×1     → 1/16 (= divisor)
+//   1: ×4     → 1/4     6: ×2/3   → 1/16T
+//   2: ×3     → 3/16    7: ×1/2   → 1/32
+//   3: ×2     → 1/8
+//   4: ×4/3   → 1/8T
+struct StochasticDurationFraction { uint16_t num; uint16_t den; };
+constexpr StochasticDurationFraction kStochasticDurationLut[] = {
+    { 8, 1 }, { 4, 1 }, { 3, 1 }, { 2, 1 },
+    { 4, 3 }, { 1, 1 }, { 2, 3 }, { 1, 2 },
+};
+constexpr int kStochasticDurationLutSize =
+    int(sizeof(kStochasticDurationLut) / sizeof(kStochasticDurationLut[0]));
+
+inline StochasticDurationFraction stochasticDurationFraction(int index) {
+    if (index < 0) index = 0;
+    if (index >= kStochasticDurationLutSize) index = kStochasticDurationLutSize - 1;
+    return kStochasticDurationLut[index];
+}
+
 // Burst-cluster pitch mode. Hold = cluster tails copy the anchor's pitch.
 // Roll = cluster tails re-pick a fresh pitch each cell (melody-keyed).
 // Integer ordering preserved (Hold=0, Roll=1) so wire format is unaffected

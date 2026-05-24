@@ -197,10 +197,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
     ASSERT(_sequence != nullptr, "invalid sequence");
     const auto &sequence = this->sequence();
 
-    // Divisor with clock multiplier
-    float clockMult = sequence.clockMultiplier() * 0.01f;
-    uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-    divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
+    uint32_t divisor = effectiveDivisor();
 
     // Reset measure
     uint32_t resetDivisor = sequence.resetMeasure() * _engine.measureDivisor();
@@ -263,53 +260,17 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     // since last trigger, flag a refresh. Cheap (int compares per field) and
     // avoids rebuilding every tick.
     {
-        const uint8_t curNoteDuration = uint8_t(sequence.noteDuration());
-        const uint8_t curVariation    = uint8_t(sequence.variation());
-        const uint8_t curBurst        = uint8_t(sequence.burst());
-        const uint8_t curGateLength   = uint8_t(sequence.gateLength());
-        const uint8_t curComplexity   = uint8_t(sequence.complexity());
-        const int8_t  curContour      = int8_t(sequence.contour());
-        const uint8_t curBias         = uint8_t(sequence.marblesBias());
-        const uint8_t curSpread       = uint8_t(sequence.marblesSpread());
-        const uint8_t curBurstCount   = uint8_t(sequence.burstCount());
-        const uint8_t curBurstRate    = uint8_t(sequence.burstRate());
-        const uint8_t curBurstHold   = uint8_t(sequence.burstHold());
-        const uint8_t curRange        = uint8_t(sequence.range());
-        const bool firstRun = !_shapingSnapshotValid;
-        const bool anyKnobMoved = firstRun
-            || curNoteDuration != _lastShapingNoteDuration
-            || curVariation    != _lastShapingVariation
-            || curBurst        != _lastShapingBurst
-            || curGateLength   != _lastShapingGateLength
-            || curComplexity   != _lastShapingComplexity
-            || curContour      != _lastShapingContour
-            || curBias         != _lastShapingMarblesBias
-            || curSpread       != _lastShapingMarblesSpread
-            || curBurstCount   != _lastShapingBurstCount
-            || curBurstRate    != _lastShapingBurstRate
-            || curBurstHold   != _lastShapingBurstHold
-            || curRange        != _lastShapingRange;
-
+        uint8_t cur[kShapingKnobCount];
+        readShapingKnobs(cur);
+        bool anyKnobMoved = !_shapingSnapshotValid;
+        for (size_t i = 0; !anyKnobMoved && i < kShapingKnobCount; ++i) {
+            if (cur[i] != _shapingSnapshot[i]) anyKnobMoved = true;
+        }
         if (anyKnobMoved) {
             _stepCacheRefreshPending = true;
-            _lastShapingNoteDuration = curNoteDuration;
-            _lastShapingVariation    = curVariation;
-            _lastShapingBurst        = curBurst;
-            _lastShapingGateLength   = curGateLength;
-            _lastShapingComplexity   = curComplexity;
-            _lastShapingContour      = curContour;
-            _lastShapingMarblesBias  = curBias;
-            _lastShapingMarblesSpread = curSpread;
-            _lastShapingBurstCount   = curBurstCount;
-            _lastShapingBurstRate    = curBurstRate;
-            _lastShapingBurstHold   = curBurstHold;
-            _lastShapingRange        = curRange;
-            _shapingSnapshotValid    = true;
+            for (size_t i = 0; i < kShapingKnobCount; ++i) _shapingSnapshot[i] = cur[i];
+            _shapingSnapshotValid = true;
         }
-        // Pitch-shaping knobs (Complexity, Contour, Bias, Spread, Range) now
-        // reshape the loop deterministically through the cache walk's own
-        // pick path (see rebuildStepCache). No tape-rewrite hook
-        // here — the cache rebuild triggered by anyKnobMoved is enough.
     }
 
     // Coalesce cache refreshes: Live rhythm + melody writes from the previous
@@ -796,19 +757,37 @@ void StochasticTrackEngine::syncWindowEdit() {
 void StochasticTrackEngine::refreshStepCache() {
     auto &seq = sequence();
     auto &trk = stochasticTrack();
-    // Match the divisor computation in tick(): base divisor scaled by the
-    // sequence's clockMultiplier and PPQN conversion. clockMultiplier is in
-    // hundredths of one (so 100 == 1.0×).
-    float clockMult = seq.clockMultiplier() * 0.01f;
-    if (clockMult <= 0.f) clockMult = 1.f;
-    uint32_t divisor = uint32_t(seq.divisor()) * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
-    divisor = std::max<uint32_t>(1u, uint32_t(std::lround(divisor / clockMult)));
+    uint32_t divisor = effectiveDivisor();
     // Scale + rootNote are passed so the cache can bake melody-domain picks
     // (anchor pitches in Loop melody, cluster-tail Generate-mode pitches).
     const auto &scale = seq.selectedScale(_model.project().scale());
     int rootNote = seq.selectedRootNote(_model.project().rootNote());
     stochastic_cache::rebuildStepCache(
         _stepCache, seq, divisor, seq.rhythmSeed(), &scale, &trk, rootNote);
+}
+
+uint32_t StochasticTrackEngine::effectiveDivisor() const {
+    const auto &seq = sequence();
+    float clockMult = seq.clockMultiplier() * 0.01f;
+    if (clockMult <= 0.f) clockMult = 1.f;
+    uint32_t divisor = uint32_t(seq.divisor()) * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
+    return std::max<uint32_t>(1u, uint32_t(std::lround(divisor / clockMult)));
+}
+
+void StochasticTrackEngine::readShapingKnobs(uint8_t out[kShapingKnobCount]) const {
+    const auto &seq = sequence();
+    out[size_t(ShapingKnob::NoteDuration)]  = uint8_t(seq.noteDuration());
+    out[size_t(ShapingKnob::Variation)]     = uint8_t(seq.variation());
+    out[size_t(ShapingKnob::Burst)]         = uint8_t(seq.burst());
+    out[size_t(ShapingKnob::GateLength)]    = uint8_t(seq.gateLength());
+    out[size_t(ShapingKnob::Complexity)]    = uint8_t(seq.complexity());
+    out[size_t(ShapingKnob::Contour)]       = uint8_t(int8_t(seq.contour()));
+    out[size_t(ShapingKnob::MarblesBias)]   = uint8_t(seq.marblesBias());
+    out[size_t(ShapingKnob::MarblesSpread)] = uint8_t(seq.marblesSpread());
+    out[size_t(ShapingKnob::BurstCount)]    = uint8_t(seq.burstCount());
+    out[size_t(ShapingKnob::BurstRate)]     = uint8_t(seq.burstRate());
+    out[size_t(ShapingKnob::BurstHold)]     = uint8_t(seq.burstHold());
+    out[size_t(ShapingKnob::Range)]         = uint8_t(seq.range());
 }
 
 void StochasticTrackEngine::clearDirectHistory() {

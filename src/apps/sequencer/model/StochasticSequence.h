@@ -358,11 +358,9 @@ public:
     // inert at short durations so Burst/Count/Rate aren't silently dead.
     void printBurst(StringBuilder &str) const {
         printRouted(str, Routing::Target::StochasticBurst);
-        static const int lutNum[] = { 8, 4, 3, 2, 4, 1, 2, 1 };
-        static const int lutDen[] = { 1, 1, 1, 1, 3, 1, 3, 2 };
-        int idx = clamp(int(noteDuration()), 0, 7);
+        auto frac = stochasticDurationFraction(int(noteDuration()));
         // parentTicks = divisor * (CONFIG_PPQN/CONFIG_SEQUENCE_PPQN=4) * num / den.
-        int parentTicks = (int(divisor()) * 4 * lutNum[idx]) / lutDen[idx];
+        int parentTicks = (int(divisor()) * 4 * frac.num) / frac.den;
         const int kMinBurstParentTicks = 96;
         if (parentTicks < kMinBurstParentTicks) str("%d%% *", burst());
         else str("%d%%", burst());
@@ -393,11 +391,8 @@ public:
     // instead of lying with hardcoded 1/16-centered strings). Short form
     // ("x/y" / "x/yT") — no leading raw-tick value.
     void printDurationEntry(StringBuilder &str, int entry) const {
-        // LUT mirrors StochasticTrackEngine::getDurationFraction().
-        static const int lutNum[] = { 8, 4, 3, 2, 4, 1, 2, 1 };
-        static const int lutDen[] = { 1, 1, 1, 1, 3, 1, 3, 2 };
-        int idx = clamp(entry, 0, 7);
-        int effectiveDivisor = (int(divisor()) * lutNum[idx]) / lutDen[idx];
+        auto frac = stochasticDurationFraction(entry);
+        int effectiveDivisor = (int(divisor()) * frac.num) / frac.den;
         ModelUtils::printDivisorShort(str, effectiveDivisor);
     }
     void editNoteDuration(int value, bool shift) { if (!isRouted(Routing::Target::StochasticNoteDuration)) setNoteDuration(noteDuration() + value); }

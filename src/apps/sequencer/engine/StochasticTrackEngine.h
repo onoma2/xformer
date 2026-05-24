@@ -94,32 +94,18 @@ public:
     // the Poisson roll fires. Returns 0.0 when patience knob = 100 (off).
     static float patienceMeter(uint32_t loops, int patience);
 
-    // V5 duration LUT as multipliers of the sequence divisor, sorted descending.
-    // ticks = (divisor * num) / den. Labels assume divisor = 1/16:
-    //   entry 0: ×8     → 1/2
-    //   entry 1: ×4     → 1/4
-    //   entry 2: ×3     → 3/16
-    //   entry 3: ×2     → 1/8
-    //   entry 4: ×4/3   → 1/8T
-    //   entry 5: ×1     → 1/16 (= divisor)
-    //   entry 6: ×2/3   → 1/16T
-    //   entry 7: ×1/2   → 1/32
-    // Whole table scales with the sequence's clock divisor.
-    struct DurationFraction { uint16_t num; uint16_t den; };
+    // Duration LUT lives in StochasticTypes.h (kStochasticDurationLut + the
+    // stochasticDurationFraction() accessor). Existing call sites keep the
+    // StochasticTrackEngine::DurationFraction / getDurationFraction API via
+    // thin aliases below.
+    using DurationFraction = StochasticDurationFraction;
     static DurationFraction getDurationFraction(int index) {
-        static const DurationFraction lut[] = {
-            { 8, 1 }, { 4, 1 }, { 3, 1 }, { 2, 1 },
-            { 4, 3 }, { 1, 1 }, { 2, 3 }, { 1, 2 },
-        };
-        if (index < 0) index = 0;
-        if (index > 7) index = 7;
-        return lut[index];
+        return stochasticDurationFraction(index);
     }
 
-    // Backward-compatibility helper for any call site that still wants ticks
-    // at PPQN=192 assuming divisor = 1/16 (legacy reference).
+    // Ticks at PPQN=192 assuming divisor = 1/16 (legacy reference scale).
     static uint32_t getDurationMultiplier(int index) {
-        auto f = getDurationFraction(index);
+        auto f = stochasticDurationFraction(index);
         return (48u * f.num) / f.den;
     }
 
@@ -131,6 +117,10 @@ private:
     const StochasticSequence &sequence() const { return *_sequence; }
     StochasticTrack &stochasticTrack()             { return _stochasticTrack; }
     const StochasticTrack &stochasticTrack() const { return _stochasticTrack; }
+
+    // Sequence divisor scaled by clockMultiplier + PPQN conversion. Same
+    // value flows to tick() and refreshStepCache().
+    uint32_t effectiveDivisor() const;
 
     void triggerStep(uint32_t tick, uint32_t divisor);
     void resetMeasure();
@@ -199,19 +189,20 @@ private:
     // writes them mid-cycle (no UI involvement, no shaping-edit notify), the
     // cache must rebuild before the next event read. triggerStep snapshots
     // the current shaping-knob set at the top and flags refresh on any drift.
-    // Last-applied tilt/window already tracked via the existing fields above.
-    uint8_t _lastShapingNoteDuration = 0xff;
-    uint8_t _lastShapingVariation = 0xff;
-    uint8_t _lastShapingBurst = 0xff;
-    uint8_t _lastShapingGateLength = 0xff;
-    uint8_t _lastShapingComplexity = 0xff;
-    int8_t  _lastShapingContour = 0;
-    uint8_t _lastShapingMarblesBias = 0xff;
-    uint8_t _lastShapingMarblesSpread = 0xff;
-    uint8_t _lastShapingBurstCount = 0xff;
-    uint8_t _lastShapingBurstRate = 0xff;
-    uint8_t _lastShapingBurstHold = 0xff;
-    uint8_t _lastShapingRange = 0xff;
+    // Routed-CV invalidation snapshot. Index via ShapingKnob enum so
+    // adding a knob is one enum entry + one line in readShapingKnobs().
+    // sign of `contour` is folded into uint8 storage — `!=` only cares
+    // about identity, not numeric order.
+    enum class ShapingKnob : uint8_t {
+        NoteDuration, Variation, Burst, GateLength,
+        Complexity, Contour, MarblesBias, MarblesSpread,
+        BurstCount, BurstRate, BurstHold, Range,
+        Count
+    };
+    static constexpr size_t kShapingKnobCount = size_t(ShapingKnob::Count);
+    void readShapingKnobs(uint8_t out[kShapingKnobCount]) const;
+
+    uint8_t _shapingSnapshot[kShapingKnobCount] = {};
     bool    _shapingSnapshotValid = false;
 
     bool _activity = false;

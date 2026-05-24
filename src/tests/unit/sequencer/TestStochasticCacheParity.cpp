@@ -914,6 +914,71 @@ CASE("live_rhythm_reads_event_durationIndex_and_burst_fields") {
     expectEqual(int(cache.runtimeSteps[3].durationTicks()), 48);
 }
 
+CASE("cluster_truncates_cleanly_at_size_edge") {
+    // Cluster anchor near the end of the active range: the cluster wants to
+    // span beyond size-1. The walk must stop at size without writing past
+    // runtimeSteps[size-1] and without leaving clusterRemaining underflowed.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(4);
+    seq.setFirst(0);
+    seq.setRhythmMode(StochasticSourceMode::Live);
+    for (int i = 0; i < 4; ++i) {
+        auto &ev = seq.steps()[i];
+        ev.setRhythmValid(true);
+        ev.setRest(false);
+        ev.setDurationIndex(5);   // ×1 = 48 ticks at divisor=48
+    }
+    // Anchor at step 2, asking for 5 burst tails — would land at steps 3..7,
+    // but size=4 caps it at step 3 (one tail emitted, 4 dropped).
+    seq.steps()[2].setChildCount(5);
+    seq.steps()[2].setBurstRate(2);   // index 2 → kBurstSpacingLut[2] = 4
+
+    StepCache cache{};
+    rebuildStepCache(cache, seq, /*divisor*/ 48, /*seed*/ 0xc1u);
+    expectEqual(int(cache.count), 4);
+    // Cluster anchor at step 2: prevDur 48 / 4 = 12 ticks per cluster cell.
+    expectEqual(int(cache.runtimeSteps[2].durationTicks()), 12);
+    // Step 3: cluster tail at the size edge.
+    expectEqual(int(cache.runtimeSteps[3].durationTicks()), 12);
+    // Steps 0, 1: natural duration before the anchor.
+    expectEqual(int(cache.runtimeSteps[0].durationTicks()), 48);
+    expectEqual(int(cache.runtimeSteps[1].durationTicks()), 48);
+}
+
+CASE("cluster_at_step_zero_bootstraps_prev_duration") {
+    // Cluster firing on step 0 has no previous cell to divide. Bootstrap
+    // must use step 0's own LUT pick as prevDur so the cluster cells get
+    // a sensible duration (and don't underflow / div-by-zero).
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(4);
+    seq.setFirst(0);
+    seq.setRhythmMode(StochasticSourceMode::Live);
+    for (int i = 0; i < 4; ++i) {
+        auto &ev = seq.steps()[i];
+        ev.setRhythmValid(true);
+        ev.setRest(false);
+        ev.setDurationIndex(5);   // ×1 = 48 ticks
+    }
+    // Anchor at step 0, 2 tails, denom 4 → cluster cells = 48/4 = 12 ticks.
+    seq.steps()[0].setChildCount(2);
+    seq.steps()[0].setBurstRate(2);
+
+    StepCache cache{};
+    rebuildStepCache(cache, seq, /*divisor*/ 48, /*seed*/ 0xb007);
+    expectEqual(int(cache.count), 4);
+    // Step 0 (anchor) now plays the cluster-cell duration, not the natural pick.
+    expectEqual(int(cache.runtimeSteps[0].durationTicks()), 12);
+    // Steps 1, 2: cluster tails.
+    expectEqual(int(cache.runtimeSteps[1].durationTicks()), 12);
+    expectEqual(int(cache.runtimeSteps[2].durationTicks()), 12);
+    // Step 3: cluster ended, natural duration restored.
+    expectEqual(int(cache.runtimeSteps[3].durationTicks()), 48);
+}
+
 CASE("rank_assignment_is_stable_across_runs_at_same_seed") {
     // Replaces the old "Tilt changes ranks" test — Tilt no longer influences
     // rank assignment. The new contract is that ranks are deterministic per

@@ -28,15 +28,16 @@ static const int kBurstSpacingLutSize = 5;
 // inaudible mush. Cluster F gate.
 static const uint32_t kMinBurstParentTicks = 96;
 
-// Triangular-kernel weighted pick over a LUT.
-// knob = 0   → ~always lut[0]
-// knob = 100 → ~always lut[last]
-// midpoints  → smooth distribution over neighbors (50-tick tent half-width).
-static int pickFromLutTriangular(const int *lut, int lutSize, int knob, Random &rng) {
-    int weights[8];  // enough for any reasonable LUT
+// Triangular-kernel weighted pick over a LUT. knob 0 → ~always lut[0],
+// knob 100 → ~always lut[last]; midpoints smooth over neighbors with a
+// 50-unit tent half-width. Size deduced from the array reference so the
+// weights buffer matches the LUT at compile time.
+template <int LutSize>
+static int pickFromLutTriangular(const int (&lut)[LutSize], int knob, Random &rng) {
+    int weights[LutSize];
     int total = 0;
-    for (int i = 0; i < lutSize; ++i) {
-        int center = (i * 100) / (lutSize - 1);
+    for (int i = 0; i < LutSize; ++i) {
+        int center = (LutSize > 1) ? (i * 100) / (LutSize - 1) : 50;
         int dist = knob > center ? knob - center : center - knob;
         int w = 50 - dist;
         if (w < 0) w = 0;
@@ -44,23 +45,15 @@ static int pickFromLutTriangular(const int *lut, int lutSize, int knob, Random &
         total += w;
     }
     if (total <= 0) {
-        return lut[rng.nextRange(uint32_t(lutSize))];
+        return lut[rng.nextRange(uint32_t(LutSize))];
     }
     int roll = int(rng.nextRange(uint32_t(total)));
     int sum = 0;
-    for (int i = 0; i < lutSize; ++i) {
+    for (int i = 0; i < LutSize; ++i) {
         sum += weights[i];
         if (roll < sum) return lut[i];
     }
-    return lut[lutSize - 1];
-}
-
-static int pickBurstCountFromLut(int knob, Random &rng) {
-    return pickFromLutTriangular(kBurstCountLut, kBurstCountLutSize, knob, rng);
-}
-
-static int pickBurstSpacingFromLut(int knob, Random &rng) {
-    return pickFromLutTriangular(kBurstSpacingLut, kBurstSpacingLutSize, knob, rng);
+    return lut[LutSize - 1];
 }
 
 // Public wrappers for the cache walk. Cache builds shape decisions per-cell
@@ -69,13 +62,13 @@ static int pickBurstSpacingFromLut(int knob, Random &rng) {
 // (mutate uses Loop seed,
 // cache uses keyed per-cell seed).
 int StochasticGenerator::pickBurstCount(int knob, Random &rng) {
-    return pickBurstCountFromLut(knob, rng);
+    return pickFromLutTriangular(kBurstCountLut, knob, rng);
 }
 
 // Returns LUT entry index 0..kBurstSpacingLutSize-1 (not the denominator).
 // Caller looks up the denominator in its own copy of kBurstSpacingLut.
 int StochasticGenerator::pickBurstSpacingSlot(int knob, Random &rng) {
-    const int picked = pickBurstSpacingFromLut(knob, rng);
+    const int picked = pickFromLutTriangular(kBurstSpacingLut, knob, rng);
     for (int i = 0; i < kBurstSpacingLutSize; ++i) {
         if (kBurstSpacingLut[i] == picked) return i;
     }
@@ -437,9 +430,9 @@ StochasticStepContent StochasticGenerator::generateRhythmEvent(const StochasticS
     // — which replays _lastStepContent through evaluateBurst — has something to
     // evaluate. evaluateBurst keeps its own duration check.
     if (int(rng.nextRange(100)) < sequence.burst()) {
-        event.setChildCount(pickBurstCountFromLut(sequence.burstCount(), rng));
+        event.setChildCount(pickFromLutTriangular(kBurstCountLut, sequence.burstCount(), rng));
         int spacingSlot = -1;
-        const int picked = pickBurstSpacingFromLut(sequence.burstRate(), rng);
+        const int picked = pickFromLutTriangular(kBurstSpacingLut, sequence.burstRate(), rng);
         for (int i = 0; i < kBurstSpacingLutSize; ++i) {
             if (kBurstSpacingLut[i] == picked) { spacingSlot = i; break; }
         }
