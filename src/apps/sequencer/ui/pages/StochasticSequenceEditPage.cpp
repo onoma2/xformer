@@ -1217,8 +1217,9 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
         }
 
         if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
-            for (int i = 8; i < 11; ++i) {
-                int index = MatrixMap::fromStep(i + 1);
+            // Hint Init/Even/Random slots (visual steps 13/14/15).
+            for (int s = 12; s <= 14; ++s) {
+                int index = MatrixMap::fromStep(s);
                 leds.unmask(index);
                 leds.set(index, false, true);
                 leds.mask(index);
@@ -1236,6 +1237,14 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
             bool active = (i == activeIdx);
             bool selected = (_durSelectionMask & (1U << i)) != 0;
             leds.set(MatrixMap::fromStep(i), active || (i == _selectedDurEntry), true);
+        }
+        if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
+            for (int s = 12; s <= 14; ++s) {
+                int index = MatrixMap::fromStep(s);
+                leds.unmask(index);
+                leds.set(index, false, true);
+                leds.mask(index);
+            }
         }
         break;
     }
@@ -1457,10 +1466,12 @@ void StochasticSequenceEditPage::handlePitchKeyPress(KeyPressEvent &event) {
     }
 
     if (key.isQuickEdit() && !key.shiftModifier()) {
+        // PAGE + visual step 13/14/15 = Init / Even / Random. Random slot
+        // matches Live page's quick-edit Random for cross-page consistency.
         switch (key.quickEdit()) {
-        case 1: contextAction(int(ContextAction::Init)); break;
-        case 2: contextAction(int(ContextAction::Even)); break;
-        case 3: contextAction(int(ContextAction::Random)); break;
+        case 4: contextAction(int(ContextAction::Init)); break;
+        case 5: contextAction(int(ContextAction::Even)); break;
+        case 6: contextAction(int(ContextAction::Random)); break;
         }
         event.consume();
         return;
@@ -1545,10 +1556,11 @@ void StochasticSequenceEditPage::handleDurationKeyPress(KeyPressEvent &event) {
     }
 
     if (key.isQuickEdit() && !key.shiftModifier()) {
+        // Same Init/Even/Random slot layout as Pitch page (steps 13/14/15).
         switch (key.quickEdit()) {
-        case 1: contextAction(int(ContextAction::Init)); break;
-        case 2: contextAction(int(ContextAction::Even)); break;
-        case 3: contextAction(int(ContextAction::Random)); break;
+        case 4: contextAction(int(ContextAction::Init)); break;
+        case 5: contextAction(int(ContextAction::Even)); break;
+        case 6: contextAction(int(ContextAction::Random)); break;
         }
         event.consume();
         return;
