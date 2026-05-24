@@ -125,7 +125,14 @@ void Project::clear() {
     stoSeq.setDivisor(12);   // 1/16 — better default than 1/4 for stochastic content
     stoSeq.setSize(4);
     stoSeq.setNoteDuration(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
+    // Mask + Tilt defaults sit at transparent positions: both Masks at 100
+    // bypass the trigger-time filter entirely; Tilts are at their respective
+    // neutral positions for their axes (TiltR=50 = pure salt, TiltM=0 =
+    // natural / no inversion).
     stoSeq.setMaskRhythm(100);
+    stoSeq.setTiltRhythm(50);
+    stoSeq.setMaskMelody(100);
+    stoSeq.setTiltMelody(0);
     stoSeq.setRest(0);
     stoSeq.setBurst(0);
     stoSeq.setGateLength(0);

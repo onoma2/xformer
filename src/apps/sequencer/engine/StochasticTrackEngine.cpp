@@ -431,7 +431,10 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             const uint32_t effectiveMilli =
                 (tiltMag * rankPctMilli + (100 - tiltMag) * saltPctMilli) / 100;
             const uint32_t maskMilli = uint32_t(sequence.maskRhythm()) * 10;
-            if (tiltSigned >= 0) {
+            // knob<50 = low-pass (long notes survive): rank 0 is longest, so
+            // pass when effective < mask. knob>50 = high-pass (short survives):
+            // pass when (1000-effective) < mask, i.e. high rank = short.
+            if (tiltSigned <= 0) {
                 maskRhythmPass = effectiveMilli < maskMilli;
             } else {
                 maskRhythmPass = (1000 - effectiveMilli) < maskMilli;
