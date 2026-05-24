@@ -214,7 +214,7 @@ CASE("burst_fit_mode_packs_cluster_into_prev_dur") {
         ev.setRest(false);
         ev.setDurationIndex(3);   // ×2 = 96 ticks
     }
-    seq.steps()[2].setChildCount(3);   // 3 tails → 4 total cluster cells
+    seq.steps()[2].setBurstTails(3);   // 3 tails → 4 total cluster cells
     seq.steps()[2].setBurstRate(0);    // ignored in Fit mode
 
     StepCache cache{};
@@ -247,7 +247,7 @@ CASE("burst_fit_mode_accel_curve_first_cell_longest") {
         ev.setRest(false);
         ev.setDurationIndex(0);   // ×8 = 384 ticks — plenty for cluster floor
     }
-    seq.steps()[2].setChildCount(3);
+    seq.steps()[2].setBurstTails(3);
     seq.steps()[2].setBurstRate(0);
 
     StepCache cache{};
@@ -279,7 +279,7 @@ CASE("burst_fit_mode_decel_curve_last_cell_longest") {
         ev.setRest(false);
         ev.setDurationIndex(0);
     }
-    seq.steps()[2].setChildCount(3);
+    seq.steps()[2].setBurstTails(3);
     seq.steps()[2].setBurstRate(0);
 
     StepCache cache{};
@@ -788,7 +788,7 @@ CASE("cache_cap_truncates_silently") {
         ev.setDurationIndex(1);  // ×4 → 192 ticks, allows bursts
         ev.setRest(false);
         ev.setRhythmValid(true);
-        ev.setChildCount(5);
+        ev.setBurstTails(5);
         ev.setBurstRate(0);  // densest spacing
     }
 
@@ -817,7 +817,7 @@ CASE("parents_keep_priority_under_burst_truncation") {
         ev.setDurationIndex(1);  // ×4 = 192 ticks, allows bursts
         ev.setRest(false);
         ev.setRhythmValid(true);
-        ev.setChildCount(5);
+        ev.setBurstTails(5);
         ev.setBurstRate(0);
     }
 
@@ -1058,7 +1058,7 @@ CASE("live_rhythm_reads_event_durationIndex_and_burst_fields") {
         ev.setDurationIndex(5);   // ×1 = 48 ticks at divisor=48
     }
     // Slot 1 carries a burst spec — cluster of 2 cells with denom 3.
-    seq.steps()[1].setChildCount(1);
+    seq.steps()[1].setBurstTails(1);
     seq.steps()[1].setBurstRate(1);     // index 1 → kBurstSpacingLut[1] = 3
 
     StepCache cache{};
@@ -1093,7 +1093,7 @@ CASE("cluster_truncates_cleanly_at_size_edge") {
     }
     // Anchor at step 2, asking for 5 burst tails — would land at steps 3..7,
     // but size=4 caps it at step 3 (one tail emitted, 4 dropped).
-    seq.steps()[2].setChildCount(5);
+    seq.steps()[2].setBurstTails(5);
     seq.steps()[2].setBurstRate(2);   // index 2 → kBurstSpacingLut[2] = 4
 
     StepCache cache{};
@@ -1125,7 +1125,7 @@ CASE("cluster_at_step_zero_bootstraps_prev_duration") {
         ev.setDurationIndex(5);   // ×1 = 48 ticks
     }
     // Anchor at step 0, 2 tails, denom 4 → cluster cells = 48/4 = 12 ticks.
-    seq.steps()[0].setChildCount(2);
+    seq.steps()[0].setBurstTails(2);
     seq.steps()[0].setBurstRate(2);
 
     StepCache cache{};

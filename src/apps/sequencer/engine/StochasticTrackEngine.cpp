@@ -472,21 +472,21 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // replays a captured _lastStepContent rather than the step.
         StochasticGenerator::EvaluatedBurstNote evalBursts[kMaxBurst];
         for (int i = 0; i < kMaxBurst; ++i) evalBursts[i].valid = false;
-        uint8_t childCount = 0;
+        uint8_t clusterTailCount = 0;
 
         if (useRepeat && !isRest) {
             StochasticGenerator::evaluateBurst(evalBursts, sequence, eval, track, scale, rootNote, note, durationTicks, _rng);
-            for (int i = 0; i < kMaxBurst; ++i) if (evalBursts[i].valid) childCount++;
+            for (int i = 0; i < kMaxBurst; ++i) if (evalBursts[i].valid) clusterTailCount++;
         }
 
-        recordDirectHistory(finalCv, isRest, !isRest, childCount);
+        recordDirectHistory(finalCv, isRest, !isRest, clusterTailCount);
 
         if (!isRest) {
             // DBG_STO("%u CVpush ON p=%d cv=%.3f", tick, _currentStep, finalCv);
             _cvQueue.push({ tick, finalCv, isSlide });
             _gateQueue.push({ tick, true });
 
-            if (!isLegato && childCount == 0) {
+            if (!isLegato && clusterTailCount == 0) {
                 // Non-Repeat reads the cache-baked gate fraction. Repeat
                 // uses pickGateLength at runtime because _lastStepContent carries
                 // no cache-baked gate fraction.

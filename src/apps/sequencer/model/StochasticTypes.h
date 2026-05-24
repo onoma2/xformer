@@ -117,8 +117,11 @@ struct StochasticStepContent {
         bytes[1] = (bytes[1] & 0xFC) | ((value >> 4) & 0x03);
     }
 
-    int childCount() const { return (bytes[1] >> 2) & 0x07; }
-    void setChildCount(int value) { bytes[1] = (bytes[1] & 0xE3) | ((value & 0x07) << 2); }
+    // burstTails — number of cluster cells AFTER the anchor cell.
+    // Storage: 3 bits (0..7). Value 0 = no cluster fires on this step.
+    // Total audible cluster cells = anchor + burstTails (range 1..8).
+    int burstTails() const { return (bytes[1] >> 2) & 0x07; }
+    void setBurstTails(int value) { bytes[1] = (bytes[1] & 0xE3) | ((value & 0x07) << 2); }
 
     int burstRate() const { return ((bytes[1] >> 5) & 0x07) | ((bytes[2] & 0x0F) << 3); }
     void setBurstRate(int value) {

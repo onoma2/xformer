@@ -259,9 +259,9 @@ void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int si
 }
 
 void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *bursts, const StochasticSequence &sequence, const StochasticStepContent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int anchorNote, uint32_t durationTicks, Random &rng) {
-    int count = event.childCount();
+    int count = event.burstTails();
 
-    // Cluster F eval-time safety net: regardless of what childCount the event
+    // Cluster F eval-time safety net: regardless of what burstTails the event
     // stores (possibly generated at a longer duration), suppress burst if the
     // current effective parent is too short.
     if (durationTicks < kMinBurstParentTicks) {
@@ -328,14 +328,15 @@ StochasticStepContent StochasticGenerator::generateRhythmEvent(const StochasticS
     event.setSlide(false);
     event.setRhythmValid(true);
 
-    event.setChildCount(0);
+    event.setBurstTails(0);
     event.setBurstRate(0);
-    // Burst storage: the cache decides per-cell eligibility (prev_dur / denom
-    // playable). The generator just stores count + spacing so Repeat playback
-    // — which replays _lastStepContent through evaluateBurst — has something to
-    // evaluate. evaluateBurst keeps its own duration check.
+    // Burst storage: the cache decides per-cell eligibility. The generator
+    // picks total cells from the LUT (2..8) and stores tails = total - 1
+    // (range 1..7, fits the 3-bit burstTails field). Repeat playback reads
+    // burstTails directly via evaluateBurst.
     if (int(rng.nextRange(100)) < sequence.burst()) {
-        event.setChildCount(pickFromLutTriangular(kBurstCountLut, sequence.burstCount(), rng));
+        const int total = pickFromLutTriangular(kBurstCountLut, sequence.burstCount(), rng);
+        event.setBurstTails(std::max(1, total - 1));
         int spacingSlot = -1;
         const int picked = pickFromLutTriangular(kBurstSpacingLut, sequence.burstRate(), rng);
         for (int i = 0; i < kBurstSpacingLutSize; ++i) {

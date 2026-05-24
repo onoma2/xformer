@@ -178,11 +178,13 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
             // Burst roll fires per cell. The two timing-mode branches (Fit /
             // Overflow) build different cluster duration arrays.
             if (int(stepRng.nextRange(100)) < int(seq.burst())) {
-                // count = tails count (legacy contract; total cluster cells = count + 1).
-                int count = StochasticGenerator::pickBurstCount(int(seq.burstCount()), stepRng);
-                if (count > StochasticTrackEngine::kMaxBurst) count = StochasticTrackEngine::kMaxBurst;
-                if (count < 1) count = 1;
-                const int total = count + 1;
+                // pickBurstCount returns TOTAL cluster cells (anchor + tails)
+                // per the BurstCount LUT contract {2..8}.
+                int total = StochasticGenerator::pickBurstCount(int(seq.burstCount()), stepRng);
+                const int totalMax = StochasticTrackEngine::kMaxBurst + 1;
+                if (total > totalMax) total = totalMax;
+                if (total < 2) total = 2;
+                const int tails = total - 1;
 
                 if (burstFit) {
                     // Fit: distribute prev_dur across (anchor + tails) via curve.
@@ -190,7 +192,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
                     buildFitCluster(prevDur, total, r);
                     cellDur = clusterDurs[0];
                     clusterIdx = 1;
-                    clusterRemaining = count;
+                    clusterRemaining = tails;
                 } else {
                     // Overflow: existing denom-pick uniform clusterDur.
                     const int spacingSlot = StochasticGenerator::pickBurstSpacingSlot(
@@ -201,7 +203,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
                         for (int k = 0; k < total; ++k) clusterDurs[k] = candidate;
                         clusterTotal = total;
                         clusterIdx = 1;
-                        clusterRemaining = count;
+                        clusterRemaining = tails;
                         cellDur = candidate;
                     }
                 }
@@ -211,18 +213,19 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
             cellDur = lutTicks(uint8_t(ev.durationIndex()));
             if (i == 0) prevDur = cellDur;
 
-            if (int(ev.childCount()) > 0) {
-                int count = int(ev.childCount());
-                if (count > StochasticTrackEngine::kMaxBurst) count = StochasticTrackEngine::kMaxBurst;
-                if (count < 1) count = 1;
-                const int total = count + 1;
+            if (int(ev.burstTails()) > 0) {
+                // burstTails stored = tails count (1..7); total = tails + 1.
+                int tails = int(ev.burstTails());
+                if (tails > StochasticTrackEngine::kMaxBurst) tails = StochasticTrackEngine::kMaxBurst;
+                if (tails < 1) tails = 1;
+                const int total = tails + 1;
 
                 if (burstFit) {
                     const float r = curveFromKnob(int(seq.burstRate()));
                     buildFitCluster(prevDur, total, r);
                     cellDur = clusterDurs[0];
                     clusterIdx = 1;
-                    clusterRemaining = count;
+                    clusterRemaining = tails;
                 } else {
                     int spacingSlot = int(ev.burstRate());
                     if (spacingSlot < 0) spacingSlot = 0;
@@ -235,7 +238,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
                         for (int k = 0; k < total; ++k) clusterDurs[k] = candidate;
                         clusterTotal = total;
                         clusterIdx = 1;
-                        clusterRemaining = count;
+                        clusterRemaining = tails;
                         cellDur = candidate;
                     }
                 }
