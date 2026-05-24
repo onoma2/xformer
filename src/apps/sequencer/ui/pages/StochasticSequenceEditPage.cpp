@@ -1140,13 +1140,11 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
 
     auto heldStep = [&] (int i) { return (_heroSelectionMask & (1U << i)) != 0; };
 
-    // Quick-edit LED hint when PAGE is held (any hero page): steps 9 + 11
-    // glow to advertise the Init / Random shortcuts on Live + Pitch + Duration.
-    auto drawQuickEditHints = [&]() {
+    // Quick-edit LED hint on the Live page only: visual step 15 (Tuesday-
+    // style Random slot) glows green while PAGE is held.
+    auto drawLiveQuickEditHint = [&]() {
         if (!globalKeyState()[Key::Page] || globalKeyState()[Key::Shift]) return;
-        const int initIdx = MatrixMap::fromStep(9);    // PAGE+step9 = Init
-        const int randIdx = MatrixMap::fromStep(11);   // PAGE+step11 = Random
-        leds.unmask(initIdx); leds.set(initIdx, false, true); leds.mask(initIdx);
+        const int randIdx = MatrixMap::fromStep(14);   // PAGE+step15 (visual) = Random
         leds.unmask(randIdx); leds.set(randIdx, false, true); leds.mask(randIdx);
     };
 
@@ -1175,7 +1173,7 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
             bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/held);
         }
-        drawQuickEditHints();
+        drawLiveQuickEditHint();
         break;
     }
     case Page::Loop:
@@ -1239,7 +1237,6 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
             bool selected = (_durSelectionMask & (1U << i)) != 0;
             leds.set(MatrixMap::fromStep(i), active || (i == _selectedDurEntry), true);
         }
-        drawQuickEditHints();
         break;
     }
     case Page::Count:
@@ -1410,14 +1407,11 @@ void StochasticSequenceEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
     bool isHero = (_currentPage == Page::Live || _currentPage == Page::Loop);
     if (isHero) {
-        // Quick-edit: PAGE + step 9..16 routes to context actions on the
-        // current page (mirrors the Pitch/Duration pages' shortcut).
+        // Quick-edit: PAGE + visual step 15 → randomize Live-row knobs.
+        // Tuesday-style slot (quickEdit() == 6 = step() == 14).
         if (key.isQuickEdit() && !key.shiftModifier()) {
-            if (_currentPage == Page::Live) {
-                switch (key.quickEdit()) {
-                case 1: contextAction(int(ContextAction::Init)); break;
-                case 3: contextAction(int(ContextAction::Random)); break;
-                }
+            if (_currentPage == Page::Live && key.quickEdit() == 6) {
+                contextAction(int(ContextAction::Random));
                 event.consume();
                 return;
             }
@@ -1712,38 +1706,12 @@ void StochasticSequenceEditPage::contextAction(int index) {
             showMessage(label);
             break;
         }
-        if (ContextAction(index) == ContextAction::Even) {
-            showMessage("NO EVEN ON LIVE");
-            break;
-        }
-        uint32_t mask = _heroSelectionMask;
-        if (mask == 0) mask = 0xFFFFu;  // no selection → all 16 slots
-        auto wants = [&](int i) { return (mask & (1U << i)) != 0; };
-        if (ContextAction(index) == ContextAction::Init) {
-            // INIT — model defaults (matches StochasticSequence::clear()).
-            // Selection-aware: a mask reduces scope to held steps.
-            if (wants(0))  sequence.setNoteDuration(5);
-            if (wants(1))  sequence.setVariation(16);
-            if (wants(2))  sequence.setRest(0);
-            if (wants(3))  sequence.setRange(50);
-            if (wants(4))  sequence.setBurst(0);
-            if (wants(5))  sequence.setBurstCount(0);
-            if (wants(6))  sequence.setBurstRate(50);
-            if (wants(7))  sequence.setFeel(50);
-            if (wants(8))  sequence.setComplexity(50);
-            if (wants(9))  sequence.setContour(0);
-            if (wants(10)) sequence.setMarblesBias(50);
-            if (wants(11)) sequence.setMarblesSpread(50);
-            if (wants(12)) sequence.setRepeatProb(0);
-            if (wants(13)) sequence.setGateLength(0);
-            if (wants(14)) sequence.setSlide(0);
-            if (wants(15)) sequence.setLegatoProb(0);
-            notifyStochasticShapingEdit();
-            showMessage(_heroSelectionMask ? "INIT SELECTED" : "INIT LIVE");
-        } else if (ContextAction(index) == ContextAction::Random) {
-            // RAND — fresh musically-bounded roll per knob. Selection-aware
-            // (mask=0 covers all 16). Tuesday-style page-owned Random; no
-            // engine seed touched.
+        if (ContextAction(index) == ContextAction::Random) {
+            // Tuesday-style page-owned Random. Selection-aware: empty mask
+            // means all 16; held mask scopes the roll to picked slots.
+            uint32_t mask = _heroSelectionMask;
+            if (mask == 0) mask = 0xFFFFu;
+            auto wants = [&](int i) { return (mask & (1U << i)) != 0; };
             static Random rng;
             if (wants(0))  sequence.setNoteDuration(rng.nextRange(8));
             if (wants(1))  sequence.setVariation(rng.nextRange(101));
@@ -1763,7 +1731,40 @@ void StochasticSequenceEditPage::contextAction(int index) {
             if (wants(15)) sequence.setLegatoProb(rng.nextRange(60));
             notifyStochasticShapingEdit();
             showMessage(_heroSelectionMask ? "RAND SELECTED" : "RAND LIVE");
+            break;
         }
+        // INIT resets the LIVE-page params bound to step buttons back to their
+        // model defaults (matches `StochasticSequence::clear()`). When the
+        // selection mask is non-empty, only the held steps' params are reset
+        // so the user can scope the init to a subset (mirrors ticket-page
+        // selection-aware INIT). EVEN/RAND are not meaningful for these
+        // mixed-type slots — surface a short reminder instead.
+        if (ContextAction(index) != ContextAction::Init) {
+            showMessage("INIT ONLY ON LIVE");
+            break;
+        }
+        uint32_t mask = _heroSelectionMask;
+        if (mask == 0) mask = 0xFFFFu;  // no selection → init all 16 slots
+        auto wants = [&](int i) { return (mask & (1U << i)) != 0; };
+        if (wants(0))  sequence.setNoteDuration(5);
+        if (wants(1))  sequence.setVariation(16);
+        if (wants(2))  sequence.setRest(0);
+        if (wants(3))  sequence.setRange(50);
+        if (wants(4))  sequence.setBurst(0);
+        if (wants(5))  sequence.setBurstCount(0);
+        if (wants(6))  sequence.setBurstRate(50);
+        if (wants(7))  sequence.setFeel(50);   // slot 7 is Feel; BurstHold lives on the context menu
+        if (wants(8))  sequence.setComplexity(50);
+        if (wants(9))  sequence.setContour(0);
+        if (wants(10)) sequence.setMarblesBias(50);
+        if (wants(11)) sequence.setMarblesSpread(50);
+        if (wants(12)) sequence.setRepeatProb(0);
+        if (wants(13)) sequence.setGateLength(0);
+        if (wants(14)) sequence.setSlide(0);
+        if (wants(15)) sequence.setLegatoProb(0);
+        // INIT touches many cache-affecting knobs; always refresh.
+        notifyStochasticShapingEdit();
+        showMessage(_heroSelectionMask ? "INIT SELECTED" : "INIT LIVE");
         break;
     }
     case Page::Loop: {
