@@ -333,6 +333,189 @@ RangeBiasSpreadFixture:
     low = near Bias, mid = cloud, high = low/high extreme tendency
 ```
 
+## Duration / Variation / Rest law
+
+Scope: generation law only. Do not include windowing, phrase scaling, reset boundaries, mask/rank, or playback transforms in this section.
+
+Current behavior to replace:
+
+```
+duration weight[i] = ticketOrFlat[i] * localKernel(NoteDuration, Variation, i)
+rest = sequential Bernoulli after the duration roll
+```
+
+Problem:
+
+- `Note Duration` and `Duration Tickets` fight inside one multiplicative field.
+- `Variation` mostly widens/leaks around `Note Duration`; it does not provide a clear way to explore the full duration field.
+- Carefully edited tickets can be overpowered by a distant `Note Duration`.
+- A `Note Duration` setting can still dominate when the user expects tickets to be the programmed duration source.
+
+New user contract:
+
+```
+Note Duration = home duration
+Duration Tickets = programmed duration source / emphasis
+Variation = who owns the duration roll
+Rest = independent silence chance
+```
+
+Variation zones:
+
+```
+low Variation    -> Note Duration owns the roll
+middle Variation -> Duration Tickets own the roll
+high Variation   -> exploration owns the roll, with full-field and opposite-side access
+```
+
+Example:
+
+```
+Note Duration = 1/16
+Duration Tickets = only 1/2 high
+
+Variation low  -> mostly 1/16
+Variation mid  -> mostly 1/2
+Variation high -> 1/2 remains important, but wider/extreme durations become reachable
+```
+
+Duration weighting shape:
+
+```
+homeWeight[i]     = bell around Note Duration
+ticketWeight[i]   = Duration Ticket value, or flat field if all tickets are zero
+exploreWeight[i]  = full-field floor + opposite-side bell around mirrored Note Duration
+
+homeAmount   = strongest at Variation=0, fades out by the ticket zone
+ticketAmount = strongest in the middle zone
+exploreAmount = rises after the ticket zone, strongest at Variation=100
+
+weight[i] =
+  homeWeight[i] * homeAmount
+  + ticketWeight[i] * ticketAmount
+  + exploreWeight[i] * exploreAmount
+```
+
+Rest law:
+
+```
+rest = random(0..99) < Rest
+```
+
+A rest still consumes the chosen duration.
+
+Dice contract:
+
+```
+duration dice and rest dice must be independent deterministic streams
+changing Rest must not reroll durations
+changing Note Duration / Variation / Duration Tickets must not reshuffle rests
+```
+
+Implementation targets:
+
+```
+StochasticGenerator::pickDuration()
+StochasticGenerator::mutateRhythmOne() duration path
+rhythm generation/cache path that currently decides duration/rest
+```
+
+Fixture requirements:
+
+```
+DurationVariationRestFixture:
+  fixed rhythmSeed
+  fixed slot index set
+  all non-duration rhythm controls held constant
+
+  case A: all tickets zero, NoteDuration=1/16, Variation low
+    durations cluster near 1/16
+
+  case B: only 1/2 ticket high, NoteDuration=1/16, Variation low
+    NoteDuration still dominates
+
+  case C: only 1/2 ticket high, NoteDuration=1/16, Variation middle
+    ticketed 1/2 dominates
+
+  case D: only 1/2 ticket high, NoteDuration=1/16, Variation high
+    1/2 remains likely, but full-field/opposite durations appear
+
+  case E: Rest changes from 0 to 100
+    rest decisions change, duration picks remain identical
+
+  case F: Variation / tickets / NoteDuration change
+    duration picks change, rest decisions remain identical
+```
+
+## Slide law
+
+Scope: per-cell slide on/off + slide time, picked from a single knob.
+
+Background: vinx's AcidGenerator scores each gated step on how musically appropriate a slide is — smaller pitch intervals to the next note score higher; large leaps score negative. Top-K candidates by score get slide. The "interval-aware musicality" puts slides where they sing (adjacent-step legato) rather than scattering randomly across leaps. See `temp-ref/vinx-performer/src/apps/sequencer/engine/generators/AcidGenerator.cpp:401` (`updateLayerSlide`).
+
+Stochastic adoption — Approach 1: per-cell deterministic, score-modulated threshold.
+
+Slide LUT (idea): one knob (Slide), one per-cell field (`event.slideSlot`, 3 bits). Slot 0 = no slide. Slots 1..N = multipliers on `track.slideTime` — e.g. `{none, ×0.5, ×1.0, ×2.0, ×4.0}` for five slots.
+
+Cache walk pick per cell:
+
+```
+For each cell:
+  next = next audible cell's pitch (degree + octave * notesPerOctave)
+  interval = |cellPitch - nextPitch|
+
+  scoreBoost  = (interval <= 1) ? +30
+              : (interval <= 3) ? +16
+              :                   -8
+  scoreBoost += (cellIdx % motifLength == 0) ? +10 : 0
+  scoreBoost += (motifLength > 4)            ?  +4 : 0
+
+  effectiveKnob = clamp(seq.slide() + scoreBoost, 0, 100)
+
+  if cellRng.nextRange(100) >= effectiveKnob:
+    slideSlot = 0                    // no slide
+  else:
+    slideSlot = 1 + cellRng.nextRange(N)   // pick from LUT slots 1..N
+```
+
+`motifLength` derived once per cache rebuild from rhythmSeed (e.g. `2 + (seedHash & 0x3)` → 2..5). Constant within one rebuild so the motif boundary bias is stable across the cycle. Independent across rebuilds — same seed produces same motifLength deterministically.
+
+Knob behavior (one Slide knob, two outputs):
+- Knob = 0 → every cell scores below threshold → all `slideSlot = 0` → no slides.
+- Knob = 50 → mid threshold. Cells with small intervals score above; cells with leaps score below. Slides land on legato-friendly transitions. Slot choice randomized across {1..N} so time varies per cell.
+- Knob = 100 → every cell scores above. Every cell slides. Time still varies via slot pick.
+
+Engine at trigger time (read from cache cell):
+- `cell.slideSlot()` (code) tells which slot.
+- If slot == 0 → no slew on this event (gate-on without slide).
+- Else `effectiveTime = slideLut[slot] * track.slideTime()`. Call `Slide::applySlide` (code) with that time.
+
+Live mode: engine rolls slideSlot per event via `_rng`, writes to `event.slideSlot`. Same score logic if engine has access to next-pitch lookahead (cache does; engine writes ahead-of-time may not). Simplest Live: score-free Bernoulli at knob threshold + random slot pick. Loop mode: score-modulated pick via keyed RNG as above.
+
+Net knobs (ui):
+- **Slide** (ui) on LIVE pitch row — single control, drives both on/off density and time-slot distribution per cell.
+- **SlideTime** (ui) on STOCH CFG — global slide-character scalar (existing). Slots multiply this.
+
+Storage delta: drop existing `event.slide` (code) bit, add `event.slideSlot` (code) 3-bit field. Net +2 bits per event.
+
+Audible test cases (golden):
+
+```
+SlideLaw:
+  case A: Slide = 0, sequence has mixed adjacent and leap intervals
+    no slides anywhere
+  case B: Slide = 50, sequence has mostly adjacent intervals
+    most cells slide; time slots distributed across {1..N}
+  case C: Slide = 50, sequence has mostly leap intervals
+    few cells slide (negative score boost suppresses)
+  case D: Slide = 100
+    every cell slides, time slots distributed
+  case E: same as B but knob scrubbed to 70 and back to 50
+    deterministic — slide pattern at 50 matches the first run
+```
+
+Score-only contribution (Approach 2, vinx-exact top-K sort by score, exact density): noted but not chosen — Approach 1 fits the per-cell streaming cache walk; Approach 2 would require a global sort per rebuild. Possible upgrade if exact-density behavior matters more than per-cell determinism later.
+
 ## Test plan
 
 Before changing any formula, capture **golden traces** of generation output at canonical knob settings:
@@ -392,7 +575,7 @@ Phase 15 starts only after Phase 14B is **fully landed and hardware-verified**. 
 
 ## Open questions
 
-1. Should Phase 15 also touch `pickDuration` and burst LUTs? Triangle scaling there has the same ×10 cliff issue. **Probably yes — same review pass.**
+1. Should duration law land in Phase 15 or split to its own Phase 15R patch? The accepted law is documented above and should not be left as an open-ended "maybe touch duration" item.
 2. Marbles bell as additive vs multiplicative — change shape or rebalance constants?
 3. Is `universalDegreeBoost` (the sieve ranking function) right for non-chromatic scales? The kernel anchors at N/2, N/3, N/4 fractions of `activeNotes` — fine for chromatic and major, but for pentatonic (5 notes) and microtonal scales these anchors land on weird positions.
 4. Should `generateDegree` be deterministic-per-cell (Phase 14B keyed RNG) or carry `lastDegree` (today)? Phase 14B's plan is "replay melody pass for [N..end] after REGEN_CELL"; Phase 15 could revisit this if a per-cell-anchor approach feels more musical.

@@ -63,10 +63,10 @@ static int pickBurstSpacingFromLut(int knob, Random &rng) {
     return pickFromLutTriangular(kBurstSpacingLut, kBurstSpacingLutSize, knob, rng);
 }
 
-// Phase 16 P7 (2026-05-23): public wrappers for cache walk consumption.
-// Cache builds shape decisions per-cell, not per-event-mutation. Both call
-// sites share the same triangular LUT pickers and same RNG semantics —
-// just sourced from different RNG instances (mutate uses Loop seed,
+// Public wrappers for the cache walk. Cache builds shape decisions per-cell
+// using these same triangular LUT pickers; mutate uses the same pickers
+// with a different RNG instance — same semantics, different RNG sources
+// (mutate uses Loop seed,
 // cache uses keyed per-cell seed).
 int StochasticGenerator::pickBurstCount(int knob, Random &rng) {
     return pickBurstCountFromLut(knob, rng);
@@ -96,7 +96,7 @@ void StochasticGenerator::generateRhythm(StochasticSequence &sequence, const Sto
         }
     }
 
-    generateMaskRanks(sequence, size, sequence.tilt(), seed ^ 0xdeadbeef);
+    generateMaskRanks(sequence, size, seed ^ 0xdeadbeef);
     sequence.setRhythmValid(true);
     sequence.setRhythmSeed(seed);
 }
@@ -148,29 +148,18 @@ static int universalDegreeBoost(int degInOct, int N) {
 void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const StochasticTrack &track, Random &rng, int mutateMagnitude) {
     int size = sequence.size();
     if (size <= 0) return;
-    // Phase 12 fix: pick target inside the active playback window [first..last]
-    // (rotate doesn't shift which events are touched, just which patternIndex
-    // maps to which slot). Mutations outside the window are silent until the
-    // window moves; that made the user think mutate was broken.
+    // Pick target inside the active playback window. Mutations outside the
+    // window would be silent until the window moved.
     int first = clamp(int(sequence.first()), 0, size - 1);
     int last  = clamp(int(sequence.last()),  first, size - 1);
     int windowSize = last - first + 1;
     int i = first + rng.nextRange(windowSize);
 
-    // Phase 12: Mutate changes this event's durationIndex; tilt-driven ranks
-    // depend on duration, so re-rank the whole buffer after the mutate.
-
-    // Run the regular rhythm generator first — gets fresh rolls for density,
-    // rest, legato, slide, accent, burst, plus an initial variation-biased
-    // duration pick.
+    // Run the regular generator first for rest / burst / etc. picks, then
+    // override the duration with a mutate-anchored triangular kernel: low
+    // mutate magnitude → strong anchor pull (stays near the noteDuration
+    // setting); high magnitude → uniform across the 8 LUT slots.
     auto rhythm = generateRhythmEvent(sequence, track, rng);
-
-    // Override the duration with mutate-anchored bias: triangular kernel around
-    // the current noteDuration slot. bias_strength = 100 - mutateMagnitude:
-    //   low magnitude → strong anchor (stays near base)
-    //   high magnitude → uniform across the 8 LUT slots
-    // Phase 11: variation is symmetric (sign dropped). Spread term widens the
-    // kernel symmetrically; direction comes from noteDuration (Bias) alone.
     int baseDur = std::max(0, std::min(7, int(sequence.noteDuration())));
     int biasStrength = 100 - std::max(0, std::min(100, mutateMagnitude));
     int varMag = clamp(int(sequence.variation()), 0, 100);   // abs via getter
@@ -197,13 +186,13 @@ void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const St
 
     sequence.events()[i].mergeRhythmFrom(rhythm);
     // Duration-aware ranks need refresh after this event's durationIndex changed.
-    generateMaskRanks(sequence, size, sequence.tilt(), sequence.rhythmSeed() ^ 0xdeadbeef);
+    generateMaskRanks(sequence, size, sequence.rhythmSeed() ^ 0xdeadbeef);
 }
 
 void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng, int mutateMagnitude) {
     int size = sequence.size();
     if (size <= 0) return;
-    // Phase 12 fix: pick target inside the active playback window [first..last].
+    // Pick target inside the active playback window.
     int first = clamp(int(sequence.first()), 0, size - 1);
     int last  = clamp(int(sequence.last()),  first, size - 1);
     int i = first + rng.nextRange(last - first + 1);
@@ -225,8 +214,6 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
             int tickets = sequence.effectiveDegreeTicket(idx, activeNotes);
             if (tickets < 0) continue;                       // excluded
             int deg = oct * activeNotes + idx;
-            // Phase 12: min/max degree clamps dropped — pool gated by range + tickets only.
-
             int boost = universalDegreeBoost(idx, activeNotes);
             int ticketWeight = (tickets > 0) ? tickets : 1;
             int w = ticketWeight * (100 + (biasStrength * boost) / 100);
@@ -275,21 +262,18 @@ void StochasticGenerator::permuteRhythmOne(StochasticSequence &sequence, Random 
     ev[j].mergeRhythmFrom(tmp);
 }
 
-// Phase 11 unified duration picker. Always combines duration tickets (base weight
-// LUT, defaults flat) with noteDuration (kernel center / Bias) and variation
-// (kernel width / Spread, symmetric — sign ignored). Returns LUT slot 0..7.
+// Duration picker. Combines duration tickets (flat-default LUT base weight),
+// noteDuration (kernel center), and variation (kernel width, symmetric).
+// Returns LUT slot 0..7.
+//
+// The (width-dist) triangle is scaled ×10 so the center retains a strong
+// lead — at low variation a low-leakage center still feels musical instead
+// of flattening to near-random.
 static int pickDuration(const StochasticSequence &sequence, Random &rng) {
     const int slots = 8;
     int center = clamp(int(sequence.noteDuration()), 0, slots - 1);
-    int spread = clamp(int(sequence.variation()), 0, 100);  // abs via variation() getter
+    int spread = clamp(int(sequence.variation()), 0, 100);
     int width = 1 + (spread * 4) / 100;                      // 1..5 slots wide
-
-    // Phase 12 musicality fix: the (width-dist) triangle is scaled ×10 so the
-    // center keeps a strong lead even when leakage starts ramping in. Old
-    // formula had `kernel + (spread/10)` where 1-slot kernel and a leakage of
-    // 1 gave a 2:1 center-to-edge ratio → ~22% center which felt random at
-    // VAR=10. Scaling the triangle 10× makes the same case 11:1 ≈ 61% center.
-    // Also removes the integer-truncation cliff at the leakage threshold.
     int weights[slots];
     int total = 0;
     for (int i = 0; i < slots; ++i) {
@@ -311,7 +295,7 @@ static int pickDuration(const StochasticSequence &sequence, Random &rng) {
     return center;
 }
 
-// Phase 16 P7 (2026-05-23): public entry point for cache walk.
+// Public entry point for cache walk.
 int StochasticGenerator::pickDurationSlot(const StochasticSequence &sequence, Random &rng) {
     return pickDuration(sequence, rng);
 }
@@ -335,23 +319,18 @@ void StochasticGenerator::permuteMelodyOne(StochasticSequence &sequence, Random 
     ev[j].mergeMelodyFrom(tmp);
 }
 
-// Phase 12: duration-aware rank assignment over the ACTIVE PLAYBACK WINDOW
-// [first..last] only. Off-window events are never read by playback, so ranking
-// them wastes "top priority" slots on inaudible content and breaks the user
-// mental model that Mask thins the audible loop by N%. Tilt is bipolar —
-// positive favors long-note survival under Mask cuts; negative favors short
-// notes. Tilt=0 → pure noise (random rank).
+// Per-event rank assignment. Score = a normalized long-vs-short axis from
+// each event's durationIndex, plus a small random jitter to break ties for
+// equal-duration events. Sort sets event.densityRank to the cell's position
+// in long-to-short order (rank 0 = longest, rank N-1 = shortest). Tilt does
+// NOT participate here — it's applied at trigger time.
 //
-// `size` arg is kept for API stability but only used for buffer bounds; the
-// window is derived from sequence.first()/last(). The mask trigger filter must
-// compare against windowSize, not size, to match this rank domain.
-void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed) {
+// Iterates the full pattern extent so each slot's rank is stable across
+// First/Size window edits. Called from RENEW / Patience / Mutate.
+void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int size, uint32_t seed) {
     Random rng(seed);
     if (size <= 0) return;
-    int first = clamp(int(sequence.first()), 0, size - 1);
-    int last  = clamp(int(sequence.last()),  first, size - 1);
-    int windowSize = last - first + 1;
-    if (windowSize <= 0) return;
+    if (size > CONFIG_STEP_COUNT) size = CONFIG_STEP_COUNT;
 
     struct WeightedIndex {
         uint8_t index;
@@ -359,20 +338,24 @@ void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int si
     };
     std::array<WeightedIndex, CONFIG_STEP_COUNT> weightedIndices;
 
-    for (int k = 0; k < windowSize; ++k) {
-        int idx = first + k;
-        weightedIndices[k].index = uint8_t(idx);
-        int durSlot = clamp(int(sequence.events()[idx].durationIndex()), 0, 7);
-        float longShortAxis = (durSlot - 3.5f) / 3.5f;          // -1..+1
-        float bias = (tilt / 100.f) * longShortAxis;
-        weightedIndices[k].weight = bias + (rng.nextRange(1000) / 1000.f) * 0.2f;
+    for (int k = 0; k < size; ++k) {
+        int durSlot = clamp(int(sequence.events()[k].durationIndex()), 0, 7);
+        // Long-vs-short axis in [-1, +1]: durSlot 0 = longest LUT entry (×8),
+        // durSlot 7 = shortest (×1/2). Negate so longest cell -> negative, sorts first.
+        float longShortAxis = (durSlot - 3.5f) / 3.5f;
+        // Small jitter (range 0..0.2) breaks ties between equal-duration events
+        // deterministically per seed without overwhelming the duration ordering.
+        float jitter = (rng.nextRange(1000) / 1000.f) * 0.2f;
+        weightedIndices[k].index = uint8_t(k);
+        weightedIndices[k].weight = longShortAxis + jitter;
     }
 
-    std::sort(weightedIndices.begin(), weightedIndices.begin() + windowSize, [](const WeightedIndex &a, const WeightedIndex &b) {
+    std::sort(weightedIndices.begin(), weightedIndices.begin() + size,
+              [](const WeightedIndex &a, const WeightedIndex &b) {
         return a.weight < b.weight;
     });
 
-    for (int k = 0; k < windowSize; ++k) {
+    for (int k = 0; k < size; ++k) {
         sequence.events()[weightedIndices[k].index].setDensityRank(k);
     }
 }
@@ -433,42 +416,26 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
     StochasticSourceEvent event;
     event.clear();
 
-    // V5 Duration: use weighted duration tickets if any are active, else
-    // single-slot pick via the noteDuration LUT macro. Variation is applied at
-    // generation time so each event gets its own randomized durationIndex
-    // baked into the stored pattern — Loop-mode playback then repeats the same
-    // varied content until RENEW, and the loop tape display sees the variation.
-    // Phase 11: single path — duration tickets always multiply into the
-    // noteDuration (Bias) + variation (Spread) kernel.
+    // Duration pick: tickets × kernel(noteDuration center, variation width).
     int durationIndex = pickDuration(sequence, rng);
 
     event.setDurationIndex(durationIndex);
     event.setDensityRank(0); // Live events have no mask rank
 
-    // Rest probability: single Bernoulli gate. `sequence.density()` is a reserved
-    // model slot (engine-unused — kept for serialization stability and future
-    // repurpose, likely as Proteus-style rank-cutoff density).
     bool restGate = (rng.nextRange(100) < sequence.rest());
     event.setRest(restGate);
-    event.setLegato(int(rng.nextRange(100)) < sequence.legatoProb());
-    event.setSlide(int(rng.nextRange(100)) < sequence.slide());
-    // Accent write removed 2026-05-22 — the accent bit was never consumed by
-    // the audio path, and its storage (`_accentProb`) was aliased with
-    // patienceMelody, so writing it here meant the patience M knob silently
-    // drove a per-event Bernoulli too. Bit 7 of byte 2 is now reserved.
+    // Legato + Slide are cache-owned. event.legato / event.slide are kept as
+    // dead bits for binary / serialization stability.
+    event.setLegato(false);
+    event.setSlide(false);
     event.setRhythmValid(true);
 
     event.setChildCount(0);
     event.setBurstRate(0);
-    // Phase 16 P7 (2026-05-23): the old kMinBurstParentTicks gate was the
-    // silent-burst killer at factory defaults — generator suppressed burst
-    // unless the event's own LUT-derived duration was already ≥ 96 ticks.
-    // Under the flat cell model burst eligibility is "prev_dur / denom is
-    // playable," judged per-cell by the cache walk. The generator no longer
-    // gates burst at write time; it just stores the chosen count/spacing so
-    // Repeat playback (which replays _lastEvent and uses evaluateChildren)
-    // still has something to evaluate. evaluateChildren keeps its own
-    // duration check on the Repeat path so short repeats still play clean.
+    // Burst storage: the cache decides per-cell eligibility (prev_dur / denom
+    // playable). The generator just stores count + spacing so Repeat playback
+    // — which replays _lastEvent through evaluateChildren — has something to
+    // evaluate. evaluateChildren keeps its own duration check.
     if (int(rng.nextRange(100)) < sequence.burst()) {
         event.setChildCount(pickBurstCountFromLut(sequence.burstCount(), rng));
         int spacingSlot = -1;
@@ -597,14 +564,11 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
             kernel = 100;
         } else {
             int d = i > lastIdx ? i - lastIdx : lastIdx - i;
-            // Phase 12 musicality fix: the (kernelWidth-dist) triangle is
-            // scaled ×10 so the center keeps a strong lead vs the kernelLeak
-            // term. Same cliff-removal as the Variation fix in pickDuration.
+            // ×10 scaling on the (kernelWidth-dist) triangle so the center
+            // retains a strong lead over the leakage floor.
             int tri = (kernelWidth > d ? kernelWidth - d : 0) * 10;
-            // Drift in scaled units too — was contour×signedDist/20, now ×10
-            // larger so it operates on the same scale as tri.
             int signedDist = i - lastIdx;
-            int drift = (contour * signedDist) / 2;        // was /20
+            int drift = (contour * signedDist) / 2;
             int maxDrift = (kernelWidth > 2 ? kernelWidth : 2) * 10;
             if (drift > maxDrift) drift = maxDrift;
             else if (drift < -maxDrift) drift = -maxDrift;
@@ -613,8 +577,8 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
         }
 
         int dm = i > biasPos ? i - biasPos : biasPos - i;
-        // Phase 12 musicality fix: ×10 scaling on the bell triangle so the
-        // marblesLeak floor doesn't overwhelm the bell at low spread values.
+        // Marbles bell triangle, same ×10 scaling so the leakage floor
+        // doesn't overwhelm the bell at low spread.
         int mtri = (marblesWidth > dm ? marblesWidth - dm : 0) * 10;
         int marbles = mtri + marblesLeak;
 

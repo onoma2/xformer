@@ -746,7 +746,7 @@ void StochasticSequenceEditPage::editLoopStep(int step, int value, bool shift) {
     case 4: seq.setSleep(seq.sleep() + v); break;
     // Bottom row — loop window / shape params (green LEDs)
     case 8:  seq.setFirst(seq.first() + value);   notifyStochasticWindowEdit(); break;
-    case 9:  seq.setLast(seq.last() + value);     notifyStochasticWindowEdit(); break;
+    case 9:  /* Last slot stubbed dead 2026-05-24 — collapsed into Size */ break;
     case 10: seq.setSize(seq.size() + value);     notifyStochasticWindowEdit(); break;
     case 11: seq.setRotate(seq.rotate() + value); break;   // rotation doesn't move window bounds
     // Last two — Mask + Tilt performance pair (filter + duration-tilt resonance)
@@ -1663,7 +1663,8 @@ void StochasticSequenceEditPage::contextAction(int index) {
         if (wants(4))  sequence.setSleep(0);
         bool windowEdited = false;
         if (wants(8))  { sequence.setFirst(0);  windowEdited = true; }
-        if (wants(9))  { sequence.setLast(15);  windowEdited = true; }
+        // wants(9) → Last slot is a dead knob (2026-05-24); equivalent default
+        // is Size=16 covered by wants(10).
         if (wants(10)) { sequence.setSize(16);  windowEdited = true; }
         if (wants(11)) sequence.setRotate(0);   // rotation doesn't move bounds
         if (windowEdited) notifyStochasticWindowEdit();

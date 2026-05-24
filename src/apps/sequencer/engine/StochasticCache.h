@@ -1,11 +1,10 @@
 #pragma once
 
-// Phase 14B engine-side cache for stochastic playback. Bit-packed cell layout
-// validated by TestStochasticCacheParity against today's playback semantics.
-//
-// Patch A scope: data structures + populate-from-events helper + rank
-// computation. Not yet wired into StochasticTrackEngine playback — playback
-// switch happens in Patch B.
+// Engine-side cache for stochastic playback. Bit-packed cell layout
+// validated by TestStochasticCacheParity. The engine reads cells[K]
+// directly for each played slot K; the cache is rebuilt only when stored
+// material changes (renew, mutate, Size edit, shaping-knob edit via
+// notifyStochasticShapingEdit).
 
 #include <cstdint>
 #include <cstddef>
@@ -25,33 +24,22 @@ constexpr uint32_t kMaxCellDuration = 4095;
 // 6-bit gate length encoded as LUT slot or fractional ticks (0..63).
 constexpr uint8_t kMaxGateLen = 63;
 
-// Melody fields. Cells store scale-domain `degree` and `octave` rather than
-// resolved voltage. Trigger-time scale + track-offset lookup matches today's
-// engine, keeping the cache invariant to scale/rootNote/track.octave/
-// track.transpose changes (no rebuild needed when those move).
+// Cells store scale-domain `degree` and `octave`, not resolved voltage —
+// scale / rootNote / track.octave / track.transpose are layered in at
+// trigger time, so those edits don't force a cache rebuild.
 //
-// Phase 16 P2 (2026-05-23): octave narrowed 5 → 4 bits (range 0..15) to free
-// one bit for `audible` packed into the cell. Practical stochastic event
-// octaves stay well under 15. `audible` was previously in CellAux.flags;
-// move into cell saves a byte per aux entry (CellAux shrinks to 1 byte).
+// Octave packed in 4 bits (0..15); practical stochastic octaves stay
+// well below that. `audible` lives in the cell (not CellAux) so the aux
+// entry stays 1 byte.
 constexpr uint8_t kMaxOctave = 15;
 
-// Phase 16 P3 (2026-05-23): bumped 64 → 80 to give burst patterns more
-// headroom before the cap truncates. Under the parent/child model this
-// reduces burst-truncation in dense patterns. Once Phase 16 P5 lands
-// (flat cell model where bursts no longer spawn separate cells), the
-// optimal cap may drop back to 64 — revisit after P5.
-// Pinned at 64 (Codex H1, 2026-05-23): CellAux::rank is 6 bits (0..63).
-// Raising kCellCap past 64 wraps cells 64+ ranks via the 0x3f mask in
-// setRank(), corrupting Mask/Tilt ordering. Widen the rank field to 7
-// bits (one spare bit in CellAux today) before raising the cap.
+// Hard cap on cells per cache. Matches kMaxEventSlots since the walk is
+// slot-keyed (one cell per slot). Pinned at 64 because CellAux::rank is
+// a 6-bit field — widening it would let cells 64+ wrap their rank bits.
 constexpr int kCellCap = 64;
 
-// Phase 16 P6 (2026-05-23): cell stores its own duration (per-cell), not
-// the absolute cycle position. Removes the silent 4095-tick overflow that
-// corrupted long-cycle playback when cells were spaced past the 12-bit
-// relTick cap — each cell's duration is independent and naturally bounded
-// by what a single cell can hold (kMaxCellDuration = 4095 ticks).
+// Cell stores its own duration in ticks; the engine sums durations for
+// the cycle length. 12-bit field clamps at kMaxCellDuration.
 struct CachedCell {
     uint32_t packed;
 
@@ -79,11 +67,9 @@ struct CachedCell {
 };
 static_assert(sizeof(CachedCell) == 4, "CachedCell must be 4 bytes");
 
-// Auxiliary per-cell metadata. Phase 16 P2 (2026-05-23): shrunk to 1 byte —
-// audible moved into the cell, burst-child stays here until Phase 16 P5 (when
-// flat layout eliminates the concept entirely).
-//   bits 0-5: rank (0..63)
-//   bit 6:    burst-child
+// Auxiliary per-cell metadata. 1 byte.
+//   bits 0-5: rank (0..63) — currently unused; ranks live on events.
+//   bit 6:    burst-child  — always 0 under the flat cell model.
 //   bit 7:    reserved
 struct CellAux {
     uint8_t packed;
@@ -103,10 +89,10 @@ struct CellAux {
 };
 static_assert(sizeof(CellAux) == 1, "CellAux must be 1 byte");
 
-// Cache footprint per active track (post Phase 16 P2):
+// Cache footprint per active track:
 //   CachedCell[64] = 256 B
-//   CellAux[64]    =  64 B   (was 128 B, audible moved into cell)
-//   Total          = 320 B   (was 384 B)
+//   CellAux[64]    =  64 B
+//   Total          = 320 B
 
 // Max event slots in a sequence — matches CONFIG_STEP_COUNT but the header
 // avoids pulling that in (Cache is consumed by tests too).
@@ -116,50 +102,30 @@ struct Cache {
     CachedCell cells[kCellCap];
     CellAux    aux[kCellCap];
 
-    // Map from event-slot index (0..kMaxEventSlots-1) to its parent cell index
-    // in `cells[]`. Lets the engine look up "for sequence slot K, what's the
-    // parent cell's rank?" without scanning the cache at trigger time.
-    // 0xff = unmapped (slot outside the active window).
+    // Slot-keyed identity map: parentCacheIdx[K] == K for K < count;
+    // 0xff outside that range. Kept for binary compat with earlier
+    // parent/child layouts.
     uint8_t    parentCacheIdx[kMaxEventSlots];
 
     uint8_t    count;
     uint16_t   cycleTicks;
-
-    // Phase 16 P6 (2026-05-23): Feel scaling moved out of cache state.
-    // Engine computes the Q16.16 scale on the fly each trigger from
-    // sequence.feel() + cycleTicks + CONFIG_PPQN via computeFeelScaleQ16.
-    // This makes routed Feel CV take effect without a cache refresh.
 };
 
-// Populate cache by walking an existing StochasticSequence's `_events[]` tape.
-// Produces the same playback stream the current engine path would produce, so
-// the parity test can match cache content against today's behavior.
+// Build the cache from the sequence's events array.
 //
-// `divisor` is the sequence divisor in ticks (engine reads this from track).
-// `seed` is the rhythmSeed used for deterministic rank assignment AND for
-//        burst-child Generate-mode pitch picking (keyed per cell index).
-// `scale` / `track` / `rootNote` are passed for burst-child Generate-mode
-//        scale-aware degree picking via StochasticGenerator::generateDegree.
-//        Optional — pass nullptr `scale` / `track` to skip burst-child note
-//        baking (children land with degree=0 placeholders for callers that
-//        only need timing).
+// `divisor`  — sequence divisor in ticks.
+// `seed`     — rhythmSeed; keys cellRng for duration / burst / gate-length /
+//              legato picks.
+// `scale` / `track` / `rootNote` — needed only for melody-domain picks
+//              (anchor pitch via generateDegree, cluster-tail Generate
+//              pitch, slide). Pass nullptr to skip pitch baking.
 // Returns number of cells written.
 int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
                               const Scale *scale = nullptr, const StochasticTrack *track = nullptr, int rootNote = 0);
 
-// Recompute ranks from keyed-hash salt + tilt. Cells must already be in
-// cache; durationIndex is recovered from gateLen via the duration LUT.
-// `tilt` is -100..+100.
-void recomputeCacheRanks(Cache &cache, uint32_t seed, int tilt);
-
-// Phase 16 P5 (2026-05-23): compute the Feel scaling factor as Q16.16
-// fixed-point. Inputs:
-//   feel        — sequence.feel() knob value, 0..100.
-//   naturalSum  — sum of natural cell durations in ticks (cache.cycleTicks).
-//   beatTicks   — ticks per beat (CONFIG_PPQN typically).
-// Detent [45..55] → returns 0x10000 (1.0, no scaling). Outside detent:
-// scale = (targetBeats × beatTicks) / naturalSum, clamped to a reasonable
-// range. Returns 0x10000 (no-op) if naturalSum is 0 to avoid div-by-zero.
+// Compute the Feel scaling factor as Q16.16. Detent [45..55] → 1.0 (no
+// scaling). Outside detent: scale = (targetBeats × beatTicks) / naturalSum,
+// clamped to 1/4 .. 4×. Returns 1.0 when naturalSum is 0.
 uint32_t computeFeelScaleQ16(int feel, uint32_t naturalSum, uint32_t beatTicks);
 
 // Convenience: multiply a tick value by a Q16.16 scale factor.
@@ -167,39 +133,14 @@ inline uint32_t applyFeelScale(uint32_t ticks, uint32_t scaleQ16) {
     return uint32_t((uint64_t(ticks) * scaleQ16) >> 16);
 }
 
-// Select the rank a mask filter should use for the event currently being
-// played.
-//
-// Codex adversarial review 2026-05-22: when Repeat fires, the engine replays
-// `_lastEvent` instead of the slot's stored event. The cache's per-slot rank
-// then refers to the *wrong* material — the current readIndex's event, not
-// the repeated event. `_lastEvent` carries its own `densityRank` (legacy
-// rank field, copied at capture time), so the right rank source for a
-// repeated event is `eval.densityRank()`, not `cache.aux[parentCacheIdx]`.
-//
-// Inputs:
-//   useRepeat        — true if engine is about to play a Repeat replay.
-//   eventDensityRank — eval.densityRank() of the (possibly repeated) event.
-//   readIndex        — current sequence slot, 0..kMaxEventSlots-1.
-//   cache            — engine's per-track cache.
-//
-// Returns the rank value that should be compared against the mask threshold.
-inline uint32_t selectMaskRank(bool useRepeat,
+// Mask threshold reads the rank straight off the event. Repeat replays
+// the captured `_lastEvent`, which carries its own densityRank from the
+// slot it was captured from, so this works for both Repeat and non-Repeat
+// trigger paths.
+inline uint32_t selectMaskRank(bool /*useRepeat*/,
                                uint8_t eventDensityRank,
-                               int readIndex,
-                               const Cache &cache) {
-    if (useRepeat) {
-        // The audible material is _lastEvent, whose densityRank travels with
-        // it. Slot-keyed cache rank would filter unrelated content.
-        return uint32_t(eventDensityRank);
-    }
-    uint8_t cacheIdx = (readIndex >= 0 && readIndex < int(kMaxEventSlots))
-                     ? cache.parentCacheIdx[readIndex]
-                     : uint8_t(0xff);
-    if (cacheIdx < kCellCap) {
-        return uint32_t(cache.aux[cacheIdx].rank());
-    }
-    // Fallback for unprimed cache (engine reset, no refresh has run yet).
+                               int /*readIndex*/,
+                               const Cache & /*cache*/) {
     return uint32_t(eventDensityRank);
 }
 

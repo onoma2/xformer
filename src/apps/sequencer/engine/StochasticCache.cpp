@@ -15,23 +15,13 @@
 
 namespace stochastic_cache {
 
-// Burst spacing denominators — kept in sync by hand with the matching LUT in
-// StochasticGenerator.cpp. The shared header refactor was out of scope when
-// the cache was added; both call sites must move together if either changes.
+// Burst spacing denominators — must stay in sync with the matching LUT in
+// StochasticGenerator.cpp.
 static const int kBurstSpacingLut[] = { 2, 3, 4, 5, 6 };
-// kBurstSpacingLutSize no longer needed in cache (picker exposed via
-// StochasticGenerator::pickBurstSpacingSlot returns a clamped slot index).
-// kMinBurstParentTicks was the old generator-side gate that silently killed
-// burst at factory defaults — removed in Phase 16 P7. Cache uses the
-// playable-cluster-cell floor (kMinChildGate) instead.
-static constexpr uint32_t kMinChildGate = 6;
 
-// Encode a duration LUT slot into the 6-bit cell field. Patch A uses the slot
-// directly (0..7); higher bits unused. Future patches may pack gateLen as a
-// fraction of relTick to a cell-edge encoding.
-static uint8_t encodeGateLenAsDurSlot(uint8_t durationIndex) {
-    return durationIndex & 0x3fu;
-}
+// Minimum tick floor for cluster-cell duration. Below this, a burst roll is
+// rejected so the audio engine never schedules a sub-audible cluster cell.
+static constexpr uint32_t kMinChildGate = 6;
 
 uint32_t computeFeelScaleQ16(int feel, uint32_t naturalSum, uint32_t beatTicks) {
     constexpr uint32_t kOneQ16 = 0x10000;
@@ -67,33 +57,21 @@ uint32_t computeFeelScaleQ16(int feel, uint32_t naturalSum, uint32_t beatTicks) 
 int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
                               const Scale *scale, const StochasticTrack *track, int rootNote) {
     (void)rootNote; // unused — generateDegree consumes scale + track only, root is applied at trigger time
-    (void)seed;     // unused under flat — no per-cell keyed RNG needed (clusters use deterministic prev-dur math)
     cache.count = 0;
     cache.cycleTicks = 0;
+    // Slot-keyed cache (2026-05-24): each slot is its own cell, indexed by
+    // slot. parentCacheIdx is the identity mapping for slots 0..size-1 and
+    // 0xff outside that range. Engine reads cache.cells[readIndex] directly.
     for (int i = 0; i < kMaxEventSlots; ++i) cache.parentCacheIdx[i] = 0xff;
 
     const bool bakeChildNotes = (scale != nullptr) && (track != nullptr);
-    const int activeNotes = bakeChildNotes ? std::max(1, scale->notesPerOctave()) : 1;
-    (void)activeNotes; // BurstPitch Roll lands in Phase 16 P8 (B5); reroll degree for cluster cells using keyed RNG.
 
-    const int first = std::max(0, std::min(int(seq.first()), int(seq.size()) - 1));
-    const int last  = std::max(first, std::min(int(seq.last()),  int(seq.size()) - 1));
-    if (last < first) return 0;
-
-    // Phase 16 P7 (2026-05-23): flat-cell generator with shaping in cache.
-    //
-    // Per-cell duration is picked here via StochasticGenerator::pickDurationSlot
-    // — NoteDuration + Variation knobs reshape playback on refreshCache without
-    // a full mutate pass. event.durationIndex is no longer read; the generator
-    // still writes it for the Repeat replay path (_lastEvent), but the
-    // non-Repeat playback path is fully cache-driven.
-    //
-    // Per-cell burst roll: rolls sequence.burst() probability via keyed RNG.
-    // On hit, picks BurstCount and BurstRate from their LUT pickers and starts
-    // a cluster of `count + 1` cells with duration prev_dur / denom. Eligibility
-    // check is "prev_dur / denom >= kMinChildGate" — judged on the actual
-    // previous cell, not the event's would-be LUT slot. This is the law the
-    // user expects: short cells can't sustain bursts; long cells can.
+    // Slot-keyed walk: iterate the full pattern extent 0..size-1. First is
+    // not consulted here — it bounds playback at the engine, not the cache
+    // build. Slot K's cell is always cells[K]; cluster state carries across
+    // slots; content depends only on (seed, events, slot index).
+    const int size = std::max(0, std::min(int(seq.size()), int(kMaxEventSlots)));
+    if (size <= 0) return 0;
 
     auto lutTicks = [&](uint8_t durationIndex) -> uint32_t {
         auto frac = StochasticTrackEngine::getDurationFraction(int(durationIndex));
@@ -102,44 +80,39 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
     };
 
     uint32_t cycleTicks = 0;
-    // Bootstrap prevDur with the first cell's natural pick. Cluster math at
-    // slot 0 still has *something* to divide; if the first cell itself starts
-    // a cluster, the cell's own LUT pick is used as prevDur. Subsequent cells
-    // see the actual emitted prevDur from the cycle.
+    // prevDur carries the last emitted cell's duration so a burst cluster
+    // can derive its own cell duration as prev / denom. Bootstrapped from
+    // the first cell's natural LUT pick the first time it's needed.
     uint32_t prevDur = 0;
     int clusterRemaining = 0;
     uint32_t clusterDur = 0;
 
-    // Mode-gated pick paths (2026-05-23). Symmetric across pitch and rhythm:
-    //
-    //   Loop → cache walks pick per cell via keyed RNG seeded by the
-    //          domain's seed. Knob movement reshapes the cache
-    //          deterministically; the events array is left untouched.
-    //
-    //   Live → engine writes fresh content into events[readIndex] every
-    //          trigger via writeLive{Rhythm,Melody}Shadow. Cache reads
-    //          events verbatim — that's the actual freshness path. Pickers
-    //          stay out of the way.
-    //
-    // The mutate path's per-slot writes do not reach Loop playback under
-    // this contract — addressed next.
+    // Mode-gated pick paths. Loop = cache picks per cell from keyed RNG
+    // (knob movement reshapes deterministically). Live = engine writes
+    // fresh content per trigger into the events array; cache reads those
+    // values verbatim.
     const bool pickMelodyInCache =
         bakeChildNotes && seq.melodyMode() == StochasticSourceMode::Loop;
     const bool pickRhythmInCache =
         seq.rhythmMode() == StochasticSourceMode::Loop;
-    Random meldRng(seq.melodySeed());
-    int meldLastDeg = -1;
+
+    // Pitch chain threads lastDegree through every slot (including cluster
+    // tails) so Complexity / Contour kernels see continuous motion that
+    // does not depend on cluster placement.
+    int chainLastDeg = -1;
     uint8_t anchorDegree = 0;
     uint8_t anchorOctave = 0;
+    bool anchorLegato = false;
+    bool anchorSlide  = false;
 
-    for (int i = first; i <= last; ++i) {
-        if (cache.count >= kCellCap) break;  // hard cap; remaining slots dropped silently
+    for (int i = 0; i < size; ++i) {
+        if (i >= kCellCap) break;  // hard cap; remaining slots dropped silently
 
         const StochasticSourceEvent &ev = seq.events()[i];
 
-        // Per-cell keyed RNG so cache rebuilds are deterministic at fixed
-        // seed (Loop replay stable) while keeping each cell's roll independent.
-        Random cellRng(keyed_rng::cellSeed(seed, uint32_t(cache.count)));
+        // Per-cell keyed RNG. Slot K's cell content is a pure function of
+        // (rhythmSeed, K); First / Size do not shift it.
+        Random cellRng(keyed_rng::cellSeed(seed, uint32_t(i)));
 
         // Decide this cell's duration. Cluster overrides the per-cell pick.
         uint32_t cellDur;
@@ -149,19 +122,19 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             --clusterRemaining;
             isClusterTail = true;
         } else if (pickRhythmInCache) {
-            // Loop: pick fresh per cell via keyed RNG so NoteDuration /
-            // Variation / Burst / BurstCount / BurstRate (ui) knobs reshape
-            // the loop deterministically.
+            // Loop: pick fresh per cell. NoteDuration + Variation knobs
+            // reshape the duration; Burst + Count + Rate knobs decide
+            // cluster firing — all deterministic in the seed.
             const int picked = StochasticGenerator::pickDurationSlot(seq, cellRng);
             cellDur = lutTicks(uint8_t(picked));
 
-            // Bootstrap prevDur with this cell's natural pick if we're at slot 0
-            // (no prior cell to inherit from). Cluster math will divide it below.
-            if (cache.count == 0) prevDur = cellDur;
+            // Bootstrap prevDur at slot 0 so a cluster starting at slot 0
+            // has something to divide. Subsequent slots see the actual
+            // emitted prev.
+            if (i == 0) prevDur = cellDur;
 
-            // Burst roll: probability gated by sequence.burst(). Eligibility =
-            // resulting cluster cell duration ≥ kMinChildGate so we never
-            // schedule sub-audible clusters.
+            // Burst roll. Reject if the resulting cluster cell would fall
+            // below the audible-cell floor.
             if (int(cellRng.nextRange(100)) < int(seq.burst())) {
                 const int spacingSlot = StochasticGenerator::pickBurstSpacingSlot(
                     int(seq.burstRate()), cellRng);
@@ -182,7 +155,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             // Read its durationIndex / childCount / burstRate so every event
             // is genuinely fresh (not seed-locked to the previous cycle).
             cellDur = lutTicks(uint8_t(ev.durationIndex()));
-            if (cache.count == 0) prevDur = cellDur;
+            if (i == 0) prevDur = cellDur;
 
             if (int(ev.childCount()) > 0) {
                 int spacingSlot = int(ev.burstRate());
@@ -204,25 +177,33 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             }
         }
 
-        // Pitch resolution per cell.
-        //
-        // - Cluster tail cell + Roll mode → fresh pick via per-cell keyed RNG.
-        // - Cluster tail cell + Hold mode → copy anchor's chosen pitch
-        //   (matches the "Burst Hold = all same pitch" contract).
-        // - Anchor / non-cluster cell + Loop mode + scale available →
-        //   pick via generateDegree using meldRng (seeded by melodySeed).
-        //   This makes pitch-shaping knobs reshape the loop without
-        //   rewriting the tape.
-        // - Anchor / non-cluster + Live mode (or no scale provided) →
-        //   read the tape. In Live the engine has just written fresh content
-        //   to this slot via writeLiveMelodyShadow.
+        // Loop melody: precompute slot K's anchor pitch for EVERY slot,
+        // advancing chainLastDeg through all of them. Anchor pitch is a
+        // pure function of (melodySeed, K); cluster placement does not
+        // shift which pitch lands where.
+        uint8_t slotDegree = 0;
+        uint8_t slotOctave = 0;
+        if (pickMelodyInCache) {
+            Random anchorRng(keyed_rng::cellSeed(seq.melodySeed(), uint32_t(i)));
+            const int degAbs = StochasticGenerator::generateDegree(
+                seq, *track, *scale, chainLastDeg, anchorRng);
+            const int notes = std::max(1, scale->notesPerOctave());
+            slotDegree = uint8_t(degAbs % notes);
+            slotOctave = uint8_t(std::min(int(kMaxOctave), degAbs / notes));
+        }
+
         uint8_t cellDegree;
         uint8_t cellOctave;
         if (isClusterTail) {
             if (bakeChildNotes && seq.burstPitch() == StochasticBurstPitch::Generate) {
+                // Cluster-tail Generate pitch lives in the melody domain
+                // (melodySeed-keyed) so NewR does not shift cluster-tail
+                // pitches. Distinct salt from the anchor RNG so the two
+                // streams stay independent.
+                Random tailRng(keyed_rng::cellSeed(seq.melodySeed(), uint32_t(i)) ^ 0x7A11C0DEu);
                 int lastDeg = -1;
                 const int degAbs = StochasticGenerator::generateDegree(
-                    seq, *track, *scale, lastDeg, cellRng);
+                    seq, *track, *scale, lastDeg, tailRng);
                 const int notes = std::max(1, scale->notesPerOctave());
                 cellDegree = uint8_t(degAbs % notes);
                 cellOctave = uint8_t(std::min(int(kMaxOctave), degAbs / notes));
@@ -231,11 +212,8 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
                 cellOctave = anchorOctave;
             }
         } else if (pickMelodyInCache) {
-            const int degAbs = StochasticGenerator::generateDegree(
-                seq, *track, *scale, meldLastDeg, meldRng);
-            const int notes = std::max(1, scale->notesPerOctave());
-            cellDegree = uint8_t(degAbs % notes);
-            cellOctave = uint8_t(std::min(int(kMaxOctave), degAbs / notes));
+            cellDegree = slotDegree;
+            cellOctave = slotOctave;
             anchorDegree = cellDegree;
             anchorOctave = cellOctave;
         } else {
@@ -245,12 +223,9 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             anchorOctave = cellOctave;
         }
 
-        // Gate length per cell. Triangular distribution centered at 50% of
-        // cell duration, widened by sequence.gateLength() (the same kernel
-        // the engine used to apply at trigger time via pickGateLength). Now
-        // baked at cache build so each cell owns its gate fraction.
-        // gateFrac stored as 64ths-of-cell-duration → engine multiplies at
-        // trigger: gateTicks = (durationTicks * gateFrac) / 64.
+        // Gate length per cell — triangular distribution around 50% of
+        // cell duration, widened by Gate Length. Stored as 64ths so the
+        // engine derives gateTicks = (durationTicks * gateFrac) / 64.
         uint8_t cellGateFrac;
         {
             int pct = 50;
@@ -268,26 +243,42 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             cellGateFrac = uint8_t(frac);
         }
 
-        // Phase 16 P6 (2026-05-23): store per-cell duration, not the
-        // absolute cycle position. CachedCell::make clamps at kMaxCellDuration.
-        // Phase 16 P8 (2026-05-23): cellGateFrac stored per cell, picked above.
-        cache.cells[cache.count] = CachedCell::make(
+        // Legato is rhythm-domain (cellRng / rhythmSeed) — it's a gate /
+        // tie behavior. Slide is melody-domain (slideRng / melodySeed)
+        // since it's a pitch-glide gesture; keeping it under rhythmSeed
+        // would mean NewR shifts which notes glide. Both pick per cell
+        // Bernoulli against their knobs; cluster tails inherit the
+        // anchor's decision so a cluster behaves as one gesture.
+        bool cellLegato;
+        bool cellSlide;
+        if (isClusterTail) {
+            cellLegato = anchorLegato;
+            cellSlide  = anchorSlide;
+        } else {
+            const int legSpread = std::max(0, std::min(100, int(seq.legatoProb())));
+            cellLegato = (legSpread > 0 && int(cellRng.nextRange(100)) < legSpread);
+            const int slideSpread = std::max(0, std::min(100, int(seq.slide())));
+            Random slideRng(keyed_rng::cellSeed(seq.melodySeed(), uint32_t(i)) ^ 0x511DE51Du);
+            cellSlide  = (slideSpread > 0 && int(slideRng.nextRange(100)) < slideSpread);
+            anchorLegato = cellLegato;
+            anchorSlide  = cellSlide;
+        }
+
+        // Slot-keyed write: cells[K] for slot K; parentCacheIdx is identity.
+        cache.cells[i] = CachedCell::make(
             cellDur,
             cellDegree,
             cellOctave,
             cellGateFrac,
-            ev.slide(),
-            ev.legato(),
+            cellSlide,
+            cellLegato,
             /*audible*/ !ev.rest());
 
-        cache.aux[cache.count] = CellAux::make(
-            /*burstChild*/ false,   // no children under flat — flag retained for binary compat
-            /*rank*/       0);
+        cache.aux[i] = CellAux::make(
+            /*burstChild*/ false,   // flat model has no separate child cells
+            /*rank*/       0);      // rank lives on event.densityRank now
 
-        // 1:1 mapping: event slot K maps to cache cell (K - first).
-        if (i < kMaxEventSlots) {
-            cache.parentCacheIdx[i] = cache.count;
-        }
+        cache.parentCacheIdx[i] = uint8_t(i);
 
         ++cache.count;
         cycleTicks += cellDur;
@@ -296,72 +287,10 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 
     cache.cycleTicks = uint16_t(std::min(cycleTicks, uint32_t(UINT16_MAX)));
 
-    // Phase 16 P6 (2026-05-23): Feel scaling is no longer baked at cache
-    // build — engine computes it per trigger from sequence.feel(), so a
-    // routed CV change takes effect without a cache refresh.
-
-    recomputeCacheRanks(cache, seed, /*tilt*/ 0);
+    // Feel scaling is computed per trigger from sequence.feel(), not baked
+    // here. Ranks live on event.densityRank, assigned by the generator at
+    // RENEW / Patience / mutateRhythmOne.
     return cache.count;
-}
-
-// Compute deterministic ranks. Tilt biases cells along a long/short
-// duration axis; keyed hash provides a tie-break salt smaller than any
-// non-zero tilt step.
-//
-// Phase 16 P6 (2026-05-23): cell holds its own duration directly, so
-// rank weighting reads it without the old relTick-delta dance.
-void recomputeCacheRanks(Cache &cache, uint32_t seed, int tilt) {
-    if (cache.count == 0) return;
-
-    struct Weighted { uint8_t idx; int32_t weight; };
-    Weighted weighted[kCellCap];
-
-    const int tiltClamped = std::max(-100, std::min(100, tilt));
-
-    uint32_t maxDur = 1;
-    for (uint8_t i = 0; i < cache.count; ++i) {
-        uint32_t d = cache.cells[i].durationTicks();
-        if (d > maxDur) maxDur = d;
-    }
-
-    for (uint8_t i = 0; i < cache.count; ++i) {
-        // longShortAxis: normalize duration to ±7 range centered on midpoint.
-        //   shortest cell → -7, longest cell → +7.
-        // Tilt > 0 + long cell → high bias → high rank → gets Mask-cut first.
-        // Mask cuts HIGH ranks, so for "long survives Mask" we need long → LOW
-        // rank. Today's contract: bias = tilt × (longShortAxis). Tilt > 0 and
-        // long cell → positive bias → high rank → cut. So semantically
-        // tilt > 0 cuts LONG cells first; "survive Mask" = low rank = short
-        // cells under +tilt. Reverse for -tilt. Same shape as legacy
-        // generateMaskRanks weighting.
-        int32_t longShortFP14;
-        if (maxDur <= 1) {
-            longShortFP14 = 0;
-        } else {
-            // Map duration ∈ [1, maxDur] → [+7, -7] linear (long → low/
-            // negative, short → high/positive). This sign matches the
-            // legacy parent/child code path: under tilt > 0, long cells
-            // get NEGATIVE bias → LOW rank → SURVIVE Mask (Mask cuts
-            // high ranks). Short cells get HIGH rank → cut first.
-            longShortFP14 = 7 - int32_t((int64_t(cache.cells[i].durationTicks()) * 14) / maxDur);
-        }
-        const int32_t biasTerm = int32_t(tiltClamped) * longShortFP14 * 100;
-
-        // Hash salt: top byte of keyed seed × small constant. Always positive,
-        // smaller magnitude than any non-zero tilt.
-        const uint32_t hash = keyed_rng::cellSeed(seed, i);
-        const int32_t saltTerm = int32_t(hash >> 24);   // 0..255
-
-        weighted[i] = Weighted{ i, biasTerm + saltTerm };
-    }
-
-    std::sort(weighted, weighted + cache.count, [](const Weighted &a, const Weighted &b) {
-        return a.weight < b.weight;
-    });
-
-    for (uint8_t k = 0; k < cache.count; ++k) {
-        cache.aux[weighted[k].idx].setRank(k);
-    }
 }
 
 } // namespace stochastic_cache

@@ -31,9 +31,6 @@ public:
     }
 
     virtual void changePattern() override {
-        // Engine owns the right to write to the sequence (Loop tape regeneration,
-        // mutation/permutation, validity flags). See ownership contract in
-        // .tasks/stochastic-track-port/PHASE13-FEATURES-PLAN.md.
         _sequence = &(_stochasticTrack.sequence(pattern()));
 
         // In-flight queue entries targeted the previous sequence's timing/CV;
@@ -43,29 +40,24 @@ public:
         _patternCycleEnded = false;
         _lastEventValid = false;
         clearDirectHistory();
-        // Phase 14B Patch B: cache is per-track, so a pattern switch leaves
-        // stale rank data behind. Rebuild from the new pattern's events.
+        // Cache is per-track and was built for the previous pattern's events;
+        // rebuild for the new pattern.
         refreshCache();
     }
 
     int currentStep() const { return _patternIndex; }
     bool activity() const { return _activity; }
 
-    // Phase 14B follow-on (2026-05-22): immediate transport sync after a
-    // model-level window edit (setFirst / setLast / setSize). Without this,
-    // engine state — _patternIndex, queued gate/CV events, cached ranks —
-    // can still reflect the old window until the next event-boundary trigger,
-    // so a Last shrink "feels like it still honors slot 31." Callers from
-    // edit paths must invoke this when the active stochastic track's window
-    // changes. See engine/StochasticTrackEngine.cpp:syncWindowEdit body.
+    // Immediate transport sync after a model-level window edit (setFirst /
+    // setSize). Snaps _patternIndex, flushes gate/CV queues, rebuilds the
+    // cache. Without this, the old window keeps driving playback until the
+    // next event-boundary trigger.
     void syncWindowEdit();
 
-    // Phase 14B Codex finding 2 follow-on (2026-05-22): rebuild the engine
-    // cache from current sequence content. Lighter than syncWindowEdit — no
-    // _patternIndex snap, no queue flush. Call from edit paths that change
-    // cache-baked fields (Burst, BurstCount, BurstRate, BurstPitch — and
-    // future cache-affecting knobs) so non-Repeat playback picks up the new
-    // shape on the next trigger instead of waiting for the next cycle wrap.
+    // Rebuild the engine cache from current sequence content. Lighter than
+    // syncWindowEdit — no _patternIndex snap, no queue flush. Call from
+    // edit paths that change cache-baked shaping fields so non-Repeat
+    // playback picks up the new shape on the next trigger.
     void refreshCacheNow() { refreshCache(); }
     int lastDegree() const { return _lastDegree; }
     int lastDurationIndex() const { return _lastDurationIndex; }
@@ -132,12 +124,9 @@ public:
     }
 
 private:
-    // ---- Patch 2 helpers (Phase 13 Batch 0) -----------------------------------
-    // Local mutable / const accessors for the owned sequence and track. These
-    // make the ownership contract visible at call sites and give one place to
-    // assert pointer validity. Mutable overloads are used by engine writes
-    // (Loop tape regen, mutation, validity flag writes); const overloads for
-    // read paths.
+    // Mutable / const accessors for the owned sequence and track. Mutable
+    // overloads are used by engine writes (Loop source regen, mutation,
+    // validity flags); const overloads for read paths.
     StochasticSequence &sequence()             { return *_sequence; }
     const StochasticSequence &sequence() const { return *_sequence; }
     StochasticTrack &stochasticTrack()             { return _stochasticTrack; }
@@ -146,51 +135,37 @@ private:
     void triggerStep(uint32_t tick, uint32_t divisor);
     void resetMeasure();
     void refreshLoopSources();
-    // Phase 12: per-domain Poisson patience roll. Fired from pattern-cycle wrap
-    // AND from forced reset-measure boundary so both count toward the patience
-    // counters. Each domain rolls independently against its own counter.
+    // Per-domain Poisson patience roll. Fired from pattern-cycle wrap AND
+    // from preempted reset-measure boundary so both count toward the
+    // patience counters. Each domain rolls independently.
     void rollPatience();
 
-    // ---- Patch 2 intent-named helpers ----------------------------------------
-    // ensureLoopSources: if Loop domain is marked invalid, regenerate the
-    // source loop tape. No-op for Live domains. Called from triggerStep.
+    // Cycle-end hook bundle: jump octave walk, sleep skip count, patience
+    // rolls, mutate. Fired from both natural pattern-cycle wrap and from
+    // preempted resetMeasure() so all four advance on the same boundary.
+    void rollCycleEndHooks();
+
+    // If a Loop domain is marked invalid, regenerate its source events.
+    // No-op for Live domains. Called from triggerStep.
     void ensureLoopSources(const Scale &scale, int rootNote);
-    // writeLiveRhythmShadow / writeLiveMelodyShadow: Live mode writes the
-    // just-generated event back into source tape so the loop-tape UI
-    // visualizes recent activity. This is the mid-audio writeback flagged in
-    // docs/stoch-review.md finding #1 — kept for behavior parity in Patch 2;
-    // may relocate to engine-owned shadow in Patch 3.
+    // Live writeback into the events array so the events display reflects
+    // the just-played event. Flags a coalesced cache refresh.
     void writeLiveRhythmShadow(int readIndex, const StochasticSourceEvent &rhythm);
     void writeLiveMelodyShadow(int readIndex, const StochasticSourceEvent &melody);
-    // Phase 14B Patch B: rebuild the engine-side cache (gStochasticCaches[idx])
-    // from the current event tape. Called after every event-write path so the
-    // cache rank is always in sync with the audible content. Pure shadow until
-    // Patch C — only the mask filter reads from it.
+    // Rebuild the engine cache from current sequence content.
     void refreshCache();
-    // Lock cache removed 2026-05-22. The heap-allocated LockedParentEvent[]
-    // colliding with the stack caused crashes at ≥2 stochastic tracks. The
-    // engine no longer captures evaluated output; the `_lock` flag on
-    // StochasticTrack remains as a UI placeholder and is ignored here. See
-    // `.tasks/stochastic-track-port/LOCK-DESIGN-DEFERRED.md` for the deferred
-    // redesign — possibly absorbed by the fractal-track trunk substrate.
     void clearDirectHistory();
     void recordDirectHistory(float cv, bool rest, bool gate, uint8_t children);
 
-    // Ownership contract (Patch 1 / Phase 13 Batch 0):
-    //   StochasticSequence    — owns pattern material (source loop tape, ticket
-    //                           weights, masks, rotations, validity flags).
-    //   StochasticTrack       — owns track-global controls (Lock toggle, divisor,
-    //                           clock multiplier, scale, octave, transpose, slide
-    //                           time, fill mode).
-    //   StochasticTrackEngine — owns runtime playback state (queues, locked
-    //                           evaluated history, repeat cache, patience counters,
-    //                           jump register, sleep counter).
-    //
-    // The engine has the right to mutate sequence material (Loop tape regeneration,
-    // mutation, permutation, validity flags) and track state where applicable.
-    // Storing these as non-const references makes that ownership explicit and
-    // removes the const_cast trick that previously hid the write boundary.
-    // See `.tasks/stochastic-track-port/PHASE13-FEATURES-PLAN.md`.
+    // Ownership:
+    //   StochasticSequence    — pattern material (events, ticket weights,
+    //                           rotations, validity flags).
+    //   StochasticTrack       — track-global controls (divisor, clock
+    //                           multiplier, scale, octave, transpose,
+    //                           slide time, fill mode).
+    //   StochasticTrackEngine — runtime playback state (queues, repeat
+    //                           cache, patience counters, jump register,
+    //                           sleep counter).
     StochasticTrack &_stochasticTrack;
     StochasticSequence *_sequence = nullptr;
     Random _rng;
@@ -201,13 +176,10 @@ private:
     uint8_t _sleepRemaining = 0;
     uint16_t _loopCycleCount = 0;          // legacy alias kept for indicator path (== rhythm count)
     uint16_t _loopCycleCountMelody = 0;
-    // Phase 12 Mask/Tilt instant re-rank cache. Engine re-runs generateMaskRanks
-    // when tilt, size, or the playback window (first/last) changes — or on
-    // Mutate fire. Ranks are window-local so first/last shifts reshape ranks.
-    int8_t _lastAppliedTilt = 0;
+    // Window-edit detection — Size changes the cache walk extent and forces
+    // a refresh; First does not (cells are slot-keyed).
     uint8_t _lastAppliedSize = 0;
     uint8_t _lastAppliedFirst = 0;
-    uint8_t _lastAppliedLast = 0;
     int _lastDegree = -1;
     int _lastDurationIndex = 0;
     int _jumpRegister = 0;
@@ -216,12 +188,10 @@ private:
     uint32_t _eventElapsed = 0;
     uint32_t _eventDuration = 0;
 
-    // Phase 16 P9 (2026-05-23): Codex audit #7. Live rhythm/melody writes
-    // both used to call refreshCache() directly, so a single trigger that
-    // wrote to both domains paid for two full cache rebuilds back-to-back.
-    // They now set this flag; triggerStep processes it once at the top of
-    // the next call before any cache read. UI-initiated edits stay direct
-    // (refreshCacheNow) so they take effect immediately.
+    // Coalesce cache refreshes from Live writes. Both writeLiveRhythmShadow
+    // and writeLiveMelodyShadow can fire in the same trigger; instead of
+    // rebuilding twice, they set this flag and triggerStep rebuilds once
+    // at the top of the next call before any cache read.
     bool _cacheRefreshPending = false;
 
     // Phase 16 P10 (2026-05-23): Codex audit follow-up. Knobs consumed inside
@@ -250,7 +220,7 @@ private:
     float _cvOutput = 0.f;
     float _cvOutputTarget = 0.f;
 
-    // Repeat cache — Phase 12 reuse of last-emitted event on Bernoulli hit.
+    // Repeat path: holds the last-emitted event for replay on a Repeat hit.
     StochasticSourceEvent _lastEvent;
     bool _lastEventValid = false;
 
@@ -281,21 +251,12 @@ private:
 
     SortedQueue<Cv, 16, CvCompare> _cvQueue;
 
-    // Phase 14B engine cache — playback-ready CV/gate cells materialized from
-    // the event tape on every event write. Mask filter reads deterministic
-    // rank from here instead of event.densityRank() (which had random noise).
-    //
-    // Lives inside the engine (not as a file-scope CCMRAM global like the old
-    // gStochasticCaches[]) because the Container<...> for track engines is
-    // already sized to its largest variant — paying the cache's ~448 B as part
-    // of StochasticTrackEngine costs ~56 B per slot (912 → 968) instead of an
-    // extra 3.6 KB CCMRAM global. See PROJECT.md "Engine gate" section.
+    // Playback-ready cells materialized from the events array. Engine reads
+    // cells[K] for each played slot; rebuilt on edit / mutation / renew.
     stochastic_cache::Cache _cache{};
 };
 
-// Bumped from 512 in Phase 14B to absorb the engine cache (CachedCell[64] +
-// CellAux[64] + parentCacheIdx[64] + housekeeping ≈ 456 B). The new ceiling
-// keeps Stochastic at or below the previous container-sizing engine
-// (TeletypeTrackEngine = 912 B per PROJECT.md), so the container slot growth
-// is at most ~56 B × 8 tracks ≈ 448 B in CCMRAM.
+// Ceiling sized to absorb the engine cache (CachedCell[64] + CellAux[64] +
+// parentCacheIdx[64] + housekeeping ≈ 456 B) while staying within the
+// track-engine container slot. See PROJECT.md "Engine gate".
 static_assert(sizeof(StochasticTrackEngine) <= 1024, "StochasticTrackEngine too large");

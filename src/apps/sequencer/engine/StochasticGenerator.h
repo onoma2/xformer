@@ -20,7 +20,7 @@ public:
     static void permuteRhythmOne(StochasticSequence &sequence, Random &rng);
     static void permuteMelodyOne(StochasticSequence &sequence, Random &rng);
 
-    static void generateMaskRanks(StochasticSequence &sequence, int size, int tilt, uint32_t seed);
+    static void generateMaskRanks(StochasticSequence &sequence, int size, uint32_t seed);
     
     struct EvaluatedChild {
         uint32_t tickOffset;
@@ -36,10 +36,9 @@ public:
     static int generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng);
     static int generateJumpOctave(const StochasticSequence &sequence, const StochasticTrack &track, int currentJump, Random &rng);
 
-    // Phase 16 P7 (2026-05-23): shaping decisions moved from mutate-time event
-    // writes into cache-build-time per-cell rolls. Cache walks call these
-    // directly so NoteDuration / Variation / Burst* knobs reshape playback
-    // on the next refreshCache (no full regeneration needed).
+    // Per-cell pickers called from the cache walk. Cache picks per-cell from
+    // these so NoteDuration / Variation / Burst* knobs reshape playback on
+    // the next refreshCache without a full regeneration pass.
     static int pickDurationSlot(const StochasticSequence &sequence, Random &rng);
     static int pickBurstCount(int knob, Random &rng);
     static int pickBurstSpacingSlot(int knob, Random &rng);

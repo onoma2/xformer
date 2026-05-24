@@ -1,6 +1,7 @@
 #include "StochasticTrackEngine.h"
 #include "StochasticGenerator.h"
 #include "StochasticCache.h"
+#include "KeyedRng.h"
 #include "Engine.h"
 
 #include "model/StochasticSequence.h"
@@ -34,12 +35,9 @@ int directHistoryTrackIndex(const Track &track) {
     return index;
 }
 
-// Phase 14B engine cache lives inside StochasticTrackEngine as a member
-// (`_cache`). The previous file-scope `gStochasticCaches[8]` was 3.6 KB of
-// CCMRAM that paid 8× the per-track cost regardless of which tracks were
-// stochastic. Folding it into the engine costs only the per-slot growth on
-// the Container<...> slot size (~56 B × 8 = 448 B) since the container is
-// already sized to its largest member (per PROJECT.md "Engine gate").
+// The engine cache lives inside StochasticTrackEngine as a member (`_cache`),
+// not in a file-scope per-track array, so memory is only paid for tracks
+// that actually run in Stochastic mode.
 }
 
 // Gate scheduling trace — disabled for release
@@ -53,11 +51,8 @@ int directHistoryTrackIndex(const Track &track) {
 // Forward decl for use by patienceProbability below.
 static float poissonCdf(int k, float lambda);
 
-// Knob 0..99 → λ ∈ [1, ~79] linear; knob 100 is the off-sentinel ("never
-// regenerate"). Phase 12 had dropped this sentinel in favor of routing the
-// "never" case through the deferred Lock feature, but Lock hasn't shipped
-// yet, so without the sentinel users had no way to disable patience-driven
-// regen. Restored 2026-05-22 (hardware feedback on feat/stochastic-seed-log).
+// Knob 0..99 → λ ∈ [1, ~79] linear; knob 100 is the off-sentinel
+// ("never regenerate").
 static inline float patienceLambda(int patience) {
     int p = patience < 0 ? 0 : (patience > 100 ? 100 : patience);
     return 1.0f + (p * 79.0f) / 100.0f;
@@ -143,20 +138,19 @@ StochasticTrackEngine::DirectHistoryEvent StochasticTrackEngine::directHistoryEv
 
 void StochasticTrackEngine::resetMeasure() {
     auto &seq = stochasticTrack().sequence(pattern());
-    // Phase 12: count the reset-measure boundary toward patience ONLY when it
-    // preempts a natural wrap that hasn't already fired. Natural wraps run
-    // before reset boundaries in normal playback (often one tick apart), so
-    // unconditional roll here would double-count and accelerate patience.
-    // If `_patternIndex` is already `first()`, the natural wrap just ran and
-    // already rolled — skip. If it's mid-cycle, reset is truncating an unfired
-    // cycle — count it.
+    // Count the reset-measure boundary toward all cycle-end hooks ONLY when
+    // it preempts a natural wrap that hasn't already fired. Natural wraps
+    // run before reset boundaries in normal playback (often one tick apart),
+    // so unconditional roll here would double-count.
+    // 2026-05-24: bundled all four hooks (jump, sleep, patience, mutate) so
+    // they stay in lockstep — previously only patience advanced on resets.
     bool preempted = (_patternIndex != seq.first());
     _patternIndex = seq.first();
     _relativeTick = 0;
     _eventElapsed = 0;
     _eventDuration = 0;
     if (preempted) {
-        rollPatience();
+        rollCycleEndHooks();
     }
 }
 
@@ -166,10 +160,8 @@ void StochasticTrackEngine::reset() {
     _sleepRemaining = 0;
     _loopCycleCount = 0;
     _loopCycleCountMelody = 0;
-    _lastAppliedTilt = 0;
     _lastAppliedSize = 0;
     _lastAppliedFirst = 0;
-    _lastAppliedLast = 0;
     _lastDegree = -1;
     _jumpRegister = 0;
     _lastFreeStepIndex = -1;
@@ -224,7 +216,6 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
     _eventElapsed++;
     if (_eventDuration == 0 || _eventElapsed >= _eventDuration) {
         _eventElapsed = 0;
-        // Phase 11: tickets always combine — sleep gate no longer mode-dependent.
         if (_sleepRemaining > 0) {
             _sleepRemaining--;
         } else {
@@ -266,12 +257,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     auto &sequence = this->sequence();
     auto &track = stochasticTrack();
 
-    // Phase 16 P10 (2026-05-23): detect routed-CV changes to cache-baked
-    // knobs. Routing writes go directly into the sequence each tick without
-    // any UI notify, so the cache can hold stale values. Snapshot the
-    // shaping set on first run; on each subsequent trigger, compare and
-    // flag refresh if any field moved. The cost is one int compare per
-    // tracked field per event — far cheaper than rebuilding every tick.
+    // Routed-CV invalidation. The UI edit path calls notifyStochasticShapingEdit
+    // which triggers a refresh, but routing writes the sequence directly per
+    // tick with no UI notify. Snapshot the cache-shaping knobs; if any moved
+    // since last trigger, flag a refresh. Cheap (int compares per field) and
+    // avoids rebuilding every tick.
     {
         const uint8_t curNoteDuration = uint8_t(sequence.noteDuration());
         const uint8_t curVariation    = uint8_t(sequence.variation());
@@ -322,9 +312,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // here — the cache rebuild triggered by anyKnobMoved is enough.
     }
 
-    // Phase 16 P9 (2026-05-23): coalesce cache refreshes — Live rhythm +
-    // melody writes from the PREVIOUS trigger may have flagged this. Pay
-    // at most one rebuild per trigger, before any cache read downstream.
+    // Coalesce cache refreshes: Live rhythm + melody writes from the previous
+    // trigger may have flagged a refresh. Pay at most one rebuild per trigger,
+    // before any cache read downstream.
     if (_cacheRefreshPending) {
         refreshCache();
         _cacheRefreshPending = false;
@@ -333,22 +323,16 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     const auto &scale = sequence.selectedScale(_model.project().scale());
     int rootNote = sequence.selectedRootNote(_model.project().rootNote());
 
-    // Patch 2: Loop source-tape regen if either domain is marked invalid.
-    // Same seeds, same order, same valid semantics as the inlined block was.
+    // Regenerate Loop sources for any domain marked invalid (e.g. patience
+    // just fired, NewR/NewM was pressed).
     ensureLoopSources(scale, rootNote);
 
-    // Phase 12 fix + 2026-05-22 follow-up: snap _patternIndex into the active
-    // window before reading. If the user shrinks Last or raises First while
-    // playback is past the new window, the engine would otherwise play one
-    // stale off-window event with stale rank/mutation state.
-    //
-    // The snap also has to flush the gate/CV queues. Previous triggerSteps
-    // pushed events with absolute ticks for indices that are now outside the
-    // window (e.g. user shrinks last from 31 → 10 mid-cycle with queued events
-    // for slot 25, 31). `tick()` drains those by absolute tick regardless of
-    // _patternIndex, so without flushing the user would still hear slot 31's
-    // gate/CV fire after the snap repositioned playback to slot 0. Same
-    // discipline as changePattern() — clear queues, force gate low.
+    // Snap _patternIndex into the active window before reading. If the user
+    // shrinks Size mid-cycle past the current playback position, the engine
+    // would otherwise play one stale off-window event with stale state.
+    // Flush gate/CV queues too — they hold absolute-tick events for slots
+    // that are now outside the window, and tick() drains them regardless of
+    // _patternIndex.
     if (_patternIndex < sequence.first() || _patternIndex > sequence.last()) {
         _patternIndex = sequence.first();
         _gateQueue.clear();
@@ -366,11 +350,6 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
     }
 
-    // Lock evaluated-cache replay path removed 2026-05-22 (crash on 2+ tracks
-    // due to heap-stack collision; see PROJECT.md heap section and
-    // .tasks/stochastic-track-port/LOCK-DESIGN-DEFERRED.md). The model-side
-    // `track.lock()` flag is intentionally not consulted here — Lock is a UI
-    // placeholder until the new design lands.
     float finalCv = 0.f;
     uint32_t durationTicks = divisor;
     bool isRest = false;
@@ -378,15 +357,13 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     bool isSlide = false;
 
     {
-        // Source loop tape is guaranteed fresh at this point — ensureLoopSources
-        // at the top of triggerStep handled any invalid Loop domain regen.
+        // Source loop is guaranteed fresh here — ensureLoopSources ran above.
         const auto &event = sequence.events()[readIndex];
         StochasticSourceEvent eval;
         eval.clear();
 
-        // Phase 12 Repeat: per-event Bernoulli that bypasses generation and
-        // reuses the previously-emitted event verbatim. Works in both Live and
-        // Loop mode — freezes/clusters at the playback layer.
+        // Repeat: per-trigger Bernoulli that replays the previously-emitted
+        // event verbatim. Works in both Live and Loop — playback-layer freeze.
         int repeatProb = int(sequence.repeatProb());
         bool useRepeat = (repeatProb > 0 && _lastEventValid &&
                           int(_rng.nextRange(100)) < repeatProb);
@@ -420,21 +397,10 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
         int activeNotes = scale.notesPerOctave();
 
-        // Phase 14B Patch C step 2 (2026-05-22): parent-cell playback fields
-        // (durationIndex, degree, octave, rest, slide, legato) sourced from
-        // the engine cache when not under Repeat. The cache is built from the
-        // event tape and tracked across all event-writes (refreshCache), so
-        // these reads are byte-equivalent to the legacy eval-tape reads —
-        // just routed through the deterministic cache. Repeat path stays on
-        // eval (i.e. _lastEvent) because the audible material is the
-        // repeated event, not the cell at readIndex (same discipline as the
-        // mask-rank fix).
-        // Phase 16 flat playback (2026-05-23): cells are 1:1 with event
-        // slots. Cell duration is implicit from relTick deltas (next cell
-        // or cycleTicks for the last cell). cell.gateLen() now holds
-        // 64ths-of-cell-duration (the gate fraction), not a duration LUT
-        // slot. Engine derives both duration and gate from these.
-        int  pDurIdx = eval.durationIndex();  // legacy fallback / repeat path
+        // Playback fields come from the cache cell for the non-Repeat path.
+        // Repeat stays on eval (i.e. _lastEvent) because the audible material
+        // is the captured event, not the cell at readIndex.
+        int  pDurIdx = eval.durationIndex();  // repeat path / fallback
         int  pDegree = int(eval.degree());
         int  pOctave = int(eval.octave());
         bool pRest   = bool(eval.rest());
@@ -457,13 +423,18 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 pRest   = !cell.audible();
                 pSlide  = cell.slide();
                 pLegato = cell.legato();
+                // Legato + Slide are cache-owned (2026-05-24). Propagate the
+                // cache's picks into _lastEvent so a subsequent Repeat
+                // replays this slot's decisions, not whatever stale bits
+                // lived on the stored event.
+                _lastEvent.setLegato(pLegato);
+                _lastEvent.setSlide(pSlide);
             }
             // else: cache unprimed → fall back to event-tape values + LUT.
         }
 
-        // Compute durationTicks:
-        //   Non-Repeat with primed cache → use cache-derived duration.
-        //   Otherwise → LUT-pick from eval.durationIndex(), legacy path.
+        // durationTicks: non-Repeat with primed cache uses the cached value;
+        // Repeat / unprimed falls back to a LUT pick from eval.durationIndex().
         uint32_t mult;
         if (cellDurFromCache > 0) {
             mult = cellDurFromCache;
@@ -472,9 +443,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             mult = (uint64_t(divisor) * frac.num) / frac.den;
             if (mult < 1) mult = 1;
         }
-        // Phase 16 P6 (2026-05-23): Feel scale computed per trigger from the
-        // current sequence.feel(). Lifting this out of cache state means a
-        // routed Feel CV takes effect immediately, without a cache refresh.
+        // Feel scale is computed per trigger so a routed Feel CV takes effect
+        // immediately without a cache refresh.
         uint32_t feelScaleQ16 = stochastic_cache::computeFeelScaleQ16(
             int(sequence.feel()), uint32_t(_cache.cycleTicks), uint32_t(CONFIG_PPQN));
         mult = stochastic_cache::applyFeelScale(mult, feelScaleQ16);
@@ -486,39 +456,43 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         int note = pDegree + (pOctave + _jumpRegister + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
 
-        // V5 Mask: deterministic playback thinning after source read/evaluation.
-        // Phase 12: ranks are assigned over the active window [first..last]
-        // (0..windowSize-1), so the mask threshold must use windowSize, not
-        // sequence.size(), to keep "% audible plays" semantics correct.
-        //
-        // Phase 14B Patch B: rank source moved from event.densityRank() (which
-        // mixed in random noise) to the engine cache's deterministic rank,
-        // derived from keyed RNG salt + tilt. The cache is rebuilt after every
-        // generator write so this lookup stays in sync with the audible content.
-        // parentCacheIdx maps event-slot index -> cache cell index in O(1).
-        //
-        // Codex review 2026-05-22 finding: Repeat replays _lastEvent, so the
-        // audible material is no longer the event at readIndex. The cache
-        // rank for readIndex would filter unrelated content. _lastEvent
-        // carries its own densityRank (copied at capture time), so when
-        // useRepeat is true the legacy rank field is the right source — it
-        // travels with the repeated event. This is the one place where the
-        // cache-as-rank-source path has to defer to the event's own rank.
-        uint32_t windowSize = std::max(1, int(sequence.last()) - int(sequence.first()) + 1);
-        uint32_t cacheRank = stochastic_cache::selectMaskRank(
-            useRepeat, eval.densityRank(), readIndex, _cache);
-        bool maskPass = sequence.mask() >= 100 ||
-            ((cacheRank * 100) < (uint32_t(sequence.mask()) * windowSize));
+        // Mask + Tilt trigger-time gate. Rank is read from the event
+        // (assigned at generation time by generateMaskRanks — duration sort,
+        // ranks 0..size-1, no tilt). Tilt blends two views of "where this
+        // cell sits in the cut order":
+        //   rankPercentile = duration-sorted rank / (size - 1).  0 = longest.
+        //   saltPercentile = stable per-slot hash, 0..1.
+        //   effective      = lerp(saltPercentile, rankPercentile, |tilt|/100).
+        // Tilt=0 cuts by salt (arbitrary but stable); |Tilt|=100 cuts by
+        // pure duration order. Tilt sign chooses which end survives the cut.
+        const uint32_t patternSize = std::max<uint32_t>(1, sequence.size());
+        const uint32_t denom = patternSize > 1 ? (patternSize - 1) : 1;
+        const uint32_t storedRank = (useRepeat ? uint32_t(eval.densityRank())
+                                               : uint32_t(sequence.events()[readIndex].densityRank()));
+        const uint32_t rankPctMilli = std::min<uint32_t>(1000, (storedRank * 1000) / denom);
+        const uint32_t saltHash = keyed_rng::cellSeed(sequence.rhythmSeed(), uint32_t(readIndex));
+        const uint32_t saltPctMilli = ((saltHash >> 24) * 1000) / 255;
+        const int tiltSigned = int(sequence.tilt());
+        const uint32_t tiltMag = uint32_t(std::abs(tiltSigned));   // 0..100
+        const uint32_t effectiveMilli =
+            (tiltMag * rankPctMilli + (100 - tiltMag) * saltPctMilli) / 100;
+        const uint32_t maskMilli = uint32_t(sequence.mask()) * 10;   // mask 0..100 → 0..1000
+        bool maskPass;
+        if (sequence.mask() >= 100) {
+            maskPass = true;   // bypass
+        } else if (tiltSigned >= 0) {
+            maskPass = effectiveMilli < maskMilli;
+        } else {
+            maskPass = (1000 - effectiveMilli) < maskMilli;
+        }
         isRest = pRest || !maskPass || !eval.rhythmValid() || !eval.melodyValid();
         isLegato = pLegato;
         isSlide = pSlide;
 
-        // Phase 16 (2026-05-23): under flat cell model, the non-Repeat path
-        // expresses bursts as consecutive cluster cells with their own
-        // duration (prev_dur/denom). Each cluster cell is its own event
-        // slot, so the engine plays them via the normal triggerStep loop —
-        // there are no aux.burstChild() cells to walk. Only Repeat still
-        // needs the legacy child-array path (bursts come from _lastEvent).
+        // Non-Repeat bursts: cluster cells are normal slots with their own
+        // duration; they play through the normal triggerStep loop, no extra
+        // child-walk. Only Repeat needs the child-array path because it
+        // replays a captured _lastEvent rather than the slot.
         StochasticGenerator::EvaluatedChild evalChildren[kMaxChildren];
         for (int i = 0; i < kMaxChildren; ++i) evalChildren[i].valid = false;
         uint8_t childCount = 0;
@@ -536,11 +510,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _gateQueue.push({ tick, true });
 
             if (!isLegato && childCount == 0) {
-                // Phase 16 P8 (2026-05-23): non-Repeat reads the cell's baked
-                // gate fraction (sequence.gateLength() spread already rolled
-                // at cache build, with cell-keyed RNG → reproducible per cell).
-                // Repeat path uses runtime pickGateLength because _lastEvent
-                // doesn't carry a cache-baked gate fraction.
+                // Non-Repeat reads the cache-baked gate fraction. Repeat
+                // uses pickGateLength at runtime because _lastEvent carries
+                // no cache-baked gate fraction.
                 uint32_t gateLen;
                 if (useRepeat) {
                     gateLen = pickGateLength(durationTicks, sequence.gateLength(), _rng);
@@ -592,90 +564,20 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         _patternIndex = sequence.first();
         _patternCycleEnded = true;
 
-        {
-            // Lock cache removed 2026-05-22 — `lockActive` gate dropped; the
-            // jump/sleep/patience/mutate cycle-end hooks always run.
-            // Proteus-style octave walk — random ±1 each fire, reflected at the
-            // ±kJumpMaxRange bounds. Non-destructive: _jumpRegister is applied
-            // as a playback offset only; stored events are never modified, so
-            // turning jump off snaps the sequence back to its captured pitches.
-            if (sequence.jump() > 0 && int(_rng.nextRange(100)) < sequence.jump()) {
-                static const int kJumpMaxRange = 2;   // ±2 octaves
-                int direction = (_rng.nextRange(2) == 0) ? -1 : +1;
-                if (_jumpRegister + direction > kJumpMaxRange) direction = -1;
-                else if (_jumpRegister + direction < -kJumpMaxRange) direction = +1;
-                _jumpRegister += direction;
-            }
+        // Jump / Sleep / Patience / Mutate all advance on the same boundary —
+        // bundled into rollCycleEndHooks() so reset-measure preempt and
+        // natural pattern wrap stay in lockstep (2026-05-24).
+        rollCycleEndHooks();
 
-            // Phase 12 musicality fix: round (+5) instead of floor so knob=2
-            // already produces 1 sleep event instead of the dead 0..2 zone.
-            if (sequence.sleep() > 0) _sleepRemaining = (sequence.sleep() * 4 + 5) / 10;
-
-            // Phase 12 fix: roll patience BEFORE mutation. If patience invalidates
-            // a Loop domain, the next triggerStep will regenerate the whole event
-            // buffer for that domain — overwriting any mutation we'd just write.
-            // Doing patience first lets the mutation skip a domain that's about
-            // to be regenerated, avoiding wasted writes that audio never observes.
-            // Also now counts the reset-measure boundary (see resetMeasure()) toward
-            // the same per-domain counters.
-            rollPatience();
-
-            // Domain-aware bipolar mutation. Sign selects algorithm:
-            //   mutate > 0 → Marbles permutation (swap two existing events)
-            //   mutate < 0 → Proteus destructive (regenerate one event)
-            //   mutate = 0 → lock (no mutation)
-            // Magnitude is the per-loop probability.
-            // Phase 12: only apply to domains that are still valid after the
-            // patience roll above; an invalidated domain is about to be wiped.
-            int mutateAmount = sequence.mutate();
-            int mutateMag = mutateAmount < 0 ? -mutateAmount : mutateAmount;
-            if (mutateMag > 0 && int(_rng.nextRange(100)) < mutateMag) {
-                bool destructive = (mutateAmount < 0);
-                bool rhythmEligible = (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.rhythmValid());
-                bool melodyEligible = (sequence.melodyMode() == StochasticSourceMode::Loop && sequence.melodyValid());
-                auto applyRhythm = [&] {
-                    if (destructive) StochasticGenerator::mutateRhythmOne(sequence, track, _rng, mutateMag);
-                    else             StochasticGenerator::permuteRhythmOne(sequence, _rng);
-                };
-                auto applyMelody = [&] {
-                    if (destructive) StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng, mutateMag);
-                    else             StochasticGenerator::permuteMelodyOne(sequence, _rng);
-                };
-                if (rhythmEligible && melodyEligible) {
-                    if (_rng.nextRange(2) == 0) applyRhythm();
-                    else                         applyMelody();
-                } else if (rhythmEligible) {
-                    applyRhythm();
-                } else if (melodyEligible) {
-                    applyMelody();
-                }
-                // Mutation just wrote into events; sync cache so the next
-                // cycle's mask filter sees the new content (Codex adversarial
-                // review finding #1, 2026-05-22).
-                refreshCache();
-            }
-
-            // Phase 12 Mask+Tilt: re-rank on Tilt / Size / First / Last change.
-            // Ranks are now window-local, so any change to the active playback
-            // window invalidates them. Content untouched.
-            if (int8_t(sequence.tilt()) != _lastAppliedTilt ||
-                uint8_t(sequence.size()) != _lastAppliedSize ||
-                uint8_t(sequence.first()) != _lastAppliedFirst ||
-                uint8_t(sequence.last())  != _lastAppliedLast) {
-                if (sequence.rhythmMode() == StochasticSourceMode::Loop) {
-                    StochasticGenerator::generateMaskRanks(sequence, sequence.size(),
-                        sequence.tilt(), sequence.rhythmSeed() ^ 0xdeadbeef);
-                }
-                // Cache rank also depends on tilt + window; the legacy refresh
-                // above only updates event.densityRank() (used as fallback).
-                // refreshCache() rebuilds cells from the (possibly resized)
-                // window and re-applies the live tilt to per-cell ranks.
-                refreshCache();
-                _lastAppliedTilt  = int8_t(sequence.tilt());
-                _lastAppliedSize  = uint8_t(sequence.size());
-                _lastAppliedFirst = uint8_t(sequence.first());
-                _lastAppliedLast  = uint8_t(sequence.last());
-            }
+        // Size edit → extend the cache walk to cover newly-active slots.
+        // Slot-keyed cache (2026-05-24): cells are keyed by slot index, so
+        // First does NOT alter cell content and does not force a rebuild —
+        // moving the window plays the same slots in their same (cluster-aware)
+        // shape, just from a different starting point.
+        if (uint8_t(sequence.size()) != _lastAppliedSize) {
+            refreshCache();
+            _lastAppliedSize  = uint8_t(sequence.size());
+            _lastAppliedFirst = uint8_t(sequence.first());
         }
     }
 }
@@ -711,6 +613,62 @@ void StochasticTrackEngine::rollPatience() {
     }
 }
 
+void StochasticTrackEngine::rollCycleEndHooks() {
+    auto &sequence = this->sequence();
+    auto &track = stochasticTrack();
+    const auto &scale = sequence.selectedScale(_model.project().scale());
+    int rootNote = sequence.selectedRootNote(_model.project().rootNote());
+
+    // Proteus-style octave walk — random ±1 each fire, reflected at the
+    // ±kJumpMaxRange bounds. Non-destructive: _jumpRegister is applied as a
+    // playback offset only; stored events are never modified.
+    if (sequence.jump() > 0 && int(_rng.nextRange(100)) < sequence.jump()) {
+        static const int kJumpMaxRange = 2;   // ±2 octaves
+        int direction = (_rng.nextRange(2) == 0) ? -1 : +1;
+        if (_jumpRegister + direction > kJumpMaxRange) direction = -1;
+        else if (_jumpRegister + direction < -kJumpMaxRange) direction = +1;
+        _jumpRegister += direction;
+    }
+
+    // Round (+5) instead of floor so knob=2 already produces 1 sleep event
+    // instead of the dead 0..2 zone.
+    if (sequence.sleep() > 0) _sleepRemaining = (sequence.sleep() * 4 + 5) / 10;
+
+    // Patience first — if it invalidates a Loop domain, the next triggerStep
+    // regenerates that domain, overwriting any mutation we'd write below.
+    rollPatience();
+
+    // Domain-aware bipolar mutation. Sign selects algorithm:
+    //   mutate > 0 → Marbles permutation (swap two existing events)
+    //   mutate < 0 → Proteus destructive (regenerate one event)
+    //   mutate = 0 → lock (no mutation)
+    int mutateAmount = sequence.mutate();
+    int mutateMag = mutateAmount < 0 ? -mutateAmount : mutateAmount;
+    if (mutateMag > 0 && int(_rng.nextRange(100)) < mutateMag) {
+        bool destructive = (mutateAmount < 0);
+        bool rhythmEligible = (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.rhythmValid());
+        bool melodyEligible = (sequence.melodyMode() == StochasticSourceMode::Loop && sequence.melodyValid());
+        auto applyRhythm = [&] {
+            if (destructive) StochasticGenerator::mutateRhythmOne(sequence, track, _rng, mutateMag);
+            else             StochasticGenerator::permuteRhythmOne(sequence, _rng);
+        };
+        auto applyMelody = [&] {
+            if (destructive) StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng, mutateMag);
+            else             StochasticGenerator::permuteMelodyOne(sequence, _rng);
+        };
+        if (rhythmEligible && melodyEligible) {
+            if (_rng.nextRange(2) == 0) applyRhythm();
+            else                         applyMelody();
+        } else if (rhythmEligible) {
+            applyRhythm();
+        } else if (melodyEligible) {
+            applyMelody();
+        }
+        // Sync cache so the next cycle's mask filter sees the new content.
+        refreshCache();
+    }
+}
+
 void StochasticTrackEngine::renewRhythm() {
     auto &seq = sequence();
     auto &trk = stochasticTrack();
@@ -728,6 +686,8 @@ void StochasticTrackEngine::renewMelody() {
     StochasticGenerator::generateMelody(seq, trk, scale, rootNote, _rng.next());
     seq.setMelodyValid(true);
     _loopCycleCountMelody = 0;
+    // Fresh melody = no inherited octave drift (2026-05-24).
+    _jumpRegister = 0;
     refreshCache();
 }
 
@@ -737,17 +697,18 @@ void StochasticTrackEngine::refreshLoopSources() {
     const auto &scale = seq.selectedScale(_model.project().scale());
     int rootNote = seq.selectedRootNote(_model.project().rootNote());
 
-    // Always regenerate the stored event buffer, regardless of source mode.
-    // Loop mode will play the new pattern. Live mode keeps generating per-tick
-    // but the loop tape display now reflects the fresh content too. Setting
-    // valid=true prevents the engine's own re-roll path from firing on the
-    // very next tick.
+    // Regenerate both stored event domains. Loop plays the new pattern; Live
+    // keeps generating per-trigger but the events-array display reflects the
+    // fresh content. valid=true keeps the engine's auto-regen path quiet on
+    // the next tick.
     StochasticGenerator::generateRhythm(seq, trk, _rng.next());
     StochasticGenerator::generateMelody(seq, trk, scale, rootNote, _rng.next());
     seq.setRhythmValid(true);
     seq.setMelodyValid(true);
     _loopCycleCount = 0;
     _loopCycleCountMelody = 0;
+    // Both domains rewritten = fresh material; clear inherited octave drift.
+    _jumpRegister = 0;
     refreshCache();
 }
 
@@ -777,19 +738,18 @@ void StochasticTrackEngine::ensureLoopSources(const Scale &scale, int rootNote) 
     }
     if (seq.melodyMode() == StochasticSourceMode::Loop && !seq.melodyValid()) {
         StochasticGenerator::generateMelody(seq, trk, scale, rootNote, _rng.next());
+        // Patience invalidated melody = fresh material; clear octave drift.
+        _jumpRegister = 0;
         regenerated = true;
     }
     if (regenerated) refreshCache();
 }
 
 void StochasticTrackEngine::writeLiveRhythmShadow(int readIndex, const StochasticSourceEvent &rhythm) {
-    // Live-mode writeback into the source loop tape so the loop-tape UI
-    // visualizes recent activity. Mid-audio write — see docs/stoch-review.md
-    // finding #1; Patch 3 may relocate to engine-owned shadow if needed.
+    // Live writeback into the events array so the events display reflects
+    // the recently played event. Flag a coalesced cache refresh so we only
+    // rebuild once even if both rhythm and melody write in the same trigger.
     sequence().events()[readIndex].mergeRhythmFrom(rhythm);
-    // Phase 16 P9 (2026-05-23): coalesce refresh — if rhythm + melody both
-    // write in the same trigger, we used to rebuild the cache twice.
-    // Flag instead; consumed at the top of the next triggerStep.
     _cacheRefreshPending = true;
 }
 
@@ -845,21 +805,13 @@ void StochasticTrackEngine::refreshCache() {
     if (clockMult <= 0.f) clockMult = 1.f;
     uint32_t divisor = uint32_t(seq.divisor()) * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
     divisor = std::max<uint32_t>(1u, uint32_t(std::lround(divisor / clockMult)));
-    // Scale + rootNote are needed to bake burst-child notes in Generate mode
-    // (Patch C-1b). rhythmSeed drives both deterministic rank salt and the
-    // per-cell keyed RNG for burst-child degree picks — same seed → same
-    // rank order AND same burst child pitches.
+    // Scale + rootNote are passed so the cache can bake melody-domain picks
+    // (anchor pitches in Loop melody, cluster-tail Generate-mode pitches).
     const auto &scale = seq.selectedScale(_model.project().scale());
     int rootNote = seq.selectedRootNote(_model.project().rootNote());
     stochastic_cache::regenerateCacheFromEvents(
         _cache, seq, divisor, seq.rhythmSeed(), &scale, &trk, rootNote);
-    // tilt feeds rank weights; recomputeCacheRanks already ran inside
-    // regenerateCacheFromEvents with tilt=0, so re-run with live tilt.
-    stochastic_cache::recomputeCacheRanks(_cache, seq.rhythmSeed(), int(seq.tilt()));
 }
-
-// captureLockedParent removed 2026-05-22 — see header comment near the
-// triggerStep declaration and `.tasks/stochastic-track-port/LOCK-DESIGN-DEFERRED.md`.
 
 void StochasticTrackEngine::clearDirectHistory() {
     int trackIndex = directHistoryTrackIndex(_track);

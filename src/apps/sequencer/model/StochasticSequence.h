@@ -478,8 +478,12 @@ public:
     int first() const { return _first; }
     void setFirst(int first) { _first = clamp(first, 0, int(_size) - 1); }
 
-    int last() const { return clamp(int(_last), first(), int(_size) - 1); }
-    void setLast(int last) { _last = clamp(last, first(), int(_size) - 1); }
+    // Stubbed 2026-05-24: Last is collapsed into Size — playback end = size - 1.
+    // _last field kept for serialization round-trip; setLast is no-op so the
+    // stored value doesn't drift if UI dead-knob is moved. last() shadows
+    // _last with size - 1 unconditionally.
+    int last() const { return int(_size) - 1; }
+    void setLast(int /*last*/) { /* no-op while stubbed */ }
 
     bool patternValid() const { return rhythmValid() && melodyValid(); }
     void setPatternValid(bool valid) { setRhythmValid(valid); setMelodyValid(valid); }

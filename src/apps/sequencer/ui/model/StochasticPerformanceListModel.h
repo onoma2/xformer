@@ -42,7 +42,7 @@ public:
         Jump,
         Size,
         First,
-        Last,
+        // Last removed 2026-05-24 — collapsed into Size.
         Rotate,
         Range,
         MinDegree,
@@ -160,7 +160,6 @@ private:
         case Jump:          return "Jump";
         case Size:          return "Size";
         case First:         return "First";
-        case Last:          return "Last";
         case Rotate:        return "Rotate";
         case Range:         return "Range";
         case MinDegree:     return "Low Degree";
@@ -209,7 +208,6 @@ private:
         case Jump:          sequence.printJump(str); break;
         case Size:          str("%d", sequence.size()); break;
         case First:         str("%d", sequence.first() + 1); break;
-        case Last:          str("%d", sequence.last() + 1); break;
         case Rotate:        sequence.printRotate(str); break;
         case Range:         str("%d Oct", sequence.range()); break;
         case MinDegree:     sequence.printMinDegree(str); break;
@@ -253,7 +251,6 @@ private:
         case Jump:          sequence.editJump(value, shift); break;
         case Size:          sequence.setSize(sequence.size() + value);    notifyWindowEdit(); break;
         case First:         sequence.setFirst(sequence.first() + value);  notifyWindowEdit(); break;
-        case Last:          sequence.setLast(sequence.last() + value);    notifyWindowEdit(); break;
         case Rotate:        sequence.editRotate(value, shift); break;
         case Range:         sequence.setRange(sequence.range() + value); break;
         case MinDegree:     sequence.editMinDegree(value, shift); break;
@@ -309,7 +306,7 @@ private:
 //   3. Rhythm     — NoteDuration, Variation, Rest, articulation probs
 //   4. Burst      — Burst + Count/Rate/Pitch
 //   5. Pattern    — Mask, Tilt
-//   6. Window     — Size, First, Last, Rotate
+//   6. Window     — Size, First, Rotate
 //   7. Evolution  — Sleep, Patience, Mutate, Jump
 inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel::items[] = {
     // Playback
@@ -342,7 +339,6 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     // Sequence window
     Size,
     First,
-    Last,
     Rotate,
     // State evolution
     Sleep,
