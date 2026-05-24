@@ -543,7 +543,7 @@ public:
         _gateLength.write(writer);
         for (int i = 0; i < 8; ++i) writer.write(_durationTickets[i]);
         writer.write(uint8_t(0));   // reserved (was StochasticLevel enum)
-
+        writer.write(_tiltMelody);
 
         for (const auto &event : _steps) {
             for (int i = 0; i < 6; ++i) {
