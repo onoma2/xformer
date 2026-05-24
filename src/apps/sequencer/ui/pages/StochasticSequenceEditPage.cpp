@@ -337,19 +337,19 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
     case 0:  { FixedStringBuilder<16> d; durationLabel(d); str("DURATION %s", static_cast<const char*>(d)); break; }
     case 1:  str("VARIATION %d", variation); break;
     case 2:  str("REST %d", rest); break;
-    case 3:  str("RANGE %d%%", seq.range()); break;
-    case 4:  str("BURST %d", burst); break;
-    case 5:  str("BURST COUNT %d", burstCount); break;
-    case 6:  str("BURST RATE %d", burstRate); break;
-    case 7:  str("FEEL %d", feel); break;
+    case 3:  str("FEEL %d", feel); break;
+    case 4:  str("GATE LENGTH %d", gateLength); break;
+    case 5:  str("LEGATO %d", legato); break;
+    case 6:  str("BURST %d", burst); break;
+    case 7:  str("BURST COUNT %d", burstCount); break;
     case 8:  str("COMPLEXITY %d", complexity); break;
     case 9:  str("CONTOUR %+d", contour); break;
     case 10: str("BIAS %d", bias); break;
     case 11: str("SPREAD %d", spread); break;
-    case 12: str("REPEAT %d", repeats); break;
-    case 13: str("GATE LENGTH %d", gateLength); break;
-    case 14: str("SLIDE %d", slide); break;
-    case 15: str("LEGATO %d", legato); break;
+    case 12: str("RANGE %d%%", seq.range()); break;
+    case 13: str("SLIDE %d", slide); break;
+    case 14: str("REPEAT %d", repeats); break;
+    case 15: str("BURST RATE %d", burstRate); break;
     default: labeled = false; break;
     }
     if (labeled || heldCount > 1) {
@@ -364,26 +364,26 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
         const int yTop = 18;
         const int yBot = 24;
 
-        // Top row (slots 0..7): rhythm + burst sub-set.
+        // Top row (slots 0..7): rhythm + articulation, burst pair on right.
         FixedStringBuilder<16> durStr; durationLabel(durStr);
         s.reset(); s("D %s",  static_cast<const char*>(durStr)); canvas.drawText(col0 + 0 * colStep, yTop, s);
         s.reset(); s("V %d",  variation);   canvas.drawText(col0 + 1 * colStep, yTop, s);
         s.reset(); s("R %d",  rest);        canvas.drawText(col0 + 2 * colStep, yTop, s);
-        s.reset(); s("R%d",   seq.range()); canvas.drawText(col0 + 3 * colStep, yTop, s);
-        s.reset(); s("B %d",  burst);       canvas.drawText(col0 + 4 * colStep, yTop, s);
-        s.reset(); s("C %d",  burstCount);  canvas.drawText(col0 + 5 * colStep, yTop, s);
-        s.reset(); s("T %d",  burstRate);   canvas.drawText(col0 + 6 * colStep, yTop, s);
-        s.reset(); s("F %d",  feel);        canvas.drawText(col0 + 7 * colStep, yTop, s);
+        s.reset(); s("F %d",  feel);        canvas.drawText(col0 + 3 * colStep, yTop, s);
+        s.reset(); s("G %d",  gateLength);  canvas.drawText(col0 + 4 * colStep, yTop, s);
+        s.reset(); s("A %d",  legato);      canvas.drawText(col0 + 5 * colStep, yTop, s);
+        s.reset(); s("B %d",  burst);       canvas.drawText(col0 + 6 * colStep, yTop, s);
+        s.reset(); s("C %d",  burstCount);  canvas.drawText(col0 + 7 * colStep, yTop, s);
 
-        // Bottom row (slots 8..15): pitch shape + per-event gate behavior.
+        // Bottom row (slots 8..15): pitch shape, repeat standalone, burst rate corner.
         s.reset(); s("X %d",  complexity);  canvas.drawText(col0 + 0 * colStep, yBot, s);
         s.reset(); s("O %+d", contour);     canvas.drawText(col0 + 1 * colStep, yBot, s);
         s.reset(); s("I %d",  bias);        canvas.drawText(col0 + 2 * colStep, yBot, s);
         s.reset(); s("S %d",  spread);      canvas.drawText(col0 + 3 * colStep, yBot, s);
-        s.reset(); s("E %d",  repeats);     canvas.drawText(col0 + 4 * colStep, yBot, s);
-        s.reset(); s("G %d",  gateLength);  canvas.drawText(col0 + 5 * colStep, yBot, s);
-        s.reset(); s("L %d",  slide);       canvas.drawText(col0 + 6 * colStep, yBot, s);
-        s.reset(); s("A %d",  legato);      canvas.drawText(col0 + 7 * colStep, yBot, s);
+        s.reset(); s("N %d",  seq.range()); canvas.drawText(col0 + 4 * colStep, yBot, s);
+        s.reset(); s("L %d",  slide);       canvas.drawText(col0 + 5 * colStep, yBot, s);
+        s.reset(); s("E %d",  repeats);     canvas.drawText(col0 + 6 * colStep, yBot, s);
+        s.reset(); s("T %d",  burstRate);   canvas.drawText(col0 + 7 * colStep, yBot, s);
     }
 
     // Footer mirrors LOOP page. Shift swaps NewR / NewM labels to Undo.
@@ -693,33 +693,29 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
 void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     auto &seq = _project.selectedTrack().stochasticTrack().sequence(_project.selectedPatternIndex());
     int v = shift ? value * 10 : value;
-    // DIRECT layout:
-    //   Top row    0=DURA  1=VARI  2=REST  3=RANG       (red)
-    //              4=BURS  5=BCNT  6=BRAT  7=BPIT       (orange — burst sub-set)
-    //   Bottom row 8=CMPX  9=CONT  10=BIAS 11=SPRE 12=REPT  (green — pitch shape)
-    //              13=GATE 14=SLID 15=LEGA              (red — per-event gate behavior)
+    // LIVE layout (semantic grouping):
+    //   Top row    0=DURA  1=VARI  2=REST  3=FEEL  4=GATE  5=LEGA   (rhythm + articulation)
+    //              6=BURS  7=BCNT                                   (burst — top-right)
+    //   Bottom row 8=CMPX  9=CONT  10=BIAS 11=SPRE 12=RANG 13=SLID  (pitch shape)
+    //              14=REPT                                          (repeat — standalone)
+    //              15=BRAT                                          (burst — bottom-right)
     switch (step) {
-    // Phase 16 P10 (2026-05-23): every knob whose value is now consumed by the
-    // cache walk (rebuildStepCache) must invalidate the cache on
-    // edit. Knobs that only roll at trigger time (Rest, Repeat, Legato, Slide
-    // probability) stay no-op refresh-wise. Feel is read per-trigger by the
-    // engine so notify is redundant for it — kept for consistency.
     case 0:  seq.setNoteDuration(seq.noteDuration() + value);        notifyStochasticShapingEdit(); break;
     case 1:  seq.setVariation(seq.variation() + v);                  notifyStochasticShapingEdit(); break;
     case 2:  seq.setRest(seq.rest() + v); break;
-    case 3:  seq.setRange(seq.range() + (shift ? value * 10 : value)); notifyStochasticShapingEdit(); break;
-    case 4:  seq.setBurst(seq.burst() + v);                          notifyStochasticShapingEdit(); break;
-    case 5:  seq.setBurstCount(seq.burstCount() + v);                notifyStochasticShapingEdit(); break;
-    case 6:  seq.setBurstRate(seq.burstRate() + v);                  notifyStochasticShapingEdit(); break;
-    case 7:  seq.setFeel(seq.feel() + v);                            notifyStochasticShapingEdit(); break;
+    case 3:  seq.setFeel(seq.feel() + v);                            notifyStochasticShapingEdit(); break;
+    case 4:  seq.setGateLength(seq.gateLength() + v);                notifyStochasticShapingEdit(); break;
+    case 5:  seq.setLegatoProb(seq.legatoProb() + v);                notifyStochasticShapingEdit(); break;
+    case 6:  seq.setBurst(seq.burst() + v);                          notifyStochasticShapingEdit(); break;
+    case 7:  seq.setBurstCount(seq.burstCount() + v);                notifyStochasticShapingEdit(); break;
     case 8:  seq.setComplexity(seq.complexity() + v);                notifyStochasticShapingEdit(); break;
     case 9:  seq.setContour(seq.contour() + v);                      notifyStochasticShapingEdit(); break;
     case 10: seq.setMarblesBias(seq.marblesBias() + v);              notifyStochasticShapingEdit(); break;
     case 11: seq.setMarblesSpread(seq.marblesSpread() + v);          notifyStochasticShapingEdit(); break;
-    case 12: seq.setRepeatProb(seq.repeatProb() + v); break;
-    case 13: seq.setGateLength(seq.gateLength() + v);                notifyStochasticShapingEdit(); break;
-    case 14: seq.setSlide(seq.slide() + v); break;
-    case 15: seq.setLegatoProb(seq.legatoProb() + v); break;
+    case 12: seq.setRange(seq.range() + (shift ? value * 10 : value)); notifyStochasticShapingEdit(); break;
+    case 13: seq.setSlide(seq.slide() + v);                          notifyStochasticShapingEdit(); break;
+    case 14: seq.setRepeatProb(seq.repeatProb() + v); break;
+    case 15: seq.setBurstRate(seq.burstRate() + v);                  notifyStochasticShapingEdit(); break;
     }
 }
 
@@ -1150,29 +1146,23 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
 
     switch (_currentPage) {
     case Page::Live: {
-        // Top row 0..3 red — DURA/VARI/REST/RANG.
-        for (int i = 0; i <= 3; ++i) {
-            bool held = heldStep(i);
-            leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/held);
-        }
-        // Top row 4..7 orange (red+green) — burst sub-set (BURS/BCNT/BRAT/BPIT).
-        for (int i = 4; i <= 7; ++i) {
-            bool held = heldStep(i);
-            leds.set(MatrixMap::fromStep(i), /*red*/!held, /*green*/!held ? true : true);
-            if (held) {
-                leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/false);
-            }
-        }
-        // Bottom row 8..12 green — pitch shape (CMPX/CONT/BIAS/SPRE/REPT).
-        for (int i = 8; i <= 12; ++i) {
-            bool held = heldStep(i);
-            leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
-        }
-        // Bottom row 13..15 red — per-event gate behavior (GATE/SLID/LEGA).
-        for (int i = 13; i <= 15; ++i) {
-            bool held = heldStep(i);
-            leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/held);
-        }
+        // Slot palette:
+        //   red   = rhythm + articulation (DURA/VARI/REST/FEEL/GATE/LEGA + REPT)
+        //   orange (red+green) = burst (BURS/BCNT/BRAT)
+        //   green = pitch shape (CMPX/CONT/BIAS/SPRE/RANG/SLID)
+        auto paintRed   = [&](int i) { leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/heldStep(i)); };
+        auto paintGreen = [&](int i) { leds.set(MatrixMap::fromStep(i), /*red*/heldStep(i), /*green*/true); };
+        auto paintOrange = [&](int i) {
+            const bool held = heldStep(i);
+            leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/!held);
+        };
+        // Top row: 0..5 rhythm/articulation (red), 6..7 burst (orange).
+        for (int i = 0; i <= 5; ++i) paintRed(i);
+        for (int i = 6; i <= 7; ++i) paintOrange(i);
+        // Bottom row: 8..13 pitch shape (green), 14 repeat (red), 15 burst rate (orange).
+        for (int i = 8; i <= 13; ++i) paintGreen(i);
+        paintRed(14);
+        paintOrange(15);
         drawLiveQuickEditHint();
         break;
     }
@@ -1742,56 +1732,53 @@ void StochasticSequenceEditPage::contextAction(int index) {
             if (mask == 0) mask = 0xFFFFu;
             auto wants = [&](int i) { return (mask & (1U << i)) != 0; };
             static Random rng;
+            // Slots match the LIVE layout (see editLiveStep comment).
             if (wants(0))  sequence.setNoteDuration(rng.nextRange(8));
             if (wants(1))  sequence.setVariation(rng.nextRange(101));
             if (wants(2))  sequence.setRest(rng.nextRange(50));
-            if (wants(3))  sequence.setRange(20 + rng.nextRange(61));
-            if (wants(4))  sequence.setBurst(rng.nextRange(60));
-            if (wants(5))  sequence.setBurstCount(rng.nextRange(101));
-            if (wants(6))  sequence.setBurstRate(rng.nextRange(101));
-            if (wants(7))  sequence.setFeel(40 + rng.nextRange(21));
+            if (wants(3))  sequence.setFeel(40 + rng.nextRange(21));
+            if (wants(4))  sequence.setGateLength(rng.nextRange(101));
+            if (wants(5))  sequence.setLegatoProb(rng.nextRange(60));
+            if (wants(6))  sequence.setBurst(rng.nextRange(60));
+            if (wants(7))  sequence.setBurstCount(rng.nextRange(101));
             if (wants(8))  sequence.setComplexity(rng.nextRange(101));
             if (wants(9))  sequence.setContour(int(rng.nextRange(101)) - 50);
             if (wants(10)) sequence.setMarblesBias(rng.nextRange(101));
             if (wants(11)) sequence.setMarblesSpread(40 + rng.nextRange(61));
-            if (wants(12)) sequence.setRepeatProb(rng.nextRange(50));
-            if (wants(13)) sequence.setGateLength(rng.nextRange(101));
-            if (wants(14)) sequence.setSlide(rng.nextRange(60));
-            if (wants(15)) sequence.setLegatoProb(rng.nextRange(60));
+            if (wants(12)) sequence.setRange(20 + rng.nextRange(61));
+            if (wants(13)) sequence.setSlide(rng.nextRange(60));
+            if (wants(14)) sequence.setRepeatProb(rng.nextRange(50));
+            if (wants(15)) sequence.setBurstRate(rng.nextRange(101));
             notifyStochasticShapingEdit();
             showMessage(_heroSelectionMask ? "RAND SELECTED" : "RAND LIVE");
             break;
         }
-        // INIT resets the LIVE-page params bound to step buttons back to their
-        // model defaults (matches `StochasticSequence::clear()`). When the
-        // selection mask is non-empty, only the held steps' params are reset
-        // so the user can scope the init to a subset (mirrors ticket-page
-        // selection-aware INIT). EVEN/RAND are not meaningful for these
-        // mixed-type slots — surface a short reminder instead.
+        // INIT resets the LIVE-page params bound to step buttons back to
+        // their model defaults. Selection-aware: empty mask hits all 16.
+        // EVEN is not meaningful for the mixed-type slots — short reminder.
         if (ContextAction(index) != ContextAction::Init) {
             showMessage("INIT ONLY ON LIVE");
             break;
         }
         uint32_t mask = _heroSelectionMask;
-        if (mask == 0) mask = 0xFFFFu;  // no selection → init all 16 slots
+        if (mask == 0) mask = 0xFFFFu;
         auto wants = [&](int i) { return (mask & (1U << i)) != 0; };
         if (wants(0))  sequence.setNoteDuration(5);
         if (wants(1))  sequence.setVariation(16);
         if (wants(2))  sequence.setRest(0);
-        if (wants(3))  sequence.setRange(50);
-        if (wants(4))  sequence.setBurst(0);
-        if (wants(5))  sequence.setBurstCount(0);
-        if (wants(6))  sequence.setBurstRate(50);
-        if (wants(7))  sequence.setFeel(50);   // slot 7 is Feel; BurstHold lives on the context menu
+        if (wants(3))  sequence.setFeel(50);
+        if (wants(4))  sequence.setGateLength(0);
+        if (wants(5))  sequence.setLegatoProb(0);
+        if (wants(6))  sequence.setBurst(0);
+        if (wants(7))  sequence.setBurstCount(0);
         if (wants(8))  sequence.setComplexity(50);
         if (wants(9))  sequence.setContour(0);
         if (wants(10)) sequence.setMarblesBias(50);
         if (wants(11)) sequence.setMarblesSpread(50);
-        if (wants(12)) sequence.setRepeatProb(0);
-        if (wants(13)) sequence.setGateLength(0);
-        if (wants(14)) sequence.setSlide(0);
-        if (wants(15)) sequence.setLegatoProb(0);
-        // INIT touches many cache-affecting knobs; always refresh.
+        if (wants(12)) sequence.setRange(50);
+        if (wants(13)) sequence.setSlide(0);
+        if (wants(14)) sequence.setRepeatProb(0);
+        if (wants(15)) sequence.setBurstRate(50);
         notifyStochasticShapingEdit();
         showMessage(_heroSelectionMask ? "INIT SELECTED" : "INIT LIVE");
         break;
