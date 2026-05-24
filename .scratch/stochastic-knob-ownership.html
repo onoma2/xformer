@@ -284,7 +284,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng none">None</td>
       <td class="law threshold">Threshold</td>
-      <td>Per-trigger rank threshold — steps whose cache rank exceeds the threshold become rests. Paired with Tilt: Mask sets cutoff %, Tilt picks which end of the duration axis to cut.</td>
+      <td>Per-trigger rank threshold — steps whose stored rank exceeds the threshold become rests. Paired with Tilt: Mask sets cutoff %, Tilt picks which end of the duration axis to cut. <strong>LoopR-only:</strong> LiveR events bypass <code>generateMaskRanks</code> and store rank=0, so the engine gates the whole block on <code>rhythmMode==Loop</code>. Knob is inert in LiveR.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -294,7 +294,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng none">None</td>
       <td class="law bipolar">Bipolar</td>
-      <td>Duration filter direction + strength. -Tilt = low-pass (short steps survive); +Tilt = high-pass (long steps survive); magnitude blends between random-salt cut (Tilt=0) and strict duration-sorted cut (|Tilt|=100). Pure trigger-time read — no recompute, no cache touch on edit.</td>
+      <td>Duration filter direction + strength. -Tilt = low-pass (short steps survive); +Tilt = high-pass (long steps survive); magnitude blends between random-salt cut (Tilt=0) and strict duration-sorted cut (|Tilt|=100). Pure trigger-time read — no recompute, no cache touch on edit. <strong>LoopR-only</strong> — same gate as Mask; inert in LiveR.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>

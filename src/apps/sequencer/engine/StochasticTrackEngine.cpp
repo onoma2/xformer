@@ -412,37 +412,33 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         int note = pDegree + (pOctave + _jumpRegister + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
 
-        // Mask + Tilt trigger-time gate. Rank is read from the event
-        // (assigned at generation time by generateMaskRanks — duration sort,
-        // ranks 0..size-1, no tilt). Tilt blends two views of "where this
-        // cell sits in the cut order":
-        //   rankPercentile = duration-sorted rank / (size - 1).  0 = longest.
-        //   saltPercentile = stable per-step hash, 0..1.
-        //   effective      = lerp(saltPercentile, rankPercentile, |tilt|/100).
-        // Tilt=0 cuts by salt (arbitrary but stable); |Tilt|=100 cuts by
-        // pure duration order. Tilt sign chooses which end survives the cut.
-        const uint32_t patternSize = std::max<uint32_t>(1, sequence.size());
-        const uint32_t denom = patternSize > 1 ? (patternSize - 1) : 1;
-        // Repeat replays the rank captured with _lastStepContent — intentional. The
-        // Repeat contract is "frozen material," so a mutate-driven rerank
-        // since capture does not retroactively shift the replayed event.
-        const uint32_t storedRank = (useRepeat ? uint32_t(eval.densityRank())
-                                               : uint32_t(sequence.steps()[stepIndex].densityRank()));
-        const uint32_t rankPctMilli = std::min<uint32_t>(1000, (storedRank * 1000) / denom);
-        const uint32_t saltHash = keyed_rng::cellSeed(sequence.rhythmSeed(), uint32_t(stepIndex));
-        const uint32_t saltPctMilli = ((saltHash >> 24) * 1000) / 255;
-        const int tiltSigned = int(sequence.tilt());
-        const uint32_t tiltMag = uint32_t(std::abs(tiltSigned));   // 0..100
-        const uint32_t effectiveMilli =
-            (tiltMag * rankPctMilli + (100 - tiltMag) * saltPctMilli) / 100;
-        const uint32_t maskMilli = uint32_t(sequence.mask()) * 10;   // mask 0..100 → 0..1000
-        bool maskPass;
-        if (sequence.mask() >= 100) {
-            maskPass = true;   // bypass
-        } else if (tiltSigned >= 0) {
-            maskPass = effectiveMilli < maskMilli;
-        } else {
-            maskPass = (1000 - effectiveMilli) < maskMilli;
+        // Mask + Tilt — LoopR-only. In LiveR, every step's stored rank is 0
+        // (Live events bypass generateMaskRanks), so Tilt's duration axis
+        // would collapse to "attenuate salt cut" — confusing knob with no
+        // musical meaning. Gate the whole block on rhythmMode==Loop; both
+        // knobs are inert in Live. UI should mark them stale.
+        bool maskPass = true;
+        if (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.mask() < 100) {
+            // Rank from event (Repeat replays captured rank — frozen-material
+            // contract: a mutate-driven rerank since capture does not
+            // retroactively shift the replayed event).
+            const uint32_t patternSize = std::max<uint32_t>(1, sequence.size());
+            const uint32_t denom = patternSize > 1 ? (patternSize - 1) : 1;
+            const uint32_t storedRank = (useRepeat ? uint32_t(eval.densityRank())
+                                                   : uint32_t(sequence.steps()[stepIndex].densityRank()));
+            const uint32_t rankPctMilli = std::min<uint32_t>(1000, (storedRank * 1000) / denom);
+            const uint32_t saltHash = keyed_rng::cellSeed(sequence.rhythmSeed(), uint32_t(stepIndex));
+            const uint32_t saltPctMilli = ((saltHash >> 24) * 1000) / 255;
+            const int tiltSigned = int(sequence.tilt());
+            const uint32_t tiltMag = uint32_t(std::abs(tiltSigned));   // 0..100
+            const uint32_t effectiveMilli =
+                (tiltMag * rankPctMilli + (100 - tiltMag) * saltPctMilli) / 100;
+            const uint32_t maskMilli = uint32_t(sequence.mask()) * 10;   // 0..1000
+            if (tiltSigned >= 0) {
+                maskPass = effectiveMilli < maskMilli;
+            } else {
+                maskPass = (1000 - effectiveMilli) < maskMilli;
+            }
         }
         isRest = pRest || !maskPass || !eval.rhythmValid() || !eval.melodyValid();
         isLegato = pLegato;
