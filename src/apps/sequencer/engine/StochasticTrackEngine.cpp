@@ -51,11 +51,14 @@ int directHistoryTrackIndex(const Track &track) {
 // Forward decl for use by patienceProbability below.
 static float poissonCdf(int k, float lambda);
 
-// Knob 0..99 → λ ∈ [1, ~79] linear; knob 100 is the off-sentinel
-// ("never regenerate").
+// Knob 0..99 → λ ∈ [1, 128] on a log2 curve; knob 100 is the off-sentinel
+// ("never regenerate"). Musical time scales logarithmically — every ~14
+// knob units doubles the expected wait, so the perceptually-useful short-
+// to-medium loop region (1, 2, 4, 8, 16 loops) is spread across the lower
+// 60% of the knob instead of squeezed into the bottom sliver.
 static inline float patienceLambda(int patience) {
     int p = patience < 0 ? 0 : (patience > 100 ? 100 : patience);
-    return 1.0f + (p * 79.0f) / 100.0f;
+    return std::exp2(float(p) * 7.0f / 99.0f);
 }
 
 float StochasticTrackEngine::patienceProbability(uint32_t loops, int patience) {
