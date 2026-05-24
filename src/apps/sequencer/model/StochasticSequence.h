@@ -195,8 +195,12 @@ public:
     int jump() const { return _jump.get(isRouted(Routing::Target::StochasticJump)); }
     void setJump(int jump, bool routed = false) { _jump.set(clamp(jump, 0, 100), routed); }
 
+    // Range — bipolar field width / jump-chance knob, 0..100 centered at 50.
+    // 50 = single-octave field (no decision in Steps 3..5). >50 expands the
+    // candidate set up to 4 octaves. <50 keeps single octave plus a per-slot
+    // octave-displacement chance. See PITCH-LAW-FINAL.md Step 3.
     int range() const { return _range; }
-    void setRange(int range) { _range = clamp(range, 1, 4); }
+    void setRange(int range) { _range = clamp(range, 0, 100); }
 
     // degreeTickets
     int degreeTicket(int degree) const { return _degreeTickets[degree]; }
@@ -616,7 +620,7 @@ public:
         _mutate.read(reader);
         _jump.read(reader);
         reader.read(_range);
-        _range = clamp(int(_range), 1, 4);
+        _range = clamp(int(_range), 0, 100);
 
         uint8_t rhythmMode, melodyMode;
         reader.read(rhythmMode);
@@ -694,7 +698,7 @@ private:
         _patienceRhythm.setBase(100);
         _mutate.setBase(0);
         _jump.setBase(0);
-        _range = 1;
+        _range = 50;
         _rhythmMode = StochasticSourceMode::Live;
         _melodyMode = StochasticSourceMode::Live;
 

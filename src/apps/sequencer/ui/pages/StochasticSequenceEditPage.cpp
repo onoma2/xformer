@@ -337,7 +337,7 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
     case 0:  { FixedStringBuilder<16> d; durationLabel(d); str("DURATION %s", static_cast<const char*>(d)); break; }
     case 1:  str("VARIATION %d", variation); break;
     case 2:  str("REST %d", rest); break;
-    case 3:  str("RANGE %d oct", seq.range()); break;
+    case 3:  str("RANGE %d%%", seq.range()); break;
     case 4:  str("BURST %d", burst); break;
     case 5:  str("BURST COUNT %d", burstCount); break;
     case 6:  str("BURST RATE %d", burstRate); break;
@@ -369,7 +369,7 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
         s.reset(); s("D %s",  static_cast<const char*>(durStr)); canvas.drawText(col0 + 0 * colStep, yTop, s);
         s.reset(); s("V %d",  variation);   canvas.drawText(col0 + 1 * colStep, yTop, s);
         s.reset(); s("R %d",  rest);        canvas.drawText(col0 + 2 * colStep, yTop, s);
-        s.reset(); s("N %d",  seq.range()); canvas.drawText(col0 + 3 * colStep, yTop, s);
+        s.reset(); s("R%d",   seq.range()); canvas.drawText(col0 + 3 * colStep, yTop, s);
         s.reset(); s("B %d",  burst);       canvas.drawText(col0 + 4 * colStep, yTop, s);
         s.reset(); s("C %d",  burstCount);  canvas.drawText(col0 + 5 * colStep, yTop, s);
         s.reset(); s("T %d",  burstRate);   canvas.drawText(col0 + 6 * colStep, yTop, s);
@@ -705,7 +705,7 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     case 0:  seq.setNoteDuration(seq.noteDuration() + value);        notifyStochasticShapingEdit(); break;
     case 1:  seq.setVariation(seq.variation() + v);                  notifyStochasticShapingEdit(); break;
     case 2:  seq.setRest(seq.rest() + v); break;
-    case 3:  seq.setRange(seq.range() + value);                      notifyStochasticShapingEdit(); break;
+    case 3:  seq.setRange(seq.range() + (shift ? value * 10 : value)); notifyStochasticShapingEdit(); break;
     case 4:  seq.setBurst(seq.burst() + v);                          notifyStochasticShapingEdit(); break;
     case 5:  seq.setBurstCount(seq.burstCount() + v);                notifyStochasticShapingEdit(); break;
     case 6:  seq.setBurstRate(seq.burstRate() + v);                  notifyStochasticShapingEdit(); break;
@@ -1649,7 +1649,7 @@ void StochasticSequenceEditPage::contextAction(int index) {
         if (wants(0))  sequence.setNoteDuration(5);
         if (wants(1))  sequence.setVariation(16);
         if (wants(2))  sequence.setRest(0);
-        if (wants(3))  sequence.setRange(1);
+        if (wants(3))  sequence.setRange(50);
         if (wants(4))  sequence.setBurst(0);
         if (wants(5))  sequence.setBurstCount(0);
         if (wants(6))  sequence.setBurstRate(50);

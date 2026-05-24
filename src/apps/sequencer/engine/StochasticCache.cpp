@@ -92,10 +92,10 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
     const bool pickRhythmInCache =
         seq.rhythmMode() == StochasticSourceMode::Loop;
 
-    // Pitch chain threads lastDegree through every step (including cluster
-    // tails) so Complexity / Contour kernels see continuous motion that
-    // does not depend on cluster placement.
-    int chainLastDeg = -1;
+    // Pitch chain threads the per-step state (lastDegree + class recency)
+    // through every step including cluster tails so Complexity / Contour /
+    // recency penalty see continuous motion across the whole cycle.
+    StochasticGenerator::PitchGenState pitchState{};
     uint8_t anchorDegree = 0;
     uint8_t anchorOctave = 0;
     bool anchorLegato = false;
@@ -182,7 +182,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
         if (pickMelodyInCache) {
             Random anchorRng(keyed_rng::cellSeed(seq.melodySeed(), uint32_t(i)));
             const int degAbs = StochasticGenerator::generateDegree(
-                seq, *track, *scale, chainLastDeg, anchorRng);
+                seq, *track, *scale, pitchState, anchorRng);
             const int notes = std::max(1, scale->notesPerOctave());
             slotDegree = uint8_t(degAbs % notes);
             slotOctave = uint8_t(std::min(int(kMaxOctave), degAbs / notes));
@@ -197,9 +197,9 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
                 // pitches. Distinct salt from the anchor RNG so the two
                 // streams stay independent.
                 Random tailRng(keyed_rng::cellSeed(seq.melodySeed(), uint32_t(i)) ^ 0x7A11C0DEu);
-                int lastDeg = -1;
+                StochasticGenerator::PitchGenState tailState{};
                 const int degAbs = StochasticGenerator::generateDegree(
-                    seq, *track, *scale, lastDeg, tailRng);
+                    seq, *track, *scale, tailState, tailRng);
                 const int notes = std::max(1, scale->notesPerOctave());
                 cellDegree = uint8_t(degAbs % notes);
                 cellOctave = uint8_t(std::min(int(kMaxOctave), degAbs / notes));

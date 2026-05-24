@@ -31,9 +31,18 @@ public:
 
     static void evaluateBurst(EvaluatedBurstNote *bursts, const StochasticSequence &sequence, const StochasticStepContent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int anchorNote, uint32_t durationTicks, Random &rng);
 
+    // Pitch generation state passed through the per-slot picker. Tracks the
+    // last absolute degree (for direction/contour) plus the recent class
+    // history that drives Step 1's recency penalty. See PITCH-LAW-FINAL.md.
+    struct PitchGenState {
+        int lastDegree = -1;
+        int lastClass = -1;
+        int classRunLength = 0;
+    };
+
     static StochasticStepContent generateRhythmEvent(const StochasticSequence &sequence, const StochasticTrack &track, Random &rng);
-    static StochasticStepContent generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng);
-    static int generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng);
+    static StochasticStepContent generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, PitchGenState &state, Random &rng);
+    static int generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, PitchGenState &state, Random &rng);
     // Per-cell pickers called from the cache walk. Cache picks per-cell from
     // these so NoteDuration / Variation / Burst* knobs reshape playback on
     // the next refreshStepCache without a full regeneration pass.

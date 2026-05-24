@@ -6,6 +6,7 @@
 #include "RecordHistory.h"
 #include "StepRecorder.h"
 #include "StochasticCache.h"
+#include "StochasticGenerator.h"
 #include "model/StochasticSequence.h"
 #include "model/StochasticTrack.h"
 
@@ -171,6 +172,7 @@ private:
     uint8_t _lastAppliedSize = 0;
     uint8_t _lastAppliedFirst = 0;
     int _lastDegree = -1;
+    StochasticGenerator::PitchGenState _pitchState{};
     int _lastDurationIndex = 0;
     int _jumpRegister = 0;
     int _lastFreeStepIndex = -1;

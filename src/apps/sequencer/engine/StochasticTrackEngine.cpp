@@ -163,6 +163,7 @@ void StochasticTrackEngine::reset() {
     _lastAppliedSize = 0;
     _lastAppliedFirst = 0;
     _lastDegree = -1;
+    _pitchState = {};
     _jumpRegister = 0;
     _lastFreeStepIndex = -1;
     _patternCycleEnded = false;
@@ -185,6 +186,7 @@ void StochasticTrackEngine::restart() {
     _currentStep = stochasticTrack().sequence(pattern()).first();
     _relativeTick = 0;
     _lastDegree = -1;
+    _pitchState = {};
     _lastFreeStepIndex = -1;
     _eventElapsed = 0;
     _eventDuration = 0;
@@ -343,9 +345,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             }
 
             if (sequence.melodyMode() == StochasticSourceMode::Live) {
-                auto melody = StochasticGenerator::generateMelodyEvent(sequence, track, scale, rootNote, _lastDegree, _rng);
+                auto melody = StochasticGenerator::generateMelodyEvent(sequence, track, scale, rootNote, _pitchState, _rng);
                 eval.mergeMelodyFrom(melody);
-                _lastDegree = int(eval.degree()) + int(eval.octave()) * scale.notesPerOctave();
+                _lastDegree = _pitchState.lastDegree;
                 writeLiveMelodyShadow(stepIndex, melody);
             } else {
                 eval.mergeMelodyFrom(event);

@@ -205,7 +205,7 @@ private:
         case Size:          str("%d", sequence.size()); break;
         case First:         str("%d", sequence.first() + 1); break;
         case Rotate:        sequence.printRotate(str); break;
-        case Range:         str("%d Oct", sequence.range()); break;
+        case Range:         str("%d%%", sequence.range()); break;
         case Refresh:       str("Exec"); break;
         case LastItem:      break;
         }

@@ -96,12 +96,12 @@ void StochasticGenerator::generateRhythm(StochasticSequence &sequence, const Sto
 
 void StochasticGenerator::generateMelody(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, uint32_t seed) {
     Random rng(seed);
-    int lastDegree = -1;
+    StochasticGenerator::PitchGenState state{};
     int size = sequence.size();
-    
+
     for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
         if (i < size) {
-            auto melody = generateMelodyEvent(sequence, track, scale, rootNote, lastDegree, rng);
+            auto melody = generateMelodyEvent(sequence, track, scale, rootNote, state, rng);
             sequence.steps()[i].mergeMelodyFrom(melody);
         } else {
             sequence.steps()[i].setMelodyValid(false);
@@ -368,8 +368,8 @@ void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *bursts, const Stocha
             bursts[i].gateTicks = gate;
             
             if (sequence.burstHold() == StochasticBurstHold::Roll) {
-                int lastDegree = -1;
-                bursts[i].note = generateDegree(sequence, track, scale, lastDegree, rng);
+                StochasticGenerator::PitchGenState burstState{};
+                bursts[i].note = generateDegree(sequence, track, scale, burstState, rng);
             } else {
                 bursts[i].note = anchorNote;
             }
@@ -416,11 +416,11 @@ StochasticStepContent StochasticGenerator::generateRhythmEvent(const StochasticS
     return event;
 }
 
-StochasticStepContent StochasticGenerator::generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng) {
+StochasticStepContent StochasticGenerator::generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, PitchGenState &state, Random &rng) {
     StochasticStepContent event;
     event.clear();
 
-    int absoluteDegree = generateDegree(sequence, track, scale, lastDegree, rng);
+    int absoluteDegree = generateDegree(sequence, track, scale, state, rng);
     int activeNotes = scale.notesPerOctave();
     event.setDegree(absoluteDegree % activeNotes);
     event.setOctave(absoluteDegree / activeNotes);
@@ -429,102 +429,191 @@ StochasticStepContent StochasticGenerator::generateMelodyEvent(const StochasticS
     return event;
 }
 
-// Unified pitch picker. All shaping multiplies:
-//   1. Build allowed degrees from range × scale tones, gated by ticket≥0.
-//   2. Per-slot weight = ticket × complexityKernel × marblesKernel.
-//      - complexityKernel: triangular around lastDegree, width grows with
-//        complexity plus a leakage term so high complexity allows leaps.
-//      - marblesKernel: triangular around bias position, width grows with
-//        spread; always running.
-//   3. Weighted random pick.
+// Run-length recency penalty per PITCH-LAW-FINAL.md Step 1. Returns a
+// per-mille multiplier (1000 = full weight). Cuts the favored class's
+// weight after each repeat so heavy tickets can't lock the line.
+static uint32_t recencyPenaltyMilli(int runLength) {
+    if (runLength <= 0) return 1000;
+    if (runLength == 1) return 550;
+    if (runLength == 2) return 200;
+    return 50;
+}
+
+// Beta-distribution approximation used by Step 4. Returns 0..1000.
+// spread < 500 → collapse toward bias (low spread = concentrated near Bias).
+// spread > 500 → Bernoulli-like pull toward edges, Bias picks which edge wins.
+// spread = 500 → cloud around Bias (mostly uniform with small bias pull).
+static uint32_t betaShapeMilli(uint32_t uMilli, int biasKnob, int spreadKnob) {
+    uint32_t bias = uint32_t(clamp(biasKnob, 0, 100)) * 10;       // 0..1000
+    uint32_t spread = uint32_t(clamp(spreadKnob, 0, 100)) * 10;   // 0..1000
+    if (uMilli > 1000) uMilli = 1000;
+
+    if (spread < 500) {
+        // Pull strength = (500 - spread) / 500. At spread=0, fully collapse to bias.
+        uint32_t pull = ((500 - spread) * 1000) / 500;            // 0..1000
+        return (bias * pull + uMilli * (1000 - pull)) / 1000;
+    } else {
+        // Bernoulli edge pull. Strength = (spread - 500) / 500.
+        uint32_t bernPull = ((spread - 500) * 1000) / 500;        // 0..1000
+        uint32_t edgePick = (uMilli < bias) ? 0 : 1000;
+        return (uMilli * (1000 - bernPull) + edgePick * bernPull) / 1000;
+    }
+}
+
+// Five-step sequential pitch generation. See
+// .tasks/stochastic-track-port/PITCH-LAW-FINAL.md for the design contract.
 //
-// Pitch-centrality (stochasticPitchCentrality) is intentionally NOT a factor
-// here — pitch-mask audibility happens at trigger time via maskMelody/tiltMelody.
-int StochasticGenerator::generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng) {
-    int activeNotes = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
-    int range = sequence.range();
-    int N = activeNotes;
+// Step 1 — Class roll. Weighted random over scale-degree classes using
+//          tickets × recency penalty. Blind to motion.
+// Step 2 — Class repeat check. Complexity decides whether to keep a repeat
+//          or re-roll on Step 1. Bounded retries (3).
+// Step 3 — Pitch candidate set. Range builds the absolute-pitch set for
+//          the chosen class (single octave, multi-octave field, or single +
+//          per-slot octave-jump chance).
+// Step 4 — Region roll. Beta-distribution over the sorted set, shaped by
+//          Bias + Spread. Octave-blind.
+// Step 5 — Direction nudge. Contour applies up/down preference vs the
+//          last absolute pitch.
+int StochasticGenerator::generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, PitchGenState &state, Random &rng) {
+    (void)track;
+    const int activeNotes = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
+    const int N = activeNotes;
+    const int range = clamp(int(sequence.range()), 0, 100);
+    const int complexity = clamp(int(sequence.complexity()), 0, 100);
+    const int contour = clamp(int(sequence.contour()), -100, 100);
+    const int biasKnob = clamp(int(sequence.marblesBias()), 0, 100);
+    const int spreadKnob = clamp(int(sequence.marblesSpread()), 0, 100);
 
-    constexpr int kMaxSlots = CONFIG_USER_SCALE_SIZE * 4;
-    int allowedDegrees[kMaxSlots];
-    int ticketWeights[kMaxSlots];
+    // Build the allowed class set (degrees-in-octave with ticket >= 0).
+    int allowedClasses[CONFIG_USER_SCALE_SIZE];
+    int classTicket[CONFIG_USER_SCALE_SIZE];
     int allowedCount = 0;
-
-    for (int oct = 0; oct < range; ++oct) {
-        for (int i = 0; i < activeNotes; ++i) {
-            int tickets = sequence.effectiveDegreeTicket(i, activeNotes);
-            if (tickets >= 0) {
-                allowedDegrees[allowedCount] = oct * activeNotes + i;
-                ticketWeights[allowedCount] = tickets;
-                allowedCount++;
-            }
+    for (int c = 0; c < N; ++c) {
+        const int t = sequence.effectiveDegreeTicket(c, N);
+        if (t >= 0) {
+            allowedClasses[allowedCount] = c;
+            classTicket[allowedCount] = t;
+            ++allowedCount;
         }
     }
     if (allowedCount == 0) return 0;
 
-    int lastIdx = -1;
-    if (lastDegree != -1) {
-        for (int i = 0; i < allowedCount; ++i) {
-            if (allowedDegrees[i] == lastDegree) { lastIdx = i; break; }
-        }
-    }
-
-    int complexity = clamp(int(sequence.complexity()), 0, 100);
-    int kernelWidth = 1 + (complexity * N) / 50;
-    int kernelLeak = complexity / 10;
-    int contour = clamp(int(sequence.contour()), -100, 100);
-
-    int marblesBias = clamp(int(sequence.marblesBias()), 0, 100);
-    int marblesSpread = clamp(int(sequence.marblesSpread()), 0, 100);
-
-    int biasPos = (allowedCount > 1) ? (marblesBias * (allowedCount - 1) + 50) / 100 : 0;
-    int marblesWidth = 1 + (marblesSpread * allowedCount) / 100;
-    int marblesLeak = 1 + marblesSpread / 10;
-
+    // ---- Step 1 + 2: class roll with recency, repeat-rejection by Complexity.
+    int chosenClass = -1;
     bool anyTicket = false;
     for (int i = 0; i < allowedCount; ++i) {
-        if (ticketWeights[i] > 0) { anyTicket = true; break; }
+        if (classTicket[i] > 0) { anyTicket = true; break; }
     }
-
-    int weights[kMaxSlots];
-    int totalWeight = 0;
-    for (int i = 0; i < allowedCount; ++i) {
-        int base = anyTicket ? ticketWeights[i] : 10;
-        if (base < 0) base = 0;
-
-        int kernel;
-        if (lastIdx < 0) {
-            kernel = 100;
-        } else {
-            int d = i > lastIdx ? i - lastIdx : lastIdx - i;
-            int tri = (kernelWidth > d ? kernelWidth - d : 0) * 10;
-            int signedDist = i - lastIdx;
-            int drift = (contour * signedDist) / 2;
-            int maxDrift = (kernelWidth > 2 ? kernelWidth : 2) * 10;
-            if (drift > maxDrift) drift = maxDrift;
-            else if (drift < -maxDrift) drift = -maxDrift;
-            kernel = tri + kernelLeak + drift;
-            if (kernel < 0) kernel = 0;
-        }
-
-        int dm = i > biasPos ? i - biasPos : biasPos - i;
-        int mtri = (marblesWidth > dm ? marblesWidth - dm : 0) * 10;
-        int marbles = mtri + marblesLeak;
-
-        weights[i] = base * kernel * marbles;
-        totalWeight += weights[i];
-    }
-
-    int degree = allowedDegrees[0];
-    if (totalWeight > 0) {
-        int roll = int(rng.nextRange(uint32_t(totalWeight)));
-        int sum = 0;
+    for (int retry = 0; retry < 4; ++retry) {
+        // Weight each allowed class: tickets (or flat 10 if all-zero) × recency.
+        uint32_t weights[CONFIG_USER_SCALE_SIZE];
+        uint32_t total = 0;
         for (int i = 0; i < allowedCount; ++i) {
-            sum += weights[i];
-            if (roll < sum) { degree = allowedDegrees[i]; break; }
+            uint32_t base = anyTicket ? uint32_t(classTicket[i]) : 10u;
+            uint32_t penalty = (allowedClasses[i] == state.lastClass)
+                ? recencyPenaltyMilli(state.classRunLength) : 1000u;
+            weights[i] = base * penalty;
+            total += weights[i];
+        }
+        int picked = 0;
+        if (total > 0) {
+            uint32_t roll = rng.nextRange(total);
+            uint32_t sum = 0;
+            for (int i = 0; i < allowedCount; ++i) {
+                sum += weights[i];
+                if (roll < sum) { picked = i; break; }
+            }
+        }
+        chosenClass = allowedClasses[picked];
+        // Step 2: if class == lastClass, Complexity-driven reject probability.
+        if (chosenClass == state.lastClass && state.lastClass >= 0) {
+            const uint32_t reject = uint32_t(complexity);
+            if (rng.nextRange(100u) < reject) continue;   // re-roll
+        }
+        break;
+    }
+    if (chosenClass < 0) chosenClass = allowedClasses[0];
+
+    // ---- Step 3: pitch candidate set construction.
+    // Range > 50 anchors a fixed multi-octave playable field starting at
+    // octave 0 — Bias picks within it, Contour can swap both directions.
+    // Range = 50 is a single-octave field (Steps 4 + 5 collapse to no-ops).
+    // Range < 50 keeps the line on its current octave but rolls a per-slot
+    // displacement chance, adding ±1 octave neighbors when the jump fires.
+    const int currentOctave = (state.lastDegree >= 0) ? (state.lastDegree / N) : 0;
+
+    int candidates[8];
+    int candCount = 0;
+    if (range > 50) {
+        int width = 1 + ((range - 50) * 3) / 50;   // 1..4
+        if (width < 1) width = 1;
+        if (width > 4) width = 4;
+        for (int k = 0; k < width; ++k) {
+            candidates[candCount++] = chosenClass + k * N;
+        }
+    } else if (range < 50) {
+        candidates[candCount++] = chosenClass + currentOctave * N;
+        const uint32_t jumpPct = uint32_t((50 - range) * 2);
+        if (rng.nextRange(100u) < jumpPct) {
+            if (currentOctave - 1 >= 0) candidates[candCount++] = chosenClass + (currentOctave - 1) * N;
+            candidates[candCount++] = chosenClass + (currentOctave + 1) * N;
+        }
+    } else {
+        candidates[candCount++] = chosenClass + currentOctave * N;
+    }
+
+    // Sort ascending so Steps 4 and 5 can index a flat list.
+    for (int i = 1; i < candCount; ++i) {
+        int v = candidates[i];
+        int j = i;
+        while (j > 0 && candidates[j-1] > v) { candidates[j] = candidates[j-1]; --j; }
+        candidates[j] = v;
+    }
+
+    // ---- Step 4: region roll via beta-distribution over the set.
+    int chosenPitch = candidates[0];
+    if (candCount > 1) {
+        const uint32_t u = rng.nextRange(1001u);
+        const uint32_t shaped = betaShapeMilli(u, biasKnob, spreadKnob);
+        int idx = int((shaped * uint32_t(candCount - 1) + 500) / 1000);
+        if (idx < 0) idx = 0;
+        if (idx >= candCount) idx = candCount - 1;
+        chosenPitch = candidates[idx];
+    }
+
+    // ---- Step 5: direction nudge — Contour swaps to a directionally-correct
+    // pitch if the picked one moves against the requested direction.
+    if (contour != 0 && state.lastDegree >= 0 && candCount > 1) {
+        const int wantSign = contour > 0 ? 1 : -1;
+        const int gotSign = (chosenPitch > state.lastDegree) ? 1
+                          : (chosenPitch < state.lastDegree ? -1 : 0);
+        if (gotSign != wantSign) {
+            const uint32_t swapPct = uint32_t(contour > 0 ? contour : -contour);
+            if (rng.nextRange(100u) < swapPct) {
+                int best = -1;
+                int bestDist = 0;
+                for (int i = 0; i < candCount; ++i) {
+                    int d = candidates[i] - state.lastDegree;
+                    int s = d > 0 ? 1 : (d < 0 ? -1 : 0);
+                    if (s == wantSign) {
+                        int ad = d < 0 ? -d : d;
+                        if (best < 0 || ad < bestDist) { best = i; bestDist = ad; }
+                    }
+                }
+                if (best >= 0) chosenPitch = candidates[best];
+            }
         }
     }
-    lastDegree = degree;
-    return degree;
+
+    // Update state: track lastDegree, lastClass, run length.
+    const int chosenClassActual = chosenPitch % N;
+    if (chosenClassActual == state.lastClass) {
+        state.classRunLength = state.classRunLength + 1;
+    } else {
+        state.lastClass = chosenClassActual;
+        state.classRunLength = 0;
+    }
+    state.lastDegree = chosenPitch;
+    return chosenPitch;
 }
 

@@ -6,121 +6,350 @@
 #include "apps/sequencer/model/Scale.h"
 #include "core/utils/Random.h"
 
-// Unified pitch picker. Shaping factors: degree tickets, complexity kernel,
-// marbles bias/spread. Pitch-centrality (Steps law) is no longer a factor here —
-// it acts at trigger time via maskMelody/tiltMelody.
+// Five-step pitch law — see .tasks/stochastic-track-port/PITCH-LAW-FINAL.md.
+//   1. Class roll (tickets × recency penalty, blind to motion).
+//   2. Class repeat check (Complexity rejects repeats).
+//   3. Pitch candidate set (Range bipolar: =50 single octave, >50 multi-octave,
+//      <50 single + per-slot jump chance).
+//   4. Region roll (Bias + Spread beta-distribution over the sorted set).
+//   5. Direction nudge (Contour swaps for directional alternative).
+
+static void setTransparentDefaults(StochasticSequence &seq) {
+    seq.clear();
+    seq.setRange(50);
+    seq.setComplexity(50);
+    seq.setMarblesBias(50);
+    seq.setMarblesSpread(80);
+    seq.setContour(0);
+}
 
 UNIT_TEST("StochasticGenerator") {
 
-CASE("tickets_steer_the_distribution") {
+CASE("tickets_steer_the_class_distribution") {
     StochasticSequence seq;
-    seq.clear();
-    seq.setRange(1);
-
+    setTransparentDefaults(seq);
+    // Flat-zero baseline; only classes 0 and 1 get heavy tickets.
     for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 0);
-    // Two heavy tickets — pick should land mostly on degrees 0 and 1.
     seq.setDegreeTicket(0, 100);
     seq.setDegreeTicket(1, 100);
-
-    // Neutral shaping
-    seq.setComplexity(50);
-    seq.setMarblesBias(50);
-    seq.setMarblesSpread(100);
+    seq.setComplexity(0);     // accept repeats so recency is the only damp
 
     StochasticTrack track;
     track.clear();
 
     Random rng(42);
-    int lastDegree = -1;
+    StochasticGenerator::PitchGenState state{};
     int hit01 = 0;
     for (int i = 0; i < 200; ++i) {
         const auto &scale = Scale::get(0);
-        int deg = StochasticGenerator::generateDegree(seq, track, scale, lastDegree, rng);
-        int degInOct = deg % 12;
-        if (degInOct == 0 || degInOct == 1) hit01++;
-        lastDegree = deg;
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        int klass = deg % 12;
+        if (klass == 0 || klass == 1) hit01++;
     }
-
-    expectTrue(hit01 >= 140, "tickets should dominate (>=70% on weighted degrees)");
+    expectTrue(hit01 >= 150, "tickets should dominate the class roll");
 }
 
-CASE("marbles_distribution_always_runs_with_transparent_defaults") {
+CASE("recency_penalty_breaks_single_ticket_lock") {
+    // Heavy single ticket on class 5. Without the recency penalty the line
+    // would lock; with it, run length stays bounded.
     StochasticSequence seq;
-    seq.clear();
-    seq.setRange(1);
-
-    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10); // flat
-
-    // Transparent defaults — bias center, spread wide, steps open.
-    seq.setMarblesBias(50);
-    seq.setMarblesSpread(100);
-    seq.setComplexity(50);
+    setTransparentDefaults(seq);
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
+    seq.setDegreeTicket(5, 100);
+    seq.setComplexity(0);     // disable Step 2 reject; isolate recency
 
     StochasticTrack track;
     track.clear();
 
     Random rng(42);
-    int lastDegree = -1;
-    int uniqueDegrees = 0;
-    int seen[12] = {};
+    StochasticGenerator::PitchGenState state{};
+    int runLen = 0;
+    int maxRun = 0;
+    int last = -1;
     for (int i = 0; i < 200; ++i) {
         const auto &scale = Scale::get(0);
-        int deg = StochasticGenerator::generateDegree(seq, track, scale, lastDegree, rng);
-        int dio = deg % 12;
-        if (!seen[dio]) { seen[dio] = 1; uniqueDegrees++; }
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        int klass = deg % 12;
+        if (klass == last) runLen++;
+        else { last = klass; runLen = 0; }
+        if (runLen > maxRun) maxRun = runLen;
     }
-
-    expectTrue(uniqueDegrees >= 5,
-               "transparent defaults should produce a wide spread of degrees");
+    expectTrue(maxRun <= 5, "recency penalty should cap class run length");
 }
 
-CASE("complexity_kernel_narrows_movement_at_low_values") {
+CASE("complexity_high_forces_movement") {
     StochasticSequence seq;
-    seq.clear();
-    seq.setRange(2);
+    setTransparentDefaults(seq);
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
+    seq.setDegreeTicket(3, 100); // bias toward class 3
+    seq.setComplexity(100);   // always reject class repeats
 
-    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10); // flat
+    StochasticTrack track;
+    track.clear();
 
-    seq.setMarblesBias(50);
-    seq.setMarblesSpread(100);
-    // Low complexity — kernel tight, picks should cluster near lastDegree
+    Random rng(42);
+    StochasticGenerator::PitchGenState state{};
+    int classRepeats = 0;
+    int last = -1;
+    for (int i = 0; i < 200; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        int klass = deg % 12;
+        if (klass == last) classRepeats++;
+        last = klass;
+    }
+    // Bounded retries (3) means a few repeats slip through when all alternatives
+    // were re-rolled into the same class — accept a small residual.
+    expectTrue(classRepeats <= 25, "high Complexity should suppress class repeats");
+}
+
+CASE("complexity_low_keeps_repeats") {
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
+    seq.setDegreeTicket(7, 100); // bias toward class 7
+    seq.setComplexity(0);     // accept all repeats
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(42);
+    StochasticGenerator::PitchGenState state{};
+    int hit7 = 0;
+    for (int i = 0; i < 200; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        if ((deg % 12) == 7) hit7++;
+    }
+    // At Complexity=0, recency is the only damp; class 7 still dominates.
+    expectTrue(hit7 >= 70, "low Complexity should let the heavy ticket dominate within recency limits");
+}
+
+CASE("range_50_is_single_octave_field") {
+    // At Range=50 the candidate set is a single pitch per class — no octave
+    // decision. Bias/Spread/Contour are inert.
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setRange(50);
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 0);
+    seq.setDegreeTicket(5, 100);
     seq.setComplexity(0);
 
     StochasticTrack track;
     track.clear();
 
-    Random rng(42);
-    int lastDegree = 7;
-    int nearLast = 0;
+    Random rng(7);
+    StochasticGenerator::PitchGenState state{};
+    int octsSeen[8] = {};
+    int uniqueOcts = 0;
+    for (int i = 0; i < 100; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        int oct = deg / 12;
+        if (oct >= 0 && oct < 8 && !octsSeen[oct]) { octsSeen[oct] = 1; uniqueOcts++; }
+    }
+    expectEqual(uniqueOcts, 1, "Range=50 should produce a single-octave field");
+}
+
+CASE("range_high_fans_across_octaves") {
+    // Range=100 → 4-octave field. With one heavy class ticket the same class
+    // should appear in multiple octaves.
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setRange(100);
+    seq.setMarblesSpread(80); // near-uniform across the set
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 0);
+    seq.setDegreeTicket(0, 100);
+    seq.setComplexity(0);
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(13);
+    StochasticGenerator::PitchGenState state{};
+    int octsSeen[8] = {};
+    int uniqueOcts = 0;
     for (int i = 0; i < 200; ++i) {
         const auto &scale = Scale::get(0);
-        int prev = lastDegree;
-        int deg = StochasticGenerator::generateDegree(seq, track, scale, lastDegree, rng);
-        int dist = deg > prev ? deg - prev : prev - deg;
-        if (dist <= 2) nearLast++;
-        // lastDegree already updated by generateDegree via reference
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        int oct = deg / 12;
+        if (oct >= 0 && oct < 8 && !octsSeen[oct]) { octsSeen[oct] = 1; uniqueOcts++; }
     }
+    expectTrue(uniqueOcts >= 3, "Range>50 should fan the same class across multiple octaves");
+}
 
-    expectTrue(nearLast >= 120, "low complexity should keep picks within ~2 scale steps");
+CASE("range_low_produces_octave_jumps") {
+    // Range < 50 keeps single octave + periodic jumps. At Range=0, every slot
+    // has 100% jump chance, so jumps should appear frequently.
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setRange(0);
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
+    seq.setComplexity(0);
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(101);
+    StochasticGenerator::PitchGenState state{};
+    int octsSeen[8] = {};
+    int uniqueOcts = 0;
+    for (int i = 0; i < 200; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        int oct = deg / 12;
+        if (oct >= 0 && oct < 8 && !octsSeen[oct]) { octsSeen[oct] = 1; uniqueOcts++; }
+    }
+    expectTrue(uniqueOcts >= 2, "Range<50 should add occasional octave-displacement jumps");
+}
+
+CASE("bias_low_favors_low_pitches") {
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setRange(100);              // 4-octave field
+    seq.setMarblesBias(0);          // lowest end
+    seq.setMarblesSpread(0);        // collapse to bias
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 0);
+    seq.setDegreeTicket(0, 100);
+    seq.setComplexity(0);
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(55);
+    StochasticGenerator::PitchGenState state{};
+    int lowCount = 0;
+    for (int i = 0; i < 200; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        if (deg / 12 == 0) lowCount++;
+    }
+    expectTrue(lowCount >= 170, "Bias=0 with Spread=0 should land on the lowest octave");
+}
+
+CASE("bias_high_favors_high_pitches") {
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setRange(100);
+    seq.setMarblesBias(100);        // highest end
+    seq.setMarblesSpread(0);        // collapse to bias
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 0);
+    seq.setDegreeTicket(0, 100);
+    seq.setComplexity(0);
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(77);
+    StochasticGenerator::PitchGenState state{};
+    int highCount = 0;
+    for (int i = 0; i < 200; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        if (deg / 12 >= 3) highCount++;
+    }
+    expectTrue(highCount >= 170, "Bias=100 with Spread=0 should land on the highest octave");
+}
+
+CASE("contour_nudges_up") {
+    // Contour=+100 with a multi-octave field should bias upward motion.
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setRange(100);
+    seq.setMarblesBias(50);
+    seq.setMarblesSpread(80);
+    seq.setContour(100);
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
+    seq.setComplexity(0);
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(33);
+    StochasticGenerator::PitchGenState state{};
+    int upMoves = 0, downMoves = 0;
+    int last = -1;
+    for (int i = 0; i < 200; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        if (last >= 0) {
+            if (deg > last) upMoves++;
+            else if (deg < last) downMoves++;
+        }
+        last = deg;
+    }
+    expectTrue(upMoves > downMoves * 2, "Contour=+100 should produce dominantly upward motion");
+}
+
+CASE("contour_nudges_down") {
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setRange(100);
+    seq.setMarblesBias(50);
+    seq.setMarblesSpread(80);
+    seq.setContour(-100);
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
+    seq.setComplexity(0);
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(33);
+    StochasticGenerator::PitchGenState state{};
+    int upMoves = 0, downMoves = 0;
+    int last = -1;
+    for (int i = 0; i < 200; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        if (last >= 0) {
+            if (deg > last) upMoves++;
+            else if (deg < last) downMoves++;
+        }
+        last = deg;
+    }
+    expectTrue(downMoves > upMoves * 2, "Contour=-100 should produce dominantly downward motion");
+}
+
+CASE("heavy_ticket_does_not_collapse_to_single_note") {
+    // The anti-collapse promise. One class at ticket=100, others at 10.
+    // The system should still produce a variety of pitches.
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setRange(100);
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
+    seq.setDegreeTicket(0, 100);
+    seq.setComplexity(50);
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(101);
+    StochasticGenerator::PitchGenState state{};
+    int uniqueDegrees = 0;
+    int seen[12 * 8] = {};
+    for (int i = 0; i < 200; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        if (deg >= 0 && deg < 96 && !seen[deg]) { seen[deg] = 1; uniqueDegrees++; }
+    }
+    expectTrue(uniqueDegrees >= 8, "heavy ticket should not collapse to a single repeated pitch");
 }
 
 CASE("produces_valid_output_at_all_defaults") {
     StochasticSequence seq;
-    seq.clear();
-    seq.setRange(1);
+    seq.clear();   // factory defaults
 
     StochasticTrack track;
     track.clear();
 
     Random rng(42);
-    int lastDegree = -1;
+    StochasticGenerator::PitchGenState state{};
     int outCount = 0;
     for (int i = 0; i < 100; ++i) {
         const auto &scale = Scale::get(0);
-        int deg = StochasticGenerator::generateDegree(seq, track, scale, lastDegree, rng);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
         if (deg >= 0) outCount++;
     }
-
     expectEqual(outCount, 100, "default config should always produce a valid degree");
 }
 
