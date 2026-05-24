@@ -264,6 +264,99 @@ Dev branch per AGENTS.md line 81 — no migration ceremony, no project version
 bump. New saves use the new shape; old saves either auto-migrate at load
 (silently fill defaults for dropped fields) or get discarded as disposable.
 
+## Findings from 2026-05-24 adversarial architecture review
+
+External review surfaced bugs, dead code, and refactor opportunities that
+either belong here or need an explicit "do later" call.
+
+### Live bugs — consider fixing inline, not deferring
+
+- **B1 — `clear()` vs `sanitizeAfterRead()` default divergence.** `clear()`
+  sets `_rhythmMode = Live`; `sanitizeAfterRead()` sets it to `Loop` when
+  recovering from an invalid size. A project with a corrupted size field
+  silently loads as Loop instead of Live. Extract a shared `setDefaults()`
+  helper and call it from both paths.
+- **B2 — `cycleTicks` uint16 truncation.** `StochasticCache.cpp` accumulates
+  per-cell durations into a `uint32_t` then truncates to `uint16_t` at
+  `cache.cycleTicks`. Worst case `64 × 4095 = 262,080` ticks wraps. The
+  engine feeds `cycleTicks` to Feel scaling, so dense long-duration patterns
+  could see wrong Feel adjustments. Either guard the truncation with a
+  saturating clamp or widen `cycleTicks` to `uint32_t`.
+- **B3 — Mask rank stale on Repeat after Mutate.** Trigger-time Mask reads
+  `eval.densityRank()`; on Repeat `eval = _lastEvent`, which holds the
+  rank captured at the slot the event was last fired from. If `permuteRhythm`
+  or `mutateRhythm` reshuffled ranks since capture, Repeat replays with a
+  rank that no longer matches any slot in the current pattern. Decide:
+  recapture rank on each mask read (always read from `events[readIndex]`),
+  or accept the staleness as part of Repeat's "frozen material" contract.
+
+### Cheap-win drops — extend the existing dead-field bullet
+
+Add to the existing "Drop dead event fields" sweep:
+
+- `_last` byte on `StochasticSequence` — already collapsed semantically
+  (`last()` returns `size-1`, `setLast()` is a no-op); still serialized and
+  occupies model RAM. Drop the field entirely.
+- `StochasticLevel` enum + `_level` field — pre-flat-cell level-gating
+  artifact, persists in serialization and UI but gates nothing.
+- `_minDegree` / `_maxDegree` — reserved-but-inert, generator no longer
+  clamps. Two bytes per pattern × 17 patterns × 8 tracks.
+- `StochasticGenerator::generateJumpOctave()` — public method that returns
+  0 unconditionally. Real jump logic lives in `rollCycleEndHooks()`.
+- `StochasticGenerator::betaDistributionSample()` — private, no callers,
+  drags `std::pow` in.
+- `StochasticModeInternal` enum in `StochasticTypes.h` — no references
+  anywhere.
+- `CellAux::rank()` / `setRank()` accessors and the rank bits — rank lives
+  on `event.densityRank` now.
+- `CellAux::burstChild()` accessor and bit — always 0 under the flat cell
+  model; comment in the header already says so.
+- `selectMaskRank()` inline helper — wraps a single cast, all parameters
+  unused except `eventDensityRank`. Replace callers with the cast directly.
+- `kMinAudibleGateTicks` defined twice (once in `StochasticTrackEngine.cpp`,
+  once in `StochasticCache.cpp`) — consolidate to a single header constant.
+- Investigate: `StochasticTrack::activePatternIndex()` / `setActivePatternIndex()`
+  / `activeSeed()` / `setActiveSeed()` look like dead stubs but may be a
+  framework interface requirement. Check before dropping.
+
+### Structural refactors — alongside the rename + dead-field track
+
+- **R1 — Collapse shaping snapshot into an enum-indexed array.** Today's 12
+  `_lastShaping*` fields plus `_shapingSnapshotValid` require parallel edits
+  in three places (declaration, read/compare loop, write-back) every time a
+  cache-baked knob is added. Replace with `uint8_t _shapingSnapshot[N]`
+  indexed by an enum so adding a knob is one enum entry.
+- **R2 — Extract `effectiveDivisor()` on the engine.** Divisor math runs in
+  `tick()`, `refreshCache()`, and approximately in `StochasticSequence::printBurst()`.
+  Three independent implementations. The engine pair must agree; UI's
+  approximation can stay separate but should be commented as such.
+- **R3 — Deduplicate the duration LUT.** `lutNum` / `lutDen` arrays appear in
+  `StochasticSequence::printBurst()`, `StochasticSequence::printSlotDuration()`,
+  and `StochasticTrackEngine::getDurationFraction()`. Extract a single header
+  constant.
+- **R4 — Templatize `pickFromLutTriangular()`.** `pickBurstCountFromLut` and
+  `pickBurstSpacingFromLut` copy the same pattern with different LUTs.
+  Templatize for reuse (FractalTrack will want it too).
+- **R5 — Decompose `regenerateCacheFromEvents()` and add direct unit
+  coverage.** ~180-line function carrying slot iteration, cluster state
+  machine, two pick paths, gate-length kernel, legato/slide rolls, and
+  cluster-tail pitch. Existing tests cover parity, not the cluster state
+  machine in isolation. Split into named helpers (`pickCellDuration`,
+  `applyCluster`, `pickAnchorPitch`, etc.) and add unit tests for cluster
+  boundary cases (cluster overrun, cluster spanning the size-edge).
+
+### Architecture note (not a refactor — write it down)
+
+Engine holds mutable references into the model (`StochasticTrack&`,
+`StochasticSequence*`) and writes to `_events[]` from
+`writeLiveRhythmShadow`, `writeLiveMelodyShadow`, `ensureLoopSources`,
+`rollPatience`, and `rollCycleEndHooks`. UI reads the same events for
+display. STM32 is safe today only because engine and UI tasks don't
+preempt each other on the same tick — implicit scheduling assumption, not
+structural. Document the concurrency model explicitly in
+`docs/performer-architecture.md` (which task owns writes, which reads are
+safe and when). Fractal should avoid this pattern entirely.
+
 ## References
 
 - Proteus mutation model — `temp-ref/docs/SeasideModularVCV/src/Proteus.cpp:680-789`
@@ -297,6 +390,15 @@ bump. New saves use the new shape; old saves either auto-migrate at load
   list. (ui) toggle already reads HOLD/ROLL; (code) still used
   Parent/Generate from the pre-flat-cell parent/child (idea). Enum integer
   ordering preserved so wire format is unaffected.
+- 2026-05-24: Adversarial architecture review folded in (see "Findings from
+  2026-05-24 adversarial architecture review" section above). Three live
+  bugs catalogued (Loop/Live default divergence, cycleTicks uint16
+  truncation, Repeat-mode mask-rank staleness). Cheap-win drop list
+  expanded with eight additional dead-code items. Five new structural
+  refactor candidates queued (shaping-snapshot enum array, effectiveDivisor
+  extraction, duration LUT dedup, pickFromLutTriangular templatize,
+  regenerateCacheFromEvents decomposition). Concurrency-model documentation
+  task added (engine→model writes via mutable refs).
 - 2026-05-24: Slot-keyed cache + cross-domain seed isolation landed (see
   "What landed in the 2026-05-24 session" above). Slide / Legato cache
   migration that was queued as future work is done; both fields are dead
