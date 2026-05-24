@@ -665,6 +665,55 @@ void StochasticTrackEngine::renewMelody() {
     refreshStepCache();
 }
 
+void StochasticTrackEngine::captureLiveAsLoopRhythm() {
+    auto &seq = sequence();
+    seq.setRhythmValid(true);
+    _loopCycleCount = 0;
+    refreshStepCache();
+}
+
+void StochasticTrackEngine::captureLiveAsLoopMelody() {
+    auto &seq = sequence();
+    seq.setMelodyValid(true);
+    _loopCycleCountMelody = 0;
+    refreshStepCache();
+}
+
+void StochasticTrackEngine::captureUndoRhythm() {
+    _undoSeedRhythm = sequence().rhythmSeed();
+    _undoSeedRhythmValid = true;
+}
+
+void StochasticTrackEngine::captureUndoMelody() {
+    _undoSeedMelody = sequence().melodySeed();
+    _undoSeedMelodyValid = true;
+}
+
+bool StochasticTrackEngine::undoRenewRhythm() {
+    if (!_undoSeedRhythmValid) return false;
+    auto &seq = sequence();
+    auto &trk = stochasticTrack();
+    StochasticGenerator::generateRhythm(seq, trk, _undoSeedRhythm);
+    _loopCycleCount = 0;
+    refreshStepCache();
+    _undoSeedRhythmValid = false;   // single-level
+    return true;
+}
+
+bool StochasticTrackEngine::undoRenewMelody() {
+    if (!_undoSeedMelodyValid) return false;
+    auto &seq = sequence();
+    auto &trk = stochasticTrack();
+    const auto &scale = seq.selectedScale(_model.project().scale());
+    int rootNote = seq.selectedRootNote(_model.project().rootNote());
+    StochasticGenerator::generateMelody(seq, trk, scale, rootNote, _undoSeedMelody);
+    _loopCycleCountMelody = 0;
+    _jumpRegister = 0;
+    refreshStepCache();
+    _undoSeedMelodyValid = false;
+    return true;
+}
+
 void StochasticTrackEngine::refreshLoopSources() {
     auto &seq = sequence();
     auto &trk = stochasticTrack();

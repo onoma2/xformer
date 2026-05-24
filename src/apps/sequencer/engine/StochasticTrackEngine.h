@@ -70,6 +70,24 @@ public:
     void renewRhythm();
     void renewMelody();
 
+    // Live → Loop capture. Marks the current per-step Live shadow content as
+    // the loop's stored events. Pairs with the rhythm/melody mode toggle so
+    // pressing Loop while in Live freezes "what just played" as the loop.
+    void captureLiveAsLoopRhythm();
+    void captureLiveAsLoopMelody();
+
+    // Single-level undo for user-triggered NewR / NewM. Capture stashes the
+    // current seed; undo re-runs the generator with that stashed seed to
+    // restore the pre-NewR / pre-NewM content. Mutations between capture and
+    // undo are discarded (events are regenerated from seed). Only one undo
+    // per domain — capturing again overwrites the slot.
+    void captureUndoRhythm();
+    void captureUndoMelody();
+    bool undoRenewRhythm();   // true if undo fired, false if no snapshot
+    bool undoRenewMelody();
+    bool hasUndoRhythm() const { return _undoSeedRhythmValid; }
+    bool hasUndoMelody() const { return _undoSeedMelodyValid; }
+
     // Max cluster cells — matches burstCount LUT {2..8}. Sized 8 so Fit-mode
     // clusters can pack up to 8 trap-style hits into one prev_dur.
     static constexpr int kMaxBurst = 8;
@@ -174,6 +192,10 @@ private:
     uint8_t _lastAppliedFirst = 0;
     int _lastDegree = -1;
     StochasticGenerator::PitchGenState _pitchState{};
+    uint32_t _undoSeedRhythm = 0;
+    uint32_t _undoSeedMelody = 0;
+    bool _undoSeedRhythmValid = false;
+    bool _undoSeedMelodyValid = false;
     int _lastDurationIndex = 0;
     int _jumpRegister = 0;
     int _lastFreeStepIndex = -1;
