@@ -197,7 +197,7 @@ CASE("rest_event_audible_false") {
 }
 
 CASE("slot_keyed_cache_writes_full_size_extent_regardless_of_first") {
-    // Slot-keyed cache (2026-05-24): cell content is keyed by slot index,
+    // Step-keyed cache (2026-05-24): cell content is keyed by step index,
     // not by walk position. First does not affect what gets written — it
     // bounds playback at the engine, not the cache build. Cache always
     // covers 0..size-1.
@@ -260,7 +260,7 @@ CASE("burst_knob_at_100_produces_cluster_cells") {
     // Phase 16 P7 (2026-05-23): cluster cells are driven by sequence.burst()
     // rolling per-cell at cache build, not by event.childCount written at
     // mutate time. With burst=100, every cell tries to start a cluster.
-    // Variation locked to 0 so durations are deterministic ×1 LUT slots,
+    // Variation locked to 0 so durations are deterministic ×1 LUT entrys,
     // making the cluster cells (shorter than the LUT pick) easy to identify.
     StochasticSequence seq;
     seq.clear();
@@ -421,7 +421,7 @@ CASE("mask_rank_long_event_gets_rank_zero") {
     seq.setSize(8);
     seq.setFirst(0);
     for (int i = 0; i < 8; ++i) {
-        // durationIndex 0 = longest LUT slot (×8), 7 = shortest (×1/2). So
+        // durationIndex 0 = longest LUT entry (×8), 7 = shortest (×1/2). So
         // event[0] is the longest, event[7] is the shortest.
         seq.steps()[i].setDurationIndex(i);
         seq.steps()[i].setRhythmValid(true);
@@ -593,7 +593,7 @@ CASE("burst_pitch_roll_rerolls_cluster_tail_pitch") {
 }
 
 CASE("runtime_step_array_is_one_to_one_with_stored_steps") {
-    // Slot-keyed: runtimeSteps[K] holds the runtime step for stored step K.
+    // Step-keyed: runtimeSteps[K] holds the runtime step for stored step K.
     // count caps the valid range; no parentCacheIdx mapping is needed.
     StochasticSequence seq;
     seq.clear();
@@ -738,14 +738,14 @@ CASE("cycle_longer_than_4095_ticks_preserves_per_cell_durations") {
     //
     // Phase 16 P7 (2026-05-23): cache picks duration from sequence.noteDuration
     // + variation knobs, not from event.durationIndex. Set the knob, lock
-    // variation to 0 so every cell picks the same LUT slot.
+    // variation to 0 so every cell picks the same LUT entry.
     StochasticSequence seq;
     seq.clear();
     clearAllEvents(seq);
     seq.setSize(32);
     seq.setFirst(0);
     seq.setRhythmMode(StochasticSourceMode::Loop);
-    seq.setNoteDuration(1);   // LUT slot 1 = ×4
+    seq.setNoteDuration(1);   // LUT entry 1 = ×4
     seq.setVariation(0);       // tight kernel → always picks the center slot
     seq.setBurst(0);           // no clusters
     for (int i = 0; i < 32; ++i) {
@@ -886,7 +886,7 @@ CASE("live_rhythm_reads_event_durationIndex_and_burst_fields") {
 
     // Sequence-level knobs deliberately different from what events store —
     // the test proves cache ignores them in Live and uses event fields.
-    seq.setNoteDuration(0);    // would map to LUT slot 0 = ×8 if used
+    seq.setNoteDuration(0);    // would map to LUT entry 0 = ×8 if used
     seq.setVariation(0);
     seq.setBurst(0);
 

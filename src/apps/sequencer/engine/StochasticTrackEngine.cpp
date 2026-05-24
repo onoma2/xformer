@@ -210,7 +210,7 @@ TrackEngine::TickResult StochasticTrackEngine::tick(uint32_t tick) {
     }
 
     // Event-driven step advancement. The current event's durationTicks (set in
-    // triggerStep, from the LUT slot × divisor) controls when the NEXT event
+    // triggerStep, from the LUT entry × divisor) controls when the NEXT event
     // fires. Same path for Duration-Tickets mode and Live/Loop mode — only the
     // duration source differs (weighted ticket pick vs noteDuration+variation).
     _eventElapsed++;
@@ -330,7 +330,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     // Snap _currentStep into the active window before reading. If the user
     // shrinks Size mid-cycle past the current playback position, the engine
     // would otherwise play one stale off-window event with stale state.
-    // Flush gate/CV queues too — they hold absolute-tick events for slots
+    // Flush gate/CV queues too — they hold absolute-tick events for steps
     // that are now outside the window, and tick() drains them regardless of
     // _currentStep.
     if (_currentStep < sequence.first() || _currentStep > sequence.last()) {
@@ -456,7 +456,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // ranks 0..size-1, no tilt). Tilt blends two views of "where this
         // cell sits in the cut order":
         //   rankPercentile = duration-sorted rank / (size - 1).  0 = longest.
-        //   saltPercentile = stable per-slot hash, 0..1.
+        //   saltPercentile = stable per-step hash, 0..1.
         //   effective      = lerp(saltPercentile, rankPercentile, |tilt|/100).
         // Tilt=0 cuts by salt (arbitrary but stable); |Tilt|=100 cuts by
         // pure duration order. Tilt sign chooses which end survives the cut.
@@ -487,10 +487,10 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         isLegato = pLegato;
         isSlide = pSlide;
 
-        // Non-Repeat bursts: cluster cells are normal slots with their own
+        // Non-Repeat bursts: cluster cells are normal steps with their own
         // duration; they play through the normal triggerStep loop, no extra
         // child-walk. Only Repeat needs the child-array path because it
-        // replays a captured _lastStepContent rather than the slot.
+        // replays a captured _lastStepContent rather than the step.
         StochasticGenerator::EvaluatedBurstNote evalBursts[kMaxBurst];
         for (int i = 0; i < kMaxBurst; ++i) evalBursts[i].valid = false;
         uint8_t childCount = 0;
@@ -546,7 +546,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 }
             }
             // Phase 16 (2026-05-23): non-Repeat burst playback is implicit —
-            // cluster cells are normal event slots with their own duration;
+            // cluster cells are normal event steps with their own duration;
             // each gets a triggerStep call. No cache-walk needed here.
         } else {
             // DBG_STO("%u CVpush REST p=%d cv=%.3f mode=%s", tick, _currentStep, finalCv,
@@ -567,10 +567,10 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // natural pattern wrap stay in lockstep (2026-05-24).
         rollCycleEndHooks();
 
-        // Size edit → extend the cache walk to cover newly-active slots.
-        // Slot-keyed cache (2026-05-24): cells are keyed by slot index, so
+        // Size edit → extend the cache walk to cover newly-active steps.
+        // Step-keyed cache (2026-05-24): cells are keyed by step index, so
         // First does NOT alter cell content and does not force a rebuild —
-        // moving the window plays the same slots in their same (cluster-aware)
+        // moving the window plays the same steps in their same (cluster-aware)
         // shape, just from a different starting point.
         if (uint8_t(sequence.size()) != _lastAppliedSize) {
             refreshStepCache();
@@ -761,7 +761,7 @@ void StochasticTrackEngine::syncWindowEdit() {
     // track's sequence. Brings engine playback state in line with the new
     // window NOW — without waiting for the next event-boundary trigger.
     //
-    // Without this, queued gate/CV events (with absolute ticks for slots that
+    // Without this, queued gate/CV events (with absolute ticks for steps that
     // may be outside the new window) and an in-flight _eventDuration (set
     // when the old window was active) keep playback honoring the old
     // boundaries until the current event finishes.
@@ -779,7 +779,7 @@ void StochasticTrackEngine::syncWindowEdit() {
         _eventElapsed = _eventDuration;
     }
 
-    // Queued events were scheduled at absolute ticks for slots that may not
+    // Queued events were scheduled at absolute ticks for steps that may not
     // exist in the new window. Drop them all; force gate off so the user
     // doesn't hear a stuck gate from the old window.
     _gateQueue.clear();
@@ -789,7 +789,7 @@ void StochasticTrackEngine::syncWindowEdit() {
 
     // Cache rank ordering was built for the old window — windowSize feeds the
     // mask threshold and the rank distribution was assigned over the old
-    // window's slot set. Rebuild for the new window.
+    // window's step set. Rebuild for the new window.
     refreshStepCache();
 }
 

@@ -8,7 +8,7 @@
 // Burst count LUT — knob picks weighted-random over {2,3,4,5}.
 // 1 child is meaningless; max 5 matches kMaxBurst in StochasticTrackEngine.h.
 // burstCount is a MAX intent: actual count clips to whatever the picked
-// spacing slot can hold inside the parent duration (Option C).
+// spacing LUT entry can hold inside the parent duration (Option C).
 static const int kBurstCountLut[] = { 2, 3, 4, 5 };
 static const int kBurstCountLutSize = 4;
 
@@ -72,7 +72,7 @@ int StochasticGenerator::pickBurstCount(int knob, Random &rng) {
     return pickBurstCountFromLut(knob, rng);
 }
 
-// Returns LUT slot index 0..kBurstSpacingLutSize-1 (not the denominator).
+// Returns LUT entry index 0..kBurstSpacingLutSize-1 (not the denominator).
 // Caller looks up the denominator in its own copy of kBurstSpacingLut.
 int StochasticGenerator::pickBurstSpacingSlot(int knob, Random &rng) {
     const int picked = pickBurstSpacingFromLut(knob, rng);
@@ -122,7 +122,7 @@ void StochasticGenerator::generateMelody(StochasticSequence &sequence, const Sto
 // Universal scale-degree weight from position alone. Works for any scale size
 // (5, 7, 12, 24, 43, microtonal). Anchors at simple integer fractions of N:
 // root (0), half (N/2), thirds (N/3, 2N/3), quarters (N/4, 3N/4). Triangular
-// kernel around each anchor falls off across N/6 slots.
+// kernel around each anchor falls off across N/6 positions.
 static int universalDegreeBoost(int degInOct, int N) {
     if (N <= 1) return 0;
     int halfWidth = N / 6;
@@ -158,7 +158,7 @@ void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const St
     // Run the regular generator first for rest / burst / etc. picks, then
     // override the duration with a mutate-anchored triangular kernel: low
     // mutate magnitude → strong anchor pull (stays near the noteDuration
-    // setting); high magnitude → uniform across the 8 LUT slots.
+    // setting); high magnitude → uniform across the 8 LUT entrys.
     auto rhythm = generateRhythmEvent(sequence, track, rng);
     int baseDur = std::max(0, std::min(7, int(sequence.noteDuration())));
     int biasStrength = 100 - std::max(0, std::min(100, mutateMagnitude));
@@ -264,19 +264,19 @@ void StochasticGenerator::permuteRhythmOne(StochasticSequence &sequence, Random 
 
 // Duration picker. Combines duration tickets (flat-default LUT base weight),
 // noteDuration (kernel center), and variation (kernel width, symmetric).
-// Returns LUT slot 0..7.
+// Returns LUT entry 0..7.
 //
 // The (width-dist) triangle is scaled ×10 so the center retains a strong
 // lead — at low variation a low-leakage center still feels musical instead
 // of flattening to near-random.
 static int pickDuration(const StochasticSequence &sequence, Random &rng) {
-    const int slots = 8;
-    int center = clamp(int(sequence.noteDuration()), 0, slots - 1);
+    const int entries = 8;
+    int center = clamp(int(sequence.noteDuration()), 0, entries - 1);
     int spread = clamp(int(sequence.variation()), 0, 100);
-    int width = 1 + (spread * 4) / 100;                      // 1..5 slots wide
-    int weights[slots];
+    int width = 1 + (spread * 4) / 100;                      // 1..5 entries wide
+    int weights[entries];
     int total = 0;
-    for (int i = 0; i < slots; ++i) {
+    for (int i = 0; i < entries; ++i) {
         int base = sequence.durationTicket(i);
         if (base <= 0) base = 10;                            // flat default
         int dist = i > center ? i - center : center - i;
@@ -288,7 +288,7 @@ static int pickDuration(const StochasticSequence &sequence, Random &rng) {
     if (total <= 0) return center;
     int roll = int(rng.nextRange(uint32_t(total)));
     int sum = 0;
-    for (int i = 0; i < slots; ++i) {
+    for (int i = 0; i < entries; ++i) {
         sum += weights[i];
         if (roll < sum) return i;
     }
@@ -325,7 +325,7 @@ void StochasticGenerator::permuteMelodyOne(StochasticSequence &sequence, Random 
 // in long-to-short order (rank 0 = longest, rank N-1 = shortest). Tilt does
 // NOT participate here — it's applied at trigger time.
 //
-// Iterates the full pattern extent so each slot's rank is stable across
+// Iterates the full pattern extent so each step's rank is stable across
 // First/Size window edits. Called from RENEW / Patience / Mutate.
 void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int size, uint32_t seed) {
     Random rng(seed);
@@ -370,7 +370,7 @@ void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *bursts, const Stocha
         count = 0;
     }
 
-    // Spacing comes from the LUT slot baked into event.burstRate(). Option C:
+    // Spacing comes from the LUT entry baked into event.burstRate(). Option C:
     // the picked denominator determines child spacing INDEPENDENTLY of count;
     // count auto-clips via the break-out logic below when children no longer fit.
     int spacingSlot = int(event.burstRate());
@@ -466,7 +466,7 @@ StochasticStepContent StochasticGenerator::generateMelodyEvent(const StochasticS
 // Phase 11 unified pitch picker. Single path. All shaping multiplies:
 //   1. Build allowed degrees from range × scale tones, gated by ticket≥0
 //      (Phase 12: min/max degree clamps dropped — redundant with range + pitch
-//      tickets at 0; reserved as model slots only.)
+//      tickets at 0; reserved as model fields only.)
 //   2. Steps sieve — universalDegreeBoost rank cutoff. Knob 0..100, 100=open.
 //      Top-K most-fundamental degrees survive. Mirrors Mask on rhythm side.
 //   3. Per-survivor weight = ticket × complexityKernel × marblesKernel
@@ -524,7 +524,7 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
         }
     }
 
-    // 3. Locate lastDegree's slot in allowedDegrees for complexity kernel
+    // 3. Locate lastDegree's position in allowedDegrees for complexity kernel
     int lastIdx = -1;
     if (lastDegree != -1) {
         for (int i = 0; i < allowedCount; ++i) {

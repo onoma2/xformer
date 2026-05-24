@@ -96,14 +96,14 @@ public:
 
     // V5 duration LUT as multipliers of the sequence divisor, sorted descending.
     // ticks = (divisor * num) / den. Labels assume divisor = 1/16:
-    //   slot 0: ×8     → 1/2
-    //   slot 1: ×4     → 1/4
-    //   slot 2: ×3     → 3/16
-    //   slot 3: ×2     → 1/8
-    //   slot 4: ×4/3   → 1/8T
-    //   slot 5: ×1     → 1/16 (= divisor)
-    //   slot 6: ×2/3   → 1/16T
-    //   slot 7: ×1/2   → 1/32
+    //   entry 0: ×8     → 1/2
+    //   entry 1: ×4     → 1/4
+    //   entry 2: ×3     → 3/16
+    //   entry 3: ×2     → 1/8
+    //   entry 4: ×4/3   → 1/8T
+    //   entry 5: ×1     → 1/16 (= divisor)
+    //   entry 6: ×2/3   → 1/16T
+    //   entry 7: ×1/2   → 1/32
     // Whole table scales with the sequence's clock divisor.
     struct DurationFraction { uint16_t num; uint16_t den; };
     static DurationFraction getDurationFraction(int index) {
@@ -177,7 +177,7 @@ private:
     uint16_t _loopCycleCount = 0;          // legacy alias kept for indicator path (== rhythm count)
     uint16_t _loopCycleCountMelody = 0;
     // Window-edit detection — Size changes the cache walk extent and forces
-    // a refresh; First does not (cells are slot-keyed).
+    // a refresh; First does not (cells are step-keyed).
     uint8_t _lastAppliedSize = 0;
     uint8_t _lastAppliedFirst = 0;
     int _lastDegree = -1;
@@ -252,11 +252,11 @@ private:
     SortedQueue<Cv, 16, CvCompare> _cvQueue;
 
     // Playback-ready cells materialized from the events array. Engine reads
-    // runtimeSteps[K] for each played slot; rebuilt on edit / mutation / renew.
+    // runtimeSteps[K] for each played step; rebuilt on edit / mutation / renew.
     stochastic_cache::StepCache _stepCache{};
 };
 
 // Ceiling sized to absorb the engine cache (RuntimeStep[64] + CellAux[64] +
 // housekeeping ≈ 390 B) while staying within the track-engine container
-// slot. See PROJECT.md "Engine gate".
+// step. See PROJECT.md "Engine gate".
 static_assert(sizeof(StochasticTrackEngine) <= 1024, "StochasticTrackEngine too large");

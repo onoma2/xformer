@@ -177,7 +177,7 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
         _directTrailFilled = 0;
     }
 
-    // Horizontal stride per slot. DURA controls the base footstep distance;
+    // Horizontal stride per step. DURA controls the base footstep distance;
     // VARI perturbs each older particle deterministically. The whole walker set
     // is midpoint-anchored: it grows from center and collapses back to center,
     // never from the right wall. Clamp the visible span so it neither hits the
@@ -315,15 +315,15 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
     }
 
     // --- Info rows ---------------------------------------------------------
-    // Tiny readout: per-slot 1-letter label + value, two rows of 8 columns
+    // Tiny readout: per-step 1-letter label + value, two rows of 8 columns
     // aligned to a 32-px grid. Small overlay: full param name + value when a
     // step is held.
 
     // Helper: Duration step shows the actual fraction (e.g. "1/16", "1/8T")
-    // from the divisor-aware printSlotDuration table — not the raw slot index.
+    // from the divisor-aware printDurationEntry table — not the raw step index.
     auto durationLabel = [&](FixedStringBuilder<16> &s) {
         s.reset();
-        seq.printSlotDuration(s, duration);
+        seq.printDurationEntry(s, duration);
     };
     FixedStringBuilder<32> str;
     bool labeled = true;
@@ -426,7 +426,7 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         // Bug fix 2026-05-22: previous math wrapped across the full sequence
         // size, not the playback window. At the cycle boundary (engine
         // wraps from `last` to `first`), `_currentStep` becomes `first` and
-        // the just-played audible slot is `last`. Old math gave `first - 1`
+        // the just-played audible step is `last`. Old math gave `first - 1`
         // (sometimes outside the window). Walk the window, not the sequence.
         int next = eng.currentStep();
         int winFirst = std::max(0, std::min(lf, seqSize - 1));
@@ -442,8 +442,8 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
 
     // Adaptive event timeline: ALL steps 0..size-1 always visible. Brackets
     // snap to the [first, last] window — moving first/last shifts only the
-    // brackets, not the slot count. Rotate shifts which event plays at each
-    // window slot (same logic the engine uses for read-index resolution).
+    // brackets, not the step count. Rotate shifts which step plays at each
+    // window step (same logic the engine uses for read-index resolution).
     const int minStepW = 3;
 
     auto resolveEventIdx = [&] (int displayIdx) -> int {
@@ -1030,17 +1030,17 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
         if (active) {
             canvas.setColor(Color::Bright);
             canvas.hline(x - 1, baseY + 2, barW + 2);
-        } else if (i == _selectedDurSlot) {
+        } else if (i == _selectedDurEntry) {
             canvas.setColor(Color::MediumBright);
             canvas.hline(x - 1, baseY + 2, barW + 2);
         }
 
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Low);
-        FixedStringBuilder<8> slotLabel;
-        sequence.printSlotDuration(slotLabel, i);
-        int labelW = canvas.textWidth(slotLabel);
-        canvas.drawText(x + (barW - labelW) / 2, baseY + 8, slotLabel);
+        FixedStringBuilder<8> entryLabel;
+        sequence.printDurationEntry(entryLabel, i);
+        int labelW = canvas.textWidth(entryLabel);
+        canvas.drawText(x + (barW - labelW) / 2, baseY + 8, entryLabel);
     }
 
     // Left info: Small font primary value depending on focus.
@@ -1048,9 +1048,9 @@ void StochasticSequenceEditPage::drawDurationPage(Canvas &canvas) {
     if (_durFocus == DurFocus::Rest) {
         str("REST %d%%", sequence.rest());
     } else {
-        FixedStringBuilder<8> slotLabel;
-        sequence.printSlotDuration(slotLabel, _selectedDurSlot);
-        str("%s: %d", (const char *)slotLabel, sequence.durationTicket(_selectedDurSlot));
+        FixedStringBuilder<8> entryLabel;
+        sequence.printDurationEntry(entryLabel, _selectedDurEntry);
+        str("%s: %d", (const char *)entryLabel, sequence.durationTicket(_selectedDurEntry));
     }
     canvas.setFont(Font::Small);
     canvas.setColor(Color::Bright);
@@ -1166,7 +1166,7 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
         for (int i = 0; i < 8; ++i) {
             bool active = (i == activeIdx);
             bool selected = (_durSelectionMask & (1U << i)) != 0;
-            leds.set(MatrixMap::fromStep(i), active || (i == _selectedDurSlot), true);
+            leds.set(MatrixMap::fromStep(i), active || (i == _selectedDurEntry), true);
         }
         break;
     }
@@ -1268,7 +1268,7 @@ void StochasticSequenceEditPage::handleDurationKeyDown(KeyEvent &event) {
     if (key.isStep() && !key.pageModifier()) {
         int step = key.step();
         if (step >= 0 && step < 8) {
-            _selectedDurSlot = step;
+            _selectedDurEntry = step;
             if (_persistMode) {
                 _durSelectionMask ^= (1U << step);
             } else {
@@ -1566,7 +1566,7 @@ void StochasticSequenceEditPage::handleDurationEncoder(EncoderEvent &event) {
     switch (_durFocus) {
     case DurFocus::DurTicket: {
         uint32_t mask = _durSelectionMask;
-        if (_durSelectionMask == 0) mask = (1U << _selectedDurSlot);
+        if (_durSelectionMask == 0) mask = (1U << _selectedDurEntry);
         for (int i = 0; i < 8; ++i) {
             if (mask & (1U << i)) {
                 sequence.setDurationTicket(i, sequence.durationTicket(i) + event.value());

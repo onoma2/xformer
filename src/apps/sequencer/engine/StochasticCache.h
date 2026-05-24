@@ -2,7 +2,7 @@
 
 // Engine-side cache for stochastic playback. Bit-packed cell layout
 // validated by TestStochasticCacheParity. The engine reads runtimeSteps[K]
-// directly for each played slot K; the cache is rebuilt only when stored
+// directly for each played step K; the cache is rebuilt only when stored
 // material changes (renew, mutate, Size edit, shaping-knob edit via
 // notifyStochasticShapingEdit).
 
@@ -27,7 +27,7 @@ constexpr uint32_t kMinAudibleGateTicks = 6;
 // absolute-position scheme this cannot silently corrupt the playhead.
 constexpr uint32_t kMaxCellDuration = 4095;
 
-// 6-bit gate length encoded as LUT slot or fractional ticks (0..63).
+// 6-bit gate length encoded as LUT entry or fractional ticks (0..63).
 constexpr uint8_t kMaxGateLen = 63;
 
 // Cells store scale-domain `degree` and `octave`, not resolved voltage —
@@ -40,7 +40,7 @@ constexpr uint8_t kMaxGateLen = 63;
 constexpr uint8_t kMaxOctave = 15;
 
 // Hard cap on cells per cache. Matches kMaxEventSlots since the walk is
-// slot-keyed (one cell per slot). Pinned at 64 because CellAux::rank is
+// step-keyed (one cell per step). Pinned at 64 because CellAux::rank is
 // a 6-bit field — widening it would let cells 64+ wrap their rank bits.
 constexpr int kCellCap = 64;
 
@@ -89,7 +89,7 @@ static_assert(sizeof(CellAux) == 1, "CellAux must be 1 byte");
 //   CellAux[64]    =  64 B
 //   Total          = 320 B
 
-// Max event slots in a sequence — matches CONFIG_STEP_COUNT but the header
+// Max stored steps in a sequence — matches CONFIG_STEP_COUNT but the header
 // avoids pulling that in (Cache is consumed by tests too).
 constexpr int kMaxEventSlots = 64;
 

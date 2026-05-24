@@ -148,14 +148,14 @@ public:
     int contour() const { return _contour.get(isRouted(Routing::Target::StochasticContour)); }
     void setContour(int contour, bool routed = false) { _contour.set(clamp(contour, -100, 100), routed); }
 
-    // Phase 12: _repeatProb slot repurposed as Repeat probability. Per-event
+    // Phase 12: _repeatProb field repurposed as Repeat probability. Per-event
     // chance to reuse the previously-generated event verbatim (note, octave,
     // duration, articulation). 100% freezes on the last event. Mid values
     // cluster durations like a human player.
     int repeatProb() const { return _repeatProb; }
     void setRepeatProb(int value) { _repeatProb = clamp(value, 0, 100); }
 
-    // Live-mode duration LUT slot index 0..7. Divisor-relative: see
+    // Live-mode duration LUT entry index 0..7. Divisor-relative: see
     // StochasticTrackEngine::getDurationFraction() for the multiplier table.
     int noteDuration() const { return _noteDuration.get(isRouted(Routing::Target::StochasticNoteDuration)); }
     void setNoteDuration(int v, bool routed = false) { _noteDuration.set(clamp(v, 0, 7), routed); }
@@ -242,7 +242,7 @@ public:
     void setMaskRotation(int rotation) { _maskRotation = clamp(rotation, -32, 32); }
 
     // accentProb
-    // Phase 12: _patienceMelody slot repurposed as melody patience (independent of
+    // Phase 12: _patienceMelody field repurposed as melody patience (independent of
     // rhythm patience). Same Poisson-CDF behavior. Knob 0..99 → λ ∈ [1, 50];
     // knob 100 = off sentinel. No routing target (matches Repeat treatment).
     int patienceMelody() const { return _patienceMelody; }
@@ -274,7 +274,7 @@ public:
     int mask() const { return _mask.get(isRouted(Routing::Target::StochasticMask)); }
     void setMask(int mask, bool routed = false) { _mask.set(clamp(mask, 0, 100), routed); }
 
-    // gateLength — repurposed from the Phase 11 `_gateLength` reserved slot. Knob
+    // gateLength — repurposed from the Phase 11 `_gateLength` reserved field. Knob
     // 0..100 controls the spread of per-event gate length around a hardcoded
     // 50% center. 0 = exact 50% every event; 100 = triangular distribution
     // 10..100% peaked at 50%. Floored at 10% of duration AND at an absolute
@@ -386,17 +386,17 @@ public:
 
     void printNoteDuration(StringBuilder &str) const {
         printRouted(str, Routing::Target::StochasticNoteDuration);
-        printSlotDuration(str, noteDuration());
+        printDurationEntry(str, noteDuration());
     }
-    // Phase 11: divisor-aware label for any LUT slot. Used by both noteDuration
+    // Phase 11: divisor-aware label for any LUT entry. Used by both noteDuration
     // print and the duration ticket bars (so labels track clock-divisor changes
     // instead of lying with hardcoded 1/16-centered strings). Short form
     // ("x/y" / "x/yT") — no leading raw-tick value.
-    void printSlotDuration(StringBuilder &str, int slot) const {
+    void printDurationEntry(StringBuilder &str, int entry) const {
         // LUT mirrors StochasticTrackEngine::getDurationFraction().
         static const int lutNum[] = { 8, 4, 3, 2, 4, 1, 2, 1 };
         static const int lutDen[] = { 1, 1, 1, 1, 3, 1, 3, 2 };
-        int idx = clamp(slot, 0, 7);
+        int idx = clamp(entry, 0, 7);
         int effectiveDivisor = (int(divisor()) * lutNum[idx]) / lutDen[idx];
         ModelUtils::printDivisorShort(str, effectiveDivisor);
     }
@@ -673,7 +673,7 @@ private:
         _rotate.setBase(0);
         _complexity.setBase(50);
         _contour.setBase(0);
-        _noteDuration.setBase(5);   // LUT slot 5 = ×1 (= divisor)
+        _noteDuration.setBase(5);   // LUT entry 5 = ×1 (= divisor)
         _variation.setBase(16);     // audible variation at fresh roll
         _rest.setBase(0);
         _slide.setBase(0);

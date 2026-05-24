@@ -57,15 +57,15 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
     (void)rootNote; // unused — generateDegree consumes scale + track only, root is applied at trigger time
     cache.count = 0;
     cache.cycleTicks = 0;
-    // Slot-keyed cache: each step owns runtimeSteps[K]. Engine reads
+    // Step-keyed cache: each step owns runtimeSteps[K]. Engine reads
     // cache.runtimeSteps[stepIndex] directly; validity = stepIndex < count.
 
     const bool bakeChildNotes = (scale != nullptr) && (track != nullptr);
 
-    // Slot-keyed walk: iterate the full pattern extent 0..size-1. First is
+    // Step-keyed walk: iterate the full pattern extent 0..size-1. First is
     // not consulted here — it bounds playback at the engine, not the cache
-    // build. Slot K's cell is always runtimeSteps[K]; cluster state carries across
-    // slots; content depends only on (seed, events, slot index).
+    // build. Step K's cell is always runtimeSteps[K]; cluster state carries across
+    // steps; content depends only on (seed, events, step index).
     const int size = std::max(0, std::min(int(seq.size()), int(kMaxEventSlots)));
     if (size <= 0) return 0;
 
@@ -92,7 +92,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
     const bool pickRhythmInCache =
         seq.rhythmMode() == StochasticSourceMode::Loop;
 
-    // Pitch chain threads lastDegree through every slot (including cluster
+    // Pitch chain threads lastDegree through every step (including cluster
     // tails) so Complexity / Contour kernels see continuous motion that
     // does not depend on cluster placement.
     int chainLastDeg = -1;
@@ -102,11 +102,11 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
     bool anchorSlide  = false;
 
     for (int i = 0; i < size; ++i) {
-        if (i >= kCellCap) break;  // hard cap; remaining slots dropped silently
+        if (i >= kCellCap) break;  // hard cap; remaining steps dropped silently
 
         const StochasticStepContent &ev = seq.steps()[i];
 
-        // Per-cell keyed RNG. Slot K's cell content is a pure function of
+        // Per-cell keyed RNG. Step K's cell content is a pure function of
         // (rhythmSeed, K); First / Size do not shift it.
         Random stepRng(keyed_rng::cellSeed(seed, uint32_t(i)));
 
@@ -124,8 +124,8 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
             const int picked = StochasticGenerator::pickDurationSlot(seq, stepRng);
             cellDur = lutTicks(uint8_t(picked));
 
-            // Bootstrap prevDur at slot 0 so a cluster starting at slot 0
-            // has something to divide. Subsequent slots see the actual
+            // Bootstrap prevDur at step 0 so a cluster starting at step 0
+            // has something to divide. Subsequent steps see the actual
             // emitted prev.
             if (i == 0) prevDur = cellDur;
 
@@ -173,7 +173,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
             }
         }
 
-        // Loop melody: precompute slot K's anchor pitch for EVERY slot,
+        // Loop melody: precompute step K's anchor pitch for EVERY step,
         // advancing chainLastDeg through all of them. Anchor pitch is a
         // pure function of (melodySeed, K); cluster placement does not
         // shift which pitch lands where.
@@ -260,7 +260,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
             anchorSlide  = cellSlide;
         }
 
-        // Slot-keyed write: runtimeSteps[K] for step K.
+        // Step-keyed write: runtimeSteps[K] for step K.
         cache.runtimeSteps[i] = RuntimeStep::make(
             cellDur,
             cellDegree,

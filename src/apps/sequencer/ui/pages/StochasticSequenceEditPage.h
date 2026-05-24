@@ -103,7 +103,7 @@ private:
     bool _persistMode = false;
 
     Page _currentPage = Page::Live;
-    int _selectedDurSlot = 0;
+    int _selectedDurEntry = 0;
     DurFocus _durFocus = DurFocus::DurTicket;
 
     // Hero pages (Live/Loop): bitmask of currently held step buttons. Multiple
@@ -125,5 +125,5 @@ private:
 };
 
 // Duration ticket labels are now generated at runtime via
-// StochasticSequence::printSlotDuration() so they track the active clock divisor.
+// StochasticSequence::printDurationEntry() so they track the active clock divisor.
 // The old hardcoded table assumed divisor = 1/16 and lied at any other divisor.
