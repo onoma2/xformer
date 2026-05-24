@@ -15,6 +15,12 @@ class Scale;
 
 namespace stochastic_cache {
 
+// Audible-trigger floor in ticks (~16 ms @ 192 PPQN, 120 BPM). Used as both
+// the minimum gate-on duration for triggered events and the cluster-cell
+// duration floor — below this, a roll is rejected so playback never
+// schedules a sub-audible cell.
+constexpr uint32_t kMinAudibleGateTicks = 6;
+
 // Per-cell duration cap (12-bit field). ~21 quarter-notes at PPQN=192. A
 // cell whose natural duration exceeds this is clamped at build time —
 // the cycle is the sum of all cells' durations, so unlike the old
@@ -67,25 +73,14 @@ struct CachedCell {
 };
 static_assert(sizeof(CachedCell) == 4, "CachedCell must be 4 bytes");
 
-// Auxiliary per-cell metadata. 1 byte.
-//   bits 0-5: rank (0..63) — currently unused; ranks live on events.
-//   bit 6:    burst-child  — always 0 under the flat cell model.
-//   bit 7:    reserved
+// Auxiliary per-cell metadata. 1 byte; all bits currently reserved. Ranks
+// live on events (event.densityRank), burst-child has no meaning under the
+// flat cell model. The byte stays so a future per-cell flag has somewhere
+// cheap to land.
 struct CellAux {
     uint8_t packed;
 
-    uint8_t rank()       const { return packed & 0x3fu; }
-    bool    burstChild() const { return (packed >> 6) & 1u; }
-
-    void setRank(uint8_t rank) {
-        packed = uint8_t((packed & ~0x3fu) | (rank & 0x3fu));
-    }
-
-    static CellAux make(bool burstChild, uint8_t rank) {
-        return CellAux{
-            uint8_t((rank & 0x3fu) | ((burstChild ? 1u : 0u) << 6)),
-        };
-    }
+    static CellAux make() { return CellAux{0}; }
 };
 static_assert(sizeof(CellAux) == 1, "CellAux must be 1 byte");
 
@@ -134,17 +129,6 @@ uint32_t computeFeelScaleQ16(int feel, uint32_t naturalSum, uint32_t beatTicks);
 // Convenience: multiply a tick value by a Q16.16 scale factor.
 inline uint32_t applyFeelScale(uint32_t ticks, uint32_t scaleQ16) {
     return uint32_t((uint64_t(ticks) * scaleQ16) >> 16);
-}
-
-// Mask threshold reads the rank straight off the event. Repeat replays
-// the captured `_lastEvent`, which carries its own densityRank from the
-// slot it was captured from, so this works for both Repeat and non-Repeat
-// trigger paths.
-inline uint32_t selectMaskRank(bool /*useRepeat*/,
-                               uint8_t eventDensityRank,
-                               int /*readIndex*/,
-                               const Cache & /*cache*/) {
-    return uint32_t(eventDensityRank);
 }
 
 } // namespace stochastic_cache

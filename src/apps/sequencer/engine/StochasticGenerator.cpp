@@ -605,27 +605,3 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
     return degree;
 }
 
-int StochasticGenerator::generateJumpOctave(const StochasticSequence &sequence, const StochasticTrack &track, int currentJump, Random &rng) {
-    return 0;
-}
-
-float StochasticGenerator::betaDistributionSample(float x, float spread) {
-    float normalizedSpread = clamp(spread, 0.0f, 1.0f);
-    if (normalizedSpread == 0.5f) return x;
-    
-    if (normalizedSpread < 0.5f) {
-        float p = 1.0f + (0.5f - normalizedSpread) * 4.0f;
-        if (x < 0.5f) {
-            return 0.5f * std::pow(2.0f * x, p);
-        } else {
-            return 1.0f - 0.5f * std::pow(2.0f * (1.0f - x), p);
-        }
-    } else {
-        float p = 1.0f + (normalizedSpread - 0.5f) * 4.0f;
-        if (x < 0.5f) {
-            return 0.5f * (1.0f - std::pow(1.0f - 2.0f * x, p));
-        } else {
-            return 0.5f + 0.5f * std::pow(2.0f * x - 1.0f, p);
-        }
-    }
-}

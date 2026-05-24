@@ -105,12 +105,6 @@ public:
     void printSlideTime(StringBuilder &str) const { printRouted(str, Routing::Target::SlideTime); str("%d%%", slideTime()); }
     void editSlideTime(int value, bool shift) { if (!isRouted(Routing::Target::SlideTime)) setSlideTime(ModelUtils::adjustedByStep(slideTime(), value, 5, !shift)); }
 
-    int8_t activePatternIndex() const { return -1; }
-    void setActivePatternIndex(int index) {}
-
-    uint32_t activeSeed() const { return 0; }
-    void setActiveSeed(uint32_t seed) {}
-
     // sequences
     const StochasticSequenceArray &sequences() const { return _sequences; }
           StochasticSequenceArray &sequences()       { return _sequences; }

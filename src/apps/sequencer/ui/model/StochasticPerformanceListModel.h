@@ -10,7 +10,6 @@
 class StochasticPerformanceListModel : public RoutableListModel {
 public:
     enum Item {
-        Level,
         Mode,
         GateLength,
         Character,
@@ -45,8 +44,6 @@ public:
         // Last removed 2026-05-24 — collapsed into Size.
         Rotate,
         Range,
-        MinDegree,
-        MaxDegree,
         Refresh,
         LastItem
     };
@@ -128,7 +125,6 @@ private:
 
     const char *itemName(Item item) const {
         switch (item) {
-        case Level:         return "Level";
         case Mode:          return "Mode";
         case GateLength:    return "Gate Length";
         case Character:     return "Complexity";
@@ -162,8 +158,6 @@ private:
         case First:         return "First";
         case Rotate:        return "Rotate";
         case Range:         return "Range";
-        case MinDegree:     return "Low Degree";
-        case MaxDegree:     return "High Degree";
         case Refresh:       return "Refresh";
         case LastItem:      break;
         }
@@ -176,7 +170,6 @@ private:
 
     void formatValue(Item item, const StochasticSequence &sequence, StringBuilder &str) const {
         switch (item) {
-        case Level:         sequence.printLevel(str); break;
         case Mode:          sequence.printCoupledMode(str); break;
         case GateLength:    sequence.printGateLength(str); break;
         case Character:     sequence.printComplexity(str); break;
@@ -210,8 +203,6 @@ private:
         case First:         str("%d", sequence.first() + 1); break;
         case Rotate:        sequence.printRotate(str); break;
         case Range:         str("%d Oct", sequence.range()); break;
-        case MinDegree:     sequence.printMinDegree(str); break;
-        case MaxDegree:     sequence.printMaxDegree(str); break;
         case Refresh:       str("Exec"); break;
         case LastItem:      break;
         }
@@ -219,7 +210,6 @@ private:
 
     void editValue(Item item, StochasticSequence &sequence, int value, bool shift) {
         switch (item) {
-        case Level:         sequence.editLevel(value, shift); break;
         case Mode:          sequence.editCoupledMode(value, shift); break;
         case GateLength:    sequence.editGateLength(value, shift); break;
         case Character:     sequence.editComplexityMacro(value, shift); break;
@@ -253,8 +243,6 @@ private:
         case First:         sequence.setFirst(sequence.first() + value);  notifyWindowEdit(); break;
         case Rotate:        sequence.editRotate(value, shift); break;
         case Range:         sequence.setRange(sequence.range() + value); break;
-        case MinDegree:     sequence.editMinDegree(value, shift); break;
-        case MaxDegree:     sequence.editMaxDegree(value, shift); break;
         case Refresh:       sequence.refresh(); break;
         case LastItem:      break;
         }

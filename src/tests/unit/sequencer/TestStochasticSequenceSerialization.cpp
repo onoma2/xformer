@@ -38,7 +38,6 @@ CASE("default_round_trip") {
     readSequence(restored, buf, sizeof(buf));
 
     expectEqual(restored.gateLength(), seq.gateLength(), "gate length default");
-    expectEqual(restored.level() == StochasticLevel::Core, true, "level default Core");
     for (int i = 0; i < 8; ++i) {
         expectEqual(restored.durationTicket(i), seq.durationTicket(i), "duration ticket default");
     }
@@ -85,22 +84,6 @@ CASE("duration_tickets_persist") {
     expectEqual(restored.durationTicket(2), 30, "duration ticket[2]");
     expectEqual(restored.durationTicket(5), 20, "duration ticket[5]");
     expectEqual(restored.durationTicket(1), 0, "duration ticket[1] zero");
-}
-
-CASE("level_persists") {
-    StochasticSequence seq;
-    seq.clear();
-    seq.setLevel(StochasticLevel::Direct);
-
-    uint8_t buf[2048];
-    std::memset(buf, 0, sizeof(buf));
-    writeSequence(seq, buf, sizeof(buf));
-
-    StochasticSequence restored;
-    restored.clear();
-    readSequence(restored, buf, sizeof(buf));
-
-    expectEqual(static_cast<int>(restored.level()), static_cast<int>(StochasticLevel::Direct), "level should be Direct after round trip");
 }
 
 CASE("lock_does_not_persist") {

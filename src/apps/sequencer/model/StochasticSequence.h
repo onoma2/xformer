@@ -299,14 +299,6 @@ public:
     int feel() const { return _feel.get(isRouted(Routing::Target::StochasticFeel)); }
     void setFeel(int feel, bool routed = false) { _feel.set(clamp(feel, 0, 100), routed); }
 
-    // minDegree
-    int minDegree() const { return _minDegree; }
-    void setMinDegree(int degree) { _minDegree = clamp(degree, 0, 127); }
-
-    // maxDegree
-    int maxDegree() const { return _maxDegree; }
-    void setMaxDegree(int degree) { _maxDegree = clamp(degree, 0, 127); }
-
     // rotate
     int rotate() const { return _rotate.get(isRouted(Routing::Target::Rotate)); }
     void setRotate(int rotate, bool routed = false) { _rotate.set(clamp(rotate, -64, 64), routed); }
@@ -322,20 +314,6 @@ public:
         for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) if (_degreeTickets[i] > 0) return true;
         return false;
     }
-
-    // Level (UI presentation, not engine)
-    StochasticLevel level() const { return _level; }
-    void setLevel(StochasticLevel level) { _level = ModelUtils::clampedEnum(level); }
-
-    void printLevel(StringBuilder &str) const {
-        switch (_level) {
-        case StochasticLevel::Core:       str("Core"); break;
-        case StochasticLevel::Direct:     str("Direct"); break;
-        case StochasticLevel::Weights:    str("Weights"); break;
-        case StochasticLevel::Last:       break;
-        }
-    }
-    void editLevel(int value, bool shift) { setLevel(ModelUtils::adjustedEnum(level(), value)); }
 
     void printRepeatProb(StringBuilder &str) const { str("%d%%", repeatProb()); }
     void editRepeatProb(int value, bool shift) { setRepeatProb(repeatProb() + value); }
@@ -390,12 +368,6 @@ public:
         else str("%d%%", burst());
     }
     void editBurst(int value, bool shift) { if (!isRouted(Routing::Target::StochasticBurst)) setBurst(burst() + value); }
-
-    void printMinDegree(StringBuilder &str) const { str("%d", minDegree()); }
-    void editMinDegree(int value, bool shift) { setMinDegree(minDegree() + value); }
-
-    void printMaxDegree(StringBuilder &str) const { str("%d", maxDegree()); }
-    void editMaxDegree(int value, bool shift) { setMaxDegree(maxDegree() + value); }
 
     void printPatienceMelody(StringBuilder &str) const { str("%d%%", patienceMelody()); }
     void editPatienceMelody(int value, bool shift) { setPatienceMelody(patienceMelody() + value); }
@@ -467,23 +439,17 @@ public:
         setRootNote(rootNote() + value);
     }
 
-    // Phase 7 Pattern controls (Per-pattern metadata)
+    // Pattern window. last() resolves to size-1 — Last is collapsed into Size.
     int size() const { return _size; }
     void setSize(int size) {
         _size = clamp(size, 2, CONFIG_STEP_COUNT);
         _first = clamp(int(_first), 0, int(_size) - 1);
-        _last = clamp(int(_last), int(_first), int(_size) - 1);
     }
 
     int first() const { return _first; }
     void setFirst(int first) { _first = clamp(first, 0, int(_size) - 1); }
 
-    // Stubbed 2026-05-24: Last is collapsed into Size — playback end = size - 1.
-    // _last field kept for serialization round-trip; setLast is no-op so the
-    // stored value doesn't drift if UI dead-knob is moved. last() shadows
-    // _last with size - 1 unconditionally.
     int last() const { return int(_size) - 1; }
-    void setLast(int /*last*/) { /* no-op while stubbed */ }
 
     bool patternValid() const { return rhythmValid() && melodyValid(); }
     void setPatternValid(bool valid) { setRhythmValid(valid); setMelodyValid(valid); }
@@ -527,7 +493,7 @@ public:
 
         writer.write(_size);
         writer.write(_first);
-        writer.write(_last);
+        writer.write(uint8_t(0));  // reserved (was _last; now derived as size-1)
 
         writer.write(_rhythmValid);
         writer.write(_melodyValid);
@@ -548,8 +514,8 @@ public:
         _tilt.write(writer);
         _burst.write(writer);
         _feel.write(writer);
-        writer.write(_minDegree);
-        writer.write(_maxDegree);
+        writer.write(uint8_t(0));   // reserved (was _minDegree)
+        writer.write(uint8_t(0));   // reserved (was _maxDegree)
         _rotate.write(writer);
         _complexity.write(writer);
         _contour.write(writer);
@@ -569,7 +535,7 @@ public:
         writer.write(static_cast<uint8_t>(_melodyMode));
         _gateLength.write(writer);
         for (int i = 0; i < 8; ++i) writer.write(_durationTickets[i]);
-        writer.write(static_cast<uint8_t>(_level));
+        writer.write(uint8_t(0));   // reserved (was StochasticLevel enum)
 
 
         for (const auto &event : _events) {
@@ -590,7 +556,7 @@ public:
 
         reader.read(_size);
         reader.read(_first);
-        reader.read(_last);
+        { uint8_t reserved; reader.read(reserved); }   // was _last
 
         reader.read(_rhythmValid);
         reader.read(_melodyValid);
@@ -622,10 +588,8 @@ public:
         _tilt.read(reader);
         _burst.read(reader);
         _feel.read(reader);
-        reader.read(_minDegree);
-        _minDegree = clamp(int(_minDegree), 0, 127);
-        reader.read(_maxDegree);
-        _maxDegree = clamp(int(_maxDegree), 0, 127);
+        { uint8_t reserved; reader.read(reserved); }   // was _minDegree
+        { uint8_t reserved; reader.read(reserved); }   // was _maxDegree
         _rotate.read(reader);
         _complexity.read(reader);
         _contour.read(reader);
@@ -658,9 +622,7 @@ public:
             reader.read(_durationTickets[i]);
             _durationTickets[i] = clamp(int(_durationTickets[i]), 0, 100);
         }
-        uint8_t level;
-        reader.read(level);
-        _level = level < uint8_t(StochasticLevel::Last) ? static_cast<StochasticLevel>(level) : StochasticLevel::Core;
+        { uint8_t reserved; reader.read(reserved); }   // was StochasticLevel enum
 
 
         for (auto &event : _events) {
@@ -685,7 +647,6 @@ private:
 
         _size = 32;
         _first = 0;
-        _last = 31;
 
         _rhythmValid = false;
         _melodyValid = false;
@@ -709,8 +670,6 @@ private:
         _tilt.setBase(0);
         _burst.setBase(0);
         _feel.setBase(50);
-        _minDegree = 0;
-        _maxDegree = 127;
         _rotate.setBase(0);
         _complexity.setBase(50);
         _contour.setBase(0);
@@ -745,7 +704,6 @@ private:
         }
 
         _first = clamp(int(_first), 0, int(_size) - 1);
-        _last = clamp(int(_last), int(_first), int(_size) - 1);
         _rhythmValid = _rhythmValid ? true : false;
         _melodyValid = _melodyValid ? true : false;
 
@@ -761,12 +719,12 @@ private:
     uint8_t _resetMeasure = 0;
     Routable<uint8_t> _clockMultiplier;
 
-    // Phase 7 Generation Parameters
     uint8_t _size;
     uint8_t _first;
-    uint8_t _last;
+    // Last collapsed into Size — last() returns size-1. Wire format reserves
+    // one byte for backward read compat; field dropped from RAM.
 
-    // Phase 8.2 Split Source Buffers
+    // Split rhythm + melody storage
     std::array<StochasticSourceEvent, CONFIG_STEP_COUNT> _events;
     bool _rhythmValid;
     bool _melodyValid;
@@ -790,9 +748,6 @@ private:
     Routable<uint8_t> _burst;
     Routable<uint8_t> _feel;
 
-    uint8_t _minDegree;
-    uint8_t _maxDegree;
-
     Routable<int8_t> _rotate;
     Routable<uint8_t> _complexity;
     Routable<int8_t> _contour;
@@ -810,8 +765,6 @@ private:
     uint8_t _range;
 
     uint8_t _durationTickets[8];
-
-    StochasticLevel _level = StochasticLevel::Core;
 
     StochasticSourceMode _rhythmMode;
     StochasticSourceMode _melodyMode;

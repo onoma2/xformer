@@ -177,7 +177,6 @@ CASE("single_parent_event_relTick_and_gateLen") {
     expectFalse(cache.cells[0].slide(),  "slide is cache-picked, not propagated from event");
     expectFalse(cache.cells[0].legato(), "legato is cache-picked, not propagated from event");
     expectTrue(cache.cells[0].audible(), "non-rest event is audible");
-    expectFalse(cache.aux[0].burstChild(), "no burst children under flat — flag always false");
 }
 
 CASE("rest_event_audible_false") {
@@ -639,12 +638,6 @@ CASE("parent_cache_idx_maps_slot_to_parent_cell") {
 
     // Slot outside the window is unmapped.
     expectEqual(int(cache.parentCacheIdx[10]), 0xff);
-
-    // The cells at the mapped indices must NOT be burst children.
-    for (int slot = 0; slot <= 3; ++slot) {
-        uint8_t cidx = cache.parentCacheIdx[slot];
-        expectFalse(cache.aux[cidx].burstChild(), "parentCacheIdx must point at a parent cell");
-    }
 }
 
 CASE("cache_cap_truncates_silently") {
@@ -705,40 +698,7 @@ CASE("parents_keep_priority_under_burst_truncation") {
                    "every window slot must map to a parent cell");
         expectTrue(cache.parentCacheIdx[slot] < kCellCap,
                    "mapped index must point inside the cache");
-        expectFalse(cache.aux[cache.parentCacheIdx[slot]].burstChild(),
-                    "mapping must point at a parent, not a burst child");
     }
-}
-
-CASE("repeat_path_uses_event_rank_not_cache_rank") {
-    // Codex adversarial review 2026-05-22: when Repeat fires, the engine
-    // replays _lastEvent. The slot's cached rank refers to the original
-    // event at that index, NOT the repeated material. Mask must filter by
-    // the repeated event's own densityRank so the right material is gated.
-    Cache cache{};
-    // Construct a sequence that primes the cache so we know the ranks at
-    // each slot.
-    StochasticSequence seq;
-    seq.clear();
-    clearAllEvents(seq);
-    seq.setSize(8);
-    seq.setFirst(0);
-    for (int i = 0; i < 8; ++i) {
-        auto &ev = seq.events()[i];
-        ev.setDurationIndex(i);
-        ev.setRest(false);
-        ev.setRhythmValid(true);
-    }
-    regenerateCacheFromEvents(cache, seq, 48, /*seed*/ 0xa5a5);
-
-    // 2026-05-24: selectMaskRank now always returns the supplied event rank,
-    // regardless of Repeat vs non-Repeat. The cache no longer stores rank.
-    // This test just verifies the function returns the passed-in event rank.
-    const uint8_t suppliedRank = 17;
-    uint32_t r_nonrepeat = selectMaskRank(/*useRepeat=*/false, suppliedRank, 3, cache);
-    uint32_t r_repeat    = selectMaskRank(/*useRepeat=*/true,  suppliedRank, 3, cache);
-    expectEqual(int(r_nonrepeat), int(suppliedRank));
-    expectEqual(int(r_repeat),    int(suppliedRank));
 }
 
 CASE("feel_scale_in_detent_is_unity") {
@@ -801,18 +761,6 @@ CASE("applyFeelScale_quarter_compresses") {
     uint32_t quarter = uint32_t(0.25f * 65536.f);
     expectEqual(int(applyFeelScale(96, quarter)), 24);
     expectEqual(int(applyFeelScale(768, quarter)), 192);
-}
-
-CASE("fallback_when_cache_unprimed") {
-    // Engine reset, no refresh yet — parentCacheIdx is zero-init = 0, but
-    // cacheIdx 0 with count=0 means cells/aux are also zeroed. The mask
-    // filter must not lock up; selectMaskRank falls back to the legacy
-    // density rank when the cache hasn't been built.
-    Cache cache{};   // count = 0, parentCacheIdx[i] = 0 (default zero-init)
-
-    // Out-of-range readIndex returns the event rank via fallback.
-    uint32_t r = selectMaskRank(/*useRepeat=*/false, /*evRank=*/42, /*readIndex=*/100, cache);
-    expectEqual(int(r), 42);
 }
 
 CASE("cycle_longer_than_4095_ticks_preserves_per_cell_durations") {

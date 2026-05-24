@@ -4,8 +4,6 @@
 
 #include <cstdint>
 
-enum class StochasticModeInternal : uint8_t { Loop, Live, Last };
-
 enum class StochasticSourceMode : uint8_t {
     Loop,
     Live,
@@ -17,13 +15,6 @@ enum class StochasticSourceMode : uint8_t {
 // Integer ordering preserved (Hold=0, Roll=1) so wire format is unaffected
 // by the rename from Parent/Generate.
 enum class StochasticBurstHold : uint8_t { Hold, Roll, Last };
-
-enum class StochasticLevel : uint8_t {
-    Core,     // Level 1
-    Direct,   // Level 2
-    Weights,  // Level 3
-    Last
-};
 
 // MarblesMode
 enum class MarblesMode : uint8_t {

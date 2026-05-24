@@ -34,8 +34,6 @@ public:
     static StochasticSourceEvent generateRhythmEvent(const StochasticSequence &sequence, const StochasticTrack &track, Random &rng);
     static StochasticSourceEvent generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng);
     static int generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng);
-    static int generateJumpOctave(const StochasticSequence &sequence, const StochasticTrack &track, int currentJump, Random &rng);
-
     // Per-cell pickers called from the cache walk. Cache picks per-cell from
     // these so NoteDuration / Variation / Burst* knobs reshape playback on
     // the next refreshCache without a full regeneration pass.
@@ -43,6 +41,4 @@ public:
     static int pickBurstCount(int knob, Random &rng);
     static int pickBurstSpacingSlot(int knob, Random &rng);
 
-private:
-    static float betaDistributionSample(float x, float spread);
 };

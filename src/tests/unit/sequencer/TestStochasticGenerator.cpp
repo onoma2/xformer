@@ -15,8 +15,6 @@ CASE("tickets_steer_the_distribution") {
     StochasticSequence seq;
     seq.clear();
     seq.setRange(1);
-    seq.setMinDegree(0);
-    seq.setMaxDegree(127);
 
     for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 0);
     // Two heavy tickets — pick should land mostly on degrees 0 and 1.
@@ -50,8 +48,6 @@ CASE("steps_sieve_restricts_to_fundamental_degrees") {
     StochasticSequence seq;
     seq.clear();
     seq.setRange(1);
-    seq.setMinDegree(0);
-    seq.setMaxDegree(127);
 
     // Default tickets (flat) — sieve must do the filtering.
     for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
@@ -81,8 +77,6 @@ CASE("marbles_distribution_always_runs_with_transparent_defaults") {
     StochasticSequence seq;
     seq.clear();
     seq.setRange(1);
-    seq.setMinDegree(0);
-    seq.setMaxDegree(127);
 
     for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10); // flat
 
@@ -114,8 +108,6 @@ CASE("complexity_kernel_narrows_movement_at_low_values") {
     StochasticSequence seq;
     seq.clear();
     seq.setRange(2);
-    seq.setMinDegree(0);
-    seq.setMaxDegree(127);
 
     for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10); // flat
 
@@ -147,8 +139,6 @@ CASE("produces_valid_output_at_all_defaults") {
     StochasticSequence seq;
     seq.clear();
     seq.setRange(1);
-    seq.setMinDegree(0);
-    seq.setMaxDegree(127);
 
     StochasticTrack track;
     track.clear();

@@ -19,9 +19,7 @@ namespace stochastic_cache {
 // StochasticGenerator.cpp.
 static const int kBurstSpacingLut[] = { 2, 3, 4, 5, 6 };
 
-// Minimum tick floor for cluster-cell duration. Below this, a burst roll is
-// rejected so the audio engine never schedules a sub-audible cluster cell.
-static constexpr uint32_t kMinChildGate = 6;
+// kMinAudibleGateTicks (see StochasticCache.h) is the cluster-cell floor.
 
 uint32_t computeFeelScaleQ16(int feel, uint32_t naturalSum, uint32_t beatTicks) {
     constexpr uint32_t kOneQ16 = 0x10000;
@@ -140,7 +138,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
                     int(seq.burstRate()), cellRng);
                 const int denom = kBurstSpacingLut[spacingSlot];
                 const uint32_t candidate = prevDur / uint32_t(denom);
-                if (candidate >= kMinChildGate) {
+                if (candidate >= kMinAudibleGateTicks) {
                     clusterDur = candidate;
                     cellDur = clusterDur;
                     int count = StochasticGenerator::pickBurstCount(int(seq.burstCount()), cellRng);
@@ -165,7 +163,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
                 }
                 const int denom = kBurstSpacingLut[spacingSlot];
                 const uint32_t candidate = prevDur / uint32_t(denom);
-                if (candidate >= kMinChildGate) {
+                if (candidate >= kMinAudibleGateTicks) {
                     clusterDur = candidate;
                     cellDur = clusterDur;
                     int count = int(ev.childCount());
@@ -274,9 +272,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             cellLegato,
             /*audible*/ !ev.rest());
 
-        cache.aux[i] = CellAux::make(
-            /*burstChild*/ false,   // flat model has no separate child cells
-            /*rank*/       0);      // rank lives on event.densityRank now
+        cache.aux[i] = CellAux::make();
 
         cache.parentCacheIdx[i] = uint8_t(i);
 

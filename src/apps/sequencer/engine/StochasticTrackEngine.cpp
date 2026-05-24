@@ -76,7 +76,7 @@ float StochasticTrackEngine::patienceMeter(uint32_t loops, int patience) {
 // distribution across the allowed range, still peak-centered at 50%. Floored at
 // 10% of duration AND at kMinAudibleGateTicks (audible-trigger guarantee for
 // very short events where even 50% would be too brief).
-static const uint32_t kMinAudibleGateTicks = 6;   // ~16 ms @ 192 PPQN, 120 BPM
+using stochastic_cache::kMinAudibleGateTicks;   // ~16 ms @ 192 PPQN, 120 BPM
 
 static uint32_t pickGateLength(uint32_t durationTicks, int spread, Random &rng) {
     int pct = 50;
