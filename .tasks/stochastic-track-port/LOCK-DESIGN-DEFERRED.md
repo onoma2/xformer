@@ -147,6 +147,102 @@ Tuesday's entire loop mechanism is "re-seed the RNG on cycle wrap, advance steps
 
 This is now the preferred implementation when the Lock work resumes. The tape design above is kept as a fallback.
 
+## A third option: A/B preview paradigm borrowed from GeneratorPage
+
+_Added 2026-05-24 during open design discussion._
+
+`SequenceBuilderImpl<T>` (used by NoteSequence's GeneratorPage for Algo / Euclidean
+preview) holds three states for a layer: `_original` (deep copy taken at entry),
+`_edit` (reference to the live model), and `_preview` (allocated buffer with new
+content). The "togglePreview" button swaps which copy lives at the `_edit`
+reference. Engine plays whichever copy is live; UI signals via header which
+state is on display.
+
+The mechanic adapts cleanly to `StochasticSequence` despite it not being layered:
+the whole sequence struct (~560 B, all knobs + events + window) is a single
+snapshot unit. No layer-specific builder needed.
+
+### Lightweight A/B (musical performance tool, ~1-2 days work)
+
+State on `StochasticSequenceEditPage`:
+
+```cpp
+StochasticSequence _snapshot;   // ~560 B
+bool _snapshotArmed = false;
+bool _showingSnapshot = false;
+```
+
+Capture button (dedicated Fn combo): copies live → `_snapshot`. From that point,
+a toggle swaps which is live in the model via `_track.sequence(idx) = _snapshot`
+(or vice versa). After swap, fire `notifyStochasticWindowEdit` +
+`notifyStochasticShapingEdit` so the engine cache + queues rebuild.
+
+Use case: "compare current to a snapshot I took earlier". User dials a melody,
+captures, experiments, toggles to A/B. Engine plays whichever's live.
+
+Open issues at this lightweight tier:
+- **Pattern switching invalidates the snapshot.** Either clear on pattern change
+  (simplest) or per-pattern snapshot table (`560 × 16 ≈ 9 KB`, prohibitive for UI
+  scratch state).
+- **Edits while "showing snapshot" mutate the snapshot.** GeneratorPage's
+  behavior — accept it (snapshot is just "the other copy") or freeze that side
+  read-only (cleaner Lock semantic).
+- **Auto-regen (Patience, Mutate, Jump) continues** modifying the live sequence
+  regardless of which copy is on display. For pure A/B that's intended ("both
+  timelines evolve"); for Lock semantic it leaks.
+
+### True Lock built on top (full feature, bigger)
+
+Lock = A/B + regen freeze + persistence:
+
+- `notifyStochasticWindowEdit/ShapingEdit` already exist — re-use as the swap
+  notification path.
+- While `_showingSnapshot` is true, the cycle-end hooks (`rollCycleEndHooks`)
+  must skip Jump/Sleep/Patience/Mutate for the locked side. Easiest: gate the
+  hooks on `!isLocked()`.
+- Engine state — `_currentStep`, `_pitchState`, `_jumpRegister`, `_sleepRemaining`,
+  `_loopCycleCount` — needs to reset on swap so playback is reproducible. Today's
+  `syncWindowEdit` only handles queues + cache. Need a richer "renew engine
+  state" call.
+- Persistence: snapshot must survive save/load. Either it becomes a stored
+  pattern slot (the locked content IS one of the patterns; UI marks it as
+  locked) or a dedicated locked-pattern field on the track (adds ~560 B to the
+  track persistence footprint).
+- UI affordance: pattern slot shows a lock icon when locked. Patience / Mutate /
+  NewR / NewM operations bypass locked slots.
+
+### How this relates to the other two designs above
+
+| Design | Footprint | Determinism | Persistence | Notes |
+|---|---|---|---|---|
+| Tape replay | ~768 B/track CCMRAM | Replays captured ticks | Tape would persist | Capacity cliff at 128 events/cycle. Kept as fallback. |
+| RNG snapshot | ~20 B/track | Re-derives from frozen RNG + live knobs | RNG state persists | Preferred. Knobs become "perform on top of frozen loop" controls. |
+| A/B preview | ~560 B/page (UI) + persistence cost if Lock | Plays the swapped copy verbatim | Snapshot is a pattern slot or dedicated field | Different mental model — no "frozen RNG with live knobs"; whole sequence including knob values is the locked unit. |
+
+The three are not exclusive. A/B preview is **content-level** lock: snapshot includes
+knob positions. RNG snapshot is **state-level** lock: only the RNG seed is frozen,
+knobs stay live. The musical character differs:
+
+- **Content lock (A/B)**: "this melody is the keeper. Knobs are stored as part of
+  the snapshot. Twiddling knobs while locked silently lands on the other copy
+  (or is blocked, depending on UX choice)."
+- **State lock (RNG snapshot)**: "this seed produces this loop. Knobs reshape
+  the result deterministically against the locked seed. Knob-tweak-while-locked
+  is the intended performance gesture."
+
+A/B preview is musically more like a "scene save / scene compare" feature than a
+performance Lock. Both have value; they answer different user questions.
+
+### Path forward
+
+- Land Lightweight A/B first as a near-term win. Proves the swap mechanic,
+  surfaces engine-state-reset edge cases, immediate performance value.
+- Then decide: extend to True Lock (content semantic) or implement RNG snapshot
+  Lock (state semantic) alongside as separate features.
+- The "outsource to fractal" question below remains separate — that's about
+  whether the Lock infrastructure should live in stochastic or be generalized
+  across track types.
+
 ## Open question: outsource to fractal
 
 The fractal-track design (see `.tasks/fractal-track-implementation/DICTIONARY.md`) has a "trunk" — an inline `uint16_t[]` buffer per step (11-bit CV + 4-bit gate length + 1 flag). Lock semantics in fractal: trunk content is captured during recording, and Lock blocks further trunk writes. Branches and ornamentation continue while locked.
