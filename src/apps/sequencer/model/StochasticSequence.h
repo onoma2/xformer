@@ -514,60 +514,7 @@ public:
     void setMelodySeed(uint32_t seed) { _melodySeed = seed; }
 
     void clear() {
-        _scale = -1;
-        _rootNote = -1;
-        _divisor = 12;
-        _resetMeasure = 0;
-        _clockMultiplier.setBase(100);
-
-        _size = 32;       // Phase 16 (2026-05-23): density restoration after flat bake-children-into-slots
-        _first = 0;
-        _last = 31;
-
-        _rhythmValid = false;
-        _melodyValid = false;
-        _rhythmSeed = 0;
-        _melodySeed = 0;
-
-for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
-            _degreeTickets[i] = 0;
-        }
-        _repeatProb = 0;
-        _degreeRotation = 0;
-        _maskRotation = 0;
-        _patienceMelody = 100;   // patienceMelody default (off sentinel)
-        _legatoProb = 0;
-        _marblesMode = MarblesMode::Off;
-        _marblesSpread = 50;
-        _marblesBias = 50;
-        _stepsSieve = 100;
-        _mask.setBase(100);
-        _gateLength.setBase(0);   // gate length spread default — 0 = exact 50% center
-        _tilt.setBase(0);
-        _burst.setBase(0);
-        _feel.setBase(50);    // detent default — Feel inactive
-        _minDegree = 0;
-        _maxDegree = 127;
-        _rotate.setBase(0);
-        _complexity.setBase(50);
-        _contour.setBase(0);
-        _noteDuration.setBase(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
-        _variation.setBase(16);   // ~1-slot leakage so newR produces audible variation out of the box
-        _rest.setBase(0);
-        _slide.setBase(0);
-        _burstRate = 50;
-        _burstCount = 0;
-        _burstPitch = StochasticBurstPitch::Parent;
-        _sleep.setBase(0);
-        _patienceRhythm.setBase(100);
-        _mutate.setBase(0);
-        _jump.setBase(0);
-        _range = 1;
-        _rhythmMode = StochasticSourceMode::Live;   // Phase 16 (2026-05-23): default playback = Live (was Loop)
-        _melodyMode = StochasticSourceMode::Live;
-
-        for (int i = 0; i < 8; ++i) _durationTickets[i] = 0;
-
+        setDefaults();
         for (auto &event : _events) event.clear();
     }
 
@@ -726,6 +673,65 @@ for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
     }
 
 private:
+    // Shared defaults for clear() and the invalid-size recovery path in
+    // sanitizeAfterRead(). Touches all model fields except _events (callers
+    // decide whether to wipe events too).
+    void setDefaults() {
+        _scale = -1;
+        _rootNote = -1;
+        _divisor = 12;
+        _resetMeasure = 0;
+        _clockMultiplier.setBase(100);
+
+        _size = 32;
+        _first = 0;
+        _last = 31;
+
+        _rhythmValid = false;
+        _melodyValid = false;
+        _rhythmSeed = 0;
+        _melodySeed = 0;
+
+        for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
+            _degreeTickets[i] = 0;
+        }
+        _repeatProb = 0;
+        _degreeRotation = 0;
+        _maskRotation = 0;
+        _patienceMelody = 100;
+        _legatoProb = 0;
+        _marblesMode = MarblesMode::Off;
+        _marblesSpread = 50;
+        _marblesBias = 50;
+        _stepsSieve = 100;
+        _mask.setBase(100);
+        _gateLength.setBase(0);
+        _tilt.setBase(0);
+        _burst.setBase(0);
+        _feel.setBase(50);
+        _minDegree = 0;
+        _maxDegree = 127;
+        _rotate.setBase(0);
+        _complexity.setBase(50);
+        _contour.setBase(0);
+        _noteDuration.setBase(5);   // LUT slot 5 = ×1 (= divisor)
+        _variation.setBase(16);     // audible variation at fresh roll
+        _rest.setBase(0);
+        _slide.setBase(0);
+        _burstRate = 50;
+        _burstCount = 0;
+        _burstPitch = StochasticBurstPitch::Parent;
+        _sleep.setBase(0);
+        _patienceRhythm.setBase(100);
+        _mutate.setBase(0);
+        _jump.setBase(0);
+        _range = 1;
+        _rhythmMode = StochasticSourceMode::Live;
+        _melodyMode = StochasticSourceMode::Live;
+
+        for (int i = 0; i < 8; ++i) _durationTickets[i] = 0;
+    }
+
     void sanitizeAfterRead() {
         _scale = clamp(int(_scale), -1, Scale::Count - 1);
         _rootNote = clamp(int(_rootNote), -1, 11);
@@ -733,52 +739,7 @@ private:
         _resetMeasure = clamp(int(_resetMeasure), 0, 128);
 
         if (_size < 2 || _size > CONFIG_STEP_COUNT) {
-            _size = 16;
-            _first = 0;
-            _last = 15;
-            _rhythmValid = false;
-            _melodyValid = false;
-            _rhythmSeed = 0;
-            _melodySeed = 0;
-
-            for (int i = 0; i < CONFIG_USER_SCALE_SIZE; ++i) {
-                _degreeTickets[i] = 0;
-            }
-            _repeatProb = 0;
-            _degreeRotation = 0;
-            _maskRotation = 0;
-            _patienceMelody = 100;   // patienceMelody default (off sentinel)
-            _legatoProb = 0;
-            _marblesMode = MarblesMode::Off;
-            _marblesSpread = 50;
-            _marblesBias = 50;
-            _stepsSieve = 100;
-            _mask.setBase(100);
-            _gateLength.setBase(0);   // gate length spread default — 0 = exact 50% center
-            _tilt.setBase(0);
-            _burst.setBase(0);
-            _minDegree = 0;
-            _maxDegree = 127;
-            _rotate.setBase(0);
-            _complexity.setBase(50);
-            _contour.setBase(0);
-            _noteDuration.setBase(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
-            _variation.setBase(16);   // ~1-slot leakage so newR produces audible variation out of the box
-            _rest.setBase(0);
-            _slide.setBase(0);
-            _burstRate = 50;
-            _burstCount = 0;
-            _burstPitch = StochasticBurstPitch::Parent;
-            _sleep.setBase(0);
-            _patienceRhythm.setBase(100);
-            _mutate.setBase(0);
-            _jump.setBase(0);
-            _range = 1;
-            _rhythmMode = StochasticSourceMode::Loop;
-            _melodyMode = StochasticSourceMode::Loop;
-
-            for (int i = 0; i < 8; ++i) _durationTickets[i] = 0;
-
+            setDefaults();
             for (auto &event : _events) event.clear();
             return;
         }

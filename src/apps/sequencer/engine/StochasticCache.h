@@ -108,7 +108,10 @@ struct Cache {
     uint8_t    parentCacheIdx[kMaxEventSlots];
 
     uint8_t    count;
-    uint16_t   cycleTicks;
+    // Sum of per-cell durations. Widened to 32 bits so dense long-duration
+    // patterns (worst case 64 × kMaxCellDuration = 262 080) reach Feel
+    // scaling without truncation.
+    uint32_t   cycleTicks;
 };
 
 // Build the cache from the sequence's events array.

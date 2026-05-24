@@ -467,6 +467,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // pure duration order. Tilt sign chooses which end survives the cut.
         const uint32_t patternSize = std::max<uint32_t>(1, sequence.size());
         const uint32_t denom = patternSize > 1 ? (patternSize - 1) : 1;
+        // Repeat replays the rank captured with _lastEvent — intentional. The
+        // Repeat contract is "frozen material," so a mutate-driven rerank
+        // since capture does not retroactively shift the replayed event.
         const uint32_t storedRank = (useRepeat ? uint32_t(eval.densityRank())
                                                : uint32_t(sequence.events()[readIndex].densityRank()));
         const uint32_t rankPctMilli = std::min<uint32_t>(1000, (storedRank * 1000) / denom);

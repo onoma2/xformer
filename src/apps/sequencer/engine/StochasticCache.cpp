@@ -285,7 +285,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
         prevDur = cellDur;
     }
 
-    cache.cycleTicks = uint16_t(std::min(cycleTicks, uint32_t(UINT16_MAX)));
+    cache.cycleTicks = cycleTicks;
 
     // Feel scaling is computed per trigger from sequence.feel(), not baked
     // here. Ranks live on event.densityRank, assigned by the generator at
