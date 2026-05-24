@@ -81,7 +81,47 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
     // the first cell's natural LUT pick the first time it's needed.
     uint32_t prevDur = 0;
     int clusterRemaining = 0;
-    uint32_t clusterDur = 0;
+    int clusterIdx = 0;
+    int clusterTotal = 0;
+    // Sized kMaxBurst + 1 because count from pickBurstCount is the tail count
+    // (legacy contract preserved); Fit-mode total cells = anchor + tails.
+    uint32_t clusterDurs[StochasticTrackEngine::kMaxBurst + 1] = {};
+
+    // Map BurstRate 0..100 to a log-symmetric curve factor r ∈ [0.4..2.5].
+    // r=1.0 at knob=50 (uniform — today's behavior). r<1 = first cell long,
+    // tail shrinks (accel into climax). r>1 = first cell short, tail grows
+    // (drag flam into long note). See PHASE15/16 trap-flam discussion.
+    auto curveFromKnob = [](int knob) -> float {
+        const float k = float(std::max(0, std::min(100, knob)));
+        // ln(2.5) ≈ 0.9163. exponent ranges -0.9163..+0.9163 across knob 0..100.
+        const float expo = 0.9163f * (k - 50.0f) / 50.0f;
+        return std::exp(expo);
+    };
+
+    // Fit-mode cluster sizing: distribute prev_dur across N cells via curve.
+    // Reserves a kMinAudibleGateTicks floor per cell so extreme r still
+    // produces audible hits; rest of prev_dur scales by r^k.
+    auto buildFitCluster = [&](uint32_t total, int cells, float r) {
+        if (cells <= 0) cells = 1;
+        if (cells > StochasticTrackEngine::kMaxBurst + 1) cells = StochasticTrackEngine::kMaxBurst + 1;
+        const int floorPerCell = stochastic_cache::kMinAudibleGateTicks;
+        const int reserved = floorPerCell * cells;
+        int budget = int(total) - reserved;
+        if (budget < 0) budget = 0;
+        float weights[StochasticTrackEngine::kMaxBurst + 1];
+        float sum = 0.f;
+        float rk = 1.f;
+        for (int k = 0; k < cells; ++k) {
+            weights[k] = rk;
+            sum += rk;
+            rk *= r;
+        }
+        if (sum <= 0.f) sum = 1.f;
+        for (int k = 0; k < cells; ++k) {
+            clusterDurs[k] = uint32_t(floorPerCell) + uint32_t(int(float(budget) * weights[k] / sum));
+        }
+        clusterTotal = cells;
+    };
 
     // Mode-gated pick paths. Loop = cache picks per cell from keyed RNG
     // (knob movement reshapes deterministically). Live = engine writes
@@ -114,8 +154,13 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
         // Decide this cell's duration. Cluster overrides the per-cell pick.
         uint32_t cellDur;
         bool isClusterTail = false;   // continuation cell of an in-flight cluster
+        const bool burstFit = burstHoldIsFit(seq.burstHold());
+
         if (clusterRemaining > 0) {
-            cellDur = clusterDur;
+            // Read this cell's duration from the cluster's pre-built array.
+            const int idx = std::min(clusterIdx, int(StochasticTrackEngine::kMaxBurst) - 1);
+            cellDur = clusterDurs[idx];
+            ++clusterIdx;
             --clusterRemaining;
             isClusterTail = true;
         } else if (pickRhythmInCache) {
@@ -130,46 +175,69 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
             // emitted prev.
             if (i == 0) prevDur = cellDur;
 
-            // Burst roll. Reject if the resulting cluster cell would fall
-            // below the audible-cell floor.
+            // Burst roll fires per cell. The two timing-mode branches (Fit /
+            // Overflow) build different cluster duration arrays.
             if (int(stepRng.nextRange(100)) < int(seq.burst())) {
-                const int spacingSlot = StochasticGenerator::pickBurstSpacingSlot(
-                    int(seq.burstRate()), stepRng);
-                const int denom = kBurstSpacingLut[spacingSlot];
-                const uint32_t candidate = prevDur / uint32_t(denom);
-                if (candidate >= kMinAudibleGateTicks) {
-                    clusterDur = candidate;
-                    cellDur = clusterDur;
-                    int count = StochasticGenerator::pickBurstCount(int(seq.burstCount()), stepRng);
-                    if (count > StochasticTrackEngine::kMaxBurst) {
-                        count = StochasticTrackEngine::kMaxBurst;
-                    }
+                // count = tails count (legacy contract; total cluster cells = count + 1).
+                int count = StochasticGenerator::pickBurstCount(int(seq.burstCount()), stepRng);
+                if (count > StochasticTrackEngine::kMaxBurst) count = StochasticTrackEngine::kMaxBurst;
+                if (count < 1) count = 1;
+                const int total = count + 1;
+
+                if (burstFit) {
+                    // Fit: distribute prev_dur across (anchor + tails) via curve.
+                    const float r = curveFromKnob(int(seq.burstRate()));
+                    buildFitCluster(prevDur, total, r);
+                    cellDur = clusterDurs[0];
+                    clusterIdx = 1;
                     clusterRemaining = count;
+                } else {
+                    // Overflow: existing denom-pick uniform clusterDur.
+                    const int spacingSlot = StochasticGenerator::pickBurstSpacingSlot(
+                        int(seq.burstRate()), stepRng);
+                    const int denom = kBurstSpacingLut[spacingSlot];
+                    const uint32_t candidate = prevDur / uint32_t(denom);
+                    if (candidate >= kMinAudibleGateTicks) {
+                        for (int k = 0; k < total; ++k) clusterDurs[k] = candidate;
+                        clusterTotal = total;
+                        clusterIdx = 1;
+                        clusterRemaining = count;
+                        cellDur = candidate;
+                    }
                 }
             }
         } else {
             // Live: engine wrote fresh content into events[i] this trigger.
-            // Read its durationIndex / childCount / burstRate so every event
-            // is genuinely fresh (not seed-locked to the previous cycle).
             cellDur = lutTicks(uint8_t(ev.durationIndex()));
             if (i == 0) prevDur = cellDur;
 
             if (int(ev.childCount()) > 0) {
-                int spacingSlot = int(ev.burstRate());
-                if (spacingSlot < 0) spacingSlot = 0;
-                if (spacingSlot >= int(sizeof(kBurstSpacingLut)/sizeof(kBurstSpacingLut[0]))) {
-                    spacingSlot = int(sizeof(kBurstSpacingLut)/sizeof(kBurstSpacingLut[0])) - 1;
-                }
-                const int denom = kBurstSpacingLut[spacingSlot];
-                const uint32_t candidate = prevDur / uint32_t(denom);
-                if (candidate >= kMinAudibleGateTicks) {
-                    clusterDur = candidate;
-                    cellDur = clusterDur;
-                    int count = int(ev.childCount());
-                    if (count > StochasticTrackEngine::kMaxBurst) {
-                        count = StochasticTrackEngine::kMaxBurst;
-                    }
+                int count = int(ev.childCount());
+                if (count > StochasticTrackEngine::kMaxBurst) count = StochasticTrackEngine::kMaxBurst;
+                if (count < 1) count = 1;
+                const int total = count + 1;
+
+                if (burstFit) {
+                    const float r = curveFromKnob(int(seq.burstRate()));
+                    buildFitCluster(prevDur, total, r);
+                    cellDur = clusterDurs[0];
+                    clusterIdx = 1;
                     clusterRemaining = count;
+                } else {
+                    int spacingSlot = int(ev.burstRate());
+                    if (spacingSlot < 0) spacingSlot = 0;
+                    if (spacingSlot >= int(sizeof(kBurstSpacingLut)/sizeof(kBurstSpacingLut[0]))) {
+                        spacingSlot = int(sizeof(kBurstSpacingLut)/sizeof(kBurstSpacingLut[0])) - 1;
+                    }
+                    const int denom = kBurstSpacingLut[spacingSlot];
+                    const uint32_t candidate = prevDur / uint32_t(denom);
+                    if (candidate >= kMinAudibleGateTicks) {
+                        for (int k = 0; k < total; ++k) clusterDurs[k] = candidate;
+                        clusterTotal = total;
+                        clusterIdx = 1;
+                        clusterRemaining = count;
+                        cellDur = candidate;
+                    }
                 }
             }
         }
@@ -192,7 +260,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
         uint8_t cellDegree;
         uint8_t cellOctave;
         if (isClusterTail) {
-            if (bakeChildNotes && seq.burstHold() == StochasticBurstHold::Roll) {
+            if (bakeChildNotes && burstHoldIsRoll(seq.burstHold())) {
                 // Cluster-tail Generate pitch lives in the melody domain
                 // (melodySeed-keyed) so NewR does not shift cluster-tail
                 // pitches. Distinct salt from the anchor RNG so the two

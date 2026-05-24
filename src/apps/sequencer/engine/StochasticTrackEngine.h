@@ -70,8 +70,9 @@ public:
     void renewRhythm();
     void renewMelody();
 
-    // Max children per parent burst — matches burstCount LUT {2, 3, 4, 5}.
-    static constexpr int kMaxBurst = 5;
+    // Max cluster cells — matches burstCount LUT {2..8}. Sized 8 so Fit-mode
+    // clusters can pack up to 8 trap-style hits into one prev_dur.
+    static constexpr int kMaxBurst = 8;
 
     // Recent evaluated parent events for Direct hero drawing. This is UI truth,
     // not source material: only what just reached the scheduler is recorded.

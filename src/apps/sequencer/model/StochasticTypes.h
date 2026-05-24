@@ -57,11 +57,30 @@ inline int stochasticPitchCentrality(int degInOct, int N) {
     return b;
 }
 
-// Burst-cluster pitch mode. Hold = cluster tails copy the anchor's pitch.
-// Roll = cluster tails re-pick a fresh pitch each cell (melody-keyed).
-// Integer ordering preserved (Hold=0, Roll=1) so wire format is unaffected
-// by the rename from Parent/Generate.
-enum class StochasticBurstHold : uint8_t { Hold, Roll, Last };
+// Burst-cluster mode — two orthogonal axes packed into one enum:
+//
+//   Pitch axis:   Hold = cluster cells share anchor's pitch
+//                 Roll = each cluster cell rolls own pitch
+//
+//   Timing axis:  Fit  = cluster packs into one prev_dur with BurstRate curve
+//                 Over = uniform denom from BurstRate, can overflow prev_dur
+//
+// Values ordered so that bit 0 = Fit/Over, bit 1 = Hold/Roll. Helpers expose
+// the two axes individually for downstream branches.
+enum class StochasticBurstHold : uint8_t {
+    HoldFit,
+    HoldOver,
+    RollFit,
+    RollOver,
+    Last
+};
+
+inline bool burstHoldIsRoll(StochasticBurstHold m) {
+    return m == StochasticBurstHold::RollFit || m == StochasticBurstHold::RollOver;
+}
+inline bool burstHoldIsFit(StochasticBurstHold m) {
+    return m == StochasticBurstHold::HoldFit || m == StochasticBurstHold::RollFit;
+}
 
 // MarblesMode
 enum class MarblesMode : uint8_t {

@@ -512,7 +512,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                         uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
 
                         int childNote = evalBursts[i].note;
-                        if (sequence.burstHold() == StochasticBurstHold::Roll) {
+                        if (burstHoldIsRoll(sequence.burstHold())) {
                             childNote += (_jumpRegister + track.octave()) * activeNotes + track.transpose();
                         }
                         float childCv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);

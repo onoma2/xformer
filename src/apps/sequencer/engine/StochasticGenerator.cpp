@@ -6,11 +6,11 @@
 #include <algorithm>
 
 // Burst count LUT — knob picks weighted-random over {2,3,4,5}.
-// 1 child is meaningless; max 5 matches kMaxBurst in StochasticTrackEngine.h.
+// 1 child is meaningless; LUT spans {2..8} matching kMaxBurst in StochasticTrackEngine.h.
 // burstCount is a MAX intent: actual count clips to whatever the picked
 // spacing LUT entry can hold inside the parent duration (Option C).
-static const int kBurstCountLut[] = { 2, 3, 4, 5 };
-static const int kBurstCountLutSize = 4;
+static const int kBurstCountLut[] = { 2, 3, 4, 5, 6, 7, 8 };
+static const int kBurstCountLutSize = 7;
 
 // Burst spacing LUT — knob picks weighted-random denominator from {2,3,4,5,6}.
 // Spacing = parentDurationTicks / denominator.
@@ -299,7 +299,7 @@ void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *bursts, const Stocha
             bursts[i].tickOffset = offset;
             bursts[i].gateTicks = gate;
             
-            if (sequence.burstHold() == StochasticBurstHold::Roll) {
+            if (burstHoldIsRoll(sequence.burstHold())) {
                 StochasticGenerator::PitchGenState burstState{};
                 bursts[i].note = generateDegree(sequence, track, scale, burstState, rng);
             } else {

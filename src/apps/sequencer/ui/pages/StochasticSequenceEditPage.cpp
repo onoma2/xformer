@@ -212,7 +212,7 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
     int contourStep = (contour * 4) / 100;          // -4..+4 px over age
     int burstSpacing = 7 - (burstRate * 5) / 100;   // high rate = tighter child pips
     if (burstSpacing < 2) burstSpacing = 2;
-    bool burstPitchScatter = (seq.burstHold() == StochasticBurstHold::Roll);
+    bool burstPitchScatter = burstHoldIsRoll(seq.burstHold());
 
     // Slide and Legato turn the point cloud into a connected phrase. Slide draws
     // a pitch ribbon; Legato draws a low gate-continuity rail between events.
@@ -1619,18 +1619,32 @@ void StochasticSequenceEditPage::contextAction(int index) {
 
     switch (_currentPage) {
     case Page::Live: {
-        // BurstHold toggle — demoted off slot 7 (slot 7 is Feel)
-        // because Feel took its place. Hold = cluster cells share previous
-        // pitch (ratchet); Roll = cluster cells each pick own pitch.
+        // BurstHold cycle through the four combined pitch×timing modes:
+        // HoldOver → RollOver → HoldFit → RollFit → back. Pitch axis: Hold
+        // shares anchor pitch, Roll re-rolls per cell. Timing axis: Fit packs
+        // cluster into one prev_dur with BurstRate curve, Over uses the
+        // existing denom-pick uniform math (can overflow).
         if (ContextAction(index) == ContextAction::BurstHold) {
             auto cur = sequence.burstHold();
-            sequence.setBurstHold(cur == StochasticBurstHold::Hold
-                                  ? StochasticBurstHold::Roll
-                                  : StochasticBurstHold::Hold);
+            StochasticBurstHold next;
+            switch (cur) {
+            case StochasticBurstHold::HoldOver: next = StochasticBurstHold::RollOver; break;
+            case StochasticBurstHold::RollOver: next = StochasticBurstHold::HoldFit;  break;
+            case StochasticBurstHold::HoldFit:  next = StochasticBurstHold::RollFit;  break;
+            case StochasticBurstHold::RollFit:  next = StochasticBurstHold::HoldOver; break;
+            default:                            next = StochasticBurstHold::HoldOver; break;
+            }
+            sequence.setBurstHold(next);
             notifyStochasticShapingEdit();
-            showMessage(sequence.burstHold() == StochasticBurstHold::Hold
-                        ? "BURST HOLD"
-                        : "BURST ROLL");
+            const char *label = "BURST HOLD";
+            switch (next) {
+            case StochasticBurstHold::HoldOver: label = "HOLD / OVER"; break;
+            case StochasticBurstHold::RollOver: label = "ROLL / OVER"; break;
+            case StochasticBurstHold::HoldFit:  label = "HOLD / FIT";  break;
+            case StochasticBurstHold::RollFit:  label = "ROLL / FIT";  break;
+            default: break;
+            }
+            showMessage(label);
             break;
         }
         // INIT resets the LIVE-page params bound to step buttons back to their

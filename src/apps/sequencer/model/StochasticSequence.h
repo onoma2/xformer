@@ -435,7 +435,15 @@ public:
     void printJump(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticJump); str("%d%%", jump()); }
     void editJump(int value, bool shift) { if (!isRouted(Routing::Target::StochasticJump)) setJump(jump() + value); }
 
-    void printBurstHold(StringBuilder &str) const { str(burstHold() == StochasticBurstHold::Hold ? "Hold" : "Roll"); }
+    void printBurstHold(StringBuilder &str) const {
+        switch (burstHold()) {
+        case StochasticBurstHold::HoldFit:  str("Hold/Fit");  break;
+        case StochasticBurstHold::HoldOver: str("Hold/Over"); break;
+        case StochasticBurstHold::RollFit:  str("Roll/Fit");  break;
+        case StochasticBurstHold::RollOver: str("Roll/Over"); break;
+        default: str("?"); break;
+        }
+    }
     void editBurstHold(int value, bool shift) { setBurstHold(ModelUtils::adjustedEnum(burstHold(), value)); }
 
     void printRotate(StringBuilder &str) const { printRouted(str, Routing::Target::Rotate); str("%+d", rotate()); }
@@ -617,7 +625,7 @@ public:
         _burstCount = clamp(int(_burstCount), 0, 100);
         uint8_t burstHold;
         reader.read(burstHold);
-        _burstHold = burstHold < uint8_t(StochasticBurstHold::Last) ? static_cast<StochasticBurstHold>(burstHold) : StochasticBurstHold::Hold;
+        _burstHold = burstHold < uint8_t(StochasticBurstHold::Last) ? static_cast<StochasticBurstHold>(burstHold) : StochasticBurstHold::HoldOver;
         _sleep.read(reader);
         _patienceRhythm.read(reader);
         _mutate.read(reader);
@@ -696,7 +704,7 @@ private:
         _slide.setBase(0);
         _burstRate = 50;
         _burstCount = 0;
-        _burstHold = StochasticBurstHold::Hold;
+        _burstHold = StochasticBurstHold::HoldOver;   // default matches today's "uniform burst, shared pitch"
         _sleep.setBase(0);
         _patienceRhythm.setBase(100);
         _mutate.setBase(0);

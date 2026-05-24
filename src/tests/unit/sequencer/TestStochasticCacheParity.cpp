@@ -196,6 +196,104 @@ CASE("rest_event_audible_false") {
     expectFalse(cache.runtimeSteps[0].audible(), "rest event must be marked non-audible");
 }
 
+CASE("burst_fit_mode_packs_cluster_into_prev_dur") {
+    // Fit mode: cluster of count+1 cells fits inside one prev_dur.
+    // Sum of cell durations across the cluster should equal prev_dur
+    // (modulo the per-cell min-gate floor).
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(8);
+    seq.setFirst(0);
+    seq.setRhythmMode(StochasticSourceMode::Live);
+    seq.setBurstHold(StochasticBurstHold::HoldFit);
+    seq.setBurstRate(50);   // r = 1.0 (uniform curve at knob center)
+    for (int i = 0; i < 8; ++i) {
+        auto &ev = seq.steps()[i];
+        ev.setRhythmValid(true);
+        ev.setRest(false);
+        ev.setDurationIndex(3);   // ×2 = 96 ticks
+    }
+    seq.steps()[2].setChildCount(3);   // 3 tails → 4 total cluster cells
+    seq.steps()[2].setBurstRate(0);    // ignored in Fit mode
+
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0xfeed);
+
+    // Cluster occupies steps 2, 3, 4, 5. Sum must equal prev_dur (96 ticks).
+    uint32_t clusterSum = 0;
+    for (int i = 2; i < 6; ++i) clusterSum += cache.runtimeSteps[i].durationTicks();
+    expectEqual(int(clusterSum), 96, "Fit cluster sum must equal prev_dur");
+
+    // Uniform curve → all four cells equal (modulo integer rounding).
+    expectTrue(cache.runtimeSteps[2].durationTicks() == cache.runtimeSteps[3].durationTicks(),
+               "Fit mode at r=1 should produce uniform cluster cells");
+}
+
+CASE("burst_fit_mode_accel_curve_first_cell_longest") {
+    // Fit + accel curve (BurstRate < 50): first cluster cell should be the
+    // longest, subsequent cells shrinking.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(8);
+    seq.setFirst(0);
+    seq.setRhythmMode(StochasticSourceMode::Live);
+    seq.setBurstHold(StochasticBurstHold::HoldFit);
+    seq.setBurstRate(0);   // r = 0.4 (strong accel)
+    for (int i = 0; i < 8; ++i) {
+        auto &ev = seq.steps()[i];
+        ev.setRhythmValid(true);
+        ev.setRest(false);
+        ev.setDurationIndex(0);   // ×8 = 384 ticks — plenty for cluster floor
+    }
+    seq.steps()[2].setChildCount(3);
+    seq.steps()[2].setBurstRate(0);
+
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0xfeed);
+
+    // First cell longest, monotonic shrink across the cluster.
+    const uint32_t a = cache.runtimeSteps[2].durationTicks();
+    const uint32_t b = cache.runtimeSteps[3].durationTicks();
+    const uint32_t c = cache.runtimeSteps[4].durationTicks();
+    const uint32_t d = cache.runtimeSteps[5].durationTicks();
+    expectTrue(a > b, "accel curve: anchor cell > tail 1");
+    expectTrue(b > c, "accel curve: tail 1 > tail 2");
+    expectTrue(c > d, "accel curve: tail 2 > tail 3");
+}
+
+CASE("burst_fit_mode_decel_curve_last_cell_longest") {
+    // Fit + decel curve (BurstRate > 50): cluster grows toward the end.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(8);
+    seq.setFirst(0);
+    seq.setRhythmMode(StochasticSourceMode::Live);
+    seq.setBurstHold(StochasticBurstHold::HoldFit);
+    seq.setBurstRate(100);   // r = 2.5 (strong decel)
+    for (int i = 0; i < 8; ++i) {
+        auto &ev = seq.steps()[i];
+        ev.setRhythmValid(true);
+        ev.setRest(false);
+        ev.setDurationIndex(0);
+    }
+    seq.steps()[2].setChildCount(3);
+    seq.steps()[2].setBurstRate(0);
+
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0xfeed);
+
+    const uint32_t a = cache.runtimeSteps[2].durationTicks();
+    const uint32_t b = cache.runtimeSteps[3].durationTicks();
+    const uint32_t c = cache.runtimeSteps[4].durationTicks();
+    const uint32_t d = cache.runtimeSteps[5].durationTicks();
+    expectTrue(a < b, "decel curve: anchor < tail 1");
+    expectTrue(b < c, "decel curve: tail 1 < tail 2");
+    expectTrue(c < d, "decel curve: tail 2 < tail 3");
+}
+
 CASE("loop_rest_dice_independent_of_duration_dice") {
     // PHASE15 dice contract: in Loop mode, changing Rest must NOT reroll
     // durations. Build the cache twice with different Rest knob values and
@@ -599,7 +697,7 @@ CASE("burst_pitch_hold_keeps_parent_pitch_in_cluster_tail") {
     seq.setBurst(100);          // every cell tries to start a cluster
     seq.setBurstCount(50);
     seq.setBurstRate(50);
-    seq.setBurstHold(StochasticBurstHold::Hold);
+    seq.setBurstHold(StochasticBurstHold::HoldOver);
     for (int i = 0; i < 4; ++i) {
         seq.steps()[i].setRhythmValid(true);
         seq.steps()[i].setRest(false);
@@ -634,7 +732,7 @@ CASE("burst_pitch_roll_rerolls_cluster_tail_pitch") {
     seq.setBurst(100);
     seq.setBurstCount(100);    // bias toward longer clusters → more tail cells
     seq.setBurstRate(50);
-    seq.setBurstHold(StochasticBurstHold::Roll);
+    seq.setBurstHold(StochasticBurstHold::RollOver);
     seq.setRange(3);           // wider candidate pool so reroll has room to differ
     for (int i = 0; i < 8; ++i) {
         seq.steps()[i].setRhythmValid(true);
