@@ -186,11 +186,13 @@ public:
     void setSleep(int sleep, bool routed = false) { _sleep.set(clamp(sleep, 0, 100), routed); }
 
 
+    // mutate — probability 0..100 that one randomly-picked step inside the
+    // active window gets destructively re-rolled at each cycle-end. Unipolar.
     int mutate() const { return _mutate.get(isRouted(Routing::Target::StochasticMutate)); }
     // Bipolar: -100..0 = Proteus destructive (regenerate one event), 0 = lock,
     // 0..+100 = Marbles permutation (swap two existing events). Magnitude is
     // probability per loop iteration.
-    void setMutate(int mutate, bool routed = false) { _mutate.set(clamp(mutate, -100, 100), routed); }
+    void setMutate(int mutate, bool routed = false) { _mutate.set(clamp(mutate, 0, 100), routed); }
 
     int jump() const { return _jump.get(isRouted(Routing::Target::StochasticJump)); }
     void setJump(int jump, bool routed = false) { _jump.set(clamp(jump, 0, 100), routed); }
@@ -426,7 +428,7 @@ public:
     void editSleep(int value, bool shift) { if (!isRouted(Routing::Target::StochasticSleep)) setSleep(sleep() + value); }
 
 
-    void printMutate(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMutate); str("%+d%%", mutate()); }
+    void printMutate(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMutate); str("%d%%", mutate()); }
     void editMutate(int value, bool shift) { if (!isRouted(Routing::Target::StochasticMutate)) setMutate(mutate() + value); }
 
     void printJump(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticJump); str("%d%%", jump()); }
@@ -775,7 +777,7 @@ private:
     StochasticBurstHold _burstHold;
     Routable<uint8_t> _sleep;
     Routable<uint8_t> _patienceRhythm;
-    Routable<int8_t> _mutate;
+    Routable<uint8_t> _mutate;
     Routable<uint8_t> _jump;
     uint8_t _range;
 

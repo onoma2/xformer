@@ -615,23 +615,18 @@ void StochasticTrackEngine::rollCycleEndHooks() {
     // regenerates that domain, overwriting any mutation we'd write below.
     rollPatience();
 
-    // Domain-aware bipolar mutation. Sign selects algorithm:
-    //   mutate > 0 → Marbles permutation (swap two existing events)
-    //   mutate < 0 → Proteus destructive (regenerate one event)
-    //   mutate = 0 → lock (no mutation)
-    int mutateAmount = sequence.mutate();
-    int mutateMag = mutateAmount < 0 ? -mutateAmount : mutateAmount;
-    if (mutateMag > 0 && int(_rng.nextRange(100)) < mutateMag) {
-        bool destructive = (mutateAmount < 0);
+    // Destructive mutation. Mutate knob is probability 0..100 of one event
+    // inside [first..last] being re-rolled per cycle-end. Domain chosen at
+    // random when both are Loop and valid.
+    const int mutateAmount = sequence.mutate();
+    if (mutateAmount > 0 && int(_rng.nextRange(100)) < mutateAmount) {
         bool rhythmEligible = (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.rhythmValid());
         bool melodyEligible = (sequence.melodyMode() == StochasticSourceMode::Loop && sequence.melodyValid());
         auto applyRhythm = [&] {
-            if (destructive) StochasticGenerator::mutateRhythmOne(sequence, track, _rng, mutateMag);
-            else             StochasticGenerator::permuteRhythmOne(sequence, _rng);
+            StochasticGenerator::mutateRhythmOne(sequence, track, _rng);
         };
         auto applyMelody = [&] {
-            if (destructive) StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng, mutateMag);
-            else             StochasticGenerator::permuteMelodyOne(sequence, _rng);
+            StochasticGenerator::mutateMelodyOne(sequence, track, scale, rootNote, _rng);
         };
         if (rhythmEligible && melodyEligible) {
             if (_rng.nextRange(2) == 0) applyRhythm();
@@ -641,7 +636,6 @@ void StochasticTrackEngine::rollCycleEndHooks() {
         } else if (melodyEligible) {
             applyMelody();
         }
-        // Sync cache so the next cycle's mask filter sees the new content.
         refreshStepCache();
     }
 }

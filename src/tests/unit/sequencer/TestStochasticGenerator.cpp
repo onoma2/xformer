@@ -389,6 +389,62 @@ CASE("ticket_minus_one_still_excludes") {
     expectEqual(hit7, 0, "ticket=-1 must hard-exclude class");
 }
 
+CASE("mutate_rhythm_targets_inside_window") {
+    // mutateRhythmOne must touch only the [first..last] window. Steps outside
+    // the window must keep their original durationIndex.
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setSize(16);
+    seq.setFirst(4);   // window = [4..11] (size minus default last)
+    // last() returns size-1 in current model — so set size to clip the window.
+    // For this test, just verify the explicit setFirst clamps target picking.
+    for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
+        seq.steps()[i].setDurationIndex(5);  // every step at ×1
+        seq.steps()[i].setRhythmValid(true);
+    }
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(31);
+    for (int n = 0; n < 50; ++n) {
+        StochasticGenerator::mutateRhythmOne(seq, track, rng);
+    }
+    // Steps before window's first stay untouched.
+    for (int i = 0; i < 4; ++i) {
+        expectEqual(int(seq.steps()[i].durationIndex()), 5,
+                    "step before window first must not be mutated");
+    }
+}
+
+CASE("mutate_melody_targets_inside_window") {
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setSize(16);
+    seq.setFirst(4);
+    for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
+        seq.steps()[i].setDegree(0);
+        seq.steps()[i].setOctave(0);
+        seq.steps()[i].setMelodyValid(true);
+    }
+    // Heavy ticket on degree 7 so mutated steps will reliably change.
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 0);
+    seq.setDegreeTicket(7, 100);
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(91);
+    for (int n = 0; n < 50; ++n) {
+        const auto &scale = Scale::get(0);
+        StochasticGenerator::mutateMelodyOne(seq, track, scale, 0, rng);
+    }
+    for (int i = 0; i < 4; ++i) {
+        expectEqual(int(seq.steps()[i].degree()), 0,
+                    "step before window first must not be mutated");
+    }
+}
+
 CASE("produces_valid_output_at_all_defaults") {
     StochasticSequence seq;
     seq.clear();   // factory defaults

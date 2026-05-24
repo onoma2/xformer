@@ -653,7 +653,7 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         FixedStringBuilder<32> str;
         if (heldStep == 0)       str("PATIENCE R %d", seq.patienceRhythm());
         else if (heldStep == 1)  str("PATIENCE M %d", seq.patienceMelody());
-        else if (heldStep == 2)  str("MUTATE %+d", seq.mutate());
+        else if (heldStep == 2)  str("MUTATE %d", seq.mutate());
         else if (heldStep == 3)  str("JUMP %d", seq.jump());
         else if (heldStep == 4)  str("SLEEP %d", seq.sleep());
         else if (heldStep == 8)  str("FIRST %d", seq.first());
@@ -673,7 +673,7 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         FixedStringBuilder<16> s;
         s("PR%d",  seq.patienceRhythm()); canvas.drawText(4,   16, s);
         s.reset(); s("PM%d",  seq.patienceMelody()); canvas.drawText(34,  16, s);
-        s.reset(); s("M%+d", seq.mutate());          canvas.drawText(66,  16, s);
+        s.reset(); s("M%d",  seq.mutate());          canvas.drawText(66,  16, s);
         s.reset(); s("J%d",  seq.jump());            canvas.drawText(94,  16, s);
         s.reset(); s("S%d",  seq.sleep());           canvas.drawText(120, 16, s);
     }

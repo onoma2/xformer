@@ -112,94 +112,36 @@ void StochasticGenerator::generateMelody(StochasticSequence &sequence, const Sto
     sequence.setMelodySeed(seed);
 }
 
-void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const StochasticTrack &track, Random &rng, int mutateMagnitude) {
+// Destructively re-roll the rhythm content of one step inside the active
+// window. Mutate is a pure probability gate at the cycle-end hook; magnitude
+// is not exposed. Full mask-rank recompute follows because the new event's
+// durationIndex changes the sort position.
+void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const StochasticTrack &track, Random &rng) {
     int size = sequence.size();
     if (size <= 0) return;
-    // Pick target inside the active playback window. Mutations outside the
-    // window would be silent until the window moved.
-    int first = clamp(int(sequence.first()), 0, size - 1);
-    int last  = clamp(int(sequence.last()),  first, size - 1);
-    int windowSize = last - first + 1;
-    int i = first + rng.nextRange(windowSize);
-
-    // Run the regular generator first for rest / burst / etc. picks, then
-    // override the duration with a mutate-anchored triangular kernel: low
-    // mutate magnitude → strong anchor pull (stays near the noteDuration
-    // setting); high magnitude → uniform across the 8 LUT entrys.
-    auto rhythm = generateRhythmEvent(sequence, track, rng);
-    int baseDur = std::max(0, std::min(7, int(sequence.noteDuration())));
-    int biasStrength = 100 - std::max(0, std::min(100, mutateMagnitude));
-    int varMag = clamp(int(sequence.variation()), 0, 100);   // abs via getter
-
-    int weights[8]; int total = 0;
-    for (int s = 0; s < 8; ++s) {
-        int dist = std::abs(s - baseDur);
-        int anchorKernel = std::max(0, 7 - dist);
-        int spreadBoost = varMag * std::max(0, 4 - dist);    // symmetric spread bonus
-        int w = 100 + biasStrength * anchorKernel + spreadBoost;
-        weights[s] = w;
-        total += w;
-    }
-    int durIdx = baseDur;
-    if (total > 0) {
-        int roll = int(rng.nextRange(uint32_t(total)));
-        int sum = 0;
-        for (int s = 0; s < 8; ++s) {
-            sum += weights[s];
-            if (roll < sum) { durIdx = s; break; }
-        }
-    }
-    rhythm.setDurationIndex(durIdx);
-
-    sequence.steps()[i].mergeRhythmFrom(rhythm);
-    // Duration-aware ranks need refresh after this event's durationIndex changed.
-    generateMaskRanks(sequence, size, sequence.rhythmSeed() ^ 0xdeadbeef);
-}
-
-void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng, int mutateMagnitude) {
-    int size = sequence.size();
-    if (size <= 0) return;
-    // Pick target inside the active playback window.
     int first = clamp(int(sequence.first()), 0, size - 1);
     int last  = clamp(int(sequence.last()),  first, size - 1);
     int i = first + rng.nextRange(last - first + 1);
 
-    // Pure ticket-weighted candidate pick. Steps-law centrality boost is
-    // gone (mask-melody owns audibility at trigger time). mutateMagnitude
-    // is currently a no-op on the pitch axis here; PHASE15 owns the
-    // mutate-distance revamp.
-    (void)mutateMagnitude;
+    auto rhythm = generateRhythmEvent(sequence, track, rng);
+    sequence.steps()[i].mergeRhythmFrom(rhythm);
+    generateMaskRanks(sequence, size, sequence.rhythmSeed() ^ 0xdeadbeef);
+}
+
+// Destructively re-roll the melody content of one step inside the active
+// window. Routes through generateDegree so the new pitch uses the 5-step
+// pitch law (tickets, region, contour) with a fresh state — no chain context.
+void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, Random &rng) {
+    (void)rootNote;
+    int size = sequence.size();
+    if (size <= 0) return;
+    int first = clamp(int(sequence.first()), 0, size - 1);
+    int last  = clamp(int(sequence.last()),  first, size - 1);
+    int i = first + rng.nextRange(last - first + 1);
+
+    PitchGenState state{};
+    int absDegree = generateDegree(sequence, track, scale, state, rng);
     int activeNotes = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
-    int range = sequence.range();
-
-    int allowedDegrees[CONFIG_USER_SCALE_SIZE * 4];
-    int weights[CONFIG_USER_SCALE_SIZE * 4];
-    int allowedCount = 0;
-    int totalWeight = 0;
-
-    for (int oct = 0; oct < range; ++oct) {
-        for (int idx = 0; idx < activeNotes; ++idx) {
-            int tickets = sequence.effectiveDegreeTicket(idx, activeNotes);
-            if (tickets < 0) continue;
-            int deg = oct * activeNotes + idx;
-            int w = (tickets > 0) ? tickets : 1;
-            allowedDegrees[allowedCount] = deg;
-            weights[allowedCount] = w;
-            totalWeight += w;
-            ++allowedCount;
-        }
-    }
-    if (allowedCount == 0) return;
-
-    int absDegree = allowedDegrees[0];
-    if (totalWeight > 0) {
-        int roll = int(rng.nextRange(uint32_t(totalWeight)));
-        int sum = 0;
-        for (int k = 0; k < allowedCount; ++k) {
-            sum += weights[k];
-            if (roll < sum) { absDegree = allowedDegrees[k]; break; }
-        }
-    }
 
     StochasticStepContent melody;
     melody.clear();
@@ -207,25 +149,6 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
     melody.setOctave(absDegree / activeNotes);
     melody.setMelodyValid(true);
     sequence.steps()[i].mergeMelodyFrom(melody);
-}
-
-// Marbles-style permutation: swap rhythm content between two random positions
-// in the active playback window [first..last].
-void StochasticGenerator::permuteRhythmOne(StochasticSequence &sequence, Random &rng) {
-    int size = sequence.size();
-    if (size < 2) return;
-    int first = clamp(int(sequence.first()), 0, size - 1);
-    int last  = clamp(int(sequence.last()),  first, size - 1);
-    int windowSize = last - first + 1;
-    if (windowSize < 2) return;
-    int i = first + rng.nextRange(windowSize);
-    int j = first + rng.nextRange(windowSize - 1);
-    if (j >= i) ++j;  // ensure j != i
-    auto &ev = sequence.steps();
-    StochasticStepContent tmp;
-    tmp.mergeRhythmFrom(ev[i]);
-    ev[i].mergeRhythmFrom(ev[j]);
-    ev[j].mergeRhythmFrom(tmp);
 }
 
 // Duration picker. Combines duration tickets (flat-default LUT base weight),
@@ -266,24 +189,6 @@ int StochasticGenerator::pickDurationSlot(const StochasticSequence &sequence, Ra
     return pickDuration(sequence, rng);
 }
 
-// Marbles-style permutation: swap melody content between two random positions
-// in the active playback window [first..last].
-void StochasticGenerator::permuteMelodyOne(StochasticSequence &sequence, Random &rng) {
-    int size = sequence.size();
-    if (size < 2) return;
-    int first = clamp(int(sequence.first()), 0, size - 1);
-    int last  = clamp(int(sequence.last()),  first, size - 1);
-    int windowSize = last - first + 1;
-    if (windowSize < 2) return;
-    int i = first + rng.nextRange(windowSize);
-    int j = first + rng.nextRange(windowSize - 1);
-    if (j >= i) ++j;
-    auto &ev = sequence.steps();
-    StochasticStepContent tmp;
-    tmp.mergeMelodyFrom(ev[i]);
-    ev[i].mergeMelodyFrom(ev[j]);
-    ev[j].mergeMelodyFrom(tmp);
-}
 
 // Per-event rank assignment. Score = a normalized long-vs-short axis from
 // each event's durationIndex, plus a small random jitter to break ties for
