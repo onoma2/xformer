@@ -196,6 +196,69 @@ CASE("rest_event_audible_false") {
     expectFalse(cache.runtimeSteps[0].audible(), "rest event must be marked non-audible");
 }
 
+CASE("loop_rest_dice_independent_of_duration_dice") {
+    // PHASE15 dice contract: in Loop mode, changing Rest must NOT reroll
+    // durations. Build the cache twice with different Rest knob values and
+    // assert duration sequence is identical.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(8);
+    seq.setFirst(0);
+    seq.setRhythmMode(StochasticSourceMode::Loop);
+    seq.setNoteDuration(5);
+    seq.setVariation(50);     // some duration variation per cell
+    seq.setBurst(0);
+    for (int i = 0; i < 8; ++i) {
+        seq.steps()[i].setRhythmValid(true);
+    }
+
+    seq.setRest(0);
+    StepCache cacheA{};
+    rebuildStepCache(cacheA, seq, 48, 0x5151u);
+    uint32_t durA[8];
+    for (int i = 0; i < 8; ++i) durA[i] = cacheA.runtimeSteps[i].durationTicks();
+
+    seq.setRest(80);
+    StepCache cacheB{};
+    rebuildStepCache(cacheB, seq, 48, 0x5151u);
+    for (int i = 0; i < 8; ++i) {
+        expectEqual(int(cacheB.runtimeSteps[i].durationTicks()), int(durA[i]),
+                    "Rest knob change must not reroll durations");
+    }
+}
+
+CASE("loop_rest_is_scrubbable") {
+    // Rest knob movement reshapes the audible pattern deterministically in
+    // Loop mode — same seed + same Rest produces the same audible mask;
+    // different Rest produces a different mask.
+    StochasticSequence seq;
+    seq.clear();
+    clearAllEvents(seq);
+    seq.setSize(16);
+    seq.setFirst(0);
+    seq.setRhythmMode(StochasticSourceMode::Loop);
+    seq.setNoteDuration(5);
+    seq.setVariation(0);
+    seq.setBurst(0);
+    for (int i = 0; i < 16; ++i) seq.steps()[i].setRhythmValid(true);
+
+    seq.setRest(50);
+    StepCache cacheA{};
+    rebuildStepCache(cacheA, seq, 48, 0xabcdu);
+    int audibleA = 0;
+    for (int i = 0; i < 16; ++i) if (cacheA.runtimeSteps[i].audible()) audibleA++;
+
+    seq.setRest(0);
+    StepCache cacheB{};
+    rebuildStepCache(cacheB, seq, 48, 0xabcdu);
+    int audibleB = 0;
+    for (int i = 0; i < 16; ++i) if (cacheB.runtimeSteps[i].audible()) audibleB++;
+
+    expectEqual(audibleB, 16, "Rest=0 → every cell audible");
+    expectTrue(audibleA < 16, "Rest=50 → some cells silenced");
+}
+
 CASE("slot_keyed_cache_writes_full_size_extent_regardless_of_first") {
     // Step-keyed cache (2026-05-24): cell content is keyed by step index,
     // not by walk position. First does not affect what gets written — it

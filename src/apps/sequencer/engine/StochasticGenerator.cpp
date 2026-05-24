@@ -151,30 +151,57 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
     sequence.steps()[i].mergeMelodyFrom(melody);
 }
 
-// Duration picker. Combines duration tickets (flat-default LUT base weight),
-// noteDuration (kernel center), and variation (kernel width, symmetric).
-// Returns LUT entry 0..7.
+// Three-zone Variation-blended duration picker. See PHASE15-PITCH-MATH-REVIEW
+// "Duration / Variation / Rest law" section. Three overlapping triangular
+// zone amounts (home / ticket / explore) sum per LUT slot.
 //
-// The (width-dist) triangle is scaled ×10 so the center retains a strong
-// lead — at low variation a low-leakage center still feels musical instead
-// of flattening to near-random.
+//   home    = bell around NoteDuration               (Variation=0 dominates)
+//   ticket  = max(1, durationTicket[i])              (Variation=50 dominates)
+//   explore = floor + bell around mirrored NoteDur   (Variation=100 dominates)
+//
+// Ticket states (mirror of pitch tickets): -1 excludes the slot entirely,
+// 0 is default-flat (weight 1 on the ticket axis), 1..100 is emphasis.
 static int pickDuration(const StochasticSequence &sequence, Random &rng) {
-    const int entries = 8;
-    int center = clamp(int(sequence.noteDuration()), 0, entries - 1);
-    int spread = clamp(int(sequence.variation()), 0, 100);
-    int width = 1 + (spread * 4) / 100;                      // 1..5 entries wide
+    constexpr int entries = 8;
+    const int center = clamp(int(sequence.noteDuration()), 0, entries - 1);
+    const int V = clamp(int(sequence.variation()), 0, 100);
+    const int mirror = (entries - 1) - center;
+
+    const int homeAmount    = std::max(0, 100 - 2 * V);
+    const int absVMid       = V > 50 ? V - 50 : 50 - V;
+    const int ticketAmount  = std::max(0, 100 - 2 * absVMid);
+    const int exploreAmount = std::max(0, 2 * V - 100);
+
+    // Home bell is a narrow spike (halfwidth 1) so Variation=0 locks
+    // strictly to NoteDuration. Mirror bell is wider (halfwidth 2) so
+    // exploration spreads around the opposite end.
+    constexpr int homeHalf = 1;
+    constexpr int mirrorHalf = 2;
+    constexpr int exploreFloor = 5;
+
     int weights[entries];
     int total = 0;
     for (int i = 0; i < entries; ++i) {
-        int base = sequence.durationTicket(i);
-        if (base <= 0) base = 10;                            // flat default
-        int dist = i > center ? i - center : center - i;
-        int tri = (width > dist ? width - dist : 0) * 10;
-        int kernel = tri + spread / 10;
-        weights[i] = base * kernel;
+        const int t = sequence.durationTicket(i);
+        if (t < 0) { weights[i] = 0; continue; }
+
+        const int dh = i > center ? i - center : center - i;
+        const int homeBell = (homeHalf > dh ? homeHalf - dh : 0) * 10;
+        const int ticketW = t > 0 ? t : 1;
+        const int dm = i > mirror ? i - mirror : mirror - i;
+        const int mirrorBell = (mirrorHalf > dm ? mirrorHalf - dm : 0) * 10;
+        const int exploreW = exploreFloor + mirrorBell;
+
+        weights[i] = homeBell * homeAmount
+                   + ticketW  * ticketAmount
+                   + exploreW * exploreAmount;
         total += weights[i];
     }
+
+    // All-excluded fallback: pick the configured NoteDuration slot even if
+    // it's been excluded. Rare; UI should flag.
     if (total <= 0) return center;
+
     int roll = int(rng.nextRange(uint32_t(total)));
     int sum = 0;
     for (int i = 0; i < entries; ++i) {

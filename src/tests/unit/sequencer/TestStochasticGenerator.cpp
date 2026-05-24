@@ -445,6 +445,78 @@ CASE("mutate_melody_targets_inside_window") {
     }
 }
 
+CASE("duration_v0_locks_to_note_duration") {
+    StochasticSequence seq;
+    seq.clear();
+    seq.setNoteDuration(5);   // LUT slot 5 = ×1
+    seq.setVariation(0);
+    for (int i = 0; i < 8; ++i) seq.setDurationTicket(i, 0);
+
+    Random rng(99);
+    int hit5 = 0;
+    for (int i = 0; i < 200; ++i) {
+        int slot = StochasticGenerator::pickDurationSlot(seq, rng);
+        if (slot == 5) hit5++;
+    }
+    expectEqual(hit5, 200, "Variation=0 must lock duration to NoteDuration");
+}
+
+CASE("duration_v50_with_ticket_emphasis") {
+    StochasticSequence seq;
+    seq.clear();
+    seq.setNoteDuration(5);
+    seq.setVariation(50);
+    for (int i = 0; i < 8; ++i) seq.setDurationTicket(i, 0);
+    seq.setDurationTicket(2, 100);   // emphasize slot 2
+
+    Random rng(7);
+    int hit2 = 0;
+    for (int i = 0; i < 200; ++i) {
+        int slot = StochasticGenerator::pickDurationSlot(seq, rng);
+        if (slot == 2) hit2++;
+    }
+    expectTrue(hit2 >= 180, "Variation=50 must let heavy ticket dominate");
+}
+
+CASE("duration_v100_prefers_opposite_side") {
+    StochasticSequence seq;
+    seq.clear();
+    seq.setNoteDuration(1);   // LUT slot 1 → mirror at slot 6
+    seq.setVariation(100);
+    for (int i = 0; i < 8; ++i) seq.setDurationTicket(i, 0);
+
+    Random rng(13);
+    int picks[8] = {};
+    for (int i = 0; i < 400; ++i) {
+        int slot = StochasticGenerator::pickDurationSlot(seq, rng);
+        if (slot >= 0 && slot < 8) picks[slot]++;
+    }
+    // mirror (slot 6) plus its neighbors (5, 7) should dominate over the home side (0, 1, 2).
+    int mirrorSide = picks[5] + picks[6] + picks[7];
+    int homeSide   = picks[0] + picks[1] + picks[2];
+    expectTrue(mirrorSide > homeSide, "Variation=100 must bias toward the opposite-side bell");
+}
+
+CASE("duration_ticket_minus_one_excludes") {
+    StochasticSequence seq;
+    seq.clear();
+    seq.setNoteDuration(3);
+    seq.setVariation(50);
+    for (int i = 0; i < 8; ++i) seq.setDurationTicket(i, 0);
+    seq.setDurationTicket(2, -1);   // exclude slot 2
+    seq.setDurationTicket(5, -1);   // exclude slot 5
+
+    Random rng(101);
+    int hit2 = 0, hit5 = 0;
+    for (int i = 0; i < 400; ++i) {
+        int slot = StochasticGenerator::pickDurationSlot(seq, rng);
+        if (slot == 2) hit2++;
+        if (slot == 5) hit5++;
+    }
+    expectEqual(hit2, 0, "ticket=-1 must hard-exclude slot 2");
+    expectEqual(hit5, 0, "ticket=-1 must hard-exclude slot 5");
+}
+
 CASE("produces_valid_output_at_all_defaults") {
     StochasticSequence seq;
     seq.clear();   // factory defaults

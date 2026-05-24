@@ -100,6 +100,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
     uint8_t anchorOctave = 0;
     bool anchorLegato = false;
     bool anchorSlide  = false;
+    bool anchorAudible = true;
 
     for (int i = 0; i < size; ++i) {
         if (i >= kCellCap) break;  // hard cap; remaining steps dropped silently
@@ -260,6 +261,25 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
             anchorSlide  = cellSlide;
         }
 
+        // Rest pick — Loop mode rolls fresh per cell from a salted RNG so
+        // the Rest knob is scrubbable and the rest stream is independent of
+        // the duration stream. Live mode reads the stored event.rest bit
+        // (engine writes fresh content per trigger). Cluster tails inherit
+        // the anchor's rest decision so a cluster behaves as one gesture.
+        bool cellAudible;
+        if (isClusterTail) {
+            cellAudible = anchorAudible;
+        } else if (pickRhythmInCache) {
+            const int restKnob = std::max(0, std::min(100, int(seq.rest())));
+            Random restRng(keyed_rng::cellSeed(seq.rhythmSeed(), uint32_t(i)) ^ 0x5E57DEADu);
+            const bool restHit = (restKnob > 0 && int(restRng.nextRange(100)) < restKnob);
+            cellAudible = !restHit;
+            anchorAudible = cellAudible;
+        } else {
+            cellAudible = !ev.rest();
+            anchorAudible = cellAudible;
+        }
+
         // Step-keyed write: runtimeSteps[K] for step K.
         cache.runtimeSteps[i] = RuntimeStep::make(
             cellDur,
@@ -268,7 +288,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
             cellGateFrac,
             cellSlide,
             cellLegato,
-            /*audible*/ !ev.rest());
+            cellAudible);
 
         cache.aux[i] = CellAux::make();
 

@@ -318,9 +318,10 @@ public:
     int rotate() const { return _rotate.get(isRouted(Routing::Target::Rotate)); }
     void setRotate(int rotate, bool routed = false) { _rotate.set(clamp(rotate, -64, 64), routed); }
 
-    // durationTickets (Level 3 parent-duration weights)
+    // durationTickets — per-LUT-slot duration emphasis. Three states (mirror
+    // of pitch tickets): -1 excludes the slot, 0 default-flat, 1..100 weight.
     int durationTicket(int index) const { return _durationTickets[index]; }
-    void setDurationTicket(int index, int value) { _durationTickets[index] = clamp(value, 0, 100); }
+    void setDurationTicket(int index, int value) { _durationTickets[index] = clamp(value, -1, 100); }
     bool durationTicketsActive() const {
         for (int i = 0; i < 8; ++i) if (_durationTickets[i] > 0) return true;
         return false;
@@ -633,7 +634,7 @@ public:
         _gateLength.read(reader);
         for (int i = 0; i < 8; ++i) {
             reader.read(_durationTickets[i]);
-            _durationTickets[i] = clamp(int(_durationTickets[i]), 0, 100);
+            _durationTickets[i] = clamp(int(_durationTickets[i]), -1, 100);
         }
         { uint8_t reserved; reader.read(reserved); }   // was StochasticLevel enum
 
@@ -781,7 +782,7 @@ private:
     Routable<uint8_t> _jump;
     uint8_t _range;
 
-    uint8_t _durationTickets[8];
+    int8_t _durationTickets[8];
 
     StochasticSourceMode _rhythmMode;
     StochasticSourceMode _melodyMode;
