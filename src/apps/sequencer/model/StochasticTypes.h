@@ -31,6 +31,32 @@ inline StochasticDurationFraction stochasticDurationFraction(int index) {
     return kStochasticDurationLut[index];
 }
 
+// Position-only pitch centrality. Higher = more tonal (root, fifth, thirds, etc).
+// Triangular kernels around root/half/thirds/quarters; ceiling = root anchor weight.
+// Used by the engine trigger-time melody-mask block (maskMelody/tiltMelody).
+constexpr int kStochasticPitchCentralityMax = 30;
+inline int stochasticPitchCentrality(int degInOct, int N) {
+    if (N <= 1) return 0;
+    int halfWidth = N / 6;
+    if (halfWidth < 1) halfWidth = 1;
+    auto kernel = [&](int target, int weight) -> int {
+        int dist = degInOct - target;
+        if (dist < 0) dist = -dist;
+        int wrap = N - dist;
+        if (wrap < dist) dist = wrap;
+        int w = (halfWidth - dist) * weight / halfWidth;
+        return w > 0 ? w : 0;
+    };
+    int b = 0;
+    b += kernel(0,             kStochasticPitchCentralityMax);
+    if (N >= 2) b += kernel(N / 2,        20);
+    if (N >= 3) b += kernel(N / 3,        10);
+    if (N >= 3) b += kernel((2 * N) / 3,  10);
+    if (N >= 4) b += kernel(N / 4,         5);
+    if (N >= 4) b += kernel((3 * N) / 4,   5);
+    return b;
+}
+
 // Burst-cluster pitch mode. Hold = cluster tails copy the anchor's pitch.
 // Roll = cluster tails re-pick a fresh pitch each cell (melody-keyed).
 // Integer ordering preserved (Hold=0, Roll=1) so wire format is unaffected

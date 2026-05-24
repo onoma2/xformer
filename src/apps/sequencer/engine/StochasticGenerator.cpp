@@ -112,32 +112,6 @@ void StochasticGenerator::generateMelody(StochasticSequence &sequence, const Sto
     sequence.setMelodySeed(seed);
 }
 
-// Universal scale-degree weight from position alone. Works for any scale size
-// (5, 7, 12, 24, 43, microtonal). Anchors at simple integer fractions of N:
-// root (0), half (N/2), thirds (N/3, 2N/3), quarters (N/4, 3N/4). Triangular
-// kernel around each anchor falls off across N/6 positions.
-static int universalDegreeBoost(int degInOct, int N) {
-    if (N <= 1) return 0;
-    int halfWidth = N / 6;
-    if (halfWidth < 1) halfWidth = 1;
-    auto kernel = [&](int target, int weight) {
-        int dist = std::abs(degInOct - target);
-        // Wrap-around (octave equivalence at N)
-        int wrap = N - dist;
-        if (wrap < dist) dist = wrap;
-        int w = (halfWidth - dist) * weight / halfWidth;
-        return w > 0 ? w : 0;
-    };
-    int boost = 0;
-    boost += kernel(0,             30);                  // root anchor
-    if (N >= 2) boost += kernel(N / 2,         20);      // half
-    if (N >= 3) boost += kernel(N / 3,         10);      // third
-    if (N >= 3) boost += kernel((2 * N) / 3,   10);
-    if (N >= 4) boost += kernel(N / 4,          5);      // quarter
-    if (N >= 4) boost += kernel((3 * N) / 4,    5);
-    return boost;
-}
-
 void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const StochasticTrack &track, Random &rng, int mutateMagnitude) {
     int size = sequence.size();
     if (size <= 0) return;
@@ -190,12 +164,13 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
     int last  = clamp(int(sequence.last()),  first, size - 1);
     int i = first + rng.nextRange(last - first + 1);
 
-    // Build a weighted candidate list combining: degree tickets (user-curated),
-    // universal degree LUT (geometric anchors), and bias_strength inverse to
-    // mutate magnitude. Low magnitude = strong anchor pull (tonal); high = uniform.
+    // Pure ticket-weighted candidate pick. Steps-law centrality boost is
+    // gone (mask-melody owns audibility at trigger time). mutateMagnitude
+    // is currently a no-op on the pitch axis here; PHASE15 owns the
+    // mutate-distance revamp.
+    (void)mutateMagnitude;
     int activeNotes = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
     int range = sequence.range();
-    int biasStrength = 100 - std::max(0, std::min(100, mutateMagnitude));
 
     int allowedDegrees[CONFIG_USER_SCALE_SIZE * 4];
     int weights[CONFIG_USER_SCALE_SIZE * 4];
@@ -205,11 +180,9 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
     for (int oct = 0; oct < range; ++oct) {
         for (int idx = 0; idx < activeNotes; ++idx) {
             int tickets = sequence.effectiveDegreeTicket(idx, activeNotes);
-            if (tickets < 0) continue;                       // excluded
+            if (tickets < 0) continue;
             int deg = oct * activeNotes + idx;
-            int boost = universalDegreeBoost(idx, activeNotes);
-            int ticketWeight = (tickets > 0) ? tickets : 1;
-            int w = ticketWeight * (100 + (biasStrength * boost) / 100);
+            int w = (tickets > 0) ? tickets : 1;
             allowedDegrees[allowedCount] = deg;
             weights[allowedCount] = w;
             totalWeight += w;
@@ -456,24 +429,22 @@ StochasticStepContent StochasticGenerator::generateMelodyEvent(const StochasticS
     return event;
 }
 
-// Phase 11 unified pitch picker. Single path. All shaping multiplies:
-//   1. Build allowed degrees from range × scale tones, gated by ticket≥0
-//      (Phase 12: min/max degree clamps dropped — redundant with range + pitch
-//      tickets at 0; reserved as model fields only.)
-//   2. Steps sieve — universalDegreeBoost rank cutoff. Knob 0..100, 100=open.
-//      Top-K most-fundamental degrees survive. Mirrors Mask on rhythm side.
-//   3. Per-survivor weight = ticket × complexityKernel × marblesKernel
-//      - complexityKernel: triangular around lastDegree, width grows with complexity
-//        plus a leakage term so high complexity allows leaps (linearity baked in)
-//      - marblesKernel: triangular around bias position, width grows with spread,
-//        always running with transparent defaults (bias=50, spread=100 → wide)
-//   4. Weighted random pick over survivors
+// Unified pitch picker. All shaping multiplies:
+//   1. Build allowed degrees from range × scale tones, gated by ticket≥0.
+//   2. Per-slot weight = ticket × complexityKernel × marblesKernel.
+//      - complexityKernel: triangular around lastDegree, width grows with
+//        complexity plus a leakage term so high complexity allows leaps.
+//      - marblesKernel: triangular around bias position, width grows with
+//        spread; always running.
+//   3. Weighted random pick.
+//
+// Pitch-centrality (stochasticPitchCentrality) is intentionally NOT a factor
+// here — pitch-mask audibility happens at trigger time via maskMelody/tiltMelody.
 int StochasticGenerator::generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng) {
     int activeNotes = clamp(scale.notesPerOctave(), 1, CONFIG_USER_SCALE_SIZE);
     int range = sequence.range();
     int N = activeNotes;
 
-    // 1. Build allowed degrees + ticket weights
     constexpr int kMaxSlots = CONFIG_USER_SCALE_SIZE * 4;
     int allowedDegrees[kMaxSlots];
     int ticketWeights[kMaxSlots];
@@ -491,33 +462,6 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
     }
     if (allowedCount == 0) return 0;
 
-    // 2. Steps sieve — keep top-K by universalDegreeBoost rank
-    int steps = clamp(int(sequence.stepsSieve()), 0, 100);
-    int K = (allowedCount * steps + 99) / 100;
-    if (K < 1) K = 1;
-    if (K > allowedCount) K = allowedCount;
-
-    int sieveRank[kMaxSlots];
-    for (int i = 0; i < allowedCount; ++i) {
-        int degInOct = ((allowedDegrees[i] % N) + N) % N;
-        sieveRank[i] = universalDegreeBoost(degInOct, N);
-    }
-    bool keep[kMaxSlots] = {};
-    if (K >= allowedCount) {
-        for (int i = 0; i < allowedCount; ++i) keep[i] = true;
-    } else {
-        for (int k = 0; k < K; ++k) {
-            int bestIdx = -1; int bestRank = -1;
-            for (int i = 0; i < allowedCount; ++i) {
-                if (keep[i]) continue;
-                if (sieveRank[i] > bestRank) { bestRank = sieveRank[i]; bestIdx = i; }
-            }
-            if (bestIdx >= 0) keep[bestIdx] = true;
-            else break;
-        }
-    }
-
-    // 3. Locate lastDegree's position in allowedDegrees for complexity kernel
     int lastIdx = -1;
     if (lastDegree != -1) {
         for (int i = 0; i < allowedCount; ++i) {
@@ -526,19 +470,17 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
     }
 
     int complexity = clamp(int(sequence.complexity()), 0, 100);
-    int kernelWidth = 1 + (complexity * N) / 50;     // ~1 .. ~2N
-    int kernelLeak = complexity / 10;                // 0..10
-    int contour = clamp(int(sequence.contour()), -100, 100); // Drift: directional bias from lastIdx
+    int kernelWidth = 1 + (complexity * N) / 50;
+    int kernelLeak = complexity / 10;
+    int contour = clamp(int(sequence.contour()), -100, 100);
 
-    int marblesBias = clamp(int(sequence.marblesBias()), 0, 100);     // 0..100
-    int marblesSpread = clamp(int(sequence.marblesSpread()), 0, 100); // 0..100
+    int marblesBias = clamp(int(sequence.marblesBias()), 0, 100);
+    int marblesSpread = clamp(int(sequence.marblesSpread()), 0, 100);
 
     int biasPos = (allowedCount > 1) ? (marblesBias * (allowedCount - 1) + 50) / 100 : 0;
     int marblesWidth = 1 + (marblesSpread * allowedCount) / 100;
     int marblesLeak = 1 + marblesSpread / 10;
 
-    // Global ticket-active check: if any ticket > 0, zero tickets mean "excluded"
-    // (filter). If ALL tickets are 0, use flat=10 fallback for all (no filter).
     bool anyTicket = false;
     for (int i = 0; i < allowedCount; ++i) {
         if (ticketWeights[i] > 0) { anyTicket = true; break; }
@@ -547,8 +489,6 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
     int weights[kMaxSlots];
     int totalWeight = 0;
     for (int i = 0; i < allowedCount; ++i) {
-        if (!keep[i]) { weights[i] = 0; continue; }
-
         int base = anyTicket ? ticketWeights[i] : 10;
         if (base < 0) base = 0;
 
@@ -557,8 +497,6 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
             kernel = 100;
         } else {
             int d = i > lastIdx ? i - lastIdx : lastIdx - i;
-            // ×10 scaling on the (kernelWidth-dist) triangle so the center
-            // retains a strong lead over the leakage floor.
             int tri = (kernelWidth > d ? kernelWidth - d : 0) * 10;
             int signedDist = i - lastIdx;
             int drift = (contour * signedDist) / 2;
@@ -570,8 +508,6 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
         }
 
         int dm = i > biasPos ? i - biasPos : biasPos - i;
-        // Marbles bell triangle, same ×10 scaling so the leakage floor
-        // doesn't overwhelm the bell at low spread.
         int mtri = (marblesWidth > dm ? marblesWidth - dm : 0) * 10;
         int marbles = mtri + marblesLeak;
 
@@ -579,7 +515,6 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
         totalWeight += weights[i];
     }
 
-    // 4. Weighted random pick
     int degree = allowedDegrees[0];
     if (totalWeight > 0) {
         int roll = int(rng.nextRange(uint32_t(totalWeight)));
@@ -587,11 +522,6 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
         for (int i = 0; i < allowedCount; ++i) {
             sum += weights[i];
             if (roll < sum) { degree = allowedDegrees[i]; break; }
-        }
-    } else {
-        // All weights zero (shouldn't happen with leakage floor); pick any survivor
-        for (int i = 0; i < allowedCount; ++i) {
-            if (keep[i]) { degree = allowedDegrees[i]; break; }
         }
     }
     lastDegree = degree;

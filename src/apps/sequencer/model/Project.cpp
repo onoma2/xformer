@@ -125,7 +125,7 @@ void Project::clear() {
     stoSeq.setDivisor(12);   // 1/16 — better default than 1/4 for stochastic content
     stoSeq.setSize(4);
     stoSeq.setNoteDuration(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
-    stoSeq.setMask(100);
+    stoSeq.setMaskRhythm(100);
     stoSeq.setRest(0);
     stoSeq.setBurst(0);
     stoSeq.setGateLength(0);

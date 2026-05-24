@@ -6,8 +6,9 @@
 #include "apps/sequencer/model/Scale.h"
 #include "core/utils/Random.h"
 
-// Phase 11: unified pitch picker. All shaping (tickets, complexity kernel,
-// marbles bias/spread, Steps sieve) multiplies — no bypass branches.
+// Unified pitch picker. Shaping factors: degree tickets, complexity kernel,
+// marbles bias/spread. Pitch-centrality (Steps law) is no longer a factor here —
+// it acts at trigger time via maskMelody/tiltMelody.
 
 UNIT_TEST("StochasticGenerator") {
 
@@ -25,7 +26,6 @@ CASE("tickets_steer_the_distribution") {
     seq.setComplexity(50);
     seq.setMarblesBias(50);
     seq.setMarblesSpread(100);
-    seq.setStepsSieve(100); // sieve fully open
 
     StochasticTrack track;
     track.clear();
@@ -44,35 +44,6 @@ CASE("tickets_steer_the_distribution") {
     expectTrue(hit01 >= 140, "tickets should dominate (>=70% on weighted degrees)");
 }
 
-CASE("steps_sieve_restricts_to_fundamental_degrees") {
-    StochasticSequence seq;
-    seq.clear();
-    seq.setRange(1);
-
-    // Default tickets (flat) — sieve must do the filtering.
-    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
-
-    // Tight sieve — only the root anchor should survive.
-    seq.setStepsSieve(5);
-    seq.setComplexity(50);
-    seq.setMarblesBias(50);
-    seq.setMarblesSpread(100);
-
-    StochasticTrack track;
-    track.clear();
-
-    Random rng(42);
-    int lastDegree = -1;
-    int rootCount = 0;
-    for (int i = 0; i < 200; ++i) {
-        const auto &scale = Scale::get(0);
-        int deg = StochasticGenerator::generateDegree(seq, track, scale, lastDegree, rng);
-        if ((deg % 12) == 0) rootCount++;
-    }
-
-    expectTrue(rootCount >= 180, "tight Steps sieve should keep almost all picks on the root");
-}
-
 CASE("marbles_distribution_always_runs_with_transparent_defaults") {
     StochasticSequence seq;
     seq.clear();
@@ -83,7 +54,6 @@ CASE("marbles_distribution_always_runs_with_transparent_defaults") {
     // Transparent defaults — bias center, spread wide, steps open.
     seq.setMarblesBias(50);
     seq.setMarblesSpread(100);
-    seq.setStepsSieve(100);
     seq.setComplexity(50);
 
     StochasticTrack track;
@@ -113,7 +83,6 @@ CASE("complexity_kernel_narrows_movement_at_low_values") {
 
     seq.setMarblesBias(50);
     seq.setMarblesSpread(100);
-    seq.setStepsSieve(100);
     // Low complexity — kernel tight, picks should cluster near lastDegree
     seq.setComplexity(0);
 

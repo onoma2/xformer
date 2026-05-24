@@ -104,6 +104,9 @@ enum ProjectVersion {
     // added Project::busSafety
     Version34 = 34,
 
+    // added StochasticSequence::tiltMelody (unipolar mask-melody inversion)
+    Version35 = 35,
+
     // automatically derive latest version
     Last,
     Latest = Last - 1,

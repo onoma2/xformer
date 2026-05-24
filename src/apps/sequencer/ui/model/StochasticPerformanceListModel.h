@@ -22,7 +22,8 @@ public:
         Shape,
         Spread,
         Bias,
-        Steps,
+        MaskMelody,
+        TiltMelody,
         NoteDuration,
         Variation,
         Rest,
@@ -32,8 +33,8 @@ public:
         BurstCount,
         BurstRate,
         BurstHold,
-        Mask,
-        Tilt,
+        MaskRhythm,
+        TiltRhythm,
         Sleep,
         Patience,
         PatienceMelody,
@@ -83,9 +84,9 @@ public:
 
     virtual Routing::Target routingTarget(int row) const override {
         switch (itemForRow(row)) {
-        case Mask:          return Routing::Target::StochasticMask;
+        case MaskRhythm:    return Routing::Target::StochasticMask;
         case GateLength:    return Routing::Target::StochasticGateLength;
-        case Tilt:          return Routing::Target::StochasticTilt;
+        case TiltRhythm:    return Routing::Target::StochasticTilt;
         case Burst:         return Routing::Target::StochasticBurst;
         case Contour:       return Routing::Target::StochasticContour;
         case NoteDuration:  return Routing::Target::StochasticNoteDuration;
@@ -137,7 +138,8 @@ private:
         case Shape:         return "Shape";
         case Spread:        return "Spread";
         case Bias:          return "Bias";
-        case Steps:         return "Steps";
+        case MaskMelody:    return "MaskM";
+        case TiltMelody:    return "TiltM";
         case NoteDuration:  return "Note Duration";
         case Variation:     return "Variation";
         case Rest:          return "Rest";
@@ -147,8 +149,8 @@ private:
         case BurstCount:    return "Burst Count";
         case BurstRate:     return "Burst Rate";
         case BurstHold:    return "Burst Hold";
-        case Mask:          return "Mask";
-        case Tilt:          return "Tilt";
+        case MaskRhythm:    return "MaskR";
+        case TiltRhythm:    return "TiltR";
         case Sleep:         return "Sleep";
         case Patience:      return "Patience R";
         case PatienceMelody:return "Patience M";
@@ -182,7 +184,8 @@ private:
         case Shape:         sequence.printMarblesMode(str); break;
         case Spread:        sequence.printMarblesSpread(str); break;
         case Bias:          sequence.printMarblesBias(str); break;
-        case Steps:         sequence.printStepsSieve(str); break;
+        case MaskMelody:    sequence.printMaskMelody(str); break;
+        case TiltMelody:    sequence.printTiltMelody(str); break;
         case NoteDuration:  sequence.printNoteDuration(str); break;
         case Variation:     sequence.printVariation(str); break;
         case Rest:          sequence.printRest(str); break;
@@ -192,8 +195,8 @@ private:
         case BurstCount:    str("%d%%", sequence.burstCount()); break;
         case BurstRate:     str("%d%%", sequence.burstRate()); break;
         case BurstHold:    sequence.printBurstHold(str); break;
-        case Mask:          sequence.printMask(str); break;
-        case Tilt:          sequence.printTilt(str); break;
+        case MaskRhythm:    sequence.printMaskRhythm(str); break;
+        case TiltRhythm:    sequence.printTiltRhythm(str); break;
         case Sleep:         sequence.printSleep(str); break;
         case Patience:      sequence.printPatienceRhythm(str); break;
         case PatienceMelody:sequence.printPatienceMelody(str); break;
@@ -222,7 +225,8 @@ private:
         case Shape:         sequence.editMarblesMode(value, shift); break;
         case Spread:        sequence.editMarblesSpread(value, shift); break;
         case Bias:          sequence.editMarblesBias(value, shift); break;
-        case Steps:         sequence.editStepsSieve(value, shift); break;
+        case MaskMelody:    sequence.editMaskMelody(value, shift); break;
+        case TiltMelody:    sequence.editTiltMelody(value, shift); break;
         case NoteDuration:  sequence.editNoteDuration(value, shift); break;
         case Variation:     sequence.editVariation(value, shift); break;
         case Rest:          sequence.editRest(value, shift); break;
@@ -232,8 +236,8 @@ private:
         case BurstCount:    sequence.setBurstCount(sequence.burstCount() + value);       notifyShapingEdit(); break;
         case BurstRate:     sequence.setBurstRate(sequence.burstRate() + value);         notifyShapingEdit(); break;
         case BurstHold:    sequence.editBurstHold(value, shift);                       notifyShapingEdit(); break;
-        case Mask:          sequence.editMask(value, shift); break;
-        case Tilt:          sequence.editTilt(value, shift); break;
+        case MaskRhythm:    sequence.editMaskRhythm(value, shift); break;
+        case TiltRhythm:    sequence.editTiltRhythm(value, shift); break;
         case Sleep:         sequence.editSleep(value, shift); break;
         case Patience:      sequence.editPatienceRhythm(value, shift); break;
         case PatienceMelody:sequence.editPatienceMelody(value, shift); break;
@@ -307,7 +311,8 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     Repeat,
     Bias,
     Spread,
-    Steps,
+    MaskMelody,
+    TiltMelody,
     Range,
     // Rhythm
     NoteDuration,
@@ -321,9 +326,9 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     BurstCount,
     BurstRate,
     BurstHold,
-    // Pattern sieve
-    Mask,
-    Tilt,
+    // Pattern sieve (rhythm)
+    MaskRhythm,
+    TiltRhythm,
     // Sequence window
     Size,
     First,

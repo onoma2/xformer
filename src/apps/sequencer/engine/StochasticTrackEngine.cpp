@@ -412,16 +412,11 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         int note = pDegree + (pOctave + _jumpRegister + track.octave()) * activeNotes + track.transpose();
         finalCv = scale.noteToVolts(note) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
 
-        // Mask + Tilt — LoopR-only. In LiveR, every step's stored rank is 0
-        // (Live events bypass generateMaskRanks), so Tilt's duration axis
-        // would collapse to "attenuate salt cut" — confusing knob with no
-        // musical meaning. Gate the whole block on rhythmMode==Loop; both
-        // knobs are inert in Live. UI should mark them stale.
-        bool maskPass = true;
-        if (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.mask() < 100) {
-            // Rank from event (Repeat replays captured rank — frozen-material
-            // contract: a mutate-driven rerank since capture does not
-            // retroactively shift the replayed event).
+        // MaskR + TiltR — LoopR-only. In LiveR every event stores rank=0
+        // (Live bypasses generateMaskRanks), so TiltR's duration axis would
+        // collapse to a salt-only cut. Both knobs are inert in LiveR.
+        bool maskRhythmPass = true;
+        if (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.maskRhythm() < 100) {
             const uint32_t patternSize = std::max<uint32_t>(1, sequence.size());
             const uint32_t denom = patternSize > 1 ? (patternSize - 1) : 1;
             const uint32_t storedRank = (useRepeat ? uint32_t(eval.densityRank())
@@ -429,18 +424,38 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             const uint32_t rankPctMilli = std::min<uint32_t>(1000, (storedRank * 1000) / denom);
             const uint32_t saltHash = keyed_rng::cellSeed(sequence.rhythmSeed(), uint32_t(stepIndex));
             const uint32_t saltPctMilli = ((saltHash >> 24) * 1000) / 255;
-            const int tiltSigned = int(sequence.tilt());
-            const uint32_t tiltMag = uint32_t(std::abs(tiltSigned));   // 0..100
+            const int tiltSigned = int(sequence.tiltRhythm());
+            const uint32_t tiltMag = uint32_t(std::abs(tiltSigned));
             const uint32_t effectiveMilli =
                 (tiltMag * rankPctMilli + (100 - tiltMag) * saltPctMilli) / 100;
-            const uint32_t maskMilli = uint32_t(sequence.mask()) * 10;   // 0..1000
+            const uint32_t maskMilli = uint32_t(sequence.maskRhythm()) * 10;
             if (tiltSigned >= 0) {
-                maskPass = effectiveMilli < maskMilli;
+                maskRhythmPass = effectiveMilli < maskMilli;
             } else {
-                maskPass = (1000 - effectiveMilli) < maskMilli;
+                maskRhythmPass = (1000 - effectiveMilli) < maskMilli;
             }
         }
-        isRest = pRest || !maskPass || !eval.rhythmValid() || !eval.melodyValid();
+
+        // MaskM + TiltM — LoopM-only. Pitch-centrality filter: each played
+        // step's degree gets a centrality score; MaskM thresholds it. TiltM
+        // is unipolar inversion magnitude — 0 keeps high-centrality (tonal),
+        // 100 keeps low-centrality (anti-tonal). LiveM bypasses (inert).
+        bool maskMelodyPass = true;
+        if (sequence.melodyMode() == StochasticSourceMode::Loop && sequence.maskMelody() < 100) {
+            const int N = activeNotes > 0 ? activeNotes : 1;
+            int degInOct = pDegree % N;
+            if (degInOct < 0) degInOct += N;
+            const uint32_t centralityMilli = std::min<uint32_t>(1000,
+                uint32_t(stochasticPitchCentrality(degInOct, N)) * 1000u /
+                uint32_t(kStochasticPitchCentralityMax));
+            const uint32_t tiltMag = uint32_t(sequence.tiltMelody());   // 0..100
+            const uint32_t effectiveMilli =
+                ((100 - tiltMag) * centralityMilli + tiltMag * (1000 - centralityMilli)) / 100;
+            const uint32_t maskMilli = uint32_t(sequence.maskMelody()) * 10;
+            maskMelodyPass = effectiveMilli >= (1000 - maskMilli);
+        }
+
+        isRest = pRest || !maskRhythmPass || !maskMelodyPass || !eval.rhythmValid() || !eval.melodyValid();
         isLegato = pLegato;
         isSlide = pSlide;
 

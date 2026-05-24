@@ -10,6 +10,7 @@
 #include "core/math/Math.h"
 
 #include "Routing.h"
+#include "ProjectVersion.h"
 #include "StochasticTypes.h"
 
 class StochasticSequence {
@@ -97,9 +98,9 @@ public:
 
     void writeRouted(Routing::Target target, int intValue, float floatValue) {
         switch (target) {
-        case Routing::Target::StochasticMask: setMask(intValue, true); break;
+        case Routing::Target::StochasticMask: setMaskRhythm(intValue, true); break;
         case Routing::Target::StochasticGateLength: setGateLength(intValue, true); break;
-        case Routing::Target::StochasticTilt: setTilt(intValue, true); break;
+        case Routing::Target::StochasticTilt: setTiltRhythm(intValue, true); break;
         case Routing::Target::StochasticBurst: setBurst(intValue, true); break;
         case Routing::Target::StochasticComplexity: setComplexity(intValue, true); break;
         case Routing::Target::StochasticContour: setContour(intValue, true); break;
@@ -266,13 +267,19 @@ public:
     int marblesBias() const { return _marblesBias; }
     void setMarblesBias(int bias) { _marblesBias = clamp(bias, 0, 100); }
 
-    // stepsSieve — pitch sieve cutoff (Phase 11). 0..100, 100=open.
-    int stepsSieve() const { return _stepsSieve; }
-    void setStepsSieve(int value) { _stepsSieve = clamp(value, 0, 100); }
+    // maskMelody — pitch-centrality threshold. 0..100, 100=bypass. Acts at
+    // trigger time, gated on melodyMode==Loop. Inert in LiveM.
+    int maskMelody() const { return _maskMelody; }
+    void setMaskMelody(int value) { _maskMelody = clamp(value, 0, 100); }
 
-    // mask (deterministic loop playback thinning, V5 rename from density)
-    int mask() const { return _mask.get(isRouted(Routing::Target::StochasticMask)); }
-    void setMask(int mask, bool routed = false) { _mask.set(clamp(mask, 0, 100), routed); }
+    // tiltMelody — unipolar inversion magnitude for the melody mask.
+    // 0 = natural (high-centrality survives), 100 = inverted (low survives).
+    int tiltMelody() const { return _tiltMelody; }
+    void setTiltMelody(int value) { _tiltMelody = clamp(value, 0, 100); }
+
+    // maskRhythm (deterministic loop playback thinning, V5 rename from density)
+    int maskRhythm() const { return _maskRhythm.get(isRouted(Routing::Target::StochasticMask)); }
+    void setMaskRhythm(int value, bool routed = false) { _maskRhythm.set(clamp(value, 0, 100), routed); }
 
     // gateLength — repurposed from the Phase 11 `_gateLength` reserved field. Knob
     // 0..100 controls the spread of per-event gate length around a hardcoded
@@ -284,9 +291,9 @@ public:
     int gateLength() const { return _gateLength.get(isRouted(Routing::Target::StochasticGateLength)); }
     void setGateLength(int value, bool routed = false) { _gateLength.set(clamp(value, 0, 100), routed); }
 
-    // tilt (attached to mask)
-    int tilt() const { return _tilt.get(isRouted(Routing::Target::StochasticTilt)); }
-    void setTilt(int tilt, bool routed = false) { _tilt.set(clamp(tilt, -100, 100), routed); }
+    // tiltRhythm (attached to maskRhythm)
+    int tiltRhythm() const { return _tiltRhythm.get(isRouted(Routing::Target::StochasticTilt)); }
+    void setTiltRhythm(int value, bool routed = false) { _tiltRhythm.set(clamp(value, -100, 100), routed); }
 
     // burs
     int burst() const { return _burst.get(isRouted(Routing::Target::StochasticBurst)); }
@@ -318,8 +325,11 @@ public:
     void printRepeatProb(StringBuilder &str) const { str("%d%%", repeatProb()); }
     void editRepeatProb(int value, bool shift) { setRepeatProb(repeatProb() + value); }
 
-    void printStepsSieve(StringBuilder &str) const { str("%d", stepsSieve()); }
-    void editStepsSieve(int value, bool shift) { setStepsSieve(stepsSieve() + value); }
+    void printMaskMelody(StringBuilder &str) const { str("%d%%", maskMelody()); }
+    void editMaskMelody(int value, bool shift) { setMaskMelody(maskMelody() + value); }
+
+    void printTiltMelody(StringBuilder &str) const { str("%d%%", tiltMelody()); }
+    void editTiltMelody(int value, bool shift) { setTiltMelody(tiltMelody() + value); }
 
     void printMarblesMode(StringBuilder &str) const { str(marblesMode() == MarblesMode::Off ? "Off" : "On"); }
     void editMarblesMode(int value, bool shift) { setMarblesMode(ModelUtils::adjustedEnum(marblesMode(), value)); }
@@ -331,8 +341,8 @@ public:
     void editMarblesBias(int value, bool shift) { setMarblesBias(marblesBias() + value); }
 
 
-    void printMask(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMask); str("%d%%", mask()); }
-    void editMask(int value, bool shift) { if (!isRouted(Routing::Target::StochasticMask)) setMask(mask() + value); }
+    void printMaskRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMask); str("%d%%", maskRhythm()); }
+    void editMaskRhythm(int value, bool shift) { if (!isRouted(Routing::Target::StochasticMask)) setMaskRhythm(maskRhythm() + value); }
 
     // Level 1 Density macro: writes density only (no fan-out to rest)
     void printGateLength(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticGateLength); str("%d%%", gateLength()); }
@@ -349,8 +359,8 @@ public:
         }
     }
 
-    void printTilt(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticTilt); str("%+d%%", tilt()); }
-    void editTilt(int value, bool shift) { if (!isRouted(Routing::Target::StochasticTilt)) setTilt(tilt() + value); }
+    void printTiltRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticTilt); str("%+d%%", tiltRhythm()); }
+    void editTiltRhythm(int value, bool shift) { if (!isRouted(Routing::Target::StochasticTilt)) setTiltRhythm(tiltRhythm() + value); }
 
     // Phase 12: append "*" when current noteDuration + divisor combo can't
     // produce audible burst (parentTicks < 96). Engine still gates Burst
@@ -504,9 +514,9 @@ public:
         writer.write(static_cast<uint8_t>(_marblesMode));
         writer.write(_marblesSpread);
         writer.write(_marblesBias);
-        writer.write(_stepsSieve);
-        _mask.write(writer);
-        _tilt.write(writer);
+        writer.write(_maskMelody);
+        _maskRhythm.write(writer);
+        _tiltRhythm.write(writer);
         _burst.write(writer);
         _feel.write(writer);
         writer.write(uint8_t(0));   // reserved (was _minDegree)
@@ -577,10 +587,10 @@ public:
         _marblesSpread = clamp(int(_marblesSpread), 0, 100);
         reader.read(_marblesBias);
         _marblesBias = clamp(int(_marblesBias), 0, 100);
-        reader.read(_stepsSieve);
-        _stepsSieve = clamp(int(_stepsSieve), 0, 100);
-        _mask.read(reader);
-        _tilt.read(reader);
+        reader.read(_maskMelody);
+        _maskMelody = clamp(int(_maskMelody), 0, 100);
+        _maskRhythm.read(reader);
+        _tiltRhythm.read(reader);
         _burst.read(reader);
         _feel.read(reader);
         { uint8_t reserved; reader.read(reserved); }   // was _minDegree
@@ -619,6 +629,9 @@ public:
         }
         { uint8_t reserved; reader.read(reserved); }   // was StochasticLevel enum
 
+        _tiltMelody = 0;
+        reader.read(_tiltMelody, ProjectVersion::Version35);
+        _tiltMelody = clamp(int(_tiltMelody), 0, 100);
 
         for (auto &event : _steps) {
             for (int i = 0; i < 6; ++i) {
@@ -659,10 +672,11 @@ private:
         _marblesMode = MarblesMode::Off;
         _marblesSpread = 50;
         _marblesBias = 50;
-        _stepsSieve = 100;
-        _mask.setBase(100);
+        _maskMelody = 100;
+        _tiltMelody = 0;
+        _maskRhythm.setBase(100);
         _gateLength.setBase(0);
-        _tilt.setBase(0);
+        _tiltRhythm.setBase(0);
         _burst.setBase(0);
         _feel.setBase(50);
         _rotate.setBase(0);
@@ -735,11 +749,12 @@ private:
     MarblesMode _marblesMode;
     uint8_t _marblesSpread;
     uint8_t _marblesBias;
-    uint8_t _stepsSieve;
+    uint8_t _maskMelody;
+    uint8_t _tiltMelody;
 
-    Routable<uint8_t> _mask;
+    Routable<uint8_t> _maskRhythm;
     Routable<uint8_t> _gateLength;
-    Routable<int8_t> _tilt;
+    Routable<int8_t> _tiltRhythm;
     Routable<uint8_t> _burst;
     Routable<uint8_t> _feel;
 

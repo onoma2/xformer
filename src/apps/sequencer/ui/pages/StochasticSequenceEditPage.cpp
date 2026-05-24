@@ -622,15 +622,24 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     canvas.fillRect(leftX,  tapeBot + 7, (fillR * halfW) / 100, 3);
     canvas.fillRect(rightX, tapeBot + 7, (fillM * halfW) / 100, 3);
 
-    // Truncated bottom-row state — Mask + Tilt under the bars, tiny font.
+    // Bottom-row chip state — MaskR + TiltR under the bars (normal color).
     canvas.setFont(Font::Tiny);
     canvas.setColor(Color::Medium);
     FixedStringBuilder<16> mt;
-    mt("MK%d", seq.mask());
+    mt("%d", seq.maskRhythm());
     canvas.drawText(margin, tapeBot + 14, mt);
     mt.reset();
-    mt("TL%+d", seq.tilt());
+    mt("%+d", seq.tiltRhythm());
     canvas.drawText(margin + availW - canvas.textWidth(mt), tapeBot + 14, mt);
+
+    // Top-row chip state — MaskM + TiltM above the tape (inverse color).
+    canvas.setColor(Color::Bright);
+    mt.reset();
+    mt("%d", seq.maskMelody());
+    canvas.drawText(margin, tapeTop - 4, mt);
+    mt.reset();
+    mt("%d", seq.tiltMelody());
+    canvas.drawText(margin + availW - canvas.textWidth(mt), tapeTop - 4, mt);
 
     // Top-area readout. Multi-select aware: popcount>1 → "MANY SELECTED",
     // popcount==1 → that step's value in Small font, popcount==0 → tiny macros.
@@ -651,8 +660,10 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         else if (heldStep == 9)  str("LAST %d", seq.last());
         else if (heldStep == 10) str("SIZE %d", seq.size());
         else if (heldStep == 11) str("ROTATE %+d", seq.rotate());
-        else if (heldStep == 14) str("MASK %d", seq.mask());
-        else if (heldStep == 15) str("TILT %+d", seq.tilt());
+        else if (heldStep == 6)  str("MASKM %d", seq.maskMelody());
+        else if (heldStep == 7)  str("TILTM %d", seq.tiltMelody());
+        else if (heldStep == 14) str("MASKR %d", seq.maskRhythm());
+        else if (heldStep == 15) str("TILTR %+d", seq.tiltRhythm());
         canvas.setFont(Font::Small);
         canvas.setColor(Color::Bright);
         canvas.drawText(8, 18, str);
@@ -749,9 +760,12 @@ void StochasticSequenceEditPage::editLoopStep(int step, int value, bool shift) {
     case 9:  /* Last slot stubbed dead 2026-05-24 — collapsed into Size */ break;
     case 10: seq.setSize(seq.size() + value);     notifyStochasticWindowEdit(); break;
     case 11: seq.setRotate(seq.rotate() + value); break;   // rotation doesn't move window bounds
-    // Last two — Mask + Tilt performance pair (filter + duration-tilt resonance)
-    case 14: seq.setMask(seq.mask() + v); break;
-    case 15: seq.setTilt(seq.tilt() + v); break;
+    // Top row last two — MaskM + TiltM (pitch-centrality filter, LoopM-only)
+    case 6: seq.setMaskMelody(seq.maskMelody() + v); break;
+    case 7: seq.setTiltMelody(seq.tiltMelody() + v); break;
+    // Bottom row last two — MaskR + TiltR (rhythm density filter, LoopR-only)
+    case 14: seq.setMaskRhythm(seq.maskRhythm() + v); break;
+    case 15: seq.setTiltRhythm(seq.tiltRhythm() + v); break;
     }
 }
 
@@ -1118,12 +1132,17 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
             bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/true, /*green*/held);
         }
+        // Top row right (6..7): green — MaskM + TiltM (pitch-centrality, LoopM)
+        for (int i = 6; i <= 7; ++i) {
+            bool held = heldStep(i);
+            leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
+        }
         // Bottom row left (8..11): green — loop window (first, last, size, rotate)
         for (int i = 8; i <= 11; ++i) {
             bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
         }
-        // Bottom row right (14..15): green — Mask + Tilt performance pair
+        // Bottom row right (14..15): green — MaskR + TiltR (rhythm density, LoopR)
         for (int i = 14; i <= 15; ++i) {
             bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
@@ -1654,7 +1673,7 @@ void StochasticSequenceEditPage::contextAction(int index) {
             break;
         }
         uint32_t mask = _heroSelectionMask;
-        if (mask == 0) mask = 0xC30Fu;  // bits 0-3, 4, 8-11, 14-15 (the bound LOOP slots)
+        if (mask == 0) mask = 0xC3CFu;  // bits 0-4, 6-7, 8-11, 14-15 (the bound LOOP slots)
         auto wants = [&](int i) { return (mask & (1U << i)) != 0; };
         if (wants(0))  sequence.setPatienceRhythm(100);
         if (wants(1))  sequence.setPatienceMelody(100);
@@ -1668,8 +1687,10 @@ void StochasticSequenceEditPage::contextAction(int index) {
         if (wants(10)) { sequence.setSize(16);  windowEdited = true; }
         if (wants(11)) sequence.setRotate(0);   // rotation doesn't move bounds
         if (windowEdited) notifyStochasticWindowEdit();
-        if (wants(14)) sequence.setMask(100);
-        if (wants(15)) sequence.setTilt(0);
+        if (wants(6))  sequence.setMaskMelody(100);
+        if (wants(7))  sequence.setTiltMelody(0);
+        if (wants(14)) sequence.setMaskRhythm(100);
+        if (wants(15)) sequence.setTiltRhythm(0);
         showMessage(_heroSelectionMask ? "INIT SELECTED" : "INIT LOOP");
         break;
     }
