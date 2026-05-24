@@ -35,7 +35,7 @@ private:
         Init,
         Even,
         Random,
-        BurstPitch,   // Phase 16 (2026-05-23): toggle Hold/Roll burst-pitch mode (demoted from LIVE slot 7)
+        BurstHold,    // toggle Hold/Roll burst-pitch mode
         Last
     };
 
@@ -77,7 +77,7 @@ private:
     void notifyStochasticWindowEdit();
 
     // Codex review 2026-05-22 finding 2: edits to burst-shaping knobs (Burst,
-    // BurstCount, BurstRate, BurstPitch) and other cache-baked fields must
+    // BurstCount, BurstRate, BurstHold) and other cache-baked fields must
     // invalidate the engine cache; otherwise non-Repeat playback keeps using
     // pre-edit baked child cells. Lighter than syncWindowEdit (no queue
     // flush, no _patternIndex snap) — just refreshCache.

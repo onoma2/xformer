@@ -70,7 +70,7 @@ public:
     void renewMelody();
 
     // Max children per parent burst — matches burstCount LUT {2, 3, 4, 5}.
-    static constexpr int kMaxChildren = 5;
+    static constexpr int kMaxBurst = 5;
 
     // Recent evaluated parent events for Direct hero drawing. This is UI truth,
     // not source material: only what just reached the scheduler is recorded.
@@ -210,7 +210,7 @@ private:
     uint8_t _lastShapingMarblesSpread = 0xff;
     uint8_t _lastShapingBurstCount = 0xff;
     uint8_t _lastShapingBurstRate = 0xff;
-    uint8_t _lastShapingBurstPitch = 0xff;
+    uint8_t _lastShapingBurstHold = 0xff;
     uint8_t _lastShapingRange = 0xff;
     bool    _shapingSnapshotValid = false;
 

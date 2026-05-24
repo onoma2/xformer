@@ -178,8 +178,8 @@ public:
     int burstCount() const { return _burstCount; }
     void setBurstCount(int count) { _burstCount = clamp(count, 0, 100); }
 
-    StochasticBurstPitch burstPitch() const { return _burstPitch; }
-    void setBurstPitch(StochasticBurstPitch pitch) { _burstPitch = ModelUtils::clampedEnum(pitch); }
+    StochasticBurstHold burstHold() const { return _burstHold; }
+    void setBurstHold(StochasticBurstHold pitch) { _burstHold = ModelUtils::clampedEnum(pitch); }
 
     int sleep() const { return _sleep.get(isRouted(Routing::Target::StochasticSleep)); }
     void setSleep(int sleep, bool routed = false) { _sleep.set(clamp(sleep, 0, 100), routed); }
@@ -449,8 +449,8 @@ public:
     void printJump(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticJump); str("%d%%", jump()); }
     void editJump(int value, bool shift) { if (!isRouted(Routing::Target::StochasticJump)) setJump(jump() + value); }
 
-    void printBurstPitch(StringBuilder &str) const { str(burstPitch() == StochasticBurstPitch::Parent ? "Parent" : "Gen"); }
-    void editBurstPitch(int value, bool shift) { setBurstPitch(ModelUtils::adjustedEnum(burstPitch(), value)); }
+    void printBurstHold(StringBuilder &str) const { str(burstHold() == StochasticBurstHold::Hold ? "Hold" : "Roll"); }
+    void editBurstHold(int value, bool shift) { setBurstHold(ModelUtils::adjustedEnum(burstHold(), value)); }
 
     void printRotate(StringBuilder &str) const { printRouted(str, Routing::Target::Rotate); str("%+d", rotate()); }
     void editRotate(int value, bool shift) { if (!isRouted(Routing::Target::Rotate)) setRotate(rotate() + value); }
@@ -559,7 +559,7 @@ public:
         _slide.write(writer);
         writer.write(_burstRate);
         writer.write(_burstCount);
-        writer.write(static_cast<uint8_t>(_burstPitch));
+        writer.write(static_cast<uint8_t>(_burstHold));
         _sleep.write(writer);
         _patienceRhythm.write(writer);
         _mutate.write(writer);
@@ -637,9 +637,9 @@ public:
         _burstRate = clamp(int(_burstRate), 0, 100);
         reader.read(_burstCount);
         _burstCount = clamp(int(_burstCount), 0, 100);
-        uint8_t burstPitch;
-        reader.read(burstPitch);
-        _burstPitch = burstPitch < uint8_t(StochasticBurstPitch::Last) ? static_cast<StochasticBurstPitch>(burstPitch) : StochasticBurstPitch::Parent;
+        uint8_t burstHold;
+        reader.read(burstHold);
+        _burstHold = burstHold < uint8_t(StochasticBurstHold::Last) ? static_cast<StochasticBurstHold>(burstHold) : StochasticBurstHold::Hold;
         _sleep.read(reader);
         _patienceRhythm.read(reader);
         _mutate.read(reader);
@@ -720,7 +720,7 @@ private:
         _slide.setBase(0);
         _burstRate = 50;
         _burstCount = 0;
-        _burstPitch = StochasticBurstPitch::Parent;
+        _burstHold = StochasticBurstHold::Hold;
         _sleep.setBase(0);
         _patienceRhythm.setBase(100);
         _mutate.setBase(0);
@@ -802,7 +802,7 @@ private:
     Routable<uint8_t> _slide;
     uint8_t _burstRate;
     uint8_t _burstCount;
-    StochasticBurstPitch _burstPitch;
+    StochasticBurstHold _burstHold;
     Routable<uint8_t> _sleep;
     Routable<uint8_t> _patienceRhythm;
     Routable<int8_t> _mutate;

@@ -32,7 +32,7 @@ public:
         Burst,
         BurstCount,
         BurstRate,
-        BurstPitch,
+        BurstHold,
         Mask,
         Tilt,
         Sleep,
@@ -150,7 +150,7 @@ private:
         case Burst:         return "Burst";
         case BurstCount:    return "Burst Count";
         case BurstRate:     return "Burst Rate";
-        case BurstPitch:    return "Burst Pitch";
+        case BurstHold:    return "Burst Hold";
         case Mask:          return "Mask";
         case Tilt:          return "Tilt";
         case Sleep:         return "Sleep";
@@ -198,7 +198,7 @@ private:
         case Burst:         sequence.printBurst(str); break;
         case BurstCount:    str("%d%%", sequence.burstCount()); break;
         case BurstRate:     str("%d%%", sequence.burstRate()); break;
-        case BurstPitch:    sequence.printBurstPitch(str); break;
+        case BurstHold:    sequence.printBurstHold(str); break;
         case Mask:          sequence.printMask(str); break;
         case Tilt:          sequence.printTilt(str); break;
         case Sleep:         sequence.printSleep(str); break;
@@ -241,7 +241,7 @@ private:
         case Burst:         sequence.editBurst(value, shift);                            notifyShapingEdit(); break;
         case BurstCount:    sequence.setBurstCount(sequence.burstCount() + value);       notifyShapingEdit(); break;
         case BurstRate:     sequence.setBurstRate(sequence.burstRate() + value);         notifyShapingEdit(); break;
-        case BurstPitch:    sequence.editBurstPitch(value, shift);                       notifyShapingEdit(); break;
+        case BurstHold:    sequence.editBurstHold(value, shift);                       notifyShapingEdit(); break;
         case Mask:          sequence.editMask(value, shift); break;
         case Tilt:          sequence.editTilt(value, shift); break;
         case Sleep:         sequence.editSleep(value, shift); break;
@@ -332,7 +332,7 @@ inline const StochasticPerformanceListModel::Item StochasticPerformanceListModel
     Burst,
     BurstCount,
     BurstRate,
-    BurstPitch,
+    BurstHold,
     // Pattern sieve
     Mask,
     Tilt,

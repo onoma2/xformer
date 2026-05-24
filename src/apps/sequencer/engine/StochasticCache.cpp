@@ -144,8 +144,8 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
                     clusterDur = candidate;
                     cellDur = clusterDur;
                     int count = StochasticGenerator::pickBurstCount(int(seq.burstCount()), cellRng);
-                    if (count > StochasticTrackEngine::kMaxChildren) {
-                        count = StochasticTrackEngine::kMaxChildren;
+                    if (count > StochasticTrackEngine::kMaxBurst) {
+                        count = StochasticTrackEngine::kMaxBurst;
                     }
                     clusterRemaining = count;
                 }
@@ -169,8 +169,8 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
                     clusterDur = candidate;
                     cellDur = clusterDur;
                     int count = int(ev.childCount());
-                    if (count > StochasticTrackEngine::kMaxChildren) {
-                        count = StochasticTrackEngine::kMaxChildren;
+                    if (count > StochasticTrackEngine::kMaxBurst) {
+                        count = StochasticTrackEngine::kMaxBurst;
                     }
                     clusterRemaining = count;
                 }
@@ -195,7 +195,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
         uint8_t cellDegree;
         uint8_t cellOctave;
         if (isClusterTail) {
-            if (bakeChildNotes && seq.burstPitch() == StochasticBurstPitch::Generate) {
+            if (bakeChildNotes && seq.burstHold() == StochasticBurstHold::Roll) {
                 // Cluster-tail Generate pitch lives in the melody domain
                 // (melodySeed-keyed) so NewR does not shift cluster-tail
                 // pitches. Distinct salt from the anchor RNG so the two

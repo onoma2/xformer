@@ -22,14 +22,14 @@ public:
 
     static void generateMaskRanks(StochasticSequence &sequence, int size, uint32_t seed);
     
-    struct EvaluatedChild {
+    struct EvaluatedBurstNote {
         uint32_t tickOffset;
         uint32_t gateTicks;
         int note;
         bool valid;
     };
 
-    static void evaluateChildren(EvaluatedChild *children, const StochasticSequence &sequence, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng);
+    static void evaluateBurst(EvaluatedBurstNote *children, const StochasticSequence &sequence, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng);
 
     static StochasticSourceEvent generateRhythmEvent(const StochasticSequence &sequence, const StochasticTrack &track, Random &rng);
     static StochasticSourceEvent generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng);

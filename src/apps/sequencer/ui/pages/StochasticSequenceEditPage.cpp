@@ -15,7 +15,7 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "INIT" },
     { "EVEN" },
     { "RAND" },
-    { "BPITCH" },   // Phase 16 (2026-05-23): toggle BurstPitch Hold/Roll (slot 7 → Feel)
+    { "BPITCH" },   // context-menu label: toggle BurstHold Hold/Roll (slot 7 owned by Feel)
 };
 
 static const ContextMenuModel::Item durContextMenuItems[] = {
@@ -212,7 +212,7 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
     int contourStep = (contour * 4) / 100;          // -4..+4 px over age
     int burstSpacing = 7 - (burstRate * 5) / 100;   // high rate = tighter child pips
     if (burstSpacing < 2) burstSpacing = 2;
-    bool burstPitchScatter = (seq.burstPitch() == StochasticBurstPitch::Generate);
+    bool burstPitchScatter = (seq.burstHold() == StochasticBurstHold::Roll);
 
     // Slide and Legato turn the point cloud into a connected phrase. Slide draws
     // a pitch ribbon; Legato draws a low gate-continuity rail between events.
@@ -1600,16 +1600,16 @@ void StochasticSequenceEditPage::contextAction(int index) {
 
     switch (_currentPage) {
     case Page::Live: {
-        // BurstPitch toggle (Phase 16, 2026-05-23) — demoted from slot 7
+        // BurstHold toggle — demoted off slot 7 (slot 7 is Feel)
         // because Feel took its place. Hold = cluster cells share previous
         // pitch (ratchet); Roll = cluster cells each pick own pitch.
-        if (ContextAction(index) == ContextAction::BurstPitch) {
-            auto cur = sequence.burstPitch();
-            sequence.setBurstPitch(cur == StochasticBurstPitch::Parent
-                                  ? StochasticBurstPitch::Generate
-                                  : StochasticBurstPitch::Parent);
+        if (ContextAction(index) == ContextAction::BurstHold) {
+            auto cur = sequence.burstHold();
+            sequence.setBurstHold(cur == StochasticBurstHold::Hold
+                                  ? StochasticBurstHold::Roll
+                                  : StochasticBurstHold::Hold);
             notifyStochasticShapingEdit();
-            showMessage(sequence.burstPitch() == StochasticBurstPitch::Parent
+            showMessage(sequence.burstHold() == StochasticBurstHold::Hold
                         ? "BURST HOLD"
                         : "BURST ROLL");
             break;
@@ -1634,7 +1634,7 @@ void StochasticSequenceEditPage::contextAction(int index) {
         if (wants(4))  sequence.setBurst(0);
         if (wants(5))  sequence.setBurstCount(0);
         if (wants(6))  sequence.setBurstRate(50);
-        if (wants(7))  sequence.setFeel(50);   // Phase 16: slot 7 is Feel (was BurstPitch)
+        if (wants(7))  sequence.setFeel(50);   // slot 7 is Feel; BurstHold lives on the context menu
         if (wants(8))  sequence.setComplexity(50);
         if (wants(9))  sequence.setContour(0);
         if (wants(10)) sequence.setMarblesBias(50);

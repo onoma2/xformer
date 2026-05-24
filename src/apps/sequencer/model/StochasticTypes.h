@@ -12,7 +12,11 @@ enum class StochasticSourceMode : uint8_t {
     Last
 };
 
-enum class StochasticBurstPitch : uint8_t { Parent, Generate, Last };
+// Burst-cluster pitch mode. Hold = cluster tails copy the anchor's pitch.
+// Roll = cluster tails re-pick a fresh pitch each cell (melody-keyed).
+// Integer ordering preserved (Hold=0, Roll=1) so wire format is unaffected
+// by the rename from Parent/Generate.
+enum class StochasticBurstHold : uint8_t { Hold, Roll, Last };
 
 enum class StochasticLevel : uint8_t {
     Core,     // Level 1

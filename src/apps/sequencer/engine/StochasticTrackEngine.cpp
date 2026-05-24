@@ -273,7 +273,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         const uint8_t curSpread       = uint8_t(sequence.marblesSpread());
         const uint8_t curBurstCount   = uint8_t(sequence.burstCount());
         const uint8_t curBurstRate    = uint8_t(sequence.burstRate());
-        const uint8_t curBurstPitch   = uint8_t(sequence.burstPitch());
+        const uint8_t curBurstHold   = uint8_t(sequence.burstHold());
         const uint8_t curRange        = uint8_t(sequence.range());
         const bool firstRun = !_shapingSnapshotValid;
         const bool anyKnobMoved = firstRun
@@ -287,7 +287,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             || curSpread       != _lastShapingMarblesSpread
             || curBurstCount   != _lastShapingBurstCount
             || curBurstRate    != _lastShapingBurstRate
-            || curBurstPitch   != _lastShapingBurstPitch
+            || curBurstHold   != _lastShapingBurstHold
             || curRange        != _lastShapingRange;
 
         if (anyKnobMoved) {
@@ -302,7 +302,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             _lastShapingMarblesSpread = curSpread;
             _lastShapingBurstCount   = curBurstCount;
             _lastShapingBurstRate    = curBurstRate;
-            _lastShapingBurstPitch   = curBurstPitch;
+            _lastShapingBurstHold   = curBurstHold;
             _lastShapingRange        = curRange;
             _shapingSnapshotValid    = true;
         }
@@ -496,13 +496,13 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // duration; they play through the normal triggerStep loop, no extra
         // child-walk. Only Repeat needs the child-array path because it
         // replays a captured _lastEvent rather than the slot.
-        StochasticGenerator::EvaluatedChild evalChildren[kMaxChildren];
-        for (int i = 0; i < kMaxChildren; ++i) evalChildren[i].valid = false;
+        StochasticGenerator::EvaluatedBurstNote evalChildren[kMaxBurst];
+        for (int i = 0; i < kMaxBurst; ++i) evalChildren[i].valid = false;
         uint8_t childCount = 0;
 
         if (useRepeat && !isRest) {
-            StochasticGenerator::evaluateChildren(evalChildren, sequence, eval, track, scale, rootNote, note, durationTicks, _rng);
-            for (int i = 0; i < kMaxChildren; ++i) if (evalChildren[i].valid) childCount++;
+            StochasticGenerator::evaluateBurst(evalChildren, sequence, eval, track, scale, rootNote, note, durationTicks, _rng);
+            for (int i = 0; i < kMaxBurst; ++i) if (evalChildren[i].valid) childCount++;
         }
 
         recordDirectHistory(finalCv, isRest, !isRest, childCount);
@@ -532,13 +532,13 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 // Legacy burst playback for Repeat — bursts come from
                 // _lastEvent (Repeat replays the captured event, not the
                 // window). The flat-cell cache path doesn't apply here.
-                for (int i = 0; i < kMaxChildren; ++i) {
+                for (int i = 0; i < kMaxBurst; ++i) {
                     if (evalChildren[i].valid) {
                         uint32_t childTick = tick + evalChildren[i].tickOffset;
                         uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
 
                         int childNote = evalChildren[i].note;
-                        if (sequence.burstPitch() == StochasticBurstPitch::Generate) {
+                        if (sequence.burstHold() == StochasticBurstHold::Roll) {
                             childNote += (_jumpRegister + track.octave()) * activeNotes + track.transpose();
                         }
                         float childCv = scale.noteToVolts(childNote) + (scale.isChromatic() ? rootNote : 0) * (1.f / 12.f);
@@ -829,7 +829,7 @@ void StochasticTrackEngine::recordDirectHistory(float cv, bool rest, bool gate, 
     for (int i = kDirectHistoryMax - 1; i > 0; --i) {
         gDirectHistory[trackIndex][i] = gDirectHistory[trackIndex][i - 1];
     }
-    if (children > kMaxChildren) children = kMaxChildren;
+    if (children > kMaxBurst) children = kMaxBurst;
     int cvSixteenths = int(cv * 16.f);
     if (cvSixteenths < -128) cvSixteenths = -128;
     if (cvSixteenths > 127) cvSixteenths = 127;

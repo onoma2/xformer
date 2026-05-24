@@ -1,12 +1,12 @@
 #include "StochasticGenerator.h"
-#include "StochasticTrackEngine.h"   // for getDurationFraction + kMaxChildren
+#include "StochasticTrackEngine.h"   // for getDurationFraction + kMaxBurst
 #include "Config.h"                  // CONFIG_PPQN / CONFIG_SEQUENCE_PPQN
 
 #include <cmath>
 #include <algorithm>
 
 // Burst count LUT — knob picks weighted-random over {2,3,4,5}.
-// 1 child is meaningless; max 5 matches kMaxChildren in StochasticTrackEngine.h.
+// 1 child is meaningless; max 5 matches kMaxBurst in StochasticTrackEngine.h.
 // burstCount is a MAX intent: actual count clips to whatever the picked
 // spacing slot can hold inside the parent duration (Option C).
 static const int kBurstCountLut[] = { 2, 3, 4, 5 };
@@ -360,7 +360,7 @@ void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int si
     }
 }
 
-void StochasticGenerator::evaluateChildren(EvaluatedChild *children, const StochasticSequence &sequence, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng) {
+void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *children, const StochasticSequence &sequence, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng) {
     int count = event.childCount();
 
     // Cluster F eval-time safety net: regardless of what childCount the event
@@ -383,7 +383,7 @@ void StochasticGenerator::evaluateChildren(EvaluatedChild *children, const Stoch
     const uint32_t minChildGate = 6;
     spacing = std::max(float(minChildGate + 1), spacing);
 
-    for (int i = 0; i < StochasticTrackEngine::kMaxChildren; ++i) {
+    for (int i = 0; i < StochasticTrackEngine::kMaxBurst; ++i) {
         children[i].valid = false;
         if (i < count) {
             uint32_t offset = uint32_t((i + 1) * spacing);
@@ -401,7 +401,7 @@ void StochasticGenerator::evaluateChildren(EvaluatedChild *children, const Stoch
             children[i].tickOffset = offset;
             children[i].gateTicks = gate;
             
-            if (sequence.burstPitch() == StochasticBurstPitch::Generate) {
+            if (sequence.burstHold() == StochasticBurstHold::Roll) {
                 int lastDegree = -1;
                 children[i].note = generateDegree(sequence, track, scale, lastDegree, rng);
             } else {
@@ -434,8 +434,8 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
     event.setBurstRate(0);
     // Burst storage: the cache decides per-cell eligibility (prev_dur / denom
     // playable). The generator just stores count + spacing so Repeat playback
-    // — which replays _lastEvent through evaluateChildren — has something to
-    // evaluate. evaluateChildren keeps its own duration check.
+    // — which replays _lastEvent through evaluateBurst — has something to
+    // evaluate. evaluateBurst keeps its own duration check.
     if (int(rng.nextRange(100)) < sequence.burst()) {
         event.setChildCount(pickBurstCountFromLut(sequence.burstCount(), rng));
         int spacingSlot = -1;

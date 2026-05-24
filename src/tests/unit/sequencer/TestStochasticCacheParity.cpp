@@ -22,7 +22,7 @@ using namespace stochastic_cache;
 
 namespace {
 
-// Reproduces evaluateChildren's spacing math for the parity check. Kept local
+// Reproduces evaluateBurst's spacing math for the parity check. Kept local
 // so we're not silently agreeing with the cache implementation by sharing the
 // same constants — the duplication is intentional.
 static const int kSpacingLutForTest[] = { 2, 3, 4, 5, 6 };
@@ -524,7 +524,7 @@ CASE("gate_length_high_varies_gate_per_cell") {
 }
 
 CASE("burst_pitch_hold_keeps_parent_pitch_in_cluster_tail") {
-    // BurstPitch == Parent: cluster tail cells carry the same degree/octave
+    // BurstHold == Hold: cluster tail cells carry the same degree/octave
     // as the cluster starter (which itself uses the source event's pitch).
     const Scale &scale = Scale::get(0);
     StochasticTrack track;
@@ -539,7 +539,7 @@ CASE("burst_pitch_hold_keeps_parent_pitch_in_cluster_tail") {
     seq.setBurst(100);          // every cell tries to start a cluster
     seq.setBurstCount(50);
     seq.setBurstRate(50);
-    seq.setBurstPitch(StochasticBurstPitch::Parent);
+    seq.setBurstHold(StochasticBurstHold::Hold);
     for (int i = 0; i < 4; ++i) {
         seq.events()[i].setRhythmValid(true);
         seq.events()[i].setRest(false);
@@ -557,7 +557,7 @@ CASE("burst_pitch_hold_keeps_parent_pitch_in_cluster_tail") {
 }
 
 CASE("burst_pitch_roll_rerolls_cluster_tail_pitch") {
-    // BurstPitch == Generate: cluster tail cells reroll degree via
+    // BurstHold == Roll: cluster tail cells reroll degree via
     // generateDegree. With deterministic keyed RNG, at least one tail cell
     // must differ from the starter's degree (otherwise the reroll is a noop).
     const Scale &scale = Scale::get(0);
@@ -574,7 +574,7 @@ CASE("burst_pitch_roll_rerolls_cluster_tail_pitch") {
     seq.setBurst(100);
     seq.setBurstCount(100);    // bias toward longer clusters → more tail cells
     seq.setBurstRate(50);
-    seq.setBurstPitch(StochasticBurstPitch::Generate);
+    seq.setBurstHold(StochasticBurstHold::Roll);
     seq.setRange(3);           // wider candidate pool so reroll has room to differ
     for (int i = 0; i < 8; ++i) {
         seq.events()[i].setRhythmValid(true);
