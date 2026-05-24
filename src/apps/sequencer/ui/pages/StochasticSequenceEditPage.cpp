@@ -663,7 +663,7 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         else if (heldStep == 6)  str("MASKM %d", seq.maskMelody());
         else if (heldStep == 7)  str("TILTM %d", seq.tiltMelody());
         else if (heldStep == 14) str("MASKR %d", seq.maskRhythm());
-        else if (heldStep == 15) str("TILTR %+d", seq.tiltRhythm());
+        else if (heldStep == 15) str("TILTR %d", seq.tiltRhythm());
         canvas.setFont(Font::Small);
         canvas.setColor(Color::Bright);
         canvas.drawText(8, 18, str);

@@ -291,9 +291,11 @@ public:
     int gateLength() const { return _gateLength.get(isRouted(Routing::Target::StochasticGateLength)); }
     void setGateLength(int value, bool routed = false) { _gateLength.set(clamp(value, 0, 100), routed); }
 
-    // tiltRhythm (attached to maskRhythm)
+    // tiltRhythm — paired with maskRhythm. 0..100, center 50 = pure salt cut,
+    // 0 = max negative rank-cut, 100 = max positive rank-cut. Engine recovers
+    // signed magnitude as (knob - 50) and uses |signed| * 2 as the rank weight.
     int tiltRhythm() const { return _tiltRhythm.get(isRouted(Routing::Target::StochasticTilt)); }
-    void setTiltRhythm(int value, bool routed = false) { _tiltRhythm.set(clamp(value, -100, 100), routed); }
+    void setTiltRhythm(int value, bool routed = false) { _tiltRhythm.set(clamp(value, 0, 100), routed); }
 
     // burs
     int burst() const { return _burst.get(isRouted(Routing::Target::StochasticBurst)); }
@@ -359,7 +361,7 @@ public:
         }
     }
 
-    void printTiltRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticTilt); str("%+d%%", tiltRhythm()); }
+    void printTiltRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticTilt); str("%d%%", tiltRhythm()); }
     void editTiltRhythm(int value, bool shift) { if (!isRouted(Routing::Target::StochasticTilt)) setTiltRhythm(tiltRhythm() + value); }
 
     // Phase 12: append "*" when current noteDuration + divisor combo can't
@@ -629,8 +631,7 @@ public:
         }
         { uint8_t reserved; reader.read(reserved); }   // was StochasticLevel enum
 
-        _tiltMelody = 0;
-        reader.read(_tiltMelody, ProjectVersion::Version35);
+        reader.read(_tiltMelody);
         _tiltMelody = clamp(int(_tiltMelody), 0, 100);
 
         for (auto &event : _steps) {
@@ -676,7 +677,7 @@ private:
         _tiltMelody = 0;
         _maskRhythm.setBase(100);
         _gateLength.setBase(0);
-        _tiltRhythm.setBase(0);
+        _tiltRhythm.setBase(50);
         _burst.setBase(0);
         _feel.setBase(50);
         _rotate.setBase(0);
@@ -754,7 +755,7 @@ private:
 
     Routable<uint8_t> _maskRhythm;
     Routable<uint8_t> _gateLength;
-    Routable<int8_t> _tiltRhythm;
+    Routable<uint8_t> _tiltRhythm;
     Routable<uint8_t> _burst;
     Routable<uint8_t> _feel;
 

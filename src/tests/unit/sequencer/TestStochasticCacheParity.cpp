@@ -455,7 +455,7 @@ CASE("mask_rank_is_tilt_independent") {
     int ranksAtPlusTilt[8];
     for (int i = 0; i < 8; ++i) ranksAtPlusTilt[i] = seq.steps()[i].densityRank();
 
-    seq.setTiltRhythm(-100);
+    seq.setTiltRhythm(0);
     StochasticGenerator::generateMaskRanks(seq, 8, 0xaabbccdd);
     for (int i = 0; i < 8; ++i) {
         expectEqual(seq.steps()[i].densityRank(), ranksAtPlusTilt[i],

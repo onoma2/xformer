@@ -415,6 +415,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // MaskR + TiltR — LoopR-only. In LiveR every event stores rank=0
         // (Live bypasses generateMaskRanks), so TiltR's duration axis would
         // collapse to a salt-only cut. Both knobs are inert in LiveR.
+        // TiltR is 0..100 with center 50 = pure salt cut; <50 cuts longs,
+        // >50 cuts shorts. Signed magnitude reconstructed below.
         bool maskRhythmPass = true;
         if (sequence.rhythmMode() == StochasticSourceMode::Loop && sequence.maskRhythm() < 100) {
             const uint32_t patternSize = std::max<uint32_t>(1, sequence.size());
@@ -424,8 +426,8 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             const uint32_t rankPctMilli = std::min<uint32_t>(1000, (storedRank * 1000) / denom);
             const uint32_t saltHash = keyed_rng::cellSeed(sequence.rhythmSeed(), uint32_t(stepIndex));
             const uint32_t saltPctMilli = ((saltHash >> 24) * 1000) / 255;
-            const int tiltSigned = int(sequence.tiltRhythm());
-            const uint32_t tiltMag = uint32_t(std::abs(tiltSigned));
+            const int tiltSigned = int(sequence.tiltRhythm()) - 50;   // -50..+50
+            const uint32_t tiltMag = uint32_t(std::abs(tiltSigned)) * 2;   // 0..100
             const uint32_t effectiveMilli =
                 (tiltMag * rankPctMilli + (100 - tiltMag) * saltPctMilli) / 100;
             const uint32_t maskMilli = uint32_t(sequence.maskRhythm()) * 10;

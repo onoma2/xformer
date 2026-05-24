@@ -278,23 +278,43 @@
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
-      <td class="knob">Mask</td>
-      <td class="code">sequence.mask()</td>
+      <td class="knob">MaskR</td>
+      <td class="code">sequence.maskRhythm()</td>
       <td class="own seq">SEQ</td>
       <td class="layer engine">Engine</td>
       <td class="rng none">None</td>
       <td class="law threshold">Threshold</td>
-      <td>Per-trigger rank threshold — steps whose stored rank exceeds the threshold become rests. Paired with Tilt: Mask sets cutoff %, Tilt picks which end of the duration axis to cut. <strong>LoopR-only:</strong> LiveR events bypass <code>generateMaskRanks</code> and store rank=0, so the engine gates the whole block on <code>rhythmMode==Loop</code>. Knob is inert in LiveR.</td>
+      <td>Per-trigger duration-rank threshold — steps whose stored rank exceeds the threshold become rests. Paired with TiltR: MaskR sets cutoff %, TiltR picks which end of the duration axis to cut. <strong>LoopR-only:</strong> LiveR events bypass <code>generateMaskRanks</code> and store rank=0, so the engine gates the whole block on <code>rhythmMode==Loop</code>. Knob is inert in LiveR.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
-      <td class="knob">Tilt</td>
-      <td class="code">sequence.tilt()</td>
+      <td class="knob">TiltR</td>
+      <td class="code">sequence.tiltRhythm()</td>
       <td class="own seq">SEQ</td>
       <td class="layer engine">Engine</td>
       <td class="rng none">None</td>
-      <td class="law bipolar">Bipolar</td>
-      <td>Duration filter direction + strength. -Tilt = low-pass (short steps survive); +Tilt = high-pass (long steps survive); magnitude blends between random-salt cut (Tilt=0) and strict duration-sorted cut (|Tilt|=100). Pure trigger-time read — no recompute, no cache touch on edit. <strong>LoopR-only</strong> — same gate as Mask; inert in LiveR.</td>
+      <td class="law scalar">Scalar (centered)</td>
+      <td>Duration filter direction + strength, knob 0..100 centered at 50. TiltR=50 = pure salt cut (random thinning); TiltR&lt;50 keeps the short end (low-pass), TiltR&gt;50 keeps the long end (high-pass). Distance from 50 sets the rank-vs-salt blend (|knob-50|×2 = magnitude). Pure trigger-time read. <strong>LoopR-only</strong> — same gate as MaskR; inert in LiveR.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">MaskM</td>
+      <td class="code">sequence.maskMelody()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng none">None</td>
+      <td class="law threshold">Threshold</td>
+      <td>Per-trigger pitch-centrality threshold — steps whose played degree scores below the threshold become rests. Centrality comes from <code>stochasticPitchCentrality()</code> (root/half/thirds/quarters with triangular kernels), normalized against the scale's root-anchor weight. <strong>LoopM-only:</strong> LiveM pitches are rolled fresh each trigger so the filter has no stable material to thin against; the engine gates the whole block on <code>melodyMode==Loop</code>. Knob is inert in LiveM. Default 100 = bypass. Pitch-centrality is no longer a factor in the generator's pick — this knob owns it entirely.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">TiltM</td>
+      <td class="code">sequence.tiltMelody()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng none">None</td>
+      <td class="law scalar">Scalar (unipolar)</td>
+      <td>Inversion magnitude on the MaskM filter. TiltM=0 keeps the highest-centrality steps (tonal — root, fifth, thirds survive); TiltM=100 inverts to keep the lowest-centrality steps ("everything but the root"); intermediate values progressively blend the two sets. Pure trigger-time read. <strong>LoopM-only</strong> — same gate as MaskM; inert in LiveM.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
