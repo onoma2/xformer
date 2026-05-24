@@ -172,18 +172,19 @@ RAM is the tight resource. A feature is acceptable only if it stays within the b
 - CCMRAM target: `.ccmram_bss` below roughly **56 KB** unless hardware testing proves safe margin.
 - Flash is secondary right now; still measure `.text`, but do not optimize flash before RAM unless flash is the stated task.
 
-**Current measured baseline. Refresh this block after resource-optimization work or before major feature work.**
-- Flash: `.text` ~763 KB, still with headroom in 1 MB flash.
-- SRAM (128 KB): current post-P15 build is `.data=6,320` + `.bss=113,640` = 119,960 B, about 91.4% used. Largest blocks:
-  - `Model` = 88,072 B.
+**Current measured baseline (2026-05-24). Refresh this block after resource-optimization work or before major feature work.**
+- Flash: `.text` ≈ 867 KB.
+- SRAM (128 KB): `.data=6,416` + `.bss=112,912` = 119,328 B, about 91.0% used (in the hard warning zone, ~670 B under the 120 KB threshold). Largest blocks:
+  - `Model` = 88,312 B — dominates main SRAM. Inside it, `Project._tracks` = 80,960 B = 8 × 10,120 B track-variant container. The container is sized to the largest track mode (CurveTrack ≈ 10,092 B, NoteTrack ≈ 9,544 B); StochasticTrack at 8,444 B already fits, so stochastic-side shrinks do not free model SRAM unless every variant shrinks below the cap.
   - LCD driver DMA buffer = 8,192 B normal SRAM.
-  - Teletype file slot globals = 4 x 1,226 B.
-  - USB host / filesystem globals = about 6.2 KB total, mostly functional buffers.
-- CCM RAM (64 KB): current post-P15 `.ccmram_bss=54,096`, about 84.5% used. Largest blocks:
-  - `Ui`, including 16,384 B 8-bit Canvas framebuffer.
-  - `Engine` = 11,492 B.
-  - FreeRTOS static stacks.
+  - Teletype file slot globals = 4 × 1,226 B.
+  - USB host / filesystem globals ≈ 6 KB, mostly functional buffers.
+- CCM RAM (64 KB): `.ccmram_bss=55,092`, about 84.1% used. Largest blocks:
+  - `Ui` = 27,752 B (includes 16,384 B 8-bit Canvas framebuffer).
+  - `Engine` = 11,940 B (engine-task slot — Stochastic cache adds 320 B per active stochastic track inside this slot; variant container also sized to the largest engine).
+  - FreeRTOS static stacks: engine/fs/ui = 4,256 B each; usbh/profiler = 2,208 B each.
 - FreeRTOS heap disabled (static allocation only).
+- StochasticSequence = 496 B (64 events × 6 B = 384 B + 112 B knobs/seeds/tickets); StochasticTrack = 8,444 B (17 sequences × 496 B + ~12 B track-global).
 
 ## C++ Heap (`new` / `malloc`)
 

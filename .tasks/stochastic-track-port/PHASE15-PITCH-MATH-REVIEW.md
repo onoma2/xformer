@@ -1,12 +1,27 @@
 # Phase 15 — Pitch Math Review
 
-_Stub drafted 2026-05-22. Status: design queue; depends on Phase 14B landing first._
+_Drafted 2026-05-22. Refreshed 2026-05-24. **Status: design queue / parking lot.**
+None of the redesigns below have landed. Tracks independently of PHASE17
+structural cleanup — touches generator math, not storage shape._
 
 ## Why this exists
 
-`StochasticGenerator::generateDegree` (`src/apps/sequencer/engine/StochasticGenerator.cpp:493`) produces musically surprising output at default knob values. The walkthrough in `PHASE14B-SEED-LOG.md` ("Pitch math — carrying forward unchanged") shows that starting from C with all knobs at defaults, the next note's peak probability is at F# rather than near C — because the marbles bell overpowers the kernel that's supposed to re-center on `lastDegree`.
+`StochasticGenerator::generateDegree` produces musically surprising output at
+default knob values. Starting from C with all knobs at defaults, the next
+note's peak probability lands on F# rather than near C — the Marbles bell
+overpowers the kernel that's supposed to re-center on `lastDegree`.
 
-Phase 14B explicitly carries today's formulas forward unchanged so the seed+log architecture change doesn't bundle a musicality shift. Phase 15 is the dedicated cleanup pass on the math.
+The structural work (slot-keyed cache, seed-domain isolation, scrubbable
+knobs) carries today's pitch formulas forward unchanged. Phase 15 is the
+dedicated cleanup pass on that math.
+
+## What landed elsewhere (context)
+
+Pitch knobs are now Loop-scrubbable on a fixed `melodySeed`: cache picks
+anchor pitch per slot via `keyed_rng::cellSeed(melodySeed, slot)`, NewR
+does not shift pitches, cluster-tail Generate pitch and Slide are both
+melody-domain too. Tilt is trigger-time only. None of this changes the
+underlying `generateDegree` math — Phase 15 still owns that math.
 
 ## Scope
 
@@ -566,23 +581,37 @@ Phase 15 *will* change audible behavior. That's the point — today's defaults a
 
 Existing user presets that depended on the old weirdness may sound different. Migration: snapshot before/after on stock presets, document deltas in the release notes.
 
-## Phasing relative to 14B
+## Phasing
 
-Phase 15 starts only after Phase 14B is **fully landed and hardware-verified**. Reasoning:
-- 14B is a storage architecture change; 15 is an audible change.
-- Bundling = can't isolate regressions.
-- Golden-trace tests written for 15 also serve as parameter-coverage tests (`PHASE14B-SEED-LOG.md`, "Parameter coverage test"), so write them at the Patch B → C boundary anyway.
+The storage / scrubbing structural work has landed. PHASE15 is the musicality
+pass on the generator math; it touches `generateDegree` and the duration
+picker, not storage shape. Independent of PHASE17 (structural cleanup);
+they can land in either order.
 
 ## Open questions
 
-1. Should duration law land in Phase 15 or split to its own Phase 15R patch? The accepted law is documented above and should not be left as an open-ended "maybe touch duration" item.
-2. Marbles bell as additive vs multiplicative — change shape or rebalance constants?
-3. Is `universalDegreeBoost` (the sieve ranking function) right for non-chromatic scales? The kernel anchors at N/2, N/3, N/4 fractions of `activeNotes` — fine for chromatic and major, but for pentatonic (5 notes) and microtonal scales these anchors land on weird positions.
-4. Should `generateDegree` be deterministic-per-cell (Phase 14B keyed RNG) or carry `lastDegree` (today)? Phase 14B's plan is "replay melody pass for [N..end] after REGEN_CELL"; Phase 15 could revisit this if a per-cell-anchor approach feels more musical.
+1. Should the duration law (Note Duration / Variation / Rest section above)
+   land in PHASE15 or split to its own PHASE15R patch? The accepted law is
+   documented and should not stay open-ended.
+2. Marbles bell as additive vs multiplicative — change shape or rebalance
+   constants?
+3. Is `universalDegreeBoost` (the sieve ranking function) right for
+   non-chromatic scales? Anchors at N/2, N/3, N/4 fractions of
+   `activeNotes` are fine for chromatic and major, but for pentatonic (5
+   notes) and microtonal scales these land on weird positions.
+4. Anchor pitches are already per-slot keyed by `melodySeed` (see context
+   section). The remaining question is whether `lastDegree` chain through
+   slots stays the right musical model, or whether each anchor's pitch
+   should be a pure function of `(melodySeed, slot)` with no chain at all.
+   Today the chain runs through every slot (cluster placement no longer
+   shifts it) — Complexity / Contour kernels still see continuous motion.
+   Dropping the chain would simplify the model further but lose the
+   step-to-step coloring of those two knobs.
 
 ## Next step
 
-Wait for 14B to land. Then:
-1. Write the golden-trace test harness as part of Patch B prep.
-2. Capture baselines.
-3. Open Phase 15 as a separate branch.
+1. Write the golden-trace test harness — fixtures listed throughout the
+   "Issues to fix" and "Revamp target" sections.
+2. Capture baselines at current generator math.
+3. Land redesigns on their own branch with before/after audible deltas
+   captured per fixture.
