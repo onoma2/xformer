@@ -425,7 +425,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law lut">LUT center</td>
-      <td>Knob picks center slot of the 8-entry duration LUT (x8 .. x1/2 of divisor). Per-step pick via triangular kernel.</td>
+      <td>Home center of the duration LUT (x8 .. x1/2 of divisor). The picker is a three-zone Variation blend: at V=0 only the home bell contributes → strict NoteDuration lock. As Variation grows past zero, ticket and explore zones blend in. See Variation row.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -436,7 +436,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law kernel">Kernel width</td>
-      <td>Width of the kernel around Note Duration's center slot. 0 = locked center, 100 = wide with opposite-side access.</td>
+      <td>Owns which duration-pick zone dominates per cell. Three overlapping triangles: home (peaks V=0), ticket (peaks V=50), explore (peaks V=100). At V=0 NoteDuration locks; at V=50 Duration Tickets drive; at V=100 explore wins (floor + opposite-side bell). Duration tickets are three-state (-1 exclude, 0 flat=1, 1..100 emphasis), same contract as pitch tickets.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -447,7 +447,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law integer">Integer</td>
-      <td>Number of octaves in the candidate pool for pitch generation.</td>
+      <td>Bipolar 0..100 centered at 50. Range=50 → single-octave field (Steps 3-5 of the pitch law collapse to no-ops). Range&gt;50 → field expands up to 4 octaves at knob=100. Range&lt;50 → single octave + per-slot octave-displacement chance, stronger toward knob=0. Bias/Spread/Contour all operate on the candidate set built here.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -458,7 +458,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law bernoulli">Bernoulli</td>
-      <td>Per-step cluster-start probability. On hit: cluster step duration = prev_dur / denom.</td>
+      <td>Per-step cluster-start probability. On hit: cluster timing depends on BurstHold's Fit/Over axis (see BurstHold row). Floor: cluster cells must each be ≥ kMinClusterCellTicks (12 ticks) so the gate clamp leaves a discrete retrigger gap. Below that floor the cluster doesn't fire — cell plays as ordinary.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -469,7 +469,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law lut">LUT center</td>
-      <td>Center of triangular pick over the burst-count LUT {2,3,4,5}.</td>
+      <td>Center of triangular pick over BurstCount LUT {2,3,4,5,6,7,8}. Returns TOTAL cluster cells (anchor + tails). Stored as <code>burstTails = total - 1</code> in the 3-bit event field. In Fit mode, if prev_dur can't house the requested count at the 12-tick floor, count auto-reduces to whatever fits.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -480,18 +480,18 @@
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law lut">LUT center</td>
-      <td>Center of triangular pick over the burst-spacing-denominator LUT {2,3,4,5,6}.</td>
+      <td>Two interpretations depending on BurstHold timing axis. <strong>Fit modes</strong>: log-symmetric curve factor r ∈ [0.4..2.5] (knob=0 → r=0.4 strong accel, knob=50 → r=1.0 uniform, knob=100 → r=2.5 strong decel). Cluster cell durations follow <code>r^k</code> normalized to sum = prev_dur. <strong>Overflow modes</strong>: triangular pick over spacing-denominator LUT {2,3,4,5,6}; cluster cells uniform at <code>prev_dur / denom</code>.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
-      <td class="knob">Burst Pitch (Hold/Roll)</td>
+      <td class="knob">BurstHold (4-state)</td>
       <td class="code">sequence.burstHold()</td>
-      <td class="loop melody">Melody</td>
+      <td class="loop melody">Both</td>
       <td class="own seq">SEQ</td>
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law enum">Enum</td>
-      <td>Context menu toggle. Hold = cluster tails copy anchor pitch. Roll (Roll) = re-pick per step via melodySeed-keyed RNG so NewR does not shift cluster-tail pitches; only NewM does.</td>
+      <td>Single 4-state enum collapsing two orthogonal axes. <strong>Pitch axis</strong>: Hold = cluster cells share anchor pitch; Roll = each cluster cell re-rolls own pitch via melodySeed-keyed RNG. <strong>Timing axis</strong>: Fit = cluster cells distributed across one prev_dur via BurstRate curve (trap-style flams); Over = cluster cells uniform at prev_dur/denom, can overflow into next slot budget (today's classic burst). States: <code>HoldOver</code> (default — uniform shared-pitch), <code>HoldFit</code>, <code>RollOver</code>, <code>RollFit</code>.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -502,7 +502,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law kernel">Kernel width</td>
-      <td>Width of pitch kernel around <code>lastDegree</code>. 0 = neighbor-anchored, 100 = wide leakage.</td>
+      <td>5-step pitch law — Step 2 (class repeat check). Probability of REJECTING a class-repeat: 0 = repeats kept (stepwise feel), 100 = forced movement (every same-class roll re-rolls Step 1). Bounded retries (4) so heavy single-ticket emphasis never hangs the picker. Does NOT shape candidate pool — that's Range/tickets.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -513,7 +513,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law bipolar">Bipolar</td>
-      <td>Signed directional drift of pitch kernel center. +Up, -Down.</td>
+      <td>5-step pitch law — Step 5 (direction nudge). Applied AFTER Step 4 region roll. If chosen pitch's direction (vs lastPitch) mismatches Contour sign, roll <code>swap = rng &lt; |Contour|</code>; on hit, replace with the nearest pitch in the candidate set that goes the desired direction. Bounded retries (2). Octave-blind — consumes the sorted candidate set as a flat list.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -524,7 +524,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law lut">LUT center</td>
-      <td>Marbles bell center position across the scale (0..100 → low..high). Picks a center slot in the candidate pool.</td>
+      <td>5-step pitch law — Step 4 region roll, beta-distribution shape center. 0 → low end of candidate set, 50 → center, 100 → high end. Combined with Spread to drive the beta sample; the result indexes into the sorted candidate set (octave-blind).</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -535,7 +535,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng keyed">Keyed</td>
       <td class="law kernel">Kernel width</td>
-      <td>Width of the Marbles bell around Bias. 0 = locked, 100 = wide.</td>
+      <td>5-step pitch law — Step 4 region roll, beta-distribution concentration. Spread&lt;50 collapses toward Bias (Spread=0 = pure Bias). Spread=50 = cloud around Bias. Spread&gt;50 Bernoulli-pulls toward edges with Bias picking the edge. Linear weighting replaced by continuous beta-shape.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -586,9 +586,9 @@
       <td class="code">sequence.rest()</td>
       <td class="own seq">SEQ</td>
       <td class="layer engine">Engine</td>
-      <td class="rng engine">Engine</td>
+      <td class="rng keyed">Keyed (Loop) / Engine (Live)</td>
       <td class="law bernoulli">Bernoulli</td>
-      <td>Per-event Bernoulli for silence. Generator writes step content&#x27;s rest bit at RENEW/Mutate. Cache reads steps array verbatim. Loop scrubbing handled by Mask + Tilt.</td>
+      <td>Per-cell Bernoulli for silence. <strong>Loop mode</strong>: rolled per-cell at cache time from a salt-separated RNG <code>cellSeed(rhythmSeed ^ 0x5E57DEAD, K)</code> — independent dice from the duration roll. Moving the Rest knob reshapes the audible mask without rerolling durations; moving NoteDuration/Variation/Tickets doesn't reshuffle rests. <strong>Live mode</strong>: engine writes ev.rest() per trigger using <code>_rng</code>. Cluster tails inherit anchor's rest decision.</td>
       <td class="state fixed">Fixed</td>
     </tr>
   </tbody>
@@ -608,7 +608,7 @@
       <td class="layer engine">Engine</td>
       <td class="rng engine">Engine</td>
       <td class="law poisson">Poisson</td>
-      <td>Poisson CDF with cycle-count buildup. On fire: rotates <code>rhythmSeed</code>, regenerates the entire rhythm steps array.</td>
+      <td>Poisson CDF with cycle-count buildup. Knob → λ on a log2 curve: every ~14 knob units doubles the expected wait (knob 0 → λ=1, knob 14 → λ=2, knob 28 → λ=4, ..., knob 99 → λ=128). Knob 100 = off sentinel (never regenerate). On fire: rotates <code>rhythmSeed</code>, regenerates the entire rhythm steps array.</td>
       <td class="state fixed">Fixed</td>
     </tr>
     <tr>
@@ -627,9 +627,9 @@
       <td class="own seq">SEQ</td>
       <td class="layer engine">Engine</td>
       <td class="rng engine">Engine</td>
-      <td class="law bipolar">Bipolar</td>
-      <td>Bipolar Bernoulli per cycle. Positive = permute one event (Marbles swap). Negative = regenerate one event. Sign chooses action; magnitude is probability.</td>
-      <td class="state proposed">Under discussion — see Phase 17 design</td>
+      <td class="law bernoulli">Bernoulli</td>
+      <td>Unipolar 0..100. Per-cycle probability of destructively re-rolling one event inside [first..last]. Domain (rhythm or melody) picked at random when both are Loop+valid. Rhythm mutation re-runs <code>generateMaskRanks</code> globally so MaskR stays correct over the new content. Melody mutation routes through the 5-step pitch law (generateDegree with fresh PitchGenState). Permute branch dropped — Mutate is destructive-only now.</td>
+      <td class="state fixed">Fixed</td>
     </tr>
     <tr>
       <td class="knob">Jump</td>
