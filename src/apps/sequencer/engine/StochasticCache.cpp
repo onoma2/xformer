@@ -104,7 +104,9 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
     auto buildFitCluster = [&](uint32_t total, int cells, float r) {
         if (cells <= 0) cells = 1;
         if (cells > StochasticTrackEngine::kMaxBurst + 1) cells = StochasticTrackEngine::kMaxBurst + 1;
-        const int floorPerCell = stochastic_cache::kMinAudibleGateTicks;
+        // Reserve enough room per cell for a gate-on + audible gap before the
+        // next gate-on. Curve distributes the remaining budget.
+        const int floorPerCell = stochastic_cache::kMinClusterCellTicks;
         const int reserved = floorPerCell * cells;
         int budget = int(total) - reserved;
         if (budget < 0) budget = 0;
@@ -184,22 +186,32 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
                 const int totalMax = StochasticTrackEngine::kMaxBurst + 1;
                 if (total > totalMax) total = totalMax;
                 if (total < 2) total = 2;
-                const int tails = total - 1;
 
                 if (burstFit) {
-                    // Fit: distribute prev_dur across (anchor + tails) via curve.
-                    const float r = curveFromKnob(int(seq.burstRate()));
-                    buildFitCluster(prevDur, total, r);
-                    cellDur = clusterDurs[0];
-                    clusterIdx = 1;
-                    clusterRemaining = tails;
+                    // Fit: auto-reduce cell count if prev_dur can't house the
+                    // requested density at the cluster-cell floor. Below 2
+                    // fittable cells the cluster doesn't fire and the cell
+                    // stays ordinary.
+                    int maxFittable = int(prevDur / stochastic_cache::kMinClusterCellTicks);
+                    if (maxFittable < 2) {
+                        // No room for anchor + tail at the floor — skip cluster.
+                    } else {
+                        if (total > maxFittable) total = maxFittable;
+                        const int tails = total - 1;
+                        const float r = curveFromKnob(int(seq.burstRate()));
+                        buildFitCluster(prevDur, total, r);
+                        cellDur = clusterDurs[0];
+                        clusterIdx = 1;
+                        clusterRemaining = tails;
+                    }
                 } else {
                     // Overflow: existing denom-pick uniform clusterDur.
                     const int spacingSlot = StochasticGenerator::pickBurstSpacingSlot(
                         int(seq.burstRate()), stepRng);
                     const int denom = kBurstSpacingLut[spacingSlot];
                     const uint32_t candidate = prevDur / uint32_t(denom);
-                    if (candidate >= kMinAudibleGateTicks) {
+                    if (candidate >= stochastic_cache::kMinClusterCellTicks) {
+                        const int tails = total - 1;
                         for (int k = 0; k < total; ++k) clusterDurs[k] = candidate;
                         clusterTotal = total;
                         clusterIdx = 1;
@@ -218,14 +230,21 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
                 int tails = int(ev.burstTails());
                 if (tails > StochasticTrackEngine::kMaxBurst) tails = StochasticTrackEngine::kMaxBurst;
                 if (tails < 1) tails = 1;
-                const int total = tails + 1;
+                int total = tails + 1;
 
                 if (burstFit) {
-                    const float r = curveFromKnob(int(seq.burstRate()));
-                    buildFitCluster(prevDur, total, r);
-                    cellDur = clusterDurs[0];
-                    clusterIdx = 1;
-                    clusterRemaining = tails;
+                    int maxFittable = int(prevDur / stochastic_cache::kMinClusterCellTicks);
+                    if (maxFittable < 2) {
+                        // No room for cluster — fall back to ordinary cell.
+                    } else {
+                        if (total > maxFittable) total = maxFittable;
+                        const int actualTails = total - 1;
+                        const float r = curveFromKnob(int(seq.burstRate()));
+                        buildFitCluster(prevDur, total, r);
+                        cellDur = clusterDurs[0];
+                        clusterIdx = 1;
+                        clusterRemaining = actualTails;
+                    }
                 } else {
                     int spacingSlot = int(ev.burstRate());
                     if (spacingSlot < 0) spacingSlot = 0;
@@ -234,7 +253,7 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
                     }
                     const int denom = kBurstSpacingLut[spacingSlot];
                     const uint32_t candidate = prevDur / uint32_t(denom);
-                    if (candidate >= kMinAudibleGateTicks) {
+                    if (candidate >= stochastic_cache::kMinClusterCellTicks) {
                         for (int k = 0; k < total; ++k) clusterDurs[k] = candidate;
                         clusterTotal = total;
                         clusterIdx = 1;

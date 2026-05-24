@@ -15,11 +15,18 @@ class Scale;
 
 namespace stochastic_cache {
 
-// Audible-trigger floor in ticks (~16 ms @ 192 PPQN, 120 BPM). Used as both
-// the minimum gate-on duration for triggered events and the cluster-cell
-// duration floor — below this, a roll is rejected so playback never
-// schedules a sub-audible cell.
+// Audible-trigger floor in ticks (~16 ms @ 192 PPQN, 120 BPM). Minimum
+// gate-on duration for triggered events.
 constexpr uint32_t kMinAudibleGateTicks = 6;
+
+// Minimum cluster cell duration in ticks (~32 ms @ 192 PPQN, 120 BPM). Sized
+// above kMinAudibleGateTicks so the gate-length clamp inside a cluster cell
+// leaves a discrete gate-off gap before the next cell's gate-on. Below this
+// floor a Fit cluster auto-reduces its cell count, and an Overflow cluster
+// refuses to fire — preventing the "machine-gun continuous gate" symptom
+// where consecutive cluster gate-ons land same-tick as the previous gate-off
+// and the envelope can't retrigger.
+constexpr uint32_t kMinClusterCellTicks = 12;
 
 // Per-cell duration cap (12-bit field). ~21 quarter-notes at PPQN=192. A
 // cell whose natural duration exceeds this is clamped at build time —
