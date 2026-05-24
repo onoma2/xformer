@@ -311,12 +311,13 @@ CASE("contour_nudges_down") {
 }
 
 CASE("heavy_ticket_does_not_collapse_to_single_note") {
-    // The anti-collapse promise. One class at ticket=100, others at 10.
-    // The system should still produce a variety of pitches.
+    // The anti-collapse promise. One class at ticket=100, ALL others at 0
+    // (default-flat). The 0 entries must remain pickable so the line stays
+    // varied — this is the Item 6 contract.
     StochasticSequence seq;
     setTransparentDefaults(seq);
     seq.setRange(100);
-    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 10);
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 0);
     seq.setDegreeTicket(0, 100);
     seq.setComplexity(50);
 
@@ -333,6 +334,59 @@ CASE("heavy_ticket_does_not_collapse_to_single_note") {
         if (deg >= 0 && deg < 96 && !seen[deg]) { seen[deg] = 1; uniqueDegrees++; }
     }
     expectTrue(uniqueDegrees >= 8, "heavy ticket should not collapse to a single repeated pitch");
+}
+
+CASE("ticket_zero_is_default_flat_not_excluded") {
+    // Item 6 contract: 0 means default-flat. Setting one class to 100 and
+    // all others to 0 should NOT silence the others — they get base weight 1,
+    // so the line still visits them.
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setRange(50);   // single octave so we see class distribution only
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 0);
+    seq.setDegreeTicket(3, 100);
+    seq.setComplexity(0);
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(99);
+    StochasticGenerator::PitchGenState state{};
+    int seenClass[12] = {};
+    int uniqueClasses = 0;
+    for (int i = 0; i < 400; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        int klass = deg % 12;
+        if (klass >= 0 && klass < 12 && !seenClass[klass]) { seenClass[klass] = 1; uniqueClasses++; }
+    }
+    expectTrue(uniqueClasses >= 8, "ticket=0 classes must remain pickable when another class is emphasized");
+}
+
+CASE("ticket_minus_one_still_excludes") {
+    // -1 must still hard-exclude (the only path to silence a class).
+    StochasticSequence seq;
+    setTransparentDefaults(seq);
+    seq.setRange(50);
+    for (int i = 0; i < 32; ++i) seq.setDegreeTicket(i, 0);
+    seq.setDegreeTicket(5, -1);
+    seq.setDegreeTicket(7, -1);
+    seq.setComplexity(0);
+
+    StochasticTrack track;
+    track.clear();
+
+    Random rng(123);
+    StochasticGenerator::PitchGenState state{};
+    int hit5 = 0, hit7 = 0;
+    for (int i = 0; i < 400; ++i) {
+        const auto &scale = Scale::get(0);
+        int deg = StochasticGenerator::generateDegree(seq, track, scale, state, rng);
+        if ((deg % 12) == 5) hit5++;
+        if ((deg % 12) == 7) hit7++;
+    }
+    expectEqual(hit5, 0, "ticket=-1 must hard-exclude class");
+    expectEqual(hit7, 0, "ticket=-1 must hard-exclude class");
 }
 
 CASE("produces_valid_output_at_all_defaults") {

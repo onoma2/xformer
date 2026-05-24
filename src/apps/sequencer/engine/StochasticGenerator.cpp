@@ -499,17 +499,16 @@ int StochasticGenerator::generateDegree(const StochasticSequence &sequence, cons
     if (allowedCount == 0) return 0;
 
     // ---- Step 1 + 2: class roll with recency, repeat-rejection by Complexity.
+    // Ticket states: -1 excludes (filtered above); 0 is default-flat (weight 1);
+    // 1..100 is weighted emphasis. The three states have stable meanings
+    // independent of context — heavy emphasis stays emphasis, never silently
+    // excludes the others.
     int chosenClass = -1;
-    bool anyTicket = false;
-    for (int i = 0; i < allowedCount; ++i) {
-        if (classTicket[i] > 0) { anyTicket = true; break; }
-    }
     for (int retry = 0; retry < 4; ++retry) {
-        // Weight each allowed class: tickets (or flat 10 if all-zero) × recency.
         uint32_t weights[CONFIG_USER_SCALE_SIZE];
         uint32_t total = 0;
         for (int i = 0; i < allowedCount; ++i) {
-            uint32_t base = anyTicket ? uint32_t(classTicket[i]) : 10u;
+            uint32_t base = uint32_t(classTicket[i] > 0 ? classTicket[i] : 1);
             uint32_t penalty = (allowedClasses[i] == state.lastClass)
                 ? recencyPenaltyMilli(state.classRunLength) : 1000u;
             weights[i] = base * penalty;
