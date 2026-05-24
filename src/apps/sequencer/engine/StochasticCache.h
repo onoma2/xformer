@@ -120,8 +120,13 @@ struct StepCache {
 //              (anchor pitch via generateDegree, cluster-tail Generate
 //              pitch, slide). Pass nullptr to skip pitch baking.
 // Returns number of cells written.
+// `capturedRhythm` / `capturedMelody`: when true, the Loop cache walk
+// reads the corresponding domain from the stored events array (Live's
+// shadow) instead of rolling fresh from the seed. Set by Live-mode
+// NewR / NewM "capture" and cleared by Loop-mode NewR / NewM renews.
 int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
-                              const Scale *scale = nullptr, const StochasticTrack *track = nullptr, int rootNote = 0);
+                              const Scale *scale = nullptr, const StochasticTrack *track = nullptr, int rootNote = 0,
+                              bool capturedRhythm = false, bool capturedMelody = false);
 
 // Compute the Feel scaling factor as Q16.16. Detent [45..55] → 1.0 (no
 // scaling). Outside detent: scale = (targetBeats × beatTicks) / naturalSum,

@@ -788,39 +788,35 @@ bool StochasticSequenceEditPage::handleLiveFunction(int fn, bool shift, int pres
     };
     switch (fn) {
     case 0: {
-        // Live → Loop transitions freeze the live shadow as the captured loop;
-        // Loop → Live is a plain mode swap.
-        const bool wasLive = (seq.rhythmMode() == StochasticSourceMode::Live);
-        auto newMode = wasLive ? StochasticSourceMode::Loop : StochasticSourceMode::Live;
+        // Plain mode toggle. No capture side effect.
+        auto newMode = (seq.rhythmMode() == StochasticSourceMode::Loop)
+            ? StochasticSourceMode::Live : StochasticSourceMode::Loop;
         seq.setRhythmMode(newMode);
-        if (wasLive) {
-            if (auto *eng = stoEng()) eng->captureLiveAsLoopRhythm();
-            showMessage("Live rhythm captured");
-        }
         return true;
     }
     case 1: {
-        const bool wasLive = (seq.melodyMode() == StochasticSourceMode::Live);
-        auto newMode = wasLive ? StochasticSourceMode::Loop : StochasticSourceMode::Live;
+        auto newMode = (seq.melodyMode() == StochasticSourceMode::Loop)
+            ? StochasticSourceMode::Live : StochasticSourceMode::Loop;
         seq.setMelodyMode(newMode);
-        if (wasLive) {
-            if (auto *eng = stoEng()) eng->captureLiveAsLoopMelody();
-            showMessage("Live melody captured");
-        }
         return true;
     }
     case 2:
-        // Live mode: NewR/NewM single-press (nothing destructive — Live rolls
-        // fresh per trigger anyway). Loop guard is in handleLoopFunction.
-        // Shift+NewR = undo last user-pressed NewR.
+        // NewR mode-aware: Live mode = capture shadow (single press),
+        // Loop mode = renew (double-press guard). Shift = undo last renew.
         if (shift) {
             auto *eng = stoEng();
             if (eng && eng->undoRenewRhythm()) showMessage("Undo NewR");
             else                                showMessage("Nothing to undo");
             return true;
         }
-        if (auto *eng = stoEng()) { eng->captureUndoRhythm(); eng->renewRhythm(); }
-        showMessage("Rhythm renewed");
+        if (seq.rhythmMode() == StochasticSourceMode::Live) {
+            if (auto *eng = stoEng()) eng->captureLiveAsLoopRhythm();
+            showMessage("Live rhythm captured");
+        } else if (pressCount == 2) {
+            if (auto *eng = stoEng()) { eng->captureUndoRhythm(); eng->renewRhythm(); showMessage("Rhythm renewed"); }
+        } else {
+            showMessage("Press again to renew rhythm");
+        }
         return true;
     case 3:
         if (shift) {
@@ -829,8 +825,14 @@ bool StochasticSequenceEditPage::handleLiveFunction(int fn, bool shift, int pres
             else                                showMessage("Nothing to undo");
             return true;
         }
-        if (auto *eng = stoEng()) { eng->captureUndoMelody(); eng->renewMelody(); }
-        showMessage("Melody renewed");
+        if (seq.melodyMode() == StochasticSourceMode::Live) {
+            if (auto *eng = stoEng()) eng->captureLiveAsLoopMelody();
+            showMessage("Live melody captured");
+        } else if (pressCount == 2) {
+            if (auto *eng = stoEng()) { eng->captureUndoMelody(); eng->renewMelody(); showMessage("Melody renewed"); }
+        } else {
+            showMessage("Press again to renew melody");
+        }
         return true;
     }
     return false;
@@ -846,47 +848,45 @@ bool StochasticSequenceEditPage::handleLoopFunction(int fn, bool shift, int pres
         return nullptr;
     };
     switch (fn) {
-    case 0: { // LoopR / LiveR — toggle rhythm source mode; Live→Loop captures.
-        const bool wasLive = (seq.rhythmMode() == StochasticSourceMode::Live);
-        auto newMode = wasLive ? StochasticSourceMode::Loop : StochasticSourceMode::Live;
+    case 0: { // LoopR / LiveR — plain mode toggle.
+        auto newMode = (seq.rhythmMode() == StochasticSourceMode::Loop)
+            ? StochasticSourceMode::Live : StochasticSourceMode::Loop;
         seq.setRhythmMode(newMode);
-        if (wasLive) {
-            if (auto *eng = stoEng()) eng->captureLiveAsLoopRhythm();
-            showMessage("Live rhythm captured");
-        }
         return true;
     }
-    case 1: { // LoopM / LiveM — toggle melody source mode; Live→Loop captures.
-        const bool wasLive = (seq.melodyMode() == StochasticSourceMode::Live);
-        auto newMode = wasLive ? StochasticSourceMode::Loop : StochasticSourceMode::Live;
+    case 1: { // LoopM / LiveM — plain mode toggle.
+        auto newMode = (seq.melodyMode() == StochasticSourceMode::Loop)
+            ? StochasticSourceMode::Live : StochasticSourceMode::Loop;
         seq.setMelodyMode(newMode);
-        if (wasLive) {
-            if (auto *eng = stoEng()) eng->captureLiveAsLoopMelody();
-            showMessage("Live melody captured");
-        }
         return true;
     }
-    case 2: // NewR — Shift+ = undo; otherwise double-click guard.
+    case 2: // NewR — mode-aware (mirrors Live page logic).
         if (shift) {
             auto *eng = stoEng();
             if (eng && eng->undoRenewRhythm()) showMessage("Undo NewR");
             else                                showMessage("Nothing to undo");
             return true;
         }
-        if (pressCount == 2) {
+        if (seq.rhythmMode() == StochasticSourceMode::Live) {
+            if (auto *eng = stoEng()) eng->captureLiveAsLoopRhythm();
+            showMessage("Live rhythm captured");
+        } else if (pressCount == 2) {
             if (auto *eng = stoEng()) { eng->captureUndoRhythm(); eng->renewRhythm(); showMessage("Rhythm renewed"); }
         } else {
             showMessage("Press again to renew rhythm");
         }
         return true;
-    case 3: // NewM — Shift+ = undo; otherwise double-click guard.
+    case 3: // NewM — mode-aware.
         if (shift) {
             auto *eng = stoEng();
             if (eng && eng->undoRenewMelody()) showMessage("Undo NewM");
             else                                showMessage("Nothing to undo");
             return true;
         }
-        if (pressCount == 2) {
+        if (seq.melodyMode() == StochasticSourceMode::Live) {
+            if (auto *eng = stoEng()) eng->captureLiveAsLoopMelody();
+            showMessage("Live melody captured");
+        } else if (pressCount == 2) {
             if (auto *eng = stoEng()) { eng->captureUndoMelody(); eng->renewMelody(); showMessage("Melody renewed"); }
         } else {
             showMessage("Press again to renew melody");
@@ -1482,9 +1482,18 @@ void StochasticSequenceEditPage::handlePitchKeyPress(KeyPressEvent &event) {
             sequence.setMelodyMode(newMode);
             break;
         }
-        case 1: // F2: NewM — double-click guard.
-            if (event.count() == 2) {
-                if (auto *eng = stoEng()) { eng->renewMelody(); showMessage("Melody renewed"); }
+        case 1: // F2: NewM — mode-aware. Live = capture (single press),
+                // Loop = renew (double-press guard). Shift = undo last renew.
+            if (event.key().shiftModifier()) {
+                if (auto *eng = stoEng()) {
+                    if (eng->undoRenewMelody()) showMessage("Undo NewM");
+                    else                        showMessage("Nothing to undo");
+                }
+            } else if (sequence.melodyMode() == StochasticSourceMode::Live) {
+                if (auto *eng = stoEng()) eng->captureLiveAsLoopMelody();
+                showMessage("Live melody captured");
+            } else if (event.count() == 2) {
+                if (auto *eng = stoEng()) { eng->captureUndoMelody(); eng->renewMelody(); showMessage("Melody renewed"); }
             } else {
                 showMessage("Press again to renew melody");
             }
@@ -1561,9 +1570,17 @@ void StochasticSequenceEditPage::handleDurationKeyPress(KeyPressEvent &event) {
             sequence.setRhythmMode(newMode);
             break;
         }
-        case 1: // F2: NewR — double-click guard.
-            if (event.count() == 2) {
-                if (auto *eng = stoEng()) { eng->renewRhythm(); showMessage("Rhythm renewed"); }
+        case 1: // F2: NewR — mode-aware (matches Pitch page NewM logic).
+            if (event.key().shiftModifier()) {
+                if (auto *eng = stoEng()) {
+                    if (eng->undoRenewRhythm()) showMessage("Undo NewR");
+                    else                        showMessage("Nothing to undo");
+                }
+            } else if (sequence.rhythmMode() == StochasticSourceMode::Live) {
+                if (auto *eng = stoEng()) eng->captureLiveAsLoopRhythm();
+                showMessage("Live rhythm captured");
+            } else if (event.count() == 2) {
+                if (auto *eng = stoEng()) { eng->captureUndoRhythm(); eng->renewRhythm(); showMessage("Rhythm renewed"); }
             } else {
                 showMessage("Press again to renew rhythm");
             }

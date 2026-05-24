@@ -648,6 +648,7 @@ void StochasticTrackEngine::renewRhythm() {
     auto &trk = stochasticTrack();
     StochasticGenerator::generateRhythm(seq, trk, _rng.next());
     seq.setRhythmValid(true);
+    _capturedFromLiveRhythm = false;   // back to seed-keyed Loop content
     _loopCycleCount = 0;
     refreshStepCache();
 }
@@ -659,6 +660,7 @@ void StochasticTrackEngine::renewMelody() {
     int rootNote = seq.selectedRootNote(_model.project().rootNote());
     StochasticGenerator::generateMelody(seq, trk, scale, rootNote, _rng.next());
     seq.setMelodyValid(true);
+    _capturedFromLiveMelody = false;
     _loopCycleCountMelody = 0;
     // Fresh melody = no inherited octave drift (2026-05-24).
     _jumpRegister = 0;
@@ -668,6 +670,8 @@ void StochasticTrackEngine::renewMelody() {
 void StochasticTrackEngine::captureLiveAsLoopRhythm() {
     auto &seq = sequence();
     seq.setRhythmValid(true);
+    seq.setRhythmMode(StochasticSourceMode::Loop);   // auto-switch
+    _capturedFromLiveRhythm = true;                  // cache reads events[] in Loop mode
     _loopCycleCount = 0;
     refreshStepCache();
 }
@@ -675,7 +679,10 @@ void StochasticTrackEngine::captureLiveAsLoopRhythm() {
 void StochasticTrackEngine::captureLiveAsLoopMelody() {
     auto &seq = sequence();
     seq.setMelodyValid(true);
+    seq.setMelodyMode(StochasticSourceMode::Loop);   // auto-switch
+    _capturedFromLiveMelody = true;
     _loopCycleCountMelody = 0;
+    _jumpRegister = 0;
     refreshStepCache();
 }
 
@@ -827,7 +834,8 @@ void StochasticTrackEngine::refreshStepCache() {
     const auto &scale = seq.selectedScale(_model.project().scale());
     int rootNote = seq.selectedRootNote(_model.project().rootNote());
     stochastic_cache::rebuildStepCache(
-        _stepCache, seq, divisor, seq.rhythmSeed(), &scale, &trk, rootNote);
+        _stepCache, seq, divisor, seq.rhythmSeed(), &scale, &trk, rootNote,
+        _capturedFromLiveRhythm, _capturedFromLiveMelody);
 }
 
 uint32_t StochasticTrackEngine::effectiveDivisor() const {

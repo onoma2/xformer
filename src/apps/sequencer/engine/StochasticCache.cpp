@@ -53,7 +53,8 @@ uint32_t computeFeelScaleQ16(int feel, uint32_t naturalSum, uint32_t beatTicks) 
 }
 
 int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
-                              const Scale *scale, const StochasticTrack *track, int rootNote) {
+                              const Scale *scale, const StochasticTrack *track, int rootNote,
+                              bool capturedRhythm, bool capturedMelody) {
     (void)rootNote; // unused — generateDegree consumes scale + track only, root is applied at trigger time
     cache.count = 0;
     cache.cycleTicks = 0;
@@ -129,10 +130,15 @@ int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t d
     // (knob movement reshapes deterministically). Live = engine writes
     // fresh content per trigger into the events array; cache reads those
     // values verbatim.
+    // Loop-mode cache normally rolls duration / pitch / rest fresh from the
+    // seed every cell. When the domain was captured from Live (NewR/NewM in
+    // Live mode), the events array holds Live's stored shadow and the cache
+    // must read it verbatim — same path as Live mode — so the captured
+    // performance plays back. NewR/NewM in Loop clears the flag.
     const bool pickMelodyInCache =
-        bakeChildNotes && seq.melodyMode() == StochasticSourceMode::Loop;
+        bakeChildNotes && seq.melodyMode() == StochasticSourceMode::Loop && !capturedMelody;
     const bool pickRhythmInCache =
-        seq.rhythmMode() == StochasticSourceMode::Loop;
+        seq.rhythmMode() == StochasticSourceMode::Loop && !capturedRhythm;
 
     // Pitch chain threads the per-step state (lastDegree + class recency)
     // through every step including cluster tails so Complexity / Contour /

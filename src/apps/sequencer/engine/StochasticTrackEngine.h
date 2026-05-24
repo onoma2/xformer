@@ -196,6 +196,11 @@ private:
     uint32_t _undoSeedMelody = 0;
     bool _undoSeedRhythmValid = false;
     bool _undoSeedMelodyValid = false;
+    // Set by Live-mode NewR / NewM capture. While true, Loop-mode cache walk
+    // reads the corresponding domain from the events array (Live's shadow)
+    // instead of rolling fresh from the seed. Cleared by Loop-mode renew.
+    bool _capturedFromLiveRhythm = false;
+    bool _capturedFromLiveMelody = false;
     int _lastDurationIndex = 0;
     int _jumpRegister = 0;
     int _lastFreeStepIndex = -1;
