@@ -1,5 +1,7 @@
 # Task Board
-_Updated: 2026-05-24 (Stochastic: slot-keyed cache landed; NewR/NewM domain isolation closed; Slide / Legato / cluster-tail Generate pitch moved to cache-pick under their owning seed; jump octave drift resets on melody renew; cycle-end hooks bundled so Jump/Sleep/Patience/Mutate all advance on the same boundary; comment audit pass on engine layer.)_
+_Updated: 2026-05-24 (Stochastic: slot-keyed cache landed; NewR/NewM domain isolation closed; Slide / Legato / cluster-tail Generate pitch moved to cache-pick under their owning seed; jump octave drift resets on melody renew; cycle-end hooks bundled so Jump/Sleep/Patience/Mutate all advance on the same boundary; comment audit pass on engine layer; cleanup sweep dropped 11 dead-code items; vocabulary rename — StepContent / RuntimeStep / StepCache / step / Gate / Cv — converged with NoteTrack idiom.)_
+
+**Naming convention from 2026-05-24 forward:** older entries below use prior names that are consistent with the code at the time they were written. Current canonical: step (idea, int), `StochasticStepContent` (stored), `RuntimeStep` (runtime), `StepCache` (container), `Gate` / `Cv` (output).
 
 ## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
 **Status:** done — Phases A-F complete and hardware verified.

@@ -89,10 +89,10 @@ void StochasticGenerator::generateRhythm(StochasticSequence &sequence, const Sto
     for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
         if (i < size) {
             auto rhythm = generateRhythmEvent(sequence, track, rng);
-            sequence.events()[i].mergeRhythmFrom(rhythm);
+            sequence.steps()[i].mergeRhythmFrom(rhythm);
         } else {
             // Do not clear the whole event, only rhythm part
-            sequence.events()[i].clearRhythm();
+            sequence.steps()[i].clearRhythm();
         }
     }
 
@@ -109,9 +109,9 @@ void StochasticGenerator::generateMelody(StochasticSequence &sequence, const Sto
     for (int i = 0; i < CONFIG_STEP_COUNT; ++i) {
         if (i < size) {
             auto melody = generateMelodyEvent(sequence, track, scale, rootNote, lastDegree, rng);
-            sequence.events()[i].mergeMelodyFrom(melody);
+            sequence.steps()[i].mergeMelodyFrom(melody);
         } else {
-            sequence.events()[i].setMelodyValid(false);
+            sequence.steps()[i].setMelodyValid(false);
         }
     }
 
@@ -184,7 +184,7 @@ void StochasticGenerator::mutateRhythmOne(StochasticSequence &sequence, const St
     }
     rhythm.setDurationIndex(durIdx);
 
-    sequence.events()[i].mergeRhythmFrom(rhythm);
+    sequence.steps()[i].mergeRhythmFrom(rhythm);
     // Duration-aware ranks need refresh after this event's durationIndex changed.
     generateMaskRanks(sequence, size, sequence.rhythmSeed() ^ 0xdeadbeef);
 }
@@ -235,12 +235,12 @@ void StochasticGenerator::mutateMelodyOne(StochasticSequence &sequence, const St
         }
     }
 
-    StochasticSourceEvent melody;
+    StochasticStepContent melody;
     melody.clear();
     melody.setDegree(absDegree % activeNotes);
     melody.setOctave(absDegree / activeNotes);
     melody.setMelodyValid(true);
-    sequence.events()[i].mergeMelodyFrom(melody);
+    sequence.steps()[i].mergeMelodyFrom(melody);
 }
 
 // Marbles-style permutation: swap rhythm content between two random positions
@@ -255,8 +255,8 @@ void StochasticGenerator::permuteRhythmOne(StochasticSequence &sequence, Random 
     int i = first + rng.nextRange(windowSize);
     int j = first + rng.nextRange(windowSize - 1);
     if (j >= i) ++j;  // ensure j != i
-    auto &ev = sequence.events();
-    StochasticSourceEvent tmp;
+    auto &ev = sequence.steps();
+    StochasticStepContent tmp;
     tmp.mergeRhythmFrom(ev[i]);
     ev[i].mergeRhythmFrom(ev[j]);
     ev[j].mergeRhythmFrom(tmp);
@@ -312,8 +312,8 @@ void StochasticGenerator::permuteMelodyOne(StochasticSequence &sequence, Random 
     int i = first + rng.nextRange(windowSize);
     int j = first + rng.nextRange(windowSize - 1);
     if (j >= i) ++j;
-    auto &ev = sequence.events();
-    StochasticSourceEvent tmp;
+    auto &ev = sequence.steps();
+    StochasticStepContent tmp;
     tmp.mergeMelodyFrom(ev[i]);
     ev[i].mergeMelodyFrom(ev[j]);
     ev[j].mergeMelodyFrom(tmp);
@@ -339,7 +339,7 @@ void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int si
     std::array<WeightedIndex, CONFIG_STEP_COUNT> weightedIndices;
 
     for (int k = 0; k < size; ++k) {
-        int durSlot = clamp(int(sequence.events()[k].durationIndex()), 0, 7);
+        int durSlot = clamp(int(sequence.steps()[k].durationIndex()), 0, 7);
         // Long-vs-short axis in [-1, +1]: durSlot 0 = longest LUT entry (×8),
         // durSlot 7 = shortest (×1/2). Negate so longest cell -> negative, sorts first.
         float longShortAxis = (durSlot - 3.5f) / 3.5f;
@@ -356,11 +356,11 @@ void StochasticGenerator::generateMaskRanks(StochasticSequence &sequence, int si
     });
 
     for (int k = 0; k < size; ++k) {
-        sequence.events()[weightedIndices[k].index].setDensityRank(k);
+        sequence.steps()[weightedIndices[k].index].setDensityRank(k);
     }
 }
 
-void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *children, const StochasticSequence &sequence, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng) {
+void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *bursts, const StochasticSequence &sequence, const StochasticStepContent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int anchorNote, uint32_t durationTicks, Random &rng) {
     int count = event.childCount();
 
     // Cluster F eval-time safety net: regardless of what childCount the event
@@ -384,7 +384,7 @@ void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *children, const Stoc
     spacing = std::max(float(minChildGate + 1), spacing);
 
     for (int i = 0; i < StochasticTrackEngine::kMaxBurst; ++i) {
-        children[i].valid = false;
+        bursts[i].valid = false;
         if (i < count) {
             uint32_t offset = uint32_t((i + 1) * spacing);
             uint32_t gate = std::max(minChildGate, uint32_t(spacing * 0.5f));
@@ -398,22 +398,22 @@ void StochasticGenerator::evaluateBurst(EvaluatedBurstNote *children, const Stoc
                 }
             }
 
-            children[i].tickOffset = offset;
-            children[i].gateTicks = gate;
+            bursts[i].tickOffset = offset;
+            bursts[i].gateTicks = gate;
             
             if (sequence.burstHold() == StochasticBurstHold::Roll) {
                 int lastDegree = -1;
-                children[i].note = generateDegree(sequence, track, scale, lastDegree, rng);
+                bursts[i].note = generateDegree(sequence, track, scale, lastDegree, rng);
             } else {
-                children[i].note = parentNote;
+                bursts[i].note = anchorNote;
             }
-            children[i].valid = true;
+            bursts[i].valid = true;
         }
     }
 }
 
-StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticSequence &sequence, const StochasticTrack &track, Random &rng) {
-    StochasticSourceEvent event;
+StochasticStepContent StochasticGenerator::generateRhythmEvent(const StochasticSequence &sequence, const StochasticTrack &track, Random &rng) {
+    StochasticStepContent event;
     event.clear();
 
     // Duration pick: tickets × kernel(noteDuration center, variation width).
@@ -434,7 +434,7 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
     event.setBurstRate(0);
     // Burst storage: the cache decides per-cell eligibility (prev_dur / denom
     // playable). The generator just stores count + spacing so Repeat playback
-    // — which replays _lastEvent through evaluateBurst — has something to
+    // — which replays _lastStepContent through evaluateBurst — has something to
     // evaluate. evaluateBurst keeps its own duration check.
     if (int(rng.nextRange(100)) < sequence.burst()) {
         event.setChildCount(pickBurstCountFromLut(sequence.burstCount(), rng));
@@ -450,8 +450,8 @@ StochasticSourceEvent StochasticGenerator::generateRhythmEvent(const StochasticS
     return event;
 }
 
-StochasticSourceEvent StochasticGenerator::generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng) {
-    StochasticSourceEvent event;
+StochasticStepContent StochasticGenerator::generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng) {
+    StochasticStepContent event;
     event.clear();
 
     int absoluteDegree = generateDegree(sequence, track, scale, lastDegree, rng);

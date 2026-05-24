@@ -52,21 +52,19 @@ uint32_t computeFeelScaleQ16(int feel, uint32_t naturalSum, uint32_t beatTicks) 
     return uint32_t(scale * float(kOneQ16) + 0.5f);
 }
 
-int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
+int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
                               const Scale *scale, const StochasticTrack *track, int rootNote) {
     (void)rootNote; // unused — generateDegree consumes scale + track only, root is applied at trigger time
     cache.count = 0;
     cache.cycleTicks = 0;
-    // Slot-keyed cache (2026-05-24): each slot is its own cell, indexed by
-    // slot. parentCacheIdx is the identity mapping for slots 0..size-1 and
-    // 0xff outside that range. Engine reads cache.cells[readIndex] directly.
-    for (int i = 0; i < kMaxEventSlots; ++i) cache.parentCacheIdx[i] = 0xff;
+    // Slot-keyed cache: each step owns runtimeSteps[K]. Engine reads
+    // cache.runtimeSteps[stepIndex] directly; validity = stepIndex < count.
 
     const bool bakeChildNotes = (scale != nullptr) && (track != nullptr);
 
     // Slot-keyed walk: iterate the full pattern extent 0..size-1. First is
     // not consulted here — it bounds playback at the engine, not the cache
-    // build. Slot K's cell is always cells[K]; cluster state carries across
+    // build. Slot K's cell is always runtimeSteps[K]; cluster state carries across
     // slots; content depends only on (seed, events, slot index).
     const int size = std::max(0, std::min(int(seq.size()), int(kMaxEventSlots)));
     if (size <= 0) return 0;
@@ -106,11 +104,11 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
     for (int i = 0; i < size; ++i) {
         if (i >= kCellCap) break;  // hard cap; remaining slots dropped silently
 
-        const StochasticSourceEvent &ev = seq.events()[i];
+        const StochasticStepContent &ev = seq.steps()[i];
 
         // Per-cell keyed RNG. Slot K's cell content is a pure function of
         // (rhythmSeed, K); First / Size do not shift it.
-        Random cellRng(keyed_rng::cellSeed(seed, uint32_t(i)));
+        Random stepRng(keyed_rng::cellSeed(seed, uint32_t(i)));
 
         // Decide this cell's duration. Cluster overrides the per-cell pick.
         uint32_t cellDur;
@@ -123,7 +121,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             // Loop: pick fresh per cell. NoteDuration + Variation knobs
             // reshape the duration; Burst + Count + Rate knobs decide
             // cluster firing — all deterministic in the seed.
-            const int picked = StochasticGenerator::pickDurationSlot(seq, cellRng);
+            const int picked = StochasticGenerator::pickDurationSlot(seq, stepRng);
             cellDur = lutTicks(uint8_t(picked));
 
             // Bootstrap prevDur at slot 0 so a cluster starting at slot 0
@@ -133,15 +131,15 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
 
             // Burst roll. Reject if the resulting cluster cell would fall
             // below the audible-cell floor.
-            if (int(cellRng.nextRange(100)) < int(seq.burst())) {
+            if (int(stepRng.nextRange(100)) < int(seq.burst())) {
                 const int spacingSlot = StochasticGenerator::pickBurstSpacingSlot(
-                    int(seq.burstRate()), cellRng);
+                    int(seq.burstRate()), stepRng);
                 const int denom = kBurstSpacingLut[spacingSlot];
                 const uint32_t candidate = prevDur / uint32_t(denom);
                 if (candidate >= kMinAudibleGateTicks) {
                     clusterDur = candidate;
                     cellDur = clusterDur;
-                    int count = StochasticGenerator::pickBurstCount(int(seq.burstCount()), cellRng);
+                    int count = StochasticGenerator::pickBurstCount(int(seq.burstCount()), stepRng);
                     if (count > StochasticTrackEngine::kMaxBurst) {
                         count = StochasticTrackEngine::kMaxBurst;
                     }
@@ -229,8 +227,8 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             int pct = 50;
             const int spread = std::max(0, std::min(100, int(seq.gateLength())));
             if (spread > 0) {
-                int r1 = int(cellRng.nextRange(101));
-                int r2 = int(cellRng.nextRange(101));
+                int r1 = int(stepRng.nextRange(101));
+                int r2 = int(stepRng.nextRange(101));
                 int tri = (r1 + r2) / 2;
                 pct = 50 + ((tri - 50) * spread) / 100;
             }
@@ -241,7 +239,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             cellGateFrac = uint8_t(frac);
         }
 
-        // Legato is rhythm-domain (cellRng / rhythmSeed) — it's a gate /
+        // Legato is rhythm-domain (stepRng / rhythmSeed) — it's a gate /
         // tie behavior. Slide is melody-domain (slideRng / melodySeed)
         // since it's a pitch-glide gesture; keeping it under rhythmSeed
         // would mean NewR shifts which notes glide. Both pick per cell
@@ -254,7 +252,7 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             cellSlide  = anchorSlide;
         } else {
             const int legSpread = std::max(0, std::min(100, int(seq.legatoProb())));
-            cellLegato = (legSpread > 0 && int(cellRng.nextRange(100)) < legSpread);
+            cellLegato = (legSpread > 0 && int(stepRng.nextRange(100)) < legSpread);
             const int slideSpread = std::max(0, std::min(100, int(seq.slide())));
             Random slideRng(keyed_rng::cellSeed(seq.melodySeed(), uint32_t(i)) ^ 0x511DE51Du);
             cellSlide  = (slideSpread > 0 && int(slideRng.nextRange(100)) < slideSpread);
@@ -262,8 +260,8 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             anchorSlide  = cellSlide;
         }
 
-        // Slot-keyed write: cells[K] for slot K; parentCacheIdx is identity.
-        cache.cells[i] = CachedCell::make(
+        // Slot-keyed write: runtimeSteps[K] for step K.
+        cache.runtimeSteps[i] = RuntimeStep::make(
             cellDur,
             cellDegree,
             cellOctave,
@@ -273,8 +271,6 @@ int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint3
             /*audible*/ !ev.rest());
 
         cache.aux[i] = CellAux::make();
-
-        cache.parentCacheIdx[i] = uint8_t(i);
 
         ++cache.count;
         cycleTicks += cellDur;

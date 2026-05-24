@@ -419,13 +419,13 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     int currentStep = -1;
     if (_engine.selectedTrackEngine().trackMode() == Track::TrackMode::Stochastic) {
         auto &eng = _engine.selectedTrackEngine().as<StochasticTrackEngine>();
-        // currentStep() returns _patternIndex, which is the NEXT step to fire
+        // currentStep() returns _currentStep, which is the NEXT step to fire
         // (engine increments inside triggerStep after reading the index).
         // Step back one with wrap to track what's audible right now.
         //
         // Bug fix 2026-05-22: previous math wrapped across the full sequence
         // size, not the playback window. At the cycle boundary (engine
-        // wraps from `last` to `first`), `_patternIndex` becomes `first` and
+        // wraps from `last` to `first`), `_currentStep` becomes `first` and
         // the just-played audible slot is `last`. Old math gave `first - 1`
         // (sometimes outside the window). Walk the window, not the sequence.
         int next = eng.currentStep();
@@ -434,7 +434,7 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         int winSize  = winLast - winFirst + 1;
         if (winSize <= 0) winSize = 1;
         // Clamp next into the window before stepping back (defensive: snap
-        // clause may have repositioned _patternIndex on a window edit).
+        // clause may have repositioned _currentStep on a window edit).
         int relNext = ((next - winFirst) % winSize + winSize) % winSize;
         int relAudible = (relNext - 1 + winSize) % winSize;
         currentStep = winFirst + relAudible;
@@ -455,11 +455,11 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         return displayIdx;
     };
 
-    // The engine writes back live-generated events to sequence.events()[] each
+    // The engine writes back live-generated events to sequence.steps()[] each
     // tick (Live mode), so the stored buffer is always the most recently-played
     // content. Tape reads stored data uniformly — Loop mode is a snapshot, Live
     // mode updates progressively as each step plays.
-    auto durIndexForSlot = [&] (const StochasticSourceEvent &ev) {
+    auto durIndexForSlot = [&] (const StochasticStepContent &ev) {
         return int(ev.durationIndex());
     };
 
@@ -483,7 +483,7 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     int pitchMax = INT32_MIN;
     for (int i = 0; i < seqSize; ++i) {
         int eIdx = resolveEventIdx(i);
-        const auto &ev = seq.events()[eIdx];
+        const auto &ev = seq.steps()[eIdx];
         totalEventTicks += ticksForSlot(durIndexForSlot(ev));
         if (!ev.rest()) {
             int pitch = int(ev.degree()) + int(ev.octave()) * 12;
@@ -517,7 +517,7 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
 
     for (int i = 0; i < seqSize; ++i) {
         int eIdx = resolveEventIdx(i);
-        const auto &ev = seq.events()[eIdx];
+        const auto &ev = seq.steps()[eIdx];
         int durIdx = durIndexForSlot(ev);
         int eventTicks = ticksForSlot(durIdx);
         ticksAccum += eventTicks;
@@ -687,7 +687,7 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     //              13=GATE 14=SLID 15=LEGA              (red — per-event gate behavior)
     switch (step) {
     // Phase 16 P10 (2026-05-23): every knob whose value is now consumed by the
-    // cache walk (regenerateCacheFromEvents) must invalidate the cache on
+    // cache walk (rebuildStepCache) must invalidate the cache on
     // edit. Knobs that only roll at trigger time (Rest, Repeat, Legato, Slide
     // probability) stay no-op refresh-wise. Feel is read per-trigger by the
     // engine so notify is redundant for it — kept for consistency.
@@ -715,7 +715,7 @@ void StochasticSequenceEditPage::notifyStochasticShapingEdit() {
     auto &engine = _engine.trackEngine(trackIdx);
     if (engine.trackMode() != Track::TrackMode::Stochastic) return;
     if (engine.pattern() != _project.selectedPatternIndex()) return;
-    static_cast<StochasticTrackEngine &>(engine).refreshCacheNow();
+    static_cast<StochasticTrackEngine &>(engine).refreshStepCacheNow();
 }
 
 void StochasticSequenceEditPage::notifyStochasticWindowEdit() {

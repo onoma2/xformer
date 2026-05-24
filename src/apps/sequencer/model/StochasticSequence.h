@@ -464,8 +464,8 @@ public:
     }
 
     // Phase 8.2 Split Source Buffers
-    const std::array<StochasticSourceEvent, CONFIG_STEP_COUNT> &events() const { return _events; }
-          std::array<StochasticSourceEvent, CONFIG_STEP_COUNT> &events()       { return _events; }
+    const std::array<StochasticStepContent, CONFIG_STEP_COUNT> &steps() const { return _steps; }
+          std::array<StochasticStepContent, CONFIG_STEP_COUNT> &steps()       { return _steps; }
 
     bool rhythmValid() const { return _rhythmValid; }
     void setRhythmValid(bool valid) { _rhythmValid = valid; }
@@ -481,7 +481,7 @@ public:
 
     void clear() {
         setDefaults();
-        for (auto &event : _events) event.clear();
+        for (auto &event : _steps) event.clear();
     }
 
     void write(VersionedSerializedWriter &writer) const {
@@ -538,7 +538,7 @@ public:
         writer.write(uint8_t(0));   // reserved (was StochasticLevel enum)
 
 
-        for (const auto &event : _events) {
+        for (const auto &event : _steps) {
             for (int i = 0; i < 6; ++i) {
                 writer.write(event.bytes[i]);
             }
@@ -625,7 +625,7 @@ public:
         { uint8_t reserved; reader.read(reserved); }   // was StochasticLevel enum
 
 
-        for (auto &event : _events) {
+        for (auto &event : _steps) {
             for (int i = 0; i < 6; ++i) {
                 reader.read(event.bytes[i]);
             }
@@ -636,7 +636,7 @@ public:
 
 private:
     // Shared defaults for clear() and the invalid-size recovery path in
-    // sanitizeAfterRead(). Touches all model fields except _events (callers
+    // sanitizeAfterRead(). Touches all model fields except _steps (callers
     // decide whether to wipe events too).
     void setDefaults() {
         _scale = -1;
@@ -699,7 +699,7 @@ private:
 
         if (_size < 2 || _size > CONFIG_STEP_COUNT) {
             setDefaults();
-            for (auto &event : _events) event.clear();
+            for (auto &event : _steps) event.clear();
             return;
         }
 
@@ -708,7 +708,7 @@ private:
         _melodyValid = _melodyValid ? true : false;
 
         for (int i = _size; i < CONFIG_STEP_COUNT; ++i) {
-            _events[i].clear();
+            _steps[i].clear();
         }
     }
 
@@ -725,7 +725,7 @@ private:
     // one byte for backward read compat; field dropped from RAM.
 
     // Split rhythm + melody storage
-    std::array<StochasticSourceEvent, CONFIG_STEP_COUNT> _events;
+    std::array<StochasticStepContent, CONFIG_STEP_COUNT> _steps;
     bool _rhythmValid;
     bool _melodyValid;
     uint32_t _rhythmSeed;

@@ -1,7 +1,7 @@
 #pragma once
 
 // Engine-side cache for stochastic playback. Bit-packed cell layout
-// validated by TestStochasticCacheParity. The engine reads cells[K]
+// validated by TestStochasticCacheParity. The engine reads runtimeSteps[K]
 // directly for each played slot K; the cache is rebuilt only when stored
 // material changes (renew, mutate, Size edit, shaping-knob edit via
 // notifyStochasticShapingEdit).
@@ -46,7 +46,7 @@ constexpr int kCellCap = 64;
 
 // Cell stores its own duration in ticks; the engine sums durations for
 // the cycle length. 12-bit field clamps at kMaxCellDuration.
-struct CachedCell {
+struct RuntimeStep {
     uint32_t packed;
 
     uint32_t durationTicks() const { return  packed        & 0xfffu; }
@@ -57,7 +57,7 @@ struct CachedCell {
     bool     slide()         const { return (packed >> 30) & 1u; }
     bool     legato()        const { return (packed >> 31) & 1u; }
 
-    static CachedCell make(uint32_t durationTicks, uint8_t degree, uint8_t octave,
+    static RuntimeStep make(uint32_t durationTicks, uint8_t degree, uint8_t octave,
                            uint8_t gateLen, bool slide, bool legato, bool audible = true) {
         if (octave > kMaxOctave) octave = kMaxOctave;
         if (durationTicks > kMaxCellDuration) durationTicks = kMaxCellDuration;
@@ -68,10 +68,10 @@ struct CachedCell {
                    | ((audible ? 1u : 0u)               << 29)
                    | ((slide   ? 1u : 0u)               << 30)
                    | ((legato  ? 1u : 0u)               << 31);
-        return CachedCell{r};
+        return RuntimeStep{r};
     }
 };
-static_assert(sizeof(CachedCell) == 4, "CachedCell must be 4 bytes");
+static_assert(sizeof(RuntimeStep) == 4, "RuntimeStep must be 4 bytes");
 
 // Auxiliary per-cell metadata. 1 byte; all bits currently reserved. Ranks
 // live on events (event.densityRank), burst-child has no meaning under the
@@ -85,7 +85,7 @@ struct CellAux {
 static_assert(sizeof(CellAux) == 1, "CellAux must be 1 byte");
 
 // Cache footprint per active track:
-//   CachedCell[64] = 256 B
+//   RuntimeStep[64] = 256 B
 //   CellAux[64]    =  64 B
 //   Total          = 320 B
 
@@ -93,20 +93,15 @@ static_assert(sizeof(CellAux) == 1, "CellAux must be 1 byte");
 // avoids pulling that in (Cache is consumed by tests too).
 constexpr int kMaxEventSlots = 64;
 
-struct Cache {
-    CachedCell cells[kCellCap];
-    CellAux    aux[kCellCap];
+struct StepCache {
+    RuntimeStep runtimeSteps[kCellCap];
+    CellAux     aux[kCellCap];
 
-    // Slot-keyed identity map: parentCacheIdx[K] == K for K < count;
-    // 0xff outside that range. Kept for binary compat with earlier
-    // parent/child layouts.
-    uint8_t    parentCacheIdx[kMaxEventSlots];
-
-    uint8_t    count;
-    // Sum of per-cell durations. Widened to 32 bits so dense long-duration
-    // patterns (worst case 64 × kMaxCellDuration = 262 080) reach Feel
-    // scaling without truncation.
-    uint32_t   cycleTicks;
+    uint8_t     count;
+    // Sum of per-cell durations. 32-bit so dense long-duration patterns
+    // (worst case 64 × kMaxCellDuration = 262 080) reach Feel scaling
+    // without truncation.
+    uint32_t    cycleTicks;
 };
 
 // Build the cache from the sequence's events array.
@@ -118,7 +113,7 @@ struct Cache {
 //              (anchor pitch via generateDegree, cluster-tail Generate
 //              pitch, slide). Pass nullptr to skip pitch baking.
 // Returns number of cells written.
-int regenerateCacheFromEvents(Cache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
+int rebuildStepCache(StepCache &cache, const StochasticSequence &seq, uint32_t divisor, uint32_t seed,
                               const Scale *scale = nullptr, const StochasticTrack *track = nullptr, int rootNote = 0);
 
 // Compute the Feel scaling factor as Q16.16. Detent [45..55] → 1.0 (no

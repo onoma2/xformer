@@ -1,7 +1,16 @@
 # Phase 17 — Sequence reduction + mutate redesign
 
 **Status:** Drafted 2026-05-23. Refreshed 2026-05-24 after the slot-keyed cache /
-seed-domain isolation session.
+seed-domain isolation session and the StepContent / RuntimeStep vocabulary rename.
+
+> **Naming convention from 2026-05-24 forward:** step (idea, int index),
+> `StochasticStepContent` (code, stored data), `RuntimeStep` (code, runtime-rolled
+> data), `StepCache` (code, container for the runtime layer), `Gate` / `Cv` (code,
+> output queue entries — same names as NoteTrack). Earlier task entries above use
+> the prior vocabulary (`StochasticSourceEvent`, `CachedCell`, `Cache`, `slot`,
+> `_patternIndex`, `readIndex`, `_lastEvent`, `events()`, `parentCacheIdx`,
+> `parent`/`child`) — they are consistent with the names in code at the time
+> they were written.
 
 ## Goal
 
@@ -410,3 +419,18 @@ safe and when). Fractal should avoid this pattern entirely.
   boundary. PHASE15 pitch-law revamp (Marbles continuous, Range bipolar,
   ticket transparency, layer ownership) tracks separately — independent of
   this structural cleanup.
+- 2026-05-24: Vocabulary rename landed. `StochasticSourceEvent` →
+  `StochasticStepContent`; `CachedCell` → `RuntimeStep`; `Cache` →
+  `StepCache`; `events()` → `steps()`; `_events` → `_steps`;
+  `_patternIndex` → `_currentStep`; `readIndex` → `stepIndex`;
+  `regenerateCacheFromEvents` → `rebuildStepCache`; `refreshCache` →
+  `refreshStepCache`; `_cache` → `_stepCache`; `_lastEvent` →
+  `_lastStepContent`; `parentNote` → `anchorNote`; `evalChildren` →
+  `evalBursts`. `parentCacheIdx` field deleted (identity under
+  slot-keyed; replaced with `stepIndex < count` bounds check). `CellAux`
+  rank/burstChild accessors and bits deleted in prior cleanup sweep.
+  `Gate` / `Cv` queue entry struct names unchanged — they already
+  matched NoteTrack. The remaining `children` / `parent` references in
+  comments / wire-format are dropped in evaluateBurst body; `BurstPitch`
+  → `BurstHold` was done in the earlier rename pass. Pure mechanical
+  refactor; no behavior change. All 7 tests green.

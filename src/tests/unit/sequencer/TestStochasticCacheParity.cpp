@@ -1,6 +1,6 @@
 // Phase 14B Patch A — engine cache parity test.
 //
-// Proves that stochastic_cache::regenerateCacheFromEvents produces a cell
+// Proves that stochastic_cache::rebuildStepCache produces a cell
 // stream matching today's playback semantics for the rhythm domain. CV
 // resolution is deferred to Patch B; this test only validates timing,
 // gate shape, burst-child expansion, flag propagation, window respect,
@@ -55,8 +55,8 @@ int expectedChildOffsets(uint32_t parentTicks, int childCount, int spacingSlot, 
 }
 
 void clearAllEvents(StochasticSequence &seq) {
-    for (int i = 0; i < int(seq.events().size()); ++i) {
-        seq.events()[i].clear();
+    for (int i = 0; i < int(seq.steps().size()); ++i) {
+        seq.steps()[i].clear();
     }
 }
 
@@ -79,7 +79,7 @@ CASE("cell_pack_roundtrip") {
                     for (bool slide : { false, true }) {
                         for (bool legato : { false, true }) {
                             for (bool audible : { false, true }) {
-                                auto c = CachedCell::make(dur, deg, oct, g, slide, legato, audible);
+                                auto c = RuntimeStep::make(dur, deg, oct, g, slide, legato, audible);
                                 expectEqual(uint32_t(c.durationTicks()), dur);
                                 expectEqual(int(c.degree()), int(deg));
                                 expectEqual(int(c.octave()), int(oct));
@@ -98,8 +98,8 @@ CASE("cell_pack_roundtrip") {
 
 CASE("cell_duration_clamps_at_kMaxCellDuration") {
     // Phase 16 P6 (2026-05-23): individual cell duration is capped by the
-    // 12-bit field width. CachedCell::make must clamp gracefully, not wrap.
-    auto c = CachedCell::make(8000, 0, 0, 32, false, false, true);
+    // 12-bit field width. RuntimeStep::make must clamp gracefully, not wrap.
+    auto c = RuntimeStep::make(8000, 0, 0, 32, false, false, true);
     expectEqual(int(c.durationTicks()), int(kMaxCellDuration));
 }
 
@@ -111,11 +111,11 @@ CASE("empty_sequence_yields_empty_cache") {
     clearAllEvents(seq);
     // Two slots, both cleared. With rest=false by default both cells are audible.
 
-    Cache cache{};
-    int n = regenerateCacheFromEvents(cache, seq, /*divisor*/ 48, /*seed*/ 0xdeadbeef);
+    StepCache cache{};
+    int n = rebuildStepCache(cache, seq, /*divisor*/ 48, /*seed*/ 0xdeadbeef);
     expectEqual(n, 2);
     expectEqual(int(cache.count), 2);
-    expectTrue(cache.cells[0].audible(), "default cleared event has rest=false → audible");
+    expectTrue(cache.runtimeSteps[0].audible(), "default cleared event has rest=false → audible");
 }
 
 CASE("cache_stores_event_degree_and_octave") {
@@ -129,23 +129,22 @@ CASE("cache_stores_event_degree_and_octave") {
     seq.setFirst(0);
     seq.setSize(4);
 
-    // StochasticSourceEvent stores octave as 5-bit unsigned (0..31); the
+    // StochasticStepContent stores octave as 5-bit unsigned (0..31); the
     // engine layers _jumpRegister + track.octave() at trigger time for the
     // signed offset case. Match that range here.
-    seq.events()[0].setDegree(0);  seq.events()[0].setOctave(0);  seq.events()[0].setRhythmValid(true); seq.events()[0].setRest(false);
-    seq.events()[1].setDegree(7);  seq.events()[1].setOctave(1);  seq.events()[1].setRhythmValid(true); seq.events()[1].setRest(false);
-    seq.events()[2].setDegree(11); seq.events()[2].setOctave(2);  seq.events()[2].setRhythmValid(true); seq.events()[2].setRest(false);
-    seq.events()[3].setDegree(64); seq.events()[3].setOctave(3);  seq.events()[3].setRhythmValid(true); seq.events()[3].setRest(false);
+    seq.steps()[0].setDegree(0);  seq.steps()[0].setOctave(0);  seq.steps()[0].setRhythmValid(true); seq.steps()[0].setRest(false);
+    seq.steps()[1].setDegree(7);  seq.steps()[1].setOctave(1);  seq.steps()[1].setRhythmValid(true); seq.steps()[1].setRest(false);
+    seq.steps()[2].setDegree(11); seq.steps()[2].setOctave(2);  seq.steps()[2].setRhythmValid(true); seq.steps()[2].setRest(false);
+    seq.steps()[3].setDegree(64); seq.steps()[3].setOctave(3);  seq.steps()[3].setRhythmValid(true); seq.steps()[3].setRest(false);
 
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, 0xfeed);
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0xfeed);
 
     for (int slot = 0; slot < 4; ++slot) {
-        uint8_t cIdx = cache.parentCacheIdx[slot];
-        expectEqual(int(cache.cells[cIdx].degree()), int(seq.events()[slot].degree()),
-                    "cache cell must store same degree as source event");
-        expectEqual(int(cache.cells[cIdx].octave()), int(seq.events()[slot].octave()),
-                    "cache cell must store same octave as source event");
+        expectEqual(int(cache.runtimeSteps[slot].degree()), int(seq.steps()[slot].degree()),
+                    "runtime step must store same degree as stored step");
+        expectEqual(int(cache.runtimeSteps[slot].octave()), int(seq.steps()[slot].octave()),
+                    "runtime step must store same octave as stored step");
     }
 }
 
@@ -156,7 +155,7 @@ CASE("single_parent_event_relTick_and_gateLen") {
     seq.setSize(2);                  // setSize min is 2 (Last collapsed into Size)
     seq.setFirst(0);
 
-    auto &ev = seq.events()[0];
+    auto &ev = seq.steps()[0];
     ev.setDurationIndex(5);  // ×1 of divisor
     ev.setRest(false);
     ev.setRhythmValid(true);
@@ -169,14 +168,14 @@ CASE("single_parent_event_relTick_and_gateLen") {
     seq.setSlide(0);
     seq.setLegatoProb(0);
 
-    Cache cache{};
-    int n = regenerateCacheFromEvents(cache, seq, /*divisor*/ 48, /*seed*/ 0x1234);
+    StepCache cache{};
+    int n = rebuildStepCache(cache, seq, /*divisor*/ 48, /*seed*/ 0x1234);
     expectEqual(n, 2);
-    expectEqual(int(cache.cells[0].durationTicks()), 48);
-    expectEqual(int(cache.cells[0].gateLen()), 32);
-    expectFalse(cache.cells[0].slide(),  "slide is cache-picked, not propagated from event");
-    expectFalse(cache.cells[0].legato(), "legato is cache-picked, not propagated from event");
-    expectTrue(cache.cells[0].audible(), "non-rest event is audible");
+    expectEqual(int(cache.runtimeSteps[0].durationTicks()), 48);
+    expectEqual(int(cache.runtimeSteps[0].gateLen()), 32);
+    expectFalse(cache.runtimeSteps[0].slide(),  "slide is cache-picked, not propagated from event");
+    expectFalse(cache.runtimeSteps[0].legato(), "legato is cache-picked, not propagated from event");
+    expectTrue(cache.runtimeSteps[0].audible(), "non-rest event is audible");
 }
 
 CASE("rest_event_audible_false") {
@@ -186,15 +185,15 @@ CASE("rest_event_audible_false") {
     seq.setSize(2);
     seq.setFirst(0);
 
-    auto &ev = seq.events()[0];
+    auto &ev = seq.steps()[0];
     ev.setDurationIndex(5);
     ev.setRest(true);
     ev.setRhythmValid(true);
 
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, 0);
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0);
     expectEqual(int(cache.count), 2);
-    expectFalse(cache.cells[0].audible(), "rest event must be marked non-audible");
+    expectFalse(cache.runtimeSteps[0].audible(), "rest event must be marked non-audible");
 }
 
 CASE("slot_keyed_cache_writes_full_size_extent_regardless_of_first") {
@@ -212,18 +211,17 @@ CASE("slot_keyed_cache_writes_full_size_extent_regardless_of_first") {
     seq.setVariation(0);
     seq.setBurst(0);
 
-    for (int i = 0; i < int(seq.events().size()); ++i) {
-        auto &ev = seq.events()[i];
+    for (int i = 0; i < int(seq.steps().size()); ++i) {
+        auto &ev = seq.steps()[i];
         ev.setRest(false);
         ev.setRhythmValid(true);
     }
 
-    Cache cache{};
-    int n = regenerateCacheFromEvents(cache, seq, 48, 0);
+    StepCache cache{};
+    int n = rebuildStepCache(cache, seq, 48, 0);
     expectEqual(n, 5);  // all slots 0..4 written
     for (int i = 0; i < 5; ++i) {
-        expectEqual(int(cache.cells[i].durationTicks()), 48);
-        expectEqual(int(cache.parentCacheIdx[i]), i);
+        expectEqual(int(cache.runtimeSteps[i].durationTicks()), 48);
     }
     expectEqual(int(cache.cycleTicks), 240);
 }
@@ -242,19 +240,19 @@ CASE("slot_keyed_cache_is_first_independent") {
     seqA.setVariation(40); seqB.setVariation(40);
     seqA.setBurst(30); seqB.setBurst(30);
 
-    for (int i = 0; i < int(seqA.events().size()); ++i) {
-        seqA.events()[i].setRest(false); seqA.events()[i].setRhythmValid(true);
-        seqB.events()[i].setRest(false); seqB.events()[i].setRhythmValid(true);
+    for (int i = 0; i < int(seqA.steps().size()); ++i) {
+        seqA.steps()[i].setRest(false); seqA.steps()[i].setRhythmValid(true);
+        seqB.steps()[i].setRest(false); seqB.steps()[i].setRhythmValid(true);
     }
 
-    Cache cacheA{};
-    Cache cacheB{};
-    regenerateCacheFromEvents(cacheA, seqA, 48, 0xcafe);
-    regenerateCacheFromEvents(cacheB, seqB, 48, 0xcafe);
+    StepCache cacheA{};
+    StepCache cacheB{};
+    rebuildStepCache(cacheA, seqA, 48, 0xcafe);
+    rebuildStepCache(cacheB, seqB, 48, 0xcafe);
 
     for (int i = 0; i < int(cacheA.count); ++i) {
-        expectEqual(int(cacheA.cells[i].durationTicks()),
-                    int(cacheB.cells[i].durationTicks()));
+        expectEqual(int(cacheA.runtimeSteps[i].durationTicks()),
+                    int(cacheB.runtimeSteps[i].durationTicks()));
     }
 }
 
@@ -278,20 +276,20 @@ CASE("burst_knob_at_100_produces_cluster_cells") {
     seq.setBurstRate(60);      // mid-range denom
 
     for (int i = 0; i < 8; ++i) {
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
     }
 
-    Cache cache{};
-    int n = regenerateCacheFromEvents(cache, seq, 48, /*seed*/ 0xdead);
+    StepCache cache{};
+    int n = rebuildStepCache(cache, seq, 48, /*seed*/ 0xdead);
     expectEqual(n, 8);
 
     // First cell sets the baseline duration. At least one of the remaining
     // cells must be shorter — that's the cluster signature.
-    const uint32_t baselineDur = cache.cells[0].durationTicks();
+    const uint32_t baselineDur = cache.runtimeSteps[0].durationTicks();
     bool sawShorterCell = false;
     for (int i = 1; i < int(cache.count); ++i) {
-        if (cache.cells[i].durationTicks() < baselineDur) {
+        if (cache.runtimeSteps[i].durationTicks() < baselineDur) {
             sawShorterCell = true;
             break;
         }
@@ -315,14 +313,14 @@ CASE("burst_knob_at_zero_produces_no_cluster_cells") {
     seq.setBurst(0);
 
     for (int i = 0; i < 8; ++i) {
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
     }
 
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, 0xfeed);
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0xfeed);
     for (int i = 0; i < int(cache.count); ++i) {
-        expectEqual(int(cache.cells[i].durationTicks()), 96,
+        expectEqual(int(cache.runtimeSteps[i].durationTicks()), 96,
                     "burst=0 → every cell at noteDuration's natural LUT pick");
     }
 }
@@ -345,15 +343,15 @@ CASE("cluster_cell_duration_never_below_minimum") {
     seq.setBurstRate(100);     // bias toward largest denominator (denser → shorter cluster cells)
 
     for (int i = 0; i < 8; ++i) {
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
     }
 
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, 0xbaadf00d);
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0xbaadf00d);
     constexpr uint32_t kMinCellTicks = 6;
     for (int i = 0; i < int(cache.count); ++i) {
-        expectTrue(cache.cells[i].durationTicks() >= kMinCellTicks,
+        expectTrue(cache.runtimeSteps[i].durationTicks() >= kMinCellTicks,
                    "no cell may fall below the audible floor");
     }
 }
@@ -366,7 +364,7 @@ CASE("rank_is_deterministic_per_seed") {
     seq.setFirst(0);
 
     for (int i = 0; i < 8; ++i) {
-        auto &ev = seq.events()[i];
+        auto &ev = seq.steps()[i];
         ev.setDurationIndex(i);  // 0..7 spans the LUT
         ev.setRest(false);
         ev.setRhythmValid(true);
@@ -375,11 +373,11 @@ CASE("rank_is_deterministic_per_seed") {
     // Two runs with same seed must produce identical event ranks.
     StochasticGenerator::generateMaskRanks(seq, 8, 0xaabbccdd);
     int firstPass[8];
-    for (int i = 0; i < 8; ++i) firstPass[i] = seq.events()[i].densityRank();
+    for (int i = 0; i < 8; ++i) firstPass[i] = seq.steps()[i].densityRank();
 
     StochasticGenerator::generateMaskRanks(seq, 8, 0xaabbccdd);
     for (int i = 0; i < 8; ++i) {
-        expectEqual(int(seq.events()[i].densityRank()), firstPass[i], "same seed → same rank");
+        expectEqual(int(seq.steps()[i].densityRank()), firstPass[i], "same seed → same rank");
     }
 }
 
@@ -394,7 +392,7 @@ CASE("rank_changes_when_seed_changes") {
     // the random jitter from seed. Different seeds → different tie-break order
     // → ranks differ.
     for (int i = 0; i < 8; ++i) {
-        auto &ev = seq.events()[i];
+        auto &ev = seq.steps()[i];
         ev.setDurationIndex(3);  // all events same duration
         ev.setRest(false);
         ev.setRhythmValid(true);
@@ -402,12 +400,12 @@ CASE("rank_changes_when_seed_changes") {
 
     StochasticGenerator::generateMaskRanks(seq, 8, 0xaabbccdd);
     int ranksA[8];
-    for (int i = 0; i < 8; ++i) ranksA[i] = seq.events()[i].densityRank();
+    for (int i = 0; i < 8; ++i) ranksA[i] = seq.steps()[i].densityRank();
 
     StochasticGenerator::generateMaskRanks(seq, 8, 0x12345678);
     int divergent = 0;
     for (int i = 0; i < 8; ++i) {
-        if (seq.events()[i].densityRank() != ranksA[i]) ++divergent;
+        if (seq.steps()[i].densityRank() != ranksA[i]) ++divergent;
     }
     expectTrue(divergent >= 4, "seed change should reshuffle most ranks (equal-duration tie-break)");
 }
@@ -425,15 +423,15 @@ CASE("mask_rank_long_event_gets_rank_zero") {
     for (int i = 0; i < 8; ++i) {
         // durationIndex 0 = longest LUT slot (×8), 7 = shortest (×1/2). So
         // event[0] is the longest, event[7] is the shortest.
-        seq.events()[i].setDurationIndex(i);
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
+        seq.steps()[i].setDurationIndex(i);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
     }
 
     StochasticGenerator::generateMaskRanks(seq, 8, 0xaabbccdd);
 
-    int rankLong  = seq.events()[0].densityRank();
-    int rankShort = seq.events()[7].densityRank();
+    int rankLong  = seq.steps()[0].densityRank();
+    int rankShort = seq.steps()[7].densityRank();
     expectTrue(rankLong < rankShort, "longest event gets a low rank (survives Mask cut by default)");
 }
 
@@ -447,20 +445,20 @@ CASE("mask_rank_is_tilt_independent") {
     seq.setSize(8);
     seq.setFirst(0);
     for (int i = 0; i < 8; ++i) {
-        seq.events()[i].setDurationIndex(i);
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
+        seq.steps()[i].setDurationIndex(i);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
     }
 
     seq.setTilt(100);
     StochasticGenerator::generateMaskRanks(seq, 8, 0xaabbccdd);
     int ranksAtPlusTilt[8];
-    for (int i = 0; i < 8; ++i) ranksAtPlusTilt[i] = seq.events()[i].densityRank();
+    for (int i = 0; i < 8; ++i) ranksAtPlusTilt[i] = seq.steps()[i].densityRank();
 
     seq.setTilt(-100);
     StochasticGenerator::generateMaskRanks(seq, 8, 0xaabbccdd);
     for (int i = 0; i < 8; ++i) {
-        expectEqual(seq.events()[i].densityRank(), ranksAtPlusTilt[i],
+        expectEqual(seq.steps()[i].densityRank(), ranksAtPlusTilt[i],
                     "rank stays identical regardless of Tilt value");
     }
 }
@@ -480,13 +478,13 @@ CASE("gate_length_zero_locks_gate_at_50_percent") {
     seq.setBurst(0);
     seq.setGateLength(0);   // tight gate kernel
     for (int i = 0; i < 8; ++i) {
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
     }
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, 0xfeed);
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0xfeed);
     for (int i = 0; i < int(cache.count); ++i) {
-        expectEqual(int(cache.cells[i].gateLen()), 32,
+        expectEqual(int(cache.runtimeSteps[i].gateLen()), 32,
                     "gateLength=0 locks every cell to 50% gate fraction (32/64)");
     }
 }
@@ -507,15 +505,15 @@ CASE("gate_length_high_varies_gate_per_cell") {
     seq.setBurst(0);
     seq.setGateLength(100);
     for (int i = 0; i < 16; ++i) {
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
     }
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, 0xaaaa);
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0xaaaa);
     int distinctValues = 0;
     uint8_t seen[64] = { 0 };
     for (int i = 0; i < int(cache.count); ++i) {
-        const uint8_t g = cache.cells[i].gateLen();
+        const uint8_t g = cache.runtimeSteps[i].gateLen();
         if (g < 64 && !seen[g]) { seen[g] = 1; ++distinctValues; }
     }
     expectTrue(distinctValues >= 3,
@@ -540,17 +538,17 @@ CASE("burst_pitch_hold_keeps_parent_pitch_in_cluster_tail") {
     seq.setBurstRate(50);
     seq.setBurstHold(StochasticBurstHold::Hold);
     for (int i = 0; i < 4; ++i) {
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
-        seq.events()[i].setDegree(3);
-        seq.events()[i].setOctave(1);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
+        seq.steps()[i].setDegree(3);
+        seq.steps()[i].setOctave(1);
     }
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, 0xbeef, &scale, &track);
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0xbeef, &scale, &track);
     for (int i = 0; i < int(cache.count); ++i) {
-        expectEqual(int(cache.cells[i].degree()), 3,
+        expectEqual(int(cache.runtimeSteps[i].degree()), 3,
                     "Hold mode: every cell keeps source-event degree");
-        expectEqual(int(cache.cells[i].octave()), 1,
+        expectEqual(int(cache.runtimeSteps[i].octave()), 1,
                     "Hold mode: every cell keeps source-event octave");
     }
 }
@@ -576,16 +574,16 @@ CASE("burst_pitch_roll_rerolls_cluster_tail_pitch") {
     seq.setBurstHold(StochasticBurstHold::Roll);
     seq.setRange(3);           // wider candidate pool so reroll has room to differ
     for (int i = 0; i < 8; ++i) {
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
-        seq.events()[i].setDegree(0);
-        seq.events()[i].setOctave(0);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
+        seq.steps()[i].setDegree(0);
+        seq.steps()[i].setOctave(0);
     }
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, 0xcafe, &scale, &track);
+    StepCache cache{};
+    rebuildStepCache(cache, seq, 48, 0xcafe, &scale, &track);
     bool sawNonZero = false;
     for (int i = 0; i < int(cache.count); ++i) {
-        if (cache.cells[i].degree() != 0 || cache.cells[i].octave() != 0) {
+        if (cache.runtimeSteps[i].degree() != 0 || cache.runtimeSteps[i].octave() != 0) {
             sawNonZero = true;
             break;
         }
@@ -594,50 +592,25 @@ CASE("burst_pitch_roll_rerolls_cluster_tail_pitch") {
                "Roll mode: at least one cluster tail cell must reroll to a different degree");
 }
 
-CASE("parent_cache_idx_maps_slot_to_parent_cell") {
-    // The engine's mask filter looks up cache rank via parentCacheIdx[readIndex].
-    // Verify that mapping is correct even when bursts insert extra cells
-    // between parents.
+CASE("runtime_step_array_is_one_to_one_with_stored_steps") {
+    // Slot-keyed: runtimeSteps[K] holds the runtime step for stored step K.
+    // count caps the valid range; no parentCacheIdx mapping is needed.
     StochasticSequence seq;
     seq.clear();
     clearAllEvents(seq);
     seq.setSize(4);
     seq.setFirst(0);
 
-    // slot 0: short, no burst (durationIndex=7 → 24 ticks @ divisor=48, below kMinBurstParentTicks=96)
-    seq.events()[0].setDurationIndex(7);
-    seq.events()[0].setRest(false);
-    seq.events()[0].setRhythmValid(true);
-    // slot 1: long, burst with 2 children
-    seq.events()[1].setDurationIndex(1);  // ×4 = 192 ticks
-    seq.events()[1].setRest(false);
-    seq.events()[1].setRhythmValid(true);
-    seq.events()[1].setChildCount(2);
-    seq.events()[1].setBurstRate(2);
-    // slot 2: short, no burst
-    seq.events()[2].setDurationIndex(6);
-    seq.events()[2].setRest(false);
-    seq.events()[2].setRhythmValid(true);
-    // slot 3: long, burst with 3 children
-    seq.events()[3].setDurationIndex(1);
-    seq.events()[3].setRest(false);
-    seq.events()[3].setRhythmValid(true);
-    seq.events()[3].setChildCount(3);
-    seq.events()[3].setBurstRate(2);
+    for (int k = 0; k < 4; ++k) {
+        seq.steps()[k].setDurationIndex(5);
+        seq.steps()[k].setRest(false);
+        seq.steps()[k].setRhythmValid(true);
+    }
 
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, 48, 0xa5a5);
-
-    // Phase 16 flat (2026-05-23): cells are 1:1 with event slots. No
-    // separate burst-child cells. parentCacheIdx[K] = K - first for K in
-    // [first..last]. Outside the window, 0xff.
-    expectEqual(int(cache.parentCacheIdx[0]), 0);
-    expectEqual(int(cache.parentCacheIdx[1]), 1);
-    expectEqual(int(cache.parentCacheIdx[2]), 2);
-    expectEqual(int(cache.parentCacheIdx[3]), 3);
-
-    // Slot outside the window is unmapped.
-    expectEqual(int(cache.parentCacheIdx[10]), 0xff);
+    StepCache cache{};
+    int n = rebuildStepCache(cache, seq, 48, 0xa5a5);
+    expectEqual(n, 4);
+    expectEqual(int(cache.count), 4);
 }
 
 CASE("cache_cap_truncates_silently") {
@@ -650,7 +623,7 @@ CASE("cache_cap_truncates_silently") {
     seq.setSize(16);  // 16 slots
 
     for (int i = 0; i < 16; ++i) {
-        auto &ev = seq.events()[i];
+        auto &ev = seq.steps()[i];
         ev.setDurationIndex(1);  // ×4 → 192 ticks, allows bursts
         ev.setRest(false);
         ev.setRhythmValid(true);
@@ -658,8 +631,8 @@ CASE("cache_cap_truncates_silently") {
         ev.setBurstRate(0);  // densest spacing
     }
 
-    Cache cache{};
-    int n = regenerateCacheFromEvents(cache, seq, 48, 0);
+    StepCache cache{};
+    int n = rebuildStepCache(cache, seq, 48, 0);
     expectTrue(n <= kCellCap, "cache must not exceed cell cap");
     expectEqual(n, int(cache.count));
 }
@@ -679,7 +652,7 @@ CASE("parents_keep_priority_under_burst_truncation") {
     // fit, but cap is 64. Without parent priority, the first ~10 slots would
     // consume the entire cap and slots 11..31 would be unmapped.
     for (int i = 0; i < 32; ++i) {
-        auto &ev = seq.events()[i];
+        auto &ev = seq.steps()[i];
         ev.setDurationIndex(1);  // ×4 = 192 ticks, allows bursts
         ev.setRest(false);
         ev.setRhythmValid(true);
@@ -687,18 +660,10 @@ CASE("parents_keep_priority_under_burst_truncation") {
         ev.setBurstRate(0);
     }
 
-    Cache cache{};
-    int n = regenerateCacheFromEvents(cache, seq, 48, 0xabcdef);
+    StepCache cache{};
+    int n = rebuildStepCache(cache, seq, 48, 0xabcdef);
     expectTrue(n <= kCellCap, "cap respected");
-
-    // Every parent slot in the active window MUST map to a parent cell —
-    // never 0xff. This is the property that prevents mixed rank semantics.
-    for (int slot = 0; slot <= 31; ++slot) {
-        expectTrue(cache.parentCacheIdx[slot] != 0xff,
-                   "every window slot must map to a parent cell");
-        expectTrue(cache.parentCacheIdx[slot] < kCellCap,
-                   "mapped index must point inside the cache");
-    }
+    expectEqual(int(cache.count), 32);  // all 32 steps written
 }
 
 CASE("feel_scale_in_detent_is_unity") {
@@ -784,19 +749,19 @@ CASE("cycle_longer_than_4095_ticks_preserves_per_cell_durations") {
     seq.setVariation(0);       // tight kernel → always picks the center slot
     seq.setBurst(0);           // no clusters
     for (int i = 0; i < 32; ++i) {
-        auto &ev = seq.events()[i];
+        auto &ev = seq.steps()[i];
         ev.setRhythmValid(true);
         ev.setRest(false);
     }
-    Cache cache{};
-    int n = regenerateCacheFromEvents(cache, seq, /*divisor*/ 192, /*seed*/ 0xfeedf00d);
+    StepCache cache{};
+    int n = rebuildStepCache(cache, seq, /*divisor*/ 192, /*seed*/ 0xfeedf00d);
     expectEqual(n, 32);
 
     // Every cell holds its own 768-tick duration (×4 × 192 = 768). Pre-fix,
     // cells past index 5 (4095 / 768) would clamp to relTick=4095 and the
     // engine's delta math would return duration=1 for every later cell.
     for (int i = 0; i < 32; ++i) {
-        expectEqual(int(cache.cells[i].durationTicks()), 768,
+        expectEqual(int(cache.runtimeSteps[i].durationTicks()), 768,
                     "every cell must keep its full duration past the 4095-tick mark");
     }
 }
@@ -814,26 +779,26 @@ CASE("cache_walk_picks_duration_from_noteDuration_knob") {
     seq.setVariation(0);
     seq.setBurst(0);
     for (int i = 0; i < 4; ++i) {
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
         // Event-stored durationIndex deliberately a random slot — should be
         // ignored by cache in Loop mode.
-        seq.events()[i].setDurationIndex(7);
+        seq.steps()[i].setDurationIndex(7);
     }
 
     seq.setNoteDuration(5);     // ×1 = 48 at divisor 48
-    Cache cacheA{};
-    regenerateCacheFromEvents(cacheA, seq, /*divisor*/ 48, /*seed*/ 0xabc);
+    StepCache cacheA{};
+    rebuildStepCache(cacheA, seq, /*divisor*/ 48, /*seed*/ 0xabc);
     for (int i = 0; i < 4; ++i) {
-        expectEqual(int(cacheA.cells[i].durationTicks()), 48,
+        expectEqual(int(cacheA.runtimeSteps[i].durationTicks()), 48,
                     "knob=5 (×1) should produce 48-tick cells");
     }
 
     seq.setNoteDuration(3);     // ×2 = 96 at divisor 48
-    Cache cacheB{};
-    regenerateCacheFromEvents(cacheB, seq, /*divisor*/ 48, /*seed*/ 0xabc);
+    StepCache cacheB{};
+    rebuildStepCache(cacheB, seq, /*divisor*/ 48, /*seed*/ 0xabc);
     for (int i = 0; i < 4; ++i) {
-        expectEqual(int(cacheB.cells[i].durationTicks()), 96,
+        expectEqual(int(cacheB.runtimeSteps[i].durationTicks()), 96,
                     "knob=3 (×2) should produce 96-tick cells");
     }
 }
@@ -842,7 +807,7 @@ CASE("burst_fires_at_factory_defaults") {
     // Codex audit finding #1+#2: pre-P7 the generator gated burst on the
     // event's own duration ≥ 96 ticks, and bursts were baked at mutate time
     // so the Burst knob did nothing until a regeneration cycle ran. With B3
-    // landed, raising the Burst knob and calling refreshCache produces
+    // landed, raising the Burst knob and calling refreshStepCache produces
     // visible cluster cells immediately, at factory-default divisor/duration.
     StochasticSequence seq;
     seq.clear();
@@ -855,12 +820,12 @@ CASE("burst_fires_at_factory_defaults") {
     seq.setBurstCount(50);      // medium count from the LUT
     seq.setBurstRate(50);       // medium denom from the LUT
     for (int i = 0; i < 32; ++i) {
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
     }
 
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, /*divisor*/ 48, /*seed*/ 0x515ce11);
+    StepCache cache{};
+    rebuildStepCache(cache, seq, /*divisor*/ 48, /*seed*/ 0x515ce11);
     expectEqual(int(cache.count), 32);
 
     // At default 1/16 = 48 ticks per cell. Cluster cells = 48 / denom where
@@ -869,7 +834,7 @@ CASE("burst_fires_at_factory_defaults") {
     // 0 because the generator gate suppressed every burst.
     int clusterCells = 0;
     for (int i = 0; i < int(cache.count); ++i) {
-        if (cache.cells[i].durationTicks() < 48) ++clusterCells;
+        if (cache.runtimeSteps[i].durationTicks() < 48) ++clusterCells;
     }
     expectTrue(clusterCells > 0,
                "factory-default burst must produce at least one cluster cell");
@@ -879,7 +844,7 @@ CASE("cache_rebuild_is_deterministic_at_fixed_seed") {
     // Phase 16 P7 (2026-05-23): cache shaping decisions now consume keyed
     // RNG, so two rebuilds at the same seed must produce identical cells.
     // This is what keeps Loop replay stable when knob edits trigger a
-    // refreshCache.
+    // refreshStepCache.
     StochasticSequence seq;
     seq.clear();
     clearAllEvents(seq);
@@ -889,19 +854,19 @@ CASE("cache_rebuild_is_deterministic_at_fixed_seed") {
     seq.setBurst(80);
     seq.setVariation(50);
     for (int i = 0; i < 16; ++i) {
-        seq.events()[i].setRhythmValid(true);
-        seq.events()[i].setRest(false);
+        seq.steps()[i].setRhythmValid(true);
+        seq.steps()[i].setRest(false);
     }
 
-    Cache cacheA{};
-    Cache cacheB{};
-    regenerateCacheFromEvents(cacheA, seq, 48, /*seed*/ 0xc0ffee);
-    regenerateCacheFromEvents(cacheB, seq, 48, /*seed*/ 0xc0ffee);
+    StepCache cacheA{};
+    StepCache cacheB{};
+    rebuildStepCache(cacheA, seq, 48, /*seed*/ 0xc0ffee);
+    rebuildStepCache(cacheB, seq, 48, /*seed*/ 0xc0ffee);
 
     expectEqual(int(cacheA.count), int(cacheB.count));
     for (int i = 0; i < int(cacheA.count); ++i) {
-        expectEqual(int(cacheA.cells[i].durationTicks()),
-                    int(cacheB.cells[i].durationTicks()),
+        expectEqual(int(cacheA.runtimeSteps[i].durationTicks()),
+                    int(cacheB.runtimeSteps[i].durationTicks()),
                     "same seed must produce same per-cell durations");
     }
 }
@@ -926,27 +891,27 @@ CASE("live_rhythm_reads_event_durationIndex_and_burst_fields") {
     seq.setBurst(0);
 
     for (int i = 0; i < 4; ++i) {
-        auto &ev = seq.events()[i];
+        auto &ev = seq.steps()[i];
         ev.setRhythmValid(true);
         ev.setRest(false);
         ev.setDurationIndex(5);   // ×1 = 48 ticks at divisor=48
     }
     // Slot 1 carries a burst spec — cluster of 2 cells with denom 3.
-    seq.events()[1].setChildCount(1);
-    seq.events()[1].setBurstRate(1);     // index 1 → kBurstSpacingLut[1] = 3
+    seq.steps()[1].setChildCount(1);
+    seq.steps()[1].setBurstRate(1);     // index 1 → kBurstSpacingLut[1] = 3
 
-    Cache cache{};
-    regenerateCacheFromEvents(cache, seq, /*divisor*/ 48, /*seed*/ 0xfeed);
+    StepCache cache{};
+    rebuildStepCache(cache, seq, /*divisor*/ 48, /*seed*/ 0xfeed);
     expectEqual(int(cache.count), 4);
 
     // Slot 0: ev.durationIndex=5 → 48 ticks (not slot 0 = ×8 which knob would give).
-    expectEqual(int(cache.cells[0].durationTicks()), 48);
+    expectEqual(int(cache.runtimeSteps[0].durationTicks()), 48);
     // Slot 1: cluster anchor. cluster_dur = prev(48) / 3 = 16 ticks.
-    expectEqual(int(cache.cells[1].durationTicks()), 16);
+    expectEqual(int(cache.runtimeSteps[1].durationTicks()), 16);
     // Slot 2: cluster tail, same cluster duration.
-    expectEqual(int(cache.cells[2].durationTicks()), 16);
+    expectEqual(int(cache.runtimeSteps[2].durationTicks()), 16);
     // Slot 3: cluster ended (childCount=1 = anchor + 1 tail). Natural pick again.
-    expectEqual(int(cache.cells[3].durationTicks()), 48);
+    expectEqual(int(cache.runtimeSteps[3].durationTicks()), 48);
 }
 
 CASE("rank_assignment_is_stable_across_runs_at_same_seed") {
@@ -960,7 +925,7 @@ CASE("rank_assignment_is_stable_across_runs_at_same_seed") {
     seq.setSize(8);
 
     for (int i = 0; i < 8; ++i) {
-        auto &ev = seq.events()[i];
+        auto &ev = seq.steps()[i];
         ev.setDurationIndex(i);
         ev.setRest(false);
         ev.setRhythmValid(true);
@@ -968,11 +933,11 @@ CASE("rank_assignment_is_stable_across_runs_at_same_seed") {
 
     StochasticGenerator::generateMaskRanks(seq, 8, 0xfeedface);
     uint8_t firstPass[8];
-    for (int i = 0; i < 8; ++i) firstPass[i] = seq.events()[i].densityRank();
+    for (int i = 0; i < 8; ++i) firstPass[i] = seq.steps()[i].densityRank();
 
     StochasticGenerator::generateMaskRanks(seq, 8, 0xfeedface);
     for (int i = 0; i < 8; ++i) {
-        expectEqual(int(seq.events()[i].densityRank()), int(firstPass[i]),
+        expectEqual(int(seq.steps()[i].densityRank()), int(firstPass[i]),
                     "same seed + same durations must produce same ranks");
     }
 }

@@ -35,7 +35,7 @@ int directHistoryTrackIndex(const Track &track) {
     return index;
 }
 
-// The engine cache lives inside StochasticTrackEngine as a member (`_cache`),
+// The engine cache lives inside StochasticTrackEngine as a member (`_stepCache`),
 // not in a file-scope per-track array, so memory is only paid for tracks
 // that actually run in Stochastic mode.
 }
@@ -144,8 +144,8 @@ void StochasticTrackEngine::resetMeasure() {
     // so unconditional roll here would double-count.
     // 2026-05-24: bundled all four hooks (jump, sleep, patience, mutate) so
     // they stay in lockstep — previously only patience advanced on resets.
-    bool preempted = (_patternIndex != seq.first());
-    _patternIndex = seq.first();
+    bool preempted = (_currentStep != seq.first());
+    _currentStep = seq.first();
     _relativeTick = 0;
     _eventElapsed = 0;
     _eventDuration = 0;
@@ -155,7 +155,7 @@ void StochasticTrackEngine::resetMeasure() {
 }
 
 void StochasticTrackEngine::reset() {
-    _patternIndex = stochasticTrack().sequence(pattern()).first();
+    _currentStep = stochasticTrack().sequence(pattern()).first();
     _relativeTick = 0;
     _sleepRemaining = 0;
     _loopCycleCount = 0;
@@ -173,7 +173,7 @@ void StochasticTrackEngine::reset() {
     _slideActive = false;
     _cvOutput = 0.f;
     _cvOutputTarget = 0.f;
-    _lastEventValid = false;
+    _lastStepContentValid = false;
     clearDirectHistory();
     _gateQueue.clear();
     _cvQueue.clear();
@@ -182,13 +182,13 @@ void StochasticTrackEngine::reset() {
 }
 
 void StochasticTrackEngine::restart() {
-    _patternIndex = stochasticTrack().sequence(pattern()).first();
+    _currentStep = stochasticTrack().sequence(pattern()).first();
     _relativeTick = 0;
     _lastDegree = -1;
     _lastFreeStepIndex = -1;
     _eventElapsed = 0;
     _eventDuration = 0;
-    _lastEventValid = false;
+    _lastStepContentValid = false;
     clearDirectHistory();
     _rng = Random(0x12345678 + _track.trackIndex());
 }
@@ -291,7 +291,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             || curRange        != _lastShapingRange;
 
         if (anyKnobMoved) {
-            _cacheRefreshPending = true;
+            _stepCacheRefreshPending = true;
             _lastShapingNoteDuration = curNoteDuration;
             _lastShapingVariation    = curVariation;
             _lastShapingBurst        = curBurst;
@@ -308,16 +308,16 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
         // Pitch-shaping knobs (Complexity, Contour, Bias, Spread, Range) now
         // reshape the loop deterministically through the cache walk's own
-        // pick path (see regenerateCacheFromEvents). No tape-rewrite hook
+        // pick path (see rebuildStepCache). No tape-rewrite hook
         // here — the cache rebuild triggered by anyKnobMoved is enough.
     }
 
     // Coalesce cache refreshes: Live rhythm + melody writes from the previous
     // trigger may have flagged a refresh. Pay at most one rebuild per trigger,
     // before any cache read downstream.
-    if (_cacheRefreshPending) {
-        refreshCache();
-        _cacheRefreshPending = false;
+    if (_stepCacheRefreshPending) {
+        refreshStepCache();
+        _stepCacheRefreshPending = false;
     }
 
     const auto &scale = sequence.selectedScale(_model.project().scale());
@@ -327,26 +327,26 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
     // just fired, NewR/NewM was pressed).
     ensureLoopSources(scale, rootNote);
 
-    // Snap _patternIndex into the active window before reading. If the user
+    // Snap _currentStep into the active window before reading. If the user
     // shrinks Size mid-cycle past the current playback position, the engine
     // would otherwise play one stale off-window event with stale state.
     // Flush gate/CV queues too — they hold absolute-tick events for slots
     // that are now outside the window, and tick() drains them regardless of
-    // _patternIndex.
-    if (_patternIndex < sequence.first() || _patternIndex > sequence.last()) {
-        _patternIndex = sequence.first();
+    // _currentStep.
+    if (_currentStep < sequence.first() || _currentStep > sequence.last()) {
+        _currentStep = sequence.first();
         _gateQueue.clear();
         _cvQueue.clear();
         _gateOutput = false;
         _activity = false;
     }
-    int readIndex = _patternIndex;
+    int stepIndex = _currentStep;
     if (sequence.rotate() != 0) {
         int windowSize = sequence.last() - sequence.first() + 1;
         if (windowSize > 0) {
-            int offset = (_patternIndex - sequence.first() + sequence.rotate()) % windowSize;
+            int offset = (_currentStep - sequence.first() + sequence.rotate()) % windowSize;
             if (offset < 0) offset += windowSize;
-            readIndex = sequence.first() + offset;
+            stepIndex = sequence.first() + offset;
         }
     }
 
@@ -358,17 +358,17 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
     {
         // Source loop is guaranteed fresh here — ensureLoopSources ran above.
-        const auto &event = sequence.events()[readIndex];
-        StochasticSourceEvent eval;
+        const auto &event = sequence.steps()[stepIndex];
+        StochasticStepContent eval;
         eval.clear();
 
         // Repeat: per-trigger Bernoulli that replays the previously-emitted
         // event verbatim. Works in both Live and Loop — playback-layer freeze.
         int repeatProb = int(sequence.repeatProb());
-        bool useRepeat = (repeatProb > 0 && _lastEventValid &&
+        bool useRepeat = (repeatProb > 0 && _lastStepContentValid &&
                           int(_rng.nextRange(100)) < repeatProb);
         if (useRepeat) {
-            eval = _lastEvent;
+            eval = _lastStepContent;
             // _lastDegree stays as-is — frozen on the previous pitch.
         } else {
             // Keep rhythm and melody writes domain-preserving; direct packed bitfield
@@ -376,7 +376,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             if (sequence.rhythmMode() == StochasticSourceMode::Live) {
                 auto rhythm = StochasticGenerator::generateRhythmEvent(sequence, track, _rng);
                 eval.mergeRhythmFrom(rhythm);
-                writeLiveRhythmShadow(readIndex, rhythm);
+                writeLiveRhythmShadow(stepIndex, rhythm);
             } else {
                 eval.mergeRhythmFrom(event);
             }
@@ -385,21 +385,21 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                 auto melody = StochasticGenerator::generateMelodyEvent(sequence, track, scale, rootNote, _lastDegree, _rng);
                 eval.mergeMelodyFrom(melody);
                 _lastDegree = int(eval.degree()) + int(eval.octave()) * scale.notesPerOctave();
-                writeLiveMelodyShadow(readIndex, melody);
+                writeLiveMelodyShadow(stepIndex, melody);
             } else {
                 eval.mergeMelodyFrom(event);
                 _lastDegree = int(eval.degree()) + int(eval.octave()) * scale.notesPerOctave();
             }
 
-            _lastEvent = eval;
-            _lastEventValid = true;
+            _lastStepContent = eval;
+            _lastStepContentValid = true;
         }
 
         int activeNotes = scale.notesPerOctave();
 
         // Playback fields come from the cache cell for the non-Repeat path.
-        // Repeat stays on eval (i.e. _lastEvent) because the audible material
-        // is the captured event, not the cell at readIndex.
+        // Repeat stays on eval (i.e. _lastStepContent) because the audible material
+        // is the captured event, not the cell at stepIndex.
         int  pDurIdx = eval.durationIndex();  // repeat path / fallback
         int  pDegree = int(eval.degree());
         int  pOctave = int(eval.octave());
@@ -408,30 +408,25 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         bool pLegato = bool(eval.legato());
         uint32_t cellDurFromCache = 0;       // 0 → use legacy durationIndex path
         uint8_t  cellGateFrac     = 32;      // default 50% if no cache
-        if (!useRepeat) {
-            uint8_t cIdx = (readIndex >= 0 && readIndex < int(stochastic_cache::kMaxEventSlots))
-                         ? _cache.parentCacheIdx[readIndex]
-                         : uint8_t(0xff);
-            if (cIdx < stochastic_cache::kCellCap && cIdx < _cache.count) {
-                const auto &cell = _cache.cells[cIdx];
-                // Phase 16 P6 (2026-05-23): cells store their own duration.
-                cellDurFromCache = cell.durationTicks();
-                if (cellDurFromCache == 0) cellDurFromCache = 1;
-                cellGateFrac = cell.gateLen();
-                pDegree = int(cell.degree());
-                pOctave = int(cell.octave());
-                pRest   = !cell.audible();
-                pSlide  = cell.slide();
-                pLegato = cell.legato();
-                // Legato + Slide are cache-owned (2026-05-24). Propagate the
-                // cache's picks into _lastEvent so a subsequent Repeat
-                // replays this slot's decisions, not whatever stale bits
-                // lived on the stored event.
-                _lastEvent.setLegato(pLegato);
-                _lastEvent.setSlide(pSlide);
-            }
-            // else: cache unprimed → fall back to event-tape values + LUT.
+        if (!useRepeat && stepIndex >= 0 && stepIndex < int(_stepCache.count)) {
+            const auto &cell = _stepCache.runtimeSteps[stepIndex];
+            cellDurFromCache = cell.durationTicks();
+            if (cellDurFromCache == 0) cellDurFromCache = 1;
+            cellGateFrac = cell.gateLen();
+            pDegree = int(cell.degree());
+            pOctave = int(cell.octave());
+            pRest   = !cell.audible();
+            pSlide  = cell.slide();
+            pLegato = cell.legato();
+            // Legato + Slide are cache-owned. Propagate the cache's picks
+            // into _lastStepContent so a subsequent Repeat replays this
+            // step's decisions, not whatever stale bits lived on the stored
+            // content.
+            _lastStepContent.setLegato(pLegato);
+            _lastStepContent.setSlide(pSlide);
         }
+        // else: cache unprimed or out-of-window → fall back to stored
+        // durationIndex via the LUT path below.
 
         // durationTicks: non-Repeat with primed cache uses the cached value;
         // Repeat / unprimed falls back to a LUT pick from eval.durationIndex().
@@ -446,7 +441,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // Feel scale is computed per trigger so a routed Feel CV takes effect
         // immediately without a cache refresh.
         uint32_t feelScaleQ16 = stochastic_cache::computeFeelScaleQ16(
-            int(sequence.feel()), uint32_t(_cache.cycleTicks), uint32_t(CONFIG_PPQN));
+            int(sequence.feel()), uint32_t(_stepCache.cycleTicks), uint32_t(CONFIG_PPQN));
         mult = stochastic_cache::applyFeelScale(mult, feelScaleQ16);
         if (mult < 1) mult = 1;
         _lastDurationIndex = pDurIdx;
@@ -467,13 +462,13 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // pure duration order. Tilt sign chooses which end survives the cut.
         const uint32_t patternSize = std::max<uint32_t>(1, sequence.size());
         const uint32_t denom = patternSize > 1 ? (patternSize - 1) : 1;
-        // Repeat replays the rank captured with _lastEvent — intentional. The
+        // Repeat replays the rank captured with _lastStepContent — intentional. The
         // Repeat contract is "frozen material," so a mutate-driven rerank
         // since capture does not retroactively shift the replayed event.
         const uint32_t storedRank = (useRepeat ? uint32_t(eval.densityRank())
-                                               : uint32_t(sequence.events()[readIndex].densityRank()));
+                                               : uint32_t(sequence.steps()[stepIndex].densityRank()));
         const uint32_t rankPctMilli = std::min<uint32_t>(1000, (storedRank * 1000) / denom);
-        const uint32_t saltHash = keyed_rng::cellSeed(sequence.rhythmSeed(), uint32_t(readIndex));
+        const uint32_t saltHash = keyed_rng::cellSeed(sequence.rhythmSeed(), uint32_t(stepIndex));
         const uint32_t saltPctMilli = ((saltHash >> 24) * 1000) / 255;
         const int tiltSigned = int(sequence.tilt());
         const uint32_t tiltMag = uint32_t(std::abs(tiltSigned));   // 0..100
@@ -495,26 +490,26 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // Non-Repeat bursts: cluster cells are normal slots with their own
         // duration; they play through the normal triggerStep loop, no extra
         // child-walk. Only Repeat needs the child-array path because it
-        // replays a captured _lastEvent rather than the slot.
-        StochasticGenerator::EvaluatedBurstNote evalChildren[kMaxBurst];
-        for (int i = 0; i < kMaxBurst; ++i) evalChildren[i].valid = false;
+        // replays a captured _lastStepContent rather than the slot.
+        StochasticGenerator::EvaluatedBurstNote evalBursts[kMaxBurst];
+        for (int i = 0; i < kMaxBurst; ++i) evalBursts[i].valid = false;
         uint8_t childCount = 0;
 
         if (useRepeat && !isRest) {
-            StochasticGenerator::evaluateBurst(evalChildren, sequence, eval, track, scale, rootNote, note, durationTicks, _rng);
-            for (int i = 0; i < kMaxBurst; ++i) if (evalChildren[i].valid) childCount++;
+            StochasticGenerator::evaluateBurst(evalBursts, sequence, eval, track, scale, rootNote, note, durationTicks, _rng);
+            for (int i = 0; i < kMaxBurst; ++i) if (evalBursts[i].valid) childCount++;
         }
 
         recordDirectHistory(finalCv, isRest, !isRest, childCount);
 
         if (!isRest) {
-            // DBG_STO("%u CVpush ON p=%d cv=%.3f", tick, _patternIndex, finalCv);
+            // DBG_STO("%u CVpush ON p=%d cv=%.3f", tick, _currentStep, finalCv);
             _cvQueue.push({ tick, finalCv, isSlide });
             _gateQueue.push({ tick, true });
 
             if (!isLegato && childCount == 0) {
                 // Non-Repeat reads the cache-baked gate fraction. Repeat
-                // uses pickGateLength at runtime because _lastEvent carries
+                // uses pickGateLength at runtime because _lastStepContent carries
                 // no cache-baked gate fraction.
                 uint32_t gateLen;
                 if (useRepeat) {
@@ -530,14 +525,14 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
 
             if (useRepeat) {
                 // Legacy burst playback for Repeat — bursts come from
-                // _lastEvent (Repeat replays the captured event, not the
+                // _lastStepContent (Repeat replays the captured event, not the
                 // window). The flat-cell cache path doesn't apply here.
                 for (int i = 0; i < kMaxBurst; ++i) {
-                    if (evalChildren[i].valid) {
-                        uint32_t childTick = tick + evalChildren[i].tickOffset;
+                    if (evalBursts[i].valid) {
+                        uint32_t childTick = tick + evalBursts[i].tickOffset;
                         uint32_t lowTick = childTick > tick + 2 ? childTick - 2 : tick;
 
-                        int childNote = evalChildren[i].note;
+                        int childNote = evalBursts[i].note;
                         if (sequence.burstHold() == StochasticBurstHold::Roll) {
                             childNote += (_jumpRegister + track.octave()) * activeNotes + track.transpose();
                         }
@@ -546,7 +541,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
                         _gateQueue.push({ lowTick, false });
                         _cvQueue.push({ childTick, childCv, isSlide });
                         _gateQueue.push({ childTick, true });
-                        _gateQueue.push({ childTick + evalChildren[i].gateTicks, false });
+                        _gateQueue.push({ childTick + evalBursts[i].gateTicks, false });
                     }
                 }
             }
@@ -554,7 +549,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             // cluster cells are normal event slots with their own duration;
             // each gets a triggerStep call. No cache-walk needed here.
         } else {
-            // DBG_STO("%u CVpush REST p=%d cv=%.3f mode=%s", tick, _patternIndex, finalCv,
+            // DBG_STO("%u CVpush REST p=%d cv=%.3f mode=%s", tick, _currentStep, finalCv,
             //     track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always ? "Always" : "Gate");
             _gateQueue.push({ tick, false });
             if (track.cvUpdateMode() == StochasticTrack::CvUpdateMode::Always) _cvQueue.push({ tick, finalCv, false });
@@ -562,9 +557,9 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         }
     }
 
-    _patternIndex++;
-    if (_patternIndex > sequence.last()) {
-        _patternIndex = sequence.first();
+    _currentStep++;
+    if (_currentStep > sequence.last()) {
+        _currentStep = sequence.first();
         _patternCycleEnded = true;
 
         // Jump / Sleep / Patience / Mutate all advance on the same boundary —
@@ -578,7 +573,7 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
         // moving the window plays the same slots in their same (cluster-aware)
         // shape, just from a different starting point.
         if (uint8_t(sequence.size()) != _lastAppliedSize) {
-            refreshCache();
+            refreshStepCache();
             _lastAppliedSize  = uint8_t(sequence.size());
             _lastAppliedFirst = uint8_t(sequence.first());
         }
@@ -668,7 +663,7 @@ void StochasticTrackEngine::rollCycleEndHooks() {
             applyMelody();
         }
         // Sync cache so the next cycle's mask filter sees the new content.
-        refreshCache();
+        refreshStepCache();
     }
 }
 
@@ -678,7 +673,7 @@ void StochasticTrackEngine::renewRhythm() {
     StochasticGenerator::generateRhythm(seq, trk, _rng.next());
     seq.setRhythmValid(true);
     _loopCycleCount = 0;
-    refreshCache();
+    refreshStepCache();
 }
 
 void StochasticTrackEngine::renewMelody() {
@@ -691,7 +686,7 @@ void StochasticTrackEngine::renewMelody() {
     _loopCycleCountMelody = 0;
     // Fresh melody = no inherited octave drift (2026-05-24).
     _jumpRegister = 0;
-    refreshCache();
+    refreshStepCache();
 }
 
 void StochasticTrackEngine::refreshLoopSources() {
@@ -712,7 +707,7 @@ void StochasticTrackEngine::refreshLoopSources() {
     _loopCycleCountMelody = 0;
     // Both domains rewritten = fresh material; clear inherited octave drift.
     _jumpRegister = 0;
-    refreshCache();
+    refreshStepCache();
 }
 
 void StochasticTrackEngine::update(float dt) {
@@ -745,20 +740,20 @@ void StochasticTrackEngine::ensureLoopSources(const Scale &scale, int rootNote) 
         _jumpRegister = 0;
         regenerated = true;
     }
-    if (regenerated) refreshCache();
+    if (regenerated) refreshStepCache();
 }
 
-void StochasticTrackEngine::writeLiveRhythmShadow(int readIndex, const StochasticSourceEvent &rhythm) {
+void StochasticTrackEngine::writeLiveRhythmShadow(int stepIndex, const StochasticStepContent &rhythm) {
     // Live writeback into the events array so the events display reflects
     // the recently played event. Flag a coalesced cache refresh so we only
     // rebuild once even if both rhythm and melody write in the same trigger.
-    sequence().events()[readIndex].mergeRhythmFrom(rhythm);
-    _cacheRefreshPending = true;
+    sequence().steps()[stepIndex].mergeRhythmFrom(rhythm);
+    _stepCacheRefreshPending = true;
 }
 
-void StochasticTrackEngine::writeLiveMelodyShadow(int readIndex, const StochasticSourceEvent &melody) {
-    sequence().events()[readIndex].mergeMelodyFrom(melody);
-    _cacheRefreshPending = true;
+void StochasticTrackEngine::writeLiveMelodyShadow(int stepIndex, const StochasticStepContent &melody) {
+    sequence().steps()[stepIndex].mergeMelodyFrom(melody);
+    _stepCacheRefreshPending = true;
 }
 
 void StochasticTrackEngine::syncWindowEdit() {
@@ -775,9 +770,9 @@ void StochasticTrackEngine::syncWindowEdit() {
     int last  = seq.last();
     if (last < first) last = first;
 
-    // Snap _patternIndex into the new window if it's now outside.
-    if (_patternIndex < first || _patternIndex > last) {
-        _patternIndex = first;
+    // Snap _currentStep into the new window if it's now outside.
+    if (_currentStep < first || _currentStep > last) {
+        _currentStep = first;
         // Force the next tick to trigger a step (don't wait for the now-stale
         // _eventDuration to elapse — its remaining ticks belonged to the old
         // window's event).
@@ -795,10 +790,10 @@ void StochasticTrackEngine::syncWindowEdit() {
     // Cache rank ordering was built for the old window — windowSize feeds the
     // mask threshold and the rank distribution was assigned over the old
     // window's slot set. Rebuild for the new window.
-    refreshCache();
+    refreshStepCache();
 }
 
-void StochasticTrackEngine::refreshCache() {
+void StochasticTrackEngine::refreshStepCache() {
     auto &seq = sequence();
     auto &trk = stochasticTrack();
     // Match the divisor computation in tick(): base divisor scaled by the
@@ -812,8 +807,8 @@ void StochasticTrackEngine::refreshCache() {
     // (anchor pitches in Loop melody, cluster-tail Generate-mode pitches).
     const auto &scale = seq.selectedScale(_model.project().scale());
     int rootNote = seq.selectedRootNote(_model.project().rootNote());
-    stochastic_cache::regenerateCacheFromEvents(
-        _cache, seq, divisor, seq.rhythmSeed(), &scale, &trk, rootNote);
+    stochastic_cache::rebuildStepCache(
+        _stepCache, seq, divisor, seq.rhythmSeed(), &scale, &trk, rootNote);
 }
 
 void StochasticTrackEngine::clearDirectHistory() {

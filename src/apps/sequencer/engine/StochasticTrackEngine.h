@@ -38,27 +38,27 @@ public:
         _gateQueue.clear();
         _cvQueue.clear();
         _patternCycleEnded = false;
-        _lastEventValid = false;
+        _lastStepContentValid = false;
         clearDirectHistory();
         // Cache is per-track and was built for the previous pattern's events;
         // rebuild for the new pattern.
-        refreshCache();
+        refreshStepCache();
     }
 
-    int currentStep() const { return _patternIndex; }
+    int currentStep() const { return _currentStep; }
     bool activity() const { return _activity; }
 
     // Immediate transport sync after a model-level window edit (setFirst /
-    // setSize). Snaps _patternIndex, flushes gate/CV queues, rebuilds the
+    // setSize). Snaps _currentStep, flushes gate/CV queues, rebuilds the
     // cache. Without this, the old window keeps driving playback until the
     // next event-boundary trigger.
     void syncWindowEdit();
 
     // Rebuild the engine cache from current sequence content. Lighter than
-    // syncWindowEdit — no _patternIndex snap, no queue flush. Call from
+    // syncWindowEdit — no _currentStep snap, no queue flush. Call from
     // edit paths that change cache-baked shaping fields so non-Repeat
     // playback picks up the new shape on the next trigger.
-    void refreshCacheNow() { refreshCache(); }
+    void refreshStepCacheNow() { refreshStepCache(); }
     int lastDegree() const { return _lastDegree; }
     int lastDurationIndex() const { return _lastDurationIndex; }
     uint16_t loopCycleCount() const { return _loopCycleCount; }
@@ -150,10 +150,10 @@ private:
     void ensureLoopSources(const Scale &scale, int rootNote);
     // Live writeback into the events array so the events display reflects
     // the just-played event. Flags a coalesced cache refresh.
-    void writeLiveRhythmShadow(int readIndex, const StochasticSourceEvent &rhythm);
-    void writeLiveMelodyShadow(int readIndex, const StochasticSourceEvent &melody);
+    void writeLiveRhythmShadow(int stepIndex, const StochasticStepContent &rhythm);
+    void writeLiveMelodyShadow(int stepIndex, const StochasticStepContent &melody);
     // Rebuild the engine cache from current sequence content.
-    void refreshCache();
+    void refreshStepCache();
     void clearDirectHistory();
     void recordDirectHistory(float cv, bool rest, bool gate, uint8_t children);
 
@@ -171,7 +171,7 @@ private:
     Random _rng;
 
     // Engine state
-    uint8_t _patternIndex = 0;
+    uint8_t _currentStep = 0;
     uint32_t _relativeTick = 0;
     uint8_t _sleepRemaining = 0;
     uint16_t _loopCycleCount = 0;          // legacy alias kept for indicator path (== rhythm count)
@@ -192,10 +192,10 @@ private:
     // and writeLiveMelodyShadow can fire in the same trigger; instead of
     // rebuilding twice, they set this flag and triggerStep rebuilds once
     // at the top of the next call before any cache read.
-    bool _cacheRefreshPending = false;
+    bool _stepCacheRefreshPending = false;
 
     // Phase 16 P10 (2026-05-23): Codex audit follow-up. Knobs consumed inside
-    // regenerateCacheFromEvents are cache-baked state — when a routing target
+    // rebuildStepCache are cache-baked state — when a routing target
     // writes them mid-cycle (no UI involvement, no shaping-edit notify), the
     // cache must rebuild before the next event read. triggerStep snapshots
     // the current shaping-knob set at the top and flags refresh on any drift.
@@ -221,8 +221,8 @@ private:
     float _cvOutputTarget = 0.f;
 
     // Repeat path: holds the last-emitted event for replay on a Repeat hit.
-    StochasticSourceEvent _lastEvent;
-    bool _lastEventValid = false;
+    StochasticStepContent _lastStepContent;
+    bool _lastStepContentValid = false;
 
     struct Gate {
         uint32_t tick;
@@ -252,11 +252,11 @@ private:
     SortedQueue<Cv, 16, CvCompare> _cvQueue;
 
     // Playback-ready cells materialized from the events array. Engine reads
-    // cells[K] for each played slot; rebuilt on edit / mutation / renew.
-    stochastic_cache::Cache _cache{};
+    // runtimeSteps[K] for each played slot; rebuilt on edit / mutation / renew.
+    stochastic_cache::StepCache _stepCache{};
 };
 
-// Ceiling sized to absorb the engine cache (CachedCell[64] + CellAux[64] +
-// parentCacheIdx[64] + housekeeping ≈ 456 B) while staying within the
-// track-engine container slot. See PROJECT.md "Engine gate".
+// Ceiling sized to absorb the engine cache (RuntimeStep[64] + CellAux[64] +
+// housekeeping ≈ 390 B) while staying within the track-engine container
+// slot. See PROJECT.md "Engine gate".
 static_assert(sizeof(StochasticTrackEngine) <= 1024, "StochasticTrackEngine too large");

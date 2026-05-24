@@ -27,7 +27,7 @@ enum class MarblesMode : uint8_t {
  * RAM-packed pair of rhythm and melody source material.
  * This 6-byte record allows storing 17 patterns within the Performer track budget.
  */
-struct StochasticSourceEvent {
+struct StochasticStepContent {
     uint8_t bytes[6];
 
     void clear() {
@@ -92,20 +92,20 @@ struct StochasticSourceEvent {
     bool melodyValid() const { return (bytes[5] >> 4) & 0x01; }
     void setMelodyValid(bool value) { bytes[5] = (bytes[5] & ~(1 << 4)) | ((value ? 1 : 0) << 4); }
 
-    void mergeRhythmFrom(const StochasticSourceEvent &event) {
+    void mergeRhythmFrom(const StochasticStepContent &event) {
         bytes[0] = event.bytes[0];
         bytes[1] = event.bytes[1];
         bytes[2] = event.bytes[2];
         bytes[3] = event.bytes[3];
     }
 
-    void mergeMelodyFrom(const StochasticSourceEvent &event) {
+    void mergeMelodyFrom(const StochasticStepContent &event) {
         bytes[4] = event.bytes[4];
         bytes[5] = event.bytes[5];
     }
 };
 
-static_assert(sizeof(StochasticSourceEvent) == 6, "Event must be exactly 6 bytes");
+static_assert(sizeof(StochasticStepContent) == 6, "Event must be exactly 6 bytes");
 
 struct StochasticChildHit {
     // 32 bits (4 bytes)

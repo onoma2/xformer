@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stochastic — knob ownership + law (proposed state)</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --card: #ffffff;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --border: #e5e5e5;
+    --realtime:    #2563eb;
+    --loop:        #16a34a;
+    --liveonly:    #ca8a04;
+    --cycle:       #7c3aed;
+    --window:      #0891b2;
+    --proposed:    #dc2626;
+    --seq-tag:     #1f2937;
+    --trk-tag:     #b45309;
+    --layer-model:  #0f766e;
+    --layer-engine: #be185d;
+
+    /* RNG path tints */
+    --rng-keyed:  #15803d;
+    --rng-engine: #c2410c;
+    --rng-none:   #9ca3af;
+
+    /* law-type tints */
+    --law-scalar:    #1d4ed8;
+    --law-bipolar:   #6d28d9;
+    --law-bernoulli: #b91c1c;
+    --law-lut:       #0e7490;
+    --law-kernel:    #047857;
+    --law-enum:      #4338ca;
+    --law-poisson:   #b45309;
+    --law-integer:   #475569;
+    --law-threshold: #be123c;
+  }
+  html { background: var(--bg); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color: var(--text);
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px 96px;
+    line-height: 1.5;
+    font-size: 16px;
+  }
+  h1 { font-size: 1.5rem; line-height: 1.3; margin: 0 0 8px; }
+  h2 {
+    font-size: 1.05rem;
+    line-height: 1.3;
+    margin: 32px 0 12px;
+    padding: 6px 12px;
+    border-left: 4px solid;
+    background: rgba(0,0,0,0.02);
+  }
+  h2.realtime { border-color: var(--realtime); }
+  h2.loop     { border-color: var(--loop); }
+  h2.liveonly { border-color: var(--liveonly); }
+  h2.cycle    { border-color: var(--cycle); }
+  h2.window   { border-color: var(--window); }
+
+  p.lede { color: var(--muted); margin: 0 0 24px; }
+
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 16px 20px;
+    margin: 0 0 12px;
+    font-size: 14px;
+  }
+  .legend.ownership {
+    grid-template-columns: 1fr 1fr;
+    margin-top: 0;
+    margin-bottom: 12px;
+  }
+  .legend.layer {
+    grid-template-columns: 1fr 1fr;
+    margin-top: 0;
+    margin-bottom: 12px;
+  }
+  .legend.laws {
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 0;
+    margin-bottom: 28px;
+  }
+  .legend .item { display: block; }
+  .legend .tag {
+    font-weight: 600;
+    display: inline-block;
+    margin-right: 6px;
+    min-width: 0;
+  }
+  .legend .tag.realtime { color: var(--realtime); }
+  .legend .tag.loop     { color: var(--loop); }
+  .legend .tag.liveonly { color: var(--liveonly); }
+  .legend .tag.cycle    { color: var(--cycle); }
+  .legend .tag.window   { color: var(--window); }
+  .legend .tag.seq      { color: var(--seq-tag); }
+  .legend .tag.trk      { color: var(--trk-tag); }
+  .legend .tag.layer-model  { color: var(--layer-model); }
+  .legend .tag.layer-engine { color: var(--layer-engine); }
+  .legend .tag.rng-keyed    { color: var(--rng-keyed); }
+  .legend .tag.rng-engine   { color: var(--rng-engine); }
+  .legend .tag.rng-none     { color: var(--rng-none); }
+  .legend .tag.law-scalar    { color: var(--law-scalar); }
+  .legend .tag.law-bipolar   { color: var(--law-bipolar); }
+  .legend .tag.law-bernoulli { color: var(--law-bernoulli); }
+  .legend .tag.law-lut       { color: var(--law-lut); }
+  .legend .tag.law-kernel    { color: var(--law-kernel); }
+  .legend .tag.law-enum      { color: var(--law-enum); }
+  .legend .tag.law-poisson   { color: var(--law-poisson); }
+  .legend .tag.law-integer   { color: var(--law-integer); }
+  .legend .tag.law-threshold { color: var(--law-threshold); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border: 1px solid var(--border);
+    font-size: 14.5px;
+    table-layout: fixed;
+  }
+  th, td {
+    padding: 10px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    word-break: break-word;
+  }
+  th {
+    font-weight: 600;
+    background: rgba(0,0,0,0.025);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td.knob { font-weight: 600; }
+  td.code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  td.own, td.layer, td.rng, td.law, td.state {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  td.own.seq { color: var(--seq-tag); }
+  td.own.trk { color: var(--trk-tag); }
+  td.layer.model  { color: var(--layer-model); }
+  td.layer.engine { color: var(--layer-engine); }
+  td.rng.keyed    { color: var(--rng-keyed); }
+  td.rng.engine   { color: var(--rng-engine); }
+  td.rng.none     { color: var(--rng-none); }
+  td.law.scalar    { color: var(--law-scalar); }
+  td.law.bipolar   { color: var(--law-bipolar); }
+  td.law.bernoulli { color: var(--law-bernoulli); }
+  td.law.lut       { color: var(--law-lut); }
+  td.law.kernel    { color: var(--law-kernel); }
+  td.law.enum      { color: var(--law-enum); }
+  td.law.poisson   { color: var(--law-poisson); }
+  td.law.integer   { color: var(--law-integer); }
+  td.law.threshold { color: var(--law-threshold); }
+  td.state.fixed    { color: var(--muted); }
+  td.state.proposed {
+    color: var(--proposed);
+    white-space: normal;
+    text-transform: none;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0;
+  }
+
+  /* column widths via colgroup */
+  col.c-knob   { width: 140px; }
+  col.c-code   { width: 195px; }
+  col.c-loop   { width: 70px; }
+  col.c-own    { width: 55px; }
+  col.c-layer  { width: 75px; }
+  col.c-rng    { width: 75px; }
+  col.c-law    { width: 105px; }
+  col.c-state  { width: 110px; }
+
+  td.loop.rhythm { color: #be185d; font-weight: 600; }
+  td.loop.melody { color: #7c3aed; font-weight: 600; }
+  /* behavior column flexes */
+
+  .note {
+    background: rgba(220,38,38,0.06);
+    border-left: 3px solid var(--proposed);
+    padding: 10px 14px;
+    margin: 14px 0 0;
+    font-size: 14px;
+    color: #7a1313;
+  }
+  .note strong { color: var(--proposed); }
+</style>
+</head>
+<body>
+
+<h1>Stochastic knobs — behavior, ownership, layer, RNG, law</h1>
+<p class="lede">Five orthogonal axes per knob. <strong>Behavior</strong> (section) = how the value reaches playback at runtime. <strong>Ownership</strong> = where the data lives in the model. <strong>Layer</strong> = whether the knob is structural/config (model) or a runtime decision parameter (engine). <strong>RNG</strong> = what randomness source runs under the knob. <strong>Law</strong> = mathematical shape of how the value translates to effect.</p>
+
+<div class="legend">
+  <div class="item"><span class="tag realtime">REALTIME</span> engine reads knob directly at trigger time — no intermediate storage</div>
+  <div class="item"><span class="tag loop">LOOP</span> Loop: cache picks per step from knob (scrubable). Live: engine rolls per step from knob.</div>
+  <div class="item"><span class="tag liveonly">LIVE-ONLY</span> Live: engine rolls per step. Loop: cache reads steps array verbatim; knob inert until next RENEW / Mutate.</div>
+  <div class="item"><span class="tag cycle">CYCLE-END</span> fires at cycle boundary — may rotate seed and rewrite events</div>
+  <div class="item"><span class="tag window">PATTERN SHAPE</span> bounds the playback window; no per-step content effect</div>
+  <div class="item"></div>
+</div>
+
+<div class="legend ownership">
+  <div class="item"><span class="tag seq">SEQ</span> <code>StochasticSequence</code> — per-pattern. Each pattern has its own copy. <strong>Changes when pattern index changes during playback</strong> (changePattern repoints <code>_sequence</code>).</div>
+  <div class="item"><span class="tag trk">TRK</span> <code>StochasticTrack</code> — per-track global. All patterns of this track share the value. <strong>Stays the same across pattern switches.</strong></div>
+  <div class="item" style="grid-column: 1 / -1; color: var(--muted); font-size: 13px;">Note: saving the project persists both SEQ and TRK fields — save survival is universal. Ownership only governs pattern-switch behavior.</div>
+</div>
+
+<div class="legend layer">
+  <div class="item"><span class="tag layer-model">MODEL</span> structural / config — engine respects but doesn't probabilistically decide with (scale, tempo, window, track offsets)</div>
+  <div class="item"><span class="tag layer-engine">ENGINE</span> runtime decision parameter — engine uses for picks, rolls, scaling, filtering</div>
+</div>
+
+<div class="legend layer">
+  <div class="item"><span class="tag rng-keyed">KEYED</span> cache walk uses <code>keyed_rng::cellSeed(seed, stepIndex)</code> — same seed + same knobs = same output, scrubable</div>
+  <div class="item"><span class="tag rng-engine">ENGINE</span> engine's <code>_rng</code> state — advances per call, non-reproducible across rebuilds</div>
+  <div class="item" style="grid-column: 1 / -1;"><span class="tag rng-none">NONE</span> no random roll involved — knob value used directly (scalar multiplier, threshold, integer offset)</div>
+</div>
+
+<div class="legend laws">
+  <div class="item"><span class="tag law-scalar">SCALAR</span> continuous numeric used directly (multiplier, tau, %)</div>
+  <div class="item"><span class="tag law-bipolar">BIPOLAR</span> signed continuous — sign carries meaning beyond magnitude</div>
+  <div class="item"><span class="tag law-bernoulli">BERNOULLI</span> yes/no probability roll per step or cycle</div>
+  <div class="item"><span class="tag law-lut">LUT CENTER</span> picks a discrete slot from a finite table (often paired with a kernel width)</div>
+  <div class="item"><span class="tag law-kernel">KERNEL WIDTH</span> width of a distribution around a center value</div>
+  <div class="item"><span class="tag law-enum">ENUM</span> selects from named options</div>
+  <div class="item"><span class="tag law-poisson">POISSON</span> Poisson lambda — CDF rises with each cycle until threshold</div>
+  <div class="item"><span class="tag law-integer">INTEGER</span> discrete count / offset / position</div>
+  <div class="item"><span class="tag law-threshold">THRESHOLD</span> value compared against ranked input — steps pass or get filtered</div>
+</div>
+
+<h2 class="realtime">Realtime — engine reads knob directly at trigger time. No intermediate storage.</h2>
+<table>
+  <colgroup>
+    <col class="c-knob"><col class="c-code"><col class="c-own"><col class="c-layer"><col class="c-rng"><col class="c-law"><col><col class="c-state">
+  </colgroup>
+  <thead><tr><th>UI label</th><th>Code field</th><th>Owner</th><th>Layer</th><th>RNG</th><th>Law</th><th>Behavior</th><th>State</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="knob">Feel</td>
+      <td class="code">sequence.feel()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng none">None</td>
+      <td class="law scalar">Scalar</td>
+      <td>Per-trigger Q16.16 scale on step duration toward 3/4 or 5/4 meter. Detent at 45..55.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Repeat</td>
+      <td class="code">sequence.repeatProb()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng engine">Engine</td>
+      <td class="law bernoulli">Bernoulli</td>
+      <td>Per-trigger Bernoulli — replays <code>_lastEvent</code> verbatim instead of advancing.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Mask</td>
+      <td class="code">sequence.mask()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng none">None</td>
+      <td class="law threshold">Threshold</td>
+      <td>Per-trigger rank threshold — steps whose cache rank exceeds the threshold become rests. Paired with Tilt: Mask sets cutoff %, Tilt picks which end of the duration axis to cut.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Tilt</td>
+      <td class="code">sequence.tilt()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng none">None</td>
+      <td class="law bipolar">Bipolar</td>
+      <td>Duration filter direction + strength. -Tilt = low-pass (short steps survive); +Tilt = high-pass (long steps survive); magnitude blends between random-salt cut (Tilt=0) and strict duration-sorted cut (|Tilt|=100). Pure trigger-time read — no recompute, no cache touch on edit.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Divisor</td>
+      <td class="code">sequence.divisor()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law lut">LUT center</td>
+      <td>Sequence base clock divisor — picks ticks-per-step from a small set of musical subdivisions.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Clock Multiplier</td>
+      <td class="code">sequence.clockMultiplier()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law scalar">Scalar</td>
+      <td>Multiplier on step duration (50..200 %). Combined with divisor.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Reset Measure</td>
+      <td class="code">sequence.resetMeasure()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law integer">Integer</td>
+      <td>Hard sync — sequence restart every N measures (0 = off).</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Slide Time</td>
+      <td class="code">track.slideTime()</td>
+      <td class="own trk">TRK</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law scalar">Scalar</td>
+      <td>Track-level slide tau (0..100). Engine uses uniformly across all events with <code>slide</code> set.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Scale</td>
+      <td class="code">track.scale()</td>
+      <td class="own trk">TRK</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law enum">Enum</td>
+      <td>Selected scale for pitch generation + voltage conversion.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Root Note</td>
+      <td class="code">track.rootNote()</td>
+      <td class="own trk">TRK</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law enum">Enum</td>
+      <td>Root note offset for chromatic scales.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Octave</td>
+      <td class="code">track.octave()</td>
+      <td class="own trk">TRK</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law integer">Integer</td>
+      <td>Signed track-wide octave offset applied at CV computation.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Transpose</td>
+      <td class="code">track.transpose()</td>
+      <td class="own trk">TRK</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law integer">Integer</td>
+      <td>Signed track-wide semitone offset.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Fill Mode</td>
+      <td class="code">track.fillMode()</td>
+      <td class="own trk">TRK</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law enum">Enum</td>
+      <td>Behavior under fill mute.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 class="loop">Loop — cache picks in Loop (scrubable), engine writes in Live (fresh)</h2>
+<table>
+  <colgroup>
+    <col class="c-knob"><col class="c-code"><col class="c-loop"><col class="c-own"><col class="c-layer"><col class="c-rng"><col class="c-law"><col><col class="c-state">
+  </colgroup>
+  <thead><tr><th>UI label</th><th>Code field</th><th>Loop</th><th>Owner</th><th>Layer</th><th>RNG</th><th>Law</th><th>Behavior</th><th>State</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="knob">Note Duration</td>
+      <td class="code">sequence.noteDuration()</td>
+      <td class="loop rhythm">Rhythm</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law lut">LUT center</td>
+      <td>Knob picks center slot of the 8-entry duration LUT (x8 .. x1/2 of divisor). Per-step pick via triangular kernel.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Variation</td>
+      <td class="code">sequence.variation()</td>
+      <td class="loop rhythm">Rhythm</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law kernel">Kernel width</td>
+      <td>Width of the kernel around Note Duration's center slot. 0 = locked center, 100 = wide with opposite-side access.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Range</td>
+      <td class="code">sequence.range()</td>
+      <td class="loop melody">Melody</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law integer">Integer</td>
+      <td>Number of octaves in the candidate pool for pitch generation.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Burst</td>
+      <td class="code">sequence.burst()</td>
+      <td class="loop rhythm">Rhythm</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law bernoulli">Bernoulli</td>
+      <td>Per-step cluster-start probability. On hit: cluster step duration = prev_dur / denom.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Burst Count</td>
+      <td class="code">sequence.burstCount()</td>
+      <td class="loop rhythm">Rhythm</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law lut">LUT center</td>
+      <td>Center of triangular pick over the burst-count LUT {2,3,4,5}.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Burst Rate</td>
+      <td class="code">sequence.burstRate()</td>
+      <td class="loop rhythm">Rhythm</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law lut">LUT center</td>
+      <td>Center of triangular pick over the burst-spacing-denominator LUT {2,3,4,5,6}.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Burst Pitch (Hold/Roll)</td>
+      <td class="code">sequence.burstHold()</td>
+      <td class="loop melody">Melody</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law enum">Enum</td>
+      <td>Context menu toggle. Hold = cluster tails copy anchor pitch. Roll (Roll) = re-pick per step via melodySeed-keyed RNG so NewR does not shift cluster-tail pitches; only NewM does.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Complexity</td>
+      <td class="code">sequence.complexity()</td>
+      <td class="loop melody">Melody</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law kernel">Kernel width</td>
+      <td>Width of pitch kernel around <code>lastDegree</code>. 0 = neighbor-anchored, 100 = wide leakage.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Contour</td>
+      <td class="code">sequence.contour()</td>
+      <td class="loop melody">Melody</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law bipolar">Bipolar</td>
+      <td>Signed directional drift of pitch kernel center. +Up, -Down.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Bias</td>
+      <td class="code">sequence.marblesBias()</td>
+      <td class="loop melody">Melody</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law lut">LUT center</td>
+      <td>Marbles bell center position across the scale (0..100 → low..high). Picks a center slot in the candidate pool.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Spread</td>
+      <td class="code">sequence.marblesSpread()</td>
+      <td class="loop melody">Melody</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law kernel">Kernel width</td>
+      <td>Width of the Marbles bell around Bias. 0 = locked, 100 = wide.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Gate Length</td>
+      <td class="code">sequence.gateLength()</td>
+      <td class="loop rhythm">Rhythm</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law kernel">Kernel width</td>
+      <td>Width of triangular distribution around 50% center. Cache picks per step via two keyed RNG pulls — knob is a deterministic playable control over the per-slot curve; same value recalls the same set.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Slide</td>
+      <td class="code">sequence.slide()</td>
+      <td class="loop melody">Melody</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law bernoulli">Bernoulli</td>
+      <td>Per-step Bernoulli for glide-into-this-note. When set, the engine ramps CV toward the new pitch over the Slide Time (track-owned). Cluster tails inherit the anchor's slide decision.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Legato</td>
+      <td class="code">sequence.legatoProb()</td>
+      <td class="loop rhythm">Rhythm</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng keyed">Keyed</td>
+      <td class="law bernoulli">Bernoulli</td>
+      <td>Per-step Bernoulli for tie-into-next. When set, the gate stays at 100% and the gate-off is suppressed so the step joins seamlessly into the next slot. Cluster tails inherit the anchor's legato decision.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 class="liveonly">Live-only — Live: engine rolls per step. Loop: cache reads steps array; knob inert until next RENEW/Mutate</h2>
+<table>
+  <colgroup>
+    <col class="c-knob"><col class="c-code"><col class="c-own"><col class="c-layer"><col class="c-rng"><col class="c-law"><col><col class="c-state">
+  </colgroup>
+  <thead><tr><th>UI label</th><th>Code field</th><th>Owner</th><th>Layer</th><th>RNG</th><th>Law</th><th>Behavior</th><th>State</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="knob">Rest</td>
+      <td class="code">sequence.rest()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng engine">Engine</td>
+      <td class="law bernoulli">Bernoulli</td>
+      <td>Per-event Bernoulli for silence. Generator writes step content&#x27;s rest bit at RENEW/Mutate. Cache reads steps array verbatim. Loop scrubbing handled by Mask + Tilt.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 class="cycle">Cycle-end — fires at cycle boundary, may rotate seed or rewrite steps array</h2>
+<table>
+  <colgroup>
+    <col class="c-knob"><col class="c-code"><col class="c-own"><col class="c-layer"><col class="c-rng"><col class="c-law"><col><col class="c-state">
+  </colgroup>
+  <thead><tr><th>UI label</th><th>Code field</th><th>Owner</th><th>Layer</th><th>RNG</th><th>Law</th><th>Behavior</th><th>State</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="knob">Patience R</td>
+      <td class="code">sequence.patienceRhythm()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng engine">Engine</td>
+      <td class="law poisson">Poisson</td>
+      <td>Poisson CDF with cycle-count buildup. On fire: rotates <code>rhythmSeed</code>, regenerates the entire rhythm steps array.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Patience M</td>
+      <td class="code">sequence.patienceMelody()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng engine">Engine</td>
+      <td class="law poisson">Poisson</td>
+      <td>Same as Patience R, melody domain.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Mutate</td>
+      <td class="code">sequence.mutate()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng engine">Engine</td>
+      <td class="law bipolar">Bipolar</td>
+      <td>Bipolar Bernoulli per cycle. Positive = permute one event (Marbles swap). Negative = regenerate one event. Sign chooses action; magnitude is probability.</td>
+      <td class="state proposed">Under discussion — see Phase 17 design</td>
+    </tr>
+    <tr>
+      <td class="knob">Jump</td>
+      <td class="code">sequence.jump()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng engine">Engine</td>
+      <td class="law bernoulli">Bernoulli</td>
+      <td>Per-cycle Bernoulli. On fire: <code>_jumpRegister</code> walks ±1 octave, bounded ±2. Applied as octave offset at trigger time.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Sleep</td>
+      <td class="code">sequence.sleep()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng none">None</td>
+      <td class="law integer">Integer</td>
+      <td>Per-cycle: skip N cycles before next playback (N = knob × 4 / 10).</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 class="window">Pattern shape — playback window bounds (SEQ-owned, no per-step content effect)</h2>
+<table>
+  <colgroup>
+    <col class="c-knob"><col class="c-code"><col class="c-own"><col class="c-layer"><col class="c-rng"><col class="c-law"><col><col class="c-state">
+  </colgroup>
+  <thead><tr><th>UI label</th><th>Code field</th><th>Owner</th><th>Layer</th><th>RNG</th><th>Law</th><th>Behavior</th><th>State</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="knob">First</td>
+      <td class="code">sequence.first()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law integer">Integer</td>
+      <td>Playback start slot. Cells are slot-keyed, so moving First plays the same slots in their same shape from a different starting point — no cache rebuild, no per-step RNG shift.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Size</td>
+      <td class="code">sequence.size()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer model">Model</td>
+      <td class="rng none">None</td>
+      <td class="law integer">Integer</td>
+      <td>Total pattern slot count (2..64). Size also acts as the last-slot bound — playback runs <code>first .. size-1</code>. Growing Size extends the cache walk to cover newly-active slots (triggers a refresh); shrinking just truncates the active range.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+    <tr>
+      <td class="knob">Rotate</td>
+      <td class="code">sequence.rotate()</td>
+      <td class="own seq">SEQ</td>
+      <td class="layer engine">Engine</td>
+      <td class="rng none">None</td>
+      <td class="law integer">Integer</td>
+      <td>Signed read-offset added to the in-window playback position at trigger time. Polyrhythmic phasing against other tracks — steps stay slot-keyed; Rotate just changes which slot fires first within the active window.</td>
+      <td class="state fixed">Fixed</td>
+    </tr>
+  </tbody>
+</table>
+<p style="color: var(--muted); font-size: 13px; margin-top: -8px;">Last is stubbed in the model — <code>sequence.last()</code> resolves to <code>size - 1</code>, <code>setLast()</code> is a no-op. The UI no longer exposes it.</p>
+
+</body>
+</html>

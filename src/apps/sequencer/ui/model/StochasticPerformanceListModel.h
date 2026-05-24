@@ -271,7 +271,7 @@ private:
     void notifyShapingEdit() {
         if (!shouldNotifyEngine()) return;
         int idx = _project->selectedTrackIndex();
-        static_cast<StochasticTrackEngine &>(_engine->trackEngine(idx)).refreshCacheNow();
+        static_cast<StochasticTrackEngine &>(_engine->trackEngine(idx)).refreshStepCacheNow();
     }
 
     StochasticTrack *_track = nullptr;

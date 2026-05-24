@@ -29,14 +29,14 @@ public:
         bool valid;
     };
 
-    static void evaluateBurst(EvaluatedBurstNote *children, const StochasticSequence &sequence, const StochasticSourceEvent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int parentNote, uint32_t durationTicks, Random &rng);
+    static void evaluateBurst(EvaluatedBurstNote *bursts, const StochasticSequence &sequence, const StochasticStepContent &event, const StochasticTrack &track, const Scale &scale, int rootNote, int anchorNote, uint32_t durationTicks, Random &rng);
 
-    static StochasticSourceEvent generateRhythmEvent(const StochasticSequence &sequence, const StochasticTrack &track, Random &rng);
-    static StochasticSourceEvent generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng);
+    static StochasticStepContent generateRhythmEvent(const StochasticSequence &sequence, const StochasticTrack &track, Random &rng);
+    static StochasticStepContent generateMelodyEvent(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int rootNote, int &lastDegree, Random &rng);
     static int generateDegree(const StochasticSequence &sequence, const StochasticTrack &track, const Scale &scale, int &lastDegree, Random &rng);
     // Per-cell pickers called from the cache walk. Cache picks per-cell from
     // these so NoteDuration / Variation / Burst* knobs reshape playback on
-    // the next refreshCache without a full regeneration pass.
+    // the next refreshStepCache without a full regeneration pass.
     static int pickDurationSlot(const StochasticSequence &sequence, Random &rng);
     static int pickBurstCount(int knob, Random &rng);
     static int pickBurstSpacingSlot(int knob, Random &rng);

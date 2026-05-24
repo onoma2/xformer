@@ -69,7 +69,7 @@ private:
     void editLoopStep(int step, int value, bool shift);
 
     // Phase 14B follow-on: window-edit (first/last/size) requires immediate
-    // engine sync — model-only edits leave _patternIndex / queues / cache
+    // engine sync — model-only edits leave _currentStep / queues / cache
     // pointing at the old window until the next event-boundary trigger.
     // Call this AFTER setFirst/setLast/setSize on the selected stochastic
     // sequence. No-op if the selected track isn't currently a Stochastic
@@ -80,7 +80,7 @@ private:
     // BurstCount, BurstRate, BurstHold) and other cache-baked fields must
     // invalidate the engine cache; otherwise non-Repeat playback keeps using
     // pre-edit baked child cells. Lighter than syncWindowEdit (no queue
-    // flush, no _patternIndex snap) — just refreshCache.
+    // flush, no _currentStep snap) — just refreshStepCache.
     void notifyStochasticShapingEdit();
 
     // Per-page Fn handlers.
