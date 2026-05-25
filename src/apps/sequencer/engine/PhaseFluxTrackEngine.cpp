@@ -235,11 +235,16 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         ++candCount;
     }
 
-    // Sort by trigger time ascending — PowerBend + phaseShift can scramble.
-    std::sort(cands, cands + candCount,
-        [](const PulseCandidate &a, const PulseCandidate &b) {
-            return a.triggerTime < b.triggerTime;
-        });
+    // Insertion sort by trigger time — avoids std::sort inlining past array bounds.
+    for (int i = 1; i < candCount; ++i) {
+        PulseCandidate key = cands[i];
+        int j = i - 1;
+        while (j >= 0 && cands[j].triggerTime > key.triggerTime) {
+            cands[j + 1] = cands[j];
+            --j;
+        }
+        cands[j + 1] = key;
+    }
 
     // §6.4 collision clamp — verbatim port of StochasticGenerator::evaluateBurst.
     const int kMinStageParentTicks = int(kMinPulseGateTicks + kMinPulseGapTicks);
