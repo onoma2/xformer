@@ -111,3 +111,7 @@ enum ProjectVersion {
     Last,
     Latest = Last - 1,
 };
+
+// Placeholder for the upcoming PhaseFlux serialization bump. Dev iterates
+// at the current Latest; rename to Version36 + insert into the enum on ship.
+constexpr int Version_PhaseFlux_Pending = 36;

@@ -1,0 +1,452 @@
+#include "UnitTest.h"
+
+#include "apps/sequencer/model/PhaseFluxSequence.h"
+#include "apps/sequencer/model/PhaseFluxTrack.h"
+#include "core/io/VersionedSerializedWriter.h"
+#include "core/io/VersionedSerializedReader.h"
+#include "../core/io/MemoryReaderWriter.h"
+#include "model/ProjectVersion.h"
+
+#include <cstring>
+
+static void writeSequence(const PhaseFluxSequence &seq, uint8_t *buf, size_t len) {
+    MemoryWriter memoryWriter(buf, len);
+    VersionedSerializedWriter writer([&memoryWriter](const void *data, size_t sz) {
+        memoryWriter.write(data, sz);
+    }, ProjectVersion::Latest);
+    seq.write(writer);
+}
+
+static void readSequence(PhaseFluxSequence &seq, const uint8_t *buf, size_t len) {
+    MemoryReader memoryReader(buf, len);
+    VersionedSerializedReader reader([&memoryReader](void *data, size_t sz) {
+        memoryReader.read(data, sz);
+    }, ProjectVersion::Latest);
+    seq.read(reader);
+}
+
+static void writeTrack(const PhaseFluxTrack &track, uint8_t *buf, size_t len) {
+    MemoryWriter memoryWriter(buf, len);
+    VersionedSerializedWriter writer([&memoryWriter](const void *data, size_t sz) {
+        memoryWriter.write(data, sz);
+    }, ProjectVersion::Latest);
+    track.write(writer);
+}
+
+static void readTrack(PhaseFluxTrack &track, const uint8_t *buf, size_t len) {
+    MemoryReader memoryReader(buf, len);
+    VersionedSerializedReader reader([&memoryReader](void *data, size_t sz) {
+        memoryReader.read(data, sz);
+    }, ProjectVersion::Latest);
+    track.read(reader);
+}
+
+// Build a default Stage and compare all 24 fields against a probe Stage —
+// used by bitpack_no_overlap to confirm only the field-under-test moved.
+static void expectStageEqualExceptOne(const PhaseFluxSequence::Stage &probe,
+                                      const PhaseFluxSequence::Stage &defaults,
+                                      const char *which, int excludeIndex) {
+    int i = 0;
+    if (excludeIndex != i++) expectEqual(probe.pulseCount(), defaults.pulseCount(), which);
+    if (excludeIndex != i++) expectEqual(probe.basePitch(), defaults.basePitch(), which);
+    if (excludeIndex != i++) expectEqual(int(probe.pitchRange()), int(defaults.pitchRange()), which);
+    if (excludeIndex != i++) expectEqual(int(probe.pitchDirection()), int(defaults.pitchDirection()), which);
+    if (excludeIndex != i++) expectEqual(int(probe.temporalCurve()), int(defaults.temporalCurve()), which);
+    if (excludeIndex != i++) expectEqual(probe.temporalFlipV(), defaults.temporalFlipV(), which);
+    if (excludeIndex != i++) expectEqual(probe.temporalFlipH(), defaults.temporalFlipH(), which);
+    if (excludeIndex != i++) expectEqual(probe.temporalWarp(), defaults.temporalWarp(), which);
+    if (excludeIndex != i++) expectEqual(probe.temporalResponse(), defaults.temporalResponse(), which);
+    if (excludeIndex != i++) expectEqual(int(probe.pitchCurve()), int(defaults.pitchCurve()), which);
+    if (excludeIndex != i++) expectEqual(probe.pitchFlipV(), defaults.pitchFlipV(), which);
+    if (excludeIndex != i++) expectEqual(probe.pitchFlipH(), defaults.pitchFlipH(), which);
+    if (excludeIndex != i++) expectEqual(probe.pitchWarp(), defaults.pitchWarp(), which);
+    if (excludeIndex != i++) expectEqual(probe.pitchResponse(), defaults.pitchResponse(), which);
+    if (excludeIndex != i++) expectEqual(probe.maskMelody(), defaults.maskMelody(), which);
+    if (excludeIndex != i++) expectEqual(probe.tiltMelody(), defaults.tiltMelody(), which);
+    if (excludeIndex != i++) expectEqual(probe.phaseShift(), defaults.phaseShift(), which);
+    if (excludeIndex != i++) expectEqual(int(probe.mask()), int(defaults.mask()), which);
+    if (excludeIndex != i++) expectEqual(probe.maskShift(), defaults.maskShift(), which);
+    if (excludeIndex != i++) expectEqual(probe.accumulatorStep(), defaults.accumulatorStep(), which);
+    if (excludeIndex != i++) expectEqual(probe.accumulatorLength(), defaults.accumulatorLength(), which);
+    if (excludeIndex != i++) expectEqual(probe.gateLength(), defaults.gateLength(), which);
+    if (excludeIndex != i++) expectEqual(int(probe.stageDivisor()), int(defaults.stageDivisor()), which);
+    if (excludeIndex != i++) expectEqual(probe.skip(), defaults.skip(), which);
+}
+
+UNIT_TEST("PhaseFluxSequenceSerialization") {
+
+CASE("default_round_trip") {
+    PhaseFluxSequence seq;
+    seq.clear();
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence restored;
+    restored.clear();
+    readSequence(restored, buf, sizeof(buf));
+
+    expectEqual(restored.scale(), -1, "scale default");
+    expectEqual(restored.rootNote(), -1, "rootNote default");
+    expectEqual(restored.divisor(), 12, "divisor default");
+    expectEqual(restored.clockMultiplier(), 100, "clockMultiplier default");
+    expectEqual(restored.resetMeasure(), 0, "resetMeasure default");
+
+    for (int i = 0; i < PhaseFluxSequence::StageCount; ++i) {
+        const auto &s = restored.stage(i);
+        expectEqual(s.pulseCount(), 1, "default pulseCount");
+        expectEqual(s.basePitch(), 0, "default basePitch");
+        expectEqual(int(s.pitchRange()), int(PhaseFluxSequence::PitchRangeType::One), "default pitchRange");
+        expectEqual(int(s.pitchDirection()), int(PhaseFluxSequence::PitchDirectionType::Up), "default pitchDirection");
+        expectEqual(int(s.temporalCurve()), int(PhaseFluxSequence::TemporalCurveType::Linear), "default temporalCurve");
+        expectEqual(s.temporalFlipV(), false, "default temporalFlipV");
+        expectEqual(s.temporalFlipH(), false, "default temporalFlipH");
+        expectEqual(s.temporalWarp(), 0, "default temporalWarp");
+        expectEqual(s.temporalResponse(), 0, "default temporalResponse");
+        expectEqual(int(s.pitchCurve()), int(PhaseFluxSequence::PitchCurveType::Ramp), "default pitchCurve");
+        expectEqual(s.pitchFlipV(), false, "default pitchFlipV");
+        expectEqual(s.pitchFlipH(), false, "default pitchFlipH");
+        expectEqual(s.pitchWarp(), 0, "default pitchWarp");
+        expectEqual(s.pitchResponse(), 0, "default pitchResponse");
+        expectEqual(s.maskMelody(), 100, "default maskMelody");
+        expectEqual(s.tiltMelody(), 0, "default tiltMelody");
+        expectEqual(s.phaseShift(), 0, "default phaseShift");
+        expectEqual(int(s.mask()), int(PhaseFluxSequence::MaskType::Off), "default mask");
+        expectEqual(s.maskShift(), 0, "default maskShift");
+        expectEqual(s.accumulatorStep(), 0, "default accumulatorStep");
+        expectEqual(s.accumulatorLength(), 1, "default accumulatorLength");
+        expectEqual(s.gateLength(), 50, "default gateLength");
+        expectEqual(int(s.stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_16), "default stageDivisor");
+        expectEqual(s.skip(), false, "default skip");
+    }
+}
+
+CASE("chassis_fields_persist") {
+    PhaseFluxSequence seq;
+    seq.clear();
+    seq.setScale(3);
+    seq.setRootNote(5);
+    seq.setDivisor(24);
+    seq.setClockMultiplier(133);
+    seq.setResetMeasure(8);
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence restored;
+    restored.clear();
+    readSequence(restored, buf, sizeof(buf));
+
+    expectEqual(restored.scale(), 3, "scale persists");
+    expectEqual(restored.rootNote(), 5, "rootNote persists");
+    expectEqual(restored.divisor(), 24, "divisor persists");
+    expectEqual(restored.clockMultiplier(), 133, "clockMultiplier persists");
+    expectEqual(restored.resetMeasure(), 8, "resetMeasure persists");
+
+    // Track-level chassis
+    PhaseFluxTrack track;
+    track.clear();
+    track.setSlideTime(77);
+    track.setOctave(-3);
+    track.setTranspose(42);
+    track.setPlayMode(Types::PlayMode::Free);
+    track.setFillMode(PhaseFluxTrack::FillMode::NextPattern);
+    track.setCvUpdateMode(PhaseFluxTrack::CvUpdateMode::Always);
+
+    uint8_t tbuf[65536];
+    std::memset(tbuf, 0, sizeof(tbuf));
+    writeTrack(track, tbuf, sizeof(tbuf));
+
+    PhaseFluxTrack rtrack;
+    rtrack.clear();
+    readTrack(rtrack, tbuf, sizeof(tbuf));
+
+    expectEqual(rtrack.slideTime(), 77, "slideTime persists");
+    expectEqual(rtrack.octave(), -3, "octave persists");
+    expectEqual(rtrack.transpose(), 42, "transpose persists");
+    expectTrue(rtrack.playMode() == Types::PlayMode::Free, "playMode persists");
+    expectTrue(rtrack.fillMode() == PhaseFluxTrack::FillMode::NextPattern, "fillMode persists");
+    expectTrue(rtrack.cvUpdateMode() == PhaseFluxTrack::CvUpdateMode::Always, "cvUpdateMode persists");
+}
+
+CASE("stage_fields_persist") {
+    // Distribute 24 field touches across the 16 stages. Each stage gets a
+    // distinctive set of values; round-trip must restore them all.
+    PhaseFluxSequence seq;
+    seq.clear();
+
+    auto &s0  = seq.stage(0);
+    auto &s1  = seq.stage(1);
+    auto &s2  = seq.stage(2);
+    auto &s3  = seq.stage(3);
+    auto &s4  = seq.stage(4);
+    auto &s5  = seq.stage(5);
+    auto &s6  = seq.stage(6);
+    auto &s7  = seq.stage(7);
+
+    s0.setPulseCount(5);
+    s0.setBasePitch(11);
+    s0.setPitchRange(PhaseFluxSequence::PitchRangeType::Two);
+    s0.setPitchDirection(PhaseFluxSequence::PitchDirectionType::Bipolar);
+
+    s1.setTemporalCurve(PhaseFluxSequence::TemporalCurveType::Bell);
+    s1.setTemporalFlipV(true);
+    s1.setTemporalFlipH(true);
+    s1.setTemporalWarp(31);
+    s1.setTemporalResponse(-17);
+
+    s2.setPitchCurve(PhaseFluxSequence::PitchCurveType::Triangle);
+    s2.setPitchFlipV(true);
+    s2.setPitchFlipH(true);
+    s2.setPitchWarp(-29);
+    s2.setPitchResponse(23);
+
+    s3.setMaskMelody(73);
+    s3.setTiltMelody(42);
+    s3.setPhaseShift(5);
+
+    s4.setMask(PhaseFluxSequence::MaskType::TwoInFour);
+    s4.setMaskShift(3);
+
+    s5.setAccumulatorStep(7);
+    s5.setAccumulatorLength(9);
+
+    s6.setGateLength(88);
+    s6.setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_4T);
+
+    s7.setSkip(true);
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence r;
+    r.clear();
+    readSequence(r, buf, sizeof(buf));
+
+    expectEqual(r.stage(0).pulseCount(), 5, "s0 pulseCount");
+    expectEqual(r.stage(0).basePitch(), 11, "s0 basePitch");
+    expectEqual(int(r.stage(0).pitchRange()), int(PhaseFluxSequence::PitchRangeType::Two), "s0 pitchRange");
+    expectEqual(int(r.stage(0).pitchDirection()), int(PhaseFluxSequence::PitchDirectionType::Bipolar), "s0 pitchDirection");
+
+    expectEqual(int(r.stage(1).temporalCurve()), int(PhaseFluxSequence::TemporalCurveType::Bell), "s1 temporalCurve");
+    expectEqual(r.stage(1).temporalFlipV(), true, "s1 temporalFlipV");
+    expectEqual(r.stage(1).temporalFlipH(), true, "s1 temporalFlipH");
+    expectEqual(r.stage(1).temporalWarp(), 31, "s1 temporalWarp");
+    expectEqual(r.stage(1).temporalResponse(), -17, "s1 temporalResponse");
+
+    expectEqual(int(r.stage(2).pitchCurve()), int(PhaseFluxSequence::PitchCurveType::Triangle), "s2 pitchCurve");
+    expectEqual(r.stage(2).pitchFlipV(), true, "s2 pitchFlipV");
+    expectEqual(r.stage(2).pitchFlipH(), true, "s2 pitchFlipH");
+    expectEqual(r.stage(2).pitchWarp(), -29, "s2 pitchWarp");
+    expectEqual(r.stage(2).pitchResponse(), 23, "s2 pitchResponse");
+
+    expectEqual(r.stage(3).maskMelody(), 73, "s3 maskMelody");
+    expectEqual(r.stage(3).tiltMelody(), 42, "s3 tiltMelody");
+    expectEqual(r.stage(3).phaseShift(), 5, "s3 phaseShift");
+
+    expectEqual(int(r.stage(4).mask()), int(PhaseFluxSequence::MaskType::TwoInFour), "s4 mask");
+    expectEqual(r.stage(4).maskShift(), 3, "s4 maskShift");
+
+    expectEqual(r.stage(5).accumulatorStep(), 7, "s5 accumulatorStep");
+    expectEqual(r.stage(5).accumulatorLength(), 9, "s5 accumulatorLength");
+
+    expectEqual(r.stage(6).gateLength(), 88, "s6 gateLength");
+    expectEqual(int(r.stage(6).stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_4T), "s6 stageDivisor");
+
+    expectEqual(r.stage(7).skip(), true, "s7 skip");
+}
+
+CASE("stage_edge_values_persist") {
+    // Pin min + max on stages 0/1 for every numeric field. Bool fields toggle
+    // across stages. Catches sign-extension bugs and clamp drift.
+    PhaseFluxSequence seq;
+    seq.clear();
+
+    seq.stage(0).setPulseCount(1);
+    seq.stage(1).setPulseCount(8);
+
+    seq.stage(0).setBasePitch(-63);
+    seq.stage(1).setBasePitch(63);
+
+    seq.stage(0).setTemporalWarp(-63);
+    seq.stage(1).setTemporalWarp(63);
+
+    seq.stage(0).setTemporalResponse(-63);
+    seq.stage(1).setTemporalResponse(63);
+
+    seq.stage(0).setPitchWarp(-63);
+    seq.stage(1).setPitchWarp(63);
+
+    seq.stage(0).setPitchResponse(-63);
+    seq.stage(1).setPitchResponse(63);
+
+    seq.stage(0).setMaskMelody(0);
+    seq.stage(1).setMaskMelody(100);
+
+    seq.stage(0).setTiltMelody(0);
+    seq.stage(1).setTiltMelody(100);
+
+    seq.stage(0).setPhaseShift(0);
+    seq.stage(1).setPhaseShift(7);
+
+    seq.stage(0).setMaskShift(0);
+    seq.stage(1).setMaskShift(7);
+
+    seq.stage(0).setAccumulatorStep(-15);
+    seq.stage(1).setAccumulatorStep(15);
+
+    seq.stage(0).setAccumulatorLength(1);
+    seq.stage(1).setAccumulatorLength(16);
+
+    seq.stage(0).setGateLength(0);
+    seq.stage(1).setGateLength(100);
+
+    seq.stage(0).setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_32);
+    seq.stage(1).setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_2);
+
+    seq.stage(0).setPitchRange(PhaseFluxSequence::PitchRangeType::Half);
+    seq.stage(1).setPitchRange(PhaseFluxSequence::PitchRangeType::Three);
+
+    seq.stage(0).setPitchDirection(PhaseFluxSequence::PitchDirectionType::Up);
+    seq.stage(1).setPitchDirection(PhaseFluxSequence::PitchDirectionType::Bipolar);
+
+    seq.stage(0).setTemporalCurve(PhaseFluxSequence::TemporalCurveType::Linear);
+    seq.stage(1).setTemporalCurve(PhaseFluxSequence::TemporalCurveType::Bounce);
+
+    seq.stage(0).setPitchCurve(PhaseFluxSequence::PitchCurveType::Ramp);
+    seq.stage(1).setPitchCurve(PhaseFluxSequence::PitchCurveType::Triangle);
+
+    seq.stage(0).setMask(PhaseFluxSequence::MaskType::Off);
+    seq.stage(1).setMask(PhaseFluxSequence::MaskType::OneInEight);
+
+    seq.stage(0).setSkip(false);
+    seq.stage(1).setSkip(true);
+
+    seq.stage(0).setTemporalFlipV(false);
+    seq.stage(1).setTemporalFlipV(true);
+    seq.stage(0).setTemporalFlipH(false);
+    seq.stage(1).setTemporalFlipH(true);
+    seq.stage(0).setPitchFlipV(false);
+    seq.stage(1).setPitchFlipV(true);
+    seq.stage(0).setPitchFlipH(false);
+    seq.stage(1).setPitchFlipH(true);
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence r;
+    r.clear();
+    readSequence(r, buf, sizeof(buf));
+
+    expectEqual(r.stage(0).pulseCount(), 1, "min pulseCount");
+    expectEqual(r.stage(1).pulseCount(), 8, "max pulseCount");
+    expectEqual(r.stage(0).basePitch(), -63, "min basePitch");
+    expectEqual(r.stage(1).basePitch(), 63, "max basePitch");
+    expectEqual(r.stage(0).temporalWarp(), -63, "min temporalWarp");
+    expectEqual(r.stage(1).temporalWarp(), 63, "max temporalWarp");
+    expectEqual(r.stage(0).temporalResponse(), -63, "min temporalResponse");
+    expectEqual(r.stage(1).temporalResponse(), 63, "max temporalResponse");
+    expectEqual(r.stage(0).pitchWarp(), -63, "min pitchWarp");
+    expectEqual(r.stage(1).pitchWarp(), 63, "max pitchWarp");
+    expectEqual(r.stage(0).pitchResponse(), -63, "min pitchResponse");
+    expectEqual(r.stage(1).pitchResponse(), 63, "max pitchResponse");
+    expectEqual(r.stage(0).maskMelody(), 0, "min maskMelody");
+    expectEqual(r.stage(1).maskMelody(), 100, "max maskMelody");
+    expectEqual(r.stage(0).tiltMelody(), 0, "min tiltMelody");
+    expectEqual(r.stage(1).tiltMelody(), 100, "max tiltMelody");
+    expectEqual(r.stage(0).phaseShift(), 0, "min phaseShift");
+    expectEqual(r.stage(1).phaseShift(), 7, "max phaseShift");
+    expectEqual(r.stage(0).maskShift(), 0, "min maskShift");
+    expectEqual(r.stage(1).maskShift(), 7, "max maskShift");
+    expectEqual(r.stage(0).accumulatorStep(), -15, "min accumulatorStep");
+    expectEqual(r.stage(1).accumulatorStep(), 15, "max accumulatorStep");
+    expectEqual(r.stage(0).accumulatorLength(), 1, "min accumulatorLength");
+    expectEqual(r.stage(1).accumulatorLength(), 16, "max accumulatorLength");
+    expectEqual(r.stage(0).gateLength(), 0, "min gateLength");
+    expectEqual(r.stage(1).gateLength(), 100, "max gateLength");
+    expectEqual(int(r.stage(0).stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_32), "min stageDivisor");
+    expectEqual(int(r.stage(1).stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_2), "max stageDivisor");
+    expectEqual(int(r.stage(0).pitchRange()), int(PhaseFluxSequence::PitchRangeType::Half), "min pitchRange");
+    expectEqual(int(r.stage(1).pitchRange()), int(PhaseFluxSequence::PitchRangeType::Three), "max pitchRange");
+    expectEqual(int(r.stage(1).mask()), int(PhaseFluxSequence::MaskType::OneInEight), "max mask");
+    expectEqual(r.stage(0).skip(), false, "skip false");
+    expectEqual(r.stage(1).skip(), true, "skip true");
+    expectEqual(r.stage(1).temporalFlipV(), true, "temporalFlipV true");
+    expectEqual(r.stage(1).temporalFlipH(), true, "temporalFlipH true");
+    expectEqual(r.stage(1).pitchFlipV(), true, "pitchFlipV true");
+    expectEqual(r.stage(1).pitchFlipH(), true, "pitchFlipH true");
+}
+
+CASE("lock_does_not_persist") {
+    PhaseFluxTrack track;
+    track.clear();
+    track.setLock(true);
+    expectEqual(track.lock(), true, "lock true before write");
+
+    uint8_t buf[65536];
+    std::memset(buf, 0, sizeof(buf));
+    writeTrack(track, buf, sizeof(buf));
+
+    PhaseFluxTrack restored;
+    restored.clear();
+    readTrack(restored, buf, sizeof(buf));
+
+    expectEqual(restored.lock(), false, "lock must NOT persist (parity with Stochastic)");
+}
+
+CASE("bitpack_no_overlap") {
+    // Retro lesson #4 gate. For every Stage field, set ONE field to its max
+    // on stage 0 and verify all 23 other fields still read their default
+    // values. Adjacent bit offset swaps must make this fail.
+    PhaseFluxSequence defaults;
+    defaults.clear();
+    const auto &def = defaults.stage(0);
+
+    auto probe = [&](int idx, void (*set)(PhaseFluxSequence::Stage &)) {
+        PhaseFluxSequence seq;
+        seq.clear();
+        set(seq.stage(0));
+
+        uint8_t buf[4096];
+        std::memset(buf, 0, sizeof(buf));
+        writeSequence(seq, buf, sizeof(buf));
+
+        PhaseFluxSequence r;
+        r.clear();
+        readSequence(r, buf, sizeof(buf));
+
+        expectStageEqualExceptOne(r.stage(0), def, "no overlap", idx);
+    };
+
+    // Order must match expectStageEqualExceptOne's enumeration (0..23).
+    probe(0,  [](PhaseFluxSequence::Stage &s) { s.setPulseCount(8); });
+    probe(1,  [](PhaseFluxSequence::Stage &s) { s.setBasePitch(63); });
+    probe(2,  [](PhaseFluxSequence::Stage &s) { s.setPitchRange(PhaseFluxSequence::PitchRangeType::Three); });
+    probe(3,  [](PhaseFluxSequence::Stage &s) { s.setPitchDirection(PhaseFluxSequence::PitchDirectionType::Bipolar); });
+    probe(4,  [](PhaseFluxSequence::Stage &s) { s.setTemporalCurve(PhaseFluxSequence::TemporalCurveType::Bounce); });
+    probe(5,  [](PhaseFluxSequence::Stage &s) { s.setTemporalFlipV(true); });
+    probe(6,  [](PhaseFluxSequence::Stage &s) { s.setTemporalFlipH(true); });
+    probe(7,  [](PhaseFluxSequence::Stage &s) { s.setTemporalWarp(63); });
+    probe(8,  [](PhaseFluxSequence::Stage &s) { s.setTemporalResponse(63); });
+    probe(9,  [](PhaseFluxSequence::Stage &s) { s.setPitchCurve(PhaseFluxSequence::PitchCurveType::Triangle); });
+    probe(10, [](PhaseFluxSequence::Stage &s) { s.setPitchFlipV(true); });
+    probe(11, [](PhaseFluxSequence::Stage &s) { s.setPitchFlipH(true); });
+    probe(12, [](PhaseFluxSequence::Stage &s) { s.setPitchWarp(63); });
+    probe(13, [](PhaseFluxSequence::Stage &s) { s.setPitchResponse(63); });
+    probe(14, [](PhaseFluxSequence::Stage &s) { s.setMaskMelody(0); });
+    probe(15, [](PhaseFluxSequence::Stage &s) { s.setTiltMelody(100); });
+    probe(16, [](PhaseFluxSequence::Stage &s) { s.setPhaseShift(7); });
+    probe(17, [](PhaseFluxSequence::Stage &s) { s.setMask(PhaseFluxSequence::MaskType::OneInEight); });
+    probe(18, [](PhaseFluxSequence::Stage &s) { s.setMaskShift(7); });
+    probe(19, [](PhaseFluxSequence::Stage &s) { s.setAccumulatorStep(15); });
+    probe(20, [](PhaseFluxSequence::Stage &s) { s.setAccumulatorLength(16); });
+    probe(21, [](PhaseFluxSequence::Stage &s) { s.setGateLength(100); });
+    probe(22, [](PhaseFluxSequence::Stage &s) { s.setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_2); });
+    probe(23, [](PhaseFluxSequence::Stage &s) { s.setSkip(true); });
+}
+
+} // UNIT_TEST("PhaseFluxSequenceSerialization")

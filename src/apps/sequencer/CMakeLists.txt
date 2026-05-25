@@ -53,6 +53,8 @@ set(sources
     model/NoteSequence.cpp
     model/NoteTrack.cpp
     model/StochasticTrack.cpp
+    model/PhaseFluxSequence.cpp
+    model/PhaseFluxTrack.cpp
     model/DiscreteMapSequence.cpp
     model/DiscreteMapTrack.cpp
     model/IndexedSequence.cpp
