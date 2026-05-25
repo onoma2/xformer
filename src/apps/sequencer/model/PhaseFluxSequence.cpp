@@ -58,7 +58,6 @@ void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_scale);
     writer.write(_rootNote);
     writer.write(_resetMeasure);
-    writer.write(_edited);
     _divisor.write(writer);
     _clockMultiplier.write(writer);
     for (const auto &stage : _stages) {
@@ -70,7 +69,6 @@ void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
     reader.read(_scale);
     reader.read(_rootNote);
     reader.read(_resetMeasure);
-    reader.read(_edited);
     _divisor.read(reader);
     _clockMultiplier.read(reader);
     _scale = clamp(int(_scale), -1, Scale::Count - 1);

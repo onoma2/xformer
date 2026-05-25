@@ -97,12 +97,6 @@ public:
         Div1_2 = 7,
     };
 
-    static int stageDivisorTicks(int slot) {
-        static const int kTicks[8] = { 6, 8, 12, 16, 24, 32, 48, 96 };
-        if (slot < 0 || slot > 7) slot = int(StageDivisorSlot::Div1_16);
-        return kTicks[slot];
-    }
-
     class Stage {
     public:
         //----------------------------------------
@@ -216,10 +210,9 @@ public:
 
     private:
         // Layout: 93 bits across 3 × uint32_t = 96 bits envelope, 3 spare in
-        // _data0. Offsets chosen to keep related fields adjacent for hex
-        // readability. Do NOT reorder without bumping ProjectVersion.
+        // _data2 (bits 29..31). Do NOT reorder without bumping ProjectVersion.
 
-        // word 0 — pitch shape (29 used, 3 spare bits 29..31)
+        // word 0 — pitch shape + pulseCount (32 used, 0 spare)
         union {
             uint32_t raw;
             BitField<uint32_t,  0, BasePitch::Bits>       basePitch;       //  0..6
@@ -245,7 +238,7 @@ public:
             BitField<uint32_t, 25, TiltMelody::Bits>       tiltMelody;       // 25..31
         } _data1;
 
-        // word 2 — pulse/mask/accum/gate (32 used, 0 spare)
+        // word 2 — mask / accum / gate / divisor / skip (29 used, 3 spare bits 29..31)
         union {
             uint32_t raw;
             BitField<uint32_t,  0, PhaseShift::Bits>         phaseShift;        //  0..2
@@ -256,7 +249,7 @@ public:
             BitField<uint32_t, 18, GateLength::Bits>         gateLength;        // 18..24
             BitField<uint32_t, 25, StageDivisor::Bits>       stageDivisor;      // 25..27
             BitField<uint32_t, 28, 1>                        skip;              // 28
-            // bits 29..31 spare — moved pulseCount to word 0 to balance.
+            // bits 29..31 spare
         } _data2;
     };
 
