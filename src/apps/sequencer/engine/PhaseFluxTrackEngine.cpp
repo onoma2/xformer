@@ -99,8 +99,14 @@ void PhaseFluxTrackEngine::stop() {
 }
 
 void PhaseFluxTrackEngine::changePattern() {
-    // §7.1 — pattern switch is the one event that clears accumulator counters.
-    reset();
+    // §7.1 — pattern switch clears accumulator counters. Engine::updatePlayState
+    // calls this every measure (handleSongAdvance, regardless of song mode), so
+    // a full reset() would re-anchor _resetTickOffset on each measure boundary
+    // and kill the held cycle. Lazy seq-pointer rebind in tick() handles the
+    // sequence swap; here we only zero the counters.
+    for (int i = 0; i < kStageCount; ++i) {
+        _accumulatorCounter[i] = 0;
+    }
 }
 
 bool PhaseFluxTrackEngine::detectLayoutChange() {

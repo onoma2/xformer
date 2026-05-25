@@ -28,8 +28,8 @@ _Updated: 2026-05-25 (PhaseFlux Phase A landed — `PhaseFluxTrack` + `PhaseFlux
 **Reference:** `.tasks/stability-fixes.md`
 
 ## 🟡 phaseflux — New TrackMode: 4×4 grid sequencer, stateless-ramp engine, scale-degree pitch, per-stage curves + transforms
-**Status:** Phase A + Phase B complete. STM32 release build clean, both static_assert ceilings pass. Ready for hardware flash + boot-smoke test.
-**Where I stopped:** Phase B landed in 3 commits: engine (PhaseFluxTrackEngine + Engine.cpp wiring), minimal UI (PhaseFluxEditPage grid+scopes, PhaseFluxSequencePage list, TrackListModel, SequenceListModel, Pages/TopPage/TrackPage dispatch, TrackModeListModel skip gate removed), STM32 clean with array-bounds fix (insertion sort replacing std::sort). All 5 PhaseFlux test suites green.
+**Status:** Phase A + Phase B complete + sim-runtime bug fix. STM32 release build clean, both static_assert ceilings pass. Ready for hardware flash + boot-smoke test.
+**Where I stopped:** Phase B landed in 3 commits: engine (PhaseFluxTrackEngine + Engine.cpp wiring), minimal UI (PhaseFluxEditPage grid+scopes, PhaseFluxSequencePage list, TrackListModel, SequenceListModel, Pages/TopPage/TrackPage dispatch, TrackModeListModel skip gate removed), STM32 clean with array-bounds fix (insertion sort replacing std::sort). All 5 PhaseFlux test suites green. Follow-on fix: `changePattern()` was doing a full `reset()`; `Engine::updatePlayState()` calls `changePattern()` on every track at every measure boundary (handleSongAdvance fires regardless of song mode), so PhaseFlux's `_resetTickOffset` was re-anchoring every measure. Restricted `changePattern()` to clearing accumulator counters per §7.1; sequence pointer rebind already handled lazily in `tick()`.
 **Next action:** Flash to hardware. Boot smoke test: select PhaseFlux track, verify grid page navigates, play — check CV + gate output on scope. Then Phase C UI polish (full §17 EditPage spec from `ui-preview/pages_phaseflux.py`).
 **Depends on:** nothing
 **Branch:** feat/phaseflux
