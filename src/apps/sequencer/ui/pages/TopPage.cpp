@@ -280,7 +280,8 @@ void TopPage::setSequencePage() {
     bool fromSequenceView = (currentPage == &pages.noteSequence ||
                             currentPage == &pages.accumulator ||
                             currentPage == &pages.stochasticPerformance ||
-                            currentPage == &pages.stochasticConfig);
+                            currentPage == &pages.stochasticConfig ||
+                            currentPage == &pages.phaseFluxSequence);
 
     if (fromSequenceView) {
         switch (_sequenceView) {
