@@ -571,24 +571,23 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     canvas.fillRect(leftX,  tapeBot + 7, (fillR * halfW) / 100, 3);
     canvas.fillRect(rightX, tapeBot + 7, (fillM * halfW) / 100, 3);
 
-    // Bottom-row chip state — MaskR + TiltR under the bars (normal color).
-    canvas.setFont(Font::Tiny);
-    canvas.setColor(Color::Medium);
-    FixedStringBuilder<16> mt;
-    mt("%d", seq.maskRhythm());
-    canvas.drawText(margin, tapeBot + 14, mt);
-    mt.reset();
-    mt("%+d", seq.tiltRhythm());
-    canvas.drawText(margin + availW - canvas.textWidth(mt), tapeBot + 14, mt);
-
-    // Top-row chip state — MaskM + TiltM above the tape (inverse color).
-    canvas.setColor(Color::Bright);
-    mt.reset();
-    mt("%d", seq.maskMelody());
-    canvas.drawText(margin, tapeTop - 4, mt);
-    mt.reset();
-    mt("%d", seq.tiltMelody());
-    canvas.drawText(margin + availW - canvas.textWidth(mt), tapeTop - 4, mt);
+    // Side bars — MaskR / TiltR in the left margin (R domain),
+    // MaskM / TiltM in the right margin (M domain). 2 px wide bars
+    // climbing tape_h from the bottom; faint at default 50, brighter
+    // when knob deviates from default.
+    auto drawSideBar = [&](int x, int value) {
+        canvas.setColor(Color::Low);
+        canvas.drawRect(x, tapeTop, 2, tapeRowH);
+        int fillH = (value * (tapeRowH - 2)) / 100;
+        if (fillH > 0) {
+            canvas.setColor(value == 50 ? Color::Low : Color::Medium);
+            canvas.fillRect(x, tapeBot - fillH, 2, fillH);
+        }
+    };
+    drawSideBar(2,           seq.maskRhythm());
+    drawSideBar(6,           seq.tiltRhythm());
+    drawSideBar(Width - 8,   seq.tiltMelody());
+    drawSideBar(Width - 4,   seq.maskMelody());
 
     // Top-area readout. Multi-select aware: popcount>1 → "MANY SELECTED",
     // popcount==1 → that step's value in Small font, popcount==0 → tiny macros.
@@ -608,22 +607,35 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         else if (heldStep == 8)  str("FIRST %d", seq.first());
         else if (heldStep == 9)  str("SIZE %d", seq.size());
         else if (heldStep == 10) str("ROTATE %+d", seq.rotate());
-        else if (heldStep == 6)  str("MASKM %d", seq.maskMelody());
-        else if (heldStep == 7)  str("TILTM %d", seq.tiltMelody());
-        else if (heldStep == 14) str("MASKR %d", seq.maskRhythm());
-        else if (heldStep == 15) str("TILTR %d", seq.tiltRhythm());
+        else if (heldStep == 6)  str("MASK MELODY %d", seq.maskMelody());
+        else if (heldStep == 7)  str("TILT MELODY %d", seq.tiltMelody());
+        else if (heldStep == 14) str("MASK RHYTHM %d", seq.maskRhythm());
+        else if (heldStep == 15) str("TILT RHYTHM %d", seq.tiltRhythm());
         canvas.setFont(Font::Small);
         canvas.setColor(Color::Bright);
         canvas.drawText(8, 18, str);
     } else {
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Medium);
-        FixedStringBuilder<16> s;
-        s("PR%d",  seq.patienceRhythm()); canvas.drawText(4,   16, s);
-        s.reset(); s("PM%d",  seq.patienceMelody()); canvas.drawText(34,  16, s);
-        s.reset(); s("M%d",  seq.mutate());          canvas.drawText(66,  16, s);
-        s.reset(); s("J%d",  seq.jump());            canvas.drawText(94,  16, s);
-        s.reset(); s("S%d",  seq.sleep());           canvas.drawText(120, 16, s);
+        FixedStringBuilder<8> chips[5];
+        chips[0]("PR%d", seq.patienceRhythm());
+        chips[1]("PM%d", seq.patienceMelody());
+        chips[2]("MU%d", seq.mutate());
+        chips[3]("JU%d", seq.jump());
+        chips[4]("SL%d", seq.sleep());
+        const int gap = 6;
+        int total = 0;
+        int widths[5];
+        for (int i = 0; i < 5; ++i) {
+            widths[i] = canvas.textWidth(chips[i]);
+            total += widths[i];
+        }
+        total += gap * 4;
+        int x = margin + (availW - total) / 2;
+        for (int i = 0; i < 5; ++i) {
+            canvas.drawText(x, 16, chips[i]);
+            x += widths[i] + gap;
+        }
     }
 
     const char *fnR = (seq.rhythmMode() == StochasticSourceMode::Loop) ? "LoopR" : "LiveR";
