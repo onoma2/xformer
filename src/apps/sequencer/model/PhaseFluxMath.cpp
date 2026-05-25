@@ -50,19 +50,25 @@ float PhaseFluxMath::powerBendKnobToParam(int encoded) {
 int PhaseFluxMath::computeCumulativeTicks(
     const int stageDivisorTicksArr[kStageCount],
     const bool skip[kStageCount],
+    int sequenceDivisor,
     int measureDivisor,
     int clockMultiplier,
     int cumulativeTicks[kStageCount + 1]) {
 
     if (clockMultiplier <= 0) clockMultiplier = 100;
+    if (sequenceDivisor <= 0) sequenceDivisor = kReferenceSequenceDivisor;
 
     int durationTicks[kStageCount];
     cumulativeTicks[0] = 0;
     for (int i = 0; i < kStageCount; ++i) {
         int cell = int(kSnakeOrder[i]);
         int raw = skip[cell] ? 0 : stageDivisorTicksArr[cell];
+        // Sequence divisor scales the whole cycle uniformly. Stage slot table
+        // is calibrated at the 1/16 reference (= kReferenceSequenceDivisor);
+        // raw * (sequenceDivisor / reference) gives the per-stage tick count.
+        int scaledBySeq = (raw * sequenceDivisor) / kReferenceSequenceDivisor;
         // Apply clockMultiplier: 100=identity, 50=×2 length, 150=×2/3 length.
-        int scaled = (raw * 100) / clockMultiplier;
+        int scaled = (scaledBySeq * 100) / clockMultiplier;
         durationTicks[i] = scaled;
         cumulativeTicks[i + 1] = cumulativeTicks[i] + scaled;
     }

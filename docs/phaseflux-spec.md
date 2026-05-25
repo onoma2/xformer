@@ -574,6 +574,55 @@ Mod inputs are deferred but Routing alignment is not. Fields that may ever be CV
 
 ---
 
+## 14.1 Open questions — unresolved
+
+| Spec Q | Status |
+|---|---|
+| Q8 curve "squash" transform — applies to BOTH temporal and pitch axes | **OPEN.** Observed limitation (2026-05-25): with `pulseCount ≤ 8` (3-bit field cap), pulses distribute monotonically across the curve output but skip intermediate values as the output span grows (range for pitch, slot duration for temporal). Current transforms (warp, response, flipV/H) do not address this. Candidate semantics to choose between: (1) **Output quantize/step** — snap curve output to K levels so adjacent pulse phases collapse onto identical output values (Marbles `steps`); (2) **Density compression/expansion** — pull pulses into a narrower window of the available span (or push them apart toward the extremes) without bending the curve shape; (3) **Fold** — `curve_out × K mod 1` so the curve traverses the span K times within one stage; (4) **Staircase** — quantize curve to N plateaus, neighbouring phases sharing one output. Each fills a different gap (1+4 reduce distinct outputs, 2 compresses or expands the active span, 3 increases coverage via repeated traversal). **Both axes benefit:** for temporal, density compression = cluster pulses in the middle of the slot with silence at edges (burst-in-middle feel); density expansion = push pulses to slot endpoints (anti-cluster). For pitch, same operation in scale-degree space. Decide before Phase C UI for either panel — likely two parallel fields (`temporalSquash`, `pitchSquash`) sharing one semantic. |
+| Q9 global 16-stage compression/expansion | **OPEN.** Phaseque-borrow (2026-05-26): a `cycleSpread` field at sequence level that scales the active stages into a narrower window of the total cycle (low spread = compression toward midpoint) or pushes them to the endpoints (high spread = bernoulli-like expansion), independent of `clockMultiplier` and `divisor` which already scale the cycle period. This is **Marbles `spread`** applied to the time axis (distribution width), not `bias` (which would shift the cluster's center position). Low value = busy middle with silent edges; high value = burst-at-bar-edges feel. Bipolar 0..127 unsigned (low=compression, mid=neutral, high=expansion) or signed ±100 (centered at neutral); 7-bit, Routable target. Decide: live alongside `divisor` and `clockMultiplier` or merged into one of them with broader range? Also: pair with a `cycleBias` later (Marbles bias = WHERE the cluster sits, separate axis from compression). |
+| Q10 global phase warp | **OPEN.** Apply powerBend to the master phase **before** slot derivation, so the same cumulative table is traversed non-linearly: early stages stretch and late ones compress (or vice versa). Sequence-level bipolar ±100% field, 7-bit signed, Routable. Audibly: gives the whole 16-stage cycle a "swing/lag" feel that's macro-level, independent of per-stage warp. Decide: warp the master phase only, or warp the cumulative-table durations themselves (different semantics — phase warp keeps the cycle length but moves the per-stage hits; table warp restretches each stage's actual duration). |
+| Q11 snap-to-grid utility | **OPEN.** Once continuous `stageLen` and `sequenceShift` land, edits drift off the natural grid. Need a sequence-level "snap" action (not a stored field) that quantizes per-stage `stageLen` multipliers and `phaseShift` values to nearest grid increment, and `sequenceShift` to the nearest 1/16 (or 1/32) of cycle. Bound to an F-key or context-menu entry on EditPage. Decide: pre-Phase-C UI lock. |
+
+---
+
+## 14.2 Proposed new fields — design sketches
+
+These are accepted-in-principle but not yet bit-pack-budgeted or test-covered. Each retains an "OPEN" item for any unresolved sub-question.
+
+### Per-stage: continuous `stageLen` multiplier
+
+Augment (not replace) the existing 3-bit `stageDivisor` enum with a continuous **length multiplier** that scales the slot duration relative to the chosen enum slot.
+
+- Field: `stageLen`, bipolar 7-bit signed value (`SignedValue<7>`), range ±64 representing ±100% length multiplier on top of the enum-derived ticks.
+- Semantics: `effectiveStageTicks = enumTicks × (1 + stageLen/100)` (or a log-mapped version to feel musical at the extremes). At `stageLen=0` (default) behaves identically to today.
+- Snake-walk cumulative table consumes the post-multiplier value; `kMinCycleTicks` floor still applies after scaling.
+- Routable target? Likely no — per-stage and not cheap to broadcast.
+- **Bit-pack cost:** 7 bits per stage × 16 stages = 112 bits total. `_data2` has 3 spare bits — far short. Requires repack (reclaim from `accumulatorStep` 5→4 bits, `accumulatorLength` 4→3 bits, etc.) or moving the field to a 4th word (`_data3`) — breaking the 3×uint32_t invariant.
+- **OPEN:** Final bit budget. Either accept a coarser 4-bit `stageLen` (±15 levels ≈ 15% steps) fitting in spare + 1 reclaimed bit, or expand to `_data3` and bump ProjectVersion accordingly.
+
+### Per-sequence: `sequenceShift`
+
+Global phase offset for the cycle against the master clock.
+
+- Field: `sequenceShift`, `Routable<int8_t>` bipolar ±100 (= ±100% of cycle).
+- Semantics: `effectiveTick = (relativeTick + (sequenceShift × cycleTicks / 100)) mod cycleTicks`. Applied before snake-walk lookup. Negative shifts move cycle start earlier; positive later.
+- Routing target: new `Routing::Target::SequenceShift` (or reuse `Shift` if it exists generically; needs a check at wire-up time).
+- **Bit-pack cost:** 8 bits on `PhaseFluxSequence` (alongside `_divisor`, `_clockMultiplier`). Cheap.
+- **OPEN:** Reuse vs new Routing::Target. Sub-question: shift in ticks or in cycle-relative percent — keeping percent makes it invariant to divisor changes.
+
+### Per-sequence: `firstStage` / `lastStage`
+
+NoteSequence-style stage-range gating. Stages outside `[firstStage..lastStage]` contribute zero to the cumulative table (treated as if `skip=true`).
+
+- Fields: `firstStage`, `lastStage`, both 4-bit unsigned 0..15. Stored on `PhaseFluxSequence`. Validate `firstStage ≤ lastStage` at edit time.
+- Semantics: snake-walk visits cells `kSnakeOrder[firstStage..lastStage]` and only those contribute their `stageDivisorTicks × sequenceDivisor / kReferenceSequenceDivisor` to the cycle. Stages outside the range act as `skip=true` for purposes of `computeCumulativeTicks` but their stored attributes are preserved.
+- Routable? Probably no — discrete edit, not a continuous knob.
+- **Bit-pack cost:** 8 bits total on `PhaseFluxSequence`. Cheap.
+- Redundancy note: equivalent musically to setting `skip` on the excluded stages, but cheaper to edit and matches NoteSequence ergonomics. User flagged this as a convenience addition, not a strict need.
+- **OPEN:** Default values (probably 0 / 15). Behaviour when `firstStage > lastStage` (clamp on set, or treat as "all stages skipped"?).
+
+---
+
 ## 15. Deferred to v2
 
 Explicit list. Any of these reappearing in MVP scope requires a written impact assessment and re-locking of this doc.

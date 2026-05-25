@@ -137,6 +137,7 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
 
     _cycleTicks = PhaseFluxMath::computeCumulativeTicks(
         stageDivisorTicksArr, skipArr,
+        _sequence->divisor(),
         int(_engine.measureDivisor()),
         _sequence->clockMultiplier(),
         _cumulativeTicks);

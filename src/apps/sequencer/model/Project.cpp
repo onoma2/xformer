@@ -107,37 +107,70 @@ void Project::clear() {
     noteSequence(5, 0).setLastStep(15);
     noteSequence(5, 0).setGates({ 0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0 });
 
-    // Track 7: Indexed
-    track(6).setTrackMode(Track::TrackMode::Indexed);
-    auto &indexed = indexedSequence(6, 0);
-    indexed.setActiveLength(5);
-    for (int i = 0; i < 5; ++i) {
-        indexed.step(i).setNoteIndex(i * 2);
-        indexed.step(i).setGateLength(IndexedSequence::gateEncodeTicks(4));
+    // Track 7: Note with empty sequence (gates all off — NoteSequence::clear default).
+
+    // Track 8: PhaseFlux — each of 16 stages showcases a distinct curve / warp
+    // / response combination on either the temporal or pitch axis. Sequence
+    // divisor = 96 (1/2 note at PPQN-48) so every stage is half a beat long
+    // and pulseCount=4 produces an audible 3-pulse ratchet (the t=0 candidate
+    // is dropped by the §6.4 collision clamp; the other 3 land cleanly).
+    track(7).setTrackMode(Track::TrackMode::PhaseFlux);
+    auto &pfTrack = track(7).phaseFluxTrack();
+    auto &pfSeq = pfTrack.sequence(0);
+
+    pfSeq.setDivisor(96);
+
+    using TempCurve = PhaseFluxSequence::TemporalCurveType;
+    using PitchCurve = PhaseFluxSequence::PitchCurveType;
+
+    for (int i = 0; i < 16; ++i) {
+        auto &stage = pfSeq.stage(i);
+        stage.setPulseCount(4);
+        stage.setBasePitch(0);
+        stage.setGateLength(40);
     }
 
-    // Track 8: Stochastic (Live Rhythm + Live Melody, should produce gates)
-    track(7).setTrackMode(Track::TrackMode::Stochastic);
-    auto &stoTrack = track(7).stochasticTrack();
-    auto &stoSeq = stoTrack.sequence(0);
-    stoSeq.setRhythmMode(StochasticSourceMode::Live);
-    stoSeq.setMelodyMode(StochasticSourceMode::Live);
-    stoSeq.setDivisor(12);   // 1/16 — better default than 1/4 for stochastic content
-    stoSeq.setSize(4);
-    stoSeq.setNoteDuration(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
-    // Mask + Tilt defaults sit at transparent positions: both Masks at 100
-    // bypass the trigger-time filter entirely; Tilts are at their respective
-    // neutral positions for their axes (TiltR=50 = pure salt, TiltM=0 =
-    // natural / no inversion).
-    stoSeq.setMaskRhythm(100);
-    stoSeq.setTiltRhythm(50);
-    stoSeq.setMaskMelody(100);
-    stoSeq.setTiltMelody(0);
-    stoSeq.setRest(0);
-    stoSeq.setBurst(0);
-    stoSeq.setGateLength(0);
-    stoTrack.setCvUpdateMode(StochasticTrack::CvUpdateMode::Gate);
-    stoTrack.setLock(false);
+    // 0..3 — Temporal Linear baseline + warp/response identity demo.
+    // With Linear curve, warp and response compose into one powerBend → stage
+    // 1 and stage 2 should sound identical, confirming the redundancy.
+    pfSeq.stage(0).setTemporalCurve(TempCurve::Linear);
+    pfSeq.stage(1).setTemporalCurve(TempCurve::Linear);
+    pfSeq.stage(1).setTemporalWarp(50);
+    pfSeq.stage(2).setTemporalCurve(TempCurve::Linear);
+    pfSeq.stage(2).setTemporalResponse(50);
+    pfSeq.stage(3).setTemporalCurve(TempCurve::Bell);
+
+    // 4..7 — Temporal Bell + Bounce. With Bell, warp and response decouple:
+    // 4 = peak shifted in input axis, 5 = peak stretched in output amplitude,
+    // 6 = both (combination only reachable via two knobs), 7 = Bounce decay.
+    pfSeq.stage(4).setTemporalCurve(TempCurve::Bell);
+    pfSeq.stage(4).setTemporalWarp(40);
+    pfSeq.stage(5).setTemporalCurve(TempCurve::Bell);
+    pfSeq.stage(5).setTemporalResponse(40);
+    pfSeq.stage(6).setTemporalCurve(TempCurve::Bell);
+    pfSeq.stage(6).setTemporalWarp(40);
+    pfSeq.stage(6).setTemporalResponse(40);
+    pfSeq.stage(7).setTemporalCurve(TempCurve::Bounce);
+
+    // 8..11 — Pitch Ramp baseline + warp/response. Same Linear-equivalence
+    // story (9 ≈ 10), then Bell pitch (arc up-and-back).
+    pfSeq.stage(8).setPitchCurve(PitchCurve::Ramp);
+    pfSeq.stage(9).setPitchCurve(PitchCurve::Ramp);
+    pfSeq.stage(9).setPitchWarp(50);
+    pfSeq.stage(10).setPitchCurve(PitchCurve::Ramp);
+    pfSeq.stage(10).setPitchResponse(50);
+    pfSeq.stage(11).setPitchCurve(PitchCurve::Bell);
+
+    // 12..15 — Pitch Bell warp/response decoupling + Triangle + reversed skew.
+    pfSeq.stage(12).setPitchCurve(PitchCurve::Bell);
+    pfSeq.stage(12).setPitchWarp(40);
+    pfSeq.stage(13).setPitchCurve(PitchCurve::Bell);
+    pfSeq.stage(13).setPitchResponse(40);
+    pfSeq.stage(14).setPitchCurve(PitchCurve::Triangle);
+    pfSeq.stage(15).setPitchCurve(PitchCurve::Triangle);
+    pfSeq.stage(15).setPitchWarp(-40);
+
+    pfTrack.setOctave(+1);
 
     setTempo(80.f);
     setScale(2); // 2 corresponds to Minor scale

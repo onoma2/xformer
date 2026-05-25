@@ -19,14 +19,22 @@ public:
     virtual void encoder(EncoderEvent &event) override;
 
 private:
+    static constexpr int kSetCount = 2;  // TEMP, PTCH (more sets pending confirmation)
+
     void drawGrid(Canvas &canvas);
     void drawGridCell(Canvas &canvas, int idx, bool isActive, bool isSelected);
-    void drawScopes(Canvas &canvas);
-    void drawTemporalScope(Canvas &canvas, int stageIdx);
-    void drawPitchScope(Canvas &canvas, int stageIdx);
+    void drawTemporalScope(Canvas &canvas, int stageIdx, int scopeX);
+    void drawPitchScope(Canvas &canvas, int stageIdx, int scopeX);
+    void drawStageBadge(Canvas &canvas, int scopeX);
+    void drawParamList(Canvas &canvas);
+
+    void editSlot(int slot, int value, bool shift);
+    void toggleShiftAt(int slot);
 
     const PhaseFluxTrackEngine *trackEngine() const;
     const PhaseFluxTrack &phaseFluxTrack() const;
 
     int _selectedCell = 0;
+    int _currentSet = 0;    // 0 = TEMP, 1 = PTCH (more sets later)
+    int _selectedSlot = 0;  // 0..4 (which F-slot is active)
 };

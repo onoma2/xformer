@@ -30,7 +30,7 @@ CASE("all_default_divisor_no_skip") {
     clearSkip(skip);
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 100, cum);
 
     int expectedStage = 48;     // Div1_16 at master-PPQN-192
     int expectedCycle = 16 * 48;
@@ -52,7 +52,7 @@ CASE("skip_contributes_zero") {
     skip[10] = true;
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 100, cum);
 
     int expectedCycle = 13 * 48;
     expectEqual(cycleTicks, expectedCycle, "3 skipped of 16 leaves 13 contributing stages");
@@ -84,7 +84,7 @@ CASE("mixed_divisors_sum_correctly") {
     }
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 100, cum);
 
     int expected = 4 * (48 + 96 + 192 + 384);
     expectEqual(cycleTicks, expected, "4*(48+96+192+384) = 2880 ticks");
@@ -104,7 +104,7 @@ CASE("kMinCycleTicks_floor_engaged") {
     skip[3] = false;
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 150, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 150, cum);
 
     int floor = kMeasureDivisor / 32;
     expectEqual(cycleTicks, floor, "stretched cycle must hit the floor exactly");
@@ -121,7 +121,7 @@ CASE("kMinCycleTicks_floor_engaged") {
 
     // At-floor case (clockMultiplier=100): cycle already equals floor, no scaling.
     int cum0[17];
-    int cycleTicks0 = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum0);
+    int cycleTicks0 = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 100, cum0);
     expectEqual(cycleTicks0, floor, "at-floor cycle is left unchanged");
     expectEqual(cum0[4], floor, "at-floor cum[4] equals raw contribution");
 }
@@ -133,7 +133,7 @@ CASE("all_skipped_returns_zero") {
     for (int i = 0; i < 16; ++i) skip[i] = true;
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 100, cum);
 
     expectEqual(cycleTicks, 0, "all-skipped must report cycleTicks=0 (idle)");
     for (int i = 0; i <= 16; ++i) {
@@ -155,7 +155,7 @@ CASE("snake_order_applied") {
     ticks[4] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_16);  // 48
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 100, cum);
 
     const auto &snake = PhaseFluxMath::snakeOrder();
     for (int i = 0; i < 16; ++i) {
@@ -177,8 +177,8 @@ CASE("clock_multiplier_50_doubles") {
 
     int cum100[17];
     int cum50[17];
-    int cycle100 = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum100);
-    int cycle50  = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 50,  cum50);
+    int cycle100 = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 100, cum100);
+    int cycle50  = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 50,  cum50);
 
     expectEqual(cycle50, cycle100 * 2, "clockMultiplier 50 doubles cycle length");
 }
@@ -191,10 +191,33 @@ CASE("clock_multiplier_150_shrinks") {
     clearSkip(skip);
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 150, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 150, cum);
 
     int expected = 16 * ((192 * 100) / 150);  // = 16 * 128 = 2048
     expectEqual(cycleTicks, expected, "clockMultiplier 150 shrinks to ~2/3");
+}
+
+CASE("sequence_divisor_scales_cycle_uniformly") {
+    // Stage table is calibrated at divisor=12 (1/16 reference). Divisor=24
+    // (1/8) should double cycle length; divisor=6 (1/32) should halve it.
+    int ticks[16];
+    bool skip[16];
+    fillSlot(ticks, Slot::Div1_16);
+    clearSkip(skip);
+
+    int cum12[17], cum24[17], cum6[17];
+    int cyc12 = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 12, kMeasureDivisor, 100, cum12);
+    int cyc24 = PhaseFluxMath::computeCumulativeTicks(ticks, skip, 24, kMeasureDivisor, 100, cum24);
+    int cyc6  = PhaseFluxMath::computeCumulativeTicks(ticks, skip,  6, kMeasureDivisor, 100, cum6);
+
+    expectEqual(cyc12, 768, "divisor=12 (default 1/16) keeps cycle at 768");
+    expectEqual(cyc24, 1536, "divisor=24 (1/8) doubles cycle to 1536");
+    expectEqual(cyc6,   384, "divisor=6 (1/32) halves cycle to 384");
+
+    for (int i = 0; i < 16; ++i) {
+        expectEqual(cum24[i + 1] - cum24[i], 96, "divisor=24 stage delta = 96 (was 48)");
+        expectEqual(cum6[i + 1] - cum6[i],   24, "divisor=6 stage delta = 24 (was 48)");
+    }
 }
 
 CASE("each_slot_value_used_at_least_once") {

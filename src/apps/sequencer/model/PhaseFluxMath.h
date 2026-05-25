@@ -16,8 +16,15 @@ public:
     /** §2 — boustrophedon snake permutation of the 4×4 grid. */
     static const std::array<uint8_t, kStageCount> &snakeOrder();
 
-    /** Slot enum → ticks-per-stage in CONFIG_SEQUENCE_PPQN (48) units. */
+    /** Slot enum → ticks-per-stage AT the 1/16 reference base (sequence
+     *  divisor = 12 at PPQN-48). Stage divisor is therefore a relative
+     *  multiplier of the sequence base period — sequence divisor governs
+     *  the cycle length; stage slot picks each stage's ratio within. */
     static int stageDivisorTicks(PhaseFluxSequence::StageDivisorSlot slot);
+
+    /** Reference sequence divisor (= 1/16 at PPQN-48). Stage tick table is
+     *  calibrated against this; other divisor values scale uniformly. */
+    static constexpr int kReferenceSequenceDivisor = 12;
 
     /** §6 — PowerBend(z, p) = z ^ ((1 − p) / (1 + p)), z∈[0,1], p∈(−1,+1). */
     static float powerBend(float z, float p);
@@ -38,6 +45,7 @@ public:
     static int computeCumulativeTicks(
         const int stageDivisorTicksArr[kStageCount],
         const bool skip[kStageCount],
+        int sequenceDivisor,
         int measureDivisor,
         int clockMultiplier,
         int cumulativeTicks[kStageCount + 1]);

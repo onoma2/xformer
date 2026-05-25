@@ -5,9 +5,11 @@
 #include "ui/painters/WindowPainter.h"
 
 #include "model/Curve.h"
+#include "model/ModelUtils.h"
 #include "model/PhaseFluxMath.h"
 
 #include "core/math/Math.h"
+#include "core/utils/StringBuilder.h"
 
 #include <algorithm>
 #include <cmath>
@@ -22,13 +24,17 @@ static constexpr int CellH     = 9;
 static constexpr int CellGap   = 1;
 static constexpr int DividerX  = 46;
 
-// Right pane scopes
-static constexpr int ScopeTempX  = 50;
-static constexpr int ScopePitchX = 154;
-static constexpr int ScopeW      = 100;
-static constexpr int ScopeH      = 38;
-static constexpr int ScopeY      = 12;
-static constexpr int DividerX2   = 152;
+// Right pane: single scope (left half) + 5-row param list (right half).
+static constexpr int ScopeTempX   = 50;
+static constexpr int ScopeW       = 100;
+static constexpr int ScopeH       = 38;
+static constexpr int ScopeY       = 12;
+static constexpr int DividerX2    = 152;
+static constexpr int ParamPanelX  = 156;
+static constexpr int ParamPanelY  = 12;
+static constexpr int ParamPanelW  = 256 - ParamPanelX - 2;
+static constexpr int ParamPanelH  = 40;
+static constexpr int ParamRowH    = ParamPanelH / 5;
 
 // Mask table — bit set = muted (LSB = pulse 0)
 constexpr uint8_t kMaskTable[8] = { 0x00, 0xAA, 0x49, 0x11, 0xB6, 0x55, 0x77, 0x01 };
@@ -85,8 +91,25 @@ void PhaseFluxEditPage::exit() {
 void PhaseFluxEditPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "PHFLX");
-    WindowPainter::drawActiveFunction(canvas, "GRID");
-    WindowPainter::drawFooter(canvas);
+
+    // Header: TEMP / PTCH (more sets later).
+    const char *setName = (_currentSet == 0) ? "TEMP" : "PTCH";
+    WindowPainter::drawActiveFunction(canvas, setName);
+
+    // Footer: 5 labels, swap to shift variants when Shift is held.
+    const bool shift = globalKeyState()[Key::Shift];
+    static const char *kLabelsTemp[5]      = { "Curve", "Warp",  "Resp", "Gate", "Puls" };
+    static const char *kLabelsTempShift[5] = { "FlipV", "FlipH", nullptr, nullptr, "Skip" };
+    static const char *kLabelsPtch[5]      = { "Curve", "Warp",  "Resp", "Base", "Rng" };
+    static const char *kLabelsPtchShift[5] = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
+
+    const char *(*primary)[5] = (_currentSet == 0) ? &kLabelsTemp : &kLabelsPtch;
+    const char *(*altShift)[5] = (_currentSet == 0) ? &kLabelsTempShift : &kLabelsPtchShift;
+    const char *footer[5];
+    for (int i = 0; i < 5; ++i) {
+        footer[i] = (shift && (*altShift)[i]) ? (*altShift)[i] : (*primary)[i];
+    }
+    WindowPainter::drawFooter(canvas, footer, pageKeyState(), _selectedSlot);
 
     drawGrid(canvas);
 
@@ -95,7 +118,15 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     canvas.vline(DividerX,  13, 39);
     canvas.vline(DividerX2, 13, 39);
 
-    drawScopes(canvas);
+    // Single scope: temporal for TEMP set, pitch for PTCH set. Both land at
+    // the same scope position so the right pane stays free for the param list.
+    if (_currentSet == 0) {
+        drawTemporalScope(canvas, _selectedCell, ScopeTempX);
+    } else {
+        drawPitchScope(canvas, _selectedCell, ScopeTempX);
+    }
+    drawStageBadge(canvas, ScopeTempX);
+    drawParamList(canvas);
 }
 
 void PhaseFluxEditPage::updateLeds(Leds &leds) {
@@ -103,15 +134,20 @@ void PhaseFluxEditPage::updateLeds(Leds &leds) {
 }
 
 void PhaseFluxEditPage::keyDown(KeyEvent &event) {
-    event.consume();
+    (void)event;
 }
 
 void PhaseFluxEditPage::keyUp(KeyEvent &event) {
-    event.consume();
+    (void)event;
 }
 
 void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
+
+    // Page+key combos belong to TopPage (Page+S0/S1/S2 etc.). Don't consume.
+    if (key.pageModifier()) {
+        return;
+    }
 
     if (key.isStep()) {
         _selectedCell = key.step();
@@ -119,11 +155,77 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    event.consume();
+    // Left/Right pages between sets.
+    if (key.isLeft()) {
+        _currentSet = (_currentSet + kSetCount - 1) % kSetCount;
+        event.consume();
+        return;
+    }
+    if (key.isRight()) {
+        _currentSet = (_currentSet + 1) % kSetCount;
+        event.consume();
+        return;
+    }
+
+    // F1..F5 select slot. Shift+F toggles the binary at that slot if any.
+    if (key.isFunction()) {
+        int slot = key.function();
+        if (globalKeyState()[Key::Shift]) {
+            toggleShiftAt(slot);
+        } else {
+            _selectedSlot = slot;
+        }
+        event.consume();
+        return;
+    }
 }
 
 void PhaseFluxEditPage::encoder(EncoderEvent &event) {
+    editSlot(_selectedSlot, event.value(), event.pressed() || globalKeyState()[Key::Shift]);
     event.consume();
+}
+
+void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
+    auto &stage = _project.selectedPhaseFluxSequence().stage(_selectedCell);
+    auto cycle = [](int v, int lo, int hi) { return clamp(v, lo, hi); };
+    if (_currentSet == 0) {
+        // TEMP
+        switch (slot) {
+        case 0: stage.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(cycle(int(stage.temporalCurve()) + value, 0, 2))); break;
+        case 1: stage.setTemporalWarp(ModelUtils::adjusted(stage.temporalWarp(), value, -64, 64)); break;
+        case 2: stage.setTemporalResponse(ModelUtils::adjusted(stage.temporalResponse(), value, -64, 64)); break;
+        case 3: stage.setGateLength(ModelUtils::adjusted(stage.gateLength(), value, 0, 100)); break;
+        case 4: stage.setPulseCount(ModelUtils::adjusted(stage.pulseCount(), value, 1, 8)); break;
+        }
+    } else {
+        // PTCH
+        switch (slot) {
+        case 0: stage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(stage.pitchCurve()) + value, 0, 2))); break;
+        case 1: stage.setPitchWarp(ModelUtils::adjusted(stage.pitchWarp(), value, -64, 64)); break;
+        case 2: stage.setPitchResponse(ModelUtils::adjusted(stage.pitchResponse(), value, -64, 64)); break;
+        case 3: stage.setBasePitch(ModelUtils::adjusted(stage.basePitch(), value, -64, 64)); break;
+        case 4: stage.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(stage.pitchRange()) + value, 0, 3))); break;
+        }
+    }
+    (void)shift;
+}
+
+void PhaseFluxEditPage::toggleShiftAt(int slot) {
+    auto &stage = _project.selectedPhaseFluxSequence().stage(_selectedCell);
+    if (_currentSet == 0) {
+        switch (slot) {
+        case 0: stage.setTemporalFlipV(!stage.temporalFlipV()); break;
+        case 1: stage.setTemporalFlipH(!stage.temporalFlipH()); break;
+        case 4: stage.setSkip(!stage.skip()); break;
+        default: break;
+        }
+    } else {
+        switch (slot) {
+        case 0: stage.setPitchFlipV(!stage.pitchFlipV()); break;
+        case 1: stage.setPitchFlipH(!stage.pitchFlipH()); break;
+        default: break;
+        }
+    }
 }
 
 void PhaseFluxEditPage::drawGrid(Canvas &canvas) {
@@ -186,17 +288,12 @@ void PhaseFluxEditPage::drawGridCell(Canvas &canvas, int idx, bool isActive, boo
     }
 }
 
-void PhaseFluxEditPage::drawScopes(Canvas &canvas) {
-    drawTemporalScope(canvas, _selectedCell);
-    drawPitchScope(canvas, _selectedCell);
-}
-
-void PhaseFluxEditPage::drawTemporalScope(Canvas &canvas, int stageIdx) {
+void PhaseFluxEditPage::drawTemporalScope(Canvas &canvas, int stageIdx, int scopeX) {
     const PhaseFluxSequence &seq = _project.selectedPhaseFluxSequence();
     const auto &stage = seq.stage(stageIdx);
     if (stage.skip()) return;
 
-    int x = ScopeTempX;
+    int x = scopeX;
     int y = ScopeY;
     canvas.setColor(Color::Low);
     canvas.drawRect(x, y, ScopeW, ScopeH);
@@ -235,12 +332,12 @@ void PhaseFluxEditPage::drawTemporalScope(Canvas &canvas, int stageIdx) {
     }
 }
 
-void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx) {
+void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX) {
     const PhaseFluxSequence &seq = _project.selectedPhaseFluxSequence();
     const auto &stage = seq.stage(stageIdx);
     if (stage.skip()) return;
 
-    int x = ScopePitchX;
+    int x = scopeX;
     int y = ScopeY;
     canvas.setColor(Color::Low);
     canvas.drawRect(x, y, ScopeW, ScopeH);
@@ -287,4 +384,64 @@ const PhaseFluxTrackEngine *PhaseFluxEditPage::trackEngine() const {
 
 const PhaseFluxTrack &PhaseFluxEditPage::phaseFluxTrack() const {
     return _project.selectedTrack().phaseFluxTrack();
+}
+
+void PhaseFluxEditPage::drawStageBadge(Canvas &canvas, int scopeX) {
+    canvas.setFont(Font::Tiny);
+    canvas.setBlendMode(BlendMode::Set);
+    canvas.setColor(Color::MediumBright);
+    FixedStringBuilder<4> s("%d", _selectedCell + 1);
+    canvas.drawText(scopeX + 2, ScopeY + 6, s);
+}
+
+void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
+    const PhaseFluxSequence &seq = _project.selectedPhaseFluxSequence();
+    const auto &stage = seq.stage(_selectedCell);
+
+    static const char *kTempCurve[3]  = { "Lin", "Bel", "Bnc" };
+    static const char *kPitchCurve[3] = { "Rmp", "Bel", "Tri" };
+    static const char *kPitchRange[4] = { "1/2", "1",   "2",   "3" };
+
+    static const char *kNamesTemp[5]  = { "Curve", "Warp", "Resp", "Gate", "Puls" };
+    static const char *kNamesPtch[5]  = { "Curve", "Warp", "Resp", "Base", "Rng"  };
+
+    FixedStringBuilder<8> values[5];
+    if (_currentSet == 0) {
+        values[0]("%s",  kTempCurve[clamp(int(stage.temporalCurve()), 0, 2)]);
+        values[1]("%+d", stage.temporalWarp());
+        values[2]("%+d", stage.temporalResponse());
+        values[3]("%d",  stage.gateLength());
+        values[4]("%d",  stage.pulseCount());
+    } else {
+        values[0]("%s",  kPitchCurve[clamp(int(stage.pitchCurve()), 0, 2)]);
+        values[1]("%+d", stage.pitchWarp());
+        values[2]("%+d", stage.pitchResponse());
+        values[3]("%+d", stage.basePitch());
+        values[4]("%s",  kPitchRange[clamp(int(stage.pitchRange()), 0, 3)]);
+    }
+    const char *(*names)[5] = (_currentSet == 0) ? &kNamesTemp : &kNamesPtch;
+
+    canvas.setFont(Font::Tiny);
+    canvas.setBlendMode(BlendMode::Set);
+
+    // Highlight box wraps only the value column (~1/3 of panel width), right-
+    // aligned, so the label stays static and only the live value pops.
+    const int valueColW = ParamPanelW / 3;
+    const int valueColX = ParamPanelX + ParamPanelW - valueColW;
+
+    for (int i = 0; i < 5; ++i) {
+        int ry = ParamPanelY + i * ParamRowH;
+        int rh = ParamRowH - 1;
+        bool isSelected = (i == _selectedSlot);
+
+        if (isSelected) {
+            canvas.setColor(Color::Bright);
+            canvas.drawRect(valueColX, ry, valueColW, rh);
+        }
+        canvas.setColor(Color::Medium);
+        canvas.drawText(ParamPanelX + 2, ry + rh - 2, (*names)[i]);
+        canvas.setColor(isSelected ? Color::Bright : Color::MediumBright);
+        int vw = canvas.textWidth(values[i]);
+        canvas.drawText(ParamPanelX + ParamPanelW - 2 - vw, ry + rh - 2, values[i]);
+    }
 }
