@@ -81,6 +81,7 @@ private:
 
     // Cached layout inputs for change detection.
     uint8_t _cachedStageDivisor[kStageCount];
+    uint8_t _cachedStageLen[kStageCount];
     bool _cachedSkip[kStageCount];
     uint16_t _cachedDivisor = 0;
     uint8_t _cachedClockMult = 0;

@@ -73,6 +73,7 @@ static void expectStageEqualExceptOne(const PhaseFluxSequence::Stage &probe,
     if (excludeIndex != i++) expectEqual(probe.gateLength(), defaults.gateLength(), which);
     if (excludeIndex != i++) expectEqual(int(probe.stageDivisor()), int(defaults.stageDivisor()), which);
     if (excludeIndex != i++) expectEqual(probe.skip(), defaults.skip(), which);
+    if (excludeIndex != i++) expectEqual(probe.stageLen(), defaults.stageLen(), which);
 }
 
 UNIT_TEST("PhaseFluxSequenceSerialization") {
@@ -121,6 +122,7 @@ CASE("default_round_trip") {
         expectEqual(s.gateLength(), 50, "default gateLength");
         expectEqual(int(s.stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_16), "default stageDivisor");
         expectEqual(s.skip(), false, "default skip");
+        expectEqual(s.stageLen(), 64, "default stageLen (×1 transparent — Phaseque STEP_LEN pattern)");
     }
 }
 
@@ -219,6 +221,7 @@ CASE("stage_fields_persist") {
     s6.setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_4T);
 
     s7.setSkip(true);
+    s7.setStageLen(42);
 
     uint8_t buf[4096];
     std::memset(buf, 0, sizeof(buf));
@@ -259,6 +262,7 @@ CASE("stage_fields_persist") {
     expectEqual(int(r.stage(6).stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_4T), "s6 stageDivisor");
 
     expectEqual(r.stage(7).skip(), true, "s7 skip");
+    expectEqual(r.stage(7).stageLen(), 42, "s7 stageLen");
 }
 
 CASE("stage_edge_values_persist") {
@@ -305,6 +309,9 @@ CASE("stage_edge_values_persist") {
 
     seq.stage(0).setGateLength(0);
     seq.stage(1).setGateLength(100);
+
+    seq.stage(0).setStageLen(0);
+    seq.stage(1).setStageLen(127);
 
     seq.stage(0).setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_32);
     seq.stage(1).setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_2);
@@ -370,6 +377,8 @@ CASE("stage_edge_values_persist") {
     expectEqual(r.stage(1).accumulatorLength(), 16, "max accumulatorLength");
     expectEqual(r.stage(0).gateLength(), 0, "min gateLength");
     expectEqual(r.stage(1).gateLength(), 100, "max gateLength");
+    expectEqual(r.stage(0).stageLen(), 0, "min stageLen");
+    expectEqual(r.stage(1).stageLen(), 127, "max stageLen");
     expectEqual(int(r.stage(0).stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_32), "min stageDivisor");
     expectEqual(int(r.stage(1).stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_2), "max stageDivisor");
     expectEqual(int(r.stage(0).pitchRange()), int(PhaseFluxSequence::PitchRangeType::Half), "min pitchRange");
@@ -449,6 +458,7 @@ CASE("bitpack_no_overlap") {
     probe(21, [](PhaseFluxSequence::Stage &s) { s.setGateLength(100); });
     probe(22, [](PhaseFluxSequence::Stage &s) { s.setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_2); });
     probe(23, [](PhaseFluxSequence::Stage &s) { s.setSkip(true); });
+    probe(24, [](PhaseFluxSequence::Stage &s) { s.setStageLen(63); });
 }
 
 CASE("track_writes_phaseflux_mode") {

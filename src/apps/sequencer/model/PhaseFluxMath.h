@@ -35,6 +35,7 @@ public:
     /**
      * §3.1 — Snake-walk cumulative duration table.
      *   stageDivisorTicksArr[i] — ticks/stage at clockMultiplier=100, by cell index
+     *   stageLenArr[i]          — per-stage ±100 length multiplier (factor = 1 + v/100)
      *   skip[i]                 — true if cell contributes 0
      *   measureDivisor          — floor source: kMinCycleTicks = measureDivisor/32
      *   clockMultiplier         — 50..150 (/100 = factor)
@@ -44,6 +45,7 @@ public:
      */
     static int computeCumulativeTicks(
         const int stageDivisorTicksArr[kStageCount],
+        const int stageLenArr[kStageCount],
         const bool skip[kStageCount],
         int sequenceDivisor,
         int measureDivisor,

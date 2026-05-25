@@ -44,6 +44,7 @@ public:
     using AccumulatorLength = UnsignedValue<4>;
     using GateLength = UnsignedValue<7>;
     using StageDivisor = UnsignedValue<3>;
+    using StageLen = UnsignedValue<7>;   // 0..127 mapped to 0..~2× factor via /64
 
     enum class PitchRangeType : uint8_t {
         Half = 0,    // 0.5 octave
@@ -190,6 +191,13 @@ public:
         bool skip() const { return bool(_data2.skip); }
         void setSkip(bool v) { _data2.skip = v; }
 
+        // stageLen — ±100 multiplier (encoded width clamps to SignedValue<7>)
+        // stageLen — 0..127 unipolar. Stored value × enumTicks / 64 gives the
+        // effective stage duration (Phaseque STEP_LEN pattern). Default = 64
+        // (= 1×, transparent). 0 = silent stage. 127 ≈ 2× stretch.
+        int stageLen() const { return int(_data3.stageLen); }
+        void setStageLen(int v) { _data3.stageLen = StageLen::clamp(clamp(v, 0, 127)); }
+
         //----------------------------------------
         // Methods
         //----------------------------------------
@@ -204,13 +212,15 @@ public:
         bool operator==(const Stage &other) const {
             return _data0.raw == other._data0.raw &&
                    _data1.raw == other._data1.raw &&
-                   _data2.raw == other._data2.raw;
+                   _data2.raw == other._data2.raw &&
+                   _data3.raw == other._data3.raw;
         }
         bool operator!=(const Stage &other) const { return !(*this == other); }
 
     private:
-        // Layout: 93 bits across 3 × uint32_t = 96 bits envelope, 3 spare in
-        // _data2 (bits 29..31). Do NOT reorder without bumping ProjectVersion.
+        // Layout: 100 bits across 4 × uint32_t = 128 bits envelope, 3 spare in
+        // _data2 (bits 29..31) and 25 spare in _data3 (bits 7..31). Do NOT
+        // reorder without bumping ProjectVersion.
 
         // word 0 — pitch shape + pulseCount (32 used, 0 spare)
         union {
@@ -251,6 +261,13 @@ public:
             BitField<uint32_t, 28, 1>                        skip;              // 28
             // bits 29..31 spare
         } _data2;
+
+        // word 3 — stageLen + 25 spare bits (future fields)
+        union {
+            uint32_t raw;
+            BitField<uint32_t, 0, StageLen::Bits> stageLen;   // 0..6
+            // bits 7..31 spare
+        } _data3;
     };
 
     using StageArray = std::array<Stage, StageCount>;
@@ -324,6 +341,17 @@ public:
         else { str("%d %s", resetMeasure(), resetMeasure() > 1 ? "bars" : "bar"); }
     }
 
+    // globalPhase — fraction [0, 1] of cycle to shift the read phase by.
+    // CurveTrack precedent (model/CurveTrack.h:201). Stored as plain float.
+    float globalPhase() const { return _globalPhase; }
+    void setGlobalPhase(float v) { _globalPhase = clamp(v, 0.f, 1.f); }
+    void editGlobalPhase(int value, bool shift) {
+        setGlobalPhase(globalPhase() + value * (shift ? 0.1f : 0.01f));
+    }
+    void printGlobalPhase(StringBuilder &str) const {
+        str("%.2f", globalPhase());
+    }
+
     // edited — dirty bit for UI
     int edited() const { return _edited; }
     void setEdited(int v) { _edited = v; }
@@ -368,6 +396,7 @@ private:
     int8_t _rootNote = -1;
     uint8_t _resetMeasure = 0;
     uint8_t _edited = 0;
+    float _globalPhase = 0.f;
     Routable<uint16_t> _divisor;
     Routable<uint8_t> _clockMultiplier;
 

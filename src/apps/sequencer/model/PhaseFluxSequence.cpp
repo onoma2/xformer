@@ -4,6 +4,7 @@ void PhaseFluxSequence::Stage::clear() {
     _data0.raw = 0;
     _data1.raw = 0;
     _data2.raw = 0;
+    _data3.raw = 0;
     setPulseCount(1);
     setBasePitch(0);
     setPitchRange(PitchRangeType::One);
@@ -28,18 +29,21 @@ void PhaseFluxSequence::Stage::clear() {
     setGateLength(50);
     setStageDivisor(StageDivisorSlot::Div1_16);
     setSkip(false);
+    setStageLen(64);   // 64 = ×1 transparent default; sequence runs unchanged when stageLen is added
 }
 
 void PhaseFluxSequence::Stage::write(VersionedSerializedWriter &writer) const {
     writer.write(_data0.raw);
     writer.write(_data1.raw);
     writer.write(_data2.raw);
+    writer.write(_data3.raw);
 }
 
 void PhaseFluxSequence::Stage::read(VersionedSerializedReader &reader) {
     reader.read(_data0.raw);
     reader.read(_data1.raw);
     reader.read(_data2.raw);
+    reader.read(_data3.raw);
 }
 
 void PhaseFluxSequence::clear() {
@@ -47,6 +51,7 @@ void PhaseFluxSequence::clear() {
     _rootNote = -1;
     _resetMeasure = 0;
     _edited = 0;
+    _globalPhase = 0.f;
     _divisor.setBase(12);                // 1/16 at PPQN 48
     _clockMultiplier.setBase(100);
     for (auto &stage : _stages) {
@@ -58,6 +63,7 @@ void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_scale);
     writer.write(_rootNote);
     writer.write(_resetMeasure);
+    writer.write(_globalPhase);
     _divisor.write(writer);
     _clockMultiplier.write(writer);
     for (const auto &stage : _stages) {
@@ -69,6 +75,7 @@ void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
     reader.read(_scale);
     reader.read(_rootNote);
     reader.read(_resetMeasure);
+    reader.read(_globalPhase);
     _divisor.read(reader);
     _clockMultiplier.read(reader);
     _scale = clamp(int(_scale), -1, Scale::Count - 1);

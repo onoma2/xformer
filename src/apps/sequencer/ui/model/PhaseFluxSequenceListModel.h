@@ -36,6 +36,7 @@ private:
     enum Item {
         Divisor,
         ClockMult,
+        GlobalPhase,
         Scale,
         RootNote,
         ResetMeasure,
@@ -46,6 +47,7 @@ private:
         switch (item) {
         case Divisor:      return "Divisor";
         case ClockMult:    return "Clock Mult";
+        case GlobalPhase:  return "Global Phase";
         case Scale:        return "Scale";
         case RootNote:     return "Root";
         case ResetMeasure: return "Reset Measure";
@@ -60,6 +62,7 @@ private:
         switch (item) {
         case Divisor:      _sequence->printDivisor(str); break;
         case ClockMult:    _sequence->printClockMultiplier(str); break;
+        case GlobalPhase:  _sequence->printGlobalPhase(str); break;
         case Scale:        _sequence->printScale(str); break;
         case RootNote:     _sequence->printRootNote(str); break;
         case ResetMeasure: _sequence->printResetMeasure(str); break;
@@ -71,6 +74,7 @@ private:
         switch (item) {
         case Divisor:      _sequence->editDivisor(value, shift); break;
         case ClockMult:    _sequence->editClockMultiplier(value, shift); break;
+        case GlobalPhase:  _sequence->editGlobalPhase(value, shift); break;
         case Scale:        _sequence->editScale(value, shift); break;
         case RootNote:     _sequence->editRootNote(value, shift); break;
         case ResetMeasure: _sequence->editResetMeasure(value, shift); break;

@@ -117,6 +117,7 @@ bool PhaseFluxTrackEngine::detectLayoutChange() {
     for (int i = 0; i < kStageCount; ++i) {
         const auto &s = _sequence->stage(i);
         if (uint8_t(s.stageDivisor()) != _cachedStageDivisor[i]) return true;
+        if (uint8_t(s.stageLen()) != _cachedStageLen[i]) return true;
         if (s.skip() != _cachedSkip[i]) return true;
     }
     return false;
@@ -124,19 +125,22 @@ bool PhaseFluxTrackEngine::detectLayoutChange() {
 
 void PhaseFluxTrackEngine::rebuildCumulativeTable() {
     int stageDivisorTicksArr[kStageCount];
+    int stageLenArr[kStageCount];
     bool skipArr[kStageCount];
     for (int i = 0; i < kStageCount; ++i) {
         const auto &s = _sequence->stage(i);
         stageDivisorTicksArr[i] = PhaseFluxMath::stageDivisorTicks(s.stageDivisor());
+        stageLenArr[i] = s.stageLen();
         skipArr[i] = s.skip();
         _cachedStageDivisor[i] = uint8_t(s.stageDivisor());
+        _cachedStageLen[i] = uint8_t(s.stageLen());
         _cachedSkip[i] = s.skip();
     }
     _cachedDivisor = uint16_t(_sequence->divisor());
     _cachedClockMult = uint8_t(_sequence->clockMultiplier());
 
     _cycleTicks = PhaseFluxMath::computeCumulativeTicks(
-        stageDivisorTicksArr, skipArr,
+        stageDivisorTicksArr, stageLenArr, skipArr,
         _sequence->divisor(),
         int(_engine.measureDivisor()),
         _sequence->clockMultiplier(),
@@ -266,8 +270,18 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         int pulsePeriod = nextT - t;
         if (pulsePeriod <= 0) continue;
 
-        int nominalGate = (int(stage.gateLength()) * pulsePeriod) / 100;
+        // §6.4 gate-length rules:
+        //   gateLength == 0 → explicit silence, pulse dropped
+        //   gateLength == 1 → always-audible-minimum sentinel; floor at kMinPulseGateTicks
+        //   gateLength >= 2 → scale by percent, drop if computed gate < kMinPulseGateTicks
+        int len = int(stage.gateLength());
+        if (len == 0) continue;
+
+        int nominalGate = (len * pulsePeriod) / 100;
         int gateTicks = std::min(nominalGate, pulsePeriod - int(kMinPulseGapTicks));
+        if (len == 1 && gateTicks < int(kMinPulseGateTicks)) {
+            gateTicks = int(kMinPulseGateTicks);
+        }
         if (gateTicks < int(kMinPulseGateTicks)) continue;
 
         if (_scheduleCount >= kMaxPulses) break;
@@ -320,6 +334,16 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
     }
 
     uint32_t relativeTick = tick - _resetTickOffset;
+
+    // Sequence globalPhase shift (CurveTrack precedent — CurveTrackEngine.cpp:404).
+    // Fraction 0..1 of the cycle, added to relativeTick mod cycleTicks.
+    if (_cycleTicks > 0) {
+        float phase = _sequence->globalPhase();
+        if (phase > 0.f) {
+            uint32_t shift = uint32_t(phase * float(_cycleTicks));
+            relativeTick = (relativeTick + shift) % uint32_t(_cycleTicks);
+        }
+    }
 
     // §3.3 Reset Measure — light reset, preserves counters per §7.1.
     int resetMeasure = _sequence->resetMeasure();

@@ -98,7 +98,7 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
 
     // Footer: 5 labels, swap to shift variants when Shift is held.
     const bool shift = globalKeyState()[Key::Shift];
-    static const char *kLabelsTemp[5]      = { "Curve", "Warp",  "Resp", "Gate", "Puls" };
+    static const char *kLabelsTemp[5]      = { "Curve", "Warp",  "Resp", "Len",  "Puls" };
     static const char *kLabelsTempShift[5] = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
     static const char *kLabelsPtch[5]      = { "Curve", "Warp",  "Resp", "Base", "Rng" };
     static const char *kLabelsPtchShift[5] = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
@@ -199,7 +199,7 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
         case 0: stage.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(cycle(int(stage.temporalCurve()) + value, 0, 2))); break;
         case 1: stage.setTemporalWarp(ModelUtils::adjusted(stage.temporalWarp(), value, -64, 64)); break;
         case 2: stage.setTemporalResponse(ModelUtils::adjusted(stage.temporalResponse(), value, -64, 64)); break;
-        case 3: stage.setGateLength(ModelUtils::adjusted(stage.gateLength(), value, 0, 100)); break;
+        case 3: stage.setStageLen(ModelUtils::adjusted(stage.stageLen(), value, 0, 127)); break;
         case 4: stage.setPulseCount(ModelUtils::adjusted(stage.pulseCount(), value, 1, 8)); break;
         }
     } else {
@@ -406,7 +406,7 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
     static const char *kPitchCurve[3] = { "Rmp", "Bel", "Tri" };
     static const char *kPitchRange[4] = { "1/2", "1",   "2",   "3" };
 
-    static const char *kNamesTemp[5]  = { "Curve", "Warp", "Resp", "Gate", "Puls" };
+    static const char *kNamesTemp[5]  = { "Curve", "Warp", "Resp", "Len",  "Puls" };
     static const char *kNamesPtch[5]  = { "Curve", "Warp", "Resp", "Base", "Rng"  };
 
     FixedStringBuilder<8> values[5];
@@ -414,7 +414,7 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
         values[0]("%s",  kTempCurve[clamp(int(stage.temporalCurve()), 0, 2)]);
         values[1]("%+d", stage.temporalWarp());
         values[2]("%+d", stage.temporalResponse());
-        values[3]("%d",  stage.gateLength());
+        values[3]("%.2fx", stage.stageLen() / 64.0f);
         values[4]("%d",  stage.pulseCount());
     } else {
         values[0]("%s",  kPitchCurve[clamp(int(stage.pitchCurve()), 0, 2)]);

@@ -128,6 +128,7 @@ void Project::clear() {
         stage.setPulseCount(4);
         stage.setBasePitch(0);
         stage.setGateLength(40);
+        // stageLen default = 64 = 1× transparent; no override needed.
     }
 
     // 0..3 — Temporal Linear baseline + warp/response identity demo.

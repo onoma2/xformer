@@ -49,6 +49,7 @@ float PhaseFluxMath::powerBendKnobToParam(int encoded) {
 
 int PhaseFluxMath::computeCumulativeTicks(
     const int stageDivisorTicksArr[kStageCount],
+    const int stageLenArr[kStageCount],
     const bool skip[kStageCount],
     int sequenceDivisor,
     int measureDivisor,
@@ -67,8 +68,14 @@ int PhaseFluxMath::computeCumulativeTicks(
         // is calibrated at the 1/16 reference (= kReferenceSequenceDivisor);
         // raw * (sequenceDivisor / reference) gives the per-stage tick count.
         int scaledBySeq = (raw * sequenceDivisor) / kReferenceSequenceDivisor;
+        // Per-stage length multiplier: factor = (100 + stageLen) / 100.
+        // stageLen = -100 → factor 0; +100 → factor 2×. kMinCycleTicks floor
+        // stretches all-zero cycles proportionally.
+        // stageLen unipolar 0..127 mapped to factor 0..~2 via /64 (= Phaseque
+        // STEP_LEN pattern). Stored 64 = factor 1 = transparent.
+        int scaledByLen = (scaledBySeq * stageLenArr[cell]) / 64;
         // Apply clockMultiplier: 100=identity, 50=×2 length, 150=×2/3 length.
-        int scaled = (scaledBySeq * 100) / clockMultiplier;
+        int scaled = (scaledByLen * 100) / clockMultiplier;
         durationTicks[i] = scaled;
         cumulativeTicks[i + 1] = cumulativeTicks[i] + scaled;
     }
