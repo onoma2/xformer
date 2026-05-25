@@ -93,7 +93,8 @@ void TopPage::keyPress(KeyPressEvent &event) {
         bool onSequenceView = (currentPage == &pages.noteSequence ||
                               currentPage == &pages.accumulator ||
                               currentPage == &pages.stochasticPerformance ||
-                              currentPage == &pages.stochasticConfig);
+                              currentPage == &pages.stochasticConfig ||
+                              currentPage == &pages.phaseFluxSequence);
         bool onSequenceEditView = (currentPage == &pages.noteSequenceEdit ||
                                    currentPage == &pages.curveSequenceEdit ||
                                    currentPage == &pages.tuesdayEdit ||

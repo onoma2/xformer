@@ -136,10 +136,12 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
         _cumulativeTicks);
 
     // §3.4 — held gate from old layout ends; pulse-fire memory cleared.
+    // _prevSlotIdx reset forces rebuildSchedule on next tick even if same slot.
     _gateTimer = 0;
     _gateState = false;
     _pulseFired = 0;
     _scheduleCount = 0;
+    _prevSlotIdx = -1;
     _layoutDirty = false;
 }
 
@@ -199,7 +201,7 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         float triggerTime = t_shifted * float(slotDurationTicks);
 
         // §6.2 pitch pipeline using triggerTime/slotDuration as φ
-        float phi = t_shifted;
+        float phi = (pulseCount == 1) ? 0.0f : t_shifted;
         float phi_warped = applyPowerBend(phi, stage.pitchWarp());
         float phi_input = pFlipH ? (1.f - phi_warped) : phi_warped;
         float p_curved = Curve::eval(pitchCurveType, phi_input);

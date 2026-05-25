@@ -11,17 +11,18 @@ static const std::array<uint8_t, PhaseFluxMath::kStageCount> kSnakeOrder = {{
    15, 14, 13, 12,    // row 3  R -> L
 }};
 
-// Seq-PPQN-48 ticks per StageDivisorSlot. Matches KnownDivisor table
-// entries; if the slot enum is extended, extend this table in lockstep.
+// Master-PPQN-192 ticks per StageDivisorSlot (CONFIG_PPQN=192).
+// Seq-PPQN-48 values multiplied by CONFIG_PPQN/CONFIG_SEQUENCE_PPQN=4.
+// If the slot enum is extended, extend this table in lockstep.
 static const int kStageDivisorTicks[8] = {
-     6,   // Div1_32
-     8,   // Div1_16T
-    12,   // Div1_16
-    16,   // Div1_8T
-    24,   // Div1_8
-    32,   // Div1_4T
-    48,   // Div1_4
-    96,   // Div1_2
+    24,   // Div1_32
+    32,   // Div1_16T
+    48,   // Div1_16
+    64,   // Div1_8T
+    96,   // Div1_8
+   128,   // Div1_4T
+   192,   // Div1_4
+   384,   // Div1_2
 };
 
 const std::array<uint8_t, PhaseFluxMath::kStageCount> &PhaseFluxMath::snakeOrder() {

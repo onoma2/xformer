@@ -7,10 +7,10 @@
 
 using Slot = PhaseFluxSequence::StageDivisorSlot;
 
-// Units throughout these tests are CONFIG_SEQUENCE_PPQN-48 ticks — same scale
-// as the KnownDivisor table entries. measureDivisor=192 = 4/4 measure at
-// PPQN-48, so kMinCycleTicks floor = 192/32 = 6.
-static constexpr int kMeasureDivisor = 192;
+// Units throughout these tests are CONFIG_PPQN-192 (master) ticks — same scale
+// as the kStageDivisorTicks table entries. measureDivisor=768 = 4/4 measure at
+// master-PPQN-192, so kMinCycleTicks floor = 768/32 = 24.
+static constexpr int kMeasureDivisor = 768;
 
 static void fillSlot(int out[16], Slot slot) {
     int t = PhaseFluxMath::stageDivisorTicks(slot);
@@ -32,13 +32,13 @@ CASE("all_default_divisor_no_skip") {
     int cum[17];
     int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum);
 
-    int expectedStage = 12;     // Div1_16 at seq-PPQN-48
-    int expectedCycle = 16 * 12;
+    int expectedStage = 48;     // Div1_16 at master-PPQN-192
+    int expectedCycle = 16 * 48;
 
-    expectEqual(cycleTicks, expectedCycle, "16x 1/16 must sum to 192 ticks (one measure)");
+    expectEqual(cycleTicks, expectedCycle, "16x 1/16 must sum to 768 ticks (one measure)");
     expectEqual(cum[0], 0, "first cumulative is 0");
     for (int i = 0; i < 16; ++i) {
-        expectEqual(cum[i + 1] - cum[i], expectedStage, "each stage contributes 12 ticks");
+        expectEqual(cum[i + 1] - cum[i], expectedStage, "each stage contributes 48 ticks");
     }
 }
 
@@ -54,7 +54,7 @@ CASE("skip_contributes_zero") {
     int cum[17];
     int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum);
 
-    int expectedCycle = 13 * 12;
+    int expectedCycle = 13 * 48;
     expectEqual(cycleTicks, expectedCycle, "3 skipped of 16 leaves 13 contributing stages");
 
     // The skip flags are indexed by cell ID. Look up which slot positions
@@ -66,7 +66,7 @@ CASE("skip_contributes_zero") {
         if (cell == 0 || cell == 5 || cell == 10) {
             expectEqual(delta, 0, "skipped cells contribute 0 to cumulative");
         } else {
-            expectEqual(delta, 12, "unskipped cells contribute their full divisor");
+            expectEqual(delta, 48, "unskipped cells contribute their full divisor");
         }
     }
 }
@@ -75,7 +75,7 @@ CASE("mixed_divisors_sum_correctly") {
     int ticks[16];
     bool skip[16];
     clearSkip(skip);
-    // 4x Div1_16 (12), 4x Div1_8 (24), 4x Div1_4 (48), 4x Div1_2 (96)
+    // 4x Div1_16 (48), 4x Div1_8 (96), 4x Div1_4 (192), 4x Div1_2 (384)
     for (int i = 0; i < 4; ++i) {
         ticks[i] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_16);
         ticks[i + 4] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_8);
@@ -86,19 +86,19 @@ CASE("mixed_divisors_sum_correctly") {
     int cum[17];
     int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum);
 
-    int expected = 4 * (12 + 24 + 48 + 96);
-    expectEqual(cycleTicks, expected, "4*(12+24+48+96) = 720 ticks");
+    int expected = 4 * (48 + 96 + 192 + 384);
+    expectEqual(cycleTicks, expected, "4*(48+96+192+384) = 2880 ticks");
 }
 
 CASE("kMinCycleTicks_floor_engaged") {
     // Single contributing cell (cell 3) with clockMultiplier=150 makes raw
-    // cycle = 6 * 100/150 = 4 ticks, below the floor of measureDivisor/32 = 6.
+    // cycle = 24 * 100/150 = 16 ticks, below the floor of measureDivisor/32 = 24.
     // The §3.1 contract: scale BOTH cycleTicks AND every cumulativeTicks[i]
     // proportionally so per-tick derivation walks the stretched table.
     int ticks[16];
     bool skip[16];
     for (int i = 0; i < 16; ++i) {
-        ticks[i] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_32);  // 6 ticks each
+        ticks[i] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_32);  // 24 ticks each
         skip[i] = true;
     }
     skip[3] = false;
@@ -110,7 +110,7 @@ CASE("kMinCycleTicks_floor_engaged") {
     expectEqual(cycleTicks, floor, "stretched cycle must hit the floor exactly");
 
     // Cell 3 sits at snake index 3, so cum[3]=0 and cum[4] holds its endpoint.
-    // Pre-stretch cum[4] would be 4; post-stretch it must be the floor (6).
+    // Pre-stretch cum[4] would be 16; post-stretch it must be the floor (24).
     // Catches a regression that sets cycleTicks=floor without scaling cum[].
     expectEqual(cum[3], 0, "pre-stretch cum at slot 3 stays at 0 (cells 0..2 skipped)");
     expectEqual(cum[4], floor, "cum[4] must scale up to the floor after stretch");
@@ -146,13 +146,13 @@ CASE("snake_order_applied") {
     bool skip[16];
     clearSkip(skip);
     // Distinct divisor per cell so the snake permutation is visible.
-    // Cell 0 = Div1_2 (96), cell 4 = Div1_16 (12) — at slot 7 (row 1 R->L
-    // hits cell 4 last in that row), so cum[8]-cum[7] should be 12, not 96.
+    // Cell 0 = Div1_2 (384), cell 4 = Div1_16 (48) — at slot 7 (row 1 R->L
+    // hits cell 4 last in that row), so cum[8]-cum[7] should be 48, not 384.
     for (int i = 0; i < 16; ++i) {
-        ticks[i] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_8);  // baseline 24
+        ticks[i] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_8);  // baseline 96
     }
-    ticks[0] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_2);   // 96
-    ticks[4] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_16);  // 12
+    ticks[0] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_2);   // 384
+    ticks[4] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_16);  // 48
 
     int cum[17];
     int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum);
@@ -165,8 +165,8 @@ CASE("snake_order_applied") {
         expectEqual(delta, expectedTicks, "slot delta must match the cell at snake position");
     }
     // Sanity: sum matches expected sum.
-    int expectedSum = 14 * 24 + 96 + 12;
-    expectEqual(cycleTicks, expectedSum, "sum equals 14x24 + 96 + 12");
+    int expectedSum = 14 * 96 + 384 + 48;
+    expectEqual(cycleTicks, expectedSum, "sum equals 14x96 + 384 + 48");
 }
 
 CASE("clock_multiplier_50_doubles") {
@@ -186,14 +186,14 @@ CASE("clock_multiplier_50_doubles") {
 CASE("clock_multiplier_150_shrinks") {
     int ticks[16];
     bool skip[16];
-    // Use Div1_4 (48 ticks) so 100/150 = 2/3 lands on a clean integer (32).
+    // Use Div1_4 (192 ticks) so 100/150 = 2/3 lands on a clean integer (128).
     fillSlot(ticks, Slot::Div1_4);
     clearSkip(skip);
 
     int cum[17];
     int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 150, cum);
 
-    int expected = 16 * ((48 * 100) / 150);  // = 16 * 32 = 512
+    int expected = 16 * ((192 * 100) / 150);  // = 16 * 128 = 2048
     expectEqual(cycleTicks, expected, "clockMultiplier 150 shrinks to ~2/3");
 }
 
@@ -204,7 +204,7 @@ CASE("each_slot_value_used_at_least_once") {
         Slot::Div1_32, Slot::Div1_16T, Slot::Div1_16, Slot::Div1_8T,
         Slot::Div1_8,  Slot::Div1_4T,  Slot::Div1_4,  Slot::Div1_2,
     };
-    int expected[8] = { 6, 8, 12, 16, 24, 32, 48, 96 };
+    int expected[8] = { 24, 32, 48, 64, 96, 128, 192, 384 };
     for (int i = 0; i < 8; ++i) {
         expectEqual(PhaseFluxMath::stageDivisorTicks(slots[i]), expected[i],
                     "stageDivisorTicks slot mapping must match KnownDivisor");
