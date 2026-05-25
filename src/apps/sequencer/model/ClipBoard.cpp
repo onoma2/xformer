@@ -98,6 +98,9 @@ void ClipBoard::copyPattern(int patternIndex) {
         case Track::TrackMode::Stochastic:
             pattern.sequences[trackIndex].data.stochastic = track.stochasticTrack().sequence(patternIndex);
             break;
+        case Track::TrackMode::PhaseFlux:
+            pattern.sequences[trackIndex].data.phaseFlux = track.phaseFluxTrack().sequence(patternIndex);
+            break;
         default:
             break;
         }
@@ -266,6 +269,9 @@ void ClipBoard::pastePattern(int patternIndex) const {
                     break;
                 case Track::TrackMode::Stochastic:
                     track.stochasticTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.stochastic;
+                    break;
+                case Track::TrackMode::PhaseFlux:
+                    track.phaseFluxTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.phaseFlux;
                     break;
                 default:
                     break;

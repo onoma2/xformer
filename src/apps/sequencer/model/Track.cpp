@@ -38,6 +38,9 @@ void Track::clearPattern(int patternIndex) {
     case TrackMode::Stochastic:
         _track.stochastic->sequence(patternIndex).clear();
         break;
+    case TrackMode::PhaseFlux:
+        _track.phaseFlux->sequence(patternIndex).clear();
+        break;
     case TrackMode::Last:
         break;
     }
@@ -67,6 +70,9 @@ void Track::copyPattern(int src, int dst) {
         break;
     case TrackMode::Stochastic:
         _track.stochastic->sequence(dst) = _track.stochastic->sequence(src);
+        break;
+    case TrackMode::PhaseFlux:
+        _track.phaseFlux->sequence(dst) = _track.phaseFlux->sequence(src);
         break;
     case TrackMode::Last:
         break;
@@ -105,6 +111,9 @@ void Track::gateOutputName(int index, StringBuilder &str) const {
     case TrackMode::Stochastic:
         str("Gate");
         break;
+    case TrackMode::PhaseFlux:
+        str("Gate");
+        break;
     case TrackMode::Last:
         break;
     }
@@ -132,6 +141,9 @@ void Track::cvOutputName(int index, StringBuilder &str) const {
         _track.teletype->cvOutputName(index, str);
         break;
     case TrackMode::Stochastic:
+        str("CV");
+        break;
+    case TrackMode::PhaseFlux:
         str("CV");
         break;
     case TrackMode::Last:
@@ -170,6 +182,9 @@ void Track::write(VersionedSerializedWriter &writer) const {
         break;
     case TrackMode::Stochastic:
         _track.stochastic->write(writer);
+        break;
+    case TrackMode::PhaseFlux:
+        _track.phaseFlux->write(writer);
         break;
     case TrackMode::Last:
         break;
@@ -211,6 +226,9 @@ void Track::read(VersionedSerializedReader &reader) {
         break;
     case TrackMode::Stochastic:
         _track.stochastic->read(reader);
+        break;
+    case TrackMode::PhaseFlux:
+        _track.phaseFlux->read(reader);
         break;
     case TrackMode::Last:
         break;

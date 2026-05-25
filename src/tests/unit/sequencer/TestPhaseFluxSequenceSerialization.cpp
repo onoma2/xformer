@@ -2,6 +2,8 @@
 
 #include "apps/sequencer/model/PhaseFluxSequence.h"
 #include "apps/sequencer/model/PhaseFluxTrack.h"
+#include "apps/sequencer/model/Project.h"
+#include "apps/sequencer/model/Track.h"
 #include "core/io/VersionedSerializedWriter.h"
 #include "core/io/VersionedSerializedReader.h"
 #include "../core/io/MemoryReaderWriter.h"
@@ -447,6 +449,50 @@ CASE("bitpack_no_overlap") {
     probe(21, [](PhaseFluxSequence::Stage &s) { s.setGateLength(100); });
     probe(22, [](PhaseFluxSequence::Stage &s) { s.setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_2); });
     probe(23, [](PhaseFluxSequence::Stage &s) { s.setSkip(true); });
+}
+
+CASE("track_writes_phaseflux_mode") {
+    // Full Container + union + dispatch path: Project::setTrackMode flips
+    // track 0 to PhaseFlux, we poke a few chassis + stage fields, then
+    // serialize via Track::write and restore via Track::read.
+    Project project;
+    project.setTrackMode(0, Track::TrackMode::PhaseFlux);
+    Track &track = project.track(0);
+    expectEqual(int(track.trackMode()), int(Track::TrackMode::PhaseFlux), "track in PhaseFlux mode");
+
+    auto &pfTrack = track.phaseFluxTrack();
+    pfTrack.setOctave(3);
+    pfTrack.setTranspose(-7);
+    pfTrack.setSlideTime(42);
+
+    auto &stage0 = pfTrack.sequence(0).stage(0);
+    stage0.setBasePitch(12);
+    stage0.setMask(PhaseFluxSequence::MaskType::OneInFour);
+    stage0.setPulseCount(4);
+
+    uint8_t buf[65536];
+    std::memset(buf, 0, sizeof(buf));
+    MemoryWriter mw(buf, sizeof(buf));
+    VersionedSerializedWriter writer([&mw](const void *d, size_t s){ mw.write(d, s); }, ProjectVersion::Latest);
+    track.write(writer);
+
+    // restored track must be flipped to PhaseFlux *before* read; Track::read
+    // reads the mode byte then dispatches into the matching Container slot.
+    Project project2;
+    project2.setTrackMode(0, Track::TrackMode::PhaseFlux);
+    Track &restored = project2.track(0);
+
+    MemoryReader mr(buf, sizeof(buf));
+    VersionedSerializedReader reader([&mr](void *d, size_t s){ mr.read(d, s); }, ProjectVersion::Latest);
+    restored.read(reader);
+
+    expectEqual(int(restored.trackMode()), int(Track::TrackMode::PhaseFlux), "mode preserved");
+    expectEqual(restored.phaseFluxTrack().octave(), 3, "octave preserved");
+    expectEqual(restored.phaseFluxTrack().transpose(), -7, "transpose preserved");
+    expectEqual(restored.phaseFluxTrack().slideTime(), 42, "slideTime preserved");
+    expectEqual(restored.phaseFluxTrack().sequence(0).stage(0).basePitch(), 12, "stage 0 basePitch preserved");
+    expectEqual(int(restored.phaseFluxTrack().sequence(0).stage(0).mask()), int(PhaseFluxSequence::MaskType::OneInFour), "stage 0 mask preserved");
+    expectEqual(restored.phaseFluxTrack().sequence(0).stage(0).pulseCount(), 4, "stage 0 pulseCount preserved");
 }
 
 } // UNIT_TEST("PhaseFluxSequenceSerialization")

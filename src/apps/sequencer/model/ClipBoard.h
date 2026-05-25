@@ -105,6 +105,7 @@ private:
                 IndexedSequence indexed;
                 TeletypeTrack::PatternSlot teletypeClip;
                 StochasticSequence stochastic;
+                PhaseFluxSequence phaseFlux;
             } data;
         } sequences[CONFIG_TRACK_COUNT];
     };
