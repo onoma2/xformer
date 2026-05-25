@@ -12,11 +12,13 @@ public:
     virtual int columns() const override { return 2; }
 
     virtual void cell(int row, int column, StringBuilder &str) const override {
+        if (!_track) return;
         if (column == 0) formatName(Item(row), str);
         else if (column == 1) formatValue(Item(row), str);
     }
 
     virtual void edit(int row, int column, int value, bool shift) override {
+        if (!_track) return;
         if (column == 1) editValue(Item(row), value, shift);
     }
 

@@ -155,10 +155,6 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     const int octave = _phaseFluxTrack.octave();
     const int transpose = _phaseFluxTrack.transpose();
 
-    const float temporalWarp = PhaseFluxMath::powerBendKnobToParam(stage.temporalWarp());
-    const float temporalResp = PhaseFluxMath::powerBendKnobToParam(stage.temporalResponse());
-    const float pitchWarp = PhaseFluxMath::powerBendKnobToParam(stage.pitchWarp());
-    const float pitchResp = PhaseFluxMath::powerBendKnobToParam(stage.pitchResponse());
     const Curve::Type tempCurveType = temporalCurveLut(stage.temporalCurve());
     const Curve::Type pitchCurveType = pitchCurveLut(stage.pitchCurve());
     const bool tFlipV = stage.temporalFlipV();
@@ -197,7 +193,6 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         float t_curved = Curve::eval(tempCurveType, t_input);
         float t_flipped = tFlipV ? (1.f - t_curved) : t_curved;
         float t_final = applyPowerBend(t_flipped, stage.temporalResponse());
-        (void)temporalWarp; (void)temporalResp;
         float t_shifted = t_final + (float(phaseShift) * 0.125f);
         t_shifted = std::fmod(t_shifted, 1.f);
         if (t_shifted < 0.f) t_shifted += 1.f;
@@ -210,7 +205,7 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         float p_curved = Curve::eval(pitchCurveType, phi_input);
         float p_flipped = pFlipV ? (1.f - p_curved) : p_curved;
         float p_final = applyPowerBend(p_flipped, stage.pitchResponse());
-        (void)pitchWarp; (void)pitchResp;
+        // §6.2.1 maskMelody/tiltMelody centrality filter deferred to Phase C.
 
         float offsetDegrees = 0.f;
         switch (stage.pitchDirection()) {
