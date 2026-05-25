@@ -91,26 +91,39 @@ CASE("mixed_divisors_sum_correctly") {
 }
 
 CASE("kMinCycleTicks_floor_engaged") {
+    // Single contributing cell (cell 3) with clockMultiplier=150 makes raw
+    // cycle = 6 * 100/150 = 4 ticks, below the floor of measureDivisor/32 = 6.
+    // The §3.1 contract: scale BOTH cycleTicks AND every cumulativeTicks[i]
+    // proportionally so per-tick derivation walks the stretched table.
     int ticks[16];
     bool skip[16];
-    clearSkip(skip);
     for (int i = 0; i < 16; ++i) {
         ticks[i] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_32);  // 6 ticks each
         skip[i] = true;
     }
-    skip[3] = false;   // only cell 3 contributes, 6 ticks raw
+    skip[3] = false;
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 150, cum);
 
-    int floor = kMeasureDivisor / 32;  // = 6
-    expectTrue(cycleTicks >= floor, "cycleTicks must be at least kMinCycleTicks floor");
+    int floor = kMeasureDivisor / 32;
+    expectEqual(cycleTicks, floor, "stretched cycle must hit the floor exactly");
 
-    // Stretch test: now drop divisor below the floor. Set cell 3 to a single
-    // raw tick via Div1_32 with clockMultiplier=150 (raw 6 * 100/150 = 4).
-    int cum2[17];
-    int cycleTicks2 = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 150, cum2);
-    expectTrue(cycleTicks2 >= floor, "stretched cycle must meet floor even after clockMult shrink");
+    // Cell 3 sits at snake index 3, so cum[3]=0 and cum[4] holds its endpoint.
+    // Pre-stretch cum[4] would be 4; post-stretch it must be the floor (6).
+    // Catches a regression that sets cycleTicks=floor without scaling cum[].
+    expectEqual(cum[3], 0, "pre-stretch cum at slot 3 stays at 0 (cells 0..2 skipped)");
+    expectEqual(cum[4], floor, "cum[4] must scale up to the floor after stretch");
+    expectEqual(cum[16], floor, "cum[16] must equal returned cycleTicks");
+    for (int i = 5; i <= 15; ++i) {
+        expectEqual(cum[i], floor, "post-cell-3 slots are skipped — cum stays at floor");
+    }
+
+    // At-floor case (clockMultiplier=100): cycle already equals floor, no scaling.
+    int cum0[17];
+    int cycleTicks0 = PhaseFluxMath::computeCumulativeTicks(ticks, skip, kMeasureDivisor, 100, cum0);
+    expectEqual(cycleTicks0, floor, "at-floor cycle is left unchanged");
+    expectEqual(cum0[4], floor, "at-floor cum[4] equals raw contribution");
 }
 
 CASE("all_skipped_returns_zero") {
