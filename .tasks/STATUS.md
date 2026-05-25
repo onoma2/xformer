@@ -27,13 +27,13 @@ _Updated: 2026-05-25 (PhaseFlux Phase A landed — `PhaseFluxTrack` + `PhaseFlux
 **Branch:** TBD
 **Reference:** `.tasks/stability-fixes.md`
 
-## 🔴 phaseflux — New TrackMode: 4×4 grid sequencer, stateless-ramp engine, scale-degree pitch, per-stage curves + transforms
-**Status:** Phase A fully done (all 4 spec §18.1 test families landed and green). Phase B (engine + minimal UI) in progress autonomously toward hardware-test readiness.
-**Where I stopped:** Phase A complete in 7 commits. 32 tests green: serialization (7) + cumulative duration table (9) + per-tick derivation (8) + PowerBend encoding (8). `PhaseFluxMath` math helpers (snake permutation, PowerBend, cumulative table, per-tick derivation) implemented as stateless functions in `model/PhaseFluxMath.{h,cpp}`. Storage + Track infrastructure + all switch sites + ClipBoard + Routing wired. Sim release build clean. `TrackModeListModel` gate still in place — user can't reach PhaseFlux from Track Setup page until engine + UI land.
-**Next action:** Phase B in progress — building `PhaseFluxTrackEngine` (consumes `PhaseFluxMath` helpers + §6.1/§6.2/§6.3/§6.4 curve+mask+collision pipelines + §11.1 transport), `Engine.cpp` case wiring, minimal UI (PhaseFluxTrackListModel + Project accessor + stub PhaseFluxEditPage + PhaseFluxSequencePage + Pages.h + TopPage/TrackPage dispatch), remove the TrackModeListModel skip. Then STM32 release build + RAM-ceiling verification, hand off for hardware flash + boot-smoke audibility test.
+## 🟡 phaseflux — New TrackMode: 4×4 grid sequencer, stateless-ramp engine, scale-degree pitch, per-stage curves + transforms
+**Status:** Phase A + Phase B complete. STM32 release build clean, both static_assert ceilings pass. Ready for hardware flash + boot-smoke test.
+**Where I stopped:** Phase B landed in 3 commits: engine (PhaseFluxTrackEngine + Engine.cpp wiring), minimal UI (PhaseFluxEditPage grid+scopes, PhaseFluxSequencePage list, TrackListModel, SequenceListModel, Pages/TopPage/TrackPage dispatch, TrackModeListModel skip gate removed), STM32 clean with array-bounds fix (insertion sort replacing std::sort). All 5 PhaseFlux test suites green.
+**Next action:** Flash to hardware. Boot smoke test: select PhaseFlux track, verify grid page navigates, play — check CV + gate output on scope. Then Phase C UI polish (full §17 EditPage spec from `ui-preview/pages_phaseflux.py`).
 **Depends on:** nothing
 **Branch:** feat/phaseflux
-**Reference:** `.tasks/phaseflux/task.md` (Phase A done-list + Phase B entry checklist + decision log). `docs/phaseflux-spec.md` (locked spec — single source of truth). `docs/spec-template.md` (process lessons). `ui-preview/pages_phaseflux.py` + `ui-preview/phaseflux-preview.png` (UI render — full §17 EditPage design; Phase B ships a stub of this, full design lands in Phase C UI polish).
+**Reference:** `.tasks/phaseflux/task.md` (Phase A done-list + Phase B entry checklist + decision log). `docs/phaseflux-spec.md` (locked spec — single source of truth). `ui-preview/pages_phaseflux.py` + `ui-preview/phaseflux-preview.png` (UI render — full §17 EditPage design; Phase C UI polish).
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
