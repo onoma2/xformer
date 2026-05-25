@@ -27,6 +27,14 @@ _Updated: 2026-05-25 (Stochastic, third session pass — performance gesture cle
 **Branch:** TBD
 **Reference:** `.tasks/stability-fixes.md`
 
+## ⚪ phaseflux — New TrackMode: 4×4 grid sequencer, stateless-ramp engine, scale-degree pitch, per-stage curves + transforms
+**Status:** ready — design fully locked in `docs/phaseflux-spec.md` (18 sections, all 66 audit questions resolved, 3-reviewer audit clean). UI rendered + verified in `ui-preview/phaseflux-preview.png`.
+**Where I stopped:** Spec lock complete. No open product decisions before implementation. Implementer-resolved items captured in spec §16 punch list + this task's Open questions.
+**Next action:** Phase A — math & storage foundations. Add `Track::TrackMode::PhaseFlux` enum + `Version_PhaseFlux_Pending = 36` placeholder. Create `PhaseFluxTrack` / `PhaseFluxSequence` / Stage record model files with bit-packed 3×uint32_t records. Land serialization round-trip test (retro lesson #4 gate) before any engine code.
+**Depends on:** nothing
+**Branch:** TBD (suggest `feat/phaseflux`)
+**Reference:** `.tasks/phaseflux/task.md` (deep context). `docs/phaseflux-spec.md` (locked spec — single source of truth). `docs/spec-template.md` (process lessons extracted). `ui-preview/pages_phaseflux.py` + `ui-preview/phaseflux-preview.png` (UI render).
+
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.
 **Where I stopped:** Current build is `.data=6,320`, `.bss=113,640`, `.ccmram_bss=54,096`; MonitorPage shows `Track=9560`, `NoteTrack=9544`, `CurveTrack=9480`, `Model=88072`.
