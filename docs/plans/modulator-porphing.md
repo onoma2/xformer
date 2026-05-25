@@ -122,8 +122,7 @@ All other shape comparisons (`Random`, `ADSR`, `ChaosLorenz`, `ChaosLatoocarfian
 
 ## Deferred / Flagged
 
-- **Serialization backward compat**: Appending `_shapeMorph` without a `ProjectVersion` guard means old project files will misalign. Must add `Version35` and guard the read before merging to main.
-- **Old→new shape migration**: When version guard is added, old files with `Shape::Triangle` (1) etc. should be mapped to `Shape::Sine` + `shapeMorph=25` on load.
+- **Serialization backward compat**: Appending `_shapeMorph` is unconditional; old dev project files won't round-trip and are accepted to break. Per `PROJECT.md:385` no ProjectVersion bump during dev; the bump (and any old→new shape migration like `Shape::Triangle` → `Shape::Sine` + `shapeMorph=25`) is a release-prep concern, not a per-feature concern.
 
 ## Execution Order
 

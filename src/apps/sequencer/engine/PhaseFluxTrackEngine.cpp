@@ -195,11 +195,14 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         bool muted = (maskByte >> ((i + maskShift) & 7)) & 1;
         if (muted) continue;
 
-        // §6.1 temporal pipeline
+        // §6.1 temporal pipeline. tFlipH no longer applied at the curve input
+        // — for the temporal axis the §6.4 sort cancels any input-domain mirror
+        // on Linear/Bell curves. Instead tFlipH mirrors the scheduled trigger
+        // offsets after the collision clamp (below) so the result actually
+        // reads as "horizontal mirror in time".
         float t_raw = (pulseCount == 1) ? 0.5f : (float(i) / float(pulseCount - 1));
         float t_warped = applyPowerBend(t_raw, stage.temporalWarp());
-        float t_input = tFlipH ? (1.f - t_warped) : t_warped;
-        float t_curved = Curve::eval(tempCurveType, t_input);
+        float t_curved = Curve::eval(tempCurveType, t_warped);
         float t_flipped = tFlipV ? (1.f - t_curved) : t_curved;
         float t_final = applyPowerBend(t_flipped, stage.temporalResponse());
         float t_shifted = t_final + (float(phaseShift) * 0.125f);
@@ -273,6 +276,28 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         _schedule[_scheduleCount].cv = cands[k].cv;
         ++_scheduleCount;
         prevEnd = t + gateTicks;
+    }
+
+    // §6.1.1 temporal flipH — reflect each scheduled pulse's [triggerOffset,
+    // triggerOffset+gateTicks] interval around the slot midpoint. Preserves
+    // gate duration; new triggerOffset = slotDur - oldEnd. Pulses retain
+    // their CV pairing, so the pitch profile mirrors in time as well.
+    // Re-sort by triggerOffset since order flips.
+    if (tFlipH && _scheduleCount > 0) {
+        for (int k = 0; k < _scheduleCount; ++k) {
+            int endTick = int(_schedule[k].triggerOffset) + int(_schedule[k].gateTicks);
+            int newOffset = slotDurationTicks - endTick;
+            _schedule[k].triggerOffset = uint16_t(std::max(0, newOffset));
+        }
+        for (int i = 1; i < _scheduleCount; ++i) {
+            ScheduledPulse key = _schedule[i];
+            int j = i - 1;
+            while (j >= 0 && _schedule[j].triggerOffset > key.triggerOffset) {
+                _schedule[j + 1] = _schedule[j];
+                --j;
+            }
+            _schedule[j + 1] = key;
+        }
     }
 }
 

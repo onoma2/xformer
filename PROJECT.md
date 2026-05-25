@@ -382,7 +382,7 @@ Requirements: `ragel` on PATH (`brew install ragel`), `arm-none-eabi-gcc` toolch
 - RAM is the tight constraint; flash has plenty of margin.
 - To free RAM: shrink note-step fields/pattern count/snapshots, reduce UI/page caches, or trim task stack sizes; prefer moving non-DMA data to CCM if SRAM pressure rises.
 - **Never commit ANY changes without testing on hardware.** Every commit must be flashed and verified on the STM32 module before pushing.
-- **HARD RULE: No ProjectVersion bump without explicit user request.** We are in active development consolidating many features; version bumps are done on request only, not automatically when adding model fields. Write new fields unconditionally; guard reads with `dataVersion() >= VersionN`. The version number is bumped once when consolidating a batch of features for a release, not per-feature.
+- **HARD RULE: No ProjectVersion bump without explicit user request.** We are in active development consolidating many features; version bumps are done on request only, not automatically when adding model fields. Write new fields unconditionally; no read guards needed during dev. **Old dev-stage project files are accepted to break — there is no requirement to preserve cross-branch file layout, add migration code, or anticipate future version-guarded reads.** Any spec or plan doc that says "must bump", "requires bumping", "before merge", or proposes a `dataVersion() >= VersionN` guard is stale — flag and update it instead of complying. Version bumps and read guards are batched once at release-prep time, not per-feature, and only when the user explicitly says so.
 
 ## Testing Conventions and Common Errors
 

@@ -99,7 +99,7 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     // Footer: 5 labels, swap to shift variants when Shift is held.
     const bool shift = globalKeyState()[Key::Shift];
     static const char *kLabelsTemp[5]      = { "Curve", "Warp",  "Resp", "Gate", "Puls" };
-    static const char *kLabelsTempShift[5] = { "FlipV", "FlipH", nullptr, nullptr, "Skip" };
+    static const char *kLabelsTempShift[5] = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
     static const char *kLabelsPtch[5]      = { "Curve", "Warp",  "Resp", "Base", "Rng" };
     static const char *kLabelsPtchShift[5] = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
 
@@ -150,7 +150,12 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
     }
 
     if (key.isStep()) {
-        _selectedCell = key.step();
+        if (key.shiftModifier()) {
+            auto &stage = _project.selectedPhaseFluxSequence().stage(key.step());
+            stage.setSkip(!stage.skip());
+        } else {
+            _selectedCell = key.step();
+        }
         event.consume();
         return;
     }
@@ -216,7 +221,6 @@ void PhaseFluxEditPage::toggleShiftAt(int slot) {
         switch (slot) {
         case 0: stage.setTemporalFlipV(!stage.temporalFlipV()); break;
         case 1: stage.setTemporalFlipH(!stage.temporalFlipH()); break;
-        case 4: stage.setSkip(!stage.skip()); break;
         default: break;
         }
     } else {

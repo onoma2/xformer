@@ -201,15 +201,16 @@ ResponseAxis(y, r) = PowerBend(y, r)
 ```
 t_raw[i]        = i / (N − 1)                                              // N = pulseCount; for N=1 use 0.5
 t_warped        = WarpAxis(t_raw[i], temporalWarp)
-                                                                             // hflip first (input-axis), then base curve, then vflip (output-axis)
-t_input         = temporalFlipH ? (1.0 − t_warped) : t_warped
-t_curved        = TempCurve(t_input, temporalCurve)
+                                                                             // vflip after the base curve (output-axis only — see §6.1.1 for temporalFlipH)
+t_curved        = TempCurve(t_warped, temporalCurve)
 t_flipped       = temporalFlipV ? (1.0 − t_curved) : t_curved
 t_final         = ResponseAxis(t_flipped, temporalResponse)
 trigger_time[i] = ((t_final + phaseShift / 8) mod 1.0) * stage_duration
 ```
 
 `phaseShift` rotates the trigger pattern by `phaseShift × 45°` inside the stage, modulo `stage_duration`. Applied **after** curve+flip evaluation, **before** mask. Deterministic.
+
+**Note on `temporalFlipH`:** unlike `temporalFlipV` and the pitch flips, the temporal horizontal flip is **not** applied at the curve-input stage. The §6.4 collision clamp sorts pulses by trigger time, which cancels any input-domain mirror on Linear/Bell/Bounce curves (the same set of trigger times re-emerges in the same order). Instead `temporalFlipH` is applied to the **scheduled** trigger intervals after the clamp — see §6.1.1.
 
 **Base shapes** (3 enum values, 1 spare):
 
@@ -222,7 +223,23 @@ trigger_time[i] = ((t_final + phaseShift / 8) mod 1.0) * stage_duration
 **Flips** (vflip + hflip = 2 bits, 4 variants per base):
 
 - `temporalFlipV = true` → output mirrored top-to-bottom (`1 − y`). Linear+vflip = reverse trigger order (last pulse fires first). Bell+vflip = inverted bell (concentrates pulses at endpoints, sparse in middle).
-- `temporalFlipH = true` → input mirrored left-to-right (`1 − x`). For symmetric base shapes (Bell), no audible effect. For Bounce, reverses bounce-cluster direction.
+- `temporalFlipH = true` → see §6.1.1. Curve-input mirror was the original spec but was effectively a no-op because §6.4 sort re-orders the trigger times. Re-spec'd as a post-clamp time-axis reflection.
+
+### 6.1.1 `temporalFlipH` — post-clamp time-axis mirror
+
+Applied after the §6.4 collision clamp produces the final scheduled pulses `(triggerOffset[k], gateTicks[k], cv[k])`:
+
+```
+for each scheduled k:
+    endTick[k]        = triggerOffset[k] + gateTicks[k]
+    newOffset[k]      = stage_duration − endTick[k]      // mirror the gate interval around slot midpoint
+    triggerOffset[k]  = max(0, newOffset[k])
+re-sort by triggerOffset                                  // order flips
+```
+
+Gate duration is preserved. CV pairing is preserved per-pulse (no re-mapping of pitches), so the pitch profile mirrors in time along with the trigger positions — the pulse that previously fired last with its pitch now fires first.
+
+**Audible effect:** with `temporalWarp = +50` (Linear), pulses cluster late (silence at start, busy end). Add `temporalFlipH = true` → cluster shifts to early (busy start, silence at end). On Bell curve with no warp, the cluster sits in the middle and the mirror is symmetric → still no audible change. Bounce is asymmetric in time, and the time-axis mirror flips the bounce direction.
 
 ### 6.2 Pitch curves — scale-degree quantized, NoteTrack-aligned
 
@@ -598,7 +615,7 @@ Augment (not replace) the existing 3-bit `stageDivisor` enum with a continuous *
 - Snake-walk cumulative table consumes the post-multiplier value; `kMinCycleTicks` floor still applies after scaling.
 - Routable target? Likely no — per-stage and not cheap to broadcast.
 - **Bit-pack cost:** 7 bits per stage × 16 stages = 112 bits total. `_data2` has 3 spare bits — far short. Requires repack (reclaim from `accumulatorStep` 5→4 bits, `accumulatorLength` 4→3 bits, etc.) or moving the field to a 4th word (`_data3`) — breaking the 3×uint32_t invariant.
-- **OPEN:** Final bit budget. Either accept a coarser 4-bit `stageLen` (±15 levels ≈ 15% steps) fitting in spare + 1 reclaimed bit, or expand to `_data3` and bump ProjectVersion accordingly.
+- **OPEN:** Final bit budget. Either accept a coarser 4-bit `stageLen` (±15 levels ≈ 15% steps) fitting in spare + 1 reclaimed bit, or expand `Stage` to `_data3` (3 → 4 × uint32_t per stage record). Per `PROJECT.md:385` no ProjectVersion bump during dev — dev projects accepted to break on field-shape changes.
 
 ### Per-sequence: `sequenceShift`
 

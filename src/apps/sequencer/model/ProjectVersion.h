@@ -1,6 +1,33 @@
 // Project version enum for serialization; guarded to avoid redefinition
 #pragma once
 
+// ============================================================================
+// VERSION-BUMP POLICY (READ BEFORE TOUCHING THIS ENUM)
+// ============================================================================
+// Bump ProjectVersion ONLY when consolidating a batch of features for a
+// release, and only when the user explicitly says so. During development the
+// on-disk layout changes many times — every track-mode addition, field
+// extension, bit-pack re-shuffle would otherwise force a new entry. That
+// churn is exactly what this policy avoids.
+//
+// During dev:
+//   - Write new fields unconditionally; do NOT add `dataVersion() >= VersionN`
+//     guards in read().
+//   - Dev project files on SD card are accepted to break across branches.
+//   - Pre-allocate a placeholder constant *outside* the enum (see
+//     `Version_PhaseFlux_Pending` below) so the upcoming bump number is
+//     reserved without auto-bumping `Latest`.
+//
+// At release prep:
+//   - User explicitly approves the bump.
+//   - Placeholder constant moves *into* the enum chain (becomes
+//     `VersionN = N`).
+//   - Read paths gain the `dataVersion() >= VersionN` guards.
+//   - Old project migration is written if needed.
+//
+// Project root pointers: PROJECT.md:385 (HARD RULE), AGENTS.md:102.
+// ============================================================================
+
 enum ProjectVersion {
     // added NoteTrack::cvUpdateMode
     Version4 = 4,
