@@ -549,6 +549,9 @@ void Engine::updateTrackSetups() {
             case Track::TrackMode::Stochastic:
                 trackEngine = trackContainer.create<StochasticTrackEngine>(*this, _model, track, linkedTrackEngine);
                 break;
+            case Track::TrackMode::PhaseFlux:
+                trackEngine = trackContainer.create<PhaseFluxTrackEngine>(*this, _model, track, linkedTrackEngine);
+                break;
             case Track::TrackMode::Last:
                 break;
             }

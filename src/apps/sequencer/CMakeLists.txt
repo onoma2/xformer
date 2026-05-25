@@ -22,6 +22,7 @@ set(sources
     engine/StochasticTrackEngine.cpp
     engine/StochasticGenerator.cpp
     engine/StochasticCache.cpp
+    engine/PhaseFluxTrackEngine.cpp
     engine/TuesdayTrackEngine.cpp
     engine/RoutingEngine.cpp
     engine/SequenceState.cpp
