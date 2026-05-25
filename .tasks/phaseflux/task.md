@@ -76,6 +76,7 @@ Reverse-chronological — append-only.
 - 2026-05-25: ProjectVersion stays at `Version35`. `Version_PhaseFlux_Pending = 36` lives as a standalone `constexpr int` after the enum's closing brace, NOT as a new enum entry — adding it inside the enum would auto-bump `Latest` and cause version-guard churn on every save. Rename + insert into the enum at ship time.
 - 2026-05-25: Temporary gate in `TrackModeListModel` skips PhaseFlux during forward cycling. Without it, the user could land on PhaseFlux from the Track Setup page; Engine.cpp has no per-mode case yet, so the old TrackEngine instance would keep ticking with the wrong `_trackMode`, triggering `SANITIZE_TRACK_MODE` asserts or release-build UB. Gate gets removed when `PhaseFluxTrackEngine` + UI page land.
 - 2026-05-25: `Project::selectedPhaseFluxSequence()` accessor deferred to Phase B (UI is the only consumer). No tests or model-layer code in this commit reference it; adding it now would be cruft.
+- 2026-05-25: **Phase A math families landed.** `PhaseFluxMath` lives in `model/` alongside `Curve.{h,cpp}` (precedent for stateless math helpers used by engines). Snake order is a file-static `std::array<uint8_t, 16>` returned by reference. Floor-scaling uses int64 promotion + round-to-nearest with `+ cycleTicks/2` and re-derives final `cycleTicks` from the rounded `cum[16]` so the table is internally consistent. Linear scan over 16 slots in `deriveTickPosition` instead of binary search (16 elements, readability wins). Acceptance tests verify the §3.1 contract that the floor scales BOTH `cycleTicks` AND every `cumulativeTicks[i]` — regression where someone "fixes" the floor by setting cycleTicks alone now fails the test.
 
 ## Open questions
 
@@ -103,20 +104,41 @@ Implementer-resolved items (engineering punch list, §16):
 - [x] 66-question external audit completed and resolved
 - [x] Spec template extracted to `docs/spec-template.md`
 
-**Phase A — math & storage foundations (done)**
+**Phase A — math & storage foundations (done — all 4 test families per spec §18.1)**
+
+Storage layer (commit `e8e69c0d` + cleanup `5fc124b5`):
 - [x] `Version_PhaseFlux_Pending = 36` placeholder constant landed outside the enum chain
 - [x] `PhaseFluxSequence` storage class — chassis (`_divisor`, `_clockMultiplier`, `_resetMeasure`, `_scale`, `_rootNote`, `_edited`) + 16-stage array
 - [x] `PhaseFluxSequence::Stage` bit-packed record — 3 × `uint32_t`, 24 fields, 93 bits used, 3 spare
 - [x] `PhaseFluxTrack` storage class — chassis (`_slideTime`, `_octave`, `_transpose`, `_playMode`, `_fillMode`, `_cvUpdateMode`, `_lock`) + pattern slot array, `static_assert(sizeof(...) <= 9544)`
 - [x] All required `Routable<>` wrappers (`_slideTime`, `_octave`, `_transpose`, `_divisor`, `_clockMultiplier`) — day-1 contract per spec §12.3
-- [x] Serialization round-trip test — 7 cases (default, every chassis field, every stage field, every numeric min/max edge, bit-pack non-overlap, `_lock` non-persistence, Track-level mode round-trip)
+- [x] **Test family 1: Serialization round-trip** — 7 cases (default, every chassis field, every stage field, every numeric min/max edge, bit-pack non-overlap, `_lock` non-persistence)
+
+Track infrastructure wiring (commit `f5f5a9e3` + gating `8996ef3a`):
 - [x] `TrackMode::PhaseFlux` enum value (serialize ID 8) wired through `Track.h` + `Track.cpp` (6 switch sites each)
 - [x] `Track::phaseFluxTrack()` accessor pair, `Container<...>` template parameter, union member, `#include`
 - [x] `ClipBoard` pattern copy/paste wired
 - [x] `Routing` `writeTarget` PhaseFlux dispatch wired (no new `Routing::Target::` entries)
 - [x] `TrackModeListModel` temporary gate so PhaseFlux is unreachable via Track Setup page until engine + UI land
-- [x] Spec-compliance + code-quality reviewer subagents passed on both commits
-- [x] Sim release build (`make -C build/sim/release sequencer`) clean; regression tests (Stochastic / Accumulator / NoteSequence serialization) green
+- [x] Track-level round-trip test (8th case in `TestPhaseFluxSequenceSerialization`)
+
+Math helpers (commit `c397e381` + cleanup `f8a1bc6d`):
+- [x] `PhaseFluxMath` class (`src/apps/sequencer/model/PhaseFluxMath.h/.cpp`) — stateless helpers, no engine state
+- [x] `snakeOrder()` — boustrophedon 4×4 permutation per spec §2: `{0,1,2,3, 7,6,5,4, 8,9,10,11, 15,14,13,12}`
+- [x] `stageDivisorTicks(slot)` — 8-slot enum → ticks at CONFIG_SEQUENCE_PPQN=48: `{6, 8, 12, 16, 24, 32, 48, 96}` matching `KnownDivisor.h`
+- [x] `powerBend(z, p)` — spec §6 formula `pow(z, (1-p)/(1+p))`, no defensive clamping (encoding boundary is the guard)
+- [x] `powerBendKnobToParam(encoded)` — spec §16 `encoded/64.0f` (NOT `/63`), max-knob ±0.984375
+- [x] `computeCumulativeTicks(...)` — spec §3.1 snake-walk + kMinCycleTicks floor (proportional stretch) + all-skipped idle marker
+- [x] `deriveTickPosition(...)` — spec §3.2 modulo + slot search + active cell remap + stagePhase; idle return on `cycleTicks == 0`
+- [x] **Test family 2: Cumulative duration table** — 9 cases including snake-order verification + floor-stretch correctness (cum[] scales proportionally, not just cycleTicks)
+- [x] **Test family 3: Per-tick derivation** — 8 cases including cycle wraparound + large-tick overflow + idle return + snake remap at derive time
+- [x] **Test family 4: PowerBend encoding** — 8 cases including identity at p=0 + endpoint preservation + monotonicity + max-knob abs < 1.0 degeneracy guard
+
+Quality gates:
+- [x] Spec-compliance + code-quality reviewer subagents passed on every Phase A commit
+- [x] Sim release build (`make -C build/sim/release sequencer`) clean; full sequencer binary links
+- [x] All 32 PhaseFlux test cases green (7 serialization + 9 cumulative + 8 per-tick + 8 powerbend)
+- [x] Regression: Stochastic / Accumulator / NoteSequence serialization tests still green
 - [x] Pre-existing failure `TestStochasticDurationDictionary::direct_history_event_is_compact_ui_truth` noted (unrelated to PhaseFlux)
 
 ## Notes
