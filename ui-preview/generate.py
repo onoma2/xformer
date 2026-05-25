@@ -84,6 +84,13 @@ from pages import (
     render_ref_skylines,
     render_ref_prob_div,
 )
+from pages_stochastic_loop import (
+    render_stochastic_loop_proposed,
+)
+from pages_stochastic_live import (
+    render_stochastic_live_proposed,
+    render_stochastic_live_constellation,
+)
 from pages_modulator import (
     render_modulator_current_sine,
     render_modulator_current_adsr,
@@ -359,6 +366,28 @@ def render_page(page: str, scale: int = 4):
         render_modulator_proposed_adsr_page2(canvas)
     elif page == "modulator-proposed-chaos-page2":
         render_modulator_proposed_chaos_page2(canvas)
+    elif page == "stochastic-loop-proposed":
+        render_stochastic_loop_proposed(canvas)
+    elif page == "stochastic-loop-proposed-held":
+        render_stochastic_loop_proposed(canvas, held_step=14)
+    elif page == "stochastic-live-proposed":
+        render_stochastic_live_proposed(canvas)
+    elif page == "stochastic-live-proposed-held":
+        render_stochastic_live_proposed(canvas, held_step=9)
+    elif page == "stochastic-live-proposed-burst":
+        render_stochastic_live_proposed(canvas, burst=80, burst_count=6, burst_rate=80, variation=60)
+    elif page == "stochastic-live-proposed-spread":
+        render_stochastic_live_proposed(canvas, spread=90, bias=30, contour=-50)
+    elif page == "stochastic-live-constellation":
+        render_stochastic_live_constellation(canvas)
+    elif page == "stochastic-live-constellation-burst":
+        render_stochastic_live_constellation(canvas, burst=80, burst_count=6, burst_rate=80,
+                                             variation=60, playing_idx=3)
+    elif page == "stochastic-live-constellation-complex":
+        render_stochastic_live_constellation(canvas, complexity=90, contour=-40,
+                                             variation=70, duration=6)
+    elif page == "stochastic-live-constellation-newseed":
+        render_stochastic_live_constellation(canvas, seed=0xBADD00D5, playing_idx=7)
     else:
         raise ValueError(f"Unknown page: {page}")
 
@@ -399,7 +428,12 @@ def main():
                                  'modulator-current-random', 'modulator-current-chaos',
                                  'modulator-proposed-sine', 'modulator-proposed-adsr',
                                  'modulator-proposed-random', 'modulator-proposed-chaos',
-                                 'modulator-proposed-adsr-page2', 'modulator-proposed-chaos-page2'],
+                                 'modulator-proposed-adsr-page2', 'modulator-proposed-chaos-page2',
+                                 'stochastic-loop-proposed', 'stochastic-loop-proposed-held',
+                                 'stochastic-live-proposed', 'stochastic-live-proposed-held',
+                                 'stochastic-live-proposed-burst', 'stochastic-live-proposed-spread',
+                                 'stochastic-live-constellation', 'stochastic-live-constellation-burst',
+                                 'stochastic-live-constellation-complex', 'stochastic-live-constellation-newseed'],
                         help='Which edit page or reference screen to render')
     args = parser.parse_args()
 

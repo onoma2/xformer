@@ -21,12 +21,14 @@ struct PackedDirectHistoryEvent {
     int8_t cvSixteenths = 0;
     uint8_t children = 0;
     uint8_t flags = 0; // bit0 rest, bit1 gate
+    uint16_t serial = 0; // monotonic id; UI hashes this for stable per-event XY
 };
 static_assert(sizeof(PackedDirectHistoryEvent::cvSixteenths) == 1, "Direct history CV must stay 8-bit");
-static_assert(sizeof(PackedDirectHistoryEvent) <= 4, "Direct history event must stay UI-sized");
+static_assert(sizeof(PackedDirectHistoryEvent) <= 6, "Direct history event must stay UI-sized");
 
 PackedDirectHistoryEvent gDirectHistory[CONFIG_TRACK_COUNT][StochasticTrackEngine::kDirectHistoryMax] = {};
 uint8_t gDirectHistoryCount[CONFIG_TRACK_COUNT] = {};
+uint16_t gDirectHistorySerial[CONFIG_TRACK_COUNT] = {};
 
 int directHistoryTrackIndex(const Track &track) {
     int index = track.trackIndex();
@@ -132,6 +134,7 @@ StochasticTrackEngine::DirectHistoryEvent StochasticTrackEngine::directHistoryEv
     const auto &packed = gDirectHistory[trackIndex][age];
     DirectHistoryEvent event;
     event.cv = float(packed.cvSixteenths) * 0.0625f;
+    event.serial = packed.serial;
     event.children = packed.children;
     event.rest = (packed.flags & 1) != 0;
     event.gate = (packed.flags & 2) != 0;
@@ -882,5 +885,6 @@ void StochasticTrackEngine::recordDirectHistory(float cv, bool rest, bool gate, 
     gDirectHistory[trackIndex][0].cvSixteenths = int8_t(cvSixteenths);
     gDirectHistory[trackIndex][0].children = children;
     gDirectHistory[trackIndex][0].flags = (rest ? 1 : 0) | (gate ? 2 : 0);
+    gDirectHistory[trackIndex][0].serial = ++gDirectHistorySerial[trackIndex];
     if (gDirectHistoryCount[trackIndex] < kDirectHistoryMax) gDirectHistoryCount[trackIndex]++;
 }

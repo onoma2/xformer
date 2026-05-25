@@ -119,7 +119,7 @@ private:
     // Event-driven walker trail, copied from the engine's recent Direct history
     // and transformed into viewport-relative coordinates.
     static constexpr int kDirectTrailMax = 12;
-    struct DirectParticle { int16_t yOffset; uint8_t flags; uint8_t children; };
+    struct DirectParticle { uint16_t serial; uint8_t flags; uint8_t children; };
     DirectParticle _directTrail[kDirectTrailMax] = {};
     uint8_t _directTrailFilled = 0;            // how many slots are valid (0..max)
 };

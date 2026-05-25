@@ -135,12 +135,11 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
         }
     }
 
-    // --- Event-driven walker ----------------------------------------------
-    // The trail is an event-time ring buffer. On every gate rising edge the
-    // engine emits a new event; we shift the ring left and write a fresh
-    // particle at slot 0 (the right edge of the viewport) with vertical
-    // position derived from the live CV (= pitch). Horizontal motion = rhythm
-    // (events arriving), vertical = pitch.
+    // --- Constellation rings -----------------------------------------------
+    // Each recent event lives at a deterministic XY derived from its age
+    // index and a seed mixed from rhythmSeed XOR melodySeed. Newer events
+    // read brighter; older events fade out. NewR / NewM rerolls the seed
+    // pair so the whole constellation reshapes instantly.
     _directWalkerTick++;
 
     const StochasticTrackEngine *stoEng = nullptr;
@@ -149,168 +148,123 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
         stoEng = &eng;
     }
 
-    // Map liveCv (≈ -5..+5 V typical) to a vertical offset around biasY.
-    // Range opens the vertical travel, while Bias/Spread stay the visible pitch
-    // field. This keeps Bias/Spread semantics intact and makes Range legible.
-    auto cvToOffset = [&] (float cv) {
-        int offset = -int(cv * (2.f + float(range)));   // 1V ≈ 3..6 px
-        int cvOffsetMax = 4 + range * 3;
-        int hardMax = vpH / 2 - 2;
-        if (cvOffsetMax > hardMax) cvOffsetMax = hardMax;
-        if (offset > cvOffsetMax) offset = cvOffsetMax;
-        else if (offset < -cvOffsetMax) offset = -cvOffsetMax;
-        return offset;
-    };
-
-    // Runtime history supplies event truth: recent CV positions, actual rests,
-    // and actual child count when the engine produced a parent burst. Knobs
-    // still shape the metaphor below.
     if (stoEng && stoEng->directHistoryCount() > 0) {
-        int count = std::min<int>(kDirectTrailMax, stoEng->directHistoryCount());
+        int count = std::min<int>(int(kDirectTrailMax), stoEng->directHistoryCount());
         for (int i = 0; i < count; ++i) {
             const auto &ev = stoEng->directHistoryEvent(i);
             uint8_t flags = (ev.rest ? 1 : 0) | (ev.children > 0 ? 2 : 0);
-            _directTrail[i] = { int16_t(cvToOffset(ev.cv)), flags, ev.children };
+            _directTrail[i] = { ev.serial, flags, ev.children };
         }
         _directTrailFilled = uint8_t(count);
     } else {
         _directTrailFilled = 0;
     }
 
-    // Horizontal stride per step. DURA controls the base footstep distance;
-    // VARI perturbs each older particle deterministically. The whole walker set
-    // is midpoint-anchored: it grows from center and collapses back to center,
-    // never from the right wall. Clamp the visible span so it neither hits the
-    // walls nor squeezes below a readable 60 px footprint.
-    int baseStride = 7 + (7 - duration) * 4;
-    if (baseStride < 5) baseStride = 5;
-    int vpCx = (vpLeft + vpRight) / 2;
-    int filled = _directTrailFilled > 0 ? _directTrailFilled : 1;
-    const int kMinDirectSpan = 60;
-    int maxSpan = (vpRight - vpLeft) - 18;
-    int rawSpan = (filled - 1) * baseStride;
-    int span = rawSpan;
-    if (filled > 1 && span < kMinDirectSpan) span = kMinDirectSpan;
-    if (span > maxSpan) span = maxSpan;
-    int walkerX = vpCx + span / 2;
-    int oldestX = vpCx - span / 2;
-    int effectiveStride = filled > 1 ? span / (filled - 1) : 0;
+    uint32_t constSeed = seq.rhythmSeed() ^ seq.melodySeed();
+    int baseR = 2 + duration / 2;             // 2..5 from DUR LUT 0..7
+    int sparseThreshold = 100 - rest;          // higher Rest → fewer rings kept
 
-    // Pitch guide rails: RANGE opens the vertical travel without disturbing the
-    // Bias/Spread haze. Low contrast so it reads as motion affordance, not grid.
-    canvas.setColor(Color::Low);
-    int rails = 1 + range * 2;
-    for (int r = 0; r < rails; ++r) {
-        int y = vpCy;
-        if (rails > 1) y = vpCy - ((rails - 1) * 3) / 2 + r * 3;
-        if (y >= vpTop + 1 && y <= vpBot - 1) canvas.hline(oldestX, y, span + 1);
-    }
+    auto ringXY = [&](uint16_t serial, int &outX, int &outY) {
+        uint32_t h = (uint32_t(serial) * 2654435761u) ^ (constSeed * 0x9E3779B1u);
+        int rx = int(h & 0xFFFF);
+        int ry = int((h >> 16) & 0xFFFF);
+        int cx = (vpLeft + vpRight) / 2;
+        int cy = (vpTop + vpBot) / 2;
+        int hw = (vpRight - vpLeft) / 2;
+        int hh = vpH / 2;
+        int scale = 35 + (complexity * 65) / 100;          // 35..100
+        int dx = (((rx - 0x8000) * hw) / 32768 * scale) / 100;
+        int dy = (((ry - 0x8000) * hh) / 32768 * scale) / 100;
+        int x = cx + dx;
+        int y = cy + dy;
+        // Contour skews the cloud via a serial-derived tilt — even-serial
+        // events drift one way, odd the other, scaled by Contour. Keeps
+        // the tilt visual without an age dependency.
+        int tilt = int(serial & 0xF) - 8;       // -8..+7
+        x += (contour * tilt * 6) / 1000;
+        y -= (contour * tilt * 3) / 1000;
+        if (x < vpLeft + 4) x = vpLeft + 4;
+        if (x > vpRight - 4) x = vpRight - 4;
+        if (y < vpTop + 4) y = vpTop + 4;
+        if (y > vpBot - 4) y = vpBot - 4;
+        outX = x;
+        outY = y;
+    };
 
-    // Particle slope encodes CONT direction (positive = up-right tilt). Contour
-    // also adds an age-based vertical drift so the whole phrase visibly leans.
-    int slopeDy = -(contour * 3) / 200;             // -1..+1 typically
-    int contourStep = (contour * 4) / 100;          // -4..+4 px over age
-    int burstSpacing = 7 - (burstRate * 5) / 100;   // high rate = tighter child pips
-    if (burstSpacing < 2) burstSpacing = 2;
-    bool burstPitchScatter = burstHoldIsRoll(seq.burstHold());
+    auto ageColor = [](int age) -> Color {
+        if (age == 0) return Color::Bright;
+        if (age <= 1) return Color::MediumBright;
+        if (age <= 3) return Color::Medium;
+        if (age <= 5) return Color::MediumLow;
+        if (age <= 8) return Color::Low;
+        return Color::None;
+    };
 
-    // Slide and Legato turn the point cloud into a connected phrase. Slide draws
-    // a pitch ribbon; Legato draws a low gate-continuity rail between events.
-    if (_directTrailFilled > 1 && (slide > 0 || legato > 0)) {
-        int prevX = -1;
-        int prevY = -1;
-        for (int i = _directTrailFilled - 1; i >= 0; --i) {
-            const DirectParticle &p = _directTrail[i];
-            bool isRest = (p.flags & 1) != 0;
-            int jitter = (variation * int((uint32_t(_directWalkerTick + i * 29) % 9u) - 4)) / 120;
-            int px = walkerX - i * effectiveStride + jitter;
-            int py = biasY + p.yOffset + contourStep * i;
-            if (py < vpTop + 2) py = vpTop + 2;
-            if (py > vpBot - 2) py = vpBot - 2;
-            if (!isRest && prevX >= 0) {
-                if (slide > 0) {
-                    canvas.setColor(slide > 65 ? Color::Medium : Color::MediumLow);
-                    canvas.line(prevX, prevY, px, py);
-                }
-                if (legato > 45) {
-                    canvas.setColor(Color::Low);
-                    int railY = (prevY > py ? prevY : py) + 2;
-                    if (railY <= vpBot - 1) canvas.hline(prevX, railY, px - prevX + 1);
-                }
-            }
-            if (!isRest) {
-                prevX = px;
-                prevY = py;
-            }
+    auto drawCircle = [&](int cx, int cy, int r) {
+        int x = r, y = 0, err = 0;
+        while (x >= y) {
+            canvas.point(cx + x, cy + y);
+            canvas.point(cx + y, cy + x);
+            canvas.point(cx - y, cy + x);
+            canvas.point(cx - x, cy + y);
+            canvas.point(cx - x, cy - y);
+            canvas.point(cx - y, cy - x);
+            canvas.point(cx + y, cy - x);
+            canvas.point(cx + x, cy - y);
+            if (err <= 0) { y += 1; err += 2 * y + 1; }
+            if (err > 0)  { x -= 1; err -= 2 * x + 1; }
         }
-    }
+    };
 
-    // Draw oldest → newest so newer events overdraw older fade.
-    for (int i = _directTrailFilled - 1; i >= 0; --i) {
-        const DirectParticle &p = _directTrail[i];
-        int jitter = (variation * int((uint32_t(_directWalkerTick + i * 29) % 9u) - 4)) / 120;
-        int px = walkerX - i * effectiveStride + jitter;
-        if (px < vpLeft) break;
-        if (px > vpRight) continue;
-        int py = biasY + p.yOffset + contourStep * i;
-        if (py < vpTop + 2) py = vpTop + 2;
-        if (py > vpBot - 2) py = vpBot - 2;
-
+    for (int age = _directTrailFilled - 1; age >= 0; --age) {
+        Color col = ageColor(age);
+        if (col == Color::None) continue;
+        const auto &p = _directTrail[age];
         bool isRest = (p.flags & 1) != 0;
         bool isBurst = (p.flags & 2) != 0;
-
-        if (isRest) {
-            canvas.setColor(Color::Medium);
-            canvas.hline(px - 1, vpCy, 3);
+        int x, y;
+        ringXY(p.serial, x, y);
+        int r = baseR;
+        if (variation > 0) {
+            int wob = ((int(p.serial) * 11) % 5) - 2;
+            r += (variation * wob) / 200;
+            if (r < 2) r = 2; else if (r > 6) r = 6;
+        }
+        bool keep = (((uint32_t(p.serial) * 37u + constSeed) % 100u) < uint32_t(sparseThreshold));
+        if (isRest || !keep) {
+            canvas.setColor(col);
+            canvas.point(x, y);
             continue;
         }
-
-        // Brighter trail: clamp floor up so even the oldest slot reads as a
-        // visible dot rather than disappearing into the dim haze.
-        int fade = 100 - i * 8;
-        if (fade < 30) fade = 30;
-        int trailStrength = (fade + repeats) / 2;
-        Color col = (trailStrength >= 70) ? Color::Bright
-                   : (trailStrength >= 50) ? Color::MediumBright
-                   : (trailStrength >= 30) ? Color::Medium
-                                           : Color::MediumLow;
-        canvas.setColor(col);
-        int radius = gateLength >= 75 ? 2 : (gateLength >= 35 ? 1 : 0);
-        if (i == 0) {
-            int pulseRadius = radius + 1;
-            canvas.hline(px - pulseRadius, py, pulseRadius * 2 + 1);
-            for (int yy = 1; yy <= pulseRadius; ++yy) {
-                int w = pulseRadius * 2 + 1 - yy * 2;
-                if (w < 1) w = 1;
-                canvas.hline(px - w / 2, py - yy, w);
-                canvas.hline(px - w / 2, py + yy, w);
-            }
+        if (age == 0) {
+            canvas.setColor(Color::Bright);
+            drawCircle(x, y, r + 1);
+            if (repeats > 50) drawCircle(x, y, r - 1);
+            canvas.fillRect(x - 1, y - 1, 3, 3);
             canvas.setColor(Color::MediumBright);
-            canvas.point(px - pulseRadius - 2, py);
-            canvas.point(px + pulseRadius + 2, py);
-            canvas.point(px, py - pulseRadius - 2);
-            canvas.point(px, py + pulseRadius + 2);
-        } else {
-            canvas.line(px - 1, py + slopeDy, px + 1, py - slopeDy);
-            canvas.point(px, py);
-            if (radius > 1) canvas.point(px, py - 1);
-        }
-        // Burst children — small dots offset rightward from the parent slot.
-        if (isBurst && p.children > 0) {
-            for (int c = 0; c < p.children; ++c) {
-                int cxp = px + (c + 1) * burstSpacing;
-                if (cxp >= vpRight - 1) break;
-                int cy = py;
-                if (burstPitchScatter) {
-                    int scatter = 1 + spread / 35;
-                    cy += (int((_directWalkerTick + i * 17 + c * 5) % uint32_t(scatter * 2 + 1)) - scatter);
+            canvas.point(x - r - 2, y);
+            canvas.point(x + r + 2, y);
+            canvas.point(x, y - r - 2);
+            canvas.point(x, y + r + 2);
+            if (isBurst && burst > 0 && p.children > 0) {
+                int n = std::min<int>(int(p.children), burstCount - 1);
+                int petalR = r + 3 + (burstRate * 3) / 100;
+                static const int8_t dx8[8] = {  3,  2,  0, -2, -3, -2,  0,  2 };
+                static const int8_t dy8[8] = {  0,  2,  3,  2,  0, -2, -3, -2 };
+                for (int k = 0; k < n; ++k) {
+                    int slot = (k * 8) / std::max(1, n);
+                    int bx = x + (dx8[slot] * petalR) / 3;
+                    int by = y + (dy8[slot] * petalR) / 3;
+                    if (bx >= vpLeft && bx < vpRight && by >= vpTop && by <= vpBot) {
+                        canvas.setColor(Color::MediumBright);
+                        canvas.point(bx, by);
+                    }
                 }
-                if (cy < vpTop + 1) cy = vpTop + 1;
-                if (cy > vpBot - 1) cy = vpBot - 1;
-                canvas.setColor(Color::MediumBright);
-                canvas.point(cxp, cy);
-                canvas.point(cxp, cy + 1 <= vpBot ? cy + 1 : cy);
             }
+        } else {
+            canvas.setColor(col);
+            drawCircle(x, y, r);
+            if (repeats > 50 && r > 2) drawCircle(x, y, r - 2);
         }
     }
 
@@ -358,32 +312,26 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Medium);
         FixedStringBuilder<16> s;
-        // 8-column grid, 32 px per column, starting at x=8.
+        // Grid-locked 6-column strip: label padded to 2 chars, value
+        // right-aligned in fixed-width field so digit changes never
+        // shift the next chip. 11 important knobs only.
         const int col0 = 8;
-        const int colStep = 32;
+        const int colStep = 40;
         const int yTop = 18;
         const int yBot = 24;
 
-        // Top row (slots 0..7): rhythm + articulation, burst pair on right.
-        FixedStringBuilder<16> durStr; durationLabel(durStr);
-        s.reset(); s("D %s",  static_cast<const char*>(durStr)); canvas.drawText(col0 + 0 * colStep, yTop, s);
-        s.reset(); s("V %d",  variation);   canvas.drawText(col0 + 1 * colStep, yTop, s);
-        s.reset(); s("R %d",  rest);        canvas.drawText(col0 + 2 * colStep, yTop, s);
-        s.reset(); s("F %d",  feel);        canvas.drawText(col0 + 3 * colStep, yTop, s);
-        s.reset(); s("G %d",  gateLength);  canvas.drawText(col0 + 4 * colStep, yTop, s);
-        s.reset(); s("A %d",  legato);      canvas.drawText(col0 + 5 * colStep, yTop, s);
-        s.reset(); s("B %d",  burst);       canvas.drawText(col0 + 6 * colStep, yTop, s);
-        s.reset(); s("C %d",  burstCount);  canvas.drawText(col0 + 7 * colStep, yTop, s);
+        s.reset(); s("%-2s%3d", "D",  duration);   canvas.drawText(col0 + 0 * colStep, yTop, s);
+        s.reset(); s("%-2s%3d", "V",  variation);  canvas.drawText(col0 + 1 * colStep, yTop, s);
+        s.reset(); s("%-2s%3d", "R",  rest);       canvas.drawText(col0 + 2 * colStep, yTop, s);
+        s.reset(); s("%-2s%3d", "BU", burst);      canvas.drawText(col0 + 3 * colStep, yTop, s);
+        s.reset(); s("%-2s%3d", "BC", burstCount); canvas.drawText(col0 + 4 * colStep, yTop, s);
+        s.reset(); s("%-2s%3d", "BR", burstRate);  canvas.drawText(col0 + 5 * colStep, yTop, s);
 
-        // Bottom row (slots 8..15): pitch shape, repeat standalone, burst rate corner.
-        s.reset(); s("X %d",  complexity);  canvas.drawText(col0 + 0 * colStep, yBot, s);
-        s.reset(); s("O %+d", contour);     canvas.drawText(col0 + 1 * colStep, yBot, s);
-        s.reset(); s("I %d",  bias);        canvas.drawText(col0 + 2 * colStep, yBot, s);
-        s.reset(); s("S %d",  spread);      canvas.drawText(col0 + 3 * colStep, yBot, s);
-        s.reset(); s("N %d",  seq.range()); canvas.drawText(col0 + 4 * colStep, yBot, s);
-        s.reset(); s("L %d",  slide);       canvas.drawText(col0 + 5 * colStep, yBot, s);
-        s.reset(); s("E %d",  repeats);     canvas.drawText(col0 + 6 * colStep, yBot, s);
-        s.reset(); s("T %d",  burstRate);   canvas.drawText(col0 + 7 * colStep, yBot, s);
+        s.reset(); s("%-2s%3d",  "E", repeats);    canvas.drawText(col0 + 0 * colStep, yBot, s);
+        s.reset(); s("%-2s%3d",  "S", spread);     canvas.drawText(col0 + 1 * colStep, yBot, s);
+        s.reset(); s("%-2s%+4d", "O", contour);    canvas.drawText(col0 + 2 * colStep, yBot, s);
+        s.reset(); s("%-2s%3d",  "X", complexity); canvas.drawText(col0 + 3 * colStep, yBot, s);
+        s.reset(); s("%-2s%3d",  "I", bias);       canvas.drawText(col0 + 4 * colStep, yBot, s);
     }
 
     // Footer mirrors LOOP page. Shift swaps NewR / NewM labels to Undo.
@@ -658,9 +606,8 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
         else if (heldStep == 3)  str("JUMP %d", seq.jump());
         else if (heldStep == 4)  str("SLEEP %d", seq.sleep());
         else if (heldStep == 8)  str("FIRST %d", seq.first());
-        else if (heldStep == 9)  str("LAST %d", seq.last());
-        else if (heldStep == 10) str("SIZE %d", seq.size());
-        else if (heldStep == 11) str("ROTATE %+d", seq.rotate());
+        else if (heldStep == 9)  str("SIZE %d", seq.size());
+        else if (heldStep == 10) str("ROTATE %+d", seq.rotate());
         else if (heldStep == 6)  str("MASKM %d", seq.maskMelody());
         else if (heldStep == 7)  str("TILTM %d", seq.tiltMelody());
         else if (heldStep == 14) str("MASKR %d", seq.maskRhythm());
@@ -755,9 +702,8 @@ void StochasticSequenceEditPage::editLoopStep(int step, int value, bool shift) {
     case 4: seq.setSleep(seq.sleep() + v); break;
     // Bottom row — loop window / shape params (green LEDs)
     case 8:  seq.setFirst(seq.first() + value);   notifyStochasticWindowEdit(); break;
-    case 9:  /* Last slot stubbed dead 2026-05-24 — collapsed into Size */ break;
-    case 10: seq.setSize(seq.size() + value);     notifyStochasticWindowEdit(); break;
-    case 11: seq.setRotate(seq.rotate() + value); break;   // rotation doesn't move window bounds
+    case 9:  seq.setSize(seq.size() + value);     notifyStochasticWindowEdit(); break;
+    case 10: seq.setRotate(seq.rotate() + value); break;   // rotation doesn't move window bounds
     // Top row last two — MaskM + TiltM (pitch-centrality filter, LoopM-only)
     case 6: seq.setMaskMelody(seq.maskMelody() + v); break;
     case 7: seq.setTiltMelody(seq.tiltMelody() + v); break;
@@ -1177,8 +1123,8 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
             bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
         }
-        // Bottom row left (8..11): green — loop window (first, last, size, rotate)
-        for (int i = 8; i <= 11; ++i) {
+        // Bottom row left (8..10): green — loop window (first, size, rotate)
+        for (int i = 8; i <= 10; ++i) {
             bool held = heldStep(i);
             leds.set(MatrixMap::fromStep(i), /*red*/held, /*green*/true);
         }
@@ -1789,7 +1735,7 @@ void StochasticSequenceEditPage::contextAction(int index) {
             break;
         }
         uint32_t mask = _heroSelectionMask;
-        if (mask == 0) mask = 0xC3CFu;  // bits 0-4, 6-7, 8-11, 14-15 (the bound LOOP slots)
+        if (mask == 0) mask = 0xC1CFu;  // bits 0-3, 6-7, 8, 14-15 (same defaults as before — Size/Rotate/Sleep stay opt-in)
         auto wants = [&](int i) { return (mask & (1U << i)) != 0; };
         if (wants(0))  sequence.setPatienceRhythm(100);
         if (wants(1))  sequence.setPatienceMelody(100);
@@ -1798,10 +1744,8 @@ void StochasticSequenceEditPage::contextAction(int index) {
         if (wants(4))  sequence.setSleep(0);
         bool windowEdited = false;
         if (wants(8))  { sequence.setFirst(0);  windowEdited = true; }
-        // wants(9) → Last slot is a dead knob (2026-05-24); equivalent default
-        // is Size=16 covered by wants(10).
-        if (wants(10)) { sequence.setSize(16);  windowEdited = true; }
-        if (wants(11)) sequence.setRotate(0);   // rotation doesn't move bounds
+        if (wants(9))  { sequence.setSize(16);  windowEdited = true; }
+        if (wants(10)) sequence.setRotate(0);   // rotation doesn't move bounds
         if (windowEdited) notifyStochasticWindowEdit();
         if (wants(6))  sequence.setMaskMelody(100);
         if (wants(7))  sequence.setTiltMelody(0);

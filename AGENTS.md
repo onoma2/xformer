@@ -32,6 +32,19 @@ Trust user intent on small, low-impact changes. Do not over-process obvious requ
 - User says "execute" / "ship it", or
 - Change is trivial
 
+## Display UI Gate (Before Discussing OLED Pages)
+
+Any change touching the 256×64 OLED frame — label positions, chip placement, side bars, grid layouts, footer text — must be rendered with `ui-preview/` before the user is asked to evaluate.
+
+- Add or update a renderer in `ui-preview/pages_*.py`.
+- Wire it through `generate.py` with a `-proposed` slug.
+- Output renders into `ui-preview/<slug>/<slug-variant>.png` (one subfolder per page slug, variants as files inside). Create the folder if it doesn't exist.
+- Run `python3 ui-preview/generate.py --page <slug-variant> -o ui-preview/<slug>/<slug-variant>.png` and read the image back.
+- Run `open ui-preview/<slug>/<slug-variant>.png` so the user sees the render in Preview before any chat description.
+- Then present the render.
+
+Sketches and ASCII art lie about pixel widths and font advances. Only a real render against the parsed `tiny5x5` / `ati8x8` bitmaps shows whether labels collide, overflow the safe content area (y=11..52 per `ui-preview/UI-VARIANTS.md`), or get truncated. Applies to *proposals* and final implementations alike.
+
 ## Verification Gate (Before Writing Code)
 
 You must be able to answer these before shipping:

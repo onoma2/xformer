@@ -20,6 +20,21 @@ Imperative verbs from the user are the trigger: "do", "fix", "commit", "land", "
 
 **Never reference commit hashes or phase numbers (P9, P11, c4945aa2, Phase 16 P7, etc.) in chat.** The user does not memorize those tokens; they use agents to forget them. Describe behaviors and code by what they do and where they live, not by which milestone introduced them. If the user uses a phase number first, you can echo it; otherwise don't.
 
+## Research codebase first. Don't theorize about features that already exist.
+
+Before proposing a new feature, mechanism, or architecture, **search the codebase for how the existing tracks already solve the same problem**. Performer has Note / Curve / Stochastic / Tuesday / DiscreteMap track engines — odds are very high that whatever timing, phase, reset, traversal, or storage pattern is being designed is already implemented somewhere, often well-thought-out and battle-tested.
+
+Mandatory checks before opening an abstract design conversation:
+
+- For new track timing or clocking → read at least one existing `*TrackEngine.cpp` and identify how it handles tick, divisor, clockMultiplier, resetMeasure, sync modes.
+- For new sequence/track fields → diff against NoteSequence / NoteTrack and Stochastic equivalents to surface what's already conventionalised.
+- For new phase, ramp, or per-step continuous state → check DiscreteMap's stateless-ramp pattern before inventing a stateful one.
+- For new traversal or cursor logic → check Re:Rene's seekX/seekY pattern, NoteSequenceState advance modes, runMode handling.
+
+Surfacing an existing precedent late in the conversation ("oh, DiscreteMap already does it this way") wastes the prior rounds of design discussion the user already invested in. The precedent should be in the *first* response on the topic, not the fifth. If the existing implementation is the right answer, propose adopting it directly. If it's wrong for this case, name *why* it doesn't fit before sketching a new design.
+
+This rule is in tension with "answer first" — both still hold. Research is the answer when the answer lives in the codebase. Cite the file and the pattern, then synthesise.
+
 ## Headline contract violations. Do not bury them.
 
 If the current code breaks a contract the user has already stated, that is the headline of the reply. Not a footnote, not a "candidate to revisit." The first sentence states the violation; the second proposes the fix; the user authorizes or redirects. Describing a contract violation as a neutral observation is failing the user — they then have to find it, name it, and demand a fix that should have been offered.
@@ -37,6 +52,20 @@ Never justify feature changes with "most users / most people / users probably / 
 Hold positions across turns. If three responses ago you argued features X/Y/Z are essential and each serves a distinct purpose, the next turn cannot propose dropping one of them with "most people probably wouldn't miss it." Either don't propose the change, or explicitly name what new information overturned the prior reasoning.
 
 After a factual error about the codebase, the next message corrects the error and stops. Do not pivot to a new proposal in the same response. The user needs to know you can be wrong; the trust budget for new speculation is zero until you've shown you're back on solid ground.
+
+## Display UI proposals must render with ui-preview.
+
+When proposing or discussing any change to an OLED page (label positions, chip placement, side bars, grid layouts, footer text — anything that draws inside the 256×64 frame), render it with the `ui-preview/` Python tool before asking the user to evaluate. Sketches and ASCII art lie about pixel widths and font advances; only a real render against the parsed `tiny5x5` / `ati8x8` bitmaps shows whether labels collide, overflow the safe area (y=11..52), or get truncated.
+
+Workflow:
+- Add or update a renderer in `ui-preview/pages_*.py` for the proposed layout.
+- Wire it through `generate.py` with a clear `--page <slug>` name (proposals get a `-proposed` suffix).
+- Output renders into `ui-preview/<slug>/<slug-variant>.png` (one subfolder per page slug, variants as files inside). Create the folder if it doesn't exist.
+- Run `python3 ui-preview/generate.py --page <slug-variant> -o ui-preview/<slug>/<slug-variant>.png` and read the image back.
+- Run `open ui-preview/<slug>/<slug-variant>.png` so the user sees the render in Preview before any chat description.
+- Only then present the design for review.
+
+This applies to *proposals* too, not just final implementations — the whole point is to catch glyph collisions and safe-area overruns at the design stage, not after they ship to firmware. See `ui-preview/UI-VARIANTS.md` for the canvas geometry contract.
 
 ## Code comments cap at 3 lines.
 

@@ -97,6 +97,7 @@ public:
     static constexpr int kDirectHistoryMax = 12;
     struct DirectHistoryEvent {
         float cv = 0.f;
+        uint16_t serial = 0;   // monotonic per-event id; stable across age shifts
         uint8_t children = 0;
         bool rest = false;
         bool gate = false;
