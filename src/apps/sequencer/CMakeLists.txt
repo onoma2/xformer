@@ -55,6 +55,7 @@ set(sources
     model/StochasticTrack.cpp
     model/PhaseFluxSequence.cpp
     model/PhaseFluxTrack.cpp
+    model/PhaseFluxMath.cpp
     model/DiscreteMapSequence.cpp
     model/DiscreteMapTrack.cpp
     model/IndexedSequence.cpp
