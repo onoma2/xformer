@@ -138,6 +138,8 @@ set(sources
     ui/pages/StochasticConfigPage.cpp
     ui/pages/StochasticPerformancePage.cpp
     ui/pages/StochasticSequenceEditPage.cpp
+    ui/pages/PhaseFluxEditPage.cpp
+    ui/pages/PhaseFluxSequencePage.cpp
     ui/pages/TempoPage.cpp
     ui/pages/TextInputPage.cpp
     ui/pages/TopPage.cpp

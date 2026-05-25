@@ -75,10 +75,14 @@ public:
     // cvUpdateMode
     CvUpdateMode cvUpdateMode() const { return _cvUpdateMode; }
     void setCvUpdateMode(CvUpdateMode mode) { _cvUpdateMode = ModelUtils::clampedEnum(mode); }
+    void editCvUpdateMode(int value, bool) { setCvUpdateMode(ModelUtils::adjustedEnum(cvUpdateMode(), value)); }
+    void printCvUpdateMode(StringBuilder &str) const { str(cvUpdateModeName(cvUpdateMode())); }
 
     // playMode
     Types::PlayMode playMode() const { return _playMode; }
     void setPlayMode(Types::PlayMode playMode) { _playMode = ModelUtils::clampedEnum(playMode); }
+    void editPlayMode(int value, bool) { setPlayMode(ModelUtils::adjustedEnum(playMode(), value)); }
+    void printPlayMode(StringBuilder &str) const { str(Types::playModeName(playMode())); }
 
     // sequences
     const PhaseFluxSequenceArray &sequences() const { return _sequences; }

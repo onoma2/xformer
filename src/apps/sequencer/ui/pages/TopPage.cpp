@@ -100,7 +100,8 @@ void TopPage::keyPress(KeyPressEvent &event) {
                                    currentPage == &pages.discreteMapSequence ||
                                    currentPage == &pages.indexedSequenceEdit ||
                                    (currentPage == &pages.teletypeScriptView && _mode == Mode::SequenceEdit) ||
-                                   currentPage == &pages.stochasticSequenceEdit);
+                                   currentPage == &pages.stochasticSequenceEdit ||
+                                   currentPage == &pages.phaseFluxEdit);
         bool onTrackView = (currentPage == &pages.track ||
                            currentPage == &pages.harmony);
 
@@ -264,6 +265,9 @@ void TopPage::setTrackView(TrackView view) {
     case Track::TrackMode::Indexed:
         setMainPage(pages.track);
         break;
+    case Track::TrackMode::PhaseFlux:
+        setMainPage(pages.track);
+        break;
     case Track::TrackMode::Last:
         break;
     }
@@ -343,6 +347,9 @@ void TopPage::setSequenceView(SequenceView view) {
         // Page+S1 (Sequence) — Stochastic's performance list-model.
         setMainPage(pages.stochasticPerformance);
         break;
+    case Track::TrackMode::PhaseFlux:
+        setMainPage(pages.phaseFluxSequence);
+        break;
     case Track::TrackMode::Last:
         break;
     }
@@ -376,6 +383,9 @@ void TopPage::setSequenceEditPage() {
     case Track::TrackMode::Stochastic:
         // Page+S0 (SequenceEdit) — main hero edit pages (was stochasticPerformance).
         setMainPage(pages.stochasticSequenceEdit);
+        break;
+    case Track::TrackMode::PhaseFlux:
+        setMainPage(pages.phaseFluxEdit);
         break;
     case Track::TrackMode::Last:
         break;

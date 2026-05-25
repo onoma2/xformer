@@ -269,6 +269,11 @@ public:
     const Scale &selectedScale(int defaultScale) const {
         return Scale::get(_scale != -1 ? _scale : defaultScale);
     }
+    void editScale(int value, bool) { if (!isRouted(Routing::Target::Scale)) setScale(scale() + value); }
+    void printScale(StringBuilder &str) const {
+        printRouted(str, Routing::Target::Scale);
+        str(scale() < 0 ? "Default" : Scale::name(scale()));
+    }
 
     // rootNote — −1 = inherit
     int rootNote() const { return _rootNote; }
@@ -276,11 +281,23 @@ public:
     int selectedRootNote(int defaultRootNote) const {
         return _rootNote != -1 ? _rootNote : defaultRootNote;
     }
+    void editRootNote(int value, bool) { if (!isRouted(Routing::Target::RootNote)) setRootNote(rootNote() + value); }
+    void printRootNote(StringBuilder &str) const {
+        printRouted(str, Routing::Target::RootNote);
+        if (rootNote() < 0) { str("Default"); } else { Types::printNote(str, rootNote()); }
+    }
 
     // divisor — Routable<uint16_t>, matches NoteSequence convention
     int divisor() const { return _divisor.get(isRouted(Routing::Target::Divisor)); }
     void setDivisor(int v, bool routed = false) {
         _divisor.set(ModelUtils::clampDivisor(v), routed);
+    }
+    void editDivisor(int value, bool shift) {
+        if (!isRouted(Routing::Target::Divisor)) setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
+    }
+    void printDivisor(StringBuilder &str) const {
+        printRouted(str, Routing::Target::Divisor);
+        ModelUtils::printDivisor(str, divisor());
     }
 
     // clockMultiplier — Routable<uint8_t>, 50..150
@@ -288,10 +305,24 @@ public:
     void setClockMultiplier(int v, bool routed = false) {
         _clockMultiplier.set(clamp(v, 50, 150), routed);
     }
+    void editClockMultiplier(int value, bool shift) {
+        if (!isRouted(Routing::Target::ClockMult)) setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
+    }
+    void printClockMultiplier(StringBuilder &str) const {
+        printRouted(str, Routing::Target::ClockMult);
+        str("%.2fx", clockMultiplier() * 0.01f);
+    }
 
     // resetMeasure 0..128
     int resetMeasure() const { return _resetMeasure; }
     void setResetMeasure(int v) { _resetMeasure = clamp(v, 0, 128); }
+    void editResetMeasure(int value, bool shift) {
+        setResetMeasure(ModelUtils::adjustedByPowerOfTwo(resetMeasure(), value, shift));
+    }
+    void printResetMeasure(StringBuilder &str) const {
+        if (resetMeasure() == 0) { str("off"); }
+        else { str("%d %s", resetMeasure(), resetMeasure() > 1 ? "bars" : "bar"); }
+    }
 
     // edited — dirty bit for UI
     int edited() const { return _edited; }

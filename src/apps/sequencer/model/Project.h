@@ -524,6 +524,16 @@ public:
     const DiscreteMapSequence &selectedDiscreteMapSequence() const { return discreteMapSequence(_selectedTrackIndex, selectedPatternIndex()); }
           DiscreteMapSequence &selectedDiscreteMapSequence()       { return discreteMapSequence(_selectedTrackIndex, selectedPatternIndex()); }
 
+    // phaseFluxSequence
+
+    const PhaseFluxSequence &phaseFluxSequence(int trackIndex, int patternIndex) const { return _tracks[trackIndex].phaseFluxTrack().sequence(patternIndex); }
+          PhaseFluxSequence &phaseFluxSequence(int trackIndex, int patternIndex)       { return _tracks[trackIndex].phaseFluxTrack().sequence(patternIndex); }
+
+    // selectedPhaseFluxSequence
+
+    const PhaseFluxSequence &selectedPhaseFluxSequence() const { return phaseFluxSequence(_selectedTrackIndex, selectedPatternIndex()); }
+          PhaseFluxSequence &selectedPhaseFluxSequence()       { return phaseFluxSequence(_selectedTrackIndex, selectedPatternIndex()); }
+
     // indexedSequence
 
     const IndexedSequence &indexedSequence(int trackIndex, int patternIndex) const { return _tracks[trackIndex].indexedTrack().sequence(patternIndex); }
