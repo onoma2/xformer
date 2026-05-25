@@ -63,7 +63,10 @@ public:
 
     virtual void edit(int row, int column, int value, bool shift) override {
         if (column == 1) {
-            _trackModes[row] = ModelUtils::adjustedEnum(_trackModes[row], value);
+            Track::TrackMode next = ModelUtils::adjustedEnum(_trackModes[row], value);
+            // PhaseFlux has no engine/UI yet; skip so user can't land on it.
+            if (next == Track::TrackMode::PhaseFlux) next = _trackModes[row];
+            _trackModes[row] = next;
         }
     }
 
