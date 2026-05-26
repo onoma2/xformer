@@ -4,6 +4,7 @@ set(sources
     # asteroids
     asteroids/Asteroids.cpp
     # engine
+    engine/AccumulatorOps.cpp
     engine/ArpeggiatorEngine.cpp
     engine/Clock.cpp
     engine/CurveTrackEngine.cpp
