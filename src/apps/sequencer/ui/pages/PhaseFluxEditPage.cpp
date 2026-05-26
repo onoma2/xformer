@@ -96,12 +96,23 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "PHFLX");
 
-    // Header: TEMP / PTCH / PTCH.G (global pitch mode).
+    // Header: TEMP / PTCH / PTCH.G / ACCUM.N[T] / ACCUM.P[T].
     const bool isPtch = (_currentSet == 1);
+    const bool isAccumN = (_currentSet == 2);
+    const bool isAccumP = (_currentSet == 3);
+    const auto &seqForHeader = _project.selectedPhaseFluxSequence();
     const bool isGlobalPitch =
-        isPtch && _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
-    const char *setName =
-        (_currentSet == 0) ? "TEMP" : (isGlobalPitch ? "PTCH.G" : "PTCH");
+        isPtch && seqForHeader.pitchMode() == PhaseFluxSequence::PitchMode::Global;
+    const char *setName = "TEMP";
+    if (_currentSet == 1) {
+        setName = isGlobalPitch ? "PTCH.G" : "PTCH";
+    } else if (isAccumN) {
+        setName = (seqForHeader.noteAccumConfig().scope() == AccumulatorConfig::Scope::Track)
+            ? "ACCUM.NT" : "ACCUM.N";
+    } else if (isAccumP) {
+        setName = (seqForHeader.pulseAccumConfig().scope() == AccumulatorConfig::Scope::Track)
+            ? "ACCUM.PT" : "ACCUM.P";
+    }
     WindowPainter::drawActiveFunction(canvas, setName);
 
     // Footer: 5 labels, swap to shift variants when Shift is held.
@@ -112,18 +123,23 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     static const char *kLabelsPtchShift[5]   = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
     static const char *kLabelsPtchGlobal[5]      = { "Curve", "Warp",  "Resp", "Rate", "Note" };
     static const char *kLabelsPtchGlobalShift[5] = { "FlipV", "FlipH", nullptr, nullptr, "Span" };
+    static const char *kLabelsAccum[5]       = { "Amount", "+Lim", "-Lim", "Order", "Reset" };
+    static const char *kLabelsAccumShift[5]  = { "Trig",   nullptr, nullptr, "Polar", "Scope" };
 
     const char *(*primary)[5];
     const char *(*altShift)[5];
     if (_currentSet == 0) {
         primary = &kLabelsTemp;
         altShift = &kLabelsTempShift;
-    } else if (isGlobalPitch) {
+    } else if (_currentSet == 1 && isGlobalPitch) {
         primary = &kLabelsPtchGlobal;
         altShift = &kLabelsPtchGlobalShift;
-    } else {
+    } else if (_currentSet == 1) {
         primary = &kLabelsPtch;
         altShift = &kLabelsPtchShift;
+    } else {
+        primary = &kLabelsAccum;
+        altShift = &kLabelsAccumShift;
     }
     const char *footer[5];
     for (int i = 0; i < 5; ++i) {
@@ -254,6 +270,27 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
     const bool isGlobalPitch =
         _currentSet == 1 &&
         _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
+    const bool isAccumN = (_currentSet == 2);
+    const bool isAccumP = (_currentSet == 3);
+    if (isAccumN || isAccumP) {
+        auto &cfg = isAccumN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
+        const int limMax = isAccumN ? 28 : 8;
+        switch (slot) {
+        case 0:
+            if (isAccumN) {
+                activeStage.setAccumulatorStep(activeStage.accumulatorStep() + value);
+            } else {
+                activeStage.setPulseAccumStep(activeStage.pulseAccumStep() + value);
+            }
+            break;
+        case 1: cfg.setPosLim(clamp(int(cfg.posLim()) + value, 1, limMax)); break;
+        case 2: cfg.setNegLim(clamp(int(cfg.negLim()) + value, 1, limMax)); break;
+        case 3: cfg.setOrder(AccumulatorConfig::Order(cycle(int(cfg.order()) + value, 0, 3))); break;
+        case 4: cfg.setReset(uint8_t(cycle(int(cfg.reset()) + value, 0, 15))); break;
+        }
+        (void)shift;
+        return;
+    }
     if (_currentSet == 0) {
         // TEMP
         switch (slot) {
@@ -292,6 +329,7 @@ void PhaseFluxEditPage::randomizeCurrentSet() {
     // chassis-feel knobs the user wants stable across "shake" gestures.
     static Random rng;
     auto &seq = _project.selectedPhaseFluxSequence();
+    if (_currentSet != 0 && _currentSet != 1) return;
     for (int i = 0; i < 16; ++i) {
         auto &s = seq.stage(i);
         if (_currentSet == 0) {
@@ -315,6 +353,34 @@ void PhaseFluxEditPage::toggleShiftAt(int slot) {
     const bool isGlobalPitch =
         _currentSet == 1 &&
         _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
+    const bool isAccumN = (_currentSet == 2);
+    const bool isAccumP = (_currentSet == 3);
+    if (isAccumN || isAccumP) {
+        auto &cfg = isAccumN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
+        switch (slot) {
+        case 0: {
+            auto trig = isAccumN ? activeStage.accumulatorTrigger() : activeStage.pulseAccumTrigger();
+            auto next = (trig == PhaseFluxSequence::AccumulatorTriggerType::Stage)
+                ? PhaseFluxSequence::AccumulatorTriggerType::Pulse
+                : PhaseFluxSequence::AccumulatorTriggerType::Stage;
+            if (isAccumN) activeStage.setAccumulatorTrigger(next);
+            else          activeStage.setPulseAccumTrigger(next);
+            break;
+        }
+        case 3:
+            cfg.setPolarity(cfg.polarity() == AccumulatorConfig::Polarity::Uni
+                ? AccumulatorConfig::Polarity::Bi
+                : AccumulatorConfig::Polarity::Uni);
+            break;
+        case 4:
+            cfg.setScope(cfg.scope() == AccumulatorConfig::Scope::Local
+                ? AccumulatorConfig::Scope::Track
+                : AccumulatorConfig::Scope::Local);
+            break;
+        default: break;
+        }
+        return;
+    }
     if (_currentSet == 0) {
         switch (slot) {
         case 0: activeStage.setTemporalFlipV(!activeStage.temporalFlipV()); break;
@@ -524,6 +590,9 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
     const bool isGlobalPitch =
         _currentSet == 1 &&
         _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
+    const bool isAccumN = (_currentSet == 2);
+    const bool isAccumP = (_currentSet == 3);
+    const bool isAccum = isAccumN || isAccumP;
     // In Global PTCH mode, F1-F3 read from stage[0] (the master). Cell mode
     // and TEMP set read from the currently selected cell.
     const auto &pitchSrc = isGlobalPitch ? masterStage : activeStage;
@@ -534,9 +603,28 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
     static const char *kNamesTemp[5]       = { "Curve", "Warp", "Resp", "Len",  "Puls" };
     static const char *kNamesPtch[5]       = { "Curve", "Warp", "Resp", "Base", "Span" };
     static const char *kNamesPtchGlobal[5] = { "Curve", "Warp", "Resp", "Rate", "Note" };
+    static const char *kNamesAccum[5]      = { "Amount", "+Lim", "-Lim", "Order", "Reset" };
+    static const char *kNamesAccumShift[5] = { "Trig",   "+Lim", "-Lim", "Polar", "Scope" };
 
     FixedStringBuilder<8> values[5];
-    if (_currentSet == 0) {
+    if (isAccum) {
+        const auto &cfg = isAccumN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
+        const int amount = isAccumN ? activeStage.accumulatorStep() : activeStage.pulseAccumStep();
+        const auto trig  = isAccumN ? activeStage.accumulatorTrigger() : activeStage.pulseAccumTrigger();
+        static const char *kOrder[4] = { "Wrap", "Pend", "Hold", "RTZ" };
+        const char *trigStr = (trig == PhaseFluxSequence::AccumulatorTriggerType::Pulse) ? "Pulse" : "Stage";
+        const char *polarStr = (cfg.polarity() == AccumulatorConfig::Polarity::Bi) ? "Bi" : "Uni";
+        const char *scopeStr = (cfg.scope() == AccumulatorConfig::Scope::Track) ? "Track" : "Local";
+        if (shift) values[0]("%s", trigStr);
+        else       values[0]("%+d", amount);
+        values[1]("%d", cfg.posLim());
+        values[2]("%d", cfg.negLim());
+        if (shift) values[3]("%s", polarStr);
+        else       values[3]("%s", kOrder[clamp(int(cfg.order()), 0, 3)]);
+        if (shift) values[4]("%s", scopeStr);
+        else if (cfg.reset() == 0) values[4]("Manual");
+        else values[4]("%dcyc", int(cfg.reset()));
+    } else if (_currentSet == 0) {
         values[0]("%s",  kTempCurve[clamp(int(activeStage.temporalCurve()), 0, 2)]);
         values[1]("%+d", activeStage.temporalWarp());
         values[2]("%+d", activeStage.temporalResponse());
@@ -561,6 +649,8 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
     const char *(*names)[5];
     if (_currentSet == 0) {
         names = &kNamesTemp;
+    } else if (isAccum) {
+        names = shift ? &kNamesAccumShift : &kNamesAccum;
     } else if (isGlobalPitch) {
         // In Global PTCH, the F5 panel label swaps NOTE → SPAN while Shift is
         // held, since Shift+F5 cycles the per-cell range (range demoted).

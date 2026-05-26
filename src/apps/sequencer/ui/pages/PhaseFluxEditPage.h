@@ -19,7 +19,7 @@ public:
     virtual void encoder(EncoderEvent &event) override;
 
 private:
-    static constexpr int kSetCount = 2;  // TEMP, PTCH (more sets pending confirmation)
+    static constexpr int kSetCount = 4;  // TEMP, PTCH, ACCUM.N, ACCUM.P
 
     void drawGrid(Canvas &canvas);
     void drawGridCell(Canvas &canvas, int idx, bool isActive, bool isSelected);
@@ -36,6 +36,6 @@ private:
     const PhaseFluxTrack &phaseFluxTrack() const;
 
     int _selectedCell = 0;
-    int _currentSet = 0;    // 0 = TEMP, 1 = PTCH (more sets later)
+    int _currentSet = 0;    // 0 = TEMP, 1 = PTCH, 2 = ACCUM.N, 3 = ACCUM.P
     int _selectedSlot = 0;  // 0..4 (which F-slot is active)
 };
