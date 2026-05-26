@@ -1,0 +1,96 @@
+# Fractal Track — Current Design Summary
+
+**Status:** Pre-implementation. Blocked on stochastic completion + RAM budget.
+**Last updated:** 2026-05-22
+**Canonical details:** DICTIONARY.md (vocabulary/ownership), TASK.md (phases/gates)
+
+---
+
+## What It Is
+
+FractalTrack is a child melodic mirror track. A parent track (Note, Curve, Stochastic, Tuesday, Teletype — any lower-index engine) supplies gate+CV. Fractal samples that output at its own section rate into a small inline trunk buffer, then plays it back through configurable loop windows, capture rules, and (post-MVP) mutation/branch/ornamentation transforms.
+
+It is not a stochastic generator, not a note sequencer, not a CV recorder, and not a high-fidelity automation trace. One cell per Fractal section. Intra-section motion is intentionally discarded.
+
+## Substrate
+
+**Mirror with section grid.** One inline `uint16_t` trunk per engine instance. Default 64 cells (128 B), max 128 cells (256 B). No heap. No per-pattern buffer. Pattern switch changes config only; trunk survives.
+
+**Cell encoding (16 bits):**
+- bits 0–10: CV (11-bit fixed-point, ~5.9 cents/LSB)
+- bits 11–14: gate length (0=rest, 1=trigger, 2–14=proportional, 15=full/tie)
+- bit 15: valid (uncaptured cells output project root note with gate off)
+
+## Ownership
+
+| Owner | What it owns |
+|-------|-------------|
+| **FractalSequence** (×17 patterns) | Timing (divisor, playMode, resetMeasure), loop lenses (loopFirst, loopLast, rotate, loopMode), record extent (recordFirst, recordLast), capture rules (recordMode, punchMode, recordQuantize), reserved future fields |
+| **FractalTrack** (×1, track-wide) | 17 sequences, sourceA, bufferLength, lock, recordTrigger (Routable), octave, transpose, slideTime, cvUpdateMode, reserved future fields |
+| **FractalTrackEngine** (×1, volatile) | Trunk buffer, parent resolution, gate-length measurement, capture/read/loop-boundary rule execution, RNG, evolution history, branch state |
+
+Trunk is **not serialized.** Save/load preserves model config; trunk starts empty on power cycle.
+
+## Core Pipeline (MVP)
+
+```
+tick → divisor math → shouldAdvanceSection?
+  → sectionBoundary:
+      1. executeCaptureRule  (if !lock and rule allows: read source → write trunk)
+      2. play                (mapLogicalToRead → read trunk → schedule output)
+  → drainQueues
+```
+
+Default capture rule: **Replace** — continuously overwrite trunk cells from source while unlocked.
+Lock write-protects the trunk. Branch transforms and ornamentation continue while locked.
+
+## Window Hierarchy
+
+```
+recordFirst ≤ loopFirst ≤ mutateFirst ≤ mutateLast ≤ loopLast ≤ recordLast ≤ bufferLength-1
+```
+
+- **Record extent** — where capture writes land
+- **Loop window** — what playback reads (per-pattern lens over the same trunk)
+- **Mutation zone** (post-MVP) — where evolution may change trunk cells
+
+## RAM
+
+| Item | Estimate |
+|------|----------|
+| FractalTrack (model) | ~570 B |
+| FractalTrackEngine | ~600 B (max buffer) |
+| 8× FractalTrack model | ~4.6 KB |
+| 8× FractalTrackEngine | ~4.8 KB CCMRAM |
+
+Both fit comfortably under current container gates (NoteTrack=9544 B, TeletypeTrackEngine=912 B).
+
+## Stage Gates (before Phase 1 code)
+
+| Gate | Must pass |
+|------|-----------|
+| **A — Contract** | TASK + DICTIONARY agree. Every field has owner + active/reserved/deferred status. |
+| **B — RAM** | STM32 sizeof probes under container gates. |
+| **C — Serialization** | Round-trip test for all model fields. Invalid enums sanitize. |
+| **D — Engine** | No STL, no heap in tick path. Source reads guarded. |
+| **E — Hardware** | Mirror, lock, loop window, pattern lens audible on STM32. |
+| **F — UI** | Active fields only. Reserved hidden. |
+
+## Phase Order
+
+0. Contract cleanup + stage gates
+1. Model + serialization + round-trip test
+2. Engine (minimal behavior: Replace capture, forward playback, lock)
+3. List UI (active fields only)
+4. Hardware verification → **stop, hand off to user**
+
+Post-MVP (each independent, lands in reserved fields/hooks):
+runMode → two-source mixing → CV-scan → bar-quantized loop → capture variants → snapshot → sleep → density/tilt → mutation/patience → branches → ornamentation → visual page
+
+## Key Design Constraints
+
+- **No RNG content generation.** All content comes from parent capture or defaults to project root note.
+- **No heap in engine.** Inline buffer, pre-allocated BSS only.
+- **No cache between model and engine.** Parent reads are live; trunk writes are immediate.
+- **No reseed.** Mutations evolve from captured baseline.
+- **Section phase is always active** (4-section lens, neutral defaults = identity transform).

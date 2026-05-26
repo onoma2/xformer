@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stochastic Engine: Parameter Conflicts & DSP Laws</title>
+    <style>
+        body {
+            background-color: #ffffff;
+            color: #222222;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            color: #111111;
+            border-bottom: 2px solid #eeeeee;
+            padding-bottom: 0.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+            margin-bottom: 3rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid #dddddd;
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #333333;
+        }
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+        .tag {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .tag-dead-zone { background-color: #ffebee; color: #dc3545; border: 1px solid #f5c6cb; }
+        .tag-conflict { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .tag-protection { background-color: #e2e3e5; color: #1e4b30; border: 1px solid #c3e6cb; }
+        .tag-weird { background-color: #d1ecf1; color: #0f5132; border: 1px solid #badbcc; }
+        code {
+            background-color: #f1f1f1;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+            color: #d63384;
+        }
+        .law-current { color: #495057; font-weight: 500; }
+        .law-proposed { color: #0d6efd; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+    <h1>Stochastic Engine Analysis: Conflicts & Knob Laws</h1>
+    <p>This table outlines DSP constraints, edge-case behaviors, and the underlying mathematical mapping (Linear vs. Exponential) of the parameter knobs to evaluate their musical feel.</p>
+
+    <h2>Live Page & Shape Interactions</h2>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 15%;">Parameter(s)</th>
+                <th style="width: 20%;">Interaction / Issue</th>
+                <th style="width: 35%;">Behavior & Explanation</th>
+                <th style="width: 15%;">Current Law</th>
+                <th style="width: 15%;">Proposed Law</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>RANG</code><br>(Pitch Range)</td>
+                <td>Set to 0<br><span class="tag tag-weird">Extreme Behavior</span></td>
+                <td><strong>Octave Jumps.</strong> In the bipolar-Range model, Range=0 does NOT kill pitch shaping. It produces a single-octave field with a 100% per-slot octave-displacement chance. Pitch generation continues, heavily biased toward jumps. <code>CMPX</code>, <code>CONT</code>, <code>BIAS</code>, and <code>SPRE</code> still fully operate.</td>
+                <td class="law-current">Linear<br>(Interval math mapping)</td>
+                <td class="law-proposed">Keep Current<br>(Discrete pitch intervals scale naturally on a linear axis)</td>
+            </tr>
+            <tr>
+                <td><code>SPRE</code><br>(Spread)</td>
+                <td>Set to 0<br><span class="tag tag-weird">Deterministic Mode</span></td>
+                <td><strong>Collapses to Bias.</strong> In the beta-distribution model, Spread=0 collapses the distribution onto the Bias position. <code>BIAS</code> becomes highly effective: every roll lands exactly on the slot Bias points at, turning the probabilistic picker into a direct index selector.</td>
+                <td class="law-current">Linear<br>(Probability threshold thresholds 0-1000)</td>
+                <td class="law-proposed">Keep Current<br>(Acts like a linear crossfader between distribution shapes)</td>
+            </tr>
+            <tr>
+                <td><code>REST</code><br>(Rest Prob)</td>
+                <td>Set to 100%<br><span class="tag tag-dead-zone">Dead Zone</span></td>
+                <td><strong>Overrides Gate/Burst.</strong> Rest evaluations occur upstream of CV/Gate queueing. If a step evaluates to a rest, the engine skips processing <code>GATE</code>, <code>SLID</code>, <code>LEGA</code>, and all Burst evaluations.</td>
+                <td class="law-current">Linear Probability<br>(0-100%)</td>
+                <td class="law-proposed">Keep Current<br>(Standard probability)</td>
+            </tr>
+            <tr>
+                <td><code>BurstHold</code><br>(Context Menu)</td>
+                <td>Set to Hold / Hold*<br><span class="tag tag-dead-zone">Pitch Freeze</span></td>
+                <td><strong>Locks Burst Pitch.</strong> Pitch behavior of cluster cells is determined entirely by the BurstHold state. In Hold modes, the burst repeats the exact same anchor pitch. Roll modes must be selected for the burst to arpeggiate.</td>
+                <td class="law-current">Discrete Enum<br>(4 states)</td>
+                <td class="law-proposed">Keep Current</td>
+            </tr>
+            <tr>
+                <td><code>BURS</code><br>(Burst Prob)</td>
+                <td><code>DURA</code> is too short<br><span class="tag tag-protection">DSP Protection</span></td>
+                <td><strong>Silent Suppression.</strong> In <code>evaluateBurst</code>, the engine explicitly checks if <code>durationTicks</code> is below <code>kMinBurstParentTicks</code> (96 ticks). If the step is too short, the burst logic gracefully suppresses itself.</td>
+                <td class="law-current">Linear Probability<br>(0-100%)</td>
+                <td class="law-proposed">Keep Current</td>
+            </tr>
+            <tr>
+                <td><code>BRAT</code><br>(Burst Rate)</td>
+                <td>N/A</td>
+                <td><strong>Ratchet Acceleration.</strong> Determines the clustering timing of a burst (accelerating vs decelerating rolls).</td>
+                <td class="law-current">Log-Symmetric Exponential<br>(<code>exp(0.916*k)</code>)</td>
+                <td class="law-proposed">Keep Current<br>(Excellent musical feel. Symmetrical acceleration/deceleration around a uniform 50% midpoint)</td>
+            </tr>
+            <tr>
+                <td><code>GATE</code><br>(Gate Length)</td>
+                <td>Set to 100% (Tie)<br><span class="tag tag-conflict">Conflict</span></td>
+                <td><strong>Overrides Legato.</strong> If the generated gate length fills the entire duration slot, the CV is held high. <code>LEGA</code> (Legato Probability) becomes functionally identical to a standard tie.</td>
+                <td class="law-current">Linear Spread<br>(Deviation around 50% center)</td>
+                <td class="law-proposed">Keep Current</td>
+            </tr>
+            <tr>
+                <td><code>REPT</code><br>(Repeat Prob)</td>
+                <td>Set to 100%<br><span class="tag tag-dead-zone">Dead Zone</span></td>
+                <td><strong>Freezes Live Generation.</strong> If the real-time engine is repeating the historical buffer at 100%, new values are never generated; it continuously replays <code>_lastStepContent</code>.</td>
+                <td class="law-current">Linear Probability<br>(0-100%)</td>
+                <td class="law-proposed">Keep Current</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Loop Page & Window Interactions</h2>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 15%;">Parameter(s)</th>
+                <th style="width: 20%;">Interaction / Issue</th>
+                <th style="width: 35%;">Behavior & Explanation</th>
+                <th style="width: 15%;">Current Law</th>
+                <th style="width: 15%;">Proposed Law</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>Patience</code><br>+ <code>Mutate</code></td>
+                <td>Patience locked (100)<br><span class="tag tag-weird">Independence</span></td>
+                <td><strong>Mutate Continues.</strong> Patience invalidates loop sources and triggers full regeneration. <code>Mutate</code> is an independent cycle-end hook. Setting Patience to 100 ("no regen ever") does NOT block Mutation; Mutate still fires.</td>
+                <td class="law-current">Linear Lambda<br>(<code>1.0 + p*0.79</code> mapping 1 to ~80 loops)</td>
+                <td class="law-proposed"><strong>Change to Exponential</strong><br>A linear scale makes the top half of the knob (40-80 loops) mostly imperceptible. An exponential curve would provide finer resolution for short waits (1-8 loops) while compressing the extreme wait times.</td>
+            </tr>
+            <tr>
+                <td><code>Size</code><br>(Loop Size)</td>
+                <td>Set to 1<br><span class="tag tag-dead-zone">Dead Zone</span></td>
+                <td><strong>Kills Rotation.</strong> Rotating a 1-step loop modulo bounds just evaluates back to the same index. The <code>Rotate</code> knob functionally mimics manually adjusting the <code>First</code> knob.</td>
+                <td class="law-current">Linear<br>(1 to 16 steps)</td>
+                <td class="law-proposed">Keep Current</td>
+            </tr>
+            <tr>
+                <td><code>First</code> / <code>Size</code></td>
+                <td>Edited mid-playback<br><span class="tag tag-protection">DSP Protection</span></td>
+                <td><strong>Aggressive Snap & Flush.</strong> If a window is shrunk and the <code>_currentStep</code> falls outside the new bounds, <code>syncWindowEdit</code> instantly snaps the step back to <code>sequence.first()</code> and clears the CV queues to prevent memory overflows.</td>
+                <td class="law-current">Linear Index</td>
+                <td class="law-proposed">Keep Current</td>
+            </tr>
+            <tr>
+                <td><code>Sleep</code></td>
+                <td>Evaluates active<br><span class="tag tag-weird">Audible Mute</span></td>
+                <td><strong>Walker Continues.</strong> Sleep does not freeze the stochastic walker (<code>_currentStep</code>). The index keeps advancing; the engine simply rests (silences) every emission while the <code>_sleepRemaining</code> counter is active. It is a mute, not a pause.</td>
+                <td class="law-current">Linear Skip Count<br>(<code>(sleep*4+5)/10</code> skips 0-40 events)</td>
+                <td class="law-proposed">Keep Current<br>(Though skipping 40 events is extreme, the linear step count is predictable)</td>
+            </tr>
+            <tr>
+                <td><code>MaskM</code> / <code>MaskR</code></td>
+                <td>Set to 100%<br><span class="tag tag-dead-zone">Filter Bypass</span></td>
+                <td><strong>Bypass State.</strong> Mask is a trigger-time audibility filter, not part of generation. Setting it to 100% completely bypasses the filter (all steps are audible). It cannot cause "generative starvation" because generation happens upstream.</td>
+                <td class="law-current">Linear Threshold<br>(0-100%)</td>
+                <td class="law-proposed">Keep Current</td>
+            </tr>
+        </tbody>
+    </table>
+
+</body>
+</html>

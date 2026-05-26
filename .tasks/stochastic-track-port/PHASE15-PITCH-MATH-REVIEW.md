@@ -62,6 +62,98 @@ Each item is a known divergence between the formula's apparent intent and its au
 - Make sieve a soft weight rather than a hard cut. Top-K get +boost, others stay at lower weight but still pickable.
 - Or: document the interaction explicitly in the UI — when sieve is partial, the kernel only operates on survivors.
 
+### 3b. Reframe Steps Sieve as pitch-side Mask/Tilt
+
+`Steps Sieve` (ui) can stay useful if it stops being an invisible
+`universalDegreeBoost()` (code) veto and becomes the pitch-side equivalent of
+`Mask / Tilt` (ui).
+
+Problem with the current contract:
+
+```
+Pitch Tickets (ui) say which notes are allowed or preferred.
+Steps Sieve (ui) then silently removes some of those notes by hidden geometry.
+```
+
+That makes `Pitch Tickets` (ui) feel broken. A user can explicitly prepare a
+pitch vocabulary and still have the picker reject part of it for reasons the UI
+does not expose.
+
+Proposed contract:
+
+```
+Scale (ui/idea)          = musical vocabulary
+Pitch Tickets (ui/code)  = explicit note emphasis / exclusion
+Range (ui/code)          = octave field
+Pitch Tilt (idea/code)   = rank direction for pitch candidates
+Steps Sieve (ui/code)    = how much of the ranked pitch field survives
+Pitch macros (ui)        = weights over survivors, not hidden vetoes
+```
+
+Order:
+
+```
+1. Scale creates the vocabulary.
+2. Pitch Tickets apply explicit user exclusions and ticket weights.
+3. Range expands candidates across octaves.
+4. Pitch Tilt assigns deterministic ranks to candidates.
+5. Steps Sieve keeps the top ranked candidates.
+6. Bias / Spread / Complexity / Contour weight the survivors.
+7. Seeded dice picks the note.
+```
+
+Ranking must be user-legible:
+
+```
+low Pitch Tilt    -> lower pitches survive first
+high Pitch Tilt   -> higher pitches survive first
+center Pitch Tilt -> seed/random rank or ticket-strength rank
+```
+
+Hard rule: only visible controls may hard-remove pitches.
+
+`Pitch Tickets` (ui) may hard-exclude notes because the ticket page shows it.
+`Steps Sieve` (ui) may hard-thin candidates only if framed and displayed as a
+pitch mask. Otherwise it should be a soft weight, not a veto.
+
+### 3c. Separate motion controls from region controls
+
+Keep two musical ownership groups:
+
+```
+motion controls (idea):
+  Complexity (ui/code) = stepwise vs leaping motion from the previous note
+  Contour (ui/code)    = ascending vs descending pressure
+
+region controls (idea):
+  Bias (ui/code)       = low / middle / high region preference
+  Spread (ui/code)     = narrow focus vs wide pitch field
+```
+
+Defaults must be transparent:
+
+```
+Contour (ui) = 0      -> neutral direction
+Bias (ui) = 50        -> neutral center
+Spread (ui) default   -> wide enough not to dominate motion
+Complexity (ui)       -> no edge trap, no forced repeat trap
+```
+
+Formula direction:
+
+```
+candidate pool = Scale + Pitch Tickets + Range
+region weight  = softened Bias / Spread
+motion weight  = softened Complexity / Contour
+ticket weight  = durable user emphasis, not a multiplier that can erase shape
+final weight   = blend(ticket weight, region weight, motion weight) with explicit ownership
+```
+
+Do not let three or four multiplicative triangles fight each other. `Bias /
+Spread` (ui) should own region. `Complexity / Contour` (ui) should own motion.
+`Pitch Tickets` (ui) should remain durable emphasis/exclusion, not become a
+dominance trap or a fragile post-filter.
+
 ### 4. Contour drift swamps kernel at high knob values
 
 **Symptom:** `drift = contour × signedDist / 2`. At `contour = 100` and `i - lastIdx = 11`, drift = 550 vs max `tri = 130`. The kernel triangle becomes irrelevant; the knob's effective behavior shifts from "directional bias" to "force the walk in one direction."

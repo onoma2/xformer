@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stochastic Track — Lessons for Future Projects</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; max-width: 920px; margin: 2em auto; padding: 0 1.2em; background: #fafafa; color: #222; line-height: 1.6; }
+  h1 { font-size: 1.35em; border-bottom: 2px solid #333; padding-bottom: 0.3em; }
+  h2 { font-size: 1.1em; margin-top: 2.2em; color: #444; }
+  h3 { font-size: 1em; margin-top: 1.4em; color: #555; }
+  table { border-collapse: collapse; width: 100%; margin: 0.8em 0; font-size: 0.87em; }
+  th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #eee; font-weight: 600; }
+  tr:nth-child(even) { background: #f5f5f5; }
+  .tag { display: inline-block; font-size: 0.72em; padding: 1px 6px; border-radius: 3px; font-weight: 600; margin-right: 4px; }
+  .tag-t { background: #d2e3fc; color: #1a3a6b; }
+  .tag-c { background: #fce8b2; color: #6b4f00; }
+  .summary { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 1em 1.2em; margin: 1em 0; }
+  ul { margin: 0.3em 0; padding-left: 1.3em; }
+  li { margin-bottom: 0.3em; }
+  .timeline { font-size: 0.85em; color: #666; margin: 0.3em 0 1.2em 0; }
+  .footer { margin-top: 3em; font-size: 0.8em; color: #888; border-top: 1px solid #ddd; padding-top: 0.5em; }
+  .lesson { background: #fff; border-left: 3px solid #888; padding: 0.6em 1em; margin: 1em 0; }
+  .lesson strong { display: block; margin-bottom: 0.2em; }
+  .evidence { font-size: 0.85em; color: #666; margin-top: 0.3em; }
+  .action { background: #f0f4ff; border-left: 3px solid #4a7fd4; padding: 0.6em 1em; margin: 0.8em 0; }
+</style>
+</head>
+<body>
+
+<h1>Stochastic Track Port — Lessons for Future Projects</h1>
+<p class="timeline">Source: 6-day implementation, ~120 commits across 17 phases on <code>feat/stochastic</code> / <code>feat/stochastic-seed-log</code>. This document extracts generalizable lessons from that project for application to all future firmware feature work.</p>
+
+<!-- ============================================================ -->
+<h2>1. Project Context</h2>
+
+<div class="summary">
+<p>Port a generative melodic sequencer track type from a fork into a RAM-constrained STM32F4 Eurorack sequencer (128 KB SRAM, 64 KB CCMRAM). The project combined step-probability sequencing with global stochastic constraints (Pitch Weight Tables, Marbles-style distributions, Proteus-style patience/mutation, burst scheduling) and a deterministic keyed-RNG engine with captured-event lock replay.</p>
+<p>The project went through 17 phases with multiple architecture rewrites driven by discovered constraints. Key outcomes: the feature is hardware-stable, passing 6 test suites, and is the most complex track type in the firmware. The journey surfaced structural process gaps that apply to any embedded feature project of similar scope.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>2. Lessons Learned — General Principles</h2>
+
+<!-- ---- TECHNICAL ---- -->
+
+<div class="lesson">
+<span class="tag tag-t">Technical</span>
+<strong>L1. Define state ownership before writing any code.</strong>
+Every data field must have exactly one owner (persistent model, runtime engine, or UI). The owner defines who writes, who reads, and when. If the engine needs to write persistent state, that's a design smell — it should write to its own runtime state instead.
+<p class="evidence">29 pattern-defining fields were initially placed on Track (global) instead of Sequence (per-pattern). Engine wrote generated events back into persistent model via <code>const_cast</code>, creating task-race conditions. Lock replay buffer was not scoped to patterns, replaying stale cache after pattern changes. All found after implementation, all required architectural rework.</p>
+</div>
+<div class="action"><strong>Action:</strong> Before Phase 1 of any feature, produce an ownership table: every field, its owner, serialization status, and lifecycle. No code starts without this table committed to the task wiki.</div>
+
+<div class="lesson">
+<span class="tag tag-t">Technical</span>
+<strong>L2. Embedded constraints must gate the design from day one, not be discovered incrementally.</strong>
+STL containers, dynamic allocation in tick paths, floating-point structs in CCMRAM, unpacked buffer layouts — these are not implementation details to fix later. They are design constraints that shape the architecture. Reference code that violates them is reference material, not a starting point.
+<p class="evidence"><code>std::vector</code>, <code>std::sort</code>, <code>std::mt19937</code> were ported from Vinx and had to be fully replaced. An inline lock buffer (64 × 28 B) would have overflowed CCMRAM by 11 KB across 8 tracks — the entire engine approach had to change to heap allocation. Both were documented as risks in the plan but not gated before implementation began.</p>
+</div>
+<div class="action"><strong>Action:</strong> Run an embedded-compatibility audit on all reference code before porting. Document banned patterns and mandatory replacements. The audit output is a prerequisite for Phase 1 approval.</div>
+
+<div class="lesson">
+<span class="tag tag-t">Technical</span>
+<strong>L3. The first complex user of a platform subsystem will surface latent bugs.</strong>
+Container destructor semantics, engine tick ordering, heap allocation lifecycle — these were stable until the first track type with non-trivial state exercised them. Expect platform bugs when your feature differs structurally from existing features.
+<p class="evidence">Container placement-new without destructor call → heap leak → hard fault after 2–3 track-mode switches. Engine processed clock events before rebuilding containers → hard fault on project clear. Both were generic platform bugs exposed only by the stochastic track's heap-allocated engine state.</p>
+</div>
+<div class="action"><strong>Action:</strong> When adding the first feature that exercises a subsystem in a new way (heap allocation, non-trivial destructors, tick-path timing), audit that subsystem's code before building on it. Fix latent platform bugs before feature work.</div>
+
+<div class="lesson">
+<span class="tag tag-t">Technical</span>
+<strong>L4. Serialization round-trip tests must be the first test written.</strong>
+Write → clear → read → assert equality across every field. This catches missing fields, wrong order, wrong defaults, and enum clamp issues immediately. Serialization bugs compound silently if not caught early — they only surface when a user saves and reloads.
+<p class="evidence">Three fields were not serialized; one transient field was. Bug catalog documented them, but the fix came 2+ phases later. During the window, all development was built on a broken save/load foundation.</p>
+</div>
+<div class="action"><strong>Action:</strong> For any new model type, the first test file is a round-trip test. CI gates on it. No feature work proceeds without a passing round-trip.</div>
+
+<div class="lesson">
+<span class="tag tag-t">Technical</span>
+<strong>L5. Validate the core identity model before building anything on top of it.</strong>
+"Is this feature's identity stored output or recipe replay?" is an architecture question, not an implementation detail. Answering it wrong means rebuilding the engine from scratch — multiple times. A short architecture spike comparing candidates saves days of rework.
+<p class="evidence">The project went through stored-tape (Vinx) → parent/child model (Phase 7b) → seed+log model (Phase 14B) → flat-cell model (Phase 16). Each rewrite invalidated previous implementation. A 2-hour spike comparing these three models before any engine code would have saved significant rework.</p>
+</div>
+<div class="action"><strong>Action:</strong> For any feature with a novel data/identity model, produce a 1-page comparison of at least 2 candidate architectures with RAM estimates, lifecycle semantics, and migration cost. Lock the choice with user sign-off before Phase 1.</div>
+
+<div class="lesson">
+<span class="tag tag-t">Technical</span>
+<strong>L6. Test control-response at low values, not just extremes.</strong>
+Integer truncation (<code>knob / N</code>) produces silent cliffs at the bottom of ranges. These don't show up in "does knob=0 vs knob=100 produce different output" tests. They show up when a user carefully dials in knob=10 and gets the same output as knob=0.
+<p class="evidence">Variation kernel at knob=10 gave 22% center probability instead of expected ~60%. Complexity kernel leak (max 10 vs triangle max 130) was effectively dead. Sleep knob values 1–2 produced zero sleeps. Found by dedicated adversarial review, not by phase testing.</p>
+</div>
+<div class="action"><strong>Action:</strong> For every continuous knob, include a sweep test at values 0, 1, 2, 5, 10, 50, 90, 95, 99, 100. Assert output changes meaningfully between adjacent test points.</div>
+
+<div class="lesson">
+<span class="tag tag-t">Technical</span>
+<strong>L7. Integration-level concerns (output pipeline, timing, queues) must be tested early on hardware.</strong>
+Unit tests on the generator don't cover gate/CV scheduling, burst timing overlap, queue overflow, or parent-child gate collision. These are system-level bugs that only surface when the full tick-to-output path runs on real hardware at real clock rates.
+<p class="evidence">Parent gate-OFF silently truncated early burst children. Queue overflow had no defined behavior. Burst at short parent durations produced sub-audible mush. All found during hardware verification, all required engine-level rework, none catchable by generator unit tests.</p>
+</div>
+<div class="action"><strong>Action:</strong> After engine foundations land, schedule a hardware output-verification pass covering gate timing, burst scheduling, queue overflow, and timing edge cases before building UI or advanced features.</div>
+
+<!-- ---- COMMUNICATION ---- -->
+
+<div class="lesson">
+<span class="tag tag-c">Communication</span>
+<strong>L8. Define MVP scope explicitly, freeze it, and enforce the freeze.</strong>
+A "post-MVP gates" section in the task plan is not a scope freeze — it's a wish list. Scope creep happens one reference module at a time. "MeloDICER has X, SIG has Y, Proteus has Z" turns into "we need X+Y+Z" without anyone making a deliberate decision to include all of them.
+<p class="evidence">Initial plan was a Vinx port. Expanded to include Marbles, Proteus patience/mutation, Tuesday burst, SIG probability weighting, MeloDICER direct controls, and a novel keyed-RNG engine. Each was a reasonable addition individually; collectively they produced 17 phases and multiple architecture rewrites.</p>
+</div>
+<div class="action"><strong>Action:</strong> Write a one-page scope document with explicit "in" and "deferred" lists. User signs off. Any addition after freeze requires a scope-change entry with impact assessment (RAM, time, architecture risk).</div>
+
+<div class="lesson">
+<span class="tag tag-c">Communication</span>
+<strong>L9. Freeze the vocabulary after the first draft.</strong>
+Control names and field semantics are a specification, not documentation that can be updated at any time. Renaming a control means renaming it everywhere: code, dictionary, UI labels, routing targets, tests, and commit messages. Partial renames create a confusing mess where different documents use different names for the same thing.
+<p class="evidence">Density → Mask → Density (repurposed). Character → Complexity. Rate → NoteDuration. Linearity → Repeat. AccentProb → Patience M. MarblesSteps → Steps sieve. Three dictionary rewrites. Agents reading code couldn't determine field liveness without cross-referencing 5+ phase documents.</p>
+</div>
+<div class="action"><strong>Action:</strong> After the architecture spike, commit a frozen dictionary. Vocabulary changes require a rename-audit commit that updates all references atomically.</div>
+
+<div class="lesson">
+<span class="tag tag-c">Communication</span>
+<strong>L10. Schedule adversarial reviews early — after foundations, not after features.</strong>
+An adversarial review after engine foundations catches state-ownership races, lifecycle bugs, and serialization gaps when they're cheap to fix. A review after 14 phases catches the same issues plus UI type-guard gaps and lock-identity bugs — now requiring architectural changes instead of design adjustments.
+<p class="evidence">The most valuable document produced was the adversarial review (stoch-review.md), but it arrived after Phase 14. The top finding — engine mutates project model state from the engine task — would have been a Phase 2 fix if the review had been scheduled after engine foundations.</p>
+</div>
+<div class="action"><strong>Action:</strong> Schedule adversarial reviews at two points: (1) after engine/model foundations land, focusing on state ownership, lifecycle safety, and serialization; (2) after output pipeline and lock mechanics land, focusing on timing, RAM, and output correctness.</div>
+
+<div class="lesson">
+<span class="tag tag-c">Communication</span>
+<strong>L11. Known bugs block new features. No exceptions.</strong>
+A bug catalog is a blocking work item, not a reference document. Continuing to build UI and advanced features on top of known serialization bugs, state-machine bugs, and timing bugs compounds technical debt and makes the bugs harder to fix (more code depends on buggy behavior).
+<p class="evidence">Phase 10.6 documented 12 confirmed bugs. Development continued into Phase 11 simplification, Phase 12 feature additions, hero page UI work, and Phase 14B architecture changes — all on top of the unfixed bugs. When Cluster A serialization bugs were finally fixed, the fixes had to account for 4 phases of code built on the broken foundation.</p>
+</div>
+<div class="action"><strong>Action:</strong> Adopt a "bugs first" policy: any cataloged bug with severity ≥ medium blocks all new feature commits. The bug catalog is a living document; new bugs found during feature work are added before continuing.</div>
+
+<div class="lesson">
+<span class="tag tag-c">Communication</span>
+<strong>L12. Architecture decisions require explicit user approval before implementation starts.</strong>
+Major model/engine redesigns are not implementation details that can be decided by the implementing agent. They affect RAM budget, save/load compatibility, user-visible behavior, and migration cost. "I drafted a new architecture and started implementing it" is not an acceptable workflow.
+<p class="evidence">Phase 14B seed+log model and Phase 16 flat-cell model were both drafted and partially implemented based on agent analysis. The parent/child model (Phase 7b) was built, debugged, hardware-verified, then replaced. User approval was implied by lack of objection rather than explicitly recorded.</p>
+</div>
+<div class="action"><strong>Action:</strong> Any phase that rewrites the core model or engine must be preceded by a decision brief: what changes, why, RAM impact, migration cost, alternatives considered. Implementation starts only after user acknowledgment is recorded in the task wiki.</div>
+
+<!-- ============================================================ -->
+<h2>3. Summary Table</h2>
+
+<table>
+  <thead>
+    <tr><th>#</th><th>Lesson (one-line)</th><th>Category</th><th>When to Apply</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>L1</td><td>Define state ownership before any code</td><td><span class="tag tag-t">Technical</span></td><td>Phase 0 — before implementation</td></tr>
+    <tr><td>L2</td><td>Embedded constraints gate design from day one</td><td><span class="tag tag-t">Technical</span></td><td>Phase 0 — reference code audit</td></tr>
+    <tr><td>L3</td><td>First complex user of a subsystem surfaces latent bugs</td><td><span class="tag tag-t">Technical</span></td><td>Before building on platform code in new ways</td></tr>
+    <tr><td>L4</td><td>Serialization round-trip test is the first test</td><td><span class="tag tag-t">Technical</span></td><td>Phase 1 — first test written</td></tr>
+    <tr><td>L5</td><td>Validate core identity model before building on it</td><td><span class="tag tag-t">Technical</span></td><td>Phase 0 — architecture spike</td></tr>
+    <tr><td>L6</td><td>Test control response at low values, not just extremes</td><td><span class="tag tag-t">Technical</span></td><td>After engine foundations</td></tr>
+    <tr><td>L7</td><td>Test output pipeline on hardware early</td><td><span class="tag tag-t">Technical</span></td><td>After engine foundations, before UI</td></tr>
+    <tr><td>L8</td><td>Freeze MVP scope and enforce the freeze</td><td><span class="tag tag-c">Communication</span></td><td>Phase 0 — before implementation</td></tr>
+    <tr><td>L9</td><td>Freeze vocabulary after first draft</td><td><span class="tag tag-c">Communication</span></td><td>After architecture spike</td></tr>
+    <tr><td>L10</td><td>Adversarial reviews after foundations, not after features</td><td><span class="tag tag-c">Communication</span></td><td>After engine/model foundations</td></tr>
+    <tr><td>L11</td><td>Known bugs block new features</td><td><span class="tag tag-c">Communication</span></td><td>Ongoing — every phase</td></tr>
+    <tr><td>L12</td><td>Architecture decisions require explicit user approval</td><td><span class="tag tag-c">Communication</span></td><td>Before any core rewrite phase</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2>4. Prerequisite Checklist for Future Projects</h2>
+
+<p>The following items must be completed and committed to the task wiki before Phase 1 implementation begins:</p>
+
+<table>
+  <thead>
+    <tr><th style="width:4%">✓</th><th style="width:42%">Item</th><th style="width:20%">Produces</th><th style="width:34%">Why</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>☐</td><td>State ownership table (every field, one owner each)</td><td>Wiki document</td><td>Prevents engine↔model races, wrong-owner fields, lifecycle bugs (L1)</td></tr>
+    <tr><td>☐</td><td>Embedded-compatibility audit of reference code</td><td>Banned-pattern list + replacement map</td><td>Prevents porting incompatible patterns into bare-metal code (L2)</td></tr>
+    <tr><td>☐</td><td>Architecture spike comparing ≥ 2 identity models</td><td>1-page comparison + user-signed choice</td><td>Prevents costly mid-project rewrites of the core data model (L5)</td></tr>
+    <tr><td>☐</td><td>Scope freeze document (in / deferred)</td><td>Wiki document with user sign-off</td><td>Prevents feature-by-feature scope creep (L8)</td></tr>
+    <tr><td>☐</td><td>Frozen vocabulary / dictionary</td><td>Committed dictionary file</td><td>Prevents rename churn and documentation inconsistency (L9)</td></tr>
+    <tr><td>☐</td><td>Platform subsystem audit (if first complex user)</td><td>Audit notes + bug fixes</td><td>Prevents latent platform bugs from causing hard faults (L3)</td></tr>
+  </tbody>
+</table>
+
+<div class="footer">
+  <p>Generated 2026-05-23 from task wiki entries, phase documents, git history, and adversarial review of the stochastic track implementation.</p>
+</div>
+
+</body>
+</html>

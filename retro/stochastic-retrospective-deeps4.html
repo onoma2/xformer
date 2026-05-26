@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stochastic Track Port — Retrospective</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background:#f5f0eb; color:#1a1a1a; max-width:900px; margin:0 auto; padding:40px 20px; line-height:1.6; }
+  h1 { font-size:1.6em; margin-bottom:8px; color:#2c1810; }
+  h2 { font-size:1.2em; margin:32px 0 12px; padding-bottom:6px; border-bottom:2px solid #d4a574; color:#4a3020; }
+  h3 { font-size:1em; margin:20px 0 8px; color:#5c3c28; }
+  p { margin:8px 0; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:0.92em; }
+  th, td { padding:8px 12px; border:1px solid #d4a574; text-align:left; vertical-align:top; }
+  th { background:#e8d5c4; font-weight:600; }
+  tr:nth-child(even) { background:#faf6f2; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:3px; font-size:0.78em; font-weight:600; margin-right:4px; }
+  .tag-t { background:#d4e6f1; color:#1a5276; }
+  .tag-c { background:#f5cba7; color:#935116; }
+  .meta { color:#7f6b5d; font-size:0.88em; margin-bottom:24px; }
+  ul { margin:8px 0 8px 20px; }
+  li { margin:4px 0; }
+  .callout { background:#fff; border-left:4px solid #d4a574; padding:12px 16px; margin:16px 0; border-radius:0 4px 4px 0; }
+  .callout strong { color:#5c3c28; }
+</style>
+</head>
+<body>
+
+<h1>Stochastic Track Port — Project Retrospective</h1>
+<p class="meta">May 17–24, 2026 · 95 commits across 3 branches · STM32 Eurorack firmware</p>
+
+<!-- ============================================================ -->
+<h2>1. Project Overview</h2>
+
+<p><strong>Objective:</strong> Port the Vinx fork's Stochastic track type to the XFORMER performer module, then extend it into a full generative sequencer with ticket-based probability shaping, Marbles-style distribution control, burst/ratchet support, loop/live source modes, and a deterministic lock/freeze mechanism — all within an STM32F405RGT (128 KB SRAM) budget.</p>
+
+<p><strong>Scope:</strong> A mono generative sequencer track type living alongside existing Note, Curve, Indexed, and Tuesday tracks. Generates CV/gate output from probability-weighted degree and duration tickets, with looper controls (window, mask, tilt, patience, mutate) and per-pattern 16-slot storage. UI surface spans four hero pages (Core/Marbles/Direct/Loop) plus ticket editor pages, all on a 128×64 monochrome OLED.</p>
+
+<p><strong>Timeline:</strong> ~7 days from first commit to current WIP branch (<code>feat/stochastic-seed-log</code>). Implementation is ongoing — the storage architecture redesign (Phase 14B seed+log, Phase 16 flat-cell, Phase 17 sequence reduction) is in progress.</p>
+
+<!-- ============================================================ -->
+<h2>2. Key Mistakes &amp; Challenges</h2>
+
+<h3>2.1 — Heap Allocation Crash on STM32 <span class="tag tag-t">technical</span></h3>
+<p>Each <code>StochasticTrackEngine</code> constructor called <code>new LockedParentEvent[64]</code>, allocating 5,888 B per track. The STM32F405 has ~12 KB free between end-of-<code>.bss</code> and top-of-stack, shared by heap and stack. Two stochastic tracks consumed 11,776 B — leaving 52 B for the call stack. The ARM <code>_sbrk</code> implementation does not check against the stack pointer, so <code>new</code> returned memory that silently overlapped the live stack. The firmware hardfaulted on reboot with no warning. The fix deleted the heap allocation outright and deferred the Lock feature redesign.</p>
+<p><strong>Root cause:</strong> Assuming host-environment heap semantics apply on a bare-metal MCU. The allocation did not overflow <code>.bss</code> or trigger a linker error — it consumed the dynamic headroom that the stack also needed.</p>
+
+<h3>2.2 — Host vs Target <code>sizeof</code> Mismatch <span class="tag tag-t">technical</span></h3>
+<p>Multiple features were RAM-costed using host-compiled <code>sizeof</code> estimates rather than ARM <code>sizeof</code> probes from the STM32 release build. Container alignment, <code>Routable&lt;&gt;</code> storage overhead, and compiler padding differ between x86 and ARM Cortex-M. Several design decisions (e.g., "we have room for this field") were made against incorrect numbers. PROJECT.md now mandates STM32 <code>sizeof</code> probes as the source of truth.</p>
+
+<h3>2.3 — Accent / Patience Storage Alias <span class="tag tag-t">technical</span></h3>
+<p>Two independent engine semantics — accent probability and patience-melody — shared one byte (<code>_accentProb</code>). Setting patience M to 100 (the "off" sentinel) silently caused every generated event to carry <code>accent=true</code>. The accent flag was never consumed by the audio path, so the bug was invisible at the output but corrupted downstream logic that depended on the byte's value. Fixed by killing the accent semantic entirely and renaming the field to <code>_patienceMelody</code>.</p>
+<p><strong>Root cause:</strong> Field repurposing without grep-auditing every read site. The rename from <code>_accentProb</code> to <code>_patienceMelody</code> was only cosmetic — the real fix required understanding who reads the byte and for what purpose.</p>
+
+<h3>2.4 — Track vs Sequence Ownership Confusion <span class="tag tag-t">technical</span></h3>
+<p>Phase 9 (V4 ownership correction) discovered that pitch tickets, rhythm/melody source modes, generator controls (complexity, rate, variation, rest, burst), evolution knobs (sleep, patience, mutate, jump), and even the loop-window rotate were all Track-owned. This meant switching patterns 1–16 did not recall different harmonic masks, rhythm styles, or evolution rules. A pattern was just an arbitrary 64-step loop window over global track settings — not a self-contained musical snapshot. The fix moved ~29 fields from Track to Sequence (16× multiplier on RAM), requiring a 48-bit event packing pass to stay under the NoteTrack container gate.</p>
+<p><strong>Root cause:</strong> The original Vinx port inherited a Track-owns-everything topology. No one asked "where does state live?" before building the engine. AGENTS.md lists this as the first invariant but it was skipped during the port.</p>
+
+<h3>2.5 — Serialization Symmetry Gaps <span class="tag tag-t">technical</span></h3>
+<p><code>StochasticSequence::clear()</code> and <code>sanitizeAfterRead()</code> knew about <code>_density</code>, <code>_durationTickets[]</code>, and <code>_level</code> — but <code>write()</code> and <code>read()</code> didn't. PHASE9-V4 explicitly warned that read/write order must remain symmetric. The gap was found during a systematic debugging pass (Phase 10.6 bug catalog), not during implementation. Also: <code>StochasticTrack::_lock</code> was serialized despite being declared engine-only (runtime transient) in the ownership table.</p>
+<p><strong>Root cause:</strong> Fields were added to clear/sanitize without updating write/read. No serialization round-trip test existed to catch the asymmetry.</p>
+
+<h3>2.6 — Burst Gate Scheduling: Parent OFF Masks Children <span class="tag tag-t">technical</span></h3>
+<p>The parent gate-OFF fired at <code>tick+10</code> (50% of a 1/16 parent), cutting any child whose ON landed before that offset. With 4 children at burstRate=50 in a 48-tick parent, child offsets were approximately 4, 9, 14, 19. Child 2 (offset 9) fired ON at tick+9, then the parent OFF at tick+10 forced it low — a 1-tick gate effectively lost. Two of four children were silently truncated. The fix skipped the parent OFF push entirely when children exist, letting the last child's OFF be the natural gate-low.</p>
+<p><strong>Root cause:</strong> Gate scheduling with nested events requires ordering analysis. The simple formula "parent gate = min(50% of duration, 10 ticks)" didn't account for children whose ON falls inside that window.</p>
+
+<h3>2.7 — Integer-Division Cliffs in Continuous Knobs <span class="tag tag-t">technical</span></h3>
+<p>Five places used <code>KNOB / N</code> integer division for 0..100 UI knobs mapped to small ranges. Knob values 1–2 silently produced zero effect (e.g., sleep knob at 2 produced 0 sleeps). Found in Variation, Complexity, Marbles Spread, Sleep, and Contour drift. Fixed uniformly by multiplying the triangle term by 10 before division. Also: <code>(sleep × 4 + 5) / 10</code> (round, was floor) so knob=2 → 1 sleep instead of 0.</p>
+<p><strong>Root cause:</strong> Using integer math for continuous knob ranges without checking the quantization floor. The pattern was copy-pasted across multiple pickers.</p>
+
+<h3>2.8 — Feature Scope Drift &amp; Architectural Churn <span class="tag tag-c">communication</span></h3>
+<p>The project went through V2 → V3 → V4 → V5 control granularity models, then Phase 11 simplification (collapsing 3 levels into flat list), Phase 12 follow-ups, Phase 13 feature planning, Phase 14 trunk vs seed+log, Phase 14B seed+log, Phase 15 pitch math review, Phase 16 flat-cell model, and Phase 17 sequence reduction. Each phase reworked the same surface area. 17 task-wiki documents span hundreds of lines, with cross-references marking older docs as "superseded." Commit messages reference phase numbers (P9, P11, Phase 16 P7) that are meaningless without the task wiki.</p>
+<p><strong>Root cause:</strong> Storage architecture (what gets stored vs what re-rolls, identity-as-output vs identity-as-recipe) was not decided before building the UI and engine layers. The design kept oscillating between "baked event tape" and "seed + knobs" models. No one asked "what is the identity of a pattern?" before writing code.</p>
+
+<h3>2.9 — Adversarial Review Ran Too Late <span class="tag tag-c">communication</span></h3>
+<p>Codex adversarial reviews flagged real bugs in the mutation pipeline, Mask/Tilt window scoping, and musicality cliffs AFTER Phase 12 landed. The fixes required reworking mutation targets, mask rank generation, burst divisor math, and continuous-knob math — all post-merge. Had the adversarial pass run continuously during implementation, several of the integer-division cliffs and window-scoping bugs would have been caught before they shipped.</p>
+
+<h3>2.10 — Reference Vocabulary Leak <span class="tag tag-c">communication</span></h3>
+<p>Terms from Proteus ("density", "complexity"), Marbles ("spread", "bias", "steps", "deja-vu"), Melodicer ("rate", "variation", "dice/realtime"), Tuesday ("burst"), and SIG ("tickets") leaked into code and documentation. The Phase 7 dictionary was created mid-project as a corrective — translating external vocabulary to Performer-native concepts. By that point, code already used the borrowed terms. The dictionary itself accumulated amendations as design decisions shifted (e.g., "divisor-relative" vs "absolute tick" duration tickets).</p>
+
+<!-- ============================================================ -->
+<h2>3. Lessons Learned</h2>
+
+<h3>Technical</h3>
+<table>
+<tr><th style="width:50px">#</th><th>Lesson</th><th>Trigger</th></tr>
+<tr><td>1</td><td><strong>Never heap-allocate on a bare-metal MCU without proving the stack margin.</strong> Pre-allocate via file-scope BSS arrays or linker-placed sections. If you must heap-allocate, verify <code>_sbrk</code> checks against the stack pointer — many embedded libc implementations don't.</td><td>Heap crash (2.1)</td></tr>
+<tr><td>2</td><td><strong>Run STM32 release <code>sizeof</code> probes as the source of truth for RAM costing.</strong> Host <code>sizeof</code> differs in alignment, padding, and template instantiation. Every feature-gate decision must be made against ARM numbers.</td><td>Host vs target sizeof (2.2)</td></tr>
+<tr><td>3</td><td><strong>Never alias two independent semantics onto one storage byte.</strong> If you repurpose a field, grep every read site and verify none of them depend on the old meaning. Renaming the C++ identifier is cosmetic — the bytes are positional in serialization.</td><td>Accent/patience alias (2.3)</td></tr>
+<tr><td>4</td><td><strong>Establish ownership contracts before implementation.</strong> Ask "where does state live?" for every field before writing the first line of engine code. Track-owns-everything is the wrong default for pattern-based sequencers.</td><td>Track vs sequence ownership (2.4)</td></tr>
+<tr><td>5</td><td><strong>Write serialization round-trip tests before implementing serialization.</strong> A test that writes, clears, reads back, and asserts equality catches every field-mismatch bug immediately. Without it, the gap between clear/sanitize and write/read grows silently.</td><td>Serialization symmetry (2.5)</td></tr>
+<tr><td>6</td><td><strong>Gate scheduling with nested events requires ordering analysis.</strong> Draw the timeline of parent gate-ON, parent gate-OFF, and each child's ON/OFF before implementing. A simple "parent OFF at 50% duration" rule breaks when children fire inside that window.</td><td>Burst gate masking (2.6)</td></tr>
+<tr><td>7</td><td><strong>For 0..100 UI knobs mapped to small ranges, multiply before dividing.</strong> <code>KNOB / N</code> integer division creates dead zones at low knob values. Scale the numerator by 10 (or use floating point) so the quantization floor doesn't swallow the first few knob positions.</td><td>Integer-division cliffs (2.7)</td></tr>
+<tr><td>8</td><td><strong>Design the storage model and identity contract before building UI and engine layers.</strong> Oscillating between "baked event tape" and "seed + knobs" rewrites the entire system each time. The identity question ("what makes a pattern a pattern?") must be answered first.</td><td>Scope drift (2.8)</td></tr>
+</table>
+
+<h3>Communication</h3>
+<table>
+<tr><th style="width:50px">#</th><th>Lesson</th><th>Trigger</th></tr>
+<tr><td>9</td><td><strong>Use task-oriented naming, not numbered milestone tracking for rapid iteration.</strong> Phase numbers (P9, P11, Phase 16) leak into commits and become cognitive overhead. They imply a linear progression that doesn't match the actual design oscillation. Name documents by what they decide, not where they fall in a sequence.</td><td>Scope drift (2.8)</td></tr>
+<tr><td>10</td><td><strong>Aggressively consolidate documentation.</strong> Every doc that says "See also X, which supersedes Y" is a navigation tax. After a design shift, merge the surviving decisions into one current document and mark the old ones as historical appendices — don't leave a chain of partially-outdated references.</td><td>Documentation debt (2.8, 2.10)</td></tr>
+<tr><td>11</td><td><strong>Run adversarial review continuously during implementation, not as a post-landing gate.</strong> Codex reviews caught real bugs (mutation pipeline, window scoping, musicality cliffs) after Phase 12 landed. Integrating review into the development loop would have caught several of these before merge.</td><td>Late adversarial review (2.9)</td></tr>
+<tr><td>12</td><td><strong>Translate external reference vocabulary to project-native terms before coding begins.</strong> Borrowing Proteus/Marbles/Melodicer names for knobs and code identifiers creates a layer of indirection. The names carry assumptions from their original systems. Define a project-native vocabulary first; reference external modules in design notes, not in user-facing labels or code.</td><td>Vocabulary leak (2.10)</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>4. Recommended Actions</h2>
+
+<h3>Technical — to prevent recurrence in future projects</h3>
+
+<table>
+<tr><th style="width:50px">R#</th><th>Action</th><th>Prevents</th></tr>
+<tr><td>R1</td><td><strong>RAM gate checklist for every feature branch.</strong> Before merging: build STM32 release, run <code>arm-none-eabi-size</code>, check <code>.data + .bss</code> against the hard-warning zone (120 KB), check <code>.ccmram_bss</code>, and measure <code>sizeof</code> for the changed track/engine types. Record the numbers in the commit message or a status file.</td><td>Heap crash, sizeof mismatch (2.1, 2.2)</td></tr>
+<tr><td>R2</td><td><strong>No heap allocation in engine constructors.</strong> Add a lint rule or review gate that flags <code>new</code> / <code>malloc</code> in any file under <code>src/apps/sequencer/engine/</code>. Pre-allocated file-scope arrays (like <code>gDirectHistory</code>) are the established pattern.</td><td>Heap crash (2.1)</td></tr>
+<tr><td>R3</td><td><strong>Serialization test as part of model implementation.</strong> Any <code>write()</code>/<code>read()</code> pair must have a corresponding test that writes known values, clears, reads back, and asserts equality. Run this test on every commit that adds or reorders a serialized field.</td><td>Serialization symmetry (2.5)</td></tr>
+<tr><td>R4</td><td><strong>Ownership audit as a design gate before engine code.</strong> Before writing <code>triggerStep</code> or <code>generateRhythm</code>, produce a one-page table answering "sequence-owned or track-owned or engine-only?" for every field. Review it against the pattern-switch use case. The table from PHASE9-V4 is the template.</td><td>Track vs sequence confusion (2.4), field aliasing (2.3)</td></tr>
+<tr><td>R5</td><td><strong>Gate scheduling test with multiple burst children.</strong> Add a test that generates a parent with 4 children at short duration (e.g., 48 ticks) and asserts every child's gate-ON precedes its gate-OFF and no child's gate is truncated by the parent's gate-OFF. Run on every commit that touches burst or gate logic.</td><td>Burst gate masking (2.6)</td></tr>
+<tr><td>R6</td><td><strong>Continuous knob math review.</strong> For any 0..100 knob that drives a range smaller than 10, verify with a table: knob=0 → output, knob=1 → output, knob=2 → output, knob=50 → output, knob=100 → output. Flag any dead zone where the first N knob positions produce identical output. The Phase 12 musicality fix (×10 scaling) is the pattern to follow.</td><td>Integer-division cliffs (2.7)</td></tr>
+</table>
+
+<h3>Communication — to prevent recurrence in future projects</h3>
+
+<table>
+<tr><th style="width:50px">R#</th><th>Action</th><th>Prevents</th></tr>
+<tr><td>R7</td><td><strong>Design the storage/identity contract before implementation.</strong> Before writing a single line of code for a new track type or major feature, answer: "What is the identity of a pattern? Does it store baked output or a recipe? Does changing a knob change locked playback?" Write the answer in one document. Do not start coding until it's stable.</td><td>Architectural churn (2.8)</td></tr>
+<tr><td>R8</td><td><strong>Merge, don't chain, design documents.</strong> After a design shift, produce ONE current document and append a "Prior art" section with links to the superseded docs. Do not leave a chain of N documents where doc K says "see doc K+1 for the current version." The reader should only need to open one file.</td><td>Documentation debt (2.8, 2.10)</td></tr>
+<tr><td>R9</td><td><strong>Run a vocabulary audit before coding.</strong> For any feature inspired by an external module (Proteus, Marbles, Melodicer, Tuesday, SIG), produce a translation table: "External term → Our term → What it actually does." Stick to the project-native terms in code, UI labels, and user-facing docs. Reference external modules in a "Credits" or "Inspiration" section only.</td><td>Vocabulary leak (2.10)</td></tr>
+<tr><td>R10</td><td><strong>Integrate adversarial review into the development loop.</strong> On every branch that changes >50 lines in the engine path, run a focused adversarial pass BEFORE merging. The Codex pattern (3–4 targeted reviews) found real bugs in this project. Make it a habit, not an afterthought.</td><td>Late bug discovery (2.9)</td></tr>
+</table>
+
+</body>
+</html>

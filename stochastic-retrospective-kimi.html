@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stochastic Track — General Lessons for Future Projects</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 40px auto; max-width: 900px; line-height: 1.55; color: #222; background: #f8f9fa; }
+  h1 { font-size: 1.6rem; border-bottom: 2px solid #dee2e6; padding-bottom: .3rem; margin-top: 2rem; }
+  h2 { font-size: 1.25rem; margin-top: 1.6rem; color: #343a40; }
+  h3 { font-size: 1.05rem; margin-top: 1.3rem; color: #495057; }
+  p, li { font-size: 0.95rem; }
+  ul { padding-left: 1.4rem; }
+  li { margin-bottom: .35rem; }
+  table { width: 100%; border-collapse: collapse; margin: .8rem 0 1.2rem; font-size: 0.92rem; background: #fff; }
+  th, td { border: 1px solid #dee2e6; padding: .5rem .6rem; text-align: left; vertical-align: top; }
+  th { background: #e9ecef; font-weight: 600; }
+  .tag { display: inline-block; padding: .15rem .45rem; border-radius: 999px; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+  .tag-comm { background: #fff3cd; color: #856404; }
+  .tag-tech { background: #d1ecf1; color: #0c5460; }
+  .tag-mix { background: #f8d7da; color: #721c24; }
+  .summary { background: #fff; border: 1px solid #dee2e6; border-radius: 6px; padding: 1rem 1.2rem; margin: .6rem 0 1.2rem; }
+  .summary p { margin: .3rem 0; }
+  .principle { background: #fff; border-left: 4px solid #adb5bd; padding: .8rem 1rem; margin: .6rem 0 1rem; }
+  .principle.comm { border-left-color: #ffc107; }
+  .principle.tech { border-left-color: #17a2b8; }
+  .principle strong { display: block; margin-bottom: .25rem; }
+  hr { border: none; border-top: 1px solid #dee2e6; margin: 2rem 0; }
+  .future { background: #fff; border: 1px solid #ced4da; border-radius: 6px; padding: 1rem 1.2rem; margin: .6rem 0 1.2rem; }
+</style>
+</head>
+<body>
+
+<h1>Stochastic Track — General Lessons for Future Projects</h1>
+
+<div class="summary">
+  <p><strong>Context:</strong> Implementing a probability-driven sequencer track inside a RAM-constrained STM32 Eurorack firmware.</p>
+  <p><strong>Commits:</strong> 107 across 6 days (May 17–22, 2026).</p>
+  <p><strong>Focus of this document:</strong> Generalizable lessons extracted from the specific mistakes and challenges, intended to guide future projects.</p>
+</div>
+
+<hr>
+
+<h1>1. Project Overview (Brief)</h1>
+
+<div class="summary">
+  <p><strong>Objective:</strong> Port and extend a stochastic sequencer track into Performer's native architecture — model, engine, and UI — while staying under strict RAM/CCMRAM gates.</p>
+  <p><strong>Key challenge:</strong> The project went through rapid architectural iterations (V3 → V4 → V5, Phases 7–16), multiple adversarial reviews, and several hard-reboot bugs before stabilizing.</p>
+  <p><strong>Outcome:</strong> Hardware-stable implementation with four hero UI pages, deterministic generators, and a chosen future direction (seed+log architecture). The real value for the organization is the process lessons below.</p>
+</div>
+
+<hr>
+
+<h1>2. General Lessons for Future Projects</h1>
+
+<h2>Communication & Process</h2>
+
+<div class="principle comm">
+  <strong>1. Maintain exactly one living specification; archive everything else.</strong>
+  <p>This project accumulated overlapping documents (V3, V4, V5, Phase 7 through 12) with contradictory definitions for the same terms. Implementation drifted depending on which document the current developer read last. <em>For future projects:</em> designate one file as the contract. Move all outdated versions into an <code>archive/</code> folder and prepend explicit deprecation notices. If a term changes meaning, rename it everywhere or the old spec becomes a landmine.</p>
+</div>
+
+<div class="principle comm">
+  <strong>2. Ground-truth the model before designing the visual layer.</strong>
+  <p>Eleven poetic UI preview variants were rendered in Python before the canonical control vocabulary was extracted from existing codebase patterns. The beautiful previews assumed controls that did not yet exist in the real C++ structs. <em>For future projects:</em> require header-file field names, ranges, and defaults to be frozen before any visual design begins. The UI layer must map 1:1 to real struct members, not to aspirational concepts.</p>
+</div>
+
+<div class="principle comm">
+  <strong>3. Write acceptance criteria for feel changes; do not rely on verbal agreement.</strong>
+  <p>Major audible behavior shifts (baked repeat vs floating, per-cycle Live regen, project migration loss) were accepted in design sessions but not always recorded before code moved forward. <em>For future projects:</em> any change that alters user-facing behavior must have a written checklist that is explicitly signed off before implementation starts. Verbal acceptance evaporates when the person who gave it is no longer on the thread.</p>
+</div>
+
+<div class="principle comm">
+  <strong>4. Cross-reference architecture decisions in source files, not just wikis.</strong>
+  <p>Critical fixes (Container destructor leak, engine rebuild order) were logged in the task wiki, but subsequent developers rediscovered the same bugs independently because they edited the source without reading the wiki first. <em>For future projects:</em> add a one-line comment in the relevant header file pointing to the wiki decision. Wikis are passive; source comments are active.</p>
+</div>
+
+<div class="principle comm">
+  <strong>5. Treat duplicate or ambiguous labels as bugs, even if the code compiles.</strong>
+  <p>After renaming "Character" to "Complexity," both the old enum entry and the new entry remained in the UI list model, both displayed as "Complexity." Users could not distinguish them, and bug reports became impossible to interpret. <em>For future projects:</em> every rename commit must include a grep pass for the old label in list models, footer strings, and documentation. If two controls share a label, one must change or one must be deleted.</p>
+</div>
+
+<h2>Architecture & State Ownership</h2>
+
+<div class="principle tech">
+  <strong>6. Const-cast in an engine is an alarm bell for state ownership.</strong>
+  <p>When the engine task cast away constness to write generated events back into the model sequence, the architecture lost its invariant. The engine and UI tasks then raced on the same packed memory without a write lock. <em>For future projects:</em> treat any <code>const_cast</code> that enables mutation as a code-review stop. Either move the output to engine-owned runtime state, or define a locked write path with clear ownership. State ownership is not a style issue; it is a correctness issue.</p>
+</div>
+
+<div class="principle tech">
+  <strong>7. Pattern identity must follow the cache.</strong>
+  <p>The lock replay buffer was keyed only by array index. Changing project patterns while Lock was active replayed cached events from the previous pattern at the same index, producing musically random output. <em>For future projects:</em> any cache that outlives a context switch needs an identity tag (pattern ID, scene ID, bank number) or must be explicitly invalidated on every transition. Caches without identity are time bombs.</p>
+</div>
+
+<div class="principle tech">
+  <strong>8. Variant storage must type-erase and invoke destructors.</strong>
+  <p>The project's <code>Container&lt;A,B,C&gt;</code> placement-new'd the next occupant without calling the previous one's destructor. A heap-allocated lock buffer leaked ~1.8 KB on every track-mode switch, exhausting the STM32 heap and causing hard reboots. <em>For future projects:</em> any union, variant, or type-erased buffer must store a destructor thunk and invoke it on replacement and on scope exit. This is generic infrastructure, not a feature-specific concern.</p>
+</div>
+
+<div class="principle tech">
+  <strong>9. Enforce tick-order invariants at the architecture level.</strong>
+  <p>A single-line fix — moving <code>updateTrackSetups()</code> before clock-event processing — eliminated a hard-reboot bug where an engine accessed model memory that had already been repurposed. <em>For future projects:</em> document the invariant explicitly ("engine containers always match model trackMode before any engine code runs") and assert it in code if possible. On embedded systems, ordering bugs become reboots, not exceptions.</p>
+</div>
+
+<h2>UI & Embedded Safety</h2>
+
+<div class="principle tech">
+  <strong>10. Type-specific pages must guard every callback locally.</strong>
+  <p>Multiple draw/LED/input paths called <code>selectedTrack().stochasticTrack()</code> without verifying the track mode. Project load and mode mutations outside the normal navigation path left stale pages alive, leading to type-specific accessors on wrong memory layouts. <em>For future projects:</em> every page that calls a type-specific accessor must early-return if the mode mismatch is detected. Do not assume the navigation layer will always replace the page first.</p>
+</div>
+
+<div class="principle tech">
+  <strong>11. Never expose a control that has no engine branch.</strong>
+  <p><code>PlayMode</code> (Aligned / Free) was persisted and shown in the config UI, but the engine never branched on it. Users saw a control with no audible effect, creating false expectations and wasting support time. <em>For future projects:</em> if a parameter is not wired to behavior, hide it from the UI and do not serialize it. An unimplemented control is worse than a missing one because users will report it as broken.</p>
+</div>
+
+<h2>Testing & Math</h2>
+
+<div class="principle tech">
+  <strong>12. Serialization symmetry must be proven by a round-trip test, not by eye.</strong>
+  <p>Three pattern-defining fields were initialized by <code>clear()</code> but never written or read. Save/load silently dropped generative identity. Conversely, transient engine state (<code>_lock</code>) was serialized, violating the ownership contract. <em>For future projects:</em> require a TDD round-trip test for every new model type: set non-default values, write, clear, read back, assert equality. This test is cheaper than a hardware debugging session.</p>
+</div>
+
+<div class="principle tech">
+  <strong>13. State machines need explicit reset and restart coverage.</strong>
+  <p>The ticket-mode timing state worked during normal playback but was uninitialized on <code>resetMeasure()</code> and <code>restart()</code>, causing up to 384 ticks of silence or machine-gun retriggering. <em>For future projects:</em> every state variable introduced for a mode must be explicitly initialized in <code>reset()</code>, <code>restart()</code>, and <code>clear()</code>. Reset paths are where state machines break; they deserve their own test cases.</p>
+</div>
+
+<div class="principle tech">
+  <strong>14. Audit probability kernels for integer-division cliffs.</strong>
+  <p>Five separate picker kernels used <code>knob / N</code> integer division, creating silent cliffs at low knob values. A user setting a knob to 10 got audibly identical output to a knob at 0 because the division truncated to zero. <em>For future projects:</em> grep for division by constants inside probability kernels. Either replace with scaled multiplication or document why floor behavior is musically intended. Probability math that collapses to zero at non-zero settings is a UX failure.</p>
+</div>
+
+<div class="principle tech">
+  <strong>15. Default values must exercise the feature, not collapse it.</strong>
+  <p>A default variation of 0 collapsed the duration picker to a single deterministic slot, and all Bernoulli probabilities defaulted to 0. Pressing "New Pattern" at defaults produced identical output, so users thought the feature was broken. <em>For future projects:</em> review every new parameter's default. If zero means "feature is effectively off," raise the default to the minimum audible setting and document why.</p>
+</div>
+
+<h2>Memory & Hardware</h2>
+
+<div class="principle tech">
+  <strong>16. Heap allocation on firmware is a last resort, not a convenience.</strong>
+  <p>The heap-allocated lock buffer saved CCMRAM on paper but introduced a crash vector under sustained load. It was later removed after a hardware failure. <em>For future projects:</em> prefer static pools, engine-owned CCMRAM with explicit size gates, or bounded project-owned pools. If heap is unavoidable, expose allocation failure through UI feedback and disable the feature when unavailable. Silent failure on RAM-critical firmware is unacceptable.</p>
+</div>
+
+<div class="principle tech">
+  <strong>17. Macro controls must be one-to-one with single fields.</strong>
+  <p>Original L1 macros wrote through to multiple sequence fields in lockstep, clobbering explicit user edits at lower levels. The redesign made each macro write exactly one field, with engine-clever derivation handling the sophistication. <em>For future projects:</em> macros that fan out to multiple fields create hidden coupling and destroy user agency. One knob, one field. Sophistication belongs in the engine, not in the edit path.</p>
+</div>
+
+<div class="principle tech">
+  <strong>18. Queue-based scheduling needs envelope semantics for overlapping events.</strong>
+  <p>Independent gate-ON/OFF pushes into a sorted queue created truncation when a parent OFF preceded a child ON. Burst children were silently cut to 1-tick gates. <em>For future projects:</em> when scheduling multiple related events into a queue, define whether the parent event's OFF is authoritative or whether child events extend the envelope. Document the tie-breaking rule for same-tick collisions.</p>
+</div>
+
+<hr>
+
+<h1>3. Recommended Actions for Future Projects</h1>
+
+<h2>Process Changes</h2>
+
+<table>
+  <tr><th style="width:28%">Action</th><th>How to implement</th><th style="width:10%">Priority</th></tr>
+  <tr>
+    <td>Single living spec policy</td>
+    <td>At project kickoff, create <code>CONTRACT.md</code>. Every design iteration overwrites it; old versions move to <code>archive/</code> with a deprecation header. No engineer may reference an archived doc for implementation truth.</td>
+    <td>High</td>
+  </tr>
+  <tr>
+    <td>Model-freeze gate before UI design</td>
+    <td>Require a checklist item: "Header file fields are frozen and match UI control map 1:1." No pixel renders until this is checked.</td>
+    <td>High</td>
+  </tr>
+  <tr>
+    <td>Written acceptance bar for feel changes</td>
+    <td>Any user-visible behavior change must add a bullet to the task wiki acceptance bar before the commit lands. Verbal agreement is not sufficient.</td>
+    <td>High</td>
+  </tr>
+  <tr>
+    <td>Source-to-wiki back-references</td>
+    <td>Every architecture decision recorded in a wiki must have a corresponding one-line comment in the relevant header file with a URL or path to the wiki entry.</td>
+    <td>Medium</td>
+  </tr>
+  <tr>
+    <td>Label audit on every rename</td>
+    <td>Add a CI script or pre-commit check that greps for old labels in <code>*ListModel*</code>, <code>*Page*</code>, and <code>manuals/</code> after any enum or field rename.</td>
+    <td>Medium</td>
+  </tr>
+</table>
+
+<h2>Technical Checklists</h2>
+
+<table>
+  <tr><th style="width:28%">Action</th><th>How to implement</th><th style="width:10%">Priority</th></tr>
+  <tr>
+    <td>Const-cast review stop</td>
+    <td>Treat any <code>const_cast</code> that enables mutation as a mandatory code-review block. Require a written justification of state ownership before approval.</td>
+    <td>Critical</td>
+  </tr>
+  <tr>
+    <td>Cache identity tags</td>
+    <td>Every runtime cache that persists across pattern/scene/track changes must store an identity field or an explicit invalidation trigger.</td>
+    <td>Critical</td>
+  </tr>
+  <tr>
+    <td>Variant destructor test</td>
+    <td>Add a generic unit test that constructs, destroys, and re-constructs every track engine type inside a Container, verifying no leaks or stale references.</td>
+    <td>High</td>
+  </tr>
+  <tr>
+    <td>Tick-order invariant comment</td>
+    <td>In <code>Engine::update()</code>, add an explicit comment documenting the invariant and a one-line assertion (or static analysis note) if the platform supports it.</td>
+    <td>High</td>
+  </tr>
+  <tr>
+    <td>Page-local mode guards</td>
+    <td>Add an automated check (lint or review script) that every type-specific page calls <code>trackMode() == Expected</code> at entry to draw/LED/input callbacks.</td>
+    <td>High</td>
+  </tr>
+  <tr>
+    <td>Serialization round-trip test</td>
+    <td>For every new model type, require a test that sets every field to a non-default value, writes, clears, reads back, and asserts equality. Run before every hardware verification.</td>
+    <td>High</td>
+  </tr>
+  <tr>
+    <td>Reset/restart coverage checklist</td>
+    <td>When adding state variables for a new mode, require initialization in <code>reset()</code>, <code>restart()</code>, and <code>clear()</code>. Reviewers must verify this explicitly.</td>
+    <td>High</td>
+  </tr>
+  <tr>
+    <td>Probability kernel audit</td>
+    <td>Run a one-time audit and a CI grep rule for <code>/ [0-9]+</code> inside <code>generate*</code> and <code>pick*</code> functions. Flag for manual review.</td>
+    <td>Medium</td>
+  </tr>
+  <tr>
+    <td>Default-value audibility review</td>
+    <td>At feature completion, review every new parameter's default. If zero collapses the feature, raise it and document the rationale in the header file.</td>
+    <td>Medium</td>
+  </tr>
+  <tr>
+    <td>Heap-allocation UI feedback</td>
+    <td>If heap allocation is unavoidable, the UI must show a diagnostic and disable the feature on failure. Add this to the UI review checklist.</td>
+    <td>Medium</td>
+  </tr>
+  <tr>
+    <td>Unimplemented-control sweep</td>
+    <td>Before shipping, grep for model fields that are serialized or shown in UI but never read by the engine. Either wire them or remove them.</td>
+    <td>High</td>
+  </tr>
+</table>
+
+<hr>
+
+<h1>4. Summary: Principles at a Glance</h1>
+
+<table>
+  <tr><th style="width:14%">Area</th><th>Principle</th><th style="width:12%">Category</th></tr>
+  <tr><td>Specs</td><td>One living document; archive everything else.</td><td><span class="tag tag-comm">Communication</span></td></tr>
+  <tr><td>Design</td><td>Model before pixels.</td><td><span class="tag tag-comm">Communication</span></td></tr>
+  <tr><td>Decisions</td><td>Write acceptance criteria; do not rely on memory.</td><td><span class="tag tag-comm">Communication</span></td></tr>
+  <tr><td>Documentation</td><td>Cross-reference decisions in source, not just wikis.</td><td><span class="tag tag-comm">Communication</span></td></tr>
+  <tr><td>Labels</td><td>Duplicate labels are bugs, not polish issues.</td><td><span class="tag tag-comm">Communication</span></td></tr>
+  <tr><td>State</td><td>Const-cast is an ownership alarm.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>Caches</td><td>Identity must follow the cache across context switches.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>Variants</td><td>Placement-new must invoke the prior destructor.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>Timing</td><td>Document and enforce tick-order invariants.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>UI safety</td><td>Type-specific pages guard every callback locally.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>Controls</td><td>Never expose an unimplemented parameter.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>Persistence</td><td>Serialization symmetry must be tested, not assumed.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>State machines</td><td>Reset and restart paths need explicit test coverage.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>Math</td><td>Audit probability kernels for integer-division cliffs.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>Defaults</td><td>Defaults must exercise the feature, not collapse it.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>Memory</td><td>Treat heap allocation on firmware as a last resort.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>Macros</td><td>One knob, one field. Sophistication belongs in the engine.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+  <tr><td>Scheduling</td><td>Define envelope semantics for overlapping queued events.</td><td><span class="tag tag-tech">Technical</span></td></tr>
+</table>
+
+<p style="margin-top:2rem; color:#6c757d; font-size:.85rem;">
+  Derived from <code>feat/stochastic</code> git history, task wiki entries, phase documents, and adversarial reviews. Generalized for application to future firmware and product projects.
+</p>
+
+</body>
+</html>

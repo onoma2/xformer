@@ -312,26 +312,32 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
         canvas.setFont(Font::Tiny);
         canvas.setColor(Color::Medium);
         FixedStringBuilder<16> s;
-        // Grid-locked 6-column strip: label padded to 2 chars, value
-        // right-aligned in fixed-width field so digit changes never
-        // shift the next chip. 11 important knobs only.
+        // 8-column grid, 32 px per column, starting at x=8. All 16 knobs.
         const int col0 = 8;
-        const int colStep = 40;
+        const int colStep = 32;
         const int yTop = 18;
         const int yBot = 24;
 
-        s.reset(); s("%-2s%3d", "D",  duration);   canvas.drawText(col0 + 0 * colStep, yTop, s);
-        s.reset(); s("%-2s%3d", "V",  variation);  canvas.drawText(col0 + 1 * colStep, yTop, s);
-        s.reset(); s("%-2s%3d", "R",  rest);       canvas.drawText(col0 + 2 * colStep, yTop, s);
-        s.reset(); s("%-2s%3d", "BU", burst);      canvas.drawText(col0 + 3 * colStep, yTop, s);
-        s.reset(); s("%-2s%3d", "BC", burstCount); canvas.drawText(col0 + 4 * colStep, yTop, s);
-        s.reset(); s("%-2s%3d", "BR", burstRate);  canvas.drawText(col0 + 5 * colStep, yTop, s);
+        // Top row (slots 0..7): rhythm + articulation, burst pair on right.
+        FixedStringBuilder<16> durStr; durationLabel(durStr);
+        s.reset(); s("D %s",  static_cast<const char*>(durStr)); canvas.drawText(col0 + 0 * colStep, yTop, s);
+        s.reset(); s("V %d",  variation);   canvas.drawText(col0 + 1 * colStep, yTop, s);
+        s.reset(); s("R %d",  rest);        canvas.drawText(col0 + 2 * colStep, yTop, s);
+        s.reset(); s("F %d",  feel);        canvas.drawText(col0 + 3 * colStep, yTop, s);
+        s.reset(); s("G %d",  gateLength);  canvas.drawText(col0 + 4 * colStep, yTop, s);
+        s.reset(); s("A %d",  legato);      canvas.drawText(col0 + 5 * colStep, yTop, s);
+        s.reset(); s("B %d",  burst);       canvas.drawText(col0 + 6 * colStep, yTop, s);
+        s.reset(); s("C %d",  burstCount);  canvas.drawText(col0 + 7 * colStep, yTop, s);
 
-        s.reset(); s("%-2s%3d",  "E", repeats);    canvas.drawText(col0 + 0 * colStep, yBot, s);
-        s.reset(); s("%-2s%3d",  "S", spread);     canvas.drawText(col0 + 1 * colStep, yBot, s);
-        s.reset(); s("%-2s%+4d", "O", contour);    canvas.drawText(col0 + 2 * colStep, yBot, s);
-        s.reset(); s("%-2s%3d",  "X", complexity); canvas.drawText(col0 + 3 * colStep, yBot, s);
-        s.reset(); s("%-2s%3d",  "I", bias);       canvas.drawText(col0 + 4 * colStep, yBot, s);
+        // Bottom row (slots 8..15): pitch shape, repeat standalone, burst rate corner.
+        s.reset(); s("X %d",  complexity);  canvas.drawText(col0 + 0 * colStep, yBot, s);
+        s.reset(); s("O %+d", contour);     canvas.drawText(col0 + 1 * colStep, yBot, s);
+        s.reset(); s("I %d",  bias);        canvas.drawText(col0 + 2 * colStep, yBot, s);
+        s.reset(); s("S %d",  spread);      canvas.drawText(col0 + 3 * colStep, yBot, s);
+        s.reset(); s("N %d",  seq.range()); canvas.drawText(col0 + 4 * colStep, yBot, s);
+        s.reset(); s("L %d",  slide);       canvas.drawText(col0 + 5 * colStep, yBot, s);
+        s.reset(); s("E %d",  repeats);     canvas.drawText(col0 + 6 * colStep, yBot, s);
+        s.reset(); s("T %d",  burstRate);   canvas.drawText(col0 + 7 * colStep, yBot, s);
     }
 
     // Footer mirrors LOOP page. Shift swaps NewR / NewM labels to Undo.

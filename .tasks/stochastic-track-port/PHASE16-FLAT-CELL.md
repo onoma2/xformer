@@ -56,6 +56,8 @@ Routing target: reuse `Routing::Target::StochasticReserved` (ID 67, currently un
    - `Burst` (probability) = chance this cell starts a cluster.
    - `BurstCount` = how many consecutive cells the cluster spans.
    - `BurstRate` = **denominator applied to the previous cell's duration**. cluster_cell_duration = `prev_cell_duration / BurstRate_denom`. denom ∈ {2,3,4,5,6} — the same set today's burst spacing uses. Cluster cell durations are arbitrary ticks; they do NOT have to land on a LUT slot, which is what produces genuine polyrhythmic placement (e.g. prev=×1 at 48 ticks, denom=3 → cluster cells at 16 ticks = triplet-of-1/16 spacing, unreachable from the LUT alone).
+   - `BurstRate` (ui/code) should use an exponential/log-shaped knob curve over denominator selection, not a linear "more tiny values" curve. Low = loose echo, mid = musical subdivision, high = tight flurry.
+   - Denominator field stays musical and bounded: core {2,3,4,5,6}; optional longer-cell extensions {8,12} only if the resulting cluster cell remains audible. Do not replace this with pure powers like {2,4,8,16}; odd denominators carry the 3/5 feel.
    - All `BurstCount` cluster cells emit at the same cluster_cell_duration. Generator returns to LUT picking after the cluster ends.
    - `BurstPitch::Parent` = cluster cells inherit the cluster-starting cell's degree+octave.
    - `BurstPitch::Generate` = each cluster cell rolls its own pitch via the keyed-RNG → generateDegree path.

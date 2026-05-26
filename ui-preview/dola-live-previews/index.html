@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stochastic Live Page - Three Poetic Redesigns</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            line-height: 1.55;
+            padding: 32px 16px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; }
+        h2 { font-size: 1.25rem; font-weight: 600; margin: 32px 0 12px; color: #2563eb; }
+        .subtitle { font-size: 0.95rem; color: #6b7280; margin-bottom: 24px; }
+        .concept {
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 16px 0;
+        }
+        .concept h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #1e40af;
+        }
+        .concept img {
+            max-width: 100%;
+            border: 2px solid #333;
+            image-rendering: pixelated;
+            border-radius: 4px;
+            margin: 12px 0;
+        }
+        .concept ul { margin: 12px 0 12px 24px; }
+        .concept li { margin: 6px 0; }
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: #dbeafe;
+            color: #1d4ed8;
+            margin-right: 8px;
+        }
+        .inspiration {
+            font-size: 0.85rem;
+            color: #6b7280;
+            margin-top: 8px;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin: 24px 0;
+        }
+        .comparison-item {
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            padding: 16px;
+        }
+        .comparison-item h4 {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2563eb;
+        }
+        footer {
+            margin-top: 48px;
+            padding-top: 16px;
+            border-top: 1px solid #e5e5e5;
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 0.9rem;
+        }
+        .summary-table th, .summary-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border: 1px solid #e5e5e5;
+            vertical-align: top;
+        }
+        .summary-table th {
+            background: #eff6ff;
+            font-weight: 600;
+            color: #1e40af;
+        }
+        .summary-table tr:nth-child(even) { background: #fafafa; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Stochastic Live Page - Three Poetic Redesigns</h1>
+    <p class="subtitle">Conceptual redesigns for the Stochastic track's LIVE page, drawing inspiration from norns sequencers</p>
+
+    <div class="summary-table">
+        <thead>
+            <tr>
+                <th>Concept</th>
+                <th>Core Metaphor</th>
+                <th>Inspiration</th>
+                <th>Strengths</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Pond Ripples</strong></td>
+                <td>Events drop like stones into water</td>
+                <td>Direct original concept from pages_levels.py</td>
+                <td>Most similar to current Marbles haze; familiar visual language</td>
+            </tr>
+            <tr>
+                <td><strong>Star Drift</strong></td>
+                <td>Stars born at right edge, drifting left</td>
+                <td>norns constellations.lua</td>
+                <td>Cosmic, musical feel; constellation lines show pitch relationships</td>
+            </tr>
+            <tr>
+                <td><strong>Spiral Rotation</strong></td>
+                <td>Events arranged along golden-ratio spiral</td>
+                <td>norns spirals.lua</td>
+                <td>Unique visual identity; naturally shows cycling patterns</td>
+            </tr>
+        </tbody>
+    </div>
+
+    <h2>Concept 1: Pond Ripples</h2>
+    <div class="concept">
+        <span class="tag">Water Metaphor</span>
+        <span class="tag">Ripples = Events</span>
+        <p class="inspiration">Inspired by: original direct-pond concept from pages_levels.py</p>
+        
+        <img src="dola-pond-ripples.png" alt="Pond Ripples Concept">
+        
+        <h3>Visual Language</h3>
+        <ul>
+            <li><strong>Background:</strong> Deep water texture (dim Gaussian haze matching current Marbles visualization)</li>
+            <li><strong>Events:</strong> Drop like stones at the right edge, creating expanding ripples</li>
+            <li><strong>Vertical position:</strong> Pitch (CV value mapped to Y offset)</li>
+            <li><strong>Ripple amplitude:</strong> Gate intensity / recency (newest = brightest)</li>
+            <li><strong>Burst events:</strong> Multiple concentric ripples from same origin</li>
+            <li><strong>Newest event:</strong> Bright center dot with crosshair (like current walker)</li>
+        </ul>
+
+        <h3>Design Notes</h3>
+        <p>This concept is the most evolutionarily similar to the current LIVE page design. It keeps the Marbles bell curve haze as "water depth" while making the event visualization more poetic. The ripple metaphor naturally suggests:
+        <ul>
+            <li>Older events = larger, fainter ripples</li>
+            <li>Bursts = overlapping wave patterns</li>
+            <li>Slide/legato = wake trails between ripples</li>
+        </ul>
+    </div>
+
+    <h2>Concept 2: Star Drift</h2>
+    <div class="concept">
+        <span class="tag">Cosmic Metaphor</span>
+        <span class="tag">Constellations</span>
+        <p class="inspiration">Inspired by: norns constellations.lua (star-field density sequencer)</p>
+        
+        <img src="dola-star-drift.png" alt="Star Drift Concept">
+        
+        <h3>Visual Language</h3>
+        <ul>
+            <li><strong>Background:</strong> Cosmic dust field (dim random points)</li>
+            <li><strong>Events:</strong> Stars born at the RIGHT edge when a gate fires</li>
+            <li><strong>Drift:</strong> Stars drift LEFTWARD across viewport as they age</li>
+            <li><strong>Vertical position:</strong> Pitch (CV value)</li>
+            <li><strong>Brightness:</strong> Recency (newest = brightest)</li>
+            <li><strong>Size:</strong> Gate length (longer gate = larger star)</li>
+            <li><strong>Burst events:</strong> Tight star clusters</li>
+            <li><strong>Constellation lines:</strong> Faint connections between same-pitch stars</li>
+            <li><strong>Newest event:</strong> Bright square with four-pointed "twinkle" markers</li>
+        </ul>
+
+        <h3>Design Notes</h3>
+        <p>The constellations metaphor brings a uniquely musical quality:
+        <ul>
+            <li>Pitch relationships become visible as constellation patterns</li>
+            <li>The "drift" implies the passage of time in a very organic way</li>
+            <li>Complexity can control star field density</li>
+            <li>Spread can control the "universe" vertical height</li>
+            <li>Naturally suggests loop/repeat as "stable constellations"</li>
+        </ul>
+    </div>
+
+    <h2>Concept 3: Spiral Rotation</h2>
+    <div class="concept">
+        <span class="tag">Golden Ratio</span>
+        <span class="tag">Cyclic Pattern</span>
+        <p class="inspiration">Inspired by: norns spirals.lua (spiral point sequencer)</p>
+        
+        <img src="dola-spiral-rotation.png" alt="Spiral Rotation Concept">
+        
+        <h3>Visual Language</h3>
+        <ul>
+            <li><strong>Layout:</strong> Golden-ratio spiral centered in viewport</li>
+            <li><strong>Guide rings:</strong> Concentric circles + 8 radial rays</li>
+            <li><strong>Newest events:</strong> Near the CENTER</li>
+            <li><strong>Older events:</strong> Spiral OUTWARD</li>
+            <li><strong>Angle:</strong> Sequence position / timing in cycle</li>
+            <li><strong>Radius:</strong> Age / recency (but compressed due to golden ratio)</li>
+            <li><strong>Burst events:</strong> Satellite points orbiting main event</li>
+            <li><strong>Newest event:</strong> Bright square with crosshair</li>
+        </ul>
+
+        <h3>Design Notes</h3>
+        <p>The spiral metaphor is the most visually distinctive:
+        <ul>
+            <li>Golden ratio (phi = 1.618) creates naturally pleasing proportions</li>
+            <li>Each turn = ~1.618x larger, so events pack densely yet readably</li>
+            <li>Angle naturally encodes "where in the pattern"</li>
+            <li>The spiral form inherently suggests cycling, repetition, continuity</li>
+            <li>Unique visual signature compared to typical linear sequencer views</li>
+            <li>Vertical compression (0.6x) keeps the spiral within the narrow OLED aspect ratio</li>
+        </ul>
+    </div>
+
+    <h2>Comparison & Next Steps</h2>
+    <div class="comparison">
+        <div class="comparison-item">
+            <h4>Pond Ripples</h4>
+            <p><strong>Best for:</strong> Evolution from current design</p>
+            <p><strong>Pros:</strong> Familiar Marbles haze background, ripple metaphor naturally handles bursts, Slide/legato as wakes</p>
+            <p><strong>Cons:</strong> Less visually distinctive than other concepts</p>
+        </div>
+        <div class="comparison-item">
+            <h4>Star Drift</h4>
+            <p><strong>Best for:</strong> Musical expressiveness</p>
+            <p><strong>Pros:</strong> Constellation lines show pitch relationships, cosmic feel matches stochastic nature, drift = intuitive time flow</p>
+            <p><strong>Cons:</strong> Horizontal drift may feel less "loop-focused"</p>
+        </div>
+        <div class="comparison-item">
+            <h4>Spiral Rotation</h4>
+            <p><strong>Best for:</strong> Unique visual identity</p>
+            <p><strong>Pros:</strong> Golden ratio = inherently pleasing, naturally shows cycling/looping, very distinctive</p>
+            <p><strong>Cons:</strong> Pitch mapping less direct (angle not height)</p>
+        </div>
+    </div>
+
+    <footer>
+        <p>All previews rendered at 256x64 (the firmware's internal buffer size), scaled 4x for display.</p>
+        <p>Render script: <code>ui-preview/render_dola_live.py</code></p>
+    </footer>
+</div>
+</body>
+</html>
