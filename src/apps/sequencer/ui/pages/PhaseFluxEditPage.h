@@ -25,6 +25,7 @@ private:
     void drawGridCell(Canvas &canvas, int idx, bool isActive, bool isSelected);
     void drawTemporalScope(Canvas &canvas, int stageIdx, int scopeX);
     void drawPitchScope(Canvas &canvas, int stageIdx, int scopeX);
+    void drawAccumDualStrip(Canvas &canvas, int scopeX, int activeSetIdx);
     void drawStageBadge(Canvas &canvas, int scopeX);
     void drawParamList(Canvas &canvas);
 

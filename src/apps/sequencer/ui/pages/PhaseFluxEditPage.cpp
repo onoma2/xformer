@@ -154,11 +154,11 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     canvas.vline(DividerX,  13, 39);
     canvas.vline(DividerX2, 13, 39);
 
-    // Single scope: temporal for TEMP set, pitch for PTCH set. Both land at
-    // the same scope position so the right pane stays free for the param list.
-    // Global pitch mode draws stage[0]'s pitch curve as the master.
+    // Middle pane dispatch: TEMP→scope, ACCUM→dual strip, else→pitch scope.
     if (_currentSet == 0) {
         drawTemporalScope(canvas, _selectedCell, ScopeTempX);
+    } else if (isAccumN || isAccumP) {
+        drawAccumDualStrip(canvas, ScopeTempX, _currentSet);
     } else {
         drawPitchScope(canvas, isGlobalPitch ? 0 : _selectedCell, ScopeTempX);
     }
@@ -555,6 +555,78 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     }
 }
 
+void PhaseFluxEditPage::drawAccumDualStrip(Canvas &canvas, int scopeX, int activeSetIdx) {
+    const PhaseFluxSequence &seq = _project.selectedPhaseFluxSequence();
+    const auto *te = trackEngine();
+    const int activeCell = te ? te->activeCell() : -1;
+    const bool nActive = (activeSetIdx == 2);
+
+    const int x0 = scopeX;
+    const int y0 = ScopeY;
+    const int h  = ScopeH;
+
+    const int badgeW       = 12;
+    const int gapOuter     = 2;
+    const int stripH       = (h - gapOuter) / 2;
+    const int topMidline   = y0 + stripH / 2;
+    const int botMidline   = y0 + stripH + gapOuter + stripH / 2;
+
+    const int barW         = 3;
+    const int gapWithin    = 1;
+    const int interGroup   = 5;
+
+    int positions[16];
+    int cursor = x0 + badgeW;
+    for (int group = 0; group < 4; ++group) {
+        for (int c = 0; c < 4; ++c) {
+            positions[group * 4 + c] = cursor;
+            cursor += barW + gapWithin;
+        }
+        cursor -= gapWithin;
+        if (group < 3) cursor += interGroup;
+    }
+
+    canvas.setBlendMode(BlendMode::Set);
+    canvas.setColor(Color::Low);
+    for (int group = 0; group < 3; ++group) {
+        int endOfGroupX = positions[group * 4 + 3] + barW;
+        int gridX = endOfGroupX + interGroup / 2;
+        for (int y = y0; y < y0 + h; y += 2) {
+            canvas.point(gridX, y);
+        }
+    }
+
+    const int halfH = stripH / 2 - 1;
+
+    auto drawStrip = [&](int midlineY, int maxAmount, bool isNoteStrip, bool bright) {
+        for (int i = 0; i < 16; ++i) {
+            const auto &stage = seq.stage(i);
+            int amount = isNoteStrip ? stage.accumulatorStep() : stage.pulseAccumStep();
+            if (amount == 0) continue;
+
+            int absAmt = amount < 0 ? -amount : amount;
+            int barH = (absAmt * halfH) / maxAmount;
+            if (barH == 0) barH = 1;
+
+            int barY = (amount > 0) ? (midlineY - barH) : (midlineY + 1);
+
+            Color color;
+            if (bright) {
+                if (i == activeCell)            color = Color::Bright;
+                else if (i == _selectedCell)    color = Color::MediumBright;
+                else                            color = Color::Medium;
+            } else {
+                color = (i == activeCell) ? Color::Medium : Color::Low;
+            }
+            canvas.setColor(color);
+            canvas.fillRect(positions[i], barY, barW, barH);
+        }
+    };
+
+    drawStrip(topMidline, PhaseFluxSequence::AccumulatorStep::Max, true,  nActive);
+    drawStrip(botMidline, PhaseFluxSequence::PulseAccumStep::Max,  false, !nActive);
+}
+
 const PhaseFluxTrackEngine *PhaseFluxEditPage::trackEngine() const {
     const auto &te = _engine.trackEngine(_project.selectedTrackIndex());
     if (te.trackMode() == Track::TrackMode::PhaseFlux) {
@@ -571,11 +643,22 @@ void PhaseFluxEditPage::drawStageBadge(Canvas &canvas, int scopeX) {
     canvas.setFont(Font::Tiny);
     canvas.setBlendMode(BlendMode::Set);
     canvas.setColor(Color::MediumBright);
+    const auto &seq = _project.selectedPhaseFluxSequence();
     const bool isPtchGlobal =
         _currentSet == 1 &&
-        _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
+        seq.pitchMode() == PhaseFluxSequence::PitchMode::Global;
+    const bool isAccumN = (_currentSet == 2);
+    const bool isAccumP = (_currentSet == 3);
     if (isPtchGlobal) {
         canvas.drawText(scopeX + 2, ScopeY + 6, "G");
+    } else if (isAccumN || isAccumP) {
+        const auto &cfg = isAccumN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
+        if (cfg.scope() == AccumulatorConfig::Scope::Track) {
+            canvas.drawText(scopeX + 2, ScopeY + 6, "T");
+        } else {
+            FixedStringBuilder<4> s("%d", _selectedCell + 1);
+            canvas.drawText(scopeX + 2, ScopeY + 6, s);
+        }
     } else {
         FixedStringBuilder<4> s("%d", _selectedCell + 1);
         canvas.drawText(scopeX + 2, ScopeY + 6, s);
