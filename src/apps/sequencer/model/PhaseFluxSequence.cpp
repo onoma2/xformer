@@ -63,7 +63,9 @@ void PhaseFluxSequence::Stage::clear() {
     setMask(MaskType::Off);
     setMaskShift(0);
     setAccumulatorStep(0);
-    setAccumulatorLength(1);
+    setPulseAccumStep(0);
+    setAccumulatorTrigger(AccumulatorTriggerType::Stage);
+    setPulseAccumTrigger(AccumulatorTriggerType::Stage);
     setGateLength(50);
     setStageDivisor(StageDivisorSlot::Div1_16);
     setSkip(false);

@@ -9,9 +9,15 @@
 
 UNIT_TEST("PhaseFluxSize") {
 
+CASE("stage_record_remains_16_bytes_after_accumulator_v2") {
+    // Locked layout (§13.3): 4 × uint32_t = 16 bytes. If a new field bumps
+    // the Stage past 16 bytes, the entire PhaseFluxTrack envelope shifts.
+    expectEqual(int(sizeof(PhaseFluxSequence::Stage)), 16, "Stage stays 16 bytes after accumulator v2 bit-pack rework");
+}
+
 CASE("print_sizes") {
     std::printf("\n--- model size probe ---\n");
-    std::printf("PhaseFluxSequence::Stage = %zu bytes (3x uint32_t = 12 expected)\n",
+    std::printf("PhaseFluxSequence::Stage = %zu bytes (4x uint32_t = 16 expected)\n",
                 sizeof(PhaseFluxSequence::Stage));
     std::printf("PhaseFluxSequence        = %zu bytes\n", sizeof(PhaseFluxSequence));
     std::printf("PhaseFluxTrack           = %zu bytes  (envelope ceiling 9544)\n",

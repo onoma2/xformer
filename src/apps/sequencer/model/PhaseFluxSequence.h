@@ -42,7 +42,7 @@ public:
     using Mask = UnsignedValue<3>;
     using MaskShift = UnsignedValue<3>;
     using AccumulatorStep = SignedValue<5>;
-    using AccumulatorLength = UnsignedValue<4>;
+    using PulseAccumStep = SignedValue<4>;
     using GateLength = UnsignedValue<7>;
     using StageDivisor = UnsignedValue<3>;
     using StageLen = UnsignedValue<7>;   // 0..127 mapped to 0..~2× factor via /64
@@ -88,6 +88,11 @@ public:
         TwoInFour = 5,
         ThreeInFour = 6,
         OneInEight = 7,
+    };
+
+    enum class AccumulatorTriggerType : uint8_t {
+        Stage = 0,
+        Pulse = 1,
     };
 
     // 3-bit slot index. Maps to Performer divisor primitive ticks via
@@ -180,9 +185,17 @@ public:
         int accumulatorStep() const { return AccumulatorStep::Min + int(_data2.accumulatorStep); }
         void setAccumulatorStep(int v) { _data2.accumulatorStep = AccumulatorStep::clamp(v) - AccumulatorStep::Min; }
 
-        // accumulatorLength — stored 0..15, exposed as 1..16
-        int accumulatorLength() const { return int(_data2.accumulatorLength) + 1; }
-        void setAccumulatorLength(int v) { _data2.accumulatorLength = AccumulatorLength::clamp(v - 1); }
+        // pulseAccumStep — ±7 pulses per trigger (signed 4-bit)
+        int pulseAccumStep() const { return PulseAccumStep::Min + int(_data2.pulseAccumStep); }
+        void setPulseAccumStep(int v) { _data2.pulseAccumStep = PulseAccumStep::clamp(v) - PulseAccumStep::Min; }
+
+        // accumulatorTrigger — Stage or Pulse (§13.4)
+        AccumulatorTriggerType accumulatorTrigger() const { return bool(_data2.accumulatorTrigger) ? AccumulatorTriggerType::Pulse : AccumulatorTriggerType::Stage; }
+        void setAccumulatorTrigger(AccumulatorTriggerType v) { _data2.accumulatorTrigger = bool(uint8_t(v) & 1); }
+
+        // pulseAccumTrigger — Stage or Pulse (§13.4)
+        AccumulatorTriggerType pulseAccumTrigger() const { return bool(_data2.pulseAccumTrigger) ? AccumulatorTriggerType::Pulse : AccumulatorTriggerType::Stage; }
+        void setPulseAccumTrigger(AccumulatorTriggerType v) { _data2.pulseAccumTrigger = bool(uint8_t(v) & 1); }
 
         // gateLength 0..100
         int gateLength() const { return int(_data2.gateLength); }
@@ -223,9 +236,9 @@ public:
         bool operator!=(const Stage &other) const { return !(*this == other); }
 
     private:
-        // Layout: 100 bits across 4 × uint32_t = 128 bits envelope, 3 spare in
-        // _data2 (bits 29..31) and 25 spare in _data3 (bits 7..31). Do NOT
-        // reorder without bumping ProjectVersion.
+        // Layout: 4 × uint32_t = 128 bits envelope, 1 spare in _data2 (bit 31)
+        // and 25 spare in _data3 (bits 7..31). Do NOT reorder without bumping
+        // ProjectVersion.
 
         // word 0 — pitch shape + pulseCount (32 used, 0 spare)
         union {
@@ -253,18 +266,20 @@ public:
             BitField<uint32_t, 25, TiltMelody::Bits>       tiltMelody;       // 25..31
         } _data1;
 
-        // word 2 — mask / accum / gate / divisor / skip (29 used, 3 spare bits 29..31)
+        // word 2 — mask / accum / gate / divisor / skip / triggers (31 used, 1 spare bit 31)
         union {
             uint32_t raw;
-            BitField<uint32_t,  0, PhaseShift::Bits>         phaseShift;        //  0..2
-            BitField<uint32_t,  3, Mask::Bits>               mask;              //  3..5
-            BitField<uint32_t,  6, MaskShift::Bits>          maskShift;         //  6..8
-            BitField<uint32_t,  9, AccumulatorStep::Bits>    accumulatorStep;   //  9..13
-            BitField<uint32_t, 14, AccumulatorLength::Bits>  accumulatorLength; // 14..17
-            BitField<uint32_t, 18, GateLength::Bits>         gateLength;        // 18..24
-            BitField<uint32_t, 25, StageDivisor::Bits>       stageDivisor;      // 25..27
-            BitField<uint32_t, 28, 1>                        skip;              // 28
-            // bits 29..31 spare
+            BitField<uint32_t,  0, PhaseShift::Bits>         phaseShift;          //  0..2
+            BitField<uint32_t,  3, Mask::Bits>               mask;                //  3..5
+            BitField<uint32_t,  6, MaskShift::Bits>          maskShift;           //  6..8
+            BitField<uint32_t,  9, AccumulatorStep::Bits>    accumulatorStep;     //  9..13
+            BitField<uint32_t, 14, PulseAccumStep::Bits>     pulseAccumStep;      // 14..17
+            BitField<uint32_t, 18, GateLength::Bits>         gateLength;          // 18..24
+            BitField<uint32_t, 25, StageDivisor::Bits>       stageDivisor;        // 25..27
+            BitField<uint32_t, 28, 1>                        skip;                // 28
+            BitField<uint32_t, 29, 1>                        accumulatorTrigger;  // 29
+            BitField<uint32_t, 30, 1>                        pulseAccumTrigger;   // 30
+            // bit 31 spare
         } _data2;
 
         // word 3 — stageLen + 25 spare bits (future fields)

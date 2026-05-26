@@ -459,13 +459,8 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
     // Slot change: advance previous cell's accumulator, rebuild schedule.
     if (_slotIdx != _prevSlotIdx) {
         if (_prevSlotIdx >= 0) {
-            int completedCell = int(PhaseFluxMath::snakeOrder()[_prevSlotIdx]);
-            const auto &completed = _sequence->stage(completedCell);
-            int len = completed.accumulatorLength();
-            if (len > 0) {
-                _accumulatorCounter[completedCell] =
-                    (_accumulatorCounter[completedCell] + 1) % len;
-            }
+            // TODO Task 5: counter advance against AccumulatorOps + per-sequence
+            // config. Pre-Task-4 logic deleted alongside accumulatorLength removal.
         }
         _pulseFired = 0;
         _prevSlotIdx = _slotIdx;

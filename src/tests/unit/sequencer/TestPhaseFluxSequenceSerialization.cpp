@@ -44,7 +44,7 @@ static void readTrack(PhaseFluxTrack &track, const uint8_t *buf, size_t len) {
     track.read(reader);
 }
 
-// Build a default Stage and compare all 24 fields against a probe Stage —
+// Build a default Stage and compare all Stage fields against a probe Stage —
 // used by bitpack_no_overlap to confirm only the field-under-test moved.
 static void expectStageEqualExceptOne(const PhaseFluxSequence::Stage &probe,
                                       const PhaseFluxSequence::Stage &defaults,
@@ -70,10 +70,12 @@ static void expectStageEqualExceptOne(const PhaseFluxSequence::Stage &probe,
     if (excludeIndex != i++) expectEqual(int(probe.mask()), int(defaults.mask()), which);
     if (excludeIndex != i++) expectEqual(probe.maskShift(), defaults.maskShift(), which);
     if (excludeIndex != i++) expectEqual(probe.accumulatorStep(), defaults.accumulatorStep(), which);
-    if (excludeIndex != i++) expectEqual(probe.accumulatorLength(), defaults.accumulatorLength(), which);
+    if (excludeIndex != i++) expectEqual(probe.pulseAccumStep(), defaults.pulseAccumStep(), which);
     if (excludeIndex != i++) expectEqual(probe.gateLength(), defaults.gateLength(), which);
     if (excludeIndex != i++) expectEqual(int(probe.stageDivisor()), int(defaults.stageDivisor()), which);
     if (excludeIndex != i++) expectEqual(probe.skip(), defaults.skip(), which);
+    if (excludeIndex != i++) expectEqual(int(probe.accumulatorTrigger()), int(defaults.accumulatorTrigger()), which);
+    if (excludeIndex != i++) expectEqual(int(probe.pulseAccumTrigger()), int(defaults.pulseAccumTrigger()), which);
     if (excludeIndex != i++) expectEqual(probe.stageLen(), defaults.stageLen(), which);
 }
 
@@ -119,10 +121,12 @@ CASE("default_round_trip") {
         expectEqual(int(s.mask()), int(PhaseFluxSequence::MaskType::Off), "default mask");
         expectEqual(s.maskShift(), 0, "default maskShift");
         expectEqual(s.accumulatorStep(), 0, "default accumulatorStep");
-        expectEqual(s.accumulatorLength(), 1, "default accumulatorLength");
+        expectEqual(s.pulseAccumStep(), 0, "default pulseAccumStep");
         expectEqual(s.gateLength(), 50, "default gateLength");
         expectEqual(int(s.stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_16), "default stageDivisor");
         expectEqual(s.skip(), false, "default skip");
+        expectEqual(int(s.accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "default accumulatorTrigger");
+        expectEqual(int(s.pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "default pulseAccumTrigger");
         expectEqual(s.stageLen(), 64, "default stageLen (×1 transparent — Phaseque STEP_LEN pattern)");
     }
 }
@@ -216,7 +220,9 @@ CASE("stage_fields_persist") {
     s4.setMaskShift(3);
 
     s5.setAccumulatorStep(7);
-    s5.setAccumulatorLength(9);
+    s5.setPulseAccumStep(-3);
+    s5.setAccumulatorTrigger(PhaseFluxSequence::AccumulatorTriggerType::Pulse);
+    s5.setPulseAccumTrigger(PhaseFluxSequence::AccumulatorTriggerType::Pulse);
 
     s6.setGateLength(88);
     s6.setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_4T);
@@ -257,7 +263,9 @@ CASE("stage_fields_persist") {
     expectEqual(r.stage(4).maskShift(), 3, "s4 maskShift");
 
     expectEqual(r.stage(5).accumulatorStep(), 7, "s5 accumulatorStep");
-    expectEqual(r.stage(5).accumulatorLength(), 9, "s5 accumulatorLength");
+    expectEqual(r.stage(5).pulseAccumStep(), -3, "s5 pulseAccumStep");
+    expectEqual(int(r.stage(5).accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Pulse), "s5 accumulatorTrigger");
+    expectEqual(int(r.stage(5).pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Pulse), "s5 pulseAccumTrigger");
 
     expectEqual(r.stage(6).gateLength(), 88, "s6 gateLength");
     expectEqual(int(r.stage(6).stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_4T), "s6 stageDivisor");
@@ -305,8 +313,14 @@ CASE("stage_edge_values_persist") {
     seq.stage(0).setAccumulatorStep(-15);
     seq.stage(1).setAccumulatorStep(15);
 
-    seq.stage(0).setAccumulatorLength(1);
-    seq.stage(1).setAccumulatorLength(16);
+    seq.stage(0).setPulseAccumStep(-7);
+    seq.stage(1).setPulseAccumStep(7);
+
+    seq.stage(0).setAccumulatorTrigger(PhaseFluxSequence::AccumulatorTriggerType::Stage);
+    seq.stage(1).setAccumulatorTrigger(PhaseFluxSequence::AccumulatorTriggerType::Pulse);
+
+    seq.stage(0).setPulseAccumTrigger(PhaseFluxSequence::AccumulatorTriggerType::Stage);
+    seq.stage(1).setPulseAccumTrigger(PhaseFluxSequence::AccumulatorTriggerType::Pulse);
 
     seq.stage(0).setGateLength(0);
     seq.stage(1).setGateLength(100);
@@ -374,8 +388,12 @@ CASE("stage_edge_values_persist") {
     expectEqual(r.stage(1).maskShift(), 7, "max maskShift");
     expectEqual(r.stage(0).accumulatorStep(), -15, "min accumulatorStep");
     expectEqual(r.stage(1).accumulatorStep(), 15, "max accumulatorStep");
-    expectEqual(r.stage(0).accumulatorLength(), 1, "min accumulatorLength");
-    expectEqual(r.stage(1).accumulatorLength(), 16, "max accumulatorLength");
+    expectEqual(r.stage(0).pulseAccumStep(), -7, "min pulseAccumStep");
+    expectEqual(r.stage(1).pulseAccumStep(), 7, "max pulseAccumStep");
+    expectEqual(int(r.stage(0).accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "min accumulatorTrigger");
+    expectEqual(int(r.stage(1).accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Pulse), "max accumulatorTrigger");
+    expectEqual(int(r.stage(0).pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "min pulseAccumTrigger");
+    expectEqual(int(r.stage(1).pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Pulse), "max pulseAccumTrigger");
     expectEqual(r.stage(0).gateLength(), 0, "min gateLength");
     expectEqual(r.stage(1).gateLength(), 100, "max gateLength");
     expectEqual(r.stage(0).stageLen(), 0, "min stageLen");
@@ -434,7 +452,7 @@ CASE("bitpack_no_overlap") {
         expectStageEqualExceptOne(r.stage(0), def, "no overlap", idx);
     };
 
-    // Order must match expectStageEqualExceptOne's enumeration (0..23).
+    // Order must match expectStageEqualExceptOne's enumeration.
     probe(0,  [](PhaseFluxSequence::Stage &s) { s.setPulseCount(8); });
     probe(1,  [](PhaseFluxSequence::Stage &s) { s.setBasePitch(63); });
     probe(2,  [](PhaseFluxSequence::Stage &s) { s.setPitchRange(PhaseFluxSequence::PitchRangeType::Three); });
@@ -455,11 +473,13 @@ CASE("bitpack_no_overlap") {
     probe(17, [](PhaseFluxSequence::Stage &s) { s.setMask(PhaseFluxSequence::MaskType::OneInEight); });
     probe(18, [](PhaseFluxSequence::Stage &s) { s.setMaskShift(7); });
     probe(19, [](PhaseFluxSequence::Stage &s) { s.setAccumulatorStep(15); });
-    probe(20, [](PhaseFluxSequence::Stage &s) { s.setAccumulatorLength(16); });
+    probe(20, [](PhaseFluxSequence::Stage &s) { s.setPulseAccumStep(7); });
     probe(21, [](PhaseFluxSequence::Stage &s) { s.setGateLength(100); });
     probe(22, [](PhaseFluxSequence::Stage &s) { s.setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_2); });
     probe(23, [](PhaseFluxSequence::Stage &s) { s.setSkip(true); });
-    probe(24, [](PhaseFluxSequence::Stage &s) { s.setStageLen(63); });
+    probe(24, [](PhaseFluxSequence::Stage &s) { s.setAccumulatorTrigger(PhaseFluxSequence::AccumulatorTriggerType::Pulse); });
+    probe(25, [](PhaseFluxSequence::Stage &s) { s.setPulseAccumTrigger(PhaseFluxSequence::AccumulatorTriggerType::Pulse); });
+    probe(26, [](PhaseFluxSequence::Stage &s) { s.setStageLen(63); });
 }
 
 CASE("track_writes_phaseflux_mode") {
@@ -581,6 +601,98 @@ CASE("pulse_accum_config_roundtrips_with_non_defaults") {
     expectEqual(int(r.pulseAccumConfig().reset()), 9, "pulse reset persists");
     expectEqual(int(r.pulseAccumConfig().posLim()), 8, "pulse posLim persists");
     expectEqual(int(r.pulseAccumConfig().negLim()), 6, "pulse negLim persists");
+}
+
+CASE("pulse_accum_step_per_cell_roundtrips") {
+    PhaseFluxSequence seq;
+    seq.clear();
+    seq.stage(3).setPulseAccumStep(5);
+    seq.stage(11).setPulseAccumStep(-4);
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence r;
+    r.clear();
+    readSequence(r, buf, sizeof(buf));
+
+    expectEqual(r.stage(3).pulseAccumStep(), 5, "stage 3 pulseAccumStep persists");
+    expectEqual(r.stage(11).pulseAccumStep(), -4, "stage 11 pulseAccumStep persists");
+    expectEqual(r.stage(0).pulseAccumStep(), 0, "other stages keep default");
+}
+
+CASE("accumulator_trigger_per_cell_roundtrips") {
+    PhaseFluxSequence seq;
+    seq.clear();
+    seq.stage(7).setAccumulatorTrigger(PhaseFluxSequence::AccumulatorTriggerType::Pulse);
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence r;
+    r.clear();
+    readSequence(r, buf, sizeof(buf));
+
+    expectEqual(int(r.stage(7).accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Pulse), "stage 7 accumulatorTrigger persists");
+    expectEqual(int(r.stage(0).accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "other stages keep default Stage");
+}
+
+CASE("pulse_accum_trigger_per_cell_roundtrips") {
+    PhaseFluxSequence seq;
+    seq.clear();
+    seq.stage(9).setPulseAccumTrigger(PhaseFluxSequence::AccumulatorTriggerType::Pulse);
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence r;
+    r.clear();
+    readSequence(r, buf, sizeof(buf));
+
+    expectEqual(int(r.stage(9).pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Pulse), "stage 9 pulseAccumTrigger persists");
+    expectEqual(int(r.stage(0).pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "other stages keep default Stage");
+}
+
+CASE("bit_pack_no_collision") {
+    // Write every per-cell field that lives in _data2 to a distinct,
+    // non-default value on the same Stage. If any pair shares bits, at
+    // least one read-back will be corrupted.
+    PhaseFluxSequence seq;
+    seq.clear();
+    auto &s = seq.stage(0);
+    s.setPhaseShift(5);
+    s.setMask(PhaseFluxSequence::MaskType::TwoInFour);
+    s.setMaskShift(6);
+    s.setAccumulatorStep(-11);
+    s.setPulseAccumStep(6);
+    s.setGateLength(73);
+    s.setStageDivisor(PhaseFluxSequence::StageDivisorSlot::Div1_4T);
+    s.setSkip(true);
+    s.setAccumulatorTrigger(PhaseFluxSequence::AccumulatorTriggerType::Pulse);
+    s.setPulseAccumTrigger(PhaseFluxSequence::AccumulatorTriggerType::Pulse);
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence r;
+    r.clear();
+    readSequence(r, buf, sizeof(buf));
+
+    const auto &rs = r.stage(0);
+    expectEqual(rs.phaseShift(), 5, "phaseShift survives collision check");
+    expectEqual(int(rs.mask()), int(PhaseFluxSequence::MaskType::TwoInFour), "mask survives collision check");
+    expectEqual(rs.maskShift(), 6, "maskShift survives collision check");
+    expectEqual(rs.accumulatorStep(), -11, "accumulatorStep survives collision check");
+    expectEqual(rs.pulseAccumStep(), 6, "pulseAccumStep survives collision check");
+    expectEqual(rs.gateLength(), 73, "gateLength survives collision check");
+    expectEqual(int(rs.stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Div1_4T), "stageDivisor survives collision check");
+    expectEqual(rs.skip(), true, "skip survives collision check");
+    expectEqual(int(rs.accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Pulse), "accumulatorTrigger survives collision check");
+    expectEqual(int(rs.pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Pulse), "pulseAccumTrigger survives collision check");
 }
 
 } // UNIT_TEST("PhaseFluxSequenceSerialization")
