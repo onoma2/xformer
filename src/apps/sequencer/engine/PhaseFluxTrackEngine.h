@@ -38,9 +38,10 @@ public:
     }
     virtual float cvOutput(int index) const override {
         (void)index;
-        if (mute() && _phaseFluxTrack.cvUpdateMode() == PhaseFluxTrack::CvUpdateMode::Gate) {
-            return 0.0f;
-        }
+        // §9 mute behavior: DAC holds previous voltage when track is muted.
+        // The engine stops pushing CvUpdate notifications when muted; the
+        // accessor just returns the last computed value. cvUpdateMode is
+        // decoupled — it controls evaluation timing only (§6.2.2).
         return _cvOutput;
     }
     virtual float sequenceProgress() const override {

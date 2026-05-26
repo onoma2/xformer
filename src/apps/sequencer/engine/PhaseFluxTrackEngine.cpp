@@ -385,6 +385,51 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
 
     TickResult result = NoUpdate;
 
+    // §6.2.2 continuous pitch CV. cvUpdateMode == Always evaluates the pitch
+    // pipeline every engine tick from _stagePhase, producing a smooth envelope
+    // independent of pulse activity. Gate mode falls through unchanged — CV
+    // only updates inside the pulse-fire loop below.
+    if (_phaseFluxTrack.cvUpdateMode() == PhaseFluxTrack::CvUpdateMode::Always) {
+        const auto &stage = _sequence->stage(_activeCell);
+        if (!stage.skip()) {
+            const Scale &scale = _sequence->selectedScale(_model.project().scale());
+            const int rootNote = _sequence->selectedRootNote(_model.project().rootNote());
+            const int octave = _phaseFluxTrack.octave();
+            const int transpose = _phaseFluxTrack.transpose();
+            const float rangeOctaves = pitchRangeToOctaves(stage.pitchRange());
+            const int rangeDegrees = std::max(1, int(std::round(rangeOctaves * scale.notesPerOctave())));
+            const int accOffset = _accumulatorCounter[_activeCell] * stage.accumulatorStep();
+            const int baseDegree = stage.basePitch() + accOffset
+                + octave * scale.notesPerOctave() + transpose;
+            const Curve::Type pitchCurveType = pitchCurveLut(stage.pitchCurve());
+
+            float phi = _stagePhase;
+            float phi_warped = applyPowerBend(phi, stage.pitchWarp());
+            float phi_input = stage.pitchFlipH() ? (1.f - phi_warped) : phi_warped;
+            float p_curved = Curve::eval(pitchCurveType, phi_input);
+            float p_flipped = stage.pitchFlipV() ? (1.f - p_curved) : p_curved;
+            float p_final = applyPowerBend(p_flipped, stage.pitchResponse());
+
+            float offsetDegrees = 0.f;
+            switch (stage.pitchDirection()) {
+            case PhaseFluxSequence::PitchDirectionType::Up:
+                offsetDegrees = p_final * float(rangeDegrees); break;
+            case PhaseFluxSequence::PitchDirectionType::Down:
+                offsetDegrees = -p_final * float(rangeDegrees); break;
+            case PhaseFluxSequence::PitchDirectionType::Bipolar:
+                offsetDegrees = (p_final - 0.5f) * float(rangeDegrees); break;
+            }
+            int degree = baseDegree + int(std::round(offsetDegrees));
+            float cv = scale.noteToVolts(degree);
+            if (scale.isChromatic()) cv += float(rootNote) * (1.f / 12.f);
+
+            if (cv != _cvOutput) {
+                _cvOutput = cv;
+                result = result | CvUpdate;
+            }
+        }
+    }
+
     // Slot change: advance previous cell's accumulator, rebuild schedule.
     if (_slotIdx != _prevSlotIdx) {
         if (_prevSlotIdx >= 0) {

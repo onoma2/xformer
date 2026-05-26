@@ -302,6 +302,40 @@ Key reading rule: under **Bipolar**, neither endpoint sits at basePitch — the 
 
 **No RNG.** Walk and S/H both dropped — engine is fully deterministic.
 
+### 6.2.2 Pitch CV evaluation timing — `cvUpdateMode`
+
+The pitch curve can either be **sampled at pulse-fire moments only** (discrete point-samples coupled to gate events) or **evaluated continuously every engine tick** (a smooth envelope across the stage, independent of pulse activity). This is the "CurveTrack-style continuous CV" pattern carried into PhaseFlux's per-stage curve world.
+
+Selected via `PhaseFluxTrack::cvUpdateMode`:
+
+| Mode | Pitch CV behavior | When CV target changes |
+|---|---|---|
+| `Gate` (default) | Sampled at each pulse-fire tick using the same pitch pipeline that built `_schedule[k].cv`. Between pulses, CV holds the last sampled value. | only when a scheduled pulse fires |
+| `Always` | Evaluated every tick from the current `_stagePhase` through the full pitch pipeline (warp / curve / flip / response / direction / range / basePitch / scale-quantize). | every engine tick (PPQN-192) |
+
+In `Always` mode, the gate path (pulses fire at scheduled offsets) is **unaffected** — pulses still trigger gate events from `_schedule`. Only the pitch CV stream becomes continuous. Pulses become pure gate-trigger events; pitch is an independent stream that follows the curve continuously across the stage.
+
+**Per-tick formula in Always mode** (mirrors the pitch pipeline used in `rebuildSchedule` for `Gate` mode, just sampled at `_stagePhase` instead of pulse `t_shifted`):
+
+```
+phi              = _stagePhase                              // 0..1 across the active stage
+phi_warped       = WarpAxis(phi, pitchWarp)
+phi_input        = pitchFlipH ? (1 − phi_warped) : phi_warped
+p_curved         = PitchCurve(phi_input, pitchCurve)
+p_flipped        = pitchFlipV ? (1 − p_curved) : p_curved
+p_final          = ResponseAxis(p_flipped, pitchResponse)
+offsetDegrees    = direction-signed × p_final × rangeDegrees + accumulatorOffset
+degree           = basePitch + offsetDegrees + octave × notesPerOctave + transpose
+cv               = scale.noteToVolts(degree) + (chromatic ? rootNote/12 : 0)
+_cvOutput        = cv
+```
+
+**Scale-degree hysteresis is open** — continuous evaluation crosses degree boundaries inside the curve and re-quantizes each tick. Without hysteresis the output can jitter on near-boundary phase positions. Marbles-style hysteresis (`_lastDegree` member; only re-quantize when phase has moved past half a degree-width) is the obvious follow-up — see §14.1 Q12.
+
+**Engine cost**: one extra branch + the existing pitch pipeline call per tick. The pipeline is already in `rebuildSchedule` per pulse; `Always` mode runs it ~PPQN-192 times per beat instead of `pulseCount` times per stage. Cheap (single Curve::eval LUT + a few floats).
+
+**Default**: `cvUpdateMode = Gate` (current behavior preserved). Track-level setter via `PhaseFluxTrack::setCvUpdateMode()`. Editable in the Track list page (`PhaseFluxTrackListModel`).
+
 ### 6.2.1 Melody mask (centrality filter, per-stage)
 
 Each stage has `maskMelody` (0..100, threshold) and `tiltMelody` (0..100, tilt direction) — borrowed from Stochastic's `MaskMelody` / `TiltMelody` law (`engine/StochasticTrackEngine.cpp:454-466`). The pair filters pulses by the **innate scale-degree centrality** — tonic + fifth = high centrality, tritone-ish = low.
@@ -450,10 +484,12 @@ Reset Measure is a **rhythmic re-anchor within one pattern**. Pattern switch is 
 
 ## 9. Outputs
 
-- **Gate Out** — single gate, per pulse, held for `gateLength × pulse_period`.
-- **CV Out** — quantized to scale degree via `Scale::noteToVolts()` (§6.2), 1V/Oct. External quantizer is unnecessary because output is already scale-locked.
+- **Gate Out** — single gate, per pulse, held for `gateLength × pulse_period` (see §6.4 for the per-pulse gate rules; overlapping gates merge via the runtime's `_gateState=true` retrigger).
+- **CV Out** — quantized to scale degree via `Scale::noteToVolts()` (§6.2), 1V/Oct. External quantizer is unnecessary because output is already scale-locked. Evaluation timing controlled by `cvUpdateMode` (§6.2.2): `Gate` = sampled at pulse fires; `Always` = continuous envelope across each stage.
 
 PhaseFlux produces exactly **one logical CV value + one logical gate value** per tick. Two jacks (Performer standard pitch+gate pair). No per-cell jack routing.
+
+**Mute behavior** (matches NoteTrack): when the track is muted, the engine **stops pushing CV updates** to the output. The DAC continues to hold its previous voltage in hardware. CV does NOT snap to 0V — silence in CV terms is "no further updates", not "force a specific voltage". This is decoupled from `cvUpdateMode` — that enum controls evaluation timing only. (Historical: pre-MVP code force-zeroed CV on mute; that was wrong and removed when the §6.2.2 continuous-CV mode landed.)
 
 **Multi-jack mirroring**: when the player routes PhaseFlux to multiple physical CV/gate jacks via Performer's `CvRoutePage`, all routed jacks output the **same** single logical value. No per-jack divergence — PhaseFlux is single-voice monophonic by design, mirroring follows Performer's standard track-to-jack mapping.
 
@@ -595,6 +631,7 @@ Mod inputs are deferred but Routing alignment is not. Fields that may ever be CV
 | Q9 global 16-stage compression/expansion | **OPEN.** Phaseque-borrow (2026-05-26): a `cycleSpread` field at sequence level that scales the active stages into a narrower window of the total cycle (low spread = compression toward midpoint) or pushes them to the endpoints (high spread = bernoulli-like expansion), independent of `clockMultiplier` and `divisor` which already scale the cycle period. This is **Marbles `spread`** applied to the time axis (distribution width), not `bias` (which would shift the cluster's center position). Low value = busy middle with silent edges; high value = burst-at-bar-edges feel. Bipolar 0..127 unsigned (low=compression, mid=neutral, high=expansion) or signed ±100 (centered at neutral); 7-bit, Routable target. Decide: live alongside `divisor` and `clockMultiplier` or merged into one of them with broader range? Also: pair with a `cycleBias` later (Marbles bias = WHERE the cluster sits, separate axis from compression). |
 | Q10 global phase warp | **OPEN.** Apply powerBend to the master phase **before** slot derivation, so the same cumulative table is traversed non-linearly: early stages stretch and late ones compress (or vice versa). Sequence-level bipolar ±100% field, 7-bit signed, Routable. Audibly: gives the whole 16-stage cycle a "swing/lag" feel that's macro-level, independent of per-stage warp. Decide: warp the master phase only, or warp the cumulative-table durations themselves (different semantics — phase warp keeps the cycle length but moves the per-stage hits; table warp restretches each stage's actual duration). |
 | Q11 snap-to-grid utility | **OPEN.** Once continuous `stageLen` and `sequenceShift` land, edits drift off the natural grid. Need a sequence-level "snap" action (not a stored field) that quantizes per-stage `stageLen` multipliers and `phaseShift` values to nearest grid increment, and `sequenceShift` to the nearest 1/16 (or 1/32) of cycle. Bound to an F-key or context-menu entry on EditPage. Decide: pre-Phase-C UI lock. |
+| Q12 scale-degree hysteresis for continuous CV (§6.2.2) | **OPEN.** When `cvUpdateMode = Always`, the pitch curve evaluates every tick and re-quantizes to the nearest scale degree. Phase positions near a degree boundary oscillate between two adjacent degrees as the curve crosses, producing audible jitter. Marbles uses a hysteresis quantizer (`marbles/random/quantizer.cc:91`) that keeps the previous output until the curve has moved past half a degree-width. Candidate semantics: (1) **No hysteresis** — re-quantize each tick (jitter on near-boundary motion, but truthful to the curve); (2) **Fixed half-degree hysteresis** — Marbles-style; smooth glides at the cost of slight pitch lag; (3) **Configurable hysteresis amount** — Marbles `steps` knob equivalent, per-stage 0..1 hysteresis width. Decide before audible Always-mode ships. |
 
 ---
 
