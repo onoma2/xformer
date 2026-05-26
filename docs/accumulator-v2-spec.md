@@ -302,8 +302,8 @@ NoteTrack's existing `model/Accumulator.h` class remains untouched in v1. Migrat
 | `pulseAccumOrder` | 2 bits | (same set as note) | `Wrap` |
 | `pulseAccumPolarity` | 1 bit | `Uni` / `Bi` | `Uni` |
 | `pulseAccumReset` | 4 bits | integer 0..15; `0` = manual, `N>0` = auto every N cycles | `0` (manual) |
-| `pulseAccumPosLim` | 4 bits | 1..8 pulses | 4 |
-| `pulseAccumNegLim` | 4 bits | 1..8 pulses | 4 |
+| `pulseAccumPosLim` | 4 bits | 1..8 pulses | 8 |
+| `pulseAccumNegLim` | 4 bits | 1..8 pulses | 8 |
 
 Total: ~34 bits ≈ 5 bytes for both `AccumulatorConfig`s. Sequence has ~5 KB headroom; trivial.
 
@@ -412,7 +412,7 @@ PhaseFlux's existing `PhaseFluxEditPage` carousel (`TEMP` / `PTCH`) extends to *
 
 | Slot | Plain label | Param | Scope | Shift+Fn |
 |---|---|---|---|---|
-| F1 | `Amount` | active-set's per-cell `*AccumStep` (signed ±15 / ±8) | per-cell | **`Trig`** — toggle `*AccumTrigger` Stage ↔ Pulse (per-cell) |
+| F1 | `Amount` | active-set's per-cell `*AccumStep` (signed: note ±15 / pulse ±7) | per-cell | **`Trig`** — toggle `*AccumTrigger` Stage ↔ Pulse (per-cell) |
 | F2 | `+Lim`   | active-set's `*AccumPosLim` (1..28 / 1..8) | per-sequence | — |
 | F3 | `-Lim`   | active-set's `*AccumNegLim` (1..28 / 1..8) | per-sequence | — |
 | F4 | `Order`  | active-set's `*AccumOrder` — encoder cycles `Wrap` / `Pend` / `Hold` / `RTZ` | per-sequence | **`Polar`** — toggle `*AccumPolarity` Uni ↔ Bi (per-sequence) |

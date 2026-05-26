@@ -496,6 +496,10 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
     uint32_t cycleTick = (_cycleTicks > 0) ? (relativeTick % uint32_t(_cycleTicks)) : 0;
     if (_cycleTicks > 0 && cycleTick < _prevCycleTick) {
         ++_cycleCount;
+        // 1-active-stage case: _slotIdx never changes, so the slot-change branch
+        // below never resets pulse-fired memory. Reset here on every cycle wrap.
+        // Multi-stage case is unaffected — slot change also clears _pulseFired.
+        _pulseFired = 0;
         const auto &noteCfg = _sequence->noteAccumConfig();
         if (noteCfg.reset() > 0 && _cycleCount % noteCfg.reset() == 0) {
             for (int i = 0; i < kStageCount; ++i) {

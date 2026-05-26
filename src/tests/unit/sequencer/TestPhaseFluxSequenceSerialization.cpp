@@ -547,8 +547,8 @@ CASE("default_clear_initializes_pulse_lims_to_4") {
     expectEqual(int(seq.pulseAccumConfig().order()), int(AccumulatorConfig::Order::Wrap), "pulse order default Wrap");
     expectEqual(int(seq.pulseAccumConfig().polarity()), int(AccumulatorConfig::Polarity::Uni), "pulse polarity default Uni");
     expectEqual(int(seq.pulseAccumConfig().reset()), 0, "pulse reset default 0");
-    expectEqual(int(seq.pulseAccumConfig().posLim()), 4, "pulse posLim default 4 (spec §13.3)");
-    expectEqual(int(seq.pulseAccumConfig().negLim()), 4, "pulse negLim default 4 (spec §13.3)");
+    expectEqual(int(seq.pulseAccumConfig().posLim()), 8, "pulse posLim default 8 (spec §13.3)");
+    expectEqual(int(seq.pulseAccumConfig().negLim()), 8, "pulse negLim default 8 (spec §13.3)");
 }
 
 CASE("note_accum_config_roundtrips_with_non_defaults") {

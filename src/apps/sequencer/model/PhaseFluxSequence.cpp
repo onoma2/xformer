@@ -99,8 +99,8 @@ void PhaseFluxSequence::clear() {
     _noteAccumConfig = AccumulatorConfig();
     _pulseAccumConfig = AccumulatorConfig();
     // Pulse range is 1..8 (vs note 1..28); override default ctor lims per spec §13.3.
-    _pulseAccumConfig.setPosLim(4);
-    _pulseAccumConfig.setNegLim(4);
+    _pulseAccumConfig.setPosLim(8);
+    _pulseAccumConfig.setNegLim(8);
     for (auto &stage : _stages) {
         stage.clear();
     }
