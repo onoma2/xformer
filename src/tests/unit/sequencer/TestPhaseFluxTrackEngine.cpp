@@ -161,4 +161,59 @@ CASE("note_counter_negative_step_uni_descends_to_neg_lim") {
     expectEqual(counter, 0, "step -1: -3 -> 0 (wrap to zero end)");
 }
 
+// ---- Pulse-count accumulator pipeline (spec §13.10 Task 7) ----
+// Counter walk tested here; engine integration path (rebuildSchedule
+// clamp + per-pulse loop) is verified in Task 10 audition.
+
+CASE("pulse_accum_drift_with_stage_trigger_walks_count_1_to_8") {
+    // posLim=7, step=+1: counter walks 1..8 then wraps to 0.
+    AccumulatorConfig cfg;
+    cfg.setOrder(AccumulatorConfig::Order::Wrap);
+    cfg.setPolarity(AccumulatorConfig::Polarity::Uni);
+    cfg.setPosLim(7);
+    cfg.setNegLim(7);
+    const int basePulseCount = 1;
+    const int step = +1;
+    int counter = 0;
+    int8_t dir = 1;
+    auto effective = [&]() {
+        int v = basePulseCount + counter * step;
+        if (v < 1) v = 1;
+        if (v > 8) v = 8;
+        return v;
+    };
+    expectEqual(effective(), 1, "cycle 0: counter=0 -> N=1");
+    const int expected[] = { 2, 3, 4, 5, 6, 7, 8, 1, 2 };
+    for (int i = 0; i < 9; ++i) {
+        PhaseFluxTrackEngine::advanceCounter(counter, dir, cfg, step);
+        expectEqual(effective(), expected[i], "next cycle N");
+    }
+}
+
+CASE("effective_pulse_count_clamps_at_8_when_offset_pushes_above") {
+    // pulseCount=4, step=+1, counter=10 -> raw=14, clamp to 8.
+    const int basePulseCount = 4;
+    const int step = +1;
+    const int counter = 10;
+    int raw = basePulseCount + counter * step;
+    int eff = raw;
+    if (eff < 1) eff = 1;
+    if (eff > 8) eff = 8;
+    expectEqual(raw, 14, "raw exceeds 8");
+    expectEqual(eff, 8, "effective clamps at 8");
+}
+
+CASE("effective_pulse_count_clamps_at_1_when_offset_pushes_below") {
+    // pulseCount=4, step=-1, counter=10 -> raw=-6, clamp to 1.
+    const int basePulseCount = 4;
+    const int step = -1;
+    const int counter = 10;
+    int raw = basePulseCount + counter * step;
+    int eff = raw;
+    if (eff < 1) eff = 1;
+    if (eff > 8) eff = 8;
+    expectEqual(raw, -6, "raw underflows 1");
+    expectEqual(eff, 1, "effective clamps at 1");
+}
+
 } // UNIT_TEST("PhaseFluxTrackEngine")

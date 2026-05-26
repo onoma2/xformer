@@ -215,7 +215,16 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     if (slotDurationTicks <= 0) return;
 
     const auto &stage = _sequence->stage(_activeCell);
-    const int pulseCount = stage.pulseCount();
+
+    // §13.8 — clamp on the OUTPUT, not the counter: counter walks past 1..8
+    // so wrap/pendulum bounds stay independent of pulse-count clipping.
+    const auto &pulseCfg = _sequence->pulseAccumConfig();
+    const int pulseCounterIdx = (pulseCfg.scope() == AccumulatorConfig::Scope::Local)
+        ? _activeCell : 0;
+    const int pulseAccOffset = _pulseAccumCounter[pulseCounterIdx] * stage.pulseAccumStep();
+    int pulseCount = stage.pulseCount() + pulseAccOffset;
+    if (pulseCount < 1) pulseCount = 1;
+    if (pulseCount > 8) pulseCount = 8;
 
     const Scale &scale = _sequence->selectedScale(_model.project().scale());
     const int rootNote = _sequence->selectedRootNote(_model.project().rootNote());
@@ -250,9 +259,9 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     const int rangeDegrees = std::max(1, int(std::round(rangeOctaves * scale.notesPerOctave())));
     const auto &noteCfg = _sequence->noteAccumConfig();
     // Track scope shares counter [0]; Local scope uses per-cell index (§13.3).
-    const int counterIdx = (noteCfg.scope() == AccumulatorConfig::Scope::Local)
+    const int noteCounterIdx = (noteCfg.scope() == AccumulatorConfig::Scope::Local)
         ? _activeCell : 0;
-    const int noteAccOffset = _noteAccumCounter[counterIdx] * stage.accumulatorStep();
+    const int noteAccOffset = _noteAccumCounter[noteCounterIdx] * stage.accumulatorStep();
     const int baseDegree = stage.basePitch() + noteAccOffset
         + octave * scale.notesPerOctave() + transpose;
 
@@ -327,6 +336,23 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         cands[candCount].triggerTime = triggerTime;
         cands[candCount].cv = cv;
         ++candCount;
+
+        // Pulse-trigger advances fire AFTER candidate accepted (post-mask).
+        // Affects the NEXT pulse / cell — Cirklon next-step semantics.
+        if (stage.accumulatorTrigger() == PhaseFluxSequence::AccumulatorTriggerType::Pulse) {
+            int step = stage.accumulatorStep();
+            if (step != 0) {
+                advanceCounter(_noteAccumCounter[noteCounterIdx],
+                               _noteAccumDir[noteCounterIdx], noteCfg, step);
+            }
+        }
+        if (stage.pulseAccumTrigger() == PhaseFluxSequence::AccumulatorTriggerType::Pulse) {
+            int step = stage.pulseAccumStep();
+            if (step != 0) {
+                advanceCounter(_pulseAccumCounter[pulseCounterIdx],
+                               _pulseAccumDir[pulseCounterIdx], pulseCfg, step);
+            }
+        }
     }
 
     // Insertion sort by trigger time — avoids std::sort inlining past array bounds.
@@ -548,14 +574,14 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             const int completedCell = int(PhaseFluxMath::snakeOrder()[_prevSlotIdx]);
             const auto &completed = _sequence->stage(completedCell);
 
-            // Note accumulator (Stage trigger only; Pulse trigger wires in Task 7).
+            // Note accumulator — Stage trigger only here; Pulse trigger advances in rebuildSchedule's per-pulse loop.
             if (completed.accumulatorTrigger() == PhaseFluxSequence::AccumulatorTriggerType::Stage) {
                 const auto &cfg = _sequence->noteAccumConfig();
                 const int idx = (cfg.scope() == AccumulatorConfig::Scope::Track) ? 0 : completedCell;
                 advanceCounter(_noteAccumCounter[idx], _noteAccumDir[idx], cfg, completed.accumulatorStep());
             }
 
-            // Pulse accumulator (Stage trigger only; Pulse trigger wires in Task 7).
+            // Pulse accumulator — Stage trigger only here; Pulse trigger advances in rebuildSchedule's per-pulse loop.
             if (completed.pulseAccumTrigger() == PhaseFluxSequence::AccumulatorTriggerType::Stage) {
                 const auto &cfg = _sequence->pulseAccumConfig();
                 const int idx = (cfg.scope() == AccumulatorConfig::Scope::Track) ? 0 : completedCell;
