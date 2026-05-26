@@ -30,6 +30,7 @@ private:
 
     void editSlot(int slot, int value, bool shift);
     void toggleShiftAt(int slot);
+    void randomizeCurrentSet();
 
     const PhaseFluxTrackEngine *trackEngine() const;
     const PhaseFluxTrack &phaseFluxTrack() const;

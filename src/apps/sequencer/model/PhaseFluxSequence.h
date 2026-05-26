@@ -67,11 +67,15 @@ public:
         // 3 reserved
     };
 
+    // Pitch base shape. 4 slots filled (2-bit field full).
+    // Bounce = ExpDown3x (3 cascading exp drops) — multi-peak/weird shape
+    // matching the temporal Bounce slot but applied to pitch CV instead of
+    // trigger timing.
     enum class PitchCurveType : uint8_t {
         Ramp = 0,
         Bell = 1,
         Triangle = 2,
-        // 3 reserved
+        Bounce = 3,    // ExpDown3x — 3 cascading exp drops, mirrors temporal Bounce
     };
 
     enum class MaskType : uint8_t {

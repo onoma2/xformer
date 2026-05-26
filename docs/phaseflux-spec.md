@@ -199,7 +199,7 @@ ResponseAxis(y, r) = PowerBend(y, r)
 ### 6.1 Temporal curves — base shape + flips
 
 ```
-t_raw[i]        = i / (N − 1)                                              // N = pulseCount; for N=1 use 0.5
+t_raw[i]        = i / N                                                    // N = pulseCount; first pulse at 0 (slot start), last at (N−1)/N
 t_warped        = WarpAxis(t_raw[i], temporalWarp)
                                                                              // vflip after the base curve (output-axis only — see §6.1.1 for temporalFlipH)
 t_curved        = TempCurve(t_warped, temporalCurve)
@@ -354,51 +354,47 @@ Mask patterns (8 fixed Boolean ring patterns, length 8):
 
 The mask gates pulse output only — pitch CV still evaluates at the masked pulse's curve position (sustains last value via `_cvUpdateMode`).
 
-### 6.4 Pulse-fire collision clamp — Stochastic burst law
+### 6.4 Pulse-fire schedule — overlap-allowed
 
-After §6.1 produces `trigger_time[i]` (with `phaseShift` applied) and §6.3 mask + §6.2.1 melody mask determine which pulses survive, the engine applies a clamp pass before scheduling gate events. The rule mirrors Stochastic's `evaluateBurst` (`engine/StochasticGenerator.cpp:261-311`):
+After §6.1 produces `trigger_time[i]` (with `phaseShift` applied) and §6.3 mask + §6.2.1 melody mask determine which pulses survive, the engine schedules gate events. **Trigger overlap is allowed** — NoteTrack precedent: the runtime tick loop merges overlapping gates via `_gateState=true` retrigger, so no "gap between pulses" or "previous gate must end first" guards are needed. Each surviving candidate fires at its computed time regardless of previous gate state.
 
 ```
 const uint32_t kMinPulseGateTicks = 6;     // ~30ms @ 120 BPM, PPQN=192 — audible floor
-const uint32_t kMinPulseGapTicks  = 1;     // retrigger gap guarantee
-const uint32_t kMinStageParentTicks = kMinPulseGateTicks + kMinPulseGapTicks;
-                                             // below this, no pulses fire — stage is too short to be audible
 
-if stage_duration < kMinStageParentTicks:
-  return                                     // no pulses fire — stage too short, gate stays low
+if stage_duration < kMinPulseGateTicks:
+  return                                     // stage too short to fit any audible gate
 
 // Surviving pulses sorted by trigger_time ascending (PowerBend + phaseShift can scramble order)
 survivors = [(i, trigger_time[i]) for i in 0..pulseCount-1 if !muted[i] && melodyMaskPass[i]]
 sort survivors by trigger_time
 
-prev_end = 0
 for (i, t) in survivors:
-  // Drop if too close to previous gate (retrigger gap violation, Q15+Q16 case)
-  if t < prev_end + kMinPulseGapTicks:
-    continue                                 // PowerBend collision — extras auto-drop
-
-  // Compute gate length: nominal × duty, clamped to distance to next pulse (Q18 case)
   next_t       = next survivor's trigger_time, OR stage_duration
   pulse_period = next_t - t
-  nominal_gate = (gateLength% × pulse_period) / 100
-  gate_ticks   = min(nominal_gate, pulse_period - kMinPulseGapTicks)
+  if pulse_period <= 0: continue              // defensive (i/N positions never produce this)
 
-  // Audible-floor drop
-  if gate_ticks < kMinPulseGateTicks:
-    continue                                 // gate would be inaudible — drop
+  // gateLength rules:
+  //   len == 0  → explicit silence, pulse dropped
+  //   len == 1  → always-audible-minimum sentinel; floor at kMinPulseGateTicks
+  //   len >= 2  → scale by percent, drop if computed gate < kMinPulseGateTicks
+  if gateLength == 0: continue
+  gate_ticks = (gateLength × pulse_period) / 100
+  if gateLength == 1 && gate_ticks < kMinPulseGateTicks:
+    gate_ticks = kMinPulseGateTicks
+  if gate_ticks < kMinPulseGateTicks: continue
 
   schedule gate-on at tick t
   schedule gate-off at tick t + gate_ticks
-  prev_end = t + gate_ticks
 ```
 
-**Locked semantics** (resolves Q15, Q16, Q18):
+**Locked semantics**:
 
-- **`pulseCount` is a max-cap, not a strict count.** PowerBend warp + phaseShift can compress pulses into a window too tight for all of them; extras drop. The user gets "as many as fit cleanly", not "exactly N or glitch".
-- **Each surviving pulse fires its own gate edge** (retrigger semantics preserved). No coalescing — adjacent gates are either separated by ≥ `kMinPulseGapTicks` or one is dropped.
-- **Gate length always ≤ pulse_period − kMinPulseGapTicks** (Q18). Player turning `gateLength` to 100% gets `pulse_period − 1 tick` — never overlaps the next gate.
-- **Same-tick collisions** (Q16): the sort puts them adjacent; the gap check drops all but the first. Mask indices are preserved against the original pulseCount so a same-tick collision doesn't shift mask semantics.
+- **`pulseCount` is a max-cap, not a strict count.** A pulse can still be dropped via `gateLength` rules above (explicit 0 or computed < 6 ticks). Otherwise all surviving candidates fire.
+- **Overlap is allowed.** A pulse firing while the previous gate is still high re-asserts `_gateState=true` and resets `_gateTimer`. Downstream sees one extended gate — same as NoteTrack HOLD mode.
+- **Gate length not capped by pulse period.** `gate_ticks = (gateLength × pulse_period) / 100` directly; can extend past the next pulse's trigger or even past slot end. The runtime tick loop handles cross-pulse and cross-stage overlap via retrigger.
+- **Same-tick collisions** (sort puts them adjacent, pulse_period = 0 → defensive continue drops the duplicate). Mask indices preserved against the original pulseCount.
 - **`kMinPulseGateTicks = 6`** matches Stochastic's `minChildGate` constant — single source of truth for "audible floor" across track types.
+- **Pulse position formula** (§6.1): `t_raw[i] = i / N` (uniform spacing). First pulse at 0 (slot start); last at `(N−1)/N` (never lands on the boundary). Single-pulse is the natural N=1 case: one pulse at slot start.
 
 Order of application:
 1. §6.1 produce `trigger_time[i]` for i in 0..pulseCount−1 (with phaseShift mod)
@@ -846,7 +842,7 @@ Tests land in three phases. Each phase gates the next.
 | Phase shift mod | Pulse times correct after phaseShift × 45° rotation. |
 | Temporal mask × shift | All 8 mask patterns × all 8 shifts × pulseCount range. Gate suppressed correctly per `(i + maskShift) mod 8`. |
 | Melody mask (centrality+tilt) | Byte-for-byte match against Stochastic `engine/StochasticTrackEngine.cpp:454-466`. |
-| Pulse collision clamp (§6.4) | Drops PowerBend collisions; gate length truncation; minimum-audible-gate floor. |
+| Pulse schedule (§6.4) | Overlap-allowed schedule (no collision drop). gateLength rules: 0 → silent; 1 → audible-minimum floor at 6 ticks; ≥ 2 → percent × pulse_period, drop if < 6. |
 | Accumulator lifecycle | Counter advance on slotIdx change; mod-N wrap; preservation across Reset Measure; clear on pattern switch (§7.1 asymmetry). |
 | Pitch quantization | `degree → noteToVolts` across all defined scales. Octave + transpose application. Scale-extends-infinitely (out-of-nominal-range degrees). |
 | Curve LUTs at φ=0, 0.25, 0.5, 0.75, 1 | Linear/Bell/Bounce + Ramp/Bell/Triangle, including vflip + hflip composition. |

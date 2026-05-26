@@ -42,6 +42,7 @@ inline Curve::Type pitchCurveLut(PhaseFluxSequence::PitchCurveType v) {
     case PhaseFluxSequence::PitchCurveType::Ramp:     return Curve::RampUp;
     case PhaseFluxSequence::PitchCurveType::Bell:     return Curve::Bell;
     case PhaseFluxSequence::PitchCurveType::Triangle: return Curve::Triangle;
+    case PhaseFluxSequence::PitchCurveType::Bounce:   return Curve::ExpDown3x;
     }
     return Curve::RampUp;
 }
@@ -204,7 +205,11 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         // on Linear/Bell curves. Instead tFlipH mirrors the scheduled trigger
         // offsets after the collision clamp (below) so the result actually
         // reads as "horizontal mirror in time".
-        float t_raw = (pulseCount == 1) ? 0.5f : (float(i) / float(pulseCount - 1));
+        // i/N formula: uniform spacing with first pulse always at slot start.
+        // Single-pulse case is now consistent with first-of-many (no special-
+        // case midpoint). Last pulse lands at (N-1)/N — never on the slot
+        // boundary, so the fmod(1.0)→0 collapse goes away.
+        float t_raw = float(i) / float(pulseCount);
         float t_warped = applyPowerBend(t_raw, stage.temporalWarp());
         float t_curved = Curve::eval(tempCurveType, t_warped);
         float t_flipped = tFlipV ? (1.f - t_curved) : t_curved;
@@ -257,14 +262,15 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         cands[j + 1] = key;
     }
 
-    // §6.4 collision clamp — verbatim port of StochasticGenerator::evaluateBurst.
-    const int kMinStageParentTicks = int(kMinPulseGateTicks + kMinPulseGapTicks);
-    if (slotDurationTicks < kMinStageParentTicks) return;
+    // §6.4 schedule — trigger overlap is allowed. NoteTrack precedent: the
+    // runtime tick loop merges overlapping gates via _gateState=true retrigger,
+    // so no need for "gap between pulses" or "previous gate must end first"
+    // guards. Each candidate fires at its computed time; gate length follows
+    // the per-stage gateLength rules below.
+    if (slotDurationTicks < int(kMinPulseGateTicks)) return;
 
-    int prevEnd = 0;
     for (int k = 0; k < candCount; ++k) {
         int t = int(cands[k].triggerTime);
-        if (t < prevEnd + int(kMinPulseGapTicks)) continue;
 
         int nextT = (k + 1 < candCount) ? int(cands[k + 1].triggerTime) : slotDurationTicks;
         int pulsePeriod = nextT - t;
@@ -277,8 +283,7 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         int len = int(stage.gateLength());
         if (len == 0) continue;
 
-        int nominalGate = (len * pulsePeriod) / 100;
-        int gateTicks = std::min(nominalGate, pulsePeriod - int(kMinPulseGapTicks));
+        int gateTicks = (len * pulsePeriod) / 100;
         if (len == 1 && gateTicks < int(kMinPulseGateTicks)) {
             gateTicks = int(kMinPulseGateTicks);
         }
@@ -289,7 +294,6 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         _schedule[_scheduleCount].gateTicks = uint16_t(gateTicks);
         _schedule[_scheduleCount].cv = cands[k].cv;
         ++_scheduleCount;
-        prevEnd = t + gateTicks;
     }
 
     // §6.1.1 temporal flipH — reflect each scheduled pulse's [triggerOffset,

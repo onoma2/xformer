@@ -3,12 +3,14 @@
 #include "Pages.h"
 
 #include "ui/painters/WindowPainter.h"
+#include "ui/MatrixMap.h"
 
 #include "model/Curve.h"
 #include "model/ModelUtils.h"
 #include "model/PhaseFluxMath.h"
 
 #include "core/math/Math.h"
+#include "core/utils/Random.h"
 #include "core/utils/StringBuilder.h"
 
 #include <algorithm>
@@ -53,6 +55,7 @@ inline Curve::Type pitchCurveLut(PhaseFluxSequence::PitchCurveType v) {
     case PhaseFluxSequence::PitchCurveType::Ramp:     return Curve::RampUp;
     case PhaseFluxSequence::PitchCurveType::Bell:     return Curve::Bell;
     case PhaseFluxSequence::PitchCurveType::Triangle: return Curve::Triangle;
+    case PhaseFluxSequence::PitchCurveType::Bounce:   return Curve::ExpDown3x;
     }
     return Curve::RampUp;
 }
@@ -130,7 +133,30 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
 }
 
 void PhaseFluxEditPage::updateLeds(Leds &leds) {
-    (void)leds;
+    // Step matrix LEDs — port of NoteSequenceEditPage::updateLeds pattern.
+    //   red   = playhead (current cell) OR edit cursor (selected cell)
+    //   green = cell will fire (not skipped AND stageLen > 0)
+    // Overlap → yellow (R+G both on).
+    const auto *te = trackEngine();
+    int currentCell = te ? te->activeCell() : -1;
+    const auto &seq = _project.selectedPhaseFluxSequence();
+    for (int i = 0; i < 16; ++i) {
+        bool red   = (i == currentCell) || (i == _selectedCell);
+        bool green = !seq.stage(i).skip() && seq.stage(i).stageLen() > 0;
+        leds.set(MatrixMap::fromStep(i), red, green);
+    }
+
+    // Empty quick-edit overlay — when Page modifier is held, the bottom row
+    // (S8..S15) is reserved for future quick-edit slots. No slots wired yet,
+    // so mask the row dark to signal "ready but empty".
+    if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {
+        for (int i = 0; i < 8; ++i) {
+            int index = MatrixMap::fromStep(i + 8);
+            leds.unmask(index);
+            leds.set(index, false, false);
+            leds.mask(index);
+        }
+    }
 }
 
 void PhaseFluxEditPage::keyDown(KeyEvent &event) {
@@ -143,6 +169,18 @@ void PhaseFluxEditPage::keyUp(KeyEvent &event) {
 
 void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
+
+    // Quick-edit overlay (Page + bottom-row step S8..S15). Set-aware actions.
+    if (key.isQuickEdit() && !key.shiftModifier()) {
+        switch (key.quickEdit()) {
+        case 6: randomizeCurrentSet(); break;   // Page+S15 — randomize current set
+        // case 4: Init (later)
+        // case 5: Even (later)
+        // case 7: spare
+        }
+        event.consume();
+        return;
+    }
 
     // Page+key combos belong to TopPage (Page+S0/S1/S2 etc.). Don't consume.
     if (key.pageModifier()) {
@@ -205,7 +243,7 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
     } else {
         // PTCH
         switch (slot) {
-        case 0: stage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(stage.pitchCurve()) + value, 0, 2))); break;
+        case 0: stage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(stage.pitchCurve()) + value, 0, 3))); break;
         case 1: stage.setPitchWarp(ModelUtils::adjusted(stage.pitchWarp(), value, -64, 64)); break;
         case 2: stage.setPitchResponse(ModelUtils::adjusted(stage.pitchResponse(), value, -64, 64)); break;
         case 3: stage.setBasePitch(ModelUtils::adjusted(stage.basePitch(), value, -64, 64)); break;
@@ -213,6 +251,28 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
         }
     }
     (void)shift;
+}
+
+void PhaseFluxEditPage::randomizeCurrentSet() {
+    // Set-aware: TEMP randomizes temporal shape params, PTCH randomizes pitch
+    // shape params. stageLen and basePitch deliberately excluded — they're
+    // chassis-feel knobs the user wants stable across "shake" gestures.
+    static Random rng;
+    auto &seq = _project.selectedPhaseFluxSequence();
+    for (int i = 0; i < 16; ++i) {
+        auto &s = seq.stage(i);
+        if (_currentSet == 0) {
+            s.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(rng.nextRange(3)));
+            s.setTemporalWarp(int(rng.nextRange(128)) - 64);
+            s.setTemporalResponse(int(rng.nextRange(128)) - 64);
+            s.setPulseCount(1 + rng.nextRange(8));
+        } else {
+            s.setPitchCurve(PhaseFluxSequence::PitchCurveType(rng.nextRange(4)));
+            s.setPitchWarp(int(rng.nextRange(128)) - 64);
+            s.setPitchResponse(int(rng.nextRange(128)) - 64);
+            s.setPitchRange(PhaseFluxSequence::PitchRangeType(rng.nextRange(4)));
+        }
+    }
 }
 
 void PhaseFluxEditPage::toggleShiftAt(int slot) {
@@ -403,7 +463,7 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
     const auto &stage = seq.stage(_selectedCell);
 
     static const char *kTempCurve[3]  = { "Lin", "Bel", "Bnc" };
-    static const char *kPitchCurve[3] = { "Rmp", "Bel", "Tri" };
+    static const char *kPitchCurve[4] = { "Rmp", "Bel", "Tri", "Bnc" };
     static const char *kPitchRange[4] = { "1/2", "1",   "2",   "3" };
 
     static const char *kNamesTemp[5]  = { "Curve", "Warp", "Resp", "Len",  "Puls" };
@@ -417,7 +477,7 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
         values[3]("%.2fx", stage.stageLen() / 64.0f);
         values[4]("%d",  stage.pulseCount());
     } else {
-        values[0]("%s",  kPitchCurve[clamp(int(stage.pitchCurve()), 0, 2)]);
+        values[0]("%s",  kPitchCurve[clamp(int(stage.pitchCurve()), 0, 3)]);
         values[1]("%+d", stage.pitchWarp());
         values[2]("%+d", stage.pitchResponse());
         values[3]("%+d", stage.basePitch());
