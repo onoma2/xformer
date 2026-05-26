@@ -83,9 +83,10 @@ void PhaseFluxTrackEngine::advanceCounter(int &counter, int8_t &pendulumDir,
         AccumulatorOps::tickWrap(counter, direction, absMin, absMax, magnitude);
         break;
     case AccumulatorConfig::Order::Pendulum: {
-        // Pendulum: step magnitude only — direction lives in pendulumDir (NoteTrack precedent).
+        // Signed step respected — first move follows the cell's configured drift sign.
+        // Diverges from NoteTrack (unsigned step + separate Direction enum).
         int pdir = int(pendulumDir);
-        AccumulatorOps::tickPendulum(counter, pdir, absMin, absMax, magnitude);
+        AccumulatorOps::tickPendulum(counter, pdir, absMin, absMax, step);
         pendulumDir = int8_t(pdir);
         break;
     }

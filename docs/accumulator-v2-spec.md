@@ -548,6 +548,8 @@ This caller-side decomposition resolves the Pendulum+Uni zero-crossing concern a
 
 **Direction state:** the existing class uses `_direction` (config: Up/Down/Freeze) and `_pendulumDirection` (runtime: ±1). For PhaseFlux, we don't need a separate Direction config — the sign of `stage.step` carries the direction. `Freeze` is implicit when `step == 0` (no advance happens). So the engine passes `direction = step > 0 ? +1 : -1` to the tick functions, and tracks `pendulumDir` per-counter as runtime state.
 
+**Pendulum signed-step semantics — divergence from NoteTrack:** PhaseFlux passes the *signed* `step` (not its magnitude) to `tickPendulum`, so `counter += step * pendulumDir` honors the cell's configured drift sign on the first move. NoteTrack uses unsigned step × a separate Direction enum; PhaseFlux folds the direction into the step sign. Without this, a Uni cell with negative step (bounds `[-negLim, 0]`, initial `pendulumDir = +1`) would advance up out of range on tick 1, clamp back to 0, then flip — producing a degenerate one-tick stall. A Bi cell with negative step would ascend first instead of descending. With signed step, both cases drift in the configured direction immediately.
+
 **RTZ Order (the one NoteTrack doesn't have):** add a new free function:
 
 ```cpp
