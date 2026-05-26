@@ -171,6 +171,14 @@ void Project::clear() {
     pfSeq.stage(15).setPitchCurve(PitchCurve::Triangle);
     pfSeq.stage(15).setPitchWarp(-40);
 
+    // Accumulator demo: reset every 4 cycles so audible drift cycles back to baseline.
+    pfSeq.noteAccumConfig().setReset(4);
+    pfSeq.pulseAccumConfig().setReset(4);
+    pfSeq.stage(0).setAccumulatorStep(+2);
+    pfSeq.stage(4).setAccumulatorStep(-1);
+    pfSeq.stage(8).setPulseAccumStep(+1);
+    pfSeq.stage(12).setPulseAccumStep(-1);
+
     pfTrack.setOctave(+1);
 
     setTempo(80.f);
