@@ -37,6 +37,7 @@ set(sources
     intro/Intro.cpp
     # model
     model/Accumulator.cpp
+    model/AccumulatorConfig.cpp
     model/Arpeggiator.cpp
     model/Calibration.cpp
     model/HarmonyEngine.cpp
