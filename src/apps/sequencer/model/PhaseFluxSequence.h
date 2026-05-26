@@ -356,6 +356,44 @@ public:
         str("%.2f", globalPhase());
     }
 
+    // pitchRate — P:T ratio table index for Global pitch mode. 1:1 = locked.
+    static constexpr int kPitchRateCount = 17;
+    static int pitchRateNum(int index);
+    static int pitchRateDen(int index);
+    static int defaultPitchRateIndex();  // index of 1:1
+
+    int pitchRate() const { return _pitchRate; }
+    void setPitchRate(int v) { _pitchRate = clamp(v, 0, kPitchRateCount - 1); }
+    void editPitchRate(int value, bool) {
+        setPitchRate(pitchRate() + value);
+    }
+    void printPitchRate(StringBuilder &str) const {
+        str("%d:%d", pitchRateNum(_pitchRate), pitchRateDen(_pitchRate));
+    }
+
+    // pitchMode — Cell = per-stage curves (today). Global = stage[0] curve
+    // driven by free-running pitchPhase. Sequence-owned so different sequences
+    // on the same track can use different modes.
+    enum class PitchMode : uint8_t {
+        Cell,
+        Global,
+        Last
+    };
+
+    static const char *pitchModeName(PitchMode mode) {
+        switch (mode) {
+        case PitchMode::Cell:   return "Cell";
+        case PitchMode::Global: return "Global";
+        case PitchMode::Last:   break;
+        }
+        return nullptr;
+    }
+
+    PitchMode pitchMode() const { return _pitchMode; }
+    void setPitchMode(PitchMode mode) { _pitchMode = ModelUtils::clampedEnum(mode); }
+    void editPitchMode(int value, bool) { setPitchMode(ModelUtils::adjustedEnum(pitchMode(), value)); }
+    void printPitchMode(StringBuilder &str) const { str(pitchModeName(pitchMode())); }
+
     // edited — dirty bit for UI
     int edited() const { return _edited; }
     void setEdited(int v) { _edited = v; }
@@ -400,6 +438,8 @@ private:
     int8_t _rootNote = -1;
     uint8_t _resetMeasure = 0;
     uint8_t _edited = 0;
+    uint8_t _pitchRate = 0;  // set to defaultPitchRateIndex() in clear()
+    PitchMode _pitchMode = PitchMode::Cell;
     float _globalPhase = 0.f;
     Routable<uint16_t> _divisor;
     Routable<uint8_t> _clockMultiplier;

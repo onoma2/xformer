@@ -99,6 +99,10 @@ private:
     int _activeCell = 0;
     float _stagePhase = 0.f;
 
+    // Continuous pitch phase for Global pitch mode. Free-running accumulator,
+    // never resets at cell entry. Advances every tick at rate × tempo.
+    float _pitchPhase = 0.f;
+
     // Per-stage-visit schedule built at slot entry by rebuildSchedule().
     ScheduledPulse _schedule[kMaxPulses];
     int _scheduleCount = 0;

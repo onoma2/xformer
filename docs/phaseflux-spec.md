@@ -336,6 +336,43 @@ _cvOutput        = cv
 
 **Default**: `cvUpdateMode = Gate` (current behavior preserved). Track-level setter via `PhaseFluxTrack::setCvUpdateMode()`. Editable in the Track list page (`PhaseFluxTrackListModel`).
 
+### 6.2.3 Pitch source — `pitchMode` (Cell vs Global)
+
+The pitch curve+warp+response triple can either live **per-cell** (today's behavior — each of the 16 stages defines its own contour) or **globally** on the sequence (one shape, drifted across all cells against the temporal walker). Selected via `PhaseFluxSequence::pitchMode`:
+
+| Mode | Pitch curve source | Phase input | Range / basePitch / accumulator |
+|---|---|---|---|
+| `Cell` (default) | Active stage's `pitchCurve` / `pitchWarp` / `pitchResponse` / `pitchFlipV` / `pitchFlipH`. | `_stagePhase` (0..1 within the active cell, resets at each cell entry). Same as today. | Per-cell, unchanged. |
+| `Global` | `stage[0]`'s pitch curve+warp+response+flips ARE the global ones — no separate storage. Stages 1..15 keep their pitch fields in storage but the engine ignores them. | `_pitchPhase` (free-running accumulator, never resets at cell entry). Advances every tick by `rate × tempo` where one cell = one unit. | Per-cell, unchanged. `basePitch` and `pitchRange` still come from the active stage. |
+
+**Storage layout** — no new per-stage fields; `stage[0]`'s existing pitch fields are reused as the globals. Roundtrip is lossless: switching `Cell → Global → Cell` returns the original per-cell data intact because stages 1..15 are never overwritten by the Global path.
+
+**Rate ratio** (`PhaseFluxSequence::pitchRate`) — index into a static 17-entry P:T ratio table. `1:1` is the locked baseline (Global mode at rate 1:1 visually matches Cell mode in that each cell sees one full pitch curve). Non-integer ratios make `_pitchPhase` drift against the temporal walker so repeated visits to the same cell sample the curve at different positions, producing different notes on each revisit.
+
+**`_pitchPhase` lifetime** — always advancing, regardless of mode. In Cell mode the accumulator ticks but the value is unused. This keeps mode flips instant and seamless (Global mode picks up wherever the phase happens to be).
+
+**Per-tick advance** (every engine tick, both modes):
+
+```
+ratePerSlot     = pitchRateNum / pitchRateDen
+slotTicks       = _cumulativeTicks[_slotIdx+1] − _cumulativeTicks[_slotIdx]
+_pitchPhase    += ratePerSlot / slotTicks
+_pitchPhase    -= floor(_pitchPhase)                  // mod 1
+```
+
+**Pulse-fire pitch in Global mode** (in `rebuildSchedule`, replacing the per-pulse `phi = t_shifted` of Cell mode):
+
+```
+phi = _pitchPhase + triggerTime × (ratePerSlot / slotDurationTicks)
+phi -= floor(phi)
+```
+
+i.e. the pitch head's position is projected forward from slot start to each scheduled pulse's fire time. `stage[0]`'s curve+warp+response then run the rest of the pitch pipeline at that `phi`.
+
+**Always-mode (continuous CV) in Global pitch mode** — same pipeline as §6.2.2 but with curve source = `stage[0]` and `phi = _pitchPhase` instead of `_stagePhase`.
+
+**Default**: `pitchMode = Cell`. Sequence-level setter via `PhaseFluxSequence::setPitchMode()`. Editable in the Sequence list page (`PhaseFluxSequenceListModel`). Each sequence on a track can choose its own mode independently.
+
 ### 6.2.1 Melody mask (centrality filter, per-stage)
 
 Each stage has `maskMelody` (0..100, threshold) and `tiltMelody` (0..100, tilt direction) — borrowed from Stochastic's `MaskMelody` / `TiltMelody` law (`engine/StochasticTrackEngine.cpp:454-466`). The pair filters pulses by the **innate scale-degree centrality** — tonic + fifth = high centrality, tritone-ish = low.
@@ -580,6 +617,9 @@ Omitted:
 PhaseFlux-specific additions:
 - 16 × stage record (§5)
 - Optional: `_scale`, `_rootNote` (−1 = inherit from project default) if PhaseFlux participates in scale routing later. Default −1.
+- `_pitchMode` (enum Cell/Global, 1 byte) — selects per-cell vs `stage[0]`-as-globals pitch source; see §6.2.3.
+- `_pitchRate` (1 byte, index into 17-entry P:T ratio table) — drift rate of the free-running `_pitchPhase` accumulator in Global mode. Default index = `1:1`.
+- `_globalPhase` (float ∈ [0, 1]) — fraction-of-cycle phase shift, CurveTrack precedent.
 
 ### 12.3 Routable-from-day-1 contract
 
@@ -751,6 +791,25 @@ Inside the 256×42 px safe content area (header/footer guards per `ui-preview/UI
 - Footer F-keys (default view): STAGE / TIME / PITCH / DIV / TRK.
 - Footer F-keys (edit-hold view): TIME / CURVE / XFRM / ACCM / TRK — cycle param banks for the 16 params not shown on the bottom row (basePitch, pitchRange, pitchDirection, pitchResponse, temporalResponse, temporalFlipV, temporalFlipH, pitchFlipV, pitchFlipH, maskMelody, tiltMelody, maskShift, accumulatorStep, accumulatorLength, gateLength, skip).
 
+### 17.2.1 PTCH set — Cell vs Global mode visuals
+
+When `pitchMode = Cell` (default) the PTCH set displays today's per-cell layout:
+- Header: `PTCH`. Stage badge inside scope: stage number (`5`).
+- F1-F5: Curve / Warp / Resp / Base / Span. F1-F4 edit active stage's pitch params; F5 cycles `pitchRange` (and shows the enum value on the row).
+- Shift+F: FlipV / FlipH / — / — / — on the footer; Shift+F1/F2 toggle the active stage's `pitchFlipV` / `pitchFlipH`.
+
+When `pitchMode = Global`:
+- Header: `PTCH.G` (the `.G` suffix tells the player that knob twists affect the sequence-wide master rather than the active stage).
+- Stage badge inside scope: literal `G` (replaces the stage number, since edits aren't stage-scoped).
+- Pitch scope draws `stage[0]`'s curve regardless of the playing/selected cell.
+- F1-F5 panel labels: Curve / Warp / Resp / Rate / Note.
+  - F1-F3 read+edit `stage[0]`'s pitch curve/warp/response.
+  - F4 reads+edits sequence-level `pitchRate` (displays the ratio text e.g. `3:2`).
+  - F5 shows the active stage's basePitch as a note name (Scale `Short1` form, e.g. `C4`) and the active stage's `pitchRange` as a row of dots beneath it. F5 encoder edits the active stage's basePitch (per-cell anchor stays per-cell).
+- Shift+F: FlipV / FlipH / — / — / Span. Shift+F1/F2 toggle `stage[0]`'s flips. Shift+F5 cycles the active stage's `pitchRange` (demoted from F5 encoder edit). While Shift is held the F5 panel-row label swaps `NOTE` → `SPAN` to reflect the active-while-shift behavior.
+
+Render variants live in `ui-preview/phaseflux-pitchmode/` for layout review.
+
 ### 17.3 PhaseFluxSequenceListModel items
 
 Subset of `NoteSequenceListModel` per spec §12.2:
@@ -759,6 +818,9 @@ Subset of `NoteSequenceListModel` per spec §12.2:
 |---|---|---|
 | `Divisor` | `Routing::Target::Divisor` | `_divisor` (Routable, §12.2) |
 | `ClockMult` | `Routing::Target::ClockMult` | `_clockMultiplier` (Routable, §12.2) |
+| `GlobalPhase` | — | `_globalPhase` (CurveTrack precedent) |
+| `PitchMode` | — | `_pitchMode` (Cell/Global, §6.2.3) |
+| `PitchRate` | — | `_pitchRate` (P:T ratio index, §6.2.3) |
 | `ResetMeasure` | — | `_resetMeasure` (§3.3) |
 | `Scale` | `Routing::Target::Scale` | `_scale` (optional, `−1 = inherit`) |
 | `RootNote` | `Routing::Target::RootNote` | `_rootNote` (optional, `−1 = inherit`) |

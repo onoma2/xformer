@@ -37,6 +37,8 @@ private:
         Divisor,
         ClockMult,
         GlobalPhase,
+        PitchMode,
+        PitchRate,
         Scale,
         RootNote,
         ResetMeasure,
@@ -48,6 +50,8 @@ private:
         case Divisor:      return "Divisor";
         case ClockMult:    return "Clock Mult";
         case GlobalPhase:  return "Global Phase";
+        case PitchMode:    return "Pitch Mode";
+        case PitchRate:    return "Pitch Rate";
         case Scale:        return "Scale";
         case RootNote:     return "Root";
         case ResetMeasure: return "Reset Measure";
@@ -63,6 +67,8 @@ private:
         case Divisor:      _sequence->printDivisor(str); break;
         case ClockMult:    _sequence->printClockMultiplier(str); break;
         case GlobalPhase:  _sequence->printGlobalPhase(str); break;
+        case PitchMode:    _sequence->printPitchMode(str); break;
+        case PitchRate:    _sequence->printPitchRate(str); break;
         case Scale:        _sequence->printScale(str); break;
         case RootNote:     _sequence->printRootNote(str); break;
         case ResetMeasure: _sequence->printResetMeasure(str); break;
@@ -75,6 +81,8 @@ private:
         case Divisor:      _sequence->editDivisor(value, shift); break;
         case ClockMult:    _sequence->editClockMultiplier(value, shift); break;
         case GlobalPhase:  _sequence->editGlobalPhase(value, shift); break;
+        case PitchMode:    _sequence->editPitchMode(value, shift); break;
+        case PitchRate:    _sequence->editPitchRate(value, shift); break;
         case Scale:        _sequence->editScale(value, shift); break;
         case RootNote:     _sequence->editRootNote(value, shift); break;
         case ResetMeasure: _sequence->editResetMeasure(value, shift); break;

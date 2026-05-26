@@ -475,7 +475,11 @@ CASE("track_writes_phaseflux_mode") {
     pfTrack.setTranspose(-7);
     pfTrack.setSlideTime(42);
 
-    auto &stage0 = pfTrack.sequence(0).stage(0);
+    auto &seq = pfTrack.sequence(0);
+    seq.setPitchRate(3);  // some non-default ratio index
+    seq.setPitchMode(PhaseFluxSequence::PitchMode::Global);
+
+    auto &stage0 = seq.stage(0);
     stage0.setBasePitch(12);
     stage0.setMask(PhaseFluxSequence::MaskType::OneInFour);
     stage0.setPulseCount(4);
@@ -500,6 +504,8 @@ CASE("track_writes_phaseflux_mode") {
     expectEqual(restored.phaseFluxTrack().octave(), 3, "octave preserved");
     expectEqual(restored.phaseFluxTrack().transpose(), -7, "transpose preserved");
     expectEqual(restored.phaseFluxTrack().slideTime(), 42, "slideTime preserved");
+    expectEqual(int(restored.phaseFluxTrack().sequence(0).pitchMode()), int(PhaseFluxSequence::PitchMode::Global), "pitchMode preserved");
+    expectEqual(restored.phaseFluxTrack().sequence(0).pitchRate(), 3, "pitchRate preserved");
     expectEqual(restored.phaseFluxTrack().sequence(0).stage(0).basePitch(), 12, "stage 0 basePitch preserved");
     expectEqual(int(restored.phaseFluxTrack().sequence(0).stage(0).mask()), int(PhaseFluxSequence::MaskType::OneInFour), "stage 0 mask preserved");
     expectEqual(restored.phaseFluxTrack().sequence(0).stage(0).pulseCount(), 4, "stage 0 pulseCount preserved");

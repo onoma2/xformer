@@ -67,6 +67,7 @@ void PhaseFluxTrackEngine::reset() {
     _prevSlotIdx = -1;
     _activeCell = 0;
     _stagePhase = 0.f;
+    _pitchPhase = 0.f;
     _gateState = false;
     _gateTimer = 0;
     _cvOutput = 0.f;
@@ -170,14 +171,28 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     const int transpose = _phaseFluxTrack.transpose();
 
     const Curve::Type tempCurveType = temporalCurveLut(stage.temporalCurve());
-    const Curve::Type pitchCurveType = pitchCurveLut(stage.pitchCurve());
     const bool tFlipV = stage.temporalFlipV();
     const bool tFlipH = stage.temporalFlipH();
-    const bool pFlipV = stage.pitchFlipV();
-    const bool pFlipH = stage.pitchFlipH();
     const int phaseShift = stage.phaseShift();
     const int maskByte = kMaskTable[int(stage.mask())];
     const int maskShift = stage.maskShift();
+
+    // Pitch source: Cell mode = active stage; Global mode = stage[0]'s curve.
+    const bool isGlobalPitch =
+        _sequence->pitchMode() == PhaseFluxSequence::PitchMode::Global;
+    const auto &pitchStage = isGlobalPitch ? _sequence->stage(0) : stage;
+    const Curve::Type pitchCurveType = pitchCurveLut(pitchStage.pitchCurve());
+    const bool pFlipV = pitchStage.pitchFlipV();
+    const bool pFlipH = pitchStage.pitchFlipH();
+    const int pitchWarpKnob = pitchStage.pitchWarp();
+    const int pitchRespKnob = pitchStage.pitchResponse();
+
+    // Global mode advance projection: pitchPhase at slot start + per-tick rate.
+    const float pitchAdvancePerTick = isGlobalPitch
+        ? (float(PhaseFluxSequence::pitchRateNum(_sequence->pitchRate())) /
+           float(PhaseFluxSequence::pitchRateDen(_sequence->pitchRate()))) /
+              float(slotDurationTicks)
+        : 0.f;
 
     const float rangeOctaves = pitchRangeToOctaves(stage.pitchRange());
     const int rangeDegrees = std::max(1, int(std::round(rangeOctaves * scale.notesPerOctave())));
@@ -219,13 +234,20 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         if (t_shifted < 0.f) t_shifted += 1.f;
         float triggerTime = t_shifted * float(slotDurationTicks);
 
-        // §6.2 pitch pipeline using triggerTime/slotDuration as φ
-        float phi = (pulseCount == 1) ? 0.0f : t_shifted;
-        float phi_warped = applyPowerBend(phi, stage.pitchWarp());
+        // §6.2 pitch pipeline. Cell mode φ = stagePhase-equivalent (today).
+        // Global mode φ = pitchPhase projected to triggerTime — free-running.
+        float phi;
+        if (isGlobalPitch) {
+            phi = _pitchPhase + triggerTime * pitchAdvancePerTick;
+            phi -= std::floor(phi);
+        } else {
+            phi = (pulseCount == 1) ? 0.0f : t_shifted;
+        }
+        float phi_warped = applyPowerBend(phi, pitchWarpKnob);
         float phi_input = pFlipH ? (1.f - phi_warped) : phi_warped;
         float p_curved = Curve::eval(pitchCurveType, phi_input);
         float p_flipped = pFlipV ? (1.f - p_curved) : p_curved;
-        float p_final = applyPowerBend(p_flipped, stage.pitchResponse());
+        float p_final = applyPowerBend(p_flipped, pitchRespKnob);
         // §6.2.1 maskMelody/tiltMelody centrality filter deferred to Phase C.
 
         float offsetDegrees = 0.f;
@@ -401,14 +423,18 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             const int accOffset = _accumulatorCounter[_activeCell] * stage.accumulatorStep();
             const int baseDegree = stage.basePitch() + accOffset
                 + octave * scale.notesPerOctave() + transpose;
-            const Curve::Type pitchCurveType = pitchCurveLut(stage.pitchCurve());
 
-            float phi = _stagePhase;
-            float phi_warped = applyPowerBend(phi, stage.pitchWarp());
-            float phi_input = stage.pitchFlipH() ? (1.f - phi_warped) : phi_warped;
+            const bool isGlobalPitch =
+                _sequence->pitchMode() == PhaseFluxSequence::PitchMode::Global;
+            const auto &pitchStage = isGlobalPitch ? _sequence->stage(0) : stage;
+            const Curve::Type pitchCurveType = pitchCurveLut(pitchStage.pitchCurve());
+
+            float phi = isGlobalPitch ? _pitchPhase : _stagePhase;
+            float phi_warped = applyPowerBend(phi, pitchStage.pitchWarp());
+            float phi_input = pitchStage.pitchFlipH() ? (1.f - phi_warped) : phi_warped;
             float p_curved = Curve::eval(pitchCurveType, phi_input);
-            float p_flipped = stage.pitchFlipV() ? (1.f - p_curved) : p_curved;
-            float p_final = applyPowerBend(p_flipped, stage.pitchResponse());
+            float p_flipped = pitchStage.pitchFlipV() ? (1.f - p_curved) : p_curved;
+            float p_final = applyPowerBend(p_flipped, pitchStage.pitchResponse());
 
             float offsetDegrees = 0.f;
             switch (stage.pitchDirection()) {
@@ -477,6 +503,20 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
 
     if (_activityTimer > 0) {
         --_activityTimer;
+    }
+
+    // Continuous pitchPhase accumulator. Advances every tick regardless of
+    // pitchMode so mode flips are seamless (Global picks up wherever the
+    // accumulator happens to be). Rate × tempo, where one cell = one unit.
+    if (_slotIdx >= 0 && _slotIdx < kStageCount) {
+        int slotTicks = _cumulativeTicks[_slotIdx + 1] - _cumulativeTicks[_slotIdx];
+        if (slotTicks > 0) {
+            float ratePerSlot =
+                float(PhaseFluxSequence::pitchRateNum(_sequence->pitchRate())) /
+                float(PhaseFluxSequence::pitchRateDen(_sequence->pitchRate()));
+            _pitchPhase += ratePerSlot / float(slotTicks);
+            _pitchPhase -= std::floor(_pitchPhase);
+        }
     }
 
     return result;

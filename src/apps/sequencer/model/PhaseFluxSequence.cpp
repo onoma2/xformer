@@ -1,5 +1,26 @@
 #include "PhaseFluxSequence.h"
 
+namespace {
+    struct PitchRatio { int num; int den; };
+    // Ordered from slowest drift (long repeat) to fastest. 1:1 = locked.
+    constexpr PitchRatio kPitchRatios[PhaseFluxSequence::kPitchRateCount] = {
+        {1,16}, {1,8}, {1,4}, {1,3}, {3,8}, {1,2}, {2,3}, {3,4}, {7,8},
+        {1,1},
+        {8,7}, {4,3}, {3,2}, {2,1}, {3,1}, {4,1}, {8,1},
+    };
+    constexpr int kDefaultPitchRateIndex = 9;  // 1:1
+}
+
+int PhaseFluxSequence::pitchRateNum(int index) {
+    return kPitchRatios[clamp(index, 0, kPitchRateCount - 1)].num;
+}
+int PhaseFluxSequence::pitchRateDen(int index) {
+    return kPitchRatios[clamp(index, 0, kPitchRateCount - 1)].den;
+}
+int PhaseFluxSequence::defaultPitchRateIndex() {
+    return kDefaultPitchRateIndex;
+}
+
 void PhaseFluxSequence::Stage::clear() {
     _data0.raw = 0;
     _data1.raw = 0;
@@ -51,6 +72,8 @@ void PhaseFluxSequence::clear() {
     _rootNote = -1;
     _resetMeasure = 0;
     _edited = 0;
+    _pitchRate = uint8_t(defaultPitchRateIndex());
+    _pitchMode = PitchMode::Cell;
     _globalPhase = 0.f;
     _divisor.setBase(12);                // 1/16 at PPQN 48
     _clockMultiplier.setBase(100);
@@ -63,6 +86,8 @@ void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_scale);
     writer.write(_rootNote);
     writer.write(_resetMeasure);
+    writer.write(_pitchRate);
+    writer.write(static_cast<uint8_t>(_pitchMode));
     writer.write(_globalPhase);
     _divisor.write(writer);
     _clockMultiplier.write(writer);
@@ -75,9 +100,14 @@ void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
     reader.read(_scale);
     reader.read(_rootNote);
     reader.read(_resetMeasure);
+    reader.read(_pitchRate);
+    uint8_t pitchMode;
+    reader.read(pitchMode);
+    _pitchMode = pitchMode < uint8_t(PitchMode::Last) ? static_cast<PitchMode>(pitchMode) : PitchMode::Cell;
     reader.read(_globalPhase);
     _divisor.read(reader);
     _clockMultiplier.read(reader);
+    _pitchRate = clamp(int(_pitchRate), 0, kPitchRateCount - 1);
     _scale = clamp(int(_scale), -1, Scale::Count - 1);
     _rootNote = clamp(int(_rootNote), -1, 11);
     _resetMeasure = clamp(int(_resetMeasure), 0, 128);

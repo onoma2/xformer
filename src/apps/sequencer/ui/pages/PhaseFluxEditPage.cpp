@@ -8,6 +8,7 @@
 #include "model/Curve.h"
 #include "model/ModelUtils.h"
 #include "model/PhaseFluxMath.h"
+#include "model/Scale.h"
 
 #include "core/math/Math.h"
 #include "core/utils/Random.h"
@@ -95,19 +96,35 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "PHFLX");
 
-    // Header: TEMP / PTCH (more sets later).
-    const char *setName = (_currentSet == 0) ? "TEMP" : "PTCH";
+    // Header: TEMP / PTCH / PTCH.G (global pitch mode).
+    const bool isPtch = (_currentSet == 1);
+    const bool isGlobalPitch =
+        isPtch && _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
+    const char *setName =
+        (_currentSet == 0) ? "TEMP" : (isGlobalPitch ? "PTCH.G" : "PTCH");
     WindowPainter::drawActiveFunction(canvas, setName);
 
     // Footer: 5 labels, swap to shift variants when Shift is held.
     const bool shift = globalKeyState()[Key::Shift];
     static const char *kLabelsTemp[5]      = { "Curve", "Warp",  "Resp", "Len",  "Puls" };
     static const char *kLabelsTempShift[5] = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
-    static const char *kLabelsPtch[5]      = { "Curve", "Warp",  "Resp", "Base", "Rng" };
-    static const char *kLabelsPtchShift[5] = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
+    static const char *kLabelsPtch[5]        = { "Curve", "Warp",  "Resp", "Base", "Span" };
+    static const char *kLabelsPtchShift[5]   = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
+    static const char *kLabelsPtchGlobal[5]      = { "Curve", "Warp",  "Resp", "Rate", "Note" };
+    static const char *kLabelsPtchGlobalShift[5] = { "FlipV", "FlipH", nullptr, nullptr, "Span" };
 
-    const char *(*primary)[5] = (_currentSet == 0) ? &kLabelsTemp : &kLabelsPtch;
-    const char *(*altShift)[5] = (_currentSet == 0) ? &kLabelsTempShift : &kLabelsPtchShift;
+    const char *(*primary)[5];
+    const char *(*altShift)[5];
+    if (_currentSet == 0) {
+        primary = &kLabelsTemp;
+        altShift = &kLabelsTempShift;
+    } else if (isGlobalPitch) {
+        primary = &kLabelsPtchGlobal;
+        altShift = &kLabelsPtchGlobalShift;
+    } else {
+        primary = &kLabelsPtch;
+        altShift = &kLabelsPtchShift;
+    }
     const char *footer[5];
     for (int i = 0; i < 5; ++i) {
         footer[i] = (shift && (*altShift)[i]) ? (*altShift)[i] : (*primary)[i];
@@ -123,10 +140,11 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
 
     // Single scope: temporal for TEMP set, pitch for PTCH set. Both land at
     // the same scope position so the right pane stays free for the param list.
+    // Global pitch mode draws stage[0]'s pitch curve as the master.
     if (_currentSet == 0) {
         drawTemporalScope(canvas, _selectedCell, ScopeTempX);
     } else {
-        drawPitchScope(canvas, _selectedCell, ScopeTempX);
+        drawPitchScope(canvas, isGlobalPitch ? 0 : _selectedCell, ScopeTempX);
     }
     drawStageBadge(canvas, ScopeTempX);
     drawParamList(canvas);
@@ -229,25 +247,40 @@ void PhaseFluxEditPage::encoder(EncoderEvent &event) {
 }
 
 void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
-    auto &stage = _project.selectedPhaseFluxSequence().stage(_selectedCell);
+    auto &seq = _project.selectedPhaseFluxSequence();
+    auto &activeStage = seq.stage(_selectedCell);
+    auto &masterStage = seq.stage(0);
     auto cycle = [](int v, int lo, int hi) { return clamp(v, lo, hi); };
+    const bool isGlobalPitch =
+        _currentSet == 1 &&
+        _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
     if (_currentSet == 0) {
         // TEMP
         switch (slot) {
-        case 0: stage.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(cycle(int(stage.temporalCurve()) + value, 0, 2))); break;
-        case 1: stage.setTemporalWarp(ModelUtils::adjusted(stage.temporalWarp(), value, -64, 64)); break;
-        case 2: stage.setTemporalResponse(ModelUtils::adjusted(stage.temporalResponse(), value, -64, 64)); break;
-        case 3: stage.setStageLen(ModelUtils::adjusted(stage.stageLen(), value, 0, 127)); break;
-        case 4: stage.setPulseCount(ModelUtils::adjusted(stage.pulseCount(), value, 1, 8)); break;
+        case 0: activeStage.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(cycle(int(activeStage.temporalCurve()) + value, 0, 2))); break;
+        case 1: activeStage.setTemporalWarp(ModelUtils::adjusted(activeStage.temporalWarp(), value, -64, 64)); break;
+        case 2: activeStage.setTemporalResponse(ModelUtils::adjusted(activeStage.temporalResponse(), value, -64, 64)); break;
+        case 3: activeStage.setStageLen(ModelUtils::adjusted(activeStage.stageLen(), value, 0, 127)); break;
+        case 4: activeStage.setPulseCount(ModelUtils::adjusted(activeStage.pulseCount(), value, 1, 8)); break;
+        }
+    } else if (isGlobalPitch) {
+        // Global PTCH — F1-F3 edit stage[0], F4 edits sequence rate, F5
+        // edits active stage's basePitch (per-cell anchor stays per-cell).
+        switch (slot) {
+        case 0: masterStage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(masterStage.pitchCurve()) + value, 0, 3))); break;
+        case 1: masterStage.setPitchWarp(ModelUtils::adjusted(masterStage.pitchWarp(), value, -64, 64)); break;
+        case 2: masterStage.setPitchResponse(ModelUtils::adjusted(masterStage.pitchResponse(), value, -64, 64)); break;
+        case 3: seq.editPitchRate(value, shift); break;
+        case 4: activeStage.setBasePitch(ModelUtils::adjusted(activeStage.basePitch(), value, -64, 64)); break;
         }
     } else {
-        // PTCH
+        // Cell PTCH
         switch (slot) {
-        case 0: stage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(stage.pitchCurve()) + value, 0, 3))); break;
-        case 1: stage.setPitchWarp(ModelUtils::adjusted(stage.pitchWarp(), value, -64, 64)); break;
-        case 2: stage.setPitchResponse(ModelUtils::adjusted(stage.pitchResponse(), value, -64, 64)); break;
-        case 3: stage.setBasePitch(ModelUtils::adjusted(stage.basePitch(), value, -64, 64)); break;
-        case 4: stage.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(stage.pitchRange()) + value, 0, 3))); break;
+        case 0: activeStage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(activeStage.pitchCurve()) + value, 0, 3))); break;
+        case 1: activeStage.setPitchWarp(ModelUtils::adjusted(activeStage.pitchWarp(), value, -64, 64)); break;
+        case 2: activeStage.setPitchResponse(ModelUtils::adjusted(activeStage.pitchResponse(), value, -64, 64)); break;
+        case 3: activeStage.setBasePitch(ModelUtils::adjusted(activeStage.basePitch(), value, -64, 64)); break;
+        case 4: activeStage.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(activeStage.pitchRange()) + value, 0, 3))); break;
         }
     }
     (void)shift;
@@ -276,17 +309,35 @@ void PhaseFluxEditPage::randomizeCurrentSet() {
 }
 
 void PhaseFluxEditPage::toggleShiftAt(int slot) {
-    auto &stage = _project.selectedPhaseFluxSequence().stage(_selectedCell);
+    auto &seq = _project.selectedPhaseFluxSequence();
+    auto &activeStage = seq.stage(_selectedCell);
+    auto &masterStage = seq.stage(0);
+    const bool isGlobalPitch =
+        _currentSet == 1 &&
+        _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
     if (_currentSet == 0) {
         switch (slot) {
-        case 0: stage.setTemporalFlipV(!stage.temporalFlipV()); break;
-        case 1: stage.setTemporalFlipH(!stage.temporalFlipH()); break;
+        case 0: activeStage.setTemporalFlipV(!activeStage.temporalFlipV()); break;
+        case 1: activeStage.setTemporalFlipH(!activeStage.temporalFlipH()); break;
+        default: break;
+        }
+    } else if (isGlobalPitch) {
+        // F1/F2 flips toggle stage[0] (the master pitch curve). Shift+F5
+        // cycles the active stage's range — demoted from F5 encoder edit.
+        switch (slot) {
+        case 0: masterStage.setPitchFlipV(!masterStage.pitchFlipV()); break;
+        case 1: masterStage.setPitchFlipH(!masterStage.pitchFlipH()); break;
+        case 4: {
+            int next = (int(activeStage.pitchRange()) + 1) & 3;
+            activeStage.setPitchRange(PhaseFluxSequence::PitchRangeType(next));
+            break;
+        }
         default: break;
         }
     } else {
         switch (slot) {
-        case 0: stage.setPitchFlipV(!stage.pitchFlipV()); break;
-        case 1: stage.setPitchFlipH(!stage.pitchFlipH()); break;
+        case 0: activeStage.setPitchFlipV(!activeStage.pitchFlipV()); break;
+        case 1: activeStage.setPitchFlipH(!activeStage.pitchFlipH()); break;
         default: break;
         }
     }
@@ -454,36 +505,70 @@ void PhaseFluxEditPage::drawStageBadge(Canvas &canvas, int scopeX) {
     canvas.setFont(Font::Tiny);
     canvas.setBlendMode(BlendMode::Set);
     canvas.setColor(Color::MediumBright);
-    FixedStringBuilder<4> s("%d", _selectedCell + 1);
-    canvas.drawText(scopeX + 2, ScopeY + 6, s);
+    const bool isPtchGlobal =
+        _currentSet == 1 &&
+        _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
+    if (isPtchGlobal) {
+        canvas.drawText(scopeX + 2, ScopeY + 6, "G");
+    } else {
+        FixedStringBuilder<4> s("%d", _selectedCell + 1);
+        canvas.drawText(scopeX + 2, ScopeY + 6, s);
+    }
 }
 
 void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
     const PhaseFluxSequence &seq = _project.selectedPhaseFluxSequence();
-    const auto &stage = seq.stage(_selectedCell);
+    const auto &activeStage = seq.stage(_selectedCell);
+    const auto &masterStage = seq.stage(0);
+    const bool shift = globalKeyState()[Key::Shift];
+    const bool isGlobalPitch =
+        _currentSet == 1 &&
+        _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
+    // In Global PTCH mode, F1-F3 read from stage[0] (the master). Cell mode
+    // and TEMP set read from the currently selected cell.
+    const auto &pitchSrc = isGlobalPitch ? masterStage : activeStage;
 
     static const char *kTempCurve[3]  = { "Lin", "Bel", "Bnc" };
     static const char *kPitchCurve[4] = { "Rmp", "Bel", "Tri", "Bnc" };
-    static const char *kPitchRange[4] = { "1/2", "1",   "2",   "3" };
 
-    static const char *kNamesTemp[5]  = { "Curve", "Warp", "Resp", "Len",  "Puls" };
-    static const char *kNamesPtch[5]  = { "Curve", "Warp", "Resp", "Base", "Rng"  };
+    static const char *kNamesTemp[5]       = { "Curve", "Warp", "Resp", "Len",  "Puls" };
+    static const char *kNamesPtch[5]       = { "Curve", "Warp", "Resp", "Base", "Span" };
+    static const char *kNamesPtchGlobal[5] = { "Curve", "Warp", "Resp", "Rate", "Note" };
 
     FixedStringBuilder<8> values[5];
     if (_currentSet == 0) {
-        values[0]("%s",  kTempCurve[clamp(int(stage.temporalCurve()), 0, 2)]);
-        values[1]("%+d", stage.temporalWarp());
-        values[2]("%+d", stage.temporalResponse());
-        values[3]("%.2fx", stage.stageLen() / 64.0f);
-        values[4]("%d",  stage.pulseCount());
+        values[0]("%s",  kTempCurve[clamp(int(activeStage.temporalCurve()), 0, 2)]);
+        values[1]("%+d", activeStage.temporalWarp());
+        values[2]("%+d", activeStage.temporalResponse());
+        values[3]("%.2fx", activeStage.stageLen() / 64.0f);
+        values[4]("%d",  activeStage.pulseCount());
+    } else if (isGlobalPitch) {
+        values[0]("%s",  kPitchCurve[clamp(int(pitchSrc.pitchCurve()), 0, 3)]);
+        values[1]("%+d", pitchSrc.pitchWarp());
+        values[2]("%+d", pitchSrc.pitchResponse());
+        values[3]("%d:%d",
+            PhaseFluxSequence::pitchRateNum(seq.pitchRate()),
+            PhaseFluxSequence::pitchRateDen(seq.pitchRate()));
+        // values[4] populated specially below (note name + range dots stacked).
     } else {
-        values[0]("%s",  kPitchCurve[clamp(int(stage.pitchCurve()), 0, 3)]);
-        values[1]("%+d", stage.pitchWarp());
-        values[2]("%+d", stage.pitchResponse());
-        values[3]("%+d", stage.basePitch());
-        values[4]("%s",  kPitchRange[clamp(int(stage.pitchRange()), 0, 3)]);
+        values[0]("%s",  kPitchCurve[clamp(int(activeStage.pitchCurve()), 0, 3)]);
+        values[1]("%+d", activeStage.pitchWarp());
+        values[2]("%+d", activeStage.pitchResponse());
+        values[3]("%+d", activeStage.basePitch());
+        static const char *kPitchRange[4] = { "1/2", "1", "2", "3" };
+        values[4]("%s",  kPitchRange[clamp(int(activeStage.pitchRange()), 0, 3)]);
     }
-    const char *(*names)[5] = (_currentSet == 0) ? &kNamesTemp : &kNamesPtch;
+    const char *(*names)[5];
+    if (_currentSet == 0) {
+        names = &kNamesTemp;
+    } else if (isGlobalPitch) {
+        // In Global PTCH, the F5 panel label swaps NOTE → SPAN while Shift is
+        // held, since Shift+F5 cycles the per-cell range (range demoted).
+        static const char *kNamesPtchGlobalShift[5] = { "Curve", "Warp", "Resp", "Rate", "Span" };
+        names = shift ? &kNamesPtchGlobalShift : &kNamesPtchGlobal;
+    } else {
+        names = &kNamesPtch;
+    }
 
     canvas.setFont(Font::Tiny);
     canvas.setBlendMode(BlendMode::Set);
@@ -505,6 +590,29 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
         canvas.setColor(Color::Medium);
         canvas.drawText(ParamPanelX + 2, ry + rh - 2, (*names)[i]);
         canvas.setColor(isSelected ? Color::Bright : Color::MediumBright);
+
+        // F5 in Global PTCH renders the active stage's note name on the row's
+        // upper portion and range dots beneath. All other rows print a single
+        // right-flush value.
+        if (isGlobalPitch && i == 4) {
+            const Scale &scale = seq.selectedScale(_model.project().scale());
+            int rootNote = seq.selectedRootNote(_model.project().rootNote());
+            FixedStringBuilder<8> noteStr;
+            scale.noteName(noteStr, activeStage.basePitch(), rootNote, Scale::Short1);
+            int vw = canvas.textWidth(noteStr);
+            canvas.drawText(ParamPanelX + ParamPanelW - 2 - vw, ry + rh - 2, noteStr);
+            // Range dots beneath note name, flush right.
+            int dots = clamp(int(activeStage.pitchRange()), 0, 3) + 1;
+            int dotY = ry + rh + 1;
+            int dotX = ParamPanelX + ParamPanelW - 4;
+            canvas.setColor(isSelected ? Color::Bright : Color::MediumBright);
+            for (int k = 0; k < dots; ++k) {
+                canvas.point(dotX, dotY);
+                dotX -= 3;
+            }
+            continue;
+        }
+
         int vw = canvas.textWidth(values[i]);
         canvas.drawText(ParamPanelX + ParamPanelW - 2 - vw, ry + rh - 2, values[i]);
     }
