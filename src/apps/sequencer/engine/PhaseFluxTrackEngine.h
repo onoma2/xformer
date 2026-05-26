@@ -101,10 +101,6 @@ private:
     uint16_t _cachedDivisor = 0;
     uint8_t _cachedClockMult = 0;
 
-    // Per-cell accumulator (scale degrees). Legacy single-counter array;
-    // Task 6 rewires pitch application against _noteAccumCounter[] and removes.
-    int _accumulatorCounter[kStageCount];
-
     // Dual-accumulator state (spec §13.3, Task 5).
     // Local scope uses [cell] index; Track scope shares [0].
     int _noteAccumCounter[kStageCount];

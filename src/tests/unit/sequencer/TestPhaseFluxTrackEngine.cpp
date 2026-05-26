@@ -122,6 +122,26 @@ CASE("note_counter_rtz_overflow_snaps_to_zero") {
     expectEqual(counter, 0, "RTZ snaps to zero on overflow past posLim");
 }
 
+CASE("note_accum_drift_sequence_matches_spec_example") {
+    // NOTE: Unit tests exercise the counter advance helper only. The integration
+    // path — Engine reading _noteAccumCounter[counterIdx] in rebuildSchedule and
+    // Always-mode CV — is verified in Task 10 simulator audition.
+    // Spec §13.10 Task 6: step=+1, scope=Local, order=Wrap, posLim=7.
+    // Counter sequence consumed by pitch eval: 0, +1, +2, ..., +7, 0, +1, ...
+    AccumulatorConfig cfg;
+    cfg.setOrder(AccumulatorConfig::Order::Wrap);
+    cfg.setPolarity(AccumulatorConfig::Polarity::Uni);
+    cfg.setPosLim(7);
+    cfg.setNegLim(7);
+    int counter = 0;
+    int8_t dir = 1;
+    const int expected[] = { 1, 2, 3, 4, 5, 6, 7, 0, 1, 2 };
+    for (int i = 0; i < 10; ++i) {
+        PhaseFluxTrackEngine::advanceCounter(counter, dir, cfg, +1);
+        expectEqual(counter, expected[i], "drift step");
+    }
+}
+
 CASE("note_counter_negative_step_uni_descends_to_neg_lim") {
     // Uni polarity with negative step: bounds become -negLim..0
     AccumulatorConfig cfg;

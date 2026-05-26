@@ -117,7 +117,6 @@ void PhaseFluxTrackEngine::reset() {
     _activityTimer = 0;
     _scheduleCount = 0;
     for (int i = 0; i < kStageCount; ++i) {
-        _accumulatorCounter[i] = 0;
         _noteAccumCounter[i] = 0;
         _noteAccumDir[i] = 1;
         _pulseAccumCounter[i] = 0;
@@ -154,7 +153,6 @@ void PhaseFluxTrackEngine::changePattern() {
     // calls this every measure, so full reset() would re-anchor _resetTickOffset
     // on each measure boundary and kill the held cycle.
     for (int i = 0; i < kStageCount; ++i) {
-        _accumulatorCounter[i] = 0;
         _noteAccumCounter[i] = 0;
         _noteAccumDir[i] = 1;
         _pulseAccumCounter[i] = 0;
@@ -250,8 +248,12 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
 
     const float rangeOctaves = pitchRangeToOctaves(stage.pitchRange());
     const int rangeDegrees = std::max(1, int(std::round(rangeOctaves * scale.notesPerOctave())));
-    const int accOffset = _accumulatorCounter[_activeCell] * stage.accumulatorStep();
-    const int baseDegree = stage.basePitch() + accOffset
+    const auto &noteCfg = _sequence->noteAccumConfig();
+    // Track scope shares counter [0]; Local scope uses per-cell index (§13.3).
+    const int counterIdx = (noteCfg.scope() == AccumulatorConfig::Scope::Local)
+        ? _activeCell : 0;
+    const int noteAccOffset = _noteAccumCounter[counterIdx] * stage.accumulatorStep();
+    const int baseDegree = stage.basePitch() + noteAccOffset
         + octave * scale.notesPerOctave() + transpose;
 
     // §6.1 + §6.2 — build per-pulse (triggerOffset, cv) pairs, then apply
@@ -499,8 +501,12 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             const int transpose = _phaseFluxTrack.transpose();
             const float rangeOctaves = pitchRangeToOctaves(stage.pitchRange());
             const int rangeDegrees = std::max(1, int(std::round(rangeOctaves * scale.notesPerOctave())));
-            const int accOffset = _accumulatorCounter[_activeCell] * stage.accumulatorStep();
-            const int baseDegree = stage.basePitch() + accOffset
+            const auto &noteCfg = _sequence->noteAccumConfig();
+            // Track scope shares counter [0]; Local scope uses per-cell index (§13.3).
+            const int counterIdx = (noteCfg.scope() == AccumulatorConfig::Scope::Local)
+                ? _activeCell : 0;
+            const int noteAccOffset = _noteAccumCounter[counterIdx] * stage.accumulatorStep();
+            const int baseDegree = stage.basePitch() + noteAccOffset
                 + octave * scale.notesPerOctave() + transpose;
 
             const bool isGlobalPitch =
