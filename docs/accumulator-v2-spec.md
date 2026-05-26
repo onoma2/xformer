@@ -369,8 +369,8 @@ Cleared on pattern switch (`changePattern()`); preserved across measure reset.
 
 **Application:**
 
-- Note accumulator: `noteAccOffset = noteCounter × stage.accumulatorStep`, added into the degree before `Scale::noteToVolts` (existing code path).
-- Pulse accumulator: `effectivePulseCount = clamp(stage.pulseCount + pulseCounter × stage.pulseAccumStep, 1, 8)`. Applied at `rebuildSchedule`'s pulse-loop start; clamping is hard (no overflow into next cell).
+- Note accumulator: `noteAccOffset = noteCounter`, added into the degree before `Scale::noteToVolts`. The counter already stores the ACCUMULATED scale degrees (each trigger adds `step` to the counter inside `AccumulatorOps`), so no multiplication on application — would double-apply the step.
+- Pulse accumulator: `effectivePulseCount = clamp(stage.pulseCount + pulseCounter, 1, 8)`. Counter directly accumulates pulse delta; applied at `rebuildSchedule`'s pulse-loop start; clamping is hard (no overflow into next cell).
 
 **Limits** (set per-sequence): `posLim` and `negLim`, each 1..28 scale degrees (note accumulator) or 1..8 pulses (pulse accumulator). Effective counter range depends on Polarity (below).
 
@@ -509,7 +509,7 @@ The four Order resolutions (Wrap / Pendulum / Hold / Random) are **already imple
 
 | Order | Existing function | Lines | Notes |
 |---|---|---|---|
-| Wrap | `Accumulator::tickWithWrap()` | 58-70 | Direction-aware (Up/Down). Uses `_minValue` / `_maxValue` directly. |
+| Wrap | `Accumulator::tickWithWrap()` | 58-70 | Direction-aware (Up/Down). Uses `_minValue` / `_maxValue` directly. PhaseFlux's `tickWrap` uses safe positive-remainder modulo (`((delta % range) + range) % range`) instead of single-subtract — step can exceed range (±15 note / ±7 pulse vs limit min 1), and single-subtract would leave the counter outside `[min, max]` on multi-range overshoot. |
 | Pendulum | `Accumulator::tickWithPendulum()` | 72-86 | Tracks `_pendulumDirection` (runtime ±1), reverses at min/max. Clamps to exactly min/max on hit. |
 | Hold | `Accumulator::tickWithHold()` | 104-118 | Direction-aware, clips at limit. |
 | Random | `Accumulator::tickWithRandom()` | 88-102 | Uniform random in `[min, max]`. NB: this is NOT Metropolix's weighted drunken walk (§13.7); if drunken walk is wanted, that's a separate decision. For v1, NoteTrack's uniform Random is the shipped algorithm — keep it consistent. |
@@ -549,6 +549,8 @@ This caller-side decomposition resolves the Pendulum+Uni zero-crossing concern a
 **Direction state:** the existing class uses `_direction` (config: Up/Down/Freeze) and `_pendulumDirection` (runtime: ±1). For PhaseFlux, we don't need a separate Direction config — the sign of `stage.step` carries the direction. `Freeze` is implicit when `step == 0` (no advance happens). So the engine passes `direction = step > 0 ? +1 : -1` to the tick functions, and tracks `pendulumDir` per-counter as runtime state.
 
 **Pendulum signed-step semantics — divergence from NoteTrack:** PhaseFlux passes the *signed* `step` (not its magnitude) to `tickPendulum`, so `counter += step * pendulumDir` honors the cell's configured drift sign on the first move. NoteTrack uses unsigned step × a separate Direction enum; PhaseFlux folds the direction into the step sign. Without this, a Uni cell with negative step (bounds `[-negLim, 0]`, initial `pendulumDir = +1`) would advance up out of range on tick 1, clamp back to 0, then flip — producing a degenerate one-tick stall. A Bi cell with negative step would ascend first instead of descending. With signed step, both cases drift in the configured direction immediately.
+
+Boundary handling must FLIP `pendulumDir` (negate it) rather than force it to a hardcoded ±1 — NoteTrack's original hardcoded values (max → -1, min → +1) assume positive step, and fail with negative step (counter stays clamped at the boundary because `step * pendulumDir` keeps pushing past). Flipping is correct for both sign cases.
 
 **RTZ Order (the one NoteTrack doesn't have):** add a new free function:
 
@@ -602,7 +604,7 @@ Each task is independently dispatchable. Order matters where dependencies are li
 
 **Task 6: Wire Note accumulator into pitch pipeline**
 - *Files*: `src/apps/sequencer/engine/PhaseFluxTrackEngine.cpp`
-- *Deliverable*: In `rebuildSchedule()` and the Always-mode CV branch, compute `noteAccOffset = noteCounter × stage.accumulatorStep` (Local scope) or `noteAccOffset = sharedCounter × stage.accumulatorStep` (Track scope). Add to `baseDegree` before scale-quantization. Same code path for both Cell and Global pitchMode (per §13.8 decoupling).
+- *Deliverable*: In `rebuildSchedule()` and the Always-mode CV branch, compute `noteAccOffset = noteCounter` (Local scope) or `noteAccOffset = sharedCounter` (Track scope). The counter already stores accumulated scale degrees; no multiplication on application. Add to `baseDegree` before scale-quantization. Same code path for both Cell and Global pitchMode (per §13.8 decoupling).
 - *Tests*: extend `TestPhaseFluxTrackEngine.cpp` — set up a stage with `accumulatorStep = +1`, scope=Local, order=Wrap, posLim=7. Advance through several cycles. Verify produced CV reflects degree drift `0, +1, +2, ..., +7, 0, +1, ...`.
 - *Depends on*: Task 5.
 

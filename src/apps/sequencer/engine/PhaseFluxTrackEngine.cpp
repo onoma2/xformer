@@ -214,7 +214,9 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     const auto &pulseCfg = _sequence->pulseAccumConfig();
     const int pulseCounterIdx = (pulseCfg.scope() == AccumulatorConfig::Scope::Local)
         ? _activeCell : 0;
-    const int pulseAccOffset = _pulseAccumCounter[pulseCounterIdx] * stage.pulseAccumStep();
+    // Counter already stores accumulated delta (each tick adds step), so apply
+    // directly — multiplying by step here would be quadratic growth.
+    const int pulseAccOffset = _pulseAccumCounter[pulseCounterIdx];
     int pulseCount = stage.pulseCount() + pulseAccOffset;
     if (pulseCount < 1) pulseCount = 1;
     if (pulseCount > 8) pulseCount = 8;
@@ -254,7 +256,8 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     // Track scope shares counter [0]; Local scope uses per-cell index (§13.3).
     const int noteCounterIdx = (noteCfg.scope() == AccumulatorConfig::Scope::Local)
         ? _activeCell : 0;
-    const int noteAccOffset = _noteAccumCounter[noteCounterIdx] * stage.accumulatorStep();
+    // Counter already stores accumulated degrees — apply directly.
+    const int noteAccOffset = _noteAccumCounter[noteCounterIdx];
     const int baseDegree = stage.basePitch() + noteAccOffset
         + octave * scale.notesPerOctave() + transpose;
 
@@ -537,7 +540,8 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             // Track scope shares counter [0]; Local scope uses per-cell index (§13.3).
             const int counterIdx = (noteCfg.scope() == AccumulatorConfig::Scope::Local)
                 ? _activeCell : 0;
-            const int noteAccOffset = _noteAccumCounter[counterIdx] * stage.accumulatorStep();
+            // Counter already stores accumulated degrees — apply directly.
+            const int noteAccOffset = _noteAccumCounter[counterIdx];
             const int baseDegree = stage.basePitch() + noteAccOffset
                 + octave * scale.notesPerOctave() + transpose;
 

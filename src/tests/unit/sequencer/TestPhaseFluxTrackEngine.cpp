@@ -166,7 +166,9 @@ CASE("note_counter_negative_step_uni_descends_to_neg_lim") {
 // clamp + per-pulse loop) is verified in Task 10 audition.
 
 CASE("pulse_accum_drift_with_stage_trigger_walks_count_1_to_8") {
-    // posLim=7, step=+1: counter walks 1..8 then wraps to 0.
+    // posLim=7, step=+1: counter walks 1..7 (capped) then wraps to 0.
+    // Effective pulse count = basePulseCount + counter (no multiplication;
+    // counter already stores the accumulated delta).
     AccumulatorConfig cfg;
     cfg.setOrder(AccumulatorConfig::Order::Wrap);
     cfg.setPolarity(AccumulatorConfig::Polarity::Uni);
@@ -177,12 +179,13 @@ CASE("pulse_accum_drift_with_stage_trigger_walks_count_1_to_8") {
     int counter = 0;
     int8_t dir = 1;
     auto effective = [&]() {
-        int v = basePulseCount + counter * step;
+        int v = basePulseCount + counter;
         if (v < 1) v = 1;
         if (v > 8) v = 8;
         return v;
     };
     expectEqual(effective(), 1, "cycle 0: counter=0 -> N=1");
+    // Walks 1+1=2, 1+2=3, ..., 1+7=8, then wrap counter to 0 -> N=1, then 2.
     const int expected[] = { 2, 3, 4, 5, 6, 7, 8, 1, 2 };
     for (int i = 0; i < 9; ++i) {
         PhaseFluxTrackEngine::advanceCounter(counter, dir, cfg, step);
@@ -191,11 +194,11 @@ CASE("pulse_accum_drift_with_stage_trigger_walks_count_1_to_8") {
 }
 
 CASE("effective_pulse_count_clamps_at_8_when_offset_pushes_above") {
-    // pulseCount=4, step=+1, counter=10 -> raw=14, clamp to 8.
+    // pulseCount=4, counter=10 -> raw=14, clamp to 8.
+    // Counter directly represents accumulated pulse offset.
     const int basePulseCount = 4;
-    const int step = +1;
     const int counter = 10;
-    int raw = basePulseCount + counter * step;
+    int raw = basePulseCount + counter;
     int eff = raw;
     if (eff < 1) eff = 1;
     if (eff > 8) eff = 8;
@@ -204,11 +207,10 @@ CASE("effective_pulse_count_clamps_at_8_when_offset_pushes_above") {
 }
 
 CASE("effective_pulse_count_clamps_at_1_when_offset_pushes_below") {
-    // pulseCount=4, step=-1, counter=10 -> raw=-6, clamp to 1.
+    // pulseCount=4, counter=-10 -> raw=-6, clamp to 1.
     const int basePulseCount = 4;
-    const int step = -1;
-    const int counter = 10;
-    int raw = basePulseCount + counter * step;
+    const int counter = -10;
+    int raw = basePulseCount + counter;
     int eff = raw;
     if (eff < 1) eff = 1;
     if (eff > 8) eff = 8;
