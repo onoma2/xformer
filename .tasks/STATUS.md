@@ -1,5 +1,5 @@
 # Task Board
-_Updated: 2026-05-25 (Stochastic, fourth session pass — Loop page chip cleanup + Live page constellation redesign: Loop page bottom-band MaskR/TiltR chips (which overflowed the footer separator at y=53) replaced with thin vertical bars in the left/right margins; MaskM/TiltM moved to the same side-bar scheme on the right; top tiny readout centered with 5 chips PR/PM/MU/JU/SL (M→MU, J→JU, S→SL); held-step labels for the four mask/tilt knobs expanded to full words "MASK RHYTHM" / "TILT RHYTHM" / "MASK MELODY" / "TILT MELODY"; stale LAST slot removed and Size/Rotate shifted one index lower (case 9 = Size, case 10 = Rotate, slot 11 freed). **Live page constellation:** comet-trail walker (pitch guide rails, slide ribbons, legato rails, age-based stride math) replaced with 12 fixed rings in a seed-hashed XY field — each event keyed by a monotonic `serial` baked into the engine's history struct, so age fade happens in place while position stays put. Bell haze (Bias center / Spread width) preserved. Contour skews via per-event serial bits. Variation wobbles ring radius. Rest culls a slot to a faint dot. Burst petals draw around the bright ring (newest event). Repeat (>50) double-strokes the outline. NewR/NewM reshuffles the seed → next event lands at a fresh XY. Chip strip reduced from 16 single-letter cells to the 11 important knobs (D/V/R/BU/BC/BR on top, E/S/O/X/I bottom), grid-locked with `%-2s%3d` formatting so digit changes never shift positions. UI-preview workflow rule added to CLAUDE.md + AGENTS.md: any OLED-page change must be rendered via `ui-preview/` and `open`'d before any chat description. Previous-session highlights (still landed): Live capture on NewR/NewM (mode-aware, auto-switches to Loop); Pitch+Duration quick-edit at slots 13/14/15; Mutate unipolar-destructive; Duration/Variation/Rest three-zone law; Burst 4-state + Fit-curve flams; Patience log2 curve; ContentSnapshot; Shift+NewR/NewM undo; pitch 5-step law.)_
+_Updated: 2026-05-26_
 
 **Naming convention from 2026-05-24 forward:** older entries below use prior names that are consistent with the code at the time they were written. Current canonical: step (idea, int), `StochasticStepContent` (stored), `RuntimeStep` (runtime), `StepCache` (container), `Gate` / `Cv` (output).
 
@@ -26,6 +26,14 @@ _Updated: 2026-05-25 (Stochastic, fourth session pass — Loop page chip cleanup
 **Depends on:** nothing
 **Branch:** TBD
 **Reference:** `.tasks/stability-fixes.md`
+
+## ⚪ teletype-v2-dialect — Performer-native Teletype++ dialect and Phase 1 data-model plan
+**Status:** ready — Phase 0 dialect definition is source-checked; Phase 1 plan is written.
+**Where I stopped:** `docs/teletype_v2.md` now defines the keep/drop/redesign contract, and `docs/teletype_v2_phase1_plan.md` outlines native program/runtime/output state steps.
+**Next action:** Start Phase 1 Step 1 by defining fixed-size native program storage and size probes, with no interpreter work yet.
+**Depends on:** RAM gates; Teletype runtime architecture lessons.
+**Branch:** TBD
+**Reference:** `.tasks/teletype-v2-dialect/TASK.md`
 
 ## ⚪ phaseflux — New TrackMode: 4×4 grid sequencer, stateless-ramp engine, scale-degree pitch, per-stage curves + transforms
 **Status:** ready — design fully locked in `docs/phaseflux-spec.md` (18 sections, all 66 audit questions resolved, 3-reviewer audit clean). UI rendered + verified in `ui-preview/phaseflux-preview.png`.
