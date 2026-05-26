@@ -1,5 +1,6 @@
 #include "PhaseFluxTrackEngine.h"
 
+#include "AccumulatorOps.h"
 #include "Engine.h"
 
 #include "model/Curve.h"
@@ -7,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace {
 
@@ -58,6 +60,46 @@ inline float applyPowerBend(float x, int knob) {
 
 } // namespace
 
+void PhaseFluxTrackEngine::advanceCounter(int &counter, int8_t &pendulumDir,
+                                          const AccumulatorConfig &cfg, int step) {
+    if (step == 0) return;
+
+    // §13.9 polarity-to-bounds mapping. Uni: bounds depend on step sign;
+    // Bi: bounds span both limits regardless of step sign.
+    int absMin, absMax;
+    if (cfg.polarity() == AccumulatorConfig::Polarity::Uni) {
+        if (step > 0) { absMin = 0;                       absMax = +int(cfg.posLim()); }
+        else          { absMin = -int(cfg.negLim());      absMax = 0;                  }
+    } else {
+        absMin = -int(cfg.negLim());
+        absMax = +int(cfg.posLim());
+    }
+
+    const int direction = step > 0 ? +1 : -1;
+    const int magnitude = std::abs(step);
+
+    switch (cfg.order()) {
+    case AccumulatorConfig::Order::Wrap:
+        AccumulatorOps::tickWrap(counter, direction, absMin, absMax, magnitude);
+        break;
+    case AccumulatorConfig::Order::Pendulum: {
+        // Pendulum: step magnitude only — direction lives in pendulumDir (NoteTrack precedent).
+        int pdir = int(pendulumDir);
+        AccumulatorOps::tickPendulum(counter, pdir, absMin, absMax, magnitude);
+        pendulumDir = int8_t(pdir);
+        break;
+    }
+    case AccumulatorConfig::Order::Hold:
+        AccumulatorOps::tickHold(counter, direction, absMin, absMax, magnitude);
+        break;
+    case AccumulatorConfig::Order::RTZ:
+        // RTZ ops only checks bounds; advance manually first.
+        counter += step;
+        AccumulatorOps::tickRTZ(counter, absMin, absMax);
+        break;
+    }
+}
+
 void PhaseFluxTrackEngine::reset() {
     _resetTickOffset = 0;
     _firstTickAfterReset = true;
@@ -76,7 +118,13 @@ void PhaseFluxTrackEngine::reset() {
     _scheduleCount = 0;
     for (int i = 0; i < kStageCount; ++i) {
         _accumulatorCounter[i] = 0;
+        _noteAccumCounter[i] = 0;
+        _noteAccumDir[i] = 1;
+        _pulseAccumCounter[i] = 0;
+        _pulseAccumDir[i] = 1;
     }
+    _cycleCount = 0;
+    _prevCycleTick = 0;
     for (int i = 0; i <= kStageCount; ++i) {
         _cumulativeTicks[i] = 0;
     }
@@ -92,6 +140,7 @@ void PhaseFluxTrackEngine::restart() {
     _gateState = false;
     _gateTimer = 0;
     _prevSlotIdx = -1;
+    _prevCycleTick = 0;
     _scheduleCount = 0;
 }
 
@@ -101,14 +150,18 @@ void PhaseFluxTrackEngine::stop() {
 }
 
 void PhaseFluxTrackEngine::changePattern() {
-    // §7.1 — pattern switch clears accumulator counters. Engine::updatePlayState
-    // calls this every measure (handleSongAdvance, regardless of song mode), so
-    // a full reset() would re-anchor _resetTickOffset on each measure boundary
-    // and kill the held cycle. Lazy seq-pointer rebind in tick() handles the
-    // sequence swap; here we only zero the counters.
+    // §13.4 — pattern switch is a hard reset for accumulators. Engine::updatePlayState
+    // calls this every measure, so full reset() would re-anchor _resetTickOffset
+    // on each measure boundary and kill the held cycle.
     for (int i = 0; i < kStageCount; ++i) {
         _accumulatorCounter[i] = 0;
+        _noteAccumCounter[i] = 0;
+        _noteAccumDir[i] = 1;
+        _pulseAccumCounter[i] = 0;
+        _pulseAccumDir[i] = 1;
     }
+    _cycleCount = 0;
+    _prevCycleTick = 0;
 }
 
 bool PhaseFluxTrackEngine::detectLayoutChange() {
@@ -155,6 +208,7 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
     _pulseFired = 0;
     _scheduleCount = 0;
     _prevSlotIdx = -1;
+    _prevCycleTick = 0;
     _layoutDirty = false;
 }
 
@@ -348,6 +402,7 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
         _sequence = seq;
         _layoutDirty = true;
         _prevSlotIdx = -1;
+        _prevCycleTick = 0;
     }
 
     if (_firstTickAfterReset) {
@@ -382,6 +437,7 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             _gateTimer = 0;
             _gateState = false;
             _prevSlotIdx = -1;
+            _prevCycleTick = 0;
         }
     }
 
@@ -404,6 +460,29 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
     _slotIdx = slotIdx;
     _activeCell = activeCell;
     _stagePhase = stagePhase;
+
+    // §13.4 cycle-wrap detection — timing-based per spec §13.10 Task 5.
+    // Slot-based detection misses when stage 0 is skipped (zero-width slot)
+    // or when only one slot is active (no slot transition occurs).
+    uint32_t cycleTick = (_cycleTicks > 0) ? (relativeTick % uint32_t(_cycleTicks)) : 0;
+    if (_cycleTicks > 0 && cycleTick < _prevCycleTick) {
+        ++_cycleCount;
+        const auto &noteCfg = _sequence->noteAccumConfig();
+        if (noteCfg.reset() > 0 && _cycleCount % noteCfg.reset() == 0) {
+            for (int i = 0; i < kStageCount; ++i) {
+                _noteAccumCounter[i] = 0;
+                _noteAccumDir[i] = 1;
+            }
+        }
+        const auto &pulseCfg = _sequence->pulseAccumConfig();
+        if (pulseCfg.reset() > 0 && _cycleCount % pulseCfg.reset() == 0) {
+            for (int i = 0; i < kStageCount; ++i) {
+                _pulseAccumCounter[i] = 0;
+                _pulseAccumDir[i] = 1;
+            }
+        }
+    }
+    _prevCycleTick = cycleTick;
 
     TickResult result = NoUpdate;
 
@@ -459,8 +538,23 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
     // Slot change: advance previous cell's accumulator, rebuild schedule.
     if (_slotIdx != _prevSlotIdx) {
         if (_prevSlotIdx >= 0) {
-            // TODO Task 5: counter advance against AccumulatorOps + per-sequence
-            // config. Pre-Task-4 logic deleted alongside accumulatorLength removal.
+            // §13.4 Stage-trigger advance for the completing cell.
+            const int completedCell = int(PhaseFluxMath::snakeOrder()[_prevSlotIdx]);
+            const auto &completed = _sequence->stage(completedCell);
+
+            // Note accumulator (Stage trigger only; Pulse trigger wires in Task 7).
+            if (completed.accumulatorTrigger() == PhaseFluxSequence::AccumulatorTriggerType::Stage) {
+                const auto &cfg = _sequence->noteAccumConfig();
+                const int idx = (cfg.scope() == AccumulatorConfig::Scope::Track) ? 0 : completedCell;
+                advanceCounter(_noteAccumCounter[idx], _noteAccumDir[idx], cfg, completed.accumulatorStep());
+            }
+
+            // Pulse accumulator (Stage trigger only; Pulse trigger wires in Task 7).
+            if (completed.pulseAccumTrigger() == PhaseFluxSequence::AccumulatorTriggerType::Stage) {
+                const auto &cfg = _sequence->pulseAccumConfig();
+                const int idx = (cfg.scope() == AccumulatorConfig::Scope::Track) ? 0 : completedCell;
+                advanceCounter(_pulseAccumCounter[idx], _pulseAccumDir[idx], cfg, completed.pulseAccumStep());
+            }
         }
         _pulseFired = 0;
         _prevSlotIdx = _slotIdx;
@@ -469,7 +563,6 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
         rebuildSchedule(slotDuration);
     }
 
-    uint32_t cycleTick = relativeTick % uint32_t(_cycleTicks);
     int posInSlot = int(cycleTick) - _cumulativeTicks[_slotIdx];
 
     // Fire any scheduled pulses whose trigger has been reached this tick.

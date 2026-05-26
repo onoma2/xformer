@@ -6,6 +6,7 @@
 #include "model/PhaseFluxTrack.h"
 #include "model/PhaseFluxSequence.h"
 #include "model/PhaseFluxMath.h"
+#include "model/AccumulatorConfig.h"
 
 #include <cstdint>
 
@@ -55,6 +56,19 @@ public:
     int activeCell() const { return _activeCell; }
     int slotIndex() const { return _slotIdx; }
 
+    // Test accessors — counter state observability (spec §13.10 Task 5).
+    int noteAccumCounter(int idx) const { return _noteAccumCounter[idx]; }
+    int pulseAccumCounter(int idx) const { return _pulseAccumCounter[idx]; }
+    int8_t noteAccumDir(int idx) const { return _noteAccumDir[idx]; }
+    int8_t pulseAccumDir(int idx) const { return _pulseAccumDir[idx]; }
+    uint32_t cycleCount() const { return _cycleCount; }
+
+    // Pure helper — advance one counter per accumulator config and per-cell step.
+    // Static so unit tests can exercise the order/polarity/bounds logic without
+    // constructing a full Engine. Caller owns the counter + pendulumDir state.
+    static void advanceCounter(int &counter, int8_t &pendulumDir,
+                               const AccumulatorConfig &cfg, int step);
+
 private:
     static constexpr uint32_t kActivityPulseTicks = 12;
     static constexpr uint32_t kMinPulseGateTicks = 6;
@@ -87,8 +101,18 @@ private:
     uint16_t _cachedDivisor = 0;
     uint8_t _cachedClockMult = 0;
 
-    // Per-cell accumulator (scale degrees).
+    // Per-cell accumulator (scale degrees). Legacy single-counter array;
+    // Task 6 rewires pitch application against _noteAccumCounter[] and removes.
     int _accumulatorCounter[kStageCount];
+
+    // Dual-accumulator state (spec §13.3, Task 5).
+    // Local scope uses [cell] index; Track scope shares [0].
+    int _noteAccumCounter[kStageCount];
+    int8_t _noteAccumDir[kStageCount];
+    int _pulseAccumCounter[kStageCount];
+    int8_t _pulseAccumDir[kStageCount];
+    uint32_t _cycleCount = 0;
+    uint32_t _prevCycleTick = 0;
 
     // Per-stage-visit pulse-fire memory (bit i = pulse i fired).
     uint8_t _pulseFired = 0;
