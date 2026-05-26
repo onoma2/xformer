@@ -503,105 +503,66 @@ Applied to the three questions:
 
 The "decoupled" rule simplifies `AccumulatorOps`: the engine never has to look at downstream application outcomes to decide whether to advance. Counter advance is a pure function of (current counter, direction, config, trigger event).
 
-### 13.9 `AccumulatorOps::applyOrder` — pseudo-code for all 8 cases
+### 13.9 Boundary resolution — reuse the NoteTrack implementation
 
-`applyOrder` is the single function any track engine calls to handle the post-advance boundary resolution. Signature:
+The four Order resolutions (Wrap / Pendulum / Hold / Random) are **already implemented and shipping** in `src/apps/sequencer/model/Accumulator.cpp`. Extract these as free functions for `AccumulatorOps`; don't re-derive.
+
+| Order | Existing function | Lines | Notes |
+|---|---|---|---|
+| Wrap | `Accumulator::tickWithWrap()` | 58-70 | Direction-aware (Up/Down). Uses `_minValue` / `_maxValue` directly. |
+| Pendulum | `Accumulator::tickWithPendulum()` | 72-86 | Tracks `_pendulumDirection` (runtime ±1), reverses at min/max. Clamps to exactly min/max on hit. |
+| Hold | `Accumulator::tickWithHold()` | 104-118 | Direction-aware, clips at limit. |
+| Random | `Accumulator::tickWithRandom()` | 88-102 | Uniform random in `[min, max]`. NB: this is NOT Metropolix's weighted drunken walk (§13.7); if drunken walk is wanted, that's a separate decision. For v1, NoteTrack's uniform Random is the shipped algorithm — keep it consistent. |
+
+**Critical architecture detail:** the existing class operates on **absolute `_minValue` / `_maxValue`**, not polarity-derived bounds. `_polarity` is set at config time and used in `reset()` for the initial value — it never appears in the tick functions themselves. The polarity-vs-step-sign mapping happens at the **caller** (which sets min and max explicitly).
+
+This means `AccumulatorOps` should take explicit `min` and `max` as parameters:
 
 ```cpp
-// Inputs:
-//   counter   — current value AFTER step has been added (may be out of range)
-//   dir       — current direction state, +1 or −1 (Pendulum uses this; others ignore)
-//   posLim    — positive limit (always positive)
-//   negLim    — negative limit (always positive; representing the magnitude)
-//   polarity  — Uni or Bi
-//   order     — Wrap / Pendulum / Hold / RTZ
-//
-// Outputs (returned via reference):
-//   counter   — clamped/wrapped/reset to in-range value
-//   dir       — possibly flipped (Pendulum)
-void applyOrder(int& counter, int8_t& dir,
-                Polarity polarity, int posLim, int negLim,
-                Order order);
+// Free functions in engine/AccumulatorOps.h, extracted from Accumulator.cpp.
+// Each takes the counter and runtime direction by reference, mutates in place.
+// `min` and `max` are absolute bounds — caller computes them per polarity.
+void tickWrap     (int& counter, int direction, int min, int max, int step);
+void tickPendulum (int& counter, int& pendulumDir, int min, int max, int step);
+void tickHold     (int& counter, int direction, int min, int max, int step);
+void tickRandom   (int& counter, int min, int max);  // direction ignored
 ```
 
-For each order, the active limits are:
-
-- **Uni**: counter ranges `[0, +posLim]` when stepping positive, `[−negLim, 0]` when stepping negative. The "zero" end is the reference.
-- **Bi**: counter ranges `[−negLim, +posLim]` regardless of step direction. Zero is centred.
-
-Pseudo-code:
+Engine-side polarity-to-bounds mapping (called by `PhaseFluxTrackEngine` before each tick):
 
 ```cpp
-void applyOrder(int& counter, int8_t& dir,
-                Polarity polarity, int posLim, int negLim,
-                Order order) {
+int absMin, absMax;
+if (cfg.polarity == Uni) {
+    // One-sided: bounds depend on configured step sign.
+    if (stage.step > 0) { absMin = 0;           absMax = +cfg.posLim; }
+    else                { absMin = -cfg.negLim; absMax = 0;            }
+} else {
+    // Two-sided: bounds span both limits regardless of step sign.
+    absMin = -cfg.negLim;
+    absMax = +cfg.posLim;
+}
+// Then call the appropriate tick function.
+```
 
-    // Determine effective bounds for this polarity.
-    int hi, lo;
-    if (polarity == Uni) {
-        // One-sided: which side depends on the sign of the cumulative drift.
-        // Convention: counter sign matches step direction. lo is 0 for positive
-        // drift, hi is 0 for negative drift.
-        if (counter >= 0) { hi = +posLim; lo = 0;       }
-        else              { hi = 0;       lo = −negLim; }
-    } else {
-        hi = +posLim;
-        lo = −negLim;
-    }
+This caller-side decomposition resolves the Pendulum+Uni zero-crossing concern automatically: when `step > 0` in Uni mode, `absMin = 0`, and the existing `tickWithPendulum` clamps to `_minValue` (= 0) on the downward bounce. Pendulum reflects at 0 going back up. No edge case to fix in the ops layer.
 
-    if (counter > hi) {
-        switch (order) {
-        case Wrap:
-            if (polarity == Uni) {
-                // Wrap to "zero" (lo for positive drift, hi for negative drift)
-                counter = lo;
-            } else {
-                // Wrap to opposite limit
-                counter = lo + (counter − hi − 1);
-            }
-            break;
-        case Pendulum:
-            counter = hi − (counter − hi);   // reflect about hi
-            dir = -dir;
-            break;
-        case Hold:
-            counter = hi;
-            // dir unchanged — direction can't auto-reverse out of Hold
-            break;
-        case RTZ:
-            counter = 0;
-            // dir unchanged
-            break;
-        }
-    } else if (counter < lo) {
-        // Mirror logic for lower bound.
-        switch (order) {
-        case Wrap:
-            if (polarity == Uni) {
-                counter = hi;
-            } else {
-                counter = hi − (lo − counter − 1);
-            }
-            break;
-        case Pendulum:
-            counter = lo + (lo − counter);
-            dir = -dir;
-            break;
-        case Hold:
-            counter = lo;
-            break;
-        case RTZ:
-            counter = 0;
-            break;
-        }
+**Direction state:** the existing class uses `_direction` (config: Up/Down/Freeze) and `_pendulumDirection` (runtime: ±1). For PhaseFlux, we don't need a separate Direction config — the sign of `stage.step` carries the direction. `Freeze` is implicit when `step == 0` (no advance happens). So the engine passes `direction = step > 0 ? +1 : -1` to the tick functions, and tracks `pendulumDir` per-counter as runtime state.
+
+**RTZ Order (the one NoteTrack doesn't have):** add a new free function:
+
+```cpp
+// On overflow at either bound, snap to zero. Direction unchanged.
+// Used only when counter is already out of range.
+void tickRTZ(int& counter, int min, int max) {
+    if (counter > max || counter < min) {
+        counter = 0;
     }
-    // else counter is in-range — no change.
 }
 ```
 
-This function is called by the engine AFTER advancing the counter by `step × dir`. The engine never inspects `polarity` / `order` / limits itself — `applyOrder` is the single source of truth for boundary semantics.
+Engine integration: after advancing the counter by `step × direction`, the engine dispatches on `cfg.order` to call the right tick function (or for RTZ, the range check above).
 
-For `Random` order (deferred per §13.7), the same signature applies; the function picks a new value via the drunken-walk algorithm instead of resolving boundaries.
+For implementer guidance: extract the four NoteTrack tick functions VERBATIM into `engine/AccumulatorOps.cpp`, parameterising on `min` / `max` / `step` / `direction` instead of class members. Same algorithm, same boundary math. Add `tickRTZ` as a new fifth function. Unit tests (§13.11) compare new free functions' outputs against equivalent direct-class outputs — a passing test means the extraction was faithful.
 
 ### 13.10 Implementation tasks — for subagent-driven dispatch
 
@@ -613,10 +574,10 @@ Each task is independently dispatchable. Order matters where dependencies are li
 - *Tests*: `TestAccumulatorConfig.cpp` — roundtrip of every field value, default-state roundtrip, edge values (max posLim, max reset, etc.).
 - *Depends on*: nothing.
 
-**Task 2: `AccumulatorOps::applyOrder` + per-case unit tests**
+**Task 2: `AccumulatorOps` free functions extracted from NoteTrack + per-case unit tests**
 - *Files*: new `src/apps/sequencer/engine/AccumulatorOps.h` + `.cpp`
-- *Deliverable*: free function `applyOrder(counter, dir, polarity, posLim, negLim, order)` matching the pseudo-code in §13.9. Pure function, no side effects beyond the reference parameters.
-- *Tests*: `TestAccumulatorOps.cpp` — at minimum one test per (Order × Polarity × overflow-direction) cell of §13.4's table = 8 × 2 = 16 cases. Plus edge cases: counter exactly at limit, counter overshoots by more than 1, Pendulum at-limit + reverse.
+- *Deliverable*: extract `tickWithWrap` / `tickWithPendulum` / `tickWithHold` / `tickWithRandom` (currently `Accumulator.cpp:58-118`) as free functions `tickWrap` / `tickPendulum` / `tickHold` / `tickRandom`, parameterised on `(counter&, direction, min, max, step)` instead of class members. Add new function `tickRTZ(counter&, min, max)` for the order absent from NoteTrack. Pure functions, no class state.
+- *Tests*: `TestAccumulatorOps.cpp` — at minimum one test per (Order × overflow-direction × polarity-bounds) combination per §13.4. Faithfulness tests: run each new free function and the equivalent NoteTrack class method on identical inputs and verify equal output.
 - *Depends on*: Task 1 (uses the enum types).
 
 **Task 3: `PhaseFluxSequence` per-sequence config fields**
@@ -679,21 +640,28 @@ For each task, the unit tests to write before the implementation (TDD per CLAUDE
 
 **`TestAccumulatorOps.cpp`** (Task 2):
 
-The 8 baseline cases of §13.4's table — at least one test per cell:
-- `wrap_uni_overflow_returns_to_zero`
-- `wrap_bi_overflow_jumps_to_opposite_limit`
-- `pendulum_uni_overflow_reflects_back_toward_zero_and_flips_dir`
-- `pendulum_bi_overflow_reflects_back_toward_neg_limit_and_flips_dir`
-- `hold_uni_overflow_pins_at_pos_limit_dir_unchanged`
-- `hold_bi_overflow_pins_at_pos_limit_dir_unchanged`
-- `rtz_uni_overflow_snaps_to_zero_dir_unchanged`
-- `rtz_bi_overflow_snaps_to_zero_dir_unchanged`
+Per-function tests against bounds (caller-supplied `min` and `max`, matching how the engine drives the ops):
 
-Mirror set for under-bound (8 more cases). Edge cases:
-- `counter_exactly_at_limit_no_action`
-- `counter_overshoots_by_step_of_3` — boundary math handles step > 1
+- `tick_wrap_overflow_returns_to_min_when_direction_up`
+- `tick_wrap_underflow_returns_to_max_when_direction_down`
+- `tick_pendulum_overflow_reflects_at_max_and_flips_dir`
+- `tick_pendulum_underflow_reflects_at_min_and_flips_dir`
+- `tick_pendulum_at_zero_min_descends_then_reflects` — Pendulum+Uni positive-step case (caller sets `min=0`)
+- `tick_hold_overflow_pins_at_max`
+- `tick_hold_underflow_pins_at_min`
+- `tick_random_stays_in_range`
+- `tick_rtz_overflow_snaps_to_zero`
+- `tick_rtz_underflow_snaps_to_zero`
+
+Faithfulness tests — verify extracted free functions produce identical output to the existing NoteTrack `Accumulator` class methods on equivalent inputs:
+- `extracted_wrap_matches_notetrack_wrap`
+- `extracted_pendulum_matches_notetrack_pendulum`
+- `extracted_hold_matches_notetrack_hold`
+
+Edge cases:
 - `pendulum_after_flip_descends_correctly_until_next_limit`
-- `wrap_negative_step_decrements_correctly`
+- `wrap_step_of_3_handles_overshoot_correctly`
+- `pendulum_clamp_to_exact_min_max_on_hit`  — existing `tickWithPendulum` clamps to exactly `_minValue`/`_maxValue`; verify the extracted version preserves this
 
 **`TestPhaseFluxSequenceSerialization.cpp`** (Tasks 3, 4 — extends existing file):
 - `note_accum_config_roundtrips_with_non_defaults`
