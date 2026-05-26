@@ -149,17 +149,9 @@ void PhaseFluxTrackEngine::stop() {
 }
 
 void PhaseFluxTrackEngine::changePattern() {
-    // §13.4 — pattern switch is a hard reset for accumulators. Engine::updatePlayState
-    // calls this every measure, so full reset() would re-anchor _resetTickOffset
-    // on each measure boundary and kill the held cycle.
-    for (int i = 0; i < kStageCount; ++i) {
-        _noteAccumCounter[i] = 0;
-        _noteAccumDir[i] = 1;
-        _pulseAccumCounter[i] = 0;
-        _pulseAccumDir[i] = 1;
-    }
-    _cycleCount = 0;
-    _prevCycleTick = 0;
+    // Engine::updatePlayState fires this every measure boundary, not only on real
+    // pattern switches — clearing accumulators here would kill drift each measure.
+    // Real pattern switches are caught by the seq-pointer rebind in tick().
 }
 
 bool PhaseFluxTrackEngine::detectLayoutChange() {
@@ -425,12 +417,21 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
 
 TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
     // Resolve sequence lazily — pattern() can change without changePattern().
+    // This branch fires once on real pattern switches; §13.4 accumulator hard-reset
+    // belongs here, not in changePattern() (which the engine calls every measure).
     PhaseFluxSequence *seq = &_phaseFluxTrack.sequence(pattern());
     if (seq != _sequence) {
         _sequence = seq;
         _layoutDirty = true;
         _prevSlotIdx = -1;
         _prevCycleTick = 0;
+        for (int i = 0; i < kStageCount; ++i) {
+            _noteAccumCounter[i] = 0;
+            _noteAccumDir[i] = 1;
+            _pulseAccumCounter[i] = 0;
+            _pulseAccumDir[i] = 1;
+        }
+        _cycleCount = 0;
     }
 
     if (_firstTickAfterReset) {
