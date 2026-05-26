@@ -94,6 +94,11 @@ void PhaseFluxSequence::clear() {
     _globalPhase = 0.f;
     _divisor.setBase(12);                // 1/16 at PPQN 48
     _clockMultiplier.setBase(100);
+    _noteAccumConfig = AccumulatorConfig();
+    _pulseAccumConfig = AccumulatorConfig();
+    // Pulse range is 1..8 (vs note 1..28); override default ctor lims per spec §13.3.
+    _pulseAccumConfig.setPosLim(4);
+    _pulseAccumConfig.setNegLim(4);
     for (auto &stage : _stages) {
         stage.clear();
     }
@@ -108,6 +113,8 @@ void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_globalPhase);
     _divisor.write(writer);
     _clockMultiplier.write(writer);
+    _noteAccumConfig.write(writer);
+    _pulseAccumConfig.write(writer);
     for (const auto &stage : _stages) {
         stage.write(writer);
     }
@@ -124,6 +131,8 @@ void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
     reader.read(_globalPhase);
     _divisor.read(reader);
     _clockMultiplier.read(reader);
+    _noteAccumConfig.read(reader);
+    _pulseAccumConfig.read(reader);
     _pitchRate = clamp(int(_pitchRate), 0, kPitchRateCount - 1);
     _scale = clamp(int(_scale), -1, Scale::Count - 1);
     _rootNote = clamp(int(_rootNote), -1, 11);

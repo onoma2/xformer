@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AccumulatorConfig.h"
 #include "Config.h"
 #include "Bitfield.h"
 #include "Serialize.h"
@@ -394,6 +395,12 @@ public:
     void editPitchMode(int value, bool) { setPitchMode(ModelUtils::adjustedEnum(pitchMode(), value)); }
     void printPitchMode(StringBuilder &str) const { str(pitchModeName(pitchMode())); }
 
+    // accumulator configs — per-sequence note/pulse counter behavior (spec §13.3)
+    const AccumulatorConfig &noteAccumConfig() const { return _noteAccumConfig; }
+          AccumulatorConfig &noteAccumConfig()       { return _noteAccumConfig; }
+    const AccumulatorConfig &pulseAccumConfig() const { return _pulseAccumConfig; }
+          AccumulatorConfig &pulseAccumConfig()       { return _pulseAccumConfig; }
+
     // edited — dirty bit for UI
     int edited() const { return _edited; }
     void setEdited(int v) { _edited = v; }
@@ -443,6 +450,9 @@ private:
     float _globalPhase = 0.f;
     Routable<uint16_t> _divisor;
     Routable<uint8_t> _clockMultiplier;
+
+    AccumulatorConfig _noteAccumConfig;
+    AccumulatorConfig _pulseAccumConfig;
 
     StageArray _stages;
 

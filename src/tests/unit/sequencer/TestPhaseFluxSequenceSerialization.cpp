@@ -1,5 +1,6 @@
 #include "UnitTest.h"
 
+#include "apps/sequencer/model/AccumulatorConfig.h"
 #include "apps/sequencer/model/PhaseFluxSequence.h"
 #include "apps/sequencer/model/PhaseFluxTrack.h"
 #include "apps/sequencer/model/Project.h"
@@ -509,6 +510,77 @@ CASE("track_writes_phaseflux_mode") {
     expectEqual(restored.phaseFluxTrack().sequence(0).stage(0).basePitch(), 12, "stage 0 basePitch preserved");
     expectEqual(int(restored.phaseFluxTrack().sequence(0).stage(0).mask()), int(PhaseFluxSequence::MaskType::OneInFour), "stage 0 mask preserved");
     expectEqual(restored.phaseFluxTrack().sequence(0).stage(0).pulseCount(), 4, "stage 0 pulseCount preserved");
+}
+
+CASE("default_clear_initializes_pulse_lims_to_4") {
+    PhaseFluxSequence seq;
+    seq.clear();
+
+    expectEqual(int(seq.noteAccumConfig().scope()), int(AccumulatorConfig::Scope::Local), "note scope default Local");
+    expectEqual(int(seq.noteAccumConfig().order()), int(AccumulatorConfig::Order::Wrap), "note order default Wrap");
+    expectEqual(int(seq.noteAccumConfig().polarity()), int(AccumulatorConfig::Polarity::Uni), "note polarity default Uni");
+    expectEqual(int(seq.noteAccumConfig().reset()), 0, "note reset default 0");
+    expectEqual(int(seq.noteAccumConfig().posLim()), 7, "note posLim default 7");
+    expectEqual(int(seq.noteAccumConfig().negLim()), 7, "note negLim default 7");
+
+    expectEqual(int(seq.pulseAccumConfig().scope()), int(AccumulatorConfig::Scope::Local), "pulse scope default Local");
+    expectEqual(int(seq.pulseAccumConfig().order()), int(AccumulatorConfig::Order::Wrap), "pulse order default Wrap");
+    expectEqual(int(seq.pulseAccumConfig().polarity()), int(AccumulatorConfig::Polarity::Uni), "pulse polarity default Uni");
+    expectEqual(int(seq.pulseAccumConfig().reset()), 0, "pulse reset default 0");
+    expectEqual(int(seq.pulseAccumConfig().posLim()), 4, "pulse posLim default 4 (spec §13.3)");
+    expectEqual(int(seq.pulseAccumConfig().negLim()), 4, "pulse negLim default 4 (spec §13.3)");
+}
+
+CASE("note_accum_config_roundtrips_with_non_defaults") {
+    PhaseFluxSequence seq;
+    seq.clear();
+    seq.noteAccumConfig().setScope(AccumulatorConfig::Scope::Track);
+    seq.noteAccumConfig().setOrder(AccumulatorConfig::Order::Pendulum);
+    seq.noteAccumConfig().setPolarity(AccumulatorConfig::Polarity::Bi);
+    seq.noteAccumConfig().setReset(11);
+    seq.noteAccumConfig().setPosLim(23);
+    seq.noteAccumConfig().setNegLim(17);
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence r;
+    r.clear();
+    readSequence(r, buf, sizeof(buf));
+
+    expectEqual(int(r.noteAccumConfig().scope()), int(AccumulatorConfig::Scope::Track), "note scope persists");
+    expectEqual(int(r.noteAccumConfig().order()), int(AccumulatorConfig::Order::Pendulum), "note order persists");
+    expectEqual(int(r.noteAccumConfig().polarity()), int(AccumulatorConfig::Polarity::Bi), "note polarity persists");
+    expectEqual(int(r.noteAccumConfig().reset()), 11, "note reset persists");
+    expectEqual(int(r.noteAccumConfig().posLim()), 23, "note posLim persists");
+    expectEqual(int(r.noteAccumConfig().negLim()), 17, "note negLim persists");
+}
+
+CASE("pulse_accum_config_roundtrips_with_non_defaults") {
+    PhaseFluxSequence seq;
+    seq.clear();
+    seq.pulseAccumConfig().setScope(AccumulatorConfig::Scope::Track);
+    seq.pulseAccumConfig().setOrder(AccumulatorConfig::Order::RTZ);
+    seq.pulseAccumConfig().setPolarity(AccumulatorConfig::Polarity::Bi);
+    seq.pulseAccumConfig().setReset(9);
+    seq.pulseAccumConfig().setPosLim(8);
+    seq.pulseAccumConfig().setNegLim(6);
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence r;
+    r.clear();
+    readSequence(r, buf, sizeof(buf));
+
+    expectEqual(int(r.pulseAccumConfig().scope()), int(AccumulatorConfig::Scope::Track), "pulse scope persists");
+    expectEqual(int(r.pulseAccumConfig().order()), int(AccumulatorConfig::Order::RTZ), "pulse order persists");
+    expectEqual(int(r.pulseAccumConfig().polarity()), int(AccumulatorConfig::Polarity::Bi), "pulse polarity persists");
+    expectEqual(int(r.pulseAccumConfig().reset()), 9, "pulse reset persists");
+    expectEqual(int(r.pulseAccumConfig().posLim()), 8, "pulse posLim persists");
+    expectEqual(int(r.pulseAccumConfig().negLim()), 6, "pulse negLim persists");
 }
 
 } // UNIT_TEST("PhaseFluxSequenceSerialization")
