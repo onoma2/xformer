@@ -70,6 +70,10 @@ void PhaseFluxSequence::Stage::clear() {
     setStageDivisor(StageDivisorSlot::Div1_16);
     setSkip(false);
     setStageLen(64);   // 64 = ×1 transparent default; sequence runs unchanged when stageLen is added
+    setTemporalRepeat(RepeatType::x1);
+    setPitchRepeat(RepeatType::x1);
+    setTemporalWindow(WindowType::Off);
+    setPitchWindow(WindowType::Off);
 }
 
 void PhaseFluxSequence::Stage::write(VersionedSerializedWriter &writer) const {

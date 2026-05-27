@@ -128,6 +128,10 @@ CASE("default_round_trip") {
         expectEqual(int(s.accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "default accumulatorTrigger");
         expectEqual(int(s.pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "default pulseAccumTrigger");
         expectEqual(s.stageLen(), 64, "default stageLen (×1 transparent — Phaseque STEP_LEN pattern)");
+        expectEqual(int(s.temporalRepeat()), int(PhaseFluxSequence::RepeatType::x1), "default temporalRepeat");
+        expectEqual(int(s.pitchRepeat()),    int(PhaseFluxSequence::RepeatType::x1), "default pitchRepeat");
+        expectEqual(int(s.temporalWindow()), int(PhaseFluxSequence::WindowType::Off), "default temporalWindow");
+        expectEqual(int(s.pitchWindow()),    int(PhaseFluxSequence::WindowType::Off), "default pitchWindow");
     }
 }
 
@@ -272,6 +276,50 @@ CASE("stage_fields_persist") {
 
     expectEqual(r.stage(7).skip(), true, "s7 skip");
     expectEqual(r.stage(7).stageLen(), 42, "s7 stageLen");
+}
+
+CASE("repeat_and_window_roundtrip") {
+    // §14.2 — per-axis Repeat (x1/x2/x3/x5) + Window (Off/F70/F50/P70/P50).
+    PhaseFluxSequence seq;
+    seq.clear();
+
+    seq.stage(0).setTemporalRepeat(PhaseFluxSequence::RepeatType::x1);
+    seq.stage(0).setPitchRepeat(PhaseFluxSequence::RepeatType::x5);
+    seq.stage(0).setTemporalWindow(PhaseFluxSequence::WindowType::Off);
+    seq.stage(0).setPitchWindow(PhaseFluxSequence::WindowType::Polarize50);
+
+    seq.stage(1).setTemporalRepeat(PhaseFluxSequence::RepeatType::x2);
+    seq.stage(1).setPitchRepeat(PhaseFluxSequence::RepeatType::x3);
+    seq.stage(1).setTemporalWindow(PhaseFluxSequence::WindowType::Focus70);
+    seq.stage(1).setPitchWindow(PhaseFluxSequence::WindowType::Focus50);
+
+    seq.stage(2).setTemporalRepeat(PhaseFluxSequence::RepeatType::x3);
+    seq.stage(2).setPitchRepeat(PhaseFluxSequence::RepeatType::x2);
+    seq.stage(2).setTemporalWindow(PhaseFluxSequence::WindowType::Polarize70);
+    seq.stage(2).setPitchWindow(PhaseFluxSequence::WindowType::Off);
+
+    uint8_t buf[4096];
+    std::memset(buf, 0, sizeof(buf));
+    writeSequence(seq, buf, sizeof(buf));
+
+    PhaseFluxSequence restored;
+    restored.clear();
+    readSequence(restored, buf, sizeof(buf));
+
+    expectEqual(int(restored.stage(0).temporalRepeat()), int(PhaseFluxSequence::RepeatType::x1), "s0 temporalRepeat");
+    expectEqual(int(restored.stage(0).pitchRepeat()),    int(PhaseFluxSequence::RepeatType::x5), "s0 pitchRepeat");
+    expectEqual(int(restored.stage(0).temporalWindow()), int(PhaseFluxSequence::WindowType::Off),       "s0 temporalWindow");
+    expectEqual(int(restored.stage(0).pitchWindow()),    int(PhaseFluxSequence::WindowType::Polarize50),"s0 pitchWindow");
+
+    expectEqual(int(restored.stage(1).temporalRepeat()), int(PhaseFluxSequence::RepeatType::x2), "s1 temporalRepeat");
+    expectEqual(int(restored.stage(1).pitchRepeat()),    int(PhaseFluxSequence::RepeatType::x3), "s1 pitchRepeat");
+    expectEqual(int(restored.stage(1).temporalWindow()), int(PhaseFluxSequence::WindowType::Focus70), "s1 temporalWindow");
+    expectEqual(int(restored.stage(1).pitchWindow()),    int(PhaseFluxSequence::WindowType::Focus50), "s1 pitchWindow");
+
+    expectEqual(int(restored.stage(2).temporalRepeat()), int(PhaseFluxSequence::RepeatType::x3), "s2 temporalRepeat");
+    expectEqual(int(restored.stage(2).pitchRepeat()),    int(PhaseFluxSequence::RepeatType::x2), "s2 pitchRepeat");
+    expectEqual(int(restored.stage(2).temporalWindow()), int(PhaseFluxSequence::WindowType::Polarize70), "s2 temporalWindow");
+    expectEqual(int(restored.stage(2).pitchWindow()),    int(PhaseFluxSequence::WindowType::Off),       "s2 pitchWindow");
 }
 
 CASE("stage_edge_values_persist") {

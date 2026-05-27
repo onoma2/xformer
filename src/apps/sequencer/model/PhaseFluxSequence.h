@@ -46,6 +46,8 @@ public:
     using GateLength = UnsignedValue<7>;
     using StageDivisor = UnsignedValue<3>;
     using StageLen = UnsignedValue<7>;   // 0..127 mapped to 0..~2× factor via /64
+    using Repeat = UnsignedValue<2>;     // x1 / x2 / x3 / x5 (RepeatType enum)
+    using Window = UnsignedValue<3>;     // Off / F70 / F50 / P70 / P50 (WindowType, 3 spare)
 
     enum class PitchRangeType : uint8_t {
         Half = 0,    // 0.5 octave
@@ -93,6 +95,24 @@ public:
     enum class AccumulatorTriggerType : uint8_t {
         Stage = 0,
         Pulse = 1,
+    };
+
+    // §14.2 — per-stage Repeat enum. 4 slots filled (2-bit field full).
+    enum class RepeatType : uint8_t {
+        x1 = 0,    // no repeat (default)
+        x2 = 1,
+        x3 = 2,
+        x5 = 3,
+    };
+
+    // §14.2 — per-stage Window enum. 5 slots filled, 3 reserved.
+    enum class WindowType : uint8_t {
+        Off        = 0,    // full curve visible (default)
+        Focus70    = 1,    // center 70% kept, outer 30% hidden
+        Focus50    = 2,    // center 50% kept, outer 50% hidden
+        Polarize70 = 3,    // outer 70% kept (35% each side), middle 30% hidden
+        Polarize50 = 4,    // outer 50% kept (25% each side), middle 50% hidden
+        // 5..7 reserved
     };
 
     // 3-bit slot index. Maps to Performer divisor primitive ticks via
@@ -216,6 +236,18 @@ public:
         int stageLen() const { return int(_data3.stageLen); }
         void setStageLen(int v) { _data3.stageLen = StageLen::clamp(clamp(v, 0, 127)); }
 
+        // temporalRepeat / pitchRepeat — per-axis enum, x1/x2/x3/x5.
+        RepeatType temporalRepeat() const { return RepeatType(int(_data3.temporalRepeat)); }
+        void setTemporalRepeat(RepeatType v) { _data3.temporalRepeat = Repeat::clamp(int(v)); }
+        RepeatType pitchRepeat() const { return RepeatType(int(_data3.pitchRepeat)); }
+        void setPitchRepeat(RepeatType v) { _data3.pitchRepeat = Repeat::clamp(int(v)); }
+
+        // temporalWindow / pitchWindow — per-axis 5-value enum.
+        WindowType temporalWindow() const { return WindowType(int(_data3.temporalWindow)); }
+        void setTemporalWindow(WindowType v) { _data3.temporalWindow = Window::clamp(int(v)); }
+        WindowType pitchWindow() const { return WindowType(int(_data3.pitchWindow)); }
+        void setPitchWindow(WindowType v) { _data3.pitchWindow = Window::clamp(int(v)); }
+
         //----------------------------------------
         // Methods
         //----------------------------------------
@@ -282,11 +314,15 @@ public:
             // bit 31 spare
         } _data2;
 
-        // word 3 — stageLen + 25 spare bits (future fields)
+        // word 3 — stageLen + Repeat × 2 + Window × 2 + 15 spare bits
         union {
             uint32_t raw;
-            BitField<uint32_t, 0, StageLen::Bits> stageLen;   // 0..6
-            // bits 7..31 spare
+            BitField<uint32_t,  0, StageLen::Bits> stageLen;          //  0..6
+            BitField<uint32_t,  7, Repeat::Bits>   pitchRepeat;       //  7..8
+            BitField<uint32_t,  9, Repeat::Bits>   temporalRepeat;    //  9..10
+            BitField<uint32_t, 11, Window::Bits>   pitchWindow;       // 11..13
+            BitField<uint32_t, 14, Window::Bits>   temporalWindow;    // 14..16
+            // bits 17..31 spare (15)
         } _data3;
     };
 

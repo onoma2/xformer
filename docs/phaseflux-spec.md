@@ -245,78 +245,87 @@ Gate duration is preserved. CV pairing is preserved per-pulse (no re-mapping of 
 
 **Status: draft, not yet wired.**
 
-Per-cell field 1..8. Divides the cell duration into R equal sub-sections; pulses distribute across sub-sections; each pulse's trigger position is shaped by the temporal curve within its own sub-section. Effect: R copies of the temporal pattern within one cell visit.
+Per-cell 4-value enum (`UnsignedValue<2>`): **x1 / x2 / x3 / x5** (default x1 = no repeat). Divides the cell duration into R equal sub-sections; each sub-section traverses the (post-Window) temporal curve. Effect: R copies of the windowed pattern within one cell visit.
 
-Storage: `temporalRepeat` as `UnsignedValue<3>` stored on `_data3` per §5 / §14.2 layout. Default 1 (no repetition, current behavior).
+Storage: `temporalRepeat` as `UnsignedValue<2>` stored on `_data3` per §14.2 layout. Default value = 0 (x1, no repetition).
 
-Engine math in `rebuildSchedule`:
+Engine math in `rebuildSchedule` (pipeline: **Window → Repeat → Warp → Curve eval → FlipV → Response → FlipH**):
 
 ```
-R               = stage.temporalRepeat()
-pulsesPerSub    = pulseCount / R                              // base allotment
-remainder       = pulseCount % R                              // earlier subs get +1
+R               = repeatValue(stage.temporalRepeat())          // 1, 2, 3, or 5
+pulsesPerSub    = pulseCount / R                                // base allotment
+remainder       = pulseCount % R                                // earlier subs get +1
 
 for each pulse i in [0, pulseCount):
-    subIdx          = (i × R) / pulseCount                     // which sub-section
+    subIdx          = (i × R) / pulseCount
     pulsesInThisSub = pulsesPerSub + (subIdx < remainder ? 1 : 0)
     localPulseIdx   = i − (start index of subIdx)
-    t_raw_local     = localPulseIdx / pulsesInThisSub          // local position 0..1
-    t_curved_local  = curve(applyPowerBend(t_raw_local, temporalWarp))
+    t_raw_local     = localPulseIdx / pulsesInThisSub           // local position 0..1
+    // Window applies INSIDE each sub-section (Window → Repeat order):
+    if !isInWindow(t_raw_local, stage.temporalWindow()): drop pulse
+    t_warped        = applyPowerBend(t_raw_local, temporalWarp)
+    t_curved_local  = curve(t_warped)
     t_shifted_global = (subIdx + t_curved_local) / R
-    // continue with §6.1 pipeline using t_shifted_global instead of t_raw
+    // continue with §6.1 pipeline
 ```
 
-**Distribution policy**: when `pulseCount` doesn't divide evenly by R, earlier sub-sections get the extra pulse(s). Predictable for the player.
+**Distribution policy**: when `pulseCount` doesn't divide evenly by R, earlier sub-sections get the extra pulse(s).
 
-**Edge case `R > pulseCount`**: some sub-sections have zero pulses → audible silence within those sub-sections, bursts in others. Musically interesting "kick-rest-kick-rest" pattern.
+**Edge case `R > pulseCount`**: some sub-sections have zero pulses → silence inside those sub-sections, bursts in others.
 
-**Interaction with `phaseShift`, `mask`, `maskShift`**: applied AFTER Repeat math. Repeat builds the per-pulse t_shifted positions, then phaseShift rotates them, mask filters by original pulse index. Order preserved.
+**Interaction with `phaseShift`, `mask`, `maskShift`**: applied AFTER Repeat math.
 
-**Interaction with §6.4 collision clamp**: still runs after Repeat. Overlapping pulses across sub-sections merge per existing rules.
+**Combined with Window**: per the pipeline order, Window applies *within* each repeated sub-section. Bell + x3 + Polarize 50 = three "rise-gap-fall" patterns. Bounce + x3 + Focus 50 = three middle-of-drop bursts.
 
-**Audible effect**: combined with `pulseCount=8` and `temporalRepeat=2` → 4 pulses per sub-section, each sub-section traverses the temporal curve. Combined with Bounce temporal → two front-loaded bursts per cell. Combined with Bell temporal → two cluster-in-middle bursts.
+**Coverage**: with Repeat × Window combos, the multi-bump / sawtooth-N / sine-N curve families (§14.1 Q8) become reachable from base shapes. No new curve enum slots needed.
 
-**Coverage**: with Repeat-N, the multi-bump / sawtooth-N / sine-N curve families (open question §14.1 Q8 from earlier discussions) become reachable from base shapes Linear, Bell, Bounce. No need to add new curve enum slots for those families.
-
-### 6.1.3 `temporalWindow` — sample a sub-range of the curve
+### 6.1.3 `temporalWindow` — crop which portion of the curve the engine sees
 
 **Status: draft, not yet wired.**
 
-Two per-cell fields, `temporalWindowStart` and `temporalWindowEnd`, each 3-bit (`UnsignedValue<3>`, range 0..7 mapped to 0/7..7/7 = 0..1). The curve is evaluated over the input sub-range `[wStart, wEnd]` only, instead of the full `[0, 1]`.
+Per-cell 5-value enum (`UnsignedValue<3>`):
 
-Engine math (applied BEFORE warp/response):
+| Value | Mode | Visible input range | Hidden |
+|---|---|---|---|
+| 0 (default) | Off | `[0, 1]` (full) | — |
+| 1 | Focus 70 | `[0.15, 0.85]` | outer 30% |
+| 2 | Focus 50 | `[0.25, 0.75]` | outer 50% |
+| 3 | Polarize 70 | `[0, 0.35] ∪ [0.65, 1.0]` | middle 30% |
+| 4 | Polarize 50 | `[0, 0.25] ∪ [0.75, 1.0]` | middle 50% |
+
+Engine math (Window applied INSIDE each Repeat sub-section, BEFORE warp):
 
 ```
-phi_in     = (post-Repeat) t_raw                                // §6.1.2
-wStart     = stage.temporalWindowStart() / 7.0
-wEnd       = stage.temporalWindowEnd()   / 7.0
-windowed   = wStart + phi_in × (wEnd − wStart)                  // crop input to [wStart, wEnd]
-t_warped   = applyPowerBend(windowed, temporalWarp)
-t_curved   = Curve::eval(tempCurveType, t_warped)
-// ... rest of §6.1 pipeline unchanged
+// Inside the per-pulse loop in §6.1.2:
+t_raw_local                = ... (per-pulse local position 0..1)
+if !isInWindow(t_raw_local, stage.temporalWindow()):
+    drop pulse                                                   // does not fire
+t_warped = applyPowerBend(t_raw_local, temporalWarp)
+// ... continues
 ```
 
-**Defaults**: `wStart = 0`, `wEnd = 7` (= 1.0) → identity, current behavior.
+Where `isInWindow(t, mode)` returns true if `t` falls in the visible band per the table above.
 
-**Edit constraint**: `wEnd ≥ wStart` enforced at the edit site (encoder clamp). If `wEnd == wStart`, the entire curve collapses to a single output value (musically: constant offset).
+**Defaults**: Off → identity, current behavior.
 
-**Semantic**: input cropping only. Output is whatever the curve gives in `[wStart, wEnd]`. No auto-rescale. For Bell with window `[0.4, 0.6]`, output stays near 1.0 (top of the bell) — "stuck at peak" feel. For Bounce with window `[0, 0.3]`, output covers [1.0, 0.15] — clean steep portion only, no flat tail.
+**Semantic**:
+- **Focus** keeps the center band — pulses cluster around the curve's middle. Bell + Focus 50 = pulses fire only near the peak (sustained high output). Bounce + Focus 50 = middle of the curve only.
+- **Polarize** keeps the outer bands — pulses cluster at the cell's start AND end with a silent middle. Bell + Polarize 50 = small rise on left, gap, small fall on right.
 
-**What this does that warp/response can't**: warp bends the input axis non-linearly while still covering `[0, 1]`. Response bends output. Neither REMOVES portions of the curve. Window CROPS the shape — produces effects unreachable by any bending.
+**What this does that warp/response can't**: warp/response BEND the axes; Window REMOVES segments. Especially Polarize — produces a hole in the middle that no warp can imitate.
 
-**Combined with Repeat**: Repeat applies first (multi-cycle), then Window crops each cycle. `Bounce + Repeat 3 + Window [0, 0.3]` = three sharp plucks per cell, each containing only the steep initial drop (no slow tail in any of them).
+**Combined with Repeat**: per pipeline order **Window → Repeat → ...**, Window applies INSIDE each repeated sub-section. `Bell + Repeat 3 + Polarize 50` = three rise-gap-fall patterns. `Bounce + Repeat 3 + Focus 50` = three middle-drop pulses.
 
-**Audible character per base curve** (with default warp=0, response=0):
+**Audible character per base curve** (with default warp=0, response=0, Repeat x1):
 
 | Curve | Window | Effect on temporal pulse positioning |
 |---|---|---|
-| Linear | `[0, 0.5]` | Pulses cluster in first half of slot. Sub-range of cell duration. |
-| Linear | `[0.5, 1.0]` | Pulses cluster in second half. |
-| Bell | `[0, 0.5]` | Just the rising half of bell — pulses cluster late (toward peak). |
-| Bell | `[0.5, 1.0]` | Just the falling half — pulses cluster early. |
-| Bell | `[0.4, 0.6]` | Peak region only — pulses cluster very tightly near slot midpoint. |
-| Bounce | `[0, 0.3]` | Just the steep drop — pulses cluster in first 30% of slot, sharp burst. |
-| Bounce | `[0.7, 1.0]` | Just the tail — pulses barely move, almost-uniform clustering near slot start. |
+| Linear | Focus 50 | Pulses cluster in middle half of slot. |
+| Linear | Polarize 50 | Pulses cluster at start AND end, silent middle. |
+| Bell | Focus 50 | Pulses cluster very tightly near slot midpoint (peak region). |
+| Bell | Polarize 50 | Pulses cluster early AND late with quiet middle. |
+| Bounce | Focus 50 | Pulses fire only in the middle drop region. |
+| Bounce | Polarize 50 | Pulses fire only in the first and last drops, middle drop silent. |
 
 ### 6.2 Pitch curves — scale-degree quantized, NoteTrack-aligned
 
@@ -454,67 +463,75 @@ i.e. the pitch head's position is projected forward from slot start to each sche
 
 **Status: draft, not yet wired.**
 
-Per-cell field 1..8 (`UnsignedValue<3>`, stored on `_data3` per §5 / §14.2 layout). Default 1 (current behavior).
+Per-cell 4-value enum (`UnsignedValue<2>`): **x1 / x2 / x3 / x5** (default x1 = no repeat). Stored on `_data3` per §14.2 layout.
 
-Engine math: pitch curve is sampled at `fmod(phi × pitchRepeat, 1.0)` instead of `phi`. Applies to both the per-pulse pitch in `rebuildSchedule` (where `phi = t_shifted`) and the Always-mode continuous CV branch (where `phi = _stagePhase`).
+Engine math (pipeline: **Window → Repeat → Warp → Curve eval → FlipV → Response → FlipH**). The pitch curve is sampled at the windowed-then-repeated position:
 
 ```
-phi_repeated = fmod(phi × stage.pitchRepeat(), 1.0)
-phi_warped   = WarpAxis(phi_repeated, pitchWarp)
-phi_input    = pitchFlipH ? (1 − phi_warped) : phi_warped
-p_curved     = PitchCurve(phi_input, pitchCurve)
+R              = repeatValue(stage.pitchRepeat())                // 1, 2, 3, or 5
+// Window applies to phi BEFORE repeat:
+if !isInWindow(phi, stage.pitchWindow()):
+    pulse contributes no pitch motion (held at boundary)
+phi_repeated   = fmod(phi × R, 1.0)
+phi_warped     = applyPowerBend(phi_repeated, pitchWarp)
+phi_input      = pitchFlipH ? (1 − phi_warped) : phi_warped
+p_curved       = PitchCurve(phi_input, pitchCurve)
 // ... rest of §6.2 pipeline unchanged
 ```
 
-With `pitchCurve = Ramp` and `pitchRepeat = 3`, the pitch traversal looks like three sawtooth ramps within one cell visit — the "stacked ramps" pattern. Combined with non-trivial `pulseCount`, each pulse samples a different point along the repeated curve.
+With `pitchCurve = Ramp` and `pitchRepeat = x3`, the pitch traversal looks like three sawtooth ramps within one cell visit — the "stacked ramps" pattern.
 
-**Cell mode only.** In Global pitch mode, `pitchRate` already owns the multi-cycle frequency. Pitch Repeat is ignored when `pitchMode = Global` to avoid compounding two frequency multipliers (would confuse the player). Alternative considered (combine multiplicatively as `effective = pitchRate × pitchRepeat`) — rejected for v1 on UX grounds.
+**Cell mode only.** In Global pitch mode, `pitchRate` already owns the multi-cycle frequency; pitchRepeat is ignored.
 
-**Coverage**: with Repeat-N on Ramp / Bell / Triangle / Bounce, the multi-bump / sawtooth-N / sine-N pitch families become reachable. New pitch curve LUTs for these shapes are no longer needed.
+**Coverage**: with Repeat × Window combos on Ramp/Bell/Triangle/Bounce, multi-bump / sawtooth-N / sine-N pitch families become reachable from base shapes.
 
-**Interaction with `pitchDirection`, `pitchRange`, `pitchFlipV/H`, `pitchWarp`, `pitchResponse`**: all applied AFTER the Repeat fmod. Repeat is purely an input-axis frequency multiplier.
+**Interaction with `pitchDirection`, `pitchRange`, `pitchFlipV/H`, `pitchWarp`, `pitchResponse`**: all applied AFTER the Repeat fmod.
 
-**Interaction with §6.2.1 melody mask**: mask runs on `degree[i]` AFTER the full pitch pipeline. Each pulse's degree is computed from its own Repeat-sampled phi → masked or not on the resulting degree.
+**Audible effect example**: `pitchCurve = Ramp`, `pitchRange = 2 oct`, `pitchRepeat = x5`, `pulseCount = 8` → 8 pulses sample 5 stacked ramps spanning the 2-octave range. 16th-note-arpeggio-inside-the-cell feel instead of one slow sweep.
 
-**Audible effect example**: `basePitch = 0`, `pitchCurve = Ramp`, `pitchRange = 2 oct`, `pitchRepeat = 4`, `pulseCount = 8` → 8 pulses sample 4 stacked ramps from 0 to +14 degrees. Each ramp completes in 1/4 of the cell; each ramp's 2 pulses land at degrees ≈ 0 and 7 (mid-ramp). Sounds like a 16th-note arpeggio inside the cell instead of one slow sweep.
-
-### 6.2.5 `pitchWindow` — sample a sub-range of the pitch curve
+### 6.2.5 `pitchWindow` — crop which portion of the pitch curve the engine sees
 
 **Status: draft, not yet wired.**
 
-Two per-cell fields, `pitchWindowStart` and `pitchWindowEnd`, each 3-bit (`UnsignedValue<3>`, range 0..7 mapped to 0/7..7/7 = 0..1). Identical math to §6.1.3 but on the pitch axis.
+Per-cell 5-value enum (`UnsignedValue<3>`):
 
-Engine math (applied BEFORE warp/response, AFTER Repeat fmod):
+| Value | Mode | Visible input range | Hidden |
+|---|---|---|---|
+| 0 (default) | Off | `[0, 1]` (full) | — |
+| 1 | Focus 70 | `[0.15, 0.85]` | outer 30% |
+| 2 | Focus 50 | `[0.25, 0.75]` | outer 50% |
+| 3 | Polarize 70 | `[0, 0.35] ∪ [0.65, 1.0]` | middle 30% |
+| 4 | Polarize 50 | `[0, 0.25] ∪ [0.75, 1.0]` | middle 50% |
+
+Same math as §6.1.3 but on the pitch axis. Engine math (Window applies BEFORE Repeat, BEFORE warp):
 
 ```
-phi_in     = fmod(phi × pitchRepeat, 1.0)                       // §6.2.4
-wStart     = stage.pitchWindowStart() / 7.0
-wEnd       = stage.pitchWindowEnd()   / 7.0
-windowed   = wStart + phi_in × (wEnd − wStart)
-phi_warped = applyPowerBend(windowed, pitchWarp)
-phi_input  = pitchFlipH ? (1 − phi_warped) : phi_warped
-p_curved   = PitchCurve(phi_input, pitchCurve)
+phi          = (per-pulse phi or _stagePhase per §6.2.2)
+if !isInWindow(phi, stage.pitchWindow()):
+    // hidden — pulse contributes no pitch motion; CV held at boundary
+phi_repeated = fmod(phi × pitchRepeat, 1.0)                   // §6.2.4
+phi_warped   = applyPowerBend(phi_repeated, pitchWarp)
 // ... rest of §6.2 pipeline unchanged
 ```
 
-**Defaults**: `wStart = 0`, `wEnd = 7` → identity, current behavior.
+**Defaults**: Off → identity, current behavior.
 
-**Audible character examples**:
+**Audible character examples** (with default warp=0, response=0, Repeat x1):
 
 | Curve | Window | Effect on pitch CV |
 |---|---|---|
-| Ramp | `[0, 0.5]` | Pitch covers only the lower half of the range. With `range = 2 oct`, pitch sweeps 0 → +7 instead of 0 → +14 over the cell. |
-| Bell | `[0, 0.5]` | Pitch climbs to peak then stays — sounds like Ramp Up that flattens. |
-| Bell | `[0.5, 1.0]` | Pitch starts at peak and falls. Sounds like Ramp Down. |
-| Bell | `[0.4, 0.6]` | Pitch stays near peak — sustained high note. |
-| Triangle | `[0, 0.5]` | Just the up-slope = Ramp Up character. |
-| Triangle | `[0.5, 1.0]` | Just the down-slope = Ramp Down. |
-| Bounce | `[0, 0.3]` | Steep pitch drop — pluck character without the asymptotic tail. |
-| Bounce | `[0.7, 1.0]` | Pitch stays near 0 — drone-like sustain. |
+| Ramp | Focus 50 | Pitch covers only the middle 50% of range — narrower sweep. |
+| Ramp | Polarize 50 | Pitch fires at the lowest AND highest quarters; mid-range silent. |
+| Bell | Focus 50 | Pitch stuck near peak — sustained high note. |
+| Bell | Polarize 50 | Low pitches at cell start AND end, silent in between (the peak is hidden). |
+| Triangle | Focus 50 | Sharp peak region only. |
+| Triangle | Polarize 50 | Up-slope start + down-slope end with silent middle. |
+| Bounce | Focus 50 | Middle drop only — single pluck mid-cell. |
+| Bounce | Polarize 50 | First and last drops; middle drop silent. |
 
-**Cell mode only** for pitch Repeat applies here too — in Global pitch mode, pitchRate already owns multi-cycle traversal. Pitch Window is ignored when `pitchMode = Global` (paired with the Repeat constraint in §6.2.4). Alternative considered (apply Window inside the rate-driven Global cycle) — rejected for v1 on UX grounds.
+**Cell mode only**; ignored in Global pitch mode (paired with Repeat constraint).
 
-**Combined with Repeat**: each repeated cycle plays the windowed slice. `Ramp + Repeat 3 + Window [0, 0.5]` = three half-ramps stacked per cell — pitch climbs 0 → 0.5 → resets → 0 → 0.5 → resets → 0 → 0.5. Combined with `pitchRange` for vertical scaling.
+**Combined with Repeat**: per pipeline order Window→Repeat, the windowed curve gets repeated. `Ramp + x3 + Polarize 50` = three patterns each with a low-pitch start, gap, low-pitch end (the polarize bands of the ramp = its bottom and top edges). Each repeat carries the windowed character.
 
 **Coverage gained**: Window unlocks "Bell-half = Ramp", "Triangle-half = monotonic", "Bounce-front = sharp pluck", "Bell-peak = sustained", and the mirror cases via FlipH/FlipV. Many shape characters reachable from a single base curve.
 
@@ -826,51 +843,64 @@ These are accepted-in-principle but not yet bit-pack-budgeted or test-covered. E
 
 ### Per-stage: `Repeat` and `Window` — curve-shape transforms (paired addition)
 
-Two paired sets of per-cell fields covering multi-cycle traversal (Repeat) and sub-range cropping (Window) on both temporal and pitch axes. Designed together since they share `_data3` budget and compose cleanly in the pipeline.
+Two paired sets of per-cell fields. Repeat multiplies curve traversals within the cell; Window crops which portion of the curve the engine evaluates. Per-axis (temporal and pitch independently). Both apply BEFORE Warp/Response in the pipeline.
 
-**Repeat** — `temporalRepeat` and `pitchRepeat`, each `UnsignedValue<3>` (range 1..8, default 1). Multiplies the curve traversal count within the cell duration on each axis independently. Full math in §6.1.2 (temporal) and §6.2.4 (pitch).
+**Repeat** — `temporalRepeat` and `pitchRepeat`, each a 4-value enum stored as `UnsignedValue<2>`:
 
-- Coverage: with Repeat, the multi-bump / sawtooth-N / sine-N / multi-decay curve families become reachable from existing base shapes. No new curve enum slots needed for those.
+| Value | Multiplier |
+|---|---|
+| 0 (default) | ×1 (no repeat) |
+| 1 | ×2 |
+| 2 | ×3 |
+| 3 | ×5 |
 
-**Window** — `temporalWindowStart` + `temporalWindowEnd` and `pitchWindowStart` + `pitchWindowEnd`, each `UnsignedValue<3>` (range 0..7 mapped to 0..1, default `wStart=0` / `wEnd=7`). Crops the input range so the curve evaluates only over `[wStart/7, wEnd/7]`. Full math in §6.1.3 (temporal) and §6.2.5 (pitch).
+Coverage: multi-bump / multi-decay / N-cycle pulse patterns become reachable from base shapes. No new curve enum slots needed for those.
 
-- Coverage: Window unlocks shape characters unreachable by warp/response (which bend axes but never crop). Examples: Bell-half = Ramp; Bounce-front = sharp pluck without tail; Bell-peak = sustained note.
-- Edit constraint: `wEnd ≥ wStart` enforced at UI; degenerate `wEnd == wStart` produces a constant offset (musically: defeats the curve).
+**Window** — `temporalWindow` and `pitchWindow`, each a 5-value enum stored as `UnsignedValue<3>`:
 
-**Pipeline order** (per axis): `Repeat → Window → Warp → Curve eval → FlipV → Response → FlipH`. Repeat multiplies cycles, Window crops within each cycle, then the existing warp/curve/response pipeline runs.
+| Value | Mode | What engine evaluates |
+|---|---|---|
+| 0 (default) | Off | full curve `[0, 1]` |
+| 1 | Focus 70 | center 70% — input `[0.15, 0.85]` (outer 30% hidden) |
+| 2 | Focus 50 | center 50% — input `[0.25, 0.75]` (outer 50% hidden) |
+| 3 | Polarize 70 | outer 70% — input `[0, 0.35] ∪ [0.65, 1.0]` (middle 30% hidden) |
+| 4 | Polarize 50 | outer 50% — input `[0, 0.25] ∪ [0.75, 1.0]` (middle 50% hidden) |
 
-- **Bit-pack cost**: 6 bits Repeat (3 per axis × 2 axes) + 12 bits Window (3 per endpoint × 2 endpoints × 2 axes) = 18 bits per stage × 16 = 288 bits total. `_data3` has 25 spare bits after `stageLen` (7 bits used); 18 used, 7 remain.
+3 spare enum slots in the 3-bit field (values 5/6/7) reserved for future window shapes.
+
+- **Focus** vs **Polarize** give opposite musical gestures:
+  - Focus narrows pulses/pitches into the center of the curve (Bell at Focus 50 = sustained near-peak).
+  - Polarize concentrates pulses/pitches at the cell's edges with a silent middle (Bell at Polarize 50 = small rise on left, gap, small fall on right).
+- Hidden portion: engine does not evaluate; for temporal axis pulses falling in the hidden band are dropped; for pitch axis the curve doesn't contribute (held at boundary value or skipped depending on `cvUpdateMode`).
+
+**Pipeline order** (per axis): `Window → Repeat → Warp → Curve eval → FlipV → Response → FlipH`. Window applies on raw input, then Repeat multiplies the windowed result, then Warp bends, then the curve evaluates, then FlipV mirrors output, then Response bends output, then FlipH mirrors trigger timing. Window-then-Repeat (rather than Repeat-then-Window) was chosen so each repeated sub-section carries the windowed shape — gives `Bell + x3 + Polarize 50` three "rise-gap-fall" cycles, much richer than three half-bells with a single crop applied after.
+
+- **Bit-pack cost**: 4 bits Repeat (2 per axis × 2 axes) + 6 bits Window (3 per axis × 2 axes) = 10 bits per stage × 16 stages = 160 bits total. `_data3` has 25 spare bits after `stageLen` (7 used); 10 used, **15 remain**.
 - Layout (locked):
   ```
   _data3:
     bits  0..6   stageLen (7)                 [existing]
-    bits  7..9   pitchRepeat (3)              [NEW Repeat]
-    bits 10..12  temporalRepeat (3)
-    bits 13..15  pitchWindowStart (3)         [NEW Window]
-    bits 16..18  pitchWindowEnd (3)
-    bits 19..21  temporalWindowStart (3)
-    bits 22..24  temporalWindowEnd (3)
-    bits 25..31  spare (7)
+    bits  7..8   pitchRepeat (2)              [NEW Repeat]
+    bits  9..10  temporalRepeat (2)
+    bits 11..13  pitchWindow (3)              [NEW Window]
+    bits 14..16  temporalWindow (3)
+    bits 17..31  spare (15)
   ```
 - Routable target? No for either — per-stage discrete enums, not natural CV targets.
 - Pitch Repeat and Pitch Window are **Cell-mode only**; both ignored in Global pitch mode where `pitchRate` owns multi-cycle. See §6.2.4 / §6.2.5 for rationale.
 
-**UI surface**:
+**UI surface** (subject to the paged-footer layout in §17.2.1 — these slots are not yet wired):
 
-- TEMP set:
-  - Shift+F3 = `Repeat` (edits `temporalRepeat`)
-  - Shift+F4 = `WStart` (edits `temporalWindowStart`)
-  - Shift+F5 = `WEnd` (edits `temporalWindowEnd`)
-- PTCH set (Cell mode):
-  - Shift+F3 = `Repeat` (edits `pitchRepeat`)
-  - Shift+F4 = `WStart` (edits `pitchWindowStart`)
-  - Shift+F5 = `WEnd` (edits `pitchWindowEnd`)
-- PTCH set (Global mode): Shift+F3/F4/F5 are no-ops (Repeat and Window ignored in Global mode).
+Footer order for transform slots follows pipeline order: `Window → Repeat → Warp → FlipV → Response → FlipH`. Window and Repeat are NEW slots; they slot in BEFORE Warp on the encounter path. Existing slot positions (`Curve`, `Warp`, `Resp`, `FlipV`, `FlipH`, topic-specific F4) stay put.
+
+- TEMP: add a Page-2 (P2) extension carrying `Window / Repeat / — / — / Next` (Window F1, Repeat F2 — pipeline order).
+- PTCH Cell: same P2 pattern, `Window / Repeat / — / — / Next`.
+- PTCH Global: Repeat and Window are no-ops (ignored in Global mode); no P2.
 - ACCUM sets: not applicable.
 
-All three shift slots (F3/F4/F5) are currently empty in both TEMP and PTCH sets, no conflict with existing bindings.
+**Render reference**: `ui-preview/window-preview/window-bell-bounce.png` shows Bell and Bounce at Off / F70 / F50 / P70 / P50.
 
-**OPEN**: none — semantics fully specified in §6.1.2 / §6.1.3 / §6.2.4 / §6.2.5. Output rescale on Window deferred (Interpretation A — input-only crop — is the locked v1 semantic; rescale variant can be added later as an "auto-normalize" toggle if audition shows demand).
+**OPEN**: footer placement (P2 of TEMP/PTCH-Cell vs Shift+F variants) decide at UI wire-up time.
 
 ### Per-sequence: accumulator `sleep` — divisor on trigger advance
 
@@ -983,17 +1013,6 @@ effectiveTick = uint32_t(warped * cycleTicks)                        // re-map b
 - Response on time globally (bend trigger positions across the cycle) is mostly covered by `cyclePhaseWarp` — same family of non-linear time mapping. No need for a second variant.
 
 **OPEN**: none — semantic fully specified and resolves §14.1 Q10.
-
-### Per-stage: continuous `stageLen` multiplier
-
-Augment (not replace) the existing 3-bit `stageDivisor` enum with a continuous **length multiplier** that scales the slot duration relative to the chosen enum slot.
-
-- Field: `stageLen`, bipolar 7-bit signed value (`SignedValue<7>`), range ±64 representing ±100% length multiplier on top of the enum-derived ticks.
-- Semantics: `effectiveStageTicks = enumTicks × (1 + stageLen/100)` (or a log-mapped version to feel musical at the extremes). At `stageLen=0` (default) behaves identically to today.
-- Snake-walk cumulative table consumes the post-multiplier value; `kMinCycleTicks` floor still applies after scaling.
-- Routable target? Likely no — per-stage and not cheap to broadcast.
-- **Bit-pack cost:** 7 bits per stage × 16 stages = 112 bits total. `_data2` has 3 spare bits — far short. Requires repack (reclaim from `accumulatorStep` 5→4 bits, `accumulatorLength` 4→3 bits, etc.) or moving the field to a 4th word (`_data3`) — breaking the 3×uint32_t invariant.
-- **OPEN:** Final bit budget. Either accept a coarser 4-bit `stageLen` (±15 levels ≈ 15% steps) fitting in spare + 1 reclaimed bit, or expand `Stage` to `_data3` (3 → 4 × uint32_t per stage record). Per `PROJECT.md:385` no ProjectVersion bump during dev — dev projects accepted to break on field-shape changes.
 
 ### Per-sequence: `sequenceShift`
 
