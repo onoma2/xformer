@@ -816,4 +816,229 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         expectEqual(int(result.error), int(TT2EvalError::None), "ok");
         expectEqual(runtime.variables.a, int16_t(1), "PROB skipped because IF was taken");
     }
+
+
+    CASE("l_1_to_3_sets_a_to_final_i") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "L 1 3: A I");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(3), "A = final I");
+    }
+
+    CASE("l_0_to_2_accumulates_count") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "L 0 2: A + A 1");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(4), "A += 1 three times");
+    }
+
+    CASE("l_reversed_bounds_descends") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "L 3 1: A I");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "A = final I (descended to 1)");
+    }
+
+    CASE("l_invalid_arity_1_param_rejected") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "L 1: A I");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::InvalidModArity),
+                    "L with 1 param rejected");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+    }
+
+    CASE("l_invalid_arity_3_params_rejected") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "L 1 3 5: A I");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::InvalidModArity),
+                    "L with 3 params rejected");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+    }
+
+    CASE("l_nested_two_levels") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "L 0 1: L 0 1: X + X 1");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.x, int16_t(4), "X = 4 after nested loops");
+    }
+
+    CASE("l_body_failure_stops_loop_and_reports") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "L 1 3: CV 9 1");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::OutOfRange),
+                    "body failure stops L loop");
+    }
+
+    CASE("l_i_left_at_final_in_range_value") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "L 1 3: A I");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        runtime.variables.i = 42;
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(3), "A = final I");
+        // I is left at the final in-range value, not restored to 42.
+        expectEqual(runtime.variables.i, int16_t(3), "I left at final loop value");
+    }
+
+    CASE("l_single_iteration_equal_bounds") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "L 5 5: A I");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(5), "A = 5");
+    }
+
+    CASE("l_negative_to_positive_bounds") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "L -2 1: A I");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "A = final I = 1");
+    }
+
+    CASE("l_variable_bounds") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "X 1");
+        writeLine(program.scripts[0], 1, "B 3");
+        writeLine(program.scripts[0], 2, "L X B: A I");
+        program.scripts[0].length = 3;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(3), "A = final I = 3");
+    }
+
+    CASE("l_body_mutation_carries_across_iterations") {
+        TeletypeProgram program = {};
+        init(program);
+        // L 0 1: I + I 10; A I
+        // Iter 1: I=0, set I=10, A=10. Loop bumps I=11.
+        // Iter 2: I=11, set I=21, A=21. Loop bumps I=22, back-off to 21.
+        writeLine(program.scripts[0], 0, "L 0 1: I + I 10; A I");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(21), "A saw mutated I=21");
+        expectEqual(runtime.variables.i, int16_t(21), "I = 21 after loop");
+    }
+
+    CASE("l_does_not_double_execute_trailing_segment") {
+        TeletypeProgram program = {};
+        init(program);
+        // L 1 1: A I; B + B 10
+        // One iteration: A=1, B=2+10=12.
+        // If the trailing segment ran again outside L: B=12+10=22 (wrong).
+        writeLine(program.scripts[0], 0, "L 1 1: A I; B + B 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "A = 1");
+        expectEqual(runtime.variables.b, int16_t(12), "B = 12, not double-executed");
+    }
+
 }

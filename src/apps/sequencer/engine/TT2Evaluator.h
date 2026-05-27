@@ -54,6 +54,7 @@ inline bool popStack(int16_t *stack, uint8_t &stackSize, int16_t &value,
 struct TT2EvalResult {
     TT2EvalError error;
     int16_t value;    // top of stack if stackSize > 0, else 0
+    int16_t underTop; // second value if stackSize >= 2, else 0
     uint8_t stackSize;
 };
 
@@ -75,12 +76,15 @@ extern const size_t tt2NativeOpCount;
 // Only NUMBER / XNUMBER / BNUMBER / RNUMBER and OP tokens are allowed.
 // MOD, PRE_SEP, SUB_SEP must not appear in this range.
 // Right-to-left evaluation, fresh stack.
+// When forceGet is true, the first (leftmost) op is treated as a getter
+// regardless of context; used for mod prefix expressions.
 inline TT2EvalResult evaluateSegment(const TT2Command &cmd,
                                      uint8_t start, uint8_t end,
                                      TT2Runtime &runtime,
                                      TT2OutputState &output,
                                      const TT2OpFunc *table,
-                                     size_t tableCount) {
+                                     size_t tableCount,
+                                     bool forceGet = false) {
     int16_t stack[TT2_COMMAND_MAX_LENGTH];
     uint8_t stackSize = 0;
     TT2EvalError error = TT2EvalError::None;
@@ -104,19 +108,20 @@ inline TT2EvalResult evaluateSegment(const TT2Command &cmd,
                 if (op == nullptr) {
                     error = TT2EvalError::UnsupportedOp;
                 } else {
-                    bool isSet = (idx == start);
+                    bool isSet = forceGet ? false : (idx == start);
                     op(runtime, output, stack, stackSize, isSet, error);
                 }
             }
         } else {
-            // Should not happen in a properly extracted segment.
             error = TT2EvalError::UnsupportedSeparator;
         }
     }
 
     int16_t topValue =
         (stackSize > 0 && error == TT2EvalError::None) ? stack[stackSize - 1] : 0;
-    return {error, topValue, stackSize};
+    int16_t underTopValue =
+        (stackSize >= 2 && error == TT2EvalError::None) ? stack[stackSize - 2] : 0;
+    return {error, topValue, underTopValue, stackSize};
 }
 
 // Convenience wrapper using the global native v2 op table.
@@ -125,7 +130,16 @@ inline TT2EvalResult evaluateSegment(const TT2Command &cmd,
                                      TT2Runtime &runtime,
                                      TT2OutputState &output) {
     return evaluateSegment(cmd, start, end, runtime, output,
-                           tt2NativeOpTable, tt2NativeOpCount);
+                           tt2NativeOpTable, tt2NativeOpCount, false);
+}
+
+// Convenience: evaluate a mod prefix expression (force-get all ops).
+inline TT2EvalResult evaluateModPrefix(const TT2Command &cmd,
+                                       uint8_t start, uint8_t end,
+                                       TT2Runtime &runtime,
+                                       TT2OutputState &output) {
+    return evaluateSegment(cmd, start, end, runtime, output,
+                           tt2NativeOpTable, tt2NativeOpCount, true);
 }
 
 // Evaluate one flat TT2Command through the native v2 op table.
@@ -133,9 +147,10 @@ inline TT2EvalResult evaluateSegment(const TT2Command &cmd,
 // - Splits the command at SUB_SEP (`;`) into segments, executes left-to-right.
 // - Each segment gets its own stack (no carry-over between segments).
 // - Within a segment, PRE_SEP (`:`) splits prefix (mod condition) from body.
-// - Supported mods: IF, ELIF, ELSE.
+// - Supported mods: IF, ELIF, ELSE, PROB, L.
 //   IF starts a new conditional chain; ELIF and ELSE continue it.
 //   First true branch runs, later branches are skipped.
+//   L start end: body — loop body (remaining segments) with I = start..end.
 // - Unsupported mods return UnsupportedMod; prefix is not evaluated.
 // - Stops at first error and returns it.
 inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
@@ -167,7 +182,7 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
         ElseSeen, // ELSE encountered (branch executed or skipped)
     };
 
-    TT2EvalResult lastResult = {TT2EvalError::None, 0, 0};
+    TT2EvalResult lastResult = {TT2EvalError::None, 0, 0, 0};
     ChainState chainState = ChainState::None;
 
     for (uint8_t seg = 0; seg < segCount; ++seg) {
@@ -191,7 +206,7 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
         if (preSepPos < e) {
             // Prefix [s .. preSepPos), body [preSepPos+1 .. e).
             if (cmd.tag[s] != uint8_t(MOD)) {
-                return {TT2EvalError::UnsupportedMod, 0, 0};
+                return {TT2EvalError::UnsupportedMod, 0, 0, 0};
             }
             int16_t modValue = cmd.value[s];
 
@@ -200,13 +215,13 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 chainState = ChainState::None;
 
                 // Evaluate prefix expression (skip the MOD token itself).
-                auto prefix = evaluateSegment(cmd, s + 1, preSepPos,
+                auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
                                               runtime, output);
                 if (prefix.error != TT2EvalError::None) {
                     return prefix;
                 }
                 if (prefix.stackSize != 1) {
-                    return {TT2EvalError::InvalidModArity, 0, 0};
+                    return {TT2EvalError::InvalidModArity, 0, 0, 0};
                 }
 
                 if (prefix.value != 0) {
@@ -221,7 +236,7 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 }
             } else if (modValue == E_MOD_ELIF) {
                 if (chainState == ChainState::None) {
-                    return {TT2EvalError::OrphanElif, 0, 0};
+                    return {TT2EvalError::OrphanElif, 0, 0, 0};
                 }
                 if (chainState == ChainState::Taken ||
                     chainState == ChainState::ElseSeen) {
@@ -229,13 +244,13 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                     continue;
                 }
                 // chainState == Pending
-                auto prefix = evaluateSegment(cmd, s + 1, preSepPos,
+                auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
                                               runtime, output);
                 if (prefix.error != TT2EvalError::None) {
                     return prefix;
                 }
                 if (prefix.stackSize != 1) {
-                    return {TT2EvalError::InvalidModArity, 0, 0};
+                    return {TT2EvalError::InvalidModArity, 0, 0, 0};
                 }
 
                 if (prefix.value != 0) {
@@ -249,10 +264,10 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 // else remain Pending
             } else if (modValue == E_MOD_ELSE) {
                 if (chainState == ChainState::None) {
-                    return {TT2EvalError::OrphanElse, 0, 0};
+                    return {TT2EvalError::OrphanElse, 0, 0, 0};
                 }
                 if (chainState == ChainState::ElseSeen) {
-                    return {TT2EvalError::DuplicateElse, 0, 0};
+                    return {TT2EvalError::DuplicateElse, 0, 0, 0};
                 }
                 if (chainState == ChainState::Taken) {
                     chainState = ChainState::ElseSeen;
@@ -273,13 +288,13 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 }
 
                 // PROB n: body  —  execute body with probability n%.
-                auto prefix = evaluateSegment(cmd, s + 1, preSepPos,
+                auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
                                               runtime, output);
                 if (prefix.error != TT2EvalError::None) {
                     return prefix;
                 }
                 if (prefix.stackSize != 1) {
-                    return {TT2EvalError::InvalidModArity, 0, 0};
+                    return {TT2EvalError::InvalidModArity, 0, 0, 0};
                 }
 
                 int16_t pct = prefix.value;
@@ -303,9 +318,69 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 } else {
                     chainState = ChainState::Pending;
                 }
+            } else if (modValue == E_MOD_L) {
+                // L start end: body  —  loop body (remaining segments)
+                // with I stepping from start to end, inclusive.
+                // Reversed and equal bounds are valid.
+                // I is set once before the loop; body can read and mutate it.
+                // I is left at the final in-range value (not restored).
+                // Body consumes remaining segments; outer loop must stop.
+                auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
+                                              runtime, output);
+                if (prefix.error != TT2EvalError::None) {
+                    return prefix;
+                }
+                if (prefix.stackSize != 2) {
+                    return {TT2EvalError::InvalidModArity, 0, 0, 0};
+                }
+
+                int16_t startVal = prefix.value;
+                int16_t endVal = prefix.underTop;
+
+                int16_t step = (endVal >= startVal) ? 1 : -1;
+
+                // Build body command from after ':' through end of command.
+                TT2Command bodyCmd = {};
+                uint8_t bodyLen = 0;
+                for (uint8_t pos = preSepPos + 1;
+                     pos < cmd.length && bodyLen < TT2_COMMAND_MAX_LENGTH;
+                     ++pos) {
+                    bodyCmd.tag[bodyLen] = cmd.tag[pos];
+                    bodyCmd.value[bodyLen] = cmd.value[pos];
+                    bodyLen++;
+                }
+                bodyCmd.length = bodyLen;
+
+                runtime.variables.i = startVal;
+                // Use int32_t to handle range edge cases (e.g. end == 32767).
+                if (step > 0) {
+                    for (int32_t l = startVal; l <= endVal; ++l) {
+                        lastResult = evaluateCommand(bodyCmd, runtime,
+                                                     output);
+                        if (lastResult.error != TT2EvalError::None) {
+                            return lastResult;
+                        }
+                        runtime.variables.i += step;
+                    }
+                } else {
+                    for (int32_t l = startVal; l >= endVal; --l) {
+                        lastResult = evaluateCommand(bodyCmd, runtime,
+                                                     output);
+                        if (lastResult.error != TT2EvalError::None) {
+                            return lastResult;
+                        }
+                        runtime.variables.i += step;
+                    }
+                }
+                // Back off the final post-loop increment; leave I at
+                // the last in-range value, matching Teletype behavior.
+                runtime.variables.i -= step;
+
+                // L consumed all remaining segments; return directly.
+                return lastResult;
             } else {
                 // Unsupported mod — reject before prefix side effects.
-                return {TT2EvalError::UnsupportedMod, 0, 0};
+                return {TT2EvalError::UnsupportedMod, 0, 0, 0};
             }
         } else {
             // No PRE_SEP: plain segment ends any active conditional chain.

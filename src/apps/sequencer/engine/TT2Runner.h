@@ -14,12 +14,12 @@ inline TT2EvalResult runScript(const TeletypeProgram &program,
                                TT2OutputState &output,
                                uint8_t scriptIndex) {
     if (scriptIndex >= TT2_SCRIPT_COUNT) {
-        return {TT2EvalError::InvalidScriptIndex, 0, 0};
+        return {TT2EvalError::InvalidScriptIndex, 0, 0, 0};
     }
 
     const TT2Script &script = program.scripts[scriptIndex];
     if (script.length > TT2_COMMANDS_PER_SCRIPT) {
-        return {TT2EvalError::ScriptLengthOverflow, 0, 0};
+        return {TT2EvalError::ScriptLengthOverflow, 0, 0, 0};
     }
 
     // Push one execution frame for the script context.
@@ -42,5 +42,5 @@ inline TT2EvalResult runScript(const TeletypeProgram &program,
         }
     }
 
-    return {TT2EvalError::None, 0, 0};
+    return {TT2EvalError::None, 0, 0, 0};
 }

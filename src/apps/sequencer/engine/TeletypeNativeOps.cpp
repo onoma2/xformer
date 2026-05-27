@@ -57,6 +57,17 @@ static void opX(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
     }
 }
 
+static void opI(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
+                uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    if (isSetPosition && stackSize >= 1) {
+        int16_t val = 0;
+        if (!popStack(stack, stackSize, val, error)) return;
+        runtime.variables.i = val;
+    } else {
+        pushStack(stack, stackSize, runtime.variables.i, error);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Math ops
 // ---------------------------------------------------------------------------
@@ -158,6 +169,7 @@ namespace {
             table[E_OP_A]        = opA;
             table[E_OP_B]        = opB;
             table[E_OP_X]        = opX;
+            table[E_OP_I]        = opI;
             table[E_OP_ADD]      = opAdd;
             table[E_OP_SYM_PLUS] = opAdd;
             table[E_OP_CV]       = opCv;
