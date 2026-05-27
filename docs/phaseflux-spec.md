@@ -814,7 +814,7 @@ Mod inputs are deferred but Routing alignment is not. Fields that may ever be CV
 |---|---|
 | Q8 curve "squash" transform — applies to BOTH temporal and pitch axes | **PARTIALLY RESOLVED.** Option 3 (Fold) is now spec'd as `temporalRepeat` / `pitchRepeat` in §6.1.2 / §6.2.4 / §14.2 — handles repeated curve traversal cleanly with R=1..8 per cell. Options 1 (Output quantize), 2 (Density compress/expand), 4 (Staircase) remain open if those characters are needed later. Original wording preserved for reference: "Observed limitation (2026-05-25): with `pulseCount ≤ 8` (3-bit field cap), pulses distribute monotonically across the curve output but skip intermediate values as the output span grows. Current transforms (warp, response, flipV/H) do not address this. Candidate semantics: (1) Output quantize/step — Marbles `steps`; (2) Density compression/expansion — pull pulses into a narrower window of the available span; (3) **Fold** — `curve_out × K mod 1` so the curve traverses the span K times within one stage; (4) Staircase — quantize curve to N plateaus." |
 | Q9 global 16-stage compression/expansion | **OPEN.** Phaseque-borrow (2026-05-26): a `cycleSpread` field at sequence level that scales the active stages into a narrower window of the total cycle (low spread = compression toward midpoint) or pushes them to the endpoints (high spread = bernoulli-like expansion), independent of `clockMultiplier` and `divisor` which already scale the cycle period. This is **Marbles `spread`** applied to the time axis (distribution width), not `bias` (which would shift the cluster's center position). Low value = busy middle with silent edges; high value = burst-at-bar-edges feel. Bipolar 0..127 unsigned (low=compression, mid=neutral, high=expansion) or signed ±100 (centered at neutral); 7-bit, Routable target. Decide: live alongside `divisor` and `clockMultiplier` or merged into one of them with broader range? Also: pair with a `cycleBias` later (Marbles bias = WHERE the cluster sits, separate axis from compression). |
-| Q10 global phase warp | **OPEN.** Apply powerBend to the master phase **before** slot derivation, so the same cumulative table is traversed non-linearly: early stages stretch and late ones compress (or vice versa). Sequence-level bipolar ±100% field, 7-bit signed, Routable. Audibly: gives the whole 16-stage cycle a "swing/lag" feel that's macro-level, independent of per-stage warp. Decide: warp the master phase only, or warp the cumulative-table durations themselves (different semantics — phase warp keeps the cycle length but moves the per-stage hits; table warp restretches each stage's actual duration). |
+| Q10 global phase warp | **RESOLVED** as `cyclePhaseWarp` in §14.2. Selected the master-phase warp variant (warp the phase pre-slot-derivation, keep cycle length, move per-stage hits). The alternative (warp cumulative-table durations) was rejected because it would mutate the table on every nudge tick — expensive and incompatible with `detectLayoutChange()` caching. Routable per-sequence `int8_t`, ±64, default 0. Sequence-level Response on CV considered and rejected (breaks scale-degree contract). |
 | Q11 snap-to-grid utility | **OPEN.** Once continuous `stageLen` and `sequenceShift` land, edits drift off the natural grid. Need a sequence-level "snap" action (not a stored field) that quantizes per-stage `stageLen` multipliers and `phaseShift` values to nearest grid increment, and `sequenceShift` to the nearest 1/16 (or 1/32) of cycle. Bound to an F-key or context-menu entry on EditPage. Decide: pre-Phase-C UI lock. |
 | Q12 scale-degree hysteresis for continuous CV (§6.2.2) | **OPEN.** When `cvUpdateMode = Always`, the pitch curve evaluates every tick and re-quantizes to the nearest scale degree. Phase positions near a degree boundary oscillate between two adjacent degrees as the curve crosses, producing audible jitter. Marbles uses a hysteresis quantizer (`marbles/random/quantizer.cc:91`) that keeps the previous output until the curve has moved past half a degree-width. Candidate semantics: (1) **No hysteresis** — re-quantize each tick (jitter on near-boundary motion, but truthful to the curve); (2) **Fixed half-degree hysteresis** — Marbles-style; smooth glides at the cost of slight pitch lag; (3) **Configurable hysteresis amount** — Marbles `steps` knob equivalent, per-stage 0..1 hysteresis width. Decide before audible Always-mode ships. |
 
@@ -871,6 +871,118 @@ Two paired sets of per-cell fields covering multi-cycle traversal (Repeat) and s
 All three shift slots (F3/F4/F5) are currently empty in both TEMP and PTCH sets, no conflict with existing bindings.
 
 **OPEN**: none — semantics fully specified in §6.1.2 / §6.1.3 / §6.2.4 / §6.2.5. Output rescale on Window deferred (Interpretation A — input-only crop — is the locked v1 semantic; rescale variant can be added later as an "auto-normalize" toggle if audition shows demand).
+
+### Per-sequence: accumulator `sleep` — divisor on trigger advance
+
+**Status: draft, not yet wired.**
+
+Per-accumulator field on `AccumulatorConfig` (lives alongside `scope`, `order`, `polarity`, `reset`, `posLim`, `negLim`). Range 0..15 (4 bits), default 0.
+
+**Semantic**: the counter advances every `(sleep + 1)` trigger events. `sleep = 0` (default) = advance every trigger (current behavior). `sleep = 3` = advance every 4th trigger; counter holds for 3 trigger events, then jumps by the full `step`. Higher values produce slower, chunkier drift.
+
+**Compared to step magnitude**: lowering `step` gives smoother drift in smaller increments. Increasing `sleep` keeps the step size but introduces discrete plateaus — counter pauses, then jumps. Different musical character, especially with step values ≥ 2 (audible jumps with rest gaps between).
+
+| step | sleep | Counter trajectory |
+|---|---|---|
+| 2 | 0 | 0, 2, 4, 6, 8, … (fast, smooth) |
+| 1 | 0 | 0, 1, 2, 3, 4, … (half-speed, smooth) |
+| 2 | 1 | 0, 0, 2, 2, 4, 4, … (same effective slope, stutter) |
+| 2 | 3 | 0, 0, 0, 0, 2, 2, 2, 2, 4, … (slow + chunky plateaus) |
+
+**Engine state**: per-counter sleep counter — `uint8_t _noteSleepTick[16]` + `uint8_t _pulseSleepTick[16]` = 32 bytes added. Increments on each trigger event; advances the main counter when it hits `sleep + 1`, then resets to 0.
+
+**Storage**: 4 bits per accumulator on `AccumulatorConfig`. Current flags byte uses all 8 bits exactly (1 scope + 2 order + 1 polarity + 4 reset). Sleep needs a second flags byte — total `AccumulatorConfig` grows from 3 to 4 bytes (1 byte flags1 + 1 byte flags2 + 1 byte posLim + 1 byte negLim). Per-sequence cost across both N + P accumulators: 8 bytes total.
+
+**Interactions**:
+
+- **Sleep × Reset**: `sleep = 3, reset = 4` → counter holds for 4 trigger events between advances, then a 4-cycle auto-reset wipes the counter back to zero. Patient drift inside a phrase. When auto-reset fires, **also resets the sleep counter** so the next phrase starts fresh.
+- **Sleep × Pendulum**: counter bounces normally, but each bounce step takes `sleep + 1` triggers to complete. Slower swing.
+- **Sleep × Random**: re-rolls every `(sleep + 1)` trigger events. Sparse chaotic motion.
+- **Sleep × Pulse-trigger**: with `*AccumTrigger = Pulse` and `sleep = 3`, the counter advances every 4th pulse fire (not every pulse). Lets dense pulse patterns drive sparse drift.
+- **Sleep × hard reset (transport / pattern switch)**: clears sleep counters along with main counters. Both reset to zero.
+
+**UI**: Shift+F2 or Shift+F3 on ACCUM.N / ACCUM.P set (both currently free in the post-MVP slot map). Encoder edits 0..15. Display as `Sleep N` or as a ratio `1:1..1:16`. Slot label kept short: `Sleep`.
+
+**OPEN**: none — semantic fully specified. Bit-pack repack of `AccumulatorConfig` (3→4 bytes) is the only storage decision; second-flags-byte is the simpler choice over shrinking `reset` to 3 bits.
+
+### Per-sequence: `warpNudge` / `responseNudge` / `pulseNudge` — performative global offsets
+
+**Status: draft, not yet wired.**
+
+Three per-sequence `Routable<int8_t>` fields that ADD to every stage's per-cell value live. Performative gestures — twist on stage, every cell shifts together. Modelled on NoteTrack's `transpose` (which shifts all step pitches uniformly).
+
+| Field | Range | Default | Effect |
+|---|---|---|---|
+| `warpNudge` | ±64 | 0 | added to `temporalWarp` AND `pitchWarp` of every stage |
+| `responseNudge` | ±64 | 0 | added to `temporalResponse` AND `pitchResponse` of every stage |
+| `pulseNudge` | ±7 | 0 | added to `pulseCount` of every stage |
+
+**One knob per concept, applies to both axes**: Warp Nudge moves both temporal and pitch warp simultaneously. Single performative knob per character, not split per-axis. (Per-axis variants — `tempWarpNudge`, `pitchWarpNudge` — can be added later as Tier-2 if audition shows they're needed; this keeps v1 simple.)
+
+**Engine math** at the start of each stage's pipeline (per §6.1 / §6.2):
+
+```
+effectiveTempWarp     = clamp(stage.temporalWarp()     + seq.warpNudge(),     −64, +64)
+effectiveTempResponse = clamp(stage.temporalResponse() + seq.responseNudge(), −64, +64)
+effectivePitchWarp    = clamp(stage.pitchWarp()        + seq.warpNudge(),     −64, +64)
+effectivePitchResponse= clamp(stage.pitchResponse()    + seq.responseNudge(), −64, +64)
+effectivePulseCount   = clamp(stage.pulseCount()       + seq.pulseNudge(),    1, 8)
+// engine then proceeds with effective* values everywhere the per-stage fields were previously read
+```
+
+Apply BEFORE the existing `effectivePulseCount` computation that incorporates `pulseAccOffset` (§13.4 / §13.10 Task 7). So the full pulse-count formula becomes:
+
+```
+effectivePulseCount = clamp(stage.pulseCount() + seq.pulseNudge() + pulseAccumCounter, 1, 8)
+```
+
+Order doesn't matter for the warp/response Nudge — it's a uniform offset before any non-linear bending.
+
+**Storage**: 3 × `Routable<int8_t>` on `PhaseFluxSequence` = ~6 bytes per sequence. Across 17 sequences = ~102 bytes per track. PhaseFluxTrack 4772 → ~4874. Negligible against 9544 ceiling.
+
+**Routing targets**: three new `Routing::Target::WarpNudge` / `ResponseNudge` / `PulseNudge`. CV-modulatable for live shaping (LFO, envelope, expression pedal via CV in).
+
+**UI**: 3 new rows on `PhaseFluxSequenceListModel` (between existing rows). Labels short: `WarpN`, `RespN`, `PulsN`. Encoder edits the values.
+
+**Combined with accumulator drift**: drift via accumulator (per-cell step values walk a counter) + bend via nudge (uniform live offset) = two independent live gestures with different feel. Accumulator gives evolving over time; nudge gives instantaneous global shift.
+
+**OPEN**:
+
+- Whether to split into per-axis (6 knobs) at all? Recommend no for v1; revisit if audition feedback says one axis needs separate control.
+
+### Per-sequence: `cyclePhaseWarp` — macro swing across the 16-stage cycle (resolves §14.1 Q10)
+
+**Status: draft, not yet wired.**
+
+Single per-sequence `Routable<int8_t>` field, ±64, default 0. PowerBend transform applied to the master cycle phase `relativeTick / cycleTicks` BEFORE slot derivation (§3.2 per-tick math).
+
+Engine math:
+
+```
+cyclePhase    = relativeTick % cycleTicks / float(cycleTicks)        // ∈ [0,1)
+warped        = applyPowerBend(cyclePhase, seq.cyclePhaseWarp())     // PowerBend, same math as per-stage warp
+effectiveTick = uint32_t(warped * cycleTicks)                        // re-map back to ticks
+// slot derivation then proceeds from effectiveTick instead of relativeTick % cycleTicks
+```
+
+**Effect**: positive nudge stretches early stages and compresses late stages (or vice versa via negative). The 16-stage cycle gets a macro swing/lag character that's independent of per-stage `temporalWarp` (which warps within each stage).
+
+**Composability**:
+- Per-stage warp bends within each cell.
+- `cyclePhaseWarp` bends WHERE in the cycle each cell happens.
+- Both apply; effects compound.
+
+**Routing target**: `Routing::Target::CyclePhaseWarp`. CV-modulatable for live macro-swing.
+
+**Storage**: 1 × `Routable<int8_t>` per sequence = 2 bytes × 17 sequences = 34 bytes per track. Negligible.
+
+**UI**: one new row on `PhaseFluxSequenceListModel` ("Cycle Warp"). Encoder edits ±64.
+
+**Why this one and not "sequence-level Response on CV"**:
+- Response on CV would bend the final voltage non-linearly. PhaseFlux's CV is integer scale-degree quantized via `Scale::noteToVolts()` — bending pre-quantization mangles scale-degree intuition; bending post-quantization breaks the integer-quantization contract that defines pitch in PhaseFlux (§6.2). Not viable.
+- Response on time globally (bend trigger positions across the cycle) is mostly covered by `cyclePhaseWarp` — same family of non-linear time mapping. No need for a second variant.
+
+**OPEN**: none — semantic fully specified and resolves §14.1 Q10.
 
 ### Per-stage: continuous `stageLen` multiplier
 
