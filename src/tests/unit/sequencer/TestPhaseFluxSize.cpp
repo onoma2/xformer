@@ -5,6 +5,13 @@
 #include "apps/sequencer/model/NoteTrack.h"
 #include "apps/sequencer/model/StochasticTrack.h"
 
+#include "apps/sequencer/engine/PhaseFluxTrackEngine.h"
+#include "apps/sequencer/engine/NoteTrackEngine.h"
+#include "apps/sequencer/engine/TeletypeTrackEngine.h"
+#include "apps/sequencer/engine/StochasticTrackEngine.h"
+#include "apps/sequencer/engine/CurveTrackEngine.h"
+#include "apps/sequencer/engine/Engine.h"
+
 #include <cstdio>
 
 UNIT_TEST("PhaseFluxSize") {
@@ -33,7 +40,15 @@ CASE("print_sizes") {
                 sizeof(PhaseFluxTrack) + 8 * 16 * 4);
     std::printf("Stage with _data3, full track = %zu bytes  (each pattern has 16 larger stages)\n",
                 sizeof(PhaseFluxTrack) + 8 * 16 * 4);
-    std::printf("--- end probe ---\n");
+    std::printf("\n--- engine size probe ---\n");
+    std::printf("PhaseFluxTrackEngine     = %zu bytes\n", sizeof(PhaseFluxTrackEngine));
+    std::printf("NoteTrackEngine          = %zu bytes\n", sizeof(NoteTrackEngine));
+    std::printf("CurveTrackEngine         = %zu bytes\n", sizeof(CurveTrackEngine));
+    std::printf("StochasticTrackEngine    = %zu bytes\n", sizeof(StochasticTrackEngine));
+    std::printf("TeletypeTrackEngine      = %zu bytes\n", sizeof(TeletypeTrackEngine));
+    std::printf("Engine::TrackEngineContainer = %zu bytes  (sized to largest engine)\n",
+                sizeof(Engine::TrackEngineContainer));
+    std::printf("--- end engine probe ---\n");
 
     // Always passes — this is a measurement, not an assertion.
     expectEqual(1, 1, "probe ran");

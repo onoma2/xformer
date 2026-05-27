@@ -137,4 +137,4 @@ private:
     uint32_t _activityTimer = 0;
 };
 
-static_assert(sizeof(PhaseFluxTrackEngine) <= 1024, "PhaseFluxTrackEngine too large");
+static_assert(sizeof(PhaseFluxTrackEngine) <= 900, "PhaseFluxTrackEngine too large (early-warn ceiling — TeletypeTrackEngine at 944 is the real container limit)");
