@@ -318,6 +318,43 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 } else {
                     chainState = ChainState::Pending;
                 }
+            } else if (modValue == E_MOD_EVERY || modValue == E_MOD_EV ||
+                       modValue == E_MOD_SKIP) {
+                // EVERY MOD: body  —  tick per-(script,line) counter,
+                // count++ then count %= mod, fire when count == 0.
+                // SKIP MOD: body  —  same counter, fire when count != 0.
+                auto prefix = evaluateModPrefix(cmd, s + 1, preSepPos,
+                                              runtime, output);
+                if (prefix.error != TT2EvalError::None) {
+                    return prefix;
+                }
+                if (prefix.stackSize != 1) {
+                    return {TT2EvalError::InvalidModArity, 0, 0, 0};
+                }
+                int16_t mod = prefix.value;
+
+                bool isSkip = (modValue == E_MOD_SKIP);
+                uint8_t scriptNumber = tt2ActiveScriptNumber(runtime);
+                uint8_t lineNumber = tt2ActiveLineNumber(runtime);
+
+                if (scriptNumber < TT2_SCRIPT_COUNT &&
+                    lineNumber < TT2_COMMANDS_PER_SCRIPT) {
+                    TT2EveryCount &every =
+                        runtime.every.every[scriptNumber][lineNumber];
+                    tt2EverySetSkip(every, isSkip);
+                    tt2EverySetMod(every, mod);
+                    tt2EveryTick(every);
+                    bool shouldRun = isSkip
+                        ? tt2SkipIsNow(every)
+                        : tt2EveryIsNow(every);
+                    if (shouldRun) {
+                        lastResult = evaluateSegment(cmd, preSepPos + 1, e,
+                                                     runtime, output);
+                        if (lastResult.error != TT2EvalError::None) {
+                            return lastResult;
+                        }
+                    }
+                }
             } else if (modValue == E_MOD_L) {
                 // L start end: body  —  loop body (remaining segments)
                 // with I stepping from start to end, inclusive.
@@ -351,7 +388,7 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                 }
                 bodyCmd.length = bodyLen;
 
-                runtime.variables.i = startVal;
+                tt2ActiveI(runtime) = startVal;
                 // Use int32_t to handle range edge cases (e.g. end == 32767).
                 if (step > 0) {
                     for (int32_t l = startVal; l <= endVal; ++l) {
@@ -360,7 +397,7 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                         if (lastResult.error != TT2EvalError::None) {
                             return lastResult;
                         }
-                        runtime.variables.i += step;
+                        tt2ActiveI(runtime) += step;
                     }
                 } else {
                     for (int32_t l = startVal; l >= endVal; --l) {
@@ -369,12 +406,12 @@ inline TT2EvalResult evaluateCommand(const TT2Command &cmd,
                         if (lastResult.error != TT2EvalError::None) {
                             return lastResult;
                         }
-                        runtime.variables.i += step;
+                        tt2ActiveI(runtime) += step;
                     }
                 }
                 // Back off the final post-loop increment; leave I at
                 // the last in-range value, matching Teletype behavior.
-                runtime.variables.i -= step;
+                tt2ActiveI(runtime) -= step;
 
                 // L consumed all remaining segments; return directly.
                 return lastResult;

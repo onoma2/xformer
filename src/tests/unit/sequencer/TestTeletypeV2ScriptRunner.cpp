@@ -372,7 +372,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
     CASE("unsupported_mod_rejected_before_prefix_side_effects") {
         TeletypeProgram program = {};
         init(program);
-        writeLine(program.scripts[0], 0, "EVERY CV 1 100: B 2");
+        writeLine(program.scripts[0], 0, "W CV 1 100: B 2");
         program.scripts[0].length = 1;
 
         TT2Runtime runtime = {};
@@ -382,7 +382,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
 
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::UnsupportedMod),
-                    "EVERY rejected");
+                    "W rejected");
         expectEqual(runtime.variables.cv[0], int16_t(0),
                     "CV[0] not set by prefix");
         expectEqual(runtime.variables.b, int16_t(2),
@@ -392,7 +392,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
     CASE("unsupported_mod_rejected_before_body_side_effects") {
         TeletypeProgram program = {};
         init(program);
-        writeLine(program.scripts[0], 0, "EVERY 1: B 2");
+        writeLine(program.scripts[0], 0, "W 1: B 2");
         program.scripts[0].length = 1;
 
         TT2Runtime runtime = {};
@@ -402,7 +402,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
 
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::UnsupportedMod),
-                    "EVERY rejected");
+                    "W rejected");
         expectEqual(runtime.variables.b, int16_t(2),
                     "B not set by body");
     }
@@ -940,7 +940,9 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
 
         TT2Runtime runtime = {};
         init(runtime);
-        runtime.variables.i = 42;
+        // Set up a valid exec frame so tt2ActiveI() is defined before runScript.
+        runtime.exec.depth = 1;
+        runtime.exec.frames[0].i = 42;
         TT2OutputState output = {};
         init(output);
 
@@ -948,7 +950,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         expectEqual(int(result.error), int(TT2EvalError::None), "ok");
         expectEqual(runtime.variables.a, int16_t(3), "A = final I");
         // I is left at the final in-range value, not restored to 42.
-        expectEqual(runtime.variables.i, int16_t(3), "I left at final loop value");
+        expectEqual(tt2ActiveI(runtime), int16_t(3), "I left at final loop value");
     }
 
     CASE("l_single_iteration_equal_bounds") {
@@ -1018,7 +1020,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::None), "ok");
         expectEqual(runtime.variables.a, int16_t(21), "A saw mutated I=21");
-        expectEqual(runtime.variables.i, int16_t(21), "I = 21 after loop");
+        expectEqual(tt2ActiveI(runtime), int16_t(21), "I = 21 after loop");
     }
 
     CASE("l_does_not_double_execute_trailing_segment") {
@@ -1041,4 +1043,294 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         expectEqual(runtime.variables.b, int16_t(12), "B = 12, not double-executed");
     }
 
+
+    // Old Teletype semantics: EVERY tick does count++ then count %= mod.
+    // EVERY fires when count == 0 after modulo.
+    // SKIP fires when count != 0 after modulo.
+
+    CASE("every_1_fires_every_call") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EVERY 1: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto r1 = runScript(program, runtime, output, 0);
+        expectEqual(int(r1.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "fires call 1");
+
+        auto r2 = runScript(program, runtime, output, 0);
+        expectEqual(int(r2.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "fires call 2");
+    }
+
+    CASE("every_2_fires_on_second_call") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EVERY 2: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto r1 = runScript(program, runtime, output, 0);
+        expectEqual(int(r1.error), int(TT2EvalError::None), "pass1 skip");
+        expectEqual(runtime.variables.a, int16_t(1), "skip");
+
+        auto r2 = runScript(program, runtime, output, 0);
+        expectEqual(int(r2.error), int(TT2EvalError::None), "pass2 fire");
+        expectEqual(runtime.variables.a, int16_t(10), "fire");
+
+        auto r3 = runScript(program, runtime, output, 0);
+        expectEqual(int(r3.error), int(TT2EvalError::None), "pass3 skip again");
+        expectEqual(runtime.variables.a, int16_t(10), "A stays (skip)");
+
+        auto r4 = runScript(program, runtime, output, 0);
+        expectEqual(int(r4.error), int(TT2EvalError::None), "pass4 fire again");
+        expectEqual(runtime.variables.a, int16_t(10), "fire");
+    }
+
+    CASE("every_3_fires_on_third_call") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EVERY 3: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto r1 = runScript(program, runtime, output, 0);
+        expectEqual(int(r1.error), int(TT2EvalError::None), "pass1 skip");
+        expectEqual(runtime.variables.a, int16_t(1), "skip");
+
+        auto r2 = runScript(program, runtime, output, 0);
+        expectEqual(int(r2.error), int(TT2EvalError::None), "pass2 skip");
+        expectEqual(runtime.variables.a, int16_t(1), "skip");
+
+        auto r3 = runScript(program, runtime, output, 0);
+        expectEqual(int(r3.error), int(TT2EvalError::None), "pass3 fire");
+        expectEqual(runtime.variables.a, int16_t(10), "fire");
+    }
+
+    CASE("every_per_script_isolation") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "A + A 1");
+        writeLine(program.scripts[0], 1, "EVERY 2: A + A 1");
+        writeLine(program.scripts[1], 0, "EVERY 1: X 42");
+        program.scripts[0].length = 2;
+        program.scripts[1].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto r0a = runScript(program, runtime, output, 0);
+        expectEqual(int(r0a.error), int(TT2EvalError::None), "s0 pass1");
+        expectEqual(runtime.variables.a, int16_t(2), "A=2");
+
+        auto r1 = runScript(program, runtime, output, 1);
+        expectEqual(int(r1.error), int(TT2EvalError::None), "s1 pass1");
+        expectEqual(runtime.variables.x, int16_t(42), "X=42");
+
+        auto r0b = runScript(program, runtime, output, 0);
+        expectEqual(int(r0b.error), int(TT2EvalError::None), "s0 pass2");
+        expectEqual(runtime.variables.a, int16_t(4), "A=4");
+    }
+
+    CASE("every_per_line_persistence") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EVERY 2: A 10");
+        writeLine(program.scripts[0], 1, "EVERY 3: X 20");
+        program.scripts[0].length = 2;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto r1 = runScript(program, runtime, output, 0);
+        expectEqual(int(r1.error), int(TT2EvalError::None), "pass1");
+        expectEqual(runtime.variables.a, int16_t(1), "A default");
+        expectEqual(runtime.variables.x, int16_t(0), "X default");
+
+        auto r2 = runScript(program, runtime, output, 0);
+        expectEqual(int(r2.error), int(TT2EvalError::None), "pass2");
+        expectEqual(runtime.variables.a, int16_t(10), "A=10");
+        expectEqual(runtime.variables.x, int16_t(0), "X=0");
+
+        auto r3 = runScript(program, runtime, output, 0);
+        expectEqual(int(r3.error), int(TT2EvalError::None), "pass3");
+        expectEqual(runtime.variables.a, int16_t(10), "A stays 10");
+        expectEqual(runtime.variables.x, int16_t(20), "X=20");
+    }
+
+    CASE("every_init_resets_counters") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EVERY 2: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto r1 = runScript(program, runtime, output, 0);
+        expectEqual(int(r1.error), int(TT2EvalError::None), "pass1");
+        expectEqual(runtime.variables.a, int16_t(1), "skip");
+
+        init(runtime);
+
+        auto r2 = runScript(program, runtime, output, 0);
+        expectEqual(int(r2.error), int(TT2EvalError::None), "pass2");
+        expectEqual(runtime.variables.a, int16_t(1), "skip after reset");
+    }
+
+    CASE("skip_2_runs_first_skips_second") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "SKIP 2: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto r1 = runScript(program, runtime, output, 0);
+        expectEqual(int(r1.error), int(TT2EvalError::None), "pass1 fire");
+        expectEqual(runtime.variables.a, int16_t(10), "A set call 1");
+
+        auto r2 = runScript(program, runtime, output, 0);
+        expectEqual(int(r2.error), int(TT2EvalError::None), "pass2 skip");
+        expectEqual(runtime.variables.a, int16_t(10), "A unchanged call 2");
+
+        auto r3 = runScript(program, runtime, output, 0);
+        expectEqual(int(r3.error), int(TT2EvalError::None), "pass3 fire");
+        expectEqual(runtime.variables.a, int16_t(10), "A set call 3");
+    }
+
+    CASE("skip_and_every_opposite_phase") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EVERY 2: A 10");
+        writeLine(program.scripts[0], 1, "SKIP 2: X 20");
+        program.scripts[0].length = 2;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        // Pass 1: every count=1%2=1 skip; skip count=1%2=1 fire.
+        auto r1 = runScript(program, runtime, output, 0);
+        expectEqual(int(r1.error), int(TT2EvalError::None), "pass1");
+        expectEqual(runtime.variables.a, int16_t(1), "EVERY skip");
+        expectEqual(runtime.variables.x, int16_t(20), "SKIP fire");
+
+        // Pass 2: every count=2%2=0 fire; skip count=2%2=0 skip.
+        auto r2 = runScript(program, runtime, output, 0);
+        expectEqual(int(r2.error), int(TT2EvalError::None), "pass2");
+        expectEqual(runtime.variables.a, int16_t(10), "EVERY fire");
+        expectEqual(runtime.variables.x, int16_t(20), "X stays 20 (SKIP skip)");
+    }
+
+    CASE("every_ev_alias_works") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EV 1: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "A set via EV");
+    }
+
+    CASE("every_side_effects_only_when_fires") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EVERY 2: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+        expectEqual(int(output.cvDirty), 0, "no CV side effects");
+    }
+
+    CASE("every_arity_error") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EVERY: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::InvalidModArity),
+                    "EMPTY prefix rejected");
+    }
+
+    CASE("every_negative_mod_treated_as_positive") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EVERY -2: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto r1 = runScript(program, runtime, output, 0);
+        expectEqual(int(r1.error), int(TT2EvalError::None), "pass1 skip");
+        expectEqual(runtime.variables.a, int16_t(1), "skip");
+
+        auto r2 = runScript(program, runtime, output, 0);
+        expectEqual(int(r2.error), int(TT2EvalError::None), "pass2 fire");
+        expectEqual(runtime.variables.a, int16_t(10), "A set");
+    }
+
+    CASE("every_zero_mod_treated_as_one") {
+        // EVERY 0 normalizes to EVERY 1: fires every call.
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "EVERY 0: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto r1 = runScript(program, runtime, output, 0);
+        expectEqual(int(r1.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "fires on EVERY 0");
+    }
 }
+
+

@@ -2,6 +2,7 @@
 
 #include "TeletypeProgram.h"
 
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 
@@ -24,7 +25,6 @@ struct TT2RuntimeCommand {
 
 struct TT2Variables {
     int16_t a, x, b, y, c, z, d, t;
-    int16_t i;
     int16_t j[TT2_SCRIPT_COUNT];
     int16_t k[TT2_SCRIPT_COUNT];
     int16_t cv[TT2_CV_COUNT];
@@ -262,3 +262,50 @@ static_assert(sizeof(TT2Rng) <= 22, "TT2Rng size drift");
 static_assert(sizeof(TT2ExecFrame) <= 22, "TT2ExecFrame size drift");
 static_assert(sizeof(TT2ExecState) <= 164, "TT2ExecState size drift");
 static_assert(sizeof(TT2Runtime) <= 2132, "TT2Runtime size drift");
+
+// Active execution context accessors — resolve through the exec stack.
+// depth must be > 0 (set by runScript or future nested execution).
+// Callers must ensure depth > 0 before calling; accessing I without a
+// frame is undefined behavior.
+inline int16_t &tt2ActiveI(TT2Runtime &runtime) {
+    assert(runtime.exec.depth > 0 && "tt2ActiveI called without exec frame");
+    return runtime.exec.frames[runtime.exec.depth - 1].i;
+}
+
+inline uint8_t &tt2ActiveScriptNumber(TT2Runtime &runtime) {
+    return runtime.exec.frames[runtime.exec.depth > 0
+                                ? runtime.exec.depth - 1 : 0].script_number;
+}
+
+inline uint8_t &tt2ActiveLineNumber(TT2Runtime &runtime) {
+    return runtime.exec.frames[runtime.exec.depth > 0
+                               ? runtime.exec.depth - 1 : 0].line_number;
+}
+
+// EVERY / SKIP helpers — per-(script, line) counter state.
+// Matches old Teletype semantics: tick does count++ then count %= mod.
+// EVERY fires when count == 0 after modulo.
+// SKIP fires when count != 0 after modulo.
+inline void tt2EverySetSkip(TT2EveryCount &every, bool skip) {
+    every.skip = skip ? 1 : 0;
+}
+
+inline void tt2EverySetMod(TT2EveryCount &every, int16_t mod) {
+    if (mod < 0) mod = -mod;
+    else if (mod == 0) mod = 1;
+    every.mod = mod;
+    every.count %= every.mod;
+}
+
+inline void tt2EveryTick(TT2EveryCount &every) {
+    every.count++;
+    every.count %= every.mod;
+}
+
+inline bool tt2EveryIsNow(const TT2EveryCount &every) {
+    return every.count == 0 && every.skip == 0;
+}
+
+inline bool tt2SkipIsNow(const TT2EveryCount &every) {
+    return every.count != 0 && every.skip != 0;
+}

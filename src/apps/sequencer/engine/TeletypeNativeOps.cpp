@@ -62,9 +62,9 @@ static void opI(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
         if (!popStack(stack, stackSize, val, error)) return;
-        runtime.variables.i = val;
+        tt2ActiveI(runtime) = val;
     } else {
-        pushStack(stack, stackSize, runtime.variables.i, error);
+        pushStack(stack, stackSize, tt2ActiveI(runtime), error);
     }
 }
 
