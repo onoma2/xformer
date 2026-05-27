@@ -56,6 +56,7 @@ Define Teletype v2 as a Performer-native Teletype++ dialect: preserve hardware-i
 - [x] Post-Step-5 findings fix batch — 6 issues resolved: (1) broken include path after ownership move (`model/` → `engine/`); (2) runtime defaults aligned with upstream; (3) CV clamp to 0..16383; (4) TR boolean normalization; (5) pattern init `len = 0`; (6) stack overflow guard. Set-vs-get semantics refined to `isSetPosition && stackSize >= 1`. All 75 TT2 tests green. STM32 release clean. RAM gate proven.
 - [x] Step 2 semantic blockers — M/M.ACT ownership fixed: `opM`/`opMACT` now read/write `variables.m`/`variables.m_act` instead of `metro` struct; `opM` clamps to minimum 2ms. Scale bits initialized to `0x0AB5` and roots to 0 for all 16 entries. Turtle initialized to upstream `turtle_init()` defaults (fence `{0,0,3,63}`, mode `Bump`, heading 180, speed 100, `NO_SCRIPT`). `runScript()` clears full exec frame with `memset` before setting context, preventing stale `if_else_condition`/`breaking`/`fparam*` from prior runs. 81 TT2 tests green.
 - [x] Step 3 separator/mod execution — `evaluateCommand()` restructured with `evaluateSegment()` helper. SUB_SEP splits into segments executed left-to-right with isolated stacks. PRE_SEP splits segment into prefix (mod condition) and body. IF mod supported: prefix evaluated, body executes if top-of-stack != 0. Unsupported mods rejected before prefix evaluation. IF arity enforced (`prefix.stackSize == 1`, else `InvalidModArity`). `evaluateSegment()` takes explicit op-table parameter; fake evaluator tests call real helper. 93 TT2 tests green.
+- [x] Step 6: TT2TrackEngine smoke wiring — `runScript()`, `cvOutput()`, `gateOutput()` added to `TT2TrackEngine`. `cvOutput()` converts raw 0..16383 to Performer float volts (-5V..+5V). `gateOutput()` returns boolean from `trLevel`. Test file `TestTeletypeV2TrackEngineSmoke.cpp` with 6 cases: single CV, single TR high/low, multi-CV, no-track noop, voltage bounds. All 99 TT2 tests green. STM32 release build clean; firmware binary unchanged (TT2TrackEngine.h not yet linked into main build).
 
 ## Phase 1 RAM budget
 
@@ -75,7 +76,14 @@ Hard guards when structs are wired:
 
 ## Next action
 
-Phase 2 Step 6: TT2TrackEngine smoke wiring — trigger one script manually or through a controlled test hook. Verify `CV 1 5000` changes `TT2OutputState`. Do not wire full trigger inputs or metro scheduling until the core runner is stable.
+Phase 2 sandbox/smoke complete. Phase 2b candidates (not first slice):
+
+- `IF` / `ELSE` full implementation
+- `L` loops
+- Delay scheduling
+- Nested script calls (`SCRIPT` op)
+- Full trigger input and metro scheduling (wire TT2TrackEngine into `Engine::TrackEngineContainer` and `Engine.cpp` track creation)
+- Add `TT2Track` to `Track` container with `TrackMode::TeletypeV2` or mode-switching strategy
 
 ## Phase 2 outline
 

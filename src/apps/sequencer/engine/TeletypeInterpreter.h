@@ -24,6 +24,7 @@ enum class TT2EvalError : uint8_t {
     InvalidScriptIndex,
     ScriptLengthOverflow,
     InvalidModArity,
+    NoTrack,
 };
 
 // Guarded stack helpers used by the evaluator and native op handlers.
