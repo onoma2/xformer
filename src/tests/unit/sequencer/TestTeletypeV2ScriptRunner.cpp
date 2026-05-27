@@ -1,6 +1,6 @@
 #include "UnitTest.h"
 
-#include "engine/TeletypeInterpreter.h"
+#include "engine/TT2Runner.h"
 
 // Pre-include model/Types.h in C++ mode so that when teletype.h pulls in
 // state.h -> types.h inside extern "C", the C++ templates are already
@@ -372,7 +372,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
     CASE("unsupported_mod_rejected_before_prefix_side_effects") {
         TeletypeProgram program = {};
         init(program);
-        writeLine(program.scripts[0], 0, "PROB CV 1 100: B 2");
+        writeLine(program.scripts[0], 0, "EVERY CV 1 100: B 2");
         program.scripts[0].length = 1;
 
         TT2Runtime runtime = {};
@@ -382,7 +382,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
 
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::UnsupportedMod),
-                    "PROB rejected");
+                    "EVERY rejected");
         expectEqual(runtime.variables.cv[0], int16_t(0),
                     "CV[0] not set by prefix");
         expectEqual(runtime.variables.b, int16_t(2),
@@ -392,7 +392,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
     CASE("unsupported_mod_rejected_before_body_side_effects") {
         TeletypeProgram program = {};
         init(program);
-        writeLine(program.scripts[0], 0, "PROB 1: B 2");
+        writeLine(program.scripts[0], 0, "EVERY 1: B 2");
         program.scripts[0].length = 1;
 
         TT2Runtime runtime = {};
@@ -402,7 +402,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
 
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::UnsupportedMod),
-                    "PROB rejected");
+                    "EVERY rejected");
         expectEqual(runtime.variables.b, int16_t(2),
                     "B not set by body");
     }
@@ -490,5 +490,330 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         // Active context must be set.
         expectEqual(int(frame.script_number), 0, "script_number set");
         expectEqual(int(frame.line_number), 0, "line_number set");
+    }
+
+    CASE("if_true_skips_else") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF 1: A 10; ELSE: A 20");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "IF branch executed");
+    }
+
+    CASE("if_false_executes_else") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF 0: A 10; ELSE: A 20");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(20), "ELSE branch executed");
+    }
+
+    CASE("elif_true_executes_and_skips_else") {
+        TeletypeProgram program = {};
+        init(program);
+        // Empty IF body (": ;") keeps token count under the 16 limit.
+        writeLine(program.scripts[0], 0, "IF 0: ; ELIF 1: B 10; ELSE: X 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged (default 1)");
+        expectEqual(runtime.variables.b, int16_t(10), "ELIF branch executed");
+        expectEqual(runtime.variables.x, int16_t(0), "X unchanged (default 0)");
+    }
+
+    CASE("all_false_executes_else") {
+        TeletypeProgram program = {};
+        init(program);
+        // Empty bodies for IF and ELIF to stay under 16 tokens.
+        writeLine(program.scripts[0], 0, "IF 0: ; ELIF 0: ; ELSE: X 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+        expectEqual(runtime.variables.b, int16_t(2), "B unchanged");
+        expectEqual(runtime.variables.x, int16_t(10), "ELSE branch executed");
+    }
+
+    CASE("all_false_no_else_noops") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF 0: A 10; ELIF 0: B 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+        expectEqual(runtime.variables.b, int16_t(2), "B unchanged");
+    }
+
+    CASE("orphan_else_fails") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "ELSE: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::OrphanElse),
+                    "orphan ELSE rejected");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+    }
+
+    CASE("orphan_elif_fails") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "ELIF 1: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::OrphanElif),
+                    "orphan ELIF rejected");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+    }
+
+    CASE("duplicate_else_fails") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF 0: A 10; ELSE: A 20; ELSE: A 30");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::DuplicateElse),
+                    "duplicate ELSE rejected");
+        expectEqual(runtime.variables.a, int16_t(20), "first ELSE executed");
+    }
+
+    CASE("prob_100_runs") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB 100: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "PROB 100 runs");
+    }
+
+    CASE("prob_0_skips") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB 0: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "PROB 0 skips");
+    }
+
+    CASE("prob_negative_skips") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB -1: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "PROB -1 skips");
+    }
+
+    CASE("prob_101_runs") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB 101: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "PROB 101 runs");
+    }
+
+    CASE("prob_seeded_mid_value_deterministic") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB 50: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        // With Prob state = 0, LCG first value is 1013904223.
+        // roll = 1013904223 / 42949672 = 23, so 23 < 50 → runs.
+        runtime.rng.state[static_cast<uint8_t>(TT2RngSlot::Prob)] = 0;
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10),
+                    "PROB 50 runs with seeded roll 23");
+    }
+
+    CASE("prob_body_side_effects_only_when_runs") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB 0: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged when PROB skips");
+        expectEqual(int(output.cvDirty), 0, "no CV side effects");
+    }
+
+    CASE("prob_empty_prefix_invalid_arity") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::InvalidModArity),
+                    "empty PROB prefix rejected");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+    }
+
+    CASE("prob_extra_params_invalid_arity") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB 50 60: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::InvalidModArity),
+                    "PROB with extra params rejected");
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+    }
+
+    CASE("prob_skipped_allows_else") {
+        // PROB participates in conditional chains.
+        // A skipped PROB leaves the chain Pending, so ELSE can run.
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB 0: A 10; ELSE: A 20");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(20), "ELSE executed after PROB 0");
+    }
+
+    CASE("prob_in_if_chain_blocks_else") {
+        // IF sets Pending; PROB executes and sets Taken; ELSE is skipped.
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF 0: ; PROB 100: A 10; ELSE: A 20");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "PROB executed");
+    }
+
+    CASE("prob_skipped_when_prior_if_taken") {
+        // IF sets Taken; PROB sees Taken and skips its body.
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF 1: ; PROB 100: A 10");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(1), "PROB skipped because IF was taken");
     }
 }

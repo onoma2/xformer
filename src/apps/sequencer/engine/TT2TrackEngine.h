@@ -1,6 +1,6 @@
 #pragma once
 
-#include "TeletypeInterpreter.h"
+#include "TT2Runner.h"
 #include "TeletypeOutputState.h"
 
 #include "model/TT2Track.h"

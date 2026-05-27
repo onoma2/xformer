@@ -112,6 +112,21 @@ struct TT2Rng {
     uint32_t state[TT2_RNG_COUNT];
 };
 
+// Advance the LCG in the given slot and return the next 32-bit value.
+// Each slot maintains independent state. State 0 is a valid seed.
+inline uint32_t tt2RngNext(TT2Rng &rng, TT2RngSlot slot) {
+    uint32_t &s = rng.state[static_cast<uint8_t>(slot)];
+    s = s * 1664525u + 1013904223u;
+    return s;
+}
+
+// Return a value in [0, range) using the slot's LCG.
+// Guards range == 0.
+inline uint32_t tt2RngRange(TT2Rng &rng, TT2RngSlot slot, uint32_t range) {
+    if (range == 0) return 0;
+    return tt2RngNext(rng, slot) % range;
+}
+
 enum class TT2TurtleMode : uint8_t {
     Wrap,
     Bump,
@@ -210,6 +225,12 @@ inline void init(TT2Runtime &r) {
     r.variables.in_max = 16383;
     r.variables.param_min = 0;
     r.variables.param_max = 16383;
+
+    // RNG seeding: each slot gets a distinct non-zero starting state
+    // so that different slots produce independent sequences.
+    for (int i = 0; i < TT2_RNG_COUNT; ++i) {
+        r.rng.state[i] = 0x12345678u + static_cast<uint32_t>(i) * 0x9e3779b9u;
+    }
 
     // Scale defaults matching upstream ss_init().
     for (int i = 0; i < TT2_NB_SCALES; ++i) {

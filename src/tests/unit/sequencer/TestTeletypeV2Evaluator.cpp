@@ -1,6 +1,6 @@
 #include "UnitTest.h"
 
-#include "engine/TeletypeInterpreter.h"
+#include "engine/TT2Evaluator.h"
 
 namespace {
 

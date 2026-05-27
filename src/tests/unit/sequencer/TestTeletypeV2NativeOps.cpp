@@ -1,6 +1,6 @@
 #include "UnitTest.h"
 
-#include "engine/TeletypeInterpreter.h"
+#include "engine/TT2Evaluator.h"
 #include "engine/TT2TrackEngine.h"
 
 // Pre-include model/Types.h in C++ mode so that when teletype.h pulls in

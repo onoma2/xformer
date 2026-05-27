@@ -56,7 +56,10 @@ Define Teletype v2 as a Performer-native Teletype++ dialect: preserve hardware-i
 - [x] Post-Step-5 findings fix batch — 6 issues resolved: (1) broken include path after ownership move (`model/` → `engine/`); (2) runtime defaults aligned with upstream; (3) CV clamp to 0..16383; (4) TR boolean normalization; (5) pattern init `len = 0`; (6) stack overflow guard. Set-vs-get semantics refined to `isSetPosition && stackSize >= 1`. All 75 TT2 tests green. STM32 release clean. RAM gate proven.
 - [x] Step 2 semantic blockers — M/M.ACT ownership fixed: `opM`/`opMACT` now read/write `variables.m`/`variables.m_act` instead of `metro` struct; `opM` clamps to minimum 2ms. Scale bits initialized to `0x0AB5` and roots to 0 for all 16 entries. Turtle initialized to upstream `turtle_init()` defaults (fence `{0,0,3,63}`, mode `Bump`, heading 180, speed 100, `NO_SCRIPT`). `runScript()` clears full exec frame with `memset` before setting context, preventing stale `if_else_condition`/`breaking`/`fparam*` from prior runs. 81 TT2 tests green.
 - [x] Step 3 separator/mod execution — `evaluateCommand()` restructured with `evaluateSegment()` helper. SUB_SEP splits into segments executed left-to-right with isolated stacks. PRE_SEP splits segment into prefix (mod condition) and body. IF mod supported: prefix evaluated, body executes if top-of-stack != 0. Unsupported mods rejected before prefix evaluation. IF arity enforced (`prefix.stackSize == 1`, else `InvalidModArity`). `evaluateSegment()` takes explicit op-table parameter; fake evaluator tests call real helper. 93 TT2 tests green.
+- [x] Step 4: ELSE / ELIF — conditional chain state tracks across SUB_SEP segments. IF starts a fresh chain; ELIF/ELSE continue it. First true branch runs, later branches skipped. Empty bodies (`: ;`) supported. Error cases: `OrphanElse`, `OrphanElif`, `DuplicateElse`. 8 new test cases. 108 TT2 tests green. STM32 release clean.
+- [x] Step 5: PROB mod — `PROB n: body` executes body with probability n%. Uses per-slot LCG on `TT2RngSlot::Prob` (state initialized to distinct constants in `init()`). `n <= 0` never runs, `n >= 100` always runs. Arity enforced before body side effects. PROB participates in conditional chain state: skipped if prior branch Taken/ElseSeen, sets Taken when body executes, sets Pending when skipped (so ELSE can run). 11 test cases: boundaries, negative, seeded deterministic mid-value, side-effect isolation, arity errors, chain interaction with ELSE and IF. `tt2RngRange()` fixed from division (could return `range`) to modulo `[0, range)` with `range==0` guard. Existing unsupported-mod tests retargeted to EVERY. 119 TT2 tests green. STM32 release clean.
 - [x] Step 6: TT2TrackEngine smoke wiring — `runScript()`, `cvOutput()`, `gateOutput()` added to `TT2TrackEngine`. `cvOutput()` converts raw 0..16383 to Performer float volts (-5V..+5V). `gateOutput()` returns boolean from `trLevel`. Test file `TestTeletypeV2TrackEngineSmoke.cpp` with 6 cases: single CV, single TR high/low, multi-CV, no-track noop, voltage bounds. All 99 TT2 tests green. STM32 release build clean; firmware binary unchanged (TT2TrackEngine.h not yet linked into main build).
+- [x] Cleanup: `TeletypeInterpreter.h` renamed to `TT2Evaluator.h` + `TT2Runner.h`. Evaluator (segment/command/stack/errors) separated from runner (script iteration, frame context). Comments updated to "native v2 evaluator". No compatibility shim. 108 TT2 tests green. STM32 release clean.
 
 ## Phase 1 RAM budget
 
@@ -76,11 +79,13 @@ Hard guards when structs are wired:
 
 ## Next action
 
-Phase 2 sandbox/smoke complete. Phase 2b candidates (not first slice):
+Phase 2 sandbox/smoke complete. Cleanup done.
 
-- `IF` / `ELSE` full implementation
+Next semantic step is PROB or L, blocked only by naming/ownership (now resolved).
+
+Phase 2b candidates:
 - `L` loops
-- Delay scheduling
+- Delay scheduling (`DEL`, `DEL.X`)
 - Nested script calls (`SCRIPT` op)
 - Full trigger input and metro scheduling (wire TT2TrackEngine into `Engine::TrackEngineContainer` and `Engine.cpp` track creation)
 - Add `TT2Track` to `Track` container with `TrackMode::TeletypeV2` or mode-switching strategy
