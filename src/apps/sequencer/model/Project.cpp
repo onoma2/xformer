@@ -109,75 +109,25 @@ void Project::clear() {
 
     // Track 7: Note with empty sequence (gates all off — NoteSequence::clear default).
 
-    // Track 8: PhaseFlux — each of 16 stages showcases a distinct curve / warp
-    // / response combination on either the temporal or pitch axis. Sequence
-    // divisor = 96 (1/2 note at PPQN-48) so every stage is half a beat long
-    // and pulseCount=4 produces an audible 3-pulse ratchet (the t=0 candidate
-    // is dropped by the §6.4 collision clamp; the other 3 land cleanly).
+    // Track 8: PhaseFlux — clean accumulator testbed. 4 active stages, all
+    // pitch Ramp, 1 pulse each. Stages 5..16 skipped. Accumulator defaults
+    // come from PhaseFluxSequence::clear() (note 28/28, pulse 8/8, manual reset).
     track(7).setTrackMode(Track::TrackMode::PhaseFlux);
     auto &pfTrack = track(7).phaseFluxTrack();
     auto &pfSeq = pfTrack.sequence(0);
 
     pfSeq.setDivisor(96);
 
-    using TempCurve = PhaseFluxSequence::TemporalCurveType;
     using PitchCurve = PhaseFluxSequence::PitchCurveType;
 
     for (int i = 0; i < 16; ++i) {
         auto &stage = pfSeq.stage(i);
-        stage.setPulseCount(4);
+        stage.setPulseCount(1);
         stage.setBasePitch(0);
         stage.setGateLength(40);
-        // stageLen default = 64 = 1× transparent; no override needed.
+        stage.setPitchCurve(PitchCurve::Ramp);
+        stage.setSkip(i >= 4);
     }
-
-    // 0..3 — Temporal Linear baseline + warp/response identity demo.
-    // With Linear curve, warp and response compose into one powerBend → stage
-    // 1 and stage 2 should sound identical, confirming the redundancy.
-    pfSeq.stage(0).setTemporalCurve(TempCurve::Linear);
-    pfSeq.stage(1).setTemporalCurve(TempCurve::Linear);
-    pfSeq.stage(1).setTemporalWarp(50);
-    pfSeq.stage(2).setTemporalCurve(TempCurve::Linear);
-    pfSeq.stage(2).setTemporalResponse(50);
-    pfSeq.stage(3).setTemporalCurve(TempCurve::Bell);
-
-    // 4..7 — Temporal Bell + Bounce. With Bell, warp and response decouple:
-    // 4 = peak shifted in input axis, 5 = peak stretched in output amplitude,
-    // 6 = both (combination only reachable via two knobs), 7 = Bounce decay.
-    pfSeq.stage(4).setTemporalCurve(TempCurve::Bell);
-    pfSeq.stage(4).setTemporalWarp(40);
-    pfSeq.stage(5).setTemporalCurve(TempCurve::Bell);
-    pfSeq.stage(5).setTemporalResponse(40);
-    pfSeq.stage(6).setTemporalCurve(TempCurve::Bell);
-    pfSeq.stage(6).setTemporalWarp(40);
-    pfSeq.stage(6).setTemporalResponse(40);
-    pfSeq.stage(7).setTemporalCurve(TempCurve::Bounce);
-
-    // 8..11 — Pitch Ramp baseline + warp/response. Same Linear-equivalence
-    // story (9 ≈ 10), then Bell pitch (arc up-and-back).
-    pfSeq.stage(8).setPitchCurve(PitchCurve::Ramp);
-    pfSeq.stage(9).setPitchCurve(PitchCurve::Ramp);
-    pfSeq.stage(9).setPitchWarp(50);
-    pfSeq.stage(10).setPitchCurve(PitchCurve::Ramp);
-    pfSeq.stage(10).setPitchResponse(50);
-    pfSeq.stage(11).setPitchCurve(PitchCurve::Bell);
-
-    // 12..15 — Pitch Bell warp/response decoupling + Triangle + reversed skew.
-    pfSeq.stage(12).setPitchCurve(PitchCurve::Bell);
-    pfSeq.stage(12).setPitchWarp(40);
-    pfSeq.stage(13).setPitchCurve(PitchCurve::Bell);
-    pfSeq.stage(13).setPitchResponse(40);
-    pfSeq.stage(14).setPitchCurve(PitchCurve::Triangle);
-    pfSeq.stage(15).setPitchCurve(PitchCurve::Triangle);
-    pfSeq.stage(15).setPitchWarp(-40);
-
-    // Accumulator demo: reset every 4 cycles so audible drift cycles back to baseline.
-    pfSeq.noteAccumConfig().setReset(4);
-    pfSeq.pulseAccumConfig().setReset(4);
-    pfSeq.stage(0).setAccumulatorStep(+2);
-    pfSeq.stage(4).setAccumulatorStep(-1);
-    pfSeq.stage(8).setPulseAccumStep(+1);
-    pfSeq.stage(12).setPulseAccumStep(-1);
 
     pfTrack.setOctave(+1);
 

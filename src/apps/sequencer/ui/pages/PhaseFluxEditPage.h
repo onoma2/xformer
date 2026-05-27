@@ -28,6 +28,7 @@ private:
     void drawAccumDualStrip(Canvas &canvas, int scopeX, int activeSetIdx);
     void drawStageBadge(Canvas &canvas, int scopeX);
     void drawParamList(Canvas &canvas);
+    void drawAccumPage(Canvas &canvas);
 
     void editSlot(int slot, int value, bool shift);
     void toggleShiftAt(int slot);
@@ -39,4 +40,5 @@ private:
     int _selectedCell = 0;
     int _currentSet = 0;    // 0 = TEMP, 1 = PTCH, 2 = ACCUM.N, 3 = ACCUM.P
     int _selectedSlot = 0;  // 0..4 (which F-slot is active)
+    int _accumPage = 0;     // 0 = shape page, 1 = mode page (ACCUM.N/P only)
 };

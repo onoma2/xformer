@@ -42,6 +42,34 @@ static constexpr int ParamRowH    = ParamPanelH / 5;
 // Mask table — bit set = muted (LSB = pulse 0)
 constexpr uint8_t kMaskTable[8] = { 0x00, 0xAA, 0x49, 0x11, 0xB6, 0x55, 0x77, 0x01 };
 
+// ACCUM 1x16 row layout (mirrors ui-preview/pages_phaseflux_accum_redesign.py)
+static constexpr int AccumRowXStart      = 17;
+static constexpr int AccumRowGap         = 6;
+static constexpr int AccumRowY           = 28;
+static constexpr int AccumPancakeW       = 4;
+static constexpr int AccumPancakeXOff    = 5;       // right half of the 9 px cell
+static constexpr int AccumGlyphX         = 4;       // 5 px wide column in left margin
+static constexpr int AccumGlyphOrderY    = 18;
+static constexpr int AccumGlyphPolarY    = 28;
+static constexpr int AccumGlyphResetBL   = 43;      // tiny5x5 baseline
+
+// 5x5 hand-drawn glyphs — each row holds 5 LSB-first pixel bits.
+constexpr uint8_t kGlyphOrderWrap[5]  = { 0x04, 0x08, 0x1F, 0x08, 0x04 };
+constexpr uint8_t kGlyphOrderPend[5]  = { 0x00, 0x0A, 0x1F, 0x0A, 0x00 };
+constexpr uint8_t kGlyphOrderHold[5]  = { 0x00, 0x00, 0x1F, 0x00, 0x00 };
+constexpr uint8_t kGlyphOrderRTZ[5]   = { 0x01, 0x01, 0x0F, 0x08, 0x04 };
+constexpr uint8_t kGlyphPolarUni[5]   = { 0x04, 0x0E, 0x15, 0x04, 0x04 };
+constexpr uint8_t kGlyphPolarBi[5]    = { 0x04, 0x0E, 0x04, 0x0E, 0x04 };
+
+inline void paintGlyph5x5(Canvas &canvas, int x, int y, const uint8_t pattern[5]) {
+    for (int row = 0; row < 5; ++row) {
+        uint8_t b = pattern[row];
+        for (int col = 0; col < 5; ++col) {
+            if ((b >> col) & 1) canvas.point(x + col, y + row);
+        }
+    }
+}
+
 inline Curve::Type temporalCurveLut(PhaseFluxSequence::TemporalCurveType v) {
     switch (v) {
     case PhaseFluxSequence::TemporalCurveType::Linear: return Curve::RampUp;
@@ -123,8 +151,10 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     static const char *kLabelsPtchShift[5]   = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
     static const char *kLabelsPtchGlobal[5]      = { "Curve", "Warp",  "Resp", "Rate", "Note" };
     static const char *kLabelsPtchGlobalShift[5] = { "FlipV", "FlipH", nullptr, nullptr, "Span" };
-    static const char *kLabelsAccum[5]       = { "Amount", "+Lim", "-Lim", "Order", "Reset" };
-    static const char *kLabelsAccumShift[5]  = { "Trig",   nullptr, nullptr, "Polar", "Scope" };
+    // ACCUM paged: F5 = Next. Limits moved to list page — page-1 mid slots
+    // stay empty. Page-2 reserves a slot for Sleep (drafted, not wired).
+    static const char *kLabelsAccumP0[5] = { "Ac.St", nullptr, nullptr, "Order", "Next" };
+    static const char *kLabelsAccumP1[5] = { "Reset", "Polar", "Trig",  nullptr, "Next" };
 
     const char *(*primary)[5];
     const char *(*altShift)[5];
@@ -138,14 +168,21 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
         primary = &kLabelsPtch;
         altShift = &kLabelsPtchShift;
     } else {
-        primary = &kLabelsAccum;
-        altShift = &kLabelsAccumShift;
+        primary = (_accumPage == 0) ? &kLabelsAccumP0 : &kLabelsAccumP1;
+        altShift = nullptr;  // Shift bindings dropped for ACCUM.
     }
     const char *footer[5];
     for (int i = 0; i < 5; ++i) {
-        footer[i] = (shift && (*altShift)[i]) ? (*altShift)[i] : (*primary)[i];
+        footer[i] = (shift && altShift && (*altShift)[i]) ? (*altShift)[i] : (*primary)[i];
     }
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), _selectedSlot);
+
+    // ACCUM owns the full content area — 1x16 row + pancakes + glyphs.
+    // TEMP/PTCH keep the 4x4 grid + scope + param list.
+    if (isAccumN || isAccumP) {
+        drawAccumPage(canvas);
+        return;
+    }
 
     drawGrid(canvas);
 
@@ -154,11 +191,8 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     canvas.vline(DividerX,  13, 39);
     canvas.vline(DividerX2, 13, 39);
 
-    // Middle pane dispatch: TEMP→scope, ACCUM→dual strip, else→pitch scope.
     if (_currentSet == 0) {
         drawTemporalScope(canvas, _selectedCell, ScopeTempX);
-    } else if (isAccumN || isAccumP) {
-        drawAccumDualStrip(canvas, ScopeTempX, _currentSet);
     } else {
         drawPitchScope(canvas, isGlobalPitch ? 0 : _selectedCell, ScopeTempX);
     }
@@ -245,8 +279,16 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
     }
 
     // F1..F5 select slot. Shift+F toggles the binary at that slot if any.
+    // ACCUM is paged: F5 = Next (cycle page); F1..F4 = slots within page.
     if (key.isFunction()) {
         int slot = key.function();
+        const bool isAccum = (_currentSet == 2 || _currentSet == 3);
+        if (isAccum && slot == 4) {
+            _accumPage = 1 - _accumPage;
+            _selectedSlot = 0;
+            event.consume();
+            return;
+        }
         if (globalKeyState()[Key::Shift]) {
             toggleShiftAt(slot);
         } else {
@@ -274,19 +316,35 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
     const bool isAccumP = (_currentSet == 3);
     if (isAccumN || isAccumP) {
         auto &cfg = isAccumN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
-        const int limMax = isAccumN ? 28 : 8;
-        switch (slot) {
-        case 0:
-            if (isAccumN) {
-                activeStage.setAccumulatorStep(activeStage.accumulatorStep() + value);
-            } else {
-                activeStage.setPulseAccumStep(activeStage.pulseAccumStep() + value);
+        if (_accumPage == 0) {
+            switch (slot) {
+            case 0:  // Ac.St — per-cell, UI-clamped to ±7 for both N and P.
+                if (isAccumN) {
+                    activeStage.setAccumulatorStep(clamp(activeStage.accumulatorStep() + value, -7, 7));
+                } else {
+                    activeStage.setPulseAccumStep(activeStage.pulseAccumStep() + value);
+                }
+                break;
+            case 1: break;  // slot reserved — +Lim moved to list page
+            case 2: break;  // slot reserved — -Lim moved to list page
+            case 3: cfg.setOrder(AccumulatorConfig::Order(cycle(int(cfg.order()) + value, 0, 3))); break;
             }
-            break;
-        case 1: cfg.setPosLim(clamp(int(cfg.posLim()) + value, 1, limMax)); break;
-        case 2: cfg.setNegLim(clamp(int(cfg.negLim()) + value, 1, limMax)); break;
-        case 3: cfg.setOrder(AccumulatorConfig::Order(cycle(int(cfg.order()) + value, 0, 3))); break;
-        case 4: cfg.setReset(uint8_t(cycle(int(cfg.reset()) + value, 0, 15))); break;
+        } else {
+            switch (slot) {
+            case 0: cfg.setReset(uint8_t(cycle(int(cfg.reset()) + value, 0, 15))); break;
+            case 1: cfg.setPolarity(AccumulatorConfig::Polarity(cycle(int(cfg.polarity()) + value, 0, 1))); break;
+            case 2: {
+                int trigInt = isAccumN
+                    ? int(activeStage.accumulatorTrigger())
+                    : int(activeStage.pulseAccumTrigger());
+                trigInt = cycle(trigInt + value, 0, 1);
+                auto next = PhaseFluxSequence::AccumulatorTriggerType(trigInt);
+                if (isAccumN) activeStage.setAccumulatorTrigger(next);
+                else          activeStage.setPulseAccumTrigger(next);
+                break;
+            }
+            case 3: break;  // Sleep slot reserved (§14.2 drafted, not wired).
+            }
         }
         (void)shift;
         return;
@@ -356,29 +414,8 @@ void PhaseFluxEditPage::toggleShiftAt(int slot) {
     const bool isAccumN = (_currentSet == 2);
     const bool isAccumP = (_currentSet == 3);
     if (isAccumN || isAccumP) {
-        auto &cfg = isAccumN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
-        switch (slot) {
-        case 0: {
-            auto trig = isAccumN ? activeStage.accumulatorTrigger() : activeStage.pulseAccumTrigger();
-            auto next = (trig == PhaseFluxSequence::AccumulatorTriggerType::Stage)
-                ? PhaseFluxSequence::AccumulatorTriggerType::Pulse
-                : PhaseFluxSequence::AccumulatorTriggerType::Stage;
-            if (isAccumN) activeStage.setAccumulatorTrigger(next);
-            else          activeStage.setPulseAccumTrigger(next);
-            break;
-        }
-        case 3:
-            cfg.setPolarity(cfg.polarity() == AccumulatorConfig::Polarity::Uni
-                ? AccumulatorConfig::Polarity::Bi
-                : AccumulatorConfig::Polarity::Uni);
-            break;
-        case 4:
-            cfg.setScope(cfg.scope() == AccumulatorConfig::Scope::Local
-                ? AccumulatorConfig::Scope::Track
-                : AccumulatorConfig::Scope::Local);
-            break;
-        default: break;
-        }
+        // Trig / Polar / Reset are first-class on the ACCUM page-2 footer now.
+        // Scope binding is dropped entirely.
         return;
     }
     if (_currentSet == 0) {
@@ -625,6 +662,116 @@ void PhaseFluxEditPage::drawAccumDualStrip(Canvas &canvas, int scopeX, int activ
 
     drawStrip(topMidline, PhaseFluxSequence::AccumulatorStep::Max, true,  nActive);
     drawStrip(botMidline, PhaseFluxSequence::PulseAccumStep::Max,  false, !nActive);
+}
+
+void PhaseFluxEditPage::drawAccumPage(Canvas &canvas) {
+    const auto &seq = _project.selectedPhaseFluxSequence();
+    const auto *te  = trackEngine();
+    const int activeCell = te ? te->activeCell() : -1;
+    const bool isAccumN = (_currentSet == 2);
+    const auto &cfg = isAccumN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
+
+    canvas.setBlendMode(BlendMode::Set);
+
+    // 1) 16-cell row — same per-cell visual rules as the existing 4x4 grid.
+    for (int i = 0; i < 16; ++i) {
+        const auto &stage = seq.stage(i);
+        const bool isActive   = (i == activeCell);
+        const bool isSelected = (i == _selectedCell);
+        const int x = AccumRowXStart + i * (CellW + AccumRowGap);
+        const int y = AccumRowY;
+
+        if (isActive) {
+            canvas.setColor(Color::Bright);
+            canvas.fillRect(x, y, CellW, CellH);
+        } else if (stage.skip()) {
+            canvas.setColor(Color::Low);
+            canvas.drawRect(x, y, CellW, CellH);
+            canvas.line(x + 2, y + 2, x + CellW - 3, y + CellH - 3);
+            canvas.line(x + CellW - 3, y + 2, x + 2, y + CellH - 3);
+        } else {
+            canvas.setColor(isSelected ? Color::Bright : Color::MediumLow);
+            canvas.drawRect(x, y, CellW, CellH);
+        }
+
+        if (stage.skip()) continue;
+
+        const int pulses = std::max(1, std::min(8, stage.pulseCount()));
+        const Color barColor = isActive
+            ? Color::None
+            : (isSelected ? Color::Bright : Color::MediumBright);
+        canvas.setColor(barColor);
+        canvas.hline(x + 1, y + CellH - 2, std::min(CellW - 2, pulses));
+        if (!isActive) {
+            if (stage.phaseShift() != 0) {
+                canvas.setColor(barColor);
+                canvas.point(x + 1, y + 1);
+            }
+            if (int(stage.mask()) != 0) {
+                canvas.setColor(barColor);
+                canvas.point(x + CellW - 2, y + 1);
+            }
+        }
+    }
+
+    // 2) Per-cell BIPOLAR Ac.St pancakes — positive grows up from square top,
+    //    negative grows down from square bottom. Magnitude UI-clamped to 7
+    //    (matches pulse range; note storage stays ±15).
+    constexpr int kAccumPancakeMaxMag = 7;
+    for (int i = 0; i < 16; ++i) {
+        const auto &stage = seq.stage(i);
+        if (stage.skip()) continue;
+        const int amt = isAccumN ? stage.accumulatorStep() : stage.pulseAccumStep();
+        if (amt == 0) continue;
+        const int mag = std::min(amt < 0 ? -amt : amt, kAccumPancakeMaxMag);
+        const int x = AccumRowXStart + i * (CellW + AccumRowGap) + AccumPancakeXOff;
+        canvas.setColor((i == _selectedCell) ? Color::Bright : Color::Medium);
+        if (amt > 0) {
+            for (int n = 1; n <= mag; ++n) {
+                canvas.hline(x, AccumRowY - 2 * n, AccumPancakeW);
+            }
+        } else {
+            for (int n = 1; n <= mag; ++n) {
+                canvas.hline(x, AccumRowY + CellH + 2 * n - 1, AccumPancakeW);
+            }
+        }
+    }
+
+    // 3) Per-cell S/P trig chip below square, left half of the cell column.
+    canvas.setFont(Font::Tiny);
+    for (int i = 0; i < 16; ++i) {
+        const auto &stage = seq.stage(i);
+        if (stage.skip()) continue;
+        const int x = AccumRowXStart + i * (CellW + AccumRowGap);
+        const auto trig = isAccumN ? stage.accumulatorTrigger() : stage.pulseAccumTrigger();
+        const char *trigStr =
+            (trig == PhaseFluxSequence::AccumulatorTriggerType::Stage) ? "S" : "P";
+        canvas.setColor(Color::Medium);
+        canvas.drawText(x - 2, AccumRowY + CellH + 6, trigStr);
+    }
+
+    // 4) Sequence-wide glyphs in the left margin: Order, Polar, Reset.
+    canvas.setColor(Color::MediumBright);
+    const uint8_t *orderGlyph;
+    switch (cfg.order()) {
+    case AccumulatorConfig::Order::Wrap:     orderGlyph = kGlyphOrderWrap; break;
+    case AccumulatorConfig::Order::Pendulum: orderGlyph = kGlyphOrderPend; break;
+    case AccumulatorConfig::Order::Hold:     orderGlyph = kGlyphOrderHold; break;
+    case AccumulatorConfig::Order::RTZ:      orderGlyph = kGlyphOrderRTZ;  break;
+    default:                                 orderGlyph = kGlyphOrderWrap; break;
+    }
+    paintGlyph5x5(canvas, AccumGlyphX, AccumGlyphOrderY, orderGlyph);
+    paintGlyph5x5(canvas, AccumGlyphX, AccumGlyphPolarY,
+                  (cfg.polarity() == AccumulatorConfig::Polarity::Uni)
+                      ? kGlyphPolarUni : kGlyphPolarBi);
+
+    const int reset = int(cfg.reset());
+    FixedStringBuilder<3> resetBuf;
+    if (reset <= 0)       resetBuf("M");
+    else if (reset <= 9)  resetBuf("%d", reset);
+    else                  resetBuf("+");
+    const int rw = canvas.textWidth(resetBuf);
+    canvas.drawText(AccumGlyphX + (5 - rw) / 2, AccumGlyphResetBL, resetBuf);
 }
 
 const PhaseFluxTrackEngine *PhaseFluxEditPage::trackEngine() const {

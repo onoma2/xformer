@@ -296,8 +296,8 @@ NoteTrack's existing `model/Accumulator.h` class remains untouched in v1. Migrat
 | `noteAccumOrder` | 2 bits | `Wrap` / `Pendulum` / `Hold` / `RTZ` | `Wrap` |
 | `noteAccumPolarity` | 1 bit | `Uni` / `Bi` | `Uni` |
 | `noteAccumReset` | 4 bits | integer 0..15; `0` = manual, `N>0` = auto every N cycles | `0` (manual) |
-| `noteAccumPosLim` | 5 bits | 1..28 scale degrees | 7 (1 octave) |
-| `noteAccumNegLim` | 5 bits | 1..28 scale degrees | 7 (1 octave) |
+| `noteAccumPosLim` | 5 bits | 1..28 scale degrees | **28** (max — list-page edit) |
+| `noteAccumNegLim` | 5 bits | 1..28 scale degrees | **28** (max — list-page edit) |
 | `pulseAccumScope` | 1 bit | `Local` / `Track` | `Local` |
 | `pulseAccumOrder` | 2 bits | (same set as note) | `Wrap` |
 | `pulseAccumPolarity` | 1 bit | `Uni` / `Bi` | `Uni` |
@@ -397,59 +397,42 @@ Cleared on pattern switch (`changePattern()`); preserved across measure reset.
 
 **Independence of N and P:** the two accumulators run in parallel with no coupling. Note accumulator's counter doesn't influence pulse counter's advance or vice versa. Different drift periods → polymetric pitch-vs-rhythm evolution.
 
-### 13.5 UI surface — hero edit page extension
+### 13.5 UI surface — hero edit page
 
-PhaseFlux's existing `PhaseFluxEditPage` carousel (`TEMP` / `PTCH`) extends to **four sets**: `TEMP` / `PTCH` / `ACCUM.N` / `ACCUM.P`. Left/Right paging cycles. Each ACCUM set has its own slot map and its own strip visualisation; both ACCUM sets share the same dual-strip visual (one is bright, the other dim, depending on which set is currently active).
+PhaseFlux's `PhaseFluxEditPage` carousel covers **four topics**: `TEMP` / `PTCH` / `ACCUM.N` / `ACCUM.P`, cycled by Left/Right. ACCUM topics use a dedicated layout — the 4×4 grid + scope + 5-row param list used by TEMP/PTCH is replaced with a 1×16 cell row plus left-margin glyphs.
 
 **Header** (`drawActiveFunction`):
+- `ACCUM.N` / `ACCUM.NT` — Note accumulator (Track-scope variant remains in the data path but is no longer reachable via UI).
+- `ACCUM.P` / `ACCUM.PT` — Pulse accumulator (same).
 
-- `ACCUM.N` — Note accumulator set, Local scope
-- `ACCUM.NT` — Note accumulator set, Track scope
-- `ACCUM.P` — Pulse accumulator set, Local scope
-- `ACCUM.PT` — Pulse accumulator set, Track scope
+**Footer — two pages, F5 = Next** (cycles `_accumPage` 0↔1; identical layout for ACCUM.N and ACCUM.P):
 
-**Slot map (both ACCUM.N and ACCUM.P):**
+| Page | F1 | F2 | F3 | F4 | F5 |
+|---|---|---|---|---|---|
+| **0 / shape** | `Ac.St` | — | — | `Order` | `Next` |
+| **1 / mode**  | `Reset` | `Polar` | `Trig` | — | `Next` |
 
-| Slot | Plain label | Param | Scope | Shift+Fn |
-|---|---|---|---|---|
-| F1 | `Amount` | active-set's per-cell `*AccumStep` (signed: note ±15 / pulse ±7) | per-cell | **`Trig`** — toggle `*AccumTrigger` Stage ↔ Pulse (per-cell) |
-| F2 | `+Lim`   | active-set's `*AccumPosLim` (1..28 / 1..8) | per-sequence | — |
-| F3 | `-Lim`   | active-set's `*AccumNegLim` (1..28 / 1..8) | per-sequence | — |
-| F4 | `Order`  | active-set's `*AccumOrder` — encoder cycles `Wrap` / `Pend` / `Hold` / `RTZ` | per-sequence | **`Polar`** — toggle `*AccumPolarity` Uni ↔ Bi (per-sequence) |
-| F5 | `Reset`  | active-set's `*AccumReset` — integer 0..15; `0` = manual, `N>0` = auto every N cycles | per-sequence | **`Scope`** — toggle `*AccumScope` Local ↔ Track (per-sequence) |
+- F2/F3 on page 0 are reserved slots — `+Lim` / `-Lim` editing has moved to the **sequence list page** (limits are not performative; default to max span so the accumulator is unbounded out of the box).
+- F4 on page 1 is reserved for **Sleep** (drafted in `phaseflux-spec.md §14.2`, not wired).
+- Shift bindings are dropped for ACCUM (params are first-class on the two pages).
 
-**Footer rows:**
-```
-plain: AMOUNT | +LIM | -LIM | ORDER | RESET
-shift: TRIG   |  —   |  —   | POLAR | SCOPE
-```
+**Slot semantics:**
+- `Ac.St` (renamed from the earlier `Amount`) — per-cell `*AccumStep`. UI clamps to **±7** for both Note and Pulse (note storage stays `SignedValue<5>` ±15; clamp is UI-only for now).
+- `Order` / `Polar` / `Reset` — sequence-wide `AccumulatorConfig` writes.
+- `Trig` — per-cell `*AccumTrigger`, cycles `Stage ↔ Pulse`.
+- `Reset` encoder semantics unchanged: `0` = `Manual`, `N>0` = `Ncyc`.
 
-**Right pane row label swap on Shift held**: F1 row label/value swaps to `Trig` / Stage|Pulse, F4 to `Polar` / Uni|Bi, F5 to `Scope` / Local|Track. F2 and F3 rows unchanged (no shift action). Matches the PTCH set's NOTE→SPAN swap pattern.
+**Layout — content area (y=11..52):**
 
-**Interaction model**: plain Fn press selects the slot (highlight on the right-pane value column); encoder then edits (continuous slots: Amount, +Lim, -Lim) or cycles (enum slots: Order, Reset). Shift+Fn fires the discrete toggle / cycle for the slot's shift-assigned param (Trig / Polar / Scope) without disturbing the encoder's bound slot.
+- **1×16 cell row** centred at `y=28..36`. Cells are 9 px, gap 6 px, row starts at `x=17` (right margin = 5 px, left margin = 17 px reserved for glyphs). Per-cell visual rules match the existing 4×4 grid (active fill, skip X, selected outline, pulse-count bar, phase/mask dots).
+- **Per-cell bipolar `Ac.St` pancakes** — 4 px wide, right-half of each cell column. Each pancake = 1 px lit + 1 px dark gap. Positive `Ac.St` grows **up** from the square top, negative grows **down**. Magnitude UI-clamped to 7.
+- **Per-cell S/P trig chip** — tiny5x5 single character below the square, left-half of the cell. `S` = Stage trigger, `P` = Pulse trigger.
+- **Left-margin sequence glyphs** (5 px wide column at `x=4`):
+  - Order — hand-drawn 5×5 icon for Wrap / Pendulum / Hold / RTZ.
+  - Polarity — hand-drawn 5×5 icon for Uni / Bi.
+  - Reset — tiny5x5 font: `M` (manual), digit `1..9`, or `+` (>9).
 
-**`Reset` encoder semantics**: encoder turns step through 0..N. `0` displays as `Manual` (preserve across `resetMeasure`, today's PhaseFlux default). `N>0` displays as `Ncyc` (e.g., `4cyc` = auto-reset every 4 full sequence cycles). Integer storage; the "auto" mode is implicit in `N>0` — no separate enum needed.
-
-Per-cell vs per-sequence write targets: F1 (Amount) and Shift+F1 (Trig) write to the selected cell's stage record. F2 / F3 / F4 / F5 and their shifts write to the sequence's `AccumulatorConfig` for the active set.
-
-**Middle pane — dual-strip visualisation:**
-
-- **Two stacked strips**: top = Note accumulator amounts (`accumulatorStep` per cell, ±15 range); bottom = Pulse accumulator amounts (`pulseAccumStep` per cell, ±7 range).
-- **No outer rectangle, no midlines**. Bars float around an invisible vertical centre in each strip.
-- **Active layer bright** (Color.MediumBright / Bright). **Inactive layer dim** (Color.Low). The active layer is determined by which ACCUM set is currently displayed (N or P).
-- **Stage badge** at top-left of the plot area: shows selected stage index `0..15`, or `T` when the active set is in Track scope. Tiny font, MediumBright.
-- **Bar layout**: 16 cells across, grouped 4-4-4-4. Within each group of 4: bar_w = 3 px, 1-px gap. Between groups: 5-px inter-group span with a 1-px **dotted vertical line** (Color.Low) at the centre. Pattern reads as `[][][][] · [][][][] · [][][][] · [][][][]`.
-- **Sign**: positive amounts grow upward from the invisible midline; negative grow downward. Zero values render nothing.
-- **Selected cell** highlighted via brighter bar color (Color.MediumBright vs Color.Medium for non-selected on the active layer).
-- **Active cell** (engine playhead) highlighted via Color.Bright on the active layer's bar.
-
-**Right pane — 5-row param list:**
-
-Mirrors TEMP/PTCH right-pane style. Each row shows `Label` (left, Color.Medium) + value (right, Color.MediumBright; Color.Bright when selected). Selected row gets a 1/3-width value-column outline rect (matching the C++ highlight pattern).
-
-Per-cell rows (F1/F2/F4) display the **active stage's** value. Per-sequence rows (F3/F5/Shift+F5) display the sequence-level value.
-
-**Render reference**: `ui-preview/phaseflux-accum/` — `dual-stacked-N-active.png`, `dual-stacked-P-active.png`.
+**Render reference**: `ui-preview/pages_phaseflux_accum_redesign.py` → `ui-preview/accum-n/accum-n-row.png`.
 
 ### 13.6 Cross-track architecture notes
 

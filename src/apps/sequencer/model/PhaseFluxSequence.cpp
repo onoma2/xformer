@@ -98,7 +98,10 @@ void PhaseFluxSequence::clear() {
     _clockMultiplier.setBase(100);
     _noteAccumConfig = AccumulatorConfig();
     _pulseAccumConfig = AccumulatorConfig();
-    // Pulse range is 1..8 (vs note 1..28); override default ctor lims per spec §13.3.
+    // Default to max span: note 1..28, pulse 1..8 (limits live on the list
+    // page now; max-by-default = unbounded until the user opts in).
+    _noteAccumConfig.setPosLim(28);
+    _noteAccumConfig.setNegLim(28);
     _pulseAccumConfig.setPosLim(8);
     _pulseAccumConfig.setNegLim(8);
     for (auto &stage : _stages) {
