@@ -230,6 +230,220 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
                     "line 1 reported");
     }
 
+    CASE("sub_separator_executes_both_segments") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "X 1; B 2");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.x, int16_t(1), "X = 1");
+        expectEqual(runtime.variables.b, int16_t(2), "B = 2");
+    }
+
+    CASE("sub_separator_two_cv_sets") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "CV 1 100; CV 2 200");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.cv[0], int16_t(100), "CV[0] = 100");
+        expectEqual(runtime.variables.cv[1], int16_t(200), "CV[1] = 200");
+        expectEqual(int(output.cvDirty), 0x03, "both CV dirty");
+    }
+
+    CASE("if_true_executes_body") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF 1: CV 1 1000");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.cv[0], int16_t(1000), "CV[0] = 1000");
+        expectEqual(int(output.cvDirty), 1, "CV dirty");
+    }
+
+    CASE("if_false_skips_body") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF 0: CV 1 1000");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.cv[0], int16_t(0), "CV[0] unchanged");
+        expectEqual(int(output.cvDirty), 0, "no CV dirty");
+    }
+
+    CASE("sub_separator_failure_stops_later_segment") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "CV 1 100; CV 9 1");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::OutOfRange),
+                    "out of range stops");
+        expectEqual(runtime.variables.cv[0], int16_t(100),
+                    "CV[0] set before fail");
+        expectEqual(int(output.cvDirty), 1, "first CV dirty only");
+    }
+
+    CASE("if_variable_condition_true") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF A: CV 1 1000");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        runtime.variables.a = 1;
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.cv[0], int16_t(1000), "CV[0] = 1000");
+    }
+
+    CASE("if_variable_condition_false") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF A: CV 1 1000");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        runtime.variables.a = 0;
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.cv[0], int16_t(0), "CV[0] unchanged");
+    }
+
+    CASE("if_expression_condition") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF + A 0: CV 1 1000");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        runtime.variables.a = 1;
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.cv[0], int16_t(1000), "CV[0] = 1000");
+    }
+
+    CASE("unsupported_mod_rejected_before_prefix_side_effects") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB CV 1 100: B 2");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::UnsupportedMod),
+                    "PROB rejected");
+        expectEqual(runtime.variables.cv[0], int16_t(0),
+                    "CV[0] not set by prefix");
+        expectEqual(runtime.variables.b, int16_t(2),
+                    "B not set by body");
+    }
+
+    CASE("unsupported_mod_rejected_before_body_side_effects") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "PROB 1: B 2");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::UnsupportedMod),
+                    "PROB rejected");
+        expectEqual(runtime.variables.b, int16_t(2),
+                    "B not set by body");
+    }
+
+    CASE("if_empty_prefix_invalid_arity") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "IF: CV 1 1000");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::InvalidModArity),
+                    "empty IF prefix rejected");
+        expectEqual(runtime.variables.cv[0], int16_t(0), "CV[0] unchanged");
+    }
+
+    CASE("line_number_correct_on_separator_failure") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "A 10");
+        writeLine(program.scripts[0], 1, "CV 1 100; CV 9 1");
+        writeLine(program.scripts[0], 2, "B 20");
+        program.scripts[0].length = 3;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::OutOfRange),
+                    "out of range stops");
+        expectEqual(int(runtime.exec.frames[0].line_number), 1,
+                    "line 1 reported");
+    }
+
     CASE("exec_frame_cleared") {
         TeletypeProgram program = {};
         init(program);

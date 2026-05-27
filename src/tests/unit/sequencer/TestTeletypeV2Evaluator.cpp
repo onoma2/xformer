@@ -82,48 +82,13 @@ TT2Command makeTwoNumberOp(int16_t a, int16_t b, int16_t opValue) {
     return cmd;
 }
 
-// Wrapper that calls the native evaluator with a dummy output state.
+// Wrapper that calls evaluateSegment with a fake op table.
 // Used for skeleton tests that do not touch output.
 TT2EvalResult evaluateWithFakeOps(const TT2Command &cmd, TT2Runtime &runtime,
                                   const TT2OpFunc *table, size_t count) {
-    // Build a temporary flat command and use the native evaluator.
-    // For skeleton tests we bypass tt2NativeOpTable by constructing a
-    // temporary fake table inline.  Since evaluateCommand now uses the
-    // global table, we re-implement the core loop here for test isolation.
-    int16_t stack[TT2_COMMAND_MAX_LENGTH];
-    uint8_t stackSize = 0;
-    TT2EvalError error = TT2EvalError::None;
-
-    for (uint8_t i = 0; i < cmd.length; ++i) {
-        uint8_t tag = cmd.tag[i];
-        if (tag == uint8_t(MOD)) {
-            return {TT2EvalError::UnsupportedMod, 0, 0};
-        }
-        if (tag == uint8_t(PRE_SEP) || tag == uint8_t(SUB_SEP)) {
-            return {TT2EvalError::UnsupportedSeparator, 0, 0};
-        }
-    }
-
-    for (int16_t idx = cmd.length - 1; idx >= 0; --idx) {
-        if (error != TT2EvalError::None) break;
-        uint8_t tag = cmd.tag[idx];
-        int16_t value = cmd.value[idx];
-        if (tag == uint8_t(NUMBER) || tag == uint8_t(XNUMBER) ||
-            tag == uint8_t(BNUMBER) || tag == uint8_t(RNUMBER)) {
-            stack[stackSize++] = value;
-        } else if (tag == uint8_t(OP)) {
-            if (value < 0 || static_cast<size_t>(value) >= count) {
-                error = TT2EvalError::UnknownOp;
-            } else {
-                TT2OutputState dummy = {};
-                table[value](runtime, dummy, stack, stackSize, (idx == 0), error);
-            }
-        }
-    }
-
-    int16_t top = (stackSize > 0 && error == TT2EvalError::None)
-                      ? stack[stackSize - 1] : 0;
-    return {error, top, stackSize};
+    TT2OutputState dummy = {};
+    init(dummy);
+    return evaluateSegment(cmd, 0, cmd.length, runtime, dummy, table, count);
 }
 
 } // namespace
@@ -206,37 +171,6 @@ UNIT_TEST("TeletypeV2Evaluator") {
             expectEqual(int(r.stackSize), 1, "get pushes value");
             expectEqual(r.value, int16_t(99), "read back 99");
         }
-    }
-
-    CASE("mod_rejected") {
-        TT2Runtime runtime = {};
-        TT2Command cmd = {};
-        cmd.length = 1;
-        cmd.tag[0] = uint8_t(MOD);
-        cmd.value[0] = 0;
-        auto result = evaluateWithFakeOps(cmd, runtime, fakeOpTable, fakeOpCount);
-        expectEqual(int(result.error), int(TT2EvalError::UnsupportedMod),
-                    "MOD rejected");
-    }
-
-    CASE("pre_sep_rejected") {
-        TT2Runtime runtime = {};
-        TT2Command cmd = {};
-        cmd.length = 1;
-        cmd.tag[0] = uint8_t(PRE_SEP);
-        auto result = evaluateWithFakeOps(cmd, runtime, fakeOpTable, fakeOpCount);
-        expectEqual(int(result.error), int(TT2EvalError::UnsupportedSeparator),
-                    "PRE_SEP rejected");
-    }
-
-    CASE("sub_sep_rejected") {
-        TT2Runtime runtime = {};
-        TT2Command cmd = {};
-        cmd.length = 1;
-        cmd.tag[0] = uint8_t(SUB_SEP);
-        auto result = evaluateWithFakeOps(cmd, runtime, fakeOpTable, fakeOpCount);
-        expectEqual(int(result.error), int(TT2EvalError::UnsupportedSeparator),
-                    "SUB_SEP rejected");
     }
 
     CASE("stack_underflow") {
