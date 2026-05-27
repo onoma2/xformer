@@ -13,7 +13,8 @@ enum class FakeOp : int16_t {
     VarGet = 3,
 };
 
-void fakeAdd(TT2Runtime &, TT2OutputState &, int16_t *stack,
+void fakeAdd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+             int16_t *stack,
              uint8_t &stackSize, bool, TT2EvalError &error) {
     if (stackSize < 2) {
         error = TT2EvalError::StackUnderflow;
@@ -24,12 +25,14 @@ void fakeAdd(TT2Runtime &, TT2OutputState &, int16_t *stack,
     stack[stackSize++] = a + b;
 }
 
-void fakePush42(TT2Runtime &, TT2OutputState &, int16_t *stack,
+void fakePush42(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack,
                 uint8_t &stackSize, bool, TT2EvalError &) {
     stack[stackSize++] = 42;
 }
 
-void fakeVarSet(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
+void fakeVarSet(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack,
                 uint8_t &stackSize, bool isSet, TT2EvalError &error) {
     if (!isSet || stackSize < 1) {
         error = TT2EvalError::StackUnderflow;
@@ -38,7 +41,8 @@ void fakeVarSet(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
     runtime.variables.a = stack[--stackSize];
 }
 
-void fakeVarGet(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
+void fakeVarGet(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack,
                 uint8_t &stackSize, bool, TT2EvalError &) {
     stack[stackSize++] = runtime.variables.a;
 }

@@ -17,6 +17,9 @@ Define Teletype v2 as a Performer-native Teletype++ dialect: preserve hardware-i
 
 ## Decisions log
 
+- 2026-05-28: Narrow native `SCRIPT n` support implemented in TT2 only. `runScript()` now pushes/pops `TT2ExecFrame` entries and enforces `TT2_EXEC_DEPTH` with `ExecDepthOverflow`. `SCRIPT` is an op-table handler that receives the current `TeletypeProgram` as transient evaluator context, avoiding any `TT2Runtime`/`TT2Track` size growth. Parent `I` is preserved across child calls, child `I` is isolated, child errors propagate and stop the parent. Explicit exclusions remain: `$`, `$F`, `$L`, function return values, fparams, `DEL`, `DEL.CLR`, `BREAK`, and `KILL`.
+- 2026-05-28: Accidental old-engine edits were rejected and removed. TT2 v2 work must not patch `teletype/src/ops/controlflow.c` or `teletype/src/state.c` for native dialect semantics unless explicitly requested as a separate v1/upstream fix.
+- 2026-05-28: EVERY/SKIP and `I` ownership fixed. `I` moved to `TT2ExecFrame.i` through `tt2ActiveI()` with a depth assert. EVERY/SKIP use upstream modulo semantics: normalize mod (`0 -> 1`, negative -> positive), `count++`, `count %= mod`, EVERY fires on `count == 0`, SKIP fires on `count != 0`. Counter state is per `(script,line)`.
 - 2026-05-27: 6 post-Step-5 findings resolved in one session. Include path fixed after `TeletypeInterpreter.h` + `TeletypeNativeOps.cpp` moved from `model/` to `engine/`. Runtime defaults aligned with upstream `ss_variables_init()` (A=1, B=2, C=3, D=4, M=1000, M.ACT=1, TR.TIME=100, TR.POL=1, etc.). CV write clamped with `normalise_value(0, 16383, 0, val)`. TR write stores boolean (`level != 0`). Pattern init sets `len = 0` (was 64) to match upstream `ss_pattern_init()`. Stack push is bounds-checked. Set-vs-get semantics corrected: leftmost token only sets when `isSetPosition && stackSize >= 1`; otherwise it gets. This fixes `A`, `CV 1`, `M` alone from StackUnderflow, and preserves `B + A 5` where `A` is a getter despite values on the stack.
 - 2026-05-27: Step 3 separator/mod execution. `evaluateCommand()` splits at SUB_SEP into segments (left-to-right, fresh stack per segment). PRE_SEP splits segment into prefix+body; IF mod evaluates prefix then conditionally executes body. Unsupported mods rejected before prefix evaluation. IF arity enforced (prefix must produce exactly 1 value). `evaluateSegment()` refactored with explicit op-table parameter to prevent test drift.
 - 2026-05-27: Step 2 semantic blockers fixed as one bounded patch. M/M.ACT ownership moved from `metro` struct to `variables.m`/`variables.m_act` to match upstream `ss->variables.m` usage; clamp minimum 2ms. Scale and turtle defaults initialized to match upstream `ss_init()`/`turtle_init()`. `runScript()` clears exec frame with `memset` before use.
@@ -61,6 +64,8 @@ Define Teletype v2 as a Performer-native Teletype++ dialect: preserve hardware-i
 - [x] Step 6: TT2TrackEngine smoke wiring — `runScript()`, `cvOutput()`, `gateOutput()` added to `TT2TrackEngine`. `cvOutput()` converts raw 0..16383 to Performer float volts (-5V..+5V). `gateOutput()` returns boolean from `trLevel`. Test file `TestTeletypeV2TrackEngineSmoke.cpp` with 6 cases: single CV, single TR high/low, multi-CV, no-track noop, voltage bounds. All 99 TT2 tests green. STM32 release build clean; firmware binary unchanged (TT2TrackEngine.h not yet linked into main build).
 - [x] Cleanup: `TeletypeInterpreter.h` renamed to `TT2Evaluator.h` + `TT2Runner.h`. Evaluator (segment/command/stack/errors) separated from runner (script iteration, frame context). Comments updated to "native v2 evaluator". No compatibility shim. 108 TT2 tests green. STM32 release clean.
 - [x] Step 6-adjacent: Narrow L loop — `E_MOD_L` in `evaluateCommand()` builds body command from remaining tokens and calls `evaluateCommand()` per iteration. `I` variable added to `TT2Variables` with `opI` handler. Reversed bounds (descending), equal bounds (single iter), negative bounds, and nested L (re-entrant `evaluateCommand`) supported. Mod prefix evaluation uses `forceGet` to prevent leftmost-op setter from consuming stack values. 12 test cases: L 1 3, L 0 2 counter, L 3 1 reversed, L 1 arity fail, L 1 3 5 arity fail, nested L, body failure stop, I restore, equal bounds, negative-to-positive, variable bounds. All 131 TT2 tests green. STM32 release clean. `sizeof(TT2Variables)` = 402 → `.data+bss` +2 B; `sizeof(TT2Runtime)` = 2130 → +2 B vs baseline. Size guards relaxed to `<=` for host/ARM portability.
+- [x] Step 7: EVERY/SKIP + exec-frame I ownership — `I` moved out of variables into `TT2ExecFrame.i` and is accessed through `tt2ActiveI()`. EVERY/EV/SKIP implemented with upstream modulo semantics, per-script/per-line counters, normalized mod values, side-effect isolation, and bounds checks. 13 EVERY/SKIP test cases cover every-1, every-2 multi-call, every-3, per-script isolation, per-line persistence, init reset, skip-2, opposite phase with EVERY, EV alias, side-effect isolation, arity, negative mod, and zero mod.
+- [x] Step 8: Narrow SCRIPT calls — `SCRIPT n` executes child scripts by pushing a new TT2 exec frame through `runScript()`. Parent frame is restored on return, child frame starts with independent `I = 0`, child errors propagate, parent continuation works after successful child calls, and recursive calls stop at `TT2_EXEC_DEPTH` with `ExecDepthOverflow`. Program reference is transient evaluator context, not stored in `TT2Runtime`, so `TT2Track` size remains flat. `$`, `$F`, `$L`, fparams, return values, delay, break, and kill remain out of scope.
 
 ## Phase 1 RAM budget
 
@@ -80,14 +85,14 @@ Hard guards when structs are wired:
 
 ## Next action
 
-Phase 2 sandbox/smoke complete. Cleanup done.
+Phase 2 sandbox/smoke complete through narrow native SCRIPT calls. Cleanup done.
 
-Next semantic step is PROB or L, blocked only by naming/ownership (now resolved).
+Next semantic step is narrow delay scheduling.
 
 Phase 2b candidates:
-- `L` loops
-- Delay scheduling (`DEL`, `DEL.X`)
-- Nested script calls (`SCRIPT` op)
+- Delay scheduling (`DEL`, then `DEL.CLR`)
+- `$` / function calls and return values
+- `BREAK` / `KILL`
 - Full trigger input and metro scheduling (wire TT2TrackEngine into `Engine::TrackEngineContainer` and `Engine.cpp` track creation)
 - Add `TT2Track` to `Track` container with `TrackMode::TeletypeV2` or mode-switching strategy
 
@@ -166,4 +171,4 @@ Phase 2b, not first slice:
 - Do not move TT2Runtime into TT2TrackEngine. The engine container is the dangerous CCMRAM gate.
 - Envelope, LFO, and Geode are not pre-allocated in TT2TrackEngine. They may become control ops over the Modulator/engine layer.
 - TT2OutputState is ms-based (float) for pulse/slew timing. CV targets are raw int16_t; performer outputs are float volts.
-- I (`variables.i`) currently lives in `TT2Variables` (model-owned). Before nested scripts or delay callbacks, move it to the active `TT2ExecFrame` or an accessor that can redirect there. Old Teletype stores I per-frame via `es_variables(es)->i`. Single-frame runner works correctly now; the ownership cleanup is gated on nested execution.
+- I lives in `TT2ExecFrame.i`, not `TT2Variables`; use `tt2ActiveI()` only when an exec frame is active.

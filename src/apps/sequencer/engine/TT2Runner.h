@@ -5,10 +5,10 @@
 // Run one script line-by-line through the native v2 evaluator.
 //
 // - Validates scriptIndex and script length bounds.
-// - Sets execution context (script_number, line_number) in TT2ExecState.
+// - Pushes one exec frame on entry, pops it on return (success or error).
 // - Executes lines 0 .. script.length-1; zero-length lines are skipped.
-// - Stops on first evaluator/op error and returns the result.
-// - No nested script calls, no delay.
+// - Stops on first evaluator/op error and returns it.
+// - Supports nested SCRIPT calls up to TT2_EXEC_DEPTH frames.
 inline TT2EvalResult runScript(const TeletypeProgram &program,
                                TT2Runtime &runtime,
                                TT2OutputState &output,
@@ -22,12 +22,16 @@ inline TT2EvalResult runScript(const TeletypeProgram &program,
         return {TT2EvalError::ScriptLengthOverflow, 0, 0, 0};
     }
 
-    // Push one execution frame for the script context.
-    runtime.exec.depth = 1;
-    runtime.exec.overflow = 0;
-    TT2ExecFrame &frame = runtime.exec.frames[0];
+    if (runtime.exec.depth >= TT2_EXEC_DEPTH) {
+        runtime.exec.overflow = 1;
+        return {TT2EvalError::ExecDepthOverflow, 0, 0, 0};
+    }
+
+    // Push one execution frame.
+    TT2ExecFrame &frame = runtime.exec.frames[runtime.exec.depth];
     memset(&frame, 0, sizeof(TT2ExecFrame));
     frame.script_number = scriptIndex;
+    runtime.exec.depth++;
 
     for (uint8_t line = 0; line < script.length; ++line) {
         const TT2Command &cmd = script.commands[line];
@@ -36,11 +40,13 @@ inline TT2EvalResult runScript(const TeletypeProgram &program,
         }
 
         frame.line_number = line;
-        TT2EvalResult result = evaluateCommand(cmd, runtime, output);
+        TT2EvalResult result = evaluateCommand(cmd, runtime, output, &program);
         if (result.error != TT2EvalError::None) {
+            runtime.exec.depth--;
             return result;
         }
     }
 
+    runtime.exec.depth--;
     return {TT2EvalError::None, 0, 0, 0};
 }

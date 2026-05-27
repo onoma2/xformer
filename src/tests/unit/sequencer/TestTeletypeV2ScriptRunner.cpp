@@ -112,7 +112,9 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
 
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::None), "ok");
-        expectEqual(int(runtime.exec.depth), 1, "depth");
+        // After runScript, depth is back to 0 (frame popped).
+        // frame[0] still contains the last script context.
+        expectEqual(int(runtime.exec.depth), 0, "depth popped");
         expectEqual(int(runtime.exec.frames[0].script_number), 0, "script number");
         // Last line executed was line 1.
         expectEqual(int(runtime.exec.frames[0].line_number), 1, "line number");
@@ -940,17 +942,14 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
 
         TT2Runtime runtime = {};
         init(runtime);
-        // Set up a valid exec frame so tt2ActiveI() is defined before runScript.
-        runtime.exec.depth = 1;
-        runtime.exec.frames[0].i = 42;
         TT2OutputState output = {};
         init(output);
 
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::None), "ok");
         expectEqual(runtime.variables.a, int16_t(3), "A = final I");
-        // I is left at the final in-range value, not restored to 42.
-        expectEqual(tt2ActiveI(runtime), int16_t(3), "I left at final loop value");
+        // I is left at the final in-range value.
+        expectEqual(runtime.exec.frames[0].i, int16_t(3), "I left at final loop value");
     }
 
     CASE("l_single_iteration_equal_bounds") {
@@ -1020,7 +1019,7 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         auto result = runScript(program, runtime, output, 0);
         expectEqual(int(result.error), int(TT2EvalError::None), "ok");
         expectEqual(runtime.variables.a, int16_t(21), "A saw mutated I=21");
-        expectEqual(tt2ActiveI(runtime), int16_t(21), "I = 21 after loop");
+        expectEqual(runtime.exec.frames[0].i, int16_t(21), "I = 21 after loop");
     }
 
     CASE("l_does_not_double_execute_trailing_segment") {
@@ -1331,6 +1330,111 @@ UNIT_TEST("TeletypeV2ScriptRunner") {
         expectEqual(int(r1.error), int(TT2EvalError::None), "ok");
         expectEqual(runtime.variables.a, int16_t(10), "fires on EVERY 0");
     }
-}
 
+    // --- SCRIPT nested execution tests ---
+
+    CASE("script_calls_child_and_continues") {
+        // Parent script 0 has two lines:
+        //   SCRIPT 2 ; B 20
+        // Child script 1 sets A = 10.
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "SCRIPT 2; B 20");
+        program.scripts[0].length = 1;
+        writeLine(program.scripts[1], 0, "A 10");
+        program.scripts[1].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "A set by child");
+        expectEqual(runtime.variables.b, int16_t(20), "B set after SCRIPT");
+    }
+
+    CASE("script_child_error_stops_parent") {
+        // Parent calls a child that errors (CV 9 1 out of range).
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "A 10; SCRIPT 2; B 20");
+        program.scripts[0].length = 1;
+        writeLine(program.scripts[1], 0, "CV 9 1");
+        program.scripts[1].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::OutOfRange), "child error");
+        expectEqual(runtime.variables.a, int16_t(10), "A set before child");
+        expectEqual(runtime.variables.b, int16_t(2), "B not set after child error");
+    }
+
+    CASE("script_parent_i_restored_after_child") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "I 5; A I; SCRIPT 2; B I");
+        program.scripts[0].length = 1;
+        writeLine(program.scripts[1], 0, "I 99; X 10");
+        program.scripts[1].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(5), "A = parent I before child");
+        expectEqual(runtime.variables.b, int16_t(5), "B = parent I = 5 (restored)");
+        expectEqual(runtime.variables.x, int16_t(10), "X set by child");
+    }
+
+    CASE("script_child_i_isolated_from_parent") {
+        // Parent: I=5, calls SCRIPT 2, reads B=I. Child: I=99.
+        // Child's I mutation must not leak to parent.
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "I 5; SCRIPT 2; B I");
+        program.scripts[0].length = 1;
+        writeLine(program.scripts[1], 0, "I 99");
+        program.scripts[1].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        // I was set to 5 in parent; child sets 99 in its own frame.
+        // After child returns, parent's B should read parent's I=5.
+        expectEqual(runtime.variables.a, int16_t(1), "A unchanged");
+        expectEqual(runtime.variables.b, int16_t(5), "B = parent I = 5 (child isolated)");
+    }
+
+    CASE("script_depth_overflow_stop") {
+        // s0 -> s1 -> s0 -> s1 ... until depth overflow at TT2_EXEC_DEPTH.
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "SCRIPT 2"); // calls s1
+        program.scripts[0].length = 1;
+        writeLine(program.scripts[1], 0, "SCRIPT 1"); // calls s0
+        program.scripts[1].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::ExecDepthOverflow), "overflow");
+        expectEqual(int(runtime.exec.overflow), 1, "overflow flagged");
+    }
+}
 

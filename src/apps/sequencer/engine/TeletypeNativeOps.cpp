@@ -1,4 +1,5 @@
 #include "TT2Evaluator.h"
+#include "TT2Runner.h"
 
 // ---------------------------------------------------------------------------
 // Helper: pop a 1-based output index and convert to 0-based.
@@ -24,7 +25,8 @@ static bool popOutputIndex(int16_t *stack, uint8_t &stackSize,
 // Variable ops
 // ---------------------------------------------------------------------------
 
-static void opA(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
+static void opA(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack,
                 uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
@@ -35,7 +37,8 @@ static void opA(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
     }
 }
 
-static void opB(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
+static void opB(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack,
                 uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
@@ -46,7 +49,8 @@ static void opB(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
     }
 }
 
-static void opX(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
+static void opX(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack,
                 uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
@@ -57,7 +61,8 @@ static void opX(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
     }
 }
 
-static void opI(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
+static void opI(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack,
                 uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
@@ -72,7 +77,8 @@ static void opI(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
 // Math ops
 // ---------------------------------------------------------------------------
 
-static void opAdd(TT2Runtime &, TT2OutputState &, int16_t *stack,
+static void opAdd(TT2Runtime &, TT2OutputState &, const TeletypeProgram *,
+                  int16_t *stack,
                   uint8_t &stackSize, bool, TT2EvalError &error) {
     int16_t b = 0;
     int16_t a = 0;
@@ -92,7 +98,8 @@ static int16_t normaliseCvValue(int16_t value) {
     return value;
 }
 
-static void opCv(TT2Runtime &runtime, TT2OutputState &output, int16_t *stack,
+static void opCv(TT2Runtime &runtime, TT2OutputState &output,
+                 const TeletypeProgram *, int16_t *stack,
                  uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_CV_COUNT)) {
@@ -110,7 +117,8 @@ static void opCv(TT2Runtime &runtime, TT2OutputState &output, int16_t *stack,
     }
 }
 
-static void opTr(TT2Runtime &runtime, TT2OutputState &output, int16_t *stack,
+static void opTr(TT2Runtime &runtime, TT2OutputState &output,
+                 const TeletypeProgram *, int16_t *stack,
                  uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     int16_t idx = 0;
     if (!popOutputIndex(stack, stackSize, idx, error, TT2_OUTPUT_TR_COUNT)) {
@@ -132,7 +140,8 @@ static void opTr(TT2Runtime &runtime, TT2OutputState &output, int16_t *stack,
 // Metro ops
 // ---------------------------------------------------------------------------
 
-static void opM(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
+static void opM(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                int16_t *stack,
                 uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
@@ -144,7 +153,8 @@ static void opM(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
     }
 }
 
-static void opMAct(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
+static void opMAct(TT2Runtime &runtime, TT2OutputState &, const TeletypeProgram *,
+                   int16_t *stack,
                    uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
     if (isSetPosition && stackSize >= 1) {
         int16_t val = 0;
@@ -152,6 +162,39 @@ static void opMAct(TT2Runtime &runtime, TT2OutputState &, int16_t *stack,
         runtime.variables.m_act = (val != 0) ? 1 : 0;
     } else {
         pushStack(stack, stackSize, runtime.variables.m_act, error);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Script op — nested script call
+// ---------------------------------------------------------------------------
+
+static void opScript(TT2Runtime &runtime, TT2OutputState &output,
+                     const TeletypeProgram *program, int16_t *stack,
+                     uint8_t &stackSize, bool isSetPosition, TT2EvalError &error) {
+    if (isSetPosition && stackSize >= 1) {
+        int16_t oneBased = 0;
+        if (!popStack(stack, stackSize, oneBased, error)) return;
+        int16_t zeroBased = oneBased - 1;
+        if (zeroBased < 0 || zeroBased >= TT2_SCRIPT_COUNT) {
+            error = TT2EvalError::OutOfRange;
+            return;
+        }
+        if (program == nullptr) {
+            error = TT2EvalError::NoTrack;
+            return;
+        }
+        TT2EvalResult result = runScript(*program, runtime, output,
+                                           static_cast<uint8_t>(zeroBased));
+        if (result.error != TT2EvalError::None) {
+            error = result.error;
+        }
+    } else {
+        pushStack(stack, stackSize,
+                  runtime.exec.depth > 0
+                      ? runtime.exec.frames[runtime.exec.depth - 1].script_number + 1
+                      : 0,
+                  error);
     }
 }
 
@@ -176,6 +219,7 @@ namespace {
             table[E_OP_TR]       = opTr;
             table[E_OP_M]        = opM;
             table[E_OP_M_ACT]    = opMAct;
+            table[E_OP_SCRIPT]   = opScript;
         }
     };
     OpTableBuilder opTableBuilder;
