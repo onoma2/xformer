@@ -96,6 +96,14 @@ inline float directionOffset(PhaseFluxSequence::PitchDirectionType d,
     return 0.f;
 }
 
+inline int repeatMultiplier(PhaseFluxSequence::RepeatType v) {
+    return PhaseFluxMath::repeatMultiplier(v);
+}
+
+inline bool isInWindow(float phi, PhaseFluxSequence::WindowType v) {
+    return PhaseFluxMath::isInWindow(phi, v);
+}
+
 inline Curve::Type temporalCurveLut(PhaseFluxSequence::TemporalCurveType v) {
     switch (v) {
     case PhaseFluxSequence::TemporalCurveType::Linear: return Curve::RampUp;
@@ -170,11 +178,14 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     WindowPainter::drawActiveFunction(canvas, setName);
 
     // Footer: all topics now paged. F5 = Next. Shift bindings dropped — flips
-    // are first-class on page 1 (press = toggle).
+    // are first-class on page 1 (press = toggle). TEMP / PTCH-Cell add a
+    // page 2 for the §14.2 Window + Repeat transforms.
     static const char *kLabelsTempP0[5]  = { "Curve", "Warp",  "Resp", "Puls",  "Next" };
     static const char *kLabelsTempP1[5]  = { "Len",   "FlipV", "FlipH", "Mask", "Next" };
+    static const char *kLabelsTempP2[5]  = { "Wind",  "Rep",   nullptr, nullptr, "Next" };
     static const char *kLabelsPtchP0[5]  = { "Curve", "Warp",  "Resp", "Note",  "Next" };
     static const char *kLabelsPtchP1[5]  = { "Span",  "Dir",   "FlipV", "FlipH", "Next" };
+    static const char *kLabelsPtchP2[5]  = { "Wind",  "Rep",   nullptr, nullptr, "Next" };
     static const char *kLabelsPtchGlobalP0[5] = { "Curve", "Warp", "Resp", "Rate", "Next" };
     static const char *kLabelsPtchGlobalP1[5] = { "Note",  "Span", "FlipV","FlipH","Next" };
     static const char *kLabelsAccumP0[5] = { "Ac.St", nullptr, nullptr, "Order", "Next" };
@@ -182,11 +193,13 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
 
     const char *(*primary)[5];
     if (_currentSet == 0) {
-        primary = (_topicPage == 0) ? &kLabelsTempP0 : &kLabelsTempP1;
+        primary = (_topicPage == 0) ? &kLabelsTempP0 :
+                  (_topicPage == 1) ? &kLabelsTempP1 : &kLabelsTempP2;
     } else if (_currentSet == 1 && isGlobalPitch) {
         primary = (_topicPage == 0) ? &kLabelsPtchGlobalP0 : &kLabelsPtchGlobalP1;
     } else if (_currentSet == 1) {
-        primary = (_topicPage == 0) ? &kLabelsPtchP0 : &kLabelsPtchP1;
+        primary = (_topicPage == 0) ? &kLabelsPtchP0 :
+                  (_topicPage == 1) ? &kLabelsPtchP1 : &kLabelsPtchP2;
     } else {
         primary = (_topicPage == 0) ? &kLabelsAccumP0 : &kLabelsAccumP1;
     }
@@ -305,7 +318,16 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
     if (key.isFunction()) {
         int slot = key.function();
         if (slot == 4) {
-            _topicPage = 1 - _topicPage;
+            const auto &seq = _project.selectedPhaseFluxSequence();
+            const bool isGlobalPitchHere =
+                _currentSet == 1 &&
+                seq.pitchMode() == PhaseFluxSequence::PitchMode::Global;
+            // TEMP and PTCH-Cell carry a 3rd page (§14.2 Window/Repeat).
+            // PTCH-Global and ACCUM keep the 2-page cycle.
+            const bool hasThreePages =
+                (_currentSet == 0) || (_currentSet == 1 && !isGlobalPitchHere);
+            const int pageCount = hasThreePages ? 3 : 2;
+            _topicPage = (_topicPage + 1) % pageCount;
             _selectedSlot = 0;
             event.consume();
             return;
@@ -389,8 +411,8 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
         return;
     }
     if (_currentSet == 0) {
-        // TEMP — P0: Curve/Warp/Resp/Puls; P1: Len/[FlipV*]/[FlipH*]/Mask
-        // (* = handled by togglePressSlot, not editSlot.)
+        // TEMP — P0: Curve/Warp/Resp/Puls; P1: Len/[FlipV*]/[FlipH*]/Mask;
+        // P2: Window/Repeat/—/— (* = handled by togglePressSlot, not editSlot.)
         if (_topicPage == 0) {
             switch (slot) {
             case 0: activeStage.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(cycle(int(activeStage.temporalCurve()) + value, 0, 2))); break;
@@ -398,11 +420,18 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             case 2: activeStage.setTemporalResponse(ModelUtils::adjusted(activeStage.temporalResponse(), value, -64, 64)); break;
             case 3: activeStage.setPulseCount(ModelUtils::adjusted(activeStage.pulseCount(), value, 1, 8)); break;
             }
-        } else {
+        } else if (_topicPage == 1) {
             switch (slot) {
             case 0: activeStage.setStageLen(ModelUtils::adjusted(activeStage.stageLen(), value, 0, 127)); break;
             // slots 1, 2 are FlipV / FlipH toggles (press-only)
             case 3: activeStage.setMask(PhaseFluxSequence::MaskType(cycle(int(activeStage.mask()) + value, 0, 7))); break;
+            }
+        } else {
+            // P2 — §14.2 Window + Repeat per axis.
+            switch (slot) {
+            case 0: activeStage.setTemporalWindow(PhaseFluxSequence::WindowType(cycle(int(activeStage.temporalWindow()) + value, 0, 4))); break;
+            case 1: activeStage.setTemporalRepeat(PhaseFluxSequence::RepeatType(cycle(int(activeStage.temporalRepeat()) + value, 0, 3))); break;
+            // slots 2, 3 reserved
             }
         }
     } else if (isGlobalPitch) {
@@ -422,7 +451,8 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             }
         }
     } else {
-        // PTCH Cell — P0: Curve/Warp/Resp/Note; P1: Span/Dir/[FlipV*]/[FlipH*]
+        // PTCH Cell — P0: Curve/Warp/Resp/Note; P1: Span/Dir/[FlipV*]/[FlipH*];
+        // P2: Window/Repeat/—/—
         if (_topicPage == 0) {
             switch (slot) {
             case 0: activeStage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(activeStage.pitchCurve()) + value, 0, 3))); break;
@@ -430,11 +460,18 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             case 2: activeStage.setPitchResponse(ModelUtils::adjusted(activeStage.pitchResponse(), value, -64, 64)); break;
             case 3: activeStage.setBasePitch(ModelUtils::adjusted(activeStage.basePitch(), value, -64, 64)); break;
             }
-        } else {
+        } else if (_topicPage == 1) {
             switch (slot) {
             case 0: activeStage.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(activeStage.pitchRange()) + value, 0, 3))); break;
             case 1: activeStage.setPitchDirection(PhaseFluxSequence::PitchDirectionType(cycle(int(activeStage.pitchDirection()) + value, 0, 2))); break;
             // slots 2, 3 are active stage's FlipV / FlipH toggles
+            }
+        } else {
+            // P2 — §14.2 Window + Repeat for pitch axis.
+            switch (slot) {
+            case 0: activeStage.setPitchWindow(PhaseFluxSequence::WindowType(cycle(int(activeStage.pitchWindow()) + value, 0, 4))); break;
+            case 1: activeStage.setPitchRepeat(PhaseFluxSequence::RepeatType(cycle(int(activeStage.pitchRepeat()) + value, 0, 3))); break;
+            // slots 2, 3 reserved
             }
         }
     }
@@ -570,15 +607,27 @@ void PhaseFluxEditPage::drawTemporalScope(Canvas &canvas, int stageIdx, int scop
     canvas.drawRect(x, y, ScopeW, ScopeH);
     canvas.hline(x + 1, y + ScopeH - 2, ScopeW - 2);
 
-    // Temporal density curve trace
+    // Temporal density curve trace — honors §14.2 Window + Repeat. Each
+    // sub-section [k/R, (k+1)/R] of the display shows one copy of the
+    // (windowed) curve mapped from local [0, 1].
+    const int tempRepeat = repeatMultiplier(stage.temporalRepeat());
+    const auto temporalWindowType = stage.temporalWindow();
     canvas.setColor(Color::Bright);
     int prevPy = -1;
+    bool prevVisible = false;
     for (int px = 0; px < ScopeW - 2; ++px) {
         float t_raw = float(px) / float(ScopeW - 3);
-        float t_final = evalTemporal(stage, t_raw);
+        float t_local = std::fmod(t_raw * float(tempRepeat), 1.f);
+        if (!isInWindow(t_local, temporalWindowType)) {
+            prevVisible = false;
+            continue;
+        }
+        float t_final = evalTemporal(stage, t_local);
         int py = y + ScopeH - 2 - int(t_final * float(ScopeH - 3));
-        if (prevPy >= 0) canvas.line(x + px, prevPy, x + px + 1, py);
+        int cx = x + px;
+        if (prevVisible) canvas.line(cx - 1, prevPy, cx, py);
         prevPy = py;
+        prevVisible = true;
     }
 
     // Pulse marks — 3x3 hollow ring per base pulse, 3x2 U-shape per
@@ -603,11 +652,30 @@ void PhaseFluxEditPage::drawTemporalScope(Canvas &canvas, int stageIdx, int scop
     const int effective  = std::max(1, std::min(8, stage.pulseCount() + pulseAccOffset));
     const int basesDrawn = std::min(basePulses, effective);
 
+    // §14.2 sub-section + Window math (mirrors engine in PhaseFluxTrackEngine.cpp).
+    const int subBaseSize = effective / tempRepeat;
+    const int subRemainder = effective % tempRepeat;
+    const int subOversizeBoundary = subRemainder * (subBaseSize + 1);
     for (int i = 0; i < effective; ++i) {
-        // §6.1 — matches engine: first pulse at slot start, last at (N-1)/N.
-        float t_raw = float(i) / float(effective);
-        float t_final = evalTemporal(stage, t_raw);
-        float t_shifted = t_final + float(stage.phaseShift()) * 0.125f;
+        // Same sub-section assignment the engine uses.
+        int subIdx;
+        int localPulseIdx;
+        int pulsesInThisSub;
+        if (i < subOversizeBoundary) {
+            subIdx = i / (subBaseSize + 1);
+            localPulseIdx = i % (subBaseSize + 1);
+            pulsesInThisSub = subBaseSize + 1;
+        } else {
+            const int j = i - subOversizeBoundary;
+            subIdx = subRemainder + (subBaseSize > 0 ? j / subBaseSize : 0);
+            localPulseIdx = (subBaseSize > 0) ? (j % subBaseSize) : 0;
+            pulsesInThisSub = subBaseSize > 0 ? subBaseSize : 1;
+        }
+        const float t_raw_local = float(localPulseIdx) / float(pulsesInThisSub);
+        if (!isInWindow(t_raw_local, temporalWindowType)) continue;
+        float t_final_local = evalTemporal(stage, t_raw_local);
+        float t_final_global = (float(subIdx) + t_final_local) / float(tempRepeat);
+        float t_shifted = t_final_global + float(stage.phaseShift()) * 0.125f;
         t_shifted = std::fmod(t_shifted, 1.f);
         if (t_shifted < 0.f) t_shifted += 1.f;
         bool muted = (maskByte >> ((i + maskShift) & 7)) & 1;
@@ -648,16 +716,29 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     canvas.drawRect(x, y, ScopeW, ScopeH);
     canvas.vline(x + PitchLabelColW, y + 1, ScopeH - 2);
 
+    // §14.2 Window/Repeat for pitch — Cell mode only.
+    const bool isGlobalPitchHere =
+        seq.pitchMode() == PhaseFluxSequence::PitchMode::Global;
+    const int pitchRep = isGlobalPitchHere ? 1 : repeatMultiplier(stage.pitchRepeat());
+    const auto pitchWindowType = isGlobalPitchHere
+        ? PhaseFluxSequence::WindowType::Off
+        : stage.pitchWindow();
+
     // Curve trace — Medium so the shape reads but doesn't dominate.
+    // Window hides bands; Repeat multiplies the curve frequency.
     canvas.setColor(Color::Medium);
     int prevPy = -1;
+    bool prevVisible = false;
     for (int px = 0; px < traceW; ++px) {
         float phi = float(px) / float(std::max(1, traceW - 1));
-        float p_final = evalPitch(stage, phi);
+        if (!isInWindow(phi, pitchWindowType)) { prevVisible = false; continue; }
+        float phi_repeated = (pitchRep > 1) ? std::fmod(phi * float(pitchRep), 1.f) : phi;
+        float p_final = evalPitch(stage, phi_repeated);
         int py = y + ScopeH - 2 - int(p_final * float(ScopeH - 3));
         int cx = traceX0 + px;
-        if (prevPy >= 0) canvas.line(cx - 1, prevPy, cx, py);
+        if (prevVisible) canvas.line(cx - 1, prevPy, cx, py);
         prevPy = py;
+        prevVisible = true;
     }
 
     // Engine state for playhead-aware highlight.
@@ -665,21 +746,45 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     const bool isActiveCell = te && (te->activeCell() == stageIdx);
     const float stagePhase  = isActiveCell ? te->sequenceProgress() : -1.f;
 
-    // Pulse-fire dots — 2x2, on the curve at each unmuted pulse's (t, pitch).
-    // Spacing uses i/N (engine §6.1). Dim by default, bright as the
-    // playhead crosses each one in the active cell.
+    // Pulse-fire dots — 2x2 on the curve at each unmuted pulse's (t, pitch).
+    // Honors temporal Window (drops pulses outside band) and pitch Window
+    // (drops dot when curve sample is in hidden band).
     int pulses = std::max(1, std::min(8, stage.pulseCount()));
     int maskByte = kMaskTable[int(stage.mask())];
     int maskShift = stage.maskShift();
+    const int tempRep = repeatMultiplier(stage.temporalRepeat());
+    const auto temporalWindowType = stage.temporalWindow();
+    // §14.2 sub-section + Window math (mirrors engine).
+    const int subBaseSize = pulses / tempRep;
+    const int subRemainder = pulses % tempRep;
+    const int subOversizeBoundary = subRemainder * (subBaseSize + 1);
     for (int i = 0; i < pulses; ++i) {
-        float t_raw = float(i) / float(pulses);
-        float t_final = evalTemporal(stage, t_raw);
-        float t_shifted = t_final + float(stage.phaseShift()) * 0.125f;
+        int subIdx;
+        int localPulseIdx;
+        int pulsesInThisSub;
+        if (i < subOversizeBoundary) {
+            subIdx = i / (subBaseSize + 1);
+            localPulseIdx = i % (subBaseSize + 1);
+            pulsesInThisSub = subBaseSize + 1;
+        } else {
+            const int j = i - subOversizeBoundary;
+            subIdx = subRemainder + (subBaseSize > 0 ? j / subBaseSize : 0);
+            localPulseIdx = (subBaseSize > 0) ? (j % subBaseSize) : 0;
+            pulsesInThisSub = subBaseSize > 0 ? subBaseSize : 1;
+        }
+        const float t_raw_local = float(localPulseIdx) / float(pulsesInThisSub);
+        if (!isInWindow(t_raw_local, temporalWindowType)) continue;
+        float t_final_local = evalTemporal(stage, t_raw_local);
+        float t_final_global = (float(subIdx) + t_final_local) / float(tempRep);
+        float t_shifted = t_final_global + float(stage.phaseShift()) * 0.125f;
         t_shifted = std::fmod(t_shifted, 1.f);
         if (t_shifted < 0.f) t_shifted += 1.f;
         bool muted = (maskByte >> ((i + maskShift) & 7)) & 1;
         if (muted) continue;
-        float p_final = evalPitch(stage, t_shifted);
+        // Pitch axis: window check, then repeat-multiply phi.
+        if (!isInWindow(t_shifted, pitchWindowType)) continue;
+        float phi_repeated = (pitchRep > 1) ? std::fmod(t_shifted * float(pitchRep), 1.f) : t_shifted;
+        float p_final = evalPitch(stage, phi_repeated);
         int dx = traceX0 + int(t_shifted * float(std::max(1, traceW - 1)));
         int dy = y + ScopeH - 2 - int(p_final * float(ScopeH - 3));
         bool passed = (stagePhase >= 0.f) && (stagePhase >= t_shifted);
@@ -690,8 +795,8 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     // Reachable-degree histogram + top 4 by count.
     const Scale &scale = seq.selectedScale(_model.project().scale());
     const int rootNote = seq.selectedRootNote(_model.project().rootNote());
-    const int octave = _phaseFluxTrack.octave();
-    const int transpose = _phaseFluxTrack.transpose();
+    const int octave = phaseFluxTrack().octave();
+    const int transpose = phaseFluxTrack().transpose();
     const float rangeOctaves = pitchRangeToOctaves_local(stage.pitchRange());
     const int rangeDegrees = std::max(1, int(std::round(rangeOctaves * scale.notesPerOctave())));
     const int baseDegree = stage.basePitch() + octave * scale.notesPerOctave() + transpose;
@@ -1006,94 +1111,97 @@ void PhaseFluxEditPage::drawStageBadge(Canvas &canvas, int scopeX) {
 }
 
 void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
+    // ACCUM has its own drawAccumPage layout — never reaches here.
     const PhaseFluxSequence &seq = _project.selectedPhaseFluxSequence();
     const auto &activeStage = seq.stage(_selectedCell);
     const auto &masterStage = seq.stage(0);
-    const bool shift = globalKeyState()[Key::Shift];
     const bool isGlobalPitch =
         _currentSet == 1 &&
-        _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
-    const bool isAccumN = (_currentSet == 2);
-    const bool isAccumP = (_currentSet == 3);
-    const bool isAccum = isAccumN || isAccumP;
-    // In Global PTCH mode, F1-F3 read from stage[0] (the master). Cell mode
-    // and TEMP set read from the currently selected cell.
+        seq.pitchMode() == PhaseFluxSequence::PitchMode::Global;
     const auto &pitchSrc = isGlobalPitch ? masterStage : activeStage;
 
     static const char *kTempCurve[3]  = { "Lin", "Bel", "Bnc" };
     static const char *kPitchCurve[4] = { "Rmp", "Bel", "Tri", "Bnc" };
+    static const char *kPitchDir[3]   = { "Up", "Down", "Bi" };
+    static const char *kPitchRange[4] = { "1/2", "1", "2", "3" };
+    static const char *kWindow[5]     = { "Off", "F70", "F50", "P70", "P50" };
+    static const char *kRepeat[4]     = { "x1", "x2", "x3", "x5" };
+    static const char *kMask[8]       = { "Off", "1in2", "1in3", "1in4", "2in3", "2in4", "3in4", "1in8" };
 
-    static const char *kNamesTemp[5]       = { "Curve", "Warp", "Resp", "Len",  "Puls" };
-    static const char *kNamesPtch[5]       = { "Curve", "Warp", "Resp", "Base", "Span" };
-    static const char *kNamesPtchGlobal[5] = { "Curve", "Warp", "Resp", "Rate", "Note" };
-    static const char *kNamesAccum[5]      = { "Amount", "+Lim", "-Lim", "Order", "Reset" };
-    static const char *kNamesAccumShift[5] = { "Trig",   "+Lim", "-Lim", "Polar", "Scope" };
+    const char *labels[4] = { nullptr, nullptr, nullptr, nullptr };
+    FixedStringBuilder<8> values[4];
 
-    FixedStringBuilder<8> values[5];
-    if (isAccum) {
-        const auto &cfg = isAccumN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
-        const int amount = isAccumN ? activeStage.accumulatorStep() : activeStage.pulseAccumStep();
-        const auto trig  = isAccumN ? activeStage.accumulatorTrigger() : activeStage.pulseAccumTrigger();
-        static const char *kOrder[4] = { "Wrap", "Pend", "Hold", "RTZ" };
-        const char *trigStr = (trig == PhaseFluxSequence::AccumulatorTriggerType::Pulse) ? "Pulse" : "Stage";
-        const char *polarStr = (cfg.polarity() == AccumulatorConfig::Polarity::Bi) ? "Bi" : "Uni";
-        const char *scopeStr = (cfg.scope() == AccumulatorConfig::Scope::Track) ? "Track" : "Local";
-        if (shift) values[0]("%s", trigStr);
-        else       values[0]("%+d", amount);
-        values[1]("%d", cfg.posLim());
-        values[2]("%d", cfg.negLim());
-        if (shift) values[3]("%s", polarStr);
-        else       values[3]("%s", kOrder[clamp(int(cfg.order()), 0, 3)]);
-        if (shift) values[4]("%s", scopeStr);
-        else if (cfg.reset() == 0) values[4]("Manual");
-        else values[4]("%dcyc", int(cfg.reset()));
-    } else if (_currentSet == 0) {
-        values[0]("%s",  kTempCurve[clamp(int(activeStage.temporalCurve()), 0, 2)]);
-        values[1]("%+d", activeStage.temporalWarp());
-        values[2]("%+d", activeStage.temporalResponse());
-        values[3]("%.2fx", activeStage.stageLen() / 64.0f);
-        values[4]("%d",  activeStage.pulseCount());
-    } else if (isGlobalPitch) {
-        values[0]("%s",  kPitchCurve[clamp(int(pitchSrc.pitchCurve()), 0, 3)]);
-        values[1]("%+d", pitchSrc.pitchWarp());
-        values[2]("%+d", pitchSrc.pitchResponse());
-        values[3]("%d:%d",
-            PhaseFluxSequence::pitchRateNum(seq.pitchRate()),
-            PhaseFluxSequence::pitchRateDen(seq.pitchRate()));
-        // values[4] populated specially below (note name + range dots stacked).
-    } else {
-        values[0]("%s",  kPitchCurve[clamp(int(activeStage.pitchCurve()), 0, 3)]);
-        values[1]("%+d", activeStage.pitchWarp());
-        values[2]("%+d", activeStage.pitchResponse());
-        values[3]("%+d", activeStage.basePitch());
-        static const char *kPitchRange[4] = { "1/2", "1", "2", "3" };
-        values[4]("%s",  kPitchRange[clamp(int(activeStage.pitchRange()), 0, 3)]);
-    }
-    const char *(*names)[5];
     if (_currentSet == 0) {
-        names = &kNamesTemp;
-    } else if (isAccum) {
-        names = shift ? &kNamesAccumShift : &kNamesAccum;
+        // TEMP P0: Curve/Warp/Resp/Puls — P1: Len/FlipV/FlipH/Mask — P2: Window/Repeat
+        if (_topicPage == 0) {
+            labels[0] = "Curve"; values[0]("%s",  kTempCurve[clamp(int(activeStage.temporalCurve()), 0, 2)]);
+            labels[1] = "Warp";  values[1]("%+d", activeStage.temporalWarp());
+            labels[2] = "Resp";  values[2]("%+d", activeStage.temporalResponse());
+            labels[3] = "Puls";  values[3]("%d",  activeStage.pulseCount());
+        } else if (_topicPage == 1) {
+            labels[0] = "Len";   values[0]("%.2fx", activeStage.stageLen() / 64.0f);
+            labels[1] = "FlipV"; values[1]("%s", activeStage.temporalFlipV() ? "On" : "Off");
+            labels[2] = "FlipH"; values[2]("%s", activeStage.temporalFlipH() ? "On" : "Off");
+            labels[3] = "Mask";  values[3]("%s", kMask[clamp(int(activeStage.mask()), 0, 7)]);
+        } else {
+            labels[0] = "Wind";  values[0]("%s", kWindow[clamp(int(activeStage.temporalWindow()), 0, 4)]);
+            labels[1] = "Rep";   values[1]("%s", kRepeat[clamp(int(activeStage.temporalRepeat()), 0, 3)]);
+        }
     } else if (isGlobalPitch) {
-        // In Global PTCH, the F5 panel label swaps NOTE → SPAN while Shift is
-        // held, since Shift+F5 cycles the per-cell range (range demoted).
-        static const char *kNamesPtchGlobalShift[5] = { "Curve", "Warp", "Resp", "Rate", "Span" };
-        names = shift ? &kNamesPtchGlobalShift : &kNamesPtchGlobal;
+        // PTCH Global P0: Curve/Warp/Resp/Rate — P1: Note/Span/FlipV/FlipH (no P2)
+        if (_topicPage == 0) {
+            labels[0] = "Curve"; values[0]("%s",  kPitchCurve[clamp(int(pitchSrc.pitchCurve()), 0, 3)]);
+            labels[1] = "Warp";  values[1]("%+d", pitchSrc.pitchWarp());
+            labels[2] = "Resp";  values[2]("%+d", pitchSrc.pitchResponse());
+            labels[3] = "Rate";  values[3]("%d:%d",
+                PhaseFluxSequence::pitchRateNum(seq.pitchRate()),
+                PhaseFluxSequence::pitchRateDen(seq.pitchRate()));
+        } else {
+            labels[0] = "Note";
+            {
+                const Scale &scale = seq.selectedScale(_model.project().scale());
+                int rootNote = seq.selectedRootNote(_model.project().rootNote());
+                scale.noteName(values[0], activeStage.basePitch(), rootNote, Scale::Short1);
+            }
+            labels[1] = "Span";  values[1]("%s", kPitchRange[clamp(int(activeStage.pitchRange()), 0, 3)]);
+            labels[2] = "FlipV"; values[2]("%s", masterStage.pitchFlipV() ? "On" : "Off");
+            labels[3] = "FlipH"; values[3]("%s", masterStage.pitchFlipH() ? "On" : "Off");
+        }
     } else {
-        names = &kNamesPtch;
+        // PTCH Cell P0: Curve/Warp/Resp/Note — P1: Span/Dir/FlipV/FlipH — P2: Window/Repeat
+        if (_topicPage == 0) {
+            labels[0] = "Curve"; values[0]("%s",  kPitchCurve[clamp(int(activeStage.pitchCurve()), 0, 3)]);
+            labels[1] = "Warp";  values[1]("%+d", activeStage.pitchWarp());
+            labels[2] = "Resp";  values[2]("%+d", activeStage.pitchResponse());
+            labels[3] = "Note";
+            {
+                const Scale &scale = seq.selectedScale(_model.project().scale());
+                int rootNote = seq.selectedRootNote(_model.project().rootNote());
+                scale.noteName(values[3], activeStage.basePitch(), rootNote, Scale::Short1);
+            }
+        } else if (_topicPage == 1) {
+            labels[0] = "Span";  values[0]("%s", kPitchRange[clamp(int(activeStage.pitchRange()), 0, 3)]);
+            labels[1] = "Dir";   values[1]("%s", kPitchDir[clamp(int(activeStage.pitchDirection()), 0, 2)]);
+            labels[2] = "FlipV"; values[2]("%s", activeStage.pitchFlipV() ? "On" : "Off");
+            labels[3] = "FlipH"; values[3]("%s", activeStage.pitchFlipH() ? "On" : "Off");
+        } else {
+            labels[0] = "Wind";  values[0]("%s", kWindow[clamp(int(activeStage.pitchWindow()), 0, 4)]);
+            labels[1] = "Rep";   values[1]("%s", kRepeat[clamp(int(activeStage.pitchRepeat()), 0, 3)]);
+        }
     }
 
     canvas.setFont(Font::Tiny);
     canvas.setBlendMode(BlendMode::Set);
 
-    // Highlight box wraps only the value column (~1/3 of panel width), right-
-    // aligned, so the label stays static and only the live value pops.
+    // 4 rows now (was 5). Row height = ParamPanelH / 4.
+    const int rowH = ParamPanelH / 4;
     const int valueColW = ParamPanelW / 3;
     const int valueColX = ParamPanelX + ParamPanelW - valueColW;
 
-    for (int i = 0; i < 5; ++i) {
-        int ry = ParamPanelY + i * ParamRowH;
-        int rh = ParamRowH - 1;
+    for (int i = 0; i < 4; ++i) {
+        if (labels[i] == nullptr) continue;
+        int ry = ParamPanelY + i * rowH;
+        int rh = rowH - 1;
         bool isSelected = (i == _selectedSlot);
 
         if (isSelected) {
@@ -1101,31 +1209,8 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
             canvas.drawRect(valueColX, ry, valueColW, rh);
         }
         canvas.setColor(Color::Medium);
-        canvas.drawText(ParamPanelX + 2, ry + rh - 2, (*names)[i]);
+        canvas.drawText(ParamPanelX + 2, ry + rh - 2, labels[i]);
         canvas.setColor(isSelected ? Color::Bright : Color::MediumBright);
-
-        // F5 in Global PTCH renders the active stage's note name on the row's
-        // upper portion and range dots beneath. All other rows print a single
-        // right-flush value.
-        if (isGlobalPitch && i == 4) {
-            const Scale &scale = seq.selectedScale(_model.project().scale());
-            int rootNote = seq.selectedRootNote(_model.project().rootNote());
-            FixedStringBuilder<8> noteStr;
-            scale.noteName(noteStr, activeStage.basePitch(), rootNote, Scale::Short1);
-            int vw = canvas.textWidth(noteStr);
-            canvas.drawText(ParamPanelX + ParamPanelW - 2 - vw, ry + rh - 2, noteStr);
-            // Range dots beneath note name, flush right.
-            int dots = clamp(int(activeStage.pitchRange()), 0, 3) + 1;
-            int dotY = ry + rh + 1;
-            int dotX = ParamPanelX + ParamPanelW - 4;
-            canvas.setColor(isSelected ? Color::Bright : Color::MediumBright);
-            for (int k = 0; k < dots; ++k) {
-                canvas.point(dotX, dotY);
-                dotX -= 3;
-            }
-            continue;
-        }
-
         int vw = canvas.textWidth(values[i]);
         canvas.drawText(ParamPanelX + ParamPanelW - 2 - vw, ry + rh - 2, values[i]);
     }

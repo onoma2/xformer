@@ -47,6 +47,42 @@ float PhaseFluxMath::powerBendKnobToParam(int encoded) {
     return float(encoded) / 64.0f;
 }
 
+int PhaseFluxMath::repeatMultiplier(PhaseFluxSequence::RepeatType v) {
+    switch (v) {
+    case PhaseFluxSequence::RepeatType::x1: return 1;
+    case PhaseFluxSequence::RepeatType::x2: return 2;
+    case PhaseFluxSequence::RepeatType::x3: return 3;
+    case PhaseFluxSequence::RepeatType::x5: return 5;
+    }
+    return 1;
+}
+
+bool PhaseFluxMath::isInWindow(float phi, PhaseFluxSequence::WindowType v) {
+    switch (v) {
+    case PhaseFluxSequence::WindowType::Off:        return true;
+    case PhaseFluxSequence::WindowType::Focus70:    return phi >= 0.15f && phi <= 0.85f;
+    case PhaseFluxSequence::WindowType::Focus50:    return phi >= 0.25f && phi <= 0.75f;
+    case PhaseFluxSequence::WindowType::Polarize70: return phi <= 0.35f || phi >= 0.65f;
+    case PhaseFluxSequence::WindowType::Polarize50: return phi <= 0.25f || phi >= 0.75f;
+    }
+    return true;
+}
+
+bool PhaseFluxMath::evalWindowRepeat(float phi,
+                                     PhaseFluxSequence::WindowType window,
+                                     PhaseFluxSequence::RepeatType repeat,
+                                     float &phiOut) {
+    if (!isInWindow(phi, window)) return false;
+    const int R = repeatMultiplier(repeat);
+    if (R > 1) {
+        float scaled = phi * float(R);
+        phiOut = scaled - std::floor(scaled);
+    } else {
+        phiOut = phi;
+    }
+    return true;
+}
+
 int PhaseFluxMath::computeCumulativeTicks(
     const int stageDivisorTicksArr[kStageCount],
     const int stageLenArr[kStageCount],

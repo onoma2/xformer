@@ -32,6 +32,23 @@ public:
     /** §16 — encoded ±63 → ±0.984375 via /64; ±1 degeneracy excluded by design. */
     static float powerBendKnobToParam(int encoded);
 
+    /** §14.2 Repeat — enum value to integer multiplier (1 / 2 / 3 / 5). */
+    static int repeatMultiplier(PhaseFluxSequence::RepeatType v);
+
+    /** §14.2 Window — visible-band check on input phi ∈ [0, 1].
+     *  Off: always true. Focus N: phi in centered N% band. Polarize N:
+     *  phi in outer N% (split N/2 each side). */
+    static bool isInWindow(float phi, PhaseFluxSequence::WindowType v);
+
+    /** §14.2 Window + Repeat combined eval. Returns false if phi is in the
+     *  hidden band (engine should drop the pulse / hold the CV). On true,
+     *  writes the post-Window-post-Repeat phi to *phiOut (caller then runs
+     *  the warp / curve / response pipeline on it). */
+    static bool evalWindowRepeat(float phi,
+                                 PhaseFluxSequence::WindowType window,
+                                 PhaseFluxSequence::RepeatType repeat,
+                                 float &phiOut);
+
     /**
      * §3.1 — Snake-walk cumulative duration table.
      *   stageDivisorTicksArr[i] — ticks/stage at clockMultiplier=100, by cell index

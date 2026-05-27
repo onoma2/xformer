@@ -109,9 +109,9 @@ void Project::clear() {
 
     // Track 7: Note with empty sequence (gates all off — NoteSequence::clear default).
 
-    // Track 8: PhaseFlux — clean accumulator testbed. 4 active stages, all
-    // pitch Ramp, 1 pulse each. Stages 5..16 skipped. Accumulator defaults
-    // come from PhaseFluxSequence::clear() (note 28/28, pulse 8/8, manual reset).
+    // Track 8: PhaseFlux — Repeat/Window testbed. Stages 0 & 1 active with
+    // pulseCount=8, Linear temporal curve, Window=Polarize50 (max), Repeat=x5
+    // (max). Stages 2..15 skipped. Accumulator defaults from clear().
     track(7).setTrackMode(Track::TrackMode::PhaseFlux);
     auto &pfTrack = track(7).phaseFluxTrack();
     auto &pfSeq = pfTrack.sequence(0);
@@ -119,14 +119,21 @@ void Project::clear() {
     pfSeq.setDivisor(96);
 
     using PitchCurve = PhaseFluxSequence::PitchCurveType;
+    using TempCurve  = PhaseFluxSequence::TemporalCurveType;
+    using Window     = PhaseFluxSequence::WindowType;
+    using Repeat     = PhaseFluxSequence::RepeatType;
 
     for (int i = 0; i < 16; ++i) {
         auto &stage = pfSeq.stage(i);
-        stage.setPulseCount(1);
+        const bool active = (i < 2);
+        stage.setPulseCount(8);
         stage.setBasePitch(0);
         stage.setGateLength(40);
         stage.setPitchCurve(PitchCurve::Ramp);
-        stage.setSkip(i >= 4);
+        stage.setTemporalCurve(TempCurve::Linear);
+        stage.setTemporalWindow(Window::Polarize50);
+        stage.setTemporalRepeat(Repeat::x5);
+        stage.setSkip(!active);
     }
 
     pfTrack.setOctave(+1);

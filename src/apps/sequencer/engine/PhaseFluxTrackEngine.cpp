@@ -8,7 +8,17 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
+
+// PhaseFlux trigger-path instrumentation. Logs every rebuildSchedule + every
+// pulse fire to stderr. Comment the define to silence.
+#define DBG_PFX_ENABLE
+#ifdef DBG_PFX_ENABLE
+#define DBG_PFX(fmt, ...) std::fprintf(stderr, "[PFX] " fmt "\n", ##__VA_ARGS__)
+#else
+#define DBG_PFX(fmt, ...) do { } while (0)
+#endif
 
 namespace {
 
@@ -56,6 +66,14 @@ inline float clamp01(float v) {
 inline float applyPowerBend(float x, int knob) {
     if (knob == 0) return x;
     return PhaseFluxMath::powerBend(clamp01(x), PhaseFluxMath::powerBendKnobToParam(knob));
+}
+
+inline int repeatMultiplier(PhaseFluxSequence::RepeatType v) {
+    return PhaseFluxMath::repeatMultiplier(v);
+}
+
+inline bool isInWindow(float phi, PhaseFluxSequence::WindowType v) {
+    return PhaseFluxMath::isInWindow(phi, v);
 }
 
 } // namespace
@@ -201,6 +219,23 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
     _prevSlotIdx = -1;
     _prevCycleTick = 0;
     _layoutDirty = false;
+
+#ifdef DBG_PFX_ENABLE
+    DBG_PFX("layout: cycleTicks=%d divisor=%d clockMult=%d",
+            _cycleTicks, _sequence->divisor(), _sequence->clockMultiplier());
+    int activeCount = 0;
+    for (int i = 0; i < kStageCount; ++i) {
+        const auto &s = _sequence->stage(i);
+        if (s.skip()) continue;
+        ++activeCount;
+        DBG_PFX("  stage[%d] ACTIVE pulseCount=%d tRep=%d tWin=%d pRep=%d pWin=%d stageLen=%d",
+                i, s.pulseCount(),
+                int(s.temporalRepeat()), int(s.temporalWindow()),
+                int(s.pitchRepeat()),    int(s.pitchWindow()),
+                s.stageLen());
+    }
+    DBG_PFX("  total active stages = %d", activeCount);
+#endif
 }
 
 void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
@@ -271,26 +306,53 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     PulseCandidate cands[kMaxPulses];
     int candCount = 0;
 
+    // §14.2 Window → Repeat (temporal). Repeat splits pulseCount into R
+    // sub-sections (earlier subs get the extra pulse(s) when not divisible).
+    const int tempR = repeatMultiplier(stage.temporalRepeat());
+    const int subBaseSize = pulseCount / tempR;
+    const int subRemainder = pulseCount % tempR;
+    const int subOversizeBoundary = subRemainder * (subBaseSize + 1);
+
+    // §14.2 Pitch Window + Repeat — Cell mode only (Global has its own rate).
+    const int pitchR = isGlobalPitch ? 1 : repeatMultiplier(stage.pitchRepeat());
+    const auto pitchWindowType = isGlobalPitch
+        ? PhaseFluxSequence::WindowType::Off
+        : stage.pitchWindow();
+
     for (int i = 0; i < pulseCount; ++i) {
         // §6.3 mask gates on the ORIGINAL pulse index — survives §6.4 reorder.
         bool muted = (maskByte >> ((i + maskShift) & 7)) & 1;
         if (muted) continue;
 
-        // §6.1 temporal pipeline. tFlipH no longer applied at the curve input
-        // — for the temporal axis the §6.4 sort cancels any input-domain mirror
-        // on Linear/Bell curves. Instead tFlipH mirrors the scheduled trigger
-        // offsets after the collision clamp (below) so the result actually
-        // reads as "horizontal mirror in time".
-        // i/N formula: uniform spacing with first pulse always at slot start.
-        // Single-pulse case is now consistent with first-of-many (no special-
-        // case midpoint). Last pulse lands at (N-1)/N — never on the slot
-        // boundary, so the fmod(1.0)→0 collapse goes away.
-        float t_raw = float(i) / float(pulseCount);
-        float t_warped = applyPowerBend(t_raw, stage.temporalWarp());
+        // §14.2 Repeat — assign pulse i to a sub-section. Earlier subs hold
+        // (subBaseSize + 1) pulses if there's a remainder; later subs hold
+        // (subBaseSize).
+        int subIdx;
+        int localPulseIdx;
+        int pulsesInThisSub;
+        if (i < subOversizeBoundary) {
+            subIdx = i / (subBaseSize + 1);
+            localPulseIdx = i % (subBaseSize + 1);
+            pulsesInThisSub = subBaseSize + 1;
+        } else {
+            const int j = i - subOversizeBoundary;
+            subIdx = subRemainder + (subBaseSize > 0 ? j / subBaseSize : 0);
+            localPulseIdx = (subBaseSize > 0) ? (j % subBaseSize) : 0;
+            pulsesInThisSub = subBaseSize > 0 ? subBaseSize : 1;
+        }
+        const float t_raw_local = float(localPulseIdx) / float(pulsesInThisSub);
+
+        // §14.2 temporal Window — drop pulse if outside the visible band.
+        if (!isInWindow(t_raw_local, stage.temporalWindow())) continue;
+
+        // §6.1 temporal pipeline on the local position, then map back to
+        // global via the sub-section index.
+        float t_warped = applyPowerBend(t_raw_local, stage.temporalWarp());
         float t_curved = Curve::eval(tempCurveType, t_warped);
         float t_flipped = tFlipV ? (1.f - t_curved) : t_curved;
-        float t_final = applyPowerBend(t_flipped, stage.temporalResponse());
-        float t_shifted = t_final + (float(phaseShift) * 0.125f);
+        float t_final_local = applyPowerBend(t_flipped, stage.temporalResponse());
+        float t_final_global = (float(subIdx) + t_final_local) / float(tempR);
+        float t_shifted = t_final_global + (float(phaseShift) * 0.125f);
         t_shifted = std::fmod(t_shifted, 1.f);
         if (t_shifted < 0.f) t_shifted += 1.f;
         float triggerTime = t_shifted * float(slotDurationTicks);
@@ -304,7 +366,11 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         } else {
             phi = (pulseCount == 1) ? 0.0f : t_shifted;
         }
-        float phi_warped = applyPowerBend(phi, pitchWarpKnob);
+        // §14.2 pitch Window — drop pulse contribution if outside band.
+        if (!isInWindow(phi, pitchWindowType)) continue;
+        // §14.2 pitch Repeat — fmod expands curve frequency by pitchR.
+        float phi_repeated = (pitchR > 1) ? std::fmod(phi * float(pitchR), 1.f) : phi;
+        float phi_warped = applyPowerBend(phi_repeated, pitchWarpKnob);
         float phi_input = pFlipH ? (1.f - phi_warped) : phi_warped;
         float p_curved = Curve::eval(pitchCurveType, phi_input);
         float p_flipped = pFlipV ? (1.f - p_curved) : p_curved;
@@ -395,6 +461,29 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         _schedule[_scheduleCount].cv = cands[k].cv;
         ++_scheduleCount;
     }
+
+#ifdef DBG_PFX_ENABLE
+    {
+        const auto &dbgStage = _sequence->stage(_activeCell);
+        DBG_PFX("rebuild cell=%d slot=%d slotDur=%d pulses_base=%d effective=%d cands=%d scheduled=%d "
+                "tWin=%d tRep=%d gateLen=%d mask=%d",
+                _activeCell, _slotIdx, slotDurationTicks,
+                dbgStage.pulseCount(), pulseCount, candCount, _scheduleCount,
+                int(dbgStage.temporalWindow()), int(dbgStage.temporalRepeat()),
+                int(dbgStage.gateLength()), int(dbgStage.mask()));
+        for (int k = 0; k < _scheduleCount; ++k) {
+            DBG_PFX("  fire[%d] offset=%u gate=%u cv=%.3f",
+                    k,
+                    unsigned(_schedule[k].triggerOffset),
+                    unsigned(_schedule[k].gateTicks),
+                    double(_schedule[k].cv));
+        }
+        if (candCount > _scheduleCount) {
+            DBG_PFX("  DROPPED %d candidate(s) — gateLen too short or pulseCount full",
+                    candCount - _scheduleCount);
+        }
+    }
+#endif
 
     // §6.1.1 temporal flipH — reflect each scheduled pulse's [triggerOffset,
     // triggerOffset+gateTicks] interval around the slot midpoint. Preserves
@@ -551,28 +640,38 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             const Curve::Type pitchCurveType = pitchCurveLut(pitchStage.pitchCurve());
 
             float phi = isGlobalPitch ? _pitchPhase : _stagePhase;
-            float phi_warped = applyPowerBend(phi, pitchStage.pitchWarp());
-            float phi_input = pitchStage.pitchFlipH() ? (1.f - phi_warped) : phi_warped;
-            float p_curved = Curve::eval(pitchCurveType, phi_input);
-            float p_flipped = pitchStage.pitchFlipV() ? (1.f - p_curved) : p_curved;
-            float p_final = applyPowerBend(p_flipped, pitchStage.pitchResponse());
+            // §14.2 pitch Window — Cell mode only; hold CV when phi is in
+            // hidden band (engine doesn't update output).
+            const auto pitchWindowType = isGlobalPitch
+                ? PhaseFluxSequence::WindowType::Off
+                : stage.pitchWindow();
+            if (isInWindow(phi, pitchWindowType)) {
+                // §14.2 pitch Repeat — Cell mode only; multiplies curve frequency.
+                const int pitchR = isGlobalPitch ? 1 : repeatMultiplier(stage.pitchRepeat());
+                float phi_repeated = (pitchR > 1) ? std::fmod(phi * float(pitchR), 1.f) : phi;
+                float phi_warped = applyPowerBend(phi_repeated, pitchStage.pitchWarp());
+                float phi_input = pitchStage.pitchFlipH() ? (1.f - phi_warped) : phi_warped;
+                float p_curved = Curve::eval(pitchCurveType, phi_input);
+                float p_flipped = pitchStage.pitchFlipV() ? (1.f - p_curved) : p_curved;
+                float p_final = applyPowerBend(p_flipped, pitchStage.pitchResponse());
 
-            float offsetDegrees = 0.f;
-            switch (stage.pitchDirection()) {
-            case PhaseFluxSequence::PitchDirectionType::Up:
-                offsetDegrees = p_final * float(rangeDegrees); break;
-            case PhaseFluxSequence::PitchDirectionType::Down:
-                offsetDegrees = -p_final * float(rangeDegrees); break;
-            case PhaseFluxSequence::PitchDirectionType::Bipolar:
-                offsetDegrees = (p_final - 0.5f) * float(rangeDegrees); break;
-            }
-            int degree = baseDegree + int(std::round(offsetDegrees));
-            float cv = scale.noteToVolts(degree);
-            if (scale.isChromatic()) cv += float(rootNote) * (1.f / 12.f);
+                float offsetDegrees = 0.f;
+                switch (stage.pitchDirection()) {
+                case PhaseFluxSequence::PitchDirectionType::Up:
+                    offsetDegrees = p_final * float(rangeDegrees); break;
+                case PhaseFluxSequence::PitchDirectionType::Down:
+                    offsetDegrees = -p_final * float(rangeDegrees); break;
+                case PhaseFluxSequence::PitchDirectionType::Bipolar:
+                    offsetDegrees = (p_final - 0.5f) * float(rangeDegrees); break;
+                }
+                int degree = baseDegree + int(std::round(offsetDegrees));
+                float cv = scale.noteToVolts(degree);
+                if (scale.isChromatic()) cv += float(rootNote) * (1.f / 12.f);
 
-            if (cv != _cvOutput) {
-                _cvOutput = cv;
-                result = result | CvUpdate;
+                if (cv != _cvOutput) {
+                    _cvOutput = cv;
+                    result = result | CvUpdate;
+                }
             }
         }
     }
@@ -620,6 +719,11 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
         _activity = true;
         _activityTimer = kActivityPulseTicks;
         result = result | CvUpdate | GateUpdate;
+        DBG_PFX("fire tick=%u cell=%d slot=%d k=%d posInSlot=%d offset=%u gate=%u cv=%.3f",
+                unsigned(tick), _activeCell, _slotIdx, k, posInSlot,
+                unsigned(_schedule[k].triggerOffset),
+                unsigned(_schedule[k].gateTicks),
+                double(_schedule[k].cv));
     }
 
     // Drop gate when timer expires.
