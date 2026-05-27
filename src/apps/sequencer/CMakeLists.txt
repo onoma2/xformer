@@ -20,6 +20,7 @@ set(sources
     engine/NoteTrackEngine.cpp
     engine/TeletypeBridge.cpp
     engine/TeletypeTrackEngine.cpp
+    engine/TeletypeNativeOps.cpp
     engine/StochasticTrackEngine.cpp
     engine/StochasticGenerator.cpp
     engine/StochasticCache.cpp

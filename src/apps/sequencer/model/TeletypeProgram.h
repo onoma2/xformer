@@ -1,0 +1,114 @@
+#pragma once
+
+#include <cassert>
+#include <cstdint>
+#include <cstring>
+
+extern "C" {
+#include "command.h"
+}
+
+static constexpr int TT2_SCRIPT_COUNT        = 6;
+static constexpr int TT2_COMMANDS_PER_SCRIPT = 6;
+static constexpr int TT2_COMMAND_MAX_LENGTH  = 16;
+static constexpr int TT2_PATTERN_COUNT       = 4;
+static constexpr int TT2_PATTERN_LENGTH      = 64;
+
+static constexpr int TT2_TRIGGER_SCRIPT_0 = 0;
+static constexpr int TT2_TRIGGER_SCRIPT_3 = 3;
+static constexpr int TT2_METRO_SCRIPT     = 4;
+static constexpr int TT2_INIT_SCRIPT      = 5;
+
+enum class TT2TimeBase : uint8_t {
+    Ms,
+    Clock,
+};
+
+static_assert(TT2_COMMAND_MAX_LENGTH == 16, "v2 command max must be 16");
+static_assert(COMMAND_MAX_LENGTH == TT2_COMMAND_MAX_LENGTH, "v2 and parser command max must match");
+static_assert(TT2_COMMANDS_PER_SCRIPT == 6, "v2 expects 6 commands per script");
+static_assert(TT2_PATTERN_COUNT == 4, "v2 expects 4 patterns");
+static_assert(TT2_PATTERN_LENGTH == 64, "v2 expects 64 pattern entries");
+static_assert(TT2_INIT_SCRIPT < TT2_SCRIPT_COUNT, "init script index must be valid");
+
+struct TT2Command {
+    uint8_t length;
+    uint8_t tag[TT2_COMMAND_MAX_LENGTH];
+    int16_t value[TT2_COMMAND_MAX_LENGTH];
+};
+
+struct TT2Pattern {
+    int16_t idx;
+    uint16_t len;
+    uint16_t wrap;
+    int16_t start;
+    int16_t end;
+    int16_t val[TT2_PATTERN_LENGTH];
+};
+
+struct TT2Script {
+    uint8_t length;
+    TT2Command commands[TT2_COMMANDS_PER_SCRIPT];
+};
+
+struct TeletypeProgram {
+    uint8_t dialectVersion;
+    uint8_t bootScriptIndex;
+    uint8_t bootEnabled;
+    uint8_t timeBase;
+    int16_t clockDivisor;
+    int16_t clockMultiplier;
+    uint8_t resetMetroOnLoad;
+    TT2Script scripts[TT2_SCRIPT_COUNT];
+    TT2Pattern patterns[TT2_PATTERN_COUNT];
+};
+
+inline void init(TeletypeProgram &p) {
+    memset(&p, 0, sizeof(TeletypeProgram));
+    p.dialectVersion = 2;
+    p.bootScriptIndex = TT2_INIT_SCRIPT;
+    p.bootEnabled = 0;
+    p.timeBase = uint8_t(TT2TimeBase::Ms);
+    p.clockDivisor = 12;
+    p.clockMultiplier = 100;
+    p.resetMetroOnLoad = 1;
+    for (int i = 0; i < TT2_PATTERN_COUNT; i++) {
+        p.patterns[i].len = 0;                       // match current Teletype default
+        p.patterns[i].wrap = 1;
+        p.patterns[i].start = 0;
+        p.patterns[i].end = TT2_PATTERN_LENGTH - 1;
+    }
+}
+
+inline TT2Command *scriptCommand(TT2Script &s, uint8_t index) {
+    return (index < TT2_COMMANDS_PER_SCRIPT) ? &s.commands[index] : nullptr;
+}
+
+// Lower a parsed tele_command_t into the native v2 TT2Command storage.
+// Returns false only if the source length exceeds TT2_COMMAND_MAX_LENGTH.
+// separator and comment are intentionally dropped.
+inline bool lowerCommand(const tele_command_t &src, TT2Command &dst) {
+    if (src.length > TT2_COMMAND_MAX_LENGTH) {
+        return false;
+    }
+    dst.length = src.length;
+    for (uint8_t i = 0; i < src.length; ++i) {
+        dst.tag[i] = src.tag[i];
+        dst.value[i] = src.value[i];
+    }
+    // Zero trailing slots for determinism.
+    for (uint8_t i = src.length; i < TT2_COMMAND_MAX_LENGTH; ++i) {
+        dst.tag[i] = 0;
+        dst.value[i] = 0;
+    }
+    return true;
+}
+
+inline int16_t *patternVal(TT2Pattern &pat, uint16_t index) {
+    return (index < TT2_PATTERN_LENGTH) ? &pat.val[index] : nullptr;
+}
+
+static_assert(sizeof(TT2Command) == 50, "TT2Command size drift");
+static_assert(sizeof(TT2Pattern) == 138, "TT2Pattern size drift");
+static_assert(sizeof(TT2Script) == 302, "TT2Script size drift");
+static_assert(sizeof(TeletypeProgram) == 2374, "TeletypeProgram size drift");

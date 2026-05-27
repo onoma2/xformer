@@ -1,0 +1,280 @@
+#include "UnitTest.h"
+
+#include "engine/TeletypeInterpreter.h"
+
+// Pre-include model/Types.h in C++ mode so that when teletype.h pulls in
+// state.h -> types.h inside extern "C", the C++ templates are already
+// processed and skipped by #pragma once.
+#include "model/Types.h"
+
+extern "C" {
+#include "command.h"
+#include "teletype.h"
+#include "ops/op_enum.h"
+}
+
+namespace {
+
+struct ParseResult {
+    tele_error_t error;
+    char errorMsg[TELE_ERROR_MSG_LENGTH];
+    tele_command_t cmd;
+};
+
+ParseResult tryParse(const char *text) {
+    ParseResult result;
+    result.cmd = {};
+    result.errorMsg[0] = '\0';
+    result.error = parse(text, &result.cmd, result.errorMsg);
+    return result;
+}
+
+TT2Command lower(const tele_command_t &src) {
+    TT2Command dst = {};
+    lowerCommand(src, dst);
+    return dst;
+}
+
+void writeLine(TT2Script &script, uint8_t lineIndex, const char *text) {
+    auto r = tryParse(text);
+    expectEqual(int(r.error), int(E_OK), "parse line");
+    script.commands[lineIndex] = lower(r.cmd);
+}
+
+} // namespace
+
+UNIT_TEST("TeletypeV2ScriptRunner") {
+
+    CASE("empty_script_succeeds") {
+        TeletypeProgram program = {};
+        init(program);
+        program.scripts[0].length = 0;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "empty ok");
+    }
+
+    CASE("single_line_cv") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "CV 1 5000");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.cv[0], int16_t(5000), "CV[0]");
+        expectEqual(output.cv[0].targetRaw, int16_t(5000), "targetRaw");
+        expectEqual(int(output.cvDirty), 1, "dirty");
+    }
+
+    CASE("multi_line_script") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "A 10");
+        writeLine(program.scripts[0], 1, "B + A 5");
+        writeLine(program.scripts[0], 2, "CV 1 B");
+        program.scripts[0].length = 3;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "A = 10");
+        expectEqual(runtime.variables.b, int16_t(15), "B = 15");
+        expectEqual(runtime.variables.cv[0], int16_t(15), "CV[0] = 15");
+        expectEqual(int(output.cvDirty), 1, "dirty");
+    }
+
+    CASE("execution_context_tracked") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "A 1");
+        writeLine(program.scripts[0], 1, "A 2");
+        program.scripts[0].length = 2;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(int(runtime.exec.depth), 1, "depth");
+        expectEqual(int(runtime.exec.frames[0].script_number), 0, "script number");
+        // Last line executed was line 1.
+        expectEqual(int(runtime.exec.frames[0].line_number), 1, "line number");
+    }
+
+    CASE("invalid_script_index") {
+        TeletypeProgram program = {};
+        init(program);
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 99);
+        expectEqual(int(result.error), int(TT2EvalError::InvalidScriptIndex),
+                    "invalid index rejected");
+    }
+
+    CASE("unsupported_op_stops_and_reports_line") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "A 10");
+        writeLine(program.scripts[0], 1, "SUB 1 2"); // unsupported in native table
+        writeLine(program.scripts[0], 2, "B 20");
+        program.scripts[0].length = 3;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::UnsupportedOp),
+                    "unsupported op stops");
+        // A should have been set, B should not.
+        expectEqual(runtime.variables.a, int16_t(10), "A set before error");
+        expectEqual(runtime.variables.b, int16_t(2), "B not set after error");
+        // Execution context should show the failing line.
+        expectEqual(int(runtime.exec.frames[0].line_number), 1,
+                    "line 1 reported");
+    }
+
+    CASE("blank_line_skipped") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "A 10");
+        program.scripts[0].commands[1].length = 0; // blank line
+        writeLine(program.scripts[0], 2, "B 20");
+        program.scripts[0].length = 3;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(10), "A set");
+        expectEqual(runtime.variables.b, int16_t(20), "B set after blank");
+    }
+
+    CASE("script_length_overflow_rejected") {
+        TeletypeProgram program = {};
+        init(program);
+        program.scripts[0].length = TT2_COMMANDS_PER_SCRIPT + 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::ScriptLengthOverflow),
+                    "overflow rejected");
+    }
+
+    CASE("script_index_at_boundary") {
+        TeletypeProgram program = {};
+        init(program);
+        // TT2_SCRIPT_COUNT - 1 is the last valid script.
+        writeLine(program.scripts[TT2_SCRIPT_COUNT - 1], 0, "A 42");
+        program.scripts[TT2_SCRIPT_COUNT - 1].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output,
+                                TT2_SCRIPT_COUNT - 1);
+        expectEqual(int(result.error), int(TT2EvalError::None), "boundary ok");
+        expectEqual(runtime.variables.a, int16_t(42), "A set");
+    }
+
+    CASE("eval_error_stops_execution") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "A 10");
+        writeLine(program.scripts[0], 1, "CV 9 1"); // out of range
+        writeLine(program.scripts[0], 2, "B 20");
+        program.scripts[0].length = 3;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::OutOfRange),
+                    "out of range stops");
+        expectEqual(runtime.variables.a, int16_t(10), "A set before error");
+        expectEqual(runtime.variables.b, int16_t(2), "B not set after error");
+        expectEqual(int(runtime.exec.frames[0].line_number), 1,
+                    "line 1 reported");
+    }
+
+    CASE("exec_frame_cleared") {
+        TeletypeProgram program = {};
+        init(program);
+        writeLine(program.scripts[0], 0, "A 42");
+        program.scripts[0].length = 1;
+
+        TT2Runtime runtime = {};
+        init(runtime);
+        TT2OutputState output = {};
+        init(output);
+
+        // Poison frame 0 with stale values from a prior (imaginary) run.
+        TT2ExecFrame &frame = runtime.exec.frames[0];
+        frame.if_else_condition = 1;
+        frame.i = 99;
+        frame.while_continue = 1;
+        frame.while_depth = 42;
+        frame.breaking = 1;
+        frame.delayed = 1;
+        frame.fparam1 = 77;
+        frame.fparam2 = 88;
+        frame.fresult = 123;
+        frame.fresult_set = 1;
+        // script_number and line_number are also poisoned.
+        frame.script_number = 7;
+        frame.line_number = 5;
+
+        auto result = runScript(program, runtime, output, 0);
+        expectEqual(int(result.error), int(TT2EvalError::None), "ok");
+        expectEqual(runtime.variables.a, int16_t(42), "A set");
+
+        // Stale flags must be cleared.
+        expectEqual(int(frame.if_else_condition), 0, "if_else cleared");
+        expectEqual(frame.i, int16_t(0), "i cleared");
+        expectEqual(int(frame.while_continue), 0, "while_continue cleared");
+        expectEqual(int(frame.while_depth), 0, "while_depth cleared");
+        expectEqual(int(frame.breaking), 0, "breaking cleared");
+        expectEqual(int(frame.delayed), 0, "delayed cleared");
+        expectEqual(frame.fparam1, int16_t(0), "fparam1 cleared");
+        expectEqual(frame.fparam2, int16_t(0), "fparam2 cleared");
+        expectEqual(frame.fresult, int16_t(0), "fresult cleared");
+        expectEqual(int(frame.fresult_set), 0, "fresult_set cleared");
+
+        // Active context must be set.
+        expectEqual(int(frame.script_number), 0, "script_number set");
+        expectEqual(int(frame.line_number), 0, "line_number set");
+    }
+}
