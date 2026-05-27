@@ -1099,24 +1099,44 @@ Inside the 256×42 px safe content area (header/footer guards per `ui-preview/UI
 - Footer F-keys (default view): STAGE / TIME / PITCH / DIV / TRK.
 - Footer F-keys (edit-hold view): TIME / CURVE / XFRM / ACCM / TRK — cycle param banks for the 16 params not shown on the bottom row (basePitch, pitchRange, pitchDirection, pitchResponse, temporalResponse, temporalFlipV, temporalFlipH, pitchFlipV, pitchFlipH, maskMelody, tiltMelody, maskShift, accumulatorStep, accumulatorLength, gateLength, skip).
 
-### 17.2.1 PTCH set — Cell vs Global mode visuals
+### 17.2.1 Footer pages — all topics use F5 = Next
 
-When `pitchMode = Cell` (default) the PTCH set displays today's per-cell layout:
-- Header: `PTCH`. Stage badge inside scope: stage number (`5`).
-- F1-F5: Curve / Warp / Resp / Base / Span. F1-F4 edit active stage's pitch params; F5 cycles `pitchRange` (and shows the enum value on the row).
-- Shift+F: FlipV / FlipH / — / — / — on the footer; Shift+F1/F2 toggle the active stage's `pitchFlipV` / `pitchFlipH`.
+All four topics (TEMP / PTCH / ACCUM.N / ACCUM.P) page their footer with **F5 = Next** cycling `_topicPage` between 0 and 1. L/R nav (topic change) resets `_topicPage = 0` and `_selectedSlot = 0`. Shift-modifier bindings are dropped entirely — binary toggles (`FlipV`, `FlipH`) are first-class on Page 1 slots and fire on plain F-press without selecting (no encoder edit needed).
 
-When `pitchMode = Global`:
-- Header: `PTCH.G` (the `.G` suffix tells the player that knob twists affect the sequence-wide master rather than the active stage).
-- Stage badge inside scope: literal `G` (replaces the stage number, since edits aren't stage-scoped).
-- Pitch scope draws `stage[0]`'s curve regardless of the playing/selected cell.
-- F1-F5 panel labels: Curve / Warp / Resp / Rate / Note.
-  - F1-F3 read+edit `stage[0]`'s pitch curve/warp/response.
-  - F4 reads+edits sequence-level `pitchRate` (displays the ratio text e.g. `3:2`).
-  - F5 shows the active stage's basePitch as a note name (Scale `Short1` form, e.g. `C4`) and the active stage's `pitchRange` as a row of dots beneath it. F5 encoder edits the active stage's basePitch (per-cell anchor stays per-cell).
-- Shift+F: FlipV / FlipH / — / — / Span. Shift+F1/F2 toggle `stage[0]`'s flips. Shift+F5 cycles the active stage's `pitchRange` (demoted from F5 encoder edit). While Shift is held the F5 panel-row label swaps `NOTE` → `SPAN` to reflect the active-while-shift behavior.
+**TEMP**
+| Page | F1 | F2 | F3 | F4 | F5 |
+|---|---|---|---|---|---|
+| 0 / shape | `Curve` | `Warp` | `Resp` | `Puls` | `Next` |
+| 1 / mods  | `Len` | **`FlipV`** | **`FlipH`** | `Mask` | `Next` |
 
-Render variants live in `ui-preview/phaseflux-pitchmode/` for layout review.
+**PTCH (Cell mode)** — header `PTCH`, stage badge = stage number:
+| Page | F1 | F2 | F3 | F4 | F5 |
+|---|---|---|---|---|---|
+| 0 / shape | `Curve` | `Warp` | `Resp` | `Note` | `Next` |
+| 1 / mods  | `Span` | `Dir` | **`FlipV`** | **`FlipH`** | `Next` |
+
+**PTCH (Global mode)** — header `PTCH.G`, stage badge = `G`, scope draws `stage[0]`'s curve:
+| Page | F1 | F2 | F3 | F4 | F5 |
+|---|---|---|---|---|---|
+| 0 / shape | `Curve` | `Warp` | `Resp` | `Rate` | `Next` |
+| 1 / mods  | `Note` | `Span` | **`FlipV`** | **`FlipH`** | `Next` |
+
+**ACCUM.N / ACCUM.P** — see `docs/accumulator-v2-spec.md §13.5`.
+
+Bold slots = press-to-flip (no slot selection, no encoder edit). All other slots: F-press selects, encoder edits.
+
+`Note` was previously labelled `Base` for Cell mode — renamed to `Note` for label clarity (the value is rendered as a note name via `scale.noteName(... Format::Long)`). `Dir` cycles `PitchDirectionType` (Up / Down / Bipolar).
+
+In PTCH Global, P1 `Note` / `Span` edit the **active** stage (per-cell anchor stays per-cell), while P0 `Curve` / `Warp` / `Resp` edit `stage[0]` (the master pitch curve). P1 flips also operate on `stage[0]`.
+
+Pitch scope visual (`drawPitchScope`):
+- Same outer container as TEMP scope (`100 × 38` at `(scopeX, ScopeY)`).
+- Internal split: 22 px **label column** on the left (`x = scopeX..scopeX+21`), 1-px divider at `x = scopeX+22`, then **trace zone** (`x = scopeX+23..scopeX+98`).
+- Curve trace at `Color::Medium` lives only in the trace zone.
+- Pulse-fire 2×2 dots on the curve at each unmuted pulse's (t, pitch). Spacing uses `i/N` (matches engine §6.1). Dim by default; brighten as the playhead crosses each in the active cell.
+- Label column shows **top-4 reachable scale degrees by visit count** (sampling the pitch pipeline at 64 phi-points + quantizing). Always includes the currently-playing degree (pushes lowest-count entry out). Labels right-aligned at `x = scopeX + 20`, evenly distributed in 4 slots. Currently-playing label drawn with an inverted highlight box.
+
+Render variants live in `ui-preview/phaseflux-pitchmode/` and `ui-preview/pitch-scope/`.
 
 ### 17.3 PhaseFluxSequenceListModel items
 

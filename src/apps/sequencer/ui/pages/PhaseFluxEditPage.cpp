@@ -20,7 +20,7 @@
 namespace {
 
 // Grid layout — matches Python preview spec
-static constexpr int GridX     = 2;
+static constexpr int GridX     = 6;
 static constexpr int GridY     = 12;
 static constexpr int CellW     = 9;
 static constexpr int CellH     = 9;
@@ -68,6 +68,32 @@ inline void paintGlyph5x5(Canvas &canvas, int x, int y, const uint8_t pattern[5]
             if ((b >> col) & 1) canvas.point(x + col, y + row);
         }
     }
+}
+
+// PITCH scope — label column (left) + trace zone (right).
+static constexpr int PitchLabelColW = 22;
+
+inline float pitchRangeToOctaves_local(PhaseFluxSequence::PitchRangeType v) {
+    switch (v) {
+    case PhaseFluxSequence::PitchRangeType::Half:  return 0.5f;
+    case PhaseFluxSequence::PitchRangeType::One:   return 1.0f;
+    case PhaseFluxSequence::PitchRangeType::Two:   return 2.0f;
+    case PhaseFluxSequence::PitchRangeType::Three: return 3.0f;
+    }
+    return 1.0f;
+}
+
+inline float directionOffset(PhaseFluxSequence::PitchDirectionType d,
+                              float p_final, int rangeDegrees) {
+    switch (d) {
+    case PhaseFluxSequence::PitchDirectionType::Up:
+        return p_final * float(rangeDegrees);
+    case PhaseFluxSequence::PitchDirectionType::Down:
+        return -p_final * float(rangeDegrees);
+    case PhaseFluxSequence::PitchDirectionType::Bipolar:
+        return (p_final - 0.5f) * float(rangeDegrees);
+    }
+    return 0.f;
 }
 
 inline Curve::Type temporalCurveLut(PhaseFluxSequence::TemporalCurveType v) {
@@ -143,38 +169,29 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     }
     WindowPainter::drawActiveFunction(canvas, setName);
 
-    // Footer: 5 labels, swap to shift variants when Shift is held.
-    const bool shift = globalKeyState()[Key::Shift];
-    static const char *kLabelsTemp[5]      = { "Curve", "Warp",  "Resp", "Len",  "Puls" };
-    static const char *kLabelsTempShift[5] = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
-    static const char *kLabelsPtch[5]        = { "Curve", "Warp",  "Resp", "Base", "Span" };
-    static const char *kLabelsPtchShift[5]   = { "FlipV", "FlipH", nullptr, nullptr, nullptr };
-    static const char *kLabelsPtchGlobal[5]      = { "Curve", "Warp",  "Resp", "Rate", "Note" };
-    static const char *kLabelsPtchGlobalShift[5] = { "FlipV", "FlipH", nullptr, nullptr, "Span" };
-    // ACCUM paged: F5 = Next. Limits moved to list page — page-1 mid slots
-    // stay empty. Page-2 reserves a slot for Sleep (drafted, not wired).
+    // Footer: all topics now paged. F5 = Next. Shift bindings dropped — flips
+    // are first-class on page 1 (press = toggle).
+    static const char *kLabelsTempP0[5]  = { "Curve", "Warp",  "Resp", "Puls",  "Next" };
+    static const char *kLabelsTempP1[5]  = { "Len",   "FlipV", "FlipH", "Mask", "Next" };
+    static const char *kLabelsPtchP0[5]  = { "Curve", "Warp",  "Resp", "Note",  "Next" };
+    static const char *kLabelsPtchP1[5]  = { "Span",  "Dir",   "FlipV", "FlipH", "Next" };
+    static const char *kLabelsPtchGlobalP0[5] = { "Curve", "Warp", "Resp", "Rate", "Next" };
+    static const char *kLabelsPtchGlobalP1[5] = { "Note",  "Span", "FlipV","FlipH","Next" };
     static const char *kLabelsAccumP0[5] = { "Ac.St", nullptr, nullptr, "Order", "Next" };
     static const char *kLabelsAccumP1[5] = { "Reset", "Polar", "Trig",  nullptr, "Next" };
 
     const char *(*primary)[5];
-    const char *(*altShift)[5];
     if (_currentSet == 0) {
-        primary = &kLabelsTemp;
-        altShift = &kLabelsTempShift;
+        primary = (_topicPage == 0) ? &kLabelsTempP0 : &kLabelsTempP1;
     } else if (_currentSet == 1 && isGlobalPitch) {
-        primary = &kLabelsPtchGlobal;
-        altShift = &kLabelsPtchGlobalShift;
+        primary = (_topicPage == 0) ? &kLabelsPtchGlobalP0 : &kLabelsPtchGlobalP1;
     } else if (_currentSet == 1) {
-        primary = &kLabelsPtch;
-        altShift = &kLabelsPtchShift;
+        primary = (_topicPage == 0) ? &kLabelsPtchP0 : &kLabelsPtchP1;
     } else {
-        primary = (_accumPage == 0) ? &kLabelsAccumP0 : &kLabelsAccumP1;
-        altShift = nullptr;  // Shift bindings dropped for ACCUM.
+        primary = (_topicPage == 0) ? &kLabelsAccumP0 : &kLabelsAccumP1;
     }
     const char *footer[5];
-    for (int i = 0; i < 5; ++i) {
-        footer[i] = (shift && altShift && (*altShift)[i]) ? (*altShift)[i] : (*primary)[i];
-    }
+    for (int i = 0; i < 5; ++i) footer[i] = (*primary)[i];
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), _selectedSlot);
 
     // ACCUM owns the full content area — 1x16 row + pancakes + glyphs.
@@ -266,31 +283,53 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    // Left/Right pages between sets.
+    // Left/Right cycles topics. Reset page + selection so each topic lands
+    // on its page 0 / F1 with no carry-over from the previous topic.
     if (key.isLeft()) {
         _currentSet = (_currentSet + kSetCount - 1) % kSetCount;
+        _topicPage = 0;
+        _selectedSlot = 0;
         event.consume();
         return;
     }
     if (key.isRight()) {
         _currentSet = (_currentSet + 1) % kSetCount;
+        _topicPage = 0;
+        _selectedSlot = 0;
         event.consume();
         return;
     }
 
-    // F1..F5 select slot. Shift+F toggles the binary at that slot if any.
-    // ACCUM is paged: F5 = Next (cycle page); F1..F4 = slots within page.
+    // F1..F5 — F5 always = Next (cycle topic page). F1..F4 either flip a
+    // binary slot on press or select for encoder editing.
     if (key.isFunction()) {
         int slot = key.function();
-        const bool isAccum = (_currentSet == 2 || _currentSet == 3);
-        if (isAccum && slot == 4) {
-            _accumPage = 1 - _accumPage;
+        if (slot == 4) {
+            _topicPage = 1 - _topicPage;
             _selectedSlot = 0;
             event.consume();
             return;
         }
-        if (globalKeyState()[Key::Shift]) {
-            toggleShiftAt(slot);
+        // Binary toggles are first-class — press flips, no slot selection.
+        const auto &seq = _project.selectedPhaseFluxSequence();
+        const bool isGlobalPitch =
+            _currentSet == 1 &&
+            seq.pitchMode() == PhaseFluxSequence::PitchMode::Global;
+        bool isToggle = false;
+        if (_topicPage == 1) {
+            if (_currentSet == 0) {
+                // TEMP P1: Len(0) / FlipV(1) / FlipH(2) / Mask(3)
+                isToggle = (slot == 1 || slot == 2);
+            } else if (_currentSet == 1 && isGlobalPitch) {
+                // PITCH Global P1: Note(0) / Span(1) / FlipV(2) / FlipH(3)
+                isToggle = (slot == 2 || slot == 3);
+            } else if (_currentSet == 1) {
+                // PITCH Cell P1: Span(0) / Dir(1) / FlipV(2) / FlipH(3)
+                isToggle = (slot == 2 || slot == 3);
+            }
+        }
+        if (isToggle) {
+            togglePressSlot(slot);
         } else {
             _selectedSlot = slot;
         }
@@ -316,17 +355,17 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
     const bool isAccumP = (_currentSet == 3);
     if (isAccumN || isAccumP) {
         auto &cfg = isAccumN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
-        if (_accumPage == 0) {
+        if (_topicPage == 0) {
             switch (slot) {
-            case 0:  // Ac.St — per-cell, UI-clamped to ±7 for both N and P.
+            case 0:  // Ac.St — per-cell, UI-clamped to ±7.
                 if (isAccumN) {
                     activeStage.setAccumulatorStep(clamp(activeStage.accumulatorStep() + value, -7, 7));
                 } else {
                     activeStage.setPulseAccumStep(activeStage.pulseAccumStep() + value);
                 }
                 break;
-            case 1: break;  // slot reserved — +Lim moved to list page
-            case 2: break;  // slot reserved — -Lim moved to list page
+            case 1: break;  // reserved (+Lim → list page)
+            case 2: break;  // reserved (-Lim → list page)
             case 3: cfg.setOrder(AccumulatorConfig::Order(cycle(int(cfg.order()) + value, 0, 3))); break;
             }
         } else {
@@ -343,39 +382,60 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
                 else          activeStage.setPulseAccumTrigger(next);
                 break;
             }
-            case 3: break;  // Sleep slot reserved (§14.2 drafted, not wired).
+            case 3: break;  // Sleep reserved (§14.2)
             }
         }
         (void)shift;
         return;
     }
     if (_currentSet == 0) {
-        // TEMP
-        switch (slot) {
-        case 0: activeStage.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(cycle(int(activeStage.temporalCurve()) + value, 0, 2))); break;
-        case 1: activeStage.setTemporalWarp(ModelUtils::adjusted(activeStage.temporalWarp(), value, -64, 64)); break;
-        case 2: activeStage.setTemporalResponse(ModelUtils::adjusted(activeStage.temporalResponse(), value, -64, 64)); break;
-        case 3: activeStage.setStageLen(ModelUtils::adjusted(activeStage.stageLen(), value, 0, 127)); break;
-        case 4: activeStage.setPulseCount(ModelUtils::adjusted(activeStage.pulseCount(), value, 1, 8)); break;
+        // TEMP — P0: Curve/Warp/Resp/Puls; P1: Len/[FlipV*]/[FlipH*]/Mask
+        // (* = handled by togglePressSlot, not editSlot.)
+        if (_topicPage == 0) {
+            switch (slot) {
+            case 0: activeStage.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(cycle(int(activeStage.temporalCurve()) + value, 0, 2))); break;
+            case 1: activeStage.setTemporalWarp(ModelUtils::adjusted(activeStage.temporalWarp(), value, -64, 64)); break;
+            case 2: activeStage.setTemporalResponse(ModelUtils::adjusted(activeStage.temporalResponse(), value, -64, 64)); break;
+            case 3: activeStage.setPulseCount(ModelUtils::adjusted(activeStage.pulseCount(), value, 1, 8)); break;
+            }
+        } else {
+            switch (slot) {
+            case 0: activeStage.setStageLen(ModelUtils::adjusted(activeStage.stageLen(), value, 0, 127)); break;
+            // slots 1, 2 are FlipV / FlipH toggles (press-only)
+            case 3: activeStage.setMask(PhaseFluxSequence::MaskType(cycle(int(activeStage.mask()) + value, 0, 7))); break;
+            }
         }
     } else if (isGlobalPitch) {
-        // Global PTCH — F1-F3 edit stage[0], F4 edits sequence rate, F5
-        // edits active stage's basePitch (per-cell anchor stays per-cell).
-        switch (slot) {
-        case 0: masterStage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(masterStage.pitchCurve()) + value, 0, 3))); break;
-        case 1: masterStage.setPitchWarp(ModelUtils::adjusted(masterStage.pitchWarp(), value, -64, 64)); break;
-        case 2: masterStage.setPitchResponse(ModelUtils::adjusted(masterStage.pitchResponse(), value, -64, 64)); break;
-        case 3: seq.editPitchRate(value, shift); break;
-        case 4: activeStage.setBasePitch(ModelUtils::adjusted(activeStage.basePitch(), value, -64, 64)); break;
+        // PTCH Global — P0: Curve/Warp/Resp/Rate (master stage); P1: Note(active)/Span(active)/[FlipV*]/[FlipH*]
+        if (_topicPage == 0) {
+            switch (slot) {
+            case 0: masterStage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(masterStage.pitchCurve()) + value, 0, 3))); break;
+            case 1: masterStage.setPitchWarp(ModelUtils::adjusted(masterStage.pitchWarp(), value, -64, 64)); break;
+            case 2: masterStage.setPitchResponse(ModelUtils::adjusted(masterStage.pitchResponse(), value, -64, 64)); break;
+            case 3: seq.editPitchRate(value, shift); break;
+            }
+        } else {
+            switch (slot) {
+            case 0: activeStage.setBasePitch(ModelUtils::adjusted(activeStage.basePitch(), value, -64, 64)); break;
+            case 1: activeStage.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(activeStage.pitchRange()) + value, 0, 3))); break;
+            // slots 2, 3 are master stage's FlipV / FlipH toggles
+            }
         }
     } else {
-        // Cell PTCH
-        switch (slot) {
-        case 0: activeStage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(activeStage.pitchCurve()) + value, 0, 3))); break;
-        case 1: activeStage.setPitchWarp(ModelUtils::adjusted(activeStage.pitchWarp(), value, -64, 64)); break;
-        case 2: activeStage.setPitchResponse(ModelUtils::adjusted(activeStage.pitchResponse(), value, -64, 64)); break;
-        case 3: activeStage.setBasePitch(ModelUtils::adjusted(activeStage.basePitch(), value, -64, 64)); break;
-        case 4: activeStage.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(activeStage.pitchRange()) + value, 0, 3))); break;
+        // PTCH Cell — P0: Curve/Warp/Resp/Note; P1: Span/Dir/[FlipV*]/[FlipH*]
+        if (_topicPage == 0) {
+            switch (slot) {
+            case 0: activeStage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(activeStage.pitchCurve()) + value, 0, 3))); break;
+            case 1: activeStage.setPitchWarp(ModelUtils::adjusted(activeStage.pitchWarp(), value, -64, 64)); break;
+            case 2: activeStage.setPitchResponse(ModelUtils::adjusted(activeStage.pitchResponse(), value, -64, 64)); break;
+            case 3: activeStage.setBasePitch(ModelUtils::adjusted(activeStage.basePitch(), value, -64, 64)); break;
+            }
+        } else {
+            switch (slot) {
+            case 0: activeStage.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(activeStage.pitchRange()) + value, 0, 3))); break;
+            case 1: activeStage.setPitchDirection(PhaseFluxSequence::PitchDirectionType(cycle(int(activeStage.pitchDirection()) + value, 0, 2))); break;
+            // slots 2, 3 are active stage's FlipV / FlipH toggles
+            }
         }
     }
     (void)shift;
@@ -404,46 +464,39 @@ void PhaseFluxEditPage::randomizeCurrentSet() {
     }
 }
 
-void PhaseFluxEditPage::toggleShiftAt(int slot) {
+void PhaseFluxEditPage::togglePressSlot(int slot) {
+    // Press-to-flip for binary toggles on Page 1. Topic/page selection by
+    // keyPress; this function just performs the actual flip.
     auto &seq = _project.selectedPhaseFluxSequence();
     auto &activeStage = seq.stage(_selectedCell);
     auto &masterStage = seq.stage(0);
     const bool isGlobalPitch =
         _currentSet == 1 &&
-        _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
-    const bool isAccumN = (_currentSet == 2);
-    const bool isAccumP = (_currentSet == 3);
-    if (isAccumN || isAccumP) {
-        // Trig / Polar / Reset are first-class on the ACCUM page-2 footer now.
-        // Scope binding is dropped entirely.
-        return;
-    }
+        seq.pitchMode() == PhaseFluxSequence::PitchMode::Global;
+
     if (_currentSet == 0) {
+        // TEMP P1: FlipV(1), FlipH(2)
         switch (slot) {
-        case 0: activeStage.setTemporalFlipV(!activeStage.temporalFlipV()); break;
-        case 1: activeStage.setTemporalFlipH(!activeStage.temporalFlipH()); break;
+        case 1: activeStage.setTemporalFlipV(!activeStage.temporalFlipV()); break;
+        case 2: activeStage.setTemporalFlipH(!activeStage.temporalFlipH()); break;
         default: break;
         }
     } else if (isGlobalPitch) {
-        // F1/F2 flips toggle stage[0] (the master pitch curve). Shift+F5
-        // cycles the active stage's range — demoted from F5 encoder edit.
+        // PITCH Global P1: FlipV(2)/FlipH(3) on the master pitch curve (stage 0).
         switch (slot) {
-        case 0: masterStage.setPitchFlipV(!masterStage.pitchFlipV()); break;
-        case 1: masterStage.setPitchFlipH(!masterStage.pitchFlipH()); break;
-        case 4: {
-            int next = (int(activeStage.pitchRange()) + 1) & 3;
-            activeStage.setPitchRange(PhaseFluxSequence::PitchRangeType(next));
-            break;
-        }
+        case 2: masterStage.setPitchFlipV(!masterStage.pitchFlipV()); break;
+        case 3: masterStage.setPitchFlipH(!masterStage.pitchFlipH()); break;
         default: break;
         }
-    } else {
+    } else if (_currentSet == 1) {
+        // PITCH Cell P1: FlipV(2)/FlipH(3) on the active stage.
         switch (slot) {
-        case 0: activeStage.setPitchFlipV(!activeStage.pitchFlipV()); break;
-        case 1: activeStage.setPitchFlipH(!activeStage.pitchFlipH()); break;
+        case 2: activeStage.setPitchFlipV(!activeStage.pitchFlipV()); break;
+        case 3: activeStage.setPitchFlipH(!activeStage.pitchFlipH()); break;
         default: break;
         }
     }
+    // ACCUM has no toggle slots on either page — F-press always selects.
 }
 
 void PhaseFluxEditPage::drawGrid(Canvas &canvas) {
@@ -583,29 +636,43 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     const auto &stage = seq.stage(stageIdx);
     if (stage.skip()) return;
 
-    int x = scopeX;
-    int y = ScopeY;
+    const int x = scopeX;
+    const int y = ScopeY;
+    const int traceX0 = x + PitchLabelColW + 1;
+    const int traceW  = ScopeW - PitchLabelColW - 2;
+
+    canvas.setBlendMode(BlendMode::Set);
+
+    // Outline + label/trace divider.
     canvas.setColor(Color::Low);
     canvas.drawRect(x, y, ScopeW, ScopeH);
-    canvas.hline(x + 1, y + ScopeH - 2, ScopeW - 2);
+    canvas.vline(x + PitchLabelColW, y + 1, ScopeH - 2);
 
-    // Pitch curve trace
-    canvas.setColor(Color::Bright);
+    // Curve trace — Medium so the shape reads but doesn't dominate.
+    canvas.setColor(Color::Medium);
     int prevPy = -1;
-    for (int px = 0; px < ScopeW - 2; ++px) {
-        float phi = float(px) / float(ScopeW - 3);
+    for (int px = 0; px < traceW; ++px) {
+        float phi = float(px) / float(std::max(1, traceW - 1));
         float p_final = evalPitch(stage, phi);
         int py = y + ScopeH - 2 - int(p_final * float(ScopeH - 3));
-        if (prevPy >= 0) canvas.line(x + px, prevPy, x + px + 1, py);
+        int cx = traceX0 + px;
+        if (prevPy >= 0) canvas.line(cx - 1, prevPy, cx, py);
         prevPy = py;
     }
 
-    // Pulse dots at fire times
+    // Engine state for playhead-aware highlight.
+    const auto *te = trackEngine();
+    const bool isActiveCell = te && (te->activeCell() == stageIdx);
+    const float stagePhase  = isActiveCell ? te->sequenceProgress() : -1.f;
+
+    // Pulse-fire dots — 2x2, on the curve at each unmuted pulse's (t, pitch).
+    // Spacing uses i/N (engine §6.1). Dim by default, bright as the
+    // playhead crosses each one in the active cell.
     int pulses = std::max(1, std::min(8, stage.pulseCount()));
     int maskByte = kMaskTable[int(stage.mask())];
     int maskShift = stage.maskShift();
     for (int i = 0; i < pulses; ++i) {
-        float t_raw = (pulses == 1) ? 0.5f : (float(i) / float(pulses - 1));
+        float t_raw = float(i) / float(pulses);
         float t_final = evalTemporal(stage, t_raw);
         float t_shifted = t_final + float(stage.phaseShift()) * 0.125f;
         t_shifted = std::fmod(t_shifted, 1.f);
@@ -613,10 +680,108 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
         bool muted = (maskByte >> ((i + maskShift) & 7)) & 1;
         if (muted) continue;
         float p_final = evalPitch(stage, t_shifted);
-        int px = x + 1 + int(t_shifted * float(ScopeW - 3));
-        int py = y + ScopeH - 2 - int(p_final * float(ScopeH - 3));
-        canvas.setColor(Color::Bright);
-        canvas.fillRect(px - 1, py - 1, 2, 2);
+        int dx = traceX0 + int(t_shifted * float(std::max(1, traceW - 1)));
+        int dy = y + ScopeH - 2 - int(p_final * float(ScopeH - 3));
+        bool passed = (stagePhase >= 0.f) && (stagePhase >= t_shifted);
+        canvas.setColor(passed ? Color::Bright : Color::Medium);
+        canvas.fillRect(dx - 1, dy - 1, 2, 2);
+    }
+
+    // Reachable-degree histogram + top 4 by count.
+    const Scale &scale = seq.selectedScale(_model.project().scale());
+    const int rootNote = seq.selectedRootNote(_model.project().rootNote());
+    const int octave = _phaseFluxTrack.octave();
+    const int transpose = _phaseFluxTrack.transpose();
+    const float rangeOctaves = pitchRangeToOctaves_local(stage.pitchRange());
+    const int rangeDegrees = std::max(1, int(std::round(rangeOctaves * scale.notesPerOctave())));
+    const int baseDegree = stage.basePitch() + octave * scale.notesPerOctave() + transpose;
+
+    // Histogram bucketed by signed offset (kept small for stack use).
+    constexpr int kHistBias = 64;
+    constexpr int kHistSize = 128;
+    int counts[kHistSize] = {0};
+    const int samples = 64;
+    for (int s = 0; s < samples; ++s) {
+        float phi = float(s) / float(samples);
+        float p_final = evalPitch(stage, phi);
+        float off = directionOffset(stage.pitchDirection(), p_final, rangeDegrees);
+        int deg = int(std::round(off));
+        int bin = deg + kHistBias;
+        if (bin >= 0 && bin < kHistSize) counts[bin]++;
+    }
+
+    // Currently-playing offset (sentinel = INT_MIN-ish).
+    constexpr int kNoCurrent = -10000;
+    int currentOff = kNoCurrent;
+    if (isActiveCell && stagePhase >= 0.f) {
+        float p_final = evalPitch(stage, stagePhase);
+        currentOff = int(std::round(
+            directionOffset(stage.pitchDirection(), p_final, rangeDegrees)));
+    }
+
+    // Find top 4 by count (linear repeated max — N=4, fine for small N).
+    int topDeg[5];
+    int topN = 0;
+    int countsCopy[kHistSize];
+    for (int i = 0; i < kHistSize; ++i) countsCopy[i] = counts[i];
+    for (int slot = 0; slot < 4; ++slot) {
+        int bestBin = -1;
+        int bestCount = 0;
+        for (int b = 0; b < kHistSize; ++b) {
+            if (countsCopy[b] > bestCount) {
+                bestCount = countsCopy[b];
+                bestBin = b;
+            }
+        }
+        if (bestBin < 0) break;
+        topDeg[topN++] = bestBin - kHistBias;
+        countsCopy[bestBin] = 0;
+    }
+
+    // Ensure current is in the visible set (push out lowest-count one).
+    if (currentOff != kNoCurrent) {
+        bool already = false;
+        for (int i = 0; i < topN; ++i) if (topDeg[i] == currentOff) { already = true; break; }
+        // Only include if reachable (its bucket non-zero in original histogram).
+        const int currentBin = currentOff + kHistBias;
+        const bool reachable = (currentBin >= 0 && currentBin < kHistSize && counts[currentBin] > 0);
+        if (!already && reachable) {
+            if (topN >= 4) topN = 3;
+            topDeg[topN++] = currentOff;
+        }
+    }
+
+    if (topN == 0) return;
+
+    // Sort by pitch — high at top, low at bottom (descending).
+    for (int i = 0; i < topN; ++i) {
+        for (int j = i + 1; j < topN; ++j) {
+            if (topDeg[i] < topDeg[j]) std::swap(topDeg[i], topDeg[j]);
+        }
+    }
+
+    // Draw labels: evenly distribute slots in the label column.
+    canvas.setFont(Font::Tiny);
+    const int innerY0 = y + 2;
+    const int innerH  = ScopeH - 4;
+    const int labelRight = x + PitchLabelColW - 2;
+    for (int i = 0; i < topN; ++i) {
+        const int slotCy  = innerY0 + ((2 * i + 1) * innerH) / (2 * topN);
+        const int baseline = slotCy + 2;
+        FixedStringBuilder<5> noteStr;
+        scale.noteName(noteStr, baseDegree + topDeg[i], rootNote, Scale::Long);
+        const int tw = canvas.textWidth(noteStr);
+        const int tx = labelRight - tw;
+        if (topDeg[i] == currentOff) {
+            canvas.setColor(Color::Bright);
+            canvas.fillRect(tx - 1, baseline - 5, tw + 1, 7);
+            canvas.setBlendMode(BlendMode::Sub);
+            canvas.drawText(tx, baseline, noteStr);
+            canvas.setBlendMode(BlendMode::Set);
+        } else {
+            canvas.setColor(Color::Medium);
+            canvas.drawText(tx, baseline, noteStr);
+        }
     }
 }
 
