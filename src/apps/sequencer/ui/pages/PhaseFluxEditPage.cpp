@@ -528,24 +528,52 @@ void PhaseFluxEditPage::drawTemporalScope(Canvas &canvas, int stageIdx, int scop
         prevPy = py;
     }
 
-    // Pulse tick marks
-    int pulses = std::max(1, std::min(8, stage.pulseCount()));
+    // Pulse marks — 3x3 hollow ring per base pulse, 3x2 U-shape per
+    // accumulator-added extra. Centred on the trigger time, vertically
+    // centred in the scope. 2 px inset from each border keeps the mark 1 px
+    // clear of the outline at both extremes. Dim by default; brighten as the
+    // playhead passes each pulse in the active cell.
     int maskByte = kMaskTable[int(stage.mask())];
     int maskShift = stage.maskShift();
-    for (int i = 0; i < pulses; ++i) {
-        float t_raw = (pulses == 1) ? 0.5f : (float(i) / float(pulses - 1));
+    const int markCenterY = y + ScopeH / 2;
+    const int innerSpan   = ScopeW - 5;   // 95 — px ranges 52..147
+    const auto *te = trackEngine();
+    const bool isActiveCell = te && (te->activeCell() == stageIdx);
+    const float stagePhase  = isActiveCell ? te->sequenceProgress() : -1.f;
+
+    // Match engine effective pulse count: base + pulse-accum counter, clamped 1..8.
+    const auto &pulseCfg = seq.pulseAccumConfig();
+    const int pulseCounterIdx = (pulseCfg.scope() == AccumulatorConfig::Scope::Local)
+        ? stageIdx : 0;
+    const int pulseAccOffset = te ? te->pulseAccumCounter(pulseCounterIdx) : 0;
+    const int basePulses = std::max(1, std::min(8, stage.pulseCount()));
+    const int effective  = std::max(1, std::min(8, stage.pulseCount() + pulseAccOffset));
+    const int basesDrawn = std::min(basePulses, effective);
+
+    for (int i = 0; i < effective; ++i) {
+        // §6.1 — matches engine: first pulse at slot start, last at (N-1)/N.
+        float t_raw = float(i) / float(effective);
         float t_final = evalTemporal(stage, t_raw);
         float t_shifted = t_final + float(stage.phaseShift()) * 0.125f;
         t_shifted = std::fmod(t_shifted, 1.f);
         if (t_shifted < 0.f) t_shifted += 1.f;
         bool muted = (maskByte >> ((i + maskShift) & 7)) & 1;
-        int px = x + 1 + int(t_shifted * float(ScopeW - 3));
+        bool passed = (stagePhase >= 0.f) && (stagePhase >= t_shifted);
+        int px = x + 2 + int(t_shifted * float(innerSpan));
         if (muted) {
             canvas.setColor(Color::Low);
-            canvas.point(px, y + ScopeH - 1);
+            canvas.point(px, markCenterY);
+            continue;
+        }
+        canvas.setColor(passed ? Color::Bright : Color::Medium);
+        if (i < basesDrawn) {
+            // Base pulse — 3x3 hollow ring.
+            canvas.drawRect(px - 1, markCenterY - 1, 3, 3);
         } else {
-            canvas.setColor(Color::Bright);
-            canvas.vline(px, y + ScopeH - 4, 3);
+            // Accumulator-extra — 3 wide × 2 tall U (open top, closed bottom).
+            canvas.point(px - 1, markCenterY);
+            canvas.point(px + 1, markCenterY);
+            canvas.hline(px - 1, markCenterY + 1, 3);
         }
     }
 }

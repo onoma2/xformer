@@ -1085,7 +1085,10 @@ Inside the 256×42 px safe content area (header/footer guards per `ui-preview/UI
   - `mask ≠ Off` — top-right corner dot.
 - **Selection vs active cell**: NoteTrack/Stochastic convention. The **selected** cell (bright outline, scopes/params display its values) is set by the player via top-row hardware key and **stays put** as the cursor advances. The **active** cell (currently playing, inverted fill) moves independently as the engine ticks. Encoder rotation always edits the user-selected cell, regardless of which cell is playing. No "follow" mode in MVP.
 - **Right half (x 50..253) — default view**: two side-by-side scopes ~100×38 each (temporal left, pitch right) with a 1 px divider at x=152.
-  - Temporal scope: curve trace + pulse-fire tick marks along the bottom (masked pulses dim, fired pulses bright).
+  - Temporal scope: curve trace + per-pulse marks **vertically centred** at `y = ScopeY + ScopeH/2`. Spacing matches the engine's §6.1 `i/N` formula (last pulse at `(N-1)/N`, not the cell boundary). Inset 2 px from the scope outline so 3-wide marks stay 1 px clear of the edge at both extremes. Three glyphs:
+    - **3×3 hollow ring** — one per base pulse (`stage.pulseCount()`). `Color::Medium` by default; flips to `Color::Bright` once the playhead crosses its trigger time in the active cell.
+    - **3 wide × 2 tall U** (open top, closed bottom) — one per accumulator-added extra pulse. Same dim/bright behaviour. Hidden if `pulseAccOffset` is negative (decreased pulses don't render — only the `effective = clamp(base + offset, 1, 8)` pulses appear).
+    - **Single `Color::Low` centre dot** — muted pulse (`(maskByte >> ((i + maskShift) & 7)) & 1`).
   - Pitch scope: curve trace + bright dot at each fired pulse's sampled CV.
   - **No parameter labels** — pure shape feedback.
 - **Right half — edit-hold view** (top-row stage key held): 8 boxes ~24×38 each, one per bottom-row hardware key, spanning x=50..253.
