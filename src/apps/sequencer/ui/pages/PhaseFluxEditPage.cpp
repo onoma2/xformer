@@ -1005,7 +1005,7 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
     const int innerY0 = kScopeY + 1;
     const int innerH  = kScopeH - 3;
 
-    // Slice boundary tick marks (dotted, faint).
+    // Slice boundary tick marks (dotted, faint) — PhaseFlux per-stage edges.
     canvas.setColor(Color::Low);
     const auto &snake = PhaseFluxMath::snakeOrder();
     for (int slot = 1; slot < PhaseFluxMath::kStageCount; ++slot) {
@@ -1017,7 +1017,26 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
         }
     }
 
-    // Curve trace — one pixel per X column.
+    // Tempo grid dents — short vertical ticks at the bottom edge, one per beat
+    // (project timeSignature.noteDivisor() ticks). Bends with GWarp + Phase
+    // so the displayed positions follow engine-time. Color::Low — faint.
+    const int beatTicks = int(_model.project().timeSignature().noteDivisor());
+    if (beatTicks > 0 && cycleTicks > 0) {
+        canvas.setColor(Color::Low);
+        const int dentY  = innerY0 + innerH - 4;   // 3 px above baseline
+        const int dentLen = 3;
+        for (int beatPos = 0; beatPos <= cycleTicks; beatPos += beatTicks) {
+            float rawPhase = float(beatPos) / float(cycleTicks);
+            float disp = PhaseFluxMath::powerBend(rawPhase, gwarpParam);
+            disp -= globalPhase;
+            disp -= std::floor(disp);
+            int x = innerX0 + int(disp * float(innerW - 1));
+            canvas.vline(x, dentY, dentLen);
+        }
+    }
+
+    // Curve trace — one pixel per X column. Honors temporalRepeat (sub-section
+    // splits within the slot) and temporalWindow (Off / Focus / Polarize bands).
     canvas.setColor(Color::Bright);
     int prevPy = -1;
     bool prevVisible = false;
@@ -1038,12 +1057,24 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
         const auto &s = seq.stage(cell);
         if (s.skip()) { prevVisible = false; continue; }
 
-        float t_raw = float(ticks - cumulative[slot]) / float(slotW);
+        float t_slot = float(ticks - cumulative[slot]) / float(slotW);
 
-        // Effective warp/response with WarpN/RespN applied.
+        // §14.2 Repeat — split slot into R sub-sections; figure out which sub
+        // this pixel falls in and the local position within it.
+        const int tempR = repeatMultiplier(s.temporalRepeat());
+        float t_local = std::fmod(t_slot * float(tempR), 1.f);
+
+        // §14.2 Window — drop this pixel if outside the visible band.
+        if (!isInWindow(t_local, s.temporalWindow())) {
+            prevVisible = false;
+            continue;
+        }
+
+        // Effective warp/response with WarpN/RespN applied — pipeline is
+        // Window (above) → Repeat (above) → Warp → Curve → FlipV → Response → FlipH.
         int effWarp = clamp(s.temporalWarp() + warpNudge, -64, 64);
         int effResp = clamp(s.temporalResponse() + respNudge, -64, 64);
-        float t = clamp01(t_raw);
+        float t = clamp01(t_local);
         t = PhaseFluxMath::powerBend(t, PhaseFluxMath::powerBendKnobToParam(effWarp));
         if (s.temporalFlipH()) t = 1.f - t;
         t = Curve::eval(temporalCurveLut(s.temporalCurve()), t);
@@ -1057,7 +1088,8 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
         prevVisible = true;
     }
 
-    // Pulse marks — 1 px dot per fire, centered vertically.
+    // Pulse marks — 1 px dot per fire, centered vertically. Mirrors engine's
+    // sub-section algorithm (PhaseFluxTrackEngine.cpp:331..354).
     const int markY = innerY0 + innerH / 2;
     canvas.setColor(Color::Medium);
     for (int slot = 0; slot < PhaseFluxMath::kStageCount; ++slot) {
@@ -1071,15 +1103,37 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
         if (effPulse > 16) effPulse = 16;
         int effWarp = clamp(s.temporalWarp() + warpNudge, -64, 64);
         int effResp = clamp(s.temporalResponse() + respNudge, -64, 64);
+
+        const int tempR = repeatMultiplier(s.temporalRepeat());
+        const int subBaseSize = effPulse / tempR;
+        const int subRemainder = effPulse % tempR;
+        const int subOversizeBoundary = subRemainder * (subBaseSize + 1);
+        const auto windowType = s.temporalWindow();
+
         for (int i = 0; i < effPulse; ++i) {
-            float t_local = effPulse > 0 ? float(i) / float(effPulse) : 0.f;
-            float t = clamp01(t_local);
+            int subIdx, localPulseIdx, pulsesInThisSub;
+            if (i < subOversizeBoundary) {
+                subIdx = i / (subBaseSize + 1);
+                localPulseIdx = i % (subBaseSize + 1);
+                pulsesInThisSub = subBaseSize + 1;
+            } else {
+                const int j = i - subOversizeBoundary;
+                subIdx = subRemainder + (subBaseSize > 0 ? j / subBaseSize : 0);
+                localPulseIdx = (subBaseSize > 0) ? (j % subBaseSize) : 0;
+                pulsesInThisSub = subBaseSize > 0 ? subBaseSize : 1;
+            }
+            const float t_raw_local = float(localPulseIdx) / float(pulsesInThisSub);
+            if (!isInWindow(t_raw_local, windowType)) continue;
+
+            float t = clamp01(t_raw_local);
             t = PhaseFluxMath::powerBend(t, PhaseFluxMath::powerBendKnobToParam(effWarp));
             if (s.temporalFlipH()) t = 1.f - t;
             t = Curve::eval(temporalCurveLut(s.temporalCurve()), t);
             if (s.temporalFlipV()) t = 1.f - t;
             t = PhaseFluxMath::powerBend(clamp01(t), PhaseFluxMath::powerBendKnobToParam(effResp));
-            float rawPhase = float(cumulative[slot] + int(t * float(slotW))) / float(cycleTicks);
+
+            float t_slot_global = (float(subIdx) + t) / float(tempR);
+            float rawPhase = float(cumulative[slot] + int(t_slot_global * float(slotW))) / float(cycleTicks);
             float disp = PhaseFluxMath::powerBend(rawPhase, gwarpParam);
             disp -= globalPhase;
             disp -= std::floor(disp);
