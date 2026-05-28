@@ -98,6 +98,11 @@ void PhaseFluxSequence::clear() {
     _pitchRate = uint8_t(defaultPitchRateIndex());
     _pitchMode = PitchMode::Cell;
     _globalPhase = 0.f;
+    _warpNudge = 0;
+    _responseNudge = 0;
+    _pulseNudge = 0;
+    _lenNudge = 0;
+    _cyclePhaseWarp = 0;
     _divisor.setBase(12);                // 1/16 at PPQN 48
     _clockMultiplier.setBase(100);
     _noteAccumConfig = AccumulatorConfig();
@@ -119,6 +124,11 @@ void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_pitchRate);
     writer.write(static_cast<uint8_t>(_pitchMode));
     writer.write(_globalPhase);
+    writer.write(_warpNudge);
+    writer.write(_responseNudge);
+    writer.write(_pulseNudge);
+    writer.write(_lenNudge);
+    writer.write(_cyclePhaseWarp);
     _divisor.write(writer);
     _clockMultiplier.write(writer);
     _noteAccumConfig.write(writer);
@@ -137,6 +147,11 @@ void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
     reader.read(pitchMode);
     _pitchMode = pitchMode < uint8_t(PitchMode::Last) ? static_cast<PitchMode>(pitchMode) : PitchMode::Cell;
     reader.read(_globalPhase);
+    reader.read(_warpNudge);
+    reader.read(_responseNudge);
+    reader.read(_pulseNudge);
+    reader.read(_lenNudge);
+    reader.read(_cyclePhaseWarp);
     _divisor.read(reader);
     _clockMultiplier.read(reader);
     _noteAccumConfig.read(reader);

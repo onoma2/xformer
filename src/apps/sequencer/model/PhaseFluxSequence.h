@@ -406,6 +406,59 @@ public:
         str("%.2f", globalPhase());
     }
 
+    // MACRO nudges — per-sequence offsets added to every stage's per-cell value
+    // live. §14.2 design sketches. Plain int8_t (not Routable for v1).
+    int warpNudge() const { return _warpNudge; }
+    void setWarpNudge(int v) { _warpNudge = clamp(v, -64, 64); }
+    void editWarpNudge(int value, bool shift) {
+        setWarpNudge(warpNudge() + value * (shift ? 4 : 1));
+    }
+    void printWarpNudge(StringBuilder &str) const { str("%+d", warpNudge()); }
+
+    int responseNudge() const { return _responseNudge; }
+    void setResponseNudge(int v) { _responseNudge = clamp(v, -64, 64); }
+    void editResponseNudge(int value, bool shift) {
+        setResponseNudge(responseNudge() + value * (shift ? 4 : 1));
+    }
+    void printResponseNudge(StringBuilder &str) const { str("%+d", responseNudge()); }
+
+    int pulseNudge() const { return _pulseNudge; }
+    void setPulseNudge(int v) { _pulseNudge = clamp(v, -15, 15); }
+    void editPulseNudge(int value, bool) { setPulseNudge(pulseNudge() + value); }
+    void printPulseNudge(StringBuilder &str) const { str("%+d", pulseNudge()); }
+
+    int lenNudge() const { return _lenNudge; }
+    void setLenNudge(int v) { _lenNudge = clamp(v, -64, 64); }
+    void editLenNudge(int value, bool shift) {
+        setLenNudge(lenNudge() + value * (shift ? 4 : 1));
+    }
+    void printLenNudge(StringBuilder &str) const { str("%+d", lenNudge()); }
+
+    int cyclePhaseWarp() const { return _cyclePhaseWarp; }
+    void setCyclePhaseWarp(int v) { _cyclePhaseWarp = clamp(v, -64, 64); }
+    void editCyclePhaseWarp(int value, bool shift) {
+        setCyclePhaseWarp(cyclePhaseWarp() + value * (shift ? 4 : 1));
+    }
+    void printCyclePhaseWarp(StringBuilder &str) const { str("%+d", cyclePhaseWarp()); }
+
+    // Snap globalPhase to nearest 1/16 of cycle. Press-to-fire from MACRO P1.
+    void snapToGrid() {
+        const float step = 1.f / 16.f;
+        _globalPhase = std::round(_globalPhase / step) * step;
+        if (_globalPhase < 0.f) _globalPhase = 0.f;
+        if (_globalPhase >= 1.f) _globalPhase -= 1.f;
+    }
+
+    // Reset all 5 magnitude macros (nudges + cyclePhaseWarp) to 0.
+    // globalPhase deliberately untouched — different category.
+    void zeroMacros() {
+        _warpNudge = 0;
+        _responseNudge = 0;
+        _pulseNudge = 0;
+        _lenNudge = 0;
+        _cyclePhaseWarp = 0;
+    }
+
     // pitchRate — P:T ratio table index for Global pitch mode. 1:1 = locked.
     static constexpr int kPitchRateCount = 17;
     static int pitchRateNum(int index);
@@ -497,6 +550,11 @@ private:
     uint8_t _pitchRate = 0;  // set to defaultPitchRateIndex() in clear()
     PitchMode _pitchMode = PitchMode::Cell;
     float _globalPhase = 0.f;
+    int8_t _warpNudge = 0;
+    int8_t _responseNudge = 0;
+    int8_t _pulseNudge = 0;
+    int8_t _lenNudge = 0;
+    int8_t _cyclePhaseWarp = 0;
     Routable<uint16_t> _divisor;
     Routable<uint8_t> _clockMultiplier;
 
