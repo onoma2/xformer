@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BasePage.h"
+#include "ui/StepSelection.h"
 #include "engine/PhaseFluxTrackEngine.h"
 
 class PhaseFluxEditPage : public BasePage {
@@ -56,4 +57,5 @@ private:
     int _currentSet = 0;    // 0=TEMP, 1=PTCH, 2=ACCUM.N, 3=ACCUM.P, 4=MACRO
     int _selectedSlot = 0;  // 0..3 (F1..F4) — F5 is Next
     int _topicPage = 0;     // P0/P1/(P2 for TEMP+PTCH)
+    StepSelection<16> _stepSelection;  // multi-cell edit target (held + Persist via Shift)
 };

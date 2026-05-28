@@ -274,11 +274,14 @@ void PhaseFluxEditPage::updateLeds(Leds &leds) {
 }
 
 void PhaseFluxEditPage::keyDown(KeyEvent &event) {
-    (void)event;
+    // StepSelection handles multi-cell tracking (Immediate = held; Persist =
+    // toggled in via Shift+step). PhaseFlux's 4×4 grid lives in step indices
+    // 0..15 directly, so stepOffset = 0.
+    _stepSelection.keyDown(event, 0);
 }
 
 void PhaseFluxEditPage::keyUp(KeyEvent &event) {
-    (void)event;
+    _stepSelection.keyUp(event, 0);
 }
 
 void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
@@ -308,11 +311,21 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    // StepSelection's keyPress handles Shift+Shift double-click (select-all/
+    // clear) and Shift+double-click on a step (interval-select / select-equal).
+    _stepSelection.keyPress(event, 0);
+
     if (key.isStep()) {
-        if (key.shiftModifier()) {
+        // Double-click step (no shift) → toggle skip on that step.
+        if (!key.shiftModifier() && event.count() == 2) {
             auto &stage = _project.selectedPhaseFluxSequence().stage(key.step());
             stage.setSkip(!stage.skip());
-        } else {
+            event.consume();
+            return;
+        }
+        // Single press without shift → move cursor (drives scope/grid focus).
+        // Selection state is tracked separately via _stepSelection (keyDown/Up).
+        if (!key.shiftModifier()) {
             _selectedCell = key.step();
         }
         event.consume();
@@ -404,7 +417,6 @@ void PhaseFluxEditPage::encoder(EncoderEvent &event) {
 
 void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
     auto &seq = _project.selectedPhaseFluxSequence();
-    auto &activeStage = seq.stage(_selectedCell);
     auto &masterStage = seq.stage(0);
     auto cycle = [](int v, int lo, int hi) { return clamp(v, lo, hi); };
     const bool isGlobalPitch =
@@ -412,15 +424,29 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
         _project.selectedPhaseFluxSequence().pitchMode() == PhaseFluxSequence::PitchMode::Global;
     const bool isAccumN = (_currentSet == 2);
     const bool isAccumP = (_currentSet == 3);
+
+    // Per-cell edit target: every cell in _stepSelection if any, else just
+    // _selectedCell. Multi-cell selection → encoder applies to all. C++11
+    // requires explicit std::function (matches ContextMenu's pattern).
+    auto forEachCell = [&](const std::function<void(PhaseFluxSequence::Stage&)> &fn) {
+        if (_stepSelection.any()) {
+            for (int i = 0; i < 16; ++i) {
+                if (_stepSelection[i]) fn(seq.stage(i));
+            }
+        } else {
+            fn(seq.stage(_selectedCell));
+        }
+    };
+
     if (isAccumN || isAccumP) {
         auto &cfg = isAccumN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
         if (_topicPage == 0) {
             switch (slot) {
             case 0:  // Ac.St — per-cell, UI-clamped to ±7.
                 if (isAccumN) {
-                    activeStage.setAccumulatorStep(clamp(activeStage.accumulatorStep() + value, -7, 7));
+                    forEachCell([&](PhaseFluxSequence::Stage &s) { s.setAccumulatorStep(clamp(s.accumulatorStep() + value, -7, 7)); });
                 } else {
-                    activeStage.setPulseAccumStep(activeStage.pulseAccumStep() + value);
+                    forEachCell([&](PhaseFluxSequence::Stage &s) { s.setPulseAccumStep(s.pulseAccumStep() + value); });
                 }
                 break;
             case 1: break;  // reserved (+Lim → list page)
@@ -432,13 +458,14 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             case 0: cfg.setReset(uint8_t(cycle(int(cfg.reset()) + value, 0, 15))); break;
             case 1: cfg.setPolarity(AccumulatorConfig::Polarity(cycle(int(cfg.polarity()) + value, 0, 1))); break;
             case 2: {
-                int trigInt = isAccumN
-                    ? int(activeStage.accumulatorTrigger())
-                    : int(activeStage.pulseAccumTrigger());
-                trigInt = cycle(trigInt + value, 0, 1);
-                auto next = PhaseFluxSequence::AccumulatorTriggerType(trigInt);
-                if (isAccumN) activeStage.setAccumulatorTrigger(next);
-                else          activeStage.setPulseAccumTrigger(next);
+                // Trig is per-cell — multi-edit applies the same value (cycle ↑↓) to each.
+                forEachCell([&](PhaseFluxSequence::Stage &s) {
+                    int trigInt = isAccumN ? int(s.accumulatorTrigger()) : int(s.pulseAccumTrigger());
+                    trigInt = cycle(trigInt + value, 0, 1);
+                    auto next = PhaseFluxSequence::AccumulatorTriggerType(trigInt);
+                    if (isAccumN) s.setAccumulatorTrigger(next);
+                    else          s.setPulseAccumTrigger(next);
+                });
                 break;
             }
             case 3: break;  // Sleep reserved (§14.2)
@@ -452,22 +479,22 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
         // P2: Window/Repeat/—/— (* = handled by togglePressSlot, not editSlot.)
         if (_topicPage == 0) {
             switch (slot) {
-            case 0: activeStage.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(cycle(int(activeStage.temporalCurve()) + value, 0, 2))); break;
-            case 1: activeStage.setTemporalWarp(ModelUtils::adjusted(activeStage.temporalWarp(), value, -64, 64)); break;
-            case 2: activeStage.setTemporalResponse(ModelUtils::adjusted(activeStage.temporalResponse(), value, -64, 64)); break;
-            case 3: activeStage.setPulseCount(ModelUtils::adjusted(activeStage.pulseCount(), value, 0, 16)); break;
+            case 0: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(cycle(int(s.temporalCurve()) + value, 0, 2))); }); break;
+            case 1: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setTemporalWarp(ModelUtils::adjusted(s.temporalWarp(), value, -64, 64)); }); break;
+            case 2: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setTemporalResponse(ModelUtils::adjusted(s.temporalResponse(), value, -64, 64)); }); break;
+            case 3: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setPulseCount(ModelUtils::adjusted(s.pulseCount(), value, 0, 16)); }); break;
             }
         } else if (_topicPage == 1) {
             switch (slot) {
-            case 0: activeStage.setStageLen(ModelUtils::adjusted(activeStage.stageLen(), value, 0, 127)); break;
+            case 0: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setStageLen(ModelUtils::adjusted(s.stageLen(), value, 0, 127)); }); break;
             // slots 1, 2 are FlipV / FlipH toggles (press-only)
-            case 3: activeStage.setMask(PhaseFluxSequence::MaskType(cycle(int(activeStage.mask()) + value, 0, 7))); break;
+            case 3: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setMask(PhaseFluxSequence::MaskType(cycle(int(s.mask()) + value, 0, 7))); }); break;
             }
         } else {
             // P2 — §14.2 Window + Repeat per axis.
             switch (slot) {
-            case 0: activeStage.setTemporalWindow(PhaseFluxSequence::WindowType(cycle(int(activeStage.temporalWindow()) + value, 0, 4))); break;
-            case 1: activeStage.setTemporalRepeat(PhaseFluxSequence::RepeatType(cycle(int(activeStage.temporalRepeat()) + value, 0, 3))); break;
+            case 0: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setTemporalWindow(PhaseFluxSequence::WindowType(cycle(int(s.temporalWindow()) + value, 0, 4))); }); break;
+            case 1: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setTemporalRepeat(PhaseFluxSequence::RepeatType(cycle(int(s.temporalRepeat()) + value, 0, 3))); }); break;
             // slots 2, 3 reserved
             }
         }
@@ -482,8 +509,8 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             }
         } else {
             switch (slot) {
-            case 0: activeStage.setBasePitch(ModelUtils::adjusted(activeStage.basePitch(), value, -64, 64)); break;
-            case 1: activeStage.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(activeStage.pitchRange()) + value, 0, 3))); break;
+            case 0: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setBasePitch(ModelUtils::adjusted(s.basePitch(), value, -64, 64)); }); break;
+            case 1: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(s.pitchRange()) + value, 0, 3))); }); break;
             // slots 2, 3 are master stage's FlipV / FlipH toggles
             }
         }
@@ -492,24 +519,24 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
         // P2: Window/Repeat/—/—
         if (_topicPage == 0) {
             switch (slot) {
-            case 0: activeStage.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(activeStage.pitchCurve()) + value, 0, 3))); break;
-            case 1: activeStage.setPitchWarp(ModelUtils::adjusted(activeStage.pitchWarp(), value, -64, 64)); break;
-            case 2: activeStage.setPitchResponse(ModelUtils::adjusted(activeStage.pitchResponse(), value, -64, 64)); break;
-            case 3: activeStage.setBasePitch(ModelUtils::adjusted(activeStage.basePitch(), value, -64, 64)); break;
+            case 0: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setPitchCurve(PhaseFluxSequence::PitchCurveType(cycle(int(s.pitchCurve()) + value, 0, 3))); }); break;
+            case 1: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setPitchWarp(ModelUtils::adjusted(s.pitchWarp(), value, -64, 64)); }); break;
+            case 2: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setPitchResponse(ModelUtils::adjusted(s.pitchResponse(), value, -64, 64)); }); break;
+            case 3: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setBasePitch(ModelUtils::adjusted(s.basePitch(), value, -64, 64)); }); break;
             }
         } else if (_topicPage == 1) {
             switch (slot) {
-            case 0: activeStage.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(activeStage.pitchRange()) + value, 0, 3))); break;
-            case 1: activeStage.setPitchDirection(PhaseFluxSequence::PitchDirectionType(cycle(int(activeStage.pitchDirection()) + value, 0, 2))); break;
+            case 0: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setPitchRange(PhaseFluxSequence::PitchRangeType(cycle(int(s.pitchRange()) + value, 0, 3))); }); break;
+            case 1: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setPitchDirection(PhaseFluxSequence::PitchDirectionType(cycle(int(s.pitchDirection()) + value, 0, 2))); }); break;
             // slots 2, 3 are active stage's FlipV / FlipH toggles
             }
         } else {
             // P2 — §14.2 Window + Repeat + §6.2.1 MaskM/TiltM for pitch axis.
             switch (slot) {
-            case 0: activeStage.setPitchWindow(PhaseFluxSequence::WindowType(cycle(int(activeStage.pitchWindow()) + value, 0, 4))); break;
-            case 1: activeStage.setPitchRepeat(PhaseFluxSequence::RepeatType(cycle(int(activeStage.pitchRepeat()) + value, 0, 3))); break;
-            case 2: activeStage.setMaskMelody(activeStage.maskMelody() + value); break;
-            case 3: activeStage.setTiltMelody(activeStage.tiltMelody() + value); break;
+            case 0: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setPitchWindow(PhaseFluxSequence::WindowType(cycle(int(s.pitchWindow()) + value, 0, 4))); }); break;
+            case 1: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setPitchRepeat(PhaseFluxSequence::RepeatType(cycle(int(s.pitchRepeat()) + value, 0, 3))); }); break;
+            case 2: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setMaskMelody(s.maskMelody() + value); }); break;
+            case 3: forEachCell([&](PhaseFluxSequence::Stage &s) { s.setTiltMelody(s.tiltMelody() + value); }); break;
             }
         }
     } else if (_currentSet == 4) {
@@ -821,17 +848,28 @@ void PhaseFluxEditPage::togglePressSlot(int slot) {
     // Press-to-flip for binary toggles on Page 1. Topic/page selection by
     // keyPress; this function just performs the actual flip.
     auto &seq = _project.selectedPhaseFluxSequence();
-    auto &activeStage = seq.stage(_selectedCell);
     auto &masterStage = seq.stage(0);
     const bool isGlobalPitch =
         _currentSet == 1 &&
         seq.pitchMode() == PhaseFluxSequence::PitchMode::Global;
 
+    // Multi-cell flip: toggle every selected cell when a selection is active,
+    // otherwise toggle just the cursor cell. std::function form for C++11.
+    auto flipEachCell = [&](const std::function<void(PhaseFluxSequence::Stage&)> &fn) {
+        if (_stepSelection.any()) {
+            for (int i = 0; i < 16; ++i) {
+                if (_stepSelection[i]) fn(seq.stage(i));
+            }
+        } else {
+            fn(seq.stage(_selectedCell));
+        }
+    };
+
     if (_currentSet == 0) {
         // TEMP P1: FlipV(1), FlipH(2)
         switch (slot) {
-        case 1: activeStage.setTemporalFlipV(!activeStage.temporalFlipV()); break;
-        case 2: activeStage.setTemporalFlipH(!activeStage.temporalFlipH()); break;
+        case 1: flipEachCell([](PhaseFluxSequence::Stage &s) { s.setTemporalFlipV(!s.temporalFlipV()); }); break;
+        case 2: flipEachCell([](PhaseFluxSequence::Stage &s) { s.setTemporalFlipH(!s.temporalFlipH()); }); break;
         default: break;
         }
     } else if (isGlobalPitch) {
@@ -842,10 +880,10 @@ void PhaseFluxEditPage::togglePressSlot(int slot) {
         default: break;
         }
     } else if (_currentSet == 1) {
-        // PITCH Cell P1: FlipV(2)/FlipH(3) on the active stage.
+        // PITCH Cell P1: FlipV(2)/FlipH(3) — multi-cell when selection active.
         switch (slot) {
-        case 2: activeStage.setPitchFlipV(!activeStage.pitchFlipV()); break;
-        case 3: activeStage.setPitchFlipH(!activeStage.pitchFlipH()); break;
+        case 2: flipEachCell([](PhaseFluxSequence::Stage &s) { s.setPitchFlipV(!s.pitchFlipV()); }); break;
+        case 3: flipEachCell([](PhaseFluxSequence::Stage &s) { s.setPitchFlipH(!s.pitchFlipH()); }); break;
         default: break;
         }
     } else if (_currentSet == 4) {
@@ -867,7 +905,9 @@ void PhaseFluxEditPage::drawGrid(Canvas &canvas) {
 
     for (int i = 0; i < 16; ++i) {
         bool isActive   = (i == activeCell);
-        bool isSelected = (i == _selectedCell);
+        // Selected = cursor cell OR any cell in the multi-cell StepSelection
+        // (held in Immediate mode or sticky in Persist mode).
+        bool isSelected = (i == _selectedCell) || _stepSelection[i];
         drawGridCell(canvas, i, isActive, isSelected);
 
         const auto &stage = seq.stage(i);
