@@ -178,7 +178,9 @@ bool PhaseFluxTrackEngine::detectLayoutChange() {
     if (!_sequence) return false;
     uint16_t div = uint16_t(_sequence->divisor());
     uint8_t mult = uint8_t(_sequence->clockMultiplier());
+    int8_t  lenN = int8_t(_sequence->lenNudge());
     if (div != _cachedDivisor || mult != _cachedClockMult) return true;
+    if (lenN != _cachedLenNudge) return true;
     for (int i = 0; i < kStageCount; ++i) {
         const auto &s = _sequence->stage(i);
         if (uint8_t(s.stageDivisor()) != _cachedStageDivisor[i]) return true;
@@ -192,10 +194,15 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
     int stageDivisorTicksArr[kStageCount];
     int stageLenArr[kStageCount];
     bool skipArr[kStageCount];
+    const int lenNudge = _sequence->lenNudge();
     for (int i = 0; i < kStageCount; ++i) {
         const auto &s = _sequence->stage(i);
         stageDivisorTicksArr[i] = PhaseFluxMath::stageDivisorTicks(s.stageDivisor());
-        stageLenArr[i] = s.stageLen();
+        // LenNudge adds to every stage's stageLen uniformly; clamp to storage range.
+        int effLen = s.stageLen() + lenNudge;
+        if (effLen < 0)   effLen = 0;
+        if (effLen > 127) effLen = 127;
+        stageLenArr[i] = effLen;
         skipArr[i] = s.skip();
         _cachedStageDivisor[i] = uint8_t(s.stageDivisor());
         _cachedStageLen[i] = uint8_t(s.stageLen());
@@ -203,6 +210,7 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
     }
     _cachedDivisor = uint16_t(_sequence->divisor());
     _cachedClockMult = uint8_t(_sequence->clockMultiplier());
+    _cachedLenNudge = int8_t(_sequence->lenNudge());
 
     _cycleTicks = PhaseFluxMath::computeCumulativeTicks(
         stageDivisorTicksArr, stageLenArr, skipArr,
@@ -245,6 +253,11 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
 
     const auto &stage = _sequence->stage(_activeCell);
 
+    // §14.2 MACRO nudges — per-sequence uniform offsets read once per slot.
+    const int warpNudge = _sequence->warpNudge();
+    const int respNudge = _sequence->responseNudge();
+    const int pulseNudge = _sequence->pulseNudge();
+
     // §13.8 — clamp on the OUTPUT, not the counter: counter walks past 0..16
     // so wrap/pendulum bounds stay independent of pulse-count clipping.
     const auto &pulseCfg = _sequence->pulseAccumConfig();
@@ -253,7 +266,7 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     // Counter already stores accumulated delta (each tick adds step), so apply
     // directly — multiplying by step here would be quadratic growth.
     const int pulseAccOffset = _pulseAccumCounter[pulseCounterIdx];
-    int pulseCount = stage.pulseCount() + pulseAccOffset;
+    int pulseCount = stage.pulseCount() + pulseNudge + pulseAccOffset;
     if (pulseCount < 0) pulseCount = 0;
     if (pulseCount > kMaxPulses) pulseCount = kMaxPulses;
 
@@ -269,6 +282,11 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     const int maskByte = kMaskTable[int(stage.mask())];
     const int maskShift = stage.maskShift();
 
+    // §14.2 WarpN/RespN — uniform offsets added to BOTH axes, clamped to
+    // the per-cell field range.
+    const int tempWarpKnob  = clamp(stage.temporalWarp()     + warpNudge, -64, 64);
+    const int tempRespKnob  = clamp(stage.temporalResponse() + respNudge, -64, 64);
+
     // Pitch source: Cell mode = active stage; Global mode = stage[0]'s curve.
     const bool isGlobalPitch =
         _sequence->pitchMode() == PhaseFluxSequence::PitchMode::Global;
@@ -276,8 +294,8 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     const Curve::Type pitchCurveType = pitchCurveLut(pitchStage.pitchCurve());
     const bool pFlipV = pitchStage.pitchFlipV();
     const bool pFlipH = pitchStage.pitchFlipH();
-    const int pitchWarpKnob = pitchStage.pitchWarp();
-    const int pitchRespKnob = pitchStage.pitchResponse();
+    const int pitchWarpKnob = clamp(pitchStage.pitchWarp()     + warpNudge, -64, 64);
+    const int pitchRespKnob = clamp(pitchStage.pitchResponse() + respNudge, -64, 64);
 
     // Global mode advance projection: pitchPhase at slot start + per-tick rate.
     const float pitchAdvancePerTick = isGlobalPitch
@@ -348,10 +366,10 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
 
         // §6.1 temporal pipeline on the local position, then map back to
         // global via the sub-section index.
-        float t_warped = applyPowerBend(t_raw_local, stage.temporalWarp());
+        float t_warped = applyPowerBend(t_raw_local, tempWarpKnob);
         float t_curved = Curve::eval(tempCurveType, t_warped);
         float t_flipped = tFlipV ? (1.f - t_curved) : t_curved;
-        float t_final_local = applyPowerBend(t_flipped, stage.temporalResponse());
+        float t_final_local = applyPowerBend(t_flipped, tempRespKnob);
         float t_final_global = (float(subIdx) + t_final_local) / float(tempR);
         float t_shifted = t_final_global + (float(phaseShift) * 0.125f);
         t_shifted = std::fmod(t_shifted, 1.f);
@@ -563,6 +581,15 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             uint32_t shift = uint32_t(phase * float(_cycleTicks));
             relativeTick = (relativeTick + shift) % uint32_t(_cycleTicks);
         }
+        // §14.2 cyclePhaseWarp (GWarp) — PowerBend on the cycle position before
+        // slot derivation. Bends WHERE in the cycle each cell sits without
+        // changing the total cycle length.
+        const int gwarp = _sequence->cyclePhaseWarp();
+        if (gwarp != 0) {
+            float cyclePhase = float(relativeTick % uint32_t(_cycleTicks)) / float(_cycleTicks);
+            float warped = applyPowerBend(cyclePhase, gwarp);
+            relativeTick = uint32_t(warped * float(_cycleTicks)) % uint32_t(_cycleTicks);
+        }
     }
 
     // §3.3 Reset Measure — light reset, preserves counters per §7.1.
@@ -665,12 +692,15 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             if (isInWindow(phi, pitchWindowType)) {
                 // §14.2 pitch Repeat — Cell mode only; multiplies curve frequency.
                 const int pitchR = isGlobalPitch ? 1 : repeatMultiplier(stage.pitchRepeat());
+                // §14.2 WarpN/RespN applied here too, matching the Gate-mode pipeline.
+                const int pWarpEff = clamp(pitchStage.pitchWarp()     + _sequence->warpNudge(),     -64, 64);
+                const int pRespEff = clamp(pitchStage.pitchResponse() + _sequence->responseNudge(), -64, 64);
                 float phi_repeated = (pitchR > 1) ? std::fmod(phi * float(pitchR), 1.f) : phi;
-                float phi_warped = applyPowerBend(phi_repeated, pitchStage.pitchWarp());
+                float phi_warped = applyPowerBend(phi_repeated, pWarpEff);
                 float phi_input = pitchStage.pitchFlipH() ? (1.f - phi_warped) : phi_warped;
                 float p_curved = Curve::eval(pitchCurveType, phi_input);
                 float p_flipped = pitchStage.pitchFlipV() ? (1.f - p_curved) : p_curved;
-                float p_final = applyPowerBend(p_flipped, pitchStage.pitchResponse());
+                float p_final = applyPowerBend(p_flipped, pRespEff);
 
                 float offsetDegrees = 0.f;
                 switch (stage.pitchDirection()) {
