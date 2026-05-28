@@ -571,7 +571,7 @@ void PhaseFluxEditPage::togglePressSlot(int slot) {
     } else if (_currentSet == 4) {
         // MACRO P1: Snap(2) / Zero(3) — press-to-fire utilities.
         switch (slot) {
-        case 2: seq.snapToGrid(); break;
+        case 2: seq.snapToGrid(int(_engine.measureDivisor())); break;
         case 3: seq.zeroMacros(); break;
         default: break;
         }
@@ -1019,12 +1019,12 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
 
     // Tempo grid dents — short vertical ticks at the bottom edge, one per beat
     // (project timeSignature.noteDivisor() ticks). Bends with GWarp + Phase
-    // so the displayed positions follow engine-time. Color::Low — faint.
+    // so the displayed positions follow engine-time.
     const int beatTicks = int(_model.project().timeSignature().noteDivisor());
     if (beatTicks > 0 && cycleTicks > 0) {
-        canvas.setColor(Color::Low);
-        const int dentY  = innerY0 + innerH - 4;   // 3 px above baseline
-        const int dentLen = 3;
+        canvas.setColor(Color::Medium);
+        const int dentY  = innerY0 + innerH - 5;   // 4 px above baseline
+        const int dentLen = 4;
         for (int beatPos = 0; beatPos <= cycleTicks; beatPos += beatTicks) {
             float rawPhase = float(beatPos) / float(cycleTicks);
             float disp = PhaseFluxMath::powerBend(rawPhase, gwarpParam);

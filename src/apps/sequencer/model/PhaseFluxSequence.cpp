@@ -1,5 +1,9 @@
 #include "PhaseFluxSequence.h"
 
+#include "PhaseFluxMath.h"
+
+#include <cmath>
+
 namespace {
     struct PitchRatio { int num; int den; };
     // P:T ratios. Every non-1:1 entry drifts across full 16-cell cycles —
@@ -88,6 +92,37 @@ void PhaseFluxSequence::Stage::read(VersionedSerializedReader &reader) {
     reader.read(_data1.raw);
     reader.read(_data2.raw);
     reader.read(_data3.raw);
+}
+
+void PhaseFluxSequence::snapToGrid(int measureDivisor) {
+    // 1. globalPhase snap to nearest 1/16 of cycle.
+    const float step = 1.f / 16.f;
+    _globalPhase = std::round(_globalPhase / step) * step;
+    if (_globalPhase < 0.f) _globalPhase = 0.f;
+    if (_globalPhase >= 1.f) _globalPhase -= 1.f;
+
+    if (measureDivisor <= 0) return;
+    int seqDivisor = int(_divisor.base);
+    if (seqDivisor <= 0) return;
+
+    // 2. Per-stage stageLen → nearest whole measure (guarded for sub-measure cells).
+    for (auto &stage : _stages) {
+        if (stage.skip()) continue;
+        int currentLen = stage.stageLen();
+        if (currentLen == 0) continue;
+        int stageDivisorTicks = PhaseFluxMath::stageDivisorTicks(stage.stageDivisor());
+        int cellTicksBase = (stageDivisorTicks * seqDivisor) / 12;
+        if (cellTicksBase == 0) continue;
+        int cellTicks = (cellTicksBase * currentLen) / 64;
+        if (cellTicks * 2 < measureDivisor) continue;
+        int targetMeasures = (cellTicks + measureDivisor / 2) / measureDivisor;
+        if (targetMeasures < 1) targetMeasures = 1;
+        int targetTicks = targetMeasures * measureDivisor;
+        int newStageLen = (targetTicks * 64) / cellTicksBase;
+        if (newStageLen < 0) newStageLen = 0;
+        if (newStageLen > 127) newStageLen = 127;
+        stage.setStageLen(newStageLen);
+    }
 }
 
 void PhaseFluxSequence::clear() {

@@ -443,13 +443,13 @@ public:
     }
     void printCyclePhaseWarp(StringBuilder &str) const { str("%+d", cyclePhaseWarp()); }
 
-    // Snap globalPhase to nearest 1/16 of cycle. Press-to-fire from MACRO P1.
-    void snapToGrid() {
-        const float step = 1.f / 16.f;
-        _globalPhase = std::round(_globalPhase / step) * step;
-        if (_globalPhase < 0.f) _globalPhase = 0.f;
-        if (_globalPhase >= 1.f) _globalPhase -= 1.f;
-    }
+    // Snap to grid — press-to-fire from MACRO P1. Two passes:
+    //  1. globalPhase → nearest 1/16 of cycle.
+    //  2. Each non-skipped stage's stageLen → produce a duration that
+    //     lands on the nearest whole measure. Guarded: cells shorter than
+    //     half a measure are left alone (sub-measure intent preserved).
+    // measureDivisor in master-PPQN-192 ticks; caller supplies it.
+    void snapToGrid(int measureDivisor);
 
     // Reset all 5 magnitude macros (nudges + cyclePhaseWarp) to 0.
     // globalPhase deliberately untouched — different category.
