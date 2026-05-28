@@ -192,7 +192,7 @@ def eval_pitch(stage: Stage, phi: float) -> float:
 # --------------------------------------------------------------------------
 
 # Left grid: 4x4 square-ish cells, x = 2..41
-GRID_X      = 2
+GRID_X      = 6
 GRID_Y      = 12
 GRID_CELL_W = 9
 GRID_CELL_H = 9

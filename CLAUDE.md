@@ -1,3 +1,11 @@
+# ⚠️ WORKTREE-ONLY SCOPE
+
+**You are operating inside a git worktree at `.worktrees/usb-mouse-to-route/`. All edits, builds, commits, and file operations MUST stay inside this worktree.** Do not read, modify, build into, or otherwise touch anything under `/Users/foronoma/Work/Code/Eurorack/performer-phazer/` outside of `.worktrees/usb-mouse-to-route/`. The main repo has its own `Performer.app`, build artifacts, and branches that are off-limits from this session.
+
+If a task seems to require touching the main repo, stop and ask before doing anything.
+
+---
+
 Read AGENTS.md and PROJECT.md first before working on this codebase.
 
 For any work touching track engines, timing, output routing, or new TrackModes, also read

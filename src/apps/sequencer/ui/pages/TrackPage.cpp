@@ -185,6 +185,10 @@ void TrackPage::setTrack(Track &track) {
         _stochasticTrackListModel.setTrack(track.stochasticTrack(), _project, &_engine);
         newListModel = &_stochasticTrackListModel;
         break;
+    case Track::TrackMode::PhaseFlux:
+        _phaseFluxTrackListModel.setTrack(&track.phaseFluxTrack());
+        newListModel = &_phaseFluxTrackListModel;
+        break;
     case Track::TrackMode::Last:
         ASSERT(false, "invalid track mode");
         break;

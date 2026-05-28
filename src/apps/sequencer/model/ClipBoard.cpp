@@ -70,6 +70,11 @@ void ClipBoard::copyStochasticSequence(const StochasticSequence &sequence) {
     _container.as<StochasticSequence>() = sequence;
 }
 
+void ClipBoard::copyPhaseFluxSequence(const PhaseFluxSequence &sequence) {
+    _type = Type::PhaseFluxSequence;
+    _container.as<PhaseFluxSequence>() = sequence;
+}
+
 void ClipBoard::copyPattern(int patternIndex) {
     _type = Type::Pattern;
     auto &pattern = _container.as<Pattern>();
@@ -97,6 +102,9 @@ void ClipBoard::copyPattern(int patternIndex) {
             break;
         case Track::TrackMode::Stochastic:
             pattern.sequences[trackIndex].data.stochastic = track.stochasticTrack().sequence(patternIndex);
+            break;
+        case Track::TrackMode::PhaseFlux:
+            pattern.sequences[trackIndex].data.phaseFlux = track.phaseFluxTrack().sequence(patternIndex);
             break;
         default:
             break;
@@ -238,6 +246,13 @@ void ClipBoard::pasteStochasticSequence(StochasticSequence &sequence) const {
     }
 }
 
+void ClipBoard::pastePhaseFluxSequence(PhaseFluxSequence &sequence) const {
+    if (canPastePhaseFluxSequence()) {
+        Model::WriteLock lock;
+        sequence = _container.as<PhaseFluxSequence>();
+    }
+}
+
 void ClipBoard::pastePattern(int patternIndex) const {
     if (canPastePattern()) {
         Model::WriteLock lock;
@@ -266,6 +281,9 @@ void ClipBoard::pastePattern(int patternIndex) const {
                     break;
                 case Track::TrackMode::Stochastic:
                     track.stochasticTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.stochastic;
+                    break;
+                case Track::TrackMode::PhaseFlux:
+                    track.phaseFluxTrack().sequence(patternIndex) = pattern.sequences[trackIndex].data.phaseFlux;
                     break;
                 default:
                     break;
@@ -319,6 +337,10 @@ bool ClipBoard::canPasteTuesdaySequence() const {
 
 bool ClipBoard::canPasteStochasticSequence() const {
     return _type == Type::StochasticSequence;
+}
+
+bool ClipBoard::canPastePhaseFluxSequence() const {
+    return _type == Type::PhaseFluxSequence;
 }
 
 bool ClipBoard::canPastePattern() const {

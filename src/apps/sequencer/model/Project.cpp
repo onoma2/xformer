@@ -107,37 +107,17 @@ void Project::clear() {
     noteSequence(5, 0).setLastStep(15);
     noteSequence(5, 0).setGates({ 0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0 });
 
-    // Track 7: Indexed
-    track(6).setTrackMode(Track::TrackMode::Indexed);
-    auto &indexed = indexedSequence(6, 0);
-    indexed.setActiveLength(5);
-    for (int i = 0; i < 5; ++i) {
-        indexed.step(i).setNoteIndex(i * 2);
-        indexed.step(i).setGateLength(IndexedSequence::gateEncodeTicks(4));
-    }
+    // Track 7: Note with empty sequence (gates all off — NoteSequence::clear default).
 
-    // Track 8: Stochastic (Live Rhythm + Live Melody, should produce gates)
-    track(7).setTrackMode(Track::TrackMode::Stochastic);
-    auto &stoTrack = track(7).stochasticTrack();
-    auto &stoSeq = stoTrack.sequence(0);
-    stoSeq.setRhythmMode(StochasticSourceMode::Live);
-    stoSeq.setMelodyMode(StochasticSourceMode::Live);
-    stoSeq.setDivisor(12);   // 1/16 — better default than 1/4 for stochastic content
-    stoSeq.setSize(4);
-    stoSeq.setNoteDuration(5);   // LUT slot 5 = ×1 (= divisor, 1/16 default)
-    // Mask + Tilt defaults sit at transparent positions: both Masks at 100
-    // bypass the trigger-time filter entirely; Tilts are at their respective
-    // neutral positions for their axes (TiltR=50 = pure salt, TiltM=0 =
-    // natural / no inversion).
-    stoSeq.setMaskRhythm(100);
-    stoSeq.setTiltRhythm(50);
-    stoSeq.setMaskMelody(100);
-    stoSeq.setTiltMelody(0);
-    stoSeq.setRest(0);
-    stoSeq.setBurst(0);
-    stoSeq.setGateLength(0);
-    stoTrack.setCvUpdateMode(StochasticTrack::CvUpdateMode::Gate);
-    stoTrack.setLock(false);
+    // Track 8: PhaseFlux — boot to NoteTrack-equivalent metronome. Stage 0
+    // active (Sequence::clear() defaults), pulseCount overridden to 16 so the
+    // simulator emits 1/16-grid pulses out of the box. Dialing pulseCount
+    // back down to 0 silences. Other stages remain skipped per clear().
+    track(7).setTrackMode(Track::TrackMode::PhaseFlux);
+    auto &pfTrack = track(7).phaseFluxTrack();
+    auto &pfSeq = pfTrack.sequence(0);
+    pfSeq.stage(0).setPulseCount(16);
+    pfTrack.setOctave(+1);
 
     setTempo(80.f);
     setScale(2); // 2 corresponds to Minor scale

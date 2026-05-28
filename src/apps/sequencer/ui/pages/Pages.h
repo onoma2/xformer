@@ -51,6 +51,8 @@
 #include "StochasticConfigPage.h"
 #include "StochasticPerformancePage.h"
 #include "StochasticSequenceEditPage.h"
+#include "PhaseFluxEditPage.h"
+#include "PhaseFluxSequencePage.h"
 
 #ifdef CONFIG_ENABLE_INTRO
 #include "IntroPage.h"
@@ -97,6 +99,8 @@ struct Pages {
     StochasticConfigPage stochasticConfig;
     StochasticPerformancePage stochasticPerformance;
     StochasticSequenceEditPage stochasticSequenceEdit;
+    PhaseFluxEditPage phaseFluxEdit;
+    PhaseFluxSequencePage phaseFluxSequence;
     SystemPage system;
     // modal pages
     TempoPage tempo;
@@ -159,6 +163,8 @@ struct Pages {
         stochasticConfig(manager, context),
         stochasticPerformance(manager, context),
         stochasticSequenceEdit(manager, context),
+        phaseFluxEdit(manager, context),
+        phaseFluxSequence(manager, context),
         system(manager, context),
         // modal pages
         tempo(manager, context),

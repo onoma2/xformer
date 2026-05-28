@@ -1,5 +1,5 @@
 # Task Board
-_Updated: 2026-05-26_
+_Updated: 2026-05-29 (PhaseFlux feature surface complete — entering slow-polish phase pending hardware audition. Macro topic with full nudge set + traversal patterns + multi-cell StepSelection + context menu + clipboard + USB keyboard + shake + MaskM/TiltM filter + Stochastic-pattern per-stage divisor all wired. Spec template §17 split with infrastructure baselines (clipboard / context-menu / quickEdit / USB-keyboard) so next track-mode spec inherits them. Now merging into parent `feat/stochastic-seed-log` (sibling `feat/tt2-v2-native` will need rebase/merge after).)_
 
 **Naming convention from 2026-05-24 forward:** older entries below use prior names that are consistent with the code at the time they were written. Current canonical: step (idea, int), `StochasticStepContent` (stored), `RuntimeStep` (runtime), `StepCache` (container), `Gate` / `Cv` (output).
 
@@ -35,13 +35,13 @@ _Updated: 2026-05-26_
 **Branch:** TBD
 **Reference:** `.tasks/teletype-v2-dialect/TASK.md`
 
-## ⚪ phaseflux — New TrackMode: 4×4 grid sequencer, stateless-ramp engine, scale-degree pitch, per-stage curves + transforms
-**Status:** ready — design fully locked in `docs/phaseflux-spec.md` (18 sections, all 66 audit questions resolved, 3-reviewer audit clean). UI rendered + verified in `ui-preview/phaseflux-preview.png`.
-**Where I stopped:** Spec lock complete. No open product decisions before implementation. Implementer-resolved items captured in spec §16 punch list + this task's Open questions.
-**Next action:** Phase A — math & storage foundations. Add `Track::TrackMode::PhaseFlux` enum + `Version_PhaseFlux_Pending = 36` placeholder. Create `PhaseFluxTrack` / `PhaseFluxSequence` / Stage record model files with bit-packed 3×uint32_t records. Land serialization round-trip test (retro lesson #4 gate) before any engine code.
+## 🟡 phaseflux — New TrackMode: 4×4 grid sequencer, stateless-ramp engine, scale-degree pitch, per-stage curves + transforms
+**Status:** Feature surface effectively complete; entering slow-polish phase pending hardware audition. Engine + scope + macro topic + nudges (WarpN/RespN/PulsN/LenN/GWarp) + Snap + Zero + project beat-grid dents + Window/Repeat in scope + traversal-pattern picker (Snake + 7 René mk2 patterns) + per-stage divisor as Stochastic-style fraction-vs-seqDivisor (Whole-note default) + MaskM/TiltM pitch centrality filter + clipboard + context menu (INIT[Stage/Topic/Sequence/Track] / COPY / PASTE / DUP) + shake (2 variants on PAGE+S15/S16) + USB keyboard baseline (F1-F5 + Tab + arrows) + multi-cell StepSelection (held + Persist via Shift) + double-click step = skip toggle. Spec/template/policy docs cleaned up — ProjectVersion bump retired, sequenceShift folded into globalPhase, modes A/B confirmed shipped.
+**Where I stopped:** Last commit `198b46c6` — multi-cell selection. All shipped behavior verified in sim build (build/sim/debug + build/stm32/release both clean). Merged into parent `feat/stochastic-seed-log` (sibling `feat/tt2-v2-native` to be reconciled separately).
+**Next action:** **Slow polishing after testing.** Hardware audition full feature set against musical expectations; collect per-feature feedback. Likely follow-ups discovered during play: visual tweaks on scopes (dent visibility, playhead style, label collisions), tuning of randomize ranges, refinement of context-menu wording, adjusting the StepSelection Persist→Immediate transition if friction hits, potentially adding pitchPhaseWarp for Global mode pitch-decoupled evolution. Patterns 5+6 (René spirals) may need correction against the source image. Other deferred: wire `+Lim` / `-Lim` editing on `PhaseFluxListPage`; decide on cycleSpread (§14.1 Q9), pitchPhaseWarp, hysteresis for Always mode (§14.1 Q12). Don't add new big features without audition signal.
 **Depends on:** nothing
-**Branch:** TBD (suggest `feat/phaseflux`)
-**Reference:** `.tasks/phaseflux/task.md` (deep context). `docs/phaseflux-spec.md` (locked spec — single source of truth). `docs/spec-template.md` (process lessons extracted). `ui-preview/pages_phaseflux.py` + `ui-preview/phaseflux-preview.png` (UI render).
+**Branch:** feat/phaseflux
+**Reference:** `.tasks/phaseflux/task.md` (decision log). `docs/phaseflux-spec.md` (locked spec — single source of truth). `docs/spec-template.md` §17.2-17.5 (UI infrastructure baseline ported from this work). `ui-preview/macro/` + `ui-preview/tempo-scope/` (mockup renders). Macro mockup at `ui-preview/pages_phaseflux_macro.py`.
 
 ## 🟡 resource-optimization — RAM & Flash budget recovery
 **Status:** paused — baseline recorded; safe wins exhausted; struct-packing only remaining.

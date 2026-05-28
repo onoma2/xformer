@@ -393,6 +393,10 @@ void OverviewPage::draw(Canvas &canvas) {
             canvas.setColor(Color::Medium);
             canvas.drawText(36, y, "Stochastic");
             break;
+        case Track::TrackMode::PhaseFlux:
+            canvas.setColor(Color::Medium);
+            canvas.drawText(36, y, "PhaseFlux");
+            break;
         case Track::TrackMode::Last:
             break;
         }

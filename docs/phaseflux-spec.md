@@ -137,7 +137,7 @@ PhaseFlux pitch is **scale-degree based, NoteTrack-aligned**. `basePitch` is an 
 
 | Field | Range | Bits | Notes |
 |---|---|---|---|
-| `pulseCount` | 1..8 | 3 | `UnsignedValue<3>`. Hybrid vocab — aligned with `NoteSequenceStep::pulseCount` |
+| `pulseCount` | 0..16 | 5 | `UnsignedValue<5>` in `_data3[17..21]`. **0 = silent stage (duration consumed, no events fired)**; 1..16 = N pulses per stage. Engine clamps `pulseCount + accumOffset` to `[0, kMaxPulses=16]`. |
 | `basePitch` | ±63 scale degrees | 7 | `SignedValue<7>`. Integer scale degree, not volts. NoteTrack-uniform. |
 | `pitchRange` | 0.5 / 1 / 2 / 3 octaves | 2 | enum of the active scale's octave width (`notesPerOctave` × value) |
 | `pitchDirection` | Up / Down / Bipolar | 2 | direction of sweep relative to basePitch (1 spare value) |
@@ -199,17 +199,18 @@ ResponseAxis(y, r) = PowerBend(y, r)
 ### 6.1 Temporal curves — base shape + flips
 
 ```
-t_raw[i]        = i / (N − 1)                                              // N = pulseCount; for N=1 use 0.5
+t_raw[i]        = i / N                                                    // N = pulseCount; first pulse at 0 (slot start), last at (N−1)/N
 t_warped        = WarpAxis(t_raw[i], temporalWarp)
-                                                                             // hflip first (input-axis), then base curve, then vflip (output-axis)
-t_input         = temporalFlipH ? (1.0 − t_warped) : t_warped
-t_curved        = TempCurve(t_input, temporalCurve)
+                                                                             // vflip after the base curve (output-axis only — see §6.1.1 for temporalFlipH)
+t_curved        = TempCurve(t_warped, temporalCurve)
 t_flipped       = temporalFlipV ? (1.0 − t_curved) : t_curved
 t_final         = ResponseAxis(t_flipped, temporalResponse)
 trigger_time[i] = ((t_final + phaseShift / 8) mod 1.0) * stage_duration
 ```
 
 `phaseShift` rotates the trigger pattern by `phaseShift × 45°` inside the stage, modulo `stage_duration`. Applied **after** curve+flip evaluation, **before** mask. Deterministic.
+
+**Note on `temporalFlipH`:** unlike `temporalFlipV` and the pitch flips, the temporal horizontal flip is **not** applied at the curve-input stage. The §6.4 collision clamp sorts pulses by trigger time, which cancels any input-domain mirror on Linear/Bell/Bounce curves (the same set of trigger times re-emerges in the same order). Instead `temporalFlipH` is applied to the **scheduled** trigger intervals after the clamp — see §6.1.1.
 
 **Base shapes** (3 enum values, 1 spare):
 
@@ -222,7 +223,109 @@ trigger_time[i] = ((t_final + phaseShift / 8) mod 1.0) * stage_duration
 **Flips** (vflip + hflip = 2 bits, 4 variants per base):
 
 - `temporalFlipV = true` → output mirrored top-to-bottom (`1 − y`). Linear+vflip = reverse trigger order (last pulse fires first). Bell+vflip = inverted bell (concentrates pulses at endpoints, sparse in middle).
-- `temporalFlipH = true` → input mirrored left-to-right (`1 − x`). For symmetric base shapes (Bell), no audible effect. For Bounce, reverses bounce-cluster direction.
+- `temporalFlipH = true` → see §6.1.1. Curve-input mirror was the original spec but was effectively a no-op because §6.4 sort re-orders the trigger times. Re-spec'd as a post-clamp time-axis reflection.
+
+### 6.1.1 `temporalFlipH` — post-clamp time-axis mirror
+
+Applied after the §6.4 collision clamp produces the final scheduled pulses `(triggerOffset[k], gateTicks[k], cv[k])`:
+
+```
+for each scheduled k:
+    endTick[k]        = triggerOffset[k] + gateTicks[k]
+    newOffset[k]      = stage_duration − endTick[k]      // mirror the gate interval around slot midpoint
+    triggerOffset[k]  = max(0, newOffset[k])
+re-sort by triggerOffset                                  // order flips
+```
+
+Gate duration is preserved. CV pairing is preserved per-pulse (no re-mapping of pitches), so the pitch profile mirrors in time along with the trigger positions — the pulse that previously fired last with its pitch now fires first.
+
+**Audible effect:** with `temporalWarp = +50` (Linear), pulses cluster late (silence at start, busy end). Add `temporalFlipH = true` → cluster shifts to early (busy start, silence at end). On Bell curve with no warp, the cluster sits in the middle and the mirror is symmetric → still no audible change. Bounce is asymmetric in time, and the time-axis mirror flips the bounce direction.
+
+### 6.1.2 `temporalRepeat` — N copies of the curve within one cell
+
+**Status: draft, not yet wired.**
+
+Per-cell 4-value enum (`UnsignedValue<2>`): **x1 / x2 / x3 / x5** (default x1 = no repeat). Divides the cell duration into R equal sub-sections; each sub-section traverses the (post-Window) temporal curve. Effect: R copies of the windowed pattern within one cell visit.
+
+Storage: `temporalRepeat` as `UnsignedValue<2>` stored on `_data3` per §14.2 layout. Default value = 0 (x1, no repetition).
+
+Engine math in `rebuildSchedule` (pipeline: **Window → Repeat → Warp → Curve eval → FlipV → Response → FlipH**):
+
+```
+R               = repeatValue(stage.temporalRepeat())          // 1, 2, 3, or 5
+pulsesPerSub    = pulseCount / R                                // base allotment
+remainder       = pulseCount % R                                // earlier subs get +1
+
+for each pulse i in [0, pulseCount):
+    subIdx          = (i × R) / pulseCount
+    pulsesInThisSub = pulsesPerSub + (subIdx < remainder ? 1 : 0)
+    localPulseIdx   = i − (start index of subIdx)
+    t_raw_local     = localPulseIdx / pulsesInThisSub           // local position 0..1
+    // Window applies INSIDE each sub-section (Window → Repeat order):
+    if !isInWindow(t_raw_local, stage.temporalWindow()): drop pulse
+    t_warped        = applyPowerBend(t_raw_local, temporalWarp)
+    t_curved_local  = curve(t_warped)
+    t_shifted_global = (subIdx + t_curved_local) / R
+    // continue with §6.1 pipeline
+```
+
+**Distribution policy**: when `pulseCount` doesn't divide evenly by R, earlier sub-sections get the extra pulse(s).
+
+**Edge case `R > pulseCount`**: some sub-sections have zero pulses → silence inside those sub-sections, bursts in others.
+
+**Interaction with `phaseShift`, `mask`, `maskShift`**: applied AFTER Repeat math.
+
+**Combined with Window**: per the pipeline order, Window applies *within* each repeated sub-section. Bell + x3 + Polarize 50 = three "rise-gap-fall" patterns. Bounce + x3 + Focus 50 = three middle-of-drop bursts.
+
+**Coverage**: with Repeat × Window combos, the multi-bump / sawtooth-N / sine-N curve families (§14.1 Q8) become reachable from base shapes. No new curve enum slots needed.
+
+### 6.1.3 `temporalWindow` — crop which portion of the curve the engine sees
+
+**Status: draft, not yet wired.**
+
+Per-cell 5-value enum (`UnsignedValue<3>`):
+
+| Value | Mode | Visible input range | Hidden |
+|---|---|---|---|
+| 0 (default) | Off | `[0, 1]` (full) | — |
+| 1 | Focus 70 | `[0.15, 0.85]` | outer 30% |
+| 2 | Focus 50 | `[0.25, 0.75]` | outer 50% |
+| 3 | Polarize 70 | `[0, 0.35] ∪ [0.65, 1.0]` | middle 30% |
+| 4 | Polarize 50 | `[0, 0.25] ∪ [0.75, 1.0]` | middle 50% |
+
+Engine math (Window applied INSIDE each Repeat sub-section, BEFORE warp):
+
+```
+// Inside the per-pulse loop in §6.1.2:
+t_raw_local                = ... (per-pulse local position 0..1)
+if !isInWindow(t_raw_local, stage.temporalWindow()):
+    drop pulse                                                   // does not fire
+t_warped = applyPowerBend(t_raw_local, temporalWarp)
+// ... continues
+```
+
+Where `isInWindow(t, mode)` returns true if `t` falls in the visible band per the table above.
+
+**Defaults**: Off → identity, current behavior.
+
+**Semantic**:
+- **Focus** keeps the center band — pulses cluster around the curve's middle. Bell + Focus 50 = pulses fire only near the peak (sustained high output). Bounce + Focus 50 = middle of the curve only.
+- **Polarize** keeps the outer bands — pulses cluster at the cell's start AND end with a silent middle. Bell + Polarize 50 = small rise on left, gap, small fall on right.
+
+**What this does that warp/response can't**: warp/response BEND the axes; Window REMOVES segments. Especially Polarize — produces a hole in the middle that no warp can imitate.
+
+**Combined with Repeat**: per pipeline order **Window → Repeat → ...**, Window applies INSIDE each repeated sub-section. `Bell + Repeat 3 + Polarize 50` = three rise-gap-fall patterns. `Bounce + Repeat 3 + Focus 50` = three middle-drop pulses.
+
+**Audible character per base curve** (with default warp=0, response=0, Repeat x1):
+
+| Curve | Window | Effect on temporal pulse positioning |
+|---|---|---|
+| Linear | Focus 50 | Pulses cluster in middle half of slot. |
+| Linear | Polarize 50 | Pulses cluster at start AND end, silent middle. |
+| Bell | Focus 50 | Pulses cluster very tightly near slot midpoint (peak region). |
+| Bell | Polarize 50 | Pulses cluster early AND late with quiet middle. |
+| Bounce | Focus 50 | Pulses fire only in the middle drop region. |
+| Bounce | Polarize 50 | Pulses fire only in the first and last drops, middle drop silent. |
 
 ### 6.2 Pitch curves — scale-degree quantized, NoteTrack-aligned
 
@@ -285,6 +388,153 @@ Key reading rule: under **Bipolar**, neither endpoint sits at basePitch — the 
 
 **No RNG.** Walk and S/H both dropped — engine is fully deterministic.
 
+### 6.2.2 Pitch CV evaluation timing — `cvUpdateMode`
+
+The pitch curve can either be **sampled at pulse-fire moments only** (discrete point-samples coupled to gate events) or **evaluated continuously every engine tick** (a smooth envelope across the stage, independent of pulse activity). This is the "CurveTrack-style continuous CV" pattern carried into PhaseFlux's per-stage curve world.
+
+Selected via `PhaseFluxTrack::cvUpdateMode`:
+
+| Mode | Pitch CV behavior | When CV target changes |
+|---|---|---|
+| `Gate` (default) | Sampled at each pulse-fire tick using the same pitch pipeline that built `_schedule[k].cv`. Between pulses, CV holds the last sampled value. | only when a scheduled pulse fires |
+| `Always` | Evaluated every tick from the current `_stagePhase` through the full pitch pipeline (warp / curve / flip / response / direction / range / basePitch / scale-quantize). | every engine tick (PPQN-192) |
+
+In `Always` mode, the gate path (pulses fire at scheduled offsets) is **unaffected** — pulses still trigger gate events from `_schedule`. Only the pitch CV stream becomes continuous. Pulses become pure gate-trigger events; pitch is an independent stream that follows the curve continuously across the stage.
+
+**Per-tick formula in Always mode** (mirrors the pitch pipeline used in `rebuildSchedule` for `Gate` mode, just sampled at `_stagePhase` instead of pulse `t_shifted`):
+
+```
+phi              = _stagePhase                              // 0..1 across the active stage
+phi_warped       = WarpAxis(phi, pitchWarp)
+phi_input        = pitchFlipH ? (1 − phi_warped) : phi_warped
+p_curved         = PitchCurve(phi_input, pitchCurve)
+p_flipped        = pitchFlipV ? (1 − p_curved) : p_curved
+p_final          = ResponseAxis(p_flipped, pitchResponse)
+offsetDegrees    = direction-signed × p_final × rangeDegrees + accumulatorOffset
+degree           = basePitch + offsetDegrees + octave × notesPerOctave + transpose
+cv               = scale.noteToVolts(degree) + (chromatic ? rootNote/12 : 0)
+_cvOutput        = cv
+```
+
+**Scale-degree hysteresis is open** — continuous evaluation crosses degree boundaries inside the curve and re-quantizes each tick. Without hysteresis the output can jitter on near-boundary phase positions. Marbles-style hysteresis (`_lastDegree` member; only re-quantize when phase has moved past half a degree-width) is the obvious follow-up — see §14.1 Q12.
+
+**Engine cost**: one extra branch + the existing pitch pipeline call per tick. The pipeline is already in `rebuildSchedule` per pulse; `Always` mode runs it ~PPQN-192 times per beat instead of `pulseCount` times per stage. Cheap (single Curve::eval LUT + a few floats).
+
+**Default**: `cvUpdateMode = Gate` (current behavior preserved). Track-level setter via `PhaseFluxTrack::setCvUpdateMode()`. Editable in the Track list page (`PhaseFluxTrackListModel`).
+
+### 6.2.3 Pitch source — `pitchMode` (Cell vs Global)
+
+The pitch curve+warp+response triple can either live **per-cell** (today's behavior — each of the 16 stages defines its own contour) or **globally** on the sequence (one shape, drifted across all cells against the temporal walker). Selected via `PhaseFluxSequence::pitchMode`:
+
+| Mode | Pitch curve source | Phase input | Range / basePitch / accumulator |
+|---|---|---|---|
+| `Cell` (default) | Active stage's `pitchCurve` / `pitchWarp` / `pitchResponse` / `pitchFlipV` / `pitchFlipH`. | `_stagePhase` (0..1 within the active cell, resets at each cell entry). Same as today. | Per-cell, unchanged. |
+| `Global` | `stage[0]`'s pitch curve+warp+response+flips ARE the global ones — no separate storage. Stages 1..15 keep their pitch fields in storage but the engine ignores them. | `_pitchPhase` (free-running accumulator, never resets at cell entry). Advances every tick by `rate × tempo` where one cell = one unit. | Per-cell, unchanged. `basePitch` and `pitchRange` still come from the active stage. |
+
+**Storage layout** — no new per-stage fields; `stage[0]`'s existing pitch fields are reused as the globals. Roundtrip is lossless: switching `Cell → Global → Cell` returns the original per-cell data intact because stages 1..15 are never overwritten by the Global path.
+
+**Rate ratio** (`PhaseFluxSequence::pitchRate`) — index into a static 17-entry P:T ratio table. `1:1` is the locked baseline (Global mode at rate 1:1 visually matches Cell mode in that each cell sees one full pitch curve). Non-integer ratios make `_pitchPhase` drift against the temporal walker so repeated visits to the same cell sample the curve at different positions, producing different notes on each revisit.
+
+**`_pitchPhase` lifetime** — always advancing, regardless of mode. In Cell mode the accumulator ticks but the value is unused. This keeps mode flips instant and seamless (Global mode picks up wherever the phase happens to be).
+
+**Per-tick advance** (every engine tick, both modes):
+
+```
+ratePerSlot     = pitchRateNum / pitchRateDen
+slotTicks       = _cumulativeTicks[_slotIdx+1] − _cumulativeTicks[_slotIdx]
+_pitchPhase    += ratePerSlot / slotTicks
+_pitchPhase    -= floor(_pitchPhase)                  // mod 1
+```
+
+**Pulse-fire pitch in Global mode** (in `rebuildSchedule`, replacing the per-pulse `phi = t_shifted` of Cell mode):
+
+```
+phi = _pitchPhase + triggerTime × (ratePerSlot / slotDurationTicks)
+phi -= floor(phi)
+```
+
+i.e. the pitch head's position is projected forward from slot start to each scheduled pulse's fire time. `stage[0]`'s curve+warp+response then run the rest of the pitch pipeline at that `phi`.
+
+**Always-mode (continuous CV) in Global pitch mode** — same pipeline as §6.2.2 but with curve source = `stage[0]` and `phi = _pitchPhase` instead of `_stagePhase`.
+
+**Default**: `pitchMode = Cell`. Sequence-level setter via `PhaseFluxSequence::setPitchMode()`. Editable in the Sequence list page (`PhaseFluxSequenceListModel`). Each sequence on a track can choose its own mode independently.
+
+### 6.2.4 `pitchRepeat` — N copies of the pitch curve within one cell
+
+**Status: draft, not yet wired.**
+
+Per-cell 4-value enum (`UnsignedValue<2>`): **x1 / x2 / x3 / x5** (default x1 = no repeat). Stored on `_data3` per §14.2 layout.
+
+Engine math (pipeline: **Window → Repeat → Warp → Curve eval → FlipV → Response → FlipH**). The pitch curve is sampled at the windowed-then-repeated position:
+
+```
+R              = repeatValue(stage.pitchRepeat())                // 1, 2, 3, or 5
+// Window applies to phi BEFORE repeat:
+if !isInWindow(phi, stage.pitchWindow()):
+    pulse contributes no pitch motion (held at boundary)
+phi_repeated   = fmod(phi × R, 1.0)
+phi_warped     = applyPowerBend(phi_repeated, pitchWarp)
+phi_input      = pitchFlipH ? (1 − phi_warped) : phi_warped
+p_curved       = PitchCurve(phi_input, pitchCurve)
+// ... rest of §6.2 pipeline unchanged
+```
+
+With `pitchCurve = Ramp` and `pitchRepeat = x3`, the pitch traversal looks like three sawtooth ramps within one cell visit — the "stacked ramps" pattern.
+
+**Cell mode only.** In Global pitch mode, `pitchRate` already owns the multi-cycle frequency; pitchRepeat is ignored.
+
+**Coverage**: with Repeat × Window combos on Ramp/Bell/Triangle/Bounce, multi-bump / sawtooth-N / sine-N pitch families become reachable from base shapes.
+
+**Interaction with `pitchDirection`, `pitchRange`, `pitchFlipV/H`, `pitchWarp`, `pitchResponse`**: all applied AFTER the Repeat fmod.
+
+**Audible effect example**: `pitchCurve = Ramp`, `pitchRange = 2 oct`, `pitchRepeat = x5`, `pulseCount = 8` → 8 pulses sample 5 stacked ramps spanning the 2-octave range. 16th-note-arpeggio-inside-the-cell feel instead of one slow sweep.
+
+### 6.2.5 `pitchWindow` — crop which portion of the pitch curve the engine sees
+
+**Status: draft, not yet wired.**
+
+Per-cell 5-value enum (`UnsignedValue<3>`):
+
+| Value | Mode | Visible input range | Hidden |
+|---|---|---|---|
+| 0 (default) | Off | `[0, 1]` (full) | — |
+| 1 | Focus 70 | `[0.15, 0.85]` | outer 30% |
+| 2 | Focus 50 | `[0.25, 0.75]` | outer 50% |
+| 3 | Polarize 70 | `[0, 0.35] ∪ [0.65, 1.0]` | middle 30% |
+| 4 | Polarize 50 | `[0, 0.25] ∪ [0.75, 1.0]` | middle 50% |
+
+Same math as §6.1.3 but on the pitch axis. Engine math (Window applies BEFORE Repeat, BEFORE warp):
+
+```
+phi          = (per-pulse phi or _stagePhase per §6.2.2)
+if !isInWindow(phi, stage.pitchWindow()):
+    // hidden — pulse contributes no pitch motion; CV held at boundary
+phi_repeated = fmod(phi × pitchRepeat, 1.0)                   // §6.2.4
+phi_warped   = applyPowerBend(phi_repeated, pitchWarp)
+// ... rest of §6.2 pipeline unchanged
+```
+
+**Defaults**: Off → identity, current behavior.
+
+**Audible character examples** (with default warp=0, response=0, Repeat x1):
+
+| Curve | Window | Effect on pitch CV |
+|---|---|---|
+| Ramp | Focus 50 | Pitch covers only the middle 50% of range — narrower sweep. |
+| Ramp | Polarize 50 | Pitch fires at the lowest AND highest quarters; mid-range silent. |
+| Bell | Focus 50 | Pitch stuck near peak — sustained high note. |
+| Bell | Polarize 50 | Low pitches at cell start AND end, silent in between (the peak is hidden). |
+| Triangle | Focus 50 | Sharp peak region only. |
+| Triangle | Polarize 50 | Up-slope start + down-slope end with silent middle. |
+| Bounce | Focus 50 | Middle drop only — single pluck mid-cell. |
+| Bounce | Polarize 50 | First and last drops; middle drop silent. |
+
+**Cell mode only**; ignored in Global pitch mode (paired with Repeat constraint).
+
+**Combined with Repeat**: per pipeline order Window→Repeat, the windowed curve gets repeated. `Ramp + x3 + Polarize 50` = three patterns each with a low-pitch start, gap, low-pitch end (the polarize bands of the ramp = its bottom and top edges). Each repeat carries the windowed character.
+
+**Coverage gained**: Window unlocks "Bell-half = Ramp", "Triangle-half = monotonic", "Bounce-front = sharp pluck", "Bell-peak = sustained", and the mirror cases via FlipH/FlipV. Many shape characters reachable from a single base curve.
+
 ### 6.2.1 Melody mask (centrality filter, per-stage)
 
 Each stage has `maskMelody` (0..100, threshold) and `tiltMelody` (0..100, tilt direction) — borrowed from Stochastic's `MaskMelody` / `TiltMelody` law (`engine/StochasticTrackEngine.cpp:454-466`). The pair filters pulses by the **innate scale-degree centrality** — tonic + fifth = high centrality, tritone-ish = low.
@@ -337,51 +587,47 @@ Mask patterns (8 fixed Boolean ring patterns, length 8):
 
 The mask gates pulse output only — pitch CV still evaluates at the masked pulse's curve position (sustains last value via `_cvUpdateMode`).
 
-### 6.4 Pulse-fire collision clamp — Stochastic burst law
+### 6.4 Pulse-fire schedule — overlap-allowed
 
-After §6.1 produces `trigger_time[i]` (with `phaseShift` applied) and §6.3 mask + §6.2.1 melody mask determine which pulses survive, the engine applies a clamp pass before scheduling gate events. The rule mirrors Stochastic's `evaluateBurst` (`engine/StochasticGenerator.cpp:261-311`):
+After §6.1 produces `trigger_time[i]` (with `phaseShift` applied) and §6.3 mask + §6.2.1 melody mask determine which pulses survive, the engine schedules gate events. **Trigger overlap is allowed** — NoteTrack precedent: the runtime tick loop merges overlapping gates via `_gateState=true` retrigger, so no "gap between pulses" or "previous gate must end first" guards are needed. Each surviving candidate fires at its computed time regardless of previous gate state.
 
 ```
 const uint32_t kMinPulseGateTicks = 6;     // ~30ms @ 120 BPM, PPQN=192 — audible floor
-const uint32_t kMinPulseGapTicks  = 1;     // retrigger gap guarantee
-const uint32_t kMinStageParentTicks = kMinPulseGateTicks + kMinPulseGapTicks;
-                                             // below this, no pulses fire — stage is too short to be audible
 
-if stage_duration < kMinStageParentTicks:
-  return                                     // no pulses fire — stage too short, gate stays low
+if stage_duration < kMinPulseGateTicks:
+  return                                     // stage too short to fit any audible gate
 
 // Surviving pulses sorted by trigger_time ascending (PowerBend + phaseShift can scramble order)
 survivors = [(i, trigger_time[i]) for i in 0..pulseCount-1 if !muted[i] && melodyMaskPass[i]]
 sort survivors by trigger_time
 
-prev_end = 0
 for (i, t) in survivors:
-  // Drop if too close to previous gate (retrigger gap violation, Q15+Q16 case)
-  if t < prev_end + kMinPulseGapTicks:
-    continue                                 // PowerBend collision — extras auto-drop
-
-  // Compute gate length: nominal × duty, clamped to distance to next pulse (Q18 case)
   next_t       = next survivor's trigger_time, OR stage_duration
   pulse_period = next_t - t
-  nominal_gate = (gateLength% × pulse_period) / 100
-  gate_ticks   = min(nominal_gate, pulse_period - kMinPulseGapTicks)
+  if pulse_period <= 0: continue              // defensive (i/N positions never produce this)
 
-  // Audible-floor drop
-  if gate_ticks < kMinPulseGateTicks:
-    continue                                 // gate would be inaudible — drop
+  // gateLength rules:
+  //   len == 0  → explicit silence, pulse dropped
+  //   len == 1  → always-audible-minimum sentinel; floor at kMinPulseGateTicks
+  //   len >= 2  → scale by percent, drop if computed gate < kMinPulseGateTicks
+  if gateLength == 0: continue
+  gate_ticks = (gateLength × pulse_period) / 100
+  if gateLength == 1 && gate_ticks < kMinPulseGateTicks:
+    gate_ticks = kMinPulseGateTicks
+  if gate_ticks < kMinPulseGateTicks: continue
 
   schedule gate-on at tick t
   schedule gate-off at tick t + gate_ticks
-  prev_end = t + gate_ticks
 ```
 
-**Locked semantics** (resolves Q15, Q16, Q18):
+**Locked semantics**:
 
-- **`pulseCount` is a max-cap, not a strict count.** PowerBend warp + phaseShift can compress pulses into a window too tight for all of them; extras drop. The user gets "as many as fit cleanly", not "exactly N or glitch".
-- **Each surviving pulse fires its own gate edge** (retrigger semantics preserved). No coalescing — adjacent gates are either separated by ≥ `kMinPulseGapTicks` or one is dropped.
-- **Gate length always ≤ pulse_period − kMinPulseGapTicks** (Q18). Player turning `gateLength` to 100% gets `pulse_period − 1 tick` — never overlaps the next gate.
-- **Same-tick collisions** (Q16): the sort puts them adjacent; the gap check drops all but the first. Mask indices are preserved against the original pulseCount so a same-tick collision doesn't shift mask semantics.
+- **`pulseCount` is a max-cap, not a strict count.** A pulse can still be dropped via `gateLength` rules above (explicit 0 or computed < 6 ticks). Otherwise all surviving candidates fire.
+- **Overlap is allowed.** A pulse firing while the previous gate is still high re-asserts `_gateState=true` and resets `_gateTimer`. Downstream sees one extended gate — same as NoteTrack HOLD mode.
+- **Gate length not capped by pulse period.** `gate_ticks = (gateLength × pulse_period) / 100` directly; can extend past the next pulse's trigger or even past slot end. The runtime tick loop handles cross-pulse and cross-stage overlap via retrigger.
+- **Same-tick collisions** (sort puts them adjacent, pulse_period = 0 → defensive continue drops the duplicate). Mask indices preserved against the original pulseCount.
 - **`kMinPulseGateTicks = 6`** matches Stochastic's `minChildGate` constant — single source of truth for "audible floor" across track types.
+- **Pulse position formula** (§6.1): `t_raw[i] = i / N` (uniform spacing). First pulse at 0 (slot start); last at `(N−1)/N` (never lands on the boundary). Single-pulse is the natural N=1 case: one pulse at slot start.
 
 Order of application:
 1. §6.1 produce `trigger_time[i]` for i in 0..pulseCount−1 (with phaseShift mod)
@@ -437,10 +683,12 @@ Reset Measure is a **rhythmic re-anchor within one pattern**. Pattern switch is 
 
 ## 9. Outputs
 
-- **Gate Out** — single gate, per pulse, held for `gateLength × pulse_period`.
-- **CV Out** — quantized to scale degree via `Scale::noteToVolts()` (§6.2), 1V/Oct. External quantizer is unnecessary because output is already scale-locked.
+- **Gate Out** — single gate, per pulse, held for `gateLength × pulse_period` (see §6.4 for the per-pulse gate rules; overlapping gates merge via the runtime's `_gateState=true` retrigger).
+- **CV Out** — quantized to scale degree via `Scale::noteToVolts()` (§6.2), 1V/Oct. External quantizer is unnecessary because output is already scale-locked. Evaluation timing controlled by `cvUpdateMode` (§6.2.2): `Gate` = sampled at pulse fires; `Always` = continuous envelope across each stage.
 
 PhaseFlux produces exactly **one logical CV value + one logical gate value** per tick. Two jacks (Performer standard pitch+gate pair). No per-cell jack routing.
+
+**Mute behavior** (matches NoteTrack): when the track is muted, the engine **stops pushing CV updates** to the output. The DAC continues to hold its previous voltage in hardware. CV does NOT snap to 0V — silence in CV terms is "no further updates", not "force a specific voltage". This is decoupled from `cvUpdateMode` — that enum controls evaluation timing only. (Historical: pre-MVP code force-zeroed CV on mute; that was wrong and removed when the §6.2.2 continuous-CV mode landed.)
 
 **Multi-jack mirroring**: when the player routes PhaseFlux to multiple physical CV/gate jacks via Performer's `CvRoutePage`, all routed jacks output the **same** single logical value. No per-jack divergence — PhaseFlux is single-voice monophonic by design, mirroring follows Performer's standard track-to-jack mapping.
 
@@ -531,6 +779,9 @@ Omitted:
 PhaseFlux-specific additions:
 - 16 × stage record (§5)
 - Optional: `_scale`, `_rootNote` (−1 = inherit from project default) if PhaseFlux participates in scale routing later. Default −1.
+- `_pitchMode` (enum Cell/Global, 1 byte) — selects per-cell vs `stage[0]`-as-globals pitch source; see §6.2.3.
+- `_pitchRate` (1 byte, index into 17-entry P:T ratio table) — drift rate of the free-running `_pitchPhase` accumulator in Global mode. Default index = `1:1`.
+- `_globalPhase` (float ∈ [0, 1]) — fraction-of-cycle phase shift, CurveTrack precedent. Covers the cycle-shift role (was previously also drafted as a separate `sequenceShift` bipolar field in §14.2; that proposal is now retired in favor of this). Making it `Routable<float>` for CV is the only remaining surface decision; field already lives at the right place in the engine pipeline (`PhaseFluxTrackEngine.cpp:558-561`).
 
 ### 12.3 Routable-from-day-1 contract
 
@@ -574,6 +825,208 @@ Mod inputs are deferred but Routing alignment is not. Fields that may ever be CV
 
 ---
 
+## 14.1 Open questions — unresolved
+
+| Spec Q | Status |
+|---|---|
+| Q8 curve "squash" transform — applies to BOTH temporal and pitch axes | **PARTIALLY RESOLVED.** Option 3 (Fold) is now spec'd as `temporalRepeat` / `pitchRepeat` in §6.1.2 / §6.2.4 / §14.2 — handles repeated curve traversal cleanly with R=1..8 per cell. Options 1 (Output quantize), 2 (Density compress/expand), 4 (Staircase) remain open if those characters are needed later. Original wording preserved for reference: "Observed limitation (2026-05-25): with `pulseCount ≤ 8` (3-bit field cap), pulses distribute monotonically across the curve output but skip intermediate values as the output span grows. Current transforms (warp, response, flipV/H) do not address this. Candidate semantics: (1) Output quantize/step — Marbles `steps`; (2) Density compression/expansion — pull pulses into a narrower window of the available span; (3) **Fold** — `curve_out × K mod 1` so the curve traverses the span K times within one stage; (4) Staircase — quantize curve to N plateaus." |
+| Q9 global 16-stage compression/expansion | **OPEN.** Phaseque-borrow (2026-05-26): a `cycleSpread` field at sequence level that scales the active stages into a narrower window of the total cycle (low spread = compression toward midpoint) or pushes them to the endpoints (high spread = bernoulli-like expansion), independent of `clockMultiplier` and `divisor` which already scale the cycle period. This is **Marbles `spread`** applied to the time axis (distribution width), not `bias` (which would shift the cluster's center position). Low value = busy middle with silent edges; high value = burst-at-bar-edges feel. Bipolar 0..127 unsigned (low=compression, mid=neutral, high=expansion) or signed ±100 (centered at neutral); 7-bit, Routable target. Decide: live alongside `divisor` and `clockMultiplier` or merged into one of them with broader range? Also: pair with a `cycleBias` later (Marbles bias = WHERE the cluster sits, separate axis from compression). |
+| Q10 global phase warp | **RESOLVED** as `cyclePhaseWarp` in §14.2. Selected the master-phase warp variant (warp the phase pre-slot-derivation, keep cycle length, move per-stage hits). The alternative (warp cumulative-table durations) was rejected because it would mutate the table on every nudge tick — expensive and incompatible with `detectLayoutChange()` caching. Routable per-sequence `int8_t`, ±64, default 0. Sequence-level Response on CV considered and rejected (breaks scale-degree contract). |
+| Q11 snap-to-grid utility | **OPEN.** Once continuous `stageLen` and `sequenceShift` land, edits drift off the natural grid. Need a sequence-level "snap" action (not a stored field) that quantizes per-stage `stageLen` multipliers and `phaseShift` values to nearest grid increment, and `sequenceShift` to the nearest 1/16 (or 1/32) of cycle. Bound to an F-key or context-menu entry on EditPage. Decide: pre-Phase-C UI lock. |
+| Q12 scale-degree hysteresis for continuous CV (§6.2.2) | **OPEN.** When `cvUpdateMode = Always`, the pitch curve evaluates every tick and re-quantizes to the nearest scale degree. Phase positions near a degree boundary oscillate between two adjacent degrees as the curve crosses, producing audible jitter. Marbles uses a hysteresis quantizer (`marbles/random/quantizer.cc:91`) that keeps the previous output until the curve has moved past half a degree-width. Candidate semantics: (1) **No hysteresis** — re-quantize each tick (jitter on near-boundary motion, but truthful to the curve); (2) **Fixed half-degree hysteresis** — Marbles-style; smooth glides at the cost of slight pitch lag; (3) **Configurable hysteresis amount** — Marbles `steps` knob equivalent, per-stage 0..1 hysteresis width. Decide before audible Always-mode ships. |
+
+---
+
+## 14.2 Proposed new fields — design sketches
+
+These are accepted-in-principle but not yet bit-pack-budgeted or test-covered. Each retains an "OPEN" item for any unresolved sub-question.
+
+### Per-stage: `Repeat` and `Window` — curve-shape transforms (paired addition)
+
+Two paired sets of per-cell fields. Repeat multiplies curve traversals within the cell; Window crops which portion of the curve the engine evaluates. Per-axis (temporal and pitch independently). Both apply BEFORE Warp/Response in the pipeline.
+
+**Repeat** — `temporalRepeat` and `pitchRepeat`, each a 4-value enum stored as `UnsignedValue<2>`:
+
+| Value | Multiplier |
+|---|---|
+| 0 (default) | ×1 (no repeat) |
+| 1 | ×2 |
+| 2 | ×3 |
+| 3 | ×5 |
+
+Coverage: multi-bump / multi-decay / N-cycle pulse patterns become reachable from base shapes. No new curve enum slots needed for those.
+
+**Window** — `temporalWindow` and `pitchWindow`, each a 5-value enum stored as `UnsignedValue<3>`:
+
+| Value | Mode | What engine evaluates |
+|---|---|---|
+| 0 (default) | Off | full curve `[0, 1]` |
+| 1 | Focus 70 | center 70% — input `[0.15, 0.85]` (outer 30% hidden) |
+| 2 | Focus 50 | center 50% — input `[0.25, 0.75]` (outer 50% hidden) |
+| 3 | Polarize 70 | outer 70% — input `[0, 0.35] ∪ [0.65, 1.0]` (middle 30% hidden) |
+| 4 | Polarize 50 | outer 50% — input `[0, 0.25] ∪ [0.75, 1.0]` (middle 50% hidden) |
+
+3 spare enum slots in the 3-bit field (values 5/6/7) reserved for future window shapes.
+
+- **Focus** vs **Polarize** give opposite musical gestures:
+  - Focus narrows pulses/pitches into the center of the curve (Bell at Focus 50 = sustained near-peak).
+  - Polarize concentrates pulses/pitches at the cell's edges with a silent middle (Bell at Polarize 50 = small rise on left, gap, small fall on right).
+- Hidden portion: engine does not evaluate; for temporal axis pulses falling in the hidden band are dropped; for pitch axis the curve doesn't contribute (held at boundary value or skipped depending on `cvUpdateMode`).
+
+**Pipeline order** (per axis): `Window → Repeat → Warp → Curve eval → FlipV → Response → FlipH`. Window applies on raw input, then Repeat multiplies the windowed result, then Warp bends, then the curve evaluates, then FlipV mirrors output, then Response bends output, then FlipH mirrors trigger timing. Window-then-Repeat (rather than Repeat-then-Window) was chosen so each repeated sub-section carries the windowed shape — gives `Bell + x3 + Polarize 50` three "rise-gap-fall" cycles, much richer than three half-bells with a single crop applied after.
+
+- **Bit-pack cost**: 4 bits Repeat (2 per axis × 2 axes) + 6 bits Window (3 per axis × 2 axes) = 10 bits per stage × 16 stages = 160 bits total. `_data3` has 25 spare bits after `stageLen` (7 used); 10 used, **15 remain**.
+- Layout (locked):
+  ```
+  _data3:
+    bits  0..6   stageLen (7)                 [existing]
+    bits  7..8   pitchRepeat (2)              [NEW Repeat]
+    bits  9..10  temporalRepeat (2)
+    bits 11..13  pitchWindow (3)              [NEW Window]
+    bits 14..16  temporalWindow (3)
+    bits 17..31  spare (15)
+  ```
+- Routable target? No for either — per-stage discrete enums, not natural CV targets.
+- Pitch Repeat and Pitch Window are **Cell-mode only**; both ignored in Global pitch mode where `pitchRate` owns multi-cycle. See §6.2.4 / §6.2.5 for rationale.
+
+**UI surface** (subject to the paged-footer layout in §17.2.1 — these slots are not yet wired):
+
+Footer order for transform slots follows pipeline order: `Window → Repeat → Warp → FlipV → Response → FlipH`. Window and Repeat are NEW slots; they slot in BEFORE Warp on the encounter path. Existing slot positions (`Curve`, `Warp`, `Resp`, `FlipV`, `FlipH`, topic-specific F4) stay put.
+
+- TEMP: add a Page-2 (P2) extension carrying `Window / Repeat / — / — / Next` (Window F1, Repeat F2 — pipeline order).
+- PTCH Cell: same P2 pattern, `Window / Repeat / — / — / Next`.
+- PTCH Global: Repeat and Window are no-ops (ignored in Global mode); no P2.
+- ACCUM sets: not applicable.
+
+**Render reference**: `ui-preview/window-preview/window-bell-bounce.png` shows Bell and Bounce at Off / F70 / F50 / P70 / P50.
+
+**OPEN**: footer placement (P2 of TEMP/PTCH-Cell vs Shift+F variants) decide at UI wire-up time.
+
+### Per-sequence: accumulator `sleep` — divisor on trigger advance
+
+**Status: draft, not yet wired.**
+
+Per-accumulator field on `AccumulatorConfig` (lives alongside `scope`, `order`, `polarity`, `reset`, `posLim`, `negLim`). Range 0..15 (4 bits), default 0.
+
+**Semantic**: the counter advances every `(sleep + 1)` trigger events. `sleep = 0` (default) = advance every trigger (current behavior). `sleep = 3` = advance every 4th trigger; counter holds for 3 trigger events, then jumps by the full `step`. Higher values produce slower, chunkier drift.
+
+**Compared to step magnitude**: lowering `step` gives smoother drift in smaller increments. Increasing `sleep` keeps the step size but introduces discrete plateaus — counter pauses, then jumps. Different musical character, especially with step values ≥ 2 (audible jumps with rest gaps between).
+
+| step | sleep | Counter trajectory |
+|---|---|---|
+| 2 | 0 | 0, 2, 4, 6, 8, … (fast, smooth) |
+| 1 | 0 | 0, 1, 2, 3, 4, … (half-speed, smooth) |
+| 2 | 1 | 0, 0, 2, 2, 4, 4, … (same effective slope, stutter) |
+| 2 | 3 | 0, 0, 0, 0, 2, 2, 2, 2, 4, … (slow + chunky plateaus) |
+
+**Engine state**: per-counter sleep counter — `uint8_t _noteSleepTick[16]` + `uint8_t _pulseSleepTick[16]` = 32 bytes added. Increments on each trigger event; advances the main counter when it hits `sleep + 1`, then resets to 0.
+
+**Storage**: 4 bits per accumulator on `AccumulatorConfig`. Current flags byte uses all 8 bits exactly (1 scope + 2 order + 1 polarity + 4 reset). Sleep needs a second flags byte — total `AccumulatorConfig` grows from 3 to 4 bytes (1 byte flags1 + 1 byte flags2 + 1 byte posLim + 1 byte negLim). Per-sequence cost across both N + P accumulators: 8 bytes total.
+
+**Interactions**:
+
+- **Sleep × Reset**: `sleep = 3, reset = 4` → counter holds for 4 trigger events between advances, then a 4-cycle auto-reset wipes the counter back to zero. Patient drift inside a phrase. When auto-reset fires, **also resets the sleep counter** so the next phrase starts fresh.
+- **Sleep × Pendulum**: counter bounces normally, but each bounce step takes `sleep + 1` triggers to complete. Slower swing.
+- **Sleep × Random**: re-rolls every `(sleep + 1)` trigger events. Sparse chaotic motion.
+- **Sleep × Pulse-trigger**: with `*AccumTrigger = Pulse` and `sleep = 3`, the counter advances every 4th pulse fire (not every pulse). Lets dense pulse patterns drive sparse drift.
+- **Sleep × hard reset (transport / pattern switch)**: clears sleep counters along with main counters. Both reset to zero.
+
+**UI**: Shift+F2 or Shift+F3 on ACCUM.N / ACCUM.P set (both currently free in the post-MVP slot map). Encoder edits 0..15. Display as `Sleep N` or as a ratio `1:1..1:16`. Slot label kept short: `Sleep`.
+
+**OPEN**: none — semantic fully specified. Bit-pack repack of `AccumulatorConfig` (3→4 bytes) is the only storage decision; second-flags-byte is the simpler choice over shrinking `reset` to 3 bits.
+
+### Per-sequence: `warpNudge` / `responseNudge` / `pulseNudge` — performative global offsets
+
+**Status: draft, not yet wired.**
+
+Three per-sequence `Routable<int8_t>` fields that ADD to every stage's per-cell value live. Performative gestures — twist on stage, every cell shifts together. Modelled on NoteTrack's `transpose` (which shifts all step pitches uniformly).
+
+| Field | Range | Default | Effect |
+|---|---|---|---|
+| `warpNudge` | ±64 | 0 | added to `temporalWarp` AND `pitchWarp` of every stage |
+| `responseNudge` | ±64 | 0 | added to `temporalResponse` AND `pitchResponse` of every stage |
+| `pulseNudge` | ±7 | 0 | added to `pulseCount` of every stage |
+
+**One knob per concept, applies to both axes**: Warp Nudge moves both temporal and pitch warp simultaneously. Single performative knob per character, not split per-axis. (Per-axis variants — `tempWarpNudge`, `pitchWarpNudge` — can be added later as Tier-2 if audition shows they're needed; this keeps v1 simple.)
+
+**Engine math** at the start of each stage's pipeline (per §6.1 / §6.2):
+
+```
+effectiveTempWarp     = clamp(stage.temporalWarp()     + seq.warpNudge(),     −64, +64)
+effectiveTempResponse = clamp(stage.temporalResponse() + seq.responseNudge(), −64, +64)
+effectivePitchWarp    = clamp(stage.pitchWarp()        + seq.warpNudge(),     −64, +64)
+effectivePitchResponse= clamp(stage.pitchResponse()    + seq.responseNudge(), −64, +64)
+effectivePulseCount   = clamp(stage.pulseCount()       + seq.pulseNudge(),    0, 16)
+// engine then proceeds with effective* values everywhere the per-stage fields were previously read
+```
+
+Apply BEFORE the existing `effectivePulseCount` computation that incorporates `pulseAccOffset` (§13.4 / §13.10 Task 7). So the full pulse-count formula becomes:
+
+```
+effectivePulseCount = clamp(stage.pulseCount() + seq.pulseNudge() + pulseAccumCounter, 0, 16)
+```
+
+Order doesn't matter for the warp/response Nudge — it's a uniform offset before any non-linear bending.
+
+**Storage**: 3 × `Routable<int8_t>` on `PhaseFluxSequence` = ~6 bytes per sequence. Across 17 sequences = ~102 bytes per track. PhaseFluxTrack 4772 → ~4874. Negligible against 9544 ceiling.
+
+**Routing targets**: three new `Routing::Target::WarpNudge` / `ResponseNudge` / `PulseNudge`. CV-modulatable for live shaping (LFO, envelope, expression pedal via CV in).
+
+**UI**: 3 new rows on `PhaseFluxSequenceListModel` (between existing rows). Labels short: `WarpN`, `RespN`, `PulsN`. Encoder edits the values.
+
+**Combined with accumulator drift**: drift via accumulator (per-cell step values walk a counter) + bend via nudge (uniform live offset) = two independent live gestures with different feel. Accumulator gives evolving over time; nudge gives instantaneous global shift.
+
+**OPEN**:
+
+- Whether to split into per-axis (6 knobs) at all? Recommend no for v1; revisit if audition feedback says one axis needs separate control.
+
+### Per-sequence: `cyclePhaseWarp` — macro swing across the 16-stage cycle (resolves §14.1 Q10)
+
+**Status: draft, not yet wired.**
+
+Single per-sequence `Routable<int8_t>` field, ±64, default 0. PowerBend transform applied to the master cycle phase `relativeTick / cycleTicks` BEFORE slot derivation (§3.2 per-tick math).
+
+Engine math:
+
+```
+cyclePhase    = relativeTick % cycleTicks / float(cycleTicks)        // ∈ [0,1)
+warped        = applyPowerBend(cyclePhase, seq.cyclePhaseWarp())     // PowerBend, same math as per-stage warp
+effectiveTick = uint32_t(warped * cycleTicks)                        // re-map back to ticks
+// slot derivation then proceeds from effectiveTick instead of relativeTick % cycleTicks
+```
+
+**Effect**: positive nudge stretches early stages and compresses late stages (or vice versa via negative). The 16-stage cycle gets a macro swing/lag character that's independent of per-stage `temporalWarp` (which warps within each stage).
+
+**Composability**:
+- Per-stage warp bends within each cell.
+- `cyclePhaseWarp` bends WHERE in the cycle each cell happens.
+- Both apply; effects compound.
+
+**Routing target**: `Routing::Target::CyclePhaseWarp`. CV-modulatable for live macro-swing.
+
+**Storage**: 1 × `Routable<int8_t>` per sequence = 2 bytes × 17 sequences = 34 bytes per track. Negligible.
+
+**UI**: one new row on `PhaseFluxSequenceListModel` ("Cycle Warp"). Encoder edits ±64.
+
+**Why this one and not "sequence-level Response on CV"**:
+- Response on CV would bend the final voltage non-linearly. PhaseFlux's CV is integer scale-degree quantized via `Scale::noteToVolts()` — bending pre-quantization mangles scale-degree intuition; bending post-quantization breaks the integer-quantization contract that defines pitch in PhaseFlux (§6.2). Not viable.
+- Response on time globally (bend trigger positions across the cycle) is mostly covered by `cyclePhaseWarp` — same family of non-linear time mapping. No need for a second variant.
+
+**OPEN**: none — semantic fully specified and resolves §14.1 Q10.
+
+### Per-sequence: `firstStage` / `lastStage`
+
+NoteSequence-style stage-range gating. Stages outside `[firstStage..lastStage]` contribute zero to the cumulative table (treated as if `skip=true`).
+
+- Fields: `firstStage`, `lastStage`, both 4-bit unsigned 0..15. Stored on `PhaseFluxSequence`. Validate `firstStage ≤ lastStage` at edit time.
+- Semantics: snake-walk visits cells `kSnakeOrder[firstStage..lastStage]` and only those contribute their `stageDivisorTicks × sequenceDivisor / kReferenceSequenceDivisor` to the cycle. Stages outside the range act as `skip=true` for purposes of `computeCumulativeTicks` but their stored attributes are preserved.
+- Routable? Probably no — discrete edit, not a continuous knob.
+- **Bit-pack cost:** 8 bits total on `PhaseFluxSequence`. Cheap.
+- Redundancy note: equivalent musically to setting `skip` on the excluded stages, but cheaper to edit and matches NoteSequence ergonomics. User flagged this as a convenience addition, not a strict need.
+- **OPEN:** Default values (probably 0 / 15). Behaviour when `firstStage > lastStage` (clamp on set, or treat as "all stages skipped"?).
+
+---
+
 ## 15. Deferred to v2
 
 Explicit list. Any of these reappearing in MVP scope requires a written impact assessment and re-locking of this doc.
@@ -590,7 +1043,7 @@ Explicit list. Any of these reappearing in MVP scope requires a written impact a
 - Compression/Expansion (Flux `COMP`) — subsumed by `temporalResponse` PowerBend axis; not a separate field
 - Per-degree bitmask (alternative to centrality-based MaskM+TiltM)
 - Sequence-level global accumulator step + per-stage override (NoteTrack's Accumulator pattern) — PhaseFlux uses per-stage independent for MVP
-- Accumulator advance modes A (per-pulse) and C (per-grid-cycle)
+- Accumulator advance mode C (per-full-16-cell-cycle). Modes A (per-pulse) and B (per-stage) are shipped via the per-stage `accumulatorTrigger` / `pulseAccumTrigger` Stage/Pulse enum (`PhaseFluxTrackEngine.cpp:421,428,703-711`).
 - Accumulator ping-pong counter motion
 - Per-track modulation input subsystem
 - Fill alt sequence
@@ -605,8 +1058,8 @@ Explicit list. Any of these reappearing in MVP scope requires a written impact a
 Items the implementer resolves; locked design above doesn't depend on them.
 
 - Stage record packs to **3 × `uint32_t` (12 B)** with 3 spare bits (refined curve model: 93 bits/stage) — use the NoteSequenceStep BitField pattern (`model/Bitfield.h`, anonymous unions with `raw` + named slots). 16 stages × 12 B = 192 B for stage data per sequence.
-- **Serialization version: dev iterates at `Version35` with placeholder constant `Version_PhaseFlux_Pending = 36`.** Dev builds read/write PhaseFlux data without a version-guard bump; old shipped firmware cannot read dev project files (known dev-stage cost). On ship, the constant becomes `ProjectVersion::Version36` and the proper version guard goes in. No churn of the enum during iteration.
-- Serialization version + read/write order (round-trip test gate per retro #4)
+- **Serialization version: do NOT bump.** Dev branch stays on the existing `Latest` per `src/apps/sequencer/model/ProjectVersion.h` policy. Add new model fields by writing/reading them unconditionally — no `dataVersion() >= VersionN` guards, no placeholder constant. Old dev project files on SD card are accepted to break across branches. Bumps happen only at user-driven release prep.
+- Same-branch read/write symmetry: round-trip test gate per retro #4 (any field added to `write()` must be read back identically by `read()` in the same build — orthogonal to version policy).
 - Default `_resetMeasure` UI step granularity (powers-of-two from NoteSequence)
 - Whether PhaseFlux participates in Project-level scale/rootNote inheritance
 - UI page implementation (layout locked in §17; only pixel-level details remain)
@@ -636,12 +1089,15 @@ Inside the 256×42 px safe content area (header/footer guards per `ui-preview/UI
   - Active (playing) cell — inverted bright fill.
   - Selected cell — bright outline.
   - `skip=true` — hollow X.
-  - pulseCount visualised as a tiny horizontal bar across the bottom of the cell (1..8 px wide).
+  - pulseCount visualised as a tiny horizontal bar across the bottom of the cell (0..16 px wide, clamped to cell width). pulseCount=0 draws no bar (silent stage).
   - `phaseShift ≠ 0` — top-left corner dot.
   - `mask ≠ Off` — top-right corner dot.
 - **Selection vs active cell**: NoteTrack/Stochastic convention. The **selected** cell (bright outline, scopes/params display its values) is set by the player via top-row hardware key and **stays put** as the cursor advances. The **active** cell (currently playing, inverted fill) moves independently as the engine ticks. Encoder rotation always edits the user-selected cell, regardless of which cell is playing. No "follow" mode in MVP.
 - **Right half (x 50..253) — default view**: two side-by-side scopes ~100×38 each (temporal left, pitch right) with a 1 px divider at x=152.
-  - Temporal scope: curve trace + pulse-fire tick marks along the bottom (masked pulses dim, fired pulses bright).
+  - Temporal scope: curve trace + per-pulse marks **vertically centred** at `y = ScopeY + ScopeH/2`. Spacing matches the engine's §6.1 `i/N` formula (last pulse at `(N-1)/N`, not the cell boundary). Inset 2 px from the scope outline so 3-wide marks stay 1 px clear of the edge at both extremes. Three glyphs:
+    - **3×3 hollow ring** — one per base pulse (`stage.pulseCount()`). `Color::Medium` by default; flips to `Color::Bright` once the playhead crosses its trigger time in the active cell.
+    - **3 wide × 2 tall U** (open top, closed bottom) — one per accumulator-added extra pulse. Same dim/bright behaviour. Hidden if `pulseAccOffset` is negative (decreased pulses don't render — only the `effective = clamp(base + offset, 0, 16)` pulses appear).
+    - **Single `Color::Low` centre dot** — muted pulse (`(maskByte >> ((i + maskShift) & 7)) & 1`).
   - Pitch scope: curve trace + bright dot at each fired pulse's sampled CV.
   - **No parameter labels** — pure shape feedback.
 - **Right half — edit-hold view** (top-row stage key held): 8 boxes ~24×38 each, one per bottom-row hardware key, spanning x=50..253.
@@ -652,6 +1108,45 @@ Inside the 256×42 px safe content area (header/footer guards per `ui-preview/UI
 - Footer F-keys (default view): STAGE / TIME / PITCH / DIV / TRK.
 - Footer F-keys (edit-hold view): TIME / CURVE / XFRM / ACCM / TRK — cycle param banks for the 16 params not shown on the bottom row (basePitch, pitchRange, pitchDirection, pitchResponse, temporalResponse, temporalFlipV, temporalFlipH, pitchFlipV, pitchFlipH, maskMelody, tiltMelody, maskShift, accumulatorStep, accumulatorLength, gateLength, skip).
 
+### 17.2.1 Footer pages — all topics use F5 = Next
+
+All four topics (TEMP / PTCH / ACCUM.N / ACCUM.P) page their footer with **F5 = Next** cycling `_topicPage` between 0 and 1. L/R nav (topic change) resets `_topicPage = 0` and `_selectedSlot = 0`. Shift-modifier bindings are dropped entirely — binary toggles (`FlipV`, `FlipH`) are first-class on Page 1 slots and fire on plain F-press without selecting (no encoder edit needed).
+
+**TEMP**
+| Page | F1 | F2 | F3 | F4 | F5 |
+|---|---|---|---|---|---|
+| 0 / shape | `Curve` | `Warp` | `Resp` | `Puls` | `Next` |
+| 1 / mods  | `Len` | **`FlipV`** | **`FlipH`** | `Mask` | `Next` |
+
+**PTCH (Cell mode)** — header `PTCH`, stage badge = stage number:
+| Page | F1 | F2 | F3 | F4 | F5 |
+|---|---|---|---|---|---|
+| 0 / shape | `Curve` | `Warp` | `Resp` | `Note` | `Next` |
+| 1 / mods  | `Span` | `Dir` | **`FlipV`** | **`FlipH`** | `Next` |
+
+**PTCH (Global mode)** — header `PTCH.G`, stage badge = `G`, scope draws `stage[0]`'s curve:
+| Page | F1 | F2 | F3 | F4 | F5 |
+|---|---|---|---|---|---|
+| 0 / shape | `Curve` | `Warp` | `Resp` | `Rate` | `Next` |
+| 1 / mods  | `Note` | `Span` | **`FlipV`** | **`FlipH`** | `Next` |
+
+**ACCUM.N / ACCUM.P** — see `docs/accumulator-v2-spec.md §13.5`.
+
+Bold slots = press-to-flip (no slot selection, no encoder edit). All other slots: F-press selects, encoder edits.
+
+`Note` was previously labelled `Base` for Cell mode — renamed to `Note` for label clarity (the value is rendered as a note name via `scale.noteName(... Format::Long)`). `Dir` cycles `PitchDirectionType` (Up / Down / Bipolar).
+
+In PTCH Global, P1 `Note` / `Span` edit the **active** stage (per-cell anchor stays per-cell), while P0 `Curve` / `Warp` / `Resp` edit `stage[0]` (the master pitch curve). P1 flips also operate on `stage[0]`.
+
+Pitch scope visual (`drawPitchScope`):
+- Same outer container as TEMP scope (`100 × 38` at `(scopeX, ScopeY)`).
+- Internal split: 22 px **label column** on the left (`x = scopeX..scopeX+21`), 1-px divider at `x = scopeX+22`, then **trace zone** (`x = scopeX+23..scopeX+98`).
+- Curve trace at `Color::Medium` lives only in the trace zone.
+- Pulse-fire 2×2 dots on the curve at each unmuted pulse's (t, pitch). Spacing uses `i/N` (matches engine §6.1). Dim by default; brighten as the playhead crosses each in the active cell.
+- Label column shows **top-4 reachable scale degrees by visit count** (sampling the pitch pipeline at 64 phi-points + quantizing). Always includes the currently-playing degree (pushes lowest-count entry out). Labels right-aligned at `x = scopeX + 20`, evenly distributed in 4 slots. Currently-playing label drawn with an inverted highlight box.
+
+Render variants live in `ui-preview/phaseflux-pitchmode/` and `ui-preview/pitch-scope/`.
+
 ### 17.3 PhaseFluxSequenceListModel items
 
 Subset of `NoteSequenceListModel` per spec §12.2:
@@ -660,6 +1155,9 @@ Subset of `NoteSequenceListModel` per spec §12.2:
 |---|---|---|
 | `Divisor` | `Routing::Target::Divisor` | `_divisor` (Routable, §12.2) |
 | `ClockMult` | `Routing::Target::ClockMult` | `_clockMultiplier` (Routable, §12.2) |
+| `GlobalPhase` | — | `_globalPhase` (CurveTrack precedent) |
+| `PitchMode` | — | `_pitchMode` (Cell/Global, §6.2.3) |
+| `PitchRate` | — | `_pitchRate` (P:T ratio index, §6.2.3) |
 | `ResetMeasure` | — | `_resetMeasure` (§3.3) |
 | `Scale` | `Routing::Target::Scale` | `_scale` (optional, `−1 = inherit`) |
 | `RootNote` | `Routing::Target::RootNote` | `_rootNote` (optional, `−1 = inherit`) |
@@ -780,7 +1278,7 @@ Tests land in three phases. Each phase gates the next.
 | Phase shift mod | Pulse times correct after phaseShift × 45° rotation. |
 | Temporal mask × shift | All 8 mask patterns × all 8 shifts × pulseCount range. Gate suppressed correctly per `(i + maskShift) mod 8`. |
 | Melody mask (centrality+tilt) | Byte-for-byte match against Stochastic `engine/StochasticTrackEngine.cpp:454-466`. |
-| Pulse collision clamp (§6.4) | Drops PowerBend collisions; gate length truncation; minimum-audible-gate floor. |
+| Pulse schedule (§6.4) | Overlap-allowed schedule (no collision drop). gateLength rules: 0 → silent; 1 → audible-minimum floor at 6 ticks; ≥ 2 → percent × pulse_period, drop if < 6. |
 | Accumulator lifecycle | Counter advance on slotIdx change; mod-N wrap; preservation across Reset Measure; clear on pattern switch (§7.1 asymmetry). |
 | Pitch quantization | `degree → noteToVolts` across all defined scales. Octave + transpose application. Scale-extends-infinitely (out-of-nominal-range degrees). |
 | Curve LUTs at φ=0, 0.25, 0.5, 0.75, 1 | Linear/Bell/Bounce + Ramp/Bell/Triangle, including vflip + hflip composition. |

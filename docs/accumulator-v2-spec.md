@@ -1,77 +1,3 @@
-# Adversarial Review — Implementation Readiness
-
-The current spec is not implementable as written.
-
-Critical issue: it describes a general accumulator framework, not a bounded `performer-phazer` feature plan. It mixes current behavior, Csound-style abstraction, future target types, and unbudgeted storage changes.
-
-## Findings
-
-1. **State ownership is unresolved.**
-   The spec says each instance owns `ACC`, `INC`, limits, direction, mode, polarity, and scope.
-   Current code stores one `Accumulator` inside each `NoteSequence`, while the engine mutates it through `const_cast`.
-   Relevant paths: `src/apps/sequencer/model/NoteSequence.h`, `src/apps/sequencer/model/Accumulator.h`, `src/apps/sequencer/engine/NoteTrackEngine.cpp`.
-
-2. **`LOCAL` scope explodes RAM unless redefined.**
-   The spec says each step maintains its own accumulator state.
-   Current model only has one accumulator plus a 4-bit per-step command.
-   Literal per-step accumulator state means 64 states per sequence and needs a hard rejection or compressed design first.
-
-3. **Trigger semantics conflict with the engine.**
-   The spec says "boolean rising edge evaluated at step clock rate."
-   Current behavior supports `Step`, `Gate`, and `Retrigger` modes in separate timing paths.
-   The spec must define ordering relative to condition, gate probability, retrigger scheduling, fill sequence, and note evaluation.
-
-4. **Boundary math is under-specified for large overshoot.**
-   `WRAP` and `PENDULUM` examples handle one breach, not repeated wrap or reflection when `INC` exceeds the full range.
-
-5. **The spec adds modes the UI/model cannot hold.**
-   Current `Order` is `Wrap`, `Pendulum`, `Random`, `Hold`.
-   The spec adds `RTZ` and `ONE-SHOT`.
-   That requires enum storage, UI rows, serialization, and tests.
-
-6. **Per-step commands do not fit current step storage.**
-   The spec wants `DEFEAT`, `ABS_SET`, `REL_NUDGE`, `RESET`, `REVERSE`, limit changes, and increment changes.
-   Current per-step storage is a 4-bit `OFF / S / -7..+7` trigger or override value.
-   This is a schema redesign, not an accumulator tweak.
-
-7. **Continuous domain is premature.**
-   The spec allows float timing, CV, cents, and ms.
-   Current implementation is integer pitch offset only.
-   Float accumulators across timing and CV targets need target-specific clamps, units, display, serialization, and RAM accounting.
-
-## Proposed Action Plan
-
-1. Rewrite the spec around current topology first:
-   model owns accumulator config; engine owns runtime tick application; UI edits config and reads current value only if that ownership is deliberate.
-
-2. Split v2 into phases:
-   - Phase 1: integer pitch accumulator only.
-   - Phase 2: cleanup current semantics and tests.
-   - Phase 3: optional new commands.
-   - Phase 4: optional continuous targets.
-
-3. Define `LOCAL` without per-step full state.
-   Either reject it for v2, or define it as "apply only on marked steps using one shared accumulator."
-   Do not allow literal 64 accumulator states without RAM proof.
-
-4. Replace abstract trigger text with the actual three engine paths:
-   `Step`, `Gate`, and `Retrigger`.
-   Include exact ordering relative to condition, gate probability, retrigger scheduling, fill sequence, and note evaluation.
-
-5. Fix boundary algorithms with modulo/reflection tests.
-   Cover `INC > range`, negative `INC`, invalid `min > max`, `min == max`, `Freeze`, and random range.
-
-6. Keep per-step v2 storage compatible unless a schema redesign is explicitly accepted.
-   Current 4-bit `OFF / S / -7..+7` override can be formalized.
-   The command-table idea should move to "future schema."
-
-7. Add a verification checklist:
-   unit tests for accumulator math, note-engine trigger timing tests, serialization round-trip, UI render if OLED pages change, and STM32 release RAM check.
-
-Do not implement from this doc yet. First edit should be a spec tightening pass, not code.
-
----
-
 # Accumulator — Revised Specification
 
 ## 1. Definition
@@ -272,3 +198,488 @@ endif
 - **Initialization**: Default `ACC = 0`, `DIR = +1`, `MODE = WRAP`, `POLARITY = BIPOLAR`.
 - **Disconnection**: If `ACC` is used purely for threshold logic, do not auto-sum it into the primary output. Maintain two registers (`ACC_LOGIC`, `ACC_OFFSET`) or a disconnect flag.
 - **Polyphony**: Each voice may host an independent accumulator instance, or a single global accumulator may modulate all voices. Scope is per-instance.
+
+---
+
+## 12. Reference implementations — Cirklon and Metropolix
+
+Two well-established hardware sequencers ship accumulator features. Their UI vocabulary differs from this spec but the underlying mechanics map cleanly. Used as design reference for what musicians actually want.
+
+### 12.1 Cirklon (Sequentix)
+
+- **Three accumulators per track**: note / velocity / aux D. Each is a constantly-applied offset to its target value. Hidden state.
+- **Scope is always TRACK** (track-level state, not per-step state).
+- **Per-step event hooks**: any step may carry an aux event in the "Accumulator" group:
+  - `offset note abs` — ABS_SET (replaces accumulator with the event's value)
+  - `offset note rel` — REL_NUDGE (adds the event's value to the accumulator)
+  - same pair for velocity and aux D
+- **Order modes** (`accum conf` page): `rtz`, `clip`, `rvtz`, `rvbp`.
+  - `rtz` — return to zero on overflow
+  - `clip` — stick at limit
+  - `rvtz` — reverse on limit, accumulator returns toward zero
+  - `rvbp` — reverse on limit, accumulator continues bi-polar (sign flips, keeps moving)
+- **Reverse switch** per accumulator — toggled automatically by `rvtz`/`rvbp` on limit hit. Subsequent REL events subtract instead of add. Switch resets when accumulator is cleared.
+- **Range limit** is absolute (`limit = N` means `−N..+N`).
+- **Reset** at pattern start / new pattern selection. Otherwise the accumulator state persists across pattern loops indefinitely.
+
+### 12.2 Metropolix (Intellijel)
+
+- **Per-stage accumulator state** with sequence-wide configuration on a `LIM` screen.
+- **Per-stage fields**:
+  - `TRANSPOSE AMOUNT` — step value in scale degrees, ±7 default
+  - `TRANSPOSE TRIGGER` — `Stage` / `Pulse` / `Ratch` (when this stage's step value fires into the counter)
+- **Sequence-level LIM screen**:
+  - **Mode** — `LOCAL` (counter is per-stage; today's PhaseFlux behavior) vs `TRACK` (one shared counter across all stages)
+  - **Range limits** — explicit ± bounds
+  - **Order / Polarity / Reset** — analogous to §5 modes
+- **Bulk operations** — ALT-modifier shortcuts for "set all stages at once", "reset all", "set all triggers to same value".
+- **Reset** on sequence RESET (manual or auto) returns all counters to their starting pitches.
+- **Interactions** documented across `GATE TYPE` (Hold/Multi/Single/Rest) × `TRANSPOSE TRIGGER` (Stage/Pulse/Ratchet). Worth reading before implementing — there are non-obvious cases (e.g., `Rest` gate type doesn't trigger accumulation; ratchets only contribute under `Ratch` trigger).
+
+### 12.3 Mapping across the three models
+
+| Concept | This spec (§1-§11) | Cirklon | Metropolix |
+|---|---|---|---|
+| Per-step step value | `INC` | event value (abs/rel) | `TRANSPOSE AMOUNT` |
+| Trigger granularity | "rising edge from step clock / pulse / ratchet / external" | every pattern step | per-stage `TRANSPOSE TRIGGER` |
+| Scope | `LOCAL` / `TRACK` (§8) | always TRACK | LIM screen `Mode` LOCAL / TRACK |
+| Range limit | `LIM_HI` / `LIM_LO` | `limit` (absolute, ±N) | LIM screen ± bounds |
+| Overflow modes | `WRAP` / `PENDULUM` / `CLIP` / `RTZ` / `RANDOM` / `ONE-SHOT` | `rtz` / `clip` / `rvtz` / `rvbp` | LIM screen Order |
+| Polarity | `UNI` / `BI` (§5) | sign of stored value | LIM screen Polarity |
+| Per-step overrides | `DEFEAT` / `ABS_SET` / `REL_NUDGE` / `RESET` / `REVERSE` / `SET_LIM_*` / `SET_INC` (§7) | aux events (abs / rel only) | not exposed |
+| Direction reverse | `DIR` register (§3) | reverse switch | derived from sign of `TRANSPOSE AMOUNT` |
+
+Cirklon's strength is the per-step event vocabulary (rich set of one-shot modifiers). Metropolix's strength is the per-stage trigger granularity (Stage/Pulse/Ratchet) and the explicit LOCAL/TRACK scope toggle. This spec generalises both into the §5 / §7 / §8 model.
+
+---
+
+## 13. Application to PhaseFlux
+
+### 13.1 Current state (pre-spec)
+
+PhaseFlux today carries a single, minimal accumulator — per-cell counter array with everything else hardcoded:
+
+| §3 register | PhaseFlux (current) | Source |
+|---|---|---|
+| `ACC` | `_accumulatorCounter[16]` (int per cell, runtime only) | `engine/PhaseFluxTrackEngine.h` |
+| `INC` | per-cell `accumulatorStep` (±15 scale degrees, `SignedValue<5>`) | `model/PhaseFluxSequence.h` |
+| `LIM_HI` / `LIM_LO` | derived: `[0, accumulatorLength − 1]` | per-cell `accumulatorLength` 1..16 |
+| `DIR` | always `+1` | not configurable |
+| `MODE` | always `WRAP` | `(counter + 1) % length` |
+| `POLARITY` | always `UNI` | counter ∈ 0..length−1 |
+| `SCOPE` | always `LOCAL` | per-cell counter array |
+| trigger | cell-completion only | advances in slot-change block |
+
+Application: §6.A `Offset` — `accOffset = counter × stepValue` added into the per-cell degree before `Scale::noteToVolts`.
+
+Reset: cleared on pattern switch; preserved across measure reset (`docs/phaseflux-spec.md` §7.1).
+
+### 13.2 Locked design — dual-accumulator MVP
+
+PhaseFlux gains **two independent accumulators per sequence**: a **Note** accumulator (`N`) targeting scale-degree offset, and a **Pulse** accumulator (`P`) targeting `pulseCount`. They share architecture (config + ops) but have separate state (counters, direction, INC) so their drift periods are independent — Cirklon's "3 accumulators per track" model.
+
+Shared architecture (cross-track):
+
+- `model/AccumulatorConfig.h` — settings struct, per-sequence. Fields: `Scope` / `Order` / `Polarity`. Serialised as one byte per instance.
+- `engine/AccumulatorOps.h/.cpp` — stateless free functions for order resolution and §7 override commands. Identical code path for any track that opts in.
+- Per-track runtime state (counter or counter array, direction state) stays local to each track's engine. Storage shape varies by scope (single counter for `Track`, 16-counter array for `Local`).
+
+NoteTrack's existing `model/Accumulator.h` class remains untouched in v1. Migration to the shared engine is a follow-up after PhaseFlux is hardware-audible.
+
+### 13.3 Storage layout
+
+**Per-sequence (`PhaseFluxSequence`)** — one `AccumulatorConfig` per accumulator:
+
+| Field | Type | Values | Default |
+|---|---|---|---|
+| `noteAccumScope` | 1 bit | `Local` / `Track` | `Local` |
+| `noteAccumOrder` | 2 bits | `Wrap` / `Pendulum` / `Hold` / `RTZ` | `Wrap` |
+| `noteAccumPolarity` | 1 bit | `Uni` / `Bi` | `Uni` |
+| `noteAccumReset` | 4 bits | integer 0..15; `0` = manual, `N>0` = auto every N cycles | `0` (manual) |
+| `noteAccumPosLim` | 5 bits | 1..28 scale degrees | **28** (max — list-page edit) |
+| `noteAccumNegLim` | 5 bits | 1..28 scale degrees | **28** (max — list-page edit) |
+| `pulseAccumScope` | 1 bit | `Local` / `Track` | `Local` |
+| `pulseAccumOrder` | 2 bits | (same set as note) | `Wrap` |
+| `pulseAccumPolarity` | 1 bit | `Uni` / `Bi` | `Uni` |
+| `pulseAccumReset` | 4 bits | integer 0..15; `0` = manual, `N>0` = auto every N cycles | `0` (manual) |
+| `pulseAccumPosLim` | 5 bits | 1..16 pulses | **16** (matches new pulseCount ceiling) |
+| `pulseAccumNegLim` | 5 bits | 1..16 pulses | **16** (matches new pulseCount ceiling) |
+
+Total: ~34 bits ≈ 5 bytes for both `AccumulatorConfig`s. Sequence has ~5 KB headroom; trivial.
+
+**Order vocabulary aligned to Metropolix + NoteTrack**: `Hold` replaces the earlier draft's `Clip`. Same semantics (sticks at limit until external reset); naming matches the wider ecosystem.
+
+**Limits are explicit and decoupled from `accumulatorLength`** — Metropolix LIM screen pattern (Positive Limit and Negative Limit, 1..28 each). Earlier draft derived range from `length × step` which forced a coupling; explicit limits give independent control of step magnitude vs reachable range.
+
+**`*AccumReset` semantics in PhaseFlux** — integer field; the "auto" mode is implicit in the value:
+
+- `0` — **Manual.** Counters survive `resetMeasure` loops (Cirklon-style; matches current §7.1 of `docs/phaseflux-spec.md`). Cleared only on **transport restart** or **pattern switch** (hard resets, not configurable).
+- `N > 0` — **Auto every N cycles.** Counters reset every N full sequence cycles (one cycle = one complete 16-cell traversal). `N=1` resets every cycle (each loop starts fresh); `N=4` resets every 4 cycles, etc.
+
+Both modes share the hard-reset clear on transport + pattern switch. The integer-instead-of-enum design removes the need for a separate `Manual` vs `Auto` toggle — the value itself carries the policy, and `N` is naturally encoder-editable on the hero page (F5 slot).
+
+`External` (Cirklon's `Aux/Mod` — reset only via a routed input) is deferred to v2 alongside `Routing::Target::AccumReset` infrastructure.
+
+**Per-cell (`Stage`)** — note accumulator keeps its existing step field; pulse accumulator gets a parallel step field. `accumulatorLength` (existing) is **removed** — per-sequence `*AccumPosLim` / `*AccumNegLim` replace it. The 4 bits previously holding `accumulatorLength` (`_data2[14..17]`) are reclaimed.
+
+| Field | Type | Values | Default |
+|---|---|---|---|
+| `accumulatorStep` (existing) | 5 bits signed | ±15 degrees per trigger | 0 (no drift) |
+| `accumulatorTrigger` (new) | 1 bit | `Stage` / `Pulse` | `Stage` |
+| `pulseAccumStep` (new) | 4 bits signed | ±7 pulses per trigger | 0 |
+| `pulseAccumTrigger` (new) | 1 bit | `Stage` / `Pulse` | `Stage` |
+
+**Bit-pack layout** (locked). `_data2` after the changes:
+
+```
+bits  0..2   phaseShift (3)
+bits  3..5   mask (3)
+bits  6..8   maskShift (3)
+bits  9..13  accumulatorStep (5)         [unchanged]
+bits 14..17  pulseAccumStep (4)          [NEW — reclaims accumulatorLength]
+bits 18..24  gateLength (7)
+bits 25..27  stageDivisor (3)
+bit  28      skip (1)
+bit  29      accumulatorTrigger (1)      [NEW — was spare]
+bit  30      pulseAccumTrigger (1)       [NEW — was spare]
+bit  31      spare (1)
+```
+
+`_data3` is unchanged (stageLen at bits 0..6; bits 7..31 spare). No `Stage` size increase — still 4 × `uint32_t`. 1 spare bit remains in `_data2` for future per-cell additions; 25 spare bits in `_data3`.
+
+Added per cell: 10 bits × 16 stages = 160 bits ≈ 20 bytes. Fits in spare `_data2` / `_data3` without repack — verified against current bit usage in `PhaseFluxSequence::Stage`.
+
+**Engine state** (runtime, not serialised):
+
+```cpp
+int   _noteAccumCounter[16];     // per-cell or [0]-shared depending on scope
+int8  _noteAccumDir[16];         // direction-flip state for Pendulum (per-counter)
+int   _pulseAccumCounter[16];
+int8  _pulseAccumDir[16];
+```
+
+Cleared on pattern switch (`changePattern()`); preserved across measure reset.
+
+### 13.4 Engine semantics
+
+**Trigger sources:**
+
+- `Stage` trigger: counter advances when the engine moves out of the cell (existing slot-change block).
+- `Pulse` trigger: counter advances on each pulse fire inside the per-pulse loop of `rebuildSchedule`. Cells with `pulseCount > 1` produce ramps within a single visit.
+
+**Application:**
+
+- Note accumulator: `noteAccOffset = noteCounter`, added into the degree before `Scale::noteToVolts`. The counter already stores the ACCUMULATED scale degrees (each trigger adds `step` to the counter inside `AccumulatorOps`), so no multiplication on application — would double-apply the step.
+- Pulse accumulator: `effectivePulseCount = clamp(stage.pulseCount + pulseCounter, 0, 16)`. Counter directly accumulates pulse delta; applied at `rebuildSchedule`'s pulse-loop start; clamping is hard (no overflow into next cell). `pulseCount = 0` produces a silent stage (duration consumed, no events fired).
+
+**Limits** (set per-sequence): `posLim` and `negLim`, each 1..28 scale degrees (note accumulator) or 1..16 pulses (pulse accumulator). Effective counter range depends on Polarity (below).
+
+**Order resolution** (one `AccumulatorOps::applyOrder(counter, dir, polarity, posLim, negLim, order)` call per advance) — behavior depends on **Order × Polarity** (Metropolix LIM screen pattern):
+
+| Order | Polarity | Behavior |
+|---|---|---|
+| `Wrap` | `Uni` | Counter rises from 0 to `posLim` (or falls from 0 to `−negLim` if step is negative). On overflow, wraps back to **0** and continues in same direction. |
+| `Wrap` | `Bi` | Counter ranges `−negLim..+posLim`. On overflow at `+posLim`, wraps to `−negLim` (opposite limit). Same in reverse. |
+| `Pendulum` | `Uni` | Counter bounces between **0** and the active-direction limit. On hitting `+posLim`, reverses; counter descends back to 0 and reverses again. (Mirror for negative step.) |
+| `Pendulum` | `Bi` | Counter bounces between `+posLim` and `−negLim`. Reverses direction at each limit. |
+| `Hold` | either | Counter rises to the active-direction limit and sticks there until reset. Direction never auto-reverses. (Metropolix calls this Hold; NoteTrack also uses Hold; earlier draft of this spec called it Clip — renamed for cross-track alignment.) |
+| `RTZ` | either | On overflow at either limit, counter snaps back to 0. Direction unchanged; accumulation continues from 0. |
+
+**Polarity meaning recap:**
+
+- `Uni`: counter is one-sided. Sign matches the active step's direction. Counter ∈ `[0, +posLim]` if stepping positive, `[−negLim, 0]` if stepping negative. The "zero" end is always the stage's reference pitch (no offset applied).
+- `Bi`: counter is two-sided. Counter ∈ `[−negLim, +posLim]`. Zero is centred; positive and negative offsets are both reachable regardless of step sign.
+
+**Scope:**
+
+- `Local`: each cell carries its own counter. Cell A's INC + length only affect cell A's counter. 16 counters in play.
+- `Track`: single counter (`_*Counter[0]`); each cell's trigger contributes its own INC to that shared counter. All cells read the same counter value when applying the offset.
+
+**Independence of N and P:** the two accumulators run in parallel with no coupling. Note accumulator's counter doesn't influence pulse counter's advance or vice versa. Different drift periods → polymetric pitch-vs-rhythm evolution.
+
+### 13.5 UI surface — hero edit page
+
+PhaseFlux's `PhaseFluxEditPage` carousel covers **four topics**: `TEMP` / `PTCH` / `ACCUM.N` / `ACCUM.P`, cycled by Left/Right. ACCUM topics use a dedicated layout — the 4×4 grid + scope + 5-row param list used by TEMP/PTCH is replaced with a 1×16 cell row plus left-margin glyphs.
+
+**Header** (`drawActiveFunction`):
+- `ACCUM.N` / `ACCUM.NT` — Note accumulator (Track-scope variant remains in the data path but is no longer reachable via UI).
+- `ACCUM.P` / `ACCUM.PT` — Pulse accumulator (same).
+
+**Footer — two pages, F5 = Next** (cycles `_accumPage` 0↔1; identical layout for ACCUM.N and ACCUM.P):
+
+| Page | F1 | F2 | F3 | F4 | F5 |
+|---|---|---|---|---|---|
+| **0 / shape** | `Ac.St` | — | — | `Order` | `Next` |
+| **1 / mode**  | `Reset` | `Polar` | `Trig` | — | `Next` |
+
+- F2/F3 on page 0 are reserved slots — `+Lim` / `-Lim` editing has moved to the **sequence list page** (limits are not performative; default to max span so the accumulator is unbounded out of the box).
+- F4 on page 1 is reserved for **Sleep** (drafted in `phaseflux-spec.md §14.2`, not wired).
+- Shift bindings are dropped for ACCUM (params are first-class on the two pages).
+
+**Slot semantics:**
+- `Ac.St` (renamed from the earlier `Amount`) — per-cell `*AccumStep`. UI clamps to **±7** for both Note and Pulse (note storage stays `SignedValue<5>` ±15; clamp is UI-only for now).
+- `Order` / `Polar` / `Reset` — sequence-wide `AccumulatorConfig` writes.
+- `Trig` — per-cell `*AccumTrigger`, cycles `Stage ↔ Pulse`.
+- `Reset` encoder semantics unchanged: `0` = `Manual`, `N>0` = `Ncyc`.
+
+**Layout — content area (y=11..52):**
+
+- **1×16 cell row** centred at `y=28..36`. Cells are 9 px, gap 6 px, row starts at `x=17` (right margin = 5 px, left margin = 17 px reserved for glyphs). Per-cell visual rules match the existing 4×4 grid (active fill, skip X, selected outline, pulse-count bar, phase/mask dots).
+- **Per-cell bipolar `Ac.St` pancakes** — 4 px wide, right-half of each cell column. Each pancake = 1 px lit + 1 px dark gap. Positive `Ac.St` grows **up** from the square top, negative grows **down**. Magnitude UI-clamped to 7.
+- **Per-cell S/P trig chip** — tiny5x5 single character below the square, left-half of the cell. `S` = Stage trigger, `P` = Pulse trigger.
+- **Left-margin sequence glyphs** (5 px wide column at `x=4`):
+  - Order — hand-drawn 5×5 icon for Wrap / Pendulum / Hold / RTZ.
+  - Polarity — hand-drawn 5×5 icon for Uni / Bi.
+  - Reset — tiny5x5 font: `M` (manual), digit `1..9`, or `+` (>9).
+
+**Render reference**: `ui-preview/pages_phaseflux_accum_redesign.py` → `ui-preview/accum-n/accum-n-row.png`.
+
+### 13.6 Cross-track architecture notes
+
+PhaseFlux's `AccumulatorConfig` + `AccumulatorOps` are designed for cross-track reuse. NoteTrack's existing `model/Accumulator.h` can migrate to the shared engine in a follow-up:
+
+- NoteTrack's existing per-step "trigger flag" → `*AccumTrigger = Pulse` (per-step) in the shared model.
+- NoteTrack always operates at `Scope = Track` (single counter); the shared engine's `Track` branch covers it.
+- NoteTrack's existing `Order = Random` and `Direction = Down/Freeze` are out of MVP scope for PhaseFlux but planned features for the shared `AccumulatorOps` later. They can be ported when NoteTrack migrates.
+
+Until that migration, NoteTrack continues to use its existing class unchanged; PhaseFlux uses the new shared engine alone.
+
+### 13.7 Deferred to a later pass
+
+- **Per-step override commands** (§7): `DEFEAT` / `ABS_SET` / `REL_NUDGE` / `RESET` / `REVERSE` / `SET_LIM_HI` / `SET_LIM_LO` / `SET_INC`. UI cost is significant — no spare slots on the hero page.
+- **Order mode `Random`** — Metropolix drunken-walk algorithm. Specified here for precision when added; not implemented in v1.
+
+  ```
+  on trigger (Random order):
+      r = rand_uniform(0, 100)
+      if r < 50:           // 50% — move in step direction
+          distance = rand_int(1, |step|)
+          counter += distance × sign(step)
+      elif r < 80:         // 30% — move opposite direction
+          distance = rand_int(1, |step|)
+          counter -= distance × sign(step)
+      else:                // 20% — don't accumulate this trigger
+          (no change)
+      apply boundary using current polarity rules
+  ```
+
+  Bias toward step direction (50%) means the counter "generally trends" in the configured direction while still wandering. Counter constrained by `posLim` / `negLim` per polarity rules. The "drunken walk" character emerges from the weighted random choice + variable distance.
+
+- **Order mode `OneShot`** — fires once, then locks counter until external reset. Niche for a grid sequencer; defer.
+- **Cirklon `rvtz` / `rvbp` reverse-on-limit variants** distinct from Pendulum. Distinct only in post-flip target (zero vs opposite limit); already covered by `Pendulum × Uni` vs `Pendulum × Bi` in the table above — so likely no new Order value needed. Verify in audition.
+- **`accumulatorReset = External`** — Cirklon's `Aux/Mod`-only reset. Requires a new `Routing::Target::AccumReset` destination; defer until per-track routing surface lands.
+- **CTRL knob routing for accumulator config fields** — Metropolix exposes `Accum Mode`, `Accum Polar`, `Accum PosLim`, `Accum NegLim` as routable destinations. Reserve slots in `Routing::Target` planning; not implemented in v1.
+- **NoteTrack migration** to the shared `AccumulatorConfig` + `AccumulatorOps`. After PhaseFlux is verified.
+- **Per-step Abs vs Rel mode** (Cirklon's `offset note abs` / `offset note rel` events). Useful as branch points but adds 1 bit per cell and requires a UI surface decision. Defer.
+
+### 13.8 Locked rules — counter decoupled from output
+
+A single universal rule resolves the three earlier open questions:
+
+> **The counter is decoupled from output.** Counter ticks on its configured trigger event (Stage completion or Pulse fire) regardless of whether the downstream application produces audible output. Output saturation, clamping, or other post-counter handling does not feed back into counter state.
+
+Applied to the three questions:
+
+- **Reset on `pitchMode` switch** — counters **preserve**. The pitch curve source is orthogonal to the accumulator's drift state; flipping Cell ↔ Global does not reset counters.
+- **`Pulse` trigger with `skip = true`** — counter follows trigger events. Skip is implemented by removing the cell from the cumulative tick table → no Stage or Pulse trigger events fire for that cell → counter doesn't tick. The cell is *absent*, not *muted*. Same outcome as if it were never configured to drift.
+- **Pulse clamp at `pulseCount` boundaries (0 or 16)** — counter ticks. `clamp(stage.pulseCount + offset, 0, 16)` clips the *applied value*; the counter has already incremented by the trigger event and doesn't see whether the result was clipped. Symmetrically: Note accumulator's counter ticks even when the resulting degree saturates `scale.noteToVolts()`.
+
+The "decoupled" rule simplifies `AccumulatorOps`: the engine never has to look at downstream application outcomes to decide whether to advance. Counter advance is a pure function of (current counter, direction, config, trigger event).
+
+### 13.9 Boundary resolution — reuse the NoteTrack implementation
+
+The four Order resolutions (Wrap / Pendulum / Hold / Random) are **already implemented and shipping** in `src/apps/sequencer/model/Accumulator.cpp`. Extract these as free functions for `AccumulatorOps`; don't re-derive.
+
+| Order | Existing function | Lines | Notes |
+|---|---|---|---|
+| Wrap | `Accumulator::tickWithWrap()` | 58-70 | Direction-aware (Up/Down). Uses `_minValue` / `_maxValue` directly. PhaseFlux's `tickWrap` uses safe positive-remainder modulo (`((delta % range) + range) % range`) instead of single-subtract — step can exceed range (±15 note / ±7 pulse vs limit min 1), and single-subtract would leave the counter outside `[min, max]` on multi-range overshoot. |
+| Pendulum | `Accumulator::tickWithPendulum()` | 72-86 | Tracks `_pendulumDirection` (runtime ±1), reverses at min/max. Clamps to exactly min/max on hit. |
+| Hold | `Accumulator::tickWithHold()` | 104-118 | Direction-aware, clips at limit. |
+| Random | `Accumulator::tickWithRandom()` | 88-102 | Uniform random in `[min, max]`. NB: this is NOT Metropolix's weighted drunken walk (§13.7); if drunken walk is wanted, that's a separate decision. For v1, NoteTrack's uniform Random is the shipped algorithm — keep it consistent. |
+
+**Critical architecture detail:** the existing class operates on **absolute `_minValue` / `_maxValue`**, not polarity-derived bounds. `_polarity` is set at config time and used in `reset()` for the initial value — it never appears in the tick functions themselves. The polarity-vs-step-sign mapping happens at the **caller** (which sets min and max explicitly).
+
+This means `AccumulatorOps` should take explicit `min` and `max` as parameters:
+
+```cpp
+// Free functions in engine/AccumulatorOps.h, extracted from Accumulator.cpp.
+// Each takes the counter and runtime direction by reference, mutates in place.
+// `min` and `max` are absolute bounds — caller computes them per polarity.
+void tickWrap     (int& counter, int direction, int min, int max, int step);
+void tickPendulum (int& counter, int& pendulumDir, int min, int max, int step);
+void tickHold     (int& counter, int direction, int min, int max, int step);
+void tickRandom   (int& counter, int min, int max);  // direction ignored
+```
+
+Engine-side polarity-to-bounds mapping (called by `PhaseFluxTrackEngine` before each tick):
+
+```cpp
+int absMin, absMax;
+if (cfg.polarity == Uni) {
+    // One-sided: bounds depend on configured step sign.
+    if (stage.step > 0) { absMin = 0;           absMax = +cfg.posLim; }
+    else                { absMin = -cfg.negLim; absMax = 0;            }
+} else {
+    // Two-sided: bounds span both limits regardless of step sign.
+    absMin = -cfg.negLim;
+    absMax = +cfg.posLim;
+}
+// Then call the appropriate tick function.
+```
+
+This caller-side decomposition resolves the Pendulum+Uni zero-crossing concern automatically: when `step > 0` in Uni mode, `absMin = 0`, and the existing `tickWithPendulum` clamps to `_minValue` (= 0) on the downward bounce. Pendulum reflects at 0 going back up. No edge case to fix in the ops layer.
+
+**Direction state:** the existing class uses `_direction` (config: Up/Down/Freeze) and `_pendulumDirection` (runtime: ±1). For PhaseFlux, we don't need a separate Direction config — the sign of `stage.step` carries the direction. `Freeze` is implicit when `step == 0` (no advance happens). So the engine passes `direction = step > 0 ? +1 : -1` to the tick functions, and tracks `pendulumDir` per-counter as runtime state.
+
+**Pendulum signed-step semantics — divergence from NoteTrack:** PhaseFlux passes the *signed* `step` (not its magnitude) to `tickPendulum`, so `counter += step * pendulumDir` honors the cell's configured drift sign on the first move. NoteTrack uses unsigned step × a separate Direction enum; PhaseFlux folds the direction into the step sign. Without this, a Uni cell with negative step (bounds `[-negLim, 0]`, initial `pendulumDir = +1`) would advance up out of range on tick 1, clamp back to 0, then flip — producing a degenerate one-tick stall. A Bi cell with negative step would ascend first instead of descending. With signed step, both cases drift in the configured direction immediately.
+
+Boundary handling must FLIP `pendulumDir` (negate it) rather than force it to a hardcoded ±1 — NoteTrack's original hardcoded values (max → -1, min → +1) assume positive step, and fail with negative step (counter stays clamped at the boundary because `step * pendulumDir` keeps pushing past). Flipping is correct for both sign cases.
+
+**RTZ Order (the one NoteTrack doesn't have):** add a new free function:
+
+```cpp
+// On overflow at either bound, snap to zero. Direction unchanged.
+// Used only when counter is already out of range.
+void tickRTZ(int& counter, int min, int max) {
+    if (counter > max || counter < min) {
+        counter = 0;
+    }
+}
+```
+
+Engine integration: after advancing the counter by `step × direction`, the engine dispatches on `cfg.order` to call the right tick function (or for RTZ, the range check above).
+
+For implementer guidance: extract the four NoteTrack tick functions VERBATIM into `engine/AccumulatorOps.cpp`, parameterising on `min` / `max` / `step` / `direction` instead of class members. Same algorithm, same boundary math. Add `tickRTZ` as a new fifth function. Unit tests (§13.11) compare new free functions' outputs against equivalent direct-class outputs — a passing test means the extraction was faithful.
+
+### 13.10 Implementation tasks — for subagent-driven dispatch
+
+Each task is independently dispatchable. Order matters where dependencies are listed; otherwise tasks can fan out. Each task is sized so a single subagent can implement-and-test it in one pass.
+
+**Task 1: `AccumulatorConfig` struct + roundtrip test**
+- *Files*: new `src/apps/sequencer/model/AccumulatorConfig.h` + `.cpp`
+- *Deliverable*: struct with fields `scope` (1 bit), `order` (2 bits), `polarity` (1 bit), `reset` (4 bits), `posLim` (u8), `negLim` (u8). Enums: `Scope { Local, Track }`, `Order { Wrap, Pendulum, Hold, RTZ }`, `Polarity { Uni, Bi }`. Default ctor initializes to `Local` / `Wrap` / `Uni` / 0 / 7 / 7. Read/write serialization methods.
+- *Tests*: `TestAccumulatorConfig.cpp` — roundtrip of every field value, default-state roundtrip, edge values (max posLim, max reset, etc.).
+- *Depends on*: nothing.
+
+**Task 2: `AccumulatorOps` free functions extracted from NoteTrack + per-case unit tests**
+- *Files*: new `src/apps/sequencer/engine/AccumulatorOps.h` + `.cpp`
+- *Deliverable*: extract `tickWithWrap` / `tickWithPendulum` / `tickWithHold` / `tickWithRandom` (currently `Accumulator.cpp:58-118`) as free functions `tickWrap` / `tickPendulum` / `tickHold` / `tickRandom`, parameterised on `(counter&, direction, min, max, step)` instead of class members. Add new function `tickRTZ(counter&, min, max)` for the order absent from NoteTrack. Pure functions, no class state.
+- *Tests*: `TestAccumulatorOps.cpp` — at minimum one test per (Order × overflow-direction × polarity-bounds) combination per §13.4. Faithfulness tests: run each new free function and the equivalent NoteTrack class method on identical inputs and verify equal output.
+- *Depends on*: Task 1 (uses the enum types).
+
+**Task 3: `PhaseFluxSequence` per-sequence config fields**
+- *Files*: `src/apps/sequencer/model/PhaseFluxSequence.h/.cpp`
+- *Deliverable*: two `AccumulatorConfig` members on `PhaseFluxSequence`: `_noteAccumConfig` and `_pulseAccumConfig`. Accessors + serialization extension. `clear()` resets both to defaults.
+- *Tests*: extend `TestPhaseFluxSequenceSerialization.cpp` — non-default values for both configs survive write→read.
+- *Depends on*: Task 1.
+
+**Task 4: `PhaseFluxSequence::Stage` per-cell field changes (bit-pack rework)**
+- *Files*: `src/apps/sequencer/model/PhaseFluxSequence.h/.cpp`
+- *Deliverable*: Remove `accumulatorLength` field (reclaim `_data2[14..17]`). Add `pulseAccumStep` (4 bits signed, `_data2[14..17]`), `accumulatorTrigger` (1 bit, `_data2[29]`), `pulseAccumTrigger` (1 bit, `_data2[30]`). Update `Stage::clear()` defaults. Layout must match §13.3.
+- *Tests*: extend `TestPhaseFluxSequenceSerialization.cpp` — non-default values for new fields survive roundtrip. `TestPhaseFluxSize.cpp` confirms `Stage` is still 16 bytes. Bit-pack non-overlap test (each field reads back the value it was written, with no collision).
+- *Depends on*: nothing (parallel to Task 3).
+
+**Task 5: Engine state arrays + cycle counter**
+- *Files*: `src/apps/sequencer/engine/PhaseFluxTrackEngine.h/.cpp`
+- *Deliverable*: add `_noteAccumCounter[16]`, `_noteAccumDir[16]`, `_pulseAccumCounter[16]`, `_pulseAccumDir[16]`, `_cycleCount` (uint32_t — counts completed full sequence cycles since last reset). Initialise in `reset()`. Detect cycle wrap in `tick()` (when `relativeTick` wraps `_cycleTicks`). Update `changePattern()` and the resetMeasure block per §13.4 reset semantics. **No application yet** — counters just maintain state.
+- *Tests*: extend `TestPhaseFluxTrackEngine.cpp` — counter starts at 0, advances on cell-completion when `accumulatorTrigger = Stage` and step ≠ 0, respects Order (use `applyOrder`), respects per-sequence reset policy (`reset = 0` preserves across `resetMeasure`; `reset = N>0` clears every N cycles).
+- *Depends on*: Tasks 2, 3, 4.
+
+**Task 6: Wire Note accumulator into pitch pipeline**
+- *Files*: `src/apps/sequencer/engine/PhaseFluxTrackEngine.cpp`
+- *Deliverable*: In `rebuildSchedule()` and the Always-mode CV branch, compute `noteAccOffset = noteCounter` (Local scope) or `noteAccOffset = sharedCounter` (Track scope). The counter already stores accumulated scale degrees; no multiplication on application. Add to `baseDegree` before scale-quantization. Same code path for both Cell and Global pitchMode (per §13.8 decoupling).
+- *Tests*: extend `TestPhaseFluxTrackEngine.cpp` — set up a stage with `accumulatorStep = +1`, scope=Local, order=Wrap, posLim=7. Advance through several cycles. Verify produced CV reflects degree drift `0, +1, +2, ..., +7, 0, +1, ...`.
+- *Depends on*: Task 5.
+
+**Task 7: Wire Pulse accumulator into pulse-count pipeline**
+- *Files*: `src/apps/sequencer/engine/PhaseFluxTrackEngine.cpp`
+- *Deliverable*: In `rebuildSchedule()`, compute `effectivePulseCount = clamp(stage.pulseCount + pulseAccumOffset, 0, 16)`. Use `effectivePulseCount` in the per-pulse loop instead of `stage.pulseCount()`. Trigger advance per `pulseAccumTrigger`: at cell start (Stage) or per pulse fire (Pulse).
+- *Tests*: extend `TestPhaseFluxTrackEngine.cpp` — set up a stage with `pulseCount = 1`, `pulseAccumStep = +1`, `pulseAccumTrigger = Stage`. Across cycles, verify cell fires 1, 2, 3, ..., 8 pulses then wraps per Order setting.
+- *Depends on*: Task 5.
+
+**Task 8: ACCUM.N + ACCUM.P sets in `PhaseFluxEditPage`**
+- *Files*: `src/apps/sequencer/ui/pages/PhaseFluxEditPage.h/.cpp`
+- *Deliverable*: extend `_currentSet` carousel from 2 (TEMP / PTCH) to 4 (TEMP / PTCH / ACCUM.N / ACCUM.P). Header label switching (`ACCUM.N` / `ACCUM.NT` / `ACCUM.P` / `ACCUM.PT`). Footer labels per §13.5 slot map. F1-F5 plain + Shift+F1/F4/F5 actions wired per §13.5. Encoder edits selected slot's value.
+- *Tests*: none directly (UI). Manual verification via simulator.
+- *Depends on*: Tasks 3, 4.
+
+**Task 9: Dual-strip visualisation in middle pane**
+- *Files*: `src/apps/sequencer/ui/pages/PhaseFluxEditPage.cpp`
+- *Deliverable*: draw `drawAccumDualStrip()` matching `ui-preview/pages_phaseflux_hero_accum.py` — two stacked strips, grouped 4-4-4-4 layout (bar_w=3, gap_within=1, inter_group=5 with dotted line at center, Color.Low), no midlines, active layer bright / inactive dim, stage badge top-left (`5` or `T` for Track scope).
+- *Tests*: none directly (UI). Manual verification.
+- *Depends on*: Task 8.
+
+**Task 10: Default project demo + spec compliance audition**
+- *Files*: `src/apps/sequencer/model/Project.cpp`
+- *Deliverable*: track 8 PhaseFlux sequence gets non-zero `accumulatorStep` on a few stages (e.g., stage 0 = +2, stage 4 = -1) and demonstrative `pulseAccumStep` values. Order = Wrap, Polarity = Uni, posLim = 7, Reset = 4 (auto every 4 cycles). Audible drift verified by ear in simulator.
+- *Tests*: none — audition is the test.
+- *Depends on*: Tasks 6, 7, 8, 9.
+
+### 13.11 Test harness — concrete test names
+
+For each task, the unit tests to write before the implementation (TDD per CLAUDE.md). Names are deliberately verbose so failures are self-explanatory.
+
+**`TestAccumulatorConfig.cpp`** (Task 1):
+- `defaults_match_spec` — `Scope=Local, Order=Wrap, Polarity=Uni, reset=0, posLim=7, negLim=7`
+- `every_field_roundtrips` — set each field to a non-default value, write+read, verify
+- `reset_field_handles_max_15` — `reset=15` roundtrips
+- `pos_lim_handles_max_28` — note variant; same for pulse variant up to 8
+
+**`TestAccumulatorOps.cpp`** (Task 2):
+
+Per-function tests against bounds (caller-supplied `min` and `max`, matching how the engine drives the ops):
+
+- `tick_wrap_overflow_returns_to_min_when_direction_up`
+- `tick_wrap_underflow_returns_to_max_when_direction_down`
+- `tick_pendulum_overflow_reflects_at_max_and_flips_dir`
+- `tick_pendulum_underflow_reflects_at_min_and_flips_dir`
+- `tick_pendulum_at_zero_min_descends_then_reflects` — Pendulum+Uni positive-step case (caller sets `min=0`)
+- `tick_hold_overflow_pins_at_max`
+- `tick_hold_underflow_pins_at_min`
+- `tick_random_stays_in_range`
+- `tick_rtz_overflow_snaps_to_zero`
+- `tick_rtz_underflow_snaps_to_zero`
+
+Faithfulness tests — verify extracted free functions produce identical output to the existing NoteTrack `Accumulator` class methods on equivalent inputs:
+- `extracted_wrap_matches_notetrack_wrap`
+- `extracted_pendulum_matches_notetrack_pendulum`
+- `extracted_hold_matches_notetrack_hold`
+
+Edge cases:
+- `pendulum_after_flip_descends_correctly_until_next_limit`
+- `wrap_step_of_3_handles_overshoot_correctly`
+- `pendulum_clamp_to_exact_min_max_on_hit`  — existing `tickWithPendulum` clamps to exactly `_minValue`/`_maxValue`; verify the extracted version preserves this
+
+**`TestPhaseFluxSequenceSerialization.cpp`** (Tasks 3, 4 — extends existing file):
+- `note_accum_config_roundtrips_with_non_defaults`
+- `pulse_accum_config_roundtrips_with_non_defaults`
+- `pulse_accum_step_per_cell_roundtrips`
+- `accumulator_trigger_per_cell_roundtrips`
+- `pulse_accum_trigger_per_cell_roundtrips`
+- `bit_pack_no_collision` — write each per-cell field to a distinct value, read all back, none was corrupted by another
+
+**`TestPhaseFluxSize.cpp`** (Task 4 — extends existing file):
+- `stage_record_remains_16_bytes_after_accumulator_v2`
+
+**`TestPhaseFluxTrackEngine.cpp`** (Tasks 5, 6, 7 — extends existing file):
+- `note_counter_advances_on_cell_completion_when_step_nonzero`
+- `note_counter_holds_when_step_is_zero`
+- `note_counter_respects_wrap_uni_order`
+- `note_counter_respects_pendulum_bi_order`
+- `note_counter_resets_to_zero_when_reset_equals_1_per_cycle`
+- `note_counter_preserves_through_reset_measure_when_reset_equals_0`
+- `note_counter_clears_on_pattern_switch`
+- `note_counter_track_scope_shares_single_counter_across_cells`
+- `pulse_counter_clamps_to_1_at_lower_bound_but_counter_continues`
+- `pulse_counter_clamps_to_8_at_upper_bound_but_counter_continues`
+- `skip_cell_does_not_advance_counter_under_either_trigger`
+- `pitch_pipeline_adds_note_accumulator_offset_to_degree`
+- `pulse_pipeline_uses_effective_pulse_count_from_clamp`
+
+**Audible / UI verification (Tasks 8, 9, 10)**: no unit tests. Manual checklist:
+- ACCUM.N selected → F1 highlight, encoder edits selected stage's `accumulatorStep`
+- Shift+F4 toggles Order display through Wrap → Pend → Hold → RTZ
+- Shift+F5 toggles SCOPE (Local ↔ Track), header marker swaps `.N` → `.NT`
+- Strip shows 16 bars in 4-grouped layout, dotted lines at group seams, active layer bright
+- Project demo on track 8 produces audible degree drift over a few cycles
+- Setting Reset=4 in the demo: drift resets every 4 cycles, audibly verifiable

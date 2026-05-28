@@ -4,6 +4,7 @@ set(sources
     # asteroids
     asteroids/Asteroids.cpp
     # engine
+    engine/AccumulatorOps.cpp
     engine/ArpeggiatorEngine.cpp
     engine/Clock.cpp
     engine/CurveTrackEngine.cpp
@@ -22,6 +23,7 @@ set(sources
     engine/StochasticTrackEngine.cpp
     engine/StochasticGenerator.cpp
     engine/StochasticCache.cpp
+    engine/PhaseFluxTrackEngine.cpp
     engine/TuesdayTrackEngine.cpp
     engine/RoutingEngine.cpp
     engine/SequenceState.cpp
@@ -36,6 +38,7 @@ set(sources
     intro/Intro.cpp
     # model
     model/Accumulator.cpp
+    model/AccumulatorConfig.cpp
     model/Arpeggiator.cpp
     model/Calibration.cpp
     model/HarmonyEngine.cpp
@@ -53,6 +56,9 @@ set(sources
     model/NoteSequence.cpp
     model/NoteTrack.cpp
     model/StochasticTrack.cpp
+    model/PhaseFluxSequence.cpp
+    model/PhaseFluxTrack.cpp
+    model/PhaseFluxMath.cpp
     model/DiscreteMapSequence.cpp
     model/DiscreteMapTrack.cpp
     model/IndexedSequence.cpp
@@ -134,6 +140,8 @@ set(sources
     ui/pages/StochasticConfigPage.cpp
     ui/pages/StochasticPerformancePage.cpp
     ui/pages/StochasticSequenceEditPage.cpp
+    ui/pages/PhaseFluxEditPage.cpp
+    ui/pages/PhaseFluxSequencePage.cpp
     ui/pages/TempoPage.cpp
     ui/pages/TextInputPage.cpp
     ui/pages/TopPage.cpp

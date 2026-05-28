@@ -8,6 +8,7 @@
 #include "TuesdaySequence.h"
 #include "DiscreteMapSequence.h"
 #include "IndexedSequence.h"
+#include "PhaseFluxSequence.h"
 #include "Project.h"
 #include "UserScale.h"
 
@@ -33,6 +34,7 @@ public:
     void copyDiscreteMapSequence(const DiscreteMapSequence &sequence);
     void copyTuesdaySequence(const TuesdaySequence &sequence);
     void copyStochasticSequence(const StochasticSequence &sequence);
+    void copyPhaseFluxSequence(const PhaseFluxSequence &sequence);
     void copyPattern(int patternIndex);
     void copyUserScale(const UserScale &userScale);
 
@@ -46,6 +48,7 @@ public:
     void pasteDiscreteMapSequence(DiscreteMapSequence &sequence) const;
     void pasteTuesdaySequence(TuesdaySequence &sequence) const;
     void pasteStochasticSequence(StochasticSequence &sequence) const;
+    void pastePhaseFluxSequence(PhaseFluxSequence &sequence) const;
     void pastePattern(int patternIndex) const;
     void pasteUserScale(UserScale &userScale) const;
 
@@ -59,6 +62,7 @@ public:
     bool canPasteDiscreteMapSequence() const;
     bool canPasteTuesdaySequence() const;
     bool canPasteStochasticSequence() const;
+    bool canPastePhaseFluxSequence() const;
     bool canPastePattern() const;
     bool canPasteUserScale() const;
 
@@ -75,6 +79,7 @@ private:
         DiscreteMapSequence,
         TuesdaySequence,
         StochasticSequence,
+        PhaseFluxSequence,
         Pattern,
         UserScale,
     };
@@ -105,6 +110,7 @@ private:
                 IndexedSequence indexed;
                 TeletypeTrack::PatternSlot teletypeClip;
                 StochasticSequence stochastic;
+                PhaseFluxSequence phaseFlux;
             } data;
         } sequences[CONFIG_TRACK_COUNT];
     };

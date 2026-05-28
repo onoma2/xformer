@@ -1,6 +1,36 @@
 // Project version enum for serialization; guarded to avoid redefinition
 #pragma once
 
+// ============================================================================
+// VERSION POLICY — READ BEFORE TOUCHING ANYTHING IN THIS FILE
+// ============================================================================
+// The Version4..Version35 chain below was relevant ONLY up to Version35.
+// Each entry there represents a historical add-field-with-read-guard event
+// that mattered when projects were shared between shipped firmware and dev
+// builds.
+//
+// Current policy (post-Version35):
+//   - Dev branch stays at the existing `Latest` version. Do NOT add a new
+//     enum entry, do NOT add a `dataVersion() >= VersionN` guard, do NOT
+//     reserve a placeholder constant.
+//   - Add new fields to model structs by writing/reading them unconditionally.
+//     Dev project files on SD card are accepted to break across branches —
+//     that breakage is the trade we already chose.
+//   - The historical entries below are NOT a pattern to extend. Do not
+//     pattern-match from `NoteSequence.cpp` / `Project.cpp` read-guards;
+//     those are frozen legacy code paths.
+//
+// A new `VersionN` enum entry is added ONLY when the user explicitly says
+// so during release prep — never as a side effect of feature work, never
+// "before merge", never as a punch-list item, never because a spec template
+// or plan doc says it should be.
+//
+// If any spec, plan, or task wiki proposes a bump or a `Version_*_Pending`
+// placeholder, treat it as stale and flag it for removal.
+//
+// Project root pointers: PROJECT.md:385 (HARD RULE), AGENTS.md:102.
+// ============================================================================
+
 enum ProjectVersion {
     // added NoteTrack::cvUpdateMode
     Version4 = 4,

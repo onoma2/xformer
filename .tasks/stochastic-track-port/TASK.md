@@ -583,7 +583,7 @@ Phase 7b is a ground-up core rebuild inside the existing `TrackMode::Stochastic`
 **Serialization:**
 - Append new fields at the end of `StochasticTrack::write()` and `read()` in exactly the same order.
 - Add event/child arrays to `StochasticSequence::write()` and `read()` after existing old step data to avoid another `end_of_file` regression.
-- No version bump unless the user explicitly approves; dev projects may break, but read/write symmetry must be exact.
+- No version bump (dev policy — `ProjectVersion.h` header). Dev project files on this branch are accepted to break; no migration code, no roundtrip-with-old-version requirement. `write()` and `read()` only need to be symmetric with each other in current-branch code.
 - After read, clamp enum values with `ModelUtils::clampedEnum()` or explicit range checks.
 
 **Clipboard:**
