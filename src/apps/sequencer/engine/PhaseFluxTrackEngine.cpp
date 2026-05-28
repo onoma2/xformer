@@ -5,6 +5,7 @@
 
 #include "model/Curve.h"
 #include "model/Scale.h"
+#include "model/StochasticTypes.h"
 
 #include <algorithm>
 #include <cmath>
@@ -375,8 +376,6 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         float p_curved = Curve::eval(pitchCurveType, phi_input);
         float p_flipped = pFlipV ? (1.f - p_curved) : p_curved;
         float p_final = applyPowerBend(p_flipped, pitchRespKnob);
-        // §6.2.1 maskMelody/tiltMelody centrality filter deferred to Phase C.
-
         float offsetDegrees = 0.f;
         switch (stage.pitchDirection()) {
         case PhaseFluxSequence::PitchDirectionType::Up:
@@ -391,6 +390,24 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         }
 
         int degree = baseDegree + int(std::round(offsetDegrees));
+
+        // §6.2.1 MaskMelody + TiltMelody — pitch-centrality filter ported from
+        // StochasticTrackEngine (12-EDO tuned; see StochasticTypes.h).
+        if (stage.maskMelody() < 100) {
+            const int N = scale.notesPerOctave();
+            if (N > 0) {
+                int degInOct = ((degree % N) + N) % N;
+                const uint32_t centralityMilli = std::min<uint32_t>(1000,
+                    uint32_t(stochasticPitchCentrality(degInOct, N)) * 1000u /
+                    uint32_t(kStochasticPitchCentralityMax));
+                const uint32_t tiltMag = uint32_t(stage.tiltMelody());
+                const uint32_t effectiveMilli =
+                    ((100 - tiltMag) * centralityMilli + tiltMag * (1000 - centralityMilli)) / 100;
+                const uint32_t maskMilli = uint32_t(stage.maskMelody()) * 10;
+                if (effectiveMilli < (1000 - maskMilli)) continue;
+            }
+        }
+
         float cv = scale.noteToVolts(degree);
         if (scale.isChromatic()) cv += float(rootNote) * (1.f / 12.f);
 

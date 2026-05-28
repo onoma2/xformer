@@ -9,6 +9,7 @@
 #include "model/ModelUtils.h"
 #include "model/PhaseFluxMath.h"
 #include "model/Scale.h"
+#include "model/StochasticTypes.h"
 
 #include "core/math/Math.h"
 #include "core/utils/Random.h"
@@ -185,7 +186,7 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     static const char *kLabelsTempP2[5]  = { "Wind",  "Rep",   nullptr, nullptr, "Next" };
     static const char *kLabelsPtchP0[5]  = { "Curve", "Warp",  "Resp", "Note",  "Next" };
     static const char *kLabelsPtchP1[5]  = { "Span",  "Dir",   "FlipV", "FlipH", "Next" };
-    static const char *kLabelsPtchP2[5]  = { "Wind",  "Rep",   nullptr, nullptr, "Next" };
+    static const char *kLabelsPtchP2[5]  = { "Wind",  "Rep",   "Mask",  "Tilt",  "Next" };
     static const char *kLabelsPtchGlobalP0[5] = { "Curve", "Warp", "Resp", "Rate", "Next" };
     static const char *kLabelsPtchGlobalP1[5] = { "Note",  "Span", "FlipV","FlipH","Next" };
     static const char *kLabelsAccumP0[5] = { "Ac.St", nullptr, nullptr, "Order", "Next" };
@@ -467,11 +468,12 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             // slots 2, 3 are active stage's FlipV / FlipH toggles
             }
         } else {
-            // P2 — §14.2 Window + Repeat for pitch axis.
+            // P2 — §14.2 Window + Repeat + §6.2.1 MaskM/TiltM for pitch axis.
             switch (slot) {
             case 0: activeStage.setPitchWindow(PhaseFluxSequence::WindowType(cycle(int(activeStage.pitchWindow()) + value, 0, 4))); break;
             case 1: activeStage.setPitchRepeat(PhaseFluxSequence::RepeatType(cycle(int(activeStage.pitchRepeat()) + value, 0, 3))); break;
-            // slots 2, 3 reserved
+            case 2: activeStage.setMaskMelody(activeStage.maskMelody() + value); break;
+            case 3: activeStage.setTiltMelody(activeStage.tiltMelody() + value); break;
             }
         }
     }
@@ -801,6 +803,24 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     const int rangeDegrees = std::max(1, int(std::round(rangeOctaves * scale.notesPerOctave())));
     const int baseDegree = stage.basePitch() + octave * scale.notesPerOctave() + transpose;
 
+    // §6.2.1 MaskM/TiltM filter — mirrors PhaseFluxTrackEngine.cpp. Returns
+    // true if the absolute degree survives the centrality threshold.
+    const int N = scale.notesPerOctave();
+    const int maskMel = stage.maskMelody();
+    const int tiltMel = stage.tiltMelody();
+    auto passesMelodyMask = [&](int absDeg) -> bool {
+        if (maskMel >= 100 || N <= 0) return true;
+        int degInOct = ((absDeg % N) + N) % N;
+        const uint32_t centralityMilli = std::min<uint32_t>(1000,
+            uint32_t(stochasticPitchCentrality(degInOct, N)) * 1000u /
+            uint32_t(kStochasticPitchCentralityMax));
+        const uint32_t tiltMag = uint32_t(tiltMel);
+        const uint32_t effectiveMilli =
+            ((100 - tiltMag) * centralityMilli + tiltMag * (1000 - centralityMilli)) / 100;
+        const uint32_t maskMilli = uint32_t(maskMel) * 10;
+        return effectiveMilli >= (1000 - maskMilli);
+    };
+
     // Histogram bucketed by signed offset (kept small for stack use).
     constexpr int kHistBias = 64;
     constexpr int kHistSize = 128;
@@ -811,17 +831,19 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
         float p_final = evalPitch(stage, phi);
         float off = directionOffset(stage.pitchDirection(), p_final, rangeDegrees);
         int deg = int(std::round(off));
+        if (!passesMelodyMask(baseDegree + deg)) continue;
         int bin = deg + kHistBias;
         if (bin >= 0 && bin < kHistSize) counts[bin]++;
     }
 
-    // Currently-playing offset (sentinel = INT_MIN-ish).
+    // Currently-playing offset (sentinel = INT_MIN-ish). Hidden if filter rejects.
     constexpr int kNoCurrent = -10000;
     int currentOff = kNoCurrent;
     if (isActiveCell && stagePhase >= 0.f) {
         float p_final = evalPitch(stage, stagePhase);
-        currentOff = int(std::round(
+        int candidate = int(std::round(
             directionOffset(stage.pitchDirection(), p_final, rangeDegrees)));
+        if (passesMelodyMask(baseDegree + candidate)) currentOff = candidate;
     }
 
     // Find top 4 by count (linear repeated max — N=4, fine for small N).
@@ -1187,6 +1209,8 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
         } else {
             labels[0] = "Wind";  values[0]("%s", kWindow[clamp(int(activeStage.pitchWindow()), 0, 4)]);
             labels[1] = "Rep";   values[1]("%s", kRepeat[clamp(int(activeStage.pitchRepeat()), 0, 3)]);
+            labels[2] = "Mask";  values[2]("%d", activeStage.maskMelody());
+            labels[3] = "Tilt";  values[3]("%d", activeStage.tiltMelody());
         }
     }
 
