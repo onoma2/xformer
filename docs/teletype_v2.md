@@ -26,6 +26,46 @@ The goal is a native Performer scripting language derived from Teletype:
 - No heap-backed script strings.
 - No project version ceremony during dev-stage work unless release prep starts.
 
+## Project End State
+
+The final project state has one active Performer Teletype implementation: Teletype++.
+
+Old Teletype remains useful only as source material for token spelling, parser compatibility, and semantic reference tests. It is not the runtime architecture.
+
+Target ownership:
+
+```text
+Performer Teletype++ track
+  model:  TeletypeProgram + TT2Runtime
+  engine: TT2OutputState + scheduling/output plumbing
+  parser: existing Ragel frontend -> native lowering
+```
+
+Replacement boundary:
+
+- replace active Performer execution paths based on `scene_state_t`, `TeletypeBridge`, `tele_*` output callbacks, `g_activeEngine`, and old `TeletypeTrackEngine` bridge execution;
+- keep Ragel tokenization/parsing as the source-compatibility frontend unless it becomes a proven blocker;
+- keep token/op spelling tables only as compatibility input, not as a reason to preserve old runtime shape;
+- keep hardware-independent pasted-script compatibility as the user-facing rule;
+- do not preserve Monome hardware-only behavior or old Performer project files during dev-stage work.
+
+Deletion is allowed only after the native path covers the kept language slice, has scheduler coverage for init/metro/trigger/delay, and passes a bounded golden-script smoke set. Deletion is not a license to add new dialect surface.
+
+## Scope Guard
+
+Do not expand this work into a second Teletype product, a full upstream emulator, or an old-project migration layer.
+
+The path is:
+
+```text
+native TT2 covers kept language
+  -> wire TT2 as the Performer Teletype track
+  -> run golden pasted-script smoke set
+  -> remove old bridge/runtime from active track path
+```
+
+Anything outside that path needs a separate task.
+
 ## Hard Compatibility Rule
 
 Scripts pasted from elsewhere should run as Teletype++ when they do not require Monome Teletype hardware.

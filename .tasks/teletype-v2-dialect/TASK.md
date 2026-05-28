@@ -40,6 +40,31 @@ Define Teletype v2 as a Performer-native Teletype++ dialect: preserve hardware-i
 - [ ] Exact pattern storage shape — resolved: 4×64, same as current.
 - [ ] Whether `P.CYC` / `PN.CYC` dead implementations should be deleted — resolved: delete.
 
+## Project end state / scope guard
+
+Final state:
+
+- One active Performer Teletype implementation: Teletype++.
+- TT2 model owns `TeletypeProgram` + `TT2Runtime`.
+- TT2 engine owns `TT2OutputState` + scheduling/output plumbing.
+- Existing Ragel parser remains the source-compatibility frontend unless proven blocking.
+- Hardware-independent pasted Teletype scripts run through native TT2.
+- Performer-added ops and 8-output CV/TR semantics stay.
+
+Replacement boundary:
+
+- Remove active Performer dependence on `scene_state_t`, `TeletypeBridge`, `tele_*` output callbacks, `g_activeEngine`, and old bridge-style `TeletypeTrackEngine` execution after native coverage is sufficient.
+- Keep old Teletype source only as parser/input reference and semantic comparison material.
+- Do not patch `teletype/src` to make TT2 work unless explicitly doing a separate old-runtime fix.
+
+Scope guard:
+
+- No full upstream Teletype emulator.
+- No old project migration layer during dev-stage work.
+- No Monome hardware-only compatibility target.
+- No new dialect surface just because old Teletype is being deleted.
+- Deletion happens only after native TT2 covers the kept language slice, init/metro/trigger/delay scheduling, and a bounded golden-script smoke set.
+
 ## Completed steps
 
 - [x] Reframed v2 as a breaking Performer-native dialect, not a compatibility wrapper.
