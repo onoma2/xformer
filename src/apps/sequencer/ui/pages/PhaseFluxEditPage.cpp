@@ -469,7 +469,7 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             // slots 2, 3 are master stage's FlipV / FlipH toggles
             }
         }
-    } else {
+    } else if (_currentSet == 1) {
         // PTCH Cell — P0: Curve/Warp/Resp/Note; P1: Span/Dir/[FlipV*]/[FlipH*];
         // P2: Window/Repeat/—/—
         if (_topicPage == 0) {
