@@ -302,8 +302,8 @@ NoteTrack's existing `model/Accumulator.h` class remains untouched in v1. Migrat
 | `pulseAccumOrder` | 2 bits | (same set as note) | `Wrap` |
 | `pulseAccumPolarity` | 1 bit | `Uni` / `Bi` | `Uni` |
 | `pulseAccumReset` | 4 bits | integer 0..15; `0` = manual, `N>0` = auto every N cycles | `0` (manual) |
-| `pulseAccumPosLim` | 4 bits | 1..8 pulses | 8 |
-| `pulseAccumNegLim` | 4 bits | 1..8 pulses | 8 |
+| `pulseAccumPosLim` | 5 bits | 1..16 pulses | **16** (matches new pulseCount ceiling) |
+| `pulseAccumNegLim` | 5 bits | 1..16 pulses | **16** (matches new pulseCount ceiling) |
 
 Total: ~34 bits ≈ 5 bytes for both `AccumulatorConfig`s. Sequence has ~5 KB headroom; trivial.
 
@@ -370,9 +370,9 @@ Cleared on pattern switch (`changePattern()`); preserved across measure reset.
 **Application:**
 
 - Note accumulator: `noteAccOffset = noteCounter`, added into the degree before `Scale::noteToVolts`. The counter already stores the ACCUMULATED scale degrees (each trigger adds `step` to the counter inside `AccumulatorOps`), so no multiplication on application — would double-apply the step.
-- Pulse accumulator: `effectivePulseCount = clamp(stage.pulseCount + pulseCounter, 1, 8)`. Counter directly accumulates pulse delta; applied at `rebuildSchedule`'s pulse-loop start; clamping is hard (no overflow into next cell).
+- Pulse accumulator: `effectivePulseCount = clamp(stage.pulseCount + pulseCounter, 0, 16)`. Counter directly accumulates pulse delta; applied at `rebuildSchedule`'s pulse-loop start; clamping is hard (no overflow into next cell). `pulseCount = 0` produces a silent stage (duration consumed, no events fired).
 
-**Limits** (set per-sequence): `posLim` and `negLim`, each 1..28 scale degrees (note accumulator) or 1..8 pulses (pulse accumulator). Effective counter range depends on Polarity (below).
+**Limits** (set per-sequence): `posLim` and `negLim`, each 1..28 scale degrees (note accumulator) or 1..16 pulses (pulse accumulator). Effective counter range depends on Polarity (below).
 
 **Order resolution** (one `AccumulatorOps::applyOrder(counter, dir, polarity, posLim, negLim, order)` call per advance) — behavior depends on **Order × Polarity** (Metropolix LIM screen pattern):
 
@@ -482,7 +482,7 @@ Applied to the three questions:
 
 - **Reset on `pitchMode` switch** — counters **preserve**. The pitch curve source is orthogonal to the accumulator's drift state; flipping Cell ↔ Global does not reset counters.
 - **`Pulse` trigger with `skip = true`** — counter follows trigger events. Skip is implemented by removing the cell from the cumulative tick table → no Stage or Pulse trigger events fire for that cell → counter doesn't tick. The cell is *absent*, not *muted*. Same outcome as if it were never configured to drift.
-- **Pulse clamp at `pulseCount` boundaries (1 or 8)** — counter ticks. `clamp(stage.pulseCount + offset, 1, 8)` clips the *applied value*; the counter has already incremented by the trigger event and doesn't see whether the result was clipped. Symmetrically: Note accumulator's counter ticks even when the resulting degree saturates `scale.noteToVolts()`.
+- **Pulse clamp at `pulseCount` boundaries (0 or 16)** — counter ticks. `clamp(stage.pulseCount + offset, 0, 16)` clips the *applied value*; the counter has already incremented by the trigger event and doesn't see whether the result was clipped. Symmetrically: Note accumulator's counter ticks even when the resulting degree saturates `scale.noteToVolts()`.
 
 The "decoupled" rule simplifies `AccumulatorOps`: the engine never has to look at downstream application outcomes to decide whether to advance. Counter advance is a pure function of (current counter, direction, config, trigger event).
 
@@ -593,7 +593,7 @@ Each task is independently dispatchable. Order matters where dependencies are li
 
 **Task 7: Wire Pulse accumulator into pulse-count pipeline**
 - *Files*: `src/apps/sequencer/engine/PhaseFluxTrackEngine.cpp`
-- *Deliverable*: In `rebuildSchedule()`, compute `effectivePulseCount = clamp(stage.pulseCount + pulseAccumOffset, 1, 8)`. Use `effectivePulseCount` in the per-pulse loop instead of `stage.pulseCount()`. Trigger advance per `pulseAccumTrigger`: at cell start (Stage) or per pulse fire (Pulse).
+- *Deliverable*: In `rebuildSchedule()`, compute `effectivePulseCount = clamp(stage.pulseCount + pulseAccumOffset, 0, 16)`. Use `effectivePulseCount` in the per-pulse loop instead of `stage.pulseCount()`. Trigger advance per `pulseAccumTrigger`: at cell start (Stage) or per pulse fire (Pulse).
 - *Tests*: extend `TestPhaseFluxTrackEngine.cpp` — set up a stage with `pulseCount = 1`, `pulseAccumStep = +1`, `pulseAccumTrigger = Stage`. Across cycles, verify cell fires 1, 2, 3, ..., 8 pulses then wraps per Order setting.
 - *Depends on*: Task 5.
 

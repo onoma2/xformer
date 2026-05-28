@@ -418,7 +418,7 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             case 0: activeStage.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(cycle(int(activeStage.temporalCurve()) + value, 0, 2))); break;
             case 1: activeStage.setTemporalWarp(ModelUtils::adjusted(activeStage.temporalWarp(), value, -64, 64)); break;
             case 2: activeStage.setTemporalResponse(ModelUtils::adjusted(activeStage.temporalResponse(), value, -64, 64)); break;
-            case 3: activeStage.setPulseCount(ModelUtils::adjusted(activeStage.pulseCount(), value, 1, 8)); break;
+            case 3: activeStage.setPulseCount(ModelUtils::adjusted(activeStage.pulseCount(), value, 0, 16)); break;
             }
         } else if (_topicPage == 1) {
             switch (slot) {
@@ -491,7 +491,7 @@ void PhaseFluxEditPage::randomizeCurrentSet() {
             s.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(rng.nextRange(3)));
             s.setTemporalWarp(int(rng.nextRange(128)) - 64);
             s.setTemporalResponse(int(rng.nextRange(128)) - 64);
-            s.setPulseCount(1 + rng.nextRange(8));
+            s.setPulseCount(1 + rng.nextRange(16));
         } else {
             s.setPitchCurve(PhaseFluxSequence::PitchCurveType(rng.nextRange(4)));
             s.setPitchWarp(int(rng.nextRange(128)) - 64);
@@ -555,7 +555,7 @@ void PhaseFluxEditPage::drawGrid(Canvas &canvas) {
         int x = GridX + col * (CellW + CellGap);
         int y = GridY + row * (CellH + CellGap);
 
-        int pulses = std::max(1, std::min(8, stage.pulseCount()));
+        int pulses = std::max(0, std::min(16, stage.pulseCount()));
         Color barColor = isActive ? Color::None : (isSelected ? Color::Bright : Color::MediumBright);
         canvas.setColor(barColor);
         canvas.hline(x + 1, y + CellH - 2, std::min(CellW - 2, pulses));
@@ -643,13 +643,13 @@ void PhaseFluxEditPage::drawTemporalScope(Canvas &canvas, int stageIdx, int scop
     const bool isActiveCell = te && (te->activeCell() == stageIdx);
     const float stagePhase  = isActiveCell ? te->sequenceProgress() : -1.f;
 
-    // Match engine effective pulse count: base + pulse-accum counter, clamped 1..8.
+    // Match engine effective pulse count: base + pulse-accum counter, clamped 0..16.
     const auto &pulseCfg = seq.pulseAccumConfig();
     const int pulseCounterIdx = (pulseCfg.scope() == AccumulatorConfig::Scope::Local)
         ? stageIdx : 0;
     const int pulseAccOffset = te ? te->pulseAccumCounter(pulseCounterIdx) : 0;
-    const int basePulses = std::max(1, std::min(8, stage.pulseCount()));
-    const int effective  = std::max(1, std::min(8, stage.pulseCount() + pulseAccOffset));
+    const int basePulses = std::max(0, std::min(16, stage.pulseCount()));
+    const int effective  = std::max(0, std::min(16, stage.pulseCount() + pulseAccOffset));
     const int basesDrawn = std::min(basePulses, effective);
 
     // §14.2 sub-section + Window math (mirrors engine in PhaseFluxTrackEngine.cpp).
@@ -749,7 +749,7 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     // Pulse-fire dots — 2x2 on the curve at each unmuted pulse's (t, pitch).
     // Honors temporal Window (drops pulses outside band) and pitch Window
     // (drops dot when curve sample is in hidden band).
-    int pulses = std::max(1, std::min(8, stage.pulseCount()));
+    int pulses = std::max(0, std::min(16, stage.pulseCount()));
     int maskByte = kMaskTable[int(stage.mask())];
     int maskShift = stage.maskShift();
     const int tempRep = repeatMultiplier(stage.temporalRepeat());
@@ -994,7 +994,7 @@ void PhaseFluxEditPage::drawAccumPage(Canvas &canvas) {
 
         if (stage.skip()) continue;
 
-        const int pulses = std::max(1, std::min(8, stage.pulseCount()));
+        const int pulses = std::max(0, std::min(16, stage.pulseCount()));
         const Color barColor = isActive
             ? Color::None
             : (isSelected ? Color::Bright : Color::MediumBright);

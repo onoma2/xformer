@@ -13,7 +13,7 @@
 class PhaseFluxTrackEngine : public TrackEngine {
 public:
     static constexpr int kStageCount = PhaseFluxMath::kStageCount;
-    static constexpr int kMaxPulses = 8;
+    static constexpr int kMaxPulses = 16;
 
     PhaseFluxTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
         TrackEngine(engine, model, track, linkedTrackEngine),

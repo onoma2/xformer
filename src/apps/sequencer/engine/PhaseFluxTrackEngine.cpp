@@ -244,7 +244,7 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
 
     const auto &stage = _sequence->stage(_activeCell);
 
-    // §13.8 — clamp on the OUTPUT, not the counter: counter walks past 1..8
+    // §13.8 — clamp on the OUTPUT, not the counter: counter walks past 0..16
     // so wrap/pendulum bounds stay independent of pulse-count clipping.
     const auto &pulseCfg = _sequence->pulseAccumConfig();
     const int pulseCounterIdx = (pulseCfg.scope() == AccumulatorConfig::Scope::Local)
@@ -253,8 +253,8 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     // directly — multiplying by step here would be quadratic growth.
     const int pulseAccOffset = _pulseAccumCounter[pulseCounterIdx];
     int pulseCount = stage.pulseCount() + pulseAccOffset;
-    if (pulseCount < 1) pulseCount = 1;
-    if (pulseCount > 8) pulseCount = 8;
+    if (pulseCount < 0) pulseCount = 0;
+    if (pulseCount > kMaxPulses) pulseCount = kMaxPulses;
 
     const Scale &scale = _sequence->selectedScale(_model.project().scale());
     const int rootNote = _sequence->selectedRootNote(_model.project().rootNote());

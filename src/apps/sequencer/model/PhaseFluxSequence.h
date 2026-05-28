@@ -134,9 +134,25 @@ public:
         // Properties
         //----------------------------------------
 
-        // pulseCount — stored 0..7, exposed as 1..8
-        int pulseCount() const { return int(_data0.pulseCount) + 1; }
-        void setPulseCount(int v) { _data0.pulseCount = PulseCount::clamp(v - 1); }
+        // pulseCount — exposed range 0..16. Encoding (no version bump):
+        //   pulseMute=1     → 0 (silent stage, duration consumed, no events)
+        //   pulseMute=0     → (low+1) + (high<<3), low ∈ _data0 (3 bits), high ∈ _data3 (1 bit)
+        // Legacy files: both new bits default to 0 → reads back as 1..8 unchanged.
+        int pulseCount() const {
+            if (_data3.pulseMute) return 0;
+            return int(_data0.pulseCount) + 1 + (int(_data3.pulseCountHigh) << 3);
+        }
+        void setPulseCount(int v) {
+            v = clamp(v, 0, 16);
+            if (v == 0) {
+                _data3.pulseMute = 1;
+            } else {
+                _data3.pulseMute = 0;
+                int stored = v - 1;
+                _data0.pulseCount = PulseCount::clamp(stored & 0x7);
+                _data3.pulseCountHigh = (stored >> 3) & 0x1;
+            }
+        }
 
         // basePitch — ±63 scale degrees
         int basePitch() const { return BasePitch::Min + int(_data0.basePitch); }
@@ -314,7 +330,7 @@ public:
             // bit 31 spare
         } _data2;
 
-        // word 3 — stageLen + Repeat × 2 + Window × 2 + 15 spare bits
+        // word 3 — stageLen + Repeat × 2 + Window × 2 + pulseCount extension + 13 spare
         union {
             uint32_t raw;
             BitField<uint32_t,  0, StageLen::Bits> stageLen;          //  0..6
@@ -322,7 +338,9 @@ public:
             BitField<uint32_t,  9, Repeat::Bits>   temporalRepeat;    //  9..10
             BitField<uint32_t, 11, Window::Bits>   pitchWindow;       // 11..13
             BitField<uint32_t, 14, Window::Bits>   temporalWindow;    // 14..16
-            // bits 17..31 spare (15)
+            BitField<uint32_t, 17, 1>              pulseCountHigh;    // 17 — pulseCount extension bit
+            BitField<uint32_t, 18, 1>              pulseMute;         // 18 — sentinel for pulseCount==0
+            // bits 19..31 spare (13)
         } _data3;
     };
 
