@@ -284,13 +284,20 @@ void PhaseFluxEditPage::keyUp(KeyEvent &event) {
 void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
+    // Context menu — PAGE+Shift opens INIT/COPY/PASTE.
+    if (key.isContextMenu()) {
+        contextShow();
+        event.consume();
+        return;
+    }
+
     // Quick-edit overlay (Page + bottom-row step S8..S15). Set-aware actions.
     if (key.isQuickEdit() && !key.shiftModifier()) {
         switch (key.quickEdit()) {
-        case 6: randomizeCurrentSet(); break;   // Page+S15 — randomize current set
+        case 6: shake(true);  break;   // Page+S15 — shake whole topic
+        case 7: shake(false); break;   // Page+S16 — shake current page only
         // case 4: Init (later)
         // case 5: Even (later)
-        // case 7: spare
         }
         event.consume();
         return;
@@ -514,27 +521,272 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
     (void)shift;
 }
 
-void PhaseFluxEditPage::randomizeCurrentSet() {
-    // Set-aware: TEMP randomizes temporal shape params, PTCH randomizes pitch
-    // shape params. stageLen and basePitch deliberately excluded — they're
-    // chassis-feel knobs the user wants stable across "shake" gestures.
+// Shake — randomize current topic params. wholeTopic=true iterates all pages
+// of the topic; false touches only the current page (= what's "guarded by
+// Next" in the footer). TEMP and PTCH scope to the selected cell only;
+// ACCUM scopes to non-skipped cells; MACRO is sequence-level.
+//
+// Always excluded ("chassis-feel" — stable across shakes): stageLen,
+// basePitch, skip flag. MACRO P1 Snap/Zero slots are press-only, skipped.
+// Randomized pulseCount never goes to 0 (silence stays intentional).
+void PhaseFluxEditPage::shake(bool wholeTopic) {
     static Random rng;
     auto &seq = _project.selectedPhaseFluxSequence();
-    if (_currentSet != 0 && _currentSet != 1) return;
-    for (int i = 0; i < 16; ++i) {
-        auto &s = seq.stage(i);
-        if (_currentSet == 0) {
-            s.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(rng.nextRange(3)));
-            s.setTemporalWarp(int(rng.nextRange(128)) - 64);
-            s.setTemporalResponse(int(rng.nextRange(128)) - 64);
-            s.setPulseCount(1 + rng.nextRange(16));
-        } else {
-            s.setPitchCurve(PhaseFluxSequence::PitchCurveType(rng.nextRange(4)));
-            s.setPitchWarp(int(rng.nextRange(128)) - 64);
-            s.setPitchResponse(int(rng.nextRange(128)) - 64);
-            s.setPitchRange(PhaseFluxSequence::PitchRangeType(rng.nextRange(4)));
+
+    auto pageRange = [&](int maxPage) {
+        int first = wholeTopic ? 0 : _topicPage;
+        int last  = wholeTopic ? maxPage : _topicPage;
+        if (last > maxPage) last = maxPage;
+        return std::pair<int, int>{first, last};
+    };
+
+    if (_currentSet == 0) {
+        // TEMP — selected cell only, 3 pages.
+        auto &s = seq.stage(_selectedCell);
+        auto [first, last] = pageRange(2);
+        for (int page = first; page <= last; ++page) {
+            if (page == 0) {
+                s.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(rng.nextRange(3)));
+                s.setTemporalWarp(int(rng.nextRange(129)) - 64);
+                s.setTemporalResponse(int(rng.nextRange(129)) - 64);
+                s.setPulseCount(1 + rng.nextRange(16));
+            } else if (page == 1) {
+                // Len slot skipped (chassis-feel).
+                s.setTemporalFlipV(bool(rng.nextRange(2)));
+                s.setTemporalFlipH(bool(rng.nextRange(2)));
+                s.setMask(PhaseFluxSequence::MaskType(rng.nextRange(8)));
+            } else {
+                s.setTemporalWindow(PhaseFluxSequence::WindowType(rng.nextRange(5)));
+                s.setTemporalRepeat(PhaseFluxSequence::RepeatType(rng.nextRange(4)));
+            }
+        }
+    } else if (_currentSet == 1) {
+        // PTCH — selected cell only; pages differ in Global vs Cell mode.
+        const bool isGlobalPitch =
+            seq.pitchMode() == PhaseFluxSequence::PitchMode::Global;
+        auto &active = seq.stage(_selectedCell);
+        auto &master = seq.stage(0);
+        const int maxPage = isGlobalPitch ? 1 : 2;
+        auto [first, last] = pageRange(maxPage);
+        for (int page = first; page <= last; ++page) {
+            if (isGlobalPitch) {
+                if (page == 0) {
+                    master.setPitchCurve(PhaseFluxSequence::PitchCurveType(rng.nextRange(4)));
+                    master.setPitchWarp(int(rng.nextRange(129)) - 64);
+                    master.setPitchResponse(int(rng.nextRange(129)) - 64);
+                    seq.setPitchRate(rng.nextRange(PhaseFluxSequence::kPitchRateCount));
+                } else {
+                    // Note slot (basePitch) skipped (chassis-feel).
+                    active.setPitchRange(PhaseFluxSequence::PitchRangeType(rng.nextRange(4)));
+                    master.setPitchFlipV(bool(rng.nextRange(2)));
+                    master.setPitchFlipH(bool(rng.nextRange(2)));
+                }
+            } else {
+                if (page == 0) {
+                    active.setPitchCurve(PhaseFluxSequence::PitchCurveType(rng.nextRange(4)));
+                    active.setPitchWarp(int(rng.nextRange(129)) - 64);
+                    active.setPitchResponse(int(rng.nextRange(129)) - 64);
+                    // Note slot (basePitch) skipped.
+                } else if (page == 1) {
+                    active.setPitchRange(PhaseFluxSequence::PitchRangeType(rng.nextRange(4)));
+                    active.setPitchDirection(PhaseFluxSequence::PitchDirectionType(rng.nextRange(3)));
+                    active.setPitchFlipV(bool(rng.nextRange(2)));
+                    active.setPitchFlipH(bool(rng.nextRange(2)));
+                } else {
+                    active.setPitchWindow(PhaseFluxSequence::WindowType(rng.nextRange(5)));
+                    active.setPitchRepeat(PhaseFluxSequence::RepeatType(rng.nextRange(4)));
+                    active.setMaskMelody(rng.nextRange(101));
+                    active.setTiltMelody(rng.nextRange(101));
+                }
+            }
+        }
+    } else if (_currentSet == 2 || _currentSet == 3) {
+        // ACCUM — non-skipped cells (per-stage step + trigger) + sequence config.
+        const bool isN = (_currentSet == 2);
+        auto &cfg = isN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
+        auto [first, last] = pageRange(1);
+        for (int page = first; page <= last; ++page) {
+            if (page == 0) {
+                // Ac.St (per-cell step) + Order (per-sequence).
+                for (auto &s : seq.stages()) {
+                    if (s.skip()) continue;
+                    if (isN) s.setAccumulatorStep(int(rng.nextRange(31)) - 15);
+                    else     s.setPulseAccumStep(int(rng.nextRange(15)) - 7);
+                }
+                cfg.setOrder(AccumulatorConfig::Order(rng.nextRange(4)));
+            } else {
+                // Reset + Polar (per-sequence) + Trig (per-cell).
+                cfg.setReset(uint8_t(rng.nextRange(16)));
+                cfg.setPolarity(AccumulatorConfig::Polarity(rng.nextRange(2)));
+                for (auto &s : seq.stages()) {
+                    if (s.skip()) continue;
+                    auto trig = PhaseFluxSequence::AccumulatorTriggerType(rng.nextRange(2));
+                    if (isN) s.setAccumulatorTrigger(trig);
+                    else     s.setPulseAccumTrigger(trig);
+                }
+            }
+        }
+    } else if (_currentSet == 4) {
+        // MACRO — sequence-level. Snap/Zero on P1 are press-only, skipped.
+        auto [first, last] = pageRange(1);
+        for (int page = first; page <= last; ++page) {
+            if (page == 0) {
+                seq.setWarpNudge(int(rng.nextRange(129)) - 64);
+                seq.setResponseNudge(int(rng.nextRange(129)) - 64);
+                seq.setPulseNudge(int(rng.nextRange(31)) - 15);
+                seq.setLenNudge(int(rng.nextRange(129)) - 64);
+            } else {
+                seq.setGlobalPhase(float(rng.nextRange(100)) / 100.f);
+                seq.setCyclePhaseWarp(int(rng.nextRange(129)) - 64);
+                // Snap (slot 2) + Zero (slot 3) press-only — skipped.
+            }
         }
     }
+}
+
+// Context menu — top level: INIT (sub) / COPY / PASTE. INIT sub-menu opens
+// when INIT is picked.
+enum class PhaseFluxContextAction { Init, Copy, Paste, Last };
+
+static const ContextMenuModel::Item kPhaseFluxTopMenu[] = {
+    { "INIT" }, { "COPY" }, { "PASTE" },
+};
+
+enum class PhaseFluxInitTarget { Stage, Topic, Sequence, Track, Last };
+
+static const ContextMenuModel::Item kPhaseFluxInitMenu[] = {
+    { "STAGE" }, { "TOPIC" }, { "SEQUENCE" }, { "TRACK" },
+};
+
+void PhaseFluxEditPage::contextShow(bool doubleClick) {
+    showContextMenu(ContextMenu(
+        kPhaseFluxTopMenu,
+        int(PhaseFluxContextAction::Last),
+        [&] (int index) { contextAction(index); },
+        [&] (int index) { return contextActionEnabled(index); },
+        doubleClick
+    ));
+}
+
+void PhaseFluxEditPage::contextAction(int index) {
+    switch (PhaseFluxContextAction(index)) {
+    case PhaseFluxContextAction::Init:
+        // Open INIT sub-menu — Stage / Topic / Sequence / Track.
+        showContextMenu(ContextMenu(
+            kPhaseFluxInitMenu,
+            int(PhaseFluxInitTarget::Last),
+            [&] (int sub) {
+                switch (PhaseFluxInitTarget(sub)) {
+                case PhaseFluxInitTarget::Stage:    initStage(); break;
+                case PhaseFluxInitTarget::Topic:    initTopic(); break;
+                case PhaseFluxInitTarget::Sequence: initSequence(); break;
+                case PhaseFluxInitTarget::Track:    initTrack(); break;
+                case PhaseFluxInitTarget::Last:     break;
+                }
+            },
+            [&] (int) { return true; }
+        ));
+        break;
+    case PhaseFluxContextAction::Copy:  copySequence(); break;
+    case PhaseFluxContextAction::Paste: pasteSequence(); break;
+    case PhaseFluxContextAction::Last:  break;
+    }
+}
+
+bool PhaseFluxEditPage::contextActionEnabled(int index) const {
+    switch (PhaseFluxContextAction(index)) {
+    case PhaseFluxContextAction::Paste:
+        return _model.clipBoard().canPastePhaseFluxSequence();
+    default:
+        return true;
+    }
+}
+
+void PhaseFluxEditPage::initStage() {
+    auto &seq = _project.selectedPhaseFluxSequence();
+    seq.stage(_selectedCell).clear();
+    showMessage("STAGE CLEARED");
+}
+
+void PhaseFluxEditPage::initTopic() {
+    // Reset current topic's params, scoped per the shake convention:
+    // TEMP/PTCH = selected cell only; ACCUM = non-skipped cells +
+    // sequence-level config; MACRO = sequence-level macros.
+    auto &seq = _project.selectedPhaseFluxSequence();
+    auto resetStageTemp = [](PhaseFluxSequence::Stage &s) {
+        s.setTemporalCurve(PhaseFluxSequence::TemporalCurveType::Linear);
+        s.setTemporalWarp(0);
+        s.setTemporalResponse(0);
+        s.setTemporalFlipV(false);
+        s.setTemporalFlipH(false);
+        s.setPulseCount(0);
+        s.setMask(PhaseFluxSequence::MaskType::Off);
+        s.setMaskShift(0);
+        s.setPhaseShift(0);
+        s.setTemporalWindow(PhaseFluxSequence::WindowType::Off);
+        s.setTemporalRepeat(PhaseFluxSequence::RepeatType::x1);
+        // stageLen preserved (chassis-feel, mirror of shake exclusion).
+    };
+    auto resetStagePitch = [](PhaseFluxSequence::Stage &s) {
+        s.setPitchCurve(PhaseFluxSequence::PitchCurveType::Ramp);
+        s.setPitchWarp(0);
+        s.setPitchResponse(0);
+        s.setPitchFlipV(false);
+        s.setPitchFlipH(false);
+        s.setPitchRange(PhaseFluxSequence::PitchRangeType::One);
+        s.setPitchDirection(PhaseFluxSequence::PitchDirectionType::Up);
+        s.setPitchWindow(PhaseFluxSequence::WindowType::Off);
+        s.setPitchRepeat(PhaseFluxSequence::RepeatType::x1);
+        s.setMaskMelody(100);
+        s.setTiltMelody(0);
+        // basePitch preserved (chassis-feel).
+    };
+    if (_currentSet == 0) {
+        resetStageTemp(seq.stage(_selectedCell));
+        showMessage("TEMP CELL CLEARED");
+    } else if (_currentSet == 1) {
+        resetStagePitch(seq.stage(_selectedCell));
+        showMessage("PITCH CELL CLEARED");
+    } else if (_currentSet == 2 || _currentSet == 3) {
+        const bool isN = (_currentSet == 2);
+        auto &cfg = isN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
+        for (auto &s : seq.stages()) {
+            if (s.skip()) continue;
+            if (isN) { s.setAccumulatorStep(0); s.setAccumulatorTrigger(PhaseFluxSequence::AccumulatorTriggerType::Stage); }
+            else     { s.setPulseAccumStep(0);  s.setPulseAccumTrigger(PhaseFluxSequence::AccumulatorTriggerType::Stage); }
+        }
+        cfg = AccumulatorConfig();
+        if (isN) { cfg.setPosLim(28); cfg.setNegLim(28); }
+        else     { cfg.setPosLim(16); cfg.setNegLim(16); }
+        showMessage(isN ? "ACCUM.N CLEARED" : "ACCUM.P CLEARED");
+    } else if (_currentSet == 4) {
+        seq.zeroMacros();
+        seq.setGlobalPhase(0.f);
+        seq.setTraversalPattern(0);
+        showMessage("MACRO CLEARED");
+    }
+}
+
+void PhaseFluxEditPage::initSequence() {
+    _project.selectedPhaseFluxSequence().clear();
+    showMessage("SEQUENCE CLEARED");
+}
+
+void PhaseFluxEditPage::initTrack() {
+    auto &track = _project.selectedTrack();
+    track.phaseFluxTrack().clear();
+    showMessage("TRACK CLEARED");
+}
+
+void PhaseFluxEditPage::copySequence() {
+    _model.clipBoard().copyPhaseFluxSequence(_project.selectedPhaseFluxSequence());
+    showMessage("COPIED");
+}
+
+void PhaseFluxEditPage::pasteSequence() {
+    if (!_model.clipBoard().canPastePhaseFluxSequence()) return;
+    _model.clipBoard().pastePhaseFluxSequence(_project.selectedPhaseFluxSequence());
+    showMessage("PASTED");
 }
 
 void PhaseFluxEditPage::togglePressSlot(int slot) {

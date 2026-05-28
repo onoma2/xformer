@@ -18,6 +18,8 @@ public:
     virtual void keyPress(KeyPressEvent &event) override;
     virtual void encoder(EncoderEvent &event) override;
 
+    virtual void contextShow(bool doubleClick = false) override;
+
 private:
     static constexpr int kSetCount = 5;  // TEMP, PTCH, ACCUM.N, ACCUM.P, MACRO
 
@@ -33,7 +35,17 @@ private:
 
     void editSlot(int slot, int value, bool shift);
     void togglePressSlot(int slot);
-    void randomizeCurrentSet();
+    void shake(bool wholeTopic);
+
+    // Context menu — INIT (with sub: Stage/Topic/Sequence/Track) + COPY + PASTE.
+    void contextAction(int index);
+    bool contextActionEnabled(int index) const;
+    void initStage();
+    void initTopic();
+    void initSequence();
+    void initTrack();
+    void copySequence();
+    void pasteSequence();
 
     const PhaseFluxTrackEngine *trackEngine() const;
     const PhaseFluxTrack &phaseFluxTrack() const;
