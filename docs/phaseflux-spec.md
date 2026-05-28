@@ -781,7 +781,7 @@ PhaseFlux-specific additions:
 - Optional: `_scale`, `_rootNote` (−1 = inherit from project default) if PhaseFlux participates in scale routing later. Default −1.
 - `_pitchMode` (enum Cell/Global, 1 byte) — selects per-cell vs `stage[0]`-as-globals pitch source; see §6.2.3.
 - `_pitchRate` (1 byte, index into 17-entry P:T ratio table) — drift rate of the free-running `_pitchPhase` accumulator in Global mode. Default index = `1:1`.
-- `_globalPhase` (float ∈ [0, 1]) — fraction-of-cycle phase shift, CurveTrack precedent.
+- `_globalPhase` (float ∈ [0, 1]) — fraction-of-cycle phase shift, CurveTrack precedent. Covers the cycle-shift role (was previously also drafted as a separate `sequenceShift` bipolar field in §14.2; that proposal is now retired in favor of this). Making it `Routable<float>` for CV is the only remaining surface decision; field already lives at the right place in the engine pipeline (`PhaseFluxTrackEngine.cpp:558-561`).
 
 ### 12.3 Routable-from-day-1 contract
 
@@ -1014,16 +1014,6 @@ effectiveTick = uint32_t(warped * cycleTicks)                        // re-map b
 
 **OPEN**: none — semantic fully specified and resolves §14.1 Q10.
 
-### Per-sequence: `sequenceShift`
-
-Global phase offset for the cycle against the master clock.
-
-- Field: `sequenceShift`, `Routable<int8_t>` bipolar ±100 (= ±100% of cycle).
-- Semantics: `effectiveTick = (relativeTick + (sequenceShift × cycleTicks / 100)) mod cycleTicks`. Applied before snake-walk lookup. Negative shifts move cycle start earlier; positive later.
-- Routing target: new `Routing::Target::SequenceShift` (or reuse `Shift` if it exists generically; needs a check at wire-up time).
-- **Bit-pack cost:** 8 bits on `PhaseFluxSequence` (alongside `_divisor`, `_clockMultiplier`). Cheap.
-- **OPEN:** Reuse vs new Routing::Target. Sub-question: shift in ticks or in cycle-relative percent — keeping percent makes it invariant to divisor changes.
-
 ### Per-sequence: `firstStage` / `lastStage`
 
 NoteSequence-style stage-range gating. Stages outside `[firstStage..lastStage]` contribute zero to the cumulative table (treated as if `skip=true`).
@@ -1053,7 +1043,7 @@ Explicit list. Any of these reappearing in MVP scope requires a written impact a
 - Compression/Expansion (Flux `COMP`) — subsumed by `temporalResponse` PowerBend axis; not a separate field
 - Per-degree bitmask (alternative to centrality-based MaskM+TiltM)
 - Sequence-level global accumulator step + per-stage override (NoteTrack's Accumulator pattern) — PhaseFlux uses per-stage independent for MVP
-- Accumulator advance modes A (per-pulse) and C (per-grid-cycle)
+- Accumulator advance mode C (per-full-16-cell-cycle). Modes A (per-pulse) and B (per-stage) are shipped via the per-stage `accumulatorTrigger` / `pulseAccumTrigger` Stage/Pulse enum (`PhaseFluxTrackEngine.cpp:421,428,703-711`).
 - Accumulator ping-pong counter motion
 - Per-track modulation input subsystem
 - Fill alt sequence
@@ -1068,8 +1058,8 @@ Explicit list. Any of these reappearing in MVP scope requires a written impact a
 Items the implementer resolves; locked design above doesn't depend on them.
 
 - Stage record packs to **3 × `uint32_t` (12 B)** with 3 spare bits (refined curve model: 93 bits/stage) — use the NoteSequenceStep BitField pattern (`model/Bitfield.h`, anonymous unions with `raw` + named slots). 16 stages × 12 B = 192 B for stage data per sequence.
-- **Serialization version: dev iterates at `Version35` with placeholder constant `Version_PhaseFlux_Pending = 36`.** Dev builds read/write PhaseFlux data without a version-guard bump; old shipped firmware cannot read dev project files (known dev-stage cost). On ship, the constant becomes `ProjectVersion::Version36` and the proper version guard goes in. No churn of the enum during iteration.
-- Serialization version + read/write order (round-trip test gate per retro #4)
+- **Serialization version: do NOT bump.** Dev branch stays on the existing `Latest` per `src/apps/sequencer/model/ProjectVersion.h` policy. Add new model fields by writing/reading them unconditionally — no `dataVersion() >= VersionN` guards, no placeholder constant. Old dev project files on SD card are accepted to break across branches. Bumps happen only at user-driven release prep.
+- Same-branch read/write symmetry: round-trip test gate per retro #4 (any field added to `write()` must be read back identically by `read()` in the same build — orthogonal to version policy).
 - Default `_resetMeasure` UI step granularity (powers-of-two from NoteSequence)
 - Whether PhaseFlux participates in Project-level scale/rootNote inheritance
 - UI page implementation (layout locked in §17; only pixel-level details remain)
