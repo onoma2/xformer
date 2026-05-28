@@ -90,7 +90,7 @@
 [Explicit list. Reappearance requires written impact assessment.]
 
 ## 16. Engineering punch list
-[Items not gating design — implementer-resolves. Bit layout, serialization version policy (`Version_*_Pending` placeholder dev → bump on ship), RAM measurement command.]
+[Items not gating design — implementer-resolves. Bit layout, RAM measurement command. Do NOT include a serialization version policy — dev branch does not bump `ProjectVersion`; see `src/apps/sequencer/model/ProjectVersion.h` header comment.]
 
 ## 17. UI surfaces — modelled on NoteTrack
 [Three files: EditPage, SequencePage, TrackListModel. Field tables. Wiring path with line refs to TopPage / TrackPage switches.]

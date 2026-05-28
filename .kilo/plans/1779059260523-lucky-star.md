@@ -69,7 +69,7 @@ static const char* lfoShapeName(int morph) {
 }
 ```
 
-Serialization (`write`/`read`): append `_shapeMorph` at the end. **No version bump per user request** — old project files on this dev branch will not load correctly; backward compat must be addressed before merge.
+Serialization (`write`/`read`): append `_shapeMorph` at the end. No version bump (dev policy). Old project files on this dev branch may not load correctly — accepted dev-stage cost, no migration required.
 
 ## Engine Changes
 

@@ -137,7 +137,7 @@ PhaseFlux pitch is **scale-degree based, NoteTrack-aligned**. `basePitch` is an 
 
 | Field | Range | Bits | Notes |
 |---|---|---|---|
-| `pulseCount` | 0..16 | 3 + 1 + 1 | Split-encoded across two words to dodge ProjectVersion bump. Low 3 bits in `_data0` (legacy slot), 1 high bit + 1 mute sentinel in `_data3` spare. Legacy files with both new bits zero decode to 1..8 unchanged. **0 = silent stage (duration consumed, no events fired)**; 1..16 = N pulses per stage. Engine clamps `pulseCount + accumOffset` to `[0, kMaxPulses=16]`. |
+| `pulseCount` | 0..16 | 5 | `UnsignedValue<5>` in `_data3[17..21]`. **0 = silent stage (duration consumed, no events fired)**; 1..16 = N pulses per stage. Engine clamps `pulseCount + accumOffset` to `[0, kMaxPulses=16]`. |
 | `basePitch` | ±63 scale degrees | 7 | `SignedValue<7>`. Integer scale degree, not volts. NoteTrack-uniform. |
 | `pitchRange` | 0.5 / 1 / 2 / 3 octaves | 2 | enum of the active scale's octave width (`notesPerOctave` × value) |
 | `pitchDirection` | Up / Down / Bipolar | 2 | direction of sweep relative to basePitch (1 spare value) |

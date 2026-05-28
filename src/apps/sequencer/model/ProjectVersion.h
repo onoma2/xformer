@@ -2,28 +2,31 @@
 #pragma once
 
 // ============================================================================
-// VERSION-BUMP POLICY (READ BEFORE TOUCHING THIS ENUM)
+// VERSION POLICY — READ BEFORE TOUCHING ANYTHING IN THIS FILE
 // ============================================================================
-// Bump ProjectVersion ONLY when consolidating a batch of features for a
-// release, and only when the user explicitly says so. During development the
-// on-disk layout changes many times — every track-mode addition, field
-// extension, bit-pack re-shuffle would otherwise force a new entry. That
-// churn is exactly what this policy avoids.
+// The Version4..Version35 chain below was relevant ONLY up to Version35.
+// Each entry there represents a historical add-field-with-read-guard event
+// that mattered when projects were shared between shipped firmware and dev
+// builds.
 //
-// During dev:
-//   - Write new fields unconditionally; do NOT add `dataVersion() >= VersionN`
-//     guards in read().
-//   - Dev project files on SD card are accepted to break across branches.
-//   - Pre-allocate a placeholder constant *outside* the enum (see
-//     `Version_PhaseFlux_Pending` below) so the upcoming bump number is
-//     reserved without auto-bumping `Latest`.
+// Current policy (post-Version35):
+//   - Dev branch stays at the existing `Latest` version. Do NOT add a new
+//     enum entry, do NOT add a `dataVersion() >= VersionN` guard, do NOT
+//     reserve a placeholder constant.
+//   - Add new fields to model structs by writing/reading them unconditionally.
+//     Dev project files on SD card are accepted to break across branches —
+//     that breakage is the trade we already chose.
+//   - The historical entries below are NOT a pattern to extend. Do not
+//     pattern-match from `NoteSequence.cpp` / `Project.cpp` read-guards;
+//     those are frozen legacy code paths.
 //
-// At release prep:
-//   - User explicitly approves the bump.
-//   - Placeholder constant moves *into* the enum chain (becomes
-//     `VersionN = N`).
-//   - Read paths gain the `dataVersion() >= VersionN` guards.
-//   - Old project migration is written if needed.
+// A new `VersionN` enum entry is added ONLY when the user explicitly says
+// so during release prep — never as a side effect of feature work, never
+// "before merge", never as a punch-list item, never because a spec template
+// or plan doc says it should be.
+//
+// If any spec, plan, or task wiki proposes a bump or a `Version_*_Pending`
+// placeholder, treat it as stale and flag it for removal.
 //
 // Project root pointers: PROJECT.md:385 (HARD RULE), AGENTS.md:102.
 // ============================================================================
@@ -138,7 +141,3 @@ enum ProjectVersion {
     Last,
     Latest = Last - 1,
 };
-
-// Placeholder for the upcoming PhaseFlux serialization bump. Dev iterates
-// at the current Latest; rename to Version36 + insert into the enum on ship.
-constexpr int Version_PhaseFlux_Pending = 36;

@@ -26,7 +26,7 @@ public:
 
     // Width typedefs feed Bitfield + range checks. Keep names verbose so
     // call sites read like the spec table (§5).
-    using PulseCount = UnsignedValue<3>;
+    using PulseCount = UnsignedValue<5>;  // 0..31 storage; UI/engine clamp to 0..16. 0 = silent stage.
     using BasePitch = SignedValue<7>;
     using PitchRange = UnsignedValue<2>;
     using PitchDirection = UnsignedValue<2>;
@@ -134,25 +134,9 @@ public:
         // Properties
         //----------------------------------------
 
-        // pulseCount — exposed range 0..16. Encoding (no version bump):
-        //   pulseMute=1     → 0 (silent stage, duration consumed, no events)
-        //   pulseMute=0     → (low+1) + (high<<3), low ∈ _data0 (3 bits), high ∈ _data3 (1 bit)
-        // Legacy files: both new bits default to 0 → reads back as 1..8 unchanged.
-        int pulseCount() const {
-            if (_data3.pulseMute) return 0;
-            return int(_data0.pulseCount) + 1 + (int(_data3.pulseCountHigh) << 3);
-        }
-        void setPulseCount(int v) {
-            v = clamp(v, 0, 16);
-            if (v == 0) {
-                _data3.pulseMute = 1;
-            } else {
-                _data3.pulseMute = 0;
-                int stored = v - 1;
-                _data0.pulseCount = PulseCount::clamp(stored & 0x7);
-                _data3.pulseCountHigh = (stored >> 3) & 0x1;
-            }
-        }
+        // pulseCount — 0..16. 0 = silent stage (duration consumed, no events).
+        int pulseCount() const { return int(_data3.pulseCount); }
+        void setPulseCount(int v) { _data3.pulseCount = PulseCount::clamp(clamp(v, 0, 16)); }
 
         // basePitch — ±63 scale degrees
         int basePitch() const { return BasePitch::Min + int(_data0.basePitch); }
@@ -204,7 +188,6 @@ public:
         int tiltMelody() const { return int(_data1.tiltMelody); }
         void setTiltMelody(int v) { _data1.tiltMelody = TiltMelody::clamp(clamp(v, 0, 100)); }
 
-        // pulseCount lives in _data2 — see layout below
         // phaseShift 0..7
         int phaseShift() const { return int(_data2.phaseShift); }
         void setPhaseShift(int v) { _data2.phaseShift = PhaseShift::clamp(v); }
@@ -284,11 +267,9 @@ public:
         bool operator!=(const Stage &other) const { return !(*this == other); }
 
     private:
-        // Layout: 4 × uint32_t = 128 bits envelope, 1 spare in _data2 (bit 31)
-        // and 25 spare in _data3 (bits 7..31). Do NOT reorder without bumping
-        // ProjectVersion.
+        // Layout: 4 × uint32_t = 128 bits envelope.
 
-        // word 0 — pitch shape + pulseCount (32 used, 0 spare)
+        // word 0 — pitch shape (29 used, 3 spare bits 29..31)
         union {
             uint32_t raw;
             BitField<uint32_t,  0, BasePitch::Bits>       basePitch;       //  0..6
@@ -299,7 +280,7 @@ public:
             BitField<uint32_t, 14, 1>                     pitchFlipH;      // 14
             BitField<uint32_t, 15, PitchWarp::Bits>       pitchWarp;       // 15..21
             BitField<uint32_t, 22, PitchResponse::Bits>   pitchResponse;   // 22..28
-            BitField<uint32_t, 29, PulseCount::Bits>      pulseCount;      // 29..31
+            // bits 29..31 spare (3)
         } _data0;
 
         // word 1 — temporal shape + melody mask (32 used, 0 spare)
@@ -330,17 +311,16 @@ public:
             // bit 31 spare
         } _data2;
 
-        // word 3 — stageLen + Repeat × 2 + Window × 2 + pulseCount extension + 13 spare
+        // word 3 — stageLen + Repeat × 2 + Window × 2 + pulseCount (22 used, 10 spare)
         union {
             uint32_t raw;
-            BitField<uint32_t,  0, StageLen::Bits> stageLen;          //  0..6
-            BitField<uint32_t,  7, Repeat::Bits>   pitchRepeat;       //  7..8
-            BitField<uint32_t,  9, Repeat::Bits>   temporalRepeat;    //  9..10
-            BitField<uint32_t, 11, Window::Bits>   pitchWindow;       // 11..13
-            BitField<uint32_t, 14, Window::Bits>   temporalWindow;    // 14..16
-            BitField<uint32_t, 17, 1>              pulseCountHigh;    // 17 — pulseCount extension bit
-            BitField<uint32_t, 18, 1>              pulseMute;         // 18 — sentinel for pulseCount==0
-            // bits 19..31 spare (13)
+            BitField<uint32_t,  0, StageLen::Bits>   stageLen;        //  0..6
+            BitField<uint32_t,  7, Repeat::Bits>     pitchRepeat;     //  7..8
+            BitField<uint32_t,  9, Repeat::Bits>     temporalRepeat;  //  9..10
+            BitField<uint32_t, 11, Window::Bits>     pitchWindow;     // 11..13
+            BitField<uint32_t, 14, Window::Bits>     temporalWindow;  // 14..16
+            BitField<uint32_t, 17, PulseCount::Bits> pulseCount;      // 17..21
+            // bits 22..31 spare (10)
         } _data3;
     };
 
