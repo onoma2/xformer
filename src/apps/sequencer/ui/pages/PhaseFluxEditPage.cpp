@@ -159,10 +159,11 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "PHFLX");
 
-    // Header: TEMP / PTCH / PTCH.G / ACCUM.N[T] / ACCUM.P[T].
+    // Header: TEMP / PTCH / PTCH.G / ACCUM.N[T] / ACCUM.P[T] / MACRO.
     const bool isPtch = (_currentSet == 1);
     const bool isAccumN = (_currentSet == 2);
     const bool isAccumP = (_currentSet == 3);
+    const bool isMacro = (_currentSet == 4);
     const auto &seqForHeader = _project.selectedPhaseFluxSequence();
     const bool isGlobalPitch =
         isPtch && seqForHeader.pitchMode() == PhaseFluxSequence::PitchMode::Global;
@@ -175,6 +176,8 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     } else if (isAccumP) {
         setName = (seqForHeader.pulseAccumConfig().scope() == AccumulatorConfig::Scope::Track)
             ? "ACCUM.PT" : "ACCUM.P";
+    } else if (isMacro) {
+        setName = "MACRO";
     }
     WindowPainter::drawActiveFunction(canvas, setName);
 
@@ -191,6 +194,8 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     static const char *kLabelsPtchGlobalP1[5] = { "Note",  "Span", "FlipV","FlipH","Next" };
     static const char *kLabelsAccumP0[5] = { "Ac.St", nullptr, nullptr, "Order", "Next" };
     static const char *kLabelsAccumP1[5] = { "Reset", "Polar", "Trig",  nullptr, "Next" };
+    static const char *kLabelsMacroP0[5] = { "WarpN", "RespN", "PulsN", "LenN",  "Next" };
+    static const char *kLabelsMacroP1[5] = { "Phase", "GWarp", "Snap",  "Zero",  "Next" };
 
     const char *(*primary)[5];
     if (_currentSet == 0) {
@@ -201,6 +206,8 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     } else if (_currentSet == 1) {
         primary = (_topicPage == 0) ? &kLabelsPtchP0 :
                   (_topicPage == 1) ? &kLabelsPtchP1 : &kLabelsPtchP2;
+    } else if (_currentSet == 4) {
+        primary = (_topicPage == 0) ? &kLabelsMacroP0 : &kLabelsMacroP1;
     } else {
         primary = (_topicPage == 0) ? &kLabelsAccumP0 : &kLabelsAccumP1;
     }
@@ -212,6 +219,14 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     // TEMP/PTCH keep the 4x4 grid + scope + param list.
     if (isAccumN || isAccumP) {
         drawAccumPage(canvas);
+        return;
+    }
+
+    // MACRO drops the grid + per-stage scope + param list. Full-width macro
+    // scope spans x=2..253. Numeric values not displayed — the scope shape
+    // is live feedback for every knob.
+    if (isMacro) {
+        drawMacroScope(canvas);
         return;
     }
 
@@ -349,6 +364,9 @@ void PhaseFluxEditPage::keyPress(KeyPressEvent &event) {
             } else if (_currentSet == 1) {
                 // PITCH Cell P1: Span(0) / Dir(1) / FlipV(2) / FlipH(3)
                 isToggle = (slot == 2 || slot == 3);
+            } else if (_currentSet == 4) {
+                // MACRO P1: Phase(0) / GWarp(1) / Snap(2)* / Zero(3)*
+                isToggle = (slot == 2 || slot == 3);
             }
         }
         if (isToggle) {
@@ -476,6 +494,22 @@ void PhaseFluxEditPage::editSlot(int slot, int value, bool shift) {
             case 3: activeStage.setTiltMelody(activeStage.tiltMelody() + value); break;
             }
         }
+    } else if (_currentSet == 4) {
+        // MACRO — P0: nudges (uniform per-cell offsets); P1: cycle + utilities.
+        if (_topicPage == 0) {
+            switch (slot) {
+            case 0: seq.editWarpNudge(value, shift); break;
+            case 1: seq.editResponseNudge(value, shift); break;
+            case 2: seq.editPulseNudge(value, shift); break;
+            case 3: seq.editLenNudge(value, shift); break;
+            }
+        } else {
+            switch (slot) {
+            case 0: seq.editGlobalPhase(value, shift); break;
+            case 1: seq.editCyclePhaseWarp(value, shift); break;
+            // slots 2 (Snap) and 3 (Zero) are press-to-fire — handled by togglePressSlot
+            }
+        }
     }
     (void)shift;
 }
@@ -532,6 +566,13 @@ void PhaseFluxEditPage::togglePressSlot(int slot) {
         switch (slot) {
         case 2: activeStage.setPitchFlipV(!activeStage.pitchFlipV()); break;
         case 3: activeStage.setPitchFlipH(!activeStage.pitchFlipH()); break;
+        default: break;
+        }
+    } else if (_currentSet == 4) {
+        // MACRO P1: Snap(2) / Zero(3) — press-to-fire utilities.
+        switch (slot) {
+        case 2: seq.snapToGrid(); break;
+        case 3: seq.zeroMacros(); break;
         default: break;
         }
     }
@@ -912,6 +953,159 @@ void PhaseFluxEditPage::drawPitchScope(Canvas &canvas, int stageIdx, int scopeX)
     }
 }
 
+void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
+    // Full-width scope spanning the whole content area below the header.
+    // Shows all 16 stages' temporal curves stitched along X, slice widths
+    // proportional to effective tick budgets (with LenN applied). Live
+    // response to WarpN/RespN/PulsN/GWarp/Phase. Skipped stages have
+    // zero-width slices and don't render.
+    constexpr int kScopeX = 2;
+    constexpr int kScopeY = 12;
+    constexpr int kScopeW = 252;   // PageWidth - 4
+    constexpr int kScopeH = 38;
+
+    canvas.setBlendMode(BlendMode::Set);
+    canvas.setColor(Color::Low);
+    canvas.drawRect(kScopeX, kScopeY, kScopeW, kScopeH);
+    canvas.hline(kScopeX + 1, kScopeY + kScopeH - 2, kScopeW - 2);
+
+    const PhaseFluxSequence &seq = _project.selectedPhaseFluxSequence();
+    const int warpNudge = seq.warpNudge();
+    const int respNudge = seq.responseNudge();
+    const int pulseNudge = seq.pulseNudge();
+    const int lenNudge = seq.lenNudge();
+    const int gwarp = seq.cyclePhaseWarp();
+    const float gwarpParam = PhaseFluxMath::powerBendKnobToParam(gwarp);
+    const float gwarpParamInv = PhaseFluxMath::powerBendKnobToParam(-gwarp);
+    const float globalPhase = seq.globalPhase();
+
+    // Recompute cumulative ticks UI-side with LenN applied — mirrors
+    // PhaseFluxTrackEngine::rebuildCumulativeTable.
+    int stageDivisorTicksArr[PhaseFluxMath::kStageCount];
+    int stageLenArr[PhaseFluxMath::kStageCount];
+    bool skipArr[PhaseFluxMath::kStageCount];
+    for (int i = 0; i < PhaseFluxMath::kStageCount; ++i) {
+        const auto &s = seq.stage(i);
+        stageDivisorTicksArr[i] = PhaseFluxMath::stageDivisorTicks(s.stageDivisor());
+        int effLen = s.stageLen() + lenNudge;
+        if (effLen < 0)   effLen = 0;
+        if (effLen > 127) effLen = 127;
+        stageLenArr[i] = effLen;
+        skipArr[i] = s.skip();
+    }
+    int cumulative[PhaseFluxMath::kStageCount + 1];
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(
+        stageDivisorTicksArr, stageLenArr, skipArr,
+        seq.divisor(), int(_engine.measureDivisor()),
+        seq.clockMultiplier(), cumulative);
+    if (cycleTicks <= 0) return;
+
+    const int innerX0 = kScopeX + 1;
+    const int innerW  = kScopeW - 2;
+    const int innerY0 = kScopeY + 1;
+    const int innerH  = kScopeH - 3;
+
+    // Slice boundary tick marks (dotted, faint).
+    canvas.setColor(Color::Low);
+    const auto &snake = PhaseFluxMath::snakeOrder();
+    for (int slot = 1; slot < PhaseFluxMath::kStageCount; ++slot) {
+        float rawPhase = float(cumulative[slot]) / float(cycleTicks);
+        float disp = PhaseFluxMath::powerBend(rawPhase, gwarpParam);
+        int x = innerX0 + int(disp * float(innerW - 1));
+        for (int y = innerY0; y < innerY0 + innerH; y += 2) {
+            canvas.point(x, y);
+        }
+    }
+
+    // Curve trace — one pixel per X column.
+    canvas.setColor(Color::Bright);
+    int prevPy = -1;
+    bool prevVisible = false;
+    for (int px = 0; px < innerW; ++px) {
+        float dispPhase = float(px) / float(innerW - 1);
+        float rawPhase = PhaseFluxMath::powerBend(dispPhase, gwarpParamInv);
+        rawPhase += globalPhase;
+        rawPhase -= std::floor(rawPhase);
+        int ticks = int(rawPhase * float(cycleTicks));
+
+        int slot = 0;
+        while (slot < PhaseFluxMath::kStageCount - 1 && ticks >= cumulative[slot + 1]) {
+            ++slot;
+        }
+        int slotW = cumulative[slot + 1] - cumulative[slot];
+        if (slotW <= 0) { prevVisible = false; continue; }
+        int cell = int(snake[slot]);
+        const auto &s = seq.stage(cell);
+        if (s.skip()) { prevVisible = false; continue; }
+
+        float t_raw = float(ticks - cumulative[slot]) / float(slotW);
+
+        // Effective warp/response with WarpN/RespN applied.
+        int effWarp = clamp(s.temporalWarp() + warpNudge, -64, 64);
+        int effResp = clamp(s.temporalResponse() + respNudge, -64, 64);
+        float t = clamp01(t_raw);
+        t = PhaseFluxMath::powerBend(t, PhaseFluxMath::powerBendKnobToParam(effWarp));
+        if (s.temporalFlipH()) t = 1.f - t;
+        t = Curve::eval(temporalCurveLut(s.temporalCurve()), t);
+        if (s.temporalFlipV()) t = 1.f - t;
+        t = PhaseFluxMath::powerBend(clamp01(t), PhaseFluxMath::powerBendKnobToParam(effResp));
+
+        int py = innerY0 + innerH - 1 - int(t * float(innerH - 1));
+        int cx = innerX0 + px;
+        if (prevVisible) canvas.line(cx - 1, prevPy, cx, py);
+        prevPy = py;
+        prevVisible = true;
+    }
+
+    // Pulse marks — 1 px dot per fire, centered vertically.
+    const int markY = innerY0 + innerH / 2;
+    canvas.setColor(Color::Medium);
+    for (int slot = 0; slot < PhaseFluxMath::kStageCount; ++slot) {
+        int cell = int(snake[slot]);
+        const auto &s = seq.stage(cell);
+        if (s.skip()) continue;
+        int slotW = cumulative[slot + 1] - cumulative[slot];
+        if (slotW <= 0) continue;
+        int effPulse = s.pulseCount() + pulseNudge;
+        if (effPulse < 0) effPulse = 0;
+        if (effPulse > 16) effPulse = 16;
+        int effWarp = clamp(s.temporalWarp() + warpNudge, -64, 64);
+        int effResp = clamp(s.temporalResponse() + respNudge, -64, 64);
+        for (int i = 0; i < effPulse; ++i) {
+            float t_local = effPulse > 0 ? float(i) / float(effPulse) : 0.f;
+            float t = clamp01(t_local);
+            t = PhaseFluxMath::powerBend(t, PhaseFluxMath::powerBendKnobToParam(effWarp));
+            if (s.temporalFlipH()) t = 1.f - t;
+            t = Curve::eval(temporalCurveLut(s.temporalCurve()), t);
+            if (s.temporalFlipV()) t = 1.f - t;
+            t = PhaseFluxMath::powerBend(clamp01(t), PhaseFluxMath::powerBendKnobToParam(effResp));
+            float rawPhase = float(cumulative[slot] + int(t * float(slotW))) / float(cycleTicks);
+            float disp = PhaseFluxMath::powerBend(rawPhase, gwarpParam);
+            disp -= globalPhase;
+            disp -= std::floor(disp);
+            int x = innerX0 + int(disp * float(innerW - 1));
+            canvas.point(x, markY);
+        }
+    }
+
+    // Playhead — vertical bright line at current cycle position.
+    const auto *te = trackEngine();
+    if (te && te->isActiveSequence(seq)) {
+        const int slotIdx = te->slotIndex();
+        const float stagePhase = te->sequenceProgress();
+        if (slotIdx >= 0 && slotIdx < PhaseFluxMath::kStageCount && stagePhase >= 0.f) {
+            int slotW = cumulative[slotIdx + 1] - cumulative[slotIdx];
+            float rawPhase = float(cumulative[slotIdx] + int(stagePhase * float(slotW))) / float(cycleTicks);
+            float disp = PhaseFluxMath::powerBend(rawPhase, gwarpParam);
+            disp -= globalPhase;
+            disp -= std::floor(disp);
+            int x = innerX0 + int(disp * float(innerW - 1));
+            canvas.setColor(Color::Bright);
+            canvas.vline(x, innerY0, innerH);
+        }
+    }
+}
+
 void PhaseFluxEditPage::drawAccumDualStrip(Canvas &canvas, int scopeX, int activeSetIdx) {
     const PhaseFluxSequence &seq = _project.selectedPhaseFluxSequence();
     const auto *te = trackEngine();
@@ -1213,6 +1407,8 @@ void PhaseFluxEditPage::drawParamList(Canvas &canvas) {
             labels[3] = "Tilt";  values[3]("%d", activeStage.tiltMelody());
         }
     }
+    // MACRO topic doesn't reach this function (full-width scope replaces
+    // the param panel; values are encoded in the scope shape).
 
     canvas.setFont(Font::Tiny);
     canvas.setBlendMode(BlendMode::Set);

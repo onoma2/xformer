@@ -19,7 +19,7 @@ public:
     virtual void encoder(EncoderEvent &event) override;
 
 private:
-    static constexpr int kSetCount = 4;  // TEMP, PTCH, ACCUM.N, ACCUM.P
+    static constexpr int kSetCount = 5;  // TEMP, PTCH, ACCUM.N, ACCUM.P, MACRO
 
     void drawGrid(Canvas &canvas);
     void drawGridCell(Canvas &canvas, int idx, bool isActive, bool isSelected);
@@ -29,6 +29,7 @@ private:
     void drawStageBadge(Canvas &canvas, int scopeX);
     void drawParamList(Canvas &canvas);
     void drawAccumPage(Canvas &canvas);
+    void drawMacroScope(Canvas &canvas);
 
     void editSlot(int slot, int value, bool shift);
     void togglePressSlot(int slot);
@@ -38,7 +39,7 @@ private:
     const PhaseFluxTrack &phaseFluxTrack() const;
 
     int _selectedCell = 0;
-    int _currentSet = 0;    // 0 = TEMP, 1 = PTCH, 2 = ACCUM.N, 3 = ACCUM.P
+    int _currentSet = 0;    // 0=TEMP, 1=PTCH, 2=ACCUM.N, 3=ACCUM.P, 4=MACRO
     int _selectedSlot = 0;  // 0..3 (F1..F4) — F5 is Next
-    int _topicPage = 0;     // 0 = shape page, 1 = mods page (all topics)
+    int _topicPage = 0;     // P0/P1/(P2 for TEMP+PTCH)
 };
