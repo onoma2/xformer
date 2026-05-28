@@ -571,7 +571,7 @@ void PhaseFluxEditPage::togglePressSlot(int slot) {
     } else if (_currentSet == 4) {
         // MACRO P1: Snap(2) / Zero(3) — press-to-fire utilities.
         switch (slot) {
-        case 2: seq.snapToGrid(int(_engine.measureDivisor())); break;
+        case 2: seq.snapToGrid(int(_engine.noteDivisor())); break;
         case 3: seq.zeroMacros(); break;
         default: break;
         }

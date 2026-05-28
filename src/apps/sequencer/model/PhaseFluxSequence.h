@@ -445,11 +445,12 @@ public:
 
     // Snap to grid — press-to-fire from MACRO P1. Two passes:
     //  1. globalPhase → nearest 1/16 of cycle.
-    //  2. Each non-skipped stage's stageLen → produce a duration that
-    //     lands on the nearest whole measure. Guarded: cells shorter than
-    //     half a measure are left alone (sub-measure intent preserved).
-    // measureDivisor in master-PPQN-192 ticks; caller supplies it.
-    void snapToGrid(int measureDivisor);
+    //  2. Each non-skipped stage's stageLen → nearest whole project beat
+    //     (TimeSignature.noteDivisor — 1/4 in /4 signatures, 1/8 in /8).
+    //     Floor at 1 beat — never snap a cell to 0 length. Silent cells
+    //     (stageLen=0) are left alone, they're intentional.
+    // beatTicks in master-PPQN-192 ticks; caller passes engine noteDivisor.
+    void snapToGrid(int beatTicks);
 
     // Reset all 5 magnitude macros (nudges + cyclePhaseWarp) to 0.
     // globalPhase deliberately untouched — different category.
