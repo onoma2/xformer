@@ -46,6 +46,7 @@ private:
     void initTrack();
     void copySequence();
     void pasteSequence();
+    void duplicateSequence();
 
     const PhaseFluxTrackEngine *trackEngine() const;
     const PhaseFluxTrack &phaseFluxTrack() const;

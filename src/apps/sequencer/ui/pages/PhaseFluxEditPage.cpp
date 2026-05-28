@@ -646,10 +646,10 @@ void PhaseFluxEditPage::shake(bool wholeTopic) {
 
 // Context menu — top level: INIT (sub) / COPY / PASTE. INIT sub-menu opens
 // when INIT is picked.
-enum class PhaseFluxContextAction { Init, Copy, Paste, Last };
+enum class PhaseFluxContextAction { Init, Copy, Paste, Dup, Last };
 
 static const ContextMenuModel::Item kPhaseFluxTopMenu[] = {
-    { "INIT" }, { "COPY" }, { "PASTE" },
+    { "INIT" }, { "COPY" }, { "PASTE" }, { "DUP" },
 };
 
 enum class PhaseFluxInitTarget { Stage, Topic, Sequence, Track, Last };
@@ -689,6 +689,7 @@ void PhaseFluxEditPage::contextAction(int index) {
         break;
     case PhaseFluxContextAction::Copy:  copySequence(); break;
     case PhaseFluxContextAction::Paste: pasteSequence(); break;
+    case PhaseFluxContextAction::Dup:   duplicateSequence(); break;
     case PhaseFluxContextAction::Last:  break;
     }
 }
@@ -787,6 +788,22 @@ void PhaseFluxEditPage::pasteSequence() {
     if (!_model.clipBoard().canPastePhaseFluxSequence()) return;
     _model.clipBoard().pastePhaseFluxSequence(_project.selectedPhaseFluxSequence());
     showMessage("PASTED");
+}
+
+void PhaseFluxEditPage::duplicateSequence() {
+    // PhaseFlux-only duplicate: clone the current pattern's PhaseFluxSequence
+    // into the next pattern slot, then leave the user there. Other tracks at
+    // the next pattern index are untouched. Mirrors PatternPage::duplicate-
+    // Pattern but scoped to PhaseFlux only.
+    if (_project.selectedPatternIndex() >= CONFIG_PATTERN_COUNT - 1) {
+        showMessage("ALREADY LAST PATTERN");
+        return;
+    }
+    _model.clipBoard().copyPhaseFluxSequence(_project.selectedPhaseFluxSequence());
+    _project.editSelectedPatternIndex(1, false);
+    _model.clipBoard().pastePhaseFluxSequence(_project.selectedPhaseFluxSequence());
+    _model.clipBoard().clear();
+    showMessage("DUPLICATED");
 }
 
 void PhaseFluxEditPage::togglePressSlot(int slot) {
