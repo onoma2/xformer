@@ -213,6 +213,7 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
     _cachedLenNudge = int8_t(_sequence->lenNudge());
 
     _cycleTicks = PhaseFluxMath::computeCumulativeTicks(
+        PhaseFluxMath::traversalOrder(_sequence->traversalPattern()),
         stageDivisorTicksArr, stageLenArr, skipArr,
         _sequence->divisor(),
         int(_engine.measureDivisor()),
@@ -610,6 +611,7 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
     int slotIdx = 0, activeCell = 0;
     float stagePhase = 0.f;
     bool valid = PhaseFluxMath::deriveTickPosition(
+        PhaseFluxMath::traversalOrder(_sequence->traversalPattern()),
         relativeTick, _cumulativeTicks, _cycleTicks,
         slotIdx, activeCell, stagePhase);
 
@@ -727,7 +729,7 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
     if (_slotIdx != _prevSlotIdx) {
         if (_prevSlotIdx >= 0) {
             // §13.4 Stage-trigger advance for the completing cell.
-            const int completedCell = int(PhaseFluxMath::snakeOrder()[_prevSlotIdx]);
+            const int completedCell = int(PhaseFluxMath::traversalOrder(_sequence->traversalPattern())[_prevSlotIdx]);
             const auto &completed = _sequence->stage(completedCell);
 
             // Note accumulator — Stage trigger only here; Pulse trigger advances in rebuildSchedule's per-pulse loop.

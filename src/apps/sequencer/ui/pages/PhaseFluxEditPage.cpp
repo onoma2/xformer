@@ -995,6 +995,7 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
     }
     int cumulative[PhaseFluxMath::kStageCount + 1];
     int cycleTicks = PhaseFluxMath::computeCumulativeTicks(
+        PhaseFluxMath::traversalOrder(seq.traversalPattern()),
         stageDivisorTicksArr, stageLenArr, skipArr,
         seq.divisor(), int(_engine.measureDivisor()),
         seq.clockMultiplier(), cumulative);
@@ -1007,7 +1008,7 @@ void PhaseFluxEditPage::drawMacroScope(Canvas &canvas) {
 
     // Slice boundary tick marks (dotted, faint) — PhaseFlux per-stage edges.
     canvas.setColor(Color::Low);
-    const auto &snake = PhaseFluxMath::snakeOrder();
+    const auto &snake = PhaseFluxMath::traversalOrder(seq.traversalPattern());
     for (int slot = 1; slot < PhaseFluxMath::kStageCount; ++slot) {
         float rawPhase = float(cumulative[slot]) / float(cycleTicks);
         float disp = PhaseFluxMath::powerBend(rawPhase, gwarpParam);

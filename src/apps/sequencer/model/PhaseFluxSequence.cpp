@@ -94,6 +94,10 @@ void PhaseFluxSequence::Stage::read(VersionedSerializedReader &reader) {
     reader.read(_data3.raw);
 }
 
+void PhaseFluxSequence::printTraversalPattern(StringBuilder &str) const {
+    str(PhaseFluxMath::traversalPatternName(_traversalPattern));
+}
+
 void PhaseFluxSequence::snapToGrid(int beatTicks) {
     // 1. globalPhase snap to nearest 1/16 of cycle.
     const float step = 1.f / 16.f;
@@ -138,6 +142,7 @@ void PhaseFluxSequence::clear() {
     _pulseNudge = 0;
     _lenNudge = 0;
     _cyclePhaseWarp = 0;
+    _traversalPattern = 0;
     _divisor.setBase(12);                // 1/16 at PPQN 48
     _clockMultiplier.setBase(100);
     _noteAccumConfig = AccumulatorConfig();
@@ -168,6 +173,7 @@ void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_pulseNudge);
     writer.write(_lenNudge);
     writer.write(_cyclePhaseWarp);
+    writer.write(_traversalPattern);
     _divisor.write(writer);
     _clockMultiplier.write(writer);
     _noteAccumConfig.write(writer);
@@ -191,6 +197,7 @@ void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
     reader.read(_pulseNudge);
     reader.read(_lenNudge);
     reader.read(_cyclePhaseWarp);
+    reader.read(_traversalPattern);
     _divisor.read(reader);
     _clockMultiplier.read(reader);
     _noteAccumConfig.read(reader);

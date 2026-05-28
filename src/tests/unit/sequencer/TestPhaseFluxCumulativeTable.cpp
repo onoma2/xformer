@@ -38,7 +38,7 @@ CASE("all_default_divisor_no_skip") {
     clearLens(lens);
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
 
     int expectedStage = 48;     // Div1_16 at master-PPQN-192
     int expectedCycle = 16 * 48;
@@ -62,7 +62,7 @@ CASE("skip_contributes_zero") {
     skip[10] = true;
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
 
     int expectedCycle = 13 * 48;
     expectEqual(cycleTicks, expectedCycle, "3 skipped of 16 leaves 13 contributing stages");
@@ -96,7 +96,7 @@ CASE("mixed_divisors_sum_correctly") {
     }
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
 
     int expected = 4 * (48 + 96 + 192 + 384);
     expectEqual(cycleTicks, expected, "4*(48+96+192+384) = 2880 ticks");
@@ -118,7 +118,7 @@ CASE("kMinCycleTicks_floor_engaged") {
     skip[3] = false;
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 150, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 150, cum);
 
     int floor = kMeasureDivisor / 32;
     expectEqual(cycleTicks, floor, "stretched cycle must hit the floor exactly");
@@ -135,7 +135,7 @@ CASE("kMinCycleTicks_floor_engaged") {
 
     // At-floor case (clockMultiplier=100): cycle already equals floor, no scaling.
     int cum0[17];
-    int cycleTicks0 = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 100, cum0);
+    int cycleTicks0 = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 100, cum0);
     expectEqual(cycleTicks0, floor, "at-floor cycle is left unchanged");
     expectEqual(cum0[4], floor, "at-floor cum[4] equals raw contribution");
 }
@@ -149,7 +149,7 @@ CASE("all_skipped_returns_zero") {
     for (int i = 0; i < 16; ++i) skip[i] = true;
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
 
     expectEqual(cycleTicks, 0, "all-skipped must report cycleTicks=0 (idle)");
     for (int i = 0; i <= 16; ++i) {
@@ -173,7 +173,7 @@ CASE("snake_order_applied") {
     ticks[4] = PhaseFluxMath::stageDivisorTicks(Slot::Div1_16);  // 48
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
 
     const auto &snake = PhaseFluxMath::snakeOrder();
     for (int i = 0; i < 16; ++i) {
@@ -197,8 +197,8 @@ CASE("clock_multiplier_50_doubles") {
 
     int cum100[17];
     int cum50[17];
-    int cycle100 = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 100, cum100);
-    int cycle50  = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 50,  cum50);
+    int cycle100 = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 100, cum100);
+    int cycle50  = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 50,  cum50);
 
     expectEqual(cycle50, cycle100 * 2, "clockMultiplier 50 doubles cycle length");
 }
@@ -213,7 +213,7 @@ CASE("clock_multiplier_150_shrinks") {
     clearLens(lens);
 
     int cum[17];
-    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 150, cum);
+    int cycleTicks = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 150, cum);
 
     int expected = 16 * ((192 * 100) / 150);  // = 16 * 128 = 2048
     expectEqual(cycleTicks, expected, "clockMultiplier 150 shrinks to ~2/3");
@@ -230,9 +230,9 @@ CASE("sequence_divisor_scales_cycle_uniformly") {
     clearLens(lens);
 
     int cum12[17], cum24[17], cum6[17];
-    int cyc12 = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 100, cum12);
-    int cyc24 = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 24, kMeasureDivisor, 100, cum24);
-    int cyc6  = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip,  6, kMeasureDivisor, 100, cum6);
+    int cyc12 = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 100, cum12);
+    int cyc24 = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 24, kMeasureDivisor, 100, cum24);
+    int cyc6  = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip,  6, kMeasureDivisor, 100, cum6);
 
     expectEqual(cyc12, 768, "divisor=12 (default 1/16) keeps cycle at 768");
     expectEqual(cyc24, 1536, "divisor=24 (1/8) doubles cycle to 1536");
@@ -255,7 +255,7 @@ CASE("stage_len_scales_per_stage") {
     lens[1] = 32;                   // 48 × 32 / 64 = 24   (0.5×)
     lens[2] = 0;                    // 48 × 0  / 64 = 0    (silent)
     int cum[17];
-    int cyc = PhaseFluxMath::computeCumulativeTicks(ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
+    int cyc = PhaseFluxMath::computeCumulativeTicks(PhaseFluxMath::snakeOrder(), ticks, lens, skip, 12, kMeasureDivisor, 100, cum);
 
     expectEqual(cum[1] - cum[0], 72, "stageLen=96 stretches Div1_16 (48 ticks) to 72 (1.5×)");
     expectEqual(cum[2] - cum[1], 24, "stageLen=32 shrinks Div1_16 to 24 (0.5×)");

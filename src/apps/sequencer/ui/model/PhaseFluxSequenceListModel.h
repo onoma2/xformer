@@ -39,6 +39,7 @@ private:
         GlobalPhase,
         PitchMode,
         PitchRate,
+        Traversal,
         // MACRO nudges + cyclePhaseWarp — §14.2.
         WarpNudge,
         ResponseNudge,
@@ -58,6 +59,7 @@ private:
         case GlobalPhase:    return "Global Phase";
         case PitchMode:      return "Pitch Mode";
         case PitchRate:      return "Pitch Rate";
+        case Traversal:      return "Traversal";
         case WarpNudge:      return "Warp Nudge";
         case ResponseNudge:  return "Resp Nudge";
         case PulseNudge:     return "Pulse Nudge";
@@ -80,6 +82,7 @@ private:
         case GlobalPhase:    _sequence->printGlobalPhase(str); break;
         case PitchMode:      _sequence->printPitchMode(str); break;
         case PitchRate:      _sequence->printPitchRate(str); break;
+        case Traversal:      _sequence->printTraversalPattern(str); break;
         case WarpNudge:      _sequence->printWarpNudge(str); break;
         case ResponseNudge:  _sequence->printResponseNudge(str); break;
         case PulseNudge:     _sequence->printPulseNudge(str); break;
@@ -99,6 +102,7 @@ private:
         case GlobalPhase:    _sequence->editGlobalPhase(value, shift); break;
         case PitchMode:      _sequence->editPitchMode(value, shift); break;
         case PitchRate:      _sequence->editPitchRate(value, shift); break;
+        case Traversal:      _sequence->editTraversalPattern(value, shift); break;
         case WarpNudge:      _sequence->editWarpNudge(value, shift); break;
         case ResponseNudge:  _sequence->editResponseNudge(value, shift); break;
         case PulseNudge:     _sequence->editPulseNudge(value, shift); break;

@@ -2,14 +2,42 @@
 
 #include <cmath>
 
-// Boustrophedon snake: row 0 L->R, row 1 R->L, row 2 L->R, row 3 R->L.
-// Stored as a static const so the engine can take a reference cheaply.
-static const std::array<uint8_t, PhaseFluxMath::kStageCount> kSnakeOrder = {{
-    0,  1,  2,  3,    // row 0  L -> R
-    7,  6,  5,  4,    // row 1  R -> L
-    8,  9, 10, 11,    // row 2  L -> R
-   15, 14, 13, 12,    // row 3  R -> L
-}};
+// 8 traversal patterns. Index 0 is PhaseFlux's original top-down snake
+// (preserved as default). Indices 1..7 mirror René's PATTERN 1..7
+// (algorithmic 4×4 walks — rows, snake, columns, spirals, diagonals).
+// René's P8 + permutation patterns P9..P16 dropped from the v1 set.
+//
+// Cell indexing in PhaseFlux: cell 0 = top-left, cell 15 = bottom-right.
+//   row 0 (top):    0  1  2  3
+//   row 1:          4  5  6  7
+//   row 2:          8  9 10 11
+//   row 3 (bot):   12 13 14 15
+//
+// René uses bottom-row-first in its docs (row 1 = bottom row). The
+// indices below translate that step-order into PhaseFlux cell indices.
+static const std::array<uint8_t, PhaseFluxMath::kStageCount>
+    kTraversalPatterns[PhaseFluxMath::kTraversalPatternCount] = {
+    // 0 — Snake (PhaseFlux original top-down boustrophedon). Default.
+    {{ 0,  1,  2,  3,    7,  6,  5,  4,    8,  9, 10, 11,   15, 14, 13, 12 }},
+    // 1 — Rows: bottom-up, all L→R (René P1).
+    {{12, 13, 14, 15,    8,  9, 10, 11,    4,  5,  6,  7,    0,  1,  2,  3 }},
+    // 2 — SnakeUp: snake bottom-up (René P2).
+    {{12, 13, 14, 15,   11, 10,  9,  8,    4,  5,  6,  7,    3,  2,  1,  0 }},
+    // 3 — Cols: columns bottom-up, right column first (René P3).
+    {{15, 11,  7,  3,   14, 10,  6,  2,   13,  9,  5,  1,   12,  8,  4,  0 }},
+    // 4 — ColSnake: columns zigzag, down/up alternating (René P4).
+    {{ 0,  4,  8, 12,   13,  9,  5,  1,    2,  6, 10, 14,   15, 11,  7,  3 }},
+    // 5 — Spiral: outward from bottom-left (René P5).
+    {{12, 13, 14, 15,   11,  7,  3,  2,    1,  0,  4,  8,    9, 10,  6,  5 }},
+    // 6 — Inward: inner-to-outer counter-clockwise (René P6).
+    {{ 9,  5,  6, 10,    8,  4,  0,  1,    2,  3,  7, 11,   15, 14, 13, 12 }},
+    // 7 — Diag: anti-diagonal scan from bottom-left (René P7).
+    {{12,  8, 13,  4,    9, 14,  0,  5,   10, 15,  1,  6,   11,  2,  7,  3 }},
+};
+
+static const char *kTraversalPatternNames[PhaseFluxMath::kTraversalPatternCount] = {
+    "Snake", "Rows", "SnakeUp", "Cols", "ColSnake", "Spiral", "Inward", "Diag",
+};
 
 // Per-stage divisor as a fraction (num/den) multiplied against the sequence
 // divisor — Stochastic's `kStochasticDurationLut` pattern. At the NoteTrack
@@ -26,8 +54,20 @@ static const PhaseFluxMath::StageDivisorFraction kStageDivisorFrac[8] = {
     { 32, 1 },   // 7 TwoBar    — ×32    → 2 bars
 };
 
+const std::array<uint8_t, PhaseFluxMath::kStageCount> &PhaseFluxMath::traversalOrder(int patternIdx) {
+    if (patternIdx < 0) patternIdx = 0;
+    if (patternIdx >= kTraversalPatternCount) patternIdx = kTraversalPatternCount - 1;
+    return kTraversalPatterns[patternIdx];
+}
+
 const std::array<uint8_t, PhaseFluxMath::kStageCount> &PhaseFluxMath::snakeOrder() {
-    return kSnakeOrder;
+    return kTraversalPatterns[0];  // backward-compat: original PhaseFlux snake
+}
+
+const char *PhaseFluxMath::traversalPatternName(int patternIdx) {
+    if (patternIdx < 0) patternIdx = 0;
+    if (patternIdx >= kTraversalPatternCount) patternIdx = kTraversalPatternCount - 1;
+    return kTraversalPatternNames[patternIdx];
 }
 
 PhaseFluxMath::StageDivisorFraction PhaseFluxMath::stageDivisorFraction(PhaseFluxSequence::StageDivisorSlot slot) {
@@ -93,6 +133,7 @@ bool PhaseFluxMath::evalWindowRepeat(float phi,
 }
 
 int PhaseFluxMath::computeCumulativeTicks(
+    const std::array<uint8_t, kStageCount> &traversal,
     const int stageDivisorTicksArr[kStageCount],
     const int stageLenArr[kStageCount],
     const bool skip[kStageCount],
@@ -107,7 +148,7 @@ int PhaseFluxMath::computeCumulativeTicks(
     int durationTicks[kStageCount];
     cumulativeTicks[0] = 0;
     for (int i = 0; i < kStageCount; ++i) {
-        int cell = int(kSnakeOrder[i]);
+        int cell = int(traversal[i]);
         int raw = skip[cell] ? 0 : stageDivisorTicksArr[cell];
         // Sequence divisor scales the whole cycle uniformly. Stage slot table
         // is calibrated at the 1/16 reference (= kReferenceSequenceDivisor);
@@ -147,6 +188,7 @@ int PhaseFluxMath::computeCumulativeTicks(
 }
 
 bool PhaseFluxMath::deriveTickPosition(
+    const std::array<uint8_t, kStageCount> &traversal,
     uint32_t relativeTick,
     const int cumulativeTicks[kStageCount + 1],
     int cycleTicks,
@@ -169,7 +211,7 @@ bool PhaseFluxMath::deriveTickPosition(
         }
     }
     slotIdx = slot;
-    activeCell = int(kSnakeOrder[slot]);
+    activeCell = int(traversal[slot]);
 
     int slotTicks = cumulativeTicks[slot + 1] - cumulativeTicks[slot];
     if (slotTicks <= 0) {

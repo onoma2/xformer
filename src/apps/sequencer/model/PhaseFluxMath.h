@@ -14,6 +14,17 @@ public:
     static constexpr int kStageCount = PhaseFluxSequence::StageCount;
 
     /** §2 — boustrophedon snake permutation of the 4×4 grid. */
+    /** Traversal patterns — 8 different walks across the 4×4 grid.
+     *  Index 0 = PhaseFlux original top-down snake (default for back-compat).
+     *  Indices 1..7 = Make Noise René mk2 Access Patterns 1..7 (rows,
+     *  snake-up, columns, column-zigzag, spirals, diagonals).
+     *  Used by engine + UI to map slotIdx → cellIdx. */
+    static constexpr int kTraversalPatternCount = 8;
+    static const std::array<uint8_t, kStageCount> &traversalOrder(int patternIdx);
+    static const char *traversalPatternName(int patternIdx);
+
+    /** Back-compat alias — returns traversalOrder(0). Existing call sites
+     *  that don't yet thread the pattern argument keep working. */
     static const std::array<uint8_t, kStageCount> &snakeOrder();
 
     /** Per-stage divisor as a fraction (num/den) — multiplier against the
@@ -69,6 +80,7 @@ public:
      * cycle < floor is proportionally stretched.
      */
     static int computeCumulativeTicks(
+        const std::array<uint8_t, kStageCount> &traversal,
         const int stageDivisorTicksArr[kStageCount],
         const int stageLenArr[kStageCount],
         const bool skip[kStageCount],
@@ -82,6 +94,7 @@ public:
      * (cycleTicks == 0); outputs untouched in that case.
      */
     static bool deriveTickPosition(
+        const std::array<uint8_t, kStageCount> &traversal,
         uint32_t relativeTick,
         const int cumulativeTicks[kStageCount + 1],
         int cycleTicks,

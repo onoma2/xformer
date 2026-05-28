@@ -23,7 +23,7 @@ CASE("slot_zero_at_tick_zero") {
 
     int slot = -1, cell = -1;
     float phase = -1.0f;
-    bool ok = PhaseFluxMath::deriveTickPosition(0, cum, cum[16], slot, cell, phase);
+    bool ok = PhaseFluxMath::deriveTickPosition(PhaseFluxMath::snakeOrder(),0, cum, cum[16], slot, cell, phase);
 
     expectTrue(ok, "deriveTickPosition must succeed for tick 0");
     expectEqual(slot, 0, "slotIdx 0 at tick 0");
@@ -37,7 +37,7 @@ CASE("slot_advance_at_boundary") {
     // tick 12 is exactly the start of slot 1.
     int slot = -1, cell = -1;
     float phase = -1.0f;
-    bool ok = PhaseFluxMath::deriveTickPosition(12, cum, cum[16], slot, cell, phase);
+    bool ok = PhaseFluxMath::deriveTickPosition(PhaseFluxMath::snakeOrder(),12, cum, cum[16], slot, cell, phase);
 
     expectTrue(ok, "derivation succeeds");
     expectEqual(slot, 1, "slot advances on the boundary tick");
@@ -49,7 +49,7 @@ CASE("stage_phase_mid_slot") {
     buildUniform(cum, 12);
     int slot = -1, cell = -1;
     float phase = -1.0f;
-    bool ok = PhaseFluxMath::deriveTickPosition(6, cum, cum[16], slot, cell, phase);
+    bool ok = PhaseFluxMath::deriveTickPosition(PhaseFluxMath::snakeOrder(),6, cum, cum[16], slot, cell, phase);
 
     expectTrue(ok, "derivation succeeds");
     expectEqual(slot, 0, "still in slot 0 at tick 6");
@@ -64,7 +64,7 @@ CASE("cycle_wraparound") {
     int slot = -1, cell = -1;
     float phase = -1.0f;
     // tick 200 mod 192 = 8 → slot 0 (0..12), phase 8/12 ≈ 0.667
-    bool ok = PhaseFluxMath::deriveTickPosition(200, cum, cycle, slot, cell, phase);
+    bool ok = PhaseFluxMath::deriveTickPosition(PhaseFluxMath::snakeOrder(),200, cum, cycle, slot, cell, phase);
 
     expectTrue(ok, "derivation succeeds");
     expectEqual(slot, 0, "wraps back to slot 0");
@@ -78,7 +78,7 @@ CASE("large_relative_tick") {
 
     int slot = -1, cell = -1;
     float phase = -1.0f;
-    bool ok = PhaseFluxMath::deriveTickPosition(1000000u, cum, cycle, slot, cell, phase);
+    bool ok = PhaseFluxMath::deriveTickPosition(PhaseFluxMath::snakeOrder(),1000000u, cum, cycle, slot, cell, phase);
 
     expectTrue(ok, "derivation succeeds for large tick");
     expectTrue(slot >= 0 && slot < 16, "slotIdx within range");
@@ -90,7 +90,7 @@ CASE("idle_returns_false") {
     int cum[17] = { 0 };
     int slot = 99, cell = 99;
     float phase = 99.0f;
-    bool ok = PhaseFluxMath::deriveTickPosition(42, cum, 0, slot, cell, phase);
+    bool ok = PhaseFluxMath::deriveTickPosition(PhaseFluxMath::snakeOrder(),42, cum, 0, slot, cell, phase);
 
     expectFalse(ok, "idle cycleTicks=0 returns false");
     expectEqual(slot, 99, "outputs left untouched in idle");
@@ -108,7 +108,7 @@ CASE("snake_remap_active_cell") {
         uint32_t tick = uint32_t(i * 10 + 5);
         int slot = -1, cell = -1;
         float phase = -1.0f;
-        bool ok = PhaseFluxMath::deriveTickPosition(tick, cum, cum[16], slot, cell, phase);
+        bool ok = PhaseFluxMath::deriveTickPosition(PhaseFluxMath::snakeOrder(),tick, cum, cum[16], slot, cell, phase);
         expectTrue(ok, "derivation succeeds for midpoint sweep");
         expectEqual(slot, i, "slot tracks i");
         expectEqual(cell, int(snake[i]), "activeCell = snakeOrder[slotIdx]");
@@ -129,13 +129,13 @@ CASE("non_uniform_durations") {
     float phase = -1.0f;
 
     // tick at start of slot 2 should land in slot 2.
-    bool ok = PhaseFluxMath::deriveTickPosition(uint32_t(cum[2]), cum, cycle, slot, cell, phase);
+    bool ok = PhaseFluxMath::deriveTickPosition(PhaseFluxMath::snakeOrder(),uint32_t(cum[2]), cum, cycle, slot, cell, phase);
     expectTrue(ok, "derivation succeeds");
     expectEqual(slot, 2, "non-uniform: slot at cum[2] boundary");
     expectTrue(nearly(phase, 0.0f), "phase at boundary is 0");
 
     // tick at mid of slot 3 (24-tick stage): cum[3] + 12 → phase 0.5
-    ok = PhaseFluxMath::deriveTickPosition(uint32_t(cum[3] + 12), cum, cycle, slot, cell, phase);
+    ok = PhaseFluxMath::deriveTickPosition(PhaseFluxMath::snakeOrder(),uint32_t(cum[3] + 12), cum, cycle, slot, cell, phase);
     expectTrue(ok, "derivation succeeds");
     expectEqual(slot, 3, "non-uniform: in slot 3");
     expectTrue(nearly(phase, 0.5f), "phase 0.5 halfway through 24-tick stage");

@@ -443,6 +443,14 @@ public:
     }
     void printCyclePhaseWarp(StringBuilder &str) const { str("%+d", cyclePhaseWarp()); }
 
+    // traversalPattern — picks which of the 8 grid-walk patterns the engine
+    // uses to map slotIdx → cellIdx. Index 0 = PhaseFlux original snake
+    // (default). 1..7 = Make Noise René mk2 Access Patterns 1..7.
+    int traversalPattern() const { return _traversalPattern; }
+    void setTraversalPattern(int v) { _traversalPattern = clamp(v, 0, 7); }
+    void editTraversalPattern(int value, bool) { setTraversalPattern(traversalPattern() + value); }
+    void printTraversalPattern(StringBuilder &str) const;
+
     // Snap to grid — press-to-fire from MACRO P1. Two passes:
     //  1. globalPhase → nearest 1/16 of cycle.
     //  2. Each non-skipped stage's stageLen → nearest whole project beat
@@ -558,6 +566,7 @@ private:
     int8_t _pulseNudge = 0;
     int8_t _lenNudge = 0;
     int8_t _cyclePhaseWarp = 0;
+    uint8_t _traversalPattern = 0;
     Routable<uint16_t> _divisor;
     Routable<uint8_t> _clockMultiplier;
 
