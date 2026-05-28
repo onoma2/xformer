@@ -39,6 +39,7 @@
 19. **Three surfaces, NoteTrack-modeled.** EditPage (BasePage) + SequencePage (ListPage backed by `*SequenceListModel`) + `*TrackListModel` for the shared TrackPage. Wire through three switches in TopPage (`setSequenceEditPage`, `setSequenceView`) and TrackPage (`setTrack`).
 20. **Render proposals with `ui-preview/`.** ASCII sketches lie about pixel widths. Run the python tool, read the PNG, then ask for review (CLAUDE.md rule).
 21. **Tag concepts.** `(code)`, `(ui)`, `(idea)` — every named term, every reply (CLAUDE.md rule).
+22. **UI infrastructure baseline.** Every track-mode EditPage owes the user four infrastructure surfaces beyond its own per-cell content: clipboard hooks (copy/paste at sequence level), context menu (`PAGE+Shift` opens INIT/COPY/PASTE/DUP), quickEdit shortcuts (`PAGE+S8..S15` for muscle-memory actions like shake/init/even/random), and USB keyboard baseline (F1-F5 + Tab + arrows). See §17.2-17.5. Skipping any of these = the page feels half-finished compared to NoteTrack/Stochastic/IndexedSequence.
 
 ---
 
@@ -93,7 +94,43 @@
 [Items not gating design — implementer-resolves. Bit layout, RAM measurement command. Do NOT include a serialization version policy — dev branch does not bump `ProjectVersion`; see `src/apps/sequencer/model/ProjectVersion.h` header comment.]
 
 ## 17. UI surfaces — modelled on NoteTrack
+
+### 17.1 Three primary files
 [Three files: EditPage, SequencePage, TrackListModel. Field tables. Wiring path with line refs to TopPage / TrackPage switches.]
+
+### 17.2 Clipboard hooks
+[Sequence-level copy/paste. Extend `model/ClipBoard.{h,cpp}` with `copyXxxSequence` / `pasteXxxSequence` / `canPasteXxxSequence` methods and add a `Type::XxxSequence` enum entry. The Pattern union in `ClipBoard.h` already accepts any `XxxSequence` so pattern-level copy/paste (across all tracks) works automatically via `PatternPage`. PhaseFlux precedent: ClipBoard.cpp adds three 4-line methods following the existing Stochastic/Tuesday pattern (`ClipBoard.cpp:62-71, 230-247, 322-340`).]
+
+### 17.3 Context menu — INIT (sub) / COPY / PASTE / DUP
+[Trigger via `key.isContextMenu()` (= PAGE+Shift) in `keyPress`. Standard four-item top menu:
+- **INIT** opens a sub-menu (nested `showContextMenu` call) with targets: **Stage** (selected cell `clear()`), **Topic** (current footer-topic params on appropriate scope — cell for shape topics, non-skipped cells + sequence config for accumulator topics, sequence-level for global topics), **Sequence** (`PhaseFluxSequence::clear()`), **Track** (whole `PhaseFluxTrack::clear()`).
+- **COPY** copies the current sequence to clipboard.
+- **PASTE** pastes when `canPasteXxxSequence()` returns true (greyed otherwise via `contextActionEnabled`).
+- **DUP** copies current → advances pattern index → pastes → clears clipboard (mirrors `PatternPage::duplicatePattern` scoped to this track only).
+
+Override `void contextShow(bool doubleClick = false) override` on the page. Define a `ContextAction` enum + `ContextMenuModel::Item[]` array. PhaseFlux precedent: `PhaseFluxEditPage.cpp` context-menu block.]
+
+### 17.4 QuickEdit shortcuts — PAGE+S8..S15
+[`Key::isQuickEdit()` = `pageModifier() && isStep() && step() >= 8`. `Key::quickEdit()` returns `step() - 8` (range 0..7, = visual steps 9..16). Convention across pages:
+- **Slot 4** (S13): INIT (= context-menu INIT shortcut)
+- **Slot 5** (S14): EVEN (distribute evenly)
+- **Slot 6** (S15): RANDOM / SHAKE — whole-topic randomize (Stochastic convention; PhaseFlux uses this for `shake(wholeTopic=true)`)
+- **Slot 7** (S16): page-scoped variant (PhaseFlux uses for `shake(wholeTopic=false)`)
+- Slots 0..3 (S9..S12) free for page-specific shortcuts.
+
+Use `!key.shiftModifier()` guard so SHIFT+PAGE+Sxx stays reserved for future variants. Action handlers should be independent functions reusable by the context menu — quickEdit is the muscle-memory path, context menu is the discoverable path; both end at the same handler. Precedent: `StochasticSequenceEditPage.cpp:1357,1404,1494`, `PhaseFluxEditPage.cpp` keyPress quickEdit block.]
+
+### 17.5 USB keyboard baseline
+[Minimal override matching `NoteSequenceEditPage::keyboard`:
+```cpp
+void XxxEditPage::keyboard(KeyboardEvent &event) override {
+    if (handleFunctionKeys(event)) return;   // F1..F5 → hardware F-buttons
+    BasePage::keyboard(event);               // Tab → context menu, arrows → nav + encoder
+}
+```
+Auto-included via BasePage: Tab → PAGE+SHIFT (= context menu), Left/Right → hardware Left/Right (Shift honored), Up/Down → encoder rotation (one click per press, honors hardware Encoder-pressed state). `TopPage::keyboard` adds Escape (pop page) + Space (play/stop) globally — no per-page handling needed.
+
+Richer shortcuts (Alt-combos, letter-keys for stage selection, text input) layer on top if the page warrants them. PhaseFlux precedent: `PhaseFluxEditPage::keyboard` two-line override.]
 
 ## 18. Testing & MVP acceptance
 [Phase A (math + storage foundations) / Phase B (first hw guard: boot + smoke + audible signal) / Phase C (remaining test families). MVP-done comprehensive gate list.]
