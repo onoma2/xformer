@@ -11,29 +11,38 @@ static const std::array<uint8_t, PhaseFluxMath::kStageCount> kSnakeOrder = {{
    15, 14, 13, 12,    // row 3  R -> L
 }};
 
-// Master-PPQN-192 ticks per StageDivisorSlot (CONFIG_PPQN=192).
-// Seq-PPQN-48 values multiplied by CONFIG_PPQN/CONFIG_SEQUENCE_PPQN=4.
-// If the slot enum is extended, extend this table in lockstep.
-static const int kStageDivisorTicks[8] = {
-    24,   // Div1_32
-    32,   // Div1_16T
-    48,   // Div1_16
-    64,   // Div1_8T
-    96,   // Div1_8
-   128,   // Div1_4T
-   192,   // Div1_4
-   384,   // Div1_2
+// Per-stage divisor as a fraction (num/den) multiplied against the sequence
+// divisor — Stochastic's `kStochasticDurationLut` pattern. At the NoteTrack
+// reference seqDivisor=12, slot labels match their musical name; change
+// seqDivisor and every cell scales uniformly. Slot 6 (Bar) is the default.
+static const PhaseFluxMath::StageDivisorFraction kStageDivisorFrac[8] = {
+    {  1, 1 },   // 0 Sixteenth — ×1     → 1/16 at seqDiv=12
+    {  4, 3 },   // 1 EighthT   — ×4/3   → 1/8T
+    {  2, 1 },   // 2 Eighth    — ×2     → 1/8
+    {  8, 3 },   // 3 QuarterT  — ×8/3   → 1/4T
+    {  4, 1 },   // 4 Quarter   — ×4     → 1/4
+    {  8, 1 },   // 5 Half      — ×8     → 1/2
+    { 16, 1 },   // 6 Bar       — ×16    → 1 bar  (DEFAULT)
+    { 32, 1 },   // 7 TwoBar    — ×32    → 2 bars
 };
 
 const std::array<uint8_t, PhaseFluxMath::kStageCount> &PhaseFluxMath::snakeOrder() {
     return kSnakeOrder;
 }
 
-int PhaseFluxMath::stageDivisorTicks(PhaseFluxSequence::StageDivisorSlot slot) {
+PhaseFluxMath::StageDivisorFraction PhaseFluxMath::stageDivisorFraction(PhaseFluxSequence::StageDivisorSlot slot) {
     int idx = int(slot);
     if (idx < 0) idx = 0;
     if (idx > 7) idx = 7;
-    return kStageDivisorTicks[idx];
+    return kStageDivisorFrac[idx];
+}
+
+int PhaseFluxMath::stageDivisorTicks(PhaseFluxSequence::StageDivisorSlot slot) {
+    // Master-PPQN-192 ticks at the calibration point (seqDivisor=12).
+    // kReferenceSequenceDivisor (= 12 in sequencer-PPQN-48) × 4 (master/seq ratio)
+    // = 48 master ticks per ×1 multiplier. Multiply by the slot's fraction.
+    auto frac = stageDivisorFraction(slot);
+    return (48 * int(frac.num)) / int(frac.den);
 }
 
 float PhaseFluxMath::powerBend(float z, float p) {

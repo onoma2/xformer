@@ -43,7 +43,7 @@ void PhaseFluxSequence::Stage::clear() {
     _data1.raw = 0;
     _data2.raw = 0;
     _data3.raw = 0;
-    setPulseCount(1);
+    setPulseCount(0);
     setBasePitch(0);
     setPitchRange(PitchRangeType::One);
     setPitchDirection(PitchDirectionType::Up);
@@ -67,7 +67,7 @@ void PhaseFluxSequence::Stage::clear() {
     setAccumulatorTrigger(AccumulatorTriggerType::Stage);
     setPulseAccumTrigger(AccumulatorTriggerType::Stage);
     setGateLength(50);
-    setStageDivisor(StageDivisorSlot::Div1_16);
+    setStageDivisor(StageDivisorSlot::Bar);
     setSkip(false);
     setStageLen(64);   // 64 = ×1 transparent default; sequence runs unchanged when stageLen is added
     setTemporalRepeat(RepeatType::x1);
@@ -112,8 +112,12 @@ void PhaseFluxSequence::clear() {
     _noteAccumConfig.setNegLim(28);
     _pulseAccumConfig.setPosLim(16);
     _pulseAccumConfig.setNegLim(16);
-    for (auto &stage : _stages) {
-        stage.clear();
+    for (size_t i = 0; i < _stages.size(); ++i) {
+        _stages[i].clear();
+        // Fresh sequence: only stage 0 active. Dial pulseCount on stage 0
+        // up to 16 → matches NoteTrack 16-step 1/16 grid (since default
+        // stageDivisor = Bar, seqDivisor = 12).
+        if (i > 0) _stages[i].setSkip(true);
     }
 }
 

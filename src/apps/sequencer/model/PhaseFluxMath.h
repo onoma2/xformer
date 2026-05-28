@@ -16,10 +16,18 @@ public:
     /** §2 — boustrophedon snake permutation of the 4×4 grid. */
     static const std::array<uint8_t, kStageCount> &snakeOrder();
 
-    /** Slot enum → ticks-per-stage AT the 1/16 reference base (sequence
-     *  divisor = 12 at PPQN-48). Stage divisor is therefore a relative
-     *  multiplier of the sequence base period — sequence divisor governs
-     *  the cycle length; stage slot picks each stage's ratio within. */
+    /** Per-stage divisor as a fraction (num/den) — multiplier against the
+     *  sequence divisor. Stochastic's `kStochasticDurationLut` pattern.
+     *  effectiveSequencerTicks = seqDivisor × num / den. Labels follow
+     *  seqDivisor via ModelUtils::printDivisorShort against the effective
+     *  divisor (which is then a known entry in the KnownDivisor table). */
+    struct StageDivisorFraction { uint16_t num; uint16_t den; };
+    static StageDivisorFraction stageDivisorFraction(PhaseFluxSequence::StageDivisorSlot slot);
+
+    /** Master-PPQN-192 ticks at the calibration point (seqDivisor=12).
+     *  Computed from stageDivisorFraction. Preserved as a function so
+     *  existing computeCumulativeTicks math (which rescales by current
+     *  seqDivisor) keeps working without changes. */
     static int stageDivisorTicks(PhaseFluxSequence::StageDivisorSlot slot);
 
     /** Reference sequence divisor (= 1/16 at PPQN-48). Stage tick table is

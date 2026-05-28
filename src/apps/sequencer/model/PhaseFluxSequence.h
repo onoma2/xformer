@@ -115,17 +115,19 @@ public:
         // 5..7 reserved
     };
 
-    // 3-bit slot index. Maps to Performer divisor primitive ticks via
-    // stageDivisorTicks(). Default slot 2 = 1/16 (12 ticks at PPQN 48).
+    // 3-bit slot index. Stochastic-style multiplier against sequence divisor —
+    // labels follow seqDivisor live (printStageDivisor uses ModelUtils::
+    // printDivisorShort against the effective divisor). Default slot 6 (Bar)
+    // gives one-bar cells at the NoteTrack-default seqDivisor=12.
     enum class StageDivisorSlot : uint8_t {
-        Div1_32 = 0,
-        Div1_16T = 1,
-        Div1_16 = 2,
-        Div1_8T = 3,
-        Div1_8 = 4,
-        Div1_4T = 5,
-        Div1_4 = 6,
-        Div1_2 = 7,
+        Sixteenth = 0,    // ×1     = 1/16 at seqDiv=12
+        EighthT   = 1,    // ×4/3   = 1/8T
+        Eighth    = 2,    // ×2     = 1/8
+        QuarterT  = 3,    // ×8/3   = 1/4T
+        Quarter   = 4,    // ×4     = 1/4
+        Half      = 5,    // ×8     = 1/2
+        Bar       = 6,    // ×16    = 1 bar  ← DEFAULT
+        TwoBar    = 7,    // ×32    = 2 bars
     };
 
     class Stage {

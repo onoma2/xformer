@@ -109,33 +109,14 @@ void Project::clear() {
 
     // Track 7: Note with empty sequence (gates all off — NoteSequence::clear default).
 
-    // Track 8: PhaseFlux — Repeat/Window testbed. Stages 0 & 1 active with
-    // pulseCount=8, Linear temporal curve, Window=Polarize50 (max), Repeat=x5
-    // (max). Stages 2..15 skipped. Accumulator defaults from clear().
+    // Track 8: PhaseFlux — boot to NoteTrack-equivalent metronome. Stage 0
+    // active (Sequence::clear() defaults), pulseCount overridden to 16 so the
+    // simulator emits 1/16-grid pulses out of the box. Dialing pulseCount
+    // back down to 0 silences. Other stages remain skipped per clear().
     track(7).setTrackMode(Track::TrackMode::PhaseFlux);
     auto &pfTrack = track(7).phaseFluxTrack();
     auto &pfSeq = pfTrack.sequence(0);
-
-    pfSeq.setDivisor(96);
-
-    using PitchCurve = PhaseFluxSequence::PitchCurveType;
-    using TempCurve  = PhaseFluxSequence::TemporalCurveType;
-    using Window     = PhaseFluxSequence::WindowType;
-    using Repeat     = PhaseFluxSequence::RepeatType;
-
-    for (int i = 0; i < 16; ++i) {
-        auto &stage = pfSeq.stage(i);
-        const bool active = (i < 2);
-        stage.setPulseCount(8);
-        stage.setBasePitch(0);
-        stage.setGateLength(40);
-        stage.setPitchCurve(PitchCurve::Ramp);
-        stage.setTemporalCurve(TempCurve::Linear);
-        stage.setTemporalWindow(Window::Polarize50);
-        stage.setTemporalRepeat(Repeat::x5);
-        stage.setSkip(!active);
-    }
-
+    pfSeq.stage(0).setPulseCount(16);
     pfTrack.setOctave(+1);
 
     setTempo(80.f);
