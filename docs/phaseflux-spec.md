@@ -109,6 +109,15 @@ When all 16 cells have `skip=true`, `cycleTicks` would compute to 0 and the §3.
 
 The `cycleTicks < kMinCycleTicks` floor in §3.1 (clamped to one 1/32-note minimum, ~24 ticks at standard PPQN) is the second guard — it prevents the cycle from collapsing to audio-rate when most cells are skipped but at least one survives. The floor scales all cell durations proportionally so musical proportions are preserved at the minimum size.
 
+### 3.6 Skip behavior — `cycleLength: Adaptive | Fixed`
+
+Per-sequence `cycleLength` field on `PhaseFluxSequence` picks how `skip` participates in the cumulative table:
+
+- **`Adaptive`** (legacy): `raw = skip[cell] ? 0 : stageDivisorTicksArr[cell]`. Skipped stages contribute zero ticks to the cycle. Toggling skip resizes the cycle and shifts the playback rate of surviving stages against the external clock. Useful for live "drop a stage to tighten the loop" gestures.
+- **`Fixed`** (default for new sequences): `raw = stageDivisorTicksArr[cell]` unconditionally. Skipped stages keep their slot in the cycle but emit silence during it (`rebuildSchedule` early-returns with `scheduleCount = 0`; accumulators stay frozen for that slot — see §7.1). Toggling skip mutes a region without rearranging neighbor timing. Matches Note Track's gate-off-keeps-cycle-length precedent — only convention that exists elsewhere in the codebase.
+
+Default policy: existing serialized sequences load as `Adaptive` (preserves prior playback exactly); `clear()` initializes new sequences to `Fixed`. Storage uses one spare bit in the `_pitchRate` serialization byte (bit 5) — old files have bit 5 == 0 → Adaptive; no `ProjectVersion` bump.
+
 ---
 
 ## 4. Identity / storage model
@@ -535,31 +544,37 @@ phi_warped   = applyPowerBend(phi_repeated, pitchWarp)
 
 **Coverage gained**: Window unlocks "Bell-half = Ramp", "Triangle-half = monotonic", "Bounce-front = sharp pluck", "Bell-peak = sustained", and the mirror cases via FlipH/FlipV. Many shape characters reachable from a single base curve.
 
-### 6.2.1 Melody mask (centrality filter, per-stage)
+### 6.2.1 Melody mask (centrality filter, per-stage) — orthogonal union
 
-Each stage has `maskMelody` (0..100, threshold) and `tiltMelody` (0..100, tilt direction) — borrowed from Stochastic's `MaskMelody` / `TiltMelody` law (`engine/StochasticTrackEngine.cpp:454-466`). The pair filters pulses by the **innate scale-degree centrality** — tonic + fifth = high centrality, tritone-ish = low.
+Each stage has `maskMelody` (0..100, tonal-filter strength) and `tiltMelody` (0..100, anti-tonal-filter strength). The pair filters pulses by the **innate scale-degree centrality** — tonic + fifth = high centrality, tritone-ish = low. Two independent monotonic threshold sweeps on opposite ends of the centrality axis; pulse passes if EITHER filter admits it.
 
 ```
 N            = scale.notesPerOctave()
 degInOct     = ((degree[i] mod N) + N) mod N
-centrality   = stochasticPitchCentrality(degInOct, N) × 1000 / centralityMax    // 0..1000 milli-units
-effective    = ((100 − tiltMelody) × centrality + tiltMelody × (1000 − centrality)) / 100
-maskMilli    = maskMelody × 10
-passes       = effective ≥ (1000 − maskMilli)
+centrality   = stochasticPitchCentrality(degInOct, N)              // raw 0..centralityMax
+maskThresh   = centralityMax × (100 − maskMelody) / 100
+tiltThresh   = centralityMax × (100 − tiltMelody) / 100
+maskPass     = centrality ≥ maskThresh
+tiltPass     = tiltMelody > 0 ∧ (centralityMax − centrality) ≥ tiltThresh
+passes       = maskPass ∨ tiltPass
 ```
 
-- `tiltMelody = 0` → high-centrality (tonal) degrees survive at low mask values
-- `tiltMelody = 100` → low-centrality (anti-tonal) degrees survive at low mask values
-- `maskMelody = 100` → bypass (everything passes)
-- `maskMelody = 0` + `tiltMelody = 0` → only tonic survives, every other pulse becomes a rest
+- `maskMelody = 100` → mask filter bypass (every position passes via mask, tilt becomes inert)
+- `maskMelody = 0` → only top centrality (tonic) passes via mask
+- `tiltMelody = 0` → tilt filter disabled (no anti-tonal positions added)
+- `tiltMelody = 100` → tilt filter bypass (every position passes via tilt)
+- defaults `maskMelody = 100, tiltMelody = 0` → fully transparent (mask lets everything through, tilt adds nothing)
+- `maskMelody = 20, tiltMelody = 20` → root + most-anti-tonal pair (maximum-tension set)
+
+**Why this shape replaces the prior `lerp(centrality, complement, tilt/100)` formula**: any linear interpolation between a function and its complement has a fixed point at midpoint where every position collapses to the same effective value (the "dead zone"). The orthogonal-union design has each knob act on its own pool with no interaction in the formula — no dead zone, mask remains monotonic, tilt's polarity-flip semantic preserved as "add wrong notes" rather than "invert weights".
 
 **Fail action** (when `passes == false`): pulse becomes a rest — gate is suppressed. CV behavior is delegated to track-level `_cvUpdateMode` (§12.1, NoteTrack-uniform):
 - `CvUpdateMode::Gate` (default) → CV holds previous value through the silenced pulse
 - `CvUpdateMode::Always` → CV still updates to the would-be `degree[i]` silently (useful for slewing pitch under VCA control or feeding external modules)
 
-This is the same chassis NoteTrack uses for gate-off CV behavior (`NoteTrackEngine.cpp:824`) — no new logic, just routed through.
+**Scale-bias caveat**: `stochasticPitchCentrality` (`model/StochasticTypes.h:38`) is a triangular-kernel function with `halfWidth = N/6` and integer weights anchored to chromatic-scale assumptions (root 30, fifth 20, thirds 10, fourths 5). Tuned for 12-EDO; produces musically intuitive results on Chromatic, Major, Minor, and other 7+-degree diatonic scales. On scales with fewer degrees the kernel collapses: whole-tone (N=6) gives sharp integer hits with no overlap; pentatonic (N=5) double-counts two positions; microtonal scales below N≈5 produce degenerate distributions. UserScale precedent: weights MUST be algorithm-derived from position (not stored per-degree) because UserScale lets users define any N up to `CONFIG_USER_SCALE_SIZE`. Marbles-style per-degree weight authoring would require new UserScale UI; out of scope for MVP.
 
-**Scale-bias caveat**: `stochasticPitchCentrality` (`model/StochasticTypes.h:38`) is a triangular-kernel function with `halfWidth = N/6` and integer weights anchored to chromatic-scale assumptions (root 30, fifth 20, thirds 10, fourths 5). This is **tuned for 12-EDO** and produces musically intuitive results on Chromatic, Major, Minor, and other 7+-degree diatonic scales. On scales with fewer degrees the kernel collapses: whole-tone (N=6) gives sharp integer hits with no overlap; pentatonic (N=5) double-counts two positions; microtonal scales below N≈5 produce degenerate distributions. Players using non-12-EDO scales will see MaskMelody acting less smoothly than on chromatic — this is not a bug, it's the centrality function's domain. Spec inherits the existing Stochastic engine math verbatim; redesigning the centrality table for scale-agnostic behavior is post-MVP.
+The Stochastic engine carries the same orthogonal-union formula (`StochasticTrackEngine.cpp:454-471`) — semantics aligned across both engines.
 
 ### 6.3 Pulse mask
 
