@@ -170,6 +170,16 @@ _Updated: 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union 
 
 ---
 
+## ⚪ wallclock-time-architecture — Unify time handling: WallClock service (B) + PhaseFlux/Stochastic onto tickPosition (A)
+**Status:** ready — design validated against ER-101 reference, no code started.
+**Where I stopped:** Two gaps. (A) PhaseFlux + Stochastic re-derive phase from discrete integer tick while six other engines read the continuous `Clock::tickPosition()`. (B) Real wall-time is scattered across 3 `os::ticks()` behavioral sites (modulator `dt` `Engine.cpp:72`, MidiOutput CC rate-limit, MidiCv voice) with no service, and `os::ticks()` is 32-bit (wraps). ER-101's lesson (`OTHERS/ortagonal/er-101/wallclock.h`): single 64-bit free-running reference + `walltimer` with drift-free `end_time += delay` restart. NOT importing ER-101's synthetic-clock/tick-adjustment — xformer transport already centralizes cross-track sync.
+**Next action:** B first (substrate): add a 64-bit µs `WallClock` + `WallTimer` value type, migrate the 3 scattered sites, fold the slave-period outlier guard (ER-101 0.5×–2× latch) in — this absorbs the Phase 0 slave-clock item. A is parallel/independent: PhaseFlux + Stochastic read `tickPosition()`. Verify sim + STM32 + timing parity; hardware-check slave guard against a jittery clock.
+**Depends on:** nothing. Overlaps performer-improvements Phase 0 (slave-clock filter — same fix, this is its proper home).
+**Branch:** TBD
+**Reference:** `docs/plans/2026-05-29-wallclock-time-architecture-design.md` (validated design). ER-101 source at `OTHERS/ortagonal/er-101/` (`wallclock.h`, `res-er-clock.md`).
+
+---
+
 ## 🔵 fractal-track-implementation — Parent-material command/rule track (FractalTrack)
 **Status:** blocked — design re-anchored 2026-05-22 to parent material + volatile trunk + model-owned command rules; awaits stochastic completion and RAM budget.
 **Where I stopped:** Current best contract is now parent motif → section-sampled engine trunk → model rule sequence → output. The captured unit is a Fractal section, not a Performer step or parent event; parent provenance is opaque. Capture is a model rule family (record extent, Replace/Latch/Once, PunchIn, recordTrigger, lock), not hidden engine plumbing or a separate manual recorder phase. Trunk cell contract stores 11-bit CV + 4-bit gate length + valid; trunk is volatile engine state, never serialized.
