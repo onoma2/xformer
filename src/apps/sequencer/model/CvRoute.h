@@ -34,8 +34,18 @@ public:
         Last
     };
 
-    InputSource inputSource(int lane) const { return _inputs[lane]; }
-    OutputDest outputDest(int lane) const { return _outputs[lane]; }
+    InputSource inputSource(int lane) const {
+        if (lane < 0 || lane >= LaneCount) {
+            return InputSource::Off;
+        }
+        return _inputs[lane];
+    }
+    OutputDest outputDest(int lane) const {
+        if (lane < 0 || lane >= LaneCount) {
+            return OutputDest::None;
+        }
+        return _outputs[lane];
+    }
 
     void setInputSource(int lane, InputSource source) {
         if (lane < 0 || lane >= LaneCount) {

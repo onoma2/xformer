@@ -97,6 +97,7 @@ public:
                     _adsrTimer[index] = 0;
                 } else {
                     int attackTicks = (attackMs * CONFIG_PPQN) / 2500;
+                    if (attackTicks < 1) attackTicks = 1;
                     _adsrTimer[index]++;
                     level = clamp(static_cast<int>((127 * _adsrTimer[index]) / attackTicks), 0, 127);
                     if (level >= 127) {
@@ -114,6 +115,7 @@ public:
                     _adsrState[index] = ADSRState::Sustain;
                 } else {
                     int decayTicks = (decayMs * CONFIG_PPQN) / 2500;
+                    if (decayTicks < 1) decayTicks = 1;
                     _adsrTimer[index]++;
                     int decayAmount = 127 - sustainLevel;
                     level = 127 - clamp(static_cast<int>((decayAmount * _adsrTimer[index]) / decayTicks), 0, decayAmount);
@@ -135,6 +137,7 @@ public:
                     _adsrState[index] = ADSRState::Idle;
                 } else {
                     int releaseTicks = (releaseMs * CONFIG_PPQN) / 2500;
+                    if (releaseTicks < 1) releaseTicks = 1;
                     _adsrTimer[index]++;
                     level = startLevel - clamp(static_cast<int>((startLevel * _adsrTimer[index]) / releaseTicks), 0, startLevel);
                     if (level <= 0) {

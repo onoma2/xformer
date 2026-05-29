@@ -351,6 +351,14 @@ public:
         reader.read(_sustain);
         reader.read(_release);
         reader.read(_amplitude);
+
+        // Sanitize raw-read fields against bad/old file data: rate is used as a
+        // divisor, and out-of-range enums would fall through engine switches.
+        if (_rate < 6) _rate = 6;
+        if (_rate > 6144) _rate = 6144;
+        _shape = ModelUtils::clampedEnum(_shape);
+        _randomMode = ModelUtils::clampedEnum(_randomMode);
+        _mode = ModelUtils::clampedEnum(_mode);
     }
 
 private:
