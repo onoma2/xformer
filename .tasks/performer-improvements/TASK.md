@@ -191,6 +191,26 @@ section as reference only; implementation planning lives in the new task.
 
 ---
 
+## performer-nx Fork Survey
+
+`temp-ref/performer-nx` is a procedural-generation fork (Markov/Turing algo track, per-track LFO, acid bassline generator) built before XFORMER grew Tuesday, Stochastic, and global-modulators. Verdict: almost everything it adds is already covered by a more-developed XFORMER path. Surveyed 2026-05-29.
+
+| performer-nx feature | XFORMER status | Verdict |
+|----------------------|----------------|---------|
+| AlgorithmicTrack — Markov | Tuesday algo 3 "Markov" (`TuesdayTrackEngine.cpp:84`), also exposed as AlgoGenerator | Redundant — skip |
+| AlgorithmicTrack — Turing | No shift-register sequencer exists anywhere in src | **Gap — pull (see below)** |
+| LfoTrack (8 waveforms, sync/free) | global-modulators-v1: LFO/chaos shapes as routing sources | Redundant — skip |
+| LfoPainter | ModulatorPage already draws shape + live playhead + random/chaos scope (`ModulatorPage.cpp:254`) | Redundant — skip |
+| AcidBasslineGenerator | Tuesday already has glide→slide, accent, scale, bassline algos TriTrance/Stomper (`TuesdayAlgoCore.cpp:407`) | Redundant — skip |
+| PageKeyMap.h / MatrixMap.h / Colors.h | Inline key→page in TopPage / inline literals | Cosmetic refactor — optional, only if already in that code |
+| Texts.h (centralized strings) | Strings scattered across cpp/pages | Possible flash win — verify string dedup before adopting |
+| RoutableListModel.h | No generic routable list-model base | Dedup refactor — tracked under core-architecture-optimization |
+
+### Actionable: Turing as a Tuesday algo
+Add a Turing-machine (looping shift register with per-step bit-flip probability) as the 16th algorithm in `TuesdayAlgoCore`, not a new track type. Reuses the entire Tuesday track + AlgoGenerator + preview/apply plumbing for one algo's worth of code — no new TrackMode, no model-union growth, no new pages.
+
+---
+
 ## Implementation Plan (Prioritized)
 
 ### Phase 0: Critical Stability Fixes
