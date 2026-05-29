@@ -27,12 +27,19 @@ _Updated: 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union 
 **Branch:** TBD
 **Reference:** `.tasks/stability-fixes.md`
 
-## ⚪ teletype-v2-dialect — Performer-native Teletype++ dialect and Phase 1 data-model plan
-**Status:** ready — Phase 0 dialect definition is source-checked; Phase 1 plan is written.
-**Where I stopped:** `docs/teletype_v2.md` now defines the keep/drop/redesign contract, and `docs/teletype_v2_phase1_plan.md` outlines native program/runtime/output state steps.
-**Next action:** Start Phase 1 Step 1 by defining fixed-size native program storage and size probes, with no interpreter work yet.
+## 🟡 teletype-v2-dialect — Performer-native Teletype++ dialect and Phase 1 data-model plan
+**Status:** active — Phase 2 dialect landed on `feat/tt2-v2-native`: parser/lowering/evaluator/script-runner, native SCRIPT calls, EVERY/SKIP/PROB mods, narrow L loop with Teletype-correct I semantics. Six TT2 unit tests green; sim + STM32 release build clean (rebased onto dev tip).
+**Where I stopped:** `docs/teletype_v2.md` defines the keep/drop/redesign contract; `docs/teletype_v2_phase1_plan.md` outlines native program/runtime/output state. TT2TrackEngine/TeletypeInterpreter/TeletypeProgram/TeletypeRuntime/TeletypeOutputState in place.
+**Next action:** Implement narrow `DEL n: body` scheduling with `TT2DelayQueue`; keep `DEL.CLR`, `$`/function-return ops, `BREAK`, `KILL` out of the first slice.
 **Depends on:** RAM gates; Teletype runtime architecture lessons.
-**Branch:** TBD
+**Branch:** feat/tt2-v2-native (Phase 2 dialect work — parser/lowering/evaluator/native SCRIPT/EVERY/SKIP/PROB/loop — committed there, rebased onto dev tip)
+**Subtasks (Teletype family under this dialect umbrella):**
+- `teletype-performer-ecosystem-redesign` — 6-layer pipeline architecture overview (umbrella design context)
+- `teletype-runtime-architecture` — VM/slot/runtime ownership; Phase 0-4 hardware-verified 🟡
+- `teletype-cv-source-combiner` — raw/value-domain CV source pipeline for outputs 🟡
+- `teletype-edit-page` — multi-mode (INPUT/OUTPUT/CV/TIMING) config page 🟡
+- `teletype-keyboard-shortcuts` — F1-F5 + Alt shortcuts 🟢 (shipped via usb-keyboard-system)
+- `teletype-file-reliability` — save/load bug fixes 🟢 (merged to master)
 **Reference:** `.tasks/teletype-v2-dialect/TASK.md`
 
 ## 🟡 phaseflux — New TrackMode: 4×4 grid sequencer, stateless-ramp engine, scale-degree pitch, per-stage curves + transforms
@@ -106,13 +113,12 @@ _Updated: 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union 
 
 ---
 
-## ⚪ indexed-sequence-macro-refactor — Extract macro logic into IndexedSequence model
-**Status:** ready — not started
-**Where I stopped:** Identified ~700 lines of macro logic in `IndexedSequenceEditPage.cpp:1605-2304` that must move to `IndexedSequence` model methods. 20 macros across rhythm, waveform, melodic, and duration categories.
-**Next action:** Read macro code, catalog functions, design model API (individual methods vs. enum dispatch)
+## 🟢 indexed-sequence-macro-refactor — Extract macro logic into IndexedSequence model
+**Status:** done — macro logic lives in the model; EditPage only dispatches.
+**Where I stopped:** Eight `populateWithMacro*` methods (Rhythm/Triangle/Sawtooth/Scale/Arpeggio/Chord/Modal/RandomMelody) implemented in `IndexedSequence.cpp`; `IndexedSequenceEditPage.cpp` macro menus now call `sequence.populateWithMacro*(...)` instead of inlining the math.
+**Next action:** none — launchpad-track-port Phase 4 (Macro Grid v2) dependency is now cleared.
 **Depends on:** nothing
-**Blocks:** launchpad-track-port Phase 4 (Macro Grid v2 for Indexed)
-**Branch:** TBD
+**Branch:** (folded into feature history)
 
 ---
 
