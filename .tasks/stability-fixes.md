@@ -18,15 +18,17 @@ Narrow crash, corrupt-state, out-of-bounds, and bad-serialization fixes found du
 - [ ] **CV Router output one update stale** — `Engine.cpp`: `updateTrackOutputs()` reads `_cvRouteOutputs` before `updateOverrides()` recomputes them. Reorder CV Router computation before physical CV output composition. (Do this first.)
 
 **Crash / corruption:**
-- [ ] **Modulator deserialization sanitize** — `Modulator::read()`: bad project data can set `_rate=0` or invalid enums → divide-by-zero / invalid engine path.
-- [ ] **ADSR zero-tick clamp** — `ModulatorEngine.h`: small nonzero attack/decay/release compute zero ticks; clamp to ≥1.
-- [ ] **GeneratorPage bound-track/type guards** — draw/LED/input/context callbacks use type-specific accessors after the selected track changes.
-- [ ] **Generator relative-index OOB** — `RandomGenerator::update()` writes 64 values via `SequenceBuilder::setValue()`, which adds `firstStep`.
+- [x] **Modulator deserialization sanitize** — DONE (`fix/stability`): `read()` clamps `_rate` to [6,6144] and `shape`/`randomMode`/`mode` to valid enum range. Test: `TestModulatorReadSanitize`.
+- [x] **ADSR zero-tick clamp** — DONE (`fix/stability`): attack/decay/release ticks clamped to ≥1. Sub-ms times rounded to 0 froze the envelope (ARM divide-by-zero returns 0, not a trap). Test: `TestModulatorAdsrZeroTick`.
+- [ ] **GeneratorPage bound-track/type guards** — draw/LED/input/context callbacks use type-specific accessors after the selected track changes. (Verify against `feat/generator` first.)
+- [ ] **Generator relative-index OOB** — `RandomGenerator::update()` writes 64 values via `SequenceBuilder::setValue()`, which adds `firstStep`. (Verify against `feat/generator` first.)
 
 **Hardening (recommended, not known-live):**
 - [ ] **Bus writer arbitration** — RoutingEngine / CV Router / Teletype all write bus CV, implicit last-writer-wins; add priority or observability.
 - [ ] **Bus shaper stale state** — source/bias/depth/min/max edits don't trigger shaper reset (only target/tracks/shaper do).
-- [ ] **CvRoute getter guards** — `inputSource()`/`outputDest()` index arrays unguarded while setters already guard. Backlog hardening — current callers appear valid.
+- [x] **CvRoute getter guards** — DONE (`fix/stability`): `inputSource()`/`outputDest()` guard invalid lanes (return Off/None) like the setters. Test: `TestCvRouteLaneGuard`.
+
+**Still open (this session deferred):** CV Router output ordering (critical — needs hardware audition), GeneratorPage + Generator-OOB (verify on `feat/generator`), bus arbitration + bus shaper (design-ish hardening).
 
 ## Moved out / already done
 - **Slave-clock scheduling-period filter** → now owned by `wallclock-time-architecture` (the WallClock service folds in the slave-period outlier guard; ER-101's 0.5×–2× latch is the proven minimum). Not here.
@@ -42,6 +44,7 @@ Narrow crash, corrupt-state, out-of-bounds, and bad-serialization fixes found du
 - 2026-05-22: Initial scope is stability only. Excluded semantics/UI-only issues: modulator wall-clock vs transport-clock behavior, modulator scaling feel, generator A/B label polish.
 - 2026-05-22: Adversarial review identified the first four stability issues; Scope/CV Router/Bus audit identified one critical timing fix and two recommended bus-system hardening items.
 - 2026-05-29: Folded into `performer-improvements` Phase 0, then re-extracted to a standalone task — stability/crash fixes are a different concern from fork-feature integration, and the slave-clock item had migrated to `wallclock-time-architecture`.
+- 2026-05-29: Landed first three (TDD, branch `fix/stability`): CvRoute lane guards, ADSR zero-tick clamp, Modulator read sanitize. Confirmed the ADSR bug is a frozen envelope on ARM (divide-by-zero returns 0), not a crash. Sim tests green, STM32 release builds.
 
 ## Notes
 - Items GeneratorPage + Generator-OOB touch generator code that moved to `feat/generator` (generator-preview-apply); verify against that branch before fixing.

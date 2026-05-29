@@ -114,12 +114,12 @@ _Updated: 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union 
 
 ---
 
-## ⚪ stability-fixes — Narrow crash/corruption fixes from adversarial reviews
-**Status:** ready — re-extracted from performer-improvements Phase 0 (2026-05-29); no code started.
-**Where I stopped:** Crash/corrupt-state/OOB/bad-serialization fixes only. Critical: CV Router output one update stale (`Engine.cpp`). Crash: Modulator deserialize sanitize, ADSR zero-tick clamp, GeneratorPage type guards, Generator relative-index OOB. Hardening: bus writer arbitration, bus shaper stale state, CvRoute getter guards. SortedQueue overflow + SANITIZE_TRACK_MODE already done in main; slave-clock filter moved to wallclock-time-architecture.
-**Next action:** CV Router output ordering first, then Modulator/Generator crash fixes, then bus observability.
-**Depends on:** nothing. (GeneratorPage + Generator-OOB items overlap code on `feat/generator` — verify there before fixing.)
-**Branch:** TBD
+## 🟡 stability-fixes — Narrow crash/corruption fixes from adversarial reviews
+**Status:** in progress — 3 of the audit fixes landed on `fix/stability` (TDD); rest deferred.
+**Where I stopped:** DONE: CvRoute lane guards, ADSR zero-tick clamp, Modulator read sanitize (3 new unit tests green, STM32 release builds). REMAINING: CV Router output ordering (critical — needs hardware audition), GeneratorPage type guards + Generator relative-index OOB (verify on `feat/generator` first), bus writer arbitration + bus shaper stale state (design-ish hardening). SortedQueue overflow + SANITIZE_TRACK_MODE already in main; slave-clock filter owned by wallclock-time-architecture.
+**Next action:** Hardware-audition the CV Router output-ordering fix next session; reconcile the two generator items against `feat/generator`.
+**Depends on:** nothing. (GeneratorPage + Generator-OOB overlap `feat/generator` — verify there before fixing.)
+**Branch:** fix/stability (off dev)
 **Reference:** `.tasks/stability-fixes.md`
 
 ---
