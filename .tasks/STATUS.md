@@ -156,7 +156,17 @@ _Updated: 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union 
 **Next action:** Step 1 in TASK.md — reproduce the mouse-rejection crash on hardware with the rejection at `usbh_driver_hid.c:218-224` removed, observe whether keyboard/Launchpad survive, to establish the failure boundary before designing a fix.
 **Depends on:** none (gated on libusbhost mouse-enumeration root cause investigation, which is step 1 of this task itself)
 **Branch:** feat/usb-mouse-to-route (from master @ 11b5dae0)
-**Reference:** `.tasks/usb-mouse-to-route/TASK.md`
+**Reference:** `.tasks/usb-mouse-to-route/TASK.md`. Precursor: `hid-keyboard-layering` gives mouse decode a home in `hid/` so it doesn't land back in UI.
+
+---
+
+## ⚪ hid-keyboard-layering — Extract USB-keyboard HID decode out of UI into `hid/` module
+**Status:** ready — design validated, no code started.
+**Where I stopped:** `ui/KeyboardManager` straddles three layers (HID decode / event buffering / UI dispatch). Decision: sibling decode headers in a new neutral `apps/sequencer/hid/` module (no `HidDevice` base — keyboard/mouse share little decode). `hid/Keyboard.h` gets `keycodeToAscii`/`keycodeToStep` + shared `Report` struct; `hid/Mouse.h` ships as a documented stub (decode deferred to usb-mouse-to-route, which is gated on the libusbhost crash). All keyboard decode callers are internal to KeyboardManager.cpp — self-contained. Engine handler signature untouched this pass.
+**Next action:** Create `hid/Keyboard.{h,cpp}` (move decode verbatim), retype ring buffer to `Hid::Keyboard::Report`, stub `hid/Mouse.h`, add `TestHidKeyboard.cpp`, wire CMake. Verify sim + STM32 release (pure code move, RAM/flash-neutral).
+**Depends on:** nothing (pure relocation, no behavior change). Unblocks the `hid/` home for usb-mouse-to-route.
+**Branch:** TBD
+**Reference:** `docs/plans/2026-05-29-hid-keyboard-layering-design.md` (validated design). Prior `usb-keyboard-manager-refactor` (🟢 done) moved decode Ui→KeyboardManager; this moves it KeyboardManager→`hid/`.
 
 ---
 
