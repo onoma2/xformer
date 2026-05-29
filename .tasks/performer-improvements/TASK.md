@@ -219,23 +219,26 @@ Crash, corrupt-state, out-of-bounds, and bad-serialization fixes only — no fee
 
 **Critical (timing/stability):**
 1. **CV Router output one update stale** — `Engine.cpp`: `updateTrackOutputs()` reads `_cvRouteOutputs` before `updateOverrides()` recomputes them. Reorder CV Router computation before physical CV output composition.
+2. **Slave clock scheduling-period unfiltered** — `Clock.cpp:152`: `slaveTick()` assigns `_slaveTickPeriodUs = periodUs` raw, and `:155` derives the sub-tick period from it with no outlier guard or window. A swung/jittery external clock jitters playback timing. (Display BPM is already smoothed at `:165` — `0.9*prev + 0.1*bpm` + running avg — but the timing-critical period path is not.) Port performer-nx's filter pipeline: first estimate → pair-averaged across 2 ticks → >25%-from-average outlier clamp → 8-sample sliding window.
 
 **Crash / corruption:**
-2. **Modulator deserialization sanitize** — `Modulator.h` `Modulator::read()`: bad project data can set `_rate=0` or invalid enums → divide-by-zero / invalid engine path.
-3. **ADSR zero-tick clamp** — `ModulatorEngine.h`: small nonzero attack/decay/release compute zero ticks; clamp to ≥1.
-4. **GeneratorPage bound-track/type guards** — `GeneratorPage.cpp`: draw/LED/input/context callbacks use type-specific accessors after the selected track changes.
-5. **Generator relative-index OOB** — `RandomGenerator.cpp` / `SequenceBuilder.h`: `RandomGenerator::update()` writes 64 values via `SequenceBuilder::setValue()`, which adds `firstStep`.
+3. **Modulator deserialization sanitize** — `Modulator.h` `Modulator::read()`: bad project data can set `_rate=0` or invalid enums → divide-by-zero / invalid engine path.
+4. **ADSR zero-tick clamp** — `ModulatorEngine.h`: small nonzero attack/decay/release compute zero ticks; clamp to ≥1.
+5. **GeneratorPage bound-track/type guards** — `GeneratorPage.cpp`: draw/LED/input/context callbacks use type-specific accessors after the selected track changes.
+6. **Generator relative-index OOB** — `RandomGenerator.cpp` / `SequenceBuilder.h`: `RandomGenerator::update()` writes 64 values via `SequenceBuilder::setValue()`, which adds `firstStep`.
 
 **Hardening (recommended, not known-live):**
-6. **Bus writer arbitration** — `RoutingEngine.cpp`: RoutingEngine / CV Router / Teletype all write bus CV, implicit last-writer-wins; add priority or observability.
-7. **Bus shaper stale state** — `RoutingEngine.cpp`: source/bias/depth/min/max edits don't trigger shaper reset (only target/tracks/shaper do).
-8. **CvRoute getter guards** — `CvRoute.h`: `inputSource()`/`outputDest()` index arrays unguarded while setters already guard. Backlog hardening — current callers appear valid.
+7. **Bus writer arbitration** — `RoutingEngine.cpp`: RoutingEngine / CV Router / Teletype all write bus CV, implicit last-writer-wins; add priority or observability.
+8. **Bus shaper stale state** — `RoutingEngine.cpp`: source/bias/depth/min/max edits don't trigger shaper reset (only target/tracks/shaper do).
+9. **CvRoute getter guards** — `CvRoute.h`: `inputSource()`/`outputDest()` index arrays unguarded while setters already guard. Backlog hardening — current callers appear valid.
 
 **Open questions:**
 - Generator builders: absolute 0..63 addressing, or restrict to `builder.length()`?
 - Generator page invalid context: no-op, close, or revert+close on draw/LED callbacks?
 
-**Notes:** Items 4-5 touch generator code that moved to `feat/generator` (generator-preview-apply); verify against that branch before fixing. Scope page stays monitor-only (not a timing proof). Excluded as semantics/UI-only: modulator wall-clock vs transport-clock, modulator scaling feel, generator A/B label polish.
+**Already done in main (performer-nx survey, do not re-add):** SortedQueue drop-oldest overflow guard (`SortedQueue.h:32`, landed 2026-05-23); `SANITIZE_TRACK_MODE` enabled via `CONFIG_ENABLE_SANITIZE=1` (`TrackEngine.h:25`).
+
+**Notes:** Items 5-6 touch generator code that moved to `feat/generator` (generator-preview-apply); verify against that branch before fixing. Scope page stays monitor-only (not a timing proof). Excluded as semantics/UI-only: modulator wall-clock vs transport-clock, modulator scaling feel, generator A/B label polish.
 
 **Phase 0 decisions log** (carried from the former `stability-fixes` task):
 - 2026-05-22: CvRoute lane getter guards are low-cost hardening. Current callers appear valid, so this is backlog hardening, not a known live crash.
