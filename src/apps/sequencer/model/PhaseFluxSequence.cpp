@@ -136,6 +136,7 @@ void PhaseFluxSequence::clear() {
     _edited = 0;
     _pitchRate = uint8_t(defaultPitchRateIndex());
     _pitchMode = PitchMode::Cell;
+    _cycleLength = CycleLengthMode::Fixed;
     _globalPhase = 0.f;
     _warpNudge = 0;
     _responseNudge = 0;
@@ -165,7 +166,14 @@ void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_scale);
     writer.write(_rootNote);
     writer.write(_resetMeasure);
-    writer.write(_pitchRate);
+    // _pitchRate is 0..16 (5 bits). Pack cycleLength flag into bit 5 for
+    // forward-compatible storage — old files read bit 5 = 0 = Adaptive,
+    // preserving current playback exactly.
+    {
+        uint8_t packed = uint8_t(_pitchRate) & 0x1F;
+        if (_cycleLength == CycleLengthMode::Fixed) packed |= 0x20;
+        writer.write(packed);
+    }
     writer.write(static_cast<uint8_t>(_pitchMode));
     writer.write(_globalPhase);
     writer.write(_warpNudge);
@@ -187,7 +195,16 @@ void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
     reader.read(_scale);
     reader.read(_rootNote);
     reader.read(_resetMeasure);
-    reader.read(_pitchRate);
+    // _pitchRate packs cycleLength in bit 5 (see write()). Old files have
+    // bit 5 == 0 → Adaptive (preserves prior playback exactly).
+    {
+        uint8_t packed;
+        reader.read(packed);
+        _pitchRate = packed & 0x1F;
+        _cycleLength = (packed & 0x20)
+            ? CycleLengthMode::Fixed
+            : CycleLengthMode::Adaptive;
+    }
     uint8_t pitchMode;
     reader.read(pitchMode);
     _pitchMode = pitchMode < uint8_t(PitchMode::Last) ? static_cast<PitchMode>(pitchMode) : PitchMode::Cell;

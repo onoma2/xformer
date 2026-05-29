@@ -508,11 +508,49 @@ public:
     void editPitchMode(int value, bool) { setPitchMode(ModelUtils::adjustedEnum(pitchMode(), value)); }
     void printPitchMode(StringBuilder &str) const { str(pitchModeName(pitchMode())); }
 
+    // cycleLength — Adaptive = skipped stages drop out of cycle (current).
+    // Fixed = skipped stages stay in cycle but emit silence (Note-Track-like).
+    enum class CycleLengthMode : uint8_t {
+        Adaptive,
+        Fixed,
+        Last
+    };
+
+    static const char *cycleLengthModeName(CycleLengthMode mode) {
+        switch (mode) {
+        case CycleLengthMode::Adaptive: return "Adaptive";
+        case CycleLengthMode::Fixed:    return "Fixed";
+        case CycleLengthMode::Last:     break;
+        }
+        return nullptr;
+    }
+
+    CycleLengthMode cycleLength() const { return _cycleLength; }
+    void setCycleLength(CycleLengthMode mode) { _cycleLength = ModelUtils::clampedEnum(mode); }
+    void editCycleLength(int value, bool) { setCycleLength(ModelUtils::adjustedEnum(cycleLength(), value)); }
+    void printCycleLength(StringBuilder &str) const { str(cycleLengthModeName(cycleLength())); }
+
     // accumulator configs — per-sequence note/pulse counter behavior (spec §13.3)
     const AccumulatorConfig &noteAccumConfig() const { return _noteAccumConfig; }
           AccumulatorConfig &noteAccumConfig()       { return _noteAccumConfig; }
     const AccumulatorConfig &pulseAccumConfig() const { return _pulseAccumConfig; }
           AccumulatorConfig &pulseAccumConfig()       { return _pulseAccumConfig; }
+
+    // accumulator mode — Stage = per-cell counter (each stage drifts alone),
+    // Sequence = shared counter (whole pattern transposes together).
+    static const char *accumModeName(AccumulatorConfig::Scope scope) {
+        return scope == AccumulatorConfig::Scope::Track ? "Sequence" : "Stage";
+    }
+    void editNoteAccumMode(int value, bool) {
+        int v = (int(_noteAccumConfig.scope()) + value) & 1;
+        _noteAccumConfig.setScope(AccumulatorConfig::Scope(v));
+    }
+    void printNoteAccumMode(StringBuilder &str) const { str(accumModeName(_noteAccumConfig.scope())); }
+    void editPulseAccumMode(int value, bool) {
+        int v = (int(_pulseAccumConfig.scope()) + value) & 1;
+        _pulseAccumConfig.setScope(AccumulatorConfig::Scope(v));
+    }
+    void printPulseAccumMode(StringBuilder &str) const { str(accumModeName(_pulseAccumConfig.scope())); }
 
     // edited — dirty bit for UI
     int edited() const { return _edited; }
@@ -560,6 +598,7 @@ private:
     uint8_t _edited = 0;
     uint8_t _pitchRate = 0;  // set to defaultPitchRateIndex() in clear()
     PitchMode _pitchMode = PitchMode::Cell;
+    CycleLengthMode _cycleLength = CycleLengthMode::Fixed;
     float _globalPhase = 0.f;
     int8_t _warpNudge = 0;
     int8_t _responseNudge = 0;

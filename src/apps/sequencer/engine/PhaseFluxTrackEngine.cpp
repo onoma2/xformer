@@ -14,7 +14,7 @@
 
 // PhaseFlux trigger-path instrumentation. Logs every rebuildSchedule + every
 // pulse fire to stderr. Comment the define to silence.
-#define DBG_PFX_ENABLE
+// #define DBG_PFX_ENABLE  // uncomment for sim-side debug; flooded the STM32 firmware → hw reboot after 3-5 min
 #ifdef DBG_PFX_ENABLE
 #define DBG_PFX(fmt, ...) std::fprintf(stderr, "[PFX] " fmt "\n", ##__VA_ARGS__)
 #else
@@ -212,13 +212,16 @@ void PhaseFluxTrackEngine::rebuildCumulativeTable() {
     _cachedClockMult = uint8_t(_sequence->clockMultiplier());
     _cachedLenNudge = int8_t(_sequence->lenNudge());
 
+    const bool fixedCycle =
+        _sequence->cycleLength() == PhaseFluxSequence::CycleLengthMode::Fixed;
     _cycleTicks = PhaseFluxMath::computeCumulativeTicks(
         PhaseFluxMath::traversalOrder(_sequence->traversalPattern()),
         stageDivisorTicksArr, stageLenArr, skipArr,
         _sequence->divisor(),
         int(_engine.measureDivisor()),
         _sequence->clockMultiplier(),
-        _cumulativeTicks);
+        _cumulativeTicks,
+        fixedCycle);
 
     // §3.4 — held gate from old layout ends; pulse-fire memory cleared.
     // _prevSlotIdx reset forces rebuildSchedule on next tick even if same slot.
@@ -253,6 +256,10 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
     if (slotDurationTicks <= 0) return;
 
     const auto &stage = _sequence->stage(_activeCell);
+
+    // Fixed cycle: skipped stages keep their slot but emit silence. Empty
+    // schedule, accumulators stay frozen for this slot.
+    if (stage.skip()) return;
 
     // §14.2 MACRO nudges — per-sequence uniform offsets read once per slot.
     const int warpNudge = _sequence->warpNudge();
@@ -410,20 +417,20 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
 
         int degree = baseDegree + int(std::round(offsetDegrees));
 
-        // §6.2.1 MaskMelody + TiltMelody — pitch-centrality filter ported from
-        // StochasticTrackEngine (12-EDO tuned; see StochasticTypes.h).
-        if (stage.maskMelody() < 100) {
+        // §6.2.1 Orthogonal union: mask = tonal filter on centrality,
+        // tilt = anti-tonal filter on inverted centrality. Pass = OR.
+        // mask=100 bypasses mask filter (all pass); tilt=0 disables tilt filter.
+        {
             const int N = scale.notesPerOctave();
-            if (N > 0) {
+            if (N > 0 && (stage.maskMelody() < 100 || stage.tiltMelody() > 0)) {
                 int degInOct = ((degree % N) + N) % N;
-                const uint32_t centralityMilli = std::min<uint32_t>(1000,
-                    uint32_t(stochasticPitchCentrality(degInOct, N)) * 1000u /
-                    uint32_t(kStochasticPitchCentralityMax));
-                const uint32_t tiltMag = uint32_t(stage.tiltMelody());
-                const uint32_t effectiveMilli =
-                    ((100 - tiltMag) * centralityMilli + tiltMag * (1000 - centralityMilli)) / 100;
-                const uint32_t maskMilli = uint32_t(stage.maskMelody()) * 10;
-                if (effectiveMilli < (1000 - maskMilli)) continue;
+                const int centrality = stochasticPitchCentrality(degInOct, N);
+                const int maskThresh = kStochasticPitchCentralityMax * (100 - int(stage.maskMelody())) / 100;
+                const int tiltThresh = kStochasticPitchCentralityMax * (100 - int(stage.tiltMelody())) / 100;
+                const bool maskPass = centrality >= maskThresh;
+                const bool tiltPass = stage.tiltMelody() > 0 &&
+                    (kStochasticPitchCentralityMax - centrality) >= tiltThresh;
+                if (!maskPass && !tiltPass) continue;
             }
         }
 
@@ -732,15 +739,20 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             const int completedCell = int(PhaseFluxMath::traversalOrder(_sequence->traversalPattern())[_prevSlotIdx]);
             const auto &completed = _sequence->stage(completedCell);
 
+            // Fixed cycle: skipped completing cell freezes its accumulator
+            // (slot was silent, no advance). Adaptive: skipped cells have
+            // zero-width slots so this branch never fires for them.
+            const bool advanceCompleted = !completed.skip();
+
             // Note accumulator — Stage trigger only here; Pulse trigger advances in rebuildSchedule's per-pulse loop.
-            if (completed.accumulatorTrigger() == PhaseFluxSequence::AccumulatorTriggerType::Stage) {
+            if (advanceCompleted && completed.accumulatorTrigger() == PhaseFluxSequence::AccumulatorTriggerType::Stage) {
                 const auto &cfg = _sequence->noteAccumConfig();
                 const int idx = (cfg.scope() == AccumulatorConfig::Scope::Track) ? 0 : completedCell;
                 advanceCounter(_noteAccumCounter[idx], _noteAccumDir[idx], cfg, completed.accumulatorStep());
             }
 
             // Pulse accumulator — Stage trigger only here; Pulse trigger advances in rebuildSchedule's per-pulse loop.
-            if (completed.pulseAccumTrigger() == PhaseFluxSequence::AccumulatorTriggerType::Stage) {
+            if (advanceCompleted && completed.pulseAccumTrigger() == PhaseFluxSequence::AccumulatorTriggerType::Stage) {
                 const auto &cfg = _sequence->pulseAccumConfig();
                 const int idx = (cfg.scope() == AccumulatorConfig::Scope::Track) ? 0 : completedCell;
                 advanceCounter(_pulseAccumCounter[idx], _pulseAccumDir[idx], cfg, completed.pulseAccumStep());

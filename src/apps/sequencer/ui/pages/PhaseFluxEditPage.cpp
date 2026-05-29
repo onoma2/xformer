@@ -171,11 +171,9 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     if (_currentSet == 1) {
         setName = isGlobalPitch ? "PTCH.G" : "PTCH";
     } else if (isAccumN) {
-        setName = (seqForHeader.noteAccumConfig().scope() == AccumulatorConfig::Scope::Track)
-            ? "ACCUM.NT" : "ACCUM.N";
+        setName = "ACCUM.N";
     } else if (isAccumP) {
-        setName = (seqForHeader.pulseAccumConfig().scope() == AccumulatorConfig::Scope::Track)
-            ? "ACCUM.PT" : "ACCUM.P";
+        setName = "ACCUM.P";
     } else if (isMacro) {
         setName = "MACRO";
     }
@@ -213,6 +211,12 @@ void PhaseFluxEditPage::draw(Canvas &canvas) {
     }
     const char *footer[5];
     for (int i = 0; i < 5; ++i) footer[i] = (*primary)[i];
+    // ACCUM P0 F2 — surface current Accum Mode (Stage/Sequence) per accumulator.
+    if ((isAccumN || isAccumP) && _topicPage == 0) {
+        const auto &cfg = isAccumN
+            ? seqForHeader.noteAccumConfig() : seqForHeader.pulseAccumConfig();
+        footer[1] = (cfg.scope() == AccumulatorConfig::Scope::Track) ? "M:Seq" : "M:Sta";
+    }
     WindowPainter::drawFooter(canvas, footer, pageKeyState(), _selectedSlot);
 
     // ACCUM owns the full content area — 1x16 row + pancakes + glyphs.
