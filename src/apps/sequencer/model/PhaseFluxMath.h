@@ -87,7 +87,8 @@ public:
         int sequenceDivisor,
         int measureDivisor,
         int clockMultiplier,
-        int cumulativeTicks[kStageCount + 1]);
+        int cumulativeTicks[kStageCount + 1],
+        bool fixedCycleLength = false);
 
     /**
      * §3.2 — Derive slot/cell/phase for a relativeTick. Returns false on idle

@@ -140,7 +140,8 @@ int PhaseFluxMath::computeCumulativeTicks(
     int sequenceDivisor,
     int measureDivisor,
     int clockMultiplier,
-    int cumulativeTicks[kStageCount + 1]) {
+    int cumulativeTicks[kStageCount + 1],
+    bool fixedCycleLength) {
 
     if (clockMultiplier <= 0) clockMultiplier = 100;
     if (sequenceDivisor <= 0) sequenceDivisor = kReferenceSequenceDivisor;
@@ -149,7 +150,10 @@ int PhaseFluxMath::computeCumulativeTicks(
     cumulativeTicks[0] = 0;
     for (int i = 0; i < kStageCount; ++i) {
         int cell = int(traversal[i]);
-        int raw = skip[cell] ? 0 : stageDivisorTicksArr[cell];
+        // Fixed cycle: skipped stages still contribute their slot to the cycle
+        // (engine emits silence during the slot). Adaptive: skipped stages
+        // drop out, cycle shrinks.
+        int raw = (!fixedCycleLength && skip[cell]) ? 0 : stageDivisorTicksArr[cell];
         // Sequence divisor scales the whole cycle uniformly. Stage slot table
         // is calibrated at the 1/16 reference (= kReferenceSequenceDivisor);
         // raw * (sequenceDivisor / reference) gives the per-stage tick count.

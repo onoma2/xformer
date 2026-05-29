@@ -40,6 +40,9 @@ private:
         PitchMode,
         PitchRate,
         Traversal,
+        CycleLength,
+        NoteAccumMode,
+        PulseAccumMode,
         // MACRO nudges + cyclePhaseWarp — §14.2.
         WarpNudge,
         ResponseNudge,
@@ -60,6 +63,9 @@ private:
         case PitchMode:      return "Pitch Mode";
         case PitchRate:      return "Pitch Rate";
         case Traversal:      return "Traversal";
+        case CycleLength:    return "Cycle Length";
+        case NoteAccumMode:  return "Note Accum Mode";
+        case PulseAccumMode: return "Pulse Accum Mode";
         case WarpNudge:      return "Warp Nudge";
         case ResponseNudge:  return "Resp Nudge";
         case PulseNudge:     return "Pulse Nudge";
@@ -83,6 +89,9 @@ private:
         case PitchMode:      _sequence->printPitchMode(str); break;
         case PitchRate:      _sequence->printPitchRate(str); break;
         case Traversal:      _sequence->printTraversalPattern(str); break;
+        case CycleLength:    _sequence->printCycleLength(str); break;
+        case NoteAccumMode:  _sequence->printNoteAccumMode(str); break;
+        case PulseAccumMode: _sequence->printPulseAccumMode(str); break;
         case WarpNudge:      _sequence->printWarpNudge(str); break;
         case ResponseNudge:  _sequence->printResponseNudge(str); break;
         case PulseNudge:     _sequence->printPulseNudge(str); break;
@@ -103,6 +112,9 @@ private:
         case PitchMode:      _sequence->editPitchMode(value, shift); break;
         case PitchRate:      _sequence->editPitchRate(value, shift); break;
         case Traversal:      _sequence->editTraversalPattern(value, shift); break;
+        case CycleLength:    _sequence->editCycleLength(value, shift); break;
+        case NoteAccumMode:  _sequence->editNoteAccumMode(value, shift); break;
+        case PulseAccumMode: _sequence->editPulseAccumMode(value, shift); break;
         case WarpNudge:      _sequence->editWarpNudge(value, shift); break;
         case ResponseNudge:  _sequence->editResponseNudge(value, shift); break;
         case PulseNudge:     _sequence->editPulseNudge(value, shift); break;

@@ -449,23 +449,23 @@ void StochasticTrackEngine::triggerStep(uint32_t tick, uint32_t divisor) {
             }
         }
 
-        // MaskM + TiltM — LoopM-only. Pitch-centrality filter: each played
-        // step's degree gets a centrality score; MaskM thresholds it. TiltM
-        // is unipolar inversion magnitude — 0 keeps high-centrality (tonal),
-        // 100 keeps low-centrality (anti-tonal). LiveM bypasses (inert).
+        // MaskM + TiltM — LoopM-only. Orthogonal union: mask = tonal filter
+        // on centrality, tilt = anti-tonal filter on inverted centrality.
+        // Pass = mask_filter OR tilt_filter. mask=100 bypasses mask filter
+        // (all pass); tilt=0 disables tilt filter. LiveM bypasses (inert).
         bool maskMelodyPass = true;
-        if (sequence.melodyMode() == StochasticSourceMode::Loop && sequence.maskMelody() < 100) {
+        if (sequence.melodyMode() == StochasticSourceMode::Loop &&
+            (sequence.maskMelody() < 100 || sequence.tiltMelody() > 0)) {
             const int N = activeNotes > 0 ? activeNotes : 1;
             int degInOct = pDegree % N;
             if (degInOct < 0) degInOct += N;
-            const uint32_t centralityMilli = std::min<uint32_t>(1000,
-                uint32_t(stochasticPitchCentrality(degInOct, N)) * 1000u /
-                uint32_t(kStochasticPitchCentralityMax));
-            const uint32_t tiltMag = uint32_t(sequence.tiltMelody());   // 0..100
-            const uint32_t effectiveMilli =
-                ((100 - tiltMag) * centralityMilli + tiltMag * (1000 - centralityMilli)) / 100;
-            const uint32_t maskMilli = uint32_t(sequence.maskMelody()) * 10;
-            maskMelodyPass = effectiveMilli >= (1000 - maskMilli);
+            const int centrality = stochasticPitchCentrality(degInOct, N);
+            const int maskThresh = kStochasticPitchCentralityMax * (100 - int(sequence.maskMelody())) / 100;
+            const int tiltThresh = kStochasticPitchCentralityMax * (100 - int(sequence.tiltMelody())) / 100;
+            const bool maskPass = centrality >= maskThresh;
+            const bool tiltPass = sequence.tiltMelody() > 0 &&
+                (kStochasticPitchCentralityMax - centrality) >= tiltThresh;
+            maskMelodyPass = maskPass || tiltPass;
         }
 
         isRest = pRest || !maskRhythmPass || !maskMelodyPass || !eval.rhythmValid() || !eval.melodyValid();
