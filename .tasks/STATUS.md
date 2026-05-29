@@ -114,10 +114,20 @@ _Updated: 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union 
 
 ---
 
-## 🟡 performer-improvements — Non-Launchpad improvements + stability fixes (VinxScorza, Modulove, Mebitek)
-**Status:** paused — Phase 1 wired and hardware-verified (6/8 items done); generator task extracted; former `stability-fixes` task folded in as Phase 0.
-**Where I stopped:** Phase 1 items completed: (1) Quick octave change Step+F1-F5, (2) Double-click Page context menus with 2s auto-close, (3) Short clock pulse 1ms floor, (4-6) PerformerPage mute LEDs + pattern labels + MenuWrap. Generator preview/apply extracted to `generator-preview-apply` task. Phase 0 (Critical Stability Fixes) absorbed from `stability-fixes` — CV Router ordering, Modulator/ADSR sanitize, Generator OOB guards, bus arbitration; nothing started.
-**Next action:** Phase 0 stability first — CV Router output ordering, then Modulator/Generator crash fixes. Then remaining Phase 1: Curve undo restoration.
+## ⚪ stability-fixes — Narrow crash/corruption fixes from adversarial reviews
+**Status:** ready — re-extracted from performer-improvements Phase 0 (2026-05-29); no code started.
+**Where I stopped:** Crash/corrupt-state/OOB/bad-serialization fixes only. Critical: CV Router output one update stale (`Engine.cpp`). Crash: Modulator deserialize sanitize, ADSR zero-tick clamp, GeneratorPage type guards, Generator relative-index OOB. Hardening: bus writer arbitration, bus shaper stale state, CvRoute getter guards. SortedQueue overflow + SANITIZE_TRACK_MODE already done in main; slave-clock filter moved to wallclock-time-architecture.
+**Next action:** CV Router output ordering first, then Modulator/Generator crash fixes, then bus observability.
+**Depends on:** nothing. (GeneratorPage + Generator-OOB items overlap code on `feat/generator` — verify there before fixing.)
+**Branch:** TBD
+**Reference:** `.tasks/stability-fixes.md`
+
+---
+
+## 🟡 performer-improvements — Non-Launchpad fork-feature integrations (VinxScorza, Modulove, Mebitek, performer-nx)
+**Status:** paused — Phase 1 wired and hardware-verified (6/8 items done); generator task extracted; stability re-extracted to its own task. Fork-feature integration only now.
+**Where I stopped:** Phase 1 items completed: (1) Quick octave change Step+F1-F5, (2) Double-click Page context menus with 2s auto-close, (3) Short clock pulse 1ms floor, (4-6) PerformerPage mute LEDs + pattern labels + MenuWrap. Generator preview/apply extracted to `generator-preview-apply`. Crash/corruption stability fixes re-extracted to `stability-fixes` (different concern). Still holds: performer-nx fork survey + Turing-as-Tuesday-algo actionable, and the deferred macro-overload open question.
+**Next action:** Remaining Phase 1: Curve undo restoration. Then generator-preview-apply Phase A.
 **Depends on:** resource-optimization (RAM headroom available)
 **Branch:** TBD
 
@@ -141,12 +151,12 @@ _Updated: 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union 
 
 ---
 
-## 🟡 route-reordering — Rearranging Routing::Target enum into signal-flow ordering
-**Status:** paused — Spec complete; no code started.
-**Where I stopped:** Spec written in `reorder-spec.md`. Target ordering by signal-flow agreed. `targetSerialize()` already decouples serialization from enum values.
-**Next action:** Update `Routing.h` enum, sentinel values, `isXxxTarget()` checks; then `Routing.cpp` `targetInfos[]` and `targetName()` order.
-**Depends on:** nothing (pure refactor, no behavior change)
-**Branch:** feat/modulators
+## 🔵 route-reordering — Rearranging Routing::Target enum into signal-flow ordering
+**Status:** blocked — gated on the routing direction decision. Reordering the `Target` enum now is throwaway work if the five-sources collapse rewrites/replaces it. Spec also stale (62-target snapshot, pre-Stochastic/PhaseFlux).
+**Where I stopped:** Spec written in `reorder-spec.md` (signal-flow order). `targetSerialize()` already decouples serialization from enum values, so reordering is behavior-safe — but premature.
+**Next action:** Wait for the routing direction decision (`core-architecture-optimization` → `routing-five-sources-map.md`). If the collapse happens, fold ordering into it. If "consistency pass only" wins, do this then.
+**Blocked-by:** routing direction decision (core-architecture-optimization routing-five-sources-map)
+**Branch:** TBD
 
 ---
 

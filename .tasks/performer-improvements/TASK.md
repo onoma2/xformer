@@ -233,38 +233,7 @@ No `Macro.h` consolidation as originally framed — the three categories don't b
 
 ## Implementation Plan (Prioritized)
 
-### Phase 0: Critical Stability Fixes
-
-Crash, corrupt-state, out-of-bounds, and bad-serialization fixes only — no feel/UI/labels. Folded in from the former `stability-fixes` task (adversarial-review findings). Recommended order: CV Router ordering first, then Modulator/Generator crash fixes, then bus observability.
-
-**Critical (timing/stability):**
-1. **CV Router output one update stale** — `Engine.cpp`: `updateTrackOutputs()` reads `_cvRouteOutputs` before `updateOverrides()` recomputes them. Reorder CV Router computation before physical CV output composition.
-2. **Slave clock scheduling-period unfiltered** — `Clock.cpp:152`: `slaveTick()` assigns `_slaveTickPeriodUs = periodUs` raw, and `:155` derives the sub-tick period from it with no outlier guard or window. A swung/jittery external clock jitters playback timing. (Display BPM is already smoothed at `:165` — `0.9*prev + 0.1*bpm` + running avg — but the timing-critical period path is not.) Port performer-nx's filter pipeline: first estimate → pair-averaged across 2 ticks → >25%-from-average outlier clamp → 8-sample sliding window. **Home moved:** this fix now belongs to `wallclock-time-architecture` (the WallClock service folds in the slave-period guard; ER-101's 0.5×–2× latch is the proven minimum). Do it there, not here.
-
-**Crash / corruption:**
-3. **Modulator deserialization sanitize** — `Modulator.h` `Modulator::read()`: bad project data can set `_rate=0` or invalid enums → divide-by-zero / invalid engine path.
-4. **ADSR zero-tick clamp** — `ModulatorEngine.h`: small nonzero attack/decay/release compute zero ticks; clamp to ≥1.
-5. **GeneratorPage bound-track/type guards** — `GeneratorPage.cpp`: draw/LED/input/context callbacks use type-specific accessors after the selected track changes.
-6. **Generator relative-index OOB** — `RandomGenerator.cpp` / `SequenceBuilder.h`: `RandomGenerator::update()` writes 64 values via `SequenceBuilder::setValue()`, which adds `firstStep`.
-
-**Hardening (recommended, not known-live):**
-7. **Bus writer arbitration** — `RoutingEngine.cpp`: RoutingEngine / CV Router / Teletype all write bus CV, implicit last-writer-wins; add priority or observability.
-8. **Bus shaper stale state** — `RoutingEngine.cpp`: source/bias/depth/min/max edits don't trigger shaper reset (only target/tracks/shaper do).
-9. **CvRoute getter guards** — `CvRoute.h`: `inputSource()`/`outputDest()` index arrays unguarded while setters already guard. Backlog hardening — current callers appear valid.
-
-**Open questions:**
-- Generator builders: absolute 0..63 addressing, or restrict to `builder.length()`?
-- Generator page invalid context: no-op, close, or revert+close on draw/LED callbacks?
-
-**Already done in main (performer-nx survey, do not re-add):** SortedQueue drop-oldest overflow guard (`SortedQueue.h:32`, landed 2026-05-23); `SANITIZE_TRACK_MODE` enabled via `CONFIG_ENABLE_SANITIZE=1` (`TrackEngine.h:25`).
-
-**Notes:** Items 5-6 touch generator code that moved to `feat/generator` (generator-preview-apply); verify against that branch before fixing. Scope page stays monitor-only (not a timing proof). Excluded as semantics/UI-only: modulator wall-clock vs transport-clock, modulator scaling feel, generator A/B label polish.
-
-**Phase 0 decisions log** (carried from the former `stability-fixes` task):
-- 2026-05-22: CvRoute lane getter guards are low-cost hardening. Current callers appear valid, so this is backlog hardening, not a known live crash.
-- 2026-05-22: Scope/CV Router/Bus audit added recommended follow-ups. CV Router physical-output ordering is the only critical stability/timing fix from that audit; bus writer observability/priority is recommended next. Scope remains monitor-only unless promoted to a diagnostic tool.
-- 2026-05-22: Initial scope is stability only. Excluded semantics/UI-only issues: modulator wall-clock vs transport-clock behavior, modulator scaling feel, generator A/B label polish.
-- 2026-05-22: Adversarial review identified the first four stability issues; Scope/CV Router/Bus audit identified one critical timing fix and two recommended bus-system hardening items.
+_Crash/corruption stability fixes were re-extracted to the standalone `stability-fixes` task on 2026-05-29 (different concern from fork-feature integration). This task is fork-feature integration only._
 
 ### Phase 1: High Priority
 1. **Quick octave change** (Step+F1-F5) — **DONE** — Page shortcut handler
@@ -299,7 +268,6 @@ Crash, corrupt-state, out-of-bounds, and bad-serialization fixes only — no fee
 
 ## Success Criteria
 
-- **Phase 0**: No crash from bad project data; CV Router outputs are current-tick; generator writes stay in bounds
 - **Phase 1**: Performer page enhanced, shortcuts functional
 - **Phase 2**: Undo restored, generators have preview/apply, UI responsiveness improved
 - **Phase 3**: Advanced generators working, LFO modulators operational (if done)
