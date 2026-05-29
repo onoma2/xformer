@@ -19,14 +19,6 @@ _Updated: 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union 
 **Branch:** feat/stochastic-seed-log
 **Reference:** `.tasks/stochastic-track-port/finalize.md` (closing punch list — must clear before task complete). `.tasks/stochastic-track-port/LIVE-CONSTELLATION.md` (Live page metaphor + per-event serial XY contract). `.tasks/stochastic-track-port/PITCH-LAW-FINAL.md` (5-step pitch law, knob ownership, anti-collapse safeguards). `.tasks/stochastic-track-port/LOCK-DESIGN-DEFERRED.md` (three Lock candidates: tape replay, RNG snapshot, A/B preview — A/B paradigm sketched). `.tasks/stochastic-track-port/PHASE16-FLAT-CELL.md` (flat-cell rhythm rewrite, separate track, P1-P8 unwired). `.tasks/stochastic-track-port/PHASE15-PITCH-MATH-REVIEW.md` (original review, mostly superseded by PITCH-LAW-FINAL.md). `.tasks/stochastic-track-port/PHASE17-SEED-DELTA.md` (structural cleanup parking lot). `.scratch/stochastic-knob-ownership.html` (current knob inventory).
 
-## ⚪ stability-fixes — Narrow crash/corruption fixes from adversarial reviews
-**Status:** ready — Modulator/Generator fixes captured; Scope/CV Router/Bus recommendations added.
-**Where I stopped:** Audits found four initial stability fixes plus CV Router physical-output staleness, bus last-writer ambiguity, bus shaper stale-state risk, and CvRoute getter hardening.
-**Next action:** Fix CV Router output ordering first, then implement the Modulator/Generator crash/corruption fixes and add bus writer observability/priority.
-**Depends on:** nothing
-**Branch:** TBD
-**Reference:** `.tasks/stability-fixes.md`
-
 ## 🟡 teletype-v2-dialect — Performer-native Teletype++ dialect and Phase 1 data-model plan
 **Status:** active — Phase 2 dialect landed on `feat/tt2-v2-native`: parser/lowering/evaluator/script-runner, native SCRIPT calls, EVERY/SKIP/PROB mods, narrow L loop with Teletype-correct I semantics. Six TT2 unit tests green; sim + STM32 release build clean (rebased onto dev tip).
 **Where I stopped:** `docs/teletype_v2.md` defines the keep/drop/redesign contract; `docs/teletype_v2_phase1_plan.md` outlines native program/runtime/output state. TT2TrackEngine/TeletypeInterpreter/TeletypeProgram/TeletypeRuntime/TeletypeOutputState in place.
@@ -122,10 +114,10 @@ _Updated: 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union 
 
 ---
 
-## 🟡 performer-improvements — Non-Launchpad improvements from VinxScorza, Modulove, and Mebitek
-**Status:** paused — Phase 1 wired and hardware-verified (6/8 items done); generator task extracted to separate task.
-**Where I stopped:** Phase 1 items completed: (1) Quick octave change Step+F1-F5, (2) Double-click Page context menus with 2s auto-close, (3) Short clock pulse 1ms floor, (4-6) PerformerPage mute LEDs + pattern labels + MenuWrap. Generator preview/apply extracted to `generator-preview-apply` task.
-**Next action:** Remaining Phase 1: Curve undo restoration. Then generator-preview-apply Phase A.
+## 🟡 performer-improvements — Non-Launchpad improvements + stability fixes (VinxScorza, Modulove, Mebitek)
+**Status:** paused — Phase 1 wired and hardware-verified (6/8 items done); generator task extracted; former `stability-fixes` task folded in as Phase 0.
+**Where I stopped:** Phase 1 items completed: (1) Quick octave change Step+F1-F5, (2) Double-click Page context menus with 2s auto-close, (3) Short clock pulse 1ms floor, (4-6) PerformerPage mute LEDs + pattern labels + MenuWrap. Generator preview/apply extracted to `generator-preview-apply` task. Phase 0 (Critical Stability Fixes) absorbed from `stability-fixes` — CV Router ordering, Modulator/ADSR sanitize, Generator OOB guards, bus arbitration; nothing started.
+**Next action:** Phase 0 stability first — CV Router output ordering, then Modulator/Generator crash fixes. Then remaining Phase 1: Curve undo restoration.
 **Depends on:** resource-optimization (RAM headroom available)
 **Branch:** TBD
 

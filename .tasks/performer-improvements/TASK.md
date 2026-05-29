@@ -193,6 +193,36 @@ section as reference only; implementation planning lives in the new task.
 
 ## Implementation Plan (Prioritized)
 
+### Phase 0: Critical Stability Fixes
+
+Crash, corrupt-state, out-of-bounds, and bad-serialization fixes only — no feel/UI/labels. Folded in from the former `stability-fixes` task (adversarial-review findings). Recommended order: CV Router ordering first, then Modulator/Generator crash fixes, then bus observability.
+
+**Critical (timing/stability):**
+1. **CV Router output one update stale** — `Engine.cpp`: `updateTrackOutputs()` reads `_cvRouteOutputs` before `updateOverrides()` recomputes them. Reorder CV Router computation before physical CV output composition.
+
+**Crash / corruption:**
+2. **Modulator deserialization sanitize** — `Modulator.h` `Modulator::read()`: bad project data can set `_rate=0` or invalid enums → divide-by-zero / invalid engine path.
+3. **ADSR zero-tick clamp** — `ModulatorEngine.h`: small nonzero attack/decay/release compute zero ticks; clamp to ≥1.
+4. **GeneratorPage bound-track/type guards** — `GeneratorPage.cpp`: draw/LED/input/context callbacks use type-specific accessors after the selected track changes.
+5. **Generator relative-index OOB** — `RandomGenerator.cpp` / `SequenceBuilder.h`: `RandomGenerator::update()` writes 64 values via `SequenceBuilder::setValue()`, which adds `firstStep`.
+
+**Hardening (recommended, not known-live):**
+6. **Bus writer arbitration** — `RoutingEngine.cpp`: RoutingEngine / CV Router / Teletype all write bus CV, implicit last-writer-wins; add priority or observability.
+7. **Bus shaper stale state** — `RoutingEngine.cpp`: source/bias/depth/min/max edits don't trigger shaper reset (only target/tracks/shaper do).
+8. **CvRoute getter guards** — `CvRoute.h`: `inputSource()`/`outputDest()` index arrays unguarded while setters already guard. Backlog hardening — current callers appear valid.
+
+**Open questions:**
+- Generator builders: absolute 0..63 addressing, or restrict to `builder.length()`?
+- Generator page invalid context: no-op, close, or revert+close on draw/LED callbacks?
+
+**Notes:** Items 4-5 touch generator code that moved to `feat/generator` (generator-preview-apply); verify against that branch before fixing. Scope page stays monitor-only (not a timing proof). Excluded as semantics/UI-only: modulator wall-clock vs transport-clock, modulator scaling feel, generator A/B label polish.
+
+**Phase 0 decisions log** (carried from the former `stability-fixes` task):
+- 2026-05-22: CvRoute lane getter guards are low-cost hardening. Current callers appear valid, so this is backlog hardening, not a known live crash.
+- 2026-05-22: Scope/CV Router/Bus audit added recommended follow-ups. CV Router physical-output ordering is the only critical stability/timing fix from that audit; bus writer observability/priority is recommended next. Scope remains monitor-only unless promoted to a diagnostic tool.
+- 2026-05-22: Initial scope is stability only. Excluded semantics/UI-only issues: modulator wall-clock vs transport-clock behavior, modulator scaling feel, generator A/B label polish.
+- 2026-05-22: Adversarial review identified the first four stability issues; Scope/CV Router/Bus audit identified one critical timing fix and two recommended bus-system hardening items.
+
 ### Phase 1: High Priority
 1. **Quick octave change** (Step+F1-F5) — **DONE** — Page shortcut handler
 2. **Submenu shortcuts** (double-click F1-F5) — **DONE** — Double-click Page opens context menu with 2s auto-close
@@ -226,6 +256,7 @@ section as reference only; implementation planning lives in the new task.
 
 ## Success Criteria
 
+- **Phase 0**: No crash from bad project data; CV Router outputs are current-tick; generator writes stay in bounds
 - **Phase 1**: Performer page enhanced, shortcuts functional
 - **Phase 2**: Undo restored, generators have preview/apply, UI responsiveness improved
 - **Phase 3**: Advanced generators working, LFO modulators operational (if done)
