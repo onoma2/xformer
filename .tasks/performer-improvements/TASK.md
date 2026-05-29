@@ -214,6 +214,23 @@ performer-nx's `FIX_BROKEN_SCALE_CHANGE` (`NoteSequence.cpp:200`, `Project.h:135
 
 ---
 
+## Open question (deferred): "macro" is overloaded across models
+
+Surveyed 2026-05-29. Not happy with the current state; no clean single home decided yet.
+
+`macro` means three unrelated things in the model layer:
+1. **Pattern-population** — `IndexedSequence` (8: Rhythm/Triangle/Sawtooth/Scale/Arpeggio/Chord/Modal/RandomMelody) + `CurveSequence` (4: Init/Fm/Damp/Bounce). Generate a step range from a shape/rule.
+2. **Magnitude-group** — `PhaseFluxSequence::zeroMacros()`: the 5 per-stage nudge knobs.
+3. **Fan-out edit** — `StochasticSequence::editComplexityMacro` / Density: one knob writes several underlying params.
+
+Directions (deferred, not decided):
+- **Pattern-population overlaps `SequenceBuilder`.** The generator framework (`SequenceBuilder` + Algo/Random generators, preview/apply, A/B) already does "write a shape/rule into a sequence range." Several pattern-population macros are things SequenceBuilder can already do — candidate to fold them onto that path instead of bespoke per-model `populateWithMacro*`.
+- **Magnitude (2) and fan-out (3) should get their own class** — they are not pattern generation and should stop sharing the "macro" name. Separate, named abstractions, not a lumped `Macro.h`.
+
+No `Macro.h` consolidation as originally framed — the three categories don't belong together. Revisit when touching the generator path or the PhaseFlux/Stochastic param grouping.
+
+---
+
 ## Implementation Plan (Prioritized)
 
 ### Phase 0: Critical Stability Fixes
