@@ -45,11 +45,14 @@ Physical CV inputs (`CvInput`, updated at `Engine.cpp:146`) feed two consumers: 
 - **Output layout** is general but entangled with the per-tick rotation recompute (see engine map).
 - **Input** is fine; its complexity is already covered by the routing maps.
 
-## Optimization / redesign candidates (deferred — not chosen)
+## Direction
 
-- **Decide linking's scope.** Either (a) accept "Curve-follows-stepped-source" as the only semantic and make the UI *not offer* link on track types that can't consume/produce — stops the silent dead-end; or (b) generalise the link contract beyond `SequenceState*` so procedural types can be link sources/followers (much larger — needs a type-neutral "what does a follower need from a source" contract).
-- **Symmetry:** Note produces but doesn't consume — confirm whether Note-follows-Note was ever intended, or drop the unused producer path.
-- **Output layout** rationalisation is coupled to the engine-update-contention hoist (rotation recompute) — do them together, not separately.
+**Lean: remove linking** (product-owner call, 2026-05-30 — never used). The original purpose was a Curve track slaved to a Note track's playhead for synced per-step modulation, from the Note/Curve-only era. That need is now served other ways — global modulators (`global-modulators-v1`), routing, and the Curve track's own clock-mult / global-phase. So the option is **not** "scope vs generalise" but: drop the `linkTrack` UI + the `linkedTrackEngine` wiring + `TrackLinkData` / `linkData()` overrides. Removes a Note/Curve-era subsystem entirely rather than carrying or generalising it.
+- Before removing: confirm no project-file dependency (linkTrack is serialized — a removal needs a forward-compatible read that ignores the stored value, no version bump).
+- Removing linking also **unblocks the engine-update hoist** — no linked-track intra-loop dependency to worry about.
+- **Output layout** rationalisation stays coupled to the engine-update-contention hoist (rotation recompute) — do those together.
+
+(Superseded options, kept for context: scope the UI to capable types; or generalise the contract for procedural types. Both dropped in favour of removal.)
 
 ## Relation to other maps
 

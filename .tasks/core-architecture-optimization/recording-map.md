@@ -28,10 +28,13 @@ Record start/stop (`:445-450`) is driven by record mode (PlayState); the fall-th
 
 So recording (like linking) is structurally a Note/Curve feature. New track types return the base no-ops → can't accept external MIDI to record or monitor. This is the parity gap flagged in `finalize.md` ("No MIDI input path" for Stochastic).
 
-## Candidates (deferred — not chosen)
+## Direction
 
+**Undecided — needs more thought** (2026-05-30). Unlike linking (leaning remove), recording is *not* a remove candidate yet — live note capture into Note/Curve is a legitimate feature even if the procedural types don't share it. Open options:
 - **Accept and scope:** recording stays Note/Curve-only; make the UI/record-arm not imply it works on other types. Cheap, honest.
 - **Generalise:** a per-track-type "capture" contract (what does this engine do with an incoming note?) — large, overlaps the Fractal-track "capture is a model rule" design and the Stochastic capture-from-Live work. Only worth it if record-into-procedural-tracks is a real goal.
+
+Revisit after deciding whether external-MIDI-into-procedural-tracks matters; the Fractal/Stochastic capture work may set the precedent.
 
 ## Relation to other maps
 
