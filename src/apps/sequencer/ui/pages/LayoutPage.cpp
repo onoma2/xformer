@@ -22,7 +22,8 @@ void LayoutPage::enter() {
 
 void LayoutPage::draw(Canvas &canvas) {
     bool showCommit = _mode == Mode::TrackMode && !_trackModeListModel.sameAsProject(_project);
-    const char *functionNames[] = { "MODE", "GATE", "CV", showCommit ? "COMMIT" : nullptr };
+    // 5 entries = CONFIG_FUNCTION_KEY_COUNT; slot 3 is the freed LINK slot.
+    const char *functionNames[] = { "MODE", "GATE", "CV", nullptr, showCommit ? "COMMIT" : nullptr };
 
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "LAYOUT");
@@ -36,10 +37,11 @@ void LayoutPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
     if (key.isFunction()) {
-        if (key.function() == 3) {
+        if (key.function() == 4) {
             commitLayout();
+        } else if (key.function() < 3) {
+            setMode(Mode(key.function()));
         }
-        setMode(Mode(key.function()));
         event.consume();
     }
 
