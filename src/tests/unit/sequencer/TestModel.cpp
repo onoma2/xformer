@@ -39,8 +39,9 @@ CASE("model_coordinates_harmony_between_sequences") {
     model.harmonyEngine().setMode(HarmonyEngine::Ionian);
     model.harmonyEngine().setTranspose(0);
 
-    // Get first track and configure sequence as HarmonyFollowerRoot
-    auto& track1 = model.project().track(0);
+    // Get a Note track and configure sequence as HarmonyFollowerRoot
+    // (track 0 defaults to Curve, track 7 to PhaseFlux; tracks 1-6 are Note)
+    auto& track1 = model.project().track(1);
     auto& seq1 = track1.noteTrack().sequence(0);
     seq1.setHarmonyRole(NoteSequence::HarmonyFollowerRoot);
     seq1.setHarmonyScale(0); // Use Ionian (matching HarmonyEngine)

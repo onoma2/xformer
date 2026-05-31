@@ -124,9 +124,8 @@ CASE("default_round_trip") {
         expectEqual(s.pulseAccumStep(), 0, "default pulseAccumStep");
         expectEqual(s.gateLength(), 50, "default gateLength");
         expectEqual(int(s.stageDivisor()), int(PhaseFluxSequence::StageDivisorSlot::Bar), "default stageDivisor");
-        // Stage 0 stays active (skip=false). Sequence::clear sets stages 1..15
-        // to skip=true; this test runs against a bare Stage so skip default = false.
-        expectEqual(s.skip(), false, "default skip");
+        // clear() keeps stage 0 active and skips stages 1..15.
+        expectEqual(s.skip(), i != 0, "default skip (only stage 0 active)");
         expectEqual(int(s.accumulatorTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "default accumulatorTrigger");
         expectEqual(int(s.pulseAccumTrigger()), int(PhaseFluxSequence::AccumulatorTriggerType::Stage), "default pulseAccumTrigger");
         expectEqual(s.stageLen(), 64, "default stageLen (×1 transparent — Phaseque STEP_LEN pattern)");
@@ -590,15 +589,15 @@ CASE("default_clear_initializes_pulse_lims_to_4") {
     expectEqual(int(seq.noteAccumConfig().order()), int(AccumulatorConfig::Order::Wrap), "note order default Wrap");
     expectEqual(int(seq.noteAccumConfig().polarity()), int(AccumulatorConfig::Polarity::Uni), "note polarity default Uni");
     expectEqual(int(seq.noteAccumConfig().reset()), 0, "note reset default 0");
-    expectEqual(int(seq.noteAccumConfig().posLim()), 7, "note posLim default 7");
-    expectEqual(int(seq.noteAccumConfig().negLim()), 7, "note negLim default 7");
+    expectEqual(int(seq.noteAccumConfig().posLim()), 28, "note posLim default 28");
+    expectEqual(int(seq.noteAccumConfig().negLim()), 28, "note negLim default 28");
 
     expectEqual(int(seq.pulseAccumConfig().scope()), int(AccumulatorConfig::Scope::Local), "pulse scope default Local");
     expectEqual(int(seq.pulseAccumConfig().order()), int(AccumulatorConfig::Order::Wrap), "pulse order default Wrap");
     expectEqual(int(seq.pulseAccumConfig().polarity()), int(AccumulatorConfig::Polarity::Uni), "pulse polarity default Uni");
     expectEqual(int(seq.pulseAccumConfig().reset()), 0, "pulse reset default 0");
-    expectEqual(int(seq.pulseAccumConfig().posLim()), 8, "pulse posLim default 8 (spec §13.3)");
-    expectEqual(int(seq.pulseAccumConfig().negLim()), 8, "pulse negLim default 8 (spec §13.3)");
+    expectEqual(int(seq.pulseAccumConfig().posLim()), 16, "pulse posLim default 16 (pulseCount ceiling)");
+    expectEqual(int(seq.pulseAccumConfig().negLim()), 16, "pulse negLim default 16 (pulseCount ceiling)");
 }
 
 CASE("note_accum_config_roundtrips_with_non_defaults") {
