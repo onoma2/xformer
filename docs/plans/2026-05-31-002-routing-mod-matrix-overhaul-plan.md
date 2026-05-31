@@ -107,16 +107,24 @@ What's genuinely absent (and stays out): Step / parameter-locks.
   structural` (structural = UI-only, never routable).
 - R5. **Scope = track mask + group.** Generalize Indexed `targetGroups` so a route can target
   a cell/stage group within a track (Indexed, PhaseFlux); track-wide stays the default.
-- R6. **Shapers stay, as explicit nodes.** Keep the 8-processor bank; **extract `VcaNext`
-  into an explicit `scaleSource` field** on the route (depth modulated by a chosen source)
-  instead of the positional next-route hack.
+- R6. **Shapers stay, as explicit nodes.** Keep the processor bank; **extract `VcaNext`
+  into an explicit `scaleSource` field** on the route, instead of the positional next-route hack.
+  **F3 caveat:** old `VcaNext` scaled by the neighbor route's *processed output* (after its
+  shaper+depth), not a raw source. `scaleSource` reading a raw source value is a **semantic
+  change** — R11 parity for VcaNext patches only holds if `scaleSource` can also reference a
+  *route's post-shaper output*, not just a raw `Source`. Decide whether scaleSource ∈ {Source}
+  or {Source ∪ route-output} at U5. (Per-track-array composition for shapers is deferred — see
+  Design.)
 - R7. **Bus ownership stays with Engine** (it already owns `_busCv[]` + the safety
   slew/decay via `setBusCv`/`busCv`/`applyBusSafety`). The matrix and CvRoute remain
   **co-clients** that write through `setBusCv` and read through `busCv` — neither "owns" it.
-  The plan must pin the **write order** (matrix recompute vs CvRoute update within a tick)
-  and state the conflict rule explicitly: **last-writer-wins per tick**, with `_busCvWritten`
-  + decay handling the wrote-nobody case. This is consistent with R10 (CvRoute untouched —
-  it stays a co-client, behavior unchanged).
+  **Write-order is UNRESOLVED (F9), and it's a correctness question, not perf.** Because
+  `setBusCv` slews, two writers to the same index produce *different CV depending on order* —
+  the loser's slew still moved the rail. So "last-writer-wins" is insufficient: the plan must
+  (a) pin a deterministic order (matrix recompute vs CvRoute update), and (b) ensure only the
+  winning writer's delta is applied per index per tick (skip the loser's slew). Decide before
+  U2 (which routes the global/Bus branch). Consistent with R10 (CvRoute behavior unchanged —
+  only the Engine-side write arbitration changes).
 - R8. **Two routing surfaces, split by broadcastability** (slot-ownership decision below).
   - **Global masked pool** — Performer-wide (Tier 0) + broadcastable common params (Tier 1/2):
     keeps `scope = Track(mask)` so one scarce source (4 CV in) drives many tracks in **one
@@ -124,21 +132,30 @@ What's genuinely absent (and stays out): Step / parameter-locks.
   - **Per-track local matrix** — Tier 3/4 + cell/group + inlets (the Indexed `RouteConfig`
     model generalized); single-track, in-context, with **assign-from-parameter** (long-press a
     param → local route). This is where the 10–30 per-track params live, off the global list.
-- R12. **Two target kinds (taxonomy).**
+- R12. **Three target kinds (taxonomy).** (F3 — Bus is a distinct third kind, not direct/inlet.)
   - **Direct** — modulate a param straight (Octave, Tempo, Stochastic Complexity, a cell's
     Duration). The matrix writes the value to the param.
   - **Inlet** — a named per-track CV bus that global routing fills (`_routedX`), consumed
     internally either **hardwired** (DiscreteMap: Input/Scanner/Sync feed the engine) or by a
     **local matrix** (Indexed: A/B feed `RouteConfig`). Inlets are the global→local bridge.
+  - **Shared rail (Bus)** — `BusCv1–4`, Engine-owned, both source and target, read by other
+    routes/CvRoute. Not a param, not a per-track inlet — a global CV rail. Carries the
+    write-order/slew hazard (R7/F9).
 - R13. **Each track type owns its inlets — no borrowing.** Kill the Indexed-borrows-DiscreteMap
   drift (`isDiscreteMapTarget` in the Indexed dispatch). A type declares its own inlets in its
   param table; no shared enum group across types.
 - R9. **Clean break — new project format, no migration** (owner decision, 2026-05-31).
-  Design the right new `Route` bit-structure directly (`source, scope, paramKey, depth,
-  shaper, scaleSource`). **Bump `ProjectVersion`.** Old projects (≤ v34) simply never load on
-  the new firmware — the loader rejects them with a clear message; users are informed. No
-  sentinel, no forward-compat encoding, no read-time migration. This is a fundamental
-  subsystem overhaul; carrying the old format through is solving a problem that doesn't exist.
+  Design the new `Route` bit-structure directly. **Bump `ProjectVersion`** to a new
+  `VersionRoutingMatrix`; the loader **rejects any file `< VersionRoutingMatrix`** with a clear
+  message (F4: the floor is symbolic — latest shipped is **Version35**, not v34; rejecting "≤34"
+  would wrongly accept and misparse a v35 file). No sentinel, no forward-compat, no migration.
+  **This deliberately overrides the post-Version35 no-bump policy** in `ProjectVersion.h`
+  ("do NOT add a new enum entry / do NOT bump") — that policy is for incremental dev changes; a
+  fundamental format overhaul is the documented exception (owner). **F4 blast radius:** the
+  project file is one linear version-gated stream (`Project::read`); `_routing.read` sits
+  mid-stream (before midiOutput/cvRoute/tracks), so changing the Route record length shifts
+  every downstream byte — the bump re-floors the *whole file*, not "routes only." Harmless under
+  full rejection, but the format change is project-wide, not routing-local.
 - R10. **CvRoute and Modulator engine untouched** in behavior; the matrix references `Mod1–8`
   as sources and leaves CvRoute as the independent CV→CV path.
 - R11. No behavior regression for routes rebuilt in the new format (a given source→param→depth
@@ -193,26 +210,44 @@ What's genuinely absent (and stays out): Step / parameter-locks.
 
 Slot, name-free, absorbing shaper + scale-source + scope:
 
+**Per-track depth + shaper are retained (F1, owner 2026-05-31).** The current `Route` already
+carries per-track arrays — `_biasPct[8]`, `_depthPct[8]`, `_shaper[8]` (Routing.h:731-746) —
+so one masked route applies a *different depth and shaper per masked track*. That is the value
+of broadcast (one CV, per-track tuning) and must be preserved (R11). So the two slot shapes differ:
+
 ```
-RouteSlot {
-  Source  source;        // existing Source enum incl. Mod1-8 (Modulator engine) and Bus
-  Scope   scope;         // Global | Track(mask) | Group(track, cellMask)
-  uint8_t paramKey;      // stable key into the scope's param table (not array index)
-  float   min, max;      // normalized depth window (existing)
-  Shaper  shaper;        // existing processor enum
-  Source  scaleSource;   // extracted from VcaNext; None = unity depth
+// Global masked pool slot — fat, per-track tuning, few of these:
+GlobalRouteSlot {
+  Source  source;            // incl. Mod1-8, Bus
+  uint8_t trackMask;         // broadcast set
+  uint8_t paramKey;          // into Tier-0/1/2 table
+  float   min, max;          // normalized window
+  int8_t  biasPct[8], depthPct[8];   // PER-TRACK (existing)
+  Shaper  shaper[8];                 // PER-TRACK (existing) — the ×8 state cost
+  Source  scaleSource;
+}
+// Per-track local pool slot — thin, single-track, scalar:
+LocalRouteSlot {
+  Source source; Scope scope;   // Track(single) | Group(cellMask)
+  uint8_t paramKey; float min,max; Shaper shaper; Source scaleSource;
 }
 ```
+
+**Deferred (owner): the composition of the per-track array** — which shapers it carries, and
+whether to **drop the stateful shapers** (Envelope/FreqFollow/Activity/ProgressiveDivider —
+the ones whose `shaperState[8]` drives the ×8 RAM). Dropping the stateful ones would shrink the
+fat slot substantially. Decide at implementation; the RAM figures below are upper bounds until then.
 
 Engine apply (replaces `writeTarget` name dispatch), at the single-pass per-tick recompute:
 
 ```
 for slot in active routes:
-    v = sourceValue(slot.source)
-    v = shape(slot.shaper, v, state)
-    v = depthWindow(min, max, v)
-    if slot.scaleSource != None: v *= sourceValue(slot.scaleSource)
-    resolve(slot.scope) -> scopeObj(s); for each: scopeObj.applyRouted(slot.paramKey, v)
+    for each track t in slot.scope:
+        v = sourceValue(slot.source)
+        v = shape(slot.shaper[t], v, state[t])          // per-track shaper + state
+        v = depthWindow(min, max, v) scaled by depthPct[t]/biasPct[t]
+        if slot.scaleSource != None: v *= scaleValue(slot.scaleSource, t)   // see F3 caveat
+        scopeObj(t).applyRouted(slot.paramKey, v)
 ```
 
 Param table per scope (global; common-track; per-track-type) declared once. A row is either a
@@ -266,12 +301,23 @@ for **common params**, and the global track-mask makes that one route + one link
 - Combined ≈ ~2 KB (vs ~3.2 KB pure-global), and **both** broadcast-linked-edit *and* local
   in-context routing are preserved. The `scope` field already models both (`Track(mask)` vs
   `Track(single)`/`Group`); ownership = which pool a route lives in, by scope.
+- **F2 caveat — the saving is conditional, not automatic.** Today `_routeStates[CONFIG_ROUTE_COUNT]`
+  is one static `[16]` array with the ×8 `shaperState` baked in; merely *labelling* routes as
+  two pools saves nothing. The ~2 KB only materializes if the engine actually allocates **a
+  small global pool (`RouteState[~8]`, ×8 state) + separate per-track scalar slots** — and the
+  ×8 figure is an **upper bound** that shrinks further if the deferred per-track-array
+  composition drops the stateful shapers (see Design/F1). Treat the numbers as a target to
+  validate at U7/U8, not a settled budget.
+
+### paramKey stability — RESOLVED: append-only numeric keys (F6)
+Keys are explicit numeric, **append-only, never reused after deletion**, never the array index.
+This is the constraint that makes "add a routable param = add one row" safe for saved files
+(reordering/adding rows never shifts existing routes). Hard rule, enforced at U7. (Was wrongly
+listed as open while U7 depended on it.)
 
 ### Still open
 - Param-table representation on a no-heap MCU: `constexpr` rows with function pointers (flash
   cost) vs virtual `applyRouted` per scope (vtable indirection). Measure on STM32.
-- `paramKey` stability: serialize a small stable per-scope key (not the array index) so
-  reordering rows doesn't shift saved routes.
 - Group scope granularity: reuse Indexed's exact `targetGroups` semantics, or a unified
   cell/stage group model shared by Indexed + PhaseFlux?
 - Source-side fan-out (`RoutingEngine::updateSources`) has the same smear — in scope or a
@@ -367,19 +413,26 @@ No universal block; no `isXxxTarget` predicates; the matrix above is the literal
   it, and retire the `routeIndex+1` neighbor read outright. No migration needed — old projects
   don't load (R9 clean break), so there are no stored legacy `VcaNext` patches to round-trip.
 - **U6. Group scope.** Generalize Indexed `targetGroups` into the slot's `Scope`.
-- **U7. Route re-addressing + new format.** `Route` stores `(source, scope, paramKey, depth,
-  shaper, scaleSource)`; bump `ProjectVersion`; loader rejects ≤ v34 with a clear message
-  (R9). Fixtures: new-format route round-trips save/load; a too-old project is rejected
-  cleanly (no crash, no misparse).
+- **U7. Route re-addressing + new format + ENGINE CUTOVER** (F5). `Route` stores `(source,
+  scope, paramKey, per-track depth/shaper, scaleSource)`; bump `ProjectVersion`; loader rejects
+  `< VersionRoutingMatrix` (R9). **This is the cutover:** new-format routes have no `_target`,
+  so the engine must switch to the param-table `applyRouted` path here — the old `Target`
+  dispatch *cannot run* on new-format routes. U1–U6 build the tables + new apply path *alongside*
+  the still-authoritative old dispatch; U7 flips storage **and** engine together; U9 only
+  deletes the now-dead old code. ("Old dispatch stays live until **U7**," not U9 — F5 fix.)
+  **paramKey rule (F6, hard, not open):** keys are explicit numeric, **append-only, never
+  reused after deletion** — never the array index. This is the constraint that makes "add a
+  routable param = add one row" safe for saved files. Fixtures: round-trip with stable keys;
+  reorder rows → saved routes unchanged; too-old project rejected cleanly.
 - **U8. UI — global masked page + per-track local matrix.** Global `RoutingPage` = the masked
   pool: Tier 0 + broadcastable Tier 1/2 common params (track-mask intact) + source→inlet
   patches. Build the **per-track local matrix** page (generalize `IndexedRouteConfigPage`):
   Tier 3/4 + cell/group + inlets, scoped param picker (only that type's rows), Quick/Deep,
   **assign-from-param** (long-press → local route). Two pools by scope (slot-ownership
   decision, resolved).
-- **U9. Retire the smear.** Delete `targetInfos`, the dispatch switch, `isXxxTarget`,
-  per-model `writeRouted`, **and the `Target` enum itself** once all scopes are ported —
-  nothing keeps it (no migration table; old files don't load).
+- **U9. Retire the smear.** Delete the now-dead `targetInfos`, dispatch switch, `isXxxTarget`,
+  per-model `writeRouted`, **and the `Target` enum itself** — all unused since the U7 cutover
+  (no migration table; old files don't load).
 
 ---
 
@@ -387,8 +440,10 @@ No universal block; no `isXxxTarget` predicates; the matrix above is the literal
 
 - **Serialization:** clean break (R9). New `Route` format; `ProjectVersion` bump; old projects
   rejected on load. No migration, no sentinel, no forward-compat layer.
-- **Hot path:** the apply loop replaces the name dispatch at the single-pass recompute site
-  the spine (U4) just built.
+- **Hot path:** the new `applyRouted` loop runs at the single-pass recompute site the spine's
+  engine-rework (the merged U4 of the *spine* plan) built; it **replaces** the name dispatch at
+  the **U7 cutover** of *this* plan (F5 — not before; U1–U6 stage the tables behind the live old
+  dispatch).
 - **CvRoute / Modulator:** untouched (R10).
 - **Every track type** gains a param-table declaration — heterogeneity lives there cleanly,
   not in one global enum. **tt2:** PhaseFlux/Teletype routing becomes declarable.
@@ -398,19 +453,32 @@ No universal block; no `isXxxTarget` predicates; the matrix above is the literal
 ## Risk Analysis & Mitigation
 
 - **Clean-break load safety (R9/R11)** — old projects must be *rejected cleanly*, never
-  misparsed. Mitigation: the loader checks `ProjectVersion` first and refuses ≤ v34 with a
-  message; fixture proves a too-old file is rejected without crash or partial load.
+  misparsed. Mitigation: the loader checks `ProjectVersion` first and refuses `< VersionRoutingMatrix`
+  (symbolic floor; latest shipped is v35 — F4) with a message; fixture proves a too-old file is
+  rejected without crash or partial load.
 - **Flash/RAM of param tables** — measure on STM32; share the common-track table across types;
   prefer `constexpr` flash tables.
-- **Scope creep** — sources fan-out, Step/p-locks, internal-modulator expansion all explicitly
-  out; CvRoute/Modulator untouched.
-- **Big-bang risk** — sequence U1→U9; each scope ports behind the live old dispatch; the flat
-  enum is the last thing removed and only as live addressing.
+- **Acknowledged added scope (F7)** — two items are *expansion*, not pure unification, and are
+  named as such: (a) **PhaseFlux/Teletype gain routability** (new surface, new tests) — kept
+  because the overhaul is the natural time to add it, but it is added scope; (b) the
+  **concept-equivalence gate** is owner-requested (Phase vs Scan) but currently has one worked
+  example — treat as a lightweight rule, not heavy machinery, until a second case appears.
+- **Minimum-viable was considered (F8)** — the lone reported symptom (`StochasticFeel` dead
+  route) could be patched with a compile-time "every Target has a writer" assert. The owner
+  chose the full overhaul deliberately (architectural-fix preference, no velocity pressure), not
+  by default. Table correctness is where dead-route-class bugs reappear — `applyRouted` per row
+  must be reviewed, not assumed mechanical.
+- **Scope creep (held out)** — sources fan-out, Step/p-locks, internal-modulator expansion all
+  explicitly out; CvRoute/Modulator untouched.
+- **Big-bang risk** — U1–U6 stage param tables + the new apply path *behind* the live old
+  dispatch (old still authoritative); **U7 is the single cutover** (storage + engine flip
+  together); U9 deletes the dead old code. The risky moment is U7, not spread across all units.
 
 ---
 
 ## Sequencing
 
-U1 → U2 → U3 → U4 → U5 (shaper/scaleSource) → U6 (groups) → U7 (re-address + new format) → U8
-(UI) → U9 (retire smear). Each unit keeps the system working; the old dispatch stays live
-until U9. CvRoute and the Modulator engine are not modified.
+U1 → U2 → U3 → U4 → U5 (shaper/scaleSource) → U6 (groups) → **U7 (re-address + new format +
+engine cutover)** → U8 (UI) → U9 (delete dead old code). U1–U6 stage behind the live old
+dispatch; the cutover is U7; U9 is pure deletion. CvRoute and the Modulator engine are not
+modified.
