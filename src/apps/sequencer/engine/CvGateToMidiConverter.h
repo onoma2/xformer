@@ -1,5 +1,7 @@
 #pragma once
 
+#include "WallClock.h"
+
 #include "core/midi/MidiMessage.h"
 #include "core/math/Math.h"
 
@@ -12,7 +14,7 @@ public:
     }
 
     void reset() {
-        _lastGateOff = os::ticks();
+        _lastGateOff = WallClock().now();
         _gate = 0;
         _note = -1;
     }
@@ -37,7 +39,7 @@ public:
             }
         } else {
             if (gateCv > 3.f) {
-                if (os::ticks() - _lastGateOff >= GateOnDelay) {
+                if (WallClock().now() - _lastGateOff >= GateOnDelay) {
                     // gate on
                     callback(MidiMessage::makeNoteOn(channel, note, 127));
                     _gate = 1;
@@ -50,7 +52,7 @@ public:
     }
 
 private:
-    static constexpr uint32_t GateOnDelay = os::time::ms(5);
+    static constexpr uint32_t GateOnDelay = 5000; // 5 ms in µs
 
     uint32_t _lastGateOff;
     uint8_t _gate;

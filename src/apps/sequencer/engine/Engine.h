@@ -2,6 +2,7 @@
 
 #include "EngineState.h"
 #include "Clock.h"
+#include "WallClock.h"
 #include "TapTempo.h"
 #include "NudgeTempo.h"
 #include "TrackEngine.h"
@@ -288,7 +289,8 @@ private:
 
     uint32_t _tick = 0;
 
-    uint32_t _lastSystemTicks = 0;
+    WallClock _wallClock;
+    uint32_t _lastWallUs = 0;
 
     // midi monitoring
     struct {

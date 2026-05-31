@@ -1,6 +1,7 @@
 #include "TeletypeBridge.h"
 
 #include "TeletypeTrackEngine.h"
+#include "WallClock.h"
 
 #include "core/Debug.h"
 #include "core/math/Math.h"
@@ -61,7 +62,7 @@ void TeletypeBridge::setActiveEngine(TeletypeTrackEngine *engine) {
 }
 
 uint32_t TeletypeBridge::ticksMs() {
-    return os::ticks() / os::time::ms(1);
+    return WallClock().now() / 1000; // µs -> ms
 }
 
 bool TeletypeBridge::hasDelays() {

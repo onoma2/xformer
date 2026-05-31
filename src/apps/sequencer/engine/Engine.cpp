@@ -59,7 +59,7 @@ void Engine::init() {
     updateTrackSetups();
     reset();
 
-    _lastSystemTicks = os::ticks();
+    _lastWallUs = _wallClock.now();
 }
 
 void Engine::update() {
@@ -69,9 +69,9 @@ void Engine::update() {
         return;
     }
 
-    uint32_t systemTicks = os::ticks();
-    float dt = (0.001f * (systemTicks - _lastSystemTicks)) / os::time::ms(1);
-    _lastSystemTicks = systemTicks;
+    uint32_t nowUs = _wallClock.now();
+    float dt = (nowUs - _lastWallUs) * 1e-6f; // seconds of real wall time (wrap-safe delta)
+    _lastWallUs = nowUs;
 
     // suspending
     if (_requestSuspend != _suspended) {

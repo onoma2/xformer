@@ -1,5 +1,6 @@
 #include "MidiOutputEngine.h"
 #include "Engine.h"
+#include "WallClock.h"
 
 #include "model/Model.h"
 #include "model/MidiOutput.h"
@@ -26,10 +27,10 @@ void MidiOutputEngine::update(bool forceSendCC) {
     // gives roughly 67 events per second per track
     // be conservative and make this 50 events per second
     bool sendCC = forceSendCC;
-    uint32_t ticks = os::ticks();
-    if (ticks >= _lastSendCCTicks + os::time::ms(1000 / 50)) {
+    uint32_t nowUs = WallClock().now();
+    if (nowUs - _lastSendCCUs >= 20000) { // 50 events/s (20 ms in µs), wrap-safe
         sendCC = true;
-        _lastSendCCTicks = ticks;
+        _lastSendCCUs = nowUs;
     }
 
     for (int outputIndex = 0; outputIndex < CONFIG_MIDI_OUTPUT_COUNT; ++outputIndex) {
