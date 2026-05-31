@@ -21,6 +21,7 @@ public:
 
     void convert(float pitchCv, float gateCv, uint8_t channel, std::function<void(const MidiMessage &message)> callback) {
         int8_t note = clamp(60 + int(std::floor(pitchCv * 12.f + 0.5f)), 0, 127);
+        uint32_t nowUs = WallClock().now();
 
         if (_gate) {
             if (gateCv < 2.f) {
@@ -30,7 +31,7 @@ public:
                     _note = -1;
                 }
                 _gate = 0;
-                _lastGateOff = os::ticks();
+                _lastGateOff = nowUs;
             } else if (note != _note) {
                 // legato note change
                 callback(MidiMessage::makeNoteOn(channel, note, 127));
@@ -39,14 +40,14 @@ public:
             }
         } else {
             if (gateCv > 3.f) {
-                if (WallClock().now() - _lastGateOff >= GateOnDelay) {
+                if (nowUs - _lastGateOff >= GateOnDelay) {
                     // gate on
                     callback(MidiMessage::makeNoteOn(channel, note, 127));
                     _gate = 1;
                     _note = note;
                 }
             } else {
-                _lastGateOff = os::ticks();
+                _lastGateOff = nowUs;
             }
         }
     }
