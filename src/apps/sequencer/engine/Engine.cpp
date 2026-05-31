@@ -193,13 +193,16 @@ void Engine::update() {
         }
 
         // single per-tick global recompute (was run once per firing track, T×
-        // redundant). Order: routing -> CV-router overrides -> track outputs, so
-        // physical outputs use current-tick CV routes (not one update stale).
-        // The reducer remains a rate-limit safety cap.
+        // redundant). The reducer remains a rate-limit safety cap.
+        // Compose physical outputs first so routing sources that read CvOut/GateOut
+        // see the just-ticked track values; then route; then fill CV-route outputs
+        // and recompose so CV-route output channels are current-tick (not one
+        // update stale). The double compose breaks the routing<->CV-route cycle.
         if (cvUpdated && _updateReducer.update()) {
             for (auto trackEngine : _trackEngines) {
                 trackEngine->update(0.f);
             }
+            updateTrackOutputs();
             _routingEngine.update();
             updateOverrides();
             updateTrackOutputs();
