@@ -252,7 +252,6 @@ void register_project(py::module &m) {
     track
         .def_property_readonly("trackIndex", &Track::trackIndex)
         .def_property_readonly("trackMode", &Track::trackMode)
-        .def_property("linkTrack", &Track::linkTrack, &Track::setLinkTrack)
         .def_property_readonly("noteTrack", [] (Track &track) { return &track.noteTrack(); })
         .def_property_readonly("curveTrack", [] (Track &track) { return &track.curveTrack(); })
         .def_property_readonly("midiCvTrack", [] (Track &track) { return &track.midiCvTrack(); })

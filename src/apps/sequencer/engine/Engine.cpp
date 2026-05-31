@@ -517,8 +517,6 @@ void Engine::onClockMidi(uint8_t data) {
 void Engine::updateTrackSetups() {
     for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
         auto &track = _project.track(trackIndex);
-        int linkTrack = track.linkTrack();
-        const TrackEngine *linkedTrackEngine = linkTrack >= 0 ? &trackEngine(linkTrack) : nullptr;
 
         if (!_trackEngines[trackIndex] || _trackEngines[trackIndex]->trackMode() != track.trackMode()) {
             auto &trackEngine = _trackEngines[trackIndex];
@@ -526,39 +524,36 @@ void Engine::updateTrackSetups() {
 
             switch (track.trackMode()) {
             case Track::TrackMode::Note:
-                trackEngine = trackContainer.create<NoteTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<NoteTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Curve:
-                trackEngine = trackContainer.create<CurveTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<CurveTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::MidiCv:
-                trackEngine = trackContainer.create<MidiCvTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<MidiCvTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Tuesday:
-                trackEngine = trackContainer.create<TuesdayTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<TuesdayTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::DiscreteMap:
-                trackEngine = trackContainer.create<DiscreteMapTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<DiscreteMapTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Indexed:
-                trackEngine = trackContainer.create<IndexedTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<IndexedTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Teletype:
-                trackEngine = trackContainer.create<TeletypeTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<TeletypeTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Stochastic:
-                trackEngine = trackContainer.create<StochasticTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<StochasticTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::PhaseFlux:
-                trackEngine = trackContainer.create<PhaseFluxTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<PhaseFluxTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Last:
                 break;
             }
         }
-
-        // update linked track engine
-        _trackEngines[trackIndex]->setLinkedTrackEngine(linkedTrackEngine);
     }
 }
 

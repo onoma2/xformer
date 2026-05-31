@@ -11,7 +11,6 @@
 LayoutPage::LayoutPage(PageManager &manager, PageContext &context) :
     ListPage(manager, context, _trackModeListModel),
     _trackModeListModel(context.model.project()),
-    _linkTrackListModel(context.model.project()),
     _gateOutputListModel(context.model.project()),
     _cvOutputListModel(context.model.project())
 {
@@ -23,7 +22,7 @@ void LayoutPage::enter() {
 
 void LayoutPage::draw(Canvas &canvas) {
     bool showCommit = _mode == Mode::TrackMode && !_trackModeListModel.sameAsProject(_project);
-    const char *functionNames[] = { "MODE", "LINK", "GATE", "CV", showCommit ? "COMMIT" : nullptr };
+    const char *functionNames[] = { "MODE", "GATE", "CV", showCommit ? "COMMIT" : nullptr };
 
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "LAYOUT");
@@ -37,7 +36,7 @@ void LayoutPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
 
     if (key.isFunction()) {
-        if (key.function() == 4) {
+        if (key.function() == 3) {
             commitLayout();
         }
         setMode(Mode(key.function()));
@@ -54,9 +53,6 @@ void LayoutPage::setMode(Mode mode) {
     switch (mode) {
     case Mode::TrackMode:
         setListModel(_trackModeListModel);
-        break;
-    case Mode::LinkTrack:
-        setListModel(_linkTrackListModel);
         break;
     case Mode::GateOutput:
         setListModel(_gateOutputListModel);

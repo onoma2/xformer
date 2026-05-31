@@ -16,7 +16,7 @@ public:
     static constexpr int PerformerGateCount = 8;
     static constexpr int PerformerCvCount = 8;
 
-    TeletypeTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine);
+    TeletypeTrackEngine(Engine &engine, const Model &model, Track &track);
 
     virtual Track::TrackMode trackMode() const override { return Track::TrackMode::Teletype; }
 

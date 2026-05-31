@@ -9,8 +9,8 @@
 
 class TuesdayTrackEngine : public TrackEngine {
 public:
-    TuesdayTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
-        TrackEngine(engine, model, track, linkedTrackEngine)
+    TuesdayTrackEngine(Engine &engine, const Model &model, Track &track) :
+        TrackEngine(engine, model, track)
     {
         reset();
     }

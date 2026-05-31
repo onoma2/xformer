@@ -151,20 +151,8 @@ void CurveTrackEngine::restart() {
 TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
     ASSERT(_sequence != nullptr, "invalid sequence");
     const auto &sequence = *_sequence;
-    const auto *linkData = _linkedTrackEngine ? _linkedTrackEngine->linkData() : nullptr;
 
-    if (linkData) {
-        _linkData = *linkData;
-        _sequenceState = *linkData->sequenceState;
-
-        updateRecording(linkData->relativeTick, linkData->divisor);
-
-        if (linkData->relativeTick % linkData->divisor == 0) {
-            triggerStep(tick, linkData->divisor);
-        }
-
-        updateOutput(linkData->relativeTick, linkData->divisor);
-    } else {
+    {
         float clockMult = sequence.clockMultiplier() * 0.01f;
         uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
         divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
@@ -234,10 +222,6 @@ TrackEngine::TickResult CurveTrackEngine::tick(uint32_t tick) {
         _tickPhase = 0.0f;
 
         updateOutput(relativeTick, divisor);
-
-        _linkData.divisor = divisor;
-        _linkData.relativeTick = relativeTick;
-        _linkData.sequenceState = &_sequenceState;
     }
 
     return TickResult::NoUpdate;

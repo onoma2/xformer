@@ -12,8 +12,8 @@
 
 class CurveTrackEngine : public TrackEngine {
 public:
-    CurveTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
-        TrackEngine(engine, model, track, linkedTrackEngine),
+    CurveTrackEngine(Engine &engine, const Model &model, Track &track) :
+        TrackEngine(engine, model, track),
         _curveTrack(track.curveTrack())
     {
         reset();
@@ -27,8 +27,6 @@ public:
     virtual void update(float dt) override;
 
     virtual void changePattern() override;
-
-    virtual const TrackLinkData *linkData() const override { return &_linkData; }
 
     virtual bool activity() const override { return _activity; }
     virtual bool gateOutput(int index) const override { return _gateOutput; }
@@ -60,8 +58,6 @@ private:
     void updateRecording(uint32_t relativeTick, uint32_t divisor);
 
     CurveTrack &_curveTrack;
-
-    TrackLinkData _linkData;
 
     float _recordValue;
     CurveRecorder _recorder;

@@ -4,7 +4,6 @@
 
 void Track::clear() {
   _trackMode = TrackMode::Default;
-  _linkTrack = -1;
   _runGate.clear();
   _runGate.base = 1; // Default to Run = On
   _cvOutputRotate.clear();
@@ -153,7 +152,8 @@ void Track::cvOutputName(int index, StringBuilder &str) const {
 
 void Track::write(VersionedSerializedWriter &writer) const {
     writer.writeEnum(_trackMode, trackModeSerialize);
-    writer.write(_linkTrack);
+    int8_t linkReserved = 0; // reserved byte (was _linkTrack); keep for stream alignment
+    writer.write(linkReserved);
     _runGate.write(writer);
     writer.write(_cvOutputRotate.base);
     writer.write(_gateOutputRotate.base);
@@ -193,8 +193,10 @@ void Track::write(VersionedSerializedWriter &writer) const {
 
 void Track::read(VersionedSerializedReader &reader) {
   reader.readEnum(_trackMode, trackModeSerialize);
-  reader.read(_linkTrack);
-  
+  int8_t linkReserved; // reserved byte (was _linkTrack); consume to keep alignment
+  reader.read(linkReserved);
+  (void)linkReserved;
+
   _runGate.read(reader);
 
   _cvOutputRotate.read(reader);

@@ -58,8 +58,8 @@ NoteSequence *noteSequenceForTrack(Model &model, int trackIndex) {
 }
 } // namespace
 
-TeletypeTrackEngine::TeletypeTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
-    TrackEngine(engine, model, track, linkedTrackEngine),
+TeletypeTrackEngine::TeletypeTrackEngine(Engine &engine, const Model &model, Track &track) :
+    TrackEngine(engine, model, track),
     _teletypeTrack(track.teletypeTrack())
 {
     reset();
