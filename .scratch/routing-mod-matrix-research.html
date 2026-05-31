@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Routing → Mod-Matrix Research</title>
+<style>
+  :root{
+    --bg:#14161a; --panel:#1c1f25; --ink:#e6e8ec; --dim:#9aa3ad; --line:#2c313a;
+    --glob:#4aa3ff; --track:#37c98b; --type:#e0a93b; --none:#e0556b; --idea:#b079ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;padding:24px;max-width:1080px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:26px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+  h3{font-size:13px;margin:16px 0 6px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+  .sub{color:var(--dim);margin:0 0 18px}
+  .grid{display:grid;gap:12px}
+  .cols3{grid-template-columns:1fr 1fr 1fr}
+  .cols2{grid-template-columns:1fr 1fr}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .card.glob{border-top:3px solid var(--glob)} .card.track{border-top:3px solid var(--track)}
+  .card.type{border-top:3px solid var(--type)} .card.none{border-top:3px solid var(--none)} .card.idea{border-top:3px solid var(--idea)}
+  table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px}
+  th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600}
+  code{background:#0e1014;padding:1px 5px;border-radius:4px;font-size:12px;color:#cdd6e0}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;font-weight:600}
+  .t-glob{background:rgba(74,163,255,.15);color:var(--glob)} .t-track{background:rgba(55,201,139,.15);color:var(--track)}
+  .t-type{background:rgba(224,169,59,.15);color:var(--type)} .t-none{background:rgba(224,85,107,.15);color:var(--none)}
+  ul{margin:6px 0;padding-left:18px} li{margin:3px 0}
+  .flag{color:var(--none);font-weight:600}
+  .pill{font-size:11px;color:var(--dim)}
+  .src a{color:var(--glob);text-decoration:none} .src{font-size:12px;color:var(--dim)}
+  .lead{color:var(--idea);font-weight:600}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;white-space:pre;overflow-x:auto;background:#0e1014;padding:10px;border-radius:6px;color:#cdd6e0}
+</style>
+</head>
+<body>
+
+<h1>Routing → Mod-Matrix Behavioral Structure</h1>
+<p class="sub">Research artifact, 2026-05-31. No direction chosen. Goal: pick a clean behavioral model for routing and separate concerns at both the <b>UI/behavior</b> level and the <b>engine</b> level. Companion to <code>.tasks/core-architecture-optimization/routing-five-sources-map.md</code>.</p>
+
+<!-- ============ 1. PARADIGMS ============ -->
+<h2>1 · Mod-matrix paradigms (what the field does)</h2>
+<p class="sub">Two independent axes. Performer today sits in the worst corner of both: one flat global table (engine), one central list page (UI).</p>
+
+<div class="grid cols2">
+  <div class="card">
+    <h3>Axis A — Engine: where routing lives</h3>
+    <table>
+      <tr><th>Model</th><th>Who owns a route</th><th>Examples</th></tr>
+      <tr><td><b>Global flat matrix</b></td><td>one central table, all sources × all destinations</td><td>PolyBrute, classic synths, <b>Performer now</b></td></tr>
+      <tr><td><b>Per-scope / per-device</b></td><td>routing lives <i>where the target parameter lives</i>; local source/target vocabulary</td><td>Bitwig "unified modulation", <b>Performer's own Indexed RouteConfig</b></td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Axis B — UI: how a route is made</h3>
+    <table>
+      <tr><th>Model</th><th>Interaction</th><th>Examples</th></tr>
+      <tr><td><b>Matrix / list page</b></td><td>central page, rows=src cols=dest, edit the cell</td><td>PolyBrute grid, <b>Performer RoutingPage</b></td></tr>
+      <tr><td><b>Hold source → dest</b></td><td>hold a source, tap a destination, depth pops up</td><td>Hydrasynth (32 conns)</td></tr>
+      <tr><td><b>Assign-from-parameter</b></td><td>long-press the param you want moved → pick a source</td><td>Bitwig, Vital, Logic Sampler</td></tr>
+    </table>
+  </div>
+</div>
+<p class="sub">Common matrix-slot anatomy across all of them: <code>source → destination · depth (bipolar/unipolar)</code>, fixed N slots ("virtual patch cables"). Performer's Indexed <code>RouteConfig</code> already <i>is</i> a slot: <code>{ source, targetParam, amount −200..+200%, targetGroups }</code> × 2 slots + combine mode.</p>
+
+<!-- ============ 2. CURRENT STATE ============ -->
+<h2>2 · Current Performer routing — the smear</h2>
+<div class="card">
+  <p>One flat <code>Routing::Target</code> enum (<b>103 entries</b>) × <code>Routing::Source</code> (<b>37</b>). A single routable target's identity is spread across <b>five</b> places that must move in lockstep; miss one → <span class="flag">silent dead route</span>:</p>
+  <ol>
+    <li><code>Target</code> enum + First/Last sentinels — <code>model/Routing.h</code></li>
+    <li><code>targetInfos[]</code> metadata table — <code>Routing.cpp:375</code></li>
+    <li><code>writeTarget</code> dispatch switch (per trackMode) — <code>Routing.cpp:208</code></li>
+    <li>picker applicability + <code>isPerTrackTarget</code> — <code>RoutingPage.cpp</code></li>
+    <li>per-model <code>writeRouted</code> leaf — each <code>*Track</code>/<code>*Sequence</code></li>
+  </ol>
+  <p class="pill">Live drift bugs this produces: <code>StochasticFeel</code> routes but never writes (no leaf case); PhaseFlux per-stage params never added anywhere; Indexed dual-sources its targets; Stochastic Divisor/Scale/RootNote special-cased because its divisor isn't <code>Routable</code>. Built for 2 homogeneous types (Note/Curve), now stretched over 8 heterogeneous ones.</p>
+</div>
+
+<!-- ============ 3. BUCKETS ============ -->
+<h2>3 · Current routes, bucketed</h2>
+<p class="sub">The enum already groups by category. Re-cast into the three buckets you asked for. Sources feed all buckets: <code>CvIn1–4</code>, <code>Midi</code>, <code>Mod1–8</code> (global modulators), <code>CvOut1–8 / GateOut1–8 / BusCv1–4</code> (output-feedback).</p>
+
+<div class="grid cols3">
+  <div class="card glob">
+    <h3><span class="tag t-glob">Whole-Performer</span></h3>
+    <p class="pill">global, one instance, no track index</p>
+    <ul>
+      <li><b>Engine:</b> Play, PlayToggle, Record, RecordToggle, TapTempo</li>
+      <li><b>Project:</b> Tempo, Swing, CvRouteScan, CvRouteRoute</li>
+      <li><b>Bus:</b> BusCv1–4 <span class="pill">(internal patchbay — also sources)</span></li>
+    </ul>
+  </div>
+  <div class="card track">
+    <h3><span class="tag t-track">Per-track, generic</span></h3>
+    <p class="pill">every track type, indexed by track</p>
+    <ul>
+      <li><b>PlayState:</b> Mute, Fill, FillAmount, Pattern</li>
+      <li><b>Track:</b> Run, Reset, SlideTime, Octave, Transpose, Offset, Rotate, 5× ProbabilityBias, Cv/GateOutputRotate</li>
+      <li><b>Sequence:</b> FirstStep, LastStep, RunMode, Divisor, ClockMult, Scale, RootNote</li>
+    </ul>
+  </div>
+  <div class="card type">
+    <h3><span class="tag t-type">Per-track-TYPE</span></h3>
+    <p class="pill">only meaningful for one engine</p>
+    <ul>
+      <li><b>Tuesday:</b> Algorithm, Flow, Ornament, Power, Glide, Trill, StepTrill, GateOffset, GateLength</li>
+      <li><b>Curve:</b> Chaos×4, Wavefolder Fold/Gain, DjFilter, CurveRate</li>
+      <li><b>DiscreteMap:</b> Input, Scanner, Sync, RangeHigh, RangeLow</li>
+      <li><b>Indexed:</b> IndexedA/B <i>+ borrows DiscreteMap group</i></li>
+      <li><b>Stochastic:</b> Mask, GateLength, Tilt, Feel, Burst, Complexity, Contour, NoteDuration, Variation, Rest, Slide, Sleep, PatienceRhythm, Mutate, Jump</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ 4. OBSERVATIONS ============ -->
+<h2>4 · Observations (the asymmetry)</h2>
+<div class="grid cols2">
+  <div class="card none">
+    <h3>Track types with <span class="flag">nothing</span> type-specific routable</h3>
+    <ul>
+      <li><b>PhaseFlux</b> — rich per-stage nudges/warp shipped; <span class="flag">zero</span> in the enum (overhaul was waited on first). Only generic Track+Sequence route.</li>
+      <li><b>Teletype</b> — no targets at all (<code>Routing.cpp:284</code> bare <code>break</code>).</li>
+      <li><b>MidiCv</b> — generic Track only.</li>
+      <li><b>Note</b> — generic Track/Sequence only (the original homogeneous case).</li>
+    </ul>
+  </div>
+  <div class="card type">
+    <h3>Redundant / borrowed targets on older types</h3>
+    <ul>
+      <li>The flat <b>Track</b> block (Octave, Transpose, biases…) is offered to every type even where it's meaningless — older Note/Curve-era targets bolted onto heterogeneous engines.</li>
+      <li><b>Indexed borrows DiscreteMap</b>'s target group <i>and</i> owns IndexedA/B — dual-sourced, gated in two places.</li>
+      <li><b>Stochastic</b> Divisor/Scale/RootNote special-cased because its divisor isn't a <code>Routable</code> like everyone else's.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card idea" style="margin-top:12px">
+  <h3><span class="tag" style="background:rgba(176,121,255,.15);color:var(--idea)">Precedent</span> Indexed already manages routing <i>inside itself</i></h3>
+  <p>Indexed doesn't use the global <code>Target</code> enum for its modulation. It carries a self-contained 2-slot mod-matrix in the <i>sequence</i>, with its own local vocabulary and its own config page:</p>
+  <div class="mono">IndexedSequence::RouteConfig {
+    RouteSource source;        // local source enum (not Routing::Source)
+    ModTarget    targetParam;  // local target enum (Duration, …)
+    float        amount;       // −200%..+200%, bipolar depth
+    uint8_t      targetGroups; // bitmask: which cell groups it hits
+}
+routeA, routeB  +  RouteCombineMode      // 2 slots + combine
+→ IndexedRouteConfigPage  (its own UI)</div>
+  <p class="pill">This is a per-scope mod-matrix (Axis A, lower row) with assign-in-context UI — exactly the Bitwig shape, already in the codebase. It sidesteps all five global sources of truth. The open question is whether to <b>generalize it</b>.</p>
+</div>
+
+<!-- ============ 5. PROPOSAL ============ -->
+<h2>5 · Proposed separation of concerns</h2>
+<p class="sub">Direction only — for discussion. Split routing into two tiers along the bucket boundary, each owning its own small source/target vocabulary instead of one 103-entry flat enum.</p>
+
+<div class="grid cols2">
+  <div class="card glob">
+    <h3>Tier 1 — Global mod matrix</h3>
+    <p><b>Owns:</b> the Whole-Performer bucket (Engine, Project, Bus).</p>
+    <p><b>Engine:</b> one small central matrix, fixed slots <code>source → global-target · depth</code>. Sources = CvIn/Midi/Mod/Bus.</p>
+    <p><b>UI:</b> one global routing page (today's RoutingPage, shrunk to global-only).</p>
+  </div>
+  <div class="card track">
+    <h3>Tier 2 — Per-track mod matrix</h3>
+    <p><b>Owns:</b> per-track generic + per-track-type buckets.</p>
+    <p><b>Engine:</b> each track carries its own slots (generalize Indexed <code>RouteConfig</code>). The track type <b>declares its own routable targets in one place</b> — kills the five-source smear; a missing leaf can't drift because the declaration <i>is</i> the leaf.</p>
+    <p><b>UI:</b> per-track route page (Indexed pattern) and/or assign-from-parameter (long-press the param). Targets shown are exactly that type's — no inapplicable Octave on a Teletype track.</p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:12px">
+  <h3>What this buys</h3>
+  <ul>
+    <li><b>One home per target.</b> A track type lists its routable params once; no enum/targetInfos/dispatch/picker/leaf lockstep. PhaseFlux/Teletype get routing by declaring it locally, not by editing five global files.</li>
+    <li><b>No cross-type pollution.</b> Generic Track targets stop being offered where meaningless; Indexed stops borrowing DiscreteMap.</li>
+    <li><b>Behavior vs engine split is clean:</b> UI tier = "where do I make the route" (global page vs in-track / assign-from-param); engine tier = "who computes it" (central global matrix vs per-track matrices folded into the single-pass recompute the spine just built).</li>
+    <li><b>Bus stays the bridge</b> between tiers (a track writes BusCvN; the global matrix or another track reads it) — the one explicit cross-tier patch point.</li>
+  </ul>
+  <p class="pill">Open: fixed slot count per tier? bipolar depth + curve per slot (Indexed has amount only)? does the global modulator set (Mod1–8) stay global sources or become per-track? migration of existing routes off the flat enum (forward-compatible, no version bump).</p>
+</div>
+
+<h2>Sources</h2>
+<p class="src">
+  <a href="https://www.willpirkle.com/synthlab/docs/html/mod_matrix.html">SynthLab SDK — Modulation Matrix</a> ·
+  <a href="https://www.bitwig.com/userguide/latest/the_unified_modulation_system/">Bitwig — Unified Modulation System</a> ·
+  <a href="https://www.bitwig.com/userguide/latest/modulator/">Bitwig — Modulators (per-device slots)</a> ·
+  <a href="https://support.arturia.com/hc/en-us/articles/4405748080914-PolyBrute-Modulation-Matrix">Arturia PolyBrute — Modulation Matrix (grid)</a> ·
+  <a href="https://gearspace.com/board/electronic-music-instruments-and-electronic-music-production/1392477-synths-physical-mod-matrix-interface.html">Hardware mod-matrix UI patterns (Hydrasynth hold-assign)</a> ·
+  <a href="https://www.attackmagazine.com/technique/synth-secrets/what-is-a-modulation-matrix-how-does-it-work/">Attack Magazine — What is a modulation matrix</a>
+</p>
+
+</body>
+</html>
