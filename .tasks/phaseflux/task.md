@@ -105,6 +105,7 @@ Implementer-resolved items (engineering punch list, §16):
 - [ ] Bounce temporal-curve LUT choice (ExpDown2x, ExpDown3x, or new `Bounce = 1 − (1−x)³` entry in `model/Curve.h`) — engine-side, deferred to Phase B
 - [ ] Default `_resetMeasure` UI step granularity (powers-of-two from NoteSequence) — UI-side, deferred to Phase B/C
 - [ ] Pre-build snake permutation lookup (`snakeOrder[16]`) — static const or computed once at engine init — engine-side, deferred to Phase B
+- [ ] **CycleLength Adaptive/Fixed needs rethinking — not behaving as expected.** The Adaptive-vs-Fixed semantics (skip drops slot from cycle and shifts surviving-stage tempo vs skip stays in cycle as silence) don't play out as intended in practice. Revisit the whole model alongside the future per-track tick-clock / wall-clock / update-cadence discussion (the same discussion that holds deferred PhaseFlux sub-tick envelope smoothing). Don't patch piecemeal — think the cycle-length contract through first. (flagged 2026-05-31)
 
 ## Completed steps
 
