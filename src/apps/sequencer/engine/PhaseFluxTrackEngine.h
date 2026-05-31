@@ -15,8 +15,8 @@ public:
     static constexpr int kStageCount = PhaseFluxMath::kStageCount;
     static constexpr int kMaxPulses = 16;
 
-    PhaseFluxTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
-        TrackEngine(engine, model, track, linkedTrackEngine),
+    PhaseFluxTrackEngine(Engine &engine, const Model &model, Track &track) :
+        TrackEngine(engine, model, track),
         _phaseFluxTrack(track.phaseFluxTrack())
     {
         reset();

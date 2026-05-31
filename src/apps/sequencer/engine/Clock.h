@@ -68,6 +68,26 @@ public:
     void setMasterBpm(float bpm);
 
     // Slave clock control
+
+    // Outlier guard. Adopt `candidate` as the new slave period if: no baseline
+    // is latched yet; or it is within 0.5x..2x of `current`; or it agrees with
+    // the previous raw measurement `lastRaw` (a sustained new tempo confirmed
+    // over two consecutive ticks, not a single-tick spike). Rejects isolated
+    // jitter spikes while still adopting a real tempo jump after one tick.
+    // Pure for testing.
+    static bool acceptSlavePeriod(bool latched, uint32_t current, uint32_t lastRaw, uint32_t candidate) {
+        if (candidate == 0) {
+            return false;
+        }
+        if (!latched) {
+            return true;
+        }
+        if (candidate >= current / 2 && candidate <= current * 2) {
+            return true;
+        }
+        return lastRaw != 0 && candidate >= lastRaw / 2 && candidate <= lastRaw * 2;
+    }
+
     void slaveConfigure(int slave, int divisor, bool enabled);
     void slaveTick(int slave);
     void slaveStart(int slave);
@@ -157,6 +177,8 @@ private:
     uint32_t _elapsedUs;
     uint32_t _lastSlaveTickUs; // time of last call to slaveTick
     uint32_t _slaveTickPeriodUs = 0; // slave tick period time
+    bool _slavePeriodLatched = false; // a real period has been measured (outlier guard baseline)
+    uint32_t _slaveLastRawPeriodUs = 0; // previous raw measurement (for sustained-change confirm)
     uint32_t _slaveSubTicksPending; // number of slave sub ticks pending
     uint32_t _slaveSubTickPeriodUs = 0; // slave sub tick period time
     uint32_t _nextSlaveSubTickUs; // time of next slave sub tick

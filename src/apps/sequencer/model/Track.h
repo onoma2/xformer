@@ -121,25 +121,6 @@ public:
     str(trackModeName(trackMode()));
   }
 
-  // linkTrack
-
-  int linkTrack() const { return _linkTrack; }
-  void setLinkTrack(int linkTrack) {
-    _linkTrack = clamp(linkTrack, -1, _trackIndex - 1);
-  }
-
-  void editLinkTrack(int value, bool shift) {
-    setLinkTrack(linkTrack() + value);
-  }
-
-  void printLinkTrack(StringBuilder &str) const {
-    if (linkTrack() == -1) {
-      str("None");
-    } else {
-      str("Track%d", linkTrack() + 1);
-    }
-  }
-
   // cvOutputRotate
 
   int cvOutputRotate() const { return _cvOutputRotate.get(Routing::isRouted(Routing::Target::CvOutputRotate, _trackIndex)); }
@@ -313,7 +294,6 @@ public:
 
   Track &operator=(const Track &other) {
     ASSERT(_trackMode == other._trackMode, "invalid track mode");
-    _linkTrack = other._linkTrack;
     _container = other._container;
     setTrackIndex(other._trackIndex); // Call the private setTrackIndex
     return *this;
@@ -408,7 +388,6 @@ private:
 
   uint8_t _trackIndex = -1;
   TrackMode _trackMode;
-  int8_t _linkTrack;
   Routable<uint8_t> _runGate;
   Routable<int8_t> _cvOutputRotate;
   Routable<int8_t> _gateOutputRotate;

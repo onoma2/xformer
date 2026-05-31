@@ -33,8 +33,8 @@ public:
         }
     };
 
-    NoteTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
-        TrackEngine(engine, model, track, linkedTrackEngine),
+    NoteTrackEngine(Engine &engine, const Model &model, Track &track) :
+        TrackEngine(engine, model, track),
         _noteTrack(track.noteTrack())
     {
         reset();
@@ -51,8 +51,6 @@ public:
 
     virtual void monitorMidi(uint32_t tick, const MidiMessage &message) override;
     virtual void clearMidiMonitoring() override;
-
-    virtual const TrackLinkData *linkData() const override { return &_linkData; }
 
     virtual bool activity() const override { return _activity; }
     virtual bool gateOutput(int index) const override { return _gateOutput; }
@@ -81,8 +79,6 @@ private:
     }
 
     NoteTrack &_noteTrack;
-
-    TrackLinkData _linkData;
 
     NoteSequence *_sequence = nullptr;
     const NoteSequence *_fillSequence = nullptr;

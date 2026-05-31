@@ -13,13 +13,6 @@
 #include <cstdint>
 
 class Engine;
-class SequenceState;
-
-struct TrackLinkData {
-    uint32_t divisor;
-    uint32_t relativeTick;
-    SequenceState *sequenceState;
-};
 
 #if CONFIG_ENABLE_SANITIZE
 # define SANITIZE_TRACK_MODE(_actual_, _expected_) ASSERT(_actual_ == _expected_, "invalid track mode");
@@ -36,19 +29,13 @@ public:
         GateUpdate  = (1<<1),
     };
 
-    TrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
+    TrackEngine(Engine &engine, const Model &model, Track &track) :
         _engine(engine),
         _model(model),
         _track(track),
-        _trackState(model.project().playState().trackState(track.trackIndex())),
-        _linkedTrackEngine(linkedTrackEngine)
+        _trackState(model.project().playState().trackState(track.trackIndex()))
     {
         changePattern();
-    }
-
-    const TrackEngine *linkedTrackEngine() const { return _linkedTrackEngine; }
-    void setLinkedTrackEngine(const TrackEngine *linkedTrackEngine) {
-        _linkedTrackEngine = linkedTrackEngine;
     }
 
     template<typename T>
@@ -80,8 +67,6 @@ public:
     virtual void monitorMidi(uint32_t tick, const MidiMessage &message) {}
     virtual void clearMidiMonitoring() {}
 
-    virtual const TrackLinkData *linkData() const { return nullptr; }
-
     // track output
 
     virtual bool activity() const = 0;
@@ -106,7 +91,6 @@ protected:
     const Model &_model;
     Track &_track;
     const PlayState::TrackState &_trackState;
-    const TrackEngine *_linkedTrackEngine;
 };
 
 ENUM_CLASS_OPERATORS(TrackEngine::TickResult)

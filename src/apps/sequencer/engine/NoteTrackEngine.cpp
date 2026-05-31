@@ -159,18 +159,8 @@ void NoteTrackEngine::restart() {
 TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
     ASSERT(_sequence != nullptr, "invalid sequence");
     const auto &sequence = *_sequence;
-    const auto *linkData = _linkedTrackEngine ? _linkedTrackEngine->linkData() : nullptr;
 
-        if (linkData) {
-            _linkData = *linkData;
-            _sequenceState = *linkData->sequenceState;
-            _noteSequenceState = *linkData->sequenceState;
-
-        if (linkData->relativeTick % linkData->divisor == 0) {
-            recordStep(tick, linkData->divisor);
-            triggerStep(tick, linkData->divisor);
-        }
-        } else {
+    {
             float clockMult = sequence.clockMultiplier() * 0.01f;
             uint32_t divisor = sequence.divisor() * (CONFIG_PPQN / CONFIG_SEQUENCE_PPQN);
             divisor = std::max<uint32_t>(1, std::lround(divisor / clockMult));
@@ -360,10 +350,6 @@ TrackEngine::TickResult NoteTrackEngine::tick(uint32_t tick) {
         case Types::PlayMode::Last:
             break;
         }
-
-        _linkData.divisor = divisor;
-        _linkData.relativeTick = relativeTick;
-        _linkData.sequenceState = &_sequenceState;
     }
 
     auto &midiOutputEngine = _engine.midiOutputEngine();

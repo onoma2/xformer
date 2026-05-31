@@ -59,7 +59,7 @@ void Engine::init() {
     updateTrackSetups();
     reset();
 
-    _lastSystemTicks = os::ticks();
+    _lastWallUs = _wallClock.now();
 }
 
 void Engine::update() {
@@ -69,9 +69,9 @@ void Engine::update() {
         return;
     }
 
-    uint32_t systemTicks = os::ticks();
-    float dt = (0.001f * (systemTicks - _lastSystemTicks)) / os::time::ms(1);
-    _lastSystemTicks = systemTicks;
+    uint32_t nowUs = _wallClock.now();
+    float dt = (nowUs - _lastWallUs) * 1e-6f; // seconds of real wall time (wrap-safe delta)
+    _lastWallUs = nowUs;
 
     // suspending
     if (_requestSuspend != _suspended) {
@@ -161,24 +161,18 @@ void Engine::update() {
         // update play state
         updatePlayState(true);
 
-        // tick track engines
+        // tick track engines; collect whether any track updated its CV output
+        bool cvUpdated = false;
         for (size_t trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
-                auto &track = _model.project().track(trackIndex);
-                auto &trackEngine = *_trackEngines[trackIndex];
+            auto &track = _model.project().track(trackIndex);
+            auto &trackEngine = *_trackEngines[trackIndex];
 
-                TrackEngine::TickResult result = TrackEngine::TickResult::NoUpdate;
-
-                if (track.runGate()) {
-                    result = trackEngine.tick(tick);
-                }
-
-            //    trackEngine.update(0.001f); // commented out to solve timing discrepansy in Ms when engine is stopped for Teletype metro
-            // update track outputs and routings if tick results in updating the track's CV output
-            if ((result & TrackEngine::TickResult::CvUpdate) && _trackUpdateReducers[trackIndex].update()) {
-                trackEngine.update(0.f);
-                updateTrackOutputs();
-                updateOverrides();
-                _routingEngine.update();
+            TrackEngine::TickResult result = TrackEngine::TickResult::NoUpdate;
+            if (track.runGate()) {
+                result = trackEngine.tick(tick);
+            }
+            if (result & TrackEngine::TickResult::CvUpdate) {
+                cvUpdated = true;
             }
         }
 
@@ -187,7 +181,8 @@ void Engine::update() {
             _midiOutputEngine.update(true);
         }
 
-        // tick modulators
+        // tick modulators before the global recompute so a modulator used as a
+        // routing/CV source reflects the current tick
         for (int modulatorIndex = 0; modulatorIndex < CONFIG_MODULATOR_COUNT; ++modulatorIndex) {
             const auto &modulator = _project.modulator(modulatorIndex);
             int gateTrack = modulator.gateTrack();
@@ -195,6 +190,22 @@ void Engine::update() {
                 _trackEngines[gateTrack]->gateOutput(0) : false;
             _modulatorEngine.tick(tick, modulator, modulatorIndex, gate);
             _midiOutputEngine.sendModulator(modulatorIndex, _modulatorEngine.currentValue(modulatorIndex));
+        }
+
+        // single per-tick global recompute (was run once per firing track, T×
+        // redundant). The reducer remains a rate-limit safety cap.
+        // Compose physical outputs first so routing sources that read CvOut/GateOut
+        // see the just-ticked track values; then route; then fill CV-route outputs
+        // and recompose so CV-route output channels are current-tick (not one
+        // update stale). The double compose breaks the routing<->CV-route cycle.
+        if (cvUpdated && _updateReducer.update()) {
+            for (auto trackEngine : _trackEngines) {
+                trackEngine->update(0.f);
+            }
+            updateTrackOutputs();
+            _routingEngine.update();
+            updateOverrides();
+            updateTrackOutputs();
         }
     }
 
@@ -204,8 +215,9 @@ void Engine::update() {
 
     _midiOutputEngine.update();
 
-    updateTrackOutputs();
+    // final compose: overrides fill the CV-route outputs before track outputs read them
     updateOverrides();
+    updateTrackOutputs();
     applyBusSafety();
 
     // update cv/gate outputs
@@ -517,8 +529,6 @@ void Engine::onClockMidi(uint8_t data) {
 void Engine::updateTrackSetups() {
     for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
         auto &track = _project.track(trackIndex);
-        int linkTrack = track.linkTrack();
-        const TrackEngine *linkedTrackEngine = linkTrack >= 0 ? &trackEngine(linkTrack) : nullptr;
 
         if (!_trackEngines[trackIndex] || _trackEngines[trackIndex]->trackMode() != track.trackMode()) {
             auto &trackEngine = _trackEngines[trackIndex];
@@ -526,39 +536,36 @@ void Engine::updateTrackSetups() {
 
             switch (track.trackMode()) {
             case Track::TrackMode::Note:
-                trackEngine = trackContainer.create<NoteTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<NoteTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Curve:
-                trackEngine = trackContainer.create<CurveTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<CurveTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::MidiCv:
-                trackEngine = trackContainer.create<MidiCvTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<MidiCvTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Tuesday:
-                trackEngine = trackContainer.create<TuesdayTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<TuesdayTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::DiscreteMap:
-                trackEngine = trackContainer.create<DiscreteMapTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<DiscreteMapTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Indexed:
-                trackEngine = trackContainer.create<IndexedTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<IndexedTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Teletype:
-                trackEngine = trackContainer.create<TeletypeTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<TeletypeTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Stochastic:
-                trackEngine = trackContainer.create<StochasticTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<StochasticTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::PhaseFlux:
-                trackEngine = trackContainer.create<PhaseFluxTrackEngine>(*this, _model, track, linkedTrackEngine);
+                trackEngine = trackContainer.create<PhaseFluxTrackEngine>(*this, _model, track);
                 break;
             case Track::TrackMode::Last:
                 break;
             }
         }
-
-        // update linked track engine
-        _trackEngines[trackIndex]->setLinkedTrackEngine(linkedTrackEngine);
     }
 }
 

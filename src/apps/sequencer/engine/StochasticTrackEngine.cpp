@@ -114,8 +114,8 @@ static float poissonCdf(int k, float lambda) {
     return sum > 1.0f ? 1.0f : sum;
 }
 
-StochasticTrackEngine::StochasticTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
-    TrackEngine(engine, model, track, linkedTrackEngine),
+StochasticTrackEngine::StochasticTrackEngine(Engine &engine, const Model &model, Track &track) :
+    TrackEngine(engine, model, track),
     _stochasticTrack(track.stochasticTrack()),
     _rng(0x12345678 + track.trackIndex())
 {

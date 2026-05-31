@@ -76,5 +76,5 @@ private:
     Engine &_engine;
     const MidiOutput &_midiOutput;
     std::array<OutputState, CONFIG_MIDI_OUTPUT_COUNT> _outputStates;
-    uint32_t _lastSendCCTicks = 0;
+    uint32_t _lastSendCCUs = 0;
 };

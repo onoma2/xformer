@@ -11,8 +11,8 @@
 
 class IndexedTrackEngine : public TrackEngine {
 public:
-    IndexedTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
-        TrackEngine(engine, model, track, linkedTrackEngine),
+    IndexedTrackEngine(Engine &engine, const Model &model, Track &track) :
+        TrackEngine(engine, model, track),
         _indexedTrack(track.indexedTrack())
     {
         reset();

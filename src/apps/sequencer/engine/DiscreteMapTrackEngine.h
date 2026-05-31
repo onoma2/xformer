@@ -8,8 +8,8 @@
 
 class DiscreteMapTrackEngine : public TrackEngine {
 public:
-    DiscreteMapTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine) :
-        TrackEngine(engine, model, track, linkedTrackEngine),
+    DiscreteMapTrackEngine(Engine &engine, const Model &model, Track &track) :
+        TrackEngine(engine, model, track),
         _discreteMapTrack(track.discreteMapTrack())
     {
         reset();

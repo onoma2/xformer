@@ -12,7 +12,7 @@
 
 class StochasticTrackEngine : public TrackEngine {
 public:
-    StochasticTrackEngine(Engine &engine, const Model &model, Track &track, const TrackEngine *linkedTrackEngine);
+    StochasticTrackEngine(Engine &engine, const Model &model, Track &track);
 
     virtual void reset() override;
     virtual void restart() override;

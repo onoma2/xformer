@@ -2,6 +2,7 @@
 
 #include "EngineState.h"
 #include "Clock.h"
+#include "WallClock.h"
 #include "TapTempo.h"
 #include "NudgeTempo.h"
 #include "TrackEngine.h"
@@ -44,7 +45,6 @@ public:
     using TrackEngineContainer = Container<NoteTrackEngine, CurveTrackEngine, MidiCvTrackEngine, TuesdayTrackEngine, DiscreteMapTrackEngine, IndexedTrackEngine, TeletypeTrackEngine, StochasticTrackEngine, PhaseFluxTrackEngine>;
     using TrackEngineContainerArray = std::array<TrackEngineContainer, CONFIG_TRACK_COUNT>;
     using TrackEngineArray = std::array<TrackEngine *, CONFIG_TRACK_COUNT>;
-    using TrackUpdateReducerArray = std::array<UpdateReducer<os::time::ms(25)>, CONFIG_TRACK_COUNT>;
 
     using MidiReceiveHandler = std::function<bool(MidiPort port, uint8_t cable, const MidiMessage &message)>;
 
@@ -262,7 +262,7 @@ private:
 
     TrackEngineContainerArray _trackEngineContainers;
     TrackEngineArray _trackEngines;
-    TrackUpdateReducerArray _trackUpdateReducers;
+    UpdateReducer<os::time::ms(25)> _updateReducer; // rate-limit cap on the per-tick global recompute
 
     MidiOutputEngine _midiOutputEngine;
 
@@ -288,7 +288,8 @@ private:
 
     uint32_t _tick = 0;
 
-    uint32_t _lastSystemTicks = 0;
+    WallClock _wallClock;
+    uint32_t _lastWallUs = 0;
 
     // midi monitoring
     struct {
