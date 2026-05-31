@@ -23,8 +23,9 @@ ER-101 uses a single 64-bit free-running `wallclock()` as *the* reference; every
 
 **Transfers to xformer:**
 1. Drift-free deadline pattern (`end_time += delay`) for wall-time consumers.
-2. 64-bit wall reference — avoids the `os::ticks()` 32-bit wrap in long sessions.
-3. Outlier-guarded period latch (`this_period > last/2 && < 2*last`, `interrupt_handlers.c`). ER-101 and performer-nx independently converge on bounding the slave period; the 0.5×–2× latch is the proven minimum, performer-nx's 4-phase pipeline is the deluxe version.
+2. Outlier-guarded period latch (`this_period > last/2 && < 2*last`, `interrupt_handlers.c`). ER-101 and performer-nx independently converge on bounding the slave period; the 0.5×–2× latch is the proven minimum, performer-nx's 4-phase pipeline is the deluxe version.
+
+**Does NOT transfer — ER-101's 64-bit width.** ER-101's `wallclock_t` is `uint64_t` because its counter runs at CPU_HZ (~66 MHz → a 32-bit counter wraps in ~1 minute). xformer counts microseconds and already standardizes on `uint32_t` µs (`Clock::_elapsedUs`) with wrap-safe deltas. On a 32-bit Cortex-M4, a 64-bit software-extended counter costs multi-instruction ops on the hot path and can't be read atomically (the two halves tear across the high-word increment). Use `uint32_t` with wrap-safe comparison — only the *pattern* transfers, not the width.
 
 **Does NOT transfer:** ER-101's synthetic-clock generation + per-track tick-adjustment keep 4 independently-subdivided tracks drift-locked. xformer's transport `Clock` already distributes one tick to all engines simultaneously — cross-track sync is centralized. Importing that machinery re-solves a problem xformer doesn't have.
 
@@ -32,20 +33,20 @@ ER-101 uses a single 64-bit free-running `wallclock()` as *the* reference; every
 
 ### B — `WallClock` service (the substrate)
 
-A 64-bit µs free-running clock + a `WallTimer` value type:
+A 32-bit µs free-running clock + a wrap-safe `WallTimer` value type (matching the engine's existing `uint32_t` µs convention):
 
 ```cpp
-class WallClock {            // wraps os::ticks() into monotonic 64-bit µs
-    uint64_t now() const;    // free-running, independent of play/stop and tempo
+class WallClock {            // wraps the existing time source into uint32_t µs
+    uint32_t now() const;    // free-running, independent of play/stop and tempo
 };
 
-struct WallTimer {           // absolute-deadline timer, drift-free
-    uint64_t endUs = 0;
+struct WallTimer {           // absolute-deadline timer, drift-free + wrap-safe
+    uint32_t endUs = 0;
     bool running = false;
-    void schedule(uint64_t deadlineUs);
-    void start(WallClock &c, uint64_t delayUs);
-    bool elapsed(WallClock &c);     // true once, when now() > endUs
-    void restart(uint64_t delayUs); // endUs += delayUs  (NOT now + delay)
+    void schedule(uint32_t deadlineUs);
+    void start(WallClock &c, uint32_t delayUs);
+    bool elapsed(WallClock &c);     // true once: (int32_t)(now() - endUs) >= 0  (wrap-safe, NOT now > end)
+    void restart(uint32_t delayUs); // endUs += delayUs  (NOT now + delay)
 };
 ```
 

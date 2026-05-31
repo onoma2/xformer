@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture — Current vs Proposed</title>
+<style>
+  :root { --blue:#2563eb; --red:#dc2626; --green:#16a34a; --amber:#ca8a04; --gray:#d4d4d4; --ink:#1a1a1a; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    background:#fafafa; color:var(--ink); line-height:1.5; margin:0; padding:24px; }
+  .wrap { max-width:1000px; margin:0 auto; }
+  h1 { font-size:1.5rem; margin:0 0 4px; }
+  .sub { color:#555; margin:0 0 22px; font-size:0.95rem; }
+  h2 { font-size:1.2rem; margin:34px 0 6px; padding-bottom:6px; border-bottom:2px solid var(--blue); color:var(--blue); }
+  .cap { color:#666; font-size:0.85rem; margin:0 0 14px; }
+  code,.m { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:0.84em; }
+
+  .verdict { background:#fff; border:1px solid var(--gray); border-left:5px solid var(--green); padding:16px 20px; margin:6px 0 8px; }
+  .verdict b { color:var(--green); font-size:1.05rem; }
+
+  .cmp { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .side h3 { margin:0 0 8px; font-size:0.95rem; text-transform:uppercase; letter-spacing:0.04em; }
+  .side.cur h3 { color:var(--red); } .side.pro h3 { color:var(--green); }
+
+  /* flow boxes */
+  .flow { display:flex; flex-direction:column; gap:0; }
+  .box { background:#fff; border:1px solid var(--gray); padding:8px 11px; font-size:0.84rem; }
+  .box .m { display:block; }
+  .arrow { text-align:center; color:#999; font-size:0.9rem; line-height:1.1; padding:2px 0; }
+  .bad { border-color:var(--red); border-width:2px; background:#fff6f6; }
+  .bad .lbl { color:var(--red); font-weight:700; font-size:0.74rem; text-transform:uppercase; }
+  .good { border-color:var(--green); border-width:2px; background:#f5fcf7; }
+  .good .lbl { color:var(--green); font-weight:700; font-size:0.74rem; text-transform:uppercase; }
+  .loop { border:1px dashed var(--red); padding:8px; margin:0; }
+  .loop .tag { font-size:0.72rem; color:var(--red); font-weight:700; text-transform:uppercase; }
+  .loopg { border:1px dashed var(--green); padding:8px; }
+  .loopg .tag { font-size:0.72rem; color:var(--green); font-weight:700; text-transform:uppercase; }
+
+  /* fan-out */
+  .fan { display:grid; grid-template-columns:auto 24px 1fr; align-items:center; gap:0 4px; }
+  .fan .src { background:#fff; border:2px solid var(--red); padding:10px 12px; font-size:0.85rem; font-weight:600; }
+  .fan .srcg { background:#fff; border:2px solid var(--green); padding:10px 12px; font-size:0.85rem; font-weight:600; }
+  .fan .conn { color:#bbb; text-align:center; }
+  .fan .targets { display:flex; flex-direction:column; gap:4px; }
+  .chip { background:#fff; border:1px solid var(--gray); padding:5px 9px; font-size:0.8rem; }
+
+  /* matrix */
+  table { width:100%; border-collapse:collapse; margin:6px 0; font-size:0.86rem; }
+  th,td { border:1px solid var(--gray); padding:8px 10px; text-align:center; }
+  th { background:rgba(37,99,235,0.08); color:var(--blue); font-weight:600; }
+  td.lab { text-align:left; font-weight:600; background:#fafafa; }
+  .y { color:var(--green); font-weight:700; } .n { color:var(--red); font-weight:700; } .dash { color:#bbb; }
+
+  /* verdict matrix */
+  .vmx td { text-align:left; }
+  .badge { font-size:0.72rem; font-weight:700; text-transform:uppercase; padding:2px 7px; border-radius:3px; white-space:nowrap; }
+  .keep { background:#eef4ff; color:var(--blue); } .tweak { background:#fef9e7; color:var(--amber); }
+  .refac { background:#fdeded; color:var(--red); }
+  .legend { font-size:0.82rem; color:#555; margin:8px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Architecture — Current vs Proposed</h1>
+<p class="sub">Schematic read of the mapped subsystems, to answer one question: overhaul, or targeted changes?</p>
+
+<div class="verdict">
+<b>Verdict: targeted changes, not a total overhaul.</b><br>
+The engine core is sound. Every issue is <i>per-feature drift</i> along three axes, each fixable in place:<br>
+&nbsp;&nbsp;<b>1.</b> Note/Curve-era subsystems that never generalized to 8 track types (linking, recording).<br>
+&nbsp;&nbsp;<b>2.</b> Per-feature fan-out — one concept defined/executed in many places (routing 5-sources, engine per-track recompute).<br>
+&nbsp;&nbsp;<b>3.</b> Scattered wall-time (CC rate-limit, modulator dt, slave clock) with no shared service.<br>
+No data model needs replacing; no track type needs rewriting. The work is consolidation + two scoped generalizations.
+</div>
+
+<h2>1 · Engine::update() pipeline</h2>
+<p class="cap">The orchestration. Current re-runs global work per firing track; proposed runs it once per tick.</p>
+<div class="cmp">
+  <div class="side cur">
+    <h3>Current</h3>
+    <div class="flow">
+      <div class="box"><span class="m">cvInput · receiveMidi · receiveKbd</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><span class="m">routingEngine.update()  ← pass #1</span></div>
+      <div class="arrow">↓ per queued tick (K)</div>
+      <div class="loop">
+        <span class="tag">per-track loop (×8)</span>
+        <div class="box" style="margin-top:6px"><span class="m">trackEngine.tick()</span></div>
+        <div class="arrow">↓ if CvUpdate &amp; reducer</div>
+        <div class="box bad"><span class="lbl">global recompute ×T</span>
+          <span class="m">trackOutputs → overrides → routing</span></div>
+        <div class="arrow" style="color:var(--red)">↑ order: outputs read stale CV-route</div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="box bad"><span class="lbl">modulators after routing</span><span class="m">modulator.tick() — source 1 tick late</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><span class="m">trackOutputs · overrides · cv/gate out</span></div>
+    </div>
+  </div>
+  <div class="side pro">
+    <h3>Proposed</h3>
+    <div class="flow">
+      <div class="box"><span class="m">cvInput · receiveMidi · receiveKbd</span></div>
+      <div class="arrow">↓ per queued tick (K)</div>
+      <div class="loopg">
+        <span class="tag">per-track loop (×8)</span>
+        <div class="box good" style="margin-top:6px"><span class="lbl">tick only</span><span class="m">trackEngine.tick()</span></div>
+      </div>
+      <div class="arrow">↓ once per tick</div>
+      <div class="box good"><span class="lbl">single global pass</span>
+        <span class="m">modulators → routing → overrides(CVrouter) → trackOutputs</span></div>
+      <div class="arrow">↓</div>
+      <div class="box"><span class="m">cv/gate out</span></div>
+    </div>
+  </div>
+</div>
+<p class="legend"><b>Change type: REFACTOR (gated).</b> Removes T× redundancy, fixes CV-route stale + modulator lag. Gate: confirm linking reads <code>sequenceState</code> not composed output (io-linking map says it does → likely clears).</p>
+
+<h2>2 · Routing — definition of one target</h2>
+<p class="cap">Adding one routable param today touches five places; miss one = silent dead route.</p>
+<div class="cmp">
+  <div class="side cur">
+    <h3>Current — 1 target, 5 sources of truth</h3>
+    <div class="fan">
+      <div class="src">add<br>1 target</div>
+      <div class="conn">─→</div>
+      <div class="targets">
+        <div class="chip">enum <code>Target</code></div>
+        <div class="chip"><code>targetInfos[]</code> metadata</div>
+        <div class="chip"><code>writeTarget</code> dispatch switch</div>
+        <div class="chip">picker applicability</div>
+        <div class="chip">model <code>writeRouted</code></div>
+      </div>
+    </div>
+  </div>
+  <div class="side pro">
+    <h3>Proposed — 1 descriptor, derived</h3>
+    <div class="fan">
+      <div class="srcg">1 target<br>descriptor</div>
+      <div class="conn" style="color:var(--green)">─→</div>
+      <div class="targets">
+        <div class="chip">name · range · applicable modes · setter ref</div>
+        <div class="chip" style="border-style:dashed">dispatch · picker · metadata <i>derive from it</i></div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="legend"><b>Change type: REFACTOR.</b> Biggest single win for "impossible to think about." Direction still open (collapse vs per-track-ownership vs consistency-pass). Blocks <code>route-reordering</code>.</p>
+
+<h2>3 · Track-type capability matrix</h2>
+<p class="cap">Where the Note/Curve-era shows: subsystems that only two of eight types participate in.</p>
+<table>
+  <thead><tr><th class="lab">Capability</th><th>Note</th><th>Curve</th><th>Tuesday</th><th>Stoch</th><th>PhaseFlux</th><th>Indexed</th><th>DiscMap</th><th>MidiCv</th></tr></thead>
+  <tbody>
+    <tr><td class="lab">Linking — produce</td><td class="y">✓</td><td class="y">✓</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td></tr>
+    <tr><td class="lab">Linking — consume</td><td class="n">✗</td><td class="y">✓</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td></tr>
+    <tr><td class="lab">Recording (MIDI in)</td><td class="y">✓</td><td class="y">✓</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td></tr>
+    <tr><td class="lab">Routing targets</td><td>uni</td><td>+chaos/wf</td><td>+9</td><td>+15</td><td class="n">0</td><td>borrow</td><td>+5</td><td>uni</td></tr>
+  </tbody>
+</table>
+<p class="legend"><b>Change type: linking/recording → TWEAK or scoped REFACTOR.</b> Either stop the UI offering inert links/record-arm on types that can't (cheap, honest), or generalize the contract (large — only if record/link-into-procedural is a real goal). PhaseFlux 0 routing targets is part of axis 2.</p>
+
+<h2>4 · Time sources</h2>
+<p class="cap">A continuous transport position (well-used) and real wall-time (scattered, no service).</p>
+<div class="cmp">
+  <div class="side cur">
+    <h3>Current</h3>
+    <div class="flow">
+      <div class="box bad"><span class="lbl">scattered os::ticks()</span>
+        <span class="m">Engine dt · MidiOut CC · MidiCv voice · slave clock</span></div>
+      <div class="arrow">·</div>
+      <div class="box"><span class="m">tickPosition() ← 6 engines</span>
+        <span class="m" style="color:var(--red)">PhaseFlux · Stochastic opt out</span></div>
+    </div>
+  </div>
+  <div class="side pro">
+    <h3>Proposed</h3>
+    <div class="flow">
+      <div class="box good"><span class="lbl">WallClock + WallTimer (32-bit wrap-safe µs)</span>
+        <span class="m">one drift-free service ← all wall-time users</span></div>
+      <div class="arrow">·</div>
+      <div class="box good"><span class="m">tickPosition() ← all 8 continuous engines</span></div>
+    </div>
+  </div>
+</div>
+<p class="legend"><b>Change type: REFACTOR (B) + TWEAK (A).</b> Design done (ER-101 ref). Absorbs the slave-clock filter.</p>
+
+<h2>Verdict matrix</h2>
+<table class="vmx">
+  <thead><tr><th class="lab">Subsystem</th><th>Change</th><th style="text-align:left">Why / scope</th><th style="text-align:left">Gated on</th></tr></thead>
+  <tbody>
+    <tr><td class="lab">Model / containers</td><td><span class="badge keep">keep</span></td><td>Sound. Union sizing is fine; pool is no-go under current semantics.</td><td>—</td></tr>
+    <tr><td class="lab">Track engines</td><td><span class="badge keep">keep</span></td><td>Each is fine in isolation. No rewrite.</td><td>—</td></tr>
+    <tr><td class="lab">Engine::update orchestration</td><td><span class="badge refac">refactor</span></td><td>Hoist global passes out of per-track loop; fix ordering.</td><td>linking dependency (likely clear)</td></tr>
+    <tr><td class="lab">Routing definition</td><td><span class="badge refac">refactor</span></td><td>Collapse 5 sources → 1 descriptor.</td><td>direction decision</td></tr>
+    <tr><td class="lab">Time / wall-clock</td><td><span class="badge refac">refactor</span></td><td>WallClock service (B) + tickPosition parity (A).</td><td>—  (design ready)</td></tr>
+    <tr><td class="lab">Linking</td><td><span class="badge tweak">tweak</span></td><td>Scope UI to capable types, or generalize (large).</td><td>is procedural-link a goal?</td></tr>
+    <tr><td class="lab">Recording</td><td><span class="badge tweak">tweak</span></td><td>Same as linking — scope or generalize together.</td><td>is procedural-record a goal?</td></tr>
+    <tr><td class="lab">MIDI engine</td><td><span class="badge tweak">tweak</span></td><td>Document the dispatch contract; fold CC into WallTimer.</td><td>—</td></tr>
+    <tr><td class="lab">Clock (struct half)</td><td><span class="badge tweak">tweak</span></td><td>Confirm swing scope; document source precedence.</td><td>—</td></tr>
+    <tr><td class="lab">Stability fixes</td><td><span class="badge tweak">tweak</span></td><td>3 landed; CV-router ordering folds into the engine refactor.</td><td>hardware audition</td></tr>
+  </tbody>
+</table>
+<p class="legend">No <span class="badge refac" style="background:#1a1a1a;color:#fff">overhaul</span> row. Three refactors (engine loop, routing definition, wall-clock) carry the weight; everything else is keep-or-tweak.</p>
+
+</div>
+</body>
+</html>

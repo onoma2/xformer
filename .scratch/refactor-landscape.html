@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refactor / Optimization Landscape</title>
+<style>
+  :root {
+    --blue: #2563eb;
+    --red: #dc2626;
+    --green: #16a34a;
+    --amber: #ca8a04;
+    --gray: #e5e5e5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #fafafa; color: #1a1a1a; line-height: 1.5;
+    margin: 0; padding: 24px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; line-height: 1.3; margin: 0 0 4px; }
+  .sub { color: #555; margin: 0 0 28px; font-size: 0.95rem; }
+  h2 {
+    font-size: 1.25rem; line-height: 1.3; margin: 32px 0 12px;
+    padding-bottom: 6px; border-bottom: 2px solid var(--blue); color: var(--blue);
+  }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.86em; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 12px 14px; border: 1px solid var(--gray); vertical-align: top; }
+  thead th { background: rgba(37,99,235,0.08); color: var(--blue); font-weight: 600; }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  tbody tr:nth-child(odd) { background: #fff; }
+  .tag { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap; }
+  .done { color: var(--green); }
+  .defer { color: var(--amber); }
+  .block { color: var(--red); }
+  .active { color: var(--blue); }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 8px 0; }
+  .card { background: #fff; border: 1px solid var(--gray); border-left: 4px solid var(--blue); padding: 14px 16px; }
+  .card.alt { border-left-color: var(--green); }
+  .card h3 { margin: 0 0 6px; font-size: 1rem; }
+  .card p { margin: 4px 0; font-size: 0.9rem; color: #333; }
+  ul.q { list-style: none; padding: 0; margin: 8px 0; }
+  ul.q li { background: #fff; border: 1px solid var(--gray); border-left: 4px solid var(--amber); padding: 10px 14px; margin-bottom: 8px; font-size: 0.92rem; }
+  .crit { border-left-color: var(--red); }
+  .note { color: #666; font-size: 0.85rem; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Refactor / Optimization Landscape</h1>
+<p class="sub">Session map — architecture research, task split, and the one code change that landed. As of 2026-05-30.</p>
+
+<h2>Branch state</h2>
+<div class="cards">
+  <div class="card">
+    <h3><code>dev</code> — planning & research</h3>
+    <p>All task-wiki changes, architecture maps, and design docs. Integration branch.</p>
+  </div>
+  <div class="card alt">
+    <h3><code>fix/stability</code> — 3 fixes, <span class="block">unmerged</span></h3>
+    <p>The three stability fixes + their wiki update. Merge to <code>dev</code> when ready: <code>git merge fix/stability</code>.</p>
+  </div>
+</div>
+
+<h2>Stability fixes</h2>
+<table>
+  <thead><tr><th>Fix</th><th>Status</th><th>Where / test</th></tr></thead>
+  <tbody>
+    <tr><td>CvRoute lane getter guards (OOB read)</td><td><span class="tag done">Landed</span></td><td><code>CvRoute.h</code> · <code>TestCvRouteLaneGuard</code></td></tr>
+    <tr><td>ADSR zero-tick clamp (frozen envelope on ARM)</td><td><span class="tag done">Landed</span></td><td><code>ModulatorEngine.h</code> · <code>TestModulatorAdsrZeroTick</code></td></tr>
+    <tr><td>Modulator <code>read()</code> sanitize (rate=0 divisor, enums)</td><td><span class="tag done">Landed</span></td><td><code>Modulator.h</code> · <code>TestModulatorReadSanitize</code></td></tr>
+    <tr><td>CV Router output one-update-stale</td><td><span class="tag block">Deferred</span></td><td>Critical; needs hardware audition</td></tr>
+    <tr><td>GeneratorPage guards + Generator relative-index OOB</td><td><span class="tag defer">Deferred</span></td><td>Verify on <code>feat/generator</code> first</td></tr>
+    <tr><td>Bus writer arbitration + bus shaper stale state</td><td><span class="tag defer">Deferred</span></td><td>Design-ish hardening</td></tr>
+  </tbody>
+</table>
+<p class="note">TDD throughout. Verify-red caught that the ADSR bug is a frozen envelope (ARM divide-by-zero returns 0), not a crash. Sim + STM32 release build clean.</p>
+
+<h2>Architecture research maps <span class="note">(under core-architecture-optimization)</span></h2>
+<table>
+  <thead><tr><th>Map</th><th>Finds</th><th>Direction</th></tr></thead>
+  <tbody>
+    <tr><td><code>routing-five-sources-map</code></td><td>One target's definition smeared across 5 sources (enum / targetInfos / dispatch switch / picker / model writeRouted); drift = silent dead routes (StochasticFeel no-op, PhaseFlux 0 targets, Indexed borrows DiscreteMap)</td><td><span class="tag defer">Deferred</span></td></tr>
+    <tr><td><code>engine-update-contention-map</code></td><td>Routing / track-output / overrides are global recomputes invoked per-firing-track inside the tick loop (T× redundant); CV-route 1-update-stale; modulators 1 tick behind routing</td><td><span class="tag defer">Deferred</span></td></tr>
+    <tr><td>IO / layout / linking <span class="note">(stub)</span></td><td>Link system (<code>linkedTrackEngine</code> / <code>linkTrack</code> / virtual <code>linkData</code>) + output assignment baked for the Note/Curve-only era; dead-ends at new track types</td><td><span class="tag defer">Next to dig</span></td></tr>
+    <tr><td>Shared <code>Sequence</code> base <span class="note">(open-q)</span></td><td>7 types duplicate trackIndex/divisor/resetMeasure; fork's base adds a ~544 B vtable — wrong. Want non-virtual base</td><td><span class="tag defer">Deferred</span></td></tr>
+    <tr><td><code>RoutableListModel</code> base <span class="note">(open-q)</span></td><td>Routable-param list models repeat boilerplate per page</td><td><span class="tag defer">Deferred</span></td></tr>
+  </tbody>
+</table>
+
+<h2>Design docs — ready to build <span class="note">(docs/plans/)</span></h2>
+<table>
+  <thead><tr><th>Doc</th><th>Scope</th></tr></thead>
+  <tbody>
+    <tr><td>HID keyboard layering</td><td>Extract HID decode out of UI into <code>apps/sequencer/hid/</code> (Keyboard.h + Mouse.h stub). Unblocks usb-mouse-to-route. Task <code>hid-keyboard-layering</code> ⚪</td></tr>
+    <tr><td>Wallclock / time architecture</td><td><b>B:</b> 32-bit wrap-safe µs WallClock + drift-free WallTimer (ER-101 pattern, not its width), absorbs slave-clock filter. <b>A:</b> PhaseFlux/Stochastic onto <code>tickPosition()</code>. Task <code>wallclock-time-architecture</code> ⚪</td></tr>
+  </tbody>
+</table>
+
+<h2>Task board changes</h2>
+<table>
+  <thead><tr><th>Task</th><th>Change</th></tr></thead>
+  <tbody>
+    <tr><td>indexed-sequence-macro-refactor</td><td><span class="tag done">→ done</span> macro logic confirmed in IndexedSequence model</td></tr>
+    <tr><td>teletype-v2-dialect</td><td><span class="tag active">→ active</span> Phase 2 landed on <code>feat/tt2-v2-native</code>; + subtask map of the teletype family</td></tr>
+    <tr><td>stability-fixes</td><td>folded into performer-improvements Phase 0, then <b>re-extracted</b> (different concern)</td></tr>
+    <tr><td>performer-improvements</td><td>now fork-feature integration only; holds performer-nx survey + Turing-as-Tuesday-algo</td></tr>
+    <tr><td>route-reordering</td><td><span class="tag block">→ blocked</span> on the routing direction decision (don't reorder an enum the collapse may replace)</td></tr>
+    <tr><td>macro overload</td><td><span class="tag defer">deferred open-q</span> — 3 unrelated meanings; pattern-population overlaps SequenceBuilder</td></tr>
+    <tr><td>feat/tt2-v2-native</td><td>rebased onto dev tip; builds clean (6 TT2 tests pass, STM32 ok)</td></tr>
+  </tbody>
+</table>
+
+<h2>Open decisions waiting on you</h2>
+<ul class="q">
+  <li class="crit"><b>Routing direction</b> — collapse the 5 sources of truth, per-track-type ownership, or consistency-pass-only? Blocks route-reordering.</li>
+  <li><b>Engine update contention</b> — hoist the global passes out of the per-track loop? Gated on confirming the track-linking intra-loop dependency (dig the IO/linking map first).</li>
+  <li><b>resource-optimization base</b> — branch off <code>dev</code> (real footprint, serves feature stack) vs <code>master</code> (independent merge). Leaning dev.</li>
+  <li><b>Merge <code>fix/stability</code> → dev</b> whenever you want the 3 fixes on the integration branch.</li>
+</ul>
+
+</div>
+</body>
+</html>

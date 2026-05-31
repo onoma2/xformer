@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engine::update() — Current vs Proposed</title>
+<style>
+  :root { --blue:#2563eb; --red:#dc2626; --green:#16a34a; --amber:#ca8a04; --gray:#e5e5e5; }
+  * { box-sizing: border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    background:#fafafa; color:#1a1a1a; line-height:1.5; margin:0; padding:24px; }
+  .wrap { max-width:920px; margin:0 auto; }
+  h1 { font-size:1.5rem; line-height:1.3; margin:0 0 4px; }
+  .sub { color:#555; margin:0 0 28px; font-size:0.95rem; }
+  h2 { font-size:1.25rem; line-height:1.3; margin:32px 0 12px; padding-bottom:6px;
+    border-bottom:2px solid var(--blue); color:var(--blue); }
+  code,.mono { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:0.85em; }
+  .cmp { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .col { background:#fff; border:1px solid var(--gray); padding:16px 18px; }
+  .col.cur { border-top:4px solid var(--red); }
+  .col.pro { border-top:4px solid var(--green); }
+  .col h3 { margin:0 0 10px; font-size:1.05rem; }
+  .col.cur h3 { color:var(--red); }
+  .col.pro h3 { color:var(--green); }
+  .col h4 { margin:14px 0 4px; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.04em; color:#666; }
+  .col ul { margin:4px 0; padding-left:18px; font-size:0.9rem; }
+  .col li { margin:4px 0; }
+  .runs { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:0.84rem;
+    background:#fafafa; border:1px solid var(--gray); padding:8px 10px; margin:4px 0; }
+  .swot { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:8px; }
+  .quad { background:#fff; border:1px solid var(--gray); padding:14px 16px; }
+  .quad h3 { margin:0 0 8px; font-size:1rem; display:flex; align-items:baseline; gap:8px; }
+  .quad ul { margin:0; padding-left:18px; font-size:0.9rem; }
+  .quad li { margin:5px 0; }
+  .s { border-left:4px solid var(--green); } .s h3 { color:var(--green); }
+  .w { border-left:4px solid var(--red); } .w h3 { color:var(--red); }
+  .o { border-left:4px solid var(--blue); } .o h3 { color:var(--blue); }
+  .t { border-left:4px solid var(--amber); } .t h3 { color:var(--amber); }
+  .gate { background:#fff; border:1px solid var(--gray); border-left:4px solid var(--amber);
+    padding:12px 16px; margin-top:14px; font-size:0.92rem; }
+  .note { color:#666; font-size:0.85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1><code>Engine::update()</code> — Current vs Proposed</h1>
+<p class="sub">Per-tick subsystem contention. T = tracks firing CvUpdate (≤8), K = queued ticks per call. <code>Engine.cpp:65-214</code>.</p>
+
+<h2>State comparison</h2>
+<div class="cmp">
+
+  <div class="col cur">
+    <h3>Current</h3>
+    <h4>Structure</h4>
+    <ul>
+      <li>Inside the per-tick track loop, <i>each firing track</i> triggers three <b>global</b> recomputes: <code>updateTrackOutputs</code> + <code>updateOverrides</code> + <code>routingEngine.update</code> (<code>:179-181</code>).</li>
+      <li>Capped only by a per-track <code>UpdateReducer&lt;25ms&gt;</code> — frequency limit, not a structural fix.</li>
+    </ul>
+    <h4>Run counts</h4>
+    <div class="runs">routing&nbsp;&nbsp;&nbsp;&nbsp;= 1 + (T × K)<br>trackOut  = (T × K) + 1<br>overrides = (T × K) + 1</div>
+    <h4>Ordering defects</h4>
+    <ul>
+      <li><b>CV-route stale:</b> loop runs <code>updateTrackOutputs</code> → <code>updateOverrides</code>; outputs consume <code>_cvRouteOutputs</code> <i>before</i> routing recomputes them → one update behind. (Root of the stability bug.)</li>
+      <li><b>Modulator lag:</b> modulators tick <i>after</i> routing (<code>:190</code>); modulator-as-source is one tick behind.</li>
+    </ul>
+  </div>
+
+  <div class="col pro">
+    <h3>Proposed</h3>
+    <h4>Structure</h4>
+    <ul>
+      <li>Hoist the three global passes <b>out</b> of the per-track loop → run <b>once per tick</b>, after all tracks have ticked.</li>
+      <li>The per-track <code>UpdateReducer</code> crutch becomes unnecessary.</li>
+    </ul>
+    <h4>Run counts</h4>
+    <div class="runs">routing&nbsp;&nbsp;&nbsp;&nbsp;= 1 + K<br>trackOut  = K + 1<br>overrides = K + 1</div>
+    <h4>Ordering fixes</h4>
+    <ul>
+      <li><b>CV-route current:</b> reorder so routing / <code>updateOverrides</code> (CV router) run <i>before</i> <code>updateTrackOutputs</code> → physical outputs use current-tick routing. Fixes the stale bug structurally.</li>
+      <li><b>Modulator:</b> tick modulators before routing, or accept + document the 1-tick latency.</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="gate">
+  <b>Gate before any of this:</b> confirm the track-linking intra-loop dependency. A track that links another (<code>linkedTrackEngine</code>) may read its source's <i>freshly-composed</i> output mid-loop — the likely reason the recompute is per-track today. If so, hoisting breaks linking. Dig the IO/layout/linking map first.
+</div>
+
+<h2>SWOT — hoist + reorder</h2>
+<div class="swot">
+  <div class="quad s">
+    <h3>Strengths</h3>
+    <ul>
+      <li>Removes the <b>T×</b> redundant global recompute — real CPU headroom on the hot path.</li>
+      <li>Fixes CV-route stale at the <b>structural</b> level, not a band-aid in one call site.</li>
+      <li>One deterministic pass order per tick — far easier to reason about.</li>
+    </ul>
+  </div>
+  <div class="quad w">
+    <h3>Weaknesses</h3>
+    <ul>
+      <li>Requires resolving the track-linking dependency first (unknown until mapped).</li>
+      <li>Touches the audio hot path — regression risk, needs hardware audition.</li>
+      <li>No engine-timing test harness today; correctness rests on manual listening.</li>
+    </ul>
+  </div>
+  <div class="quad o">
+    <h3>Opportunities</h3>
+    <ul>
+      <li>Frees CPU for heavier engines (Teletype, future Fractal) and more track types.</li>
+      <li>Retires the per-track <code>UpdateReducer</code> entirely.</li>
+      <li>Aligns with the routing-collapse work — both rationalise routing execution.</li>
+      <li>Could fold the duplicate suspended-path pipeline into one tail.</li>
+    </ul>
+  </div>
+  <div class="quad t">
+    <h3>Threats</h3>
+    <ul>
+      <li>If linked tracks <i>do</i> need mid-loop fresh output, hoisting breaks linking <b>silently</b>.</li>
+      <li>Reordering modulators can shift modulation timing audibly.</li>
+      <li>Unaudited timing change risks subtle musical drift that unit tests won't catch.</li>
+    </ul>
+  </div>
+</div>
+
+<p class="note" style="margin-top:18px;">Direction deferred. Full map: <code>.tasks/core-architecture-optimization/engine-update-contention-map.md</code>.</p>
+
+</div>
+</body>
+</html>
