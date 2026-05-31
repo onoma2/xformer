@@ -112,7 +112,7 @@ private:
     uint32_t _prevCycleTick = 0;
 
     // Per-stage-visit pulse-fire memory (bit i = pulse i fired).
-    uint8_t _pulseFired = 0;
+    uint16_t _pulseFired = 0;
 
     // Derived position.
     int _slotIdx = 0;

@@ -393,8 +393,9 @@ void PhaseFluxTrackEngine::rebuildSchedule(int slotDurationTicks) {
         } else {
             phi = (pulseCount == 1) ? 0.0f : t_shifted;
         }
-        // §14.2 pitch Window — drop pulse contribution if outside band.
-        if (!isInWindow(phi, pitchWindowType)) continue;
+        // §14.2 pitch Window — hidden pitch bands hold at the nearest
+        // visible boundary. Temporal windows drop pulses; pitch windows do not.
+        phi = PhaseFluxMath::holdPitchWindowBoundary(phi, pitchWindowType);
         // §14.2 pitch Repeat — fmod expands curve frequency by pitchR.
         float phi_repeated = (pitchR > 1) ? std::fmod(phi * float(pitchR), 1.f) : phi;
         float phi_warped = applyPowerBend(phi_repeated, pitchWarpKnob);
@@ -693,41 +694,40 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
             const Curve::Type pitchCurveType = pitchCurveLut(pitchStage.pitchCurve());
 
             float phi = isGlobalPitch ? _pitchPhase : _stagePhase;
-            // §14.2 pitch Window — Cell mode only; hold CV when phi is in
-            // hidden band (engine doesn't update output).
+            // §14.2 pitch Window — Cell mode only; hidden bands hold at the
+            // nearest visible boundary.
             const auto pitchWindowType = isGlobalPitch
                 ? PhaseFluxSequence::WindowType::Off
                 : stage.pitchWindow();
-            if (isInWindow(phi, pitchWindowType)) {
-                // §14.2 pitch Repeat — Cell mode only; multiplies curve frequency.
-                const int pitchR = isGlobalPitch ? 1 : repeatMultiplier(stage.pitchRepeat());
-                // §14.2 WarpN/RespN applied here too, matching the Gate-mode pipeline.
-                const int pWarpEff = clamp(pitchStage.pitchWarp()     + _sequence->warpNudge(),     -64, 64);
-                const int pRespEff = clamp(pitchStage.pitchResponse() + _sequence->responseNudge(), -64, 64);
-                float phi_repeated = (pitchR > 1) ? std::fmod(phi * float(pitchR), 1.f) : phi;
-                float phi_warped = applyPowerBend(phi_repeated, pWarpEff);
-                float phi_input = pitchStage.pitchFlipH() ? (1.f - phi_warped) : phi_warped;
-                float p_curved = Curve::eval(pitchCurveType, phi_input);
-                float p_flipped = pitchStage.pitchFlipV() ? (1.f - p_curved) : p_curved;
-                float p_final = applyPowerBend(p_flipped, pRespEff);
+            phi = PhaseFluxMath::holdPitchWindowBoundary(phi, pitchWindowType);
+            // §14.2 pitch Repeat — Cell mode only; multiplies curve frequency.
+            const int pitchR = isGlobalPitch ? 1 : repeatMultiplier(stage.pitchRepeat());
+            // §14.2 WarpN/RespN applied here too, matching the Gate-mode pipeline.
+            const int pWarpEff = clamp(pitchStage.pitchWarp()     + _sequence->warpNudge(),     -64, 64);
+            const int pRespEff = clamp(pitchStage.pitchResponse() + _sequence->responseNudge(), -64, 64);
+            float phi_repeated = (pitchR > 1) ? std::fmod(phi * float(pitchR), 1.f) : phi;
+            float phi_warped = applyPowerBend(phi_repeated, pWarpEff);
+            float phi_input = pitchStage.pitchFlipH() ? (1.f - phi_warped) : phi_warped;
+            float p_curved = Curve::eval(pitchCurveType, phi_input);
+            float p_flipped = pitchStage.pitchFlipV() ? (1.f - p_curved) : p_curved;
+            float p_final = applyPowerBend(p_flipped, pRespEff);
 
-                float offsetDegrees = 0.f;
-                switch (stage.pitchDirection()) {
-                case PhaseFluxSequence::PitchDirectionType::Up:
-                    offsetDegrees = p_final * float(rangeDegrees); break;
-                case PhaseFluxSequence::PitchDirectionType::Down:
-                    offsetDegrees = -p_final * float(rangeDegrees); break;
-                case PhaseFluxSequence::PitchDirectionType::Bipolar:
-                    offsetDegrees = (p_final - 0.5f) * float(rangeDegrees); break;
-                }
-                int degree = baseDegree + int(std::round(offsetDegrees));
-                float cv = scale.noteToVolts(degree);
-                if (scale.isChromatic()) cv += float(rootNote) * (1.f / 12.f);
+            float offsetDegrees = 0.f;
+            switch (stage.pitchDirection()) {
+            case PhaseFluxSequence::PitchDirectionType::Up:
+                offsetDegrees = p_final * float(rangeDegrees); break;
+            case PhaseFluxSequence::PitchDirectionType::Down:
+                offsetDegrees = -p_final * float(rangeDegrees); break;
+            case PhaseFluxSequence::PitchDirectionType::Bipolar:
+                offsetDegrees = (p_final - 0.5f) * float(rangeDegrees); break;
+            }
+            int degree = baseDegree + int(std::round(offsetDegrees));
+            float cv = scale.noteToVolts(degree);
+            if (scale.isChromatic()) cv += float(rootNote) * (1.f / 12.f);
 
-                if (cv != _cvOutput) {
-                    _cvOutput = cv;
-                    result = result | CvUpdate;
-                }
+            if (cv != _cvOutput) {
+                _cvOutput = cv;
+                result = result | CvUpdate;
             }
         }
     }
@@ -769,10 +769,10 @@ TrackEngine::TickResult PhaseFluxTrackEngine::tick(uint32_t tick) {
 
     // Fire any scheduled pulses whose trigger has been reached this tick.
     for (int k = 0; k < _scheduleCount; ++k) {
-        if (_pulseFired & (1 << k)) continue;
+        if (_pulseFired & uint16_t(1u << k)) continue;
         if (posInSlot < int(_schedule[k].triggerOffset)) continue;
 
-        _pulseFired |= uint8_t(1 << k);
+        _pulseFired |= uint16_t(1u << k);
 
         _cvOutput = _schedule[k].cv;
         _gateState = true;

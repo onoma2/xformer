@@ -19,7 +19,17 @@ CASE("stage_count_parity") {
 }
 
 CASE("max_pulses_constant") {
-    expectEqual(PhaseFluxTrackEngine::kMaxPulses, 8, "kMaxPulses == 8");
+    expectEqual(PhaseFluxTrackEngine::kMaxPulses, 16, "kMaxPulses == 16");
+}
+
+CASE("pulse_fired_mask_can_represent_all_16_pulses") {
+    uint16_t mask = 0;
+    for (int k = 0; k < PhaseFluxTrackEngine::kMaxPulses; ++k) {
+        mask |= uint16_t(1u << k);
+    }
+    for (int k = 0; k < PhaseFluxTrackEngine::kMaxPulses; ++k) {
+        expectEqual((mask & uint16_t(1u << k)) != 0, true, "pulse bit retained");
+    }
 }
 
 // ---- Counter advance via advanceCounter() helper (spec §13.10 Task 5) ----
@@ -165,15 +175,15 @@ CASE("note_counter_negative_step_uni_descends_to_neg_lim") {
 // Counter walk tested here; engine integration path (rebuildSchedule
 // clamp + per-pulse loop) is verified in Task 10 audition.
 
-CASE("pulse_accum_drift_with_stage_trigger_walks_count_1_to_8") {
-    // posLim=7, step=+1: counter walks 1..7 (capped) then wraps to 0.
+CASE("pulse_accum_drift_with_stage_trigger_walks_count_1_to_16") {
+    // posLim=15, step=+1: counter walks 1..15 (capped) then wraps to 0.
     // Effective pulse count = basePulseCount + counter (no multiplication;
     // counter already stores the accumulated delta).
     AccumulatorConfig cfg;
     cfg.setOrder(AccumulatorConfig::Order::Wrap);
     cfg.setPolarity(AccumulatorConfig::Polarity::Uni);
-    cfg.setPosLim(7);
-    cfg.setNegLim(7);
+    cfg.setPosLim(15);
+    cfg.setNegLim(15);
     const int basePulseCount = 1;
     const int step = +1;
     int counter = 0;
@@ -181,29 +191,29 @@ CASE("pulse_accum_drift_with_stage_trigger_walks_count_1_to_8") {
     auto effective = [&]() {
         int v = basePulseCount + counter;
         if (v < 1) v = 1;
-        if (v > 8) v = 8;
+        if (v > PhaseFluxTrackEngine::kMaxPulses) v = PhaseFluxTrackEngine::kMaxPulses;
         return v;
     };
     expectEqual(effective(), 1, "cycle 0: counter=0 -> N=1");
-    // Walks 1+1=2, 1+2=3, ..., 1+7=8, then wrap counter to 0 -> N=1, then 2.
-    const int expected[] = { 2, 3, 4, 5, 6, 7, 8, 1, 2 };
-    for (int i = 0; i < 9; ++i) {
+    // Walks 1+1=2, 1+2=3, ..., 1+15=16, then wrap counter to 0 -> N=1, then 2.
+    const int expected[] = { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 1, 2 };
+    for (int i = 0; i < 17; ++i) {
         PhaseFluxTrackEngine::advanceCounter(counter, dir, cfg, step);
         expectEqual(effective(), expected[i], "next cycle N");
     }
 }
 
-CASE("effective_pulse_count_clamps_at_8_when_offset_pushes_above") {
-    // pulseCount=4, counter=10 -> raw=14, clamp to 8.
+CASE("effective_pulse_count_clamps_at_16_when_offset_pushes_above") {
+    // pulseCount=8, counter=10 -> raw=18, clamp to 16.
     // Counter directly represents accumulated pulse offset.
-    const int basePulseCount = 4;
+    const int basePulseCount = 8;
     const int counter = 10;
     int raw = basePulseCount + counter;
     int eff = raw;
     if (eff < 1) eff = 1;
-    if (eff > 8) eff = 8;
-    expectEqual(raw, 14, "raw exceeds 8");
-    expectEqual(eff, 8, "effective clamps at 8");
+    if (eff > PhaseFluxTrackEngine::kMaxPulses) eff = PhaseFluxTrackEngine::kMaxPulses;
+    expectEqual(raw, 18, "raw exceeds 16");
+    expectEqual(eff, 16, "effective clamps at 16");
 }
 
 CASE("effective_pulse_count_clamps_at_1_when_offset_pushes_below") {

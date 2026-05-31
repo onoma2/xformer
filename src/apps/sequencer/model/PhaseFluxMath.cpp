@@ -117,6 +117,32 @@ bool PhaseFluxMath::isInWindow(float phi, PhaseFluxSequence::WindowType v) {
     return true;
 }
 
+float PhaseFluxMath::holdPitchWindowBoundary(float phi, PhaseFluxSequence::WindowType v) {
+    switch (v) {
+    case PhaseFluxSequence::WindowType::Off:
+        return phi;
+    case PhaseFluxSequence::WindowType::Focus70:
+        if (phi < 0.15f) return 0.15f;
+        if (phi > 0.85f) return 0.85f;
+        return phi;
+    case PhaseFluxSequence::WindowType::Focus50:
+        if (phi < 0.25f) return 0.25f;
+        if (phi > 0.75f) return 0.75f;
+        return phi;
+    case PhaseFluxSequence::WindowType::Polarize70:
+        if (phi > 0.35f && phi < 0.65f) {
+            return phi < 0.5f ? 0.35f : 0.65f;
+        }
+        return phi;
+    case PhaseFluxSequence::WindowType::Polarize50:
+        if (phi > 0.25f && phi < 0.75f) {
+            return phi < 0.5f ? 0.25f : 0.75f;
+        }
+        return phi;
+    }
+    return phi;
+}
+
 bool PhaseFluxMath::evalWindowRepeat(float phi,
                                      PhaseFluxSequence::WindowType window,
                                      PhaseFluxSequence::RepeatType repeat,

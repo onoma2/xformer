@@ -59,6 +59,10 @@ public:
      *  phi in outer N% (split N/2 each side). */
     static bool isInWindow(float phi, PhaseFluxSequence::WindowType v);
 
+    /** §14.2 Pitch Window — hidden pitch bands hold at the nearest visible
+     *  boundary instead of deleting pulses. Off/visible values are identity. */
+    static float holdPitchWindowBoundary(float phi, PhaseFluxSequence::WindowType v);
+
     /** §14.2 Window + Repeat combined eval. Returns false if phi is in the
      *  hidden band (engine should drop the pulse / hold the CV). On true,
      *  writes the post-Window-post-Repeat phi to *phiOut (caller then runs

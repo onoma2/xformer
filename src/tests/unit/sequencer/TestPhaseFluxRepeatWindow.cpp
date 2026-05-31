@@ -69,6 +69,33 @@ CASE("window_polarize_50_visible_outer") {
     expectEqual(PhaseFluxMath::isInWindow(0.90f, Win::Polarize50), true,  "phi=0.90 in (right)");
 }
 
+CASE("hold_pitch_window_boundary_focus_clamps_to_visible_edges") {
+    expectEqual(approxEq(PhaseFluxMath::holdPitchWindowBoundary(0.10f, Win::Focus50), 0.25f), true,
+                "Focus50 low hidden phi holds at low edge");
+    expectEqual(approxEq(PhaseFluxMath::holdPitchWindowBoundary(0.90f, Win::Focus50), 0.75f), true,
+                "Focus50 high hidden phi holds at high edge");
+    expectEqual(approxEq(PhaseFluxMath::holdPitchWindowBoundary(0.50f, Win::Focus50), 0.50f), true,
+                "Focus50 visible phi passes unchanged");
+}
+
+CASE("hold_pitch_window_boundary_polarize_clamps_middle_to_nearest_edge") {
+    expectEqual(approxEq(PhaseFluxMath::holdPitchWindowBoundary(0.40f, Win::Polarize50), 0.25f), true,
+                "Polarize50 lower-middle hidden phi holds at left edge");
+    expectEqual(approxEq(PhaseFluxMath::holdPitchWindowBoundary(0.60f, Win::Polarize50), 0.75f), true,
+                "Polarize50 upper-middle hidden phi holds at right edge");
+    expectEqual(approxEq(PhaseFluxMath::holdPitchWindowBoundary(0.10f, Win::Polarize50), 0.10f), true,
+                "Polarize50 visible left phi passes unchanged");
+    expectEqual(approxEq(PhaseFluxMath::holdPitchWindowBoundary(0.90f, Win::Polarize50), 0.90f), true,
+                "Polarize50 visible right phi passes unchanged");
+}
+
+CASE("hold_pitch_window_boundary_off_is_identity") {
+    expectEqual(approxEq(PhaseFluxMath::holdPitchWindowBoundary(0.10f, Win::Off), 0.10f), true,
+                "Off low phi passes unchanged");
+    expectEqual(approxEq(PhaseFluxMath::holdPitchWindowBoundary(0.90f, Win::Off), 0.90f), true,
+                "Off high phi passes unchanged");
+}
+
 // ---- evalWindowRepeat — combined pipeline ----
 
 CASE("eval_off_x1_identity") {
