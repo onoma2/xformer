@@ -11,7 +11,7 @@ date: 2026-05-30
 
 ## Summary
 
-Execute the unblocking spine of the architecture overhaul: remove the unused track-linking subsystem, rework `Engine::update()` so the global recompute runs once per tick with correct ordering (folding in the CV-router-stale stability fix), stand up a shared 32-bit wrap-safe microsecond wall-clock service to replace scattered `os::ticks()` use, and bring PhaseFlux and Stochastic onto the shared continuous transport position. Routing-definition collapse and the recording subsystem are explicitly out of this plan.
+Execute the unblocking spine of the architecture overhaul: remove the unused track-linking subsystem, rework `Engine::update()` so the global recompute runs once per tick with correct ordering (folding in the CV-router-stale stability fix), stand up a shared 32-bit wrap-safe microsecond wall-clock service to replace scattered `os::ticks()` use. (The originally-planned PhaseFlux/Stochastic `tickPosition()` parity, U5, was closed as not-applicable — see U5.) Routing-definition collapse and the recording subsystem are explicitly out of this plan.
 
 ---
 
@@ -27,7 +27,7 @@ Six subsystem maps under `.tasks/core-architecture-optimization/` established th
 - R2. Physical CV outputs reflect current-tick routing — CV-route outputs are no longer one update stale (structural resolution of the `stability-fixes` critical item).
 - R3. A single 32-bit microsecond wall-clock service (matching the engine's existing `uint32_t` µs convention) replaces the scattered `os::ticks()` behavioral call sites; its timers are drift-free and wrap-safe.
 - R4. An external slave clock with jitter/swing produces stable playback timing (period outlier-guarded).
-- R5. PhaseFlux and Stochastic derive phase from the shared continuous transport position (`Clock::tickPosition()`) like the other six engines.
+- ~~R5. PhaseFlux and Stochastic derive phase from the shared continuous transport position (`Clock::tickPosition()`) like the other six engines.~~ **Dropped** — neither engine has a continuous phase to repoint (see U5).
 - R6. The linking subsystem is removed without breaking existing project files that stored a link assignment.
 - R7. No behavior regression in kept subsystems (model, containers, track engines, outputs); STM32 release builds within budget.
 
@@ -61,7 +61,7 @@ Six subsystem maps under `.tasks/core-architecture-optimization/` established th
 - `src/apps/sequencer/ui/pages/LayoutPage.{h,cpp}`, `src/apps/sequencer/ui/model/LinkTrackListModel.h` — the link UI control.
 - `src/apps/sequencer/engine/Clock.{h,cpp}` — `tickPosition()`, `slaveTick()` raw period assignment.
 - Behavioral `os::ticks()` wall-time consumers (full inventory): `Engine.cpp:72` (modulator `dt`), `MidiOutputEngine.cpp:29` (CC rate-limit), `MidiCvTrackEngine.cpp:113,215` (voice timing), `CvGateToMidiConverter.h:15,31,40,47` (gate-on debounce delay), `TeletypeBridge.cpp:64` (wall-ms feed to Teletype TIME). Seed-only: `RandomGenerator.cpp:60-66` (one-shot RNG seed). Display-only (out of scope): all `os::ticks()` reads under `ui/` plus `Engine.cpp:485` uptime and `FileManager.cpp:1251`.
-- `tickPosition()` consumer pattern: `src/apps/sequencer/engine/CurveTrackEngine.cpp` (Free-mode phase) — mirror for PhaseFlux/Stochastic.
+- `tickPosition()` consumer pattern: `src/apps/sequencer/engine/CurveTrackEngine.cpp` (Free-mode phase), `DiscreteMapTrackEngine.cpp:193` (stateless ramp) — the engines that have a continuous phase already read it.
 
 ### Institutional Learnings
 
@@ -85,7 +85,7 @@ Six subsystem maps under `.tasks/core-architecture-optimization/` established th
 - **Fix loop ordering** — run routing / `updateOverrides` (CV router) before `updateTrackOutputs`, so physical outputs use current-tick routing. This is the structural form of the `stability-fixes` CV-router item.
 - **Modulators tick first, before routing** (decided, not deferred) — the once-per-tick order is `modulators → routing → updateOverrides → updateTrackOutputs`, so a modulator used as a routing source reflects the current tick, eliminating the 1-tick source latency. This is the architecturally correct order; no reason to ship the documented-latency fallback.
 - **UpdateReducer removal is gated on measurement, split out of U4** — hoisting + ordering (U4) is decided and unconditional. Whether `UpdateReducer<25ms>` can be dropped depends on the measured cost of one full recompute per tick at 192 PPQN on STM32, which has no answer from reasoning alone. U4 keeps the reducer as a safety cap; its removal is a measured follow-up (U6), not an in-U4 judgment call.
-- **tickPosition parity is additive** — PhaseFlux/Stochastic become new readers of `Clock::tickPosition()`; no transport rework.
+- ~~**tickPosition parity is additive**~~ — withdrawn; PhaseFlux/Stochastic have no continuous phase to repoint (see U5, closed not-applicable).
 
 ---
 
@@ -93,7 +93,8 @@ Six subsystem maps under `.tasks/core-architecture-optimization/` established th
 
 ### Resolved During Planning
 
-- Plan scope: spine only (linking, engine rework, wall-clock, tickPosition parity). Routing + recording out. (user, 2026-05-30)
+- Plan scope: spine only (linking, engine rework, wall-clock). Routing + recording out. (user, 2026-05-30)
+- tickPosition parity (U5) closed as not-applicable; PhaseFlux sub-tick smoothing deferred to a future per-track tick/wall-clock/update-cadence discussion. (user, 2026-05-31)
 - Routing direction: deferred to its own plan. (user, 2026-05-30)
 - Recording: out of this plan. (user, 2026-05-30)
 
@@ -120,8 +121,9 @@ graph LR
   U2[U2 WallClock + WallTimer] --> U3[U3 Migrate wall-time consumers]
   U3 --> U4
   U4 --> U6[U6 UpdateReducer removal — measured]
-  U5[U5 PhaseFlux/Stochastic tickPosition] -.independent.-> U4
 ```
+
+> U5 (PhaseFlux/Stochastic tickPosition parity) was closed as not-applicable — removed from the graph.
 
 `Engine::update()` per-tick shape, before vs after (directional):
 
@@ -282,33 +284,29 @@ AFTER:  per-track loop { tick }  then once: modulators -> routing -> overrides(C
 
 ---
 
-### U5. PhaseFlux and Stochastic onto tickPosition()
+### U5. PhaseFlux and Stochastic onto tickPosition() — NOT APPLICABLE (closed 2026-05-31)
 
-**Goal:** Bring the two holdout continuous engines onto the shared interpolated transport position, matching the other six.
+**Status:** Closed without implementation. The premise was wrong: neither engine
+is a Curve-style Free-mode engine that re-derives a continuous phase from the
+integer tick, so there is nothing to repoint at `tickPosition()`.
 
-**Requirements:** R5
+Findings (verified against current code):
+- **Stochastic** has no phase. `tick()` sets `_cvOutputTarget` from events; `update(dt)`
+  slides `_cvOutput` toward it on real time (`StochasticTrackEngine.cpp:748`). It is
+  sample-and-hold + slide, already continuous via `update(dt)`. `tickPosition()` does
+  not apply.
+- **PhaseFlux** generates its whole CV envelope inside `tick()` from an integer-tick
+  `_stagePhase` (`PhaseFluxTrackEngine.cpp:637` + the pipeline ~669–728); `update()`
+  is a no-op. The output is tick-quantized by construction. Genuine sub-tick smoothing
+  would mean *relocating* the envelope pipeline from `tick()` into `update()` driven by
+  `tickPosition()` — an architectural rewrite of a CV-curve path, not a phase-source swap.
+- The six engines that genuinely have a continuous phase/ramp (Curve, DiscreteMap,
+  Tuesday, Indexed, Note-Free, Teletype-Free) already read `tickPosition()` —
+  confirmed e.g. `DiscreteMapTrackEngine.cpp:193`.
 
-**Dependencies:** None (independent; land anytime)
-
-**Files:**
-- Modify: `src/apps/sequencer/engine/PhaseFluxTrackEngine.cpp` (phase derivation reads `_engine.clock().tickPosition()`)
-- Modify: `src/apps/sequencer/engine/StochasticTrackEngine.cpp` (where it derives phase/position from integer tick)
-- Test: extend `src/tests/unit/sequencer/TestPhaseFluxPerTickDerivation.cpp` (and a Stochastic equivalent if one exists)
-
-**Approach:**
-- Mirror the Curve/Indexed/Tuesday Free-mode pattern: read the continuous fractional `tickPosition()` for smooth sub-tick phase instead of the discrete integer tick.
-- Verify each engine's reset/loop-wrap semantics still hold against the continuous position (the `fmod(tickPos, resetDivisor)` pattern from Tuesday).
-
-**Execution note:** Test-first where the existing PhaseFlux derivation tests give a harness to extend.
-
-**Patterns to follow:** `CurveTrackEngine.cpp` / `TuesdayTrackEngine.cpp` `tickPosition()` usage.
-
-**Test scenarios:**
-- Happy path: PhaseFlux phase advances smoothly across sub-tick positions, matching the documented per-tick derivation.
-- Edge case: loop-wrap / resetMeasure still lands phase correctly when derived from continuous position (no off-by-one at the wrap boundary).
-- Edge case: at a tick boundary the continuous-derived phase equals the prior integer-derived value (no discontinuity introduced by the switch).
-
-**Verification:** PhaseFlux/Stochastic derivation tests green; sim + STM32 build clean; audible phase behavior unchanged except smoother sub-tick motion.
+**Deferred:** sub-tick PhaseFlux envelope smoothing is its own future topic, to be
+taken up in a broader discussion of per-track tick-clock vs wall-clock vs update
+cadence — not part of this spine plan.
 
 ---
 
@@ -342,7 +340,7 @@ AFTER:  per-track loop { tick }  then once: modulators -> routing -> overrides(C
 
 - **Hot path:** U4 touches `Engine::update()`, which every track engine ticks through. Highest regression risk; gated by hardware audition.
 - **Serialization:** U1 removes the linking *feature* but keeps the `_linkTrack` byte in the wire format — written as a reserved zero, read-and-discarded — so the positional stream stays byte-aligned. Do **not** drop the byte. Old files load unchanged; no version bump.
-- **Cross-engine:** U3 changes modulator `dt` and MIDI/clock timing sources; U5 changes PhaseFlux/Stochastic phase source. All additive or source-swaps, not contract changes.
+- **Cross-engine:** U3 changes modulator `dt` and MIDI/clock timing sources — additive source-swaps, not contract changes. (U5 closed not-applicable.)
 - **tt2 (`feat/tt2-v2-native`):** rebases over this spine and adopts the new contracts (no linking, WallClock available for its DEL scheduling, single-pass update). Land each unit promptly so tt2's rebases stay small.
 
 ---
@@ -358,4 +356,4 @@ AFTER:  per-track loop { tick }  then once: modulators -> routing -> overrides(C
 
 ## Sequencing
 
-U1 and U2 are independent and can start in parallel. U3 follows U2. U4 follows U1 and U3. U5 is independent and can land at any point. Suggested order: U1 → U2 → U3 → U4, with U5 slotted in whenever convenient.
+U1 and U2 are independent and can start in parallel. U3 follows U2. U4 follows U1 and U3. U6 (measured UpdateReducer removal) follows U4. Order: U1 → U2 → U3 → U4 → U6. (U5 closed not-applicable.)
