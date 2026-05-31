@@ -147,9 +147,11 @@ void Clock::slaveTick(int slave) {
             _slaveTickPeriodUs = (60 * 1000000 * divisor) / (120 * _ppqn);
         }
 
-        // update tick period if we have a valid measurement
-        if (periodUs > 0 && _lastSlaveTickUs > 0) {
+        // update tick period if we have a valid, non-outlier measurement
+        if (periodUs > 0 && _lastSlaveTickUs > 0 &&
+            acceptSlavePeriod(_slavePeriodLatched, _slaveTickPeriodUs, periodUs)) {
             _slaveTickPeriodUs = periodUs;
+            _slavePeriodLatched = true;
         }
 
         _slaveSubTickPeriodUs = _slaveTickPeriodUs / _slaveSubTicksPending;
@@ -399,6 +401,7 @@ void Clock::setupMasterTimer() {
 void Clock::setupSlaveTimer() {
     _elapsedUs = 0;
     _lastSlaveTickUs = 0;
+    _slavePeriodLatched = false;
 
     _timer.setPeriod(SlaveTimerPeriod);
 }
