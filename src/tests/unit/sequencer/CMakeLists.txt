@@ -53,6 +53,7 @@ register_sequencer_test(TestCvRouteLaneGuard TestCvRouteLaneGuard.cpp)
 register_sequencer_test(TestModulatorAdsrZeroTick TestModulatorAdsrZeroTick.cpp)
 register_sequencer_test(TestModulatorReadSanitize TestModulatorReadSanitize.cpp)
 register_sequencer_test(TestLinkingRemovalSerialization TestLinkingRemovalSerialization.cpp)
+register_sequencer_test(TestWallClock TestWallClock.cpp)
 # Disabled: requires complex mock dependencies for hardware drivers
 # register_sequencer_test(TestNoteTrackEngine TestNoteTrackEngine.cpp)
 # register_sequencer_test(TestAccumulatorModulation TestAccumulatorModulation.cpp)
