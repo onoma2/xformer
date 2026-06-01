@@ -193,17 +193,18 @@ What's genuinely absent (and stays out): Step / parameter-locks.
     source-center is structural** (source 0.5 → `u`=0 → out=base). Only **center-preserving**
     shapers allowed (None/TriangleFold; Crease + all stateful denied; VcaNext denied by policy →
     `scaleSource`, R6).
-  - **Absolute** — `u = source` (raw, ∈[0,1]): unipolar sweep from base; **`d` *is* the window
-    width** (signed → sweeps up/down). `min` disappears (it *is* base, the anchor/floor); `max` =
-    `base + d·range`.
+  - **Absolute** — `u = source` (raw, ∈[0,1]): unipolar from base. `delta = d·source·range`, so
+    source 0 → base, source 1 → `base + d·range`; `d` (signed) sets how far and which direction
+    the value travels from base.
   The combine flag is the only difference (centered vs raw source). Bipolar params
   (Octave/Transpose/Offset/Rotate/biases) are the Modulate set; indices/enums/transport are
-  Absolute. Owner confirms the assignment. **Coupling (accepted):** the Absolute window floor is
-  the base value — resting (no-CV) value and sweep start are the same point.
-- R16. **One coefficient replaces three controls.** `biasPct`, `depthPct`, **and the `min/max`
-  window** all collapse into the single signed per-track gain `d[8]` — `d` is the Modulate depth
-  and the Absolute window width. `biasPct` dropped (DC shift breaks Modulate neutral; base anchors
-  Absolute). `min/max` dropped (base is the anchor, `d` the span). So `Route` loses `_biasPct[8]`,
+  Absolute. Owner confirms the assignment. **Coupling (accepted):** Absolute's resting (no-CV)
+  value and its travel start are the same point — base. (Legacy free `min/max` could float the
+  swept range independent of base; that is the deleted behavior.)
+- R16. **One coefficient replaces three controls.** The legacy `biasPct`, `depthPct`, **and
+  `min/max`** all collapse into the single signed per-track gain `d[8]` — `d` is the Modulate depth
+  and the Absolute travel span. `biasPct` dropped (DC shift breaks Modulate neutral; base anchors
+  Absolute). The legacy `min/max` is dropped (base is the anchor, `d` the span). So `Route` loses `_biasPct[8]`,
   `_depthPct[8]`, and `_min/_max`; gains `d[8]` + `combine`. `applyBiasDepthToSource` reduces to
   the `d` gain. Per-track `d` is kept so a masked global route still tunes each track (F1).
 
@@ -261,7 +262,7 @@ Slot, name-free, absorbing shaper + scale-source + scope:
 collapse to one signed `d` (R15/R16).** The current `Route` carries `_biasPct[8]`, `_depthPct[8]`,
 `_min/_max`, `_shaper[8]` (Routing.h:731-746) so one masked route tunes *each masked track* — the
 broadcast value to keep. The unified combine makes the route **base-anchored**: `biasPct` dropped,
-`depthPct`+`min/max` → one signed per-track gain `d[8]` (Modulate depth / Absolute window width).
+`depthPct`+`min/max` → one signed per-track gain `d[8]` (Modulate depth / Absolute travel span).
 Three per-route shaping controls → one. So the slot shapes:
 
 ```
@@ -271,7 +272,7 @@ GlobalRouteSlot {
   uint8_t trackMask;         // broadcast set
   uint8_t paramKey;          // into the param registry
   uint8_t combine;           // Absolute (raw source) | Modulate (centered) — R15
-  int8_t  d[8];              // PER-TRACK signed % — depth (Modulate) / window width (Absolute)
+  int8_t  d[8];              // PER-TRACK signed % — depth (Modulate) / travel span (Absolute)
   Shaper  shaper[8];         // PER-TRACK — Modulate restricts to center-preserving (R15)
   Source  scaleSource;
 }
@@ -305,7 +306,7 @@ for slot in active routes:
 ```
 `d` is the single per-track coefficient (no `min/max`). Modulate: source-center → `u`=0 → `delta`=0
 → out=base (neutral, structural — allowed shapers map center→center). Absolute: source 0 → base,
-source 1 → base + `d`·range (the window, width `d`, anchored at base). The override table stores
+source 1 → base + `d`·range (travels `d`·range from base). The override table stores
 `delta`; the read combines `clamp(base + delta)` uniformly. `range` is the param's intrinsic span
 from the registry (half-span for bipolar, full for unipolar). Old full-range replace = the special
 case `d`=100%, base=range floor (R11). Every stage is **center-preserving** at source-center

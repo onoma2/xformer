@@ -101,42 +101,41 @@ the loop and the duplication.
 Per-param, via a `RouteParam::Flag` (`Modulate` vs `Absolute`):
 
 - **Absolute.** `u = raw source`; `out = clamp(base + d·s·range)` — base-anchored sweep, `d` the
-  window width. (Old full-range replace = `base` at range floor, `d`=100%.)
+  travel span. (Old full-range replace = `base` at range floor, `d`=100%.)
 - **Modulate.** `u = centered source`; `out = clamp(base + d·(s−0.5)·2·range)` — bipolar around
   base, neutral at source-center. Per-pattern base stays meaningful while routed.
 
 The existing ranges already sort this: several params are **already bipolar**
 (designed as modulators, implemented as replace), others are absolute indices.
 
-### Offset-space contract (resolves review finding 1)
+### Depth-and-range contract (resolves review finding 1)
 
-Modulate is **not** "reinterpret the current window as an offset" — that would turn
-Divisor's `6..24` window into "+6..+24 ticks always" (a regression). Each Modulate
-param declares an explicit offset space: **neutral = 0**, a **signed offset window**,
-and a **final absolute clamp** after `base + offset`. Source polarity is bipolar
-(0.5 source = no change). Values from `targetInfos` (min..max, default minDef..maxDef):
+There is no per-route window. Each param declares an intrinsic **range** (its span,
+registry); the route's single signed **`d`** scales it. The delta is `d · u · range`
+(`u` = source-form per combine), so a Modulate param is neutral at source-center by
+construction and an Absolute param travels `d·range` from base. `range` values come
+from `targetInfos` (shown as min..max; the half-span feeds bipolar params):
 
-| Param | Storage | Today min..max (def) | Combine | Neutral | Offset window | Final clamp |
-|---|---|---|---|---|---|---|
-| Octave | Track Routable | -10..10 (-1..1) | **Modulate** | 0 | ± window | valid octave |
-| Transpose | Track Routable | -60..60 (-12..12) | **Modulate** | 0 | ± | pitch range |
-| Offset (Curve) | Routable | -500..500 (-100..100) | **Modulate** | 0 | ± | value range |
-| Rotate | Routable | -64..64 (0..64) | **Modulate** | 0 | ± | step count |
-| Gate/Retrig/Length/Note/Shape Bias | Routable | -8..8 | **Modulate** | 0 | ± | bias range |
-| SlideTime | Routable | 0..100 | Absolute | — | — | — |
-| Divisor | Seq Routable | 1..768 (6..24) | Absolute | — | — | — |
-| ClockMult | Seq Routable | 50..150 | Absolute (additive sweep over 50..150) | — | — | — |
-| Scale / RootNote | Routable (Note/Curve) / base-only (Stoch, PF) | 0..23 / 0..11 | Absolute (index) | — | — | — |
-| RunMode | Seq Routable | 0..5 enum | Absolute | — | — | — |
-| FirstStep / LastStep | Seq Routable | 0..63 | Absolute | — | — | — |
-| Mute / Pattern / Fill | PlayState | — | Absolute | — | — | — |
+| Param | Storage | targetInfos range | Combine | `d`-range | clamp |
+|---|---|---|---|---|---|
+| Octave | Track Routable | -10..10 | **Modulate** | ±d·range | valid octave |
+| Transpose | Track Routable | -60..60 | **Modulate** | ±d·range | pitch range |
+| Offset (Curve) | Routable | -500..500 | **Modulate** | ±d·range | value range |
+| Rotate | Routable | -64..64 | **Modulate** | ±d·range | step count |
+| Gate/Retrig/Length/Note/Shape Bias | Routable | -8..8 | **Modulate** | ±d·range | bias range |
+| SlideTime | Routable | 0..100 | Absolute | d·range from base | — |
+| Divisor | Seq Routable | 1..768 | Absolute | d·range from base | — |
+| ClockMult | Seq Routable | 50..150 | Absolute (additive sweep) | d·range from base | — |
+| Scale / RootNote | Routable (Note/Curve) / base-only (Stoch, PF) | 0..23 / 0..11 | Absolute (index) | d·range from base | — |
+| RunMode | Seq Routable | 0..5 enum | Absolute | d·range from base | — |
+| FirstStep / LastStep | Seq Routable | 0..63 | Absolute | d·range from base | — |
+| Mute / Pattern / Fill | PlayState | — | Absolute | d·range from base | — |
 
-### Modulate window representation (resolves review finding 2 — neutral is enforceable)
+### Modulate neutral contract (resolves review finding 2 — neutral is enforceable)
 
-A free `min..max` window cannot guarantee neutral: a stored window of `+1..+3`
-makes source 0.5 produce `+2`, i.e. constant drift, not "no change." So Modulate
-does **not** reuse the absolute `min/max` pair. A Modulate param stores a **single
-signed depth magnitude `d`**; the offset is
+A free min..max pair (the deleted legacy control) could not guarantee neutral — a
+stored `+1..+3` makes source 0.5 produce `+2`, constant drift. The unified model has
+no such pair; a Modulate route carries only the **single signed `d`**, and the offset is
 
 ```
 offset = d * (source_centered)        // source_centered ∈ [-1, +1], 0.5 source → 0
