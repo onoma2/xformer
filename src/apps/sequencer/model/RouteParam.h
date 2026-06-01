@@ -58,9 +58,14 @@ struct RouteParam {
 
     // Per-scope param table: the single source of truth for label, range, flags,
     // and the apply hook. Resolution is by key (linear scan over the small set).
+    // The table carries the Scope::Kind its hooks expect (e.g. the global table
+    // expects Global, whose object is a Project*); applyRouted fails closed on a
+    // null object or a kind mismatch so a bad resolved scope can never reach a
+    // hook's unchecked cast.
     class Table {
     public:
-        constexpr Table(const Row *rows, size_t count) : _rows(rows), _count(count) {}
+        constexpr Table(Scope::Kind expectedKind, const Row *rows, size_t count)
+            : _expectedKind(expectedKind), _rows(rows), _count(count) {}
 
         const Row *find(uint8_t key) const {
             if (key == 0) {
@@ -75,6 +80,9 @@ struct RouteParam {
         }
 
         bool applyRouted(const Scope &scope, uint8_t key, float normalized) const {
+            if (scope.object == nullptr || scope.kind != _expectedKind) {
+                return false;
+            }
             const Row *row = find(key);
             if (!row || (row->flags & Structural)) {
                 return false;
@@ -83,10 +91,12 @@ struct RouteParam {
             return true;
         }
 
+        Scope::Kind expectedKind() const { return _expectedKind; }
         const Row *rows() const { return _rows; }
         size_t count() const { return _count; }
 
     private:
+        Scope::Kind _expectedKind;
         const Row *_rows;
         size_t _count;
     };

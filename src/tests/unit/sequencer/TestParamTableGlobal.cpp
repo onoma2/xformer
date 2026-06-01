@@ -55,4 +55,19 @@ CASE("table rejects keys it does not own") {
     expectFalse(GlobalParamTable::table().applyRouted(scope, 200, 0.5f), "unknown key not owned");
 }
 
+CASE("table fails closed on a bad scope") {
+    Project p;
+    RouteParam::Scope nullObj;
+    nullObj.kind = RouteParam::Scope::Kind::Global;
+    nullObj.object = nullptr;
+    expectFalse(GlobalParamTable::table().applyRouted(nullObj, GlobalParamTable::Tempo, 0.5f),
+                "null object rejected before the Project* cast");
+
+    RouteParam::Scope wrongKind;
+    wrongKind.kind = RouteParam::Scope::Kind::Track;   // global table expects Global
+    wrongKind.object = &p;
+    expectFalse(GlobalParamTable::table().applyRouted(wrongKind, GlobalParamTable::Tempo, 0.5f),
+                "wrong scope kind rejected before the Project* cast");
+}
+
 } // UNIT_TEST

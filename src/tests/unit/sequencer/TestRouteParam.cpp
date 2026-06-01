@@ -34,7 +34,15 @@ constexpr RouteParam::Row kRows[] = {
     { 9, "structural", { 0.f, 1.f }, RouteParam::Structural, applyNoop   },
 };
 
-constexpr RouteParam::Table kTable{ kRows, sizeof(kRows) / sizeof(kRows[0]) };
+// A track-scoped test table; applyRouted scopes below must match this kind.
+constexpr RouteParam::Table kTable{ RouteParam::Scope::Kind::Track, kRows, sizeof(kRows) / sizeof(kRows[0]) };
+
+RouteParam::Scope trackScope(void *object) {
+    RouteParam::Scope scope;
+    scope.kind = RouteParam::Scope::Kind::Track;
+    scope.object = object;
+    return scope;
+}
 
 } // namespace
 
@@ -57,9 +65,7 @@ CASE("unknown key returns nullptr") {
 
 CASE("applyRouted invokes the row hook with the normalized value") {
     FakeScopeObject obj;
-    RouteParam::Scope scope;
-    scope.kind = RouteParam::Scope::Kind::Track;
-    scope.object = &obj;
+    RouteParam::Scope scope = trackScope(&obj);
     scope.trackIndex = 3;
 
     bool applied = kTable.applyRouted(scope, 5, 0.75f);
@@ -70,22 +76,32 @@ CASE("applyRouted invokes the row hook with the normalized value") {
 
 CASE("applyRouted on unknown key writes nothing and returns false") {
     FakeScopeObject obj;
-    RouteParam::Scope scope;
-    scope.object = &obj;
-
-    bool applied = kTable.applyRouted(scope, 7, 0.5f);
+    bool applied = kTable.applyRouted(trackScope(&obj), 7, 0.5f);
     expectFalse(applied, "unknown key is not a silent success");
     expectEqual(obj.writeCount, 0, "no hook fired");
 }
 
 CASE("structural rows are never applied") {
     FakeScopeObject obj;
-    RouteParam::Scope scope;
-    scope.object = &obj;
-
-    bool applied = kTable.applyRouted(scope, 9, 0.5f);
+    bool applied = kTable.applyRouted(trackScope(&obj), 9, 0.5f);
     expectFalse(applied, "structural param is UI-only, never routable");
     expectEqual(obj.writeCount, 0, "structural hook never fired");
+}
+
+CASE("null object fails closed, hook never dereferences") {
+    bool applied = kTable.applyRouted(trackScope(nullptr), 5, 0.75f);
+    expectFalse(applied, "null scope object is rejected before the hook");
+}
+
+CASE("scope-kind mismatch fails closed") {
+    FakeScopeObject obj;
+    RouteParam::Scope wrong;
+    wrong.kind = RouteParam::Scope::Kind::Global;   // table expects Track
+    wrong.object = &obj;
+
+    bool applied = kTable.applyRouted(wrong, 5, 0.75f);
+    expectFalse(applied, "wrong scope kind is rejected before the hook");
+    expectEqual(obj.writeCount, 0, "mismatched-kind hook never fired");
 }
 
 CASE("flags read back per row") {

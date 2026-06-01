@@ -39,7 +39,7 @@ constexpr RouteParam::Row kRows[] = {
     { GlobalParamTable::CvRouteRoute, "CVR Route",  {    0.f,  100.f }, RouteParam::Continuous, applyCvRouteRoute },
 };
 
-constexpr RouteParam::Table kTable{ kRows, sizeof(kRows) / sizeof(kRows[0]) };
+constexpr RouteParam::Table kTable{ RouteParam::Scope::Kind::Global, kRows, sizeof(kRows) / sizeof(kRows[0]) };
 
 } // namespace
 
