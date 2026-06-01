@@ -420,11 +420,13 @@ public:
     RouteConfig& routeA() { return _routeA; }
     void setRouteA(const RouteConfig& cfg) { _routeA = cfg; }
     float routedIndexedA() const { return _routedIndexedA; }
+    void setRoutedIndexedA(float v) { _routedIndexedA = v; }
 
     const RouteConfig& routeB() const { return _routeB; }
     RouteConfig& routeB() { return _routeB; }
     void setRouteB(const RouteConfig& cfg) { _routeB = cfg; }
     float routedIndexedB() const { return _routedIndexedB; }
+    void setRoutedIndexedB(float v) { _routedIndexedB = v; }
 
     RouteCombineMode routeCombineMode() const { return _routeCombineMode; }
     void setRouteCombineMode(RouteCombineMode mode) { _routeCombineMode = ModelUtils::clampedEnum(mode); }

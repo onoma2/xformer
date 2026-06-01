@@ -74,5 +74,10 @@ struct ParamKey {
         ChaosParam1    = 95,
         ChaosParam2    = 96,
         CurveRate      = 97,
+
+        // --- Inlets: per-track CV buses, not direct params (R12/R13) (100..) ---
+        // Each type owns its own inlets (no borrowing). Rows flagged Inlet.
+        IndexedA = 100,   // Indexed
+        IndexedB = 101,   // Indexed
     };
 };

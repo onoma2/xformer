@@ -69,6 +69,7 @@ set(sources
     model/ParamTableGlobal.cpp
     model/ParamTableNote.cpp
     model/ParamTableCurve.cpp
+    model/ParamTableIndexed.cpp
     model/Project.cpp
     model/Routing.cpp
     model/Scale.cpp
