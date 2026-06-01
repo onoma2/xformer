@@ -104,6 +104,28 @@ CASE("scope-kind mismatch fails closed") {
     expectEqual(obj.writeCount, 0, "mismatched-kind hook never fired");
 }
 
+CASE("gate rising edge fires once, re-arms after falling") {
+    uint8_t mask = 0;
+    expectTrue(RouteParam::gateRisingEdge(mask, 0, 1.0f), "low->high fires");
+    expectFalse(RouteParam::gateRisingEdge(mask, 0, 1.0f), "held high does not refire");
+    expectFalse(RouteParam::gateRisingEdge(mask, 0, 0.0f), "high->low is not a rising edge");
+    expectTrue(RouteParam::gateRisingEdge(mask, 0, 1.0f), "re-armed after falling");
+}
+
+CASE("gate tracks are independent within one mask") {
+    uint8_t mask = 0;
+    expectTrue(RouteParam::gateRisingEdge(mask, 2, 1.0f), "track 2 fires");
+    expectFalse(RouteParam::gateRisingEdge(mask, 2, 1.0f), "track 2 holds");
+    expectTrue(RouteParam::gateRisingEdge(mask, 5, 1.0f), "track 5 fires independently");
+    expectFalse(RouteParam::gateRisingEdge(mask, 2, 1.0f), "track 2 still held");
+}
+
+CASE("gate threshold is 0.5") {
+    uint8_t mask = 0;
+    expectFalse(RouteParam::gateRisingEdge(mask, 0, 0.5f), "exactly 0.5 is not high");
+    expectTrue(RouteParam::gateRisingEdge(mask, 0, 0.51f), "just above 0.5 is high");
+}
+
 CASE("flags read back per row") {
     expectTrue((kTable.find(5)->flags & RouteParam::Continuous) != 0, "key 5 is continuous");
     expectTrue((kTable.find(9)->flags & RouteParam::Structural) != 0, "key 9 is structural");

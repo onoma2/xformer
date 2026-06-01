@@ -75,6 +75,11 @@ public:
         };
 
         std::array<TrackStateUnion, CONFIG_TRACK_COUNT> shaperState;
+
+        // Rising-edge state for Trigger-kind targets: one "was high" bit per
+        // track (bit 0 for global triggers). Unifies the former per-target
+        // latches (Reset / PlayToggle / RecordToggle / TapTempo).
+        uint8_t gateMask = 0;
     };
 
     // Reset a single TrackStateUnion to the correct initial values for a given shaper.
@@ -94,7 +99,7 @@ private:
     void updateSources();
     void updateSinks();
 
-    void writeEngineTarget(Routing::Target target, float normalized);
+    void writeEngineTarget(Routing::Target target, float normalized, RouteState &routeState);
 
     Engine &_engine;
     Routing &_routing;
@@ -104,8 +109,4 @@ private:
     std::array<RouteState, CONFIG_ROUTE_COUNT> _routeStates;
     std::array<float, CONFIG_TRACK_COUNT> _cvRotateValues{};
     std::array<bool, CONFIG_TRACK_COUNT> _cvRotateInterp{};
-
-    uint8_t _lastPlayToggleActive = false;
-    uint8_t _lastRecordToggleActive = false;
-    std::array<uint8_t, CONFIG_TRACK_COUNT> _lastResetActive{};
 };

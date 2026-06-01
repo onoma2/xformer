@@ -26,7 +26,26 @@ struct RouteParam {
         Discrete   = 1 << 2,   // stepped value domain
         Structural = 1 << 3,   // UI-only, never routable
         Inlet      = 1 << 4,   // fills a per-track CV bus, not a direct param (R12)
+        Trigger    = 1 << 5,   // acts on the rising edge of its routed value, not the level
     };
+
+    // Rising-edge detector for Trigger-kind rows. gateMask holds one "was high"
+    // bit per track (bit 0 for global triggers); returns true on a low->high
+    // crossing and updates the stored bit. One uniform mechanism for what used
+    // to be scattered per-target latches (o_C IOFrame model: the edge is a
+    // property of the input, detected once -- reset is just another clocked
+    // input, no different from clock).
+    static bool gateRisingEdge(uint8_t &gateMask, int trackIndex, float value, float threshold = 0.5f) {
+        uint8_t bit = uint8_t(1) << (trackIndex & 7);
+        bool wasHigh = (gateMask & bit) != 0;
+        bool isHigh = value > threshold;
+        if (isHigh) {
+            gateMask |= bit;
+        } else {
+            gateMask &= ~bit;
+        }
+        return isHigh && !wasHigh;
+    }
 
     struct Range {
         float min;

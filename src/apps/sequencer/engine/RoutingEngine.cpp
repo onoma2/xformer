@@ -1,5 +1,7 @@
 #include "RoutingEngine.h"
 
+#include "model/RouteParam.h"
+
 #include "Engine.h"
 #include "MidiUtils.h"
 #include "core/math/Math.h"
@@ -239,7 +241,6 @@ RoutingEngine::RoutingEngine(Engine &engine, Model &model) :
     _engine(engine),
     _routing(model.project().routing())
 {
-    _lastResetActive.fill(false);
     _cvRotateValues.fill(0.f);
     _cvRotateInterp.fill(false);
 }
@@ -448,20 +449,8 @@ void RoutingEngine::updateSinks() {
         if (routeChanged) {
             // disable previous routing
             Routing::setRouted(routeState.target, routeState.tracks, false);
-            // reset last state for play/record toggle
-            if (routeState.target == Routing::Target::PlayToggle) {
-                _lastPlayToggleActive = false;
-            }
-            if (routeState.target == Routing::Target::RecordToggle) {
-                _lastRecordToggleActive = false;
-            }
-            if (routeState.target == Routing::Target::Reset) {
-                for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
-                    if (routeState.tracks & (1 << i)) {
-                        _lastResetActive[i] = false;
-                    }
-                }
-            }
+            // re-arm trigger edge state (Reset / PlayToggle / RecordToggle / TapTempo)
+            routeState.gateMask = 0;
             // reset shaper state to correct initial values for the new route config
             resetRouteShaperState(routeState, route);
         }
@@ -561,15 +550,10 @@ void RoutingEngine::updateSinks() {
                         }
                         float routed = route.min() + shaperOut * routeSpan;
 
-                        // Special handling for Reset target
+                        // Reset is a Trigger target: act on the rising edge only.
                         if (target == Routing::Target::Reset) {
-                            bool active = routed > 0.5f;
-                            if (active != _lastResetActive[trackIndex]) {
-                                if (active) {
-                                    // Rising edge detected - reset this track
-                                    _engine.trackEngine(trackIndex).reset();
-                                }
-                                _lastResetActive[trackIndex] = active;
+                            if (RouteParam::gateRisingEdge(routeState.gateMask, trackIndex, routed)) {
+                                _engine.trackEngine(trackIndex).reset();
                             }
                         } else {
                             // Normal target handling
@@ -584,7 +568,7 @@ void RoutingEngine::updateSinks() {
                 }
             } else if (Routing::isEngineTarget(target)) {
                 float baseValue = route.min() + _sourceValues[routeIndex] * (route.max() - route.min());
-                writeEngineTarget(target, baseValue);
+                writeEngineTarget(target, baseValue, routeState);
             } else {
                 float baseValue = route.min() + _sourceValues[routeIndex] * (route.max() - route.min());
                 _routing.writeTarget(target, route.tracks(), baseValue);
@@ -612,45 +596,35 @@ void RoutingEngine::updateSinks() {
     }
 }
 
-void RoutingEngine::writeEngineTarget(Routing::Target target, float normalized) {
+void RoutingEngine::writeEngineTarget(Routing::Target target, float normalized, RouteState &routeState) {
     bool active = normalized > 0.5f;
 
     switch (target) {
     case Routing::Target::Play:
+        // level-following: state mirrors the routed value
         if (active != _engine.clockRunning()) {
             _engine.togglePlay();
         }
         break;
-    case Routing::Target::PlayToggle:
-        if (active != _lastPlayToggleActive) {
-            if (active) {
-                _engine.togglePlay();
-            }
-            _lastPlayToggleActive = active;
-        }
-        break;
     case Routing::Target::Record:
+        // level-following
         if (active != _engine.recording()) {
             _engine.toggleRecording();
         }
         break;
+    case Routing::Target::PlayToggle:
+        if (RouteParam::gateRisingEdge(routeState.gateMask, 0, normalized)) {
+            _engine.togglePlay();
+        }
+        break;
     case Routing::Target::RecordToggle:
-        if (active != _lastRecordToggleActive) {
-            if (active) {
-                _engine.toggleRecording();
-            }
-            _lastRecordToggleActive = active;
+        if (RouteParam::gateRisingEdge(routeState.gateMask, 0, normalized)) {
+            _engine.toggleRecording();
         }
         break;
     case Routing::Target::TapTempo:
-        {
-            static bool lastActive = false;
-            if (active != lastActive) {
-                if (active) {
-                    _engine.tapTempoTap();
-                }
-                lastActive = active;
-            }
+        if (RouteParam::gateRisingEdge(routeState.gateMask, 0, normalized)) {
+            _engine.tapTempoTap();
         }
         break;
     default:
