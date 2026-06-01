@@ -24,8 +24,9 @@ In scope to unify: the **Routing matrix** (16 slots), the **Bus**, the **Shaper 
 (`Mod1–8`; it also emits independent MIDI, so it does more than feed routing).
 
 Almost no new DSP. Every "feature" already exists fragmented; the work is unify, extract,
-and make-explicit. The slot pool, normalized pipeline, depth window, and shaper bank are
-reused. Routing splits into **two surfaces by broadcastability**: a **global masked pool**
+and make-explicit. The slot pool, normalized pipeline, and shaper bank are reused (the per-route
+depth/bias/window collapse to one signed `d` — R15/R16). Routing splits into **two surfaces by
+broadcastability**: a **global masked pool**
 (Performer-wide + broadcastable common params, track-mask kept so one scarce source drives many
 tracks in one linked route) and **per-track local matrices** (Indexed's `RouteConfig`
 generalized — the type-specific/cell params, in-context). Targets split into **direct**
@@ -244,8 +245,9 @@ What's genuinely absent (and stays out): Step / parameter-locks.
   canonical name + shared target only if same axis + domain + result + kind; else keep distinct.
   Resolves "Phase" (Curve/PhaseFlux `globalPhase` → canonical **Phase**, a Tier-2b mix-in) vs
   DiscreteMap `scan` (stays distinct — spatial index, inlet-fed). Guards UI naming, not just targets.
-- **Keep 16 slots + depth window.** Reasonable, bounded, shipped. (Slot ownership — one global
-  pool vs per-track local pools — is the open UX/RAM question below.)
+- **Keep 16 slots.** Reasonable, bounded, shipped. No `min/max` window — the route carries one
+  signed `d` (R15/R16). (Slot ownership — one global pool vs per-track local pools — is the open
+  UX/RAM question below.)
 - **Clean-break serialization** (R9): new `Route` format, `ProjectVersion` bump, old projects
   rejected on load — no migration, no sentinel. The `Target` enum is **deleted**, not kept.
 
@@ -306,13 +308,9 @@ for slot in active routes:
 source 1 → base + `d`·range (the window, width `d`, anchored at base). The override table stores
 `delta`; the read combines `clamp(base + delta)` uniformly. `range` is the param's intrinsic span
 from the registry (half-span for bipolar, full for unipolar). Old full-range replace = the special
-case `d`=100%, base=range floor (R11).
-Every stage is **center-preserving** at source-center (gain→0 deviation, the allowed shaper maps
-0.5→0.5, scale multiplies a 0 deviation), so Modulate neutral holds for any `scaleValue` and any
-allowed shaper (R15). The order equals legacy depth→shaper→scale→window, so Absolute reproduces
-old movement including shaped/scaled routes (R11). Bias is gone (R16); only Absolute consults
-`min/max`. The override table (R14) holds the per-`(track,paramKey)` value/offset the model read
-combines with base.
+case `d`=100%, base=range floor (R11). Every stage is **center-preserving** at source-center
+(the allowed shaper maps 0.5→0.5, scale multiplies a 0 deviation), so Modulate neutral holds for
+any `scaleValue` and any allowed shaper (R15).
 
 Param table per scope (global; common-track; per-track-type) declared once. A row is either a
 **direct** param or an **inlet** (R12):

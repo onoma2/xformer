@@ -125,7 +125,7 @@ and a **final absolute clamp** after `base + offset`. Source polarity is bipolar
 | Gate/Retrig/Length/Note/Shape Bias | Routable | -8..8 | **Modulate** | 0 | ± | bias range |
 | SlideTime | Routable | 0..100 | Absolute | — | — | — |
 | Divisor | Seq Routable | 1..768 (6..24) | Absolute | — | — | — |
-| ClockMult | Seq Routable | 50..150 | Absolute (mult, not additive) | — | — | — |
+| ClockMult | Seq Routable | 50..150 | Absolute (additive sweep over 50..150) | — | — | — |
 | Scale / RootNote | Routable (Note/Curve) / base-only (Stoch, PF) | 0..23 / 0..11 | Absolute (index) | — | — | — |
 | RunMode | Seq Routable | 0..5 enum | Absolute | — | — | — |
 | FirstStep / LastStep | Seq Routable | 0..63 | Absolute | — | — | — |
