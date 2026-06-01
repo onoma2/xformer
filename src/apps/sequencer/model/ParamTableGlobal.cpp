@@ -1,4 +1,5 @@
 #include "ParamTableGlobal.h"
+#include "RouteParamKey.h"
 
 #include "Project.h"
 
@@ -33,10 +34,10 @@ void applyCvRouteRoute(const RouteParam::Scope &scope, const RouteParam::Range &
 
 // Ranges mirror Routing::targetInfos so denormalization matches writeTarget.
 constexpr RouteParam::Row kRows[] = {
-    { GlobalParamTable::Tempo,        "Tempo",      {    1.f, 1000.f }, RouteParam::Continuous, applyTempo        },
-    { GlobalParamTable::Swing,        "Swing",      {   50.f,   75.f }, RouteParam::Continuous, applySwing        },
-    { GlobalParamTable::CvRouteScan,  "CVR Scan",   {    0.f,  100.f }, RouteParam::Continuous, applyCvRouteScan  },
-    { GlobalParamTable::CvRouteRoute, "CVR Route",  {    0.f,  100.f }, RouteParam::Continuous, applyCvRouteRoute },
+    { ParamKey::Tempo,        "Tempo",      {    1.f, 1000.f }, RouteParam::Continuous, applyTempo        },
+    { ParamKey::Swing,        "Swing",      {   50.f,   75.f }, RouteParam::Continuous, applySwing        },
+    { ParamKey::CvRouteScan,  "CVR Scan",   {    0.f,  100.f }, RouteParam::Continuous, applyCvRouteScan  },
+    { ParamKey::CvRouteRoute, "CVR Route",  {    0.f,  100.f }, RouteParam::Continuous, applyCvRouteRoute },
 };
 
 constexpr RouteParam::Table kTable{ RouteParam::Scope::Kind::Global, kRows, sizeof(kRows) / sizeof(kRows[0]) };

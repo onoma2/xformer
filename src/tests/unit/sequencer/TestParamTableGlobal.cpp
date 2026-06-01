@@ -2,6 +2,7 @@
 
 #include "model/Project.h"
 #include "model/ParamTableGlobal.h"
+#include "model/RouteParamKey.h"
 
 // U2 of the routing mod-matrix overhaul: the global (Tier-0) param table.
 // Characterization: each global row's applyRouted hook must mutate the Project
@@ -16,10 +17,10 @@ UNIT_TEST("ParamTableGlobal") {
 CASE("value-write rows match writeTarget for every normalized input") {
     struct Spec { Routing::Target target; uint8_t key; const char *name; };
     const Spec specs[] = {
-        { Routing::Target::Tempo,        GlobalParamTable::Tempo,        "Tempo" },
-        { Routing::Target::Swing,        GlobalParamTable::Swing,        "Swing" },
-        { Routing::Target::CvRouteScan,  GlobalParamTable::CvRouteScan,  "CvRouteScan" },
-        { Routing::Target::CvRouteRoute, GlobalParamTable::CvRouteRoute, "CvRouteRoute" },
+        { Routing::Target::Tempo,        ParamKey::Tempo,        "Tempo" },
+        { Routing::Target::Swing,        ParamKey::Swing,        "Swing" },
+        { Routing::Target::CvRouteScan,  ParamKey::CvRouteScan,  "CvRouteScan" },
+        { Routing::Target::CvRouteRoute, ParamKey::CvRouteRoute, "CvRouteRoute" },
     };
     const float inputs[] = { 0.f, 0.25f, 0.5f, 0.75f, 1.f };
 
@@ -60,13 +61,13 @@ CASE("table fails closed on a bad scope") {
     RouteParam::Scope nullObj;
     nullObj.kind = RouteParam::Scope::Kind::Global;
     nullObj.object = nullptr;
-    expectFalse(GlobalParamTable::table().applyRouted(nullObj, GlobalParamTable::Tempo, 0.5f),
+    expectFalse(GlobalParamTable::table().applyRouted(nullObj, ParamKey::Tempo, 0.5f),
                 "null object rejected before the Project* cast");
 
     RouteParam::Scope wrongKind;
     wrongKind.kind = RouteParam::Scope::Kind::Track;   // global table expects Global
     wrongKind.object = &p;
-    expectFalse(GlobalParamTable::table().applyRouted(wrongKind, GlobalParamTable::Tempo, 0.5f),
+    expectFalse(GlobalParamTable::table().applyRouted(wrongKind, ParamKey::Tempo, 0.5f),
                 "wrong scope kind rejected before the Project* cast");
 }
 

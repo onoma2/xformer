@@ -11,30 +11,9 @@
 // being a hook detail.
 //
 // Built alongside the live old dispatch; the engine routes through it at the U7
-// cutover. paramKeys are provisional per-type here; the shared Tier-1/2/3 key
-// registry is factored when the second type lands (U4).
+// cutover. Row keys come from the shared ParamKey registry (model/RouteParamKey.h),
+// the single append-only numbering authority -- shared concepts reuse one key.
 
 struct NoteParamTable {
-    enum Key : uint8_t {
-        None      = 0,
-        // track-level
-        SlideTime = 1,
-        Octave    = 2,
-        Transpose = 3,
-        Rotate    = 4,
-        GateProbabilityBias      = 5,
-        RetriggerProbabilityBias = 6,
-        LengthBias               = 7,
-        NoteProbabilityBias      = 8,
-        // sequence-level (fan-out)
-        Scale     = 9,
-        RootNote  = 10,
-        Divisor   = 11,
-        ClockMult = 12,
-        RunMode   = 13,
-        FirstStep = 14,
-        LastStep  = 15,
-    };
-
     static const RouteParam::Table &table();
 };

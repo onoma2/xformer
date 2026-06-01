@@ -58,6 +58,7 @@ register_sequencer_test(TestSlaveClockGuard TestSlaveClockGuard.cpp)
 register_sequencer_test(TestRouteParam TestRouteParam.cpp)
 register_sequencer_test(TestParamTableGlobal TestParamTableGlobal.cpp)
 register_sequencer_test(TestParamTableNote TestParamTableNote.cpp)
+register_sequencer_test(TestParamRegistry TestParamRegistry.cpp)
 # Disabled: requires complex mock dependencies for hardware drivers
 # register_sequencer_test(TestNoteTrackEngine TestNoteTrackEngine.cpp)
 # register_sequencer_test(TestAccumulatorModulation TestAccumulatorModulation.cpp)

@@ -17,16 +17,9 @@
 // targets carry write arbitration -- both land later when that state model
 // is settled.
 //
-// paramKeys are append-only numeric, never the array index (F6).
+// Row keys come from the shared ParamKey registry (model/RouteParamKey.h), the
+// single append-only numbering authority.
 
 struct GlobalParamTable {
-    enum Key : uint8_t {
-        None         = 0,
-        Tempo        = 1,
-        Swing        = 2,
-        CvRouteScan  = 3,
-        CvRouteRoute = 4,
-    };
-
     static const RouteParam::Table &table();
 };
