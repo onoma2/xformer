@@ -144,10 +144,21 @@ Play/Rec/PlayToggle/RecordToggle/TapTempo, BusCv1–4.
   **truncate** float→int16_t (not round). Phase is a launch addition (no writeTarget parity),
   tested directly; lights up at U7. Added to the uniqueness sweep. Sim + STM32 release clean.
 
+## U4 Indexed + inlet row-kind landed (2026-06-02)
+
+- **`ParamTableIndexed.{h,cpp}`** — first table to carry **INLET** rows (R12). A/B inlets fill the
+  per-track routed-CV field (`_routedIndexedA/B`, −100..100 → −1..1), flagged `RouteParam::Inlet`;
+  added `setRoutedIndexedA/B` setters as the write API. Each type owns its inlets (R13) — legacy
+  `DiscreteMapSync` borrow dropped. Registry inlet block: IndexedA=100, IndexedB=101.
+- Direct rows reuse 9 shared keys. Hooks mirror `writeTarget` incl. the parity quirk that
+  Divisor/Scale/RootNote write the **base** (no routed flag) while the rest write the routed slot.
+  `Table::applyRouted` fires Inlet rows normally (only Structural is rejected).
+- `TestParamTableIndexed`: routed-slot-aware parity, inlet-flag asserts, inlet fan-out. Added to
+  the uniqueness sweep. Sim + STM32 release clean.
+
 ## Next action
 
-Remaining U4 per-type tables onto the registry: Tuesday, DiscreteMap, Stochastic, PhaseFlux,
-MidiCv, Indexed (each = parity port + appended keys + uniqueness sweep; Stochastic/PhaseFlux
-carry the defect-fixes; several introduce **inlets** — Indexed A/B, DiscreteMap In/Scanner/Sync,
-PhaseFlux A/B — a first-class target kind). Then U5 scaleSource, U6 groups, U6b override+combine
-(range-class lands here), U7 cutover.
+Remaining U4 per-type tables: Tuesday, DiscreteMap (Input/Scanner/Sync inlets + SlewTime≡SlideTime
+storage resolution), Stochastic (defect-fixes: Feel dead slot, Scale/RootNote base-write),
+PhaseFlux (A/B inlets + five nudges + Phase, defect-fix Scale/RootNote), MidiCv. Then U5
+scaleSource, U6 groups, U6b override+combine (range-class lands here), U7 cutover.
