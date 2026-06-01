@@ -160,6 +160,24 @@ What's genuinely absent (and stays out): Step / parameter-locks.
   as sources and leaves CvRoute as the independent CV→CV path.
 - R11. No behavior regression for routes rebuilt in the new format (a given source→param→depth
   produces the same movement as the old equivalent). STM32 flash/RAM within budget.
+- R14. **Routed value is transient, not per-pattern model data** (sub-spec
+  `2026-06-01-003-routed-value-storage-subspec.md`). Today the `routed` half of
+  `Routable<T>` is stored per `Sequence` ×17 (patterns+snapshot) and `writeTarget`
+  loops all 17 writing the same value. Split it: `Sequence`/`Track` keep **base only**;
+  the live routed value lives once per `(track, paramKey)` in a **model-owned transient
+  override table** (not serialized). Read combines base + override at access; the
+  ×17 copy loop and routed duplication are deleted. Closes two defects the split
+  exposes — the **StochasticFeel dead routed slot** (Routable, never dispatched) and
+  the **Stochastic/PhaseFlux Scale/RootNote base-mutation** (routing writes serialized
+  base). Migration is per `(param × type)` — see the sub-spec's inventory (kinds
+  S/T/P/B/D in scope; X/I/G/R untouched).
+- R15. **Per-param combine: Absolute vs Modulate** (`RouteParam::Flag`). Absolute =
+  route replaces base (today's only mode). Modulate = `clamp(base + d·source_centered,
+  hardMin, hardMax)`, depth-only (no additive bias), and only **center-preserving**
+  shapers allowed (None/TriangleFold; Crease and all stateful denied; VcaNext denied by
+  policy → `scaleSource`, R6). Neutral at source-center is structural and testable. The
+  already-bipolar params (Octave/Transpose/Offset/Rotate/biases) are the Modulate set;
+  indices/enums/transport stay Absolute. Owner confirms the assignment.
 
 ---
 
@@ -413,6 +431,18 @@ No universal block; no `isXxxTarget` predicates; the matrix above is the literal
   it, and retire the `routeIndex+1` neighbor read outright. No migration needed — old projects
   don't load (R9 clean break), so there are no stored legacy `VcaNext` patches to round-trip.
 - **U6. Group scope.** Generalize Indexed `targetGroups` into the slot's `Scope`.
+- **U6b. Routed-value storage + combine mode** (R14/R15; sub-spec
+  `2026-06-01-003-routed-value-storage-subspec.md`). Drop the per-pattern `Routable`
+  `routed` half and the ×17 copy loop; `Sequence`/`Track` keep base only. Add the
+  **model-owned transient override table** keyed by `(track, paramKey)` (not
+  serialized), written by the apply path, gated by the active-route bit, invalidated on
+  track-mode change + route reconfig. Add the **Absolute/Modulate** combine flag with
+  the center-preserving Modulate contract (depth-only, allowed shapers None/TriangleFold).
+  Fix the **StochasticFeel dead slot** and the **Stochastic/PhaseFlux Scale/RootNote
+  base-mutation** as part of the migration. Depends on the per-type tables (U3/U4) and
+  the `scaleSource` extraction (U5, which removes VcaNext); lands **before U7** since the
+  cutover flips Route storage onto this read path. Migration inventory + tests per the
+  sub-spec (neutral-at-center matrix, base-at-clamp, denied-shaper rejection).
 - **U7. Route re-addressing + new format + ENGINE CUTOVER** (F5). `Route` stores `(source,
   scope, paramKey, per-track depth/shaper, scaleSource)`; bump `ProjectVersion`; loader rejects
   `< VersionRoutingMatrix` (R9). **This is the cutover:** new-format routes have no `_target`,
@@ -478,7 +508,8 @@ No universal block; no `isXxxTarget` predicates; the matrix above is the literal
 
 ## Sequencing
 
-U1 → U2 → U3 → U4 → U5 (shaper/scaleSource) → U6 (groups) → **U7 (re-address + new format +
-engine cutover)** → U8 (UI) → U9 (delete dead old code). U1–U6 stage behind the live old
-dispatch; the cutover is U7; U9 is pure deletion. CvRoute and the Modulator engine are not
-modified.
+U1 → U2 → U3 → U4 → U5 (shaper/scaleSource) → U6 (groups) → **U6b (routed-value storage +
+combine mode, R14/R15)** → **U7 (re-address + new format + engine cutover)** → U8 (UI) → U9
+(delete dead old code). U1–U6b stage behind the live old dispatch; the cutover is U7; U9 is
+pure deletion. U6b must precede U7 (the cutover flips Route storage onto the override-table
+read path). CvRoute and the Modulator engine are not modified.
