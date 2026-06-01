@@ -66,13 +66,51 @@ Curate **musically-usable** routable params into one registry, grouped by concep
 cheap and removing-after-ship is costly. Triage is additive (promote a candidate when
 there's a use), not subtractive.
 
-Launch set = routable-today + owner-picked candidates + inlets. Decided so far:
-- **PhaseFlux:** A/B inlets (stage-group routing, like Indexed); all five nudges
-  (Warp/Response/Len/CyclePhaseWarp/Pulse, bipolar) are launch targets. PulseCount +
-  Pitch*/Temporal* deep params stay candidates (append per-key later).
+Working canvas (ephemeral): `.scratch/param-groups.html` (grouped) / `.scratch/param-census.html`
+(full per-type surface). **Snapshot below is the durable copy.** Status: **now** = routable today
+(parity baseline), **LAUNCH** = owner-promoted into the launch set, **cand** = candidate awaiting
+keep/drop, **fix** = routable but defective today, **excl** = structural/internal (out).
 
-Working canvas: `.scratch/param-groups.html` (grouped concepts + triage),
-`.scratch/param-census.html` (full per-type surface).
+Range class: bipolar ± / unipolar % / index N / gate / inlet.
+
+### Shared concepts (one row, many types) — all **now**
+Transpose (bip), Octave (bip), SlideTime (uni), Rotate (bip), Scale (idx), RootNote (idx),
+Divisor (idx), ClockMult (uni), RunMode (enum), FirstStep (idx), LastStep (idx), GateLength (uni),
+Offset (bip), ProbabilityBias×5 (bip). · **Phase** (uni, Curve+PhaseFlux globalPhase) = **cand**.
+
+### Universal / Tier-0 — all **now**
+Mute/Fill/FillAmount/Pattern, Run, Reset, Cv/GateOutputRotate · Tempo, Swing, CvRouteScan/Route,
+Play/Rec/PlayToggle/RecordToggle/TapTempo, BusCv1–4.
+
+### Type-specific
+- **Tuesday** — now: Algorithm/Flow/Ornament/Power/Glide/Trill/StepTrill, GateLength/GateOffset,
+  Octave/Transpose/Rotate, Divisor/ClockMult/Scale/RootNote. cand: Skew/Start/LoopLength/
+  MaskParameter/MaskProgression.
+- **Curve** — now: Wavefolder Fold/Gain, DjFilter, Chaos×4, CurveRate, Offset/Rotate/SlideTime,
+  Shape&Gate ProbBias, Divisor/ClockMult/RunMode/First/LastStep. cand: GlobalPhase(Phase),
+  Min/Max/Range/XFade, ShapeVariation/ShapeVariationProbability.
+- **MidiCv** — now: Transpose/SlideTime. cand: PitchBendRange/ModulationRange.
+- **DiscreteMap** — now: Octave/Transpose/SlideTime/Offset, RangeHigh/RangeLow, Divisor/ClockMult/
+  Scale/RootNote; inlets Input/Scanner/Sync. cand: SlewTime/Threshold/GateLength.
+- **Indexed** — now: Octave/Transpose/SlideTime, Divisor/ClockMult/Scale/RootNote/RunMode/FirstStep;
+  inlets A/B. cand: Duration/ActiveLength/GateLength.
+- **Stochastic** — now: Complexity/Variation/Rest/Slide/Burst/Sleep/Mutate/Jump, Contour,
+  MaskRhythm/TiltRhythm/GateLength/PatienceRhythm/NoteDuration/Rotate, Octave/Transpose/SlideTime.
+  **fix:** Scale/RootNote/Divisor (base-write defect); **Feel** (dead slot — Routable, undispatched).
+  cand: LegatoProb/RepeatProb/Marbles Spread/Bias, MaskMelody/TiltMelody/PatienceMelody,
+  DegreeRotation/MaskRotation.
+- **PhaseFlux** — now: Divisor/ClockMult, Octave/Transpose/SlideTime. **LAUNCH:** A/B inlets
+  (stage-group routing, like Indexed); **all five nudges** WarpNudge/ResponseNudge/LenNudge/
+  CyclePhaseWarp/PulseNudge (bipolar). **fix:** Scale/RootNote (base-write). cand: PulseCount,
+  GlobalPhase(Phase), Pitch* (Range/Warp/Response/Window/Repeat/Rate), Temporal* (Warp/Response/
+  Window/Repeat/Curve), StageLen/StageDivisor/PhaseShift, MaskMelody/TiltMelody.
+- **Teletype** — cand: ClockDivisor/ClockMultiplier/TimeBase. Rest is Teletype-internal
+  (script-driven CV/trigger in/out, clips, pattern slots) — decide if Teletype is in the matrix
+  at all or stays script-routed.
+
+### Triage still owner's call
+The `cand` rows above (keep/drop, lean-additive) for every type except PhaseFlux (decided).
+Polarity confirm on Pitch*/Temporal* (uni vs bipolar) and Curve Min/Max/Range.
 
 ## Open / still owner's call
 
