@@ -77,8 +77,9 @@ base-only fields entirely.
 
 - `Sequence` keeps **base only** (`int8_t _scale` instead of
   `Routable<int8_t> _scale`).
-- The **routed value lives once per `(track, paramKey)`** in engine RAM —
-  transient, CCMRAM, not serialized (it is modulation, not project data).
+- The **routed value lives once per `(track, paramKey)`** in a model-owned
+  transient override table — **not serialized** (it is modulation, not project
+  data). See the ownership section below for owner/lifetime/concurrency.
 - Read combines base + the live route value at access time.
 - The per-pattern copy loop is deleted; the ×17 routed storage is dropped.
 
@@ -158,7 +159,15 @@ to hold. Two user knobs otherwise break it, both constrained on Modulate routes:
 | FrequencyFollower | history (`freqAcc/sign/hold`) | deny — stateful |
 | Activity | history | deny — stateful |
 | ProgressiveDivider | history | deny — stateful |
-| VcaNext | neighbor route output | deny — neighbor-dependent (→ `scaleSource`, parent R6) |
+| VcaNext | 0.5 (`0.5+(src-0.5)*neighbor`); neighbor-dependent away from center | deny — **separate policy**, see below |
+
+Two deny reasons, kept distinct:
+- **Fails center-preservation** → Crease (0.5→1.0) and all stateful shapers
+  (Location, Envelope, FrequencyFollower, Activity, ProgressiveDivider — output
+  depends on prior samples, so center is not fixed).
+- **Passes center-preservation but denied by policy** → VcaNext *is* center-preserving
+  (center → 0.5), but it is neighbor-route-dependent and is being extracted into the
+  explicit `scaleSource` field (parent R6), so it does not exist as a Modulate shaper.
 
 Allowed Modulate shapers: **None, TriangleFold**. A denied shaper on a Modulate route
 is rejected at edit (or opt-in with the neutral guarantee explicitly waived).
