@@ -170,6 +170,11 @@ Play/Rec/PlayToggle/RecordToggle/TapTempo, BusCv1–4.
   RangeLow=111. **SlewTime≡SlideTime resolved:** no track `_slideTime`; shared SlideTime key →
   sequence `setSlewTime`. Parity: only SlideTime(slewTime)+ClockMult write the routed slot, rest
   base. Reuses 8 shared keys. Parity test + inlet flags + fan-out; sweep; sim + STM32 clean.
+- **Codex BLOCK fixed:** DiscreteMap's track-routed params (Octave/Transpose/Offset/SlideTime/
+  RangeHigh/RangeLow) fan to ALL `sequences()` incl. snapshot slots (`DiscreteMapTrack::writeRouted`
+  range-for), not just patterns — hooks now mirror that; Divisor/ClockMult/Scale/RootNote stay
+  pattern-only (writeTarget pattern loop). Snapshot-slot parity assertion added. DiscreteMap-only
+  quirk (Note/Curve/Indexed write track fields, not fanned).
 
 ## Next action
 
