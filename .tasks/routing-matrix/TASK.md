@@ -118,9 +118,25 @@ Play/Rec/PlayToggle/RecordToggle/TapTempo, BusCv1–4.
 - Bus write/read ordering (R7, deferred — only bites at U7 cutover or a real collision).
 - Per-track shaper-array composition (drop stateful shapers? — deferred).
 - Polarity (uni vs bipolar) for any deferred param only when it's promoted later.
+- **paramKey storage width — U7 watch-item.** Registry key is `uint8_t` (`RouteParam::Row::key`),
+  Tier-4 type-specific starts at 80 → ~176 slots left. Projected full registry (launch + all
+  deferred) ≈ 130–160 keys, fits — but the width is part of the (clean-break) wire format and
+  gets settled at U7 with the full count known, not widened speculatively now (Codex review).
+
+## Registry landed (2026-06-02)
+
+- **Shared `ParamKey` registry** in `model/RouteParamKey.h` — the single append-only numbering
+  authority (F6). Tier-grouped with reserved gaps: Tier-0 Global 1–4, Tier-1 universal 20–21,
+  Tier-2 pitched 40–45, Tier-3 step-range 64–66, Tier-4 Note-specific 80–83. Keys minted on use.
+- **U2/U3 reworked onto it** — Global + Note tables dropped their local `enum Key`; rows reference
+  `ParamKey::`. writeTarget-parity tests still green; STM32 release clean.
+- **`TestParamRegistry`** sweeps every real table for unique non-zero row keys — turns the
+  no-duplicate-key contract from comment-only into a run guard (`Table::find` returns first scan
+  hit, so a dup would silently alias). Every U4 table appends to the sweep.
 
 ## Next action
 
-Finish the param triage → build the registry (one subsectioned list, range-class,
-per-type apply bindings derived from it) → rework U2/U3 scaffolding onto it →
-continue units (U4 inlets, U5 scaleSource, U6 groups, U6b override+combine, U7 cutover).
+Continue units onto the registry: **U4** — second per-type table (proposed: Curve, max shared-key
+reuse with Note: Divisor/ClockMult/RunMode/First/LastStep/SlideTime/Rotate/ProbBias; introduces
+Phase Tier-2b + DSP block) → then inlets (Indexed A/B, DiscreteMap In/Scanner/Sync) → U5
+scaleSource, U6 groups, U6b override+combine, U7 cutover. Range-class lands with combine (U6b).
