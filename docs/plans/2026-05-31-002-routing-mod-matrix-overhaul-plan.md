@@ -93,11 +93,11 @@ What's genuinely absent (and stays out): Step / parameter-locks.
 
 ## Requirements
 
-- R1. **Name/semantics-agnostic engine.** Apply path reads a source (normalized), runs the
-  route's pipeline in **legacy order — signed per-track gain on the centered source → shaper →
-  scaleSource (on the centered output)** — then applies the **combine** (R15): Absolute maps the
-  result through `min/max`; Modulate ignores the window and writes a base-relative offset. It
-  calls `scope.applyRouted(paramKey, …)` either way — no target names/ranges/`switch` in the engine.
+- R1. **Name/semantics-agnostic engine.** Apply path reads a source (normalized), runs
+  shaper → scaleSource, then the **combine** (R15): one base-anchored formula
+  `out = clamp(base + d·u·range)`, where `u` is the centered source (Modulate) or raw source
+  (Absolute) and `d` is the single signed coefficient — **no `min/max` window**. It writes the
+  delta via `scope.applyRouted(paramKey, …)` — no target names/ranges/`switch` in the engine.
 - R2. **One param table per scope** (global; each track type) = the single source for UI
   label, range/format, applicability, and the engine apply hook. Add a routable param = add
   one row.
@@ -165,36 +165,46 @@ What's genuinely absent (and stays out): Step / parameter-locks.
   full rejection, but the format change is project-wide, not routing-local.
 - R10. **CvRoute and Modulator engine untouched** in behavior; the matrix references `Mod1–8`
   as sources and leaves CvRoute as the independent CV→CV path.
-- R11. No behavior regression for **Absolute** routes rebuilt in the new format (a given
-  source→param→depth produces the same movement as the old equivalent). Absolute is the
-  parity-preserving default. **Modulate (R15) is an owner-approved intentional behavior change**
-  for the bipolar params — a rebuilt Transpose/Octave/etc. route modulates around base instead of
-  replacing it; that is the desired new semantics, not a regression. Tests prove both: Absolute
-  matches the old movement, Modulate is neutral at source-center. STM32 flash/RAM within budget.
+- R11. Both combines are **base-anchored** (R15); there is no free `min/max` window. The old
+  full-range replace is recovered as the special case **base = range floor, `d` = 100%**, and
+  Absolute reproduces the old movement there. Outside that case, Absolute is the new base-anchored
+  sweep and **Modulate is an owner-approved intentional behavior change** for the bipolar params
+  (modulate around base, not replace) — desired, not a regression. Tests prove: the recovery case
+  matches old movement, Modulate is neutral at source-center, the anchored sweep behaves. STM32
+  flash/RAM within budget.
 - R14. **Routed value is transient, not per-pattern model data** (sub-spec
   `2026-06-01-003-routed-value-storage-subspec.md`). Today the `routed` half of
   `Routable<T>` is stored per `Sequence` ×17 (patterns+snapshot) and `writeTarget`
   loops all 17 writing the same value. Split it: `Sequence`/`Track` keep **base only**;
   the live routed value lives once per `(track, paramKey)` in a **model-owned transient
-  override table** (not serialized). Read combines base + override at access; the
-  ×17 copy loop and routed duplication are deleted. Closes two defects the split
+  override table** (not serialized). The override stores an additive **delta**; read =
+  `clamp(base + delta)` at access (uniform for both combines — R15). The ×17 copy loop and
+  routed duplication are deleted. Closes two defects the split
   exposes — the **StochasticFeel dead routed slot** (Routable, never dispatched) and
   the **Stochastic/PhaseFlux Scale/RootNote base-mutation** (routing writes serialized
   base). Migration is per `(param × type)` — see the sub-spec's inventory (kinds
   S/T/P/B/D in scope; X/I/G/R untouched).
-- R15. **Per-param combine: Absolute vs Modulate** (`RouteParam::Flag`). Absolute =
-  route replaces base (today's only mode), uses the `min/max` window. Modulate =
-  `clamp(base + d·source_centered, hardMin, hardMax)`, ignores the window, and only
-  **center-preserving** shapers allowed (None/TriangleFold; Crease and all stateful denied;
-  VcaNext denied by policy → `scaleSource`, R6). Neutral at source-center is structural and
-  testable. The already-bipolar params (Octave/Transpose/Offset/Rotate/biases) are the
-  Modulate set; indices/enums/transport stay Absolute. Owner confirms the assignment.
-- R16. **Combine subsumes bias + depth** (collapses the per-track shaping arrays). `biasPct`
-  is **dropped** — a DC source shift that Modulate forbids (breaks neutral) and Absolute
-  makes redundant (the window positions the value). `depthPct` becomes the route's **signed
-  per-track gain `d[8]`** on the centered source (the Modulate magnitude; for Absolute, the
-  source→window gain). Two per-track ×8 arrays → one; `applyBiasDepthToSource` loses the bias
-  term. Per-track `d` is kept so a masked global route still tunes each track (F1).
+- R15. **Per-param combine: Absolute vs Modulate** (`RouteParam::Flag`) — **one signed per-track
+  `d`, base-anchored, no `min/max` window.** Both modes share one formula:
+  `out = clamp(base + d · u · range, hardMin, hardMax)`, where `u` is the source after
+  shaper/scale and `range` is the param's intrinsic span (registry, R-census).
+  - **Modulate** — `u = (source − 0.5)·2` (centered, ∈[-1,+1]): bipolar around base, **neutral at
+    source-center is structural** (source 0.5 → `u`=0 → out=base). Only **center-preserving**
+    shapers allowed (None/TriangleFold; Crease + all stateful denied; VcaNext denied by policy →
+    `scaleSource`, R6).
+  - **Absolute** — `u = source` (raw, ∈[0,1]): unipolar sweep from base; **`d` *is* the window
+    width** (signed → sweeps up/down). `min` disappears (it *is* base, the anchor/floor); `max` =
+    `base + d·range`.
+  The combine flag is the only difference (centered vs raw source). Bipolar params
+  (Octave/Transpose/Offset/Rotate/biases) are the Modulate set; indices/enums/transport are
+  Absolute. Owner confirms the assignment. **Coupling (accepted):** the Absolute window floor is
+  the base value — resting (no-CV) value and sweep start are the same point.
+- R16. **One coefficient replaces three controls.** `biasPct`, `depthPct`, **and the `min/max`
+  window** all collapse into the single signed per-track gain `d[8]` — `d` is the Modulate depth
+  and the Absolute window width. `biasPct` dropped (DC shift breaks Modulate neutral; base anchors
+  Absolute). `min/max` dropped (base is the anchor, `d` the span). So `Route` loses `_biasPct[8]`,
+  `_depthPct[8]`, and `_min/_max`; gains `d[8]` + `combine`. `applyBiasDepthToSource` reduces to
+  the `d` gain. Per-track `d` is kept so a masked global route still tunes each track (F1).
 
 ---
 
@@ -245,29 +255,28 @@ What's genuinely absent (and stays out): Step / parameter-locks.
 
 Slot, name-free, absorbing shaper + scale-source + scope:
 
-**Per-track gain + shaper are retained (F1, owner 2026-05-31), but bias/depth collapse to one
-signed gain (R15).** The current `Route` carries `_biasPct[8]`, `_depthPct[8]`, `_shaper[8]`
-(Routing.h:731-746) so one masked route tunes *each masked track* — the broadcast value to keep.
-With the Absolute/Modulate combine (R15), `biasPct` is **dropped** (a DC shift; Modulate forbids
-it, Absolute positions via the window) and `depthPct` becomes the route's **signed per-track gain
-`d[8]`** on the centered source. Two per-track ×8 arrays → one. So the slot shapes:
+**Per-track gain + shaper are retained (F1, owner 2026-05-31); bias, depth, AND the min/max window
+collapse to one signed `d` (R15/R16).** The current `Route` carries `_biasPct[8]`, `_depthPct[8]`,
+`_min/_max`, `_shaper[8]` (Routing.h:731-746) so one masked route tunes *each masked track* — the
+broadcast value to keep. The unified combine makes the route **base-anchored**: `biasPct` dropped,
+`depthPct`+`min/max` → one signed per-track gain `d[8]` (Modulate depth / Absolute window width).
+Three per-route shaping controls → one. So the slot shapes:
 
 ```
 // Global masked pool slot — fat, per-track tuning, few of these:
 GlobalRouteSlot {
   Source  source;            // incl. Mod1-8, Bus
   uint8_t trackMask;         // broadcast set
-  uint8_t paramKey;          // into Tier-0/1/2 table
-  uint8_t combine;           // Absolute | Modulate (R15)
-  float   min, max;          // window — ABSOLUTE only (Modulate ignores; base + d*centered)
-  int8_t  d[8];              // PER-TRACK signed gain (was depthPct; biasPct removed)
+  uint8_t paramKey;          // into the param registry
+  uint8_t combine;           // Absolute (raw source) | Modulate (centered) — R15
+  int8_t  d[8];              // PER-TRACK signed % — depth (Modulate) / window width (Absolute)
   Shaper  shaper[8];         // PER-TRACK — Modulate restricts to center-preserving (R15)
   Source  scaleSource;
 }
 // Per-track local pool slot — thin, single-track, scalar:
 LocalRouteSlot {
   Source source; Scope scope;   // Track(single) | Group(cellMask)
-  uint8_t paramKey; uint8_t combine; float min,max; int8_t d; Shaper shaper; Source scaleSource;
+  uint8_t paramKey; uint8_t combine; int8_t d; Shaper shaper; Source scaleSource;
 }
 ```
 
@@ -279,24 +288,25 @@ fat slot substantially. Decide at implementation; the RAM figures below are uppe
 Engine apply (replaces `writeTarget` name dispatch), at the single-pass per-tick recompute:
 
 ```
-// Pipeline order matches legacy exactly (depth → shaper → scale → window,
-// RoutingEngine.cpp:512-531) so Absolute is parity-equivalent incl. shaped/scaled routes.
+// One base-anchored formula, no window: out = clamp(base + d*u*range).
+// combine picks u (centered vs raw source); d is the single signed coefficient.
 for slot in active routes:
     for each track t in slot.scope:
-        s  = sourceValue(slot.source)                       // raw normalized [0,1]
-        g  = 0.5 + (s - 0.5) * gain(slot.d[t])              // signed per-track gain on the CENTERED
-                                                            // source (R16, was depthPct); no bias
-        h  = shape(slot.shaper[t], g, state[t])             // shaper (legacy: after depth)
+        s = sourceValue(slot.source)                        // raw normalized [0,1]
+        h = shape(slot.shaper[t], s, state[t])              // shaper (center-preserving for Modulate)
         if slot.scaleSource != None:
-            h = 0.5 + (h - 0.5) * scaleValue(slot.scaleSource, t)  // scale the CENTERED output
-                                                            // (legacy VcaNext form — center-preserving)
-        if slot.combine == Absolute:
-            v = slot.min + clamp(h,0,1) * (slot.max - slot.min)    // through window
-            scopeObj(t).writeOverride(slot.paramKey, v)            // replaces base (legacy parity)
-        else: // Modulate
-            offset = (h - 0.5) * 2                          // centered; window ignored (R15)
-            scopeObj(t).writeOverrideOffset(slot.paramKey, offset) // read = clamp(base + offset)
+            h = 0.5 + (h - 0.5) * scaleValue(slot.scaleSource, t)   // scale the centered output
+        u = (slot.combine == Modulate) ? (h - 0.5) * 2      // centered ∈[-1,+1], 0 at source-center
+                                       :  h                 // raw     ∈[0,1],  Absolute sweep
+        delta = gain(slot.d[t]) * u * range(slot.paramKey)  // signed % × source-form × param span
+        scopeObj(t).writeOverrideDelta(slot.paramKey, delta)   // read = clamp(base + delta)
 ```
+`d` is the single per-track coefficient (no `min/max`). Modulate: source-center → `u`=0 → `delta`=0
+→ out=base (neutral, structural — allowed shapers map center→center). Absolute: source 0 → base,
+source 1 → base + `d`·range (the window, width `d`, anchored at base). The override table stores
+`delta`; the read combines `clamp(base + delta)` uniformly. `range` is the param's intrinsic span
+from the registry (half-span for bipolar, full for unipolar). Old full-range replace = the special
+case `d`=100%, base=range floor (R11).
 Every stage is **center-preserving** at source-center (gain→0 deviation, the allowed shaper maps
 0.5→0.5, scale multiplies a 0 deviation), so Modulate neutral holds for any `scaleValue` and any
 allowed shaper (R15). The order equals legacy depth→shaper→scale→window, so Absolute reproduces

@@ -89,16 +89,21 @@ the loop and the duplication.
 
 ---
 
-## Combine semantics — replace vs modulate (owner decision)
+## Combine semantics — Absolute vs Modulate (owner decision)
 
-**Does routing replace the base, or modulate around it?** Per-param, via a
-`RouteParam::Flag` (`Modulate` vs `Absolute`):
+> **Unified model (authoritative — parent R15/R16).** Both combines are **base-anchored** with
+> **one signed coefficient `d`, no `min/max` window**: `out = clamp(base + d·u·range)`. Modulate
+> uses centered source `u=(s−0.5)·2` (neutral at center); Absolute uses raw source `u=s` (sweep
+> from base, width `d`). The override table stores the additive `delta`; read = `clamp(base+delta)`.
+> The per-param detail below (which params modulate, param spans, center-preserving shapers) still
+> holds; the old "Absolute = replace via window" framing is superseded by the anchored model.
 
-- **Absolute (today's only mode).** read = `routeActive ? routeValue : base`. The
-  route owns the value; base ignored while routed. Window bounds the absolute value.
-- **Modulate.** read = `clamp(base_p + offset, hardMin, hardMax)`. Base stays the
-  per-pattern origin; the route shifts around it. Per-pattern base stays meaningful
-  while routed.
+Per-param, via a `RouteParam::Flag` (`Modulate` vs `Absolute`):
+
+- **Absolute.** `u = raw source`; `out = clamp(base + d·s·range)` — base-anchored sweep, `d` the
+  window width. (Old full-range replace = `base` at range floor, `d`=100%.)
+- **Modulate.** `u = centered source`; `out = clamp(base + d·(s−0.5)·2·range)` — bipolar around
+  base, neutral at source-center. Per-pattern base stays meaningful while routed.
 
 The existing ranges already sort this: several params are **already bipolar**
 (designed as modulators, implemented as replace), others are absolute indices.
