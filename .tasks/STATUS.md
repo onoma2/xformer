@@ -3,6 +3,14 @@ _Updated: 2026-05-29 (PhaseFlux polish round landed: mask+tilt orthogonal union 
 
 **Naming convention from 2026-05-24 forward:** older entries below use prior names that are consistent with the code at the time they were written. Current canonical: step (idea, int), `StochasticStepContent` (stored), `RuntimeStep` (runtime), `StepCache` (container), `Gate` / `Cv` (output).
 
+## 🟡 routing-matrix — unified scope-addressed mod matrix (name-agnostic engine)
+**Status:** active — design locked & Codex-clean; param registry curation in progress. Plan `docs/plans/2026-05-31-002-routing-mod-matrix-overhaul-plan.md` + sub-spec `2026-06-01-003-routed-value-storage-subspec.md`. Engine delivers a normalized value into `(scope, paramKey)`; per-type param tables; no flat `Target` enum. **Unified combine:** one signed per-track `d`, base-anchored, no `min/max` window — `out = clamp(base + d·u·range)`, combine flag picks centered (Modulate, neutral-at-center) vs raw (Absolute, sweep-from-base) source; `d` subsumes bias+depth+window. Routed value is a model-owned transient override (delta; read = `clamp(base+delta)`), killing the per-pattern `Routable` duplication + ×17 copy loop. `scaleSource = Source` only (R6). Clean-break format (R9).
+**Where I stopped:** On `refactor/routing-matrix`: U1 `RouteParam` (+fail-closed guard), U2 `GlobalParamTable`, trigger unification (Reset/Play/Record/TapTempo → one `RouteState.gateMask`), U3 first type `NoteParamTable` — all parity-tested, green, nothing wired live. U2/U3 per-type tables predate the registry+`d` model and get reworked. Param triage underway: PhaseFlux launch set decided (A/B inlets + all five nudges).
+**Next action:** Finish musical param triage (lean & additive — `paramKey` append-only) → build the registry (grouped concepts, range-class, per-type apply bindings) → rework U2/U3 onto it → U4 inlets, U5 scaleSource, U6 groups, U6b override+combine, U7 cutover.
+**Depends on:** spine refactor (landed on dev: WallClock, slave-guard, single-pass engine recompute, linking removed).
+**Branch:** refactor/routing-matrix
+**Reference:** `.tasks/routing-matrix/TASK.md` (decision log). `.scratch/param-groups.html` (grouped triage canvas). `.scratch/param-census.html` (full per-type surface). `.tasks/core-architecture-optimization/routing-five-sources-map.md` (the smear this replaces).
+
 ## 🟢 generator-preview-apply — Generator A/B preview, step selection, 64-step context, Tuesday AlgoGenerator
 **Status:** done — Phases A-F complete and hardware verified.
 **Where I stopped:** All phases committed. SequenceBuilder 3-copy state machine, RandomGenerator enhancements, GeneratorPage A/B workflow, 64-step bank visualization, context menu expansion, and Tuesday AlgoGenerator (15 algorithms via TuesdayAlgoCore). RAM: `.data + .bss = 118,884` (92.9%).
