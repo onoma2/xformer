@@ -60,9 +60,11 @@ CASE("rows match writeTarget for every normalized input") {
     const float inputs[] = { 0.f, 0.25f, 0.5f, 0.75f, 1.f };
 
     for (const auto &s : specs) {
-        if (s.routedWrite) {
-            Routing::setRouted(s.target, 0xFF, true);   // expose routed slot through gated getters
-        }
+        // Force the routed flag explicitly (setRouted is global static): routed-slot
+        // specs expose the routed slot; base-write specs (Divisor/Scale/RootNote)
+        // pin it false so the gated RootNote getter reads the base we wrote, never a
+        // stale routed slot left set by a prior test.
+        Routing::setRouted(s.target, 0xFF, s.routedWrite);
 
         for (float n : inputs) {
             Project &oldP = indexedProject();

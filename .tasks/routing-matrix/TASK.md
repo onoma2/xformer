@@ -118,6 +118,12 @@ Play/Rec/PlayToggle/RecordToggle/TapTempo, BusCv1–4.
 - Bus write/read ordering (R7, deferred — only bites at U7 cutover or a real collision).
 - Per-track shaper-array composition (drop stateful shapers? — deferred).
 - Polarity (uni vs bipolar) for any deferred param only when it's promoted later.
+- **Indexed External sync inlet — owner call (Codex review, 2026-06-02).** Indexed has a live
+  `SyncMode::External` whose engine reads `routedSync()` (`IndexedTrackEngine.cpp:202`), driven
+  today by routing `DiscreteMapSync` into `IndexedTrack::_routedSync` (a borrowed target). The
+  resolved Indexed launch set ("inlets A/B") omits any Sync inlet, and R13 drops the borrow — so
+  the U4 Indexed table has no Sync row. Nothing breaks pre-U7 (old dispatch still feeds it), but
+  **U7 must either retire Indexed External sync or add an Indexed-owned Sync inlet** (key 102).
 - **paramKey storage width — U7 watch-item.** Registry key is `uint8_t` (`RouteParam::Row::key`),
   Tier-4 type-specific starts at 80 → ~176 slots left. Projected full registry (launch + all
   deferred) ≈ 130–160 keys, fits — but the width is part of the (clean-break) wire format and
