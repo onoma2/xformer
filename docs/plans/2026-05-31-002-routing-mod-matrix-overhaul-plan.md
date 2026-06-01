@@ -94,10 +94,10 @@ What's genuinely absent (and stays out): Step / parameter-locks.
 ## Requirements
 
 - R1. **Name/semantics-agnostic engine.** Apply path reads a source (normalized), runs the
-  route's shaper + signed per-track gain on the centered source, then applies the
-  **combine** (R15): Absolute maps the gained source through `min/max`; Modulate ignores the
-  window and writes a base-relative offset. It calls `scope.applyRouted(paramKey, …)` either
-  way — no target names/ranges/`switch` in the engine.
+  route's pipeline in **legacy order — signed per-track gain on the centered source → shaper →
+  scaleSource (on the centered output)** — then applies the **combine** (R15): Absolute maps the
+  result through `min/max`; Modulate ignores the window and writes a base-relative offset. It
+  calls `scope.applyRouted(paramKey, …)` either way — no target names/ranges/`switch` in the engine.
 - R2. **One param table per scope** (global; each track type) = the single source for UI
   label, range/format, applicability, and the engine apply hook. Add a routable param = add
   one row.
@@ -274,24 +274,30 @@ fat slot substantially. Decide at implementation; the RAM figures below are uppe
 Engine apply (replaces `writeTarget` name dispatch), at the single-pass per-tick recompute:
 
 ```
+// Pipeline order matches legacy exactly (depth → shaper → scale → window,
+// RoutingEngine.cpp:512-531) so Absolute is parity-equivalent incl. shaped/scaled routes.
 for slot in active routes:
     for each track t in slot.scope:
-        s  = sourceValue(slot.source)                   // raw normalized [0,1]
-        s  = shape(slot.shaper[t], s, state[t])         // per-track shaper + state
-        if slot.scaleSource != None: s *= scaleValue(slot.scaleSource, t)   // see F3 caveat
-        sg = 0.5 + (s - 0.5) * gain(slot.d[t])          // signed per-track gain on the CENTERED
-                                                        // source (R16); no bias. d=100% → identity
+        s  = sourceValue(slot.source)                       // raw normalized [0,1]
+        g  = 0.5 + (s - 0.5) * gain(slot.d[t])              // signed per-track gain on the CENTERED
+                                                            // source (R16, was depthPct); no bias
+        h  = shape(slot.shaper[t], g, state[t])             // shaper (legacy: after depth)
+        if slot.scaleSource != None:
+            h = 0.5 + (h - 0.5) * scaleValue(slot.scaleSource, t)  // scale the CENTERED output
+                                                            // (legacy VcaNext form — center-preserving)
         if slot.combine == Absolute:
-            v = slot.min + clamp(sg,0,1) * (slot.max - slot.min)   // gained source through window
-            scopeObj(t).writeOverride(slot.paramKey, v)            // replaces base (legacy depth parity)
+            v = slot.min + clamp(h,0,1) * (slot.max - slot.min)    // through window
+            scopeObj(t).writeOverride(slot.paramKey, v)            // replaces base (legacy parity)
         else: // Modulate
-            offset = (sg - 0.5) * 2                     // centered; window ignored (R15)
+            offset = (h - 0.5) * 2                          // centered; window ignored (R15)
             scopeObj(t).writeOverrideOffset(slot.paramKey, offset) // read = clamp(base + offset)
 ```
-`d` is the signed per-track gain on the **centered** source in both modes (matching legacy
-`depthPct` so Absolute keeps R11 parity); bias is gone (R16). Only Absolute consults `min/max`;
-Modulate maps the gained centered source straight to a base-relative offset. The override table
-(R14) holds the per-`(track,paramKey)` value/offset the model read combines with base.
+Every stage is **center-preserving** at source-center (gain→0 deviation, the allowed shaper maps
+0.5→0.5, scale multiplies a 0 deviation), so Modulate neutral holds for any `scaleValue` and any
+allowed shaper (R15). The order equals legacy depth→shaper→scale→window, so Absolute reproduces
+old movement including shaped/scaled routes (R11). Bias is gone (R16); only Absolute consults
+`min/max`. The override table (R14) holds the per-`(track,paramKey)` value/offset the model read
+combines with base.
 
 Param table per scope (global; common-track; per-track-type) declared once. A row is either a
 **direct** param or an **inlet** (R12):
