@@ -77,7 +77,14 @@ struct ParamKey {
 
         // --- Inlets: per-track CV buses, not direct params (R12/R13) (100..) ---
         // Each type owns its own inlets (no borrowing). Rows flagged Inlet.
-        IndexedA = 100,   // Indexed
-        IndexedB = 101,   // Indexed
+        IndexedA           = 100,   // Indexed
+        IndexedB           = 101,   // Indexed
+        DiscreteMapInput   = 102,   // DiscreteMap
+        DiscreteMapScanner = 103,   // DiscreteMap
+        DiscreteMapSync    = 104,   // DiscreteMap
+
+        // --- DiscreteMap signature block (110..) ---
+        DiscreteMapRangeHigh = 110,
+        DiscreteMapRangeLow  = 111,
     };
 };

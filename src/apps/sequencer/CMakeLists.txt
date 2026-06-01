@@ -70,6 +70,7 @@ set(sources
     model/ParamTableNote.cpp
     model/ParamTableCurve.cpp
     model/ParamTableIndexed.cpp
+    model/ParamTableDiscreteMap.cpp
     model/Project.cpp
     model/Routing.cpp
     model/Scale.cpp

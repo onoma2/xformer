@@ -90,8 +90,11 @@ public:
     void writeRouted(Routing::Target target, int intValue, float floatValue);
 
     float routedInput() const { return _routedInput; }
+    void setRoutedInput(float v) { _routedInput = v; }
     float routedScanner() const { return _routedScanner; }
+    void setRoutedScanner(float v) { _routedScanner = v; }
     float routedSync() const { return _routedSync; }
+    void setRoutedSync(float v) { _routedSync = v; }
 
 private:
     void setTrackIndex(int trackIndex) {
