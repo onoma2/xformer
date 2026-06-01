@@ -117,7 +117,11 @@ What's genuinely absent (and stays out): Step / parameter-locks.
   output" use case is preserved without that coupling: route the processed signal to a `BusCv`
   and set `scaleSource` to that Bus. So exact positional-VcaNext parity is **not** preserved (a
   deliberate behavior change, like Modulate — no legacy patches load under R9 anyway); the
-  capability is. (Per-track-array composition for shapers is deferred — see Design.)
+  capability is. **Caveat:** raw CvIn/Mod/Midi/feedback `scaleSource`s read a pass-start value
+  (no ordering issue); the **Bus** sub-case inherits the **deferred Bus write/read ordering
+  (R7/F9)** — a `scaleSource` reading a Bus written the same tick is subject to whatever R7 pins,
+  so it resolves *with* R7, not independently. (Per-track-array composition for shapers is
+  deferred — see Design.)
 - R7. **Bus ownership stays with Engine** (it already owns `_busCv[]` + the safety
   slew/decay via `setBusCv`/`busCv`/`applyBusSafety`). The matrix and CvRoute remain
   **co-clients** that write through `setBusCv` and read through `busCv` — neither "owns" it.
@@ -476,8 +480,9 @@ No universal block; no `isXxxTarget` predicates; the matrix above is the literal
   Scale/RootNote base-mutation** — the new path never mutates base. Depends on the per-type
   tables (U3/U4) and the `scaleSource` extraction (U5). `scaleSource = Source` only (R6 resolved —
   Bus covers the processed-signal case), so the apply pipeline's scale stage reads a plain source
-  value; no route-output dependency. Tests per the sub-spec (neutral-at-center matrix, base-at-
-  clamp, denied-shaper rejection).
+  value; **no direct route-output dependency** (a Bus-mediated `scaleSource` inherits R7 Bus
+  ordering, resolved with R7). Tests per the sub-spec (neutral-at-center matrix, base-at-clamp,
+  denied-shaper rejection).
 - **U7. Route re-addressing + new format + ENGINE CUTOVER + destructive storage flip** (F5).
   `Route` stores `(source, scope, paramKey, combine, per-track `d`/shaper, scaleSource)`; bump
   `ProjectVersion`; loader rejects `< VersionRoutingMatrix` (R9). **This is the cutover and the
