@@ -94,8 +94,10 @@ What's genuinely absent (and stays out): Step / parameter-locks.
 ## Requirements
 
 - R1. **Name/semantics-agnostic engine.** Apply path reads a source (normalized), runs the
-  route's shaper + depth window, and calls `scope.applyRouted(paramId, value)`. No target
-  names/ranges/`switch` in the engine.
+  route's shaper + signed per-track gain on the centered source, then applies the
+  **combine** (R15): Absolute maps the gained source through `min/max`; Modulate ignores the
+  window and writes a base-relative offset. It calls `scope.applyRouted(paramKey, …)` either
+  way — no target names/ranges/`switch` in the engine.
 - R2. **One param table per scope** (global; each track type) = the single source for UI
   label, range/format, applicability, and the engine apply hook. Add a routable param = add
   one row.
@@ -274,20 +276,22 @@ Engine apply (replaces `writeTarget` name dispatch), at the single-pass per-tick
 ```
 for slot in active routes:
     for each track t in slot.scope:
-        s = sourceValue(slot.source)                    // raw normalized [0,1]
-        s = shape(slot.shaper[t], s, state[t])          // per-track shaper + state
+        s  = sourceValue(slot.source)                   // raw normalized [0,1]
+        s  = shape(slot.shaper[t], s, state[t])         // per-track shaper + state
         if slot.scaleSource != None: s *= scaleValue(slot.scaleSource, t)   // see F3 caveat
+        sg = 0.5 + (s - 0.5) * gain(slot.d[t])          // signed per-track gain on the CENTERED
+                                                        // source (R16); no bias. d=100% → identity
         if slot.combine == Absolute:
-            v = slot.min + s * (slot.max - slot.min)    // map shaped source through window
-            v = applyGain(v, slot.d[t])                 // signed per-track gain (R16); no bias
-            scopeObj(t).writeOverride(slot.paramKey, v)             // replaces base
+            v = slot.min + clamp(sg,0,1) * (slot.max - slot.min)   // gained source through window
+            scopeObj(t).writeOverride(slot.paramKey, v)            // replaces base (legacy depth parity)
         else: // Modulate
-            offset = slot.d[t] * (s - 0.5) * 2          // centered, no window, no bias (R15/R16)
-            scopeObj(t).writeOverrideOffset(slot.paramKey, offset)  // read = clamp(base + offset)
+            offset = (sg - 0.5) * 2                     // centered; window ignored (R15)
+            scopeObj(t).writeOverrideOffset(slot.paramKey, offset) // read = clamp(base + offset)
 ```
-Bias is gone (R16); `min/max` is consulted only on the Absolute branch; Modulate never
-touches the window. The override table (R14) holds the per-`(track,paramKey)` value/offset that
-the model read combines with base.
+`d` is the signed per-track gain on the **centered** source in both modes (matching legacy
+`depthPct` so Absolute keeps R11 parity); bias is gone (R16). Only Absolute consults `min/max`;
+Modulate maps the gained centered source straight to a base-relative offset. The override table
+(R14) holds the per-`(track,paramKey)` value/offset the model read combines with base.
 
 Param table per scope (global; common-track; per-track-type) declared once. A row is either a
 **direct** param or an **inlet** (R12):
