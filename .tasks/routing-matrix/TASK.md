@@ -176,8 +176,20 @@ Play/Rec/PlayToggle/RecordToggle/TapTempo, BusCv1–4.
   pattern-only (writeTarget pattern loop). Snapshot-slot parity assertion added. DiscreteMap-only
   quirk (Note/Curve/Indexed write track fields, not fanned).
 
+## U4 batch 1: MidiCv + Tuesday landed (2026-06-02, Codex-clean)
+
+- **MidiCv** — two track-level routed-slot rows (Transpose/SlideTime), no fan-out; reuses shared keys.
+- **Tuesday** — 14 sequence-level routed-slot rows, pattern fan-out; reuses Octave/Transpose/Rotate/
+  Divisor/ClockMult; appends signature block Algorithm/Flow/Ornament/Power/Glide/Trill/StepTrill/
+  GateLength/GateOffset (keys 120–128). GateLength/GateOffset use the clamped setter (no-op vs
+  writeTarget's unclamped `Routable.write`, range always 0..100). Parity tests + sweep; sim + STM32 clean.
+- **OWNER CALL — Tuesday Scale/RootNote:** dispatched no-ops today (`TuesdaySequence::writeRouted`
+  has no case → `default:break`), so the triage's "now" listing is optimistic. Adding them is a
+  fix-forward (like StochasticFeel), not parity — **omitted from batch 1, pending owner decision**
+  on whether to wire them as a fix (append keys then) or drop from the launch set.
+
 ## Next action
 
-Remaining U4 per-type tables: Stochastic (defect-fixes: Feel dead slot, Scale/RootNote base-write),
-PhaseFlux (A/B inlets + five nudges + Phase, defect-fix Scale/RootNote), Tuesday, MidiCv. Then U5
-scaleSource, U6 groups, U6b override+combine (range-class lands here), U7 cutover.
+U4 batch 2: Stochastic (defect-fixes: Feel dead slot, Scale/RootNote base-write) + PhaseFlux (A/B
+inlets + five nudges + Phase, defect-fix Scale/RootNote) — both carry intentional non-parity, own
+review. Then U5 scaleSource, U6 groups, U6b override+combine (range-class lands here), U7 cutover.
