@@ -111,12 +111,13 @@ What's genuinely absent (and stays out): Step / parameter-locks.
   a cell/stage group within a track (Indexed, PhaseFlux); track-wide stays the default.
 - R6. **Shapers stay, as explicit nodes.** Keep the processor bank; **extract `VcaNext`
   into an explicit `scaleSource` field** on the route, instead of the positional next-route hack.
-  **F3 caveat:** old `VcaNext` scaled by the neighbor route's *processed output* (after its
-  shaper+depth), not a raw source. `scaleSource` reading a raw source value is a **semantic
-  change** — R11 parity for VcaNext patches only holds if `scaleSource` can also reference a
-  *route's post-shaper output*, not just a raw `Source`. Decide whether scaleSource ∈ {Source}
-  or {Source ∪ route-output} at U5. (Per-track-array composition for shapers is deferred — see
-  Design.)
+  **RESOLVED: `scaleSource ∈ {Source}` only** (which includes `BusCv1–4`). Route-output as a
+  scaleSource would re-introduce the inter-route evaluation-order coupling this extraction exists
+  to remove (the `routeIndex+1` hack). The old VcaNext "scale by a neighbor route's *processed*
+  output" use case is preserved without that coupling: route the processed signal to a `BusCv`
+  and set `scaleSource` to that Bus. So exact positional-VcaNext parity is **not** preserved (a
+  deliberate behavior change, like Modulate — no legacy patches load under R9 anyway); the
+  capability is. (Per-track-array composition for shapers is deferred — see Design.)
 - R7. **Bus ownership stays with Engine** (it already owns `_busCv[]` + the safety
   slew/decay via `setBusCv`/`busCv`/`applyBusSafety`). The matrix and CvRoute remain
   **co-clients** that write through `setBusCv` and read through `busCv` — neither "owns" it.
@@ -473,10 +474,10 @@ No universal block; no `isXxxTarget` predicates; the matrix above is the literal
   `Routable` routed half + the `writeTarget` copy loop **stay live and unchanged** this unit.
   Closes-by-design (verified at U7): the **StochasticFeel dead slot** and **Stochastic/PhaseFlux
   Scale/RootNote base-mutation** — the new path never mutates base. Depends on the per-type
-  tables (U3/U4); the `scaleSource`/VcaNext handling depends on **R6 staying open until U5**
-  (see below). Tests per the sub-spec (neutral-at-center matrix, base-at-clamp, denied-shaper
-  rejection). **R6 caveat:** R6's `scaleSource ∈ {Source}` vs `{Source ∪ route-output}` choice
-  is unresolved (decided at U5); U6b/U7 must not treat VcaNext extraction as settled until then.
+  tables (U3/U4) and the `scaleSource` extraction (U5). `scaleSource = Source` only (R6 resolved —
+  Bus covers the processed-signal case), so the apply pipeline's scale stage reads a plain source
+  value; no route-output dependency. Tests per the sub-spec (neutral-at-center matrix, base-at-
+  clamp, denied-shaper rejection).
 - **U7. Route re-addressing + new format + ENGINE CUTOVER + destructive storage flip** (F5).
   `Route` stores `(source, scope, paramKey, combine, per-track `d`/shaper, scaleSource)`; bump
   `ProjectVersion`; loader rejects `< VersionRoutingMatrix` (R9). **This is the cutover and the
