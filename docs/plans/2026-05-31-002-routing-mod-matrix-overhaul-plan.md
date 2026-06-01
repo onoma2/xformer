@@ -158,8 +158,12 @@ What's genuinely absent (and stays out): Step / parameter-locks.
   full rejection, but the format change is project-wide, not routing-local.
 - R10. **CvRoute and Modulator engine untouched** in behavior; the matrix references `Mod1–8`
   as sources and leaves CvRoute as the independent CV→CV path.
-- R11. No behavior regression for routes rebuilt in the new format (a given source→param→depth
-  produces the same movement as the old equivalent). STM32 flash/RAM within budget.
+- R11. No behavior regression for **Absolute** routes rebuilt in the new format (a given
+  source→param→depth produces the same movement as the old equivalent). Absolute is the
+  parity-preserving default. **Modulate (R15) is an owner-approved intentional behavior change**
+  for the bipolar params — a rebuilt Transpose/Octave/etc. route modulates around base instead of
+  replacing it; that is the desired new semantics, not a regression. Tests prove both: Absolute
+  matches the old movement, Modulate is neutral at source-center. STM32 flash/RAM within budget.
 - R14. **Routed value is transient, not per-pattern model data** (sub-spec
   `2026-06-01-003-routed-value-storage-subspec.md`). Today the `routed` half of
   `Routable<T>` is stored per `Sequence` ×17 (patterns+snapshot) and `writeTarget`
@@ -172,12 +176,18 @@ What's genuinely absent (and stays out): Step / parameter-locks.
   base). Migration is per `(param × type)` — see the sub-spec's inventory (kinds
   S/T/P/B/D in scope; X/I/G/R untouched).
 - R15. **Per-param combine: Absolute vs Modulate** (`RouteParam::Flag`). Absolute =
-  route replaces base (today's only mode). Modulate = `clamp(base + d·source_centered,
-  hardMin, hardMax)`, depth-only (no additive bias), and only **center-preserving**
-  shapers allowed (None/TriangleFold; Crease and all stateful denied; VcaNext denied by
-  policy → `scaleSource`, R6). Neutral at source-center is structural and testable. The
-  already-bipolar params (Octave/Transpose/Offset/Rotate/biases) are the Modulate set;
-  indices/enums/transport stay Absolute. Owner confirms the assignment.
+  route replaces base (today's only mode), uses the `min/max` window. Modulate =
+  `clamp(base + d·source_centered, hardMin, hardMax)`, ignores the window, and only
+  **center-preserving** shapers allowed (None/TriangleFold; Crease and all stateful denied;
+  VcaNext denied by policy → `scaleSource`, R6). Neutral at source-center is structural and
+  testable. The already-bipolar params (Octave/Transpose/Offset/Rotate/biases) are the
+  Modulate set; indices/enums/transport stay Absolute. Owner confirms the assignment.
+- R16. **Combine subsumes bias + depth** (collapses the per-track shaping arrays). `biasPct`
+  is **dropped** — a DC source shift that Modulate forbids (breaks neutral) and Absolute
+  makes redundant (the window positions the value). `depthPct` becomes the route's **signed
+  per-track gain `d[8]`** on the centered source (the Modulate magnitude; for Absolute, the
+  source→window gain). Two per-track ×8 arrays → one; `applyBiasDepthToSource` loses the bias
+  term. Per-track `d` is kept so a masked global route still tunes each track (F1).
 
 ---
 
@@ -228,10 +238,12 @@ What's genuinely absent (and stays out): Step / parameter-locks.
 
 Slot, name-free, absorbing shaper + scale-source + scope:
 
-**Per-track depth + shaper are retained (F1, owner 2026-05-31).** The current `Route` already
-carries per-track arrays — `_biasPct[8]`, `_depthPct[8]`, `_shaper[8]` (Routing.h:731-746) —
-so one masked route applies a *different depth and shaper per masked track*. That is the value
-of broadcast (one CV, per-track tuning) and must be preserved (R11). So the two slot shapes differ:
+**Per-track gain + shaper are retained (F1, owner 2026-05-31), but bias/depth collapse to one
+signed gain (R15).** The current `Route` carries `_biasPct[8]`, `_depthPct[8]`, `_shaper[8]`
+(Routing.h:731-746) so one masked route tunes *each masked track* — the broadcast value to keep.
+With the Absolute/Modulate combine (R15), `biasPct` is **dropped** (a DC shift; Modulate forbids
+it, Absolute positions via the window) and `depthPct` becomes the route's **signed per-track gain
+`d[8]`** on the centered source. Two per-track ×8 arrays → one. So the slot shapes:
 
 ```
 // Global masked pool slot — fat, per-track tuning, few of these:
@@ -239,15 +251,16 @@ GlobalRouteSlot {
   Source  source;            // incl. Mod1-8, Bus
   uint8_t trackMask;         // broadcast set
   uint8_t paramKey;          // into Tier-0/1/2 table
-  float   min, max;          // normalized window
-  int8_t  biasPct[8], depthPct[8];   // PER-TRACK (existing)
-  Shaper  shaper[8];                 // PER-TRACK (existing) — the ×8 state cost
+  uint8_t combine;           // Absolute | Modulate (R15)
+  float   min, max;          // window — ABSOLUTE only (Modulate ignores; base + d*centered)
+  int8_t  d[8];              // PER-TRACK signed gain (was depthPct; biasPct removed)
+  Shaper  shaper[8];         // PER-TRACK — Modulate restricts to center-preserving (R15)
   Source  scaleSource;
 }
 // Per-track local pool slot — thin, single-track, scalar:
 LocalRouteSlot {
   Source source; Scope scope;   // Track(single) | Group(cellMask)
-  uint8_t paramKey; float min,max; Shaper shaper; Source scaleSource;
+  uint8_t paramKey; uint8_t combine; float min,max; int8_t d; Shaper shaper; Source scaleSource;
 }
 ```
 
@@ -431,25 +444,30 @@ No universal block; no `isXxxTarget` predicates; the matrix above is the literal
   it, and retire the `routeIndex+1` neighbor read outright. No migration needed — old projects
   don't load (R9 clean break), so there are no stored legacy `VcaNext` patches to round-trip.
 - **U6. Group scope.** Generalize Indexed `targetGroups` into the slot's `Scope`.
-- **U6b. Routed-value storage + combine mode** (R14/R15; sub-spec
-  `2026-06-01-003-routed-value-storage-subspec.md`). Drop the per-pattern `Routable`
-  `routed` half and the ×17 copy loop; `Sequence`/`Track` keep base only. Add the
-  **model-owned transient override table** keyed by `(track, paramKey)` (not
-  serialized), written by the apply path, gated by the active-route bit, invalidated on
-  track-mode change + route reconfig. Add the **Absolute/Modulate** combine flag with
-  the center-preserving Modulate contract (depth-only, allowed shapers None/TriangleFold).
-  Fix the **StochasticFeel dead slot** and the **Stochastic/PhaseFlux Scale/RootNote
-  base-mutation** as part of the migration. Depends on the per-type tables (U3/U4) and
-  the `scaleSource` extraction (U5, which removes VcaNext); lands **before U7** since the
-  cutover flips Route storage onto this read path. Migration inventory + tests per the
-  sub-spec (neutral-at-center matrix, base-at-clamp, denied-shaper rejection).
-- **U7. Route re-addressing + new format + ENGINE CUTOVER** (F5). `Route` stores `(source,
-  scope, paramKey, per-track depth/shaper, scaleSource)`; bump `ProjectVersion`; loader rejects
-  `< VersionRoutingMatrix` (R9). **This is the cutover:** new-format routes have no `_target`,
-  so the engine must switch to the param-table `applyRouted` path here — the old `Target`
-  dispatch *cannot run* on new-format routes. U1–U6 build the tables + new apply path *alongside*
-  the still-authoritative old dispatch; U7 flips storage **and** engine together; U9 only
-  deletes the now-dead old code. ("Old dispatch stays live until **U7**," not U9 — F5 fix.)
+- **U6b. Routed-value override table + combine mode — ADDITIVE** (R14/R15/R16; sub-spec
+  `2026-06-01-003-routed-value-storage-subspec.md`). **Builds alongside the live old storage;
+  deletes nothing** (the destructive removal is U7, so U1–U6b all stay buildable behind the
+  authoritative old dispatch). Add the **model-owned transient override table** keyed by
+  `(track, paramKey)` (not serialized), the **Absolute/Modulate** combine flag with the
+  center-preserving Modulate contract (depth-only, allowed shapers None/TriangleFold), and the
+  signed per-track gain `d` (R16). Wire the new apply path to write the override table and the
+  read/combine to consult it — exercised by tests, not yet the engine default. The existing
+  `Routable` routed half + the `writeTarget` copy loop **stay live and unchanged** this unit.
+  Closes-by-design (verified at U7): the **StochasticFeel dead slot** and **Stochastic/PhaseFlux
+  Scale/RootNote base-mutation** — the new path never mutates base. Depends on the per-type
+  tables (U3/U4); the `scaleSource`/VcaNext handling depends on **R6 staying open until U5**
+  (see below). Tests per the sub-spec (neutral-at-center matrix, base-at-clamp, denied-shaper
+  rejection). **R6 caveat:** R6's `scaleSource ∈ {Source}` vs `{Source ∪ route-output}` choice
+  is unresolved (decided at U5); U6b/U7 must not treat VcaNext extraction as settled until then.
+- **U7. Route re-addressing + new format + ENGINE CUTOVER + destructive storage flip** (F5).
+  `Route` stores `(source, scope, paramKey, combine, per-track `d`/shaper, scaleSource)`; bump
+  `ProjectVersion`; loader rejects `< VersionRoutingMatrix` (R9). **This is the cutover and the
+  only destructive step:** drop the per-pattern `Routable` routed half, delete the ×17
+  `writeTarget` copy loop, drop `biasPct`, rename `depthPct`→`d` (R16); `Sequence`/`Track` keep
+  base only; engine switches to the param-table `applyRouted` + override-table read. New-format
+  routes have no `_target`, so the old dispatch *cannot run* on them. U1–U6b build the tables +
+  override path *alongside* the still-authoritative old dispatch; U7 flips storage **and** engine
+  together; U9 only deletes the now-dead old code. ("Old dispatch stays live until **U7**," F5.)
   **paramKey rule (F6, hard, not open):** keys are explicit numeric, **append-only, never
   reused after deletion** — never the array index. This is the constraint that makes "add a
   routable param = add one row" safe for saved files. Fixtures: round-trip with stable keys;
