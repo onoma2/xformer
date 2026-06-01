@@ -46,10 +46,11 @@ struct ParamKey {
         Octave    = 43,
         SlideTime = 44,
         Rotate    = 45,
-        // reserve 46..59
+        Offset    = 46,   // Curve (DiscreteMap later)
+        // reserve 47..59
 
         // --- Tier 2b: temporal phase (60..63) ---
-        // Phase = 60 -- minted when Curve/PhaseFlux tables land
+        Phase = 60,   // Curve/PhaseFlux globalPhase (clamp 0..1)
 
         // --- Tier 3: step-range, Note/Curve family (64..79) ---
         RunMode   = 64,
@@ -58,10 +59,20 @@ struct ParamKey {
         // reserve 67..79
 
         // --- Tier 4: type-specific (80..), appended as per-type tables land ---
-        // Note:
-        GateProbabilityBias      = 80,
-        RetriggerProbabilityBias = 81,
-        LengthBias               = 82,
-        NoteProbabilityBias      = 83,
+        // Probability-bias family (shared, per-type backing):
+        GateProbabilityBias      = 80,   // Note, Curve
+        RetriggerProbabilityBias = 81,   // Note
+        LengthBias               = 82,   // Note
+        NoteProbabilityBias      = 83,   // Note
+        ShapeProbabilityBias     = 84,   // Curve
+        // Curve signature block (90..):
+        WavefolderFold = 90,
+        WavefolderGain = 91,
+        DjFilter       = 92,
+        ChaosAmount    = 93,
+        ChaosRate      = 94,
+        ChaosParam1    = 95,
+        ChaosParam2    = 96,
+        CurveRate      = 97,
     };
 };
