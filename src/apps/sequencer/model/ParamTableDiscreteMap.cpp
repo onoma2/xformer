@@ -25,24 +25,37 @@ void applyInput(const RouteParam::Scope &s, const RouteParam::Range &r, float n)
 void applyScanner(const RouteParam::Scope &s, const RouteParam::Range &r, float n) { dmTrack(s).setRoutedScanner(denormF(r, n)); }
 void applySync(const RouteParam::Scope &s, const RouteParam::Range &r, float n)    { dmTrack(s).setRoutedSync(denormF(r, n)); }
 
-// sequence-level: fan out to every pattern (matches writeTarget).
-// Octave/Transpose/Offset/Divisor/Scale/RootNote/RangeHigh/RangeLow write the
-// BASE (no routed flag); SlideTime(slewTime) and ClockMult write the routed slot.
+// Two fan-out scopes, matching writeTarget exactly:
+//  - track-routed params (Octave/Transpose/Offset/SlideTime/RangeHigh/RangeLow)
+//    reach DiscreteMapTrack::writeRouted, which fans to ALL sequences() -- patterns
+//    AND snapshot slots (CONFIG_PATTERN_COUNT + CONFIG_SNAPSHOT_COUNT).
+//  - sequence-targets (Divisor/ClockMult/Scale/RootNote) reach the writeTarget
+//    pattern loop, so they touch only CONFIG_PATTERN_COUNT patterns.
+// Octave/Transpose/Offset/Divisor/Scale/RootNote/RangeHigh/RangeLow write the BASE
+// (no routed flag); SlideTime(slewTime) and ClockMult write the routed slot.
 void applyOctave(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
     int v = denormI(r, n);
-    for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) dmTrack(s).sequence(p).setOctave(v);
+    for (auto &seq : dmTrack(s).sequences()) seq.setOctave(v);
 }
 void applyTranspose(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
     int v = denormI(r, n);
-    for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) dmTrack(s).sequence(p).setTranspose(v);
+    for (auto &seq : dmTrack(s).sequences()) seq.setTranspose(v);
 }
 void applyOffset(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
     int v = denormI(r, n);
-    for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) dmTrack(s).sequence(p).setOffset(v);
+    for (auto &seq : dmTrack(s).sequences()) seq.setOffset(v);
 }
 void applySlideTime(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
     int v = denormI(r, n);
-    for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) dmTrack(s).sequence(p).setSlewTime(v, true);
+    for (auto &seq : dmTrack(s).sequences()) seq.setSlewTime(v, true);
+}
+void applyRangeHigh(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
+    float v = denormF(r, n);
+    for (auto &seq : dmTrack(s).sequences()) seq.setRangeHigh(v);
+}
+void applyRangeLow(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
+    float v = denormF(r, n);
+    for (auto &seq : dmTrack(s).sequences()) seq.setRangeLow(v);
 }
 void applyDivisor(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
     int v = denormI(r, n);
@@ -59,14 +72,6 @@ void applyScale(const RouteParam::Scope &s, const RouteParam::Range &r, float n)
 void applyRootNote(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
     int v = denormI(r, n);
     for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) dmTrack(s).sequence(p).setRootNote(v);
-}
-void applyRangeHigh(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
-    float v = denormF(r, n);
-    for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) dmTrack(s).sequence(p).setRangeHigh(v);
-}
-void applyRangeLow(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
-    float v = denormF(r, n);
-    for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) dmTrack(s).sequence(p).setRangeLow(v);
 }
 
 // Ranges mirror Routing::targetInfos so denormalization matches writeTarget.

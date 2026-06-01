@@ -86,7 +86,7 @@ CASE("inlet rows are flagged Inlet, direct rows are not") {
     expectTrue((t.find(ParamKey::Octave)->flags & RouteParam::Inlet) == 0, "Octave is not an inlet");
 }
 
-CASE("sequence rows fan out to every pattern") {
+CASE("sequence-target rows fan out to every pattern") {
     Routing::setRouted(Routing::Target::Divisor, 0xFF, false);
     Project &p = dmProject();
     RouteParam::Scope scope;
@@ -97,6 +97,27 @@ CASE("sequence rows fan out to every pattern") {
     int d0 = p.track(0).discreteMapTrack().sequence(0).divisor();
     int d15 = p.track(0).discreteMapTrack().sequence(CONFIG_PATTERN_COUNT - 1).divisor();
     expectEqual(d15, d0, "all patterns received the routed divisor");
+}
+
+CASE("track-routed rows fan out to snapshot sequences too (writeTarget parity)") {
+    // Octave reaches DiscreteMapTrack::writeRouted, which fans to ALL sequences
+    // incl. the snapshot slots -- not just the patterns. The table must match.
+    Routing::setRouted(Routing::Target::Octave, 0xFF, false);
+
+    Project oldP, newP;
+    makeDiscreteMapTrack0(oldP);
+    makeDiscreteMapTrack0(newP);
+    oldP.routing().writeTarget(Routing::Target::Octave, 1 << 0, 1.f);
+
+    RouteParam::Scope scope;
+    scope.kind = RouteParam::Scope::Kind::Track;
+    scope.object = &newP.track(0);
+    DiscreteMapParamTable::table().applyRouted(scope, ParamKey::Octave, 1.f);
+
+    int snap = CONFIG_PATTERN_COUNT;   // first snapshot slot, past the patterns
+    expectEqual(newP.track(0).discreteMapTrack().sequence(snap).octave(),
+                oldP.track(0).discreteMapTrack().sequence(snap).octave(),
+                "snapshot slot matches writeTarget");
 }
 
 } // UNIT_TEST

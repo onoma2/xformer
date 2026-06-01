@@ -14,8 +14,10 @@
 // concept is the sequence _slewTime, so the shared SlideTime key routes to
 // setSlewTime. Parity: only SlideTime(slewTime) and ClockMult write the routed
 // slot; Octave/Transpose/Offset/Divisor/Scale/RootNote/RangeHigh/RangeLow write
-// the base (ungated). Direct rows fan out across patterns; inlets are track-level.
-// Built alongside the live old dispatch; nothing wired live yet.
+// the base (ungated). Fan-out matches writeTarget: track-routed params (Octave/
+// Transpose/Offset/SlideTime/RangeHigh/RangeLow) reach all sequences incl. snapshot
+// slots; sequence-targets (Divisor/ClockMult/Scale/RootNote) touch patterns only;
+// inlets are track-level. Built alongside the live old dispatch; nothing wired live.
 
 struct DiscreteMapParamTable {
     static const RouteParam::Table &table();
