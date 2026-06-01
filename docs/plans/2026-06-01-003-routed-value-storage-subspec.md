@@ -125,14 +125,35 @@ and a **final absolute clamp** after `base + offset`. Source polarity is bipolar
 | FirstStep / LastStep | Seq Routable | 0..63 | Absolute | — | — | — |
 | Mute / Pattern / Fill | PlayState | — | Absolute | — | — | — |
 
-The bipolar params already center on 0, so Modulate is `base + (already-signed route
-output)`; absolute params keep replace. **Owner decision is the column assignment**
-(which params modulate); the structure and the per-param flag are settled. Clean-break
-format (parent R9) means no legacy routes to migrate, so replace→modulate is free at load.
+### Modulate window representation (resolves review finding 2 — neutral is enforceable)
 
-Tests required (review finding 1): base at hard min/max, 0.5 source = no change,
-negative depth, and the default windows for Divisor, ClockMult, Octave, Transpose,
-each Bias.
+A free `min..max` window cannot guarantee neutral: a stored window of `+1..+3`
+makes source 0.5 produce `+2`, i.e. constant drift, not "no change." So Modulate
+does **not** reuse the absolute `min/max` pair. A Modulate param stores a **single
+signed depth magnitude `d`**; the offset is
+
+```
+offset = d * (source_centered)        // source_centered ∈ [-1, +1], 0.5 source → 0
+read   = clamp(base + offset, hardMin, hardMax)
+```
+
+Neutral is **structural**, not a user responsibility: the window is symmetric ±d by
+construction, source-center is always 0, and `d`'s sign sets polarity. Absolute
+params keep the existing `min/max` pair unchanged. The UI for a Modulate route edits
+one depth value, not a min..max span — so an asymmetric "+1..+3" window is
+unrepresentable for a Modulate param. (`biasPct`/`depthPct` and the shaper still
+apply to the source before the ±d map; they shift the source within its bipolar
+range, they do not break neutral since 0.5-centered source still maps to 0.)
+
+The bipolar absolute ranges (Octave -10..10, Transpose -60..60, biases -8..8) inform
+`d`'s default magnitude (e.g. half-range), but Modulate's stored form is `d`, not the
+pair. **Owner decision is the column assignment** (which params modulate); the
+representation and per-param flag are settled. Clean-break format (parent R9) means
+no legacy routes to migrate, so replace→modulate is free at load.
+
+Tests required: source 0.5 → exactly base (every Modulate param), full +d and −d at
+base hard min/max (clamp holds), negative `d` inverts polarity, and that an
+asymmetric window cannot be constructed for a Modulate param.
 
 ## Routed-value ownership — DECIDED: model-owned transient override table (resolves finding 2)
 
@@ -161,26 +182,55 @@ This keeps the model the single read API for UI, file, and clipboard paths.
 
 ## Migration inventory (replaces blast-radius; resolves finding 3)
 
-Classified on a **single axis — where the param's value is stored today** — so the
-kinds are mutually exclusive and collectively exhaustive. Built from
-`Routing::writeTarget` + every `writeRouted` switch, not from `Routable<>`
-declarations (that scan misses the base-only fields C). Every routed target lands
-in exactly one kind. Only **A, B, C** are touched by this spec.
+**Storage kind is per `(param × track type)`, not per Target** — the flat enum
+cannot be classified once. `Scale` is sequence-`Routable` in Note/Curve but a plain
+base field in Stochastic/PhaseFlux; `Octave` is track-`Routable` in Note but
+absent in MidiCv. So the inventory is **per type**, built from `writeTarget` + every
+`writeRouted` + the `Routable<>`/plain field declarations. This per-type-divergence
+is itself the argument for per-type tables.
 
-| Kind | Storage today | Targets | Target state |
-|---|---|---|---|
-| A. Sequence-level `Routable<T>` | `{base,routed}` ×17 patterns | Note/Curve scale·rootNote·runMode·first/last·divisor·clockMult; Tuesday/DiscreteMap/Indexed/PhaseFlux divisor·clockMult; Project Tempo/Swing | drop routed half + copy loop; base→plain; route via override |
-| B. Track-level `Routable<T>` | `{base,routed}` ×1 | Octave·Transpose·SlideTime·Rotate·5 biases·Cv/GateOutRotate (per type's track scope) | base→plain + override; one uniform read path (not a RAM win) |
-| C. Plain base field (forward-designed) | base only, no routed slot | **Stochastic** Scale·RootNote·Divisor; **PhaseFlux** Scale·RootNote | already target shape — add the override table; no field surgery; stop the interim base-write |
-| D. Inlet | engine per-track CV bus | DiscreteMap In/Scan/Sync; Indexed A/B | parent overhaul inlet path (out of scope here) |
-| E. Engine action / trigger | none | Play·Record·PlayToggle·RecordToggle·TapTempo·Reset | done — `RouteState.gateMask` |
-| F. Engine rail | engine-owned CV | BusCv1-4 | engine-owned `setBusCv` (out of scope) |
+### Storage kinds (the axis)
 
-A vs B is the storage multiplier (×17 vs ×1) — A is where the dedup win is, B joins
-for a uniform read path. C is already where A/B are headed; it needs the override
-table, not a `Routable`-to-plain conversion. For each A/B/C target the implementation
-records, before changing storage: active-route read path, edit guard, serialization,
-and owner (track / sequence).
+| Kind | Storage today | This spec |
+|---|---|---|
+| **S** Sequence-level `Routable<T>` | `{base,routed}` ×17 patterns | drop routed half + copy loop; base→plain; route via override (**the dedup win**) |
+| **T** Track-level `Routable<T>` | `{base,routed}` ×1 | base→plain + override; uniform read path (not a RAM win) |
+| **P** Project-global `Routable<T>` | `{base,routed}` ×1 (Project / CvRoute) | base→plain + override (scalar) |
+| **B** Plain base field, no routed slot | base only | add override; stop the interim base-write; no field surgery |
+| **X** PlayState transport | live `TrackState`, no base/routed | unchanged — action-like, writes live transport directly |
+| **I** Inlet | engine per-track CV bus | parent overhaul inlet path (out of scope) |
+| **G** Engine action / trigger | none | done — `RouteState.gateMask` |
+| **R** Engine rail (Bus) | engine-owned CV | engine `setBusCv` (out of scope) |
 
-Fits the parent overhaul's clean-break format window; reshapes what `Routable` *is*
-rather than adding a unit.
+In scope for the override table: **S, T, P, B**. Untouched: X, I, G, R.
+
+### Per-type / global enumeration (every routed Target, exactly once per type)
+
+**Global (type-independent):**
+- **P** — Tempo, Swing, CvRouteScan, CvRouteRoute (`_tempo`,`_swing` Project; `_scan`,`_route` CvRoute)
+- **X** — Mute, Fill, FillAmount, Pattern (PlayState `TrackState`)
+- **G** — Play, PlayToggle, Record, RecordToggle, TapTempo, Reset; **Run** (level via `_runGate` `Routable`, treat as T-stored gate)
+- **R** — BusCv1, BusCv2, BusCv3, BusCv4
+- **T** (universal Track base) — CvOutputRotate, GateOutputRotate (`Track.h`)
+
+**Per track type** (S = sequence Routable, T = track Routable, B = base-only, I = inlet):
+
+| Type | S (sequence Routable) | T (track Routable) | B (base-only) | I (inlet) |
+|---|---|---|---|---|
+| Note | Scale,RootNote,Divisor,ClockMult,RunMode,FirstStep,LastStep | SlideTime,Octave,Transpose,Rotate,Gate/Retrig/Length/Note ProbBias | — | — |
+| Curve | Divisor,ClockMult,RunMode,FirstStep,LastStep,WavefolderFold,WavefolderGain,DjFilter,ChaosAmount,ChaosRate,ChaosParam1,ChaosParam2 | SlideTime,Offset,Rotate,Shape/Gate ProbBias,CurveRate | — | — |
+| MidiCv | — | SlideTime,Transpose | — | — |
+| Tuesday | Algorithm,Flow,Ornament,Power,Glide,Trill,StepTrill,Octave,Transpose,Divisor,ClockMult,Rotate,GateLength,GateOffset | — | — | — |
+| DiscreteMap | ClockMult,SlewTime | Octave,Transpose,SlideTime,Offset | RangeHigh,RangeLow (`float`) | Input,Scanner,Sync |
+| Indexed | ClockMult,RunMode,RootNote,FirstStep | Octave,Transpose,SlideTime | — | A, B (+borrows DiscreteMapSync) |
+| Stochastic | ClockMult,MaskRhythm,GateLength,Tilt,Burst,Feel,Rotate,Complexity,Contour,NoteDuration,Variation,Rest,Slide,Sleep,PatienceRhythm,Mutate,Jump | Octave,Transpose,SlideTime | **Scale,RootNote,Divisor** | — |
+| PhaseFlux | Divisor,ClockMult (`Routable`, but `writeRouted` is empty → dormant) | Octave,Transpose,SlideTime | **Scale,RootNote** | — |
+
+Notes that drove review finding 3:
+- Stochastic's S set is large (17 Routable seq params); only Scale/RootNote/Divisor are B. A Routable-scan would have mis-bucketed all of these.
+- PhaseFlux Divisor/ClockMult are `Routable` but `PhaseFluxSequence::writeRouted` is **empty** — PF routing is not dispatched today (forward-designed, dormant). The override migration wires it; until then PF routes are no-ops, not base-corrupting.
+- Indexed borrowing `DiscreteMapSync` is the cross-type drift the parent plan removes (R13).
+
+For each S/T/P/B entry the implementation records, before changing storage:
+active-route read path, edit guard, serialization, and owner. Fits the parent
+overhaul's clean-break window; reshapes what `Routable` *is* rather than adding a unit.
