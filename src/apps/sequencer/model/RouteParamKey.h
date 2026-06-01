@@ -86,5 +86,16 @@ struct ParamKey {
         // --- DiscreteMap signature block (110..) ---
         DiscreteMapRangeHigh = 110,
         DiscreteMapRangeLow  = 111,
+
+        // --- Tuesday signature block (120..) ---
+        Algorithm  = 120,
+        Flow       = 121,
+        Ornament   = 122,
+        Power      = 123,
+        Glide      = 124,
+        Trill      = 125,
+        StepTrill  = 126,
+        GateLength = 127,   // Tuesday (may be shared if later types match the gate)
+        GateOffset = 128,   // Tuesday
     };
 };

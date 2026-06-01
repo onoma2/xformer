@@ -61,6 +61,8 @@ register_sequencer_test(TestParamTableNote TestParamTableNote.cpp)
 register_sequencer_test(TestParamTableCurve TestParamTableCurve.cpp)
 register_sequencer_test(TestParamTableIndexed TestParamTableIndexed.cpp)
 register_sequencer_test(TestParamTableDiscreteMap TestParamTableDiscreteMap.cpp)
+register_sequencer_test(TestParamTableMidiCv TestParamTableMidiCv.cpp)
+register_sequencer_test(TestParamTableTuesday TestParamTableTuesday.cpp)
 register_sequencer_test(TestParamRegistry TestParamRegistry.cpp)
 # Disabled: requires complex mock dependencies for hardware drivers
 # register_sequencer_test(TestNoteTrackEngine TestNoteTrackEngine.cpp)

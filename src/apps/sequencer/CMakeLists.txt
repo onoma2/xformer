@@ -71,6 +71,8 @@ set(sources
     model/ParamTableCurve.cpp
     model/ParamTableIndexed.cpp
     model/ParamTableDiscreteMap.cpp
+    model/ParamTableMidiCv.cpp
+    model/ParamTableTuesday.cpp
     model/Project.cpp
     model/Routing.cpp
     model/Scale.cpp
