@@ -46,12 +46,14 @@ struct RouteParam {
 
     // One routable parameter. key is an append-only numeric paramKey, never the
     // array index, so reordering/adding rows never shifts saved routes (F6).
+    // The hook receives the row's range (single source of truth) so it can
+    // denormalize the [0,1] value into the param's domain itself.
     struct Row {
         uint8_t key;
         const char *name;
         Range range;
         uint8_t flags;
-        void (*applyRouted)(const Scope &scope, float normalized);
+        void (*applyRouted)(const Scope &scope, const Range &range, float normalized);
     };
 
     // Per-scope param table: the single source of truth for label, range, flags,
@@ -77,7 +79,7 @@ struct RouteParam {
             if (!row || (row->flags & Structural)) {
                 return false;
             }
-            row->applyRouted(scope, normalized);
+            row->applyRouted(scope, row->range, normalized);
             return true;
         }
 

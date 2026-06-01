@@ -18,13 +18,13 @@ struct FakeScopeObject {
     int writeCount = 0;
 };
 
-void applyToFake(const RouteParam::Scope &scope, float normalized) {
+void applyToFake(const RouteParam::Scope &scope, const RouteParam::Range &, float normalized) {
     auto *obj = static_cast<FakeScopeObject *>(scope.object);
     obj->lastValue = normalized;
     obj->writeCount += 1;
 }
 
-void applyNoop(const RouteParam::Scope &, float) {}
+void applyNoop(const RouteParam::Scope &, const RouteParam::Range &, float) {}
 
 // Rows are declared with keys in NON-index order to prove find() resolves by
 // key, not by position. Key 0 is reserved for "None", so real keys start at 1.
