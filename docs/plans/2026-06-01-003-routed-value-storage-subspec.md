@@ -137,13 +137,24 @@ offset = d * (source_centered)        // source_centered ∈ [-1, +1], 0.5 sourc
 read   = clamp(base + offset, hardMin, hardMax)
 ```
 
-Neutral is **structural**, not a user responsibility: the window is symmetric ±d by
-construction, source-center is always 0, and `d`'s sign sets polarity. Absolute
-params keep the existing `min/max` pair unchanged. The UI for a Modulate route edits
-one depth value, not a min..max span — so an asymmetric "+1..+3" window is
-unrepresentable for a Modulate param. (`biasPct`/`depthPct` and the shaper still
-apply to the source before the ±d map; they shift the source within its bipolar
-range, they do not break neutral since 0.5-centered source still maps to 0.)
+Neutral is **structural**, not a user responsibility — but only if the signal fed
+into the ±d map is itself neutral at center. **Today bias/depth are applied before
+the window map** (`shaped = 0.5 + (src-0.5)*depth + bias`, RoutingEngine), so a
+non-zero `biasPct` makes raw-center produce a non-zero `shaped`, and a Modulate map
+on `shaped` would drift. So Modulate does **not** run on the biased/windowed signal:
+
+- `source_centered` is taken from the **raw source before bias/window** (`src-0.5`,
+  scaled to [-1,+1]); `offset = d * source_centered`.
+- A Modulate route carries **`d` only — no additive `biasPct`** (bias is a DC center
+  shift, which directly contradicts "center = no change"). `depthPct` folds into `d`.
+- **Stateful shapers** (Envelope, Location, Activity, ProgressiveDivider) are
+  **not neutral-preserving** — their output depends on prior samples. They are
+  disallowed on a Modulate route (or opt-in with the neutral guarantee explicitly
+  waived). Stateless odd-symmetric shapers (which map 0→0) are allowed.
+
+With that, source-center → exactly 0 offset is provable, independent of user knobs.
+The UI for a Modulate route edits one depth value, not a min..max span, and exposes
+no bias — so an asymmetric "+1..+3" window is unrepresentable.
 
 The bipolar absolute ranges (Octave -10..10, Transpose -60..60, biases -8..8) inform
 `d`'s default magnitude (e.g. half-range), but Modulate's stored form is `d`, not the
@@ -197,21 +208,22 @@ is itself the argument for per-type tables.
 | **T** Track-level `Routable<T>` | `{base,routed}` ×1 | base→plain + override; uniform read path (not a RAM win) |
 | **P** Project-global `Routable<T>` | `{base,routed}` ×1 (Project / CvRoute) | base→plain + override (scalar) |
 | **B** Plain base field, no routed slot | base only | add override; stop the interim base-write; no field surgery |
+| **D** `Routable` but undispatched (dead slot) | `{base,routed}`, routed never written | add dispatch via override, or force active-bit off; do not migrate as normal S |
 | **X** PlayState transport | live `TrackState`, no base/routed | unchanged — action-like, writes live transport directly |
 | **I** Inlet | engine per-track CV bus | parent overhaul inlet path (out of scope) |
 | **G** Engine action / trigger | none | done — `RouteState.gateMask` |
 | **R** Engine rail (Bus) | engine-owned CV | engine `setBusCv` (out of scope) |
 
-In scope for the override table: **S, T, P, B**. Untouched: X, I, G, R.
+In scope for the override table: **S, T, P, B, D**. Untouched: X, I, G, R.
 
 ### Per-type / global enumeration (every routed Target, exactly once per type)
 
 **Global (type-independent):**
 - **P** — Tempo, Swing, CvRouteScan, CvRouteRoute (`_tempo`,`_swing` Project; `_scan`,`_route` CvRoute)
 - **X** — Mute, Fill, FillAmount, Pattern (PlayState `TrackState`)
-- **G** — Play, PlayToggle, Record, RecordToggle, TapTempo, Reset; **Run** (level via `_runGate` `Routable`, treat as T-stored gate)
+- **G** — Play, PlayToggle, Record, RecordToggle, TapTempo, Reset (no model storage; edge/action)
 - **R** — BusCv1, BusCv2, BusCv3, BusCv4
-- **T** (universal Track base) — CvOutputRotate, GateOutputRotate (`Track.h`)
+- **T** (universal Track base) — CvOutputRotate, GateOutputRotate, **Run** (`_runGate` `Routable`, level-gate — has T storage, so it migrates with T) (`Track.h`)
 
 **Per track type** (S = sequence Routable, T = track Routable, B = base-only, I = inlet):
 
@@ -223,12 +235,24 @@ In scope for the override table: **S, T, P, B**. Untouched: X, I, G, R.
 | Tuesday | Algorithm,Flow,Ornament,Power,Glide,Trill,StepTrill,Octave,Transpose,Divisor,ClockMult,Rotate,GateLength,GateOffset | — | — | — |
 | DiscreteMap | ClockMult,SlewTime | Octave,Transpose,SlideTime,Offset | RangeHigh,RangeLow (`float`) | Input,Scanner,Sync |
 | Indexed | ClockMult,RunMode,RootNote,FirstStep | Octave,Transpose,SlideTime | — | A, B (+borrows DiscreteMapSync) |
-| Stochastic | ClockMult,MaskRhythm,GateLength,Tilt,Burst,Feel,Rotate,Complexity,Contour,NoteDuration,Variation,Rest,Slide,Sleep,PatienceRhythm,Mutate,Jump | Octave,Transpose,SlideTime | **Scale,RootNote,Divisor** | — |
-| PhaseFlux | Divisor,ClockMult (`Routable`, but `writeRouted` is empty → dormant) | Octave,Transpose,SlideTime | **Scale,RootNote** | — |
+| Stochastic | ClockMult,MaskRhythm,GateLength,Tilt,Burst,Rotate,Complexity,Contour,NoteDuration,Variation,Rest,Slide,Sleep,PatienceRhythm,Mutate,Jump (16, dispatched) | Octave,Transpose,SlideTime | **Scale,RootNote,Divisor** (base-write via `writeTarget`) | — |
+| PhaseFlux | Divisor,ClockMult (dispatched, routed) | Octave,Transpose,SlideTime | **Scale,RootNote** (base-write via `writeRouted`) | — |
 
-Notes that drove review finding 3:
-- Stochastic's S set is large (17 Routable seq params); only Scale/RootNote/Divisor are B. A Routable-scan would have mis-bucketed all of these.
-- PhaseFlux Divisor/ClockMult are `Routable` but `PhaseFluxSequence::writeRouted` is **empty** — PF routing is not dispatched today (forward-designed, dormant). The override migration wires it; until then PF routes are no-ops, not base-corrupting.
+**Dead routed slot (own category — Routable but undispatched):**
+- **Stochastic Feel** — `_feel` is `Routable<uint8_t>` and `feel()` reads
+  `_feel.get(isRouted(StochasticFeel))`, but `StochasticSequence::writeRouted` has
+  **no Feel case**. The target routes (the active bit is set) yet nothing writes the
+  routed slot — a read-but-never-written dead route. This is the `StochasticFeel`
+  dead-route the parent plan cites as a motivating bug. The migration must either add
+  the dispatch or treat it as dormant with the active bit forced off — not list it as
+  a normal S param.
+
+Notes (corrected from a complete read of every `writeRouted`, incl. inline-`.h`):
+- Stochastic's dispatched S set is 16 params; Scale/RootNote/Divisor are B
+  (base-mutating via `writeTarget`'s Stochastic arm); Feel is the dead slot above.
+- PhaseFlux `writeRouted` (`PhaseFluxSequence.h:572`) **is** dispatched, not dormant:
+  Divisor/ClockMult routed (S), Scale/RootNote base-write (B). Same base-corruption
+  path as Stochastic for Scale/RootNote.
 - Indexed borrowing `DiscreteMapSync` is the cross-type drift the parent plan removes (R13).
 
 For each S/T/P/B entry the implementation records, before changing storage:
