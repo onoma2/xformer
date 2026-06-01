@@ -94,7 +94,7 @@ the loop and the duplication.
 > **Unified model (authoritative — parent R15/R16).** Both combines are **base-anchored** with
 > **one signed coefficient `d`, no `min/max` window**: `out = clamp(base + d·u·range)`. Modulate
 > uses centered source `u=(s−0.5)·2` (neutral at center); Absolute uses raw source `u=s` (sweep
-> from base, width `d`). The override table stores the additive `delta`; read = `clamp(base+delta)`.
+> from base by `d`·range). The override table stores the additive `delta`; read = `clamp(base+delta)`.
 > The per-param detail below (which params modulate, param spans, center-preserving shapers) still
 > holds; the old "Absolute = replace via window" framing is superseded by the anchored model.
 
@@ -138,11 +138,14 @@ stored `+1..+3` makes source 0.5 produce `+2`, constant drift. The unified model
 no such pair; a Modulate route carries only the **single signed `d`**, and the offset is
 
 ```
-offset = d * (source_centered)        // source_centered ∈ [-1, +1], 0.5 source → 0
-read   = clamp(base + offset, hardMin, hardMax)
+offset = gain(d) * source_centered * range(paramKey)   // d = signed % coefficient;
+read   = clamp(base + offset, hardMin, hardMax)         // source_centered ∈ [-1,+1], 0.5 → 0
 ```
 
-where `source_centered ∈ [-1,+1]` is the **post-shaper** source re-centered, and the
+`d` is a normalized signed **percent coefficient** (not value-space); `range` is the param's
+intrinsic span (registry). This is the same `d·u·range` as the authoritative model — neutral
+holds because `source_centered` = 0 at source-center regardless of `range`. `source_centered ∈
+[-1,+1]` is the **post-shaper** source re-centered, and the
 shaper must be **center-preserving** (maps source-center → its own center) for neutral
 to hold. Two user knobs otherwise break it, both constrained on Modulate routes:
 
