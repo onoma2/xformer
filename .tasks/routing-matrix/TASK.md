@@ -132,11 +132,22 @@ Play/Rec/PlayToggle/RecordToggle/TapTempo, BusCv1–4.
   `ParamKey::`. writeTarget-parity tests still green; STM32 release clean.
 - **`TestParamRegistry`** sweeps every real table for unique non-zero row keys — turns the
   no-duplicate-key contract from comment-only into a run guard (`Table::find` returns first scan
-  hit, so a dup would silently alias). Every U4 table appends to the sweep.
+  hit, so a dup would silently alias). Every per-type table appends to the sweep.
+
+## U4 Curve landed (2026-06-02)
+
+- **`ParamTableCurve.{h,cpp}`** — second per-type table, validating "one key, many types":
+  reuses 8 keys it shares with Note (SlideTime/Rotate/GateProbabilityBias/Divisor/ClockMult/
+  RunMode/First/LastStep) and appends Curve-specific (Offset, ShapeProbabilityBias, Wavefolder
+  Fold/Gain, DjFilter, Chaos×4, CurveRate) + shared Phase (Tier-2b globalPhase, keys 46/60/84/90–97).
+- Hooks mirror `writeTarget` exactly: CurveRate denorm 0–400 then /100; Wavefolder/DjFilter
+  **truncate** float→int16_t (not round). Phase is a launch addition (no writeTarget parity),
+  tested directly; lights up at U7. Added to the uniqueness sweep. Sim + STM32 release clean.
 
 ## Next action
 
-Continue units onto the registry: **U4** — second per-type table (proposed: Curve, max shared-key
-reuse with Note: Divisor/ClockMult/RunMode/First/LastStep/SlideTime/Rotate/ProbBias; introduces
-Phase Tier-2b + DSP block) → then inlets (Indexed A/B, DiscreteMap In/Scanner/Sync) → U5
-scaleSource, U6 groups, U6b override+combine, U7 cutover. Range-class lands with combine (U6b).
+Remaining U4 per-type tables onto the registry: Tuesday, DiscreteMap, Stochastic, PhaseFlux,
+MidiCv, Indexed (each = parity port + appended keys + uniqueness sweep; Stochastic/PhaseFlux
+carry the defect-fixes; several introduce **inlets** — Indexed A/B, DiscreteMap In/Scanner/Sync,
+PhaseFlux A/B — a first-class target kind). Then U5 scaleSource, U6 groups, U6b override+combine
+(range-class lands here), U7 cutover.
