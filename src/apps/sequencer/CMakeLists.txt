@@ -67,6 +67,7 @@ set(sources
     model/TuesdayTrack.cpp
     model/PlayState.cpp
     model/ParamTableGlobal.cpp
+    model/ParamTableNote.cpp
     model/Project.cpp
     model/Routing.cpp
     model/Scale.cpp
