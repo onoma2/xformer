@@ -68,15 +68,19 @@ there's a use), not subtractive.
 
 Working canvas (ephemeral): `.scratch/param-groups.html` (grouped) / `.scratch/param-census.html`
 (full per-type surface). **Snapshot below is the durable copy.** Status: **now** = routable today
-(parity baseline), **LAUNCH** = owner-promoted into the launch set, **cand** = candidate awaiting
-keep/drop, **fix** = routable but defective today, **excl** = structural/internal (out).
+(parity baseline), **LAUNCH** = owner-promoted into the launch set, **deferred** = decided out of
+launch (append per-key later), **fix** = routable but defective today, **excl** = structural/internal (out).
+
+**Triage RESOLVED (owner, 2026-06-01):** launch = all **now** + **LAUNCH** rows + the **fix**
+items repaired. Everything **deferred** is out of v1 (append-only key when a use appears). Teletype
+is out of the matrix entirely.
 
 Range class: bipolar ± / unipolar % / index N / gate / inlet.
 
 ### Shared concepts (one row, many types) — all **now**
 Transpose (bip), Octave (bip), SlideTime (uni), Rotate (bip), Scale (idx), RootNote (idx),
 Divisor (idx), ClockMult (uni), RunMode (enum), FirstStep (idx), LastStep (idx), GateLength (uni),
-Offset (bip), ProbabilityBias×5 (bip). · **Phase** (uni, Curve+PhaseFlux globalPhase) = **cand**.
+Offset (bip), ProbabilityBias×5 (bip), **Phase** (uni, Curve+PhaseFlux globalPhase — **LAUNCH**, kept).
 
 ### Universal / Tier-0 — all **now**
 Mute/Fill/FillAmount/Pattern, Run, Reset, Cv/GateOutputRotate · Tempo, Swing, CvRouteScan/Route,
@@ -84,40 +88,36 @@ Play/Rec/PlayToggle/RecordToggle/TapTempo, BusCv1–4.
 
 ### Type-specific
 - **Tuesday** — now: Algorithm/Flow/Ornament/Power/Glide/Trill/StepTrill, GateLength/GateOffset,
-  Octave/Transpose/Rotate, Divisor/ClockMult/Scale/RootNote. cand: Skew/Start/LoopLength/
+  Octave/Transpose/Rotate, Divisor/ClockMult/Scale/RootNote. deferred: Skew/Start/LoopLength/
   MaskParameter/MaskProgression.
 - **Curve** — now: Wavefolder Fold/Gain, DjFilter, Chaos×4, CurveRate, Offset/Rotate/SlideTime,
-  Shape&Gate ProbBias, Divisor/ClockMult/RunMode/First/LastStep. cand: GlobalPhase(Phase),
-  Min/Max/Range/XFade, ShapeVariation/ShapeVariationProbability.
-- **MidiCv** — now: Transpose/SlideTime. cand: PitchBendRange/ModulationRange.
+  Shape&Gate ProbBias, Divisor/ClockMult/RunMode/First/LastStep, Phase (shared, LAUNCH).
+  deferred: Min/Max/Range/XFade, ShapeVariation/ShapeVariationProbability.
+- **MidiCv** — now: Transpose/SlideTime. deferred: PitchBendRange/ModulationRange.
 - **DiscreteMap** — now: Octave/Transpose/SlideTime/Offset, RangeHigh/RangeLow, Divisor/ClockMult/
-  Scale/RootNote; inlets Input/Scanner/Sync. cand: SlewTime/Threshold/GateLength.
+  Scale/RootNote; inlets Input/Scanner/Sync. deferred: Threshold/GateLength.
+  **SlewTime ≡ SlideTime** (owner) — drop as a separate concept; it is the SlideTime concept
+  (resolve track `_slideTime` vs seq `_slewTime` storage at build).
 - **Indexed** — now: Octave/Transpose/SlideTime, Divisor/ClockMult/Scale/RootNote/RunMode/FirstStep;
-  inlets A/B. cand: Duration/ActiveLength/GateLength.
+  inlets A/B. deferred: Duration/ActiveLength/GateLength.
 - **Stochastic** — now: Complexity/Variation/Rest/Slide/Burst/Sleep/Mutate/Jump, Contour,
   MaskRhythm/TiltRhythm/GateLength/PatienceRhythm/NoteDuration/Rotate, Octave/Transpose/SlideTime.
   **fix:** Scale/RootNote/Divisor (base-write defect); **Feel** (dead slot — Routable, undispatched).
-  cand: LegatoProb/RepeatProb/Marbles Spread/Bias, MaskMelody/TiltMelody/PatienceMelody,
+  deferred: LegatoProb/RepeatProb/Marbles Spread/Bias, MaskMelody/TiltMelody/PatienceMelody,
   DegreeRotation/MaskRotation.
 - **PhaseFlux** — now: Divisor/ClockMult, Octave/Transpose/SlideTime. **LAUNCH:** A/B inlets
   (stage-group routing, like Indexed); **all five nudges** WarpNudge/ResponseNudge/LenNudge/
-  CyclePhaseWarp/PulseNudge (bipolar). **fix:** Scale/RootNote (base-write). cand: PulseCount,
-  GlobalPhase(Phase), Pitch* (Range/Warp/Response/Window/Repeat/Rate), Temporal* (Warp/Response/
+  CyclePhaseWarp/PulseNudge (bipolar), Phase (shared, LAUNCH). **fix:** Scale/RootNote (base-write).
+  deferred: PulseCount, Pitch* (Range/Warp/Response/Window/Repeat/Rate), Temporal* (Warp/Response/
   Window/Repeat/Curve), StageLen/StageDivisor/PhaseShift, MaskMelody/TiltMelody.
-- **Teletype** — cand: ClockDivisor/ClockMultiplier/TimeBase. Rest is Teletype-internal
-  (script-driven CV/trigger in/out, clips, pattern slots) — decide if Teletype is in the matrix
-  at all or stays script-routed.
-
-### Triage still owner's call
-The `cand` rows above (keep/drop, lean-additive) for every type except PhaseFlux (decided).
-Polarity confirm on Pitch*/Temporal* (uni vs bipolar) and Curve Min/Max/Range.
+- **Teletype** — **OUT of the matrix entirely** (owner, 2026-06-01). No matrix targets; Teletype
+  stays script-routed (its own CV/trigger in/out, clips, pattern slots). No Teletype param table.
 
 ## Open / still owner's call
 
-- The rest of the candidate triage (keep/drop) across the other types.
-- Polarity confirm on a few PhaseFlux/Curve concepts (uni vs bipolar).
 - Bus write/read ordering (R7, deferred — only bites at U7 cutover or a real collision).
 - Per-track shaper-array composition (drop stateful shapers? — deferred).
+- Polarity (uni vs bipolar) for any deferred param only when it's promoted later.
 
 ## Next action
 
