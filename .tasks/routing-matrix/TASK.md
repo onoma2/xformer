@@ -162,9 +162,17 @@ Play/Rec/PlayToggle/RecordToggle/TapTempo, BusCv1–4.
 - `TestParamTableIndexed`: routed-slot-aware parity, inlet-flag asserts, inlet fan-out. Added to
   the uniqueness sweep. Sim + STM32 release clean.
 
+## U4 DiscreteMap landed (2026-06-02)
+
+- **`ParamTableDiscreteMap.{h,cpp}`** — owns Input/Scanner/Sync inlets (the Sync the Indexed
+  engine borrows lives here): track-level routed-CV fields filled raw (no scaling, no fan-out),
+  flagged `Inlet`; added `setRoutedInput/Scanner/Sync`. Inlet keys 102–104; sig RangeHigh=110/
+  RangeLow=111. **SlewTime≡SlideTime resolved:** no track `_slideTime`; shared SlideTime key →
+  sequence `setSlewTime`. Parity: only SlideTime(slewTime)+ClockMult write the routed slot, rest
+  base. Reuses 8 shared keys. Parity test + inlet flags + fan-out; sweep; sim + STM32 clean.
+
 ## Next action
 
-Remaining U4 per-type tables: Tuesday, DiscreteMap (Input/Scanner/Sync inlets + SlewTime≡SlideTime
-storage resolution), Stochastic (defect-fixes: Feel dead slot, Scale/RootNote base-write),
-PhaseFlux (A/B inlets + five nudges + Phase, defect-fix Scale/RootNote), MidiCv. Then U5
+Remaining U4 per-type tables: Stochastic (defect-fixes: Feel dead slot, Scale/RootNote base-write),
+PhaseFlux (A/B inlets + five nudges + Phase, defect-fix Scale/RootNote), Tuesday, MidiCv. Then U5
 scaleSource, U6 groups, U6b override+combine (range-class lands here), U7 cutover.
