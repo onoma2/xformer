@@ -137,24 +137,35 @@ offset = d * (source_centered)        // source_centered ∈ [-1, +1], 0.5 sourc
 read   = clamp(base + offset, hardMin, hardMax)
 ```
 
-Neutral is **structural**, not a user responsibility — but only if the signal fed
-into the ±d map is itself neutral at center. **Today bias/depth are applied before
-the window map** (`shaped = 0.5 + (src-0.5)*depth + bias`, RoutingEngine), so a
-non-zero `biasPct` makes raw-center produce a non-zero `shaped`, and a Modulate map
-on `shaped` would drift. So Modulate does **not** run on the biased/windowed signal:
+where `source_centered ∈ [-1,+1]` is the **post-shaper** source re-centered, and the
+shaper must be **center-preserving** (maps source-center → its own center) for neutral
+to hold. Two user knobs otherwise break it, both constrained on Modulate routes:
 
-- `source_centered` is taken from the **raw source before bias/window** (`src-0.5`,
-  scaled to [-1,+1]); `offset = d * source_centered`.
-- A Modulate route carries **`d` only — no additive `biasPct`** (bias is a DC center
-  shift, which directly contradicts "center = no change"). `depthPct` folds into `d`.
-- **Stateful shapers** (Envelope, Location, Activity, ProgressiveDivider) are
-  **not neutral-preserving** — their output depends on prior samples. They are
-  disallowed on a Modulate route (or opt-in with the neutral guarantee explicitly
-  waived). Stateless odd-symmetric shapers (which map 0→0) are allowed.
+- **Bias** — `shaped = 0.5 + (src-0.5)*depth + bias` (RoutingEngine) applies a DC
+  shift before the map, so `bias≠0` moves center off-neutral. A Modulate route carries
+  **`d` only — no additive `biasPct`** (`depthPct` folds into `d`).
+- **Shaper** — must map center→center. The criterion is **center-preservation, not
+  statelessness** (Crease is stateless yet maps 0.5→1.0). Classification of every
+  `Routing::Shaper` under Modulate (verified at bias=0):
 
-With that, source-center → exactly 0 offset is provable, independent of user knobs.
-The UI for a Modulate route edits one depth value, not a min..max span, and exposes
-no bias — so an asymmetric "+1..+3" window is unrepresentable.
+| Shaper | Center (0.5) → | Modulate |
+|---|---|---|
+| None | 0.5 (identity) | **allow** |
+| TriangleFold | 0.5 (`x=0 → folded 0`) | **allow** |
+| Crease | **1.0** (`0.5 ≤ threshold` adds +0.5) | deny — not center-preserving |
+| Location | history (integrator) | deny — stateful |
+| Envelope | history (→0) | deny — stateful |
+| FrequencyFollower | history (`freqAcc/sign/hold`) | deny — stateful |
+| Activity | history | deny — stateful |
+| ProgressiveDivider | history | deny — stateful |
+| VcaNext | neighbor route output | deny — neighbor-dependent (→ `scaleSource`, parent R6) |
+
+Allowed Modulate shapers: **None, TriangleFold**. A denied shaper on a Modulate route
+is rejected at edit (or opt-in with the neutral guarantee explicitly waived).
+
+With bias excluded and the shaper center-preserving, source-center → exactly 0 offset
+is provable. The UI for a Modulate route edits one depth value, no min..max, no bias —
+so an asymmetric "+1..+3" window is unrepresentable.
 
 The bipolar absolute ranges (Octave -10..10, Transpose -60..60, biases -8..8) inform
 `d`'s default magnitude (e.g. half-range), but Modulate's stored form is `d`, not the
@@ -162,9 +173,10 @@ pair. **Owner decision is the column assignment** (which params modulate); the
 representation and per-param flag are settled. Clean-break format (parent R9) means
 no legacy routes to migrate, so replace→modulate is free at load.
 
-Tests required: source 0.5 → exactly base (every Modulate param), full +d and −d at
-base hard min/max (clamp holds), negative `d` inverts polarity, and that an
-asymmetric window cannot be constructed for a Modulate param.
+Tests required: source 0.5 → exactly base for every Modulate param **and for each
+allowed shaper** (None, TriangleFold); full +d and −d at base hard min/max (clamp
+holds); negative `d` inverts polarity; a denied shaper (e.g. FrequencyFollower,
+Crease) cannot be set on a Modulate route; an asymmetric window cannot be constructed.
 
 ## Routed-value ownership — DECIDED: model-owned transient override table (resolves finding 2)
 
