@@ -110,11 +110,11 @@ The existing ranges already sort this: several params are **already bipolar**
 
 ### Depth-and-range contract (resolves review finding 1)
 
-There is no per-route window. Each param declares an intrinsic **range** (its span,
-registry); the route's single signed **`d`** scales it. The delta is `d · u · range`
-(`u` = source-form per combine), so a Modulate param is neutral at source-center by
-construction and an Absolute param travels `d·range` from base. `range` values come
-from `targetInfos` (shown as min..max; the half-span feeds bipolar params):
+There is no per-route window. Each param declares a registry **range** = its **`d`=100%
+displacement**, defined once: `(max−min)/2` for bipolar, `(max−min)` for unipolar/index (parent
+R15). The route's single signed **`d`** scales it: delta is `d · u · range` (`u` = source-form
+per combine), so a Modulate param is neutral at source-center and an Absolute param travels
+`d·range` from base. The `targetInfos` min..max below give the bound; `range` is derived from it:
 
 | Param | Storage | targetInfos range | Combine | `d`-range | clamp |
 |---|---|---|---|---|---|
@@ -142,9 +142,10 @@ offset = gain(d) * source_centered * range(paramKey)   // d = signed % coefficie
 read   = clamp(base + offset, hardMin, hardMax)         // source_centered ∈ [-1,+1], 0.5 → 0
 ```
 
-`d` is a normalized signed **percent coefficient** (not value-space); `range` is the param's
-intrinsic span (registry). This is the same `d·u·range` as the authoritative model — neutral
-holds because `source_centered` = 0 at source-center regardless of `range`. `source_centered ∈
+`d` is a normalized signed **percent coefficient** (not value-space); `range` is the registry
+`d`=100% displacement (`(max−min)/2` bipolar, `(max−min)` unipolar/index — parent R15). This is the
+same `d·u·range` as the authoritative model — neutral holds because `source_centered` = 0 at
+source-center regardless of `range`. `source_centered ∈
 [-1,+1]` is the **post-shaper** source re-centered, and the
 shaper must be **center-preserving** (maps source-center → its own center) for neutral
 to hold. Two user knobs otherwise break it, both constrained on Modulate routes:

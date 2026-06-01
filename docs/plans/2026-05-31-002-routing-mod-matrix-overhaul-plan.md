@@ -188,7 +188,10 @@ What's genuinely absent (and stays out): Step / parameter-locks.
 - R15. **Per-param combine: Absolute vs Modulate** (`RouteParam::Flag`) — **one signed per-track
   `d`, base-anchored, no `min/max` window.** Both modes share one formula:
   `out = clamp(base + d · u · range, hardMin, hardMax)`, where `u` is the source after
-  shaper/scale and `range` is the param's intrinsic span (registry, R-census).
+  shaper/scale and `range` is the param's **`d`=100% displacement** held in the registry —
+  defined **once**: `(max−min)/2` for **bipolar** params, `(max−min)` for **unipolar/index**.
+  Worked: Octave (−10..10) → range = 10, so `d`=100%,`u`=+1 adds +10 (reaches the rail from
+  center); SlideTime (0..100) → range = 100, so `d`=100%,`u`=1 sweeps base..base+100.
   - **Modulate** — `u = (source − 0.5)·2` (centered, ∈[-1,+1]): bipolar around base, **neutral at
     source-center is structural** (source 0.5 → `u`=0 → out=base). Only **center-preserving**
     shapers allowed (None/TriangleFold; Crease + all stateful denied; VcaNext denied by policy →
@@ -307,9 +310,9 @@ for slot in active routes:
 `d` is the single per-track coefficient (no `min/max`). Modulate: source-center → `u`=0 → `delta`=0
 → out=base (neutral, structural — allowed shapers map center→center). Absolute: source 0 → base,
 source 1 → base + `d`·range (travels `d`·range from base). The override table stores
-`delta`; the read combines `clamp(base + delta)` uniformly. `range` is the param's intrinsic span
-from the registry (half-span for bipolar, full for unipolar). Old full-range replace = the special
-case `d`=100%, base=range floor (R11). Every stage is **center-preserving** at source-center
+`delta`; the read combines `clamp(base + delta)` uniformly. `range` is the registry `d`=100%
+displacement (R15: `(max−min)/2` bipolar, `(max−min)` unipolar/index). Old full-range replace =
+the special case `d`=100%, base=range floor (R11). Every stage is **center-preserving** at source-center
 (the allowed shaper maps 0.5→0.5, scale multiplies a 0 deviation), so Modulate neutral holds for
 any `scaleValue` and any allowed shaper (R15).
 
