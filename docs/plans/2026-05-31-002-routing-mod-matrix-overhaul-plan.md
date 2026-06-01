@@ -274,12 +274,20 @@ Engine apply (replaces `writeTarget` name dispatch), at the single-pass per-tick
 ```
 for slot in active routes:
     for each track t in slot.scope:
-        v = sourceValue(slot.source)
-        v = shape(slot.shaper[t], v, state[t])          // per-track shaper + state
-        v = depthWindow(min, max, v) scaled by depthPct[t]/biasPct[t]
-        if slot.scaleSource != None: v *= scaleValue(slot.scaleSource, t)   // see F3 caveat
-        scopeObj(t).applyRouted(slot.paramKey, v)
+        s = sourceValue(slot.source)                    // raw normalized [0,1]
+        s = shape(slot.shaper[t], s, state[t])          // per-track shaper + state
+        if slot.scaleSource != None: s *= scaleValue(slot.scaleSource, t)   // see F3 caveat
+        if slot.combine == Absolute:
+            v = slot.min + s * (slot.max - slot.min)    // map shaped source through window
+            v = applyGain(v, slot.d[t])                 // signed per-track gain (R16); no bias
+            scopeObj(t).writeOverride(slot.paramKey, v)             // replaces base
+        else: // Modulate
+            offset = slot.d[t] * (s - 0.5) * 2          // centered, no window, no bias (R15/R16)
+            scopeObj(t).writeOverrideOffset(slot.paramKey, offset)  // read = clamp(base + offset)
 ```
+Bias is gone (R16); `min/max` is consulted only on the Absolute branch; Modulate never
+touches the window. The override table (R14) holds the per-`(track,paramKey)` value/offset that
+the model read combines with base.
 
 Param table per scope (global; common-track; per-track-type) declared once. A row is either a
 **direct** param or an **inlet** (R12):
