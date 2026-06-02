@@ -210,12 +210,21 @@ sim + STM32 release clean, nothing wired live.
   consumption first (own task), not a table row.
 - ~~Tuesday Scale/RootNote~~ — RESOLVED (owner, 2026-06-02): wired as base writes (were dispatched
   no-ops); Tuesday now on par. Defect closes at U6b like the other tracks.
-- **Sync inlet — RESOLVED (now)**, see `docs/plans/2026-06-02-004-reset-vocabulary-and-sync-subspec.md`.
-  Not retire, not Indexed-owns-it: **universalize Sync as a warm (`restart()`-class) re-anchor inlet
-  on every track** (sibling of `resetMeasure`), distinct from the cold `Reset` target. Dissolves the
-  Indexed→DiscreteMapSync borrow by promotion; DiscreteMap keeps Input/Scanner. Drops DiscreteMap's
-  Sync inlet row from its table once built. Pairs with `wallclock-time-architecture` (drift). Build
-  semantics (per-track warm behavior, storage, UI) settled at implementation.
+- **Sync inlet — RESOLVED (now), build not started**, see
+  `docs/plans/2026-06-02-004-reset-vocabulary-and-sync-subspec.md`. Not retire, not Indexed-owns-it:
+  **universalize Sync as a warm (`restart()`-class) re-anchor inlet on every track** (sibling of
+  `resetMeasure`), distinct from the cold `Reset` target. Pairs with `wallclock-time-architecture`
+  (drift); a separate workstream, not part of table staging — likely lands alongside/after wallclock.
+  Planned actions:
+  1. Per-track warm semantics — sync edge → `restart()` not `reset()`; lighter phase-only re-anchor
+     for continuous tracks (Curve/PhaseFlux/DiscreteMap) where a cold clear jolts CV.
+  2. Universal sync storage — sync-inlet field + edge detector on every track (replacing the
+     `_routedSync` only DiscreteMap/Indexed have).
+  3. Registry — add **Sync** as one universal inlet/target (no single owner), distinct from Reset.
+  4. Kill the borrow — drop Indexed's `DiscreteMapSync` use, retire `SyncMode::External` in both
+     engines, **remove DiscreteMap's Sync inlet row** (keep Input/Scanner).
+  5. UI — reconcile the Indexed/DiscreteMap "Sync" chip (Off/Reset/Ext) onto the universal inlet;
+     keep `ResetMeasure`.
 - **Scale/RootNote/Divisor base-write** (Stochastic, PhaseFlux, Indexed, DiscreteMap) — closes
   structurally at U6b (override table = transient delta), not per-hook.
 - **uint8_t paramKey width** — revisit at U7 with full registry count.
