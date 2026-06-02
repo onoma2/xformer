@@ -229,7 +229,21 @@ sim + STM32 release clean, nothing wired live.
   structurally at U6b (override table = transient delta), not per-hook.
 - **uint8_t paramKey width** — revisit at U7 with full registry count.
 
+## Engine units started (2026-06-03)
+
+- **`RouteApply.h` — value pipeline (U5 + U6b math), pure unit landed.** `scaled` (scaleSource
+  centered-scale, replacing the VcaNext `routeIndex+1` hack, R6) + `toU` (Modulate centered vs
+  Absolute raw) + `delta` ((d/100)·u·range). Structural contracts tested (Modulate neutral-at-center,
+  full swing, Absolute sweep, scale closes VCA). Header-only, included only by the test — firmware
+  untouched. `TestRouteApply`.
+
 ## Next action
 
-U5 scaleSource extraction → U6 group scope → U6b routed-value override table + combine mode
-(range-class lands here; closes the base-write defects uniformly) → U7 re-address + engine cutover.
+Continue the new apply path alongside the live dispatch:
+- **Override table** (U6b storage) — model-owned transient `(track, paramKey)→delta`, not serialized;
+  read = `clamp(base+delta)`. Closes the Scale/RootNote/Divisor base-write defects by construction.
+- **Shaper stage** — `shape(shaper, s, state)→h` feeding RouteApply; classify center-preserving
+  shapers (Modulate allows None/TriangleFold; deny Crease/stateful/VcaNext per R15).
+- **Slot model** — `(source, scope, paramKey, combine, d[8], shaper[8], scaleSource)`.
+- Then **U6 group scope**, **U7 re-address + engine cutover** (the single flip; deletes old dispatch
+  + VcaNext neighbor read + per-pattern `Routable` routed half).
