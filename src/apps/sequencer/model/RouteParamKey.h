@@ -114,5 +114,14 @@ struct ParamKey {
         PatienceRhythm        = 142,
         NoteDuration          = 143,
         Feel                  = 144,   // dead-slot fix (wired here, no-op in old dispatch)
+
+        // --- PhaseFlux signature block (150..) ---
+        // Nudges are new routables (no legacy Routing::Target); A/B inlets are
+        // deferred until PhaseFlux gets stage-group inlet storage + engine support.
+        WarpNudge      = 150,
+        ResponseNudge  = 151,
+        LenNudge       = 152,
+        CyclePhaseWarp = 153,
+        PulseNudge     = 154,
     };
 };

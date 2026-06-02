@@ -74,6 +74,7 @@ set(sources
     model/ParamTableMidiCv.cpp
     model/ParamTableTuesday.cpp
     model/ParamTableStochastic.cpp
+    model/ParamTablePhaseFlux.cpp
     model/Project.cpp
     model/Routing.cpp
     model/Scale.cpp
