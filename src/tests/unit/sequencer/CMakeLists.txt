@@ -56,6 +56,7 @@ register_sequencer_test(TestLinkingRemovalSerialization TestLinkingRemovalSerial
 register_sequencer_test(TestWallClock TestWallClock.cpp)
 register_sequencer_test(TestSlaveClockGuard TestSlaveClockGuard.cpp)
 register_sequencer_test(TestRouteParam TestRouteParam.cpp)
+register_sequencer_test(TestRouteApply TestRouteApply.cpp)
 register_sequencer_test(TestParamTableGlobal TestParamTableGlobal.cpp)
 register_sequencer_test(TestParamTableNote TestParamTableNote.cpp)
 register_sequencer_test(TestParamTableCurve TestParamTableCurve.cpp)
