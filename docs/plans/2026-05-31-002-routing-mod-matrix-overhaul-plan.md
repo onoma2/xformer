@@ -478,6 +478,13 @@ No universal block; no `isXxxTarget` predicates; the matrix above is the literal
 - **U5. Shaper-as-node + scaleSource extraction.** Add the explicit `scaleSource` field, apply
   it, and retire the `routeIndex+1` neighbor read outright. No migration needed — old projects
   don't load (R9 clean break), so there are no stored legacy `VcaNext` patches to round-trip.
+  - **Execution note (2026-06-03):** scaleSource is not a standalone live edit — it's a *stage* of
+    the new value pipeline, so it builds alongside the live dispatch like U3/U4, not by mutating the
+    old `Route`/serialization (which would break projects before the U7 clean-break). Landed as the
+    pure unit `model/RouteApply.h` (`scaled`/`toU`/`delta`), merging U5's scaleSource stage with the
+    U6b combine math (they are one function). The explicit `scaleSource` replaces the neighbor hack
+    *in the new path*; the live `RoutingEngine` `VcaNext` `routeIndex+1` read (`RoutingEngine.cpp:493`,
+    `:542`) stays untouched and is **deleted at the U7 cutover**, not here.
 - **U6. Group scope.** Generalize Indexed `targetGroups` into the slot's `Scope`.
 - **U6b. Routed-value override table + combine mode — ADDITIVE** (R14/R15/R16; sub-spec
   `2026-06-01-003-routed-value-storage-subspec.md`). **Builds alongside the live old storage;
