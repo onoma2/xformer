@@ -213,7 +213,7 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
         _project.writeRouted(target, intValue, floatValue);
     } else if (isPlayStateTarget(target)) {
         _project.playState().writeRouted(target, tracks, intValue, floatValue);
-    } else if (isTrackTarget(target) || isSequenceTarget(target) || isTuesdayTarget(target) || isChaosTarget(target) || isWavefolderTarget(target) || isDiscreteMapTarget(target) || isIndexedTarget(target)) {
+    } else if (isTrackTarget(target) || isSequenceTarget(target) || isTuesdayTarget(target) || isChaosTarget(target) || isWavefolderTarget(target) || isDiscreteMapTarget(target) || isIndexedTarget(target) || isStochasticTarget(target)) {
         for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
             if (tracks & (1<<trackIndex)) {
                 auto &track = _project.track(trackIndex);
@@ -295,6 +295,12 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                     } else if (target == Routing::Target::RootNote) {
                         for (int patternIndex = 0; patternIndex < CONFIG_PATTERN_COUNT; ++patternIndex) {
                             track.stochasticTrack().sequence(patternIndex).setRootNote(intValue);
+                        }
+                    } else if (target == Routing::Target::Rotate) {
+                        // Rotate lives on the sequence; isTrackTarget would route it to
+                        // the track leaf (no Rotate case) -- send it to the sequence.
+                        for (int patternIndex = 0; patternIndex < CONFIG_PATTERN_COUNT; ++patternIndex) {
+                            track.stochasticTrack().sequence(patternIndex).writeRouted(target, intValue, floatValue);
                         }
                     } else if (isTrackTarget(target)) {
                         track.stochasticTrack().writeRouted(target, intValue, floatValue);

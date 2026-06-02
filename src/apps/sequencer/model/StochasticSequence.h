@@ -112,6 +112,7 @@ public:
         case Routing::Target::StochasticPatienceRhythm: setPatienceRhythm(intValue, true); break;
         case Routing::Target::StochasticMutate: setMutate(intValue, true); break;
         case Routing::Target::StochasticJump: setJump(intValue, true); break;
+        case Routing::Target::StochasticFeel: setFeel(intValue, true); break;
         case Routing::Target::Rotate: setRotate(intValue, true); break;
         case Routing::Target::ClockMult: setClockMultiplier(intValue, true); break;
         default: break;
