@@ -188,8 +188,32 @@ Play/Rec/PlayToggle/RecordToggle/TapTempo, BusCv1–4.
   fix-forward (like StochasticFeel), not parity — **omitted from batch 1, pending owner decision**
   on whether to wire them as a fix (append keys then) or drop from the launch set.
 
+## U4 batch 2: Stochastic + PhaseFlux landed (2026-06-02, Codex-clean) — U4 COMPLETE
+
+- **Live bugfix shipped** (`Routing.cpp` + `StochasticSequence.h`): routing *any* Stochastic-specific
+  param was a dead no-op (outer guard omitted `isStochasticTarget`; Feel had no writeRouted case;
+  Rotate took the track branch with no Rotate case). Fixed all three → Stochastic routing now works
+  live. Codex-verified safe for non-Stochastic tracks.
+- **Stochastic table** — 23 rows, clean parity port after the fix (keys 130–144). Scale/RootNote/
+  Divisor are plain-int base writes (defect closes at U6b override table).
+- **PhaseFlux table** — parity (Octave/Transpose/SlideTime/Divisor/ClockMult/Scale/RootNote) + LAUNCH
+  nudges (WarpNudge/ResponseNudge/LenNudge/CyclePhaseWarp/PulseNudge, keys 150–154) + Phase (shared
+  key 60, sequence-level binding vs Curve's track-level). **A/B inlets DEFERRED** — no model storage
+  or stage-group engine support exists (separate model+engine task, not a table row).
+
+**All per-type tables now staged on the registry: Global, Note, Curve, Indexed, DiscreteMap, MidiCv,
+Tuesday, Stochastic, PhaseFlux.** Every one parity-tested (or direct-tested for launch/fix-forward),
+sim + STM32 release clean, nothing wired live.
+
+## Open items carried to later units
+- **PhaseFlux A/B inlets** — needs inlet storage + stage-group engine consumption first (own task).
+- **Tuesday Scale/RootNote** — dispatched no-ops today; owner call: wire as fix or drop from launch.
+- **Indexed External-sync inlet** (DiscreteMapSync borrow) — U7 owner call.
+- **Scale/RootNote/Divisor base-write** (Stochastic, PhaseFlux, Indexed, DiscreteMap) — closes
+  structurally at U6b (override table = transient delta), not per-hook.
+- **uint8_t paramKey width** — revisit at U7 with full registry count.
+
 ## Next action
 
-U4 batch 2: Stochastic (defect-fixes: Feel dead slot, Scale/RootNote base-write) + PhaseFlux (A/B
-inlets + five nudges + Phase, defect-fix Scale/RootNote) — both carry intentional non-parity, own
-review. Then U5 scaleSource, U6 groups, U6b override+combine (range-class lands here), U7 cutover.
+U5 scaleSource extraction → U6 group scope → U6b routed-value override table + combine mode
+(range-class lands here; closes the base-write defects uniformly) → U7 re-address + engine cutover.
