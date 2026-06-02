@@ -7,6 +7,7 @@
 #include "model/ParamTableDiscreteMap.h"
 #include "model/ParamTableMidiCv.h"
 #include "model/ParamTableTuesday.h"
+#include "model/ParamTableStochastic.h"
 
 // Polices the shared ParamKey registry invariant (F6): within any one table no
 // two rows may share a key, and no row may use key 0 (None). Table::find()
@@ -40,6 +41,7 @@ CASE("every table has unique, non-zero row keys") {
     expectUniqueNonZeroKeys(DiscreteMapParamTable::table(), "DiscreteMap table key uniqueness");
     expectUniqueNonZeroKeys(MidiCvParamTable::table(), "MidiCv table key uniqueness");
     expectUniqueNonZeroKeys(TuesdayParamTable::table(), "Tuesday table key uniqueness");
+    expectUniqueNonZeroKeys(StochasticParamTable::table(), "Stochastic table key uniqueness");
 }
 
 } // UNIT_TEST

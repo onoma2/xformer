@@ -97,5 +97,22 @@ struct ParamKey {
         StepTrill  = 126,
         GateLength = 127,   // Tuesday (may be shared if later types match the gate)
         GateOffset = 128,   // Tuesday
+
+        // --- Stochastic signature block (130..) ---
+        Complexity            = 130,
+        Variation             = 131,
+        Rest                  = 132,
+        Slide                 = 133,
+        Burst                 = 134,
+        Sleep                 = 135,
+        Mutate                = 136,
+        Jump                  = 137,
+        Contour               = 138,
+        MaskRhythm            = 139,
+        TiltRhythm            = 140,
+        StochasticGateLength  = 141,   // distinct legacy target from Tuesday GateLength
+        PatienceRhythm        = 142,
+        NoteDuration          = 143,
+        Feel                  = 144,   // dead-slot fix (wired here, no-op in old dispatch)
     };
 };

@@ -73,6 +73,7 @@ set(sources
     model/ParamTableDiscreteMap.cpp
     model/ParamTableMidiCv.cpp
     model/ParamTableTuesday.cpp
+    model/ParamTableStochastic.cpp
     model/Project.cpp
     model/Routing.cpp
     model/Scale.cpp
