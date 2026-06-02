@@ -237,9 +237,30 @@ sim + STM32 release clean, nothing wired live.
   full swing, Absolute sweep, scale closes VCA). Header-only, included only by the test — firmware
   untouched. `TestRouteApply`.
 
+## Sliced cutover plan — Codex-validated (2026-06-03)
+
+`docs/plans/2026-06-03-005-sliced-cutover-plan.md` (v3, three adversarial-review rounds → SAFE).
+**Apply-fork shadow slice:** no storage/format change; in `updateSinks()` the apply forks per
+`(trackMode, paramKey)` — Note/PhaseFlux per-track params take the new path (compute
+`RouteApply::delta` → write a transient override table, skip old `writeTarget` for that
+route+track), everything else stays on live `writeTarget`. Override table cleared/rebuilt each pass
+(presence=routed). Migrated getters read `clamp(base+override)`, drop `isRouted`, edit-gate on
+presence. No new `Route` members (combine/d derived inline, default Modulate; range inferred
+`min<0`→bipolar). Shapers None/TriangleFold (bias-free). **Fixes PhaseFlux base-write in-slice.**
+Caveat: Modulate default = forward-model audition, not like-for-like vs today's absolute routes.
+Riskiest step = getter migration (stale-clear, mixed-mask, base non-mutation, zero-delta presence).
+
 ## Next action
 
-Continue the new apply path alongside the live dispatch:
+Build the slice in order (see plan 005):
+1. **Override table** + `routeOverride()` accessor (mirror `isRouted` reach) + clear/rebuild in
+   `updateSinks()` + `clamp(base+delta)` read helper.
+2. Shaper stage (None/TriangleFold, bias-free) feeding `RouteApply`.
+3. Apply fork in `updateSinks()` (per-trackMode predicate; skip `writeTarget` for migrated).
+4. Migrate Note + PhaseFlux getters → override-read + edit-gate on presence.
+5. Hardware audition → 6. UI (persist combine/d/scaleSource) → 7. expand → 8. real U7 → 9. U9.
+
+(`RouteApply.h` value pipeline already landed.)
 - **Override table** (U6b storage) — model-owned transient `(track, paramKey)→delta`, not serialized;
   read = `clamp(base+delta)`. Closes the Scale/RootNote/Divisor base-write defects by construction.
 - **Shaper stage** — `shape(shaper, s, state)→h` feeding RouteApply; classify center-preserving
