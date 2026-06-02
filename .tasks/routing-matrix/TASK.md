@@ -210,9 +210,12 @@ sim + STM32 release clean, nothing wired live.
   consumption first (own task), not a table row.
 - ~~Tuesday Scale/RootNote~~ — RESOLVED (owner, 2026-06-02): wired as base writes (were dispatched
   no-ops); Tuesday now on par. Defect closes at U6b like the other tracks.
-- **Indexed External-sync inlet** (DiscreteMapSync borrow) — U7 owner call. Feature = external CV
-  rising-edge resets the Indexed sequence to start (`IndexedTrackEngine` External sync mode); owner
-  understands it now, decision (own Sync inlet key 102 vs retire) deferred to U7.
+- **Sync inlet — RESOLVED (now)**, see `docs/plans/2026-06-02-004-reset-vocabulary-and-sync-subspec.md`.
+  Not retire, not Indexed-owns-it: **universalize Sync as a warm (`restart()`-class) re-anchor inlet
+  on every track** (sibling of `resetMeasure`), distinct from the cold `Reset` target. Dissolves the
+  Indexed→DiscreteMapSync borrow by promotion; DiscreteMap keeps Input/Scanner. Drops DiscreteMap's
+  Sync inlet row from its table once built. Pairs with `wallclock-time-architecture` (drift). Build
+  semantics (per-track warm behavior, storage, UI) settled at implementation.
 - **Scale/RootNote/Divisor base-write** (Stochastic, PhaseFlux, Indexed, DiscreteMap) — closes
   structurally at U6b (override table = transient delta), not per-hook.
 - **uint8_t paramKey width** — revisit at U7 with full registry count.
