@@ -81,7 +81,8 @@ struct ParamKey {
         IndexedB           = 101,   // Indexed
         DiscreteMapInput   = 102,   // DiscreteMap
         DiscreteMapScanner = 103,   // DiscreteMap
-        DiscreteMapSync    = 104,   // DiscreteMap
+        // 104 RETIRED (was DiscreteMapSync) — external re-anchor folds into the
+        // universal Align target (binds restart()), subspec 004. Never reuse 104.
 
         // --- DiscreteMap signature block (110..) ---
         DiscreteMapRangeHigh = 110,

@@ -54,7 +54,6 @@ CASE("rows match writeTarget for every normalized input") {
         // inlets (track-level routed-CV field)
         { Routing::Target::DiscreteMapInput,   ParamKey::DiscreteMapInput,   false, [](Project &p){ return p.track(0).discreteMapTrack().routedInput(); },   "Input" },
         { Routing::Target::DiscreteMapScanner, ParamKey::DiscreteMapScanner, false, [](Project &p){ return p.track(0).discreteMapTrack().routedScanner(); }, "Scanner" },
-        { Routing::Target::DiscreteMapSync,    ParamKey::DiscreteMapSync,    false, [](Project &p){ return p.track(0).discreteMapTrack().routedSync(); },    "Sync" },
     };
     const float inputs[] = { 0.f, 0.25f, 0.5f, 0.75f, 1.f };
 
@@ -82,7 +81,6 @@ CASE("inlet rows are flagged Inlet, direct rows are not") {
     const RouteParam::Table &t = DiscreteMapParamTable::table();
     expectTrue((t.find(ParamKey::DiscreteMapInput)->flags & RouteParam::Inlet) != 0, "Input is an inlet");
     expectTrue((t.find(ParamKey::DiscreteMapScanner)->flags & RouteParam::Inlet) != 0, "Scanner is an inlet");
-    expectTrue((t.find(ParamKey::DiscreteMapSync)->flags & RouteParam::Inlet) != 0, "Sync is an inlet");
     expectTrue((t.find(ParamKey::Octave)->flags & RouteParam::Inlet) == 0, "Octave is not an inlet");
 }
 

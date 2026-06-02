@@ -210,21 +210,21 @@ sim + STM32 release clean, nothing wired live.
   consumption first (own task), not a table row.
 - ~~Tuesday Scale/RootNote~~ — RESOLVED (owner, 2026-06-02): wired as base writes (were dispatched
   no-ops); Tuesday now on par. Defect closes at U6b like the other tracks.
-- **Sync inlet — RESOLVED (now), build not started**, see
-  `docs/plans/2026-06-02-004-reset-vocabulary-and-sync-subspec.md`. Not retire, not Indexed-owns-it:
-  **universalize Sync as a warm (`restart()`-class) re-anchor inlet on every track** (sibling of
-  `resetMeasure`), distinct from the cold `Reset` target. Pairs with `wallclock-time-architecture`
-  (drift); a separate workstream, not part of table staging — likely lands alongside/after wallclock.
-  Planned actions:
-  1. Per-track warm semantics — sync edge → `restart()` not `reset()`; lighter phase-only re-anchor
-     for continuous tracks (Curve/PhaseFlux/DiscreteMap) where a cold clear jolts CV.
-  2. Universal sync storage — sync-inlet field + edge detector on every track (replacing the
-     `_routedSync` only DiscreteMap/Indexed have).
-  3. Registry — add **Sync** as one universal inlet/target (no single owner), distinct from Reset.
-  4. Kill the borrow — drop Indexed's `DiscreteMapSync` use, retire `SyncMode::External` in both
-     engines, **remove DiscreteMap's Sync inlet row** (keep Input/Scanner).
-  5. UI — reconcile the Indexed/DiscreteMap "Sync" chip (Off/Reset/Ext) onto the universal inlet;
-     keep `ResetMeasure`.
+- **Re-anchor target — RESOLVED as Align/lifecycle**, subspec
+  `docs/plans/2026-06-02-004-reset-vocabulary-and-sync-subspec.md`. Frame: **restart = pointer/
+  time-base alignment (the routable gesture); reset = lifecycle (play/stop/load) — not a routing
+  target.** Routing only ever triggers `restart` (an **Align** target binding `restart()`); External
+  sync folds into Align; the Indexed→DiscreteMapSync borrow dies.
+  - **NOW done (2026-06-02):** dropped the DiscreteMap **Sync** inlet row (Input/Scanner stay);
+    retired `ParamKey` 104 (never reuse); subspec rewritten to align/lifecycle. Model `_routedSync`
+    left in place for the deferred engine task. Sim + STM32 clean.
+  - **Align target apply-binding** (→ each engine `restart()`) wired at U7 cutover with the other
+    target bindings; not built yet.
+- **DEFERRED engine task — what reset/restart mean per track** (separate, pairs with
+  `wallclock-time-architecture`): trim each track's `restart()` to minimal pointer/time-base
+  (fork's drifted heavy); repoint `resetMeasure` from `reset()`→`restart()` (inherited upstream
+  over-reach); Tuesday `restart()`=`reset()` → real restart; Stochastic RNG re-seed decision; define
+  `reset()` canonically as lifecycle; retire `SyncMode::External` + `_routedSync` once Align covers it.
 - **Scale/RootNote/Divisor base-write** (Stochastic, PhaseFlux, Indexed, DiscreteMap) — closes
   structurally at U6b (override table = transient delta), not per-hook.
 - **uint8_t paramKey width** — revisit at U7 with full registry count.

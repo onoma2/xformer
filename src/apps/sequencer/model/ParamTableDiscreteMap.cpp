@@ -20,10 +20,11 @@ inline int denormI(const RouteParam::Range &r, float n) {
     return int(std::round(denormF(r, n)));
 }
 
-// inlets: track-level routed-CV fields, raw denormalized float (no scaling, no fan-out)
+// inlets: track-level routed-CV fields, raw denormalized float (no scaling, no fan-out).
+// Sync is intentionally absent: external re-anchor folds into the universal Align
+// target (binds restart()), not a DiscreteMap-owned inlet -- see subspec 004.
 void applyInput(const RouteParam::Scope &s, const RouteParam::Range &r, float n)   { dmTrack(s).setRoutedInput(denormF(r, n)); }
 void applyScanner(const RouteParam::Scope &s, const RouteParam::Range &r, float n) { dmTrack(s).setRoutedScanner(denormF(r, n)); }
-void applySync(const RouteParam::Scope &s, const RouteParam::Range &r, float n)    { dmTrack(s).setRoutedSync(denormF(r, n)); }
 
 // Two fan-out scopes, matching writeTarget exactly:
 //  - track-routed params (Octave/Transpose/Offset/SlideTime/RangeHigh/RangeLow)
@@ -87,10 +88,9 @@ constexpr RouteParam::Row kRows[] = {
     { ParamKey::RootNote,        "Root Note",  {   0.f,  11.f }, RouteParam::Discrete,   applyRootNote },
     { ParamKey::DiscreteMapRangeHigh, "Range Hi", { -5.f, 5.f }, RouteParam::Continuous, applyRangeHigh },
     { ParamKey::DiscreteMapRangeLow,  "Range Lo", { -5.f, 5.f }, RouteParam::Continuous, applyRangeLow },
-    // inlets (track-level)
+    // inlets (track-level) -- Sync dropped (folds into universal Align, subspec 004)
     { ParamKey::DiscreteMapInput,   "Inlet In",  { -5.f,  5.f }, RouteParam::Inlet, applyInput },
     { ParamKey::DiscreteMapScanner, "Inlet Scan",{  0.f, 34.f }, RouteParam::Inlet, applyScanner },
-    { ParamKey::DiscreteMapSync,    "Inlet Sync",{  0.f,  1.f }, RouteParam::Inlet, applySync },
 };
 
 constexpr RouteParam::Table kTable{ RouteParam::Scope::Kind::Track, kRows, sizeof(kRows) / sizeof(kRows[0]) };

@@ -6,9 +6,10 @@
 //
 // Track-scope: Scope.object is a Track* in DiscreteMap mode. Direct rows mirror
 // Routing::writeTarget for a DiscreteMap track, name-agnostic. Inlet rows
-// Input/Scanner/Sync (R12) fill the per-track routed-CV fields
-// (_routedInput/Scanner/Sync, raw denormalized float), flagged RouteParam::Inlet;
-// DiscreteMap owns these (the Sync the Indexed engine borrows lives here).
+// Input/Scanner (R12) fill the per-track routed-CV fields (_routedInput/Scanner,
+// raw denormalized float), flagged RouteParam::Inlet. Sync is NOT an inlet here:
+// external re-anchor folds into the universal Align target (binds restart()) --
+// see docs/plans/2026-06-02-004-align-vs-reset subspec.
 //
 // SlewTime == SlideTime (owner): DiscreteMap has no track _slideTime; the slide
 // concept is the sequence _slewTime, so the shared SlideTime key routes to
