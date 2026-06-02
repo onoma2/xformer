@@ -91,6 +91,12 @@ void TuesdaySequence::writeRouted(Routing::Target target, int intValue, float fl
     case Routing::Target::GateOffset:
         _gateOffset.write(intValue);
         break;
+    case Routing::Target::Scale:
+        setScale(intValue);
+        break;
+    case Routing::Target::RootNote:
+        setRootNote(intValue);
+        break;
     default:
         break;
     }

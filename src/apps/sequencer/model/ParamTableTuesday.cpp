@@ -40,6 +40,17 @@ TUESDAY_SEQ_HOOK(applyGateOffset, setGateOffset)
 
 #undef TUESDAY_SEQ_HOOK
 
+// Scale/RootNote are plain ints (base write, no routed flag), like the other
+// pitched tracks; the base-write defect closes at U6b (override table).
+void applyScale(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
+    int v = denormI(r, n);
+    for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) tuesdayTrack(s).sequence(p).setScale(v);
+}
+void applyRootNote(const RouteParam::Scope &s, const RouteParam::Range &r, float n) {
+    int v = denormI(r, n);
+    for (int p = 0; p < CONFIG_PATTERN_COUNT; ++p) tuesdayTrack(s).sequence(p).setRootNote(v);
+}
+
 // Ranges mirror Routing::targetInfos so denormalization matches writeTarget.
 constexpr RouteParam::Row kRows[] = {
     { ParamKey::Algorithm,       "Algorithm",  {   0.f,  14.f }, RouteParam::Discrete,   applyAlgorithm },
@@ -56,6 +67,8 @@ constexpr RouteParam::Row kRows[] = {
     { ParamKey::Rotate,          "Rotate",     { -64.f,  64.f }, RouteParam::Continuous, applyRotate },
     { ParamKey::Divisor,         "Divisor",    {   1.f, 768.f }, RouteParam::Discrete,   applyDivisor },
     { ParamKey::ClockMultiplier, "Clock Mult", {  50.f, 150.f }, RouteParam::Continuous, applyClockMult },
+    { ParamKey::Scale,           "Scale",      {   0.f,  23.f }, RouteParam::Discrete,   applyScale },
+    { ParamKey::RootNote,        "Root Note",  {   0.f,  11.f }, RouteParam::Discrete,   applyRootNote },
 };
 
 constexpr RouteParam::Table kTable{ RouteParam::Scope::Kind::Track, kRows, sizeof(kRows) / sizeof(kRows[0]) };

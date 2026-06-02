@@ -49,6 +49,8 @@ CASE("rows match writeTarget for every normalized input") {
         { Routing::Target::Rotate,    ParamKey::Rotate,          [](Project &p){ return float(p.track(0).tuesdayTrack().sequence(0).rotate()); },     "Rotate" },
         { Routing::Target::Divisor,   ParamKey::Divisor,         [](Project &p){ return float(p.track(0).tuesdayTrack().sequence(0).divisor()); },    "Divisor" },
         { Routing::Target::ClockMult, ParamKey::ClockMultiplier, [](Project &p){ return float(p.track(0).tuesdayTrack().sequence(0).clockMultiplier()); }, "ClockMult" },
+        { Routing::Target::Scale,     ParamKey::Scale,           [](Project &p){ return float(p.track(0).tuesdayTrack().sequence(0).scale()); },      "Scale" },
+        { Routing::Target::RootNote,  ParamKey::RootNote,        [](Project &p){ return float(p.track(0).tuesdayTrack().sequence(0).rootNote()); },   "RootNote" },
     };
     const float inputs[] = { 0.f, 0.25f, 0.5f, 0.75f, 1.f };
 
