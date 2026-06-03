@@ -6,6 +6,7 @@
 #include "MidiConfig.h"
 #include "Serialize.h"
 #include "ModelUtils.h"
+#include "RouteApply.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -745,6 +746,13 @@ public:
         void setShaper(int trackIndex, Shaper shaper) {
             _shaper[trackIndex] = ModelUtils::clampedEnum(shaper);
         }
+        // value-pipeline controls (per route): combine picks centered (Modulate) vs
+        // sweep-from-base (Absolute); scaleSource scales the shaped source (R6).
+        RouteApply::Combine combine() const { return _combine; }
+        void setCombine(RouteApply::Combine combine) { _combine = combine; }
+        Source scaleSource() const { return _scaleSource; }
+        void setScaleSource(Source scaleSource) { _scaleSource = ModelUtils::clampedEnum(scaleSource); }
+
         Source source() const { return _source; }
         void setSource(Source source) {
             source = ModelUtils::clampedEnum(source);
@@ -805,6 +813,8 @@ public:
         std::array<int8_t, CONFIG_TRACK_COUNT> _biasPct;
         std::array<int8_t, CONFIG_TRACK_COUNT> _depthPct;
         std::array<Shaper, CONFIG_TRACK_COUNT> _shaper;
+        RouteApply::Combine _combine;
+        Source _scaleSource;
         Source _source;
         CvSource _cvSource;
         MidiSource _midiSource;

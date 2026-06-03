@@ -78,6 +78,8 @@ void Routing::Route::clear() {
     _biasPct.fill(DefaultBiasPct);
     _depthPct.fill(DefaultDepthPct);
     _shaper.fill(Shaper::None);
+    _combine = RouteApply::Combine::Modulate;
+    _scaleSource = Source::None;
     _source = Source::None;
     _cvSource.clear();
     _midiSource.clear();
@@ -95,6 +97,8 @@ void Routing::Route::write(VersionedSerializedWriter &writer) const {
         writer.write(_depthPct[i]);
         writer.write(_shaper[i]);
     }
+    writer.write(_combine);
+    writer.write(_scaleSource);
     writer.write(_source);
     if (isCvSource(_source)) {
         _cvSource.write(writer);
@@ -115,6 +119,8 @@ void Routing::Route::read(VersionedSerializedReader &reader) {
         reader.read(_depthPct[i]);
         reader.read(_shaper[i]);
     }
+    reader.read(_combine);
+    reader.read(_scaleSource);
     reader.read(_source);
     if (isCvSource(_source)) {
         _cvSource.read(reader);
@@ -139,7 +145,9 @@ bool Routing::Route::operator==(const Route &other) const {
         (!isMidiSource(_source) || _midiSource == other._midiSource) &&
         _biasPct == other._biasPct &&
         _depthPct == other._depthPct &&
-        _shaper == other._shaper
+        _shaper == other._shaper &&
+        _combine == other._combine &&
+        _scaleSource == other._scaleSource
     );
 }
 

@@ -28,6 +28,7 @@
 
 namespace RouteApply {
 
+    // Serialized on Route by raw ordinal — append only, never reorder (would break files).
     enum class Combine : uint8_t {
         Modulate,   // centered source: bipolar around base, neutral at source-center
         Absolute,   // raw source: sweep from base, d*range travel
