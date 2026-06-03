@@ -1,6 +1,9 @@
 #include "RoutingEngine.h"
 
 #include "model/RouteParam.h"
+#include "model/RouteFork.h"
+#include "model/RouteShaper.h"
+#include "model/RouteApply.h"
 
 #include "Engine.h"
 #include "MidiUtils.h"
@@ -239,7 +242,8 @@ static_assert(int(MidiPort::UsbMidi) == int(Types::MidiPort::UsbMidi), "invalid 
 
 RoutingEngine::RoutingEngine(Engine &engine, Model &model) :
     _engine(engine),
-    _routing(model.project().routing())
+    _routing(model.project().routing()),
+    _project(model.project())
 {
     _cvRotateValues.fill(0.f);
     _cvRotateInterp.fill(false);
@@ -424,6 +428,7 @@ void RoutingEngine::updateSources() {
 void RoutingEngine::updateSinks() {
     _cvRotateValues.fill(0.f);
     _cvRotateInterp.fill(false);
+    Routing::clearRouteOverrides();
 
     for (int routeIndex = 0; routeIndex < CONFIG_ROUTE_COUNT; ++routeIndex) {
         const auto &route = _routing.route(routeIndex);
@@ -509,6 +514,18 @@ void RoutingEngine::updateSinks() {
                 float routeSpan = route.max() - route.min();
                 for (int trackIndex = 0; trackIndex < CONFIG_TRACK_COUNT; ++trackIndex) {
                     if (tracks & (1 << trackIndex)) {
+                        // Apply fork: migrated Note/PhaseFlux per-track params take the
+                        // bias-free override path; old writeTarget is skipped for them.
+                        uint8_t paramKey;
+                        RouteParam::Range pRange;
+                        if (RouteFork::migrated(_project.track(trackIndex).trackMode(), target, paramKey, pRange)) {
+                            float h = RouteShaper::shape(route.shaper(trackIndex), _sourceValues[routeIndex]);
+                            float delta = RouteApply::delta(h, 1.f, RouteApply::Combine::Modulate,
+                                                            route.depthPct(trackIndex), RouteFork::inferRange(pRange));
+                            Routing::writeRouteOverride(paramKey, trackIndex, delta);
+                            continue;
+                        }
+
                         float shapedSource = applyBiasDepthToSource(_sourceValues[routeIndex], route, trackIndex);
                         float biasNormalized = route.biasPct(trackIndex) * 0.01f;
                         float shaperOut = shapedSource;

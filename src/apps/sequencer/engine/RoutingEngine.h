@@ -103,6 +103,7 @@ private:
 
     Engine &_engine;
     Routing &_routing;
+    Project &_project;
 
     std::array<float, CONFIG_ROUTE_COUNT> _sourceValues;
 
