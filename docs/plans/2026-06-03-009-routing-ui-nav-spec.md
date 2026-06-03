@@ -34,8 +34,12 @@ bands (added GLOBAL/DMAP/PFLX/Phase, corrected STOC 130–144), and LEARN slot (
   not reintroduce the flat `Target` enum.
 
 _Model half landed (2026-06-03): Global base+delta (997f8b84) + combine/scaleSource
-persisted on Route (d8a4a16b). The engine still hardcodes Modulate until this UI sets
-combine. Building the surfaces below next._
+persisted on Route (d8a4a16b). Engine now honors route.combine() (96c08e17, Absolute/Modulate)._
+
+_UI landed, sim-verified (2026-06-04): **route overview** home (ee2f6514) + **tab-editor
+display shell** (e601fa36, read-only preview via Page+S6). Editing still flows through the
+old RouteListModel rows. Next: make the tab editor editable (depth/combine/spread), then
+promote it over the old rows for migrated/global targets._
 
 ### Global is base+delta (decided 2026-06-03)
 
