@@ -331,3 +331,33 @@ same route today (which wrote an absolute `min + shaper*span`). Not a regression
 4. `isRouted`/`setRouted` still maintained for UI markers + old-path targets.
 5. Pre-existing failures on clean HEAD (NOT this work): TestDiscreteMapSequence,
    TestStochasticDurationDictionary, TestHarmonyInversionIssue, TestCurveTrackLfoShapes(+Integration).
+
+## Editable base under route + seam coverage (2026-06-03, plan 006)
+
+Hardware audition of the cutover found base was only editable by deleting the route. In the
+base-anchored model editing base = moving the modulation center, a useful live gesture, so the
+lock was friction. Unlocked it (plan `docs/plans/2026-06-03-006-routed-base-editable-plan.md`):
+
+- All migrated relative editors drop the `routeOverridden` gate and edit from **base**
+  (`setX(_x.base ± value)`), not the override-aware getter — else each edit would lurch base by
+  the live override. NoteSequence (7), NoteTrack (8), PhaseFluxSequence (4); PhaseFluxTrack
+  gained `editSlideTime/Octave/Transpose`, called by its list model.
+- Absolute setters degated (QuickEdit `setIndexedValue`, Launchpad First/Last/RunMode) — they
+  set an absolute target, no lurch.
+- **First/Last cross-endpoint fix (Codex-flagged riskiest):** `setFirstStep`/`setLastStep`
+  clamp against the peer's `.base` (not the override-aware getter, which is the moving routed
+  window); `offsetFirstAndLastStep` bounds from base. Read getter keeps `max(firstStep(), …)`.
+- **Structural step ops to base loop:** `duplicateSteps` (Codex-flagged — wrote base LastStep
+  from the modulated range) and `shiftSteps` (sibling — rotated the modulated window, dragging
+  in off-loop steps) now read `_firstStep.base`/`_lastStep.base`.
+- Dead per-class `routeOverridden` helpers removed (gates gone; `Routing::routeOverridden`
+  static stays for tests).
+- **Readout decision:** routed param shows the **effective** value (base+override); the routing
+  arrow is a static "this is routed" glyph. Not changing the readout.
+
+Also: `RouteFork::computeDelta` extracted from `updateSinks` and unit-tested — the
+source→shape→delta→override-value seam is now covered in sim; only the loop track-selection +
+`writeTarget`-skip wiring is hardware-only.
+
+`TestRouteGetterMigration` now asserts edit-under-route shifts base (no lurch) + the First/Last
+base-domain clamp. sim + STM32 green; 65/65 (minus 5 pre-existing-on-HEAD failures). Codex-gated.

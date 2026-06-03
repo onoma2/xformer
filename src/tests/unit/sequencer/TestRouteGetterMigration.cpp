@@ -10,8 +10,9 @@
 // is a static, so the engine writer is simulated here by driving it directly.
 //
 // Proves: base-anchored read; stale-clear on route delete; base never mutated
-// under routing (PhaseFlux Scale/RootNote defect fix); edit-gating matches the
-// old isRouted gate; clamp to the param's routing range.
+// under routing (PhaseFlux Scale/RootNote defect fix); clamp to the param's
+// routing range. Edits are NOT gated under a route (plan 006): they edit the base
+// (anchor), shifting the modulation center, with no lurch by the live override.
 
 namespace {
 constexpr int kTrack = 2;
@@ -47,17 +48,19 @@ CASE("Note scale: Default(-1) preserved when unrouted") {
     expectEqual(seq.scale(), -1, "Default passes through when no override");
 }
 
-CASE("Note scale: edit-gating blocks edits while overridden") {
+CASE("Note scale: edit under active route shifts base, no lurch") {
     Routing::clearRouteOverrides();
     NoteSequence seq(kTrack);
     seq.setScale(5);
-    Routing::writeRouteOverride(ParamKey::Scale, kTrack, 0.f);
-    seq.editScale(2, false);
+    Routing::writeRouteOverride(ParamKey::Scale, kTrack, 7.f);
+    expectEqual(seq.scale(), 12, "effective = base + override");
+    seq.editScale(2, false);                       // edit while routed (no longer gated)
+    expectEqual(seq.scale(), 14, "effective shifts by edit amount (base 7 + override 7)");
     Routing::clearRouteOverrides();
-    expectEqual(seq.scale(), 5, "edit ignored while overridden");
+    expectEqual(seq.scale(), 7, "base = 5 + 2, NOT 5 + 7 + 2 (edit-from-base, no lurch)");
 
-    seq.editScale(2, false);
-    expectEqual(seq.scale(), 7, "edit applies when not overridden");
+    seq.editScale(1, false);
+    expectEqual(seq.scale(), 8, "unrouted edit unchanged");
 }
 
 // Track-level getters (NoteTrack/PhaseFluxTrack transpose/octave/...) use the same
@@ -97,15 +100,27 @@ CASE("PhaseFlux scale: base never mutated (defect fix) + selectedScale uses over
     expectEqual(seq.scale(), 5, "base intact after clear");
 }
 
-CASE("PhaseFlux divisor: override + edit gate") {
+CASE("PhaseFlux scale: edit under route shifts base, no lurch") {
     Routing::clearRouteOverrides();
     PhaseFluxSequence seq;
     seq.setTrackIndex(kTrack);
-    seq.setDivisor(12);
-    Routing::writeRouteOverride(ParamKey::Divisor, kTrack, 0.f);
-    seq.editDivisor(1, false);
+    seq.setScale(5);
+    Routing::writeRouteOverride(ParamKey::Scale, kTrack, 3.f);
+    seq.editScale(2, false);                        // edit while routed
     Routing::clearRouteOverrides();
-    expectEqual(seq.divisor(), 12, "edit blocked while overridden");
+    expectEqual(seq.scale(), 7, "base = 5 + 2, not 5 + 3 + 2");
+}
+
+CASE("Note first/last edit clamps in base domain under route") {
+    Routing::clearRouteOverrides();
+    NoteSequence seq(kTrack);
+    seq.setFirstStep(0);
+    seq.setLastStep(15);
+    Routing::writeRouteOverride(ParamKey::LastStep, kTrack, 16.f);   // lastStep() effective -> 31
+    expectEqual(seq.lastStep(), 31, "last effective = 15 + 16");
+    seq.editFirstStep(20, false);                  // base first clamps against base last (15)
+    Routing::clearRouteOverrides();
+    expectEqual(seq.firstStep(), 15, "first clamped to last BASE (15), not routed window (31)");
 }
 
 } // UNIT_TEST

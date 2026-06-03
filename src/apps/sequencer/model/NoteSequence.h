@@ -398,9 +398,7 @@ public:
     }
 
     void editScale(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::Scale, _trackIndex)) {
-            setScale(scale() + value);
-        }
+        setScale(_scale.base + value);
     }
 
     void printScale(StringBuilder &str) const {
@@ -425,9 +423,7 @@ public:
     }
 
     void editRootNote(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::RootNote, _trackIndex)) {
-            setRootNote(rootNote() + value);
-        }
+        setRootNote(_rootNote.base + value);
     }
 
     void printRootNote(StringBuilder &str) const {
@@ -459,9 +455,7 @@ public:
     }
 
     void editDivisor(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::Divisor, _trackIndex)) {
-            setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
-        }
+        setDivisor(ModelUtils::adjustedByDivisor(_divisor.base, value, shift));
     }
 
     void printDivisor(StringBuilder &str) const {
@@ -537,9 +531,7 @@ public:
     }
 
     void editClockMultiplier(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::ClockMultiplier, _trackIndex)) {
-            setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
-        }
+        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
     }
 
     void printClockMultiplier(StringBuilder &str) const {
@@ -574,9 +566,7 @@ public:
     }
 
     void editRunMode(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::RunMode, _trackIndex)) {
-            setRunMode(ModelUtils::adjustedEnum(runMode(), value));
-        }
+        setRunMode(ModelUtils::adjustedEnum(Types::RunMode(int(_runMode.base)), value));
     }
 
     void printRunMode(StringBuilder &str) const {
@@ -618,14 +608,16 @@ public:
     }
 
     void setFirstStep(int firstStep, bool routed = false) {
-        _firstStep.set(clamp(firstStep, 0, lastStep()), routed);
+        // clamp in base domain so a base edit is bounded by the peer's base, not its
+        // override-aware getter (which is the moving routed window).
+        _firstStep.set(clamp(firstStep, 0, int(_lastStep.base)), routed);
     }
 
     void editFirstStep(int value, bool shift) {
         if (shift) {
             offsetFirstAndLastStep(value);
-        } else if (!Routing::routeOverridden(ParamKey::FirstStep, _trackIndex)) {
-            setFirstStep(firstStep() + value);
+        } else {
+            setFirstStep(_firstStep.base + value);
         }
     }
 
@@ -642,14 +634,14 @@ public:
     }
 
     void setLastStep(int lastStep, bool routed = false) {
-        _lastStep.set(clamp(lastStep, firstStep(), CONFIG_STEP_COUNT - 1), routed);
+        _lastStep.set(clamp(lastStep, int(_firstStep.base), CONFIG_STEP_COUNT - 1), routed);
     }
 
     void editLastStep(int value, bool shift) {
         if (shift) {
             offsetFirstAndLastStep(value);
-        } else if (!Routing::routeOverridden(ParamKey::LastStep, _trackIndex)) {
-            setLastStep(lastStep() + value);
+        } else {
+            setLastStep(_lastStep.base + value);
         }
     }
 
@@ -710,7 +702,6 @@ public:
     //----------------------------------------
 
     inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
-    inline bool routeOverridden(uint8_t paramKey) const { return Routing::routeOverridden(paramKey, _trackIndex); }
     inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
     void writeRouted(Routing::Target target, int intValue, float floatValue);
 
@@ -782,7 +773,7 @@ private:
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
 
     void offsetFirstAndLastStep(int value) {
-        value = clamp(value, -firstStep(), CONFIG_STEP_COUNT - 1 - lastStep());
+        value = clamp(value, -int(_firstStep.base), CONFIG_STEP_COUNT - 1 - int(_lastStep.base));
         if (value > 0) {
             editLastStep(value, false);
             editFirstStep(value, false);

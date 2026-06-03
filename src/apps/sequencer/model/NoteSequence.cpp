@@ -331,13 +331,19 @@ void NoteSequence::shiftSteps(const std::bitset<CONFIG_STEP_COUNT> &selected, in
     if (selected.any()) {
         ModelUtils::shiftSteps(_steps, selected, direction);
     } else {
-        ModelUtils::shiftSteps(_steps, firstStep(), lastStep(), direction);
+        // Rotate the base loop, not the override-aware getters: a route on
+        // First/Last must not make the edited window flicker with the modulation.
+        ModelUtils::shiftSteps(_steps, _firstStep.base, _lastStep.base, direction);
     }
 }
 
 void NoteSequence::duplicateSteps() {
-    ModelUtils::duplicateSteps(_steps, firstStep(), lastStep());
-    setLastStep(lastStep() + (lastStep() - firstStep() + 1));
+    // Operate on the base loop, not the override-aware getters: this writes base
+    // LastStep, so reading the modulated range would lurch base under a route.
+    int first = _firstStep.base;
+    int last = _lastStep.base;
+    ModelUtils::duplicateSteps(_steps, first, last);
+    setLastStep(last + (last - first + 1));
 }
 
 void NoteSequence::write(VersionedSerializedWriter &writer) const {

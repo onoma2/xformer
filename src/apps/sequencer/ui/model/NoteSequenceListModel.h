@@ -287,21 +287,17 @@ private:
         case Mode:
             return _sequence->setMode(NoteSequence::Mode(index));
         case FirstStep:
-            if (!_sequence->routeOverridden(ParamKey::FirstStep)) _sequence->setFirstStep(index);
-            return;
+            return _sequence->setFirstStep(index);
         case LastStep:
-            if (!_sequence->routeOverridden(ParamKey::LastStep)) _sequence->setLastStep(index);
-            return;
+            return _sequence->setLastStep(index);
         case NoteFirstStep:
             return _sequence->setNoteFirstStep(index);
         case NoteLastStep:
             return _sequence->setNoteLastStep(index);
         case RunMode:
-            if (!_sequence->routeOverridden(ParamKey::RunMode)) _sequence->setRunMode(Types::RunMode(index));
-            return;
+            return _sequence->setRunMode(Types::RunMode(index));
         case DivisorX:
-            if (!_sequence->routeOverridden(ParamKey::Divisor)) _sequence->setIndexedDivisor(index);
-            return;
+            return _sequence->setIndexedDivisor(index);
         case DivisorY:
             return _sequence->setIndexedDivisorY(index);
         case DivisorYSource:
@@ -309,16 +305,13 @@ private:
         case DivisorYTrack:
             return _sequence->setDivisorYTrack(index);
         case ClockMult:
-            if (!_sequence->routeOverridden(ParamKey::ClockMultiplier)) _sequence->setClockMultiplier(index + 50);
-            return;
+            return _sequence->setClockMultiplier(index + 50);
         case ResetMeasure:
             return _sequence->setResetMeasure(index);
         case Scale:
-            if (!_sequence->routeOverridden(ParamKey::Scale)) _sequence->setIndexedScale(index);
-            return;
+            return _sequence->setIndexedScale(index);
         case RootNote:
-            if (!_sequence->routeOverridden(ParamKey::RootNote)) _sequence->setIndexedRootNote(index);
-            return;
+            return _sequence->setIndexedRootNote(index);
         case Last:
             break;
         }

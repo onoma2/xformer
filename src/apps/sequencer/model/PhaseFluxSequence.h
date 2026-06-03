@@ -343,7 +343,7 @@ public:
     const Scale &selectedScale(int defaultScale) const {
         return Scale::get(scale() != -1 ? scale() : defaultScale);
     }
-    void editScale(int value, bool) { if (!Routing::routeOverridden(ParamKey::Scale, _trackIndex)) setScale(scale() + value); }
+    void editScale(int value, bool) { setScale(_scale + value); }
     void printScale(StringBuilder &str) const {
         printRouted(str, Routing::Target::Scale);
         str(scale() < 0 ? "Default" : Scale::name(scale()));
@@ -355,7 +355,7 @@ public:
     int selectedRootNote(int defaultRootNote) const {
         return rootNote() != -1 ? rootNote() : defaultRootNote;
     }
-    void editRootNote(int value, bool) { if (!Routing::routeOverridden(ParamKey::RootNote, _trackIndex)) setRootNote(rootNote() + value); }
+    void editRootNote(int value, bool) { setRootNote(_rootNote + value); }
     void printRootNote(StringBuilder &str) const {
         printRouted(str, Routing::Target::RootNote);
         if (rootNote() < 0) { str("Default"); } else { Types::printNote(str, rootNote()); }
@@ -367,7 +367,7 @@ public:
         _divisor.set(ModelUtils::clampDivisor(v), routed);
     }
     void editDivisor(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::Divisor, _trackIndex)) setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
+        setDivisor(ModelUtils::adjustedByDivisor(_divisor.base, value, shift));
     }
     void printDivisor(StringBuilder &str) const {
         printRouted(str, Routing::Target::Divisor);
@@ -380,7 +380,7 @@ public:
         _clockMultiplier.set(clamp(v, 50, 150), routed);
     }
     void editClockMultiplier(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::ClockMultiplier, _trackIndex)) setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
+        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
     }
     void printClockMultiplier(StringBuilder &str) const {
         printRouted(str, Routing::Target::ClockMult);

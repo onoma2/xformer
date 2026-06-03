@@ -56,17 +56,20 @@ public:
     bool lock() const { return _lock; }
     void setLock(bool v) { _lock = v; }
 
-    // slideTime — Routable 0..100
+    // slideTime — Routable 0..100. editX edits the base (anchor), so it works under a route.
     int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime.base, 0, 100); }
     void setSlideTime(int v, bool routed = false) { _slideTime.set(clamp(v, 0, 100), routed); }
+    void editSlideTime(int value, bool) { setSlideTime(_slideTime.base + value); }
 
     // octave — Routable ±10
     int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave.base, -10, 10); }
     void setOctave(int v, bool routed = false) { _octave.set(clamp(v, -10, 10), routed); }
+    void editOctave(int value, bool) { setOctave(_octave.base + value); }
 
     // transpose — Routable ±100 (scale degrees, see spec §12.1)
     int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -60, 60); }
     void setTranspose(int v, bool routed = false) { _transpose.set(clamp(v, -100, 100), routed); }
+    void editTranspose(int value, bool) { setTranspose(_transpose.base + value); }
 
     // fillMode
     FillMode fillMode() const { return _fillMode; }
@@ -95,7 +98,6 @@ public:
     //----------------------------------------
 
     inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
-    inline bool routeOverridden(uint8_t paramKey) const { return Routing::routeOverridden(paramKey, _trackIndex); }
     inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
 
     void writeRouted(Routing::Target target, int intValue, float floatValue) {

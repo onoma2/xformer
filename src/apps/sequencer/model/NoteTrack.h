@@ -124,9 +124,7 @@ public:
     }
 
     void editSlideTime(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::SlideTime, _trackIndex)) {
-            setSlideTime(ModelUtils::adjustedByStep(slideTime(), value, 5, !shift));
-        }
+        setSlideTime(ModelUtils::adjustedByStep(_slideTime.base, value, 5, !shift));
     }
 
     void printSlideTime(StringBuilder &str) const {
@@ -142,9 +140,7 @@ public:
     }
 
     void editOctave(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::Octave, _trackIndex)) {
-            setOctave(octave() + value);
-        }
+        setOctave(_octave.base + value);
     }
 
     void printOctave(StringBuilder &str) const {
@@ -160,9 +156,7 @@ public:
     }
 
     void editTranspose(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::Transpose, _trackIndex)) {
-            setTranspose(transpose() + value);
-        }
+        setTranspose(_transpose.base + value);
     }
 
     void printTranspose(StringBuilder &str) const {
@@ -178,9 +172,7 @@ public:
     }
 
     void editRotate(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::Rotate, _trackIndex)) {
-            setRotate(rotate() + value);
-        }
+        setRotate(_rotate.base + value);
     }
 
     void printRotate(StringBuilder &str) const {
@@ -196,9 +188,7 @@ public:
     }
 
     void editGateProbabilityBias(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::GateProbabilityBias, _trackIndex)) {
-            setGateProbabilityBias(gateProbabilityBias() + value);
-        }
+        setGateProbabilityBias(_gateProbabilityBias.base + value);
     }
 
     void printGateProbabilityBias(StringBuilder &str) const {
@@ -214,9 +204,7 @@ public:
     }
 
     void editRetriggerProbabilityBias(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::RetriggerProbabilityBias, _trackIndex)) {
-            setRetriggerProbabilityBias(retriggerProbabilityBias() + value);
-        }
+        setRetriggerProbabilityBias(_retriggerProbabilityBias.base + value);
     }
 
     void printRetriggerProbabilityBias(StringBuilder &str) const {
@@ -232,9 +220,7 @@ public:
     }
 
     void editLengthBias(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::LengthBias, _trackIndex)) {
-            setLengthBias(lengthBias() + value);
-        }
+        setLengthBias(_lengthBias.base + value);
     }
 
     void printLengthBias(StringBuilder &str) const {
@@ -250,9 +236,7 @@ public:
     }
 
     void editNoteProbabilityBias(int value, bool shift) {
-        if (!Routing::routeOverridden(ParamKey::NoteProbabilityBias, _trackIndex)) {
-            setNoteProbabilityBias(noteProbabilityBias() + value);
-        }
+        setNoteProbabilityBias(_noteProbabilityBias.base + value);
     }
 
     void printNoteProbabilityBias(StringBuilder &str) const {
