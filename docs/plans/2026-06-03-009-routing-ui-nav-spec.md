@@ -33,6 +33,10 @@ bands (added GLOBAL/DMAP/PFLX/Phase, corrected STOC 130–144), and LEARN slot (
   are already staged on the shared `ParamKey` registry. The UI reads those tables; it does
   not reintroduce the flat `Target` enum.
 
+_Model half landed (2026-06-03): Global base+delta (997f8b84) + combine/scaleSource
+persisted on Route (d8a4a16b). The engine still hardcodes Modulate until this UI sets
+combine. Building the surfaces below next._
+
 ### Global is base+delta (decided 2026-06-03)
 
 The four Global params (Tempo, Swing, CVR Scan, CVR Route) **migrate to the base-anchored
