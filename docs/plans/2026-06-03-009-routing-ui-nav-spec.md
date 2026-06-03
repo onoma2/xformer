@@ -36,10 +36,12 @@ bands (added GLOBAL/DMAP/PFLX/Phase, corrected STOC 130–144), and LEARN slot (
 _Model half landed (2026-06-03): Global base+delta (997f8b84) + combine/scaleSource
 persisted on Route (d8a4a16b). Engine now honors route.combine() (96c08e17, Absolute/Modulate)._
 
-_UI landed, sim-verified (2026-06-04): **route overview** home (ee2f6514) + **tab-editor
-display shell** (e601fa36, read-only preview via Page+S6). Editing still flows through the
-old RouteListModel rows. Next: make the tab editor editable (depth/combine/spread), then
-promote it over the old rows for migrated/global targets._
+_UI landed + hardware-verified (2026-06-04): **route overview** home (ee2f6514) +
+**editable tab editor** (e601fa36 shell → ac589d48 editable, Page+S6: encoder→depth,
+F2→combine, F5→commit). Hardware audition PASSED — saves/loads correct, combine
+Modulate↔Absolute switches live. The new editor sets depth+combine; source/target/tracks
+still flow through the old RouteListModel rows. Next: tab param aggregation + spread, then
+promote over the old rows for migrated/global targets._
 
 ### Global is base+delta (decided 2026-06-03)
 
