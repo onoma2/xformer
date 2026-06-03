@@ -47,7 +47,7 @@ public:
     }
 
     int currentStep() const { return _currentStep; }
-    bool activity() const { return _activity; }
+    bool activity() const override { return _activity; }
 
     // Immediate transport sync after a model-level window edit (setFirst /
     // setSize). Snaps _currentStep, flushes gate/CV queues, rebuilds the

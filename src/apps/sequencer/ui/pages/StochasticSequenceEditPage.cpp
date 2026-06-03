@@ -18,12 +18,6 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "BPITCH" },   // context-menu label: toggle BurstHold Hold/Roll (slot 7 owned by Feel)
 };
 
-static const ContextMenuModel::Item durContextMenuItems[] = {
-    { "INIT" },
-    { "EVEN" },
-    { "RAND" },
-};
-
 StochasticSequenceEditPage::StochasticSequenceEditPage(PageManager &manager, PageContext &context) :
     BasePage(manager, context)
 {}
@@ -97,7 +91,6 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
     int bias       = seq.marblesBias();
     int spread     = seq.marblesSpread();
     int repeats    = seq.repeatProb();
-    int range      = seq.range();
     int burst      = seq.burst();
     int burstCount = seq.burstCount();
     int burstRate  = seq.burstRate();
@@ -112,7 +105,6 @@ void StochasticSequenceEditPage::drawLivePage(Canvas &canvas) {
     const int vpTop = 25;
     const int vpBot = 53;
     const int vpH = vpBot - vpTop;
-    const int vpCy = (vpTop + vpBot) / 2;
 
     // --- Marbles bell haze (BIAS + SPRE) -----------------------------------
     int biasY = vpTop + ((100 - bias) * vpH) / 100;
@@ -399,7 +391,6 @@ void StochasticSequenceEditPage::drawLoopPage(Canvas &canvas) {
     // snap to the [first, last] window — moving first/last shifts only the
     // brackets, not the step count. Rotate shifts which step plays at each
     // window step (same logic the engine uses for read-index resolution).
-    const int minStepW = 3;
 
     auto resolveEventIdx = [&] (int displayIdx) -> int {
         if (displayIdx >= lf && displayIdx <= ll && windowSize > 0 && rot != 0) {
@@ -1189,7 +1180,6 @@ void StochasticSequenceEditPage::updateLeds(Leds &leds) {
         }
         for (int i = 0; i < 8; ++i) {
             bool active = (i == activeIdx);
-            bool selected = (_durSelectionMask & (1U << i)) != 0;
             leds.set(MatrixMap::fromStep(i), active || (i == _selectedDurEntry), true);
         }
         if (globalKeyState()[Key::Page] && !globalKeyState()[Key::Shift]) {

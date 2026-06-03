@@ -54,7 +54,7 @@ private:
     // pattern used by NoteSequenceEditPage::isActiveForSelectedTrack().
     bool isActiveForSelectedTrack() const;
 
-    void contextShow(bool doubleClick = false);
+    void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     void nextPage();
 

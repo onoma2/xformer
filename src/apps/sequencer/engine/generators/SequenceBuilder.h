@@ -83,7 +83,7 @@ public:
         _showingPreview = true;
     }
 
-    void updatePreview() {
+    void updatePreview() override {
         if (!_preview) {
             _preview = new (std::nothrow) T(_original);
             if (!_preview) {

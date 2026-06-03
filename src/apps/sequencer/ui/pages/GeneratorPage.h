@@ -48,7 +48,7 @@ public:
     virtual void encoder(EncoderEvent &event) override;
     virtual void keyboard(KeyboardEvent &event) override;
 
-    void contextShow(bool doubleClick = false);
+    void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
     void init();
@@ -81,6 +81,5 @@ private:
     Track::TrackMode _boundTrackMode = Track::TrackMode::Note;
 
     char _contextMenuAuxLabel[16] = "";
-    char _variationMenuLabel[16] = "VAR";
     ContextMenuModel::Item _contextMenuItems[5];
 };

@@ -38,7 +38,6 @@ static constexpr int ParamPanelX  = 156;
 static constexpr int ParamPanelY  = 12;
 static constexpr int ParamPanelW  = 256 - ParamPanelX - 2;
 static constexpr int ParamPanelH  = 40;
-static constexpr int ParamRowH    = ParamPanelH / 5;
 
 // Mask table — bit set = muted (LSB = pulse 0)
 constexpr uint8_t kMaskTable[8] = { 0x00, 0xAA, 0x49, 0x11, 0xB6, 0x55, 0x77, 0x01 };

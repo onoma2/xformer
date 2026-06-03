@@ -22,8 +22,8 @@ enum HID_TYPE {
 
 class UsbH {
 public:
-    UsbH(UsbMidi &usbMidi) : _usbMidi(usbMidi) {}
-    UsbH() : _usbMidi(_defaultUsbMidi) {}
+    UsbH(UsbMidi &) {}   // sim stub: param kept for API parity with the hardware driver
+    UsbH() {}
 
     void init() {}
     void process() {}
@@ -39,8 +39,4 @@ public:
 
     void setHidCallbacks(HidConnectCallback, HidDisconnectCallback, void *) {}
     void setDebugMessageCallback(DebugMessageCallback, void *) {}
-
-private:
-    UsbMidi _defaultUsbMidi;
-    UsbMidi &_usbMidi;
 };

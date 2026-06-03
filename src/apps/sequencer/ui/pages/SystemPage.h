@@ -41,7 +41,7 @@ private:
 
     void executeUtilityItem(UtilitiesListModel::Item item);
 
-    void contextShow(bool doubleClick = false);
+    void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
 

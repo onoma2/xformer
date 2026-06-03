@@ -25,7 +25,7 @@ private:
         Last
     };
 
-    void contextShow(bool doubleClick = false);
+    void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
 

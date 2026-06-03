@@ -39,7 +39,7 @@ private:
 
     void drawDetail(Canvas &canvas, const CurveSequence::Step &step);
 
-    void contextShow(bool doubleClick = false);
+    void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
 

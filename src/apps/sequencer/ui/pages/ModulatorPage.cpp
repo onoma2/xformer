@@ -735,7 +735,7 @@ void ModulatorPage::contextShow(bool doubleClick) {
         contextMenuItems,
         int(ContextAction::Last),
         [this] (int index) { contextAction(index); },
-        [this] (int index) { return true; },
+        [] (int index) { return true; },
         doubleClick
     ));
 }

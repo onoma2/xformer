@@ -24,7 +24,7 @@ public:
     virtual void encoder(EncoderEvent &event) override;
     virtual void keyboard(KeyboardEvent &event) override;
 private:
-    void contextShow(bool doubleClick = false);
+    void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
 

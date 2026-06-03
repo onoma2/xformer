@@ -107,7 +107,7 @@ private:
     float rangeMin() const { return -5.f; }
     float rangeMax() const { return 5.f; }
 
-    void contextShow(bool doubleClick = false);
+    void contextShow(bool doubleClick = false) override;
     void contextAction(int index);
     bool contextActionEnabled(int index) const;
     enum class NoteSpread : uint8_t {
