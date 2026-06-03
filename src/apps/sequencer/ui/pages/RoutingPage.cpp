@@ -28,9 +28,11 @@ RoutingPage::RoutingPage(PageManager &manager, PageContext &context) :
 void RoutingPage::reset() {
     _engine.midiLearn().stop();
     showRoute(0);
+    _overviewActive = true;
 }
 
 void RoutingPage::enter() {
+    _overviewActive = true;   // normal entry lands on the overview home
     ListPage::enter();
 }
 
@@ -41,6 +43,10 @@ void RoutingPage::exit() {
 }
 
 void RoutingPage::draw(Canvas &canvas) {
+    if (overviewActive()) {
+        drawOverview(canvas);
+        return;
+    }
     if (overlayActive()) {
         drawBiasOverlay(canvas);
         return;
@@ -49,7 +55,7 @@ void RoutingPage::draw(Canvas &canvas) {
     bool showCommit = *_route != _editRoute;
     bool showLearn = _editRoute.target() != Routing::Target::None;
     bool highlightLearn = showLearn && _engine.midiLearn().isActive();
-    const char *functionNames[] = { "PREV", "NEXT", "INIT", showLearn ? "LEARN" : nullptr, showCommit ? "COMMIT" : nullptr };
+    const char *functionNames[] = { "BACK", "NEXT", "INIT", showLearn ? "LEARN" : nullptr, showCommit ? "COMMIT" : nullptr };
 
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "ROUTING");
@@ -61,6 +67,11 @@ void RoutingPage::draw(Canvas &canvas) {
 
 void RoutingPage::keyPress(KeyPressEvent &event) {
     const auto &key = event.key();
+
+    if (overviewActive()) {
+        handleOverviewKey(event);
+        return;
+    }
 
     if (overlayActive()) {
         handleBiasOverlayKey(event);
@@ -81,8 +92,9 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
 
     if (key.isFunction()) {
         switch (Function(key.function())) {
-        case Function::Prev:
-            selectRoute(_routeIndex - 1);
+        case Function::Prev: // BACK to the route overview
+            _engine.midiLearn().stop();
+            _overviewActive = true;
             break;
         case Function::Next:
             selectRoute(_routeIndex + 1);
@@ -115,6 +127,11 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
 }
 
 void RoutingPage::encoder(EncoderEvent &event) {
+    if (overviewActive()) {
+        overviewEncoder(event.value());
+        event.consume();
+        return;
+    }
     if (overlayActive()) {
         bool shift = pageKeyState()[Key::Shift];
         editBiasOverlay(event.value(), shift);
@@ -132,6 +149,7 @@ void RoutingPage::encoder(EncoderEvent &event) {
 }
 
 void RoutingPage::showRoute(int routeIndex, const Routing::Route *initialValue) {
+    _overviewActive = false;   // showing a route means the per-route editor
     _route = &_project.routing().route(routeIndex);
     _routeIndex = routeIndex;
     _editRoute = *(initialValue ? initialValue : _route);
@@ -572,6 +590,128 @@ void RoutingPage::commitRoute() {
         *_route = _editRoute;
         setEdit(false);
         showMessage(busFeedback ? "ROUTE CHG FB" : "ROUTE CHANGED");
+    }
+}
+
+static void overviewSourceTarget(const Routing::Route &route, StringBuilder &str) {
+    Routing::printSource(route.source(), str);
+    str(">");
+    str(Routing::targetName(route.target()));
+}
+
+void RoutingPage::drawOverview(Canvas &canvas) {
+    const auto &routing = _project.routing();
+
+    int occupied = 0;
+    for (int i = 0; i < CONFIG_ROUTE_COUNT; ++i) {
+        if (routing.route(i).active()) ++occupied;
+    }
+
+    WindowPainter::clear(canvas);
+    WindowPainter::drawHeader(canvas, _model, _engine, "ROUTING");
+    WindowPainter::drawActiveFunction(canvas, FixedStringBuilder<16>("%d/%d", occupied, CONFIG_ROUTE_COUNT));
+    const char *functionNames[] = { nullptr, "ADD", nullptr, nullptr, "EDIT" };
+    WindowPainter::drawFooter(canvas, functionNames, pageKeyState());
+
+    canvas.setFont(Font::Tiny);
+    const int rowH = 6;
+    const int topY = 18;
+    const int visible = 6;
+
+    for (int i = 0; i < visible; ++i) {
+        int idx = _overviewScroll + i;
+        if (idx >= CONFIG_ROUTE_COUNT) break;
+        const auto &route = routing.route(idx);
+        int y = topY + i * rowH;
+        bool sel = idx == _overviewSel;
+
+        if (sel) {
+            canvas.setColor(Color::MediumBright);
+            canvas.fillRect(0, y - 1, CONFIG_LCD_WIDTH - 6, rowH);
+            canvas.setBlendMode(BlendMode::Sub);
+        }
+
+        canvas.setColor(route.active() ? Color::Bright : Color::Low);
+        canvas.drawText(3, y + 4, FixedStringBuilder<4>("%d", idx + 1));
+
+        if (route.active()) {
+            FixedStringBuilder<32> st;
+            overviewSourceTarget(route, st);
+            canvas.setColor(Color::Bright);
+            canvas.drawText(18, y + 4, st);
+            // per-track mask (8 cells) or "global"
+            if (Routing::isPerTrackTarget(route.target())) {
+                uint8_t tracks = route.tracks();
+                for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+                    int px = 150 + t * 5;
+                    if (tracks & (1 << t)) {
+                        canvas.setColor(Color::Bright);
+                        canvas.fillRect(px, y, 4, 4);
+                    } else {
+                        canvas.setColor(Color::Low);
+                        canvas.drawRect(px, y, 4, 4);
+                    }
+                }
+            } else {
+                canvas.setColor(Color::Medium);
+                canvas.drawText(150, y + 4, "global");
+            }
+        } else {
+            canvas.setColor(Color::Low);
+            canvas.drawText(18, y + 4, "--");
+        }
+
+        if (sel) canvas.setBlendMode(BlendMode::Set);
+    }
+
+    // scrollbar
+    int trackTop = 12, trackH = CONFIG_LCD_HEIGHT - 11 - trackTop;
+    canvas.setColor(Color::Low);
+    canvas.vline(CONFIG_LCD_WIDTH - 3, trackTop, trackH);
+    int thumbH = std::max(4, trackH * visible / CONFIG_ROUTE_COUNT);
+    int thumbY = trackTop + trackH * _overviewScroll / CONFIG_ROUTE_COUNT;
+    canvas.setColor(Color::Bright);
+    canvas.fillRect(CONFIG_LCD_WIDTH - 4, thumbY, 3, thumbH);
+}
+
+void RoutingPage::syncOverviewScroll() {
+    const int visible = 6;
+    _overviewSel = clamp(_overviewSel, 0, CONFIG_ROUTE_COUNT - 1);
+    if (_overviewSel < _overviewScroll) _overviewScroll = _overviewSel;
+    if (_overviewSel >= _overviewScroll + visible) _overviewScroll = _overviewSel - visible + 1;
+}
+
+void RoutingPage::overviewEncoder(int delta) {
+    _overviewSel += delta;
+    syncOverviewScroll();
+}
+
+void RoutingPage::openRouteFromOverview() {
+    showRoute(_overviewSel);   // sets _overviewActive = false
+}
+
+void RoutingPage::handleOverviewKey(KeyPressEvent &event) {
+    const auto &key = event.key();
+    if (key.isFunction()) {
+        switch (Function(key.function())) {
+        case Function::Next: { // ADD: open the first empty route
+            int empty = _project.routing().findEmptyRoute();
+            if (empty < 0) {
+                showMessage("NO EMPTY ROUTES");
+                break;
+            }
+            _overviewSel = empty;
+            syncOverviewScroll();
+            openRouteFromOverview();
+            break;
+        }
+        case Function::Commit: // EDIT: open selected
+            openRouteFromOverview();
+            break;
+        default:
+            break;
+        }
+        event.consume();
     }
 }
 

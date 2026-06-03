@@ -30,6 +30,17 @@ public:
 private:
     virtual void drawCell(Canvas &canvas, int row, int column, int x, int y, int w, int h) override;
 
+    // route overview (home): list of all routes, source>target | track-mask | depth
+    bool overviewActive() const { return _overviewActive; }
+    void drawOverview(Canvas &canvas);
+    void handleOverviewKey(KeyPressEvent &event);
+    void overviewEncoder(int delta);
+    void syncOverviewScroll();
+    void openRouteFromOverview();
+    bool _overviewActive = true;
+    int _overviewSel = 0;
+    int _overviewScroll = 0;
+
     // bias/depth overlay
     void enterBiasOverlay();
     void exitBiasOverlay(bool commit);
