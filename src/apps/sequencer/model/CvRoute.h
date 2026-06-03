@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Routing.h"
+#include "RouteParamKey.h"
 #include "Serialize.h"
 
 #include "core/math/Math.h"
@@ -61,8 +62,8 @@ public:
         _outputs[lane] = clampEnum(dest);
     }
 
-    int scan() const { return _scan.get(Routing::isRouted(Routing::Target::CvRouteScan)); }
-    int route() const { return _route.get(Routing::isRouted(Routing::Target::CvRouteRoute)); }
+    int scan() const { return Routing::routedValueGlobalInt(ParamKey::CvRouteScan, _scan.base, 0, 100); }
+    int route() const { return Routing::routedValueGlobalInt(ParamKey::CvRouteRoute, _route.base, 0, 100); }
 
     void setScan(int value, bool routed = false) {
         _scan.set(clamp(value, 0, 100), routed);
@@ -71,6 +72,10 @@ public:
     void setRoute(int value, bool routed = false) {
         _route.set(clamp(value, 0, 100), routed);
     }
+
+    // edit the base (anchor) so it works under a route without lurching by the override
+    void editScan(int delta, int step) { setScan(int(_scan.base) + delta * step); }
+    void editRoute(int delta, int step) { setRoute(int(_route.base) + delta * step); }
 
     void clear() {
         _inputs.fill(InputSource::CvIn);

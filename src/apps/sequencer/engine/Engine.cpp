@@ -343,7 +343,7 @@ void Engine::tapTempoReset() {
 }
 
 void Engine::tapTempoTap() {
-    float bpm = _project.tempo();
+    float bpm = _project.tempoBase();   // tap the anchor, not the modulated value
     bpm = _tapTempo.tap(bpm);
     _project.setTempo(bpm);
 }

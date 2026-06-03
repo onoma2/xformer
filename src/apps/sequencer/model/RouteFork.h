@@ -8,6 +8,7 @@
 #include "Track.h"
 #include "ParamTableNote.h"
 #include "ParamTablePhaseFlux.h"
+#include "ParamTableGlobal.h"
 
 // Apply-fork decision for the routing mod-matrix slice (plan 005, step 3).
 //
@@ -46,6 +47,11 @@ namespace RouteFork {
         case Routing::Target::RunMode:                   return ParamKey::RunMode;
         case Routing::Target::FirstStep:                 return ParamKey::FirstStep;
         case Routing::Target::LastStep:                  return ParamKey::LastStep;
+        // global (project) targets — no track dimension
+        case Routing::Target::Tempo:                     return ParamKey::Tempo;
+        case Routing::Target::Swing:                     return ParamKey::Swing;
+        case Routing::Target::CvRouteScan:               return ParamKey::CvRouteScan;
+        case Routing::Target::CvRouteRoute:              return ParamKey::CvRouteRoute;
         default:                                         return ParamKey::None;
         }
     }
@@ -77,6 +83,23 @@ namespace RouteFork {
         }
         uint8_t key = targetToParamKey(target);
         const RouteParam::Row *row = table->find(key);
+        if (!row) {
+            return false;
+        }
+        paramKey = key;
+        range = row->range;
+        return true;
+    }
+
+    // Global (project) variant: Tempo/Swing/CVR have no track dimension. Gates on
+    // the project-target range + the global param table, filling key + range the
+    // same way migrated() does — the engine writes the override at GlobalTrack.
+    inline bool migratedGlobal(Routing::Target target, uint8_t &paramKey, RouteParam::Range &range) {
+        if (!Routing::isProjectTarget(target)) {
+            return false;
+        }
+        uint8_t key = targetToParamKey(target);
+        const RouteParam::Row *row = GlobalParamTable::table().find(key);
         if (!row) {
             return false;
         }

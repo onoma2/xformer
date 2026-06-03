@@ -10,6 +10,7 @@
 #include "PlayState.h"
 #include "UserScale.h"
 #include "Routing.h"
+#include "RouteParamKey.h"
 #include "CvRoute.h"
 #include "MidiOutput.h"
 #include "Modulator.h"
@@ -66,15 +67,14 @@ public:
 
     // tempo
 
-    float tempo() const { return _tempo.get(isRouted(Routing::Target::Tempo)); }
+    float tempo() const { return Routing::routedValueGlobal(ParamKey::Tempo, _tempo.base, 1.f, 1000.f); }
+    float tempoBase() const { return _tempo.base; }   // anchor, for edit-from-base under a route
     void setTempo(float tempo, bool routed = false) {
         _tempo.set(clamp(tempo, 1.f, 1000.f), routed);
     }
 
     void editTempo(int value, bool shift) {
-        if (!isRouted(Routing::Target::Tempo)) {
-            setTempo(tempo() + value * (shift ? 0.1f : 1.f));
-        }
+        setTempo(_tempo.base + value * (shift ? 0.1f : 1.f));
     }
 
     void printTempo(StringBuilder &str) const {
@@ -84,15 +84,13 @@ public:
 
     // swing
 
-    int swing() const { return _swing.get(isRouted(Routing::Target::Swing)); }
+    int swing() const { return Routing::routedValueGlobalInt(ParamKey::Swing, _swing.base, 50, 75); }
     void setSwing(int swing, bool routed = false) {
         _swing.set(clamp(swing, 50, 75), routed);
     }
 
     void editSwing(int value, bool shift) {
-        if (!isRouted(Routing::Target::Swing)) {
-            setSwing(ModelUtils::adjustedByStep(swing(), value, 5, !shift));
-        }
+        setSwing(ModelUtils::adjustedByStep(int(_swing.base), value, 5, !shift));
     }
 
     void printSwing(StringBuilder &str) const {

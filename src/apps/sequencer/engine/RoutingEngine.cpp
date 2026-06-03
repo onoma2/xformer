@@ -583,6 +583,16 @@ void RoutingEngine::updateSinks() {
             } else if (Routing::isEngineTarget(target)) {
                 float baseValue = route.min() + _sourceValues[routeIndex] * (route.max() - route.min());
                 writeEngineTarget(target, baseValue, routeState);
+            } else if (Routing::isProjectTarget(target)) {
+                // Global (Tempo/Swing/CVR): base-anchored override at GlobalTrack,
+                // skipping old absolute writeTarget. No track dimension -> slot 0
+                // carries the route's shaper/depth.
+                uint8_t gKey; RouteParam::Range gRange;
+                if (RouteFork::migratedGlobal(target, gKey, gRange)) {
+                    float delta = RouteFork::computeDelta(_sourceValues[routeIndex],
+                                                          route.shaper(0), route.depthPct(0), gRange);
+                    Routing::writeRouteOverride(gKey, Routing::GlobalTrack, delta);
+                }
             } else {
                 float baseValue = route.min() + _sourceValues[routeIndex] * (route.max() - route.min());
                 _routing.writeTarget(target, route.tracks(), baseValue);

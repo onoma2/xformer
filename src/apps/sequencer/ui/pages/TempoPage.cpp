@@ -114,7 +114,7 @@ void TempoPage::keyUp(KeyEvent &event) {
 void TempoPage::encoder(EncoderEvent &event) {
     switch (_mode) {
     case Mode::Tempo:
-        _project.setTempo(_project.tempo() + event.value() * (event.pressed() ? 0.1f : 1.f) * (globalKeyState()[Key::Shift] ? 10.f : 1.f));
+        _project.setTempo(_project.tempoBase() + event.value() * (event.pressed() ? 0.1f : 1.f) * (globalKeyState()[Key::Shift] ? 10.f : 1.f));
         break;
     case Mode::Swing:
         _project.editSwing(event.value(), globalKeyState()[Key::Shift]);

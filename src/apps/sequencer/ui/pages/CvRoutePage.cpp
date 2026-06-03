@@ -164,9 +164,9 @@ void CvRoutePage::encoder(EncoderEvent &event) {
 
     if (_activeCol == 4) {
         if (_editRow == EditRow::Input) {
-            cvRoute.setScan(cvRoute.scan() + delta * step);
+            cvRoute.editScan(delta, step);
         } else {
-            cvRoute.setRoute(cvRoute.route() + delta * step);
+            cvRoute.editRoute(delta, step);
         }
     } else {
         if (_editRow == EditRow::Input) {
