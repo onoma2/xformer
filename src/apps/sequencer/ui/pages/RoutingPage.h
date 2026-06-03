@@ -41,6 +41,13 @@ private:
     int _overviewSel = 0;
     int _overviewScroll = 0;
 
+    // tab editor (read-only display shell of the new lens editor; Page+S6)
+    bool tabEditorActive() const { return _tabEditorActive; }
+    void drawTabEditor(Canvas &canvas);
+    void handleTabEditorKey(KeyPressEvent &event);
+    bool _tabEditorActive = false;
+    int _tabEditorTab = 0;
+
     // bias/depth overlay
     void enterBiasOverlay();
     void exitBiasOverlay(bool commit);

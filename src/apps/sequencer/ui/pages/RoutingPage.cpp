@@ -51,6 +51,10 @@ void RoutingPage::draw(Canvas &canvas) {
         drawBiasOverlay(canvas);
         return;
     }
+    if (tabEditorActive()) {
+        drawTabEditor(canvas);
+        return;
+    }
 
     bool showCommit = *_route != _editRoute;
     bool showLearn = _editRoute.target() != Routing::Target::None;
@@ -78,8 +82,20 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
+    if (tabEditorActive()) {
+        handleTabEditorKey(event);
+        return;
+    }
+
     if (key.pageModifier() && key.isStep() && key.step() == 4) { // Page + S5
         enterBiasOverlay();
+        event.consume();
+        return;
+    }
+
+    if (key.pageModifier() && key.isStep() && key.step() == 5) { // Page + S6: tab editor preview
+        _tabEditorActive = true;
+        _tabEditorTab = 0;
         event.consume();
         return;
     }
@@ -139,6 +155,11 @@ void RoutingPage::encoder(EncoderEvent &event) {
         return;
     }
 
+    if (tabEditorActive()) { // read-only display: encoder is inert
+        event.consume();
+        return;
+    }
+
     if (!edit() && pageKeyState()[Key::Shift]) {
         selectRoute(_routeIndex + event.value());
         event.consume();
@@ -150,6 +171,7 @@ void RoutingPage::encoder(EncoderEvent &event) {
 
 void RoutingPage::showRoute(int routeIndex, const Routing::Route *initialValue) {
     _overviewActive = false;   // showing a route means the per-route editor
+    _tabEditorActive = false;
     _route = &_project.routing().route(routeIndex);
     _routeIndex = routeIndex;
     _editRoute = *(initialValue ? initialValue : _route);
@@ -715,7 +737,119 @@ void RoutingPage::handleOverviewKey(KeyPressEvent &event) {
     }
 }
 
+static char trackModeLetter(Track::TrackMode mode) {
+    switch (mode) {
+    case Track::TrackMode::Note:        return 'N';
+    case Track::TrackMode::Curve:       return 'C';
+    case Track::TrackMode::MidiCv:      return 'M';
+    case Track::TrackMode::Tuesday:     return 'A'; // Algo
+    case Track::TrackMode::DiscreteMap: return 'D';
+    case Track::TrackMode::Indexed:     return 'I';
+    case Track::TrackMode::Teletype:    return 'T';
+    case Track::TrackMode::Stochastic:  return 'S';
+    case Track::TrackMode::PhaseFlux:   return 'P';
+    default:                            return '?';
+    }
+}
+
+void RoutingPage::drawTabEditor(Canvas &canvas) {
+    const char *tabs[] = { "PITCH", "CLOCK", "PROB", "GLOB" };
+    const int tabCount = 4;
+
+    WindowPainter::clear(canvas);
+    WindowPainter::drawHeader(canvas, _model, _engine, "ROUTE");
+    WindowPainter::drawActiveFunction(canvas, Routing::targetName(_editRoute.target()));
+    const char *fn[] = { "BACK", nullptr, nullptr, nullptr, nullptr };
+    WindowPainter::drawFooter(canvas, fn, pageKeyState());
+
+    canvas.setFont(Font::Tiny);
+
+    // left vertical tab column
+    const int tabX = 2, tabW = 40, tabTop = 14, tabH = 9;
+    for (int i = 0; i < tabCount; ++i) {
+        int y = tabTop + i * tabH;
+        bool active = i == _tabEditorTab;
+        if (active) {
+            canvas.setColor(Color::MediumBright);
+            canvas.fillRect(tabX, y, tabW, tabH - 1);
+            canvas.setBlendMode(BlendMode::Sub);
+            canvas.drawText(tabX + 3, y + 6, tabs[i]);
+            canvas.setBlendMode(BlendMode::Set);
+        } else {
+            canvas.setColor(Color::Low);
+            canvas.drawText(tabX + 3, y + 6, tabs[i]);
+        }
+    }
+    canvas.setColor(Color::Low);
+    canvas.vline(tabW + 2, 12, CONFIG_LCD_HEIGHT - 23);
+
+    // the route's param row: name . source . depth . track+engine mini-map
+    const int cx = tabW + 6, rowY = 16;
+    const int mapX = CONFIG_LCD_WIDTH - 8 * 11 - 1, mapY = rowY + 8;
+    canvas.setColor(Color::Bright);
+    canvas.drawText(cx, rowY + 4, Routing::targetName(_editRoute.target()));
+    FixedStringBuilder<12> src;
+    Routing::printSource(_editRoute.source(), src);
+    canvas.setColor(Color::Medium);
+    canvas.drawText(cx, rowY + 12, src);
+    FixedStringBuilder<8> dep("%+d%%", _editRoute.depthPct(0));
+    canvas.setColor(Color::Bright);
+    canvas.drawText(mapX - 6 - canvas.textWidth(dep), rowY + 12, dep);   // right-aligned before the map
+
+    // mini-map (per-track engine letter; filled = member)
+    bool perTrack = Routing::isPerTrackTarget(_editRoute.target());
+    if (perTrack) {
+        uint8_t tracks = _editRoute.tracks();
+        for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+            int px = mapX + t * 11;
+            char letter[2] = { trackModeLetter(_project.track(t).trackMode()), 0 };
+            if (tracks & (1 << t)) {
+                canvas.setColor(Color::Bright);
+                canvas.fillRect(px, mapY, 10, 7);
+                canvas.setBlendMode(BlendMode::Sub);
+                canvas.drawText(px + 3, mapY + 5, letter);
+                canvas.setBlendMode(BlendMode::Set);
+            } else {
+                canvas.setColor(Color::Low);
+                canvas.drawText(px + 3, mapY + 5, letter);
+            }
+        }
+    } else {
+        canvas.setColor(Color::Medium);
+        canvas.drawText(mapX, mapY + 5, "global");
+    }
+
+    // combine line
+    canvas.setColor(Color::Medium);
+    canvas.drawText(cx, rowY + 28,
+        FixedStringBuilder<24>("Combine: %s",
+            _editRoute.combine() == RouteApply::Combine::Absolute ? "Absolute" : "Modulate"));
+}
+
+void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
+    const auto &key = event.key();
+    if (key.isLeft()) {
+        _tabEditorTab = (_tabEditorTab + 3) % 4;
+        event.consume();
+        return;
+    }
+    if (key.isRight()) {
+        _tabEditorTab = (_tabEditorTab + 1) % 4;
+        event.consume();
+        return;
+    }
+    if ((key.isFunction() && key.function() == 0) ||
+        (key.pageModifier() && key.isStep() && key.step() == 5)) { // BACK / Page+S6 toggle
+        _tabEditorActive = false;
+        event.consume();
+        return;
+    }
+}
+
 void RoutingPage::keyboard(KeyboardEvent &event) {
+    if (tabEditorActive() || overviewActive()) { // read-only / list views own no keyboard editing
+        return;
+    }
     if (event.isPressed()) {
         if (event.keycode() == KeyboardEvent::KeyEnter) {
             commitRoute();
