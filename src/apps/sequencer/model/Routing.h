@@ -845,6 +845,17 @@ public:
     static bool routeOverridden(uint8_t paramKey, int trackIndex);
     static float routedValue(uint8_t paramKey, int trackIndex, float base, float lo, float hi);
     static int routedValueInt(uint8_t paramKey, int trackIndex, int base, int lo, int hi);
+
+    // Global routes (Tempo/Swing/CVR) have no track dimension; their override lives
+    // in a reserved slot of the same table. GlobalTrack sits one past the last real
+    // track, so it never collides with a per-track entry.
+    static constexpr int GlobalTrack = CONFIG_TRACK_COUNT;
+    static float routedValueGlobal(uint8_t paramKey, float base, float lo, float hi) {
+        return routedValue(paramKey, GlobalTrack, base, lo, hi);
+    }
+    static int routedValueGlobalInt(uint8_t paramKey, int base, int lo, int hi) {
+        return routedValueInt(paramKey, GlobalTrack, base, lo, hi);
+    }
 private:
     static std::pair<float, float> normalizedDefaultRange(Target target);
     static float targetValueStep(Target target, bool shift);
