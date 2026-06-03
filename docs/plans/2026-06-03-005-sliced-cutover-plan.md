@@ -114,15 +114,24 @@ modulated, output unaffected by snapshot slots).
 
 ## Build order
 
+_Status (2026-06-03): steps 1–4 DONE — apply-fork cutover live for Note + PhaseFlux,
+each slice TDD + Codex-gated, sim + STM32 green. See `.tasks/routing-matrix/TASK.md`
+("Slices 1-4 landed"). Step 5 (hardware audition) is next._
+
 1. **Override table** + `routeOverride()` accessor + clear/rebuild-per-recompute +
-   `clamp(base+delta)` read helper. Tested standalone.
-2. **Shaper stage** (None/TriangleFold, bias-free) feeding `RouteApply`. Tested.
+   `clamp(base+delta)` read helper. Tested standalone. ✅ `Routing::*RouteOverride*`,
+   sparse `RouteOverrideEntry[128]`; `TestRouteOverride`.
+2. **Shaper stage** (None/TriangleFold, bias-free) feeding `RouteApply`. Tested. ✅
+   `model/RouteShaper.h`; `TestRouteShaper`.
 3. **Apply fork** — the override-write pass for migrated-type targets, old
    `writeTarget` skipped for those; range inferred; combine/d derived inline. Tested
-   against `RouteApply` expectations.
+   against `RouteApply` expectations. ✅ `model/RouteFork.h` + `updateSinks()` fork;
+   `TestRouteFork`.
 4. **Migrate Note + PhaseFlux getters** to override-read; edit-gate on override
-   presence; assert snapshot + stale-clear + base-write-exclusion behavior.
-5. **Hardware audition** — Note + PhaseFlux, Modulate, None/TriangleFold.
+   presence; assert snapshot + stale-clear + base-write-exclusion behavior. ✅ 22
+   getters + every interactive knob-edit gate; `TestRouteGetterMigration`. PhaseFlux
+   Scale/RootNote base-write defect fixed in-slice.
+5. **Hardware audition** — Note + PhaseFlux, Modulate, None/TriangleFold. ← NEXT
 6. **UI** — persisted `combine`/`d`/`scaleSource` on `Route` (+ `clear()`/`==`/copy) +
    local matrix; validates the model UX, not just plumbing.
 7. **Expand** — other six getters; defect-heavy tracks to audition; remaining shapers;

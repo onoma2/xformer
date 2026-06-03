@@ -268,3 +268,66 @@ Build the slice in order (see plan 005):
 - **Slot model** — `(source, scope, paramKey, combine, d[8], shaper[8], scaleSource)`.
 - Then **U6 group scope**, **U7 re-address + engine cutover** (the single flip; deletes old dispatch
   + VcaNext neighbor read + per-pattern `Routable` routed half).
+
+## Slices 1-4 landed — apply-fork cutover live for Note + PhaseFlux (2026-06-03)
+
+Plan 005 build order, TDD + Codex-gated each slice. Sim + STM32 release green throughout.
+
+- **Slice 1 — override table.** `Routing::clearRouteOverrides / writeRouteOverride /
+  routeOverride / routedValue` backed by a file-scope sparse `RouteOverrideEntry[CONFIG_ROUTE_COUNT
+  * CONFIG_TRACK_COUNT]` (~1KB .bss; chosen over a dense [track][key] table ~8KB for the tight
+  SRAM budget). Linear scan, last-write-wins, presence=routed (a zero-delta entry still reads
+  present). `clearRouteOverrides()` wired at the top of `updateSinks()` (rebuilt every recompute).
+  `routedValue = clamp(base+delta)`. `TestRouteOverride` (8 cases).
+- **Slice 2 — bias-free shaper stage.** `model/RouteShaper.h` `shape(Shaper, h)` — None +
+  TriangleFold (center locked at 0.5, exact match to live `applyTriangleFold` at bias=0); the other
+  seven shapers fall through to identity this slice. Header-only. `TestRouteShaper` (6 cases).
+- **Slice 3 — apply fork.** `model/RouteFork.h`: `targetToParamKey` (legacy Target -> shared
+  ParamKey), `inferRange` (min<0 -> half-span, else full span), `migrated(mode,target,&key,&range)`
+  gating on the Note/PhaseFlux param tables. In `updateSinks()` per-track loop, a migrated
+  Note/PhaseFlux target computes `RouteShaper::shape` -> `RouteApply::delta` (Modulate,
+  d=depthPct, scaleSource=None, range from the table) -> `writeRouteOverride`, then `continue`
+  (skips old `writeTarget`). Everything else (Reset/CvOutRot/Run/global/bus/non-migrated modes)
+  stays on live `writeTarget`. `_project` member added to RoutingEngine. `TestRouteFork` (8 cases).
+- **Slice 4 — getter migration (the cutover).** `Routing::routeOverridden` + `routedValueInt`
+  companions. 22 getters -> `clamp(base+override)`: NoteSequence (7), NoteTrack (8),
+  PhaseFluxSequence (4, incl. `selectedScale/RootNote` raw-field reads rerouted through the getter),
+  PhaseFluxTrack (3). Clamp range = the param routing range (matches `inferRange`); base passes
+  through unclamped when not overridden, so Scale/RootNote -1 Default survives. Edit-gating swapped
+  `isRouted`->`routeOverridden` on every interactive knob path: editX methods, PhaseFluxTrackListModel,
+  NoteSequenceListModel::setIndexedValue (QuickEdit), LaunchpadController First/Last/RunMode.
+  `TestRouteGetterMigration` (9 cases). **PhaseFlux Scale/RootNote base-write defect fixed for free**
+  (fork skips the base-mutating writeTarget; getter reads base+override).
+
+### Gate boundary (Codex-agreed)
+
+Interactive single-knob UI edits gate on override presence; **programmatic / bulk / structural
+writes intentionally write base** (Python bindings, `duplicateSteps`, clipboard, init, generator,
+routing-apply hooks). Under the base-anchored model writing base shifts the modulation center, not
+corruption. No interactive knob path on a migrated param remains ungated.
+
+### UI status — no new editor yet (slice 6)
+
+Routes are still configured through the existing `RouteListModel` (Target/Tracks/Min/Max/Bias/
+Depth/Shaper/Source). For a migrated Note/PhaseFlux target: **Depth** = the live `d` knob;
+**Shaper** = None/TriangleFold honored (others act as None); **Min/Max window and Bias are inert**
+(still render + accept edits, but do nothing — the new path uses the full param range, bias-free).
+combine (Modulate) / scaleSource (None) are not exposed. Slice 6 replaces the dead fields with real
+persisted combine/d/scaleSource controls.
+
+### Audition caveat (slice 5)
+
+Modulate default = forward-model: bipolar around base. A migrated route sounds DIFFERENT from the
+same route today (which wrote an absolute `min + shaper*span`). Not a regression — the new model.
+
+### Carry-forwards
+
+1. Unported shapers (Crease/Location/Envelope/FreqFollower/Activity/ProgDiv/VcaNext) shape as
+   identity in the new path — accept, or gate those routes back to old `writeTarget`.
+2. Divisor override not divisor-quantized (non-musical divisions possible under modulation) — defer
+   to a quantize stage.
+3. Snapshot "unaffected on output" not unit-tested (engine harness disabled); structurally holds
+   (engine reads the active sequence only).
+4. `isRouted`/`setRouted` still maintained for UI markers + old-path targets.
+5. Pre-existing failures on clean HEAD (NOT this work): TestDiscreteMapSequence,
+   TestStochasticDurationDictionary, TestHarmonyInversionIssue, TestCurveTrackLfoShapes(+Integration).
