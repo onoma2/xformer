@@ -102,16 +102,35 @@ CASE("unmapped + special targets are never migrated") {
     expectFalse(RouteFork::migrated(Mode::Note, Routing::Target::Run, key, range), "Run");
 }
 
-CASE("composes into a base-anchored delta via shaper + RouteApply") {
+// computeDelta is the exact source->delta composition updateSinks() runs per
+// migrated track (shape -> Modulate delta over inferRange). Pinning it here
+// covers the live engine seam in sim; only the loop/skip wiring is left to hardware.
+CASE("computeDelta: source-center is neutral for any shaper/depth (base-anchored)") {
+    RouteParam::Range transpose{ -60.f, 60.f };
+    expectTrue(near(RouteFork::computeDelta(0.5f, Routing::Shaper::None, 100, transpose), 0.f), "None center");
+    expectTrue(near(RouteFork::computeDelta(0.5f, Routing::Shaper::TriangleFold, 100, transpose), 0.f), "TriFold center");
+    expectTrue(near(RouteFork::computeDelta(0.5f, Routing::Shaper::None, 37, transpose), 0.f), "any depth");
+}
+
+CASE("computeDelta: full swing and depth scaling over the inferred range") {
+    RouteParam::Range transpose{ -60.f, 60.f };   // bipolar -> 60
+    expectTrue(near(RouteFork::computeDelta(1.0f, Routing::Shaper::None, 100, transpose), 60.f),  "src1 -> +range");
+    expectTrue(near(RouteFork::computeDelta(0.0f, Routing::Shaper::None, 100, transpose), -60.f), "src0 -> -range");
+    expectTrue(near(RouteFork::computeDelta(1.0f, Routing::Shaper::None, 50, transpose), 30.f),   "depth 50 -> half");
+    RouteParam::Range scale{ 0.f, 23.f };          // unipolar -> 23
+    expectTrue(near(RouteFork::computeDelta(1.0f, Routing::Shaper::None, 100, scale), 23.f),      "unipolar full");
+}
+
+CASE("computeDelta: TriangleFold reshapes the source before Modulate") {
+    RouteParam::Range transpose{ -60.f, 60.f };
+    expectTrue(near(RouteFork::computeDelta(0.75f, Routing::Shaper::TriangleFold, 100, transpose), 60.f),  "0.75 -> +full");
+    expectTrue(near(RouteFork::computeDelta(0.25f, Routing::Shaper::TriangleFold, 100, transpose), -60.f), "0.25 -> -full");
+}
+
+CASE("computeDelta: range comes from the migrated row") {
     uint8_t key; RouteParam::Range range;
     RouteFork::migrated(Mode::Note, Routing::Target::Transpose, key, range);
-    float modRange = RouteFork::inferRange(range);
-    // None shaper, full source, depth 100, Modulate -> +full range.
-    float hi = RouteShaper::shape(Routing::Shaper::None, 1.0f);
-    expectTrue(near(RouteApply::delta(hi, 1.0f, Combine::Modulate, 100, modRange), 60.f), "full swing +60");
-    // Source center -> neutral (base anchored).
-    float mid = RouteShaper::shape(Routing::Shaper::None, 0.5f);
-    expectTrue(near(RouteApply::delta(mid, 1.0f, Combine::Modulate, 100, modRange), 0.f), "center neutral");
+    expectTrue(near(RouteFork::computeDelta(1.0f, Routing::Shaper::None, 100, range), 60.f), "Transpose row -> 60");
 }
 
 } // UNIT_TEST

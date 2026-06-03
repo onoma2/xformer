@@ -2,8 +2,6 @@
 
 #include "model/RouteParam.h"
 #include "model/RouteFork.h"
-#include "model/RouteShaper.h"
-#include "model/RouteApply.h"
 
 #include "Engine.h"
 #include "MidiUtils.h"
@@ -519,9 +517,8 @@ void RoutingEngine::updateSinks() {
                         uint8_t paramKey;
                         RouteParam::Range pRange;
                         if (RouteFork::migrated(_project.track(trackIndex).trackMode(), target, paramKey, pRange)) {
-                            float h = RouteShaper::shape(route.shaper(trackIndex), _sourceValues[routeIndex]);
-                            float delta = RouteApply::delta(h, 1.f, RouteApply::Combine::Modulate,
-                                                            route.depthPct(trackIndex), RouteFork::inferRange(pRange));
+                            float delta = RouteFork::computeDelta(_sourceValues[routeIndex],
+                                                                 route.shaper(trackIndex), route.depthPct(trackIndex), pRange);
                             Routing::writeRouteOverride(paramKey, trackIndex, delta);
                             continue;
                         }

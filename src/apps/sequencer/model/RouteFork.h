@@ -3,6 +3,8 @@
 #include "Routing.h"
 #include "RouteParam.h"
 #include "RouteParamKey.h"
+#include "RouteShaper.h"
+#include "RouteApply.h"
 #include "Track.h"
 #include "ParamTableNote.h"
 #include "ParamTablePhaseFlux.h"
@@ -52,6 +54,15 @@ namespace RouteFork {
     // the full span. Mirrors RouteApply's `range` contract.
     inline float inferRange(const RouteParam::Range &r) {
         return r.min < 0.f ? (r.max - r.min) * 0.5f : (r.max - r.min);
+    }
+
+    // The per-track value composition updateSinks() runs for a migrated target:
+    // bias-free shape of the normalized source, then the Modulate delta over the
+    // param's inferred range (depthPct = the per-track d gain, scaleSource = None).
+    inline float computeDelta(float sourceValue, Routing::Shaper shaper, int depthPct,
+                              const RouteParam::Range &range) {
+        float h = RouteShaper::shape(shaper, sourceValue);
+        return RouteApply::delta(h, 1.f, RouteApply::Combine::Modulate, depthPct, inferRange(range));
     }
 
     // True when (trackMode, target) is a migrated per-track param; fills paramKey
