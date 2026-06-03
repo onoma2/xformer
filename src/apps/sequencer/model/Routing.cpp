@@ -370,6 +370,64 @@ void Routing::printRouted(StringBuilder &str, Target target, int trackIndex) {
     }
 }
 
+// Transient override store: one entry per targeted (trackIndex, paramKey).
+// At most one route per (key, track) (conflict-guarded), each spanning up to
+// CONFIG_TRACK_COUNT tracks -> CONFIG_ROUTE_COUNT * CONFIG_TRACK_COUNT slots.
+struct RouteOverrideEntry {
+    float delta;
+    uint8_t paramKey;
+    uint8_t trackIndex;
+};
+static std::array<RouteOverrideEntry, CONFIG_ROUTE_COUNT * CONFIG_TRACK_COUNT> routeOverrides;
+static size_t routeOverrideCount = 0;
+
+void Routing::clearRouteOverrides() {
+    routeOverrideCount = 0;
+}
+
+void Routing::writeRouteOverride(uint8_t paramKey, int trackIndex, float delta) {
+    for (size_t i = 0; i < routeOverrideCount; ++i) {
+        if (routeOverrides[i].paramKey == paramKey && routeOverrides[i].trackIndex == trackIndex) {
+            routeOverrides[i].delta = delta;
+            return;
+        }
+    }
+    if (routeOverrideCount < routeOverrides.size()) {
+        routeOverrides[routeOverrideCount++] = { delta, paramKey, uint8_t(trackIndex) };
+    }
+}
+
+bool Routing::routeOverride(uint8_t paramKey, int trackIndex, float &delta) {
+    for (size_t i = 0; i < routeOverrideCount; ++i) {
+        if (routeOverrides[i].paramKey == paramKey && routeOverrides[i].trackIndex == trackIndex) {
+            delta = routeOverrides[i].delta;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Routing::routeOverridden(uint8_t paramKey, int trackIndex) {
+    float delta;
+    return routeOverride(paramKey, trackIndex, delta);
+}
+
+float Routing::routedValue(uint8_t paramKey, int trackIndex, float base, float lo, float hi) {
+    float delta;
+    if (routeOverride(paramKey, trackIndex, delta)) {
+        return clamp(base + delta, lo, hi);
+    }
+    return base;
+}
+
+int Routing::routedValueInt(uint8_t paramKey, int trackIndex, int base, int lo, int hi) {
+    float delta;
+    if (routeOverride(paramKey, trackIndex, delta)) {
+        return int(std::round(clamp(float(base) + delta, float(lo), float(hi))));
+    }
+    return base;
+}
+
 struct TargetInfo {
     int16_t min;
     int16_t max;

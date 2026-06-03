@@ -834,6 +834,17 @@ public:
     static bool isRouted(Target target, int trackIndex = -1);
     static void setRouted(Target target, uint8_t tracks, bool routed);
     static void printRouted(StringBuilder &str, Target target, int trackIndex = -1);
+
+    // Routed-value override table (transient, not serialized). A (trackIndex,
+    // paramKey) -> signed delta store; presence = routed (mirrors isRouted's
+    // active semantics, track-mask dimension preserved). Cleared/rebuilt each
+    // RoutingEngine recompute; migrated getters read routedValue = clamp(base+delta).
+    static void clearRouteOverrides();
+    static void writeRouteOverride(uint8_t paramKey, int trackIndex, float delta);
+    static bool routeOverride(uint8_t paramKey, int trackIndex, float &delta);
+    static bool routeOverridden(uint8_t paramKey, int trackIndex);
+    static float routedValue(uint8_t paramKey, int trackIndex, float base, float lo, float hi);
+    static int routedValueInt(uint8_t paramKey, int trackIndex, int base, int lo, int hi);
 private:
     static std::pair<float, float> normalizedDefaultRange(Target target);
     static float targetValueStep(Target target, bool shift);
