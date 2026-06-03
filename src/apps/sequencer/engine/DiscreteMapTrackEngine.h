@@ -6,7 +6,7 @@
 #include "model/DiscreteMapSequence.h"
 #include "model/Scale.h"
 
-class DiscreteMapTrackEngine : public TrackEngine {
+class DiscreteMapTrackEngine final : public TrackEngine {
 public:
     DiscreteMapTrackEngine(Engine &engine, const Model &model, Track &track) :
         TrackEngine(engine, model, track),

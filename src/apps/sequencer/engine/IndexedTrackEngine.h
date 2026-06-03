@@ -9,7 +9,7 @@
 
 #include "core/utils/Random.h"
 
-class IndexedTrackEngine : public TrackEngine {
+class IndexedTrackEngine final : public TrackEngine {
 public:
     IndexedTrackEngine(Engine &engine, const Model &model, Track &track) :
         TrackEngine(engine, model, track),

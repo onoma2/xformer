@@ -5,7 +5,7 @@
 
 #include "model/Track.h"
 
-class MidiCvTrackEngine : public TrackEngine {
+class MidiCvTrackEngine final : public TrackEngine {
 public:
     MidiCvTrackEngine(Engine &engine, const Model &model, Track &track) :
         TrackEngine(engine, model, track),

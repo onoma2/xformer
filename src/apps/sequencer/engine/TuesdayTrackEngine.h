@@ -7,7 +7,7 @@
 #include "core/utils/Random.h"
 #include "SortedQueue.h"
 
-class TuesdayTrackEngine : public TrackEngine {
+class TuesdayTrackEngine final : public TrackEngine {
 public:
     TuesdayTrackEngine(Engine &engine, const Model &model, Track &track) :
         TrackEngine(engine, model, track)

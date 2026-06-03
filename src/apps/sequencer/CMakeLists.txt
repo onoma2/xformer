@@ -165,6 +165,7 @@ set(sources
     ui/model/DiscreteMapSequenceListModel.h
     ui/model/IndexedTrackListModel.h
     ui/model/NoteSequenceListModel.cpp
+    ui/model/StochasticPerformanceListModel.cpp
     ui/model/TeletypeTrackListModel.h
     # ui/painters
     ui/painters/SequencePainter.cpp

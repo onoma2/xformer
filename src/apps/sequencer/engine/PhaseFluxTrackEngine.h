@@ -10,7 +10,7 @@
 
 #include <cstdint>
 
-class PhaseFluxTrackEngine : public TrackEngine {
+class PhaseFluxTrackEngine final : public TrackEngine {
 public:
     static constexpr int kStageCount = PhaseFluxMath::kStageCount;
     static constexpr int kMaxPulses = 16;

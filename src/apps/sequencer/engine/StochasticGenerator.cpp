@@ -10,7 +10,6 @@
 // burstCount is a MAX intent: actual count clips to whatever the picked
 // spacing LUT entry can hold inside the parent duration (Option C).
 static const int kBurstCountLut[] = { 2, 3, 4, 5, 6, 7, 8 };
-static const int kBurstCountLutSize = 7;
 
 // Burst spacing LUT — knob picks weighted-random denominator from {2,3,4,5,6}.
 // Spacing = parentDurationTicks / denominator.

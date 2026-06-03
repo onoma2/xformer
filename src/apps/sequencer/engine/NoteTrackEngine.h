@@ -8,7 +8,7 @@
 #include "RecordHistory.h"
 #include "StepRecorder.h"
 
-class NoteTrackEngine : public TrackEngine {
+class NoteTrackEngine final : public TrackEngine {
 public:
 #if CONFIG_EXPERIMENTAL_SPREAD_RTRIG_TICKS
     // Sequence ID constants for experimental spread-ticks feature

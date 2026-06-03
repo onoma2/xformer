@@ -10,7 +10,7 @@
 
 #include "model/Track.h"
 
-class CurveTrackEngine : public TrackEngine {
+class CurveTrackEngine final : public TrackEngine {
 public:
     CurveTrackEngine(Engine &engine, const Model &model, Track &track) :
         TrackEngine(engine, model, track),

@@ -10,7 +10,7 @@
 #include "model/StochasticSequence.h"
 #include "model/StochasticTrack.h"
 
-class StochasticTrackEngine : public TrackEngine {
+class StochasticTrackEngine final : public TrackEngine {
 public:
     StochasticTrackEngine(Engine &engine, const Model &model, Track &track);
 

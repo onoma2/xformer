@@ -1789,6 +1789,9 @@ void StochasticSequenceEditPage::contextAction(int index) {
             showMessage("RANDOM TICKETS");
             break;
         }
+        case ContextAction::BurstHold:
+            showMessage("BURST HOLD: LIVE PAGE");
+            break;
         case ContextAction::Last:
             break;
         }
@@ -1818,6 +1821,9 @@ void StochasticSequenceEditPage::contextAction(int index) {
             showMessage("RAND DUR");
             break;
         }
+        case ContextAction::BurstHold:
+            showMessage("BURST HOLD: LIVE PAGE");
+            break;
         case ContextAction::Last:
             break;
         }

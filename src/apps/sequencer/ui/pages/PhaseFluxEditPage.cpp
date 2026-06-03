@@ -584,7 +584,7 @@ void PhaseFluxEditPage::shake(bool wholeTopic) {
     if (_currentSet == 0) {
         // TEMP — selected cell only, 3 pages.
         auto &s = seq.stage(_selectedCell);
-        auto [first, last] = pageRange(2);
+        auto pr = pageRange(2); int first = pr.first, last = pr.second;
         for (int page = first; page <= last; ++page) {
             if (page == 0) {
                 s.setTemporalCurve(PhaseFluxSequence::TemporalCurveType(rng.nextRange(3)));
@@ -608,7 +608,7 @@ void PhaseFluxEditPage::shake(bool wholeTopic) {
         auto &active = seq.stage(_selectedCell);
         auto &master = seq.stage(0);
         const int maxPage = isGlobalPitch ? 1 : 2;
-        auto [first, last] = pageRange(maxPage);
+        auto pr = pageRange(maxPage); int first = pr.first, last = pr.second;
         for (int page = first; page <= last; ++page) {
             if (isGlobalPitch) {
                 if (page == 0) {
@@ -645,7 +645,7 @@ void PhaseFluxEditPage::shake(bool wholeTopic) {
         // ACCUM — non-skipped cells (per-stage step + trigger) + sequence config.
         const bool isN = (_currentSet == 2);
         auto &cfg = isN ? seq.noteAccumConfig() : seq.pulseAccumConfig();
-        auto [first, last] = pageRange(1);
+        auto pr = pageRange(1); int first = pr.first, last = pr.second;
         for (int page = first; page <= last; ++page) {
             if (page == 0) {
                 // Ac.St (per-cell step) + Order (per-sequence).
@@ -669,7 +669,7 @@ void PhaseFluxEditPage::shake(bool wholeTopic) {
         }
     } else if (_currentSet == 4) {
         // MACRO — sequence-level. Snap/Zero on P1 are press-only, skipped.
-        auto [first, last] = pageRange(1);
+        auto pr = pageRange(1); int first = pr.first, last = pr.second;
         for (int page = first; page <= last; ++page) {
             if (page == 0) {
                 seq.setWarpNudge(int(rng.nextRange(129)) - 64);

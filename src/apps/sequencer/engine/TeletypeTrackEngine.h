@@ -8,7 +8,7 @@
 #include <array>
 #include <cstdint>
 
-class TeletypeTrackEngine : public TrackEngine {
+class TeletypeTrackEngine final : public TrackEngine {
 public:
     static constexpr int TriggerInputCount = 4;
     static constexpr int TriggerOutputCount = 4;
