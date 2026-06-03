@@ -74,9 +74,9 @@ private:
         case PlayMode:     _track->editPlayMode(value, shift); break;
         case FillMode:     _track->setFillMode(ModelUtils::adjustedEnum(_track->fillMode(), value)); break;
         case CvUpdateMode: _track->editCvUpdateMode(value, shift); break;
-        case SlideTime:    if (!_track->isRouted(Routing::Target::SlideTime)) _track->setSlideTime(ModelUtils::adjusted(_track->slideTime(), value, 0, 100)); break;
-        case Octave:       _track->setOctave(ModelUtils::adjusted(_track->octave(), value, -10, 10)); break;
-        case Transpose:    _track->setTranspose(ModelUtils::adjusted(_track->transpose(), value, -100, 100)); break;
+        case SlideTime:    if (!_track->routeOverridden(ParamKey::SlideTime)) _track->setSlideTime(ModelUtils::adjusted(_track->slideTime(), value, 0, 100)); break;
+        case Octave:       if (!_track->routeOverridden(ParamKey::Octave)) _track->setOctave(ModelUtils::adjusted(_track->octave(), value, -10, 10)); break;
+        case Transpose:    if (!_track->routeOverridden(ParamKey::Transpose)) _track->setTranspose(ModelUtils::adjusted(_track->transpose(), value, -100, 100)); break;
         case Last:         break;
         }
     }

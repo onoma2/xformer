@@ -8,6 +8,7 @@
 #include "Types.h"
 #include "Scale.h"
 #include "Routing.h"
+#include "RouteParamKey.h"
 #include "ProjectVersion.h"
 
 #include "core/math/Math.h"
@@ -337,36 +338,36 @@ public:
     void setTrackIndex(int v) { _trackIndex = v; }
 
     // scale — −1 = inherit
-    int scale() const { return _scale; }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
     void setScale(int v) { _scale = clamp(v, -1, Scale::Count - 1); }
     const Scale &selectedScale(int defaultScale) const {
-        return Scale::get(_scale != -1 ? _scale : defaultScale);
+        return Scale::get(scale() != -1 ? scale() : defaultScale);
     }
-    void editScale(int value, bool) { if (!isRouted(Routing::Target::Scale)) setScale(scale() + value); }
+    void editScale(int value, bool) { if (!Routing::routeOverridden(ParamKey::Scale, _trackIndex)) setScale(scale() + value); }
     void printScale(StringBuilder &str) const {
         printRouted(str, Routing::Target::Scale);
         str(scale() < 0 ? "Default" : Scale::name(scale()));
     }
 
     // rootNote — −1 = inherit
-    int rootNote() const { return _rootNote; }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
     void setRootNote(int v) { _rootNote = clamp(v, -1, 11); }
     int selectedRootNote(int defaultRootNote) const {
-        return _rootNote != -1 ? _rootNote : defaultRootNote;
+        return rootNote() != -1 ? rootNote() : defaultRootNote;
     }
-    void editRootNote(int value, bool) { if (!isRouted(Routing::Target::RootNote)) setRootNote(rootNote() + value); }
+    void editRootNote(int value, bool) { if (!Routing::routeOverridden(ParamKey::RootNote, _trackIndex)) setRootNote(rootNote() + value); }
     void printRootNote(StringBuilder &str) const {
         printRouted(str, Routing::Target::RootNote);
         if (rootNote() < 0) { str("Default"); } else { Types::printNote(str, rootNote()); }
     }
 
     // divisor — Routable<uint16_t>, matches NoteSequence convention
-    int divisor() const { return _divisor.get(isRouted(Routing::Target::Divisor)); }
+    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor.base, 1, 768); }
     void setDivisor(int v, bool routed = false) {
         _divisor.set(ModelUtils::clampDivisor(v), routed);
     }
     void editDivisor(int value, bool shift) {
-        if (!isRouted(Routing::Target::Divisor)) setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
+        if (!Routing::routeOverridden(ParamKey::Divisor, _trackIndex)) setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
     }
     void printDivisor(StringBuilder &str) const {
         printRouted(str, Routing::Target::Divisor);
@@ -374,12 +375,12 @@ public:
     }
 
     // clockMultiplier — Routable<uint8_t>, 50..150
-    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
     void setClockMultiplier(int v, bool routed = false) {
         _clockMultiplier.set(clamp(v, 50, 150), routed);
     }
     void editClockMultiplier(int value, bool shift) {
-        if (!isRouted(Routing::Target::ClockMult)) setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
+        if (!Routing::routeOverridden(ParamKey::ClockMultiplier, _trackIndex)) setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
     }
     void printClockMultiplier(StringBuilder &str) const {
         printRouted(str, Routing::Target::ClockMult);

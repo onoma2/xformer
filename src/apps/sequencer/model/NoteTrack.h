@@ -118,13 +118,13 @@ public:
 
     // slideTime
 
-    int slideTime() const { return _slideTime.get(isRouted(Routing::Target::SlideTime)); }
+    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime.base, 0, 100); }
     void setSlideTime(int slideTime, bool routed = false) {
         _slideTime.set(clamp(slideTime, 0, 100), routed);
     }
 
     void editSlideTime(int value, bool shift) {
-        if (!isRouted(Routing::Target::SlideTime)) {
+        if (!Routing::routeOverridden(ParamKey::SlideTime, _trackIndex)) {
             setSlideTime(ModelUtils::adjustedByStep(slideTime(), value, 5, !shift));
         }
     }
@@ -136,13 +136,13 @@ public:
 
     // octave
 
-    int octave() const { return _octave.get(isRouted(Routing::Target::Octave)); }
+    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave.base, -10, 10); }
     void setOctave(int octave, bool routed = false) {
         _octave.set(clamp(octave, -10, 10), routed);
     }
 
     void editOctave(int value, bool shift) {
-        if (!isRouted(Routing::Target::Octave)) {
+        if (!Routing::routeOverridden(ParamKey::Octave, _trackIndex)) {
             setOctave(octave() + value);
         }
     }
@@ -154,13 +154,13 @@ public:
 
     // transpose
 
-    int transpose() const { return _transpose.get(isRouted(Routing::Target::Transpose)); }
+    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -60, 60); }
     void setTranspose(int transpose, bool routed = false) {
         _transpose.set(clamp(transpose, -100, 100), routed);
     }
 
     void editTranspose(int value, bool shift) {
-        if (!isRouted(Routing::Target::Transpose)) {
+        if (!Routing::routeOverridden(ParamKey::Transpose, _trackIndex)) {
             setTranspose(transpose() + value);
         }
     }
@@ -172,13 +172,13 @@ public:
 
     // rotate
 
-    int rotate() const { return _rotate.get(isRouted(Routing::Target::Rotate)); }
+    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64); }
     void setRotate(int rotate, bool routed = false) {
         _rotate.set(clamp(rotate, -64, 64), routed);
     }
 
     void editRotate(int value, bool shift) {
-        if (!isRouted(Routing::Target::Rotate)) {
+        if (!Routing::routeOverridden(ParamKey::Rotate, _trackIndex)) {
             setRotate(rotate() + value);
         }
     }
@@ -190,13 +190,13 @@ public:
 
     // gateProbabilityBias
 
-    int gateProbabilityBias() const { return _gateProbabilityBias.get(isRouted(Routing::Target::GateProbabilityBias)); }
+    int gateProbabilityBias() const { return Routing::routedValueInt(ParamKey::GateProbabilityBias, _trackIndex, _gateProbabilityBias.base, -NoteSequence::GateProbability::Range, NoteSequence::GateProbability::Range); }
     void setGateProbabilityBias(int gateProbabilityBias, bool routed = false) {
         _gateProbabilityBias.set(clamp(gateProbabilityBias, -NoteSequence::GateProbability::Range, NoteSequence::GateProbability::Range), routed);
     }
 
     void editGateProbabilityBias(int value, bool shift) {
-        if (!isRouted(Routing::Target::GateProbabilityBias)) {
+        if (!Routing::routeOverridden(ParamKey::GateProbabilityBias, _trackIndex)) {
             setGateProbabilityBias(gateProbabilityBias() + value);
         }
     }
@@ -208,13 +208,13 @@ public:
 
     // retriggerProbabilityBias
 
-    int retriggerProbabilityBias() const { return _retriggerProbabilityBias.get(isRouted(Routing::Target::RetriggerProbabilityBias)); }
+    int retriggerProbabilityBias() const { return Routing::routedValueInt(ParamKey::RetriggerProbabilityBias, _trackIndex, _retriggerProbabilityBias.base, -NoteSequence::RetriggerProbability::Range, NoteSequence::RetriggerProbability::Range); }
     void setRetriggerProbabilityBias(int retriggerProbabilityBias, bool routed = false) {
         _retriggerProbabilityBias.set(clamp(retriggerProbabilityBias, -NoteSequence::RetriggerProbability::Range, NoteSequence::RetriggerProbability::Range), routed);
     }
 
     void editRetriggerProbabilityBias(int value, bool shift) {
-        if (!isRouted(Routing::Target::RetriggerProbabilityBias)) {
+        if (!Routing::routeOverridden(ParamKey::RetriggerProbabilityBias, _trackIndex)) {
             setRetriggerProbabilityBias(retriggerProbabilityBias() + value);
         }
     }
@@ -226,13 +226,13 @@ public:
 
     // lengthBias
 
-    int lengthBias() const { return _lengthBias.get(isRouted(Routing::Target::LengthBias)); }
+    int lengthBias() const { return Routing::routedValueInt(ParamKey::LengthBias, _trackIndex, _lengthBias.base, -NoteSequence::Length::Range, NoteSequence::Length::Range); }
     void setLengthBias(int lengthBias, bool routed = false) {
         _lengthBias.set(clamp(lengthBias, -NoteSequence::Length::Range, NoteSequence::Length::Range), routed);
     }
 
     void editLengthBias(int value, bool shift) {
-        if (!isRouted(Routing::Target::LengthBias)) {
+        if (!Routing::routeOverridden(ParamKey::LengthBias, _trackIndex)) {
             setLengthBias(lengthBias() + value);
         }
     }
@@ -244,13 +244,13 @@ public:
 
     // noteProbabilityBias
 
-    int noteProbabilityBias() const { return _noteProbabilityBias.get(isRouted(Routing::Target::NoteProbabilityBias)); }
+    int noteProbabilityBias() const { return Routing::routedValueInt(ParamKey::NoteProbabilityBias, _trackIndex, _noteProbabilityBias.base, -NoteSequence::NoteVariationProbability::Range, NoteSequence::NoteVariationProbability::Range); }
     void setNoteProbabilityBias(int noteProbabilityBias, bool routed = false) {
         _noteProbabilityBias.set(clamp(noteProbabilityBias, -NoteSequence::NoteVariationProbability::Range, NoteSequence::NoteVariationProbability::Range), routed);
     }
 
     void editNoteProbabilityBias(int value, bool shift) {
-        if (!isRouted(Routing::Target::NoteProbabilityBias)) {
+        if (!Routing::routeOverridden(ParamKey::NoteProbabilityBias, _trackIndex)) {
             setNoteProbabilityBias(noteProbabilityBias() + value);
         }
     }

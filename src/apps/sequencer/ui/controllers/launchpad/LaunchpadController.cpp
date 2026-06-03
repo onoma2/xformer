@@ -364,9 +364,11 @@ void LaunchpadController::sequenceSetLayer(int row, int col) {
 
 void LaunchpadController::sequenceSetFirstStep(int step) {
     switch (_project.selectedTrack().trackMode()) {
-    case Track::TrackMode::Note:
-        _project.selectedNoteSequence().setFirstStep(step);
+    case Track::TrackMode::Note: {
+        auto &sequence = _project.selectedNoteSequence();
+        if (!sequence.routeOverridden(ParamKey::FirstStep)) sequence.setFirstStep(step);
         break;
+    }
     case Track::TrackMode::Curve:
         _project.selectedCurveSequence().setFirstStep(step);
         break;
@@ -379,9 +381,11 @@ void LaunchpadController::sequenceSetFirstStep(int step) {
 
 void LaunchpadController::sequenceSetLastStep(int step) {
     switch (_project.selectedTrack().trackMode()) {
-    case Track::TrackMode::Note:
-        _project.selectedNoteSequence().setLastStep(step);
+    case Track::TrackMode::Note: {
+        auto &sequence = _project.selectedNoteSequence();
+        if (!sequence.routeOverridden(ParamKey::LastStep)) sequence.setLastStep(step);
         break;
+    }
     case Track::TrackMode::Curve:
         _project.selectedCurveSequence().setLastStep(step);
         break;
@@ -394,9 +398,11 @@ void LaunchpadController::sequenceSetLastStep(int step) {
 
 void LaunchpadController::sequenceSetRunMode(int mode) {
     switch (_project.selectedTrack().trackMode()) {
-    case Track::TrackMode::Note:
-        _project.selectedNoteSequence().setRunMode(Types::RunMode(mode));
+    case Track::TrackMode::Note: {
+        auto &sequence = _project.selectedNoteSequence();
+        if (!sequence.routeOverridden(ParamKey::RunMode)) sequence.setRunMode(Types::RunMode(mode));
         break;
+    }
     case Track::TrackMode::Curve:
         _project.selectedCurveSequence().setRunMode(Types::RunMode(mode));
         break;

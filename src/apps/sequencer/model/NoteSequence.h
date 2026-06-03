@@ -7,6 +7,7 @@
 #include "Types.h"
 #include "Scale.h"
 #include "Routing.h"
+#include "RouteParamKey.h"
 #include "Accumulator.h"
 
 #include "core/math/Math.h"
@@ -386,7 +387,7 @@ public:
 
     // scale
 
-    int scale() const { return _scale.get(isRouted(Routing::Target::Scale)); }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale.base, 0, 23); }
     void setScale(int scale, bool routed = false) {
         _scale.set(clamp(scale, -1, Scale::Count - 1), routed);
     }
@@ -397,7 +398,7 @@ public:
     }
 
     void editScale(int value, bool shift) {
-        if (!isRouted(Routing::Target::Scale)) {
+        if (!Routing::routeOverridden(ParamKey::Scale, _trackIndex)) {
             setScale(scale() + value);
         }
     }
@@ -413,7 +414,7 @@ public:
 
     // rootNote
 
-    int rootNote() const { return _rootNote.get(isRouted(Routing::Target::RootNote)); }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote.base, 0, 11); }
     void setRootNote(int rootNote, bool routed = false) {
         _rootNote.set(clamp(rootNote, -1, 11), routed);
     }
@@ -424,7 +425,7 @@ public:
     }
 
     void editRootNote(int value, bool shift) {
-        if (!isRouted(Routing::Target::RootNote)) {
+        if (!Routing::routeOverridden(ParamKey::RootNote, _trackIndex)) {
             setRootNote(rootNote() + value);
         }
     }
@@ -444,7 +445,7 @@ public:
 
     // divisor
 
-    int divisor() const { return _divisor.get(isRouted(Routing::Target::Divisor)); }
+    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor.base, 1, 768); }
     void setDivisor(int divisor, bool routed = false) {
         _divisor.set(ModelUtils::clampDivisor(divisor), routed);
     }
@@ -458,7 +459,7 @@ public:
     }
 
     void editDivisor(int value, bool shift) {
-        if (!isRouted(Routing::Target::Divisor)) {
+        if (!Routing::routeOverridden(ParamKey::Divisor, _trackIndex)) {
             setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
         }
     }
@@ -530,13 +531,13 @@ public:
 
     // clockMultiplier
 
-    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
     void setClockMultiplier(int clockMultiplier, bool routed = false) {
         _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
     }
 
     void editClockMultiplier(int value, bool shift) {
-        if (!isRouted(Routing::Target::ClockMult)) {
+        if (!Routing::routeOverridden(ParamKey::ClockMultiplier, _trackIndex)) {
             setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
         }
     }
@@ -567,13 +568,13 @@ public:
 
     // runMode
 
-    Types::RunMode runMode() const { return _runMode.get(isRouted(Routing::Target::RunMode)); }
+    Types::RunMode runMode() const { return Types::RunMode(Routing::routedValueInt(ParamKey::RunMode, _trackIndex, int(_runMode.base), 0, 5)); }
     void setRunMode(Types::RunMode runMode, bool routed = false) {
         _runMode.set(ModelUtils::clampedEnum(runMode), routed);
     }
 
     void editRunMode(int value, bool shift) {
-        if (!isRouted(Routing::Target::RunMode)) {
+        if (!Routing::routeOverridden(ParamKey::RunMode, _trackIndex)) {
             setRunMode(ModelUtils::adjustedEnum(runMode(), value));
         }
     }
@@ -613,7 +614,7 @@ public:
     // firstStep
 
     int firstStep() const {
-        return _firstStep.get(isRouted(Routing::Target::FirstStep));
+        return Routing::routedValueInt(ParamKey::FirstStep, _trackIndex, _firstStep.base, 0, CONFIG_STEP_COUNT - 1);
     }
 
     void setFirstStep(int firstStep, bool routed = false) {
@@ -623,7 +624,7 @@ public:
     void editFirstStep(int value, bool shift) {
         if (shift) {
             offsetFirstAndLastStep(value);
-        } else if (!isRouted(Routing::Target::FirstStep)) {
+        } else if (!Routing::routeOverridden(ParamKey::FirstStep, _trackIndex)) {
             setFirstStep(firstStep() + value);
         }
     }
@@ -637,7 +638,7 @@ public:
 
     int lastStep() const {
         // make sure last step is always >= first step even if stored value is invalid (due to routing changes)
-        return std::max(firstStep(), int(_lastStep.get(isRouted(Routing::Target::LastStep))));
+        return std::max(firstStep(), Routing::routedValueInt(ParamKey::LastStep, _trackIndex, _lastStep.base, 0, CONFIG_STEP_COUNT - 1));
     }
 
     void setLastStep(int lastStep, bool routed = false) {
@@ -647,7 +648,7 @@ public:
     void editLastStep(int value, bool shift) {
         if (shift) {
             offsetFirstAndLastStep(value);
-        } else if (!isRouted(Routing::Target::LastStep)) {
+        } else if (!Routing::routeOverridden(ParamKey::LastStep, _trackIndex)) {
             setLastStep(lastStep() + value);
         }
     }
@@ -709,6 +710,7 @@ public:
     //----------------------------------------
 
     inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
+    inline bool routeOverridden(uint8_t paramKey) const { return Routing::routeOverridden(paramKey, _trackIndex); }
     inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
     void writeRouted(Routing::Target target, int intValue, float floatValue);
 
