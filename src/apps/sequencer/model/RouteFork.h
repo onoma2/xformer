@@ -66,9 +66,10 @@ namespace RouteFork {
     // bias-free shape of the normalized source, then the Modulate delta over the
     // param's inferred range (depthPct = the per-track d gain, scaleSource = None).
     inline float computeDelta(float sourceValue, Routing::Shaper shaper, int depthPct,
-                              const RouteParam::Range &range) {
+                              const RouteParam::Range &range,
+                              RouteApply::Combine combine = RouteApply::Combine::Modulate) {
         float h = RouteShaper::shape(shaper, sourceValue);
-        return RouteApply::delta(h, 1.f, RouteApply::Combine::Modulate, depthPct, inferRange(range));
+        return RouteApply::delta(h, 1.f, combine, depthPct, inferRange(range));
     }
 
     // True when (trackMode, target) is a migrated per-track param; fills paramKey

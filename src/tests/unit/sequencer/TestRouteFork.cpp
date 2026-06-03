@@ -127,6 +127,19 @@ CASE("computeDelta: TriangleFold reshapes the source before Modulate") {
     expectTrue(near(RouteFork::computeDelta(0.25f, Routing::Shaper::TriangleFold, 100, transpose), -60.f), "0.25 -> -full");
 }
 
+CASE("computeDelta: combine Absolute sweeps from base (raw source), Modulate centers") {
+    RouteParam::Range transpose{ -60.f, 60.f };   // inferRange -> 60
+    // Absolute: u = raw source -> source 0 = base (delta 0), 0.5 = half, 1 = full
+    expectTrue(near(RouteFork::computeDelta(0.0f, Routing::Shaper::None, 100, transpose, Combine::Absolute), 0.f),  "abs src0 -> base");
+    expectTrue(near(RouteFork::computeDelta(0.5f, Routing::Shaper::None, 100, transpose, Combine::Absolute), 30.f), "abs src0.5 -> half");
+    expectTrue(near(RouteFork::computeDelta(1.0f, Routing::Shaper::None, 100, transpose, Combine::Absolute), 60.f), "abs src1 -> full");
+    // Modulate (default) centers: 0.5 neutral, 0 = -full
+    expectTrue(near(RouteFork::computeDelta(0.5f, Routing::Shaper::None, 100, transpose, Combine::Modulate), 0.f),   "mod src0.5 -> 0");
+    expectTrue(near(RouteFork::computeDelta(0.0f, Routing::Shaper::None, 100, transpose, Combine::Modulate), -60.f), "mod src0 -> -full");
+    // default arg is Modulate (back-compat with the 4-arg call sites)
+    expectTrue(near(RouteFork::computeDelta(0.5f, Routing::Shaper::None, 100, transpose), 0.f), "default = Modulate");
+}
+
 CASE("computeDelta: range comes from the migrated row") {
     uint8_t key; RouteParam::Range range;
     RouteFork::migrated(Mode::Note, Routing::Target::Transpose, key, range);

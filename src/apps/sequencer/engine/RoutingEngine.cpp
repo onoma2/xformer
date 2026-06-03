@@ -518,7 +518,8 @@ void RoutingEngine::updateSinks() {
                         RouteParam::Range pRange;
                         if (RouteFork::migrated(_project.track(trackIndex).trackMode(), target, paramKey, pRange)) {
                             float delta = RouteFork::computeDelta(_sourceValues[routeIndex],
-                                                                 route.shaper(trackIndex), route.depthPct(trackIndex), pRange);
+                                                                 route.shaper(trackIndex), route.depthPct(trackIndex), pRange,
+                                                                 route.combine());
                             Routing::writeRouteOverride(paramKey, trackIndex, delta);
                             continue;
                         }
@@ -590,7 +591,8 @@ void RoutingEngine::updateSinks() {
                 uint8_t gKey; RouteParam::Range gRange;
                 if (RouteFork::migratedGlobal(target, gKey, gRange)) {
                     float delta = RouteFork::computeDelta(_sourceValues[routeIndex],
-                                                          route.shaper(0), route.depthPct(0), gRange);
+                                                          route.shaper(0), route.depthPct(0), gRange,
+                                                          route.combine());
                     Routing::writeRouteOverride(gKey, Routing::GlobalTrack, delta);
                 }
             } else {
