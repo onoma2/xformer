@@ -1,0 +1,68 @@
+#include "UnitTest.h"
+
+#include "apps/sequencer/model/RouteShaper.h"
+#include "apps/sequencer/model/RouteApply.h"
+#include "apps/sequencer/model/Routing.h"
+
+#include <cmath>
+
+// Step 2 of the apply-fork slice: the bias-free shaper stage feeding RouteApply.
+// Only None + TriangleFold are ported this slice (remaining shapers land later).
+// The new model drops bias (d subsumes it), so TriangleFold's center is fixed at
+// 0.5 -- h=0.5 maps to 0.5, keeping RouteApply Modulate neutral at source-center.
+// Pure: no engine state. Header-only/test-only; nothing wired live.
+
+namespace {
+
+using RouteApply::Combine;
+
+bool near(float a, float b) { return std::fabs(a - b) < 1e-4f; }
+
+constexpr float R = 60.f;
+
+} // namespace
+
+UNIT_TEST("RouteShaper") {
+
+CASE("None is identity") {
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::None, 0.0f), 0.0f), "0");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::None, 0.37f), 0.37f), "mid");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::None, 1.0f), 1.0f), "1");
+}
+
+CASE("TriangleFold preserves source-center") {
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::TriangleFold, 0.5f), 0.5f), "center fixed at 0.5");
+}
+
+CASE("TriangleFold maps the bias-free triangle (endpoints fold to center)") {
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::TriangleFold, 0.0f), 0.5f),  "0 -> 0.5");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::TriangleFold, 0.25f), 0.0f), "0.25 -> 0");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::TriangleFold, 0.75f), 1.0f), "0.75 -> 1");
+    expectTrue(near(RouteShaper::shape(Routing::Shaper::TriangleFold, 1.0f), 0.5f),  "1 -> 0.5");
+}
+
+CASE("TriangleFold output stays in [0,1]") {
+    for (int i = 0; i <= 100; ++i) {
+        float h = i / 100.f;
+        float out = RouteShaper::shape(Routing::Shaper::TriangleFold, h);
+        expectTrue(out >= 0.f && out <= 1.f, "in range");
+    }
+}
+
+CASE("unported shapers fall through to identity this slice") {
+    for (auto shaper : { Routing::Shaper::Crease, Routing::Shaper::Location,
+                         Routing::Shaper::Envelope, Routing::Shaper::FrequencyFollower,
+                         Routing::Shaper::Activity, Routing::Shaper::ProgressiveDivider,
+                         Routing::Shaper::VcaNext }) {
+        expectTrue(near(RouteShaper::shape(shaper, 0.37f), 0.37f), "identity");
+        expectTrue(near(RouteShaper::shape(shaper, 0.0f), 0.0f), "identity 0");
+        expectTrue(near(RouteShaper::shape(shaper, 1.0f), 1.0f), "identity 1");
+    }
+}
+
+CASE("TriangleFold composes with RouteApply Modulate: center stays neutral") {
+    float h = RouteShaper::shape(Routing::Shaper::TriangleFold, 0.5f);
+    expectTrue(near(RouteApply::delta(h, 1.0f, Combine::Modulate, 100, R), 0.f), "center -> delta 0");
+}
+
+} // UNIT_TEST
