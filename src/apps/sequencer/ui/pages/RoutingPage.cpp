@@ -155,7 +155,12 @@ void RoutingPage::encoder(EncoderEvent &event) {
         return;
     }
 
-    if (tabEditorActive()) { // read-only display: encoder is inert
+    if (tabEditorActive()) { // edit unified depth (all member tracks held equal)
+        int step = pageKeyState()[Key::Shift] ? 10 : 1;
+        int d = clamp(_editRoute.depthPct(0) + event.value() * step, -100, 100);
+        for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+            _editRoute.setDepthPct(t, d);
+        }
         event.consume();
         return;
     }
@@ -756,10 +761,11 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     const char *tabs[] = { "PITCH", "CLOCK", "PROB", "GLOB" };
     const int tabCount = 4;
 
+    bool changed = *_route != _editRoute;
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "ROUTE");
     WindowPainter::drawActiveFunction(canvas, Routing::targetName(_editRoute.target()));
-    const char *fn[] = { "BACK", nullptr, nullptr, nullptr, nullptr };
+    const char *fn[] = { "BACK", "COMBINE", nullptr, nullptr, changed ? "COMMIT" : nullptr };
     WindowPainter::drawFooter(canvas, fn, pageKeyState());
 
     canvas.setFont(Font::Tiny);
@@ -838,12 +844,31 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         event.consume();
         return;
     }
-    if ((key.isFunction() && key.function() == 0) ||
-        (key.pageModifier() && key.isStep() && key.step() == 5)) { // BACK / Page+S6 toggle
+    if (key.isFunction()) {
+        switch (Function(key.function())) {
+        case Function::Prev: // BACK to overview; uncommitted edits are discarded on re-open
+            _tabEditorActive = false;
+            _overviewActive = true;
+            break;
+        case Function::Next: // COMBINE: toggle Modulate <-> Absolute
+            _editRoute.setCombine(_editRoute.combine() == RouteApply::Combine::Absolute
+                                  ? RouteApply::Combine::Modulate : RouteApply::Combine::Absolute);
+            break;
+        case Function::Commit: // COMMIT the draft
+            commitRoute();
+            break;
+        default:
+            break;
+        }
+        event.consume();
+        return;
+    }
+    if (key.pageModifier() && key.isStep() && key.step() == 5) { // Page+S6 exits
         _tabEditorActive = false;
         event.consume();
         return;
     }
+    event.consume(); // modal: swallow all other keys so they don't reach TopPage
 }
 
 void RoutingPage::keyboard(KeyboardEvent &event) {

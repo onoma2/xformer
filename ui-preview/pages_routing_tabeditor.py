@@ -16,9 +16,12 @@ def render_routing_tabeditor(canvas: Canvas, active_tab=0, target="Transpose",
     canvas.set_color(Color.Medium); canvas.hline(0, 10, PW)
     # footer
     canvas.set_color(Color.Medium); canvas.hline(0, PH - 11, PW)
-    canvas.draw_text(2 + (PW // 5 - canvas.text_width("BACK")) // 2, PH - 3, "BACK")
-    for i in range(1, 5):
-        canvas.vline((PW * i) // 5, PH - 10, 10)
+    labels=["BACK","COMBINE","","","COMMIT"]
+    for i in range(1,5): canvas.vline((PW*i)//5, PH-10, 10)
+    for i,t in enumerate(labels):
+        if not t: continue
+        x0=(PW*i)//5; x1=(PW*(i+1))//5
+        canvas.draw_text(x0+(x1-x0-canvas.text_width(t))//2, PH-3, t)
     # vertical tabs
     tabX, tabW, tabTop, tabH = 2, 40, 14, 9
     for i, t in enumerate(TABS):
