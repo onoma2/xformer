@@ -23,6 +23,11 @@ RouteDraft::Draft gModDraft;
 bool gModEditActive = false;
 ModEditTarget gModEditTarget = ModEditTarget::Value;
 
+// Full-frame SPREAD sub-view (Shift+S5): draws 8 per-track bipolar depth bars over
+// the owner-guarded draft instead of the list rows. One file-scope flag, reset in
+// resetModEdit() alongside the rest of the edit state.
+bool gModSpread = false;
+
 // Owning page of the live draft. The source picker is also a ListPage; gating the
 // draw-time reset and key interception on this == owner keeps the picker's own
 // draw/dispatch from cancelling or mutating the underlying page's draft.
@@ -60,6 +65,38 @@ void drawDepthBar(Canvas &canvas, int x, int y, int w, int depthPct, bool focus 
     }
 }
 
+// Vertical bipolar depth bar for the SPREAD view: an outline column x..x+w over
+// y..y+h, a center tick, and a fill growing from center — upward for +depth,
+// downward for -depth. Dim when the track is ineligible (not editable).
+void drawSpreadBar(Canvas &canvas, int x, int y, int w, int h, int depthPct, bool eligible, bool selected) {
+    canvas.setColor(eligible ? (selected ? Color::Bright : Color::Medium) : Color::Low);
+    canvas.drawRect(x, y, w, h);
+    int cy = y + h / 2;
+    canvas.hline(x, cy, w);
+    int half = h / 2;
+    int span = std::abs(depthPct) * half / 100;
+    if (eligible && span > 0) {
+        canvas.setColor(selected ? Color::Bright : Color::Medium);
+        canvas.fillRect(x + 1, depthPct >= 0 ? cy - span : cy, w - 1, span);
+    }
+}
+
+// Single-letter engine abbreviation for the SPREAD per-track labels.
+char trackModeLetter(Track::TrackMode mode) {
+    switch (mode) {
+    case Track::TrackMode::Note:        return 'N';
+    case Track::TrackMode::Curve:       return 'C';
+    case Track::TrackMode::MidiCv:      return 'M';
+    case Track::TrackMode::Tuesday:     return 'T';
+    case Track::TrackMode::DiscreteMap: return 'D';
+    case Track::TrackMode::Indexed:     return 'I';
+    case Track::TrackMode::Teletype:    return '9';
+    case Track::TrackMode::Stochastic:  return 'S';
+    case Track::TrackMode::PhaseFlux:   return 'P';
+    default:                            return '?';
+    }
+}
+
 } // namespace
 
 ListPage::ListPage(PageManager &manager, PageContext &context, ListModel &listModel) :
@@ -89,8 +126,14 @@ void ListPage::exit() {
 
 void ListPage::draw(Canvas &canvas) {
     int gateRouteIndex;
-    if (!modulatedRow(_selectedRow, gateRouteIndex)) {
+    bool spreadOwned = gModSpread && this == gModEditOwner;
+    if (!spreadOwned && !modulatedRow(_selectedRow, gateRouteIndex)) {
         cancelModEditIfOwner();
+    }
+
+    if (spreadOwned) {
+        drawSpread(canvas);
+        return;
     }
 
     int displayRow = _displayRow;
@@ -131,7 +174,31 @@ void ListPage::keyPress(KeyPressEvent &event) {
     int routeIndex;
     bool modRow = modulatedRow(_selectedRow, routeIndex);
 
-    if (modRow && _edit && key.isFunction() && _manager.top() == this) {
+    // Shift+S5 (step index 4) on a migrated routing row enters the SPREAD sub-view.
+    if (modRow && !gModSpread && key.shiftModifier() && key.isStep() && key.step() == 4) {
+        enterSpread(routeIndex);
+        event.consume();
+        return;
+    }
+
+    // SPREAD owns Left/Right for eligible-track navigation; F-keys fall through to
+    // the shared inline handler below (same SRC/COMBINE/CANCEL/COMMIT, teardown via
+    // cancelModEditIfOwner/resetModEdit which also clear gModSpread).
+    if (gModSpread && this == gModEditOwner && (key.isLeft() || key.isRight())) {
+        int sel = _project.selectedTrackIndex();
+        int dir = key.isRight() ? 1 : -1;
+        for (int t = sel + dir; t >= 0 && t < CONFIG_TRACK_COUNT; t += dir) {
+            if (trackEligible(t)) {
+                _project.setSelectedTrackIndex(t);
+                break;
+            }
+        }
+        event.consume();
+        return;
+    }
+
+    bool spreadOwned = gModSpread && this == gModEditOwner;
+    if ((modRow || spreadOwned) && _edit && key.isFunction() && _manager.top() == this) {
         auto &routing = _project.routing();
         switch (key.function()) {
         case 1: // F2 SRC
@@ -219,6 +286,16 @@ void ListPage::keyPress(KeyPressEvent &event) {
 }
 
 void ListPage::encoder(EncoderEvent &event) {
+    if (gModSpread && this == gModEditOwner && gModEditActive) {
+        int t = _project.selectedTrackIndex();
+        if (trackEligible(t)) {
+            int depth = clamp(gModDraft.route.depthPct(t) + event.value(), -100, 100);
+            gModDraft.route.setDepthPct(t, depth);
+            gModDraft.route.setTracks(gModDraft.route.tracks() | (1 << t));
+        }
+        event.consume();
+        return;
+    }
     if (_edit && gModEditActive && this == gModEditOwner && gModEditTarget == ModEditTarget::Depth) {
         int trackIndex = _project.selectedTrackIndex();
         int depth = clamp(gModDraft.route.depthPct(trackIndex) + event.value(), -100, 100);
@@ -357,6 +434,7 @@ void ListPage::resetModEdit() {
     gModEditActive = false;
     gModEditTarget = ModEditTarget::Value;
     gModEditOwner = nullptr;
+    gModSpread = false;
 }
 
 void ListPage::cancelModEditIfOwner() {
@@ -396,6 +474,99 @@ void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
     canvas.drawText(96, y + 7, ">");
 
     drawDepthBar(canvas, 104, y + 4, 92, depthPct, depthFocus);
+}
+
+bool ListPage::trackEligible(int trackIndex) const {
+    if (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {
+        return false;
+    }
+    Routing::Target target = _listModel->routingTarget(_selectedRow);
+    if (target == Routing::Target::None) {
+        return false;
+    }
+    uint8_t key = 0;
+    RouteParam::Range range;
+    return RouteFork::migrated(_project.track(trackIndex).trackMode(), target, key, range);
+}
+
+int ListPage::firstEligibleTrack() const {
+    for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+        if (trackEligible(t)) {
+            return t;
+        }
+    }
+    return -1;
+}
+
+void ListPage::enterSpread(int routeIndex) {
+    if (routeIndex < 0) {
+        return;
+    }
+    auto &routing = _project.routing();
+    if (!gModEditActive) {
+        gModDraft = RouteDraft::begin(routing, routeIndex);
+        gModEditActive = true;
+        gModEditOwner = this;
+    }
+    gModSpread = true;
+    _edit = true;
+    int first = firstEligibleTrack();
+    if (first >= 0) {
+        _project.setSelectedTrackIndex(first);
+    }
+}
+
+void ListPage::drawSpread(Canvas &canvas) {
+    canvas.setBlendMode(BlendMode::Set);
+
+    char header[24];
+    {
+        const char *name = Routing::targetName(_listModel->routingTarget(_selectedRow));
+        int i = 0;
+        for (; name[i] && i < int(sizeof(header)) - 1; ++i) {
+            char c = name[i];
+            header[i] = (c >= 'a' && c <= 'z') ? char(c - 32) : c;
+        }
+        header[i] = 0;
+    }
+    FixedStringBuilder<8> srcStr;
+    printSourceAbbrev(gModDraft.route.source(), srcStr);
+
+    canvas.setFont(Font::Small);
+    canvas.setColor(Color::Bright);
+    canvas.drawText(2, 8, header);
+    int hx = 4 + canvas.textWidth(header) + 4;
+    canvas.setColor(Color::Medium);
+    canvas.drawText(hx, 8, "<");
+    canvas.drawText(hx + 8, 8, srcStr);
+    const char *spread = "SPREAD";
+    canvas.drawText(Width - canvas.textWidth(spread) - 2, 8, spread);
+
+    int sel = _project.selectedTrackIndex();
+    int colW = Width / CONFIG_TRACK_COUNT;
+    int barW = 14;
+    int barTop = 12;
+    int barH = 27;
+    for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+        int cx = t * colW + colW / 2;
+        bool eligible = trackEligible(t);
+        bool selected = eligible && t == sel;
+        drawSpreadBar(canvas, cx - barW / 2, barTop, barW, barH,
+                      gModDraft.route.depthPct(t), eligible, selected);
+
+        FixedStringBuilder<4> label;
+        label("%d%c", t + 1, trackModeLetter(_project.track(t).trackMode()));
+        int lw = canvas.textWidth(label);
+        int lx = cx - lw / 2;
+        canvas.setColor(eligible ? (selected ? Color::Bright : Color::Medium) : Color::Low);
+        canvas.drawText(lx, barTop + barH + 9, label);
+        if (selected) {
+            canvas.hline(lx, barTop + barH + 11, lw);
+        }
+    }
+
+    const char *names[] = { nullptr, "SRC", "COMBINE", "CANCEL", "COMMIT" };
+    WindowPainter::drawFooter(canvas, names, pageKeyState());
 }
 
 void ListPage::scrollTo(int row) {

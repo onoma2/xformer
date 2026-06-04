@@ -40,6 +40,14 @@ protected:
 private:
     void drawModulatedRow(Canvas &canvas, int row, int y);
 
+    // SPREAD sub-view (Shift+S5 on a migrated row): full-frame per-track depth
+    // editor over the owner-guarded draft. enterSpread ensures a draft is active,
+    // drawSpread renders the 8 bars, trackEligible gates which tracks are editable.
+    void enterSpread(int routeIndex);
+    void drawSpread(Canvas &canvas);
+    bool trackEligible(int trackIndex) const;
+    int firstEligibleTrack() const;
+
     // True when `row` is a migrated routing target currently modulated for the
     // selected track; on success returns its routeIndex (>=0). Same gate as
     // drawModulatedRow — guards all inline modulation edit handling.

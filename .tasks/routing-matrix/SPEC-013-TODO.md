@@ -63,9 +63,18 @@ Provenance: `docs/routing-legacy-vs-matrix.md`.
 **Phase 3 DONE** — param-door inline editor complete (display + draft/commit depth/source/combine
 + draft MOD+). Commits: unit1, unit2, unit3.
 
-## Phase 4 — param-door spread (spec §4, §6)
-- [ ] **Shift+S5** → per-track vertical bipolar bars for this param × tracks (render `mod-spread.png`).
-      Engine already reads per-track `depthPct[]`; UI-only.
+## Phase 4 — param-door spread (spec §4, §6) — DONE
+- [x] **Shift+S5** → per-track vertical bipolar bars (`ListPage` spread mode on the owner-guarded
+      draft): 8 bars from `depthPct[t]`, number+engine labels, eligible (migrated) tracks editable,
+      Left/Right nav skips ineligible, encoder edits depth + adds track to mask, F2/F3/F4/F5 shared
+      with inline editor. Reached on a modulated row; editing other eligible tracks builds the
+      multi-track spread. STM32-green, Codex ALLOW.
+
+> **FLASH IS NOW THE HARD CONSTRAINT (not RAM).** App partition = 960 KB (`sequencer.ld`,
+> 0x08010000). Phase-4 hit the ceiling. Reclaimed: removed the superseded bias/depth/shaper
+> overlay (~5 KB) + gated the Asteroids easter-egg off (`CONFIG_ENABLE_ASTEROIDS`, ~14.5 KB).
+> Now ~16.7 KB free. Flash culprits + measurement commands documented in PROJECT.md
+> ("Flash ceiling snapshot"). Phases 5-7 must watch flash; gate more non-core (Intro) if needed.
 
 ## Phase 5 — matrix door (spec §5, §6, §11)
 - [ ] param×track **numeric** grid; column headers number+engine letter (`1N 2C 3N…`); ineligible `-`,
