@@ -11,11 +11,13 @@ Provenance: `docs/routing-legacy-vs-matrix.md`.
 - **Build gate = STM32 release.** `make -C build/stm32/release sequencer` must be green, no new
   warnings. Sim is for the host unit tests only. Never trust sim for the compile gate.
 - **Render before UI.** Any OLED change → `ui-preview/` render + read back BEFORE firmware.
-- **Codex-gate model/engine units.** Header/model logic gets a Codex review before it lands.
-- **Flash before commit.** Firmware UI changes are NOT committed until the owner flashes and
-  hardware-verifies. Build + review + leave uncommitted; commit only on owner's go.
-- **One reviewable, audible-where-possible unit at a time.** Don't hand the owner a sliver to
-  flash. The routing-page tab editor already sets depth live (HW-verified) — use it.
+- **Per-phase gate (owner 2026-06-04) = STM32 release build green + Codex gate.** Every phase: run
+  `make -C build/stm32/release sequencer` (green, no new warnings) AND a Codex review (ALLOW) before
+  commit. These two are the gate that stands in for hardware flashing until phase 7.
+- **Flash cadence (owner override 2026-06-04): owner flashes ONCE after phase 7.** Do NOT ask the
+  owner to flash per phase. Commit each phase when STM32-green + reviewed; momentum over slivers.
+- **One reviewable unit at a time** for review/commit, but keep building forward to phase 7.
+  The routing-page tab editor already sets depth live — it stays usable throughout.
 
 ## Status legend
 [x] done & committed · [~] built/uncommitted (awaiting flash+commit) · [ ] not started
@@ -28,12 +30,12 @@ Provenance: `docs/routing-legacy-vs-matrix.md`.
       bounds-guarded. Committed `8197ea0d`, Codex-gated. (`model/RouteDraft.h`, `TestRouteDraft`.)
 - [x] **Model: membership ops** — `isTrackModulated` + `removeTrack` (per-track clear+free-if-last;
       global free). Committed `e2c00d16`, Codex-gated. 16 cases green.
-- [~] **UI: MOD+/MOD- context slot** — state-dependent slot (per-track membership) on the 4
+- [x] **UI: MOD+/MOD- context slot** — state-dependent slot (per-track membership) on the 4
       migrated pages (Note/PhaseFlux/Project/Track); MOD+ = create→source→setSource, MOD- =
       removeTrack; migrated-only gate; non-migrated pages drop the ROUTE item; legacy
       `editRoute`/`beginModulate` hook retired (`showRoute`/`RouteListModel` kept, phase-9 delete).
-      Built, STM32-green, internal + Codex review ALLOW. Renders `modulation-ctx-*.png`.
-      **NEXT: owner flash + verify → commit.**
+      Committed `c9aefb52`. STM32-green, internal + Codex ALLOW, hardware-verified by owner.
+      Renders `modulation-ctx-*.png`.
       - NOTE (carry to phase 3): phase-1 MOD+ writes source live immediately — this does NOT yet
         honor spec §3 "live untouched until COMMIT". Phase 3 replaces it with real draft/commit.
 
@@ -42,10 +44,10 @@ Provenance: `docs/routing-legacy-vs-matrix.md`.
       (matrix). No separate work item.
 
 ## Phase 3 — param door, inline editing (spec §4, §6, §11)
-- [ ] Render-check inline row states (already have `mod-param-row.png`, `mod-param-depth.png`;
-      re-verify against the real list-page geometry before coding).
-- [ ] Inline modulated-row on migrated param list pages: `name  src › [horizontal bipolar bar]  value`
-      (bipolar bar in the dead space; centre tick = base, fill ±).
+- [x] Render-check inline row states (`mod-param-row.png`, `mod-param-depth.png` confirmed).
+- [x] **Unit 1 — inline modulated-row DISPLAY** (draw-only): selected migrated+modulated row draws
+      `<src› [horizontal bipolar bar]` in the middle band (`ListPage::draw` + base `routingTarget`
+      hook), strictly gated. STM32-green, Codex ALLOW. (Editing is units 2-3 below.)
 - [ ] Encoder: **press toggles value↔depth**, turn edits the active one (depth turn = staged draft).
 - [ ] Footer F-keys while a modulated row is focused: **SRC=F2, COMBINE=F3, COMMIT=F5** (F5 lit only
       when draft dirty/committable), **CANCEL = back key**. Draft/commit: live untouched until COMMIT;

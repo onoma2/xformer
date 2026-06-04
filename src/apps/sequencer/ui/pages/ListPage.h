@@ -34,6 +34,11 @@ protected:
     virtual void drawCell(Canvas &canvas, int row, int column, int x, int y, int w, int h);
 
 private:
+    void drawModulatedRow(Canvas &canvas, int row, int y);
+
+protected:
+
+private:
     void scrollTo(int row);
     void editSelectedRow(int value, bool shift);
 

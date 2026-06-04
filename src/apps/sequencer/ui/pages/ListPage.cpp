@@ -6,6 +6,44 @@
 #include "core/math/Math.h"
 
 #include "model/Track.h"
+#include "model/RouteFork.h"
+#include "model/RouteDraft.h"
+
+namespace {
+
+// Short source label for the inline modulated-row badge: CvIn1->"CV1",
+// CvOut1->"O1", BusCv1->"B1", GateOut1->"G1", Mod1->"M1".
+void printSourceAbbrev(Routing::Source source, StringBuilder &str) {
+    if (Routing::isCvSource(source)) {
+        str("CV%d", int(source) - int(Routing::Source::CvIn1) + 1);
+    } else if (source >= Routing::Source::CvOut1 && source <= Routing::Source::CvOut8) {
+        str("O%d", int(source) - int(Routing::Source::CvOut1) + 1);
+    } else if (Routing::isBusSource(source)) {
+        str("B%d", int(source) - int(Routing::Source::BusCv1) + 1);
+    } else if (source >= Routing::Source::GateOut1 && source <= Routing::Source::GateOut8) {
+        str("G%d", int(source) - int(Routing::Source::GateOut1) + 1);
+    } else if (Routing::isModulatorSource(source)) {
+        str("M%d", int(source) - int(Routing::Source::Mod1) + 1);
+    } else {
+        Routing::printSource(source, str);
+    }
+}
+
+// Horizontal bipolar depth bar: dim baseline x..x+w, center tick, and a fill
+// from center outward — rightward for +depth, leftward for -depth.
+void drawDepthBar(Canvas &canvas, int x, int y, int w, int depthPct) {
+    int cx = x + w / 2;
+    canvas.setColor(Color::Low);
+    canvas.hline(x, y + 1, w);
+    canvas.vline(cx, y - 1, 5);
+    int span = std::abs(depthPct) * (w / 2) / 100;
+    if (span > 0) {
+        canvas.setColor(Color::Medium);
+        canvas.fillRect(depthPct >= 0 ? cx : cx - span, y, span, 3);
+    }
+}
+
+} // namespace
 
 ListPage::ListPage(PageManager &manager, PageContext &context, ListModel &listModel) :
     BasePage(manager, context)
@@ -42,6 +80,9 @@ void ListPage::draw(Canvas &canvas) {
         if (row < _listModel->rows()) {
             drawCell(canvas, row, 0, 8, 12 + i * LineHeight, 128 - 16, LineHeight);
             drawCell(canvas, row, 1, 128, 12 + i * LineHeight, 128 - 16, LineHeight);
+            if (row == _selectedRow) {
+                drawModulatedRow(canvas, row, 12 + i * LineHeight);
+            }
         }
     }
 
@@ -157,6 +198,44 @@ void ListPage::drawCell(Canvas &canvas, int row, int column, int x, int y, int w
     canvas.setBlendMode(BlendMode::Set);
     canvas.setColor(column == int(_edit) && row == _selectedRow ? Color::Bright : Color::Medium);
     canvas.drawText(x, y + 7, str);
+}
+
+void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
+    Routing::Target target = _listModel->routingTarget(row);
+    if (target == Routing::Target::None) {
+        return;
+    }
+
+    const auto &track = _project.selectedTrack();
+    uint8_t key = 0;
+    RouteParam::Range range;
+    bool isMigrated = RouteFork::migrated(track.trackMode(), target, key, range) ||
+                      RouteFork::migratedGlobal(target, key, range);
+    if (!isMigrated) {
+        return;
+    }
+
+    int trackIndex = _project.selectedTrackIndex();
+    const auto &routing = _project.routing();
+    if (!RouteDraft::isTrackModulated(routing, target, trackIndex)) {
+        return;
+    }
+
+    int routeIndex = routing.findRoute(target, trackIndex);
+    if (routeIndex < 0) {
+        return;
+    }
+    const auto &route = routing.route(routeIndex);
+
+    FixedStringBuilder<8> srcStr;
+    printSourceAbbrev(route.source(), srcStr);
+    canvas.setFont(Font::Small);
+    canvas.setBlendMode(BlendMode::Set);
+    canvas.setColor(Color::Medium);
+    canvas.drawText(78, y + 7, srcStr);
+    canvas.drawText(96, y + 7, ">");
+
+    drawDepthBar(canvas, 104, y + 4, 92, route.depthPct(trackIndex));
 }
 
 void ListPage::scrollTo(int row) {

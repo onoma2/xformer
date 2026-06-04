@@ -6,5 +6,5 @@
 
 class RoutableListModel : public ListModel {
 public:
-    virtual Routing::Target routingTarget(int row) const = 0;
+    virtual Routing::Target routingTarget(int row) const override = 0;
 };
