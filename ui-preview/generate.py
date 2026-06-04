@@ -454,6 +454,27 @@ def render_page(page: str, scale: int = 4):
     elif page == "routing-rowbar":
         from pages_routing_rowbar import render_routing_rowbar
         render_routing_rowbar(canvas, scenario=1)
+    elif page == "mod-param-row":
+        from pages_modulation import render_mod_param_row
+        render_mod_param_row(canvas)
+    elif page == "mod-param-depth":
+        from pages_modulation import render_mod_param_depth
+        render_mod_param_depth(canvas)
+    elif page == "mod-spread":
+        from pages_modulation import render_mod_spread
+        render_mod_spread(canvas)
+    elif page == "mod-source":
+        from pages_modulation import render_mod_source
+        render_mod_source(canvas)
+    elif page == "mod-matrix":
+        from pages_modulation import render_mod_matrix
+        render_mod_matrix(canvas)
+    elif page == "mod-matrix-bytype":
+        from pages_modulation import render_mod_matrix_bytype
+        render_mod_matrix_bytype(canvas)
+    elif page == "mod-matrix-src":
+        from pages_modulation import render_mod_matrix_src
+        render_mod_matrix_src(canvas)
     else:
         raise ValueError(f"Unknown page: {page}")
 
@@ -489,6 +510,7 @@ def main():
                                  # Routing UI redesign
                                  'routing-list', 'routing-list-mid', 'routing-list-end',
                                  'routing-hero', 'routing-hero-step', 'routing-scope', 'routing-scope-global', 'routing-unified', 'routing-unified-clock', 'routing-spread', 'routing-target', 'routing-scope-bytype', 'routing-unified-idx', 'routing-unified-idx1', 'routing-source', 'routing-source-gate', 'routing-tabscope', 'routing-tabscope-bytype', 'routing-depth', 'routing-depth-abs', 'routing-tablane', 'routing-rowbar',
+                                 'mod-param-row', 'mod-param-depth', 'mod-spread', 'mod-source', 'mod-matrix', 'mod-matrix-bytype', 'mod-matrix-src',
                                  # Pure reference screens
                                  'ref-prob-melod', 'ref-shredder', 'ref-euclid',
                                  'ref-delinquencer', 'ref-skylines', 'ref-prob-div',

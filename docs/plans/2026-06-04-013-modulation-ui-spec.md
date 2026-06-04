@@ -86,8 +86,13 @@ editor, no page switch).
 
 For setting up several params across several tracks in one session.
 
-- **Layout:** rows = the current band's params; columns = the 8 tracks; **each cell = a vertical
-  bipolar depth bar**. Tabs (Left/Right) switch bands.
+- **Layout:** rows = the current band's params; columns = the 8 tracks; **each cell = a depth
+  number** (numeric grid, à la the Numerical Audio Matrix). Column headers = **number+engine
+  letter** (`1N 2C 3N…`). Ineligible cells (engine doesn't own the param) show `-`; eligible-
+  unrouted show `.`. Tabs (Left/Right) switch bands.
+- **Cursor = brightness** (the cursor cell + its column header + the row name brighten); **not a
+  box**. **By-type = a thin underline** on the selected group's cells (distinct from the cursor
+  brightness cue).
 - **One source per row** — a row = one source modulating that param across its tracks; cells
   differ only in **depth** (= spread). **SRC** F-key sets the row's source.
 - **Scope:** **T1–T8 toggle columns** into the focused row; **Shift+Tn = by-type** (all tracks
@@ -97,13 +102,20 @@ For setting up several params across several tracks in one session.
   the row.
 - **REMOVE:** clears the focused row's modulation.
 - Cells for tracks whose engine doesn't own the param render **ineligible** (dim/dash).
+- **Two cell views, toggled:** **depth** (numbers per cell) and **source** (each routed cell's
+  source abbreviation — `CV1`/`O1`/`B1`/`G1`/`M1`). Source view is the "what source drives which
+  param/track" map; since one-source-per-row, a row's routed cells share their source.
 
 ## 6. Depth language (LOCKED)
 
 - **Horizontal** bipolar bar = the param-door unified amount (one bar in the row's dead space,
   centre tick = base/neutral, fill right = +, left = −).
-- **Vertical** bipolar bars = spread (the param-door spread sub-view) and the matrix grid cells.
+- **Vertical** bipolar bars = the spread sub-view (per-track, full height).
+- **Numbers** = the matrix grid cells (depth value per cell). The bipolar-bar idiom is used only
+  where it has room (param-door row, spread); the dense grid is numeric.
 - Hermod model: depth = attenuverter, combine = polarity, base = offset.
+- **Track/engine labels:** spread labels and matrix column headers are **number+engine letter**
+  (`1N 2C 3N…`), so the engine — and thus eligibility — is visible per track.
 
 ## 7. Source picker (LOCKED)
 
@@ -135,21 +147,30 @@ Render each screen with `ui-preview` and read it back; only then implement. Scre
 2. **Param door — depth focus + dirty**: depth-edit active, COMMIT (F5) shown, CANCEL=back.
 3. **Param door — spread sub-view** (Shift+S5): vertical bipolar bars, this param × tracks.
 4. **Source picker**: CV-domain + None, footer CANCEL(back)/COMMIT.
-5. **Matrix grid** (a band): param rows × 8 track columns, vertical bipolar cells, footer
-   SRC/COMBINE/COMMIT.
-6. **Matrix grid — by-type**: Shift+T lit a homogeneous engine set across a row.
+5. **Matrix grid — depth view** (a band): param rows × 8 track columns, **numeric** cells,
+   number+engine column headers, footer SRC/COMBINE/COMMIT.
+6. **Matrix grid — by-type**: Shift+T underlines a homogeneous engine set across a row.
+7. **Matrix grid — source view**: same grid, cells show the **source** per routed cell
+   (`CV1 B1 M1…`) instead of depth — toggled from the depth view.
 
-Renders settle the **render-time opens (§11)**. Present all, get approval, then write per-phase
-TDD plans.
+Renders done — `ui-preview/modulation/mod-*.png`, renderer `ui-preview/pages_modulation.py`.
 
-## 11. Open — render-time only (no behavior undecided)
+## 11. Render outcomes (SETTLED 2026-06-04)
 
-- Exact F-slot assignment for SRC and COMBINE (and how the param-row footer swaps to modulation
-  controls while a row is dirty vs the page's normal F-keys).
-- Exact pixel layout of the matrix cells (8 columns × ≤4 rows on 256×64) and the horizontal
-  in-row bar.
-- Whether the param-door spread sub-view and a matrix-grid row are literally the same widget
-  reached two ways (same bipolar idiom either way).
+- **F-slots:** **SRC = F2, COMBINE = F3, COMMIT = F5** (lit only when the draft is dirty/
+  committable); **CANCEL = the page back/exit key** (frees an F-slot). The param-row footer swaps
+  to these modulation controls while a modulated row is focused.
+- **Labels:** spread labels and matrix column headers are **number+engine letter** (`1N 2C 3N…`).
+  Engine letter reveals eligibility (a param's non-owning engines show ineligible).
+- **Matrix cells are numeric** (depth value); ineligible `-`, eligible-unrouted `.`.
+- **Cursor = brightness** (cursor cell + its column header + row name brighten), **not a box**.
+- **By-type = a thin underline** on the group's cells (distinct from the cursor brightness).
+- **Matrix has two cell views — depth and source** — toggled (see §5a). Source view shows each
+  routed cell's source abbreviation (`CV1` CV In, `O1` CV Out, `B1` Bus, `G1` Gate, `M1` Mod);
+  one-source-per-row means a row's routed cells share a source, so the source view reads as a
+  "what source drives which param/track" map.
+- Spread sub-view and a matrix row are the **same vertical-bar idiom** reached two ways (no
+  separate widget); the matrix's own cells are numeric, not bars.
 
 ## 12. Implementation phases (detailed TDD plans written per phase, after renders)
 
