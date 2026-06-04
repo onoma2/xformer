@@ -55,6 +55,24 @@ namespace RouteBrowse {
         }
     }
 
+    // Fill out[] with the sources the tab-editor source picker offers for a target:
+    // every Source in enum order except MIDI (owned by the deferred learn unit) and the
+    // bus that would self-route the target. Returns the count written (<= maxOut).
+    inline int sourceList(Routing::Target target, Routing::Source *out, int maxOut) {
+        int n = 0;
+        for (int s = 0; s < int(Routing::Source::Last) && n < maxOut; ++s) {
+            auto source = Routing::Source(s);
+            if (source == Routing::Source::Midi) {
+                continue;
+            }
+            if (Routing::isBusSelfRoute(source, target)) {
+                continue;
+            }
+            out[n++] = source;
+        }
+        return n;
+    }
+
     // True when route is active, its target maps to paramKey, and its scope overlaps
     // trackMask. trackMask 0 = global scope (matches a project/global route only); a
     // non-zero mask = per-track scope (matches a per-track route whose tracks overlap).

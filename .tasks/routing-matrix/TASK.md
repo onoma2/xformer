@@ -361,3 +361,28 @@ source→shape→delta→override-value seam is now covered in sim; only the loo
 
 `TestRouteGetterMigration` now asserts edit-under-route shifts base (no lurch) + the First/Last
 base-domain clamp. sim + STM32 green; 65/65 (minus 5 pre-existing-on-HEAD failures). Codex-gated.
+
+## Slice 6 — source selection in the tab editor (2026-06-04, Codex-clean)
+
+F3 SRC on a routed row opens a scrollable source-list overlay; encoder press (or OK)
+commits the picked source live to the focused route. No effect on empty rows (creation
+still defaults CV1, then F3 changes it). Footer is now `BACK · COMBINE · SRC`.
+
+- **Model unit (TDD, Codex-clean):** `RouteBrowse::sourceList(target, out, max)` — every
+  `Routing::Source` in enum order except `Midi` and the bus that `isBusSelfRoute`s the
+  target; clamps by written count. 3 cases in `TestRouteBrowse` (CV-domain count + MIDI
+  exclusion + Mod8-last; bus-self-route excluded for a bus target; maxOut clamp).
+- **UI:** `RouteSourceSelectListModel` (`sourceList` + `printSource` for cells, `sourceAt`/
+  `indexOf`) + `RouteSourceSelectPage` (mirrors `GeneratorSelectPage`: ListPage subclass,
+  `show(target, current, callback)`, encoder press = OK). Registered in `Pages.h`.
+- **F3 wiring** in `RoutingPage::handleTabEditorKey` (`Function::Init`): lambda captures the
+  committed `_route` pointer by value (stable — fixed `RouteArray`), `setSource` on confirm.
+  Self-route exclusion in the list means a valid pick never snaps to None.
+- **Decision: MIDI deferred.** Picking bare MIDI sets an unconfigured `midiSource` (half
+  route), so MIDI is left out of the list; it gets its own F4 LEARN unit (MidiLearn →
+  source=Midi + midiSource on the live route). Commit-on-press (not live-on-scroll) — a
+  discrete pick, avoids thrashing the source through 30+ entries while scrolling.
+- ui-preview `routing-source` / `routing-source-gate` (rendered 5 visible rows after the
+  6-row variant overran the footer). sim release green, zero warnings.
+
+**Next:** F4 LEARN (MIDI source in the tab editor) → Page+S5 spread (per-track unique depths).

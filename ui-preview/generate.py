@@ -388,6 +388,54 @@ def render_page(page: str, scale: int = 4):
                                              variation=70, duration=6)
     elif page == "stochastic-live-constellation-newseed":
         render_stochastic_live_constellation(canvas, seed=0xBADD00D5, playing_idx=7)
+    elif page == "routing-list":
+        from pages_routing import render_routing_list
+        render_routing_list(canvas, selected=0, scroll=0)
+    elif page == "routing-list-mid":
+        from pages_routing import render_routing_list
+        render_routing_list(canvas, selected=9, scroll=7)
+    elif page == "routing-list-end":
+        from pages_routing import render_routing_list
+        render_routing_list(canvas, selected=13, scroll=10)
+    elif page == "routing-hero":
+        from pages_routing_hero import render_routing_hero
+        render_routing_hero(canvas, track=3, mode="NOTE", topic_idx=0, selected_row=0)
+    elif page == "routing-hero-step":
+        from pages_routing_hero import render_routing_hero
+        render_routing_hero(canvas, track=3, mode="NOTE", topic_idx=1, selected_row=1)
+    elif page == "routing-scope":
+        from pages_routing_scope import render_routing_scope
+        render_routing_scope(canvas, selected=(2, 4), cursor=2)
+    elif page == "routing-unified":
+        from pages_routing_unified import render_routing_unified
+        render_routing_unified(canvas, tab_idx=0, selected_row=0)
+    elif page == "routing-unified-clock":
+        from pages_routing_unified import render_routing_unified
+        render_routing_unified(canvas, tab_idx=1, selected_row=0)
+    elif page == "routing-unified-idx":
+        from pages_routing_unified import render_routing_unified
+        render_routing_unified(canvas, tab_idx=3, selected_row=0, engine="indexed")
+    elif page == "routing-unified-idx1":
+        from pages_routing_unified import render_routing_unified
+        render_routing_unified(canvas, tab_idx=3, selected_row=0, engine="indexed1")
+    elif page == "routing-spread":
+        from pages_routing_spread import render_routing_spread
+        render_routing_spread(canvas, selected_row=0)
+    elif page == "routing-target":
+        from pages_routing_target import render_routing_target
+        render_routing_target(canvas, selected_row=0)
+    elif page == "routing-scope-bytype":
+        from pages_routing_scope import render_routing_scope
+        render_routing_scope(canvas, selected=(0,2,4), cursor=2)
+    elif page == "routing-scope-global":
+        from pages_routing_scope import render_routing_scope
+        render_routing_scope(canvas, selected=(), cursor=0)
+    elif page == "routing-source":
+        from pages_routing_source import render_routing_source
+        render_routing_source(canvas, selected=1, scroll=0)
+    elif page == "routing-source-gate":
+        from pages_routing_source import render_routing_source
+        render_routing_source(canvas, selected=24, scroll=19)
     else:
         raise ValueError(f"Unknown page: {page}")
 
@@ -420,6 +468,9 @@ def main():
                                  'stochastic-marbles-pit-orchisstra', 'stochastic-marbles-bline',
                                  'stochastic-lock-meadowphysics', 'stochastic-lock-pit-orchisstra',
                                  'stochastic-track-bline', 'stochastic-track-pitter-patter',
+                                 # Routing UI redesign
+                                 'routing-list', 'routing-list-mid', 'routing-list-end',
+                                 'routing-hero', 'routing-hero-step', 'routing-scope', 'routing-scope-global', 'routing-unified', 'routing-unified-clock', 'routing-spread', 'routing-target', 'routing-scope-bytype', 'routing-unified-idx', 'routing-unified-idx1', 'routing-source', 'routing-source-gate',
                                  # Pure reference screens
                                  'ref-prob-melod', 'ref-shredder', 'ref-euclid',
                                  'ref-delinquencer', 'ref-skylines', 'ref-prob-div',

@@ -932,7 +932,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "ROUTE");
     WindowPainter::drawActiveFunction(canvas, bandParamName(RouteBrowse::Band(_tabEditorTab), cursorKey));
-    const char *fn[] = { "BACK", _tabRowRouted ? "COMBINE" : nullptr, nullptr, nullptr, nullptr };
+    const char *fn[] = { "BACK", _tabRowRouted ? "COMBINE" : nullptr, _tabRowRouted ? "SRC" : nullptr, nullptr, nullptr };
     WindowPainter::drawFooter(canvas, fn, pageKeyState());
 
     canvas.setFont(Font::Tiny);
@@ -1059,6 +1059,17 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
             if (_tabRowRouted && _route) {
                 _route->setCombine(_route->combine() == RouteApply::Combine::Absolute
                                    ? RouteApply::Combine::Modulate : RouteApply::Combine::Absolute);
+            }
+            break;
+        case Function::Init: // SRC: pick the focused route's source (live on confirm)
+            if (_tabRowRouted && _route) {
+                Routing::Route *route = _route;
+                _manager.pages().routeSourceSelect.show(route->target(), route->source(),
+                    [route] (bool ok, Routing::Source source) {
+                        if (ok) {
+                            route->setSource(source);
+                        }
+                    });
             }
             break;
         default:

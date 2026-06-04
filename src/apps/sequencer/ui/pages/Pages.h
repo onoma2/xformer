@@ -24,6 +24,7 @@
 #include "ProjectPage.h"
 #include "QuickEditPage.h"
 #include "RoutingPage.h"
+#include "RouteSourceSelectPage.h"
 #include "SongPage.h"
 #include "StartupPage.h"
 #include "SystemPage.h"
@@ -112,6 +113,7 @@ struct Pages {
     // generator pages
     GeneratorPage generator;
     GeneratorSelectPage generatorSelect;
+    RouteSourceSelectPage routeSourceSelect;
     // helper pages
     TextInputPage textInput;
     ConfirmationPage confirmation;
@@ -176,6 +178,7 @@ struct Pages {
         // generator pages
         generator(manager, context),
         generatorSelect(manager, context),
+        routeSourceSelect(manager, context),
         // helper pages
         textInput(manager, context),
         confirmation(manager, context),

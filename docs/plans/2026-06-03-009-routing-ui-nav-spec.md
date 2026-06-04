@@ -43,9 +43,14 @@ _UI landed + hardware-verified (2026-06-04): overview (ee2f6514) → editable ta
 editor (Page+S6) is now a live param-centric editor: encoder navigates a band's params,
 press opens the DEPTH modal (Generator's QuickEditPage ported — big readout + LED ring) or
 creates a route on an empty row; F2 toggles combine; Left/Right cycle bands. Depth + combine
-edit the committed route LIVE (audible immediately) — draft/commit removed. Next: source
-selection in-editor (created routes default CV1), Page+S5 spread (per-track unique depths),
-then promote over the old RouteListModel rows._
+edit the committed route LIVE (audible immediately) — draft/commit removed. **Source selection
+landed (2026-06-04): F3 SRC opens a scrollable source-list overlay (`RouteSourceSelectPage`,
+mirrors `GeneratorSelectPage`), encoder press commits the picked source live; list = CV-domain
+sources only (`RouteBrowse::sourceList`, MIDI + self-route bus excluded).** As-built footer is
+`BACK · COMBINE · SRC` (the binding table below proposed F1 SRC / F5 EXIT; the built editor
+keeps BACK on F1, combine on F2, and put SRC on the free F3). Next: F4 LEARN (MIDI source
+in-editor — MIDI is deferred to it), Page+S5 spread (per-track unique depths), then promote
+over the old RouteListModel rows._
 
 ### Global is base+delta (decided 2026-06-03)
 
