@@ -45,9 +45,16 @@ private:
     bool tabEditorActive() const { return _tabEditorActive; }
     void drawTabEditor(Canvas &canvas);
     void handleTabEditorKey(KeyPressEvent &event);
+    void enterTabEditor();
+    void tabRefocus();          // load the cursor row's committed route into _editRoute (if routed)
     int routeForBandParam(uint8_t paramKey, uint8_t trackMask) const;
+    int tabBandParamCount() const;
     bool _tabEditorActive = false;
     int _tabEditorTab = 0;
+    int _tabEditorRow = 0;
+    bool _tabEdit = false;       // encoder-press toggles: false = move cursor, true = edit depth
+    bool _tabRowRouted = false;  // cursor row resolves to a committed route
+    uint8_t _tabScopeMask = 0;   // scope fixed on entry (per-track mask, or 0 = global)
 
     // bias/depth overlay
     void enterBiasOverlay();

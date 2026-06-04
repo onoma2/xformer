@@ -98,9 +98,8 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
         return;
     }
 
-    if (key.pageModifier() && key.isStep() && key.step() == 5) { // Page + S6: tab editor preview
-        _tabEditorActive = true;
-        _tabEditorTab = 0;
+    if (key.pageModifier() && key.isStep() && key.step() == 5) { // Page + S6: tab editor
+        enterTabEditor();
         event.consume();
         return;
     }
@@ -160,11 +159,17 @@ void RoutingPage::encoder(EncoderEvent &event) {
         return;
     }
 
-    if (tabEditorActive()) { // edit unified depth (all member tracks held equal)
-        int step = pageKeyState()[Key::Shift] ? 10 : 1;
-        int d = clamp(_editRoute.depthPct(0) + event.value() * step, -100, 100);
-        for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
-            _editRoute.setDepthPct(t, d);
+    if (tabEditorActive()) {
+        if (_tabEdit && _tabRowRouted) { // edit unified depth (all member tracks held equal)
+            int step = pageKeyState()[Key::Shift] ? 10 : 1;
+            int d = clamp(_editRoute.depthPct(0) + event.value() * step, -100, 100);
+            for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+                _editRoute.setDepthPct(t, d);
+            }
+        } else {                         // move the row cursor, re-point to that param's route
+            int n = tabBandParamCount();
+            _tabEditorRow = clamp(_tabEditorRow + event.value(), 0, n - 1);
+            tabRefocus();
         }
         event.consume();
         return;
@@ -782,15 +787,78 @@ int RoutingPage::routeForBandParam(uint8_t paramKey, uint8_t trackMask) const {
     return -1;
 }
 
+int RoutingPage::tabBandParamCount() const {
+    uint8_t keys[8];
+    return RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
+}
+
+// Re-point _editRoute to the cursor row's committed route, if that param is routed
+// at the scope. Unrouted rows leave _tabRowRouted false (display-only this unit;
+// route creation is a later unit).
+void RoutingPage::tabRefocus() {
+    uint8_t keys[8];
+    int n = RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
+    _tabEditorRow = clamp(_tabEditorRow, 0, (n > 0 ? n - 1 : 0));
+    int routeIdx = (n > 0) ? routeForBandParam(keys[_tabEditorRow], _tabScopeMask) : -1;
+    if (routeIdx >= 0) {
+        _route = &_project.routing().route(routeIdx);
+        _routeIndex = routeIdx;
+        _editRoute = *_route;
+        _tabRowRouted = true;
+    } else {
+        _tabRowRouted = false;
+        _tabEdit = false;
+    }
+}
+
+// Which of the 4 tab bands contains paramKey; -1 if none.
+static int bandOfParamKey(uint8_t key) {
+    uint8_t keys[8];
+    for (int b = 0; b < 4; ++b) {
+        int n = RouteBrowse::bandParams(RouteBrowse::Band(b), keys, 8);
+        for (int i = 0; i < n; ++i) {
+            if (keys[i] == key) return b;
+        }
+    }
+    return -1;
+}
+
+void RoutingPage::enterTabEditor() {
+    _tabEditorActive = true;
+    _tabEdit = false;
+    // scope = the entered route's scope; land the cursor on the entered route's param
+    bool perTrack = Routing::isPerTrackTarget(_editRoute.target());
+    _tabScopeMask = perTrack ? uint8_t(_editRoute.tracks()) : 0;
+    uint8_t key = RouteFork::targetToParamKey(_editRoute.target());
+    int band = bandOfParamKey(key);
+    if (band >= 0) {
+        _tabEditorTab = band;
+        uint8_t keys[8];
+        int n = RouteBrowse::bandParams(RouteBrowse::Band(band), keys, 8);
+        _tabEditorRow = 0;
+        for (int i = 0; i < n; ++i) {
+            if (keys[i] == key) { _tabEditorRow = i; break; }
+        }
+    } else {
+        _tabEditorTab = 0;
+        _tabEditorRow = 0;
+    }
+    tabRefocus();
+}
+
 void RoutingPage::drawTabEditor(Canvas &canvas) {
     const char *tabs[] = { "PITCH", "CLOCK", "PROB", "GLOB" };
     const int tabCount = 4;
 
-    bool changed = *_route != _editRoute;
+    // cursor param name in the header; COMMIT only when the focused route has edits
+    uint8_t curKeys[8];
+    int curN = RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), curKeys, 8);
+    uint8_t cursorKey = (curN > 0) ? curKeys[clamp(_tabEditorRow, 0, curN - 1)] : 0;
+    bool changed = _tabRowRouted && *_route != _editRoute;
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "ROUTE");
-    WindowPainter::drawActiveFunction(canvas, Routing::targetName(_editRoute.target()));
-    const char *fn[] = { "BACK", "COMBINE", nullptr, nullptr, changed ? "COMMIT" : nullptr };
+    WindowPainter::drawActiveFunction(canvas, bandParamName(RouteBrowse::Band(_tabEditorTab), cursorKey));
+    const char *fn[] = { "BACK", _tabRowRouted ? "COMBINE" : nullptr, nullptr, nullptr, changed ? "COMMIT" : nullptr };
     WindowPainter::drawFooter(canvas, fn, pageKeyState());
 
     canvas.setFont(Font::Tiny);
@@ -814,13 +882,11 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     canvas.setColor(Color::Low);
     canvas.vline(tabW + 2, 12, CONFIG_LCD_HEIGHT - 23);
 
-    // scope = the entered route's scope; per-track tracks, else global (mask 0)
     auto band = RouteBrowse::Band(_tabEditorTab);
-    bool perTrack = Routing::isPerTrackTarget(_editRoute.target());
-    uint8_t scopeMask = perTrack ? uint8_t(_editRoute.tracks()) : 0;
-    uint8_t focusKey = RouteFork::targetToParamKey(_editRoute.target());
 
-    // band param list: each param resolved to its routed state at this scope
+    // band param list: each param resolved to its routed state at the fixed scope.
+    // The cursor row (_tabEditorRow) drives the highlight; its routed route is loaded
+    // into _editRoute, so the cursor row reads/edits the live draft.
     uint8_t keys[8];
     int n = RouteBrowse::bandParams(band, keys, 8);
     const int cx = tabW + 6, listTop = 15, rowH = 6;
@@ -828,20 +894,19 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     for (int i = 0; i < n; ++i) {
         int y = listTop + i * rowH;
         uint8_t key = keys[i];
-        bool focus = key == focusKey;
-        // focused row mirrors the live draft (_editRoute); others read committed routes
+        bool cursor = i == _tabEditorRow;
         int depth = 0;
         bool routed;
-        if (focus) {
-            routed = true;
-            depth = _editRoute.depthPct(0);
+        if (cursor) {
+            routed = _tabRowRouted;
+            if (routed) depth = _editRoute.depthPct(0);
         } else {
-            int routeIdx = routeForBandParam(key, scopeMask);
+            int routeIdx = routeForBandParam(key, _tabScopeMask);
             routed = routeIdx >= 0;
             if (routed) depth = _project.routing().route(routeIdx).depthPct(0);
         }
 
-        if (focus) {
+        if (cursor) {
             canvas.setColor(Color::MediumBright);
             canvas.fillRect(cx - 2, y - 1, CONFIG_LCD_WIDTH - cx - 2, rowH);
             canvas.setBlendMode(BlendMode::Sub);
@@ -849,24 +914,23 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         canvas.setColor(routed ? Color::Bright : Color::Low);
         canvas.drawText(cx, y + 4, bandParamName(band, key));
         if (routed) {
-            FixedStringBuilder<8> dep("%+d%%", depth);
+            FixedStringBuilder<10> dep(_tabEdit && cursor ? ">%+d%%" : "%+d%%", depth);
             canvas.setColor(Color::Medium);
             canvas.drawText(depthR - canvas.textWidth(dep), y + 4, dep);
         } else {
             canvas.setColor(Color::Low);
             canvas.drawText(depthR - canvas.textWidth("--"), y + 4, "--");
         }
-        if (focus) canvas.setBlendMode(BlendMode::Set);
+        if (cursor) canvas.setBlendMode(BlendMode::Set);
     }
 
-    // scope mini-map + combine for the entered route, compact at the bottom
+    // scope mini-map + combine for the focused route, compact at the bottom
     const int mapX = CONFIG_LCD_WIDTH - 8 * 11 - 1, mapY = CONFIG_LCD_HEIGHT - 19;
-    if (perTrack) {
-        uint8_t tracks = _editRoute.tracks();
+    if (_tabScopeMask != 0) {
         for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
             int px = mapX + t * 11;
             char letter[2] = { trackModeLetter(_project.track(t).trackMode()), 0 };
-            if (tracks & (1 << t)) {
+            if (_tabScopeMask & (1 << t)) {
                 canvas.setColor(Color::Bright);
                 canvas.fillRect(px, mapY, 10, 7);
                 canvas.setBlendMode(BlendMode::Sub);
@@ -881,20 +945,25 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         canvas.setColor(Color::Medium);
         canvas.drawText(mapX, mapY + 5, "global");
     }
-    canvas.setColor(Color::Medium);
-    canvas.drawText(cx, mapY + 5,
-        _editRoute.combine() == RouteApply::Combine::Absolute ? "ABS" : "MOD");
+    if (_tabRowRouted) {
+        canvas.setColor(Color::Medium);
+        canvas.drawText(cx, mapY + 5,
+            _editRoute.combine() == RouteApply::Combine::Absolute ? "ABS" : "MOD");
+    }
 }
 
 void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
     const auto &key = event.key();
-    if (key.isLeft()) {
-        _tabEditorTab = (_tabEditorTab + 3) % 4;
+    if (key.isLeft() || key.isRight()) {
+        _tabEditorTab = (_tabEditorTab + (key.isLeft() ? 3 : 1)) % 4;
+        _tabEditorRow = 0;
+        _tabEdit = false;
+        tabRefocus();
         event.consume();
         return;
     }
-    if (key.isRight()) {
-        _tabEditorTab = (_tabEditorTab + 1) % 4;
+    if (key.isEncoder()) { // toggle edit on the cursor row (only if it's a route)
+        if (_tabRowRouted) _tabEdit = !_tabEdit;
         event.consume();
         return;
     }
@@ -904,12 +973,14 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
             _tabEditorActive = false;
             _overviewActive = true;
             break;
-        case Function::Next: // COMBINE: toggle Modulate <-> Absolute
-            _editRoute.setCombine(_editRoute.combine() == RouteApply::Combine::Absolute
-                                  ? RouteApply::Combine::Modulate : RouteApply::Combine::Absolute);
+        case Function::Next: // COMBINE: toggle Modulate <-> Absolute on the focused route
+            if (_tabRowRouted) {
+                _editRoute.setCombine(_editRoute.combine() == RouteApply::Combine::Absolute
+                                      ? RouteApply::Combine::Modulate : RouteApply::Combine::Absolute);
+            }
             break;
-        case Function::Commit: // COMMIT the draft
-            commitRoute();
+        case Function::Commit: // COMMIT the focused route
+            if (_tabRowRouted) commitRoute();
             break;
         default:
             break;
