@@ -45,6 +45,7 @@ private:
     bool tabEditorActive() const { return _tabEditorActive; }
     void drawTabEditor(Canvas &canvas);
     void handleTabEditorKey(KeyPressEvent &event);
+    int routeForBandParam(uint8_t paramKey, uint8_t trackMask) const;
     bool _tabEditorActive = false;
     int _tabEditorTab = 0;
 

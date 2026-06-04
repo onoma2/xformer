@@ -3,6 +3,11 @@
 #include "ui/painters/WindowPainter.h"
 #include "ui/pages/ContextMenu.h"
 
+#include "model/RouteBrowse.h"
+#include "model/RouteFork.h"
+#include "model/ParamTableGlobal.h"
+#include "model/ParamTableNote.h"
+
 #include "core/utils/StringBuilder.h"
 #include "core/math/Math.h"
 #include "core/utils/Random.h"
@@ -757,6 +762,26 @@ static char trackModeLetter(Track::TrackMode mode) {
     }
 }
 
+// Name for a band ParamKey: Global keys from the global table, the rest from Note
+// (which backs every per-track band param). Reuses the staged row names, no new strings.
+static const char *bandParamName(RouteBrowse::Band band, uint8_t key) {
+    const RouteParam::Table &tbl = (band == RouteBrowse::Band::Global)
+        ? GlobalParamTable::table() : NoteParamTable::table();
+    const RouteParam::Row *row = tbl.find(key);
+    return row ? row->name : "?";
+}
+
+// Find the active route targeting paramKey within the scope; -1 if none.
+int RoutingPage::routeForBandParam(uint8_t paramKey, uint8_t trackMask) const {
+    const auto &routing = _project.routing();
+    for (int r = 0; r < CONFIG_ROUTE_COUNT; ++r) {
+        if (RouteBrowse::matches(routing.route(r), paramKey, trackMask)) {
+            return r;
+        }
+    }
+    return -1;
+}
+
 void RoutingPage::drawTabEditor(Canvas &canvas) {
     const char *tabs[] = { "PITCH", "CLOCK", "PROB", "GLOB" };
     const int tabCount = 4;
@@ -789,21 +814,45 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     canvas.setColor(Color::Low);
     canvas.vline(tabW + 2, 12, CONFIG_LCD_HEIGHT - 23);
 
-    // the route's param row: name . source . depth . track+engine mini-map
-    const int cx = tabW + 6, rowY = 16;
-    const int mapX = CONFIG_LCD_WIDTH - 8 * 11 - 1, mapY = rowY + 8;
-    canvas.setColor(Color::Bright);
-    canvas.drawText(cx, rowY + 4, Routing::targetName(_editRoute.target()));
-    FixedStringBuilder<12> src;
-    Routing::printSource(_editRoute.source(), src);
-    canvas.setColor(Color::Medium);
-    canvas.drawText(cx, rowY + 12, src);
-    FixedStringBuilder<8> dep("%+d%%", _editRoute.depthPct(0));
-    canvas.setColor(Color::Bright);
-    canvas.drawText(mapX - 6 - canvas.textWidth(dep), rowY + 12, dep);   // right-aligned before the map
-
-    // mini-map (per-track engine letter; filled = member)
+    // scope = the entered route's scope; per-track tracks, else global (mask 0)
+    auto band = RouteBrowse::Band(_tabEditorTab);
     bool perTrack = Routing::isPerTrackTarget(_editRoute.target());
+    uint8_t scopeMask = perTrack ? uint8_t(_editRoute.tracks()) : 0;
+    uint8_t focusKey = RouteFork::targetToParamKey(_editRoute.target());
+
+    // band param list: each param resolved to its routed state at this scope
+    uint8_t keys[8];
+    int n = RouteBrowse::bandParams(band, keys, 8);
+    const int cx = tabW + 6, listTop = 15, rowH = 6;
+    const int depthR = CONFIG_LCD_WIDTH - 4;
+    for (int i = 0; i < n; ++i) {
+        int y = listTop + i * rowH;
+        uint8_t key = keys[i];
+        bool focus = key == focusKey;
+        int routeIdx = routeForBandParam(key, scopeMask);
+        bool routed = routeIdx >= 0;
+
+        if (focus) {
+            canvas.setColor(Color::MediumBright);
+            canvas.fillRect(cx - 2, y - 1, CONFIG_LCD_WIDTH - cx - 2, rowH);
+            canvas.setBlendMode(BlendMode::Sub);
+        }
+        canvas.setColor(routed ? Color::Bright : Color::Low);
+        canvas.drawText(cx, y + 4, bandParamName(band, key));
+        if (routed) {
+            const auto &rt = _project.routing().route(routeIdx);
+            FixedStringBuilder<8> dep("%+d%%", rt.depthPct(0));
+            canvas.setColor(Color::Medium);
+            canvas.drawText(depthR - canvas.textWidth(dep), y + 4, dep);
+        } else {
+            canvas.setColor(Color::Low);
+            canvas.drawText(depthR - canvas.textWidth("--"), y + 4, "--");
+        }
+        if (focus) canvas.setBlendMode(BlendMode::Set);
+    }
+
+    // scope mini-map + combine for the entered route, compact at the bottom
+    const int mapX = CONFIG_LCD_WIDTH - 8 * 11 - 1, mapY = CONFIG_LCD_HEIGHT - 19;
     if (perTrack) {
         uint8_t tracks = _editRoute.tracks();
         for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
@@ -824,12 +873,9 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         canvas.setColor(Color::Medium);
         canvas.drawText(mapX, mapY + 5, "global");
     }
-
-    // combine line
     canvas.setColor(Color::Medium);
-    canvas.drawText(cx, rowY + 28,
-        FixedStringBuilder<24>("Combine: %s",
-            _editRoute.combine() == RouteApply::Combine::Absolute ? "Absolute" : "Modulate"));
+    canvas.drawText(cx, mapY + 5,
+        _editRoute.combine() == RouteApply::Combine::Absolute ? "ABS" : "MOD");
 }
 
 void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
