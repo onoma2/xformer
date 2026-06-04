@@ -46,16 +46,14 @@ private:
     void drawTabEditor(Canvas &canvas);
     void handleTabEditorKey(KeyPressEvent &event);
     void enterTabEditor();
-    void tabRefocus();          // load the cursor row's committed route into _editRoute (if routed)
-    void tabAutoSave();         // persist depth/combine edits to the focused route before leaving it
+    void tabRefocus();          // point _route at the cursor row's committed route (if routed)
     void tabCreateRoute();      // create + focus a route for the cursor's empty param
     int routeForBandParam(uint8_t paramKey, uint8_t trackMask) const;
     int tabBandParamCount() const;
     bool _tabEditorActive = false;
     int _tabEditorTab = 0;
     int _tabEditorRow = 0;
-    bool _tabEdit = false;       // encoder-press toggles: false = move cursor, true = edit depth
-    bool _tabRowRouted = false;  // cursor row resolves to a committed route
+    bool _tabRowRouted = false;  // cursor row resolves to a committed route (_route)
     uint8_t _tabScopeMask = 0;   // scope fixed on entry (per-track mask, or 0 = global)
 
     // bias/depth overlay

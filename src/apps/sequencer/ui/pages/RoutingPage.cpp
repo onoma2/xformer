@@ -2,11 +2,51 @@
 
 #include "ui/painters/WindowPainter.h"
 #include "ui/pages/ContextMenu.h"
+#include "ui/pages/Pages.h"
 
 #include "model/RouteBrowse.h"
 #include "model/RouteFork.h"
 #include "model/ParamTableGlobal.h"
 #include "model/ParamTableNote.h"
+
+#include "ui/model/ListModel.h"
+
+namespace {
+
+// QuickEdit adapter for a route's unified depth: big centered readout + LED ring
+// (mirrors GeneratorContextQuickEditModel). Edits all tracks held equal, live on the
+// committed route the engine reads.
+class RouteDepthQuickEditModel : public ListModel {
+public:
+    void configure(Routing::Route *route) { _route = route; }
+    int rows() const override { return 1; }
+    int columns() const override { return 2; }
+    void cell(int row, int column, StringBuilder &str) const override {
+        if (row != 0 || !_route) return;
+        if (column == 0) str("DEPTH");
+        else str("%+d%%", _route->depthPct(0));
+    }
+    void edit(int row, int column, int value, bool shift) override {
+        if (row != 0 || column != 1 || !_route) return;
+        setAll(clamp(_route->depthPct(0) + value * (shift ? 10 : 1), -100, 100));
+    }
+    int indexedCount(int) const override { return 16; }
+    int indexed(int) const override {
+        return _route ? clamp((_route->depthPct(0) + 100) * 15 / 200, 0, 15) : -1;
+    }
+    void setIndexed(int, int index) override {
+        if (_route) setAll(clamp(index * 200 / 15 - 100, -100, 100));
+    }
+private:
+    void setAll(int d) {
+        for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) _route->setDepthPct(t, d);
+    }
+    Routing::Route *_route = nullptr;
+};
+
+RouteDepthQuickEditModel gRouteDepthQuickEditModel;
+
+} // namespace
 
 #include "core/utils/StringBuilder.h"
 #include "core/math/Math.h"
@@ -159,19 +199,10 @@ void RoutingPage::encoder(EncoderEvent &event) {
         return;
     }
 
-    if (tabEditorActive()) {
-        if (_tabEdit && _tabRowRouted) { // edit unified depth (all member tracks held equal)
-            int step = pageKeyState()[Key::Shift] ? 10 : 1;
-            int d = clamp(_editRoute.depthPct(0) + event.value() * step, -100, 100);
-            for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
-                _editRoute.setDepthPct(t, d);
-            }
-        } else {                         // move the row cursor, re-point to that param's route
-            tabAutoSave();
-            int n = tabBandParamCount();
-            _tabEditorRow = clamp(_tabEditorRow + event.value(), 0, n - 1);
-            tabRefocus();
-        }
+    if (tabEditorActive()) {             // move the row cursor, re-point to that param's route
+        int n = tabBandParamCount();
+        _tabEditorRow = clamp(_tabEditorRow + event.value(), 0, n - 1);
+        tabRefocus();
         event.consume();
         return;
     }
@@ -832,21 +863,14 @@ void RoutingPage::tabCreateRoute() {
     _routeIndex = slot;
     _editRoute = *_route;
     _tabRowRouted = true;
-    _tabEdit = true;
-    showMessage("ROUTE CREATED");
+    // open the depth modal so the encoder dials the new route's depth up from 0
+    gRouteDepthQuickEditModel.configure(_route);
+    _manager.pages().quickEdit.show(gRouteDepthQuickEditModel, 0);
 }
 
-// Persist depth/combine edits to the focused route before leaving it. These edits
-// never change target/tracks, so the write can't conflict — silent, no message.
-void RoutingPage::tabAutoSave() {
-    if (_tabRowRouted && _route && *_route != _editRoute) {
-        *_route = _editRoute;
-    }
-}
-
-// Re-point _editRoute to the cursor row's committed route, if that param is routed
-// at the scope. Unrouted rows leave _tabRowRouted false (display-only this unit;
-// route creation is a later unit).
+// Point _route at the cursor row's committed route, if that param is routed at the
+// scope. The tab editor edits _route live; unrouted rows leave _tabRowRouted false
+// (cursor shows "+ADD", encoder-press creates).
 void RoutingPage::tabRefocus() {
     uint8_t keys[8];
     int n = RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
@@ -859,7 +883,6 @@ void RoutingPage::tabRefocus() {
         _tabRowRouted = true;
     } else {
         _tabRowRouted = false;
-        _tabEdit = false;
     }
 }
 
@@ -877,7 +900,6 @@ static int bandOfParamKey(uint8_t key) {
 
 void RoutingPage::enterTabEditor() {
     _tabEditorActive = true;
-    _tabEdit = false;
     // scope = the entered route's scope; land the cursor on the entered route's param
     bool perTrack = Routing::isPerTrackTarget(_editRoute.target());
     _tabScopeMask = perTrack ? uint8_t(_editRoute.tracks()) : 0;
@@ -902,15 +924,15 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     const char *tabs[] = { "PITCH", "CLOCK", "PROB", "GLOB" };
     const int tabCount = 4;
 
-    // cursor param name in the header; COMMIT only when the focused route has edits
+    // cursor param name in the header. Tab editor edits the committed route live, so
+    // there is no draft/commit — depth (modal) and combine (F2) apply immediately.
     uint8_t curKeys[8];
     int curN = RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), curKeys, 8);
     uint8_t cursorKey = (curN > 0) ? curKeys[clamp(_tabEditorRow, 0, curN - 1)] : 0;
-    bool changed = _tabRowRouted && *_route != _editRoute;
     WindowPainter::clear(canvas);
     WindowPainter::drawHeader(canvas, _model, _engine, "ROUTE");
     WindowPainter::drawActiveFunction(canvas, bandParamName(RouteBrowse::Band(_tabEditorTab), cursorKey));
-    const char *fn[] = { "BACK", _tabRowRouted ? "COMBINE" : nullptr, nullptr, nullptr, changed ? "COMMIT" : nullptr };
+    const char *fn[] = { "BACK", _tabRowRouted ? "COMBINE" : nullptr, nullptr, nullptr, nullptr };
     WindowPainter::drawFooter(canvas, fn, pageKeyState());
 
     canvas.setFont(Font::Tiny);
@@ -937,8 +959,8 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     auto band = RouteBrowse::Band(_tabEditorTab);
 
     // band param list: each param resolved to its routed state at the fixed scope.
-    // The cursor row (_tabEditorRow) drives the highlight; its routed route is loaded
-    // into _editRoute, so the cursor row reads/edits the live draft.
+    // The cursor row (_tabEditorRow) drives the highlight; its route is _route (the
+    // committed slot), edited live.
     uint8_t keys[8];
     int n = RouteBrowse::bandParams(band, keys, 8);
     const int cx = tabW + 6, listTop = 15, rowH = 6;
@@ -951,7 +973,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         bool routed;
         if (cursor) {
             routed = _tabRowRouted;
-            if (routed) depth = _editRoute.depthPct(0);
+            if (routed && _route) depth = _route->depthPct(0);
         } else {
             int routeIdx = routeForBandParam(key, _tabScopeMask);
             routed = routeIdx >= 0;
@@ -966,7 +988,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         canvas.setColor(routed ? Color::Bright : Color::Low);
         canvas.drawText(cx, y + 4, bandParamName(band, key));
         if (routed) {
-            FixedStringBuilder<10> dep(_tabEdit && cursor ? ">%+d%%" : "%+d%%", depth);
+            FixedStringBuilder<10> dep("%+d%%", depth);
             canvas.setColor(Color::Medium);
             canvas.drawText(depthR - canvas.textWidth(dep), y + 4, dep);
         } else {
@@ -979,8 +1001,8 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
 
     // scope mini-map + combine for the focused route, compact at the bottom
     // show the focused route's actual tracks when routed; else the entry scope
-    uint8_t mapMask = (_tabRowRouted && Routing::isPerTrackTarget(_editRoute.target()))
-        ? uint8_t(_editRoute.tracks()) : _tabScopeMask;
+    uint8_t mapMask = (_tabRowRouted && _route && Routing::isPerTrackTarget(_route->target()))
+        ? uint8_t(_route->tracks()) : _tabScopeMask;
     const int mapX = CONFIG_LCD_WIDTH - 8 * 11 - 1, mapY = CONFIG_LCD_HEIGHT - 19;
     if (mapMask != 0) {
         for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
@@ -1001,48 +1023,43 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         canvas.setColor(Color::Medium);
         canvas.drawText(mapX, mapY + 5, "global");
     }
-    if (_tabRowRouted) {
+    if (_tabRowRouted && _route) {
         canvas.setColor(Color::Medium);
         canvas.drawText(cx, mapY + 5,
-            _editRoute.combine() == RouteApply::Combine::Absolute ? "ABS" : "MOD");
+            _route->combine() == RouteApply::Combine::Absolute ? "ABS" : "MOD");
     }
 }
 
 void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
     const auto &key = event.key();
     if (key.isLeft() || key.isRight()) {
-        tabAutoSave();
         _tabEditorTab = (_tabEditorTab + (key.isLeft() ? 3 : 1)) % 4;
         _tabEditorRow = 0;
-        _tabEdit = false;
         tabRefocus();
         event.consume();
         return;
     }
     if (key.isEncoder()) {
-        if (_tabRowRouted) {
-            _tabEdit = !_tabEdit;        // routed row: toggle depth edit
+        if (_tabRowRouted) {            // routed row: open the depth quick-edit modal (live)
+            gRouteDepthQuickEditModel.configure(_route);
+            _manager.pages().quickEdit.show(gRouteDepthQuickEditModel, 0);
         } else {
-            tabCreateRoute();           // empty row: create a route here, enter edit
+            tabCreateRoute();           // empty row: create a route here
         }
         event.consume();
         return;
     }
     if (key.isFunction()) {
         switch (Function(key.function())) {
-        case Function::Prev: // BACK to overview (depth/combine edits auto-saved)
-            tabAutoSave();
+        case Function::Prev: // BACK to overview (edits are live, nothing to save)
             _tabEditorActive = false;
             _overviewActive = true;
             break;
-        case Function::Next: // COMBINE: toggle Modulate <-> Absolute on the focused route
-            if (_tabRowRouted) {
-                _editRoute.setCombine(_editRoute.combine() == RouteApply::Combine::Absolute
-                                      ? RouteApply::Combine::Modulate : RouteApply::Combine::Absolute);
+        case Function::Next: // COMBINE: toggle Modulate <-> Absolute on the focused route (live)
+            if (_tabRowRouted && _route) {
+                _route->setCombine(_route->combine() == RouteApply::Combine::Absolute
+                                   ? RouteApply::Combine::Modulate : RouteApply::Combine::Absolute);
             }
-            break;
-        case Function::Commit: // COMMIT the focused route
-            if (_tabRowRouted) commitRoute();
             break;
         default:
             break;
@@ -1051,7 +1068,6 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         return;
     }
     if (key.pageModifier() && key.isStep() && key.step() == 5) { // Page+S6 exits
-        tabAutoSave();
         _tabEditorActive = false;
         event.consume();
         return;
