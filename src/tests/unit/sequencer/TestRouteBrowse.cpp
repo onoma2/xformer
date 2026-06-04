@@ -1,6 +1,7 @@
 #include "UnitTest.h"
 
 #include "apps/sequencer/model/RouteBrowse.h"
+#include "apps/sequencer/model/RouteFork.h"
 #include "apps/sequencer/model/RouteParamKey.h"
 
 // Param-aggregation read model for the tab editor (lens UI). A tab band maps to a
@@ -64,6 +65,23 @@ CASE("matches: global route matches at global scope (mask 0) only") {
 CASE("matches: per-track param does not match at global scope") {
     auto r = routeFor(Routing::Target::Transpose, 0b00000001);
     expectFalse(RouteBrowse::matches(r, ParamKey::Transpose, 0), "per-track route, global scope query");
+}
+
+CASE("paramKeyToTarget: round-trips every band param key") {
+    for (int b = 0; b < 4; ++b) {
+        uint8_t keys[8];
+        int n = RouteBrowse::bandParams(RouteBrowse::Band(b), keys, 8);
+        for (int i = 0; i < n; ++i) {
+            Routing::Target t = RouteBrowse::paramKeyToTarget(keys[i]);
+            expectTrue(int(t) != int(Routing::Target::None), "band key maps to a real target");
+            expectEqual(int(RouteFork::targetToParamKey(t)), int(keys[i]), "round-trips key");
+        }
+    }
+}
+
+CASE("paramKeyToTarget: unknown key -> None") {
+    expectEqual(int(RouteBrowse::paramKeyToTarget(ParamKey::None)), int(Routing::Target::None), "None");
+    expectEqual(int(RouteBrowse::paramKeyToTarget(200)), int(Routing::Target::None), "out of range");
 }
 
 } // UNIT_TEST

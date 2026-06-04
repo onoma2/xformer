@@ -793,6 +793,39 @@ int RoutingPage::tabBandParamCount() const {
     return RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
 }
 
+// Create a route for the cursor's band param at the editor scope. Allocates an empty
+// slot, sets target (from the band key) + tracks (scope, or the selected track if the
+// scope is global but the band is per-track) + a default CV1 source, then focuses it
+// in edit mode so the encoder dials depth immediately.
+void RoutingPage::tabCreateRoute() {
+    uint8_t keys[8];
+    int n = RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
+    if (n == 0) return;
+    uint8_t key = keys[clamp(_tabEditorRow, 0, n - 1)];
+    Routing::Target target = RouteBrowse::paramKeyToTarget(key);
+    if (target == Routing::Target::None) return;
+
+    int slot = _project.routing().findEmptyRoute();
+    if (slot < 0) { showMessage("NO EMPTY ROUTES"); return; }
+
+    Routing::Route route;
+    route.clear();
+    route.setTarget(target);
+    if (Routing::isPerTrackTarget(target)) {
+        uint8_t mask = _tabScopeMask ? _tabScopeMask : uint8_t(1 << _project.selectedTrackIndex());
+        route.setTracks(mask);
+    }
+    route.setSource(Routing::Source::CvIn1);
+
+    _project.routing().route(slot) = route;
+    _route = &_project.routing().route(slot);
+    _routeIndex = slot;
+    _editRoute = *_route;
+    _tabRowRouted = true;
+    _tabEdit = true;
+    showMessage("ROUTE CREATED");
+}
+
 // Persist depth/combine edits to the focused route before leaving it. These edits
 // never change target/tracks, so the write can't conflict — silent, no message.
 void RoutingPage::tabAutoSave() {
@@ -927,8 +960,9 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
             canvas.setColor(Color::Medium);
             canvas.drawText(depthR - canvas.textWidth(dep), y + 4, dep);
         } else {
-            canvas.setColor(Color::Low);
-            canvas.drawText(depthR - canvas.textWidth("--"), y + 4, "--");
+            const char *hint = cursor ? "+ADD" : "--"; // cursor on empty row: press to add
+            canvas.setColor(cursor ? Color::Medium : Color::Low);
+            canvas.drawText(depthR - canvas.textWidth(hint), y + 4, hint);
         }
         if (cursor) canvas.setBlendMode(BlendMode::Set);
     }
@@ -975,8 +1009,12 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         event.consume();
         return;
     }
-    if (key.isEncoder()) { // toggle edit on the cursor row (only if it's a route)
-        if (_tabRowRouted) _tabEdit = !_tabEdit;
+    if (key.isEncoder()) {
+        if (_tabRowRouted) {
+            _tabEdit = !_tabEdit;        // routed row: toggle depth edit
+        } else {
+            tabCreateRoute();           // empty row: create a route here, enter edit
+        }
         event.consume();
         return;
     }

@@ -33,6 +33,28 @@ namespace RouteBrowse {
         return n;
     }
 
+    // Reverse of RouteFork::targetToParamKey for the band keys: the Routing::Target a
+    // new route should carry to back paramKey. None for unknown keys.
+    inline Routing::Target paramKeyToTarget(uint8_t key) {
+        switch (key) {
+        case ParamKey::Scale:                    return Routing::Target::Scale;
+        case ParamKey::RootNote:                 return Routing::Target::RootNote;
+        case ParamKey::Transpose:                return Routing::Target::Transpose;
+        case ParamKey::Octave:                   return Routing::Target::Octave;
+        case ParamKey::Divisor:                  return Routing::Target::Divisor;
+        case ParamKey::ClockMultiplier:          return Routing::Target::ClockMult;
+        case ParamKey::GateProbabilityBias:      return Routing::Target::GateProbabilityBias;
+        case ParamKey::RetriggerProbabilityBias: return Routing::Target::RetriggerProbabilityBias;
+        case ParamKey::LengthBias:               return Routing::Target::LengthBias;
+        case ParamKey::NoteProbabilityBias:      return Routing::Target::NoteProbabilityBias;
+        case ParamKey::Tempo:                    return Routing::Target::Tempo;
+        case ParamKey::Swing:                    return Routing::Target::Swing;
+        case ParamKey::CvRouteScan:              return Routing::Target::CvRouteScan;
+        case ParamKey::CvRouteRoute:             return Routing::Target::CvRouteRoute;
+        default:                                 return Routing::Target::None;
+        }
+    }
+
     // True when route is active, its target maps to paramKey, and its scope overlaps
     // trackMask. trackMask 0 = global scope (matches a project/global route only); a
     // non-zero mask = per-track scope (matches a per-track route whose tracks overlap).
