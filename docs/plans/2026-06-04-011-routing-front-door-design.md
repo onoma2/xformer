@@ -10,6 +10,7 @@ parent: routing-sliced-cutover
 supersedes: routing-tab-editor-complete-design (010, inside-out tab-editor framing)
 supersedes-nav-for: routing-ui-nav-spec (009 lens-tree navigation)
 related:
+  - routing-legacy-vs-matrix   # provenance: what is legacy vs our work
   - routing-tab-editor-complete-design
   - routing-ui-nav-spec
   - routing-ui-tiers
@@ -46,16 +47,24 @@ work. The musician never opens it to make a sound move.
 
 ## Front door — "modulate this"
 
-The hook already exists on list pages and just needs a leaner destination:
+**Provenance (settled — see `docs/routing-legacy-vs-matrix.md`):** the "modulate this" hook is
+**legacy** original-Performer code, not our routing-matrix work. We *reuse* it; we do not build
+it. The work is to **redirect the legacy hook's destination** away from the legacy
+`RouteListModel` editor into our lean flow. The legacy `Route` was min/max; our override path
+reads depth+combine+base, so `RouteListModel`'s Min/Max/Bias rows are **inert** for migrated
+targets — the lean flow drops them.
 
-- **List pages (Note, Curve, and the config-list siblings):** the `ROUTE` context action →
-  `routingTarget(selectedRow())` → `TopPage::editRoute(target, thisTrack)` → find/create a route
-  for *(this param, this track)*. **Built.** Today it dumps into the old `RouteListModel` matrix;
-  the change is to land in the lean flow instead.
-- **Graphical pages (PhaseFlux, Tuesday, DiscreteMap, Indexed):** each already tracks the param
-  under the encoder (PhaseFlux `(_currentSet,_topicPage,_selectedSlot)`, Tuesday
-  `paramForPage`, DiscreteMap/Indexed `_editMode`). Add a per-page **`currentRouteTarget()`**
-  (the graphical analogue of `routingTarget(selectedRow())`) + a `ROUTE` action. _(DiscreteMap
+The legacy hook exists on list pages and just needs that redirect:
+
+- **List pages (Note, Curve, config-list siblings) — LEGACY hook, reuse:** the `ROUTE` context
+  action → `routingTarget(selectedRow())` → `TopPage::editRoute(target, thisTrack)` → find/create
+  a route for *(this param, this track)*. **Legacy, since 2019.** Today it dumps into the legacy
+  `RouteListModel`; the change is to land in the lean flow instead.
+- **Graphical pages (PhaseFlux, Tuesday, DiscreteMap, Indexed) — NEW work, no legacy hook:**
+  these have no `routingTarget()`. Each already tracks the param under the encoder (PhaseFlux
+  `(_currentSet,_topicPage,_selectedSlot)`, Tuesday `paramForPage`, DiscreteMap/Indexed
+  `_editMode`). Author a per-page **`currentRouteTarget()`** (the graphical analogue of
+  `routingTarget(selectedRow())`) + a `ROUTE` action. _(DiscreteMap
   and Indexed already have a `ROUTE` action but it hardcodes `Divisor` — a latent half-feature
   this fixes.)_ Stochastic's performance surface has no per-param anchor; its routable params
   live on its config list, which already has `ROUTE`.
@@ -139,24 +148,25 @@ The routing page becomes the **review/manage** home, not a creation path:
 What to avoid (criticised prior art): Peak/Summit single-slot-per-screen pickers (our old
 `RouteListModel`), Metropolix cryptic-glyph + hidden-chord overload.
 
-## MVP — Note "modulate this", end to end
+## MVP — Note "modulate this" = redirect the legacy hook
 
-Almost entirely built; one new wiring:
+Not "build a front door" — the hook is legacy and works. The MVP **redirects its destination**:
 
-- ROUTE context action on `NoteSequencePage` — **built**.
-- `routingTarget(selectedRow())` + `editRoute` find/create for (target, this track) — **built**.
-- Source overlay (`RouteSourceSelectPage`) — **built**.
-- Depth view — inline bar is new; the QuickEdit modal exists as a fallback.
+- ROUTE context action on `NoteSequencePage` — **legacy, reuse**.
+- `routingTarget(selectedRow())` + `editRoute` find/create for (target, this track) — **legacy, reuse**.
+- Source overlay (`RouteSourceSelectPage`) — **ours, built**.
+- Depth — QuickEdit modal **ours, built** (use as-is for slice 1; inline bar is slice 2).
 
-**New wiring:** ROUTE → (create route) → source overlay → on pick, depth → return to the
-sequence, *instead of* opening the old `RouteListModel`. That's the user story working on a live
-engine, list archetype, minimal code.
+**The change:** `editRoute` lands in the lean flow — source overlay → depth — *instead of*
+`RoutingPage::showRoute()` opening the legacy `RouteListModel` (whose Min/Max/Bias rows are inert
+under the override path anyway). Set `combine = Modulate` + leave source for the overlay on
+create. That's the user story working on a live engine, list archetype, minimal new code.
 
 ## Build-status matrix
 
 | Piece | State |
 |---|---|
-| ROUTE action + find/create (Note/Curve list) | built |
+| ROUTE action + find/create (Note/Curve list) | built (**legacy** — reuse) |
 | Source overlay (CV-domain) | built |
 | Depth QuickEdit modal (number+ring) | built |
 | Inline bipolar depth bar per row | unbuilt |
