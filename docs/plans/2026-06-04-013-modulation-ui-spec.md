@@ -1,0 +1,179 @@
+---
+id: modulation-ui-spec
+schema: spec
+title: "spec: modulation UI — two doors, draft/commit, one model (CONTRACT)"
+type: spec
+status: draft
+scope: next
+date: 2026-06-04
+supersedes:
+  - routing-front-door-design        # 011
+  - routing-tab-editor-complete-design # 010
+  - routing-ui-nav-spec              # 009 (for migrated/global modulation UI)
+related:
+  - routing-legacy-vs-matrix
+---
+
+# Modulation UI — contract spec
+
+> **For Claude:** This is the frozen contract from the 2026-06-04 grillme session. Every
+> decision below is locked. Do NOT improvise unspecified behavior — if implementation hits a
+> case not covered here, STOP and amend this spec. Renders precede code (see §10). Detailed
+> bite-sized TDD task-plans are written per-phase **after** the renders are approved.
+
+**Goal:** Let the musician modulate a param — "I set up a param, I want to modulate it" —
+through two deliberate doors into one modulation model, with draft→commit editing.
+
+**Architecture:** One model (`Routing::Route` = invisible slot). Two UI doors: a **param door**
+(inline on the param's own row) and a **matrix door** (param×track grid for bulk sessions). All
+editing is staged and applied on COMMIT. The legacy `RouteListModel` editor is removed.
+
+**Vocabulary:** the user thinks in **modulation**, never "routes/slots." See
+`docs/routing-legacy-vs-matrix.md` (a Route is storage plumbing). The legacy context word
+"ROUTE" is renamed **MODULATE**.
+
+---
+
+## 1. Supersession
+
+This supersedes 009 (lens nav), 010 (tab-editor), and 011 (front-door) for the modulation UI of
+migrated/global params. The **Page+S6 tab editor, the source overlay/depth-modal auto-chain, and
+the legacy `RouteListModel` per-route editor are all retired** by this spec. Keep
+`docs/routing-legacy-vs-matrix.md` (provenance).
+
+## 2. Domain model & data (LOCKED)
+
+- A **modulation** = `(param, track-set, source, per-track depth, combine, shaper)`. The
+  `Routing::Route` slot that stores it is invisible to the user — never surfaced as "slot N".
+- **Depth = one `Route::depthPct[8]` array.** Two views of the same array:
+  - **unified** — all member tracks equal (the route's single amount),
+  - **spread** — per-track values differ.
+  There is no second depth field. Legacy `_min`/`_max` exist but are **inert** under the
+  override path and are never shown.
+- **One source per param, per track.** A param has at most one modulation source on a track.
+  No source stacking; the grid's one-row-per-param holds.
+- `combine` = Modulate (centred, wiggle ±d around base) or Absolute (sweep from base).
+- Base value (the param's set value) is the Hermod-style offset; modulation is `clamp(base + delta)`.
+
+## 3. Editing model — draft → COMMIT (LOCKED, both doors)
+
+- Editing builds a **draft**; the **live modulation is untouched until COMMIT**. Nothing is
+  audible/active before COMMIT. This **replaces** the tab editor's live-edit model.
+- **COMMIT = F5.** **CANCEL = the page back/exit key** (not an F-slot).
+- **CANCEL** reverts a draft to its last committed state; **CANCEL on a newly-created draft
+  removes it** (frees the slot).
+- **Source is required to COMMIT** — COMMIT is unavailable until a real source is set.
+- A modulated row is **always editable**: turning the encoder stages a change; the moment a
+  draft is dirty, COMMIT (F5) is offered; CANCEL (back) reverts.
+
+## 4. Param door — inline on the param's row (LOCKED)
+
+For a single param on the current track, edited where the param already lives (no separate
+editor, no page switch).
+
+- **Invoke:** context menu on the param's row → **MODULATE**. Creates a draft: source None,
+  **depth 0**, combine **Modulate**, tracks = **current track only**.
+- **Row display (modulated):** `name  source › [horizontal bipolar depth bar]  value`.
+- **Encoder:** **press toggles edit target value ↔ depth**; turn edits the active one (turning
+  depth stages it).
+- **SRC** (F-key) → source picker → COMMIT sets the source, returns to the row.
+- **COMBINE** (F-key) → toggles the draft's Modulate/Absolute.
+- **Shift+S5** → the param door's **own per-track spread sub-view** (vertical bipolar bars for
+  this param across tracks). Same bipolar idiom as the matrix cells.
+- **REMOVE:** context menu → **REMOVE MOD** deletes the modulation (frees the slot).
+
+## 5. Matrix door — param×track grid (LOCKED)
+
+For setting up several params across several tracks in one session.
+
+- **Layout:** rows = the current band's params; columns = the 8 tracks; **each cell = a vertical
+  bipolar depth bar**. Tabs (Left/Right) switch bands.
+- **One source per row** — a row = one source modulating that param across its tracks; cells
+  differ only in **depth** (= spread). **SRC** F-key sets the row's source.
+- **Scope:** **T1–T8 toggle columns** into the focused row; **Shift+Tn = by-type** (all tracks
+  of track n's engine).
+- **Depth:** cursor lands on a cell; **encoder stages that cell's depth**.
+- **COMBINE** F-key per row. **COMMIT (F5) is per-modulation (per-row).** CANCEL (back) reverts
+  the row.
+- **REMOVE:** clears the focused row's modulation.
+- Cells for tracks whose engine doesn't own the param render **ineligible** (dim/dash).
+
+## 6. Depth language (LOCKED)
+
+- **Horizontal** bipolar bar = the param-door unified amount (one bar in the row's dead space,
+  centre tick = base/neutral, fill right = +, left = −).
+- **Vertical** bipolar bars = spread (the param-door spread sub-view) and the matrix grid cells.
+- Hermod model: depth = attenuverter, combine = polarity, base = offset.
+
+## 7. Source picker (LOCKED)
+
+- Reuse `RouteSourceSelectPage`. Footer button is **COMMIT** (not OK).
+- List = CV-domain sources (CV In/Out, Bus, Gate, Mod) **plus None** at top. **None cannot be
+  committed** (source required). The self-route bus is excluded for the target.
+- MIDI source is **deferred** (would need F4 LEARN) — and is dark anyway under §8.
+
+## 8. Legacy boundary (LOCKED — accepted regression)
+
+- The legacy `RouteListModel` / per-route editor is **hidden/removed now**.
+- The new modulation UI covers **migrated engines only: Note, PhaseFlux, and global (Tempo/
+  Swing/CVR)**.
+- The six non-migrated engines (Curve, Tuesday, Stochastic, DiscreteMap, Indexed) **and MIDI
+  source have NO routing UI until each migrates.** This dark gap is accepted, in exchange for a
+  single clean UI. Migration brings each engine onto the new UI by wiring its `ParamTable*` to
+  the override path + giving its page a `currentRouteTarget()`.
+
+## 9. Naming (LOCKED)
+
+- Gesture/menu: **MODULATE** (was ROUTE). Removal: **REMOVE MOD**.
+- Commit button: **COMMIT** (was OK). Cancel: the back/exit key.
+
+## 10. Render plan — BEFORE any code
+
+Render each screen with `ui-preview` and read it back; only then implement. Screens:
+
+1. **Param door — modulated row** (clean): `name  src › [h-bar]  value`, value-edit focus.
+2. **Param door — depth focus + dirty**: depth-edit active, COMMIT (F5) shown, CANCEL=back.
+3. **Param door — spread sub-view** (Shift+S5): vertical bipolar bars, this param × tracks.
+4. **Source picker**: CV-domain + None, footer CANCEL(back)/COMMIT.
+5. **Matrix grid** (a band): param rows × 8 track columns, vertical bipolar cells, footer
+   SRC/COMBINE/COMMIT.
+6. **Matrix grid — by-type**: Shift+T lit a homogeneous engine set across a row.
+
+Renders settle the **render-time opens (§11)**. Present all, get approval, then write per-phase
+TDD plans.
+
+## 11. Open — render-time only (no behavior undecided)
+
+- Exact F-slot assignment for SRC and COMBINE (and how the param-row footer swaps to modulation
+  controls while a row is dirty vs the page's normal F-keys).
+- Exact pixel layout of the matrix cells (8 columns × ≤4 rows on 256×64) and the horizontal
+  in-row bar.
+- Whether the param-door spread sub-view and a matrix-grid row are literally the same widget
+  reached two ways (same bipolar idiom either way).
+
+## 12. Implementation phases (detailed TDD plans written per phase, after renders)
+
+1. **Retire legacy + MODULATE/REMOVE rename** — hide `RouteListModel`/old editor; rename the
+   context action ROUTE→MODULATE (+ REMOVE MOD); migrated-only gating (`RouteFork::migrated`/
+   `migratedGlobal`); non-migrated context entry hidden.
+2. **Draft/commit core** — staging buffer per modulation; COMMIT(F5)/CANCEL(back); source
+   required; live route written only on COMMIT.
+3. **Param door** — inline modulated row (horizontal bar), press value↔depth, SRC picker
+   (COMMIT), COMBINE, creation defaults (depth 0).
+4. **Param-door spread** — Shift+S5 vertical bipolar bars.
+5. **Matrix grid** — param×track grid, cells, T-toggle + Shift+T by-type, per-row source/COMMIT.
+6. **Per-engine migration** — wire each remaining engine's `ParamTable*` live + `currentRouteTarget()`; it joins the new UI, its dark gap closes.
+7. **MIDI source (F4 LEARN)**; **shaper** (engine-gated, in spread).
+
+## 13. Deferred / out of scope
+
+Shaper UI (until the shaper port; only None/TriangleFold live); MIDI-learn; `scaleSource` cross-
+source; the flat "every modulation" overview list (the grid is the editor; an audit list can come
+later); serialized-format cleanup; deleting old `writeTarget`/`Routable` routed half.
+
+## 14. MVP code already on branch — reconcile
+
+The redirect MVP (TopPage::editRoute fork → source overlay → depth modal, depth-0 create,
+findRoute isPerTrackTarget fix, cancel-cleanup) was an interim that this spec **replaces**: the
+auto-chain source→depth-modal is dropped (§4 uses inline row + draft/commit), but the
+`findRoute` fix and depth-0-on-create remain correct and carry forward.

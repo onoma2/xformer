@@ -386,3 +386,62 @@ still defaults CV1, then F3 changes it). Footer is now `BACK · COMBINE · SRC`.
   6-row variant overran the footer). sim release green, zero warnings.
 
 **Next:** F4 LEARN (MIDI source in the tab editor) → Page+S5 spread (per-track unique depths).
+
+## Design pivot — front door "modulate this" (2026-06-04)
+
+Long design session reframed the routing UI from matrix-internals to the user story
+"I set up a param, I want to modulate it." Web-researched prior art (Deluge/Bitwig
+destination-first, Hermod+ depth, NerdSeq overview; eurorack peers Hermod/Metropolix/
+Vector/NerdSeq).
+
+- **Provenance settled** (`docs/routing-legacy-vs-matrix.md`): the "modulate this" hook
+  (ROUTE context action → routingTarget → editRoute → showRoute → RouteListModel) is
+  **legacy** original-Performer code (since 2019), not our work. We reuse/redirect it.
+  Min/Max/Bias rows are inert under our base+delta override path. PhaseFlux is a new
+  engine with no legacy hook (its front door is new work).
+- **Canonical spec** `docs/plans/2026-06-04-011-routing-front-door-design.md` (supersedes
+  010 tab-editor framing, 009 lens-nav). Three layers: front door (modulate-this from the
+  param) / engine spine (Param*.cpp tables, wired live per engine) / management (routing
+  page demoted to review + advanced scope/spread/shaper).
+- **Depth language locked**: inline horizontal bipolar bar per param row (TeletypeScriptView
+  drawBipolarBar rotated 90°, in the dead space between name and value) + live source dot on
+  the cursor row. Hermod model: depth=attenuverter, combine=polarity (Mod/Abs), base=offset.
+  Per-track spread = vertical bipolar bars on Page+S5 (the vertical-lane-in-editor was tried
+  and rejected — no room; render routing-tablane kept as the record).
+- **Scope**: chips + T1–T8 toggle live + Shift+Tn by-type; tabs derive from scope.
+- Renders: routing-rowbar, routing-depth(/-abs), routing-tabscope(/-bytype), routing-source.
+
+## MVP plan 012 — redirect the legacy ROUTE hook (in progress)
+
+`docs/plans/2026-06-04-012-modulate-this-mvp-plan.md`. Note "modulate this" lands in our
+lean flow (source overlay → depth modal) instead of the legacy RouteListModel, gated on
+RouteFork::migrated so Curve + the 6 unmigrated engines keep the legacy editor.
+
+## Spec FROZEN via grillme (2026-06-04) — canonical 013
+
+A relentless grillme session pinned the modulation UI into a frozen contract:
+`docs/plans/2026-06-04-013-modulation-ui-spec.md` (supersedes 009/010/011). The 3-day
+circling was diagnosed as: specs kept getting superseded + I implemented against the gaps,
+so every coding step surfaced an unspecified decision. Fix: freeze one contract, render
+before code, amend-don't-improvise.
+
+Locked decisions:
+- **Frame:** user thinks in MODULATION; a Route is an invisible storage slot. Two DOORS into
+  one model, both create: param door (inline single-param) + matrix door (bulk param×track).
+- **Model:** modulation = (param, track-set, source, depthPct[8], combine, shaper); ONE depth
+  array (unified vs spread); one source per param/track; min/max inert.
+- **Editing = draft → COMMIT** (F5), both doors; live untouched until COMMIT; CANCEL=back
+  (reverts; removes if new); source required to commit. REPLACES the tab editor's live model.
+- **Param door:** context-menu MODULATE creates inert (None, depth 0, Modulate, current track);
+  inline row `src › [horizontal bipolar bar] › value`; press toggles value↔depth; SRC + COMBINE
+  F-keys; Shift+S5 own per-track vertical-bar spread; REMOVE MOD via context menu.
+- **Matrix door:** param×track grid, cells = vertical bipolar bars, tabs=bands; one source/row;
+  T1-T8 toggle cols + Shift+Tn by-type; cursor cell → encoder stages depth; per-row COMMIT.
+- **Legacy hidden NOW:** new UI = Note/PhaseFlux/global only; Curve/Tuesday/Stochastic/
+  DiscreteMap/Indexed + MIDI dark until migrated (accepted regression).
+- **Naming:** MODULATE / REMOVE MOD / COMMIT. Source picker = CV-domain + None (None can't commit).
+
+Interim MVP (plan 012: editRoute redirect + source-overlay→depth-modal auto-chain) is
+SUPERSEDED by the inline-row + draft/commit model. Carry forward: findRoute isPerTrackTarget
+fix, depth-0-on-create. Next: render 6 screens (spec §10) → per-phase TDD plans → implement
+(phase 1 = retire legacy + rename + draft/commit core).

@@ -19,6 +19,12 @@ related:
 
 # Routing front door — "modulate this"
 
+> **SUPERSEDED by 013 (modulation-ui-spec).** The grillme session reframed this into the frozen
+> contract: two doors (param-inline + matrix grid), draft→COMMIT editing, legacy hidden now.
+> 013 is canonical; this doc is kept for the research/prior-art and the depth-language renders it
+> introduced.
+
+
 _Status (2026-06-04): DRAFT. The canonical routing-UI design, derived from the musician's
 user story rather than the matrix internals. Supersedes 010's inside-out tab-editor framing
 and 009's lens-tree navigation. Grounded in external prior art (Deluge/Bitwig destination-
