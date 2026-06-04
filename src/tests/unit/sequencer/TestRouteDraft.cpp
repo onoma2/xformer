@@ -90,4 +90,89 @@ UNIT_TEST("RouteDraft") {
         auto d = RouteDraft::create(routing, Routing::Target::Transpose, CONFIG_TRACK_COUNT);
         expectEqual(d.routeIndex, -1, "track index >= CONFIG_TRACK_COUNT -> no draft");
     }
+
+    CASE("isTrackModulated false before create, true after commit") {
+        Project project;
+        auto &routing = project.routing();
+        expectFalse(RouteDraft::isTrackModulated(routing, Routing::Target::Transpose, 2), "not modulated initially");
+        auto c = RouteDraft::create(routing, Routing::Target::Transpose, 2);
+        c.route.setSource(Routing::Source::CvIn1);
+        RouteDraft::commit(routing, c);
+        expectTrue(RouteDraft::isTrackModulated(routing, Routing::Target::Transpose, 2), "modulated after commit");
+    }
+
+    CASE("removeTrack on single-track per-track modulation frees the slot") {
+        Project project;
+        auto &routing = project.routing();
+        int idx;
+        { auto c = RouteDraft::create(routing, Routing::Target::Transpose, 1);
+          c.route.setSource(Routing::Source::CvIn1);
+          RouteDraft::commit(routing, c); idx = c.routeIndex; }
+        bool removed = RouteDraft::removeTrack(routing, Routing::Target::Transpose, 1);
+        expectTrue(removed, "returns true");
+        expectEqual(int(routing.route(idx).target()), int(Routing::Target::None), "slot freed");
+        expectEqual(routing.findEmptyRoute(), idx, "slot reusable");
+    }
+
+    CASE("removeTrack on multi-track modulation clears only the named track") {
+        Project project;
+        auto &routing = project.routing();
+        int idx;
+        { auto c = RouteDraft::create(routing, Routing::Target::Transpose, 0);
+          c.route.setSource(Routing::Source::CvIn1);
+          c.route.setTracks((1 << 0) | (1 << 3));
+          c.route.setDepthPct(0, 40);
+          c.route.setDepthPct(3, 40);
+          RouteDraft::commit(routing, c); idx = c.routeIndex; }
+        bool removed = RouteDraft::removeTrack(routing, Routing::Target::Transpose, 0);
+        expectTrue(removed, "returns true");
+        expectEqual(int(routing.route(idx).target()), int(Routing::Target::Transpose), "route still active");
+        expectEqual(int(routing.route(idx).tracks()), int(1 << 3), "only track 3 remains");
+        expectEqual(routing.route(idx).depthPct(0), 0, "track 0 depth zeroed");
+        expectTrue(RouteDraft::isTrackModulated(routing, Routing::Target::Transpose, 3), "track 3 still modulated");
+        expectFalse(RouteDraft::isTrackModulated(routing, Routing::Target::Transpose, 0), "track 0 not modulated");
+    }
+
+    CASE("removeTrack on a global modulation frees the slot") {
+        Project project;
+        auto &routing = project.routing();
+        int idx;
+        { auto c = RouteDraft::create(routing, Routing::Target::Tempo, 0);
+          c.route.setSource(Routing::Source::CvIn1);
+          RouteDraft::commit(routing, c); idx = c.routeIndex; }
+        bool removed = RouteDraft::removeTrack(routing, Routing::Target::Tempo, 0);
+        expectTrue(removed, "returns true");
+        expectEqual(int(routing.route(idx).target()), int(Routing::Target::None), "slot freed");
+        expectEqual(routing.findEmptyRoute(), idx, "slot reusable");
+    }
+
+    CASE("removeTrack returns false when not modulated on that track") {
+        Project project;
+        auto &routing = project.routing();
+        expectFalse(RouteDraft::removeTrack(routing, Routing::Target::Transpose, 0), "no-op returns false");
+    }
+
+    CASE("canCommit rejects an out-of-range routeIndex") {
+        RouteDraft::Draft d;
+        d.routeIndex = CONFIG_ROUTE_COUNT;            // out of range (upper)
+        d.route.setTarget(Routing::Target::Transpose);
+        d.route.setSource(Routing::Source::CvIn1);
+        expectFalse(RouteDraft::canCommit(d), "routeIndex >= CONFIG_ROUTE_COUNT -> cannot commit");
+    }
+
+    CASE("isTrackModulated guards out-of-range trackIndex for per-track targets") {
+        Project project; auto &routing = project.routing();
+        expectFalse(RouteDraft::isTrackModulated(routing, Routing::Target::Transpose, CONFIG_TRACK_COUNT),
+                    "out-of-range track -> false");
+        expectFalse(RouteDraft::isTrackModulated(routing, Routing::Target::Transpose, -1),
+                    "negative track -> false");
+    }
+
+    CASE("removeTrack guards out-of-range trackIndex for per-track targets") {
+        Project project; auto &routing = project.routing();
+        expectFalse(RouteDraft::removeTrack(routing, Routing::Target::Transpose, CONFIG_TRACK_COUNT),
+                    "out-of-range track -> false");
+        expectFalse(RouteDraft::removeTrack(routing, Routing::Target::Transpose, -1),
+                    "negative track -> false");
+    }
 }

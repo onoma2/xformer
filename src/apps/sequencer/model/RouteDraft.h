@@ -3,8 +3,9 @@
 #include "Routing.h"
 #include "RouteApply.h"
 
-// Draft/commit staging for one modulation. An existing Route is untouched until commit();
-// a freshly-created slot is reserved live but inert (source None) and freed on cancel().
+// Draft/commit staging for one modulation, plus membership ops (is-modulated / remove-track).
+// An existing Route is untouched until commit(); a freshly-created slot is reserved live but
+// inert (source None) and freed on cancel().
 namespace RouteDraft {
 
 struct Draft {
@@ -49,7 +50,8 @@ inline Draft begin(const Routing &routing, int routeIndex) {
 
 // Source is required to commit.
 inline bool canCommit(const Draft &d) {
-    return d.routeIndex >= 0 && d.route.active() && d.route.source() != Routing::Source::None;
+    return d.routeIndex >= 0 && d.routeIndex < CONFIG_ROUTE_COUNT &&
+           d.route.active() && d.route.source() != Routing::Source::None;
 }
 
 // Write draft -> live. Caller guarantees canCommit().
@@ -62,6 +64,37 @@ inline void cancel(Routing &routing, const Draft &d) {
     if (d.isNew && d.routeIndex >= 0) {
         routing.route(d.routeIndex).clear();
     }
+}
+
+// Is this track currently modulated for the target? (label: MOD- when true, MOD+ when false)
+inline bool isTrackModulated(const Routing &routing, Routing::Target target, int trackIndex) {
+    if (Routing::isPerTrackTarget(target) && (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT)) {
+        return false;
+    }
+    return routing.findRoute(target, trackIndex) >= 0;
+}
+
+// MOD- : remove this track from the modulation. Per-track: clear the track bit + zero its depth;
+// when it was the last track, free the whole slot. Global target: free the slot. No-op if absent.
+inline bool removeTrack(Routing &routing, Routing::Target target, int trackIndex) {
+    if (Routing::isPerTrackTarget(target) && (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT)) {
+        return false;
+    }
+    int r = routing.findRoute(target, trackIndex);
+    if (r < 0) {
+        return false;
+    }
+    auto &route = routing.route(r);
+    if (Routing::isPerTrackTarget(target)) {
+        route.setTracks(route.tracks() & ~(1 << trackIndex));
+        route.setDepthPct(trackIndex, 0);
+        if (route.tracks() == 0) {
+            route.clear();
+        }
+    } else {
+        route.clear();
+    }
+    return true;
 }
 
 } // namespace RouteDraft
