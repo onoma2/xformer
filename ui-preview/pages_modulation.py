@@ -254,7 +254,7 @@ def _matrix(canvas, bytype, view="depth"):
                 canvas.set_color(Color.Medium)
                 canvas.hline(cx - col_w // 2 + 3, y + rh - 1, col_w - 5)
 
-    _footer(canvas, ["", "SRC", "COMBINE", "", "COMMIT"], commit=False)
+    _footer(canvas, ["VIEW", "SRC", "COMBINE", "", "COMMIT"], commit=False)
 
 
 def render_mod_matrix(canvas):

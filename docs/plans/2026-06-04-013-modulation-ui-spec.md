@@ -102,9 +102,11 @@ For setting up several params across several tracks in one session.
   the row.
 - **REMOVE:** clears the focused row's modulation.
 - Cells for tracks whose engine doesn't own the param render **ineligible** (dim/dash).
-- **Two cell views, toggled:** **depth** (numbers per cell) and **source** (each routed cell's
-  source abbreviation — `CV1`/`O1`/`B1`/`G1`/`M1`). Source view is the "what source drives which
-  param/track" map; since one-source-per-row, a row's routed cells share their source.
+- **Cell views, cycled by F1 (VIEW):** **depth** (numbers per cell) → **source** (each routed
+  cell's source abbreviation — `CV1`/`O1`/`B1`/`G1`/`M1`) → **shaper** (per-cell shaper name —
+  deferred until the shaper port). Depth + shaper are per-cell (per-track arrays); source is
+  per-row (one-source-per-row, so a row's routed cells share their source). Header tag shows the
+  current view. Until shaper lands, F1 cycles two (depth↔source).
 
 ## 6. Depth language (LOCKED)
 
@@ -165,10 +167,9 @@ Renders done — `ui-preview/modulation/mod-*.png`, renderer `ui-preview/pages_m
 - **Matrix cells are numeric** (depth value); ineligible `-`, eligible-unrouted `.`.
 - **Cursor = brightness** (cursor cell + its column header + row name brighten), **not a box**.
 - **By-type = a thin underline** on the group's cells (distinct from the cursor brightness).
-- **Matrix has two cell views — depth and source** — toggled (see §5a). Source view shows each
-  routed cell's source abbreviation (`CV1` CV In, `O1` CV Out, `B1` Bus, `G1` Gate, `M1` Mod);
-  one-source-per-row means a row's routed cells share a source, so the source view reads as a
-  "what source drives which param/track" map.
+- **Matrix cell views cycled by F1 (VIEW):** depth → source → shaper (shaper deferred until the
+  port; F1 cycles two until then). Source abbreviations: `CV1` CV In, `O1` CV Out, `B1` Bus,
+  `G1` Gate, `M1` Mod. Matrix footer = **F1 VIEW · F2 SRC · F3 COMBINE · F5 COMMIT**.
 - Spread sub-view and a matrix row are the **same vertical-bar idiom** reached two ways (no
   separate widget); the matrix's own cells are numeric, not bars.
 
