@@ -5,6 +5,9 @@
 #include "ui/painters/WindowPainter.h"
 
 #include "model/FileManager.h"
+#include "model/RouteDraft.h"
+#include "model/RouteFork.h"
+#include "model/RouteParam.h"
 
 #include "core/utils/StringBuilder.h"
 
@@ -17,12 +20,20 @@ enum class ContextAction {
     Last
 };
 
-static const ContextMenuModel::Item contextMenuItems[] = {
+static const ContextMenuModel::Item contextMenuItemsModAdd[] = {
     { "INIT" },
     { "LOAD" },
     { "SAVE" },
     { "SAVE AS" },
-    { "ROUTE" }
+    { "MOD+" }
+};
+
+static const ContextMenuModel::Item contextMenuItemsModRemove[] = {
+    { "INIT" },
+    { "LOAD" },
+    { "SAVE" },
+    { "SAVE AS" },
+    { "MOD-" }
 };
 
 ProjectPage::ProjectPage(PageManager &manager, PageContext &context) :
@@ -103,8 +114,11 @@ void ProjectPage::keyboard(KeyboardEvent &event) {
 }
 
 void ProjectPage::contextShow(bool doubleClick) {
+    auto target = _listModel.routingTarget(selectedRow());
+    bool modulated = RouteDraft::isTrackModulated(_project.routing(), target, 0);
+    const auto &items = modulated ? contextMenuItemsModRemove : contextMenuItemsModAdd;
     showContextMenu(ContextMenu(
-        contextMenuItems,
+        items,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
         [&] (int index) { return contextActionEnabled(index); },
@@ -140,8 +154,12 @@ bool ProjectPage::contextActionEnabled(int index) const {
     case ContextAction::Save:
     case ContextAction::SaveAs:
         return FileManager::volumeMounted();
-    case ContextAction::Route:
-        return _listModel.routingTarget(selectedRow()) != Routing::Target::None;
+    case ContextAction::Route: {
+        auto target = _listModel.routingTarget(selectedRow());
+        if (target == Routing::Target::None) return false;
+        uint8_t key; RouteParam::Range range;
+        return RouteFork::migratedGlobal(target, key, range);
+    }
     default:
         return true;
     }
@@ -196,7 +214,7 @@ void ProjectPage::saveAsProject() {
 }
 
 void ProjectPage::initRoute() {
-    _manager.pages().top.editRoute(_listModel.routingTarget(selectedRow()), 0);
+    _manager.pages().top.toggleModulation(_listModel.routingTarget(selectedRow()), 0);
 }
 
 void ProjectPage::saveProjectToSlot(int slot) {

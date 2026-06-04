@@ -21,7 +21,6 @@ private:
         Init,
         Copy,
         Paste,
-        Route,
         Last
     };
 
@@ -32,7 +31,6 @@ private:
     void initSequence();
     void copySequence();
     void pasteSequence();
-    void initRoute();
     void invalidateThresholds();
 
     DiscreteMapSequenceListModel _listModel;

@@ -12,7 +12,6 @@ enum class ContextAction {
     Copy,
     Paste,
     Duplicate,
-    Route,
     Last
 };
 
@@ -21,7 +20,6 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "COPY" },
     { "PASTE" },
     { "DUPL" },
-    { "ROUTE" },
 };
 
 enum class LfoContextAction {
@@ -180,9 +178,6 @@ void CurveSequencePage::contextAction(int index) {
     case ContextAction::Duplicate:
         duplicateSequence();
         break;
-    case ContextAction::Route:
-        initRoute();
-        break;
     case ContextAction::Last:
         break;
     }
@@ -192,8 +187,6 @@ bool CurveSequencePage::contextActionEnabled(int index) const {
     switch (ContextAction(index)) {
     case ContextAction::Paste:
         return _model.clipBoard().canPasteCurveSequence();
-    case ContextAction::Route:
-        return _listModel.routingTarget(selectedRow()) != Routing::Target::None;
     default:
         return true;
     }
@@ -218,10 +211,6 @@ void CurveSequencePage::duplicateSequence() {
     if (_project.selectedTrack().duplicatePattern(_project.selectedPatternIndex())) {
         showMessage("SEQUENCE DUPLICATED");
     }
-}
-
-void CurveSequencePage::initRoute() {
-    _manager.pages().top.editRoute(_listModel.routingTarget(selectedRow()), _project.selectedTrackIndex());
 }
 
 void CurveSequencePage::lfoContextShow() {

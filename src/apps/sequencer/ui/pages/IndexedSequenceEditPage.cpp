@@ -29,7 +29,6 @@ enum class ContextAction {
     Init,
     Copy,
     Paste,
-    Route,
     Insert,
     MakeFirst,
     Delete,
@@ -40,7 +39,6 @@ static const ContextMenuModel::Item seqContextMenuItems[] = {
     { "INIT" },
     { "COPY" },
     { "PASTE" },
-    { "ROUTE" },
 };
 
 static const ContextMenuModel::Item stepContextMenuItems[] = {
@@ -1017,7 +1015,7 @@ void IndexedSequenceEditPage::contextShow(bool doubleClick) {
     if (_contextMode == ContextMode::Sequence) {
         showContextMenu(ContextMenu(
             seqContextMenuItems,
-            4, // count
+            3, // count
             [&] (int index) { contextAction(index); },
             [&] (int index) { return contextActionEnabled(index); },
             doubleClick
@@ -1051,9 +1049,6 @@ void IndexedSequenceEditPage::contextAction(int index) {
         } else {
             pasteStep();
         }
-        break;
-    case ContextAction::Route:
-        routeSequence();
         break;
     // STEP Actions
     case ContextAction::Insert:
@@ -1093,10 +1088,6 @@ bool IndexedSequenceEditPage::contextActionEnabled(int index) const {
 void IndexedSequenceEditPage::initSequence() {
     _project.selectedIndexedSequence().clear();
     showMessage("SEQUENCE CLEARED");
-}
-
-void IndexedSequenceEditPage::routeSequence() {
-    _manager.pages().top.editRoute(Routing::Target::Divisor, _project.selectedTrackIndex());
 }
 
 void IndexedSequenceEditPage::insertStep() {

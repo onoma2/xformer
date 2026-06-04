@@ -35,7 +35,6 @@ private:
         Copy,
         Paste,
         Random,
-        Route,
         Last
     };
 

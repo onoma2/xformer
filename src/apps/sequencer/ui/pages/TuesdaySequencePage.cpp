@@ -9,13 +9,11 @@
 
 enum class ContextAction {
     Init,
-    Route,
     Last
 };
 
 static const ContextMenuModel::Item contextMenuItems[] = {
     { "INIT" },
-    { "ROUTE" },
 };
 
 TuesdaySequencePage::TuesdaySequencePage(PageManager &manager, PageContext &context) :
@@ -81,9 +79,6 @@ void TuesdaySequencePage::contextAction(int index) {
     case ContextAction::Init:
         initSequence();
         break;
-    case ContextAction::Route:
-        initRoute();
-        break;
     case ContextAction::Last:
         break;
     }
@@ -91,8 +86,6 @@ void TuesdaySequencePage::contextAction(int index) {
 
 bool TuesdaySequencePage::contextActionEnabled(int index) const {
     switch (ContextAction(index)) {
-    case ContextAction::Route:
-        return _listModel.routingTarget(selectedRow()) != Routing::Target::None;
     default:
         return true;
     }
@@ -101,8 +94,4 @@ bool TuesdaySequencePage::contextActionEnabled(int index) const {
 void TuesdaySequencePage::initSequence() {
     _project.selectedTuesdaySequence().clear();
     showMessage("SEQUENCE INITIALIZED");
-}
-
-void TuesdaySequencePage::initRoute() {
-    _manager.pages().top.editRoute(_listModel.routingTarget(selectedRow()), _project.selectedTrackIndex());
 }

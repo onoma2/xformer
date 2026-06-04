@@ -13,7 +13,6 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "INIT" },
     { "COPY" },
     { "PASTE" },
-    { "ROUTE" },
 };
 
 DiscreteMapSequenceListPage::DiscreteMapSequenceListPage(PageManager &manager, PageContext &context) :
@@ -86,9 +85,6 @@ void DiscreteMapSequenceListPage::contextAction(int index) {
     case ContextAction::Paste:
         pasteSequence();
         break;
-    case ContextAction::Route:
-        initRoute();
-        break;
     case ContextAction::Last:
         break;
     }
@@ -98,8 +94,6 @@ bool DiscreteMapSequenceListPage::contextActionEnabled(int index) const {
     switch (ContextAction(index)) {
     case ContextAction::Paste:
         return _model.clipBoard().canPasteDiscreteMapSequence();
-    case ContextAction::Route:
-        return _listModel.routingTarget(selectedRow()) != Routing::Target::None;
     default:
         return true;
     }
@@ -120,10 +114,6 @@ void DiscreteMapSequenceListPage::pasteSequence() {
     _model.clipBoard().pasteDiscreteMapSequence(_project.selectedDiscreteMapSequence());
     invalidateThresholds();
     showMessage("PASTED");
-}
-
-void DiscreteMapSequenceListPage::initRoute() {
-    _manager.pages().top.editRoute(_listModel.routingTarget(selectedRow()), _project.selectedTrackIndex());
 }
 
 void DiscreteMapSequenceListPage::invalidateThresholds() {

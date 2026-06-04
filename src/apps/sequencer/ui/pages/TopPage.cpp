@@ -3,6 +3,7 @@
 
 #include "model/NoteSequence.h"
 #include "model/RouteFork.h"
+#include "model/RouteDraft.h"
 #include "ui/LedPainter.h"
 #include "ui/PageKeyMap.h"
 
@@ -31,55 +32,30 @@ void TopPage::updateLeds(Leds &leds) {
 }
 
 
-void TopPage::editRoute(Routing::Target target, int trackIndex) {
-    auto &routing = _project.routing();
-
+void TopPage::toggleModulation(Routing::Target target, int trackIndex) {
     if (target == Routing::Target::None) {
         return;
     }
-
-    int routeIndex = routing.findRoute(target, trackIndex);
-    bool wasCreated = false;
-    if (routeIndex < 0) {
-        routeIndex = routing.findEmptyRoute();
-        if (routeIndex < 0) {
-            showMessage("NO EMPTY ROUTES");
-            return;
-        }
-        auto &route = routing.route(routeIndex);
-        route.clear();
-        route.setTarget(target);
-        route.setTracks(1 << trackIndex);
-        wasCreated = true;
-    }
-
-    // Migrated targets (Note/PhaseFlux per-track, Tempo/Swing/CVR global) use the lean
-    // "modulate this" flow (source overlay -> depth modal) on the override path. Everything
-    // else keeps the legacy per-route editor (its min/max model the engine still reads).
-    uint8_t key;
-    RouteParam::Range range;
-    bool migrated = RouteFork::migrated(_project.track(trackIndex).trackMode(), target, key, range) ||
-                    RouteFork::migratedGlobal(target, key, range);
-    if (migrated) {
-        if (wasCreated) {
-            // start inert: depth 0 so a freshly-created route modulates nothing until the
-            // user sets an amount (clear() defaults depth to 100% = full slam on source pick).
-            auto &route = routing.route(routeIndex);
-            route.setCombine(RouteApply::Combine::Modulate);
-            for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
-                route.setDepthPct(t, 0);
-            }
-        }
-        _manager.pages().routing.beginModulate(routeIndex, wasCreated);
+    auto &routing = _project.routing();
+    if (RouteDraft::isTrackModulated(routing, target, trackIndex)) {
+        RouteDraft::removeTrack(routing, target, trackIndex);   // MOD-
         return;
     }
-
-    setMode(Mode::Routing);
-    if (wasCreated) {
-        _manager.pages().routing.showRoute(routeIndex, &routing.route(routeIndex));
-    } else {
-        _manager.pages().routing.showRoute(routeIndex);
+    auto draft = RouteDraft::create(routing, target, trackIndex);   // MOD+
+    if (draft.routeIndex < 0) {
+        showMessage("NO EMPTY ROUTES");
+        return;
     }
+    int idx = draft.routeIndex;   // capture ONLY this int (heap-safe)
+    _manager.pages().routeSourceSelect.show(target, Routing::Source::None,
+        [this, idx] (bool ok, Routing::Source source) {
+            auto &routing = _project.routing();
+            if (ok && source != Routing::Source::None) {
+                routing.route(idx).setSource(source);   // commit source onto the live slot
+            } else {
+                routing.route(idx).clear();             // cancel or None: free the freshly-created slot
+            }
+        });
 }
 
 

@@ -7,6 +7,10 @@
 
 #include "core/utils/StringBuilder.h"
 
+#include "model/RouteDraft.h"
+#include "model/RouteFork.h"
+#include "model/RouteParam.h"
+
 enum class ContextAction {
     Init,
     Copy,
@@ -16,12 +20,20 @@ enum class ContextAction {
     Last
 };
 
-static const ContextMenuModel::Item contextMenuItems[] = {
+static const ContextMenuModel::Item contextMenuItemsModAdd[] = {
     { "INIT" },
     { "COPY" },
     { "PASTE" },
     { "DUPL" },
-    { "ROUTE" },
+    { "MOD+" },
+};
+
+static const ContextMenuModel::Item contextMenuItemsModRemove[] = {
+    { "INIT" },
+    { "COPY" },
+    { "PASTE" },
+    { "DUPL" },
+    { "MOD-" },
 };
 
 
@@ -79,8 +91,12 @@ void NoteSequencePage::keyPress(KeyPressEvent &event) {
 }
 
 void NoteSequencePage::contextShow(bool doubleClick) {
+    auto target = _listModel.routingTarget(selectedRow());
+    int track = _project.selectedTrackIndex();
+    bool modulated = RouteDraft::isTrackModulated(_project.routing(), target, track);
+    const auto &items = modulated ? contextMenuItemsModRemove : contextMenuItemsModAdd;
     showContextMenu(ContextMenu(
-        contextMenuItems,
+        items,
         int(ContextAction::Last),
         [&] (int index) { contextAction(index); },
         [&] (int index) { return contextActionEnabled(index); },
@@ -114,8 +130,13 @@ bool NoteSequencePage::contextActionEnabled(int index) const {
     switch (ContextAction(index)) {
     case ContextAction::Paste:
         return _model.clipBoard().canPasteNoteSequence();
-    case ContextAction::Route:
-        return _listModel.routingTarget(selectedRow()) != Routing::Target::None;
+    case ContextAction::Route: {
+        auto target = _listModel.routingTarget(selectedRow());
+        if (target == Routing::Target::None) return false;
+        uint8_t key; RouteParam::Range range;
+        return RouteFork::migrated(_project.track(_project.selectedTrackIndex()).trackMode(), target, key, range)
+            || RouteFork::migratedGlobal(target, key, range);
+    }
     default:
         return true;
     }
@@ -143,5 +164,5 @@ void NoteSequencePage::duplicateSequence() {
 }
 
 void NoteSequencePage::initRoute() {
-    _manager.pages().top.editRoute(_listModel.routingTarget(selectedRow()), _project.selectedTrackIndex());
+    _manager.pages().top.toggleModulation(_listModel.routingTarget(selectedRow()), _project.selectedTrackIndex());
 }

@@ -24,7 +24,6 @@ static const ContextMenuModel::Item contextMenuItems[] = {
     { "COPY" },
     { "PASTE" },
     { "GEN" },
-    { "ROUTE" },
 };
 
 enum class DistributionContextAction {
@@ -1285,9 +1284,6 @@ void DiscreteMapSequencePage::contextAction(int index) {
         _generatorStage = GeneratorStage::ChooseKind;
         _generatorKind = GeneratorKind::Random;
         break;
-    case ContextAction::Route:
-        _manager.pages().top.editRoute(Routing::Target::Divisor, _project.selectedTrackIndex());
-        break;
     case ContextAction::Last:
         break;
     }
@@ -1299,8 +1295,6 @@ bool DiscreteMapSequencePage::contextActionEnabled(int index) const {
         return _model.clipBoard().canPasteDiscreteMapSequence();
     case ContextAction::Random:
         return _sequence != nullptr;
-    case ContextAction::Route:
-        return true;
     default:
         return true;
     }

@@ -22,7 +22,6 @@ private:
     bool contextActionEnabled(int index) const;
 
     void initSequence();
-    void initRoute();
 
     TuesdaySequenceListModel _listModel;
 };

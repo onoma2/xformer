@@ -66,7 +66,6 @@ private:
     void copySequence();
     void pasteSequence();
     void initSequence();
-    void routeSequence();
     void updateMonitorStep();
 
     IndexedSequence::Step& step(int index);
