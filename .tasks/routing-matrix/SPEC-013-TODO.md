@@ -48,12 +48,16 @@ Provenance: `docs/routing-legacy-vs-matrix.md`.
 - [x] **Unit 1 — inline modulated-row DISPLAY** (draw-only): selected migrated+modulated row draws
       `<src› [horizontal bipolar bar]` in the middle band (`ListPage::draw` + base `routingTarget`
       hook), strictly gated. STM32-green, Codex ALLOW. (Editing is units 2-3 below.)
-- [ ] Encoder: **press toggles value↔depth**, turn edits the active one (depth turn = staged draft).
-- [ ] Footer F-keys while a modulated row is focused: **SRC=F2, COMBINE=F3, COMMIT=F5** (F5 lit only
-      when draft dirty/committable), **CANCEL = back key**. Draft/commit: live untouched until COMMIT;
-      CANCEL reverts (removes if newly created); **source required to commit**. Replaces phase-1's
-      immediate source write.
-- [ ] Creation defaults: source None, depth 0, combine Modulate, current track only.
+- [x] **Unit 2 — inline edit draft/commit** (`ListPage` state machine): press toggles Value↔Depth;
+      turn edits base value (live) or stages depth into a file-scope `RouteDraft` (live untouched);
+      **F2 SRC** (picker→draft source), **F3 COMBINE** (draft combine), **F4 CANCEL** (discard+exit),
+      **F5 COMMIT** (write draft→live + exit). Footer `SRC·COMBINE·CANCEL·COMMIT`. CANCEL bound to
+      **F4** (spec §15 amend — these pages have no back key; LEARN reservation → F1). Owner-scoped
+      teardown (`cancelModEditIfOwner`, `_manager.top()==this`) so the source-picker round-trip
+      survives. STM32-green, Codex ALLOW (4 review rounds on picker/global-draft interaction).
+- [ ] **Unit 3 — rework MOD+ create to draft-based** so creation also honors §3 (live untouched
+      until COMMIT), replacing phase-1's immediate source write. Creation defaults: source None,
+      depth 0, combine Modulate, current track only.
 
 ## Phase 4 — param-door spread (spec §4, §6)
 - [ ] **Shift+S5** → per-track vertical bipolar bars for this param × tracks (render `mod-spread.png`).

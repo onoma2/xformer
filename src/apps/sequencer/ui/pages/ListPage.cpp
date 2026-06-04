@@ -1,6 +1,7 @@
 #include "ListPage.h"
 
 #include "ui/LedPainter.h"
+#include "ui/pages/Pages.h"
 #include "ui/painters/WindowPainter.h"
 
 #include "core/math/Math.h"
@@ -10,6 +11,22 @@
 #include "model/RouteDraft.h"
 
 namespace {
+
+// Inline modulation edit state. The Draft holds a full Routing::Route (large), so it
+// lives at file scope — one global edit at a time, mirroring gRouteDepthQuickEditModel
+// in RoutingPage.cpp — rather than as a per-instance member multiplied across ~20 list
+// pages. gModEditActive gates whether the draft is live; gModEditDepth selects which
+// target (value vs depth) the encoder turn stages.
+enum class ModEditTarget { Value, Depth };
+
+RouteDraft::Draft gModDraft;
+bool gModEditActive = false;
+ModEditTarget gModEditTarget = ModEditTarget::Value;
+
+// Owning page of the live draft. The source picker is also a ListPage; gating the
+// draw-time reset and key interception on this == owner keeps the picker's own
+// draw/dispatch from cancelling or mutating the underlying page's draft.
+const ListPage *gModEditOwner = nullptr;
 
 // Short source label for the inline modulated-row badge: CvIn1->"CV1",
 // CvOut1->"O1", BusCv1->"B1", GateOut1->"G1", Mod1->"M1".
@@ -31,14 +48,14 @@ void printSourceAbbrev(Routing::Source source, StringBuilder &str) {
 
 // Horizontal bipolar depth bar: dim baseline x..x+w, center tick, and a fill
 // from center outward — rightward for +depth, leftward for -depth.
-void drawDepthBar(Canvas &canvas, int x, int y, int w, int depthPct) {
+void drawDepthBar(Canvas &canvas, int x, int y, int w, int depthPct, bool focus = false) {
     int cx = x + w / 2;
     canvas.setColor(Color::Low);
     canvas.hline(x, y + 1, w);
     canvas.vline(cx, y - 1, 5);
     int span = std::abs(depthPct) * (w / 2) / 100;
     if (span > 0) {
-        canvas.setColor(Color::Medium);
+        canvas.setColor(focus ? Color::Bright : Color::Medium);
         canvas.fillRect(depthPct >= 0 ? cx : cx - span, y, span, 3);
     }
 }
@@ -67,9 +84,15 @@ void ListPage::enter() {
 }
 
 void ListPage::exit() {
+    cancelModEditIfOwner();
 }
 
 void ListPage::draw(Canvas &canvas) {
+    int gateRouteIndex;
+    if (!modulatedRow(_selectedRow, gateRouteIndex)) {
+        cancelModEditIfOwner();
+    }
+
     int displayRow = _displayRow;
     if (displayRow + LineCount > _listModel->rows()) {
         displayRow = std::max(0, _listModel->rows() - LineCount);
@@ -87,6 +110,12 @@ void ListPage::draw(Canvas &canvas) {
     }
 
     WindowPainter::drawScrollbar(canvas, Width - 8, 12, 4, LineCount * LineHeight, _listModel->rows(), LineCount, displayRow);
+
+    int routeIndex;
+    if (_edit && modulatedRow(_selectedRow, routeIndex)) {
+        const char *names[] = { nullptr, "SRC", "COMBINE", "CANCEL", "COMMIT" };
+        WindowPainter::drawFooter(canvas, names, pageKeyState());
+    }
 }
 
 void ListPage::updateLeds(Leds &leds) {
@@ -97,6 +126,59 @@ void ListPage::keyPress(KeyPressEvent &event) {
 
     if (key.pageModifier()) {
         return;
+    }
+
+    int routeIndex;
+    bool modRow = modulatedRow(_selectedRow, routeIndex);
+
+    if (modRow && _edit && key.isFunction() && _manager.top() == this) {
+        auto &routing = _project.routing();
+        switch (key.function()) {
+        case 1: // F2 SRC
+            if (!gModEditActive) {
+                gModDraft = RouteDraft::begin(routing, routeIndex);
+                gModEditActive = true;
+                gModEditOwner = this;
+            }
+            _manager.pages().routeSourceSelect.show(
+                _listModel->routingTarget(_selectedRow), gModDraft.route.source(),
+                [this] (bool ok, Routing::Source picked) {
+                    if (ok && picked != Routing::Source::None && gModEditActive) {
+                        gModDraft.route.setSource(picked);
+                    }
+                });
+            event.consume();
+            return;
+        case 2: // F3 COMBINE
+            if (!gModEditActive) {
+                gModDraft = RouteDraft::begin(routing, routeIndex);
+                gModEditActive = true;
+                gModEditOwner = this;
+            }
+            gModDraft.route.setCombine(
+                gModDraft.route.combine() == RouteApply::Combine::Modulate ?
+                    RouteApply::Combine::Absolute : RouteApply::Combine::Modulate);
+            event.consume();
+            return;
+        case 3: // F4 CANCEL
+            if (gModEditActive) {
+                RouteDraft::cancel(routing, gModDraft);
+            }
+            resetModEdit();
+            _edit = false;
+            event.consume();
+            return;
+        case 4: // F5 COMMIT
+            if (gModEditActive && RouteDraft::canCommit(gModDraft)) {
+                RouteDraft::commit(routing, gModDraft);
+                resetModEdit();
+                _edit = false;
+            }
+            event.consume();
+            return;
+        default:
+            break;
+        }
     }
 
     if (key.isLeft()) {
@@ -115,13 +197,33 @@ void ListPage::keyPress(KeyPressEvent &event) {
         }
         event.consume();
     } else if (key.isEncoder()) {
-        _edit = !_edit;
+        if (modRow) {
+            if (!_edit) {
+                _edit = true;
+                gModEditTarget = ModEditTarget::Value;
+            } else if (gModEditTarget == ModEditTarget::Value) {
+                if (!gModEditActive) {
+                    gModDraft = RouteDraft::begin(_project.routing(), routeIndex);
+                    gModEditActive = true;
+                    gModEditOwner = this;
+                }
+                gModEditTarget = ModEditTarget::Depth;
+            } else {
+                gModEditTarget = ModEditTarget::Value;
+            }
+        } else {
+            _edit = !_edit;
+        }
         event.consume();
     }
 }
 
 void ListPage::encoder(EncoderEvent &event) {
-    if (_edit) {
+    if (_edit && gModEditActive && this == gModEditOwner && gModEditTarget == ModEditTarget::Depth) {
+        int trackIndex = _project.selectedTrackIndex();
+        int depth = clamp(gModDraft.route.depthPct(trackIndex) + event.value(), -100, 100);
+        gModDraft.route.setDepthPct(trackIndex, depth);
+    } else if (_edit) {
         editSelectedRow(event.value(), event.pressed() || globalKeyState()[Key::Shift]);
     } else {
         setSelectedRow(selectedRow() + event.value());
@@ -182,6 +284,7 @@ void ListPage::setSelectedRow(int selectedRow) {
     }
 
     if (nextRow != _selectedRow) {
+        cancelModEditIfOwner();
         _selectedRow = nextRow;
         scrollTo(_selectedRow);
     }
@@ -196,14 +299,19 @@ void ListPage::drawCell(Canvas &canvas, int row, int column, int x, int y, int w
     _listModel->cell(row, column, str);
     canvas.setFont(Font::Small);
     canvas.setBlendMode(BlendMode::Set);
-    canvas.setColor(column == int(_edit) && row == _selectedRow ? Color::Bright : Color::Medium);
+    bool highlight = column == int(_edit) && row == _selectedRow;
+    if (highlight && gModEditActive && gModEditTarget == ModEditTarget::Depth && row == _selectedRow) {
+        highlight = false;
+    }
+    canvas.setColor(highlight ? Color::Bright : Color::Medium);
     canvas.drawText(x, y + 7, str);
 }
 
-void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
+bool ListPage::modulatedRow(int row, int &routeIndex) const {
+    routeIndex = -1;
     Routing::Target target = _listModel->routingTarget(row);
     if (target == Routing::Target::None) {
-        return;
+        return false;
     }
 
     const auto &track = _project.selectedTrack();
@@ -212,30 +320,62 @@ void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
     bool isMigrated = RouteFork::migrated(track.trackMode(), target, key, range) ||
                       RouteFork::migratedGlobal(target, key, range);
     if (!isMigrated) {
-        return;
+        return false;
     }
 
     int trackIndex = _project.selectedTrackIndex();
     const auto &routing = _project.routing();
     if (!RouteDraft::isTrackModulated(routing, target, trackIndex)) {
+        return false;
+    }
+
+    routeIndex = routing.findRoute(target, trackIndex);
+    return routeIndex >= 0;
+}
+
+void ListPage::resetModEdit() {
+    gModEditActive = false;
+    gModEditTarget = ModEditTarget::Value;
+    gModEditOwner = nullptr;
+}
+
+void ListPage::cancelModEditIfOwner() {
+    if (gModEditActive && this == gModEditOwner) {
+        RouteDraft::cancel(_project.routing(), gModDraft);
+        resetModEdit();
+    }
+}
+
+void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
+    int routeIndex;
+    if (!modulatedRow(row, routeIndex)) {
         return;
     }
 
-    int routeIndex = routing.findRoute(target, trackIndex);
-    if (routeIndex < 0) {
-        return;
+    int trackIndex = _project.selectedTrackIndex();
+
+    Routing::Source src;
+    int depthPct;
+    if (gModEditActive) {
+        src = gModDraft.route.source();
+        depthPct = gModDraft.route.depthPct(trackIndex);
+    } else {
+        const auto &route = _project.routing().route(routeIndex);
+        src = route.source();
+        depthPct = route.depthPct(trackIndex);
     }
-    const auto &route = routing.route(routeIndex);
+
+    bool depthFocus = gModEditActive && gModEditTarget == ModEditTarget::Depth;
 
     FixedStringBuilder<8> srcStr;
-    printSourceAbbrev(route.source(), srcStr);
+    printSourceAbbrev(src, srcStr);
     canvas.setFont(Font::Small);
     canvas.setBlendMode(BlendMode::Set);
     canvas.setColor(Color::Medium);
     canvas.drawText(78, y + 7, srcStr);
     canvas.drawText(96, y + 7, ">");
 
-    drawDepthBar(canvas, 104, y + 4, 92, route.depthPct(trackIndex));
+    drawDepthBar(canvas, 104, y + 4, 92, depthPct, depthFocus);
 }
 
 void ListPage::scrollTo(int row) {

@@ -227,3 +227,13 @@ showing the current track's membership — **MOD+** add this track / create, **M
 track / free slot when last. Labels rendered to fit (MOD+ / MOD- well under 51px). Verified
 against `ui-preview/modulation/modulation-ctx-*.png`. This supersedes §4 invoke/REMOVE and §9
 naming above (edited inline to match).
+
+**2026-06-04 — param-door CANCEL = F4 (these pages have no back key).** Spec §3 set "CANCEL =
+the page back/exit key (not an F-slot)", but the migrated param pages (Note/PhaseFlux/Project/
+Track sequence + track pages) are top-level Page-modifier pages with **no in-page back key** — the
+only exit is navigating away. So CANCEL is bound to a function slot. Owner chose **F4** (sits next
+to COMMIT on F5). Edit-footer = **F2 SRC · F3 COMBINE · F4 CANCEL · F5 COMMIT** (F1 free). On a
+modulated row in edit: encoder **press toggles Value↔Depth** (§4); **F4 CANCEL** discards the
+uncommitted draft + exits to navigate; **F5 COMMIT** writes draft→live + exits; leaving the page
+also cancels. This displaces the **MIDI LEARN** reservation (was F4, §12 phase 7) to the free
+**F1** slot. Supersedes §3 ("CANCEL = back key") and §11/§12's F4=LEARN for the param door.

@@ -36,6 +36,18 @@ protected:
 private:
     void drawModulatedRow(Canvas &canvas, int row, int y);
 
+    // True when `row` is a migrated routing target currently modulated for the
+    // selected track; on success returns its routeIndex (>=0). Same gate as
+    // drawModulatedRow — guards all inline modulation edit handling.
+    bool modulatedRow(int row, int &routeIndex) const;
+
+    void resetModEdit();
+
+    // Cancels the live draft and clears edit state, but only when this page owns
+    // the draft. Every navigate-away/leave site routes through here so the source
+    // picker (also a ListPage) can't wipe the owner's draft mid round-trip.
+    void cancelModEditIfOwner();
+
 protected:
 
 private:
