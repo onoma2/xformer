@@ -36,14 +36,16 @@ bands (added GLOBAL/DMAP/PFLX/Phase, corrected STOC 130–144), and LEARN slot (
 _Model half landed (2026-06-03): Global base+delta (997f8b84) + combine/scaleSource
 persisted on Route (d8a4a16b). Engine now honors route.combine() (96c08e17, Absolute/Modulate)._
 
-_UI landed + hardware-verified (2026-06-04): **route overview** home (ee2f6514) →
-**editable tab editor** (e601fa36 → ac589d48, HW-verified: saves/loads, combine live) →
-**RouteBrowse read model** (eb659fba) → **band aggregation** (8ed4ab1c/6e5a23c2) →
-**param-centric per-row cursor** (73926bd5/2c409112). The tab editor (Page+S6) now
-navigates a band's params (encoder=cursor, press=edit, turn-edit=depth, F2=combine,
-F5=commit, Left/Right=band; edits auto-save on navigate). It edits EXISTING routed params;
-unrouted rows are display-only. Next: route creation on a `--` row, then source editing +
-spread, then promote over the old RouteListModel rows._
+_UI landed + hardware-verified (2026-06-04): overview (ee2f6514) → editable tab editor
+(e601fa36→ac589d48, HW-verified) → RouteBrowse read model (eb659fba) → band aggregation
+(8ed4ab1c/6e5a23c2) → per-row cursor (73926bd5/2c409112) → **route creation** on `+ADD`
+(cd9bc39a/24045fa2) → **depth QuickEdit modal + LIVE editing** (bbf41f3d/ca092375). The tab
+editor (Page+S6) is now a live param-centric editor: encoder navigates a band's params,
+press opens the DEPTH modal (Generator's QuickEditPage ported — big readout + LED ring) or
+creates a route on an empty row; F2 toggles combine; Left/Right cycle bands. Depth + combine
+edit the committed route LIVE (audible immediately) — draft/commit removed. Next: source
+selection in-editor (created routes default CV1), Page+S5 spread (per-track unique depths),
+then promote over the old RouteListModel rows._
 
 ### Global is base+delta (decided 2026-06-03)
 
