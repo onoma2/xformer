@@ -71,8 +71,17 @@ the legacy `RouteListModel` per-route editor are all retired** by this spec. Kee
 For a single param on the current track, edited where the param already lives (no separate
 editor, no page switch).
 
-- **Invoke:** context menu on the param's row → **MODULATE**. Creates a draft: source None,
-  **depth 0**, combine **Modulate**, tracks = **current track only**.
+- **Invoke:** the context-menu modulation slot is **state-dependent on the current track's
+  membership** (single slot — the legacy ROUTE slot; the 5-slot footer is full on most pages and
+  per-track removal is track-scoped, not modulation-scoped — see §15 amendment):
+  - **MOD+** (this track not modulated for the param): if no modulation exists for the param,
+    create a draft (source None, **depth 0**, combine **Modulate**, tracks = **current track
+    only**) → source picker → COMMIT. If a modulation already exists on other tracks, add this
+    track to it (depth 0; inherits the modulation's source).
+  - **MOD-** (this track modulated): remove this track from the modulation (clear its track bit,
+    zero its depth). When it was the **last** track, the slot frees (whole modulation gone).
+  - Global params (Tempo/Swing/CVR) have no track-set: MOD+ = create, MOD- = delete the one
+    modulation.
 - **Row display (modulated):** `name  source › [horizontal bipolar depth bar]  value`.
 - **Encoder:** **press toggles edit target value ↔ depth**; turn edits the active one (turning
   depth stages it).
@@ -80,7 +89,8 @@ editor, no page switch).
 - **COMBINE** (F-key) → toggles the draft's Modulate/Absolute.
 - **Shift+S5** → the param door's **own per-track spread sub-view** (vertical bipolar bars for
   this param across tracks). Same bipolar idiom as the matrix cells.
-- **REMOVE:** context menu → **REMOVE MOD** deletes the modulation (frees the slot).
+- **REMOVE:** the same slot shows **MOD-** when this track is modulated → removes this track (and
+  frees the slot only when it was the last track). See §15.
 
 ## 5. Matrix door — param×track grid (LOCKED)
 
@@ -138,7 +148,10 @@ For setting up several params across several tracks in one session.
 
 ## 9. Naming (LOCKED)
 
-- Gesture/menu: **MODULATE** (was ROUTE). Removal: **REMOVE MOD**.
+- Gesture/menu: a **single state-dependent slot** replacing the legacy ROUTE slot —
+  **MOD+** (this track not modulated → add this track / create) / **MOD-** (this track modulated
+  → remove this track; free slot when last). Supersedes the earlier MODULATE / REMOVE MOD
+  two-item naming (see §15 amendment).
 - Commit button: **COMMIT** (was OK). Cancel: the back/exit key.
 
 ## 10. Render plan — BEFORE any code
@@ -199,3 +212,18 @@ The redirect MVP (TopPage::editRoute fork → source overlay → depth modal, de
 findRoute isPerTrackTarget fix, cancel-cleanup) was an interim that this spec **replaces**: the
 auto-chain source→depth-modal is dropped (§4 uses inline row + draft/commit), but the
 `findRoute` fix and depth-0-on-create remain correct and carry forward.
+
+## 15. Amendments (post-freeze)
+
+**2026-06-04 — context-menu modulation slot: MOD+/MOD- (single, per-track).** During phase-1
+implementation, two facts collided with the frozen §4/§9 "MODULATE + REMOVE MOD as two items":
+(1) the context-menu footer has exactly **5 slots** (F1–F5; a 6th item never draws and has no
+key), and 3 of the 4 migrated pages are already full (NoteSequence INIT/COPY/PASTE/DUPL/ROUTE,
+Project INIT/LOAD/SAVE/SAVE AS/ROUTE, Track INIT/COPY/PASTE/ROUTE/RESEED); (2) "REMOVE MOD"
+(57px) overflows one 51px slot. More fundamentally, removal on a per-track modulation is
+**track-scoped**, not whole-modulation: removing one track of a multi-track modulation must keep
+the others. Resolution (owner decision): **one state-dependent slot** (the legacy ROUTE slot)
+showing the current track's membership — **MOD+** add this track / create, **MOD-** remove this
+track / free slot when last. Labels rendered to fit (MOD+ / MOD- well under 51px). Verified
+against `ui-preview/modulation/modulation-ctx-*.png`. This supersedes §4 invoke/REMOVE and §9
+naming above (edited inline to match).
