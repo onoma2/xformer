@@ -829,8 +829,17 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         int y = listTop + i * rowH;
         uint8_t key = keys[i];
         bool focus = key == focusKey;
-        int routeIdx = routeForBandParam(key, scopeMask);
-        bool routed = routeIdx >= 0;
+        // focused row mirrors the live draft (_editRoute); others read committed routes
+        int depth = 0;
+        bool routed;
+        if (focus) {
+            routed = true;
+            depth = _editRoute.depthPct(0);
+        } else {
+            int routeIdx = routeForBandParam(key, scopeMask);
+            routed = routeIdx >= 0;
+            if (routed) depth = _project.routing().route(routeIdx).depthPct(0);
+        }
 
         if (focus) {
             canvas.setColor(Color::MediumBright);
@@ -840,8 +849,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         canvas.setColor(routed ? Color::Bright : Color::Low);
         canvas.drawText(cx, y + 4, bandParamName(band, key));
         if (routed) {
-            const auto &rt = _project.routing().route(routeIdx);
-            FixedStringBuilder<8> dep("%+d%%", rt.depthPct(0));
+            FixedStringBuilder<8> dep("%+d%%", depth);
             canvas.setColor(Color::Medium);
             canvas.drawText(depthR - canvas.textWidth(dep), y + 4, dep);
         } else {
