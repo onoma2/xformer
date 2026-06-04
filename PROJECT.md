@@ -166,6 +166,38 @@ Three major improvement categories documented in `doc/improvements/`:
 
 RAM is the tight resource. A feature is acceptable only if it stays within the budget below or identifies the exact RAM tradeoff it consumes.
 
+**Flash ceiling snapshot (2026-06-05 02:24:55 MSK).**
+- Sequencer app partition: `src/apps/sequencer/sequencer.ld` places the app at `0x08010000` with `LENGTH = 960K` = 983,040 B.
+- Current STM32 release build: `build/stm32/release/src/apps/sequencer/sequencer`.
+- Loaded flash sections from `arm-none-eabi-size -A`: `.text=952,068`, `.preinit_array=4`, `.init_array=84`, `.ARM.extab=8,416`, `.ARM.exidx=13,128`, `.data=6,600`.
+- Total loaded flash = 980,300 B. Headroom to 960K partition = 2,740 B.
+- Flash measurement command:
+  ```bash
+  cd build/stm32/release
+  make sequencer
+  /opt/homebrew/bin/arm-none-eabi-size -A src/apps/sequencer/sequencer
+  /opt/homebrew/bin/arm-none-eabi-objdump -h src/apps/sequencer/sequencer
+  ```
+- Symbol-level culprit command:
+  ```bash
+  /opt/homebrew/bin/arm-none-eabi-nm --print-size --size-sort --radix=d src/apps/sequencer/sequencer \
+    | /opt/homebrew/bin/arm-none-eabi-c++filt \
+    | rg ' [TtRrVvWw] ' \
+    | tail -80
+  ```
+- Current largest flash symbols include `match_token` (20,280 B), `stbsp_vsprintfcb` (16,128 B), `.ARM.exidx` (13,128 B), `Routing::writeTarget(...)` (11,008 B), and `PhaseFluxEditPage::editSlot(...)` (9,636 B).
+- Object/module culprit command:
+  ```bash
+  /opt/homebrew/bin/arm-none-eabi-size \
+    src/apps/sequencer/CMakeFiles/sequencer.dir/Sequencer.cpp.obj \
+    src/apps/sequencer/libsequencer_shared.a \
+    src/libcore.a \
+    | awk 'NR==1 {print "flash", $0; next} {print $1+$2, $0}' \
+    | sort -n \
+    | tail -50
+  ```
+- Current largest flash-bearing objects include `PhaseFluxEditPage.cpp.obj` (~42.3 KB), `IndexedSequenceEditPage.cpp.obj` (~32.8 KB), `DiscreteMapSequencePage.cpp.obj` (~31.0 KB), `StochasticSequenceEditPage.cpp.obj` (~30.4 KB), `CurveSequenceEditPage.cpp.obj` (~30.2 KB), `TrackPage.cpp.obj` (~26.9 KB), `FileManager.cpp.obj` (~22.8 KB), `Engine.cpp.obj` (~22.4 KB), `stb_sprintf.c.obj` (~21.3 KB), `match_token.c.obj` (20.3 KB), `TuesdayTrackEngine.cpp.obj` (~19.7 KB), and `Routing.cpp.obj` (~19.6 KB).
+
 **Budget targets:**
 - Main SRAM target: `.data + .bss` at or below roughly **111-113 KB**.
 - Hard warning zone: `.data + .bss` above **120 KB**. Feature work in this zone needs explicit symbol-level justification.

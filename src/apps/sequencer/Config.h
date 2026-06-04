@@ -60,7 +60,7 @@
 #define CONFIG_MODULATOR_COUNT          8
 
 
-#define CONFIG_ENABLE_ASTEROIDS
+// #define CONFIG_ENABLE_ASTEROIDS   // non-core easter-egg; gated off to reclaim ~19 KB flash
 // #define CONFIG_ENABLE_INTRO
 
 // Experimental Features

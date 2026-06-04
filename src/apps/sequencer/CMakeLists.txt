@@ -1,8 +1,8 @@
 set(update_file "UPDATE.DAT")
 
 set(sources
-    # asteroids
-    asteroids/Asteroids.cpp
+    # asteroids (gated by CONFIG_ENABLE_ASTEROIDS)
+    # asteroids/Asteroids.cpp
     # engine
     engine/AccumulatorOps.cpp
     engine/ArpeggiatorEngine.cpp
@@ -104,7 +104,7 @@ set(sources
     ui/controllers/launchpad/LaunchpadProDevice.cpp
     ui/controllers/launchpad/LaunchpadProMk3Device.cpp
     # ui/pages
-    ui/pages/AsteroidsPage.cpp
+    # ui/pages/AsteroidsPage.cpp  (gated by CONFIG_ENABLE_ASTEROIDS)
     ui/pages/BasePage.cpp
     ui/pages/BusyPage.cpp
     ui/pages/ClockSetupPage.cpp
