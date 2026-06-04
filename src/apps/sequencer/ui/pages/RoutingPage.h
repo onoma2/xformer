@@ -27,6 +27,11 @@ public:
 
     void showRoute(int routeIndex, const Routing::Route *initialValue = nullptr);
 
+    // Lean "modulate this" flow for migrated targets: source overlay -> depth modal,
+    // as overlays over the current page (does not open the per-route editor). wasCreated
+    // clears an abandoned freshly-created route if the source pick is cancelled.
+    void beginModulate(int routeIndex, bool wasCreated);
+
 private:
     virtual void drawCell(Canvas &canvas, int row, int column, int x, int y, int w, int h) override;
 

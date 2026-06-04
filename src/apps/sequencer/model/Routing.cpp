@@ -177,7 +177,7 @@ int Routing::findEmptyRoute() const {
 int Routing::findRoute(Target target, int trackIndex) const {
     for (size_t i = 0; i < _routes.size(); ++i) {
         const auto &route = _routes[i];
-        if (route.active() && route.target() == target && (!Routing::isTrackTarget(target) || route.tracks() & (1<<trackIndex))) {
+        if (route.active() && route.target() == target && (!Routing::isPerTrackTarget(target) || route.tracks() & (1<<trackIndex))) {
             return i;
         }
     }

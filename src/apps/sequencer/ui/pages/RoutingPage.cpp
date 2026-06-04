@@ -235,6 +235,23 @@ void RoutingPage::showRoute(int routeIndex, const Routing::Route *initialValue) 
     setEdit(false);
 }
 
+void RoutingPage::beginModulate(int routeIndex, bool wasCreated) {
+    auto &route = _project.routing().route(routeIndex);
+    _manager.pages().routeSourceSelect.show(route.target(), route.source(),
+        [this, routeIndex, wasCreated] (bool ok, Routing::Source source) {
+            auto &r = _project.routing().route(routeIndex);
+            if (ok && source != Routing::Source::None) {
+                r.setSource(source);
+                gRouteDepthQuickEditModel.configure(&r);
+                _manager.pages().quickEdit.show(gRouteDepthQuickEditModel, 0);
+            } else if (wasCreated) {
+                r.clear(); // cancelled, or confirmed None -> drop the freshly-created route
+            } else if (ok) {
+                r.setSource(source); // existing route, user chose None -> disable it
+            }
+        });
+}
+
 void RoutingPage::drawCell(Canvas &canvas, int row, int column, int x, int y, int w, int h) {
     if (row == int(RouteListModel::Item::Tracks) &&
         column == 1 &&
