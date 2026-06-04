@@ -63,6 +63,7 @@ register_sequencer_test(TestRouteCombineScaleSource TestRouteCombineScaleSource.
 register_sequencer_test(TestRouteBrowse TestRouteBrowse.cpp)
 register_sequencer_test(TestRouteShaper TestRouteShaper.cpp)
 register_sequencer_test(TestRouteFork TestRouteFork.cpp)
+register_sequencer_test(TestRouteDraft TestRouteDraft.cpp)
 register_sequencer_test(TestRouteGetterMigration TestRouteGetterMigration.cpp)
 register_sequencer_test(TestParamTableGlobal TestParamTableGlobal.cpp)
 register_sequencer_test(TestParamTableNote TestParamTableNote.cpp)
