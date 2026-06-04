@@ -167,6 +167,7 @@ void RoutingPage::encoder(EncoderEvent &event) {
                 _editRoute.setDepthPct(t, d);
             }
         } else {                         // move the row cursor, re-point to that param's route
+            tabAutoSave();
             int n = tabBandParamCount();
             _tabEditorRow = clamp(_tabEditorRow + event.value(), 0, n - 1);
             tabRefocus();
@@ -792,6 +793,14 @@ int RoutingPage::tabBandParamCount() const {
     return RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
 }
 
+// Persist depth/combine edits to the focused route before leaving it. These edits
+// never change target/tracks, so the write can't conflict — silent, no message.
+void RoutingPage::tabAutoSave() {
+    if (_tabRowRouted && _route && *_route != _editRoute) {
+        *_route = _editRoute;
+    }
+}
+
 // Re-point _editRoute to the cursor row's committed route, if that param is routed
 // at the scope. Unrouted rows leave _tabRowRouted false (display-only this unit;
 // route creation is a later unit).
@@ -925,12 +934,15 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     }
 
     // scope mini-map + combine for the focused route, compact at the bottom
+    // show the focused route's actual tracks when routed; else the entry scope
+    uint8_t mapMask = (_tabRowRouted && Routing::isPerTrackTarget(_editRoute.target()))
+        ? uint8_t(_editRoute.tracks()) : _tabScopeMask;
     const int mapX = CONFIG_LCD_WIDTH - 8 * 11 - 1, mapY = CONFIG_LCD_HEIGHT - 19;
-    if (_tabScopeMask != 0) {
+    if (mapMask != 0) {
         for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
             int px = mapX + t * 11;
             char letter[2] = { trackModeLetter(_project.track(t).trackMode()), 0 };
-            if (_tabScopeMask & (1 << t)) {
+            if (mapMask & (1 << t)) {
                 canvas.setColor(Color::Bright);
                 canvas.fillRect(px, mapY, 10, 7);
                 canvas.setBlendMode(BlendMode::Sub);
@@ -955,6 +967,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
 void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
     const auto &key = event.key();
     if (key.isLeft() || key.isRight()) {
+        tabAutoSave();
         _tabEditorTab = (_tabEditorTab + (key.isLeft() ? 3 : 1)) % 4;
         _tabEditorRow = 0;
         _tabEdit = false;
@@ -969,7 +982,8 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
     }
     if (key.isFunction()) {
         switch (Function(key.function())) {
-        case Function::Prev: // BACK to overview; uncommitted edits are discarded on re-open
+        case Function::Prev: // BACK to overview (depth/combine edits auto-saved)
+            tabAutoSave();
             _tabEditorActive = false;
             _overviewActive = true;
             break;
@@ -989,6 +1003,7 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         return;
     }
     if (key.pageModifier() && key.isStep() && key.step() == 5) { // Page+S6 exits
+        tabAutoSave();
         _tabEditorActive = false;
         event.consume();
         return;

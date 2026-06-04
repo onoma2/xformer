@@ -47,6 +47,7 @@ private:
     void handleTabEditorKey(KeyPressEvent &event);
     void enterTabEditor();
     void tabRefocus();          // load the cursor row's committed route into _editRoute (if routed)
+    void tabAutoSave();         // persist depth/combine edits to the focused route before leaving it
     int routeForBandParam(uint8_t paramKey, uint8_t trackMask) const;
     int tabBandParamCount() const;
     bool _tabEditorActive = false;
