@@ -56,17 +56,6 @@ private:
     bool _tabRowRouted = false;  // cursor row resolves to a committed route (_route)
     uint8_t _tabScopeMask = 0;   // scope fixed on entry (per-track mask, or 0 = global)
 
-    // bias/depth overlay
-    void enterBiasOverlay();
-    void exitBiasOverlay(bool commit);
-    void drawBiasOverlay(Canvas &canvas);
-    void handleBiasOverlayKey(KeyPressEvent &event);
-    void editBiasOverlay(int delta, bool shift);
-    void showBiasOverlayContext();
-    void biasOverlayContextAction(int index);
-    int focusTrackIndex() const;
-    bool overlayActive() const { return _biasOverlayActive; }
-
     void selectRoute(int routeIndex);
     void assignMidiLearn(const MidiLearn::Result &result);
     void commitRoute();
@@ -75,15 +64,4 @@ private:
     Routing::Route *_route;
     uint8_t _routeIndex;
     Routing::Route _editRoute;
-
-    bool _biasOverlayActive = false;
-    std::array<int8_t, CONFIG_TRACK_COUNT> _biasStaging;
-    std::array<int8_t, CONFIG_TRACK_COUNT> _depthStaging;
-    std::array<Routing::Shaper, CONFIG_TRACK_COUNT> _shaperStaging;
-    std::array<int8_t, CONFIG_TRACK_COUNT> _biasClipboard{};
-    std::array<int8_t, CONFIG_TRACK_COUNT> _depthClipboard{};
-    std::array<Routing::Shaper, CONFIG_TRACK_COUNT> _shaperClipboard{};
-    bool _clipboardValid = false;
-    std::array<uint8_t, 4> _slotState{}; // 0..5: A bias, A depth, A shaper, B bias, B depth, B shaper
-    int _activeSlot = 0;
 };
