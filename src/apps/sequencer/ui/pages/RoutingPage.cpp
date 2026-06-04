@@ -1067,7 +1067,8 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         event.consume();
         return;
     }
-    if (key.pageModifier() && key.isStep() && key.step() == 5) { // Page+S6 exits
+    if (key.pageModifier() && key.isStep() && key.step() == 5) { // Page+S6 exits to old editor
+        if (_route) _editRoute = *_route;   // resync so the old editor sees the live edits
         _tabEditorActive = false;
         event.consume();
         return;
