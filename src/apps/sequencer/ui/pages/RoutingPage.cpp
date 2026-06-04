@@ -816,6 +816,16 @@ void RoutingPage::tabCreateRoute() {
         route.setTracks(mask);
     }
     route.setSource(Routing::Source::CvIn1);
+    for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+        route.setDepthPct(t, 0);   // silent until the user dials depth (edit mode opens here)
+    }
+
+    // reject if the new route collides with an existing one (same guard as commit)
+    int conflict = _project.routing().checkRouteConflict(route, route);
+    if (conflict >= 0) {
+        showMessage(FixedStringBuilder<64>("CONFLICT WITH ROUTE %d", conflict + 1));
+        return;
+    }
 
     _project.routing().route(slot) = route;
     _route = &_project.routing().route(slot);
