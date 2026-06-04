@@ -287,7 +287,14 @@ void TrackPage::pasteTrackSetup() {
 }
 
 void TrackPage::initRoute() {
-    _manager.pages().top.toggleModulation(_listModel->routingTarget(selectedRow()), _project.selectedTrackIndex());
+    Routing::Target target = _listModel->routingTarget(selectedRow());
+    int trackIndex = _project.selectedTrackIndex();
+    auto &routing = _project.routing();
+    if (RouteDraft::isTrackModulated(routing, target, trackIndex)) {
+        RouteDraft::removeTrack(routing, target, trackIndex);   // MOD-
+    } else {
+        beginNewModulation(target, trackIndex);                 // MOD+
+    }
 }
 
 void TrackPage::reseedTuesday() {

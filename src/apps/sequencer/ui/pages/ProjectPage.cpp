@@ -214,7 +214,13 @@ void ProjectPage::saveAsProject() {
 }
 
 void ProjectPage::initRoute() {
-    _manager.pages().top.toggleModulation(_listModel.routingTarget(selectedRow()), 0);
+    Routing::Target target = _listModel.routingTarget(selectedRow());
+    auto &routing = _project.routing();
+    if (RouteDraft::isTrackModulated(routing, target, 0)) {
+        RouteDraft::removeTrack(routing, target, 0);   // MOD-
+    } else {
+        beginNewModulation(target, 0);                 // MOD+
+    }
 }
 
 void ProjectPage::saveProjectToSlot(int slot) {

@@ -32,33 +32,6 @@ void TopPage::updateLeds(Leds &leds) {
 }
 
 
-void TopPage::toggleModulation(Routing::Target target, int trackIndex) {
-    if (target == Routing::Target::None) {
-        return;
-    }
-    auto &routing = _project.routing();
-    if (RouteDraft::isTrackModulated(routing, target, trackIndex)) {
-        RouteDraft::removeTrack(routing, target, trackIndex);   // MOD-
-        return;
-    }
-    auto draft = RouteDraft::create(routing, target, trackIndex);   // MOD+
-    if (draft.routeIndex < 0) {
-        showMessage("NO EMPTY ROUTES");
-        return;
-    }
-    int idx = draft.routeIndex;   // capture ONLY this int (heap-safe)
-    _manager.pages().routeSourceSelect.show(target, Routing::Source::None,
-        [this, idx] (bool ok, Routing::Source source) {
-            auto &routing = _project.routing();
-            if (ok && source != Routing::Source::None) {
-                routing.route(idx).setSource(source);   // commit source onto the live slot
-            } else {
-                routing.route(idx).clear();             // cancel or None: free the freshly-created slot
-            }
-        });
-}
-
-
 void TopPage::editIndexedRouteConfig() {
     auto &pages = _manager.pages();
     setMainPage(pages.indexedRouteConfig);

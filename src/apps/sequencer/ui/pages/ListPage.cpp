@@ -333,6 +333,26 @@ bool ListPage::modulatedRow(int row, int &routeIndex) const {
     return routeIndex >= 0;
 }
 
+void ListPage::beginNewModulation(Routing::Target target, int trackIndex) {
+    auto &routing = _project.routing();
+    gModDraft = RouteDraft::create(routing, target, trackIndex);
+    if (gModDraft.routeIndex < 0) {
+        showMessage("NO EMPTY ROUTES");
+        return;
+    }
+    gModEditActive = true;
+    gModEditOwner = this;
+    gModEditTarget = ModEditTarget::Depth;
+    _edit = true;
+    _manager.pages().routeSourceSelect.show(
+        target, gModDraft.route.source(),
+        [this] (bool ok, Routing::Source picked) {
+            if (ok && picked != Routing::Source::None && gModEditActive) {
+                gModDraft.route.setSource(picked);
+            }
+        });
+}
+
 void ListPage::resetModEdit() {
     gModEditActive = false;
     gModEditTarget = ModEditTarget::Value;

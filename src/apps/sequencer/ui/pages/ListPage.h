@@ -30,6 +30,10 @@ public:
 
     void setTopRow(int row);
 
+    // MOD+ entry: reserve an inert slot, enter inline edit with the new draft
+    // active, and auto-open the source picker. Draft commits on F5, frees on F4.
+    void beginNewModulation(Routing::Target target, int trackIndex);
+
 protected:
     virtual void drawCell(Canvas &canvas, int row, int column, int x, int y, int w, int h);
 

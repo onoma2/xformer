@@ -12,7 +12,6 @@ public:
 
     void init();
 
-    void toggleModulation(Routing::Target target, int trackIndex);
     void editIndexedRouteConfig();
     void editIndexedMath();
 

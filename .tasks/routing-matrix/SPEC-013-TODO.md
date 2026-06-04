@@ -55,9 +55,13 @@ Provenance: `docs/routing-legacy-vs-matrix.md`.
       **F4** (spec §15 amend — these pages have no back key; LEARN reservation → F1). Owner-scoped
       teardown (`cancelModEditIfOwner`, `_manager.top()==this`) so the source-picker round-trip
       survives. STM32-green, Codex ALLOW (4 review rounds on picker/global-draft interaction).
-- [ ] **Unit 3 — rework MOD+ create to draft-based** so creation also honors §3 (live untouched
-      until COMMIT), replacing phase-1's immediate source write. Creation defaults: source None,
-      depth 0, combine Modulate, current track only.
+- [x] **Unit 3 — draft-based MOD+ create**: `ListPage::beginNewModulation` reserves an inert slot
+      (`RouteDraft::create`, isNew) → enters inline edit + source picker → F5 commits / F4 frees the
+      slot. Pages' MODULATE action = `isTrackModulated ? removeTrack : beginNewModulation`;
+      `TopPage::toggleModulation` removed. Honors §3 (silent until COMMIT). STM32-green, Codex ALLOW.
+
+**Phase 3 DONE** — param-door inline editor complete (display + draft/commit depth/source/combine
++ draft MOD+). Commits: unit1, unit2, unit3.
 
 ## Phase 4 — param-door spread (spec §4, §6)
 - [ ] **Shift+S5** → per-track vertical bipolar bars for this param × tracks (render `mod-spread.png`).
