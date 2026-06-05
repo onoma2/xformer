@@ -30,6 +30,10 @@ private:
     void matrixExitEdit(bool commit); // commit or cancel the draft, return to nav
     int routeForBandParam(uint8_t paramKey, uint8_t trackMask) const;
     int tabBandParamCount() const;
+
+    enum class MatrixView { Depth, Source };
+    MatrixView _matrixView = MatrixView::Depth;
+
     int _tabEditorTab = 0;
     int _tabEditorRow = 0;
     int _tabCol = 0;             // cursor track column

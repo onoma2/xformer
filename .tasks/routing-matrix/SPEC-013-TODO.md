@@ -95,9 +95,16 @@ Per-row draft/commit via `RouteDraft`; footer F1 VIEW · F2 SRC · F3 COMBINE ·
       gRouteDepthQuickEditModel + _tabScopeMask. Global band = single slot-0 value. STM32-green,
       Codex ALLOW (1 BLOCK fixed: per-track routed-cell duplicate). Residual: multiple disjoint
       per-track routes for one target → lookup returns first (pre-existing param-door artifact).
-- [ ] **5d** — scope: T1–T8 toggle columns into the focused row; Shift+Tn = by-type; by-type underline.
-- [ ] **5e** — F1 VIEW cycles depth↔source (cells show source abbrev in source view; shaper deferred).
-- [ ] **5f** — REMOVE clears the focused row's modulation.
+- [x] **5d** — T1-T8 toggle membership into the focused row (edit mode, eligible only), Shift+Tn =
+      by-type (same-engine group), by-type underline (cursor-column engine cells of cursor row).
+- [x] **5e** — F1 VIEW depth↔source (`_matrixView`; source view shows route source abbrev per cell).
+- [x] **5f** — REMOVE = **Shift+F4** on a routed focused row (clears the route).
+- **OWNER-REVIEW FLAGS (5d/5f, agent-chosen defaults, can override):** by-type underline = persistent
+  cue keyed off the cursor column's engine; REMOVE gesture = Shift+CANCEL (F1-F5 were full).
+- **DRY note:** `printSourceAbbrev` now duplicated in RoutingPage + ListPage (unify later like `trackModeLetter`).
+
+**PHASE 5 (matrix door) DONE** — ROUTING page is the matrix: grid, S1-S8/encoder nav, per-row
+draft/commit, T-toggle/by-type, F1 VIEW, REMOVE. Commits 5a 89cf0fe5 / 5b c941a429 / 5c d5d787b6 / 5d-f.
 
 ## Phase 6 — per-engine migration (spec §8)
 - [ ] Wire each remaining engine's `ParamTable*` live + give its page `currentRouteTarget()`, one

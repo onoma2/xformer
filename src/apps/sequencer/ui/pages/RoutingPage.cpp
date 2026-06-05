@@ -26,6 +26,25 @@ public:
 
 EmptyListModel gEmptyListModel;
 
+// Short source label for the matrix SOURCE view, mirroring ListPage's file-static
+// printSourceAbbrev: CvIn1->"CV1", CvOut1->"O1", BusCv1->"B1", GateOut1->"G1",
+// Mod1->"M1".
+void printSourceAbbrev(Routing::Source source, StringBuilder &str) {
+    if (Routing::isCvSource(source)) {
+        str("CV%d", int(source) - int(Routing::Source::CvIn1) + 1);
+    } else if (source >= Routing::Source::CvOut1 && source <= Routing::Source::CvOut8) {
+        str("O%d", int(source) - int(Routing::Source::CvOut1) + 1);
+    } else if (Routing::isBusSource(source)) {
+        str("B%d", int(source) - int(Routing::Source::BusCv1) + 1);
+    } else if (source >= Routing::Source::GateOut1 && source <= Routing::Source::GateOut8) {
+        str("G%d", int(source) - int(Routing::Source::GateOut1) + 1);
+    } else if (Routing::isModulatorSource(source)) {
+        str("M%d", int(source) - int(Routing::Source::Mod1) + 1);
+    } else {
+        Routing::printSource(source, str);
+    }
+}
+
 } // namespace
 
 #include "core/utils/StringBuilder.h"
@@ -234,7 +253,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     canvas.setColor(Color::Bright);
     canvas.drawText(2, 7, tabs[_tabEditorTab]);
     canvas.setColor(Color::Medium);
-    canvas.drawText(40, 7, "DEPTH");
+    canvas.drawText(40, 7, _matrixView == MatrixView::Source ? "SOURCE" : "DEPTH");
     canvas.drawText(CONFIG_LCD_WIDTH - canvas.textWidth("MODULATE") - 2, 7, "MODULATE");
     canvas.setColor(Color::Low);
     canvas.hline(0, 10, CONFIG_LCD_WIDTH);
@@ -280,25 +299,47 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
                 canvas.drawText(cx - 2, y + 6, "-");
                 continue;
             }
-            bool routed; int depth;
+            bool routed; int depth; Routing::Source source = Routing::Source::None;
             if (draftRow) {
                 int slot = globalKey ? 0 : t;
                 routed = globalKey || (_matrixDraft.route.tracks() & (1 << t));
                 depth = _matrixDraft.route.depthPct(slot);
+                source = _matrixDraft.route.source();
             } else {
                 uint8_t scopeMask = globalKey ? 0 : uint8_t(1 << t);
                 int routeIdx = routeForBandParam(key, scopeMask);
                 routed = routeIdx >= 0;
                 depth = routed ? _project.routing().route(routeIdx).depthPct(t) : 0;
+                source = routed ? _project.routing().route(routeIdx).source() : Routing::Source::None;
             }
             if (routed) {
-                FixedStringBuilder<6> txt("%+d", depth);
+                FixedStringBuilder<6> txt;
+                if (_matrixView == MatrixView::Source) {
+                    printSourceAbbrev(source, txt);
+                } else {
+                    txt("%+d", depth);
+                }
                 canvas.setColor(isCursor ? Color::Bright : Color::Medium);
                 canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
             } else {
                 canvas.setColor(isCursor ? Color::Bright : Color::MediumLow);
                 canvas.drawText(cx - canvas.textWidth(".") / 2, y + 6, ".");
             }
+        }
+    }
+
+    // by-type grouping cue: under the cursor row, underline cells whose track shares
+    // the cursor column's engine (the group a Shift+T on this column would toggle).
+    // Per-track bands only; global rows have no per-track membership.
+    if (n > 0 && !Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(cursorKey))) {
+        Track::TrackMode cursorMode = _project.track(cursorCol).trackMode();
+        int uy = top + cursorRow * rowH + 7;
+        canvas.setColor(Color::Low);
+        for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+            if (_project.track(t).trackMode() != cursorMode) continue;
+            if (!tabCellEligible(_project.track(t), cursorKey)) continue;
+            int cx = gridL + t * colW + colW / 2;
+            canvas.hline(cx - colW / 2 + 1, uy, colW - 2);
         }
     }
 
@@ -313,6 +354,48 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
     // S1-S8 pick the cursor column in both nav and edit (clamped to track count).
     if (key.isStep() && key.step() < CONFIG_TRACK_COUNT) {
         _tabCol = key.step();
+        event.consume();
+        return;
+    }
+
+    // T1-T8 toggle track membership of the focused (edit) row's draft. Plain Tn flips
+    // one track; Shift+Tn flips the whole by-type group (tracks sharing Tn's engine).
+    // Per-track bands only; the global band has no per-track membership.
+    if (key.isTrack() && _matrixEditActive) {
+        uint8_t keys[8];
+        auto editBand = RouteBrowse::Band(_tabEditorTab);
+        int en = RouteBrowse::bandParams(editBand, keys, 8);
+        uint8_t editKey = (en > 0) ? keys[clamp(_matrixEditRow, 0, en - 1)] : 0;
+        bool editGlobal = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(editKey));
+        if (!editGlobal) {
+            int tn = key.track();
+            if (key.shiftModifier()) {
+                Track::TrackMode groupMode = _project.track(tn).trackMode();
+                bool anyMember = false;
+                for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+                    if (_project.track(t).trackMode() != groupMode) continue;
+                    if (!tabCellEligible(_project.track(t), editKey)) continue;
+                    if (_matrixDraft.route.tracks() & (1 << t)) anyMember = true;
+                }
+                for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+                    if (_project.track(t).trackMode() != groupMode) continue;
+                    if (!tabCellEligible(_project.track(t), editKey)) continue;
+                    if (anyMember) {
+                        _matrixDraft.route.setTracks(_matrixDraft.route.tracks() & ~(1 << t));
+                        _matrixDraft.route.setDepthPct(t, 0);
+                    } else {
+                        _matrixDraft.route.setTracks(_matrixDraft.route.tracks() | (1 << t));
+                    }
+                }
+            } else if (tabCellEligible(_project.track(tn), editKey)) {
+                if (_matrixDraft.route.tracks() & (1 << tn)) {
+                    _matrixDraft.route.setTracks(_matrixDraft.route.tracks() & ~(1 << tn));
+                    _matrixDraft.route.setDepthPct(tn, 0);
+                } else {
+                    _matrixDraft.route.setTracks(_matrixDraft.route.tracks() | (1 << tn));
+                }
+            }
+        }
         event.consume();
         return;
     }
@@ -341,7 +424,8 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
 
     if (key.isFunction()) {
         switch (Function(key.function())) {
-        case Function::View: // no-op until the cell-view cycle lands
+        case Function::View: // cycle the cell view: depth <-> source
+            _matrixView = _matrixView == MatrixView::Depth ? MatrixView::Source : MatrixView::Depth;
             break;
         case Function::Src: // pick the draft's source (staged, applied on confirm)
             if (_matrixEditActive) {
@@ -361,8 +445,17 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
                         ? RouteApply::Combine::Modulate : RouteApply::Combine::Absolute);
             }
             break;
-        case Function::Cancel: // discard the draft, back to nav
-            if (_matrixEditActive) {
+        case Function::Cancel: // plain: discard the draft. Shift+CANCEL: REMOVE the
+            // focused row's committed route entirely (only when routed).
+            if (key.shiftModifier()) {
+                if (_matrixEditActive) {
+                    matrixExitEdit(false);
+                }
+                if (_tabRowRouted && _route) {
+                    _project.routing().route(_routeIndex).clear();
+                    tabRefocus();
+                }
+            } else if (_matrixEditActive) {
                 matrixExitEdit(false);
             }
             break;
