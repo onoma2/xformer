@@ -66,6 +66,18 @@ inline void cancel(Routing &routing, const Draft &d) {
     }
 }
 
+// First active route whose target matches; -1 if none. Under one-source-per-row a param has
+// a single route, and the param door extends it (adds a track) rather than minting per-track routes.
+inline int findRouteForTarget(const Routing &routing, Routing::Target target) {
+    for (int r = 0; r < CONFIG_ROUTE_COUNT; ++r) {
+        const auto &route = routing.route(r);
+        if (route.active() && route.target() == target) {
+            return r;
+        }
+    }
+    return -1;
+}
+
 // Is this track currently modulated for the target? (label: MOD- when true, MOD+ when false)
 inline bool isTrackModulated(const Routing &routing, Routing::Target target, int trackIndex) {
     if (Routing::isPerTrackTarget(target) && (trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT)) {

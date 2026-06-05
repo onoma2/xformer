@@ -275,3 +275,15 @@ to 0 drops it (no explicit toggle); **Shift+Tn = by-type spread** — copy the c
 all eligible tracks sharing track n's engine. The **step buttons are freed** in the matrix.
 Nav/edit is the **F2 EDIT** toggle (lit in footer when editing). Encoder = cursor row (nav) /
 cursor-cell depth or row source (edit). This supersedes §5's "T1-T8 toggle columns into the row".
+
+**2026-06-05 — ONE source per row (resolves the §2/§5 contradiction).** Per-track sources are
+rejected: per-track *routes* blow the 16-route pool (`CONFIG_ROUTE_COUNT`=16; a fully-spread param
+would cost up to 8 routes), and a per-track `source[8]` array — though cheap to store (~1 B/track)
+— adds model/serialization/per-cell-picker complexity for a rarely-needed capability. **Locked
+model: a param's modulation is ONE Route** — one source, one combine, a per-track `depthPct[8]`
+spread, and a track mask. One fully-spread param = 1 route (so up to 16 params spreadable).
+**The param door's MOD+ EXTENDS the param's single route** — it adds the current track to the
+existing route (inheriting that route's shared source) and only **creates** a route when none
+exists for the param; it must NOT mint a separate per-track route. **MOD-** removes the current
+track from the shared route (frees it when last). This supersedes §2's "one source per param, per
+track" — the binding rule is one source per row (§5).

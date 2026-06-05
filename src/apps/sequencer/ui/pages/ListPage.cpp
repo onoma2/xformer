@@ -383,6 +383,22 @@ bool ListPage::modulatedRow(int row, int &routeIndex) const {
 
 void ListPage::beginNewModulation(Routing::Target target, int trackIndex) {
     auto &routing = _project.routing();
+    int existing = RouteDraft::findRouteForTarget(routing, target);
+    if (existing >= 0 && Routing::isPerTrackTarget(target)) {
+        // EXTEND the param's single route: add this track to the LIVE route (membership is a live
+        // op, like MOD-), inheriting the route's shared source, inert at depth 0. Then open depth
+        // edit (draft) so the live route reflects the new track and the edit gates see it modulated.
+        auto &route = routing.route(existing);
+        route.setTracks(route.tracks() | (1 << trackIndex));
+        route.setDepthPct(trackIndex, 0);
+        gModDraft = RouteDraft::begin(routing, existing);
+        gModEditActive = true;
+        gModEditOwner = this;
+        gModEditTarget = ModEditTarget::Depth;
+        _edit = true;
+        return;
+    }
+    // CREATE: no route for this param yet (or a global target) — new route + source picker
     gModDraft = RouteDraft::create(routing, target, trackIndex);
     if (gModDraft.routeIndex < 0) {
         showMessage("NO EMPTY ROUTES");

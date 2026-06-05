@@ -175,4 +175,31 @@ UNIT_TEST("RouteDraft") {
         expectFalse(RouteDraft::removeTrack(routing, Routing::Target::Transpose, -1),
                     "negative track -> false");
     }
+
+    CASE("findRouteForTarget returns -1 when no route for the target") {
+        Project project; auto &routing = project.routing();
+        expectEqual(RouteDraft::findRouteForTarget(routing, Routing::Target::Transpose), -1,
+                    "no route -> -1");
+    }
+
+    CASE("findRouteForTarget finds the param's route regardless of track queried") {
+        Project project;
+        auto &routing = project.routing();
+        int idx;
+        { auto c = RouteDraft::create(routing, Routing::Target::Transpose, 2);
+          c.route.setSource(Routing::Source::CvIn1);
+          RouteDraft::commit(routing, c); idx = c.routeIndex; }
+        expectEqual(RouteDraft::findRouteForTarget(routing, Routing::Target::Transpose), idx,
+                    "found by target");
+    }
+
+    CASE("findRouteForTarget returns -1 for a different target") {
+        Project project;
+        auto &routing = project.routing();
+        { auto c = RouteDraft::create(routing, Routing::Target::Transpose, 2);
+          c.route.setSource(Routing::Source::CvIn1);
+          RouteDraft::commit(routing, c); }
+        expectEqual(RouteDraft::findRouteForTarget(routing, Routing::Target::Octave), -1,
+                    "different target -> -1");
+    }
 }
