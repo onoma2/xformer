@@ -237,3 +237,12 @@ modulated row in edit: encoder **press toggles Value↔Depth** (§4); **F4 CANCE
 uncommitted draft + exits to navigate; **F5 COMMIT** writes draft→live + exits; leaving the page
 also cancels. This displaces the **MIDI LEARN** reservation (was F4, §12 phase 7) to the free
 **F1** slot. Supersedes §3 ("CANCEL = back key") and §11/§12's F4=LEARN for the param door.
+
+**2026-06-05 — matrix-door entry = the ROUTING menu page.** §5 never said how the matrix door is
+entered, and §1 retired the Page+S6 tab editor. Owner decision: the **ROUTING top-level menu page
+becomes the matrix door** — its legacy overview + per-route editor + `RouteListModel` are removed,
+and the page shows the param×track matrix grid directly (the tab-editor band/route machinery
+evolves into it). No new gesture, no new page, no menu slot; reuses the existing ROUTING entry.
+This finally makes §8 true on hardware (legacy RouteListModel gone) and reclaims ~4-5 KB flash.
+The matrix grid uses the param-door's draft/commit + F4=CANCEL convention (§15 above): footer
+**F1 VIEW · F2 SRC · F3 COMBINE · F4 CANCEL · F5 COMMIT**, per-row draft via `RouteDraft`.

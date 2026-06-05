@@ -77,12 +77,20 @@ Provenance: `docs/routing-legacy-vs-matrix.md`.
 > ("Flash ceiling snapshot"). Phases 5-7 must watch flash; gate more non-core (Intro) if needed.
 
 ## Phase 5 — matrix door (spec §5, §6, §11)
-- [ ] param×track **numeric** grid; column headers number+engine letter (`1N 2C 3N…`); ineligible `-`,
-      eligible-unrouted `.`; tabs (Left/Right) switch bands. Renders `mod-matrix*.png`.
-- [ ] Cursor = brightness (cell + col header + row name), not a box; by-type = thin underline.
-- [ ] One source per row (SRC F2); COMBINE F3; per-row COMMIT F5; CANCEL back; REMOVE clears row.
-- [ ] Scope: T1–T8 toggle columns into the focused row; Shift+Tn = by-type.
-- [ ] F1 VIEW cycles depth↔source (shaper view deferred until shaper port).
+**ENTRY (spec §15): the ROUTING menu page BECOMES the matrix** — remove its legacy overview +
+per-route editor + `RouteListModel`; the tab editor evolves into the grid. Renders `mod-matrix*.png`.
+Per-row draft/commit via `RouteDraft`; footer F1 VIEW · F2 SRC · F3 COMBINE · F4 CANCEL · F5 COMMIT.
+- [x] **5a** — ROUTING page = matrix: removed legacy overview/per-route editor/`RouteListModel`
+      (EmptyListModel for the ctor); ROUTING now opens straight into the tab editor (self-inits via
+      `enterTabEditor`/`tabRefocus`); BACK pops the page. Freed ~9.7 KB. STM32-green, Codex ALLOW.
+- [ ] **5b** — grid layout (draw): 8-col numeric cells, number+engine column headers (eligibility
+      dim), rows=band params, `-`/`.`/number, cursor=brightness (cell+header+rowname, NOT a box),
+      band header + DEPTH/SOURCE + MODULATE, footer. Unify the track-letter helper (N/C/D/A/I/S/P/M).
+- [ ] **5c** — cursor nav (row × track col) + cursor-cell depth edit into a per-row `RouteDraft`;
+      F5 COMMIT / F4 CANCEL; per-row F2 SRC / F3 COMBINE.
+- [ ] **5d** — scope: T1–T8 toggle columns into the focused row; Shift+Tn = by-type; by-type underline.
+- [ ] **5e** — F1 VIEW cycles depth↔source (cells show source abbrev in source view; shaper deferred).
+- [ ] **5f** — REMOVE clears the focused row's modulation.
 
 ## Phase 6 — per-engine migration (spec §8)
 - [ ] Wire each remaining engine's `ParamTable*` live + give its page `currentRouteTarget()`, one

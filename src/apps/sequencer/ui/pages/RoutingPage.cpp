@@ -45,6 +45,19 @@ private:
 
 RouteDepthQuickEditModel gRouteDepthQuickEditModel;
 
+// Inert ListModel for the ListPage base: RoutingPage draws/edits only via the tab
+// editor. routingTarget defaults to None, so the inline-modulation machinery never
+// activates here.
+class EmptyListModel : public ListModel {
+public:
+    int rows() const override { return 0; }
+    int columns() const override { return 0; }
+    void cell(int, int, StringBuilder &) const override {}
+    void edit(int, int, int, bool) override {}
+};
+
+EmptyListModel gEmptyListModel;
+
 } // namespace
 
 #include "core/utils/StringBuilder.h"
@@ -62,20 +75,17 @@ enum class Function {
 };
 
 RoutingPage::RoutingPage(PageManager &manager, PageContext &context) :
-    ListPage(manager, context, _routeListModel),
-    _routeListModel(_editRoute)
+    ListPage(manager, context, gEmptyListModel)
 {
-    showRoute(0);
 }
 
 void RoutingPage::reset() {
     _engine.midiLearn().stop();
-    showRoute(0);
-    _overviewActive = true;
+    enterTabEditor();
 }
 
 void RoutingPage::enter() {
-    _overviewActive = true;   // normal entry lands on the overview home
+    enterTabEditor();
     ListPage::enter();
 }
 
@@ -86,324 +96,18 @@ void RoutingPage::exit() {
 }
 
 void RoutingPage::draw(Canvas &canvas) {
-    if (overviewActive()) {
-        drawOverview(canvas);
-        return;
-    }
-    if (tabEditorActive()) {
-        drawTabEditor(canvas);
-        return;
-    }
-
-    bool showCommit = *_route != _editRoute;
-    bool showLearn = _editRoute.target() != Routing::Target::None;
-    bool highlightLearn = showLearn && _engine.midiLearn().isActive();
-    const char *functionNames[] = { "BACK", "NEXT", "INIT", showLearn ? "LEARN" : nullptr, showCommit ? "COMMIT" : nullptr };
-
-    WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "ROUTING");
-    WindowPainter::drawActiveFunction(canvas, FixedStringBuilder<16>("ROUTE %d", _routeIndex + 1));
-    WindowPainter::drawFooter(canvas, functionNames, pageKeyState(), highlightLearn ? int(Function::Learn) : -1);
-
-    ListPage::draw(canvas);
+    drawTabEditor(canvas);
 }
 
 void RoutingPage::keyPress(KeyPressEvent &event) {
-    const auto &key = event.key();
-
-    if (overviewActive()) {
-        handleOverviewKey(event);
-        return;
-    }
-
-    if (tabEditorActive()) {
-        handleTabEditorKey(event);
-        return;
-    }
-
-    if (key.pageModifier() && key.isStep() && key.step() == 5) { // Page + S6: tab editor
-        enterTabEditor();
-        event.consume();
-        return;
-    }
-
-    if (edit() && selectedRow() == int(RouteListModel::Item::Tracks) && key.isTrack()) {
-        _editRoute.toggleTrack(key.track());
-        event.consume();
-        return;
-    }
-
-    if (key.isFunction()) {
-        switch (Function(key.function())) {
-        case Function::Prev: // BACK to the route overview
-            _engine.midiLearn().stop();
-            _overviewActive = true;
-            break;
-        case Function::Next:
-            selectRoute(_routeIndex + 1);
-            break;
-        case Function::Init:
-            _engine.midiLearn().stop();
-            _editRoute.clear();
-            setSelectedRow(0);
-            setEdit(false);
-            break;
-        case Function::Learn:
-            if (_engine.midiLearn().isActive()) {
-                _engine.midiLearn().stop();
-            } else if (_editRoute.target() != Routing::Target::None) {
-                _engine.midiLearn().start([this] (const MidiLearn::Result &result) {
-                    // TODO this might be unsafe as callback is called from engine thread
-                    assignMidiLearn(result);
-                    _engine.midiLearn().stop();
-                });
-            }
-            break;
-        case Function::Commit:
-            commitRoute();
-            break;
-        }
-        event.consume();
-    }
-
-    ListPage::keyPress(event);
+    handleTabEditorKey(event);
 }
 
 void RoutingPage::encoder(EncoderEvent &event) {
-    if (overviewActive()) {
-        overviewEncoder(event.value());
-        event.consume();
-        return;
-    }
-    if (tabEditorActive()) {             // move the row cursor, re-point to that param's route
-        int n = tabBandParamCount();
-        _tabEditorRow = clamp(_tabEditorRow + event.value(), 0, n - 1);
-        tabRefocus();
-        event.consume();
-        return;
-    }
-
-    if (!edit() && pageKeyState()[Key::Shift]) {
-        selectRoute(_routeIndex + event.value());
-        event.consume();
-        return;
-    }
-
-    ListPage::encoder(event);
-}
-
-void RoutingPage::showRoute(int routeIndex, const Routing::Route *initialValue) {
-    _overviewActive = false;   // showing a route means the per-route editor
-    _tabEditorActive = false;
-    _route = &_project.routing().route(routeIndex);
-    _routeIndex = routeIndex;
-    _editRoute = *(initialValue ? initialValue : _route);
-
-    setSelectedRow(0);
-    setEdit(false);
-}
-
-void RoutingPage::drawCell(Canvas &canvas, int row, int column, int x, int y, int w, int h) {
-    if (row == int(RouteListModel::Item::Tracks) &&
-        column == 1 &&
-        Routing::isPerTrackTarget(_editRoute.target())
-    ) {
-        canvas.setFont(Font::Tiny);
-        canvas.setBlendMode(BlendMode::Set);
-        canvas.setColor(edit() && row == selectedRow() ? Color::Bright : Color::Medium);
-
-        uint8_t tracks = _editRoute.tracks();
-        for (int i = 0; i < CONFIG_TRACK_COUNT; ++i) {
-            int px = x + i * 10;
-            canvas.drawRect(px, y + 1, 8, 8);
-            if (tracks & (1 << i)) {
-                canvas.fillRect(px + 2, y + 3, 4, 4);
-                if (_editRoute.hasNonDefaultShaping(i)) {
-                    canvas.setColor(Color::Low);
-                    canvas.fillRect(px + 1, y + 2, 3, 3);
-                    canvas.setColor(edit() && row == selectedRow() ? Color::Bright : Color::Medium);
-                }
-            }
-        }
-    } else {
-        ListPage::drawCell(canvas, row, column, x, y, w, h);
-    }
-}
-
-void RoutingPage::selectRoute(int routeIndex) {
-    routeIndex = clamp(routeIndex, 0, CONFIG_ROUTE_COUNT - 1);
-    if (routeIndex != _routeIndex) {
-        _engine.midiLearn().stop();
-        showRoute(routeIndex);
-    }
-}
-
-void RoutingPage::assignMidiLearn(const MidiLearn::Result &result) {
-    auto &midiSource = _editRoute.midiSource();
-
-    _editRoute.setSource(Routing::Source::Midi);
-
-    midiSource.source().setPort(Types::MidiPort(result.port));
-    midiSource.source().setChannel(result.channel);
-
-    switch (result.event) {
-    case MidiLearn::Event::ControlAbsolute:
-        midiSource.setEvent(Routing::MidiSource::Event::ControlAbsolute);
-        midiSource.setControlNumber(result.controlNumber);
-        break;
-    case MidiLearn::Event::ControlRelative:
-        midiSource.setEvent(Routing::MidiSource::Event::ControlRelative);
-        midiSource.setControlNumber(result.controlNumber);
-        break;
-    case MidiLearn::Event::PitchBend:
-        midiSource.setEvent(Routing::MidiSource::Event::PitchBend);
-        break;
-    case MidiLearn::Event::Note:
-        midiSource.setEvent(Routing::MidiSource::Event::NoteMomentary);
-        midiSource.setNote(result.note);
-        break;
-    case MidiLearn::Event::Last:
-        break;
-    }
-
-    setSelectedRow(int(RouteListModel::MidiSource));
-    setTopRow(int(RouteListModel::MidiSource));
-    setEdit(false);
-}
-
-void RoutingPage::commitRoute() {
-    _engine.midiLearn().stop();
-    int conflict = _project.routing().checkRouteConflict(_editRoute, *_route);
-    if (conflict >= 0) {
-        showMessage(FixedStringBuilder<64>("ROUTE SETTINGS CONFLICT WITH ROUTE %d", conflict + 1));
-    } else {
-        bool busFeedback = Routing::isBusSource(_editRoute.source()) && Routing::isBusTarget(_editRoute.target());
-        *_route = _editRoute;
-        setEdit(false);
-        showMessage(busFeedback ? "ROUTE CHG FB" : "ROUTE CHANGED");
-    }
-}
-
-static void overviewSourceTarget(const Routing::Route &route, StringBuilder &str) {
-    Routing::printSource(route.source(), str);
-    str(">");
-    str(Routing::targetName(route.target()));
-}
-
-void RoutingPage::drawOverview(Canvas &canvas) {
-    const auto &routing = _project.routing();
-
-    int occupied = 0;
-    for (int i = 0; i < CONFIG_ROUTE_COUNT; ++i) {
-        if (routing.route(i).active()) ++occupied;
-    }
-
-    WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "ROUTING");
-    WindowPainter::drawActiveFunction(canvas, FixedStringBuilder<16>("%d/%d", occupied, CONFIG_ROUTE_COUNT));
-    const char *functionNames[] = { nullptr, "ADD", nullptr, nullptr, "EDIT" };
-    WindowPainter::drawFooter(canvas, functionNames, pageKeyState());
-
-    canvas.setFont(Font::Tiny);
-    const int rowH = 6;
-    const int topY = 18;
-    const int visible = 6;
-
-    for (int i = 0; i < visible; ++i) {
-        int idx = _overviewScroll + i;
-        if (idx >= CONFIG_ROUTE_COUNT) break;
-        const auto &route = routing.route(idx);
-        int y = topY + i * rowH;
-        bool sel = idx == _overviewSel;
-
-        if (sel) {
-            canvas.setColor(Color::MediumBright);
-            canvas.fillRect(0, y - 1, CONFIG_LCD_WIDTH - 6, rowH);
-            canvas.setBlendMode(BlendMode::Sub);
-        }
-
-        canvas.setColor(route.active() ? Color::Bright : Color::Low);
-        canvas.drawText(3, y + 4, FixedStringBuilder<4>("%d", idx + 1));
-
-        if (route.active()) {
-            FixedStringBuilder<32> st;
-            overviewSourceTarget(route, st);
-            canvas.setColor(Color::Bright);
-            canvas.drawText(18, y + 4, st);
-            // per-track mask (8 cells) or "global"
-            if (Routing::isPerTrackTarget(route.target())) {
-                uint8_t tracks = route.tracks();
-                for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
-                    int px = 150 + t * 5;
-                    if (tracks & (1 << t)) {
-                        canvas.setColor(Color::Bright);
-                        canvas.fillRect(px, y, 4, 4);
-                    } else {
-                        canvas.setColor(Color::Low);
-                        canvas.drawRect(px, y, 4, 4);
-                    }
-                }
-            } else {
-                canvas.setColor(Color::Medium);
-                canvas.drawText(150, y + 4, "global");
-            }
-        } else {
-            canvas.setColor(Color::Low);
-            canvas.drawText(18, y + 4, "--");
-        }
-
-        if (sel) canvas.setBlendMode(BlendMode::Set);
-    }
-
-    // scrollbar
-    int trackTop = 12, trackH = CONFIG_LCD_HEIGHT - 11 - trackTop;
-    canvas.setColor(Color::Low);
-    canvas.vline(CONFIG_LCD_WIDTH - 3, trackTop, trackH);
-    int thumbH = std::max(4, trackH * visible / CONFIG_ROUTE_COUNT);
-    int thumbY = trackTop + trackH * _overviewScroll / CONFIG_ROUTE_COUNT;
-    canvas.setColor(Color::Bright);
-    canvas.fillRect(CONFIG_LCD_WIDTH - 4, thumbY, 3, thumbH);
-}
-
-void RoutingPage::syncOverviewScroll() {
-    const int visible = 6;
-    _overviewSel = clamp(_overviewSel, 0, CONFIG_ROUTE_COUNT - 1);
-    if (_overviewSel < _overviewScroll) _overviewScroll = _overviewSel;
-    if (_overviewSel >= _overviewScroll + visible) _overviewScroll = _overviewSel - visible + 1;
-}
-
-void RoutingPage::overviewEncoder(int delta) {
-    _overviewSel += delta;
-    syncOverviewScroll();
-}
-
-void RoutingPage::openRouteFromOverview() {
-    showRoute(_overviewSel);   // sets _overviewActive = false
-}
-
-void RoutingPage::handleOverviewKey(KeyPressEvent &event) {
-    const auto &key = event.key();
-    if (key.isFunction()) {
-        switch (Function(key.function())) {
-        case Function::Next: { // ADD: open the first empty route
-            int empty = _project.routing().findEmptyRoute();
-            if (empty < 0) {
-                showMessage("NO EMPTY ROUTES");
-                break;
-            }
-            _overviewSel = empty;
-            syncOverviewScroll();
-            openRouteFromOverview();
-            break;
-        }
-        case Function::Commit: // EDIT: open selected
-            openRouteFromOverview();
-            break;
-        default:
-            break;
-        }
-        event.consume();
-    }
+    int n = tabBandParamCount();         // move the row cursor, re-point to that param's route
+    _tabEditorRow = clamp(_tabEditorRow + event.value(), 0, n - 1);
+    tabRefocus();
+    event.consume();
 }
 
 static char trackModeLetter(Track::TrackMode mode) {
@@ -483,7 +187,6 @@ void RoutingPage::tabCreateRoute() {
     _project.routing().route(slot) = route;
     _route = &_project.routing().route(slot);
     _routeIndex = slot;
-    _editRoute = *_route;
     _tabRowRouted = true;
     // open the depth modal so the encoder dials the new route's depth up from 0
     gRouteDepthQuickEditModel.configure(_route);
@@ -501,44 +204,16 @@ void RoutingPage::tabRefocus() {
     if (routeIdx >= 0) {
         _route = &_project.routing().route(routeIdx);
         _routeIndex = routeIdx;
-        _editRoute = *_route;
         _tabRowRouted = true;
     } else {
         _tabRowRouted = false;
     }
 }
 
-// Which of the 4 tab bands contains paramKey; -1 if none.
-static int bandOfParamKey(uint8_t key) {
-    uint8_t keys[8];
-    for (int b = 0; b < 4; ++b) {
-        int n = RouteBrowse::bandParams(RouteBrowse::Band(b), keys, 8);
-        for (int i = 0; i < n; ++i) {
-            if (keys[i] == key) return b;
-        }
-    }
-    return -1;
-}
-
 void RoutingPage::enterTabEditor() {
-    _tabEditorActive = true;
-    // scope = the entered route's scope; land the cursor on the entered route's param
-    bool perTrack = Routing::isPerTrackTarget(_editRoute.target());
-    _tabScopeMask = perTrack ? uint8_t(_editRoute.tracks()) : 0;
-    uint8_t key = RouteFork::targetToParamKey(_editRoute.target());
-    int band = bandOfParamKey(key);
-    if (band >= 0) {
-        _tabEditorTab = band;
-        uint8_t keys[8];
-        int n = RouteBrowse::bandParams(RouteBrowse::Band(band), keys, 8);
-        _tabEditorRow = 0;
-        for (int i = 0; i < n; ++i) {
-            if (keys[i] == key) { _tabEditorRow = i; break; }
-        }
-    } else {
-        _tabEditorTab = 0;
-        _tabEditorRow = 0;
-    }
+    _tabEditorTab = 0;
+    _tabEditorRow = 0;
+    _tabScopeMask = 0;   // global scope by default
     tabRefocus();
 }
 
@@ -673,9 +348,8 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
     }
     if (key.isFunction()) {
         switch (Function(key.function())) {
-        case Function::Prev: // BACK to overview (edits are live, nothing to save)
-            _tabEditorActive = false;
-            _overviewActive = true;
+        case Function::Prev: // BACK: leave the routing page (edits are live, nothing to save)
+            _manager.pop();
             break;
         case Function::Next: // COMBINE: toggle Modulate <-> Absolute on the focused route (live)
             if (_tabRowRouted && _route) {
@@ -700,32 +374,9 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         event.consume();
         return;
     }
-    if (key.pageModifier() && key.isStep() && key.step() == 5) { // Page+S6 exits to old editor
-        if (_route) _editRoute = *_route;   // resync so the old editor sees the live edits
-        _tabEditorActive = false;
-        event.consume();
-        return;
-    }
     event.consume(); // modal: swallow all other keys so they don't reach TopPage
 }
 
 void RoutingPage::keyboard(KeyboardEvent &event) {
-    if (tabEditorActive() || overviewActive()) { // read-only / list views own no keyboard editing
-        return;
-    }
-    if (event.isPressed()) {
-        if (event.keycode() == KeyboardEvent::KeyEnter) {
-            commitRoute();
-            event.consume();
-            return;
-        }
-        if (event.keycode() == KeyboardEvent::KeyEscape) {
-            _manager.pop();
-            event.consume();
-            return;
-        }
-    }
-    if (!handleFunctionKeys(event)) {
-        ListPage::keyboard(event);
-    }
+    (void)event; // tab editor owns no keyboard editing
 }
