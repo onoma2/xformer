@@ -346,7 +346,9 @@ void ListPage::drawCell(Canvas &canvas, int row, int column, int x, int y, int w
     canvas.setFont(Font::Small);
     canvas.setBlendMode(BlendMode::Set);
     bool highlight = column == int(_edit) && row == _selectedRow;
-    if (highlight && gModEditActive && gModEditTarget == ModEditTarget::Depth && row == _selectedRow) {
+    // During depth-edit the value cell isn't the focus (the bar is) — dim it. Owner-gated so
+    // the source picker (also a ListPage) keeps its own selection highlight.
+    if (highlight && gModEditActive && this == gModEditOwner && gModEditTarget == ModEditTarget::Depth) {
         highlight = false;
     }
     canvas.setColor(highlight ? Color::Bright : Color::Medium);
