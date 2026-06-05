@@ -357,6 +357,20 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         bool globalKey = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(key));
         canvas.setColor(cursorRowSel ? Color::Bright : Color::Medium);
         drawClippedName(canvas, 2, y + 6, nameW - 2, bandParamName(band, key));
+        // SOURCE view paints the row's single source on EVERY eligible cell (one source per row);
+        // whether a track is actually applied is shown by DEPTH view. Resolve the row source once.
+        Routing::Source rowSource = Routing::Source::None;
+        bool rowHasRoute = false;
+        if (draftRow) {
+            rowSource = _matrixDraft.route.source();
+            rowHasRoute = true;
+        } else {
+            int rowRouteIdx = routeForBandParam(key, globalKey ? 0 : 0xFF);
+            if (rowRouteIdx >= 0) {
+                rowSource = _project.routing().route(rowRouteIdx).source();
+                rowHasRoute = true;
+            }
+        }
         for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
             const Track &track = _project.track(t);
             int cx = gridL + t * colW + colW / 2;
@@ -366,32 +380,37 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
                 canvas.drawText(cx - 2, y + 6, "-");
                 continue;
             }
-            bool routed; int depth; Routing::Source source = Routing::Source::None;
+            if (_matrixView == MatrixView::Source) {
+                FixedStringBuilder<6> txt;
+                if (rowHasRoute) {
+                    Routing::printSourceAbbrev(rowSource, txt);
+                } else {
+                    txt(".");
+                }
+                canvas.setColor(isCursor ? Color::Bright : (rowHasRoute ? Color::Medium : Color::MediumLow));
+                canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
+                continue;
+            }
+            // DEPTH view: per-track membership/depth.
+            bool routed; int depth;
             if (draftRow) {
                 int slot = globalKey ? 0 : t;
                 routed = globalKey || (_matrixDraft.route.tracks() & (1 << t));
                 depth = _matrixDraft.route.depthPct(slot);
-                source = _matrixDraft.route.source();
             } else {
                 uint8_t scopeMask = globalKey ? 0 : uint8_t(1 << t);
                 int routeIdx = routeForBandParam(key, scopeMask);
                 routed = routeIdx >= 0;
                 depth = routed ? _project.routing().route(routeIdx).depthPct(t) : 0;
-                source = routed ? _project.routing().route(routeIdx).source() : Routing::Source::None;
             }
+            FixedStringBuilder<6> txt;
             if (routed) {
-                FixedStringBuilder<6> txt;
-                if (_matrixView == MatrixView::Source) {
-                    Routing::printSourceAbbrev(source, txt);
-                } else {
-                    txt("%+d", depth);
-                }
-                canvas.setColor(isCursor ? Color::Bright : Color::Medium);
-                canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
+                txt("%+d", depth);
             } else {
-                canvas.setColor(isCursor ? Color::Bright : Color::MediumLow);
-                canvas.drawText(cx - canvas.textWidth(".") / 2, y + 6, ".");
+                txt(".");
             }
+            canvas.setColor(isCursor ? Color::Bright : (routed ? Color::Medium : Color::MediumLow));
+            canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
         }
     }
 
