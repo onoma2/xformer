@@ -315,3 +315,37 @@ where they differ; details + commit refs in `.tasks/routing-matrix/SPEC-013-TODO
 
 **Next: phase 6** (light up Curve/Tuesday/Stochastic/DiscreteMap/Indexed, one at a time) → phase 7
 (MIDI LEARN on F1, shaper) → phase 9 (delete legacy `RouteListModel`/`writeTarget` half).
+
+---
+
+## 17. Phase 6 eligibility diff — master enum vs staged ParamTables
+
+Ground truth for "what each engine can modulate" is the engine's `writeRouted` switch on
+`master` (the family gates in `Routing::writeTarget` are coarse; the switch is what actually
+moves the field). Diffed against the refactor branch's per-type `ParamTable*` registries (U4).
+`ClockMult` (enum) ≡ `ClockMultiplier` (key) — naming only.
+
+**Verdict: phase 6 is wiring-only.** No table authoring needed. Every master-enum eligible param
+has a staged registry key; the only master target *absent* from the tables is `DiscreteMapSync`,
+dropped on purpose (key 104 retired by the Align/lifecycle subspec 004 — Sync is non-routable).
+Tables otherwise only *add* fork params that never existed in the old enum.
+
+| Engine | Master `writeRouted` targets | Staged table | Delta |
+|---|---|---|---|
+| **Note** | SlideTime, Octave, Transpose, Rotate, GateProbBias, RetrigProbBias, LengthBias, NoteProbBias, Scale, RootNote, Divisor, ClockMult, RunMode, FirstStep, LastStep (15) | same 15 | none — **already wired** |
+| **Curve** | SlideTime, Offset, Rotate, ShapeProbBias, GateProbBias, CurveRate, Divisor, ClockMult, RunMode, FirstStep, LastStep, WavefolderFold, WavefolderGain, DjFilter, ChaosAmount, ChaosRate, ChaosParam1, ChaosParam2 (18) | same 18 **+ Phase** | +Phase (fork param, no old equivalent) |
+| **Tuesday** | Algorithm, Flow, Ornament, Power, Glide, Trill, StepTrill, Octave, Transpose, Divisor, ClockMult, Rotate, GateLength, GateOffset (14) | same 14 **+ Scale, RootNote** | +Scale/+RootNote (fork-wired, were no-op on master) |
+| **DiscreteMap** | Input, Scanner, **Sync**, Divisor, ClockMult, Scale, RootNote, Octave, Transpose, Offset, SlideTime, RangeHigh, RangeLow (13) | 12 (all but Sync) | **−Sync** (key 104 retired, intentional) |
+| **Indexed** | **Sync**, Octave, Transpose, SlideTime, Divisor, ClockMult, Scale, RootNote, FirstStep, RunMode, IndexedA, IndexedB (12) | 11 (all but Sync) | **−Sync** (same retirement) |
+| **MidiCv** | SlideTime, Transpose (2) | same 2 | none — dark, trivial |
+| **Stochastic** | *(not in master routing — fork engine)* | 23 rows | all-new; no master baseline |
+| **PhaseFlux** | *(not in master routing — fork engine)* | 13 rows | all-new; **already wired** |
+
+**Cross-engine generic** (handled in `writeTarget` itself, not `writeRouted`): `Run`,
+`CvOutputRotate`, `GateOutputRotate` are intentionally **NOT** tabled — they stay on the old live
+`writeTarget` path (slice-3 boundary). `Reset` has no handler on master — non-routable lifecycle.
+`Mute`/`Fill`/`FillAmount`/`Pattern` are PlayState (per-track, cross-engine), out of phase-6 scope.
+
+**Phase 6 = light up Curve → Tuesday → Stochastic → DiscreteMap → Indexed** (one at a time) by
+adding each to `RouteFork::migrated`'s table-lookup; MidiCv optional (2 params). No new tables,
+no new keys.
