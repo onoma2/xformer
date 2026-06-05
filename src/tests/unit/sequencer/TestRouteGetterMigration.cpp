@@ -182,4 +182,61 @@ CASE("Curve curveRate: centi-domain override read + stale clear") {
     expect(std::fabs(track.curveRate() - 1.0f) < 1e-4f, "stale clear -> base restored");
 }
 
+// CurveSequence-level getters migrate onto routedValueInt the same way: read
+// clamp(base + override) under a committed route, base when unrouted. The sequence
+// inherits the track's trackIndex (0 here).
+CASE("Curve sequence divisor: base-anchored read + stale clear (unipolar 1..768)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Curve);
+    auto &seq = p.track(0).curveTrack().sequence(0);
+    seq.setDivisor(12);
+    expectEqual(seq.divisor(), 12, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::Divisor, 0, 100.f);
+    expectEqual(seq.divisor(), 112, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::Divisor, 0, 10000.f);
+    expectEqual(seq.divisor(), 768, "clamps hi to 768");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.divisor(), 12, "stale clear -> base restored");
+}
+
+CASE("Curve sequence djFilter: signed centi-domain override read + clamp (bipolar -100..100)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Curve);
+    auto &seq = p.track(0).curveTrack().sequence(0);
+    seq.setDjFilter(0.2f);                          // base centi 20
+    expect(std::fabs(seq.djFilter() - 0.2f) < 1e-4f, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::DjFilter, 0, 30.f);  // centi delta 30 -> 50
+    expect(std::fabs(seq.djFilter() - 0.5f) < 1e-4f, "override -> (base + delta) / 100");
+
+    Routing::writeRouteOverride(ParamKey::DjFilter, 0, -300.f);
+    expect(std::fabs(seq.djFilter() - (-1.0f)) < 1e-4f, "clamps lo to -1.0 (centi -100)");
+
+    Routing::clearRouteOverrides();
+    expect(std::fabs(seq.djFilter() - 0.2f) < 1e-4f, "stale clear -> base restored");
+}
+
+CASE("Curve sequence chaosAmount: base-anchored read + clamp (unipolar 0..100)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Curve);
+    auto &seq = p.track(0).curveTrack().sequence(0);
+    seq.setChaosAmount(40);
+    expectEqual(seq.chaosAmount(), 40, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::ChaosAmount, 0, 30.f);
+    expectEqual(seq.chaosAmount(), 70, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::ChaosAmount, 0, 100.f);
+    expectEqual(seq.chaosAmount(), 100, "clamps hi to 100");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.chaosAmount(), 40, "stale clear -> base restored");
+}
+
 } // UNIT_TEST

@@ -51,6 +51,13 @@ namespace RouteFork {
         case Routing::Target::FirstStep:                 return ParamKey::FirstStep;
         case Routing::Target::LastStep:                  return ParamKey::LastStep;
         case Routing::Target::CurveRate:                 return ParamKey::CurveRate;
+        case Routing::Target::WavefolderFold:            return ParamKey::WavefolderFold;
+        case Routing::Target::WavefolderGain:            return ParamKey::WavefolderGain;
+        case Routing::Target::DjFilter:                  return ParamKey::DjFilter;
+        case Routing::Target::ChaosAmount:               return ParamKey::ChaosAmount;
+        case Routing::Target::ChaosRate:                 return ParamKey::ChaosRate;
+        case Routing::Target::ChaosParam1:               return ParamKey::ChaosParam1;
+        case Routing::Target::ChaosParam2:               return ParamKey::ChaosParam2;
         // global (project) targets — no track dimension
         case Routing::Target::Tempo:                     return ParamKey::Tempo;
         case Routing::Target::Swing:                     return ParamKey::Swing;
