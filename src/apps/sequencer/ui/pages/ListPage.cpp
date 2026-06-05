@@ -112,12 +112,11 @@ void ListPage::draw(Canvas &canvas) {
         if (row < _listModel->rows()) {
             int ry = 12 + i * LineHeight;
             drawCell(canvas, row, 0, 8, ry, 128 - 16, LineHeight);
+            drawCell(canvas, row, 1, 128, ry, 128 - 16, LineHeight);   // value stays in its column
             int ri;
             if (row == _selectedRow && modulatedRow(row, ri)) {
-                // modulated row owns the value column too (src › bar value), no default value
+                // overlay: value | narrow bar | source(right), without moving the value
                 drawModulatedRow(canvas, row, ry);
-            } else {
-                drawCell(canvas, row, 1, 128, ry, 128 - 16, LineHeight);
             }
         }
     }
@@ -435,31 +434,28 @@ void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
 
     bool depthFocus = gModEditActive && gModEditTarget == ModEditTarget::Depth;
 
-    FixedStringBuilder<8> srcStr;
-    Routing::printSourceAbbrev(src, srcStr);
     canvas.setFont(Font::Small);
     canvas.setBlendMode(BlendMode::Set);
 
-    // value (effective param value) right-aligned at the far edge, before the scrollbar
+    // value stays in the normal value column (drawn by the default drawCell); measure it so the
+    // bar starts after it. Layout: name | VALUE (its column) | [narrow bar] | SOURCE (right).
     FixedStringBuilder<16> valStr;
     _listModel->cell(row, 1, valStr);
-    int valX = Width - 10 - canvas.textWidth(valStr);
-    bool valueFocus = gModEditActive && gModEditTarget == ModEditTarget::Value;
+    int valueEnd = 128 + canvas.textWidth(valStr);
 
-    // source + arrow
+    // source abbrev, right-aligned at the far edge (before the scrollbar)
+    FixedStringBuilder<8> srcStr;
+    Routing::printSourceAbbrev(src, srcStr);
+    int srcX = Width - 10 - canvas.textWidth(srcStr);
     canvas.setColor(Color::Medium);
-    canvas.drawText(78, y + 7, srcStr);
-    canvas.drawText(96, y + 7, ">");
+    canvas.drawText(srcX, y + 7, srcStr);
 
-    // bipolar depth bar between the arrow and the value (never under the value)
-    int barX = 104;
-    int barEnd = valX - 4;
+    // narrow bipolar depth bar between the value and the source
+    int barX = valueEnd + 6;
+    int barEnd = srcX - 6;
     if (barEnd - barX > 8) {
         drawDepthBar(canvas, barX, y + 4, barEnd - barX, depthPct, depthFocus);
     }
-
-    canvas.setColor(valueFocus ? Color::Bright : Color::Medium);
-    canvas.drawText(valX, y + 7, valStr);
 }
 
 bool ListPage::trackEligible(int trackIndex) const {
