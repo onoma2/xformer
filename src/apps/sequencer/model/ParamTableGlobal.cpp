@@ -36,8 +36,8 @@ void applyCvRouteRoute(const RouteParam::Scope &scope, const RouteParam::Range &
 constexpr RouteParam::Row kRows[] = {
     { ParamKey::Tempo,        "Tempo",      {    1.f, 1000.f }, RouteParam::Continuous, applyTempo        },
     { ParamKey::Swing,        "Swing",      {   50.f,   75.f }, RouteParam::Continuous, applySwing        },
-    { ParamKey::CvRouteScan,  "CVR Scan",   {    0.f,  100.f }, RouteParam::Continuous, applyCvRouteScan  },
-    { ParamKey::CvRouteRoute, "CVR Route",  {    0.f,  100.f }, RouteParam::Continuous, applyCvRouteRoute },
+    { ParamKey::CvRouteScan,  "CVR Scn",    {    0.f,  100.f }, RouteParam::Continuous, applyCvRouteScan  },
+    { ParamKey::CvRouteRoute, "CVR Rte",    {    0.f,  100.f }, RouteParam::Continuous, applyCvRouteRoute },
 };
 
 constexpr RouteParam::Table kTable{ RouteParam::Scope::Kind::Global, kRows, sizeof(kRows) / sizeof(kRows[0]) };
