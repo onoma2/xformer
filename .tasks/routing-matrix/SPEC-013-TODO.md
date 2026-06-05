@@ -135,10 +135,18 @@ behavioral. Branch tip ≈ `51661240`.**
 - **VERIFIED wired:** Note + PhaseFlux per-track + global (Tempo/Swing/CVR). The 6 dark engines
   show `-` (ineligible) until phase 6.
 
-## Phase 6 — per-engine migration (spec §8)
-- [ ] Wire each remaining engine's `ParamTable*` live + give its page `currentRouteTarget()`, one
-      engine at a time, closing its dark gap: Curve, Tuesday, Stochastic, DiscreteMap, Indexed.
-      (Tables already staged; this lights them on the override path + new UI.)
+## Phase 6 — per-engine migration (spec §8, §17)
+Read-side migration (slice-4 pattern) per engine: `RouteFork::migrated` case + getter→`routedValueInt`
++ gate-free base edits + bridge each field in `targetToParamKey`. Tables already staged (§17 diff).
+- [x] **Curve** (2026-06-06) — plan `docs/plans/2026-06-05-014-phase6-curve-migration.md`,
+      `43c968b8`→`978d3dbc`. 18 getters, 9 bridges added, centi handling for curveRate/wavefolder/
+      djFilter; 4 Codex ALLOW + final ALLOW; suite green; STM32+sim clean. `Phase` row orphan (no Target).
+- [ ] Tuesday (sequence-level only; +Scale/RootNote fork rows; bridge Algorithm/Flow/Ornament/Power/
+      Glide/Trill/StepTrill/GateLength/GateOffset).
+- [ ] Stochastic (23 rows; no master baseline — table is the source).
+- [ ] DiscreteMap (Input/Scanner + sequence; Sync retired, not migrated).
+- [ ] Indexed (IndexedA/B + sequence; Sync retired).
+- [ ] MidiCv (optional — SlideTime/Transpose only).
 
 ## Phase 7 — MIDI source + shaper (spec §7, §13)
 - [ ] MIDI source via **F4 LEARN** (MidiLearn → source=Midi + midiSource on the live route).
