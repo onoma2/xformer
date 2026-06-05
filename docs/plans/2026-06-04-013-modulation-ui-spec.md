@@ -287,3 +287,31 @@ existing route (inheriting that route's shared source) and only **creates** a ro
 exists for the param; it must NOT mint a separate per-track route. **MOD-** removes the current
 track from the shared route (frees it when last). This supersedes §2's "one source per param, per
 track" — the binding rule is one source per row (§5).
+
+---
+
+## 16. Shipped state (2026-06-05) — phases 1-5 + hardware-tuning round
+
+Phases 1-5 are implemented, hardware-flashed, and tuned on `refactor/routing-matrix` (branch tip
+≈ `51661240`, STM32 + sim clean). Consolidated as-shipped contract (supersedes earlier sections
+where they differ; details + commit refs in `.tasks/routing-matrix/SPEC-013-TODO.md`):
+
+- **Model — ONE source per row.** A param's modulation is ONE `Routing::Route` = one source, one
+  combine, per-track `depthPct[8]` spread, track mask. Source AND combine are per-route (shared by
+  all member tracks). 16-route budget (`CONFIG_ROUTE_COUNT`). Membership = non-zero depth (matrix)
+  / explicit MOD+/MOD- (param door). Per-track sources/combine rejected (§15).
+- **Two doors, same model.** Param door = inline row `name | value | narrow bar | source(right)`,
+  MOD+/MOD- context slot (MOD+ extends the param's single route), encoder press value↔depth,
+  F2 SRC (picker) / F3 MOD-ABS / F4 CANCEL / F5 COMMIT, Shift+S5 spread. Matrix door = the ROUTING
+  menu page (legacy editor removed): 8-col grid, **T1-T8 = cursor column**, encoder = row(nav)/
+  depth(edit), **F2 EDIT** toggle, **F1 VIEW** depth↔source (encoder edits source inline,
+  Shift+encoder group-jumps, no picker), **Shift+Tn by-type spread**, **Shift+F4 REMOVE**,
+  steps freed. Header: band · DEPTH/SOURCE · (combine MODULATE/ABSOLUTE) · **X/16 slot counter**;
+  per-row **M/A** marker; F3 footer = **MOD/ABS**.
+- **Source abbrev:** `IN1-4` (CV in), `O1-8` (CV out), `B1-4` (bus), `G1-8` (gate), `M1-8` (mod),
+  unified `Routing::printSourceAbbrev`. SOURCE view paints the row source on every eligible cell.
+- **Wired:** Note + PhaseFlux per-track + global (Tempo/Swing/CVR). 6 engines + MIDI dark (`-`)
+  until phase 6.
+
+**Next: phase 6** (light up Curve/Tuesday/Stochastic/DiscreteMap/Indexed, one at a time) → phase 7
+(MIDI LEARN on F1, shaper) → phase 9 (delete legacy `RouteListModel`/`writeTarget` half).

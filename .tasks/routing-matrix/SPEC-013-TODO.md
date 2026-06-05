@@ -103,8 +103,37 @@ Per-row draft/commit via `RouteDraft`; footer F1 VIEW · F2 SRC · F3 COMBINE ·
   cue keyed off the cursor column's engine; REMOVE gesture = Shift+CANCEL (F1-F5 were full).
 - **DRY note:** `printSourceAbbrev` now duplicated in RoutingPage + ListPage (unify later like `trackModeLetter`).
 
-**PHASE 5 (matrix door) DONE** — ROUTING page is the matrix: grid, S1-S8/encoder nav, per-row
-draft/commit, T-toggle/by-type, F1 VIEW, REMOVE. Commits 5a 89cf0fe5 / 5b c941a429 / 5c d5d787b6 / 5d-f.
+**PHASE 5 (matrix door) DONE** — ROUTING page is the matrix: grid, nav, per-row draft/commit,
+T-toggle/by-type, F1 VIEW, REMOVE. Commits 5a 89cf0fe5 / 5b c941a429 / 5c d5d787b6 / 5d-f 8f20b958.
+
+## Hardware-tuning round (post-phase-5, owner flashing + iterating) — DONE
+Owner flashed and tuned phases 1-5 live. Model + UX decisions locked (spec §15 amendments) and
+many UI fixes landed. **All on `refactor/routing-matrix`, STM32 + sim clean, Codex-gated where
+behavioral. Branch tip ≈ `51661240`.**
+- **MODEL: ONE source per row (spec §15, commit 67b63ef0).** Resolved the §2/§5 contradiction:
+  a param's modulation is ONE Route (one source, one combine, per-track depthPct[8] spread, track
+  mask). Fits the 16-route budget (`CONFIG_ROUTE_COUNT`=16; 1 route per fully-spread param). The
+  param door's **MOD+ now EXTENDS** the param's single route (live membership add of the current
+  track, inherits the shared source, inert depth 0 → depth edit) instead of minting per-track
+  routes. New `RouteDraft::findRouteForTarget`. Combine is also per-route (shared by member tracks).
+- **MATRIX NAV remapped (spec §15, commit bc14d3d7):** **T1-T8 = move cursor to that track's column**
+  (was S1-S8); **membership is implicit** (dial depth → member, 0 → drop); **Shift+Tn = by-type
+  spread** (copy cursor depth to all same-engine tracks); **step buttons freed**. Nav/edit is the
+  **F2 EDIT** toggle (lit in footer), not encoder-press (commit 63e28736).
+- **MATRIX source editing is inline (spec §15, commit 72bc5640):** SOURCE view (F1) → encoder
+  cycles the row's source, **Shift+encoder group-jumps** (None/IN/O/B/G/M). Matrix picker + F2 SRC
+  dropped. Source abbrev unified `Routing::printSourceAbbrev`, **CvIn renamed CV→IN1-4** (fixed the
+  "CV15" BusCv mislabel). SOURCE view paints the row source on **all eligible cells** (d7ac68bd).
+- **Other matrix polish:** header **X/16 slot counter** (f424cd63); per-row **M/A** combine marker
+  + F3 footer label **MOD/ABS** (2c47b55a, 51661240, d5883e35); short matrix row names + truncation
+  (6ecea98a, 8f3c7b67); **Page+key passes through to TopPage** so you can exit ROUTING + reach the
+  Modulator page (2e9399e0 — was a 5a regression).
+- **Param-door polish:** row layout `name | VALUE(its column) | narrow bar | SOURCE(right)`
+  (b1ca68a0); **bar+source on EVERY modulated row** not just selected (cb9eed53); source-picker
+  selection highlight restored (owner-gated, 2abbbed5); unused `[this]` capture warnings fixed
+  (97a2c16a — sim/clang catches what arm-gcc doesn't, so build sim too).
+- **VERIFIED wired:** Note + PhaseFlux per-track + global (Tempo/Swing/CVR). The 6 dark engines
+  show `-` (ineligible) until phase 6.
 
 ## Phase 6 — per-engine migration (spec §8)
 - [ ] Wire each remaining engine's `ParamTable*` live + give its page `currentRouteTarget()`, one
