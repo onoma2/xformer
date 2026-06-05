@@ -325,10 +325,16 @@ Ground truth for "what each engine can modulate" is the engine's `writeRouted` s
 moves the field). Diffed against the refactor branch's per-type `ParamTable*` registries (U4).
 `ClockMult` (enum) ≡ `ClockMultiplier` (key) — naming only.
 
-**Verdict: phase 6 is wiring-only.** No table authoring needed. Every master-enum eligible param
-has a staged registry key; the only master target *absent* from the tables is `DiscreteMapSync`,
-dropped on purpose (key 104 retired by the Align/lifecycle subspec 004 — Sync is non-routable).
-Tables otherwise only *add* fork params that never existed in the old enum.
+**Verdict: no new tables or keys — but NOT wiring-only.** Every master-enum eligible param has a
+staged registry key, so the table half of phase 6 is done; the only master target *absent* from
+the tables is `DiscreteMapSync`, dropped on purpose (key 104 retired by the Align/lifecycle subspec
+004 — Sync is non-routable), and tables otherwise only *add* fork params that never existed in the
+old enum. The remaining per-engine work is the **read-side migration** (slice-4 pattern), three
+parts each: (1) add the engine's table case to `RouteFork::migrated`; (2) migrate every routed
+getter from the legacy `_x.get(isRouted(Target::X))` dual-slot read to
+`Routing::routedValueInt(ParamKey::X, base, lo, hi)` — without this the override is written but
+ignored; (3) swap interactive edit-gating `isRouted`→`routeOverridden` on that engine's knob paths
+so editing under a route writes base (no lurch). Note/PhaseFlux already carry all three.
 
 | Engine | Master `writeRouted` targets | Staged table | Delta |
 |---|---|---|---|
@@ -346,6 +352,7 @@ Tables otherwise only *add* fork params that never existed in the old enum.
 `writeTarget` path (slice-3 boundary). `Reset` has no handler on master — non-routable lifecycle.
 `Mute`/`Fill`/`FillAmount`/`Pattern` are PlayState (per-track, cross-engine), out of phase-6 scope.
 
-**Phase 6 = light up Curve → Tuesday → Stochastic → DiscreteMap → Indexed** (one at a time) by
-adding each to `RouteFork::migrated`'s table-lookup; MidiCv optional (2 params). No new tables,
-no new keys.
+**Phase 6 = light up Curve → Tuesday → Stochastic → DiscreteMap → Indexed** (one at a time),
+each via the three-part read-side migration above (`migrated` case + getter migration + edit-gate
+swap); MidiCv optional (2 params). No new tables, no new keys — but each engine is a real
+slice-4-shaped change, TDD + Codex + STM32/sim gated, not a one-liner.
