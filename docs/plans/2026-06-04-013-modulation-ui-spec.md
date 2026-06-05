@@ -257,3 +257,12 @@ still move the cursor cell within the row. **F5 COMMIT** writes the row draft→
 one modulation across its tracks); a cell edit sets `depthPct[col]` + adds `col` to the row's mask.
 Entering edit on an unrouted row creates a draft (source None, depth 0) à la the param door; F2 SRC
 sets the source, source required to COMMIT. This replaces the tab editor's live depth-modal editing.
+
+**2026-06-05 — matrix source editing is inline (no picker); supersedes §7 for the matrix.** Owner
+decision: in the matrix, source is edited inline in **SOURCE view** (F1 VIEW), exactly like depth in
+depth view — the encoder cycles the focused row's single source; **Shift+encoder jumps by group**
+(None → CV → O → B → G → M → wrap). The modal `RouteSourceSelectPage` picker and the **F2 SRC**
+F-slot are **dropped from the matrix** (matrix footer = **VIEW · — · COMBINE · CANCEL · COMMIT**).
+The param door still uses the picker (its `src ›` field). **Source abbreviations:** `IN1-4` CV inputs
+(renamed from CV1-4), `O1-8` CV outputs, `B1-4` bus, `G1-8` gate outs, `M1-8` modulators — unified
+in one shared abbreviator used by both the matrix and the param-door row.

@@ -554,6 +554,26 @@ public:
         }
     }
 
+    // Compact source label for grid/badge UIs: CvIn->IN1-4, CvOut->O1-8, BusCv->B1-4,
+    // GateOut->G1-8, Mod->M1-8, None->"-"; anything else falls back to printSource.
+    static void printSourceAbbrev(Source source, StringBuilder &str) {
+        if (source == Source::None) {
+            str("-");
+        } else if (source >= Source::CvIn1 && source <= Source::CvIn4) {
+            str("IN%d", int(source) - int(Source::CvIn1) + 1);
+        } else if (source >= Source::CvOut1 && source <= Source::CvOut8) {
+            str("O%d", int(source) - int(Source::CvOut1) + 1);
+        } else if (isBusSource(source)) {
+            str("B%d", int(source) - int(Source::BusCv1) + 1);
+        } else if (source >= Source::GateOut1 && source <= Source::GateOut8) {
+            str("G%d", int(source) - int(Source::GateOut1) + 1);
+        } else if (isModulatorSource(source)) {
+            str("M%d", int(source) - int(Source::Mod1) + 1);
+        } else {
+            printSource(source, str);
+        }
+    }
+
     class CvSource {
     public:
         Types::VoltageRange range() const { return _range; }

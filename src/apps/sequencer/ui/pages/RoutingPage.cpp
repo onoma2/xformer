@@ -1,7 +1,6 @@
 #include "RoutingPage.h"
 
 #include "ui/painters/WindowPainter.h"
-#include "ui/pages/Pages.h"
 
 #include "model/RouteBrowse.h"
 #include "model/RouteDraft.h"
@@ -25,25 +24,6 @@ public:
 };
 
 EmptyListModel gEmptyListModel;
-
-// Short source label for the matrix SOURCE view, mirroring ListPage's file-static
-// printSourceAbbrev: CvIn1->"CV1", CvOut1->"O1", BusCv1->"B1", GateOut1->"G1",
-// Mod1->"M1".
-void printSourceAbbrev(Routing::Source source, StringBuilder &str) {
-    if (Routing::isCvSource(source)) {
-        str("CV%d", int(source) - int(Routing::Source::CvIn1) + 1);
-    } else if (source >= Routing::Source::CvOut1 && source <= Routing::Source::CvOut8) {
-        str("O%d", int(source) - int(Routing::Source::CvOut1) + 1);
-    } else if (Routing::isBusSource(source)) {
-        str("B%d", int(source) - int(Routing::Source::BusCv1) + 1);
-    } else if (source >= Routing::Source::GateOut1 && source <= Routing::Source::GateOut8) {
-        str("G%d", int(source) - int(Routing::Source::GateOut1) + 1);
-    } else if (Routing::isModulatorSource(source)) {
-        str("M%d", int(source) - int(Routing::Source::Mod1) + 1);
-    } else {
-        Routing::printSource(source, str);
-    }
-}
 
 } // namespace
 
@@ -96,7 +76,13 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
 }
 
 void RoutingPage::encoder(EncoderEvent &event) {
-    if (_matrixEditActive) {                // edit mode: dial the cursor cell's draft depth
+    if (_matrixEditActive) {
+        if (_matrixView == MatrixView::Source) {    // SOURCE view: dial the row's source
+            matrixEditSource(event.value(), event.pressed() || globalKeyState()[Key::Shift]);
+            event.consume();
+            return;
+        }
+        // DEPTH view: dial the cursor cell's draft depth
         auto band = RouteBrowse::Band(_tabEditorTab);
         bool global = band == RouteBrowse::Band::Global;
         const Track &track = _project.track(_tabCol);
@@ -185,6 +171,53 @@ void RoutingPage::matrixEnterEdit() {
     }
     _matrixEditActive = true;
     _matrixEditRow = _tabEditorRow;
+}
+
+// Group index of a source for Shift+encoder jumps: 0 None, 1 CvIn, 2 CvOut, 3 BusCv,
+// 4 GateOut, 5 Mod. Matches the {None, CvIn, CvOut, BusCv, GateOut, Mod} group order.
+static int sourceGroup(Routing::Source source) {
+    if (source == Routing::Source::None) return 0;
+    if (source >= Routing::Source::CvIn1 && source <= Routing::Source::CvIn4) return 1;
+    if (source >= Routing::Source::CvOut1 && source <= Routing::Source::CvOut8) return 2;
+    if (Routing::isBusSource(source)) return 3;
+    if (source >= Routing::Source::GateOut1 && source <= Routing::Source::GateOut8) return 4;
+    if (Routing::isModulatorSource(source)) return 5;
+    return 0;
+}
+
+// SOURCE view: step the draft's single source through sourceList() order. delta>0 next,
+// <0 prev, clamped at the ends. group=true jumps to the first source of the adjacent
+// group (the next/prev group head), so Shift+encoder skips whole source families.
+void RoutingPage::matrixEditSource(int delta, bool group) {
+    if (delta == 0) return;
+    Routing::Source list[int(Routing::Source::Last)];
+    Routing::Target target = _matrixDraft.route.target();
+    int n = RouteBrowse::sourceList(target, list, int(Routing::Source::Last));
+    if (n == 0) return;
+    Routing::Source cur = _matrixDraft.route.source();
+    int idx = 0;
+    for (int i = 0; i < n; ++i) {
+        if (list[i] == cur) { idx = i; break; }
+    }
+    int next = idx;
+    if (group) {
+        int curGroup = sourceGroup(list[idx]);
+        if (delta > 0) {
+            for (int i = idx + 1; i < n; ++i) {
+                if (sourceGroup(list[i]) != curGroup) { next = i; break; }
+            }
+        } else {
+            int prevGroup = -1;
+            for (int i = idx - 1; i >= 0; --i) {
+                int g = sourceGroup(list[i]);
+                if (g != curGroup) { prevGroup = g; }
+                if (prevGroup >= 0 && (i == 0 || sourceGroup(list[i - 1]) != prevGroup)) { next = i; break; }
+            }
+        }
+    } else {
+        next = clamp(idx + (delta > 0 ? 1 : -1), 0, n - 1);
+    }
+    _matrixDraft.route.setSource(list[next]);
 }
 
 // Leave edit. commit=true writes the draft live (caller gates on canCommit); false
@@ -329,7 +362,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
             if (routed) {
                 FixedStringBuilder<6> txt;
                 if (_matrixView == MatrixView::Source) {
-                    printSourceAbbrev(source, txt);
+                    Routing::printSourceAbbrev(source, txt);
                 } else {
                     txt("%+d", depth);
                 }
@@ -358,7 +391,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     }
 
     bool canCommit = _matrixEditActive && RouteDraft::canCommit(_matrixDraft);
-    const char *fn[] = { "VIEW", "SRC", "COMBINE", "CANCEL", canCommit ? "COMMIT" : nullptr };
+    const char *fn[] = { "VIEW", nullptr, "COMBINE", "CANCEL", canCommit ? "COMMIT" : nullptr };
     WindowPainter::drawFooter(canvas, fn, pageKeyState());
 }
 
@@ -440,17 +473,6 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         switch (Function(key.function())) {
         case Function::View: // cycle the cell view: depth <-> source
             _matrixView = _matrixView == MatrixView::Depth ? MatrixView::Source : MatrixView::Depth;
-            break;
-        case Function::Src: // pick the draft's source (staged, applied on confirm)
-            if (_matrixEditActive) {
-                Routing::Target target = _matrixDraft.route.target();
-                _manager.pages().routeSourceSelect.show(target, _matrixDraft.route.source(),
-                    [this] (bool ok, Routing::Source source) {
-                        if (ok && source != Routing::Source::None && _matrixEditActive) {
-                            _matrixDraft.route.setSource(source);
-                        }
-                    });
-            }
             break;
         case Function::Combine: // toggle Modulate <-> Absolute on the draft
             if (_matrixEditActive) {

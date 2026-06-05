@@ -28,6 +28,7 @@ private:
     void tabRefocus();          // point _route at the cursor row's committed route (if routed)
     void matrixEnterEdit();     // encoder-press in nav: begin/create the per-row draft
     void matrixExitEdit(bool commit); // commit or cancel the draft, return to nav
+    void matrixEditSource(int delta, bool group); // SOURCE view: cycle the draft source
     int routeForBandParam(uint8_t paramKey, uint8_t trackMask) const;
     int tabBandParamCount() const;
 

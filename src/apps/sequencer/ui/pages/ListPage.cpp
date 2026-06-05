@@ -33,24 +33,6 @@ bool gModSpread = false;
 // draw/dispatch from cancelling or mutating the underlying page's draft.
 const ListPage *gModEditOwner = nullptr;
 
-// Short source label for the inline modulated-row badge: CvIn1->"CV1",
-// CvOut1->"O1", BusCv1->"B1", GateOut1->"G1", Mod1->"M1".
-void printSourceAbbrev(Routing::Source source, StringBuilder &str) {
-    if (Routing::isCvSource(source)) {
-        str("CV%d", int(source) - int(Routing::Source::CvIn1) + 1);
-    } else if (source >= Routing::Source::CvOut1 && source <= Routing::Source::CvOut8) {
-        str("O%d", int(source) - int(Routing::Source::CvOut1) + 1);
-    } else if (Routing::isBusSource(source)) {
-        str("B%d", int(source) - int(Routing::Source::BusCv1) + 1);
-    } else if (source >= Routing::Source::GateOut1 && source <= Routing::Source::GateOut8) {
-        str("G%d", int(source) - int(Routing::Source::GateOut1) + 1);
-    } else if (Routing::isModulatorSource(source)) {
-        str("M%d", int(source) - int(Routing::Source::Mod1) + 1);
-    } else {
-        Routing::printSource(source, str);
-    }
-}
-
 // Horizontal bipolar depth bar: dim baseline x..x+w, center tick, and a fill
 // from center outward — rightward for +depth, leftward for -depth.
 void drawDepthBar(Canvas &canvas, int x, int y, int w, int depthPct, bool focus = false) {
@@ -454,7 +436,7 @@ void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
     bool depthFocus = gModEditActive && gModEditTarget == ModEditTarget::Depth;
 
     FixedStringBuilder<8> srcStr;
-    printSourceAbbrev(src, srcStr);
+    Routing::printSourceAbbrev(src, srcStr);
     canvas.setFont(Font::Small);
     canvas.setBlendMode(BlendMode::Set);
 
@@ -534,7 +516,7 @@ void ListPage::drawSpread(Canvas &canvas) {
         header[i] = 0;
     }
     FixedStringBuilder<8> srcStr;
-    printSourceAbbrev(gModDraft.route.source(), srcStr);
+    Routing::printSourceAbbrev(gModDraft.route.source(), srcStr);
 
     canvas.setFont(Font::Small);
     canvas.setColor(Color::Bright);
