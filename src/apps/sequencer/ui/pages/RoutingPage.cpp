@@ -311,6 +311,17 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     canvas.drawText(2, 7, tabs[_tabEditorTab]);
     canvas.setColor(Color::Medium);
     canvas.drawText(40, 7, _matrixView == MatrixView::Source ? "SOURCE" : "DEPTH");
+    // occupied-slot counter (always) far-right; combine indicator sits to its left
+    int activeRoutes = 0;
+    for (int r = 0; r < CONFIG_ROUTE_COUNT; ++r) {
+        if (_project.routing().route(r).active()) {
+            ++activeRoutes;
+        }
+    }
+    FixedStringBuilder<8> slots("%d/%d", activeRoutes, CONFIG_ROUTE_COUNT);
+    int slotsX = CONFIG_LCD_WIDTH - canvas.textWidth(slots) - 2;
+    canvas.setColor(activeRoutes >= CONFIG_ROUTE_COUNT ? Color::Bright : Color::Medium);
+    canvas.drawText(slotsX, 7, slots);
     {
         RouteApply::Combine cb = RouteApply::Combine::Modulate;
         bool show = false;
@@ -319,7 +330,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         if (show) {
             const char *cbStr = cb == RouteApply::Combine::Absolute ? "ABSOLUTE" : "MODULATE";
             canvas.setColor(_matrixEditActive ? Color::Bright : Color::Medium);
-            canvas.drawText(CONFIG_LCD_WIDTH - canvas.textWidth(cbStr) - 2, 7, cbStr);
+            canvas.drawText(slotsX - 6 - canvas.textWidth(cbStr), 7, cbStr);
         }
     }
     canvas.setColor(Color::Low);
