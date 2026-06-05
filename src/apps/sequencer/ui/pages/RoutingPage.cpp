@@ -35,7 +35,7 @@ EmptyListModel gEmptyListModel;
 
 enum class Function {
     View    = 0,
-    Src     = 1,
+    Edit    = 1,
     Combine = 2,
     Cancel  = 3,
     Commit  = 4,
@@ -390,9 +390,10 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         }
     }
 
-    bool canCommit = _matrixEditActive && RouteDraft::canCommit(_matrixDraft);
-    const char *fn[] = { "VIEW", nullptr, "COMBINE", "CANCEL", canCommit ? "COMMIT" : nullptr };
-    WindowPainter::drawFooter(canvas, fn, pageKeyState());
+    bool editing = _matrixEditActive;
+    bool canCommit = editing && RouteDraft::canCommit(_matrixDraft);
+    const char *fn[] = { "VIEW", "EDIT", editing ? "COMBINE" : nullptr, editing ? "CANCEL" : nullptr, canCommit ? "COMMIT" : nullptr };
+    WindowPainter::drawFooter(canvas, fn, pageKeyState(), editing ? int(Function::Edit) : -1);
 }
 
 void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
@@ -459,18 +460,15 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         return;
     }
 
-    if (key.isEncoder()) {
-        if (_matrixEditActive) {
-            matrixExitEdit(false);      // press in edit = cancel back to nav
-        } else {
-            matrixEnterEdit();          // press in nav = enter edit on the cursor row
-        }
-        event.consume();
-        return;
-    }
-
     if (key.isFunction()) {
         switch (Function(key.function())) {
+        case Function::Edit: // F2 toggles nav <-> edit on the cursor row
+            if (_matrixEditActive) {
+                matrixExitEdit(false);
+            } else {
+                matrixEnterEdit();
+            }
+            break;
         case Function::View: // cycle the cell view: depth <-> source
             _matrixView = _matrixView == MatrixView::Depth ? MatrixView::Source : MatrixView::Depth;
             break;
