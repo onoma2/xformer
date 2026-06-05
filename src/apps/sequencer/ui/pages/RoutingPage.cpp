@@ -371,14 +371,18 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         // SOURCE view paints the row's single source on EVERY eligible cell (one source per row);
         // whether a track is actually applied is shown by DEPTH view. Resolve the row source once.
         Routing::Source rowSource = Routing::Source::None;
+        RouteApply::Combine rowCombine = RouteApply::Combine::Modulate;
         bool rowHasRoute = false;
         if (draftRow) {
             rowSource = _matrixDraft.route.source();
+            rowCombine = _matrixDraft.route.combine();
             rowHasRoute = true;
         } else {
             int rowRouteIdx = routeForBandParam(key, globalKey ? 0 : 0xFF);
             if (rowRouteIdx >= 0) {
-                rowSource = _project.routing().route(rowRouteIdx).source();
+                const auto &rr = _project.routing().route(rowRouteIdx);
+                rowSource = rr.source();
+                rowCombine = rr.combine();
                 rowHasRoute = true;
             }
         }
@@ -422,6 +426,11 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
             }
             canvas.setColor(isCursor ? Color::Bright : (routed ? Color::Medium : Color::MediumLow));
             canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
+        }
+        // per-row combine marker (M/A) in the right margin, routed rows only
+        if (rowHasRoute) {
+            canvas.setColor(cursorRowSel ? Color::Bright : Color::Medium);
+            canvas.drawText(CONFIG_LCD_WIDTH - 6, y + 6, rowCombine == RouteApply::Combine::Absolute ? "A" : "M");
         }
     }
 
