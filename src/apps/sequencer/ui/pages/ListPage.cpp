@@ -114,8 +114,8 @@ void ListPage::draw(Canvas &canvas) {
             drawCell(canvas, row, 0, 8, ry, 128 - 16, LineHeight);
             drawCell(canvas, row, 1, 128, ry, 128 - 16, LineHeight);   // value stays in its column
             int ri;
-            if (row == _selectedRow && modulatedRow(row, ri)) {
-                // overlay: value | narrow bar | source(right), without moving the value
+            if (modulatedRow(row, ri)) {
+                // every modulated row overlays: value | narrow bar | source(right)
                 drawModulatedRow(canvas, row, ry);
             }
         }
@@ -421,9 +421,12 @@ void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
 
     int trackIndex = _project.selectedTrackIndex();
 
+    // The draft belongs to the row actually being edited (selected + owner); every other
+    // modulated row reads its committed route, so all modulated rows show bar + source.
+    bool editingThis = gModEditActive && gModEditOwner == this && row == _selectedRow;
     Routing::Source src;
     int depthPct;
-    if (gModEditActive) {
+    if (editingThis) {
         src = gModDraft.route.source();
         depthPct = gModDraft.route.depthPct(trackIndex);
     } else {
@@ -432,7 +435,7 @@ void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
         depthPct = route.depthPct(trackIndex);
     }
 
-    bool depthFocus = gModEditActive && gModEditTarget == ModEditTarget::Depth;
+    bool depthFocus = editingThis && gModEditTarget == ModEditTarget::Depth;
 
     canvas.setFont(Font::Small);
     canvas.setBlendMode(BlendMode::Set);
