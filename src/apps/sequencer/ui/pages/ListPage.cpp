@@ -125,7 +125,9 @@ void ListPage::draw(Canvas &canvas) {
 
     int routeIndex;
     if (_edit && modulatedRow(_selectedRow, routeIndex)) {
-        const char *names[] = { nullptr, "SRC", "COMBINE", "CANCEL", "COMMIT" };
+        RouteApply::Combine cb = (gModEditActive && gModEditOwner == this)
+            ? gModDraft.route.combine() : _project.routing().route(routeIndex).combine();
+        const char *names[] = { nullptr, "SRC", cb == RouteApply::Combine::Absolute ? "ABS" : "MOD", "CANCEL", "COMMIT" };
         WindowPainter::drawFooter(canvas, names, pageKeyState());
     }
 }
@@ -568,7 +570,8 @@ void ListPage::drawSpread(Canvas &canvas) {
         }
     }
 
-    const char *names[] = { nullptr, "SRC", "COMBINE", "CANCEL", "COMMIT" };
+    const char *spreadCombine = (gModEditActive && gModDraft.route.combine() == RouteApply::Combine::Absolute) ? "ABS" : "MOD";
+    const char *names[] = { nullptr, "SRC", spreadCombine, "CANCEL", "COMMIT" };
     WindowPainter::drawFooter(canvas, names, pageKeyState());
 }
 

@@ -451,7 +451,8 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
 
     bool editing = _matrixEditActive;
     bool canCommit = editing && RouteDraft::canCommit(_matrixDraft);
-    const char *fn[] = { "VIEW", "EDIT", editing ? "COMBINE" : nullptr, editing ? "CANCEL" : nullptr, canCommit ? "COMMIT" : nullptr };
+    const char *combineLbl = (editing && _matrixDraft.route.combine() == RouteApply::Combine::Absolute) ? "ABS" : "MOD";
+    const char *fn[] = { "VIEW", "EDIT", editing ? combineLbl : nullptr, editing ? "CANCEL" : nullptr, canCommit ? "COMMIT" : nullptr };
     WindowPainter::drawFooter(canvas, fn, pageKeyState(), editing ? int(Function::Edit) : -1);
 }
 
