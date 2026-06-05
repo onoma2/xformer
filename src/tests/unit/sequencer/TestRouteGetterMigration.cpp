@@ -2,6 +2,7 @@
 
 #include "apps/sequencer/model/NoteSequence.h"
 #include "apps/sequencer/model/PhaseFluxSequence.h"
+#include "apps/sequencer/model/Project.h"
 #include "apps/sequencer/model/Routing.h"
 #include "apps/sequencer/model/RouteParamKey.h"
 
@@ -121,6 +122,45 @@ CASE("Note first/last edit clamps in base domain under route") {
     seq.editFirstStep(20, false);                  // base first clamps against base last (15)
     Routing::clearRouteOverrides();
     expectEqual(seq.firstStep(), 15, "first clamped to last BASE (15), not routed window (31)");
+}
+
+// CurveTrack track-level int getters migrate onto routedValueInt: read
+// clamp(base + override) under a committed Curve route, base when unrouted. Track 0
+// in Curve mode carries trackIndex 0 (set by Project::setTrackMode).
+CASE("Curve slideTime: base-anchored read + stale clear (unipolar 0..100)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Curve);
+    auto &track = p.track(0).curveTrack();
+    track.setSlideTime(40);
+    expectEqual(track.slideTime(), 40, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::SlideTime, 0, 30.f);
+    expectEqual(track.slideTime(), 70, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::SlideTime, 0, 100.f);
+    expectEqual(track.slideTime(), 100, "clamps hi to 100");
+
+    Routing::clearRouteOverrides();
+    expectEqual(track.slideTime(), 40, "stale clear -> base restored");
+}
+
+CASE("Curve rotate: signed base-anchored read + clamp (bipolar -64..64)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Curve);
+    auto &track = p.track(0).curveTrack();
+    track.setRotate(-10);
+    expectEqual(track.rotate(), -10, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::Rotate, 0, 30.f);
+    expectEqual(track.rotate(), 20, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::Rotate, 0, -100.f);
+    expectEqual(track.rotate(), -64, "clamps lo to -64");
+
+    Routing::clearRouteOverrides();
+    expectEqual(track.rotate(), -10, "stale clear -> base restored");
 }
 
 } // UNIT_TEST

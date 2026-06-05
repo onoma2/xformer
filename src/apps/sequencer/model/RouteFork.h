@@ -37,6 +37,8 @@ namespace RouteFork {
         case Routing::Target::Octave:                    return ParamKey::Octave;
         case Routing::Target::Transpose:                 return ParamKey::Transpose;
         case Routing::Target::Rotate:                    return ParamKey::Rotate;
+        case Routing::Target::Offset:                    return ParamKey::Offset;
+        case Routing::Target::ShapeProbabilityBias:      return ParamKey::ShapeProbabilityBias;
         case Routing::Target::GateProbabilityBias:       return ParamKey::GateProbabilityBias;
         case Routing::Target::RetriggerProbabilityBias:  return ParamKey::RetriggerProbabilityBias;
         case Routing::Target::LengthBias:                return ParamKey::LengthBias;

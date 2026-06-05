@@ -5,6 +5,7 @@
 #include "CurveSequence.h"
 #include "Serialize.h"
 #include "Routing.h"
+#include "RouteParamKey.h"
 
 #include <cmath>
 
@@ -107,15 +108,13 @@ public:
 
     // slideTime
 
-    int slideTime() const { return _slideTime.get(isRouted(Routing::Target::SlideTime)); }
+    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime.base, 0, 100); }
     void setSlideTime(int slideTime, bool routed = false) {
         _slideTime.set(clamp(slideTime, 0, 100), routed);
     }
 
     void editSlideTime(int value, bool shift) {
-        if (!isRouted(Routing::Target::SlideTime)) {
-            setSlideTime(ModelUtils::adjustedByStep(slideTime(), value, 5, !shift));
-        }
+        setSlideTime(ModelUtils::adjustedByStep(_slideTime.base, value, 5, !shift));
     }
 
     void printSlideTime(StringBuilder &str) const {
@@ -125,16 +124,14 @@ public:
 
     // offset
 
-    int offset() const { return _offset.get(isRouted(Routing::Target::Offset)); }
+    int offset() const { return Routing::routedValueInt(ParamKey::Offset, _trackIndex, _offset.base, -500, 500); }
     float offsetVolts() const { return offset() * 0.01f; }
     void setOffset(int offset, bool routed = false) {
         _offset.set(clamp(offset, -500, 500), routed);
     }
 
     void editOffset(int value, bool shift) {
-        if (!isRouted(Routing::Target::Offset)) {
-            setOffset(offset() + value * (shift ? 100 : 1));
-        }
+        setOffset(_offset.base + value * (shift ? 100 : 1));
     }
 
     void printOffset(StringBuilder &str) const {
@@ -144,15 +141,13 @@ public:
 
     // rotate
 
-    int rotate() const { return _rotate.get(isRouted(Routing::Target::Rotate)); }
+    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64); }
     void setRotate(int rotate, bool routed = false) {
         _rotate.set(clamp(rotate, -64, 64), routed);
     }
 
     void editRotate(int value, bool shift) {
-        if (!isRouted(Routing::Target::Rotate)) {
-            setRotate(rotate() + value);
-        }
+        setRotate(_rotate.base + value);
     }
 
     void printRotate(StringBuilder &str) const {
@@ -162,15 +157,13 @@ public:
 
     // shapeProbabilityBias
 
-    int shapeProbabilityBias() const { return _shapeProbabilityBias.get(isRouted(Routing::Target::ShapeProbabilityBias)); }
+    int shapeProbabilityBias() const { return Routing::routedValueInt(ParamKey::ShapeProbabilityBias, _trackIndex, _shapeProbabilityBias.base, -8, 8); }
     void setShapeProbabilityBias(int shapeProbabilityBias, bool routed = false) {
         _shapeProbabilityBias.set(clamp(shapeProbabilityBias, -8, 8), routed);
     }
 
     void editShapeProbabilityBias(int value, bool shift) {
-        if (!isRouted(Routing::Target::ShapeProbabilityBias)) {
-            setShapeProbabilityBias(shapeProbabilityBias() + value);
-        }
+        setShapeProbabilityBias(_shapeProbabilityBias.base + value);
     }
 
     void printShapeProbabilityBias(StringBuilder &str) const {
@@ -180,15 +173,13 @@ public:
 
     // gateProbabilityBias
 
-    int gateProbabilityBias() const { return _gateProbabilityBias.get(isRouted(Routing::Target::GateProbabilityBias)); }
+    int gateProbabilityBias() const { return Routing::routedValueInt(ParamKey::GateProbabilityBias, _trackIndex, _gateProbabilityBias.base, -CurveSequence::GateProbability::Range, CurveSequence::GateProbability::Range); }
     void setGateProbabilityBias(int gateProbabilityBias, bool routed = false) {
         _gateProbabilityBias.set(clamp(gateProbabilityBias, -CurveSequence::GateProbability::Range, CurveSequence::GateProbability::Range), routed);
     }
 
     void editGateProbabilityBias(int value, bool shift) {
-        if (!isRouted(Routing::Target::GateProbabilityBias)) {
-            setGateProbabilityBias(gateProbabilityBias() + value);
-        }
+        setGateProbabilityBias(_gateProbabilityBias.base + value);
     }
 
     void printGateProbabilityBias(StringBuilder &str) const {
