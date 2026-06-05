@@ -8,6 +8,7 @@
 #include "Track.h"
 #include "ParamTableNote.h"
 #include "ParamTablePhaseFlux.h"
+#include "ParamTableCurve.h"
 #include "ParamTableGlobal.h"
 
 // Apply-fork decision for the routing mod-matrix slice (plan 005, step 3).
@@ -47,6 +48,7 @@ namespace RouteFork {
         case Routing::Target::RunMode:                   return ParamKey::RunMode;
         case Routing::Target::FirstStep:                 return ParamKey::FirstStep;
         case Routing::Target::LastStep:                  return ParamKey::LastStep;
+        case Routing::Target::CurveRate:                 return ParamKey::CurveRate;
         // global (project) targets — no track dimension
         case Routing::Target::Tempo:                     return ParamKey::Tempo;
         case Routing::Target::Swing:                     return ParamKey::Swing;
@@ -80,6 +82,7 @@ namespace RouteFork {
         switch (mode) {
         case Track::TrackMode::Note:      table = &NoteParamTable::table(); break;
         case Track::TrackMode::PhaseFlux: table = &PhaseFluxParamTable::table(); break;
+        case Track::TrackMode::Curve:     table = &CurveParamTable::table(); break;
         default:                          return false;
         }
         uint8_t key = targetToParamKey(target);

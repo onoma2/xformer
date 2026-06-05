@@ -85,6 +85,20 @@ CASE("PhaseFlux migrates only its Target-backed params") {
     expectFalse(RouteFork::migrated(Mode::PhaseFlux, Routing::Target::FirstStep, key, range), "FirstStep not PF");
 }
 
+CASE("Curve migrates its sequence-level and track-level Target-backed params") {
+    uint8_t key = 0; RouteParam::Range range{};
+    expectTrue(RouteFork::migrated(Mode::Curve, Routing::Target::Divisor, key, range), "Curve Divisor migrated");
+    expectEqual(int(key), int(ParamKey::Divisor), "Divisor key");
+    expectTrue(near(range.min, 1.f) && near(range.max, 768.f), "Divisor range 1..768");
+
+    expectTrue(RouteFork::migrated(Mode::Curve, Routing::Target::CurveRate, key, range), "Curve CurveRate migrated");
+    expectEqual(int(key), int(ParamKey::CurveRate), "CurveRate key");
+    expectTrue(near(range.min, 0.f) && near(range.max, 400.f), "CurveRate range 0..400");
+
+    // A target with no row in the Curve table -> not migrated for Curve.
+    expectFalse(RouteFork::migrated(Mode::Curve, Routing::Target::IndexedA, key, range), "IndexedA not Curve");
+}
+
 CASE("non-migrated track modes always stay on the old path") {
     uint8_t key; RouteParam::Range range;
     for (auto m : { Mode::Curve, Mode::MidiCv, Mode::Tuesday, Mode::DiscreteMap,
