@@ -131,6 +131,20 @@ static const char *bandParamName(RouteBrowse::Band band, uint8_t key) {
     return row ? row->name : "?";
 }
 
+// Draw a row name clipped to maxW px (drop trailing chars until it fits the gutter).
+static void drawClippedName(Canvas &canvas, int x, int y, int maxW, const char *name) {
+    char buf[24];
+    int i = 0;
+    for (; i < 23 && name[i]; ++i) {
+        buf[i] = name[i];
+    }
+    buf[i] = 0;
+    while (i > 1 && canvas.textWidth(buf) > maxW) {
+        buf[--i] = 0;
+    }
+    canvas.drawText(x, y, buf);
+}
+
 // Find the active route targeting paramKey within the scope; -1 if none.
 int RoutingPage::routeForBandParam(uint8_t paramKey, uint8_t trackMask) const {
     const auto &routing = _project.routing();
@@ -289,7 +303,7 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         bool draftRow = _matrixEditActive && r == _matrixEditRow;
         bool globalKey = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(key));
         canvas.setColor(cursorRowSel ? Color::Bright : Color::Medium);
-        canvas.drawText(2, y + 6, bandParamName(band, key));
+        drawClippedName(canvas, 2, y + 6, nameW - 2, bandParamName(band, key));
         for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
             const Track &track = _project.track(t);
             int cx = gridL + t * colW + colW / 2;
