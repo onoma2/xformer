@@ -79,6 +79,23 @@ public:
     return nullptr;
   }
 
+  // Single-letter engine abbreviation (matrix column headers, SPREAD labels).
+  static char trackModeLetter(TrackMode trackMode) {
+    switch (trackMode) {
+    case TrackMode::Note:        return 'N';
+    case TrackMode::Curve:       return 'C';
+    case TrackMode::MidiCv:      return 'M';
+    case TrackMode::Tuesday:     return 'A';
+    case TrackMode::DiscreteMap: return 'D';
+    case TrackMode::Indexed:     return 'I';
+    case TrackMode::Teletype:    return 'T';
+    case TrackMode::Stochastic:  return 'S';
+    case TrackMode::PhaseFlux:   return 'P';
+    case TrackMode::Last:        break;
+    }
+    return '?';
+  }
+
   static uint8_t trackModeSerialize(TrackMode trackMode) {
     switch (trackMode) {
     case TrackMode::Note:

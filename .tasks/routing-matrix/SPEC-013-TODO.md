@@ -83,9 +83,11 @@ Per-row draft/commit via `RouteDraft`; footer F1 VIEW · F2 SRC · F3 COMBINE ·
 - [x] **5a** — ROUTING page = matrix: removed legacy overview/per-route editor/`RouteListModel`
       (EmptyListModel for the ctor); ROUTING now opens straight into the tab editor (self-inits via
       `enterTabEditor`/`tabRefocus`); BACK pops the page. Freed ~9.7 KB. STM32-green, Codex ALLOW.
-- [ ] **5b** — grid layout (draw): 8-col numeric cells, number+engine column headers (eligibility
-      dim), rows=band params, `-`/`.`/number, cursor=brightness (cell+header+rowname, NOT a box),
-      band header + DEPTH/SOURCE + MODULATE, footer. Unify the track-letter helper (N/C/D/A/I/S/P/M).
+- [x] **5b** — grid draw: 8-col numeric cells (`-`/`.`/number via `tabCellEligible`+`findRoute`),
+      number+engine column headers (real `RouteFork::migrated` eligibility dim), cursor=brightness
+      (cell+header+rowname, fillRect + left tab bar removed), band header + DEPTH + MODULATE.
+      `_tabCol` column cursor (default=current track, no nav yet). Track-letter helper unified into
+      `Track::trackModeLetter` (RoutingPage + ListPage). +468 B. STM32-green, Codex ALLOW.
 - [ ] **5c** — cursor nav (row × track col) + cursor-cell depth edit into a per-row `RouteDraft`;
       F5 COMMIT / F4 CANCEL; per-row F2 SRC / F3 COMBINE.
 - [ ] **5d** — scope: T1–T8 toggle columns into the focused row; Shift+Tn = by-type; by-type underline.

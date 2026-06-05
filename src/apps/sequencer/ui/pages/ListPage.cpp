@@ -81,22 +81,6 @@ void drawSpreadBar(Canvas &canvas, int x, int y, int w, int h, int depthPct, boo
     }
 }
 
-// Single-letter engine abbreviation for the SPREAD per-track labels.
-char trackModeLetter(Track::TrackMode mode) {
-    switch (mode) {
-    case Track::TrackMode::Note:        return 'N';
-    case Track::TrackMode::Curve:       return 'C';
-    case Track::TrackMode::MidiCv:      return 'M';
-    case Track::TrackMode::Tuesday:     return 'T';
-    case Track::TrackMode::DiscreteMap: return 'D';
-    case Track::TrackMode::Indexed:     return 'I';
-    case Track::TrackMode::Teletype:    return '9';
-    case Track::TrackMode::Stochastic:  return 'S';
-    case Track::TrackMode::PhaseFlux:   return 'P';
-    default:                            return '?';
-    }
-}
-
 } // namespace
 
 ListPage::ListPage(PageManager &manager, PageContext &context, ListModel &listModel) :
@@ -555,7 +539,7 @@ void ListPage::drawSpread(Canvas &canvas) {
                       gModDraft.route.depthPct(t), eligible, selected);
 
         FixedStringBuilder<4> label;
-        label("%d%c", t + 1, trackModeLetter(_project.track(t).trackMode()));
+        label("%d%c", t + 1, Track::trackModeLetter(_project.track(t).trackMode()));
         int lw = canvas.textWidth(label);
         int lx = cx - lw / 2;
         canvas.setColor(eligible ? (selected ? Color::Bright : Color::Medium) : Color::Low);

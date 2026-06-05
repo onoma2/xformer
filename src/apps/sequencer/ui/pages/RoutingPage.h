@@ -30,6 +30,7 @@ private:
     int tabBandParamCount() const;
     int _tabEditorTab = 0;
     int _tabEditorRow = 0;
+    int _tabCol = 0;             // cursor track column (draw state only in 5b)
     bool _tabRowRouted = false;  // cursor row resolves to a committed route (_route)
     uint8_t _tabScopeMask = 0;   // scope fixed on entry (per-track mask, or 0 = global)
 

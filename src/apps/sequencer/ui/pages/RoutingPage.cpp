@@ -110,21 +110,6 @@ void RoutingPage::encoder(EncoderEvent &event) {
     event.consume();
 }
 
-static char trackModeLetter(Track::TrackMode mode) {
-    switch (mode) {
-    case Track::TrackMode::Note:        return 'N';
-    case Track::TrackMode::Curve:       return 'C';
-    case Track::TrackMode::MidiCv:      return 'M';
-    case Track::TrackMode::Tuesday:     return 'A'; // Algo
-    case Track::TrackMode::DiscreteMap: return 'D';
-    case Track::TrackMode::Indexed:     return 'I';
-    case Track::TrackMode::Teletype:    return 'T';
-    case Track::TrackMode::Stochastic:  return 'S';
-    case Track::TrackMode::PhaseFlux:   return 'P';
-    default:                            return '?';
-    }
-}
-
 // Name for a band ParamKey: Global keys from the global table, the rest from Note
 // (which backs every per-track band param). Reuses the staged row names, no new strings.
 static const char *bandParamName(RouteBrowse::Band band, uint8_t key) {
@@ -200,6 +185,7 @@ void RoutingPage::tabRefocus() {
     uint8_t keys[8];
     int n = RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
     _tabEditorRow = clamp(_tabEditorRow, 0, (n > 0 ? n - 1 : 0));
+    _tabCol = clamp(_tabCol, 0, CONFIG_TRACK_COUNT - 1);
     int routeIdx = (n > 0) ? routeForBandParam(keys[_tabEditorRow], _tabScopeMask) : -1;
     if (routeIdx >= 0) {
         _route = &_project.routing().route(routeIdx);
@@ -213,118 +199,99 @@ void RoutingPage::tabRefocus() {
 void RoutingPage::enterTabEditor() {
     _tabEditorTab = 0;
     _tabEditorRow = 0;
+    _tabCol = clamp(_project.selectedTrackIndex(), 0, CONFIG_TRACK_COUNT - 1);
     _tabScopeMask = 0;   // global scope by default
     tabRefocus();
 }
 
+// True when track t's engine owns paramKey (so a route there is meaningful). Global
+// band params have no track dimension: eligibility is the same for every column.
+static bool tabCellEligible(const Track &track, uint8_t paramKey) {
+    Routing::Target target = RouteBrowse::paramKeyToTarget(paramKey);
+    if (target == Routing::Target::None) return false;
+    uint8_t key; RouteParam::Range range;
+    if (Routing::isProjectTarget(target)) {
+        return RouteFork::migratedGlobal(target, key, range);
+    }
+    return RouteFork::migrated(track.trackMode(), target, key, range);
+}
+
 void RoutingPage::drawTabEditor(Canvas &canvas) {
     const char *tabs[] = { "PITCH", "CLOCK", "PROB", "GLOB" };
-    const int tabCount = 4;
-
-    // cursor param name in the header. Tab editor edits the committed route live, so
-    // there is no draft/commit — depth (modal) and combine (F2) apply immediately.
-    uint8_t curKeys[8];
-    int curN = RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), curKeys, 8);
-    uint8_t cursorKey = (curN > 0) ? curKeys[clamp(_tabEditorRow, 0, curN - 1)] : 0;
-    WindowPainter::clear(canvas);
-    WindowPainter::drawHeader(canvas, _model, _engine, "ROUTE");
-    WindowPainter::drawActiveFunction(canvas, bandParamName(RouteBrowse::Band(_tabEditorTab), cursorKey));
-    const char *fn[] = { "BACK", _tabRowRouted ? "COMBINE" : nullptr, _tabRowRouted ? "SRC" : nullptr, nullptr, nullptr };
-    WindowPainter::drawFooter(canvas, fn, pageKeyState());
-
-    canvas.setFont(Font::Tiny);
-
-    // left vertical tab column
-    const int tabX = 2, tabW = 40, tabTop = 14, tabH = 9;
-    for (int i = 0; i < tabCount; ++i) {
-        int y = tabTop + i * tabH;
-        bool active = i == _tabEditorTab;
-        if (active) {
-            canvas.setColor(Color::MediumBright);
-            canvas.fillRect(tabX, y, tabW, tabH - 1);
-            canvas.setBlendMode(BlendMode::Sub);
-            canvas.drawText(tabX + 3, y + 6, tabs[i]);
-            canvas.setBlendMode(BlendMode::Set);
-        } else {
-            canvas.setColor(Color::Low);
-            canvas.drawText(tabX + 3, y + 6, tabs[i]);
-        }
-    }
-    canvas.setColor(Color::Low);
-    canvas.vline(tabW + 2, 12, CONFIG_LCD_HEIGHT - 23);
-
     auto band = RouteBrowse::Band(_tabEditorTab);
 
-    // band param list: each param resolved to its routed state at the fixed scope.
-    // The cursor row (_tabEditorRow) drives the highlight; its route is _route (the
-    // committed slot), edited live.
     uint8_t keys[8];
     int n = RouteBrowse::bandParams(band, keys, 8);
-    const int cx = tabW + 6, listTop = 15, rowH = 6;
-    const int depthR = CONFIG_LCD_WIDTH - 4;
-    for (int i = 0; i < n; ++i) {
-        int y = listTop + i * rowH;
-        uint8_t key = keys[i];
-        bool cursor = i == _tabEditorRow;
-        int depth = 0;
-        bool routed;
-        if (cursor) {
-            routed = _tabRowRouted;
-            if (routed && _route) depth = _route->depthPct(0);
-        } else {
-            int routeIdx = routeForBandParam(key, _tabScopeMask);
-            routed = routeIdx >= 0;
-            if (routed) depth = _project.routing().route(routeIdx).depthPct(0);
-        }
+    int cursorRow = clamp(_tabEditorRow, 0, (n > 0 ? n - 1 : 0));
+    int cursorCol = clamp(_tabCol, 0, CONFIG_TRACK_COUNT - 1);
+    uint8_t cursorKey = (n > 0) ? keys[cursorRow] : 0;
 
-        if (cursor) {
-            canvas.setColor(Color::MediumBright);
-            canvas.fillRect(cx - 2, y - 1, CONFIG_LCD_WIDTH - cx - 2, rowH);
-            canvas.setBlendMode(BlendMode::Sub);
-        }
-        canvas.setColor(routed ? Color::Bright : Color::Low);
-        canvas.drawText(cx, y + 4, bandParamName(band, key));
-        if (routed) {
-            FixedStringBuilder<10> dep("%+d%%", depth);
-            canvas.setColor(Color::Medium);
-            canvas.drawText(depthR - canvas.textWidth(dep), y + 4, dep);
+    WindowPainter::clear(canvas);
+    canvas.setFont(Font::Tiny);
+
+    // header: band name bright, view tag dim, MODULATE dim far right
+    canvas.setColor(Color::Bright);
+    canvas.drawText(2, 7, tabs[_tabEditorTab]);
+    canvas.setColor(Color::Medium);
+    canvas.drawText(40, 7, "DEPTH");
+    canvas.drawText(CONFIG_LCD_WIDTH - canvas.textWidth("MODULATE") - 2, 7, "MODULATE");
+    canvas.setColor(Color::Low);
+    canvas.hline(0, 10, CONFIG_LCD_WIDTH);
+
+    // grid geometry: left label gutter + 8 evenly-spaced track columns
+    const int nameW = 38;
+    const int gridL = nameW + 2;
+    const int colW = (CONFIG_LCD_WIDTH - gridL - 1) / 8;
+
+    // column headers: track number + engine letter, cursor column bright,
+    // else medium when the cursor row's param is eligible for that engine, dim if not
+    const int hdrY = 17;
+    for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
+        const Track &track = _project.track(t);
+        int cx = gridL + t * colW + colW / 2;
+        FixedStringBuilder<4> lbl("%d%c", t + 1, Track::trackModeLetter(track.trackMode()));
+        if (t == cursorCol) {
+            canvas.setColor(Color::Bright);
         } else {
-            const char *hint = cursor ? "+ADD" : "--"; // cursor on empty row: press to add
-            canvas.setColor(cursor ? Color::Medium : Color::Low);
-            canvas.drawText(depthR - canvas.textWidth(hint), y + 4, hint);
+            canvas.setColor(tabCellEligible(track, cursorKey) ? Color::Medium : Color::Low);
         }
-        if (cursor) canvas.setBlendMode(BlendMode::Set);
+        canvas.drawText(cx - canvas.textWidth(lbl) / 2, hdrY, lbl);
     }
 
-    // scope mini-map + combine for the focused route, compact at the bottom
-    // show the focused route's actual tracks when routed; else the entry scope
-    uint8_t mapMask = (_tabRowRouted && _route && Routing::isPerTrackTarget(_route->target()))
-        ? uint8_t(_route->tracks()) : _tabScopeMask;
-    const int mapX = CONFIG_LCD_WIDTH - 8 * 11 - 1, mapY = CONFIG_LCD_HEIGHT - 19;
-    if (mapMask != 0) {
+    // param rows: name in the gutter (cursor row bright), then 8 cells. Per cell:
+    //   '-' ineligible, '.' eligible+unrouted, depth number when routed.
+    const int top = 20, rowH = 8;
+    for (int r = 0; r < n; ++r) {
+        int y = top + r * rowH;
+        uint8_t key = keys[r];
+        bool cursorRowSel = r == cursorRow;
+        canvas.setColor(cursorRowSel ? Color::Bright : Color::Medium);
+        canvas.drawText(2, y + 6, bandParamName(band, key));
         for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
-            int px = mapX + t * 11;
-            char letter[2] = { trackModeLetter(_project.track(t).trackMode()), 0 };
-            if (mapMask & (1 << t)) {
-                canvas.setColor(Color::Bright);
-                canvas.fillRect(px, mapY, 10, 7);
-                canvas.setBlendMode(BlendMode::Sub);
-                canvas.drawText(px + 3, mapY + 5, letter);
-                canvas.setBlendMode(BlendMode::Set);
-            } else {
+            const Track &track = _project.track(t);
+            int cx = gridL + t * colW + colW / 2;
+            bool isCursor = cursorRowSel && t == cursorCol;
+            if (!tabCellEligible(track, key)) {
                 canvas.setColor(Color::Low);
-                canvas.drawText(px + 3, mapY + 5, letter);
+                canvas.drawText(cx - 2, y + 6, "-");
+                continue;
+            }
+            uint8_t scopeMask = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(key))
+                ? 0 : uint8_t(1 << t);
+            int routeIdx = routeForBandParam(key, scopeMask);
+            if (routeIdx >= 0) {
+                FixedStringBuilder<6> txt("%+d", _project.routing().route(routeIdx).depthPct(t));
+                canvas.setColor(isCursor ? Color::Bright : Color::Medium);
+                canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
+            } else {
+                canvas.setColor(isCursor ? Color::Bright : Color::MediumLow);
+                canvas.drawText(cx - canvas.textWidth(".") / 2, y + 6, ".");
             }
         }
-    } else {
-        canvas.setColor(Color::Medium);
-        canvas.drawText(mapX, mapY + 5, "global");
     }
-    if (_tabRowRouted && _route) {
-        canvas.setColor(Color::Medium);
-        canvas.drawText(cx, mapY + 5,
-            _route->combine() == RouteApply::Combine::Absolute ? "ABS" : "MOD");
-    }
+
+    const char *fn[] = { "BACK", _tabRowRouted ? "COMBINE" : nullptr, _tabRowRouted ? "SRC" : nullptr, nullptr, nullptr };
+    WindowPainter::drawFooter(canvas, fn, pageKeyState());
 }
 
 void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
