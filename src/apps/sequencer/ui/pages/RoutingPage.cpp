@@ -94,9 +94,14 @@ void RoutingPage::encoder(EncoderEvent &event) {
         }
         if (tabCellEligible(track, paramKey)) {   // only eligible cells are editable
             int slot = global ? 0 : _tabCol;
-            _matrixDraft.route.setDepthPct(slot, clamp(_matrixDraft.route.depthPct(slot) + event.value(), -100, 100));
-            if (!global) {
-                _matrixDraft.route.setTracks(_matrixDraft.route.tracks() | (1 << _tabCol));
+            int newDepth = clamp(_matrixDraft.route.depthPct(slot) + event.value(), -100, 100);
+            _matrixDraft.route.setDepthPct(slot, newDepth);
+            if (!global) {   // membership is implicit: non-zero depth = member, 0 drops the track
+                if (newDepth != 0) {
+                    _matrixDraft.route.setTracks(_matrixDraft.route.tracks() | (1 << _tabCol));
+                } else {
+                    _matrixDraft.route.setTracks(_matrixDraft.route.tracks() & ~(1 << _tabCol));
+                }
             }
         }
         event.consume();
@@ -399,50 +404,32 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
 void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
     const auto &key = event.key();
 
-    // S1-S8 pick the cursor column in both nav and edit (clamped to track count).
-    if (key.isStep() && key.step() < CONFIG_TRACK_COUNT) {
-        _tabCol = key.step();
-        event.consume();
-        return;
-    }
-
-    // T1-T8 toggle track membership of the focused (edit) row's draft. Plain Tn flips
-    // one track; Shift+Tn flips the whole by-type group (tracks sharing Tn's engine).
-    // Per-track bands only; the global band has no per-track membership.
-    if (key.isTrack() && _matrixEditActive) {
-        uint8_t keys[8];
-        auto editBand = RouteBrowse::Band(_tabEditorTab);
-        int en = RouteBrowse::bandParams(editBand, keys, 8);
-        uint8_t editKey = (en > 0) ? keys[clamp(_matrixEditRow, 0, en - 1)] : 0;
-        bool editGlobal = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(editKey));
-        if (!editGlobal) {
-            int tn = key.track();
-            if (key.shiftModifier()) {
+    // T1-T8 move the cursor to that track's column (nav + edit). Shift+Tn = by-type spread:
+    // copy the cursor cell's depth to all eligible tracks sharing track n's engine.
+    // Membership is implicit (encoder depth: non-zero = member, 0 drops). Steps are unused here.
+    if (key.isTrack()) {
+        int tn = key.track();
+        if (key.shiftModifier() && _matrixEditActive) {
+            uint8_t keys[8];
+            auto editBand = RouteBrowse::Band(_tabEditorTab);
+            int en = RouteBrowse::bandParams(editBand, keys, 8);
+            uint8_t editKey = (en > 0) ? keys[clamp(_matrixEditRow, 0, en - 1)] : 0;
+            if (!Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(editKey))) {
+                int srcDepth = _matrixDraft.route.depthPct(_tabCol);
                 Track::TrackMode groupMode = _project.track(tn).trackMode();
-                bool anyMember = false;
                 for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
                     if (_project.track(t).trackMode() != groupMode) continue;
                     if (!tabCellEligible(_project.track(t), editKey)) continue;
-                    if (_matrixDraft.route.tracks() & (1 << t)) anyMember = true;
-                }
-                for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
-                    if (_project.track(t).trackMode() != groupMode) continue;
-                    if (!tabCellEligible(_project.track(t), editKey)) continue;
-                    if (anyMember) {
-                        _matrixDraft.route.setTracks(_matrixDraft.route.tracks() & ~(1 << t));
-                        _matrixDraft.route.setDepthPct(t, 0);
-                    } else {
+                    _matrixDraft.route.setDepthPct(t, srcDepth);
+                    if (srcDepth != 0) {
                         _matrixDraft.route.setTracks(_matrixDraft.route.tracks() | (1 << t));
+                    } else {
+                        _matrixDraft.route.setTracks(_matrixDraft.route.tracks() & ~(1 << t));
                     }
                 }
-            } else if (tabCellEligible(_project.track(tn), editKey)) {
-                if (_matrixDraft.route.tracks() & (1 << tn)) {
-                    _matrixDraft.route.setTracks(_matrixDraft.route.tracks() & ~(1 << tn));
-                    _matrixDraft.route.setDepthPct(tn, 0);
-                } else {
-                    _matrixDraft.route.setTracks(_matrixDraft.route.tracks() | (1 << tn));
-                }
             }
+        } else {
+            _tabCol = tn;
         }
         event.consume();
         return;

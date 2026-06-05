@@ -266,3 +266,12 @@ F-slot are **dropped from the matrix** (matrix footer = **VIEW · — · COMBINE
 The param door still uses the picker (its `src ›` field). **Source abbreviations:** `IN1-4` CV inputs
 (renamed from CV1-4), `O1-8` CV outputs, `B1-4` bus, `G1-8` gate outs, `M1-8` modulators — unified
 in one shared abbreviator used by both the matrix and the param-door row.
+
+**2026-06-05 — matrix buttons: T = column, depth = membership; supersedes §5's T-toggle.** §5 put
+cursor-column nav on the step buttons and made T1-T8 toggle membership — backwards, since the
+columns ARE the tracks. New mapping: **T1-T8 = move the cursor to that track's column** (nav and
+edit); **membership is implicit** — dialing a cell's depth adds that track to the modulation, dial
+to 0 drops it (no explicit toggle); **Shift+Tn = by-type spread** — copy the cursor cell's depth to
+all eligible tracks sharing track n's engine. The **step buttons are freed** in the matrix.
+Nav/edit is the **F2 EDIT** toggle (lit in footer when editing). Encoder = cursor row (nav) /
+cursor-cell depth or row source (edit). This supersedes §5's "T1-T8 toggle columns into the row".
