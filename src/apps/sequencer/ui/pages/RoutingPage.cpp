@@ -4,6 +4,7 @@
 #include "ui/pages/Pages.h"
 
 #include "model/RouteBrowse.h"
+#include "model/RouteDraft.h"
 #include "model/RouteFork.h"
 #include "model/ParamTableGlobal.h"
 #include "model/ParamTableNote.h"
@@ -11,39 +12,6 @@
 #include "ui/model/ListModel.h"
 
 namespace {
-
-// QuickEdit adapter for a route's unified depth: big centered readout + LED ring
-// (mirrors GeneratorContextQuickEditModel). Edits all tracks held equal, live on the
-// committed route the engine reads.
-class RouteDepthQuickEditModel : public ListModel {
-public:
-    void configure(Routing::Route *route) { _route = route; }
-    int rows() const override { return 1; }
-    int columns() const override { return 2; }
-    void cell(int row, int column, StringBuilder &str) const override {
-        if (row != 0 || !_route) return;
-        if (column == 0) str("DEPTH");
-        else str("%+d%%", _route->depthPct(0));
-    }
-    void edit(int row, int column, int value, bool shift) override {
-        if (row != 0 || column != 1 || !_route) return;
-        setAll(clamp(_route->depthPct(0) + value * (shift ? 10 : 1), -100, 100));
-    }
-    int indexedCount(int) const override { return 16; }
-    int indexed(int) const override {
-        return _route ? clamp((_route->depthPct(0) + 100) * 15 / 200, 0, 15) : -1;
-    }
-    void setIndexed(int, int index) override {
-        if (_route) setAll(clamp(index * 200 / 15 - 100, -100, 100));
-    }
-private:
-    void setAll(int d) {
-        for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) _route->setDepthPct(t, d);
-    }
-    Routing::Route *_route = nullptr;
-};
-
-RouteDepthQuickEditModel gRouteDepthQuickEditModel;
 
 // Inert ListModel for the ListPage base: RoutingPage draws/edits only via the tab
 // editor. routingTarget defaults to None, so the inline-modulation machinery never
@@ -67,12 +35,14 @@ EmptyListModel gEmptyListModel;
 #include <cstring>
 
 enum class Function {
-    Prev    = 0,
-    Next    = 1,
-    Init    = 2,
-    Learn   = 3,
+    View    = 0,
+    Src     = 1,
+    Combine = 2,
+    Cancel  = 3,
     Commit  = 4,
 };
+
+static bool tabCellEligible(const Track &track, uint8_t paramKey);
 
 RoutingPage::RoutingPage(PageManager &manager, PageContext &context) :
     ListPage(manager, context, gEmptyListModel)
@@ -90,6 +60,9 @@ void RoutingPage::enter() {
 }
 
 void RoutingPage::exit() {
+    if (_matrixEditActive) {            // discard an in-flight draft (frees a new slot)
+        matrixExitEdit(false);
+    }
     _engine.midiLearn().stop();
 
     ListPage::exit();
@@ -104,7 +77,27 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
 }
 
 void RoutingPage::encoder(EncoderEvent &event) {
-    int n = tabBandParamCount();         // move the row cursor, re-point to that param's route
+    if (_matrixEditActive) {                // edit mode: dial the cursor cell's draft depth
+        auto band = RouteBrowse::Band(_tabEditorTab);
+        bool global = band == RouteBrowse::Band::Global;
+        const Track &track = _project.track(_tabCol);
+        uint8_t paramKey = 0;
+        {
+            uint8_t keys[8];
+            int n = RouteBrowse::bandParams(band, keys, 8);
+            paramKey = (n > 0) ? keys[clamp(_tabEditorRow, 0, n - 1)] : 0;
+        }
+        if (tabCellEligible(track, paramKey)) {   // only eligible cells are editable
+            int slot = global ? 0 : _tabCol;
+            _matrixDraft.route.setDepthPct(slot, clamp(_matrixDraft.route.depthPct(slot) + event.value(), -100, 100));
+            if (!global) {
+                _matrixDraft.route.setTracks(_matrixDraft.route.tracks() | (1 << _tabCol));
+            }
+        }
+        event.consume();
+        return;
+    }
+    int n = tabBandParamCount();         // nav: move the row cursor, re-point to that param's route
     _tabEditorRow = clamp(_tabEditorRow + event.value(), 0, n - 1);
     tabRefocus();
     event.consume();
@@ -135,47 +128,45 @@ int RoutingPage::tabBandParamCount() const {
     return RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
 }
 
-// Create a route for the cursor's band param at the editor scope. Allocates an empty
-// slot, sets target (from the band key) + tracks (scope, or the selected track if the
-// scope is global but the band is per-track) + a default CV1 source, then focuses it
-// in edit mode so the encoder dials depth immediately.
-void RoutingPage::tabCreateRoute() {
+// Enter edit on the cursor row. Routed row -> begin() copies the live route into the
+// draft; empty row -> create() reserves an inert slot (source None, depth 0). The live
+// route is untouched until COMMIT; the staged draft is what the grid renders and edits.
+void RoutingPage::matrixEnterEdit() {
     uint8_t keys[8];
-    int n = RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
+    auto band = RouteBrowse::Band(_tabEditorTab);
+    int n = RouteBrowse::bandParams(band, keys, 8);
     if (n == 0) return;
     uint8_t key = keys[clamp(_tabEditorRow, 0, n - 1)];
     Routing::Target target = RouteBrowse::paramKeyToTarget(key);
     if (target == Routing::Target::None) return;
 
-    int slot = _project.routing().findEmptyRoute();
-    if (slot < 0) { showMessage("NO EMPTY ROUTES"); return; }
-
-    Routing::Route route;
-    route.clear();
-    route.setTarget(target);
-    if (Routing::isPerTrackTarget(target)) {
-        uint8_t mask = _tabScopeMask ? _tabScopeMask : uint8_t(1 << _project.selectedTrackIndex());
-        route.setTracks(mask);
+    auto &routing = _project.routing();
+    if (_tabRowRouted && _route) {
+        _matrixDraft = RouteDraft::begin(routing, _routeIndex);
+    } else {
+        _matrixDraft = RouteDraft::create(routing, target, _tabCol);
+        if (_matrixDraft.routeIndex < 0) {
+            showMessage("NO EMPTY ROUTES");
+            return;
+        }
     }
-    route.setSource(Routing::Source::CvIn1);
-    for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
-        route.setDepthPct(t, 0);   // silent until the user dials depth (edit mode opens here)
-    }
+    _matrixEditActive = true;
+    _matrixEditRow = _tabEditorRow;
+}
 
-    // reject if the new route collides with an existing one (same guard as commit)
-    int conflict = _project.routing().checkRouteConflict(route, route);
-    if (conflict >= 0) {
-        showMessage(FixedStringBuilder<64>("CONFLICT WITH ROUTE %d", conflict + 1));
-        return;
+// Leave edit. commit=true writes the draft live (caller gates on canCommit); false
+// reverts (frees a freshly-allocated slot). Either way return to nav and clear state.
+void RoutingPage::matrixExitEdit(bool commit) {
+    auto &routing = _project.routing();
+    if (commit) {
+        RouteDraft::commit(routing, _matrixDraft);
+    } else {
+        RouteDraft::cancel(routing, _matrixDraft);
     }
-
-    _project.routing().route(slot) = route;
-    _route = &_project.routing().route(slot);
-    _routeIndex = slot;
-    _tabRowRouted = true;
-    // open the depth modal so the encoder dials the new route's depth up from 0
-    gRouteDepthQuickEditModel.configure(_route);
-    _manager.pages().quickEdit.show(gRouteDepthQuickEditModel, 0);
+    _matrixEditActive = false;
+    _matrixEditRow = -1;
+    _matrixDraft = RouteDraft::Draft();
+    tabRefocus();
 }
 
 // Point _route at the cursor row's committed route, if that param is routed at the
@@ -186,7 +177,15 @@ void RoutingPage::tabRefocus() {
     int n = RouteBrowse::bandParams(RouteBrowse::Band(_tabEditorTab), keys, 8);
     _tabEditorRow = clamp(_tabEditorRow, 0, (n > 0 ? n - 1 : 0));
     _tabCol = clamp(_tabCol, 0, CONFIG_TRACK_COUNT - 1);
-    int routeIdx = (n > 0) ? routeForBandParam(keys[_tabEditorRow], _tabScopeMask) : -1;
+    // A matrix row = one route for the param across its tracks. Resolve it track-
+    // agnostically: per-track params match any track (0xFF), globals match scope 0.
+    int routeIdx = -1;
+    if (n > 0) {
+        uint8_t paramKey = keys[_tabEditorRow];
+        Routing::Target target = RouteBrowse::paramKeyToTarget(paramKey);
+        uint8_t lookupMask = Routing::isPerTrackTarget(target) ? 0xFF : 0;
+        routeIdx = routeForBandParam(paramKey, lookupMask);
+    }
     if (routeIdx >= 0) {
         _route = &_project.routing().route(routeIdx);
         _routeIndex = routeIdx;
@@ -200,7 +199,9 @@ void RoutingPage::enterTabEditor() {
     _tabEditorTab = 0;
     _tabEditorRow = 0;
     _tabCol = clamp(_project.selectedTrackIndex(), 0, CONFIG_TRACK_COUNT - 1);
-    _tabScopeMask = 0;   // global scope by default
+    _matrixEditActive = false;
+    _matrixEditRow = -1;
+    _matrixDraft = RouteDraft::Draft();
     tabRefocus();
 }
 
@@ -259,12 +260,15 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     }
 
     // param rows: name in the gutter (cursor row bright), then 8 cells. Per cell:
-    //   '-' ineligible, '.' eligible+unrouted, depth number when routed.
+    //   '-' ineligible, '.' eligible+unrouted, depth number when routed. The active
+    //   draft row reads staged depths from _matrixDraft so edits show before commit.
     const int top = 20, rowH = 8;
     for (int r = 0; r < n; ++r) {
         int y = top + r * rowH;
         uint8_t key = keys[r];
         bool cursorRowSel = r == cursorRow;
+        bool draftRow = _matrixEditActive && r == _matrixEditRow;
+        bool globalKey = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(key));
         canvas.setColor(cursorRowSel ? Color::Bright : Color::Medium);
         canvas.drawText(2, y + 6, bandParamName(band, key));
         for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
@@ -276,11 +280,19 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
                 canvas.drawText(cx - 2, y + 6, "-");
                 continue;
             }
-            uint8_t scopeMask = Routing::isProjectTarget(RouteBrowse::paramKeyToTarget(key))
-                ? 0 : uint8_t(1 << t);
-            int routeIdx = routeForBandParam(key, scopeMask);
-            if (routeIdx >= 0) {
-                FixedStringBuilder<6> txt("%+d", _project.routing().route(routeIdx).depthPct(t));
+            bool routed; int depth;
+            if (draftRow) {
+                int slot = globalKey ? 0 : t;
+                routed = globalKey || (_matrixDraft.route.tracks() & (1 << t));
+                depth = _matrixDraft.route.depthPct(slot);
+            } else {
+                uint8_t scopeMask = globalKey ? 0 : uint8_t(1 << t);
+                int routeIdx = routeForBandParam(key, scopeMask);
+                routed = routeIdx >= 0;
+                depth = routed ? _project.routing().route(routeIdx).depthPct(t) : 0;
+            }
+            if (routed) {
+                FixedStringBuilder<6> txt("%+d", depth);
                 canvas.setColor(isCursor ? Color::Bright : Color::Medium);
                 canvas.drawText(cx - canvas.textWidth(txt) / 2, y + 6, txt);
             } else {
@@ -290,49 +302,73 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
         }
     }
 
-    const char *fn[] = { "BACK", _tabRowRouted ? "COMBINE" : nullptr, _tabRowRouted ? "SRC" : nullptr, nullptr, nullptr };
+    bool canCommit = _matrixEditActive && RouteDraft::canCommit(_matrixDraft);
+    const char *fn[] = { "VIEW", "SRC", "COMBINE", "CANCEL", canCommit ? "COMMIT" : nullptr };
     WindowPainter::drawFooter(canvas, fn, pageKeyState());
 }
 
 void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
     const auto &key = event.key();
+
+    // S1-S8 pick the cursor column in both nav and edit (clamped to track count).
+    if (key.isStep() && key.step() < CONFIG_TRACK_COUNT) {
+        _tabCol = key.step();
+        event.consume();
+        return;
+    }
+
     if (key.isLeft() || key.isRight()) {
+        // leaving the row discards an uncommitted draft, then switches band
+        if (_matrixEditActive) {
+            matrixExitEdit(false);
+        }
         _tabEditorTab = (_tabEditorTab + (key.isLeft() ? 3 : 1)) % 4;
         _tabEditorRow = 0;
         tabRefocus();
         event.consume();
         return;
     }
+
     if (key.isEncoder()) {
-        if (_tabRowRouted) {            // routed row: open the depth quick-edit modal (live)
-            gRouteDepthQuickEditModel.configure(_route);
-            _manager.pages().quickEdit.show(gRouteDepthQuickEditModel, 0);
+        if (_matrixEditActive) {
+            matrixExitEdit(false);      // press in edit = cancel back to nav
         } else {
-            tabCreateRoute();           // empty row: create a route here
+            matrixEnterEdit();          // press in nav = enter edit on the cursor row
         }
         event.consume();
         return;
     }
+
     if (key.isFunction()) {
         switch (Function(key.function())) {
-        case Function::Prev: // BACK: leave the routing page (edits are live, nothing to save)
-            _manager.pop();
+        case Function::View: // no-op until the cell-view cycle lands
             break;
-        case Function::Next: // COMBINE: toggle Modulate <-> Absolute on the focused route (live)
-            if (_tabRowRouted && _route) {
-                _route->setCombine(_route->combine() == RouteApply::Combine::Absolute
-                                   ? RouteApply::Combine::Modulate : RouteApply::Combine::Absolute);
-            }
-            break;
-        case Function::Init: // SRC: pick the focused route's source (live on confirm)
-            if (_tabRowRouted && _route) {
-                Routing::Route *route = _route;
-                _manager.pages().routeSourceSelect.show(route->target(), route->source(),
-                    [route] (bool ok, Routing::Source source) {
-                        if (ok) {
-                            route->setSource(source);
+        case Function::Src: // pick the draft's source (staged, applied on confirm)
+            if (_matrixEditActive) {
+                Routing::Target target = _matrixDraft.route.target();
+                _manager.pages().routeSourceSelect.show(target, _matrixDraft.route.source(),
+                    [this] (bool ok, Routing::Source source) {
+                        if (ok && source != Routing::Source::None && _matrixEditActive) {
+                            _matrixDraft.route.setSource(source);
                         }
                     });
+            }
+            break;
+        case Function::Combine: // toggle Modulate <-> Absolute on the draft
+            if (_matrixEditActive) {
+                _matrixDraft.route.setCombine(
+                    _matrixDraft.route.combine() == RouteApply::Combine::Absolute
+                        ? RouteApply::Combine::Modulate : RouteApply::Combine::Absolute);
+            }
+            break;
+        case Function::Cancel: // discard the draft, back to nav
+            if (_matrixEditActive) {
+                matrixExitEdit(false);
+            }
+            break;
+        case Function::Commit: // write the draft live (gated on canCommit)
+            if (_matrixEditActive && RouteDraft::canCommit(_matrixDraft)) {
+                matrixExitEdit(true);
             }
             break;
         default:

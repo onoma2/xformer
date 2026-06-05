@@ -88,8 +88,13 @@ Per-row draft/commit via `RouteDraft`; footer F1 VIEW · F2 SRC · F3 COMBINE ·
       (cell+header+rowname, fillRect + left tab bar removed), band header + DEPTH + MODULATE.
       `_tabCol` column cursor (default=current track, no nav yet). Track-letter helper unified into
       `Track::trackModeLetter` (RoutingPage + ListPage). +468 B. STM32-green, Codex ALLOW.
-- [ ] **5c** — cursor nav (row × track col) + cursor-cell depth edit into a per-row `RouteDraft`;
-      F5 COMMIT / F4 CANCEL; per-row F2 SRC / F3 COMBINE.
+- [x] **5c** — matrix editing (spec §15 nav: **S1-S8 = column, encoder = row/depth, press = toggle
+      nav↔edit**): per-row `RouteDraft` member on RoutingPage; routed row→begin (any-track lookup
+      `0xFF`/global `0`), unrouted→create; cursor-cell depth + mask merge; F2 SRC / F3 COMBINE / F4
+      CANCEL / F5 COMMIT; draft-aware draw. Removed old depth-modal + tabCreateRoute +
+      gRouteDepthQuickEditModel + _tabScopeMask. Global band = single slot-0 value. STM32-green,
+      Codex ALLOW (1 BLOCK fixed: per-track routed-cell duplicate). Residual: multiple disjoint
+      per-track routes for one target → lookup returns first (pre-existing param-door artifact).
 - [ ] **5d** — scope: T1–T8 toggle columns into the focused row; Shift+Tn = by-type; by-type underline.
 - [ ] **5e** — F1 VIEW cycles depth↔source (cells show source abbrev in source view; shaper deferred).
 - [ ] **5f** — REMOVE clears the focused row's modulation.

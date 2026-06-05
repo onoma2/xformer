@@ -246,3 +246,14 @@ evolves into it). No new gesture, no new page, no menu slot; reuses the existing
 This finally makes §8 true on hardware (legacy RouteListModel gone) and reclaims ~4-5 KB flash.
 The matrix grid uses the param-door's draft/commit + F4=CANCEL convention (§15 above): footer
 **F1 VIEW · F2 SRC · F3 COMBINE · F4 CANCEL · F5 COMMIT**, per-row draft via `RouteDraft`.
+
+**2026-06-05 — matrix cursor navigation (§5 didn't specify it).** §5 spent the controls on bands
+(Left/Right), membership (T1-T8 / Shift+Tn), depth (encoder), and the F-keys — leaving no cursor
+nav. Owner decision: **Steps S1–S8 = cursor column** (the 8 step buttons map to the 8 track
+columns; direct jump); **encoder = cursor row** in nav mode; **encoder press = toggle nav↔edit**;
+in edit mode **encoder = the cursor cell's depth** (staged into the row's `RouteDraft`), S1–S8
+still move the cursor cell within the row. **F5 COMMIT** writes the row draft→live + exits to nav;
+**F4 CANCEL** (or press-out) reverts + exits. Editing is **per-row** (one draft per param-row =
+one modulation across its tracks); a cell edit sets `depthPct[col]` + adds `col` to the row's mask.
+Entering edit on an unrouted row creates a draft (source None, depth 0) à la the param door; F2 SRC
+sets the source, source required to COMMIT. This replaces the tab editor's live depth-modal editing.
