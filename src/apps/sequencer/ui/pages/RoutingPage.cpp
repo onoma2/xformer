@@ -301,12 +301,22 @@ void RoutingPage::drawTabEditor(Canvas &canvas) {
     WindowPainter::clear(canvas);
     canvas.setFont(Font::Tiny);
 
-    // header: band name bright, view tag dim, MODULATE dim far right
+    // header: band name bright, view tag dim, combine state (F3) far right
     canvas.setColor(Color::Bright);
     canvas.drawText(2, 7, tabs[_tabEditorTab]);
     canvas.setColor(Color::Medium);
     canvas.drawText(40, 7, _matrixView == MatrixView::Source ? "SOURCE" : "DEPTH");
-    canvas.drawText(CONFIG_LCD_WIDTH - canvas.textWidth("MODULATE") - 2, 7, "MODULATE");
+    {
+        RouteApply::Combine cb = RouteApply::Combine::Modulate;
+        bool show = false;
+        if (_matrixEditActive) { cb = _matrixDraft.route.combine(); show = true; }
+        else if (_tabRowRouted && _route) { cb = _route->combine(); show = true; }
+        if (show) {
+            const char *cbStr = cb == RouteApply::Combine::Absolute ? "ABSOLUTE" : "MODULATE";
+            canvas.setColor(_matrixEditActive ? Color::Bright : Color::Medium);
+            canvas.drawText(CONFIG_LCD_WIDTH - canvas.textWidth(cbStr) - 2, 7, cbStr);
+        }
+    }
     canvas.setColor(Color::Low);
     canvas.hline(0, 10, CONFIG_LCD_WIDTH);
 
