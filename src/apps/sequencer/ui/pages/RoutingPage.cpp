@@ -72,6 +72,11 @@ void RoutingPage::draw(Canvas &canvas) {
 }
 
 void RoutingPage::keyPress(KeyPressEvent &event) {
+    // Page+key belongs to TopPage (mode switch; Page+Routing again -> Modulator). Don't let
+    // the matrix's T/step/function handlers consume it, or you can't leave the routing page.
+    if (event.key().pageModifier()) {
+        return;
+    }
     handleTabEditorKey(event);
 }
 
