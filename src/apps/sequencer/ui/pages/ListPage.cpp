@@ -179,7 +179,7 @@ void ListPage::keyPress(KeyPressEvent &event) {
             }
             _manager.pages().routeSourceSelect.show(
                 _listModel->routingTarget(_selectedRow), gModDraft.route.source(),
-                [this] (bool ok, Routing::Source picked) {
+                [] (bool ok, Routing::Source picked) {
                     if (ok && picked != Routing::Source::None && gModEditActive) {
                         gModDraft.route.setSource(picked);
                     }
@@ -393,7 +393,7 @@ void ListPage::beginNewModulation(Routing::Target target, int trackIndex) {
     _edit = true;
     _manager.pages().routeSourceSelect.show(
         target, gModDraft.route.source(),
-        [this] (bool ok, Routing::Source picked) {
+        [] (bool ok, Routing::Source picked) {
             if (ok && picked != Routing::Source::None && gModEditActive) {
                 gModDraft.route.setSource(picked);
             }
