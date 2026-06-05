@@ -128,10 +128,14 @@ void ListPage::draw(Canvas &canvas) {
     for (int i = 0; i < LineCount; ++i) {
         int row = displayRow + i;
         if (row < _listModel->rows()) {
-            drawCell(canvas, row, 0, 8, 12 + i * LineHeight, 128 - 16, LineHeight);
-            drawCell(canvas, row, 1, 128, 12 + i * LineHeight, 128 - 16, LineHeight);
-            if (row == _selectedRow) {
-                drawModulatedRow(canvas, row, 12 + i * LineHeight);
+            int ry = 12 + i * LineHeight;
+            drawCell(canvas, row, 0, 8, ry, 128 - 16, LineHeight);
+            int ri;
+            if (row == _selectedRow && modulatedRow(row, ri)) {
+                // modulated row owns the value column too (src › bar value), no default value
+                drawModulatedRow(canvas, row, ry);
+            } else {
+                drawCell(canvas, row, 1, 128, ry, 128 - 16, LineHeight);
             }
         }
     }
@@ -453,11 +457,27 @@ void ListPage::drawModulatedRow(Canvas &canvas, int row, int y) {
     printSourceAbbrev(src, srcStr);
     canvas.setFont(Font::Small);
     canvas.setBlendMode(BlendMode::Set);
+
+    // value (effective param value) right-aligned at the far edge, before the scrollbar
+    FixedStringBuilder<16> valStr;
+    _listModel->cell(row, 1, valStr);
+    int valX = Width - 10 - canvas.textWidth(valStr);
+    bool valueFocus = gModEditActive && gModEditTarget == ModEditTarget::Value;
+
+    // source + arrow
     canvas.setColor(Color::Medium);
     canvas.drawText(78, y + 7, srcStr);
     canvas.drawText(96, y + 7, ">");
 
-    drawDepthBar(canvas, 104, y + 4, 92, depthPct, depthFocus);
+    // bipolar depth bar between the arrow and the value (never under the value)
+    int barX = 104;
+    int barEnd = valX - 4;
+    if (barEnd - barX > 8) {
+        drawDepthBar(canvas, barX, y + 4, barEnd - barX, depthPct, depthFocus);
+    }
+
+    canvas.setColor(valueFocus ? Color::Bright : Color::Medium);
+    canvas.drawText(valX, y + 7, valStr);
 }
 
 bool ListPage::trackEligible(int trackIndex) const {
