@@ -6,6 +6,8 @@
 #include "apps/sequencer/model/Routing.h"
 #include "apps/sequencer/model/RouteParamKey.h"
 
+#include <cmath>
+
 // Step 4 of the apply-fork slice: Note + PhaseFlux getters read clamp(base +
 // override) and edit-gate on override presence (not isRouted). The override table
 // is a static, so the engine writer is simulated here by driving it directly.
@@ -161,6 +163,23 @@ CASE("Curve rotate: signed base-anchored read + clamp (bipolar -64..64)") {
 
     Routing::clearRouteOverrides();
     expectEqual(track.rotate(), -10, "stale clear -> base restored");
+}
+
+// curveRate is the float/centi special case: stored 0.0..4.0, routed in the
+// 0..400 centi domain (override delta is centi), getter divides by 100.
+CASE("Curve curveRate: centi-domain override read + stale clear") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Curve);
+    auto &track = p.track(0).curveTrack();
+    track.setCurveRate(1.0f);                    // base 1.0 -> centi 100
+    expect(std::fabs(track.curveRate() - 1.0f) < 1e-4f, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::CurveRate, 0, 150.f);  // centi delta 150 -> 250
+    expect(std::fabs(track.curveRate() - 2.5f) < 1e-4f, "override -> (base + delta) / 100");
+
+    Routing::clearRouteOverrides();
+    expect(std::fabs(track.curveRate() - 1.0f) < 1e-4f, "stale clear -> base restored");
 }
 
 } // UNIT_TEST

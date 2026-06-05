@@ -204,15 +204,13 @@ public:
 
     // curveRate (speed multiplier: 0.0 = stop, 1.0 = normal, 4.0 = 4x)
 
-    float curveRate() const { return _curveRate.get(isRouted(Routing::Target::CurveRate)); }
+    float curveRate() const { return Routing::routedValueInt(ParamKey::CurveRate, _trackIndex, int(std::lround(_curveRate.base * 100.f)), 0, 400) / 100.f; }
     void setCurveRate(float curveRate, bool routed = false) {
         _curveRate.set(clamp(curveRate, 0.f, 4.f), routed);
     }
 
     void editCurveRate(int value, bool shift) {
-        if (!isRouted(Routing::Target::CurveRate)) {
-            setCurveRate(curveRate() + value * (shift ? 0.1f : 0.01f));
-        }
+        setCurveRate(_curveRate.base + value * (shift ? 0.1f : 0.01f));
     }
 
     void printCurveRate(StringBuilder &str) const {
