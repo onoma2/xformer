@@ -30,8 +30,9 @@ inline Draft create(Routing &routing, Routing::Target target, int trackIndex) {
     r.setTarget(target);
     r.setTracks(1 << trackIndex);
     r.setCombine(RouteApply::Combine::Modulate);
+    int initDepth = Routing::isInletTarget(target) ? 100 : 0;
     for (int t = 0; t < CONFIG_TRACK_COUNT; ++t) {
-        r.setDepthPct(t, 0);
+        r.setDepthPct(t, initDepth);
     }
     d.route = r;
     d.routeIndex = idx;

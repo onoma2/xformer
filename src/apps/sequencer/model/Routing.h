@@ -401,6 +401,12 @@ public:
         return target >= Target::DiscreteMapFirst && target <= Target::DiscreteMapLast;
     }
 
+    // Base-less inlet sinks: their getter reads routedValue(..., base 0, ...), so a depth-0
+    // route is silent. New inlet routes default to full depth instead. Sync is retired.
+    static bool isInletTarget(Target target) {
+        return target == Target::DiscreteMapInput || target == Target::DiscreteMapScanner;
+    }
+
     static bool isIndexedTarget(Target target) {
         return target >= Target::IndexedFirst && target <= Target::IndexedLast;
     }

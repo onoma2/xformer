@@ -21,6 +21,17 @@ UNIT_TEST("RouteDraft") {
         }
     }
 
+    CASE("create defaults inlet targets to full depth (base-0 sink)") {
+        Project project;
+        auto &routing = project.routing();
+        auto in = RouteDraft::create(routing, Routing::Target::DiscreteMapInput, 2);
+        expectEqual(in.route.depthPct(2), 100, "DMap Input current track depth 100");
+        auto sc = RouteDraft::create(routing, Routing::Target::DiscreteMapScanner, 0);
+        expectEqual(sc.route.depthPct(0), 100, "DMap Scanner current track depth 100");
+        auto tr = RouteDraft::create(routing, Routing::Target::Transpose, 2);
+        expectEqual(tr.route.depthPct(2), 0, "normal target current track depth 0");
+    }
+
     CASE("create returns routeIndex -1 when no empty slot") {
         Project project;
         auto &routing = project.routing();
