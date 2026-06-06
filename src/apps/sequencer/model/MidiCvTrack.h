@@ -192,13 +192,13 @@ public:
 
     // slideTime
 
-    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime.base, 0, 100); }
-    void setSlideTime(int slideTime, bool routed = false) {
-        _slideTime.set(clamp(slideTime, 0, 100), routed);
+    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime, 0, 100); }
+    void setSlideTime(int slideTime) {
+        _slideTime = clamp(slideTime, 0, 100);
     }
 
     void editSlideTime(int value, bool shift) {
-        setSlideTime(ModelUtils::adjustedByStep(_slideTime.base, value, 5, !shift));
+        setSlideTime(ModelUtils::adjustedByStep(_slideTime, value, 5, !shift));
     }
 
     void printSlideTime(StringBuilder &str) const {
@@ -208,13 +208,13 @@ public:
 
     // transpose
 
-    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -100, 100); }
-    void setTranspose(int transpose, bool routed = false) {
-        _transpose.set(clamp(transpose, -100, 100), routed);
+    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose, -100, 100); }
+    void setTranspose(int transpose) {
+        _transpose = clamp(transpose, -100, 100);
     }
 
     void editTranspose(int value, bool shift) {
-        setTranspose(_transpose.base + value);
+        setTranspose(_transpose + value);
     }
 
     void printTranspose(StringBuilder &str) const {
@@ -266,8 +266,8 @@ private:
     uint8_t _pitchBendRange;
     Types::VoltageRange _modulationRange;
     bool _retrigger;
-    Routable<uint8_t> _slideTime;
-    Routable<int8_t> _transpose;
+    uint8_t _slideTime;
+    int8_t _transpose;
     Arpeggiator _arpeggiator;
 
     friend class Track;

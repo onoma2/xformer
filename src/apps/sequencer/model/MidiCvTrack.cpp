@@ -72,8 +72,8 @@ void MidiCvTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_pitchBendRange);
     writer.write(_modulationRange);
     writer.write(_retrigger);
-    writer.write(_slideTime.base);
-    writer.write(_transpose.base);
+    writer.write(_slideTime);
+    writer.write(_transpose);
     _arpeggiator.write(writer);
 }
 
@@ -98,7 +98,7 @@ void MidiCvTrack::read(VersionedSerializedReader &reader) {
     reader.read(_pitchBendRange);
     reader.read(_modulationRange);
     reader.read(_retrigger);
-    reader.read(_slideTime.base, ProjectVersion::Version20);
-    reader.read(_transpose.base, ProjectVersion::Version21);
+    reader.read(_slideTime, ProjectVersion::Version20);
+    reader.read(_transpose, ProjectVersion::Version21);
     _arpeggiator.read(reader);
 }
