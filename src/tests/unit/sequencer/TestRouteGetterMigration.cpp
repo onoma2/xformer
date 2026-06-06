@@ -376,6 +376,28 @@ CASE("Stochastic contour: signed base-anchored read + clamp (bipolar -100..100)"
     expectEqual(seq.contour(), -20, "stale clear -> base restored");
 }
 
+// variation getter abs()'s the BASE before routedValueInt, so a magnitude
+// survives the clamp instead of a negative base collapsing to 0 then abs'ing
+// to 0. Negative-base legacy storage has no public setter (setVariation clamps
+// to 0..100), so the abs path is exercised via setBase on the field snapshot.
+CASE("Stochastic variation: negative base reads magnitude under route") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Stochastic);
+    auto &seq = p.track(0).stochasticTrack().sequence(0);
+    seq.setVariation(30);
+    StochasticSequence::ContentSnapshot snap;
+    seq.captureContentTo(snap);
+    snap.variation = -30;                            // simulate legacy signed storage
+    seq.restoreContentFrom(snap);
+
+    Routing::writeRouteOverride(ParamKey::Variation, 0, 0.f);
+    expectEqual(seq.variation(), 30, "abs(base) before clamp: -30 -> 30, not 0");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.variation(), 30, "stale clear -> magnitude preserved");
+}
+
 CASE("Stochastic scale: Default(-1) preserved unrouted, clamps to 0..23 under route") {
     Routing::clearRouteOverrides();
     Project p;

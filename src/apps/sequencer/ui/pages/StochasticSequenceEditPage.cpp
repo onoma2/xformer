@@ -656,20 +656,20 @@ void StochasticSequenceEditPage::editLiveStep(int step, int value, bool shift) {
     //              14=REPT                                          (repeat — standalone)
     //              15=BRAT                                          (burst — bottom-right)
     switch (step) {
-    case 0:  seq.setNoteDuration(seq.noteDuration() + value);        notifyStochasticShapingEdit(); break;
-    case 1:  seq.setVariation(seq.variation() + v);                  notifyStochasticShapingEdit(); break;
-    case 2:  seq.setRest(seq.rest() + v); break;
-    case 3:  seq.setFeel(seq.feel() + v);                            notifyStochasticShapingEdit(); break;
-    case 4:  seq.setGateLength(seq.gateLength() + v);                notifyStochasticShapingEdit(); break;
+    case 0:  seq.setNoteDuration(seq.noteDurationBase() + value);    notifyStochasticShapingEdit(); break;
+    case 1:  seq.setVariation(seq.variationBase() + v);              notifyStochasticShapingEdit(); break;
+    case 2:  seq.setRest(seq.restBase() + v); break;
+    case 3:  seq.setFeel(seq.feelBase() + v);                        notifyStochasticShapingEdit(); break;
+    case 4:  seq.setGateLength(seq.gateLengthBase() + v);            notifyStochasticShapingEdit(); break;
     case 5:  seq.setLegatoProb(seq.legatoProb() + v);                notifyStochasticShapingEdit(); break;
-    case 6:  seq.setBurst(seq.burst() + v);                          notifyStochasticShapingEdit(); break;
+    case 6:  seq.setBurst(seq.burstBase() + v);                      notifyStochasticShapingEdit(); break;
     case 7:  seq.setBurstCount(seq.burstCount() + v);                notifyStochasticShapingEdit(); break;
-    case 8:  seq.setComplexity(seq.complexity() + v);                notifyStochasticShapingEdit(); break;
-    case 9:  seq.setContour(seq.contour() + v);                      notifyStochasticShapingEdit(); break;
+    case 8:  seq.setComplexity(seq.complexityBase() + v);            notifyStochasticShapingEdit(); break;
+    case 9:  seq.setContour(seq.contourBase() + v);                  notifyStochasticShapingEdit(); break;
     case 10: seq.setMarblesBias(seq.marblesBias() + v);              notifyStochasticShapingEdit(); break;
     case 11: seq.setMarblesSpread(seq.marblesSpread() + v);          notifyStochasticShapingEdit(); break;
     case 12: seq.setRange(seq.range() + (shift ? value * 10 : value)); notifyStochasticShapingEdit(); break;
-    case 13: seq.setSlide(seq.slide() + v);                          notifyStochasticShapingEdit(); break;
+    case 13: seq.setSlide(seq.slideBase() + v);                      notifyStochasticShapingEdit(); break;
     case 14: seq.setRepeatProb(seq.repeatProb() + v); break;
     case 15: seq.setBurstRate(seq.burstRate() + v);                  notifyStochasticShapingEdit(); break;
     }
@@ -704,21 +704,21 @@ void StochasticSequenceEditPage::editLoopStep(int step, int value, bool shift) {
     int v = shift ? value * 10 : value;
     switch (step) {
     // Top row — patience (split per domain), mutation, walk, sleep
-    case 0: seq.setPatienceRhythm(seq.patienceRhythm() + v); break;
+    case 0: seq.setPatienceRhythm(seq.patienceRhythmBase() + v); break;
     case 1: seq.setPatienceMelody(seq.patienceMelody() + v); break;
-    case 2: seq.setMutate(seq.mutate() + v); break;
-    case 3: seq.setJump(seq.jump() + v); break;
-    case 4: seq.setSleep(seq.sleep() + v); break;
+    case 2: seq.setMutate(seq.mutateBase() + v); break;
+    case 3: seq.setJump(seq.jumpBase() + v); break;
+    case 4: seq.setSleep(seq.sleepBase() + v); break;
     // Bottom row — loop window / shape params (green LEDs)
     case 8:  seq.setFirst(seq.first() + value);   notifyStochasticWindowEdit(); break;
     case 9:  seq.setSize(seq.size() + value);     notifyStochasticWindowEdit(); break;
-    case 10: seq.setRotate(seq.rotate() + value); break;   // rotation doesn't move window bounds
+    case 10: seq.setRotate(seq.rotateBase() + value); break;   // rotation doesn't move window bounds
     // Top row last two — MaskM + TiltM (pitch-centrality filter, LoopM-only)
     case 6: seq.setMaskMelody(seq.maskMelody() + v); break;
     case 7: seq.setTiltMelody(seq.tiltMelody() + v); break;
     // Bottom row last two — MaskR + TiltR (rhythm density filter, LoopR-only)
-    case 14: seq.setMaskRhythm(seq.maskRhythm() + v); break;
-    case 15: seq.setTiltRhythm(seq.tiltRhythm() + v); break;
+    case 14: seq.setMaskRhythm(seq.maskRhythmBase() + v); break;
+    case 15: seq.setTiltRhythm(seq.tiltRhythmBase() + v); break;
     }
 }
 

@@ -146,9 +146,11 @@ public:
     }
 
     int complexity() const { return Routing::routedValueInt(ParamKey::Complexity, _trackIndex, _complexity.base, 0, 100); }
+    int complexityBase() const { return _complexity.base; }
     void setComplexity(int complexity, bool routed = false) { _complexity.set(clamp(complexity, 0, 100), routed); }
 
     int contour() const { return Routing::routedValueInt(ParamKey::Contour, _trackIndex, _contour.base, -100, 100); }
+    int contourBase() const { return _contour.base; }
     void setContour(int contour, bool routed = false) { _contour.set(clamp(contour, -100, 100), routed); }
 
     // Phase 12: _repeatProb field repurposed as Repeat probability. Per-event
@@ -161,18 +163,22 @@ public:
     // Live-mode duration LUT entry index 0..7. Divisor-relative: see
     // StochasticTrackEngine::getDurationFraction() for the multiplier table.
     int noteDuration() const { return Routing::routedValueInt(ParamKey::NoteDuration, _trackIndex, _noteDuration.base, 0, 7); }
+    int noteDurationBase() const { return _noteDuration.base; }
     void setNoteDuration(int v, bool routed = false) { _noteDuration.set(clamp(v, 0, 7), routed); }
 
     // Phase 11: storage may be signed (legacy patches); read always returns |v|.
-    int variation() const { int v = Routing::routedValueInt(ParamKey::Variation, _trackIndex, _variation.base, 0, 100); return v < 0 ? -v : v; }
+    int variation() const { int b = _variation.base; return Routing::routedValueInt(ParamKey::Variation, _trackIndex, b < 0 ? -b : b, 0, 100); }
+    int variationBase() const { int b = _variation.base; return b < 0 ? -b : b; }
     // Phase 11: variation is symmetric (sign meaningless). New writes clamp to
     // [0, 100]. Legacy patches with negative storage get abs()'d at getter.
     void setVariation(int variation, bool routed = false) { _variation.set(clamp(variation, 0, 100), routed); }
 
     int rest() const { return Routing::routedValueInt(ParamKey::Rest, _trackIndex, _rest.base, 0, 100); }
+    int restBase() const { return _rest.base; }
     void setRest(int rest, bool routed = false) { _rest.set(clamp(rest, 0, 100), routed); }
 
     int slide() const { return Routing::routedValueInt(ParamKey::Slide, _trackIndex, _slide.base, 0, 100); }
+    int slideBase() const { return _slide.base; }
     void setSlide(int slide, bool routed = false) { _slide.set(clamp(slide, 0, 100), routed); }
 
     int burstRate() const { return _burstRate; }
@@ -185,18 +191,21 @@ public:
     void setBurstHold(StochasticBurstHold pitch) { _burstHold = ModelUtils::clampedEnum(pitch); }
 
     int sleep() const { return Routing::routedValueInt(ParamKey::Sleep, _trackIndex, _sleep.base, 0, 100); }
+    int sleepBase() const { return _sleep.base; }
     void setSleep(int sleep, bool routed = false) { _sleep.set(clamp(sleep, 0, 100), routed); }
 
 
     // mutate — probability 0..100 that one randomly-picked step inside the
     // active window gets destructively re-rolled at each cycle-end. Unipolar.
     int mutate() const { return Routing::routedValueInt(ParamKey::Mutate, _trackIndex, _mutate.base, 0, 100); }
+    int mutateBase() const { return _mutate.base; }
     // Bipolar: -100..0 = Proteus destructive (regenerate one event), 0 = lock,
     // 0..+100 = Marbles permutation (swap two existing events). Magnitude is
     // probability per loop iteration.
     void setMutate(int mutate, bool routed = false) { _mutate.set(clamp(mutate, 0, 100), routed); }
 
     int jump() const { return Routing::routedValueInt(ParamKey::Jump, _trackIndex, _jump.base, 0, 100); }
+    int jumpBase() const { return _jump.base; }
     void setJump(int jump, bool routed = false) { _jump.set(clamp(jump, 0, 100), routed); }
 
     // Range — bipolar field width / jump-chance knob, 0..100 centered at 50.
@@ -257,6 +266,7 @@ public:
     int patienceMelody() const { return _patienceMelody; }
     void setPatienceMelody(int value) { _patienceMelody = clamp(value, 0, 100); }
     int patienceRhythm() const { return Routing::routedValueInt(ParamKey::PatienceRhythm, _trackIndex, _patienceRhythm.base, 0, 100); }
+    int patienceRhythmBase() const { return _patienceRhythm.base; }
     void setPatienceRhythm(int value, bool routed = false) { _patienceRhythm.set(clamp(value, 0, 100), routed); }
 
     // degreeRotation
@@ -287,6 +297,7 @@ public:
 
     // maskRhythm (deterministic loop playback thinning, V5 rename from density)
     int maskRhythm() const { return Routing::routedValueInt(ParamKey::MaskRhythm, _trackIndex, _maskRhythm.base, 0, 100); }
+    int maskRhythmBase() const { return _maskRhythm.base; }
     void setMaskRhythm(int value, bool routed = false) { _maskRhythm.set(clamp(value, 0, 100), routed); }
 
     // gateLength — repurposed from the Phase 11 `_gateLength` reserved field. Knob
@@ -297,16 +308,19 @@ public:
     // Routing target keeps the legacy `StochasticGeneratorDensity` enum name
     // for save-file compatibility; UI label changes to "Gate Length".
     int gateLength() const { return Routing::routedValueInt(ParamKey::StochasticGateLength, _trackIndex, _gateLength.base, 0, 100); }
+    int gateLengthBase() const { return _gateLength.base; }
     void setGateLength(int value, bool routed = false) { _gateLength.set(clamp(value, 0, 100), routed); }
 
     // tiltRhythm — paired with maskRhythm. 0..100, center 50 = pure salt cut,
     // 0 = max negative rank-cut, 100 = max positive rank-cut. Engine recovers
     // signed magnitude as (knob - 50) and uses |signed| * 2 as the rank weight.
     int tiltRhythm() const { return Routing::routedValueInt(ParamKey::TiltRhythm, _trackIndex, _tiltRhythm.base, 0, 100); }
+    int tiltRhythmBase() const { return _tiltRhythm.base; }
     void setTiltRhythm(int value, bool routed = false) { _tiltRhythm.set(clamp(value, 0, 100), routed); }
 
     // burs
     int burst() const { return Routing::routedValueInt(ParamKey::Burst, _trackIndex, _burst.base, 0, 100); }
+    int burstBase() const { return _burst.base; }
     void setBurst(int burst, bool routed = false) { _burst.set(clamp(burst, 0, 100), routed); }
 
     // feel (Phase 16 P4, 2026-05-23) — knob 0..100, default 50. Detent
@@ -314,10 +328,12 @@ public:
     // cycle, knob > 55 lerps toward 5 beats per cycle. Generator reads
     // this in the post-walk scaling pass; inert until P5 wires it.
     int feel() const { return Routing::routedValueInt(ParamKey::Feel, _trackIndex, _feel.base, 0, 100); }
+    int feelBase() const { return _feel.base; }
     void setFeel(int feel, bool routed = false) { _feel.set(clamp(feel, 0, 100), routed); }
 
     // rotate
     int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64); }
+    int rotateBase() const { return _rotate.base; }
     void setRotate(int rotate, bool routed = false) { _rotate.set(clamp(rotate, -64, 64), routed); }
 
     // durationTickets — per-LUT-slot duration emphasis. Three states (mirror
