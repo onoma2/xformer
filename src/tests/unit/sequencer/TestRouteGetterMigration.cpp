@@ -523,4 +523,34 @@ CASE("Indexed inlet A: base-0 override read, x0.01 normalize") {
     expect(std::fabs(seq.routedIndexedA() - 0.0f) < 1e-4f, "stale clear -> 0.0");
 }
 
+CASE("MidiCv slideTime: base-anchored read + stale clear (unipolar 0..100)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::MidiCv);
+    auto &track = p.track(0).midiCvTrack();
+    track.setSlideTime(40);
+    expectEqual(track.slideTime(), 40, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::SlideTime, 0, 30.f);
+    expectEqual(track.slideTime(), 70, "override -> base + delta");
+
+    Routing::clearRouteOverrides();
+    expectEqual(track.slideTime(), 40, "stale clear -> base restored");
+}
+
+CASE("MidiCv transpose: getter clamps to field range +-100, not table +-60") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::MidiCv);
+    auto &track = p.track(0).midiCvTrack();
+    track.setTranspose(80);
+    expectEqual(track.transpose(), 80, "no override -> base (valid >table 60)");
+
+    Routing::writeRouteOverride(ParamKey::Transpose, 0, 30.f);
+    expectEqual(track.transpose(), 100, "base 80 + 30 clamps to field 100, not table 60");
+
+    Routing::clearRouteOverrides();
+    expectEqual(track.transpose(), 80, "stale clear -> base restored");
+}
+
 } // UNIT_TEST

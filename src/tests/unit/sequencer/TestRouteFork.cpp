@@ -101,12 +101,10 @@ CASE("Curve migrates its sequence-level and track-level Target-backed params") {
 
 CASE("modes not wired into migrated() stay on the old path") {
     uint8_t key; RouteParam::Range range;
-    // MidiCv + Teletype have no migrated() case, so every target stays legacy
-    // even where a param table owns a matching row.
-    for (auto m : { Mode::MidiCv, Mode::Teletype }) {
-        expectFalse(RouteFork::migrated(m, Routing::Target::Scale, key, range), "non-migrated mode");
-        expectFalse(RouteFork::migrated(m, Routing::Target::Transpose, key, range), "non-migrated mode");
-    }
+    // Teletype has no migrated() case (no routable params), so every target
+    // stays legacy. All other engines are now migrated.
+    expectFalse(RouteFork::migrated(Mode::Teletype, Routing::Target::Scale, key, range), "Teletype non-migrated");
+    expectFalse(RouteFork::migrated(Mode::Teletype, Routing::Target::Transpose, key, range), "Teletype non-migrated");
 }
 
 CASE("unmapped + special targets are never migrated") {

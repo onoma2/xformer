@@ -13,6 +13,7 @@
 #include "ParamTableStochastic.h"
 #include "ParamTableDiscreteMap.h"
 #include "ParamTableIndexed.h"
+#include "ParamTableMidiCv.h"
 #include "ParamTableGlobal.h"
 
 // Apply-fork decision for the routing mod-matrix slice (plan 005, step 3).
@@ -124,7 +125,7 @@ namespace RouteFork {
 
     // True when (trackMode, target) is a migrated per-track param; fills paramKey
     // and the param's real range. Migrated: Note, PhaseFlux, Curve, Tuesday,
-    // Stochastic, DiscreteMap, Indexed (MidiCv not yet).
+    // Stochastic, DiscreteMap, Indexed, MidiCv (all engines).
     inline bool migrated(Track::TrackMode mode, Routing::Target target,
                          uint8_t &paramKey, RouteParam::Range &range) {
         const RouteParam::Table *table = nullptr;
@@ -136,6 +137,7 @@ namespace RouteFork {
         case Track::TrackMode::Stochastic: table = &StochasticParamTable::table(); break;
         case Track::TrackMode::DiscreteMap: table = &DiscreteMapParamTable::table(); break;
         case Track::TrackMode::Indexed:   table = &IndexedParamTable::table(); break;
+        case Track::TrackMode::MidiCv:    table = &MidiCvParamTable::table(); break;
         default:                          return false;
         }
         uint8_t key = targetToParamKey(target);
