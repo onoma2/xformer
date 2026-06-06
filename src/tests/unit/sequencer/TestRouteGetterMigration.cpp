@@ -296,4 +296,21 @@ CASE("Tuesday scale: Default(-1) preserved unrouted, clamps to 0..23 under route
     expectEqual(seq.scale(), 20, "stale clear -> base restored");
 }
 
+CASE("Tuesday rotate: routed effective clamps to dynamic loop limit") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Tuesday);
+    auto &seq = p.track(0).tuesdayTrack().sequence(0);
+
+    seq.setLoopLength(4);                            // loopLengthValues[4] = 4 -> limit +-3
+    seq.setRotate(0);
+    Routing::writeRouteOverride(ParamKey::Rotate, 0, 50.f);
+    expectEqual(seq.rotate(), 3, "routed effective clamped to loop limit (len-1 = 3)");
+
+    seq.setLoopLength(1);                            // loopLengthValues[1] = 1 -> limit 0
+    expectEqual(seq.rotate(), 0, "len 1 collapses routed rotate to 0");
+
+    Routing::clearRouteOverrides();
+}
+
 } // UNIT_TEST

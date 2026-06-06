@@ -255,6 +255,7 @@ public:
     // divisor
 
     int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor.base, 1, 768); }
+    int divisorBase() const { return _divisor.base; }
     void setDivisor(int divisor, bool routed = false) {
         _divisor.set(ModelUtils::clampDivisor(divisor), routed);
     }
@@ -466,7 +467,15 @@ public:
 
     // rotate (bipolar shift for finite loops, limited by loop length)
 
-    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64); }
+    int rotate() const {
+        int v = Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64);
+        int len = actualLoopLength();
+        if (len > 0) {
+            int maxRot = len - 1;
+            return clamp(v, -maxRot, maxRot);
+        }
+        return 0;
+    }
     void setRotate(int rotate, bool routed = false) {
         int len = actualLoopLength();
         if (len > 0) {

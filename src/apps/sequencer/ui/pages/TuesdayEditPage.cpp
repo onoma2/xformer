@@ -723,17 +723,17 @@ void TuesdayEditPage::handleStepKeyPress(int step, bool shift) {
         sequence.editRootNote(1, false);
         break;
     case 3: { // Divisor up (straight)
-        int next = nextDivisorByType(sequence.divisor(), -1, '\0');
+        int next = nextDivisorByType(sequence.divisorBase(), -1, '\0');
         sequence.setDivisor(next);
         break;
     }
     case 4: { // Divisor up (triplet)
-        int next = nextDivisorByType(sequence.divisor(), -1, 'T');
+        int next = nextDivisorByType(sequence.divisorBase(), -1, 'T');
         sequence.setDivisor(next);
         break;
     }
     case 5: { // Divisor /2
-        int next = ModelUtils::clampDivisor(sequence.divisor() / 2);
+        int next = ModelUtils::clampDivisor(sequence.divisorBase() / 2);
         sequence.setDivisor(next);
         break;
     }
@@ -753,17 +753,17 @@ void TuesdayEditPage::handleStepKeyPress(int step, bool shift) {
         sequence.editRootNote(-1, false);
         break;
     case 11: { // Divisor down (straight)
-        int next = nextDivisorByType(sequence.divisor(), 1, '\0');
+        int next = nextDivisorByType(sequence.divisorBase(), 1, '\0');
         sequence.setDivisor(next);
         break;
     }
     case 12: { // Divisor down (triplet)
-        int next = nextDivisorByType(sequence.divisor(), 1, 'T');
+        int next = nextDivisorByType(sequence.divisorBase(), 1, 'T');
         sequence.setDivisor(next);
         break;
     }
     case 13: { // Divisor *2
-        int next = ModelUtils::clampDivisor(sequence.divisor() * 2);
+        int next = ModelUtils::clampDivisor(sequence.divisorBase() * 2);
         sequence.setDivisor(next);
         break;
     }
