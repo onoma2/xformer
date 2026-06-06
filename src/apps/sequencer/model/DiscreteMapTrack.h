@@ -88,10 +88,9 @@ public:
 
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);
-    void writeRouted(Routing::Target target, int intValue, float floatValue);
 
     // Inlets read the override path; _routedInput/_routedScanner storage + setters
-    // are superseded (dead) — the old writeRouted writes are skipped.
+    // are superseded (dead).
     float routedInput() const { return Routing::routedValue(ParamKey::DiscreteMapInput, _trackIndex, 0.f, -5.f, 5.f); }
     void setRoutedInput(float v) { _routedInput = v; }
     float routedScanner() const { return Routing::routedValue(ParamKey::DiscreteMapScanner, _trackIndex, 0.f, 0.f, 34.f); }

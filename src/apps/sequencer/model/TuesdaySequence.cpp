@@ -47,61 +47,6 @@ int TuesdaySequence::actualLoopLength() const {
     return 16; // Default fallback
 }
 
-void TuesdaySequence::writeRouted(Routing::Target target, int intValue, float floatValue) {
-    switch (target) {
-    case Routing::Target::Algorithm:
-        setAlgorithm(intValue, true);
-        break;
-    case Routing::Target::Flow:
-        setFlow(intValue, true);
-        break;
-    case Routing::Target::Ornament:
-        setOrnament(intValue, true);
-        break;
-    case Routing::Target::Power:
-        setPower(intValue, true);
-        break;
-    case Routing::Target::Glide:
-        setGlide(intValue, true);
-        break;
-    case Routing::Target::Trill:
-        setTrill(intValue, true);
-        break;
-    case Routing::Target::StepTrill:
-        setStepTrill(intValue, true);
-        break;
-    case Routing::Target::Octave:
-        setOctave(intValue, true);
-        break;
-    case Routing::Target::Transpose:
-        setTranspose(intValue, true);
-        break;
-    case Routing::Target::Divisor:
-        setDivisor(intValue, true);
-        break;
-    case Routing::Target::ClockMult:
-        setClockMultiplier(intValue, true);
-        break;
-    case Routing::Target::Rotate:
-        setRotate(intValue, true);
-        break;
-    case Routing::Target::GateLength:
-        _gateLength.write(intValue);
-        break;
-    case Routing::Target::GateOffset:
-        _gateOffset.write(intValue);
-        break;
-    case Routing::Target::Scale:
-        setScale(intValue);
-        break;
-    case Routing::Target::RootNote:
-        setRootNote(intValue);
-        break;
-    default:
-        break;
-    }
-}
-
 void TuesdaySequence::clear() {
     setAlgorithm(0);
     setFlow(0);

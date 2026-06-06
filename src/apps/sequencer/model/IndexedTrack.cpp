@@ -41,27 +41,3 @@ void IndexedTrack::read(VersionedSerializedReader &reader) {
     _slideTime.routed = 0;
     readArray(reader, _sequences);
 }
-
-void IndexedTrack::writeRouted(Routing::Target target, int intValue, float floatValue) {
-    // For now, forward sequence-level routable params to all patterns
-    // In the future, we might add track-level routable params here
-    switch (target) {
-    case Routing::Target::DiscreteMapSync:
-        _routedSync = floatValue;
-        break;
-    case Routing::Target::Octave:
-        setOctave(intValue, true);
-        break;
-    case Routing::Target::Transpose:
-        setTranspose(intValue, true);
-        break;
-    case Routing::Target::SlideTime:
-        setSlideTime(intValue, true);
-        break;
-    default:
-        for (auto &sequence : _sequences) {
-            sequence.writeRouted(target, intValue, floatValue);
-        }
-        break;
-    }
-}

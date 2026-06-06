@@ -134,7 +134,6 @@ public:
 
     void write(VersionedSerializedWriter &writer) const;
     void read(VersionedSerializedReader &reader);
-    void writeRouted(Routing::Target target, int intValue, float floatValue);
 
     float routedSync() const { return _routedSync; }
 

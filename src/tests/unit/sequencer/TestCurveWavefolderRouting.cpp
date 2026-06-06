@@ -20,15 +20,6 @@ CASE("wavefolder_fold_routing_conversion") {
 
     seq.setWavefolderFold(1.0f, false);  // Set base value
     expectEqual(static_cast<int>(seq.wavefolderFold() * 100), 100, "fold base at 100%");
-
-    // Test writeRouted conversion (this is what routing calls)
-    // writeRouted should receive 0-100 values and convert to 0.0-1.0
-    seq.writeRouted(Routing::Target::WavefolderFold, 0, 0.0f);
-    seq.writeRouted(Routing::Target::WavefolderFold, 50, 50.0f);
-    seq.writeRouted(Routing::Target::WavefolderFold, 100, 100.0f);
-
-    // Cannot easily test routed values without enabling routing
-    // But we verified the conversion logic exists
 }
 
 CASE("wavefolder_gain_routing_conversion") {
@@ -43,11 +34,6 @@ CASE("wavefolder_gain_routing_conversion") {
 
     seq.setWavefolderGain(2.0f, false);
     expectEqual(static_cast<int>(seq.wavefolderGain() * 100), 200, "gain base at 200%");
-
-    // Test writeRouted conversion exists (0-200 -> 0.0-2.0)
-    seq.writeRouted(Routing::Target::WavefolderGain, 0, 0.0f);
-    seq.writeRouted(Routing::Target::WavefolderGain, 100, 100.0f);
-    seq.writeRouted(Routing::Target::WavefolderGain, 200, 200.0f);
 }
 
 CASE("dj_filter_routing_conversion") {
@@ -62,11 +48,6 @@ CASE("dj_filter_routing_conversion") {
 
     seq.setDjFilter(1.0f, false);
     expectEqual(static_cast<int>(seq.djFilter() * 100), 100, "filter base at 100%");
-
-    // Test writeRouted conversion exists (-100 to 100 -> -1.0 to 1.0)
-    seq.writeRouted(Routing::Target::DjFilter, -100, -100.0f);
-    seq.writeRouted(Routing::Target::DjFilter, 0, 0.0f);
-    seq.writeRouted(Routing::Target::DjFilter, 100, 100.0f);
 }
 
 // XFade is now non-routable (UI-only control), so no routing test needed

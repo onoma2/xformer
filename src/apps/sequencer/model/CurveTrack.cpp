@@ -1,31 +1,6 @@
 #include "CurveTrack.h"
 #include "ProjectVersion.h"
 
-void CurveTrack::writeRouted(Routing::Target target, int intValue, float floatValue) {
-    switch (target) {
-    case Routing::Target::SlideTime:
-        setSlideTime(intValue, true);
-        break;
-    case Routing::Target::Offset:
-        setOffset(intValue, true);
-        break;
-    case Routing::Target::Rotate:
-        setRotate(intValue, true);
-        break;
-    case Routing::Target::ShapeProbabilityBias:
-        setShapeProbabilityBias(intValue, true);
-        break;
-    case Routing::Target::GateProbabilityBias:
-        setGateProbabilityBias(intValue, true);
-        break;
-    case Routing::Target::CurveRate:
-        setCurveRate(floatValue / 100.0f, true);  // Convert 0-400 to 0.0-4.0
-        break;
-    default:
-        break;
-    }
-}
-
 void CurveTrack::clear() {
     setPlayMode(Types::PlayMode::Free);
     setFillMode(FillMode::None);

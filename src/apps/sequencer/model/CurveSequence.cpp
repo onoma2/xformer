@@ -141,50 +141,6 @@ void CurveSequence::Step::read(VersionedSerializedReader &reader) {
     }
 }
 
-void CurveSequence::writeRouted(Routing::Target target, int intValue, float floatValue) {
-    switch (target) {
-    case Routing::Target::Divisor:
-        setDivisor(intValue, true);
-        break;
-    case Routing::Target::ClockMult:
-        setClockMultiplier(intValue, true);
-        break;
-    case Routing::Target::RunMode:
-        setRunMode(Types::RunMode(intValue), true);
-        break;
-    case Routing::Target::FirstStep:
-        setFirstStep(intValue, true);
-        break;
-    case Routing::Target::LastStep:
-        setLastStep(intValue, true);
-        break;
-    case Routing::Target::WavefolderFold:
-        setWavefolderFold(int16_t(floatValue), true);  // Already 0-100 centi-units
-        break;
-    case Routing::Target::WavefolderGain:
-        setWavefolderGain(int16_t(floatValue), true);  // Already 0-200 centi-units
-        break;
-    case Routing::Target::DjFilter:
-        setDjFilter(int16_t(floatValue), true);  // Already -100 to 100 centi-units
-        break;
-    // XFade is non-routable (UI-only control)
-    case Routing::Target::ChaosAmount:
-        setChaosAmount(intValue, true);
-        break;
-    case Routing::Target::ChaosRate:
-        setChaosRate(intValue, true);
-        break;
-    case Routing::Target::ChaosParam1:
-        setChaosParam1(intValue, true);
-        break;
-    case Routing::Target::ChaosParam2:
-        setChaosParam2(intValue, true);
-        break;
-    default:
-        break;
-    }
-}
-
 void CurveSequence::clear() {
     setRange(Types::VoltageRange::Bipolar5V);
     setDivisor(192);

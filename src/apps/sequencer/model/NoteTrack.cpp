@@ -1,37 +1,6 @@
 #include "NoteTrack.h"
 #include "ProjectVersion.h"
 
-void NoteTrack::writeRouted(Routing::Target target, int intValue, float floatValue) {
-    switch (target) {
-    case Routing::Target::SlideTime:
-        setSlideTime(intValue, true);
-        break;
-    case Routing::Target::Octave:
-        setOctave(intValue, true);
-        break;
-    case Routing::Target::Transpose:
-        setTranspose(intValue, true);
-        break;
-    case Routing::Target::Rotate:
-        setRotate(intValue, true);
-        break;
-    case Routing::Target::GateProbabilityBias:
-        setGateProbabilityBias(intValue, true);
-        break;
-    case Routing::Target::RetriggerProbabilityBias:
-        setRetriggerProbabilityBias(intValue, true);
-        break;
-    case Routing::Target::LengthBias:
-        setLengthBias(intValue, true);
-        break;
-    case Routing::Target::NoteProbabilityBias:
-        setNoteProbabilityBias(intValue, true);
-        break;
-    default:
-        break;
-    }
-}
-
 void NoteTrack::clear() {
     setPlayMode(Types::PlayMode::Free);
     setFillMode(FillMode::Gates);

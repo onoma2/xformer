@@ -97,29 +97,6 @@ public:
     inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
     inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
 
-    void writeRouted(Routing::Target target, int intValue, float floatValue) {
-        switch (target) {
-        case Routing::Target::StochasticMask: setMaskRhythm(intValue, true); break;
-        case Routing::Target::StochasticGateLength: setGateLength(intValue, true); break;
-        case Routing::Target::StochasticTilt: setTiltRhythm(intValue, true); break;
-        case Routing::Target::StochasticBurst: setBurst(intValue, true); break;
-        case Routing::Target::StochasticComplexity: setComplexity(intValue, true); break;
-        case Routing::Target::StochasticContour: setContour(intValue, true); break;
-        case Routing::Target::StochasticNoteDuration: setNoteDuration(intValue, true); break;
-        case Routing::Target::StochasticVariation: setVariation(intValue, true); break;
-        case Routing::Target::StochasticRest: setRest(intValue, true); break;
-        case Routing::Target::StochasticSlide: setSlide(intValue, true); break;
-        case Routing::Target::StochasticSleep: setSleep(intValue, true); break;
-        case Routing::Target::StochasticPatienceRhythm: setPatienceRhythm(intValue, true); break;
-        case Routing::Target::StochasticMutate: setMutate(intValue, true); break;
-        case Routing::Target::StochasticJump: setJump(intValue, true); break;
-        case Routing::Target::StochasticFeel: setFeel(intValue, true); break;
-        case Routing::Target::Rotate: setRotate(intValue, true); break;
-        case Routing::Target::ClockMult: setClockMultiplier(intValue, true); break;
-        default: break;
-        }
-    }
-
     // Phase 8.1 Source Modes
     StochasticSourceMode rhythmMode() const { return _rhythmMode; }
     void setRhythmMode(StochasticSourceMode mode) { _rhythmMode = ModelUtils::clampedEnum(mode); }

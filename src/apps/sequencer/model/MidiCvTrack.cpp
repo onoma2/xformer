@@ -14,19 +14,6 @@ static const struct VoiceConfigInfo voiceConfigInfos[int(MidiCvTrack::VoiceConfi
     [int(MidiCvTrack::VoiceConfig::PitchVelocityPressure)]  = { 3, { MidiCvTrack::VoiceSignal::Pitch, MidiCvTrack::VoiceSignal::Velocity, MidiCvTrack::VoiceSignal::Pressure } },
 };
 
-void MidiCvTrack::writeRouted(Routing::Target target, int intValue, float floatValue) {
-    switch (target) {
-    case Routing::Target::SlideTime:
-        setSlideTime(intValue, true);
-        break;
-    case Routing::Target::Transpose:
-        setTranspose(intValue, true);
-        break;
-    default:
-        break;
-    }
-}
-
 void MidiCvTrack::clear() {
     _source.clear();
     setVoices(1);

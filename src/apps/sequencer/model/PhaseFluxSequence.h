@@ -570,16 +570,6 @@ public:
     inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
     inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
 
-    void writeRouted(Routing::Target target, int intValue, float floatValue) {
-        switch (target) {
-        case Routing::Target::Divisor:    setDivisor(intValue, true); break;
-        case Routing::Target::ClockMult:  setClockMultiplier(intValue, true); break;
-        case Routing::Target::Scale:      setScale(intValue); break;
-        case Routing::Target::RootNote:   setRootNote(intValue); break;
-        default: break;
-        }
-    }
-
     //----------------------------------------
     // Methods
     //----------------------------------------

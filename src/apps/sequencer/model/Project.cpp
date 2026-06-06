@@ -15,12 +15,6 @@ Project::Project() :
 
 void Project::writeRouted(Routing::Target target, int intValue, float floatValue) {
     switch (target) {
-    case Routing::Target::Tempo:
-        setTempo(floatValue, true);
-        break;
-    case Routing::Target::Swing:
-        setSwing(intValue, true);
-        break;
     case Routing::Target::CvRouteScan:
         setCvRouteScan(intValue, true);
         break;

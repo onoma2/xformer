@@ -246,34 +246,6 @@ void NoteSequence::Step::read(VersionedSerializedReader &reader) {
     }
 }
 
-void NoteSequence::writeRouted(Routing::Target target, int intValue, float floatValue) {
-    switch (target) {
-    case Routing::Target::Scale:
-        setScale(intValue, true);
-        break;
-    case Routing::Target::RootNote:
-        setRootNote(intValue, true);
-        break;
-    case Routing::Target::Divisor:
-        setDivisor(intValue, true);
-        break;
-    case Routing::Target::ClockMult:
-        setClockMultiplier(intValue, true);
-        break;
-    case Routing::Target::RunMode:
-        setRunMode(Types::RunMode(intValue), true);
-        break;
-    case Routing::Target::FirstStep:
-        setFirstStep(intValue, true);
-        break;
-    case Routing::Target::LastStep:
-        setLastStep(intValue, true);
-        break;
-    default:
-        break;
-    }
-}
-
 void NoteSequence::clear() {
     setScale(-1);
     setRootNote(-1);

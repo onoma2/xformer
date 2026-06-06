@@ -32,29 +32,3 @@ void DiscreteMapTrack::read(VersionedSerializedReader &reader) {
     readArray(reader, _sequences);
 }
 
-void DiscreteMapTrack::writeRouted(Routing::Target target, int intValue, float floatValue) {
-    switch (target) {
-    case Routing::Target::DiscreteMapInput:
-        _routedInput = floatValue;
-        break;
-    case Routing::Target::DiscreteMapScanner:
-        _routedScanner = floatValue;
-        break;
-    case Routing::Target::DiscreteMapSync:
-        _routedSync = floatValue;
-        break;
-    case Routing::Target::DiscreteMapRangeHigh:
-    case Routing::Target::DiscreteMapRangeLow:
-    case Routing::Target::SlideTime:
-    case Routing::Target::Octave:
-    case Routing::Target::Transpose:
-    case Routing::Target::Offset:
-        // Sequence-level params: apply to all patterns
-        for (auto &sequence : _sequences) {
-            sequence.writeRouted(target, intValue, floatValue);
-        }
-        break;
-    default:
-        break;
-    }
-}

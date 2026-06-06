@@ -100,15 +100,6 @@ public:
     inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
     inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
 
-    void writeRouted(Routing::Target target, int intValue, float floatValue) {
-        switch (target) {
-        case Routing::Target::SlideTime: setSlideTime(intValue, true); break;
-        case Routing::Target::Octave:    setOctave(intValue, true); break;
-        case Routing::Target::Transpose: setTranspose(intValue, true); break;
-        default: break;
-        }
-    }
-
     //----------------------------------------
     // Methods
     //----------------------------------------
