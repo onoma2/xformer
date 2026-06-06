@@ -459,6 +459,13 @@ void RoutingEngine::updateSinks() {
         }
 
         if (route.active()) {
+            // A sourceless route is inert (spec §3: nothing active before a source
+            // is committed). Overrides are cleared each frame, so skipping leaves the
+            // target unmodulated instead of Modulate centering None=0 to a -full-scale delta.
+            if (route.source() == Routing::Source::None) {
+                continue;
+            }
+
             auto target = route.target();
 
             if (Routing::isBusTarget(target)) {

@@ -123,7 +123,8 @@ namespace RouteFork {
     }
 
     // True when (trackMode, target) is a migrated per-track param; fills paramKey
-    // and the param's real range. Migrated: Note, PhaseFlux, Curve.
+    // and the param's real range. Migrated: Note, PhaseFlux, Curve, Tuesday,
+    // Stochastic, DiscreteMap, Indexed (MidiCv not yet).
     inline bool migrated(Track::TrackMode mode, Routing::Target target,
                          uint8_t &paramKey, RouteParam::Range &range) {
         const RouteParam::Table *table = nullptr;
