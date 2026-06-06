@@ -367,7 +367,7 @@ public:
     // firstStep (Rotation Offset)
 
     int firstStep() const {
-        return Routing::routedValueInt(ParamKey::FirstStep, _trackIndex, _firstStep.base, 0, 63);
+        return Routing::routedValueInt(ParamKey::FirstStep, _trackIndex, _firstStep.base, 0, _activeLength - 1);
     }
 
     void setFirstStep(int firstStep, bool routed = false) {
