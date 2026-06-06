@@ -1,89 +1,54 @@
 #include "UnitTest.h"
 
-#include "model/Project.h"
 #include "model/ParamTableStochastic.h"
 #include "model/RouteParamKey.h"
 
 // U4 of the routing mod-matrix overhaul: the Stochastic per-type param table.
-// Most rows are characterized against Routing::writeTarget (parity). Two
-// intentional non-parity points: Feel (dead-slot fix, tested directly) and
-// Scale/RootNote/Divisor (base-write, mirrored for now; defect closes at U6b).
-// Track scope, scope.object = Track* (Stochastic mode).
-
-namespace {
-
-void makeStochTrack0(Project &p) {
-    p.clear();
-    p.setTrackMode(0, Track::TrackMode::Note);    // force a clean container init
-    p.setTrackMode(0, Track::TrackMode::Stochastic);
-}
-
-Project &stochProject() {
-    static Project p;
-    makeStochTrack0(p);
-    return p;
-}
-
-} // namespace
+// Characterization: the table owns the expected keys and resolves each to its
+// declared name/flags. Track scope. The apply hooks the table used to carry are
+// gone (the override path reads rows by key, never applies via hooks).
 
 UNIT_TEST("ParamTableStochastic") {
 
-CASE("parity rows match writeTarget for every normalized input") {
-    struct Spec {
-        Routing::Target target;
-        uint8_t key;
-        bool routedWrite;            // routed slot (setRouted to read) vs base
-        float (*read)(Project &);
-        const char *name;
-    };
+CASE("table owns the expected keys with declared names and flags") {
+    struct Spec { uint8_t key; const char *name; uint8_t flag; };
     const Spec specs[] = {
-        // track-level routed
-        { Routing::Target::Octave,    ParamKey::Octave,          true,  [](Project &p){ return float(p.track(0).stochasticTrack().octave()); },    "Octave" },
-        { Routing::Target::Transpose, ParamKey::Transpose,       true,  [](Project &p){ return float(p.track(0).stochasticTrack().transpose()); }, "Transpose" },
-        { Routing::Target::SlideTime, ParamKey::SlideTime,       true,  [](Project &p){ return float(p.track(0).stochasticTrack().slideTime()); }, "SlideTime" },
-        // sequence-level routed
-        { Routing::Target::StochasticComplexity,     ParamKey::Complexity,     true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).complexity()); },     "Complexity" },
-        { Routing::Target::StochasticVariation,      ParamKey::Variation,      true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).variation()); },      "Variation" },
-        { Routing::Target::StochasticRest,           ParamKey::Rest,           true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).rest()); },           "Rest" },
-        { Routing::Target::StochasticSlide,          ParamKey::Slide,          true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).slide()); },          "Slide" },
-        { Routing::Target::StochasticBurst,          ParamKey::Burst,          true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).burst()); },          "Burst" },
-        { Routing::Target::StochasticSleep,          ParamKey::Sleep,          true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).sleep()); },          "Sleep" },
-        { Routing::Target::StochasticMutate,         ParamKey::Mutate,         true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).mutate()); },         "Mutate" },
-        { Routing::Target::StochasticJump,           ParamKey::Jump,           true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).jump()); },           "Jump" },
-        { Routing::Target::StochasticContour,        ParamKey::Contour,        true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).contour()); },        "Contour" },
-        { Routing::Target::StochasticMask,           ParamKey::MaskRhythm,     true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).maskRhythm()); },     "MaskRhythm" },
-        { Routing::Target::StochasticTilt,           ParamKey::TiltRhythm,     true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).tiltRhythm()); },     "TiltRhythm" },
-        { Routing::Target::StochasticGateLength,     ParamKey::StochasticGateLength, true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).gateLength()); }, "GateLength" },
-        { Routing::Target::StochasticPatienceRhythm, ParamKey::PatienceRhythm, true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).patienceRhythm()); }, "Patience" },
-        { Routing::Target::StochasticNoteDuration,   ParamKey::NoteDuration,   true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).noteDuration()); },   "NoteDuration" },
-        { Routing::Target::StochasticFeel,           ParamKey::Feel,           true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).feel()); },           "Feel" },
-        { Routing::Target::Rotate,                   ParamKey::Rotate,         true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).rotate()); },         "Rotate" },
-        { Routing::Target::ClockMult,                ParamKey::ClockMultiplier,true, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).clockMultiplier()); }, "ClockMult" },
-        // sequence-level base write (defect-parity)
-        { Routing::Target::Scale,    ParamKey::Scale,    false, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).scale()); },    "Scale" },
-        { Routing::Target::RootNote, ParamKey::RootNote, false, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).rootNote()); }, "RootNote" },
-        { Routing::Target::Divisor,  ParamKey::Divisor,  false, [](Project &p){ return float(p.track(0).stochasticTrack().sequence(0).divisor()); },  "Divisor" },
+        { ParamKey::Octave,          "Octave",     RouteParam::Continuous },
+        { ParamKey::Transpose,       "Transpose",  RouteParam::Continuous },
+        { ParamKey::SlideTime,       "Slide Time", RouteParam::Continuous },
+        { ParamKey::Complexity,      "Complexity", RouteParam::Continuous },
+        { ParamKey::Variation,       "Variation",  RouteParam::Continuous },
+        { ParamKey::Rest,            "Rest",       RouteParam::Continuous },
+        { ParamKey::Slide,           "Slide",      RouteParam::Continuous },
+        { ParamKey::Burst,           "Burst",      RouteParam::Continuous },
+        { ParamKey::Sleep,           "Sleep",      RouteParam::Continuous },
+        { ParamKey::Mutate,          "Mutate",     RouteParam::Continuous },
+        { ParamKey::Jump,            "Jump",       RouteParam::Continuous },
+        { ParamKey::Contour,         "Contour",    RouteParam::Continuous },
+        { ParamKey::MaskRhythm,      "Mask Rhy",   RouteParam::Continuous },
+        { ParamKey::TiltRhythm,      "Tilt Rhy",   RouteParam::Continuous },
+        { ParamKey::StochasticGateLength, "Gate Length", RouteParam::Continuous },
+        { ParamKey::PatienceRhythm,  "Patience",   RouteParam::Continuous },
+        { ParamKey::NoteDuration,    "Note Dur",   RouteParam::Discrete },
+        { ParamKey::Rotate,          "Rotate",     RouteParam::Continuous },
+        { ParamKey::ClockMultiplier, "Clock Mult", RouteParam::Continuous },
+        { ParamKey::Feel,            "Feel",       RouteParam::Continuous },
+        { ParamKey::Scale,           "Scale",      RouteParam::Discrete },
+        { ParamKey::RootNote,        "Root Note",  RouteParam::Discrete },
+        { ParamKey::Divisor,         "Divisor",    RouteParam::Discrete },
     };
-    const float inputs[] = { 0.f, 0.25f, 0.5f, 0.75f, 1.f };
-
+    const RouteParam::Table &t = StochasticParamTable::table();
     for (const auto &s : specs) {
-        Routing::setRouted(s.target, 0xFF, s.routedWrite);
-
-        for (float n : inputs) {
-            Project &oldP = stochProject();
-            oldP.routing().writeTarget(s.target, 1 << 0, n);
-
-            static Project newP;
-            makeStochTrack0(newP);
-            RouteParam::Scope scope;
-            scope.kind = RouteParam::Scope::Kind::Track;
-            scope.object = &newP.track(0);
-            scope.trackIndex = 0;
-            bool applied = StochasticParamTable::table().applyRouted(scope, s.key, n);
-            expectTrue(applied, s.name);
-            expectEqual(s.read(newP), s.read(oldP), s.name);
-        }
+        const RouteParam::Row *row = t.find(s.key);
+        expectTrue(row != nullptr, s.name);
+        expectEqual(row->name, s.name, s.name);
+        expectTrue((row->flags & s.flag) != 0, s.name);
     }
+}
+
+CASE("unowned keys do not resolve") {
+    const RouteParam::Table &t = StochasticParamTable::table();
+    expectTrue(t.find(0) == nullptr, "key 0 (None) not owned");
 }
 
 } // UNIT_TEST

@@ -5,15 +5,14 @@
 
 // Name-agnostic routing core (U1 of the routing mod-matrix overhaul).
 //
-// A route delivers a normalized value into an addressed param slot. The engine
-// resolves (scope, paramKey) -> Row and calls the row's apply hook; it never
-// sees the target's name, range, or meaning. This replaces the flat Target enum
-// + targetInfos + per-name dispatch switch + isXxxTarget predicates.
+// A route addresses a param slot by (scope, paramKey). The engine resolves to a
+// Row to read its key, range, name and flags; it never sees the target's name,
+// range, or meaning by enum. This replaces the flat Target enum + targetInfos +
+// per-name dispatch switch + isXxxTarget predicates.
 //
 // Representation: a Table is a constexpr view over a static Row[] array, so the
-// rows live in flash/rodata (one table per scope, shared across instances) and
-// each row carries its own apply hook as a function pointer -- zero per-row RAM,
-// one indirect call on the hot path, no switch.
+// rows live in flash/rodata (one table per scope, shared across instances) --
+// zero per-row RAM, linear scan resolution by key.
 //
 // See docs/plans/2026-05-31-002-routing-mod-matrix-overhaul-plan.md.
 
@@ -65,22 +64,17 @@ struct RouteParam {
 
     // One routable parameter. key is an append-only numeric paramKey, never the
     // array index, so reordering/adding rows never shifts saved routes (F6).
-    // The hook receives the row's range (single source of truth) so it can
-    // denormalize the [0,1] value into the param's domain itself.
     struct Row {
         uint8_t key;
         const char *name;
         Range range;
         uint8_t flags;
-        void (*applyRouted)(const Scope &scope, const Range &range, float normalized);
     };
 
-    // Per-scope param table: the single source of truth for label, range, flags,
-    // and the apply hook. Resolution is by key (linear scan over the small set).
-    // The table carries the Scope::Kind its hooks expect (e.g. the global table
-    // expects Global, whose object is a Project*); applyRouted fails closed on a
-    // null object or a kind mismatch so a bad resolved scope can never reach a
-    // hook's unchecked cast.
+    // Per-scope param table: the single source of truth for label, range, and
+    // flags. Resolution is by key (linear scan over the small set). The table
+    // carries the Scope::Kind it expects (e.g. the global table expects Global,
+    // whose object is a Project*).
     class Table {
     public:
         constexpr Table(Scope::Kind expectedKind, const Row *rows, size_t count)
@@ -96,18 +90,6 @@ struct RouteParam {
                 }
             }
             return nullptr;
-        }
-
-        bool applyRouted(const Scope &scope, uint8_t key, float normalized) const {
-            if (scope.object == nullptr || scope.kind != _expectedKind) {
-                return false;
-            }
-            const Row *row = find(key);
-            if (!row || (row->flags & Structural)) {
-                return false;
-            }
-            row->applyRouted(scope, row->range, normalized);
-            return true;
         }
 
         Scope::Kind expectedKind() const { return _expectedKind; }
