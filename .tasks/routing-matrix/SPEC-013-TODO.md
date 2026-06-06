@@ -168,6 +168,19 @@ Read-side migration (slice-4 pattern) per engine: `RouteFork::migrated` case + g
       case (red since Tuesday — my per-engine re-run set omitted TestRouteFork; now in the loop).
 - [ ] MidiCv (optional — SlideTime/Transpose only; 2 params).
 
+### Phase 6 review follow-ups (non-blocking — from the adversarial slice review, 2026-06-07)
+Each engine was already Codex-gated BLOCK→ALLOW during implementation; these are test-coverage
+gaps the apply-hook strip surfaced, not behavior bugs:
+- [ ] Wavefolder Fold/Gain/DjFilter: migrated getter uses `routedValueInt` (rounds) where the old
+      dead apply-hook truncated centi. Confirm round-to-nearest is acceptable (±1 centi on 0..200),
+      then add override-delta tests for Fold/Gain (only integer DjFilter is currently covered).
+- [ ] DiscreteMap snapshot fan-out lost its direct test assertion when `TestParamTableDiscreteMap`
+      was reduced in the strip (`7029bf0e`). Structurally still holds (sequences share track index);
+      re-add a snapshot-fanout assertion to TestRouteGetterMigration or a focused test.
+- Gate `516b12f9` (sourceless routes inert) — Codex ALLOW. Slice 1 (strip) — needs-attention (the two
+  items above). Slices 2 (Curve/Tuesday/Stochastic getters) + 3 (inlets) not re-reviewed at slice
+  altitude (rescue runtime kept hanging) — but each is already per-engine ALLOW'd.
+
 ## Phase 7 — MIDI source + shaper (spec §7, §13)
 - [ ] MIDI source via **F4 LEARN** (MidiLearn → source=Midi + midiSource on the live route).
 - [ ] Shaper UI (engine-gated; only None/TriangleFold live today), surfaced in spread.
