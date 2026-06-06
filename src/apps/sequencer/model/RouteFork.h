@@ -9,6 +9,7 @@
 #include "ParamTableNote.h"
 #include "ParamTablePhaseFlux.h"
 #include "ParamTableCurve.h"
+#include "ParamTableTuesday.h"
 #include "ParamTableGlobal.h"
 
 // Apply-fork decision for the routing mod-matrix slice (plan 005, step 3).
@@ -58,6 +59,15 @@ namespace RouteFork {
         case Routing::Target::ChaosRate:                 return ParamKey::ChaosRate;
         case Routing::Target::ChaosParam1:               return ParamKey::ChaosParam1;
         case Routing::Target::ChaosParam2:               return ParamKey::ChaosParam2;
+        case Routing::Target::Algorithm:                 return ParamKey::Algorithm;
+        case Routing::Target::Flow:                      return ParamKey::Flow;
+        case Routing::Target::Ornament:                  return ParamKey::Ornament;
+        case Routing::Target::Power:                     return ParamKey::Power;
+        case Routing::Target::Glide:                     return ParamKey::Glide;
+        case Routing::Target::Trill:                     return ParamKey::Trill;
+        case Routing::Target::StepTrill:                 return ParamKey::StepTrill;
+        case Routing::Target::GateLength:                return ParamKey::GateLength;
+        case Routing::Target::GateOffset:                return ParamKey::GateOffset;
         // global (project) targets — no track dimension
         case Routing::Target::Tempo:                     return ParamKey::Tempo;
         case Routing::Target::Swing:                     return ParamKey::Swing;
@@ -92,6 +102,7 @@ namespace RouteFork {
         case Track::TrackMode::Note:      table = &NoteParamTable::table(); break;
         case Track::TrackMode::PhaseFlux: table = &PhaseFluxParamTable::table(); break;
         case Track::TrackMode::Curve:     table = &CurveParamTable::table(); break;
+        case Track::TrackMode::Tuesday:   table = &TuesdayParamTable::table(); break;
         default:                          return false;
         }
         uint8_t key = targetToParamKey(target);

@@ -239,4 +239,61 @@ CASE("Curve sequence chaosAmount: base-anchored read + clamp (unipolar 0..100)")
     expectEqual(seq.chaosAmount(), 40, "stale clear -> base restored");
 }
 
+// Tuesday sequence getters migrate onto routedValueInt the same way. Track 0 in
+// Tuesday mode carries trackIndex 0 (set by Project::setTrackMode).
+CASE("Tuesday algorithm: base-anchored read + stale clear (discrete 0..14)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Tuesday);
+    auto &seq = p.track(0).tuesdayTrack().sequence(0);
+    seq.setAlgorithm(5);
+    expectEqual(seq.algorithm(), 5, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::Algorithm, 0, 4.f);
+    expectEqual(seq.algorithm(), 9, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::Algorithm, 0, 100.f);
+    expectEqual(seq.algorithm(), 14, "clamps hi to 14");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.algorithm(), 5, "stale clear -> base restored");
+}
+
+CASE("Tuesday octave: signed base-anchored read + clamp (bipolar -10..10)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Tuesday);
+    auto &seq = p.track(0).tuesdayTrack().sequence(0);
+    seq.setOctave(-3);
+    expectEqual(seq.octave(), -3, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::Octave, 0, 5.f);
+    expectEqual(seq.octave(), 2, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::Octave, 0, -100.f);
+    expectEqual(seq.octave(), -10, "clamps lo to -10");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.octave(), -3, "stale clear -> base restored");
+}
+
+CASE("Tuesday scale: Default(-1) preserved unrouted, clamps to 0..23 under route") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Tuesday);
+    auto &seq = p.track(0).tuesdayTrack().sequence(0);
+    seq.setScale(-1);
+    expectEqual(seq.scale(), -1, "Default passes through when no override");
+
+    Routing::writeRouteOverride(ParamKey::Scale, 0, 5.f);
+    expectEqual(seq.scale(), 4, "under route effective = clamp(base(-1) + delta(5), 0, 23)");
+
+    seq.setScale(20);
+    Routing::writeRouteOverride(ParamKey::Scale, 0, 10.f);
+    expectEqual(seq.scale(), 23, "clamps hi to 23");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.scale(), 20, "stale clear -> base restored");
+}
+
 } // UNIT_TEST

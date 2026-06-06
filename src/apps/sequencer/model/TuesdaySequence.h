@@ -6,6 +6,7 @@
 #include "ModelUtils.h"
 #include "Scale.h"
 #include "Routing.h"
+#include "RouteParamKey.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -27,54 +28,50 @@ public:
 
     // algorithm
 
-    int algorithm() const { return _algorithm.get(isRouted(Routing::Target::Algorithm)); }
+    int algorithm() const { return Routing::routedValueInt(ParamKey::Algorithm, _trackIndex, _algorithm.base, 0, 14); }
     void setAlgorithm(int algorithm, bool routed = false) {
         _algorithm.set(clamp(algorithm, 0, 14), routed);
     }
 
     void editAlgorithm(int value, bool shift) {
-        if (!isRouted(Routing::Target::Algorithm)) {
-            // Cycle only through valid algorithms: 0-14 (consecutive)
-            static const int VALID_ALGORITHMS[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
-            const int VALID_COUNT = 15;
+        // Cycle only through valid algorithms: 0-14 (consecutive)
+        static const int VALID_ALGORITHMS[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+        const int VALID_COUNT = 15;
 
-            // Find current algorithm position in valid array
-            int currentIdx = -1;
-            for (int i = 0; i < VALID_COUNT; i++) {
-                if (VALID_ALGORITHMS[i] == algorithm()) {
-                    currentIdx = i;
-                    break;
-                }
+        // Find current algorithm position in valid array
+        int currentIdx = -1;
+        for (int i = 0; i < VALID_COUNT; i++) {
+            if (VALID_ALGORITHMS[i] == _algorithm.base) {
+                currentIdx = i;
+                break;
             }
-
-            // If current algorithm is not valid, start at beginning
-            if (currentIdx == -1) {
-                currentIdx = 0;
-            }
-
-            // Cycle to new position (with wrapping)
-            int newIdx = (currentIdx + value) % VALID_COUNT;
-            if (newIdx < 0) {
-                newIdx = (newIdx + VALID_COUNT) % VALID_COUNT; // Handle negative wrap
-            }
-
-            setAlgorithm(VALID_ALGORITHMS[newIdx]);
         }
+
+        // If current algorithm is not valid, start at beginning
+        if (currentIdx == -1) {
+            currentIdx = 0;
+        }
+
+        // Cycle to new position (with wrapping)
+        int newIdx = (currentIdx + value) % VALID_COUNT;
+        if (newIdx < 0) {
+            newIdx = (newIdx + VALID_COUNT) % VALID_COUNT; // Handle negative wrap
+        }
+
+        setAlgorithm(VALID_ALGORITHMS[newIdx]);
     }
 
     void printAlgorithm(StringBuilder &str) const;
 
     // flow
 
-    int flow() const { return _flow.get(isRouted(Routing::Target::Flow)); }
+    int flow() const { return Routing::routedValueInt(ParamKey::Flow, _trackIndex, _flow.base, 0, 16); }
     void setFlow(int flow, bool routed = false) {
         _flow.set(clamp(flow, 0, 16), routed);
     }
 
     void editFlow(int value, bool shift) {
-        if (!isRouted(Routing::Target::Flow)) {
-            setFlow(this->flow() + value);
-        }
+        setFlow(_flow.base + value);
     }
 
     void printFlow(StringBuilder &str) const {
@@ -84,15 +81,13 @@ public:
 
     // ornament
 
-    int ornament() const { return _ornament.get(isRouted(Routing::Target::Ornament)); }
+    int ornament() const { return Routing::routedValueInt(ParamKey::Ornament, _trackIndex, _ornament.base, 0, 16); }
     void setOrnament(int ornament, bool routed = false) {
         _ornament.set(clamp(ornament, 0, 16), routed);
     }
 
     void editOrnament(int value, bool shift) {
-        if (!isRouted(Routing::Target::Ornament)) {
-            setOrnament(this->ornament() + value);
-        }
+        setOrnament(_ornament.base + value);
     }
 
     void printOrnament(StringBuilder &str) const {
@@ -102,15 +97,13 @@ public:
 
     // power
 
-    int power() const { return _power.get(isRouted(Routing::Target::Power)); }
+    int power() const { return Routing::routedValueInt(ParamKey::Power, _trackIndex, _power.base, 0, 16); }
     void setPower(int power, bool routed = false) {
         _power.set(clamp(power, 0, 16), routed);
     }
 
     void editPower(int value, bool shift) {
-        if (!isRouted(Routing::Target::Power)) {
-            setPower(this->power() + value);
-        }
+        setPower(_power.base + value);
     }
 
     void printPower(StringBuilder &str) const {
@@ -151,15 +144,13 @@ public:
 
     // glide (slide probability 0-100%)
 
-    int glide() const { return _glide.get(isRouted(Routing::Target::Glide)); }
+    int glide() const { return Routing::routedValueInt(ParamKey::Glide, _trackIndex, _glide.base, 0, 100); }
     void setGlide(int glide, bool routed = false) {
         _glide.set(clamp(glide, 0, 100), routed);
     }
 
     void editGlide(int value, bool shift) {
-        if (!isRouted(Routing::Target::Glide)) {
-            setGlide(this->glide() + value * (shift ? 10 : 1));
-        }
+        setGlide(_glide.base + value * (shift ? 10 : 1));
     }
 
     void printGlide(StringBuilder &str) const {
@@ -168,15 +159,13 @@ public:
     }
 
     // trill (re-trigger probability 0-100%)
-    int trill() const { return _trill.get(isRouted(Routing::Target::Trill)); }
+    int trill() const { return Routing::routedValueInt(ParamKey::Trill, _trackIndex, _trill.base, 0, 100); }
     void setTrill(int trill, bool routed = false) {
         _trill.set(clamp(trill, 0, 100), routed);
     }
 
     void editTrill(int value, bool shift) {
-        if (!isRouted(Routing::Target::Trill)) {
-            setTrill(this->trill() + value * (shift ? 10 : 1));
-        }
+        setTrill(_trill.base + value * (shift ? 10 : 1));
     }
 
     void printTrill(StringBuilder &str) const {
@@ -185,15 +174,13 @@ public:
     }
 
     // stepTrill (intra-step subdivision count 0-100%)
-    int stepTrill() const { return _stepTrill.get(isRouted(Routing::Target::StepTrill)); }
+    int stepTrill() const { return Routing::routedValueInt(ParamKey::StepTrill, _trackIndex, _stepTrill.base, 0, 100); }
     void setStepTrill(int stepTrill, bool routed = false) {
         _stepTrill.set(clamp(stepTrill, 0, 100), routed);
     }
 
     void editStepTrill(int value, bool shift) {
-        if (!isRouted(Routing::Target::StepTrill)) {
-            setStepTrill(this->stepTrill() + value * (shift ? 10 : 1));
-        }
+        setStepTrill(_stepTrill.base + value * (shift ? 10 : 1));
     }
 
     void printStepTrill(StringBuilder &str) const {
@@ -235,15 +222,13 @@ public:
 
     // octave (-10 to +10)
 
-    int octave() const { return _octave.get(isRouted(Routing::Target::Octave)); }
+    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave.base, -10, 10); }
     void setOctave(int octave, bool routed = false) {
         _octave.set(clamp(octave, -10, 10), routed);
     }
 
     void editOctave(int value, bool shift) {
-        if (!isRouted(Routing::Target::Octave)) {
-            setOctave(this->octave() + value);
-        }
+        setOctave(_octave.base + value);
     }
 
     void printOctave(StringBuilder &str) const {
@@ -253,15 +238,13 @@ public:
 
     // transpose (-11 to +11)
 
-    int transpose() const { return _transpose.get(isRouted(Routing::Target::Transpose)); }
+    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -60, 60); }
     void setTranspose(int transpose, bool routed = false) {
         _transpose.set(clamp(transpose, -11, 11), routed);
     }
 
     void editTranspose(int value, bool shift) {
-        if (!isRouted(Routing::Target::Transpose)) {
-            setTranspose(this->transpose() + value);
-        }
+        setTranspose(_transpose.base + value);
     }
 
     void printTranspose(StringBuilder &str) const {
@@ -271,7 +254,7 @@ public:
 
     // divisor
 
-    int divisor() const { return _divisor.get(isRouted(Routing::Target::Divisor)); }
+    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor.base, 1, 768); }
     void setDivisor(int divisor, bool routed = false) {
         _divisor.set(ModelUtils::clampDivisor(divisor), routed);
     }
@@ -285,9 +268,7 @@ public:
     }
 
     void editDivisor(int value, bool shift) {
-        if (!isRouted(Routing::Target::Divisor)) {
-            setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
-        }
+        setDivisor(ModelUtils::adjustedByDivisor(_divisor.base, value, shift));
     }
 
     void printDivisor(StringBuilder &str) const {
@@ -297,15 +278,13 @@ public:
 
     // clockMultiplier
 
-    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
     void setClockMultiplier(int clockMultiplier, bool routed = false) {
         _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
     }
 
     void editClockMultiplier(int value, bool shift) {
-        if (!isRouted(Routing::Target::ClockMult)) {
-            setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
-        }
+        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
     }
 
     void printClockMultiplier(StringBuilder &str) const {
@@ -336,13 +315,13 @@ public:
     // Note: Scale 0 is "Semitones" (chromatic) - quantizes to all 12 semitones
     // This controls OUTPUT quantization, not algorithm behavior
 
-    int scale() const { return _scale; }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
     void setScale(int scale) {
         _scale = clamp(scale, -1, Scale::Count - 1);
     }
 
     void editScale(int value, bool shift) {
-        setScale(this->scale() + value);
+        setScale(_scale + value);
     }
 
     void printScale(StringBuilder &str) const {
@@ -355,13 +334,13 @@ public:
 
     // rootNote (-1 = Default, 0-11 = C to B)
 
-    int rootNote() const { return _rootNote; }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
     void setRootNote(int rootNote) {
         _rootNote = clamp(rootNote, -1, 11);
     }
 
     void editRootNote(int value, bool shift) {
-        setRootNote(this->rootNote() + value);
+        setRootNote(_rootNote + value);
     }
 
     void printRootNote(StringBuilder &str) const {
@@ -373,15 +352,13 @@ public:
     }
 
     // gateLength (0-100% scaling for gate duration)
-    int gateLength() const { return _gateLength.get(isRouted(Routing::Target::GateLength)); }
+    int gateLength() const { return Routing::routedValueInt(ParamKey::GateLength, _trackIndex, _gateLength.base, 0, 100); }
     void setGateLength(int gateLength, bool routed = false) {
         _gateLength.set(clamp(gateLength, 0, 100), routed);
     }
 
     void editGateLength(int value, bool shift) {
-        if (!isRouted(Routing::Target::GateLength)) {
-            setGateLength(this->gateLength() + value * (shift ? 10 : 1));
-        }
+        setGateLength(_gateLength.base + value * (shift ? 10 : 1));
     }
 
     void printGateLength(StringBuilder &str) const {
@@ -390,15 +367,13 @@ public:
     }
 
     // gateOffset (0-100% user override for algorithmic gate timing)
-    int gateOffset() const { return _gateOffset.get(isRouted(Routing::Target::GateOffset)); }
+    int gateOffset() const { return Routing::routedValueInt(ParamKey::GateOffset, _trackIndex, _gateOffset.base, 0, 100); }
     void setGateOffset(int gateOffset, bool routed = false) {
         _gateOffset.set(clamp(gateOffset, 0, 100), routed);
     }
 
     void editGateOffset(int value, bool shift) {
-        if (!isRouted(Routing::Target::GateOffset)) {
-            setGateOffset(this->gateOffset() + value * (shift ? 10 : 1));
-        }
+        setGateOffset(_gateOffset.base + value * (shift ? 10 : 1));
     }
 
     void printGateOffset(StringBuilder &str) const {
@@ -491,7 +466,7 @@ public:
 
     // rotate (bipolar shift for finite loops, limited by loop length)
 
-    int rotate() const { return _rotate.get(isRouted(Routing::Target::Rotate)); }
+    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64); }
     void setRotate(int rotate, bool routed = false) {
         int len = actualLoopLength();
         if (len > 0) {
@@ -505,9 +480,7 @@ public:
     }
 
     void editRotate(int value, bool shift) {
-        if (!isRouted(Routing::Target::Rotate)) {
-            setRotate(this->rotate() + value);
-        }
+        setRotate(_rotate.base + value);
     }
 
     void printRotate(StringBuilder &str) const {
