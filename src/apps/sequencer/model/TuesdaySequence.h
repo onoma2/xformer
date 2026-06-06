@@ -238,7 +238,7 @@ public:
 
     // transpose (-11 to +11)
 
-    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -60, 60); }
+    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -11, 11); }
     void setTranspose(int transpose, bool routed = false) {
         _transpose.set(clamp(transpose, -11, 11), routed);
     }

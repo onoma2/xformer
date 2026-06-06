@@ -63,7 +63,7 @@ constexpr RouteParam::Row kRows[] = {
     { ParamKey::GateLength,      "Gate Length",{   0.f, 100.f }, RouteParam::Continuous, applyGateLength },
     { ParamKey::GateOffset,      "Gate Offset",{   0.f, 100.f }, RouteParam::Continuous, applyGateOffset },
     { ParamKey::Octave,          "Octave",     { -10.f,  10.f }, RouteParam::Continuous, applyOctave },
-    { ParamKey::Transpose,       "Transpose",  { -60.f,  60.f }, RouteParam::Continuous, applyTranspose },
+    { ParamKey::Transpose,       "Transpose",  { -11.f,  11.f }, RouteParam::Continuous, applyTranspose },
     { ParamKey::Rotate,          "Rotate",     { -64.f,  64.f }, RouteParam::Continuous, applyRotate },
     { ParamKey::Divisor,         "Divisor",    {   1.f, 768.f }, RouteParam::Discrete,   applyDivisor },
     { ParamKey::ClockMultiplier, "Clock Mult", {  50.f, 150.f }, RouteParam::Continuous, applyClockMult },
