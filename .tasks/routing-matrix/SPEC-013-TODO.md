@@ -166,7 +166,11 @@ Read-side migration (slice-4 pattern) per engine: `RouteFork::migrated` case + g
       ParamTable `applyRouted` apply-hooks (fn ptr + ~24 KB of apply fns + dead Table::applyRouted; never
       called on the override path). Now **23.4 KB under** the 960 KB ceiling. Also fixed a stale TestRouteFork
       case (red since Tuesday — my per-engine re-run set omitted TestRouteFork; now in the loop).
-- [ ] MidiCv (optional — SlideTime/Transpose only; 2 params).
+- [x] **MidiCv** (2026-06-07) — `f8da5070`. Final engine. slideTime/transpose getters → routedValueInt
+      (transpose lo/hi = field ±100, not table ±60 — a route mustn't clamp a valid base >60 down), edits
+      gate-free from base; migrated() MidiCv case (SlideTime/Transpose already bridged). Codex ALLOW. Closed
+      the gap where MidiCv's 2 params were unroutable in the new UI after the legacy editor removal.
+      **Phase 6 COMPLETE — all 8 engines on the override path.**
 
 ### Phase 6 review follow-ups (non-blocking — from the adversarial slice review, 2026-06-07)
 Each engine was already Codex-gated BLOCK→ALLOW during implementation; these are test-coverage
