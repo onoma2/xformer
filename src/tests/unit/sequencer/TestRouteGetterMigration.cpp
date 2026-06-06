@@ -417,4 +417,57 @@ CASE("Stochastic scale: Default(-1) preserved unrouted, clamps to 0..23 under ro
     expectEqual(seq.scale(), 20, "stale clear -> base restored");
 }
 
+// DiscreteMap sequence getters migrate onto routedValueInt/routedValue. Track 0
+// in DiscreteMap mode carries trackIndex 0 (set by Project::setTrackMode).
+CASE("DiscreteMap octave: signed base-anchored read + clamp (bipolar -10..10)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::DiscreteMap);
+    auto &seq = p.track(0).discreteMapTrack().sequence(0);
+    seq.setOctave(-3);
+    expectEqual(seq.octave(), -3, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::Octave, 0, 5.f);
+    expectEqual(seq.octave(), 2, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::Octave, 0, -100.f);
+    expectEqual(seq.octave(), -10, "clamps lo to -10");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.octave(), -3, "stale clear -> base restored");
+}
+
+CASE("DiscreteMap rangeHigh: float base-anchored read via routedValue (bipolar +-5)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::DiscreteMap);
+    auto &seq = p.track(0).discreteMapTrack().sequence(0);
+    seq.setRangeHigh(2.0f);
+    expect(std::fabs(seq.rangeHigh() - 2.0f) < 1e-4f, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::DiscreteMapRangeHigh, 0, 1.5f);
+    expect(std::fabs(seq.rangeHigh() - 3.5f) < 1e-4f, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::DiscreteMapRangeHigh, 0, 10.f);
+    expect(std::fabs(seq.rangeHigh() - 5.0f) < 1e-4f, "clamps hi to +5");
+
+    Routing::clearRouteOverrides();
+    expect(std::fabs(seq.rangeHigh() - 2.0f) < 1e-4f, "stale clear -> base restored");
+}
+
+// Base-0 inlet: no param-door base, override path feeds the value directly.
+CASE("DiscreteMap input inlet: base-0 override read") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::DiscreteMap);
+    auto &track = p.track(0).discreteMapTrack();
+    expect(std::fabs(track.routedInput() - 0.0f) < 1e-4f, "no override -> 0");
+
+    Routing::writeRouteOverride(ParamKey::DiscreteMapInput, 0, 2.0f);
+    expect(std::fabs(track.routedInput() - 2.0f) < 1e-4f, "override -> delta over base 0");
+
+    Routing::clearRouteOverrides();
+    expect(std::fabs(track.routedInput() - 0.0f) < 1e-4f, "stale clear -> 0");
+}
+
 } // UNIT_TEST

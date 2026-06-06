@@ -11,6 +11,7 @@
 #include "ParamTableCurve.h"
 #include "ParamTableTuesday.h"
 #include "ParamTableStochastic.h"
+#include "ParamTableDiscreteMap.h"
 #include "ParamTableGlobal.h"
 
 // Apply-fork decision for the routing mod-matrix slice (plan 005, step 3).
@@ -85,6 +86,12 @@ namespace RouteFork {
         case Routing::Target::StochasticPatienceRhythm:  return ParamKey::PatienceRhythm;
         case Routing::Target::StochasticNoteDuration:    return ParamKey::NoteDuration;
         case Routing::Target::StochasticFeel:            return ParamKey::Feel;
+        // DiscreteMap inlets + signature block (Octave/Transpose/SlideTime/Offset/
+        // Divisor/ClockMult/Scale/RootNote bridged above via the shared keys)
+        case Routing::Target::DiscreteMapInput:          return ParamKey::DiscreteMapInput;
+        case Routing::Target::DiscreteMapScanner:        return ParamKey::DiscreteMapScanner;
+        case Routing::Target::DiscreteMapRangeHigh:      return ParamKey::DiscreteMapRangeHigh;
+        case Routing::Target::DiscreteMapRangeLow:       return ParamKey::DiscreteMapRangeLow;
         // global (project) targets — no track dimension
         case Routing::Target::Tempo:                     return ParamKey::Tempo;
         case Routing::Target::Swing:                     return ParamKey::Swing;
@@ -121,6 +128,7 @@ namespace RouteFork {
         case Track::TrackMode::Curve:     table = &CurveParamTable::table(); break;
         case Track::TrackMode::Tuesday:   table = &TuesdayParamTable::table(); break;
         case Track::TrackMode::Stochastic: table = &StochasticParamTable::table(); break;
+        case Track::TrackMode::DiscreteMap: table = &DiscreteMapParamTable::table(); break;
         default:                          return false;
         }
         uint8_t key = targetToParamKey(target);

@@ -215,13 +215,13 @@ private:
             _sequence->editPluck(value, shift);
             break;
         case Octave:
-            _sequence->setOctave(ModelUtils::adjusted(_sequence->octave(), value, -10, 10));
+            _sequence->setOctave(ModelUtils::adjusted(_sequence->octaveBase(), value, -10, 10));
             break;
         case Transpose:
-            _sequence->setTranspose(ModelUtils::adjusted(_sequence->transpose(), value, -60, 60));
+            _sequence->setTranspose(ModelUtils::adjusted(_sequence->transposeBase(), value, -60, 60));
             break;
         case Offset:
-            _sequence->setOffset(ModelUtils::adjusted(_sequence->offset(), value * (shift ? 1 : 10), -500, 500));
+            _sequence->setOffset(ModelUtils::adjusted(_sequence->offsetBase(), value * (shift ? 1 : 10), -500, 500));
             break;
         case Last:
             break;

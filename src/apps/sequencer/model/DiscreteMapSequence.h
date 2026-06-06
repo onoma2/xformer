@@ -6,6 +6,7 @@
 #include "Types.h"
 #include "Scale.h"
 #include "Routing.h"
+#include "RouteParamKey.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -133,13 +134,13 @@ public:
     }
 
     // Divisor (ticks)
-    int divisor() const { return _divisor; }
+    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor, 1, 768); }
     void setDivisor(int div) {
         _divisor = clamp(div, 1, 768);
     }
 
     // clockMultiplier
-    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
     void setClockMultiplier(int clockMultiplier, bool routed = false) {
         _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
     }
@@ -192,12 +193,12 @@ public:
     //----------------------------------------
 
     // Track-scale selection (-1 = Default/Project, 0..N = Track Scale)
-    int scale() const { return _scale; }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
     void setScale(int scale) {
         _scale = clamp(scale, -1, Scale::Count - 1);
     }
     void editScale(int value, bool shift) {
-        setScale(scale() + value);
+        setScale(_scale + value);
     }
     void printScale(StringBuilder &str) const {
         if (scale() < 0) {
@@ -208,21 +209,19 @@ public:
     }
 
     // Root note (0-11: C-B)
-    int rootNote() const { return _rootNote; }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
     void setRootNote(int root) {
         _rootNote = clamp(root, 0, 11);
     }
 
     // Slew rate percent (0 = off, 1-100)
-    int slewTime() const { return _slewTime.get(isRouted(Routing::Target::SlideTime)); }
+    int slewTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slewTime.base, 0, 100); }
     void setSlewTime(int time, bool routed = false) {
         _slewTime.set(clamp(time, 0, 100), routed);
     }
     void editSlewTime(int value, bool shift) {
-        if (!isRouted(Routing::Target::SlideTime)) {
-            int step = shift ? 5 : 1;
-            setSlewTime(clamp(slewTime() + value * step, 0, 100));
-        }
+        int step = shift ? 5 : 1;
+        setSlewTime(clamp(_slewTime.base + value * step, 0, 100));
     }
     void printSlewTime(StringBuilder &str) const {
         if (slewTime() == 0) {
@@ -251,30 +250,33 @@ public:
 
 
     // Octave
-    int octave() const { return _octave; }
+    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave, -10, 10); }
+    int octaveBase() const { return _octave; }
     void setOctave(int octave) {
         _octave = clamp(octave, -10, 10);
     }
 
     // Transpose
-    int transpose() const { return _transpose; }
+    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose, -60, 60); }
+    int transposeBase() const { return _transpose; }
     void setTranspose(int transpose) {
         _transpose = clamp(transpose, -60, 60);
     }
 
     // Offset (in centiv olts: -500 to +500 = -5.00V to +5.00V)
-    int offset() const { return _offset; }
+    int offset() const { return Routing::routedValueInt(ParamKey::Offset, _trackIndex, _offset, -500, 500); }
+    int offsetBase() const { return _offset; }
     void setOffset(int offset) {
         _offset = clamp(offset, -500, 500);
     }
 
     // Voltage Range (ABOVE/BELOW)
-    float rangeHigh() const { return _rangeHigh; }
+    float rangeHigh() const { return Routing::routedValue(ParamKey::DiscreteMapRangeHigh, _trackIndex, _rangeHigh, -5.f, 5.f); }
     void setRangeHigh(float v) {
         _rangeHigh = clamp(v, -5.0f, 5.0f);
     }
 
-    float rangeLow() const { return _rangeLow; }
+    float rangeLow() const { return Routing::routedValue(ParamKey::DiscreteMapRangeLow, _trackIndex, _rangeLow, -5.f, 5.f); }
     void setRangeLow(float v) {
         _rangeLow = clamp(v, -5.0f, 5.0f);
     }
@@ -366,13 +368,11 @@ public:
 
     // Editing helpers for list UI
     void editDivisor(int value, bool shift) {
-        setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
+        setDivisor(ModelUtils::adjustedByDivisor(_divisor, value, shift));
     }
     void printDivisor(StringBuilder &str) const { ModelUtils::printDivisor(str, divisor()); }
     void editClockMultiplier(int value, bool shift) {
-        if (!isRouted(Routing::Target::ClockMult)) {
-            setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
-        }
+        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
     }
     void printClockMultiplier(StringBuilder &str) const {
         printRouted(str, Routing::Target::ClockMult);
@@ -394,7 +394,7 @@ public:
         }
     }
     void printThresholdMode(StringBuilder &str) const { str(_thresholdMode == ThresholdMode::Position ? "Position" : "Length"); }
-    void editRootNote(int value, bool shift) { setRootNote(rootNote() + value); }
+    void editRootNote(int value, bool shift) { setRootNote(_rootNote + value); }
     void printRootNote(StringBuilder &str) const { Types::printNote(str, rootNote()); }
     void printSlew(StringBuilder &str) const { printSlewTime(str); }
     void printLoop(StringBuilder &str) const { str(loop() ? "Loop" : "Once"); }
