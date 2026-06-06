@@ -158,8 +158,15 @@ Read-side migration (slice-4 pattern) per engine: `RouteFork::migrated` case + g
       plain-field octave/transpose/offset/divisor. Sync retired (no row, no bridge). Codex caught
       base-lurch in DiscreteMapSequenceListModel + **base-0 inlet silent at depth 0** → added
       `Routing::isInletTarget`, inlet routes default depth 100 (create + MOD+ extend). 1 BLOCK→ALLOW; suite green.
-- [ ] Indexed (IndexedA/B + sequence; Sync retired).
-- [ ] MidiCv (optional — SlideTime/Transpose only).
+- [x] **Indexed** (2026-06-06) — `b4507967` + `ef6675c2`. IndexedSequence + IndexedTrack getters; IndexedA/B
+      base-0 inlets with **×0.01 normalization** (engine consumes −1..1, override domain ±100 — read
+      ±100 then ×0.01); `isInletTarget` extended to IndexedA/B; rootNote is Routable here (scale plain-int).
+      Sync retired. Codex caught firstStep dynamic-clamp (0.._activeLength-1, Tuesday-rotate class). 1 BLOCK→ALLOW.
+- [x] **Flash reclaim** (2026-06-06) — `7029bf0e`. Indexed overflowed flash by 1464 B; stripped the dead
+      ParamTable `applyRouted` apply-hooks (fn ptr + ~24 KB of apply fns + dead Table::applyRouted; never
+      called on the override path). Now **23.4 KB under** the 960 KB ceiling. Also fixed a stale TestRouteFork
+      case (red since Tuesday — my per-engine re-run set omitted TestRouteFork; now in the loop).
+- [ ] MidiCv (optional — SlideTime/Transpose only; 2 params).
 
 ## Phase 7 — MIDI source + shaper (spec §7, §13)
 - [ ] MIDI source via **F4 LEARN** (MidiLearn → source=Midi + midiSource on the live route).
