@@ -239,6 +239,16 @@ void Routing::writeTarget(Target target, uint8_t tracks, float normalized) {
                     track.setRunGate(floatValue > 0.55f, true);
                     continue;
                 }
+                // DiscreteMapSync: live non-migrated inlet (external reset/sync sink);
+                // retired from the override model but still routed via writeTarget.
+                if (target == Target::DiscreteMapSync) {
+                    if (track.trackMode() == Track::TrackMode::DiscreteMap) {
+                        track.discreteMapTrack().setRoutedSync(floatValue);
+                    } else if (track.trackMode() == Track::TrackMode::Indexed) {
+                        track.indexedTrack().setRoutedSync(floatValue);
+                    }
+                    continue;
+                }
             }
         }
     } else if (isBusTarget(target)) {

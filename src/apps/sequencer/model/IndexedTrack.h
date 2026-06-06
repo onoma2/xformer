@@ -136,6 +136,7 @@ public:
     void read(VersionedSerializedReader &reader);
 
     float routedSync() const { return _routedSync; }
+    void setRoutedSync(float v) { _routedSync = v; }
 
     inline bool isRouted(Routing::Target target) const { return Routing::isRouted(target, _trackIndex); }
     inline void printRouted(StringBuilder &str, Routing::Target target) const { Routing::printRouted(str, target, _trackIndex); }
