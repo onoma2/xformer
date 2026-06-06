@@ -141,8 +141,11 @@ Read-side migration (slice-4 pattern) per engine: `RouteFork::migrated` case + g
 - [x] **Curve** (2026-06-06) — plan `docs/plans/2026-06-05-014-phase6-curve-migration.md`,
       `43c968b8`→`978d3dbc`. 18 getters, 9 bridges added, centi handling for curveRate/wavefolder/
       djFilter; 4 Codex ALLOW + final ALLOW; suite green; STM32+sim clean. `Phase` row orphan (no Target).
-- [ ] Tuesday (sequence-level only; +Scale/RootNote fork rows; bridge Algorithm/Flow/Ornament/Power/
-      Glide/Trill/StepTrill/GateLength/GateOffset).
+- [x] **Tuesday** (2026-06-06) — `cbb0d78c` + `079d3057` + `3de7d0c3`. One file (TuesdaySequence — no
+      track getters); 16 getters incl. plain-int Scale/RootNote (−1 Default preserved) + Algorithm/Flow/
+      Ornament/Power/Glide/Trill/StepTrill/GateLength/GateOffset bridges. **Two field<table clamp fixes**
+      Codex caught: transpose ±60→±11 (getter+table), rotate dynamic clamp ±(loopLen−1) in the getter;
+      divisor shortcut keys base-edit (divisorBase) to stop base-lurch. 2 Codex BLOCK→ALLOW; suite green.
 - [ ] Stochastic (23 rows; no master baseline — table is the source).
 - [ ] DiscreteMap (Input/Scanner + sequence; Sync retired, not migrated).
 - [ ] Indexed (IndexedA/B + sequence; Sync retired).
