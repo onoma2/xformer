@@ -2,6 +2,7 @@
 
 #include "apps/sequencer/model/NoteSequence.h"
 #include "apps/sequencer/model/PhaseFluxSequence.h"
+#include "apps/sequencer/model/StochasticSequence.h"
 #include "apps/sequencer/model/Project.h"
 #include "apps/sequencer/model/Routing.h"
 #include "apps/sequencer/model/RouteParamKey.h"
@@ -311,6 +312,87 @@ CASE("Tuesday rotate: routed effective clamps to dynamic loop limit") {
     expectEqual(seq.rotate(), 0, "len 1 collapses routed rotate to 0");
 
     Routing::clearRouteOverrides();
+}
+
+// Stochastic sequence getters migrate onto routedValueInt the same way. Track 0
+// in Stochastic mode carries trackIndex 0 (set by Project::setTrackMode).
+CASE("Stochastic complexity: base-anchored read + stale clear (unipolar 0..100)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Stochastic);
+    auto &seq = p.track(0).stochasticTrack().sequence(0);
+    seq.setComplexity(40);
+    expectEqual(seq.complexity(), 40, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::Complexity, 0, 30.f);
+    expectEqual(seq.complexity(), 70, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::Complexity, 0, 100.f);
+    expectEqual(seq.complexity(), 100, "clamps hi to 100");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.complexity(), 40, "stale clear -> base restored");
+}
+
+// Track-level transpose: field clamps +-100 while the ParamTable row range is
+// +-60. The getter must use the FIELD clamp, so a base above 60 is preserved and
+// not clamped down to 60 under a route.
+CASE("Stochastic transpose: field range +-100, base>60 not clamped to 60 under route") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Stochastic);
+    auto &track = p.track(0).stochasticTrack();
+    track.setTranspose(80);
+    expectEqual(track.transpose(), 80, "no override -> base (field allows >60)");
+
+    Routing::writeRouteOverride(ParamKey::Transpose, 0, 5.f);
+    expectEqual(track.transpose(), 85, "base 80 + delta, NOT clamped to 60");
+
+    Routing::writeRouteOverride(ParamKey::Transpose, 0, 100.f);
+    expectEqual(track.transpose(), 100, "clamps hi to field range 100");
+
+    Routing::writeRouteOverride(ParamKey::Transpose, 0, -300.f);
+    expectEqual(track.transpose(), -100, "clamps lo to field range -100");
+
+    Routing::clearRouteOverrides();
+    expectEqual(track.transpose(), 80, "stale clear -> base restored");
+}
+
+CASE("Stochastic contour: signed base-anchored read + clamp (bipolar -100..100)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Stochastic);
+    auto &seq = p.track(0).stochasticTrack().sequence(0);
+    seq.setContour(-20);
+    expectEqual(seq.contour(), -20, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::Contour, 0, 50.f);
+    expectEqual(seq.contour(), 30, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::Contour, 0, -300.f);
+    expectEqual(seq.contour(), -100, "clamps lo to -100");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.contour(), -20, "stale clear -> base restored");
+}
+
+CASE("Stochastic scale: Default(-1) preserved unrouted, clamps to 0..23 under route") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Stochastic);
+    auto &seq = p.track(0).stochasticTrack().sequence(0);
+    seq.setScale(-1);
+    expectEqual(seq.scale(), -1, "Default passes through when no override");
+
+    Routing::writeRouteOverride(ParamKey::Scale, 0, 5.f);
+    expectEqual(seq.scale(), 4, "under route effective = clamp(base(-1) + delta(5), 0, 23)");
+
+    seq.setScale(20);
+    Routing::writeRouteOverride(ParamKey::Scale, 0, 10.f);
+    expectEqual(seq.scale(), 23, "clamps hi to 23");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.scale(), 20, "stale clear -> base restored");
 }
 
 } // UNIT_TEST

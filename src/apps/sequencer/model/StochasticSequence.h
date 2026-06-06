@@ -10,6 +10,7 @@
 #include "core/math/Math.h"
 
 #include "Routing.h"
+#include "RouteParamKey.h"
 #include "ProjectVersion.h"
 #include "StochasticTypes.h"
 
@@ -24,17 +25,19 @@ public:
     void setTrackIndex(int trackIndex) { _trackIndex = trackIndex; }
 
     // scale
-    int scale() const { return _scale; }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
     void setScale(int scale) { _scale = clamp(scale, -1, Scale::Count - 1); }
     const Scale &selectedScale(int defaultScale) const {
-        return Scale::get(_scale != -1 ? _scale : defaultScale);
+        int s = scale();
+        return Scale::get(s != -1 ? s : defaultScale);
     }
 
     // rootNote
-    int rootNote() const { return _rootNote; }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
     void setRootNote(int rootNote) { _rootNote = clamp(rootNote, -1, 11); }
     int selectedRootNote(int defaultRootNote) const {
-        return _rootNote != -1 ? _rootNote : defaultRootNote;
+        int r = rootNote();
+        return r != -1 ? r : defaultRootNote;
     }
 
     // divisor
@@ -42,14 +45,12 @@ public:
     void setDivisor(int divisor) { _divisor = ModelUtils::clampDivisor(divisor); }
 
     // clockMultiplier
-    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
     void setClockMultiplier(int clockMultiplier, bool routed = false) {
         _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
     }
     void editClockMultiplier(int value, bool shift) {
-        if (!isRouted(Routing::Target::ClockMult)) {
-            setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
-        }
+        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
     }
     void printClockMultiplier(StringBuilder &str) const {
         printRouted(str, Routing::Target::ClockMult);
@@ -89,7 +90,7 @@ public:
     }
 
     void editScale(int value, bool shift) {
-        setScale(scale() + value);
+        setScale(_scale + value);
     }
 
 
@@ -144,10 +145,10 @@ public:
         if (_melodyMode == StochasticSourceMode::Loop) _melodyValid = false;
     }
 
-    int complexity() const { return _complexity.get(isRouted(Routing::Target::StochasticComplexity)); }
+    int complexity() const { return Routing::routedValueInt(ParamKey::Complexity, _trackIndex, _complexity.base, 0, 100); }
     void setComplexity(int complexity, bool routed = false) { _complexity.set(clamp(complexity, 0, 100), routed); }
 
-    int contour() const { return _contour.get(isRouted(Routing::Target::StochasticContour)); }
+    int contour() const { return Routing::routedValueInt(ParamKey::Contour, _trackIndex, _contour.base, -100, 100); }
     void setContour(int contour, bool routed = false) { _contour.set(clamp(contour, -100, 100), routed); }
 
     // Phase 12: _repeatProb field repurposed as Repeat probability. Per-event
@@ -159,19 +160,19 @@ public:
 
     // Live-mode duration LUT entry index 0..7. Divisor-relative: see
     // StochasticTrackEngine::getDurationFraction() for the multiplier table.
-    int noteDuration() const { return _noteDuration.get(isRouted(Routing::Target::StochasticNoteDuration)); }
+    int noteDuration() const { return Routing::routedValueInt(ParamKey::NoteDuration, _trackIndex, _noteDuration.base, 0, 7); }
     void setNoteDuration(int v, bool routed = false) { _noteDuration.set(clamp(v, 0, 7), routed); }
 
     // Phase 11: storage may be signed (legacy patches); read always returns |v|.
-    int variation() const { int v = _variation.get(isRouted(Routing::Target::StochasticVariation)); return v < 0 ? -v : v; }
+    int variation() const { int v = Routing::routedValueInt(ParamKey::Variation, _trackIndex, _variation.base, 0, 100); return v < 0 ? -v : v; }
     // Phase 11: variation is symmetric (sign meaningless). New writes clamp to
     // [0, 100]. Legacy patches with negative storage get abs()'d at getter.
     void setVariation(int variation, bool routed = false) { _variation.set(clamp(variation, 0, 100), routed); }
 
-    int rest() const { return _rest.get(isRouted(Routing::Target::StochasticRest)); }
+    int rest() const { return Routing::routedValueInt(ParamKey::Rest, _trackIndex, _rest.base, 0, 100); }
     void setRest(int rest, bool routed = false) { _rest.set(clamp(rest, 0, 100), routed); }
 
-    int slide() const { return _slide.get(isRouted(Routing::Target::StochasticSlide)); }
+    int slide() const { return Routing::routedValueInt(ParamKey::Slide, _trackIndex, _slide.base, 0, 100); }
     void setSlide(int slide, bool routed = false) { _slide.set(clamp(slide, 0, 100), routed); }
 
     int burstRate() const { return _burstRate; }
@@ -183,19 +184,19 @@ public:
     StochasticBurstHold burstHold() const { return _burstHold; }
     void setBurstHold(StochasticBurstHold pitch) { _burstHold = ModelUtils::clampedEnum(pitch); }
 
-    int sleep() const { return _sleep.get(isRouted(Routing::Target::StochasticSleep)); }
+    int sleep() const { return Routing::routedValueInt(ParamKey::Sleep, _trackIndex, _sleep.base, 0, 100); }
     void setSleep(int sleep, bool routed = false) { _sleep.set(clamp(sleep, 0, 100), routed); }
 
 
     // mutate — probability 0..100 that one randomly-picked step inside the
     // active window gets destructively re-rolled at each cycle-end. Unipolar.
-    int mutate() const { return _mutate.get(isRouted(Routing::Target::StochasticMutate)); }
+    int mutate() const { return Routing::routedValueInt(ParamKey::Mutate, _trackIndex, _mutate.base, 0, 100); }
     // Bipolar: -100..0 = Proteus destructive (regenerate one event), 0 = lock,
     // 0..+100 = Marbles permutation (swap two existing events). Magnitude is
     // probability per loop iteration.
     void setMutate(int mutate, bool routed = false) { _mutate.set(clamp(mutate, 0, 100), routed); }
 
-    int jump() const { return _jump.get(isRouted(Routing::Target::StochasticJump)); }
+    int jump() const { return Routing::routedValueInt(ParamKey::Jump, _trackIndex, _jump.base, 0, 100); }
     void setJump(int jump, bool routed = false) { _jump.set(clamp(jump, 0, 100), routed); }
 
     // Range — bipolar field width / jump-chance knob, 0..100 centered at 50.
@@ -255,7 +256,7 @@ public:
     // knob 100 = off sentinel. No routing target (matches Repeat treatment).
     int patienceMelody() const { return _patienceMelody; }
     void setPatienceMelody(int value) { _patienceMelody = clamp(value, 0, 100); }
-    int patienceRhythm() const { return _patienceRhythm.get(isRouted(Routing::Target::StochasticPatienceRhythm)); }
+    int patienceRhythm() const { return Routing::routedValueInt(ParamKey::PatienceRhythm, _trackIndex, _patienceRhythm.base, 0, 100); }
     void setPatienceRhythm(int value, bool routed = false) { _patienceRhythm.set(clamp(value, 0, 100), routed); }
 
     // degreeRotation
@@ -285,7 +286,7 @@ public:
     void setTiltMelody(int value) { _tiltMelody = clamp(value, 0, 100); }
 
     // maskRhythm (deterministic loop playback thinning, V5 rename from density)
-    int maskRhythm() const { return _maskRhythm.get(isRouted(Routing::Target::StochasticMask)); }
+    int maskRhythm() const { return Routing::routedValueInt(ParamKey::MaskRhythm, _trackIndex, _maskRhythm.base, 0, 100); }
     void setMaskRhythm(int value, bool routed = false) { _maskRhythm.set(clamp(value, 0, 100), routed); }
 
     // gateLength — repurposed from the Phase 11 `_gateLength` reserved field. Knob
@@ -295,28 +296,28 @@ public:
     // audible-tick minimum so very short events still produce a real trigger.
     // Routing target keeps the legacy `StochasticGeneratorDensity` enum name
     // for save-file compatibility; UI label changes to "Gate Length".
-    int gateLength() const { return _gateLength.get(isRouted(Routing::Target::StochasticGateLength)); }
+    int gateLength() const { return Routing::routedValueInt(ParamKey::StochasticGateLength, _trackIndex, _gateLength.base, 0, 100); }
     void setGateLength(int value, bool routed = false) { _gateLength.set(clamp(value, 0, 100), routed); }
 
     // tiltRhythm — paired with maskRhythm. 0..100, center 50 = pure salt cut,
     // 0 = max negative rank-cut, 100 = max positive rank-cut. Engine recovers
     // signed magnitude as (knob - 50) and uses |signed| * 2 as the rank weight.
-    int tiltRhythm() const { return _tiltRhythm.get(isRouted(Routing::Target::StochasticTilt)); }
+    int tiltRhythm() const { return Routing::routedValueInt(ParamKey::TiltRhythm, _trackIndex, _tiltRhythm.base, 0, 100); }
     void setTiltRhythm(int value, bool routed = false) { _tiltRhythm.set(clamp(value, 0, 100), routed); }
 
     // burs
-    int burst() const { return _burst.get(isRouted(Routing::Target::StochasticBurst)); }
+    int burst() const { return Routing::routedValueInt(ParamKey::Burst, _trackIndex, _burst.base, 0, 100); }
     void setBurst(int burst, bool routed = false) { _burst.set(clamp(burst, 0, 100), routed); }
 
     // feel (Phase 16 P4, 2026-05-23) — knob 0..100, default 50. Detent
     // [45..55] = off (no scaling). knob < 45 lerps toward 3 beats per
     // cycle, knob > 55 lerps toward 5 beats per cycle. Generator reads
     // this in the post-walk scaling pass; inert until P5 wires it.
-    int feel() const { return _feel.get(isRouted(Routing::Target::StochasticFeel)); }
+    int feel() const { return Routing::routedValueInt(ParamKey::Feel, _trackIndex, _feel.base, 0, 100); }
     void setFeel(int feel, bool routed = false) { _feel.set(clamp(feel, 0, 100), routed); }
 
     // rotate
-    int rotate() const { return _rotate.get(isRouted(Routing::Target::Rotate)); }
+    int rotate() const { return Routing::routedValueInt(ParamKey::Rotate, _trackIndex, _rotate.base, -64, 64); }
     void setRotate(int rotate, bool routed = false) { _rotate.set(clamp(rotate, -64, 64), routed); }
 
     // durationTickets — per-LUT-slot duration emphasis. Three states (mirror
@@ -352,25 +353,21 @@ public:
 
 
     void printMaskRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMask); str("%d%%", maskRhythm()); }
-    void editMaskRhythm(int value, bool shift) { if (!isRouted(Routing::Target::StochasticMask)) setMaskRhythm(maskRhythm() + value); }
+    void editMaskRhythm(int value, bool shift) { setMaskRhythm(_maskRhythm.base + value); }
 
     // Level 1 Density macro: writes density only (no fan-out to rest)
     void printGateLength(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticGateLength); str("%d%%", gateLength()); }
     void editGateLength(int value, bool shift) {
-        if (!isRouted(Routing::Target::StochasticGateLength)) {
-            setGateLength(gateLength() + value);
-        }
+        setGateLength(_gateLength.base + value);
     }
 
     void editComplexityMacro(int value, bool shift) {
-        if (!isRouted(Routing::Target::StochasticComplexity)) {
-            int c = clamp(complexity() + value, 0, 100);
-            setComplexity(c);
-        }
+        int c = clamp(_complexity.base + value, 0, 100);
+        setComplexity(c);
     }
 
     void printTiltRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticTilt); str("%d%%", tiltRhythm()); }
-    void editTiltRhythm(int value, bool shift) { if (!isRouted(Routing::Target::StochasticTilt)) setTiltRhythm(tiltRhythm() + value); }
+    void editTiltRhythm(int value, bool shift) { setTiltRhythm(_tiltRhythm.base + value); }
 
     // Phase 12: append "*" when current noteDuration + divisor combo can't
     // produce audible burst (parentTicks < 96). Engine still gates Burst
@@ -385,22 +382,22 @@ public:
         if (parentTicks < kMinBurstParentTicks) str("%d%% *", burst());
         else str("%d%%", burst());
     }
-    void editBurst(int value, bool shift) { if (!isRouted(Routing::Target::StochasticBurst)) setBurst(burst() + value); }
+    void editBurst(int value, bool shift) { setBurst(_burst.base + value); }
 
     void printPatienceMelody(StringBuilder &str) const { str("%d%%", patienceMelody()); }
     void editPatienceMelody(int value, bool shift) { setPatienceMelody(patienceMelody() + value); }
 
     void printPatienceRhythm(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticPatienceRhythm); str("%d%%", patienceRhythm()); }
-    void editPatienceRhythm(int value, bool shift) { if (!isRouted(Routing::Target::StochasticPatienceRhythm)) setPatienceRhythm(patienceRhythm() + value); }
+    void editPatienceRhythm(int value, bool shift) { setPatienceRhythm(_patienceRhythm.base + value); }
 
     void printLegatoProb(StringBuilder &str) const { str("%d%%", legatoProb()); }
     void editLegatoProb(int value, bool shift) { setLegatoProb(ModelUtils::adjustedByStep(legatoProb(), value, 1, !shift)); }
 
     void printComplexity(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticComplexity); str("%d%%", complexity()); }
-    void editComplexity(int value, bool shift) { if (!isRouted(Routing::Target::StochasticComplexity)) setComplexity(complexity() + value); }
+    void editComplexity(int value, bool shift) { setComplexity(_complexity.base + value); }
 
     void printContour(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticContour); str("%+d%%", contour()); }
-    void editContour(int value, bool shift) { if (!isRouted(Routing::Target::StochasticContour)) setContour(contour() + value); }
+    void editContour(int value, bool shift) { setContour(_contour.base + value); }
 
     void printNoteDuration(StringBuilder &str) const {
         printRouted(str, Routing::Target::StochasticNoteDuration);
@@ -415,26 +412,26 @@ public:
         int effectiveDivisor = (int(divisor()) * frac.num) / frac.den;
         ModelUtils::printDivisorShort(str, effectiveDivisor);
     }
-    void editNoteDuration(int value, bool shift) { if (!isRouted(Routing::Target::StochasticNoteDuration)) setNoteDuration(noteDuration() + value); }
+    void editNoteDuration(int value, bool shift) { setNoteDuration(_noteDuration.base + value); }
 
     void printVariation(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticVariation); str("%d%%", variation()); }
-    void editVariation(int value, bool shift) { if (!isRouted(Routing::Target::StochasticVariation)) setVariation(variation() + value); }
+    void editVariation(int value, bool shift) { setVariation(_variation.base + value); }
 
     void printRest(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticRest); str("%d%%", rest()); }
-    void editRest(int value, bool shift) { if (!isRouted(Routing::Target::StochasticRest)) setRest(rest() + value); }
+    void editRest(int value, bool shift) { setRest(_rest.base + value); }
 
     void printSlide(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticSlide); str("%d%%", slide()); }
-    void editSlide(int value, bool shift) { if (!isRouted(Routing::Target::StochasticSlide)) setSlide(slide() + value); }
+    void editSlide(int value, bool shift) { setSlide(_slide.base + value); }
 
     void printSleep(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticSleep); str("%d%%", sleep()); }
-    void editSleep(int value, bool shift) { if (!isRouted(Routing::Target::StochasticSleep)) setSleep(sleep() + value); }
+    void editSleep(int value, bool shift) { setSleep(_sleep.base + value); }
 
 
     void printMutate(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticMutate); str("%d%%", mutate()); }
-    void editMutate(int value, bool shift) { if (!isRouted(Routing::Target::StochasticMutate)) setMutate(mutate() + value); }
+    void editMutate(int value, bool shift) { setMutate(_mutate.base + value); }
 
     void printJump(StringBuilder &str) const { printRouted(str, Routing::Target::StochasticJump); str("%d%%", jump()); }
-    void editJump(int value, bool shift) { if (!isRouted(Routing::Target::StochasticJump)) setJump(jump() + value); }
+    void editJump(int value, bool shift) { setJump(_jump.base + value); }
 
     void printBurstHold(StringBuilder &str) const {
         switch (burstHold()) {
@@ -448,7 +445,7 @@ public:
     void editBurstHold(int value, bool shift) { setBurstHold(ModelUtils::adjustedEnum(burstHold(), value)); }
 
     void printRotate(StringBuilder &str) const { printRouted(str, Routing::Target::Rotate); str("%+d", rotate()); }
-    void editRotate(int value, bool shift) { if (!isRouted(Routing::Target::Rotate)) setRotate(rotate() + value); }
+    void editRotate(int value, bool shift) { setRotate(_rotate.base + value); }
 
     void printRootNote(StringBuilder &str) const {
         if (rootNote() == -1) {
@@ -459,7 +456,7 @@ public:
     }
 
     void editRootNote(int value, bool shift) {
-        setRootNote(rootNote() + value);
+        setRootNote(_rootNote + value);
     }
 
     // Pattern window. last() resolves to size-1 — Last is collapsed into Size.

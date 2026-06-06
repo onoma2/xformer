@@ -10,6 +10,7 @@
 #include "ParamTablePhaseFlux.h"
 #include "ParamTableCurve.h"
 #include "ParamTableTuesday.h"
+#include "ParamTableStochastic.h"
 #include "ParamTableGlobal.h"
 
 // Apply-fork decision for the routing mod-matrix slice (plan 005, step 3).
@@ -68,6 +69,22 @@ namespace RouteFork {
         case Routing::Target::StepTrill:                 return ParamKey::StepTrill;
         case Routing::Target::GateLength:                return ParamKey::GateLength;
         case Routing::Target::GateOffset:                return ParamKey::GateOffset;
+        // Stochastic signature block (legacy Target names diverge from ParamKey)
+        case Routing::Target::StochasticComplexity:      return ParamKey::Complexity;
+        case Routing::Target::StochasticVariation:       return ParamKey::Variation;
+        case Routing::Target::StochasticRest:            return ParamKey::Rest;
+        case Routing::Target::StochasticSlide:           return ParamKey::Slide;
+        case Routing::Target::StochasticBurst:           return ParamKey::Burst;
+        case Routing::Target::StochasticSleep:           return ParamKey::Sleep;
+        case Routing::Target::StochasticMutate:          return ParamKey::Mutate;
+        case Routing::Target::StochasticJump:            return ParamKey::Jump;
+        case Routing::Target::StochasticContour:         return ParamKey::Contour;
+        case Routing::Target::StochasticMask:            return ParamKey::MaskRhythm;
+        case Routing::Target::StochasticTilt:            return ParamKey::TiltRhythm;
+        case Routing::Target::StochasticGateLength:      return ParamKey::StochasticGateLength;
+        case Routing::Target::StochasticPatienceRhythm:  return ParamKey::PatienceRhythm;
+        case Routing::Target::StochasticNoteDuration:    return ParamKey::NoteDuration;
+        case Routing::Target::StochasticFeel:            return ParamKey::Feel;
         // global (project) targets — no track dimension
         case Routing::Target::Tempo:                     return ParamKey::Tempo;
         case Routing::Target::Swing:                     return ParamKey::Swing;
@@ -103,6 +120,7 @@ namespace RouteFork {
         case Track::TrackMode::PhaseFlux: table = &PhaseFluxParamTable::table(); break;
         case Track::TrackMode::Curve:     table = &CurveParamTable::table(); break;
         case Track::TrackMode::Tuesday:   table = &TuesdayParamTable::table(); break;
+        case Track::TrackMode::Stochastic: table = &StochasticParamTable::table(); break;
         default:                          return false;
         }
         uint8_t key = targetToParamKey(target);

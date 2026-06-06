@@ -5,6 +5,7 @@
 #include "StochasticSequence.h"
 #include "Serialize.h"
 #include "Routing.h"
+#include "RouteParamKey.h"
 
 class StochasticTrack {
 public:
@@ -64,15 +65,15 @@ public:
     void setLock(bool lock) { _lock = lock; }
 
     // slideTime
-    int slideTime() const { return _slideTime.get(isRouted(Routing::Target::SlideTime)); }
+    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime.base, 0, 100); }
     void setSlideTime(int slideTime, bool routed = false) { _slideTime.set(clamp(slideTime, 0, 100), routed); }
 
     // octave
-    int octave() const { return _octave.get(isRouted(Routing::Target::Octave)); }
+    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave.base, -10, 10); }
     void setOctave(int octave, bool routed = false) { _octave.set(clamp(octave, -10, 10), routed); }
 
     // transpose
-    int transpose() const { return _transpose.get(isRouted(Routing::Target::Transpose)); }
+    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -100, 100); }
     void setTranspose(int transpose, bool routed = false) { _transpose.set(clamp(transpose, -100, 100), routed); }
 
     // fillMode
@@ -94,16 +95,16 @@ public:
     void editLock(int value, bool shift) { setLock(value > 0); }
 
     void printOctave(StringBuilder &str) const { printRouted(str, Routing::Target::Octave); str("%+d", octave()); }
-    void editOctave(int value, bool shift) { if (!isRouted(Routing::Target::Octave)) setOctave(octave() + value); }
+    void editOctave(int value, bool shift) { setOctave(_octave.base + value); }
 
     void printTranspose(StringBuilder &str) const { printRouted(str, Routing::Target::Transpose); str("%+d", transpose()); }
-    void editTranspose(int value, bool shift) { if (!isRouted(Routing::Target::Transpose)) setTranspose(transpose() + value); }
+    void editTranspose(int value, bool shift) { setTranspose(_transpose.base + value); }
 
     void printCvUpdateMode(StringBuilder &str) const { str(cvUpdateModeName(cvUpdateMode())); }
     void editCvUpdateMode(int value, bool shift) { setCvUpdateMode(ModelUtils::adjustedEnum(cvUpdateMode(), value)); }
 
     void printSlideTime(StringBuilder &str) const { printRouted(str, Routing::Target::SlideTime); str("%d%%", slideTime()); }
-    void editSlideTime(int value, bool shift) { if (!isRouted(Routing::Target::SlideTime)) setSlideTime(ModelUtils::adjustedByStep(slideTime(), value, 5, !shift)); }
+    void editSlideTime(int value, bool shift) { setSlideTime(ModelUtils::adjustedByStep(_slideTime.base, value, 5, !shift)); }
 
     // sequences
     const StochasticSequenceArray &sequences() const { return _sequences; }
