@@ -99,10 +99,11 @@ CASE("Curve migrates its sequence-level and track-level Target-backed params") {
     expectFalse(RouteFork::migrated(Mode::Curve, Routing::Target::IndexedA, key, range), "IndexedA not Curve");
 }
 
-CASE("non-migrated track modes always stay on the old path") {
+CASE("modes not wired into migrated() stay on the old path") {
     uint8_t key; RouteParam::Range range;
-    for (auto m : { Mode::Curve, Mode::MidiCv, Mode::Tuesday, Mode::DiscreteMap,
-                    Mode::Indexed, Mode::Stochastic }) {
+    // MidiCv + Teletype have no migrated() case, so every target stays legacy
+    // even where a param table owns a matching row.
+    for (auto m : { Mode::MidiCv, Mode::Teletype }) {
         expectFalse(RouteFork::migrated(m, Routing::Target::Scale, key, range), "non-migrated mode");
         expectFalse(RouteFork::migrated(m, Routing::Target::Transpose, key, range), "non-migrated mode");
     }

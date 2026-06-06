@@ -7,6 +7,7 @@
 #include "Scale.h"
 #include "ProjectVersion.h"
 #include "Routing.h"
+#include "RouteParamKey.h"
 
 #include "core/math/Math.h"
 #include "core/utils/StringBuilder.h"
@@ -263,13 +264,13 @@ public:
     //----------------------------------------
 
     // divisor (clock ticks)
-    int divisor() const { return _divisor; }
+    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor, 1, 768); }
     void setDivisor(int div) {
         _divisor = clamp(div, 1, 768);
     }
 
     // clockMultiplier
-    int clockMultiplier() const { return _clockMultiplier.get(isRouted(Routing::Target::ClockMult)); }
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
     void setClockMultiplier(int clockMultiplier, bool routed = false) {
         _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
     }
@@ -280,14 +281,12 @@ public:
     void toggleLoop() { _loop = !_loop; }
 
     // run mode
-    Types::RunMode runMode() const { return _runMode.get(isRouted(Routing::Target::RunMode)); }
+    Types::RunMode runMode() const { return Types::RunMode(Routing::routedValueInt(ParamKey::RunMode, _trackIndex, int(_runMode.base), 0, 5)); }
     void setRunMode(Types::RunMode runMode, bool routed = false) {
         _runMode.set(ModelUtils::clampedEnum(runMode), routed);
     }
     void editRunMode(int value, bool /*shift*/) {
-        if (!isRouted(Routing::Target::RunMode)) {
-            setRunMode(ModelUtils::adjustedEnum(runMode(), value));
-        }
+        setRunMode(ModelUtils::adjustedEnum(_runMode.base, value));
     }
     void printRunMode(StringBuilder &str) const {
         printRouted(str, Routing::Target::RunMode);
@@ -319,7 +318,7 @@ public:
     }
 
     // scale selection (-1 = Project scale, 0..N = Track scale)
-    int scale() const { return _scale; }
+    int scale() const { return Routing::routedValueInt(ParamKey::Scale, _trackIndex, _scale, 0, 23); }
     void setScale(int scale) {
         _scale = clamp(scale, -1, Scale::Count - 1);
     }
@@ -347,15 +346,13 @@ public:
     }
 
     // root note (0-11: C-B)
-    int rootNote() const { return _rootNote.get(isRouted(Routing::Target::RootNote)); }
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote.base, 0, 11); }
     void setRootNote(int rootNote, bool routed = false) {
         _rootNote.set(clamp(rootNote, -1, 11), routed);
     }
 
     void editRootNote(int value, bool shift) {
-        if (!isRouted(Routing::Target::RootNote)) {
-            setRootNote(rootNote() + value);
-        }
+        setRootNote(_rootNote.base + value);
     }
 
     void printRootNote(StringBuilder &str) const {
@@ -370,7 +367,7 @@ public:
     // firstStep (Rotation Offset)
 
     int firstStep() const {
-        return _firstStep.get(isRouted(Routing::Target::FirstStep));
+        return Routing::routedValueInt(ParamKey::FirstStep, _trackIndex, _firstStep.base, 0, 63);
     }
 
     void setFirstStep(int firstStep, bool routed = false) {
@@ -378,9 +375,7 @@ public:
     }
 
     void editFirstStep(int value, bool shift) {
-        if (!isRouted(Routing::Target::FirstStep)) {
-            setFirstStep(firstStep() + value);
-        }
+        setFirstStep(_firstStep.base + value);
     }
 
     void printFirstStep(StringBuilder &str) const {
@@ -419,13 +414,13 @@ public:
     const RouteConfig& routeA() const { return _routeA; }
     RouteConfig& routeA() { return _routeA; }
     void setRouteA(const RouteConfig& cfg) { _routeA = cfg; }
-    float routedIndexedA() const { return _routedIndexedA; }
+    float routedIndexedA() const { return Routing::routedValue(ParamKey::IndexedA, _trackIndex, 0.f, -100.f, 100.f) * 0.01f; }
     void setRoutedIndexedA(float v) { _routedIndexedA = v; }
 
     const RouteConfig& routeB() const { return _routeB; }
     RouteConfig& routeB() { return _routeB; }
     void setRouteB(const RouteConfig& cfg) { _routeB = cfg; }
-    float routedIndexedB() const { return _routedIndexedB; }
+    float routedIndexedB() const { return Routing::routedValue(ParamKey::IndexedB, _trackIndex, 0.f, -100.f, 100.f) * 0.01f; }
     void setRoutedIndexedB(float v) { _routedIndexedB = v; }
 
     RouteCombineMode routeCombineMode() const { return _routeCombineMode; }
@@ -642,7 +637,7 @@ public:
 
     // UI helper methods
     void editDivisor(int value, bool shift) {
-        setDivisor(ModelUtils::adjustedByDivisor(divisor(), value, shift));
+        setDivisor(ModelUtils::adjustedByDivisor(_divisor, value, shift));
     }
 
     void printDivisor(StringBuilder &str) const {
@@ -650,9 +645,7 @@ public:
     }
 
     void editClockMultiplier(int value, bool shift) {
-        if (!isRouted(Routing::Target::ClockMult)) {
-            setClockMultiplier(clockMultiplier() + value * (shift ? 10 : 1));
-        }
+        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
     }
 
     void printClockMultiplier(StringBuilder &str) const {
@@ -661,7 +654,7 @@ public:
     }
 
     void editScale(int value, bool shift) {
-        setScale(scale() + value);
+        setScale(_scale + value);
     }
 
     void printScale(StringBuilder &str) const {
@@ -694,8 +687,8 @@ private:
     RouteConfig _routeA;
     RouteConfig _routeB;
     RouteCombineMode _routeCombineMode = RouteCombineMode::AtoB;
-    float _routedIndexedA = 0.f;  // Routed CV value for route A
-    float _routedIndexedB = 0.f;  // Routed CV value for route B
+    float _routedIndexedA = 0.f;  // superseded by override path; dead storage retained
+    float _routedIndexedB = 0.f;  // superseded by override path; dead storage retained
 
     std::array<Step, MaxSteps> _steps;
 };

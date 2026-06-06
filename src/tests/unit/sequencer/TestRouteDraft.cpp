@@ -28,6 +28,10 @@ UNIT_TEST("RouteDraft") {
         expectEqual(in.route.depthPct(2), 100, "DMap Input current track depth 100");
         auto sc = RouteDraft::create(routing, Routing::Target::DiscreteMapScanner, 0);
         expectEqual(sc.route.depthPct(0), 100, "DMap Scanner current track depth 100");
+        auto ia = RouteDraft::create(routing, Routing::Target::IndexedA, 1);
+        expectEqual(ia.route.depthPct(1), 100, "Indexed A current track depth 100");
+        auto ib = RouteDraft::create(routing, Routing::Target::IndexedB, 3);
+        expectEqual(ib.route.depthPct(3), 100, "Indexed B current track depth 100");
         auto tr = RouteDraft::create(routing, Routing::Target::Transpose, 2);
         expectEqual(tr.route.depthPct(2), 0, "normal target current track depth 0");
     }

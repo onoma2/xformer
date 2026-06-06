@@ -12,6 +12,7 @@
 #include "ParamTableTuesday.h"
 #include "ParamTableStochastic.h"
 #include "ParamTableDiscreteMap.h"
+#include "ParamTableIndexed.h"
 #include "ParamTableGlobal.h"
 
 // Apply-fork decision for the routing mod-matrix slice (plan 005, step 3).
@@ -92,6 +93,10 @@ namespace RouteFork {
         case Routing::Target::DiscreteMapScanner:        return ParamKey::DiscreteMapScanner;
         case Routing::Target::DiscreteMapRangeHigh:      return ParamKey::DiscreteMapRangeHigh;
         case Routing::Target::DiscreteMapRangeLow:       return ParamKey::DiscreteMapRangeLow;
+        // Indexed inlets (Octave/Transpose/SlideTime/Divisor/ClockMult/Scale/RootNote/
+        // FirstStep/RunMode bridged above via the shared keys)
+        case Routing::Target::IndexedA:                  return ParamKey::IndexedA;
+        case Routing::Target::IndexedB:                  return ParamKey::IndexedB;
         // global (project) targets — no track dimension
         case Routing::Target::Tempo:                     return ParamKey::Tempo;
         case Routing::Target::Swing:                     return ParamKey::Swing;
@@ -129,6 +134,7 @@ namespace RouteFork {
         case Track::TrackMode::Tuesday:   table = &TuesdayParamTable::table(); break;
         case Track::TrackMode::Stochastic: table = &StochasticParamTable::table(); break;
         case Track::TrackMode::DiscreteMap: table = &DiscreteMapParamTable::table(); break;
+        case Track::TrackMode::Indexed:   table = &IndexedParamTable::table(); break;
         default:                          return false;
         }
         uint8_t key = targetToParamKey(target);

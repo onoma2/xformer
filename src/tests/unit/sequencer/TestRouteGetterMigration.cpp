@@ -470,4 +470,57 @@ CASE("DiscreteMap input inlet: base-0 override read") {
     expect(std::fabs(track.routedInput() - 0.0f) < 1e-4f, "stale clear -> 0");
 }
 
+// Indexed track-level transpose migrates onto routedValueInt (bipolar -60..60).
+CASE("Indexed transpose: signed base-anchored read + clamp (bipolar -60..60)") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Indexed);
+    auto &track = p.track(0).indexedTrack();
+    track.setTranspose(-20);
+    expectEqual(track.transpose(), -20, "no override -> base");
+
+    Routing::writeRouteOverride(ParamKey::Transpose, 0, 50.f);
+    expectEqual(track.transpose(), 30, "override -> base + delta");
+
+    Routing::writeRouteOverride(ParamKey::Transpose, 0, 300.f);
+    expectEqual(track.transpose(), 60, "clamps hi to 60");
+
+    Routing::clearRouteOverrides();
+    expectEqual(track.transpose(), -20, "stale clear -> base restored");
+}
+
+CASE("Indexed scale: Default(-1) preserved unrouted, clamps to 0..23 under route") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Indexed);
+    auto &seq = p.track(0).indexedTrack().sequence(0);
+    seq.setScale(-1);
+    expectEqual(seq.scale(), -1, "Default passes through when no override");
+
+    Routing::writeRouteOverride(ParamKey::Scale, 0, 5.f);
+    expectEqual(seq.scale(), 4, "under route effective = clamp(base(-1) + delta(5), 0, 23)");
+
+    seq.setScale(20);
+    Routing::writeRouteOverride(ParamKey::Scale, 0, 10.f);
+    expectEqual(seq.scale(), 23, "clamps hi to 23");
+
+    Routing::clearRouteOverrides();
+    expectEqual(seq.scale(), 20, "stale clear -> base restored");
+}
+
+// Indexed inlet A: base-0 override in the +-100 domain, getter scales by 0.01.
+CASE("Indexed inlet A: base-0 override read, x0.01 normalize") {
+    Routing::clearRouteOverrides();
+    Project p;
+    p.setTrackMode(0, Track::TrackMode::Indexed);
+    auto &seq = p.track(0).indexedTrack().sequence(0);
+    expect(std::fabs(seq.routedIndexedA() - 0.0f) < 1e-4f, "no override -> 0.0");
+
+    Routing::writeRouteOverride(ParamKey::IndexedA, 0, 50.f);   // +-100 domain
+    expect(std::fabs(seq.routedIndexedA() - 0.5f) < 1e-4f, "override +50 -> 0.5 after x0.01");
+
+    Routing::clearRouteOverrides();
+    expect(std::fabs(seq.routedIndexedA() - 0.0f) < 1e-4f, "stale clear -> 0.0");
+}
+
 } // UNIT_TEST
