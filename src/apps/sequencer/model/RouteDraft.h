@@ -15,7 +15,8 @@ struct Draft {
 };
 
 // Stage a fresh modulation: allocate a slot, set target/tracks, combine=Modulate,
-// all depth 0, source None (inert). routeIndex stays -1 if no empty slot.
+// source None (inert). Depth 0, except inlet targets default to 100 (base-less
+// sinks would read 0 otherwise). routeIndex stays -1 if no empty slot.
 inline Draft create(Routing &routing, Routing::Target target, int trackIndex) {
     Draft d;
     if (target == Routing::Target::None || trackIndex < 0 || trackIndex >= CONFIG_TRACK_COUNT) {

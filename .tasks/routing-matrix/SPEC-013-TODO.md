@@ -152,7 +152,12 @@ Read-side migration (slice-4 pattern) per engine: `RouteFork::migrated` case + g
       transpose field ±100 (not table ±60), variation abs-before-clamp, and **hero-grid base-lurch**
       (editLiveStep/editLoopStep edited 16 migrated params from the effective getter → added xBase()
       accessors). 1 BLOCK→ALLOW; suite green. Param-door already wired (Config+Performance ListPages).
-- [ ] DiscreteMap (Input/Scanner + sequence; Sync retired, not migrated).
+- [x] **DiscreteMap** (2026-06-06) — `32c1fbde` + `cbce2717`. Bespoke: float fields rangeHigh/rangeLow
+      (**first use of `routedValue` float**) + base-less Input/Scanner inlets modeled as **base-0 overrides**
+      (owner choice, matrix-only); 4 bridges (Input/Scanner/RangeHigh/RangeLow); plain-int scale/rootNote;
+      plain-field octave/transpose/offset/divisor. Sync retired (no row, no bridge). Codex caught
+      base-lurch in DiscreteMapSequenceListModel + **base-0 inlet silent at depth 0** → added
+      `Routing::isInletTarget`, inlet routes default depth 100 (create + MOD+ extend). 1 BLOCK→ALLOW; suite green.
 - [ ] Indexed (IndexedA/B + sequence; Sync retired).
 - [ ] MidiCv (optional — SlideTime/Transpose only).
 
