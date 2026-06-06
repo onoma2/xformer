@@ -146,7 +146,12 @@ Read-side migration (slice-4 pattern) per engine: `RouteFork::migrated` case + g
       Ornament/Power/Glide/Trill/StepTrill/GateLength/GateOffset bridges. **Two field<table clamp fixes**
       Codex caught: transpose ±60→±11 (getter+table), rotate dynamic clamp ±(loopLen−1) in the getter;
       divisor shortcut keys base-edit (divisorBase) to stop base-lurch. 2 Codex BLOCK→ALLOW; suite green.
-- [ ] Stochastic (23 rows; no master baseline — table is the source).
+- [x] **Stochastic** (2026-06-06) — `de345ad0` + `e2e55f24`. 23 params across StochasticSequence (17 +
+      plain-int Scale/RootNote) + StochasticTrack (3); 16 Stochastic*/Feel bridges (name divergence:
+      StochasticMask→MaskRhythm, StochasticTilt→TiltRhythm, StochasticFeel→Feel…). Codex caught:
+      transpose field ±100 (not table ±60), variation abs-before-clamp, and **hero-grid base-lurch**
+      (editLiveStep/editLoopStep edited 16 migrated params from the effective getter → added xBase()
+      accessors). 1 BLOCK→ALLOW; suite green. Param-door already wired (Config+Performance ListPages).
 - [ ] DiscreteMap (Input/Scanner + sequence; Sync retired, not migrated).
 - [ ] Indexed (IndexedA/B + sequence; Sync retired).
 - [ ] MidiCv (optional — SlideTime/Transpose only).
