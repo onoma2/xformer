@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Param groups — canonical concepts</title>
+<style>
+  :root{ --ink:#1a1a1a; --dim:#777; --line:#e5e5e5; --page:#fafafa; --card:#fff;
+    --blue:#2563eb; --green:#16a34a; --amber:#ca8a04; --purple:#7c3aed; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    font-size:15px;line-height:1.45;padding:24px}
+  main{max-width:1000px;margin:0 auto}
+  h1{font-size:1.5rem;margin:0 0 2px}
+  h2{font-size:1.15rem;margin:26px 0 6px;padding-bottom:4px;border-bottom:2px solid var(--blue)}
+  h3{font-size:.95rem;margin:16px 0 4px;color:var(--purple)}
+  .lede{color:var(--dim);margin:0 0 6px}
+  .legend{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin:14px 0;font-size:.88rem}
+  .rc{display:inline-block;font-size:.72rem;font-weight:700;padding:1px 7px;border-radius:9px;margin-right:3px}
+  .bip{background:#ede9fe;color:#5b21b6} .uni{background:#dcfce7;color:#166534}
+  .idx{background:#dbeafe;color:#1e40af} .gate{background:#fef9c3;color:#854d0e} .inl{background:#fee2e2;color:#991b1b}
+  table{width:100%;border-collapse:collapse;margin:4px 0;font-size:.9rem}
+  th,td{text-align:left;padding:5px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.03em}
+  td.k{font-family:ui-monospace,Menlo,monospace;font-size:.86rem;font-weight:600;white-space:nowrap}
+  td.by{color:var(--dim);font-size:.84rem}
+  .now{color:var(--green);font-weight:700;font-size:.8rem}
+  .note{background:#fffbeb;border:1px solid #fde68a;border-left:4px solid var(--amber);border-radius:6px;padding:10px 14px;margin:14px 0;font-size:.9rem;color:#713f12}
+</style>
+</head>
+<body>
+<main>
+
+<h1>Param groups — by concept, not by track</h1>
+<p class="lede">Every similar param is one row. Range is a <b>class</b>; the route carries depth %.</p>
+
+<div class="legend">
+  <span class="rc bip">bipolar ±</span> neutral 0, ±depth &nbsp;
+  <span class="rc uni">unipolar %</span> 0→full &nbsp;
+  <span class="rc idx">index N</span> 0→N discrete &nbsp;
+  <span class="rc gate">gate</span> 0/1 &nbsp;
+  <span class="rc inl">inlet</span> per-track CV bus &nbsp;·&nbsp;
+  <span class="now">now</span> = routable today. <b>No per-route min/max — route = target + depth%.</b>
+</div>
+
+<h2>A · Shared concepts (one row, many types)</h2>
+<table>
+<tr><th>concept</th><th>class</th><th>backed by</th><th></th></tr>
+<tr><td class="k">Transpose</td><td><span class="rc bip">bipolar</span></td><td class="by">Note, MidiCv, Indexed, Stochastic, PhaseFlux, Tuesday</td><td class="now">now</td></tr>
+<tr><td class="k">Octave</td><td><span class="rc bip">bipolar</span></td><td class="by">Note, Indexed, Stochastic, PhaseFlux, Tuesday, DiscreteMap</td><td class="now">now</td></tr>
+<tr><td class="k">SlideTime</td><td><span class="rc uni">unipolar</span></td><td class="by">Note, Curve, MidiCv, Indexed, Stochastic, PhaseFlux</td><td class="now">now</td></tr>
+<tr><td class="k">Rotate</td><td><span class="rc bip">bipolar</span></td><td class="by">Note, Curve, Tuesday, Stochastic</td><td class="now">now</td></tr>
+<tr><td class="k">Scale</td><td><span class="rc idx">index</span></td><td class="by">Note, Tuesday, DiscreteMap, Indexed, Stochastic, PhaseFlux</td><td class="now">now</td></tr>
+<tr><td class="k">RootNote</td><td><span class="rc idx">index</span></td><td class="by">Note, Tuesday, DiscreteMap, Indexed, Stochastic, PhaseFlux</td><td class="now">now</td></tr>
+<tr><td class="k">Divisor</td><td><span class="rc idx">index</span></td><td class="by">Note, Curve, Tuesday, DiscreteMap, Indexed, Stochastic, PhaseFlux</td><td class="now">now</td></tr>
+<tr><td class="k">ClockMult</td><td><span class="rc uni">unipolar</span></td><td class="by">Note, Curve, Tuesday, DiscreteMap, Indexed, Stochastic, PhaseFlux</td><td class="now">now</td></tr>
+<tr><td class="k">RunMode</td><td><span class="rc idx">enum</span></td><td class="by">Note, Curve, Indexed</td><td class="now">now</td></tr>
+<tr><td class="k">FirstStep</td><td><span class="rc idx">index</span></td><td class="by">Note, Curve, Indexed</td><td class="now">now</td></tr>
+<tr><td class="k">LastStep</td><td><span class="rc idx">index</span></td><td class="by">Note, Curve</td><td class="now">now</td></tr>
+<tr><td class="k">GateLength</td><td><span class="rc uni">unipolar</span></td><td class="by">Tuesday, DiscreteMap, Indexed, Stochastic, PhaseFlux</td><td class="now">now</td></tr>
+<tr><td class="k">Offset</td><td><span class="rc bip">bipolar</span></td><td class="by">Curve, DiscreteMap</td><td class="now">now</td></tr>
+<tr><td class="k">Phase</td><td><span class="rc uni">unipolar</span></td><td class="by">Curve, PhaseFlux (globalPhase)</td><td></td></tr>
+<tr><td class="k">ProbabilityBias ×5</td><td><span class="rc bip">bipolar</span></td><td class="by">Note (gate/retrig/len/note), Curve (gate/shape)</td><td class="now">now</td></tr>
+</table>
+
+<h2>B · Universal per-track</h2>
+<table>
+<tr><th>concept</th><th>class</th><th>backed by</th><th></th></tr>
+<tr><td class="k">Mute / Fill / FillAmount / Pattern</td><td><span class="rc gate">gate</span>/idx</td><td class="by">all (PlayState)</td><td class="now">now</td></tr>
+<tr><td class="k">Run</td><td><span class="rc gate">gate</span></td><td class="by">all</td><td class="now">now</td></tr>
+<tr><td class="k">Reset</td><td><span class="rc gate">trigger</span></td><td class="by">all</td><td class="now">now</td></tr>
+<tr><td class="k">CvOutputRotate / GateOutputRotate</td><td><span class="rc bip">bipolar</span></td><td class="by">all</td><td class="now">now</td></tr>
+</table>
+
+<h2>C · Whole-Performer (Tier 0)</h2>
+<table>
+<tr><th>concept</th><th>class</th><th></th><th></th></tr>
+<tr><td class="k">Tempo</td><td><span class="rc uni">unipolar</span></td><td class="by">Project</td><td class="now">now</td></tr>
+<tr><td class="k">Swing</td><td><span class="rc uni">unipolar</span></td><td class="by">Project</td><td class="now">now</td></tr>
+<tr><td class="k">CvRouteScan / CvRouteRoute</td><td><span class="rc uni">unipolar</span></td><td class="by">CvRoute</td><td class="now">now</td></tr>
+<tr><td class="k">Play/Rec/Toggles/TapTempo</td><td><span class="rc gate">trigger</span></td><td class="by">Engine</td><td class="now">now</td></tr>
+<tr><td class="k">BusCv1–4</td><td><span class="rc uni">CV</span></td><td class="by">Engine rail</td><td class="now">now</td></tr>
+</table>
+
+<h2>D · Type-specific (single backer)</h2>
+
+<h3>Tuesday</h3>
+<table><tr><th>concept</th><th>class</th><th></th></tr>
+<tr><td class="k">Algorithm / Flow / Ornament / Power</td><td><span class="rc idx">enum</span></td><td class="now">now</td></tr>
+<tr><td class="k">Glide / Trill / StepTrill / GateOffset</td><td><span class="rc uni">unipolar</span></td><td class="now">now</td></tr>
+<tr><td class="k">Skew / Start / LoopLength / MaskParameter / MaskProgression</td><td><span class="rc uni">uni</span>/idx</td><td></td></tr>
+</table>
+
+<h3>Curve</h3>
+<table><tr><th>concept</th><th>class</th><th></th></tr>
+<tr><td class="k">WavefolderFold / WavefolderGain / DjFilter</td><td><span class="rc uni">unipolar</span></td><td class="now">now</td></tr>
+<tr><td class="k">ChaosAmount / Rate / Param1 / Param2</td><td><span class="rc uni">unipolar</span></td><td class="now">now</td></tr>
+<tr><td class="k">CurveRate</td><td><span class="rc uni">unipolar</span></td><td class="now">now</td></tr>
+<tr><td class="k">Min / Max / Range / XFade / ShapeVariation</td><td><span class="rc uni">uni</span>/bip</td><td></td></tr>
+</table>
+
+<h3>Stochastic</h3>
+<table><tr><th>concept</th><th>class</th><th></th></tr>
+<tr><td class="k">Complexity / Variation / Rest / Slide / Burst / Sleep / Mutate / Jump</td><td><span class="rc uni">unipolar</span></td><td class="now">now</td></tr>
+<tr><td class="k">Contour</td><td><span class="rc bip">bipolar</span></td><td class="now">now</td></tr>
+<tr><td class="k">MaskRhythm / TiltRhythm / PatienceRhythm / NoteDuration</td><td><span class="rc uni">unipolar</span></td><td class="now">now</td></tr>
+<tr><td class="k">Feel</td><td><span class="rc uni">unipolar</span></td><td style="color:#991b1b;font-weight:700;font-size:.8rem">dead slot</td></tr>
+<tr><td class="k">LegatoProb / RepeatProb / Marbles Spread/Bias / Mask/TiltMelody</td><td><span class="rc uni">unipolar</span></td><td></td></tr>
+<tr><td class="k">DegreeRotation / MaskRotation</td><td><span class="rc bip">bipolar</span></td><td></td></tr>
+</table>
+
+<h3>PhaseFlux</h3>
+<table><tr><th>concept</th><th>class</th><th></th></tr>
+<tr><td class="k">PulseCount</td><td><span class="rc idx">index</span></td><td></td></tr>
+<tr><td class="k">PulseNudge</td><td><span class="rc bip">bipolar</span></td><td style="color:#16a34a;font-weight:700;font-size:.8rem">LAUNCH</td></tr>
+<tr><td class="k">WarpNudge / ResponseNudge / LenNudge / CyclePhaseWarp</td><td><span class="rc bip">bipolar</span></td><td style="color:#16a34a;font-weight:700;font-size:.8rem">LAUNCH</td></tr>
+<tr><td class="k">Pitch Range/Warp/Response/Window/Repeat/Rate</td><td><span class="rc uni">uni</span>/bip</td><td></td></tr>
+<tr><td class="k">Temporal Warp/Response/Window/Repeat/Curve</td><td><span class="rc uni">uni</span>/bip</td><td></td></tr>
+<tr><td class="k">StageLen / StageDivisor / Mask/TiltMelody / PhaseShift</td><td><span class="rc uni">uni</span>/idx</td><td></td></tr>
+<tr><td class="k">A / B</td><td><span class="rc inl">inlet</span></td><td style="color:#16a34a;font-weight:700;font-size:.8rem">LAUNCH</td></tr>
+<tr><td class="k" style="color:#999"></td><td></td><td style="color:#999;font-size:.82rem">A/B inlets like Indexed — feed per-stage-group local routing</td></tr>
+</table>
+
+<h3>DiscreteMap</h3>
+<table><tr><th>concept</th><th>class</th><th></th></tr>
+<tr><td class="k">RangeHigh / RangeLow</td><td><span class="rc bip">bipolar</span></td><td class="now">now</td></tr>
+<tr><td class="k">SlewTime / Threshold</td><td><span class="rc uni">unipolar</span></td><td></td></tr>
+<tr><td class="k">Input / Scanner / Sync</td><td><span class="rc inl">inlet</span></td><td class="now">now</td></tr>
+</table>
+
+<h3>Indexed</h3>
+<table><tr><th>concept</th><th>class</th><th></th></tr>
+<tr><td class="k">Duration / ActiveLength</td><td><span class="rc idx">index</span></td><td></td></tr>
+<tr><td class="k">RouteA / RouteB</td><td><span class="rc inl">inlet</span></td><td class="now">now</td></tr>
+</table>
+
+<h3>MidiCv</h3>
+<table><tr><th>concept</th><th>class</th><th></th></tr>
+<tr><td class="k">PitchBendRange / ModulationRange</td><td><span class="rc uni">unipolar</span></td><td></td></tr>
+</table>
+
+<div class="note">
+  <b>The grouping does double duty:</b> column "backed by" is the applicability matrix in data — a type's
+  routable set is "every concept whose backers include it." Shared concepts (A) get <b>one paramKey</b>,
+  so a route survives a track changing type. <b>Range is a class, not a number</b> — the registry holds the
+  concrete bound; the route stores depth % only. Some PhaseFlux/Curve concepts show <span class="rc uni">uni</span>/bip
+  because polarity needs your confirm (e.g. PitchWarp ± vs 0→full). Keep/drop of the non-<span class="now">now</span>
+  rows is still your triage.
+</div>
+
+</main>
+</body>
+</html>

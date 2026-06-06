@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>reset() vs restart() — per track</title>
+<style>
+  :root { --blue:#2563eb; --red:#dc2626; --green:#16a34a; --amber:#ca8a04; --line:#e5e5e5; }
+  * { box-sizing: border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+         background:#fafafa; color:#1a1a1a; line-height:1.5; margin:0; padding:24px; }
+  main { max-width:880px; margin:0 auto; }
+  h1 { font-size:1.5rem; line-height:1.3; margin:0 0 4px; }
+  .sub { color:#555; margin:0 0 22px; font-size:0.95rem; }
+  h2 { font-size:1.15rem; margin:32px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--blue); }
+  code,.mono { font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:0.88em; }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); font-size:0.88rem; }
+  th,td { text-align:left; padding:10px 11px; border:1px solid var(--line); vertical-align:top; }
+  thead th { background:rgba(37,99,235,0.08); font-weight:600; }
+  th.track { width:110px; }
+  .keep { color:var(--green); }
+  .clear { color:var(--red); }
+  .v { font-weight:700; font-size:0.75rem; text-transform:uppercase; letter-spacing:.03em;
+       padding:2px 7px; border-radius:3px; white-space:nowrap; display:inline-block; }
+  .v-warm { color:#fff; background:var(--green); }
+  .v-mid { color:var(--amber); border:1px solid var(--amber); }
+  .v-cold { color:#fff; background:var(--red); }
+  .v-na { color:#777; border:1px solid #bbb; }
+  .legend { font-size:0.85rem; color:#555; margin:8px 0 0; }
+  .legend b.keep{color:var(--green);} .legend b.clear{color:var(--red);}
+  .note { background:#fff; border:1px solid var(--line); border-left:4px solid var(--amber);
+          padding:14px 16px; margin:18px 0; font-size:0.92rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1><code>reset()</code> vs <code>restart()</code> &mdash; what each touches, per track</h1>
+  <p class="sub">Both put the playhead back to the start. The difference is <em>everything else</em>. <span class="keep">Green = restart keeps it (continuity).</span> <span class="clear">Red = only reset() also clears it (the cold extra).</span></p>
+
+  <table>
+    <thead>
+      <tr><th class="track">Track</th><th><code>restart()</code> &mdash; warm path</th><th>What <code>reset()</code> <em>additionally</em> clears (cold-only)</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>PhaseFlux</strong></td>
+        <td>Re-anchor on next tick; clear pulse/gate. <span class="keep">Keeps per-stage accumulators, CV out, slot/cell, cycle state.</span></td>
+        <td><span class="clear">All per-stage accumulators, CV out&rarr;0, slot/cell/stage/pitch phase, cycle counters, re-fetch sequence.</span></td>
+        <td><span class="v v-warm">true warm</span></td>
+      </tr>
+      <tr>
+        <td><strong>Note</strong></td>
+        <td>Cursor&rarr;start, Re:Rene X/Y&rarr;0. <span class="keep">Keeps CV/gate out, gate+CV queues, accumulators, record history.</span></td>
+        <td><span class="clear">changePattern(), clear queues, clear record history, accumulators&rarr;min, output&rarr;0, Re:Rene divisor config.</span></td>
+        <td><span class="v v-warm">warm</span></td>
+      </tr>
+      <tr>
+        <td><strong>Curve</strong></td>
+        <td>Cursor/phase&rarr;start, free-phase, <span class="clear">LPF/feedback/chaos&rarr;0</span>. <span class="keep">Keeps CV target, gate queue, recorder, fill.</span></td>
+        <td><span class="clear">changePattern(), recorder reset, gate queue clear, output gate, CV target&rarr;0, tick phase, fill&rarr;None.</span></td>
+        <td><span class="v v-warm">warm</span><span style="font-size:0.78rem;color:#777;"> (drops filter state)</span></td>
+      </tr>
+      <tr>
+        <td><strong>DiscreteMap</strong></td>
+        <td>Ramp phase&rarr;0, re-arm sync/loop/range tracking. <span class="keep">Keeps CV out, pluck envelope, sampled pitch.</span></td>
+        <td><span class="clear">prev-input crossing, pluck reset, re-sample octave/transpose/root, threshold cache, CV&rarr;0, gate timer.</span></td>
+        <td><span class="v v-warm">warm</span><span style="font-size:0.78rem;color:#777;"> (restart reads <code>routedSync</code>)</span></td>
+      </tr>
+      <tr>
+        <td><strong>Stochastic</strong></td>
+        <td>Cursor&rarr;first, clear pitch state + direct history, <span class="clear">re-seed RNG (fixed)</span>. <span class="keep">Keeps CV out, queues, sleep/loop counters, jump register.</span></td>
+        <td><span class="clear">changePattern(), clear queues, CV/gate out&rarr;0, slide, sleep/loop/jump/applied counters, pattern-cycle flag.</span></td>
+        <td><span class="v v-mid">warm-ish</span><span style="font-size:0.78rem;color:#777;"> RNG re-seed = identical replay each sync</span></td>
+      </tr>
+      <tr>
+        <td><strong>Indexed</strong></td>
+        <td><code>resetSequenceState()</code>: cursor&rarr;first, <span class="clear">re-roll runMode advance (RNG), timers, CV out&rarr;0</span>, slide.</td>
+        <td><span class="clear">Only the pattern-pointer refresh</span> &mdash; restart already clears almost everything.</td>
+        <td><span class="v v-mid">medium</span><span style="font-size:0.78rem;color:#777;"> restart still dumps CV + re-rolls advance</span></td>
+      </tr>
+      <tr>
+        <td><strong>Tuesday</strong></td>
+        <td><code>restart()</code> <strong>calls <code>reset()</code></strong> &mdash; no warm path exists.</td>
+        <td><span class="clear">Everything: step&rarr;0, all timers, CV&rarr;0, gate, slide, retrigger, micro-gate queue, cached flow/ornament.</span></td>
+        <td><span class="v v-cold">not warm</span></td>
+      </tr>
+      <tr>
+        <td><strong>MidiCv</strong></td>
+        <td><code>restart()</code> is empty &mdash; no sequence playhead to anchor.</td>
+        <td><span class="clear">Arp off, pitch-bend/pressure&rarr;0, slide, resetVoices() (note-offs).</span></td>
+        <td><span class="v v-na">n/a</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <strong>What this means for "warm the Reset target."</strong> It lands clean on <b>PhaseFlux</b> (built for it), <b>Note</b>, <b>Curve</b>, <b>DiscreteMap</b>. It's questionable on <b>Stochastic</b> (every sync re-seeds the RNG &rarr; you replay the <em>same</em> stochastic phrase) and <b>Indexed</b> (restart still dumps CV and re-rolls the advance &mdash; not gentle). It does <em>nothing different</em> on <b>Tuesday</b> (restart == reset, still cold) and <b>MidiCv</b> (nothing to anchor). So a real "warm re-anchor everywhere" needs new restart() work on Tuesday + Indexed (and a decision on Stochastic's RNG), not just a one-line routing swap.
+  </div>
+
+  <h2>The common axis</h2>
+  <p style="font-size:0.92rem;margin:0;">Across tracks, the cold-only extras cluster into four things restart() tends to <em>preserve</em> and reset() always <em>wipes</em>: <strong>(1)</strong> live CV/gate output, <strong>(2)</strong> pending queues, <strong>(3)</strong> accumulators / evolving counters, <strong>(4)</strong> <code>changePattern()</code> / re-latch the pattern. "Warm" = keep 1&ndash;3, skip 4. The tracks differ only in how completely their restart() honors that.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Per-Type Param Tables — Internals</title>
+<style>
+  :root{
+    --ink:#1a1a1a; --dim:#666; --line:#e5e5e5; --page:#fafafa; --card:#fff;
+    --blue:#2563eb; --amber:#ca8a04; --green:#16a34a; --red:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    font-size:16px;line-height:1.5;padding:24px}
+  main{max-width:860px;margin:0 auto}
+  h1{font-size:1.5rem;line-height:1.3;margin:0 0 4px}
+  h2{font-size:1.2rem;line-height:1.3;margin:30px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--blue)}
+  h3{font-size:1rem;margin:18px 0 6px}
+  .lede{color:var(--dim);margin:0 0 8px}
+  .thesis{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--blue);
+    border-radius:6px;padding:14px 16px;margin:16px 0}
+  .thesis b{color:var(--blue)}
+  code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.85em;
+    background:#f0f0f0;padding:1px 5px;border-radius:3px}
+  pre{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.8rem;line-height:1.5;
+    background:#0d1117;color:#e6edf3;border-radius:8px;padding:14px 16px;overflow-x:auto;margin:8px 0}
+  pre .c{color:#7d8590} pre .k{color:#ff7b72} pre .f{color:#d2a8ff} pre .s{color:#a5d6ff} pre .n{color:#79c0ff}
+  dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:8px 0}
+  dt{text-align:right;font-weight:600;color:var(--blue)} dd{margin:0}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:.92rem}
+  th,td{text-align:left;padding:10px 12px;border:1px solid var(--line);vertical-align:top}
+  thead th{background:rgba(37,99,235,.08);color:var(--blue);font-weight:600}
+  tbody tr:nth-child(even){background:var(--page)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0}
+  .pane{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+  .pane h3{margin:0 0 6px;font-size:.95rem}
+  .pane.note{border-left:4px solid var(--green)} .pane.stoch{border-left:4px solid var(--amber)}
+  .pane ul{margin:6px 0 0;padding-left:18px} .pane li{margin:3px 0;font-size:.9rem}
+  .tag{display:inline-block;font-size:.72rem;font-weight:600;padding:1px 6px;border-radius:8px;
+    background:#eef;color:var(--blue);margin-right:4px}
+  .note{background:#fffbeb;border:1px solid #fde68a;border-left:4px solid var(--amber);
+    border-radius:6px;padding:12px 16px;margin:14px 0;font-size:.92rem;color:#713f12}
+  .note b{color:var(--amber)}
+  .before{color:var(--red);font-weight:600} .after{color:var(--green);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+
+<h1>Per-Type Param Tables — the internals</h1>
+<p class="lede">How U3 builds one table per track type, and why the name switch dies.</p>
+
+<div class="thesis">
+  <b>One idea:</b> each track type owns a <code>constexpr Row[]</code> in flash. The engine picks the
+  table <i>once</i> from <code>track.trackMode()</code>, then resolves <code>paramKey</code> inside it and
+  calls the row's hook. The old <span class="before">103-entry per-name dispatch</span> collapses to an
+  <span class="after">8-way type→table map</span> + a small key lookup — and every hook calls a concrete
+  setter, so a dead route (routes but never writes) becomes impossible.
+</div>
+
+<h2>1 · One row</h2>
+<dl>
+  <dt>key</dt><dd>append-only numeric <code>paramKey</code> — never the array index</dd>
+  <dt>name</dt><dd>UI label (the only place the string lives)</dd>
+  <dt>range</dt><dd><code>{min,max}</code> — the hook denormalizes the [0,1] value with it</dd>
+  <dt>flags</dt><dd><code>Continuous / Discrete / Structural / Inlet / Trigger</code></dd>
+  <dt>applyRouted</dt><dd>function pointer — <i>this</i> row's write, baked into flash</dd>
+</dl>
+
+<h2>2 · Three hook flavors</h2>
+<p>The hook is where the old <code>writeRouted</code> switch-arm goes — but one arm per row, calling the
+concrete setter directly. <code>scope.object</code> is a <code>Track*</code>.</p>
+
+<h3>a. Track-direct — writes one field</h3>
+<pre><span class="c">// Octave on a Note track</span>
+<span class="k">void</span> <span class="f">applyNoteOctave</span>(<span class="k">const</span> Scope &s, <span class="k">const</span> Range &r, <span class="k">float</span> n) {
+    <span class="k">auto</span> &t = *<span class="k">static_cast</span>&lt;Track*&gt;(s.object);
+    t.<span class="f">noteTrack</span>().<span class="f">setOctave</span>(<span class="f">round</span>(<span class="f">denorm</span>(r, n)), <span class="k">true</span>);
+}</pre>
+
+<h3>b. Sequence-fanout — writes all 16 patterns</h3>
+<pre><span class="c">// Divisor lives on the Sequence; route writes every pattern so</span>
+<span class="c">// modulation is pattern-independent (the loop is a hook detail).</span>
+<span class="k">void</span> <span class="f">applyNoteDivisor</span>(<span class="k">const</span> Scope &s, <span class="k">const</span> Range &r, <span class="k">float</span> n) {
+    <span class="k">auto</span> &t = *<span class="k">static_cast</span>&lt;Track*&gt;(s.object);
+    <span class="k">int</span> v = <span class="f">round</span>(<span class="f">denorm</span>(r, n));
+    <span class="k">for</span> (<span class="k">int</span> p = <span class="n">0</span>; p &lt; <span class="n">CONFIG_PATTERN_COUNT</span>; ++p)
+        t.<span class="f">noteTrack</span>().<span class="f">sequence</span>(p).<span class="f">setDivisor</span>(v, <span class="k">true</span>);
+}</pre>
+
+<h3>c. Trigger — rising edge, not level <span class="tag">already built</span></h3>
+<pre><span class="c">// engine resolves the edge against RouteState.gateMask, then</span>
+<span class="c">// calls the hook only on a low-&gt;high crossing.</span>
+<span class="k">void</span> <span class="f">applyReset</span>(<span class="k">const</span> Scope &s, <span class="k">const</span> Range &, <span class="k">float</span>) {
+    <span class="f">trackEngine</span>(s.trackIndex).<span class="f">reset</span>();   <span class="c">// fire</span>
+}</pre>
+
+<h2>3 · Composition — a type's Row[] is the applicability matrix, literally</h2>
+<p>Table = Tier-1 universal ∪ backed Tier-2/2b ∪ backed Tier-3 ∪ Tier-4 own. Each type lists only the
+rows it backs; an inapplicable param simply has no row (can't be picked, can't no-op).</p>
+<div class="grid2">
+  <div class="pane note">
+    <h3>Note table</h3>
+    <ul>
+      <li><span class="tag">T1</span> Mute · Run · Reset · Divisor · ClockMult · Cv/GateOutRotate</li>
+      <li><span class="tag">T2</span> Scale · RootNote · Transpose · Octave · SlideTime</li>
+      <li><span class="tag">T3</span> FirstStep · LastStep · RunMode</li>
+      <li><span class="tag">T4</span> Rotate · 4× ProbabilityBias · LengthBias</li>
+    </ul>
+  </div>
+  <div class="pane stoch">
+    <h3>Stochastic table</h3>
+    <ul>
+      <li><span class="tag">T1</span> Mute · Run · Reset · Divisor · ClockMult · Cv/GateOutRotate</li>
+      <li><span class="tag">T2</span> Scale · RootNote · Transpose · Octave · SlideTime</li>
+      <li><span class="tag">T3</span> <i>none</i> — own traversal, no step-range</li>
+      <li><span class="tag">T4</span> Mask · Tilt · Feel · Burst · Complexity · Contour · …</li>
+    </ul>
+  </div>
+</div>
+<p>Same <span class="tag">T1</span>/<span class="tag">T2</span> <i>concepts</i>, but the hooks differ:
+<code>noteTrack().setOctave</code> vs <code>stochasticTrack().setOctave</code>. So sharing is at the
+key/name/range level; the <b>hook is always type-specific</b> (the setters are unrelated functions).</p>
+
+<h2>4 · Table selection — the only switch left</h2>
+<pre><span class="k">const</span> Table &<span class="f">tableForTrackMode</span>(TrackMode m) {
+    <span class="k">switch</span> (m) {
+    <span class="k">case</span> Note:       <span class="k">return</span> noteTable;
+    <span class="k">case</span> Curve:      <span class="k">return</span> curveTable;
+    <span class="k">case</span> Stochastic: <span class="k">return</span> stochasticTable;
+    <span class="c">// … 8 arms</span>
+    }
+}</pre>
+<table>
+  <thead><tr><th></th><th>Old dispatch</th><th>Per-type tables</th></tr></thead>
+  <tbody>
+    <tr><td>Switch size</td><td class="before">103 targets × trackMode arms</td><td class="after">8 (type → table), once per route resolution</td></tr>
+    <tr><td>Per param</td><td class="before">name → denorm → switch → leaf</td><td class="after">key lookup → row hook (flash fn ptr)</td></tr>
+    <tr><td>Dead route</td><td class="before">silent if a leaf is missed</td><td class="after">impossible — the row <i>is</i> the write</td></tr>
+    <tr><td>Applicability</td><td class="before"><code>isXxxTarget</code> predicates</td><td class="after">= row presence in the type's table</td></tr>
+  </tbody>
+</table>
+<p>The 8-way switch is irreducible: you must know a track's type to reach its setters. It runs <b>once</b>
+when a route resolves its scope — not per param, not per name. That is not the smear; the smear was the
+103-entry name namespace, and it's gone.</p>
+
+<div class="note">
+  <b>Decisions (mine, leaning):</b>
+  <b>(1) Explicit per-type <code>Row[]</code></b> over composition machinery — the "duplicated" T1/T2 rows
+  are constexpr flash (no RAM), and the hooks must be type-specific anyway, so a shared-metadata +
+  per-type-hook scheme buys indirection for little.
+  <b>(2) Shared paramKey registry for T1/T2/T3</b> — Divisor = the same key in every type's table, so a
+  route survives a track changing type; T4 keys are per-type. Both append-only (F6).
+  <b>Open:</b> whether sequence-fanout writing all 16 patterns stays the rule under the new format
+  (it does today).
+</div>
+
+</main>
+</body>
+</html>

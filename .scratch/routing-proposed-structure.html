@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Routing — Proposed Structure</title>
+<style>
+  :root{
+    --bg:#13151a; --panel:#1b1e25; --panel2:#22262e; --ink:#e7e9ee; --dim:#98a2ad; --line:#2d333d;
+    --src:#4aa3ff; --glob:#e0a93b; --loc:#37c98b; --rail:#b079ff; --indep:#7a8493; --warn:#e0556b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;padding:22px;max-width:1180px;margin:0 auto}
+  h1{font-size:19px;margin:0 0 2px} .sub{color:var(--dim);margin:0 0 16px;font-size:12.5px}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin:20px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+  .row{display:flex;gap:12px;align-items:stretch}
+  .col{display:flex;flex-direction:column;gap:10px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .box .t{font-weight:700;font-size:12.5px;margin-bottom:5px}
+  .box .m{color:var(--dim);font-size:11.5px}
+  .src{border-top:3px solid var(--src)} .glob{border-top:3px solid var(--glob)}
+  .loc{border-top:3px solid var(--loc)} .rail{border-top:3px solid var(--rail)} .indep{border-top:3px solid var(--indep)}
+  .chip{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:10px;margin:2px 3px 2px 0;background:#0e1014;color:#cdd6e0;border:1px solid var(--line)}
+  .chip.s{border-color:var(--src);color:var(--src)} .chip.g{border-color:var(--glob);color:var(--glob)}
+  .chip.l{border-color:var(--loc);color:var(--loc)} .chip.r{border-color:var(--rail);color:var(--rail)}
+  .flow{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;white-space:pre;background:#0e1014;border:1px solid var(--line);border-radius:8px;padding:11px;color:#cdd6e0;overflow-x:auto}
+  .arrowcol{display:flex;align-items:center;color:var(--dim);font-size:18px;padding:0 2px}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:4px}
+  th,td{text-align:left;padding:4px 7px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600}
+  code{background:#0e1014;padding:0 4px;border-radius:3px;color:#cdd6e0;font-size:11px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin-top:6px}
+  .legend b{color:var(--ink)}
+  .note{font-size:11px;color:var(--dim);margin-top:4px}
+  .warn{color:var(--warn)}
+  .half{flex:1}
+</style>
+</head>
+<body>
+
+<h1>Routing — Proposed Structure</h1>
+<p class="sub">Name-agnostic engine · per-scope param tables · two surfaces (global masked pool + per-track local matrices) · direct/inlet/rail targets · clean-break format. 2026-06-01.</p>
+
+<!-- SOURCES -->
+<h2>Sources — small, shared, scarce</h2>
+<div class="row">
+  <div class="box src half"><div class="t">External</div>
+    <span class="chip s">CvIn1–4</span><span class="chip s">Midi</span></div>
+  <div class="box src half"><div class="t">Internal (Modulator engine — independent)</div>
+    <span class="chip s">Mod1–8</span> <span class="m">Sine/Tri/Saw/Sq/Random/ADSR/Lorenz/Latoocarfian · also emits MIDI</span></div>
+  <div class="box src half"><div class="t">Feedback</div>
+    <span class="chip s">CvOut1–8</span><span class="chip s">GateOut1–8</span></div>
+  <div class="box rail half"><div class="t">Shared rail (Bus)</div>
+    <span class="chip r">BusCv1–4</span> <span class="m">source AND target · Engine-owned</span></div>
+</div>
+
+<!-- ENGINE -->
+<h2>Engine — name-agnostic apply (single-pass per-tick recompute)</h2>
+<div class="flow">for each active slot:
+    v = source(slot.source)
+    v = shape(slot.shaper[t], v, state[t])        · per-track shaper (global pool) / scalar (local)
+    v = depthWindow(min,max,v) · depthPct[t]/biasPct[t]
+    v *= scaleValue(slot.scaleSource, t)          · from VcaNext, explicit now
+    scope(t).applyRouted(slot.paramKey, v)        ← NO target name/range/switch in engine</div>
+<div class="note">Each scope owns a <b>param table</b> = the single source of truth: <code>ParamRow { name, range, flags(direct|inlet|fixed|continuous|discrete|structural), applyRouted() }</code>. Adding a routable param = adding one row. <code>paramKey</code> = append-only numeric key (never the array index).</div>
+
+<!-- TWO SURFACES -->
+<h2>Two surfaces — split by broadcastability</h2>
+<div class="row">
+
+  <div class="col" style="flex:1">
+    <div class="box glob"><div class="t">① Global masked pool · ~8 fat slots</div>
+      <div class="m">one scarce source → many tracks, <b>one route, linked edit</b>. Keeps <code>scope=Track(mask)</code> + per-track depth/shaper arrays (the ×8 RAM, contained here).</div>
+      <div style="margin-top:6px">
+        <span class="chip g">Tier 0 · Performer-wide</span> Play/Rec/TapTempo · Tempo · Swing<br>
+        <span class="chip g">Tier 1 · universal</span> Mute/Fill/Pattern · Run/Reset · Cv/GateOutRotate · Divisor/ClockMult<br>
+        <span class="chip g">Tier 2 · pitched</span> Scale/RootNote · Transpose · Octave · SlideTime<br>
+        <span class="chip g">Tier 2b · phase</span> Phase <span class="m">(Curve+PhaseFlux globalPhase, gate-unified)</span>
+      </div>
+    </div>
+    <div class="box glob"><div class="t">UI · global RoutingPage (stays small)</div>
+      <div class="m">Tier 0/1/2 broadcast routes + source→inlet patches. Quick (Fixed Core) / Deep views.</div></div>
+  </div>
+
+  <div class="arrowcol">→ inlets →</div>
+
+  <div class="col" style="flex:1.05">
+    <div class="box loc"><div class="t">② Per-track local matrix · N≈3–4 thin slots / track</div>
+      <div class="m">in-context, single-track (no mask, no ×8). Generalizes Indexed <code>RouteConfig</code> + <code>IndexedRouteConfigPage</code>. Assign-from-param (long-press → local route).</div>
+      <div style="margin-top:6px">
+        <span class="chip l">Tier 3 · step-range</span> FirstStep/LastStep/RunMode <span class="m">(Note/Curve/Indexed only)</span><br>
+        <span class="chip l">Tier 4 · type-specific</span> Tuesday algo · Stochastic · Curve DSP · DiscreteMap · PhaseFlux stages · <span class="m">+PhaseFlux/Teletype gain routing</span><br>
+        <span class="chip l">cell / group scope</span> per-cell params (Indexed cells, PhaseFlux stages)<br>
+        <span class="chip l">inlets</span> the track's own named CV buses
+      </div>
+    </div>
+    <div class="box loc"><div class="t">UI · per-track local matrix page</div>
+      <div class="m">picker shows only that type's rows (Teletype never shows Octave). Quick/Deep + assign-from-param.</div></div>
+  </div>
+</div>
+
+<!-- TWO-STAGE / INLET -->
+<h2>The inlet bridge (global → local, two engines already do this)</h2>
+<div class="flow">global page:  source ──route──▶ track INLET (_routedX)        e.g. Indexed A/B, DiscreteMap Input/Scanner/Sync
+                                       │
+local matrix: INLET (or any src) ──route──▶ direct param / cell-group
+              · Indexed: A/B → RouteConfig → cell Duration/GateLength/NoteIndex (scale-aware)
+              · DiscreteMap: Input/Scanner → hardwired engine consumption</div>
+<div class="note"><b>Three target kinds:</b>
+  <span class="chip">direct</span> writes a param ·
+  <span class="chip">inlet</span> fills a named per-track CV bus (<code>_routedX</code>), each type owns its own (no borrowing) ·
+  <span class="chip r">rail (Bus)</span> Engine-owned shared CV, src+target.</div>
+
+<!-- INDEPENDENT -->
+<h2>Left independent — referenced, not absorbed</h2>
+<div class="row">
+  <div class="box indep half"><div class="t">CvRoute (CV→CV)</div>
+    <div class="m">4-lane physical router + scan. Different job. Co-client of the Bus rail (write-order vs matrix pinned at U2).</div></div>
+  <div class="box indep half"><div class="t">Modulator engine</div>
+    <div class="m">Mod1–8 source provider; also emits independent MIDI. Matrix references it; doesn't own it.</div></div>
+</div>
+
+<!-- WHAT CHANGES -->
+<h2>vs current</h2>
+<table>
+  <tr><th></th><th>Current</th><th>Proposed</th></tr>
+  <tr><td>Addressing</td><td>flat <code>Target</code> enum (103), smeared across 5 places</td><td><code>(scope, paramKey)</code> → one per-scope param table</td></tr>
+  <tr><td>Engine</td><td>per-name dispatch switch + <code>isXxxTarget</code> + per-model <code>writeRouted</code></td><td>generic <code>applyRouted(paramKey, v)</code>, zero names</td></tr>
+  <tr><td>Applicability</td><td>universal block offered to all types; silent no-ops</td><td>= param-table membership (4 tiers, mechanically composed)</td></tr>
+  <tr><td>Per-track routing</td><td>Indexed only (its own dispatcher)</td><td>every type, generalized — Indexed is the reference</td></tr>
+  <tr><td>scaleSource</td><td>implicit <code>VcaNext</code> (neighbor route)</td><td>explicit <code>scaleSource</code> field</td></tr>
+  <tr><td>Serialization</td><td>v35, forward-compat</td><td class="warn">clean break — bump ProjectVersion, old projects rejected</td></tr>
+</table>
+
+<p class="note">Held out (future): Step/parameter-locks · source-side fan-out cleanup · internal-modulator expansion. CvRoute &amp; Modulator engine unchanged. Source: <code>docs/plans/2026-05-31-002-routing-mod-matrix-overhaul-plan.md</code>.</p>
+
+</body>
+</html>
