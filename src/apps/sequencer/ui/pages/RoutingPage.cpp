@@ -68,7 +68,11 @@ void RoutingPage::exit() {
 }
 
 void RoutingPage::draw(Canvas &canvas) {
-    drawTabEditor(canvas);
+    if (_tabEditorTab == 4) {
+        drawBus(canvas);
+    } else {
+        drawTabEditor(canvas);
+    }
 }
 
 void RoutingPage::keyPress(KeyPressEvent &event) {
@@ -77,10 +81,19 @@ void RoutingPage::keyPress(KeyPressEvent &event) {
     if (event.key().pageModifier()) {
         return;
     }
-    handleTabEditorKey(event);
+    if (_tabEditorTab == 4) {
+        handleBusKey(event);
+    } else {
+        handleTabEditorKey(event);
+    }
 }
 
 void RoutingPage::encoder(EncoderEvent &event) {
+    if (_tabEditorTab == 4) {           // bus tab: move the lane cursor 0..3
+        _busLane = clamp(_busLane + event.value(), 0, Engine::BusCvCount - 1);
+        event.consume();
+        return;
+    }
     if (_matrixEditActive) {
         if (_matrixView == MatrixView::Source) {    // SOURCE view: dial the row's source
             matrixEditSource(event.value(), event.pressed() || globalKeyState()[Key::Shift]);
@@ -495,7 +508,7 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         if (_matrixEditActive) {
             matrixExitEdit(false);
         }
-        _tabEditorTab = (_tabEditorTab + (key.isLeft() ? 3 : 1)) % 4;
+        _tabEditorTab = (_tabEditorTab + (key.isLeft() ? 4 : 1)) % 5;
         _tabEditorRow = 0;
         tabRefocus();
         event.consume();
@@ -547,6 +560,143 @@ void RoutingPage::handleTabEditorKey(KeyPressEvent &event) {
         return;
     }
     event.consume(); // modal: swallow all other keys so they don't reach TopPage
+}
+
+// Bipolar -5..+5V bar: baseline + centre tick, filled span proportional to |volts|.
+static void drawBusVoltBar(Canvas &canvas, int x, int y, int w, float volts, bool focus) {
+    int cx = x + w / 2;
+    canvas.setColor(Color::Low);
+    canvas.hline(x, y + 1, w);
+    canvas.vline(cx, y - 1, 5);
+    int span = int(std::min(std::abs(volts), 5.f) / 5.f * (w / 2));
+    canvas.setColor(focus ? Color::Bright : Color::Medium);
+    if (span > 0) {
+        if (volts >= 0.f) {
+            canvas.fillRect(cx, y, span, 3);
+        } else {
+            canvas.fillRect(cx - span, y, span, 3);
+        }
+    }
+}
+
+void RoutingPage::drawBus(Canvas &canvas) {
+    const int DIV = 104;     // vertical divider x
+    const int VAL_R = 98;    // right edge of the right-aligned value column
+
+    WindowPainter::clear(canvas);
+    canvas.setFont(Font::Tiny);
+
+    // header: band name + zone labels, divider between LEVEL block and CONNECTIONS zone
+    canvas.setColor(Color::Bright);
+    canvas.drawText(3, 7, "BUS");
+    canvas.setColor(Color::Low);
+    canvas.drawText(DIV + 4, 7, "<SOURCES");
+    canvas.drawText(CONFIG_LCD_WIDTH - canvas.textWidth("READERS>") - 3, 7, "READERS>");
+    canvas.hline(0, 10, CONFIG_LCD_WIDTH);
+    canvas.vline(DIV, 11, CONFIG_LCD_HEIGHT - 22);
+
+    const int top = 14, rowH = 10;
+    for (int lane = 0; lane < Engine::BusCvCount; ++lane) {
+        int y = top + lane * rowH;
+        bool focus = lane == _busLane;
+        if (focus) {
+            canvas.setColor(Color::Bright);
+            canvas.fillRect(0, y - 1, 2, rowH - 1);
+        }
+        // fixed LEVEL block: lane label, bipolar bar, right-aligned value
+        float volts = _engine.busCv(lane);
+        canvas.setColor(focus ? Color::Bright : Color::Medium);
+        FixedStringBuilder<4> label("B%d", lane + 1);
+        canvas.drawText(6, y + 4, label);
+        drawBusVoltBar(canvas, 22, y + 1, 40, volts, focus);
+        FixedStringBuilder<8> vtxt(volts != 0.f ? "%+.1fV" : "0.0V", volts);
+        canvas.drawText(VAL_R - canvas.textWidth(vtxt), y + 4, vtxt);
+
+        // CONNECTIONS zone: live R/C/T writer glyphs, then enumerable source/reader tokens
+        uint8_t writers = _engine.busWriters(lane);
+        int cx = DIV + 6;
+        struct { const char *g; uint8_t bit; } glyphs[] = {
+            { "R", Engine::BusWriterRouting },
+            { "C", Engine::BusWriterCvRouter },
+            { "T", Engine::BusWriterTeletype },
+        };
+        for (auto &g : glyphs) {
+            canvas.setColor((writers & g.bit) ? Color::Bright : Color::Low);
+            canvas.drawText(cx, y + 4, g.g);
+            cx += canvas.textWidth(g.g) + 4;
+        }
+        cx += 2;
+
+        // enumerable routing routes: sources that write this lane (bright), targets that read it (dim)
+        const auto &routing = _project.routing();
+        Routing::Target laneTarget = Routing::Target(int(Routing::Target::BusCv1) + lane);
+        Routing::Source laneSource = Routing::Source(int(Routing::Source::BusCv1) + lane);
+        bool any = false;
+        for (int r = 0; r < CONFIG_ROUTE_COUNT && cx < CONFIG_LCD_WIDTH - 8; ++r) {
+            const auto &route = routing.route(r);
+            if (!route.active()) {
+                continue;
+            }
+            if (route.target() == laneTarget) {     // route writes the lane: show its source
+                FixedStringBuilder<8> tok;
+                Routing::printSourceAbbrev(route.source(), tok);
+                canvas.setColor(focus ? Color::Bright : Color::Medium);
+                canvas.drawText(cx, y + 4, tok);
+                cx += canvas.textWidth(tok) + 5;
+                any = true;
+            }
+        }
+        for (int r = 0; r < CONFIG_ROUTE_COUNT && cx < CONFIG_LCD_WIDTH - 8; ++r) {
+            const auto &route = routing.route(r);
+            if (!route.active()) {
+                continue;
+            }
+            if (route.source() == laneSource) {      // route reads the lane: show its target
+                const char *nm = Routing::targetName(route.target());
+                drawClippedName(canvas, cx, y + 4, CONFIG_LCD_WIDTH - 4 - cx, nm ? nm : "?");
+                cx += canvas.textWidth(nm ? nm : "?") + 5;
+                any = true;
+            }
+        }
+        // enumerable CV-router lane links
+        const auto &cvRoute = _project.cvRoute();
+        if (cvRoute.outputDest(lane) == CvRoute::OutputDest::Bus || cvRoute.inputSource(lane) == CvRoute::InputSource::Bus) {
+            any = true;
+        }
+
+        if (!any && writers == 0) {
+            canvas.setColor(Color::Low);
+            canvas.drawText(DIV + 6 + 3 * (canvas.textWidth("R") + 4) + 2, y + 4, "IDLE");
+        }
+    }
+
+    const char *fn[] = { "VIEW", "ADD", "SAFE", "REMOVE", nullptr };
+    WindowPainter::drawFooter(canvas, fn, pageKeyState(), _project.busSafety() ? int(Function::Combine) : -1);
+}
+
+void RoutingPage::handleBusKey(KeyPressEvent &event) {
+    const auto &key = event.key();
+
+    if (key.isLeft() || key.isRight()) {     // band cycle: leave/enter the bus tab
+        _tabEditorTab = (_tabEditorTab + (key.isLeft() ? 4 : 1)) % 5;
+        _tabEditorRow = 0;
+        tabRefocus();
+        event.consume();
+        return;
+    }
+
+    if (key.isFunction()) {
+        switch (Function(key.function())) {
+        case Function::Combine: // F3 SAFE: toggle bus safety
+            _project.setBusSafety(!_project.busSafety());
+            break;
+        default: // VIEW / ADD / REMOVE deferred to the follow-up slice
+            break;
+        }
+        event.consume();
+        return;
+    }
+    event.consume(); // modal: swallow other keys so they don't reach TopPage
 }
 
 void RoutingPage::keyboard(KeyboardEvent &event) {

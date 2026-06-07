@@ -24,6 +24,8 @@ private:
     // ROUTING opens directly into the matrix grid view
     void drawTabEditor(Canvas &canvas);
     void handleTabEditorKey(KeyPressEvent &event);
+    void drawBus(Canvas &canvas);              // tab 4: bus hub display
+    void handleBusKey(KeyPressEvent &event);   // tab 4: lane cursor + SAFE + band cycle
     void enterTabEditor();
     void tabRefocus();          // point _route at the cursor row's committed route (if routed)
     void matrixEnterEdit();     // encoder-press in nav: begin/create the per-row draft
@@ -38,6 +40,7 @@ private:
     int _tabEditorTab = 0;
     int _tabEditorRow = 0;
     int _tabCol = 0;             // cursor track column
+    int _busLane = 0;            // bus tab: focused lane cursor 0..3
     bool _tabRowRouted = false;  // cursor row resolves to a committed route (_route)
 
     RouteDraft::Draft _matrixDraft;        // per-row staging buffer (single-instance page)
