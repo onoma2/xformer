@@ -140,9 +140,9 @@ public:
     }
 
     // clockMultiplier
-    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
-    void setClockMultiplier(int clockMultiplier, bool routed = false) {
-        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier, 50, 150); }
+    void setClockMultiplier(int clockMultiplier) {
+        _clockMultiplier = clamp(clockMultiplier, 50, 150);
     }
 
     // Loop mode
@@ -215,13 +215,13 @@ public:
     }
 
     // Slew rate percent (0 = off, 1-100)
-    int slewTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slewTime.base, 0, 100); }
-    void setSlewTime(int time, bool routed = false) {
-        _slewTime.set(clamp(time, 0, 100), routed);
+    int slewTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slewTime, 0, 100); }
+    void setSlewTime(int time) {
+        _slewTime = clamp(time, 0, 100);
     }
     void editSlewTime(int value, bool shift) {
         int step = shift ? 5 : 1;
-        setSlewTime(clamp(_slewTime.base + value * step, 0, 100));
+        setSlewTime(clamp(_slewTime + value * step, 0, 100));
     }
     void printSlewTime(StringBuilder &str) const {
         if (slewTime() == 0) {
@@ -371,7 +371,7 @@ public:
     }
     void printDivisor(StringBuilder &str) const { ModelUtils::printDivisor(str, divisor()); }
     void editClockMultiplier(int value, bool shift) {
-        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
+        setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
     }
     void printClockMultiplier(StringBuilder &str) const {
         printRouted(str, Routing::Target::ClockMult);
@@ -402,7 +402,7 @@ private:
     ClockSource _clockSource = ClockSource::Internal;
     SyncMode _syncMode = SyncMode::Off;
     uint16_t _divisor = 192;
-    Routable<uint8_t> _clockMultiplier;
+    uint8_t _clockMultiplier;
     uint8_t _gateLength = 0;     // 0 = 1T pulse
     bool _loop = true;
     uint8_t _resetMeasure = 8;   // default 8 bars
@@ -411,7 +411,7 @@ private:
 
     int8_t _scale = -1;
     int8_t _rootNote = 0;       // C
-    Routable<uint8_t> _slewTime;
+    uint8_t _slewTime;
     int8_t _pluck = 0;
     int8_t _octave = 0;
     int8_t _transpose = 0;

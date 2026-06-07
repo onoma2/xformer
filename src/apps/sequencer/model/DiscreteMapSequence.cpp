@@ -39,8 +39,7 @@ void DiscreteMapSequence::clear() {
     _clockSource = ClockSource::Internal;
     _syncMode = SyncMode::Off;
     _divisor = 192;
-    _clockMultiplier.clear();
-    _clockMultiplier.setBase(100);
+    _clockMultiplier = 100;
     _gateLength = 0; // 1T default
     _loop = true;
     _resetMeasure = 8;
@@ -164,14 +163,14 @@ void DiscreteMapSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(static_cast<uint8_t>(_clockSource));
     writer.write(static_cast<uint8_t>(_syncMode));
     writer.write(_divisor);
-    writer.write(_clockMultiplier.base);
+    writer.write(_clockMultiplier);
     writer.write(_gateLength);
     writer.write(_loop);
     writer.write(_resetMeasure);
     writer.write(static_cast<uint8_t>(_thresholdMode));
     writer.write(_scale);
     writer.write(_rootNote);
-    _slewTime.write(writer);
+    writer.write(_slewTime);
     writer.write(_pluck);
     writer.write(_octave);
     writer.write(_transpose);
@@ -195,7 +194,7 @@ void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
     _syncMode = ModelUtils::clampedEnum(static_cast<SyncMode>(syncMode));
 
     reader.read(_divisor);
-    reader.read(_clockMultiplier.base);
+    reader.read(_clockMultiplier);
     reader.read(_gateLength);
     reader.read(_loop);
 
@@ -207,7 +206,7 @@ void DiscreteMapSequence::read(VersionedSerializedReader &reader) {
     reader.read(_scale);
 
     reader.read(_rootNote);
-    _slewTime.read(reader);
+    reader.read(_slewTime);
     reader.read(_pluck);
     reader.read(_octave);
     reader.read(_transpose);
