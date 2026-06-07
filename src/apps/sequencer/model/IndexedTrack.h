@@ -67,13 +67,13 @@ public:
 
     // slideTime
 
-    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime.base, 0, 100); }
-    void setSlideTime(int slideTime, bool routed = false) {
-        _slideTime.set(clamp(slideTime, 0, 100), routed);
+    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime, 0, 100); }
+    void setSlideTime(int slideTime) {
+        _slideTime = clamp(slideTime, 0, 100);
     }
 
     void editSlideTime(int value, bool shift) {
-        setSlideTime(ModelUtils::adjustedByStep(_slideTime.base, value, 5, !shift));
+        setSlideTime(ModelUtils::adjustedByStep(_slideTime, value, 5, !shift));
     }
 
     void printSlideTime(StringBuilder &str) const {
@@ -102,13 +102,13 @@ public:
 
     // octave
 
-    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave.base, -10, 10); }
-    void setOctave(int octave, bool routed = false) {
-        _octave.set(clamp(octave, -10, 10), routed);
+    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave, -10, 10); }
+    void setOctave(int octave) {
+        _octave = clamp(octave, -10, 10);
     }
 
     void editOctave(int value, bool shift) {
-        setOctave(_octave.base + value);
+        setOctave(_octave + value);
     }
 
     void printOctave(StringBuilder &str) const {
@@ -118,13 +118,13 @@ public:
 
     // transpose
 
-    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -60, 60); }
-    void setTranspose(int transpose, bool routed = false) {
-        _transpose.set(clamp(transpose, -60, 60), routed);
+    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose, -60, 60); }
+    void setTranspose(int transpose) {
+        _transpose = clamp(transpose, -60, 60);
     }
 
     void editTranspose(int value, bool shift) {
-        setTranspose(_transpose.base + value);
+        setTranspose(_transpose + value);
     }
 
     void printTranspose(StringBuilder &str) const {
@@ -154,9 +154,9 @@ private:
     Types::PlayMode _playMode = Types::PlayMode::Aligned;
     IndexedSequenceArray _sequences;
     float _routedSync = 0.f;
-    Routable<int8_t> _octave;
-    Routable<int8_t> _transpose;
-    Routable<uint8_t> _slideTime;
+    int8_t _octave;
+    int8_t _transpose;
+    uint8_t _slideTime;
 
     friend class Track;
 };

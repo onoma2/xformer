@@ -269,9 +269,9 @@ public:
     }
 
     // clockMultiplier
-    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
-    void setClockMultiplier(int clockMultiplier, bool routed = false) {
-        _clockMultiplier.set(clamp(clockMultiplier, 50, 150), routed);
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier, 50, 150); }
+    void setClockMultiplier(int clockMultiplier) {
+        _clockMultiplier = clamp(clockMultiplier, 50, 150);
     }
 
     // loop mode
@@ -280,12 +280,12 @@ public:
     void toggleLoop() { _loop = !_loop; }
 
     // run mode
-    Types::RunMode runMode() const { return Types::RunMode(Routing::routedValueInt(ParamKey::RunMode, _trackIndex, int(_runMode.base), 0, 5)); }
-    void setRunMode(Types::RunMode runMode, bool routed = false) {
-        _runMode.set(ModelUtils::clampedEnum(runMode), routed);
+    Types::RunMode runMode() const { return Types::RunMode(Routing::routedValueInt(ParamKey::RunMode, _trackIndex, int(_runMode), 0, 5)); }
+    void setRunMode(Types::RunMode runMode) {
+        _runMode = ModelUtils::clampedEnum(runMode);
     }
     void editRunMode(int value, bool /*shift*/) {
-        setRunMode(ModelUtils::adjustedEnum(_runMode.base, value));
+        setRunMode(ModelUtils::adjustedEnum(_runMode, value));
     }
     void printRunMode(StringBuilder &str) const {
         printRouted(str, Routing::Target::RunMode);
@@ -345,13 +345,13 @@ public:
     }
 
     // root note (0-11: C-B)
-    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote.base, 0, 11); }
-    void setRootNote(int rootNote, bool routed = false) {
-        _rootNote.set(clamp(rootNote, -1, 11), routed);
+    int rootNote() const { return Routing::routedValueInt(ParamKey::RootNote, _trackIndex, _rootNote, 0, 11); }
+    void setRootNote(int rootNote) {
+        _rootNote = clamp(rootNote, -1, 11);
     }
 
     void editRootNote(int value, bool shift) {
-        setRootNote(_rootNote.base + value);
+        setRootNote(_rootNote + value);
     }
 
     void printRootNote(StringBuilder &str) const {
@@ -366,15 +366,15 @@ public:
     // firstStep (Rotation Offset)
 
     int firstStep() const {
-        return Routing::routedValueInt(ParamKey::FirstStep, _trackIndex, _firstStep.base, 0, _activeLength - 1);
+        return Routing::routedValueInt(ParamKey::FirstStep, _trackIndex, _firstStep, 0, _activeLength - 1);
     }
 
-    void setFirstStep(int firstStep, bool routed = false) {
-        _firstStep.set(clamp(firstStep, 0, _activeLength - 1), routed);
+    void setFirstStep(int firstStep) {
+        _firstStep = clamp(firstStep, 0, _activeLength - 1);
     }
 
     void editFirstStep(int value, bool shift) {
-        setFirstStep(_firstStep.base + value);
+        setFirstStep(_firstStep + value);
     }
 
     void printFirstStep(StringBuilder &str) const {
@@ -547,14 +547,12 @@ public:
 
     void clear() {
         _divisor = 1;   // 1 tick per stored tick
-        _clockMultiplier.clear();
-        _clockMultiplier.setBase(100);
+        _clockMultiplier = 100;
         _loop = true;
         _activeLength = 5;
         _scale = -1;  // Use project scale
-        _runMode.clear();
-        _rootNote.clear();
-        _firstStep.clear();
+        _rootNote = 0;
+        _firstStep = 0;
         setRunMode(Types::RunMode::Forward);
         _syncMode = SyncMode::Off;
         _resetMeasure = 0;
@@ -581,15 +579,18 @@ public:
 
     void write(VersionedSerializedWriter &writer) const {
         writer.write(_divisor);
-        writer.write(_clockMultiplier.base);
+        writer.write(_clockMultiplier);
         writer.write(_loop);
-        _runMode.write(writer);
+        writer.write(_runMode);
         writer.write(_activeLength);
         writer.write(_scale);
-        writer.write(_rootNote); // Now writes Routable base
+        // rootNote historically serialized as a 2-byte Routable<int8_t> (base +
+        // routed mirror). Keep both bytes so existing patches load unchanged.
+        writer.write(_rootNote);
+        writer.write(_rootNote);
         writer.write(static_cast<uint8_t>(_syncMode));
         writer.write(_resetMeasure);
-        _firstStep.write(writer);
+        writer.write(_firstStep);
 
         _routeA.write(writer);
         _routeB.write(writer);
@@ -602,12 +603,15 @@ public:
 
     void read(VersionedSerializedReader &reader) {
         reader.read(_divisor);
-        reader.read(_clockMultiplier.base);
+        reader.read(_clockMultiplier);
         reader.read(_loop);
-        _runMode.read(reader);
+        reader.read(_runMode);
         reader.read(_activeLength);
         reader.read(_scale);
+        // rootNote historically serialized as a 2-byte Routable<int8_t> (base +
+        // routed mirror); read the value, then consume the duplicate byte.
         reader.read(_rootNote);
+        { int8_t routedMirror; reader.read(routedMirror); }
 
         uint8_t sync;
         reader.read(sync);
@@ -615,7 +619,7 @@ public:
 
         reader.read(_resetMeasure);
 
-        _firstStep.read(reader);
+        reader.read(_firstStep);
 
         _routeA.read(reader);
         _routeB.read(reader);
@@ -644,7 +648,7 @@ public:
     }
 
     void editClockMultiplier(int value, bool shift) {
-        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
+        setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
     }
 
     void printClockMultiplier(StringBuilder &str) const {
@@ -672,13 +676,13 @@ public:
 
 private:
     uint16_t _divisor = 1;        // Time scale (ticks per stored tick)
-    Routable<uint8_t> _clockMultiplier;
+    uint8_t _clockMultiplier;
     bool _loop = true;            // Loop mode
-    Routable<Types::RunMode> _runMode;
+    Types::RunMode _runMode;
     uint8_t _activeLength = 16;   // Dynamic step count (1-32)
     int8_t _scale = -1;           // Scale selection
-    Routable<int8_t> _rootNote;   // Root note (C), now Routable
-    Routable<uint8_t> _firstStep; // Rotation offset (0-31)
+    int8_t _rootNote;             // Root note (C)
+    uint8_t _firstStep;           // Rotation offset (0-31)
     SyncMode _syncMode = SyncMode::Off;
     uint8_t _resetMeasure = 0;    // Bars (0 = off)
     int _trackIndex = -1;

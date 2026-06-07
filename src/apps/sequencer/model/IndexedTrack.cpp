@@ -24,20 +24,17 @@ void IndexedTrack::clear() {
 void IndexedTrack::write(VersionedSerializedWriter &writer) const {
     writer.write(_cvUpdateMode);
     writer.write(_playMode);
-    writer.write(_octave.base);
-    writer.write(_transpose.base);
-    writer.write(_slideTime.base);
+    writer.write(_octave);
+    writer.write(_transpose);
+    writer.write(_slideTime);
     writeArray(writer, _sequences);
 }
 
 void IndexedTrack::read(VersionedSerializedReader &reader) {
     reader.read(_cvUpdateMode);
     reader.read(_playMode);
-    reader.read(_octave.base);
-    reader.read(_transpose.base);
-    reader.read(_slideTime.base);
-    _octave.routed = 0;
-    _transpose.routed = 0;
-    _slideTime.routed = 0;
+    reader.read(_octave);
+    reader.read(_transpose);
+    reader.read(_slideTime);
     readArray(reader, _sequences);
 }
