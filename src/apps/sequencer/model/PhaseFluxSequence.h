@@ -362,12 +362,12 @@ public:
     }
 
     // divisor — Routable<uint16_t>, matches NoteSequence convention
-    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor.base, 1, 768); }
-    void setDivisor(int v, bool routed = false) {
-        _divisor.set(ModelUtils::clampDivisor(v), routed);
+    int divisor() const { return Routing::routedValueInt(ParamKey::Divisor, _trackIndex, _divisor, 1, 768); }
+    void setDivisor(int v) {
+        _divisor = ModelUtils::clampDivisor(v);
     }
     void editDivisor(int value, bool shift) {
-        setDivisor(ModelUtils::adjustedByDivisor(_divisor.base, value, shift));
+        setDivisor(ModelUtils::adjustedByDivisor(_divisor, value, shift));
     }
     void printDivisor(StringBuilder &str) const {
         printRouted(str, Routing::Target::Divisor);
@@ -375,12 +375,12 @@ public:
     }
 
     // clockMultiplier — Routable<uint8_t>, 50..150
-    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier.base, 50, 150); }
-    void setClockMultiplier(int v, bool routed = false) {
-        _clockMultiplier.set(clamp(v, 50, 150), routed);
+    int clockMultiplier() const { return Routing::routedValueInt(ParamKey::ClockMultiplier, _trackIndex, _clockMultiplier, 50, 150); }
+    void setClockMultiplier(int v) {
+        _clockMultiplier = clamp(v, 50, 150);
     }
     void editClockMultiplier(int value, bool shift) {
-        setClockMultiplier(_clockMultiplier.base + value * (shift ? 10 : 1));
+        setClockMultiplier(_clockMultiplier + value * (shift ? 10 : 1));
     }
     void printClockMultiplier(StringBuilder &str) const {
         printRouted(str, Routing::Target::ClockMult);
@@ -597,8 +597,8 @@ private:
     int8_t _lenNudge = 0;
     int8_t _cyclePhaseWarp = 0;
     uint8_t _traversalPattern = 0;
-    Routable<uint16_t> _divisor;
-    Routable<uint8_t> _clockMultiplier;
+    uint16_t _divisor;
+    uint8_t _clockMultiplier;
 
     AccumulatorConfig _noteAccumConfig;
     AccumulatorConfig _pulseAccumConfig;

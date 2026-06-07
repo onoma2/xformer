@@ -106,7 +106,7 @@ void PhaseFluxSequence::snapToGrid(int beatTicks) {
     if (_globalPhase >= 1.f) _globalPhase -= 1.f;
 
     if (beatTicks <= 0) return;
-    int seqDivisor = int(_divisor.base);
+    int seqDivisor = int(_divisor);
     if (seqDivisor <= 0) return;
 
     // 2. Per-stage stageLen → nearest whole project beat. Floor at 1 beat
@@ -144,8 +144,8 @@ void PhaseFluxSequence::clear() {
     _lenNudge = 0;
     _cyclePhaseWarp = 0;
     _traversalPattern = 0;
-    _divisor.setBase(12);                // 1/16 at PPQN 48
-    _clockMultiplier.setBase(100);
+    _divisor = 12;                       // 1/16 at PPQN 48
+    _clockMultiplier = 100;
     _noteAccumConfig = AccumulatorConfig();
     _pulseAccumConfig = AccumulatorConfig();
     // Default to max span: note ±28, pulse ±16 (matching new pulseCount ceiling).
@@ -182,8 +182,8 @@ void PhaseFluxSequence::write(VersionedSerializedWriter &writer) const {
     writer.write(_lenNudge);
     writer.write(_cyclePhaseWarp);
     writer.write(_traversalPattern);
-    _divisor.write(writer);
-    _clockMultiplier.write(writer);
+    writer.write(_divisor);
+    writer.write(_clockMultiplier);
     _noteAccumConfig.write(writer);
     _pulseAccumConfig.write(writer);
     for (const auto &stage : _stages) {
@@ -215,17 +215,17 @@ void PhaseFluxSequence::read(VersionedSerializedReader &reader) {
     reader.read(_lenNudge);
     reader.read(_cyclePhaseWarp);
     reader.read(_traversalPattern);
-    _divisor.read(reader);
-    _clockMultiplier.read(reader);
+    reader.read(_divisor);
+    reader.read(_clockMultiplier);
     _noteAccumConfig.read(reader);
     _pulseAccumConfig.read(reader);
     _pitchRate = clamp(int(_pitchRate), 0, kPitchRateCount - 1);
     _scale = clamp(int(_scale), -1, Scale::Count - 1);
     _rootNote = clamp(int(_rootNote), -1, 11);
     _resetMeasure = clamp(int(_resetMeasure), 0, 128);
-    uint16_t d = _divisor.base;
-    _divisor.setBase(ModelUtils::clampDivisor(d));
-    _clockMultiplier.setBase(clamp(int(_clockMultiplier.base), 50, 150));
+    uint16_t d = _divisor;
+    _divisor = ModelUtils::clampDivisor(d);
+    _clockMultiplier = clamp(int(_clockMultiplier), 50, 150);
     for (auto &stage : _stages) {
         stage.read(reader);
     }

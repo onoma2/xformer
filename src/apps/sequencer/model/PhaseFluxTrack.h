@@ -57,19 +57,19 @@ public:
     void setLock(bool v) { _lock = v; }
 
     // slideTime — Routable 0..100. editX edits the base (anchor), so it works under a route.
-    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime.base, 0, 100); }
-    void setSlideTime(int v, bool routed = false) { _slideTime.set(clamp(v, 0, 100), routed); }
-    void editSlideTime(int value, bool) { setSlideTime(_slideTime.base + value); }
+    int slideTime() const { return Routing::routedValueInt(ParamKey::SlideTime, _trackIndex, _slideTime, 0, 100); }
+    void setSlideTime(int v) { _slideTime = clamp(v, 0, 100); }
+    void editSlideTime(int value, bool) { setSlideTime(_slideTime + value); }
 
     // octave — Routable ±10
-    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave.base, -10, 10); }
-    void setOctave(int v, bool routed = false) { _octave.set(clamp(v, -10, 10), routed); }
-    void editOctave(int value, bool) { setOctave(_octave.base + value); }
+    int octave() const { return Routing::routedValueInt(ParamKey::Octave, _trackIndex, _octave, -10, 10); }
+    void setOctave(int v) { _octave = clamp(v, -10, 10); }
+    void editOctave(int value, bool) { setOctave(_octave + value); }
 
     // transpose — Routable ±100 (scale degrees, see spec §12.1)
-    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose.base, -60, 60); }
-    void setTranspose(int v, bool routed = false) { _transpose.set(clamp(v, -100, 100), routed); }
-    void editTranspose(int value, bool) { setTranspose(_transpose.base + value); }
+    int transpose() const { return Routing::routedValueInt(ParamKey::Transpose, _trackIndex, _transpose, -60, 60); }
+    void setTranspose(int v) { _transpose = clamp(v, -100, 100); }
+    void editTranspose(int value, bool) { setTranspose(_transpose + value); }
 
     // fillMode
     FillMode fillMode() const { return _fillMode; }
@@ -108,9 +108,9 @@ public:
 
     void clear() {
         _lock = false;
-        _slideTime.setBase(0);
-        _octave.setBase(0);
-        _transpose.setBase(0);
+        _slideTime = 0;
+        _octave = 0;
+        _transpose = 0;
         _fillMode = FillMode::None;
         _cvUpdateMode = CvUpdateMode::Gate;
         _playMode = Types::PlayMode::Aligned;
@@ -120,9 +120,9 @@ public:
     }
 
     void write(VersionedSerializedWriter &writer) const {
-        _slideTime.write(writer);
-        _octave.write(writer);
-        _transpose.write(writer);
+        writer.write(_slideTime);
+        writer.write(_octave);
+        writer.write(_transpose);
         writer.write(static_cast<uint8_t>(_fillMode));
         writer.write(static_cast<uint8_t>(_cvUpdateMode));
         writer.write(static_cast<uint8_t>(_playMode));
@@ -132,9 +132,9 @@ public:
     }
 
     void read(VersionedSerializedReader &reader) {
-        _slideTime.read(reader);
-        _octave.read(reader);
-        _transpose.read(reader);
+        reader.read(_slideTime);
+        reader.read(_octave);
+        reader.read(_transpose);
         uint8_t fillMode;
         reader.read(fillMode);
         _fillMode = fillMode < uint8_t(FillMode::Last) ? static_cast<FillMode>(fillMode) : FillMode::None;
@@ -160,9 +160,9 @@ private:
     int8_t _trackIndex = -1;
 
     bool _lock;
-    Routable<uint8_t> _slideTime;
-    Routable<int8_t> _octave;
-    Routable<int8_t> _transpose;
+    uint8_t _slideTime;
+    int8_t _octave;
+    int8_t _transpose;
     FillMode _fillMode;
     CvUpdateMode _cvUpdateMode;
     Types::PlayMode _playMode;
